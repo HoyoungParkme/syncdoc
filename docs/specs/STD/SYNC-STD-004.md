@@ -32,6 +32,8 @@ upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
 
 Python: 클래스 `PascalCase`, 함수·변수 `snake_case`, 상수 `UPPER`. 테이블·컬럼 `snake_case`. React: 컴포넌트 `PascalCase`, 파일명 = 컴포넌트명.
 
+**DTO와 ORM 이름이 같을 때** — DTO(API 응답·클래스 2.8)가 그 이름을 갖고, ORM 모델은 코드에서 `*Row`로 별칭한다: `Document`(DTO) / `DocumentRow`(ORM), `Version` / `VersionRow`. 서비스가 내부에서 돌려주는 건 Row, 입구로 나가는 건 DTO. MINISPEC 시그니처의 엔티티 이름은 Row다.
+
 #### DEV-3 함수 docstring 첫 줄 = MINISPEC 항목 ID
 
 ```python
@@ -40,6 +42,8 @@ async def save_pipeline(...):
 ```
 
 코드에서 명세로 돌아가는 유일한 고리. 검사기가 이걸로 MINISPEC↔코드 일치를 대조한다(4장).
+
+`_`로 시작하는 비공개 헬퍼는 MINISPEC이 없어도 된다 — 단 **그 모듈 밖에서 부르지 않는다.** 밖에서 부르게 되면 MINISPEC 항목으로 올린다.
 
 #### DEV-4 타입 힌트 필수, 형식은 도구가
 
