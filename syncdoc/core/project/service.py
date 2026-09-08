@@ -14,6 +14,10 @@ class ProjectService:
         self.session = session
         self.repo = ProjectRepository(session)
 
+    def list_projects(self) -> list[Project]:
+        """SYNC-MS-001#ProjectService.list_projects"""
+        return self.repo.all()
+
     def get(self, code: str) -> Project:
         """SYNC-MS-001#ProjectService.get"""
         project = self.repo.by_code(code)

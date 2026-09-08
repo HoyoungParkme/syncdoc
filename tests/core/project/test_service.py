@@ -16,3 +16,11 @@ def test_get_by_code_with_repository_or_not_found(db_session: Session) -> None:
     with pytest.raises(NotFound) as ei:
         ProjectService(db_session).get("NOPE")
     assert ei.value.extra == {"resource": "project", "id": "NOPE"}
+
+
+# ── list_projects ──
+def test_list_projects_ordered_by_code_with_repository(db_session: Session) -> None:
+    make_project(db_session, "ZZ")
+    make_project(db_session, "AB")
+    got = ProjectService(db_session).list_projects()
+    assert [p.code for p in got] == ["AB", "ZZ"] and all(p.repository is not None for p in got)

@@ -16,6 +16,10 @@ class ProjectRepository:
         stmt = select(Project).options(joinedload(Project.repository)).where(Project.code == code)
         return self.session.scalar(stmt)
 
+    def all(self) -> list[Project]:
+        stmt = select(Project).options(joinedload(Project.repository)).order_by(Project.code)
+        return list(self.session.scalars(stmt))
+
     def add(self, row: Project | Repository) -> None:
         self.session.add(row)
         self.session.flush()
