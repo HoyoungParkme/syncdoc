@@ -1,8 +1,8 @@
-/** UI-4 프로젝트 상세 — SYNC-UI-002#UI-4. 11단계 표 + 문서 행, 요약 수치, 표준 묶음.
- *  최근 변경(요소 5)은 GET /api/projects/{code}(ProjectDetail·recent_changes)가 versions.message 없이는 못 만든다(보고). */
+/** UI-4 프로젝트 상세 — SYNC-UI-002#UI-4. 11단계 표 + 문서 행, 요약 수치, 표준 묶음, 최근 변경(status 커밋 포함).
+ *  GET /api/projects/{code}(ProjectDetail) 하나로 그린다. */
 import { useEffect, useState } from 'react'
 import { Link, useOutletContext, useParams } from 'react-router-dom'
-import { ago, api, authorLabel, STAGE_NAMES, STAGE_TYPES, STATUS_KO, type DocumentSummary, type ProjectSummary } from '../api/client'
+import { ago, api, authorLabel, STAGE_NAMES, STAGE_TYPES, STATUS_KO, type DocumentSummary, type ProjectDetail as Detail, type ProjectSummary, type Version } from '../api/client'
 
 const ST: Record<string, string> = { approved: 'ok', review: 'rv', draft: 'dr' }
 
@@ -11,9 +11,13 @@ export function ProjectDetail() {
   const { projects } = useOutletContext<{ projects: ProjectSummary[] }>()
   const p = projects.find((x) => x.code === code)
   const [docs, setDocs] = useState<DocumentSummary[]>([])
+  const [recent, setRecent] = useState<Version[]>([])
   const [open, setOpen] = useState<Record<string, boolean>>({})
   useEffect(() => {
-    api.get<DocumentSummary[]>(`/api/projects/${code}/docs`).then(setDocs)
+    api.get<Detail>(`/api/projects/${code}`).then((d) => {
+      setDocs(d.docs)
+      setRecent(d.recent_changes)
+    })
   }, [code])
   if (!p) return <div className="page lbl">프로젝트를 찾을 수 없습니다.</div>
   const byType = (t: string) => docs.filter((d) => d.doc_type === t)
@@ -100,7 +104,19 @@ export function ProjectDetail() {
         <aside className="panel" data-el="5">
           <div className="pbody">
             <h4>최근 변경</h4>
-            <p className="lbl">GET /api/projects/{'{code}'}의 recent_changes는 versions.message가 없어 아직 못 만든다(명세 결함 보고).</p>
+            {recent.length === 0 && <p className="lbl">아직 변경이 없습니다.</p>}
+            <ul className="recent">
+              {recent.map((v) => (
+                <li key={v.commit_hash + (v.version_no ?? 's')}>
+                  <Link to={`/p/${code}/d/${v.doc_id}`}>
+                    <b>{v.doc_id}</b>
+                  </Link>
+                  {v.version_no != null && <> v{v.version_no}</>} · {ago(v.created_at)} · {authorLabel(v.author)}
+                  <br />
+                  <span className="lbl">{v.message.split('\n')[0]}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </aside>
       </div>

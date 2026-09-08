@@ -82,6 +82,18 @@ export interface ProjectSummary {
   counts: Record<string, number>
   updated_at: string | null
 }
+export interface Version {
+  doc_id: string
+  version_no: number | null
+  commit_hash: string
+  message: string
+  author: Author | null
+  created_at: string
+}
+export interface ProjectDetail extends ProjectSummary {
+  docs: DocumentSummary[]
+  recent_changes: Version[]
+}
 export interface DocItem {
   item_id: string
   display_name: string | null
