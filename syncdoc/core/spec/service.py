@@ -37,6 +37,7 @@ from syncdoc.core.types import (
     ItemRef,
     ItemView,
     ValidateResult,
+    Version,
     VersionBrief,
     Violation,
     Warning,
@@ -481,6 +482,32 @@ class SpecService:
         row.status = str(to)
         row.current_body = new_body
         self.session.flush()
+
+    def recent_changes(self, project_id: int, n: int = 10) -> list[Version]:
+        """SYNC-MS-002#SpecService.recent_changes"""
+        rows: list[Version] = [
+            Version(
+                doc_id=doc_id,
+                version_no=v.version_no,
+                commit_hash=v.commit_hash,
+                message=v.message,
+                author=self._author_of(v),  # type: ignore[arg-type]
+                created_at=v.created_at,
+            )
+            for v, doc_id in self.repo.recent_versions(project_id, n)
+        ] + [
+            Version(
+                doc_id=doc_id,
+                version_no=None,
+                commit_hash=c.commit_hash,  # type: ignore[arg-type]
+                message=f"status({doc_id}): {c.from_status} → {c.to_status}",
+                author=AuthorRef("human", c.changed_by_user_id, None, "web"),
+                created_at=c.changed_at,
+            )
+            for c, doc_id in self.repo.recent_status_changes(project_id, n)
+        ]
+        rows.sort(key=lambda r: r.created_at, reverse=True)
+        return rows[:n]
 
     def describe_items(self, item_pks: list[int]) -> dict[int, ItemRef]:
         """SYNC-MS-002#SpecService.describe_items"""

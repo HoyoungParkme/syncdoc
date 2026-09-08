@@ -259,6 +259,23 @@ class ItemRef:
     is_deleted: bool = False
 
 
+@dataclass
+class Version:
+    """SYNC-API-001 Version (DTO) — list_versions·recent_changes. status 커밋이면 version_no=None.
+
+    doc_id는 API 스키마에 없다 — 프로젝트 단위 목록(recent_changes)이 문서를 가리키려면 필요(보고).
+    author는 id만(AuthorRef) — 이름은 queries가 users_by_ids로 author_view에 채운다.
+    """
+
+    doc_id: str
+    version_no: int | None
+    commit_hash: str
+    message: str
+    author: AuthorRef
+    created_at: datetime
+    author_view: ApiAuthor | None = None
+
+
 @dataclass(frozen=True)
 class DocRef:
     """문서 pk → 표시 정보 (describe_documents). 문서 단위 참조 대상·댓글 응답의 doc_id."""

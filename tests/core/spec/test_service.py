@@ -577,3 +577,35 @@ def test_describe_documents_and_versions_by_ids(db_session: Session) -> None:
         (2, "spec(EXMP-PRD-001): 한 줄\n\n이유"),
     ]
     assert vb[v2.id].document_id == d.id and svc.versions_by_ids([]) == {}
+
+
+# ── recent_changes ──
+def test_recent_changes_merges_versions_and_status_commits_desc(db_session: Session) -> None:
+    svc, a, d = _seed(db_session)
+    v2 = svc.save(d, d.body + "\n", "h2", a, "spec(EXMP-PRD-001): 한 줄 추가\n\n이유", [])
+    d2 = svc.get_document("EXMP-PRD-001")
+    svc.apply_status(d2, d2.body.replace("status: draft", "status: review"), "c1", a.user, "검토")
+    svc.apply_status(d2, d2.body, None, a.user, "commit 없는 자동 강등은 안 나온다", to="draft")
+    pid = _project_id(db_session, "EXMP")
+    got = svc.recent_changes(pid, 10)
+    assert [(r.doc_id, r.version_no, r.commit_hash) for r in got] == [
+        ("EXMP-PRD-001", None, "c1"),
+        ("EXMP-PRD-001", 2, "h2"),
+        ("EXMP-PRD-001", 1, "h1"),
+    ]
+    assert got[0].message == "status(EXMP-PRD-001): draft → review"
+    assert (got[0].author.kind, got[0].author.user_id, got[0].author.via) == (
+        "human",
+        a.user.id,
+        "web",
+    )
+    assert (
+        got[1].message.startswith("spec(EXMP-PRD-001): 한 줄 추가")
+        and got[1].author.kind == "agent"
+    )
+    assert [r.version_no for r in svc.recent_changes(pid, 2)] == [None, 2]
+    assert v2.version_no == 2
+
+
+def _project_id(session: Session, code: str) -> int:
+    return session.execute(text("SELECT id FROM projects WHERE code=:c"), {"c": code}).scalar_one()

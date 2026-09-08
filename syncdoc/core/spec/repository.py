@@ -81,6 +81,26 @@ class SpecRepository:
             return []
         return list(self.session.scalars(select(VersionRow).where(VersionRow.id.in_(ids))))
 
+    def recent_versions(self, project_id: int, n: int) -> list[tuple[VersionRow, str]]:
+        stmt = (
+            select(VersionRow, Document.doc_id)
+            .join(Document, Document.id == VersionRow.document_id)
+            .where(Document.project_id == project_id)
+            .order_by(VersionRow.created_at.desc(), VersionRow.id.desc())
+            .limit(n)
+        )
+        return [(v, d) for v, d in self.session.execute(stmt)]
+
+    def recent_status_changes(self, project_id: int, n: int) -> list[tuple[StatusChange, str]]:
+        stmt = (
+            select(StatusChange, Document.doc_id)
+            .join(Document, Document.id == StatusChange.document_id)
+            .where(Document.project_id == project_id, StatusChange.commit_hash.is_not(None))
+            .order_by(StatusChange.changed_at.desc(), StatusChange.id.desc())
+            .limit(n)
+        )
+        return [(c, d) for c, d in self.session.execute(stmt)]
+
     def latest_versions(self, document_ids: list[int]) -> dict[int, VersionRow]:
         """문서마다 최근 버전 하나. 쿼리 한 번."""
         if not document_ids:
