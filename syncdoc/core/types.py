@@ -258,6 +258,28 @@ class ItemRef:
     is_deleted: bool = False
 
 
+@dataclass(frozen=True)
+class DocRef:
+    """문서 pk → 표시 정보 (describe_documents). 문서 단위 참조 대상·댓글 응답의 doc_id."""
+
+    document_id: int
+    doc_id: str
+    title: str
+    stage: int | None
+    status: str
+
+
+@dataclass(frozen=True)
+class VersionBrief:
+    """버전 id → 요약 (versions_by_ids). 플래그의 cause_version_no, 미결정 목록."""
+
+    id: int
+    document_id: int
+    version_no: int
+    created_at: datetime
+    message: str
+
+
 @dataclass
 class ItemReferences:
     doc_id: str

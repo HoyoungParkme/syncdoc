@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from syncdoc import db
 from syncdoc.core.account.service import AccountService
 from syncdoc.core.collab.service import CommentService
-from syncdoc.core.markdown import parse_frontmatter
 from syncdoc.core.project.models import Project
 from syncdoc.core.project.service import ProjectService
 from syncdoc.core.reference.service import ReferenceService
@@ -142,13 +141,16 @@ def flag_summaries(s: Session, rows: list) -> list[FlagSummary]:
         [f.target_item_id for f in rows] + [f.cause_item_id for f in rows if f.cause_item_id]
     )
     users = AccountService(s).users_by_ids([f.assignee_user_id for f in rows if f.assignee_user_id])
+    versions = spec.versions_by_ids([f.cause_version_id for f in rows if f.cause_version_id])
     return [
         FlagSummary(
             id=f.id,
             kind=f.kind,
             target=names.get(f.target_item_id) or ItemRef(None, None, None),
             cause=names.get(f.cause_item_id) if f.cause_item_id else None,
-            cause_version_no=None,  # 버전 id → 번호 조회 함수가 MS에 없다 (B3 get_flag에서)
+            cause_version_no=(
+                versions[f.cause_version_id].version_no if f.cause_version_id in versions else None
+            ),
             assignee=users.get(f.assignee_user_id) if f.assignee_user_id else None,
             raised_at=f.raised_at,
             resolved_at=f.resolved_at,
@@ -157,15 +159,12 @@ def flag_summaries(s: Session, rows: list) -> list[FlagSummary]:
     ]
 
 
-def _doc_refs(spec: SpecService, project_id: int, doc_pks: list[int]) -> dict[int, ItemRef]:
-    """문서 pk → ItemRef(item_id=None, 제목). describe_items는 항목만 — pk 공간이 겹친다."""
-    wanted = set(doc_pks)
-    out: dict[int, ItemRef] = {}
-    for d in spec.list_by_project(project_id):
-        if d.id in wanted:
-            title = parse_frontmatter(spec.get_document(d.doc_id).body)[0].get("title", d.doc_id)
-            out[d.id] = ItemRef(doc_id=d.doc_id, item_id=None, display_name=title)
-    return out
+def _doc_refs(spec: SpecService, document_ids: list[int]) -> dict[int, ItemRef]:
+    """문서 단위 참조 대상 → ItemRef(item_id=None, 제목). describe_documents(MS-008 5단계)."""
+    return {
+        i: ItemRef(doc_id=r.doc_id, item_id=None, display_name=r.title)
+        for i, r in spec.describe_documents(document_ids).items()
+    }
 
 
 def _to_ref(e: RefEdge, names: dict[int, ItemRef]) -> ItemRef:
@@ -190,11 +189,8 @@ async def item_references_view(doc_id: str, item_id: str) -> ItemReferences:
             e.from_item_pk for e in down if e.from_item_pk
         ]
         names = spec.describe_items(need)
-        project_id = ProjectService(s).get(doc_id.split("-")[0]).id
         doc_names = _doc_refs(
-            spec,
-            project_id,
-            [e.to_document_id for e in up if e.to_document_id and not e.to_item_pk],
+            spec, [e.to_document_id for e in up if e.to_document_id and not e.to_item_pk]
         )
         upstream = [_to_ref(e, {**doc_names, **names} if e.to_item_pk else doc_names) for e in up]
         downstream = []
@@ -223,8 +219,7 @@ async def upstream_checklist(doc_id: str) -> list[UpstreamCheck]:
             if src not in grouped.setdefault(key, []):
                 grouped[key].append(src)
         item_names = spec.describe_items([k[1] for k in grouped if k[0] == "item"])
-        project_id = ProjectService(s).get(doc_id.split("-")[0]).id
-        doc_names = _doc_refs(spec, project_id, [k[1] for k in grouped if k[0] == "doc"])
+        doc_names = _doc_refs(spec, [k[1] for k in grouped if k[0] == "doc"])
         out: list[UpstreamCheck] = []
         for (kind, pk), sources in grouped.items():
             ref = (item_names if kind == "item" else doc_names).get(pk)

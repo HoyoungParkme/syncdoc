@@ -20,6 +20,11 @@ class SpecRepository:
     def document_by_id(self, document_id: int) -> Document | None:
         return self.session.get(Document, document_id)
 
+    def documents_by_ids(self, ids: list[int]) -> list[Document]:
+        if not ids:
+            return []
+        return list(self.session.scalars(select(Document).where(Document.id.in_(ids))))
+
     def documents_of_project(self, project_id: int) -> list[Document]:
         stmt = select(Document).where(Document.project_id == project_id)
         return list(self.session.scalars(stmt))
@@ -70,6 +75,11 @@ class SpecRepository:
             .limit(1)
         )
         return self.session.scalar(stmt)
+
+    def versions_by_ids(self, ids: list[int]) -> list[VersionRow]:
+        if not ids:
+            return []
+        return list(self.session.scalars(select(VersionRow).where(VersionRow.id.in_(ids))))
 
     def latest_versions(self, document_ids: list[int]) -> dict[int, VersionRow]:
         """문서마다 최근 버전 하나. 쿼리 한 번."""

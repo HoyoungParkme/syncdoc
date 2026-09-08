@@ -27,6 +27,7 @@ from syncdoc.core.types import (
     Author,
     AuthorRef,
     DocItem,
+    DocRef,
     DocStatus,
     DocType,
     Document,
@@ -36,6 +37,7 @@ from syncdoc.core.types import (
     ItemRef,
     ItemView,
     ValidateResult,
+    VersionBrief,
     Violation,
     Warning,
     fold_via,
@@ -480,10 +482,10 @@ class SpecService:
         row.current_body = new_body
         self.session.flush()
 
-    def describe_items(self, pks: list[int]) -> dict[int, ItemRef]:
+    def describe_items(self, item_pks: list[int]) -> dict[int, ItemRef]:
         """SYNC-MS-002#SpecService.describe_items"""
         out: dict[int, ItemRef] = {}
-        for item, doc_id in self.repo.items_with_doc_id(pks):
+        for item, doc_id in self.repo.items_with_doc_id(item_pks):
             out[item.id] = ItemRef(
                 doc_id=doc_id,
                 item_id=item.item_id,
@@ -492,12 +494,26 @@ class SpecService:
             )
         return out
 
-    def doc_id_of(self, document_id: int) -> str:
-        """document pk → doc_id. MS-002에 없는 조회 — 댓글 resolve 응답용(보고)."""
-        row = self.repo.document_by_id(document_id)
-        if row is None:
-            raise NotFound("document", document_id)
-        return row.doc_id
+    def describe_documents(self, document_ids: list[int]) -> dict[int, DocRef]:
+        """SYNC-MS-002#SpecService.describe_documents"""
+        out: dict[int, DocRef] = {}
+        for row in self.repo.documents_by_ids(document_ids):
+            title = parse_frontmatter(row.current_body)[0].get("title") or row.doc_id
+            out[row.id] = DocRef(
+                document_id=row.id,
+                doc_id=row.doc_id,
+                title=title,
+                stage=STAGE_OF.get(row.doc_type),
+                status=row.status,
+            )
+        return out
+
+    def versions_by_ids(self, version_ids: list[int]) -> dict[int, VersionBrief]:
+        """SYNC-MS-002#SpecService.versions_by_ids"""
+        return {
+            v.id: VersionBrief(v.id, v.document_id, v.version_no, v.created_at, v.message)
+            for v in self.repo.versions_by_ids(version_ids)
+        }
 
     def _deleted_item_ids(self, doc_id: str | None) -> set[str]:
         if not doc_id:

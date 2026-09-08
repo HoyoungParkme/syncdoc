@@ -127,6 +127,7 @@ async def test_item_references_view_upstream_downstream_missing_document(scoped:
     ]
     assert g1.downstream == [] and [f.kind for f in g1.flags] == ["broken_ref"]
     assert (g1.flags[0].cause.item_id, g1.flags[0].assignee.github_login) == ("Q1", "hoyoung")
+    assert g1.flags[0].cause_version_no is None  # broken_ref는 cause_version이 없다
     # PRD#R1: 상위 미존재 Q9(raw_target만), 하위 G1(같은 문서 #R1)
     r1 = await queries.item_references_view("EXMP-PRD-001", "R1")
     assert [(r.is_missing, r.raw_target) for r in r1.upstream] == [(True, "EXMP-RFQ-001#Q9")]

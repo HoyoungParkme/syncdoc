@@ -555,4 +555,25 @@ def test_describe_items_items_and_documents(db_session: Session) -> None:
     )
     assert got[pks["N1"]].is_deleted is True and 999_999 not in got
     assert svc.describe_items([]) == {}
-    # 문서 pk는 받지 않는다 — items.id와 documents.id가 겹쳐 구분 불가(MS-002 결함, 보고). queries가 따로 푼다
+    # 문서 pk는 받지 않는다 — items.id와 documents.id가 겹친다. 문서는 describe_documents
+
+
+# ── describe_documents · versions_by_ids ──
+def test_describe_documents_and_versions_by_ids(db_session: Session) -> None:
+    svc, a, d = _seed(db_session)
+    got = svc.describe_documents([d.id, 999_999])
+    assert list(got) == [d.id]
+    assert (got[d.id].doc_id, got[d.id].title, got[d.id].stage, got[d.id].status) == (
+        "EXMP-PRD-001",
+        "예시 제품",
+        2,
+        "draft",
+    )
+    assert svc.describe_documents([]) == {}
+    v2 = svc.save(d, d.body + "\n", "h2", a, "spec(EXMP-PRD-001): 한 줄\n\n이유", [])
+    vb = svc.versions_by_ids([d.current_version_id, v2.id, 999_999])
+    assert sorted((b.version_no, b.message) for b in vb.values()) == [
+        (1, "spec: 테스트"),
+        (2, "spec(EXMP-PRD-001): 한 줄\n\n이유"),
+    ]
+    assert vb[v2.id].document_id == d.id and svc.versions_by_ids([]) == {}

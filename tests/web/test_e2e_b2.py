@@ -91,6 +91,10 @@ async def test_s2_minjun_reads_comments_approves_and_connects_mcp(
     ]
     flags = scoped.execute(text("SELECT kind, assignee_user_id FROM flags")).all()
     assert flags == [("upstream_impact", proj["user"].id)]  # 상위 담당 = RFQ 최근 작성자(호영)
+    q1_refs = client.get("/api/docs/EXMP-RFQ-001/items/Q1/references").json()
+    assert [(f["kind"], f["cause_version_no"]) for f in q1_refs["flags"]] == [
+        ("upstream_impact", 1)
+    ]
 
     # 6. 토큰 발급 → 7. 그 토큰으로 MCP (SEQ-C2). HTTP 인증 + 인프로세스 도구
     tok = client.post("/api/me/tokens", json={"label": "Codex"}).json()

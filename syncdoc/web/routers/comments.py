@@ -71,5 +71,5 @@ async def resolve_comment(
     """SYNC-API-001#POST/api/comments/{id}/resolve"""
     c = CommentService(session).resolve(comment_id, req.resolved if req else True)
     session.commit()
-    doc_id = SpecService(session).doc_id_of(c.document_id)
+    doc_id = SpecService(session).describe_documents([c.document_id])[c.document_id].doc_id
     return Comment.of(c, doc_id, _users(session, [c]))
