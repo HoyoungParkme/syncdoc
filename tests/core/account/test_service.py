@@ -102,3 +102,13 @@ def test_authenticate_token_none_for_revoked_typo_or_expired(db_session: Session
     future.token.expires_at = datetime.now(UTC) + timedelta(days=1)
     db_session.flush()
     assert svc.authenticate_token(future.raw).id == u.id
+
+
+# ── user_by_login ──
+def test_user_by_login_returns_placeholder_too(db_session: Session) -> None:
+    svc = AccountService(db_session)
+    u = make_user(db_session, login="real")
+    p = make_user(db_session, login="ghost", token=None)
+    assert svc.user_by_login("real").id == u.id
+    assert svc.user_by_login("ghost").id == p.id
+    assert svc.user_by_login("nobody") is None

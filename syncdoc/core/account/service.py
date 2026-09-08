@@ -61,6 +61,10 @@ class AccountService:
             return None
         return self.repo.user_by_id(t.user_id)
 
+    def user_by_login(self, login: str) -> User | None:
+        """SYNC-MS-006#AccountService.user_by_login"""
+        return self.repo.user_by_login(login)
+
     @staticmethod
     def github_token_for(user: User) -> str:
         """SYNC-MS-006#AccountService.github_token_for"""
