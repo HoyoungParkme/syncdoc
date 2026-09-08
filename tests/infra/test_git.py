@@ -165,3 +165,16 @@ async def test_changed_files_deleted_file_has_status_d(repos: dict[str, Path]) -
     head = await g.fetch(repos["work"])
     got = await g.changed_files(repos["work"], f"{base}..{head}", "docs/specs/")
     assert [(c.path, c.status) for c in got] == [(SEED, "D")]
+
+
+# ── list ──
+async def test_list_filters_by_glob_at_ref(repos: dict[str, Path]) -> None:
+    o = repos["other"]
+    write_commit_push(o, "docs/specs/SCN/SYNC-SCN-001.md", "s", "a")
+    write_commit_push(o, "docs/specs/_templates/PRD.md", "t", "b")
+    write_commit_push(o, "docs/specs/README.md", "r", "c")
+    write_commit_push(o, "README.md", "x", "d")
+    await g.fetch(repos["work"])
+    got = await g.list(repos["work"], "docs/specs/*/*.md", "origin/HEAD")
+    assert got == [SEED, "docs/specs/SCN/SYNC-SCN-001.md", "docs/specs/_templates/PRD.md"]
+    assert await g.list(repos["work"], "docs/specs/*/*.md") == [SEED]

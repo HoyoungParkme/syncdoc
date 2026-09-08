@@ -6,13 +6,14 @@ core는 이것을 통해서만 저장소를 만진다. 실패는 GitError(cmd, s
 
 import asyncio
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from syncdoc.core.account.service import AccountService
 from syncdoc.core.errors import PushFailed, Unauthorized
 from syncdoc.core.types import Author, ChangedFile
 
-range_ = range  # changed_files의 인자 이름 range(MS-009 시그니처)가 내장을 가린다
+range_ = range  # changed_files의 인자 range · 함수 list — MS-009 이름이 내장을 가린다
+list_ = list
 _TOKEN_IN_URL = re.compile(r"(x-access-token:)[^@]+@")
 _HASH = re.compile(r"[0-9a-f]{40}")
 
@@ -169,3 +170,9 @@ async def changed_files(workdir: Path, range: str, prefix: str) -> list[ChangedF
 def _message(subject_body: str) -> str:
     subject, _, body = subject_body.partition("\n")
     return f"{subject}\n\n{body.strip()}" if body.strip() else subject
+
+
+async def list(workdir: Path, glob: str, ref: str = "HEAD") -> list_[str]:
+    """SYNC-MS-009#git.list"""
+    out = await _run(workdir, "ls-tree", "-r", "--name-only", ref, "--", "docs/specs")
+    return [p for p in out.splitlines() if PurePosixPath(p).match(glob)]
