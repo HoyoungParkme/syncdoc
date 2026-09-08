@@ -192,3 +192,12 @@ async def test_log_lists_file_history_oldest_first(repos: dict[str, Path]) -> No
     assert got[1].hash == h2 and got[1].login == "seed"
     assert got[0].date.tzinfo is not None and got[0].date <= got[1].date
     assert await g.log(repos["work"], "docs/specs/none.md") == []
+
+
+# ── rev_list_count ──
+async def test_rev_list_count_counts_commits_behind(repos: dict[str, Path]) -> None:
+    write_commit_push(repos["other"], SEED, "v2", "a")
+    write_commit_push(repos["other"], SEED, "v3", "b")
+    await g.fetch(repos["work"])
+    assert await g.rev_list_count(repos["work"], "HEAD..origin/HEAD") == 2
+    assert await g.rev_list_count(repos["work"], "origin/HEAD..HEAD") == 0
