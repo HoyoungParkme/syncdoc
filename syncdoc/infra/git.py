@@ -66,20 +66,24 @@ async def checkout(workdir: Path, ref: str) -> None:
 
 async def commit_push(
     workdir: Path,
-    path: str,
-    content: str,
     message: str,
     author: Author,
+    path: str | None = None,
+    content: str | None = None,
     files: dict[str, str] | None = None,
 ) -> str:
     """SYNC-MS-009#git.commit_push"""
+    if files is None:
+        if path is None or content is None:
+            raise ValueError("path+content 또는 files 중 하나는 있어야 한다")
+        files = {path: content}
     try:
         token = AccountService.github_token_for(author.user)
     except Unauthorized as e:
         raise PushFailed("미등록") from e
     await _run(workdir, "fetch", "origin")
     await _run(workdir, "reset", "--hard", "origin/HEAD")
-    to_write = files if files is not None else {path: content}
+    to_write = files
     for p, c in to_write.items():
         f = workdir / p
         f.parent.mkdir(parents=True, exist_ok=True)

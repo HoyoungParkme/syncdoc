@@ -46,7 +46,9 @@ def _author(token: str | None = "gho_secret") -> Author:
 
 
 async def test_commit_push_creates_commit_on_remote(repos: dict[str, Path]) -> None:
-    h = await g.commit_push(repos["work"], SEED, "v2", "spec(SYNC-PRD-001): v2", _author())
+    h = await g.commit_push(
+        repos["work"], "spec(SYNC-PRD-001): v2", _author(), path=SEED, content="v2"
+    )
     assert h == git(repos["remote"], "rev-parse", "main")
     assert git(repos["work"], "log", "-1", "--format=%an <%ae>") == (
         "박호영 <hoyoung@users.noreply.github.com>"
@@ -57,7 +59,7 @@ async def test_commit_push_creates_commit_on_remote(repos: dict[str, Path]) -> N
 async def test_commit_push_same_content_makes_no_commit(repos: dict[str, Path]) -> None:
     head = git(repos["remote"], "rev-parse", "main")
     body = (repos["work"] / SEED).read_text(encoding="utf-8")
-    assert await g.commit_push(repos["work"], SEED, body, "noop", _author()) == head
+    assert await g.commit_push(repos["work"], "noop", _author(), path=SEED, content=body) == head
     assert git(repos["remote"], "rev-parse", "main") == head
 
 
@@ -73,7 +75,7 @@ async def test_commit_push_rebases_when_remote_moved_on_other_file(
         return await real_run(workdir, *args)
 
     monkeypatch.setattr(g, "_run", racing_run)
-    h = await g.commit_push(repos["work"], SEED, "mine", "spec: mine", _author())
+    h = await g.commit_push(repos["work"], "spec: mine", _author(), path=SEED, content="mine")
     assert h == git(repos["remote"], "rev-parse", "main")
     assert git(repos["remote"], "rev-parse", "main~1") == pushed[0]
     assert git(repos["work"], "show", "HEAD:docs/specs/RFQ/X.md") == "x"
@@ -92,7 +94,7 @@ async def test_commit_push_conflict_restores_workdir(
 
     monkeypatch.setattr(g, "_run", racing_run)
     with pytest.raises(PushFailed) as ei:
-        await g.commit_push(repos["work"], SEED, "mine", "spec: mine", _author())
+        await g.commit_push(repos["work"], "spec: mine", _author(), path=SEED, content="mine")
     assert ei.value.extra["reason"] == "conflict"
     assert git(repos["work"], "status", "--porcelain") == ""
     assert git(repos["work"], "rev-parse", "HEAD") == pushed[0]
@@ -100,7 +102,7 @@ async def test_commit_push_conflict_restores_workdir(
 
 
 async def test_commit_push_leaves_no_token_in_config(repos: dict[str, Path]) -> None:
-    await g.commit_push(repos["work"], SEED, "v2", "m", _author())
+    await g.commit_push(repos["work"], "m", _author(), path=SEED, content="v2")
     cfg = (repos["work"] / ".git" / "config").read_text(encoding="utf-8")
     assert "gho_secret" not in cfg and "x-access-token" not in cfg
     assert g._with_token("https://github.com/o/r.git", "tok") == (
@@ -113,7 +115,7 @@ async def test_commit_push_leaves_no_token_in_config(repos: dict[str, Path]) -> 
 
 async def test_commit_push_unregistered_user_is_push_failed(repos: dict[str, Path]) -> None:
     with pytest.raises(PushFailed) as ei:
-        await g.commit_push(repos["work"], SEED, "v2", "m", _author(token=None))
+        await g.commit_push(repos["work"], "m", _author(token=None), path=SEED, content="v2")
     assert ei.value.extra["reason"] == "미등록"
 
 
@@ -237,9 +239,14 @@ async def test_init_specs_returns_26_files_and_commit_push_writes_them(
     }
     assert files["docs/specs/_templates/PRD.md"].startswith("---\ndoc_id:")
     assert "SYNC-STD-001" in files["docs/specs/README.md"]
-    h = await g.commit_push(
-        repos["work"], "", "", "chore(SYNC): init syncdoc", _author(), files=files
-    )
+    h = await g.commit_push(repos["work"], "chore(SYNC): init syncdoc", _author(), files=files)
     assert h == git(repos["remote"], "rev-parse", "main")
     assert await g.exists(repos["work"], "docs/specs/_templates/STD.md")
     assert len(await g.list(repos["work"], "docs/specs/_templates/*.md")) == 12
+
+
+async def test_commit_push_requires_path_content_or_files(repos: dict[str, Path]) -> None:
+    with pytest.raises(ValueError):
+        await g.commit_push(repos["work"], "m", _author())
+    with pytest.raises(ValueError):
+        await g.commit_push(repos["work"], "m", _author(), path=SEED)

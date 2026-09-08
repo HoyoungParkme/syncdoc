@@ -14,7 +14,7 @@ router = APIRouter(tags=["auth"])
 
 
 @router.get("/auth/github", status_code=302)
-def github_start(
+async def github_start(
     request: Request, next_path: str = Query("/", alias="next", pattern=r"^/([^/].*)?$")
 ) -> RedirectResponse:
     """SYNC-API-001#GET/auth/github — state 생성 · 세션에 next·state 저장 · 302 GitHub 동의 화면."""
@@ -25,7 +25,7 @@ def github_start(
 
 
 @router.post("/auth/logout", status_code=204)
-def logout(request: Request) -> Response:
+async def logout(request: Request) -> Response:
     """SYNC-API-001#POST/auth/logout — 세션 종료."""
     auth.logout(request)
     return Response(status_code=204)

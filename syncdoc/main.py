@@ -23,12 +23,12 @@ app.include_router(account.router)
 
 
 @app.exception_handler(Problem)
-def problem_handler(_: Request, exc: Problem) -> JSONResponse:
+async def problem_handler(_: Request, exc: Problem) -> JSONResponse:
     return JSONResponse(
         exc.to_dict(), status_code=exc.status, media_type="application/problem+json"
     )
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
+async def health() -> dict[str, str]:
     return {"status": "ok"}
