@@ -1,5 +1,6 @@
 """SYNC-MS-005 테스트 관점 — CommentService (B1 셋)."""
 
+import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -79,3 +80,40 @@ def test_counts_top_level_unresolved_only(db_session: Session) -> None:
     assert cs.count_unresolved_by_document([d.id, d2.id, 999]) == {d.id: 1, d2.id: 1}
     assert cs.count_unresolved_by_document([]) == {}
     assert db_session.execute(text("SELECT count(*) FROM comments")).scalar() == 4
+
+
+# ── list · add · resolve · unresolved_count · unresolved_in ──
+def test_add_list_thread_resolve_and_counts(db_session: Session) -> None:
+    from syncdoc.core.errors import NotFound
+
+    svc, p, a, d = _doc(db_session)
+    cs = CommentService(db_session)
+    line = PRD.split("\n")[9]
+    c1 = cs.add(d.id, 10, line, "애매하다", a.user, None)
+    c2 = cs.add(d.id, 10, line, "나도", a.user, None)  # 같은 줄에 둘 → 스레드 둘
+    r = cs.add(d.id, 10, line, "답글", a.user, c1.id)
+    assert c1.line_hash == line_hash(line) and r.parent_comment_id == c1.id
+    top = cs.list(d.id)
+    assert (
+        [c.id for c in top] == [c1.id, c2.id]
+        and [x.id for x in top[0].replies] == [r.id]
+        and top[1].replies == []
+    )
+    assert cs.unresolved_count(d.id) == 2  # 최상위만
+    other = make_project(db_session, "OTHR")
+    svc.create(other.id, "OTHR-PRD-001", DocType.PRD, PRD.replace("EXMP", "OTHR"), "h", a)
+    with pytest.raises(NotFound):
+        cs.add(
+            svc.get_document("OTHR-PRD-001").id, 1, "x", "y", a.user, c1.id
+        )  # 다른 문서의 parent
+    got = cs.unresolved_in([d.id])
+    assert [(s.id, s.doc_id, s.line_no, s.excerpt, s.author.github_login) for s in got] == [
+        (c1.id, "EXMP-PRD-001", 10, "애매하다", "hoyoung"),
+        (c2.id, "EXMP-PRD-001", 10, "나도", "hoyoung"),
+        (r.id, "EXMP-PRD-001", 10, "답글", "hoyoung"),
+    ]  # 답글도 포함
+    assert cs.resolve(c1.id, True).is_resolved is True and cs.unresolved_count(d.id) == 1
+    assert [c.id for c in cs.list(d.id)] == [c1.id, c2.id]  # 해결된 것도 목록에
+    assert cs.resolve(c1.id, False).is_resolved is False and cs.unresolved_count(d.id) == 2
+    with pytest.raises(NotFound):
+        cs.resolve(999_999, True)
