@@ -320,6 +320,53 @@ class SpecService:
             created_at=now_utc(),
         )
 
+    def get_document(self, doc_id: str) -> Document:
+        """SYNC-MS-002#SpecService.get_document"""
+        row = self.repo.document_by_doc_id(doc_id)
+        if row is None:
+            raise NotFound("document", doc_id)
+        items = [
+            DocItem(pk=i.id, item_id=i.item_id, display_name=i.display_name)
+            for i in self.repo.items_of(row.id)
+        ]
+        latest = self.repo.latest_version(row.id)
+        return Document(
+            **self._summary_fields(row, latest),
+            body=row.current_body,
+            convention_error_detail=row.convention_error_detail,
+            items=items,
+        )
+
+    def _summary_fields(self, row: DocumentRow, latest: Version | None) -> dict:
+        return {
+            "id": row.id,
+            "doc_id": row.doc_id,
+            "doc_type": row.doc_type,
+            "stage": STAGE_OF.get(row.doc_type),
+            "status": row.status,
+            "current_version_no": row.current_version_no,
+            "has_convention_error": row.has_convention_error,
+            "incomplete_warnings": json.loads(row.incomplete_warnings or "[]"),
+            "updated_at": row.updated_at,
+            "last_author": self._author_of(latest),
+        }
+
+    def _author_of(self, v: Version | None) -> Author | None:
+        """버전 행 → Author. via는 DB에 없어 kind로 추정(agent→mcp, human→github)."""
+        if v is None:
+            return None
+        user = self.session.get(User, v.author_user_id)
+        instructed = (
+            self.session.get(User, v.instructed_by_user_id) if v.instructed_by_user_id else None
+        )
+        kind = AuthorKind(v.author_kind)
+        return Author(
+            kind=kind,
+            user=user,
+            instructed_by=instructed,
+            via=Entry.mcp if kind == AuthorKind.agent else Entry.github,
+        )
+
     def _deleted_item_ids(self, doc_id: str | None) -> set[str]:
         if not doc_id:
             return set()

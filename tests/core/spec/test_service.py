@@ -241,3 +241,17 @@ def test_issue_doc_id_sequence_no_reuse(db_session: Session) -> None:
     )
     assert svc.issue_doc_id(p.id, DocType.PRD) == "EXMP-PRD-003"
     assert svc.issue_doc_id(p.id, DocType.RFQ) == "EXMP-RFQ-001"
+
+
+# ── create ──
+def test_create_inserts_document_items_version(db_session: Session) -> None:
+    svc = SpecService(db_session)
+    p = make_project(db_session)
+    a = author(db_session)
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "abc123", a)
+    assert v.version_no == 1 and v.author_kind == "agent" and v.instructed_by_user_id == a.user.id
+    d = svc.get_document("EXMP-PRD-001")
+    assert d.current_version_no == 1 and d.status == "draft" and d.stage == 2
+    assert [i.item_id for i in d.items] == ["G1", "R1", "N1"]
+    assert d.last_author is not None and d.last_author.user.id == a.user.id
+    assert d.body == PRD and d.has_convention_error is False
