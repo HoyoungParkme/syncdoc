@@ -211,3 +211,35 @@ async def test_exists_is_committed_not_workdir(repos: dict[str, Path]) -> None:
     (repos["work"] / "docs/specs/UC/x.md").write_text("uncommitted", encoding="utf-8")
     assert await g.exists(repos["work"], "docs/specs/UC") is False
     assert await g.exists(repos["work"], "docs/specs/UC/x.md") is False
+
+
+# ── init_specs ──
+async def test_init_specs_returns_26_files_and_commit_push_writes_them(
+    repos: dict[str, Path],
+) -> None:
+    files = await g.init_specs(repos["work"])
+    assert len(files) == 26
+    dirs = {p.split("/")[2] for p in files if p.endswith("/.gitkeep")}
+    assert dirs == {
+        "RFQ",
+        "PRD",
+        "SCN",
+        "UC",
+        "INFRA",
+        "DOM",
+        "UI",
+        "API",
+        "SEQ",
+        "MS",
+        "CODE",
+        "STD",
+        "assets",
+    }
+    assert files["docs/specs/_templates/PRD.md"].startswith("---\ndoc_id:")
+    assert "SYNC-STD-001" in files["docs/specs/README.md"]
+    h = await g.commit_push(
+        repos["work"], "", "", "chore(SYNC): init syncdoc", _author(), files=files
+    )
+    assert h == git(repos["remote"], "rev-parse", "main")
+    assert await g.exists(repos["work"], "docs/specs/_templates/STD.md")
+    assert len(await g.list(repos["work"], "docs/specs/_templates/*.md")) == 12

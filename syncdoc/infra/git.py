@@ -213,3 +213,28 @@ async def rev_list_count(workdir: Path, range: str) -> int:
 async def exists(workdir: Path, path: str) -> bool:
     """SYNC-MS-009#git.exists"""
     return bool((await _run(workdir, "ls-tree", "HEAD", "--", path)).strip())
+
+
+_TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "docs" / "specs" / "_templates"
+_TYPES = ("RFQ", "PRD", "SCN", "UC", "INFRA", "DOM", "UI", "API", "SEQ", "MS", "CODE", "STD")
+_README = """# docs/specs — 명세 원본
+
+싱크독 명세 체인 11단계 + STD. 쓰는 법은 명세 작성 규약 SYNC-STD-001, 타입별 뼈대는 `_templates/`.
+
+- 경로 `docs/specs/{TYPE}/{doc_id}.md` · 문서 ID `{프로젝트코드}-{TYPE}-{NNN}`
+- 상태(`status`)는 frontmatter가 진실. 변경은 싱크독 웹에서만
+- 첨부는 `assets/`
+"""
+
+
+async def init_specs(workdir: Path) -> dict[str, str]:
+    """SYNC-MS-009#git.init_specs"""
+    files: dict[str, str] = {}
+    for t in _TYPES:
+        files[f"docs/specs/{t}/.gitkeep"] = ""
+        files[f"docs/specs/_templates/{t}.md"] = (_TEMPLATES_DIR / f"{t}.md").read_text(
+            encoding="utf-8"
+        )
+    files["docs/specs/assets/.gitkeep"] = ""
+    files["docs/specs/README.md"] = _README
+    return files
