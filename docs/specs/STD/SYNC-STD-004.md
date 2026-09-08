@@ -43,7 +43,7 @@ async def save_pipeline(...):
 
 #### DEV-4 타입 힌트 필수, 형식은 도구가
 
-모든 함수 시그니처에 타입 힌트. MINISPEC 시그니처와 같아야 한다. `from __future__ import annotations`를 모든 모듈에 — `list[...]` 표기가 MINISPEC과 같게. 포맷은 `ruff format`, 린트는 `ruff check` — 손으로 맞추지 않는다. `tests/`는 E501 무시, 중간 커밋은 F401 무시(pyproject에 명시). React는 `prettier` + `eslint`.
+모든 함수 시그니처에 타입 힌트. MINISPEC 시그니처와 같아야 한다. `from __future__ import annotations`를 모든 모듈에 — `list[...]` 표기가 MINISPEC과 같게. 포맷은 `ruff format`, 린트는 `ruff check` — 손으로 맞추지 않는다. `tests/`는 E501 무시, 중간 커밋은 F401 무시, `mcp/tools.py`는 E501 무시(도구 description이 API 명세 원문이라 길다) — 전부 pyproject에 명시. React는 `prettier` + `eslint`.
 
 #### DEV-5 에러는 problem+json 타입 하나에 예외 클래스 하나
 
@@ -81,7 +81,9 @@ FK 전부, unique 제약 전부, 그리고 ERD·DD 3장 인덱스 표. 쿼리가
 
 #### DEV-10 트랜잭션 경계는 MINISPEC이 정한 곳
 
-`pipeline.save_pipeline` 6단계, `pipeline.rebuild` 3~9단계처럼 MINISPEC에 "한 트랜잭션"이라고 적힌 범위가 트랜잭션이다. 서비스 메서드는 트랜잭션을 열지 않는다 — 호출자의 것 안에서 돈다.
+`pipeline.save_pipeline` 6단계, `pipeline.rebuild` 3~9단계처럼 MINISPEC에 "한 트랜잭션"이라고 적힌 범위가 트랜잭션이다. 서비스 메서드는 트랜잭션도 세션도 열지 않는다 — 호출자의 것 안에서 돈다.
+
+**세션 소유자는 입구 층이다** — `pipeline`·`queries`·라우터·MCP 도구가 `db.session_scope()`로 열고 닫는다. 서비스 하나만 부르는 라우터(SEQ-C1)는 라우터가 연다. `init_project`처럼 서비스가 트랜잭션을 언급하면 그건 "이 범위를 한 트랜잭션으로 묶어라"는 호출자에게 하는 지시다.
 
 ---
 
@@ -133,6 +135,8 @@ C  통합·배포       외부 연결 · 첫 사용
 ```
 
 막히면 — 명세가 틀렸거나 모자란 것이다. 코드로 우회하지 않고 명세를 고치고 그 문서에 플래그가 붙게 한다.
+
+**작업 메모(WORKLOG 등)는 명세를 이기지 못한다.** 되먹임으로 명세가 갱신되면 메모의 "결정"이 낡는다. 다시 시작할 때 명세를 먼저 읽고 메모를 맞춘 뒤 일한다.
 
 ---
 
