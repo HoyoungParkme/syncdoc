@@ -115,7 +115,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 1. `dec = get_decision(version_id)` → `changed_pks`
 2. `target_pk`마다:
    - `causes` = `changed_pks` 중 이 target을 참조하는 것 전부 (`ReferenceService.upstream(target_pk)` ∩ `changed_pks`)
-   - `assignee = SpecService.last_author(target의 document_id)` (None 가능, UC-S4 3b)
+   - `assignee = (SpecService.last_author(target의 document_id) or None).user_id` (None 가능, UC-S4 3b)
    - `cause_pk`마다 — **원인 하나에 플래그 하나** (결정: 첫 것만이면 손실, jsonb 묶음은 화면·스키마 변경이 큼):
      - if 같은 `(target, cause, cause_version)` 미해결 플래그 있음 → 건너뜀
      - `DB: flags insert (kind=needs_check, target_item_pk, cause_item_pk=cause_pk, cause_version_id=version_id, assignee_user_id, raised_at=now)`
@@ -133,7 +133,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-SEQ-001#SEQ-1]] 9 · [[SYNC-UC-001#UC-H13]] 5
 
-**처리** `refs = ReferenceService.downstream(cause_item_pk)` · 각 `from_item_pk`에 `DB: flags insert (kind=broken_ref, target=from_item_pk, cause=cause_item_pk, cause_version=None, assignee=SpecService.last_author(target 문서))` · `→` 수. 원인 항목은 `is_deleted=true`지만 행이 남아 있어 FK가 유지된다
+**처리** `refs = ReferenceService.downstream(cause_item_pk)` · 각 `from_item_pk`에 `DB: flags insert (kind=broken_ref, target=from_item_pk, cause=cause_item_pk, cause_version=None, assignee=SpecService.last_author(target 문서).user_id)` · `→` 수. 원인 항목은 `is_deleted=true`지만 행이 남아 있어 FK가 유지된다
 
 ---
 
