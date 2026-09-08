@@ -392,6 +392,11 @@ class SpecService:
             doc_version_no=document.current_version_no,
         )
 
+    def detect_deleted_items(self, document: Document, body: str) -> list[int]:
+        """SYNC-MS-002#SpecService.detect_deleted_items"""
+        new_ids = {b.item_id for b in self.item_blocks(body, document.doc_type)}
+        return [i.id for i in self.repo.items_of(document.id) if i.item_id not in new_ids]
+
     def _deleted_item_ids(self, doc_id: str | None) -> set[str]:
         if not doc_id:
             return set()

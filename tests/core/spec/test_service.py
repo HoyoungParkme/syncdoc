@@ -306,3 +306,19 @@ def test_get_item_block_not_found_deleted(db_session: Session) -> None:
     assert ei2.value.extra["deleted_at"]
     with pytest.raises(NotFound):
         svc.get_item("EXMP-PRD-404", "R1")
+
+
+# ── detect_deleted_items ──
+def test_detect_deleted_items(db_session: Session) -> None:
+    svc = SpecService(db_session)
+    p = make_project(db_session)
+    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", author(db_session))
+    d = svc.get_document("EXMP-PRD-001")
+    n1_pk = next(i.pk for i in d.items if i.item_id == "N1")
+    without_n1 = PRD.split("### 3.2 비기능")[0] + "## 4. 성공지표\n\n## 5. 미결사항\n"
+    assert svc.detect_deleted_items(d, without_n1) == [n1_pk]
+    assert svc.detect_deleted_items(d, PRD.replace("#### N1 성능", "#### N1 속도")) == []
+    reordered = PRD.replace("#### G1 첫 목표\n한 줄로.\n", "").replace(
+        "## 5. 미결사항", "#### G1 첫 목표\n한 줄로.\n\n## 5. 미결사항"
+    )
+    assert svc.detect_deleted_items(d, reordered) == []
