@@ -496,7 +496,7 @@ flowchart TB
 classDiagram
     class ProjectService {
         «service»
-        +init_project(remote_url: str, code: str, name: str, user: User, import_existing: bool = False) ProjectSummary
+        +init_project(remote_url: str, code: str, name: str, user: User, import_existing: bool = False) Project
         +list_projects() list~Project~
         +get(code: str) Project
         +repo_status() list~RepoStatus~
@@ -772,7 +772,7 @@ classDiagram
         +list(document_id: int) list~Comment~
         +add(document_id: int, line_no: int, line_text: str, body: str, user: User, parent_id: int?) Comment
         +resolve(comment_id: int, resolved: bool) Comment
-        +relocate(document_id: int, old_body: str, new_body: str) int
+        +relocate(document_id: int, old_body: str, new_body: str, old_version_no: int) int
         +unresolved_count(document_id: int) int
         +count_unresolved(project_id: int) int
         +count_unresolved_by_document(document_ids: list~int~) dict
@@ -864,6 +864,7 @@ classDiagram
 ```
 save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | None,
               body: str, expected_version: int | None,
+              project_code: str | None,
               author: Author, message: str,
               changed_items: list[str] | None = None,
               upstream_impact: list[str] | None = None,
