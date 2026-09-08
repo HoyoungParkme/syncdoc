@@ -145,8 +145,7 @@ async def _run(
         version = spec.create(project.id, doc_id, doc_type, body, commit_hash, author)
         prev_version_id = None
     else:
-        prev = spec.repo.latest_version(document.id)
-        prev_version_id = prev.id if prev else None
+        prev_version_id = document.current_version_id
         version = spec.save(
             document,
             body,
@@ -160,13 +159,13 @@ async def _run(
     for pk in deleted:
         tracking.raise_broken(pk)
     # 10. 참조 추출
-    item_pks = {i.item_id: i.pk for i in spec.get_document(doc_id).items}
+    item_pks = spec.item_pks(document_id)
     fm, _ = parse_frontmatter(body)
     upstream_ids = re.findall(r"[\w-]+", fm.get("upstream", "").strip("[]"))
     refs.extract(document_id, version.id, body, item_pks, upstream_ids)
     # 11. 변경 영향 (B1 스텁 → 빈 목록)
     affected = tracking.detect_impact(document_id, prev_version_id, version.id, changed_items)
-    if affected:
+    if affected:  # B1 스텁이 빈 목록이라 안 걸린다 (CODE-001 B1 스텁 표)
         raise NotImplementedYet("tracking.create_pending — B3")
     pending_id = None
     # 12. 하위→상위 되먹임

@@ -275,6 +275,7 @@ class SpecService:
             **self._summary_fields(row, latest),
             body=row.current_body,
             commit_hash=latest.commit_hash if latest else None,
+            current_version_id=latest.id if latest else None,
             convention_error_detail=row.convention_error_detail,
             items=items,
         )
@@ -426,6 +427,10 @@ class SpecService:
             return ids[0] if ids else None
 
         return first(stage - 1), first(stage + 1)
+
+    def item_pks(self, document_id: int) -> dict[str, int]:
+        """SYNC-MS-002#SpecService.item_pks"""
+        return {i.item_id: i.id for i in self.repo.items_of(document_id)}
 
     def resolve_item(self, doc_id: str, item_id: str) -> int:
         """SYNC-MS-002#SpecService.resolve_item"""

@@ -227,6 +227,7 @@ class Document(DocumentSummary):
 
     body: str = ""
     commit_hash: str | None = None  # 최근 버전의 커밋 (API-002 get_document)
+    current_version_id: int | None = None  # 최근 versions.id — detect_impact의 prev
     convention_error_detail: str | None = None
     items: list[DocItem] = field(default_factory=list)
     prev_doc_id: str | None = None
