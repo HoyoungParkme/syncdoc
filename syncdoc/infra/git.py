@@ -124,7 +124,7 @@ async def read(workdir: Path, path: str, ref: str = "HEAD") -> str:
 
 
 def _login_of(name: str, email: str) -> str:
-    """커밋 author → GitHub login. *@users.noreply.github.com이면 앞부분(ID+ 접두어 제거), 아니면 %an."""
+    """커밋 author → GitHub login. noreply 메일이면 앞부분(ID+ 접두어 제거), 아니면 %an."""
     if email.endswith("@users.noreply.github.com"):
         return email.split("@")[0].split("+")[-1]
     return name
