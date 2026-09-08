@@ -2,10 +2,32 @@
 
 import glob
 
+import pytest
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from syncdoc.core.errors import ConventionViolation, ItemDeleted, NotFound
+from syncdoc.core.project.models import Project, Repository
 from syncdoc.core.spec.service import SpecService, parse_frontmatter
-from syncdoc.core.types import DocType, Entry
+from syncdoc.core.types import Author, AuthorKind, DocType, Entry
+from tests.core.account.test_service import make_user
+
+
+def make_project(session: Session, code: str = "EXMP") -> Project:
+    p = Project(code=code, name="예시")
+    session.add(p)
+    session.flush()
+    session.add(Repository(project_id=p.id, remote_url="https://x/r.git", workdir_path="/w"))
+    session.flush()
+    return p
+
+
+def author(session: Session, login: str = "hoyoung", kind: AuthorKind = AuthorKind.agent) -> Author:
+    u = make_user(session, login=login)
+    return Author(
+        kind=kind, user=u, instructed_by=u if kind == AuthorKind.agent else None, via=Entry.mcp
+    )
+
 
 SPECS = sorted(p for p in glob.glob("docs/specs/*/*.md") if "/_templates/" not in p)
 
@@ -167,3 +189,36 @@ classDiagram
 """
     r = SpecService(db_session).validate(body, DocType.DOM, Entry.github)
     assert r.violations == [] and [str(w) for w in r.warnings] == ["entity.mismatch: Foo"]
+
+
+# ── apply_frontmatter ──
+def test_apply_frontmatter_creates_fills_and_rejects(db_session: Session) -> None:
+    svc = SpecService(db_session)
+    body = "# 제목 줄\n\n본문\n"
+    out = svc.apply_frontmatter(body, "EXMP-PRD-001", DocType.PRD, "draft")
+    fm, n = parse_frontmatter(out)
+    assert fm == {"doc_id": "EXMP-PRD-001", "type": "PRD", "title": "제목 줄", "status": "draft"}
+    assert out.endswith(body)
+    # doc_id 비움 → 채워짐, upstream 보존, 순서 유지
+    body = (
+        "---\ndoc_id: \ntype: RFQ\ntitle: T\nstatus: approved\nupstream: [EXMP-RFQ-001]\n---\n# T\n"
+    )
+    out = svc.apply_frontmatter(body, "EXMP-PRD-002", DocType.PRD, "draft")
+    assert out.split("\n")[1:7] == [
+        "doc_id: EXMP-PRD-002",
+        "type: PRD",
+        "title: T",
+        "status: draft",
+        "upstream: [EXMP-RFQ-001]",
+        "---",
+    ]
+    # doc_id 다른 값 → 위반
+    with pytest.raises(ConventionViolation) as ei:
+        svc.apply_frontmatter(
+            body.replace("doc_id: ", "doc_id: EXMP-PRD-009"), "EXMP-PRD-002", DocType.PRD, "draft"
+        )
+    assert ei.value.extra["violations"][0]["rule"] == "frontmatter.doc_id"
+    # 헤딩 없으면 title = doc_id
+    assert "title: EXMP-PRD-003" in svc.apply_frontmatter(
+        "본문", "EXMP-PRD-003", DocType.PRD, "draft"
+    )

@@ -3,17 +3,30 @@
 다른 묶음 것은 인자로 받는다. 항목 판정은 item_blocks 한 곳(SYNC-STD-001 1.3).
 """
 
+import json
 import re
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from syncdoc.core.account.models import User
+from syncdoc.core.errors import ConventionViolation, ItemDeleted, NotFound
+from syncdoc.core.project.models import Project
+from syncdoc.core.spec.models import Document as DocumentRow
+from syncdoc.core.spec.models import Item, StatusChange, Version
 from syncdoc.core.spec.repository import SpecRepository
 from syncdoc.core.types import (
+    STAGE_OF,
+    Author,
+    AuthorKind,
+    DocItem,
     DocStatus,
     DocType,
+    Document,
+    DocumentSummary,
     Entry,
     ItemBlock,
+    ItemView,
     ValidateResult,
     Violation,
     Warning,
@@ -230,6 +243,34 @@ class SpecService:
         if doc_type == "DOM" and "클래스" in (fm.get("title") or ""):
             W.extend(_entity_mismatch(body))
         return ValidateResult(V, W)
+
+    def apply_frontmatter(
+        self, body: str, doc_id: str, doc_type: DocType, status: DocStatus
+    ) -> str:
+        """SYNC-MS-002#SpecService.apply_frontmatter"""
+        fm, fm_lines = parse_frontmatter(body)
+        if not fm:
+            m = re.search(r"^# (.+)$", body, re.M)
+            title = m.group(1).strip() if m else doc_id
+            return (
+                f"---\ndoc_id: {doc_id}\ntype: {doc_type}\ntitle: {title}\nstatus: {status}\n---\n"
+                + body
+            )
+        if fm.get("doc_id") and fm["doc_id"] != doc_id:
+            raise ConventionViolation(
+                [Violation(2, "frontmatter.doc_id", f"발급 {doc_id}와 다름: {fm['doc_id']}")]
+            )
+        forced = {"doc_id": doc_id, "type": str(doc_type), "status": str(status)}
+        lines = body.split("\n")
+        out: list[str] = []
+        for line in lines[1 : fm_lines - 1]:
+            k, sep, _ = line.partition(":")
+            if sep and k.strip() in forced:
+                out.append(f"{k.strip()}: {forced.pop(k.strip())}")
+            else:
+                out.append(line)
+        out.extend(f"{k}: {v}" for k, v in forced.items())
+        return "\n".join(["---", *out, "---", *lines[fm_lines:]])
 
     def _deleted_item_ids(self, doc_id: str | None) -> set[str]:
         if not doc_id:
