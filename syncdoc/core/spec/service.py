@@ -397,6 +397,60 @@ class SpecService:
         new_ids = {b.item_id for b in self.item_blocks(body, document.doc_type)}
         return [i.id for i in self.repo.items_of(document.id) if i.item_id not in new_ids]
 
+    def save(
+        self,
+        document: Document,
+        body: str,
+        commit_hash: str,
+        author: Author,
+        deleted_item_pks: list[int],
+        has_convention_error: bool = False,
+        warnings: list | None = None,
+        rebuild: bool = False,
+    ) -> Version:
+        """SYNC-MS-002#SpecService.save"""
+        row = self.repo.document_by_id(document.id)
+        assert row is not None
+        new_no = row.current_version_no + 1
+        version = self._new_version(row.id, new_no, commit_hash, body, author)
+        self.repo.add(version)
+        fm, _ = parse_frontmatter(body)
+        for b in self.item_blocks(body, row.doc_type, fm.get("title")):
+            item = self.repo.item_of(row.id, b.item_id)
+            if item is not None:
+                item.display_name = b.display_name
+            else:
+                self.session.add(
+                    Item(document_id=row.id, item_id=b.item_id, display_name=b.display_name)
+                )
+        for item in self.repo.items_by_pks(deleted_item_pks):
+            item.is_deleted, item.deleted_at = True, now_utc()
+        new_status = fm.get("status", row.status) if author.via == Entry.github else row.status
+        if row.status == DocStatus.approved and body != row.current_body:
+            new_status = DocStatus.review
+            self.session.add(
+                StatusChange(
+                    document_id=row.id,
+                    from_status=DocStatus.approved,
+                    to_status=DocStatus.review,
+                    changed_by_user_id=author.user.id,
+                    reason="본문 수정으로 자동 강등",
+                    commit_hash=None,
+                    changed_at=now_utc(),
+                )
+            )
+        row.current_body = body
+        row.current_version_no = new_no
+        row.status = str(new_status)
+        row.has_convention_error = has_convention_error
+        if not has_convention_error:
+            row.convention_error_detail = None
+        row.incomplete_warnings = (
+            json.dumps([str(w) for w in warnings], ensure_ascii=False) if warnings else None
+        )
+        self.session.flush()
+        return version
+
     def _deleted_item_ids(self, doc_id: str | None) -> set[str]:
         if not doc_id:
             return set()

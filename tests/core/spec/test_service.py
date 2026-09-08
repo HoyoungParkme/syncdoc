@@ -322,3 +322,65 @@ def test_detect_deleted_items(db_session: Session) -> None:
         "## 5. 미결사항", "#### G1 첫 목표\n한 줄로.\n\n## 5. 미결사항"
     )
     assert svc.detect_deleted_items(d, reordered) == []
+
+
+# ── save ──
+def _seed(db_session: Session, status: str = "draft"):
+    svc = SpecService(db_session)
+    p = make_project(db_session)
+    a = author(db_session)
+    body = PRD.replace("status: draft", f"status: {status}")
+    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, body, "h1", a)
+    return svc, a, svc.get_document("EXMP-PRD-001")
+
+
+def test_save_bumps_version_and_upserts_items(db_session: Session) -> None:
+    svc, a, d = _seed(db_session)
+    body = PRD.replace("#### N1 성능", "#### N1 속도") + "\n#### N2 새 항목\n내용\n"
+    v = svc.save(d, body, "h2", a, [])
+    assert v.version_no == 2 and v.body == body
+    d2 = svc.get_document("EXMP-PRD-001")
+    assert d2.current_version_no == 2 and d2.body == body and d2.status == "draft"
+    assert [(i.item_id, i.display_name) for i in d2.items][2:] == [
+        ("N1", "속도"),
+        ("N2", "새 항목"),
+    ]
+    assert d2.incomplete_warnings == []
+
+
+def test_save_approved_document_demotes_to_review_with_status_change(db_session: Session) -> None:
+    svc, a, d = _seed(db_session, "approved")
+    svc.save(d, d.body.replace("한 줄로.", "두 줄로."), "h2", a, [])
+    assert svc.get_document("EXMP-PRD-001").status == "review"
+    rows = db_session.execute(
+        text("SELECT from_status, to_status, reason, commit_hash FROM status_changes")
+    ).all()
+    assert rows == [("approved", "review", "본문 수정으로 자동 강등", None)]
+    # github 경로에서 frontmatter status가 진실
+    d2 = svc.get_document("EXMP-PRD-001")
+    gh = Author(kind=AuthorKind.human, user=a.user, instructed_by=None, via=Entry.github)
+    svc.save(d2, d2.body.replace("status: approved", "status: approved\n"), "h3", gh, [])
+    assert svc.get_document("EXMP-PRD-001").status == "approved"
+
+
+def test_save_deleted_pks_and_warnings(db_session: Session) -> None:
+    svc, a, d = _seed(db_session)
+    n1 = next(i.pk for i in d.items if i.item_id == "N1")
+    from syncdoc.core.types import Warning as W
+
+    svc.save(
+        d,
+        PRD,
+        "h2",
+        a,
+        [n1],
+        has_convention_error=True,
+        warnings=[W("section.missing", "성공지표")],
+    )
+    row = db_session.execute(
+        text("SELECT is_deleted, deleted_at FROM items WHERE item_id='N1'")
+    ).one()
+    assert row[0] is True and row[1] is not None
+    d2 = svc.get_document("EXMP-PRD-001")
+    assert d2.has_convention_error and d2.incomplete_warnings == ["section.missing: 성공지표"]
+    assert [i.item_id for i in d2.items] == ["G1", "R1"]
