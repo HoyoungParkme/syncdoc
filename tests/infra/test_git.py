@@ -12,6 +12,24 @@ from syncdoc.infra import git as g
 from tests.infra.conftest import SEED, git, write_commit_push
 
 
+# ── clone ──
+async def test_clone_full_history_and_no_token_in_config(repos: dict[str, Path]) -> None:
+    write_commit_push(repos["other"], SEED, "v2", "second")
+    write_commit_push(repos["other"], SEED, "v3", "third")
+    target = repos["work"].parent / "cloned"
+    await g.clone(str(repos["remote"]), target, "s3cr3t")
+    assert git(target, "rev-parse", "HEAD") == git(repos["remote"], "rev-parse", "main")
+    assert git(target, "rev-list", "--count", "HEAD") == "3"  # 전체 이력 (--depth 없음)
+    assert git(target, "remote", "get-url", "origin") == str(repos["remote"])
+    assert "s3cr3t" not in (target / ".git" / "config").read_text(encoding="utf-8")
+    assert await g.fetch(target) == git(repos["remote"], "rev-parse", "main")
+
+
+async def test_clone_failure_is_git_error(tmp_path: Path) -> None:
+    with pytest.raises(g.GitError):
+        await g.clone(str(tmp_path / "nope.git"), tmp_path / "x", "t")
+
+
 # ── fetch ──
 async def test_fetch_returns_origin_head_without_touching_workdir(repos: dict[str, Path]) -> None:
     before = git(repos["work"], "rev-parse", "HEAD")

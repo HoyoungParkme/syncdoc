@@ -53,6 +53,12 @@ def _with_token(remote_url: str, token: str) -> str:
     return remote_url
 
 
+async def clone(remote_url: str, workdir: Path, token: str) -> None:
+    """SYNC-MS-009#git.clone"""
+    await _run(None, "clone", _with_token(remote_url, token), str(workdir))
+    await _run(workdir, "remote", "set-url", "origin", remote_url)
+
+
 async def fetch(workdir: Path) -> str:
     """SYNC-MS-009#git.fetch"""
     await _run(workdir, "fetch", "origin")
