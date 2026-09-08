@@ -80,3 +80,4 @@ def test_downgrade_removes_everything(alembic_cfg: Config) -> None:
     engine = create_engine(settings.DATABASE_URL)
     assert set(inspect(engine).get_table_names()) - {"alembic_version"} == set()
     engine.dispose()
+    command.upgrade(alembic_cfg, "head")
