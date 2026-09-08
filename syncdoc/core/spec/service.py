@@ -534,6 +534,13 @@ class SpecService:
             )
         return out
 
+    def doc_id_of(self, document_id: int) -> str:
+        """document pk → doc_id. MS-002에 없는 조회 — 댓글 resolve 응답용(보고)."""
+        row = self.repo.document_by_id(document_id)
+        if row is None:
+            raise NotFound("document", document_id)
+        return row.doc_id
+
     def _deleted_item_ids(self, doc_id: str | None) -> set[str]:
         if not doc_id:
             return set()
