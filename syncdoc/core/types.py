@@ -1,11 +1,12 @@
-"""SYNC-DOM-002 2.7 열거형 · 2.8 내부 타입(DTO). 카드 A가 쓰는 것만.
+"""SYNC-DOM-002 2.7 열거형 · 2.8 내부 타입(DTO) + API 응답 형태(SYNC-API-001 4장과 같은 이름).
 
 열거형은 DB enum이 아니라 varchar + 앱 검증(SYNC-DOM-003 설계 규칙). 타입은 여기 한 곳에만.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 from syncdoc.core.account.models import AccessToken, User
 
@@ -91,3 +92,130 @@ class GithubUser:
     id: int
     login: str
     name: str
+
+
+# 11단계 순서 (SYNC-STD-001 2장). STD는 단계 밖
+STAGE_OF: dict[str, int] = {
+    t: i + 1
+    for i, t in enumerate(
+        ["RFQ", "PRD", "SCN", "UC", "INFRA", "DOM", "UI", "API", "SEQ", "MS", "CODE"]
+    )
+}
+
+
+@dataclass(frozen=True)
+class Violation:
+    line: int
+    rule: str
+    message: str
+
+
+@dataclass(frozen=True)
+class Warning:
+    rule: str
+    message: str
+
+    def __str__(self) -> str:
+        return f"{self.rule}: {self.message}" if self.message else self.rule
+
+
+@dataclass(frozen=True)
+class ValidateResult:
+    violations: list[Violation]
+    warnings: list[Warning]
+
+
+@dataclass(frozen=True)
+class ItemBlock:
+    item_id: str
+    display_name: str
+    level: int
+    start_line: int
+    end_line: int
+    text: str
+
+
+@dataclass
+class DocItem:
+    """Document.items[] 원소 (SYNC-API-001 Document.items)."""
+
+    pk: int
+    item_id: str
+    display_name: str | None
+    flags: list[str] = field(default_factory=list)
+
+
+@dataclass
+class DocumentSummary:
+    """SYNC-API-001 DocumentSummary. counts는 queries가 채운다."""
+
+    id: int
+    doc_id: str
+    doc_type: str
+    stage: int | None
+    status: str
+    current_version_no: int
+    has_convention_error: bool
+    incomplete_warnings: list[str]
+    updated_at: datetime
+    last_author: Author | None
+    counts: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass
+class Document(DocumentSummary):
+    """SYNC-API-001 Document. items[].flags·prev/next는 queries.document_view가 붙인다."""
+
+    body: str = ""
+    convention_error_detail: str | None = None
+    items: list[DocItem] = field(default_factory=list)
+    prev_doc_id: str | None = None
+    next_doc_id: str | None = None
+
+
+@dataclass
+class ItemView:
+    pk: int
+    doc_id: str
+    item_id: str
+    display_name: str | None
+    body: str
+    doc_status: str
+    doc_version_no: int
+    flags: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RefEdge:
+    from_item_pk: int | None
+    to_item_pk: int | None
+    to_document_id: int | None
+    raw_target: str
+    is_missing: bool
+
+
+@dataclass(frozen=True)
+class ExtractResult:
+    added: int
+    removed: int
+    missing: int
+
+
+@dataclass(frozen=True)
+class SaveResult:
+    doc_id: str
+    version_no: int
+    commit_hash: str
+    status: str
+    pending_decision_version_id: int | None
+    warnings: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "doc_id": self.doc_id,
+            "version_no": self.version_no,
+            "commit_hash": self.commit_hash,
+            "status": self.status,
+            "pending_decision_version_id": self.pending_decision_version_id,
+            "warnings": self.warnings,
+        }

@@ -1,1 +1,272 @@
-"""SYNC-MS-002 — SpecService. B1에서 채운다."""
+"""SYNC-MS-002 — SpecService. documents·items·versions·status_changes만.
+
+다른 묶음 것은 인자로 받는다. 항목 판정은 item_blocks 한 곳(SYNC-STD-001 1.3).
+"""
+
+import re
+from datetime import UTC, datetime
+
+from sqlalchemy.orm import Session
+
+from syncdoc.core.spec.repository import SpecRepository
+from syncdoc.core.types import (
+    DocStatus,
+    DocType,
+    Entry,
+    ItemBlock,
+    ValidateResult,
+    Violation,
+    Warning,
+)
+
+# ── SYNC-STD-001 2장 — 타입별 항목 패턴·필수 절 (tools/validate.py가 원형) ──
+TYPES: dict[str, tuple[list[str], list[str]]] = {
+    "RFQ": ([r"Q\d+"], ["배경", "요구", "사용자와 환경", "미정"]),
+    "PRD": ([r"G\d+", r"R\d+", r"N\d+"], ["목표", "비목표", "요구사항", "성공지표", "미결사항"]),
+    "SCN": ([r"P\d+", r"S\d+"], ["페르소나", "시나리오", "대응표"]),
+    "UC": (
+        [r"UC-[AHGS]\d+"],
+        ["액터", "사용자 목표 수준 유스케이스", "하위기능 수준 유스케이스", "대응표"],
+    ),
+    "INFRA": (
+        [r"C\d+"],
+        ["제약", "구성도", "기술 스택", "데이터가 사는 곳", "인증과 접근", "미결사항"],
+    ),
+    "DOM": ([r"[A-Z][A-Za-z]+", r"[a-z][a-z0-9_]+"], []),
+    "UI": ([r"UI-\d+"], []),
+    "API": ([r"(GET|POST|PUT|PATCH|DELETE)/\S+", r"[a-z][a-z_]+"], []),
+    "SEQ": ([r"SEQ-\d+", r"SEQ-C\d+"], ["생명선", "대응표", "되먹일 것"]),
+    "MS": ([r"[A-Za-z_]+\.[a-z_]+"], ["함수 목록", "미결사항"]),
+    "CODE": ([r"[A-C]\d*"], ["슬라이스", "통합 테스트", "커밋", "미결사항"]),
+    "STD": ([r"[A-Z]+-\d+", r"V-[A-Z]+"], ["미결사항"]),
+}
+SUBTYPES: dict[tuple[str, str], tuple[list[str], list[str]]] = {
+    ("DOM", "도메인"): (
+        [r"[A-Z][A-Za-z]+"],
+        ["개념 식별", "개념 모델", "개념별 정리", "경계", "미결사항"],
+    ),
+    ("DOM", "클래스"): (
+        [r"[A-Z][A-Za-z]+"],
+        ["폴더 구조", "엔티티", "의존 관계", "설계 클래스", "미결사항"],
+    ),
+    ("DOM", "ERD"): ([r"[a-z][a-z0-9_]+"], ["ERD", "DD", "인덱스", "미결사항"]),
+    ("UI", "화면 설계"): (
+        [r"UI-\d+"],
+        ["유스케이스 대응", "화면 목록", "공통 틀", "화면 흐름", "미결사항"],
+    ),
+    ("UI", "와이어프레임"): ([r"UI-\d+"], ["형식"]),
+    ("API", "REST"): (
+        [r"(GET|POST|PUT|PATCH|DELETE)/\S+"],
+        ["규칙", "에러", "엔드포인트", "미결사항"],
+    ),
+    ("API", "MCP"): ([r"[a-z][a-z_]+"], ["규칙", "도구", "에이전트 순서", "미결사항"]),
+}
+DOC_ID = re.compile(r"^[A-Z]{1,4}-[A-Z]+-\d{3}$")
+REF = re.compile(r"\[\[([^\]]+)\]\]")
+HEADING = re.compile(r"^(#{1,6}) (\S+)(?: (.*))?$")
+FRONTMATTER = re.compile(r"^---\n(.*?)\n---\n", re.S)
+
+
+def parse_frontmatter(body: str) -> tuple[dict[str, str], int]:
+    """frontmatter → (필드 dict, 차지하는 줄 수). 없으면 ({}, 0)."""
+    m = FRONTMATTER.match(body)
+    if not m:
+        return {}, 0
+    fm: dict[str, str] = {}
+    for line in m.group(1).split("\n"):
+        k, _, v = line.partition(":")
+        fm[k.strip()] = v.strip()
+    return fm, m.group(0).count("\n")
+
+
+def patterns_for(doc_type: str, title: str | None) -> tuple[re.Pattern[str] | None, list[str]]:
+    pats, secs = TYPES.get(doc_type, ([], []))
+    for (t, key), (p, s) in SUBTYPES.items():
+        if t == doc_type and title and key in title:
+            pats, secs = p, s
+    return (re.compile("^(?:" + "|".join(pats) + ")$") if pats else None), secs
+
+
+def masked_lines(body: str) -> list[str]:
+    """frontmatter·코드블록·인라인 코드를 같은 길이 공백으로. 줄 수 유지 (STD-001 1.3·1.5)."""
+    _, fm_lines = parse_frontmatter(body)
+    out: list[str] = []
+    in_block = False
+    for i, line in enumerate(body.split("\n")):
+        if i < fm_lines:
+            out.append("")
+            continue
+        if line.startswith("```"):
+            in_block = not in_block
+            out.append("")
+            continue
+        if in_block:
+            out.append("")
+        else:
+            out.append(re.sub(r"`[^`]*`", lambda m: " " * len(m.group(0)), line))
+    return out
+
+
+class SpecService:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+        self.repo = SpecRepository(session)
+
+    def item_blocks(
+        self, body: str, doc_type: DocType, title: str | None = None
+    ) -> list[ItemBlock]:
+        """SYNC-MS-002#SpecService.item_blocks"""
+        if title is None:
+            title = parse_frontmatter(body)[0].get("title")
+        item_re, _ = patterns_for(doc_type, title)
+        if item_re is None:
+            return []
+        lines = body.split("\n")
+        heads = []  # (line_idx, level, token, rest)
+        for i, line in enumerate(masked_lines(body)):
+            h = HEADING.match(line)
+            if h:
+                heads.append((i, len(h.group(1)), h.group(2), h.group(3) or ""))
+        blocks: list[ItemBlock] = []
+        for n, (i, level, tok, rest) in enumerate(heads):
+            if not item_re.match(tok):
+                continue
+            end = len(lines) - 1
+            for j, lvl, _, _ in heads[n + 1 :]:
+                if lvl <= level:
+                    end = j - 1
+                    break
+            blocks.append(
+                ItemBlock(
+                    item_id=tok,
+                    display_name=rest.strip(),
+                    level=level,
+                    start_line=i + 1,
+                    end_line=end + 1,
+                    text="\n".join(lines[i : end + 1]),
+                )
+            )
+        return blocks
+
+    def validate(
+        self,
+        body: str,
+        doc_type: DocType,
+        entry: Entry,
+        current_status: DocStatus | None = None,
+    ) -> ValidateResult:
+        """SYNC-MS-002#SpecService.validate"""
+        V: list[Violation] = []
+        W: list[Warning] = []
+        fm, _ = parse_frontmatter(body)
+        # 1. frontmatter
+        if not fm:
+            V.append(Violation(1, "frontmatter.missing", "frontmatter 블록 없음"))
+        else:
+            for f in ("doc_id", "type", "title", "status"):
+                if f not in fm:
+                    V.append(Violation(2, "frontmatter.field", f"필수 필드 {f} 없음"))
+            if fm.get("type", "") not in TYPES:
+                V.append(Violation(2, "frontmatter.type", f"type {fm.get('type')!r}"))
+            if fm.get("status") not in ("draft", "review", "approved"):
+                V.append(Violation(2, "frontmatter.status", str(fm.get("status"))))
+            did = fm.get("doc_id", "")
+            if not DOC_ID.match(did):
+                V.append(Violation(2, "frontmatter.doc_id", f"형식 {did!r}"))
+            elif did.split("-")[1] != doc_type:
+                V.append(Violation(2, "frontmatter.doc_id", f"{did}의 타입 ≠ {doc_type}"))
+            for u in re.findall(r"[\w-]+", fm.get("upstream", "").strip("[]")):
+                if not DOC_ID.match(u):
+                    V.append(Violation(2, "frontmatter.ref", f"upstream {u!r}"))
+            # 2. MCP 경로의 status 변경
+            if entry == Entry.mcp and current_status and fm.get("status") != current_status:
+                V.append(Violation(2, "frontmatter.status_change", "상태 변경은 웹에서만(UC-H8)"))
+        # 3. 헤딩 순회
+        item_re, secs = patterns_for(doc_type, fm.get("title"))
+        deleted = self._deleted_item_ids(fm.get("doc_id"))
+        seen: set[str] = set()
+        items: list[str] = []
+        sections: list[str] = []
+        lines = masked_lines(body)
+        for i, line in enumerate(lines, start=1):
+            h = HEADING.match(line)
+            if not h:
+                continue
+            tok, text = h.group(2), h.group(2) + (" " + h.group(3) if h.group(3) else "")
+            if item_re and item_re.match(tok):
+                if tok in seen:
+                    V.append(Violation(i, "item.duplicate", tok))
+                seen.add(tok)
+                items.append(tok)
+                if tok in deleted:
+                    V.append(Violation(i, "item.reused", f"{tok} — 삭제된 항목 ID 재사용"))
+                if re.search(r"(?<![0-9])0\d", tok):
+                    V.append(Violation(i, "item.padding", tok))
+            else:
+                if re.search(r"[.:]$", tok) and item_re and item_re.match(tok[:-1]):
+                    V.append(Violation(i, "item.punct", tok))
+                elif re.match(r"^[A-Z]+-?\d+$", tok) and item_re:
+                    V.append(
+                        Violation(
+                            i, "item.pattern", f"{tok} — ID처럼 보이지만 {doc_type} 패턴 아님"
+                        )
+                    )
+                sections.append(re.sub(r"^[\d.]+\s*", "", text))
+        # 4. 참조 형식
+        for i, line in enumerate(lines, start=1):
+            for r in REF.findall(line):
+                d, _, it = r.partition("#")
+                if d == "":
+                    d = fm.get("doc_id", "")
+                if not DOC_ID.match(d) or (it and " " in it):
+                    V.append(Violation(i, "ref.format", r))
+        # 5. 미완성
+        for s in secs:
+            if not any(sec.startswith(s) for sec in sections):
+                W.append(Warning("section.missing", s))
+        if not items and doc_type not in ("CODE", "STD"):
+            W.append(Warning("item.none", ""))
+        # 6. DOM 클래스 명세 — 2장·4장 엔티티 속성 대조
+        if doc_type == "DOM" and "클래스" in (fm.get("title") or ""):
+            W.extend(_entity_mismatch(body))
+        return ValidateResult(V, W)
+
+    def _deleted_item_ids(self, doc_id: str | None) -> set[str]:
+        if not doc_id:
+            return set()
+        doc = self.repo.document_by_doc_id(doc_id)
+        if doc is None:
+            return set()
+        return {i.item_id for i in self.repo.items_of(doc.id, include_deleted=True) if i.is_deleted}
+
+
+_CLASS = re.compile(r"class (\w+) \{(.*?)\}", re.S)
+
+
+def _entity_mismatch(body: str) -> list[Warning]:
+    """DOM 클래스 명세: 2장(엔티티)과 4장(설계) mermaid의 같은 클래스 속성이 다르면 경고."""
+    chapters: dict[str, str] = {}
+    cur = None
+    for line in body.split("\n"):
+        m = re.match(r"^## (\d+)\.", line)
+        if m:
+            cur = m.group(1)
+        if cur:
+            chapters[cur] = chapters.get(cur, "") + line + "\n"
+
+    def attrs(text: str) -> dict[str, set[str]]:
+        return {
+            m.group(1): {a.strip() for a in m.group(2).split("\n") if a.strip().startswith("+")}
+            for m in _CLASS.finditer(text)
+        }
+
+    a2, a4 = attrs(chapters.get("2", "")), attrs(chapters.get("4", ""))
+    return [
+        Warning("entity.mismatch", name)
+        for name in sorted(a2)
+        if name in a4 and a2[name] != a4[name]
+    ]
+
+
+def now_utc() -> datetime:
+    return datetime.now(UTC)
