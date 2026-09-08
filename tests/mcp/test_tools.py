@@ -2,7 +2,6 @@
 
 import json
 
-import pytest
 from mcp import Client
 from sqlalchemy.orm import Session
 
@@ -12,15 +11,7 @@ from syncdoc.core.tracking.service import TrackingService
 from syncdoc.core.types import DocType
 from syncdoc.mcp import tools
 from tests.core.reference.test_service import PRD, RFQ
-from tests.core.spec.test_service import author, make_project
-
-
-@pytest.fixture
-def as_user(scoped: Session):
-    a = author(scoped)
-    tok = tools.current_user_id.set(a.user.id)
-    yield a
-    tools.current_user_id.reset(tok)
+from tests.core.spec.test_service import make_project
 
 
 async def call(tool: str, **args):
@@ -51,6 +42,8 @@ async def test_tools_listed_with_descriptions() -> None:
         "get_document",
         "get_item",
         "get_template",
+        "create_document",
+        "update_document",
     }
     assert names["get_template"].startswith("문서 타입의 템플릿과 작성 규약")
 

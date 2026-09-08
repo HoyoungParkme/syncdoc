@@ -2,7 +2,7 @@
 
 전송 streamable HTTP `POST /mcp`. 인증은 Bearer 토큰 → AccountService.authenticate_token(SEQ-C2) — web/mcp 미들웨어가
 검증하고 여기서는 current_user_id로 받는다. 에러는 isError + problem+json(SYNC-API-001과 같은 형식).
-B1: init_project · list_documents · get_document · get_item · get_template. create·update는 pipeline.save_pipeline 뒤.
+B1: 도구 7개 전부. 쓰기 둘(create·update)은 pipeline.save_pipeline(entry=mcp)로.
 """
 
 from __future__ import annotations
@@ -18,13 +18,22 @@ from mcp.server.mcpserver import MCPServer
 from mcp.types import CallToolResult, TextContent
 
 from syncdoc import db
-from syncdoc.core import queries
+from syncdoc.core import pipeline, queries
 from syncdoc.core.account.models import User
 from syncdoc.core.errors import NotFound, Problem, Unauthorized
 from syncdoc.core.markdown import masked_lines
 from syncdoc.core.project.service import ProjectService
 from syncdoc.core.spec.service import TYPES, patterns_for
-from syncdoc.core.types import STAGE_OF, Document, DocumentSummary, ItemView, ProjectSummary
+from syncdoc.core.types import (
+    STAGE_OF,
+    Author,
+    AuthorKind,
+    Document,
+    DocumentSummary,
+    Entry,
+    ItemView,
+    ProjectSummary,
+)
 from syncdoc.infra import git
 
 server = MCPServer(
@@ -65,6 +74,12 @@ def _user(session) -> User:
     if user is None:
         raise Unauthorized("토큰 없음")
     return user
+
+
+def _agent_author(session) -> Author:
+    """SEQ-C2 — 토큰으로 들어온 요청은 발급자 계정. kind=agent, instructed_by=발급자, via=mcp."""
+    user = _user(session)
+    return Author(kind=AuthorKind.agent, user=user, instructed_by=user, via=Entry.mcp)
 
 
 def _author_json(d: DocumentSummary) -> dict | None:
@@ -283,3 +298,67 @@ async def _read_spec_file(workdir: Path, path: str) -> str:
         if local.exists():
             return local.read_text(encoding="utf-8")
         raise NotFound("file", path) from None
+
+
+@server.tool(
+    description="새 문서를 만든다. 문서 ID는 서버가 발급한다({코드}-{타입}-{번호}). 저장소의 docs/specs/_templates/ 템플릿이 적용되므로 body는 템플릿 구조를 따라야 한다. 항목 ID(#R12 같은 것)는 body에 직접 붙인다. 서버는 발급하지 않고 형식·유일성만 검사한다. 기존 문서를 고치려면 이 도구가 아니라 update_document를 써야 한다."
+)
+async def create_document(
+    project_code: str,
+    doc_type: str,
+    body: str,
+    message: str,
+    upstream_impact: list[str] | None = None,
+) -> CallToolResult:
+    """SYNC-API-002#create_document"""
+    try:
+        with db.session_scope() as s:
+            author = _agent_author(s)
+        r = await pipeline.save_pipeline(
+            Entry.mcp,
+            None,
+            doc_type,
+            body,
+            None,
+            project_code,
+            author,
+            message,
+            upstream_impact=upstream_impact,
+        )
+    except Problem as p:
+        return _problem(p)
+    return _ok(r.to_dict())
+
+
+@server.tool(
+    description="기존 문서의 본문을 교체해 새 버전을 만든다. 반드시 get_document로 받은 version_no를 expected_version에 넣어야 한다. 그 사이 문서가 바뀌었으면 version-conflict 에러에 현재 버전과 본문이 담기니, 그것을 읽고 병합해 다시 부른다. 본문에서 항목 ID가 사라지면 하위 참조 목록과 함께 item-deletion-needs-confirm 에러가 나며, 사람에게 확인받은 뒤 confirm_item_deletion=true로 다시 부른다. 저장 후 하위에 영향이 있으면 결과의 pending_decision_version_id가 채워지고, 전파 여부는 지시한 사람이 웹에서 결정한다. 승인 상태 문서를 고치면 검토중으로 내려간다. 이 변경이 상위 항목과 어긋나게 됐음을 알면 upstream_impact에 그 상위 항목을 넣는다."
+)
+async def update_document(
+    doc_id: str,
+    body: str,
+    expected_version: int,
+    message: str,
+    changed_items: list[str],
+    upstream_impact: list[str] | None = None,
+    confirm_item_deletion: bool = False,
+) -> CallToolResult:
+    """SYNC-API-002#update_document"""
+    try:
+        with db.session_scope() as s:
+            author = _agent_author(s)
+        r = await pipeline.save_pipeline(
+            Entry.mcp,
+            doc_id,
+            None,
+            body,
+            expected_version,
+            None,
+            author,
+            message,
+            changed_items=changed_items,
+            upstream_impact=upstream_impact,
+            confirm_item_deletion=confirm_item_deletion,
+        )
+    except Problem as p:
+        return _problem(p)
+    return _ok(r.to_dict())
