@@ -44,3 +44,8 @@ async def fetch(workdir: Path) -> str:
     """SYNC-MS-009#git.fetch"""
     await _run(workdir, "fetch", "origin")
     return (await _run(workdir, "rev-parse", "origin/HEAD")).strip()
+
+
+async def checkout(workdir: Path, ref: str) -> None:
+    """SYNC-MS-009#git.checkout"""
+    await _run(workdir, "checkout", "--force", ref)
