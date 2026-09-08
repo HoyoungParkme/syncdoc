@@ -1,0 +1,133 @@
+---
+doc_id: SYNC-CODE-001
+type: CODE
+title: 구현 계획 — 슬라이스 카드와 커밋 기록
+status: draft
+upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYNC-MS-005, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
+---
+
+# 구현 계획
+
+## 0. 이 문서가 다루는 것
+
+11단계 CODE. 개발 규약([[SYNC-STD-004]]) DEV-11~14대로 작업을 슬라이스 카드로 자르고, 각 카드에 커밋을 기록한다. **에이전트는 카드 하나를 받아 카드 안 참조만 따라간다.**
+
+슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
+
+**진행 상황**: 카드 8개 중 완료 0.
+
+---
+
+## 1. 슬라이스
+
+#### A 기반
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-INFRA-001]] 3·4·8장 · [[SYNC-DOM-002]] 1장 · [[SYNC-DOM-003]] · [[SYNC-STD-004#DEV-7]] |
+| 구현 | 폴더 구조(클래스 1장 그대로) · `pyproject.toml`(FastAPI·SQLAlchemy 2·Alembic·httpx·mcp) · `docker-compose.yml`(app + PostgreSQL) · `config.py`(환경 변수: DB URL·SECRET_KEY·GitHub OAuth·WEBHOOK_SECRET·REPOS_DIR) · `db.py`(엔진·세션) · 빈 FastAPI 앱 + `/health` |
+| DB | 엔티티 12개 SQLAlchemy 모델(클래스 2장) · Alembic `0001_initial` — 테이블 12개 + 인덱스(ERD·DD 3장) 한 번에 |
+| infra | [[SYNC-MS-009#git.clone]] ~ [[SYNC-MS-009#git.init_specs]] 11개 · [[SYNC-MS-009#github.verify_signature]] ~ [[SYNC-MS-009#github.get_user]] 3개 |
+| 인증 | [[SYNC-MS-006#AccountService.login_github]] ~ [[SYNC-MS-006#AccountService.create_placeholder]] 8개 · `/auth/*` 라우터 · 세션 |
+| 테스트 | 마이그레이션 up/down · git 어댑터는 임시 저장소로 · OAuth는 GitHub 응답 모킹 |
+| 선행 | 없음 |
+| 완료 | — |
+
+#### B1 대화하다가 명세가 쌓인다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-SCN-001#S1]] · [[SYNC-UC-001#UC-A1]] · [[SYNC-UC-001#UC-A6]] · [[SYNC-UC-001#UC-S1]] · [[SYNC-UC-001#UC-S2]] · [[SYNC-UC-001#UC-S7]] |
+| 구현 함수 | [[SYNC-MS-001#ProjectService.init_project]] · [[SYNC-MS-001#ProjectService.get]] · [[SYNC-MS-002#SpecService.validate]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-002#SpecService.issue_doc_id]] · [[SYNC-MS-002#SpecService.apply_frontmatter]] · [[SYNC-MS-002#SpecService.detect_deleted_items]] · [[SYNC-MS-002#SpecService.create]] · [[SYNC-MS-002#SpecService.save]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.get_item]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-003#ReferenceService.extract]] · [[SYNC-MS-003#ReferenceService.downstream]] · [[SYNC-MS-004#TrackingService.raise_broken]] · [[SYNC-MS-007#pipeline.save_pipeline]] · [[SYNC-MS-008#queries.document_list]] · [[SYNC-MS-008#queries.document_view]] · [[SYNC-MS-008#queries.item_view]] |
+| API | [[SYNC-API-002#init_project]] · [[SYNC-API-002#get_template]] · [[SYNC-API-002#list_documents]] · [[SYNC-API-002#get_document]] · [[SYNC-API-002#get_item]] · [[SYNC-API-002#create_document]] · [[SYNC-API-002#update_document]] · MCP 서버·인증([[SYNC-SEQ-001#SEQ-C2]]) |
+| 화면 | 없음. 이 슬라이스는 MCP만 |
+| 테스트 | 구현 함수의 테스트 관점 전부 · **E2E**: 에이전트가 `init_project` → `create_document` → `get_document` → `update_document`(버전 충돌·규약 위반·삭제 확인 세 갈래) → 저장소에 커밋이 있고 참조가 추출됨 |
+| 미결 처리 | `detect_impact`는 B3까지 스텁(빈 목록 반환). `changed_items`는 받아서 저장만 |
+| 선행 | A |
+| 완료 | — |
+
+#### B2 읽고 확정한다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-SCN-001#S2]] · [[SYNC-SCN-001#S5]] · [[SYNC-SCN-001#S6]] · [[SYNC-UC-001#UC-H2]] · UC-H3 · UC-H8 · UC-H9 · UC-H14 · UC-H15(댓글·규약 오류 묶음만) |
+| 구현 함수 | [[SYNC-MS-002#SpecService.change_status]] · [[SYNC-MS-002#SpecService.apply_status]] · [[SYNC-MS-002#SpecService.neighbors]] · [[SYNC-MS-002#SpecService.describe_items]] · [[SYNC-MS-002#SpecService.resolve_item]] · [[SYNC-MS-002#SpecService.recent_changes]] · [[SYNC-MS-003#ReferenceService.upstream]] · [[SYNC-MS-003#ReferenceService.downstream_of_document]] · [[SYNC-MS-003#ReferenceService.upstream_of_document]] · [[SYNC-MS-005#CommentService.list]] ~ [[SYNC-MS-005#CommentService.unresolved_in]] 8개 · [[SYNC-MS-004#TrackingService.flags_for_items]] · [[SYNC-MS-004#TrackingService.count_flags]] · [[SYNC-MS-004#TrackingService.count_flags_by_document]] · [[SYNC-MS-008#queries.project_summary]] · [[SYNC-MS-008#queries.project_detail]] · [[SYNC-MS-008#queries.item_references_view]] · [[SYNC-MS-008#queries.upstream_checklist]] · [[SYNC-MS-006#AccountService.issue_token]] · [[SYNC-MS-006#AccountService.list_tokens]] · [[SYNC-MS-006#AccountService.revoke_token]] |
+| API | [[SYNC-API-001#GET/api/projects]] · [[SYNC-API-001#GET/api/projects/{code}]] · [[SYNC-API-001#GET/api/projects/{code}/docs]] · [[SYNC-API-001#GET/api/docs/{docId}]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/references]] · [[SYNC-API-001#GET/api/docs/{docId}/upstream]] · [[SYNC-API-001#POST/api/docs/{docId}/status]] · [[SYNC-API-001#GET/api/docs/{docId}/comments]] · [[SYNC-API-001#POST/api/docs/{docId}/comments]] · [[SYNC-API-001#POST/api/comments/{id}/resolve]] · [[SYNC-API-001#GET/api/me]] · [[SYNC-API-001#GET/api/me/tokens]] · [[SYNC-API-001#POST/api/me/tokens]] · [[SYNC-API-001#DELETE/api/me/tokens/{id}]] · [[SYNC-API-001#POST/api/projects]] |
+| 화면 | [[SYNC-UI-002#UI-1]] · [[SYNC-UI-002#UI-2]] · [[SYNC-UI-002#UI-3]] · [[SYNC-UI-002#UI-4]] · [[SYNC-UI-002#UI-5]](유저용·원본 탭, 참조 패널, 댓글 패널, 상태 변경 + 상위 대조 다이얼로그) · [[SYNC-UI-002#UI-13]] · 유저용 탭 렌더링은 [[SYNC-STD-002]] V-* — `_tools/view_build.py`가 참조 구현 |
+| 테스트 | 구현 함수의 테스트 관점 · **E2E**: 민준이 웹에서 로그인 → 프로젝트 목록 → 문서 뷰 → 댓글 → 승인(상위 대조 포함) → 토큰 발급 → 그 토큰으로 MCP `get_document` |
+| 선행 | B1 |
+| 완료 | — |
+
+#### B3 상위 변경 추적
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-SCN-001#S4]] · [[SYNC-UC-001#UC-S3]] · UC-S4 · UC-H10 · UC-H11 · UC-H12 · UC-H13 · UC-H15 |
+| 구현 함수 | [[SYNC-MS-004#TrackingService.detect_impact]](스텁 해제) · [[SYNC-MS-004#TrackingService.create_pending]] · [[SYNC-MS-004#TrackingService.get_decision]] · [[SYNC-MS-004#TrackingService.record_decision]] · [[SYNC-MS-004#TrackingService.raise_flags]] · [[SYNC-MS-004#TrackingService.raise_upstream]] · [[SYNC-MS-004#TrackingService.get_flag]] · [[SYNC-MS-004#TrackingService.resolve]] · [[SYNC-MS-004#TrackingService.flags_for_assignee]] · [[SYNC-MS-004#TrackingService.flags_unassigned]] · [[SYNC-MS-004#TrackingService.flags_in_project]] · [[SYNC-MS-004#TrackingService.pending_decisions_for]] · [[SYNC-MS-002#SpecService.diff]] · [[SYNC-MS-002#SpecService.resolve_items]] · [[SYNC-MS-002#SpecService.last_author]] · [[SYNC-MS-002#SpecService.versions_instructed_by]] · [[SYNC-MS-002#SpecService.convention_error_docs_by]] · [[SYNC-MS-002#SpecService.documents_authored_by]] · [[SYNC-MS-003#ReferenceService.count_downstream]] · [[SYNC-MS-008#queries.todo]] · [[SYNC-MS-008#queries.decision_view]] · [[SYNC-MS-008#queries.flag_view]] · [[SYNC-MS-008#queries.project_items]] · [[SYNC-MS-008#queries.diff_with_impact]] |
+| API | [[SYNC-API-001#GET/api/todo]] · [[SYNC-API-001#GET/api/flags/{id}]] · [[SYNC-API-001#POST/api/flags/{id}/resolve]] · [[SYNC-API-001#GET/api/decisions/{versionId}]] · [[SYNC-API-001#POST/api/decisions/{versionId}]] · [[SYNC-API-001#GET/api/projects/{code}/flags]] · [[SYNC-API-001#GET/api/docs/{docId}/diff]] · MCP `update_document`의 `changed_items`·`upstream_impact` 실동작 |
+| 화면 | [[SYNC-UI-002#UI-10]] · [[SYNC-UI-002#UI-11]] · [[SYNC-UI-002#UI-12]] |
+| 테스트 | 구현 함수의 테스트 관점 · **E2E**: 에이전트가 PRD R12 수정(`changed_items`) → 호영 내 할 일에 전파 미결정 → 예 → 하위 4건 플래그 → 민준 내 할 일 → 확인 처리(수정 동반·수정 없음 둘 다) · 항목 삭제 → 끊어진 참조 · API가 UC-A6 어긋남 지정 → 하위 불일치 |
+| 선행 | B2 |
+| 완료 | — |
+
+#### B4 나머지 화면과 운영
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-SCN-001#S3]] · [[SYNC-SCN-001#S7]] · [[SYNC-UC-001#UC-H4]] · UC-H6 · UC-H7 · UC-H16 · UC-G1 · UC-S6 |
+| 구현 함수 | [[SYNC-MS-002#SpecService.list_versions]] · [[SYNC-MS-002#SpecService.mark_deleted]] · [[SYNC-MS-002#SpecService.revert]] · [[SYNC-MS-002#SpecService.list_items_by_project]] · [[SYNC-MS-002#SpecService.clear_index]] · [[SYNC-MS-002#SpecService.mark_convention_error]] · [[SYNC-MS-003#ReferenceService.references_among]] · [[SYNC-MS-003#ReferenceService.resolve_missing]] · [[SYNC-MS-003#ReferenceService.clear]] · [[SYNC-MS-001#ProjectService.list_projects]] · [[SYNC-MS-001#ProjectService.repo_status]] · [[SYNC-MS-001#ProjectService.rebuild_index]] · [[SYNC-MS-007#pipeline.process_commit]] · [[SYNC-MS-007#pipeline.rebuild]] · [[SYNC-MS-008#queries.graph_view]] · [[SYNC-API-002#get_references]] |
+| API | [[SYNC-API-001#GET/api/projects/{code}/graph]] · [[SYNC-API-001#GET/api/docs/{docId}/versions]] · [[SYNC-API-001#POST/api/docs/{docId}/revert]] · [[SYNC-API-001#POST/hooks/github]] · [[SYNC-API-001#GET/api/admin/repos]] · [[SYNC-API-001#POST/api/admin/repos/{code}/rebuild]] · 폴링 스케줄러 |
+| 화면 | [[SYNC-UI-002#UI-7]] · [[SYNC-UI-002#UI-8]] · [[SYNC-UI-002#UI-9]] · [[SYNC-UI-002#UI-14]] |
+| 테스트 | 구현 함수의 테스트 관점 · **E2E**: GitHub에 직접 push → webhook → 문서 갱신 · 서버 꺼둔 뒤 push → 켜면 따라잡음 · DB 비우고 재구축 → 참조 복원, 플래그는 유지 · 되돌리기 → 새 버전 + 삭제 확인 |
+| 선행 | B3 |
+| 완료 | — |
+
+#### C 통합·배포
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-INFRA-001]] 5·7·8장 |
+| 구현 | Cloudflare Tunnel 고정 주소 · GitHub OAuth 앱 등록(callback URL) · webhook 등록 · `docker compose up` 기동 스크립트 · 기동 시 따라잡기 · 5분 폴링 |
+| 첫 사용 | 싱크독 저장소를 싱크독에 `init_project`(import_existing=true) → 문서 25개가 인덱스됨 → 참조 777개 확인 → 이 문서를 싱크독에서 승인 |
+| 테스트 | 노트북 밖에서 접속 · 팀원 로그인 · 팀원 토큰으로 MCP |
+| 선행 | B4 |
+| 완료 | — |
+
+---
+
+## 2. 통합 테스트 시나리오
+
+시나리오 S1~S7을 그대로 E2E 테스트로. 각 슬라이스의 `테스트` 행에 나눠 들어가 있다. 전부 통과하면 PRD 성공지표 측정을 시작한다.
+
+| 시나리오 | 슬라이스 | 검증하는 것 |
+|---|---|---|
+| [[SYNC-SCN-001#S1]] | B1 | MCP로 문서가 쌓이고 커밋·참조가 생긴다 |
+| [[SYNC-SCN-001#S2]] | B2 | 웹에서 읽고 댓글 달고 승인한다 |
+| [[SYNC-SCN-001#S3]] | B1·B4 | 코딩 중 에이전트가 항목·참조를 조회한다 |
+| [[SYNC-SCN-001#S4]] | B3 | 상위 변경이 하위 플래그로, 하위 불일치가 상위 플래그로 |
+| [[SYNC-SCN-001#S5]] | B2 | 다른 툴 팀원이 토큰 발급 후 MCP로 붙는다 |
+| [[SYNC-SCN-001#S6]] | B2·B4 | 그래프·순서 읽기·원본 탭 |
+| [[SYNC-SCN-001#S7]] | B4 | 플랫폼 없이 push한 것이 반영된다 |
+
+---
+
+## 3. CODE 단계 전 결정
+
+MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
+
+- [x] **삭제된 파일 push** → 문서는 남기고 `draft` + 규약 오류 `file.deleted`, 항목 전부 `is_deleted`, 하위에 끊어진 참조. `SpecService.mark_deleted` 신설 (B4)
+- [x] **같은 문서 안 참조 전파** → 전파한다. 같은 문서 항목도 대상 (B3)
+- [x] **원인 항목이 여럿일 때** → 원인마다 플래그 따로. 확인도 따로 (B3)
+
+- [x] **원격 기본 브랜치** → `main` 고정 (B1)
+- [x] **React 라이브러리** → react-markdown+remark-gfm · mermaid · react-flow+dagre · diff 직접 (B2·B4). 인프라 3장에 기록
+
+결정 전부 끝. A 카드부터 시작할 수 있다.
+
+## 4. 커밋·PR 목록
+
+슬라이스 카드의 `완료` 행에 기록한다. PR 하나 = 슬라이스 하나(DEV-15). 아직 없음.
+
+## 5. 미결사항
+
+- [ ] B1에서 `detect_impact` 스텁 — B3에서 해제할 때 B1 카드를 미완으로 되돌리나 (STD-004 미결과 같음)

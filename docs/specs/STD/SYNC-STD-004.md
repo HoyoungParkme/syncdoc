@@ -1,0 +1,157 @@
+---
+doc_id: SYNC-STD-004
+type: STD
+title: 개발 규약 — 코드 파트 표준
+status: draft
+upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
+---
+
+# 개발 규약
+
+## 0. 이 문서가 다루는 것
+
+명세 체인 10단계가 끝난 뒤 **코드로 가는 법**. 읽는 사람은 코드를 짜는 에이전트와 그걸 시키는 사람이다. 명세 작성 규약([[SYNC-STD-001]])이 "문서를 어떻게 쓰나"라면 이건 "그 문서로 코드를 어떻게 짜나".
+
+세 가지를 정한다 — 코드가 지켜야 할 규칙(1·2장), 작업을 어떻게 자르나(3장), 언제 끝났다고 하나(4장). 프로젝트마다 다른 것(어느 슬라이스를 어떤 순서로)은 그 프로젝트의 CODE 문서([[SYNC-CODE-001]])에 둔다.
+
+**원칙** — 코드는 MINISPEC을 옮긴 것이다. MINISPEC에 없는 함수를 만들면 MINISPEC을 먼저 고친다. 명세 없는 코드는 싱크독이 막으려는 바로 그것이다.
+
+---
+
+## 1. 코딩 규약
+
+#### DEV-1 폴더와 파일은 클래스 명세 1장 그대로
+
+`syncdoc/core/{묶음}/models.py · repository.py · service.py`, `core/pipeline.py`, `core/queries.py`, `web/routers/*.py`, `mcp/tools.py`, `infra/git.py · github.py`. 새 폴더를 만들려면 클래스 명세를 먼저 고친다.
+
+테스트는 거울 구조 — `tests/core/spec/test_service.py`가 `core/spec/service.py`를 검사한다.
+
+#### DEV-2 이름은 명세의 이름
+
+클래스·메서드·테이블·컬럼 이름은 클래스 명세·ERD·DD·MINISPEC에 적힌 그대로. `SpecService.save`를 `save_document`로 바꾸지 않는다. 바꿔야 하면 명세부터.
+
+Python: 클래스 `PascalCase`, 함수·변수 `snake_case`, 상수 `UPPER`. 테이블·컬럼 `snake_case`. React: 컴포넌트 `PascalCase`, 파일명 = 컴포넌트명.
+
+#### DEV-3 함수 docstring 첫 줄 = MINISPEC 항목 ID
+
+```python
+async def save_pipeline(...):
+    """SYNC-MS-007#pipeline.save_pipeline"""
+```
+
+코드에서 명세로 돌아가는 유일한 고리. 검사기가 이걸로 MINISPEC↔코드 일치를 대조한다(4장).
+
+#### DEV-4 타입 힌트 필수, 형식은 도구가
+
+모든 함수 시그니처에 타입 힌트. MINISPEC 시그니처와 같아야 한다. 포맷은 `ruff format`, 린트는 `ruff check` — 손으로 맞추지 않는다. React는 `prettier` + `eslint`.
+
+#### DEV-5 에러는 problem+json 타입 하나에 예외 클래스 하나
+
+`urn:syncdoc:version-conflict` ↔ `VersionConflict(Problem)`. API 명세 2장 에러 표와 1:1. 새 에러는 API 명세부터.
+
+#### DEV-6 로그에 남기지 않는 것
+
+토큰 원문(MCP·GitHub), 비밀키, 본문 전체. 로그는 `doc_id`·`version_no`·`user_id`·`entry`·소요 시간까지.
+
+---
+
+## 2. DB 물리 규칙
+
+#### DEV-7 마이그레이션은 Alembic, 리비전 하나 = ERD 변경 하나
+
+- 첫 리비전 `0001_initial` = ERD·DD 테이블 전부 (12개). 이후 리비전은 ERD·DD가 바뀔 때만
+- 리비전 메시지 = 바뀐 ERD 항목: `0002_add_flags_upstream_impact`
+- 열거형은 DB enum이 아니라 `varchar` + 앱 검증 (ERD 설계 규칙). 값 추가에 마이그레이션 없음
+- `downgrade`를 반드시 쓴다. 되돌릴 수 없는 리비전은 리뷰에서 막는다
+
+#### DEV-8 인덱스는 ERD·DD 3장에 적힌 것만
+
+FK 전부, unique 제약 전부, 그리고 ERD·DD 3장 인덱스 표. 쿼리가 느리다고 코드에서 인덱스를 추가하지 않는다 — ERD·DD 3장에 먼저 적고 리비전을 만든다.
+
+#### DEV-9 정규화는 3NF, 예외는 명시
+
+모든 테이블 3NF. 의도적 비정규화는 둘뿐이고 ERD·DD에 이유가 있다 — `documents.current_body`(조회 캐시), `propagation_decisions.affected_pks`(저장 시점 스냅샷). 셋째가 생기면 ERD·DD에 이유를 적는다.
+
+#### DEV-10 트랜잭션 경계는 MINISPEC이 정한 곳
+
+`pipeline.save_pipeline` 6단계, `pipeline.rebuild` 3~9단계처럼 MINISPEC에 "한 트랜잭션"이라고 적힌 범위가 트랜잭션이다. 서비스 메서드는 트랜잭션을 열지 않는다 — 호출자의 것 안에서 돈다.
+
+---
+
+## 3. 작업 단위 — 슬라이스 카드
+
+#### DEV-11 개발 순서는 기반 → 슬라이스 → 통합
+
+```
+A  기반 (수평)     뼈대 · DB 전체 · infra 어댑터 · 인증
+                   기능이 아니라 땅이다. 수직으로 자를 수 없다
+B  슬라이스 (수직)  시나리오 하나 = 슬라이스 하나. DB→서비스→조율자→입구→화면→테스트를 끝까지
+                   시나리오 우선순위 순서. 앞 슬라이스가 만든 걸 뒤 슬라이스가 쓴다
+C  통합·배포       외부 연결 · 첫 사용
+```
+
+계층별(전부 DB → 전부 서비스 → …)도 기능별(모든 걸 슬라이스로)도 아니다. 기반은 계층으로, 기능은 슬라이스로. 에이전트가 "아직 없는 걸 부르는" 일이 없으면서 B1이 끝나면 뭐가 돌아간다.
+
+#### DEV-12 슬라이스 카드 형식
+
+프로젝트 CODE 문서에 슬라이스마다 항목 하나. **에이전트는 카드 하나를 받아 카드 안 참조만 따라간다.**
+
+```markdown
+#### B3 상위 변경 추적
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-SCN-001#S4]] · UC-H10 · H11 · S3 · S4 |
+| 구현 함수 | [[SYNC-MS-004#TrackingService.detect_impact]] · … (MINISPEC 항목 전부) |
+| API | [[SYNC-API-001#POST/api/decisions/{versionId}]] · … |
+| 화면 | [[SYNC-UI-002#UI-10]] · UI-11 · UI-12 |
+| 테스트 | 구현 함수의 테스트 관점 전부 + S4를 E2E로 |
+| 선행 | B1 · B2 |
+| 완료 | (커밋 기록란. DEV-14) |
+```
+
+`구현 함수`에 없는 함수를 짜게 되면 카드가 틀린 것이다. 카드를 고치고, 필요하면 MINISPEC을 고친다.
+
+#### DEV-13 에이전트 작업 순서
+
+```
+1. 카드를 읽는다. 선행 슬라이스가 완료인지 확인
+2. 카드의 참조를 전부 연다 — 시나리오·유스케이스(왜) → MINISPEC(어떻게) → API·화면(입구)
+3. MINISPEC 순서대로 구현. 함수 하나 = 커밋 하나. docstring에 항목 ID
+4. MINISPEC 테스트 관점을 테스트로. 통과할 때까지
+5. 슬라이스 E2E (시나리오 흐름 그대로)
+6. 완료 조건(DEV-14) 확인 → CODE 문서 완료란에 기록 → 다음 카드
+```
+
+막히면 — 명세가 틀렸거나 모자란 것이다. 코드로 우회하지 않고 명세를 고치고 그 문서에 플래그가 붙게 한다.
+
+---
+
+## 4. 완료 조건
+
+#### DEV-14 슬라이스가 끝났다는 것
+
+| 조건 | 확인 방법 |
+|---|---|
+| 카드의 구현 함수가 전부 있다 | `docstring` 항목 ID 대조. MINISPEC에 있는데 코드에 없거나 그 반대면 미완 |
+| 시그니처가 MINISPEC과 같다 | 검사기가 타입 힌트와 대조 |
+| 테스트 통과 | 단위(테스트 관점) + E2E(시나리오) 전부 |
+| 린트·포맷 통과 | `ruff check` · `ruff format --check` |
+| 명세 통과 | `validate.py` 위반 0 (코드가 명세를 고쳤으면) |
+| CODE 문서 기록 | 슬라이스 카드 완료란에 커밋 해시·PR·날짜 |
+
+여섯 다 되어야 다음 카드. 하나라도 빠지면 그 슬라이스는 미완이고 다음 슬라이스의 `선행` 조건이 안 된다.
+
+#### DEV-15 커밋·PR
+
+- 커밋 메시지 규격: `code(슬라이스): 함수명 — 요약` 예: `code(B3): TrackingService.detect_impact — diff 기반 판정`. 명세 커밋(`spec(…)`)과 구분
+- PR = 슬라이스 하나. PR 설명 = 카드 내용 + 완료 조건 체크
+- 리뷰는 코드가 아니라 **카드 대조** — 구현 함수 목록과 코드가 맞는지, 테스트 관점이 테스트에 있는지
+
+---
+
+## 5. 미결사항
+
+- [ ] MINISPEC↔코드 일치 검사기 — docstring 항목 ID로 대조. `validate.py`처럼 규약의 코드화. 아직 없다
+- [ ] React 쪽 "함수 = MINISPEC 항목" 대응 — 컴포넌트는 MINISPEC이 없다. 와이어프레임 요소 ID를 컴포넌트에 어떻게 매핑할지
+- [ ] 슬라이스가 앞 슬라이스 코드를 고쳐야 할 때 — 앞 카드를 미완으로 되돌리나, 새 카드를 만드나

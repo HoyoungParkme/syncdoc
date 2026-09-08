@@ -1,0 +1,7 @@
+docs/views/
+__pycache__/
+*.pyc
+.env
+.venv/
+node_modules/
+tools/data.json
