@@ -68,7 +68,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 1. `repo = project.get(코드).repository`. 코드는 `doc_id` 앞부분 또는 생성 시 인자. **저장소 락 획득** (`asyncio.Lock`, 저장소별). 이후 전부 락 안
 2. if `doc_id is not None` → `document = spec.get_document(doc_id)`, `doc_type = document.doc_type` · if 없음 → `! not-found`
    (`entry == github`도 같다 · if github 경로에서 없음 → process_commit이 `doc_id=None`으로 다시 부른다)
-3. if `doc_id is None` (생성) → `doc_id = spec.issue_doc_id(project_id, doc_type)`, `body = spec.apply_frontmatter(body, doc_id, doc_type, "draft")`
+3. if `doc_id is None` (생성) → `doc_id = spec.issue_doc_id(project_id, project.code, doc_type)`, `body = spec.apply_frontmatter(body, doc_id, doc_type, "draft")`
 4. `(violations, warnings) = spec.validate(body, doc_type, entry, current_status=document.status if document else None)`
    - if `violations and entry != github` → `! convention-violation {violations, warnings}`, 락 해제
    - if `violations and entry == github` → 계속. 8단계에 `has_convention_error=True`로 전달
@@ -79,9 +79,9 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 8. **트랜잭션 시작**
    - if 생성 → `version = spec.create(project_id, doc_id, doc_type, body, commit_hash, author)`
    - if `entry == web_status` → `spec.apply_status(document, new_body, commit_hash, user, reason)` (Document.status·current_body 갱신 + StatusChange). **Version 없음.** 9~12 건너뛰고 13으로
-   - else → `version = spec.save(document, body, commit_hash, author, deleted, has_convention_error, warnings)`
+   - else → `version = spec.save(document, body, commit_hash, author, deleted, validate_result=(4단계 결과 if entry == github else None))`
 9. `deleted`마다 `tracking.raise_broken(pk)`
-10. `reference.extract(document_id, version.id, body)`
+10. `reference.extract(document_id, version.id, body, item_pks=save가 돌려준 {item_id: pk}, upstream_doc_ids=frontmatter upstream)`
 11. `affected = tracking.detect_impact(document_id, prev_version_id, version.id, changed_items)` · if `affected` → `pending_id = tracking.create_pending(version.id)` · else `pending_id = None`
 12. if `upstream_impact` → 각각 `spec.resolve_item(doc, item)` · if 못 찾음 → `warnings`에 `upstream_impact.unknown` 추가하고 건너뜀 · `tracking.raise_upstream(pks, document_id, version.id, cause_item_pk=None)`
 13. `collab.relocate(document_id, old_body, body)`
