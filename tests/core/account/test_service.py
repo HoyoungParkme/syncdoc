@@ -112,3 +112,25 @@ def test_user_by_login_returns_placeholder_too(db_session: Session) -> None:
     assert svc.user_by_login("real").id == u.id
     assert svc.user_by_login("ghost").id == p.id
     assert svc.user_by_login("nobody") is None
+
+
+# ── create_placeholder ──
+def test_create_placeholder_inserts_unregistered_user(db_session: Session) -> None:
+    svc = AccountService(db_session)
+    p = svc.create_placeholder("ghost")
+    assert (p.github_login, p.display_name, p.github_user_id, p.github_token_encrypted) == (
+        "ghost",
+        "ghost",
+        None,
+        None,
+    )
+    with pytest.raises(Unauthorized):
+        AccountService.github_token_for(p)
+
+
+def test_create_placeholder_twice_returns_same_row(db_session: Session) -> None:
+    svc = AccountService(db_session)
+    a = svc.create_placeholder("ghost")
+    b = svc.create_placeholder("ghost")
+    assert a.id == b.id
+    assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 1

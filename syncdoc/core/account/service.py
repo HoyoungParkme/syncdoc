@@ -6,6 +6,7 @@ import secrets
 from datetime import UTC, datetime
 
 from cryptography.fernet import Fernet
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from syncdoc.config import settings
@@ -64,6 +65,23 @@ class AccountService:
     def user_by_login(self, login: str) -> User | None:
         """SYNC-MS-006#AccountService.user_by_login"""
         return self.repo.user_by_login(login)
+
+    def create_placeholder(self, login: str) -> User:
+        """SYNC-MS-006#AccountService.create_placeholder"""
+        try:
+            with self.session.begin_nested():
+                return self.repo.add_user(
+                    User(
+                        github_login=login,
+                        github_user_id=None,
+                        display_name=login,
+                        github_token_encrypted=None,
+                    )
+                )
+        except IntegrityError:
+            existing = self.repo.user_by_login(login)
+            assert existing is not None
+            return existing
 
     @staticmethod
     def github_token_for(user: User) -> str:
