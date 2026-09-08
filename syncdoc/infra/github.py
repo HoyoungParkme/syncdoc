@@ -7,6 +7,7 @@ import httpx
 
 from syncdoc.config import settings
 from syncdoc.core.errors import Unauthorized
+from syncdoc.core.types import GithubUser
 
 
 def verify_signature(body: bytes, header: str) -> bool:
@@ -31,3 +32,16 @@ async def exchange_code(code: str) -> str:
     if not token:
         raise Unauthorized("GitHub code 교환 실패")
     return token
+
+
+async def get_user(token: str) -> GithubUser:
+    """SYNC-MS-009#github.get_user"""
+    async with httpx.AsyncClient() as client:
+        r = await client.get(
+            "https://api.github.com/user",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+        )
+    if not r.is_success:
+        raise Unauthorized("GitHub 사용자 조회 실패")
+    d = r.json()
+    return GithubUser(id=d["id"], login=d["login"], name=d.get("name") or d["login"])
