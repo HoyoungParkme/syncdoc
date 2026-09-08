@@ -83,8 +83,8 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
    - if `entry == web_status` → `spec.apply_status(document, new_body, commit_hash, user, reason)` (Document.status·current_body 갱신 + StatusChange). **Version 없음.** 9~12 건너뛰고 13으로
    - else → `version = spec.save(document, body, commit_hash, author, deleted, validate_result=(4단계 결과 if entry == github else None))`
 9. `deleted`마다 `tracking.raise_broken(pk)`
-10. `reference.extract(document_id, version.id, body, item_pks=save가 돌려준 {item_id: pk}, upstream_doc_ids=frontmatter upstream)`
-11. `affected = tracking.detect_impact(document_id, prev_version_id, version.id, changed_items)` · if `affected` → `pending_id = tracking.create_pending(version.id)` · else `pending_id = None`
+10. `reference.extract(document_id, version.id, body, item_pks=spec.item_pks(document_id), upstream_doc_ids=frontmatter upstream)`
+11. `affected = tracking.detect_impact(document_id, prev_version_id=document.current_version_id (2단계에서 읽은 것. 신규면 None), version.id, changed_items)` · if `affected` → `pending_id = tracking.create_pending(version.id)` · else `pending_id = None`
 12. if `upstream_impact` → 각각 `spec.resolve_item(doc, item)` · if 못 찾음 → `warnings`에 `upstream_impact.unknown` 추가하고 건너뜀 · `tracking.raise_upstream(pks, document_id, version.id, cause_item_pk=None)`
 13. `collab.relocate(document_id, old_body, body, old_version_no=document.current_version_no)`
 14. **커밋.** 락 해제
