@@ -43,7 +43,7 @@ async def save_pipeline(...):
 
 #### DEV-4 타입 힌트 필수, 형식은 도구가
 
-모든 함수 시그니처에 타입 힌트. MINISPEC 시그니처와 같아야 한다. 포맷은 `ruff format`, 린트는 `ruff check` — 손으로 맞추지 않는다. React는 `prettier` + `eslint`.
+모든 함수 시그니처에 타입 힌트. MINISPEC 시그니처와 같아야 한다. `from __future__ import annotations`를 모든 모듈에 — `list[...]` 표기가 MINISPEC과 같게. 포맷은 `ruff format`, 린트는 `ruff check` — 손으로 맞추지 않는다. `tests/`는 E501 무시, 중간 커밋은 F401 무시(pyproject에 명시). React는 `prettier` + `eslint`.
 
 #### DEV-5 에러는 problem+json 타입 하나에 예외 클래스 하나
 
@@ -119,6 +119,8 @@ C  통합·배포       외부 연결 · 첫 사용
 
 `구현 함수`에 없는 함수를 짜게 되면 카드가 틀린 것이다. 카드를 고치고, 필요하면 MINISPEC을 고친다.
 
+**카드는 호출 그래프로 닫혀 있어야 한다.** 카드의 함수가 부르는 함수는 (a) 같은 카드에 있거나 (b) 선행 카드에서 완료됐거나 (c) 카드에 "스텁"으로 명시되어야 한다. 스텁은 둘뿐 — 빈 결과를 돌려주거나(`detect_impact → []`), `not-implemented` 에러를 내거나(`import_existing → 501`). 조용히 다르게 동작하는 스텁은 안 된다. 카드를 쓸 때 MINISPEC의 `호출하는 것`을 따라 닫힘을 확인한다.
+
 #### DEV-13 에이전트 작업 순서
 
 ```
@@ -159,6 +161,6 @@ C  통합·배포       외부 연결 · 첫 사용
 
 ## 5. 미결사항
 
-- [x] MINISPEC↔코드 일치 검사기 — 완료. `python tools/check_code.py [--doc …] [--items …]` — docstring 항목 ID로 MS 항목과 코드 함수를 잇고 async·인자·타입·기본값·반환을 대조한다. DEV-14의 첫 두 조건이 이걸로 판정된다
+- [x] MINISPEC↔코드 일치 검사기 — `tools/check_code.py`. AST로 docstring 항목 ID·시그니처 대조. `--doc`·`--items`로 범위 지정
 - [ ] React 쪽 "함수 = MINISPEC 항목" 대응 — 컴포넌트는 MINISPEC이 없다. 와이어프레임 요소 ID를 컴포넌트에 어떻게 매핑할지
 - [ ] 슬라이스가 앞 슬라이스 코드를 고쳐야 할 때 — 앞 카드를 미완으로 되돌리나, 새 카드를 만드나
