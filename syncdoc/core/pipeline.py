@@ -2,7 +2,7 @@
 
 세 입구(MCP·웹·GitHub)가 전부 save_pipeline로 들어온다. 저장소 단위 asyncio.Lock(프로세스 내).
 세션은 여기서 연다(DEV-10 — 서비스는 세션을 열지 않는다). push가 DB 트랜잭션 앞이다.
-B1: save_pipeline. entry=web_status 분기는 B2(apply_status)에서.
+B1: save_pipeline · B2: entry=web_status 분기(apply_status).
 """
 
 from __future__ import annotations
@@ -140,7 +140,19 @@ async def _run(
     assert commit_hash is not None
     # 8. 트랜잭션
     if entry == Entry.web_status:
-        raise NotImplementedYet("save_pipeline(entry=web_status) — B2 apply_status")
+        assert document is not None
+        reason = message.split("\n\n", 1)[1].strip() or None if "\n\n" in message else None
+        spec.apply_status(document, body, commit_hash, author.user, reason)
+        collab.relocate(document.id, document.body, body, document.current_version_no)
+        s.commit()
+        return SaveResult(
+            doc_id,
+            document.current_version_no,
+            commit_hash,
+            spec.get_document(doc_id).status,
+            None,
+            [],
+        )
     if document is None:
         version = spec.create(project.id, doc_id, doc_type, body, commit_hash, author)
         prev_version_id = None

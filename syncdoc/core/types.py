@@ -246,6 +246,45 @@ class ItemView:
     flags: list[str] = field(default_factory=list)
 
 
+@dataclass
+class ItemRef:
+    """SYNC-API-001 ItemRef. 문서 전체 참조면 item_id=None."""
+
+    doc_id: str | None
+    item_id: str | None
+    display_name: str | None
+    raw_target: str = ""
+    is_missing: bool = False
+    is_deleted: bool = False
+
+
+@dataclass
+class ItemReferences:
+    doc_id: str
+    item_id: str
+    upstream: list[ItemRef]
+    downstream: list[ItemRef]
+    flags: list[Any]
+
+
+@dataclass
+class UpstreamCheck:
+    target: ItemRef
+    target_version_no: int
+    target_status: str
+    referenced_from: list[str]
+
+
+@dataclass
+class CommentSummary:
+    id: int
+    doc_id: str
+    line_no: int
+    excerpt: str
+    author: UserRef | None
+    created_at: datetime
+
+
 @dataclass(frozen=True)
 class RefEdge:
     from_item_pk: int | None

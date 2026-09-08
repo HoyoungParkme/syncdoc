@@ -50,6 +50,16 @@ class SpecRepository:
             return []
         return list(self.session.scalars(select(Item).where(Item.id.in_(pks))))
 
+    def items_with_doc_id(self, pks: list[int]) -> list[tuple[Item, str]]:
+        if not pks:
+            return []
+        stmt = (
+            select(Item, Document.doc_id)
+            .join(Document, Document.id == Item.document_id)
+            .where(Item.id.in_(pks))
+        )
+        return [(i, d) for i, d in self.session.execute(stmt)]
+
     # versions
     def latest_version(self, document_id: int) -> Version | None:
         stmt = (

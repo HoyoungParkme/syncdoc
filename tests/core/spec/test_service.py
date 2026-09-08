@@ -502,3 +502,43 @@ def test_last_author_neighbors_resolve_item(db_session: Session) -> None:
     with pytest.raises(ItemDeleted):
         svc.resolve_item("EXMP-RFQ-001", "Q2")
     assert rfq_item.version_no == 1
+
+
+# ── apply_status ──
+def test_apply_status_records_change_without_version(db_session: Session) -> None:
+    svc, a, d = _seed(db_session)
+    new_body = PRD.replace("status: draft", "status: review")
+    svc.apply_status(d, new_body, "c0ffee", a.user, "검토 시작")
+    d2 = svc.get_document("EXMP-PRD-001")
+    assert d2.status == "review" and d2.body == new_body and d2.current_version_no == 1
+    assert db_session.execute(text("SELECT count(*) FROM versions")).scalar() == 1
+    row = db_session.execute(
+        text("SELECT from_status, to_status, reason, commit_hash FROM status_changes")
+    ).one()
+    assert row == ("draft", "review", "검토 시작", "c0ffee")
+    svc.apply_status(
+        d2,
+        new_body.replace("status: review", "status: approved"),
+        None,
+        a.user,
+        None,
+        to="approved",
+    )
+    assert svc.get_document("EXMP-PRD-001").status == "approved"
+
+
+# ── describe_items ──
+def test_describe_items_items_and_documents(db_session: Session) -> None:
+    svc, a, d = _seed(db_session)
+    pks = {i.item_id: i.pk for i in d.items}
+    db_session.execute(text("UPDATE items SET is_deleted=true WHERE item_id='N1'"))
+    got = svc.describe_items([pks["G1"], pks["N1"], 999_999])
+    assert (got[pks["G1"]].doc_id, got[pks["G1"]].item_id, got[pks["G1"]].display_name) == (
+        "EXMP-PRD-001",
+        "G1",
+        "첫 목표",
+    )
+    assert got[pks["N1"]].is_deleted is True and 999_999 not in got
+    assert svc.describe_items([]) == {}
+    doc_ref = svc.describe_items([d.id])  # 문서 pk → item_id=None, 제목
+    assert doc_ref[d.id].item_id is None and doc_ref[d.id].display_name == "예시 제품"

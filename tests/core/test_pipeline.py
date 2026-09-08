@@ -184,15 +184,28 @@ async def test_github_entry_saves_violations_as_convention_error(scoped: Session
     assert scoped.execute(text("SELECT via FROM versions WHERE version_no=2")).scalar() == "github"
 
 
-async def test_web_status_entry_is_b2(scoped: Session, proj) -> None:
+async def test_web_status_entry_commits_status_only(scoped: Session, proj) -> None:
     await create(proj)
     human = Author(
         kind=AuthorKind.human, user=proj["user"], instructed_by=None, via=Entry.web_status
     )
-    with pytest.raises(NotImplementedYet):
-        await pipeline.save_pipeline(
-            Entry.web_status, "EXMP-PRD-001", None, PRD_BODY, 1, None, human, "status(...)"
-        )
+    body = PRD_BODY.replace("status: draft", "status: review")
+    r = await pipeline.save_pipeline(
+        Entry.web_status,
+        "EXMP-PRD-001",
+        None,
+        body,
+        1,
+        None,
+        human,
+        "status(EXMP-PRD-001): draft → review\n\n이유",
+    )
+    assert (r.version_no, r.status, r.pending_decision_version_id) == (1, "review", None)
+    assert scoped.execute(text("SELECT count(*) FROM versions")).scalar() == 1
+    assert scoped.execute(text("SELECT reason, commit_hash FROM status_changes")).one() == (
+        "이유",
+        r.commit_hash,
+    )
 
 
 async def test_concurrent_saves_are_serialized_second_conflicts(scoped: Session, proj) -> None:
@@ -227,3 +240,65 @@ async def test_relocate_moves_comment_on_update(scoped: Session, proj) -> None:
         proj, "EXMP-PRD-001", PRD_BODY.replace("# 예시 제품 PRD", "# 예시 제품 PRD\n추가"), 1
     )
     assert c.line_no == n + 1
+
+
+# ── change_status (SpecService → pipeline web_status) ──
+async def test_change_status_commits_frontmatter_no_version(scoped: Session, proj) -> None:
+    from syncdoc.core.errors import StatusBlocked, UpstreamReviewRequired
+
+    await create(proj, DocType.RFQ, RFQ)
+    r = await create(proj)
+    svc = SpecService(scoped)
+    user = proj["user"]
+    # review로 — 상위 대조 없이 됨
+    d = await svc.change_status("EXMP-PRD-001", "review", user, "검토 시작")
+    assert d.status == "review" and d.current_version_no == 1
+    assert (
+        g(proj["repos"]["remote"], "log", "-1", "--format=%s", "main")
+        == "status(EXMP-PRD-001): draft → review"
+    )
+    row = scoped.execute(
+        text("SELECT from_status, to_status, reason, commit_hash FROM status_changes")
+    ).one()
+    assert row[:3] == ("draft", "review", "검토 시작") and row[3] == g(
+        proj["repos"]["remote"], "rev-parse", "main"
+    )
+    assert (
+        scoped.execute(
+            text("SELECT count(*) FROM versions WHERE document_id=:d"), {"d": d.id}
+        ).scalar()
+        == 1
+    )
+    assert "status: review" in svc.get_document("EXMP-PRD-001").body
+    # 같은 상태로 다시 → 커밋 없음
+    head = g(proj["repos"]["remote"], "rev-parse", "main")
+    await svc.change_status("EXMP-PRD-001", "review", user, None)
+    assert g(proj["repos"]["remote"], "rev-parse", "main") == head
+    # approved인데 upstream_reviewed=false → 거부
+    with pytest.raises(UpstreamReviewRequired):
+        await svc.change_status("EXMP-PRD-001", "approved", user, None)
+    # 정상 승인 + 어긋난 상위 지정 → Q2에 upstream_impact 플래그
+    d2 = await svc.change_status(
+        "EXMP-PRD-001",
+        "approved",
+        user,
+        "합의",
+        upstream_reviewed=True,
+        upstream_mismatch=["EXMP-RFQ-001#Q2"],
+    )
+    assert d2.status == "approved"
+    q2 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q2")
+    assert scoped.execute(text("SELECT kind, target_item_id FROM flags")).all() == [
+        ("upstream_impact", q2)
+    ]
+    # 규약 오류·미완성 문서는 approved 불가
+    # 미완성 경고를 DB에 둔 문서 (mcp 경로는 warnings를 DB에 안 쓴다 — MS-007 4·8단계 불일치, 보고)
+    scoped.execute(
+        text(
+            """UPDATE documents SET incomplete_warnings='["section.missing: 요구"]' WHERE doc_id='EXMP-RFQ-001'"""
+        )
+    )
+    with pytest.raises(StatusBlocked) as ei:
+        await svc.change_status("EXMP-RFQ-001", "approved", user, None, upstream_reviewed=True)
+    assert "section.missing: 요구" in ei.value.extra["warnings"]
+    assert r.doc_id == "EXMP-PRD-001"
