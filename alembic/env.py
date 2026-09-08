@@ -4,6 +4,13 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
+# 모델 12개 전부 metadata에 올린다 (import 부작용)
+import syncdoc.core.account.models  # noqa: E402, F401
+import syncdoc.core.collab.models  # noqa: E402, F401
+import syncdoc.core.project.models  # noqa: E402, F401
+import syncdoc.core.reference.models  # noqa: E402, F401
+import syncdoc.core.spec.models  # noqa: E402, F401
+import syncdoc.core.tracking.models  # noqa: E402, F401
 from alembic import context
 from syncdoc.config import settings
 from syncdoc.db import Base
