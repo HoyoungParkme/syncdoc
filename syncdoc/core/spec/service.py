@@ -16,8 +16,6 @@ from syncdoc.core.errors import (
     ConventionViolation,
     ItemDeleted,
     NotFound,
-    StatusBlocked,
-    UpstreamReviewRequired,
 )
 from syncdoc.core.markdown import DOC_ID, HEADING, REF, cut_blocks, masked_lines, parse_frontmatter
 from syncdoc.core.spec.models import Document as DocumentRow
@@ -27,7 +25,6 @@ from syncdoc.core.spec.repository import SpecRepository
 from syncdoc.core.types import (
     STAGE_OF,
     Author,
-    AuthorKind,
     AuthorRef,
     DocItem,
     DocStatus,
@@ -454,49 +451,6 @@ class SpecService:
         if item.is_deleted:
             raise ItemDeleted(item.deleted_at.isoformat() if item.deleted_at else None)
         return item.id
-
-    async def change_status(
-        self,
-        doc_id: str,
-        to: DocStatus,
-        user: User,
-        reason: str | None,
-        upstream_reviewed: bool = False,
-        upstream_mismatch: list[str] = [],  # noqa: B006 — MINISPEC 시그니처 그대로
-    ) -> DocumentSummary:
-        """SYNC-MS-002#SpecService.change_status"""
-        from syncdoc.core import (
-            pipeline,
-        )  # 서비스가 pipeline을 부르는 곳(DOM-002 3.2). 순환 import 회피
-        from syncdoc.core.tracking.service import TrackingService
-
-        document = self.get_document(doc_id)
-        if to == DocStatus.approved and (
-            document.has_convention_error or document.incomplete_warnings
-        ):
-            raise StatusBlocked(document.convention_error_detail, document.incomplete_warnings)
-        if to == DocStatus.approved and not upstream_reviewed:
-            raise UpstreamReviewRequired()
-        if document.status == to:
-            return document
-        new_body = re.sub(r"^status: .*$", f"status: {to}", document.body, count=1, flags=re.M)
-        author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.web_status)
-        await pipeline.save_pipeline(
-            Entry.web_status,
-            doc_id,
-            None,
-            new_body,
-            document.current_version_no,
-            None,
-            author,
-            f"status({doc_id}): {document.status} → {to}\n\n{reason or ''}",
-        )
-        if upstream_mismatch:
-            pks = [self.resolve_item(*t.partition("#")[::2]) for t in upstream_mismatch]
-            TrackingService(self.session).raise_upstream(
-                pks, document.id, document.current_version_id, None
-            )
-        return self.get_document(doc_id)
 
     def apply_status(
         self,

@@ -1,14 +1,12 @@
-"""routers/documents — SYNC-API-001 3.4. SpecService 또는 queries."""
+"""routers/documents — SYNC-API-001 3.4. queries(읽기) · pipeline(상태 변경 — DOM-002 3.1 예외)."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
-from syncdoc.core import queries
+from syncdoc.core import pipeline, queries
 from syncdoc.core.account.models import User
-from syncdoc.core.spec.service import SpecService
-from syncdoc.db import get_session
+from syncdoc.core.types import DocStatus
 from syncdoc.web.auth import current_user
 from syncdoc.web.schemas.documents import ChangeStatus, Document, DocumentSummary, UpstreamCheck
 
@@ -32,11 +30,9 @@ async def change_status(
     doc_id: str,
     req: ChangeStatus,
     user: User = Depends(current_user),
-    session: Session = Depends(get_session),
 ) -> DocumentSummary:
     """SYNC-API-001#POST/api/docs/{docId}/status"""
-    d = await SpecService(session).change_status(
-        doc_id, req.to, user, req.reason, req.upstream_reviewed, req.upstream_mismatch
+    d = await pipeline.change_status(
+        doc_id, DocStatus(req.to), user, req.reason, req.upstream_reviewed, req.upstream_mismatch
     )
-    session.commit()
     return DocumentSummary.of(await queries.document_view(d.doc_id))

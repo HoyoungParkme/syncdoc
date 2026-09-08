@@ -1,4 +1,4 @@
-"""SYNC-MS-007 테스트 관점 — save_pipeline (B1: mcp·github 경로)."""
+"""SYNC-MS-007 테스트 관점 — save_pipeline (B1: mcp·github 경로) · change_status (B2)."""
 
 import asyncio
 
@@ -198,6 +198,7 @@ async def test_web_status_entry_commits_status_only(scoped: Session, proj) -> No
         None,
         human,
         "status(EXMP-PRD-001): draft → review\n\n이유",
+        reason="이유",  # 커밋 메시지를 다시 파싱하지 않는다 (MS-002 apply_status 근거)
     )
     assert (r.version_no, r.status, r.pending_decision_version_id) == (1, "review", None)
     assert scoped.execute(text("SELECT count(*) FROM versions")).scalar() == 1
@@ -241,7 +242,7 @@ async def test_relocate_moves_comment_on_update(scoped: Session, proj) -> None:
     assert c.line_no == n + 1
 
 
-# ── change_status (SpecService → pipeline web_status) ──
+# ── change_status (pipeline — 검사 → web_status 저장 → 승인 대조 플래그) ──
 async def test_change_status_commits_frontmatter_no_version(scoped: Session, proj) -> None:
     from syncdoc.core.errors import StatusBlocked, UpstreamReviewRequired
 
@@ -250,7 +251,7 @@ async def test_change_status_commits_frontmatter_no_version(scoped: Session, pro
     svc = SpecService(scoped)
     user = proj["user"]
     # review로 — 상위 대조 없이 됨
-    d = await svc.change_status("EXMP-PRD-001", "review", user, "검토 시작")
+    d = await pipeline.change_status("EXMP-PRD-001", "review", user, "검토 시작")
     assert d.status == "review" and d.current_version_no == 1
     assert (
         g(proj["repos"]["remote"], "log", "-1", "--format=%s", "main")
@@ -271,13 +272,13 @@ async def test_change_status_commits_frontmatter_no_version(scoped: Session, pro
     assert "status: review" in svc.get_document("EXMP-PRD-001").body
     # 같은 상태로 다시 → 커밋 없음
     head = g(proj["repos"]["remote"], "rev-parse", "main")
-    await svc.change_status("EXMP-PRD-001", "review", user, None)
+    await pipeline.change_status("EXMP-PRD-001", "review", user, None)
     assert g(proj["repos"]["remote"], "rev-parse", "main") == head
     # approved인데 upstream_reviewed=false → 거부
     with pytest.raises(UpstreamReviewRequired):
-        await svc.change_status("EXMP-PRD-001", "approved", user, None)
+        await pipeline.change_status("EXMP-PRD-001", "approved", user, None)
     # 정상 승인 + 어긋난 상위 지정 → Q2에 upstream_impact 플래그
-    d2 = await svc.change_status(
+    d2 = await pipeline.change_status(
         "EXMP-PRD-001",
         "approved",
         user,
@@ -290,14 +291,13 @@ async def test_change_status_commits_frontmatter_no_version(scoped: Session, pro
     assert scoped.execute(text("SELECT kind, target_item_id FROM flags")).all() == [
         ("upstream_impact", q2)
     ]
-    # 규약 오류·미완성 문서는 approved 불가
-    # 미완성 경고를 DB에 둔 문서 (mcp 경로는 warnings를 DB에 안 쓴다 — MS-007 4·8단계 불일치, 보고)
-    scoped.execute(
-        text(
-            """UPDATE documents SET incomplete_warnings='["section.missing: 요구"]' WHERE doc_id='EXMP-RFQ-001'"""
-        )
-    )
+    # 미완성 경고가 있는 문서는 approved 불가 — mcp 저장에도 경고가 남는다 (MS-007 8단계, 모든 경로)
+    scn = await create(proj, DocType.SCN, "# 시나리오\n\n## 배경\n\n아직 항목이 없다.\n")
+    body = svc.get_document(scn.doc_id).body + "\n한 줄 더.\n"
+    r3 = await update(proj, scn.doc_id, body, 1)
+    assert "item.none" in r3.warnings
+    assert "item.none" in svc.get_document(scn.doc_id).incomplete_warnings
     with pytest.raises(StatusBlocked) as ei:
-        await svc.change_status("EXMP-RFQ-001", "approved", user, None, upstream_reviewed=True)
-    assert "section.missing: 요구" in ei.value.extra["warnings"]
+        await pipeline.change_status(scn.doc_id, "approved", user, None, upstream_reviewed=True)
+    assert "item.none" in ei.value.extra["warnings"]
     assert r.doc_id == "EXMP-PRD-001"
