@@ -10,9 +10,11 @@ from pathlib import Path
 
 from syncdoc.core.account.service import AccountService
 from syncdoc.core.errors import PushFailed, Unauthorized
-from syncdoc.core.types import Author
+from syncdoc.core.types import Author, ChangedFile
 
+range_ = range  # changed_files의 인자 이름 range(MS-009 시그니처)가 내장을 가린다
 _TOKEN_IN_URL = re.compile(r"(x-access-token:)[^@]+@")
+_HASH = re.compile(r"[0-9a-f]{40}")
 
 
 class GitError(Exception):
@@ -117,3 +119,53 @@ async def commit_push(
 async def read(workdir: Path, path: str, ref: str = "HEAD") -> str:
     """SYNC-MS-009#git.read"""
     return await _run(workdir, "show", f"{ref}:{path}")
+
+
+def _login_of(name: str, email: str) -> str:
+    """커밋 author → GitHub login. *@users.noreply.github.com이면 앞부분(ID+ 접두어 제거), 아니면 %an."""
+    if email.endswith("@users.noreply.github.com"):
+        return email.split("@")[0].split("+")[-1]
+    return name
+
+
+async def changed_files(workdir: Path, range: str, prefix: str) -> list[ChangedFile]:
+    """SYNC-MS-009#git.changed_files"""
+    out = await _run(
+        workdir,
+        "log",
+        "--name-status",
+        "--format=%H%x00%an%x00%ae%x00%s%n%b%x00",
+        range,
+        "--",
+        prefix,
+    )
+    seen: dict[str, ChangedFile] = {}
+    tokens = out.split("\0")
+    # 레코드: hash, an, ae, "subject\nbody", "\n<status lines>\n<next hash>" — 첫 hash 뒤로 4개 단위
+    hash_ = tokens[0].strip()
+    for i in range_(4, len(tokens), 4):
+        an, ae, msg = tokens[i - 3], tokens[i - 2], tokens[i - 1]
+        lines = tokens[i].split("\n")
+        next_hash = lines[-1].strip() if _HASH.fullmatch(lines[-1].strip()) else ""
+        for line in lines:
+            if "\t" not in line:
+                continue
+            status, *paths = line.split("\t")
+            path = paths[-1]
+            parts = Path(path).parts
+            if "_templates" in parts or "assets" in parts or path in seen:
+                continue
+            seen[path] = ChangedFile(
+                path=path,
+                status=status[0],
+                commit_hash=hash_,
+                author_login=_login_of(an, ae),
+                message=_message(msg),
+            )
+        hash_ = next_hash
+    return [seen[p] for p in sorted(seen)]
+
+
+def _message(subject_body: str) -> str:
+    subject, _, body = subject_body.partition("\n")
+    return f"{subject}\n\n{body.strip()}" if body.strip() else subject

@@ -126,3 +126,42 @@ async def test_read_returns_file_at_ref_or_raises(repos: dict[str, Path]) -> Non
     assert (await g.read(repos["work"], SEED, first)).startswith("---\ndoc_id: SYNC-PRD-001")
     with pytest.raises(g.GitError):
         await g.read(repos["work"], "docs/specs/none.md")
+
+
+# ── changed_files ──
+async def test_changed_files_keeps_last_commit_per_file_and_skips_templates(
+    repos: dict[str, Path],
+) -> None:
+    base = git(repos["work"], "rev-parse", "HEAD")
+    o = repos["other"]
+    write_commit_push(o, SEED, "v2", "spec(SYNC-PRD-001): v2")
+    h3 = write_commit_push(o, SEED, "v3", "spec(SYNC-PRD-001): v3\n\n이유가 있다")
+    h4 = write_commit_push(o, "docs/specs/SCN/SYNC-SCN-001.md", "s", "spec(SYNC-SCN-001): new")
+    write_commit_push(o, "docs/specs/_templates/PRD.md", "t", "chore: template")
+    write_commit_push(o, "docs/specs/assets/a.png", "img", "chore: asset")
+    write_commit_push(o, "README.md", "outside", "chore: outside prefix")
+    head = await g.fetch(repos["work"])
+    got = await g.changed_files(repos["work"], f"{base}..{head}", "docs/specs/")
+    assert [(c.path, c.status, c.commit_hash) for c in got] == [
+        (SEED, "M", h3),
+        ("docs/specs/SCN/SYNC-SCN-001.md", "A", h4),
+    ]
+    assert got[0].message == "spec(SYNC-PRD-001): v3\n\n이유가 있다"
+    assert got[0].author_login == "seed"
+    assert got[1].message == "spec(SYNC-SCN-001): new"
+
+
+async def test_changed_files_login_from_noreply_email(repos: dict[str, Path]) -> None:
+    assert g._login_of("박호영", "12345+hoyoung@users.noreply.github.com") == "hoyoung"
+    assert g._login_of("박호영", "hoyoung@users.noreply.github.com") == "hoyoung"
+    assert g._login_of("seed", "seed@example.com") == "seed"
+
+
+async def test_changed_files_deleted_file_has_status_d(repos: dict[str, Path]) -> None:
+    base = git(repos["work"], "rev-parse", "HEAD")
+    git(repos["other"], "rm", "-q", SEED)
+    git(repos["other"], "commit", "-q", "-m", "spec(SYNC-PRD-001): delete")
+    git(repos["other"], "push", "-q", "origin", "HEAD:main")
+    head = await g.fetch(repos["work"])
+    got = await g.changed_files(repos["work"], f"{base}..{head}", "docs/specs/")
+    assert [(c.path, c.status) for c in got] == [(SEED, "D")]
