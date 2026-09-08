@@ -264,7 +264,7 @@ class ItemReferences:
     item_id: str
     upstream: list[ItemRef]
     downstream: list[ItemRef]
-    flags: list[Any]
+    flags: list[FlagSummary]
 
 
 @dataclass
@@ -273,6 +273,20 @@ class UpstreamCheck:
     target_version_no: int
     target_status: str
     referenced_from: list[str]
+
+
+@dataclass
+class FlagSummary:
+    """SYNC-API-001 FlagSummary — queries가 Flag 행에 ItemRef·UserRef를 채운 것."""
+
+    id: int
+    kind: str
+    target: ItemRef
+    cause: ItemRef | None
+    cause_version_no: int | None
+    assignee: UserRef | None
+    raised_at: datetime
+    resolved_at: datetime | None
 
 
 @dataclass

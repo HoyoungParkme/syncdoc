@@ -540,5 +540,4 @@ def test_describe_items_items_and_documents(db_session: Session) -> None:
     )
     assert got[pks["N1"]].is_deleted is True and 999_999 not in got
     assert svc.describe_items([]) == {}
-    doc_ref = svc.describe_items([d.id])  # 문서 pk → item_id=None, 제목
-    assert doc_ref[d.id].item_id is None and doc_ref[d.id].display_name == "예시 제품"
+    # 문서 pk는 받지 않는다 — items.id와 documents.id가 겹쳐 구분 불가(MS-002 결함, 보고). queries가 따로 푼다

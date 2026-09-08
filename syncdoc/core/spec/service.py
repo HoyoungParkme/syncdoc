@@ -532,15 +532,6 @@ class SpecService:
                 display_name=item.display_name,
                 is_deleted=item.is_deleted,
             )
-        for pk in pks:
-            if pk in out:
-                continue
-            row = self.repo.document_by_id(
-                pk
-            )  # 문서 pk(to_document_id) — item_id=None, display_name=title
-            if row is not None:
-                title = parse_frontmatter(row.current_body)[0].get("title", row.doc_id)
-                out[pk] = ItemRef(doc_id=row.doc_id, item_id=None, display_name=title)
         return out
 
     def _deleted_item_ids(self, doc_id: str | None) -> set[str]:

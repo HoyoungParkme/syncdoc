@@ -11,7 +11,6 @@ from syncdoc.core.errors import (
     ConventionViolation,
     ItemDeletionNeedsConfirm,
     NotFound,
-    NotImplementedYet,
     PushFailed,
     VersionConflict,
 )
