@@ -201,3 +201,13 @@ async def test_rev_list_count_counts_commits_behind(repos: dict[str, Path]) -> N
     await g.fetch(repos["work"])
     assert await g.rev_list_count(repos["work"], "HEAD..origin/HEAD") == 2
     assert await g.rev_list_count(repos["work"], "origin/HEAD..HEAD") == 0
+
+
+# ── exists ──
+async def test_exists_is_committed_not_workdir(repos: dict[str, Path]) -> None:
+    assert await g.exists(repos["work"], "docs/specs") is True
+    assert await g.exists(repos["work"], SEED) is True
+    (repos["work"] / "docs/specs/UC").mkdir()
+    (repos["work"] / "docs/specs/UC/x.md").write_text("uncommitted", encoding="utf-8")
+    assert await g.exists(repos["work"], "docs/specs/UC") is False
+    assert await g.exists(repos["work"], "docs/specs/UC/x.md") is False

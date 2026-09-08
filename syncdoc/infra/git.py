@@ -208,3 +208,8 @@ async def log(workdir: Path, path: str) -> list_[Commit]:
 async def rev_list_count(workdir: Path, range: str) -> int:
     """SYNC-MS-009#git.rev_list_count"""
     return int((await _run(workdir, "rev-list", "--count", range)).strip())
+
+
+async def exists(workdir: Path, path: str) -> bool:
+    """SYNC-MS-009#git.exists"""
+    return bool((await _run(workdir, "ls-tree", "HEAD", "--", path)).strip())
