@@ -159,6 +159,6 @@ C  통합·배포       외부 연결 · 첫 사용
 
 ## 5. 미결사항
 
-- [ ] MINISPEC↔코드 일치 검사기 — docstring 항목 ID로 대조. `validate.py`처럼 규약의 코드화. 아직 없다
+- [x] MINISPEC↔코드 일치 검사기 — 완료. `python tools/check_code.py [--doc …] [--items …]` — docstring 항목 ID로 MS 항목과 코드 함수를 잇고 async·인자·타입·기본값·반환을 대조한다. DEV-14의 첫 두 조건이 이걸로 판정된다
 - [ ] React 쪽 "함수 = MINISPEC 항목" 대응 — 컴포넌트는 MINISPEC이 없다. 와이어프레임 요소 ID를 컴포넌트에 어떻게 매핑할지
 - [ ] 슬라이스가 앞 슬라이스 코드를 고쳐야 할 때 — 앞 카드를 미완으로 되돌리나, 새 카드를 만드나
