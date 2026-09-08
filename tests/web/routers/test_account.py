@@ -7,6 +7,7 @@ import base64
 import json
 from urllib.parse import parse_qs, urlparse
 
+import sqlalchemy
 from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -16,6 +17,7 @@ from syncdoc.core.account.service import AccountService
 from syncdoc.db import get_session
 from syncdoc.main import app
 from syncdoc.web import auth
+from tests.conftest import github_ok
 from tests.core.account.test_service import make_user
 
 
@@ -84,5 +86,47 @@ def test_login_session_then_logout_clears(client: TestClient, db_session: Sessio
 def test_session_of_unknown_user_is_401(client: TestClient, db_session: Session) -> None:
     make_user(db_session, login="gone")
     client.get("/__test/login/gone")
-    db_session.execute(__import__("sqlalchemy").text("DELETE FROM users WHERE github_login='gone'"))
+    db_session.execute(sqlalchemy.text("DELETE FROM users WHERE github_login='gone'"))
     assert client.get("/__test/whoami").status_code == 401
+
+
+# ── E2E: SEQ-8 GitHub로 로그인한다 (GitHub 응답 모킹) ──
+def test_oauth_e2e_login_then_session_then_logout(
+    client: TestClient, db_session: Session, mock_github
+) -> None:
+    calls = mock_github(github_ok(42, "hoyoung", "박호영"))
+    r = client.get("/auth/github", params={"next": "/p/SYNC"}, follow_redirects=False)
+    state = parse_qs(urlparse(r.headers["location"]).query)["state"][0]
+    r = client.get(
+        "/auth/github/callback", params={"code": "the-code", "state": state}, follow_redirects=False
+    )
+    assert r.status_code == 302 and r.headers["location"] == "/p/SYNC"
+    assert [c.url.path for c in calls] == ["/login/oauth/access_token", "/user"]
+    assert session_of(client) == {"login": "hoyoung"}
+    assert client.get("/__test/whoami").json() == {"login": "hoyoung"}
+    row = db_session.execute(
+        sqlalchemy.text("SELECT github_user_id, github_token_encrypted FROM users")
+    ).one()
+    assert row[0] == 42 and row[1] is not None and b"gho_" not in bytes(row[1])
+    assert client.post("/auth/logout").status_code == 204
+    assert client.get("/__test/whoami").status_code == 401
+
+
+def test_oauth_callback_state_mismatch_is_401(client: TestClient, mock_github) -> None:
+    calls = mock_github(github_ok())
+    client.get("/auth/github", follow_redirects=False)
+    r = client.get("/auth/github/callback", params={"code": "c", "state": "wrong"})
+    assert r.status_code == 401 and r.json()["type"] == "urn:syncdoc:unauthorized"
+    assert calls == []  # GitHub를 부르기 전에 거부
+    r = client.get("/auth/github/callback", params={"code": "c", "state": ""})
+    assert r.status_code == 401
+
+
+def test_oauth_callback_without_next_goes_root(client: TestClient, mock_github) -> None:
+    mock_github(github_ok())
+    r = client.get("/auth/github", follow_redirects=False)
+    state = parse_qs(urlparse(r.headers["location"]).query)["state"][0]
+    r = client.get(
+        "/auth/github/callback", params={"code": "c", "state": state}, follow_redirects=False
+    )
+    assert r.status_code == 302 and r.headers["location"] == "/"

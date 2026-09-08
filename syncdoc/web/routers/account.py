@@ -1,13 +1,14 @@
-"""routers/account — /auth/*. SYNC-API-001 3.1 · SYNC-SEQ-001#SEQ-8. AccountService만 부른다.
-
-GET /auth/github/callback 은 없다 — AccountService.login_github 보류(MS-006 sync vs MS-009 async).
-"""
+"""routers/account — /auth/*. SYNC-API-001 3.1 · SYNC-SEQ-001#SEQ-8. AccountService만 부른다."""
 
 import secrets
 
-from fastapi import APIRouter, Query, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import RedirectResponse
+from sqlalchemy.orm import Session
 
+from syncdoc.core.account.service import AccountService
+from syncdoc.core.errors import Unauthorized
+from syncdoc.db import get_session
 from syncdoc.web import auth
 
 router = APIRouter(tags=["auth"])
@@ -22,6 +23,20 @@ async def github_start(
     request.session["oauth_state"] = state
     request.session["oauth_next"] = next_path
     return RedirectResponse(auth.authorize_url(state), status_code=302)
+
+
+@router.get("/auth/github/callback", status_code=302)
+async def github_callback(
+    request: Request, code: str, state: str, session: Session = Depends(get_session)
+) -> RedirectResponse:
+    """SYNC-API-001#GET/auth/github/callback — state 대조 · login_github · 세션 · 302 next."""
+    if not state or state != request.session.get("oauth_state"):
+        raise Unauthorized("state 불일치")
+    next_path = request.session.get("oauth_next") or "/"
+    user = await AccountService(session).login_github(code, state)
+    session.commit()  # 트랜잭션은 호출자(DEV-10)
+    auth.login(request, user)
+    return RedirectResponse(next_path, status_code=302)
 
 
 @router.post("/auth/logout", status_code=204)
