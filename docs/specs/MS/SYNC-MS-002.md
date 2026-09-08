@@ -68,7 +68,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **처리**
 1. `DB: documents where doc_id` · if 없음 → `! not-found {resource: document, id}`
 2. `DB: items where document_id and is_deleted=false` — `item_id`, `display_name`
-3. `DB: versions where document_id order by version_no desc limit 1` — 최근 작성 주체
+3. `DB: versions where document_id order by version_no desc limit 1` — 최근 작성 주체를 `AuthorRef(kind, user_id, instructed_by_id, via)`로. **users를 읽지 않는다** — 이름은 `queries`가 `AccountService.users_by_ids`로
 4. `→ Document(doc_id, doc_type, stage, status, current_body, current_version_no, has_convention_error, convention_error_detail, incomplete_warnings, items[], last_author)`. 플래그·이웃은 **넣지 않는다** — `queries.document_view`가 붙인다
 
 **출력** `Document`. `items[].flags`·`prev_doc_id`·`next_doc_id`는 비어 있다
@@ -192,7 +192,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **입력** 전부 `pipeline`이 확정한 값. `commit_hash`는 push 성공 후
 
 **처리** — 호출자의 트랜잭션 안
-1. `DB: documents insert (project_id, doc_id, doc_type, status=frontmatter의 status, current_body=body, current_version_no=1, has_convention_error=False)`
+1. `DB: documents insert (project_id, doc_id, doc_type, status=frontmatter의 status (없으면 draft), current_body=body, current_version_no=1, has_convention_error=False)`
 2. `blocks = item_blocks(body, doc_type)`. `DB: items insert` 블록마다 `(document_id, item_id, display_name, is_deleted=False)`
 3. `DB: versions insert (document_id, version_no=1, commit_hash, body, author_kind, author_user_id, instructed_by_user_id, created_at)`
 4. `→ Version`
@@ -209,20 +209,20 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### SpecService.save 버전·항목 저장
 
-**시그니처** `save(document: Document, body: str, commit_hash: str, author: Author, deleted_item_pks: list[int], has_convention_error: bool = False, warnings: list | None = None, rebuild: bool = False) -> Version`
+**시그니처** `save(document: Document, body: str, commit_hash: str, author: Author, deleted_item_pks: list[int], validate_result: ValidateResult | None = None, rebuild: bool = False) -> Version`
 
 근거: [[SYNC-SEQ-001#SEQ-1]] 8단계 · [[SYNC-UC-001#UC-A6]] 6a
 
-**입력** `document` 현재 행. `body` 새 본문. `commit_hash`. `author`. `deleted_item_pks` — `pipeline`이 확인 끝낸 것. `has_convention_error`·`warnings` — github 경로. `rebuild` — 재구축이면 `version_no`를 커밋 순서대로
+**입력** `document` 현재 행(DTO의 `id`로 다시 읽는다). `body` 새 본문. `commit_hash`. `author`. `deleted_item_pks` — `pipeline`이 확인 끝낸 것. `validate_result` — github 경로에서 위반이어도 저장할 때. 위반·경고 둘 다 여기서. `rebuild` — 재구축이면 `version_no`를 커밋 순서대로
 
 **처리** — 호출자의 트랜잭션 안. **버전 충돌 검사는 하지 않는다**(`pipeline` 5단계가 이미)
 1. `new_no = document.current_version_no + 1`
-2. `DB: versions insert (document_id, version_no=new_no, commit_hash, body, author…)`
+2. `DB: versions insert (document_id, version_no=new_no, commit_hash, body, author_kind, author_user_id, instructed_by_user_id, via=author.via를 mcp|web|github로 접음)`
 3. `blocks = item_blocks(body, doc_type)`. 블록마다 `DB: items where document_id and item_id` · if 있음 → `display_name` 갱신 · else → insert
 4. `deleted_item_pks`마다 `DB: items set is_deleted=true, deleted_at=now`
 5. if `author.via == github` → `new_status = fm.status` (원본이 진실) · else → `new_status = document.status`
 6. if `document.status == approved and body != document.current_body` → `new_status = review`, `DB: status_changes insert (from=approved, to=review, changed_by=author.user, reason="본문 수정으로 자동 강등", commit_hash=None)` (UC-A6 6a)
-7. `DB: documents update (current_body, current_version_no=new_no, status=new_status, has_convention_error, convention_error_detail, incomplete_warnings=warnings)`
+7. `DB: documents update (current_body, current_version_no=new_no, status=new_status)` · if `validate_result` → `has_convention_error = bool(violations)`, `convention_error_detail = violations를 "rule: message" 줄로 (없으면 null)`, `incomplete_warnings = warnings JSON (없으면 null)` · else → 오류·경고 컬럼 그대로
 8. `→ Version`
 
 **출력** 새 `Version`
@@ -428,11 +428,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### SpecService.last_author 최근 버전 작성자
 
-**시그니처** `last_author(document_id: int) -> User | None`
+**시그니처** `last_author(document_id: int) -> AuthorRef | None`
 
 근거: [[SYNC-SEQ-001#SEQ-3]] · `TrackingService.raise_flags` 담당자 결정 (클래스 5장 1)
 
-**처리** `v = DB: versions where document_id order by version_no desc limit 1` · if 없음 → None · else → `User(v.author_user_id)`. 자리표시 User(`github_token_encrypted` null)도 그대로 — 담당은 되지만 로그인 전엔 못 본다
+**처리** `v = DB: versions where document_id order by version_no desc limit 1` · if 없음 → None · else → `AuthorRef(v.author_kind, v.author_user_id, v.instructed_by_user_id, v.via)`. 담당자 결정은 `.user_id`. 자리표시 User도 그대로 — 담당은 되지만 로그인 전엔 못 본다
 
 ---
 
@@ -492,11 +492,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### SpecService.issue_doc_id 문서 ID 발급
 
-**시그니처** `issue_doc_id(project_id: int, doc_type: DocType) -> str` (private)
+**시그니처** `issue_doc_id(project_id: int, code: str, doc_type: DocType) -> str` (private) — `code`는 인자로 받는다. SpecService가 `projects`를 읽지 않게
 
 근거: [[SYNC-SEQ-001#SEQ-19]] · [[SYNC-STD-001]] 1.1
 
-**처리** `DB: max(번호) from documents where project_id and doc_type` — `doc_id`의 마지막 세 자리. +1, 세 자리 패딩. `→ f"{code}-{doc_type}-{n:03d}"`. **저장소 락 안에서만** 부른다(동시 발급 방지)
+**처리** `DB: max(번호) from documents where project_id and doc_type` — `doc_id`의 마지막 세 자리. +1, 세 자리 패딩. `→ f"{code}-{doc_type}-{n:03d}"`. `code`는 pipeline이 `ProjectService.get`에서 얻어 넘긴다. **저장소 락 안에서만** 부른다(동시 발급 방지)
 
 **테스트 관점** 첫 PRD → `-001` · 002 삭제 후 → `-003`(재사용 안 함. 문서는 삭제 안 하지만 규칙은 같다)
 
@@ -512,7 +512,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **처리**
 1. frontmatter 제거
-2. 코드블록(```` ``` ````)·인라인 코드(`` ` ``)를 같은 길이의 공백으로 치환 — 줄 번호 유지
+2. 코드블록(```` ``` ````)·인라인 코드(`` ` ``)를 같은 길이의 공백으로 치환 — 줄 번호 유지. 이 마스킹과 헤딩·참조 정규식은 `core/markdown.py` 순수 함수 — `ReferenceService.extract`도 같은 것을 쓴다
 3. 줄마다 `^(#{1,6}) (\S+)(?: (.*))?$` · if 첫 토큰이 타입 패턴에 맞음 → 항목 시작, 레벨 기억 · else → 절(무시)
 4. 블록 끝 = 다음 헤딩 중 `레벨 <= 시작 레벨`인 것의 직전 줄 · if 그런 헤딩 없음 → 문서 끝
 5. `→ [ItemBlock(item_id, display_name=제목, level, start_line, end_line, text)]`. `text`는 **원본**(치환 전) 줄 범위
