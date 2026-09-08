@@ -13,10 +13,6 @@ class ReferenceRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def from_document(self, document_id: int) -> list[Reference]:
-        stmt = select(Reference).where(Reference.from_document_id == document_id)
-        return list(self.session.scalars(stmt))
-
     def from_item(self, item_pk: int) -> list[Reference]:
         return list(
             self.session.scalars(select(Reference).where(Reference.from_item_id == item_pk))
@@ -28,10 +24,10 @@ class ReferenceRepository:
         )
         return list(self.session.scalars(stmt))
 
-    def from_document_existing(self, document_id: int) -> list[Reference]:
-        stmt = select(Reference).where(
-            Reference.from_document_id == document_id, Reference.is_missing.is_(False)
-        )
+    def from_document(self, document_id: int, include_missing: bool = True) -> list[Reference]:
+        stmt = select(Reference).where(Reference.from_document_id == document_id)
+        if not include_missing:
+            stmt = stmt.where(Reference.is_missing.is_(False))
         return list(self.session.scalars(stmt.order_by(Reference.id)))
 
     def to_item(self, item_pk: int) -> list[Reference]:

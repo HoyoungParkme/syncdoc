@@ -122,6 +122,11 @@ def test_upstream_of_document_excludes_missing_includes_frontmatter(db_session: 
     raws = sorted((e.from_item_pk is None, e.raw_target) for e in edges)
     assert raws == [(False, "#R1"), (False, "EXMP-RFQ-001#Q1"), (True, "EXMP-RFQ-001")]
     assert all(not e.is_missing for e in edges)
+    with_missing = ref.upstream_of_document(d.id, include_missing=True)
+    assert [e.raw_target for e in with_missing if e.is_missing] == [
+        "EXMP-RFQ-001#Q9",
+        "EXMP-NONE-001",
+    ]  # 항목·frontmatter 미존재 둘 다 (document_view.missing_refs용)
 
 
 def test_downstream_of_document_only_whole_document_refs(db_session: Session) -> None:
