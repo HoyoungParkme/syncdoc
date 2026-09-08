@@ -69,7 +69,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 1. `DB: documents where doc_id` · if 없음 → `! not-found {resource: document, id}`
 2. `DB: items where document_id and is_deleted=false` — `item_id`, `display_name`
 3. `DB: versions where document_id order by version_no desc limit 1` — 최근 작성 주체를 `AuthorRef(kind, user_id, instructed_by_id, via)`로. **users를 읽지 않는다** — 이름은 `queries`가 `AccountService.users_by_ids`로
-4. `→ Document(doc_id, doc_type, stage, status, current_body, current_version_no, has_convention_error, convention_error_detail, incomplete_warnings, items[], last_author)`. 플래그·이웃은 **넣지 않는다** — `queries.document_view`가 붙인다
+4. `→ Document(id, doc_id, doc_type, stage, status, current_body, current_version_no, commit_hash=최근 버전의 것, has_convention_error, convention_error_detail, incomplete_warnings, items[], last_author: AuthorRef)`. 플래그·이웃은 **넣지 않는다** — `queries.document_view`가 붙인다
 
 **출력** `Document`. `items[].flags`·`prev_doc_id`·`next_doc_id`는 비어 있다
 
