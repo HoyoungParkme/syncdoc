@@ -1,0 +1,33 @@
+# SYNC-INFRA-001 8장 — docker compose up: app(:8000) + db(:5432)
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://syncdoc:${POSTGRES_PASSWORD:-syncdoc}@db:5432/syncdoc
+      REPOS_DIR: /var/syncdoc/repos
+    volumes:
+      - repos:/var/syncdoc/repos
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: syncdoc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-syncdoc}
+      POSTGRES_DB: syncdoc
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U syncdoc"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  pgdata:
+  repos:

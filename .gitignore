@@ -5,3 +5,4 @@ __pycache__/
 .venv/
 node_modules/
 tools/data.json
+.claude/WORKLOG.md
