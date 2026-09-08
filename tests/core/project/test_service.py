@@ -53,11 +53,8 @@ async def test_init_project_empty_repo_creates_specs_commit_and_11_null_stages(
     g(seed, "commit", "-q", "-m", "init")
     g(seed, "push", "-q", "origin", "HEAD:main")
     svc = ProjectService(db_session)
-    summary = await svc.init_project(str(bare), "NEW", "새 프로젝트", user)
-    assert summary.code == "NEW" and summary.remote_url == str(bare)
-    assert len(summary.stages) == 11 and all(
-        s.status is None and s.doc_count == 0 for s in summary.stages
-    )
+    project = await svc.init_project(str(bare), "NEW", "새 프로젝트", user)
+    assert project.code == "NEW" and project.repository.remote_url == str(bare)
     p = svc.get("NEW")
     assert p.repository.workdir_path == str(repos_dir / "NEW")
     assert p.repository.last_processed_commit == g(bare, "rev-parse", "main")

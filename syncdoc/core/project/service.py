@@ -20,7 +20,7 @@ from syncdoc.core.errors import (
 )
 from syncdoc.core.project.models import Project, Repository
 from syncdoc.core.project.repository import ProjectRepository
-from syncdoc.core.types import Author, AuthorKind, Entry, ProjectSummary
+from syncdoc.core.types import Author, AuthorKind, Entry
 from syncdoc.infra import git
 from syncdoc.infra.git import GitError
 
@@ -37,10 +37,8 @@ class ProjectService:
         name: str,
         user: User,
         import_existing: bool = False,
-    ) -> ProjectSummary:
+    ) -> Project:
         """SYNC-MS-001#ProjectService.init_project"""
-        from syncdoc.core.queries import build_project_summary  # 순수 함수. 순환 import 회피
-
         if not re.fullmatch(r"[A-Z]{1,4}", code):
             raise ProjectCodeInvalid("^[A-Z]{1,4}$")
         if self.repo.exists(code):
@@ -80,7 +78,7 @@ class ProjectService:
             raise
         repository.last_processed_commit = commit_hash
         self.session.flush()
-        return build_project_summary(self.repo.by_code(code), [], {}, 0)
+        return self.repo.by_code(code)
 
     def list_projects(self) -> list[Project]:
         """SYNC-MS-001#ProjectService.list_projects"""

@@ -82,20 +82,6 @@ class AuthorRef:
 
 
 @dataclass
-class FlagSummary:
-    """SYNC-API-001 FlagSummary — pk 형태. ItemRef·UserRef로 채우는 건 queries."""
-
-    id: int
-    kind: str
-    target_item_pk: int
-    cause_item_pk: int | None
-    cause_version_id: int | None
-    assignee_user_id: int | None
-    raised_at: datetime
-    resolved_at: datetime | None
-
-
-@dataclass
 class StageSummary:
     stage: int
     doc_type: str

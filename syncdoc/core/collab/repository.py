@@ -19,10 +19,6 @@ class CommentRepository:
         )
         return list(self.session.scalars(stmt.order_by(Comment.id)))
 
-    def current_version_no(self, document_id: int) -> int:
-        stmt = select(Document.current_version_no).where(Document.id == document_id)
-        return self.session.scalar(stmt) or 0
-
     def count_unresolved_in_project(self, project_id: int) -> int:
         stmt = (
             select(func.count())

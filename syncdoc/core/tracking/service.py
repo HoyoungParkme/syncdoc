@@ -14,7 +14,7 @@ from syncdoc.core.reference.service import ReferenceService
 from syncdoc.core.spec.service import SpecService
 from syncdoc.core.tracking.models import Flag
 from syncdoc.core.tracking.repository import TrackingRepository
-from syncdoc.core.types import FlagKind, FlagSummary
+from syncdoc.core.types import FlagKind
 
 
 class TrackingService:
@@ -86,22 +86,11 @@ class TrackingService:
             n += 1
         return n
 
-    def flags_for_items(self, item_pks: list[int]) -> dict[int, list[FlagSummary]]:
+    def flags_for_items(self, item_pks: list[int]) -> dict[int, list[Flag]]:
         """SYNC-MS-004#TrackingService.flags_for_items"""
-        out: dict[int, list[FlagSummary]] = {}
+        out: dict[int, list[Flag]] = {}
         for f in self.repo.unresolved_for_items(item_pks):
-            out.setdefault(f.target_item_id, []).append(
-                FlagSummary(
-                    id=f.id,
-                    kind=f.kind,
-                    target_item_pk=f.target_item_id,
-                    cause_item_pk=f.cause_item_id,
-                    cause_version_id=f.cause_version_id,
-                    assignee_user_id=f.assignee_user_id,
-                    raised_at=f.raised_at,
-                    resolved_at=f.resolved_at,
-                )
-            )
+            out.setdefault(f.target_item_id, []).append(f)
         return out
 
     def count_flags(self, project_id: int) -> dict[str, int]:

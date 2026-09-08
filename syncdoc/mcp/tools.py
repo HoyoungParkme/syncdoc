@@ -117,10 +117,9 @@ async def init_project(
     """SYNC-API-002#init_project"""
     try:
         with db.session_scope() as s:
-            summary = await ProjectService(s).init_project(
-                remote_url, code, name, _user(s), import_existing
-            )
+            await ProjectService(s).init_project(remote_url, code, name, _user(s), import_existing)
             s.commit()
+        summary = next(p for p in await queries.project_summary() if p.code == code)
         return _ok(_project_json(summary))
     except Problem as p:
         return _problem(p)

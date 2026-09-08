@@ -56,11 +56,11 @@ def test_relocate_moves_lines_marks_missing_picks_nearest(db_session: Session) -
     )
     new = new.replace("## 5. 미결사항", "#### R1 첫 기능\n## 5. 미결사항")
     svc.save(d, new, "h2", a, [])
-    assert CommentService(db_session).relocate(d.id, PRD, new) == 1
+    assert CommentService(db_session).relocate(d.id, PRD, new, old_version_no=1) == 1
     assert c_r1.line_no == n_r1 + 3 - 1 and c_r1.original_location is None
     assert c_g1.line_no == n_g1 and c_g1.original_location == f"v1:{n_g1}"
     assert c_done.line_no == n_g1 and c_done.original_location is None  # 해결된 건 안 옮김
-    CommentService(db_session).relocate(d.id, new, new)
+    CommentService(db_session).relocate(d.id, new, new, old_version_no=2)
     assert c_g1.original_location == f"v1:{n_g1}"  # 이미 있으면 그대로
 
 

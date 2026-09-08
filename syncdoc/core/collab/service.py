@@ -21,7 +21,7 @@ class CommentService:
         self.session = session
         self.repo = CommentRepository(session)
 
-    def relocate(self, document_id: int, old_body: str, new_body: str) -> int:
+    def relocate(self, document_id: int, old_body: str, new_body: str, old_version_no: int) -> int:
         """SYNC-MS-005#CommentService.relocate"""
         rows = self.repo.unresolved_of(document_id)
         if not rows:
@@ -29,7 +29,6 @@ class CommentService:
         new_hashes: dict[str, list[int]] = {}
         for no, line in enumerate(new_body.split("\n"), start=1):
             new_hashes.setdefault(line_hash(line), []).append(no)
-        old_version_no = self.repo.current_version_no(document_id) - 1
         moved = 0
         for c in rows:
             cands = new_hashes.get(c.line_hash, [])

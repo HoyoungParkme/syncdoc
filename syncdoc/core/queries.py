@@ -30,10 +30,10 @@ from syncdoc.core.types import (
 _ORDER = {"draft": 0, "review": 1, "approved": 2}
 
 
-def build_project_summary(
+def _summarize(
     project: Project, docs: list[DocumentSummary], flags: dict[str, int], unresolved: int
 ) -> ProjectSummary:
-    """단계 11칸 계산(UC-H14 1a·1b). ProjectService.init_project도 신규(docs=[])로 이걸 쓴다."""
+    """단계 11칸 계산(UC-H14 1a·1b)."""
     stages: list[StageSummary] = []
     for doc_type, n in STAGE_OF.items():
         stage_docs = [d for d in docs if d.stage == n]
@@ -81,9 +81,7 @@ async def project_summary() -> list[ProjectSummary]:
         for p in ProjectService(s).list_projects():
             docs = SpecService(s).list_by_project(p.id)
             flags = TrackingService(s).count_flags(p.id)
-            out.append(
-                build_project_summary(p, docs, flags, CommentService(s).count_unresolved(p.id))
-            )
+            out.append(_summarize(p, docs, flags, CommentService(s).count_unresolved(p.id)))
         out.sort(key=lambda x: (x.updated_at is not None, x.updated_at), reverse=True)
         return out
 
