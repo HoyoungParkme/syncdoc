@@ -130,5 +130,5 @@ class NotImplementedYet(Problem):
     status = 501
     title = "not-implemented"
 
-    def __init__(self, feature: str) -> None:
-        super().__init__(f"{feature}: 아직 구현되지 않음", feature=feature)
+    def __init__(self, card: str) -> None:
+        super().__init__(f"{card}: 아직 구현되지 않음", card=card)

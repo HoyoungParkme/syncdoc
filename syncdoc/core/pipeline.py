@@ -1,3 +1,190 @@
-"""SYNC-MS-007 — 쓰기 조율. B1에서 채운다."""
+"""SYNC-MS-007 — pipeline. 쓰기 조율. 자기 테이블이 없고 서비스를 순서대로 부른다.
+
+세 입구(MCP·웹·GitHub)가 전부 save_pipeline로 들어온다. 저장소 단위 asyncio.Lock(프로세스 내).
+세션은 여기서 연다(DEV-10 — 서비스는 세션을 열지 않는다). push가 DB 트랜잭션 앞이다.
+B1: save_pipeline. entry=web_status 분기는 B2(apply_status)에서.
+"""
 
 from __future__ import annotations
+
+import asyncio
+import re
+from pathlib import Path
+
+from sqlalchemy.orm import Session
+
+from syncdoc import db
+from syncdoc.core.collab.service import CommentService
+from syncdoc.core.errors import (
+    ConventionViolation,
+    ItemDeleted,
+    ItemDeletionNeedsConfirm,
+    NotFound,
+    NotImplementedYet,
+    VersionConflict,
+)
+from syncdoc.core.markdown import parse_frontmatter
+from syncdoc.core.project.service import ProjectService
+from syncdoc.core.reference.service import ReferenceService
+from syncdoc.core.spec.service import SpecService
+from syncdoc.core.tracking.service import TrackingService
+from syncdoc.core.types import Author, DocStatus, DocType, Entry, SaveResult
+from syncdoc.infra import git
+
+_locks: dict[str, asyncio.Lock] = {}
+
+
+def _lock(code: str) -> asyncio.Lock:
+    return _locks.setdefault(code, asyncio.Lock())
+
+
+async def save_pipeline(
+    entry: Entry,
+    doc_id: str | None,
+    doc_type: DocType | None,
+    body: str,
+    expected_version: int | None,
+    project_code: str | None,
+    author: Author,
+    message: str,
+    changed_items: list[str] | None = None,
+    upstream_impact: list[str] | None = None,
+    confirm_item_deletion: bool = False,
+    commit_hash: str | None = None,
+) -> SaveResult:
+    """SYNC-MS-007#pipeline.save_pipeline"""
+    code = project_code if doc_id is None else doc_id.split("-")[0]
+    if code is None:
+        raise NotFound("project", "None")
+    async with _lock(code):
+        with db.session_scope() as s:
+            return await _run(
+                s,
+                entry,
+                doc_id,
+                doc_type,
+                body,
+                expected_version,
+                code,
+                author,
+                message,
+                changed_items,
+                upstream_impact,
+                confirm_item_deletion,
+                commit_hash,
+            )
+
+
+async def _run(
+    s: Session,
+    entry: Entry,
+    doc_id: str | None,
+    doc_type: DocType | None,
+    body: str,
+    expected_version: int | None,
+    code: str,
+    author: Author,
+    message: str,
+    changed_items: list[str] | None,
+    upstream_impact: list[str] | None,
+    confirm_item_deletion: bool,
+    commit_hash: str | None,
+) -> SaveResult:
+    """save_pipeline 본체 — 락·세션 안."""
+    spec, refs = SpecService(s), ReferenceService(s)
+    tracking, collab = TrackingService(s), CommentService(s)
+    project = ProjectService(s).get(code)
+    repo = project.repository
+    # 2·3. 대상 문서 또는 생성
+    document = None
+    if doc_id is not None:
+        document = spec.get_document(doc_id)
+        doc_type = document.doc_type
+    else:
+        assert doc_type is not None
+        doc_id = spec.issue_doc_id(project.id, code, doc_type)
+        body = spec.apply_frontmatter(body, doc_id, doc_type, DocStatus.draft)
+    # 4. 규약
+    vr = spec.validate(body, doc_type, entry, document.status if document else None)
+    if vr.violations and entry != Entry.github:
+        raise ConventionViolation(vr.violations, vr.warnings)
+    # 5. 버전
+    if entry != Entry.github and document and expected_version != document.current_version_no:
+        raise VersionConflict(document.current_version_no, document.body)
+    # 6. 삭제 확인
+    deleted: list[int] = []
+    if entry != Entry.web_status and document:
+        deleted = spec.detect_deleted_items(document, body)
+        downstream = {pk: refs.downstream(pk) for pk in deleted}
+        if any(downstream.values()) and not confirm_item_deletion:
+            names = {i.pk: i.item_id for i in document.items}
+            raise ItemDeletionNeedsConfirm(
+                [
+                    {
+                        "item_id": names[pk],
+                        "downstream": [e.from_item_pk for e in edges if e.from_item_pk],
+                    }
+                    for pk, edges in downstream.items()
+                    if edges
+                ]
+            )
+    # 7. push — 여기까지 DB 쓰기 없음
+    if entry != Entry.github:
+        commit_hash = await git.commit_push(
+            Path(repo.workdir_path),
+            message,
+            author,
+            path=f"docs/specs/{doc_type}/{doc_id}.md",
+            content=body,
+        )
+    assert commit_hash is not None
+    # 8. 트랜잭션
+    if entry == Entry.web_status:
+        raise NotImplementedYet("save_pipeline(entry=web_status) — B2 apply_status")
+    if document is None:
+        version = spec.create(project.id, doc_id, doc_type, body, commit_hash, author)
+        prev_version_id = None
+    else:
+        prev = spec.repo.latest_version(document.id)
+        prev_version_id = prev.id if prev else None
+        version = spec.save(
+            document,
+            body,
+            commit_hash,
+            author,
+            deleted,
+            validate_result=vr if entry == Entry.github else None,
+        )
+    document_id = version.document_id
+    # 9. 끊어진 참조
+    for pk in deleted:
+        tracking.raise_broken(pk)
+    # 10. 참조 추출
+    item_pks = {i.item_id: i.pk for i in spec.get_document(doc_id).items}
+    fm, _ = parse_frontmatter(body)
+    upstream_ids = re.findall(r"[\w-]+", fm.get("upstream", "").strip("[]"))
+    refs.extract(document_id, version.id, body, item_pks, upstream_ids)
+    # 11. 변경 영향 (B1 스텁 → 빈 목록)
+    affected = tracking.detect_impact(document_id, prev_version_id, version.id, changed_items)
+    if affected:
+        raise NotImplementedYet("tracking.create_pending — B3")
+    pending_id = None
+    # 12. 하위→상위 되먹임
+    warnings = [str(w) for w in vr.warnings]
+    if upstream_impact:
+        target_pks = []
+        for target in upstream_impact:
+            d, _, i = target.partition("#")
+            try:
+                target_pks.append(spec.resolve_item(d, i))
+            except (NotFound, ItemDeleted):
+                warnings.append(f"upstream_impact.unknown: {target}")
+        if target_pks:
+            tracking.raise_upstream(target_pks, document_id, version.id, None)
+    # 13. 댓글 줄 이동
+    if document is not None:
+        collab.relocate(document_id, document.body, body, document.current_version_no)
+    # 14. 커밋
+    s.commit()
+    status = spec.get_document(doc_id).status
+    return SaveResult(doc_id, version.version_no, commit_hash, status, pending_id, warnings)
