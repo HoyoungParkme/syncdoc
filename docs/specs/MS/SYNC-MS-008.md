@@ -118,9 +118,10 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. `pks = [i.pk for i in doc.items]` · `flags = TrackingService.flags_for_items(pks)` → `{pk: [kind]}`
 3. 항목마다 `item.flags = flags.get(pk, [])`
 4. `doc.prev_doc_id, doc.next_doc_id = SpecService.neighbors(doc_id)`
-5. `→ doc`
+5. `names = AccountService.users_by_ids([doc.last_author.user_id, doc.last_author.instructed_by_id])` → API `Author{kind, user: UserRef, instructed_by, via}`로 채움
+6. `→ doc`
 
-**호출하는 것** `SpecService.get_document` · `TrackingService.flags_for_items` · `SpecService.neighbors`
+**호출하는 것** `SpecService.get_document` · `TrackingService.flags_for_items` · `SpecService.neighbors` · `AccountService.users_by_ids`
 
 **테스트 관점** 플래그 있는 항목 → `flags=["needs_check"]` · 규약 오류 문서 → 정상 반환 · 첫 단계 문서 → `prev_doc_id=None`
 
