@@ -4,6 +4,8 @@ core는 이것을 통해서만 저장소를 만진다. 실패는 GitError(cmd, s
 .git/config·로그에 남기지 않는다(SYNC-INFRA-001 5장 · SYNC-STD-004#DEV-6).
 """
 
+from __future__ import annotations
+
 import asyncio
 import re
 from datetime import datetime
@@ -13,8 +15,7 @@ from syncdoc.core.account.service import AccountService
 from syncdoc.core.errors import PushFailed, Unauthorized
 from syncdoc.core.types import Author, ChangedFile, Commit
 
-range_ = range  # changed_files의 인자 range · 함수 list — MS-009 이름이 내장을 가린다
-list_ = list
+range_ = range  # changed_files의 인자 이름 range(MS-009 시그니처)가 내장을 가린다
 _TOKEN_IN_URL = re.compile(r"(x-access-token:)[^@]+@")
 _HASH = re.compile(r"[0-9a-f]{40}")
 
@@ -183,13 +184,13 @@ def _message(subject_body: str) -> str:
     return f"{subject}\n\n{body.strip()}" if body.strip() else subject
 
 
-async def list(workdir: Path, glob: str, ref: str = "HEAD") -> list_[str]:
+async def list(workdir: Path, glob: str, ref: str = "HEAD") -> list[str]:
     """SYNC-MS-009#git.list"""
     out = await _run(workdir, "ls-tree", "-r", "--name-only", ref, "--", "docs/specs")
     return [p for p in out.splitlines() if PurePosixPath(p).match(glob)]
 
 
-async def log(workdir: Path, path: str) -> list_[Commit]:
+async def log(workdir: Path, path: str) -> list[Commit]:
     """SYNC-MS-009#git.log"""
     out = await _run(
         workdir,
@@ -201,7 +202,7 @@ async def log(workdir: Path, path: str) -> list_[Commit]:
         path,
     )
     tokens = out.split("\0")
-    commits: list_[Commit] = []
+    commits: list[Commit] = []
     for i in range_(0, len(tokens) - 1, 5):
         h, an, ae, date, msg = (t.strip("\n") for t in tokens[i : i + 5])
         commits.append(
