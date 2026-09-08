@@ -384,3 +384,41 @@ def test_save_deleted_pks_and_warnings(db_session: Session) -> None:
     d2 = svc.get_document("EXMP-PRD-001")
     assert d2.has_convention_error and d2.incomplete_warnings == ["section.missing: 성공지표"]
     assert [i.item_id for i in d2.items] == ["G1", "R1"]
+
+
+# ── list_by_project ──
+def test_list_by_project_filters_and_order(db_session: Session) -> None:
+    svc = SpecService(db_session)
+    p, other = make_project(db_session), make_project(db_session, "OTHR")
+    a = author(db_session)
+
+    def mk(pid: int, did: str, typ: str, status: str = "draft", title: str = "x") -> None:
+        body = f"---\ndoc_id: {did}\ntype: {typ}\ntitle: {title}\nstatus: {status}\n---\n# {did}\n"
+        svc.create(pid, did, typ, body, "h", a)
+
+    mk(p.id, "EXMP-DOM-003", "DOM", title="ERD·DD")
+    mk(p.id, "EXMP-DOM-001", "DOM", "approved", title="도메인")
+    mk(p.id, "EXMP-DOM-002", "DOM", title="클래스")
+    mk(p.id, "EXMP-PRD-001", "PRD", "approved")
+    mk(p.id, "EXMP-STD-001", "STD")
+    mk(other.id, "OTHR-PRD-001", "PRD")
+
+    def ids(xs):
+        return [d.doc_id for d in xs]
+
+    assert ids(svc.list_by_project(p.id)) == [
+        "EXMP-PRD-001",
+        "EXMP-DOM-001",
+        "EXMP-DOM-002",
+        "EXMP-DOM-003",
+        "EXMP-STD-001",
+    ]
+    assert ids(svc.list_by_project(p.id, stage=6)) == [
+        "EXMP-DOM-001",
+        "EXMP-DOM-002",
+        "EXMP-DOM-003",
+    ]
+    assert ids(svc.list_by_project(p.id, status="approved")) == ["EXMP-PRD-001", "EXMP-DOM-001"]
+    assert ids(svc.list_by_project(p.id, has_convention_error=True)) == []
+    got = svc.list_by_project(p.id)
+    assert got[-1].stage is None and got[0].last_author.user.id == a.user.id and got[0].counts == {}

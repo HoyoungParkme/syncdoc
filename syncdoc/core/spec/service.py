@@ -451,6 +451,25 @@ class SpecService:
         self.session.flush()
         return version
 
+    def list_by_project(
+        self,
+        project_id: int,
+        stage: int | None = None,
+        status: DocStatus | None = None,
+        has_convention_error: bool | None = None,
+    ) -> list[DocumentSummary]:
+        """SYNC-MS-002#SpecService.list_by_project"""
+        rows = self.repo.documents_of_project(project_id)
+        if stage is not None:
+            rows = [r for r in rows if STAGE_OF.get(r.doc_type) == stage]
+        if status is not None:
+            rows = [r for r in rows if r.status == status]
+        if has_convention_error is not None:
+            rows = [r for r in rows if r.has_convention_error == has_convention_error]
+        latest = self.repo.latest_versions([r.id for r in rows])
+        rows.sort(key=lambda r: (STAGE_OF.get(r.doc_type, 99), r.doc_id))
+        return [DocumentSummary(**self._summary_fields(r, latest.get(r.id))) for r in rows]
+
     def _deleted_item_ids(self, doc_id: str | None) -> set[str]:
         if not doc_id:
             return set()
