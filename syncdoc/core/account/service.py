@@ -1,5 +1,7 @@
 """SYNC-MS-006 — AccountService. users·access_tokens만. 비밀키는 config.SECRET_KEY(DB 밖)."""
 
+from __future__ import annotations
+
 import base64
 import hashlib
 import secrets

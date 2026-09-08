@@ -1,5 +1,7 @@
 """SYNC-DOM-002 2.6 계정 — User · AccessToken. 테이블은 SYNC-DOM-003#users · #access_tokens."""
 
+from __future__ import annotations
+
 from datetime import datetime
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, LargeBinary, String, func

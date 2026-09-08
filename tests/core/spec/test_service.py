@@ -7,8 +7,9 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from syncdoc.core.errors import ConventionViolation, ItemDeleted, NotFound
+from syncdoc.core.markdown import parse_frontmatter
 from syncdoc.core.project.models import Project, Repository
-from syncdoc.core.spec.service import SpecService, parse_frontmatter
+from syncdoc.core.spec.service import SpecService
 from syncdoc.core.types import Author, AuthorKind, DocType, Entry
 from tests.core.account.test_service import make_user
 
@@ -229,7 +230,7 @@ def test_issue_doc_id_sequence_no_reuse(db_session: Session) -> None:
     svc = SpecService(db_session)
     p = make_project(db_session)
     a = author(db_session)
-    assert svc.issue_doc_id(p.id, DocType.PRD) == "EXMP-PRD-001"
+    assert svc.issue_doc_id(p.id, "EXMP", DocType.PRD) == "EXMP-PRD-001"
     svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a)
     svc.create(
         p.id, "EXMP-PRD-002", DocType.PRD, PRD.replace("EXMP-PRD-001", "EXMP-PRD-002"), "h2", a
@@ -239,8 +240,8 @@ def test_issue_doc_id_sequence_no_reuse(db_session: Session) -> None:
             "DELETE FROM versions; DELETE FROM items; DELETE FROM documents WHERE doc_id='EXMP-PRD-001'"
         )
     )
-    assert svc.issue_doc_id(p.id, DocType.PRD) == "EXMP-PRD-003"
-    assert svc.issue_doc_id(p.id, DocType.RFQ) == "EXMP-RFQ-001"
+    assert svc.issue_doc_id(p.id, "EXMP", DocType.PRD) == "EXMP-PRD-003"
+    assert svc.issue_doc_id(p.id, "EXMP", DocType.RFQ) == "EXMP-RFQ-001"
 
 
 # ── create ──
@@ -253,7 +254,12 @@ def test_create_inserts_document_items_version(db_session: Session) -> None:
     d = svc.get_document("EXMP-PRD-001")
     assert d.current_version_no == 1 and d.status == "draft" and d.stage == 2
     assert [i.item_id for i in d.items] == ["G1", "R1", "N1"]
-    assert d.last_author is not None and d.last_author.user.id == a.user.id
+    assert d.last_author is not None and d.last_author.user_id == a.user.id
+    assert (d.last_author.kind, d.last_author.instructed_by_id, d.last_author.via) == (
+        "agent",
+        a.user.id,
+        "mcp",
+    )
     assert d.body == PRD and d.has_convention_error is False
 
 
@@ -366,24 +372,31 @@ def test_save_approved_document_demotes_to_review_with_status_change(db_session:
 def test_save_deleted_pks_and_warnings(db_session: Session) -> None:
     svc, a, d = _seed(db_session)
     n1 = next(i.pk for i in d.items if i.item_id == "N1")
+    from syncdoc.core.types import ValidateResult, Violation
     from syncdoc.core.types import Warning as W
 
-    svc.save(
-        d,
-        PRD,
-        "h2",
-        a,
-        [n1],
-        has_convention_error=True,
-        warnings=[W("section.missing", "성공지표")],
+    vr = ValidateResult(
+        [Violation(3, "author.unknown", "ghost")], [W("section.missing", "성공지표")]
     )
+    svc.save(d, PRD, "h2", a, [n1], validate_result=vr)
     row = db_session.execute(
         text("SELECT is_deleted, deleted_at FROM items WHERE item_id='N1'")
     ).one()
     assert row[0] is True and row[1] is not None
     d2 = svc.get_document("EXMP-PRD-001")
-    assert d2.has_convention_error and d2.incomplete_warnings == ["section.missing: 성공지표"]
+    assert d2.has_convention_error and d2.convention_error_detail == "author.unknown: ghost"
+    assert d2.incomplete_warnings == ["section.missing: 성공지표"]
     assert [i.item_id for i in d2.items] == ["G1", "R1"]
+    svc.save(d2, PRD, "h3", a, [])  # validate_result 없음 → 오류·경고 컬럼 그대로
+    assert svc.get_document("EXMP-PRD-001").has_convention_error is True
+    svc.save(d2, PRD, "h4", a, [], validate_result=ValidateResult([], []))  # 통과 → 해제
+    d4 = svc.get_document("EXMP-PRD-001")
+    assert (
+        d4.has_convention_error is False
+        and d4.convention_error_detail is None
+        and d4.incomplete_warnings == []
+    )
+    assert db_session.execute(text("SELECT via FROM versions WHERE version_no=4")).scalar() == "mcp"
 
 
 # ── list_by_project ──
@@ -421,4 +434,4 @@ def test_list_by_project_filters_and_order(db_session: Session) -> None:
     assert ids(svc.list_by_project(p.id, status="approved")) == ["EXMP-PRD-001", "EXMP-DOM-001"]
     assert ids(svc.list_by_project(p.id, has_convention_error=True)) == []
     got = svc.list_by_project(p.id)
-    assert got[-1].stage is None and got[0].last_author.user.id == a.user.id and got[0].counts == {}
+    assert got[-1].stage is None and got[0].last_author.user_id == a.user.id and got[0].counts == {}

@@ -3,6 +3,8 @@
 테이블은 SYNC-DOM-003#documents · #items · #versions · #status_changes. 인덱스는 DOM-003 3장.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 
 from sqlalchemy import (

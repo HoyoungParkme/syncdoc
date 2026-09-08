@@ -3,22 +3,23 @@
 다른 묶음 것은 인자로 받는다. 항목 판정은 item_blocks 한 곳(SYNC-STD-001 1.3).
 """
 
+from __future__ import annotations
+
 import json
 import re
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from syncdoc.core.account.models import User
 from syncdoc.core.errors import ConventionViolation, ItemDeleted, NotFound
-from syncdoc.core.project.models import Project
+from syncdoc.core.markdown import DOC_ID, HEADING, REF, cut_blocks, masked_lines, parse_frontmatter
 from syncdoc.core.spec.models import Document as DocumentRow
 from syncdoc.core.spec.models import Item, StatusChange, Version
 from syncdoc.core.spec.repository import SpecRepository
 from syncdoc.core.types import (
     STAGE_OF,
     Author,
-    AuthorKind,
+    AuthorRef,
     DocItem,
     DocStatus,
     DocType,
@@ -75,22 +76,6 @@ SUBTYPES: dict[tuple[str, str], tuple[list[str], list[str]]] = {
     ),
     ("API", "MCP"): ([r"[a-z][a-z_]+"], ["규칙", "도구", "에이전트 순서", "미결사항"]),
 }
-DOC_ID = re.compile(r"^[A-Z]{1,4}-[A-Z]+-\d{3}$")
-REF = re.compile(r"\[\[([^\]]+)\]\]")
-HEADING = re.compile(r"^(#{1,6}) (\S+)(?: (.*))?$")
-FRONTMATTER = re.compile(r"^---\n(.*?)\n---\n", re.S)
-
-
-def parse_frontmatter(body: str) -> tuple[dict[str, str], int]:
-    """frontmatter → (필드 dict, 차지하는 줄 수). 없으면 ({}, 0)."""
-    m = FRONTMATTER.match(body)
-    if not m:
-        return {}, 0
-    fm: dict[str, str] = {}
-    for line in m.group(1).split("\n"):
-        k, _, v = line.partition(":")
-        fm[k.strip()] = v.strip()
-    return fm, m.group(0).count("\n")
 
 
 def patterns_for(doc_type: str, title: str | None) -> tuple[re.Pattern[str] | None, list[str]]:
@@ -99,26 +84,6 @@ def patterns_for(doc_type: str, title: str | None) -> tuple[re.Pattern[str] | No
         if t == doc_type and title and key in title:
             pats, secs = p, s
     return (re.compile("^(?:" + "|".join(pats) + ")$") if pats else None), secs
-
-
-def masked_lines(body: str) -> list[str]:
-    """frontmatter·코드블록·인라인 코드를 같은 길이 공백으로. 줄 수 유지 (STD-001 1.3·1.5)."""
-    _, fm_lines = parse_frontmatter(body)
-    out: list[str] = []
-    in_block = False
-    for i, line in enumerate(body.split("\n")):
-        if i < fm_lines:
-            out.append("")
-            continue
-        if line.startswith("```"):
-            in_block = not in_block
-            out.append("")
-            continue
-        if in_block:
-            out.append("")
-        else:
-            out.append(re.sub(r"`[^`]*`", lambda m: " " * len(m.group(0)), line))
-    return out
 
 
 class SpecService:
@@ -135,32 +100,7 @@ class SpecService:
         item_re, _ = patterns_for(doc_type, title)
         if item_re is None:
             return []
-        lines = body.split("\n")
-        heads = []  # (line_idx, level, token, rest)
-        for i, line in enumerate(masked_lines(body)):
-            h = HEADING.match(line)
-            if h:
-                heads.append((i, len(h.group(1)), h.group(2), h.group(3) or ""))
-        blocks: list[ItemBlock] = []
-        for n, (i, level, tok, rest) in enumerate(heads):
-            if not item_re.match(tok):
-                continue
-            end = len(lines) - 1
-            for j, lvl, _, _ in heads[n + 1 :]:
-                if lvl <= level:
-                    end = j - 1
-                    break
-            blocks.append(
-                ItemBlock(
-                    item_id=tok,
-                    display_name=rest.strip(),
-                    level=level,
-                    start_line=i + 1,
-                    end_line=end + 1,
-                    text="\n".join(lines[i : end + 1]),
-                )
-            )
-        return blocks
+        return cut_blocks(body, lambda tok: bool(item_re.match(tok)))
 
     def validate(
         self,
@@ -273,9 +213,8 @@ class SpecService:
         out.extend(f"{k}: {v}" for k, v in forced.items())
         return "\n".join(["---", *out, "---", *lines[fm_lines:]])
 
-    def issue_doc_id(self, project_id: int, doc_type: DocType) -> str:
+    def issue_doc_id(self, project_id: int, code: str, doc_type: DocType) -> str:
         """SYNC-MS-002#SpecService.issue_doc_id"""
-        code = self.session.get(Project, project_id).code
         return f"{code}-{doc_type}-{self.repo.max_doc_number(project_id, doc_type) + 1:03d}"
 
     def create(
@@ -353,20 +292,15 @@ class SpecService:
             "last_author": self._author_of(latest),
         }
 
-    def _author_of(self, v: Version | None) -> Author | None:
-        """버전 행 → Author. via는 DB에 없어 kind로 추정(agent→mcp, human→github)."""
+    def _author_of(self, v: Version | None) -> AuthorRef | None:
+        """버전 행 → AuthorRef(id만). 이름은 queries가 AccountService.users_by_ids로."""
         if v is None:
             return None
-        user = self.session.get(User, v.author_user_id)
-        instructed = (
-            self.session.get(User, v.instructed_by_user_id) if v.instructed_by_user_id else None
-        )
-        kind = AuthorKind(v.author_kind)
-        return Author(
-            kind=kind,
-            user=user,
-            instructed_by=instructed,
-            via=Entry.mcp if kind == AuthorKind.agent else Entry.github,
+        return AuthorRef(
+            kind=v.author_kind,
+            user_id=v.author_user_id,
+            instructed_by_id=v.instructed_by_user_id,
+            via=v.via,
         )
 
     def get_item(self, doc_id: str, item_id: str) -> ItemView:
@@ -406,8 +340,7 @@ class SpecService:
         commit_hash: str,
         author: Author,
         deleted_item_pks: list[int],
-        has_convention_error: bool = False,
-        warnings: list | None = None,
+        validate_result: ValidateResult | None = None,
         rebuild: bool = False,
     ) -> Version:
         """SYNC-MS-002#SpecService.save"""
@@ -444,12 +377,13 @@ class SpecService:
         row.current_body = body
         row.current_version_no = new_no
         row.status = str(new_status)
-        row.has_convention_error = has_convention_error
-        if not has_convention_error:
-            row.convention_error_detail = None
-        row.incomplete_warnings = (
-            json.dumps([str(w) for w in warnings], ensure_ascii=False) if warnings else None
-        )
+        if validate_result is not None:
+            v, w = validate_result.violations, validate_result.warnings
+            row.has_convention_error = bool(v)
+            row.convention_error_detail = "\n".join(f"{x.rule}: {x.message}" for x in v) or None
+            row.incomplete_warnings = (
+                json.dumps([str(x) for x in w], ensure_ascii=False) if w else None
+            )
         self.session.flush()
         return version
 

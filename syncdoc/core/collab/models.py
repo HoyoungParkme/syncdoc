@@ -1,5 +1,7 @@
 """SYNC-DOM-002 2.5 협업 — Comment. 테이블은 SYNC-DOM-003#comments."""
 
+from __future__ import annotations
+
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, false, func

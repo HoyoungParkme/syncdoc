@@ -1,1 +1,3 @@
 """SYNC-MS-008 — 읽기 조합. B1에서 채운다."""
+
+from __future__ import annotations

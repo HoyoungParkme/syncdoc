@@ -3,6 +3,8 @@
 to_item_id·to_document_id는 CHECK로 하나만. is_missing=true면 둘 다 null(DOM-003 설계 규칙).
 """
 
+from __future__ import annotations
+
 from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, String, false
 from sqlalchemy.orm import Mapped, mapped_column
 

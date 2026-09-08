@@ -1,5 +1,7 @@
 """SYNC-DOM-002 4.2 — documents·items·versions·status_changes 조회·저장. DB만 안다."""
 
+from __future__ import annotations
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 

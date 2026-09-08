@@ -1,5 +1,7 @@
 """SYNC-DOM-002 4.3 — references 조회·저장. DB만 안다."""
 
+from __future__ import annotations
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 

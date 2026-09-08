@@ -3,6 +3,8 @@
 카드 A·B1이 던지는 것. 새 에러는 API 명세부터.
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 

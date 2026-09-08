@@ -3,6 +3,8 @@
 열거형은 DB enum이 아니라 varchar + 앱 검증(SYNC-DOM-003 설계 규칙). 타입은 여기 한 곳에만.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -67,6 +69,16 @@ class Author:
     user: User
     instructed_by: User | None
     via: Entry
+
+
+@dataclass(frozen=True)
+class AuthorRef:
+    """SpecService가 돌려주는 작성 주체 — id만. UserRef로 채우는 건 queries."""
+
+    kind: str
+    user_id: int
+    instructed_by_id: int | None
+    via: str
 
 
 @dataclass(frozen=True)
@@ -163,7 +175,7 @@ class DocumentSummary:
     has_convention_error: bool
     incomplete_warnings: list[str]
     updated_at: datetime
-    last_author: Author | None
+    last_author: AuthorRef | None
     counts: dict[str, int] = field(default_factory=dict)
 
 

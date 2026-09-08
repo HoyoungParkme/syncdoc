@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 #!/usr/bin/env python3
 """SYNC-STD-004#DEV-14 — MINISPEC↔코드 일치 검사기.
 

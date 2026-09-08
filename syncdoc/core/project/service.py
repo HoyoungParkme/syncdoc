@@ -1,5 +1,7 @@
 """SYNC-MS-001 — ProjectService. projects·repositories만. documents를 모른다 — 요약은 queries."""
 
+from __future__ import annotations
+
 from sqlalchemy.orm import Session
 
 from syncdoc.core.errors import NotFound

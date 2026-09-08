@@ -3,6 +3,8 @@
 테이블은 SYNC-DOM-003#projects · #repositories.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, func
@@ -22,7 +24,7 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    repository: Mapped["Repository"] = relationship(uselist=False)  # MS-001 "Project.repository"
+    repository: Mapped[Repository] = relationship(uselist=False)  # MS-001 "Project.repository"
 
 
 class Repository(Base):

@@ -3,6 +3,8 @@
 세션은 요청마다 하나. 서비스는 트랜잭션을 열지 않는다(SYNC-STD-004#DEV-10).
 """
 
+from __future__ import annotations
+
 from collections.abc import Iterator
 
 from sqlalchemy import create_engine

@@ -1,10 +1,12 @@
 """SYNC-MS-003 — ReferenceService. references 테이블만. pk만 안다 — 표시 이름은 queries가."""
 
+from __future__ import annotations
+
 from sqlalchemy.orm import Session
 
+from syncdoc.core.markdown import REF, cut_blocks, masked_lines
 from syncdoc.core.reference.models import Reference
 from syncdoc.core.reference.repository import ReferenceRepository
-from syncdoc.core.spec.service import HEADING, REF, masked_lines
 from syncdoc.core.types import ExtractResult, RefEdge
 
 
@@ -32,20 +34,15 @@ class ReferenceService:
         upstream_doc_ids: list[str],
     ) -> ExtractResult:
         """SYNC-MS-003#ReferenceService.extract"""
-        # 1·2. 코드 제외 본문에서 [[ ]]마다 어느 항목 블록 안인지 (블록 경계 = item_pks의 헤딩)
+        # 1·2. [[ ]]마다 어느 항목 블록 안인지 — 경계는 markdown.cut_blocks(item_pks 헤딩)
         wanted: dict[tuple[int | None, str], tuple[int | None, int | None, bool]] = {}
-        current: tuple[int, int] | None = None  # (from_item_pk, level)
-        for line in masked_lines(body):
-            h = HEADING.match(line)
-            if h:
-                level, tok = len(h.group(1)), h.group(2)
-                if tok in item_pks:
-                    current = (item_pks[tok], level)
-                elif current and level <= current[1]:
-                    current = None
-            from_pk = current[0] if current else None
+        owner: dict[int, int] = {}  # 줄 idx → from_item_pk
+        for b in cut_blocks(body, lambda tok: tok in item_pks):
+            for ln in range(b.start_line - 1, b.end_line):
+                owner[ln] = item_pks[b.item_id]
+        for ln, line in enumerate(masked_lines(body)):
             for raw in REF.findall(line):
-                wanted[(from_pk, raw)] = self._resolve(raw, document_id)
+                wanted[(owner.get(ln), raw)] = self._resolve(raw, document_id)
         # 5. frontmatter upstream → 문서 참조
         for doc_id in upstream_doc_ids:
             wanted[(None, doc_id)] = self._resolve(doc_id, document_id)
