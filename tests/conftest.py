@@ -135,3 +135,17 @@ def repos(tmp_path: Path) -> dict[str, Path]:
     work = tmp_path / "work"
     git(tmp_path, "clone", "-q", str(remote), str(work))
     return {"remote": remote, "work": work, "other": other}
+
+
+# ── FastAPI TestClient (web·mcp 공유) ──
+@pytest.fixture
+def client(db_session: Session):
+    from fastapi.testclient import TestClient  # noqa: E402
+
+    from syncdoc.db import get_session  # noqa: E402
+    from syncdoc.main import app  # noqa: E402
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()

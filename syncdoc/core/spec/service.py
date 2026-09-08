@@ -274,6 +274,7 @@ class SpecService:
         return Document(
             **self._summary_fields(row, latest),
             body=row.current_body,
+            commit_hash=latest.commit_hash if latest else None,
             convention_error_detail=row.convention_error_detail,
             items=items,
         )

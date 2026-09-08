@@ -40,6 +40,7 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["E501"]
+"syncdoc/mcp/tools.py" = ["E501"]  # 도구 description은 SYNC-API-002 원문 그대로
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]

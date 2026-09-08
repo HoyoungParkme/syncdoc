@@ -240,6 +240,7 @@ class Document(DocumentSummary):
     """SYNC-API-001 Document. items[].flags·prev/next는 queries.document_view가 붙인다."""
 
     body: str = ""
+    commit_hash: str | None = None  # 최근 버전의 커밋 (API-002 get_document)
     convention_error_detail: str | None = None
     items: list[DocItem] = field(default_factory=list)
     prev_doc_id: str | None = None
