@@ -278,3 +278,31 @@ def test_get_document_not_found_convention_error_and_deleted_items(db_session: S
     assert d.incomplete_warnings == ["section.missing: 목표"]
     assert [i.item_id for i in d.items] == ["G1", "R1"]
     assert d.items[0].flags == [] and d.prev_doc_id is None
+
+
+# ── get_item ──
+def test_get_item_block_not_found_deleted(db_session: Session) -> None:
+    svc = SpecService(db_session)
+    p = make_project(db_session)
+    a = author(db_session)
+    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a)
+    v = svc.get_item("EXMP-PRD-001", "R1")
+    assert (
+        v.body.startswith("#### R1 첫 기능")
+        and "##### 인수기준" in v.body
+        and "### 3.2" not in v.body
+    )
+    assert (v.doc_status, v.doc_version_no, v.display_name, v.flags) == ("draft", 1, "첫 기능", [])
+    last = svc.get_item("EXMP-PRD-001", "N1")
+    assert last.body.rstrip().endswith("- [ ] 1초 이내")  # 코드블록 포함, 다음 절 전까지
+    with pytest.raises(NotFound) as ei:
+        svc.get_item("EXMP-PRD-001", "R9")
+    assert ei.value.extra["available_items"] == ["G1", "R1", "N1"]
+    db_session.execute(
+        text("UPDATE items SET is_deleted=true, deleted_at=now() WHERE item_id='N1'")
+    )
+    with pytest.raises(ItemDeleted) as ei2:
+        svc.get_item("EXMP-PRD-001", "N1")
+    assert ei2.value.extra["deleted_at"]
+    with pytest.raises(NotFound):
+        svc.get_item("EXMP-PRD-404", "R1")

@@ -367,6 +367,31 @@ class SpecService:
             via=Entry.mcp if kind == AuthorKind.agent else Entry.github,
         )
 
+    def get_item(self, doc_id: str, item_id: str) -> ItemView:
+        """SYNC-MS-002#SpecService.get_item"""
+        document = self.get_document(doc_id)
+        item_id = item_id.replace("~", "/")
+        item = self.repo.item_of(document.id, item_id)
+        if item is None:
+            raise NotFound(
+                "item",
+                f"{doc_id}#{item_id}",
+                available_items=[i.item_id for i in document.items],
+            )
+        if item.is_deleted:
+            raise ItemDeleted(item.deleted_at.isoformat() if item.deleted_at else None)
+        blocks = self.item_blocks(document.body, document.doc_type)
+        block = next(b for b in blocks if b.item_id == item_id)
+        return ItemView(
+            pk=item.id,
+            doc_id=doc_id,
+            item_id=item_id,
+            display_name=item.display_name,
+            body=block.text,
+            doc_status=document.status,
+            doc_version_no=document.current_version_no,
+        )
+
     def _deleted_item_ids(self, doc_id: str | None) -> set[str]:
         if not doc_id:
             return set()
