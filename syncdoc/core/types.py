@@ -81,15 +81,6 @@ class AuthorRef:
     via: str
 
 
-@dataclass(frozen=True)
-class UserRef:
-    """SYNC-API-001 UserRef."""
-
-    id: int
-    github_login: str
-    display_name: str
-
-
 @dataclass
 class FlagSummary:
     """SYNC-API-001 FlagSummary — pk 형태. ItemRef·UserRef로 채우는 건 queries."""
@@ -207,6 +198,25 @@ class DocItem:
     flags: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class UserRef:
+    """SYNC-API-001 UserRef."""
+
+    id: int
+    github_login: str
+    display_name: str
+
+
+@dataclass
+class ApiAuthor:
+    """SYNC-API-001 Author — queries가 AuthorRef를 users_by_ids로 채운 것."""
+
+    kind: str
+    user: UserRef | None
+    instructed_by: UserRef | None
+    via: str
+
+
 @dataclass
 class DocumentSummary:
     """SYNC-API-001 DocumentSummary. counts는 queries가 채운다."""
@@ -222,6 +232,7 @@ class DocumentSummary:
     updated_at: datetime
     last_author: AuthorRef | None
     counts: dict[str, int] = field(default_factory=dict)
+    author: ApiAuthor | None = None  # queries가 채운다 (API Author)
 
 
 @dataclass

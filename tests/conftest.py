@@ -80,3 +80,18 @@ def github_ok(user_id: int = 42, login: str = "hoyoung", name: str | None = "박
         return httpx.Response(404)
 
     return handler
+
+
+@pytest.fixture
+def scoped(db_session: Session, monkeypatch: pytest.MonkeyPatch) -> Session:
+    """pipeline·queries의 db.session_scope()가 테스트 트랜잭션 세션을 쓰게 한다."""
+    from contextlib import contextmanager
+
+    from syncdoc import db
+
+    @contextmanager
+    def _scope():
+        yield db_session
+
+    monkeypatch.setattr(db, "session_scope", _scope)
+    return db_session
