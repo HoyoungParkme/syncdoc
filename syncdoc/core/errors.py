@@ -121,3 +121,14 @@ class ExistingSpecs(Problem):
 
     def __init__(self, doc_count: int) -> None:
         super().__init__("docs/specs/가 이미 있음", doc_count=doc_count)
+
+
+class NotImplementedYet(Problem):
+    """CODE-001 B1 스텁 — 뒤 카드에서 해제되는 기능."""
+
+    type = "urn:syncdoc:not-implemented"
+    status = 501
+    title = "not-implemented"
+
+    def __init__(self, feature: str) -> None:
+        super().__init__(f"{feature}: 아직 구현되지 않음", feature=feature)

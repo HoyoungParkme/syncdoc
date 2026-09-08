@@ -20,6 +20,9 @@ class ProjectRepository:
         stmt = select(Project).options(joinedload(Project.repository)).order_by(Project.code)
         return list(self.session.scalars(stmt))
 
+    def exists(self, code: str) -> bool:
+        return self.session.scalar(select(Project.id).where(Project.code == code)) is not None
+
     def add(self, row: Project | Repository) -> None:
         self.session.add(row)
         self.session.flush()
