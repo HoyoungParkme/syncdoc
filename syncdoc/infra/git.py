@@ -112,3 +112,8 @@ async def commit_push(
             await _run(workdir, "reset", "--hard", "origin/HEAD")
             raise PushFailed(e.stderr.strip()) from e
     return (await _run(workdir, "rev-parse", "HEAD")).strip()
+
+
+async def read(workdir: Path, path: str, ref: str = "HEAD") -> str:
+    """SYNC-MS-009#git.read"""
+    return await _run(workdir, "show", f"{ref}:{path}")

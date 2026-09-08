@@ -115,3 +115,14 @@ async def test_commit_push_unregistered_user_is_push_failed(repos: dict[str, Pat
     with pytest.raises(PushFailed) as ei:
         await g.commit_push(repos["work"], SEED, "v2", "m", _author(token=None))
     assert ei.value.extra["reason"] == "미등록"
+
+
+# ── read ──
+async def test_read_returns_file_at_ref_or_raises(repos: dict[str, Path]) -> None:
+    first = git(repos["work"], "rev-parse", "HEAD")
+    write_commit_push(repos["other"], SEED, "v2", "second")
+    await g.fetch(repos["work"])
+    assert await g.read(repos["work"], SEED, "origin/HEAD") == "v2"
+    assert (await g.read(repos["work"], SEED, first)).startswith("---\ndoc_id: SYNC-PRD-001")
+    with pytest.raises(g.GitError):
+        await g.read(repos["work"], "docs/specs/none.md")
