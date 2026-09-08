@@ -1,7 +1,4 @@
-"""routers/projects — SYNC-API-001 3.3. ProjectService(한 묶음) 또는 queries(집계)만 부른다.
-
-GET /api/projects/{code}(ProjectDetail)는 recent_changes가 versions.message 없이는 못 만든다(보고).
-"""
+"""routers/projects — SYNC-API-001 3.3. ProjectService(한 묶음) 또는 queries(집계)만 부른다."""
 
 from __future__ import annotations
 
@@ -14,7 +11,7 @@ from syncdoc.core.project.service import ProjectService
 from syncdoc.db import get_session
 from syncdoc.web.auth import current_user
 from syncdoc.web.schemas.documents import DocumentSummary
-from syncdoc.web.schemas.projects import InitProject, ProjectSummary
+from syncdoc.web.schemas.projects import InitProject, ProjectDetail, ProjectSummary
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -36,6 +33,12 @@ async def init_project(
     session.commit()
     summary = next(p for p in await queries.project_summary() if p.code == req.code)
     return ProjectSummary.of(summary)
+
+
+@router.get("/{code}", response_model=ProjectDetail)
+async def get_project(code: str, user: User = Depends(current_user)) -> ProjectDetail:
+    """SYNC-API-001#GET/api/projects/{code}"""
+    return ProjectDetail.of(await queries.project_detail(code))
 
 
 @router.get("/{code}/docs", response_model=list[DocumentSummary])

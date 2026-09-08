@@ -1,4 +1,4 @@
-"""SYNC-API-001 3.3 — GET /api/projects · POST /api/projects · GET /api/projects/{code}/docs."""
+"""SYNC-API-001 3.3 — GET /api/projects · POST · GET /api/projects/{code} · GET /api/projects/{code}/docs."""
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -35,6 +35,22 @@ def test_list_and_docs(client: TestClient, scoped: Session) -> None:
     assert client.get("/api/projects/EXMP/docs", params={"status": "bogus"}).status_code == 422
     r = client.get("/api/projects/NOPE/docs")
     assert r.status_code == 404 and r.json()["type"] == "urn:syncdoc:not-found"
+    # 상세 (UI-4): 요약 + 문서 목록 + 최근 변경
+    d = SpecService(scoped).get_document("EXMP-PRD-001")
+    SpecService(scoped).apply_status(
+        d, d.body.replace("status: draft", "status: review"), "c1", a.user, "검토"
+    )
+    det = client.get("/api/projects/EXMP").json()
+    assert det["code"] == "EXMP" and [x["doc_id"] for x in det["docs"]] == ["EXMP-PRD-001"]
+    assert [
+        (v["doc_id"], v["version_no"], v["message"], v["author"]["kind"], v["author"]["via"])
+        for v in det["recent_changes"]
+    ] == [
+        ("EXMP-PRD-001", None, "status(EXMP-PRD-001): draft → review", "human", "web"),
+        ("EXMP-PRD-001", 1, "spec: 테스트", "agent", "mcp"),
+    ]
+    assert det["recent_changes"][0]["author"]["user"]["github_login"] == "hoyoung"
+    assert client.get("/api/projects/NOPE").status_code == 404
 
 
 def test_init_project_web_path(
