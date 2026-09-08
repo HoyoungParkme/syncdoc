@@ -15,7 +15,7 @@ def _doc(db_session: Session):
     svc = SpecService(db_session)
     p = make_project(db_session)
     a = author(db_session)
-    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a)
+    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
     return svc, p, a, svc.get_document("EXMP-PRD-001")
 
 
@@ -56,7 +56,7 @@ def test_relocate_moves_lines_marks_missing_picks_nearest(db_session: Session) -
         "#### G1 첫 목표\n", ""
     )
     new = new.replace("## 5. 미결사항", "#### R1 첫 기능\n## 5. 미결사항")
-    svc.save(d, new, "h2", a, [])
+    svc.save(d, new, "h2", a, "spec: 테스트", [])
     assert CommentService(db_session).relocate(d.id, PRD, new, old_version_no=1) == 1
     assert c_r1.line_no == n_r1 + 3 - 1 and c_r1.original_location is None
     assert c_g1.line_no == n_g1 and c_g1.original_location == f"v1:{n_g1}"
@@ -69,7 +69,9 @@ def test_relocate_moves_lines_marks_missing_picks_nearest(db_session: Session) -
 def test_counts_top_level_unresolved_only(db_session: Session) -> None:
     svc, p, a, d = _doc(db_session)
     other = make_project(db_session, "OTHR")
-    svc.create(other.id, "OTHR-PRD-001", DocType.PRD, PRD.replace("EXMP", "OTHR"), "h", a)
+    svc.create(
+        other.id, "OTHR-PRD-001", DocType.PRD, PRD.replace("EXMP", "OTHR"), "h", a, "spec: 테스트"
+    )
     d2 = svc.get_document("OTHR-PRD-001")
     top = _comment(db_session, d.id, a.user.id, 1, "x")
     _comment(db_session, d.id, a.user.id, 1, "x", parent=top.id)  # 답글은 안 센다
@@ -101,7 +103,9 @@ def test_add_list_thread_resolve_and_counts(db_session: Session) -> None:
     )
     assert cs.unresolved_count(d.id) == 2  # 최상위만
     other = make_project(db_session, "OTHR")
-    svc.create(other.id, "OTHR-PRD-001", DocType.PRD, PRD.replace("EXMP", "OTHR"), "h", a)
+    svc.create(
+        other.id, "OTHR-PRD-001", DocType.PRD, PRD.replace("EXMP", "OTHR"), "h", a, "spec: 테스트"
+    )
     with pytest.raises(NotFound):
         cs.add(
             svc.get_document("OTHR-PRD-001").id, 1, "x", "y", a.user, c1.id

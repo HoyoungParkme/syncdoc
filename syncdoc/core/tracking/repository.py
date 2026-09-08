@@ -5,7 +5,8 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from syncdoc.core.spec.models import Document, Item, Version
+from syncdoc.core.spec.models import Document, Item
+from syncdoc.core.spec.models import Version as VersionRow
 from syncdoc.core.tracking.models import Flag
 
 
@@ -30,12 +31,12 @@ class TrackingRepository:
     def has_unresolved_upstream(self, target_pk: int, cause_document_id: int) -> bool:
         stmt = (
             select(Flag.id)
-            .join(Version, Version.id == Flag.cause_version_id)
+            .join(VersionRow, VersionRow.id == Flag.cause_version_id)
             .where(
                 Flag.kind == "upstream_impact",
                 Flag.target_item_id == target_pk,
                 Flag.resolved_at.is_(None),
-                Version.document_id == cause_document_id,
+                VersionRow.document_id == cause_document_id,
             )
         )
         return self.session.scalar(stmt) is not None

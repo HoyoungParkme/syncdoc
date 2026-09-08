@@ -17,7 +17,7 @@ from tests.core.spec.test_service import author, make_project
 
 def _mk(svc, pid, did, typ, status="draft", title="x", a=None):
     body = f"---\ndoc_id: {did}\ntype: {typ}\ntitle: {title}\nstatus: {status}\n---\n# {did}\n#### Q1 첫\n"
-    svc.create(pid, did, typ, body, "h", a)
+    svc.create(pid, did, typ, body, "h", a, "spec: 테스트")
 
 
 # ── project_summary ──
@@ -60,8 +60,8 @@ async def test_document_list_counts_and_filters(scoped: Session) -> None:
     svc, ref, tr = SpecService(scoped), ReferenceService(scoped), TrackingService(scoped)
     p = make_project(scoped)
     a = author(scoped)
-    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a)
-    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a)
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
     d = svc.get_document("EXMP-PRD-001")
     pks = {i.item_id: i.pk for i in d.items}
     ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])
@@ -84,8 +84,8 @@ async def test_document_view_and_item_view_flags_neighbors_author(scoped: Sessio
     svc, ref, tr = SpecService(scoped), ReferenceService(scoped), TrackingService(scoped)
     p = make_project(scoped)
     a = author(scoped)
-    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a)
-    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a)
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
     _mk(svc, p.id, "EXMP-SCN-001", "SCN", a=a)
     d = svc.get_document("EXMP-PRD-001")
     pks = {i.item_id: i.pk for i in d.items}
@@ -111,8 +111,8 @@ async def test_item_references_view_upstream_downstream_missing_document(scoped:
     svc, ref, tr = SpecService(scoped), ReferenceService(scoped), TrackingService(scoped)
     p = make_project(scoped)
     a = author(scoped)
-    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a)
-    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a)
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
     d = svc.get_document("EXMP-PRD-001")
     pks = {i.item_id: i.pk for i in d.items}
     ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])
@@ -145,11 +145,11 @@ async def test_upstream_checklist_groups_by_target_in_stage_order(scoped: Sessio
     svc, ref = SpecService(scoped), ReferenceService(scoped)
     p = make_project(scoped)
     a = author(scoped)
-    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a)
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
     body = PRD.replace(
         "없는 항목 [[EXMP-RFQ-001#Q9]]", "근거 [[EXMP-RFQ-001#Q1]] · 둘째 [[EXMP-RFQ-001#Q2]]"
     )
-    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, body, "h1", a)
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, body, "h1", a, "spec: 테스트")
     d = svc.get_document("EXMP-PRD-001")
     pks = {i.item_id: i.pk for i in d.items}
     ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])

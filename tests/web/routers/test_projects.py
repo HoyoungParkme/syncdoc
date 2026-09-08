@@ -18,7 +18,7 @@ def test_list_and_docs(client: TestClient, scoped: Session) -> None:
     login(client, scoped, "minjun")
     p = make_project(scoped, "EXMP")
     a = author(scoped)
-    SpecService(scoped).create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a)
+    SpecService(scoped).create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
     lst = client.get("/api/projects").json()
     assert [x["code"] for x in lst] == ["EXMP"] and len(lst[0]["stages"]) == 11
     prd = next(s for s in lst[0]["stages"] if s["doc_type"] == "PRD")

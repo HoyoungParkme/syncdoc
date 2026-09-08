@@ -21,7 +21,8 @@ from syncdoc.core.errors import (
 )
 from syncdoc.core.markdown import DOC_ID, HEADING, REF, cut_blocks, masked_lines, parse_frontmatter
 from syncdoc.core.spec.models import Document as DocumentRow
-from syncdoc.core.spec.models import Item, StatusChange, Version
+from syncdoc.core.spec.models import Item, StatusChange
+from syncdoc.core.spec.models import Version as VersionRow
 from syncdoc.core.spec.repository import SpecRepository
 from syncdoc.core.types import (
     STAGE_OF,
@@ -234,7 +235,8 @@ class SpecService:
         body: str,
         commit_hash: str,
         author: Author,
-    ) -> Version:
+        message: str,
+    ) -> VersionRow:
         """SYNC-MS-002#SpecService.create"""
         fm, _ = parse_frontmatter(body)
         row = DocumentRow(
@@ -251,14 +253,14 @@ class SpecService:
             self.session.add(
                 Item(document_id=row.id, item_id=b.item_id, display_name=b.display_name)
             )
-        version = self._new_version(row.id, 1, commit_hash, body, author)
+        version = self._new_version(row.id, 1, commit_hash, body, author, message)
         self.repo.add(version)
         return version
 
     def _new_version(
-        self, document_id: int, no: int, commit_hash: str, body: str, author: Author
-    ) -> Version:
-        return Version(
+        self, document_id: int, no: int, commit_hash: str, body: str, author: Author, message: str
+    ) -> VersionRow:
+        return VersionRow(
             document_id=document_id,
             version_no=no,
             commit_hash=commit_hash,
@@ -267,6 +269,7 @@ class SpecService:
             author_user_id=author.user.id,
             instructed_by_user_id=author.instructed_by.id if author.instructed_by else None,
             via=fold_via(author.via),
+            message=message,
             created_at=now_utc(),
         )
 
@@ -289,7 +292,7 @@ class SpecService:
             items=items,
         )
 
-    def _summary_fields(self, row: DocumentRow, latest: Version | None) -> dict:
+    def _summary_fields(self, row: DocumentRow, latest: VersionRow | None) -> dict:
         return {
             "id": row.id,
             "doc_id": row.doc_id,
@@ -303,7 +306,7 @@ class SpecService:
             "last_author": self._author_of(latest),
         }
 
-    def _author_of(self, v: Version | None) -> AuthorRef | None:
+    def _author_of(self, v: VersionRow | None) -> AuthorRef | None:
         """버전 행 → AuthorRef(id만). 이름은 queries가 AccountService.users_by_ids로."""
         if v is None:
             return None
@@ -350,15 +353,16 @@ class SpecService:
         body: str,
         commit_hash: str,
         author: Author,
+        message: str,
         deleted_item_pks: list[int],
         validate_result: ValidateResult | None = None,
         rebuild: bool = False,
-    ) -> Version:
+    ) -> VersionRow:
         """SYNC-MS-002#SpecService.save"""
         row = self.repo.document_by_id(document.id)
         assert row is not None
         new_no = row.current_version_no + 1
-        version = self._new_version(row.id, new_no, commit_hash, body, author)
+        version = self._new_version(row.id, new_no, commit_hash, body, author, message)
         self.repo.add(version)
         fm, _ = parse_frontmatter(body)
         for b in self.item_blocks(body, row.doc_type, fm.get("title")):

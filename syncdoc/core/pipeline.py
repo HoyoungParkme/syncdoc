@@ -154,7 +154,7 @@ async def _run(
             [],
         )
     if document is None:
-        version = spec.create(project.id, doc_id, doc_type, body, commit_hash, author)
+        version = spec.create(project.id, doc_id, doc_type, body, commit_hash, author, message)
         prev_version_id = None
     else:
         prev_version_id = document.current_version_id
@@ -163,6 +163,7 @@ async def _run(
             body,
             commit_hash,
             author,
+            message,
             deleted,
             validate_result=vr if entry == Entry.github else None,
         )

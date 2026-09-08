@@ -5,7 +5,8 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from syncdoc.core.spec.models import Document, Item, StatusChange, Version
+from syncdoc.core.spec.models import Document, Item, StatusChange
+from syncdoc.core.spec.models import Version as VersionRow
 
 
 class SpecRepository:
@@ -29,7 +30,7 @@ class SpecRepository:
         )
         return max((int(d.rsplit("-", 1)[1]) for d in self.session.scalars(stmt)), default=0)
 
-    def add(self, row: Document | Item | Version | StatusChange) -> None:
+    def add(self, row: Document | Item | VersionRow | StatusChange) -> None:
         self.session.add(row)
         self.session.flush()
 
@@ -61,27 +62,28 @@ class SpecRepository:
         return [(i, d) for i, d in self.session.execute(stmt)]
 
     # versions
-    def latest_version(self, document_id: int) -> Version | None:
+    def latest_version(self, document_id: int) -> VersionRow | None:
         stmt = (
-            select(Version)
-            .where(Version.document_id == document_id)
-            .order_by(Version.version_no.desc())
+            select(VersionRow)
+            .where(VersionRow.document_id == document_id)
+            .order_by(VersionRow.version_no.desc())
             .limit(1)
         )
         return self.session.scalar(stmt)
 
-    def latest_versions(self, document_ids: list[int]) -> dict[int, Version]:
+    def latest_versions(self, document_ids: list[int]) -> dict[int, VersionRow]:
         """문서마다 최근 버전 하나. 쿼리 한 번."""
         if not document_ids:
             return {}
         latest = (
-            select(Version.document_id, func.max(Version.version_no).label("no"))
-            .where(Version.document_id.in_(document_ids))
-            .group_by(Version.document_id)
+            select(VersionRow.document_id, func.max(VersionRow.version_no).label("no"))
+            .where(VersionRow.document_id.in_(document_ids))
+            .group_by(VersionRow.document_id)
             .subquery()
         )
-        stmt = select(Version).join(
+        stmt = select(VersionRow).join(
             latest,
-            (Version.document_id == latest.c.document_id) & (Version.version_no == latest.c.no),
+            (VersionRow.document_id == latest.c.document_id)
+            & (VersionRow.version_no == latest.c.no),
         )
         return {v.document_id: v for v in self.session.scalars(stmt)}
