@@ -222,3 +222,22 @@ def test_apply_frontmatter_creates_fills_and_rejects(db_session: Session) -> Non
     assert "title: EXMP-PRD-003" in svc.apply_frontmatter(
         "본문", "EXMP-PRD-003", DocType.PRD, "draft"
     )
+
+
+# ── issue_doc_id ──
+def test_issue_doc_id_sequence_no_reuse(db_session: Session) -> None:
+    svc = SpecService(db_session)
+    p = make_project(db_session)
+    a = author(db_session)
+    assert svc.issue_doc_id(p.id, DocType.PRD) == "EXMP-PRD-001"
+    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a)
+    svc.create(
+        p.id, "EXMP-PRD-002", DocType.PRD, PRD.replace("EXMP-PRD-001", "EXMP-PRD-002"), "h2", a
+    )
+    db_session.execute(
+        text(
+            "DELETE FROM versions; DELETE FROM items; DELETE FROM documents WHERE doc_id='EXMP-PRD-001'"
+        )
+    )
+    assert svc.issue_doc_id(p.id, DocType.PRD) == "EXMP-PRD-003"
+    assert svc.issue_doc_id(p.id, DocType.RFQ) == "EXMP-RFQ-001"

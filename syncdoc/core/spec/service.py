@@ -272,6 +272,54 @@ class SpecService:
         out.extend(f"{k}: {v}" for k, v in forced.items())
         return "\n".join(["---", *out, "---", *lines[fm_lines:]])
 
+    def issue_doc_id(self, project_id: int, doc_type: DocType) -> str:
+        """SYNC-MS-002#SpecService.issue_doc_id"""
+        code = self.session.get(Project, project_id).code
+        return f"{code}-{doc_type}-{self.repo.max_doc_number(project_id, doc_type) + 1:03d}"
+
+    def create(
+        self,
+        project_id: int,
+        doc_id: str,
+        doc_type: DocType,
+        body: str,
+        commit_hash: str,
+        author: Author,
+    ) -> Version:
+        """SYNC-MS-002#SpecService.create"""
+        fm, _ = parse_frontmatter(body)
+        row = DocumentRow(
+            project_id=project_id,
+            doc_id=doc_id,
+            doc_type=str(doc_type),
+            status=fm.get("status") or "draft",
+            current_body=body,
+            current_version_no=1,
+            has_convention_error=False,
+        )
+        self.repo.add(row)
+        for b in self.item_blocks(body, doc_type, fm.get("title")):
+            self.session.add(
+                Item(document_id=row.id, item_id=b.item_id, display_name=b.display_name)
+            )
+        version = self._new_version(row.id, 1, commit_hash, body, author)
+        self.repo.add(version)
+        return version
+
+    def _new_version(
+        self, document_id: int, no: int, commit_hash: str, body: str, author: Author
+    ) -> Version:
+        return Version(
+            document_id=document_id,
+            version_no=no,
+            commit_hash=commit_hash,
+            body=body,
+            author_kind=str(author.kind),
+            author_user_id=author.user.id,
+            instructed_by_user_id=author.instructed_by.id if author.instructed_by else None,
+            created_at=now_utc(),
+        )
+
     def _deleted_item_ids(self, doc_id: str | None) -> set[str]:
         if not doc_id:
             return set()
