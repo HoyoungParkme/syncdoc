@@ -35,6 +35,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#queries.todo]] | 내 할 일 여섯 묶음 |
 | [[#queries.project_items]] | 프로젝트 플래그·댓글·오류 목록 |
 | [[#queries.upstream_checklist]] | 승인 전 상위 대조 목록 |
+| [[#queries.downstream_view]] | 이 문서를 참조하는 것 (추적표) |
 | [[#queries.decision_view]] | 전파 미결정 상세 |
 | [[#queries.flag_view]] | 플래그 상세 |
 
@@ -118,6 +119,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. `pks = [i.pk for i in doc.items]` · `rows = TrackingService.flags_for_items(pks)` → `{pk: [Flag]}` · `flags = {pk: [f.kind for f in v]}`
 3. 항목마다 `item.flags = flags.get(pk, [])` (kind 문자열만. `FlagSummary`는 참조 패널에서)
 4. `doc.prev_doc_id, doc.next_doc_id = SpecService.neighbors(doc_id)`
+4a. `doc.missing_refs = [e.raw_target for e in ReferenceService.upstream_of_document(doc.id, include_missing=True) if e.is_missing]` — 유저용 탭이 링크를 회색 `?`로 그리는 근거
 5. `names = AccountService.users_by_ids([doc.last_author.user_id, doc.last_author.instructed_by_id])` → API `Author{kind, user: UserRef, instructed_by, via}`로 채움
 6. `→ doc`
 
@@ -146,8 +148,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. `document_id = pk의 문서`
 3. `up = ReferenceService.upstream(pk)` · `down = ReferenceService.downstream(pk) + ReferenceService.downstream_of_document(document_id)` — 문서 전체 참조도 이 항목의 하위로 본다
 4. `need = {e.to_item_pk for e in up} ∪ {e.to_document_id…} ∪ {e.from_item_pk for e in down}` · `names = SpecService.describe_items(need)` — **한 번**
-5. `RefEdge` → `ItemRef`: `to_item_pk`가 있으면 `names[pk]` · `to_document_id`만 있으면 `ItemRef(doc_id, item_id=None, display_name=문서 제목)` · `is_missing`이면 `ItemRef(raw_target만, is_missing=True)`
-6. `flags = TrackingService.flags_for_items([pk])` → `FlagSummary[]` (미해결만)
+5. `RefEdge` → `ItemRef`: `to_item_pk`가 있으면 `names[pk]` · `to_document_id`만 있으면 `SpecService.describe_documents`로 `ItemRef(doc_id, item_id=None, display_name=문서 제목)` — 항목·문서 id 공간이 겹치므로 따로 · `is_missing`이면 `ItemRef(raw_target만, is_missing=True)`
+6. `flags = TrackingService.flags_for_items([pk])` → `FlagSummary[]` — `describe_items`·`versions_by_ids`·`users_by_ids`로 채운다 (미해결만)
 7. `→ ItemReferences(doc_id, item_id, upstream, downstream, flags)`
 
 **호출하는 것** `SpecService.resolve_item` `SpecService.describe_items` · `ReferenceService.upstream` `downstream` `downstream_of_document` · `TrackingService.flags_for_items`
@@ -250,6 +252,21 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ---
 
+#### queries.downstream_view 이 문서를 참조하는 것
+
+**시그니처** `async def downstream_view(doc_id: str) -> DownstreamView`
+
+근거: [[SYNC-API-001#GET/api/docs/{docId}/downstream]] · [[SYNC-STD-002]] V-PRD 추적표
+
+**처리**
+1. `doc = SpecService.get_document(doc_id)` · `pks = SpecService.item_pks(doc.id)`
+2. `edges = ReferenceService.references_among(set(pks.values()) ∪ {문서}, include_document_targets=True)`에서 `to`가 이 문서인 것만 (또는 `downstream(pk)` ×N + `downstream_of_document`)
+3. `from` pk를 `describe_items`로, 문서를 `describe_documents`로
+4. `by_item = {item_id: [ItemRef…]}` (문서 단위는 키 `"(문서)"`) · `by_document = [{doc_id, title, items: [이 문서 항목 ID들]}]` 문서 단계순
+5. `→ DownstreamView(by_item, by_document)`
+
+---
+
 #### queries.decision_view 전파 미결정 상세
 
 **시그니처** `async def decision_view(version_id: int) -> DecisionDetail`
@@ -275,7 +292,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **처리**
 1. `f = TrackingService.get_flag(flag_id)` · if 없음 → `! not-found`
-2. `names = SpecService.describe_items([f.target_item_pk, f.cause_item_pk])`
+2. `names = SpecService.describe_items([f.target_item_pk, f.cause_item_pk])` · `vb = SpecService.versions_by_ids([f.cause_version_id])` → `cause_version_no`
 3. if `f.kind == needs_check and f.cause_item_pk` → `cause_doc = 원인 문서`, `cur_no = cause_doc.current_version_no` · `cause_diff = SpecService.diff(cause_doc_id, f.cause_version_no, cur_no)` · `cause_change_count = cur_no - f.cause_version_no` (UC-H11 3a 누적)
 4. if `f.kind == broken_ref` → `cause_diff=None`, `cause_deleted_at = 원인 항목의 deleted_at`
 4a. if `f.kind == upstream_impact` → `cause_diff=None` · if `f.cause_item_pk` → `cause_body = SpecService.get_item(하위 항목).body` · else → `cause_body = 하위 문서 제목 + "(문서 단위 지목)"`
