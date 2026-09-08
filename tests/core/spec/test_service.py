@@ -255,3 +255,26 @@ def test_create_inserts_document_items_version(db_session: Session) -> None:
     assert [i.item_id for i in d.items] == ["G1", "R1", "N1"]
     assert d.last_author is not None and d.last_author.user.id == a.user.id
     assert d.body == PRD and d.has_convention_error is False
+
+
+# ── get_document ──
+def test_get_document_not_found_convention_error_and_deleted_items(db_session: Session) -> None:
+    svc = SpecService(db_session)
+    p = make_project(db_session)
+    a = author(db_session)
+    with pytest.raises(NotFound) as ei:
+        svc.get_document("EXMP-PRD-009")
+    assert ei.value.extra == {"resource": "document", "id": "EXMP-PRD-009"}
+    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a)
+    db_session.execute(
+        text(
+            "UPDATE documents SET has_convention_error=true, convention_error_detail='author.unknown: x', "
+            "incomplete_warnings='[\"section.missing: 목표\"]'; "
+            "UPDATE items SET is_deleted=true WHERE item_id='N1'"
+        )
+    )
+    d = svc.get_document("EXMP-PRD-001")
+    assert d.has_convention_error and d.convention_error_detail == "author.unknown: x"
+    assert d.incomplete_warnings == ["section.missing: 목표"]
+    assert [i.item_id for i in d.items] == ["G1", "R1"]
+    assert d.items[0].flags == [] and d.prev_doc_id is None
