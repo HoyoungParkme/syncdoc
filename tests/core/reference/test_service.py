@@ -102,3 +102,34 @@ def test_downstream_lists_edges_pointing_to_item(db_session: Session) -> None:
     ]
     assert [e.from_item_pk for e in ref.downstream(pks["R1"])] == [pks["G1"]]
     assert ref.downstream(pks["G1"]) == []
+
+
+# ── upstream · upstream_of_document · downstream_of_document ──
+def test_upstream_edges_including_missing(db_session: Session) -> None:
+    svc, ref, d, v, pks, _ = _setup(db_session)
+    ref.extract(d.id, v.id, d.body, pks, UPSTREAM)
+    g1 = ref.upstream(pks["G1"])
+    assert sorted(e.raw_target for e in g1) == ["#R1", "EXMP-RFQ-001#Q1"]
+    r1 = ref.upstream(pks["R1"])
+    assert [(e.raw_target, e.is_missing) for e in r1] == [("EXMP-RFQ-001#Q9", True)]  # 미존재 포함
+    assert ref.upstream(999_999) == []
+
+
+def test_upstream_of_document_excludes_missing_includes_frontmatter(db_session: Session) -> None:
+    svc, ref, d, v, pks, _ = _setup(db_session)
+    ref.extract(d.id, v.id, d.body, pks, UPSTREAM)
+    edges = ref.upstream_of_document(d.id)
+    raws = sorted((e.from_item_pk is None, e.raw_target) for e in edges)
+    assert raws == [(False, "#R1"), (False, "EXMP-RFQ-001#Q1"), (True, "EXMP-RFQ-001")]
+    assert all(not e.is_missing for e in edges)
+
+
+def test_downstream_of_document_only_whole_document_refs(db_session: Session) -> None:
+    svc, ref, d, v, pks, _ = _setup(db_session)
+    ref.extract(d.id, v.id, d.body, pks, UPSTREAM)
+    rfq = svc.get_document("EXMP-RFQ-001")
+    edges = ref.downstream_of_document(rfq.id)
+    assert [(e.from_item_pk, e.raw_target) for e in edges] == [
+        (None, "EXMP-RFQ-001")
+    ]  # 절 본문·upstream
+    assert ref.downstream_of_document(d.id) == []

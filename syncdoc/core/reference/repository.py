@@ -17,6 +17,23 @@ class ReferenceRepository:
         stmt = select(Reference).where(Reference.from_document_id == document_id)
         return list(self.session.scalars(stmt))
 
+    def from_item(self, item_pk: int) -> list[Reference]:
+        return list(
+            self.session.scalars(select(Reference).where(Reference.from_item_id == item_pk))
+        )
+
+    def to_document_only(self, document_id: int) -> list[Reference]:
+        stmt = select(Reference).where(
+            Reference.to_document_id == document_id, Reference.to_item_id.is_(None)
+        )
+        return list(self.session.scalars(stmt))
+
+    def from_document_existing(self, document_id: int) -> list[Reference]:
+        stmt = select(Reference).where(
+            Reference.from_document_id == document_id, Reference.is_missing.is_(False)
+        )
+        return list(self.session.scalars(stmt.order_by(Reference.id)))
+
     def to_item(self, item_pk: int) -> list[Reference]:
         return list(self.session.scalars(select(Reference).where(Reference.to_item_id == item_pk)))
 
