@@ -21,6 +21,11 @@ class AccountRepository:
     def user_by_github_user_id(self, github_user_id: int) -> User | None:
         return self.session.scalar(select(User).where(User.github_user_id == github_user_id))
 
+    def users_by_ids(self, ids: list[int]) -> list[User]:
+        if not ids:
+            return []
+        return list(self.session.scalars(select(User).where(User.id.in_(ids))))
+
     def placeholder_by_login(self, login: str) -> User | None:
         return self.session.scalar(
             select(User).where(User.github_login == login, User.github_user_id.is_(None))

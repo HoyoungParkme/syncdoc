@@ -178,3 +178,12 @@ async def test_login_github_bad_code_is_unauthorized(db_session: Session, mock_g
     with pytest.raises(Unauthorized):
         await AccountService(db_session).login_github("bad", "state")
     assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 0
+
+
+# ── users_by_ids ──
+def test_users_by_ids_one_query_dict(db_session: Session) -> None:
+    a, b = make_user(db_session, login="a"), make_user(db_session, login="b", token=None)
+    got = AccountService(db_session).users_by_ids([a.id, b.id, 999_999])
+    assert set(got) == {a.id, b.id}
+    assert (got[b.id].github_login, got[b.id].display_name) == ("b", "b")
+    assert AccountService(db_session).users_by_ids([]) == {}
