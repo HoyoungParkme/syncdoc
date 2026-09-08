@@ -52,6 +52,7 @@ syncdoc/
 │   ├── account/            사용자, 액세스토큰
 │   │
 │   ├── types.py            2.7 열거형 · 2.8 DTO. 묶음 전부가 쓰므로 묶음 밖
+│   ├── markdown.py         순수 함수 — frontmatter 파싱 · 코드 마스킹 · 헤딩/참조 정규식 · 항목 블록 자르기. spec·reference가 같이 쓴다. DB 없음
 │   ├── errors.py           problem+json 타입마다 예외 클래스 하나 (STD-004 DEV-5)
 │   ├── pipeline.py         쓰기 조율. 묶음들을 순서대로 부른다
 │   └── queries.py          읽기 조합. 여러 묶음에서 ID로 모아 응답 형태를 만든다
@@ -190,6 +191,7 @@ classDiagram
         +AuthorKind author_kind
         +int author_user_id
         +int instructed_by_user_id
+        +str via
         +datetime created_at
     }
 ```
@@ -364,12 +366,14 @@ classDiagram
 | 타입 | 필드 | 쓰는 곳 |
 |---|---|---|
 | `Entry` | 열거 `mcp` · `web_revert` · `web_status` · `github` | pipeline |
-| `Author` | `kind: AuthorKind` · `user: User` · `instructed_by: User \| None` · `via: Entry` | pipeline · save · Version 기록. API 응답의 `via`는 `web_revert`·`web_status`를 `web`으로 접는다 |
+| `Author` | `kind: AuthorKind` · `user: User` · `instructed_by: User \| None` · `via: Entry` | pipeline · save · Version 기록. `versions.via`에 `mcp`·`web`·`github`로 접어 저장 |
+| `AuthorRef` | `kind: AuthorKind` · `user_id: int` · `instructed_by_id: int \| None` · `via: str` | SpecService가 돌려주는 작성 주체 — **id만**. `UserRef`로 채우는 건 `queries`가 `AccountService.users_by_ids`로 |
 | `Violation` | `line: int` · `rule: str` · `message: str` | validate |
 | `Warning` | `rule: str` · `message: str` | validate |
 | `ValidateResult` | `violations: list[Violation]` · `warnings: list[Warning]` | validate → pipeline |
 | `ItemBlock` | `item_id: str` · `display_name: str` · `level: int` · `start_line: int` · `end_line: int` · `text: str` | item_blocks → validate·get_item·save·diff |
 | `ItemView` | `doc_id` · `item_id` · `display_name` · `body: str` · `doc_status: DocStatus` · `doc_version_no: int` · `flags: list[str]` | get_item → queries |
+| `Document` (DTO) | API `Document` 스키마 + `id: int`(행 pk) · `last_author: AuthorRef` | get_document. ORM 모델과 이름이 같아 코드에서는 모델을 `DocumentRow`로 별칭 |
 | `ItemBrief` | `pk: int` · `doc_id` · `item_id: str \| None` · `stage: int` · `display_name` | list_items_by_project → queries.graph_view |
 | `RefEdge` | `from_item_pk: int` · `to_item_pk: int \| None` · `to_document_id: int \| None` · `raw_target: str` · `is_missing: bool` | ReferenceService (다음 묶음) |
 | `ExtractResult` | `added: int` · `removed: int` · `missing: int` | reference.extract |
@@ -465,6 +469,7 @@ flowchart TB
     SS -.->|raise_upstream (승인 대조)| TS
     QR -.->|count_unresolved* · unresolved_in| CS
     QR -.->|list_projects · get| PS
+    QR -.->|users_by_ids| AS
     PS -.->|rebuild| PL
     PS -.->|clone · fetch · rev_list_count| GIT
     TS -.->|downstream · upstream| RS
@@ -542,7 +547,7 @@ classDiagram
         +apply_frontmatter(body: str, doc_id: str, doc_type: DocType, status: DocStatus) str
         +detect_deleted_items(document: Document, body: str) list~int~
         +create(project_id: int, doc_id: str, doc_type: DocType, body: str, commit_hash: str, author: Author) Version
-        +save(document: Document, body: str, commit_hash: str, author: Author, deleted_item_pks: list~int~, has_convention_error: bool, warnings: list?, rebuild: bool) Version
+        +save(document: Document, body: str, commit_hash: str, author: Author, deleted_item_pks: list~int~, validate_result: ValidateResult?, rebuild: bool) Version
         +apply_status(document: Document, new_body: str, commit_hash: str?, user: User, reason: str?, to: DocStatus?) None
         +async change_status(doc_id: str, to: DocStatus, user: User, reason: str?, upstream_reviewed: bool = False, upstream_mismatch: list~str~ = []) DocumentSummary
         +list_versions(doc_id: str) list~Version~
@@ -554,7 +559,7 @@ classDiagram
         +resolve_items(doc_id: str, item_ids: list~str~) list~int~
         +list_items_by_project(project_id: int, stage: int?, doc_id: str?) list~ItemBrief~
         +neighbors(doc_id: str) tuple
-        +last_author(document_id: int) User?
+        +last_author(document_id: int) AuthorRef?
         +recent_changes(project_id: int, n: int) list~Version~
         +versions_instructed_by(version_ids: list~int~, user_id: int) list~int~
         +convention_error_docs_by(user_id: int) list~DocumentSummary~
@@ -562,7 +567,7 @@ classDiagram
         +mark_deleted(document: Document, commit_hash: str, author: Author) list~int~
         +clear_index(project_id: int) None
         +mark_convention_error(document_id: int, violations: list?, warnings: list?) None
-        -issue_doc_id(project_id: int, doc_type: DocType) str
+        -issue_doc_id(project_id: int, code: str, doc_type: DocType) str
         -item_blocks(body: str, doc_type: DocType, title: str?) list~ItemBlock~
     }
     class Document {
@@ -595,6 +600,7 @@ classDiagram
         +AuthorKind author_kind
         +int author_user_id
         +int instructed_by_user_id
+        +str via
         +datetime created_at
     }
     class StatusChange {
@@ -814,6 +820,7 @@ classDiagram
         +authenticate_token(raw: str) User?
         +github_token_for(user: User) str
         +user_by_login(login: str) User?
+        +users_by_ids(ids: list~int~) dict
         +create_placeholder(login: str) User
     }
     class User {
