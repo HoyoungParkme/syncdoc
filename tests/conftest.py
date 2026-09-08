@@ -43,3 +43,40 @@ def db_session(_schema: None) -> Session:
             session.close()
             tx.rollback()
     engine.dispose()
+
+
+@pytest.fixture
+def mock_github(monkeypatch: pytest.MonkeyPatch):
+    """infra/github의 httpx.AsyncClient를 MockTransport로. install(handler) → 요청 기록 list."""
+    import httpx  # noqa: E402
+
+    from syncdoc.infra import github as gh  # noqa: E402
+
+    real = httpx.AsyncClient
+    calls: list[httpx.Request] = []
+
+    def install(handler):
+        def h(req: httpx.Request) -> httpx.Response:
+            calls.append(req)
+            return handler(req)
+
+        monkeypatch.setattr(
+            gh.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(h), **kw)
+        )
+        return calls
+
+    return install
+
+
+def github_ok(user_id: int = 42, login: str = "hoyoung", name: str | None = "박호영"):
+    """exchange_code → gho_{login}, get_user → {id, login, name} 인 정상 GitHub 핸들러."""
+    import httpx  # noqa: E402
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path == "/login/oauth/access_token":
+            return httpx.Response(200, json={"access_token": f"gho_{login}"})
+        if req.url.path == "/user":
+            return httpx.Response(200, json={"id": user_id, "login": login, "name": name})
+        return httpx.Response(404)
+
+    return handler

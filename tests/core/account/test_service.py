@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from syncdoc.core.account.models import User
 from syncdoc.core.account.service import AccountService, _fernet
 from syncdoc.core.errors import NotFound, Unauthorized
+from tests.conftest import github_ok
 
 
 def make_user(session: Session, login: str = "hoyoung", token: str | None = "gho_x") -> User:
@@ -134,3 +135,46 @@ def test_create_placeholder_twice_returns_same_row(db_session: Session) -> None:
     b = svc.create_placeholder("ghost")
     assert a.id == b.id
     assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 1
+
+
+# ── login_github ──
+async def test_login_github_first_login_creates_user(db_session: Session, mock_github) -> None:
+    mock_github(github_ok(42, "hoyoung", "박호영"))
+    u = await AccountService(db_session).login_github("code", "state")
+    assert (u.github_user_id, u.github_login, u.display_name) == (42, "hoyoung", "박호영")
+    assert AccountService.github_token_for(u) == "gho_hoyoung"
+    assert u.github_token_encrypted != b"gho_hoyoung"
+    assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 1
+
+
+async def test_login_github_renamed_login_updates_same_row(
+    db_session: Session, mock_github
+) -> None:
+    svc = AccountService(db_session)
+    mock_github(github_ok(42, "old-name", "박호영"))
+    first = await svc.login_github("c1", "s")
+    mock_github(github_ok(42, "new-name", "Hoyoung"))
+    second = await svc.login_github("c2", "s")
+    assert second.id == first.id
+    assert (second.github_login, second.display_name) == ("new-name", "Hoyoung")
+    assert AccountService.github_token_for(second) == "gho_new-name"
+    assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 1
+
+
+async def test_login_github_fills_placeholder_row(db_session: Session, mock_github) -> None:
+    svc = AccountService(db_session)
+    ghost = svc.create_placeholder("hoyoung")
+    mock_github(github_ok(42, "hoyoung", "박호영"))
+    u = await svc.login_github("code", "state")
+    assert u.id == ghost.id and u.github_user_id == 42 and u.display_name == "박호영"
+    assert AccountService.github_token_for(u) == "gho_hoyoung"
+    assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 1
+
+
+async def test_login_github_bad_code_is_unauthorized(db_session: Session, mock_github) -> None:
+    import httpx
+
+    mock_github(lambda r: httpx.Response(200, json={"error": "bad_verification_code"}))
+    with pytest.raises(Unauthorized):
+        await AccountService(db_session).login_github("bad", "state")
+    assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 0

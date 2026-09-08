@@ -14,6 +14,7 @@ from syncdoc.core.account.models import AccessToken, User
 from syncdoc.core.account.repository import AccountRepository
 from syncdoc.core.errors import NotFound, Unauthorized
 from syncdoc.core.types import IssuedToken
+from syncdoc.infra import github
 
 
 def _fernet() -> Fernet:
@@ -30,6 +31,23 @@ class AccountService:
     def __init__(self, session: Session) -> None:
         self.session = session
         self.repo = AccountRepository(session)
+
+    async def login_github(self, code: str, state: str) -> User:
+        """SYNC-MS-006#AccountService.login_github"""
+        token = await github.exchange_code(code)
+        info = await github.get_user(token)
+        u = self.repo.user_by_github_user_id(info.id)
+        if u is not None:
+            u.github_login, u.display_name = info.login, info.name
+        elif (u := self.repo.placeholder_by_login(info.login)) is not None:
+            u.github_user_id, u.display_name = info.id, info.name
+        else:
+            u = self.repo.add_user(
+                User(github_login=info.login, github_user_id=info.id, display_name=info.name)
+            )
+        u.github_token_encrypted = _fernet().encrypt(token.encode())
+        self.session.flush()
+        return u
 
     def list_tokens(self, user: User) -> list[AccessToken]:
         """SYNC-MS-006#AccountService.list_tokens"""
