@@ -7,9 +7,10 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -46,8 +47,14 @@ mcp_mount = MCPMount()
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
     mcp_mount.build()
+    # SPA 대체 라우트(/{path})는 맨 뒤여야 한다 — 기동 시점에 뒤로 보낸다
+    routes = app_.router.routes
+    spa_routes = [r for r in routes if getattr(r, "name", "") == "spa"]
+    for r in spa_routes:
+        routes.remove(r)
+        routes.append(r)
     async with mcp_server.session_manager.run():
         yield
 
@@ -78,3 +85,19 @@ async def health() -> dict[str, str]:
 
 # /mcp — SYNC-INFRA-001 4.1 경로 · SEQ-C2 Bearer 인증. 정확 경로 Route라 다른 라우트와 순서 무관
 app.add_route("/mcp", BearerAuth(mcp_mount), methods=["GET", "POST", "DELETE"])
+
+
+# `/` 및 정적 — React 빌드 결과(SYNC-INFRA-001 4.1).
+# frontend/ → `npm run build` → syncdoc/web/static. 없으면 API만
+STATIC = Path(__file__).resolve().parent / "web" / "static"
+
+
+@app.get("/{path:path}", include_in_schema=False)
+async def spa(path: str) -> FileResponse:
+    """정적 파일이면 그것, 아니면 index.html(SPA). /api·/auth·/mcp는 위 라우트가 먼저."""
+    if not STATIC.exists():
+        raise Problem("React 빌드 결과가 없다 — frontend/에서 npm run build")
+    target = STATIC / path
+    if path and target.is_file() and target.resolve().is_relative_to(STATIC):
+        return FileResponse(target)
+    return FileResponse(STATIC / "index.html")
