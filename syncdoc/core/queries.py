@@ -1,7 +1,7 @@
 """SYNC-MS-008 — queries. 읽기 조합. 서비스는 자기 묶음만 알고 여기서 ID로 잇는다. 쓰지 않는다.
 
 B1: project_summary · document_list · document_view · item_view.
-B2: item_references_view · upstream_checklist. 세션은 db.session_scope().
+B2: project_detail · item_references_view · upstream_checklist. 세션은 db.session_scope().
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from syncdoc.core.types import (
     ItemRef,
     ItemReferences,
     ItemView,
+    ProjectDetail,
     ProjectSummary,
     RefEdge,
     StageSummary,
@@ -91,6 +92,29 @@ async def project_summary() -> list[ProjectSummary]:
             out.append(_summarize(p, docs, flags, CommentService(s).count_unresolved(p.id)))
         out.sort(key=lambda x: (x.updated_at is not None, x.updated_at), reverse=True)
         return out
+
+
+async def project_detail(code: str) -> ProjectDetail:
+    """SYNC-MS-008#queries.project_detail"""
+    with db.session_scope() as s:
+        project = ProjectService(s).get(code)
+        recent = SpecService(s).recent_changes(project.id, 10)
+        ids = [r.author.user_id for r in recent] + [
+            r.author.instructed_by_id for r in recent if r.author.instructed_by_id
+        ]
+        names: dict[int, UserRef] = AccountService(s).users_by_ids(ids)
+        for r in recent:
+            r.author_view = ApiAuthor(
+                kind=r.author.kind,
+                user=names.get(r.author.user_id),
+                instructed_by=names.get(r.author.instructed_by_id)
+                if r.author.instructed_by_id
+                else None,
+                via=r.author.via,
+            )
+    summary = next(p for p in await project_summary() if p.code == code)
+    docs = await document_list(code)
+    return ProjectDetail(**vars(summary), docs=docs, recent_changes=recent)
 
 
 async def document_list(

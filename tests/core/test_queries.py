@@ -56,6 +56,36 @@ async def test_project_summary_stages_counts_order(scoped: Session) -> None:
 
 
 # ── document_list ──
+async def test_project_detail_docs_and_recent_changes_with_names(scoped: Session) -> None:
+    svc = SpecService(scoped)
+    p = make_project(scoped)
+    a = author(scoped)
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec(EXMP-RFQ-001): 초안")
+    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec(EXMP-PRD-001): 초안")
+    d = svc.get_document("EXMP-PRD-001")
+    svc.apply_status(d, d.body.replace("status: draft", "status: review"), "c1", a.user, "검토")
+    pd = await queries.project_detail("EXMP")
+    assert (pd.code, pd.remote_url, [x.doc_id for x in pd.docs]) == (
+        "EXMP",
+        p.repository.remote_url,
+        ["EXMP-RFQ-001", "EXMP-PRD-001"],
+    )
+    assert pd.stages[1].status == "review" and pd.docs[1].counts["needs_check"] == 0
+    assert [(r.doc_id, r.version_no, r.message.split("\n")[0]) for r in pd.recent_changes] == [
+        ("EXMP-PRD-001", None, "status(EXMP-PRD-001): draft → review"),
+        ("EXMP-PRD-001", 1, "spec(EXMP-PRD-001): 초안"),
+        ("EXMP-RFQ-001", 1, "spec(EXMP-RFQ-001): 초안"),
+    ]
+    assert [(r.author_view.kind, r.author_view.user.github_login) for r in pd.recent_changes] == [
+        ("human", "hoyoung"),
+        ("agent", "hoyoung"),
+        ("agent", "hoyoung"),
+    ]
+    assert pd.recent_changes[1].author_view.instructed_by.github_login == "hoyoung"
+    with pytest.raises(NotFound):
+        await queries.project_detail("NOPE")
+
+
 async def test_document_list_counts_and_filters(scoped: Session) -> None:
     svc, ref, tr = SpecService(scoped), ReferenceService(scoped), TrackingService(scoped)
     p = make_project(scoped)

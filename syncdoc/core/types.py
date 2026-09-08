@@ -103,6 +103,14 @@ class ProjectSummary:
     updated_at: datetime | None
 
 
+@dataclass
+class ProjectDetail(ProjectSummary):
+    """SYNC-API-001 ProjectDetail — ProjectSummary + 문서 목록 + 최근 변경(status 커밋 포함)."""
+
+    docs: list[DocumentSummary] = field(default_factory=list)
+    recent_changes: list[Version] = field(default_factory=list)
+
+
 @dataclass(frozen=True)
 class IssuedToken:
     token: AccessToken
