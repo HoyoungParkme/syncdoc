@@ -435,3 +435,70 @@ def test_list_by_project_filters_and_order(db_session: Session) -> None:
     assert ids(svc.list_by_project(p.id, has_convention_error=True)) == []
     got = svc.list_by_project(p.id)
     assert got[-1].stage is None and got[0].last_author.user_id == a.user.id and got[0].counts == {}
+
+
+# ── last_author · neighbors · resolve_item ──
+def test_last_author_neighbors_resolve_item(db_session: Session) -> None:
+    svc = SpecService(db_session)
+    p = make_project(db_session)
+    a = author(db_session)
+
+    def mk(did: str, typ: str, title: str = "x") -> None:
+        svc.create(
+            p.id,
+            did,
+            typ,
+            f"---\ndoc_id: {did}\ntype: {typ}\ntitle: {title}\nstatus: draft\n---\n# {did}\n#### Q1 첫\n",
+            "h",
+            a,
+        )
+
+    for did, typ, title in [
+        ("EXMP-INFRA-001", "INFRA", "x"),
+        ("EXMP-DOM-003", "DOM", "ERD"),
+        ("EXMP-DOM-001", "DOM", "도메인"),
+        ("EXMP-DOM-002", "DOM", "클래스"),
+        ("EXMP-UI-002", "UI", "와이어프레임"),
+        ("EXMP-UI-001", "UI", "화면 설계"),
+        ("EXMP-STD-001", "STD", "s"),
+    ]:
+        mk(did, typ, title)
+    assert svc.neighbors("EXMP-DOM-002") == (
+        "EXMP-INFRA-001",
+        "EXMP-UI-001",
+    )  # 앞뒤 단계, doc_id 순 첫 것
+    assert svc.neighbors("EXMP-INFRA-001") == (None, "EXMP-DOM-001")
+    assert svc.neighbors("EXMP-STD-001") == (None, None)
+    with pytest.raises(NotFound):
+        svc.neighbors("EXMP-PRD-009")
+    # last_author
+    d = svc.get_document("EXMP-DOM-001")
+    la = svc.last_author(d.id)
+    assert (la.kind, la.user_id, la.instructed_by_id, la.via) == (
+        "agent",
+        a.user.id,
+        a.user.id,
+        "mcp",
+    )
+    assert svc.last_author(999_999) is None
+    # resolve_item
+    rfq_item = svc.create(
+        p.id,
+        "EXMP-RFQ-001",
+        DocType.RFQ,
+        "---\ndoc_id: EXMP-RFQ-001\ntype: RFQ\ntitle: r\nstatus: draft\n---\n#### Q1 a\n#### Q2 b\n",
+        "h",
+        a,
+    )
+    pk = svc.resolve_item("EXMP-RFQ-001", "Q2")
+    assert pk == next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q2")
+    with pytest.raises(NotFound):
+        svc.resolve_item("EXMP-RFQ-001", "Q9")
+    with pytest.raises(NotFound):
+        svc.resolve_item("EXMP-RFQ-404", "Q1")
+    db_session.execute(
+        text("UPDATE items SET is_deleted=true, deleted_at=now() WHERE item_id='Q2'")
+    )
+    with pytest.raises(ItemDeleted):
+        svc.resolve_item("EXMP-RFQ-001", "Q2")
+    assert rfq_item.version_no == 1

@@ -406,6 +406,36 @@ class SpecService:
         rows.sort(key=lambda r: (STAGE_OF.get(r.doc_type, 99), r.doc_id))
         return [DocumentSummary(**self._summary_fields(r, latest.get(r.id))) for r in rows]
 
+    def last_author(self, document_id: int) -> AuthorRef | None:
+        """SYNC-MS-002#SpecService.last_author"""
+        return self._author_of(self.repo.latest_version(document_id))
+
+    def neighbors(self, doc_id: str) -> tuple[str | None, str | None]:
+        """SYNC-MS-002#SpecService.neighbors"""
+        row = self.repo.document_by_doc_id(doc_id)
+        if row is None:
+            raise NotFound("document", doc_id)
+        stage = STAGE_OF.get(row.doc_type)
+        if stage is None:
+            return None, None
+        docs = self.repo.documents_of_project(row.project_id)
+
+        def first(n: int) -> str | None:
+            ids = sorted(d.doc_id for d in docs if STAGE_OF.get(d.doc_type) == n)
+            return ids[0] if ids else None
+
+        return first(stage - 1), first(stage + 1)
+
+    def resolve_item(self, doc_id: str, item_id: str) -> int:
+        """SYNC-MS-002#SpecService.resolve_item"""
+        row = self.repo.document_by_doc_id(doc_id)
+        item = self.repo.item_of(row.id, item_id) if row else None
+        if item is None:
+            raise NotFound("item", f"{doc_id}#{item_id}")
+        if item.is_deleted:
+            raise ItemDeleted(item.deleted_at.isoformat() if item.deleted_at else None)
+        return item.id
+
     def _deleted_item_ids(self, doc_id: str | None) -> set[str]:
         if not doc_id:
             return set()

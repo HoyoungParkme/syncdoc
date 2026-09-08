@@ -82,6 +82,51 @@ class AuthorRef:
 
 
 @dataclass(frozen=True)
+class UserRef:
+    """SYNC-API-001 UserRef."""
+
+    id: int
+    github_login: str
+    display_name: str
+
+
+@dataclass
+class FlagSummary:
+    """SYNC-API-001 FlagSummary — pk 형태. ItemRef·UserRef로 채우는 건 queries."""
+
+    id: int
+    kind: str
+    target_item_pk: int
+    cause_item_pk: int | None
+    cause_version_id: int | None
+    assignee_user_id: int | None
+    raised_at: datetime
+    resolved_at: datetime | None
+
+
+@dataclass
+class StageSummary:
+    stage: int
+    doc_type: str
+    status: str | None
+    doc_count: int
+    gate_warning: bool = False
+
+
+@dataclass
+class ProjectSummary:
+    """SYNC-API-001 ProjectSummary. stages는 항상 11개."""
+
+    code: str
+    name: str
+    remote_url: str
+    stages: list[StageSummary]
+    std_docs: list[DocumentSummary]
+    counts: dict[str, int]
+    updated_at: datetime | None
+
+
+@dataclass(frozen=True)
 class IssuedToken:
     token: AccessToken
     raw: str
