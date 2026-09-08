@@ -378,6 +378,42 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
         $ref: '#/components/responses/Problem'
 ```
 
+#### GET/api/docs/{docId}/downstream 이 문서를 참조하는 것
+
+화면 [[SYNC-UI-001#UI-5]] · 유스케이스 [[SYNC-UC-001#UC-H3]] · 서비스 `queries.downstream_view`
+
+뷰 규약 V-PRD·V-RFQ의 **추적표**와 카드 바닥 "근거로 삼은 문서", 목표 표의 하위 참조 수가 이걸 쓴다.
+
+```yaml
+/api/docs/{docId}/downstream:
+  get:
+    summary: 이 문서(의 항목들)를 참조하는 다른 문서 항목 전부. 추적표용
+    parameters:
+    - $ref: '#/components/parameters/docId'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                by_item:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ItemRef'
+                  description: "이 문서의 item_id → 그것을 참조하는 항목들. 문서 단위 참조는 키 \"(문서)\""
+                by_document:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      doc_id: { type: string }
+                      title: { type: string }
+                      items: { type: array, items: { type: string }, description: 참조한 이 문서의 항목 ID들 }
+```
+
 #### GET/api/docs/{docId}/upstream 상위 대조 목록
 
 화면 [[SYNC-UI-001#UI-5]] · 유스케이스 [[SYNC-UC-001#UC-H8]] 3 · 서비스 `queries.upstream_checklist`
