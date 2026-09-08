@@ -373,7 +373,7 @@ classDiagram
 | `ValidateResult` | `violations: list[Violation]` · `warnings: list[Warning]` | validate → pipeline |
 | `ItemBlock` | `item_id: str` · `display_name: str` · `level: int` · `start_line: int` · `end_line: int` · `text: str` | item_blocks → validate·get_item·save·diff |
 | `ItemView` | `doc_id` · `item_id` · `display_name` · `body: str` · `doc_status: DocStatus` · `doc_version_no: int` · `flags: list[str]` | get_item → queries |
-| `Document` (DTO) | API `Document` 스키마 + `id: int`(행 pk) · `last_author: AuthorRef` | get_document. ORM 모델과 이름이 같아 코드에서는 모델을 `DocumentRow`로 별칭 |
+| `Document` (DTO) | API `Document` 스키마 + `id: int`(행 pk) · `current_version_id: int`(최근 versions.id — detect_impact의 prev) · `last_author: AuthorRef` | get_document. ORM 모델과 이름이 같아 코드에서는 모델을 `DocumentRow`로 별칭 |
 | `ItemBrief` | `pk: int` · `doc_id` · `item_id: str \| None` · `stage: int` · `display_name` | list_items_by_project → queries.graph_view |
 | `RefEdge` | `from_item_pk: int` · `to_item_pk: int \| None` · `to_document_id: int \| None` · `raw_target: str` · `is_missing: bool` | ReferenceService (다음 묶음) |
 | `ExtractResult` | `added: int` · `removed: int` · `missing: int` | reference.extract |
@@ -557,6 +557,7 @@ classDiagram
         +describe_items(pks: list~int~) dict
         +resolve_item(doc_id: str, item_id: str) int
         +resolve_items(doc_id: str, item_ids: list~str~) list~int~
+        +item_pks(document_id: int) dict
         +list_items_by_project(project_id: int, stage: int?, doc_id: str?) list~ItemBrief~
         +neighbors(doc_id: str) tuple
         +last_author(document_id: int) AuthorRef?
