@@ -16,7 +16,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **표기** — `→` 반환·결과, `!` 예외, `DB:` 테이블 접근, `git:` 저장소 접근, `·` 같은 단계 안 구분.
 
-`pipeline`은 조율자다. 자기 테이블이 없고 서비스를 순서대로 부른다. 세 입구(MCP·웹·GitHub)가 전부 `save_pipeline`로 들어온다.
+`pipeline`은 조율자다. 자기 테이블이 없고 서비스를 순서대로 부른다. 세 입구(MCP·웹·GitHub)가 전부 `save_pipeline`로 들어온다. 상태 변경·되돌리기도 조율이라 여기(원래 SpecService에 있었으나 세션·async가 꼬여 옮겼다 — B2 되먹임).
 
 ---
 
@@ -43,7 +43,9 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
                         changed_items: list[str] | None = None,
                         upstream_impact: list[str] | None = None,
                         confirm_item_deletion: bool = False,
-                        commit_hash: str | None = None) -> SaveResult
+                        commit_hash: str | None = None,
+                        reason: str | None = None,
+                        session: Session | None = None) -> SaveResult
 ```
 
 근거: [[SYNC-SEQ-001#SEQ-1]] · [[SYNC-UC-001#UC-A6]] · [[SYNC-DOM-002#SpecService]] 4.7
@@ -64,6 +66,8 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 | `upstream_impact` | 어긋난 상위 항목 | `mcp`만. `"SYNC-UC-001#UC-A6"` 형식. 하위→상위 되먹임의 에이전트 경로 |
 | `confirm_item_deletion` | 삭제 확인됨 | |
 | `commit_hash` | 이미 있는 커밋 | `github`만. push 단계 건너뜀 |
+| `reason` | 상태 변경 사유 | `web_status`만. `apply_status`로 |
+| `session` | 호출자 세션 | `change_status`·`revert`가 넘긴다. None이면 스스로 연다(DEV-10) |
 
 **처리**
 
@@ -79,9 +83,9 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
    - if `any(refs) and not confirm_item_deletion` → `! item-deletion-needs-confirm {deleted_items: [{item_id, downstream}]}`
 7. if `entry != github` → `commit_hash = git.commit_push(repo.workdir, message, author, path=STD-001 1.1 경로, content=body)` · if 실패 → `! push-failed {reason}`, 락 해제. **여기까지 DB 쓰기 없음**
 8. **트랜잭션 시작**
-   - if 생성 → `version = spec.create(project_id, doc_id, doc_type, body, commit_hash, author)`
-   - if `entry == web_status` → `spec.apply_status(document, new_body, commit_hash, user, reason)` (Document.status·current_body 갱신 + StatusChange). **Version 없음.** 9~12 건너뛰고 13으로
-   - else → `version = spec.save(document, body, commit_hash, author, deleted, validate_result=(4단계 결과 if entry == github else None))`
+   - if 생성 → `version = spec.create(project_id, doc_id, doc_type, body, commit_hash, author, message)`
+   - if `entry == web_status` → `spec.apply_status(document, body, commit_hash, author.user, reason)` (Document.status·current_body 갱신 + StatusChange). **Version 없음.** 9~13 건너뛰고 14로
+   - else → `version = spec.save(document, body, commit_hash, author, message, deleted, validate_result=4단계 결과)` — **모든 경로.** 경고(`incomplete_warnings`)는 mcp 저장에도 남아야 승인을 막는다. 위반은 github 경로에서만 저장까지 온다
 9. `deleted`마다 `tracking.raise_broken(pk)`
 10. `reference.extract(document_id, version.id, body, item_pks=spec.item_pks(document_id), upstream_doc_ids=frontmatter upstream)`
 11. `affected = tracking.detect_impact(document_id, prev_version_id=document.current_version_id (2단계에서 읽은 것. 신규면 None), version.id, changed_items)` · if `affected` → `pending_id = tracking.create_pending(version.id)` · else `pending_id = None`
@@ -117,6 +121,58 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 - 동시 저장 둘: 락 때문에 직렬화. 둘째가 version-conflict
 - `upstream_impact=["SYNC-UC-001#UC-A6"]` → UC-A6에 `upstream_impact` 플래그, 담당은 UC 문서 최근 작성자 · 없는 항목 → 경고, 저장은 됨
 - 8단계 이후 DB 오류: 트랜잭션 롤백, `last_processed_commit` 그대로
+
+---
+
+#### pipeline.change_status 상태 변경
+
+**시그니처** `async def change_status(doc_id: str, to: DocStatus, user: User, reason: str | None, upstream_reviewed: bool = False, upstream_mismatch: list[str] = []) -> DocumentSummary`
+
+근거: [[SYNC-SEQ-001#SEQ-5]] · [[SYNC-UC-001#UC-H8]] · [[SYNC-API-001#POST/api/docs/{docId}/status]] · **조율이라 pipeline에 있다** — 검사·frontmatter·push·상태 기록·플래그를 잇는다. SpecService는 DB만
+
+**입력** `doc_id`, 목표 상태 `to`, 누른 사람, 사유
+
+**처리**
+1. `document = get_document(doc_id)`
+2. if `to == approved and (document.has_convention_error or document.incomplete_warnings)` → `! status-blocked {convention_error_detail, warnings}` (UC-H8 1a). `review`·`draft`는 막지 않는다
+3. if `to == approved and not upstream_reviewed` → `! upstream-review-required` (UC-H8 3. 상위 대조를 건너뛸 수 없다)
+3a. if `document.status == to` → 아무것도 안 하고 현재 반환 (멱등)
+4. `new_body` = `current_body`의 frontmatter `status:` 줄만 교체
+5. `save_pipeline(entry=web_status, doc_id, None, new_body, expected_version=current_version_no, project_code=None, author=Author(human, user, None, web), message=f"status({doc_id}): {from} → {to}\n\n{reason or ''}", reason=reason)` — **같은 세션**. `save_pipeline`이 세션을 인자로 받거나(있으면 재사용) 없으면 연다. push 후 `spec.apply_status(…, reason)`
+5a. if `upstream_mismatch` → `pks = [resolve_item(d, i) for "d#i" in upstream_mismatch]` · `TrackingService.raise_upstream(pks, document.id, current_version_id, cause_item_pk=None)` (UC-H8 5. 승인 대조의 사람 경로)
+6. `→ DocumentSummary`
+
+**출력** 바뀐 문서 요약
+
+**예외** `status-blocked` · `upstream-review-required` · 파이프라인의 `version-conflict`·`push-failed` 전파
+
+**호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-007#pipeline.save_pipeline]]
+
+**테스트 관점** 규약 오류 문서를 `approved`로 → blocked · `approved`인데 `upstream_reviewed=false` → 거부 · `upstream_mismatch=["SYNC-UC-001#UC-A6"]` → UC-A6에 플래그 · 같은 문서를 `review`로 → 됨 · 정상 승인 → frontmatter `status: approved` 커밋 존재, Version 없음, StatusChange에 commit_hash · 같은 상태로 다시 → 커밋 없음
+
+
+---
+
+#### pipeline.revert 되돌리기
+
+**시그니처** `async def revert(doc_id: str, to_version: int, user: User, confirm_item_deletion: bool = False) -> SaveResult` — `pipeline`을 불러 async(DEV-16)
+
+근거: [[SYNC-SEQ-001#SEQ-7]] · [[SYNC-UC-001#UC-H7]] · [[SYNC-API-001#POST/api/docs/{docId}/revert]] · 조율이라 pipeline
+
+**처리**
+1. `document = get_document(doc_id)`; `old_body = DB: versions where document_id and version_no=to_version` · if 없음 → `! not-found`
+2. if `to_version == document.current_version_no` → `! already-current`(422)
+3. `save_pipeline(entry=web_revert, doc_id, None, old_body, expected_version=current_version_no, project_code=None, author=Author(human, user, None, web), message=f"revert({doc_id}): v{current} → v{to_version} 내용으로", changed_items=None, confirm_item_deletion)`
+4. `→ SaveResult`
+
+**출력** 새 버전의 `SaveResult`. 되돌린 결과가 v{N+1}
+
+**예외** `not-found`, `already-current`, 파이프라인의 `convention-violation`(4a)·`item-deletion-needs-confirm`·`push-failed`
+
+**호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-007#pipeline.save_pipeline]]
+
+**테스트 관점** v7에서 v6으로 → v8 생성, v7 남음 · 옛 본문이 현 규약 위반 → 거부 · 옛 본문에 없는 항목이 지금 있음 → 삭제 확인 요구 → confirm 후 broken_ref 플래그
+
 
 ---
 
