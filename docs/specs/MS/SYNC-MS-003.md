@@ -81,11 +81,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### ReferenceService.upstream_of_document 문서의 상위 참조 전부
 
-**시그니처** `upstream_of_document(document_id: int) -> list[RefEdge]`
+**시그니처** `upstream_of_document(document_id: int, include_missing: bool = False) -> list[RefEdge]`
 
 근거: [[SYNC-MS-008#queries.upstream_checklist]] — 승인 대조용
 
-**처리** `DB: references where from_document_id = document_id and not is_missing` → `RefEdge[]`. 항목 참조(`from_item_pk` 있음)와 frontmatter upstream(`from_item_pk` null) 모두. 미존재는 대조 대상이 아니므로 제외
+**처리** `DB: references where from_document_id = document_id` · if `not include_missing` → `and not is_missing` → `RefEdge[]`. 항목 참조와 frontmatter upstream 모두. 승인 대조는 미존재 제외, `document_view.missing_refs`는 포함
 
 ---
 
