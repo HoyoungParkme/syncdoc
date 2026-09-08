@@ -30,6 +30,7 @@ from syncdoc.core.types import (
     ValidateResult,
     Violation,
     Warning,
+    fold_via,
 )
 
 # ── SYNC-STD-001 2장 — 타입별 항목 패턴·필수 절 (tools/validate.py가 원형) ──
@@ -317,6 +318,7 @@ class SpecService:
             author_kind=str(author.kind),
             author_user_id=author.user.id,
             instructed_by_user_id=author.instructed_by.id if author.instructed_by else None,
+            via=fold_via(author.via),
             created_at=now_utc(),
         )
 

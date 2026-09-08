@@ -56,6 +56,11 @@ class Entry(StrEnum):
     github = "github"
 
 
+def fold_via(entry: Entry) -> str:
+    """Author.via → versions.via. web_revert·web_status는 web으로 접는다(DOM-002 2.8)."""
+    return "web" if entry in (Entry.web_revert, Entry.web_status) else str(entry)
+
+
 @dataclass(frozen=True)
 class Author:
     kind: AuthorKind
