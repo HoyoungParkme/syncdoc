@@ -6,11 +6,12 @@ core는 이것을 통해서만 저장소를 만진다. 실패는 GitError(cmd, s
 
 import asyncio
 import re
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from syncdoc.core.account.service import AccountService
 from syncdoc.core.errors import PushFailed, Unauthorized
-from syncdoc.core.types import Author, ChangedFile
+from syncdoc.core.types import Author, ChangedFile, Commit
 
 range_ = range  # changed_files의 인자 range · 함수 list — MS-009 이름이 내장을 가린다
 list_ = list
@@ -176,3 +177,29 @@ async def list(workdir: Path, glob: str, ref: str = "HEAD") -> list_[str]:
     """SYNC-MS-009#git.list"""
     out = await _run(workdir, "ls-tree", "-r", "--name-only", ref, "--", "docs/specs")
     return [p for p in out.splitlines() if PurePosixPath(p).match(glob)]
+
+
+async def log(workdir: Path, path: str) -> list_[Commit]:
+    """SYNC-MS-009#git.log"""
+    out = await _run(
+        workdir,
+        "log",
+        "--follow",
+        "--reverse",
+        "--format=%H%x00%an%x00%ae%x00%aI%x00%s%n%b%x00",
+        "--",
+        path,
+    )
+    tokens = out.split("\0")
+    commits: list_[Commit] = []
+    for i in range_(0, len(tokens) - 1, 5):
+        h, an, ae, date, msg = (t.strip("\n") for t in tokens[i : i + 5])
+        commits.append(
+            Commit(
+                hash=h,
+                login=_login_of(an, ae),
+                date=datetime.fromisoformat(date),
+                message=_message(msg),
+            )
+        )
+    return commits

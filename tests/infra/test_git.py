@@ -178,3 +178,17 @@ async def test_list_filters_by_glob_at_ref(repos: dict[str, Path]) -> None:
     got = await g.list(repos["work"], "docs/specs/*/*.md", "origin/HEAD")
     assert got == [SEED, "docs/specs/SCN/SYNC-SCN-001.md", "docs/specs/_templates/PRD.md"]
     assert await g.list(repos["work"], "docs/specs/*/*.md") == [SEED]
+
+
+# ── log ──
+async def test_log_lists_file_history_oldest_first(repos: dict[str, Path]) -> None:
+    o = repos["other"]
+    h2 = write_commit_push(o, SEED, "v2", "spec(SYNC-PRD-001): v2\n\n왜냐하면")
+    write_commit_push(o, "docs/specs/SCN/SYNC-SCN-001.md", "s", "other file")
+    await g.fetch(repos["work"])
+    await g.checkout(repos["work"], "origin/HEAD")
+    got = await g.log(repos["work"], SEED)
+    assert [c.message for c in got] == ["seed", "spec(SYNC-PRD-001): v2\n\n왜냐하면"]
+    assert got[1].hash == h2 and got[1].login == "seed"
+    assert got[0].date.tzinfo is not None and got[0].date <= got[1].date
+    assert await g.log(repos["work"], "docs/specs/none.md") == []
