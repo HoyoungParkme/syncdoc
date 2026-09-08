@@ -6,7 +6,7 @@
 from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from syncdoc.db import Base
 
@@ -21,6 +21,8 @@ class Project(Base):
     code: Mapped[str] = mapped_column(String(4), unique=True)
     name: Mapped[str] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    repository: Mapped["Repository"] = relationship(uselist=False)  # MS-001 "Project.repository"
 
 
 class Repository(Base):
