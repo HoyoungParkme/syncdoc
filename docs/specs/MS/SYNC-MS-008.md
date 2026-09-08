@@ -115,8 +115,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **처리**
 1. `doc = SpecService.get_document(doc_id)` · if 없음 → `! not-found` (전파)
-2. `pks = [i.pk for i in doc.items]` · `flags = TrackingService.flags_for_items(pks)` → `{pk: [kind]}`
-3. 항목마다 `item.flags = flags.get(pk, [])`
+2. `pks = [i.pk for i in doc.items]` · `rows = TrackingService.flags_for_items(pks)` → `{pk: [Flag]}` · `flags = {pk: [f.kind for f in v]}`
+3. 항목마다 `item.flags = flags.get(pk, [])` (kind 문자열만. `FlagSummary`는 참조 패널에서)
 4. `doc.prev_doc_id, doc.next_doc_id = SpecService.neighbors(doc_id)`
 5. `names = AccountService.users_by_ids([doc.last_author.user_id, doc.last_author.instructed_by_id])` → API `Author{kind, user: UserRef, instructed_by, via}`로 채움
 6. `→ doc`
