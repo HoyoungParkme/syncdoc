@@ -24,6 +24,7 @@ export function ProjectInit() {
       const k = e.kind
       if (k === 'project-code-conflict') setCodeErr('이미 쓰이는 코드입니다')
       else if (k === 'project-code-invalid' || e.problem.status === 422) setCodeErr('영문 대문자 4자 이내여야 합니다')
+      else if (k === 'repository-already-registered') setBanner(`이미 ${String(e.problem.code ?? '')} 프로젝트가 쓰는 저장소입니다`)
       else if (k === 'existing-specs') setExisting(Number(e.problem.doc_count ?? 0))
       else if (k === 'push-failed') setBanner(`push 실패: ${String(e.problem.reason ?? '')}. 만들던 작업물은 버렸습니다. 저장소 권한을 확인하세요.`)
       else if (k === 'not-implemented') setBanner('기존 명세 가져오기는 아직 구현되지 않았습니다(B4).')

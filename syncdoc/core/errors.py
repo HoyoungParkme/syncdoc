@@ -199,3 +199,12 @@ class RebuildFailed(Problem):
 
     def __init__(self, reason: str) -> None:
         super().__init__("재구축 실패, 롤백됨", reason=reason)
+
+
+class RepositoryAlreadyRegistered(Problem):
+    type = "urn:syncdoc:repository-already-registered"
+    status = 409
+    title = "repository-already-registered"
+
+    def __init__(self, code: str) -> None:
+        super().__init__(f"{code} 프로젝트가 이미 쓰는 저장소", code=code)

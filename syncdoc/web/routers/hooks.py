@@ -7,15 +7,12 @@ from sqlalchemy.orm import Session
 
 from syncdoc.core import pipeline
 from syncdoc.core.errors import NotFound, Unauthorized
+from syncdoc.core.project.repository import normalize_remote
 from syncdoc.core.project.service import ProjectService
 from syncdoc.db import get_session
 from syncdoc.infra import github
 
 router = APIRouter(prefix="/hooks", tags=["hooks"])
-
-
-def _norm(url: str) -> str:
-    return url.strip().rstrip("/").removesuffix(".git").lower()
 
 
 @router.post("/github", status_code=202)
@@ -33,7 +30,7 @@ async def github_push(
     head = payload.get("after")
     repo_info = payload.get("repository") or {}
     urls = {
-        _norm(str(repo_info.get(k)))
+        normalize_remote(str(repo_info.get(k)))
         for k in ("clone_url", "html_url", "ssh_url", "git_url", "url")
         if repo_info.get(k)
     }
@@ -41,7 +38,7 @@ async def github_push(
         (
             p.repository
             for p in ProjectService(session).list_projects()
-            if _norm(p.repository.remote_url) in urls
+            if normalize_remote(p.repository.remote_url) in urls
         ),
         None,
     )

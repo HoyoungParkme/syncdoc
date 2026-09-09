@@ -18,6 +18,7 @@ from syncdoc.core.errors import (
     ProjectCodeConflict,
     ProjectCodeInvalid,
     PushFailed,
+    RepositoryAlreadyRegistered,
 )
 from syncdoc.core.project.models import Project, Repository
 from syncdoc.core.project.repository import ProjectRepository
@@ -57,6 +58,10 @@ class ProjectService:
             raise ProjectCodeInvalid("^[A-Z]{1,4}$")
         if self.repo.exists(code):
             raise ProjectCodeConflict(code)
+        # 2a — 한 저장소를 두 프로젝트가 쓰면 문서 ID가 겹쳐 이력을 덮어쓴다 (UC-A1 2d)
+        owner = self.repo.by_remote_url(remote_url)
+        if owner is not None:
+            raise RepositoryAlreadyRegistered(owner.code)
         workdir = settings.REPOS_DIR / code
         shutil.rmtree(workdir, ignore_errors=True)
         token = AccountService.github_token_for(user)

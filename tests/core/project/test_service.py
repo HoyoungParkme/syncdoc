@@ -64,6 +64,27 @@ async def test_init_project_empty_repo_creates_specs_commit_and_11_null_stages(
     assert "docs/specs/README.md" in tree and "docs/specs/assets/.gitkeep" in tree
 
 
+async def test_init_project_rejects_already_registered_repository(
+    db_session: Session, repos_dir, repos: dict
+) -> None:
+    """UC-A1 2d — 한 저장소를 두 프로젝트가 쓰면 문서 ID가 겹쳐 이력을 덮어쓴다."""
+    from syncdoc.core.errors import RepositoryAlreadyRegistered
+    from syncdoc.core.project.repository import normalize_remote
+    from tests.core.account.test_service import make_user
+
+    user = make_user(db_session)
+    svc = ProjectService(db_session)
+    await svc.init_project(str(repos["remote"]), "ONE", "첫", user, import_existing=True)
+    for url in (str(repos["remote"]), str(repos["remote"]) + "/", str(repos["remote"]).upper()):
+        with pytest.raises(RepositoryAlreadyRegistered) as ei:
+            await svc.init_project(url, "TWO", "둘", user)
+        assert ei.value.extra["code"] == "ONE"
+    assert normalize_remote("https://GitHub.com/o/R.git/") == "https://github.com/o/r"
+    assert not (repos_dir / "TWO").exists()
+    with pytest.raises(NotFound):
+        svc.get("TWO")
+
+
 async def test_init_project_rejects_invalid_and_duplicate_code(
     db_session: Session, repos_dir
 ) -> None:
