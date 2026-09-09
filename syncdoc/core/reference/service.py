@@ -105,3 +105,27 @@ class ReferenceService:
     def downstream_of_document(self, document_id: int) -> list[RefEdge]:
         """SYNC-MS-003#ReferenceService.downstream_of_document"""
         return [_edge(r) for r in self.repo.to_document_only(document_id)]
+
+    def references_among(
+        self, item_pks: set[int], include_document_targets: bool = True
+    ) -> list[RefEdge]:
+        """SYNC-MS-003#ReferenceService.references_among"""
+        docs = self.repo.document_ids_of_items(item_pks) if include_document_targets else set()
+        return [_edge(r) for r in self.repo.among(item_pks, docs)]
+
+    def resolve_missing(self, project_id: int) -> int:
+        """SYNC-MS-003#ReferenceService.resolve_missing"""
+        n = 0
+        for r in self.repo.missing_in_project(project_id):
+            to_item, to_doc, missing = self._resolve(r.raw_target, r.from_document_id)
+            if missing:
+                continue
+            r.to_item_id, r.to_document_id, r.is_missing = to_item, to_doc, False
+            n += 1
+        self.session.flush()
+        return n
+
+    def clear(self, project_id: int) -> None:
+        """SYNC-MS-003#ReferenceService.clear"""
+        self.repo.delete_in_project(project_id)
+        self.session.flush()
