@@ -50,12 +50,12 @@ export function ProjectDetail() {
           {p.remote_url.replace(/^https?:\/\//, '')}
         </a>
         <span className="grow" />
-        <span className="btn" data-el="2.1" title="UI-8 — B4">
+        <Link className="btn" data-el="2.1" to={`/p/${code}/graph`}>
           참조 그래프
-        </span>
-        <span className="btn" data-el="2.2" title="UI-9 — B4">
+        </Link>
+        <Link className="btn" data-el="2.2" to={`/p/${code}/read`}>
           순서대로 읽기
-        </span>
+        </Link>
       </div>
       <div className="stats" data-el="3">
         {[

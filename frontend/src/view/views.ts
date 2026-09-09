@@ -1,11 +1,28 @@
 /** V-PRD · V-RFQ · V-SCN · V-INFRA · V-DOM · V-API · V-STD · V-UI(화면 설계) — tools/view_build.py 포트.
- *  하위 참조 수·추적표·"근거로 삼은 문서"는 다른 문서 전부를 훑어야 해 정적 뷰만 계산한다. API에 문서 단위 하위 참조가
- *  없어 React 탭에서는 그 칸을 비운다(보고). */
+ *  하위 참조 수·추적표·"근거로 삼은 문서"는 ctx.downstream(GET /api/docs/{id}/downstream, B4)에서 계산한다 —
+ *  view_build.downstream_of와 같은 모양 {문서ID: [항목ID들]}. */
 import { esc, h2, inline, itemBlocks, renderBlocks, secName, splitSections, type RenderCtx } from './md'
 import { ITEM_PAT, plain, type ViewFn } from './types'
 
 const card = (id: string, title: string, inner: string, ctx: RenderCtx, cls = 'card') =>
   `<article class="${cls}" id="item-${esc(id)}" data-item="${esc(id)}"><div class="card-h"><span class="iid">${esc(id)}</span><b>${inline(title, ctx)}</b></div>${inner}</article>`
+
+/** view_build.downstream_of(did)에서 항목 id를 참조한 문서들 (정렬) */
+const downsWith = (ctx: RenderCtx, id: string): string[] =>
+  Object.entries(ctx.downstream ?? {})
+    .filter(([, v]) => v.includes(id))
+    .map(([d]) => d)
+    .sort()
+const refLink = (ctx: RenderCtx, d: string) => `<a class="ref" href="${esc(ctx.href(d))}" data-ref="${esc(d)}">${esc(d)}</a>`
+/** 추적표 — 이 문서를 근거로 삼은 문서 (원본에 없음. 참조에서 계산) */
+const traceTable = (ctx: RenderCtx): string => {
+  const downs = Object.entries(ctx.downstream ?? {}).sort(([a], [b]) => (a < b ? -1 : 1))
+  if (!downs.length) return ''
+  const rows = downs
+    .map(([d, v]) => `<tr><td>${refLink(ctx, d)}</td><td>${esc(ctx.titles?.[d] ?? '')}</td><td>${esc([...v].sort().join(', '))}</td></tr>`)
+    .join('')
+  return `<h2>추적표 — 이 문서를 근거로 삼은 문서</h2><p class="soft">원본에 없다. 다른 문서의 참조에서 계산했다.</p><table class="trace"><thead><tr><th>문서</th><th>제목</th><th>참조한 항목</th></tr></thead><tbody>${rows}</tbody></table>`
+}
 
 const head = (s: string): [string, string] => {
   const nl = s.indexOf('\n')
@@ -20,7 +37,7 @@ export const vPrd: ViewFn = ({ body, ctx }) => {
       const rows = itemBlocks(text, /G\d+/)
         .map(
           (b) =>
-            `<tr id="item-${esc(b.id)}" data-item="${esc(b.id)}"><td class="iid">${esc(b.id)}</td><td>${inline(b.title, ctx)}</td><td class="num"></td></tr>`,
+            `<tr id="item-${esc(b.id)}" data-item="${esc(b.id)}"><td class="iid">${esc(b.id)}</td><td>${inline(b.title, ctx)}</td><td class="num">${downsWith(ctx, b.id).length || ''}</td></tr>`,
         )
         .join('')
       out.push(
@@ -40,8 +57,10 @@ export const vPrd: ViewFn = ({ body, ctx }) => {
           const ac = [...b.text.matchAll(/^- \[([ x])\] (.+)$/gm)]
           const done = ac.filter((m) => m[1] === 'x').length
           const desc = b.text.replace(/^- \[[ x]\] .+$/gm, '').trim()
+          const down = downsWith(ctx, b.id)
           let c = `<article class="card" id="item-${esc(b.id)}" data-item="${esc(b.id)}"><div class="card-h"><span class="iid">${esc(b.id)}</span><b>${inline(b.title, ctx)}</b>`
           if (ac.length) c += `<span class="pill">인수기준 ${done}/${ac.length}</span>`
+          if (down.length) c += `<span class="pill soft">하위 ${down.length}</span>`
           c += '</div>' + renderBlocks(desc, ctx)
           if (ac.length)
             c +=
@@ -53,6 +72,7 @@ export const vPrd: ViewFn = ({ body, ctx }) => {
                 )
                 .join('') +
               '</ul>'
+          if (down.length) c += '<div class="down">이 요구사항을 근거로 삼은 문서: ' + down.map((d) => refLink(ctx, d)).join(' · ') + '</div>'
           out.push(c + '</article>')
         }
       }
@@ -60,10 +80,28 @@ export const vPrd: ViewFn = ({ body, ctx }) => {
     }
     out.push(h2(title) + renderBlocks(text, ctx, ITEM_PAT.PRD))
   }
+  out.push(traceTable(ctx))
   return { html: out.join('\n') }
 }
 
-export const vRfq: ViewFn = ({ body, ctx }) => ({ html: renderBlocks(body, ctx, /Q\d+/) })
+/** V-RFQ — 원본 순서 그대로. 끝에 추적표(요구가 어디로 갔나) + 근거로 안 쓰인 요구 경고 */
+export const vRfq: ViewFn = ({ body, ctx }) => {
+  const out = [renderBlocks(body, ctx, /Q\d+/)]
+  const downs = Object.entries(ctx.downstream ?? {})
+  if (downs.length) {
+    const byQ = new Map<string, Set<string>>()
+    for (const [d, v] of downs) for (const it of v) (byQ.get(it) ?? byQ.set(it, new Set()).get(it)!).add(d)
+    const titles = new Map(itemBlocks(body, /Q\d+/).map((b) => [b.id, b.title]))
+    const rows = [...byQ.entries()]
+      .sort(([a], [b]) => (a === '(문서)') !== (b === '(문서)') ? (a === '(문서)' ? 1 : -1) : a < b ? -1 : 1)
+      .map(([q, ds]) => `<tr><td class="iid">${esc(q)}</td><td>${inline(titles.get(q) ?? '', ctx)}</td><td>${[...ds].sort().map((d) => refLink(ctx, d)).join(' · ')}</td></tr>`)
+      .join('')
+    out.push(`<h2>추적표 — 요구가 어디로 갔나</h2><p class="soft">원본에 없다. 다른 문서의 참조에서 계산했다. 어느 요구도 근거로 안 쓰였다면 그 요구는 구현 계획이 없는 것이다.</p><table class="trace"><thead><tr><th>요구</th><th>내용</th><th>근거로 삼은 문서</th></tr></thead><tbody>${rows}</tbody></table>`)
+    const unused = [...titles.keys()].filter((q) => !byQ.has(q))
+    if (unused.length) out.push(`<p class="warn">근거로 쓰이지 않은 요구: ${esc(unused.join(', '))}</p>`)
+  }
+  return { html: out.join('\n') }
+}
 
 export const vScn: ViewFn = ({ body, ctx }) => {
   const out: string[] = []
@@ -128,7 +166,8 @@ export const vInfra: ViewFn = ({ body, ctx }) => {
       const rows = itemBlocks(text, /C\d+/)
         .map((b) => {
           const src = /^출처: (.+)$/m.exec(b.text)
-          return `<tr id="item-${esc(b.id)}" data-item="${esc(b.id)}"><td class="iid">${esc(b.id)}</td><td>${inline(b.title, ctx)}</td><td>${src ? inline(src[1], ctx) : ''}</td><td></td></tr>`
+          const downs = downsWith(ctx, b.id)
+          return `<tr id="item-${esc(b.id)}" data-item="${esc(b.id)}"><td class="iid">${esc(b.id)}</td><td>${inline(b.title, ctx)}</td><td>${src ? inline(src[1], ctx) : ''}</td><td>${downs.map((d) => refLink(ctx, d)).join(' · ')}</td></tr>`
         })
         .join('')
       const tailIdx = text.lastIndexOf('\n\n**')
@@ -291,7 +330,8 @@ export const vUiDesign: ViewFn = ({ body, ctx }) => {
           const kind = first.includes('.') ? first.split('.')[0] : ''
           const uc = /주 유스케이스: (.+)$/.exec(first)
           const purpose = first.includes('. ') ? first.split('. ').slice(1).join('. ').split(' 주 유스케이스')[0] : first
-          return `<tr id="item-${esc(b.id)}" data-item="${esc(b.id)}"><td class="iid">${esc(b.id)}</td><td>${inline(b.title, ctx)}</td><td>${esc(kind)}</td><td>${inline(purpose, ctx)}</td><td>${uc ? inline(uc[1], ctx) : ''}</td><td></td></tr>`
+          const downs = downsWith(ctx, b.id)
+          return `<tr id="item-${esc(b.id)}" data-item="${esc(b.id)}"><td class="iid">${esc(b.id)}</td><td>${inline(b.title, ctx)}</td><td>${esc(kind)}</td><td>${inline(purpose, ctx)}</td><td>${uc ? inline(uc[1], ctx) : ''}</td><td>${downs.map((d) => refLink(ctx, d)).join(' · ')}</td></tr>`
         })
         .join('')
       const lead = text.split(/^#### /m)[0]

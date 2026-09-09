@@ -7,6 +7,10 @@ export interface RenderCtx {
   href: (docId: string, itemId?: string) => string
   /** 대상 존재 여부. 모르면 true(링크). 같은 문서 항목은 items로 판정 */
   exists: (docId: string, itemId?: string) => boolean
+  /** 이 문서를 참조하는 문서 → 참조한 항목 ID들("(문서)" 포함). view_build.downstream_of. 없으면 추적표 생략 */
+  downstream?: Record<string, string[]>
+  /** 참조하는 문서의 제목 (추적표 열) */
+  titles?: Record<string, string>
 }
 
 const NUL = '\uE000' // 코드 스팬 자리표시 (사용자 영역 문자)
