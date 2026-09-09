@@ -646,3 +646,37 @@ def test_diff_hunks_per_item_whitespace_ignored_new_item_reverse(db_session: Ses
     assert (
         svc.resolve_items("EXMP-PRD-001", ["N2"]) == [] and svc.resolve_items("NOPE", ["R1"]) == []
     )
+
+
+# ── versions_instructed_by · convention_error_docs_by · documents_authored_by ──
+def test_my_versions_error_docs_and_authored_documents(db_session: Session) -> None:
+    svc = SpecService(db_session)
+    p = make_project(db_session)
+    a, b = author(db_session, "aa"), author(db_session, "bb")
+    v1 = svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ_MIN, "h0", a, "spec: 테스트")
+    v2 = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", b, "spec: 테스트")
+    d = svc.get_document("EXMP-PRD-001")
+    v3 = svc.save(d, d.body + "\n", "h2", a, "spec: v2", [])  # PRD 최근 작성자 → a
+    assert svc.versions_instructed_by([v1.id, v2.id, v3.id], a.user.id) == [v1.id, v3.id]
+    assert svc.versions_instructed_by([], a.user.id) == []
+    assert sorted(svc.documents_authored_by(a.user.id)) == sorted([v1.document_id, d.id])
+    assert svc.documents_authored_by(b.user.id) == []  # b의 PRD는 a가 덮어썼다
+    db_session.execute(
+        text("UPDATE documents SET has_convention_error=true WHERE doc_id='EXMP-PRD-001'")
+    )
+    assert [x.doc_id for x in svc.convention_error_docs_by(a.user.id)] == ["EXMP-PRD-001"]
+    assert svc.convention_error_docs_by(b.user.id) == []
+
+
+RFQ_MIN = """---
+doc_id: EXMP-RFQ-001
+type: RFQ
+title: 요청
+status: draft
+---
+
+## 1. 요구
+
+#### Q1 첫 요구
+내용
+"""

@@ -564,6 +564,20 @@ class SpecService:
         rows.sort(key=lambda r: r.created_at, reverse=True)
         return rows[:n]
 
+    def versions_instructed_by(self, version_ids: list[int], user_id: int) -> list[int]:
+        """SYNC-MS-002#SpecService.versions_instructed_by"""
+        return self.repo.version_ids_by_user(version_ids, user_id)
+
+    def convention_error_docs_by(self, user_id: int) -> list[DocumentSummary]:
+        """SYNC-MS-002#SpecService.convention_error_docs_by"""
+        rows = [r for r in self.repo.documents_last_authored_by(user_id) if r.has_convention_error]
+        latest = self.repo.latest_versions([r.id for r in rows])
+        return [DocumentSummary(**self._summary_fields(r, latest.get(r.id))) for r in rows]
+
+    def documents_authored_by(self, user_id: int) -> list[int]:
+        """SYNC-MS-002#SpecService.documents_authored_by"""
+        return [r.id for r in self.repo.documents_last_authored_by(user_id)]
+
     def describe_items(self, item_pks: list[int]) -> dict[int, ItemRef]:
         """SYNC-MS-002#SpecService.describe_items"""
         out: dict[int, ItemRef] = {}

@@ -84,6 +84,35 @@ class SpecRepository:
         )
         return self.session.scalar(stmt)
 
+    def version_ids_by_user(self, ids: list[int], user_id: int) -> list[int]:
+        if not ids:
+            return []
+        stmt = select(VersionRow.id).where(
+            VersionRow.id.in_(ids),
+            (VersionRow.instructed_by_user_id == user_id) | (VersionRow.author_user_id == user_id),
+        )
+        return list(self.session.scalars(stmt.order_by(VersionRow.id)))
+
+    def documents_last_authored_by(self, user_id: int) -> list[Document]:
+        """최근 버전의 author_user_id가 user_id인 문서. 쿼리 한 번."""
+        latest = (
+            select(VersionRow.document_id, func.max(VersionRow.version_no).label("no"))
+            .group_by(VersionRow.document_id)
+            .subquery()
+        )
+        stmt = (
+            select(Document)
+            .join(VersionRow, VersionRow.document_id == Document.id)
+            .join(
+                latest,
+                (VersionRow.document_id == latest.c.document_id)
+                & (VersionRow.version_no == latest.c.no),
+            )
+            .where(VersionRow.author_user_id == user_id)
+            .order_by(Document.id)
+        )
+        return list(self.session.scalars(stmt))
+
     def version_bodies(self, document_id: int, nos: list[int]) -> dict[int, str]:
         stmt = select(VersionRow.version_no, VersionRow.body).where(
             VersionRow.document_id == document_id, VersionRow.version_no.in_(nos)
