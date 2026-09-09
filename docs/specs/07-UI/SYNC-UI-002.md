@@ -1129,7 +1129,7 @@ status: approved
   <div><b>순서대로 읽기</b> <span class="lbl">SYNC</span></div>
   <span class="grow"></span>
   <div class="steps" data-el="2">
-    <span class="stp done">1 RFQ</span><span class="stp done">2 PRD</span><span class="stp cur">3 SCN</span><span class="stp">4 UC</span><span class="stp">5 INFRA</span><span class="stp">6 DOM</span><span class="stp na">7 UI</span><span class="stp na">8</span><span class="stp na">9</span><span class="stp na">10</span><span class="stp na">11</span>
+    <span class="stp done">1 RFQ</span><span class="stp done">2 PRD</span><span class="stp cur">3 SCN</span><span class="stp">4 UC</span><span class="stp">5 INFRA</span><span class="stp">6 DOM</span><span class="stp na">7 UI</span><span class="stp na">8 API</span><span class="stp na">9 SEQ</span><span class="stp na">10 MS</span><span class="stp na">11 CODE</span>
   </div>
 </div>
 
@@ -1156,7 +1156,7 @@ status: approved
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
 | 1 | 헤더 | 영역 | 제목, 프로젝트 | — |
-| 2 | 단계 표시 | 진행 표시 | 11단계. 읽은 것·현재·남은 것·문서 없음 구분 | 단계 클릭 → 그 단계로 |
+| 2 | 단계 표시 | 진행 표시 | 11단계. 번호와 타입 이름은 항상 보인다. 읽은 것·현재·남은 것·문서 없음은 색으로 구분 | 단계 클릭 → 그 단계로 |
 | 3 | 미확정 배너 | 배너 | 이 단계에 승인 문서가 없을 때. 있는 문서와 상태(UC-H16 2a) | — |
 | 3.1 | 초안 보기 | 버튼 | | 승인 아닌 문서를 본문(4)에 띄운다(UC-H16 2a1) |
 | 4 | 본문 | 사람용 뷰 | 현재 단계의 승인 문서. UI-5 유저용 탭과 같은 렌더링, 목차·패널 없음(UC-H16 기본 흐름 2) | — |
