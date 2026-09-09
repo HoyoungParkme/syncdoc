@@ -117,16 +117,16 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### ReferenceService.resolve_missing 미존재 참조 해제
 
-**시그니처** `resolve_missing(project_id: int) -> int`
+**시그니처** `resolve_missing(project_id: int, target_doc_id: str | None = None) -> int`
 
 근거: [[SYNC-UC-001#UC-S2]] 2a2 · [[SYNC-SEQ-001#SEQ-21]] 7단계
 
 **처리**
-1. `rows = DB: references where is_missing and from이 project_id 안`
+1. `rows = DB: references where is_missing and from이 project_id 안` · if `target_doc_id` → `raw_target`이 그 문서를 가리키는 것만 (저장 직후 좁혀 부를 때)
 2. 행마다 `raw_target` 다시 파싱 → 대상 찾기(extract 4단계와 같음) · if 찾음 → `to_*` 채우고 `is_missing=False`
 3. `→` 해제된 수
 
-**테스트 관점** 상위 문서가 나중에 생성된 뒤 → 다음 저장(또는 재구축)에서 해제
+**테스트 관점** 상위 문서가 나중에 생성된 뒤 → 그 문서를 가리키던 미존재 참조가 즉시 해제 · 재구축에서도 해제
 
 ---
 
