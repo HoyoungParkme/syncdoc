@@ -138,3 +138,12 @@ def test_downstream_of_document_only_whole_document_refs(db_session: Session) ->
         (None, "EXMP-RFQ-001")
     ]  # 절 본문·upstream
     assert ref.downstream_of_document(d.id) == []
+
+
+def test_count_downstream_groups_by_target(db_session: Session) -> None:
+    svc, ref, d, v, pks, _ = _setup(db_session)
+    ref.extract(d.id, v.id, d.body, pks, UPSTREAM)
+    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
+    counts = ref.count_downstream([q1, pks["R1"], pks["G1"]])
+    assert counts == {q1: 1, pks["R1"]: 1}  # G1은 키 없음(0으로 읽는다)
+    assert ref.count_downstream([]) == {}
