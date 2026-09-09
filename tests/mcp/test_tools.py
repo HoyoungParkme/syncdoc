@@ -162,4 +162,5 @@ async def test_init_project_tool(scoped: Session, as_user, repos, tmp_path, monk
     err, p = await call(
         "init_project", remote_url=str(repos["remote"]), code="EXST", name="n", import_existing=True
     )
-    assert err and p["type"] == "urn:syncdoc:not-implemented" and p["status"] == 501
+    assert not err and p["code"] == "EXST"
+    assert next(s for s in p["stages"] if s["doc_type"] == "PRD")["doc_count"] == 1
