@@ -1571,5 +1571,5 @@ components:
 ## 6. 미결사항
 
 - [ ] `/api/projects/{code}/flags` 응답이 `oneOf`라 클라이언트가 `kind`별로 분기해야 한다. 엔드포인트를 넷으로 쪼갤지
-- [ ] 되돌리기·상태 변경의 `Author.via`를 `web`으로 기록할 때 `kind`는 `human`. `agent`는 MCP·GitHub push(에이전트 커밋)에서만
-- [ ] `Todo.unresolved_comments`의 "내 문서" 기준 — 클래스 명세 미결(`flags.assignee`)과 같은 문제
+- [x] 되돌리기·상태 변경의 `Author.via`를 `web`으로 기록할 때 `kind`는 `human`. `agent`는 MCP·GitHub push(에이전트 커밋)에서만 — 결정: 그대로 간다. `types.fold_via`가 `web_revert`·`web_status`를 `web`으로 접고 `kind=human`으로 기록
+- [x] `Todo.unresolved_comments`의 "내 문서" 기준 — 클래스 명세 미결(`flags.assignee`)과 같은 문제 — 결정: 최근 버전 작성자. `flags.assignee`와 같은 기준(DOM-002 5장 1). `SpecService.documents_authored_by`
