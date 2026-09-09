@@ -645,3 +645,30 @@ async def test_rebuild_fetch_failure_is_rebuild_failed(scoped: Session, proj, mo
     with pytest.raises(RebuildFailed) as ei:
         await pipeline.rebuild("EXMP")
     assert "Username" in ei.value.extra["reason"]
+
+
+async def test_process_commit_treats_directory_rename_as_modify_not_delete(
+    scoped: Session, proj
+) -> None:
+    """디렉터리에 번호를 붙이면(STD-001 1.1) git이 rename으로 본다 — 삭제로 처리하면 안 된다."""
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    repo = _repo_row(proj)
+    repo.last_processed_commit = g(remote, "rev-parse", "main")
+    scoped.flush()
+    (other / RFQ_FILE).parent.mkdir(parents=True, exist_ok=True)
+    write_commit_push(other, RFQ_FILE, RFQ, "spec(EXMP-RFQ-001): 초안")
+    await pipeline.process_commit(repo, g(remote, "rev-parse", "main"))
+    svc = SpecService(scoped)
+    assert svc.get_document("EXMP-RFQ-001").current_version_no == 1
+    # 번호 없는 옛 경로로 옮긴다 — 파일명(doc_id)은 그대로
+    (other / "docs/specs/RFQ").mkdir(parents=True, exist_ok=True)
+    g(other, "mv", RFQ_FILE, "docs/specs/RFQ/EXMP-RFQ-001.md")
+    g(other, "commit", "-q", "-m", "chore: 디렉터리 이동")
+    g(other, "push", "-q", "origin", "HEAD:main")
+    head = g(remote, "rev-parse", "main")
+    r = await pipeline.process_commit(repo, head)
+    assert [x.doc_id for x in r] == ["EXMP-RFQ-001"]
+    d = svc.get_document("EXMP-RFQ-001")
+    assert (d.current_version_no, d.status, len(d.items)) == (2, "draft", 2)  # 삭제 아님
+    assert scoped.execute(text("SELECT count(*) FROM flags")).scalar() == 0
+    assert "file.deleted" not in (d.convention_error_detail or "")
