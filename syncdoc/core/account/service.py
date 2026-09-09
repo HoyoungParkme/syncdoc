@@ -34,9 +34,9 @@ class AccountService:
         self.session = session
         self.repo = AccountRepository(session)
 
-    async def login_github(self, code: str, state: str) -> User:
+    async def login_github(self, code: str, state: str, redirect_uri: str) -> User:
         """SYNC-MS-006#AccountService.login_github"""
-        token = await github.exchange_code(code)
+        token = await github.exchange_code(code, redirect_uri)
         info = await github.get_user(token)
         u = self.repo.user_by_github_user_id(info.id)
         if u is not None:

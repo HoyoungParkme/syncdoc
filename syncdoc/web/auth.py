@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session
@@ -21,9 +21,31 @@ SESSION_COOKIE = "syncdoc_session"
 AUTHORIZE_URL = "https://github.com/login/oauth/authorize"
 
 
-def authorize_url(state: str) -> str:
-    """GitHub 동의 화면 주소. scope=repo(인프라 5장 — 저장소 범위만)."""
-    q = urlencode({"client_id": settings.GITHUB_CLIENT_ID, "scope": "repo", "state": state})
+CALLBACK_PATH = "/auth/github/callback"
+
+
+def callback_url(request: Request) -> str:
+    """이 요청으로 들어온 주소의 콜백 URL (인프라 5장 PUBLIC_BASE_URL).
+
+    터널 뒤에서는 프록시가 https를 http로 보이게 하므로 요청만으로는 스킴을 못 믿는다.
+    요청 Host가 PUBLIC_BASE_URL의 host와 같으면 그 값을, 아니면 요청에서 만든다.
+    """
+    public = settings.PUBLIC_BASE_URL.strip().rstrip("/")
+    if public and urlsplit(public).netloc == request.url.netloc:
+        return f"{public}{CALLBACK_PATH}"
+    return f"{request.url.scheme}://{request.url.netloc}{CALLBACK_PATH}"
+
+
+def authorize_url(state: str, redirect_uri: str) -> str:
+    """GitHub 동의 화면 주소. scope=repo(인프라 5장 — 저장소 범위만) · redirect_uri(SEQ-8)."""
+    q = urlencode(
+        {
+            "client_id": settings.GITHUB_CLIENT_ID,
+            "scope": "repo",
+            "state": state,
+            "redirect_uri": redirect_uri,
+        }
+    )
     return f"{AUTHORIZE_URL}?{q}"
 
 

@@ -27,7 +27,7 @@ async def github_start(
     state = secrets.token_urlsafe(16)
     request.session["oauth_state"] = state
     request.session["oauth_next"] = next_path
-    return RedirectResponse(auth.authorize_url(state), status_code=302)
+    return RedirectResponse(auth.authorize_url(state, auth.callback_url(request)), status_code=302)
 
 
 @router.get("/auth/github/callback", status_code=302)
@@ -38,7 +38,7 @@ async def github_callback(
     if not state or state != request.session.get("oauth_state"):
         raise Unauthorized("state 불일치")
     next_path = request.session.get("oauth_next") or "/"
-    user = await AccountService(session).login_github(code, state)
+    user = await AccountService(session).login_github(code, state, auth.callback_url(request))
     session.commit()  # 트랜잭션은 호출자(DEV-10)
     auth.login(request, user)
     return RedirectResponse(next_path, status_code=302)

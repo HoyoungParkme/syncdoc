@@ -32,9 +32,25 @@ def test_auth_github_redirects_to_consent_and_keeps_state_in_session(client: Tes
     assert f"{url.scheme}://{url.netloc}{url.path}" == auth.AUTHORIZE_URL
     q = parse_qs(url.query)
     assert q["client_id"] == ["test-client-id"] and q["scope"] == ["repo"]
+    assert q["redirect_uri"] == ["http://testserver/auth/github/callback"]  # SEQ-8
     sess = session_of(client)
     assert sess["oauth_state"] == q["state"][0] and len(q["state"][0]) >= 16
     assert sess["oauth_next"] == "/p/SYNC"
+
+
+def test_callback_url_uses_public_base_url_for_that_host(client: TestClient, monkeypatch) -> None:
+    """인프라 5장 — 터널 Host로 들어오면 PUBLIC_BASE_URL(https)을, 아니면 요청 주소를 쓴다."""
+    from syncdoc.config import settings
+
+    monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "https://xxx.trycloudflare.com")
+    r = client.get(
+        "/auth/github", follow_redirects=False, headers={"Host": "xxx.trycloudflare.com"}
+    )
+    q = parse_qs(urlparse(r.headers["location"]).query)
+    assert q["redirect_uri"] == ["https://xxx.trycloudflare.com/auth/github/callback"]
+    r = client.get("/auth/github", follow_redirects=False)  # 다른 Host면 요청에서
+    q = parse_qs(urlparse(r.headers["location"]).query)
+    assert q["redirect_uri"] == ["http://testserver/auth/github/callback"]
 
 
 def test_auth_github_rejects_external_next(client: TestClient) -> None:

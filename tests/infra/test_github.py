@@ -28,21 +28,22 @@ def test_verify_signature_accepts_valid_and_rejects_others() -> None:
 # ── exchange_code ──
 async def test_exchange_code_posts_client_secret_and_returns_token(mock_github) -> None:
     calls = mock_github(lambda r: httpx.Response(200, json={"access_token": "gho_abc"}))
-    assert await gh.exchange_code("the-code") == "gho_abc"
+    assert await gh.exchange_code("the-code", "http://testserver/auth/github/callback") == "gho_abc"
     req = calls[0]
     assert req.method == "POST" and str(req.url) == "https://github.com/login/oauth/access_token"
     assert req.headers["accept"] == "application/json"
     assert b"client_id=test-client-id" in req.content and b"code=the-code" in req.content
     assert b"client_secret=test-client-secret" in req.content
+    assert b"redirect_uri=http%3A%2F%2Ftestserver%2Fauth%2Fgithub%2Fcallback" in req.content
 
 
 async def test_exchange_code_without_token_is_unauthorized(mock_github) -> None:
     mock_github(lambda r: httpx.Response(200, json={"error": "bad_verification_code"}))
     with pytest.raises(Unauthorized):
-        await gh.exchange_code("bad")
+        await gh.exchange_code("bad", "http://testserver/auth/github/callback")
     mock_github(lambda r: httpx.Response(500, text="oops"))
     with pytest.raises(Unauthorized):
-        await gh.exchange_code("bad")
+        await gh.exchange_code("bad", "http://testserver/auth/github/callback")
 
 
 # ── get_user ──

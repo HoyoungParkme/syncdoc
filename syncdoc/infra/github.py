@@ -18,7 +18,7 @@ def verify_signature(body: bytes, header: str) -> bool:
     return hmac.compare_digest("sha256=" + digest, header or "")
 
 
-async def exchange_code(code: str) -> str:
+async def exchange_code(code: str, redirect_uri: str) -> str:
     """SYNC-MS-009#github.exchange_code"""
     async with httpx.AsyncClient() as client:
         r = await client.post(
@@ -27,6 +27,7 @@ async def exchange_code(code: str) -> str:
                 "client_id": settings.GITHUB_CLIENT_ID,
                 "client_secret": settings.GITHUB_CLIENT_SECRET,
                 "code": code,
+                "redirect_uri": redirect_uri,  # authorize 때와 같은 값 — GitHub가 대조한다
             },
             headers={"Accept": "application/json"},
         )

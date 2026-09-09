@@ -140,7 +140,9 @@ def test_create_placeholder_twice_returns_same_row(db_session: Session) -> None:
 # ── login_github ──
 async def test_login_github_first_login_creates_user(db_session: Session, mock_github) -> None:
     mock_github(github_ok(42, "hoyoung", "박호영"))
-    u = await AccountService(db_session).login_github("code", "state")
+    u = await AccountService(db_session).login_github(
+        "code", "state", "http://testserver/auth/github/callback"
+    )
     assert (u.github_user_id, u.github_login, u.display_name) == (42, "hoyoung", "박호영")
     assert AccountService.github_token_for(u) == "gho_hoyoung"
     assert u.github_token_encrypted != b"gho_hoyoung"
@@ -152,9 +154,9 @@ async def test_login_github_renamed_login_updates_same_row(
 ) -> None:
     svc = AccountService(db_session)
     mock_github(github_ok(42, "old-name", "박호영"))
-    first = await svc.login_github("c1", "s")
+    first = await svc.login_github("c1", "s", "http://testserver/auth/github/callback")
     mock_github(github_ok(42, "new-name", "Hoyoung"))
-    second = await svc.login_github("c2", "s")
+    second = await svc.login_github("c2", "s", "http://testserver/auth/github/callback")
     assert second.id == first.id
     assert (second.github_login, second.display_name) == ("new-name", "Hoyoung")
     assert AccountService.github_token_for(second) == "gho_new-name"
@@ -165,7 +167,7 @@ async def test_login_github_fills_placeholder_row(db_session: Session, mock_gith
     svc = AccountService(db_session)
     ghost = svc.create_placeholder("hoyoung")
     mock_github(github_ok(42, "hoyoung", "박호영"))
-    u = await svc.login_github("code", "state")
+    u = await svc.login_github("code", "state", "http://testserver/auth/github/callback")
     assert u.id == ghost.id and u.github_user_id == 42 and u.display_name == "박호영"
     assert AccountService.github_token_for(u) == "gho_hoyoung"
     assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 1
@@ -176,7 +178,9 @@ async def test_login_github_bad_code_is_unauthorized(db_session: Session, mock_g
 
     mock_github(lambda r: httpx.Response(200, json={"error": "bad_verification_code"}))
     with pytest.raises(Unauthorized):
-        await AccountService(db_session).login_github("bad", "state")
+        await AccountService(db_session).login_github(
+            "bad", "state", "http://testserver/auth/github/callback"
+        )
     assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 0
 
 
