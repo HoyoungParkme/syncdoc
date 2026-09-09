@@ -41,13 +41,14 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 근거: [[SYNC-SEQ-001#SEQ-4]] · [[SYNC-UC-001#UC-A1]] · [[SYNC-API-001#POST/api/projects]] · [[SYNC-API-002#init_project]]
 
 **처리**
+0. **코드 단위 락**을 잡는다(`asyncio.Lock`, code별). 같은 코드로 동시에 두 번 들어오면 서로의 작업 사본을 지운다(UC-A1 2c)
 1. if `not re.fullmatch(r"[A-Z]{1,4}", code)` → `! project-code-invalid {rule}` (2b)
 2. if `DB: projects where code` → `! project-code-conflict {code}` (2a)
 3. `workdir = config.REPOS_DIR / code` · if 이미 있음 → 지운다 (이전 실패 잔재)
 4. `token = AccountService.github_token_for(user)` · `git.clone(remote_url, workdir, token)` · if 실패 → workdir 삭제, `! push-failed {reason: clone}`
 5. `has = git.exists(workdir, "docs/specs")`
 6. if `has and not import_existing` → `n = len(git.list(workdir, "docs/specs/*/*.md"))`, workdir 삭제, `! existing-specs {doc_count: n}` (3a)
-7. **트랜잭션**: `DB: projects insert (code, name)`, `DB: repositories insert (project_id, remote_url, workdir_path, last_processed_commit=None)`
+7. **트랜잭션**: `DB: projects insert (code, name)`, `DB: repositories insert (project_id, remote_url, workdir_path, last_processed_commit=None, registered_by_user_id=user.id)` — 누가 등록했는지 기록. private 지원 때 이 사람 토큰으로 fetch한다
 8. if `has and import_existing` → `pipeline.rebuild(code)` (3a2. 락·트랜잭션은 그쪽) · `last_processed_commit`은 rebuild가 채움
 9. else → `files = git.init_specs(workdir)` (11단계 + `STD/` 디렉터리, `_templates/` 12개, `assets/`) · `hash = git.commit_push(workdir, message=f"chore({code}): init syncdoc", author=Author(human, user, None, web), files=files)` · if 실패 → 7단계 롤백, workdir 삭제, `! push-failed` (4a) · `DB: repositories update last_processed_commit=hash`
 10. `→ Project`. **`ProjectSummary`는 입구(MCP 도구·라우터)가 `queries.project_summary()`로 만든다** — 서비스가 `queries`를 부르면 순환이다(클래스 3.2에 PS→QR 없음). 신규면 11칸 null
@@ -80,7 +81,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-SEQ-001#SEQ-20]] · UI-14 표 2
 
-**처리** 저장소마다 `git.fetch(workdir)` · `behind = git.rev_list_count(workdir, f"{last_processed_commit}..origin/HEAD")` · if `last_processed_commit is None` → `behind=None`(문서 없음) · `→ RepoStatus(code, remote_url, last_processed_commit, synced_at, behind_by)`. 캐시 여부는 미결
+**처리** 저장소마다 `git.fetch(workdir)` (public. private이면 등록자 토큰 — MS-009 8장 미결) · if fetch 실패 → `behind_by=None`, `error`를 채워 UI-14에 표시 · `behind = git.rev_list_count(workdir, f"{last_processed_commit}..origin/HEAD")` · if `last_processed_commit is None` → `behind=None`(문서 없음) · `→ RepoStatus(code, remote_url, last_processed_commit, synced_at, behind_by)`. 캐시 여부는 미결
 
 ---
 
