@@ -435,11 +435,11 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
     project = ProjectService(s).get(code)
     repo = project.repository
     workdir = Path(repo.workdir_path)
-    head = await git.fetch(workdir)
-    await git.checkout(workdir, "origin/HEAD")
     spec, refs, account = SpecService(s), ReferenceService(s), AccountService(s)
     result = RebuildResult(0, 0, 0, 0)
     try:
+        head = await git.fetch(workdir)  # 2단계도 실패하면 rebuild-failed (MS-007 예외)
+        await git.checkout(workdir, "origin/HEAD")
         refs.clear(project.id)
         spec.clear_index(project.id)
         for path in await git.list(workdir, "docs/specs/*/*.md", head):

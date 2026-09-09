@@ -630,3 +630,15 @@ async def test_save_resolves_missing_refs_waiting_for_this_document(scoped: Sess
     assert scoped.execute(text('SELECT count(*) FROM "references" WHERE is_missing')).scalar() == 2
     await create(proj, DocType.RFQ, RFQ)
     assert scoped.execute(text('SELECT count(*) FROM "references" WHERE is_missing')).scalar() == 0
+
+
+async def test_rebuild_fetch_failure_is_rebuild_failed(scoped: Session, proj, monkeypatch) -> None:
+    from syncdoc.infra import git as gitmod
+
+    async def boom(workdir):
+        raise gitmod.GitError(["git", "fetch"], "could not read Username")
+
+    monkeypatch.setattr(gitmod, "fetch", boom)
+    with pytest.raises(RebuildFailed) as ei:
+        await pipeline.rebuild("EXMP")
+    assert "Username" in ei.value.extra["reason"]
