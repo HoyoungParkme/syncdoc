@@ -1260,6 +1260,9 @@ components:
     Version:
       type: object
       properties:
+        doc_id:
+          type: string
+          description: 프로젝트 단위 목록(최근 변경)에서 문서를 가리키려고
         version_no:
           type: integer
           nullable: true
