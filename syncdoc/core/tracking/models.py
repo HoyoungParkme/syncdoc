@@ -60,3 +60,8 @@ class PropagationDecision(Base):
     reason: Mapped[str | None] = mapped_column(Text)
     decided_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    @property
+    def affected_count(self) -> int:
+        """MS-004 get_decision — len(affected_pks)."""
+        return len(self.affected_pks)

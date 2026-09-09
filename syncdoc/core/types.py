@@ -349,7 +349,11 @@ class UpstreamCheck:
 
 @dataclass
 class FlagSummary:
-    """SYNC-API-001 FlagSummary — queries가 Flag 행에 ItemRef·UserRef를 채운 것."""
+    """SYNC-API-001 FlagSummary — Flag 행에 ItemRef·UserRef를 채운 것.
+
+    assignee_id는 API에 없다 — TrackingService.resolve가 돌려줄 때 UserRef는 입구(라우터)가
+    users_by_ids로 채운다(AuthorRef→Author와 같은 방식. tracking은 account를 못 부른다, 3.2).
+    """
 
     id: int
     kind: str
@@ -359,6 +363,15 @@ class FlagSummary:
     assignee: UserRef | None
     raised_at: datetime
     resolved_at: datetime | None
+    assignee_id: int | None = None
+
+
+@dataclass(frozen=True)
+class DecisionResult:
+    """SYNC-DOM-002 2.8 DecisionResult — record_decision."""
+
+    choice: str
+    flags_raised: int
 
 
 @dataclass

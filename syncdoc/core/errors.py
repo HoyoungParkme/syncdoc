@@ -154,3 +154,30 @@ class UpstreamReviewRequired(Problem):
 
     def __init__(self) -> None:
         super().__init__("승인은 상위 대조를 거쳐야 함")
+
+
+class ReasonRequired(Problem):
+    type = "urn:syncdoc:reason-required"
+    status = 422
+    title = "reason-required"
+
+    def __init__(self) -> None:
+        super().__init__("skip에는 사유가 필요함")
+
+
+class AlreadyDecided(Problem):
+    type = "urn:syncdoc:already-decided"
+    status = 409
+    title = "already-decided"
+
+    def __init__(self, choice: str, decided_at: str | None) -> None:
+        super().__init__("이미 결정된 전파", choice=choice, decided_at=decided_at)
+
+
+class AlreadyResolved(Problem):
+    type = "urn:syncdoc:already-resolved"
+    status = 409
+    title = "already-resolved"
+
+    def __init__(self, resolved_at: str | None) -> None:
+        super().__init__("이미 확인된 플래그", resolved_at=resolved_at)
