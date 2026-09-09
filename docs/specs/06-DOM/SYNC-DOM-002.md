@@ -37,6 +37,29 @@ upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 
 ## 1. 폴더 구조
 
+프로젝트 `syncdoc` 하나에 **백엔드와 프런트엔드를 나눠 둔다.** 명세·도구는 둘 다 쓰므로 루트에 둔다.
+
+```
+syncdoc/                        저장소 = 프로젝트
+├── backend/                    파이썬. FastAPI(웹) + MCP 서버
+│   ├── syncdoc/                임포트 패키지 — `from syncdoc.core… `
+│   ├── tests/                  syncdoc/ 구조를 그대로 따른다 (STD-004 DEV-14)
+│   ├── alembic/ · alembic.ini  마이그레이션 (DEV-7)
+│   └── pyproject.toml · uv.lock
+│
+├── frontend/                   React 소스 (Vite+TS). 빌드 → backend/syncdoc/web/static
+│                               유저용 탭 렌더링은 tools/view_build.py를 TS로 옮긴 것
+│                               (md.ts·views.ts·uc/wireframe/seq/ms.ts)
+│
+├── docs/specs/                 명세 원본 (STD-001 1.1). 양쪽이 같이 본다
+├── tools/                      validate.py · check_code.py · check_ui.py · view_build.py · dev_preview.py
+├── scripts/                    tunnel.sh — Quick Tunnel 기동 (INFRA 5장)
+├── Dockerfile · docker-compose.yml   배치 (INFRA 8장). 프런트를 빌드해 백엔드 이미지에 담는 2단계
+└── AGENTS.md · README.md
+```
+
+**backend/syncdoc/ 안**
+
 ```
 syncdoc/
 ├── main.py                 앱 조립. web·mcp 라우터 마운트
@@ -66,14 +89,15 @@ syncdoc/
 │   └── static/             React 빌드 결과 (gitignore). /{path:path} SPA 폴백은 라우트 맨 끝
 │
 ├── mcp/                    MCP 도구. core를 호출만 한다
-│   └── tools.py
+│   ├── tools.py
+│   └── auth.py             Bearer → current_user_id (SEQ-C2)
 │
 └── infra/                  외부 시스템 어댑터
     ├── git.py              clone·commit·push·fetch
     └── github.py           OAuth·webhook 검증
-
-frontend/                   React 소스 (Vite+TS). 빌드 → syncdoc/web/static. 유저용 탭 렌더링은 tools/view_build.py를 TS로 옮긴 것(md.ts·views.ts·uc/wireframe/seq/ms.ts)
 ```
+
+**이 문서에서 파일 경로를 적을 때**는 패키지 안 상대 경로로 쓴다 — `core/spec/service.py`는 `backend/syncdoc/core/spec/service.py`를 가리킨다.
 
 **묶음 안 구조** (6개 동일)
 ```
