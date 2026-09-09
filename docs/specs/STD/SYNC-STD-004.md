@@ -182,5 +182,5 @@ C  통합·배포       외부 연결 · 첫 사용
 ## 5. 미결사항
 
 - [x] MINISPEC↔코드 일치 검사기 — `tools/check_code.py`. AST로 docstring 항목 ID·시그니처 대조. `--doc`·`--items`로 범위 지정
-- [x] React 쪽 대응 — DEV-17. 화면 = 컴포넌트, 요소 = `data-el`. 검사기 `check_ui.py`는 B4 사전 작업
+- [x] React 쪽 대응 — DEV-17. 화면 = 컴포넌트, 요소 = `data-el`. 검사기 `tools/check_ui.py` 완료 — B2·B3 화면 9개 대조(`--screens`로 범위 지정). DEV-14 여섯째(화면 확인) 앞에 돌린다
 - [ ] 슬라이스가 앞 슬라이스 코드를 고쳐야 할 때 — 앞 카드를 미완으로 되돌리나, 새 카드를 만드나
