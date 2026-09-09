@@ -122,7 +122,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. if `entry == mcp and current_status and fm.status != current_status` → `frontmatter.status_change` 추가
 3. 코드블록·인라인 코드를 빈 칸으로 치환한 본문에서 헤딩 순회. 타입의 항목 패턴(STD-001 2장 표 — DOM·UI·API는 `title`로 세분)으로 항목 판정
    - if 이미 본 ID → `item.duplicate` · if 토큰 끝이 `.`·`:`이고 떼면 패턴에 맞음 → `item.punct` · if 번호 앞자리 0 → `item.padding` · if `^[A-Z]+-?\d+$`인데 패턴 밖 → `item.pattern`
-   - `deleted = DB: items where document_id and is_deleted=true` · if `item_id in deleted` → `item.reused`
+   - `deleted = DB: items where document_id and is_deleted=true` · if `item_id in deleted` → `item.reused`. 단 문서의 `convention_error_detail`이 `file.deleted:`로 시작하면 그 문서의 삭제 항목은 `deleted`에서 뺀다 — 파일 삭제로 지워진 것을 되살리는 것은 재사용이 아니라 복구다
 4. `[[ ]]` 전부 형식 검사 → `ref.format`
 5. **경고**: 필수 절마다 if 해당 절 없음 → `section.missing` · if `not items and doc_type not in (CODE, STD)` → `item.none`
 6. DOM 클래스 명세면 2장·4장 mermaid의 같은 클래스 속성 대조 → `entity.mismatch` 경고
@@ -221,7 +221,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **처리** — 호출자의 트랜잭션 안. **버전 충돌 검사는 하지 않는다**(`pipeline` 5단계가 이미)
 1. `new_no = document.current_version_no + 1`
 2. `DB: versions insert (document_id, version_no=new_no, commit_hash, body, author_kind, author_user_id, instructed_by_user_id, via=author.via를 mcp|web|github로 접음, message)`
-3. `blocks = item_blocks(body, doc_type)`. 블록마다 `DB: items where document_id and item_id` · if 있음 → `display_name` 갱신 · else → insert
+3. `blocks = item_blocks(body, doc_type)`. 블록마다 `DB: items where document_id and item_id` · if 있음 → `display_name` 갱신, **`is_deleted=false, deleted_at=null`로 되돌림**(본문에 다시 나타났으므로 복구) · else → insert
 4. `deleted_item_pks`마다 `DB: items set is_deleted=true, deleted_at=now`
 5. if `author.via == github` → `new_status = fm.status` (원본이 진실) · else → `new_status = document.status`
 6. if `document.status == approved and body != document.current_body` → `new_status = review`, `DB: status_changes insert (from=approved, to=review, changed_by=author.user, reason="본문 수정으로 자동 강등", commit_hash=None)` (UC-A6 6a)
@@ -265,7 +265,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 3. `DB: documents update status=draft, has_convention_error=true, convention_error_detail="file.deleted: {commit_hash}"`
 4. `→` 삭제된 항목 pk 목록 (호출자가 `raise_broken`)
 
-**테스트 관점** 파일 삭제 push → 문서 행 남음, `draft`, 항목 전부 삭제됨, 하위에 끊어진 참조 · 파일 되살려 push → 다음 저장이 `file.deleted`를 지움. **미결**: 되살린 항목 ID가 `item.reused` 위반에 걸린다
+**테스트 관점** 파일 삭제 push → 문서 행 남음, `draft`, 항목 전부 삭제됨, 하위에 끊어진 참조 · 파일 되살려 push → 다음 저장이 `file.deleted`를 지우고, 되살아난 항목 ID는 위반이 아니며 `is_deleted`가 풀린다(복구)
 
 ---
 
@@ -516,7 +516,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 3. 미결사항
 
-- [ ] `mark_deleted` 후 파일을 되살리면 항목 ID가 `item.reused` 위반에 걸린다. 되살림은 재사용이 아니라 복구 — 예외 필요
+- [x] `mark_deleted` 후 파일을 되살리면 항목 ID가 `item.reused` 위반에 걸린다. 되살림은 재사용이 아니라 복구 — 예외 필요 — 결정: **파일 삭제로 지워진 항목은 복구다.** 문서의 `convention_error_detail`이 `file.deleted:`로 시작하면 그 문서의 삭제 항목은 `item.reused`에서 빼고, 본문에 다시 나타나면 `is_deleted`·`deleted_at`을 되돌린다. 파일은 살아 있는데 항목만 지웠다가 같은 ID를 다시 쓰는 것만 재사용으로 남긴다
 
 - [ ] `diff`의 hunk 문맥 줄 수 (`n=1`) — 화면에서 부족할 수 있다
 - [x] `list_versions`가 자동 강등 StatusChange(commit_hash null)를 보여줄지 — 결정: 안 보여준다. `commit_hash is not null`인 상태 변경만 (본문 커밋에 딸린 강등은 그 버전 행이 이미 보인다)
