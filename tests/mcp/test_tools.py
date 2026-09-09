@@ -42,6 +42,7 @@ async def test_tools_listed_with_descriptions() -> None:
         "get_document",
         "get_item",
         "get_template",
+        "get_references",
         "create_document",
         "update_document",
     }
@@ -164,3 +165,26 @@ async def test_init_project_tool(scoped: Session, as_user, repos, tmp_path, monk
     )
     assert not err and p["code"] == "EXST"
     assert next(s for s in p["stages"] if s["doc_type"] == "PRD")["doc_count"] == 1
+
+
+async def test_get_references_splits_upstream_downstream_and_flags(
+    scoped: Session, as_user
+) -> None:
+    _seed(scoped, as_user)
+    err, r = await call("get_references", doc_id="EXMP-PRD-001", item_id="G1")
+    assert not err and (r["doc_id"], r["item_id"]) == ("EXMP-PRD-001", "G1")
+    assert sorted((u["doc_id"], u["item_id"], u["is_missing"]) for u in r["upstream"]) == [
+        ("EXMP-PRD-001", "R1", False),
+        ("EXMP-RFQ-001", "Q1", False),
+    ]
+    assert r["downstream"] == []
+    assert [(f["kind"], f["cause"], f["cause_version_no"]) for f in r["flags"]] == [
+        ("broken_ref", "EXMP-RFQ-001#Q1", None)
+    ]
+    err, r = await call("get_references", doc_id="EXMP-PRD-001", item_id="R1")
+    assert not err and [(u["raw_target"], u["is_missing"]) for u in r["upstream"]] == [
+        ("EXMP-RFQ-001#Q9", True)
+    ]
+    assert [(x["doc_id"], x["item_id"]) for x in r["downstream"]] == [("EXMP-PRD-001", "G1")]
+    err, p = await call("get_references", doc_id="EXMP-PRD-001", item_id="R9")
+    assert err and p["type"] == "urn:syncdoc:not-found"
