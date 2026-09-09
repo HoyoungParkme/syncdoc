@@ -42,12 +42,12 @@ upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ```
 syncdoc/                        저장소 = 프로젝트
 ├── backend/                    파이썬. FastAPI(웹) + MCP 서버
-│   ├── syncdoc/                임포트 패키지 — `from syncdoc.core… `
-│   ├── tests/                  syncdoc/ 구조를 그대로 따른다 (STD-004 DEV-14)
+│   ├── app/                    임포트 패키지 — `from app.core… `
+│   ├── tests/                  app/ 구조를 그대로 따른다 (STD-004 DEV-14)
 │   ├── alembic/ · alembic.ini  마이그레이션 (DEV-7)
 │   └── pyproject.toml · uv.lock
 │
-├── frontend/                   React 소스 (Vite+TS). 빌드 → backend/syncdoc/web/static
+├── frontend/                   React 소스 (Vite+TS). 빌드 → backend/app/web/static
 │                               유저용 탭 렌더링은 tools/view_build.py를 TS로 옮긴 것
 │                               (md.ts·views.ts·uc/wireframe/seq/ms.ts)
 │
@@ -58,10 +58,10 @@ syncdoc/                        저장소 = 프로젝트
 └── AGENTS.md · README.md
 ```
 
-**backend/syncdoc/ 안**
+**backend/app/ 안**
 
 ```
-syncdoc/
+app/
 ├── main.py                 앱 조립. web·mcp 라우터 마운트
 ├── config.py               환경 변수, 비밀키
 ├── db.py                   세션, 엔진
@@ -97,7 +97,9 @@ syncdoc/
     └── github.py           OAuth·webhook 검증
 ```
 
-**이 문서에서 파일 경로를 적을 때**는 패키지 안 상대 경로로 쓴다 — `core/spec/service.py`는 `backend/syncdoc/core/spec/service.py`를 가리킨다.
+**패키지 이름이 `app`인 이유** — 마지막 폴더 이름이 곧 임포트 이름이다. 프로젝트 이름(`syncdoc`)을 그대로 쓰면 `backend/syncdoc/`처럼 이름이 두 번 나온다. `src/`는 담는 상자일 뿐 패키지가 아니라 안에 이름이 또 필요하고(PyPI 배포 라이브러리 관례), 싱크독은 컨테이너로 띄우는 앱이라 그 이점이 없다.
+
+**이 문서에서 파일 경로를 적을 때**는 패키지 안 상대 경로로 쓴다 — `core/spec/service.py`는 `backend/app/core/spec/service.py`를 가리킨다.
 
 **묶음 안 구조** (6개 동일)
 ```
