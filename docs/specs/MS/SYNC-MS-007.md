@@ -83,7 +83,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
    - if `any(refs) and not confirm_item_deletion` → `! item-deletion-needs-confirm {deleted_items: [{item_id, downstream}]}`
 7. if `entry != github` → `commit_hash = git.commit_push(repo.workdir, message, author, path=STD-001 1.1 경로, content=body)` · if 실패 → `! push-failed {reason}`, 락 해제. **여기까지 DB 쓰기 없음**
 8. **트랜잭션 시작**
-   - if 생성 → `version = spec.create(project_id, doc_id, doc_type, body, commit_hash, author, message)`
+   - if 생성 → `version = spec.create(project_id, doc_id, doc_type, body, commit_hash, author, message, validate_result=4단계 결과)`
    - if `entry == web_status` → `spec.apply_status(document, body, commit_hash, author.user, reason)` (Document.status·current_body 갱신 + StatusChange). **Version 없음.** 9~13 건너뛰고 14로
    - else → `version = spec.save(document, body, commit_hash, author, message, deleted, validate_result=4단계 결과)` — **모든 경로.** 경고(`incomplete_warnings`)는 mcp 저장에도 남아야 승인을 막는다. 위반은 github 경로에서만 저장까지 온다
 9. `deleted`마다 `tracking.raise_broken(pk)`
