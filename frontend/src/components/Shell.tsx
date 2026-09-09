@@ -1,7 +1,7 @@
 /** 공통 틀 — SYNC-UI-001 3장. 상단 바: 싱크독 · [프로젝트 ▾] · [내 할 일 ●n] · [설정]. UI-1만 예외. */
 import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { api, ApiError, type ProjectSummary, type User } from '../api/client'
+import { api, ApiError, type ProjectSummary, type Todo, type User } from '../api/client'
 
 export function Shell() {
   const nav = useNavigate()
@@ -9,7 +9,9 @@ export function Shell() {
   const { code } = useParams()
   const [user, setUser] = useState<User | null>(null)
   const [projects, setProjects] = useState<ProjectSummary[]>([])
+  const [todoCount, setTodoCount] = useState(0)
   useEffect(() => {
+    api.get<Todo>('/api/todo').then((t) => setTodoCount(t.total)).catch(() => undefined)
     api
       .get<User>('/api/me')
       .then(setUser)
@@ -34,9 +36,9 @@ export function Shell() {
           ))}
         </select>
         <span className="grow" />
-        <span className="btn" title="내 할 일 — UI-10(B3)">
-          내 할 일
-        </span>
+        <Link className="btn" to="/todo">
+          내 할 일{todoCount > 0 && <span className="badge">{todoCount}</span>}
+        </Link>
         <Link className="btn" to="/settings">
           설정
         </Link>

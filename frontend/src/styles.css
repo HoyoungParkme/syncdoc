@@ -92,3 +92,12 @@ table.stages{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
 .cmt{border-top:1px solid var(--hair);padding:8px 0}.cmt.done{opacity:.55}.cacts{display:flex;gap:6px;margin-top:4px}
 .pbody textarea{margin:8px 0}
 li.ref.missing{color:#999}
+/* UI-10 내 할 일 */
+.todo .row .k{font-family:ui-monospace,Menlo,monospace;font-weight:600}.row .age{color:var(--soft);font-size:12px;white-space:nowrap}.grp h4 .cnt{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:var(--ink);color:#fff;font-size:11px;text-align:center;margin-left:6px}.grp.dim{opacity:.6}.row.link{cursor:pointer}.row.link:hover{background:#fff}
+.badge{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:#b00;color:#fff;font-size:11px;text-align:center;margin-left:4px}
+/* UI-11 플래그 처리 */
+.stack{display:flex;flex-direction:column;gap:14px}.stack section{border:1px solid var(--rule);background:#fff}.sech{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--hair);background:var(--panel);font-size:13.5px}.mybody{padding:10px 14px;font-size:13.5px}.acts{display:flex;align-items:center;gap:10px;padding:10px 0}
+.diffbox{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;padding:8px 12px;overflow-x:auto;background:#fff}.dl{white-space:pre-wrap;padding:1px 6px}.dl.add{background:#e6ffed;color:#1a6}.dl.del{background:#ffeef0;color:#b00}.dl.ctx{color:var(--soft)}
+/* UI-12 전파 선택 */
+.dialog.wide{width:min(900px,94vw)}.dhead{display:flex;align-items:center;gap:10px}.dhead .x{cursor:pointer;font-weight:400;padding:0 4px}.dbody .sech{margin-top:10px}.chk{list-style:none;padding:0;margin:6px 0}.chk li{padding:4px 0;border-top:1px solid var(--hair)}.propacts{display:flex;align-items:center;gap:10px;margin-top:14px}.skipbox{display:flex;gap:8px;align-items:center}
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:19}

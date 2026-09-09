@@ -1,0 +1,106 @@
+/** UI-11 플래그 처리 — SYNC-UI-002#UI-11. 위가 원인, 아래가 내 항목. 요소 번호 = data-el.
+ *  1 헤더(1.1 대상, 1.2 담당·부여) · 2 원인 영역(2.1 항목, 2.2 버전 범위, 2.3 diff/본문, 2.4 문서에서 보기)
+ *  · 3 내 항목 영역(3.1, 3.2 버전·변경 여부, 3.3 본문, 3.4) · 4 처리(4.1 확인함, 4.2 안내) · 5 내 할 일로 */
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ago, api, ApiError, docPath, FLAG_KO, refKey, type Document, type FlagDetail } from '../api/client'
+import { DiffBox } from '../components/DiffBox'
+import { renderBlocks, type RenderCtx } from '../view/md'
+
+export function FlagView() {
+  const { flagId = '' } = useParams()
+  const nav = useNavigate()
+  const [f, setF] = useState<FlagDetail | null>(null)
+  const [targetDoc, setTargetDoc] = useState<Document | null>(null)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    api
+      .get<FlagDetail>(`/api/flags/${flagId}`)
+      .then((d) => {
+        setF(d)
+        if (d.target.doc_id) api.get<Document>(`/api/docs/${d.target.doc_id}`).then(setTargetDoc)
+      })
+      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : String(e)))
+  }, [flagId])
+  const ctx = useMemo<RenderCtx>(
+    () => ({ selfId: f?.target.doc_id ?? '', href: (d, it) => docPath(d, it), exists: () => true }),
+    [f?.target.doc_id],
+  )
+  if (err) return <div className="page banner err">{err}</div>
+  if (!f) return null
+  const causeTo = (f.cause_version_no ?? 0) + f.cause_change_count
+  async function resolve() {
+    try {
+      await api.post(`/api/flags/${flagId}/resolve`, {})
+      nav('/todo')
+    } catch (e) {
+      alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
+    }
+  }
+  return (
+    <div className="page">
+      <div className="phead" data-el="1">
+        <div>
+          <span className="flag">{FLAG_KO[f.kind]}</span> <b data-el="1.1">{refKey(f.target)}</b> {f.target.display_name}{' '}
+          <span className="lbl" data-el="1.2">
+            담당 {f.assignee?.display_name ?? '미지정'} · {ago(f.raised_at)} 부여
+            {f.resolved_at && ` · 확인됨 ${ago(f.resolved_at)}`}
+          </span>
+        </div>
+        <span className="grow" />
+        <Link className="btn" data-el="5" to="/todo">
+          ← 내 할 일
+        </Link>
+      </div>
+      <div className="stack">
+        <section className="cause" data-el="2">
+          <div className="sech">
+            <b data-el="2.1">원인: {f.cause ? refKey(f.cause) : '(하위 문서)'}</b> {f.cause?.display_name}
+            <span className="lbl" data-el="2.2">
+              {f.kind === 'needs_check' && `v${f.cause_version_no} → v${causeTo}${f.cause_change_count > 0 ? ` · 그 사이 ${f.cause_change_count}번 바뀜` : ''}`}
+              {f.kind === 'broken_ref' && `${f.cause_deleted_at ? ago(f.cause_deleted_at) : ''} 삭제됨`}
+              {f.kind === 'upstream_impact' && '지목한 하위 항목의 현재 본문'}
+            </span>
+            <span className="grow" />
+            {f.cause?.doc_id && (
+              <Link className="btn sm" data-el="2.4" to={docPath(f.cause.doc_id, f.cause.item_id)}>
+                문서에서 보기
+              </Link>
+            )}
+          </div>
+          {f.kind === 'needs_check' && f.cause_diff && <DiffBox diff={f.cause_diff} el="2.3" />}
+          {f.kind === 'broken_ref' && (
+            <div className="mybody lbl" data-el="2.3">
+              상위 항목 {refKey(f.cause)}이(가) 사라졌습니다. 대체할 항목으로 참조를 고치거나(UC-H12) 참조를 지우세요.
+            </div>
+          )}
+          {f.kind === 'upstream_impact' && (
+            <div className="mybody body" data-el="2.3" dangerouslySetInnerHTML={{ __html: f.cause_body?.startsWith('#') ? renderBlocks(f.cause_body, ctx) : `<p>${f.cause_body ?? ''}</p>` }} />
+          )}
+        </section>
+        <section className="mine" data-el="3">
+          <div className="sech">
+            <b data-el="3.1">내 항목: {refKey(f.target)}</b>
+            <span className="lbl" data-el="3.2">
+              {targetDoc && `v${targetDoc.current_version_no} · `}플래그 부여 후 변경 {f.target_changed_since_raise ? '있음' : '없음'}
+            </span>
+            <span className="grow" />
+            <Link className="btn sm" data-el="3.4" to={docPath(f.target.doc_id, f.target.item_id)}>
+              문서에서 보기
+            </Link>
+          </div>
+          <div className="mybody body" data-el="3.3" dangerouslySetInnerHTML={{ __html: renderBlocks(f.target_body, ctx) }} />
+        </section>
+        <div className="acts" data-el="4">
+          <span className="lbl" data-el="4.2">
+            영향이 있으면 에이전트에게 수정을 시킨 뒤 돌아와 확인하세요
+          </span>
+          <span className="grow" />
+          <button className="btn" data-el="4.1" style={{ fontWeight: 600 }} disabled={!!f.resolved_at} onClick={resolve}>
+            {f.resolved_at ? '확인됨' : '확인함'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

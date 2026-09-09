@@ -148,6 +148,65 @@ export interface Comment {
   created_at: string
   replies: Comment[]
 }
+export interface DiffLine {
+  op: 'add' | 'del' | 'ctx'
+  text: string
+}
+export interface Hunk {
+  item_id: string | null
+  downstream_count: number
+  lines: DiffLine[]
+}
+export interface Diff {
+  from_version: number
+  to_version: number
+  hunks: Hunk[]
+}
+export interface FlagDetail extends FlagSummary {
+  cause_diff: Diff | null
+  cause_change_count: number
+  target_body: string
+  target_changed_since_raise: boolean
+  cause_deleted_at: string | null
+  cause_body: string | null
+}
+export interface PendingDecision {
+  version_id: number
+  doc_id: string
+  version_no: number
+  message: string
+  affected_count: number
+  created_at: string
+}
+export interface CommentSummary {
+  id: number
+  doc_id: string
+  line_no: number
+  excerpt: string
+  author: UserRef | null
+  created_at: string
+}
+export interface Todo {
+  needs_check: FlagSummary[]
+  broken_ref: FlagSummary[]
+  upstream_impact: FlagSummary[]
+  pending_decisions: PendingDecision[]
+  convention_errors: DocumentSummary[]
+  unresolved_comments: CommentSummary[]
+  unassigned: FlagSummary[]
+  total: number
+}
+export interface AffectedItem extends ItemRef {
+  caused_by_items: string[]
+  assignee: UserRef | null
+}
+export interface DecisionDetail {
+  version: Version
+  doc_id: string
+  change_diff: Diff
+  affected: AffectedItem[]
+  choice: 'propagate' | 'skip' | 'undecided'
+}
 export interface AccessToken {
   id: number
   label: string
@@ -158,6 +217,18 @@ export interface AccessToken {
 }
 
 export const STATUS_KO: Record<string, string> = { draft: '초안', review: '검토중', approved: '승인' }
+export const FLAG_KO: Record<string, string> = { needs_check: '확인 필요', broken_ref: '끊어진 참조', upstream_impact: '하위 불일치' }
+/** 항목 참조 표기 DOC#ITEM · 문서 경로 */
+export const refKey = (r: ItemRef | null): string => (r ? `${r.doc_id ?? r.raw_target}${r.item_id ? '#' + r.item_id : ''}` : '')
+export const docPath = (docId: string | null, itemId?: string | null): string =>
+  docId ? `/p/${docId.split('-')[0]}/d/${docId}${itemId ? '#item-' + itemId : ''}` : '#'
+/** 경과 — "3일" · "3시간" · "5분" (UI-10 age) */
+export function age(iso: string): string {
+  const s = (Date.now() - new Date(iso).getTime()) / 1000
+  if (s >= 86400) return `${Math.floor(s / 86400)}일`
+  if (s >= 3600) return `${Math.floor(s / 3600)}시간`
+  return `${Math.max(1, Math.floor(s / 60))}분`
+}
 export const STAGE_TYPES = ['RFQ', 'PRD', 'SCN', 'UC', 'INFRA', 'DOM', 'UI', 'API', 'SEQ', 'MS', 'CODE']
 export const STAGE_NAMES: Record<string, string> = {
   RFQ: 'RFQ', PRD: 'PRD', SCN: '사용자 시나리오', UC: 'USECASE', INFRA: '인프라', DOM: '도메인·클래스·데이터',

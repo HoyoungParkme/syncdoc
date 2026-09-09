@@ -3,11 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { api, ApiError, STATUS_KO, type Comment, type Document, type ItemReferences, type UpstreamCheck } from '../api/client'
+import { api, ApiError, FLAG_KO, STATUS_KO, type Comment, type Document, type ItemReferences, type UpstreamCheck } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { esc, splitRef } from '../view/md'
 
-const FLAG_KO: Record<string, string> = { needs_check: '확인 필요', broken_ref: '끊어진 참조', upstream_impact: '하위 불일치' }
 
 export function DocView() {
   const { code = '', docId = '' } = useParams()
@@ -16,7 +15,7 @@ export function DocView() {
   const tab = sp.get('tab') === 'raw' ? 'raw' : 'user'
   const [doc, setDoc] = useState<Document | null>(null)
   const [err, setErr] = useState('')
-  const [panel, setPanel] = useState<'refs' | 'comments'>('refs')
+  const [panel, setPanel] = useState<'refs' | 'comments'>(sp.get('panel') === 'comments' ? 'comments' : 'refs')
   const [selected, setSelected] = useState<string | null>(null)
   const [refs, setRefs] = useState<ItemReferences | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
@@ -73,7 +72,11 @@ export function DocView() {
       }
     }
     root.addEventListener('click', onClick)
-    if (window.location.hash) document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: 'start' })
+    if (window.location.hash) {
+      document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: 'start' })
+      const it = window.location.hash.startsWith('#item-') ? window.location.hash.slice(6) : ''
+      if (it && doc?.items.some((i) => i.item_id === it)) setSelected(it) // 내 할 일 3.1·7.1 진입 — 패널에 플래그 정보
+    }
     return () => {
       root.removeEventListener('click', onClick)
       if (typeof cleanup === 'function') cleanup()
