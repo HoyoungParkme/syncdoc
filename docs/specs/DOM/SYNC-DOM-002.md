@@ -124,6 +124,7 @@ classDiagram
     class Repository {
         +int id
         +int project_id
+        +int registered_by_user_id
         +str remote_url
         +str workdir_path
         +str last_processed_commit
@@ -963,7 +964,7 @@ downstream_view(doc_id) -> DownstreamView           —       이 문서를 참�
 
 ```
 git.clone(remote_url, workdir, token) -> None
-git.fetch(workdir) -> str                      origin/HEAD 해시
+git.fetch(workdir, token=None) -> str          origin/HEAD 해시. v1은 public이라 토큰 없이
 git.checkout(workdir, ref) -> None
 git.commit_push(workdir, message, author, path=None, content=None, files=None) -> str
 git.read(workdir, path, ref="HEAD") -> str
