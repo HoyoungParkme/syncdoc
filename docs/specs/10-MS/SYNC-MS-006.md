@@ -142,4 +142,4 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 3. 미결사항
 
-- [ ] **GitHub OAuth 토큰 갱신이 없다.** OAuth 앱의 "Expire user access tokens"를 켜면 8시간 뒤 만료되고 `refresh_token`으로 갱신해야 하는데 `login_github`·`github_token_for`에 갱신 경로가 없다. 만료 뒤 push가 `push-failed`로 죽는다. **지금은 앱 설정에서 만료를 꺼서 피한다** — 인프라 5장에 적었다. v2에 갱신 넣기
+- [x] **GitHub OAuth 토큰 갱신이 없다.** OAuth 앱의 "Expire user access tokens"를 켜면 8시간 뒤 만료되고 `refresh_token`으로 갱신해야 하는데 `login_github`·`github_token_for`에 갱신 경로가 없다. 만료 뒤 push가 `push-failed`로 죽는다. **지금은 앱 설정에서 만료를 꺼서 피한다** — 인프라 5장에 적었다. v2에 갱신 넣기 — 결정: v1은 앱 설정에서 만료를 꺼서 피한다(인프라 5장). 갱신은 v2
