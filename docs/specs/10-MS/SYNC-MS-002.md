@@ -519,4 +519,4 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 - [ ] `mark_deleted` 후 파일을 되살리면 항목 ID가 `item.reused` 위반에 걸린다. 되살림은 재사용이 아니라 복구 — 예외 필요
 
 - [ ] `diff`의 hunk 문맥 줄 수 (`n=1`) — 화면에서 부족할 수 있다
-- [ ] `list_versions`가 자동 강등 StatusChange(commit_hash null)를 보여줄지
+- [x] `list_versions`가 자동 강등 StatusChange(commit_hash null)를 보여줄지 — 결정: 안 보여준다. `commit_hash is not null`인 상태 변경만 (본문 커밋에 딸린 강등은 그 버전 행이 이미 보인다)
