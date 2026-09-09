@@ -1,7 +1,7 @@
 /** UI-10 내 할 일 — SYNC-UI-002#UI-10. 일곱 묶음, 경과일순. 요소 번호 = data-el.
  *  1 헤더(1.1 총 건수) · 2 확인 필요(2.1 행) · 3 끊어진 참조(3.1) · 9 하위 불일치(9.1) · 4 전파 미결정(4.1)
  *  · 5 규약 오류(5.1) · 6 미해결 댓글(6.1) · 7 담당 미지정(7.1) · 8 빈 상태. 4.1은 UI-12 다이얼로그. */
-import { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { age, api, docPath, FLAG_KO, refKey, type FlagSummary, type Todo as TodoData } from '../api/client'
 import { DecisionDialog } from '../components/DecisionDialog'
@@ -33,15 +33,6 @@ export function Todo() {
       <span className="age">{age(f.raised_at)}</span>
     </div>
   )
-  const group = (el: string, title: string, rows: FlagSummary[], dim = false) =>
-    rows.length > 0 && (
-      <section className={`grp${dim ? ' dim' : ''}`} data-el={el}>
-        <h4>
-          {title} <span className="cnt">{rows.length}</span>
-        </h4>
-        {rows.map((f, i) => flagRow(f, i === 0 ? `${el}.1` : undefined))}
-      </section>
-    )
   const empty = t.total === 0 && t.unassigned.length === 0
   return (
     <div className="page">
@@ -54,9 +45,9 @@ export function Todo() {
         </div>
       </div>
       <div className="todo">
-        {group('2', '확인 필요', t.needs_check)}
-        {group('3', '끊어진 참조', t.broken_ref)}
-        {group('9', '하위 불일치', t.upstream_impact)}
+        <Group el="2" elRow="2.1" title="확인 필요" rows={t.needs_check} row={flagRow} />
+        <Group el="3" elRow="3.1" title="끊어진 참조" rows={t.broken_ref} row={flagRow} />
+        <Group el="9" elRow="9.1" title="하위 불일치" rows={t.upstream_impact} row={flagRow} />
         {t.pending_decisions.length > 0 && (
           <section className="grp" data-el="4">
             <h4>
@@ -106,14 +97,7 @@ export function Todo() {
             ))}
           </section>
         )}
-        {t.unassigned.length > 0 && (
-          <section className="grp dim" data-el="7">
-            <h4>
-              담당 미지정 <span className="cnt">{t.unassigned.length}</span>
-            </h4>
-            {t.unassigned.map((f, i) => flagRow(f, i === 0 ? '7.1' : undefined))}
-          </section>
-        )}
+        <Group el="7" elRow="7.1" title="담당 미지정" rows={t.unassigned} row={flagRow} dim />
         {empty && (
           <div className="empty" data-el="8">
             처리할 일이 없습니다
@@ -130,5 +114,26 @@ export function Todo() {
         />
       )}
     </div>
+  )
+}
+
+/** 플래그 묶음 (2·3·9·7). 0건이면 제목까지 숨긴다. 번호는 첫 행에만 — 배치 HTML과 같게 */
+function Group(props: {
+  el: string
+  elRow: string
+  title: string
+  rows: FlagSummary[]
+  row: (f: FlagSummary, el?: string) => React.ReactNode
+  dim?: boolean
+}) {
+  const { el, elRow, title, rows, row, dim } = props
+  if (rows.length === 0) return null
+  return (
+    <section className={`grp${dim ? ' dim' : ''}`} data-el={el}>
+      <h4>
+        {title} <span className="cnt">{rows.length}</span>
+      </h4>
+      {rows.map((f, i) => row(f, i === 0 ? elRow : undefined))}
+    </section>
   )
 }

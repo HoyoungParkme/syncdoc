@@ -48,6 +48,10 @@ export function DocView() {
     if (!root || !view || tab !== 'user') return
     root.innerHTML = view.html
     const cleanup = view.onMount?.(root)
+    // 와이어프레임 요소 번호 (DEV-17) — 뷰 포트 HTML은 view_build와 같아야 하므로 여기서 붙인다
+    for (const el of root.querySelectorAll<HTMLElement>('[data-item]')) el.dataset.el = '7.1'
+    for (const el of root.querySelectorAll<HTMLElement>('a[data-ref]')) el.dataset.el = '7.2'
+    for (const el of root.querySelectorAll<HTMLElement>('pre.mermaid')) el.dataset.el = '7.3'
     mermaid.initialize({ startOnLoad: false, theme: 'neutral' })
     mermaid.run({ nodes: root.querySelectorAll<HTMLElement>('pre.mermaid') }).catch(() => undefined) // 문법 오류면 코드가 남는다 (UC-H2 2a)
     for (const el of root.querySelectorAll<HTMLElement>('[data-item]')) {
