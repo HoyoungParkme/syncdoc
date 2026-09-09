@@ -65,6 +65,16 @@ def markdown(rows) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def list_lines(block: str) -> list[str]:
+    """문서 제목(**…**)과 열린 항목(- [ ])만. 머리말·빈 줄은 뺀다."""
+    keep = []
+    for ln in block.splitlines():
+        ln = ln.rstrip()
+        if ln.startswith("- [ ] ") or (ln.startswith("**") and ln.endswith("**")):
+            keep.append(ln)
+    return keep
+
+
 def main() -> int:
     args = sys.argv[1:]
     rows = collect()
@@ -76,7 +86,8 @@ def main() -> int:
         text = open(MAP, encoding="utf-8").read()
         m = re.search(r"^## \d+\.\s*미결 모음\n(.*?)(?=^## )", text, re.S | re.M)
         have = m.group(1) if m else ""
-        ok = all(line in have for line in want.splitlines() if line.startswith("- [ ]"))
+        # 양쪽을 다 본다 — 빠진 줄뿐 아니라 닫혔는데 5장에 남은 줄도 낡음이다
+        ok = list_lines(have) == list_lines(want)
         print("STD-003 5장: " + ("최신" if ok else "낡음 — --markdown 출력으로 갈아 끼워라"))
         return 0 if ok else 1
     show_done = "--all" in args
