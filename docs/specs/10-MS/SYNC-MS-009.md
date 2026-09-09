@@ -186,5 +186,5 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 3. 미결사항
 
-- [ ] **private 저장소 지원.** v1은 public 전용 — `fetch`가 토큰 없이 돈다. private이면 폴링·재구축·`repo_status`가 `registered_by_user_id`의 토큰으로 fetch해야 하고, 그 사람이 권한을 잃었을 때 UI-14에 표시하는 흐름이 필요하다. `clone`·`commit_push`는 이미 토큰을 쓴다
+- [x] **private 저장소 지원.** v1은 public 전용 — `fetch`가 토큰 없이 돈다. private이면 폴링·재구축·`repo_status`가 `registered_by_user_id`의 토큰으로 fetch해야 하고, 그 사람이 권한을 잃었을 때 UI-14에 표시하는 흐름이 필요하다. `clone`·`commit_push`는 이미 토큰을 쓴다 — 결정: v1은 public 전용(인프라 5장). private은 v2 — `git.fetch(workdir, token)`과 `registered_by_user_id`가 그 자리
 - [ ] `commit_push` 6단계 rebase 재시도 횟수 — 지금 1회. 락이 있으니 충돌은 외부 push와만
