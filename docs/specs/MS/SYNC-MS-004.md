@@ -116,6 +116,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. `target_pk`마다:
    - `causes` = `changed_pks` 중 이 target을 참조하는 것 전부 (`ReferenceService.upstream(target_pk)` ∩ `changed_pks`)
    - `assignee = (SpecService.last_author(target의 document_id) or None).user_id` (None 가능, UC-S4 3b)
+   - if `causes` 비어 있음 (문서 단위 참조 `to_document_id`로 영향받은 것) → 플래그 하나, `cause_item_pk=None`. 원인은 "이 문서의 변경"
    - `cause_pk`마다 — **원인 하나에 플래그 하나** (결정: 첫 것만이면 손실, jsonb 묶음은 화면·스키마 변경이 큼):
      - if 같은 `(target, cause, cause_version)` 미해결 플래그 있음 → 건너뜀
      - `DB: flags insert (kind=needs_check, target_item_pk, cause_item_pk=cause_pk, cause_version_id=version_id, assignee_user_id, raised_at=now)`
