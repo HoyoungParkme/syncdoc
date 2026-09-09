@@ -48,8 +48,6 @@ class ProjectSummary(Base):
 
 
 class Version(Base):
-    """API Version + doc_id(프로젝트 단위 목록이 문서를 가리키려고. 보고)."""
-
     doc_id: str
     version_no: int | None
     commit_hash: str

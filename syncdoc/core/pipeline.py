@@ -170,7 +170,9 @@ async def _run(
             [],
         )
     if document is None:
-        version = spec.create(project.id, doc_id, doc_type, body, commit_hash, author, message)
+        version = spec.create(
+            project.id, doc_id, doc_type, body, commit_hash, author, message, validate_result=vr
+        )
         prev_version_id = None
     else:
         prev_version_id = document.current_version_id

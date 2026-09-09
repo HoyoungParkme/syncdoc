@@ -291,13 +291,18 @@ async def test_change_status_commits_frontmatter_no_version(scoped: Session, pro
     assert scoped.execute(text("SELECT kind, target_item_id FROM flags")).all() == [
         ("upstream_impact", q2)
     ]
-    # 미완성 경고가 있는 문서는 approved 불가 — mcp 저장에도 경고가 남는다 (MS-007 8단계, 모든 경로)
+    # 미완성 경고가 있는 문서는 approved 불가 — 생성 직후부터 경고가 남는다 (MS-002 create 1단계)
     scn = await create(proj, DocType.SCN, "# 시나리오\n\n## 배경\n\n아직 항목이 없다.\n")
-    body = svc.get_document(scn.doc_id).body + "\n한 줄 더.\n"
-    r3 = await update(proj, scn.doc_id, body, 1)
-    assert "item.none" in r3.warnings
+    assert "item.none" in scn.warnings
     assert "item.none" in svc.get_document(scn.doc_id).incomplete_warnings
     with pytest.raises(StatusBlocked) as ei:
         await pipeline.change_status(scn.doc_id, "approved", user, None, upstream_reviewed=True)
     assert "item.none" in ei.value.extra["warnings"]
+    # mcp 수정 저장에도 남는다 (MS-007 8단계, 모든 경로)
+    body = svc.get_document(scn.doc_id).body + "\n한 줄 더.\n"
+    r3 = await update(proj, scn.doc_id, body, 1)
+    assert "item.none" in r3.warnings
+    assert "item.none" in svc.get_document(scn.doc_id).incomplete_warnings
+    with pytest.raises(StatusBlocked):
+        await pipeline.change_status(scn.doc_id, "approved", user, None, upstream_reviewed=True)
     assert r.doc_id == "EXMP-PRD-001"

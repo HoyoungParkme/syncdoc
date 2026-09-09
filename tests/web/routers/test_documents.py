@@ -9,6 +9,7 @@ from syncdoc.core.spec.service import SpecService
 from syncdoc.core.tracking.service import TrackingService
 from syncdoc.core.types import DocType
 from tests.core.reference.test_service import PRD, RFQ
+from tests.core.spec.test_service import PRD as FULL_PRD
 from tests.core.spec.test_service import author, make_project
 from tests.core.test_pipeline import create
 from tests.web.conftest import login
@@ -85,9 +86,19 @@ def test_get_document_upstream_references(client: TestClient, scoped: Session) -
 async def test_change_status_via_api(client: TestClient, scoped: Session, proj) -> None:
     login(client, scoped)
     await create(proj, DocType.RFQ, RFQ)
-    await create(proj, DocType.PRD, PRD.replace("EXMP-RFQ-001#Q2", "EXMP-RFQ-001#Q1"))
+    await create(proj, DocType.PRD, FULL_PRD.replace("EXMP-RFQ-001#Q2", "EXMP-RFQ-001#Q1"))
     r = client.post("/api/docs/EXMP-PRD-001/status", json={"to": "approved"})
     assert r.status_code == 422 and r.json()["type"] == "urn:syncdoc:upstream-review-required"
+    # 절이 빠진(미완성) 문서는 생성 직후부터 승인 불가 — upstream 검사보다 먼저
+    incomplete = await create(
+        proj,
+        DocType.PRD,
+        PRD.replace("EXMP-RFQ-001#Q2", "EXMP-RFQ-001#Q1").replace(
+            "doc_id: EXMP-PRD-001", "doc_id: "
+        ),
+    )
+    r = client.post(f"/api/docs/{incomplete.doc_id}/status", json={"to": "approved"})
+    assert r.status_code == 409 and "section.missing: 비목표" in r.json()["warnings"]
     r = client.post("/api/docs/EXMP-PRD-001/status", json={"to": "review", "reason": "검토"})
     assert (
         r.status_code == 200

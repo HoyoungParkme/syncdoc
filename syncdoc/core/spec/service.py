@@ -236,6 +236,7 @@ class SpecService:
         commit_hash: str,
         author: Author,
         message: str,
+        validate_result: ValidateResult | None = None,
     ) -> VersionRow:
         """SYNC-MS-002#SpecService.create"""
         fm, _ = parse_frontmatter(body)
@@ -248,6 +249,8 @@ class SpecService:
             current_version_no=1,
             has_convention_error=False,
         )
+        if validate_result is not None:  # save 7단계와 같은 규칙 — 첫 저장부터 경고가 남는다
+            _apply_validate(row, validate_result)
         self.repo.add(row)
         for b in self.item_blocks(body, doc_type, fm.get("title")):
             self.session.add(
@@ -393,12 +396,7 @@ class SpecService:
         row.current_version_no = new_no
         row.status = str(new_status)
         if validate_result is not None:
-            v, w = validate_result.violations, validate_result.warnings
-            row.has_convention_error = bool(v)
-            row.convention_error_detail = "\n".join(f"{x.rule}: {x.message}" for x in v) or None
-            row.incomplete_warnings = (
-                json.dumps([str(x) for x in w], ensure_ascii=False) if w else None
-            )
+            _apply_validate(row, validate_result)
         self.session.flush()
         return version
 
@@ -549,6 +547,14 @@ class SpecService:
         if doc is None:
             return set()
         return {i.item_id for i in self.repo.items_of(doc.id, include_deleted=True) if i.is_deleted}
+
+
+def _apply_validate(row: DocumentRow, vr: ValidateResult) -> None:
+    """규약 결과 → documents 오류·경고 컬럼 (MS-002 create 1단계 · save 7단계)."""
+    v, w = vr.violations, vr.warnings
+    row.has_convention_error = bool(v)
+    row.convention_error_detail = "\n".join(f"{x.rule}: {x.message}" for x in v) or None
+    row.incomplete_warnings = json.dumps([str(x) for x in w], ensure_ascii=False) if w else None
 
 
 _CLASS = re.compile(r"class (\w+) \{(.*?)\}", re.S)

@@ -271,7 +271,7 @@ class ItemRef:
 class Version:
     """SYNC-API-001 Version (DTO) — list_versions·recent_changes. status 커밋이면 version_no=None.
 
-    doc_id는 API 스키마에 없다 — 프로젝트 단위 목록(recent_changes)이 문서를 가리키려면 필요(보고).
+    doc_id는 프로젝트 단위 목록(recent_changes)이 문서를 가리키는 데 쓴다.
     author는 id만(AuthorRef) — 이름은 queries가 users_by_ids로 author_view에 채운다.
     """
 
