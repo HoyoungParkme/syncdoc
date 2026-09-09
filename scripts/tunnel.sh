@@ -29,7 +29,7 @@ command -v cloudflared >/dev/null || {
   exit 1
 }
 
-echo "[1/4] docker compose up"
+echo "[1/4] docker compose up"  # 빌드 컨텍스트는 저장소 루트 (backend·frontend·docs)
 docker compose up -d --build
 for _ in $(seq 1 60); do
   [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/health || true)" = "200" ] && break

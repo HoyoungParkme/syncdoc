@@ -43,6 +43,9 @@ syncdoc/            저장소 = 프로젝트
 
 ## 도구
 
+파이썬은 `backend/`에서 돈다 — `cd backend && uv run pytest` · `uv run ruff check .` · `uv run alembic upgrade head`.
+검사기는 저장소 루트에서 돈다.
+
 - `python tools/validate.py` — 명세 규약 검사 (STD-001 3·4장). 위반 0·경고 0이어야 한다
 - `python tools/check_code.py` — MINISPEC↔코드 시그니처 대조 (DEV-14 첫째·둘째)
 - `python tools/check_ui.py` — 와이어프레임 요소 번호↔React `data-el` 대조 (DEV-17)
