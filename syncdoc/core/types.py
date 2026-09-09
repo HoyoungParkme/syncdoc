@@ -310,6 +310,17 @@ class Version:
 
 
 @dataclass(frozen=True)
+class ItemBrief:
+    """DOM-002 2.8 ItemBrief — list_items_by_project → graph_view. 문서 노드는 item_id=None."""
+
+    pk: int
+    doc_id: str
+    item_id: str | None
+    stage: int | None
+    display_name: str | None
+
+
+@dataclass(frozen=True)
 class DocRef:
     """문서 pk → 표시 정보 (describe_documents). 문서 단위 참조 대상·댓글 응답의 doc_id."""
 

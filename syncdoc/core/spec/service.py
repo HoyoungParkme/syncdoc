@@ -38,6 +38,7 @@ from syncdoc.core.types import (
     Entry,
     Hunk,
     ItemBlock,
+    ItemBrief,
     ItemRef,
     ItemView,
     ValidateResult,
@@ -368,7 +369,9 @@ class SpecService:
         """SYNC-MS-002#SpecService.save"""
         row = self.repo.document_by_id(document.id)
         assert row is not None
-        new_no = row.current_version_no + 1
+        # 재구축은 커밋 순서대로 다시 번호를 매긴다. current_version_no는 ≥1 제약(DOM-003)이라
+        # 0으로 못 내리므로 남아 있는 버전 수 + 1 (보고)
+        new_no = (self.repo.version_count(row.id) if rebuild else row.current_version_no) + 1
         version = self._new_version(row.id, new_no, commit_hash, body, author, message)
         self.repo.add(version)
         fm, _ = parse_frontmatter(body)
@@ -536,6 +539,110 @@ class SpecService:
         )
         row.status = str(to)
         row.current_body = new_body
+        self.session.flush()
+
+    def list_versions(self, doc_id: str) -> list[Version]:
+        """SYNC-MS-002#SpecService.list_versions"""
+        row = self.repo.document_by_doc_id(doc_id)
+        if row is None:
+            raise NotFound("document", doc_id)
+        rows = [
+            Version(
+                doc_id=doc_id,
+                version_no=v.version_no,
+                commit_hash=v.commit_hash,
+                message=v.message,
+                author=self._author_of(v),  # type: ignore[arg-type]
+                created_at=v.created_at,
+            )
+            for v in self.repo.versions_of(row.id)
+        ] + [
+            Version(
+                doc_id=doc_id,
+                version_no=None,
+                commit_hash=c.commit_hash,  # type: ignore[arg-type]
+                message=f"status({doc_id}): {c.from_status} → {c.to_status}",
+                author=AuthorRef("human", c.changed_by_user_id, None, "web"),
+                created_at=c.changed_at,
+            )
+            for c in self.repo.status_changes_with_commit(row.id)
+        ]
+        rows.sort(key=lambda r: r.created_at, reverse=True)
+        return rows
+
+    def mark_deleted(self, document: Document, commit_hash: str, author: Author) -> list[int]:
+        """SYNC-MS-002#SpecService.mark_deleted"""
+        row = self.repo.document_by_id(document.id)
+        assert row is not None
+        pks: list[int] = []
+        for item in self.repo.items_of(row.id):
+            item.is_deleted, item.deleted_at = True, now_utc()
+            pks.append(item.id)
+        self.session.add(
+            StatusChange(
+                document_id=row.id,
+                from_status=row.status,
+                to_status=DocStatus.draft,
+                changed_by_user_id=author.user.id,
+                reason="파일 삭제됨",
+                commit_hash=commit_hash,
+                changed_at=now_utc(),
+            )
+        )
+        row.status = str(DocStatus.draft)
+        row.has_convention_error = True
+        row.convention_error_detail = f"file.deleted: {commit_hash}"
+        self.session.flush()
+        return pks
+
+    def list_items_by_project(
+        self, project_id: int, stage: int | None = None, doc_id: str | None = None
+    ) -> list[ItemBrief]:
+        """SYNC-MS-002#SpecService.list_items_by_project"""
+        out: list[ItemBrief] = []
+        seen_docs: set[int] = set()
+        docs = self.repo.documents_of_project(project_id)
+        docs.sort(key=lambda r: (STAGE_OF.get(r.doc_type, 99), r.doc_id))
+        for d in docs:
+            if stage is not None and STAGE_OF.get(d.doc_type) != stage:
+                continue
+            if doc_id is not None and d.doc_id != doc_id:
+                continue
+            seen_docs.add(d.id)
+            out.append(ItemBrief(d.id, d.doc_id, None, STAGE_OF.get(d.doc_type), None))
+        for item, d in self.repo.items_of_project(project_id):
+            if d.id in seen_docs:
+                out.append(
+                    ItemBrief(
+                        item.id, d.doc_id, item.item_id, STAGE_OF.get(d.doc_type), item.display_name
+                    )
+                )
+        return out
+
+    def clear_index(self, project_id: int) -> None:
+        """SYNC-MS-002#SpecService.clear_index"""
+        # current_version_no=0(MS-002)은 DOM-003 ck_documents_version_no(≥1)에 걸린다 → 그대로 두고
+        # save(rebuild=True)가 남은 버전 수로 번호를 매긴다 (보고)
+        self.repo.delete_versions_of_project(project_id)
+        self.session.flush()
+
+    def version_body(self, doc_id: str, version_no: int) -> str:
+        """버전 본문 하나 — pipeline.revert 1단계용. MS-002에 없는 조회(보고)."""
+        row = self.repo.document_by_doc_id(doc_id)
+        if row is None:
+            raise NotFound("document", doc_id)
+        bodies = self.repo.version_bodies(row.id, [version_no])
+        if version_no not in bodies:
+            raise NotFound("version", f"{doc_id} v{version_no}")
+        return bodies[version_no]
+
+    def mark_convention_error(
+        self, document_id: int, violations: list | None, warnings: list | None
+    ) -> None:
+        """SYNC-MS-002#SpecService.mark_convention_error"""
+        row = self.repo.document_by_id(document_id)
+        assert row is not None
+        _apply_validate(row, ValidateResult(list(violations or []), list(warnings or [])))
         self.session.flush()
 
     def recent_changes(self, project_id: int, n: int = 10) -> list[Version]:

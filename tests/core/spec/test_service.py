@@ -10,7 +10,7 @@ from syncdoc.core.errors import ConventionViolation, ItemDeleted, NotFound
 from syncdoc.core.markdown import parse_frontmatter
 from syncdoc.core.project.models import Project, Repository
 from syncdoc.core.spec.service import SpecService
-from syncdoc.core.types import Author, AuthorKind, DocType, Entry
+from syncdoc.core.types import Author, AuthorKind, DocType, Entry, Violation, Warning
 from tests.core.account.test_service import make_user
 
 
@@ -680,3 +680,103 @@ status: draft
 #### Q1 첫 요구
 내용
 """
+
+
+# ── B4: list_versions · mark_deleted · list_items_by_project · clear_index · mark_convention_error ──
+def test_list_versions_merges_status_commits_and_skips_auto_demotion(db_session: Session) -> None:
+    svc, a, d = _seed(db_session, status="approved")
+    svc.save(
+        d, d.body + "\n", "h2", a, "spec: v2", []
+    )  # 승인 문서 수정 → 자동 강등(commit_hash null)
+    d2 = svc.get_document("EXMP-PRD-001")
+    svc.apply_status(d2, d2.body, "c1", a.user, "재승인", to="approved")  # 강등된 review → approved
+    d3 = svc.get_document("EXMP-PRD-001")
+    svc.save(d3, d3.body + "\n", "h3", a, "spec: v3", [])
+    got = svc.list_versions("EXMP-PRD-001")
+    assert [(v.version_no, v.commit_hash) for v in got] == [
+        (3, "h3"),
+        (None, "c1"),
+        (2, "h2"),
+        (1, "h1"),
+    ]
+    assert got[1].message == "status(EXMP-PRD-001): review → approved"
+    assert (
+        got[1].author.kind == "human"
+        and got[0].author.kind == "agent"
+        and got[0].doc_id == "EXMP-PRD-001"
+    )
+    with pytest.raises(NotFound):
+        svc.list_versions("EXMP-PRD-404")
+
+
+def test_mark_deleted_drafts_document_and_deletes_items(db_session: Session) -> None:
+    svc, a, d = _seed(db_session, status="approved")
+    pks = svc.mark_deleted(d, "dead1", a)
+    assert sorted(pks) == sorted(i.pk for i in d.items)
+    d2 = svc.get_document("EXMP-PRD-001")
+    assert (d2.status, d2.has_convention_error, d2.convention_error_detail, d2.items) == (
+        "draft",
+        True,
+        "file.deleted: dead1",
+        [],
+    )
+    row = db_session.execute(
+        text("SELECT from_status, to_status, reason, commit_hash FROM status_changes")
+    ).one()
+    assert row == ("approved", "draft", "파일 삭제됨", "dead1")
+    assert db_session.execute(text("SELECT count(*) FROM items WHERE is_deleted")).scalar() == 3
+
+
+def test_list_items_by_project_with_document_nodes_and_filters(db_session: Session) -> None:
+    svc, a, d = _seed(db_session)
+    p = db_session.execute(
+        text("SELECT project_id FROM documents WHERE id=:i"), {"i": d.id}
+    ).scalar()
+    svc.create(p, "EXMP-RFQ-001", DocType.RFQ, RFQ_MIN, "h0", a, "spec: 테스트")
+    allv = svc.list_items_by_project(p)
+    assert [(b.doc_id, b.item_id, b.stage) for b in allv] == [
+        ("EXMP-RFQ-001", None, 1),
+        ("EXMP-PRD-001", None, 2),
+        ("EXMP-PRD-001", "G1", 2),
+        ("EXMP-PRD-001", "R1", 2),
+        ("EXMP-PRD-001", "N1", 2),
+        ("EXMP-RFQ-001", "Q1", 1),
+    ]
+    assert [b.item_id for b in svc.list_items_by_project(p, stage=1)] == [None, "Q1"]
+    assert [b.item_id for b in svc.list_items_by_project(p, doc_id="EXMP-PRD-001")] == [
+        None,
+        "G1",
+        "R1",
+        "N1",
+    ]
+    db_session.execute(text("UPDATE items SET is_deleted=true WHERE item_id='N1'"))
+    assert "N1" not in [b.item_id for b in svc.list_items_by_project(p)]
+
+
+def test_clear_index_and_mark_convention_error(db_session: Session) -> None:
+    svc, a, d = _seed(db_session)
+    svc.save(d, d.body + "\n", "h2", a, "spec: v2", [])
+    p = db_session.execute(
+        text("SELECT project_id FROM documents WHERE id=:i"), {"i": d.id}
+    ).scalar()
+    svc.clear_index(p)
+    assert db_session.execute(text("SELECT count(*) FROM versions")).scalar() == 0
+    assert (
+        db_session.execute(text("SELECT count(*) FROM items")).scalar() == 3
+    )  # items·documents는 남는다
+    svc.mark_convention_error(
+        d.id, [Violation(2, "frontmatter.status", "x")], [Warning("item.none", "")]
+    )
+    d2 = svc.get_document("EXMP-PRD-001")
+    assert (d2.has_convention_error, d2.convention_error_detail, d2.incomplete_warnings) == (
+        True,
+        "frontmatter.status: x",
+        ["item.none"],
+    )
+    svc.mark_convention_error(d.id, None, None)
+    d3 = svc.get_document("EXMP-PRD-001")
+    assert (d3.has_convention_error, d3.convention_error_detail, d3.incomplete_warnings) == (
+        False,
+        None,
+        [],
+    )
