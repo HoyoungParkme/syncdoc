@@ -237,7 +237,8 @@ C6이 요구하는 것은 권한 구분이 아니라 **누가 들어올 수 있�
 **공개 경로 — Quick Tunnel**: 도메인 없이 `cloudflared tunnel --url http://localhost:8000`으로 `https://xxx.trycloudflare.com` 임시 주소를 받는다. 공짜지만 **켤 때마다 주소가 바뀐다.**
 
 - **webhook은 걸지 않는다.** Payload URL이 매번 바뀌어 못 쓴다. 대신 **폴링만으로 간다** — `POLL_INTERVAL_SECONDS`(기본 300). GitHub 직접 push(UC-G1·S7)는 5분 안에 반영된다. 기동 시 따라잡기가 있어 꺼져 있던 동안의 커밋도 들어온다
-- **OAuth 앱**은 켤 때마다 callback URL을 새 주소로 고친다(3분). 로컬용(`localhost:8000`)과 공개용 앱을 따로 두고 공개용만 고치는 게 낫다. `.env`의 `PUBLIC_BASE_URL`을 같이 바꾼다
+- **OAuth 앱**은 켤 때마다 callback URL을 새 주소로 고친다(3분). 앱 하나에 로컬용(`http://localhost:8000/auth/github/callback`)과 공개용 콜백을 **둘 다 등록해 두면** 양쪽에서 로그인된다 — 앱이 `redirect_uri`를 보내기 때문이다(SEQ-8). `.env`의 `PUBLIC_BASE_URL`을 같이 바꾼다
+- **`PUBLIC_BASE_URL`의 쓰임**: 앱이 `redirect_uri`를 만들 때 쓴다. 요청 Host가 이 값의 host와 같으면 이 값을, 아니면 요청에서 만든다(`auth.callback_url`). 터널 뒤에서는 프록시가 https를 http로 보이게 하므로 요청만으로는 스킴을 못 믿는다. 비어 있으면 요청에서만 만든다
 - 고정 주소가 필요해지면 도메인을 사서 Named Tunnel로 바꾼다 — 그때 webhook도 켠다(v2)
 
 **저장소는 public**: v1은 public 저장소만 다룬다 — `git.fetch`가 토큰 없이 돌기 때문. private 지원은 v2(MS-009 미결). `clone`·`push`는 등록자 토큰을 쓰므로 public이어도 쓰기에는 권한이 필요하다.
