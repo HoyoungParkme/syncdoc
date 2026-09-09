@@ -358,4 +358,4 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ## 6. 미결사항
 
 - [ ] 부분 수정 도구(`update_item`) 필요 여부 — 문서가 커지면
-- [ ] 토큰 만료·회수 시 MCP 에러 형식
+- [x] 토큰 만료·회수 시 MCP 에러 형식 — 결정: 401 + `application/problem+json` `urn:syncdoc:unauthorized`. `mcp/auth.py`가 구현
