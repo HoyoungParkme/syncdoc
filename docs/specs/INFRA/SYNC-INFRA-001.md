@@ -234,6 +234,16 @@ C6이 요구하는 것은 권한 구분이 아니라 **누가 들어올 수 있�
 - 커밋 작성자 — 각자의 계정으로 커밋이 남는다. 한 계정으로 몰지 않는다
 - 저장소 접근 — 각자의 토큰으로 push한다
 
+**공개 경로 — Quick Tunnel**: 도메인 없이 `cloudflared tunnel --url http://localhost:8000`으로 `https://xxx.trycloudflare.com` 임시 주소를 받는다. 공짜지만 **켤 때마다 주소가 바뀐다.**
+
+- **webhook은 걸지 않는다.** Payload URL이 매번 바뀌어 못 쓴다. 대신 **폴링만으로 간다** — `POLL_INTERVAL_SECONDS`(기본 300). GitHub 직접 push(UC-G1·S7)는 5분 안에 반영된다. 기동 시 따라잡기가 있어 꺼져 있던 동안의 커밋도 들어온다
+- **OAuth 앱**은 켤 때마다 callback URL을 새 주소로 고친다(3분). 로컬용(`localhost:8000`)과 공개용 앱을 따로 두고 공개용만 고치는 게 낫다. `.env`의 `PUBLIC_BASE_URL`을 같이 바꾼다
+- 고정 주소가 필요해지면 도메인을 사서 Named Tunnel로 바꾼다 — 그때 webhook도 켠다(v2)
+
+**저장소는 public**: v1은 public 저장소만 다룬다 — `git.fetch`가 토큰 없이 돌기 때문. private 지원은 v2(MS-009 미결). `clone`·`push`는 등록자 토큰을 쓰므로 public이어도 쓰기에는 권한이 필요하다.
+
+**컨테이너 빌드**: Dockerfile은 두 단계다 — `node`로 `frontend/`를 빌드해 `syncdoc/web/static`에 넣고, `python`으로 앱을 담는다. 프런트 빌드 단계가 없으면 새 클론에서 화면이 빈 채로 뜬다.
+
 **MCP 배치**: `mcp` 2.x `MCPServer`, streamable HTTP. FastAPI 안에 `/mcp` **정확 경로 Route**로(Mount면 뒤 라우트를 삼킨다). 세션 매니저는 인스턴스당 한 번만 돌므로 lifespan마다 앱을 새로 만든다. DNS rebinding 보호는 터널 뒤 고정 도메인이라 끈다.
 
 **웹 세션**: 테이블 없이 서명 쿠키 `syncdoc_session`(`itsdangerous`)에 `github_login`만 담고, 요청마다 `AccountService.user_by_login`으로 User를 얻는다. 노트북 재시작에도 로그인이 유지된다.
@@ -272,7 +282,7 @@ C7 때문에 원래는 webhook을 받을 수 없었으나, Cloudflare Tunnel로 
 - **주 경로**: GitHub webhook → `/hooks/github` → 서명 검증 → fetch → 변경 파일 파이프라인 (UC-G1 기본 흐름)
 - **보조 경로**: 5분 주기 폴링. webhook 유실과 서버가 꺼져 있던 구간을 메운다 (UC-G1 확장 `1a`, `1b`)
 
-두 경로 모두 필요하다. 노트북이 꺼져 있는 동안 온 webhook은 사라지므로, 켜질 때 마지막 처리 커밋 이후를 조회해 따라잡는 절차가 반드시 있어야 한다.
+두 경로 모두 있지만 **v1은 폴링만 쓴다** — Quick Tunnel 주소가 바뀌어 webhook을 걸 수 없다(5장). webhook 수신 엔드포인트(`POST /hooks/github`)는 구현되어 있고 서명 검증도 되므로, 고정 주소가 생기면 저장소에 등록만 하면 된다. 노트북이 꺼져 있던 동안의 커밋은 켜질 때 따라잡기가 가져온다 — 이 절차가 폴링만 쓸 때 더 중요하다.
 
 **밀린 커밋이 여럿이면 최종 상태만 저장한다.** `last_processed_commit..HEAD` 범위의 변경 파일을 한 번에 읽어 파일마다 버전 하나. 중간 커밋은 git에만 남는다. 커밋마다 버전을 복원하는 건 재구축(UC-S6)뿐이다.
 
