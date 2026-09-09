@@ -140,4 +140,4 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 3. 미결사항
 
-- [ ] (없음)
+없음.
