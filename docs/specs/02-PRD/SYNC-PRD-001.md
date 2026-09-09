@@ -256,7 +256,7 @@ upstream: [SYNC-RFQ-001]
 ## 6. 미결사항
 
 **착수 전 결정**
-- [ ] 기술 스택 → 인프라 아키텍처 단계에서 결정
+- [x] 기술 스택 → 인프라 아키텍처 단계에서 결정 — 결정: 인프라 3장에서 확정(FastAPI·PostgreSQL·React+Vite·MCP SDK·Cloudflare Tunnel)
 
 **진행 중 결정**
 - [ ] MCP 쓰기 권한 범위 (전체 문서 vs 특정 프로젝트)
