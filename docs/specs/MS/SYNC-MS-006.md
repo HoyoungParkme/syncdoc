@@ -40,14 +40,14 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### AccountService.login_github OAuth 콜백
 
-**시그니처** `async def login_github(code: str, state: str) -> User` — `github.*`가 async라 async([[SYNC-STD-004#DEV-16]])
+**시그니처** `async def login_github(code: str, state: str, redirect_uri: str) -> User` — `github.*`가 async라 async([[SYNC-STD-004#DEV-16]])
 
 근거: [[SYNC-SEQ-001#SEQ-8]] · [[SYNC-INFRA-001]] 5장 · [[SYNC-API-001#GET/auth/github/callback]]
 
-**입력** GitHub가 돌려준 `code`, 우리가 보낸 `state`(라우터가 세션과 대조한 뒤 넘김)
+**입력** GitHub가 돌려준 `code`, 우리가 보낸 `state`(라우터가 세션과 대조한 뒤 넘김), `redirect_uri`(라우터가 `auth.callback_url(request)`로 만든 것 — authorize 때와 같은 값)
 
 **처리**
-1. `token = github.exchange_code(code)` · if 실패 → `! unauthorized`
+1. `token = github.exchange_code(code, redirect_uri)` · if 실패 → `! unauthorized`
 2. `info = github.get_user(token)` → `{id, login, name}`
 3. `u = DB: users where github_user_id=info.id`
    - if 있음 → `login`·`display_name` 갱신 (로그인 ID 변경 대응)
