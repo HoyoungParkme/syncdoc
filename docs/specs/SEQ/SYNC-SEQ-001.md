@@ -537,14 +537,16 @@ sequenceDiagram
 
     U->>RA: GET /auth/github?next=/p/SYNC
     RA->>RA: state 생성 · 세션에 next·state 저장
-    RA-->>U: 302 GitHub 동의 화면 (scope=repo)
+    RA->>RA: redirect_uri = auth.callback_url(request)
+    RA-->>U: 302 GitHub 동의 화면 (scope=repo, redirect_uri)
     U->>RA: GET /auth/github/callback?code&state
     RA->>RA: state 대조
     alt state 불일치
         RA-->>U: 401
     end
-    RA->>AS: login_github(code, state)
-    AS->>GHI: exchange_code(code)
+    RA->>AS: login_github(code, state, redirect_uri)
+    AS->>GHI: exchange_code(code, redirect_uri)
+    Note over RA,GHI: redirect_uri는 authorize 때와 같은 값 — GitHub가 대조한다
     GHI-->>AS: access_token
     AS->>GHI: get_user(access_token)
     GHI-->>AS: {id, login, name}
@@ -556,7 +558,7 @@ sequenceDiagram
     RA-->>U: 302 next 또는 /
 ```
 
-**읽을 때 볼 것** — `github_user_id`로 upsert한다. 로그인 ID를 바꾼 사람도 같은 User다(DD users).
+**읽을 때 볼 것** — `github_user_id`로 upsert한다. 로그인 ID를 바꾼 사람도 같은 User다(DD users). `redirect_uri`를 보내므로 OAuth 앱 하나에 콜백을 여럿(로컬·공개) 등록해도 요청한 주소로 돌아온다(인프라 5장).
 
 ---
 
