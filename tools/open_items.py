@@ -27,16 +27,27 @@ DOC_ID = re.compile(r"^doc_id:\s*(\S+)", re.M)
 # PRD 인수기준·CODE 카드 안 체크박스는 미결이 아니다 — 미결 절 안에서만 읽으므로 자연히 걸러진다
 
 
+def outside_fences(text: str) -> str:
+    """코드블록 안을 공백으로 덮은 사본. 규약 문서는 예시로 `## 5. 미결사항`을 적는다."""
+    keep, fence = [], False
+    for line in text.split("\n"):
+        if line.startswith("```"):
+            fence = not fence
+            keep.append("")
+            continue
+        keep.append("" if fence else line)
+    return "\n".join(keep)
+
+
 def items_of(path: str) -> tuple[str, list[tuple[bool, str]]]:
     text = open(path, encoding="utf-8").read()
     m = DOC_ID.search(text)
     doc_id = m.group(1) if m else os.path.basename(path)
     out: list[tuple[bool, str]] = []
-    for sec in SECTION.finditer(text):
-        rest = text[sec.end() :]
+    for sec in SECTION.finditer(outside_fences(text)):
+        rest = outside_fences(text)[sec.end() :]
         end = NEXT_SECTION.search(rest)
         body = rest[: end.start()] if end else rest
-        body = re.sub(r"^```.*?^```", "", body, flags=re.S | re.M)  # 예시 코드블록은 미결이 아니다
         out += [(mark == "x", line.strip()) for mark, line in ITEM.findall(body)]
     return doc_id, out
 
