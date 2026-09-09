@@ -489,6 +489,49 @@ class RefEdge:
     to_document_id: int | None
     raw_target: str
     is_missing: bool
+    from_document_id: int | None = None  # DOM-002 2.8에 없음 — 그래프의 문서 노드 출발점(보고)
+
+
+@dataclass(frozen=True)
+class GraphNode:
+    """SYNC-API-001 Graph.nodes[] — id는 DOC#ITEM, 문서 노드는 DOC."""
+
+    id: str
+    doc_id: str
+    item_id: str | None
+    stage: int | None
+    isolated: bool
+
+
+@dataclass(frozen=True)
+class GraphEdge:
+    """SYNC-API-001 Graph.edges[] — from·to는 노드 id, 미존재면 to=None."""
+
+    from_: str
+    to: str | None
+    raw_target: str
+    is_missing: bool
+
+
+@dataclass
+class Graph:
+    nodes: list[GraphNode]
+    edges: list[GraphEdge]
+
+
+@dataclass(frozen=True)
+class DownstreamDoc:
+    doc_id: str
+    title: str
+    items: list[str]
+
+
+@dataclass
+class DownstreamView:
+    """DOM-002 2.8 DownstreamView — downstream_view → 추적표. 문서 단위 참조는 키 "(문서)"."""
+
+    by_item: dict[str, list[ItemRef]]
+    by_document: list[DownstreamDoc]
 
 
 @dataclass(frozen=True)

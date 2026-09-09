@@ -17,6 +17,7 @@ def _edge(r: Reference) -> RefEdge:
         to_document_id=r.to_document_id,
         raw_target=r.raw_target,
         is_missing=r.is_missing,
+        from_document_id=r.from_document_id,
     )
 
 

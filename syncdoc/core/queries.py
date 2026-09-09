@@ -2,7 +2,8 @@
 
 B1: project_summary · document_list · document_view · item_view.
 B2: project_detail · item_references_view · upstream_checklist.
-B3: todo · decision_view · flag_view · project_items · diff_with_impact. 세션은 db.session_scope().
+B3: todo · decision_view · flag_view · project_items · diff_with_impact.
+B4: graph_view · downstream_view · document_view 4a. 세션은 db.session_scope().
 """
 
 from __future__ import annotations
@@ -28,9 +29,14 @@ from syncdoc.core.types import (
     DocStatus,
     Document,
     DocumentSummary,
+    DownstreamDoc,
+    DownstreamView,
     FlagDetail,
     FlagKind,
     FlagSummary,
+    Graph,
+    GraphEdge,
+    GraphNode,
     ItemRef,
     ItemReferences,
     ItemView,
@@ -156,6 +162,11 @@ async def document_view(doc_id: str) -> Document:
         for item in doc.items:
             item.flags = [f.kind for f in flags.get(item.pk, [])]
         doc.prev_doc_id, doc.next_doc_id = SpecService(s).neighbors(doc_id)
+        doc.missing_refs = [
+            e.raw_target
+            for e in ReferenceService(s).upstream_of_document(doc.id, include_missing=True)
+            if e.is_missing
+        ]  # 4a — 유저용 탭이 링크를 회색 ?로
         doc.author = _api_author(s, doc.last_author)
         return doc
 
@@ -423,3 +434,126 @@ async def flag_view(flag_id: int) -> FlagDetail:
         latest = spec.versions_by_ids([tdoc.current_version_id])[tdoc.current_version_id]  # type: ignore[index]
         detail.target_changed_since_raise = latest.created_at > f.raised_at
         return detail
+
+
+async def graph_view(code: str, stage: int | None = None, doc: str | None = None) -> Graph:
+    """SYNC-MS-008#queries.graph_view"""
+    with db.session_scope() as s:
+        project = ProjectService(s).get(code)
+        spec, refs = SpecService(s), ReferenceService(s)
+        briefs = spec.list_items_by_project(project.id, stage, doc)
+        item_ids = {b.pk: f"{b.doc_id}#{b.item_id}" for b in briefs if b.item_id}
+        doc_ids = {b.pk: b.doc_id for b in briefs if b.item_id is None}
+        edges = refs.references_among(set(item_ids), include_document_targets=True)
+        nodes: dict[str, GraphNode] = {
+            (f"{b.doc_id}#{b.item_id}" if b.item_id else b.doc_id): GraphNode(
+                f"{b.doc_id}#{b.item_id}" if b.item_id else b.doc_id,
+                b.doc_id,
+                b.item_id,
+                b.stage,
+                True,
+            )
+            for b in briefs
+        }
+        # 범위 밖이지만 이어진 끝점 (UC-H4 2b)
+        out_items = {
+            pk
+            for e in edges
+            for pk in (e.from_item_pk, e.to_item_pk)
+            if pk is not None and pk not in item_ids
+        }
+        out_docs = {
+            d
+            for e in edges
+            for d in (e.from_document_id if e.from_item_pk is None else None, e.to_document_id)
+            if d is not None and d not in doc_ids
+        }
+        for pk, ref in spec.describe_items(list(out_items)).items():
+            item_ids[pk] = nid = f"{ref.doc_id}#{ref.item_id}"
+            nodes[nid] = GraphNode(
+                nid,
+                ref.doc_id or "",
+                ref.item_id,
+                STAGE_OF.get((ref.doc_id or "-").split("-")[1] if ref.doc_id else "", None),
+                True,
+            )
+        for did, dref in spec.describe_documents(list(out_docs)).items():
+            doc_ids[did] = dref.doc_id
+            nodes[dref.doc_id] = GraphNode(dref.doc_id, dref.doc_id, None, dref.stage, True)
+        out_edges: list[GraphEdge] = []
+        touched: set[str] = set()
+        for e in edges:
+            src = (
+                item_ids.get(e.from_item_pk) if e.from_item_pk else doc_ids.get(e.from_document_id)
+            )
+            if src is None:
+                continue
+            dst = None
+            if e.to_item_pk is not None:
+                dst = item_ids.get(e.to_item_pk)
+            elif e.to_document_id is not None:
+                dst = doc_ids.get(e.to_document_id)
+            out_edges.append(GraphEdge(src, dst, e.raw_target, e.is_missing))
+            touched.add(src)
+            if dst:
+                touched.add(dst)
+        return Graph(
+            nodes=[
+                GraphNode(n.id, n.doc_id, n.item_id, n.stage, n.id not in touched)
+                for n in nodes.values()
+            ],
+            edges=out_edges,
+        )
+
+
+async def downstream_view(doc_id: str) -> DownstreamView:
+    """SYNC-MS-008#queries.downstream_view"""
+    with db.session_scope() as s:
+        spec, refs = SpecService(s), ReferenceService(s)
+        document = spec.get_document(doc_id)
+        pks = spec.item_pks(document.id)
+        by_pk = {pk: item_id for item_id, pk in pks.items()}
+        edges = [
+            e
+            for e in refs.references_among(set(pks.values()), include_document_targets=True)
+            if (e.to_item_pk in by_pk) or e.to_document_id == document.id
+        ]
+        names = spec.describe_items([e.from_item_pk for e in edges if e.from_item_pk])
+        docs = spec.describe_documents(
+            [e.from_document_id for e in edges if e.from_document_id is not None]
+        )
+        by_item: dict[str, list[ItemRef]] = {}
+        by_doc: dict[str, set[str]] = {}
+        for e in edges:
+            key = by_pk[e.to_item_pk] if e.to_item_pk in by_pk else "(문서)"
+            if e.from_item_pk and e.from_item_pk in names:
+                ref = names[e.from_item_pk]
+            elif e.from_document_id in docs:
+                d = docs[e.from_document_id]
+                ref = ItemRef(d.doc_id, None, d.title, raw_target=e.raw_target)
+            else:
+                continue
+            if ref.doc_id == doc_id:
+                continue  # 같은 문서 안 참조는 추적표 대상이 아니다
+            by_item.setdefault(key, []).append(ref)
+            by_doc.setdefault(ref.doc_id or "", set()).add(key)
+        titles = {d.doc_id: d.title for d in spec.describe_documents(list(docs)).values()} | {
+            r.doc_id: "" for rs in by_item.values() for r in rs if r.doc_id
+        }
+        for did in list(titles):
+            if not titles[did]:
+                titles[did] = _title_of(spec, did)
+        by_document = sorted(
+            (DownstreamDoc(d, titles.get(d, d), sorted(items)) for d, items in by_doc.items()),
+            key=lambda x: (STAGE_OF.get(x.doc_id.split("-")[1], 99), x.doc_id),
+        )
+        return DownstreamView(by_item, by_document)
+
+
+def _title_of(spec: SpecService, doc_id: str) -> str:
+    try:
+        d = spec.get_document(doc_id)
+    except Exception:  # noqa: BLE001
+        return doc_id
+    refs = spec.describe_documents([d.id])
+    return refs[d.id].title if d.id in refs else doc_id
