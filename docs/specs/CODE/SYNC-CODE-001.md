@@ -91,7 +91,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 첫 사용 | 싱크독 저장소를 싱크독에 `init_project`(import_existing=true) → 문서·항목·참조가 인덱스되고 **validate 결과가 `tools/validate.py`와 일치** → 이 문서를 싱크독에서 승인 |
 | 테스트 | 노트북 밖에서 접속 · 팀원 로그인 · 팀원 토큰으로 MCP |
 | 선행 | B4 |
-| 완료 | — (C-1 로컬 2026-09-09 완료: `docker compose up --build`(Dockerfile에 React 빌드 단계 `6c63c6b`) → 마이그레이션 0001~0003 → 실제 GitHub OAuth 로그인 → `HoyoungParkme/syncdoc` `import_existing=true` → 문서 27·항목 338·참조 963(미존재 0)·규약 오류 0·미완성 0 = `tools/validate.py`와 일치 → MCP 토큰으로 `get_document`·`get_references` 확인. C-2(Tunnel·webhook·노트북 밖 접속·팀원 로그인) 대기 · 미결: 비공개 저장소의 fetch 토큰 — MS-009 `git.fetch`에 토큰이 없어 재구축·process_commit·repo_status·폴링이 죽는다. 이번엔 저장소를 public으로 바꿔 진행) |
+| 완료 | — (C-1 로컬 2026-09-09: `docker compose up --build`(Dockerfile 2단계) → 마이그레이션 0001~0004 → 실제 GitHub OAuth 로그인 → `HoyoungParkme/syncdoc` `import_existing=true` → 문서 27·항목 338·참조 963(미존재 0)·규약 오류 0 = `tools/validate.py`와 일치 → MCP 토큰으로 `get_document`·`get_references`. C-2 2026-09-09: Quick Tunnel `*.trycloudflare.com` → 노트북 밖에서 접속·로그인 확인, 세션 없으면 401 · 터널로 MCP(토큰 없이 401, 토큰으로 정상) · **폴링 확인**: PR #1 머지로 main 전진 → 5분 주기 폴링이 스스로 따라잡아(약 4분 40초) 바뀐 명세 10개에 v2 생성, 전부 `via=github`, `last_processed_commit`이 새 main과 일치 · OAuth는 앱 하나에 로컬·터널 콜백 둘 등록, `redirect_uri`로 각자 주소 복귀 · webhook 없음(주소 가변, 명세대로 폴링만) · **남은 것: 팀원 로그인·팀원 토큰 MCP(다른 GitHub 계정 필요)** · 미결: 비공개 저장소 fetch 토큰(v2, MS-009 8장)) |
 
 ---
 
