@@ -141,7 +141,14 @@ async def seed() -> None:
         p = Project(code="SYNC", name="싱크독")
         s.add(p)
         s.flush()
-        s.add(Repository(project_id=p.id, remote_url=str(remote), workdir_path=str(work)))
+        s.add(
+            Repository(
+                project_id=p.id,
+                remote_url=str(remote),
+                workdir_path=str(work),
+                registered_by_user_id=hoyoung.id,
+            )
+        )
         hoyoung = make_user(s, login="hoyoung")
         hoyoung.display_name = "박호영"
         minjun = make_user(s, login="minjun")

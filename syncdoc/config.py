@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: str = ""
     WEBHOOK_SECRET: str = ""
     REPOS_DIR: Path = Path("/var/syncdoc/repos")
+    PUBLIC_BASE_URL: str = ""  # Quick Tunnel 주소 (INFRA 5장). 비면 로컬만
     POLL_INTERVAL_SECONDS: int = 300  # INFRA 7장 보조 경로. 0이면 폴링·기동 따라잡기 끔(테스트)
 
 

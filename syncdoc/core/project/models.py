@@ -38,3 +38,4 @@ class Repository(Base):
     workdir_path: Mapped[str] = mapped_column(String(300))
     last_processed_commit: Mapped[str | None] = mapped_column(String(40))
     synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    registered_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))

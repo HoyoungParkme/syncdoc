@@ -120,6 +120,7 @@ class RepoStatus:
     last_processed_commit: str | None
     synced_at: datetime | None
     behind_by: int | None
+    error: str | None = None  # fetch 실패 사유. API 스키마에 없다 — UI-14에 표시(MS-001, 보고)
 
 
 @dataclass

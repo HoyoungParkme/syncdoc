@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from syncdoc.core.account.service import AccountService
 from syncdoc.core.errors import ConventionViolation, ItemDeleted, NotFound
 from syncdoc.core.markdown import parse_frontmatter
 from syncdoc.core.project.models import Project, Repository
@@ -18,7 +19,17 @@ def make_project(session: Session, code: str = "EXMP") -> Project:
     p = Project(code=code, name="예시")
     session.add(p)
     session.flush()
-    session.add(Repository(project_id=p.id, remote_url="https://x/r.git", workdir_path="/w"))
+    u = AccountService(session).user_by_login("repo-owner") or make_user(
+        session, login="repo-owner"
+    )
+    session.add(
+        Repository(
+            project_id=p.id,
+            remote_url="https://x/r.git",
+            workdir_path="/w",
+            registered_by_user_id=u.id,
+        )
+    )
     session.flush()
     return p
 

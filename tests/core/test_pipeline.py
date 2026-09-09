@@ -34,13 +34,16 @@ def proj(scoped: Session, repos: dict) -> dict:
     p = Project(code="EXMP", name="예시")
     scoped.add(p)
     scoped.flush()
+    u = make_user(scoped, login="hoyoung")
     scoped.add(
         Repository(
-            project_id=p.id, remote_url=str(repos["remote"]), workdir_path=str(repos["work"])
+            project_id=p.id,
+            remote_url=str(repos["remote"]),
+            workdir_path=str(repos["work"]),
+            registered_by_user_id=u.id,
         )
     )
     scoped.flush()
-    u = make_user(scoped, login="hoyoung")
     author = Author(kind=AuthorKind.agent, user=u, instructed_by=u, via=Entry.mcp)
     return {"project": p, "author": author, "repos": repos, "user": u}
 

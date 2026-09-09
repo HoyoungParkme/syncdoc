@@ -60,9 +60,13 @@ async def clone(remote_url: str, workdir: Path, token: str) -> None:
     await _run(workdir, "remote", "set-url", "origin", remote_url)
 
 
-async def fetch(workdir: Path) -> str:
+async def fetch(workdir: Path, token: str | None = None) -> str:
     """SYNC-MS-009#git.fetch"""
-    await _run(workdir, "fetch", "origin")
+    if token is None:  # v1은 public 저장소만 — 토큰 없이 된다
+        await _run(workdir, "fetch", "origin")
+    else:  # private(v2): clone이 config에서 토큰을 지웠으므로 URL에 다시 붙인다
+        url = _with_token((await _run(workdir, "remote", "get-url", "origin")).strip(), token)
+        await _run(workdir, "fetch", url, "+refs/heads/*:refs/remotes/origin/*")
     return (await _run(workdir, "rev-parse", "origin/HEAD")).strip()
 
 

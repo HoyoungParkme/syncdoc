@@ -48,6 +48,7 @@ class RepoStatus(Base):
     last_processed_commit: str | None
     synced_at: datetime | None
     behind_by: int | None
+    error: str | None
 
 
 class RebuildError(Base):

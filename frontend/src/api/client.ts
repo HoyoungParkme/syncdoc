@@ -232,6 +232,7 @@ export interface RepoStatus {
   last_processed_commit: string | null
   synced_at: string | null
   behind_by: number | null
+  error: string | null
 }
 export interface RebuildResult {
   docs: number

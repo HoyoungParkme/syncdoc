@@ -27,7 +27,17 @@ export function Admin() {
     }
   }
   const badge = (r: RepoStatus) =>
-    r.behind_by == null ? <span className="st na">문서 없음</span> : r.behind_by === 0 ? <span className="st ok">최신</span> : <span className="st rv">밀림 {r.behind_by}</span>
+    r.error ? (
+      <span className="st dr" title={r.error}>
+        조회 실패
+      </span>
+    ) : r.behind_by == null ? (
+      <span className="st na">문서 없음</span>
+    ) : r.behind_by === 0 ? (
+      <span className="st ok">최신</span>
+    ) : (
+      <span className="st rv">밀림 {r.behind_by}</span>
+    )
   return (
     <div className="page">
       <div className="phead" data-el="1">
