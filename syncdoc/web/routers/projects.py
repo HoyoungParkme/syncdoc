@@ -8,8 +8,12 @@ from sqlalchemy.orm import Session
 from syncdoc.core import queries
 from syncdoc.core.account.models import User
 from syncdoc.core.project.service import ProjectService
+from syncdoc.core.types import DocumentSummary as DocumentSummaryDto
+from syncdoc.core.types import FlagSummary as FlagSummaryDto
 from syncdoc.db import get_session
 from syncdoc.web.auth import current_user
+from syncdoc.web.schemas.comments import CommentSummary
+from syncdoc.web.schemas.common import FlagSummary
 from syncdoc.web.schemas.documents import DocumentSummary
 from syncdoc.web.schemas.projects import InitProject, ProjectDetail, ProjectSummary
 
@@ -50,3 +54,23 @@ async def list_docs(
 ) -> list[DocumentSummary]:
     """SYNC-API-001#GET/api/projects/{code}/docs"""
     return [DocumentSummary.of(d) for d in await queries.document_list(code, stage, status)]
+
+
+@router.get("/{code}/flags", response_model=list[FlagSummary | CommentSummary | DocumentSummary])
+async def list_items(
+    code: str,
+    kind: str = Query(
+        pattern="^(needs_check|broken_ref|upstream_impact|comments|convention_errors|incomplete)$"
+    ),
+    user: User = Depends(current_user),
+) -> list:
+    """SYNC-API-001#GET/api/projects/{code}/flags"""
+    out = []
+    for x in await queries.project_items(code, kind):
+        if isinstance(x, FlagSummaryDto):
+            out.append(FlagSummary.of(x))
+        elif isinstance(x, DocumentSummaryDto):
+            out.append(DocumentSummary.of(x))
+        else:
+            out.append(CommentSummary.model_validate(x))
+    return out

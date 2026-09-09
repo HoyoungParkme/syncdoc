@@ -1,4 +1,4 @@
-"""SYNC-API-001 4장 — Comment(스레드) · 요청 AddComment · Resolve."""
+"""SYNC-API-001 4장 — Comment(스레드) · CommentSummary · 요청 AddComment · Resolve."""
 
 from __future__ import annotations
 
@@ -34,6 +34,15 @@ class Comment(Base):
             created_at=c.created_at,
             replies=[cls.of(r, doc_id, users) for r in getattr(c, "replies", [])],
         )
+
+
+class CommentSummary(Base):
+    id: int
+    doc_id: str
+    line_no: int
+    excerpt: str
+    author: UserRef | None
+    created_at: datetime
 
 
 class AddComment(BaseModel):

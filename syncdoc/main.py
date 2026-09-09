@@ -19,7 +19,16 @@ from syncdoc.core.errors import Problem
 from syncdoc.mcp.auth import BearerAuth
 from syncdoc.mcp.tools import server as mcp_server
 from syncdoc.web import auth
-from syncdoc.web.routers import account, comments, documents, projects, references
+from syncdoc.web.routers import (
+    account,
+    comments,
+    decisions,
+    documents,
+    flags,
+    projects,
+    references,
+    todo,
+)
 
 
 class MCPMount:
@@ -67,7 +76,15 @@ app.add_middleware(
     same_site="lax",
 )
 app.include_router(account.router)
-for r in (projects.router, documents.router, references.router, comments.router):
+for r in (
+    projects.router,
+    documents.router,
+    references.router,
+    comments.router,
+    todo.router,
+    flags.router,
+    decisions.router,
+):
     app.include_router(r)
 
 
