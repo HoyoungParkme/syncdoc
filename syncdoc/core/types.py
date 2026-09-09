@@ -265,6 +265,7 @@ class ItemRef:
     raw_target: str = ""
     is_missing: bool = False
     is_deleted: bool = False
+    deleted_at: datetime | None = None  # API에 없음 — flag_view의 cause_deleted_at용(보고)
 
 
 @dataclass(frozen=True)
@@ -328,6 +329,53 @@ class VersionBrief:
     version_no: int
     created_at: datetime
     message: str
+    commit_hash: str = ""  # DOM-002 2.8에 없음 — decision_view의 Version용(보고)
+    author: AuthorRef | None = None
+
+
+@dataclass(frozen=True)
+class PendingDecision:
+    """SYNC-API-001 Todo.pending_decisions[]."""
+
+    version_id: int
+    doc_id: str
+    version_no: int
+    message: str
+    affected_count: int
+    created_at: datetime
+
+
+@dataclass
+class Todo:
+    """SYNC-API-001 Todo — 여섯 묶음 + 담당 미지정. total은 unassigned 제외."""
+
+    needs_check: list[FlagSummary]
+    broken_ref: list[FlagSummary]
+    upstream_impact: list[FlagSummary]
+    pending_decisions: list[PendingDecision]
+    convention_errors: list[DocumentSummary]
+    unresolved_comments: list[CommentSummary]
+    unassigned: list[FlagSummary]
+    total: int
+
+
+@dataclass
+class AffectedItem(ItemRef):
+    """SYNC-API-001 DecisionDetail.affected[] — ItemRef + 어느 변경 항목의 하위인지 + 담당."""
+
+    caused_by_items: list[str] = field(default_factory=list)
+    assignee: UserRef | None = None
+
+
+@dataclass
+class DecisionDetail:
+    """SYNC-API-001 DecisionDetail."""
+
+    version: Version
+    doc_id: str
+    change_diff: Diff
+    affected: list[AffectedItem]
+    choice: str
 
 
 @dataclass
@@ -364,6 +412,22 @@ class FlagSummary:
     raised_at: datetime
     resolved_at: datetime | None
     assignee_id: int | None = None
+
+
+@dataclass
+class FlagDetail(FlagSummary):
+    """SYNC-API-001 FlagDetail — FlagSummary + 원인 diff·내 항목 본문.
+
+    cause_deleted_at(broken_ref)·cause_body(upstream_impact)는 MS-008 flag_view 4·4a에만 있고
+    API 스키마에는 없다(보고).
+    """
+
+    cause_diff: Diff | None = None
+    cause_change_count: int = 0
+    target_body: str = ""
+    target_changed_since_raise: bool = False
+    cause_deleted_at: datetime | None = None
+    cause_body: str | None = None
 
 
 @dataclass(frozen=True)

@@ -587,6 +587,7 @@ class SpecService:
                 item_id=item.item_id,
                 display_name=item.display_name,
                 is_deleted=item.is_deleted,
+                deleted_at=item.deleted_at,
             )
         return out
 
@@ -607,7 +608,15 @@ class SpecService:
     def versions_by_ids(self, version_ids: list[int]) -> dict[int, VersionBrief]:
         """SYNC-MS-002#SpecService.versions_by_ids"""
         return {
-            v.id: VersionBrief(v.id, v.document_id, v.version_no, v.created_at, v.message)
+            v.id: VersionBrief(
+                v.id,
+                v.document_id,
+                v.version_no,
+                v.created_at,
+                v.message,
+                commit_hash=v.commit_hash,
+                author=self._author_of(v),
+            )
             for v in self.repo.versions_by_ids(version_ids)
         }
 

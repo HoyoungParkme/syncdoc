@@ -9,7 +9,7 @@ from syncdoc.core.errors import NotFound
 from syncdoc.core.reference.service import ReferenceService
 from syncdoc.core.spec.service import SpecService
 from syncdoc.core.tracking.service import TrackingService
-from syncdoc.core.types import DocType
+from syncdoc.core.types import DocType, Propagation
 from tests.core.collab.test_service import _comment
 from tests.core.reference.test_service import PRD, RFQ
 from tests.core.spec.test_service import author, make_project
@@ -196,3 +196,166 @@ async def test_upstream_checklist_groups_by_target_in_stage_order(scoped: Sessio
         ("EXMP-PRD-001", "R1", "draft", 1, ["G1"]),  # 같은 문서 참조도 상위
     ]
     assert await queries.upstream_checklist("EXMP-RFQ-001") == []  # 참조 없는 문서 → 빈 목록
+
+
+# ── B3: diff_with_impact · todo · decision_view · flag_view · project_items ──
+def _b3(scoped: Session):
+    """RFQ(Q1·Q2, rfq-writer) ← PRD(G1→Q1, G1→#R1, prd-writer). 참조 추출까지."""
+    svc, ref = SpecService(scoped), ReferenceService(scoped)
+    p = make_project(scoped)
+    a_rfq, a_prd = author(scoped, "rfq-writer"), author(scoped, "prd-writer")
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a_rfq, "spec(EXMP-RFQ-001): 초안")
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a_prd, "spec(EXMP-PRD-001): 초안")
+    d = svc.get_document("EXMP-PRD-001")
+    pks = {i.item_id: i.pk for i in d.items}
+    ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])
+    rfq = svc.get_document("EXMP-RFQ-001")
+    rpk = {i.item_id: i.pk for i in rfq.items}
+    return svc, p, d, rfq, pks, rpk, a_rfq, a_prd
+
+
+async def test_diff_with_impact_counts_downstream_per_hunk(scoped: Session) -> None:
+    svc, p, d, rfq, pks, rpk, a_rfq, a_prd = _b3(scoped)
+    body2 = (
+        d.body.replace("없는 항목", "없는 항목들") + "#### R2 새 항목\n내용\n"
+    )  # R1 수정 + R2 추가
+    svc.save(d, body2, "h2", a_prd, "spec: v2", [])
+    df = await queries.diff_with_impact("EXMP-PRD-001", 1, 2)
+    assert [(h.item_id, h.downstream_count) for h in df.hunks] == [("R1", 1), ("R2", 0)]  # G1→R1
+    with pytest.raises(NotFound):
+        await queries.diff_with_impact("EXMP-PRD-001", 1, 9)
+
+
+async def test_todo_decision_view_record_and_flag_view(scoped: Session) -> None:
+    svc, p, d, rfq, pks, rpk, a_rfq, a_prd = _b3(scoped)
+    tr = TrackingService(scoped)
+    # 아무것도 없는 사용자 → 여섯 묶음 빈 배열
+    empty = await queries.todo(a_prd.user)
+    assert (empty.total, empty.needs_check, empty.pending_decisions, empty.unassigned) == (
+        0,
+        [],
+        [],
+        [],
+    )
+    # 에이전트(rfq-writer 지시)가 RFQ Q1 수정 → 미결정 (pipeline 11단계와 같은 호출)
+    v2 = svc.save(
+        rfq, rfq.body.replace("내용", "바뀐 내용"), "r2", a_rfq, "spec(EXMP-RFQ-001): Q1 수정", []
+    )
+    affected = tr.detect_impact(rfq.id, rfq.current_version_id, v2.id, ["Q1"])
+    assert affected == [pks["G1"]]
+    tr.create_pending(v2.id, affected, [rpk["Q1"]])
+    td = await queries.todo(a_rfq.user)
+    assert [
+        (x.version_id, x.doc_id, x.version_no, x.affected_count) for x in td.pending_decisions
+    ] == [(v2.id, "EXMP-RFQ-001", 2, 1)]
+    assert td.total == 1 and (await queries.todo(a_prd.user)).pending_decisions == []  # 지시자만
+    # 전파 미결정 상세 (UI-12)
+    dv = await queries.decision_view(v2.id)
+    assert (dv.doc_id, dv.choice, dv.version.version_no, dv.version.commit_hash) == (
+        "EXMP-RFQ-001",
+        "undecided",
+        2,
+        "r2",
+    )
+    assert dv.version.author_view.user.github_login == "rfq-writer"
+    assert (dv.change_diff.from_version, dv.change_diff.to_version) == (1, 2)
+    assert [h.item_id for h in dv.change_diff.hunks] == ["Q1"]
+    assert [
+        (a.doc_id, a.item_id, a.caused_by_items, a.assignee.github_login) for a in dv.affected
+    ] == [("EXMP-PRD-001", "G1", ["Q1"], "prd-writer")]
+    with pytest.raises(NotFound):
+        await queries.decision_view(999_999)
+    # 예 → G1에 확인 필요 → prd-writer 내 할 일
+    assert tr.record_decision(v2.id, Propagation.propagate, None, a_rfq.user).flags_raised == 1
+    td2 = await queries.todo(a_prd.user)
+    f = td2.needs_check[0]
+    assert (
+        f.kind,
+        f.target.item_id,
+        f.cause.item_id,
+        f.cause_version_no,
+        f.assignee.github_login,
+    ) == (
+        "needs_check",
+        "G1",
+        "Q1",
+        2,
+        "prd-writer",
+    )
+    assert td2.total == 1 and (await queries.todo(a_rfq.user)).total == 0
+    # 플래그 상세 (UI-11): 원인 v2 → 현재 v2, 변경 0 · 대상 문서 변경 없음
+    fv = await queries.flag_view(f.id)
+    assert (fv.cause_change_count, fv.cause_diff.hunks, fv.target_changed_since_raise) == (
+        0,
+        [],
+        False,
+    )
+    assert fv.target_body.startswith("#### G1 목표") and fv.id == f.id
+    # 원인이 그 사이 또 바뀜(UC-H11 3a) → 누적 diff v2→v3 · 대상 저장 → 변경 있음
+    rfq2 = svc.get_document("EXMP-RFQ-001")
+    svc.save(rfq2, rfq2.body.replace("바뀐 내용", "또 바뀐 내용"), "r3", a_rfq, "spec: v3", [])
+    d2 = svc.get_document("EXMP-PRD-001")
+    svc.save(d2, d2.body + "\n", "h2", a_prd, "spec: v2", [])
+    fv2 = await queries.flag_view(f.id)
+    assert (fv2.cause_change_count, fv2.cause_diff.from_version, fv2.cause_diff.to_version) == (
+        1,
+        2,
+        3,
+    )
+    assert [h.item_id for h in fv2.cause_diff.hunks] == [
+        "Q1"
+    ] and fv2.target_changed_since_raise is True
+    # broken_ref → cause_deleted_at · upstream_impact → cause_body · 담당 미지정 → unassigned
+    scoped.execute(
+        text("UPDATE items SET is_deleted=true, deleted_at=now() WHERE id=:i"), {"i": rpk["Q2"]}
+    )
+    scoped.expire_all()
+    scoped.execute(text("UPDATE flags SET assignee_user_id=NULL WHERE id=:i"), {"i": f.id})
+    tr.raise_upstream([rpk["Q1"]], d.id, d2.current_version_id, pks["R1"])
+    bid = tr.repo.add(
+        __import__("syncdoc.core.tracking.models", fromlist=["Flag"]).Flag(
+            kind="broken_ref",
+            target_item_id=pks["G1"],
+            cause_item_id=rpk["Q2"],
+            assignee_user_id=None,
+        )
+    ).id
+    td3 = await queries.todo(a_rfq.user)
+    assert [x.kind for x in td3.upstream_impact] == ["upstream_impact"] and td3.total == 1
+    assert sorted(x.id for x in td3.unassigned) == sorted([f.id, bid])
+    bv = await queries.flag_view(bid)
+    assert bv.cause_deleted_at is not None and bv.cause_diff is None
+    uv = await queries.flag_view(td3.upstream_impact[0].id)
+    assert uv.cause_body.startswith("#### R1 기능") and uv.cause_diff is None
+    with pytest.raises(NotFound):
+        await queries.flag_view(999_999)
+    # 프로젝트 목록 다이얼로그 (UI-4 6)
+    assert [x.id for x in await queries.project_items("EXMP", "needs_check")] == [f.id]
+    assert [x.id for x in await queries.project_items("EXMP", "upstream_impact")] == [uv.id]
+    assert await queries.project_items("EXMP", "comments") == []
+    assert await queries.project_items("EXMP", "convention_errors") == []
+    scoped.execute(
+        text(
+            """UPDATE documents SET incomplete_warnings='["item.none"]' WHERE doc_id='EXMP-RFQ-001'"""
+        )
+    )
+    assert [x.doc_id for x in await queries.project_items("EXMP", "incomplete")] == ["EXMP-RFQ-001"]
+    with pytest.raises(ValueError):
+        await queries.project_items("EXMP", "bogus")
+    with pytest.raises(NotFound):
+        await queries.project_items("NOPE", "comments")
+
+
+async def test_todo_convention_errors_and_comments_of_my_documents(scoped: Session) -> None:
+    svc, p, d, rfq, pks, rpk, a_rfq, a_prd = _b3(scoped)
+    scoped.execute(
+        text("UPDATE documents SET has_convention_error=true WHERE doc_id='EXMP-PRD-001'")
+    )
+    _comment(scoped, d.id, a_rfq.user.id, 3, "이 줄이 애매하다")
+    _comment(scoped, rfq.id, a_prd.user.id, 2, "해결됨", resolved=True)
+    td = await queries.todo(a_prd.user)
+    assert [x.doc_id for x in td.convention_errors] == ["EXMP-PRD-001"]
+    assert [(c.doc_id, c.line_no, c.author.github_login) for c in td.unresolved_comments] == [
+        ("EXMP-PRD-001", 3, "rfq-writer")
+    ]
+    assert td.total == 2 and (await queries.todo(a_rfq.user)).total == 0
