@@ -380,7 +380,9 @@ classDiagram
 | `Version` (DTO) | API `Version` 스키마 — `doc_id` `version_no?` `commit_hash` `message` `author: AuthorRef` `created_at` | list_versions · recent_changes. ORM은 `VersionRow`. `create`·`save`는 `VersionRow`를 돌려준다. 내부 필드명(`author_view` 등)은 자유, **API로 나가는 필드명은 API-001 스키마 그대로**(`author`) |
 | `DocRef` | `document_id` · `doc_id` · `title` · `stage` · `status` | describe_documents. 문서 단위 참조 대상 표시 |
 | `DownstreamView` | `by_item: dict[str, list[ItemRef]]` · `by_document: list[{doc_id, title, items}]` | queries.downstream_view → 추적표 |
-| `VersionBrief` | `id` · `document_id` · `version_no` · `created_at` · `message` | versions_by_ids → 플래그의 cause_version, 미결정 목록 |
+| `VersionBrief` | `id` · `document_id` · `version_no` · `commit_hash` · `author: AuthorRef` · `created_at` · `message` | versions_by_ids → 플래그의 cause_version, 미결정 목록, decision_view의 `version` |
+| `FlagSummary` (DTO) | API 스키마 + `assignee_id: int \| None` · `target`·`cause`는 `ItemRef` | tracking이 만들지 않는다 — `queries`가 `Flag` 행 + `describe_items` + `versions_by_ids`로. `assignee` 이름은 입구가 `users_by_ids`로 |
+| `ItemRef` (DTO) | API 스키마 + `deleted_at`(내부. API로 안 나감) | describe_items. flag_view의 `cause_deleted_at`용 |
 | `ItemBrief` | `pk: int` · `doc_id` · `item_id: str \| None` · `stage: int` · `display_name` | list_items_by_project → queries.graph_view |
 | `RefEdge` | `from_item_pk: int` · `to_item_pk: int \| None` · `to_document_id: int \| None` · `raw_target: str` · `is_missing: bool` | ReferenceService (다음 묶음) |
 | `ExtractResult` | `added: int` · `removed: int` · `missing: int` | reference.extract |
