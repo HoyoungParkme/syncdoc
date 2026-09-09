@@ -605,3 +605,20 @@ async def test_repo_status_and_rebuild_index(scoped: Session, proj) -> None:
     assert (await ps.repo_status())[0].behind_by == 1
     with pytest.raises(NotFound):
         await ps.rebuild_index("NOPE")
+
+
+async def test_process_commit_skips_commits_the_app_pushed_itself(scoped: Session, proj) -> None:
+    """mcp 저장·상태 변경 커밋은 이미 기록돼 있다 — 폴링이 다시 저장하면 안 된다."""
+    remote = proj["repos"]["remote"]
+    repo = _repo_row(proj)
+    repo.last_processed_commit = g(remote, "rev-parse", "main")
+    scoped.flush()
+    await create(proj, DocType.RFQ, RFQ)
+    r = await create(proj)
+    await pipeline.change_status("EXMP-PRD-001", "review", proj["user"], "검토")
+    head = g(remote, "rev-parse", "main")
+    assert await pipeline.process_commit(repo, head) == []
+    d = SpecService(scoped).get_document("EXMP-PRD-001")
+    assert (d.current_version_no, d.status) == (1, "review")
+    assert scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar() == head
+    assert r.doc_id == "EXMP-PRD-001"

@@ -8,13 +8,14 @@ import { DiffBox } from '../components/DiffBox'
 import { renderBlocks } from '../view/md'
 
 type Deleted = { item_id: string; downstream: number[] }
+const keyOf = (v: Version) => `${v.commit_hash}:${v.version_no ?? 's'}`
 
 export function History() {
   const { docId = '' } = useParams()
   const nav = useNavigate()
   const [doc, setDoc] = useState<Document | null>(null)
   const [versions, setVersions] = useState<Version[]>([])
-  const [picked, setPicked] = useState<string[]>([]) // 체크 순서 (commit_hash). 두 개까지
+  const [picked, setPicked] = useState<string[]>([]) // 체크 순서 (행 키). 두 개까지
   const [diff, setDiff] = useState<Diff | null>(null)
   const [hint, setHint] = useState<{ item: string; refs: ItemReferences } | null>(null)
   const [revertTo, setRevertTo] = useState<number | null>(null)
@@ -27,15 +28,15 @@ export function History() {
     api.get<Version[]>(`/api/docs/${docId}/versions`).then((vs) => {
       setVersions(vs)
       const numbered = vs.filter((v) => v.version_no != null)
-      setPicked(numbered.slice(0, 2).map((v) => v.commit_hash).reverse()) // 기본: 현재 ↔ 직전
+      setPicked(numbered.slice(0, 2).map(keyOf).reverse()) // 기본: 현재 ↔ 직전
     })
   }, [docId])
-  const byHash = useMemo(() => new Map(versions.map((v) => [v.commit_hash, v])), [versions])
+  const byKey = useMemo(() => new Map(versions.map((v) => [keyOf(v), v])), [versions])
   const range = useMemo(() => {
-    const nos = picked.map((h) => byHash.get(h)?.version_no).filter((n): n is number => n != null)
+    const nos = picked.map((h) => byKey.get(h)?.version_no).filter((n): n is number => n != null)
     if (nos.length < 2) return null
     return { from: Math.min(...nos), to: Math.max(...nos) }
-  }, [picked, byHash])
+  }, [picked, byKey])
   useEffect(() => {
     setHint(null)
     if (!range) {
@@ -78,7 +79,7 @@ export function History() {
   }
   if (err) return <div className="page banner err">{err}</div>
   if (!doc) return null
-  const firstRevertable = versions.find((v) => v.version_no != null && v.version_no !== doc.current_version_no)?.commit_hash
+  const firstRevertable = versions.find((v) => v.version_no != null && v.version_no !== doc.current_version_no)
   const changedItems = diff ? diff.hunks.filter((h) => h.item_id).length : 0
   const dels = diff ? diff.hunks.reduce((n, h) => n + h.lines.filter((l) => l.op === 'del').length, 0) : 0
   const adds = diff ? diff.hunks.reduce((n, h) => n + h.lines.filter((l) => l.op === 'add').length, 0) : 0
@@ -111,9 +112,9 @@ export function History() {
             {versions.map((v, i) => {
               const cur = v.version_no === doc.current_version_no
               return (
-                <tr key={v.commit_hash + (v.version_no ?? 's')} className={cur ? 'cur' : ''} data-el={i === 0 ? '2.1' : undefined}>
+                <tr key={keyOf(v)} className={cur ? 'cur' : ''} data-el={i === 0 ? '2.1' : undefined}>
                   <td>
-                    <input type="checkbox" checked={picked.includes(v.commit_hash)} onChange={() => toggle(v.commit_hash)} />
+                    <input type="checkbox" checked={picked.includes(keyOf(v))} onChange={() => toggle(keyOf(v))} />
                   </td>
                   <td>
                     {v.version_no != null ? <b>v{v.version_no}</b> : '—'} {cur && <span className="lbl">현재</span>}
@@ -137,7 +138,7 @@ export function History() {
                   <td className={v.version_no == null ? 'lbl' : ''}>{v.message.split('\n')[0]}</td>
                   <td>
                     {v.version_no != null && !cur && (
-                      <span className="btn sm" data-el={v.commit_hash === firstRevertable ? '2.2' : undefined} onClick={() => openRevert(v.version_no!)}>
+                      <span className="btn sm" data-el={firstRevertable && keyOf(v) === keyOf(firstRevertable) ? '2.2' : undefined} onClick={() => openRevert(v.version_no!)}>
                         되돌리기
                       </span>
                     )}

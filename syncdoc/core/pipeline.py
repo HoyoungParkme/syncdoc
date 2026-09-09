@@ -372,6 +372,15 @@ async def _process_file(workdir: Path, code: str, f, head_hash: str) -> list[Sav
                 tracking.raise_broken(pk)
             s.commit()
             return []
+    with db.session_scope() as s:
+        # 앱이 직접 push한 커밋(mcp·web 저장·상태 변경·되돌리기)은 이미 기록돼 있다 — 폴링이
+        # 그것을 github 커밋으로 다시 저장하면 같은 커밋의 버전이 둘 생긴다. MS-007에 없음 (보고)
+        try:
+            known = {v.commit_hash for v in SpecService(s).list_versions(doc_id)}
+        except NotFound:
+            known = set()
+    if f.commit_hash in known:
+        return []
     body = await git.read(workdir, f.path, head_hash)
     doc_type = DocType(dir_type)
     r = await save_pipeline(
