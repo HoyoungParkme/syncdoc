@@ -77,7 +77,8 @@ def fresh_db() -> None:
 
     from alembic import command
 
-    cfg = Config(str(ROOT / "alembic.ini"))
+    cfg = Config(str(ROOT / "backend" / "alembic.ini"))  # DOM-002 1장 — 파이썬은 backend/ 아래
+    cfg.set_main_option("script_location", str(ROOT / "backend" / "alembic"))
     cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
     command.upgrade(cfg, "head")
 
