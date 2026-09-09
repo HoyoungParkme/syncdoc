@@ -20,10 +20,12 @@ stop() {
 }
 [ "${1:-}" = "--stop" ] && { stop; exit 0; }
 
+export PATH="$HOME/.local/bin:$PATH"   # sudo 없이 넣은 cloudflared
 command -v cloudflared >/dev/null || {
-  echo "cloudflared 가 없습니다. 설치:" >&2
-  echo "  curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/cloudflared" >&2
-  echo "  sudo install -m 755 /tmp/cloudflared /usr/local/bin/cloudflared" >&2
+  echo "cloudflared 가 없습니다. 설치(권한 불필요):" >&2
+  echo "  mkdir -p ~/.local/bin" >&2
+  echo "  curl -sL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o ~/.local/bin/cloudflared" >&2
+  echo "  chmod 755 ~/.local/bin/cloudflared" >&2
   exit 1
 }
 
