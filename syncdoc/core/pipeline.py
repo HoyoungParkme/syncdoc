@@ -149,7 +149,8 @@ async def _run(
     if entry != Entry.web_status and document:
         deleted = spec.detect_deleted_items(document, body)
         downstream = {pk: refs.downstream(pk) for pk in deleted}
-        if any(downstream.values()) and not confirm_item_deletion:
+        # github 진입은 물어볼 상대가 없다 — 커밋이 진실(SEQ-2). 삭제는 끊어진 참조로 통보 (보고)
+        if any(downstream.values()) and not confirm_item_deletion and entry != Entry.github:
             names = {i.pk: i.item_id for i in document.items}
             raise ItemDeletionNeedsConfirm(
                 [
