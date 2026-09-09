@@ -32,13 +32,15 @@ PRD R1이 "원본 규약이 정의되고 위반 시 오류를 낸다"고만 했�
 docs/specs/
 ├── _templates/          타입별 템플릿 12개(11단계 + STD). init_project가 복사
 ├── assets/              첨부. MD에서 상대 경로로
-├── STD/  SYNC-STD-001.md  SYNC-STD-002.md
-├── RFQ/  SYNC-RFQ-001.md
-├── PRD/  SYNC-PRD-001.md
-└── … (11단계 디렉터리)
+├── 01-RFQ/  SYNC-RFQ-001.md
+├── 02-PRD/  SYNC-PRD-001.md
+├── …                    (11단계. 번호는 2장 순서)
+├── 11-CODE/ SYNC-CODE-001.md
+└── STD/     SYNC-STD-001.md  SYNC-STD-002.md   ← 단계 밖이라 번호 없음
 ```
 
-- 경로 `docs/specs/{TYPE}/{doc_id}.md`. 파일명과 frontmatter `doc_id`가 다르면 **위반**
+- 경로 `docs/specs/{NN-TYPE}/{doc_id}.md`. **디렉터리 이름은 `{2자리 단계번호}-{TYPE}`** — 저장소를 열었을 때 읽는 순서대로 보이게(2장 11단계). 단계 밖인 `STD`는 번호 없이 `STD/`
+- 디렉터리의 `TYPE` 부분과 frontmatter `type`이 다르면 **위반**. 파일명과 frontmatter `doc_id`가 다르면 **위반**
 - 문서 ID `{프로젝트코드}-{TYPE}-{NNN}`. 세 자리. 시스템이 발급(`create_document`)하며 에이전트는 비워도 된다
 - 인코딩 UTF-8, 줄바꿈 LF
 
