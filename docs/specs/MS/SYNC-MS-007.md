@@ -191,7 +191,7 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
 **처리**
 
 1. `repo.last_processed_commit == head_hash`면 `→ []`
-2. `git.fetch(repo)`
+2. `git.fetch(repo.workdir)` (public)
 3. `files = git.changed_files(repo, f"{last}..{head}", path="docs/specs/")`. 각각 `(path, last_commit_hash_of_file, author_login, message)`. `_templates/`·`assets/`는 제외
 3a. **앱 자신이 만든 커밋은 거른다** — `commit_hash`가 이미 `versions.commit_hash`나 `status_changes.commit_hash`에 있으면 건너뛴다. 없으면 앱이 push한 커밋을 폴링이 github 경로로 다시 저장해 같은 커밋의 버전이 하나 더 생긴다
 3b. 남은 파일을 **문서 타입의 단계 순**으로 정렬(RFQ→…→CODE→STD). 경로순이면 하위가 먼저 저장돼 상위 참조가 미존재로 남는다
@@ -236,7 +236,7 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 **처리**
 
 1. `project, repo = project.get(code)`. 락 획득
-2. `git.fetch(repo)`, `git.checkout(repo, "origin/HEAD")`
+2. `git.fetch(repo.workdir)`, `git.checkout(repo.workdir, "origin/HEAD")` · if fetch 실패 → `! rebuild-failed {reason}` (500으로 새지 않게)
 3. **트랜잭션 시작**
 4. `reference.clear(project_id)` · `spec.clear_index(project_id)` — `versions`만 삭제. `documents`·`items`는 유지(플래그·댓글 FK)
 5. `paths = git.list(repo, "docs/specs/*/*.md")` (`_templates`·`assets` 제외)
