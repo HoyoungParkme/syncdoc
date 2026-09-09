@@ -237,7 +237,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### SpecService.change_status 상태 변경
 
-**시그니처** `change_status(doc_id: str, to: DocStatus, user: User, reason: str | None, upstream_reviewed: bool = False, upstream_mismatch: list[str] = []) -> DocumentSummary`
+**시그니처** `async def change_status(doc_id: str, to: DocStatus, user: User, reason: str | None, upstream_reviewed: bool = False, upstream_mismatch: list[str] = []) -> DocumentSummary` — `pipeline`을 불러 async(DEV-16)
 
 근거: [[SYNC-SEQ-001#SEQ-5]] · [[SYNC-UC-001#UC-H8]] · [[SYNC-API-001#POST/api/docs/{docId}/status]]
 
@@ -338,7 +338,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### SpecService.revert 되돌리기
 
-**시그니처** `revert(doc_id: str, to_version: int, user: User, confirm_item_deletion: bool = False) -> SaveResult`
+**시그니처** `async def revert(doc_id: str, to_version: int, user: User, confirm_item_deletion: bool = False) -> SaveResult` — `pipeline`을 불러 async(DEV-16)
 
 근거: [[SYNC-SEQ-001#SEQ-7]] · [[SYNC-UC-001#UC-H7]] · [[SYNC-API-001#POST/api/docs/{docId}/revert]]
 

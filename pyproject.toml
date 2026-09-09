@@ -1,0 +1,47 @@
+[project]
+name = "syncdoc"
+version = "0.1.0"
+description = "싱크독 — 명세 체인 플랫폼. 명세: docs/specs/, 구현 계획: docs/specs/CODE/SYNC-CODE-001.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.2",
+    "httpx>=0.27",
+    "mcp>=1.0",
+    "cryptography>=43",
+    "itsdangerous>=2.2",
+    "pydantic-settings>=2.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["syncdoc"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["tools", "docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 
 슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
 
-**진행 상황**: 카드 8개 중 완료 0.
+**진행 상황**: 카드 8개 중 완료 1 (A).
 
 ---
 
@@ -31,7 +31,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 인증 | [[SYNC-MS-006#AccountService.login_github]] ~ [[SYNC-MS-006#AccountService.create_placeholder]] 8개 · `/auth/*` 라우터 · 세션 |
 | 테스트 | 마이그레이션 up/down · git 어댑터는 임시 저장소로 · OAuth는 GitHub 응답 모킹 |
 | 선행 | 없음 |
-| 완료 | — |
+| 완료 | 2026-09-08 · 브랜치 `feat/a-foundation` · 커밋 `9d99b93`~`ad06e7a` (code 26 + spec 9, PR 없음 — 로컬 저장소) · 테스트 48 · MS-009 14/14 · MS-006 8/8 · 되먹임: [[SYNC-STD-004#DEV-16]] 신설, MS-009 `git.clone`·`commit_push`, MS-006 `login_github` async, DOM-002 1장 `core/types.py`·`errors.py` |
 
 #### B1 대화하다가 명세가 쌓인다
 
@@ -126,7 +126,11 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 
 ## 4. 커밋·PR 목록
 
-슬라이스 카드의 `완료` 행에 기록한다. PR 하나 = 슬라이스 하나(DEV-15). 아직 없음.
+슬라이스 카드의 `완료` 행에 기록한다. PR 하나 = 슬라이스 하나(DEV-15).
+
+| 슬라이스 | 브랜치 | 커밋 | 날짜 |
+|---|---|---|---|
+| A | `feat/a-foundation` | `9d99b93`~`ad06e7a` | 2026-09-08 |
 
 ## 5. 미결사항
 

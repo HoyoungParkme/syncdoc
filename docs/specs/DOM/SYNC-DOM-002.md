@@ -51,6 +51,8 @@ syncdoc/
 │   ├── collab/             댓글
 │   ├── account/            사용자, 액세스토큰
 │   │
+│   ├── types.py            2.7 열거형 · 2.8 DTO. 묶음 전부가 쓰므로 묶음 밖
+│   ├── errors.py           problem+json 타입마다 예외 클래스 하나 (STD-004 DEV-5)
 │   ├── pipeline.py         쓰기 조율. 묶음들을 순서대로 부른다
 │   └── queries.py          읽기 조합. 여러 묶음에서 ID로 모아 응답 형태를 만든다
 │
@@ -227,6 +229,7 @@ classDiagram
     class Reference {
         +int id
         +int from_item_id
+        +int from_document_id
         +int to_item_id
         +int to_document_id
         +str raw_target
@@ -269,6 +272,8 @@ classDiagram
         +int id
         +int version_id
         +Propagation choice
+        +list affected_pks
+        +list changed_pks
         +str reason
         +int decided_by_user_id
         +datetime decided_at
@@ -539,10 +544,10 @@ classDiagram
         +create(project_id: int, doc_id: str, doc_type: DocType, body: str, commit_hash: str, author: Author) Version
         +save(document: Document, body: str, commit_hash: str, author: Author, deleted_item_pks: list~int~, has_convention_error: bool, warnings: list?, rebuild: bool) Version
         +apply_status(document: Document, new_body: str, commit_hash: str?, user: User, reason: str?, to: DocStatus?) None
-        +change_status(doc_id: str, to: DocStatus, user: User, reason: str?, upstream_reviewed: bool = False, upstream_mismatch: list~str~ = []) DocumentSummary
+        +async change_status(doc_id: str, to: DocStatus, user: User, reason: str?, upstream_reviewed: bool = False, upstream_mismatch: list~str~ = []) DocumentSummary
         +list_versions(doc_id: str) list~Version~
         +diff(doc_id: str, from_no: int, to_no: int) Diff
-        +revert(doc_id: str, to_version: int, user: User, confirm_item_deletion: bool) SaveResult
+        +async revert(doc_id: str, to_version: int, user: User, confirm_item_deletion: bool) SaveResult
         +list_by_project(project_id: int, stage: int?, status: DocStatus?, has_convention_error: bool?) list~DocumentSummary~
         +describe_items(pks: list~int~) dict
         +resolve_item(doc_id: str, item_id: str) int
@@ -657,6 +662,7 @@ classDiagram
     class Reference {
         +int id
         +int from_item_id
+        +int from_document_id
         +int to_item_id
         +int to_document_id
         +str raw_target
@@ -721,6 +727,8 @@ classDiagram
         +int id
         +int version_id
         +Propagation choice
+        +list affected_pks
+        +list changed_pks
         +str reason
         +int decided_by_user_id
         +datetime decided_at
@@ -799,7 +807,7 @@ classDiagram
 classDiagram
     class AccountService {
         «service»
-        +login_github(code: str, state: str) User
+        +async login_github(code: str, state: str) User
         +list_tokens(user: User) list~AccessToken~
         +issue_token(user: User, label: str) IssuedToken
         +revoke_token(user: User, token_id: int) None
@@ -930,7 +938,7 @@ upstream_checklist(doc_id) -> list                  SEQ-5   이 문서의 upstre
 git.clone(remote_url, workdir, token) -> None
 git.fetch(workdir) -> str                      origin/HEAD 해시
 git.checkout(workdir, ref) -> None
-git.commit_push(workdir, path, content, message, author, files=None) -> str
+git.commit_push(workdir, message, author, path=None, content=None, files=None) -> str
 git.read(workdir, path, ref="HEAD") -> str
 git.changed_files(workdir, range, prefix) -> list[ChangedFile]
 git.list(workdir, glob, ref="HEAD") -> list[str]

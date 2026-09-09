@@ -47,7 +47,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `async def clone(remote_url: str, workdir: Path, token: str) -> None`
 
-**처리** `git clone --depth=0 {url with token} {workdir}` — URL은 `https://x-access-token:{token}@github.com/org/repo.git`. 완료 후 `git remote set-url origin {token 없는 url}` — 토큰이 `.git/config`에 남지 않게. push 때마다 토큰을 다시 붙인다
+**처리** `git clone {url with token} {workdir}` — **전체 이력** clone. `--depth`를 쓰지 않는다 — 재구축(`pipeline.rebuild`)이 `git log`로 파일 이력 전체를 읽기 때문. URL은 `https://x-access-token:{token}@github.com/org/repo.git`. 완료 후 `git remote set-url origin {token 없는 url}` — 토큰이 `.git/config`에 남지 않게. push 때마다 토큰을 다시 붙인다
 
 ---
 
@@ -69,11 +69,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### git.commit_push 쓰기·커밋·push·재시도
 
-**시그니처** `async def commit_push(workdir: Path, path: str, content: str, message: str, author: Author, files: dict[str, str] | None = None) -> str`
+**시그니처** `async def commit_push(workdir: Path, message: str, author: Author, path: str | None = None, content: str | None = None, files: dict[str, str] | None = None) -> str`
 
 근거: [[SYNC-SEQ-001#SEQ-1]] 7단계 · [[SYNC-UC-001#UC-S7]] · [[SYNC-INFRA-001]] 4.3
 
-**입력** `path`·`content` 하나 또는 `files` 여럿(초기화용). `author.user` — 커밋 작성자
+**입력** `path`+`content` 하나 또는 `files` 여럿(초기화용) — 둘 중 하나는 있어야 한다. `author.user` — 커밋 작성자
 
 **처리**
 1. `token = AccountService.github_token_for(author.user)` · if 실패 → `! push-failed {reason: 미등록}`
@@ -109,7 +109,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **처리**
 1. `git log --name-status --format="%H%x00%an%x00%ae%x00%s%n%b%x00" {range} -- {prefix}` — 커밋마다 파일 상태
 2. 파일별로 **마지막으로 건드린 커밋**을 남긴다 (밀린 커밋 여럿이면 최종 상태 하나)
-3. `→ [ChangedFile(path, status=A|M|D, commit_hash, author_login=커밋 author name에서 GitHub login 추출, message)]`. `author_login`은 `%ae`가 `*@users.noreply.github.com`이면 앞부분, 아니면 `%an`
+3. `→ [ChangedFile(path, status=A|M|D, commit_hash, author_login, message)]`. `author_login`: `%ae`가 `@users.noreply.github.com`으로 끝나면 `@` 앞부분에서 `{숫자}+` 접두를 뗀 것 (`12345+hoyoung@users.noreply.github.com` → `hoyoung`). 아니면 `%an`
 4. `_templates/`·`assets/` 경로는 제외
 
 **미결** `status=D`(삭제된 파일) — MS-001 미결과 같음

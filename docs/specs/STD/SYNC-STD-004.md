@@ -53,6 +53,13 @@ async def save_pipeline(...):
 
 토큰 원문(MCP·GitHub), 비밀키, 본문 전체. 로그는 `doc_id`·`version_no`·`user_id`·`entry`·소요 시간까지.
 
+#### DEV-16 async는 호출 관계가 정한다
+
+- `infra/*`(subprocess·httpx)는 전부 `async def`
+- DB만 만지는 서비스 메서드는 `def` (SQLAlchemy sync 세션. 2~3명 규모)
+- **async 함수를 하나라도 부르면 그 함수도 `async def`** — `login_github`(github), `init_project`(git), `change_status`·`revert`(pipeline), `pipeline.*`, `queries.*`, 라우터·MCP 도구 전부
+- MINISPEC 시그니처에 `async def`가 명시된다. 없으면 sync. 코드가 이걸 어기면 명세가 틀린 것 — 명세부터
+
 ---
 
 ## 2. DB 물리 규칙

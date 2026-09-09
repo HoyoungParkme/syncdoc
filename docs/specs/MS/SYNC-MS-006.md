@@ -39,7 +39,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### AccountService.login_github OAuth 콜백
 
-**시그니처** `login_github(code: str, state: str) -> User`
+**시그니처** `async def login_github(code: str, state: str) -> User` — `github.*`가 async라 async([[SYNC-STD-004#DEV-16]])
 
 근거: [[SYNC-SEQ-001#SEQ-8]] · [[SYNC-INFRA-001]] 5장 · [[SYNC-API-001#GET/auth/github/callback]]
 
@@ -52,7 +52,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
    - if 있음 → `login`·`display_name` 갱신 (로그인 ID 변경 대응)
    - else → `u = DB: users where github_login=info.login and github_user_id is null` (자리표시) · if 있음 → `github_user_id` 채움 (미등록 push 사람이 로그인) · else → insert
 4. `u.github_token_encrypted = encrypt(token, SECRET_KEY)` (Fernet) · `DB: update`
-5. `→ u`
+5. `→ u`. 라우터가 세션을 만든다 — 테이블 없이 **서명 쿠키** `syncdoc_session`에 `github_login`만. 요청마다 `user_by_login`으로 User를 얻는다(인프라 5장)
 
 **테스트 관점** 첫 로그인 → 행 생성 · 로그인 ID 바꾼 뒤 → 같은 행, `login` 갱신 · 자리표시가 있던 사람 → 그 행에 `github_user_id`·토큰 채워짐 (별도 행 안 생김)
 
