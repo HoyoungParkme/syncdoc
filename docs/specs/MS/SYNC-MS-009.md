@@ -170,9 +170,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### github.exchange_code OAuth code → token
 
-**시그니처** `async def exchange_code(code: str) -> str`
+**시그니처** `async def exchange_code(code: str, redirect_uri: str) -> str`
 
-**처리** `POST https://github.com/login/oauth/access_token {client_id, client_secret, code}` (Accept: json) → `access_token` · if 없음 → `! unauthorized`
+**처리** `POST https://github.com/login/oauth/access_token {client_id, client_secret, code, redirect_uri}` (Accept: json) → `access_token` · if 없음 → `! unauthorized`. `redirect_uri`는 authorize에 보낸 것과 **같은 값**이어야 한다(GitHub가 대조한다)
 
 ---
 
