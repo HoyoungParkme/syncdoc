@@ -187,14 +187,14 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### SpecService.create 문서 행 생성
 
-**시그니처** `create(project_id: int, doc_id: str, doc_type: DocType, body: str, commit_hash: str, author: Author, message: str) -> VersionRow`
+**시그니처** `create(project_id: int, doc_id: str, doc_type: DocType, body: str, commit_hash: str, author: Author, message: str, validate_result: ValidateResult | None = None) -> VersionRow`
 
 근거: [[SYNC-SEQ-001#SEQ-19]] 8단계
 
 **입력** 전부 `pipeline`이 확정한 값. `commit_hash`는 push 성공 후
 
 **처리** — 호출자의 트랜잭션 안
-1. `DB: documents insert (project_id, doc_id, doc_type, status=frontmatter의 status (없으면 draft), current_body=body, current_version_no=1, has_convention_error=False)`
+1. `DB: documents insert (project_id, doc_id, doc_type, status=frontmatter의 status (없으면 draft), current_body=body, current_version_no=1, has_convention_error=bool(violations), convention_error_detail, incomplete_warnings=warnings JSON)` — `save` 7단계와 같은 규칙. **첫 저장부터 경고가 남아야** 생성 직후 승인이 막힌다
 2. `blocks = item_blocks(body, doc_type)`. `DB: items insert` 블록마다 `(document_id, item_id, display_name, is_deleted=False)`
 3. `DB: versions insert (document_id, version_no=1, commit_hash, body, author_kind, author_user_id, instructed_by_user_id, via, message, created_at)`
 4. `→ Version`
@@ -276,10 +276,10 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **처리**
 1. `DB: versions where document_id` → `Version(version_no, commit_hash, message=versions.message, author=AuthorRef, created_at)` (DTO)
-2. `DB: status_changes where document_id and commit_hash is not null` → `(version_no=None, commit_hash, message="status(...): from → to", author=changed_by, created_at=changed_at)`
+2. `DB: status_changes where document_id and commit_hash is not null` → `Version(version_no=None, commit_hash, message="status(...): from → to", author=AuthorRef(kind=human, user_id=changed_by_user_id, instructed_by_id=None, via="web"), created_at=changed_at)`
 3. 둘을 `created_at` 내림차순으로 합쳐 `→`
 
-**출력** `Version[]` (DTO, API 스키마). status 행은 `version_no: null`. `author`는 `AuthorRef` — 이름은 라우터가 `users_by_ids`로
+**출력** `Version[]` (DTO, API 스키마 + `doc_id`). status 행은 `version_no: null`. `author`는 `AuthorRef` — 이름은 호출한 입구(라우터 또는 `queries`)가 `users_by_ids`로 채워 API `author`로 내보낸다
 
 **테스트 관점** 버전 3 + 상태변경 2 → 5행 시각순 · 자동 강등 StatusChange(commit_hash null)는 안 나옴 — 본문 커밋 행에 딸린 것
 
@@ -420,7 +420,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-SEQ-001#SEQ-9]] · UI-4 요소 5
 
-**처리** `list_versions`와 같이 `versions` ∪ `status_changes(commit_hash not null)`를 프로젝트 전체로, `created_at desc limit n`
+**처리** `list_versions`와 같이 `versions` ∪ `status_changes(commit_hash not null)`를 프로젝트 전체로, `created_at desc, id desc limit n` (같은 시각 안정 정렬). 각 행에 `doc_id`
 
 ---
 
