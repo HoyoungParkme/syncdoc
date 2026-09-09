@@ -33,6 +33,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#SpecService.save]] | 버전·항목 저장 |
 | [[#SpecService.apply_status]] | 상태 변경 적용 |
 | [[#SpecService.mark_deleted]] | 파일 삭제 반영 |
+| [[#SpecService.version_body]] | 특정 버전 본문 |
 | [[#SpecService.list_versions]] | 버전 + 상태변경 이력 |
 | [[#SpecService.diff]] | 두 버전 diff |
 | [[#SpecService.list_by_project]] | 프로젝트 문서 목록 |
@@ -268,6 +269,16 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ---
 
+#### SpecService.version_body 특정 버전 본문
+
+**시그니처** `version_body(doc_id: str, version_no: int) -> str`
+
+근거: [[SYNC-MS-007#pipeline.revert]] 1단계 — 되돌릴 본문을 읽는다
+
+**처리** `DB: versions join documents where doc_id and version_no` → `body` · if 없음 → `! not-found {resource: version}`
+
+---
+
 #### SpecService.list_versions 버전 + 상태변경 이력
 
 **시그니처** `list_versions(doc_id: str) -> list[Version]`
@@ -456,7 +467,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-SEQ-001#SEQ-21]] · [[SYNC-DOM-003]] 설계 규칙
 
-**처리** `DB: delete versions where document in project`. **`documents`·`items`는 지우지 않는다** — `flags`·`comments`·`status_changes`가 FK. `items`는 재구축 `save`가 upsert. `documents.current_version_no=0`으로 초기화
+**처리** `DB: delete versions where document in project`. **`documents`·`items`는 지우지 않는다** — `flags`·`comments`·`status_changes`가 FK. `items`는 재구축 `save`가 upsert. `current_version_no`는 **건드리지 않는다** — `ck_documents_version_no(>=1)` 때문에 0을 넣을 수 없다. 재구축의 `save(rebuild=True)`가 남은 버전 수 + 1로 다시 매긴다
 
 ---
 
