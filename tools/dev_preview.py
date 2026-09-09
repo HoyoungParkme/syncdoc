@@ -21,23 +21,23 @@ PREVIEW = Path(os.environ.get("SYNCDOC_PREVIEW_DIR", "/tmp/syncdoc-preview"))
 os.environ["DATABASE_URL"] = "postgresql+psycopg://syncdoc:syncdoc@localhost:5434/syncdoc_dev"
 os.environ.setdefault("SECRET_KEY", "dev-preview-secret")
 os.environ.setdefault("REPOS_DIR", str(PREVIEW / "repos"))
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "backend"))  # 임포트 패키지는 backend/app (DOM-002 1장)
 
 from fastapi import Depends, Request  # noqa: E402
 from fastapi.responses import RedirectResponse  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
-from syncdoc import db  # noqa: E402
-from syncdoc.core import pipeline  # noqa: E402
-from syncdoc.core.account.service import AccountService  # noqa: E402
-from syncdoc.core.collab.service import CommentService  # noqa: E402
-from syncdoc.core.errors import Problem  # noqa: E402
-from syncdoc.core.project.models import Project, Repository  # noqa: E402
-from syncdoc.core.reference.service import ReferenceService  # noqa: E402
-from syncdoc.core.spec.service import SpecService  # noqa: E402
-from syncdoc.core.tracking.service import TrackingService  # noqa: E402
-from syncdoc.core.types import (  # noqa: E402
+from app import db  # noqa: E402
+from app.core import pipeline  # noqa: E402
+from app.core.account.service import AccountService  # noqa: E402
+from app.core.collab.service import CommentService  # noqa: E402
+from app.core.errors import Problem  # noqa: E402
+from app.core.project.models import Project, Repository  # noqa: E402
+from app.core.reference.service import ReferenceService  # noqa: E402
+from app.core.spec.service import SpecService  # noqa: E402
+from app.core.tracking.service import TrackingService  # noqa: E402
+from app.core.types import (  # noqa: E402
     Author,
     AuthorKind,
     DocType,
@@ -45,8 +45,8 @@ from syncdoc.core.types import (  # noqa: E402
     Propagation,
     spec_dir,
 )
-from syncdoc.main import app  # noqa: E402
-from syncdoc.web import auth  # noqa: E402
+from app.main import app  # noqa: E402
+from app.web import auth  # noqa: E402
 
 ORDER = ["RFQ", "PRD", "SCN", "UC", "INFRA", "DOM", "UI", "API", "SEQ", "MS", "CODE", "STD"]
 
