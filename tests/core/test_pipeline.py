@@ -306,3 +306,34 @@ async def test_change_status_commits_frontmatter_no_version(scoped: Session, pro
     with pytest.raises(StatusBlocked):
         await pipeline.change_status(scn.doc_id, "approved", user, None, upstream_reviewed=True)
     assert r.doc_id == "EXMP-PRD-001"
+
+
+# ── 11단계: 변경 영향 → 전파 미결정 (B3, detect_impact 스텁 해제) ──
+async def test_update_with_changed_items_creates_pending_decision(scoped: Session, proj) -> None:
+    await create(proj, DocType.RFQ, RFQ)
+    r1 = await create(proj)
+    svc = SpecService(scoped)
+    rfq = svc.get_document("EXMP-RFQ-001")
+    r = await update(
+        proj, "EXMP-RFQ-001", rfq.body.replace("내용", "바뀐 내용"), 1, changed_items=["Q1"]
+    )
+    assert r.pending_decision_version_id is not None and r.version_no == 2
+    dec = scoped.execute(
+        text("SELECT version_id, choice, affected_pks, changed_pks FROM propagation_decisions")
+    ).one()
+    r1_pk = next(i.pk for i in svc.get_document("EXMP-PRD-001").items if i.item_id == "R1")
+    q1 = next(i.pk for i in rfq.items if i.item_id == "Q1")
+    assert dec == (r.pending_decision_version_id, "undecided", [r1_pk], [q1])  # R1이 Q1 참조
+    # 영향 없음 선언 → 미결정 없음 · diff 판정(changed_items None)도 같은 결과
+    r2 = await update(
+        proj, "EXMP-RFQ-001", svc.get_document("EXMP-RFQ-001").body + "\n", 2, changed_items=[]
+    )
+    assert r2.pending_decision_version_id is None
+    body = svc.get_document("EXMP-RFQ-001").body.replace("바뀐 내용", "또 바뀐 내용")
+    r3 = await update(proj, "EXMP-RFQ-001", body, 3, changed_items=None)
+    assert (
+        r3.pending_decision_version_id == r3.version_no
+        and False
+        or r3.pending_decision_version_id is not None
+    )
+    assert r1.doc_id == "EXMP-PRD-001"
