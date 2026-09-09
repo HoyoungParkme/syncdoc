@@ -52,7 +52,7 @@ syncdoc/            저장소 = 프로젝트
 - `python tools/open_items.py` — 명세의 열린 미결 모음. `--markdown`이 STD-003 5장 내용, `--check`가 그것과 대조
 - `python tools/view_build.py --all` — 사람용 뷰 생성 → `docs/views/`. React 유저용 탭의 참조 구현
 - `python tools/dev_preview.py` — 개발 DB에 시드를 넣고 앱을 띄운다. 화면 확인용
-- 커밋 메시지: 코드 `code(슬라이스): 함수 — 요약` · 명세 `spec(문서ID): 요약` · 상태 `status(문서ID): a → b`. 둘째 줄부터 이유
+- 커밋 메시지: 코드 `code(슬라이스): 함수 — 요약` · 명세 `spec(문서ID): 요약` · 상태 `status(문서ID): a → b` · 끝난 슬라이스 수정 `fix(#이슈번호): 요약`(DEV-15). 둘째 줄부터 이유
 
 ## 문서 위치
 
