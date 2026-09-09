@@ -197,7 +197,7 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
 3b. 남은 파일을 **문서 타입의 단계 순**으로 정렬(RFQ→…→CODE→STD). 경로순이면 하위가 먼저 저장돼 상위 참조가 미존재로 남는다
 4. 파일마다 (락은 `save_pipeline` 안에서):
    - `body = git.read(repo, path, head_hash)`
-   - `doc_id` = **파일명**(github 경로는 `issue_doc_id`를 쓰지 않는다 — 커밋이 진실). `path_type` = 디렉터리명. if `path_type != frontmatter.type` → `frontmatter.doc_id` 위반으로 처리(저장은 됨)
+   - `doc_id` = **파일명**(github 경로는 `issue_doc_id`를 쓰지 않는다 — 커밋이 진실). `path_type` = 디렉터리명에서 번호를 뗀 것(`06-DOM` → `DOM`, STD-001 1.1). if `path_type != frontmatter.type` → `frontmatter.doc_id` 위반으로 처리(저장은 됨)
    - github 진입은 **항목 삭제 확인을 건너뛴다** — 물어볼 상대가 없고 커밋이 진실이다. 사라진 항목은 `is_deleted` + `raise_broken`으로 통보
    - 파일명·디렉터리·미등록 작성자 위반은 저장 뒤 `spec.mark_convention_error`로 덧붙인다
    - `user = account.user_by_login(author_login)` · if None → `user = account.create_placeholder(author_login)`, 위반에 `author.unknown` 추가
@@ -239,7 +239,7 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 2. `git.fetch(repo.workdir)`, `git.checkout(repo.workdir, "origin/HEAD")` · if fetch 실패 → `! rebuild-failed {reason}` (500으로 새지 않게)
 3. **트랜잭션 시작**
 4. `reference.clear(project_id)` · `spec.clear_index(project_id)` — `versions`만 삭제. `documents`·`items`는 유지(플래그·댓글 FK)
-5. `paths = git.list(repo, "docs/specs/*/*.md")` (`_templates`·`assets` 제외)
+5. `paths = git.list(repo, "docs/specs/*/*.md")` (`_templates`·`assets` 제외. 번호 붙은 디렉터리도 `*`에 걸린다)
 6. 파일마다:
    - `log = git.log(repo, path)` 오래된 것부터 `[(hash, login, date, message)]`
    - 커밋마다: `body = git.read(path @ hash)`
