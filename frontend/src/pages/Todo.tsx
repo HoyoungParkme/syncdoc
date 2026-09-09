@@ -95,7 +95,7 @@ export function Todo() {
               미해결 댓글 <span className="cnt">{t.unresolved_comments.length}</span>
             </h4>
             {t.unresolved_comments.map((c, i) => (
-              <div className="row link" data-el={i === 0 ? '6.1' : undefined} key={c.id} onClick={() => nav(`${docPath(c.doc_id)}?panel=comments`)}>
+              <div className="row link" data-el={i === 0 ? '6.1' : undefined} key={c.id} onClick={() => nav(`${docPath(c.doc_id)}?panel=comments#line-${c.line_no}`)}>
                 <span className="k">{c.doc_id}</span> {c.line_no}행
                 <span className="lbl">
                   {c.author?.display_name}: {c.excerpt}

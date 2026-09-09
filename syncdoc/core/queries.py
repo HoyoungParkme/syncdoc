@@ -417,7 +417,8 @@ async def flag_view(flag_id: int) -> FlagDetail:
                 detail.cause_body = f"{doc.title} (문서 단위 지목)"
         target = names[f.target_item_id]
         assert target.doc_id and target.item_id
-        detail.target_body = spec.get_item(target.doc_id, target.item_id).body
+        item = spec.get_item(target.doc_id, target.item_id)
+        detail.target_body, detail.target_version_no = item.body, item.doc_version_no
         tdoc = spec.get_document(target.doc_id)
         latest = spec.versions_by_ids([tdoc.current_version_id])[tdoc.current_version_id]  # type: ignore[index]
         detail.target_changed_since_raise = latest.created_at > f.raised_at

@@ -3,7 +3,7 @@
  *  · 3 내 항목 영역(3.1, 3.2 버전·변경 여부, 3.3 본문, 3.4) · 4 처리(4.1 확인함, 4.2 안내) · 5 내 할 일로 */
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ago, api, ApiError, docPath, FLAG_KO, refKey, type Document, type FlagDetail } from '../api/client'
+import { ago, api, ApiError, docPath, FLAG_KO, refKey, type FlagDetail } from '../api/client'
 import { DiffBox } from '../components/DiffBox'
 import { renderBlocks, type RenderCtx } from '../view/md'
 
@@ -11,15 +11,11 @@ export function FlagView() {
   const { flagId = '' } = useParams()
   const nav = useNavigate()
   const [f, setF] = useState<FlagDetail | null>(null)
-  const [targetDoc, setTargetDoc] = useState<Document | null>(null)
   const [err, setErr] = useState('')
   useEffect(() => {
     api
       .get<FlagDetail>(`/api/flags/${flagId}`)
-      .then((d) => {
-        setF(d)
-        if (d.target.doc_id) api.get<Document>(`/api/docs/${d.target.doc_id}`).then(setTargetDoc)
-      })
+      .then(setF)
       .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : String(e)))
   }, [flagId])
   const ctx = useMemo<RenderCtx>(
@@ -82,7 +78,7 @@ export function FlagView() {
           <div className="sech">
             <b data-el="3.1">내 항목: {refKey(f.target)}</b>
             <span className="lbl" data-el="3.2">
-              {targetDoc && `v${targetDoc.current_version_no} · `}플래그 부여 후 변경 {f.target_changed_since_raise ? '있음' : '없음'}
+              v{f.target_version_no} · 플래그 부여 후 변경 {f.target_changed_since_raise ? '있음' : '없음'}
             </span>
             <span className="grow" />
             <Link className="btn sm" data-el="3.4" to={docPath(f.target.doc_id, f.target.item_id)}>

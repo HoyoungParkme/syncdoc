@@ -76,6 +76,11 @@ export function DocView() {
       document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: 'start' })
       const it = window.location.hash.startsWith('#item-') ? window.location.hash.slice(6) : ''
       if (it && doc?.items.some((i) => i.item_id === it)) setSelected(it) // 내 할 일 3.1·7.1 진입 — 패널에 플래그 정보
+      const ln = /^#line-(\d+)$/.exec(window.location.hash)
+      if (ln) {
+        setLine(Number(ln[1])) // 내 할 일 6.1 진입 — ?panel=comments#line-N
+        setPanel('comments')
+      }
     }
     return () => {
       root.removeEventListener('click', onClick)

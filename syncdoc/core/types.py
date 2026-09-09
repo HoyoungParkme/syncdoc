@@ -425,6 +425,7 @@ class FlagDetail(FlagSummary):
     cause_diff: Diff | None = None
     cause_change_count: int = 0
     target_body: str = ""
+    target_version_no: int = 0  # UI-11 3.2 "v7" — 문서 API를 또 부르지 않게 (MS-008 5단계)
     target_changed_since_raise: bool = False
     cause_deleted_at: datetime | None = None
     cause_body: str | None = None

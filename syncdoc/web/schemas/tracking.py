@@ -43,6 +43,7 @@ class FlagDetail(FlagSummary):
     cause_diff: Diff | None
     cause_change_count: int
     target_body: str
+    target_version_no: int
     target_changed_since_raise: bool
     cause_deleted_at: datetime | None  # MS-008 flag_view 4 (API 스키마에 없음, 보고)
     cause_body: str | None  # MS-008 flag_view 4a

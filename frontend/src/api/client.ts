@@ -166,6 +166,7 @@ export interface FlagDetail extends FlagSummary {
   cause_diff: Diff | null
   cause_change_count: number
   target_body: string
+  target_version_no: number
   target_changed_since_raise: boolean
   cause_deleted_at: string | null
   cause_body: string | null
