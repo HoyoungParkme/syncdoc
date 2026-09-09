@@ -377,7 +377,7 @@ classDiagram
 | `ItemBlock` | `item_id: str` · `display_name: str` · `level: int` · `start_line: int` · `end_line: int` · `text: str` | item_blocks → validate·get_item·save·diff |
 | `ItemView` | `doc_id` · `item_id` · `display_name` · `body: str` · `doc_status: DocStatus` · `doc_version_no: int` · `flags: list[str]` | get_item → queries |
 | `Document` (DTO) | API `Document` 스키마 + `id: int`(행 pk) · `current_version_id: int`(최근 versions.id — detect_impact의 prev) · `last_author: AuthorRef` · `missing_refs: list[str]`(미존재 참조 raw_target) | get_document. ORM은 `DocumentRow`(DEV-2) |
-| `Version` (DTO) | API `Version` 스키마 — `version_no?` `commit_hash` `message` `author: AuthorRef` `created_at` | list_versions · recent_changes. ORM은 `VersionRow`. `create`·`save`는 `VersionRow`를 돌려준다 |
+| `Version` (DTO) | API `Version` 스키마 — `doc_id` `version_no?` `commit_hash` `message` `author: AuthorRef` `created_at` | list_versions · recent_changes. ORM은 `VersionRow`. `create`·`save`는 `VersionRow`를 돌려준다. 내부 필드명(`author_view` 등)은 자유, **API로 나가는 필드명은 API-001 스키마 그대로**(`author`) |
 | `DocRef` | `document_id` · `doc_id` · `title` · `stage` · `status` | describe_documents. 문서 단위 참조 대상 표시 |
 | `DownstreamView` | `by_item: dict[str, list[ItemRef]]` · `by_document: list[{doc_id, title, items}]` | queries.downstream_view → 추적표 |
 | `VersionBrief` | `id` · `document_id` · `version_no` · `created_at` · `message` | versions_by_ids → 플래그의 cause_version, 미결정 목록 |
@@ -553,7 +553,7 @@ classDiagram
         +validate(body: str, doc_type: DocType, entry: Entry, current_status: DocStatus?) ValidateResult
         +apply_frontmatter(body: str, doc_id: str, doc_type: DocType, status: DocStatus) str
         +detect_deleted_items(document: Document, body: str) list~int~
-        +create(project_id: int, doc_id: str, doc_type: DocType, body: str, commit_hash: str, author: Author, message: str) VersionRow
+        +create(project_id: int, doc_id: str, doc_type: DocType, body: str, commit_hash: str, author: Author, message: str, validate_result: ValidateResult?) VersionRow
         +save(document: Document, body: str, commit_hash: str, author: Author, message: str, deleted_item_pks: list~int~, validate_result: ValidateResult?, rebuild: bool) VersionRow
         +apply_status(document: Document, new_body: str, commit_hash: str?, user: User, reason: str?, to: DocStatus?) None
         +list_versions(doc_id: str) list~Version~
