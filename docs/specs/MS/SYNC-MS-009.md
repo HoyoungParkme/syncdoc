@@ -156,7 +156,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-UC-001#UC-A1]] 4 · [[SYNC-STD-001]] 1.1
 
-**처리** 반환할 `files` dict 구성 — `docs/specs/{TYPE}/.gitkeep` 12개(11단계 + STD), `docs/specs/_templates/{TYPE}.md` 12개(앱에 내장된 `_templates/` 사본), `docs/specs/assets/.gitkeep`, `docs/specs/README.md`(규약 링크). `→ files` — 실제 쓰기·커밋은 `commit_push(files=…)`
+**처리** 반환할 `files` dict 구성 — `docs/specs/{NN-TYPE}/.gitkeep` 12개(11단계는 `01-RFQ`…`11-CODE`, 단계 밖 `STD`는 번호 없이 — STD-001 1.1), `docs/specs/_templates/{TYPE}.md` 12개(템플릿 파일명은 타입만. 앱에 내장된 `_templates/` 사본), `docs/specs/assets/.gitkeep`, `docs/specs/README.md`(규약 링크 + 11단계 순서표). `→ files` — 실제 쓰기·커밋은 `commit_push(files=…)`
 
 ---
 
