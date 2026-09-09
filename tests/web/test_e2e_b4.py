@@ -21,7 +21,7 @@ from tests.core.reference.test_service import RFQ
 from tests.core.test_pipeline import PRD_BODY, PRD_FILE, RFQ_FILE
 from tests.web.conftest import login
 
-SCN_FILE = "docs/specs/SCN/EXMP-SCN-001.md"
+SCN_FILE = "docs/specs/03-SCN/EXMP-SCN-001.md"
 SCN = "---\ndoc_id: EXMP-SCN-001\ntype: SCN\ntitle: 시나리오\nstatus: draft\nupstream: [EXMP-PRD-001]\n---\n# 시나리오\n\n## 1. 페르소나\n\n#### P1 사람\n근거 [[EXMP-PRD-001#R1]]\n"
 
 

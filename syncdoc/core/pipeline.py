@@ -47,6 +47,8 @@ from syncdoc.core.types import (
     RebuildResult,
     SaveResult,
     Violation,
+    spec_dir,
+    type_of_dir,
 )
 from syncdoc.infra import git
 
@@ -168,7 +170,7 @@ async def _run(
             Path(repo.workdir_path),
             message,
             author,
-            path=f"docs/specs/{doc_type}/{doc_id}.md",
+            path=f"docs/specs/{spec_dir(doc_type)}/{doc_id}.md",
             content=body,
         )
     assert commit_hash is not None
@@ -352,8 +354,8 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]:
 
 
 def _dir_type(path: str) -> str:
-    parts = Path(path).parts  # docs/specs/<TYPE>/<doc_id>.md
-    return parts[2] if len(parts) > 3 else ""
+    parts = Path(path).parts  # docs/specs/<NN-TYPE>/<doc_id>.md
+    return type_of_dir(parts[2]) if len(parts) > 3 else ""
 
 
 async def _process_file(workdir: Path, code: str, f, head_hash: str) -> list[SaveResult]:

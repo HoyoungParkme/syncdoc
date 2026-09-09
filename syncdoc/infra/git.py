@@ -13,7 +13,7 @@ from pathlib import Path, PurePosixPath
 
 from syncdoc.core.account.service import AccountService
 from syncdoc.core.errors import PushFailed, Unauthorized
-from syncdoc.core.types import Author, ChangedFile, Commit
+from syncdoc.core.types import Author, ChangedFile, Commit, spec_dir
 
 range_ = range  # changed_files의 인자 이름 range(MS-009 시그니처)가 내장을 가린다
 _TOKEN_IN_URL = re.compile(r"(x-access-token:)[^@]+@")
@@ -236,7 +236,24 @@ _README = """# docs/specs — 명세 원본
 
 싱크독 명세 체인 11단계 + STD. 쓰는 법은 명세 작성 규약 SYNC-STD-001, 타입별 뼈대는 `_templates/`.
 
-- 경로 `docs/specs/{TYPE}/{doc_id}.md` · 문서 ID `{프로젝트코드}-{TYPE}-{NNN}`
+**위에서 아래로 읽는다.** 디렉터리 번호가 그 순서다.
+
+| # | 디렉터리 | 무엇 |
+|---|---|---|
+| 1 | `01-RFQ` | 요청 — 무엇을 원하나 |
+| 2 | `02-PRD` | 제품 요구사항 |
+| 3 | `03-SCN` | 사용자 시나리오 |
+| 4 | `04-UC` | 유스케이스 |
+| 5 | `05-INFRA` | 인프라·제약 |
+| 6 | `06-DOM` | 도메인 모델 · **클래스 명세** · ERD·DD (문서 셋) |
+| 7 | `07-UI` | 화면 설계 · 와이어프레임 |
+| 8 | `08-API` | REST · MCP 도구 |
+| 9 | `09-SEQ` | 시퀀스 |
+| 10 | `10-MS` | MINISPEC — 함수 단위 |
+| 11 | `11-CODE` | 구현 슬라이스 카드 |
+| — | `STD` | 작성 규약·뷰 규약·개발 규약 (단계 밖) |
+
+- 경로 `docs/specs/{NN-TYPE}/{doc_id}.md` · 문서 ID `{프로젝트코드}-{TYPE}-{NNN}`
 - 상태(`status`)는 frontmatter가 진실. 변경은 싱크독 웹에서만
 - 첨부는 `assets/`
 """
@@ -246,7 +263,7 @@ async def init_specs(workdir: Path) -> dict[str, str]:
     """SYNC-MS-009#git.init_specs"""
     files: dict[str, str] = {}
     for t in _TYPES:
-        files[f"docs/specs/{t}/.gitkeep"] = ""
+        files[f"docs/specs/{spec_dir(t)}/.gitkeep"] = ""
         files[f"docs/specs/_templates/{t}.md"] = (_TEMPLATES_DIR / f"{t}.md").read_text(
             encoding="utf-8"
         )

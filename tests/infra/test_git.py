@@ -89,14 +89,14 @@ async def test_commit_push_rebases_when_remote_moved_on_other_file(
 
     async def racing_run(workdir: Path | None, *args: str) -> str:
         if args[:1] == ("push",) and not pushed:
-            pushed.append(write_commit_push(repos["other"], "docs/specs/RFQ/X.md", "x", "race"))
+            pushed.append(write_commit_push(repos["other"], "docs/specs/01-RFQ/X.md", "x", "race"))
         return await real_run(workdir, *args)
 
     monkeypatch.setattr(g, "_run", racing_run)
     h = await g.commit_push(repos["work"], "spec: mine", _author(), path=SEED, content="mine")
     assert h == git(repos["remote"], "rev-parse", "main")
     assert git(repos["remote"], "rev-parse", "main~1") == pushed[0]
-    assert git(repos["work"], "show", "HEAD:docs/specs/RFQ/X.md") == "x"
+    assert git(repos["work"], "show", "HEAD:docs/specs/01-RFQ/X.md") == "x"
 
 
 async def test_commit_push_conflict_restores_workdir(
@@ -156,7 +156,7 @@ async def test_changed_files_keeps_last_commit_per_file_and_skips_templates(
     o = repos["other"]
     write_commit_push(o, SEED, "v2", "spec(SYNC-PRD-001): v2")
     h3 = write_commit_push(o, SEED, "v3", "spec(SYNC-PRD-001): v3\n\n이유가 있다")
-    h4 = write_commit_push(o, "docs/specs/SCN/SYNC-SCN-001.md", "s", "spec(SYNC-SCN-001): new")
+    h4 = write_commit_push(o, "docs/specs/03-SCN/SYNC-SCN-001.md", "s", "spec(SYNC-SCN-001): new")
     write_commit_push(o, "docs/specs/_templates/PRD.md", "t", "chore: template")
     write_commit_push(o, "docs/specs/assets/a.png", "img", "chore: asset")
     write_commit_push(o, "README.md", "outside", "chore: outside prefix")
@@ -164,7 +164,7 @@ async def test_changed_files_keeps_last_commit_per_file_and_skips_templates(
     got = await g.changed_files(repos["work"], f"{base}..{head}", "docs/specs/")
     assert [(c.path, c.status, c.commit_hash) for c in got] == [
         (SEED, "M", h3),
-        ("docs/specs/SCN/SYNC-SCN-001.md", "A", h4),
+        ("docs/specs/03-SCN/SYNC-SCN-001.md", "A", h4),
     ]
     assert got[0].message == "spec(SYNC-PRD-001): v3\n\n이유가 있다"
     assert got[0].author_login == "seed"
@@ -190,13 +190,13 @@ async def test_changed_files_deleted_file_has_status_d(repos: dict[str, Path]) -
 # ── list ──
 async def test_list_filters_by_glob_at_ref(repos: dict[str, Path]) -> None:
     o = repos["other"]
-    write_commit_push(o, "docs/specs/SCN/SYNC-SCN-001.md", "s", "a")
+    write_commit_push(o, "docs/specs/03-SCN/SYNC-SCN-001.md", "s", "a")
     write_commit_push(o, "docs/specs/_templates/PRD.md", "t", "b")
     write_commit_push(o, "docs/specs/README.md", "r", "c")
     write_commit_push(o, "README.md", "x", "d")
     await g.fetch(repos["work"])
     got = await g.list(repos["work"], "docs/specs/*/*.md", "origin/HEAD")
-    assert got == [SEED, "docs/specs/SCN/SYNC-SCN-001.md", "docs/specs/_templates/PRD.md"]
+    assert got == [SEED, "docs/specs/03-SCN/SYNC-SCN-001.md", "docs/specs/_templates/PRD.md"]
     assert await g.list(repos["work"], "docs/specs/*/*.md") == [SEED]
 
 
@@ -204,7 +204,7 @@ async def test_list_filters_by_glob_at_ref(repos: dict[str, Path]) -> None:
 async def test_log_lists_file_history_oldest_first(repos: dict[str, Path]) -> None:
     o = repos["other"]
     h2 = write_commit_push(o, SEED, "v2", "spec(SYNC-PRD-001): v2\n\n왜냐하면")
-    write_commit_push(o, "docs/specs/SCN/SYNC-SCN-001.md", "s", "other file")
+    write_commit_push(o, "docs/specs/03-SCN/SYNC-SCN-001.md", "s", "other file")
     await g.fetch(repos["work"])
     await g.checkout(repos["work"], "origin/HEAD")
     got = await g.log(repos["work"], SEED)
@@ -227,10 +227,10 @@ async def test_rev_list_count_counts_commits_behind(repos: dict[str, Path]) -> N
 async def test_exists_is_committed_not_workdir(repos: dict[str, Path]) -> None:
     assert await g.exists(repos["work"], "docs/specs") is True
     assert await g.exists(repos["work"], SEED) is True
-    (repos["work"] / "docs/specs/UC").mkdir()
-    (repos["work"] / "docs/specs/UC/x.md").write_text("uncommitted", encoding="utf-8")
-    assert await g.exists(repos["work"], "docs/specs/UC") is False
-    assert await g.exists(repos["work"], "docs/specs/UC/x.md") is False
+    (repos["work"] / "docs/specs/04-UC").mkdir()
+    (repos["work"] / "docs/specs/04-UC/x.md").write_text("uncommitted", encoding="utf-8")
+    assert await g.exists(repos["work"], "docs/specs/04-UC") is False
+    assert await g.exists(repos["work"], "docs/specs/04-UC/x.md") is False
 
 
 # ── init_specs ──
@@ -240,21 +240,22 @@ async def test_init_specs_returns_26_files_and_commit_push_writes_them(
     files = await g.init_specs(repos["work"])
     assert len(files) == 26
     dirs = {p.split("/")[2] for p in files if p.endswith("/.gitkeep")}
-    assert dirs == {
-        "RFQ",
-        "PRD",
-        "SCN",
-        "UC",
-        "INFRA",
-        "DOM",
-        "UI",
-        "API",
-        "SEQ",
-        "MS",
-        "CODE",
+    assert dirs == {  # 11단계는 번호 + 타입, 단계 밖 STD는 번호 없음 (STD-001 1.1)
+        "01-RFQ",
+        "02-PRD",
+        "03-SCN",
+        "04-UC",
+        "05-INFRA",
+        "06-DOM",
+        "07-UI",
+        "08-API",
+        "09-SEQ",
+        "10-MS",
+        "11-CODE",
         "STD",
         "assets",
     }
+    assert "| 6 | `06-DOM` |" in files["docs/specs/README.md"]  # 읽는 순서표
     assert files["docs/specs/_templates/PRD.md"].startswith("---\ndoc_id:")
     assert "SYNC-STD-001" in files["docs/specs/README.md"]
     h = await g.commit_push(repos["work"], "chore(SYNC): init syncdoc", _author(), files=files)

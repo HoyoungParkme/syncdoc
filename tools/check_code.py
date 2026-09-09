@@ -20,7 +20,7 @@ import re
 import sys
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-MS_GLOB = os.path.join(ROOT, "docs", "specs", "MS", "SYNC-MS-*.md")
+MS_GLOB = os.path.join(ROOT, "docs", "specs", "10-MS", "SYNC-MS-*.md")  # STD-001 1.1 {NN-TYPE}
 # 항목 ID 접두 → 코드 파일 (SYNC-DOM-002 1장 · "MS 문서 하나 = 코드 파일 하나")
 MODULES = {
     "ProjectService": "syncdoc/core/project/service.py",

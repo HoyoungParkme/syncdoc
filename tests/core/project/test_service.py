@@ -42,7 +42,7 @@ async def test_init_project_empty_repo_creates_specs_commit_and_11_null_stages(
     from tests.infra.conftest import git as g
 
     user = make_user(db_session, login="hoyoung")
-    # repos 픽스처의 remote는 docs/specs/PRD/SYNC-PRD-001.md가 이미 있다 → 새 bare 저장소를 하나 더
+    # repos 픽스처의 remote는 docs/specs/02-PRD/SYNC-PRD-001.md가 이미 있다 → 새 bare 저장소를 하나 더
     bare = repos_dir.parent / "empty.git"
     g(repos_dir.parent, "init", "-q", "--bare", "-b", "main", str(bare))
     seed = repos_dir.parent / "seed"
@@ -116,7 +116,7 @@ async def test_init_project_existing_specs_rejects_and_removes_workdir(
     # import_existing → 재구축으로 가져온다 (3a2). 시드 PRD 하나, frontmatter가 미완이라 규약 오류
     p = await svc.init_project(str(repos["remote"]), "EXST", "n", user, import_existing=True)
     assert p.code == "EXST" and p.repository.last_processed_commit is not None
-    assert (repos_dir / "EXST" / "docs/specs/PRD/SYNC-PRD-001.md").exists()
+    assert (repos_dir / "EXST" / "docs/specs/02-PRD/SYNC-PRD-001.md").exists()
     from syncdoc.core.spec.service import SpecService
 
     d = SpecService(db_session).get_document("SYNC-PRD-001")

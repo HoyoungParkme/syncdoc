@@ -37,7 +37,14 @@ from syncdoc.core.project.models import Project, Repository  # noqa: E402
 from syncdoc.core.reference.service import ReferenceService  # noqa: E402
 from syncdoc.core.spec.service import SpecService  # noqa: E402
 from syncdoc.core.tracking.service import TrackingService  # noqa: E402
-from syncdoc.core.types import Author, AuthorKind, DocType, Entry, Propagation  # noqa: E402
+from syncdoc.core.types import (  # noqa: E402
+    Author,
+    AuthorKind,
+    DocType,
+    Entry,
+    Propagation,
+    spec_dir,
+)
 from syncdoc.main import app  # noqa: E402
 from syncdoc.web import auth  # noqa: E402
 
@@ -159,7 +166,7 @@ async def seed() -> None:
 
     # 1. 이 저장소의 명세를 단계 순서대로 올린다 (호영의 에이전트)
     for typ in ORDER:
-        for f in sorted((ROOT / "docs/specs" / typ).glob("SYNC-*.md")):
+        for f in sorted((ROOT / "docs/specs" / spec_dir(typ)).glob("SYNC-*.md")):
             try:
                 r = await pipeline.save_pipeline(
                     Entry.mcp,

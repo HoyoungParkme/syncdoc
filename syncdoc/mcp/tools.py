@@ -312,7 +312,7 @@ async def get_template(project_code: str, doc_type: str) -> CallToolResult:
             _user(s)
             workdir = Path(ProjectService(s).get(project_code).repository.workdir_path)
         template = await _read_spec_file(workdir, f"docs/specs/_templates/{doc_type}.md")
-        std = await _read_spec_file(workdir, "docs/specs/STD/SYNC-STD-001.md")
+        std = await _read_spec_file(workdir, "docs/specs/STD/SYNC-STD-001.md")  # STD는 번호 없음
     except Problem as p:
         return _problem(p)
     item_re, secs = patterns_for(doc_type, None)

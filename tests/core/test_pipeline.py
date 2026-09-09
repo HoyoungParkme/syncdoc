@@ -82,7 +82,7 @@ async def test_create_issues_id_applies_frontmatter_commits_extracts(scoped: Ses
         None,
     )
     assert "section.missing: 요구" in r.warnings  # 미완성 경고는 저장되고 실린다
-    assert "docs/specs/RFQ/EXMP-RFQ-001.md" in remote_files(proj["repos"])
+    assert "docs/specs/01-RFQ/EXMP-RFQ-001.md" in remote_files(proj["repos"])
     assert r.commit_hash == g(proj["repos"]["remote"], "rev-parse", "main")
     r2 = await create(proj)  # PRD → RFQ#Q1 참조 추출
     assert r2.doc_id == "EXMP-PRD-001" and r2.warnings == []
@@ -391,8 +391,8 @@ async def test_revert_creates_new_version_and_asks_confirm_for_vanishing_items(
 
 
 # ── process_commit (B4, UC-G1) ──
-RFQ_FILE = "docs/specs/RFQ/EXMP-RFQ-001.md"
-PRD_FILE = "docs/specs/PRD/EXMP-PRD-001.md"
+RFQ_FILE = "docs/specs/01-RFQ/EXMP-RFQ-001.md"
+PRD_FILE = "docs/specs/02-PRD/EXMP-PRD-001.md"
 
 
 def _repo_row(proj):
@@ -463,8 +463,8 @@ async def test_process_commit_mismatched_filename_deleted_file_and_partial_failu
     (other / RFQ_FILE).parent.mkdir(parents=True, exist_ok=True)
     (other / RFQ_FILE).write_text(RFQ, encoding="utf-8")
     # 파일명 ≠ frontmatter doc_id (EXMP-PRD-002 파일에 EXMP-PRD-001 본문)
-    (other / "docs/specs/PRD").mkdir(parents=True, exist_ok=True)
-    (other / "docs/specs/PRD/EXMP-PRD-002.md").write_text(PRD_BODY, encoding="utf-8")
+    (other / "docs/specs/02-PRD").mkdir(parents=True, exist_ok=True)
+    (other / "docs/specs/02-PRD/EXMP-PRD-002.md").write_text(PRD_BODY, encoding="utf-8")
     g(other, "add", "-A")
     g(
         other,
@@ -507,7 +507,7 @@ async def test_process_commit_mismatched_filename_deleted_file_and_partial_failu
     # 한 파일 실패(알 수 없는 디렉터리) → 나머지는 처리, last_processed_commit 안 바뀜
     (other / "docs/specs/BOGUS").mkdir(parents=True, exist_ok=True)
     (other / "docs/specs/BOGUS/EXMP-BOGUS-001.md").write_text("# x\n", encoding="utf-8")
-    (other / "docs/specs/PRD/EXMP-PRD-002.md").write_text(PRD_BODY + "\n", encoding="utf-8")
+    (other / "docs/specs/02-PRD/EXMP-PRD-002.md").write_text(PRD_BODY + "\n", encoding="utf-8")
     g(other, "add", "-A")
     g(
         other,

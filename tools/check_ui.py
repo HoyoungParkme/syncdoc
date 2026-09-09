@@ -21,7 +21,7 @@ import re
 import sys
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-SPEC = os.path.join(ROOT, "docs", "specs", "UI", "SYNC-UI-002.md")
+SPEC = os.path.join(ROOT, "docs", "specs", "07-UI", "SYNC-UI-002.md")  # STD-001 1.1 {NN-TYPE}
 SRC = os.path.join(ROOT, "frontend", "src")
 SECTION = re.compile(r"^## (UI-\d+) ", re.M)
 HTML_BLOCK = re.compile(r"```html\n(.*?)```", re.S)

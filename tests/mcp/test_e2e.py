@@ -156,7 +156,9 @@ async def test_s1_agent_builds_specs_over_mcp(
         "chore(EXMP): init syncdoc",
     ]
     tree = g(bare, "ls-tree", "-r", "--name-only", "main")
-    assert "docs/specs/PRD/EXMP-PRD-001.md" in tree and "docs/specs/RFQ/EXMP-RFQ-001.md" in tree
+    assert (
+        "docs/specs/02-PRD/EXMP-PRD-001.md" in tree and "docs/specs/01-RFQ/EXMP-RFQ-001.md" in tree
+    )
     assert (
         g(bare, "log", "-1", "--format=%an <%ae>", "main")
         == "hoyoung <hoyoung@users.noreply.github.com>"

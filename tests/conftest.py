@@ -102,7 +102,7 @@ def scoped(db_session: Session, monkeypatch: pytest.MonkeyPatch) -> Session:
 import subprocess  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-SEED = "docs/specs/PRD/SYNC-PRD-001.md"
+SEED = "docs/specs/02-PRD/SYNC-PRD-001.md"
 
 
 def git(cwd: Path, *args: str) -> str:

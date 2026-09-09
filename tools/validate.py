@@ -40,6 +40,11 @@ def strip_code(text):
         out.append("" if inblk else re.sub(r"`[^`]*`", lambda m: " " * len(m.group(0)), l))
     return "\n".join(out)
 
+def _type_of_dir(name):
+    """디렉터리 이름 → 타입. `06-DOM` → `DOM` (SYNC-STD-001 1.1). STD는 번호가 없다."""
+    return name.split("-", 1)[1] if name[:2].isdigit() and "-" in name else name
+
+
 def validate(path, deleted_ids=()):
     raw = open(path, encoding="utf-8").read()
     V, W = [], []
@@ -61,7 +66,7 @@ def validate(path, deleted_ids=()):
     if not DOC_ID.match(did): V.append((2, "frontmatter.doc_id", f"형식 {did!r}"))
     elif did.split("-")[1] != typ: V.append((2, "frontmatter.doc_id", f"{did}의 타입 ≠ {typ}"))
     elif fname != f"{did}.md": V.append((2, "frontmatter.doc_id", f"파일명 {fname} ≠ {did}.md"))
-    elif os.path.basename(os.path.dirname(os.path.abspath(path))) != typ: V.append((2, "frontmatter.doc_id", f"디렉터리 ≠ {typ}"))
+    elif _type_of_dir(os.path.basename(os.path.dirname(os.path.abspath(path)))) != typ: V.append((2, "frontmatter.doc_id", f"디렉터리 ≠ {typ}"))
     up = fm.get("upstream", "")
     for u in re.findall(r"[\w-]+", up.strip("[]")):
         if not DOC_ID.match(u): V.append((2, "frontmatter.ref", f"upstream {u!r}"))

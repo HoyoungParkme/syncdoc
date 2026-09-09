@@ -173,6 +173,17 @@ STAGE_OF: dict[str, int] = {
 }
 
 
+def spec_dir(doc_type: str) -> str:
+    """타입 → 저장소 디렉터리 이름 `{NN-TYPE}` (STD-001 1.1). 단계 밖 STD는 번호 없이."""
+    n = STAGE_OF.get(str(doc_type))
+    return f"{n:02d}-{doc_type}" if n else str(doc_type)
+
+
+def type_of_dir(name: str) -> str:
+    """디렉터리 이름 → 타입. `06-DOM` → `DOM`, `STD` → `STD`."""
+    return name.split("-", 1)[1] if name[:2].isdigit() and "-" in name else name
+
+
 @dataclass(frozen=True)
 class Violation:
     line: int
