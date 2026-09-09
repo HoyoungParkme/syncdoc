@@ -63,6 +63,7 @@ erDiagram
         varchar remote_url
         varchar workdir_path
         varchar last_processed_commit
+        int registered_by_user_id FK
         timestamptz synced_at
     }
     documents {
@@ -205,6 +206,7 @@ erDiagram
 | remote_url | varchar(300) | not null | GitHub 저장소 주소 | `https://github.com/dfocus/syncdoc` |
 | workdir_path | varchar(300) | not null | 노트북의 작업 사본 경로 | `/var/syncdoc/repos/SYNC` |
 | last_processed_commit | varchar(40) | null 허용 | 파이프라인이 마지막으로 처리한 커밋. 밀린 커밋 따라잡기 기준 | `a1b2c3…` |
+| registered_by_user_id | int | FK not null | 이 저장소를 등록한 사람. 감사용이자, private 저장소를 지원할 때 fetch에 쓸 토큰의 주인 — 폴링·재구축은 요청한 사람이 없거나 다른 사람일 수 있다. **v1은 public만 쓰므로 fetch에 토큰이 필요 없다**(MS-009 미결) | |
 
 ### documents
 
