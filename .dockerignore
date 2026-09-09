@@ -1,0 +1,6 @@
+.git
+.venv
+frontend/node_modules
+syncdoc/web/static
+tests
+.playwright-mcp
