@@ -308,10 +308,10 @@ Cloudflare Tunnel은 노트북에서 별도로 실행하며 `:8000`을 공개 �
 
 ## 9. 미결사항
 
-- [ ] SQLite vs PostgreSQL 최종 확정 — 3장 참고. 상시 가동 서버로 옮길 계획 유무에 달렸다
+- [x] SQLite vs PostgreSQL 최종 확정 — 3장 참고. 상시 가동 서버로 옮길 계획 유무에 달렸다 — 결정: PostgreSQL. 3장이 이미 그 기준으로 쓰였고 `docker-compose.yml`이 postgres:16-alpine, `config.py`의 기본 DSN도 psycopg
 - [ ] 플래그·댓글의 백업 방식 — 6장 참고. DB 덤프를 저장소에 커밋할지, 유실을 감수할지
 - [ ] MCP 토큰의 만료·회수 정책
 - [ ] 토큰 암호화 비밀키의 보관 위치와 교체 절차
 - [ ] 저장소를 여러 개 등록했을 때 작업 사본 디스크 사용량 한도
-- [ ] Cloudflare Tunnel 고정 주소용 도메인 확보 여부
-- [ ] 원격 기본 브랜치 `main` 고정 — 다른 브랜치 저장소 지원은 v2
+- [x] Cloudflare Tunnel 고정 주소용 도메인 확보 여부 — 결정: v1은 Quick Tunnel(도메인 없음, 5장). 고정 주소가 필요해지면 도메인을 사서 Named Tunnel — v2
+- [x] 원격 기본 브랜치 `main` 고정 — 다른 브랜치 저장소 지원은 v2 — 결정: `main` 고정 (CODE-001 3장). 다른 브랜치 저장소는 v2
