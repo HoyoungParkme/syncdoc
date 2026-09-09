@@ -53,9 +53,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### git.fetch fetch
 
-**시그니처** `async def fetch(workdir: Path) -> str`
+**시그니처** `async def fetch(workdir: Path, token: str | None = None) -> str`
 
-**처리** `git fetch origin` → `git rev-parse origin/HEAD` · `→ 해시`. 작업 사본은 건드리지 않는다
+**처리** if `token` → `git fetch {url with token} +refs/heads/*:refs/remotes/origin/*` · else → `git fetch origin` → `git rev-parse origin/HEAD` · `→ 해시`. 작업 사본은 건드리지 않는다.
+
+**public 저장소는 토큰 없이 된다** — v1은 public만 쓴다. `clone`이 `.git/config`에서 토큰을 지우므로 private이면 매번 URL에 붙여야 하고, 그때 호출자가 `AccountService.github_token_for(repo.registered_by_user)`로 얻어 넘긴다. private 지원은 v2(8장 미결)
 
 ---
 
@@ -184,4 +186,5 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 3. 미결사항
 
+- [ ] **private 저장소 지원.** v1은 public 전용 — `fetch`가 토큰 없이 돈다. private이면 폴링·재구축·`repo_status`가 `registered_by_user_id`의 토큰으로 fetch해야 하고, 그 사람이 권한을 잃었을 때 UI-14에 표시하는 흐름이 필요하다. `clone`·`commit_push`는 이미 토큰을 쓴다
 - [ ] `commit_push` 6단계 rebase 재시도 횟수 — 지금 1회. 락이 있으니 충돌은 외부 push와만
