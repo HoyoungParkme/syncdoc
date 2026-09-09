@@ -87,8 +87,8 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-INFRA-001]] 5·7·8장 |
-| 구현 | Cloudflare Tunnel 고정 주소 · GitHub OAuth 앱 등록(callback URL) · webhook 등록 · `docker compose up` 기동 스크립트 · 기동 시 따라잡기 · 5분 폴링 |
-| 첫 사용 | 싱크독 저장소를 싱크독에 `init_project`(import_existing=true) → 문서 25개가 인덱스됨 → 참조 777개 확인 → 이 문서를 싱크독에서 승인 |
+| 구현 | Cloudflare **Quick Tunnel**(도메인 없음·주소 가변, INFRA 5장) · GitHub OAuth 앱 등록(callback URL은 켤 때마다 갱신) · **webhook은 걸지 않는다**(주소가 바뀐다) · `docker compose up` 기동 스크립트 · 기동 시 따라잡기 · 5분 폴링 |
+| 첫 사용 | 싱크독 저장소를 싱크독에 `init_project`(import_existing=true) → 문서·항목·참조가 인덱스되고 **validate 결과가 `tools/validate.py`와 일치** → 이 문서를 싱크독에서 승인 |
 | 테스트 | 노트북 밖에서 접속 · 팀원 로그인 · 팀원 토큰으로 MCP |
 | 선행 | B4 |
 | 완료 | — (C-1 로컬 2026-09-09 완료: `docker compose up --build`(Dockerfile에 React 빌드 단계 `6c63c6b`) → 마이그레이션 0001~0003 → 실제 GitHub OAuth 로그인 → `HoyoungParkme/syncdoc` `import_existing=true` → 문서 27·항목 338·참조 963(미존재 0)·규약 오류 0·미완성 0 = `tools/validate.py`와 일치 → MCP 토큰으로 `get_document`·`get_references` 확인. C-2(Tunnel·webhook·노트북 밖 접속·팀원 로그인) 대기 · 미결: 비공개 저장소의 fetch 토큰 — MS-009 `git.fetch`에 토큰이 없어 재구축·process_commit·repo_status·폴링이 죽는다. 이번엔 저장소를 public으로 바꿔 진행) |
