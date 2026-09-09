@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import difflib
 import json
 import re
 from datetime import UTC, datetime
@@ -26,6 +27,8 @@ from syncdoc.core.types import (
     STAGE_OF,
     Author,
     AuthorRef,
+    Diff,
+    DiffLine,
     DocItem,
     DocRef,
     DocStatus,
@@ -33,6 +36,7 @@ from syncdoc.core.types import (
     Document,
     DocumentSummary,
     Entry,
+    Hunk,
     ItemBlock,
     ItemRef,
     ItemView,
@@ -453,6 +457,59 @@ class SpecService:
             raise ItemDeleted(item.deleted_at.isoformat() if item.deleted_at else None)
         return item.id
 
+    def resolve_items(self, doc_id: str, item_ids: list[str]) -> list[int]:
+        """SYNC-MS-002#SpecService.resolve_items"""
+        row = self.repo.document_by_doc_id(doc_id)
+        if row is None:
+            return []
+        return [i.id for i in self.repo.items_by_item_ids(row.id, item_ids)]
+
+    def diff(self, doc_id: str, from_no: int, to_no: int) -> Diff:
+        """SYNC-MS-002#SpecService.diff"""
+        row = self.repo.document_by_doc_id(doc_id)
+        if row is None:
+            raise NotFound("document", doc_id)
+        bodies = self.repo.version_bodies(row.id, [from_no, to_no])
+        for no in (from_no, to_no):
+            if no not in bodies:
+                raise NotFound("version", f"{doc_id} v{no}")
+        src, dst = (
+            self._split_items(bodies[from_no], row.doc_type),
+            self._split_items(bodies[to_no], row.doc_type),
+        )
+        order = list(dst) + [k for k in src if k not in dst]
+        order.sort(key=lambda k: k is None)  # 항목 밖 텍스트는 마지막
+        hunks: list[Hunk] = []
+        for item_id in order:
+            a, b = src.get(item_id, ""), dst.get(item_id, "")
+            if _normalized(a) == _normalized(b):
+                continue  # 공백만 바뀜 → hunk 없음
+            if not a or not b:  # 새로 생긴 항목은 전부 add, 사라진 항목은 전부 del
+                op, text = ("add", b) if not a else ("del", a)
+                lines = [DiffLine(op, ln) for ln in text.rstrip("\n").split("\n")]
+            else:
+                lines = [
+                    DiffLine({"+": "add", "-": "del", " ": "ctx"}[ln[0]], ln[1:])
+                    for ln in difflib.unified_diff(a.split("\n"), b.split("\n"), n=1, lineterm="")
+                    if ln[:3] not in ("---", "+++") and not ln.startswith("@@")
+                ]
+            hunks.append(Hunk(item_id=item_id, lines=lines))
+        return Diff(from_version=from_no, to_version=to_no, hunks=hunks)
+
+    def _split_items(self, body: str, doc_type: str) -> dict[str | None, str]:
+        """본문 → {item_id: 블록 텍스트}. 항목 밖 텍스트는 None 키 하나 (MS-002 diff 2단계)."""
+        blocks = self.item_blocks(body, DocType(doc_type))
+        lines = body.split("\n")
+        covered: set[int] = set()
+        out: dict[str | None, str] = {}
+        for blk in blocks:
+            covered.update(range(blk.start_line - 1, blk.end_line))
+            out[blk.item_id] = blk.text
+        rest = "\n".join(ln for i, ln in enumerate(lines) if i not in covered)
+        if rest.strip():
+            out[None] = rest
+        return out
+
     def apply_status(
         self,
         document: Document,
@@ -547,6 +604,10 @@ class SpecService:
         if doc is None:
             return set()
         return {i.item_id for i in self.repo.items_of(doc.id, include_deleted=True) if i.is_deleted}
+
+
+def _normalized(text: str) -> list[str]:
+    return [ln.strip() for ln in text.split("\n") if ln.strip()]
 
 
 def _apply_validate(row: DocumentRow, vr: ValidateResult) -> None:

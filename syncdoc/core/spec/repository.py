@@ -51,6 +51,14 @@ class SpecRepository:
             select(Item).where(Item.document_id == document_id, Item.item_id == item_id)
         )
 
+    def items_by_item_ids(self, document_id: int, item_ids: list[str]) -> list[Item]:
+        if not item_ids:
+            return []
+        stmt = select(Item).where(
+            Item.document_id == document_id, Item.item_id.in_(item_ids), Item.is_deleted.is_(False)
+        )
+        return list(self.session.scalars(stmt.order_by(Item.id)))
+
     def items_by_pks(self, pks: list[int]) -> list[Item]:
         if not pks:
             return []
@@ -75,6 +83,12 @@ class SpecRepository:
             .limit(1)
         )
         return self.session.scalar(stmt)
+
+    def version_bodies(self, document_id: int, nos: list[int]) -> dict[int, str]:
+        stmt = select(VersionRow.version_no, VersionRow.body).where(
+            VersionRow.document_id == document_id, VersionRow.version_no.in_(nos)
+        )
+        return {no: body for no, body in self.session.execute(stmt)}
 
     def versions_by_ids(self, ids: list[int]) -> list[VersionRow]:
         if not ids:

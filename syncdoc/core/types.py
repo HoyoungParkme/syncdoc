@@ -267,6 +267,30 @@ class ItemRef:
     is_deleted: bool = False
 
 
+@dataclass(frozen=True)
+class DiffLine:
+    op: str  # add | del | ctx
+    text: str
+
+
+@dataclass
+class Hunk:
+    """SYNC-API-001 Diff.hunks[]. downstream_count는 queries.diff_with_impact가 채운다."""
+
+    item_id: str | None
+    lines: list[DiffLine]
+    downstream_count: int = 0
+
+
+@dataclass
+class Diff:
+    """SYNC-API-001 Diff."""
+
+    from_version: int
+    to_version: int
+    hunks: list[Hunk]
+
+
 @dataclass
 class Version:
     """SYNC-API-001 Version (DTO) — list_versions·recent_changes. status 커밋이면 version_no=None.
