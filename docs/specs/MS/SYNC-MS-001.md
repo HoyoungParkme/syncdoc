@@ -44,6 +44,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 0. **코드 단위 락**을 잡는다(`asyncio.Lock`, code별). 같은 코드로 동시에 두 번 들어오면 서로의 작업 사본을 지운다(UC-A1 2c)
 1. if `not re.fullmatch(r"[A-Z]{1,4}", code)` → `! project-code-invalid {rule}` (2b)
 2. if `DB: projects where code` → `! project-code-conflict {code}` (2a)
+2a. if `DB: repositories where remote_url 정규화 일치` → `! repository-already-registered {code: 그 프로젝트}` (UC-A1 2d). 정규화는 소문자 + 끝 `/`·`.git` 제거 — `web/routers/hooks.py`가 webhook 저장소를 찾을 때와 같은 규칙
 3. `workdir = config.REPOS_DIR / code` · if 이미 있음 → 지운다 (이전 실패 잔재)
 4. `token = AccountService.github_token_for(user)` · `git.clone(remote_url, workdir, token)` · if 실패 → workdir 삭제, `! push-failed {reason: clone}`
 5. `has = git.exists(workdir, "docs/specs")`
