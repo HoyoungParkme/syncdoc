@@ -25,6 +25,7 @@ from syncdoc.core.errors import (
     ItemDeleted,
     ItemDeletionNeedsConfirm,
     NotFound,
+    RebuildFailed,
     StatusBlocked,
     UpstreamReviewRequired,
     VersionConflict,
@@ -43,6 +44,7 @@ from syncdoc.core.types import (
     DocType,
     DocumentSummary,
     Entry,
+    RebuildResult,
     SaveResult,
     Violation,
 )
@@ -402,3 +404,94 @@ async def _process_file(workdir: Path, code: str, f, head_hash: str) -> list[Sav
             )
             s.commit()
     return [r]
+
+
+async def rebuild(code: str, session: Session | None = None) -> RebuildResult:
+    """SYNC-MS-007#pipeline.rebuild
+
+    session: init_project(import_existing)가 아직 커밋 안 된 프로젝트 행이 있는 자기 세션을 넘긴다
+    (save_pipeline의 session과 같은 방식. MS-007 시그니처에 없음 — 보고).
+    """
+    async with _lock(code):
+        if session is not None:
+            return await _rebuild(session, code)
+        with db.session_scope() as s:
+            return await _rebuild(s, code)
+
+
+async def _rebuild(s: Session, code: str) -> RebuildResult:
+    project = ProjectService(s).get(code)
+    repo = project.repository
+    workdir = Path(repo.workdir_path)
+    head = await git.fetch(workdir)
+    await git.checkout(workdir, "origin/HEAD")
+    spec, refs, account = SpecService(s), ReferenceService(s), AccountService(s)
+    result = RebuildResult(0, 0, 0, 0)
+    try:
+        refs.clear(project.id)
+        spec.clear_index(project.id)
+        for path in await git.list(workdir, "docs/specs/*/*.md", head):
+            doc_id, dir_type = Path(path).stem, _dir_type(path)
+            try:
+                doc_type = DocType(dir_type)
+            except ValueError:
+                result.convention_errors.append(
+                    {
+                        "doc_id": doc_id,
+                        "detail": f"frontmatter.doc_id: 알 수 없는 디렉터리 {dir_type}",
+                    }
+                )
+                continue
+            document = None
+            try:
+                document = spec.get_document(doc_id)
+            except NotFound:
+                pass
+            for c in await git.log(workdir, path):
+                body = await git.read(workdir, path, c.hash)
+                user = account.user_by_login(c.login) or account.create_placeholder(c.login)
+                author = Author(
+                    kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.github
+                )
+                if c.message.startswith("status(") and document is not None:
+                    spec.apply_status(document, body, c.hash, user, None)
+                else:
+                    vr = spec.validate(body, doc_type, Entry.github, None)
+                    if document is None:
+                        spec.create(
+                            project.id, doc_id, doc_type, body, c.hash, author, c.message, vr
+                        )
+                    else:
+                        deleted = spec.detect_deleted_items(document, body)
+                        spec.save(
+                            document, body, c.hash, author, c.message, deleted, vr, rebuild=True
+                        )
+                    result.versions += 1
+                document = spec.get_document(doc_id)
+            if document is None:
+                continue
+            fm, _ = parse_frontmatter(document.body)
+            upstream_ids = re.findall(r"[\w-]+", fm.get("upstream", "").strip("[]"))
+            ex = refs.extract(
+                document.id,
+                document.current_version_id,  # type: ignore[arg-type]
+                document.body,
+                spec.item_pks(document.id),
+                upstream_ids,
+            )
+            vr = spec.validate(document.body, doc_type, Entry.github, None)
+            spec.mark_convention_error(document.id, vr.violations, vr.warnings)
+            if vr.violations:
+                detail = "\n".join(f"{v.rule}: {v.message}" for v in vr.violations)
+                result.convention_errors.append({"doc_id": doc_id, "detail": detail})
+            result.docs += 1
+            result.items += len(document.items)
+            result.references += ex.added
+        refs.resolve_missing(project.id)
+        repo.last_processed_commit, repo.synced_at = head, datetime.now(UTC)
+        s.commit()
+    except Exception as e:  # noqa: BLE001 — 어느 단계든 실패하면 롤백 (MS-007)
+        s.rollback()
+        log.warning("rebuild %s 실패: %s", code, e)
+        raise RebuildFailed(str(e)) from e
+    return result

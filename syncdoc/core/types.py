@@ -112,6 +112,28 @@ class ProjectDetail(ProjectSummary):
 
 
 @dataclass(frozen=True)
+class RepoStatus:
+    """SYNC-API-001 RepoStatus — UI-14 표 2. behind_by=None이면 처리한 커밋이 아직 없다."""
+
+    code: str
+    remote_url: str
+    last_processed_commit: str | None
+    synced_at: datetime | None
+    behind_by: int | None
+
+
+@dataclass
+class RebuildResult:
+    """SYNC-API-001 RebuildResult."""
+
+    docs: int
+    items: int
+    references: int
+    versions: int
+    convention_errors: list[dict[str, str]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class IssuedToken:
     token: AccessToken
     raw: str

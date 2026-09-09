@@ -13,6 +13,7 @@ from syncdoc.core.errors import (
     ItemDeletionNeedsConfirm,
     NotFound,
     PushFailed,
+    RebuildFailed,
     VersionConflict,
 )
 from syncdoc.core.project.models import Project, Repository
@@ -518,3 +519,89 @@ async def test_process_commit_mismatched_filename_deleted_file_and_partial_failu
     results = await pipeline.process_commit(repo, head3)
     assert [(r.doc_id, r.version_no) for r in results] == [("EXMP-PRD-002", 2)]
     assert scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar() == head
+
+
+# ── rebuild (B4, UC-S6) ──
+def _push_history(other, remote):
+    """RFQ v1 · PRD v1(→Q1) · PRD v2 · status 커밋(review) — 저장소에만. DB는 비어 있다."""
+    (other / RFQ_FILE).parent.mkdir(parents=True, exist_ok=True)
+    (other / PRD_FILE).parent.mkdir(parents=True, exist_ok=True)
+    write_commit_push(other, RFQ_FILE, RFQ, "spec(EXMP-RFQ-001): 초안")
+    write_commit_push(other, PRD_FILE, PRD_BODY, "spec(EXMP-PRD-001): 초안")
+    write_commit_push(
+        other, PRD_FILE, PRD_BODY.replace("한 줄로.", "두 줄로."), "spec(EXMP-PRD-001): 수정"
+    )
+    write_commit_push(
+        other,
+        PRD_FILE,
+        PRD_BODY.replace("한 줄로.", "두 줄로.").replace("status: draft", "status: review"),
+        "status(EXMP-PRD-001): draft → review",
+    )
+    return g(remote, "rev-parse", "main")
+
+
+async def test_rebuild_restores_versions_references_and_keeps_flags(
+    scoped: Session, proj, monkeypatch
+) -> None:
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    head = _push_history(other, remote)
+    r = await pipeline.rebuild("EXMP")
+    # 시드 SYNC-PRD-001(repos 픽스처) + RFQ + PRD · 항목 G1·R1·N1·Q1·Q2 · 참조 R1→Q1, 문서 upstream · 버전 1+1+2
+    assert (r.docs, r.items, r.references, r.versions) == (3, 5, 2, 4)
+    assert [e["doc_id"] for e in r.convention_errors] == ["SYNC-PRD-001"]  # 시드는 frontmatter 미완
+    svc = SpecService(scoped)
+    prd = svc.get_document("EXMP-PRD-001")
+    assert (prd.current_version_no, prd.status, "두 줄로." in prd.body) == (2, "review", True)
+    assert [v.version_no for v in svc.list_versions("EXMP-PRD-001")] == [
+        None,
+        2,
+        1,
+    ]  # status 커밋은 Version 안 늘림
+    assert (
+        scoped.execute(
+            text("SELECT count(*) FROM status_changes WHERE commit_hash IS NOT NULL")
+        ).scalar()
+        == 1
+    )
+    assert (
+        scoped.execute(text('SELECT count(*) FROM "references" WHERE is_missing')).scalar() == 0
+    )  # 7단계 해제
+    assert scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar() == head
+    # 플래그·댓글이 있는 상태에서 다시 → 그대로 남고 버전은 다시 3
+    from syncdoc.core.tracking.service import TrackingService
+
+    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
+    TrackingService(scoped).raise_broken(q1)
+    scoped.commit()
+    r2 = await pipeline.rebuild("EXMP")
+    assert r2.versions == 4 and scoped.execute(text("SELECT count(*) FROM flags")).scalar() == 1
+    assert svc.get_document("EXMP-PRD-001").current_version_no == 2
+    # 중간 실패 → 롤백, DB는 재구축 전과 같음
+    from syncdoc.infra import git as gitmod
+
+    async def boom(workdir, path, ref="HEAD"):
+        raise RuntimeError("읽기 실패")
+
+    monkeypatch.setattr(gitmod, "read", boom)
+    with pytest.raises(RebuildFailed):
+        await pipeline.rebuild("EXMP")
+    assert scoped.execute(text("SELECT count(*) FROM versions")).scalar() == 4
+    assert scoped.execute(text('SELECT count(*) FROM "references"')).scalar() == 2
+
+
+async def test_repo_status_and_rebuild_index(scoped: Session, proj) -> None:
+    from syncdoc.core.project.service import ProjectService
+
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    ps = ProjectService(scoped)
+    st = (await ps.repo_status())[0]
+    assert (st.code, st.last_processed_commit, st.behind_by) == ("EXMP", None, None)
+    head = _push_history(other, remote)
+    r = await ps.rebuild_index("EXMP")
+    assert r.docs == 3
+    st = (await ps.repo_status())[0]
+    assert (st.last_processed_commit, st.behind_by) == (head, 0) and st.synced_at is not None
+    write_commit_push(other, RFQ_FILE, RFQ + "\n", "spec: 하나 더")
+    assert (await ps.repo_status())[0].behind_by == 1
+    with pytest.raises(NotFound):
+        await ps.rebuild_index("NOPE")
