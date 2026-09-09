@@ -2,19 +2,22 @@
 
 세 입구(MCP·웹·GitHub)가 전부 save_pipeline로 들어온다. 저장소 단위 asyncio.Lock(프로세스 내).
 세션은 여기서 연다(DEV-10 — 서비스는 세션을 열지 않는다). push가 DB 트랜잭션 앞이다.
-B1: save_pipeline · B2: web_status 분기(apply_status) · change_status(조율 — SpecService에서 옮김).
+B1 save_pipeline · B2 web_status·change_status · B3 11단계 · B4 revert·process_commit·rebuild.
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
 from syncdoc import db
 from syncdoc.core.account.models import User
+from syncdoc.core.account.service import AccountService
 from syncdoc.core.collab.service import CommentService
 from syncdoc.core.errors import (
     AlreadyCurrent,
@@ -27,11 +30,13 @@ from syncdoc.core.errors import (
     VersionConflict,
 )
 from syncdoc.core.markdown import parse_frontmatter
+from syncdoc.core.project.models import Repository
 from syncdoc.core.project.service import ProjectService
 from syncdoc.core.reference.service import ReferenceService
 from syncdoc.core.spec.service import SpecService
 from syncdoc.core.tracking.service import TrackingService
 from syncdoc.core.types import (
+    STAGE_OF,
     Author,
     AuthorKind,
     DocStatus,
@@ -39,9 +44,11 @@ from syncdoc.core.types import (
     DocumentSummary,
     Entry,
     SaveResult,
+    Violation,
 )
 from syncdoc.infra import git
 
+log = logging.getLogger(__name__)
 _locks: dict[str, asyncio.Lock] = {}
 
 
@@ -66,7 +73,7 @@ async def save_pipeline(
     session: Session | None = None,
 ) -> SaveResult:
     """SYNC-MS-007#pipeline.save_pipeline"""
-    code = project_code if doc_id is None else doc_id.split("-")[0]
+    code = project_code or (doc_id.split("-")[0] if doc_id else None)
     if code is None:
         raise NotFound("project", "None")
     args = (
@@ -115,8 +122,15 @@ async def _run(
     # 2·3. 대상 문서 또는 생성
     document = None
     if doc_id is not None:
-        document = spec.get_document(doc_id)
-        doc_type = document.doc_type
+        try:
+            document = spec.get_document(doc_id)
+            doc_type = document.doc_type
+        except NotFound:
+            if entry != Entry.github:
+                raise
+            assert (
+                doc_type is not None
+            )  # github 신규 파일 — 파일명이 doc_id, frontmatter는 그대로 (보고)
     else:
         assert doc_type is not None
         doc_id = spec.issue_doc_id(project.id, code, doc_type)
@@ -295,3 +309,96 @@ async def revert(
             confirm_item_deletion=confirm_item_deletion,
             session=s,
         )
+
+
+async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]:
+    """SYNC-MS-007#pipeline.process_commit"""
+    if repo.last_processed_commit == head_hash:
+        return []
+    workdir = Path(repo.workdir_path)
+    await git.fetch(workdir)
+    rng = f"{repo.last_processed_commit}..{head_hash}" if repo.last_processed_commit else head_hash
+    files = await git.changed_files(workdir, rng, "docs/specs/")
+    # 같은 커밋의 상·하위 문서는 11단계 순서로 — 하위가 먼저 저장되면 참조가 미존재로 남는다 (보고)
+    files.sort(
+        key=lambda f: (
+            STAGE_OF.get(Path(f.path).parts[2] if len(Path(f.path).parts) > 3 else "", 99),
+            f.path,
+        )
+    )
+    with db.session_scope() as s:
+        code = next(p.code for p in ProjectService(s).list_projects() if p.id == repo.project_id)
+    results: list[SaveResult] = []
+    failed: list[str] = []
+    for f in files:
+        try:
+            results.extend(await _process_file(workdir, code, f, head_hash))
+        except Exception as e:  # noqa: BLE001 — 파일 하나 실패해도 다음 파일 계속 (MS-007)
+            log.warning("process_commit %s %s: %s", code, f.path, e)
+            failed.append(f.path)
+    if not failed:
+        with db.session_scope() as s:
+            row = s.get(Repository, repo.id)
+            assert row is not None
+            row.last_processed_commit, row.synced_at = head_hash, datetime.now(UTC)
+            s.commit()
+        repo.last_processed_commit = head_hash
+    return results
+
+
+def _dir_type(path: str) -> str:
+    parts = Path(path).parts  # docs/specs/<TYPE>/<doc_id>.md
+    return parts[2] if len(parts) > 3 else ""
+
+
+async def _process_file(workdir: Path, code: str, f, head_hash: str) -> list[SaveResult]:
+    """process_commit 4단계 — 파일 하나. 삭제면 mark_deleted, 아니면 github 저장 + 위반 덧붙임."""
+    doc_id, dir_type = Path(f.path).stem, _dir_type(f.path)
+    with db.session_scope() as s:
+        account = AccountService(s)
+        user = account.user_by_login(f.author_login)
+        unknown = user is None
+        if user is None:
+            user = account.create_placeholder(f.author_login)
+            s.commit()
+        author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.github)
+        if f.status == "D":
+            spec, tracking = SpecService(s), TrackingService(s)
+            document = spec.get_document(doc_id)
+            for pk in spec.mark_deleted(document, f.commit_hash, author):
+                tracking.raise_broken(pk)
+            s.commit()
+            return []
+    body = await git.read(workdir, f.path, head_hash)
+    doc_type = DocType(dir_type)
+    r = await save_pipeline(
+        Entry.github,
+        doc_id,
+        doc_type,
+        body,
+        None,
+        code,
+        author,
+        f.message,
+        changed_items=None,
+        commit_hash=f.commit_hash,
+    )
+    fm, _ = parse_frontmatter(body)
+    extra: list[Violation] = []
+    if fm.get("doc_id") != doc_id:
+        extra.append(Violation(2, "frontmatter.doc_id", f"파일명 {doc_id} ≠ {fm.get('doc_id')!r}"))
+    if fm.get("type") != dir_type:
+        extra.append(
+            Violation(2, "frontmatter.doc_id", f"디렉터리 {dir_type} ≠ type {fm.get('type')!r}")
+        )
+    if unknown:
+        extra.append(Violation(1, "author.unknown", f.author_login))
+    if extra:
+        with db.session_scope() as s:
+            spec = SpecService(s)
+            vr = spec.validate(body, doc_type, Entry.github, None)
+            spec.mark_convention_error(
+                spec.get_document(doc_id).id, vr.violations + extra, vr.warnings
+            )
+            s.commit()
+    return [r]

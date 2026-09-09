@@ -19,6 +19,7 @@ from syncdoc.core.project.models import Project, Repository
 from syncdoc.core.spec.service import SpecService
 from syncdoc.core.types import Author, AuthorKind, DocType, Entry
 from tests.conftest import git as g
+from tests.conftest import write_commit_push
 from tests.core.account.test_service import make_user
 from tests.core.reference.test_service import RFQ
 from tests.core.spec.test_service import PRD
@@ -383,3 +384,137 @@ async def test_revert_creates_new_version_and_asks_confirm_for_vanishing_items(
     ).one() == ("web", "human")
     assert scoped.execute(text("SELECT kind FROM flags")).scalars().all() == ["broken_ref"]  # P1에
     assert r1.version_no == 1 and scn.doc_id == "EXMP-SCN-001"
+
+
+# ── process_commit (B4, UC-G1) ──
+RFQ_FILE = "docs/specs/RFQ/EXMP-RFQ-001.md"
+PRD_FILE = "docs/specs/PRD/EXMP-PRD-001.md"
+
+
+def _repo_row(proj):
+    return proj["project"].repository
+
+
+async def test_process_commit_two_files_one_commit_and_catch_up(scoped: Session, proj) -> None:
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    repo = _repo_row(proj)
+    repo.last_processed_commit = g(remote, "rev-parse", "main")  # 시드 커밋은 처리 완료로 본다
+    scoped.flush()
+    (other / RFQ_FILE).parent.mkdir(parents=True, exist_ok=True)
+    (other / RFQ_FILE).write_text(RFQ, encoding="utf-8")
+    (other / PRD_FILE).write_text(PRD_BODY, encoding="utf-8")
+    g(other, "add", "-A")
+    g(
+        other,
+        "commit",
+        "-q",
+        "--author=hoyoung <hoyoung@users.noreply.github.com>",
+        "-m",
+        "spec: RFQ·PRD 추가",
+    )
+    g(other, "push", "-q", "origin", "HEAD:main")
+    head = g(remote, "rev-parse", "main")
+    results = await pipeline.process_commit(repo, head)
+    assert sorted((r.doc_id, r.version_no, r.commit_hash) for r in results) == [
+        ("EXMP-PRD-001", 1, head),
+        ("EXMP-RFQ-001", 1, head),
+    ]
+    svc = SpecService(scoped)
+    d = svc.get_document("EXMP-PRD-001")
+    assert (d.has_convention_error, d.last_author.via, d.last_author.user_id) == (
+        False,
+        "github",
+        proj["user"].id,
+    )
+    assert [i.item_id for i in d.items] == ["G1", "R1", "N1"]
+    assert scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar() == head
+    assert await pipeline.process_commit(repo, head) == []  # 같은 head → 아무것도 안 함
+    # 밀린 커밋 셋에 같은 파일 → 버전 하나(최종 상태) · 미등록 작성자 → 자리표시 + author.unknown
+    for n in (1, 2, 3):
+        write_commit_push(
+            other, PRD_FILE, PRD_BODY.replace("한 줄로.", f"{n}줄로."), f"spec: 수정 {n}"
+        )
+    head2 = g(remote, "rev-parse", "main")
+    results = await pipeline.process_commit(repo, head2)
+    assert [(r.doc_id, r.version_no) for r in results] == [("EXMP-PRD-001", 2)]
+    d = svc.get_document("EXMP-PRD-001")
+    assert (
+        "3줄로." in d.body
+        and d.has_convention_error
+        and "author.unknown: seed" in d.convention_error_detail
+    )
+    seed = scoped.execute(
+        text("SELECT github_user_id, display_name FROM users WHERE github_login='seed'")
+    ).one()
+    assert seed == (None, "seed")
+
+
+async def test_process_commit_mismatched_filename_deleted_file_and_partial_failure(
+    scoped: Session, proj
+) -> None:
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    repo = _repo_row(proj)
+    repo.last_processed_commit = g(remote, "rev-parse", "main")
+    scoped.flush()
+    (other / RFQ_FILE).parent.mkdir(parents=True, exist_ok=True)
+    (other / RFQ_FILE).write_text(RFQ, encoding="utf-8")
+    # 파일명 ≠ frontmatter doc_id (EXMP-PRD-002 파일에 EXMP-PRD-001 본문)
+    (other / "docs/specs/PRD").mkdir(parents=True, exist_ok=True)
+    (other / "docs/specs/PRD/EXMP-PRD-002.md").write_text(PRD_BODY, encoding="utf-8")
+    g(other, "add", "-A")
+    g(
+        other,
+        "commit",
+        "-q",
+        "--author=hoyoung <hoyoung@users.noreply.github.com>",
+        "-m",
+        "spec: 초안",
+    )
+    g(other, "push", "-q", "origin", "HEAD:main")
+    results = await pipeline.process_commit(repo, g(remote, "rev-parse", "main"))
+    assert sorted(r.doc_id for r in results) == ["EXMP-PRD-002", "EXMP-RFQ-001"]
+    svc = SpecService(scoped)
+    d = svc.get_document("EXMP-PRD-002")
+    assert (
+        d.has_convention_error
+        and "frontmatter.doc_id: 파일명 EXMP-PRD-002" in d.convention_error_detail
+    )
+    # 파일 삭제 → 문서는 남고 draft + file.deleted, 항목 전부 삭제, 하위(PRD G1)에 끊어진 참조
+    g(other, "rm", "-q", RFQ_FILE)
+    g(
+        other,
+        "commit",
+        "-q",
+        "--author=hoyoung <hoyoung@users.noreply.github.com>",
+        "-m",
+        "spec: RFQ 삭제",
+    )
+    g(other, "push", "-q", "origin", "HEAD:main")
+    head = g(remote, "rev-parse", "main")
+    assert await pipeline.process_commit(repo, head) == []
+    rfq = svc.get_document("EXMP-RFQ-001")
+    assert (rfq.status, rfq.convention_error_detail, rfq.items) == (
+        "draft",
+        f"file.deleted: {head}",
+        [],
+    )
+    assert scoped.execute(text("SELECT kind FROM flags")).scalars().all() == ["broken_ref"]
+    assert scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar() == head
+    # 한 파일 실패(알 수 없는 디렉터리) → 나머지는 처리, last_processed_commit 안 바뀜
+    (other / "docs/specs/BOGUS").mkdir(parents=True, exist_ok=True)
+    (other / "docs/specs/BOGUS/EXMP-BOGUS-001.md").write_text("# x\n", encoding="utf-8")
+    (other / "docs/specs/PRD/EXMP-PRD-002.md").write_text(PRD_BODY + "\n", encoding="utf-8")
+    g(other, "add", "-A")
+    g(
+        other,
+        "commit",
+        "-q",
+        "--author=hoyoung <hoyoung@users.noreply.github.com>",
+        "-m",
+        "spec: 둘",
+    )
+    g(other, "push", "-q", "origin", "HEAD:main")
+    head3 = g(remote, "rev-parse", "main")
+    results = await pipeline.process_commit(repo, head3)
+    assert [(r.doc_id, r.version_no) for r in results] == [("EXMP-PRD-002", 2)]
+    assert scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar() == head
