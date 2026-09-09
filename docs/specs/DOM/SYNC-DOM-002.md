@@ -523,6 +523,7 @@ classDiagram
     class Repository {
         +int id
         +int project_id
+        +int registered_by_user_id
         +str remote_url
         +str workdir_path
         +str last_processed_commit
