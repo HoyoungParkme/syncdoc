@@ -170,6 +170,9 @@ async def seed() -> None:
                 print(f"  {f.stem} 실패: {e.to_dict()}")
 
     with db.SessionLocal() as s:
+        # 단계 순으로 올려 STD 참조가 미존재로 남는다 — 재구축 7단계처럼 한 번 해제
+        ReferenceService(s).resolve_missing(1)
+        s.commit()
         spec = SpecService(s)
         q_edit, _ = with_downstream(s, "SYNC-RFQ-001")
         q_del, _ = with_downstream(s, "SYNC-RFQ-001", {q_edit})
