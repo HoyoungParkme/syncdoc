@@ -42,11 +42,18 @@ class ReferenceRepository:
         stmt = select(Reference).where(or_(*conds)).order_by(Reference.id)
         return list(self.session.scalars(stmt))
 
-    def missing_in_project(self, project_id: int) -> list[Reference]:
+    def missing_in_project(
+        self, project_id: int, target_doc_id: str | None = None
+    ) -> list[Reference]:
         doc_ids = select(Document.id).where(Document.project_id == project_id)
         stmt = select(Reference).where(
             Reference.is_missing.is_(True), Reference.from_document_id.in_(doc_ids)
         )
+        if target_doc_id is not None:  # 그 문서(또는 그 문서의 항목)를 가리키는 것만
+            stmt = stmt.where(
+                (Reference.raw_target == target_doc_id)
+                | Reference.raw_target.startswith(target_doc_id + "#")
+            )
         return list(self.session.scalars(stmt.order_by(Reference.id)))
 
     def delete_in_project(self, project_id: int) -> int:

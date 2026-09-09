@@ -627,7 +627,7 @@ class SpecService:
         self.session.flush()
 
     def version_body(self, doc_id: str, version_no: int) -> str:
-        """버전 본문 하나 — pipeline.revert 1단계용. MS-002에 없는 조회(보고)."""
+        """SYNC-MS-002#SpecService.version_body"""
         row = self.repo.document_by_doc_id(doc_id)
         if row is None:
             raise NotFound("document", doc_id)

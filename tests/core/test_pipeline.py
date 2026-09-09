@@ -622,3 +622,11 @@ async def test_process_commit_skips_commits_the_app_pushed_itself(scoped: Sessio
     assert (d.current_version_no, d.status) == (1, "review")
     assert scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar() == head
     assert r.doc_id == "EXMP-PRD-001"
+
+
+async def test_save_resolves_missing_refs_waiting_for_this_document(scoped: Session, proj) -> None:
+    """하위(PRD)가 먼저 저장돼 상위 참조가 미존재였다가 상위(RFQ)가 생기면 즉시 풀린다 (10a)."""
+    await create(proj)  # PRD가 EXMP-RFQ-001#Q1을 참조 — 아직 없다
+    assert scoped.execute(text('SELECT count(*) FROM "references" WHERE is_missing')).scalar() == 2
+    await create(proj, DocType.RFQ, RFQ)
+    assert scoped.execute(text('SELECT count(*) FROM "references" WHERE is_missing')).scalar() == 0

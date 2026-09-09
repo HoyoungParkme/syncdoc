@@ -211,6 +211,8 @@ async def _run(
     fm, _ = parse_frontmatter(body)
     upstream_ids = re.findall(r"[\w-]+", fm.get("upstream", "").strip("[]"))
     refs.extract(document_id, version.id, body, item_pks, upstream_ids)
+    # 10a. 이 문서를 기다리던 미존재 참조를 푼다 (UC-S2 2a2)
+    refs.resolve_missing(project.id, target_doc_id=doc_id)
     # 11. 변경 영향 → 전파 미결정 (UC-S3 3)
     affected = tracking.detect_impact(document_id, prev_version_id, version.id, changed_items)
     pending_id = None

@@ -114,10 +114,10 @@ class ReferenceService:
         docs = self.repo.document_ids_of_items(item_pks) if include_document_targets else set()
         return [_edge(r) for r in self.repo.among(item_pks, docs)]
 
-    def resolve_missing(self, project_id: int) -> int:
+    def resolve_missing(self, project_id: int, target_doc_id: str | None = None) -> int:
         """SYNC-MS-003#ReferenceService.resolve_missing"""
         n = 0
-        for r in self.repo.missing_in_project(project_id):
+        for r in self.repo.missing_in_project(project_id, target_doc_id):
             to_item, to_doc, missing = self._resolve(r.raw_target, r.from_document_id)
             if missing:
                 continue

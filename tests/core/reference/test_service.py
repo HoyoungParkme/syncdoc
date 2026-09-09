@@ -175,7 +175,8 @@ def test_references_among_resolve_missing_and_clear(db_session: Session) -> None
     assert ref.references_among(set()) == []
     # 미존재 해제: RFQ에 Q9가 생기면 다음 resolve_missing에서 풀린다
     v2 = svc.save(rfq, rfq.body + "#### Q9 새 요구\n내용\n", "h9", a, "spec: Q9", [])
-    assert v2.version_no == 2 and ref.resolve_missing(pid) == 1
+    assert v2.version_no == 2 and ref.resolve_missing(pid, target_doc_id="EXMP-NONE-001") == 0
+    assert ref.resolve_missing(pid, target_doc_id="EXMP-RFQ-001") == 1  # 좁혀 해제
     assert [e.is_missing for e in ref.upstream(pks["R1"])] == [False]
     assert ref.resolve_missing(pid) == 0  # EXMP-NONE-001은 여전히 없다
     # clear: 이 프로젝트의 참조 전부
