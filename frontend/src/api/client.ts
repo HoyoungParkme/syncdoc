@@ -275,6 +275,11 @@ export function age(iso: string): string {
   if (s >= 3600) return `${Math.floor(s / 3600)}시간`
   return `${Math.max(1, Math.floor(s / 60))}분`
 }
+/** 버전 번호 뒤 조사 — 마지막 자리를 읽은 소리의 받침으로 고른다. 2·4·5·9는 받침이 없다 */
+const HAS_FINAL = [true, true, false, true, false, false, true, true, true, false]
+export const josa = (n: number, withFinal: string, without: string): string =>
+  (HAS_FINAL[Math.abs(n) % 10] ? withFinal : without)
+
 export const STAGE_TYPES = ['RFQ', 'PRD', 'SCN', 'UC', 'INFRA', 'DOM', 'UI', 'API', 'SEQ', 'MS', 'CODE']
 export const STAGE_NAMES: Record<string, string> = {
   RFQ: 'RFQ', PRD: 'PRD', SCN: '사용자 시나리오', UC: 'USECASE', INFRA: '인프라', DOM: '도메인·클래스·데이터',
