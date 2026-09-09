@@ -17,6 +17,7 @@ from syncdoc import db
 from syncdoc.core.account.models import User
 from syncdoc.core.collab.service import CommentService
 from syncdoc.core.errors import (
+    AlreadyCurrent,
     ConventionViolation,
     ItemDeleted,
     ItemDeletionNeedsConfirm,
@@ -269,3 +270,28 @@ async def change_status(
             TrackingService(s).raise_upstream(pks, document.id, document.current_version_id, None)
             s.commit()
         return spec.get_document(doc_id)
+
+
+async def revert(
+    doc_id: str, to_version: int, user: User, confirm_item_deletion: bool = False
+) -> SaveResult:
+    """SYNC-MS-007#pipeline.revert"""
+    with db.session_scope() as s:
+        spec = SpecService(s)
+        document = spec.get_document(doc_id)
+        old_body = spec.version_body(doc_id, to_version)
+        if to_version == document.current_version_no:
+            raise AlreadyCurrent()
+        author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.web_revert)
+        return await save_pipeline(
+            Entry.web_revert,
+            doc_id,
+            None,
+            old_body,
+            document.current_version_no,
+            None,
+            author,
+            f"revert({doc_id}): v{document.current_version_no} → v{to_version} 내용으로",
+            confirm_item_deletion=confirm_item_deletion,
+            session=s,
+        )

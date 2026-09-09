@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from syncdoc.core import pipeline
 from syncdoc.core.errors import (
+    AlreadyCurrent,
     ConventionViolation,
     ItemDeletionNeedsConfirm,
     NotFound,
@@ -337,3 +338,48 @@ async def test_update_with_changed_items_creates_pending_decision(scoped: Sessio
         or r3.pending_decision_version_id is not None
     )
     assert r1.doc_id == "EXMP-PRD-001"
+
+
+# ── revert (B4) ──
+async def test_revert_creates_new_version_and_asks_confirm_for_vanishing_items(
+    scoped: Session, proj
+) -> None:
+    await create(proj, DocType.RFQ, RFQ)
+    r1 = await create(proj)
+    svc = SpecService(scoped)
+    user = proj["user"]
+    v1_body = svc.get_document("EXMP-PRD-001").body
+    # v2: R2 추가 → 시나리오가 R2를 참조
+    await update(proj, "EXMP-PRD-001", v1_body + "#### R2 둘째 기능\n내용\n", 1, changed_items=[])
+    scn = await pipeline.save_pipeline(
+        Entry.mcp,
+        None,
+        DocType.SCN,
+        "# 시나리오\n\n## 1. 페르소나\n\n#### P1 사람\n근거 [[EXMP-PRD-001#R2]]\n",
+        None,
+        "EXMP",
+        proj["author"],
+        "spec(SCN): 초안",
+        changed_items=[],
+    )
+    with pytest.raises(AlreadyCurrent):
+        await pipeline.revert("EXMP-PRD-001", 2, user)
+    with pytest.raises(NotFound):
+        await pipeline.revert("EXMP-PRD-001", 9, user)
+    # v1로 되돌리면 R2가 사라지고 하위 참조가 있다 → 확인 요구 → confirm
+    with pytest.raises(ItemDeletionNeedsConfirm) as ei:
+        await pipeline.revert("EXMP-PRD-001", 1, user)
+    assert ei.value.extra["deleted_items"][0]["item_id"] == "R2"
+    r = await pipeline.revert("EXMP-PRD-001", 1, user, confirm_item_deletion=True)
+    assert (r.version_no, r.doc_id) == (3, "EXMP-PRD-001")
+    d = svc.get_document("EXMP-PRD-001")
+    assert d.body == v1_body and d.current_version_no == 3  # v2는 이력에 남는다
+    assert (
+        g(proj["repos"]["remote"], "log", "-1", "--format=%s", "main")
+        == "revert(EXMP-PRD-001): v2 → v1 내용으로"
+    )
+    assert scoped.execute(
+        text("SELECT via, author_kind FROM versions WHERE version_no=3")
+    ).one() == ("web", "human")
+    assert scoped.execute(text("SELECT kind FROM flags")).scalars().all() == ["broken_ref"]  # P1에
+    assert r1.version_no == 1 and scn.doc_id == "EXMP-SCN-001"
