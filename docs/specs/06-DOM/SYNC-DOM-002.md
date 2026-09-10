@@ -1048,4 +1048,4 @@ class Document(Base):
 ## 7. 미결사항
 
 - [x] 저장소 락 범위 — 지금은 저장소 단위. 파일 단위로 좁힐지 — 결정: 저장소(프로젝트 코드) 단위. `core/pipeline.py`의 `_lock(code)`. 파일 단위로 좁히는 건 경합이 실제로 보일 때
-- [ ] `repo_status`의 fetch를 캐시할지
+- [x] `repo_status`의 fetch를 캐시할지 — 결정: 캐시가 아니라 DB에서 읽는다. `Repository`에 `behind_by`·`fetched_at`을 두고 폴링이 갱신하며 화면은 읽기만 한다. 폴링이 이미 5분마다 같은 fetch를 하고 있어 지금은 이중으로 돈다
