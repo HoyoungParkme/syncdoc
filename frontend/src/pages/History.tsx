@@ -35,15 +35,27 @@ export function History() {
       setPicked(numbered.slice(0, 2).map(keyOf).reverse()) // 기본: 현재 ↔ 직전
     })
   }, [docId])
-  const byKey = useMemo(() => new Map(versions.map((v) => [keyOf(v), v])), [versions])
+  /** 행 → 그 행이 뜻하는 버전 번호. `status` 커밋은 본문을 안 바꾸므로 **그 시점의 버전**으로 읽는다.
+   *  `v6 → status → v7`이면 status 행은 v6이다. 안 그러면 version_no가 없어 비교 범위가 안 잡힌다 (#18) */
+  const numberAt = useMemo(() => {
+    const m = new Map<string, number>()
+    let carry: number | null = null
+    for (let i = versions.length - 1; i >= 0; i--) {
+      // 목록은 최신이 위 — 오래된 것부터 훑으며 마지막으로 본 버전 번호를 물고 간다
+      const v = versions[i]
+      if (v.version_no != null) carry = v.version_no
+      if (carry != null) m.set(keyOf(v), carry)
+    }
+    return m
+  }, [versions])
   const range = useMemo(() => {
-    const nos = picked.map((h) => byKey.get(h)?.version_no).filter((n): n is number => n != null)
+    const nos = picked.map((h) => numberAt.get(h)).filter((n): n is number => n != null)
     if (nos.length < 2) return null
     return { from: Math.min(...nos), to: Math.max(...nos) }
-  }, [picked, byKey])
+  }, [picked, numberAt])
   useEffect(() => {
     setHint(null)
-    if (!range) {
+    if (!range || range.from === range.to) {
       setDiff(null)
       return
     }
@@ -56,12 +68,12 @@ export function History() {
   /** 규칙: 늘 뒤쪽이 B(현재), 앞쪽이 A(이전). **고른 순서가 아니라 버전 번호로 정한다** —
    *  사람이 어느 쪽을 먼저 눌렀는지 신경 쓰지 않아도 되게 */
   const ab = useMemo(() => {
-    const nos = picked.map((h) => byKey.get(h)?.version_no)
-    if (picked.length < 2 || nos.some((n) => n == null)) return {}
+    const nos = picked.map((h) => numberAt.get(h))
+    if (picked.length < 2 || nos.some((n) => n == null) || nos[0] === nos[1]) return {}
     const [x, y] = picked
     const older = (nos[0] as number) < (nos[1] as number) ? x : y
     return { [older]: 'A', [older === x ? y : x]: 'B' } as Record<string, string>
-  }, [picked, byKey])
+  }, [picked, numberAt])
   const openRevert = useCallback(
     (to: number) => {
       if (!doc) return
@@ -96,6 +108,8 @@ export function History() {
   const changedItems = diff ? diff.hunks.filter((h) => h.item_id).length : 0
   const dels = diff ? diff.hunks.reduce((n, h) => n + h.lines.filter((l) => l.op === 'del').length, 0) : 0
   const adds = diff ? diff.hunks.reduce((n, h) => n + h.lines.filter((l) => l.op === 'add').length, 0) : 0
+  // 두 행이 같은 버전으로 읽힌 경우 (status 행 + 그 직전 버전)
+  const same = range !== null && range.from === range.to
   const plainCtx = { selfId: docId, href: (d: string, it?: string) => docPath(d, it), exists: () => true }
   const titleOf = new Map(doc.items.map((i) => [i.item_id, i.display_name ?? '']))
   return (
@@ -170,9 +184,17 @@ export function History() {
           </div>
           <div className="drange">
             <b className="mono" data-el="3.1">{range ? `v${range.from} → v${range.to}` : `v${doc.current_version_no}`}</b>{' '}
-            <span className="lbl">{range ? `항목 ${changedItems}개 변경 · 삭제 ${dels}줄 · 추가 ${adds}줄` : '버전이 하나뿐 — 전체 본문'}</span>
+            {/* 두 행이 같은 번호로 읽히면(예: v6과 그 뒤 status) 비교할 것이 없다.
+                빈 화면으로 두면 고장인지 같은 내용인지 구분이 안 된다 (UI-7 규칙, #18) */}
+            <span className="lbl">
+              {same
+                ? '두 행의 본문이 같습니다 — status 커밋은 본문을 바꾸지 않습니다'
+                : range
+                  ? `항목 ${changedItems}개 변경 · 삭제 ${dels}줄 · 추가 ${adds}줄`
+                  : '버전이 하나뿐 — 전체 본문'}
+            </span>
           </div>
-          {range && diff ? (
+          {range && !same && diff ? (
             <div data-el="3.2">
               {diff.hunks.length === 0 && <div className="lbl">본문 차이 없음</div>}
               {/* 항목마다 카드. 어느 항목이 바뀌었는지가 줄보다 먼저 읽혀야 한다 */}
