@@ -1,6 +1,7 @@
 /** tools/wf_build.py 포트 — V-UI 와이어프레임 (STD-002 V-UI).
  *  `## UI-N 이름` 절마다 화면 하나: 상단 화면 탭, 탭마다 좌 배치 뼈대(```html 코드블록) / 우 요소 표·규칙·시나리오.
  *  뼈대의 `data-el` 번호와 요소 표의 `#` 열이 같은 번호라 클릭하면 양쪽이 서로 강조된다.
+ *  넣을 때 `data-wf`로 바꾼다 — 화면 자신의 `data-el`과 섞이면 셀렉터로 구분이 안 된다 (STD-002 6장, #19).
  *  wf_build.py는 DATA json + script로 런타임에 그렸지만 여기서는 HTML을 정적으로 만들고 onMount가 탭·연동만 붙인다. */
 import { esc, inline, type RenderCtx } from './md'
 import type { ViewFn } from './types'
@@ -69,7 +70,7 @@ export function parseWireframe(body: string): WfScreen[] {
     for (const r of metaRows.slice(1)) if (r.length >= 2) meta.push([r[0], r[1]])
 
     const lm = /```html\n([\s\S]*?)\n```/.exec(sec)
-    const layout = lm ? lm[1] : ''
+    const layout = safeLayout(lm ? lm[1] : '')
 
     const elems: WfElem[] = []
     const elemRows = between(sec, '### 요소', '### 규칙')
@@ -106,6 +107,17 @@ export function parseWireframe(body: string): WfScreen[] {
   return screens
 }
 
+/** 배치 HTML을 페이지에 넣기 전에 다듬는다 — SYNC-STD-002 6장(#19).
+ *  `<script>`·`on*=`·`javascript:`는 지우고, `data-el`은 `data-wf`로 바꾼다.
+ *  바꾸는 이유: 그대로 두면 문서 본문에서 나온 것과 화면 자신의 요소를 셀렉터로 구분할 수 없다. */
+function safeLayout(html: string): string {
+  return html
+    .replace(/<script\b[\s\S]*?<\/script\s*>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/\s(href|src)\s*=\s*(["']?)\s*javascript:[^"'>]*\2/gi, '')
+    .replace(/\bdata-el(-row)?=/g, 'data-wf$1=')
+}
+
 // ───────────────────────── HTML ─────────────────────────
 
 /** 문장 속 "(7.1)" 같은 요소 번호를 클릭 가능한 칩으로 (wf_build.py chip) */
@@ -117,7 +129,7 @@ function screenHtml(s: WfScreen, i: number, ctx: RenderCtx): string {
   const rows = s.elems
     .map(
       (e) =>
-        `<tr data-el-row="${esc(e.no)}"><td class="no">${esc(e.no)}</td><td>${inline(e.name, ctx)}</td><td class="kind">${inline(e.kind, ctx)}</td><td>${inline(e.shows, ctx)}</td><td>${inline(e.onclick, ctx)}</td></tr>`,
+        `<tr data-wf-row="${esc(e.no)}"><td class="no">${esc(e.no)}</td><td>${inline(e.name, ctx)}</td><td class="kind">${inline(e.kind, ctx)}</td><td>${inline(e.shows, ctx)}</td><td>${inline(e.onclick, ctx)}</td></tr>`,
     )
     .join('')
   const rules = s.rules.map((r) => `<li>${chip(r, ctx)}</li>`).join('')
@@ -164,9 +176,9 @@ export function mountWireframe(root: HTMLElement): () => void {
     screens().forEach((s, j) => (s.style.display = i === j ? '' : 'none'))
   }
   const hi = (sec: HTMLElement, no: string) => {
-    sec.querySelectorAll('[data-el],[data-el-row]').forEach((n) => n.classList.remove('hi'))
-    const el = sec.querySelector<HTMLElement>(`[data-el="${attrQ(no)}"]`)
-    const row = sec.querySelector<HTMLElement>(`[data-el-row="${attrQ(no)}"]`)
+    sec.querySelectorAll('[data-wf],[data-wf-row]').forEach((n) => n.classList.remove('hi'))
+    const el = sec.querySelector<HTMLElement>(`[data-wf="${attrQ(no)}"]`)
+    const row = sec.querySelector<HTMLElement>(`[data-wf-row="${attrQ(no)}"]`)
     if (el) {
       el.classList.add('hi')
       el.scrollIntoView({ block: 'nearest' })
@@ -187,15 +199,15 @@ export function mountWireframe(root: HTMLElement): () => void {
     }
     const sec = t.closest<HTMLElement>('section.screen')
     if (!sec || !root.contains(sec)) return
-    // 가장 안쪽 data-el만 (원본은 stopPropagation)
-    const el = t.closest<HTMLElement>('[data-el]')
+    // 가장 안쪽 data-wf만 (원본은 stopPropagation)
+    const el = t.closest<HTMLElement>('[data-wf]')
     if (el && sec.contains(el)) {
-      hi(sec, el.dataset.el ?? '')
+      hi(sec, el.dataset.wf ?? '')
       return
     }
-    const row = t.closest<HTMLElement>('[data-el-row]')
+    const row = t.closest<HTMLElement>('[data-wf-row]')
     if (row && sec.contains(row)) {
-      hi(sec, row.dataset.elRow ?? '')
+      hi(sec, row.dataset.wfRow ?? '')
       return
     }
     const ref = t.closest<HTMLElement>('.eref')
@@ -250,9 +262,9 @@ export const wireframeCss = `
 
 /* 뼈대 (와이어프레임) 스타일 — 원본 HTML은 스타일이 없고 여기서만 입힌다 */
 .wf{font-family:system-ui,sans-serif;font-size:12.5px;color:#222;background:#f4f4f4;border:1px solid #bbb}
-.wf [data-el]{position:relative;border:1.5px dashed #999;background:#fff;transition:background .12s,border-color .12s}
-.wf [data-el]::before{content:attr(data-el);position:absolute;top:-8px;left:5px;font:600 9.5px/1 ui-monospace,monospace;background:#ffe58a;border:1px solid #c9a800;padding:2px 4px;border-radius:2px;z-index:2;cursor:pointer}
-.wf [data-el].hi{background:var(--hi);border-color:var(--hi-b);border-style:solid}
+.wf [data-wf]{position:relative;border:1.5px dashed #999;background:#fff;transition:background .12s,border-color .12s}
+.wf [data-wf]::before{content:attr(data-wf);position:absolute;top:-8px;left:5px;font:600 9.5px/1 ui-monospace,monospace;background:#ffe58a;border:1px solid #c9a800;padding:2px 4px;border-radius:2px;z-index:2;cursor:pointer}
+.wf [data-wf].hi{background:var(--hi);border-color:var(--hi-b);border-style:solid}
 .wf .lbl{color:#777;font-size:11px}
 .wf .topbar{display:flex;align-items:center;gap:12px;padding:8px 12px;background:#e8e8e8;border-bottom:1px solid #bbb}
 .wf .grow{flex:1}
