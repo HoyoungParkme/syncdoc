@@ -1457,28 +1457,25 @@ status: approved
 ### 배치
 
 ```html
-<div class="dialog" data-el="1">
+<div class="dialog setdlg" data-el="1"><!-- 폭 620px. 카드 넷이 드는 폭이다 -->
   <div class="dhead"><span>설정</span><span class="grow"></span><span class="x" data-el="7">✕</span></div>
   <div class="dbody">
 
-    <section class="card" data-el="2">
-      <div class="cardh"><b>내 계정</b></div>
-      <div class="row"><span data-el="2.1">HoyoungParkme</span> <span class="lbl">GitHub · 박호영</span><span class="grow"></span><span class="btn sm" data-el="2.2">로그아웃</span></div>
-    </section>
-
+    <!-- 토큰이 맨 위다. 이 화면에 오는 이유가 토큰이라서 -->
     <section class="card" data-el="3">
-      <div class="cardh"><b>MCP 토큰</b> <span class="lbl">에이전트가 싱크독에 붙을 때 씁니다</span><span class="grow"></span><span class="btn sm" data-el="3.4">+ 발급</span></div>
+      <div class="cardh"><b>MCP 토큰</b><span class="grow"></span><span class="btn sm solid" data-el="3.4">+ 발급</span></div>
+      <p class="lbl">에이전트가 싱크독에 붙을 때 씁니다. 남에게 주면 그 사람 작업이 내 이름으로 남습니다.</p>
+      <div class="row"><input class="inp wide" data-el="3.3" placeholder="이름 — 예: Gemini 노트북"><span class="btn sm solid">발급</span></div>
       <div class="tokbox" data-el="4">
         <b>한 번만 보입니다. 지금 복사하세요.</b>
         <div class="tok" data-el="4.1">syncdoc_pat_7f3a…c91e</div>
         <span class="btn sm" data-el="4.2">복사</span>
       </div>
       <div class="row" data-el="3.1">
-        <b>Claude Code 노트북</b> <span class="lbl mono">syncdoc_pat_7f3a…</span> <span class="lbl">발급 09-01</span>
-        <span class="grow"></span> <span class="lbl" data-el="3.5">마지막 사용 12분 전</span> <span class="btn sm" data-el="3.2">폐기</span>
+        <span class="two"><b>Claude Code 노트북</b><span class="lbl mono">발급 2026-09-01</span></span>
+        <span class="grow"></span> <span class="lbl" data-el="3.5">마지막 사용 12분 전</span> <span class="btn sm danger" data-el="3.2">폐기</span>
       </div>
-      <div class="row dimrow"><b>테스트용</b> <span class="lbl">발급 08-28 · <s>폐기됨 09-02</s></span></div>
-      <div class="row"><input class="inp" data-el="3.3" placeholder="이름 — 예: Gemini 노트북"></div>
+      <div class="row dimrow"><span class="two"><b>테스트용</b><span class="lbl mono">발급 2026-08-28 · <s>폐기됨 2026-09-02</s></span></span></div>
     </section>
 
     <section class="card" data-el="8">
@@ -1499,8 +1496,14 @@ status: approved
       <div class="admin" data-el="6"><!-- UI-14 --></div>
     </section>
 
+    <!-- 계정은 맨 아래. 로그아웃은 상단 바에도 있다 -->
+    <section class="card" data-el="2">
+      <div class="cardh"><b>내 계정</b></div>
+      <div class="row"><span data-el="2.1">HoyoungParkme</span> <span class="lbl">GitHub · 박호영</span><span class="grow"></span><span class="btn sm" data-el="2.2">로그아웃</span></div>
+    </section>
+
   </div>
-  <div class="dfoot"><span class="grow"></span><span class="btn" data-el="9">닫기</span></div>
+  <div class="dfoot"><span class="grow"></span><span class="btn solid" data-el="9">닫기</span></div>
 </div>
 ```
 
@@ -1537,6 +1540,12 @@ status: approved
 - 토큰으로 들어온 MCP 요청은 발급자 계정으로 기록된다. 남에게 토큰을 주면 그 사람 작업이 내 이름으로 남는다 — 이 안내를 3번 카드에 둔다
 - **토큰에 프로젝트 범위가 없다.** 토큰 하나가 그 사람이 보는 모든 프로젝트에 쓴다([[SYNC-PRD-001]] 6장). 만료도 없다(인프라 9장) — 그래서 `마지막 사용`(3.5)이 안 쓰는 토큰을 찾는 유일한 단서다
 - 관리(6)는 **접힌 채로 연다.** 인덱스 재구축이 위험한 동작이라 한 번 더 눌러야 보인다([[SYNC-UI-001#UI-14]] 7장 4)
+- **카드 순서는 MCP 토큰 · 클라이언트 설정 · 관리 · 내 계정이다.** 이 화면에 오는 이유가 토큰이라 토큰이 맨 위다. 로그아웃은 상단 바에도 있으므로 계정은 맨 아래
+- 카드 머리는 제목과 동작만 든다. 설명은 제목 아래 별도 줄. 세 카드가 같은 서식을 쓴다
+- 발급(3.4)은 카드 머리의 채운 버튼이다. 누르면 이름 입력(3.3)이 목록 위에 펼쳐진다 — 기본 상태의 카드는 제목·발급·토큰 목록만 보인다
+- 토큰 행(3.1)은 두 줄이다. 첫 줄이 이름, 둘째 줄이 고정폭으로 발급일(연도까지). 식별자를 다루는 목록임이 서식으로 보여야 한다
+- **버튼 위계는 셋이다** — 채움(발급·닫기) · 테두리(보조) · 빨강(폐기). 폐기는 이 화면에서 유일한 파괴 동작이라 유일한 색이다
+- 다이얼로그 폭은 `620px`. 본문 바탕은 `배경 보조`라 흰 카드가 카드로 읽힌다
 
 ### 시나리오
 
@@ -1653,12 +1662,12 @@ status: approved
     <span class="x" data-el="5">✕</span>
   </div>
   <div class="dbody">
-    <p class="lbl" data-el="2">이 항목이 11단계 체인에서 어디에 있고 어디로 흐르는지. 위는 근거로 삼은 것, 아래는 이 항목을 근거로 삼은 것.</p>
+    <p class="lbl" data-el="2">이 항목이 11단계 체인에서 어디에 있고 어디로 흐르는지. 위는 이 항목이 근거로 삼은 것, 아래는 이 항목을 근거로 삼은 것. 항목을 누르면 그 항목 기준으로 다시 봅니다.</p>
 
     <div class="chain" data-el="3">
       <div class="crow">
         <div class="cstage" data-el="3.2">1 RFQ<br><span class="lbl">근거 ↑</span></div>
-        <div class="cchips"><span class="chip" data-el="3.1">RFQ-001#Q1 원본은 누가 읽는가</span></div>
+        <div class="cchips"><span class="chip" data-el="3.1"><i class="dot dot-approved"></i>RFQ-001#Q1 원본은 누가 읽는가</span></div>
       </div>
       <div class="crow cur">
         <div class="cstage">4 UC<br><span class="lbl">이 항목</span></div>
@@ -1678,7 +1687,7 @@ status: approved
     <span class="lbl">참조는 하위 → 상위로만 적히고, 역방향은 계산된 것이다</span>
     <span class="grow"></span>
     <span class="btn" data-el="6">닫기</span>
-    <span class="btn" data-el="4">문서 뷰로 열기</span>
+    <span class="btn solid" data-el="4">문서 뷰로 열기</span>
   </div>
 </div>
 ```
@@ -1707,6 +1716,10 @@ status: approved
 - **항목이 없는 단계도 회색으로 남긴다.** 체인이 어디서 끊겼는지 보이는 게 이 화면의 목적이다. 빈 단계를 접으면 "UI 단계에 아무것도 안 이어졌다"는 사실이 안 보인다
 - 칩(3.1)을 누르면 그 항목 기준으로 다시 그린다. 뒤로 가기는 없다 — 계속 따라가는 화면이지 되짚는 화면이 아니다
 - 범위(UI-8 2.1~2.3)와 무관하게 항상 전체 참조를 본다. 범위는 그리는 것을 고르는 조작이지 관계를 지우는 조작이 아니다
+- 다이얼로그 폭은 `720px`. 넓히면 칩 사이가 벌어져 행이 헐거워진다
+- **이 항목 칩(3.1)은 채우지 않는다.** 흰 바탕에 1.5px 진한 테두리다. 자리 표시는 행 배경과 왼쪽 라벨이 이미 하고 있어 칩까지 채우면 강조가 셋이 된다
+- 현재 단계 행은 왼쪽 라벨까지 주의색이다. 행 배경만으로는 훑을 때 놓친다
+- 칩 안 항목 ID에서 프로젝트 코드 접두는 뺀다. 같은 프로젝트 안이고 칩은 좁다 — 전체 ID는 제목(1.1)에 있다
 
 ### 시나리오
 
@@ -1738,26 +1751,28 @@ status: approved
 
 ```html
 <div class="dialog" data-el="1">
-  <div class="dhead"><span>사용 방법</span><span class="grow"></span><span class="x" data-el="4">✕</span></div>
+  <div class="dhead"><span>싱크독 사용 방법</span><span class="grow"></span><span class="x" data-el="4">✕</span></div>
   <div class="dbody">
+    <p class="dlead">개발자가 PM 없이 11단계 명세 체인을 쓰고, 에이전트가 그 명세를 따르게 하는 플랫폼입니다. 쓰는 것은 에이전트, 판단하고 확정하는 것은 웹입니다.</p>
+
     <table class="grid" data-el="2">
-      <tr class="hd"><th></th><th>무엇</th><th>어떻게</th><th>어디서</th></tr>
-      <tr data-el="2.1"><td>1</td><td>저장소를 등록한다</td><td>주소·코드·이름</td><td>프로젝트 목록</td></tr>
-      <tr><td>2</td><td>에이전트를 붙인다</td><td>MCP 토큰 발급 후 설정에 붙여넣기</td><td>설정</td></tr>
-      <tr><td>3</td><td>명세를 쌓는다</td><td>에이전트에게 시킨다. 웹에는 편집이 없다</td><td>에이전트</td></tr>
-      <tr><td>4</td><td>읽고 확정한다</td><td>상태를 초안 → 검토중 → 승인으로</td><td>문서 뷰</td></tr>
-      <tr><td>5</td><td>바뀐 것을 따라간다</td><td>전파 선택, 확인 필요 처리</td><td>내 할 일</td></tr>
-      <tr><td>6</td><td>체인을 본다</td><td>참조 그래프에서 노드 클릭</td><td>참조 그래프</td></tr>
+      <tr class="hd"><th></th><th></th><th></th><th>어디서</th></tr>
+      <tr data-el="2.1"><td class="no">1</td><td>저장소를 등록한다</td><td>명세 원본은 저장소의 docs/specs/에 둔다. 프로젝트 하나가 저장소 하나다.</td><td class="where">프로젝트 목록</td></tr>
+      <tr><td class="no">2</td><td>에이전트를 붙인다</td><td>설정에서 MCP 토큰을 발급해 Claude Code·Codex·Gemini에 넣는다. 클라이언트는 상관없다.</td><td class="where">설정</td></tr>
+      <tr><td class="no">3</td><td>에이전트와 대화하며 명세를 쓴다</td><td>명세 본문이 들어오는 길은 MCP와 GitHub push 둘뿐이다. 웹에는 편집 화면이 없다.</td><td class="where">에이전트</td></tr>
+      <tr><td class="no">4</td><td>웹에서 읽고 확정한다</td><td>유저용 탭으로 읽고, 참조를 따라가고, 댓글을 달고, 상태를 바꾼다. 승인은 상위 대조를 거친다.</td><td class="where">문서 뷰</td></tr>
+      <tr><td class="no">5</td><td>내 할 일을 처리한다</td><td>상위가 바뀌면 하위에 확인 필요가 붙는다. 알림은 없다 — 내 할 일 화면이 알림이다.</td><td class="where">내 할 일</td></tr>
+      <tr><td class="no">6</td><td>수정은 다시 에이전트에게</td><td>확인하다 영향이 있으면 화면 밖에서 에이전트에게 고치게 하고 돌아와 확인한다.</td><td class="where">에이전트</td></tr>
     </table>
 
-    <table class="grid" data-el="3">
-      <tr class="hd"><th>#</th><th>코드</th><th>이름</th><th>항목 ID</th></tr>
-      <tr data-el="3.1"><td>1</td><td>RFQ</td><td>요구·인터뷰</td><td><code>Q1</code></td></tr>
-      <tr><td>2</td><td>PRD</td><td>제품 요구</td><td><code>G1</code> <code>R12</code></td></tr>
-      <tr class="std" data-el="3.2"><td>—</td><td>STD</td><td>표준 (단계 밖)</td><td>규칙 항목</td></tr>
+    <h4 class="sectitle">11단계가 뜻하는 것</h4>
+    <table class="grid" data-el="3"><!-- 머리 행 없음. 위 소제목이 그 일을 한다 -->
+      <tr data-el="3.1"><td class="no">1</td><td class="code">RFQ</td><td><b>요구·인터뷰</b> — 무엇을 왜 만드나. 고객이 말한 것만 적는다</td><td class="ids">Q1</td></tr>
+      <tr><td class="no">2</td><td class="code">PRD</td><td><b>제품 요구</b> — 목표·비목표·요구사항. 요구에는 인수기준까지</td><td class="ids">G1 · R12 · N3</td></tr>
+      <tr class="std" data-el="3.2"><td class="no">—</td><td class="code">STD</td><td><b>표준 (단계 밖)</b> — 명세가 아니라 명세를 쓰는 법. 싱크독 프로젝트에만 있다</td><td class="ids">규칙 항목</td></tr>
     </table>
 
-    <p class="lbl" data-el="3.3">문서 ID는 <code>{프로젝트코드}-{타입}-{번호}</code>, 항목 ID는 <code>{문서ID}#{항목번호}</code>, 본문 참조는 <code>[[항목ID]]</code>.</p>
+    <p class="lbl" data-el="3.3">오른쪽은 그 단계 문서 안에서 쓰는 항목 ID 형식. 문서 ID는 <code>{프로젝트코드}-{타입}-{번호}</code>, 항목 ID는 <code>{문서ID}#{항목번호}</code>, 참조는 <code>[[항목ID]]</code>.</p>
     <p class="note" data-el="3.4">11단계 순서는 권장이지 강제가 아니다. 건너뛰어도 막지 않고 표시만 한다.</p>
   </div>
   <div class="dfoot"><span class="grow"></span><span class="btn" data-el="5">닫기</span></div>
@@ -1784,6 +1799,11 @@ status: approved
 - 이 화면은 **읽기 전용이고 상태가 없다.** 어디서 열든 같은 내용이고, 닫으면 원래 화면 그대로다
 - 항목 ID 형식은 [[SYNC-STD-001]] 2장의 타입별 패턴을 사람 말로 옮긴 것이다. 규약이 바뀌면 여기도 바뀐다
 - **"순서는 강제가 아니다"를 빼지 않는다.** 11단계를 보면 차례로 다 채워야 하는 것처럼 읽힌다. 실제로는 건너뛴 단계를 표시만 하고 막지 않는다([[SYNC-UC-001#UC-H14]] 1b)
+- 본문 맨 위 문단이 이 도구가 무엇인지 한 번에 말한다. 표만 있으면 처음 온 사람이 무엇을 읽고 있는지 모른다
+- 두 표 사이에 소제목 `11단계가 뜻하는 것`을 둔다. 두 번째 표에는 머리 행이 없다 — 소제목이 그 일을 한다
+- 설명은 문장으로 쓴다. 키워드 단문으로 줄이면 행이 얇아져 표가 목록처럼 읽힌다
+- 항목 ID는 고정폭 평문이다. 칩으로 그리면 표에 색 상자가 열한 줄 생겨 단계 이름보다 먼저 눈에 든다
+- 다이얼로그 폭은 `660px`
 
 ### 시나리오
 
