@@ -132,9 +132,9 @@ status: approved
     <table class="uptbl" data-el="11.1">
       <tr><th></th><th>상위 항목</th><th>현재</th><th>참조한 곳</th></tr>
       <tr data-el="11.2"><td><input type="checkbox" checked></td><td><b>SYNC-UC-001#UC-A6</b> 명세를 작성·수정한다</td><td>v9 · 승인</td><td>update_document</td></tr>
-      <tr><td><input type="checkbox"></td><td><b>SYNC-UC-001#UC-A1</b> 프로젝트를 초기화한다</td><td>v9 · 승인</td><td>init_project</td></tr>
-      <tr><td><input type="checkbox"></td><td><b>SYNC-DOM-002#SpecService</b></td><td>v3 · 검토중</td><td>get_document 외 4</td></tr>
-      <tr><td><input type="checkbox"></td><td><b>SYNC-STD-001</b> (문서 전체)</td><td>v2 · 승인</td><td>frontmatter upstream</td></tr>
+      <tr><td></td><td><b>SYNC-UC-001#UC-A1</b> 프로젝트를 초기화한다</td><td>v9 · 승인</td><td>init_project</td></tr>
+      <tr><td></td><td><b>SYNC-DOM-002#SpecService</b></td><td>v3 · 검토중</td><td>get_document 외 4</td></tr>
+      <tr><td></td><td><b>SYNC-STD-001</b> (문서 전체)</td><td>v2 · 승인</td><td>frontmatter upstream</td></tr>
     </table>
     <div class="dacts"><span class="btn" data-el="11.4">닫기</span> <span class="btn" data-el="11.3" style="font-weight:600">어긋남 1건 표시하고 승인</span></div>
   </div>
@@ -482,6 +482,8 @@ status: approved
 
 - 일곱 묶음은 별도 저장소 없이 각각 DB를 직접 조회한다(UC-H15 기본 흐름 2). 플래그·전파결정·문서·댓글 테이블
 - 묶음 안 정렬은 경과일 내림차순. 오래 방치된 게 위
+- **묶음 순서는 고정이다** — 확인 필요 · 하위 불일치 · 끊어진 참조 · 전파 미결정 · 규약 오류 · 미해결 댓글 · 담당 미지정. 건수에 따라 순서가 바뀌면 매번 눈으로 다시 찾아야 한다
+- 담당 미지정(7)은 마지막이고 흐리게 둔다. 남의 것이 아니라 아무의 것도 아닌 것이다
 - 상단 바 배지 숫자 = 1.1 총 건수. 담당 미지정은 배지에 안 들어간다
 - 0건 묶음은 제목까지 숨긴다. 전부 0이면 빈 상태(8)만 보인다
 - 처리가 끝나면(확인함, 전파 선택, 댓글 해결) 이 화면으로 돌아왔을 때 그 행이 사라진다
@@ -585,7 +587,7 @@ status: approved
 | 3.4 | 문서에서 보기 | 버튼 | | 내 문서의 UI-5 해당 항목 위치 |
 | 4 | 처리 영역 | 영역 | 확인함 버튼과 안내 | — |
 | 4.1 | 확인함 | 버튼 | | 플래그 해제, 확인자·시각·수정 동반 여부 기록(UC-H11 기본 흐름 5~6). UI-10으로 |
-| 4.2 | 안내 | 텍스트 | 수정이 필요하면 에이전트에게 시키고 돌아오라는 안내(UC-H11 기본 흐름 4) | — |
+| 4.2 | 안내 | 텍스트 | 수정이 필요하면 에이전트에게 시키고 돌아오라는 안내(UC-H11 기본 흐름 4). **지금 누르면 어느 쪽으로 기록되는지도 여기 적는다** — `수정 동반` 또는 `수정 없음` | — |
 | 5 | 내 할 일로 | 버튼 | | 처리하지 않고 UI-10으로. 플래그는 남는다 |
 
 ### 규칙
@@ -593,6 +595,7 @@ status: approved
 - 위가 원인, 아래가 내 항목. 위를 읽고 아래에 영향이 있는지 판단하는 순서(UC-H11 기본 흐름 2~3)
 - 2.2에서 원인이 여러 번 바뀌었으면 2.3은 부여 시점 → 현재까지 누적 diff (UC-H11 3a)
 - 3.2 "플래그 부여 후 변경 없음/있음"은 시스템이 판정한다. 부여 시점의 내 문서 버전과 현재 버전을 비교. 이 값이 확인함(4.1) 때 `수정 동반 여부`로 기록된다(UC-H11 3b)
+- **확인 버튼은 하나다.** 수정 동반 여부를 사람에게 묻지 않는다 — 시스템이 이미 아는 것을 두 번 물으면 답이 어긋난다. 대신 안내(4.2)에 어느 쪽으로 기록될지 미리 보여준다
 - 이 화면에는 편집이 없다. 수정은 에이전트에게 시키고(UC-A6), 돌아오면 3.2·3.3이 갱신되어 있다
 - 원인 항목 쪽이 잘못됐다고 판단하면(UC-H11 4a) 확인함을 누르지 않고 5로 나간다. 플래그는 남는다
 - 담당 미지정 플래그를 열었을 때 확인함을 누르면 확인자가 나로 기록된다
@@ -737,12 +740,12 @@ status: approved
 <div class="body2 hist">
   <table class="vers" data-el="2">
     <tr><th></th><th>버전</th><th>시각</th><th>작성</th><th>변경</th><th></th></tr>
-    <tr class="cur" data-el="2.1"><td><input type="checkbox" checked></td><td><b>v7</b> <span class="lbl">현재</span></td><td>1일 전</td><td>에이전트<br><span class="lbl">지시 박호영</span></td><td>spec: R10 다이어그램 렌더링으로 변경</td><td></td></tr>
-    <tr><td><input type="checkbox"></td><td>—</td><td>1일 전</td><td>박호영</td><td class="lbl">status: 검토중 → 승인</td><td></td></tr>
-    <tr><td><input type="checkbox" checked></td><td>v6</td><td>2일 전</td><td>에이전트<br><span class="lbl">지시 박호영</span></td><td>spec: 웹 편집 삭제</td><td><span class="btn sm" data-el="2.2">되돌리기</span></td></tr>
-    <tr><td><input type="checkbox"></td><td>v5</td><td>3일 전</td><td>김민준<br><span class="lbl">GitHub push</span></td><td>spec: 비목표 표 정리</td><td><span class="btn sm">되돌리기</span></td></tr>
-    <tr><td><input type="checkbox"></td><td>v4</td><td>4일 전</td><td>에이전트<br><span class="lbl">지시 김민준</span></td><td>spec: R9 MCP 토큰 조항</td><td><span class="btn sm">되돌리기</span></td></tr>
-    <tr><td><input type="checkbox"></td><td>v3</td><td>5일 전</td><td>에이전트<br><span class="lbl">지시 박호영</span></td><td>spec: 초안</td><td><span class="btn sm">되돌리기</span></td></tr>
+    <tr class="cur sel" data-el="2.1"><td><span class="ab" data-el="2.3">B</span></td><td><b>v7</b> <span class="lbl">현재</span></td><td>1일 전</td><td>에이전트<br><span class="lbl">지시 박호영</span></td><td>spec: R10 다이어그램 렌더링으로 변경</td><td></td></tr>
+    <tr><td></td><td>—</td><td>1일 전</td><td>박호영</td><td class="lbl">status: 검토중 → 승인</td><td></td></tr>
+    <tr class="sel"><td><span class="ab">A</span></td><td>v6</td><td>2일 전</td><td>에이전트<br><span class="lbl">지시 박호영</span></td><td>spec: 웹 편집 삭제</td><td><span class="btn sm" data-el="2.2">되돌리기</span></td></tr>
+    <tr><td></td><td>v5</td><td>3일 전</td><td>김민준<br><span class="lbl">GitHub push</span></td><td>spec: 비목표 표 정리</td><td><span class="btn sm">되돌리기</span></td></tr>
+    <tr><td></td><td>v4</td><td>4일 전</td><td>에이전트<br><span class="lbl">지시 김민준</span></td><td>spec: R9 MCP 토큰 조항</td><td><span class="btn sm">되돌리기</span></td></tr>
+    <tr><td></td><td>v3</td><td>5일 전</td><td>에이전트<br><span class="lbl">지시 박호영</span></td><td>spec: 초안</td><td><span class="btn sm">되돌리기</span></td></tr>
   </table>
 
   <section class="diffpane" data-el="3">
@@ -789,7 +792,8 @@ status: approved
 |---|---|---|---|---|
 | 1 | 문서 바 | 영역 | UI-5와 같음. 이력 탭 활성 | 유저용·원본 → UI-5 |
 | 2 | 버전 목록 | 표 | 최신이 위. 버전 번호, 시각, 작성 주체, 커밋 메시지(UC-H6 기본 흐름 2). `status` 커밋도 행으로 |
-| 2.1 | 버전 행 | 행 | 체크박스, 번호, 시각, 작성(사람/에이전트+지시자/GitHub push), 변경 요약 | 체크 → diff 대상 선택. 두 개까지 |
+| 2.1 | 버전 행 | 행 | 번호, `A`/`B` 뱃지(고른 두 개), 시각, 작성(사람/에이전트+지시자/GitHub push), 변경 요약 | 고르면 diff 대상. 두 개까지 |
+| 2.3 | A·B 뱃지 | 뱃지 | 고른 두 버전 중 어느 쪽이 이전(`A`)이고 어느 쪽이 현재(`B`)인지 | — |
 | 2.2 | 되돌리기 | 버튼 | 현재 버전과 `status` 행 제외한 행마다 | 되돌리기 확인(4) 열림(UC-H7 기본 흐름 1~2) |
 | 3 | diff 영역 | 영역 | 선택한 두 버전의 줄 단위 diff(UC-H6 기본 흐름 3). 기본은 현재 ↔ 직전 | — |
 | 3.1 | 비교 범위 | 텍스트 | `vA → vB`, 변경 항목 수, 줄 수 | — |
@@ -805,9 +809,10 @@ status: approved
 
 ### 규칙
 
-- 체크는 두 개까지. 세 번째를 체크하면 가장 먼저 체크한 것이 풀린다
+- **두 개까지 고른다. 세 번째를 고르면 `A`가 밀려난다.** 늘 뒤쪽이 `B`(현재), 앞쪽이 `A`(이전)다 — 순서를 사람이 신경 쓰지 않아도 되게
+- 고른 행은 테두리와 배경으로 구분한다. 뱃지(2.3)가 어느 쪽이 A인지 말해 준다
 - 버전이 하나뿐이면 diff 영역(3)에 비교 대신 전체 본문(UC-H6 3b)
-- `status` 커밋 행은 본문이 같으므로 되돌리기(2.2)가 없다. diff 대상으로는 고를 수 있으나 본문 차이는 없다
+- `status` 커밋 행과 현재 버전은 되돌리기(2.2)가 없다. `status`는 본문이 같고, 현재 버전은 되돌릴 것이 없다. diff 대상으로는 고를 수 있다
 - 되돌리기(4.2)는 UC-A6과 같은 파이프라인을 탄다. 규약 검사·참조 추출·변경 영향 감지가 전부 돈다. 되돌린 결과가 현재 규약을 위반하면 거부된다(UC-H7 4a)
 - 되돌리기 후 하위 영향이 있으면 전파 미결정이 되어 내 할 일에 뜬다
 - 되돌린 본문에 지금 있는 항목이 없으면(예: v3엔 `#R15`가 없음) 서버가 삭제 확인을 요구한다. 웹은 확인 다이얼로그(6)로 받아 재요청한다
