@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -37,6 +38,9 @@ class Comment(Base):
 
 
 class CommentSummary(Base):
+    # 판별 필드 (SYNC-API-001 GET/api/projects/{code}/flags). 클라이언트가 kind로
+    # 되짚지 않게 서버가 고정값을 채운다
+    type: Literal["comment"] = "comment"
     id: int
     doc_id: str
     line_no: int
