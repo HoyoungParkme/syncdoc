@@ -2,18 +2,28 @@
 
 import os
 
-os.environ.setdefault(
-    "DATABASE_URL",
-    os.environ.get(
-        "SYNCDOC_TEST_DATABASE_URL",
-        "postgresql+psycopg://syncdoc:syncdoc@localhost:5434/syncdoc_test",
-    ),
+# **setdefault가 아니라 덮어쓴다.** setdefault면 셸에 DATABASE_URL이 떠 있을 때 테스트가
+# 그 DB에서 돈다 — 저장소 `.env`는 개발 DB(5432)를 가리키고, 그 DB는 도커로 띄운 앱과
+# 폴링이 같이 쓴다. 테스트가 만든 사용자 행이 남의 트랜잭션에 밀려 사라지면 웹 라우트가
+# 401을 낸다. 실패하는 테스트가 매번 달라지는 것도 그래서다 (#17).
+# 의도적으로 다른 DB를 쓰려면 SYNCDOC_TEST_DATABASE_URL로 말한다.
+os.environ["DATABASE_URL"] = os.environ.get(
+    "SYNCDOC_TEST_DATABASE_URL",
+    "postgresql+psycopg://syncdoc:syncdoc@localhost:5434/syncdoc_test",
 )
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault("WEBHOOK_SECRET", "test-webhook-secret")
 os.environ.setdefault("GITHUB_CLIENT_ID", "test-client-id")
 os.environ.setdefault("GITHUB_CLIENT_SECRET", "test-client-secret")
-os.environ.setdefault("POLL_INTERVAL_SECONDS", "0")  # 테스트는 폴링·기동 따라잡기를 끈다
+os.environ["POLL_INTERVAL_SECONDS"] = "0"  # 폴링·기동 따라잡기를 끈다. 배경 작업이 세션을 함께 쓴다
+
+# 테스트 DB가 아닌 곳을 가리키면 시작하지 않는다. 스키마를 지우고 다시 만드는 픽스처가
+# 개발·운영 DB에 닿으면 그 데이터가 사라진다
+if "test" not in os.environ["DATABASE_URL"].rsplit("/", 1)[-1]:
+    raise SystemExit(
+        f"테스트 DB가 아닙니다: {os.environ['DATABASE_URL']}\n"
+        "SYNCDOC_TEST_DATABASE_URL로 테스트 DB를 지정하세요 (이름에 'test'가 들어가야 합니다)."
+    )
 
 import pytest  # noqa: E402
 from alembic.config import Config  # noqa: E402
