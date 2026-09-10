@@ -115,6 +115,27 @@ async def test_list_documents_grouped_by_stage(scoped: Session, as_user) -> None
     assert err and p["type"] == "urn:syncdoc:not-found"
 
 
+async def test_get_template_reads_the_project_own_std_document(
+    scoped: Session, as_user, monkeypatch
+) -> None:
+    """#8 — 규약 문서 이름에도 프로젝트 코드가 들어간다 (STD-001 1.1)."""
+    _seed(scoped, as_user)
+    asked: list[str] = []
+
+    async def spy(workdir, path):  # noqa: ANN001
+        asked.append(path)
+        raise tools.git.GitError(["git", "show"], "does not exist")
+
+    monkeypatch.setattr(tools.git, "read", spy)
+    err, t = await call("get_template", project_code="EXMP", doc_type="PRD")
+
+    assert not err
+    assert "docs/specs/STD/EXMP-STD-001.md" in asked
+    assert "docs/specs/STD/SYNC-STD-001.md" not in asked
+    # 저장소에 없으면 싱크독 내장 사본으로 떨어진다 (STD-001 2.12)
+    assert t["common_rules"] and t["template"]
+
+
 async def test_get_template_rules_template_example(scoped: Session, as_user) -> None:
     make_project(scoped, "SYNC")  # workdir /w 는 없음 → 앱 내장 사본으로
     err, t = await call("get_template", project_code="SYNC", doc_type="PRD")
