@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ago, api, ApiError, docPath, type RebuildResult, type RepoStatus } from '../api/client'
+import { toast, Tooltip } from '../components/ui'
 
 export function Admin() {
   const [repos, setRepos] = useState<RepoStatus[]>([])
@@ -20,6 +21,7 @@ export function Admin() {
       setResult({ code, at: new Date().toISOString(), r })
       setConfirm(null)
       load()
+      toast(`${code} 인덱스를 다시 세웠습니다 — 문서 ${r.docs} · 항목 ${r.items} · 참조 ${r.references}`)
     } catch (e) {
       alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
     } finally {
@@ -28,9 +30,9 @@ export function Admin() {
   }
   const badge = (r: RepoStatus) =>
     r.error ? (
-      <span className="st dr" title={r.error}>
-        조회 실패
-      </span>
+      <Tooltip text={r.error}>
+        <span className="st dr">조회 실패</span>
+      </Tooltip>
     ) : r.behind_by == null ? (
       <span className="st na">문서 없음</span>
     ) : r.behind_by === 0 ? (

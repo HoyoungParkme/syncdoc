@@ -1,6 +1,7 @@
 /** UI-2 프로젝트 목록 — SYNC-UI-002#UI-2. 프로젝트가 행, 11단계가 열. UC-H14 1~2, 1a·1b·3a. */
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { STAGE_TYPES, type ProjectSummary } from '../api/client'
+import { Tooltip } from '../components/ui'
 
 const CELL: Record<string, string> = { approved: 'ok', review: 'rv', draft: 'dr' }
 
@@ -39,7 +40,7 @@ export function ProjectList() {
               ].filter(Boolean)
               return (
                 <tr className="prj" data-el="2.1" key={p.code} onClick={() => nav(`/p/${p.code}`)}>
-                  <td>{flags > 0 && <span className="warn" data-el="2.3" title="플래그·규약 오류 있음">⚠</span>}</td>
+                  <td>{flags > 0 && <Tooltip text="플래그·규약 오류 있음"><span className="warn" data-el="2.3">⚠</span></Tooltip>}</td>
                   <td>
                     <b>{p.code}</b> {p.name}
                     {summary.length > 0 && (
@@ -60,9 +61,9 @@ export function ProjectList() {
                       <span className={`cell ${s.status ? CELL[s.status] : 'na'}`} data-el="2.2">
                         {s.doc_count || ''}
                         {s.gate_warning && (
-                          <i data-el="2.4" title="앞 단계 미승인">
-                            ▲
-                          </i>
+                          <Tooltip text="앞 단계 미승인">
+                            <i data-el="2.4">▲</i>
+                          </Tooltip>
                         )}
                       </span>
                     </td>

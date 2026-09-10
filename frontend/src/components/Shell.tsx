@@ -4,6 +4,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { api, ApiError, type ProjectSummary, type Todo, type User } from '../api/client'
 import { HowTo } from './HowTo'
+import { ToastHost } from './ui'
 
 export function Shell() {
   const nav = useNavigate()
@@ -50,6 +51,7 @@ export function Shell() {
         <Outlet context={{ user, projects }} />
       </main>
       {howTo && <HowTo onClose={() => setHowTo(false)} />}
+      <ToastHost />
     </div>
   )
 }

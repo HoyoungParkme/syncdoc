@@ -3,8 +3,9 @@
  *  · 4 되돌리기 확인(4.1 diff, 4.2 되돌리기, 4.3 취소) · 6 삭제 확인(6.1 삭제하고 되돌리기, 6.2 취소) */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ago, api, ApiError, docPath, josa, STATUS_KO, type Diff, type Document, type ItemReferences, type Version } from '../api/client'
+import { ago, api, ApiError, docPath, josa, type Diff, type Document, type ItemReferences, type Version } from '../api/client'
 import { DiffBox } from '../components/DiffBox'
+import { StatusPill } from '../components/ui'
 import { renderBlocks } from '../view/md'
 
 type Deleted = { item_id: string; downstream: number[] }
@@ -88,7 +89,7 @@ export function History() {
     <>
       <div className="docbar" data-el="1">
         <span>
-          <b>{doc.doc_id}</b> · <span className={`st st-${doc.status}`}>{STATUS_KO[doc.status]}</span> · v{doc.current_version_no}
+          <b>{doc.doc_id}</b> · <StatusPill status={doc.status} /> · v{doc.current_version_no}
         </span>
         <span className="tabs">
           <Link to={docPath(docId)}>유저용</Link>

@@ -3,9 +3,9 @@
  *  1 헤더(1.1·1.2·1.3) · 2.1·2.2 그래프·순서(B4) · 3 요약 수치(3.1~3.5 → 다이얼로그 6) · 4 표(4.1 단계, 4.2 문서, 4.3 상위 미승인, 4.4 표준) · 5 최근 변경 · 6 목록 다이얼로그 */
 import { useEffect, useState } from 'react'
 import { Link, useOutletContext, useParams } from 'react-router-dom'
+import { StatusPill } from '../components/ui'
 import { ago, api, authorLabel, docPath, refKey, STAGE_NAMES, STAGE_TYPES, STATUS_KO, type CommentSummary, type DocumentSummary, type FlagSummary, type ProjectDetail as Detail, type ProjectSummary, type Version } from '../api/client'
 
-const ST: Record<string, string> = { approved: 'ok', review: 'rv', draft: 'dr' }
 
 export function ProjectDetail() {
   const { code = '' } = useParams()
@@ -81,7 +81,7 @@ export function ProjectDetail() {
                   <td className="no">{s.stage}</td>
                   <td>{STAGE_NAMES[s.doc_type]}</td>
                   <td>
-                    <span className={`st ${s.status ? ST[s.status] : 'na'}`}>{s.status ? STATUS_KO[s.status] : '미작성'}</span>
+                    <StatusPill status={s.status} />
                     {s.gate_warning && (
                       <span className="gate" data-el="4.3">
                         상위 미승인
@@ -98,7 +98,7 @@ export function ProjectDetail() {
                 <td className="no">—</td>
                 <td>표준 (STD)</td>
                 <td>
-                  <span className={`st ${ST[lowest(p.std_docs)] ?? 'dr'}`}>{STATUS_KO[lowest(p.std_docs)]}</span>
+                  <StatusPill status={lowest(p.std_docs)} />
                 </td>
                 <td className="lbl">{p.std_docs.length}개</td>
               </tr>,

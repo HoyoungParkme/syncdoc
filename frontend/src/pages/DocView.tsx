@@ -6,6 +6,7 @@ import mermaid from 'mermaid'
 import { api, ApiError, FLAG_KO, STATUS_KO, type Comment, type Document, type DownstreamView, type ItemReferences, type UpstreamCheck } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { esc, splitRef } from '../view/md'
+import { StatusPill } from '../components/ui'
 
 
 export function DocView() {
@@ -141,11 +142,9 @@ export function DocView() {
       <div className="docbar" data-el="1">
         <span>
           <b>{doc.doc_id}</b> ·{' '}
-          <span className={`st st-${doc.status}`} data-el="1.1">
-            {STATUS_KO[doc.status]}
-          </span>{' '}
+          <StatusPill status={doc.status} el="1.1" />{' '}
           ·{' '}
-          <Link data-el="1.2" to={`/p/${code}/d/${docId}/history`} title="이력(UI-7)">
+          <Link data-el="1.2" to={`/p/${code}/d/${docId}/history`}>
             v{doc.current_version_no}
           </Link>
         </span>
@@ -335,7 +334,7 @@ function tocOf(doc: Document): { id: string; text: string; depth: number }[] {
 function Refs({ refs }: { refs: ItemReferences }) {
   const link = (r: ItemReferences['upstream'][number]) =>
     r.is_missing ? (
-      <li className="ref missing" title="미존재 참조">
+      <li className="ref missing">
         {r.raw_target} ?
       </li>
     ) : (

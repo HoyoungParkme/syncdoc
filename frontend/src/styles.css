@@ -165,6 +165,35 @@ li.ref.missing{color:#999}
 .graphpage{max-width:none}.graph{height:calc(100vh - var(--topbar-h) - 150px);border:1px solid var(--rule);background:#fff;position:relative}.graph .edges{position:absolute;left:12px;bottom:8px;z-index:4}.node{font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:3px 8px;border:1px solid var(--ink);background:#fff;border-radius:2px;cursor:pointer;white-space:nowrap}.node.doc{font-weight:700;background:var(--panel)}.node.iso{border-style:dashed;color:var(--soft)}.node.miss{border-style:dotted;color:#b00;background:#fff5f5}.legend{margin-top:8px}.legend span{margin-right:14px}
 /* UI-9 순서대로 읽기 */
 .steps{display:flex;gap:4px;flex-wrap:wrap}.stp{font-size:12px;padding:2px 8px;border:1px solid var(--rule);border-radius:2px;cursor:pointer;color:var(--soft)}.stp.done{background:#d6f0d6;color:#1a6;border-color:#1a6}.stp.cur{background:var(--ink);color:#fff;border-color:var(--ink)}.stp.na{opacity:.4;cursor:default}.readbody .main{max-width:900px;margin:0 auto}.readbody .nav{display:flex;gap:10px;justify-content:space-between;margin-top:24px;padding-top:12px;border-top:1px solid var(--rule)}
+/* 1.4 상태 필 — 상태색 바탕. 승인만 글씨가 희다.
+   이름을 백엔드 status 코드로 맞춰 뒀으니 클래스는 pill-{status} 하나로 끝난다 */
+.pill{display:inline-block;padding:1px var(--space-8);border-radius:var(--radius-pill);
+  font-size:var(--text-caption);font-weight:var(--w-semibold);line-height:1.6;white-space:nowrap;
+  background:var(--status-draft);color:var(--ink-body)}
+.pill-review{background:var(--status-review)}
+.pill-approved{background:var(--status-approved);color:var(--status-approved-ink)}
+/* 아직 문서가 없는 단계. 상태가 아니라 빈칸이라 색을 주지 않는다 */
+.pill-none{background:none;color:var(--ink-disabled);padding-left:0;padding-right:0}
+
+/* 1.5 항목 ID 뱃지 — 작은 사각, 고정폭, 검토중 색 바탕 */
+.idbadge{display:inline-block;padding:0 var(--space-5);border-radius:var(--radius-badge);
+  background:var(--badge-item-bg);color:var(--ink-body);
+  font-family:var(--font-mono);font-size:var(--text-mono-id);font-weight:var(--w-semibold)}
+
+/* 1.2 툴팁 — 대상 위쪽 가운데. 마우스를 통과시킨다(대상 클릭을 막으면 안 된다) */
+.tipwrap{display:inline-block}
+.tip{position:fixed;transform:translate(-50%,-100%);margin-top:calc(var(--space-6) * -1);
+  max-width:280px;padding:var(--space-6) var(--space-10);border:1px solid var(--border-strong);
+  border-radius:var(--radius-control);background:var(--bg-card);color:var(--ink-prose);
+  font-size:var(--text-caption);line-height:1.6;white-space:pre-line;
+  box-shadow:var(--shadow-tooltip);pointer-events:none;z-index:var(--z-tooltip)}
+
+/* 1.3 토스트 — 화면 아래 가운데. 2.6초 뒤 스스로 사라진다(UI-001 3.4의 유일한 예외) */
+.toast{position:fixed;left:50%;bottom:var(--space-30);transform:translateX(-50%);
+  padding:var(--space-10) var(--space-18);border-radius:var(--radius-control);
+  background:var(--ink-body);color:#fff;font-size:var(--text-ui);
+  box-shadow:var(--shadow-toast);z-index:var(--z-toast)}
+
 /* UI-16 사용 방법 — 읽기 전용 표 둘. 공통 table.grid는 칸을 가운데로 모는데
    여기는 문장이라 왼쪽 정렬이 낫다. 번호·코드 칸만 가운데 */
 .howto table.grid{width:100%;border-collapse:collapse;font-size:var(--text-meta);background:none;margin-bottom:var(--space-18)}
