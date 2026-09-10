@@ -127,6 +127,8 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
   width:min(720px,92vw);max-height:min(84vh,760px);background:var(--bg-card);border-radius:var(--radius-dialog);
   box-shadow:var(--shadow-dialog);z-index:calc(var(--z-dialog) + var(--depth,0));overflow:hidden}
 .dialog.wide{width:min(900px,94vw)}
+/* 입력이 몇 개뿐인 다이얼로그. 넓히면 입력창만 길어지고 폼이 헐거워진다 */
+.dialog.narrow{width:min(560px,92vw)}
 .dhead{flex:none;display:flex;align-items:center;gap:var(--space-10);padding:var(--space-14) var(--space-18);
   border-bottom:1px solid var(--border);font-size:var(--text-dialog-title);font-weight:var(--w-semibold);color:var(--ink-body)}
 .dhead .lbl{font-size:var(--text-meta);font-weight:var(--w-regular)}
@@ -190,6 +192,9 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .legend i.sw.na{background:var(--bg-card);border-color:var(--border)}
 .warn{color:var(--danger);border:none;padding:0;background:none;font-size:inherit}
 /* UI-3 프로젝트 초기화 · UI-13 설정 — 둘 다 다이얼로그다 */
+/* 입력을 한 상자로 묶는다. 머리·폼·발 세 층으로 읽혀야 어디까지가 채울 곳인지 보인다 */
+.initdlg .form{max-width:none;border:1px solid var(--border);border-radius:var(--radius-panel-card);
+  padding:var(--space-4) var(--space-16) var(--space-16)}
 .form{max-width:640px}
 .form label{display:block;margin:var(--space-14) 0 var(--space-4);font-weight:var(--w-semibold);font-size:var(--text-meta)}
 .inp{font:inherit;font-size:var(--text-meta);padding:var(--space-6) var(--space-8);
@@ -197,10 +202,16 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .inp.wide{width:100%}
 .inp:focus{outline:none;border-color:var(--ink-body)}
 .ferr{color:var(--danger);font-size:var(--text-caption);margin-top:var(--space-4)}
+.form .lbl code{font-family:var(--font-mono);font-size:var(--text-mono-sm);
+  background:var(--bg-sunken);border-radius:var(--radius-badge);padding:0 var(--space-4)}
+.inp.mono{font-family:var(--font-mono);font-size:var(--text-mono-id-lg)}
+.inp::placeholder{color:var(--ink-disabled)}
 .facts{display:flex;gap:var(--space-8);justify-content:flex-end;margin-top:var(--space-18)}
 /* 2.5 커밋될 것 — 등록하면 저장소에 무엇이 생기는지 */
+/* 위 입력들과 같은 테두리 언어로 묶는다. 색면으로 두면 폼 안에서 이 블록만 튄다 */
 .willcommit{margin-top:var(--space-18);padding:var(--space-10) var(--space-12);
-  background:var(--bg-sunken);border-radius:var(--radius-control);font-size:var(--text-caption)}
+  background:var(--bg-subtle);border:1px solid var(--border);border-radius:var(--radius-panel-card);
+  font-size:var(--text-caption)}
 .willcommit .mono{display:block;color:var(--ink-muted);font-size:var(--text-mono-sm);margin-top:var(--space-3)}
 /* UI-13 카드 넷 */
 .setdlg .dbody{background:var(--bg-app)}
@@ -259,7 +270,7 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .stgh .sw.rv{background:var(--status-review)}
 .stgh .sw.ok{background:var(--status-approved)}
 .stgh .sw.na{background:var(--bg-card);border-color:var(--border)}
-.stg{display:flex;align-items:center;gap:var(--space-9);padding:var(--space-8) var(--space-13);
+.stg{display:flex;align-items:center;gap:var(--space-9);padding:var(--space-6) var(--space-13);
   border-bottom:1px solid var(--divider-soft);cursor:pointer}
 .stg:hover{background:var(--bg-subtle)}
 .stg .no{width:20px;flex:none;font-size:var(--text-mono-sm);color:var(--ink-muted)}
@@ -267,7 +278,7 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .stg .caret{width:10px;text-align:center;font-size:11.5px;color:var(--ink-muted)}
 /* 문서 행 — 46px 들여쓰고 바탕을 한 톤 낮춘다. 안 그러면 어느 쪽이 묶음인지 안 보인다 */
 .doc{display:flex;align-items:center;gap:var(--space-8);flex-wrap:wrap;cursor:pointer;
-  padding:var(--space-7) var(--space-13) var(--space-7) 46px;border-bottom:1px solid var(--divider-soft);
+  padding:var(--space-6) var(--space-13) var(--space-6) 46px;border-bottom:1px solid var(--divider-soft);
   background:var(--bg-doc-row);font-size:var(--text-meta)}
 .doc:hover{background:var(--bg-sunken)}
 .doc .mono{font-size:var(--text-mono-id-lg);font-weight:var(--w-medium)}
@@ -280,7 +291,7 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .st.dr,.st-draft{background:var(--status-draft);color:var(--ink-body)}
 .st.na{background:none;color:var(--ink-disabled)}
 /* 4.3 상위 미승인 — 표시만 한다. 순서는 권장이지 강제가 아니다 */
-.gate{font-size:var(--text-caption);color:var(--danger);border:1px solid var(--danger);border-radius:8px;padding:1px var(--space-7)}
+.gate{font-size:var(--text-mono-sm);color:var(--danger);border:1px solid var(--danger);border-radius:8px;padding:0 var(--space-7)}
 .flag{font-size:var(--text-mono-sm);color:var(--caution-ink);border:1px solid var(--status-review);border-radius:8px;padding:1px var(--space-7)}
 .cm{font-size:var(--text-mono-sm);color:var(--ink-muted);border:1px solid var(--border-strong);border-radius:8px;padding:1px var(--space-7)}
 .err{font-size:var(--text-mono-sm);color:var(--danger);border:1px solid var(--danger);border-radius:8px;padding:1px var(--space-7)}
@@ -541,7 +552,7 @@ li.ref.missing{color:var(--ink-disabled)}
 /* 1.4 상태 필 — 상태색 바탕. 승인만 글씨가 희다.
    이름을 백엔드 status 코드로 맞춰 뒀으니 클래스는 pill-{status} 하나로 끝난다 */
 .pill{display:inline-block;padding:1px var(--space-8);border-radius:var(--radius-pill);
-  font-size:var(--text-caption);font-weight:var(--w-semibold);line-height:1.6;white-space:nowrap;
+  font-size:var(--text-mono-sm);font-weight:var(--w-semibold);line-height:1.55;white-space:nowrap;
   background:var(--status-draft);color:var(--ink-body)}
 .pill-review{background:var(--status-review)}
 .pill-approved{background:var(--status-approved);color:var(--status-approved-ink)}

@@ -400,7 +400,10 @@ status: approved
 
 - 단계 상태 색: `승인` 초록 / `검토중` 노랑 / `초안` 회색 / `미작성` 빈칸. UI-2와 같은 기준
 - **11단계 표 머리에 미니 히트맵 11칸을 둔다.** UI-2에서 본 그 프로젝트 행이 여기 다시 있다 — 목록에서 눌러 들어온 사람이 같은 그림을 찾을 수 있게. 14px 정사각형
-- 단계 행은 아코디언이다. 캐럿(`▾`/`▸`)이 접힘 상태를 말하고 행 전체가 손잡이다
+- 단계 행은 아코디언이고 **기본은 접힘이다.** 캐럿(`▾`/`▸`)이 접힘 상태를 말하고 행 전체가 손잡이다.
+  열두 줄이 다 펼쳐지면 화면 하나에 11단계가 안 들어와, 이 화면이 답하려는 "어디까지 왔나"를 먼저 못 본다.
+  시나리오 S-1도 "단계 행을 누르면 문서 행이 펼쳐지고"로 접힌 상태에서 출발한다
+- UI-2 칸에서 `#stage-N`으로 들어오면 **그 단계만 펼친 채로** 연다(UI-2 요소 2.2 "그 단계 위치")
 - 문서 행은 46px 들여쓰고 바탕을 한 톤 낮춘다(`#fdfdfc`). 단계 행과 같은 높이로 두면 어느 쪽이 묶음인지 안 보인다
 - 요약 수치(3)는 **17.5px 고정폭**. 0이면 흐리게(`opacity .55`), 1 이상이면 경고색 숫자에 경고 테두리
 - 4.1의 대표 상태는 그 단계 문서들 중 가장 낮은 것. 승인 2개 + 초안 1개면 `초안`
@@ -1122,32 +1125,34 @@ status: approved
 ### 배치
 
 ```html
-<div class="dialog" data-el="1">
+<div class="dialog narrow" data-el="1"><!-- 폭 560. 입력 셋이라 넓힐 이유가 없다 -->
 <div class="dhead"><b>프로젝트 초기화</b><span class="grow"></span><span class="x" data-el="3.3">✕</span></div>
-<div class="form" data-el="2">
-  <label>저장소 주소</label>
-  <input class="inp wide" data-el="2.1" value="https://github.com/dfocus/airdata">
-  <div class="lbl">싱크독이 이 저장소에 쓰기 권한이 있어야 합니다</div>
+<div class="dbody">
+  <div class="form" data-el="2"><!-- 입력 넷을 한 상자로 묶는다 -->
+    <label>저장소 주소</label>
+    <input class="inp wide mono" data-el="2.1" placeholder="https://github.com/owner/repo">
+    <div class="lbl">싱크독이 이 저장소에 쓰기 권한이 있어야 합니다</div>
 
-  <label>프로젝트 코드</label>
-  <input class="inp" data-el="2.2" value="AIRD" style="width:100px">
-  <div class="lbl">영문 대문자 4자 이내. 문서 ID 앞부분이 됩니다 — 예: AIRD-PRD-001</div>
-  <div class="ferr" data-el="2.4">이미 쓰이는 코드입니다</div>
+    <label>프로젝트 코드</label>
+    <input class="inp mono" data-el="2.2" placeholder="AIRD" style="width:140px">
+    <div class="lbl">영문 대문자 4자 이내. 문서 ID 앞부분이 됩니다 — 예: <code>AIRD-PRD-001</code></div>
+    <div class="ferr" data-el="2.4">이미 쓰이는 코드입니다</div>
 
-  <label>이름</label>
-  <input class="inp wide" data-el="2.3" value="에어데이터">
+    <label>이름</label>
+    <input class="inp wide" data-el="2.3" placeholder="에어데이터">
 
-  <div class="willcommit" data-el="2.5">
-    <b>커밋될 것</b>
-    <div class="mono">docs/specs/_templates/ · 12개</div>
-    <div class="mono">docs/specs/{01-RFQ, 02-PRD, … , 11-CODE}/</div>
-    <div class="mono">docs/specs/assets/</div>
+    <div class="willcommit" data-el="2.5">
+      <b>커밋될 것</b>
+      <div class="mono">docs/specs/_templates/ · 12개</div>
+      <div class="mono">docs/specs/{01-RFQ, 02-PRD, … , 11-CODE}/</div>
+      <div class="mono">docs/specs/assets/</div>
+    </div>
   </div>
-
-  <div class="facts">
-    <span class="btn" data-el="3.2">취소</span>
-    <span class="btn" data-el="3.1" style="font-weight:600">초기화</span>
-  </div>
+</div>
+<div class="dfoot">
+  <span class="grow"></span>
+  <span class="btn" data-el="3.2">취소</span>
+  <span class="btn solid" data-el="3.1">초기화</span>
 </div>
 </div>
 
@@ -1185,6 +1190,11 @@ status: approved
 ### 규칙
 
 - 화면은 검사하지 않는다. 초기화(3.1)를 누르면 서버가 코드 형식·중복 → 저장소 접근 → `docs/specs/` 존재 순으로 판정한다
+- **다이얼로그 폭은 560px.** 입력이 셋이라 넓힐 이유가 없다. 넓히면 입력창만 길어지고 폼이 헐거워진다
+- **입력 넷을 테두리 상자 하나로 묶는다.** 머리·폼·발 세 층으로 읽혀야 어디까지가 채울 곳인지 보인다
+- **초기화(3.1)가 주 동작이다.** 검정 채움. 취소와 같은 모양이면 어느 쪽이 진행인지 눈이 못 고른다
+- 식별자를 넣는 칸은 고정폭이다 — 저장소 주소(2.1)와 프로젝트 코드(2.2). 힌트의 예시 문서 ID도 같다
+- 입력 셋에 예시를 placeholder로 둔다. 무엇을 넣는 칸인지 라벨만으로는 모자란다
 - 성공하면 UI-2로 가고 새 프로젝트 행이 11단계 전부 `미작성`으로 보인다
 - MCP로도 같은 일을 할 수 있다(UC-A1 주 액터 에이전트). 이 화면은 MCP 연결 전에 시작하기 위한 입구
 

@@ -17,12 +17,21 @@ export function ProjectDetail() {
   const { projects } = useOutletContext<{ projects: ProjectSummary[] }>()
   const p = projects.find((x) => x.code === code)
   const [d, setD] = useState<Detail | null>(null)
+  // 기본은 접힘. 열두 줄이 다 펼쳐지면 화면 하나에 11단계가 안 들어온다.
+  // UI-2 칸에서 #stage-N으로 들어오면 그 단계만 펼친 채로 연다
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [dialog, setDialog] = useState<{ kind: string; label: string; items: unknown[] } | null>(null)
   useEffect(() => {
     setD(null)
     api.get<Detail>(`/api/projects/${code}`).then(setD)
   }, [code])
+  // UI-2 칸 클릭으로 들어온 경우 — 그 단계만 펼친다
+  useEffect(() => {
+    const m = /^#stage-(\d+)$/.exec(window.location.hash)
+    if (!m || !d) return
+    const st = d.stages.find((x) => x.stage === Number(m[1]))
+    if (st) setOpen((o) => ({ ...o, [st.doc_type]: true }))
+  }, [d])
   if (!p && !d) return <div className="page lbl">프로젝트를 찾을 수 없습니다.</div>
   // 상세가 오기 전에는 목록이 들고 있던 요약으로 그린다. 화면이 비었다 다시 차지 않게
   const sum = d ?? (p as ProjectSummary)
@@ -32,7 +41,7 @@ export function ProjectDetail() {
     api.get<unknown[]>(`/api/projects/${code}/flags?kind=${kind}`).then((items) => setDialog({ kind, label, items }))
   }
   const byType = (t: string) => docs.filter((d) => d.doc_type === t)
-  const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !(o[k] ?? true) }))
+  const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
   const row = (d: DocumentSummary) => (
     <div className="doc" data-el="4.2" key={d.doc_id} onClick={() => nav(`/p/${code}/d/${d.doc_id}`)}>
       <span className="mono">{d.doc_id}</span>
@@ -101,7 +110,7 @@ export function ProjectDetail() {
             ))}
           </div>
           {sum.stages.map((s) => {
-            const isOpen = open[s.doc_type] ?? true
+            const isOpen = open[s.doc_type] ?? false
             return (
               <div key={s.doc_type}>
                 <div className="stg" data-el="4.1" id={`stage-${s.stage}`} onClick={() => toggle(s.doc_type)}>
@@ -129,9 +138,9 @@ export function ProjectDetail() {
                 <StatusPill status={lowest(sum.std_docs)} />
                 <span className="grow" />
                 <span className="lbl">{sum.std_docs.length}개</span>
-                <span className="caret">{(open.STD ?? true) ? '▾' : '▸'}</span>
+                <span className="caret">{open.STD ? '▾' : '▸'}</span>
               </div>
-              {(open.STD ?? true) && byType('STD').map(row)}
+              {open.STD && byType('STD').map(row)}
             </div>
           )}
         </div>
