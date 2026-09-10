@@ -197,6 +197,6 @@ upstream: [SYNC-STD-001, SYNC-UI-002]
 
 ## 7. 미결사항 (기존)
 
-- [ ] V-DOM 클래스에서 조각을 합친 다이어그램의 레이아웃 — mermaid가 자동 배치하므로 원본 순서와 다를 수 있다
+- [x] V-DOM 클래스에서 조각을 합친 다이어그램의 레이아웃 — mermaid가 자동 배치하므로 원본 순서와 다를 수 있다 — 결정: mermaid 자동 배치에 맡긴다. 실제로 렌더해 보니 묶음이 최대 네 클래스(2.2 명세)라 순서가 바뀌어도 한눈에 다 보인다. 관계선 알파벳 정렬도 유지한다 — 원본에서 관계 서술 순서를 바꿔도 뷰 결과가 흔들리지 않는다
 - [x] V-API REST의 OpenAPI 합치기 — `components/schemas`를 어느 절에서 가져올지 — 결정: "스키마"로 시작하는 절의 yaml을 base로 두고 엔드포인트 조각의 `paths`만 합친다. `tools/view_build.py`·`frontend/src/view/views.ts`가 구현
 - [x] 뷰 셋을 만든 파이썬 스크립트(`build.py` 등)가 사실상 뷰 규약의 구현이다. React로 옮길 때 이 문서와 대조 — 결정: 이관 완료. `frontend/src/view/{md,views,uc,wireframe,seq,ms}.ts`가 `tools/view_build.py`의 포트이고, 뷰 규약은 이 문서가 계속 진실
