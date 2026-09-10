@@ -1217,45 +1217,57 @@ status: approved
 | 항목 | 내용 |
 |---|---|
 | 화면 설계 | [[SYNC-UI-001#UI-13]] |
-| 경로 | `/settings` |
-| 진입 | 상단 바 설정 |
-| 유스케이스 | 인프라 5장 MCP 토큰 · [[SYNC-DOM-003#access_tokens]] |
+| 경로 | 어느 화면 위든 뜨는 다이얼로그. 별도 경로 없음 |
+| 진입 | 상단 바 `설정` |
+| 유스케이스 | 인프라 5장 MCP 토큰 · [[SYNC-DOM-003#access_tokens]] · [[SYNC-UC-001#UC-S6]](관리 카드) |
 
 ### 배치
 
 ```html
-<div class="phead" data-el="1"><b>설정</b></div>
+<div class="dialog" data-el="1">
+  <div class="dhead"><span>설정</span><span class="grow"></span><span class="x" data-el="7">✕</span></div>
+  <div class="dbody">
 
-<div class="form">
-  <section class="grp" data-el="2">
-    <h4>내 계정</h4>
-    <div class="row"><span data-el="2.1">hoyoung-park</span> <span class="lbl">GitHub · 박호영</span><span class="grow"></span><span class="btn sm" data-el="2.2">로그아웃</span></div>
-  </section>
+    <section class="card" data-el="2">
+      <div class="cardh"><b>내 계정</b></div>
+      <div class="row"><span data-el="2.1">HoyoungParkme</span> <span class="lbl">GitHub · 박호영</span><span class="grow"></span><span class="btn sm" data-el="2.2">로그아웃</span></div>
+    </section>
 
-  <section class="grp" data-el="3">
-    <h4>MCP 토큰 <span class="lbl">에이전트가 싱크독에 붙을 때 씁니다</span></h4>
-    <div class="row" data-el="3.1"><b>Claude Code 노트북</b> <span class="lbl">발급 09-01 · 만료 없음</span><span class="grow"></span><span class="btn sm" data-el="3.2">폐기</span></div>
-    <div class="row"><b>Codex 데스크톱</b> <span class="lbl">발급 09-03 · 만료 없음</span><span class="grow"></span><span class="btn sm">폐기</span></div>
-    <div class="row dimrow"><b>테스트용</b> <span class="lbl">발급 08-28 · <s>폐기됨 09-02</s></span></div>
-    <div class="row">
-      <input class="inp" data-el="3.3" placeholder="이름 — 예: Gemini 노트북">
-      <span class="btn" data-el="3.4">새 토큰 발급</span>
-    </div>
-  </section>
+    <section class="card" data-el="3">
+      <div class="cardh"><b>MCP 토큰</b> <span class="lbl">에이전트가 싱크독에 붙을 때 씁니다</span><span class="grow"></span><span class="btn sm" data-el="3.4">+ 발급</span></div>
+      <div class="tokbox" data-el="4">
+        <b>한 번만 보입니다. 지금 복사하세요.</b>
+        <div class="tok" data-el="4.1">syncdoc_pat_7f3a…c91e</div>
+        <span class="btn sm" data-el="4.2">복사</span>
+      </div>
+      <div class="row" data-el="3.1">
+        <b>Claude Code 노트북</b> <span class="lbl mono">syncdoc_pat_7f3a…</span> <span class="lbl">발급 09-01</span>
+        <span class="grow"></span> <span class="lbl" data-el="3.5">마지막 사용 12분 전</span> <span class="btn sm" data-el="3.2">폐기</span>
+      </div>
+      <div class="row dimrow"><b>테스트용</b> <span class="lbl">발급 08-28 · <s>폐기됨 09-02</s></span></div>
+      <div class="row"><input class="inp" data-el="3.3" placeholder="이름 — 예: Gemini 노트북"></div>
+    </section>
 
-  <div class="dialog" data-el="4">
-    <div class="dhead">토큰 발급됨</div>
-    <div class="dbody">
-      <b>지금만 보입니다.</b> 닫으면 다시 볼 수 없습니다. 에이전트 설정에 붙여넣으세요.
-      <div class="tokbox" data-el="4.1">syncdoc_pat_7f3a…c91e</div>
-      <div class="dacts"><span class="btn" data-el="4.2">복사</span> <span class="btn" data-el="4.3">닫기</span></div>
-    </div>
+    <section class="card" data-el="8">
+      <div class="cardh"><b>클라이언트 설정</b></div>
+      <p class="lbl">Claude Code · Codex · Gemini CLI가 같은 엔드포인트를 씁니다.</p>
+      <pre class="snippet" data-el="8.1">{
+  "mcpServers": {
+    "syncdoc": {
+      "url": "https://…/mcp",
+      "headers": { "Authorization": "Bearer syncdoc_pat_…" }
+    }
+  }
+}</pre>
+    </section>
+
+    <section class="card" data-el="5">
+      <div class="cardh"><b>관리</b> <span class="lbl">인덱스 재구축 · 저장소 동기화</span><span class="grow"></span><span class="btn sm" data-el="5.1">열기</span></div>
+      <div class="admin" data-el="6"><!-- UI-14 --></div>
+    </section>
+
   </div>
-
-  <section class="grp" data-el="5">
-    <h4>관리</h4>
-    <div class="row"><span class="lbl">인덱스 재구축, 저장소 동기화 상태</span><span class="grow"></span><span class="btn sm" data-el="5.1">관리로 →</span></div>
-  </section>
+  <div class="dfoot"><span class="grow"></span><span class="btn" data-el="9">닫기</span></div>
 </div>
 ```
 
@@ -1263,39 +1275,48 @@ status: approved
 
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
-| 1 | 헤더 | 영역 | 제목 | — |
-| 2 | 내 계정 | 영역 | GitHub 로그인 ID(2.1), 표시 이름 | — |
+| 1 | 다이얼로그 | 다이얼로그 | 어느 화면 위에서든 뜬다. 닫으면 보던 화면 그대로 | — |
+| 2 | 내 계정 | 카드 | GitHub 로그인 ID(2.1), 표시 이름 | — |
+| 2.1 | 로그인 ID | 텍스트 | GitHub 계정 | — |
 | 2.2 | 로그아웃 | 버튼 | | 세션 종료 → UI-1 |
-| 3 | MCP 토큰 | 영역 | 내 토큰 목록과 발급 | — |
-| 3.1 | 토큰 행 | 행 | 이름, 발급일, 만료, 폐기 여부. 원문은 안 보인다(해시만 저장) | — |
-| 3.2 | 폐기 | 버튼 | 유효한 토큰에만 | 확인 후 `revoked_at` 기록. 그 토큰으로 오는 MCP 요청이 거부된다 |
+| 3 | MCP 토큰 | 카드 | 내 토큰 목록과 발급 | — |
+| 3.1 | 토큰 행 | 행 | 이름 · 접두어 · 발급일 · 마지막 사용(3.5) · 폐기 여부. **원문은 안 보인다**(해시만 저장) | — |
+| 3.2 | 폐기 | 버튼 | 유효한 토큰에만 | 확인 후 폐기. 그 토큰으로 오는 MCP 요청이 거부된다 |
 | 3.3 | 토큰 이름 | 입력 | 어느 에이전트에 쓸지 | — |
-| 3.4 | 새 토큰 발급 | 버튼 | 3.3이 비어 있으면 비활성 | 발급 다이얼로그(4) |
-| 4 | 토큰 발급됨 | 다이얼로그 | 원문을 **한 번만** 보여준다 | — |
+| 3.4 | 발급 | 버튼 | 3.3이 비어 있으면 비활성 | 발급하고 원문 상자(4)를 연다 |
+| 3.5 | 마지막 사용 | 텍스트 | 이 토큰으로 마지막에 들어온 시각. 한 번도 안 썼으면 `없음` | — |
+| 4 | 토큰 원문 상자 | 영역 | 발급 직후에만. **한 번만 보인다** | — |
 | 4.1 | 토큰 원문 | 텍스트 | 발급된 토큰 | — |
 | 4.2 | 복사 | 버튼 | | 클립보드로 |
-| 4.3 | 닫기 | 버튼 | | 닫힘. 이후 원문은 어디에도 없다 |
-| 5 | 관리 | 영역 | 관리 화면 입구 | — |
-| 5.1 | 관리로 | 버튼 | | UI-14로 |
+| 5 | 관리 | 카드 | 관리 영역 입구 | — |
+| 5.1 | 열기 | 버튼 | 접혀 있음 / 펼침 | 6을 펼치거나 접는다 |
+| 6 | 관리 영역 | 영역 | UI-14. 펼쳤을 때만 | — |
+| 7 | 닫기(✕) | 버튼 | | 닫힘 |
+| 8 | 클라이언트 설정 | 카드 | 에이전트에 붙여넣을 MCP 설정 | — |
+| 8.1 | 설정 스니펫 | 텍스트 | 읽기 전용 JSON. 주소와 토큰 자리 | — |
+| 9 | 닫기 | 버튼 | | 닫힘 |
 
 ### 규칙
 
-- 토큰 원문은 발급 직후 다이얼로그(4)에서만. 서버는 해시만 저장하므로 다시 보여줄 수 없다(인프라 5장, DD access_tokens)
+- **토큰 원문은 발급 직후 상자(4)에서만 보인다.** 서버는 해시만 저장하므로 다시 보여줄 수 없다(인프라 5장). 다이얼로그를 닫으면 상자도 사라진다
 - 폐기된 토큰 행은 흐리게 남긴다. 지우지 않는다
-- 토큰으로 들어온 MCP 요청은 발급자 계정으로 기록된다. 남에게 토큰을 주면 그 사람 작업이 내 이름으로 남는다 — 이 안내를 3번 영역에 둔다
-- 만료 정책은 인프라 미결사항. 지금은 만료 없음
+- **폐기(3.2)는 확인을 받는다.** 되돌릴 수 없고 그 토큰을 쓰던 에이전트가 즉시 끊긴다
+- 토큰으로 들어온 MCP 요청은 발급자 계정으로 기록된다. 남에게 토큰을 주면 그 사람 작업이 내 이름으로 남는다 — 이 안내를 3번 카드에 둔다
+- **토큰에 프로젝트 범위가 없다.** 토큰 하나가 그 사람이 보는 모든 프로젝트에 쓴다([[SYNC-PRD-001]] 6장). 만료도 없다(인프라 9장) — 그래서 `마지막 사용`(3.5)이 안 쓰는 토큰을 찾는 유일한 단서다
+- 관리(6)는 **접힌 채로 연다.** 인덱스 재구축이 위험한 동작이라 한 번 더 눌러야 보인다([[SYNC-UI-001#UI-14]] 7장 4)
 
 ### 시나리오
 
 **S-1 새 에이전트를 연결한다**
-1. 토큰 이름(3.3)에 "Gemini 노트북"을 적고 새 토큰 발급(3.4)을 누른다
-2. 다이얼로그(4)에 원문이 뜬다. 복사(4.2)한다
-3. Gemini의 MCP 설정에 붙여넣는다. 닫기(4.3)
-4. 목록(3)에 새 행이 생긴다. 원문은 더 안 보인다
+1. 상단 바 `설정`을 눌러 다이얼로그를 연다
+2. 토큰 이름(3.3)에 `Gemini 노트북`을 적고 발급(3.4)
+3. 원문 상자(4)가 뜬다. 복사(4.2)한다
+4. 클라이언트 설정(8.1)을 보고 Gemini의 MCP 설정에 붙여넣는다
+5. 목록(3)에 새 행이 생기고 `마지막 사용 없음`이다
 
-**S-2 토큰을 잃어버렸거나 유출됐다**
-1. 해당 행의 폐기(3.2)를 누른다
-2. 확인하면 즉시 그 토큰이 거부된다. 새로 발급받는다
+**S-2 안 쓰는 토큰을 정리한다**
+1. 목록에서 `마지막 사용 3개월 전`인 행을 본다
+2. 폐기(3.2)를 누르고 확인한다. 즉시 거부된다
 
 ---
 
@@ -1304,16 +1325,17 @@ status: approved
 | 항목 | 내용 |
 |---|---|
 | 화면 설계 | [[SYNC-UI-001#UI-14]] |
-| 경로 | `/settings/admin` |
-| 진입 | UI-13 관리로(5.1) |
+| 경로 | 없음. **UI-13 다이얼로그 안 관리 카드(6)** |
+| 진입 | UI-13 관리 카드 열기(5.1) |
 | 유스케이스 | [[SYNC-UC-001#UC-S6]] (사람이 관리 화면에서 실행) · [[SYNC-DOM-003#repositories]] |
 
 ### 배치
 
 ```html
-<div class="phead" data-el="1"><b>관리</b> <span class="lbl">위험한 동작이 있습니다</span></div>
+<!-- UI-13 다이얼로그 안 관리 카드(6)를 펼친 모습 -->
+<div class="adminh" data-el="1"><span class="lbl">위험한 동작이 있습니다</span></div>
 
-<div class="form">
+<div class="adminbody">
   <table class="vers" data-el="2">
     <tr><th>프로젝트</th><th>저장소</th><th>마지막 처리 커밋</th><th>동기화</th><th></th></tr>
     <tr data-el="2.1"><td><b>SYNC</b></td><td class="lbl">dfocus/syncdoc</td><td><span class="mono" data-el="2.2">a1b2c3d</span> <span class="lbl">1시간 전</span></td><td data-el="2.3"><span class="st ok">최신</span></td><td><span class="btn sm" data-el="3">인덱스 재구축</span></td></tr>
@@ -1342,7 +1364,7 @@ status: approved
 
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
-| 1 | 헤더 | 영역 | 제목, 경고 | — |
+| 1 | 경고 줄 | 텍스트 | 위험한 동작이 있다는 안내. 제목은 카드가 이미 달고 있다 | — |
 | 2 | 저장소 표 | 표 | 프로젝트마다 저장소와 동기화 상태 | — |
 | 2.1 | 저장소 행 | 행 | 프로젝트, 저장소, 마지막 처리 커밋(2.2), 동기화(2.3) | — |
 | 2.2 | 마지막 처리 커밋 | 텍스트 | `repositories.last_processed_commit`과 시각 | 새 탭으로 GitHub 커밋 |
@@ -1357,8 +1379,11 @@ status: approved
 
 ### 규칙
 
+- **독립 화면이 아니라 UI-13 안의 영역이다.** v1.2에서 별도 페이지를 없앴다. 재구축은 위험해서 깊이 두는 게 맞지만, 자주 보는 동기화 상태는 UI-4에도 함께 내보낸다([[SYNC-UI-001#UI-14]] 7장 4)
 - 재구축은 참조 테이블·버전 목록·항목 테이블을 지우고 다시 만든다. 플래그·전파결정·댓글은 그대로다(UC-S6 최소 보장, 인프라 6장)
+- 동기화 상태(2.3)는 **DB에서 읽는다.** 폴링이 `behind_by`·`fetched_at`을 갱신하므로 이 카드를 열 때마다 fetch가 돌지 않는다([[SYNC-DOM-002#Repository]])
 - `밀림 N`은 폴링이 잡아 처리한다(UC-G1 1b). 이 화면에 수동 동기화 버튼은 없다 — 유스케이스에 없다
+- 재구축 확인(4)은 **UI-13 위에 한 겹 더** 뜬다. 다이얼로그 위의 다이얼로그다
 - 이 화면은 누구나 들어올 수 있다. 권한 구분이 없기 때문이다(PRD 비목표). 대신 확인 다이얼로그(4)가 한 번 막는다
 
 ### 시나리오
