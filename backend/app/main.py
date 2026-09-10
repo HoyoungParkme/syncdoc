@@ -83,7 +83,7 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="SyncDoc", lifespan=lifespan)
 app.add_middleware(
     SessionMiddleware,
-    secret_key=settings.SECRET_KEY,
+    secret_key=settings.session_secret,  # 토큰 암호화 키와 나눈다 (INFRA 5.1)
     session_cookie=auth.SESSION_COOKIE,
     same_site="lax",
 )
