@@ -75,10 +75,15 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **처리**
 1. `raw = "syncdoc_pat_" + secrets.token_urlsafe(32)`
-2. `DB: access_tokens insert (user_id, token_hash=sha256(raw), label, issued_at=now, expires_at=None)`
+2. `DB: access_tokens insert (user_id, token_hash=sha256(raw), label, issued_at=now, expires_at=None, last_used_at=None)`
 3. `→ IssuedToken(token=행, raw)`. **`raw`는 이 반환에만 있다.** 로그에 남기지 않는다
 
-**테스트 관점** 발급 후 DB에 `raw` 없음 · `authenticate_token(raw)` → 같은 User
+`expires_at=None`은 **정책이다.** v1은 만료를 두지 않는다(인프라 9장). 컬럼과 검증 분기는 남겨
+두므로 정책이 바뀌면 이 함수만 고치면 된다.
+
+만료가 없으니 안 쓰는 토큰을 찾을 단서가 필요하다 — 그게 `last_used_at`이다.
+
+**테스트 관점** 발급 후 DB에 `raw` 없음 · `authenticate_token(raw)` → 같은 User · 발급 직후 `last_used_at is None`
 
 ---
 
@@ -100,9 +105,10 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 1. `h = sha256(raw)`
 2. `t = DB: access_tokens where token_hash=h`
 3. if `t is None or t.revoked_at or (t.expires_at and t.expires_at < now)` → `→ None`
-4. `→ DB: users where id=t.user_id`
+4. `DB: access_tokens update last_used_at=now` — 통과한 요청만. UI-13이 이 값을 보여준다
+5. `→ DB: users where id=t.user_id`
 
-**테스트 관점** 폐기 후 → None · 오타 raw → None. 어느 경우든 **어느 쪽이 틀렸는지 알려주지 않는다**
+**테스트 관점** 폐기 후 → None · 오타 raw → None. 어느 경우든 **어느 쪽이 틀렸는지 알려주지 않는다** · 성공한 인증 뒤 `last_used_at`이 갱신됨 · 실패한 인증은 아무것도 안 건드림
 
 ---
 
@@ -110,7 +116,17 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `github_token_for(user: User) -> str`
 
-**처리** if `user.github_token_encrypted is None` → `! unauthorized {reason: 미등록 사용자. 로그인 필요}` · else → `decrypt(…, SECRET_KEY)`. 자리표시 User는 push할 수 없다 — 그 사람 이름으로 커밋이 필요한 경로(웹 되돌리기·상태 변경)는 로그인한 뒤에야 가능
+**처리** if `user.github_token_encrypted is None` → `! unauthorized {reason: 미등록 사용자. 로그인 필요}` · else → `decrypt(…)`. 자리표시 User는 push할 수 없다 — 그 사람 이름으로 커밋이 필요한 경로(웹 되돌리기·상태 변경)는 로그인한 뒤에야 가능
+
+**복호화 실패도 `unauthorized`다.** 비밀키를 바꾸면 기존에 저장된 토큰이 전부 풀리지 않는다.
+이때 나는 `InvalidToken`을 잡아 `! unauthorized {reason: 토큰을 풀 수 없다. 다시 로그인해야 한다}`로
+바꾼다. 안 잡으면 `Problem`이 아니라서 평문 500이 나가고, `git.commit_push`의 `except Unauthorized`도
+못 잡는다.
+
+**복호화는 옛 키도 시도한다.** `SECRET_KEY`(새 키)와 `SECRET_KEY_OLD`(있으면)를 함께 써서
+복호화하고 암호화는 늘 새 키로 한다. 교체 절차는 인프라 5장.
+
+**테스트 관점** 미등록 → unauthorized · 키를 바꾼 뒤 옛 토큰 → unauthorized(500 아님) · 옛 키를 함께 주면 풀림
 
 ---
 

@@ -298,7 +298,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### SpecService.diff 두 버전 diff
 
-**시그니처** `diff(doc_id: str, from_no: int, to_no: int) -> Diff`
+**시그니처** `diff(doc_id: str, from_no: int, to_no: int, context: int = settings.DIFF_CONTEXT_LINES) -> Diff`
 
 근거: [[SYNC-SEQ-001#SEQ-15]] · [[SYNC-UC-001#UC-H6]] · `TrackingService.detect_impact`·`get_flag`도 쓴다
 
@@ -307,7 +307,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **처리**
 1. `DB: versions where document_id and version_no in (from, to)` → 본문 둘 · if 하나라도 없음 → `! not-found`
 2. 각 본문을 `item_blocks`로 자른다. 항목 ID → 블록 텍스트. 항목 밖 텍스트는 `item_id=None` 블록 하나
-3. 두 쪽에 있는 항목 ID 합집합마다 `difflib.unified_diff(from_block, to_block, n=1)` → 줄 목록 `(op: add|del|ctx, text)`. 양쪽 같으면 hunk 없음
+3. 두 쪽에 있는 항목 ID 합집합마다 `difflib.unified_diff(from_block, to_block, n=context)` → 줄 목록 `(op: add|del|ctx, text)`. 양쪽 같으면 hunk 없음
+
+   `context`는 앞뒤로 몇 줄을 함께 보여줄지다. 기본은 `DIFF_CONTEXT_LINES`(3). 한 줄이면 마크다운 문단에서 무엇이 바뀌었는지는 보여도 **어느 절의 변경인지가 안 보인다.** 이 diff는 이력(UI-7)·플래그(UI-11)·전파(UI-12) 세 화면에 쓰인다
 4. 새로 생긴 항목은 전부 `add`, 사라진 항목은 전부 `del`
 5. `→ Diff(from_version, to_version, hunks=[{item_id, lines}])`. `downstream_count`는 **비움** — `queries.diff_with_impact`가 붙인다
 
@@ -316,6 +318,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **예외** `not-found`
 
 **호출하는 것** [[#SpecService.item_blocks]]
+
+**테스트 관점** `context`를 키우면 `ctx` 줄만 늘고 `add`·`del` 수는 그대로 · `detect_impact`와 `pipeline`은 hunk의 `item_id`만 쓰므로 `context`와 무관하게 같은 결과
 
 **테스트 관점** 항목 하나만 고침 → hunk 하나 · 공백만 바꿈 → hunk 없음(`text.strip()` 비교) · 항목 추가 → 전부 add인 hunk · 역방향 → op가 뒤집힘
 

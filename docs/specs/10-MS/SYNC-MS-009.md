@@ -84,13 +84,24 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 4. `git add {paths}` · if `git diff --cached --quiet` (변경 없음) → `→ 현재 HEAD` (커밋 안 만듦. 같은 내용 재저장)
 5. `git -c user.name={display_name} -c user.email={login}@users.noreply.github.com commit -m {message}`
 6. `git push {url with token} HEAD:main` — 기본 브랜치는 `main` 고정(결정). 다른 브랜치 저장소는 v1에서 지원 안 함
-   - if 거부(non-fast-forward, UC-S7 2a) → `git fetch` · `git rebase origin/HEAD` · if rebase 충돌 → `git rebase --abort`, `git reset --hard origin/HEAD`, `! push-failed {reason: conflict}` · else → push 재시도 **한 번**
-   - if 그래도 실패 → `git reset --hard origin/HEAD`, `! push-failed {reason: stderr}`
+   - if 거부(non-fast-forward, UC-S7 2a) → `git fetch` · `git rebase origin/HEAD` · if rebase 충돌 → `git rebase --abort`, `git reset --hard origin/HEAD`, `! push-failed {reason: conflict}` · else → push 재시도. **`PUSH_RETRIES`회까지**(기본 3)
+   - if 다 쓰고도 실패 → `git reset --hard origin/HEAD`, `! push-failed {reason: stderr}`
 7. `→ git rev-parse HEAD`
 
 **출력** 커밋 해시
 
-**테스트 관점** 정상 → 원격에 커밋, 반환 해시 = 원격 HEAD · 같은 내용 → 커밋 안 생김, HEAD 반환 · 원격이 앞서 있음(다른 파일) → rebase 후 성공 · 원격이 같은 파일 수정 → conflict, 작업 사본 원상 · 토큰이 config에 안 남음
+**거부 판정을 stderr 문자열로 하지 않는다.** git이 영어로 말한다는 보장이 없다 — 로케일이 다르면
+`"rejected"`가 안 나와 거부를 다른 실패로 잘못 보고 재시도조차 안 한다. `git push --porcelain`의
+출력이나 종료 코드로 판정한다.
+
+**재시도 사이에 기다리지 않는다.** 저장은 프로젝트 코드 단위 락 안에서 돌므로, 자는 동안 같은
+프로젝트의 다른 저장이 전부 막힌다.
+
+**재시도로 건지는 것은 좁다.** 진입할 때 원격 최신에 맞추므로 거부는 `fetch`와 `push` 사이의 짧은
+틈에 외부 push가 끼어들 때만 난다. 한 번으로도 대부분 건지고, 셋은 여럿이 같은 저장소를 만질 때의
+대비다. **rebase 충돌은 몇 번을 해도 안 풀린다** — 에이전트가 현재 본문을 다시 읽어 합쳐야 한다.
+
+**테스트 관점** 정상 → 원격에 커밋, 반환 해시 = 원격 HEAD · 같은 내용 → 커밋 안 생김, HEAD 반환 · 원격이 앞서 있음(다른 파일) → rebase 후 성공 · 연달아 두 번 앞서도 성공(재시도 2회) · 원격이 같은 파일 수정 → conflict, 작업 사본 원상 · 토큰이 config에 안 남음 · **git 로케일이 영어가 아니어도 거부를 거부로 판정**
 
 ---
 
