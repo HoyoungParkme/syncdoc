@@ -2,6 +2,68 @@
    **styles.view.css 뒤에 로드돼야 한다** — 두 파일이 클래스를 여럿 공유하고
    앱이 이기는 근거가 로드 순서뿐이다 (.tabs .st .warn .grp .mono .steps .on .done .ref .missing).
    순서가 뒤집히면 먼저 드러나는 곳: UI-5 문서 바 탭 · UI-9 미확정 배너 · V-API 엔드포인트 행. */
+/* ── 디자인 토큰 — SYNC-UI-001 3장의 전사. 값을 바꾸려면 명세를 먼저 고친다 ──
+   뷰 본문 변수(--paper --panel --card --ink --soft --faint --rule --hair --hi --blue)는
+   styles.view.css 소유다. 여기서 재정의하지 마라 — 뷰가 '옛 규칙 + 새 값'으로 반쯤 물든다. */
+:root{
+  /* 3.1 색 — 상태 3색이 유일한 색 언어다. 장식에 쓰지 않는다 */
+  --bg-app:#f7f6f3; --bg-card:#ffffff; --bg-subtle:#fbfaf8; --bg-sunken:#f3f1ec;
+  --ink-body:#17181c; --ink-prose:#1f2024; --ink-muted:#46443f;
+  --ink-faint:#6b6862; --ink-disabled:#a8a49c;
+  --border:#e2e0da; --border-strong:#cfccc4;
+  /* 3.1 '구분선 약함' 한 행에 값이 둘이다. 어느 쪽이 어디 쓰이는지는 명세가 안 정했다 */
+  --divider:#f0eeea; --divider-soft:#f4f2ee;
+  /* 이름을 백엔드 status 코드에 맞춘다 — var(--status-{status})로 매핑 없이 이어진다 */
+  --status-draft:#9c9891; --status-review:#d99b1e; --status-approved:#2f7d5b;
+  --status-approved-ink:#ffffff;
+  --badge-item-bg:var(--status-review);  /* 3.1이 '검토중 색이 뱃지 배경이기도' 하다고 못박았다 */
+  --danger:#b8342a; --danger-bg:#fdf1ef;
+  --caution-bg:#fdf8ec; --caution-ink:#8a6410;
+  --diff-add-bg:#eef6f0;                 /* 삭제 줄 배경은 --danger-bg 재사용 (3.1) */
+  --ref-backlink:#b8860b;                /* UI-8 전용 — 되돌아오는 참조 */
+  --graph-edge:#8f8b83;                  /* UI-8 전용 */
+  --overlay:rgba(23,24,28,.42);
+
+  /* 3.2 타이포 */
+  --font-sans:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --w-regular:400; --w-medium:500; --w-semibold:600; --w-bold:700;
+  --text-logo:27px; --text-screen-title:22px; --text-doc-title:27px;
+  --text-dialog-title:16px; --text-section-title:16.5px; --text-card-title:15px;
+  --text-item-title:15px; --text-body:14.5px; --leading-body:1.7;
+  --text-ui:14px; --text-meta:13px; --text-caption:12.5px;
+  --text-mono-id:12.5px; --text-mono-id-lg:13px; --text-mono-sm:12px;
+
+  /* 3.3 간격 — px 값을 이름에 넣는다. 2~14가 1px 연속이라 순번으로는 크기를 못 짚는다 */
+  --space-2:2px; --space-3:3px; --space-4:4px; --space-5:5px; --space-6:6px;
+  --space-7:7px; --space-8:8px; --space-9:9px; --space-10:10px; --space-11:11px;
+  --space-12:12px; --space-13:13px; --space-14:14px; --space-16:16px; --space-18:18px;
+  --space-20:20px; --space-22:22px; --space-26:26px; --space-30:30px;
+
+  /* 3.3 모서리 — 용도로 이름 짓고 값은 주석에. 항목 카드 7 / 패널 카드 8의 1px 차이가 의도다 */
+  --radius-badge:3px; --radius-btn-sm:4px; --radius-chip:5px; --radius-control:6px;
+  --radius-item-card:7px; --radius-panel-card:8px; --radius-pill:9px;
+  --radius-dialog:10px; --radius-dot:50%;
+
+  /* 3.3 그림자 — 전부 --ink-body(#17181c = rgb(23,24,28)) 파생.
+     잉크 본문색을 바꾸면 이 다섯과 --overlay를 함께 고친다 */
+  --shadow-dialog:0 18px 50px rgba(23,24,28,.3);
+  --shadow-tooltip:0 6px 18px rgba(23,24,28,.14);
+  --shadow-toast:0 10px 30px rgba(23,24,28,.28);
+  --shadow-card:0 1px 3px rgba(23,24,28,.05);
+  --shadow-node-focus:0 3px 10px rgba(23,24,28,.18);
+
+  /* 3.3 겹침 순서. 다이얼로그는 열린 깊이만큼 더한다 */
+  --z-modal:45; --z-dialog:50; --z-toast:60; --z-tooltip:70; --z-graph-full:80;
+
+  /* 레이아웃 — UI-001 4장 */
+  --topbar-h:50px;
+}
+
+/* 앱 바탕만 덮는다. styles.view.css의 body{}는 그대로 두고 나중 규칙으로 이긴다 —
+   뷰 본문(.body/.wrap)은 자기 배경·글자색을 다시 선언하므로 여기 영향이 안 새어 든다 */
+body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)}
+
 .app{min-height:100vh}
 .topbar{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1.5px solid var(--ink);background:var(--panel);font-size:13.5px}
 .topbar strong a{color:var(--ink);text-decoration:none;font-size:15px}
