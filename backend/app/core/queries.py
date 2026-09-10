@@ -437,9 +437,12 @@ async def flag_view(flag_id: int) -> FlagDetail:
         if f.kind == FlagKind.needs_check and cause and cause.doc_id and base.cause_version_no:
             cur_no = spec.get_document(cause.doc_id).current_version_no
             detail.cause_change_count = cur_no - base.cause_version_no
+            # 시작점은 플래그를 만든 변경의 **직전** 버전이다. 부여 시점 버전으로 잡으면
+            # 부여 직후에 v2 → v2가 되어 정작 판단 재료인 그 변경이 안 보인다 (#10)
+            from_no = max(1, base.cause_version_no - 1)
             detail.cause_diff = (
-                spec.diff(cause.doc_id, base.cause_version_no, cur_no)
-                if cur_no != base.cause_version_no
+                spec.diff(cause.doc_id, from_no, cur_no)
+                if cur_no != from_no
                 else Diff(cur_no, cur_no, [])
             )
         elif f.kind == FlagKind.broken_ref and cause:

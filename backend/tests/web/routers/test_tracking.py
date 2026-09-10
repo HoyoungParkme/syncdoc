@@ -51,11 +51,10 @@ def test_todo_decision_flag_flow_via_api(client: TestClient, scoped: Session) ->
         2,
     )
     fv = client.get(f"/api/flags/{f['id']}").json()
-    assert (
-        fv["cause_change_count"],
-        fv["target_changed_since_raise"],
-        fv["cause_diff"]["hunks"],
-    ) == (0, False, [])
+    # 부여 직후에도 원인 변경이 보인다 — v1 → v2 (#10)
+    assert (fv["cause_diff"]["from_version"], fv["cause_diff"]["to_version"]) == (1, 2)
+    assert fv["cause_diff"]["hunks"]
+    assert (fv["cause_change_count"], fv["target_changed_since_raise"]) == (0, False)
     assert (
         fv["target_body"].startswith("#### G1 목표")
         and fv["assignee"]["github_login"] == "prd-writer"
