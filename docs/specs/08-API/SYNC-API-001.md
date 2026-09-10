@@ -1622,9 +1622,6 @@ components:
           type: string
           format: date-time
           nullable: true
-        prefix:
-          type: string
-          description: 토큰 원문 앞부분만. 목록에서 어느 토큰인지 알아보게 (UI-13 요소 3.1)
         last_used_at:
           type: string
           format: date-time
