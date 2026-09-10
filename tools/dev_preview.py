@@ -146,6 +146,12 @@ async def seed() -> None:
     fresh_db()
     remote, work = fresh_repo()
     with db.SessionLocal() as s:
+        # 사용자를 먼저 만든다 — Repository.registered_by_user_id가 hoyoung을 참조한다
+        hoyoung = make_user(s, login="hoyoung")
+        hoyoung.display_name = "박호영"
+        minjun = make_user(s, login="minjun")
+        minjun.display_name = "김민준"
+        s.flush()
         p = Project(code="SYNC", name="싱크독")
         s.add(p)
         s.flush()
@@ -157,10 +163,6 @@ async def seed() -> None:
                 registered_by_user_id=hoyoung.id,
             )
         )
-        hoyoung = make_user(s, login="hoyoung")
-        hoyoung.display_name = "박호영"
-        minjun = make_user(s, login="minjun")
-        minjun.display_name = "김민준"
         s.commit()
         h, m = agent(hoyoung), agent(minjun)
         hid = hoyoung.id

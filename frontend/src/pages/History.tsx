@@ -1,5 +1,5 @@
 /** UI-7 버전 이력 — SYNC-UI-002#UI-7. 요소 번호 = data-el.
- *  1 문서 바 · 2 버전 목록(2.1 행, 2.2 되돌리기) · 3 diff 영역(3.1 범위, 3.2 본문, 3.3 하위 참조 건수)
+ *  1 문서 바 · 2 버전 목록(2.1 행, 2.2 되돌리기, 2.3 A·B 뱃지) · 3 diff 영역(3.1 범위, 3.2 본문, 3.3 하위 참조 건수)
  *  · 4 되돌리기 확인(4.1 diff, 4.2 되돌리기, 4.3 취소) · 6 삭제 확인(6.1 삭제하고 되돌리기, 6.2 취소) */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -50,6 +50,15 @@ export function History() {
   const toggle = (h: string) => {
     setPicked((p) => (p.includes(h) ? p.filter((x) => x !== h) : [...p, h].slice(-2))) // 세 번째면 먼저 체크한 것이 풀린다
   }
+  /** 규칙: 늘 뒤쪽이 B(현재), 앞쪽이 A(이전). **고른 순서가 아니라 버전 번호로 정한다** —
+   *  사람이 어느 쪽을 먼저 눌렀는지 신경 쓰지 않아도 되게 */
+  const ab = useMemo(() => {
+    const nos = picked.map((h) => byKey.get(h)?.version_no)
+    if (picked.length < 2 || nos.some((n) => n == null)) return {}
+    const [x, y] = picked
+    const older = (nos[0] as number) < (nos[1] as number) ? x : y
+    return { [older]: 'A', [older === x ? y : x]: 'B' } as Record<string, string>
+  }, [picked, byKey])
   const openRevert = useCallback(
     (to: number) => {
       if (!doc) return
@@ -113,9 +122,19 @@ export function History() {
             {versions.map((v, i) => {
               const cur = v.version_no === doc.current_version_no
               return (
-                <tr key={keyOf(v)} className={cur ? 'cur' : ''} data-el={i === 0 ? '2.1' : undefined}>
+                <tr
+                  key={keyOf(v)}
+                  className={`${cur ? 'cur' : ''}${picked.includes(keyOf(v)) ? ' sel' : ''}`}
+                  data-el={i === 0 ? '2.1' : undefined}
+                >
                   <td>
-                    <input type="checkbox" checked={picked.includes(keyOf(v))} onChange={() => toggle(keyOf(v))} />
+                    {ab[keyOf(v)] ? (
+                      <span className="ab" data-el="2.3" onClick={() => toggle(keyOf(v))}>
+                        {ab[keyOf(v)]}
+                      </span>
+                    ) : (
+                      <input type="checkbox" checked={picked.includes(keyOf(v))} onChange={() => toggle(keyOf(v))} />
+                    )}
                   </td>
                   <td>
                     {v.version_no != null ? <b>v{v.version_no}</b> : '—'} {cur && <span className="lbl">현재</span>}
