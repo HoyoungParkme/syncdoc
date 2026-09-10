@@ -290,7 +290,7 @@ export function DocView() {
         </div>
       )}
 
-      <div className="nav" data-el="9">
+      <div className="docnav" data-el="9">
         {doc.prev_doc_id ? <Link className="btn" to={`/p/${code}/d/${doc.prev_doc_id}`}>← {doc.prev_doc_id}</Link> : <span className="btn dis">←</span>}
         {doc.next_doc_id ? <Link className="btn" to={`/p/${code}/d/${doc.next_doc_id}`}>{doc.next_doc_id} →</Link> : <span className="btn dis">→</span>}
       </div>

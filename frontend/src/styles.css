@@ -91,7 +91,8 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 /* display·border·background를 다시 적는 건 아래 UI-5 `.nav`(문서 앞뒤 이동)가
    같은 이름이라서다. 특이도로는 이기지만 선언하지 않은 속성은 그쪽이 그대로 먹는다.
    border는 button 기본 테두리까지 지운다 — 넷 중 button 둘만 테두리가 보였다 */
-.topbar .nav{display:inline-block;border:none;background:none;color:#fff;text-decoration:none;padding:var(--space-4) var(--space-8);opacity:.85;cursor:pointer}
+.topbar .nav{display:inline-block;border:none;background:none;color:#fff;text-decoration:none;
+  padding:var(--space-4) var(--space-8);opacity:.85;cursor:pointer;font-size:var(--text-ui)}
 .topbar .nav:hover{opacity:1}
 .topbar .nav.todo{background:rgba(255,255,255,.06);border-radius:var(--radius-chip);padding:var(--space-4) var(--space-10);opacity:1}
 .topbar .nav.out{opacity:.6}
@@ -110,7 +111,8 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .btn.dis,.btn:disabled{opacity:.4;cursor:default}.btn.dis:hover,.btn:disabled:hover{background:var(--bg-card)}
 .lbl{color:var(--ink-faint);font-size:var(--text-caption)}
 .mono{font-family:var(--font-mono)}
-.page{max-width:1180px;margin:0 auto;padding:var(--space-26) var(--space-22) 60px}
+/* 내용 폭이 1180이어야 한다 — box-sizing:border-box라 좌우 여백을 더해 잡는다 */
+.page{max-width:calc(1180px + var(--space-22) * 2);margin:0 auto;padding:var(--space-26) var(--space-22) 60px}
 /* 화면 제목 줄. 아래를 맞춰야 제목과 버튼의 밑선이 한 줄로 읽힌다 */
 .phead{display:flex;align-items:flex-end;gap:var(--space-12);margin-bottom:var(--space-18);font-size:var(--text-screen-title)}
 .phead b{font-weight:var(--w-semibold);letter-spacing:-.3px}
@@ -134,28 +136,33 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .dbody{flex:1;min-height:0;overflow:auto;padding:var(--space-16) var(--space-18);font-size:var(--text-ui);color:var(--ink-prose)}
 .dfoot{flex:none;display:flex;align-items:center;gap:var(--space-10);padding:var(--space-12) var(--space-18);
   border-top:1px solid var(--border);background:var(--bg-subtle);font-size:var(--text-meta);color:var(--ink-muted)}
-/* UI-1 로그인 — 상단 바가 없는 유일한 화면이라 자기 바탕을 자기가 깐다 */
-.login{max-width:420px;margin:0 auto;padding:var(--space-30);text-align:center;
-  border:1px solid var(--border);border-radius:var(--radius-panel-card);
-  background:var(--bg-card);box-shadow:var(--shadow-card);position:relative;top:22vh}
-.login .logo{font-size:var(--text-logo);font-weight:var(--w-bold);margin-bottom:var(--space-10)}
-.login .logo .lbl{font-size:var(--text-meta);font-weight:var(--w-regular)}
-.login .lbl{color:var(--ink-muted);font-size:var(--text-meta);line-height:1.7}
-.login .btn{margin:var(--space-20) 0 var(--space-12)}
+/* UI-1 로그인 — 상단 바가 없는 유일한 화면.
+   카드에 담지 않는다. 여기서 할 일은 버튼 하나뿐이라 흰 판을 깔면 '입력할 게 많은 화면'이 된다 */
+.login{max-width:340px;margin:0 auto;text-align:center;
+  min-height:100vh;display:flex;flex-direction:column;justify-content:center}
+.login .logo{display:flex;align-items:baseline;justify-content:center;gap:var(--space-9);
+  font-size:var(--text-logo);font-weight:var(--w-bold);letter-spacing:-.6px}
+.login .logo .mono{font-size:var(--text-ui);font-weight:var(--w-regular);color:var(--ink-muted);letter-spacing:0}
+.login .lbl{margin-top:var(--space-9);color:var(--ink-prose);font-size:var(--text-body);line-height:1.6}
+/* 콘텐츠 폭을 꽉 채우는 검정 채움. 이 화면의 유일한 강조 */
+.login .btn{margin:var(--space-22) 0 var(--space-12);width:100%;padding:var(--space-13) var(--space-16);
+  border-radius:var(--radius-item-card)}
+.login .cap{margin:0;color:var(--ink-faint);font-size:var(--text-caption)}
 /* UI-2 현황판 — 표가 아니라 격자다. 칸이 열 폭을 꽉 채워야 색이 띠로 읽힌다 */
 .heat{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-panel-card);overflow:hidden}
 .hrow{display:grid;grid-template-columns:20px 196px repeat(11,minmax(0,1fr));gap:var(--space-4);
-  align-items:center;padding:var(--space-10) var(--space-14);border-bottom:1px solid var(--divider)}
+  align-items:center;padding:var(--space-11) var(--space-14);border-bottom:1px solid var(--divider)}
 .hrow:last-child{border-bottom:none}
-.hrow.head{padding:var(--space-9) var(--space-14) var(--space-7);background:var(--bg-subtle);
+.hrow.head{padding:var(--space-7) var(--space-14) var(--space-6);background:var(--bg-subtle);
   border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:11px;
   color:var(--ink-muted);letter-spacing:.2px;text-align:center}
 .hrow .warn{text-align:center;font-size:var(--text-meta)}
 /* 두 줄. 코드·이름 위에, 처리할 것과 메타가 아래에 */
-.pname{display:flex;flex-direction:column;gap:1px;min-width:0;cursor:pointer;font-size:15.5px}
+/* 두 줄이 한 덩어리로 붙어야 한다. 줄 피치 18px, 행 높이 55px (핸드오프) */
+.pname{display:flex;flex-direction:column;gap:0;min-width:0;cursor:pointer;font-size:15.5px;line-height:1.15}
 .pname .mono{font-size:var(--text-mono-id-lg);font-weight:var(--w-semibold)}
 .pname .sub{display:flex;align-items:center;gap:var(--space-6);font-size:var(--text-caption);
-  color:var(--ink-muted);white-space:nowrap}
+  color:var(--ink-muted);white-space:nowrap;line-height:1.2}
 .pname .sub .work{color:var(--danger);font-weight:var(--w-semibold)}
 /* `.dot`은 UI-9 단계 점·UI-15 칩 점이 쓰는 이름이라 여기서는 못 쓴다 — 6px 동그라미가 된다 */
 .pname .sub .mid{color:var(--border-strong)}
@@ -348,7 +355,9 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .ptabs{display:flex;border-bottom:1px solid var(--border)}
 .ptabs span{flex:1;text-align:center;padding:var(--space-8);cursor:pointer;color:var(--ink-faint);font-size:var(--text-meta)}
 .ptabs span.on{font-weight:var(--w-semibold);color:var(--ink-body);background:var(--bg-card)}
-.nav{display:flex;justify-content:space-between;padding-top:var(--space-14);margin-top:var(--space-26);border-top:1px solid var(--border)}
+/* 문서 앞뒤 이동. `.nav`라는 이름은 상단 바가 이미 쓰고 있어 세 번 충돌했다 — 갈라놓는다
+   (margin-top이 상단 바 항목을 26px 밀어내 배지가 잘려 보였다) */
+.docnav{display:flex;justify-content:space-between;padding-top:var(--space-14);margin-top:var(--space-26);border-top:1px solid var(--border)}
 /* 10 원본 탭 — 목차·패널은 안 보이지만 자리는 비워 둔다 */
 .rawwrap{overflow:auto;padding:var(--space-20) calc(var(--panel-w) + var(--space-26)) 60px calc(var(--toc-w) + var(--space-26));
   background:var(--bg-card);max-height:calc(100vh - var(--topbar-h) - var(--docbar-h))}
@@ -475,14 +484,16 @@ li.ref.missing{color:var(--ink-disabled)}
 .edges .e.back{stroke:var(--ref-backlink);stroke-dasharray:4 3}
 .edges .e.gone{stroke:var(--danger);stroke-dasharray:3 3}
 .edges .e.dim{opacity:.1}
-.legend{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-4) var(--space-14);
+/* 그래프 범례는 카드 안 푸터 바다. UI-2 범례(배경 없는 텍스트 줄)와 이름을 갈라놓는다 */
+.glegend{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-4) var(--space-14);
   padding:var(--space-8) var(--space-14);border-top:1px solid var(--divider);
   background:var(--bg-subtle);font-size:var(--text-caption)}
+.glegend span{display:inline-flex;align-items:center;gap:var(--space-5)}
 /* 범례의 선 견본은 실제 선으로 그린다 */
-.legend svg.sw{width:22px;height:8px;vertical-align:middle}
-.legend svg.sw .e{fill:none;stroke:var(--graph-edge);stroke-width:1}
-.legend svg.sw .e.back{stroke:var(--ref-backlink);stroke-dasharray:4 3}
-.legend svg.sw .e.gone{stroke:var(--danger);stroke-dasharray:3 3}
+.glegend svg.sw{width:22px;height:8px;vertical-align:middle}
+.glegend svg.sw .e{fill:none;stroke:var(--graph-edge);stroke-width:1}
+.glegend svg.sw .e.back{stroke:var(--ref-backlink);stroke-dasharray:4 3}
+.glegend svg.sw .e.gone{stroke:var(--danger);stroke-dasharray:3 3}
 
 /* UI-15 11단계 흐름 — 11단계를 다 나열한다. 항목 없는 단계도 남긴다 */
 .chaindlg .dbody{padding-top:var(--space-12)}
@@ -526,7 +537,7 @@ li.ref.missing{color:var(--ink-disabled)}
 .dot-none{background:none;border:1px solid var(--border-strong)}
 .stp.cur .dot-none{border-color:rgba(255,255,255,.5)}
 .readbody .main{max-width:900px;margin:0 auto}
-.readbody .nav{display:flex;gap:var(--space-10);justify-content:space-between;margin-top:var(--space-26);padding-top:var(--space-12);border-top:1px solid var(--border)}
+.readbody .docnav{display:flex;gap:var(--space-10);justify-content:space-between;margin-top:var(--space-26);padding-top:var(--space-12);border-top:1px solid var(--border)}
 /* 1.4 상태 필 — 상태색 바탕. 승인만 글씨가 희다.
    이름을 백엔드 status 코드로 맞춰 뒀으니 클래스는 pill-{status} 하나로 끝난다 */
 .pill{display:inline-block;padding:1px var(--space-8);border-radius:var(--radius-pill);

@@ -105,7 +105,7 @@ export function Graph() {
           </div>
         )}
       </div>
-      <div className="legend lbl" data-el="4">
+      <div className="glegend lbl" data-el="4">
         <span>노드 = 항목 · 열 = 11단계</span>
         <span>
           <svg className="sw" viewBox="0 0 22 8">

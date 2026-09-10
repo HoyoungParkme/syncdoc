@@ -110,7 +110,7 @@ export function ReadOrder() {
         <style>{extraCss}</style>
         <article className="main body" data-el="4">
           <div ref={mainRef} />
-          <div className="nav" data-el="5">
+          <div className="docnav" data-el="5">
             <span className={`btn${prev === null ? ' dis' : ''}`} data-el="5.1" onClick={() => go(prev)}>
               ← {prev === null ? '처음' : label(prev)}
             </span>
