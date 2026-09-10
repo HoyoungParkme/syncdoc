@@ -97,9 +97,12 @@ upstream: [SYNC-UI-001]
   <span class="btn">로그아웃</span>
 </div>
 
-<div class="docbar" data-el="1">
-  <span><b>SYNC-PRD-001</b> · <span data-el="1.1">승인</span> · <span data-el="1.2">v7</span></span>
-  <span class="tabs" data-el="2"><span class="on" data-el="2.1">유저용</span><span data-el="2.2">원본</span><span data-el="2.3">이력</span></span>
+<div class="docbar" data-el="1"><!-- 브레드크럼. 어디서 들어왔든 지금 자리를 말한다 -->
+  <span class="crumb">싱크독</span><span class="sep">›</span>
+  <span class="crumb mono">2 PRD</span><span class="sep">›</span>
+  <b class="mono">SYNC-PRD-001</b>
+  <span class="pill pill-approved" data-el="1.1">승인</span>
+  <span class="ver mono" data-el="1.2">v7</span>
   <span class="grow"></span>
   <span data-el="5" class="lbl">미해결 댓글 2</span>
   <span class="btn" data-el="3">상태 변경 ▾</span>
@@ -122,7 +125,10 @@ upstream: [SYNC-UI-001]
   </nav>
   <div class="handle" data-el="6.2"></div>
 
-  <article class="main">
+  <article class="main"><!-- 안쪽 max-width는 세 탭이 같다 -->
+    <div class="tabs" data-el="2"><!-- 본문 폭 안, 밑줄로 구분 -->
+      <span class="on" data-el="2.1">유저용</span><span data-el="2.2">원본</span><span data-el="2.3">이력</span>
+    </div>
     <div class="banner" data-el="4">⚠ 규약 오류: frontmatter.status 누락 (커밋 a1b2c3 · 김민준)</div>
     <div class="banner warn" data-el="4a">미완성: 필수 절 「성공지표」 없음 · 승인 불가</div>
     <h2>2. 요구사항</h2>
@@ -152,6 +158,7 @@ upstream: [SYNC-UI-001]
 
 <!-- 원본 탭 -->
 <div class="rawwrap" data-el="10">
+  <div class="tabs"><span data-el="2.1">유저용</span><span class="on" data-el="2.2">원본</span><span data-el="2.3">이력</span></div>
   <div class="rawbar">
     <span class="lbl">에이전트가 읽는 원본 그대로 · 읽기 전용</span>
     <span class="grow"></span>
@@ -192,10 +199,10 @@ status: approved
 
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
-| 1 | 문서 바 | 영역 | 문서 ID, 상태(1.1), 버전(1.2) | — |
+| 1 | 문서 바 | 영역 | 브레드크럼 `프로젝트 › 단계 › 문서 ID`, 상태(1.1), 버전(1.2). 앞 두 조각은 눌러서 되짚어 올라간다 | — |
 | 1.1 | 상태 | 뱃지 | `초안`·`검토중`·`승인`. 색으로 구분 | — |
 | 1.2 | 버전 | 텍스트 | 현재 버전 번호 | 이력(UI-7)으로 |
-| 2 | 탭 | 탭 | 유저용(기본)·원본·이력 | — |
+| 2 | 탭 | 탭 | 유저용(기본)·원본·이력. **본문 안 맨 위**, 본문과 같은 폭. 활성 탭만 굵고 아래 2px 잉크선 | — |
 | 2.1 | 유저용 | 탭 | 사람용 뷰(7) | 본문 영역을 7로 |
 | 2.2 | 원본 | 탭 | 에이전트가 읽는 MD(10) | 본문 영역을 10으로 |
 | 2.3 | 이력 | 탭 | | UI-7로 |
@@ -233,7 +240,8 @@ status: approved
 - 유저용(2.1)이 기본. 원본(2.2)은 URL `?tab=raw`로 직접 열 수도 있다
 - 원본 탭(10)에서는 목차(6)와 패널(8)이 보이지 않는다. 원본은 항목 클릭·댓글이 없다
 - **세 탭의 본문 최대 폭이 같아야 한다.** 다르면 탭을 오갈 때 가운데 정렬된 본문이 좌우로 흔들린다([[SYNC-UI-001#UI-5]] 4.1)
-- 사이드바 폭(6.2·8.3)은 사람마다 기억한다. 화면을 옮겨도 유지된다
+- 사이드바 폭(6.2·8.3)은 사람마다 기억한다. 화면을 옮겨도 유지된다. 기본 좌 186px · 우 250px, 손잡이는 폭 9px에 좌우 -4px 물림(누르기 쉬우면서 자리는 1px만 먹는다)
+- 사이드바 바탕은 `배경 보조`다. 본문 흰색과 갈라 놔야 어디가 읽는 곳인지 바로 보인다
 - 원문/렌더링(10.3·10.4) 선택도 기억한다. 원본을 보는 사람은 대개 같은 쪽만 본다
 - 7.1 클릭은 패널을 참조 탭으로, 7.4 클릭은 댓글 탭으로 자동 전환
 - 처음 열면 패널(8)은 참조 탭이고 "항목을 선택하세요"
@@ -283,56 +291,69 @@ status: approved
 
 ```html
 <div class="phead" data-el="1">
-  <div><b data-el="1.1">SYNC</b> <span data-el="1.2">싱크독</span></div>
-  <div class="lbl" data-el="1.3">github.com/dfocus/syncdoc</div>
+  <div>
+    <div><b class="mono" data-el="1.1">SYNC</b> <span data-el="1.2">싱크독</span></div>
+    <a class="repo mono" data-el="1.3">github.com/dfocus/syncdoc</a>
+  </div>
   <span class="grow"></span>
   <span class="btn" data-el="2.1">참조 그래프</span>
   <span class="btn" data-el="2.2">순서대로 읽기</span>
 </div>
 
-<div class="stats" data-el="3">
+<div class="stats" data-el="3"><!-- 여섯 칸. 0이면 흐리게, 1 이상이면 경고색 + 경고 테두리 -->
   <span class="stat" data-el="3.1"><b>4</b> 확인 필요</span>
   <span class="stat" data-el="3.2"><b>1</b> 끊어진 참조</span>
   <span class="stat" data-el="3.6"><b>1</b> 하위 불일치</span>
   <span class="stat" data-el="3.3"><b>2</b> 미해결 댓글</span>
   <span class="stat" data-el="3.4"><b>1</b> 규약 오류</span>
-  <span class="stat" data-el="3.5"><b>2</b> 미완성</span>
+  <span class="stat dim" data-el="3.5"><b>0</b> 미완성</span>
 </div>
 
 <div class="body2">
-  <table class="stages" data-el="4">
-    <tr class="stg" data-el="4.1"><td class="no">1</td><td>RFQ</td><td><span class="st ok">승인</span></td><td class="lbl">1개</td></tr>
-    <tr class="doc" data-el="4.2"><td></td><td colspan="3">SYNC-RFQ-001 · 승인 · v3 · 2일 전 · 박호영</td></tr>
-    <tr class="stg"><td class="no">2</td><td>PRD</td><td><span class="st ok">승인</span></td><td class="lbl">1개</td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-PRD-001 · 승인 · v7 · 1일 전 · 에이전트(박호영) <span class="flag">확인 필요 2</span> <span class="cm">댓글 2</span></td></tr>
-    <tr class="stg"><td class="no">3</td><td>사용자 시나리오</td><td><span class="st rv">검토중</span></td><td class="lbl">1개</td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-SCN-001 · 검토중 · v4 · 3시간 전 · 에이전트(김민준)</td></tr>
-    <tr class="stg"><td class="no">4</td><td>USECASE</td><td><span class="st dr">초안</span> <span class="gate" data-el="4.3">상위 미승인</span></td><td class="lbl">1개</td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-UC-001 · 초안 · v2 · 어제 · 에이전트(박호영) <span class="err">규약 오류</span></td></tr>
-    <tr class="stg"><td class="no">5</td><td>인프라</td><td><span class="st dr">초안</span></td><td class="lbl">1개</td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-INFRA-001 · 초안 · v1 · 어제</td></tr>
-    <tr class="stg"><td class="no">6</td><td>도메인·클래스·데이터</td><td><span class="st rv">검토중</span></td><td class="lbl">3개</td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-DOM-001 · 승인 · v5</td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-DOM-002 · 검토중 · v2 <span class="flag">끊어진 참조 1</span></td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-DOM-003 · 승인 · v1</td></tr>
-    <tr class="stg"><td class="no">7</td><td>화면</td><td><span class="st na">미작성</span></td><td class="lbl">—</td></tr>
-    <tr class="stg"><td class="no">8</td><td>API</td><td><span class="st na">미작성</span></td><td class="lbl">—</td></tr>
-    <tr class="stg"><td class="no">9</td><td>SEQUENCE</td><td><span class="st na">미작성</span></td><td class="lbl">—</td></tr>
-    <tr class="stg"><td class="no">10</td><td>MINISPEC</td><td><span class="st na">미작성</span></td><td class="lbl">—</td></tr>
-    <tr class="stg"><td class="no">11</td><td>CODE</td><td><span class="st na">미작성</span></td><td class="lbl">—</td></tr>
-    <tr class="stg" data-el="4.4"><td class="no">—</td><td>표준 (STD)</td><td><span class="st dr">초안</span></td><td class="lbl">3개</td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-STD-001 · 초안 · 명세 작성 규약</td></tr>
-  </table>
+  <div class="stages" data-el="4">
+    <div class="stgh"><!-- 머리에 미니 히트맵 11칸 — UI-2에서 본 그 프로젝트 행이 여기 다시 있다 -->
+      <b>11단계</b><span class="grow"></span>
+      <i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i>
+      <i class="sw rv"></i><i class="sw rv"></i><i class="sw rv"></i><i class="sw rv"></i><i class="sw dr"></i><i class="sw dr"></i>
+    </div>
+
+    <div class="stg" data-el="4.1">
+      <span class="no mono">1</span><span class="nm">RFQ</span>
+      <span class="st ok">승인</span><span class="grow"></span>
+      <span class="lbl">1개</span><span class="caret">▾</span>
+    </div>
+    <div class="doc" data-el="4.2">
+      <span class="mono">SYNC-RFQ-001</span><span class="dot ok"></span>
+      <span class="lbl">승인 · v3 · 2일 전 · 박호영</span>
+    </div>
+
+    <div class="stg">
+      <span class="no mono">7</span><span class="nm">화면</span>
+      <span class="st rv">검토중</span><span class="gate" data-el="4.3">상위 미승인</span>
+      <span class="grow"></span><span class="lbl">2개</span><span class="caret">▸</span>
+    </div>
+    <div class="doc">
+      <span class="mono">SYNC-UI-002</span><span class="dot rv"></span>
+      <span class="lbl">검토중 · v2 · 3시간 전 · 에이전트(김민준)</span>
+      <span class="grow"></span>
+      <span class="flag">확인 필요 2</span><span class="cm">댓글 2</span>
+    </div>
+
+    <div class="stg" data-el="4.4">
+      <span class="no mono">—</span><span class="nm">표준 (STD)</span>
+      <span class="st dr">초안</span><span class="grow"></span>
+      <span class="lbl">4개</span><span class="caret">▸</span>
+    </div>
+  </div>
 
   <aside class="panel" data-el="5">
     <div class="pbody">
       <h4>최근 변경</h4>
-      <ul class="recent">
-        <li><b>SYNC-SCN-001</b> v4 · 3시간 전 · 에이전트(김민준)<br><span class="lbl">spec: 페르소나 P2 툴 목록 갱신</span></li>
-        <li><b>SYNC-PRD-001</b> v7 · 1일 전 · 에이전트(박호영)<br><span class="lbl">spec: R10 다이어그램 렌더링으로 변경</span></li>
-        <li><b>SYNC-PRD-001</b> · 1일 전 · 박호영<br><span class="lbl">status: 검토중 → 승인</span></li>
-        <li><b>SYNC-UC-001</b> v2 · 어제 · 에이전트(박호영)<br><span class="lbl">spec: UC-H17·S5 삭제</span></li>
-      </ul>
+      <div class="rc">
+        <div><span class="mono">SYNC-SCN-001</span> <span class="mono lbl">v4</span><span class="grow"></span><span class="lbl">3시간 전</span></div>
+        <div class="msg">spec: 페르소나 P2 툴 목록 갱신</div>
+        <div class="lbl">에이전트 · 지시 김민준</div>
+      </div>
       <div class="sync lbl" data-el="7">마지막 처리 커밋 <span class="mono" data-el="7.1">eb30fd6</span><br>밀린 커밋 <span data-el="7.2">0</span></div>
     </div>
   </aside>
@@ -343,13 +364,11 @@ status: approved
   <div class="dbody">
     <ul class="chk">
       <li><b>SYNC-PRD-001#R1</b> · 원인 SYNC-RFQ-001#Q03 v4 · 3일 전 · 담당 박호영</li>
-      <li><b>SYNC-PRD-001#R9</b> · 원인 SYNC-RFQ-001#Q03 v4 · 3일 전 · 담당 박호영</li>
-      <li><b>SYNC-UC-001#UC-A6</b> · 원인 SYNC-PRD-001#R1 v7 · 1일 전 · 담당 김민준</li>
-      <li><b>SYNC-UC-001#UC-H2</b> · 원인 SYNC-PRD-001#R1 v7 · 1일 전 · 담당 미지정</li>
     </ul>
   </div>
 </div>
 ```
+
 
 ### 요소
 
@@ -380,6 +399,10 @@ status: approved
 ### 규칙
 
 - 단계 상태 색: `승인` 초록 / `검토중` 노랑 / `초안` 회색 / `미작성` 빈칸. UI-2와 같은 기준
+- **11단계 표 머리에 미니 히트맵 11칸을 둔다.** UI-2에서 본 그 프로젝트 행이 여기 다시 있다 — 목록에서 눌러 들어온 사람이 같은 그림을 찾을 수 있게. 14px 정사각형
+- 단계 행은 아코디언이다. 캐럿(`▾`/`▸`)이 접힘 상태를 말하고 행 전체가 손잡이다
+- 문서 행은 46px 들여쓰고 바탕을 한 톤 낮춘다(`#fdfdfc`). 단계 행과 같은 높이로 두면 어느 쪽이 묶음인지 안 보인다
+- 요약 수치(3)는 **17.5px 고정폭**. 0이면 흐리게(`opacity .55`), 1 이상이면 경고색 숫자에 경고 테두리
 - 4.1의 대표 상태는 그 단계 문서들 중 가장 낮은 것. 승인 2개 + 초안 1개면 `초안`
 - 4.3은 표시만 한다. 순서는 권장이지 강제가 아니다(PRD 비목표)
 - 요약 수치(3)는 프로젝트 전체이고, 내 것만 보려면 내 할 일(UI-10)
@@ -779,35 +802,69 @@ status: approved
 ### 배치
 
 ```html
+<!-- 문서 뷰와 같은 3단 틀. 좌: 버전, 가운데: diff, 우: 영향 -->
 <div class="docbar" data-el="1">
-  <span><b>SYNC-PRD-001</b> · 승인 · v7</span>
-  <span class="tabs"><span>유저용</span><span>원본</span><span class="on">이력</span></span>
+  <span class="crumb">싱크독</span><span class="sep">›</span>
+  <span class="crumb mono">2 PRD</span><span class="sep">›</span>
+  <b class="mono">SYNC-PRD-001</b>
+  <span class="pill pill-approved">승인</span><span class="ver mono">v7</span>
 </div>
 
-<div class="body2 hist">
-  <table class="vers" data-el="2">
-    <tr><th></th><th>버전</th><th>시각</th><th>작성</th><th>변경</th><th></th></tr>
-    <tr class="cur sel" data-el="2.1"><td><span class="ab" data-el="2.3">B</span></td><td><b>v7</b> <span class="lbl">현재</span></td><td>1일 전</td><td>에이전트<br><span class="lbl">지시 박호영</span></td><td>spec: R10 다이어그램 렌더링으로 변경</td><td></td></tr>
-    <tr><td></td><td>—</td><td>1일 전</td><td>박호영</td><td class="lbl">status: 검토중 → 승인</td><td></td></tr>
-    <tr class="sel"><td><span class="ab">A</span></td><td>v6</td><td>2일 전</td><td>에이전트<br><span class="lbl">지시 박호영</span></td><td>spec: 웹 편집 삭제</td><td><span class="btn sm" data-el="2.2">되돌리기</span></td></tr>
-    <tr><td></td><td>v5</td><td>3일 전</td><td>김민준<br><span class="lbl">GitHub push</span></td><td>spec: 비목표 표 정리</td><td><span class="btn sm">되돌리기</span></td></tr>
-    <tr><td></td><td>v4</td><td>4일 전</td><td>에이전트<br><span class="lbl">지시 김민준</span></td><td>spec: R9 MCP 토큰 조항</td><td><span class="btn sm">되돌리기</span></td></tr>
-    <tr><td></td><td>v3</td><td>5일 전</td><td>에이전트<br><span class="lbl">지시 박호영</span></td><td>spec: 초안</td><td><span class="btn sm">되돌리기</span></td></tr>
-  </table>
+<div class="body3">
+  <nav class="vlist" data-el="2">
+    <div class="lbl">버전 7</div>
 
-  <section class="diffpane" data-el="3">
-    <div class="sech"><b data-el="3.1">v6 → v7</b> <span class="lbl">항목 2개 변경 · 삭제 3줄 · 추가 4줄</span></div>
-    <div class="diffbox" data-el="3.2">
-      <div class="lbl">#R10 다이어그램 렌더링 <span class="hint" data-el="3.3">하위 참조 2건</span></div>
-      <div class="dl">- 텍스트 원본에서 사람이 보는 그림을 자동 생성한다.</div>
-      <div class="dl">- Mermaid 렌더링과 drawio 파일 생성 두 가지를 지원한다.</div>
-      <div class="dl add">+ 원본의 다이어그램 코드블록을 사람용 뷰에서 그림으로 렌더링한다.</div>
-      <div class="dl add">+ 렌더링은 브라우저가 하며 서버는 생성물을 만들지 않는다.</div>
-      <div class="lbl" style="margin-top:8px">#R1 에이전트용 원본과 사람용 뷰 <span class="hint">하위 참조 3건</span></div>
-      <div class="dl add">+ 웹 문서 뷰는 유저용과 원본 두 탭을 전환해 보여준다.</div>
-      <div class="dl add">+ 원본 탭은 읽기와 복사만 된다.</div>
+    <div class="vcard sel" data-el="2.1">
+      <div><b class="mono">v7</b> <span class="ab" data-el="2.3">B</span><span class="grow"></span><span class="lbl">1일 전</span></div>
+      <div class="msg">spec: R10 다이어그램 렌더링으로 변경</div>
+      <div class="by"><span class="lbl">에이전트 · 지시 박호영</span></div>
     </div>
+
+    <div class="vcard">
+      <div><b class="mono">status</b><span class="grow"></span><span class="lbl">1일 전</span></div>
+      <div class="msg">status: 검토중 → 승인</div>
+      <div class="by"><span class="lbl">박호영</span></div>
+    </div>
+
+    <div class="vcard sel">
+      <div><b class="mono">v6</b> <span class="ab">A</span><span class="grow"></span><span class="lbl">2일 전</span></div>
+      <div class="msg">spec: 웹 편집 삭제</div>
+      <div class="by"><span class="lbl">에이전트 · 지시 박호영</span><span class="grow"></span><span class="btn sm danger" data-el="2.2">되돌리기</span></div>
+    </div>
+
+    <p class="hint">두 개까지 고른다. 세 번째를 누르면 <b class="mono">A</b>가 밀려난다. <b class="mono">status</b> 커밋은 본문이 같아 되돌리기가 없다.</p>
+  </nav>
+  <div class="handle"></div>
+
+  <section class="main" data-el="3">
+    <div class="tabs"><span>유저용</span><span>원본</span><span class="on">이력</span></div>
+    <div class="drange">
+      <b class="mono" data-el="3.1">v6 → v7</b>
+      <span class="lbl">항목 2개 변경 · 삭제 3줄 · 추가 4줄</span>
+    </div>
+
+    <div class="dgroup"><!-- 항목마다 카드. 어느 항목이 바뀌었는지가 먼저 읽혀야 한다 -->
+      <div class="dhead2">
+        <span class="idbadge">R10</span><b>다이어그램 렌더링</b>
+        <span class="grow"></span>
+        <span class="hint" data-el="3.3">하위 참조 2건</span>
+      </div>
+      <div class="diffbox" data-el="3.2">
+        <div class="dl del"><span class="mk">-</span><span>텍스트 원본에서 사람이 보는 그림을 자동 생성한다.</span></div>
+        <div class="dl add"><span class="mk">+</span><span>원본의 다이어그램 코드블록을 사람용 뷰에서 그림으로 렌더링한다.</span></div>
+      </div>
+    </div>
+
+    <p class="lbl">되돌리기는 "이전 내용으로 새 버전 생성"이며 이력이 지워지지 않는다. 되돌린 결과가 현재 규약을 위반하면 거부된다.</p>
   </section>
+
+  <div class="handle"></div>
+  <aside class="vimpact" data-el="7">
+    <div class="lbl">이 변경이 닿는 곳</div>
+    <div class="icard"><b class="mono">R10</b> <span class="n">2</span><div class="lbl">다이어그램 렌더링</div></div>
+    <div class="icard"><b class="mono">R1</b> <span class="n">4</span><div class="lbl">에이전트용 원본과 사람용 뷰</div></div>
+    <p class="hint">항목 ID가 붙은 줄이 바뀌면 그 항목을 참조하는 하위 건수가 여기 나온다.</p>
+  </aside>
 </div>
 
 <div class="dialog" data-el="4">
@@ -815,12 +872,11 @@ status: approved
   <div class="dbody">
     현재 v7을 v6 내용으로 되돌립니다. 이력은 지워지지 않고 <b>v8</b>이 새로 생깁니다.
     <div class="diffbox" data-el="4.1">
-      <div class="lbl">v7 → v8 (= v6 내용)</div>
-      <div class="dl">- 원본의 다이어그램 코드블록을 사람용 뷰에서 그림으로 렌더링한다.</div>
-      <div class="dl add">+ 텍스트 원본에서 사람이 보는 그림을 자동 생성한다.</div>
+      <div class="dl del"><span class="mk">-</span><span>원본의 다이어그램 코드블록을…</span></div>
+      <div class="dl add"><span class="mk">+</span><span>텍스트 원본에서 사람이 보는 그림을…</span></div>
     </div>
-    <div class="dacts"><span class="btn" data-el="4.3">취소</span> <span class="btn" data-el="4.2" style="font-weight:600">되돌리기</span></div>
   </div>
+  <div class="dfoot"><span class="grow"></span><span class="btn" data-el="4.3">취소</span> <span class="btn solid" data-el="4.2">되돌리기</span></div>
 </div>
 
 <div class="dialog" data-el="6">
@@ -828,18 +884,20 @@ status: approved
   <div class="dbody">
     v3에는 <b>#R15</b>가 없습니다. 되돌리면 이 항목이 사라지고 하위 참조 2건에 <b>끊어진 참조</b> 플래그가 붙습니다.
     <ul class="chk"><li>SYNC-UC-001#UC-H7</li><li>SYNC-DOM-003#versions</li></ul>
-    <div class="dacts"><span class="btn" data-el="6.2">취소</span> <span class="btn" data-el="6.1" style="font-weight:600">삭제하고 되돌리기</span></div>
   </div>
+  <div class="dfoot"><span class="grow"></span><span class="btn" data-el="6.2">취소</span> <span class="btn solid" data-el="6.1">삭제하고 되돌리기</span></div>
 </div>
 ```
+
 
 ### 요소
 
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
 | 1 | 문서 바 | 영역 | UI-5와 같음. 이력 탭 활성 | 유저용·원본 → UI-5 |
-| 2 | 버전 목록 | 표 | 최신이 위. 버전 번호, 시각, 작성 주체, 커밋 메시지(UC-H6 기본 흐름 2). `status` 커밋도 행으로 |
-| 2.1 | 버전 행 | 행 | 번호, `A`/`B` 뱃지(고른 두 개), 시각, 작성(사람/에이전트+지시자/GitHub push), 변경 요약 | 고르면 diff 대상. 두 개까지 |
+| 2 | 버전 목록 | 목록 | **좌측 사이드바의 카드 목록.** 최신이 위. 버전 번호, 시각, 작성 주체, 커밋 메시지(UC-H6 기본 흐름 2). `status` 커밋도 카드로 |
+| 2.1 | 버전 카드 | 카드 | 번호, `A`/`B` 뱃지(고른 두 개), 시각, 작성(사람/에이전트+지시자/GitHub push), 변경 요약, 되돌리기 | 고르면 diff 대상. 두 개까지 |
+| 7 | 이 변경이 닿는 곳 | 패널 | 우측. 바뀐 항목마다 하위 참조 건수 카드. 이 변경이 저장 전에 어디까지 번지는지 | 항목 클릭 → 3.3과 같음 |
 | 2.3 | A·B 뱃지 | 뱃지 | 고른 두 버전 중 어느 쪽이 이전(`A`)이고 어느 쪽이 현재(`B`)인지 | — |
 | 2.2 | 되돌리기 | 버튼 | 현재 버전과 `status` 행 제외한 행마다 | 되돌리기 확인(4) 열림(UC-H7 기본 흐름 1~2) |
 | 3 | diff 영역 | 영역 | 선택한 두 버전의 줄 단위 diff(UC-H6 기본 흐름 3). 기본은 현재 ↔ 직전 | — |
@@ -857,7 +915,9 @@ status: approved
 ### 규칙
 
 - **두 개까지 고른다. 세 번째를 고르면 `A`가 밀려난다.** 늘 뒤쪽이 `B`(현재), 앞쪽이 `A`(이전)다 — 순서를 사람이 신경 쓰지 않아도 되게
-- 고른 행은 테두리와 배경으로 구분한다. 뱃지(2.3)가 어느 쪽이 A인지 말해 준다
+- 고른 카드는 잉크색 1.5px 테두리와 주의 배경으로 구분한다. 뱃지(2.3)가 어느 쪽이 A인지 말해 준다
+- **UI-5와 같은 3단 틀을 쓴다.** 좌측 사이드바·본문·우측 패널의 폭과 손잡이가 같다 — 탭으로 오갈 때 틀이 바뀌면 같은 문서를 보고 있다는 감각이 끊긴다
+- diff는 **항목마다 카드**다. 머리에 항목 ID 뱃지·제목·하위 참조 건수를 놓는다 — 어느 항목이 바뀌었는지가 줄보다 먼저 읽혀야 한다
 - 버전이 하나뿐이면 diff 영역(3)에 비교 대신 전체 본문(UC-H6 3b)
 - `status` 커밋 행과 현재 버전은 되돌리기(2.2)가 없다. `status`는 본문이 같고, 현재 버전은 되돌릴 것이 없다. diff 대상으로는 고를 수 있다
 - 되돌리기(4.2)는 UC-A6과 같은 파이프라인을 탄다. 규약 검사·참조 추출·변경 영향 감지가 전부 돈다. 되돌린 결과가 현재 규약을 위반하면 거부된다(UC-H7 4a)
@@ -900,44 +960,53 @@ status: approved
 ### 배치
 
 ```html
+<!-- 표가 아니라 격자다. 칸이 열 폭을 꽉 채우는 막대여야 색 띠로 읽힌다 -->
 <div class="phead" data-el="1">
-  <div><b>프로젝트</b> <span class="lbl">3개</span></div>
+  <div><b>프로젝트</b> <span class="lbl">4개</span></div>
   <span class="grow"></span>
-  <span class="btn" data-el="1.1">+ 프로젝트 초기화</span>
+  <span class="btn solid" data-el="1.1">+ 프로젝트 초기화</span>
 </div>
 
-<table class="grid" data-el="2">
-  <tr class="hd">
-    <th></th><th>프로젝트</th>
-    <th>RFQ</th><th>PRD</th><th>SCN</th><th>UC</th><th>INFRA</th><th>DOM</th><th>UI</th><th>API</th><th>SEQ</th><th>MS</th><th>CODE</th>
-  </tr>
-  <tr class="prj" data-el="2.1">
-    <td><span class="warn" data-el="2.3">⚠</span></td>
-    <td><b>SYNC</b> 싱크독<br><span class="lbl">확인 필요 4 · 규약 오류 1</span></td>
-    <td><span class="cell ok" data-el="2.2">1</span></td><td><span class="cell ok">1</span></td><td><span class="cell rv">1</span></td>
-    <td><span class="cell dr">1 <i data-el="2.4">▲</i></span></td><td><span class="cell dr">1</span></td><td><span class="cell rv">3</span></td>
-    <td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td>
-  </tr>
-  <tr class="prj">
-    <td></td>
-    <td><b>DBA</b> DBA AX전환</td>
-    <td><span class="cell ok">1</span></td><td><span class="cell rv">1</span></td><td><span class="cell rv">1</span></td>
-    <td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td>
-    <td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td>
-  </tr>
-  <tr class="prj">
-    <td></td>
-    <td><b>AIRD</b> 에어데이터</td>
-    <td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td>
-    <td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td>
-    <td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td>
-  </tr>
-</table>
+<div class="heat" data-el="2"><!-- grid-template-columns: 20px 196px repeat(11,1fr) · gap 4px -->
+  <div class="hrow head">
+    <span></span><span></span>
+    <span>1 RFQ</span><span>2 PRD</span><span>3 SCN</span><span>4 UC</span><span>5 INFRA</span><span>6 DOM</span>
+    <span>7 UI</span><span>8 API</span><span>9 SEQ</span><span>10 MS</span><span>11 CODE</span>
+  </div>
+
+  <div class="hrow" data-el="2.1">
+    <span class="warn" data-el="2.3">⚠</span>
+    <span class="pname">
+      <span><b class="mono">SYNC</b> 싱크독</span>
+      <span class="sub"><b class="work">처리할 것 9</b> · 21문서 · 12분 전</span>
+    </span>
+    <span class="cell ok" data-el="2.2">1</span>
+    <span class="cell ok flagged">1</span>
+    <span class="cell ok">1</span>
+    <span class="cell ok">1</span>
+    <span class="cell ok">1</span>
+    <span class="cell rv flagged">3</span>
+    <span class="cell rv">2 <i data-el="2.4">▲</i></span>
+    <span class="cell rv flagged">2 <i>▲</i></span>
+    <span class="cell rv">1 <i>▲</i></span>
+    <span class="cell dr">3 <i>▲</i></span>
+    <span class="cell dr">1 <i>▲</i></span>
+  </div>
+
+  <div class="hrow">
+    <span></span>
+    <span class="pname"><span><b class="mono">RHYM</b> 리듬핏</span><span class="sub">1문서 · 어제</span></span>
+    <span class="cell rv">1</span>
+    <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
+    <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
+    <span class="cell na"></span><span class="cell na"></span>
+  </div>
+</div>
 
 <div class="legend lbl" data-el="4">
-  <span><i class="sw ok"></i> 승인</span> <span><i class="sw rv"></i> 검토중</span>
-  <span><i class="sw dr"></i> 초안</span> <span><i class="sw na"></i> 미작성</span>
-  <span>⚠ 플래그·규약 오류 있음</span> <span>▲ 상위 미승인 (막지는 않는다)</span>
+  <span><i class="sw dr"></i> 초안</span> <span><i class="sw rv"></i> 검토중</span>
+  <span><i class="sw ok"></i> 승인</span> <span><i class="sw na"></i> 미작성</span>
+  <span class="warn">⚠ 플래그·규약 오류 있음</span> <span class="warn">▲ 상위 미승인 (막지는 않는다)</span>
 </div>
 
 <div class="empty" data-el="3">등록된 프로젝트가 없습니다. 위의 프로젝트 초기화로 시작하세요.</div>
@@ -959,7 +1028,9 @@ status: approved
 
 ### 규칙
 
-- 열 순서는 11단계 순서. 열 이름은 PRD ID 체계의 타입 코드
+- **표가 아니라 격자다.** `20px 196px repeat(11,1fr)` · `gap 4px` · 행 `padding 10px 14px`. 칸은 높이 22px에 `border-radius 3px`이고 **열 폭을 꽉 채운다** — 작은 칩으로 그리면 색이 띠로 안 읽히고 히트맵이 아니게 된다
+- 열 이름은 `1 RFQ` … `11 CODE`. 단계 번호를 붙여 순서가 보이게 한다. 11px 고정폭, 머리 행 배경 `배경 보조`
+- 프로젝트 칸(196px)은 두 줄이다 — 첫 줄 `코드`(고정폭 13px/600) + `이름`(15.5px), 둘째 줄 `처리할 것 N`(있을 때만 경고색 600) · `N문서 · 갱신 시각`(12.5px 보조)
 - 칸 색: `승인` 초록 / `검토중` 노랑 / `초안` 회색 / `미작성` 빈칸. UI-4와 같은 기준
 - 2.3 경고는 종류를 구분하지 않고 하나로. 종류별 건수는 **툴팁**과 2.1 행 아래 요약과 UI-4에서
 - 칸(2.2)에 플래그가 있으면 경고색 테두리를 두른다. 색은 상태, 테두리는 플래그 — 두 정보가 한 칸에 겹치지 않게
