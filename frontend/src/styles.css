@@ -373,6 +373,17 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
   background:var(--bg-card);min-width:0;min-height:0}
 .mainwrap>*,.body3>.main>*{max-width:var(--doc-w);margin-left:auto;margin-right:auto}
 .body3 .main{border:none;padding:0;min-width:0;max-width:var(--doc-w);margin:0 auto}
+/* 7.4 줄 댓글 버튼 — 문단 오른쪽에 붙는다. 본문을 읽다가 그 자리에서 달 수 있어야 한다.
+   댓글이 있으면 개수와 주의색 테두리 */
+.body p[data-src]{position:relative}
+.cbtn{display:inline-flex;align-items:center;justify-content:center;vertical-align:top;
+  min-width:18px;height:18px;margin-left:var(--space-6);padding:0 var(--space-4);
+  border:1px solid var(--border);border-radius:var(--radius-badge);background:var(--bg-card);
+  color:var(--ink-faint);font-family:var(--font-mono);font-size:var(--text-mono-sm);
+  line-height:1;cursor:pointer;opacity:0;transition:opacity .12s}
+.body p[data-src]:hover .cbtn,.cbtn.has{opacity:1}
+.cbtn:hover{border-color:var(--ink-body);color:var(--ink-body)}
+.cbtn.has{border-color:var(--status-review);color:var(--caution-ink);font-weight:var(--w-semibold)}
 /* 문서 머리 — 킥커(어느 단계인지) · 제목 · 리드(원본 0장 첫 문단) */
 .dochead{margin-bottom:var(--space-22)}
 .kicker{font-size:var(--text-mono-sm);color:var(--ink-muted);letter-spacing:.3px}

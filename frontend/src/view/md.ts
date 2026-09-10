@@ -11,6 +11,12 @@ export interface RenderCtx {
   downstream?: Record<string, string[]>
   /** 참조하는 문서의 제목 (추적표 열) */
   titles?: Record<string, string>
+  /** 참이면 문단마다 `data-src`(그 문단 **첫 줄의 원본 텍스트**)가 붙는다.
+   *  웹 문서 뷰가 그걸로 원본 줄 번호를 찾아 줄 댓글 버튼(UI-5 요소 7.4)을 놓는다.
+   *  **번호가 아니라 텍스트인 이유**: 타입별 렌더러가 본문을 절·항목 블록으로 여러 번 쪼개
+   *  `render_blocks`를 부르므로, 블록 안 상대 위치로는 원본 줄 번호를 알 수 없다.
+   *  정적 뷰(view_build.py)는 주지 않는다 — 거기엔 댓글이 없다 (STD-002 6장) */
+  lineSrc?: boolean
 }
 
 const NUL = '\uE000' // 코드 스팬 자리표시 (사용자 영역 문자)
@@ -170,7 +176,9 @@ export function renderBlocks(text: string, ctx: RenderCtx, itemPat?: RegExp): st
       para.push(lines[i])
       i++
     }
-    out.push(`<p>${inline(para.join(' '), ctx)}</p>`)
+    // lineSrc가 아니면 속성도 없다 — 정적 뷰(view_build.py)와 같은 HTML이 나온다
+    const at = ctx.lineSrc ? ` data-src="${esc(para[0])}"` : ''
+    out.push(`<p${at}>${inline(para.join(' '), ctx)}</p>`)
   }
   return out.join('\n')
 }

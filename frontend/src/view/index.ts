@@ -58,6 +58,8 @@ export function renderView(doc: Document, code: string, downstream?: DownstreamV
     exists: (d, it) => (d === doc.doc_id ? !it || items.has(it) : !missing.has(it ? `${d}#${it}` : d)),
     downstream: downstream ? Object.fromEntries(downstream.by_document.map((x) => [x.doc_id, x.items])) : undefined,
     titles: downstream ? Object.fromEntries(downstream.by_document.map((x) => [x.doc_id, x.title])) : undefined,
+    // 문단마다 첫 줄 원본 텍스트를 실어 준다. 화면이 그걸로 줄 번호를 찾아 댓글 버튼을 놓는다
+    lineSrc: true,
   }
   const out = pick(doc.doc_type, fm.title ?? '')({ type: doc.doc_type, title: fm.title ?? '', body, ctx })
   return { html: out.html, onMount: out.onMount, title: fm.title ?? doc.doc_id, lead: leadOf(body) }
