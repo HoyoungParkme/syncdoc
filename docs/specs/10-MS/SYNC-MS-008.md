@@ -58,18 +58,19 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
      - if 비어 있음 → `status=None, doc_count=0`
      - else → `status = min(stage_docs.status, key=순서 draft<review<approved)` (UC-H14 1a), `doc_count`
      - `gate_warning` = `doc_count > 0 and any(앞 단계 k<n 중 status != approved and doc_count > 0)` (1b)
+     - `flag_count` = 그 단계 문서들의 열린 플래그 합 (UI-2 요소 2.2 테두리). `per_doc = TrackingService.count_flags_by_document([d.id for d in docs])`를 **프로젝트당 한 번** 부르고 단계별로 더한다 — 단계마다 부르면 같은 프로젝트를 11번 훑는다
    - `std_docs = [d for d in docs if d.doc_type == STD]`
-   - `counts = TrackingService.count_flags(project_id)` → `{needs_check, broken_ref}`
+   - `counts = TrackingService.count_flags(project_id)` → `{needs_check, broken_ref, upstream_impact}` — **플래그 세 종류를 다 싣는다.** `upstream_impact`를 빼면 내 할 일에는 뜨는데 프로젝트 요약에는 안 잡히는 구멍이 생긴다(UI-4 요소 3.6)
    - `counts.unresolved_comments = CommentService.count_unresolved(project_id)`
    - `counts.convention_errors = sum(d.has_convention_error for d in docs)` · `counts.incomplete = sum(bool(d.incomplete_warnings))`
    - `updated_at = max(d.updated_at)`
 3. `→` 정렬 `updated_at desc`
 
-**출력** `ProjectSummary[]`. `stages`는 항상 11개
+**출력** `ProjectSummary[]`. `stages`는 항상 11개. `counts`는 여섯 칸
 
-**호출하는 것** `ProjectService.list_projects` · `SpecService.list_by_project` · `TrackingService.count_flags` · `CommentService.count_unresolved`
+**호출하는 것** `ProjectService.list_projects` · `SpecService.list_by_project` · `TrackingService.count_flags` · `TrackingService.count_flags_by_document` · `CommentService.count_unresolved`
 
-**테스트 관점** 문서 없는 프로젝트 → 11칸 전부 null · 승인 2 + 초안 1인 단계 → `draft` · 3단계 검토중인데 4단계에 문서 → 4단계 `gate_warning=True` · STD 문서는 11칸에 안 세고 `std_docs`에
+**테스트 관점** 문서 없는 프로젝트 → 11칸 전부 null · 승인 2 + 초안 1인 단계 → `draft` · 3단계 검토중인데 4단계에 문서 → 4단계 `gate_warning=True` · STD 문서는 11칸에 안 세고 `std_docs`에 · 한 단계에 플래그 있는 문서 둘 → 그 단계 `flag_count`가 둘의 합 · `counts`에 `upstream_impact`가 있다
 
 ---
 
