@@ -1,15 +1,18 @@
-/** 공통 틀 — SYNC-UI-001 3장. 상단 바: 싱크독 · [프로젝트 ▾] · [내 할 일 ●n] · [설정]. UI-1만 예외. */
-import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
+/** 공통 틀 — SYNC-UI-001 4장. 상단 바: 싱크독 · 사용 방법 · 내 할 일 n · 설정 · 로그아웃.
+ *  UI-1만 예외. 프로젝트 전환 경로는 로고 하나다 — 목록 화면 자체가 고르는 화면이라 선택기가 겹친다. */
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { api, ApiError, type ProjectSummary, type Todo, type User } from '../api/client'
+import { HowTo } from './HowTo'
+import { ToastHost } from './ui'
 
 export function Shell() {
   const nav = useNavigate()
   const loc = useLocation()
-  const { code } = useParams()
   const [user, setUser] = useState<User | null>(null)
   const [projects, setProjects] = useState<ProjectSummary[]>([])
   const [todoCount, setTodoCount] = useState(0)
+  const [howTo, setHowTo] = useState(false)
   useEffect(() => {
     api.get<Todo>('/api/todo').then((t) => setTodoCount(t.total)).catch(() => undefined)
     api
@@ -20,6 +23,9 @@ export function Shell() {
       })
     api.get<ProjectSummary[]>('/api/projects').then(setProjects).catch(() => undefined)
   }, [nav, loc.pathname, loc.search])
+  const logout = () => {
+    api.post('/auth/logout', {}).finally(() => nav('/login'))
+  }
   if (!user) return null
   return (
     <div className="app">
@@ -27,23 +33,25 @@ export function Shell() {
         <strong>
           <Link to="/">싱크독</Link>
         </strong>
-        <select className="btn" value={code ?? ''} onChange={(e) => e.target.value && nav(`/p/${e.target.value}`)} aria-label="프로젝트">
-          <option value="">프로젝트 ▾</option>
-          {projects.map((p) => (
-            <option key={p.code} value={p.code}>
-              {p.code} {p.name}
-            </option>
-          ))}
-        </select>
         <span className="grow" />
-        <Link className="btn" to="/todo">
+        <button className="nav" type="button" onClick={() => setHowTo(true)}>
+          사용 방법
+        </button>
+        <Link className="nav todo" to="/todo">
           내 할 일{todoCount > 0 && <span className="badge">{todoCount}</span>}
         </Link>
-        <Link className="btn" to="/settings">
+        <Link className="nav" to="/settings">
           설정
         </Link>
+        <button className="nav out" type="button" onClick={logout}>
+          로그아웃
+        </button>
       </div>
-      <Outlet context={{ user, projects }} />
+      <main className="screen">
+        <Outlet context={{ user, projects }} />
+      </main>
+      {howTo && <HowTo onClose={() => setHowTo(false)} />}
+      <ToastHost />
     </div>
   )
 }

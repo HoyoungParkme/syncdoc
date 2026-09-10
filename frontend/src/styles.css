@@ -1,57 +1,114 @@
-/* 뷰 본문 — tools/view_build.py CSS 그대로 (STD-002 공통 틀·타입별 본문). React 유저용 탭이 같게 보이게 한다. */
-:root{--paper:#EDEFEC;--panel:#F8F9F7;--card:#fff;--ink:#1E2A30;--soft:#5C6B73;--faint:#8A969C;--rule:#C9CFCB;--hair:#E1E5E1;--hi:#FFF1B8;--blue:#1a5fb4}
-*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;font-size:14.5px;line-height:1.7;-webkit-font-smoothing:antialiased}
-.wrap{max-width:1200px;margin:0 auto;padding:28px 22px 80px}
-code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.88em;background:#E4E8E4;padding:1px 5px;border-radius:2px}
-pre.code{background:#1E2A30;color:#E8ECE8;padding:12px 14px;font:12.5px/1.55 ui-monospace,Menlo,monospace;overflow-x:auto;margin:8px 0 16px;border-radius:2px}pre.code code{background:none;color:inherit;padding:0;font-size:inherit}
-.mono{font-family:ui-monospace,Menlo,monospace;font-size:.92em}
-.tb{border:1.5px solid var(--ink);background:var(--panel);display:grid;grid-template-columns:1fr auto}
-.tb-main{padding:20px 26px;border-right:1.5px solid var(--ink)}.tb-kicker{font-size:12px;color:var(--soft);margin-bottom:6px}.tb-kicker a{color:var(--soft);text-decoration:none}
-.tb h1{margin:0;font-size:25px;font-weight:700;letter-spacing:-.02em}.tb p{margin:8px 0 0;color:var(--soft);font-size:13.5px;max-width:66ch}
-.tb-meta{display:grid;grid-template-columns:auto minmax(200px,340px);align-content:start;font-size:12px}
-.tb-meta div{padding:8px 14px;border-bottom:1px solid var(--hair)}.tb-meta div:nth-child(odd){color:var(--soft);border-right:1px solid var(--hair);white-space:nowrap}.tb-meta div:nth-last-child(-n+2){border-bottom:none}
-.st{display:inline-block;padding:1px 8px;border-radius:2px;font-size:11.5px;font-weight:600}.st-draft{background:#e8e8e8;color:#555}.st-review{background:#fff0b3;color:#960}.st-approved{background:#d6f0d6;color:#1a6}
-.body{border:1.5px solid var(--ink);border-top:none;background:var(--card);padding:26px 34px}
-.body h2{font-size:19px;margin:30px 0 12px;padding-bottom:8px;border-bottom:1.5px solid var(--ink);letter-spacing:-.01em}.body h2:first-child{margin-top:0}
-.body h3{font-size:15.5px;margin:22px 0 8px}.body h4{font-size:14px;margin:18px 0 6px}
-.body h1{display:none}
-h2.item,h3.item,h4.item,h5.item{display:flex;align-items:center;gap:10px}
-.iid{display:inline-block;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;font-weight:600;background:#FFE58A;border:1px solid #C9A800;padding:1px 7px;border-radius:2px;white-space:nowrap}
-a.ref{font-family:ui-monospace,Menlo,monospace;font-size:.88em;color:var(--blue);text-decoration:none;border-bottom:1px dashed var(--blue)}a.ref.missing{color:#999;border-bottom-color:#bbb}a.ref.missing::after{content:" ?"}
-table{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0 16px;background:#fff}th{text-align:left;font-weight:600;color:var(--soft);padding:7px 9px;border-bottom:1.5px solid var(--ink);background:var(--panel)}td{padding:7px 9px;border-bottom:1px solid var(--hair);vertical-align:top}
-table.reassembled td.iid,table.trace td:first-child{white-space:nowrap}td.num{text-align:right;color:var(--soft);font-family:ui-monospace,Menlo,monospace}
-.card{border:1px solid var(--rule);background:var(--panel);padding:14px 18px;margin:14px 0}
-.card-h{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:15px}.card-h b{flex:1}
-.pill{font-size:11px;padding:1px 8px;border:1px solid var(--ink);border-radius:10px;white-space:nowrap}.pill.soft{border-color:var(--rule);color:var(--soft)}
-ul.ac{list-style:none;padding:0;margin:8px 0 0}ul.ac li{display:flex;gap:8px;align-items:flex-start;margin:4px 0;font-size:13.5px}ul.ac .box{display:inline-block;width:16px;height:16px;border:1.5px solid var(--ink);border-radius:2px;font-size:11px;line-height:13px;text-align:center;flex:none;margin-top:4px;background:#fff}ul.ac li.done{color:var(--soft)}
-.pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:10px 0 20px}.pcard{border:1px solid var(--rule);background:var(--panel);padding:14px 16px}.pcard ul{margin:4px 0}
-.scard{border:1px solid var(--rule);background:#fff;padding:16px 20px;margin:14px 0}.scard ol.steps{counter-reset:s;list-style:none;padding:0;margin:10px 0}.scard ol.steps li{counter-increment:s;position:relative;padding:6px 0 6px 38px;border-left:2px solid var(--rule);margin-left:12px}.scard ol.steps li::before{content:counter(s);position:absolute;left:-13px;top:6px;width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;font-size:11.5px;text-align:center;line-height:24px;font-weight:600}
-.variant{margin:8px 0;border:1px dashed var(--rule);padding:6px 12px;background:var(--panel)}.variant summary{cursor:pointer;font-weight:600;font-size:13px}.variant p{margin:6px 0 2px;font-size:13.5px}
-.pgrid.dom{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
-.meth{display:inline-block;font:600 10.5px ui-monospace,monospace;padding:1px 6px;border-radius:2px;color:#fff;background:#666}.m-get{background:#2b7a4b}.m-post{background:#2a5db0}.m-delete{background:#b03030}.m-put,.m-patch{background:#a06a00}
-table.eps tr.grp td{background:var(--panel);font-weight:600;color:var(--soft)}td.small{font-size:12px;color:var(--soft)}
-details.ep{border:1px solid var(--rule);margin:8px 0;background:#fff}details.ep summary{cursor:pointer;padding:8px 12px;font-size:13.5px}details.ep>*:not(summary){padding:0 14px 8px}
-.desc{color:var(--soft);font-size:13.5px}table.schema{font-size:12.5px}
-.down{margin-top:10px;padding-top:8px;border-top:1px dashed var(--rule);font-size:12.5px;color:var(--soft)}
-ul,ol{margin:6px 0 12px;padding-left:22px}li{margin:3px 0}blockquote{margin:10px 0;padding:8px 14px;border-left:3px solid var(--ink);background:var(--panel);color:var(--soft)}
-hr{border:none;border-top:1px solid var(--hair);margin:22px 0}
-.soft{color:var(--soft)}.warn{color:#b00;font-size:13px;border:1px solid #b00;padding:6px 10px;background:#fff5f5}.mer{background:#fff;border:1px solid var(--rule);padding:10px;margin:8px 0 16px;overflow-x:auto}pre.mermaid{margin:0;font:12px ui-monospace,monospace;white-space:pre-wrap}pre.mermaid.nomer::before{content:"mermaid.js를 불러오지 못해 코드로 표시";display:block;color:#b00;margin-bottom:6px}
-.wfbox{border:1px dashed var(--rule);padding:10px;background:#f4f4f4;margin:8px 0 16px;font-size:12px}
-footer{margin-top:20px;font-size:12.5px;color:var(--soft)}
-.tabs{display:flex;border:1.5px solid var(--ink);border-top:none;background:var(--panel)}.tabs button{font:inherit;font-size:13px;padding:9px 16px;background:none;border:none;border-right:1px solid var(--rule);cursor:pointer;color:var(--soft)}.tabs button.on{background:#fff;color:var(--ink);font-weight:600}
-@media (max-width:860px){.tb{grid-template-columns:1fr}.tb-main{border-right:none;border-bottom:1.5px solid var(--ink)}.body{padding:18px}}
+/* 앱 틀 — SYNC-UI-002 배치 뼈대의 클래스. 값은 SYNC-UI-001 3장 디자인 토큰.
+   **styles.view.css 뒤에 로드돼야 한다** — 두 파일이 클래스를 여럿 공유하고
+   앱이 이기는 근거가 로드 순서뿐이다 (.tabs .st .warn .grp .mono .steps .on .done .ref .missing).
+   순서가 뒤집히면 먼저 드러나는 곳: UI-5 문서 바 탭 · UI-9 미확정 배너 · V-API 엔드포인트 행. */
+/* ── 디자인 토큰 — SYNC-UI-001 3장의 전사. 값을 바꾸려면 명세를 먼저 고친다 ──
+   뷰 본문 변수(--paper --panel --card --ink --soft --faint --rule --hair --hi --blue)는
+   styles.view.css 소유다. 여기서 재정의하지 마라 — 뷰가 '옛 규칙 + 새 값'으로 반쯤 물든다. */
+:root{
+  /* 3.1 색 — 상태 3색이 유일한 색 언어다. 장식에 쓰지 않는다 */
+  --bg-app:#f7f6f3; --bg-card:#ffffff; --bg-subtle:#fbfaf8; --bg-sunken:#f3f1ec;
+  --ink-body:#17181c; --ink-prose:#1f2024; --ink-muted:#46443f;
+  --ink-faint:#6b6862; --ink-disabled:#a8a49c;
+  --border:#e2e0da; --border-strong:#cfccc4;
+  /* 3.1 '구분선 약함' 한 행에 값이 둘이다. 어느 쪽이 어디 쓰이는지는 명세가 안 정했다 */
+  --divider:#f0eeea; --divider-soft:#f4f2ee;
+  /* 이름을 백엔드 status 코드에 맞춘다 — var(--status-{status})로 매핑 없이 이어진다 */
+  --status-draft:#9c9891; --status-review:#d99b1e; --status-approved:#2f7d5b;
+  --status-approved-ink:#ffffff;
+  --badge-item-bg:var(--status-review);  /* 3.1이 '검토중 색이 뱃지 배경이기도' 하다고 못박았다 */
+  --danger:#b8342a; --danger-bg:#fdf1ef;
+  --caution-bg:#fdf8ec; --caution-ink:#8a6410;
+  --diff-add-bg:#eef6f0;                 /* 삭제 줄 배경은 --danger-bg 재사용 (3.1) */
+  --ref-backlink:#b8860b;                /* UI-8 전용 — 되돌아오는 참조 */
+  --graph-edge:#8f8b83;                  /* UI-8 전용 */
+  --overlay:rgba(23,24,28,.42);
 
-/* 앱 틀 — SYNC-UI-002 배치 뼈대의 클래스(topbar·docbar·tabs·body3·toc·panel·banner·dialog·grid·stages·form). 뷰 본문 CSS는 styles.view.css(view_build.py). */
-.app{min-height:100vh}
-.topbar{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1.5px solid var(--ink);background:var(--panel);font-size:13.5px}
-.topbar strong a{color:var(--ink);text-decoration:none;font-size:15px}
+  /* 3.2 타이포 */
+  --font-sans:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --w-regular:400; --w-medium:500; --w-semibold:600; --w-bold:700;
+  --text-logo:27px; --text-screen-title:22px; --text-doc-title:27px;
+  --text-dialog-title:16px; --text-section-title:16.5px; --text-card-title:15px;
+  --text-item-title:15px; --text-body:14.5px; --leading-body:1.7;
+  --text-ui:14px; --text-meta:13px; --text-caption:12.5px;
+  --text-mono-id:12.5px; --text-mono-id-lg:13px; --text-mono-sm:12px;
+
+  /* 3.3 간격 — px 값을 이름에 넣는다. 2~14가 1px 연속이라 순번으로는 크기를 못 짚는다 */
+  --space-2:2px; --space-3:3px; --space-4:4px; --space-5:5px; --space-6:6px;
+  --space-7:7px; --space-8:8px; --space-9:9px; --space-10:10px; --space-11:11px;
+  --space-12:12px; --space-13:13px; --space-14:14px; --space-16:16px; --space-18:18px;
+  --space-20:20px; --space-22:22px; --space-26:26px; --space-30:30px;
+
+  /* 3.3 모서리 — 용도로 이름 짓고 값은 주석에. 항목 카드 7 / 패널 카드 8의 1px 차이가 의도다 */
+  --radius-badge:3px; --radius-btn-sm:4px; --radius-chip:5px; --radius-control:6px;
+  --radius-item-card:7px; --radius-panel-card:8px; --radius-pill:9px;
+  --radius-dialog:10px; --radius-dot:50%;
+
+  /* 3.3 그림자 — 전부 --ink-body(#17181c = rgb(23,24,28)) 파생.
+     잉크 본문색을 바꾸면 이 다섯과 --overlay를 함께 고친다 */
+  --shadow-dialog:0 18px 50px rgba(23,24,28,.3);
+  --shadow-tooltip:0 6px 18px rgba(23,24,28,.14);
+  --shadow-toast:0 10px 30px rgba(23,24,28,.28);
+  --shadow-card:0 1px 3px rgba(23,24,28,.05);
+  --shadow-node-focus:0 3px 10px rgba(23,24,28,.18);
+
+  /* 3.3 겹침 순서. 다이얼로그는 열린 깊이만큼 더한다 */
+  --z-modal:45; --z-dialog:50; --z-toast:60; --z-tooltip:70; --z-graph-full:80;
+
+  /* 레이아웃 — UI-001 4장 */
+  --topbar-h:50px;
+  /* 문서 바(UI-001 4.2). 목차·패널이 그 아래에 붙어야 해서 값이 필요하다 */
+  --docbar-h:50px;
+}
+
+/* 앱 바탕만 덮는다. styles.view.css의 body{}는 그대로 두고 나중 규칙으로 이긴다 —
+   뷰 본문(.body/.wrap)은 자기 배경·글자색을 다시 선언하므로 여기 영향이 안 새어 든다 */
+body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)}
+
+/* UI-001 4.1 — 페이지 전체는 스크롤하지 않는다. 각 화면이 자기 안에서 스크롤한다.
+   안 지키면 탭을 오갈 때 스크롤바가 생겼다 없어지며 가운데 정렬 본문이 좌우로 흔들린다 */
+.app{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+/* 스크롤은 여기 한 곳에서만 일어난다. 화면을 감싸는 이 칸이 필요한 이유:
+   화면 컴포넌트가 조각(fragment)으로 형제 여럿을 내놓기도 해서(UI-5 문서 바 + 본문 + 앞뒤 이동)
+   `.app > *`에 거는 규칙은 그 형제 전부를 늘려 버린다. 문서 바처럼 붙어 있어야 할 것은
+   자기가 sticky로 붙는다 */
+.screen{flex:1;min-height:0;overflow:auto}
+.topbar{flex:none;display:flex;align-items:center;gap:var(--space-14);height:var(--topbar-h);padding:0 var(--space-18);background:var(--ink-body);color:#fff;font-size:var(--text-ui)}
+.topbar strong a{color:#fff;text-decoration:none;font-size:16.5px;font-weight:var(--w-semibold)}
+/* 배경 필은 '내 할 일' 하나에만. 넷 다 두르면 그 위계가 사라진다 */
+/* display·border·background를 다시 적는 건 아래 UI-5 `.nav`(문서 앞뒤 이동)가
+   같은 이름이라서다. 특이도로는 이기지만 선언하지 않은 속성은 그쪽이 그대로 먹는다.
+   border는 button 기본 테두리까지 지운다 — 넷 중 button 둘만 테두리가 보였다 */
+.topbar .nav{display:inline-block;border:none;background:none;color:#fff;text-decoration:none;padding:var(--space-4) var(--space-8);opacity:.85;cursor:pointer}
+.topbar .nav:hover{opacity:1}
+.topbar .nav.todo{background:rgba(255,255,255,.06);border-radius:var(--radius-chip);padding:var(--space-4) var(--space-10);opacity:1}
+.topbar .nav.out{opacity:.6}
 .grow{flex:1}
 .btn{display:inline-block;font:inherit;font-size:13px;padding:5px 12px;border:1px solid var(--ink);background:#fff;border-radius:2px;cursor:pointer;color:var(--ink);text-decoration:none;line-height:1.4}
 .btn.sm{padding:2px 8px;font-size:12px}.btn.big{padding:10px 22px;font-size:15px;font-weight:600}.btn.dis,.btn:disabled{opacity:.4;cursor:default}
 .lbl{color:var(--soft);font-size:12.5px}.mono{font-family:ui-monospace,Menlo,monospace}
-.page{max-width:1200px;margin:0 auto;padding:22px 22px 80px}
+.page{max-width:1180px;margin:0 auto;padding:var(--space-26) var(--space-22) 60px}
 .phead{display:flex;align-items:center;gap:12px;margin-bottom:14px;font-size:16px}
 .empty{color:var(--soft);padding:30px;text-align:center;border:1px dashed var(--rule)}
+
+/* ── 공통 컴포넌트 — SYNC-UI-002 1장 ───────────────────────────────────────
+   1.1 다이얼로그: 오버레이 위 흰 카드. 머리·본문·발 세 층이고 본문만 스크롤한다.
+   겹쳐 뜰 때는 여는 쪽이 style에 --depth를 준다 (UI-001 3.3 "열린 깊이만큼 더한다") */
+.backdrop{position:fixed;inset:0;background:var(--overlay);z-index:calc(var(--z-modal) + var(--depth,0))}
+.dialog{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;
+  width:min(720px,92vw);max-height:min(84vh,760px);background:var(--bg-card);border-radius:var(--radius-dialog);
+  box-shadow:var(--shadow-dialog);z-index:calc(var(--z-dialog) + var(--depth,0));overflow:hidden}
+.dialog.wide{width:min(900px,94vw)}
+.dhead{flex:none;display:flex;align-items:center;gap:var(--space-10);padding:var(--space-14) var(--space-18);
+  border-bottom:1px solid var(--border);font-size:var(--text-dialog-title);font-weight:var(--w-semibold);color:var(--ink-body)}
+.dhead .lbl{font-size:var(--text-meta);font-weight:var(--w-regular)}
+.dhead .x{flex:none;cursor:pointer;font-weight:var(--w-regular);font-size:15px;color:var(--ink-faint);padding:0 var(--space-4)}
+.dhead .x:hover{color:var(--ink-body)}
+/* 본문만 스크롤한다 — 머리와 발은 늘 보인다 */
+.dbody{flex:1;min-height:0;overflow:auto;padding:var(--space-16) var(--space-18);font-size:var(--text-ui);color:var(--ink-prose)}
+.dfoot{flex:none;display:flex;align-items:center;gap:var(--space-10);padding:var(--space-12) var(--space-18);
+  border-top:1px solid var(--border);background:var(--bg-subtle);font-size:var(--text-meta);color:var(--ink-muted)}
 /* UI-1 */
 .login{max-width:420px;margin:120px auto;padding:34px;border:1.5px solid var(--ink);background:var(--panel);text-align:center}.login .logo{font-size:22px;margin-bottom:10px}.login .btn{margin:14px 0}
 /* UI-2 */
@@ -64,8 +121,7 @@ tr.prj{cursor:pointer}tr.prj:hover{background:var(--panel)}
 .inp{font:inherit;font-size:13.5px;padding:6px 8px;border:1px solid var(--rule);border-radius:2px;background:#fff}.inp.wide{width:100%}
 .ferr{color:#b00;font-size:12.5px;margin-top:4px}.facts{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
 .banner{margin:10px 0;padding:8px 12px;border:1px solid #b00;background:#fff5f5;color:#b00;font-size:13px}.banner.warn{border-color:#c9a800;background:#fffbe6;color:#7a5c00}
-.dialog{position:fixed;left:50%;top:18%;transform:translateX(-50%);width:min(720px,92vw);background:#fff;border:1.5px solid var(--ink);box-shadow:0 8px 30px rgba(0,0,0,.2);z-index:20}
-.dhead{padding:10px 16px;border-bottom:1px solid var(--rule);font-weight:600;background:var(--panel)}.dbody{padding:14px 16px;font-size:13.5px}.dacts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.dacts{display:flex;gap:var(--space-8);justify-content:flex-end;margin-top:var(--space-14)}
 .grp{border:1px solid var(--rule);background:var(--panel);padding:12px 16px;margin:12px 0}.grp h4{margin:0 0 8px}.row{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--hair)}.row:first-of-type{border-top:none}.dimrow{opacity:.55}
 .tokbox{font-family:ui-monospace,Menlo,monospace;background:#1E2A30;color:#E8ECE8;padding:10px 12px;margin:10px 0;word-break:break-all}
 /* UI-4 */
@@ -77,13 +133,14 @@ table.stages{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
 .flag{font-size:11px;color:#960;border:1px solid #c9a800;background:#fff8d6;padding:0 5px;margin-left:6px;border-radius:2px}.cm{font-size:11px;color:var(--blue);margin-left:6px}.err{font-size:11px;color:#b00;border:1px solid #b00;padding:0 5px;margin-left:6px}.warnx{font-size:11px;color:#7a5c00;margin-left:6px}
 .panel{border:1px solid var(--rule);background:var(--panel)}.pbody{padding:12px 14px;font-size:13px}.pbody h4{margin:12px 0 4px}.pbody ul{padding-left:18px;margin:4px 0}
 /* UI-5 */
-.docbar{display:flex;align-items:center;gap:14px;padding:8px 16px;border-bottom:1px solid var(--rule);background:#fff;font-size:13.5px;position:sticky;top:0;z-index:5}
+.docbar{display:flex;align-items:center;gap:14px;height:var(--docbar-h);padding:0 var(--space-16);border-bottom:1px solid var(--rule);background:#fff;font-size:13.5px;position:sticky;top:0;z-index:5}
 .tabs{display:inline-flex;border:1px solid var(--rule)}.tabs span{padding:4px 12px;cursor:pointer;color:var(--soft);border-right:1px solid var(--rule)}.tabs span:last-child{border-right:none}.tabs span.on{background:var(--panel);color:var(--ink);font-weight:600}
 .statuswrap{position:relative}.menu{position:absolute;right:0;top:110%;background:#fff;border:1px solid var(--ink);min-width:120px;z-index:10}.mi{padding:6px 12px;cursor:pointer;font-size:13px}.mi:hover{background:var(--panel)}.mi.dis{opacity:.4;cursor:default}
 .body3{display:grid;grid-template-columns:200px 1fr 300px;gap:0;align-items:start}
-.toc{position:sticky;top:44px;padding:14px 12px;font-size:12.5px;border-right:1px solid var(--hair);max-height:calc(100vh - 60px);overflow:auto}.toc div{padding:3px 0;cursor:pointer}.toc .d1{padding-left:12px;color:var(--soft)}
+/* 문서 바 아래에 붙는다 — top:0이면 스크롤할 때 문서 바 밑으로 미끄러져 들어간다 */
+.toc{position:sticky;top:var(--docbar-h);padding:14px 12px;font-size:12.5px;border-right:1px solid var(--hair);max-height:calc(100vh - var(--topbar-h) - var(--docbar-h));overflow:auto}.toc div{padding:3px 0;cursor:pointer}.toc .d1{padding-left:12px;color:var(--soft)}
 .body3 .main{border:none;padding:22px 30px;min-width:0}
-.body3 .panel{position:sticky;top:44px;max-height:calc(100vh - 60px);overflow:auto;border-top:none;border-bottom:none}
+.body3 .panel{position:sticky;top:var(--docbar-h);max-height:calc(100vh - var(--topbar-h) - var(--docbar-h));overflow:auto;border-top:none;border-bottom:none}
 .ptabs{display:flex;border-bottom:1px solid var(--rule)}.ptabs span{flex:1;text-align:center;padding:6px;cursor:pointer;color:var(--soft)}.ptabs span.on{font-weight:600;color:var(--ink);background:#fff}
 .nav{display:flex;justify-content:space-between;padding:14px 22px;border-top:1px solid var(--hair);background:#fff}
 .rawwrap{max-width:1200px;margin:0 auto;padding:16px 22px}.rawbar{display:flex;align-items:center;gap:10px;margin-bottom:8px}
@@ -99,13 +156,59 @@ li.ref.missing{color:#999}
 .stack{display:flex;flex-direction:column;gap:14px}.stack section{border:1px solid var(--rule);background:#fff}.sech{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--hair);background:var(--panel);font-size:13.5px}.mybody{padding:10px 14px;font-size:13.5px}.acts{display:flex;align-items:center;gap:10px;padding:10px 0}
 .diffbox{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;padding:8px 12px;overflow-x:auto;background:#fff}.dl{white-space:pre-wrap;padding:1px 6px}.dl.add{background:#e6ffed;color:#1a6}.dl.del{background:#ffeef0;color:#b00}.dl.ctx{color:var(--soft)}
 /* UI-12 전파 선택 */
-.dialog.wide{width:min(900px,94vw)}.dhead{display:flex;align-items:center;gap:10px}.dhead .x{cursor:pointer;font-weight:400;padding:0 4px}.dbody .sech{margin-top:10px}.chk{list-style:none;padding:0;margin:6px 0}.chk li{padding:4px 0;border-top:1px solid var(--hair)}.propacts{display:flex;align-items:center;gap:10px;margin-top:14px}.skipbox{display:flex;gap:8px;align-items:center}
-.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:19}
+.dbody .sech{margin-top:10px}.chk{list-style:none;padding:0;margin:6px 0}.chk li{padding:4px 0;border-top:1px solid var(--hair)}.propacts{display:flex;align-items:center;gap:10px;margin-top:14px}.skipbox{display:flex;gap:8px;align-items:center}
 .stat.link{cursor:pointer}
 /* UI-7 버전 이력 */
 .hist{align-items:start}table.vers{width:100%;border-collapse:collapse;font-size:13px;background:#fff}table.vers th,table.vers td{padding:6px 8px;border-bottom:1px solid var(--hair);text-align:left;vertical-align:top}table.vers tr.cur td{background:var(--panel)}.diffpane{border:1px solid var(--rule);background:#fff}.hint{cursor:pointer;color:var(--blue);border:1px solid var(--blue);padding:0 5px;font-size:11px;border-radius:2px;margin-left:6px}
 .tabs a{color:var(--soft);text-decoration:none;margin-right:10px}
 /* UI-8 참조 그래프 */
-.graphpage{max-width:none}.graph{height:calc(100vh - 200px);border:1px solid var(--rule);background:#fff;position:relative}.graph .edges{position:absolute;left:12px;bottom:8px;z-index:4}.node{font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:3px 8px;border:1px solid var(--ink);background:#fff;border-radius:2px;cursor:pointer;white-space:nowrap}.node.doc{font-weight:700;background:var(--panel)}.node.iso{border-style:dashed;color:var(--soft)}.node.miss{border-style:dotted;color:#b00;background:#fff5f5}.legend{margin-top:8px}.legend span{margin-right:14px}
+.graphpage{max-width:none}.graph{height:calc(100vh - var(--topbar-h) - 150px);border:1px solid var(--rule);background:#fff;position:relative}.graph .edges{position:absolute;left:12px;bottom:8px;z-index:4}.node{font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:3px 8px;border:1px solid var(--ink);background:#fff;border-radius:2px;cursor:pointer;white-space:nowrap}.node.doc{font-weight:700;background:var(--panel)}.node.iso{border-style:dashed;color:var(--soft)}.node.miss{border-style:dotted;color:#b00;background:#fff5f5}.legend{margin-top:8px}.legend span{margin-right:14px}
 /* UI-9 순서대로 읽기 */
 .steps{display:flex;gap:4px;flex-wrap:wrap}.stp{font-size:12px;padding:2px 8px;border:1px solid var(--rule);border-radius:2px;cursor:pointer;color:var(--soft)}.stp.done{background:#d6f0d6;color:#1a6;border-color:#1a6}.stp.cur{background:var(--ink);color:#fff;border-color:var(--ink)}.stp.na{opacity:.4;cursor:default}.readbody .main{max-width:900px;margin:0 auto}.readbody .nav{display:flex;gap:10px;justify-content:space-between;margin-top:24px;padding-top:12px;border-top:1px solid var(--rule)}
+/* 1.4 상태 필 — 상태색 바탕. 승인만 글씨가 희다.
+   이름을 백엔드 status 코드로 맞춰 뒀으니 클래스는 pill-{status} 하나로 끝난다 */
+.pill{display:inline-block;padding:1px var(--space-8);border-radius:var(--radius-pill);
+  font-size:var(--text-caption);font-weight:var(--w-semibold);line-height:1.6;white-space:nowrap;
+  background:var(--status-draft);color:var(--ink-body)}
+.pill-review{background:var(--status-review)}
+.pill-approved{background:var(--status-approved);color:var(--status-approved-ink)}
+/* 아직 문서가 없는 단계. 상태가 아니라 빈칸이라 색을 주지 않는다 */
+.pill-none{background:none;color:var(--ink-disabled);padding-left:0;padding-right:0}
+
+/* 1.5 항목 ID 뱃지 — 작은 사각, 고정폭, 검토중 색 바탕 */
+.idbadge{display:inline-block;padding:0 var(--space-5);border-radius:var(--radius-badge);
+  background:var(--badge-item-bg);color:var(--ink-body);
+  font-family:var(--font-mono);font-size:var(--text-mono-id);font-weight:var(--w-semibold)}
+
+/* 1.2 툴팁 — 대상 위쪽 가운데. 마우스를 통과시킨다(대상 클릭을 막으면 안 된다) */
+.tipwrap{display:inline-block}
+.tip{position:fixed;transform:translate(-50%,-100%);margin-top:calc(var(--space-6) * -1);
+  max-width:280px;padding:var(--space-6) var(--space-10);border:1px solid var(--border-strong);
+  border-radius:var(--radius-control);background:var(--bg-card);color:var(--ink-prose);
+  font-size:var(--text-caption);line-height:1.6;white-space:pre-line;
+  box-shadow:var(--shadow-tooltip);pointer-events:none;z-index:var(--z-tooltip)}
+
+/* 1.3 토스트 — 화면 아래 가운데. 2.6초 뒤 스스로 사라진다(UI-001 3.4의 유일한 예외) */
+.toast{position:fixed;left:50%;bottom:var(--space-30);transform:translateX(-50%);
+  padding:var(--space-10) var(--space-18);border-radius:var(--radius-control);
+  background:var(--ink-body);color:#fff;font-size:var(--text-ui);
+  box-shadow:var(--shadow-toast);z-index:var(--z-toast)}
+
+/* UI-16 사용 방법 — 읽기 전용 표 둘. 공통 table.grid는 칸을 가운데로 모는데
+   여기는 문장이라 왼쪽 정렬이 낫다. 번호·코드 칸만 가운데 */
+.howto table.grid{width:100%;border-collapse:collapse;font-size:var(--text-meta);background:none;margin-bottom:var(--space-18)}
+.howto table.grid:last-of-type{margin-bottom:var(--space-14)}
+.howto table.grid th,.howto table.grid td{padding:var(--space-6) var(--space-8);border-bottom:1px solid var(--divider);text-align:left}
+.howto tr.hd th{background:var(--bg-subtle);color:var(--ink-muted);font-size:var(--text-caption);font-weight:var(--w-semibold);border-bottom:1px solid var(--border)}
+.howto td.no,.howto tr.hd th:first-child{width:26px;text-align:center;color:var(--ink-faint);font-family:var(--font-mono);font-size:var(--text-mono-sm)}
+.howto td.code{width:64px;font-family:var(--font-mono);font-size:var(--text-mono-id);font-weight:var(--w-semibold)}
+.howto td.where{color:var(--ink-muted);white-space:nowrap}
+/* 단계 밖이라 흐리게 — 표를 훑을 때 11개와 섞이지 않게 */
+.howto tr.std td{color:var(--ink-faint)}
+.howto code{display:inline-block;padding:0 var(--space-5);border-radius:var(--radius-badge);
+  background:var(--bg-sunken);color:var(--ink-muted);font-family:var(--font-mono);font-size:var(--text-mono-sm)}
+/* 칸 안에서만 띄운다. 3.3 문장에 붙으면 뒤 쉼표가 떨어져 보인다 */
+.howto td code+code{margin-left:var(--space-5)}
+.howto .lbl{color:var(--ink-muted);font-size:var(--text-meta);line-height:1.7;margin:0 0 var(--space-10)}
+.howto .note{margin:0;padding:var(--space-8) var(--space-12);border-radius:var(--radius-control);
+  background:var(--caution-bg);color:var(--caution-ink);font-size:var(--text-meta)}

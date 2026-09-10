@@ -1,0 +1,44 @@
+/* 뷰 본문 — tools/view_build.py 의 CSS 상수와 **바이트 단위로 같아야 한다**.
+   STD-002: React 유저용 탭이 정적 뷰와 같게 보여야 한다. tools/check_view_css.py 가 지킨다.
+   이 파일을 손으로 고치지 마라 — view_build.py 를 고치고 여기로 옮긴다. */
+:root{--paper:#EDEFEC;--panel:#F8F9F7;--card:#fff;--ink:#1E2A30;--soft:#5C6B73;--faint:#8A969C;--rule:#C9CFCB;--hair:#E1E5E1;--hi:#FFF1B8;--blue:#1a5fb4}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;font-size:14.5px;line-height:1.7;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1200px;margin:0 auto;padding:28px 22px 80px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.88em;background:#E4E8E4;padding:1px 5px;border-radius:2px}
+pre.code{background:#1E2A30;color:#E8ECE8;padding:12px 14px;font:12.5px/1.55 ui-monospace,Menlo,monospace;overflow-x:auto;margin:8px 0 16px;border-radius:2px}pre.code code{background:none;color:inherit;padding:0;font-size:inherit}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:.92em}
+.tb{border:1.5px solid var(--ink);background:var(--panel);display:grid;grid-template-columns:1fr auto}
+.tb-main{padding:20px 26px;border-right:1.5px solid var(--ink)}.tb-kicker{font-size:12px;color:var(--soft);margin-bottom:6px}.tb-kicker a{color:var(--soft);text-decoration:none}
+.tb h1{margin:0;font-size:25px;font-weight:700;letter-spacing:-.02em}.tb p{margin:8px 0 0;color:var(--soft);font-size:13.5px;max-width:66ch}
+.tb-meta{display:grid;grid-template-columns:auto minmax(200px,340px);align-content:start;font-size:12px}
+.tb-meta div{padding:8px 14px;border-bottom:1px solid var(--hair)}.tb-meta div:nth-child(odd){color:var(--soft);border-right:1px solid var(--hair);white-space:nowrap}.tb-meta div:nth-last-child(-n+2){border-bottom:none}
+.st{display:inline-block;padding:1px 8px;border-radius:2px;font-size:11.5px;font-weight:600}.st-draft{background:#e8e8e8;color:#555}.st-review{background:#fff0b3;color:#960}.st-approved{background:#d6f0d6;color:#1a6}
+.body{border:1.5px solid var(--ink);border-top:none;background:var(--card);padding:26px 34px}
+.body h2{font-size:19px;margin:30px 0 12px;padding-bottom:8px;border-bottom:1.5px solid var(--ink);letter-spacing:-.01em}.body h2:first-child{margin-top:0}
+.body h3{font-size:15.5px;margin:22px 0 8px}.body h4{font-size:14px;margin:18px 0 6px}
+.body h1{display:none}
+h2.item,h3.item,h4.item,h5.item{display:flex;align-items:center;gap:10px}
+.iid{display:inline-block;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;font-weight:600;background:#FFE58A;border:1px solid #C9A800;padding:1px 7px;border-radius:2px;white-space:nowrap}
+a.ref{font-family:ui-monospace,Menlo,monospace;font-size:.88em;color:var(--blue);text-decoration:none;border-bottom:1px dashed var(--blue)}a.ref.missing{color:#999;border-bottom-color:#bbb}a.ref.missing::after{content:" ?"}
+table{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0 16px;background:#fff}th{text-align:left;font-weight:600;color:var(--soft);padding:7px 9px;border-bottom:1.5px solid var(--ink);background:var(--panel)}td{padding:7px 9px;border-bottom:1px solid var(--hair);vertical-align:top}
+table.reassembled td.iid,table.trace td:first-child{white-space:nowrap}td.num{text-align:right;color:var(--soft);font-family:ui-monospace,Menlo,monospace}
+.card{border:1px solid var(--rule);background:var(--panel);padding:14px 18px;margin:14px 0}
+.card-h{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:15px}.card-h b{flex:1}
+.pill{font-size:11px;padding:1px 8px;border:1px solid var(--ink);border-radius:10px;white-space:nowrap}.pill.soft{border-color:var(--rule);color:var(--soft)}
+ul.ac{list-style:none;padding:0;margin:8px 0 0}ul.ac li{display:flex;gap:8px;align-items:flex-start;margin:4px 0;font-size:13.5px}ul.ac .box{display:inline-block;width:16px;height:16px;border:1.5px solid var(--ink);border-radius:2px;font-size:11px;line-height:13px;text-align:center;flex:none;margin-top:4px;background:#fff}ul.ac li.done{color:var(--soft)}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:10px 0 20px}.pcard{border:1px solid var(--rule);background:var(--panel);padding:14px 16px}.pcard ul{margin:4px 0}
+.scard{border:1px solid var(--rule);background:#fff;padding:16px 20px;margin:14px 0}.scard ol.steps{counter-reset:s;list-style:none;padding:0;margin:10px 0}.scard ol.steps li{counter-increment:s;position:relative;padding:6px 0 6px 38px;border-left:2px solid var(--rule);margin-left:12px}.scard ol.steps li::before{content:counter(s);position:absolute;left:-13px;top:6px;width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;font-size:11.5px;text-align:center;line-height:24px;font-weight:600}
+.variant{margin:8px 0;border:1px dashed var(--rule);padding:6px 12px;background:var(--panel)}.variant summary{cursor:pointer;font-weight:600;font-size:13px}.variant p{margin:6px 0 2px;font-size:13.5px}
+.pgrid.dom{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.meth{display:inline-block;font:600 10.5px ui-monospace,monospace;padding:1px 6px;border-radius:2px;color:#fff;background:#666}.m-get{background:#2b7a4b}.m-post{background:#2a5db0}.m-delete{background:#b03030}.m-put,.m-patch{background:#a06a00}
+table.eps tr.grp td{background:var(--panel);font-weight:600;color:var(--soft)}td.small{font-size:12px;color:var(--soft)}
+details.ep{border:1px solid var(--rule);margin:8px 0;background:#fff}details.ep summary{cursor:pointer;padding:8px 12px;font-size:13.5px}details.ep>*:not(summary){padding:0 14px 8px}
+.desc{color:var(--soft);font-size:13.5px}table.schema{font-size:12.5px}
+.down{margin-top:10px;padding-top:8px;border-top:1px dashed var(--rule);font-size:12.5px;color:var(--soft)}
+ul,ol{margin:6px 0 12px;padding-left:22px}li{margin:3px 0}blockquote{margin:10px 0;padding:8px 14px;border-left:3px solid var(--ink);background:var(--panel);color:var(--soft)}
+hr{border:none;border-top:1px solid var(--hair);margin:22px 0}
+.soft{color:var(--soft)}.warn{color:#b00;font-size:13px;border:1px solid #b00;padding:6px 10px;background:#fff5f5}.mer{background:#fff;border:1px solid var(--rule);padding:10px;margin:8px 0 16px;overflow-x:auto}pre.mermaid{margin:0;font:12px ui-monospace,monospace;white-space:pre-wrap}pre.mermaid.nomer::before{content:"mermaid.js를 불러오지 못해 코드로 표시";display:block;color:#b00;margin-bottom:6px}
+.wfbox{border:1px dashed var(--rule);padding:10px;background:#f4f4f4;margin:8px 0 16px;font-size:12px}
+footer{margin-top:20px;font-size:12.5px;color:var(--soft)}
+.tabs{display:flex;border:1.5px solid var(--ink);border-top:none;background:var(--panel)}.tabs button{font:inherit;font-size:13px;padding:9px 16px;background:none;border:none;border-right:1px solid var(--rule);cursor:pointer;color:var(--soft)}.tabs button.on{background:#fff;color:var(--ink);font-weight:600}
+@media (max-width:860px){.tb{grid-template-columns:1fr}.tb-main{border-right:none;border-bottom:1.5px solid var(--ink)}.body{padding:18px}}
