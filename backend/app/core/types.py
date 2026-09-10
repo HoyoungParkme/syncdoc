@@ -575,6 +575,7 @@ class GraphEdge:
 class Graph:
     nodes: list[GraphNode]
     edges: list[GraphEdge]
+    project_name: str = ""  # 브레드크럼(UI-8 요소 1)
 
 
 @dataclass(frozen=True)

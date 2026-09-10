@@ -7,20 +7,23 @@
  *  범용 그래프 엔진의 배치·라우팅과 계속 싸우게 된다. */
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, STAGE_TYPES, type Graph as GraphData, type GraphScope } from '../api/client'
 import { ItemChain } from '../components/ItemChain'
 
-const COL_W = 196
-const COL_GAP = 22
-const NODE_H = 22
-const ROW_H = 30
-const HEAD_H = 30
-const PAD = 14
+/** 열 간격과 노드 폭이 다르다 — 그 차(32px)가 간선이 지나는 거터다 */
+const COL_PITCH = 150
+const NODE_W = 118
+const NODE_H = 26
+const ROW_H = 40
+const HEAD_H = 26
+const PAD = 18
 /** 되돌아오는 간선이 지나는 전용 레인. 모든 행 아래에 둔다 — 노드를 관통하지 않게 */
-const LANE_GAP = 34
+const LANE_GAP = 12
+/** 되돌아오는 간선이 꺾이는 모서리 반지름 */
+const R = 8
 
-type Placed = { id: string; col: number; row: number; label: string; flag: boolean; iso: boolean; docId: string; itemId: string | null }
+type Placed = { id: string; col: number; row: number; label: string; title: string; flag: boolean; iso: boolean; docId: string; itemId: string | null }
 
 export function Graph() {
   const { code = '' } = useParams()
@@ -81,7 +84,7 @@ export function Graph() {
         {layout && (
           <div className="cinner" style={{ width: layout.w, height: layout.h }}>
             {STAGE_TYPES.map((t, i) => (
-              <div key={t} className="colh" style={{ left: colX(i + 1), width: COL_W }}>
+              <div key={t} className="colh" style={{ left: colX(i + 1), width: NODE_W }}>
                 {i + 1} {t}
               </div>
             ))}
@@ -91,15 +94,18 @@ export function Graph() {
                 key={n.id}
                 className={`node${n.flag ? ' flag' : ''}${n.iso ? ' iso' : ''}${near && !near.all.has(n.id) ? ' dim' : ''}`}
                 data-el={n.iso ? '3.5' : '3.1'}
-                style={{ left: colX(n.col), top: rowY(n.row), width: COL_W }}
+                style={{ left: colX(n.col), top: rowY(n.row), width: NODE_W, height: NODE_H }}
                 onMouseEnter={() => setFocus(n.id)}
                 onMouseLeave={() => setFocus(null)}
                 onClick={() => n.itemId && setChain({ docId: n.docId, itemId: n.itemId })}
-                title={n.label}
+                title={n.title}
               >
-                {n.iso && '◌ '}
-                {n.label}
-                {n.flag && ' ▲'}
+                <span className="nlabel">
+                  {n.iso && '◌ '}
+                  {n.label}
+                </span>
+                {/* 플래그 표시는 오른쪽 끝 — 라벨에 붙으면 길이에 따라 자리가 흔들린다 */}
+                {n.flag && <span className="nflag">▲</span>}
               </div>
             ))}
           </div>
@@ -113,20 +119,21 @@ export function Graph() {
           </svg>{' '}
           참조 (하위 → 상위)
         </span>
-        <span>
+        <span className="back">
           <svg className="sw" viewBox="0 0 22 8">
             <path className="e back" d="M1 4 H21" />
           </svg>{' '}
           되돌아오는 참조
         </span>
-        <span>
+        <span className="gone">
           <svg className="sw" viewBox="0 0 22 8">
             <path className="e gone" d="M1 4 H21" />
           </svg>{' '}
           미존재 참조
         </span>
-        <span>◌ 고립</span>
-        <span>노드를 누르면 11단계 흐름</span>
+        <span>◌ 고립 (참조 없음)</span>
+        <span className="grow" />
+        <span>노드에 마우스를 올리면 그 항목의 참조만 남는다 · 클릭 → 11단계 흐름</span>
       </div>
     </div>
   )
@@ -135,8 +142,17 @@ export function Graph() {
     <div className="page graphpage">
       <div className="phead" data-el="1">
         <div>
-          <b>참조 그래프</b> <span className="lbl" data-el="1.1">{stats}</span>
+          <div className="crumbs">
+            <Link to={`/p/${code}`}>{g?.project_name || code}</Link>
+            <span className="sep">›</span>
+            <span>참조 그래프</span>
+          </div>
+          <b>참조 그래프</b>
         </div>
+        <span className="grow" />
+        <span className="lbl" data-el="1.1">
+          {stats}
+        </span>
       </div>
       {/* 전체보기는 상단 바까지 덮는다 — 그래서 body로 포털을 쓴다 */}
       {full ? createPortal(card, document.body) : card}
@@ -145,8 +161,8 @@ export function Graph() {
   )
 }
 
-const colX = (stage: number) => PAD + (stage - 1) * (COL_W + COL_GAP)
-const rowY = (row: number) => PAD + HEAD_H + row * ROW_H
+const colX = (stage: number) => PAD + (stage - 1) * COL_PITCH
+const rowY = (row: number) => HEAD_H + row * ROW_H
 
 /** 열 안 순서를 이웃의 평균 위치로 정렬한다(barycenter). 상위 기준과 하위 기준을 번갈아 네 번.
  *  이웃이 없는 노드는 제자리 — 그래서 언제 그려도 같은 그림이 나온다. */
@@ -188,6 +204,7 @@ function place(g: GraphData) {
         col: c,
         row,
         label: n.item_id ? `${short}#${n.item_id}` : short,
+        title: n.item_id ? `${n.doc_id}#${n.item_id}` : n.doc_id,
         flag: n.has_flag,
         iso: n.isolated,
         docId: n.doc_id,
@@ -196,12 +213,13 @@ function place(g: GraphData) {
     }),
   )
   const tallest = Math.max(1, ...cols.map((c) => c.length))
+  const lane = rowY(tallest) + LANE_GAP
   return {
     nodes,
     pos: new Map(nodes.map((n) => [n.id, n])),
-    w: colX(11) + COL_W + PAD,
-    h: rowY(tallest) + LANE_GAP + PAD,
-    lane: rowY(tallest) + LANE_GAP / 2,
+    w: colX(11) + NODE_W + PAD,
+    h: lane + 26,
+    lane,
   }
 }
 
@@ -223,38 +241,50 @@ function Edges({ layout, g, near }: { layout: Layout; g: GraphData; near: { all:
     const first = (k: 'e' | 'back' | 'gone') => !seen[k] && ((seen[k] = true), true)
     if (!edge.to) {
       // 3.4 미존재 참조 — 대상이 어느 문서에도 없다. 범위 밖이라 빠진 것과 다르다
-      paths.push(<path key={i} className={cls('gone')} data-el={first('gone') ? '3.4' : undefined} d={`M${fx} ${fy} H${fx - 26}`} />)
+      paths.push(<path key={i} className={cls('gone')} data-el={first('gone') ? '3.4' : undefined} d={`M${fx} ${fy} H${fx - 13}`} />)
       return
     }
     const t = layout.pos.get(edge.to)
     if (!t) return // 범위 밖 — 그리지 않는다 (MS-008 5)
-    const tx = colX(t.col) + COL_W
+    const tx = colX(t.col) + NODE_W
     const ty = rowY(t.row) + NODE_H / 2
     if (t.col < f.col) {
       const mid = (fx + tx) / 2
       paths.push(<path key={i} className={cls('e')} data-el={first('e') ? '3.2' : undefined} d={`M${fx} ${fy} C${mid} ${fy} ${mid} ${ty} ${tx} ${ty}`} />)
     } else if (t.col === f.col) {
       // 같은 열 — 왼쪽으로 나갔다 돌아오는 꺾은선
-      const out = fx - 14
-      paths.push(<path key={i} className={cls('e')} data-el={first('e') ? '3.2' : undefined} d={`M${fx} ${fy} H${out} V${ty} H${tx - COL_W}`} />)
+      const out = fx - 13
+      paths.push(<path key={i} className={cls('e')} data-el={first('e') ? '3.2' : undefined} d={`M${fx} ${fy} H${out} V${ty} H${tx - NODE_W}`} />)
     } else {
       // 3.3 되돌아오는 참조 — 상위가 오른쪽 열. 열 사이 빈 자리로 빠져나가 행 아래 레인을
       // 가로지른 뒤 올라온다. 열 안으로 내려가면 그 열 노드들을 관통한다
       const lane = layout.lane
-      const out = colX(f.col) + COL_W + COL_GAP / 2
-      const inn = colX(t.col) - COL_GAP / 2
-      paths.push(
-        <path
-          key={i}
-          className={cls('back')}
-          data-el={first('back') ? '3.3' : undefined}
-          d={`M${colX(f.col) + COL_W} ${fy} H${out} V${lane} H${inn} V${ty} H${colX(t.col)}`}
-        />,
-      )
+      const x1 = colX(f.col) + NODE_W
+      const out = x1 + 16
+      const inn = colX(t.col) - 16
+      // 모서리를 둥글게 — 직각으로 꺾으면 레인 위에서 선이 서로 붙어 보인다
+      const d =
+        `M${x1} ${fy} L${out - R} ${fy} Q${out} ${fy} ${out} ${fy + R}` +
+        ` L${out} ${lane - R} Q${out} ${lane} ${out + R} ${lane}` +
+        ` L${inn - R} ${lane} Q${inn} ${lane} ${inn} ${lane - R}` +
+        ` L${inn} ${ty + R} Q${inn} ${ty} ${inn + R} ${ty} L${colX(t.col)} ${ty}`
+      paths.push(<path key={i} className={cls('back')} data-el={first('back') ? '3.3' : undefined} d={d} />)
     }
   })
   return (
     <svg className="edges" width={layout.w} height={layout.h}>
+      {/* 화살촉이 없으면 어느 쪽이 상위인지 그림만 보고는 못 읽는다 */}
+      <defs>
+        <marker id="ah" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 z" fill="var(--graph-edge)" />
+        </marker>
+        <marker id="ahb" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 z" fill="var(--danger)" />
+        </marker>
+        <marker id="ahr" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 z" fill="var(--ref-backlink)" />
+        </marker>
+      </defs>
       {paths}
     </svg>
   )

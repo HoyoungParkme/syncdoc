@@ -254,6 +254,7 @@ export interface GraphEdge {
 export interface Graph {
   nodes: GraphNode[]
   edges: GraphEdge[]
+  project_name: string
 }
 export interface RepoStatus {
   code: string

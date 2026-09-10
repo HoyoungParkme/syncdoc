@@ -265,6 +265,16 @@ export function DocView() {
             </div>
           )}
 
+          {/* 문서 머리 — 킥커·제목·리드. 본문(7)은 innerHTML로 갈아 끼워서 형제로 둔다 */}
+          {tab === 'user' && (
+            <div className="dochead">
+              <div className="kicker mono">
+                {doc.project_name} · {doc.stage ? `${doc.stage}단계 ${doc.doc_type}` : `단계 밖 ${doc.doc_type}`}
+              </div>
+              <h1>{view.title}</h1>
+              {view.lead && <p className="lead">{view.lead}</p>}
+            </div>
+          )}
           {tab === 'user' ? (
             <article className="main body" ref={mainRef} />
           ) : rawMode === 'text' ? (
@@ -286,6 +296,7 @@ export function DocView() {
 
           <div className="docnav" data-el="9">
             {doc.prev_doc_id ? <Link className="btn" to={`/p/${code}/d/${doc.prev_doc_id}`}>← {doc.prev_doc_id}</Link> : <span className="btn dis">←</span>}
+            <span className="grow" />
             {doc.next_doc_id ? <Link className="btn" to={`/p/${code}/d/${doc.next_doc_id}`}>{doc.next_doc_id} →</Link> : <span className="btn dis">→</span>}
           </div>
         </div>

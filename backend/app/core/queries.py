@@ -518,6 +518,7 @@ async def graph_view(code: str, scope: GraphScope = GraphScope.all) -> Graph:
                 for n in nodes.values()
             ],
             edges=out_edges,
+            project_name=project.name,
         )
 
 
