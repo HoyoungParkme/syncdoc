@@ -88,8 +88,11 @@ export function FlagView() {
           <div className="mybody body" data-el="3.3" dangerouslySetInnerHTML={{ __html: renderBlocks(f.target_body, ctx) }} />
         </section>
         <div className="acts" data-el="4">
+          {/* 규칙: 확인 버튼은 하나다. 수정 동반 여부를 사람에게 묻지 않는다 —
+              시스템이 이미 아는 것을 두 번 물으면 답이 어긋난다. 대신 어느 쪽으로 기록될지 미리 보여준다 */}
           <span className="lbl" data-el="4.2">
-            영향이 있으면 에이전트에게 수정을 시킨 뒤 돌아와 확인하세요
+            영향이 있으면 에이전트에게 수정을 시킨 뒤 돌아와 확인하세요 · 지금 누르면{' '}
+            <b>{f.target_changed_since_raise ? '수정 동반' : '수정 없음'}</b>으로 기록됩니다
           </span>
           <span className="grow" />
           <button className="btn" data-el="4.1" style={{ fontWeight: 600 }} disabled={!!f.resolved_at} onClick={resolve}>

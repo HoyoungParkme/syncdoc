@@ -1,4 +1,5 @@
 /** UI-14 관리 — SYNC-UI-002#UI-14. 저장소 동기화 상태와 인덱스 재구축. 요소 번호 = data-el.
+ *  **독립 화면이 아니라 UI-13 다이얼로그 안 관리 카드(6) 영역이다.** v1.2에서 별도 페이지를 없앴다.
  *  1 헤더 · 2 저장소 표(2.1 행, 2.2 마지막 처리 커밋, 2.3 동기화 상태) · 3 인덱스 재구축 · 4 확인(4.1 재구축, 4.2 취소) · 5 결과(5.1 집계, 5.2 규약 오류) */
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -41,11 +42,10 @@ export function Admin() {
       <span className="st rv">밀림 {r.behind_by}</span>
     )
   return (
-    <div className="page">
-      <div className="phead" data-el="1">
-        <b>관리</b> <span className="lbl">위험한 동작이 있습니다</span>
+    <div className="adminbody">
+      <div className="adminh" data-el="1">
+        <span className="lbl">위험한 동작이 있습니다</span>
       </div>
-      <div className="form">
         <table className="vers" data-el="2">
           <thead>
             <tr>
@@ -81,8 +81,9 @@ export function Admin() {
         </table>
         {confirm && (
           <>
-            <div className="backdrop" onClick={() => !busy && setConfirm(null)} />
-            <div className="dialog" data-el="4">
+            <div className="backdrop" style={{ '--depth': 1 } as React.CSSProperties} onClick={() => !busy && setConfirm(null)} />
+            {/* UI-13 위에 한 겹 더 뜬다. 열린 깊이만큼 겹침 순서를 올린다(UI-001 3.3) */}
+            <div className="dialog" data-el="4" style={{ '--depth': 1 } as React.CSSProperties}>
               <div className="dhead">{confirm} 인덱스 재구축</div>
               <div className="dbody">
                 저장소의 모든 MD를 다시 읽어 참조 관계와 버전 목록을 처음부터 만듭니다. <b>플래그·전파 결정·댓글은 건드리지 않습니다.</b> 문서가 많으면 몇 분 걸립니다.
@@ -121,7 +122,6 @@ export function Admin() {
             </div>
           </section>
         )}
-      </div>
     </div>
   )
 }

@@ -167,15 +167,49 @@ tr.prj{cursor:pointer}tr.prj:hover{background:var(--bg-subtle)}
 .legend i.sw-approved{background:var(--status-approved)}
 .legend i.sw-none{background:none;border-color:var(--border-strong)}
 .legend i.sw.flagged{background:none;border-color:var(--danger)}
-/* UI-3 · UI-13 */
-.form{max-width:640px}.form label{display:block;margin:14px 0 4px;font-weight:600;font-size:13px}
-.inp{font:inherit;font-size:13.5px;padding:6px 8px;border:1px solid var(--rule);border-radius:2px;background:#fff}.inp.wide{width:100%}
-.ferr{color:#b00;font-size:12.5px;margin-top:4px}.facts{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+/* UI-3 프로젝트 초기화 · UI-13 설정 — 둘 다 다이얼로그다 */
+.form{max-width:640px}
+.form label{display:block;margin:var(--space-14) 0 var(--space-4);font-weight:var(--w-semibold);font-size:var(--text-meta)}
+.inp{font:inherit;font-size:var(--text-meta);padding:var(--space-6) var(--space-8);
+  border:1px solid var(--border-strong);border-radius:var(--radius-control);background:var(--bg-card)}
+.inp.wide{width:100%}
+.inp:focus{outline:none;border-color:var(--ink-body)}
+.ferr{color:var(--danger);font-size:var(--text-caption);margin-top:var(--space-4)}
+.facts{display:flex;gap:var(--space-8);justify-content:flex-end;margin-top:var(--space-18)}
+/* 2.5 커밋될 것 — 등록하면 저장소에 무엇이 생기는지 */
+.willcommit{margin-top:var(--space-18);padding:var(--space-10) var(--space-12);
+  background:var(--bg-sunken);border-radius:var(--radius-control);font-size:var(--text-caption)}
+.willcommit .mono{display:block;color:var(--ink-muted);font-size:var(--text-mono-sm);margin-top:var(--space-3)}
+/* UI-13 카드 넷 */
+.setdlg .dbody{background:var(--bg-app)}
+.card{border:1px solid var(--border);border-radius:var(--radius-panel-card);background:var(--bg-card);
+  padding:var(--space-12) var(--space-14);margin-bottom:var(--space-12)}
+.card:last-child{margin-bottom:0}
+.cardh{display:flex;align-items:center;gap:var(--space-8);margin-bottom:var(--space-6);font-size:var(--text-card-title)}
+.cardh b{font-weight:var(--w-semibold)}
+.snippet{margin:var(--space-8) 0 0;padding:var(--space-10) var(--space-12);background:var(--bg-sunken);
+  border-radius:var(--radius-control);font-family:var(--font-mono);font-size:var(--text-mono-sm);
+  color:var(--ink-muted);overflow-x:auto;white-space:pre}
+/* 6 관리 영역 — UI-14가 여기 들어온다. 접힌 채로 열린다 */
+.admin{margin-top:var(--space-10);border-top:1px solid var(--divider);padding-top:var(--space-10)}
+.adminh{margin-bottom:var(--space-8)}
+.adminbody .vers{font-size:var(--text-caption)}
 .banner{margin:var(--space-10) 0;padding:var(--space-8) var(--space-12);border:1px solid var(--danger);border-radius:var(--radius-control);background:var(--danger-bg);color:var(--danger);font-size:var(--text-meta)}
 .banner.warn{border-color:var(--status-review);background:var(--caution-bg);color:var(--caution-ink)}
 .dacts{display:flex;gap:var(--space-8);justify-content:flex-end;margin-top:var(--space-14)}
-.grp{border:1px solid var(--rule);background:var(--panel);padding:12px 16px;margin:12px 0}.grp h4{margin:0 0 8px}.row{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--hair)}.row:first-of-type{border-top:none}.dimrow{opacity:.55}
-.tokbox{font-family:ui-monospace,Menlo,monospace;background:#1E2A30;color:#E8ECE8;padding:10px 12px;margin:10px 0;word-break:break-all}
+.grp{border:1px solid var(--border);border-radius:var(--radius-panel-card);background:var(--bg-card);
+  padding:var(--space-12) var(--space-16);margin:var(--space-12) 0}
+.grp h4{margin:0 0 var(--space-8);font-size:var(--text-card-title);font-weight:var(--w-semibold)}
+.row{display:flex;align-items:center;gap:var(--space-8);padding:var(--space-6) 0;border-top:1px solid var(--divider)}
+.row:first-of-type{border-top:none}
+/* 폐기된 토큰 행은 흐리게 남긴다. 지우지 않는다 */
+.dimrow{opacity:.55}
+/* 4 토큰 원문 상자 — 발급 직후에만. 서버는 해시만 저장해 다시 보여줄 수 없다 */
+.tokbox{background:var(--ink-body);color:#fff;padding:var(--space-10) var(--space-12);
+  margin:var(--space-10) 0;border-radius:var(--radius-control);font-size:var(--text-caption)}
+.tokbox .tok{font-family:var(--font-mono);font-size:var(--text-mono-id);margin:var(--space-6) 0;word-break:break-all}
+.tokbox .btn{background:none;border-color:rgba(255,255,255,.4);color:#fff}
+.tokbox .btn:hover{background:rgba(255,255,255,.1)}
 /* UI-4 프로젝트 상세 */
 /* 3 요약 수치 여섯 칸. 0이면 흐리게, 1 이상이면 경고색 */
 .stats{display:flex;flex-wrap:wrap;gap:var(--space-8);margin:var(--space-10) 0 var(--space-18)}
@@ -274,10 +308,22 @@ tr.doc td{padding-left:var(--space-18);color:var(--ink-muted)}
 .pbody textarea{margin:8px 0}
 li.ref.missing{color:#999}
 /* UI-10 내 할 일 */
-.todo .row .k{font-family:ui-monospace,Menlo,monospace;font-weight:600}.row .age{color:var(--soft);font-size:12px;white-space:nowrap}.grp h4 .cnt{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:var(--ink);color:#fff;font-size:11px;text-align:center;margin-left:6px}.grp.dim{opacity:.6}.row.link{cursor:pointer}.row.link:hover{background:#fff}
-.badge{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:#b00;color:#fff;font-size:11px;text-align:center;margin-left:4px}
+.todo .row .k{font-family:var(--font-mono);font-size:var(--text-mono-id);font-weight:var(--w-semibold)}
+.row .age{color:var(--ink-faint);font-size:var(--text-mono-sm);white-space:nowrap}
+.grp h4 .cnt{display:inline-block;min-width:18px;padding:0 var(--space-6);border-radius:var(--radius-pill);
+  background:var(--ink-body);color:#fff;font-size:var(--text-caption);text-align:center;margin-left:var(--space-6)}
+/* 담당 미지정은 마지막이고 흐리다 — 내 것이 아니지만 아무도 안 보고 있다는 표시다 */
+.grp.dim{opacity:.6}
+.row.link{cursor:pointer}.row.link:hover{background:var(--bg-subtle)}
+.badge{display:inline-block;min-width:18px;padding:0 var(--space-6);border-radius:var(--radius-pill);
+  background:var(--danger);color:#fff;font-size:var(--text-caption);text-align:center;margin-left:var(--space-4)}
 /* UI-11 플래그 처리 */
-.stack{display:flex;flex-direction:column;gap:14px}.stack section{border:1px solid var(--rule);background:#fff}.sech{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--hair);background:var(--panel);font-size:13.5px}.mybody{padding:10px 14px;font-size:13.5px}.acts{display:flex;align-items:center;gap:10px;padding:10px 0}
+.stack{display:flex;flex-direction:column;gap:var(--space-14)}
+.stack section{border:1px solid var(--border);border-radius:var(--radius-panel-card);background:var(--bg-card);overflow:hidden}
+.sech{display:flex;align-items:center;gap:var(--space-10);padding:var(--space-8) var(--space-12);
+  border-bottom:1px solid var(--divider);background:var(--bg-subtle);font-size:var(--text-meta)}
+.mybody{padding:var(--space-10) var(--space-14);font-size:var(--text-meta)}
+.acts{display:flex;align-items:center;gap:var(--space-10);padding:var(--space-10) 0}
 /* diff — 문맥 줄(ctx)은 DIFF_CONTEXT_LINES(기본 3)만큼 앞뒤로 함께 온다.
    바뀐 줄만 보면 마크다운 문단에서 무엇이 바뀐 건지 안 보인다 */
 .diffbox{font-family:var(--font-mono);font-size:var(--text-mono-sm);padding:var(--space-10) var(--space-12);

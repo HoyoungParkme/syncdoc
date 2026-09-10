@@ -1,7 +1,9 @@
 /** UI-2 프로젝트 목록 — SYNC-UI-002#UI-2. 프로젝트가 행, 11단계가 열. UC-H14 1~2, 1a·1b·3a.
  *  1 헤더(1.1 초기화) · 2 현황판(2.1 행, 2.2 단계 칸, 2.3 경고, 2.4 상위 미승인) · 3 빈 상태 · 4 범례 */
-import { Link, useNavigate, useOutletContext } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { STAGE_TYPES, type ProjectSummary } from '../api/client'
+import { ProjectInit } from './ProjectInit'
 import { Tooltip } from '../components/ui'
 
 /** 행 아래 요약과 경고 툴팁이 같은 목록을 쓴다 — 한쪽만 고쳐 어긋나는 일이 없게 */
@@ -18,6 +20,7 @@ const breakdown = (counts: Record<string, number>) =>
 export function ProjectList() {
   const { projects } = useOutletContext<{ projects: ProjectSummary[] }>()
   const nav = useNavigate()
+  const [init, setInit] = useState(false)
   return (
     <div className="page">
       <div className="phead" data-el="1">
@@ -25,9 +28,9 @@ export function ProjectList() {
           <b>프로젝트</b> <span className="lbl">{projects.length}개</span>
         </div>
         <span className="grow" />
-        <Link className="btn" data-el="1.1" to="/projects/new">
+        <button className="btn" type="button" data-el="1.1" onClick={() => setInit(true)}>
           + 프로젝트 초기화
-        </Link>
+        </button>
       </div>
       {projects.length > 0 && (
         <>
@@ -111,6 +114,8 @@ export function ProjectList() {
           등록된 프로젝트가 없습니다. 위의 프로젝트 초기화로 시작하세요.
         </div>
       )}
+      {/* 성공하면 목록에 새 행이 보여야 한다. 목록은 셸이 들고 있으므로 다시 읽는다 */}
+      {init && <ProjectInit onClose={() => setInit(false)} onDone={() => window.location.assign('/')} />}
     </div>
   )
 }

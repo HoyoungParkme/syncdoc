@@ -287,6 +287,9 @@ export interface AccessToken {
   issued_at: string
   expires_at: string | null
   revoked_at: string | null
+  /** 만료가 없어, 안 쓰는 토큰을 찾는 단서가 이것뿐이다 (UI-13 3.5) */
+  last_used_at: string | null
+  /** 원문. 발급 응답에서만 온다 — 서버는 해시만 저장한다 */
   token?: string
 }
 
