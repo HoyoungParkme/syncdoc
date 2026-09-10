@@ -920,7 +920,13 @@ status: approved
 ```html
 <div class="login" data-el="1">
   <div class="logo"><b>싱크독</b> <span class="lbl">SyncDoc</span></div>
-  <p class="lbl" data-el="1.1">같이 일하는 사람만 들어옵니다. 저장소 접근 권한이 곧 접근 권한입니다.</p>
+  <p class="lbl" data-el="1.1">개발자가 PM 없이 11단계 명세 체인을 쓰고,<br>에이전트가 그 명세를 따르게 하는 플랫폼</p>
+  <div class="chainband" data-el="1.2">
+    <span class="bar ok"></span><span class="bar ok"></span><span class="bar rv"></span><span class="bar dr"></span>
+    <span class="bar dr"></span><span class="bar rv"></span><span class="bar na"></span><span class="bar na"></span>
+    <span class="bar na"></span><span class="bar na"></span><span class="bar na"></span>
+    <div class="codes lbl">RFQ PRD SCN UC INFRA DOM UI API SEQ MS CODE</div>
+  </div>
   <span class="btn big" data-el="2">GitHub로 로그인</span>
   <p class="lbl" data-el="3">로그인 후 원래 가려던 화면으로 돌아갑니다</p>
 </div>
@@ -931,13 +937,16 @@ status: approved
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
 | 1 | 로그인 영역 | 영역 | 로고, 안내, 버튼. 상단 바 없음 | — |
-| 1.1 | 안내 | 텍스트 | 누가 들어올 수 있는지 | — |
+| 1.1 | 한 줄 설명 | 텍스트 | 이 도구가 무엇인지 | — |
+| 1.2 | 11단계 색 띠 | 그림 | 단계마다 막대 하나. 색은 그 단계의 대표 상태, 문서가 없으면 빈 테두리. 아래에 단계 코드 | — |
 | 2 | GitHub로 로그인 | 버튼 | | GitHub OAuth 동의 화면으로. 저장소 범위(`repo`)만 요청 |
 | 3 | 복귀 안내 | 텍스트 | 원래 URL이 있었으면 그리로 간다는 안내 | — |
 
 ### 규칙
 
 - 유일하게 공통 틀(상단 바)이 없는 화면
+- **색 띠(1.2)는 로그인 전에도 보인다.** 로그인해야 볼 수 있는 문서 내용은 안 쓰고 단계별 상태 색만 쓴다. 무슨 도구인지 한 눈에 보여주는 장치이지 데이터 노출이 아니다
+- 색 띠에 프로젝트가 여럿이면 가장 최근에 바뀐 프로젝트 하나를 쓴다. 프로젝트가 없으면 전부 빈 테두리
 - OAuth 성공 → 원래 가려던 URL. 없으면 UI-2
 - OAuth 토큰은 앱 비밀키로 암호화해 저장한다(인프라 5장). 이 화면은 그 사실을 보여주지 않는다
 - 등록된 저장소에 접근 권한이 없는 계정은 로그인은 되지만 프로젝트가 하나도 안 보인다
@@ -961,15 +970,15 @@ status: approved
 | 항목 | 내용 |
 |---|---|
 | 화면 설계 | [[SYNC-UI-001#UI-3]] |
-| 경로 | `/projects/new` |
+| 경로 | UI-2 위의 다이얼로그. 별도 경로 없음 |
 | 진입 | UI-2 초기화 버튼(1.1) |
 | 유스케이스 | [[SYNC-UC-001#UC-A1]] 기본 흐름 1~6, 확장 2a·2b·3a·4a (사람 경로) |
 
 ### 배치
 
 ```html
-<div class="phead" data-el="1"><b>프로젝트 초기화</b></div>
-
+<div class="dialog" data-el="1">
+<div class="dhead"><b>프로젝트 초기화</b><span class="grow"></span><span class="x" data-el="3.3">✕</span></div>
 <div class="form" data-el="2">
   <label>저장소 주소</label>
   <input class="inp wide" data-el="2.1" value="https://github.com/dfocus/airdata">
@@ -983,10 +992,18 @@ status: approved
   <label>이름</label>
   <input class="inp wide" data-el="2.3" value="에어데이터">
 
+  <div class="willcommit" data-el="2.5">
+    <b>커밋될 것</b>
+    <div class="mono">docs/specs/_templates/ · 12개</div>
+    <div class="mono">docs/specs/{01-RFQ, 02-PRD, … , 11-CODE}/</div>
+    <div class="mono">docs/specs/assets/</div>
+  </div>
+
   <div class="facts">
     <span class="btn" data-el="3.2">취소</span>
     <span class="btn" data-el="3.1" style="font-weight:600">초기화</span>
   </div>
+</div>
 </div>
 
 <div class="dialog" data-el="4">
@@ -1011,8 +1028,10 @@ status: approved
 | 2.2 | 프로젝트 코드 | 입력 | 영문 대문자 4자 이내 | — |
 | 2.3 | 이름 | 입력 | 표시 이름 | — |
 | 2.4 | 코드 오류 | 텍스트 | 초기화 시도 후 서버가 거부한 이유. 중복(UC-A1 2a) 또는 형식(2b). 시도 전엔 안 보임 | — |
+| 2.5 | 커밋될 것 | 영역 | 등록하면 저장소에 무엇이 생기는지. 빈 저장소가 아니면 안 보인다 | — |
 | 3.1 | 초기화 | 버튼 | | 서버에 요청. 결과에 따라 2.4 / 4 / 5 / UI-2 |
 | 3.2 | 취소 | 버튼 | | UI-2로 |
+| 3.3 | 닫기(✕) | 버튼 | | 3.2와 같다 |
 | 4 | 기존 명세 발견 | 다이얼로그 | 저장소에 `docs/specs/`가 이미 있을 때(UC-A1 3a). 발견된 문서 수 | — |
 | 4.1 | 가져와서 등록 | 버튼 | | UC-S6 인덱스 재구축 후 등록(3a2). UI-2로 |
 | 4.2 | 취소 | 버튼 | | 등록 안 함(3a3). 폼으로 |
