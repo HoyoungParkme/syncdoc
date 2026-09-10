@@ -80,12 +80,14 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **처리**
 1. `token = AccountService.github_token_for(author.user)` · if 실패 → `! push-failed {reason: 미등록}`
 2. `git fetch origin` · `git reset --hard origin/HEAD` — 작업 사본을 원격 최신으로 (락 안이라 안전)
+   - **원격에 커밋이 하나도 없으면 `origin/HEAD`가 없다.** 되돌아갈 곳이 없으므로 reset을 건너뛴다. 이 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3, #6)
 3. 파일 쓰기 (`path` 또는 `files`). 상위 디렉터리 없으면 생성
 4. `git add {paths}` · if `git diff --cached --quiet` (변경 없음) → `→ 현재 HEAD` (커밋 안 만듦. 같은 내용 재저장)
 5. `git -c user.name={display_name} -c user.email={login}@users.noreply.github.com commit -m {message}`
 6. `git push {url with token} HEAD:main` — 기본 브랜치는 `main` 고정(결정). 다른 브랜치 저장소는 v1에서 지원 안 함
    - if 거부(non-fast-forward, UC-S7 2a) → `git fetch` · `git rebase origin/HEAD` · if rebase 충돌 → `git rebase --abort`, `git reset --hard origin/HEAD`, `! push-failed {reason: conflict}` · else → push 재시도. **`PUSH_RETRIES`회까지**(기본 3)
    - if 다 쓰고도 실패 → `git reset --hard origin/HEAD`, `! push-failed {reason: stderr}`
+   - **빈 저장소였으면 되돌릴 원격 커밋이 없다.** reset 대신 `git update-ref -d HEAD`로 방금 만든 로컬 커밋만 푼다
 7. `→ git rev-parse HEAD`
 
 **출력** 커밋 해시
@@ -101,7 +103,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 틈에 외부 push가 끼어들 때만 난다. 한 번으로도 대부분 건지고, 셋은 여럿이 같은 저장소를 만질 때의
 대비다. **rebase 충돌은 몇 번을 해도 안 풀린다** — 에이전트가 현재 본문을 다시 읽어 합쳐야 한다.
 
-**테스트 관점** 정상 → 원격에 커밋, 반환 해시 = 원격 HEAD · 같은 내용 → 커밋 안 생김, HEAD 반환 · 원격이 앞서 있음(다른 파일) → rebase 후 성공 · 연달아 두 번 앞서도 성공(재시도 2회) · 원격이 같은 파일 수정 → conflict, 작업 사본 원상 · 토큰이 config에 안 남음 · **git 로케일이 영어가 아니어도 거부를 거부로 판정**
+**테스트 관점** 커밋이 하나도 없는 원격 → 이 커밋이 첫 커밋 · 정상 → 원격에 커밋, 반환 해시 = 원격 HEAD · 같은 내용 → 커밋 안 생김, HEAD 반환 · 원격이 앞서 있음(다른 파일) → rebase 후 성공 · 연달아 두 번 앞서도 성공(재시도 2회) · 원격이 같은 파일 수정 → conflict, 작업 사본 원상 · 토큰이 config에 안 남음 · **git 로케일이 영어가 아니어도 거부를 거부로 판정**
 
 ---
 
@@ -158,6 +160,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **시그니처** `async def exists(workdir: Path, path: str) -> bool`
 
 **처리** `git ls-tree HEAD -- {path}` 결과 유무. 작업 사본이 아니라 **커밋된 것** 기준
+
+**커밋이 하나도 없는 저장소는 `false`다.** `HEAD`가 가리키는 것이 없어 git이 실패하는데, 그것을 에러로 올리면 빈 저장소로 프로젝트를 시작하는 길이 막힌다 — 새 프로젝트를 시작하는 가장 흔한 방법이 그것이다. `HEAD` 없음만 `false`로 삼키고 다른 git 오류는 그대로 올린다
 
 ---
 

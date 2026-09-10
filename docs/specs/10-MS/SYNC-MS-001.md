@@ -48,7 +48,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2a. if `DB: repositories where remote_url 정규화 일치` → `! repository-already-registered {code: 그 프로젝트}` (UC-A1 2d). 정규화는 소문자 + 끝 `/`·`.git` 제거 — `web/routers/hooks.py`가 webhook 저장소를 찾을 때와 같은 규칙
 3. `workdir = config.REPOS_DIR / code` · if 이미 있음 → 지운다 (이전 실패 잔재)
 4. `token = AccountService.github_token_for(user)` · `git.clone(remote_url, workdir, token)` · if 실패 → workdir 삭제, `! push-failed {reason: clone}`
-5. `has = git.exists(workdir, "docs/specs")`
+5. `has = git.exists(workdir, "docs/specs")` — 커밋이 하나도 없는 빈 저장소는 `false`다([[SYNC-MS-009#git.exists]]). 9단계가 만드는 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3)
 6. if `has and not import_existing` → `n = len(git.list(workdir, "docs/specs/*/*.md"))`, workdir 삭제, `! existing-specs {doc_count: n}` (3a)
 7. **트랜잭션**: `DB: projects insert (code, name)`, `DB: repositories insert (project_id, remote_url, workdir_path, last_processed_commit=None, registered_by_user_id=user.id)` — 누가 등록했는지 기록. private 지원 때 이 사람 토큰으로 fetch한다
 8. if `has and import_existing` → `pipeline.rebuild(code)` (3a2. 락·트랜잭션은 그쪽) · `last_processed_commit`은 rebuild가 채움

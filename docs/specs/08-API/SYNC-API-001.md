@@ -36,6 +36,8 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 `application/problem+json`. 공통 필드 `type`, `title`, `status`, `detail`. 종류별 확장 필드:
 
+**표에 없는 예외도 problem+json으로 나간다.** 서버는 포괄 핸들러로 `urn:syncdoc:internal`(500)을 만든다. `detail`에는 짧은 고정 문구만 담고 예외 종류·메시지·스택은 로그로만 보낸다 — 클라이언트가 problem+json을 전제로 파싱하는데 평문 500이 나가면 오류를 읽지도 못한다.
+
 | type | status | 언제 | 확장 필드 | 유스케이스 |
 |---|---|---|---|---|
 | `urn:syncdoc:unauthorized` | 401 | 세션 없음 | — | — |
@@ -57,6 +59,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:rebuild-failed` | 500 | 재구축 중 실패, 롤백됨 | `reason` | [[SYNC-UC-001#UC-S6]] |
 | `urn:syncdoc:repository-already-registered` | 409 | 이미 등록된 저장소 | `code` (그 저장소를 쓰는 프로젝트) | [[SYNC-UC-001#UC-A1]] 2d |
 | `urn:syncdoc:not-implemented` | 501 | 카드 스텁 — 아직 구현 안 된 경로 (`import_existing` 등). 슬라이스 진행 중에만 존재 | `card` | [[SYNC-STD-004#DEV-12]] |
+| `urn:syncdoc:internal` | 500 | **예상 못 한 오류.** 위 어느 것도 아닌 예외가 라우터에서 샜다 | — | — |
 
 ---
 
