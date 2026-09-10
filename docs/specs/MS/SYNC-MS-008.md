@@ -229,7 +229,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 3. if `kind == comments` → `doc_ids = SpecService.list_by_project(project_id)의 id` → `CommentService.unresolved_in(doc_ids)` → `CommentSummary[]`
 4. if `kind == convention_errors` → `SpecService.list_by_project(project_id, has_convention_error=True)` → `DocumentSummary[]`
 5. if `kind == incomplete` → `list_by_project` 중 `incomplete_warnings` 있는 것
-6. else → `! 422 unknown kind`
+6. else → `! ValueError` — 라우터가 `kind`를 enum으로 검증해 422를 내므로 여기까지 오지 않는다. 방어용
 
 ---
 
@@ -276,7 +276,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **처리**
 1. `dec = TrackingService.get_decision(version_id)` · if 없음 → `! not-found`
 2. `version = DB: versions where id` (SpecService 경유) → `doc_id`, `version_no`, `prev_no = version_no-1`
-3. `diff = SpecService.diff(doc_id, prev_no, version_no)` · if `prev_no == 0` → `hunks` 전부 add
+3. `diff = SpecService.diff(doc_id, prev_no, version_no)`. `prev_no == 0`은 오지 않는다 — 미결정은 이전 버전이 있을 때만 생긴다(`detect_impact` 1단계)
 4. `affected = dec.affected_pks` (create_pending 때 저장한 것) → `describe_items` + 담당자 `SpecService.last_author(대상 문서)` + `caused_by_items = 어느 변경 항목의 하위인지` (참조 테이블에서)
 5. `→ DecisionDetail(version, doc_id, change_diff, affected, choice)`
 
@@ -296,7 +296,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 3. if `f.kind == needs_check and f.cause_item_pk` → `cause_doc = 원인 문서`, `cur_no = cause_doc.current_version_no` · `cause_diff = SpecService.diff(cause_doc_id, f.cause_version_no, cur_no)` · `cause_change_count = cur_no - f.cause_version_no` (UC-H11 3a 누적)
 4. if `f.kind == broken_ref` → `cause_diff=None`, `cause_deleted_at = 원인 항목의 deleted_at`
 4a. if `f.kind == upstream_impact` → `cause_diff=None` · if `f.cause_item_pk` → `cause_body = SpecService.get_item(하위 항목).body` · else → `cause_body = 하위 문서 제목 + "(문서 단위 지목)"`
-5. `target = SpecService.get_item(target_doc_id, target_item_id)` → `target_body`
+5. `target = SpecService.get_item(target_doc_id, target_item_id)` → `target_body`, `target_version_no = target.doc_version_no` (UI-11 3.2 "v7" — 문서 API를 또 부르지 않게)
 6. `target_changed_since_raise = DB: versions where document=target_doc and created_at > f.raised_at` 존재 여부 (SpecService 경유)
 7. `→ FlagDetail(…)`
 

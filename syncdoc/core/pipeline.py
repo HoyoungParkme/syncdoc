@@ -21,7 +21,6 @@ from syncdoc.core.errors import (
     ItemDeleted,
     ItemDeletionNeedsConfirm,
     NotFound,
-    NotImplementedYet,
     StatusBlocked,
     UpstreamReviewRequired,
     VersionConflict,
@@ -194,11 +193,22 @@ async def _run(
     fm, _ = parse_frontmatter(body)
     upstream_ids = re.findall(r"[\w-]+", fm.get("upstream", "").strip("[]"))
     refs.extract(document_id, version.id, body, item_pks, upstream_ids)
-    # 11. 변경 영향 (B1 스텁 → 빈 목록)
+    # 11. 변경 영향 → 전파 미결정 (UC-S3 3)
     affected = tracking.detect_impact(document_id, prev_version_id, version.id, changed_items)
-    if affected:  # B1 스텁이 빈 목록이라 안 걸린다 (CODE-001 B1 스텁 표)
-        raise NotImplementedYet("tracking.create_pending — B3")
     pending_id = None
+    if affected:
+        assert document is not None
+        ids = (
+            changed_items
+            if changed_items is not None
+            else [
+                h.item_id
+                for h in spec.diff(doc_id, document.current_version_no, version.version_no).hunks
+                if h.item_id
+            ]
+        )
+        tracking.create_pending(version.id, affected, spec.resolve_items(doc_id, ids))
+        pending_id = version.id
     # 12. 하위→상위 되먹임
     warnings = [str(w) for w in vr.warnings]
     if upstream_impact:

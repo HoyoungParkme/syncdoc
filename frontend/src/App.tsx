@@ -2,11 +2,13 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Shell } from './components/Shell'
 import { DocView } from './pages/DocView'
+import { FlagView } from './pages/FlagView'
 import { Login } from './pages/Login'
 import { ProjectDetail } from './pages/ProjectDetail'
 import { ProjectInit } from './pages/ProjectInit'
 import { ProjectList } from './pages/ProjectList'
 import { Settings } from './pages/Settings'
+import { Todo } from './pages/Todo'
 
 export default function App() {
   return (
@@ -17,6 +19,8 @@ export default function App() {
           <Route path="/" element={<ProjectList />} />
           <Route path="/projects/new" element={<ProjectInit />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/todo" element={<Todo />} />
+          <Route path="/todo/flags/:flagId" element={<FlagView />} />
           <Route path="/p/:code" element={<ProjectDetail />} />
           <Route path="/p/:code/d/:docId" element={<DocView />} />
         </Route>

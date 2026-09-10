@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from syncdoc.core.reference.models import Reference
@@ -32,6 +32,16 @@ class ReferenceRepository:
 
     def to_item(self, item_pk: int) -> list[Reference]:
         return list(self.session.scalars(select(Reference).where(Reference.to_item_id == item_pk)))
+
+    def count_to_items(self, item_pks: list[int]) -> dict[int, int]:
+        if not item_pks:
+            return {}
+        stmt = (
+            select(Reference.to_item_id, func.count())
+            .where(Reference.to_item_id.in_(item_pks))
+            .group_by(Reference.to_item_id)
+        )
+        return {pk: n for pk, n in self.session.execute(stmt)}
 
     def document_id_of(self, doc_id: str) -> int | None:
         return self.session.scalar(select(Document.id).where(Document.doc_id == doc_id))

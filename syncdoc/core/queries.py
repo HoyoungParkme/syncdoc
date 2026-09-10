@@ -1,7 +1,8 @@
 """SYNC-MS-008 — queries. 읽기 조합. 서비스는 자기 묶음만 알고 여기서 ID로 잇는다. 쓰지 않는다.
 
 B1: project_summary · document_list · document_view · item_view.
-B2: project_detail · item_references_view · upstream_checklist. 세션은 db.session_scope().
+B2: project_detail · item_references_view · upstream_checklist.
+B3: todo · decision_view · flag_view · project_items · diff_with_impact. 세션은 db.session_scope().
 """
 
 from __future__ import annotations
@@ -9,6 +10,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from syncdoc import db
+from syncdoc.core.account.models import User
 from syncdoc.core.account.service import AccountService
 from syncdoc.core.collab.service import CommentService
 from syncdoc.core.project.models import Project
@@ -18,21 +20,29 @@ from syncdoc.core.spec.service import SpecService
 from syncdoc.core.tracking.service import TrackingService
 from syncdoc.core.types import (
     STAGE_OF,
+    AffectedItem,
     ApiAuthor,
     AuthorRef,
+    DecisionDetail,
+    Diff,
     DocStatus,
     Document,
     DocumentSummary,
+    FlagDetail,
+    FlagKind,
     FlagSummary,
     ItemRef,
     ItemReferences,
     ItemView,
+    PendingDecision,
     ProjectDetail,
     ProjectSummary,
     RefEdge,
     StageSummary,
+    Todo,
     UpstreamCheck,
     UserRef,
+    Version,
 )
 
 _ORDER = {"draft": 0, "review": 1, "approved": 2}
@@ -261,3 +271,155 @@ async def upstream_checklist(doc_id: str) -> list[UpstreamCheck]:
             )
         )
         return out
+
+
+async def diff_with_impact(doc_id: str, from_no: int, to_no: int) -> Diff:
+    """SYNC-MS-008#queries.diff_with_impact"""
+    with db.session_scope() as s:
+        spec = SpecService(s)
+        d = spec.diff(doc_id, from_no, to_no)
+        ids = [h.item_id for h in d.hunks if h.item_id]
+        pks = dict(zip(ids, spec.resolve_items(doc_id, ids), strict=False))
+        by_id = {names.item_id: pk for pk, names in spec.describe_items(list(pks.values())).items()}
+        counts = ReferenceService(s).count_downstream(list(by_id.values()))
+        for h in d.hunks:
+            h.downstream_count = counts.get(by_id.get(h.item_id or ""), 0)  # 새 항목은 0
+        return d
+
+
+async def project_items(code: str, kind: str) -> list:
+    """SYNC-MS-008#queries.project_items"""
+    with db.session_scope() as s:
+        project = ProjectService(s).get(code)
+        spec = SpecService(s)
+        if kind in ("needs_check", "broken_ref", "upstream_impact"):
+            return flag_summaries(
+                s, TrackingService(s).flags_in_project(project.id, FlagKind(kind))
+            )
+        if kind == "comments":
+            ids = [d.id for d in spec.list_by_project(project.id)]
+            return CommentService(s).unresolved_in(ids)
+        if kind == "convention_errors":
+            return spec.list_by_project(project.id, has_convention_error=True)
+        if kind == "incomplete":
+            return [d for d in spec.list_by_project(project.id) if d.incomplete_warnings]
+        raise ValueError(f"unknown kind {kind}")  # 라우터가 enum으로 422를 낸다
+
+
+async def todo(user: User) -> Todo:
+    """SYNC-MS-008#queries.todo"""
+    with db.session_scope() as s:
+        spec, tracking, collab = SpecService(s), TrackingService(s), CommentService(s)
+        nc, br, ui = tracking.flags_for_assignee(user.id)
+        un = tracking.flags_unassigned()
+        summaries = {f.id: f for f in flag_summaries(s, nc + br + ui + un)}  # describe 한 번
+        pick = lambda rows: sorted((summaries[f.id] for f in rows), key=lambda f: f.raised_at)  # noqa: E731
+        mine = spec.versions_instructed_by(tracking.pending_decisions_for(user.id), user.id)
+        vb = spec.versions_by_ids(mine)
+        docs = spec.describe_documents([v.document_id for v in vb.values()])
+        pending = sorted(
+            (
+                PendingDecision(
+                    version_id=v.id,
+                    doc_id=docs[v.document_id].doc_id,
+                    version_no=v.version_no,
+                    message=v.message,
+                    affected_count=tracking.get_decision(v.id).affected_count,
+                    created_at=v.created_at,
+                )
+                for v in vb.values()
+            ),
+            key=lambda p: p.created_at,
+        )
+        errors = spec.convention_error_docs_by(user.id)
+        for d in errors:
+            d.author = _api_author(s, d.last_author)
+        comments = sorted(
+            collab.unresolved_in(spec.documents_authored_by(user.id)), key=lambda c: c.created_at
+        )
+        groups = (pick(nc), pick(br), pick(ui), pending, errors, comments)
+        return Todo(*groups, unassigned=pick(un), total=sum(len(g) for g in groups))
+
+
+async def decision_view(version_id: int) -> DecisionDetail:
+    """SYNC-MS-008#queries.decision_view"""
+    with db.session_scope() as s:
+        spec, tracking, refs = SpecService(s), TrackingService(s), ReferenceService(s)
+        dec = tracking.get_decision(version_id)
+        vb = spec.versions_by_ids([version_id])[version_id]
+        doc_id = spec.describe_documents([vb.document_id])[vb.document_id].doc_id
+        prev_no = vb.version_no - 1
+        # 미결정은 이전 버전이 있을 때만 생긴다(UC-S3 1a) — prev_no == 0은 오지 않는다
+        change_diff = spec.diff(doc_id, prev_no, vb.version_no) if prev_no else Diff(0, 1, [])
+        changed = set(dec.changed_pks)
+        names = spec.describe_items(list(dec.affected_pks) + list(changed))
+        authors: dict[str, AuthorRef | None] = {}
+        affected: list[AffectedItem] = []
+        for pk in dec.affected_pks:
+            ref = names.get(pk)
+            if ref is None:
+                continue
+            if ref.doc_id not in authors:
+                authors[ref.doc_id] = spec.get_document(ref.doc_id).last_author
+            causes = [
+                names[e.to_item_pk].item_id for e in refs.upstream(pk) if e.to_item_pk in changed
+            ]
+            affected.append(
+                AffectedItem(
+                    **vars(ref),
+                    caused_by_items=[c for c in causes if c],
+                    assignee=_user_ref(s, authors[ref.doc_id]),
+                )
+            )
+        version = Version(
+            doc_id=doc_id,
+            version_no=vb.version_no,
+            commit_hash=vb.commit_hash,
+            message=vb.message,
+            author=vb.author,  # type: ignore[arg-type]
+            created_at=vb.created_at,
+            author_view=_api_author(s, vb.author),
+        )
+        return DecisionDetail(version, doc_id, change_diff, affected, dec.choice)
+
+
+def _user_ref(s: Session, ref: AuthorRef | None) -> UserRef | None:
+    return AccountService(s).users_by_ids([ref.user_id]).get(ref.user_id) if ref else None
+
+
+async def flag_view(flag_id: int) -> FlagDetail:
+    """SYNC-MS-008#queries.flag_view"""
+    with db.session_scope() as s:
+        spec, tracking = SpecService(s), TrackingService(s)
+        f = tracking.get_flag(flag_id)
+        base = flag_summaries(s, [f])[0]
+        names = spec.describe_items(
+            [f.target_item_id] + ([f.cause_item_id] if f.cause_item_id else [])
+        )
+        cause = names.get(f.cause_item_id) if f.cause_item_id else None
+        detail = FlagDetail(**vars(base))
+        if f.kind == FlagKind.needs_check and cause and cause.doc_id and base.cause_version_no:
+            cur_no = spec.get_document(cause.doc_id).current_version_no
+            detail.cause_change_count = cur_no - base.cause_version_no
+            detail.cause_diff = (
+                spec.diff(cause.doc_id, base.cause_version_no, cur_no)
+                if cur_no != base.cause_version_no
+                else Diff(cur_no, cur_no, [])
+            )
+        elif f.kind == FlagKind.broken_ref and cause:
+            detail.cause_deleted_at = cause.deleted_at
+        elif f.kind == FlagKind.upstream_impact:
+            if cause and cause.doc_id and cause.item_id:
+                detail.cause_body = spec.get_item(cause.doc_id, cause.item_id).body
+            elif f.cause_version_id:
+                vb = spec.versions_by_ids([f.cause_version_id])[f.cause_version_id]
+                doc = spec.describe_documents([vb.document_id])[vb.document_id]
+                detail.cause_body = f"{doc.title} (문서 단위 지목)"
+        target = names[f.target_item_id]
+        assert target.doc_id and target.item_id
+        item = spec.get_item(target.doc_id, target.item_id)
+        detail.target_body, detail.target_version_no = item.body, item.doc_version_no
+        tdoc = spec.get_document(target.doc_id)
+        latest = spec.versions_by_ids([tdoc.current_version_id])[tdoc.current_version_id]  # type: ignore[index]
+        detail.target_changed_since_raise = latest.created_at > f.raised_at
+        return detail

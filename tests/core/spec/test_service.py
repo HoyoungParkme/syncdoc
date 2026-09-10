@@ -609,3 +609,74 @@ def test_recent_changes_merges_versions_and_status_commits_desc(db_session: Sess
 
 def _project_id(session: Session, code: str) -> int:
     return session.execute(text("SELECT id FROM projects WHERE code=:c"), {"c": code}).scalar_one()
+
+
+# ── diff · resolve_items ──
+def test_diff_hunks_per_item_whitespace_ignored_new_item_reverse(db_session: Session) -> None:
+    svc, a, d = _seed(db_session)
+    body2 = PRD.replace("한 줄로.", "두 줄로.")  # G1만 고침
+    svc.save(d, body2, "h2", a, "spec: v2", [])
+    df = svc.diff("EXMP-PRD-001", 1, 2)
+    assert (df.from_version, df.to_version, [h.item_id for h in df.hunks]) == (1, 2, ["G1"])
+    ops = [(ln.op, ln.text) for ln in df.hunks[0].lines if ln.op != "ctx"]
+    assert ops == [("del", "한 줄로."), ("add", "두 줄로.")]
+    assert all(h.downstream_count == 0 for h in df.hunks)  # queries가 채운다
+    # 역방향 → op 뒤집힘
+    rev = svc.diff("EXMP-PRD-001", 2, 1)
+    assert [(ln.op, ln.text) for ln in rev.hunks[0].lines if ln.op != "ctx"] == [
+        ("del", "두 줄로."),
+        ("add", "한 줄로."),
+    ]
+    # 공백만 바꿈 → hunk 없음 · 항목 추가 → 전부 add · 항목 밖 텍스트는 None 키
+    d2 = svc.get_document("EXMP-PRD-001")
+    body3 = body2.replace("두 줄로.", "두 줄로.  \n") + "\n#### N2 새 항목\n내용\n"
+    svc.save(d2, body3.replace("# 예시 제품 PRD", "# 예시 제품 PRD v3"), "h3", a, "spec: v3", [])
+    df3 = svc.diff("EXMP-PRD-001", 2, 3)
+    assert [h.item_id for h in df3.hunks] == ["N2", None]
+    assert {ln.op for ln in df3.hunks[0].lines} == {"add"}
+    assert svc.diff("EXMP-PRD-001", 3, 3).hunks == []
+    with pytest.raises(NotFound):
+        svc.diff("EXMP-PRD-001", 1, 9)
+    with pytest.raises(NotFound):
+        svc.diff("EXMP-PRD-404", 1, 2)
+    # resolve_items — IN 하나, 없는 것·삭제된 것 건너뜀
+    pks = {i.item_id: i.pk for i in svc.get_document("EXMP-PRD-001").items}
+    assert svc.resolve_items("EXMP-PRD-001", ["R1", "N2", "R9"]) == [pks["R1"], pks["N2"]]
+    db_session.execute(text("UPDATE items SET is_deleted=true WHERE item_id='N2'"))
+    assert (
+        svc.resolve_items("EXMP-PRD-001", ["N2"]) == [] and svc.resolve_items("NOPE", ["R1"]) == []
+    )
+
+
+# ── versions_instructed_by · convention_error_docs_by · documents_authored_by ──
+def test_my_versions_error_docs_and_authored_documents(db_session: Session) -> None:
+    svc = SpecService(db_session)
+    p = make_project(db_session)
+    a, b = author(db_session, "aa"), author(db_session, "bb")
+    v1 = svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ_MIN, "h0", a, "spec: 테스트")
+    v2 = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", b, "spec: 테스트")
+    d = svc.get_document("EXMP-PRD-001")
+    v3 = svc.save(d, d.body + "\n", "h2", a, "spec: v2", [])  # PRD 최근 작성자 → a
+    assert svc.versions_instructed_by([v1.id, v2.id, v3.id], a.user.id) == [v1.id, v3.id]
+    assert svc.versions_instructed_by([], a.user.id) == []
+    assert sorted(svc.documents_authored_by(a.user.id)) == sorted([v1.document_id, d.id])
+    assert svc.documents_authored_by(b.user.id) == []  # b의 PRD는 a가 덮어썼다
+    db_session.execute(
+        text("UPDATE documents SET has_convention_error=true WHERE doc_id='EXMP-PRD-001'")
+    )
+    assert [x.doc_id for x in svc.convention_error_docs_by(a.user.id)] == ["EXMP-PRD-001"]
+    assert svc.convention_error_docs_by(b.user.id) == []
+
+
+RFQ_MIN = """---
+doc_id: EXMP-RFQ-001
+type: RFQ
+title: 요청
+status: draft
+---
+
+## 1. 요구
+
+#### Q1 첫 요구
+내용
+"""

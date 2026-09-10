@@ -64,6 +64,17 @@ async def save_pipeline(...):
 - **async 함수를 하나라도 부르면 그 함수도 `async def`** — `login_github`(github), `init_project`(git), `change_status`·`revert`(pipeline), `pipeline.*`, `queries.*`, 라우터·MCP 도구 전부
 - MINISPEC 시그니처에 `async def`가 명시된다. 없으면 sync. 코드가 이걸 어기면 명세가 틀린 것 — 명세부터
 
+#### DEV-17 React는 와이어프레임을 옮긴 것
+
+함수가 MINISPEC 항목이듯, 화면은 와이어프레임 항목이다.
+
+- **화면 하나 = 컴포넌트 하나.** `UI-10` → `pages/Todo.tsx`. 경로 없이 다른 화면 위에 뜨는 다이얼로그(`UI-12`)는 `components/`에 두고 여는 화면이 부른다
+- **요소 번호 = `data-el`.** 와이어프레임 배치 HTML의 `data-el="2.1"`이 JSX의 같은 DOM 노드에 그대로. 반복 행(`2.1`, `4.1`)은 첫 행에만 — 배치 HTML과 같게
+- **요소를 컴포넌트로 쪼개지 않는다.** 하위 요소는 JSX 블록. 두 화면 이상이 같은 요소를 쓸 때만 `components/`로 빼고 `el` prop으로 자기 번호를 받는다 (`DiffBox`가 UI-11 2.3·UI-12 2.1)
+- 컴포넌트 첫 docstring에 그 화면의 요소 번호 목록 — DEV-3의 화면판
+- 화면 간 진입은 URL로 — `#item-X`(항목 선택·패널), `?panel=comments`(패널 탭). 와이어프레임 "누르면" 열이 정한다
+- 검사기 `tools/check_ui.py` — 컴포넌트의 `data-el` 집합과 UI-002 배치의 번호 집합을 대조. 사람이 확인할 때는 개발자 도구에서 `data-el`을 보고 요소 표와 대조
+
 ---
 
 ## 2. DB 물리 규칙
@@ -171,5 +182,5 @@ C  통합·배포       외부 연결 · 첫 사용
 ## 5. 미결사항
 
 - [x] MINISPEC↔코드 일치 검사기 — `tools/check_code.py`. AST로 docstring 항목 ID·시그니처 대조. `--doc`·`--items`로 범위 지정
-- [ ] React 쪽 "함수 = MINISPEC 항목" 대응 — 컴포넌트는 MINISPEC이 없다. 와이어프레임 요소 ID를 컴포넌트에 어떻게 매핑할지
+- [x] React 쪽 대응 — DEV-17. 화면 = 컴포넌트, 요소 = `data-el`. 검사기 `check_ui.py`는 B4 사전 작업
 - [ ] 슬라이스가 앞 슬라이스 코드를 고쳐야 할 때 — 앞 카드를 미완으로 되돌리나, 새 카드를 만드나

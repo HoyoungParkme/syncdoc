@@ -265,6 +265,31 @@ class ItemRef:
     raw_target: str = ""
     is_missing: bool = False
     is_deleted: bool = False
+    deleted_at: datetime | None = None  # API에 없음 — flag_view의 cause_deleted_at용(보고)
+
+
+@dataclass(frozen=True)
+class DiffLine:
+    op: str  # add | del | ctx
+    text: str
+
+
+@dataclass
+class Hunk:
+    """SYNC-API-001 Diff.hunks[]. downstream_count는 queries.diff_with_impact가 채운다."""
+
+    item_id: str | None
+    lines: list[DiffLine]
+    downstream_count: int = 0
+
+
+@dataclass
+class Diff:
+    """SYNC-API-001 Diff."""
+
+    from_version: int
+    to_version: int
+    hunks: list[Hunk]
 
 
 @dataclass
@@ -304,6 +329,53 @@ class VersionBrief:
     version_no: int
     created_at: datetime
     message: str
+    commit_hash: str = ""  # DOM-002 2.8에 없음 — decision_view의 Version용(보고)
+    author: AuthorRef | None = None
+
+
+@dataclass(frozen=True)
+class PendingDecision:
+    """SYNC-API-001 Todo.pending_decisions[]."""
+
+    version_id: int
+    doc_id: str
+    version_no: int
+    message: str
+    affected_count: int
+    created_at: datetime
+
+
+@dataclass
+class Todo:
+    """SYNC-API-001 Todo — 여섯 묶음 + 담당 미지정. total은 unassigned 제외."""
+
+    needs_check: list[FlagSummary]
+    broken_ref: list[FlagSummary]
+    upstream_impact: list[FlagSummary]
+    pending_decisions: list[PendingDecision]
+    convention_errors: list[DocumentSummary]
+    unresolved_comments: list[CommentSummary]
+    unassigned: list[FlagSummary]
+    total: int
+
+
+@dataclass
+class AffectedItem(ItemRef):
+    """SYNC-API-001 DecisionDetail.affected[] — ItemRef + 어느 변경 항목의 하위인지 + 담당."""
+
+    caused_by_items: list[str] = field(default_factory=list)
+    assignee: UserRef | None = None
+
+
+@dataclass
+class DecisionDetail:
+    """SYNC-API-001 DecisionDetail."""
+
+    version: Version
+    doc_id: str
+    change_diff: Diff
+    affected: list[AffectedItem]
+    choice: str
 
 
 @dataclass
@@ -325,7 +397,11 @@ class UpstreamCheck:
 
 @dataclass
 class FlagSummary:
-    """SYNC-API-001 FlagSummary — queries가 Flag 행에 ItemRef·UserRef를 채운 것."""
+    """SYNC-API-001 FlagSummary — Flag 행에 ItemRef·UserRef를 채운 것.
+
+    assignee_id는 API에 없다 — TrackingService.resolve가 돌려줄 때 UserRef는 입구(라우터)가
+    users_by_ids로 채운다(AuthorRef→Author와 같은 방식. tracking은 account를 못 부른다, 3.2).
+    """
 
     id: int
     kind: str
@@ -335,6 +411,32 @@ class FlagSummary:
     assignee: UserRef | None
     raised_at: datetime
     resolved_at: datetime | None
+    assignee_id: int | None = None
+
+
+@dataclass
+class FlagDetail(FlagSummary):
+    """SYNC-API-001 FlagDetail — FlagSummary + 원인 diff·내 항목 본문.
+
+    cause_deleted_at(broken_ref)·cause_body(upstream_impact)는 MS-008 flag_view 4·4a에만 있고
+    API 스키마에는 없다(보고).
+    """
+
+    cause_diff: Diff | None = None
+    cause_change_count: int = 0
+    target_body: str = ""
+    target_version_no: int = 0  # UI-11 3.2 "v7" — 문서 API를 또 부르지 않게 (MS-008 5단계)
+    target_changed_since_raise: bool = False
+    cause_deleted_at: datetime | None = None
+    cause_body: str | None = None
+
+
+@dataclass(frozen=True)
+class DecisionResult:
+    """SYNC-DOM-002 2.8 DecisionResult — record_decision."""
+
+    choice: str
+    flags_raised: int
 
 
 @dataclass

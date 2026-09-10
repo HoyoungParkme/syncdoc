@@ -7,17 +7,65 @@ from sqlalchemy.orm import Session
 
 from syncdoc.core.spec.models import Document, Item
 from syncdoc.core.spec.models import Version as VersionRow
-from syncdoc.core.tracking.models import Flag
+from syncdoc.core.tracking.models import Flag, PropagationDecision
 
 
 class TrackingRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def add(self, row: Flag) -> Flag:
+    def add(self, row: Flag | PropagationDecision) -> Flag | PropagationDecision:
         self.session.add(row)
         self.session.flush()
         return row
+
+    def flag_by_id(self, flag_id: int) -> Flag | None:
+        return self.session.get(Flag, flag_id)
+
+    def decision_by_version(self, version_id: int) -> PropagationDecision | None:
+        return self.session.scalar(
+            select(PropagationDecision).where(PropagationDecision.version_id == version_id)
+        )
+
+    def undecided_version_ids(self) -> list[int]:
+        stmt = (
+            select(PropagationDecision.version_id)
+            .where(PropagationDecision.choice == "undecided")
+            .order_by(PropagationDecision.id)
+        )
+        return list(self.session.scalars(stmt))
+
+    def has_unresolved(
+        self, kind: str, target_pk: int, cause_pk: int | None, cause_version_id: int | None
+    ) -> bool:
+        stmt = select(Flag.id).where(
+            Flag.kind == kind,
+            Flag.target_item_id == target_pk,
+            Flag.cause_item_id.is_(None) if cause_pk is None else Flag.cause_item_id == cause_pk,
+            Flag.cause_version_id.is_(None)
+            if cause_version_id is None
+            else Flag.cause_version_id == cause_version_id,
+            Flag.resolved_at.is_(None),
+        )
+        return self.session.scalar(stmt) is not None
+
+    def unresolved_by_assignee(self, user_id: int) -> list[Flag]:
+        stmt = select(Flag).where(Flag.assignee_user_id == user_id, Flag.resolved_at.is_(None))
+        return list(self.session.scalars(stmt.order_by(Flag.raised_at, Flag.id)))
+
+    def unresolved_unassigned(self) -> list[Flag]:
+        stmt = select(Flag).where(Flag.assignee_user_id.is_(None), Flag.resolved_at.is_(None))
+        return list(self.session.scalars(stmt.order_by(Flag.raised_at, Flag.id)))
+
+    def unresolved_in_project(self, project_id: int, kind: str) -> list[Flag]:
+        stmt = (
+            select(Flag)
+            .join(Item, Item.id == Flag.target_item_id)
+            .join(Document, Document.id == Item.document_id)
+            .where(Document.project_id == project_id, Flag.kind == kind, Flag.resolved_at.is_(None))
+            .order_by(Flag.raised_at, Flag.id)
+        )
+        return list(self.session.scalars(stmt))
 
     def document_id_of_item(self, item_pk: int) -> int | None:
         return self.session.scalar(select(Item.document_id).where(Item.id == item_pk))

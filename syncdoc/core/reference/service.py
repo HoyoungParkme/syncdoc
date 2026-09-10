@@ -98,6 +98,10 @@ class ReferenceService:
         """SYNC-MS-003#ReferenceService.upstream_of_document"""
         return [_edge(r) for r in self.repo.from_document(document_id, include_missing)]
 
+    def count_downstream(self, item_pks: list[int]) -> dict[int, int]:
+        """SYNC-MS-003#ReferenceService.count_downstream"""
+        return self.repo.count_to_items(item_pks)
+
     def downstream_of_document(self, document_id: int) -> list[RefEdge]:
         """SYNC-MS-003#ReferenceService.downstream_of_document"""
         return [_edge(r) for r in self.repo.to_document_only(document_id)]
