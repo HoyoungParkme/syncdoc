@@ -73,6 +73,8 @@ def markdown(rows) -> str:
         lines.append(f"**{doc_id}**")
         lines += [f"- [ ] {t}" for t in open_ones]
         lines.append("")
+    if not lines:  # 하나도 안 열려 있으면 빈 절이 아니라 그렇다고 적는다
+        return "_열린 미결이 없다. 각 문서의 미결사항 절에 결정과 함께 닫혀 있다._\n"
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -81,7 +83,7 @@ def list_lines(block: str) -> list[str]:
     keep = []
     for ln in block.splitlines():
         ln = ln.rstrip()
-        if ln.startswith("- [ ] ") or (ln.startswith("**") and ln.endswith("**")):
+        if ln.startswith("- [ ] ") or (ln.startswith("**") and ln.endswith("**")) or ln.startswith("_"):
             keep.append(ln)
     return keep
 
