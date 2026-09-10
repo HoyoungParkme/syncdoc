@@ -97,75 +97,97 @@ upstream: [SYNC-UI-001]
   <span class="btn">로그아웃</span>
 </div>
 
-<div class="docbar" data-el="1">
-  <span><b>SYNC-PRD-001</b> · <span data-el="1.1">승인</span> · <span data-el="1.2">v7</span></span>
-  <span class="tabs" data-el="2"><span class="on" data-el="2.1">유저용</span><span data-el="2.2">원본</span><span data-el="2.3">이력</span></span>
+<div class="docbar" data-el="1"><!-- 브레드크럼. 어디서 들어왔든 지금 자리를 말한다 -->
+  <span class="crumb">싱크독</span><span class="sep">›</span>
+  <span class="crumb mono">2 PRD</span><span class="sep">›</span>
+  <b class="mono">SYNC-PRD-001</b>
+  <span class="pill pill-approved" data-el="1.1">승인</span>
+  <span class="ver mono" data-el="1.2">v7</span>
   <span class="grow"></span>
   <span data-el="5" class="lbl">미해결 댓글 2</span>
   <span class="btn" data-el="3">상태 변경 ▾</span>
 </div>
 
-<!-- 유저용 탭 (기본) -->
+<!-- 3단. 화면 높이를 채우고 가운데 열만 스크롤한다. 탭을 바꿔도 이 틀은 그대로다 -->
 <div class="body3" data-el="7">
   <nav class="toc" data-el="6">
     <div class="lbl">목차</div>
-    <div>1. 목표 / 비목표</div>
-    <div>2. 요구사항</div>
-    <div class="d1">R1 원본과 뷰</div>
-    <div class="d1">R2 참조</div>
-    <div>3. 성공지표</div>
+    <div>1. 목표</div>
+    <div>2. 비목표</div>
+    <div>3. 요구사항</div>
+    <div class="d1">R1 에이전트용 원본과 사람용 뷰</div>
+    <div class="d1">R2 ID 기반 상호참조</div>
+    <div>4. 성공지표</div>
     <div class="marked" data-el="6.1">
       <div class="lbl">표시된 항목</div>
-      <div><span class="dot flag"></span> R1 <span class="lbl">확인 필요</span></div>
-      <div><span class="dot cm"></span> R2 <span class="lbl">미해결 댓글 2</span></div>
+      <div><span class="dot dot-flag"></span> R1 <span class="lbl">확인 필요</span></div>
+      <div><span class="dot dot-cm"></span> R2 <span class="lbl">미해결 댓글 2</span></div>
     </div>
   </nav>
   <div class="handle" data-el="6.2"></div>
 
-  <article class="main">
+  <div class="mainwrap"><!-- 안쪽 max-width는 세 탭이 같다 -->
+    <div class="tabs" data-el="2"><!-- 본문 폭 안, 밑줄로 구분. 원본일 때만 오른쪽에 10.3·10.4·10.2 -->
+      <span class="on" data-el="2.1">유저용</span><span data-el="2.2">원본</span><span data-el="2.3">이력</span>
+    </div>
     <div class="banner" data-el="4">⚠ 규약 오류: frontmatter.status 누락 (커밋 a1b2c3 · 김민준)</div>
     <div class="banner warn" data-el="4a">미완성: 필수 절 「성공지표」 없음 · 승인 불가</div>
-    <h2>2. 요구사항</h2>
-    <div class="item" data-el="7.1"><span class="id">#R1</span>에이전트용 원본과 사람용 뷰 <span class="flag">확인 필요</span></div>
-    <p class="line">명세는 규약이 있는 Markdown으로 작성한다. 근거: <span class="ref" data-el="7.2">[[SYNC-RFQ-001#Q03]]</span><span class="cbtn" data-el="7.4">+</span></p>
-    <p class="line">사람용 뷰는 원본에서 파생 생성한다.<span class="cbtn has">2</span></p>
-    <div class="item"><span class="id">#R2</span>ID 기반 상호참조</div>
-    <p class="line">본문에서 <span class="ref">[[SYNC-DOM-001#참조]]</span>로 참조하면 관계가 추출된다.<span class="cbtn">+</span></p>
-    <div class="diagram" data-el="7.3"><div class="img">mermaid 렌더링 결과 (브라우저)</div></div>
-    <div class="nav" data-el="9">
+
+    <div class="dochead"><!-- 킥커·제목·리드. 본문(7)은 innerHTML로 갈아 끼워서 형제로 둔다 -->
+      <div class="kicker mono">싱크독 · 2단계 PRD</div>
+      <h1>PRD — 싱크독</h1>
+      <p class="lead">바이브코딩 시대에 개발자가 PM 없이 11단계 명세 체인을 쓰고, 에이전트가 그 명세를 따르게 하는 플랫폼.</p>
+    </div>
+
+    <article class="main" data-el="7">
+      <h2>3. 요구사항</h2>
+      <div class="item" data-el="7.1"><span class="id">#R1</span>에이전트용 원본과 사람용 뷰 <span class="flag">확인 필요</span></div>
+      <p class="line">명세는 규약이 있는 Markdown으로 작성한다. 근거: <span class="ref" data-el="7.2">[[SYNC-RFQ-001#Q03]]</span><span class="cbtn" data-el="7.4">+</span></p>
+      <p class="line">사람용 뷰는 원본에서 파생 생성한다.<span class="cbtn has">2</span></p>
+      <div class="item"><span class="id">#R2</span>ID 기반 상호참조</div>
+      <p class="line">본문에서 <span class="ref">[[SYNC-DOM-001#참조]]</span>로 참조하면 관계가 추출된다.<span class="cbtn">+</span></p>
+      <div class="diagram" data-el="7.3"><div class="img">mermaid 렌더링 결과 (브라우저)</div></div>
+    </article>
+
+    <div class="docnav" data-el="9"><!-- 본문 열 안, 본문과 같은 폭 -->
       <span class="btn">← SYNC-RFQ-001</span>
       <span class="btn">SYNC-SCN-001 →</span>
     </div>
-  </article>
+  </div>
 
   <div class="handle" data-el="8.3"></div>
   <aside class="panel" data-el="8">
-    <div class="ptabs"><span class="on" data-el="8.1">참조</span><span data-el="8.2">댓글</span></div>
+    <div class="ptabs"><span class="on" data-el="8.1">참조</span><span data-el="8.2">댓글 2</span></div>
     <div class="pbody">
-      <div class="lbl">선택: <b>#R1</b></div>
-      <h4>상위 참조</h4><ul><li class="ref">SYNC-RFQ-001#Q03</li></ul>
-      <h4>하위 참조</h4><ul><li class="ref">SYNC-UC-001#UC-A6</li><li class="ref">SYNC-UC-001#UC-H2</li></ul>
-      <h4>플래그</h4><ul><li>확인 필요 · 원인 <span class="ref">SYNC-RFQ-001#Q03</span> v4 · 3일 전</li></ul>
+      <div class="lbl">선택</div>
+      <div class="selitem"><span class="idbadge">R1</span> 에이전트용 원본과 사람용 뷰</div>
+      <div class="lbl">상위 참조 (근거)</div>
+      <div class="rcard"><b class="mono">SYNC-RFQ-001#Q03</b><div class="lbl">명세를 어디에 어떤 형식으로 두나</div></div>
+      <div class="lbl">하위 참조 (파생) 2</div>
+      <div class="rcard"><b class="mono">SYNC-UC-001#UC-A6</b><div class="lbl">명세를 작성·수정한다</div></div>
+      <div class="rcard flagged"><b class="mono">SYNC-UC-001#UC-H2</b> <span class="flag">확인 필요</span><div class="lbl">문서를 읽는다</div></div>
+      <div class="lbl">플래그</div>
+      <div class="rcard flagged"><b>확인 필요</b><div class="lbl">원인 <span class="mono">SYNC-RFQ-001#Q03</span> v4 · 3일 전</div></div>
     </div>
   </aside>
 </div>
 
-<!-- 원본 탭 -->
-<div class="rawwrap" data-el="10">
-  <div class="rawbar">
-    <span class="lbl">에이전트가 읽는 원본 그대로 · 읽기 전용</span>
+<!-- 원본 탭 — 3단 틀은 그대로고 본문 열만 바뀐다 -->
+<div class="mainwrap" data-el="10">
+  <div class="tabs" data-el="2">
+    <span data-el="2.1">유저용</span><span class="on" data-el="2.2">원본</span><span data-el="2.3">이력</span>
     <span class="grow"></span>
-    <span class="radio on" data-el="10.3">원문</span><span class="radio" data-el="10.4">렌더링</span>
+    <span class="radios"><span class="radio on" data-el="10.3">원문</span><span class="radio" data-el="10.4">렌더링</span></span>
     <span class="btn" data-el="10.2">복사</span>
   </div>
   <div class="editor" data-el="10.1">
     <div class="gutter"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div>
-    <pre class="code">---
+    <pre class="mdsrc">---
 doc_id: SYNC-PRD-001
 type: PRD
 status: approved
 ---
-#### #R1 에이전트용 원본과 사람용 뷰
+#### R1 에이전트용 원본과 사람용 뷰
 명세는 규약이 있는 Markdown으로 작성한다. 근거: [[SYNC-RFQ-001#Q03]]
 사람용 뷰는 원본에서 파생 생성한다.</pre>
   </div>
@@ -192,10 +214,10 @@ status: approved
 
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
-| 1 | 문서 바 | 영역 | 문서 ID, 상태(1.1), 버전(1.2) | — |
+| 1 | 문서 바 | 영역 | 브레드크럼 `프로젝트 › 단계 › 문서 ID`, 상태(1.1), 버전(1.2). 앞 두 조각은 눌러서 되짚어 올라간다 | — |
 | 1.1 | 상태 | 뱃지 | `초안`·`검토중`·`승인`. 색으로 구분 | — |
 | 1.2 | 버전 | 텍스트 | 현재 버전 번호 | 이력(UI-7)으로 |
-| 2 | 탭 | 탭 | 유저용(기본)·원본·이력 | — |
+| 2 | 탭 | 탭 | 유저용(기본)·원본·이력. **본문 안 맨 위**, 본문과 같은 폭. 활성 탭만 굵고 아래 2px 잉크선 | — |
 | 2.1 | 유저용 | 탭 | 사람용 뷰(7) | 본문 영역을 7로 |
 | 2.2 | 원본 | 탭 | 에이전트가 읽는 MD(10) | 본문 영역을 10으로 |
 | 2.3 | 이력 | 탭 | | UI-7로 |
@@ -203,7 +225,7 @@ status: approved
 | 4 | 규약 오류 배너 | 배너 | 어긴 규약, 커밋, 작성자. 오류 없으면 안 보임. 고치려면 에이전트에게 | — |
 | 4a | 미완성 배너 | 배너 | 필수 절 누락 등 미완성 경고(STD-001 4장). 규약 오류와 색이 다르다. 저장은 됐고 승인만 막힘 | — |
 | 5 | 미해결 댓글 수 | 텍스트 | 이 문서의 미해결 댓글 개수. 0이면 안 보임 | 패널(8) 댓글 탭 |
-| 6 | 목차 | 목록 | 제목과 항목 ID. 스크롤 따라 현재 위치 표시 | 본문 해당 위치로 스크롤 |
+| 6 | 목차 | 목록 | 절 제목과 그 아래 항목. 항목은 한 칸 들여 흐리게. 각 줄은 한 줄로 자른다 | 본문 해당 위치로 스크롤 |
 | 6.1 | 표시된 항목 | 목록 | 플래그나 미해결 댓글이 붙은 항목만. 색 점 · 항목 ID · 종류. 하나도 없으면 블록 자체가 안 보인다 | 본문 해당 항목으로 스크롤하고 패널(8)을 연다 |
 | 6.2 | 사이드바 경계 | 손잡이 | 좌측 폭을 끈다. 140~400px | — |
 | 7 | 유저용 본문 | 영역 | 사람용 뷰로 렌더링된 원본. 목차·본문·패널 3단 | — |
@@ -216,10 +238,10 @@ status: approved
 | 8.1 | 참조 탭 | 패널 | 선택 항목의 상위 참조·하위 참조·플래그(원인 항목 링크, UC-H2 2c) | 참조·원인 클릭 → 7.2와 같음 |
 | 8.2 | 댓글 탭 | 패널 | 선택 줄의 스레드. 답글·해결됨 | 해결됨 → 5번 개수 줄어듦 |
 | 9 | 단계 이동 | 버튼 2개 | 이전·다음 단계 문서 ID. 없으면 비활성 | 그 문서의 UI-5 |
-| 10 | 원본 본문 | 영역 | 원본 MD 그대로. 줄 번호. 목차·패널 없음 | — |
+| 10 | 원본 본문 | 영역 | 원본 MD 그대로. 줄 번호. 3단 틀은 유저용과 같고 본문 열만 바뀐다 | — |
 | 10.1 | MD 텍스트 | 읽기 전용 텍스트 | 저장소의 파일 내용 그대로 | 선택·복사만. 편집 불가 |
 | 10.2 | 복사 | 버튼 | | 전체 원본을 클립보드로. 에이전트에게 붙여넣는 용도 |
-| 10.3 | 원문 | 라디오 | 줄번호 거터와 MD 그대로(기본) | 본문을 원문으로 |
+| 10.3 | 원문 | 라디오 | 줄번호 거터와 MD 그대로(기본). 탭 줄(2) 오른쪽에 복사(10.2)와 함께 놓인다 | 본문을 원문으로 |
 | 10.4 | 렌더링 | 라디오 | 같은 MD를 파싱해 그린 것. frontmatter는 회색 블록, 절·항목·체크박스·인라인 코드·참조를 구분해 보여준다 | 본문을 렌더링으로 |
 | 11 | 상위 대조 | 다이얼로그 | `승인`으로 갈 때만. 이 문서가 참조하는 상위 항목 전부(UC-H8 3) | — |
 | 11.1 | 상위 항목 표 | 표 | 항목·현재 버전과 상태·이 문서에서 참조한 곳 | 항목 클릭 → 새 탭으로 그 문서 UI-5 |
@@ -231,9 +253,14 @@ status: approved
 - URL로 진입 상태를 정한다 — `#item-X`는 그 항목으로 스크롤하고 선택해 참조 패널(8.1)을 연다. `?panel=comments`는 댓글 탭(8.2)을 연다. 내 할 일(UI-10) 행이 이걸로 들어온다
 
 - 유저용(2.1)이 기본. 원본(2.2)은 URL `?tab=raw`로 직접 열 수도 있다
-- 원본 탭(10)에서는 목차(6)와 패널(8)이 보이지 않는다. 원본은 항목 클릭·댓글이 없다
+- 원본 탭(10)에서도 목차(6)와 패널(8)은 그대로다. 탭을 오갈 때 3단 틀이 흔들리지 않아야 한다. 원본 본문에는 항목 클릭·댓글 버튼이 없을 뿐이다
 - **세 탭의 본문 최대 폭이 같아야 한다.** 다르면 탭을 오갈 때 가운데 정렬된 본문이 좌우로 흔들린다([[SYNC-UI-001#UI-5]] 4.1)
-- 사이드바 폭(6.2·8.3)은 사람마다 기억한다. 화면을 옮겨도 유지된다
+- 사이드바 폭(6.2·8.3)은 사람마다 기억한다. 화면을 옮겨도 유지된다. 기본 좌 186px · 우 250px, 손잡이는 폭 9px에 좌우 -4px 물림(누르기 쉬우면서 자리는 1px만 먹는다)
+- 사이드바 바탕은 `배경 보조`다. 본문 흰색과 갈라 놔야 어디가 읽는 곳인지 바로 보인다
+- **3단은 화면 높이를 채우고 가운데 열만 스크롤한다.** 목차와 패널은 각자 안에서 스크롤하고 페이지 자체는 스크롤하지 않는다([[SYNC-UI-001#4]] 앱 셸)
+- 목차 줄은 한 줄로 자르고 넘치면 말줄임한다. 항목 제목이 길어도 아래 `표시된 항목`(6.1)이 화면 밖으로 밀려나지 않아야 한다
+- 배너(4·4a)와 단계 이동(9)은 본문 열 안, 본문과 같은 폭이다. 밖에 두면 본문 왼쪽 끝과 어긋난다
+- 유저용 본문 맨 위에 **문서 머리** 세 줄을 얹는다 — 킥커(`프로젝트 · n단계 타입`, 단계 밖이면 `단계 밖 STD`) · 제목(frontmatter `title`) · 리드(원본 0장 첫 문단). 원본 탭(10)에는 없다. 원본은 파일 그대로를 보는 화면이다
 - 원문/렌더링(10.3·10.4) 선택도 기억한다. 원본을 보는 사람은 대개 같은 쪽만 본다
 - 7.1 클릭은 패널을 참조 탭으로, 7.4 클릭은 댓글 탭으로 자동 전환
 - 처음 열면 패널(8)은 참조 탭이고 "항목을 선택하세요"
@@ -283,56 +310,69 @@ status: approved
 
 ```html
 <div class="phead" data-el="1">
-  <div><b data-el="1.1">SYNC</b> <span data-el="1.2">싱크독</span></div>
-  <div class="lbl" data-el="1.3">github.com/dfocus/syncdoc</div>
+  <div>
+    <div><b class="mono" data-el="1.1">SYNC</b> <span data-el="1.2">싱크독</span></div>
+    <a class="repo mono" data-el="1.3">github.com/dfocus/syncdoc</a>
+  </div>
   <span class="grow"></span>
   <span class="btn" data-el="2.1">참조 그래프</span>
   <span class="btn" data-el="2.2">순서대로 읽기</span>
 </div>
 
-<div class="stats" data-el="3">
+<div class="stats" data-el="3"><!-- 여섯 칸. 0이면 흐리게, 1 이상이면 경고색 + 경고 테두리 -->
   <span class="stat" data-el="3.1"><b>4</b> 확인 필요</span>
   <span class="stat" data-el="3.2"><b>1</b> 끊어진 참조</span>
   <span class="stat" data-el="3.6"><b>1</b> 하위 불일치</span>
   <span class="stat" data-el="3.3"><b>2</b> 미해결 댓글</span>
   <span class="stat" data-el="3.4"><b>1</b> 규약 오류</span>
-  <span class="stat" data-el="3.5"><b>2</b> 미완성</span>
+  <span class="stat dim" data-el="3.5"><b>0</b> 미완성</span>
 </div>
 
 <div class="body2">
-  <table class="stages" data-el="4">
-    <tr class="stg" data-el="4.1"><td class="no">1</td><td>RFQ</td><td><span class="st ok">승인</span></td><td class="lbl">1개</td></tr>
-    <tr class="doc" data-el="4.2"><td></td><td colspan="3">SYNC-RFQ-001 · 승인 · v3 · 2일 전 · 박호영</td></tr>
-    <tr class="stg"><td class="no">2</td><td>PRD</td><td><span class="st ok">승인</span></td><td class="lbl">1개</td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-PRD-001 · 승인 · v7 · 1일 전 · 에이전트(박호영) <span class="flag">확인 필요 2</span> <span class="cm">댓글 2</span></td></tr>
-    <tr class="stg"><td class="no">3</td><td>사용자 시나리오</td><td><span class="st rv">검토중</span></td><td class="lbl">1개</td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-SCN-001 · 검토중 · v4 · 3시간 전 · 에이전트(김민준)</td></tr>
-    <tr class="stg"><td class="no">4</td><td>USECASE</td><td><span class="st dr">초안</span> <span class="gate" data-el="4.3">상위 미승인</span></td><td class="lbl">1개</td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-UC-001 · 초안 · v2 · 어제 · 에이전트(박호영) <span class="err">규약 오류</span></td></tr>
-    <tr class="stg"><td class="no">5</td><td>인프라</td><td><span class="st dr">초안</span></td><td class="lbl">1개</td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-INFRA-001 · 초안 · v1 · 어제</td></tr>
-    <tr class="stg"><td class="no">6</td><td>도메인·클래스·데이터</td><td><span class="st rv">검토중</span></td><td class="lbl">3개</td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-DOM-001 · 승인 · v5</td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-DOM-002 · 검토중 · v2 <span class="flag">끊어진 참조 1</span></td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-DOM-003 · 승인 · v1</td></tr>
-    <tr class="stg"><td class="no">7</td><td>화면</td><td><span class="st na">미작성</span></td><td class="lbl">—</td></tr>
-    <tr class="stg"><td class="no">8</td><td>API</td><td><span class="st na">미작성</span></td><td class="lbl">—</td></tr>
-    <tr class="stg"><td class="no">9</td><td>SEQUENCE</td><td><span class="st na">미작성</span></td><td class="lbl">—</td></tr>
-    <tr class="stg"><td class="no">10</td><td>MINISPEC</td><td><span class="st na">미작성</span></td><td class="lbl">—</td></tr>
-    <tr class="stg"><td class="no">11</td><td>CODE</td><td><span class="st na">미작성</span></td><td class="lbl">—</td></tr>
-    <tr class="stg" data-el="4.4"><td class="no">—</td><td>표준 (STD)</td><td><span class="st dr">초안</span></td><td class="lbl">3개</td></tr>
-    <tr class="doc"><td></td><td colspan="3">SYNC-STD-001 · 초안 · 명세 작성 규약</td></tr>
-  </table>
+  <div class="stages" data-el="4">
+    <div class="stgh"><!-- 머리에 미니 히트맵 11칸 — UI-2에서 본 그 프로젝트 행이 여기 다시 있다 -->
+      <b>11단계</b><span class="grow"></span>
+      <i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i>
+      <i class="sw rv"></i><i class="sw rv"></i><i class="sw rv"></i><i class="sw rv"></i><i class="sw dr"></i><i class="sw dr"></i>
+    </div>
+
+    <div class="stg" data-el="4.1">
+      <span class="no mono">1</span><span class="nm">RFQ</span>
+      <span class="st ok">승인</span><span class="grow"></span>
+      <span class="lbl">1개</span><span class="caret">▾</span>
+    </div>
+    <div class="doc" data-el="4.2">
+      <span class="mono">SYNC-RFQ-001</span><span class="dot ok"></span>
+      <span class="lbl">승인 · v3 · 2일 전 · 박호영</span>
+    </div>
+
+    <div class="stg">
+      <span class="no mono">7</span><span class="nm">화면</span>
+      <span class="st rv">검토중</span><span class="gate" data-el="4.3">상위 미승인</span>
+      <span class="grow"></span><span class="lbl">2개</span><span class="caret">▸</span>
+    </div>
+    <div class="doc">
+      <span class="mono">SYNC-UI-002</span><span class="dot rv"></span>
+      <span class="lbl">검토중 · v2 · 3시간 전 · 에이전트(김민준)</span>
+      <span class="grow"></span>
+      <span class="flag">확인 필요 2</span><span class="cm">댓글 2</span>
+    </div>
+
+    <div class="stg" data-el="4.4">
+      <span class="no mono">—</span><span class="nm">표준 (STD)</span>
+      <span class="st dr">초안</span><span class="grow"></span>
+      <span class="lbl">4개</span><span class="caret">▸</span>
+    </div>
+  </div>
 
   <aside class="panel" data-el="5">
     <div class="pbody">
       <h4>최근 변경</h4>
-      <ul class="recent">
-        <li><b>SYNC-SCN-001</b> v4 · 3시간 전 · 에이전트(김민준)<br><span class="lbl">spec: 페르소나 P2 툴 목록 갱신</span></li>
-        <li><b>SYNC-PRD-001</b> v7 · 1일 전 · 에이전트(박호영)<br><span class="lbl">spec: R10 다이어그램 렌더링으로 변경</span></li>
-        <li><b>SYNC-PRD-001</b> · 1일 전 · 박호영<br><span class="lbl">status: 검토중 → 승인</span></li>
-        <li><b>SYNC-UC-001</b> v2 · 어제 · 에이전트(박호영)<br><span class="lbl">spec: UC-H17·S5 삭제</span></li>
-      </ul>
+      <div class="rc">
+        <div><span class="mono">SYNC-SCN-001</span> <span class="mono lbl">v4</span><span class="grow"></span><span class="lbl">3시간 전</span></div>
+        <div class="msg">spec: 페르소나 P2 툴 목록 갱신</div>
+        <div class="lbl">에이전트 · 지시 김민준</div>
+      </div>
       <div class="sync lbl" data-el="7">마지막 처리 커밋 <span class="mono" data-el="7.1">eb30fd6</span><br>밀린 커밋 <span data-el="7.2">0</span></div>
     </div>
   </aside>
@@ -343,13 +383,11 @@ status: approved
   <div class="dbody">
     <ul class="chk">
       <li><b>SYNC-PRD-001#R1</b> · 원인 SYNC-RFQ-001#Q03 v4 · 3일 전 · 담당 박호영</li>
-      <li><b>SYNC-PRD-001#R9</b> · 원인 SYNC-RFQ-001#Q03 v4 · 3일 전 · 담당 박호영</li>
-      <li><b>SYNC-UC-001#UC-A6</b> · 원인 SYNC-PRD-001#R1 v7 · 1일 전 · 담당 김민준</li>
-      <li><b>SYNC-UC-001#UC-H2</b> · 원인 SYNC-PRD-001#R1 v7 · 1일 전 · 담당 미지정</li>
     </ul>
   </div>
 </div>
 ```
+
 
 ### 요소
 
@@ -380,6 +418,13 @@ status: approved
 ### 규칙
 
 - 단계 상태 색: `승인` 초록 / `검토중` 노랑 / `초안` 회색 / `미작성` 빈칸. UI-2와 같은 기준
+- **11단계 표 머리에 미니 히트맵 11칸을 둔다.** UI-2에서 본 그 프로젝트 행이 여기 다시 있다 — 목록에서 눌러 들어온 사람이 같은 그림을 찾을 수 있게. 14px 정사각형
+- 단계 행은 아코디언이고 **기본은 접힘이다.** 캐럿(`▾`/`▸`)이 접힘 상태를 말하고 행 전체가 손잡이다.
+  열두 줄이 다 펼쳐지면 화면 하나에 11단계가 안 들어와, 이 화면이 답하려는 "어디까지 왔나"를 먼저 못 본다.
+  시나리오 S-1도 "단계 행을 누르면 문서 행이 펼쳐지고"로 접힌 상태에서 출발한다
+- UI-2 칸에서 `#stage-N`으로 들어오면 **그 단계만 펼친 채로** 연다(UI-2 요소 2.2 "그 단계 위치")
+- 문서 행은 46px 들여쓰고 바탕을 한 톤 낮춘다(`#fdfdfc`). 단계 행과 같은 높이로 두면 어느 쪽이 묶음인지 안 보인다
+- 요약 수치(3)는 **17.5px 고정폭**. 0이면 흐리게(`opacity .55`), 1 이상이면 경고색 숫자에 경고 테두리
 - 4.1의 대표 상태는 그 단계 문서들 중 가장 낮은 것. 승인 2개 + 초안 1개면 `초안`
 - 4.3은 표시만 한다. 순서는 권장이지 강제가 아니다(PRD 비목표)
 - 요약 수치(3)는 프로젝트 전체이고, 내 것만 보려면 내 할 일(UI-10)
@@ -420,82 +465,72 @@ status: approved
 ### 배치
 
 ```html
-<div class="phead" data-el="1">
-  <div><b>내 할 일</b> <span class="lbl" data-el="1.1">7건 · 경과일순</span></div>
+<div class="thead" data-el="1">
+  <b>내 할 일 <span class="cnt">7</span></b>
+  <div class="lbl" data-el="1.1">7건 · 경과일순 · 알림은 없다. 이 화면이 알림이다.</div>
 </div>
 
 <div class="todo">
 
-  <section class="grp" data-el="2">
-    <h4>확인 필요 <span class="cnt">2</span></h4>
-    <div class="row" data-el="2.1">
-      <span class="k">SYNC-PRD-001#R1</span> 에이전트용 원본과 사람용 뷰
-      <span class="lbl">원인 SYNC-RFQ-001#Q03 v4</span>
-      <span class="grow"></span><span class="age">3일</span>
+  <!-- 카드 경계는 묶음이 아니라 항목에 있다. 묶음 머리는 배경 위 맨 텍스트다 -->
+  <section class="tgroup" data-el="2">
+    <h4>확인 필요 <span class="cnt">2</span><span class="rule"></span></h4>
+    <div class="tcard" data-el="2.1">
+      <div class="th"><span class="k">SYNC-PRD-001#R1</span><span class="tt">에이전트용 원본과 사람용 뷰</span><span class="grow"></span><span class="age">3일</span></div>
+      <div class="why">원인 SYNC-RFQ-001#Q03 v4</div>
     </div>
-    <div class="row">
-      <span class="k">SYNC-PRD-001#R9</span> MCP 서버
-      <span class="lbl">원인 SYNC-RFQ-001#Q03 v4</span>
-      <span class="grow"></span><span class="age">3일</span>
-    </div>
-  </section>
-
-  <section class="grp" data-el="3">
-    <h4>끊어진 참조 <span class="cnt">1</span></h4>
-    <div class="row" data-el="3.1">
-      <span class="k">SYNC-DOM-002#Version</span> Version
-      <span class="lbl">→ SYNC-DOM-001#다이어그램 (2일 전 삭제)</span>
-      <span class="grow"></span><span class="age">2일</span>
+    <div class="tcard">
+      <div class="th"><span class="k">SYNC-PRD-001#R9</span><span class="tt">MCP 서버</span><span class="grow"></span><span class="age">3일</span></div>
+      <div class="why">원인 SYNC-RFQ-001#Q03 v4</div>
     </div>
   </section>
 
-  <section class="grp" data-el="9">
-    <h4>하위 불일치 <span class="cnt">1</span></h4>
-    <div class="row" data-el="9.1">
-      <span class="k">SYNC-UC-001#UC-A6</span> 명세를 작성·수정한다
-      <span class="lbl">← SYNC-API-002#update_document 이(가) 어긋남 지목</span>
-      <span class="grow"></span><span class="age">1일</span>
+  <section class="tgroup" data-el="3">
+    <h4>끊어진 참조 <span class="cnt">1</span><span class="rule"></span></h4>
+    <div class="tcard" data-el="3.1">
+      <div class="th"><span class="k">SYNC-DOM-002#Version</span><span class="tt">Version</span><span class="grow"></span><span class="age">2일</span></div>
+      <div class="why">→ SYNC-DOM-001#다이어그램 (2일 전 삭제)</div>
     </div>
   </section>
 
-  <section class="grp" data-el="4">
-    <h4>전파 미결정 <span class="cnt">1</span></h4>
-    <div class="row" data-el="4.1">
-      <span class="k">SYNC-PRD-001</span> v7
-      <span class="lbl">spec: R10 다이어그램 렌더링으로 변경 · 하위 3건</span>
-      <span class="grow"></span><span class="age">1일</span>
+  <section class="tgroup" data-el="9">
+    <h4>하위 불일치 <span class="cnt">1</span><span class="rule"></span></h4>
+    <div class="tcard" data-el="9.1">
+      <div class="th"><span class="k">SYNC-UC-001#UC-A6</span><span class="tt">명세를 작성·수정한다</span><span class="grow"></span><span class="age">1일</span></div>
+      <div class="why">← SYNC-API-002#update_document 이(가) 어긋남 지목</div>
     </div>
   </section>
 
-  <section class="grp" data-el="5">
-    <h4>규약 오류 <span class="cnt">1</span></h4>
-    <div class="row" data-el="5.1">
-      <span class="k">SYNC-UC-001</span>
-      <span class="lbl">커밋 a1b2c3 · frontmatter.status 누락</span>
-      <span class="grow"></span><span class="age">1일</span>
+  <section class="tgroup" data-el="4">
+    <h4>전파 미결정 <span class="cnt">1</span><span class="rule"></span></h4>
+    <div class="tcard" data-el="4.1">
+      <div class="th"><span class="k">SYNC-PRD-001</span><span class="tt">v7</span><span class="grow"></span><span class="age">1일</span></div>
+      <div class="why">spec: R10 다이어그램 렌더링으로 변경 · 하위 3건</div>
     </div>
   </section>
 
-  <section class="grp" data-el="6">
-    <h4>미해결 댓글 <span class="cnt">2</span></h4>
-    <div class="row" data-el="6.1">
-      <span class="k">SYNC-PRD-001</span> 12행
-      <span class="lbl">김민준: 이 부분 에이전트가 파싱 가능한지…</span>
-      <span class="grow"></span><span class="age">2일</span>
-    </div>
-    <div class="row">
-      <span class="k">SYNC-SCN-001</span> 40행
-      <span class="lbl">김민준: P2 툴 목록에 Cursor 빠짐</span>
-      <span class="grow"></span><span class="age">3시간</span>
+  <section class="tgroup" data-el="5">
+    <h4>규약 오류 <span class="cnt">1</span><span class="rule"></span></h4>
+    <div class="tcard" data-el="5.1">
+      <div class="th"><span class="k">SYNC-SEQ-001</span><span class="tt">v3</span><span class="grow"></span><span class="age">4시간</span></div>
+      <div class="why">규약 오류 · 문서 배너에 상세</div>
     </div>
   </section>
 
-  <section class="grp dim" data-el="7">
-    <h4>담당 미지정 <span class="cnt">1</span></h4>
-    <div class="row" data-el="7.1">
-      <span class="k">SYNC-UC-001#UC-H2</span> 사람용 뷰로 읽는다
-      <span class="lbl">확인 필요 · 원인 SYNC-PRD-001#R1 v7</span>
-      <span class="grow"></span><span class="age">1일</span>
+  <section class="tgroup" data-el="6">
+    <h4>미해결 댓글 <span class="cnt">1</span><span class="rule"></span></h4>
+    <div class="tcard" data-el="6.1">
+      <div class="th"><span class="k">SYNC-PRD-001</span><span class="tt">88행</span><span class="grow"></span><span class="age">1일</span></div>
+      <div class="why">김민준: 이 문단은 UC-H2와 어긋납니다</div>
+    </div>
+  </section>
+
+  <!-- 마지막이고 흐리다. 누구 것도 아니라 모두에게 보인다 -->
+  <section class="tgroup dim" data-el="7">
+    <h4>담당 미지정 <span class="cnt">1</span><span class="rule"></span><span class="note">누구 것도 아니라 모두에게 보인다 · 배지에는 안 들어간다</span></h4>
+    <div class="tcard" data-el="7.1">
+      <div class="th"><span class="k">SYNC-MS-007#queries.todo</span><span class="tt">내 할 일 여섯 묶음</span><span class="grow"></span><span class="age">6일</span></div>
+      <div class="why">원인 SYNC-API-001#GET/api/todo v2 · 확인 필요</div>
     </div>
   </section>
 
@@ -507,10 +542,10 @@ status: approved
 
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
-| 1 | 헤더 | 영역 | 제목, 총 건수(1.1) | — |
-| 1.1 | 총 건수 | 텍스트 | 2~6·9 묶음의 합. 담당 미지정(7)은 제외. 정렬 기준은 경과일순(UC-H15 기본 흐름 2) | — |
+| 1 | 헤더 | 영역 | 제목과 총 건수(경고색). 그 아래 부제(1.1) 한 줄 | — |
+| 1.1 | 부제 | 텍스트 | `n건 · 경과일순 · 알림은 없다. 이 화면이 알림이다.` 건수는 2~6·9의 합, 담당 미지정(7)은 제외(UC-H15 기본 흐름 2) | — |
 | 2 | 확인 필요 | 묶음 | 내가 담당인 `needs_check` 플래그. 0건이면 묶음 숨김 | — |
-| 2.1 | 확인 필요 행 | 행 | 대상 항목 ID·제목, 원인 항목·버전, 경과일 | UI-11로 (UC-H15 기본 흐름 3) |
+| 2.1 | 확인 필요 카드 | 카드 | 첫 줄에 대상 항목 ID·제목과 경과일, 둘째 줄에 원인 항목·버전 | UI-11로 (UC-H15 기본 흐름 3) |
 | 3 | 끊어진 참조 | 묶음 | 내가 담당인 `broken_ref` 플래그. 0건이면 숨김 | — |
 | 3.1 | 끊어진 참조 행 | 행 | 대상 항목, 사라진 상위 항목과 삭제 시각, 경과일 | 그 문서의 UI-5 `#item-X`. 항목 선택 + 참조 패널에 플래그 정보(UC-H12 기본 흐름 1) |
 | 9 | 하위 불일치 | 묶음 | 내가 담당인 `upstream_impact` 플래그 — 내 항목이 하위와 어긋났다고 지목됨. 0건이면 숨김 | — |
@@ -533,6 +568,9 @@ status: approved
 - 담당 미지정(7)은 마지막이고 흐리게 둔다. 남의 것이 아니라 아무의 것도 아닌 것이다
 - 상단 바 배지 숫자 = 1.1 총 건수. 담당 미지정은 배지에 안 들어간다
 - 0건 묶음은 제목까지 숨긴다. 전부 0이면 빈 상태(8)만 보인다
+- **카드 경계는 묶음이 아니라 항목에 있다.** 묶음 머리는 배경 위 맨 텍스트(이름 · 건수 · 열 끝까지 가는 실선)고, 카드는 항목마다 하나다. 묶음을 통째로 카드로 두면 항목 사이 경계가 사라진다
+- 카드는 두 줄이다 — 첫 줄이 **무엇**(항목 ID · 제목 · 경과일), 둘째 줄이 **왜**(원인·지목·요약). 한 줄로 이어 붙이면 같은 정보가 행마다 다른 자리에서 끝난다
+- 목록 폭은 `940px` 가운데. 본문 폭을 다 쓰면 첫 줄 오른쪽 끝의 경과일이 너무 멀어진다
 - 처리가 끝나면(확인함, 전파 선택, 댓글 해결) 이 화면으로 돌아왔을 때 그 행이 사라진다
 
 ### 시나리오
@@ -569,11 +607,14 @@ status: approved
 ### 배치
 
 ```html
-<div class="phead" data-el="1">
+<div class="fhead" data-el="1"><!-- 두 줄. 첫 줄이 무엇, 둘째 줄이 담당·경과 -->
   <div>
-    <span class="flag">확인 필요</span>
-    <b data-el="1.1">SYNC-PRD-001#R1</b> 에이전트용 원본과 사람용 뷰
-    <span class="lbl" data-el="1.2">담당 박호영 · 3일 전 부여</span>
+    <div class="t1">
+      <span class="flag">확인 필요</span>
+      <span class="fid" data-el="1.1">SYNC-PRD-001#R1</span>
+      <span class="ftitle">에이전트용 원본과 사람용 뷰</span>
+    </div>
+    <div class="lbl" data-el="1.2">담당 박호영 · 3일 전 부여</div>
   </div>
   <span class="grow"></span>
   <span class="btn" data-el="5">← 내 할 일</span>
@@ -583,7 +624,7 @@ status: approved
 
   <section class="cause" data-el="2">
     <div class="sech">
-      <b data-el="2.1">원인: SYNC-RFQ-001#Q03</b> 두 가지 버전
+      <b>원인</b> <span class="mono" data-el="2.1">SYNC-RFQ-001#Q03</span> <span class="lbl">두 가지 버전</span>
       <span class="lbl" data-el="2.2">v4 → v6 · 그 사이 2번 바뀜</span>
       <span class="grow"></span>
       <span class="btn sm" data-el="2.4">문서에서 보기</span>
@@ -597,22 +638,23 @@ status: approved
 
   <section class="mine" data-el="3">
     <div class="sech">
-      <b data-el="3.1">내 항목: SYNC-PRD-001#R1</b>
+      <b>내 항목</b> <span class="mono" data-el="3.1">SYNC-PRD-001#R1</span>
       <span class="lbl" data-el="3.2">v7 · 플래그 부여 후 변경 없음</span>
       <span class="grow"></span>
       <span class="btn sm" data-el="3.4">문서에서 보기</span>
     </div>
-    <div class="mybody" data-el="3.3">
-      <div class="item"><span class="id">#R1</span>에이전트용 원본과 사람용 뷰</div>
-      <p>명세는 에이전트가 읽을 것을 전제로, 규약이 있는 Markdown으로 작성한다. 이 MD가 원본이자 에이전트용 산출물이다.</p>
-      <p>사람용 뷰는 원본에 그림·참조 링크·상태 표시를 더해 파생 생성한다. 근거: <span class="ref">[[SYNC-RFQ-001#Q03]]</span></p>
+    <div class="mybody">
+      <div class="mineh"><span class="idbadge">R1</span> <b>에이전트용 원본과 사람용 뷰</b></div>
+      <div class="body" data-el="3.3">
+        <p>명세는 에이전트가 읽을 것을 전제로, 규약이 있는 Markdown으로 작성한다. 이 MD가 원본이자 에이전트용 산출물이다.</p>
+        <p>사람용 뷰는 원본에 그림·참조 링크·상태 표시를 더해 파생 생성한다. 근거: <span class="ref">[[SYNC-RFQ-001#Q03]]</span></p>
+      </div>
     </div>
   </section>
 
-  <div class="acts" data-el="4">
-    <span class="lbl" data-el="4.2">영향이 있으면 에이전트에게 수정을 시킨 뒤 돌아와 확인하세요</span>
-    <span class="grow"></span>
-    <span class="btn" data-el="4.1" style="font-weight:600">확인함</span>
+  <div class="acts" data-el="4"><!-- 앞 두 카드와 같은 카드다 -->
+    <span class="lbl" data-el="4.2">영향이 있으면 에이전트에게 수정을 시킨 뒤 돌아와 확인하세요 · 지금 누르면 <b>수정 없음</b>으로 기록됩니다</span>
+    <span class="btn solid" data-el="4.1">확인함</span>
   </div>
 </div>
 ```
@@ -646,6 +688,9 @@ status: approved
 - 이 화면에는 편집이 없다. 수정은 에이전트에게 시키고(UC-A6), 돌아오면 3.2·3.3이 갱신되어 있다
 - 원인 항목 쪽이 잘못됐다고 판단하면(UC-H11 4a) 확인함을 누르지 않고 5로 나간다. 플래그는 남는다
 - 담당 미지정 플래그를 열었을 때 확인함을 누르면 확인자가 나로 기록된다
+- 본문 폭은 `880px` 가운데. 머리는 두 줄이고 둘째 줄(담당·경과)은 메타 크기다 — 한 줄로 뭉치면 메타가 제목만큼 커 보인다
+- 처리(4)도 앞 두 카드와 같은 카드다. 배경 위 맨 줄로 두면 위계가 어긋난다. 확인함(4.1)은 이 화면의 주 동작이라 채운 버튼이다
+- 내 항목 본문(3.3) 위에 항목 ID 뱃지와 제목을 얹는다. 카드 안에서 색을 쓰는 자리는 여기 하나다
 
 ### 시나리오
 
@@ -685,7 +730,7 @@ status: approved
 ### 배치
 
 ```html
-<div class="dialog wide" data-el="1">
+<div class="dialog mid" data-el="1">
   <div class="dhead">
     <span data-el="1.1">전파 선택 — SYNC-PRD-001 v7</span>
     <span class="grow"></span>
@@ -693,6 +738,8 @@ status: approved
     <span class="x" data-el="6">✕</span>
   </div>
   <div class="dbody">
+    <!-- 규칙 셋을 먼저 말한다 — 전부냐 아니냐, 닫으면 어떻게 되나 -->
+    <p class="dlead">이 버전에서 바뀐 것과 영향받는 하위 항목입니다. 전파하면 전부에 확인 필요가 붙습니다 — 일부만 고를 수 없습니다. 닫으면 미결정이 그대로 남습니다.</p>
 
     <div class="sech" data-el="2"><b>이 버전에서 바뀐 것</b> <span class="lbl">v6 → v7 · 항목 2개</span></div>
     <div class="diffbox" data-el="2.1">
@@ -703,21 +750,29 @@ status: approved
       <div class="dl add">+ 웹 문서 뷰는 유저용과 원본 두 탭을 전환해 보여준다</div>
     </div>
 
-    <div class="sech" data-el="3"><b>영향받는 하위 항목</b> <span class="lbl">3건</span></div>
-    <ul class="chk" data-el="3.1">
-      <li><b>SYNC-UC-001#UC-H2</b> 사람용 뷰로 읽는다 <span class="lbl">← #R1, #R10 · 담당 김민준</span></li>
-      <li><b>SYNC-UC-001#UC-A6</b> 명세를 작성·수정한다 <span class="lbl">← #R1 · 담당 박호영</span></li>
-      <li><b>SYNC-DOM-001#다이어그램</b> <span class="lbl">← #R10 · 담당 미지정</span></li>
-    </ul>
-
-    <div class="propacts">
-      <div class="skipbox" data-el="5">
-        <span class="btn" data-el="5.1">하위 전파 안 함</span>
-        <input class="inp" data-el="5.2" placeholder="사유 (필수) — 예: 오탈자 수정">
-      </div>
-      <span class="grow"></span>
-      <span class="btn" data-el="4" style="font-weight:600">예 — 3건에 확인 필요 붙이기</span>
+    <!-- 표다. 한 줄로 이어 붙이면 `어느 변경`과 `담당`이 행마다 다른 자리에서 끝난다 -->
+    <div class="atable" data-el="3">
+      <div class="arow ahead"><span>영향받는 하위 항목 3건</span><span>어느 변경</span><span>담당</span></div>
+      <a class="arow" data-el="3.1"><span><b class="mono">SYNC-UC-001#UC-H2</b> 사람용 뷰로 읽는다</span><span class="lbl mono">← #R1, #R10</span><span class="lbl">김민준</span></a>
+      <a class="arow"><span><b class="mono">SYNC-UC-001#UC-A6</b> 명세를 작성·수정한다</span><span class="lbl mono">← #R1</span><span class="lbl">박호영</span></a>
+      <a class="arow"><span><b class="mono">SYNC-DOM-001#다이어그램</b></span><span class="lbl mono">← #R10</span><span class="lbl">담당 미지정</span></a>
     </div>
+
+    <!-- 세 번째 선택지. 따로 상자에 담지 않으면 눈에 안 띈다 -->
+    <div class="skipbox" data-el="5">
+      <b>전파하지 않으려면</b>
+      <div class="skiprow">
+        <input class="inp wide" data-el="5.2" placeholder="사유 (필수) — 예: 오탈자 수정">
+        <span class="btn" data-el="5.1">하위 전파 안 함</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="dfoot"><!-- 본문이 길어도 결정 버튼은 늘 보인다 -->
+    <span>결정은 셋 중 하나이며 한 번 하면 바꿀 수 없다</span>
+    <span class="grow"></span>
+    <span class="btn" data-el="6">닫기 (미결정 유지)</span>
+    <span class="btn solid" data-el="4">예 — 3건에 확인 필요 붙이기</span>
   </div>
 </div>
 ```
@@ -732,12 +787,12 @@ status: approved
 | 2 | 변경 영역 | 영역 | 이 버전에서 바뀐 항목 ID 목록과 diff(UC-H10 기본 흐름 1) | — |
 | 2.1 | 변경 diff | diff | 이전 버전 → 이 버전. 항목 ID별로 묶음 | — |
 | 3 | 영향 영역 | 영역 | UC-S3이 찾은 하위 항목(UC-H10 기본 흐름 1) | — |
-| 3.1 | 하위 항목 목록 | 목록 | 항목 ID·제목, 어느 변경 항목의 하위인지, 담당자 | 항목 클릭 → 그 문서의 UI-5 (새 탭) |
+| 3.1 | 하위 항목 표 | 표 | 3열 — 항목 ID·제목 / 어느 변경 항목의 하위인지 / 담당자. 머리 행에 열 이름 | 행 클릭 → 그 문서의 UI-5 (새 탭) |
 | 4 | 예 | 버튼 | 붙을 플래그 건수를 버튼에 표시 | UC-S4 실행. 3.1 전부에 `확인 필요`. 다이얼로그 닫힘, UI-10에서 행 사라짐 |
-| 5 | 전파 안 함 영역 | 영역 | 버튼(5.1)과 사유 입력(5.2) | — |
+| 5 | 전파 안 함 영역 | 영역 | `전파하지 않으려면` 상자. 사유 입력(5.2)과 버튼(5.1). 세 번째 선택지라 따로 담는다 | — |
 | 5.1 | 하위 전파 안 함 | 버튼 | 5.2가 비어 있으면 비활성 | `skip` + 사유 기록(UC-H10 2a). 플래그 안 붙음. 닫힘 |
 | 5.2 | 사유 | 한 줄 입력 | 필수 | — |
-| 6 | 닫기 | 버튼 | | 결정 없이 닫힘. `미결정` 유지, UI-10 행 남음(UC-H10 2b) |
+| 6 | 닫기 | 버튼 | 머리의 `✕`와 발의 `닫기 (미결정 유지)` 둘 다 | 결정 없이 닫힘. `미결정` 유지, UI-10 행 남음(UC-H10 2b) |
 
 ### 규칙
 
@@ -746,6 +801,8 @@ status: approved
 - 4를 누르면 3.1의 모든 항목에 플래그가 붙는다. 일부만 고를 수 없다. 일부만 영향이 없다면 그 담당자가 UI-11에서 "수정 없음"으로 확인하면 된다
 - 하위 항목 클릭(3.1)은 새 탭으로 연다. 다이얼로그 위에서 판단 중이므로 이 화면을 떠나지 않는다
 - 저장 주체가 에이전트면 1.2에 지시자를 함께 보여준다. 이 다이얼로그는 지시자의 내 할 일에 뜬다
+- **결정 버튼은 고정 푸터에 둔다.** 본문(diff·표·사유)이 길어 다이얼로그가 통째로 스크롤되면 세 선택지가 첫 화면에서 사라진다. 머리와 발은 고정, 본문만 스크롤
+- 본문 첫 줄에 규칙을 먼저 적는다 — 전부에 붙는다는 것, 일부만 고를 수 없다는 것, 닫으면 미결정이 남는다는 것
 
 ### 시나리오
 
@@ -779,35 +836,69 @@ status: approved
 ### 배치
 
 ```html
+<!-- 문서 뷰와 같은 3단 틀. 좌: 버전, 가운데: diff, 우: 영향. 화면 높이를 채우고 가운데만 스크롤한다 -->
 <div class="docbar" data-el="1">
-  <span><b>SYNC-PRD-001</b> · 승인 · v7</span>
-  <span class="tabs"><span>유저용</span><span>원본</span><span class="on">이력</span></span>
+  <span class="crumb">싱크독</span><span class="sep">›</span>
+  <span class="crumb mono">2 PRD</span><span class="sep">›</span>
+  <b class="mono">SYNC-PRD-001</b>
+  <span class="pill pill-approved">승인</span><span class="ver mono">v7</span>
 </div>
 
-<div class="body2 hist">
-  <table class="vers" data-el="2">
-    <tr><th></th><th>버전</th><th>시각</th><th>작성</th><th>변경</th><th></th></tr>
-    <tr class="cur sel" data-el="2.1"><td><span class="ab" data-el="2.3">B</span></td><td><b>v7</b> <span class="lbl">현재</span></td><td>1일 전</td><td>에이전트<br><span class="lbl">지시 박호영</span></td><td>spec: R10 다이어그램 렌더링으로 변경</td><td></td></tr>
-    <tr><td></td><td>—</td><td>1일 전</td><td>박호영</td><td class="lbl">status: 검토중 → 승인</td><td></td></tr>
-    <tr class="sel"><td><span class="ab">A</span></td><td>v6</td><td>2일 전</td><td>에이전트<br><span class="lbl">지시 박호영</span></td><td>spec: 웹 편집 삭제</td><td><span class="btn sm" data-el="2.2">되돌리기</span></td></tr>
-    <tr><td></td><td>v5</td><td>3일 전</td><td>김민준<br><span class="lbl">GitHub push</span></td><td>spec: 비목표 표 정리</td><td><span class="btn sm">되돌리기</span></td></tr>
-    <tr><td></td><td>v4</td><td>4일 전</td><td>에이전트<br><span class="lbl">지시 김민준</span></td><td>spec: R9 MCP 토큰 조항</td><td><span class="btn sm">되돌리기</span></td></tr>
-    <tr><td></td><td>v3</td><td>5일 전</td><td>에이전트<br><span class="lbl">지시 박호영</span></td><td>spec: 초안</td><td><span class="btn sm">되돌리기</span></td></tr>
-  </table>
+<div class="body3">
+  <nav class="vlist" data-el="2">
+    <div class="lbl">버전 7</div>
 
-  <section class="diffpane" data-el="3">
-    <div class="sech"><b data-el="3.1">v6 → v7</b> <span class="lbl">항목 2개 변경 · 삭제 3줄 · 추가 4줄</span></div>
-    <div class="diffbox" data-el="3.2">
-      <div class="lbl">#R10 다이어그램 렌더링 <span class="hint" data-el="3.3">하위 참조 2건</span></div>
-      <div class="dl">- 텍스트 원본에서 사람이 보는 그림을 자동 생성한다.</div>
-      <div class="dl">- Mermaid 렌더링과 drawio 파일 생성 두 가지를 지원한다.</div>
-      <div class="dl add">+ 원본의 다이어그램 코드블록을 사람용 뷰에서 그림으로 렌더링한다.</div>
-      <div class="dl add">+ 렌더링은 브라우저가 하며 서버는 생성물을 만들지 않는다.</div>
-      <div class="lbl" style="margin-top:8px">#R1 에이전트용 원본과 사람용 뷰 <span class="hint">하위 참조 3건</span></div>
-      <div class="dl add">+ 웹 문서 뷰는 유저용과 원본 두 탭을 전환해 보여준다.</div>
-      <div class="dl add">+ 원본 탭은 읽기와 복사만 된다.</div>
+    <div class="vcard sel" data-el="2.1">
+      <div><b class="mono">v7</b> <span class="ab" data-el="2.3">B</span><span class="grow"></span><span class="lbl">1일 전</span></div>
+      <div class="msg">spec: R10 다이어그램 렌더링으로 변경</div>
+      <div class="by"><span class="lbl">에이전트 · 지시 박호영</span></div>
     </div>
+
+    <div class="vcard">
+      <div><b class="mono">status</b><span class="grow"></span><span class="lbl">1일 전</span></div>
+      <div class="msg">status: 검토중 → 승인</div>
+      <div class="by"><span class="lbl">박호영</span></div>
+    </div>
+
+    <div class="vcard sel">
+      <div><b class="mono">v6</b> <span class="ab">A</span><span class="grow"></span><span class="lbl">2일 전</span></div>
+      <div class="msg">spec: 웹 편집 삭제</div>
+      <div class="by"><span class="lbl">에이전트 · 지시 박호영</span><span class="grow"></span><span class="btn sm danger" data-el="2.2">되돌리기</span></div>
+    </div>
+
+    <p class="hint">두 개까지 고른다. 세 번째를 누르면 <b class="mono">A</b>가 밀려난다.</p>
+  </nav>
+  <div class="handle"></div>
+
+  <section class="mainwrap" data-el="3">
+    <div class="tabs"><span>유저용</span><span>원본</span><span class="on">이력</span></div>
+    <div class="drange">
+      <b class="mono" data-el="3.1">v6 → v7</b>
+      <span class="lbl">항목 2개 변경 · 삭제 3줄 · 추가 4줄</span>
+    </div>
+
+    <div class="dgroup"><!-- 항목마다 카드. 어느 항목이 바뀌었는지가 먼저 읽혀야 한다 -->
+      <div class="dhead2">
+        <span class="idbadge">R10</span><b>다이어그램 렌더링</b>
+        <span class="grow"></span>
+        <span class="hint" data-el="3.3">하위 참조 2건</span>
+      </div>
+      <div class="diffbox" data-el="3.2">
+        <div class="dl del"><span class="mk">-</span><span>텍스트 원본에서 사람이 보는 그림을 자동 생성한다.</span></div>
+        <div class="dl add"><span class="mk">+</span><span>원본의 다이어그램 코드블록을 사람용 뷰에서 그림으로 렌더링한다.</span></div>
+      </div>
+    </div>
+
+    <p class="footnote">되돌리기는 "이전 내용으로 새 버전 생성"이며 이력이 지워지지 않는다. 되돌린 결과가 현재 규약을 위반하면 거부된다.</p>
   </section>
+
+  <div class="handle"></div>
+  <aside class="vimpact" data-el="7">
+    <div class="lbl">이 변경이 닿는 곳</div>
+    <div class="icard"><b class="mono">R10</b> <span class="n">2</span><div class="lbl">다이어그램 렌더링</div></div>
+    <div class="icard"><b class="mono">R1</b> <span class="n">4</span><div class="lbl">에이전트용 원본과 사람용 뷰</div></div>
+    <p class="hint">항목 ID가 붙은 줄이 바뀌면 그 항목을 참조하는 하위 건수가 여기 나온다.</p>
+  </aside>
 </div>
 
 <div class="dialog" data-el="4">
@@ -815,12 +906,11 @@ status: approved
   <div class="dbody">
     현재 v7을 v6 내용으로 되돌립니다. 이력은 지워지지 않고 <b>v8</b>이 새로 생깁니다.
     <div class="diffbox" data-el="4.1">
-      <div class="lbl">v7 → v8 (= v6 내용)</div>
-      <div class="dl">- 원본의 다이어그램 코드블록을 사람용 뷰에서 그림으로 렌더링한다.</div>
-      <div class="dl add">+ 텍스트 원본에서 사람이 보는 그림을 자동 생성한다.</div>
+      <div class="dl del"><span class="mk">-</span><span>원본의 다이어그램 코드블록을…</span></div>
+      <div class="dl add"><span class="mk">+</span><span>텍스트 원본에서 사람이 보는 그림을…</span></div>
     </div>
-    <div class="dacts"><span class="btn" data-el="4.3">취소</span> <span class="btn" data-el="4.2" style="font-weight:600">되돌리기</span></div>
   </div>
+  <div class="dfoot"><span class="grow"></span><span class="btn" data-el="4.3">취소</span> <span class="btn solid" data-el="4.2">되돌리기</span></div>
 </div>
 
 <div class="dialog" data-el="6">
@@ -828,18 +918,20 @@ status: approved
   <div class="dbody">
     v3에는 <b>#R15</b>가 없습니다. 되돌리면 이 항목이 사라지고 하위 참조 2건에 <b>끊어진 참조</b> 플래그가 붙습니다.
     <ul class="chk"><li>SYNC-UC-001#UC-H7</li><li>SYNC-DOM-003#versions</li></ul>
-    <div class="dacts"><span class="btn" data-el="6.2">취소</span> <span class="btn" data-el="6.1" style="font-weight:600">삭제하고 되돌리기</span></div>
   </div>
+  <div class="dfoot"><span class="grow"></span><span class="btn" data-el="6.2">취소</span> <span class="btn solid" data-el="6.1">삭제하고 되돌리기</span></div>
 </div>
 ```
+
 
 ### 요소
 
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
 | 1 | 문서 바 | 영역 | UI-5와 같음. 이력 탭 활성 | 유저용·원본 → UI-5 |
-| 2 | 버전 목록 | 표 | 최신이 위. 버전 번호, 시각, 작성 주체, 커밋 메시지(UC-H6 기본 흐름 2). `status` 커밋도 행으로 |
-| 2.1 | 버전 행 | 행 | 번호, `A`/`B` 뱃지(고른 두 개), 시각, 작성(사람/에이전트+지시자/GitHub push), 변경 요약 | 고르면 diff 대상. 두 개까지 |
+| 2 | 버전 목록 | 목록 | **좌측 사이드바의 카드 목록.** 최신이 위. 버전 번호, 시각, 작성 주체, 커밋 메시지(UC-H6 기본 흐름 2). `status` 커밋도 카드로 |
+| 2.1 | 버전 카드 | 카드 | 번호, `A`/`B` 뱃지(고른 두 개), 시각, 작성(사람/에이전트+지시자/GitHub push), 변경 요약, 되돌리기 | 고르면 diff 대상. 두 개까지 |
+| 7 | 이 변경이 닿는 곳 | 패널 | 우측. 바뀐 항목마다 하위 참조 건수 카드. 이 변경이 저장 전에 어디까지 번지는지 | 항목 클릭 → 3.3과 같음 |
 | 2.3 | A·B 뱃지 | 뱃지 | 고른 두 버전 중 어느 쪽이 이전(`A`)이고 어느 쪽이 현재(`B`)인지 | — |
 | 2.2 | 되돌리기 | 버튼 | 현재 버전과 `status` 행 제외한 행마다 | 되돌리기 확인(4) 열림(UC-H7 기본 흐름 1~2) |
 | 3 | diff 영역 | 영역 | 선택한 두 버전의 줄 단위 diff(UC-H6 기본 흐름 3). 기본은 현재 ↔ 직전 | — |
@@ -857,7 +949,9 @@ status: approved
 ### 규칙
 
 - **두 개까지 고른다. 세 번째를 고르면 `A`가 밀려난다.** 늘 뒤쪽이 `B`(현재), 앞쪽이 `A`(이전)다 — 순서를 사람이 신경 쓰지 않아도 되게
-- 고른 행은 테두리와 배경으로 구분한다. 뱃지(2.3)가 어느 쪽이 A인지 말해 준다
+- 고른 카드는 잉크색 1.5px 테두리와 주의 배경으로 구분한다. 뱃지(2.3)가 어느 쪽이 A인지 말해 준다
+- **UI-5와 같은 3단 틀을 쓴다.** 좌측 사이드바·본문·우측 패널의 폭과 손잡이가 같다 — 탭으로 오갈 때 틀이 바뀌면 같은 문서를 보고 있다는 감각이 끊긴다
+- diff는 **항목마다 카드**다. 머리에 항목 ID 뱃지·제목·하위 참조 건수를 놓는다 — 어느 항목이 바뀌었는지가 줄보다 먼저 읽혀야 한다
 - 버전이 하나뿐이면 diff 영역(3)에 비교 대신 전체 본문(UC-H6 3b)
 - `status` 커밋 행과 현재 버전은 되돌리기(2.2)가 없다. `status`는 본문이 같고, 현재 버전은 되돌릴 것이 없다. diff 대상으로는 고를 수 있다
 - 되돌리기(4.2)는 UC-A6과 같은 파이프라인을 탄다. 규약 검사·참조 추출·변경 영향 감지가 전부 돈다. 되돌린 결과가 현재 규약을 위반하면 거부된다(UC-H7 4a)
@@ -900,44 +994,53 @@ status: approved
 ### 배치
 
 ```html
+<!-- 표가 아니라 격자다. 칸이 열 폭을 꽉 채우는 막대여야 색 띠로 읽힌다 -->
 <div class="phead" data-el="1">
-  <div><b>프로젝트</b> <span class="lbl">3개</span></div>
+  <div><b>프로젝트</b> <span class="lbl">4개</span></div>
   <span class="grow"></span>
-  <span class="btn" data-el="1.1">+ 프로젝트 초기화</span>
+  <span class="btn solid" data-el="1.1">+ 프로젝트 초기화</span>
 </div>
 
-<table class="grid" data-el="2">
-  <tr class="hd">
-    <th></th><th>프로젝트</th>
-    <th>RFQ</th><th>PRD</th><th>SCN</th><th>UC</th><th>INFRA</th><th>DOM</th><th>UI</th><th>API</th><th>SEQ</th><th>MS</th><th>CODE</th>
-  </tr>
-  <tr class="prj" data-el="2.1">
-    <td><span class="warn" data-el="2.3">⚠</span></td>
-    <td><b>SYNC</b> 싱크독<br><span class="lbl">확인 필요 4 · 규약 오류 1</span></td>
-    <td><span class="cell ok" data-el="2.2">1</span></td><td><span class="cell ok">1</span></td><td><span class="cell rv">1</span></td>
-    <td><span class="cell dr">1 <i data-el="2.4">▲</i></span></td><td><span class="cell dr">1</span></td><td><span class="cell rv">3</span></td>
-    <td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td>
-  </tr>
-  <tr class="prj">
-    <td></td>
-    <td><b>DBA</b> DBA AX전환</td>
-    <td><span class="cell ok">1</span></td><td><span class="cell rv">1</span></td><td><span class="cell rv">1</span></td>
-    <td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td>
-    <td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td>
-  </tr>
-  <tr class="prj">
-    <td></td>
-    <td><b>AIRD</b> 에어데이터</td>
-    <td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td>
-    <td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td>
-    <td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td><td><span class="cell na"></span></td>
-  </tr>
-</table>
+<div class="heat" data-el="2"><!-- grid-template-columns: 20px 196px repeat(11,1fr) · gap 4px -->
+  <div class="hrow head">
+    <span></span><span></span>
+    <span>1 RFQ</span><span>2 PRD</span><span>3 SCN</span><span>4 UC</span><span>5 INFRA</span><span>6 DOM</span>
+    <span>7 UI</span><span>8 API</span><span>9 SEQ</span><span>10 MS</span><span>11 CODE</span>
+  </div>
+
+  <div class="hrow" data-el="2.1">
+    <span class="warn" data-el="2.3">⚠</span>
+    <span class="pname">
+      <span><b class="mono">SYNC</b> 싱크독</span>
+      <span class="sub"><b class="work">처리할 것 9</b> · 21문서 · 12분 전</span>
+    </span>
+    <span class="cell ok" data-el="2.2">1</span>
+    <span class="cell ok flagged">1</span>
+    <span class="cell ok">1</span>
+    <span class="cell ok">1</span>
+    <span class="cell ok">1</span>
+    <span class="cell rv flagged">3</span>
+    <span class="cell rv">2 <i data-el="2.4">▲</i></span>
+    <span class="cell rv flagged">2 <i>▲</i></span>
+    <span class="cell rv">1 <i>▲</i></span>
+    <span class="cell dr">3 <i>▲</i></span>
+    <span class="cell dr">1 <i>▲</i></span>
+  </div>
+
+  <div class="hrow">
+    <span></span>
+    <span class="pname"><span><b class="mono">RHYM</b> 리듬핏</span><span class="sub">1문서 · 어제</span></span>
+    <span class="cell rv">1</span>
+    <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
+    <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
+    <span class="cell na"></span><span class="cell na"></span>
+  </div>
+</div>
 
 <div class="legend lbl" data-el="4">
-  <span><i class="sw ok"></i> 승인</span> <span><i class="sw rv"></i> 검토중</span>
-  <span><i class="sw dr"></i> 초안</span> <span><i class="sw na"></i> 미작성</span>
-  <span>⚠ 플래그·규약 오류 있음</span> <span>▲ 상위 미승인 (막지는 않는다)</span>
+  <span><i class="sw dr"></i> 초안</span> <span><i class="sw rv"></i> 검토중</span>
+  <span><i class="sw ok"></i> 승인</span> <span><i class="sw na"></i> 미작성</span>
+  <span class="warn">⚠ 플래그·규약 오류 있음</span> <span class="warn">▲ 상위 미승인 (막지는 않는다)</span>
 </div>
 
 <div class="empty" data-el="3">등록된 프로젝트가 없습니다. 위의 프로젝트 초기화로 시작하세요.</div>
@@ -959,7 +1062,9 @@ status: approved
 
 ### 규칙
 
-- 열 순서는 11단계 순서. 열 이름은 PRD ID 체계의 타입 코드
+- **표가 아니라 격자다.** `20px 196px repeat(11,1fr)` · `gap 4px` · 행 `padding 10px 14px`. 칸은 높이 22px에 `border-radius 3px`이고 **열 폭을 꽉 채운다** — 작은 칩으로 그리면 색이 띠로 안 읽히고 히트맵이 아니게 된다
+- 열 이름은 `1 RFQ` … `11 CODE`. 단계 번호를 붙여 순서가 보이게 한다. 11px 고정폭, 머리 행 배경 `배경 보조`
+- 프로젝트 칸(196px)은 두 줄이다 — 첫 줄 `코드`(고정폭 13px/600) + `이름`(15.5px), 둘째 줄 `처리할 것 N`(있을 때만 경고색 600) · `N문서 · 갱신 시각`(12.5px 보조)
 - 칸 색: `승인` 초록 / `검토중` 노랑 / `초안` 회색 / `미작성` 빈칸. UI-4와 같은 기준
 - 2.3 경고는 종류를 구분하지 않고 하나로. 종류별 건수는 **툴팁**과 2.1 행 아래 요약과 UI-4에서
 - 칸(2.2)에 플래그가 있으면 경고색 테두리를 두른다. 색은 상태, 테두리는 플래그 — 두 정보가 한 칸에 겹치지 않게
@@ -996,11 +1101,12 @@ status: approved
 ### 배치
 
 ```html
+<!-- 카드가 없다. 앱 배경 위에 그대로 놓고 화면 세로 가운데에 둔다 -->
 <div class="login" data-el="1">
-  <div class="logo"><b>싱크독</b> <span class="lbl">SyncDoc</span></div>
+  <div class="logo"><b>싱크독</b> <span class="mono">SyncDoc</span></div>
   <p class="lbl" data-el="1.1">개발자가 PM 없이 11단계 명세 체인을 쓰고,<br>에이전트가 그 명세를 따르게 하는 플랫폼</p>
-  <span class="btn big" data-el="2">GitHub로 로그인</span>
-  <p class="lbl" data-el="3">로그인 후 원래 가려던 화면으로 돌아갑니다</p>
+  <a class="btn solid big" data-el="2">GitHub로 로그인</a>
+  <p class="cap" data-el="3">로그인 후 원래 가려던 화면으로 돌아갑니다</p>
 </div>
 ```
 
@@ -1017,6 +1123,9 @@ status: approved
 
 - 유일하게 공통 틀(상단 바)이 없는 화면
 - **이 화면은 서버에서 아무것도 안 읽는다.** v1.2에 11단계 색 띠를 뒀다가 뺐다 — 아래 참고
+- **카드에 담지 않는다.** 앱 배경 위에 로고·설명·버튼만 놓고 화면 세로 가운데에 둔다. 흰 판을 깔면 배경과 카드가 한 겹 더 갈리면서 로그인 폼이 '입력할 것이 많은 화면'처럼 보인다 — 여기서 할 일은 버튼 하나다
+- **버튼은 콘텐츠 폭을 채우는 검정 채움이다.** 이 화면에서 유일한 동작이므로 유일한 강조여야 한다. 테두리만 있는 버튼으로 두면 배경과 대비가 없어 어디를 눌러야 할지 눈이 먼저 못 찾는다
+- 복귀 안내(3)는 버튼보다 한 단계 낮은 캡션이다. 누를 것이 아니라 알림이다
 - OAuth 성공 → 원래 가려던 URL. 없으면 UI-2
 - OAuth 토큰은 앱 비밀키로 암호화해 저장한다(인프라 5장). 이 화면은 그 사실을 보여주지 않는다
 - 등록된 저장소에 접근 권한이 없는 계정은 로그인은 되지만 프로젝트가 하나도 안 보인다
@@ -1047,32 +1156,34 @@ status: approved
 ### 배치
 
 ```html
-<div class="dialog" data-el="1">
+<div class="dialog narrow" data-el="1"><!-- 폭 560. 입력 셋이라 넓힐 이유가 없다 -->
 <div class="dhead"><b>프로젝트 초기화</b><span class="grow"></span><span class="x" data-el="3.3">✕</span></div>
-<div class="form" data-el="2">
-  <label>저장소 주소</label>
-  <input class="inp wide" data-el="2.1" value="https://github.com/dfocus/airdata">
-  <div class="lbl">싱크독이 이 저장소에 쓰기 권한이 있어야 합니다</div>
+<div class="dbody">
+  <div class="form" data-el="2"><!-- 입력 넷을 한 상자로 묶는다 -->
+    <label>저장소 주소</label>
+    <input class="inp wide mono" data-el="2.1" placeholder="https://github.com/owner/repo">
+    <div class="lbl">싱크독이 이 저장소에 쓰기 권한이 있어야 합니다</div>
 
-  <label>프로젝트 코드</label>
-  <input class="inp" data-el="2.2" value="AIRD" style="width:100px">
-  <div class="lbl">영문 대문자 4자 이내. 문서 ID 앞부분이 됩니다 — 예: AIRD-PRD-001</div>
-  <div class="ferr" data-el="2.4">이미 쓰이는 코드입니다</div>
+    <label>프로젝트 코드</label>
+    <input class="inp mono" data-el="2.2" placeholder="AIRD" style="width:140px">
+    <div class="lbl">영문 대문자 4자 이내. 문서 ID 앞부분이 됩니다 — 예: <code>AIRD-PRD-001</code></div>
+    <div class="ferr" data-el="2.4">이미 쓰이는 코드입니다</div>
 
-  <label>이름</label>
-  <input class="inp wide" data-el="2.3" value="에어데이터">
+    <label>이름</label>
+    <input class="inp wide" data-el="2.3" placeholder="에어데이터">
 
-  <div class="willcommit" data-el="2.5">
-    <b>커밋될 것</b>
-    <div class="mono">docs/specs/_templates/ · 12개</div>
-    <div class="mono">docs/specs/{01-RFQ, 02-PRD, … , 11-CODE}/</div>
-    <div class="mono">docs/specs/assets/</div>
+    <div class="willcommit" data-el="2.5">
+      <b>커밋될 것</b>
+      <div class="mono">docs/specs/_templates/ · 12개</div>
+      <div class="mono">docs/specs/{01-RFQ, 02-PRD, … , 11-CODE}/</div>
+      <div class="mono">docs/specs/assets/</div>
+    </div>
   </div>
-
-  <div class="facts">
-    <span class="btn" data-el="3.2">취소</span>
-    <span class="btn" data-el="3.1" style="font-weight:600">초기화</span>
-  </div>
+</div>
+<div class="dfoot">
+  <span class="grow"></span>
+  <span class="btn" data-el="3.2">취소</span>
+  <span class="btn solid" data-el="3.1">초기화</span>
 </div>
 </div>
 
@@ -1092,7 +1203,7 @@ status: approved
 
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
-| 1 | 헤더 | 영역 | 제목 | — |
+| 1 | 헤더 | 영역 | 브레드크럼(`프로젝트 › 참조 그래프`)과 제목. 통계(1.1)는 오른쪽 끝 | 브레드크럼 첫 조각 → UI-4 |
 | 2 | 입력 폼 | 영역 | 세 입력(UC-A1 기본 흐름 1) | — |
 | 2.1 | 저장소 주소 | 입력 | GitHub 저장소 URL | — |
 | 2.2 | 프로젝트 코드 | 입력 | 영문 대문자 4자 이내 | — |
@@ -1110,6 +1221,11 @@ status: approved
 ### 규칙
 
 - 화면은 검사하지 않는다. 초기화(3.1)를 누르면 서버가 코드 형식·중복 → 저장소 접근 → `docs/specs/` 존재 순으로 판정한다
+- **다이얼로그 폭은 560px.** 입력이 셋이라 넓힐 이유가 없다. 넓히면 입력창만 길어지고 폼이 헐거워진다
+- **입력 넷을 테두리 상자 하나로 묶는다.** 머리·폼·발 세 층으로 읽혀야 어디까지가 채울 곳인지 보인다
+- **초기화(3.1)가 주 동작이다.** 검정 채움. 취소와 같은 모양이면 어느 쪽이 진행인지 눈이 못 고른다
+- 식별자를 넣는 칸은 고정폭이다 — 저장소 주소(2.1)와 프로젝트 코드(2.2). 힌트의 예시 문서 ID도 같다
+- 입력 셋에 예시를 placeholder로 둔다. 무엇을 넣는 칸인지 라벨만으로는 모자란다
 - 성공하면 UI-2로 가고 새 프로젝트 행이 11단계 전부 `미작성`으로 보인다
 - MCP로도 같은 일을 할 수 있다(UC-A1 주 액터 에이전트). 이 화면은 MCP 연결 전에 시작하기 위한 입구
 
@@ -1144,7 +1260,12 @@ status: approved
 
 ```html
 <div class="phead" data-el="1">
-  <div><b>참조 그래프</b> <span class="lbl" data-el="1.1">SYNC · 문서 21 · 항목 339 · 참조 949</span></div>
+  <div>
+    <div class="crumbs"><a href="/p/SYNC">싱크독</a><span class="sep">›</span><span>참조 그래프</span></div>
+    <b>참조 그래프</b>
+  </div>
+  <span class="grow"></span>
+  <span class="lbl" data-el="1.1">SYNC · 문서 21 · 항목 339 · 참조 949</span>
 </div>
 
 <div class="gcard">
@@ -1161,9 +1282,9 @@ status: approved
 
   <div class="canvas" data-el="3">
     <div class="colh">1 RFQ</div><div class="colh">2 PRD</div><div class="colh">3 SCN</div><div class="colh">…</div>
-    <div class="node" data-el="3.1">RFQ-001#Q1</div>
-    <div class="node flag">PRD-001#R1 ▲</div>
-    <div class="node iso" data-el="3.5">◌ PRD-001#R11</div>
+    <div class="node" data-el="3.1"><span class="nlabel">RFQ-001#Q1</span></div>
+    <div class="node flag"><span class="nlabel">PRD-001#R1</span><span class="nflag">▲</span></div>
+    <div class="node iso" data-el="3.5"><span class="nlabel">◌ PRD-001#R11</span></div>
     <svg class="edges">
       <path class="e" data-el="3.2"></path>
       <path class="e back" data-el="3.3"></path>
@@ -1171,10 +1292,11 @@ status: approved
     </svg>
   </div>
 
-  <div class="legend lbl" data-el="4">
+  <div class="glegend lbl" data-el="4">
     <span>노드 = 항목 · 열 = 11단계</span> <span>─ 참조 (하위 → 상위)</span>
-    <span>┈ 되돌아오는 참조</span> <span>┈ 미존재 참조</span> <span>◌ 고립</span>
-    <span>노드를 누르면 11단계 흐름</span>
+    <span class="back">┈ 되돌아오는 참조</span> <span class="gone">┈ 미존재 참조</span> <span>◌ 고립 (참조 없음)</span>
+    <span class="grow"></span>
+    <span>노드에 마우스를 올리면 그 항목의 참조만 남는다 · 클릭 → 11단계 흐름</span>
   </div>
 </div>
 ```
@@ -1192,12 +1314,12 @@ status: approved
 | 2.4 | 포커스 라벨 | 텍스트 | 노드에 올리기 전에는 안내. 올리면 `문서#항목 — 상위 n · 하위 m` | — |
 | 2.5 | 전체보기 | 버튼 | | 상단 바까지 숨기고 화면 전체를 캔버스로. 다시 누르면 복귀 |
 | 3 | 캔버스 | 영역 | 열 = 11단계, 노드 = 항목. 안에서 스크롤 | — |
-| 3.1 | 노드 | 노드 | 항목 ID. 플래그가 있으면 경고색 테두리·배경과 `▲` | UI-15 11단계 흐름 |
+| 3.1 | 노드 | 노드 | 항목 ID. 라벨이 넘치면 말줄임. 플래그가 있으면 경고색 테두리·배경과 오른쪽 끝 `▲` | UI-15 11단계 흐름 |
 | 3.2 | 참조 간선 | 선 | 하위 → 상위. 상위가 왼쪽 열이면 곡선, 같은 열이면 왼쪽으로 나갔다 돌아오는 꺾은선 | — |
 | 3.3 | 되돌아오는 간선 | 선 | 상위가 **오른쪽 열**일 때. 체인을 거슬러 올라가는 참조라 눈에 띄어야 한다 | — |
 | 3.4 | 미존재 참조 | 선 | 대상 항목이 **정말로 없을 때**. 노드 왼쪽으로 짧게 뻗다 끊긴다 | — |
 | 3.5 | 고립 노드 | 노드 | 상위도 하위도 없는 항목. 점선 테두리와 `◌`(UC-H4 2a) | 3.1과 같음 |
-| 4 | 범례 | 텍스트 | 기호 설명. 선 견본을 실제 선으로 그린다 | — |
+| 4 | 범례 | 텍스트 | 기호 설명. 선 견본을 실제 선으로 그린다. 선 종류를 말하는 두 항목은 라벨도 그 색. 조작 안내는 오른쪽 끝 | — |
 
 ### 규칙
 
@@ -1206,6 +1328,8 @@ status: approved
 - **열 안 순서는 이웃의 평균 위치로 정렬한다.** 상위 기준 정렬과 하위 기준 정렬을 번갈아 네 번 돌린다. 이웃이 없는 노드는 제자리. 결정론적이라 언제 그려도 같은 그림이 나온다
 - 되돌아오는 간선(3.3)은 노드를 관통하지 않는다. 모든 행 아래 전용 레인까지 내려가 가로지른 뒤 올라온다. DOM이 API·SEQ를 참조하는 경우가 여기 해당한다
 - 노드에 마우스를 올리면 **직접 상위·하위만** 남기고 나머지를 흐린다. 전이적으로 따라가지 않는다 — 그건 UI-15가 한다
+- **치수는 고정이다.** 열 간격 150px · 노드 폭 118px · 노드 높이 26px · 행 간격 40px · 캔버스 여백 18px. 열 간격과 노드 폭의 차 32px가 간선이 지나는 거터다 — 노드가 열 폭을 다 쓰면 선이 노드를 밟는다
+- 간선에는 화살촉을 단다. 방향(하위 → 상위)이 그림만으로 읽혀야 한다. 되돌아오는 간선(3.3)의 모서리 반지름은 8px
 - 배치 계산은 브라우저가 한다. 서버는 노드·간선 목록만 준다([[SYNC-MS-008#queries.graph_view]])
 
 ### 시나리오
@@ -1244,11 +1368,11 @@ status: approved
 ### 배치
 
 ```html
-<div class="phead" data-el="1">
-  <div><b>순서대로 읽기</b> <span class="lbl">SYNC</span></div>
-  <span class="grow"></span>
+<!-- 단계 레일은 전폭 서브바다. 제목은 여기가 아니라 본문 머리에 있다 -->
+<div class="steprail" data-el="1">
+  <a class="back" href="/p/SYNC">← 싱크독</a>
   <div class="steps" data-el="2">
-    <span class="stp done">1 RFQ</span><span class="stp done">2 PRD</span><span class="stp cur">3 SCN</span><span class="stp">4 UC</span><span class="stp">5 INFRA</span><span class="stp">6 DOM</span><span class="stp na">7 UI</span><span class="stp na">8 API</span><span class="stp na">9 SEQ</span><span class="stp na">10 MS</span><span class="stp na">11 CODE</span>
+    <span class="stp"><span class="no">1</span> RFQ<i class="dot dot-approved"></i></span><span class="stp"><span class="no">2</span> PRD<i class="dot dot-approved"></i></span><span class="stp cur"><span class="no">3</span> SCN<i class="dot dot-review"></i></span><span class="stp"><span class="no">4</span> UC<i class="dot dot-draft"></i></span><span class="stp na"><span class="no">5</span> INFRA<i class="dot dot-none"></i></span>
   </div>
 </div>
 
@@ -1256,17 +1380,24 @@ status: approved
   <div class="banner" data-el="3">이 단계에 승인된 문서가 없습니다. <b>SYNC-SCN-001</b>은 <b>검토중</b>입니다. <span class="btn sm" data-el="3.1">초안 보기</span></div>
 
   <article class="main" data-el="4">
-    <div class="lbl" data-el="4.1">3 / 11 · 사용자 시나리오 · SYNC-SCN-001 · 검토중 v4</div>
+    <div class="dochead">
+      <div class="kicker mono" data-el="4.1">싱크독 · 3/11 · SYNC-SCN-001 · 검토중 v4</div>
+      <h1>사용자 시나리오 — 싱크독</h1>
+      <p class="lead">누가 어떤 상황에서 싱크독을 쓰는지. 여기서 정한 시나리오가 유스케이스의 근거가 된다.</p>
+    </div>
     <h2>1. 페르소나</h2>
     <p>박호영 — 디포커스 AI팀 개발자. 싱크독을 만들었고 자기 프로젝트에도 쓴다…</p>
     <h2>2. 시나리오</h2>
     <p>S1 대화하다가 명세가 쌓인다 …</p>
-    <div class="nav" data-el="5">
-      <span class="btn" data-el="5.1">← 2 PRD</span>
-      <span class="btn" data-el="5.3">이 문서 열기</span>
-      <span class="btn" data-el="5.2">4 USECASE →</span>
-    </div>
   </article>
+
+  <!-- 이동 줄은 본문 밖. 안에 넣으면 문서의 일부처럼 읽힌다 -->
+  <div class="docnav" data-el="5">
+    <span class="btn" data-el="5.1">← 2 PRD</span>
+    <span class="btn" data-el="5.3">이 문서 열기</span>
+    <span class="grow"></span>
+    <span class="btn solid" data-el="5.2">4 USECASE →</span>
+  </div>
 </div>
 ```
 
@@ -1274,15 +1405,15 @@ status: approved
 
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
-| 1 | 헤더 | 영역 | 제목, 프로젝트 | — |
-| 2 | 단계 표시 | 진행 표시 | 11단계 칩. 번호와 타입 코드는 항상 보인다. 칩마다 그 단계의 대표 상태를 점으로. 현재 단계는 채워서 | 단계 클릭 → 그 단계로 |
+| 1 | 단계 레일 | 영역 | 화면 맨 위 전폭 서브바. 왼쪽에 `← 프로젝트 이름`, 그 뒤로 단계 칩(2) | 왼쪽 링크 → UI-4 |
+| 2 | 단계 표시 | 진행 표시 | 11단계 칩. 번호와 타입 코드는 항상 보인다. 번호는 흐리게, 상태 점은 **라벨 뒤**. 현재 단계는 채워서 | 단계 클릭 → 그 단계로 |
 | 3 | 미확정 배너 | 배너 | 이 단계에 승인 문서가 없을 때. 있는 문서와 상태(UC-H16 2a) | — |
 | 3.1 | 초안 보기 | 버튼 | | 승인 아닌 문서를 본문(4)에 띄운다(UC-H16 2a1) |
 | 4 | 본문 | 사람용 뷰 | 현재 단계의 승인 문서. UI-5 유저용 탭과 같은 렌더링, 목차·패널 없음(UC-H16 기본 흐름 2) | — |
-| 4.1 | 위치 | 텍스트 | 몇 번째 단계, 문서 ID, 상태·버전 | — |
+| 4.1 | 위치 | 텍스트 | 문서 머리의 킥커. `프로젝트 · n/11 · 문서ID · 상태 v버전`. 그 아래 제목과 리드가 온다 | — |
 | 5 | 이동 | 영역 | 앞·뒤 단계와 문서 열기 | — |
 | 5.1 | 이전 단계 | 버튼 | | 앞 단계로 |
-| 5.2 | 다음 단계 | 버튼 | | 뒤 단계로(UC-H16 기본 흐름 3) |
+| 5.2 | 다음 단계 | 버튼 | 이 화면의 주 동선이라 채운 버튼이다 | 뒤 단계로(UC-H16 기본 흐름 3) |
 | 5.3 | 이 문서 열기 | 버튼 | | 현재 문서의 UI-5 |
 
 ### 규칙
@@ -1292,6 +1423,9 @@ status: approved
 - 문서가 하나도 없는 단계(단계 표시 `na`)는 다음(5.2)이 건너뛴다
 - 단계 표시(2)는 가로로만 넘친다. 세로 넘침을 막지 않으면 칩 줄이 본문을 밀어낸다
 - 본문(4)에 참조 링크는 있으나 클릭하면 UI-5로 간다. 이 화면은 순서를 유지하는 게 목적이라 안에서 점프하지 않는다
+- 문서마다 머리(킥커 4.1 · 제목 · 리드)를 얹는다. 리드는 원본 0장 첫 문단이다 — UI-5 유저용 본문과 같은 블록
+- 배너·본문·이동 줄은 같은 좌우 경계를 쓴다(`max-width:760px` 가운데). 폭이 서로 다르면 화면이 층져 보인다
+- 이동 줄(5)은 본문 카드 **밖**이다. 안에 두면 문서의 일부처럼 읽힌다
 
 ### 시나리오
 
@@ -1323,28 +1457,25 @@ status: approved
 ### 배치
 
 ```html
-<div class="dialog" data-el="1">
+<div class="dialog setdlg" data-el="1"><!-- 폭 620px. 카드 넷이 드는 폭이다 -->
   <div class="dhead"><span>설정</span><span class="grow"></span><span class="x" data-el="7">✕</span></div>
   <div class="dbody">
 
-    <section class="card" data-el="2">
-      <div class="cardh"><b>내 계정</b></div>
-      <div class="row"><span data-el="2.1">HoyoungParkme</span> <span class="lbl">GitHub · 박호영</span><span class="grow"></span><span class="btn sm" data-el="2.2">로그아웃</span></div>
-    </section>
-
+    <!-- 토큰이 맨 위다. 이 화면에 오는 이유가 토큰이라서 -->
     <section class="card" data-el="3">
-      <div class="cardh"><b>MCP 토큰</b> <span class="lbl">에이전트가 싱크독에 붙을 때 씁니다</span><span class="grow"></span><span class="btn sm" data-el="3.4">+ 발급</span></div>
+      <div class="cardh"><b>MCP 토큰</b><span class="grow"></span><span class="btn sm solid" data-el="3.4">+ 발급</span></div>
+      <p class="lbl">에이전트가 싱크독에 붙을 때 씁니다. 남에게 주면 그 사람 작업이 내 이름으로 남습니다.</p>
+      <div class="row"><input class="inp wide" data-el="3.3" placeholder="이름 — 예: Gemini 노트북"><span class="btn sm solid">발급</span></div>
       <div class="tokbox" data-el="4">
         <b>한 번만 보입니다. 지금 복사하세요.</b>
         <div class="tok" data-el="4.1">syncdoc_pat_7f3a…c91e</div>
         <span class="btn sm" data-el="4.2">복사</span>
       </div>
       <div class="row" data-el="3.1">
-        <b>Claude Code 노트북</b> <span class="lbl mono">syncdoc_pat_7f3a…</span> <span class="lbl">발급 09-01</span>
-        <span class="grow"></span> <span class="lbl" data-el="3.5">마지막 사용 12분 전</span> <span class="btn sm" data-el="3.2">폐기</span>
+        <span class="two"><b>Claude Code 노트북</b><span class="lbl mono">발급 2026-09-01</span></span>
+        <span class="grow"></span> <span class="lbl" data-el="3.5">마지막 사용 12분 전</span> <span class="btn sm danger" data-el="3.2">폐기</span>
       </div>
-      <div class="row dimrow"><b>테스트용</b> <span class="lbl">발급 08-28 · <s>폐기됨 09-02</s></span></div>
-      <div class="row"><input class="inp" data-el="3.3" placeholder="이름 — 예: Gemini 노트북"></div>
+      <div class="row dimrow"><span class="two"><b>테스트용</b><span class="lbl mono">발급 2026-08-28 · <s>폐기됨 2026-09-02</s></span></span></div>
     </section>
 
     <section class="card" data-el="8">
@@ -1365,8 +1496,14 @@ status: approved
       <div class="admin" data-el="6"><!-- UI-14 --></div>
     </section>
 
+    <!-- 계정은 맨 아래. 로그아웃은 상단 바에도 있다 -->
+    <section class="card" data-el="2">
+      <div class="cardh"><b>내 계정</b></div>
+      <div class="row"><span data-el="2.1">HoyoungParkme</span> <span class="lbl">GitHub · 박호영</span><span class="grow"></span><span class="btn sm" data-el="2.2">로그아웃</span></div>
+    </section>
+
   </div>
-  <div class="dfoot"><span class="grow"></span><span class="btn" data-el="9">닫기</span></div>
+  <div class="dfoot"><span class="grow"></span><span class="btn solid" data-el="9">닫기</span></div>
 </div>
 ```
 
@@ -1403,6 +1540,12 @@ status: approved
 - 토큰으로 들어온 MCP 요청은 발급자 계정으로 기록된다. 남에게 토큰을 주면 그 사람 작업이 내 이름으로 남는다 — 이 안내를 3번 카드에 둔다
 - **토큰에 프로젝트 범위가 없다.** 토큰 하나가 그 사람이 보는 모든 프로젝트에 쓴다([[SYNC-PRD-001]] 6장). 만료도 없다(인프라 9장) — 그래서 `마지막 사용`(3.5)이 안 쓰는 토큰을 찾는 유일한 단서다
 - 관리(6)는 **접힌 채로 연다.** 인덱스 재구축이 위험한 동작이라 한 번 더 눌러야 보인다([[SYNC-UI-001#UI-14]] 7장 4)
+- **카드 순서는 MCP 토큰 · 클라이언트 설정 · 관리 · 내 계정이다.** 이 화면에 오는 이유가 토큰이라 토큰이 맨 위다. 로그아웃은 상단 바에도 있으므로 계정은 맨 아래
+- 카드 머리는 제목과 동작만 든다. 설명은 제목 아래 별도 줄. 세 카드가 같은 서식을 쓴다
+- 발급(3.4)은 카드 머리의 채운 버튼이다. 누르면 이름 입력(3.3)이 목록 위에 펼쳐진다 — 기본 상태의 카드는 제목·발급·토큰 목록만 보인다
+- 토큰 행(3.1)은 두 줄이다. 첫 줄이 이름, 둘째 줄이 고정폭으로 발급일(연도까지). 식별자를 다루는 목록임이 서식으로 보여야 한다
+- **버튼 위계는 셋이다** — 채움(발급·닫기) · 테두리(보조) · 빨강(폐기). 폐기는 이 화면에서 유일한 파괴 동작이라 유일한 색이다
+- 다이얼로그 폭은 `620px`. 본문 바탕은 `배경 보조`라 흰 카드가 카드로 읽힌다
 
 ### 시나리오
 
@@ -1519,12 +1662,12 @@ status: approved
     <span class="x" data-el="5">✕</span>
   </div>
   <div class="dbody">
-    <p class="lbl" data-el="2">이 항목이 11단계 체인에서 어디에 있고 어디로 흐르는지. 위는 근거로 삼은 것, 아래는 이 항목을 근거로 삼은 것.</p>
+    <p class="lbl" data-el="2">이 항목이 11단계 체인에서 어디에 있고 어디로 흐르는지. 위는 이 항목이 근거로 삼은 것, 아래는 이 항목을 근거로 삼은 것. 항목을 누르면 그 항목 기준으로 다시 봅니다.</p>
 
     <div class="chain" data-el="3">
       <div class="crow">
         <div class="cstage" data-el="3.2">1 RFQ<br><span class="lbl">근거 ↑</span></div>
-        <div class="cchips"><span class="chip" data-el="3.1">RFQ-001#Q1 원본은 누가 읽는가</span></div>
+        <div class="cchips"><span class="chip" data-el="3.1"><i class="dot dot-approved"></i>RFQ-001#Q1 원본은 누가 읽는가</span></div>
       </div>
       <div class="crow cur">
         <div class="cstage">4 UC<br><span class="lbl">이 항목</span></div>
@@ -1544,7 +1687,7 @@ status: approved
     <span class="lbl">참조는 하위 → 상위로만 적히고, 역방향은 계산된 것이다</span>
     <span class="grow"></span>
     <span class="btn" data-el="6">닫기</span>
-    <span class="btn" data-el="4">문서 뷰로 열기</span>
+    <span class="btn solid" data-el="4">문서 뷰로 열기</span>
   </div>
 </div>
 ```
@@ -1573,6 +1716,10 @@ status: approved
 - **항목이 없는 단계도 회색으로 남긴다.** 체인이 어디서 끊겼는지 보이는 게 이 화면의 목적이다. 빈 단계를 접으면 "UI 단계에 아무것도 안 이어졌다"는 사실이 안 보인다
 - 칩(3.1)을 누르면 그 항목 기준으로 다시 그린다. 뒤로 가기는 없다 — 계속 따라가는 화면이지 되짚는 화면이 아니다
 - 범위(UI-8 2.1~2.3)와 무관하게 항상 전체 참조를 본다. 범위는 그리는 것을 고르는 조작이지 관계를 지우는 조작이 아니다
+- 다이얼로그 폭은 `720px`. 넓히면 칩 사이가 벌어져 행이 헐거워진다
+- **이 항목 칩(3.1)은 채우지 않는다.** 흰 바탕에 1.5px 진한 테두리다. 자리 표시는 행 배경과 왼쪽 라벨이 이미 하고 있어 칩까지 채우면 강조가 셋이 된다
+- 현재 단계 행은 왼쪽 라벨까지 주의색이다. 행 배경만으로는 훑을 때 놓친다
+- 칩 안 항목 ID에서 프로젝트 코드 접두는 뺀다. 같은 프로젝트 안이고 칩은 좁다 — 전체 ID는 제목(1.1)에 있다
 
 ### 시나리오
 
@@ -1604,26 +1751,28 @@ status: approved
 
 ```html
 <div class="dialog" data-el="1">
-  <div class="dhead"><span>사용 방법</span><span class="grow"></span><span class="x" data-el="4">✕</span></div>
+  <div class="dhead"><span>싱크독 사용 방법</span><span class="grow"></span><span class="x" data-el="4">✕</span></div>
   <div class="dbody">
+    <p class="dlead">개발자가 PM 없이 11단계 명세 체인을 쓰고, 에이전트가 그 명세를 따르게 하는 플랫폼입니다. 쓰는 것은 에이전트, 판단하고 확정하는 것은 웹입니다.</p>
+
     <table class="grid" data-el="2">
-      <tr class="hd"><th></th><th>무엇</th><th>어떻게</th><th>어디서</th></tr>
-      <tr data-el="2.1"><td>1</td><td>저장소를 등록한다</td><td>주소·코드·이름</td><td>프로젝트 목록</td></tr>
-      <tr><td>2</td><td>에이전트를 붙인다</td><td>MCP 토큰 발급 후 설정에 붙여넣기</td><td>설정</td></tr>
-      <tr><td>3</td><td>명세를 쌓는다</td><td>에이전트에게 시킨다. 웹에는 편집이 없다</td><td>에이전트</td></tr>
-      <tr><td>4</td><td>읽고 확정한다</td><td>상태를 초안 → 검토중 → 승인으로</td><td>문서 뷰</td></tr>
-      <tr><td>5</td><td>바뀐 것을 따라간다</td><td>전파 선택, 확인 필요 처리</td><td>내 할 일</td></tr>
-      <tr><td>6</td><td>체인을 본다</td><td>참조 그래프에서 노드 클릭</td><td>참조 그래프</td></tr>
+      <tr class="hd"><th></th><th></th><th></th><th>어디서</th></tr>
+      <tr data-el="2.1"><td class="no">1</td><td>저장소를 등록한다</td><td>명세 원본은 저장소의 docs/specs/에 둔다. 프로젝트 하나가 저장소 하나다.</td><td class="where">프로젝트 목록</td></tr>
+      <tr><td class="no">2</td><td>에이전트를 붙인다</td><td>설정에서 MCP 토큰을 발급해 Claude Code·Codex·Gemini에 넣는다. 클라이언트는 상관없다.</td><td class="where">설정</td></tr>
+      <tr><td class="no">3</td><td>에이전트와 대화하며 명세를 쓴다</td><td>명세 본문이 들어오는 길은 MCP와 GitHub push 둘뿐이다. 웹에는 편집 화면이 없다.</td><td class="where">에이전트</td></tr>
+      <tr><td class="no">4</td><td>웹에서 읽고 확정한다</td><td>유저용 탭으로 읽고, 참조를 따라가고, 댓글을 달고, 상태를 바꾼다. 승인은 상위 대조를 거친다.</td><td class="where">문서 뷰</td></tr>
+      <tr><td class="no">5</td><td>내 할 일을 처리한다</td><td>상위가 바뀌면 하위에 확인 필요가 붙는다. 알림은 없다 — 내 할 일 화면이 알림이다.</td><td class="where">내 할 일</td></tr>
+      <tr><td class="no">6</td><td>수정은 다시 에이전트에게</td><td>확인하다 영향이 있으면 화면 밖에서 에이전트에게 고치게 하고 돌아와 확인한다.</td><td class="where">에이전트</td></tr>
     </table>
 
-    <table class="grid" data-el="3">
-      <tr class="hd"><th>#</th><th>코드</th><th>이름</th><th>항목 ID</th></tr>
-      <tr data-el="3.1"><td>1</td><td>RFQ</td><td>요구·인터뷰</td><td><code>Q1</code></td></tr>
-      <tr><td>2</td><td>PRD</td><td>제품 요구</td><td><code>G1</code> <code>R12</code></td></tr>
-      <tr class="std" data-el="3.2"><td>—</td><td>STD</td><td>표준 (단계 밖)</td><td>규칙 항목</td></tr>
+    <h4 class="sectitle">11단계가 뜻하는 것</h4>
+    <table class="grid" data-el="3"><!-- 머리 행 없음. 위 소제목이 그 일을 한다 -->
+      <tr data-el="3.1"><td class="no">1</td><td class="code">RFQ</td><td><b>요구·인터뷰</b> — 무엇을 왜 만드나. 고객이 말한 것만 적는다</td><td class="ids">Q1</td></tr>
+      <tr><td class="no">2</td><td class="code">PRD</td><td><b>제품 요구</b> — 목표·비목표·요구사항. 요구에는 인수기준까지</td><td class="ids">G1 · R12 · N3</td></tr>
+      <tr class="std" data-el="3.2"><td class="no">—</td><td class="code">STD</td><td><b>표준 (단계 밖)</b> — 명세가 아니라 명세를 쓰는 법. 싱크독 프로젝트에만 있다</td><td class="ids">규칙 항목</td></tr>
     </table>
 
-    <p class="lbl" data-el="3.3">문서 ID는 <code>{프로젝트코드}-{타입}-{번호}</code>, 항목 ID는 <code>{문서ID}#{항목번호}</code>, 본문 참조는 <code>[[항목ID]]</code>.</p>
+    <p class="lbl" data-el="3.3">오른쪽은 그 단계 문서 안에서 쓰는 항목 ID 형식. 문서 ID는 <code>{프로젝트코드}-{타입}-{번호}</code>, 항목 ID는 <code>{문서ID}#{항목번호}</code>, 참조는 <code>[[항목ID]]</code>.</p>
     <p class="note" data-el="3.4">11단계 순서는 권장이지 강제가 아니다. 건너뛰어도 막지 않고 표시만 한다.</p>
   </div>
   <div class="dfoot"><span class="grow"></span><span class="btn" data-el="5">닫기</span></div>
@@ -1650,6 +1799,11 @@ status: approved
 - 이 화면은 **읽기 전용이고 상태가 없다.** 어디서 열든 같은 내용이고, 닫으면 원래 화면 그대로다
 - 항목 ID 형식은 [[SYNC-STD-001]] 2장의 타입별 패턴을 사람 말로 옮긴 것이다. 규약이 바뀌면 여기도 바뀐다
 - **"순서는 강제가 아니다"를 빼지 않는다.** 11단계를 보면 차례로 다 채워야 하는 것처럼 읽힌다. 실제로는 건너뛴 단계를 표시만 하고 막지 않는다([[SYNC-UC-001#UC-H14]] 1b)
+- 본문 맨 위 문단이 이 도구가 무엇인지 한 번에 말한다. 표만 있으면 처음 온 사람이 무엇을 읽고 있는지 모른다
+- 두 표 사이에 소제목 `11단계가 뜻하는 것`을 둔다. 두 번째 표에는 머리 행이 없다 — 소제목이 그 일을 한다
+- 설명은 문장으로 쓴다. 키워드 단문으로 줄이면 행이 얇아져 표가 목록처럼 읽힌다
+- 항목 ID는 고정폭 평문이다. 칩으로 그리면 표에 색 상자가 열한 줄 생겨 단계 이름보다 먼저 눈에 든다
+- 다이얼로그 폭은 `660px`
 
 ### 시나리오
 

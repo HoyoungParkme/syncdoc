@@ -24,6 +24,9 @@ export interface ViewInput {
 }
 export interface ViewOutput {
   html: string
+  /** frontmatter 제목과 본문 첫 문단. renderView만 채운다 — 타입별 렌더러는 본문만 만든다 */
+  title?: string
+  lead?: string
   /** innerHTML 삽입 뒤 호출 — 탭·좌우 연동 같은 동작. 정리 함수를 돌려줄 수 있다 */
   onMount?: (root: HTMLElement) => void | (() => void)
 }

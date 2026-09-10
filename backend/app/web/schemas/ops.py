@@ -31,10 +31,12 @@ class GraphEdge(Base):
 class Graph(Base):
     nodes: list[GraphNode]
     edges: list[GraphEdge]
+    project_name: str
 
     @classmethod
     def of(cls, g: GraphDto) -> Graph:
         return cls(
+            project_name=g.project_name,
             nodes=[GraphNode.model_validate(n) for n in g.nodes],
             edges=[
                 GraphEdge(from_=e.from_, to=e.to, raw_target=e.raw_target, is_missing=e.is_missing)

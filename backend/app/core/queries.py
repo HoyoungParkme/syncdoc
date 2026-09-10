@@ -191,6 +191,8 @@ async def document_view(doc_id: str) -> Document:
             if e.is_missing
         ]  # 4a — 유저용 탭이 링크를 회색 ?로
         doc.author = _api_author(s, doc.last_author)
+        # 브레드크럼은 코드가 아니라 이름으로 시작한다 — 사람이 부르는 이름이 프로젝트다
+        doc.project_name = ProjectService(s).get(doc_id.split("-")[0]).name
         return doc
 
 
@@ -516,6 +518,7 @@ async def graph_view(code: str, scope: GraphScope = GraphScope.all) -> Graph:
                 for n in nodes.values()
             ],
             edges=out_edges,
+            project_name=project.name,
         )
 
 

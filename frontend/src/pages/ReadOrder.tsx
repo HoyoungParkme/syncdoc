@@ -2,11 +2,11 @@
  *  1 헤더 · 2 단계 표시(칩마다 대표 상태 점, 현재는 채워서) · 3 미확정 배너(3.1)
  *  4 본문(4.1 위치) · 5 이동(5.1 이전, 5.2 다음, 5.3 이 문서 열기) */
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { api, docPath, STAGE_NAMES, STAGE_TYPES, STATUS_KO, type Document, type DocumentSummary } from '../api/client'
+import { api, docPath, STAGE_TYPES, STATUS_KO, type Document, type DocumentSummary, type ProjectDetail } from '../api/client'
 import { extraCss, renderView } from '../view'
-import { splitRef } from '../view/md'
+import { esc, splitRef } from '../view/md'
 
 const ORDER: Record<string, number> = { draft: 0, review: 1, approved: 2 }
 
@@ -16,11 +16,16 @@ export function ReadOrder() {
   const nav = useNavigate()
   const stage = Number(sp.get('stage') ?? '1')
   const [docs, setDocs] = useState<DocumentSummary[]>([])
+  // 레일 왼쪽에 프로젝트 이름이 필요하다. 문서 목록만으로는 이름을 알 수 없다
+  const [projName, setProjName] = useState('')
   const [showDraft, setShowDraft] = useState(false)
   const [bodies, setBodies] = useState<Document[]>([])
-  const mainRef = useRef<HTMLDivElement>(null)
+  const mainRef = useRef<HTMLElement>(null)
   useEffect(() => {
-    api.get<DocumentSummary[]>(`/api/projects/${code}/docs`).then(setDocs)
+    api.get<ProjectDetail>(`/api/projects/${code}`).then((p) => {
+      setDocs(p.docs)
+      setProjName(p.name)
+    })
   }, [code])
   const inStage = docs.filter((d) => d.stage === stage).sort((a, b) => (a.doc_id < b.doc_id ? -1 : 1))
   const approved = inStage.filter((d) => d.status === 'approved')
@@ -39,7 +44,20 @@ export function ReadOrder() {
   useEffect(() => {
     const root = mainRef.current
     if (!root) return
-    root.innerHTML = bodies.map((d) => `<div class="lbl" data-el="4.1">${stage} / 11 · ${STAGE_NAMES[STAGE_TYPES[stage - 1]] ?? ''} · ${d.doc_id} · ${STATUS_KO[d.status]} v${d.current_version_no}</div>` + renderView(d, code).html).join('<hr/>')
+    // 문서마다 머리(킥커·제목·리드)를 얹는다. 킥커가 위치(4.1)다
+    root.innerHTML = bodies
+      .map((d) => {
+        const v = renderView(d, code)
+        const kicker = `${esc(d.project_name)} · ${stage}/11 · ${esc(d.doc_id)} · ${esc(STATUS_KO[d.status])} v${d.current_version_no}`
+        return (
+          `<div class="dochead"><div class="kicker mono" data-el="4.1">${kicker}</div>` +
+          `<h1>${esc(v.title ?? d.doc_id)}</h1>` +
+          (v.lead ? `<p class="lead">${esc(v.lead)}</p>` : '') +
+          `</div>` +
+          v.html
+        )
+      })
+      .join('<hr/>')
     mermaid.initialize({ startOnLoad: false, theme: 'neutral' })
     mermaid.run({ nodes: root.querySelectorAll<HTMLElement>('pre.mermaid') }).catch(() => undefined)
     const onClick = (ev: MouseEvent) => {
@@ -70,12 +88,12 @@ export function ReadOrder() {
   const go = (s: number | null) => s !== null && setSp({ stage: String(s) })
   const label = (s: number | null) => (s === null ? '' : `${s} ${STAGE_TYPES[s - 1]}`)
   return (
-    <div className="page">
-      <div className="phead" data-el="1">
-        <div>
-          <b>순서대로 읽기</b> <span className="lbl">{code}</span>
-        </div>
-        <span className="grow" />
+    <div className="readscreen">
+      {/* 단계 레일은 전폭 서브바다. 페이지 제목이 아니라 자리 표시가 여기 산다 */}
+      <div className="steprail" data-el="1">
+        <Link className="back" to={`/p/${code}`}>
+          ← {projName || code}
+        </Link>
         <div className="steps" data-el="2">
           {STAGE_TYPES.map((t, i) => {
             const s = i + 1
@@ -88,8 +106,8 @@ export function ReadOrder() {
                 className={`stp${st ? '' : ' na'}${s === stage ? ' cur' : ''}`}
                 onClick={() => hasDocs(s) && setSp({ stage: String(s) })}
               >
+                <span className="no">{s}</span> {t}
                 <i className={`dot dot-${st ?? 'none'}`} />
-                {s} {t}
               </span>
             )
           })}
@@ -108,22 +126,23 @@ export function ReadOrder() {
         )}
         {inStage.length === 0 && <div className="banner warn">이 단계에는 문서가 없습니다.</div>}
         <style>{extraCss}</style>
-        <article className="main body" data-el="4">
-          <div ref={mainRef} />
-          <div className="nav" data-el="5">
-            <span className={`btn${prev === null ? ' dis' : ''}`} data-el="5.1" onClick={() => go(prev)}>
-              ← {prev === null ? '처음' : label(prev)}
+        <article className="main body" data-el="4" ref={mainRef} />
+        {/* 이동 줄은 본문 카드 밖 — 안에 넣으면 문서의 일부처럼 읽힌다 */}
+        <div className="docnav" data-el="5">
+          <span className={`btn${prev === null ? ' dis' : ''}`} data-el="5.1" onClick={() => go(prev)}>
+            ← {prev === null ? '처음' : label(prev)}
+          </span>
+          {shown[0] && (
+            <span className="btn" data-el="5.3" onClick={() => nav(docPath(shown[0].doc_id))}>
+              이 문서 열기
             </span>
-            {shown[0] && (
-              <span className="btn" data-el="5.3" onClick={() => nav(docPath(shown[0].doc_id))}>
-                이 문서 열기
-              </span>
-            )}
-            <span className={`btn${nextStage === null ? ' dis' : ''}`} data-el="5.2" onClick={() => go(nextStage)}>
-              {nextStage === null ? '끝' : label(nextStage)} →
-            </span>
-          </div>
-        </article>
+          )}
+          <span className="grow" />
+          {/* 주 동선. 다음 단계로 가는 게 이 화면의 목적이다 */}
+          <span className={`btn solid${nextStage === null ? ' dis' : ''}`} data-el="5.2" onClick={() => go(nextStage)}>
+            {nextStage === null ? '끝' : label(nextStage)} →
+          </span>
+        </div>
       </div>
     </div>
   )

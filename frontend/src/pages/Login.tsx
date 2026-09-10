@@ -9,17 +9,18 @@ export function Login() {
   return (
     <div className="login" data-el="1">
       <div className="logo">
-        <b>싱크독</b> <span className="lbl">SyncDoc</span>
+        <b>싱크독</b> <span className="mono">SyncDoc</span>
       </div>
       <p className="lbl" data-el="1.1">
         개발자가 PM 없이 11단계 명세 체인을 쓰고,
         <br />
         에이전트가 그 명세를 따르게 하는 플랫폼
       </p>
-      <a className="btn big" data-el="2" href={`/auth/github?next=${encodeURIComponent(next)}`}>
+      {/* 이 화면에서 유일한 동작이므로 유일한 강조다 */}
+      <a className="btn solid big" data-el="2" href={`/auth/github?next=${encodeURIComponent(next)}`}>
         GitHub로 로그인
       </a>
-      <p className="lbl" data-el="3">
+      <p className="cap" data-el="3">
         로그인 후 원래 가려던 화면으로 돌아갑니다
       </p>
     </div>

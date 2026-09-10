@@ -5,12 +5,14 @@ import { useEffect, useState } from 'react'
 import { ago, api, type AccessToken, type User } from '../api/client'
 import { Admin } from '../pages/Admin'
 
-const day = (iso: string) => iso.slice(5, 10)
+const day = (iso: string) => iso.slice(0, 10)
 
 export function SettingsDialog({ user, onClose }: { user: User; onClose: () => void }) {
   const [tokens, setTokens] = useState<AccessToken[]>([])
   const [label, setLabel] = useState('')
   const [issued, setIssued] = useState<AccessToken | null>(null)
+  // 발급 폼은 접혀 있다. 기본 상태의 카드는 제목 + 발급 + 토큰 목록만 보인다
+  const [naming, setNaming] = useState(false)
   // 규칙: 관리는 접힌 채로 연다. 인덱스 재구축이 위험한 동작이라 한 번 더 눌러야 보인다
   const [adminOpen, setAdminOpen] = useState(false)
   const load = () => api.get<AccessToken[]>('/api/me/tokens').then(setTokens)
@@ -21,6 +23,7 @@ export function SettingsDialog({ user, onClose }: { user: User; onClose: () => v
     const t = await api.post<AccessToken>('/api/me/tokens', { label })
     setIssued(t)
     setLabel('')
+    setNaming(false)
     load()
   }
   async function revoke(t: AccessToken) {
@@ -52,24 +55,31 @@ export function SettingsDialog({ user, onClose }: { user: User; onClose: () => v
           </span>
         </div>
         <div className="dbody">
-          <section className="card" data-el="2">
-            <div className="cardh">
-              <b>내 계정</b>
-            </div>
-            <div className="row">
-              <span data-el="2.1">{user.github_login}</span> <span className="lbl">GitHub · {user.display_name}</span>
-              <span className="grow" />
-              <button className="btn sm" type="button" data-el="2.2" onClick={logout}>
-                로그아웃
-              </button>
-            </div>
-          </section>
-
           <section className="card" data-el="3">
             <div className="cardh">
-              <b>MCP 토큰</b>{' '}
-              <span className="lbl">에이전트가 싱크독에 붙을 때 씁니다. 남에게 주면 그 사람 작업이 내 이름으로 남습니다</span>
+              <b>MCP 토큰</b>
+              <span className="grow" />
+              <button className="btn sm solid" type="button" data-el="3.4" onClick={() => setNaming((o) => !o)}>
+                + 발급
+              </button>
             </div>
+            {/* 설명은 제목 줄이 아니라 아래 줄 — 헤더는 제목과 동작만 든다 */}
+            <p className="lbl">에이전트가 싱크독에 붙을 때 씁니다. 남에게 주면 그 사람 작업이 내 이름으로 남습니다.</p>
+            {naming && (
+              <div className="row">
+                <input
+                  className="inp wide"
+                  data-el="3.3"
+                  placeholder="이름 — 예: Gemini 노트북"
+                  value={label}
+                  autoFocus
+                  onChange={(e) => setLabel(e.target.value)}
+                />
+                <button className="btn sm solid" type="button" disabled={!label.trim()} onClick={issue}>
+                  발급
+                </button>
+              </div>
+            )}
             {/* 원문은 발급 직후 여기서만 보인다. 서버는 해시만 저장해 다시 보여줄 수 없다 */}
             {issued?.token && (
               <div className="tokbox" data-el="4">
@@ -82,12 +92,15 @@ export function SettingsDialog({ user, onClose }: { user: User; onClose: () => v
                 </button>
               </div>
             )}
+            {/* 두 줄이다 — 이름과, 그 아래 고정폭으로 발급일. 식별자를 다루는 목록임이 보여야 한다 */}
             {tokens.map((t) => (
               <div className={`row${t.revoked_at ? ' dimrow' : ''}`} data-el="3.1" key={t.id}>
-                <b>{t.label}</b>{' '}
-                <span className="lbl">
-                  발급 {day(t.issued_at)}
-                  {t.revoked_at && <s> · 폐기됨 {day(t.revoked_at)}</s>}
+                <span className="two">
+                  <b>{t.label}</b>
+                  <span className="lbl mono">
+                    발급 {day(t.issued_at)}
+                    {t.revoked_at && <s> · 폐기됨 {day(t.revoked_at)}</s>}
+                  </span>
                 </span>
                 <span className="grow" />
                 {/* 만료가 없어 안 쓰는 토큰을 찾는 단서가 이것뿐이다 */}
@@ -95,24 +108,12 @@ export function SettingsDialog({ user, onClose }: { user: User; onClose: () => v
                   마지막 사용 {t.last_used_at ? ago(t.last_used_at) : '없음'}
                 </span>
                 {!t.revoked_at && (
-                  <button className="btn sm" type="button" data-el="3.2" onClick={() => revoke(t)}>
+                  <button className="btn sm danger" type="button" data-el="3.2" onClick={() => revoke(t)}>
                     폐기
                   </button>
                 )}
               </div>
             ))}
-            <div className="row">
-              <input
-                className="inp"
-                data-el="3.3"
-                placeholder="이름 — 예: Gemini 노트북"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-              />
-              <button className="btn sm" type="button" data-el="3.4" disabled={!label.trim()} onClick={issue}>
-                + 발급
-              </button>
-            </div>
           </section>
 
           <section className="card" data-el="8">
@@ -137,10 +138,24 @@ export function SettingsDialog({ user, onClose }: { user: User; onClose: () => v
               </div>
             )}
           </section>
+
+          <section className="card" data-el="2">
+            <div className="cardh">
+              <b>내 계정</b>
+            </div>
+            <div className="row">
+              <span data-el="2.1">{user.github_login}</span> <span className="lbl">GitHub · {user.display_name}</span>
+              <span className="grow" />
+              <button className="btn sm" type="button" data-el="2.2" onClick={logout}>
+                로그아웃
+              </button>
+            </div>
+          </section>
         </div>
+
         <div className="dfoot">
           <span className="grow" />
-          <button className="btn" type="button" data-el="9" onClick={onClose}>
+          <button className="btn solid" type="button" data-el="9" onClick={onClose}>
             닫기
           </button>
         </div>

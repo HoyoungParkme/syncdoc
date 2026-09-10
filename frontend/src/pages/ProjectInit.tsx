@@ -36,7 +36,7 @@ export function ProjectInit({ onClose, onDone }: { onClose: () => void; onDone: 
   return (
     <>
       <div className="backdrop" onClick={onClose} />
-      <div className="dialog initdlg" data-el="1">
+      <div className="dialog narrow initdlg" data-el="1">
         <div className="dhead">
           <b>프로젝트 초기화</b>
           <span className="grow" />
@@ -44,20 +44,23 @@ export function ProjectInit({ onClose, onDone }: { onClose: () => void; onDone: 
             ✕
           </span>
         </div>
-        <div className="dbody form" data-el="2">
+        <div className="dbody">
+          <div className="form" data-el="2">
         <label>저장소 주소</label>
-        <input className="inp wide" data-el="2.1" value={remote} onChange={(e) => setRemote(e.target.value)} placeholder="https://github.com/org/repo" />
+        <input className="inp wide mono" data-el="2.1" value={remote} onChange={(e) => setRemote(e.target.value)} placeholder="https://github.com/owner/repo" />
         <div className="lbl">싱크독이 이 저장소에 쓰기 권한이 있어야 합니다</div>
         <label>프로젝트 코드</label>
-        <input className="inp" data-el="2.2" value={code} onChange={(e) => setCode(e.target.value)} style={{ width: 100 }} />
-        <div className="lbl">영문 대문자 4자 이내. 문서 ID 앞부분이 됩니다 — 예: AIRD-PRD-001</div>
+        <input className="inp mono" data-el="2.2" value={code} onChange={(e) => setCode(e.target.value)} placeholder="AIRD" style={{ width: 140 }} />
+        <div className="lbl">
+          영문 대문자 4자 이내. 문서 ID 앞부분이 됩니다 — 예: <code>AIRD-PRD-001</code>
+        </div>
         {codeErr && (
           <div className="ferr" data-el="2.4">
             {codeErr}
           </div>
         )}
         <label>이름</label>
-        <input className="inp wide" data-el="2.3" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="inp wide" data-el="2.3" value={name} onChange={(e) => setName(e.target.value)} placeholder="에어데이터" />
         {/* 등록하면 저장소에 무엇이 생기는지. 기존 명세가 발견되면(빈 저장소가 아니면) 감춘다 */}
         {existing === null && (
           <div className="willcommit" data-el="2.5">
@@ -72,13 +75,15 @@ export function ProjectInit({ onClose, onDone }: { onClose: () => void; onDone: 
             {banner}
           </div>
         )}
+          </div>
         </div>
         <div className="dfoot">
           <span className="grow" />
           <button className="btn" data-el="3.2" onClick={onClose}>
             취소
           </button>
-          <button className="btn" data-el="3.1" style={{ fontWeight: 600 }} onClick={() => submit(false)}>
+          {/* 주 동작. 취소와 같은 모양이면 어느 쪽이 진행인지 눈이 못 고른다 */}
+          <button className="btn solid" data-el="3.1" onClick={() => submit(false)}>
             초기화
           </button>
         </div>

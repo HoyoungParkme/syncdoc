@@ -33,10 +33,13 @@ export function ItemChain({
       .catch(() => onClose())
   }, [docId, itemId, onClose])
   if (!ch) return null
+  // 칩은 좁다. 같은 프로젝트 안이므로 코드 접두는 제목에서만 보이면 된다
+  const code = ch.item.doc_id?.split('-')[0] ?? ''
+  const short = (k: string) => (code && k.startsWith(code + '-') ? k.slice(code.length + 1) : k)
   return (
     <>
       <div className="backdrop" onClick={onClose} />
-      <div className="dialog wide chaindlg" data-el="1">
+      <div className="dialog chaindlg" data-el="1">
         <div className="dhead">
           <span data-el="1.1">
             {refKey(ch.item)}
@@ -52,7 +55,7 @@ export function ItemChain({
         </div>
         <div className="dbody">
           <p className="lbl" data-el="2">
-            이 항목이 11단계 체인에서 어디에 있고 어디로 흐르는지. 위는 근거로 삼은 것, 아래는 이 항목을 근거로 삼은 것.
+            이 항목이 11단계 체인에서 어디에 있고 어디로 흐르는지. 위는 이 항목이 근거로 삼은 것, 아래는 이 항목을 근거로 삼은 것. 항목을 누르면 그 항목 기준으로 다시 봅니다.
           </p>
           <div className="chain" data-el="3">
             {ch.rows.map((r) => {
@@ -89,7 +92,7 @@ export function ItemChain({
                           }
                         >
                           <i className={`dot dot-${it.status}`} />
-                          {refKey(it.ref)}
+                          {short(refKey(it.ref))}
                           {it.ref.display_name ? ` ${it.ref.display_name}` : ''}
                           {it.has_flag && ' ▲'}
                           {it.ref.is_missing && ' (없는 항목)'}
@@ -108,7 +111,7 @@ export function ItemChain({
           <button className="btn" type="button" data-el="6" onClick={onClose}>
             닫기
           </button>
-          <button className="btn" type="button" data-el="4" onClick={() => nav(docPath(ch.item.doc_id, ch.item.item_id))}>
+          <button className="btn solid" type="button" data-el="4" onClick={() => nav(docPath(ch.item.doc_id, ch.item.item_id))}>
             문서 뷰로 열기
           </button>
         </div>

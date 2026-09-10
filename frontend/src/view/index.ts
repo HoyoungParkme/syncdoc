@@ -60,7 +60,23 @@ export function renderView(doc: Document, code: string, downstream?: DownstreamV
     titles: downstream ? Object.fromEntries(downstream.by_document.map((x) => [x.doc_id, x.title])) : undefined,
   }
   const out = pick(doc.doc_type, fm.title ?? '')({ type: doc.doc_type, title: fm.title ?? '', body, ctx })
-  return { html: out.html, onMount: out.onMount }
+  return { html: out.html, onMount: out.onMount, title: fm.title ?? doc.doc_id, lead: leadOf(body) }
+}
+
+/** 본문 맨 앞 문단 — 화면이 제목 아래 리드로 쓴다(UI-5·UI-9 헤더 블록).
+ *  `#` 제목·구분선·빈 줄을 건너뛰고 첫 문단만. `##`(절)을 만나면 리드가 없는 문서다 */
+function leadOf(body: string): string {
+  const lines = body.split('\n')
+  let i = 0
+  while (i < lines.length) {
+    const l = lines[i].trim()
+    if (l === '' || l === '---' || /^# /.test(l)) i++
+    else break
+  }
+  if (i >= lines.length || /^#{2,}\s/.test(lines[i]) || lines[i].startsWith('|')) return ''
+  const out: string[] = []
+  for (; i < lines.length && lines[i].trim() !== ''; i++) out.push(lines[i].trim())
+  return out.join(' ').replace(/\[\[([^\]]+)\]\]/g, '$1').replace(/[*`]/g, '')
 }
 
 /** 흡수된 빌더(build·wf·seq·ms)의 CSS — 유저용 탭이 <style>로 한 번 넣는다 */
