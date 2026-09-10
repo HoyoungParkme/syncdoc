@@ -465,82 +465,72 @@ status: approved
 ### 배치
 
 ```html
-<div class="phead" data-el="1">
-  <div><b>내 할 일</b> <span class="lbl" data-el="1.1">7건 · 경과일순</span></div>
+<div class="thead" data-el="1">
+  <b>내 할 일 <span class="cnt">7</span></b>
+  <div class="lbl" data-el="1.1">7건 · 경과일순 · 알림은 없다. 이 화면이 알림이다.</div>
 </div>
 
 <div class="todo">
 
-  <section class="grp" data-el="2">
-    <h4>확인 필요 <span class="cnt">2</span></h4>
-    <div class="row" data-el="2.1">
-      <span class="k">SYNC-PRD-001#R1</span> 에이전트용 원본과 사람용 뷰
-      <span class="lbl">원인 SYNC-RFQ-001#Q03 v4</span>
-      <span class="grow"></span><span class="age">3일</span>
+  <!-- 카드 경계는 묶음이 아니라 항목에 있다. 묶음 머리는 배경 위 맨 텍스트다 -->
+  <section class="tgroup" data-el="2">
+    <h4>확인 필요 <span class="cnt">2</span><span class="rule"></span></h4>
+    <div class="tcard" data-el="2.1">
+      <div class="th"><span class="k">SYNC-PRD-001#R1</span><span class="tt">에이전트용 원본과 사람용 뷰</span><span class="grow"></span><span class="age">3일</span></div>
+      <div class="why">원인 SYNC-RFQ-001#Q03 v4</div>
     </div>
-    <div class="row">
-      <span class="k">SYNC-PRD-001#R9</span> MCP 서버
-      <span class="lbl">원인 SYNC-RFQ-001#Q03 v4</span>
-      <span class="grow"></span><span class="age">3일</span>
-    </div>
-  </section>
-
-  <section class="grp" data-el="3">
-    <h4>끊어진 참조 <span class="cnt">1</span></h4>
-    <div class="row" data-el="3.1">
-      <span class="k">SYNC-DOM-002#Version</span> Version
-      <span class="lbl">→ SYNC-DOM-001#다이어그램 (2일 전 삭제)</span>
-      <span class="grow"></span><span class="age">2일</span>
+    <div class="tcard">
+      <div class="th"><span class="k">SYNC-PRD-001#R9</span><span class="tt">MCP 서버</span><span class="grow"></span><span class="age">3일</span></div>
+      <div class="why">원인 SYNC-RFQ-001#Q03 v4</div>
     </div>
   </section>
 
-  <section class="grp" data-el="9">
-    <h4>하위 불일치 <span class="cnt">1</span></h4>
-    <div class="row" data-el="9.1">
-      <span class="k">SYNC-UC-001#UC-A6</span> 명세를 작성·수정한다
-      <span class="lbl">← SYNC-API-002#update_document 이(가) 어긋남 지목</span>
-      <span class="grow"></span><span class="age">1일</span>
+  <section class="tgroup" data-el="3">
+    <h4>끊어진 참조 <span class="cnt">1</span><span class="rule"></span></h4>
+    <div class="tcard" data-el="3.1">
+      <div class="th"><span class="k">SYNC-DOM-002#Version</span><span class="tt">Version</span><span class="grow"></span><span class="age">2일</span></div>
+      <div class="why">→ SYNC-DOM-001#다이어그램 (2일 전 삭제)</div>
     </div>
   </section>
 
-  <section class="grp" data-el="4">
-    <h4>전파 미결정 <span class="cnt">1</span></h4>
-    <div class="row" data-el="4.1">
-      <span class="k">SYNC-PRD-001</span> v7
-      <span class="lbl">spec: R10 다이어그램 렌더링으로 변경 · 하위 3건</span>
-      <span class="grow"></span><span class="age">1일</span>
+  <section class="tgroup" data-el="9">
+    <h4>하위 불일치 <span class="cnt">1</span><span class="rule"></span></h4>
+    <div class="tcard" data-el="9.1">
+      <div class="th"><span class="k">SYNC-UC-001#UC-A6</span><span class="tt">명세를 작성·수정한다</span><span class="grow"></span><span class="age">1일</span></div>
+      <div class="why">← SYNC-API-002#update_document 이(가) 어긋남 지목</div>
     </div>
   </section>
 
-  <section class="grp" data-el="5">
-    <h4>규약 오류 <span class="cnt">1</span></h4>
-    <div class="row" data-el="5.1">
-      <span class="k">SYNC-UC-001</span>
-      <span class="lbl">커밋 a1b2c3 · frontmatter.status 누락</span>
-      <span class="grow"></span><span class="age">1일</span>
+  <section class="tgroup" data-el="4">
+    <h4>전파 미결정 <span class="cnt">1</span><span class="rule"></span></h4>
+    <div class="tcard" data-el="4.1">
+      <div class="th"><span class="k">SYNC-PRD-001</span><span class="tt">v7</span><span class="grow"></span><span class="age">1일</span></div>
+      <div class="why">spec: R10 다이어그램 렌더링으로 변경 · 하위 3건</div>
     </div>
   </section>
 
-  <section class="grp" data-el="6">
-    <h4>미해결 댓글 <span class="cnt">2</span></h4>
-    <div class="row" data-el="6.1">
-      <span class="k">SYNC-PRD-001</span> 12행
-      <span class="lbl">김민준: 이 부분 에이전트가 파싱 가능한지…</span>
-      <span class="grow"></span><span class="age">2일</span>
-    </div>
-    <div class="row">
-      <span class="k">SYNC-SCN-001</span> 40행
-      <span class="lbl">김민준: P2 툴 목록에 Cursor 빠짐</span>
-      <span class="grow"></span><span class="age">3시간</span>
+  <section class="tgroup" data-el="5">
+    <h4>규약 오류 <span class="cnt">1</span><span class="rule"></span></h4>
+    <div class="tcard" data-el="5.1">
+      <div class="th"><span class="k">SYNC-SEQ-001</span><span class="tt">v3</span><span class="grow"></span><span class="age">4시간</span></div>
+      <div class="why">규약 오류 · 문서 배너에 상세</div>
     </div>
   </section>
 
-  <section class="grp dim" data-el="7">
-    <h4>담당 미지정 <span class="cnt">1</span></h4>
-    <div class="row" data-el="7.1">
-      <span class="k">SYNC-UC-001#UC-H2</span> 사람용 뷰로 읽는다
-      <span class="lbl">확인 필요 · 원인 SYNC-PRD-001#R1 v7</span>
-      <span class="grow"></span><span class="age">1일</span>
+  <section class="tgroup" data-el="6">
+    <h4>미해결 댓글 <span class="cnt">1</span><span class="rule"></span></h4>
+    <div class="tcard" data-el="6.1">
+      <div class="th"><span class="k">SYNC-PRD-001</span><span class="tt">88행</span><span class="grow"></span><span class="age">1일</span></div>
+      <div class="why">김민준: 이 문단은 UC-H2와 어긋납니다</div>
+    </div>
+  </section>
+
+  <!-- 마지막이고 흐리다. 누구 것도 아니라 모두에게 보인다 -->
+  <section class="tgroup dim" data-el="7">
+    <h4>담당 미지정 <span class="cnt">1</span><span class="rule"></span><span class="note">누구 것도 아니라 모두에게 보인다 · 배지에는 안 들어간다</span></h4>
+    <div class="tcard" data-el="7.1">
+      <div class="th"><span class="k">SYNC-MS-007#queries.todo</span><span class="tt">내 할 일 여섯 묶음</span><span class="grow"></span><span class="age">6일</span></div>
+      <div class="why">원인 SYNC-API-001#GET/api/todo v2 · 확인 필요</div>
     </div>
   </section>
 
@@ -552,10 +542,10 @@ status: approved
 
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
-| 1 | 헤더 | 영역 | 제목, 총 건수(1.1) | — |
-| 1.1 | 총 건수 | 텍스트 | 2~6·9 묶음의 합. 담당 미지정(7)은 제외. 정렬 기준은 경과일순(UC-H15 기본 흐름 2) | — |
+| 1 | 헤더 | 영역 | 제목과 총 건수(경고색). 그 아래 부제(1.1) 한 줄 | — |
+| 1.1 | 부제 | 텍스트 | `n건 · 경과일순 · 알림은 없다. 이 화면이 알림이다.` 건수는 2~6·9의 합, 담당 미지정(7)은 제외(UC-H15 기본 흐름 2) | — |
 | 2 | 확인 필요 | 묶음 | 내가 담당인 `needs_check` 플래그. 0건이면 묶음 숨김 | — |
-| 2.1 | 확인 필요 행 | 행 | 대상 항목 ID·제목, 원인 항목·버전, 경과일 | UI-11로 (UC-H15 기본 흐름 3) |
+| 2.1 | 확인 필요 카드 | 카드 | 첫 줄에 대상 항목 ID·제목과 경과일, 둘째 줄에 원인 항목·버전 | UI-11로 (UC-H15 기본 흐름 3) |
 | 3 | 끊어진 참조 | 묶음 | 내가 담당인 `broken_ref` 플래그. 0건이면 숨김 | — |
 | 3.1 | 끊어진 참조 행 | 행 | 대상 항목, 사라진 상위 항목과 삭제 시각, 경과일 | 그 문서의 UI-5 `#item-X`. 항목 선택 + 참조 패널에 플래그 정보(UC-H12 기본 흐름 1) |
 | 9 | 하위 불일치 | 묶음 | 내가 담당인 `upstream_impact` 플래그 — 내 항목이 하위와 어긋났다고 지목됨. 0건이면 숨김 | — |
@@ -578,6 +568,9 @@ status: approved
 - 담당 미지정(7)은 마지막이고 흐리게 둔다. 남의 것이 아니라 아무의 것도 아닌 것이다
 - 상단 바 배지 숫자 = 1.1 총 건수. 담당 미지정은 배지에 안 들어간다
 - 0건 묶음은 제목까지 숨긴다. 전부 0이면 빈 상태(8)만 보인다
+- **카드 경계는 묶음이 아니라 항목에 있다.** 묶음 머리는 배경 위 맨 텍스트(이름 · 건수 · 열 끝까지 가는 실선)고, 카드는 항목마다 하나다. 묶음을 통째로 카드로 두면 항목 사이 경계가 사라진다
+- 카드는 두 줄이다 — 첫 줄이 **무엇**(항목 ID · 제목 · 경과일), 둘째 줄이 **왜**(원인·지목·요약). 한 줄로 이어 붙이면 같은 정보가 행마다 다른 자리에서 끝난다
+- 목록 폭은 `940px` 가운데. 본문 폭을 다 쓰면 첫 줄 오른쪽 끝의 경과일이 너무 멀어진다
 - 처리가 끝나면(확인함, 전파 선택, 댓글 해결) 이 화면으로 돌아왔을 때 그 행이 사라진다
 
 ### 시나리오
@@ -614,11 +607,14 @@ status: approved
 ### 배치
 
 ```html
-<div class="phead" data-el="1">
+<div class="fhead" data-el="1"><!-- 두 줄. 첫 줄이 무엇, 둘째 줄이 담당·경과 -->
   <div>
-    <span class="flag">확인 필요</span>
-    <b data-el="1.1">SYNC-PRD-001#R1</b> 에이전트용 원본과 사람용 뷰
-    <span class="lbl" data-el="1.2">담당 박호영 · 3일 전 부여</span>
+    <div class="t1">
+      <span class="flag">확인 필요</span>
+      <span class="fid" data-el="1.1">SYNC-PRD-001#R1</span>
+      <span class="ftitle">에이전트용 원본과 사람용 뷰</span>
+    </div>
+    <div class="lbl" data-el="1.2">담당 박호영 · 3일 전 부여</div>
   </div>
   <span class="grow"></span>
   <span class="btn" data-el="5">← 내 할 일</span>
@@ -628,7 +624,7 @@ status: approved
 
   <section class="cause" data-el="2">
     <div class="sech">
-      <b data-el="2.1">원인: SYNC-RFQ-001#Q03</b> 두 가지 버전
+      <b>원인</b> <span class="mono" data-el="2.1">SYNC-RFQ-001#Q03</span> <span class="lbl">두 가지 버전</span>
       <span class="lbl" data-el="2.2">v4 → v6 · 그 사이 2번 바뀜</span>
       <span class="grow"></span>
       <span class="btn sm" data-el="2.4">문서에서 보기</span>
@@ -642,22 +638,23 @@ status: approved
 
   <section class="mine" data-el="3">
     <div class="sech">
-      <b data-el="3.1">내 항목: SYNC-PRD-001#R1</b>
+      <b>내 항목</b> <span class="mono" data-el="3.1">SYNC-PRD-001#R1</span>
       <span class="lbl" data-el="3.2">v7 · 플래그 부여 후 변경 없음</span>
       <span class="grow"></span>
       <span class="btn sm" data-el="3.4">문서에서 보기</span>
     </div>
-    <div class="mybody" data-el="3.3">
-      <div class="item"><span class="id">#R1</span>에이전트용 원본과 사람용 뷰</div>
-      <p>명세는 에이전트가 읽을 것을 전제로, 규약이 있는 Markdown으로 작성한다. 이 MD가 원본이자 에이전트용 산출물이다.</p>
-      <p>사람용 뷰는 원본에 그림·참조 링크·상태 표시를 더해 파생 생성한다. 근거: <span class="ref">[[SYNC-RFQ-001#Q03]]</span></p>
+    <div class="mybody">
+      <div class="mineh"><span class="idbadge">R1</span> <b>에이전트용 원본과 사람용 뷰</b></div>
+      <div class="body" data-el="3.3">
+        <p>명세는 에이전트가 읽을 것을 전제로, 규약이 있는 Markdown으로 작성한다. 이 MD가 원본이자 에이전트용 산출물이다.</p>
+        <p>사람용 뷰는 원본에 그림·참조 링크·상태 표시를 더해 파생 생성한다. 근거: <span class="ref">[[SYNC-RFQ-001#Q03]]</span></p>
+      </div>
     </div>
   </section>
 
-  <div class="acts" data-el="4">
-    <span class="lbl" data-el="4.2">영향이 있으면 에이전트에게 수정을 시킨 뒤 돌아와 확인하세요</span>
-    <span class="grow"></span>
-    <span class="btn" data-el="4.1" style="font-weight:600">확인함</span>
+  <div class="acts" data-el="4"><!-- 앞 두 카드와 같은 카드다 -->
+    <span class="lbl" data-el="4.2">영향이 있으면 에이전트에게 수정을 시킨 뒤 돌아와 확인하세요 · 지금 누르면 <b>수정 없음</b>으로 기록됩니다</span>
+    <span class="btn solid" data-el="4.1">확인함</span>
   </div>
 </div>
 ```
@@ -691,6 +688,9 @@ status: approved
 - 이 화면에는 편집이 없다. 수정은 에이전트에게 시키고(UC-A6), 돌아오면 3.2·3.3이 갱신되어 있다
 - 원인 항목 쪽이 잘못됐다고 판단하면(UC-H11 4a) 확인함을 누르지 않고 5로 나간다. 플래그는 남는다
 - 담당 미지정 플래그를 열었을 때 확인함을 누르면 확인자가 나로 기록된다
+- 본문 폭은 `880px` 가운데. 머리는 두 줄이고 둘째 줄(담당·경과)은 메타 크기다 — 한 줄로 뭉치면 메타가 제목만큼 커 보인다
+- 처리(4)도 앞 두 카드와 같은 카드다. 배경 위 맨 줄로 두면 위계가 어긋난다. 확인함(4.1)은 이 화면의 주 동작이라 채운 버튼이다
+- 내 항목 본문(3.3) 위에 항목 ID 뱃지와 제목을 얹는다. 카드 안에서 색을 쓰는 자리는 여기 하나다
 
 ### 시나리오
 
@@ -730,7 +730,7 @@ status: approved
 ### 배치
 
 ```html
-<div class="dialog wide" data-el="1">
+<div class="dialog mid" data-el="1">
   <div class="dhead">
     <span data-el="1.1">전파 선택 — SYNC-PRD-001 v7</span>
     <span class="grow"></span>
@@ -738,6 +738,8 @@ status: approved
     <span class="x" data-el="6">✕</span>
   </div>
   <div class="dbody">
+    <!-- 규칙 셋을 먼저 말한다 — 전부냐 아니냐, 닫으면 어떻게 되나 -->
+    <p class="dlead">이 버전에서 바뀐 것과 영향받는 하위 항목입니다. 전파하면 전부에 확인 필요가 붙습니다 — 일부만 고를 수 없습니다. 닫으면 미결정이 그대로 남습니다.</p>
 
     <div class="sech" data-el="2"><b>이 버전에서 바뀐 것</b> <span class="lbl">v6 → v7 · 항목 2개</span></div>
     <div class="diffbox" data-el="2.1">
@@ -748,21 +750,29 @@ status: approved
       <div class="dl add">+ 웹 문서 뷰는 유저용과 원본 두 탭을 전환해 보여준다</div>
     </div>
 
-    <div class="sech" data-el="3"><b>영향받는 하위 항목</b> <span class="lbl">3건</span></div>
-    <ul class="chk" data-el="3.1">
-      <li><b>SYNC-UC-001#UC-H2</b> 사람용 뷰로 읽는다 <span class="lbl">← #R1, #R10 · 담당 김민준</span></li>
-      <li><b>SYNC-UC-001#UC-A6</b> 명세를 작성·수정한다 <span class="lbl">← #R1 · 담당 박호영</span></li>
-      <li><b>SYNC-DOM-001#다이어그램</b> <span class="lbl">← #R10 · 담당 미지정</span></li>
-    </ul>
-
-    <div class="propacts">
-      <div class="skipbox" data-el="5">
-        <span class="btn" data-el="5.1">하위 전파 안 함</span>
-        <input class="inp" data-el="5.2" placeholder="사유 (필수) — 예: 오탈자 수정">
-      </div>
-      <span class="grow"></span>
-      <span class="btn" data-el="4" style="font-weight:600">예 — 3건에 확인 필요 붙이기</span>
+    <!-- 표다. 한 줄로 이어 붙이면 `어느 변경`과 `담당`이 행마다 다른 자리에서 끝난다 -->
+    <div class="atable" data-el="3">
+      <div class="arow ahead"><span>영향받는 하위 항목 3건</span><span>어느 변경</span><span>담당</span></div>
+      <a class="arow" data-el="3.1"><span><b class="mono">SYNC-UC-001#UC-H2</b> 사람용 뷰로 읽는다</span><span class="lbl mono">← #R1, #R10</span><span class="lbl">김민준</span></a>
+      <a class="arow"><span><b class="mono">SYNC-UC-001#UC-A6</b> 명세를 작성·수정한다</span><span class="lbl mono">← #R1</span><span class="lbl">박호영</span></a>
+      <a class="arow"><span><b class="mono">SYNC-DOM-001#다이어그램</b></span><span class="lbl mono">← #R10</span><span class="lbl">담당 미지정</span></a>
     </div>
+
+    <!-- 세 번째 선택지. 따로 상자에 담지 않으면 눈에 안 띈다 -->
+    <div class="skipbox" data-el="5">
+      <b>전파하지 않으려면</b>
+      <div class="skiprow">
+        <input class="inp wide" data-el="5.2" placeholder="사유 (필수) — 예: 오탈자 수정">
+        <span class="btn" data-el="5.1">하위 전파 안 함</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="dfoot"><!-- 본문이 길어도 결정 버튼은 늘 보인다 -->
+    <span>결정은 셋 중 하나이며 한 번 하면 바꿀 수 없다</span>
+    <span class="grow"></span>
+    <span class="btn" data-el="6">닫기 (미결정 유지)</span>
+    <span class="btn solid" data-el="4">예 — 3건에 확인 필요 붙이기</span>
   </div>
 </div>
 ```
@@ -777,12 +787,12 @@ status: approved
 | 2 | 변경 영역 | 영역 | 이 버전에서 바뀐 항목 ID 목록과 diff(UC-H10 기본 흐름 1) | — |
 | 2.1 | 변경 diff | diff | 이전 버전 → 이 버전. 항목 ID별로 묶음 | — |
 | 3 | 영향 영역 | 영역 | UC-S3이 찾은 하위 항목(UC-H10 기본 흐름 1) | — |
-| 3.1 | 하위 항목 목록 | 목록 | 항목 ID·제목, 어느 변경 항목의 하위인지, 담당자 | 항목 클릭 → 그 문서의 UI-5 (새 탭) |
+| 3.1 | 하위 항목 표 | 표 | 3열 — 항목 ID·제목 / 어느 변경 항목의 하위인지 / 담당자. 머리 행에 열 이름 | 행 클릭 → 그 문서의 UI-5 (새 탭) |
 | 4 | 예 | 버튼 | 붙을 플래그 건수를 버튼에 표시 | UC-S4 실행. 3.1 전부에 `확인 필요`. 다이얼로그 닫힘, UI-10에서 행 사라짐 |
-| 5 | 전파 안 함 영역 | 영역 | 버튼(5.1)과 사유 입력(5.2) | — |
+| 5 | 전파 안 함 영역 | 영역 | `전파하지 않으려면` 상자. 사유 입력(5.2)과 버튼(5.1). 세 번째 선택지라 따로 담는다 | — |
 | 5.1 | 하위 전파 안 함 | 버튼 | 5.2가 비어 있으면 비활성 | `skip` + 사유 기록(UC-H10 2a). 플래그 안 붙음. 닫힘 |
 | 5.2 | 사유 | 한 줄 입력 | 필수 | — |
-| 6 | 닫기 | 버튼 | | 결정 없이 닫힘. `미결정` 유지, UI-10 행 남음(UC-H10 2b) |
+| 6 | 닫기 | 버튼 | 머리의 `✕`와 발의 `닫기 (미결정 유지)` 둘 다 | 결정 없이 닫힘. `미결정` 유지, UI-10 행 남음(UC-H10 2b) |
 
 ### 규칙
 
@@ -791,6 +801,8 @@ status: approved
 - 4를 누르면 3.1의 모든 항목에 플래그가 붙는다. 일부만 고를 수 없다. 일부만 영향이 없다면 그 담당자가 UI-11에서 "수정 없음"으로 확인하면 된다
 - 하위 항목 클릭(3.1)은 새 탭으로 연다. 다이얼로그 위에서 판단 중이므로 이 화면을 떠나지 않는다
 - 저장 주체가 에이전트면 1.2에 지시자를 함께 보여준다. 이 다이얼로그는 지시자의 내 할 일에 뜬다
+- **결정 버튼은 고정 푸터에 둔다.** 본문(diff·표·사유)이 길어 다이얼로그가 통째로 스크롤되면 세 선택지가 첫 화면에서 사라진다. 머리와 발은 고정, 본문만 스크롤
+- 본문 첫 줄에 규칙을 먼저 적는다 — 전부에 붙는다는 것, 일부만 고를 수 없다는 것, 닫으면 미결정이 남는다는 것
 
 ### 시나리오
 
