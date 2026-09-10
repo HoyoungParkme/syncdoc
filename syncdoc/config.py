@@ -3,6 +3,8 @@
 DB URL · SECRET_KEY · GitHub OAuth · WEBHOOK_SECRET · REPOS_DIR.
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict

@@ -38,6 +38,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ```python
 async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | None,
                         body: str, expected_version: int | None,
+                        project_code: str | None,
                         author: Author, message: str,
                         changed_items: list[str] | None = None,
                         upstream_impact: list[str] | None = None,
@@ -54,6 +55,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 | `entry` | 어느 입구 | `mcp` `web_revert` `web_status` `github` |
 | `doc_id` | 대상 문서. 생성이면 None | 생성은 `entry=mcp`만 |
 | `doc_type` | 생성 시 타입 | 생성이면 필수 |
+| `project_code` | 생성 시 프로젝트 | 생성이면 필수. 수정이면 None — `doc_id` 앞부분에서 얻는다 |
 | `body` | 원본 MD 전체 | frontmatter 포함 |
 | `expected_version` | 낙관적 잠금 | `mcp`·`web_*`면 필수. `github`면 None |
 | `author` | 작성 주체 | `kind`·`user`·`instructed_by`·`via` |
@@ -65,10 +67,10 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 
 **처리**
 
-1. `repo = project.get(코드).repository`. 코드는 `doc_id` 앞부분 또는 생성 시 인자. **저장소 락 획득** (`asyncio.Lock`, 저장소별). 이후 전부 락 안
+1. `code = project_code if doc_id is None else doc_id.split("-")[0]` · `project = ProjectService.get(code)`, `repo = project.repository`. **저장소 락 획득** (`asyncio.Lock`, 저장소별). 이후 전부 락 안. **세션도 여기서 연다** — 서비스는 세션을 열지 않는다(DEV-10)
 2. if `doc_id is not None` → `document = spec.get_document(doc_id)`, `doc_type = document.doc_type` · if 없음 → `! not-found`
    (`entry == github`도 같다 · if github 경로에서 없음 → process_commit이 `doc_id=None`으로 다시 부른다)
-3. if `doc_id is None` (생성) → `doc_id = spec.issue_doc_id(project_id, doc_type)`, `body = spec.apply_frontmatter(body, doc_id, doc_type, "draft")`
+3. if `doc_id is None` (생성) → `doc_id = spec.issue_doc_id(project_id, project.code, doc_type)`, `body = spec.apply_frontmatter(body, doc_id, doc_type, "draft")`
 4. `(violations, warnings) = spec.validate(body, doc_type, entry, current_status=document.status if document else None)`
    - if `violations and entry != github` → `! convention-violation {violations, warnings}`, 락 해제
    - if `violations and entry == github` → 계속. 8단계에 `has_convention_error=True`로 전달
@@ -79,12 +81,12 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 8. **트랜잭션 시작**
    - if 생성 → `version = spec.create(project_id, doc_id, doc_type, body, commit_hash, author)`
    - if `entry == web_status` → `spec.apply_status(document, new_body, commit_hash, user, reason)` (Document.status·current_body 갱신 + StatusChange). **Version 없음.** 9~12 건너뛰고 13으로
-   - else → `version = spec.save(document, body, commit_hash, author, deleted, has_convention_error, warnings)`
+   - else → `version = spec.save(document, body, commit_hash, author, deleted, validate_result=(4단계 결과 if entry == github else None))`
 9. `deleted`마다 `tracking.raise_broken(pk)`
-10. `reference.extract(document_id, version.id, body)`
+10. `reference.extract(document_id, version.id, body, item_pks=save가 돌려준 {item_id: pk}, upstream_doc_ids=frontmatter upstream)`
 11. `affected = tracking.detect_impact(document_id, prev_version_id, version.id, changed_items)` · if `affected` → `pending_id = tracking.create_pending(version.id)` · else `pending_id = None`
 12. if `upstream_impact` → 각각 `spec.resolve_item(doc, item)` · if 못 찾음 → `warnings`에 `upstream_impact.unknown` 추가하고 건너뜀 · `tracking.raise_upstream(pks, document_id, version.id, cause_item_pk=None)`
-13. `collab.relocate(document_id, old_body, body)`
+13. `collab.relocate(document_id, old_body, body, old_version_no=document.current_version_no)`
 14. **커밋.** 락 해제
 15. `→ SaveResult(doc_id, version_no, commit_hash, status, pending_decision_version_id=pending_id, warnings)`
 

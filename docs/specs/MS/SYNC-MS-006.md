@@ -31,6 +31,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#AccountService.authenticate_token]] | MCP 인증 |
 | [[#AccountService.github_token_for]] | push용 토큰 복호화 |
 | [[#AccountService.user_by_login]] | 로그인 → User |
+| [[#AccountService.users_by_ids]] | 여러 사용자 표시 정보 |
 | [[#AccountService.create_placeholder]] | 미등록 자리표시 |
 
 ---
@@ -118,6 +119,14 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **시그니처** `user_by_login(login: str) -> User | None`
 
 **처리** `DB: users where github_login=login`. 자리표시도 반환
+
+---
+
+#### AccountService.users_by_ids 여러 사용자 표시 정보
+
+**시그니처** `users_by_ids(ids: list[int]) -> dict[int, UserRef]`
+
+**처리** `DB: users where id in ids` → `{id: UserRef(id, github_login, display_name)}`. `queries`가 `AuthorRef`·`assignee_user_id`를 이름으로 바꿀 때. **쿼리 한 번**
 
 ---
 

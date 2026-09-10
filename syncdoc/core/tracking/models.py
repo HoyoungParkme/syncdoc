@@ -3,6 +3,8 @@
 테이블은 SYNC-DOM-003#flags · #propagation_decisions. 인덱스는 DOM-003 3장.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, func

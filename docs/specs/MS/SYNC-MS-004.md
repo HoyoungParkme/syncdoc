@@ -115,7 +115,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 1. `dec = get_decision(version_id)` → `changed_pks`
 2. `target_pk`마다:
    - `causes` = `changed_pks` 중 이 target을 참조하는 것 전부 (`ReferenceService.upstream(target_pk)` ∩ `changed_pks`)
-   - `assignee = SpecService.last_author(target의 document_id)` (None 가능, UC-S4 3b)
+   - `assignee = (SpecService.last_author(target의 document_id) or None).user_id` (None 가능, UC-S4 3b)
    - `cause_pk`마다 — **원인 하나에 플래그 하나** (결정: 첫 것만이면 손실, jsonb 묶음은 화면·스키마 변경이 큼):
      - if 같은 `(target, cause, cause_version)` 미해결 플래그 있음 → 건너뜀
      - `DB: flags insert (kind=needs_check, target_item_pk, cause_item_pk=cause_pk, cause_version_id=version_id, assignee_user_id, raised_at=now)`
@@ -133,7 +133,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-SEQ-001#SEQ-1]] 9 · [[SYNC-UC-001#UC-H13]] 5
 
-**처리** `refs = ReferenceService.downstream(cause_item_pk)` · 각 `from_item_pk`에 `DB: flags insert (kind=broken_ref, target=from_item_pk, cause=cause_item_pk, cause_version=None, assignee=SpecService.last_author(target 문서))` · `→` 수. 원인 항목은 `is_deleted=true`지만 행이 남아 있어 FK가 유지된다
+**처리** `refs = ReferenceService.downstream(cause_item_pk)` · 각 `from_item_pk`에 `DB: flags insert (kind=broken_ref, target=from_item_pk, cause=cause_item_pk, cause_version=None, assignee=SpecService.last_author(target 문서).user_id)` · `→` 수. 원인 항목은 `is_deleted=true`지만 행이 남아 있어 FK가 유지된다
 
 ---
 
@@ -143,12 +143,12 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-UC-001#UC-S4]] · [[SYNC-UC-001#UC-H8]] 5 · [[SYNC-SEQ-001#SEQ-5]] · [[SYNC-SEQ-001#SEQ-1]] — 하위→상위 되먹임. `pipeline`(에이전트 지정)과 `SpecService.change_status`(승인 대조) 둘이 부른다
 
-**입력** `target_item_pks` 상위 항목 pk들 · `cause_document_id` 어긋났다고 지목한 하위 문서 · `cause_version_id` 그 시점 버전 · `cause_item_pk` 지목한 하위 항목(승인 대조는 문서 단위라 None)
+**입력** `target_item_pks` 상위 항목 pk들 · `cause_document_id` 어긋났다고 지목한 하위 문서 · `cause_version_id` 그 시점 버전 · `cause_item_pk` 지목한 하위 항목(승인 대조는 문서 단위라 None). 담당자 결정에 필요한 "대상 항목의 문서"는 `items.document_id`에서 읽는다(items는 spec 묶음이지만 pk→document_id 조회는 허용 — 참조 테이블과 같은 성격)
 
 **처리** — 호출자의 트랜잭션 안
 1. `target_pk`마다:
    - `assignee = SpecService.last_author(target의 document_id)` (None 가능)
-   - if 같은 `(target, cause_document_id, kind=upstream_impact)` 미해결 플래그 있음 → 건너뜀
+   - if 같은 `(target, cause_document_id, kind=upstream_impact)` 미해결 플래그 있음 → 건너뜀. `cause_document_id`는 컬럼이 없으므로 `cause_version_id`로 `versions`를 조인해 얻는다
    - `DB: flags insert (kind=upstream_impact, target_item_pk, cause_item_pk, cause_version_id, assignee_user_id, raised_at=now)`
 2. `→` 생성 수
 
@@ -183,9 +183,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### TrackingService.flags_for_items 항목별 플래그 종류
 
-**시그니처** `flags_for_items(item_pks: list[int]) -> dict[int, list[FlagSummary]]`
+**시그니처** `flags_for_items(item_pks: list[int]) -> dict[int, list[Flag]]`
 
-**처리** `DB: flags where target_item_pk in pks and resolved_at is null` → pk별 묶음. 미해결만
+**처리** `DB: flags where target_item_pk in pks and resolved_at is null` → pk별 `Flag` 행 묶음. 미해결만. **행을 그대로 준다** — `kind` 문자열 목록으로 접거나 `FlagSummary`(ItemRef·UserRef 채움)로 만드는 건 `queries`가 `describe_items`·`users_by_ids`로
 
 ---
 

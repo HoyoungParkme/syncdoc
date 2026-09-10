@@ -95,6 +95,7 @@ erDiagram
         varchar author_kind
         int author_user_id FK
         int instructed_by_user_id FK
+        varchar via
         timestamptz created_at
     }
     status_changes {
@@ -241,6 +242,7 @@ erDiagram
 | author_kind | varchar(10) | AuthorKind | 사람이 썼나 에이전트가 썼나 | `agent` |
 | author_user_id | int | FK not null | 커밋 작성자. 에이전트면 토큰 발급자 | |
 | instructed_by_user_id | int | FK null 허용 | 에이전트에게 시킨 사람. 사람이 직접 썼으면 null | |
+| via | varchar(8) | not null | 어느 입구로 저장됐나 — `mcp` / `web`(되돌리기) / `github`. `Author.via`를 접은 것. 이력 화면이 구분한다 | `web` |
 
 ### status_changes
 

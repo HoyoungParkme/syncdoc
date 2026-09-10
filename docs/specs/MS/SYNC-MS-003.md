@@ -47,8 +47,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **입력** `document_id`, 새 `version_id`, `body`, `item_pks` — 이 문서의 `{item_id: pk}` (SpecService.save가 만든 것), `upstream_doc_ids` — frontmatter `upstream`
 
 **처리** — 호출자의 트랜잭션 안
-1. 코드블록·인라인 코드를 공백으로 치환 (MS-001 `item_blocks`와 같은 방식)
-2. `SpecService.item_blocks`가 준 블록 경계로, `[[ ]]`마다 **어느 항목 블록 안**에 있는지 → `from_item_pk`. 항목 밖(절 본문)의 참조는 문서 노드에서 나가는 것으로 `from_item_pk=None`, `from_document_id`
+1. `core/markdown.py`의 마스킹·헤딩·참조 함수로 본문을 자른다 — spec 모듈을 import하지 않는다(묶음 경계). 항목 블록 경계는 같은 순수 함수가 준다
+2. `[[ ]]`마다 **어느 항목 블록 안**에 있는지 → `item_pks[item_id]`로 `from_item_pk`. 항목 밖(절 본문)의 참조는 문서 노드에서 나가는 것으로 `from_item_pk=None`, `from_document_id`
 3. 참조 문자열 파싱: `[[DOC]]` → 문서 참조 · `[[DOC#ITEM]]` → 항목 참조 · `[[#ITEM]]` → 같은 문서 항목
 4. 대상 찾기: `DB: documents where doc_id` → `to_document_id` · 항목이면 `DB: items where document_id and item_id and is_deleted=false` → `to_item_pk` · if 못 찾음 → `is_missing=True`, `to_*=None`, `raw_target` 보존
 5. frontmatter `upstream`마다 문서 참조 행 (`from_item_pk=None`, `to_document_id`)

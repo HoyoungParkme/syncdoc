@@ -73,7 +73,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### CommentService.relocate 새 버전에서 줄 찾기
 
-**시그니처** `relocate(document_id: int, old_body: str, new_body: str) -> int`
+**시그니처** `relocate(document_id: int, old_body: str, new_body: str, old_version_no: int) -> int`
 
 근거: [[SYNC-SEQ-001#SEQ-1]] 12단계 · [[SYNC-UC-001#UC-H9]] 2a·2b · [[SYNC-DOM-003#comments]] `line_hash`·`original_location`
 
@@ -84,7 +84,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
    - `cands = new_hashes.get(line_hash, [])`
    - if `len(cands) == 1` → `line_no = cands[0]`
    - if `len(cands) > 1` → 옛 `line_no`에 가장 가까운 것
-   - if `cands` 비어 있음 (줄이 사라짐, 2b) → `line_no` 유지, `original_location = f"v{옛 버전}:{line_no}"` (이미 있으면 그대로)
+   - if `cands` 비어 있음 (줄이 사라짐, 2b) → `line_no` 유지, `original_location = f"v{old_version_no}:{line_no}"` (이미 있으면 그대로)
    - `DB: update line_no, original_location`
 4. `→` 옮긴 수
 

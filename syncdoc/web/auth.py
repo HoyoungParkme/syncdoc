@@ -4,6 +4,8 @@
 세션에는 github_login만 둔다 — 사용자 조회는 AccountService.user_by_login(MS-006).
 """
 
+from __future__ import annotations
+
 from urllib.parse import urlencode
 
 from fastapi import Depends, Request

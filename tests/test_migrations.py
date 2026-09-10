@@ -61,6 +61,8 @@ def test_upgrade_creates_12_tables_and_indexes(alembic_cfg: Config) -> None:
     assert PARTIAL_INDEXES <= set(defs)
     assert all("WHERE" in defs[n] for n in PARTIAL_INDEXES)
     assert "version_no DESC" in defs["ix_versions_document_id_version_no_desc"]
+    via = next(c for c in insp.get_columns("versions") if c["name"] == "via")  # 0002
+    assert via["nullable"] is False and via["default"] is None
     # FK 컬럼 전부 인덱스(DEV-8): 각 FK의 첫 컬럼이 어떤 인덱스의 선두 컬럼이다
     for table in TABLES:
         leading = {
@@ -76,6 +78,10 @@ def test_upgrade_creates_12_tables_and_indexes(alembic_cfg: Config) -> None:
 def test_downgrade_removes_everything(alembic_cfg: Config) -> None:
     _reset_schema()
     command.upgrade(alembic_cfg, "head")
+    command.downgrade(alembic_cfg, "0001")
+    engine = create_engine(settings.DATABASE_URL)
+    assert "via" not in {c["name"] for c in inspect(engine).get_columns("versions")}
+    engine.dispose()
     command.downgrade(alembic_cfg, "base")
     engine = create_engine(settings.DATABASE_URL)
     assert set(inspect(engine).get_table_names()) - {"alembic_version"} == set()

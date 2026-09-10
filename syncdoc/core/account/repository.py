@@ -1,5 +1,7 @@
 """SYNC-DOM-002 4.6 — users·access_tokens 조회·저장. DB만 안다."""
 
+from __future__ import annotations
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -18,6 +20,11 @@ class AccountRepository:
 
     def user_by_github_user_id(self, github_user_id: int) -> User | None:
         return self.session.scalar(select(User).where(User.github_user_id == github_user_id))
+
+    def users_by_ids(self, ids: list[int]) -> list[User]:
+        if not ids:
+            return []
+        return list(self.session.scalars(select(User).where(User.id.in_(ids))))
 
     def placeholder_by_login(self, login: str) -> User | None:
         return self.session.scalar(

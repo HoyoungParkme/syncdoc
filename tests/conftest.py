@@ -80,3 +80,72 @@ def github_ok(user_id: int = 42, login: str = "hoyoung", name: str | None = "박
         return httpx.Response(404)
 
     return handler
+
+
+@pytest.fixture
+def scoped(db_session: Session, monkeypatch: pytest.MonkeyPatch) -> Session:
+    """pipeline·queries의 db.session_scope()가 테스트 트랜잭션 세션을 쓰게 한다."""
+    from contextlib import contextmanager
+
+    from syncdoc import db
+
+    @contextmanager
+    def _scope():
+        yield db_session
+
+    monkeypatch.setattr(db, "session_scope", _scope)
+    return db_session
+
+
+# ── git 임시 저장소 픽스처 (infra·project 테스트 공유) ──
+import subprocess  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+SEED = "docs/specs/PRD/SYNC-PRD-001.md"
+
+
+def git(cwd: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", "-c", "user.name=seed", "-c", "user.email=seed@example.com", *args],
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def write_commit_push(repo: Path, path: str, content: str, message: str = "seed") -> str:
+    f = repo / path
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(content, encoding="utf-8")
+    git(repo, "add", path)
+    git(repo, "commit", "-q", "-m", message)
+    git(repo, "push", "-q", "origin", "HEAD:main")
+    return git(repo, "rev-parse", "HEAD")
+
+
+@pytest.fixture
+def repos(tmp_path: Path) -> dict[str, Path]:
+    remote = tmp_path / "remote.git"
+    git(tmp_path, "init", "-q", "--bare", "-b", "main", str(remote))
+    other = tmp_path / "other"
+    git(tmp_path, "clone", "-q", str(remote), str(other))
+    git(other, "checkout", "-q", "-b", "main")
+    write_commit_push(other, SEED, "---\ndoc_id: SYNC-PRD-001\n---\n# PRD\n", "seed")
+    work = tmp_path / "work"
+    git(tmp_path, "clone", "-q", str(remote), str(work))
+    return {"remote": remote, "work": work, "other": other}
+
+
+# ── FastAPI TestClient (web·mcp 공유) ──
+@pytest.fixture
+def client(db_session: Session):
+    from fastapi.testclient import TestClient  # noqa: E402
+
+    from syncdoc.db import get_session  # noqa: E402
+    from syncdoc.main import app  # noqa: E402
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()

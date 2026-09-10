@@ -1,5 +1,7 @@
 """SYNC-MS-009 — infra/github.py. OAuth·webhook 검증. core는 이것을 통해서만 GitHub API를 만진다."""
 
+from __future__ import annotations
+
 import hashlib
 import hmac
 

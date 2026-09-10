@@ -1,5 +1,7 @@
 """SYNC-MS-006 — AccountService. users·access_tokens만. 비밀키는 config.SECRET_KEY(DB 밖)."""
 
+from __future__ import annotations
+
 import base64
 import hashlib
 import secrets
@@ -13,7 +15,7 @@ from syncdoc.config import settings
 from syncdoc.core.account.models import AccessToken, User
 from syncdoc.core.account.repository import AccountRepository
 from syncdoc.core.errors import NotFound, Unauthorized
-from syncdoc.core.types import IssuedToken
+from syncdoc.core.types import IssuedToken, UserRef
 from syncdoc.infra import github
 
 
@@ -83,6 +85,13 @@ class AccountService:
     def user_by_login(self, login: str) -> User | None:
         """SYNC-MS-006#AccountService.user_by_login"""
         return self.repo.user_by_login(login)
+
+    def users_by_ids(self, ids: list[int]) -> dict[int, UserRef]:
+        """SYNC-MS-006#AccountService.users_by_ids"""
+        return {
+            u.id: UserRef(id=u.id, github_login=u.github_login, display_name=u.display_name)
+            for u in self.repo.users_by_ids([i for i in ids if i is not None])
+        }
 
     def create_placeholder(self, login: str) -> User:
         """SYNC-MS-006#AccountService.create_placeholder"""

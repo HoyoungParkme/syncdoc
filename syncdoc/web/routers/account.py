@@ -1,5 +1,7 @@
 """routers/account — /auth/*. SYNC-API-001 3.1 · SYNC-SEQ-001#SEQ-8. AccountService만 부른다."""
 
+from __future__ import annotations
+
 import secrets
 
 from fastapi import APIRouter, Depends, Query, Request, Response
