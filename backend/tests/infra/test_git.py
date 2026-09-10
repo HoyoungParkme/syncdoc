@@ -129,7 +129,9 @@ async def test_commit_push_retries_when_remote_moves_twice(
 
     async def racing_exec(workdir: Path | None, *args: str) -> tuple[int, str, str]:
         if args[:1] == ("push",) and len(races) < 2:  # 첫 push와 첫 재시도 직전에 각각
-            races.append(write_commit_push(repos["other"], f"docs/specs/01-RFQ/{len(races)}.md", "x", "race"))
+            races.append(
+                write_commit_push(repos["other"], f"docs/specs/01-RFQ/{len(races)}.md", "x", "race")
+            )
         return await real_exec(workdir, *args)
 
     monkeypatch.setattr(g, "_exec", racing_exec)

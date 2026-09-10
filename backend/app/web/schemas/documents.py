@@ -107,6 +107,7 @@ class ChangeStatus(BaseModel):
     upstream_mismatch: list[str] = []
     upstream_reviewed: bool = False
 
+
 class ChainItem(Base):
     ref: ItemRef
     role: str

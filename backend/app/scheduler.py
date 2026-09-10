@@ -31,15 +31,20 @@ async def catch_up() -> list[SaveResult]:
     화면(MS-001 repo_status)이 읽는 behind_by·fetched_at을 적는 곳이 여기뿐이다.
     """
     with db.session_scope() as s:
-        repos = [(p.repository.id, p.repository.workdir_path, p.repository.remote_url,
-                  p.repository.last_processed_commit) for p in ProjectService(s).list_projects()]
+        repos = [
+            (
+                p.repository.id,
+                p.repository.workdir_path,
+                p.repository.remote_url,
+                p.repository.last_processed_commit,
+            )
+            for p in ProjectService(s).list_projects()
+        ]
     out: list[SaveResult] = []
     for repo_id, workdir, remote_url, last in repos:
         try:
             head = await git.fetch(Path(workdir))
-            behind = (
-                await git.rev_list_count(Path(workdir), f"{last}..{head}") if last else None
-            )
+            behind = await git.rev_list_count(Path(workdir), f"{last}..{head}") if last else None
             with db.session_scope() as s:
                 s.execute(
                     update(Repository)
