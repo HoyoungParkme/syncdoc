@@ -88,6 +88,7 @@ class StageSummary:
     status: str | None
     doc_count: int
     gate_warning: bool = False
+    flag_count: int = 0
 
 
 @dataclass
@@ -105,10 +106,15 @@ class ProjectSummary:
 
 @dataclass
 class ProjectDetail(ProjectSummary):
-    """SYNC-API-001 ProjectDetail — ProjectSummary + 문서 목록 + 최근 변경(status 커밋 포함)."""
+    """SYNC-API-001 ProjectDetail — ProjectSummary + 문서 목록 + 최근 변경(status 커밋 포함).
+
+    동기화 두 칸(UI-4 요소 7)은 DB에 적힌 값 그대로다. 이 응답을 만들 때 fetch를 돌리지 않는다.
+    """
 
     docs: list[DocumentSummary] = field(default_factory=list)
     recent_changes: list[Version] = field(default_factory=list)
+    last_processed_commit: str | None = None
+    behind_by: int | None = None
 
 
 @dataclass(frozen=True)

@@ -1137,6 +1137,11 @@ components:
         gate_warning:
           type: boolean
           description: 앞 단계에 미승인이 있는데 문서가 있다(1b)
+        flag_count:
+          type: integer
+          description: >
+            이 단계 문서들의 열린 플래그 합(세 종류). 칸 테두리와 툴팁이 쓴다(UI-2 요소 2.2).
+            색은 상태, 테두리는 플래그 — 두 정보가 한 칸에 겹치지 않게
     ProjectSummary:
       type: object
       properties:

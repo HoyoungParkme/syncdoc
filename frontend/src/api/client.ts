@@ -60,6 +60,8 @@ export interface StageSummary {
   status: string | null
   doc_count: number
   gate_warning: boolean
+  /** 이 단계 문서들의 열린 플래그 합. 색은 상태, 테두리는 플래그 (UI-2 2.2) */
+  flag_count: number
 }
 export interface DocumentSummary {
   doc_id: string
@@ -93,6 +95,9 @@ export interface Version {
 export interface ProjectDetail extends ProjectSummary {
   docs: DocumentSummary[]
   recent_changes: Version[]
+  /** 폴링이 DB에 적어 둔 값 그대로. 이 화면이 fetch를 돌리지 않는다 (UI-4 요소 7) */
+  last_processed_commit: string | null
+  behind_by: number | null
 }
 export interface DocItem {
   item_id: string

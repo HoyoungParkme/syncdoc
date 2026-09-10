@@ -1,11 +1,14 @@
 /** UI-9 순서대로 읽기 — SYNC-UI-002#UI-9. 승인 문서만, 없으면 배너(3)와 초안 보기(3.1). 요소 번호 = data-el.
- *  1 헤더 · 2 단계 표시 · 3 미확정 배너(3.1) · 4 본문(4.1 위치) · 5 이동(5.1 이전, 5.2 다음, 5.3 이 문서 열기) */
+ *  1 헤더 · 2 단계 표시(칩마다 대표 상태 점, 현재는 채워서) · 3 미확정 배너(3.1)
+ *  4 본문(4.1 위치) · 5 이동(5.1 이전, 5.2 다음, 5.3 이 문서 열기) */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
 import { api, docPath, STAGE_NAMES, STAGE_TYPES, STATUS_KO, type Document, type DocumentSummary } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { splitRef } from '../view/md'
+
+const ORDER: Record<string, number> = { draft: 0, review: 1, approved: 2 }
 
 export function ReadOrder() {
   const { code = '' } = useParams()
@@ -50,11 +53,22 @@ export function ReadOrder() {
     return () => root.removeEventListener('click', onClick)
   }, [bodies, code, nav, stage])
   const hasDocs = (s: number) => docs.some((d) => d.stage === s)
-  const next = (dir: 1 | -1) => {
+  /** 그 단계 문서들 중 가장 낮은 상태. 승인 2 + 초안 1이면 초안 (UC-H14 1a와 같은 기준) */
+  const stageStatus = (s: number) =>
+    docs
+      .filter((d) => d.stage === s)
+      .map((d) => d.status)
+      .sort((a, b) => ORDER[a] - ORDER[b])[0] ?? null
+  /** 문서 없는 단계는 건너뛴다. 갈 곳이 없으면 null — 버튼을 비활성으로 둔다 */
+  const target = (dir: 1 | -1): number | null => {
     let s = stage + dir
-    while (s >= 1 && s <= 11 && !hasDocs(s)) s += dir // 문서 없는 단계는 건너뛴다
-    if (s >= 1 && s <= 11) setSp({ stage: String(s) })
+    while (s >= 1 && s <= 11 && !hasDocs(s)) s += dir
+    return s >= 1 && s <= 11 ? s : null
   }
+  const prev = target(-1)
+  const nextStage = target(1)
+  const go = (s: number | null) => s !== null && setSp({ stage: String(s) })
+  const label = (s: number | null) => (s === null ? '' : `${s} ${STAGE_TYPES[s - 1]}`)
   return (
     <div className="page">
       <div className="phead" data-el="1">
@@ -65,9 +79,16 @@ export function ReadOrder() {
         <div className="steps" data-el="2">
           {STAGE_TYPES.map((t, i) => {
             const s = i + 1
-            const cls = !hasDocs(s) ? 'na' : s < stage ? 'done' : s === stage ? 'cur' : ''
+            const st = stageStatus(s)
+            // 번호와 타입 코드는 늘 보인다. 상태는 점 하나로 — 칩 색을 상태에 쓰면
+            // '현재 단계'와 '상태'가 같은 색을 두고 다툰다
             return (
-              <span key={t} className={`stp ${cls}`} onClick={() => hasDocs(s) && setSp({ stage: String(s) })}>
+              <span
+                key={t}
+                className={`stp${st ? '' : ' na'}${s === stage ? ' cur' : ''}`}
+                onClick={() => hasDocs(s) && setSp({ stage: String(s) })}
+              >
+                <i className={`dot dot-${st ?? 'none'}`} />
                 {s} {t}
               </span>
             )
@@ -90,16 +111,16 @@ export function ReadOrder() {
         <article className="main body" data-el="4">
           <div ref={mainRef} />
           <div className="nav" data-el="5">
-            <span className="btn" data-el="5.1" onClick={() => next(-1)}>
-              ← 이전 단계
+            <span className={`btn${prev === null ? ' dis' : ''}`} data-el="5.1" onClick={() => go(prev)}>
+              ← {prev === null ? '처음' : label(prev)}
             </span>
             {shown[0] && (
               <span className="btn" data-el="5.3" onClick={() => nav(docPath(shown[0].doc_id))}>
                 이 문서 열기
               </span>
             )}
-            <span className="btn" data-el="5.2" onClick={() => next(1)}>
-              다음 단계 →
+            <span className={`btn${nextStage === null ? ' dis' : ''}`} data-el="5.2" onClick={() => go(nextStage)}>
+              {nextStage === null ? '끝' : label(nextStage)} →
             </span>
           </div>
         </article>

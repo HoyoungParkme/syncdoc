@@ -19,6 +19,7 @@ class StageSummary(Base):
     status: str | None
     doc_count: int
     gate_warning: bool
+    flag_count: int
 
 
 class ProjectSummary(Base):
@@ -70,6 +71,8 @@ class Version(Base):
 class ProjectDetail(ProjectSummary):
     docs: list[DocumentSummary]
     recent_changes: list[Version]
+    last_processed_commit: str | None
+    behind_by: int | None
 
     @classmethod
     def of(cls, p: ProjectDetailDto) -> ProjectDetail:  # type: ignore[override]
@@ -77,6 +80,8 @@ class ProjectDetail(ProjectSummary):
             **cls._fields(p),
             docs=[DocumentSummary.of(d) for d in p.docs],
             recent_changes=[Version.of(v) for v in p.recent_changes],
+            last_processed_commit=p.last_processed_commit,
+            behind_by=p.behind_by,
         )
 
 

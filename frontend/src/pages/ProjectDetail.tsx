@@ -1,27 +1,29 @@
 /** UI-4 프로젝트 상세 — SYNC-UI-002#UI-4. 11단계 표 + 문서 행, 요약 수치, 표준 묶음, 최근 변경(status 커밋 포함).
  *  GET /api/projects/{code}(ProjectDetail) 하나로 그린다. 요소 번호 = data-el.
- *  1 헤더(1.1·1.2·1.3) · 2.1·2.2 그래프·순서(B4) · 3 요약 수치(3.1~3.5 → 다이얼로그 6) · 4 표(4.1 단계, 4.2 문서, 4.3 상위 미승인, 4.4 표준) · 5 최근 변경 · 6 목록 다이얼로그 */
+ *  1 헤더(1.1·1.2·1.3) · 2.1·2.2 그래프·순서 · 3 요약 수치 여섯(3.1·3.2·3.6·3.3·3.4·3.5 → 다이얼로그 6)
+ *  4 표(4.1 단계, 4.2 문서, 4.3 상위 미승인, 4.4 표준) · 5 최근 변경 · 6 목록 다이얼로그 · 7 동기화 상태(7.1 커밋, 7.2 밀림) */
 import { useEffect, useState } from 'react'
 import { Link, useOutletContext, useParams } from 'react-router-dom'
 import { StatusPill } from '../components/ui'
-import { ago, api, authorLabel, docPath, refKey, STAGE_NAMES, STAGE_TYPES, STATUS_KO, type CommentSummary, type DocumentSummary, type FlagSummary, type ProjectDetail as Detail, type ProjectSummary, type Version } from '../api/client'
+import { ago, api, authorLabel, docPath, refKey, STAGE_NAMES, STATUS_KO, type CommentSummary, type DocumentSummary, type FlagSummary, type ProjectDetail as Detail, type ProjectSummary } from '../api/client'
 
 
 export function ProjectDetail() {
   const { code = '' } = useParams()
   const { projects } = useOutletContext<{ projects: ProjectSummary[] }>()
   const p = projects.find((x) => x.code === code)
-  const [docs, setDocs] = useState<DocumentSummary[]>([])
-  const [recent, setRecent] = useState<Version[]>([])
+  const [d, setD] = useState<Detail | null>(null)
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [dialog, setDialog] = useState<{ kind: string; label: string; items: unknown[] } | null>(null)
   useEffect(() => {
-    api.get<Detail>(`/api/projects/${code}`).then((d) => {
-      setDocs(d.docs)
-      setRecent(d.recent_changes)
-    })
+    setD(null)
+    api.get<Detail>(`/api/projects/${code}`).then(setD)
   }, [code])
-  if (!p) return <div className="page lbl">프로젝트를 찾을 수 없습니다.</div>
+  if (!p && !d) return <div className="page lbl">프로젝트를 찾을 수 없습니다.</div>
+  // 상세가 오기 전에는 목록이 들고 있던 요약으로 그린다. 화면이 비었다 다시 차지 않게
+  const sum = d ?? (p as ProjectSummary)
+  const docs = d?.docs ?? []
+  const recent = d?.recent_changes ?? []
   const openList = (kind: string, label: string) => {
     api.get<unknown[]>(`/api/projects/${code}/flags?kind=${kind}`).then((items) => setDialog({ kind, label, items }))
   }
@@ -44,10 +46,10 @@ export function ProjectDetail() {
     <div className="page">
       <div className="phead" data-el="1">
         <div>
-          <b data-el="1.1">{p.code}</b> <span data-el="1.2">{p.name}</span>
+          <b data-el="1.1">{sum.code}</b> <span data-el="1.2">{sum.name}</span>
         </div>
-        <a className="lbl" data-el="1.3" href={p.remote_url} target="_blank" rel="noreferrer">
-          {p.remote_url.replace(/^https?:\/\//, '')}
+        <a className="lbl" data-el="1.3" href={sum.remote_url} target="_blank" rel="noreferrer">
+          {sum.remote_url.replace(/^https?:\/\//, '')}
         </a>
         <span className="grow" />
         <Link className="btn" data-el="2.1" to={`/p/${code}/graph`}>
@@ -61,19 +63,26 @@ export function ProjectDetail() {
         {[
           { el: '3.1', k: 'needs_check', kind: 'needs_check', label: '확인 필요' },
           { el: '3.2', k: 'broken_ref', kind: 'broken_ref', label: '끊어진 참조' },
+          // 3.6은 명세의 자리 순서를 따른다 — 플래그 셋을 붙여 놓고 그 뒤가 댓글·오류다
+          { el: '3.6', k: 'upstream_impact', kind: 'upstream_impact', label: '하위 불일치' },
           { el: '3.3', k: 'unresolved_comments', kind: 'comments', label: '미해결 댓글' },
           { el: '3.4', k: 'convention_errors', kind: 'convention_errors', label: '규약 오류' },
           { el: '3.5', k: 'incomplete', kind: 'incomplete', label: '미완성' },
         ].map(({ el, k, kind, label }) => (
-          <span className={`stat link${p.counts[k] ? '' : ' dim'}`} data-el={el} key={k} onClick={() => openList(kind, label)}>
-            <b>{p.counts[k] ?? 0}</b> {label}
+          <span
+            className={`stat link${sum.counts[k] ? '' : ' dim'}`}
+            data-el={el}
+            key={k}
+            onClick={() => openList(kind, label)}
+          >
+            <b>{sum.counts[k] ?? 0}</b> {label}
           </span>
         ))}
       </div>
       <div className="body2">
         <table className="stages" data-el="4">
           <tbody>
-            {p.stages.map((s) => {
+            {sum.stages.map((s) => {
               const ds = byType(s.doc_type)
               const isOpen = open[s.doc_type] ?? true
               return [
@@ -93,14 +102,14 @@ export function ProjectDetail() {
                 ...(isOpen ? ds.map(row) : []),
               ]
             })}
-            {p.std_docs.length > 0 && [
+            {sum.std_docs.length > 0 && [
               <tr className="stg" data-el="4.4" key="std" onClick={() => toggle('STD')}>
                 <td className="no">—</td>
                 <td>표준 (STD)</td>
                 <td>
-                  <StatusPill status={lowest(p.std_docs)} />
+                  <StatusPill status={lowest(sum.std_docs)} />
                 </td>
-                <td className="lbl">{p.std_docs.length}개</td>
+                <td className="lbl">{sum.std_docs.length}개</td>
               </tr>,
               ...((open.STD ?? true) ? byType('STD').map(row) : []),
             ]}
@@ -122,10 +131,36 @@ export function ProjectDetail() {
                 </li>
               ))}
             </ul>
+            {d && (
+              // 폴링이 DB에 적어 둔 값을 그대로 읽는다. 이 화면에 들어올 때마다 fetch가 돌지 않는다.
+              // 재구축 같은 조작은 여기 없고 UI-14에 있다
+              <div className="sync lbl" data-el="7">
+                마지막 처리 커밋{' '}
+                {d.last_processed_commit ? (
+                  <a
+                    className="mono"
+                    data-el="7.1"
+                    href={`${sum.remote_url.replace(/\.git$/, '')}/commit/${d.last_processed_commit}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {d.last_processed_commit.slice(0, 7)}
+                  </a>
+                ) : (
+                  <span className="mono" data-el="7.1">
+                    —
+                  </span>
+                )}
+                <br />
+                밀린 커밋{' '}
+                <span data-el="7.2" className={d.behind_by ? 'behind' : undefined}>
+                  {d.behind_by ?? '—'}
+                </span>
+              </div>
+            )}
           </div>
         </aside>
       </div>
-      {STAGE_TYPES.length === 0 && null}
       {dialog && (
         <>
           <div className="backdrop" onClick={() => setDialog(null)} />
