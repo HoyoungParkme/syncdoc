@@ -1330,6 +1330,11 @@ components:
               isolated:
                 type: boolean
                 description: "참조 없음([[SYNC-UC-001#UC-H4]] 2a)"
+              has_flag:
+                type: boolean
+                description: >
+                  이 항목에 미해결 플래그가 있다. 노드 테두리·배경과 `▲`가 이걸 본다(UI-8 요소 3.1).
+                  `scope=flagged`로 고르는 기준도 같다
         edges:
           type: array
           items:

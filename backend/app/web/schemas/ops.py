@@ -17,6 +17,7 @@ class GraphNode(Base):
     item_id: str | None
     stage: int | None
     isolated: bool
+    has_flag: bool  # UI-8 3.1 — 노드 테두리·배경과 ▲
 
 
 class GraphEdge(Base):

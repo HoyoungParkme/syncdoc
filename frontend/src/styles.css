@@ -161,11 +161,12 @@ tr.prj{cursor:pointer}tr.prj:hover{background:var(--bg-subtle)}
   margin-top:var(--space-10);padding:0 var(--space-2);font-size:var(--text-caption)}
 .legend span{display:inline-flex;align-items:center;gap:var(--space-5)}
 .legend i{font-style:normal}
-.legend .sw{width:12px;height:12px;border:1px solid transparent;border-radius:var(--radius-badge);background:var(--status-draft)}
-.legend .sw-review{background:var(--status-review)}
-.legend .sw-approved{background:var(--status-approved)}
-.legend .sw-none{background:none;border-color:var(--border-strong)}
-.legend .sw.flagged{background:none;border-color:var(--danger)}
+/* UI-2 견본은 색 네모(i), UI-8 견본은 선(svg)이다. 태그로 갈라 놓는다 — 이름이 같아 서로 물든다 */
+.legend i.sw{width:12px;height:12px;border:1px solid transparent;border-radius:var(--radius-badge);background:var(--status-draft)}
+.legend i.sw-review{background:var(--status-review)}
+.legend i.sw-approved{background:var(--status-approved)}
+.legend i.sw-none{background:none;border-color:var(--border-strong)}
+.legend i.sw.flagged{background:none;border-color:var(--danger)}
 /* UI-3 · UI-13 */
 .form{max-width:640px}.form label{display:block;margin:14px 0 4px;font-weight:600;font-size:13px}
 .inp{font:inherit;font-size:13.5px;padding:6px 8px;border:1px solid var(--rule);border-radius:2px;background:#fff}.inp.wide{width:100%}
@@ -307,8 +308,74 @@ table.vers tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--status-review)}
 .hint{cursor:pointer;color:var(--caution-ink);border:1px solid var(--status-review);background:var(--caution-bg);
   padding:0 var(--space-5);font-size:var(--text-caption);border-radius:var(--radius-badge);margin-left:var(--space-6)}
 .tabs a{color:var(--ink-faint);text-decoration:none}
-/* UI-8 참조 그래프 */
-.graphpage{max-width:none}.graph{height:calc(100vh - var(--topbar-h) - 150px);border:1px solid var(--rule);background:#fff;position:relative}.graph .edges{position:absolute;left:12px;bottom:8px;z-index:4}.node{font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:3px 8px;border:1px solid var(--ink);background:#fff;border-radius:2px;cursor:pointer;white-space:nowrap}.node.doc{font-weight:700;background:var(--panel)}.node.iso{border-style:dashed;color:var(--soft)}.node.miss{border-style:dotted;color:#b00;background:#fff5f5}.legend{margin-top:8px}.legend span{margin-right:14px}
+/* UI-8 참조 그래프 — 열은 11단계 고정, 노드는 항목 */
+.graphpage{max-width:none;padding:var(--space-18) var(--space-22) var(--space-22)}
+.gcard{border:1px solid var(--border);border-radius:var(--radius-panel-card);background:var(--bg-card);overflow:hidden}
+/* 2.5 전체보기 — 상단 바까지 덮는다. body로 포털을 써서 --z-graph-full 위에 깐다 */
+.gcard.full{position:fixed;inset:0;z-index:var(--z-graph-full);border:none;border-radius:0;
+  display:flex;flex-direction:column;background:var(--bg-card)}
+.gbar{display:flex;align-items:center;gap:var(--space-8);padding:var(--space-10) var(--space-14);
+  border-bottom:1px solid var(--border);background:var(--bg-subtle);font-size:var(--text-meta)}
+.gbar .btn.on{background:var(--ink-body);color:#fff;border-color:var(--ink-body)}
+.gbar .sep{width:1px;height:16px;background:var(--border-strong);margin:0 var(--space-4)}
+.gbar .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 3 캔버스 — 안에서 스크롤한다. 전체보기면 남은 높이를 다 쓴다 */
+.canvas{position:relative;overflow:auto;height:calc(100vh - var(--topbar-h) - 190px);background:var(--bg-card)}
+.gcard.full .canvas{flex:1;height:auto}
+.cinner{position:relative}
+.colh{position:absolute;top:0;height:22px;font-family:var(--font-mono);font-size:var(--text-mono-sm);
+  font-weight:var(--w-semibold);color:var(--ink-faint);border-bottom:1px solid var(--divider);
+  padding-bottom:var(--space-4);box-sizing:border-box}
+.node{position:absolute;box-sizing:border-box;height:22px;line-height:20px;padding:0 var(--space-6);
+  border:1px solid var(--border-strong);border-radius:var(--radius-badge);background:var(--bg-card);
+  font-family:var(--font-mono);font-size:var(--text-mono-sm);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;cursor:pointer;z-index:2}
+.node:hover{box-shadow:var(--shadow-node-focus);border-color:var(--ink-body)}
+/* 플래그가 있으면 경고색 테두리·배경과 ▲ */
+.node.flag{border-color:var(--danger);background:var(--danger-bg);color:var(--danger)}
+/* 고립 — 상위도 하위도 없다 */
+.node.iso{border-style:dashed;color:var(--ink-disabled)}
+/* 올린 노드의 직접 이웃만 남기고 나머지는 흐린다. 전이는 UI-15가 한다 */
+.node.dim{opacity:.16}
+.edges{position:absolute;left:0;top:0;pointer-events:none;z-index:1}
+.edges .e{fill:none;stroke:var(--graph-edge);stroke-width:1}
+.edges .e.back{stroke:var(--ref-backlink);stroke-dasharray:4 3}
+.edges .e.gone{stroke:var(--danger);stroke-dasharray:3 3}
+.edges .e.dim{opacity:.1}
+.legend{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-4) var(--space-14);
+  padding:var(--space-8) var(--space-14);border-top:1px solid var(--divider);
+  background:var(--bg-subtle);font-size:var(--text-caption)}
+/* 범례의 선 견본은 실제 선으로 그린다 */
+.legend svg.sw{width:22px;height:8px;vertical-align:middle}
+.legend svg.sw .e{fill:none;stroke:var(--graph-edge);stroke-width:1}
+.legend svg.sw .e.back{stroke:var(--ref-backlink);stroke-dasharray:4 3}
+.legend svg.sw .e.gone{stroke:var(--danger);stroke-dasharray:3 3}
+
+/* UI-15 11단계 흐름 — 11단계를 다 나열한다. 항목 없는 단계도 남긴다 */
+.chaindlg .dbody{padding-top:var(--space-12)}
+.chain{margin-top:var(--space-12);border:1px solid var(--border);border-radius:var(--radius-control);overflow:hidden}
+.crow{display:grid;grid-template-columns:120px minmax(0,1fr);gap:var(--space-10);
+  padding:var(--space-8) var(--space-12);border-bottom:1px solid var(--divider)}
+.crow:last-child{border-bottom:none}
+/* 기준 항목이 있는 행만 배경을 준다 — 어디서 보고 있는지 */
+.crow.cur{background:var(--caution-bg)}
+.crow.empty{background:var(--bg-subtle)}
+.crow.empty .cstage,.crow.empty .cchips{color:var(--ink-disabled)}
+.cstage{font-family:var(--font-mono);font-size:var(--text-mono-sm);color:var(--ink-muted);line-height:1.6}
+.cstage .lbl{font-family:var(--font-sans);font-size:var(--text-caption)}
+.cchips{display:flex;flex-wrap:wrap;gap:var(--space-5);align-items:flex-start;font-size:var(--text-caption)}
+/* 제목이 긴 항목이 한 줄을 통째로 먹지 않게 자른다. 전체는 title 속성으로 본다 */
+.chip{display:inline-flex;align-items:center;gap:var(--space-5);max-width:320px;
+  padding:var(--space-2) var(--space-8);border:1px solid var(--border);border-radius:var(--radius-chip);
+  background:var(--bg-card);font-size:var(--text-caption);cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip:hover{border-color:var(--border-strong)}
+.chip .dot{flex:none;width:6px;height:6px;border-radius:var(--radius-dot);background:var(--status-draft)}
+.chip .dot-review{background:var(--status-review)}
+.chip .dot-approved{background:var(--status-approved)}
+/* 기준 항목. 여기서 다시 그릴 것이 없으니 누를 것도 아니다 */
+.chip.me{background:var(--ink-body);color:#fff;border-color:var(--ink-body);cursor:default}
+.chip.gone{border-style:dashed;color:var(--ink-disabled);cursor:default}
 /* UI-9 순서대로 읽기 */
 /* 2 단계 표시 — 가로로만 넘친다. 세로로 흐르게 두면 칩 줄이 본문을 밀어낸다 (UI-9 규칙) */
 .steps{display:flex;gap:var(--space-4);flex-wrap:nowrap;overflow-x:auto;min-width:0}
