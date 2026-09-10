@@ -297,6 +297,23 @@ export interface AccessToken {
 
 export const STATUS_KO: Record<string, string> = { draft: '초안', review: '검토중', approved: '승인' }
 export const FLAG_KO: Record<string, string> = { needs_check: '확인 필요', broken_ref: '끊어진 참조', upstream_impact: '하위 불일치' }
+/** 미완성 경고 규칙 ID → 사람 말. SYNC-STD-001 4장 `화면 문구` 열의 전사 */
+const WARN_KO: Record<string, (m: string) => string> = {
+  'section.missing': (m) => `필수 절 없음: ${m}`,
+  'item.none': () => '항목이 하나도 없음',
+  'ref.missing': (m) => `가리키는 곳이 없는 참조: ${m}`,
+  'entity.mismatch': (m) => `엔티티와 설계 클래스의 속성이 다름: ${m}`,
+  'section.unnumbered': (m) => `번호 없는 절 제목: ${m}`,
+  'dom.name': (m) => `DOM 세 문서의 이름이 어긋남: ${m}`,
+}
+/** `"section.missing: 시나리오"` → `"필수 절 없음: 시나리오"`.
+ *  표에 없는 규칙은 문자열 그대로 — 규약을 늘렸는데 문구를 안 채운 것이 눈에 띄어야 한다 */
+export function warnText(w: string): string {
+  const i = w.indexOf(': ')
+  const rule = i < 0 ? w : w.slice(0, i)
+  const message = i < 0 ? '' : w.slice(i + 2)
+  return WARN_KO[rule]?.(message) ?? w
+}
 /** 항목 참조 표기 DOC#ITEM · 문서 경로 */
 export const refKey = (r: ItemRef | null): string => (r ? `${r.doc_id ?? r.raw_target}${r.item_id ? '#' + r.item_id : ''}` : '')
 export const docPath = (docId: string | null, itemId?: string | null): string =>

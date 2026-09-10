@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { api, ApiError, FLAG_KO, STATUS_KO, type Comment, type Document, type DownstreamView, type ItemReferences, type UpstreamCheck } from '../api/client'
+import { api, ApiError, FLAG_KO, STATUS_KO, warnText, type Comment, type Document, type DownstreamView, type ItemReferences, type UpstreamCheck } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { esc, renderBlocks, splitRef } from '../view/md'
 import { ItemIdBadge, StatusPill } from '../components/ui'
@@ -261,7 +261,7 @@ export function DocView() {
           )}
           {doc.incomplete_warnings.length > 0 && (
             <div className="banner warn" data-el="4a">
-              미완성: {doc.incomplete_warnings.join(' · ')} · 승인 불가
+              미완성: {doc.incomplete_warnings.map(warnText).join(' · ')} · 승인 불가
             </div>
           )}
 
