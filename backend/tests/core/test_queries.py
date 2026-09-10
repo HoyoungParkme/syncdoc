@@ -45,14 +45,34 @@ async def test_project_summary_stages_counts_order(scoped: Session) -> None:
     assert by["RFQ"].gate_warning is False and by["PRD"].gate_warning is False
     assert by["UC"].gate_warning is True and by["SCN"].gate_warning is True  # 앞 단계 미승인
     assert [d.doc_id for d in x.std_docs] == ["EXMP-STD-001"] and by["CODE"].doc_count == 0
+    # 여섯 칸. 플래그 세 종류를 다 센다 (UI-4 3.6)
     assert x.counts == {
         "needs_check": 0,
         "broken_ref": 0,
+        "upstream_impact": 0,
         "unresolved_comments": 0,
         "convention_errors": 1,
         "incomplete": 0,
     }
+    assert all(s.flag_count == 0 for s in x.stages)
     assert x.remote_url == "https://x/r.git" and x.updated_at is not None
+
+
+async def test_project_summary_stage_flag_count_sums_documents(scoped: Session) -> None:
+    """UI-2 2.2 테두리 — 한 단계에 플래그 있는 문서가 둘이면 그 단계는 둘의 합."""
+    svc, ref, tr = SpecService(scoped), ReferenceService(scoped), TrackingService(scoped)
+    p = make_project(scoped)
+    a = author(scoped)
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
+    for did in ("EXMP-PRD-001", "EXMP-PRD-002"):  # 둘 다 RFQ#Q1을 참조한다
+        v = svc.create(p.id, did, DocType.PRD, PRD.replace("EXMP-PRD-001", did), "h", a, "spec: x")
+        d = svc.get_document(did)
+        ref.extract(d.id, v.id, d.body, {i.item_id: i.pk for i in d.items}, ["EXMP-RFQ-001"])
+    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
+    tr.raise_broken(q1)  # 끊어진 참조는 가리키는 쪽에 붙는다 — PRD 문서 둘에 하나씩
+    by = {s.doc_type: s for s in (await queries.project_summary())[0].stages}
+    assert (by["PRD"].doc_count, by["PRD"].flag_count) == (2, 2)
+    assert by["RFQ"].flag_count == 0
 
 
 # ── document_list ──
@@ -84,6 +104,25 @@ async def test_project_detail_docs_and_recent_changes_with_names(scoped: Session
     assert pd.recent_changes[1].author_view.instructed_by.github_login == "hoyoung"
     with pytest.raises(NotFound):
         await queries.project_detail("NOPE")
+
+
+async def test_project_detail_sync_fields_read_db_without_fetch(
+    scoped: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """UI-4 요소 7 — 폴링이 적어 둔 값을 그대로. 이 응답을 만들며 fetch를 돌리지 않는다."""
+    from app.infra import git
+
+    monkeypatch.setattr(
+        git, "fetch", lambda *a, **k: pytest.fail("project_detail이 fetch를 불렀다")
+    )
+    p = make_project(scoped)
+    _mk(SpecService(scoped), p.id, "EXMP-RFQ-001", "RFQ", a=author(scoped))
+    pd = await queries.project_detail("EXMP")
+    assert (pd.last_processed_commit, pd.behind_by) == (None, None)  # 아직 못 받아봤다
+    scoped.execute(text("UPDATE repositories SET last_processed_commit='eb30fd6', behind_by=2"))
+    scoped.expire_all()  # 폴링은 다른 세션이다 — 이쪽 캐시를 비워 그 상황을 만든다
+    pd = await queries.project_detail("EXMP")
+    assert (pd.last_processed_commit, pd.behind_by) == ("eb30fd6", 2)
 
 
 async def test_document_list_counts_and_filters(scoped: Session) -> None:

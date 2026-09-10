@@ -59,9 +59,13 @@ _ORDER = {"draft": 0, "review": 1, "approved": 2}
 
 
 def _summarize(
-    project: Project, docs: list[DocumentSummary], flags: dict[str, int], unresolved: int
+    project: Project,
+    docs: list[DocumentSummary],
+    flags: dict[str, int],
+    unresolved: int,
+    per_doc: dict[int, dict[str, int]],
 ) -> ProjectSummary:
-    """단계 11칸 계산(UC-H14 1a·1b)."""
+    """단계 11칸 계산(UC-H14 1a·1b). per_doc은 문서별 플래그 건수 — 단계 테두리(UI-2 2.2)에 쓴다."""
     stages: list[StageSummary] = []
     for doc_type, n in STAGE_OF.items():
         stage_docs = [d for d in docs if d.stage == n]
@@ -69,10 +73,13 @@ def _summarize(
         gate = bool(stage_docs) and any(
             s.doc_count > 0 and s.status != DocStatus.approved for s in stages
         )
-        stages.append(StageSummary(n, doc_type, status, len(stage_docs), gate))
+        flag_count = sum(sum(per_doc.get(d.id, {}).values()) for d in stage_docs)
+        stages.append(StageSummary(n, doc_type, status, len(stage_docs), gate, flag_count))
     counts = {
         "needs_check": flags.get("needs_check", 0),
         "broken_ref": flags.get("broken_ref", 0),
+        # 세 종류를 다 싣는다. 빼면 내 할 일에는 뜨는데 요약에는 안 잡힌다 (UI-4 3.6)
+        "upstream_impact": flags.get("upstream_impact", 0),
         "unresolved_comments": unresolved,
         "convention_errors": sum(d.has_convention_error for d in docs),
         "incomplete": sum(bool(d.incomplete_warnings) for d in docs),
@@ -109,7 +116,10 @@ async def project_summary() -> list[ProjectSummary]:
         for p in ProjectService(s).list_projects():
             docs = SpecService(s).list_by_project(p.id)
             flags = TrackingService(s).count_flags(p.id)
-            out.append(_summarize(p, docs, flags, CommentService(s).count_unresolved(p.id)))
+            # 프로젝트당 한 번. 단계마다 부르면 같은 프로젝트를 11번 훑는다
+            per_doc = TrackingService(s).count_flags_by_document([d.id for d in docs])
+            unresolved = CommentService(s).count_unresolved(p.id)
+            out.append(_summarize(p, docs, flags, unresolved, per_doc))
         out.sort(key=lambda x: (x.updated_at is not None, x.updated_at), reverse=True)
         return out
 
@@ -132,9 +142,18 @@ async def project_detail(code: str) -> ProjectDetail:
                 else None,
                 via=r.author.via,
             )
+        # DB에 적힌 값 그대로 (MS-008 5). 폴링이 갱신하고 화면은 읽기만 한다
+        repo = project.repository
+        last_commit, behind = repo.last_processed_commit, repo.behind_by
     summary = next(p for p in await project_summary() if p.code == code)
     docs = await document_list(code)
-    return ProjectDetail(**vars(summary), docs=docs, recent_changes=recent)
+    return ProjectDetail(
+        **vars(summary),
+        docs=docs,
+        recent_changes=recent,
+        last_processed_commit=last_commit,
+        behind_by=behind,
+    )
 
 
 async def document_list(
@@ -531,8 +550,11 @@ async def item_chain(doc_id: str, item_id: str) -> ItemChain:
         doc_ids = {r.doc_id for r in described.values() if r.doc_id}
         statuses = {did: spec.get_document(did).status for did in doc_ids}
         by_stage: dict[int, list[ChainItem]] = {}
-        for p_, role in [(pk, "self"), *[(u, "upstream") for u in ups],
-                         *[(d, "downstream") for d in downs]]:
+        for p_, role in [
+            (pk, "self"),
+            *[(u, "upstream") for u in ups],
+            *[(d, "downstream") for d in downs],
+        ]:
             ref = described.get(p_)
             if ref is None or ref.doc_id is None:
                 continue
