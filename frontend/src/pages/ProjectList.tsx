@@ -1,8 +1,10 @@
 /** UI-2 프로젝트 목록 — SYNC-UI-002#UI-2. 프로젝트가 행, 11단계가 열. UC-H14 1~2, 1a·1b·3a.
- *  1 헤더(1.1 초기화) · 2 현황판(2.1 행, 2.2 단계 칸, 2.3 경고, 2.4 상위 미승인) · 3 빈 상태 · 4 범례 */
+ *  1 헤더(1.1 초기화) · 2 현황판(2.1 행, 2.2 단계 칸, 2.3 경고, 2.4 상위 미승인) · 3 빈 상태 · 4 범례
+ *
+ *  표가 아니라 격자다 — 칸이 열 폭을 꽉 채워야 색이 띠로 읽힌다. */
 import { useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
-import { STAGE_TYPES, type ProjectSummary } from '../api/client'
+import { ago, STAGE_TYPES, type ProjectSummary } from '../api/client'
 import { ProjectInit } from './ProjectInit'
 import { Tooltip } from '../components/ui'
 
@@ -13,6 +15,7 @@ const KINDS: [string, string][] = [
   ['upstream_impact', '하위 불일치'],
   ['convention_errors', '규약 오류'],
 ]
+const CELL: Record<string, string> = { approved: 'ok', review: 'rv', draft: 'dr' }
 
 const breakdown = (counts: Record<string, number>) =>
   KINDS.filter(([k]) => counts[k]).map(([k, ko]) => `${ko} ${counts[k]}`)
@@ -28,84 +31,74 @@ export function ProjectList() {
           <b>프로젝트</b> <span className="lbl">{projects.length}개</span>
         </div>
         <span className="grow" />
-        <button className="btn" type="button" data-el="1.1" onClick={() => setInit(true)}>
+        <button className="btn solid" type="button" data-el="1.1" onClick={() => setInit(true)}>
           + 프로젝트 초기화
         </button>
       </div>
       {projects.length > 0 && (
         <>
-          <table className="grid heat" data-el="2">
-            <thead>
-              <tr className="hd">
-                <th />
-                <th>프로젝트</th>
-                {STAGE_TYPES.map((t) => (
-                  <th key={t}>{t}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {projects.map((p) => {
-                const summary = breakdown(p.counts)
-                return (
-                  <tr className="prj" data-el="2.1" key={p.code} onClick={() => nav(`/p/${p.code}`)}>
-                    <td>
-                      {summary.length > 0 && (
-                        // 규칙: 아이콘은 종류를 안 나눈다. 종류별 건수는 툴팁이 편다
-                        <Tooltip text={summary.join('\n')}>
-                          <span className="warn" data-el="2.3">
-                            ⚠
-                          </span>
-                        </Tooltip>
-                      )}
-                    </td>
-                    <td>
-                      <b>{p.code}</b> {p.name}
-                      {summary.length > 0 && (
+          <div className="heat" data-el="2">
+            <div className="hrow head">
+              <span />
+              <span />
+              {STAGE_TYPES.map((t, i) => (
+                <span key={t}>
+                  {i + 1} {t}
+                </span>
+              ))}
+            </div>
+            {projects.map((p) => {
+              const work = breakdown(p.counts)
+              const docs = p.stages.reduce((n, s) => n + s.doc_count, 0) + p.std_docs.length
+              const workN = KINDS.reduce((n, [k]) => n + (p.counts[k] ?? 0), 0)
+              return (
+                <div className="hrow" data-el="2.1" key={p.code}>
+                  <span>
+                    {work.length > 0 && (
+                      // 규칙: 아이콘은 종류를 안 나눈다. 종류별 건수는 툴팁이 편다
+                      <Tooltip text={work.join('\n')}>
+                        <span className="warn" data-el="2.3">
+                          ⚠
+                        </span>
+                      </Tooltip>
+                    )}
+                  </span>
+                  <span className="pname" onClick={() => nav(`/p/${p.code}`)}>
+                    <span>
+                      <b className="mono">{p.code}</b> {p.name}
+                    </span>
+                    <span className="sub">
+                      {workN > 0 && (
                         <>
-                          <br />
-                          <span className="lbl">{summary.join(' · ')}</span>
+                          <b className="work">처리할 것 {workN}</b>
+                          <span className="mid">·</span>
                         </>
                       )}
-                    </td>
-                    {p.stages.map((s) => (
-                      <td
-                        key={s.stage}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          nav(`/p/${p.code}#stage-${s.stage}`)
-                        }}
-                      >
-                        <StageCell s={s} />
-                      </td>
-                    ))}
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                      {docs}문서{p.updated_at ? ` · ${ago(p.updated_at)}` : ''}
+                    </span>
+                  </span>
+                  {p.stages.map((s) => (
+                    <StageCell key={s.stage} s={s} onOpen={() => nav(`/p/${p.code}#stage-${s.stage}`)} />
+                  ))}
+                </div>
+              )
+            })}
+          </div>
           <div className="legend lbl" data-el="4">
             <span>
-              <i className="sw sw-approved" /> 승인
+              <i className="sw dr" /> 초안
             </span>
             <span>
-              <i className="sw sw-review" /> 검토중
+              <i className="sw rv" /> 검토중
             </span>
             <span>
-              <i className="sw sw-draft" /> 초안
+              <i className="sw ok" /> 승인
             </span>
             <span>
-              <i className="sw sw-none" /> 미작성
+              <i className="sw na" /> 미작성
             </span>
-            <span>
-              <i className="sw flagged" /> 플래그 있음
-            </span>
-            <span>
-              <span className="warn">⚠</span> 플래그·규약 오류 있음
-            </span>
-            <span>
-              <i className="warn">▲</i> 상위 미승인 (막지는 않는다)
-            </span>
+            <span className="warn">⚠ 플래그·규약 오류 있음</span>
+            <span className="warn">▲ 상위 미승인 (막지는 않는다)</span>
           </div>
         </>
       )}
@@ -122,19 +115,22 @@ export function ProjectList() {
 
 /** 색은 상태, 테두리는 플래그. 두 정보가 한 칸에 겹치지 않게 나눈다 (UI-2 규칙).
  *  칸 하나에 툴팁도 하나다 — 칸과 ▲에 따로 걸면 ▲ 위에서 둘이 같이 뜬다. */
-function StageCell({ s }: { s: ProjectSummary['stages'][number] }) {
+function StageCell({ s, onOpen }: { s: ProjectSummary['stages'][number]; onOpen: () => void }) {
   const lines = [
+    s.status ? `${s.doc_count}문서` : '미작성',
     s.flag_count ? `플래그 ${s.flag_count}` : '',
     s.gate_warning ? '앞 단계 미승인 (막지는 않는다)' : '',
   ].filter(Boolean)
-  const cell = (
-    <span
-      className={`cell cell-${s.status ?? 'none'}${s.flag_count ? ' flagged' : ''}`}
-      data-el="2.2"
-    >
-      {s.doc_count || ''}
-      {s.gate_warning && <i data-el="2.4">▲</i>}
-    </span>
+  return (
+    <Tooltip text={lines.join('\n')}>
+      <span
+        className={`cell ${s.status ? CELL[s.status] : 'na'}${s.flag_count ? ' flagged' : ''}`}
+        data-el="2.2"
+        onClick={onOpen}
+      >
+        {s.doc_count || ''}
+        {s.gate_warning && <i data-el="2.4">▲</i>}
+      </span>
+    </Tooltip>
   )
-  return lines.length ? <Tooltip text={lines.join('\n')}>{cell}</Tooltip> : cell
 }

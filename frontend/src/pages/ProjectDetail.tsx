@@ -3,13 +3,17 @@
  *  1 헤더(1.1·1.2·1.3) · 2.1·2.2 그래프·순서 · 3 요약 수치 여섯(3.1·3.2·3.6·3.3·3.4·3.5 → 다이얼로그 6)
  *  4 표(4.1 단계, 4.2 문서, 4.3 상위 미승인, 4.4 표준) · 5 최근 변경 · 6 목록 다이얼로그 · 7 동기화 상태(7.1 커밋, 7.2 밀림) */
 import { useEffect, useState } from 'react'
-import { Link, useOutletContext, useParams } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { StatusPill } from '../components/ui'
 import { ago, api, authorLabel, docPath, refKey, STAGE_NAMES, STATUS_KO, type CommentSummary, type DocumentSummary, type FlagSummary, type ProjectDetail as Detail, type ProjectSummary } from '../api/client'
 
 
+/** 미니 히트맵과 문서 행 점이 쓰는 상태 → 클래스 */
+const ST: Record<string, string> = { approved: 'ok', review: 'rv', draft: 'dr' }
+
 export function ProjectDetail() {
   const { code = '' } = useParams()
+  const nav = useNavigate()
   const { projects } = useOutletContext<{ projects: ProjectSummary[] }>()
   const p = projects.find((x) => x.code === code)
   const [d, setD] = useState<Detail | null>(null)
@@ -30,27 +34,34 @@ export function ProjectDetail() {
   const byType = (t: string) => docs.filter((d) => d.doc_type === t)
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !(o[k] ?? true) }))
   const row = (d: DocumentSummary) => (
-    <tr className="doc" data-el="4.2" key={d.doc_id}>
-      <td />
-      <td colSpan={3}>
-        <Link to={`/p/${code}/d/${d.doc_id}`}>{d.doc_id}</Link> · {STATUS_KO[d.status]} · v{d.current_version_no} · {ago(d.updated_at)} · {authorLabel(d.last_author)}
-        {d.counts.needs_check > 0 && <span className="flag"> 확인 필요 {d.counts.needs_check}</span>}
-        {d.counts.broken_ref > 0 && <span className="flag"> 끊어진 참조 {d.counts.broken_ref}</span>}
-        {d.counts.unresolved_comments > 0 && <span className="cm"> 댓글 {d.counts.unresolved_comments}</span>}
-        {d.has_convention_error && <span className="err"> 규약 오류</span>}
-        {d.incomplete_warnings.length > 0 && <span className="warnx"> 미완성</span>}
-      </td>
-    </tr>
+    <div className="doc" data-el="4.2" key={d.doc_id} onClick={() => nav(`/p/${code}/d/${d.doc_id}`)}>
+      <span className="mono">{d.doc_id}</span>
+      <span className={`dot ${ST[d.status]}`} />
+      <span className="lbl">
+        {STATUS_KO[d.status]} · v{d.current_version_no} · {ago(d.updated_at)} · {authorLabel(d.last_author)}
+      </span>
+      <span className="grow" />
+      {d.counts.needs_check > 0 && <span className="flag">확인 필요 {d.counts.needs_check}</span>}
+      {d.counts.broken_ref > 0 && <span className="flag">끊어진 참조 {d.counts.broken_ref}</span>}
+      {d.counts.unresolved_comments > 0 && <span className="cm">댓글 {d.counts.unresolved_comments}</span>}
+      {d.has_convention_error && <span className="err">규약 오류</span>}
+      {d.incomplete_warnings.length > 0 && <span className="warnx">미완성</span>}
+    </div>
   )
   return (
     <div className="page">
       <div className="phead" data-el="1">
         <div>
-          <b data-el="1.1">{sum.code}</b> <span data-el="1.2">{sum.name}</span>
+          <div>
+            <b className="mono" data-el="1.1">
+              {sum.code}
+            </b>{' '}
+            <span data-el="1.2">{sum.name}</span>
+          </div>
+          <a className="repo mono" data-el="1.3" href={sum.remote_url} target="_blank" rel="noreferrer">
+            {sum.remote_url.replace(/^https?:\/\//, '').replace(/\.git$/, '')}
+          </a>
         </div>
-        <a className="lbl" data-el="1.3" href={sum.remote_url} target="_blank" rel="noreferrer">
-          {sum.remote_url.replace(/^https?:\/\//, '')}
-        </a>
         <span className="grow" />
         <Link className="btn" data-el="2.1" to={`/p/${code}/graph`}>
           참조 그래프
@@ -80,57 +91,66 @@ export function ProjectDetail() {
         ))}
       </div>
       <div className="body2">
-        <table className="stages" data-el="4">
-          <tbody>
-            {sum.stages.map((s) => {
-              const ds = byType(s.doc_type)
-              const isOpen = open[s.doc_type] ?? true
-              return [
-                <tr className="stg" data-el="4.1" key={s.doc_type} id={`stage-${s.stage}`} onClick={() => toggle(s.doc_type)}>
-                  <td className="no">{s.stage}</td>
-                  <td>{STAGE_NAMES[s.doc_type]}</td>
-                  <td>
-                    <StatusPill status={s.status} />
-                    {s.gate_warning && (
-                      <span className="gate" data-el="4.3">
-                        상위 미승인
-                      </span>
-                    )}
-                  </td>
-                  <td className="lbl">{s.doc_count ? `${s.doc_count}개` : '—'}</td>
-                </tr>,
-                ...(isOpen ? ds.map(row) : []),
-              ]
-            })}
-            {sum.std_docs.length > 0 && [
-              <tr className="stg" data-el="4.4" key="std" onClick={() => toggle('STD')}>
-                <td className="no">—</td>
-                <td>표준 (STD)</td>
-                <td>
-                  <StatusPill status={lowest(sum.std_docs)} />
-                </td>
-                <td className="lbl">{sum.std_docs.length}개</td>
-              </tr>,
-              ...((open.STD ?? true) ? byType('STD').map(row) : []),
-            ]}
-          </tbody>
-        </table>
+        <div className="stages" data-el="4">
+          {/* 머리의 미니 히트맵 — UI-2에서 본 그 프로젝트 행이 여기 다시 있다 */}
+          <div className="stgh">
+            <b>11단계</b>
+            <span className="grow" />
+            {sum.stages.map((s) => (
+              <i key={s.stage} className={`sw ${s.status ? ST[s.status] : 'na'}`} title={STAGE_NAMES[s.doc_type]} />
+            ))}
+          </div>
+          {sum.stages.map((s) => {
+            const isOpen = open[s.doc_type] ?? true
+            return (
+              <div key={s.doc_type}>
+                <div className="stg" data-el="4.1" id={`stage-${s.stage}`} onClick={() => toggle(s.doc_type)}>
+                  <span className="no mono">{s.stage}</span>
+                  <span className="nm">{STAGE_NAMES[s.doc_type]}</span>
+                  <StatusPill status={s.status} />
+                  {s.gate_warning && (
+                    <span className="gate" data-el="4.3">
+                      상위 미승인
+                    </span>
+                  )}
+                  <span className="grow" />
+                  <span className="lbl">{s.doc_count ? `${s.doc_count}개` : '—'}</span>
+                  <span className="caret">{s.doc_count ? (isOpen ? '▾' : '▸') : ''}</span>
+                </div>
+                {isOpen && byType(s.doc_type).map(row)}
+              </div>
+            )
+          })}
+          {sum.std_docs.length > 0 && (
+            <div>
+              <div className="stg" data-el="4.4" onClick={() => toggle('STD')}>
+                <span className="no mono">—</span>
+                <span className="nm">표준 (STD)</span>
+                <StatusPill status={lowest(sum.std_docs)} />
+                <span className="grow" />
+                <span className="lbl">{sum.std_docs.length}개</span>
+                <span className="caret">{(open.STD ?? true) ? '▾' : '▸'}</span>
+              </div>
+              {(open.STD ?? true) && byType('STD').map(row)}
+            </div>
+          )}
+        </div>
         <aside className="panel" data-el="5">
           <div className="pbody">
             <h4>최근 변경</h4>
             {recent.length === 0 && <p className="lbl">아직 변경이 없습니다.</p>}
-            <ul className="recent">
-              {recent.map((v) => (
-                <li key={v.commit_hash + (v.version_no ?? 's')}>
-                  <Link to={`/p/${code}/d/${v.doc_id}`}>
-                    <b>{v.doc_id}</b>
-                  </Link>
-                  {v.version_no != null && <> v{v.version_no}</>} · {ago(v.created_at)} · {authorLabel(v.author)}
-                  <br />
-                  <span className="lbl">{v.message.split('\n')[0]}</span>
-                </li>
-              ))}
-            </ul>
+            {recent.map((v) => (
+              <div className="rc" key={v.commit_hash + (v.version_no ?? 's')} onClick={() => nav(`/p/${code}/d/${v.doc_id}`)}>
+                <div>
+                  <span className="mono">{v.doc_id}</span>{' '}
+                  <span className="mono lbl">{v.version_no != null ? `v${v.version_no}` : 'status'}</span>
+                  <span className="grow" />
+                  <span className="lbl">{ago(v.created_at)}</span>
+                </div>
+                <div className="msg">{v.message.split('\n')[0]}</div>
+                <div className="lbl">{authorLabel(v.author)}</div>
+              </div>
+            ))}
             {d && (
               // 폴링이 DB에 적어 둔 값을 그대로 읽는다. 이 화면에 들어올 때마다 fetch가 돌지 않는다.
               // 재구축 같은 조작은 여기 없고 UI-14에 있다

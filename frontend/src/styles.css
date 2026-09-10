@@ -8,6 +8,8 @@
 :root{
   /* 3.1 색 — 상태 3색이 유일한 색 언어다. 장식에 쓰지 않는다 */
   --bg-app:#f7f6f3; --bg-card:#ffffff; --bg-subtle:#fbfaf8; --bg-sunken:#f3f1ec;
+  --bg-doc-row:#fdfdfc;                  /* UI-4 문서 행. 카드 흰색과 한 톤 차이 */
+  --stat-border:#f0d5d1;                 /* UI-4 요약 수치 1 이상 */
   --ink-body:#17181c; --ink-prose:#1f2024; --ink-muted:#46443f;
   --ink-faint:#6b6862; --ink-disabled:#a8a49c;
   --border:#e2e0da; --border-strong:#cfccc4;
@@ -63,7 +65,7 @@
   /* UI-5 본문 최대 폭. 세 탭이 같아야 한다(UI-002 UI-5 규칙) — 그래서 한 곳에 둔다 */
   --doc-w:820px;
   /* 사이드바 기본 폭. 손잡이가 끌면 인라인 스타일이 이 값을 덮는다 */
-  --toc-w:200px; --panel-w:300px;
+  --toc-w:186px; --panel-w:250px;
 }
 
 /* 앱 바탕만 덮는다. styles.view.css의 body{}는 그대로 두고 나중 규칙으로 이긴다 —
@@ -101,13 +103,18 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
   cursor:pointer;color:var(--ink-body);text-decoration:none;line-height:1.4}
 .btn:hover{background:var(--bg-subtle)}
 .btn.sm{padding:var(--space-2) var(--space-8);font-size:var(--text-mono-sm);border-radius:var(--radius-btn-sm)}
+/* 화면마다 주 동작 하나. 검정 채움은 그 하나에만 준다 */
+.btn.solid{background:var(--ink-body);border-color:var(--ink-body);color:#fff;font-weight:var(--w-medium);padding:var(--space-7) var(--space-13)}
+.btn.solid:hover{background:#000}
 .btn.big{padding:var(--space-11) var(--space-22);font-size:15px;font-weight:var(--w-semibold)}
 .btn.dis,.btn:disabled{opacity:.4;cursor:default}.btn.dis:hover,.btn:disabled:hover{background:var(--bg-card)}
 .lbl{color:var(--ink-faint);font-size:var(--text-caption)}
 .mono{font-family:var(--font-mono)}
 .page{max-width:1180px;margin:0 auto;padding:var(--space-26) var(--space-22) 60px}
-.phead{display:flex;align-items:center;gap:var(--space-12);margin-bottom:var(--space-14);font-size:var(--text-section-title)}
-.phead b{font-weight:var(--w-semibold)}
+/* 화면 제목 줄. 아래를 맞춰야 제목과 버튼의 밑선이 한 줄로 읽힌다 */
+.phead{display:flex;align-items:flex-end;gap:var(--space-12);margin-bottom:var(--space-18);font-size:var(--text-screen-title)}
+.phead b{font-weight:var(--w-semibold);letter-spacing:-.3px}
+.phead .lbl{font-size:var(--text-screen-title);color:var(--ink-muted)}
 .empty{color:var(--ink-disabled);padding:var(--space-30);text-align:center;border:1px dashed var(--border-strong);border-radius:var(--radius-panel-card)}
 
 /* ── 공통 컴포넌트 — SYNC-UI-002 1장 ───────────────────────────────────────
@@ -135,160 +142,168 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .login .logo .lbl{font-size:var(--text-meta);font-weight:var(--w-regular)}
 .login .lbl{color:var(--ink-muted);font-size:var(--text-meta);line-height:1.7}
 .login .btn{margin:var(--space-20) 0 var(--space-12)}
-/* UI-2 현황판 */
-table.grid{width:100%;border-collapse:collapse;font-size:var(--text-meta);background:var(--bg-card)}
-table.grid th,table.grid td{padding:var(--space-8) var(--space-6);border-bottom:1px solid var(--divider);text-align:center}
-table.grid td:nth-child(2),table.grid th:nth-child(2){text-align:left}
-table.heat{border-radius:var(--radius-panel-card);overflow:hidden;box-shadow:var(--shadow-card)}
-table.heat tr.hd th{background:var(--bg-subtle);color:var(--ink-muted);font-size:var(--text-caption);font-weight:var(--w-semibold);border-bottom:1px solid var(--border)}
-table.heat tr.hd th:nth-child(n+3){font-family:var(--font-mono);font-size:var(--text-mono-sm)}
-table.heat tr:last-child td{border-bottom:none}
-tr.prj{cursor:pointer}tr.prj:hover{background:var(--bg-subtle)}
+/* UI-2 현황판 — 표가 아니라 격자다. 칸이 열 폭을 꽉 채워야 색이 띠로 읽힌다 */
+.heat{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-panel-card);overflow:hidden}
+.hrow{display:grid;grid-template-columns:20px 196px repeat(11,minmax(0,1fr));gap:var(--space-4);
+  align-items:center;padding:var(--space-10) var(--space-14);border-bottom:1px solid var(--divider)}
+.hrow:last-child{border-bottom:none}
+.hrow.head{padding:var(--space-9) var(--space-14) var(--space-7);background:var(--bg-subtle);
+  border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:11px;
+  color:var(--ink-muted);letter-spacing:.2px;text-align:center}
+.hrow .warn{text-align:center;font-size:var(--text-meta)}
+/* 두 줄. 코드·이름 위에, 처리할 것과 메타가 아래에 */
+.pname{display:flex;flex-direction:column;gap:1px;min-width:0;cursor:pointer;font-size:15.5px}
+.pname .mono{font-size:var(--text-mono-id-lg);font-weight:var(--w-semibold)}
+.pname .sub{display:flex;align-items:center;gap:var(--space-6);font-size:var(--text-caption);
+  color:var(--ink-muted);white-space:nowrap}
+.pname .sub .work{color:var(--danger);font-weight:var(--w-semibold)}
+/* `.dot`은 UI-9 단계 점·UI-15 칩 점이 쓰는 이름이라 여기서는 못 쓴다 — 6px 동그라미가 된다 */
+.pname .sub .mid{color:var(--border-strong)}
 /* 색은 상태. 테두리는 플래그. 둘을 겹치지 않게 나눈 게 UI-2 규칙이다 */
-.cell{display:inline-block;min-width:26px;padding:2px var(--space-6);border:1px solid transparent;border-radius:var(--radius-chip);
-  font-size:var(--text-mono-sm);font-weight:var(--w-semibold);line-height:1.6;background:var(--status-draft);color:var(--ink-body)}
-.cell-review{background:var(--status-review)}
-.cell-approved{background:var(--status-approved);color:var(--status-approved-ink)}
-/* 미작성은 상태가 아니라 빈칸이다 — 색을 주지 않고 자리만 지킨다 */
-.cell-none{background:none;color:var(--ink-disabled)}
-.cell.flagged{border-color:var(--danger)}
-.cell i{color:var(--danger);font-style:normal;margin-left:var(--space-2)}
-/* styles.view.css의 .warn은 테두리·배경까지 있는 배너다(V-* 문서 경고). 여기 .warn은 글자 하나라
-   선언 안 한 속성이 그쪽에서 새어 든다 — 되돌려 적는다. .nav와 같은 이름 충돌이다 */
-.warn{color:var(--danger);border:none;padding:0;background:none;font-size:inherit}
+.cell{display:flex;align-items:center;justify-content:center;gap:var(--space-2);height:22px;
+  border:1px solid transparent;border-radius:var(--radius-badge);cursor:pointer;
+  font-family:var(--font-mono);font-size:var(--text-mono-sm);font-weight:var(--w-semibold);
+  background:var(--status-draft);color:var(--ink-body)}
+.cell.rv{background:var(--status-review)}
+.cell.ok{background:var(--status-approved);color:var(--status-approved-ink)}
+/* 미작성은 상태가 아니라 빈칸이다 — 색 대신 테두리만 */
+.cell.na{background:var(--bg-card);border-color:var(--border)}
+.cell.flagged{border-width:1.5px;border-color:var(--danger)}
+.cell i{font-style:normal;font-size:9px;color:var(--danger)}
 /* 4 범례 — 색 넷과 기호 둘을 처음 보는 사람이 알 방법이 이것뿐이라 뺄 수 없다 */
-.legend{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-4) var(--space-14);
-  margin-top:var(--space-10);padding:0 var(--space-2);font-size:var(--text-caption)}
+.legend{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-4) var(--space-16);
+  margin-top:var(--space-12);font-size:var(--text-meta);color:var(--ink-muted)}
 .legend span{display:inline-flex;align-items:center;gap:var(--space-5)}
+.legend .warn{color:var(--danger)}
 .legend i{font-style:normal}
 /* UI-2 견본은 색 네모(i), UI-8 견본은 선(svg)이다. 태그로 갈라 놓는다 — 이름이 같아 서로 물든다 */
-.legend i.sw{width:12px;height:12px;border:1px solid transparent;border-radius:var(--radius-badge);background:var(--status-draft)}
-.legend i.sw-review{background:var(--status-review)}
-.legend i.sw-approved{background:var(--status-approved)}
-.legend i.sw-none{background:none;border-color:var(--border-strong)}
-.legend i.sw.flagged{background:none;border-color:var(--danger)}
-/* UI-3 프로젝트 초기화 · UI-13 설정 — 둘 다 다이얼로그다 */
-.form{max-width:640px}
-.form label{display:block;margin:var(--space-14) 0 var(--space-4);font-weight:var(--w-semibold);font-size:var(--text-meta)}
-.inp{font:inherit;font-size:var(--text-meta);padding:var(--space-6) var(--space-8);
-  border:1px solid var(--border-strong);border-radius:var(--radius-control);background:var(--bg-card)}
-.inp.wide{width:100%}
-.inp:focus{outline:none;border-color:var(--ink-body)}
-.ferr{color:var(--danger);font-size:var(--text-caption);margin-top:var(--space-4)}
-.facts{display:flex;gap:var(--space-8);justify-content:flex-end;margin-top:var(--space-18)}
-/* 2.5 커밋될 것 — 등록하면 저장소에 무엇이 생기는지 */
-.willcommit{margin-top:var(--space-18);padding:var(--space-10) var(--space-12);
-  background:var(--bg-sunken);border-radius:var(--radius-control);font-size:var(--text-caption)}
-.willcommit .mono{display:block;color:var(--ink-muted);font-size:var(--text-mono-sm);margin-top:var(--space-3)}
-/* UI-13 카드 넷 */
-.setdlg .dbody{background:var(--bg-app)}
-.card{border:1px solid var(--border);border-radius:var(--radius-panel-card);background:var(--bg-card);
-  padding:var(--space-12) var(--space-14);margin-bottom:var(--space-12)}
-.card:last-child{margin-bottom:0}
-.cardh{display:flex;align-items:center;gap:var(--space-8);margin-bottom:var(--space-6);font-size:var(--text-card-title)}
-.cardh b{font-weight:var(--w-semibold)}
-.snippet{margin:var(--space-8) 0 0;padding:var(--space-10) var(--space-12);background:var(--bg-sunken);
-  border-radius:var(--radius-control);font-family:var(--font-mono);font-size:var(--text-mono-sm);
-  color:var(--ink-muted);overflow-x:auto;white-space:pre}
-/* 6 관리 영역 — UI-14가 여기 들어온다. 접힌 채로 열린다 */
-.admin{margin-top:var(--space-10);border-top:1px solid var(--divider);padding-top:var(--space-10)}
-.adminh{margin-bottom:var(--space-8)}
-.adminbody .vers{font-size:var(--text-caption)}
-.banner{margin:var(--space-10) 0;padding:var(--space-8) var(--space-12);border:1px solid var(--danger);border-radius:var(--radius-control);background:var(--danger-bg);color:var(--danger);font-size:var(--text-meta)}
-.banner.warn{border-color:var(--status-review);background:var(--caution-bg);color:var(--caution-ink)}
-.dacts{display:flex;gap:var(--space-8);justify-content:flex-end;margin-top:var(--space-14)}
-.grp{border:1px solid var(--border);border-radius:var(--radius-panel-card);background:var(--bg-card);
-  padding:var(--space-12) var(--space-16);margin:var(--space-12) 0}
-.grp h4{margin:0 0 var(--space-8);font-size:var(--text-card-title);font-weight:var(--w-semibold)}
-.row{display:flex;align-items:center;gap:var(--space-8);padding:var(--space-6) 0;border-top:1px solid var(--divider)}
-.row:first-of-type{border-top:none}
-/* 폐기된 토큰 행은 흐리게 남긴다. 지우지 않는다 */
-.dimrow{opacity:.55}
-/* 4 토큰 원문 상자 — 발급 직후에만. 서버는 해시만 저장해 다시 보여줄 수 없다 */
-.tokbox{background:var(--ink-body);color:#fff;padding:var(--space-10) var(--space-12);
-  margin:var(--space-10) 0;border-radius:var(--radius-control);font-size:var(--text-caption)}
-.tokbox .tok{font-family:var(--font-mono);font-size:var(--text-mono-id);margin:var(--space-6) 0;word-break:break-all}
-.tokbox .btn{background:none;border-color:rgba(255,255,255,.4);color:#fff}
-.tokbox .btn:hover{background:rgba(255,255,255,.1)}
+.legend i.sw{width:11px;height:11px;border:1px solid transparent;border-radius:2px;background:var(--status-draft)}
+.legend i.sw.rv{background:var(--status-review)}
+.legend i.sw.ok{background:var(--status-approved)}
+.legend i.sw.na{background:var(--bg-card);border-color:var(--border)}
+.warn{color:var(--danger);border:none;padding:0;background:none;font-size:inherit}
 /* UI-4 프로젝트 상세 */
-/* 3 요약 수치 여섯 칸. 0이면 흐리게, 1 이상이면 경고색 */
-.stats{display:flex;flex-wrap:wrap;gap:var(--space-8);margin:var(--space-10) 0 var(--space-18)}
-.stat{display:flex;align-items:baseline;gap:var(--space-5);padding:var(--space-8) var(--space-13);
-  border:1px solid var(--border);border-radius:var(--radius-panel-card);background:var(--bg-card);
-  font-size:var(--text-meta);color:var(--ink-muted);box-shadow:var(--shadow-card)}
-.stat b{font-size:17px;font-weight:var(--w-semibold);color:var(--danger)}
-.stat.dim{background:var(--bg-subtle);box-shadow:none;color:var(--ink-disabled)}
-.stat.dim b{color:var(--ink-disabled)}
-.stat.link{cursor:pointer}.stat.link:hover{border-color:var(--border-strong)}
-.body2{display:grid;grid-template-columns:1fr 320px;gap:var(--space-16);align-items:start}
-/* 4 11단계 표 — 단계 행이 아코디언 손잡이다 */
-table.stages{width:100%;border-collapse:collapse;font-size:var(--text-meta);background:var(--bg-card);
-  border:1px solid var(--border);border-radius:var(--radius-panel-card);overflow:hidden}
-table.stages td{padding:var(--space-8);border-bottom:1px solid var(--divider)}
-table.stages tr:last-child td{border-bottom:none}
-tr.stg{cursor:pointer;background:var(--bg-subtle)}tr.stg:hover{background:var(--bg-sunken)}
-tr.stg td{font-weight:var(--w-medium)}
-tr.stg td.no{width:34px;color:var(--ink-faint);font-family:var(--font-mono);font-size:var(--text-mono-sm)}
-tr.doc td{padding-left:var(--space-18);color:var(--ink-muted)}
+.phead .repo{display:inline-block;margin-top:var(--space-3);font-size:var(--text-meta);color:var(--ink-muted)}
+/* 3 요약 수치 여섯 칸. 0이면 흐리게, 1 이상이면 경고색 + 경고 테두리 */
+.stats{display:flex;flex-wrap:wrap;gap:var(--space-7);margin:0 0 var(--space-14)}
+.stat{display:flex;align-items:baseline;gap:var(--space-6);padding:var(--space-7) var(--space-12);
+  border:1px solid var(--stat-border);border-radius:var(--radius-item-card);background:var(--bg-card);
+  font-size:var(--text-meta);color:var(--ink-prose)}
+.stat b{font-family:var(--font-mono);font-size:17.5px;font-weight:var(--w-semibold);color:var(--danger)}
+.stat.dim{border-color:var(--border);opacity:.55}
+.stat.dim b{color:var(--ink-muted)}
+.stat.link{cursor:pointer}
+.body2{display:grid;grid-template-columns:minmax(0,1fr) 292px;gap:var(--space-14);align-items:start}
+/* 4 11단계 — 아코디언. 단계 행이 손잡이고 문서 행은 그 아래 묶음이다 */
+.stages{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-panel-card);overflow:hidden}
+.stgh{display:flex;align-items:center;gap:var(--space-8);padding:var(--space-9) var(--space-13);
+  border-bottom:1px solid var(--border);background:var(--bg-subtle);font-size:var(--text-ui)}
+.stgh b{font-weight:var(--w-semibold)}
+/* 미니 히트맵 — UI-2에서 본 그 프로젝트 행이 여기 다시 있다 */
+.stgh .sw{width:14px;height:14px;border-radius:2px;border:1px solid transparent;background:var(--status-draft)}
+.stgh .sw.rv{background:var(--status-review)}
+.stgh .sw.ok{background:var(--status-approved)}
+.stgh .sw.na{background:var(--bg-card);border-color:var(--border)}
+.stg{display:flex;align-items:center;gap:var(--space-9);padding:var(--space-8) var(--space-13);
+  border-bottom:1px solid var(--divider-soft);cursor:pointer}
+.stg:hover{background:var(--bg-subtle)}
+.stg .no{width:20px;flex:none;font-size:var(--text-mono-sm);color:var(--ink-muted)}
+.stg .nm{font-size:14.5px;font-weight:var(--w-medium)}
+.stg .caret{width:10px;text-align:center;font-size:11.5px;color:var(--ink-muted)}
+/* 문서 행 — 46px 들여쓰고 바탕을 한 톤 낮춘다. 안 그러면 어느 쪽이 묶음인지 안 보인다 */
+.doc{display:flex;align-items:center;gap:var(--space-8);flex-wrap:wrap;cursor:pointer;
+  padding:var(--space-7) var(--space-13) var(--space-7) 46px;border-bottom:1px solid var(--divider-soft);
+  background:var(--bg-doc-row);font-size:var(--text-meta)}
+.doc:hover{background:var(--bg-sunken)}
+.doc .mono{font-size:var(--text-mono-id-lg);font-weight:var(--w-medium)}
+.doc .dot{width:8px;height:8px;border-radius:var(--radius-dot);flex:none;background:var(--status-draft)}
+.doc .dot.rv{background:var(--status-review)}
+.doc .dot.ok{background:var(--status-approved)}
 .st{display:inline-block;padding:1px var(--space-8);border-radius:var(--radius-pill);font-size:var(--text-caption);font-weight:var(--w-semibold)}
 .st.ok,.st-approved{background:var(--status-approved);color:var(--status-approved-ink)}
 .st.rv,.st-review{background:var(--status-review);color:var(--ink-body)}
 .st.dr,.st-draft{background:var(--status-draft);color:var(--ink-body)}
 .st.na{background:none;color:var(--ink-disabled)}
 /* 4.3 상위 미승인 — 표시만 한다. 순서는 권장이지 강제가 아니다 */
-.gate{margin-left:var(--space-6);font-size:var(--text-caption);color:var(--danger);border:1px solid var(--danger);border-radius:var(--radius-badge);padding:0 var(--space-5)}
-.flag{font-size:var(--text-caption);color:var(--caution-ink);border:1px solid var(--status-review);background:var(--caution-bg);padding:0 var(--space-5);margin-left:var(--space-6);border-radius:var(--radius-badge)}
-.cm{font-size:var(--text-caption);color:var(--ink-faint);margin-left:var(--space-6)}
-.err{font-size:var(--text-caption);color:var(--danger);border:1px solid var(--danger);border-radius:var(--radius-badge);padding:0 var(--space-5);margin-left:var(--space-6)}
-.warnx{font-size:var(--text-caption);color:var(--caution-ink);margin-left:var(--space-6)}
+.gate{font-size:var(--text-caption);color:var(--danger);border:1px solid var(--danger);border-radius:8px;padding:1px var(--space-7)}
+.flag{font-size:var(--text-mono-sm);color:var(--caution-ink);border:1px solid var(--status-review);border-radius:8px;padding:1px var(--space-7)}
+.cm{font-size:var(--text-mono-sm);color:var(--ink-muted);border:1px solid var(--border-strong);border-radius:8px;padding:1px var(--space-7)}
+.err{font-size:var(--text-mono-sm);color:var(--danger);border:1px solid var(--danger);border-radius:8px;padding:1px var(--space-7)}
+.warnx{font-size:var(--text-mono-sm);color:var(--caution-ink);border:1px solid var(--status-review);border-radius:8px;padding:1px var(--space-7)}
 /* 5 최근 변경 · 7 동기화 상태 */
-.panel{border:1px solid var(--border);border-radius:var(--radius-panel-card);background:var(--bg-card);box-shadow:var(--shadow-card)}
-.pbody{padding:var(--space-14) var(--space-16);font-size:var(--text-meta)}
-.pbody h4{margin:0 0 var(--space-8);font-size:var(--text-card-title);font-weight:var(--w-semibold)}
+.panel{border:1px solid var(--border);border-radius:var(--radius-panel-card);background:var(--bg-card)}
+.pbody{padding:var(--space-13) var(--space-14);font-size:var(--text-meta)}
+.pbody h4{margin:0 0 var(--space-9);font-size:var(--text-ui);font-weight:var(--w-semibold)}
 .pbody ul{padding-left:var(--space-18);margin:var(--space-4) 0}
-.recent li{margin-bottom:var(--space-8);line-height:1.6}
-.sync{margin-top:var(--space-14);padding-top:var(--space-10);border-top:1px solid var(--divider);line-height:1.8}
+.rc{padding:var(--space-7) 0;border-bottom:1px solid var(--divider-soft);cursor:pointer}
+.rc>div:first-child{display:flex;align-items:baseline;gap:var(--space-7);flex-wrap:wrap}
+.rc .mono{font-size:var(--text-mono-id);font-weight:var(--w-medium)}
+.rc .msg{margin-top:2px;color:var(--ink-prose)}
+.rc .lbl{margin-top:1px}
+.sync{margin-top:var(--space-11);padding-top:var(--space-10);border-top:1px solid var(--divider);line-height:1.7}
 .sync .behind{color:var(--danger);font-weight:var(--w-semibold)}
-/* UI-5 문서 뷰 */
-.docbar{display:flex;align-items:center;gap:var(--space-14);height:var(--docbar-h);padding:0 var(--space-16);
-  border-bottom:1px solid var(--border);background:var(--bg-card);font-size:var(--text-meta);position:sticky;top:0;z-index:5}
-.tabs{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius-control);overflow:hidden}
-.tabs span,.tabs a{padding:var(--space-4) var(--space-12);cursor:pointer;color:var(--ink-faint);
-  border-right:1px solid var(--border);text-decoration:none;font-size:var(--text-meta)}
-.tabs span:last-child,.tabs a:last-child{border-right:none}
-.tabs span.on,.tabs .on{background:var(--bg-sunken);color:var(--ink-body);font-weight:var(--w-semibold)}
+/* UI-5 문서 뷰 · UI-7 버전 이력 — 같은 3단 틀을 쓴다 */
+/* 문서 바 = 브레드크럼. 어디서 들어왔든 지금 자리를 말한다 */
+.docbar{display:flex;align-items:center;gap:var(--space-10);flex-wrap:wrap;height:var(--docbar-h);
+  padding:0 var(--space-18);border-bottom:1px solid var(--border);background:var(--bg-card);
+  font-size:var(--text-meta);position:sticky;top:0;z-index:5}
+.docbar .crumb{color:var(--ink-muted);text-decoration:none;cursor:pointer;font-size:13.5px}
+.docbar .crumb:hover{color:var(--ink-body)}
+.docbar .crumb.mono{font-size:var(--text-mono-id)}
+.docbar .sep{color:var(--ink-faint);font-size:var(--text-mono-sm)}
+.docbar>b.mono{font-size:13.5px;font-weight:var(--w-medium)}
+.docbar .ver{color:var(--ink-muted);font-size:var(--text-mono-id);text-decoration:none;
+  border-bottom:1px dashed var(--border-strong);cursor:pointer}
 .statuswrap{position:relative}
 .menu{position:absolute;right:0;top:110%;background:var(--bg-card);border:1px solid var(--border-strong);
-  border-radius:var(--radius-control);box-shadow:var(--shadow-card);min-width:120px;z-index:10;overflow:hidden}
-.mi{padding:var(--space-6) var(--space-12);cursor:pointer;font-size:var(--text-meta)}
-.mi:hover{background:var(--bg-subtle)}.mi.dis{opacity:.4;cursor:default}
+  border-radius:var(--radius-panel-card);box-shadow:0 10px 28px rgba(23,24,28,.16);min-width:180px;z-index:10;overflow:hidden}
+.mi{padding:var(--space-10) var(--space-12);cursor:pointer;font-size:var(--text-ui);border-bottom:1px solid var(--divider-soft)}
+.mi:last-child{border-bottom:none}.mi:hover{background:var(--bg-subtle)}.mi.dis{opacity:.4;cursor:default}
 /* 3단 + 손잡이 둘. 폭은 인라인 --toc-w/--panel-w가 끈다 (6.2·8.3) */
-.body3{display:grid;grid-template-columns:var(--toc-w) 5px minmax(0,1fr) 5px var(--panel-w);gap:0;align-items:start}
-.handle{align-self:stretch;cursor:col-resize;background:var(--divider)}
-.handle:hover{background:var(--border-strong)}
-/* 문서 바 아래에 붙는다 — top:0이면 스크롤할 때 문서 바 밑으로 미끄러져 들어간다 */
-.toc{position:sticky;top:var(--docbar-h);padding:var(--space-14) var(--space-12);font-size:var(--text-caption);
-  max-height:calc(100vh - var(--topbar-h) - var(--docbar-h));overflow:auto}
-.toc div{padding:var(--space-3) 0;cursor:pointer}
+.body3{display:grid;grid-template-columns:var(--toc-w) 1px minmax(0,1fr) 1px var(--panel-w);
+  gap:0;align-items:stretch;height:calc(100vh - var(--topbar-h) - var(--docbar-h));min-height:0}
+/* 손잡이는 9px인데 자리는 1px만 먹는다 — 누르기 쉬우면서 열을 밀지 않게 */
+.handle{position:relative;width:1px;background:var(--border);cursor:col-resize}
+.handle::after{content:"";position:absolute;top:0;bottom:0;left:-4px;width:9px}
+.handle:hover{background:var(--danger)}
+/* 사이드바 바탕을 본문 흰색과 갈라 놔야 어디가 읽는 곳인지 바로 보인다 */
+.toc,.vlist{background:var(--bg-subtle);padding:var(--space-13) var(--space-12);overflow:auto;
+  max-height:calc(100vh - var(--topbar-h) - var(--docbar-h))}
+.toc{position:sticky;top:var(--docbar-h);font-size:var(--text-caption)}
+.toc>div{padding:var(--space-3) 0;cursor:pointer;line-height:1.4}
 .toc .d1{padding-left:var(--space-12);color:var(--ink-faint)}
 /* 6.1 표시된 항목 — 플래그·미해결 댓글이 붙은 항목만. 없으면 블록이 통째로 없다 */
-.marked{margin-top:var(--space-14);padding-top:var(--space-10);border-top:1px solid var(--divider)}
+.marked{margin-top:var(--space-14);padding-top:var(--space-10);border-top:1px solid var(--border)}
 .marked>div{display:flex;align-items:center;gap:var(--space-5);font-family:var(--font-mono);font-size:var(--text-mono-sm)}
 .marked .lbl{font-family:var(--font-sans)}
 .marked .dot{flex:none;width:6px;height:6px;border-radius:var(--radius-dot)}
 .marked .dot.flag{background:var(--danger)}
 .marked .dot.cm{background:var(--status-review)}
-/* 규칙: 세 탭의 본문 최대 폭이 같아야 한다. 값은 --doc-w 한 곳 */
-.body3 .main{border:none;padding:var(--space-22) var(--space-30);min-width:0;max-width:var(--doc-w);margin:0 auto}
-.body3 .panel{position:sticky;top:var(--docbar-h);max-height:calc(100vh - var(--topbar-h) - var(--docbar-h));
-  overflow:auto;border:none;border-radius:0;box-shadow:none;border-left:1px solid var(--divider)}
+/* 본문 — 세 탭의 최대 폭이 같아야 한다. 값은 --doc-w 한 곳 */
+.mainwrap,.body3>.main{overflow:auto;scrollbar-gutter:stable;padding:var(--space-20) var(--space-26) 60px;
+  background:var(--bg-card);min-width:0;max-height:calc(100vh - var(--topbar-h) - var(--docbar-h))}
+.mainwrap>*,.body3>.main>*{max-width:var(--doc-w);margin-left:auto;margin-right:auto}
+.body3 .main{border:none;padding:0;min-width:0;max-width:var(--doc-w);margin:0 auto}
+/* 탭 — 본문 안 맨 위, 밑줄. 활성만 굵고 아래 2px 잉크선 */
+/* border·background를 다시 적는 건 styles.view.css의 .tabs가 테두리 두른 상자라서다
+   (V-* 문서 뷰 탭). 여기 탭은 밑줄 하나다 — .nav .warn과 같은 이름 충돌 */
+.tabs{display:flex;align-items:center;gap:var(--space-16);padding-bottom:var(--space-11);
+  margin-bottom:var(--space-16);border:none;background:none;border-bottom:1px solid var(--border)}
+.tabs span,.tabs a{padding-bottom:var(--space-3);cursor:pointer;color:var(--ink-muted);
+  text-decoration:none;font-size:var(--text-ui);border-bottom:2px solid transparent}
+.tabs span.on,.tabs .on{color:var(--ink-body);font-weight:var(--w-semibold);border-bottom-color:var(--ink-body)}
+/* 8 오른쪽 패널 */
+.body3 .panel,.vimpact{background:var(--bg-subtle);border:none;border-left:1px solid var(--border);
+  border-radius:0;box-shadow:none;overflow:auto;padding:0;
+  max-height:calc(100vh - var(--topbar-h) - var(--docbar-h))}
+.vimpact{padding:var(--space-13) var(--space-12);font-size:var(--text-meta)}
 .ptabs{display:flex;border-bottom:1px solid var(--border)}
-.ptabs span{flex:1;text-align:center;padding:var(--space-6);cursor:pointer;color:var(--ink-faint);font-size:var(--text-meta)}
+.ptabs span{flex:1;text-align:center;padding:var(--space-8);cursor:pointer;color:var(--ink-faint);font-size:var(--text-meta)}
 .ptabs span.on{font-weight:var(--w-semibold);color:var(--ink-body);background:var(--bg-card)}
-.nav{display:flex;justify-content:space-between;padding:var(--space-14) var(--space-22);border-top:1px solid var(--divider);background:var(--bg-card)}
-/* 10 원본 탭 — 목차·패널은 안 보이지만 **자리는 비워 둔다.** 폭만 같고 위치가 다르면
-   탭을 오갈 때 본문이 좌우로 뛴다 — 규칙이 막으려는 게 그것이다 */
-.rawwrap{padding:var(--space-16) calc(var(--panel-w) + 5px) var(--space-16) calc(var(--toc-w) + 5px)}
+.nav{display:flex;justify-content:space-between;padding-top:var(--space-14);margin-top:var(--space-26);border-top:1px solid var(--border)}
+/* 10 원본 탭 — 목차·패널은 안 보이지만 자리는 비워 둔다 */
+.rawwrap{overflow:auto;padding:var(--space-20) calc(var(--panel-w) + var(--space-26)) 60px calc(var(--toc-w) + var(--space-26));
+  background:var(--bg-card);max-height:calc(100vh - var(--topbar-h) - var(--docbar-h))}
 .rawinner{max-width:var(--doc-w);margin:0 auto}
 .rawbar{display:flex;align-items:center;gap:var(--space-10);margin-bottom:var(--space-8)}
 /* 10.3·10.4 원문/렌더링 — 둘 중 하나만 켜진다 */
@@ -297,16 +312,57 @@ tr.doc td{padding-left:var(--space-18);color:var(--ink-muted)}
 .radio:first-of-type{border-radius:var(--radius-btn-sm) 0 0 var(--radius-btn-sm);border-right:none}
 .radio:last-of-type{border-radius:0 var(--radius-btn-sm) var(--radius-btn-sm) 0}
 .radio.on{background:var(--bg-sunken);color:var(--ink-body);font-weight:var(--w-semibold)}
-.rawview{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-panel-card);padding:var(--space-18) var(--space-22)}
-/* 카드가 이미 테두리를 그린다. 뷰 CSS의 .body 좌우 테두리를 겹쳐 두면 액자가 둘이다 */
+.rawview{background:var(--bg-card)}
 .rawview .body{border:none;padding:0;max-width:none;margin:0}
 .rawview .front{margin:0 0 var(--space-14);padding:var(--space-10) var(--space-12);background:var(--bg-sunken);
-  color:var(--ink-muted);border-radius:var(--radius-control);font-family:var(--font-mono);font-size:var(--text-mono-sm);white-space:pre-wrap}
-.editor{display:grid;grid-template-columns:48px 1fr;background:#1E2A30;color:#E8ECE8;font:12.5px/1.6 ui-monospace,Menlo,monospace}.gutter{display:flex;flex-direction:column;align-items:flex-end;padding:12px 8px;color:#7a8a92;border-right:1px solid #33434a;user-select:none}.editor pre.code{margin:0;padding:12px 14px;background:transparent;white-space:pre-wrap}
-.uptbl{width:100%;border-collapse:collapse;margin:10px 0}.uptbl th,.uptbl td{padding:6px 8px;border-bottom:1px solid var(--hair);text-align:left;font-size:13px}
-.cmt{border-top:1px solid var(--hair);padding:8px 0}.cmt.done{opacity:.55}.cacts{display:flex;gap:6px;margin-top:4px}
-.pbody textarea{margin:8px 0}
-li.ref.missing{color:#999}
+  color:var(--ink-muted);border-radius:var(--radius-control);font-family:var(--font-mono);
+  font-size:var(--text-mono-sm);white-space:pre-wrap}
+.editor{display:grid;grid-template-columns:48px 1fr;border-radius:var(--radius-control);overflow:hidden;
+  background:var(--bg-card);border:1px solid var(--border);font:var(--text-mono-id-lg)/1.75 var(--font-mono)}
+.gutter{display:flex;flex-direction:column;align-items:flex-end;padding:var(--space-12) var(--space-8);
+  background:var(--bg-sunken);color:var(--ink-faint);user-select:none}
+.editor pre.code{margin:0;padding:var(--space-12) var(--space-14);background:transparent;white-space:pre-wrap}
+.uptbl{width:100%;border-collapse:collapse;margin:var(--space-10) 0}
+.uptbl th,.uptbl td{padding:var(--space-6) var(--space-8);border-bottom:1px solid var(--divider);text-align:left;font-size:var(--text-meta)}
+.cmt{border-top:1px solid var(--divider);padding:var(--space-8) 0}.cmt.done{opacity:.55}
+.cacts{display:flex;gap:var(--space-6);margin-top:var(--space-4)}
+.pbody textarea{margin:var(--space-8) 0}
+li.ref.missing{color:var(--ink-disabled)}
+
+/* UI-7 버전 카드 목록 */
+.vcard{border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius-control);
+  padding:var(--space-7) var(--space-8);margin-bottom:var(--space-5);cursor:pointer;font-size:var(--text-caption)}
+.vcard:hover{border-color:var(--border-strong)}
+.vcard>div{display:flex;align-items:center;gap:var(--space-6)}
+.vcard .mono{font-size:var(--text-mono-id-lg)}
+.vcard .msg{display:block;margin-top:var(--space-3);color:var(--ink-prose);line-height:1.45}
+.vcard .by{margin-top:var(--space-4);align-items:flex-start}
+/* 한글은 아무 데서나 끊긴다 — 좁은 사이드바에서 단어가 쪼개지지 않게 */
+.vcard .msg,.vcard .by .lbl{word-break:keep-all}
+.vcard .by .lbl{min-width:0;flex:1;line-height:1.4}
+.vcard .btn.sm{flex:none;white-space:nowrap;padding:1px var(--space-6);font-size:11.5px}
+/* 고른 카드 — 잉크 테두리와 주의 배경 */
+.vcard.sel{border:1.5px solid var(--ink-body);background:var(--caution-bg)}
+.ab{font-family:var(--font-mono);font-size:11px;font-weight:var(--w-bold);background:var(--ink-body);
+  color:#fff;border-radius:var(--radius-badge);padding:0 var(--space-5)}
+.btn.sm.danger{border-color:var(--danger);color:var(--danger);font-weight:var(--w-medium)}
+.btn.sm.danger:hover{background:var(--danger-bg)}
+.hint{color:var(--ink-muted);font-size:var(--text-caption);line-height:1.6}
+.vlist .hint{margin-top:var(--space-8);padding-top:var(--space-9);border-top:1px solid var(--border)}
+.drange{display:flex;align-items:baseline;gap:var(--space-10);flex-wrap:wrap;margin-bottom:var(--space-14)}
+.drange .mono{font-size:19px;font-weight:var(--w-semibold)}
+/* diff는 항목마다 카드다 — 어느 항목이 바뀌었는지가 줄보다 먼저 읽혀야 한다 */
+.dgroup{border:1px solid var(--border);border-radius:var(--radius-item-card);overflow:hidden;margin-bottom:var(--space-10)}
+.dhead2{display:flex;align-items:center;gap:var(--space-8);flex-wrap:wrap;padding:var(--space-9) var(--space-12);
+  background:var(--bg-subtle);border-bottom:1px solid var(--border);font-size:var(--text-ui)}
+.dhead2 b{font-weight:var(--w-semibold)}
+.dgroup .hint{border:1px solid var(--border-strong);background:var(--bg-card);border-radius:9px;
+  padding:1px var(--space-8);cursor:pointer;white-space:nowrap}
+/* 이 변경이 닿는 곳 */
+.icard{border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius-control);
+  padding:var(--space-7) var(--space-9);margin-bottom:var(--space-6);cursor:pointer}
+.icard>div{display:flex;align-items:center}
+.icard .n{font-family:var(--font-mono);font-weight:var(--w-semibold);color:var(--ink-muted)}
 /* UI-10 내 할 일 */
 .todo .row .k{font-family:var(--font-mono);font-size:var(--text-mono-id);font-weight:var(--w-semibold)}
 .row .age{color:var(--ink-faint);font-size:var(--text-mono-sm);white-space:nowrap}
@@ -326,34 +382,17 @@ li.ref.missing{color:#999}
 .acts{display:flex;align-items:center;gap:var(--space-10);padding:var(--space-10) 0}
 /* diff — 문맥 줄(ctx)은 DIFF_CONTEXT_LINES(기본 3)만큼 앞뒤로 함께 온다.
    바뀐 줄만 보면 마크다운 문단에서 무엇이 바뀐 건지 안 보인다 */
-.diffbox{font-family:var(--font-mono);font-size:var(--text-mono-sm);padding:var(--space-10) var(--space-12);
-  overflow-x:auto;background:var(--bg-card);line-height:1.7}
-.dl{white-space:pre-wrap;padding:1px var(--space-6);border-radius:var(--radius-badge)}
-.dl.add{background:var(--diff-add-bg);color:var(--status-approved)}
-.dl.del{background:var(--danger-bg);color:var(--danger)}
-.dl.ctx{color:var(--ink-faint)}
+.diffbox{font-family:var(--font-mono);font-size:var(--text-mono-id-lg);padding:var(--space-6) 0;
+  overflow-x:auto;background:var(--bg-card);line-height:1.85}
+/* 마커를 고정폭 칸으로 떼어 놓는다 — 본문에 붙으면 어느 쪽이 부호인지 안 보인다 */
+.dl{display:flex}
+.dl .mk{width:26px;flex:none;text-align:center;font-weight:var(--w-semibold)}
+.dl>span:last-child{flex:1;white-space:pre-wrap;padding-right:var(--space-12)}
+.dl.add{background:var(--diff-add-bg)}.dl.add .mk,.dl.add>span:last-child{color:var(--status-approved)}
+.dl.del{background:var(--danger-bg)}.dl.del .mk,.dl.del>span:last-child{color:var(--danger)}
+.dl.ctx>span:last-child{color:var(--ink-faint)}
 /* UI-12 전파 선택 */
 .dbody .sech{margin-top:10px}.chk{list-style:none;padding:0;margin:6px 0}.chk li{padding:4px 0;border-top:1px solid var(--hair)}.propacts{display:flex;align-items:center;gap:10px;margin-top:14px}.skipbox{display:flex;gap:8px;align-items:center}
-/* UI-7 버전 이력 — 유저용·원본과 같은 폭 안에 든다(--doc-w는 3단이 아니라 2단이라 넓게) */
-/* 반반. 기본 .body2(1fr 320px)는 오른쪽이 패널용 폭이라 diff 글줄이 너무 좁아진다 */
-.hist{align-items:start;max-width:1180px;margin:0 auto;padding:var(--space-18) var(--space-22);
-  grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-table.vers{width:100%;border-collapse:collapse;font-size:var(--text-meta);background:var(--bg-card);
-  border:1px solid var(--border);border-radius:var(--radius-panel-card);overflow:hidden}
-table.vers th{background:var(--bg-subtle);color:var(--ink-muted);font-size:var(--text-caption);font-weight:var(--w-semibold)}
-table.vers th,table.vers td{padding:var(--space-7) var(--space-8);border-bottom:1px solid var(--divider);text-align:left;vertical-align:top}
-table.vers tr:last-child td{border-bottom:none}
-table.vers tr.cur td{background:var(--bg-subtle)}
-/* 고른 행은 테두리와 배경으로 구분한다. 뱃지(2.3)가 어느 쪽이 A인지 말해 준다 */
-table.vers tr.sel td{background:var(--caution-bg)}
-table.vers tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--status-review)}
-.ab{display:inline-block;min-width:16px;padding:0 var(--space-5);border-radius:var(--radius-badge);
-  background:var(--ink-body);color:#fff;font-family:var(--font-mono);font-size:var(--text-mono-sm);
-  font-weight:var(--w-semibold);text-align:center;cursor:pointer}
-.diffpane{border:1px solid var(--border);border-radius:var(--radius-panel-card);background:var(--bg-card);overflow:hidden}
-.hint{cursor:pointer;color:var(--caution-ink);border:1px solid var(--status-review);background:var(--caution-bg);
-  padding:0 var(--space-5);font-size:var(--text-caption);border-radius:var(--radius-badge);margin-left:var(--space-6)}
-.tabs a{color:var(--ink-faint);text-decoration:none}
 /* UI-8 참조 그래프 — 열은 11단계 고정, 노드는 항목 */
 .graphpage{max-width:none;padding:var(--space-18) var(--space-22) var(--space-22)}
 .gcard{border:1px solid var(--border);border-radius:var(--radius-panel-card);background:var(--bg-card);overflow:hidden}

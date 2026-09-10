@@ -32,8 +32,8 @@ export function DocView() {
   const [reason, setReason] = useState('')
   const mainRef = useRef<HTMLElement>(null)
   // 규칙: 사이드바 폭과 원문/렌더링 선택은 사람마다 기억한다. 화면을 옮겨도 유지된다
-  const [tocW, addTocW] = useWidth('syncdoc.ui5.toc', 200, 140, 400)
-  const [panelW, addPanelW] = useWidth('syncdoc.ui5.panel', 300, 180, 460)
+  const [tocW, addTocW] = useWidth('syncdoc.ui5.toc', 186, 140, 400)
+  const [panelW, addPanelW] = useWidth('syncdoc.ui5.panel', 250, 180, 460)
   const [rawMode, setRawMode] = useState<'text' | 'rendered'>(() => (readStore('syncdoc.ui5.raw') === 'rendered' ? 'rendered' : 'text'))
   const pickRaw = (m: 'text' | 'rendered') => {
     setRawMode(m)
@@ -158,26 +158,21 @@ export function DocView() {
     // 폭 변수를 화면 전체가 쥔다 — 원본 탭도 같은 값으로 사이드바 자리를 비워 둬야
     // 탭을 오갈 때 본문이 좌우로 안 흔들린다 (UI-5 규칙)
     <div className="docscreen" style={{ '--toc-w': `${tocW}px`, '--panel-w': `${panelW}px` } as React.CSSProperties}>
+      {/* 브레드크럼 — 어디서 들어왔든 지금 자리를 말하고, 앞 두 조각으로 되짚어 올라간다 */}
       <div className="docbar" data-el="1">
-        <span>
-          <b>{doc.doc_id}</b> ·{' '}
-          <StatusPill status={doc.status} el="1.1" />{' '}
-          ·{' '}
-          <Link data-el="1.2" to={`/p/${code}/d/${docId}/history`}>
-            v{doc.current_version_no}
-          </Link>
-        </span>
-        <span className="tabs" data-el="2">
-          <span className={tab === 'user' ? 'on' : ''} data-el="2.1" onClick={() => setSp({})}>
-            유저용
-          </span>
-          <span className={tab === 'raw' ? 'on' : ''} data-el="2.2" onClick={() => setSp({ tab: 'raw' })}>
-            원본
-          </span>
-          <Link data-el="2.3" to={`/p/${code}/d/${docId}/history`}>
-            이력
-          </Link>
-        </span>
+        <Link className="crumb" to={`/p/${code}`}>
+          {code}
+        </Link>
+        <span className="sep">›</span>
+        <Link className="crumb mono" to={`/p/${code}#stage-${doc.stage ?? ''}`}>
+          {doc.stage ? `${doc.stage} ${doc.doc_type}` : doc.doc_type}
+        </Link>
+        <span className="sep">›</span>
+        <b className="mono">{doc.doc_id}</b>
+        <StatusPill status={doc.status} el="1.1" />
+        <Link className="ver mono" data-el="1.2" to={`/p/${code}/d/${docId}/history`}>
+          v{doc.current_version_no}
+        </Link>
         <span className="grow" />
         {unresolved > 0 && (
           <span data-el="5" className="lbl" onClick={() => setPanel('comments')}>
@@ -236,7 +231,10 @@ export function DocView() {
           </nav>
           <Handle el="6.2" onDrag={(dx) => addTocW(dx)} />
           <style>{extraCss}</style>
-          <article className="main body" ref={mainRef} />
+          <div className="mainwrap">
+            <Tabs tab={tab} setSp={setSp} code={code} docId={docId} />
+            <article className="main body" ref={mainRef} />
+          </div>
           <Handle el="8.3" onDrag={(dx) => addPanelW(-dx)} />
           <aside className="panel" data-el="8">
             <div className="ptabs">
@@ -258,6 +256,7 @@ export function DocView() {
       ) : (
         <div className="rawwrap" data-el="10">
           <div className="rawinner">
+            <Tabs tab={tab} setSp={setSp} code={code} docId={docId} />
             <div className="rawbar">
               <span className="lbl">에이전트가 읽는 원본 그대로 · 읽기 전용</span>
               <span className="grow" />
@@ -466,6 +465,23 @@ function Handle({ el, onDrag }: { el: string; onDrag: (dx: number) => void }) {
     window.addEventListener('mouseup', up)
   }
   return <div className="handle" data-el={el} onMouseDown={down} />
+}
+
+/** 탭은 본문 안 맨 위, 본문과 같은 폭. 밖에 두면 탭과 본문의 왼쪽 끝이 어긋난다 */
+function Tabs({ tab, setSp, code, docId }: { tab: string; setSp: (v: Record<string, string>) => void; code: string; docId: string }) {
+  return (
+    <div className="tabs" data-el="2">
+      <span className={tab === 'user' ? 'on' : ''} data-el="2.1" onClick={() => setSp({})}>
+        유저용
+      </span>
+      <span className={tab === 'raw' ? 'on' : ''} data-el="2.2" onClick={() => setSp({ tab: 'raw' })}>
+        원본
+      </span>
+      <Link data-el="2.3" to={`/p/${code}/d/${docId}/history`}>
+        이력
+      </Link>
+    </div>
+  )
 }
 
 function tocOf(doc: Document): { id: string; text: string; depth: number }[] {
