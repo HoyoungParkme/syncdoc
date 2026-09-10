@@ -120,8 +120,8 @@ upstream: [SYNC-UI-001]
     <div>4. 성공지표</div>
     <div class="marked" data-el="6.1">
       <div class="lbl">표시된 항목</div>
-      <div><span class="dot flag"></span> R1 <span class="lbl">확인 필요</span></div>
-      <div><span class="dot cm"></span> R2 <span class="lbl">미해결 댓글 2</span></div>
+      <div><span class="dot dot-flag"></span> R1 <span class="lbl">확인 필요</span></div>
+      <div><span class="dot dot-cm"></span> R2 <span class="lbl">미해결 댓글 2</span></div>
     </div>
   </nav>
   <div class="handle" data-el="6.2"></div>
@@ -182,7 +182,7 @@ upstream: [SYNC-UI-001]
   </div>
   <div class="editor" data-el="10.1">
     <div class="gutter"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div>
-    <pre class="code">---
+    <pre class="mdsrc">---
 doc_id: SYNC-PRD-001
 type: PRD
 status: approved
