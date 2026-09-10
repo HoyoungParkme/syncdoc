@@ -241,6 +241,32 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
         $ref: '#/components/responses/Problem'
 ```
 
+#### DELETE/api/projects/{code} 프로젝트 등록 해제
+
+화면 없음 — v1은 API만 · 서비스 [[SYNC-MS-001#ProjectService.delete_project]]
+
+```yaml
+/api/projects/{code}:
+  delete:
+    summary: 프로젝트 등록을 지우고 작업 사본을 회수한다
+    parameters:
+    - $ref: '#/components/parameters/code'
+    responses:
+      '204':
+        description: 지워짐
+      '404':
+        $ref: '#/components/responses/Problem'
+```
+
+**저장소는 건드리지 않는다.** 지우는 것은 싱크독 쪽 등록과 색인, 그리고 노트북의 작업 사본이다.
+`docs/specs/`는 원격에 그대로 남고, 다시 등록하면 `import_existing`으로 돌아온다.
+
+**돌아오지 않는 것이 있다.** 플래그·전파결정·댓글은 원본에 없는 정보라 등록을 지우면 사라진다
+(인프라 6장). 백업이 있으면 그것으로만 살릴 수 있다.
+
+이 엔드포인트가 없을 때는 한 번 등록한 저장소가 디스크에서 사라지지 않았다. 작업 사본은 전체
+이력 clone이라 쌓이면 노트북 디스크를 채운다(인프라 9장).
+
 #### GET/api/projects/{code}/docs 문서 목록
 
 화면 [[SYNC-UI-001#UI-4]], [[SYNC-UI-001#UI-9]] · 유스케이스 [[SYNC-UC-001#UC-H14]], H16 · 서비스 `SpecService`
@@ -273,7 +299,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 #### GET/api/projects/{code}/flags 프로젝트의 플래그·댓글·규약 오류 목록
 
-화면 [[SYNC-UI-001#UI-4]] · 유스케이스 [[SYNC-UC-001#UC-H14]] · 서비스 `TrackingService`
+화면 [[SYNC-UI-001#UI-4]] · 유스케이스 [[SYNC-UC-001#UC-H14]] · 서비스 [[SYNC-MS-008#queries.project_items]]
 
 ```yaml
 /api/projects/{code}/flags:
@@ -304,11 +330,20 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
                 - $ref: '#/components/schemas/FlagSummary'
                 - $ref: '#/components/schemas/CommentSummary'
                 - $ref: '#/components/schemas/DocumentSummary'
+                discriminator:
+                  propertyName: type
 ```
+
+**세 스키마에 판별 필드 `type`이 있다.** `FlagSummary`는 `"flag"`, `CommentSummary`는 `"comment"`,
+`DocumentSummary`는 `"document"`. 고정값이고 서버가 늘 채운다.
+
+이게 없으면 클라이언트가 `kind` 문자열로 어느 타입인지 되짚어야 한다 — 여섯 값을 세 타입에 맞춰
+분기하는 지식이 서버와 클라이언트 두 곳에 생기고, 서버가 `kind`를 늘려도 컴파일이 못 잡는다.
+엔드포인트를 셋으로 쪼개는 것보다 이쪽이 싸다([[SYNC-API-001]] 6장).
 
 #### GET/api/projects/{code}/graph 참조 그래프
 
-화면 [[SYNC-UI-001#UI-8]] · 유스케이스 [[SYNC-UC-001#UC-H4]] · 서비스 `ReferenceService.graph`
+화면 [[SYNC-UI-001#UI-8]] · 유스케이스 [[SYNC-UC-001#UC-H4]] · 서비스 [[SYNC-MS-008#queries.graph_view]]
 
 ```yaml
 /api/projects/{code}/graph:
@@ -317,15 +352,16 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
     parameters:
     - $ref: '#/components/parameters/code'
     - in: query
-      name: stage
-      schema:
-        type: integer
-      description: 단계로 좁힘 (2b)
-    - in: query
-      name: doc
+      name: scope
       schema:
         type: string
-      description: 문서로 좁힘 (2b)
+        enum: [all, approved, flagged]
+        default: all
+      description: >
+        무엇을 그릴지 고른다 (2b). all=전체 ·
+        approved=문서 상태가 승인인 문서의 항목만 ·
+        flagged=미해결 플래그가 붙은 항목만.
+        범위 밖 항목을 가리키는 참조는 그리지 않는다 — 미존재 참조와 다르다
     responses:
       '200':
         content:
@@ -333,6 +369,35 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
             schema:
               $ref: '#/components/schemas/Graph'
 ```
+
+**`stage`·`doc`은 v1.2에서 없앴다.** 단계로 좁혀도 한 걸음이면 문서 대부분에 닿아 좁힌 의미가
+없었다([[SYNC-UI-001#UI-8]] 7장 3). 범위는 잘라내는 조작에서 **골라내는** 조작이 됐다.
+
+#### GET/api/docs/{docId}/items/{itemId}/chain 항목의 11단계 체인
+
+화면 [[SYNC-UI-001#UI-15]] · 유스케이스 [[SYNC-UC-001#UC-H4]] 기본 흐름 3 · 서비스 [[SYNC-MS-008#queries.item_chain]]
+
+```yaml
+/api/docs/{docId}/items/{itemId}/chain:
+  get:
+    summary: "한 항목의 상·하위 전이적 폐포를 11단계로 (UI-15)"
+    parameters:
+    - $ref: '#/components/parameters/docId'
+    - $ref: '#/components/parameters/itemId'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemChain'
+      '404':
+        $ref: '#/components/responses/NotFound'
+```
+
+**직접 참조가 아니라 전이적 폐포다.** 상위 방향과 하위 방향으로 각각 너비 우선 탐색을 돌린다.
+응답은 **항상 11행**이고 항목이 없는 단계도 빈 채로 온다 — 체인이 어디서 끊겼는지 화면이 보여야
+하기 때문이다. 각 항목의 역할(`upstream`/`self`/`downstream`)은 **어느 폐포에서 나왔는지**로
+정한다. 단계 번호로 정하면 되돌아오는 참조에서 근거를 파생으로 잘못 적는다.
 
 ### 3.4 문서
 
@@ -1098,9 +1163,13 @@ components:
               type: integer
             broken_ref:
               type: integer
+            upstream_impact:
+              type: integer
             unresolved_comments:
               type: integer
             convention_errors:
+              type: integer
+            incomplete:
               type: integer
         updated_at:
           type: string
@@ -1121,9 +1190,22 @@ components:
             items:
               $ref: '#/components/schemas/Version'
             description: 최근 N건. status 커밋 포함
+          last_processed_commit:
+            type: string
+            nullable: true
+            description: 파이프라인이 마지막으로 처리한 커밋 (UI-4 요소 7.1)
+          behind_by:
+            type: integer
+            nullable: true
+            description: >
+              원격이 앞선 커밋 수 (UI-4 요소 7.2). 폴링이 DB에 적어 둔 값을 그대로 읽는다 —
+              이 응답을 만들 때 git fetch를 돌리지 않는다
     DocumentSummary:
       type: object
       properties:
+        type:
+          type: string
+          enum: [document]
         doc_id:
           type: string
         doc_type:
@@ -1360,6 +1442,9 @@ components:
     FlagSummary:
       type: object
       properties:
+        type:
+          type: string
+          enum: [flag]
         id:
           type: integer
         kind:
@@ -1434,6 +1519,9 @@ components:
     CommentSummary:
       type: object
       properties:
+        type:
+          type: string
+          enum: [comment]
         id:
           type: integer
         doc_id:
@@ -1515,6 +1603,57 @@ components:
           type: string
           format: date-time
           nullable: true
+        prefix:
+          type: string
+          description: 토큰 원문 앞부분만. 목록에서 어느 토큰인지 알아보게 (UI-13 요소 3.1)
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            이 토큰으로 마지막에 들어온 시각 (UI-13 요소 3.5). null이면 한 번도 안 씀.
+            만료가 없으므로 안 쓰는 토큰을 찾는 단서가 이것뿐이다
+    ItemChain:
+      type: object
+      properties:
+        item:
+          $ref: '#/components/schemas/ItemRef'
+        upstream_count:
+          type: integer
+          description: 상위 방향으로 전이적으로 닿는 항목 수
+        downstream_count:
+          type: integer
+          description: 하위 방향으로 전이적으로 닿는 항목 수
+        rows:
+          type: array
+          description: >
+            항상 11개. 1단계부터 11단계까지 차례로.
+            항목이 없는 단계도 빈 배열로 온다 — 체인이 어디서 끊겼는지 화면이 보여야 한다
+          items:
+            type: object
+            properties:
+              stage:
+                type: integer
+              doc_type:
+                type: string
+              items:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    ref:
+                      $ref: '#/components/schemas/ItemRef'
+                    role:
+                      type: string
+                      enum: [upstream, self, downstream]
+                      description: >
+                        어느 폐포에서 나왔는지. 단계 번호로 정하지 않는다 —
+                        되돌아오는 참조가 있으면 근거가 오른쪽 단계에 놓인다
+                    status:
+                      type: string
+                      enum: [draft, review, approved]
+                    has_flag:
+                      type: boolean
     RepoStatus:
       type: object
       properties:
@@ -1531,7 +1670,15 @@ components:
           nullable: true
         behind_by:
           type: integer
-          description: 처리 안 한 원격 커밋 수. 0이면 최신
+          nullable: true
+          description: >
+            처리 안 한 원격 커밋 수. 0이면 최신, null이면 아직 못 받아봄.
+            폴링이 DB에 적어 둔 값이다 — 이 응답을 만들 때 git fetch를 돌리지 않는다
+        fetched_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: behind_by를 잰 시각. 화면이 "언제 기준인지" 보여준다
     RebuildResult:
       type: object
       properties:
