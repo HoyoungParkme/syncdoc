@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/pipeline.py`의 함수 3개. 클래스 명세 [[SYNC-DOM-002]] 4.7의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/pipeline.py`의 함수 5개와 `scheduler.py`의 폴링 함수 2개. 클래스 명세 [[SYNC-DOM-002]] 4.7의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -27,6 +27,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#pipeline.save_pipeline]] | 본문 저장 파이프라인 |
 | [[#pipeline.process_commit]] | GitHub 커밋 처리 |
 | [[#pipeline.rebuild]] | 인덱스 재구축 |
+| [[#scheduler.catch_up]] | 밀린 커밋 따라잡기 |
+| [[#scheduler.poll_loop]] | 주기 폴링 |
 
 ---
 
@@ -263,6 +265,46 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 - 파일 순서 때문에 미존재였던 참조가 7단계 후 해제됨
 - `status(` 커밋: Version 안 늘고 StatusChange 생김
 - 중간 실패: DB가 재구축 전과 같음
+
+---
+
+#### scheduler.catch_up 밀린 커밋 따라잡기
+
+**시그니처** `async def catch_up() -> list[SaveResult]`
+
+근거: [[SYNC-INFRA-001]] 7장 · [[SYNC-UC-001#UC-G1]] 1a·1b · [[SYNC-MS-001#ProjectService.repo_status]]
+
+**처리** — 저장소마다
+1. `head = git.fetch(workdir)`
+2. `DB: repositories update behind_by = git.rev_list_count(f"{last_processed_commit}..{head}"), fetched_at = now` — **화면이 읽는 값을 여기서 적는다.** `last_processed_commit`이 없으면 `behind_by=None`
+3. if `head != repository.last_processed_commit` → [[#pipeline.process_commit]]
+4. `→ 처리 결과 목록`
+
+**예외** **저장소 하나가 실패해도 다음 저장소를 계속한다.** 로그만 남기고 그 저장소의
+`behind_by`는 건드리지 않는다 — 낡은 값이 남지만 `fetched_at`이 언제 기준인지 말해 준다.
+폴링이 예외로 죽으면 그 뒤로 아무 저장소도 안 따라잡는다.
+
+**호출하는 것** `ProjectService.list_projects` · `git.fetch` `rev_list_count` · [[#pipeline.process_commit]]
+
+**테스트 관점** 원격이 앞서 있으면 `process_commit`이 불림 · 같으면 안 불리고 `fetched_at`만 갱신 · 저장소 둘 중 앞엣것이 실패해도 뒤엣것이 처리됨 · `behind_by`가 DB에 남아 `repo_status`가 그걸 읽음
+
+---
+
+#### scheduler.poll_loop 주기 폴링
+
+**시그니처** `async def poll_loop(interval: int) -> None`
+
+근거: [[SYNC-INFRA-001]] 5장(webhook 없음, 폴링만) · [[SYNC-UC-001#UC-G1]] 1b
+
+**처리** `interval`초 자고 [[#scheduler.catch_up]]을 부르는 것을 끝없이 반복. `interval`은
+`POLL_INTERVAL_SECONDS`(기본 300). 0 이하면 아예 켜지 않는다.
+
+**기동 시 한 번은 따로다.** 앱이 뜰 때 `catch_up`을 한 번 부르고(1a) 그다음부터 이 반복에
+들어간다. 노트북이 꺼져 있던 동안 쌓인 커밋을 첫 주기까지 기다리지 않고 바로 가져온다.
+
+**호출하는 것** [[#scheduler.catch_up]]
+
+**테스트 관점** `interval` 만큼 자고 부른다 · `catch_up`이 예외를 던져도 반복이 안 멈춘다
 
 ---
 

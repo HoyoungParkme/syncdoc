@@ -80,7 +80,7 @@ app/
 │   ├── pipeline.py         쓰기 조율. 묶음들을 순서대로 부른다
 │   └── queries.py          읽기 조합. 여러 묶음에서 ID로 모아 응답 형태를 만든다
 │
-├── scheduler.py            폴링. POLL_INTERVAL_SECONDS(기본 300, 테스트 0). pipeline.process_commit을 부른다
+├── scheduler.py            폴링([[SYNC-MS-007#scheduler.catch_up]]). POLL_INTERVAL_SECONDS(기본 300, 테스트 0)
 │
 ├── web/                    REST API. core를 호출만 한다
 │   ├── routers/
