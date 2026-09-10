@@ -116,25 +116,36 @@ class ProjectService:
         return project
 
     async def repo_status(self) -> list[RepoStatus]:
-        """SYNC-MS-001#ProjectService.repo_status"""
-        out: list[RepoStatus] = []
-        for p in self.repo.all():
-            r = p.repository
-            behind, error = None, None
-            try:  # public이라 토큰 없이. 실패해도 화면은 뜨고 사유를 보여준다 (MS-001)
-                await git.fetch(Path(r.workdir_path))
-                if r.last_processed_commit:
-                    behind = await git.rev_list_count(
-                        Path(r.workdir_path), f"{r.last_processed_commit}..origin/HEAD"
-                    )
-            except GitError as e:
-                error = e.stderr.strip().splitlines()[-1] if e.stderr.strip() else str(e)
-            out.append(
-                RepoStatus(
-                    p.code, r.remote_url, r.last_processed_commit, r.synced_at, behind, error
-                )
+        """SYNC-MS-001#ProjectService.repo_status
+
+        DB만 읽는다. fetch는 폴링(scheduler.catch_up)이 하고 여기는 그 결과를 본다 —
+        화면이 열릴 때마다 저장소 수만큼 fetch가 돌면 느리고, 폴링과 이중이 된다.
+        """
+        return [
+            RepoStatus(
+                p.code,
+                p.repository.remote_url,
+                p.repository.last_processed_commit,
+                p.repository.synced_at,
+                p.repository.behind_by,
+                p.repository.fetched_at,
             )
-        return out
+            for p in self.repo.all()
+        ]
+
+    async def delete_project(self, code: str) -> None:
+        """SYNC-MS-001#ProjectService.delete_project
+
+        저장소는 건드리지 않는다 — docs/specs/는 원격에 그대로 남고 다시 등록하면
+        import_existing으로 돌아온다. 다만 플래그·전파결정·댓글은 원본에 없는 정보라
+        돌아오지 않는다(인프라 6장). 부르는 쪽이 사람에게 확인을 받아야 한다.
+        """
+        async with _lock(code):
+            project = self.get(code)
+            workdir = Path(project.repository.workdir_path)
+            self.repo.delete_all_of(project.id)
+            self.session.flush()
+            shutil.rmtree(workdir, ignore_errors=True)
 
     async def rebuild_index(self, code: str) -> RebuildResult:
         """SYNC-MS-001#ProjectService.rebuild_index"""

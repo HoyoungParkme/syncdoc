@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.account.models import User
 from app.core.errors import (
     ConventionViolation,
@@ -181,6 +182,15 @@ class SpecService:
                         )
                     )
                 sections.append(re.sub(r"^[\d.]+\s*", "", text))
+                # 단어형 ID 타입에서만. 절 제목이 항목으로 오인될 위험이 그쪽에만 있다
+                # (STD-001 1.6·4장). H1은 문서 제목이지 절이 아니다
+                if (
+                    len(h.group(1)) > 1
+                    and item_re
+                    and doc_type in ("DOM", "MS", "API")
+                    and not re.match(r"^\d", tok)
+                ):
+                    W.append(Warning("section.unnumbered", text[:40]))
         # 4. 참조 형식
         for i, line in enumerate(lines, start=1):
             for r in REF.findall(line):
@@ -467,8 +477,15 @@ class SpecService:
             return []
         return [i.id for i in self.repo.items_by_item_ids(row.id, item_ids)]
 
-    def diff(self, doc_id: str, from_no: int, to_no: int) -> Diff:
-        """SYNC-MS-002#SpecService.diff"""
+    def diff(
+        self, doc_id: str, from_no: int, to_no: int, context: int = settings.DIFF_CONTEXT_LINES
+    ) -> Diff:
+        """SYNC-MS-002#SpecService.diff
+
+        `context`는 앞뒤로 함께 보여줄 줄 수다. 한 줄이면 마크다운 문단에서 무엇이
+        바뀌었는지는 보여도 어느 절의 변경인지가 안 보인다. detect_impact와 pipeline은
+        hunk의 item_id만 쓰므로 이 값과 무관하게 같은 결과를 낸다.
+        """
         row = self.repo.document_by_doc_id(doc_id)
         if row is None:
             raise NotFound("document", doc_id)
@@ -493,7 +510,9 @@ class SpecService:
             else:
                 lines = [
                     DiffLine({"+": "add", "-": "del", " ": "ctx"}[ln[0]], ln[1:])
-                    for ln in difflib.unified_diff(a.split("\n"), b.split("\n"), n=1, lineterm="")
+                    for ln in difflib.unified_diff(
+                        a.split("\n"), b.split("\n"), n=context, lineterm=""
+                    )
                     if ln[:3] not in ("---", "+++") and not ln.startswith("@@")
                 ]
             hunks.append(Hunk(item_id=item_id, lines=lines))
@@ -567,7 +586,9 @@ class SpecService:
             )
             for c in self.repo.status_changes_with_commit(row.id)
         ]
-        rows.sort(key=lambda r: r.created_at, reverse=True)
+        # 같은 시각이면 상태 변경을 먼저. 본문 커밋 뒤에 상태를 바꾸는 순서라
+        # 시계가 같은 값을 줘도 순서가 흔들리지 않는다
+        rows.sort(key=lambda r: (r.created_at, r.version_no is None), reverse=True)
         return rows
 
     def mark_deleted(self, document: Document, commit_hash: str, author: Author) -> list[int]:
@@ -668,7 +689,9 @@ class SpecService:
             )
             for c, doc_id in self.repo.recent_status_changes(project_id, n)
         ]
-        rows.sort(key=lambda r: r.created_at, reverse=True)
+        # 같은 시각이면 상태 변경을 먼저. 본문 커밋 뒤에 상태를 바꾸는 순서라
+        # 시계가 같은 값을 줘도 순서가 흔들리지 않는다
+        rows.sort(key=lambda r: (r.created_at, r.version_no is None), reverse=True)
         return rows[:n]
 
     def versions_instructed_by(self, version_ids: list[int], user_id: int) -> list[int]:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.project.models import Project, Repository
@@ -35,6 +35,44 @@ class ProjectRepository:
 
     def exists(self, code: str) -> bool:
         return self.session.scalar(select(Project.id).where(Project.code == code)) is not None
+
+    def delete_all_of(self, project_id: int) -> None:
+        """프로젝트에 딸린 행을 자식부터 지운다 (MS-001 delete_project 2단계).
+
+        ORM cascade를 안 쓴다 — 관계가 flags·references처럼 항목을 건너 물려 있어
+        지우는 순서를 코드가 쥐고 있어야 한다.
+        """
+        self.session.execute(
+            text("""
+            with d as (select id from documents where project_id = :pid),
+                 i as (select id from items where document_id in (select id from d))
+            delete from flags
+             where target_item_id in (select id from i) or cause_item_id in (select id from i)
+            """),
+            {"pid": project_id},
+        )
+        for stmt in (
+            'delete from "references" where from_document_id in'
+            " (select id from documents where project_id = :pid)",
+            'delete from "references" where to_document_id in'
+            " (select id from documents where project_id = :pid)",
+            'delete from "references" where to_item_id in (select id from items'
+            " where document_id in (select id from documents where project_id = :pid))",
+            "delete from propagation_decisions where version_id in (select id from versions"
+            " where document_id in (select id from documents where project_id = :pid))",
+            "delete from comments where document_id in"
+            " (select id from documents where project_id = :pid)",
+            "delete from status_changes where document_id in"
+            " (select id from documents where project_id = :pid)",
+            "delete from items where document_id in"
+            " (select id from documents where project_id = :pid)",
+            "delete from versions where document_id in"
+            " (select id from documents where project_id = :pid)",
+            "delete from documents where project_id = :pid",
+            "delete from repositories where project_id = :pid",
+            "delete from projects where id = :pid",
+        ):
+            self.session.execute(text(stmt), {"pid": project_id})
 
     def add(self, row: Project | Repository) -> None:
         self.session.add(row)

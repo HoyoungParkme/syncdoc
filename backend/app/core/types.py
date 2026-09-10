@@ -120,6 +120,7 @@ class RepoStatus:
     last_processed_commit: str | None
     synced_at: datetime | None
     behind_by: int | None
+    fetched_at: datetime | None = None  # behind_by를 잰 시각. 화면이 "언제 기준인지"를 보여준다
     error: str | None = None  # fetch 실패 사유. API 스키마에 없다 — UI-14에 표시(MS-001, 보고)
 
 
@@ -505,6 +506,43 @@ class RefEdge:
 
 
 @dataclass(frozen=True)
+class ChainItem:
+    """SYNC-API-001 ItemChain.rows[].items[] — 체인 한 칸."""
+
+    ref: ItemRef
+    role: str  # upstream | self | downstream. 단계 번호가 아니라 폐포 방향으로 정한다
+    status: str
+    has_flag: bool
+
+
+@dataclass(frozen=True)
+class ChainRow:
+    """단계 하나. 항목이 없어도 빈 채로 온다 — 체인이 어디서 끊겼는지 보이게."""
+
+    stage: int
+    doc_type: str
+    items: list[ChainItem]
+
+
+@dataclass(frozen=True)
+class ItemChain:
+    """SYNC-API-001 ItemChain — UI-15. rows는 항상 11개."""
+
+    item: ItemRef
+    upstream_count: int
+    downstream_count: int
+    rows: list[ChainRow]
+
+
+class GraphScope(StrEnum):
+    """UI-8 범위 — 잘라내는 게 아니라 골라낸다 (SYNC-UI-001#UI-8 7장 3)."""
+
+    all = "all"
+    approved = "approved"  # 문서 상태가 승인인 문서의 항목만
+    flagged = "flagged"  # 미해결 플래그가 붙은 항목만
+
+
+@dataclass(frozen=True)
 class GraphNode:
     """SYNC-API-001 Graph.nodes[] — id는 DOC#ITEM, 문서 노드는 DOC."""
 
@@ -513,6 +551,7 @@ class GraphNode:
     item_id: str | None
     stage: int | None
     isolated: bool
+    has_flag: bool = False  # UI-8 3.1 — 미해결 플래그가 붙은 항목
 
 
 @dataclass(frozen=True)

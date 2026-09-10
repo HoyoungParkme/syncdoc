@@ -9,7 +9,7 @@ from app.core.errors import NotFound
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
 from app.core.tracking.service import TrackingService
-from app.core.types import DocType, Propagation
+from app.core.types import DocType, GraphScope, Propagation
 from tests.core.collab.test_service import _comment
 from tests.core.reference.test_service import PRD, RFQ
 from tests.core.spec.test_service import author, make_project
@@ -383,22 +383,60 @@ async def test_graph_view_full_stage_scope_and_isolated(scoped: Session) -> None
     iso = {n.id for n in gr.nodes if n.isolated}
     assert iso == {"EXMP-RFQ-001#Q2"}  # 아무도 참조 안 함 (코드블록 참조는 추출 안 됨)
     assert {n.stage for n in gr.nodes if n.doc_id == "EXMP-PRD-001"} == {2}
-    # 단계로 좁힘: RFQ 항목 + 직접 이어진 PRD 항목·문서
-    g1 = await queries.graph_view("EXMP", stage=1)
-    assert {n.id for n in g1.nodes} == {
-        "EXMP-RFQ-001",
-        "EXMP-RFQ-001#Q1",
-        "EXMP-RFQ-001#Q2",
-        "EXMP-PRD-001#G1",
-        "EXMP-PRD-001",
-    }
-    assert all(n.stage is not None for n in g1.nodes)
-    g2 = await queries.graph_view("EXMP", doc="EXMP-PRD-001")
-    assert "EXMP-RFQ-001#Q1" in {n.id for n in g2.nodes} and "EXMP-RFQ-001#Q2" not in {
-        n.id for n in g2.nodes
-    }
+    assert all(n.stage is not None for n in gr.nodes)
+    # 승인만: 문서 상태가 승인인 문서의 항목만. EXMP 시드는 전부 draft라 비어야 한다
+    g_ok = await queries.graph_view("EXMP", GraphScope.approved)
+    assert g_ok.nodes == [] and g_ok.edges == []
+    # 플래그 있는 것: 미해결 플래그가 붙은 항목만
+    TrackingService(scoped).raise_broken(rpk["Q1"])  # Q1은 RFQ 항목
+    g_fl = await queries.graph_view("EXMP", GraphScope.flagged)
+    flagged = {n.id for n in g_fl.nodes}
+    assert flagged and all(n.has_flag for n in g_fl.nodes)
+    # 범위 밖을 가리키는 간선은 그리지 않는다 — 미존재 참조와 다르다 (MS-008 5단계)
+    assert all(e.from_ in flagged and (e.to is None or e.to in flagged) for e in g_fl.edges)
+    assert not any(e.is_missing and e.to is None and e.from_ not in flagged for e in g_fl.edges)
     with pytest.raises(NotFound):
         await queries.graph_view("NOPE")
+
+
+async def test_item_chain_closure_roles_and_eleven_rows(scoped: Session) -> None:
+    """전이적 폐포 · 역할은 폐포 방향 · 빈 단계도 온다 (MS-008 item_chain)."""
+    svc, p, d, rfq, pks, rpk, a_rfq, a_prd = _b3(scoped)
+    ch = await queries.item_chain("EXMP-RFQ-001", "Q1")
+    assert len(ch.rows) == 11  # 항목 없는 단계도 빈 채로
+    assert [r.doc_type for r in ch.rows][:3] == ["RFQ", "PRD", "SCN"]
+    roles = {i.ref.item_id: i.role for r in ch.rows for i in r.items}
+    assert roles["Q1"] == "self"
+    assert roles["G1"] == "downstream"  # G1이 Q1을 근거로 삼는다
+    assert ch.downstream_count >= 1 and ch.upstream_count == 0
+    # 2단계(PRD) 행에 G1이 있고, 항목 없는 단계는 빈 배열
+    prd_row = next(r for r in ch.rows if r.stage == 2)
+    assert {i.ref.item_id for i in prd_row.items} == {"G1"}
+    assert next(r for r in ch.rows if r.stage == 9).items == []
+    with pytest.raises(NotFound):
+        await queries.item_chain("EXMP-RFQ-001", "NOPE")
+
+
+async def test_item_chain_is_transitive_not_just_direct(scoped: Session) -> None:
+    """한 걸음이 아니라 끝까지 따라간다. SCN P1 → PRD G1 → RFQ Q1 세 단계."""
+    svc, p, d, rfq, pks, rpk, a_rfq, a_prd = _b3(scoped)
+    ref = ReferenceService(scoped)
+    scn = "---\ndoc_id: EXMP-SCN-001\ntype: SCN\ntitle: 시나리오\nstatus: draft\n---\n\n"
+    scn += "## 1. 페르소나\n\n#### P1 개발자\n근거 [[EXMP-PRD-001#G1]]\n"
+    v = svc.create(p.id, "EXMP-SCN-001", DocType.SCN, scn, "h2", a_prd, "spec: 초안")
+    sd = svc.get_document("EXMP-SCN-001")
+    ref.extract(sd.id, v.id, sd.body, {i.item_id: i.pk for i in sd.items}, [])
+
+    ch = await queries.item_chain("EXMP-RFQ-001", "Q1")
+    reached = {i.ref.item_id for r in ch.rows for i in r.items}
+    # P1 → G1 → Q1. Q1에서 아래로 두 걸음 떨어진 P1도 폐포에 들어온다
+    assert {"G1", "P1"} <= reached
+    roles = {i.ref.item_id: i.role for r in ch.rows for i in r.items}
+    assert roles["P1"] == "downstream" and roles["G1"] == "downstream"
+    # 반대 방향에서도 두 걸음
+    up = await queries.item_chain("EXMP-SCN-001", "P1")
+    assert {i.ref.item_id for r in up.rows for i in r.items} >= {"G1", "Q1"}
+    assert {i.ref.item_id: i.role for r in up.rows for i in r.items}["Q1"] == "upstream"
 
 
 async def test_downstream_view_and_missing_refs(scoped: Session) -> None:

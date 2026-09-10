@@ -36,3 +36,5 @@ class AccessToken(Base):
     issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # 만료가 없으므로 안 쓰는 토큰을 찾는 단서 (UI-13 3.5). 인증 성공 때만 갱신
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

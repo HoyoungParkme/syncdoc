@@ -164,7 +164,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 화면 | 없음 |
 | 테스트 | 구현 함수의 테스트 관점 전부 · `repo_status`가 `git.fetch`를 안 부름 · 비밀키를 바꾼 뒤 옛 토큰이 500이 아니라 401 · `check_dom.py`가 지금 명세에서 경고 0 |
 | 선행 | B4 |
-| 완료 | — |
+| 완료 | 2026-09-10 · 브랜치 `feat/a-foundation` · 커밋 `3f0ab95`~`01afb3d` (code 8 + chore 0) · 테스트 163 · `check_code.py` 114/114 · `check_dom.py` 경고 0 · `validate.py` 위반 0·경고 0 · 마이그레이션 0005 · **실물 확인**: `scope=all` 노드 366·간선 949, `approved`·`flagged` 0(SYNC는 전부 draft·무플래그), `SYNC-PRD-001#R1` 체인이 11행에 상위 1·하위 147 · 정한 것: `_rejected`는 `push --porcelain`의 `!` 플래그로(로케일 무관), `delete_all_of`는 ORM cascade 대신 삭제 순서를 코드가 쥔다, `session_secret`은 비면 `SECRET_KEY`로 떨어져 기존 배포가 안 깨진다 · **컬럼 검사 보류**: 클래스 속성↔DD 표 대조는 경고 23건이라 뺐다 — DD 표가 어느 컬럼을 싣는지 규약을 먼저 정해야 한다 · 미결: 테스트 플래키(#17) |
 
 ---
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -14,6 +15,9 @@ from app.web.schemas.common import Author, Base, FlagSummary, ItemRef
 
 
 class DocumentSummary(Base):
+    # 판별 필드 (SYNC-API-001 GET/api/projects/{code}/flags). 클라이언트가 kind로
+    # 되짚지 않게 서버가 고정값을 채운다
+    type: Literal["document"] = "document"
     doc_id: str
     doc_type: str
     stage: int | None
@@ -102,3 +106,28 @@ class ChangeStatus(BaseModel):
     reason: str | None = None
     upstream_mismatch: list[str] = []
     upstream_reviewed: bool = False
+
+class ChainItem(Base):
+    ref: ItemRef
+    role: str
+    status: str
+    has_flag: bool
+
+
+class ChainRow(Base):
+    stage: int
+    doc_type: str
+    items: list[ChainItem]
+
+
+class ItemChain(Base):
+    """SYNC-API-001 ItemChain — UI-15. rows는 항상 11개."""
+
+    item: ItemRef
+    upstream_count: int
+    downstream_count: int
+    rows: list[ChainRow]
+
+    @classmethod
+    def of(cls, c) -> ItemChain:
+        return cls.model_validate(c, from_attributes=True)

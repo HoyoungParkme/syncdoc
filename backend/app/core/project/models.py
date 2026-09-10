@@ -39,3 +39,6 @@ class Repository(Base):
     last_processed_commit: Mapped[str | None] = mapped_column(String(40))
     synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     registered_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    # 폴링이 적고 화면은 읽기만 (MS-001 repo_status). null = 아직 한 번도 안 재봄
+    behind_by: Mapped[int | None] = mapped_column()
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

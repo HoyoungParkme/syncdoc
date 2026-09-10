@@ -30,6 +30,7 @@ MODULES = {
     "CommentService": "backend/app/core/collab/service.py",
     "AccountService": "backend/app/core/account/service.py",
     "pipeline": "backend/app/core/pipeline.py",
+    "scheduler": "backend/app/scheduler.py",  # MS-007이 pipeline과 함께 다룬다
     "queries": "backend/app/core/queries.py",
     "git": "backend/app/infra/git.py",
     "github": "backend/app/infra/github.py",

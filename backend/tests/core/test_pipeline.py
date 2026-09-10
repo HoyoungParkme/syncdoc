@@ -605,7 +605,8 @@ async def test_repo_status_and_rebuild_index(scoped: Session, proj) -> None:
     st = (await ps.repo_status())[0]
     assert (st.last_processed_commit, st.behind_by) == (head, 0) and st.synced_at is not None
     write_commit_push(other, RFQ_FILE, RFQ + "\n", "spec: 하나 더")
-    assert (await ps.repo_status())[0].behind_by == 1
+    # repo_status는 DB만 읽는다(MS-001). 폴링이 재기 전까지는 밖의 push를 모른다
+    assert (await ps.repo_status())[0].behind_by == 0
     with pytest.raises(NotFound):
         await ps.rebuild_index("NOPE")
 

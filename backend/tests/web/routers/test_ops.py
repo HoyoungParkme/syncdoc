@@ -32,8 +32,8 @@ def test_graph_versions_downstream_via_api(client: TestClient, scoped: Session) 
         "is_missing": False,
     } in gr["edges"]
     assert next(n for n in gr["nodes"] if n["id"] == "EXMP-RFQ-001#Q2")["isolated"] is True
-    assert client.get("/api/projects/EXMP/graph", params={"stage": 1}).status_code == 200
-    assert client.get("/api/projects/EXMP/graph", params={"stage": 12}).status_code == 422
+    assert client.get("/api/projects/EXMP/graph", params={"scope": "approved"}).status_code == 200
+    assert client.get("/api/projects/EXMP/graph", params={"scope": "nope"}).status_code == 422
     d2 = svc.get_document("EXMP-PRD-001")
     svc.apply_status(
         d2, d2.body.replace("status: draft", "status: review"), "c1", a_prd.user, "검토"
@@ -121,10 +121,12 @@ async def test_webhook_admin_and_catch_up(client: TestClient, scoped: Session, p
         ("EXMP", head, 0)
     ]
     write_commit_push(other, PRD_FILE, PRD_BODY, "spec(EXMP-PRD-001): 초안")
-    assert client.get("/api/admin/repos").json()[0]["behind_by"] == 1
+    # 화면은 DB만 읽는다(MS-001). 폴링이 재기 전까지는 밖에서 push한 걸 아직 모른다
+    assert client.get("/api/admin/repos").json()[0]["behind_by"] == 0
     results = await scheduler.catch_up()
     assert [r.doc_id for r in results] == ["EXMP-PRD-001"]
-    assert client.get("/api/admin/repos").json()[0]["behind_by"] == 0
+    after = client.get("/api/admin/repos").json()[0]
+    assert after["behind_by"] == 0 and after["fetched_at"] is not None
     # 재구축
     rb = client.post("/api/admin/repos/EXMP/rebuild").json()
     assert (rb["docs"], rb["versions"]) == (3, 3) and rb["convention_errors"][0][
