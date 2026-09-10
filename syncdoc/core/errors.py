@@ -181,3 +181,21 @@ class AlreadyResolved(Problem):
 
     def __init__(self, resolved_at: str | None) -> None:
         super().__init__("이미 확인된 플래그", resolved_at=resolved_at)
+
+
+class AlreadyCurrent(Problem):
+    type = "urn:syncdoc:already-current"
+    status = 422
+    title = "already-current"
+
+    def __init__(self) -> None:
+        super().__init__("현재 버전으로는 되돌릴 수 없음")
+
+
+class RebuildFailed(Problem):
+    type = "urn:syncdoc:rebuild-failed"
+    status = 500
+    title = "rebuild-failed"
+
+    def __init__(self, reason: str) -> None:
+        super().__init__("재구축 실패, 롤백됨", reason=reason)

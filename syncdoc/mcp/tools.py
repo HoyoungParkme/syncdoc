@@ -228,6 +228,48 @@ async def get_item(doc_id: str, item_id: str) -> CallToolResult:
     )
 
 
+@server.tool(
+    description="항목의 상위 참조(이 항목이 근거로 삼은 것)와 하위 참조(이 항목을 근거로 삼은 것)를 나눠 돌려준다. "
+    "이 항목이 왜 있는지, 바꾸면 어디에 영향이 가는지 알아야 할 때 부른다. 목록만 주고 본문은 펼치지 않는다. "
+    "필요한 항목만 get_item으로 다시 요청한다. 빈 목록이면 고립 항목이다."
+)
+async def get_references(doc_id: str, item_id: str) -> CallToolResult:
+    """SYNC-API-002#get_references"""
+    try:
+        with db.session_scope() as s:
+            _user(s)
+        r = await queries.item_references_view(doc_id, item_id)
+    except Problem as p:
+        return _problem(p)
+
+    def ref(x) -> dict:
+        return {
+            "doc_id": x.doc_id,
+            "item_id": x.item_id,
+            "display_name": x.display_name,
+            "raw_target": x.raw_target,
+            "is_missing": x.is_missing,
+        }
+
+    return _ok(
+        {
+            "doc_id": r.doc_id,
+            "item_id": r.item_id,
+            "upstream": [ref(x) for x in r.upstream],
+            "downstream": [ref(x) for x in r.downstream],
+            "flags": [
+                {
+                    "kind": f.kind,
+                    "cause": f"{f.cause.doc_id}#{f.cause.item_id}" if f.cause else None,
+                    "cause_version_no": f.cause_version_no,
+                    "raised_at": f.raised_at,
+                }
+                for f in r.flags
+            ],
+        }
+    )
+
+
 def _section(text: str, heading_prefix: str) -> str:
     """'## N. 제목' 절 하나. 다음 '## '까지. 코드블록 안 헤딩은 무시(마스킹)."""
     lines = text.split("\n")

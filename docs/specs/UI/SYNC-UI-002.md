@@ -231,6 +231,7 @@ status: approved
   <span class="stat" data-el="3.2"><b>1</b> 끊어진 참조</span>
   <span class="stat" data-el="3.3"><b>2</b> 미해결 댓글</span>
   <span class="stat" data-el="3.4"><b>1</b> 규약 오류</span>
+  <span class="stat" data-el="3.5"><b>2</b> 미완성</span>
 </div>
 
 <div class="body2">

@@ -106,6 +106,7 @@ export interface Document extends DocumentSummary {
   items: DocItem[]
   prev_doc_id: string | null
   next_doc_id: string | null
+  missing_refs: string[]
 }
 export interface ItemRef {
   doc_id: string | null
@@ -207,6 +208,49 @@ export interface DecisionDetail {
   change_diff: Diff
   affected: AffectedItem[]
   choice: 'propagate' | 'skip' | 'undecided'
+}
+export interface GraphNode {
+  id: string
+  doc_id: string
+  item_id: string | null
+  stage: number | null
+  isolated: boolean
+}
+export interface GraphEdge {
+  from: string
+  to: string | null
+  raw_target: string
+  is_missing: boolean
+}
+export interface Graph {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+}
+export interface RepoStatus {
+  code: string
+  remote_url: string
+  last_processed_commit: string | null
+  synced_at: string | null
+  behind_by: number | null
+}
+export interface RebuildResult {
+  docs: number
+  items: number
+  references: number
+  versions: number
+  convention_errors: { doc_id: string; detail: string }[]
+}
+export interface SaveResult {
+  doc_id: string
+  version_no: number
+  commit_hash: string
+  status: string
+  pending_decision_version_id: number | null
+  warnings: string[]
+}
+export interface DownstreamView {
+  by_item: Record<string, ItemRef[]>
+  by_document: { doc_id: string; title: string; items: string[] }[]
 }
 export interface AccessToken {
   id: number

@@ -359,3 +359,60 @@ async def test_todo_convention_errors_and_comments_of_my_documents(scoped: Sessi
         ("EXMP-PRD-001", 3, "rfq-writer")
     ]
     assert td.total == 2 and (await queries.todo(a_rfq.user)).total == 0
+
+
+# ── B4: graph_view · downstream_view · document_view 4a ──
+async def test_graph_view_full_stage_scope_and_isolated(scoped: Session) -> None:
+    svc, p, d, rfq, pks, rpk, a_rfq, a_prd = _b3(scoped)
+    gr = await queries.graph_view("EXMP")
+    ids = {n.id for n in gr.nodes}
+    # 항목 노드 + 문서 노드(문서마다 하나)
+    assert ids == {
+        "EXMP-RFQ-001",
+        "EXMP-PRD-001",
+        "EXMP-RFQ-001#Q1",
+        "EXMP-RFQ-001#Q2",
+        "EXMP-PRD-001#G1",
+        "EXMP-PRD-001#R1",
+    }
+    edges = {(e.from_, e.to, e.is_missing) for e in gr.edges}
+    assert ("EXMP-PRD-001#G1", "EXMP-RFQ-001#Q1", False) in edges
+    assert ("EXMP-PRD-001#G1", "EXMP-PRD-001#R1", False) in edges
+    assert ("EXMP-PRD-001#R1", None, True) in edges  # Q9 미존재
+    assert ("EXMP-PRD-001", "EXMP-RFQ-001", False) in edges  # frontmatter·절 본문 → 문서 노드
+    iso = {n.id for n in gr.nodes if n.isolated}
+    assert iso == {"EXMP-RFQ-001#Q2"}  # 아무도 참조 안 함 (코드블록 참조는 추출 안 됨)
+    assert {n.stage for n in gr.nodes if n.doc_id == "EXMP-PRD-001"} == {2}
+    # 단계로 좁힘: RFQ 항목 + 직접 이어진 PRD 항목·문서
+    g1 = await queries.graph_view("EXMP", stage=1)
+    assert {n.id for n in g1.nodes} == {
+        "EXMP-RFQ-001",
+        "EXMP-RFQ-001#Q1",
+        "EXMP-RFQ-001#Q2",
+        "EXMP-PRD-001#G1",
+        "EXMP-PRD-001",
+    }
+    assert all(n.stage is not None for n in g1.nodes)
+    g2 = await queries.graph_view("EXMP", doc="EXMP-PRD-001")
+    assert "EXMP-RFQ-001#Q1" in {n.id for n in g2.nodes} and "EXMP-RFQ-001#Q2" not in {
+        n.id for n in g2.nodes
+    }
+    with pytest.raises(NotFound):
+        await queries.graph_view("NOPE")
+
+
+async def test_downstream_view_and_missing_refs(scoped: Session) -> None:
+    svc, p, d, rfq, pks, rpk, a_rfq, a_prd = _b3(scoped)
+    dv = await queries.downstream_view("EXMP-RFQ-001")
+    assert {k: [(r.doc_id, r.item_id) for r in v] for k, v in dv.by_item.items()} == {
+        "Q1": [("EXMP-PRD-001", "G1")],
+        "(문서)": [("EXMP-PRD-001", None)],
+    }
+    assert [(x.doc_id, x.title, x.items) for x in dv.by_document] == [
+        ("EXMP-PRD-001", "제품", ["(문서)", "Q1"])
+    ]
+    assert (
+        await queries.downstream_view("EXMP-PRD-001")
+    ).by_document == []  # 같은 문서 안 참조(G1→R1)는 제외
+    doc = await queries.document_view("EXMP-PRD-001")
+    assert doc.missing_refs == ["EXMP-RFQ-001#Q9"]  # _b3의 upstream은 RFQ뿐

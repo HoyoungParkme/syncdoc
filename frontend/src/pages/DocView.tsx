@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { api, ApiError, FLAG_KO, STATUS_KO, type Comment, type Document, type ItemReferences, type UpstreamCheck } from '../api/client'
+import { api, ApiError, FLAG_KO, STATUS_KO, type Comment, type Document, type DownstreamView, type ItemReferences, type UpstreamCheck } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { esc, splitRef } from '../view/md'
 
@@ -19,6 +19,7 @@ export function DocView() {
   const [selected, setSelected] = useState<string | null>(null)
   const [refs, setRefs] = useState<ItemReferences | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
+  const [downstream, setDownstream] = useState<DownstreamView | null>(null)
   const [line, setLine] = useState<number | null>(null)
   const [draft, setDraft] = useState('')
   const [statusOpen, setStatusOpen] = useState(false)
@@ -33,6 +34,7 @@ export function DocView() {
       .then(setDoc)
       .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : String(e)))
     api.get<Comment[]>(`/api/docs/${docId}/comments`).then(setComments)
+    api.get<DownstreamView>(`/api/docs/${docId}/downstream`).then(setDownstream).catch(() => setDownstream(null))
   }, [docId])
   useEffect(() => {
     setSelected(null)
@@ -40,7 +42,7 @@ export function DocView() {
     load()
   }, [load])
 
-  const view = useMemo(() => (doc ? renderView(doc, code) : null), [doc, code])
+  const view = useMemo(() => (doc ? renderView(doc, code, downstream) : null), [doc, code, downstream])
 
   // 유저용 본문: innerHTML → onMount → mermaid → 항목 클릭·참조 링크·해시 스크롤
   useEffect(() => {
@@ -48,6 +50,10 @@ export function DocView() {
     if (!root || !view || tab !== 'user') return
     root.innerHTML = view.html
     const cleanup = view.onMount?.(root)
+    // 와이어프레임 요소 번호 (DEV-17) — 뷰 포트 HTML은 view_build와 같아야 하므로 여기서 붙인다
+    for (const el of root.querySelectorAll<HTMLElement>('[data-item]')) el.dataset.el = '7.1'
+    for (const el of root.querySelectorAll<HTMLElement>('a[data-ref]')) el.dataset.el = '7.2'
+    for (const el of root.querySelectorAll<HTMLElement>('pre.mermaid')) el.dataset.el = '7.3'
     mermaid.initialize({ startOnLoad: false, theme: 'neutral' })
     mermaid.run({ nodes: root.querySelectorAll<HTMLElement>('pre.mermaid') }).catch(() => undefined) // 문법 오류면 코드가 남는다 (UC-H2 2a)
     for (const el of root.querySelectorAll<HTMLElement>('[data-item]')) {
@@ -138,7 +144,10 @@ export function DocView() {
           <span className={`st st-${doc.status}`} data-el="1.1">
             {STATUS_KO[doc.status]}
           </span>{' '}
-          · <span data-el="1.2">v{doc.current_version_no}</span>
+          ·{' '}
+          <Link data-el="1.2" to={`/p/${code}/d/${docId}/history`} title="이력(UI-7)">
+            v{doc.current_version_no}
+          </Link>
         </span>
         <span className="tabs" data-el="2">
           <span className={tab === 'user' ? 'on' : ''} data-el="2.1" onClick={() => setSp({})}>
@@ -147,9 +156,9 @@ export function DocView() {
           <span className={tab === 'raw' ? 'on' : ''} data-el="2.2" onClick={() => setSp({ tab: 'raw' })}>
             원본
           </span>
-          <span data-el="2.3" title="UI-7 — B4">
+          <Link data-el="2.3" to={`/p/${code}/d/${docId}/history`}>
             이력
-          </span>
+          </Link>
         </span>
         <span className="grow" />
         {unresolved > 0 && (

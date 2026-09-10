@@ -81,7 +81,7 @@ async def test_init_project_rejects_invalid_and_duplicate_code(
 async def test_init_project_existing_specs_rejects_and_removes_workdir(
     db_session: Session, repos_dir, repos: dict
 ) -> None:
-    from syncdoc.core.errors import ExistingSpecs, NotImplementedYet
+    from syncdoc.core.errors import ExistingSpecs
     from tests.core.account.test_service import make_user
 
     user = make_user(db_session)
@@ -92,8 +92,14 @@ async def test_init_project_existing_specs_rejects_and_removes_workdir(
     assert not (repos_dir / "EXST").exists()
     with pytest.raises(NotFound):
         svc.get("EXST")
-    with pytest.raises(NotImplementedYet):  # B1 스텁 — B4에서 rebuild로 해제
-        await svc.init_project(str(repos["remote"]), "EXST", "n", user, import_existing=True)
+    # import_existing → 재구축으로 가져온다 (3a2). 시드 PRD 하나, frontmatter가 미완이라 규약 오류
+    p = await svc.init_project(str(repos["remote"]), "EXST", "n", user, import_existing=True)
+    assert p.code == "EXST" and p.repository.last_processed_commit is not None
+    assert (repos_dir / "EXST" / "docs/specs/PRD/SYNC-PRD-001.md").exists()
+    from syncdoc.core.spec.service import SpecService
+
+    d = SpecService(db_session).get_document("SYNC-PRD-001")
+    assert d.has_convention_error and d.current_version_no == 1
 
 
 async def test_init_project_clone_failure_leaves_nothing(

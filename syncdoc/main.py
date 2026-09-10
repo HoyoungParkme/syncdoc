@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -14,6 +15,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.sessions import SessionMiddleware
 
+from syncdoc import scheduler
 from syncdoc.config import settings
 from syncdoc.core.errors import Problem
 from syncdoc.mcp.auth import BearerAuth
@@ -21,10 +23,12 @@ from syncdoc.mcp.tools import server as mcp_server
 from syncdoc.web import auth
 from syncdoc.web.routers import (
     account,
+    admin,
     comments,
     decisions,
     documents,
     flags,
+    hooks,
     projects,
     references,
     todo,
@@ -65,7 +69,15 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
         routes.remove(r)
         routes.append(r)
     async with mcp_server.session_manager.run():
-        yield
+        tasks: list[asyncio.Task] = []
+        if settings.POLL_INTERVAL_SECONDS > 0:  # INFRA 7장 — 기동 시 따라잡기(1a) + 폴링(1b)
+            tasks.append(asyncio.create_task(scheduler.catch_up()))
+            tasks.append(asyncio.create_task(scheduler.poll_loop(settings.POLL_INTERVAL_SECONDS)))
+        try:
+            yield
+        finally:
+            for t in tasks:
+                t.cancel()
 
 
 app = FastAPI(title="SyncDoc", lifespan=lifespan)
@@ -84,6 +96,8 @@ for r in (
     todo.router,
     flags.router,
     decisions.router,
+    admin.router,
+    hooks.router,
 ):
     app.include_router(r)
 

@@ -1,6 +1,6 @@
 /** UI-13 설정 — SYNC-UI-002#UI-13. 내 계정 · MCP 토큰 발급·폐기(원문은 발급 직후 한 번만) · 관리 입구. */
 import { useEffect, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import { api, type AccessToken, type User } from '../api/client'
 
 const day = (iso: string) => iso.slice(5, 10).replace('-', '-')
@@ -95,9 +95,9 @@ export function Settings() {
           <div className="row">
             <span className="lbl">인덱스 재구축, 저장소 동기화 상태</span>
             <span className="grow" />
-            <span className="btn sm" data-el="5.1" title="UI-14 — B4">
+            <Link className="btn sm" data-el="5.1" to="/settings/admin">
               관리로 →
-            </span>
+            </Link>
           </div>
         </section>
       </div>

@@ -101,3 +101,11 @@ li.ref.missing{color:#999}
 /* UI-12 전파 선택 */
 .dialog.wide{width:min(900px,94vw)}.dhead{display:flex;align-items:center;gap:10px}.dhead .x{cursor:pointer;font-weight:400;padding:0 4px}.dbody .sech{margin-top:10px}.chk{list-style:none;padding:0;margin:6px 0}.chk li{padding:4px 0;border-top:1px solid var(--hair)}.propacts{display:flex;align-items:center;gap:10px;margin-top:14px}.skipbox{display:flex;gap:8px;align-items:center}
 .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:19}
+.stat.link{cursor:pointer}
+/* UI-7 버전 이력 */
+.hist{align-items:start}table.vers{width:100%;border-collapse:collapse;font-size:13px;background:#fff}table.vers th,table.vers td{padding:6px 8px;border-bottom:1px solid var(--hair);text-align:left;vertical-align:top}table.vers tr.cur td{background:var(--panel)}.diffpane{border:1px solid var(--rule);background:#fff}.hint{cursor:pointer;color:var(--blue);border:1px solid var(--blue);padding:0 5px;font-size:11px;border-radius:2px;margin-left:6px}
+.tabs a{color:var(--soft);text-decoration:none;margin-right:10px}
+/* UI-8 참조 그래프 */
+.graphpage{max-width:none}.graph{height:calc(100vh - 200px);border:1px solid var(--rule);background:#fff;position:relative}.graph .edges{position:absolute;left:12px;bottom:8px;z-index:4}.node{font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:3px 8px;border:1px solid var(--ink);background:#fff;border-radius:2px;cursor:pointer;white-space:nowrap}.node.doc{font-weight:700;background:var(--panel)}.node.iso{border-style:dashed;color:var(--soft)}.node.miss{border-style:dotted;color:#b00;background:#fff5f5}.legend{margin-top:8px}.legend span{margin-right:14px}
+/* UI-9 순서대로 읽기 */
+.steps{display:flex;gap:4px;flex-wrap:wrap}.stp{font-size:12px;padding:2px 8px;border:1px solid var(--rule);border-radius:2px;cursor:pointer;color:var(--soft)}.stp.done{background:#d6f0d6;color:#1a6;border-color:#1a6}.stp.cur{background:var(--ink);color:#fff;border-color:var(--ink)}.stp.na{opacity:.4;cursor:default}.readbody .main{max-width:900px;margin:0 auto}.readbody .nav{display:flex;gap:10px;justify-content:space-between;margin-top:24px;padding-top:12px;border-top:1px solid var(--rule)}

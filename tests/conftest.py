@@ -13,6 +13,7 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault("WEBHOOK_SECRET", "test-webhook-secret")
 os.environ.setdefault("GITHUB_CLIENT_ID", "test-client-id")
 os.environ.setdefault("GITHUB_CLIENT_SECRET", "test-client-secret")
+os.environ.setdefault("POLL_INTERVAL_SECONDS", "0")  # 테스트는 폴링·기동 따라잡기를 끈다
 
 import pytest  # noqa: E402
 from alembic.config import Config  # noqa: E402

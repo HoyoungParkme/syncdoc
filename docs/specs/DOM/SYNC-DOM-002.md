@@ -57,6 +57,8 @@ syncdoc/
 │   ├── pipeline.py         쓰기 조율. 묶음들을 순서대로 부른다
 │   └── queries.py          읽기 조합. 여러 묶음에서 ID로 모아 응답 형태를 만든다
 │
+├── scheduler.py            폴링. POLL_INTERVAL_SECONDS(기본 300, 테스트 0). pipeline.process_commit을 부른다
+│
 ├── web/                    REST API. core를 호출만 한다
 │   ├── routers/
 │   ├── schemas/            요청·응답 형태
@@ -569,6 +571,7 @@ classDiagram
         +item_pks(document_id: int) dict
         +list_items_by_project(project_id: int, stage: int?, doc_id: str?) list~ItemBrief~
         +neighbors(doc_id: str) tuple
+        +version_body(doc_id: str, version_no: int) str
         +last_author(document_id: int) AuthorRef?
         +recent_changes(project_id: int, n: int) list~Version~
         +versions_instructed_by(version_ids: list~int~, user_id: int) list~int~
@@ -920,7 +923,7 @@ process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
     밀린 커밋 여럿이면 최종 상태만 저장. 중간 버전은 git에만 (인프라 7장)
     끝나면 repositories.last_processed_commit = head
 
-rebuild(code: str) -> RebuildResult
+rebuild(code: str, session: Session | None = None) -> RebuildResult
     [[SYNC-UC-001#UC-S6]]. 한 트랜잭션:
     reference.clear · spec.clear_index(versions만 삭제. documents·items는 유지 — 플래그·댓글이 FK로 물려 있음)
     파일마다 git.log → 커밋마다 spec.validate · spec.save(rebuild=True. items는 upsert)

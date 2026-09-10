@@ -97,4 +97,10 @@ def test_init_project_web_path(
             "import_existing": True,
         },
     )
-    assert r.status_code == 501 and r.json()["type"] == "urn:syncdoc:not-implemented"
+    assert (
+        r.status_code == 201 and r.json()["code"] == "EXST"
+    )  # import_existing → 재구축으로 가져온다
+    prd = next(s for s in r.json()["stages"] if s["doc_type"] == "PRD")
+    assert (
+        prd["doc_count"] == 1 and r.json()["counts"]["convention_errors"] == 1
+    )  # 시드 PRD는 frontmatter 미완

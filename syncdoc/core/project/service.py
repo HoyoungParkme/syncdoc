@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import shutil
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -13,14 +14,13 @@ from syncdoc.core.account.service import AccountService
 from syncdoc.core.errors import (
     ExistingSpecs,
     NotFound,
-    NotImplementedYet,
     ProjectCodeConflict,
     ProjectCodeInvalid,
     PushFailed,
 )
 from syncdoc.core.project.models import Project, Repository
 from syncdoc.core.project.repository import ProjectRepository
-from syncdoc.core.types import Author, AuthorKind, Entry
+from syncdoc.core.types import Author, AuthorKind, Entry, RebuildResult, RepoStatus
 from syncdoc.infra import git
 from syncdoc.infra.git import GitError
 
@@ -56,9 +56,6 @@ class ProjectService:
             n = len(await git.list(workdir, "docs/specs/*/*.md"))
             shutil.rmtree(workdir, ignore_errors=True)
             raise ExistingSpecs(n)
-        if has and import_existing:
-            shutil.rmtree(workdir, ignore_errors=True)
-            raise NotImplementedYet("init_project(import_existing=true) — B4 pipeline.rebuild")
         savepoint = self.session.begin_nested()
         project = Project(code=code, name=name)
         self.repo.add(project)
@@ -66,6 +63,11 @@ class ProjectService:
             project_id=project.id, remote_url=remote_url, workdir_path=str(workdir)
         )
         self.repo.add(repository)
+        if has and import_existing:  # 3a2 — 기존 명세를 재구축으로 가져온다. 락·트랜잭션은 그쪽
+            from syncdoc.core import pipeline  # 서비스가 pipeline을 부르는 유일한 곳(DOM-002 3.2)
+
+            await pipeline.rebuild(code, session=self.session)
+            return self.repo.by_code(code)
         files = await git.init_specs(workdir)
         author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.mcp)
         try:
@@ -90,3 +92,28 @@ class ProjectService:
         if project is None:
             raise NotFound("project", code)
         return project
+
+    async def repo_status(self) -> list[RepoStatus]:
+        """SYNC-MS-001#ProjectService.repo_status"""
+        out: list[RepoStatus] = []
+        for p in self.repo.all():
+            r = p.repository
+            await git.fetch(Path(r.workdir_path))
+            behind = (
+                await git.rev_list_count(
+                    Path(r.workdir_path), f"{r.last_processed_commit}..origin/HEAD"
+                )
+                if r.last_processed_commit
+                else None
+            )
+            out.append(
+                RepoStatus(p.code, r.remote_url, r.last_processed_commit, r.synced_at, behind)
+            )
+        return out
+
+    async def rebuild_index(self, code: str) -> RebuildResult:
+        """SYNC-MS-001#ProjectService.rebuild_index"""
+        from syncdoc.core import pipeline  # 서비스가 pipeline을 부르는 유일한 곳(DOM-002 3.2)
+
+        self.get(code)
+        return await pipeline.rebuild(code)

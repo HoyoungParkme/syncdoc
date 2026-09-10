@@ -112,6 +112,28 @@ class ProjectDetail(ProjectSummary):
 
 
 @dataclass(frozen=True)
+class RepoStatus:
+    """SYNC-API-001 RepoStatus — UI-14 표 2. behind_by=None이면 처리한 커밋이 아직 없다."""
+
+    code: str
+    remote_url: str
+    last_processed_commit: str | None
+    synced_at: datetime | None
+    behind_by: int | None
+
+
+@dataclass
+class RebuildResult:
+    """SYNC-API-001 RebuildResult."""
+
+    docs: int
+    items: int
+    references: int
+    versions: int
+    convention_errors: list[dict[str, str]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class IssuedToken:
     token: AccessToken
     raw: str
@@ -310,6 +332,17 @@ class Version:
 
 
 @dataclass(frozen=True)
+class ItemBrief:
+    """DOM-002 2.8 ItemBrief — list_items_by_project → graph_view. 문서 노드는 item_id=None."""
+
+    pk: int
+    doc_id: str
+    item_id: str | None
+    stage: int | None
+    display_name: str | None
+
+
+@dataclass(frozen=True)
 class DocRef:
     """문서 pk → 표시 정보 (describe_documents). 문서 단위 참조 대상·댓글 응답의 doc_id."""
 
@@ -456,6 +489,49 @@ class RefEdge:
     to_document_id: int | None
     raw_target: str
     is_missing: bool
+    from_document_id: int | None = None  # DOM-002 2.8에 없음 — 그래프의 문서 노드 출발점(보고)
+
+
+@dataclass(frozen=True)
+class GraphNode:
+    """SYNC-API-001 Graph.nodes[] — id는 DOC#ITEM, 문서 노드는 DOC."""
+
+    id: str
+    doc_id: str
+    item_id: str | None
+    stage: int | None
+    isolated: bool
+
+
+@dataclass(frozen=True)
+class GraphEdge:
+    """SYNC-API-001 Graph.edges[] — from·to는 노드 id, 미존재면 to=None."""
+
+    from_: str
+    to: str | None
+    raw_target: str
+    is_missing: bool
+
+
+@dataclass
+class Graph:
+    nodes: list[GraphNode]
+    edges: list[GraphEdge]
+
+
+@dataclass(frozen=True)
+class DownstreamDoc:
+    doc_id: str
+    title: str
+    items: list[str]
+
+
+@dataclass
+class DownstreamView:
+    """DOM-002 2.8 DownstreamView — downstream_view → 추적표. 문서 단위 참조는 키 "(문서)"."""
+
+    by_item: dict[str, list[ItemRef]]
+    by_document: list[DownstreamDoc]
 
 
 @dataclass(frozen=True)

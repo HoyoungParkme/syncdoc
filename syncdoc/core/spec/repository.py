@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from syncdoc.core.spec.models import Document, Item, StatusChange
@@ -112,6 +112,35 @@ class SpecRepository:
             .order_by(Document.id)
         )
         return list(self.session.scalars(stmt))
+
+    def versions_of(self, document_id: int) -> list[VersionRow]:
+        stmt = select(VersionRow).where(VersionRow.document_id == document_id)
+        return list(self.session.scalars(stmt.order_by(VersionRow.version_no.desc())))
+
+    def status_changes_with_commit(self, document_id: int) -> list[StatusChange]:
+        stmt = select(StatusChange).where(
+            StatusChange.document_id == document_id, StatusChange.commit_hash.is_not(None)
+        )
+        return list(self.session.scalars(stmt.order_by(StatusChange.changed_at.desc())))
+
+    def items_of_project(self, project_id: int) -> list[tuple[Item, Document]]:
+        stmt = (
+            select(Item, Document)
+            .join(Document, Document.id == Item.document_id)
+            .where(Document.project_id == project_id, Item.is_deleted.is_(False))
+            .order_by(Document.doc_id, Item.id)
+        )
+        return [(i, d) for i, d in self.session.execute(stmt)]
+
+    def delete_versions_of_project(self, project_id: int) -> int:
+        doc_ids = select(Document.id).where(Document.project_id == project_id)
+        return self.session.execute(
+            delete(VersionRow).where(VersionRow.document_id.in_(doc_ids))
+        ).rowcount
+
+    def version_count(self, document_id: int) -> int:
+        stmt = select(func.count()).where(VersionRow.document_id == document_id)
+        return int(self.session.scalar(stmt) or 0)
 
     def version_bodies(self, document_id: int, nos: list[int]) -> dict[int, str]:
         stmt = select(VersionRow.version_no, VersionRow.body).where(

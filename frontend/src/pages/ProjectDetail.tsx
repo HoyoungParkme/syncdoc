@@ -1,8 +1,9 @@
 /** UI-4 프로젝트 상세 — SYNC-UI-002#UI-4. 11단계 표 + 문서 행, 요약 수치, 표준 묶음, 최근 변경(status 커밋 포함).
- *  GET /api/projects/{code}(ProjectDetail) 하나로 그린다. */
+ *  GET /api/projects/{code}(ProjectDetail) 하나로 그린다. 요소 번호 = data-el.
+ *  1 헤더(1.1·1.2·1.3) · 2.1·2.2 그래프·순서(B4) · 3 요약 수치(3.1~3.5 → 다이얼로그 6) · 4 표(4.1 단계, 4.2 문서, 4.3 상위 미승인, 4.4 표준) · 5 최근 변경 · 6 목록 다이얼로그 */
 import { useEffect, useState } from 'react'
 import { Link, useOutletContext, useParams } from 'react-router-dom'
-import { ago, api, authorLabel, STAGE_NAMES, STAGE_TYPES, STATUS_KO, type DocumentSummary, type ProjectDetail as Detail, type ProjectSummary, type Version } from '../api/client'
+import { ago, api, authorLabel, docPath, refKey, STAGE_NAMES, STAGE_TYPES, STATUS_KO, type CommentSummary, type DocumentSummary, type FlagSummary, type ProjectDetail as Detail, type ProjectSummary, type Version } from '../api/client'
 
 const ST: Record<string, string> = { approved: 'ok', review: 'rv', draft: 'dr' }
 
@@ -13,6 +14,7 @@ export function ProjectDetail() {
   const [docs, setDocs] = useState<DocumentSummary[]>([])
   const [recent, setRecent] = useState<Version[]>([])
   const [open, setOpen] = useState<Record<string, boolean>>({})
+  const [dialog, setDialog] = useState<{ kind: string; label: string; items: unknown[] } | null>(null)
   useEffect(() => {
     api.get<Detail>(`/api/projects/${code}`).then((d) => {
       setDocs(d.docs)
@@ -20,6 +22,9 @@ export function ProjectDetail() {
     })
   }, [code])
   if (!p) return <div className="page lbl">프로젝트를 찾을 수 없습니다.</div>
+  const openList = (kind: string, label: string) => {
+    api.get<unknown[]>(`/api/projects/${code}/flags?kind=${kind}`).then((items) => setDialog({ kind, label, items }))
+  }
   const byType = (t: string) => docs.filter((d) => d.doc_type === t)
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !(o[k] ?? true) }))
   const row = (d: DocumentSummary) => (
@@ -45,22 +50,22 @@ export function ProjectDetail() {
           {p.remote_url.replace(/^https?:\/\//, '')}
         </a>
         <span className="grow" />
-        <span className="btn" data-el="2.1" title="UI-8 — B4">
+        <Link className="btn" data-el="2.1" to={`/p/${code}/graph`}>
           참조 그래프
-        </span>
-        <span className="btn" data-el="2.2" title="UI-9 — B4">
+        </Link>
+        <Link className="btn" data-el="2.2" to={`/p/${code}/read`}>
           순서대로 읽기
-        </span>
+        </Link>
       </div>
       <div className="stats" data-el="3">
         {[
-          ['3.1', 'needs_check', '확인 필요'],
-          ['3.2', 'broken_ref', '끊어진 참조'],
-          ['3.3', 'unresolved_comments', '미해결 댓글'],
-          ['3.4', 'convention_errors', '규약 오류'],
-          ['3.5', 'incomplete', '미완성'],
-        ].map(([el, k, label]) => (
-          <span className={`stat${p.counts[k] ? '' : ' dim'}`} data-el={el} key={k}>
+          { el: '3.1', k: 'needs_check', kind: 'needs_check', label: '확인 필요' },
+          { el: '3.2', k: 'broken_ref', kind: 'broken_ref', label: '끊어진 참조' },
+          { el: '3.3', k: 'unresolved_comments', kind: 'comments', label: '미해결 댓글' },
+          { el: '3.4', k: 'convention_errors', kind: 'convention_errors', label: '규약 오류' },
+          { el: '3.5', k: 'incomplete', kind: 'incomplete', label: '미완성' },
+        ].map(({ el, k, kind, label }) => (
+          <span className={`stat link${p.counts[k] ? '' : ' dim'}`} data-el={el} key={k} onClick={() => openList(kind, label)}>
             <b>{p.counts[k] ?? 0}</b> {label}
           </span>
         ))}
@@ -121,7 +126,60 @@ export function ProjectDetail() {
         </aside>
       </div>
       {STAGE_TYPES.length === 0 && null}
+      {dialog && (
+        <>
+          <div className="backdrop" onClick={() => setDialog(null)} />
+          <div className="dialog" data-el="6">
+            <div className="dhead">
+              {dialog.label} {dialog.items.length}건
+              <span className="grow" />
+              <span className="x" onClick={() => setDialog(null)}>
+                ✕
+              </span>
+            </div>
+            <div className="dbody">
+              {dialog.items.length === 0 && <p className="lbl">없습니다.</p>}
+              <ul className="chk">{dialog.items.map((it) => listItem(dialog.kind, it))}</ul>
+            </div>
+          </div>
+        </>
+      )}
     </div>
+  )
+}
+
+/** 다이얼로그 6의 행 — kind에 따라 FlagSummary · CommentSummary · DocumentSummary. 항목 클릭 → 그 문서의 UI-5 */
+function listItem(kind: string, it: unknown) {
+  if (kind === 'comments') {
+    const c = it as CommentSummary
+    return (
+      <li key={c.id}>
+        <Link to={`${docPath(c.doc_id)}?panel=comments#line-${c.line_no}`}>
+          <b>{c.doc_id}</b>
+        </Link>{' '}
+        {c.line_no}행 · {c.author?.display_name}: {c.excerpt} · {ago(c.created_at)}
+      </li>
+    )
+  }
+  if (kind === 'convention_errors' || kind === 'incomplete') {
+    const d = it as DocumentSummary
+    return (
+      <li key={d.doc_id}>
+        <Link to={docPath(d.doc_id)}>
+          <b>{d.doc_id}</b>
+        </Link>{' '}
+        v{d.current_version_no} · {kind === 'incomplete' ? d.incomplete_warnings.join(' · ') : '규약 오류'} · {ago(d.updated_at)}
+      </li>
+    )
+  }
+  const f = it as FlagSummary
+  return (
+    <li key={f.id}>
+      <Link to={docPath(f.target.doc_id, f.target.item_id)}>
+        <b>{refKey(f.target)}</b>
+      </Link>{' '}
+      · 원인 {refKey(f.cause)}{f.cause_version_no ? ` v${f.cause_version_no}` : ''} · {ago(f.raised_at)} · 담당 {f.assignee?.display_name ?? '미지정'}
+    </li>
   )
 }
 

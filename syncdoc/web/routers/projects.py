@@ -15,6 +15,7 @@ from syncdoc.web.auth import current_user
 from syncdoc.web.schemas.comments import CommentSummary
 from syncdoc.web.schemas.common import FlagSummary
 from syncdoc.web.schemas.documents import DocumentSummary
+from syncdoc.web.schemas.ops import Graph
 from syncdoc.web.schemas.projects import InitProject, ProjectDetail, ProjectSummary
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -74,3 +75,14 @@ async def list_items(
         else:
             out.append(CommentSummary.model_validate(x))
     return out
+
+
+@router.get("/{code}/graph", response_model=Graph)
+async def graph(
+    code: str,
+    stage: int | None = Query(None, ge=1, le=11),
+    doc: str | None = None,
+    user: User = Depends(current_user),
+) -> Graph:
+    """SYNC-API-001#GET/api/projects/{code}/graph"""
+    return Graph.of(await queries.graph_view(code, stage, doc))

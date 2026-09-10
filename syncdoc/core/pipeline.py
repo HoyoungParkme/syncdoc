@@ -2,45 +2,55 @@
 
 세 입구(MCP·웹·GitHub)가 전부 save_pipeline로 들어온다. 저장소 단위 asyncio.Lock(프로세스 내).
 세션은 여기서 연다(DEV-10 — 서비스는 세션을 열지 않는다). push가 DB 트랜잭션 앞이다.
-B1: save_pipeline · B2: web_status 분기(apply_status) · change_status(조율 — SpecService에서 옮김).
+B1 save_pipeline · B2 web_status·change_status · B3 11단계 · B4 revert·process_commit·rebuild.
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
 from syncdoc import db
 from syncdoc.core.account.models import User
+from syncdoc.core.account.service import AccountService
 from syncdoc.core.collab.service import CommentService
 from syncdoc.core.errors import (
+    AlreadyCurrent,
     ConventionViolation,
     ItemDeleted,
     ItemDeletionNeedsConfirm,
     NotFound,
+    RebuildFailed,
     StatusBlocked,
     UpstreamReviewRequired,
     VersionConflict,
 )
 from syncdoc.core.markdown import parse_frontmatter
+from syncdoc.core.project.models import Repository
 from syncdoc.core.project.service import ProjectService
 from syncdoc.core.reference.service import ReferenceService
 from syncdoc.core.spec.service import SpecService
 from syncdoc.core.tracking.service import TrackingService
 from syncdoc.core.types import (
+    STAGE_OF,
     Author,
     AuthorKind,
     DocStatus,
     DocType,
     DocumentSummary,
     Entry,
+    RebuildResult,
     SaveResult,
+    Violation,
 )
 from syncdoc.infra import git
 
+log = logging.getLogger(__name__)
 _locks: dict[str, asyncio.Lock] = {}
 
 
@@ -65,7 +75,7 @@ async def save_pipeline(
     session: Session | None = None,
 ) -> SaveResult:
     """SYNC-MS-007#pipeline.save_pipeline"""
-    code = project_code if doc_id is None else doc_id.split("-")[0]
+    code = project_code or (doc_id.split("-")[0] if doc_id else None)
     if code is None:
         raise NotFound("project", "None")
     args = (
@@ -114,8 +124,15 @@ async def _run(
     # 2·3. 대상 문서 또는 생성
     document = None
     if doc_id is not None:
-        document = spec.get_document(doc_id)
-        doc_type = document.doc_type
+        try:
+            document = spec.get_document(doc_id)
+            doc_type = document.doc_type
+        except NotFound:
+            if entry != Entry.github:
+                raise
+            assert (
+                doc_type is not None
+            )  # github 신규 파일 — 파일명이 doc_id, frontmatter는 그대로 (보고)
     else:
         assert doc_type is not None
         doc_id = spec.issue_doc_id(project.id, code, doc_type)
@@ -132,7 +149,8 @@ async def _run(
     if entry != Entry.web_status and document:
         deleted = spec.detect_deleted_items(document, body)
         downstream = {pk: refs.downstream(pk) for pk in deleted}
-        if any(downstream.values()) and not confirm_item_deletion:
+        # github 진입은 물어볼 상대가 없다 — 커밋이 진실(SEQ-2). 삭제는 끊어진 참조로 통보 (보고)
+        if any(downstream.values()) and not confirm_item_deletion and entry != Entry.github:
             names = {i.pk: i.item_id for i in document.items}
             raise ItemDeletionNeedsConfirm(
                 [
@@ -193,6 +211,8 @@ async def _run(
     fm, _ = parse_frontmatter(body)
     upstream_ids = re.findall(r"[\w-]+", fm.get("upstream", "").strip("[]"))
     refs.extract(document_id, version.id, body, item_pks, upstream_ids)
+    # 10a. 이 문서를 기다리던 미존재 참조를 푼다 (UC-S2 2a2)
+    refs.resolve_missing(project.id, target_doc_id=doc_id)
     # 11. 변경 영향 → 전파 미결정 (UC-S3 3)
     affected = tracking.detect_impact(document_id, prev_version_id, version.id, changed_items)
     pending_id = None
@@ -269,3 +289,221 @@ async def change_status(
             TrackingService(s).raise_upstream(pks, document.id, document.current_version_id, None)
             s.commit()
         return spec.get_document(doc_id)
+
+
+async def revert(
+    doc_id: str, to_version: int, user: User, confirm_item_deletion: bool = False
+) -> SaveResult:
+    """SYNC-MS-007#pipeline.revert"""
+    with db.session_scope() as s:
+        spec = SpecService(s)
+        document = spec.get_document(doc_id)
+        old_body = spec.version_body(doc_id, to_version)
+        if to_version == document.current_version_no:
+            raise AlreadyCurrent()
+        author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.web_revert)
+        return await save_pipeline(
+            Entry.web_revert,
+            doc_id,
+            None,
+            old_body,
+            document.current_version_no,
+            None,
+            author,
+            f"revert({doc_id}): v{document.current_version_no} → v{to_version} 내용으로",
+            confirm_item_deletion=confirm_item_deletion,
+            session=s,
+        )
+
+
+async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]:
+    """SYNC-MS-007#pipeline.process_commit"""
+    if repo.last_processed_commit == head_hash:
+        return []
+    workdir = Path(repo.workdir_path)
+    await git.fetch(workdir)
+    rng = f"{repo.last_processed_commit}..{head_hash}" if repo.last_processed_commit else head_hash
+    files = await git.changed_files(workdir, rng, "docs/specs/")
+    # 같은 커밋의 상·하위 문서는 11단계 순서로 — 하위가 먼저 저장되면 참조가 미존재로 남는다 (보고)
+    files.sort(
+        key=lambda f: (
+            STAGE_OF.get(Path(f.path).parts[2] if len(Path(f.path).parts) > 3 else "", 99),
+            f.path,
+        )
+    )
+    with db.session_scope() as s:
+        code = next(p.code for p in ProjectService(s).list_projects() if p.id == repo.project_id)
+    results: list[SaveResult] = []
+    failed: list[str] = []
+    for f in files:
+        try:
+            results.extend(await _process_file(workdir, code, f, head_hash))
+        except Exception as e:  # noqa: BLE001 — 파일 하나 실패해도 다음 파일 계속 (MS-007)
+            log.warning("process_commit %s %s: %s", code, f.path, e)
+            failed.append(f.path)
+    if not failed:
+        with db.session_scope() as s:
+            row = s.get(Repository, repo.id)
+            assert row is not None
+            row.last_processed_commit, row.synced_at = head_hash, datetime.now(UTC)
+            s.commit()
+        repo.last_processed_commit = head_hash
+    return results
+
+
+def _dir_type(path: str) -> str:
+    parts = Path(path).parts  # docs/specs/<TYPE>/<doc_id>.md
+    return parts[2] if len(parts) > 3 else ""
+
+
+async def _process_file(workdir: Path, code: str, f, head_hash: str) -> list[SaveResult]:
+    """process_commit 4단계 — 파일 하나. 삭제면 mark_deleted, 아니면 github 저장 + 위반 덧붙임."""
+    doc_id, dir_type = Path(f.path).stem, _dir_type(f.path)
+    with db.session_scope() as s:
+        account = AccountService(s)
+        user = account.user_by_login(f.author_login)
+        unknown = user is None
+        if user is None:
+            user = account.create_placeholder(f.author_login)
+            s.commit()
+        author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.github)
+        if f.status == "D":
+            spec, tracking = SpecService(s), TrackingService(s)
+            document = spec.get_document(doc_id)
+            for pk in spec.mark_deleted(document, f.commit_hash, author):
+                tracking.raise_broken(pk)
+            s.commit()
+            return []
+    with db.session_scope() as s:
+        # 앱이 직접 push한 커밋(mcp·web 저장·상태 변경·되돌리기)은 이미 기록돼 있다 — 폴링이
+        # 그것을 github 커밋으로 다시 저장하면 같은 커밋의 버전이 둘 생긴다. MS-007에 없음 (보고)
+        try:
+            known = {v.commit_hash for v in SpecService(s).list_versions(doc_id)}
+        except NotFound:
+            known = set()
+    if f.commit_hash in known:
+        return []
+    body = await git.read(workdir, f.path, head_hash)
+    doc_type = DocType(dir_type)
+    r = await save_pipeline(
+        Entry.github,
+        doc_id,
+        doc_type,
+        body,
+        None,
+        code,
+        author,
+        f.message,
+        changed_items=None,
+        commit_hash=f.commit_hash,
+    )
+    fm, _ = parse_frontmatter(body)
+    extra: list[Violation] = []
+    if fm.get("doc_id") != doc_id:
+        extra.append(Violation(2, "frontmatter.doc_id", f"파일명 {doc_id} ≠ {fm.get('doc_id')!r}"))
+    if fm.get("type") != dir_type:
+        extra.append(
+            Violation(2, "frontmatter.doc_id", f"디렉터리 {dir_type} ≠ type {fm.get('type')!r}")
+        )
+    if unknown:
+        extra.append(Violation(1, "author.unknown", f.author_login))
+    if extra:
+        with db.session_scope() as s:
+            spec = SpecService(s)
+            vr = spec.validate(body, doc_type, Entry.github, None)
+            spec.mark_convention_error(
+                spec.get_document(doc_id).id, vr.violations + extra, vr.warnings
+            )
+            s.commit()
+    return [r]
+
+
+async def rebuild(code: str, session: Session | None = None) -> RebuildResult:
+    """SYNC-MS-007#pipeline.rebuild
+
+    session: init_project(import_existing)가 아직 커밋 안 된 프로젝트 행이 있는 자기 세션을 넘긴다
+    (save_pipeline의 session과 같은 방식. MS-007 시그니처에 없음 — 보고).
+    """
+    async with _lock(code):
+        if session is not None:
+            return await _rebuild(session, code)
+        with db.session_scope() as s:
+            return await _rebuild(s, code)
+
+
+async def _rebuild(s: Session, code: str) -> RebuildResult:
+    project = ProjectService(s).get(code)
+    repo = project.repository
+    workdir = Path(repo.workdir_path)
+    head = await git.fetch(workdir)
+    await git.checkout(workdir, "origin/HEAD")
+    spec, refs, account = SpecService(s), ReferenceService(s), AccountService(s)
+    result = RebuildResult(0, 0, 0, 0)
+    try:
+        refs.clear(project.id)
+        spec.clear_index(project.id)
+        for path in await git.list(workdir, "docs/specs/*/*.md", head):
+            doc_id, dir_type = Path(path).stem, _dir_type(path)
+            try:
+                doc_type = DocType(dir_type)
+            except ValueError:
+                result.convention_errors.append(
+                    {
+                        "doc_id": doc_id,
+                        "detail": f"frontmatter.doc_id: 알 수 없는 디렉터리 {dir_type}",
+                    }
+                )
+                continue
+            document = None
+            try:
+                document = spec.get_document(doc_id)
+            except NotFound:
+                pass
+            for c in await git.log(workdir, path):
+                body = await git.read(workdir, path, c.hash)
+                user = account.user_by_login(c.login) or account.create_placeholder(c.login)
+                author = Author(
+                    kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.github
+                )
+                if c.message.startswith("status(") and document is not None:
+                    spec.apply_status(document, body, c.hash, user, None)
+                else:
+                    vr = spec.validate(body, doc_type, Entry.github, None)
+                    if document is None:
+                        spec.create(
+                            project.id, doc_id, doc_type, body, c.hash, author, c.message, vr
+                        )
+                    else:
+                        deleted = spec.detect_deleted_items(document, body)
+                        spec.save(
+                            document, body, c.hash, author, c.message, deleted, vr, rebuild=True
+                        )
+                    result.versions += 1
+                document = spec.get_document(doc_id)
+            if document is None:
+                continue
+            fm, _ = parse_frontmatter(document.body)
+            upstream_ids = re.findall(r"[\w-]+", fm.get("upstream", "").strip("[]"))
+            ex = refs.extract(
+                document.id,
+                document.current_version_id,  # type: ignore[arg-type]
+                document.body,
+                spec.item_pks(document.id),
+                upstream_ids,
+            )
+            vr = spec.validate(document.body, doc_type, Entry.github, None)
+            spec.mark_convention_error(document.id, vr.violations, vr.warnings)
+            if vr.violations:
+                detail = "\n".join(f"{v.rule}: {v.message}" for v in vr.violations)
+                result.convention_errors.append({"doc_id": doc_id, "detail": detail})
+            result.docs += 1
+            result.items += len(document.items)
+            result.references += ex.added
+        refs.resolve_missing(project.id)
+        repo.last_processed_commit, repo.synced_at = head, datetime.now(UTC)
+        s.commit()
+    except Exception as e:  # noqa: BLE001 — 어느 단계든 실패하면 롤백 (MS-007)
+        s.rollback()
+        log.warning("rebuild %s 실패: %s", code, e)
+        raise RebuildFailed(str(e)) from e
+    return result

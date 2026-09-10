@@ -88,6 +88,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
    - else → `version = spec.save(document, body, commit_hash, author, message, deleted, validate_result=4단계 결과)` — **모든 경로.** 경고(`incomplete_warnings`)는 mcp 저장에도 남아야 승인을 막는다. 위반은 github 경로에서만 저장까지 온다
 9. `deleted`마다 `tracking.raise_broken(pk)`
 10. `reference.extract(document_id, version.id, body, item_pks=spec.item_pks(document_id), upstream_doc_ids=frontmatter upstream)`
+10a. `reference.resolve_missing(project_id, target_doc_id=doc_id)` — 이 문서(또는 항목)를 기다리던 미존재 참조를 푼다. 하위가 먼저 저장된 경우가 재구축까지 안 기다려도 되게(UC-S2 2a2)
 11. `affected = tracking.detect_impact(document_id, prev_version_id=document.current_version_id (2단계에서 읽은 것. 신규면 None), version.id, changed_items)` · if `affected` → `changed_pks = spec.resolve_items(doc_id, changed_items)` (선언) 또는 `detect_impact`가 diff로 판정한 것 · `pending_id = tracking.create_pending(version.id, affected, changed_pks)` · else `pending_id = None`
 12. if `upstream_impact` → 각각 `spec.resolve_item(doc, item)` · if 못 찾음 → `warnings`에 `upstream_impact.unknown` 추가하고 건너뜀 · `tracking.raise_upstream(pks, document_id, version.id, cause_item_pk=None)`
 13. `collab.relocate(document_id, old_body, body, old_version_no=document.current_version_no)`
@@ -160,7 +161,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 근거: [[SYNC-SEQ-001#SEQ-7]] · [[SYNC-UC-001#UC-H7]] · [[SYNC-API-001#POST/api/docs/{docId}/revert]] · 조율이라 pipeline
 
 **처리**
-1. `document = get_document(doc_id)`; `old_body = DB: versions where document_id and version_no=to_version` · if 없음 → `! not-found`
+1. `document = spec.get_document(doc_id)`; `old_body = spec.version_body(doc_id, to_version)` · 없으면 그쪽에서 `! not-found`
 2. if `to_version == document.current_version_no` → `! already-current`(422)
 3. `save_pipeline(entry=web_revert, doc_id, None, old_body, expected_version=current_version_no, project_code=None, author=Author(human, user, None, web), message=f"revert({doc_id}): v{current} → v{to_version} 내용으로", changed_items=None, confirm_item_deletion)`
 4. `→ SaveResult`
@@ -192,9 +193,13 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
 1. `repo.last_processed_commit == head_hash`면 `→ []`
 2. `git.fetch(repo)`
 3. `files = git.changed_files(repo, f"{last}..{head}", path="docs/specs/")`. 각각 `(path, last_commit_hash_of_file, author_login, message)`. `_templates/`·`assets/`는 제외
+3a. **앱 자신이 만든 커밋은 거른다** — `commit_hash`가 이미 `versions.commit_hash`나 `status_changes.commit_hash`에 있으면 건너뛴다. 없으면 앱이 push한 커밋을 폴링이 github 경로로 다시 저장해 같은 커밋의 버전이 하나 더 생긴다
+3b. 남은 파일을 **문서 타입의 단계 순**으로 정렬(RFQ→…→CODE→STD). 경로순이면 하위가 먼저 저장돼 상위 참조가 미존재로 남는다
 4. 파일마다 (락은 `save_pipeline` 안에서):
    - `body = git.read(repo, path, head_hash)`
-   - `doc_id` = 파일명, `path_type` = 디렉터리명. if `path_type != frontmatter.type` → `frontmatter.doc_id` 위반으로 처리(저장은 됨)
+   - `doc_id` = **파일명**(github 경로는 `issue_doc_id`를 쓰지 않는다 — 커밋이 진실). `path_type` = 디렉터리명. if `path_type != frontmatter.type` → `frontmatter.doc_id` 위반으로 처리(저장은 됨)
+   - github 진입은 **항목 삭제 확인을 건너뛴다** — 물어볼 상대가 없고 커밋이 진실이다. 사라진 항목은 `is_deleted` + `raise_broken`으로 통보
+   - 파일명·디렉터리·미등록 작성자 위반은 저장 뒤 `spec.mark_convention_error`로 덧붙인다
    - `user = account.user_by_login(author_login)` · if None → `user = account.create_placeholder(author_login)`, 위반에 `author.unknown` 추가
    - `author = Author(kind=human, user, instructed_by=None, via=github)`
    - if `status == D` (파일 삭제) → `deleted = spec.mark_deleted(document, commit_hash, author)` (`status=draft`, `file.deleted` 오류, 전 항목 `is_deleted`) · 각 pk에 `tracking.raise_broken` · 문서 행은 남는다 · 다음 파일로
@@ -221,12 +226,12 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
 
 **시그니처**
 ```python
-async def rebuild(code: str) -> RebuildResult
+async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 ```
 
 근거: [[SYNC-SEQ-001#SEQ-21]] · [[SYNC-UC-001#UC-S6]]
 
-**입력** 프로젝트 코드
+**입력** 프로젝트 코드. `session` — `init_project(import_existing)`가 아직 커밋 안 된 프로젝트 행이 있는 자기 세션을 넘긴다. None이면 스스로 연다(`save_pipeline`과 같은 방식, DEV-10)
 
 **처리**
 
@@ -239,7 +244,7 @@ async def rebuild(code: str) -> RebuildResult
    - `log = git.log(repo, path)` 오래된 것부터 `[(hash, login, date, message)]`
    - 커밋마다: `body = git.read(path @ hash)`
      - if `message.startswith("status(")` → `spec.apply_status(…, commit_hash=hash)`만 (StatusChange 복원)
-     - else → `spec.validate(body, doc_type, entry=github)` → `spec.save(document, body, hash, author, [], has_convention_error, warnings, rebuild=True)` — `version_no` 순서대로, `items` upsert
+     - else if 이 문서의 첫 커밋 → `spec.create(...)` · else → `spec.save(document, body, hash, author, message, deleted=spec.detect_deleted_items(document, body), validate_result, rebuild=True)` — `version_no`는 남은 버전 수 + 1, `items` upsert. 커밋마다 삭제 항목도 반영한다
    - 마지막 커밋 본문으로 `reference.extract`, `spec.mark_convention_error(document_id, violations, warnings)`
 7. `reference.resolve_missing(project_id)` — 파일 순서 때문에 미존재였던 참조 해제
 8. `repo.last_processed_commit = HEAD`

@@ -147,3 +147,38 @@ def test_count_downstream_groups_by_target(db_session: Session) -> None:
     counts = ref.count_downstream([q1, pks["R1"], pks["G1"]])
     assert counts == {q1: 1, pks["R1"]: 1}  # G1은 키 없음(0으로 읽는다)
     assert ref.count_downstream([]) == {}
+
+
+# ── B4: references_among · resolve_missing · clear ──
+def test_references_among_resolve_missing_and_clear(db_session: Session) -> None:
+    svc, ref, d, v, pks, a = _setup(db_session)
+    ref.extract(d.id, v.id, d.body, pks, UPSTREAM)
+    rfq = svc.get_document("EXMP-RFQ-001")
+    q1 = next(i.pk for i in rfq.items if i.item_id == "Q1")
+    pid = db_session.execute(
+        text("SELECT project_id FROM documents WHERE id=:i"), {"i": d.id}
+    ).scalar()
+    # G1 중심: G1→Q1, G1→#R1 · R1 중심: G1→R1, R1→Q9(미존재)
+    among = ref.references_among({pks["G1"]})
+    assert sorted(e.raw_target for e in among) == ["#R1", "EXMP-RFQ-001#Q1"]
+    r1 = ref.references_among({pks["R1"]})
+    assert sorted((e.raw_target, e.is_missing) for e in r1) == [
+        ("#R1", False),
+        ("EXMP-RFQ-001#Q9", True),
+    ]
+    # 문서 단위 대상 포함: PRD 문서를 가리키는 frontmatter/절 참조는 없고, RFQ 문서를 가리키는 것은 RFQ 항목 집합에서
+    doc_level = [e for e in ref.references_among({q1}) if e.to_document_id]
+    assert [e.raw_target for e in doc_level] == ["EXMP-RFQ-001"]  # 절 본문·frontmatter는 한 행
+    assert ref.references_among({q1}, include_document_targets=False) == [
+        e for e in ref.references_among({q1}) if not e.to_document_id
+    ]
+    assert ref.references_among(set()) == []
+    # 미존재 해제: RFQ에 Q9가 생기면 다음 resolve_missing에서 풀린다
+    v2 = svc.save(rfq, rfq.body + "#### Q9 새 요구\n내용\n", "h9", a, "spec: Q9", [])
+    assert v2.version_no == 2 and ref.resolve_missing(pid, target_doc_id="EXMP-NONE-001") == 0
+    assert ref.resolve_missing(pid, target_doc_id="EXMP-RFQ-001") == 1  # 좁혀 해제
+    assert [e.is_missing for e in ref.upstream(pks["R1"])] == [False]
+    assert ref.resolve_missing(pid) == 0  # EXMP-NONE-001은 여전히 없다
+    # clear: 이 프로젝트의 참조 전부
+    ref.clear(pid)
+    assert db_session.execute(text('SELECT count(*) FROM "references"')).scalar() == 0
