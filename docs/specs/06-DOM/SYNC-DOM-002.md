@@ -155,11 +155,17 @@ classDiagram
         +str workdir_path
         +str last_processed_commit
         +datetime synced_at
+        +int behind_by
+        +datetime fetched_at
     }
 ```
 
 관계
 - `Repository` 1 — 1 `Project`
+
+`behind_by`·`fetched_at`은 **폴링이 갱신하고 화면은 읽기만 한다.** 관리 화면(UI-14)과 프로젝트
+상세(UI-4)가 이 값을 그대로 보여준다. 화면이 열릴 때마다 `git fetch`를 돌리면 저장소 수만큼
+느려지고, 폴링이 이미 5분마다 같은 일을 하고 있어 이중이 된다.
 
 ### 2.2 명세
 
@@ -374,6 +380,7 @@ classDiagram
         +datetime issued_at
         +datetime expires_at
         +datetime revoked_at
+        +datetime last_used_at
     }
 ```
 
@@ -554,6 +561,8 @@ classDiagram
         +str workdir_path
         +str last_processed_commit
         +datetime synced_at
+        +int behind_by
+        +datetime fetched_at
     }
     ProjectService --> Project
     ProjectService --> Repository
@@ -878,6 +887,7 @@ classDiagram
         +datetime issued_at
         +datetime expires_at
         +datetime revoked_at
+        +datetime last_used_at
     }
     AccountService --> User
     AccountService --> AccessToken
