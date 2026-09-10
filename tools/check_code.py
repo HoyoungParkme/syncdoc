@@ -20,19 +20,19 @@ import re
 import sys
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-MS_GLOB = os.path.join(ROOT, "docs", "specs", "MS", "SYNC-MS-*.md")
+MS_GLOB = os.path.join(ROOT, "docs", "specs", "10-MS", "SYNC-MS-*.md")  # STD-001 1.1 {NN-TYPE}
 # 항목 ID 접두 → 코드 파일 (SYNC-DOM-002 1장 · "MS 문서 하나 = 코드 파일 하나")
 MODULES = {
-    "ProjectService": "syncdoc/core/project/service.py",
-    "SpecService": "syncdoc/core/spec/service.py",
-    "ReferenceService": "syncdoc/core/reference/service.py",
-    "TrackingService": "syncdoc/core/tracking/service.py",
-    "CommentService": "syncdoc/core/collab/service.py",
-    "AccountService": "syncdoc/core/account/service.py",
-    "pipeline": "syncdoc/core/pipeline.py",
-    "queries": "syncdoc/core/queries.py",
-    "git": "syncdoc/infra/git.py",
-    "github": "syncdoc/infra/github.py",
+    "ProjectService": "backend/app/core/project/service.py",
+    "SpecService": "backend/app/core/spec/service.py",
+    "ReferenceService": "backend/app/core/reference/service.py",
+    "TrackingService": "backend/app/core/tracking/service.py",
+    "CommentService": "backend/app/core/collab/service.py",
+    "AccountService": "backend/app/core/account/service.py",
+    "pipeline": "backend/app/core/pipeline.py",
+    "queries": "backend/app/core/queries.py",
+    "git": "backend/app/infra/git.py",
+    "github": "backend/app/infra/github.py",
 }
 ITEM = re.compile(r"^#{1,6} ([A-Za-z_]+\.[a-z_]+)\b", re.M)
 SIG_INLINE = re.compile(r"\*\*시그니처\*\*\s*`([^`]+)`")

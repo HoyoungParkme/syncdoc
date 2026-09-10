@@ -1,0 +1,7 @@
+.git
+backend/.venv
+.venv
+frontend/node_modules
+backend/app/web/static
+backend/tests
+.playwright-mcp

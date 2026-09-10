@@ -3,7 +3,7 @@
  *  · 4 되돌리기 확인(4.1 diff, 4.2 되돌리기, 4.3 취소) · 6 삭제 확인(6.1 삭제하고 되돌리기, 6.2 취소) */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ago, api, ApiError, docPath, STATUS_KO, type Diff, type Document, type ItemReferences, type Version } from '../api/client'
+import { ago, api, ApiError, docPath, josa, STATUS_KO, type Diff, type Document, type ItemReferences, type Version } from '../api/client'
 import { DiffBox } from '../components/DiffBox'
 import { renderBlocks } from '../view/md'
 
@@ -196,9 +196,9 @@ export function History() {
         <>
           <div className="backdrop" onClick={() => setRevertTo(null)} />
           <div className="dialog" data-el="4">
-            <div className="dhead">v{revertTo}으로 되돌리기</div>
+            <div className="dhead">v{revertTo}{josa(revertTo, '으로', '로')} 되돌리기</div>
             <div className="dbody">
-              현재 v{doc.current_version_no}을 v{revertTo} 내용으로 되돌립니다. 이력은 지워지지 않고 <b>v{doc.current_version_no + 1}</b>이 새로 생깁니다.
+              현재 v{doc.current_version_no}{josa(doc.current_version_no, '을', '를')} v{revertTo} 내용으로 되돌립니다. 이력은 지워지지 않고 <b>v{doc.current_version_no + 1}</b>{josa(doc.current_version_no + 1, '이', '가')} 새로 생깁니다.
               {revertDiff && (
                 <div style={{ marginTop: 8 }}>
                   <div className="lbl">

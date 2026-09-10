@@ -68,7 +68,7 @@ export function ReadOrder() {
             const cls = !hasDocs(s) ? 'na' : s < stage ? 'done' : s === stage ? 'cur' : ''
             return (
               <span key={t} className={`stp ${cls}`} onClick={() => hasDocs(s) && setSp({ stage: String(s) })}>
-                {s} {hasDocs(s) || s <= 6 ? t : ''}
+                {s} {t}
               </span>
             )
           })}

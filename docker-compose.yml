@@ -1,4 +1,4 @@
-# SYNC-INFRA-001 8장 — docker compose up: app(:8000) + db(:5432)
+# SYNC-INFRA-001 8장 — docker compose up: app(:8000) + db(:5432). 빌드 컨텍스트는 저장소 루트(backend·frontend·docs를 쓴다)
 services:
   app:
     build: .

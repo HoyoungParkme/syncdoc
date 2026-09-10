@@ -21,25 +21,32 @@ PREVIEW = Path(os.environ.get("SYNCDOC_PREVIEW_DIR", "/tmp/syncdoc-preview"))
 os.environ["DATABASE_URL"] = "postgresql+psycopg://syncdoc:syncdoc@localhost:5434/syncdoc_dev"
 os.environ.setdefault("SECRET_KEY", "dev-preview-secret")
 os.environ.setdefault("REPOS_DIR", str(PREVIEW / "repos"))
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "backend"))  # 임포트 패키지는 backend/app (DOM-002 1장)
 
 from fastapi import Depends, Request  # noqa: E402
 from fastapi.responses import RedirectResponse  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
-from syncdoc import db  # noqa: E402
-from syncdoc.core import pipeline  # noqa: E402
-from syncdoc.core.account.service import AccountService  # noqa: E402
-from syncdoc.core.collab.service import CommentService  # noqa: E402
-from syncdoc.core.errors import Problem  # noqa: E402
-from syncdoc.core.project.models import Project, Repository  # noqa: E402
-from syncdoc.core.reference.service import ReferenceService  # noqa: E402
-from syncdoc.core.spec.service import SpecService  # noqa: E402
-from syncdoc.core.tracking.service import TrackingService  # noqa: E402
-from syncdoc.core.types import Author, AuthorKind, DocType, Entry, Propagation  # noqa: E402
-from syncdoc.main import app  # noqa: E402
-from syncdoc.web import auth  # noqa: E402
+from app import db  # noqa: E402
+from app.core import pipeline  # noqa: E402
+from app.core.account.service import AccountService  # noqa: E402
+from app.core.collab.service import CommentService  # noqa: E402
+from app.core.errors import Problem  # noqa: E402
+from app.core.project.models import Project, Repository  # noqa: E402
+from app.core.reference.service import ReferenceService  # noqa: E402
+from app.core.spec.service import SpecService  # noqa: E402
+from app.core.tracking.service import TrackingService  # noqa: E402
+from app.core.types import (  # noqa: E402
+    Author,
+    AuthorKind,
+    DocType,
+    Entry,
+    Propagation,
+    spec_dir,
+)
+from app.main import app  # noqa: E402
+from app.web import auth  # noqa: E402
 
 ORDER = ["RFQ", "PRD", "SCN", "UC", "INFRA", "DOM", "UI", "API", "SEQ", "MS", "CODE", "STD"]
 
@@ -70,7 +77,8 @@ def fresh_db() -> None:
 
     from alembic import command
 
-    cfg = Config(str(ROOT / "alembic.ini"))
+    cfg = Config(str(ROOT / "backend" / "alembic.ini"))  # DOM-002 1장 — 파이썬은 backend/ 아래
+    cfg.set_main_option("script_location", str(ROOT / "backend" / "alembic"))
     cfg.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
     command.upgrade(cfg, "head")
 
@@ -141,7 +149,14 @@ async def seed() -> None:
         p = Project(code="SYNC", name="싱크독")
         s.add(p)
         s.flush()
-        s.add(Repository(project_id=p.id, remote_url=str(remote), workdir_path=str(work)))
+        s.add(
+            Repository(
+                project_id=p.id,
+                remote_url=str(remote),
+                workdir_path=str(work),
+                registered_by_user_id=hoyoung.id,
+            )
+        )
         hoyoung = make_user(s, login="hoyoung")
         hoyoung.display_name = "박호영"
         minjun = make_user(s, login="minjun")
@@ -152,7 +167,7 @@ async def seed() -> None:
 
     # 1. 이 저장소의 명세를 단계 순서대로 올린다 (호영의 에이전트)
     for typ in ORDER:
-        for f in sorted((ROOT / "docs/specs" / typ).glob("SYNC-*.md")):
+        for f in sorted((ROOT / "docs/specs" / spec_dir(typ)).glob("SYNC-*.md")):
             try:
                 r = await pipeline.save_pipeline(
                     Entry.mcp,
