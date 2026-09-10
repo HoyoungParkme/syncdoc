@@ -117,7 +117,8 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .phead{display:flex;align-items:flex-end;gap:var(--space-12);margin-bottom:var(--space-18);font-size:var(--text-screen-title)}
 .phead b{font-weight:var(--w-semibold);letter-spacing:-.3px}
 .phead .lbl{font-size:var(--text-screen-title);color:var(--ink-muted)}
-.empty{color:var(--ink-disabled);padding:var(--space-30);text-align:center;border:1px dashed var(--border-strong);border-radius:var(--radius-panel-card)}
+.empty{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-panel-card);
+  padding:var(--space-30) var(--space-22);text-align:center;font-size:var(--text-body);color:var(--ink-muted)}
 
 /* ── 공통 컴포넌트 — SYNC-UI-002 1장 ───────────────────────────────────────
    1.1 다이얼로그: 오버레이 위 흰 카드. 머리·본문·발 세 층이고 본문만 스크롤한다.
@@ -127,6 +128,8 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
   width:min(720px,92vw);max-height:min(84vh,760px);background:var(--bg-card);border-radius:var(--radius-dialog);
   box-shadow:var(--shadow-dialog);z-index:calc(var(--z-dialog) + var(--depth,0));overflow:hidden}
 .dialog.wide{width:min(900px,94vw)}
+/* 표 하나와 diff 하나가 드는 폭. 넓히면 표 열이 서로 멀어진다 */
+.dialog.mid{width:min(640px,92vw)}
 /* 입력이 몇 개뿐인 다이얼로그. 넓히면 입력창만 길어지고 폼이 헐거워진다 */
 .dialog.narrow{width:min(560px,92vw)}
 .dhead{flex:none;display:flex;align-items:center;gap:var(--space-10);padding:var(--space-14) var(--space-18);
@@ -292,7 +295,9 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .st.na{background:none;color:var(--ink-disabled)}
 /* 4.3 상위 미승인 — 표시만 한다. 순서는 권장이지 강제가 아니다 */
 .gate{font-size:var(--text-mono-sm);color:var(--danger);border:1px solid var(--danger);border-radius:8px;padding:0 var(--space-7)}
-.flag{font-size:var(--text-mono-sm);color:var(--caution-ink);border:1px solid var(--status-review);border-radius:8px;padding:1px var(--space-7)}
+/* 플래그는 경고색이다 — UI-001 3.1이 `#b8342a`를 플래그에 못박았다. 검토중 노랑이 아니다 */
+.flag{font-size:var(--text-mono-sm);font-weight:var(--w-semibold);color:var(--danger);
+  border:1px solid var(--danger);border-radius:var(--radius-pill);padding:1px var(--space-7)}
 .cm{font-size:var(--text-mono-sm);color:var(--ink-muted);border:1px solid var(--border-strong);border-radius:8px;padding:1px var(--space-7)}
 .err{font-size:var(--text-mono-sm);color:var(--danger);border:1px solid var(--danger);border-radius:8px;padding:1px var(--space-7)}
 .warnx{font-size:var(--text-mono-sm);color:var(--caution-ink);border:1px solid var(--status-review);border-radius:8px;padding:1px var(--space-7)}
@@ -392,7 +397,7 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .rcard.flagged{border-color:var(--danger);background:var(--danger-bg)}
 .rcard.flagged>b{color:var(--danger)}
 .rcard.missing{border-style:dashed;color:var(--ink-disabled)}
-.empty{font-size:var(--text-ui);color:var(--ink-muted);line-height:1.6}
+.pempty{font-size:var(--text-ui);color:var(--ink-muted);line-height:1.6;margin:var(--space-4) 0}
 /* 문서 앞뒤 이동. `.nav`라는 이름은 상단 바가 이미 쓰고 있어 세 번 충돌했다 — 갈라놓는다
    (margin-top이 상단 바 항목을 26px 밀어내 배지가 잘려 보였다) */
 .docnav{display:flex;align-items:center;gap:var(--space-10);flex-wrap:wrap;
@@ -476,22 +481,59 @@ li.ref.missing{color:var(--ink-disabled)}
 .icard>div{display:flex;align-items:center}
 .icard .n{font-family:var(--font-mono);font-weight:var(--w-semibold);color:var(--ink-muted)}
 /* UI-10 내 할 일 */
-.todo .row .k{font-family:var(--font-mono);font-size:var(--text-mono-id);font-weight:var(--w-semibold)}
-.row .age{color:var(--ink-faint);font-size:var(--text-mono-sm);white-space:nowrap}
-.grp h4 .cnt{display:inline-block;min-width:18px;padding:0 var(--space-6);border-radius:var(--radius-pill);
-  background:var(--ink-body);color:#fff;font-size:var(--text-caption);text-align:center;margin-left:var(--space-6)}
+/* 읽는 목록이라 본문보다 좁다 */
+.todopage{max-width:calc(940px + var(--space-22) * 2)}
+/* 헤더는 두 줄 — 제목과 빨간 건수, 그 아래 부제. 알림을 안 만든다는 결정이 부제에 적혀 있다 */
+.thead{margin-bottom:var(--space-16)}
+.thead b{font-size:var(--text-screen-title);font-weight:var(--w-semibold);letter-spacing:-.3px}
+.thead .cnt{color:var(--danger)}
+.thead .lbl{margin-top:2px;font-size:var(--text-ui)}
+/* 카드 경계는 묶음이 아니라 항목에 있다. 묶음 머리는 배경 위 맨 텍스트다 */
+.tgroup{margin-bottom:var(--space-18)}
+.tgroup h4{display:flex;align-items:center;gap:var(--space-8);margin:0 0 var(--space-7);
+  font-size:14.5px;font-weight:var(--w-semibold)}
+.tgroup h4 .cnt{font-family:var(--font-mono);font-size:var(--text-caption);font-weight:var(--w-regular);color:var(--ink-muted)}
+/* 머리 오른쪽 끝까지 가는 실선 — 묶음의 폭이 어디까지인지 말한다 */
+.tgroup h4 .rule{flex:1;height:1px;background:var(--border)}
+.tgroup h4 .note{font-size:var(--text-caption);font-weight:var(--w-regular);color:var(--ink-muted)}
+.tcard{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-item-card);
+  padding:var(--space-10) var(--space-13);margin-bottom:var(--space-6);cursor:pointer}
+.tcard:hover{border-color:var(--border-strong)}
+.tcard .th{display:flex;align-items:baseline;gap:var(--space-9);flex-wrap:wrap}
+.tcard .th .grow{flex:1}
+.tcard .k{font-family:var(--font-mono);font-size:var(--text-mono-id-lg);font-weight:var(--w-medium)}
+.tcard .tt{font-size:var(--text-ui)}
+.tcard .age{font-family:var(--font-mono);font-size:var(--text-caption);color:var(--ink-muted);white-space:nowrap}
+/* 왜 여기 왔는지 — 둘째 줄. 첫 줄에 이어 붙이면 어디서 끝나는지가 행마다 달라진다 */
+.tcard .why{font-size:var(--text-meta);color:var(--ink-muted);margin-top:var(--space-3);text-wrap:pretty}
 /* 담당 미지정은 마지막이고 흐리다 — 내 것이 아니지만 아무도 안 보고 있다는 표시다 */
-.grp.dim{opacity:.6}
+.tgroup.dim{opacity:.62}
+.row .age{color:var(--ink-faint);font-size:var(--text-mono-sm);white-space:nowrap}
 .row.link{cursor:pointer}.row.link:hover{background:var(--bg-subtle)}
 .badge{display:inline-block;min-width:18px;padding:0 var(--space-6);border-radius:var(--radius-pill);
   background:var(--danger);color:#fff;font-size:var(--text-caption);text-align:center;margin-left:var(--space-4)}
 /* UI-11 플래그 처리 */
-.stack{display:flex;flex-direction:column;gap:var(--space-14)}
+/* 읽고 판단하는 화면이라 본문보다 좁다 */
+.flagpage{max-width:calc(880px + var(--space-22) * 2)}
+/* 머리는 두 줄 — 첫 줄이 무엇, 둘째 줄이 담당·경과. 한 줄로 뭉치면 메타가 제목만큼 커 보인다 */
+.fhead{display:flex;align-items:flex-start;gap:var(--space-10);flex-wrap:wrap;margin-bottom:var(--space-16)}
+.fhead .t1{display:flex;align-items:center;gap:var(--space-8);flex-wrap:wrap}
+.fhead .fid{font-family:var(--font-mono);font-size:var(--text-section-title);font-weight:var(--w-semibold)}
+.fhead .ftitle{font-size:15.5px}
+.fhead .lbl{margin-top:var(--space-4)}
+.stack{display:flex;flex-direction:column;gap:var(--space-12)}
 .stack section{border:1px solid var(--border);border-radius:var(--radius-panel-card);background:var(--bg-card);overflow:hidden}
 .sech{display:flex;align-items:center;gap:var(--space-10);padding:var(--space-8) var(--space-12);
   border-bottom:1px solid var(--divider);background:var(--bg-subtle);font-size:var(--text-meta)}
 .mybody{padding:var(--space-10) var(--space-14);font-size:var(--text-meta)}
-.acts{display:flex;align-items:center;gap:var(--space-10);padding:var(--space-10) 0}
+/* 확인 액션도 카드다. 배경 위 맨 줄로 두면 앞 두 카드와 위계가 어긋난다 */
+.acts{display:flex;align-items:center;gap:var(--space-12);flex-wrap:wrap;
+  background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-panel-card);
+  padding:var(--space-13)}
+.acts .lbl{flex:1;font-size:var(--text-ui);text-wrap:pretty}
+/* 3.3 내 항목 머리 — ID 뱃지와 제목 */
+.mineh{display:flex;align-items:center;gap:var(--space-7);margin-bottom:var(--space-7)}
+.mineh b{font-size:14.5px;font-weight:var(--w-semibold)}
 /* diff — 문맥 줄(ctx)은 DIFF_CONTEXT_LINES(기본 3)만큼 앞뒤로 함께 온다.
    바뀐 줄만 보면 마크다운 문단에서 무엇이 바뀐 건지 안 보인다 */
 .diffbox{font-family:var(--font-mono);font-size:var(--text-mono-id-lg);padding:var(--space-6) 0;
@@ -504,7 +546,27 @@ li.ref.missing{color:var(--ink-disabled)}
 .dl.del{background:var(--danger-bg)}.dl.del .mk,.dl.del>span:last-child{color:var(--danger)}
 .dl.ctx>span:last-child{color:var(--ink-faint)}
 /* UI-12 전파 선택 */
-.dbody .sech{margin-top:10px}.chk{list-style:none;padding:0;margin:6px 0}.chk li{padding:4px 0;border-top:1px solid var(--hair)}.propacts{display:flex;align-items:center;gap:10px;margin-top:14px}.skipbox{display:flex;gap:8px;align-items:center}
+/* UI-12 전파 선택 */
+.dlead{margin:0 0 var(--space-14);color:var(--ink-prose);line-height:1.65;text-wrap:pretty}
+.dbody .sech{margin-top:var(--space-14);background:none;border:none;padding:0 0 var(--space-7)}
+.chk{list-style:none;padding:0;margin:var(--space-6) 0}
+.chk li{padding:var(--space-4) 0;border-top:1px solid var(--divider)}
+/* 3 영향받는 하위 항목 — 표. 한 줄로 이어 붙이면 담당이 행마다 다른 자리에서 끝난다 */
+.atable{margin-top:var(--space-14);border:1px solid var(--border);border-radius:var(--radius-control);overflow:hidden}
+.arow{display:grid;grid-template-columns:minmax(0,1fr) 74px 96px;gap:var(--space-8);
+  padding:var(--space-8) var(--space-11);border-top:1px solid var(--divider);
+  align-items:baseline;font-size:13.5px;color:inherit;text-decoration:none;background:var(--bg-card)}
+.arow:first-child{border-top:none}
+.arow.ahead{background:var(--bg-subtle);font-size:var(--text-caption);color:var(--ink-muted)}
+a.arow:hover{background:var(--bg-subtle)}
+.arow>span:first-child{overflow:hidden;text-overflow:ellipsis}
+/* 5 전파 안 함 — 세 번째 선택지라 따로 상자에 담는다. 안 그러면 눈에 안 띈다 */
+.skipbox{margin-top:var(--space-14);border:1px solid var(--border);border-radius:var(--radius-control);
+  padding:var(--space-11);background:var(--bg-subtle)}
+.skipbox>b{display:block;font-size:13.5px;margin-bottom:var(--space-7)}
+.skiprow{display:flex;gap:var(--space-8);align-items:center}
+.skiprow .inp{flex:1;min-width:0}
+.skiprow .btn{flex:none;white-space:nowrap}
 /* UI-8 참조 그래프 — 열은 11단계 고정, 노드는 항목 */
 .graphpage{max-width:calc(1420px + var(--space-22) * 2);padding:var(--space-22) var(--space-22) var(--space-22)}
 /* 브레드크럼 — 어느 프로젝트의 그래프인지. 제목만 있으면 되짚어 올라갈 길이 없다 */

@@ -314,7 +314,7 @@ export function DocView() {
           <div className="pbody">
             {panel === 'refs' &&
               (!selected ? (
-                <div className="empty">
+                <div className="pempty">
                   항목을 선택하세요.
                   <br />
                   항목 헤더를 누르면 그 항목의 상위·하위 참조와 플래그가 여기 옵니다.
@@ -543,9 +543,9 @@ function Refs({ refs }: { refs: ItemReferences }) {
         <ItemIdBadge>{refs.item_id}</ItemIdBadge>
       </div>
       <div className="lbl">상위 참조 (근거)</div>
-      {refs.upstream.length ? refs.upstream.map(card) : <div className="empty">없음</div>}
+      {refs.upstream.length ? refs.upstream.map(card) : <div className="pempty">없음</div>}
       <div className="lbl">하위 참조 (파생) {refs.downstream.length || ''}</div>
-      {refs.downstream.length ? refs.downstream.map(card) : <div className="empty">없음 — 고립 항목</div>}
+      {refs.downstream.length ? refs.downstream.map(card) : <div className="pempty">없음 — 고립 항목</div>}
       {refs.flags.length > 0 && (
         <>
           <div className="lbl">플래그</div>
@@ -613,7 +613,7 @@ function Comments(props: {
   )
   return (
     <>
-      {comments.length ? comments.map((c) => thread(c)) : <div className="empty">아직 댓글이 없습니다.</div>}
+      {comments.length ? comments.map((c) => thread(c)) : <div className="pempty">아직 댓글이 없습니다.</div>}
       {/* 새 댓글은 줄에 붙는다 — 줄 번호가 없으면 저장할 곳이 없다 */}
       <div className="compose">
         <div className="row">

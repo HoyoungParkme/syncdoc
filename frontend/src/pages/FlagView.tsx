@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ago, api, ApiError, docPath, FLAG_KO, refKey, type FlagDetail } from '../api/client'
 import { DiffBox } from '../components/DiffBox'
+import { ItemIdBadge } from '../components/ui'
 import { renderBlocks, type RenderCtx } from '../view/md'
 
 export function FlagView() {
@@ -34,14 +35,18 @@ export function FlagView() {
     }
   }
   return (
-    <div className="page">
-      <div className="phead" data-el="1">
+    <div className="page flagpage">
+      <div className="fhead" data-el="1">
         <div>
-          <span className="flag">{FLAG_KO[f.kind]}</span> <b data-el="1.1">{refKey(f.target)}</b> {f.target.display_name}{' '}
-          <span className="lbl" data-el="1.2">
+          <div className="t1">
+            <span className="flag">{FLAG_KO[f.kind]}</span>
+            <span className="fid" data-el="1.1">{refKey(f.target)}</span>
+            <span className="ftitle">{f.target.display_name}</span>
+          </div>
+          <div className="lbl" data-el="1.2">
             담당 {f.assignee?.display_name ?? '미지정'} · {ago(f.raised_at)} 부여
             {f.resolved_at && ` · 확인됨 ${ago(f.resolved_at)}`}
-          </span>
+          </div>
         </div>
         <span className="grow" />
         <Link className="btn" data-el="5" to="/todo">
@@ -51,7 +56,8 @@ export function FlagView() {
       <div className="stack">
         <section className="cause" data-el="2">
           <div className="sech">
-            <b data-el="2.1">원인: {f.cause ? refKey(f.cause) : '(하위 문서)'}</b> {f.cause?.display_name}
+            <b>원인</b> <span className="mono" data-el="2.1">{f.cause ? refKey(f.cause) : '(하위 문서)'}</span>{' '}
+            <span className="lbl">{f.cause?.display_name}</span>
             <span className="lbl" data-el="2.2">
               {f.kind === 'needs_check' && `v${f.cause_version_no} → v${causeTo}${f.cause_change_count > 0 ? ` · 그 사이 ${f.cause_change_count}번 바뀜` : ''}`}
               {f.kind === 'broken_ref' && `${f.cause_deleted_at ? ago(f.cause_deleted_at) : ''} 삭제됨`}
@@ -76,7 +82,7 @@ export function FlagView() {
         </section>
         <section className="mine" data-el="3">
           <div className="sech">
-            <b data-el="3.1">내 항목: {refKey(f.target)}</b>
+            <b>내 항목</b> <span className="mono" data-el="3.1">{refKey(f.target)}</span>
             <span className="lbl" data-el="3.2">
               v{f.target_version_no} · 플래그 부여 후 변경 {f.target_changed_since_raise ? '있음' : '없음'}
             </span>
@@ -85,7 +91,14 @@ export function FlagView() {
               문서에서 보기
             </Link>
           </div>
-          <div className="mybody body" data-el="3.3" dangerouslySetInnerHTML={{ __html: renderBlocks(f.target_body, ctx) }} />
+          <div className="mybody">
+            {/* 항목 ID는 뱃지로 — 카드 안에서 색을 쓰는 유일한 자리다 */}
+            <div className="mineh">
+              <ItemIdBadge>{f.target.item_id ?? f.target.doc_id}</ItemIdBadge>
+              <b>{f.target.display_name}</b>
+            </div>
+            <div className="body" data-el="3.3" dangerouslySetInnerHTML={{ __html: renderBlocks(f.target_body, ctx) }} />
+          </div>
         </section>
         <div className="acts" data-el="4">
           {/* 규칙: 확인 버튼은 하나다. 수정 동반 여부를 사람에게 묻지 않는다 —
@@ -95,7 +108,7 @@ export function FlagView() {
             <b>{f.target_changed_since_raise ? '수정 동반' : '수정 없음'}</b>으로 기록됩니다
           </span>
           <span className="grow" />
-          <button className="btn" data-el="4.1" style={{ fontWeight: 600 }} disabled={!!f.resolved_at} onClick={resolve}>
+          <button className="btn solid" data-el="4.1" disabled={!!f.resolved_at} onClick={resolve}>
             {f.resolved_at ? '확인됨' : '확인함'}
           </button>
         </div>
