@@ -133,6 +133,12 @@ upstream: [SYNC-UI-001]
     <div class="banner" data-el="4">⚠ 규약 오류: frontmatter.status 누락 (커밋 a1b2c3 · 김민준)</div>
     <div class="banner warn" data-el="4a">미완성: 필수 절 「성공지표」 없음 · 승인 불가</div>
 
+    <div class="dochead"><!-- 킥커·제목·리드. 본문(7)은 innerHTML로 갈아 끼워서 형제로 둔다 -->
+      <div class="kicker mono">싱크독 · 2단계 PRD</div>
+      <h1>PRD — 싱크독</h1>
+      <p class="lead">바이브코딩 시대에 개발자가 PM 없이 11단계 명세 체인을 쓰고, 에이전트가 그 명세를 따르게 하는 플랫폼.</p>
+    </div>
+
     <article class="main" data-el="7">
       <h2>3. 요구사항</h2>
       <div class="item" data-el="7.1"><span class="id">#R1</span>에이전트용 원본과 사람용 뷰 <span class="flag">확인 필요</span></div>
@@ -254,6 +260,7 @@ status: approved
 - **3단은 화면 높이를 채우고 가운데 열만 스크롤한다.** 목차와 패널은 각자 안에서 스크롤하고 페이지 자체는 스크롤하지 않는다([[SYNC-UI-001#4]] 앱 셸)
 - 목차 줄은 한 줄로 자르고 넘치면 말줄임한다. 항목 제목이 길어도 아래 `표시된 항목`(6.1)이 화면 밖으로 밀려나지 않아야 한다
 - 배너(4·4a)와 단계 이동(9)은 본문 열 안, 본문과 같은 폭이다. 밖에 두면 본문 왼쪽 끝과 어긋난다
+- 유저용 본문 맨 위에 **문서 머리** 세 줄을 얹는다 — 킥커(`프로젝트 · n단계 타입`, 단계 밖이면 `단계 밖 STD`) · 제목(frontmatter `title`) · 리드(원본 0장 첫 문단). 원본 탭(10)에는 없다. 원본은 파일 그대로를 보는 화면이다
 - 원문/렌더링(10.3·10.4) 선택도 기억한다. 원본을 보는 사람은 대개 같은 쪽만 본다
 - 7.1 클릭은 패널을 참조 탭으로, 7.4 클릭은 댓글 탭으로 자동 전환
 - 처음 열면 패널(8)은 참조 탭이고 "항목을 선택하세요"
@@ -1184,7 +1191,7 @@ status: approved
 
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
-| 1 | 헤더 | 영역 | 제목 | — |
+| 1 | 헤더 | 영역 | 브레드크럼(`프로젝트 › 참조 그래프`)과 제목. 통계(1.1)는 오른쪽 끝 | 브레드크럼 첫 조각 → UI-4 |
 | 2 | 입력 폼 | 영역 | 세 입력(UC-A1 기본 흐름 1) | — |
 | 2.1 | 저장소 주소 | 입력 | GitHub 저장소 URL | — |
 | 2.2 | 프로젝트 코드 | 입력 | 영문 대문자 4자 이내 | — |
@@ -1241,7 +1248,12 @@ status: approved
 
 ```html
 <div class="phead" data-el="1">
-  <div><b>참조 그래프</b> <span class="lbl" data-el="1.1">SYNC · 문서 21 · 항목 339 · 참조 949</span></div>
+  <div>
+    <div class="crumbs"><a href="/p/SYNC">싱크독</a><span class="sep">›</span><span>참조 그래프</span></div>
+    <b>참조 그래프</b>
+  </div>
+  <span class="grow"></span>
+  <span class="lbl" data-el="1.1">SYNC · 문서 21 · 항목 339 · 참조 949</span>
 </div>
 
 <div class="gcard">
@@ -1258,9 +1270,9 @@ status: approved
 
   <div class="canvas" data-el="3">
     <div class="colh">1 RFQ</div><div class="colh">2 PRD</div><div class="colh">3 SCN</div><div class="colh">…</div>
-    <div class="node" data-el="3.1">RFQ-001#Q1</div>
-    <div class="node flag">PRD-001#R1 ▲</div>
-    <div class="node iso" data-el="3.5">◌ PRD-001#R11</div>
+    <div class="node" data-el="3.1"><span class="nlabel">RFQ-001#Q1</span></div>
+    <div class="node flag"><span class="nlabel">PRD-001#R1</span><span class="nflag">▲</span></div>
+    <div class="node iso" data-el="3.5"><span class="nlabel">◌ PRD-001#R11</span></div>
     <svg class="edges">
       <path class="e" data-el="3.2"></path>
       <path class="e back" data-el="3.3"></path>
@@ -1268,10 +1280,11 @@ status: approved
     </svg>
   </div>
 
-  <div class="legend lbl" data-el="4">
+  <div class="glegend lbl" data-el="4">
     <span>노드 = 항목 · 열 = 11단계</span> <span>─ 참조 (하위 → 상위)</span>
-    <span>┈ 되돌아오는 참조</span> <span>┈ 미존재 참조</span> <span>◌ 고립</span>
-    <span>노드를 누르면 11단계 흐름</span>
+    <span class="back">┈ 되돌아오는 참조</span> <span class="gone">┈ 미존재 참조</span> <span>◌ 고립 (참조 없음)</span>
+    <span class="grow"></span>
+    <span>노드에 마우스를 올리면 그 항목의 참조만 남는다 · 클릭 → 11단계 흐름</span>
   </div>
 </div>
 ```
@@ -1289,12 +1302,12 @@ status: approved
 | 2.4 | 포커스 라벨 | 텍스트 | 노드에 올리기 전에는 안내. 올리면 `문서#항목 — 상위 n · 하위 m` | — |
 | 2.5 | 전체보기 | 버튼 | | 상단 바까지 숨기고 화면 전체를 캔버스로. 다시 누르면 복귀 |
 | 3 | 캔버스 | 영역 | 열 = 11단계, 노드 = 항목. 안에서 스크롤 | — |
-| 3.1 | 노드 | 노드 | 항목 ID. 플래그가 있으면 경고색 테두리·배경과 `▲` | UI-15 11단계 흐름 |
+| 3.1 | 노드 | 노드 | 항목 ID. 라벨이 넘치면 말줄임. 플래그가 있으면 경고색 테두리·배경과 오른쪽 끝 `▲` | UI-15 11단계 흐름 |
 | 3.2 | 참조 간선 | 선 | 하위 → 상위. 상위가 왼쪽 열이면 곡선, 같은 열이면 왼쪽으로 나갔다 돌아오는 꺾은선 | — |
 | 3.3 | 되돌아오는 간선 | 선 | 상위가 **오른쪽 열**일 때. 체인을 거슬러 올라가는 참조라 눈에 띄어야 한다 | — |
 | 3.4 | 미존재 참조 | 선 | 대상 항목이 **정말로 없을 때**. 노드 왼쪽으로 짧게 뻗다 끊긴다 | — |
 | 3.5 | 고립 노드 | 노드 | 상위도 하위도 없는 항목. 점선 테두리와 `◌`(UC-H4 2a) | 3.1과 같음 |
-| 4 | 범례 | 텍스트 | 기호 설명. 선 견본을 실제 선으로 그린다 | — |
+| 4 | 범례 | 텍스트 | 기호 설명. 선 견본을 실제 선으로 그린다. 선 종류를 말하는 두 항목은 라벨도 그 색. 조작 안내는 오른쪽 끝 | — |
 
 ### 규칙
 
@@ -1303,6 +1316,8 @@ status: approved
 - **열 안 순서는 이웃의 평균 위치로 정렬한다.** 상위 기준 정렬과 하위 기준 정렬을 번갈아 네 번 돌린다. 이웃이 없는 노드는 제자리. 결정론적이라 언제 그려도 같은 그림이 나온다
 - 되돌아오는 간선(3.3)은 노드를 관통하지 않는다. 모든 행 아래 전용 레인까지 내려가 가로지른 뒤 올라온다. DOM이 API·SEQ를 참조하는 경우가 여기 해당한다
 - 노드에 마우스를 올리면 **직접 상위·하위만** 남기고 나머지를 흐린다. 전이적으로 따라가지 않는다 — 그건 UI-15가 한다
+- **치수는 고정이다.** 열 간격 150px · 노드 폭 118px · 노드 높이 26px · 행 간격 40px · 캔버스 여백 18px. 열 간격과 노드 폭의 차 32px가 간선이 지나는 거터다 — 노드가 열 폭을 다 쓰면 선이 노드를 밟는다
+- 간선에는 화살촉을 단다. 방향(하위 → 상위)이 그림만으로 읽혀야 한다. 되돌아오는 간선(3.3)의 모서리 반지름은 8px
 - 배치 계산은 브라우저가 한다. 서버는 노드·간선 목록만 준다([[SYNC-MS-008#queries.graph_view]])
 
 ### 시나리오
@@ -1341,11 +1356,11 @@ status: approved
 ### 배치
 
 ```html
-<div class="phead" data-el="1">
-  <div><b>순서대로 읽기</b> <span class="lbl">SYNC</span></div>
-  <span class="grow"></span>
+<!-- 단계 레일은 전폭 서브바다. 제목은 여기가 아니라 본문 머리에 있다 -->
+<div class="steprail" data-el="1">
+  <a class="back" href="/p/SYNC">← 싱크독</a>
   <div class="steps" data-el="2">
-    <span class="stp done">1 RFQ</span><span class="stp done">2 PRD</span><span class="stp cur">3 SCN</span><span class="stp">4 UC</span><span class="stp">5 INFRA</span><span class="stp">6 DOM</span><span class="stp na">7 UI</span><span class="stp na">8 API</span><span class="stp na">9 SEQ</span><span class="stp na">10 MS</span><span class="stp na">11 CODE</span>
+    <span class="stp"><span class="no">1</span> RFQ<i class="dot dot-approved"></i></span><span class="stp"><span class="no">2</span> PRD<i class="dot dot-approved"></i></span><span class="stp cur"><span class="no">3</span> SCN<i class="dot dot-review"></i></span><span class="stp"><span class="no">4</span> UC<i class="dot dot-draft"></i></span><span class="stp na"><span class="no">5</span> INFRA<i class="dot dot-none"></i></span>
   </div>
 </div>
 
@@ -1353,17 +1368,24 @@ status: approved
   <div class="banner" data-el="3">이 단계에 승인된 문서가 없습니다. <b>SYNC-SCN-001</b>은 <b>검토중</b>입니다. <span class="btn sm" data-el="3.1">초안 보기</span></div>
 
   <article class="main" data-el="4">
-    <div class="lbl" data-el="4.1">3 / 11 · 사용자 시나리오 · SYNC-SCN-001 · 검토중 v4</div>
+    <div class="dochead">
+      <div class="kicker mono" data-el="4.1">싱크독 · 3/11 · SYNC-SCN-001 · 검토중 v4</div>
+      <h1>사용자 시나리오 — 싱크독</h1>
+      <p class="lead">누가 어떤 상황에서 싱크독을 쓰는지. 여기서 정한 시나리오가 유스케이스의 근거가 된다.</p>
+    </div>
     <h2>1. 페르소나</h2>
     <p>박호영 — 디포커스 AI팀 개발자. 싱크독을 만들었고 자기 프로젝트에도 쓴다…</p>
     <h2>2. 시나리오</h2>
     <p>S1 대화하다가 명세가 쌓인다 …</p>
-    <div class="nav" data-el="5">
-      <span class="btn" data-el="5.1">← 2 PRD</span>
-      <span class="btn" data-el="5.3">이 문서 열기</span>
-      <span class="btn" data-el="5.2">4 USECASE →</span>
-    </div>
   </article>
+
+  <!-- 이동 줄은 본문 밖. 안에 넣으면 문서의 일부처럼 읽힌다 -->
+  <div class="docnav" data-el="5">
+    <span class="btn" data-el="5.1">← 2 PRD</span>
+    <span class="btn" data-el="5.3">이 문서 열기</span>
+    <span class="grow"></span>
+    <span class="btn solid" data-el="5.2">4 USECASE →</span>
+  </div>
 </div>
 ```
 
@@ -1371,15 +1393,15 @@ status: approved
 
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
-| 1 | 헤더 | 영역 | 제목, 프로젝트 | — |
-| 2 | 단계 표시 | 진행 표시 | 11단계 칩. 번호와 타입 코드는 항상 보인다. 칩마다 그 단계의 대표 상태를 점으로. 현재 단계는 채워서 | 단계 클릭 → 그 단계로 |
+| 1 | 단계 레일 | 영역 | 화면 맨 위 전폭 서브바. 왼쪽에 `← 프로젝트 이름`, 그 뒤로 단계 칩(2) | 왼쪽 링크 → UI-4 |
+| 2 | 단계 표시 | 진행 표시 | 11단계 칩. 번호와 타입 코드는 항상 보인다. 번호는 흐리게, 상태 점은 **라벨 뒤**. 현재 단계는 채워서 | 단계 클릭 → 그 단계로 |
 | 3 | 미확정 배너 | 배너 | 이 단계에 승인 문서가 없을 때. 있는 문서와 상태(UC-H16 2a) | — |
 | 3.1 | 초안 보기 | 버튼 | | 승인 아닌 문서를 본문(4)에 띄운다(UC-H16 2a1) |
 | 4 | 본문 | 사람용 뷰 | 현재 단계의 승인 문서. UI-5 유저용 탭과 같은 렌더링, 목차·패널 없음(UC-H16 기본 흐름 2) | — |
-| 4.1 | 위치 | 텍스트 | 몇 번째 단계, 문서 ID, 상태·버전 | — |
+| 4.1 | 위치 | 텍스트 | 문서 머리의 킥커. `프로젝트 · n/11 · 문서ID · 상태 v버전`. 그 아래 제목과 리드가 온다 | — |
 | 5 | 이동 | 영역 | 앞·뒤 단계와 문서 열기 | — |
 | 5.1 | 이전 단계 | 버튼 | | 앞 단계로 |
-| 5.2 | 다음 단계 | 버튼 | | 뒤 단계로(UC-H16 기본 흐름 3) |
+| 5.2 | 다음 단계 | 버튼 | 이 화면의 주 동선이라 채운 버튼이다 | 뒤 단계로(UC-H16 기본 흐름 3) |
 | 5.3 | 이 문서 열기 | 버튼 | | 현재 문서의 UI-5 |
 
 ### 규칙
@@ -1389,6 +1411,9 @@ status: approved
 - 문서가 하나도 없는 단계(단계 표시 `na`)는 다음(5.2)이 건너뛴다
 - 단계 표시(2)는 가로로만 넘친다. 세로 넘침을 막지 않으면 칩 줄이 본문을 밀어낸다
 - 본문(4)에 참조 링크는 있으나 클릭하면 UI-5로 간다. 이 화면은 순서를 유지하는 게 목적이라 안에서 점프하지 않는다
+- 문서마다 머리(킥커 4.1 · 제목 · 리드)를 얹는다. 리드는 원본 0장 첫 문단이다 — UI-5 유저용 본문과 같은 블록
+- 배너·본문·이동 줄은 같은 좌우 경계를 쓴다(`max-width:760px` 가운데). 폭이 서로 다르면 화면이 층져 보인다
+- 이동 줄(5)은 본문 카드 **밖**이다. 안에 두면 문서의 일부처럼 읽힌다
 
 ### 시나리오
 

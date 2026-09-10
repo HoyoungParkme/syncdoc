@@ -1315,6 +1315,9 @@ components:
     Graph:
       type: object
       properties:
+        project_name:
+          type: string
+          description: 브레드크럼(UI-8 요소 1)
         nodes:
           type: array
           items:
