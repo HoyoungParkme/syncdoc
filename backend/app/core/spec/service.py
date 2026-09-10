@@ -182,6 +182,15 @@ class SpecService:
                         )
                     )
                 sections.append(re.sub(r"^[\d.]+\s*", "", text))
+                # 단어형 ID 타입에서만. 절 제목이 항목으로 오인될 위험이 그쪽에만 있다
+                # (STD-001 1.6·4장). H1은 문서 제목이지 절이 아니다
+                if (
+                    len(h.group(1)) > 1
+                    and item_re
+                    and doc_type in ("DOM", "MS", "API")
+                    and not re.match(r"^\d", tok)
+                ):
+                    W.append(Warning("section.unnumbered", text[:40]))
         # 4. 참조 형식
         for i, line in enumerate(lines, start=1):
             for r in REF.findall(line):

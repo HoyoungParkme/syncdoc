@@ -31,6 +31,14 @@ SUBTYPES = {
 DOC_ID = re.compile(r"^[A-Z]{1,4}-[A-Z]+-\d{3}$")
 REF = re.compile(r"\[\[([^\]]+)\]\]")
 
+def _wordy(typ, item_re):
+    """단어형 ID 타입인가 — 절 제목이 항목으로 오인될 수 있는 쪽 (STD-001 1.6·4장).
+
+    숫자로 시작하는 ID 패턴(`Q\\d+` 등)은 절 제목과 섞일 일이 없다.
+    """
+    return item_re is not None and typ in ("DOM", "MS", "API")
+
+
 def strip_code(text):
     """코드블록을 빈 줄로 치환 (줄 번호 유지)"""
     out, inblk = [], False
@@ -99,6 +107,9 @@ def validate(path, deleted_ids=()):
             elif re.match(r"^[A-Z]+-?\d+$", tok) and item_re:
                 V.append((i, "item.pattern", f"{tok} — ID처럼 보이지만 {typ} 패턴 아님"))
             sections.append(re.sub(r"^[\d.]+\s*", "", text))
+            # H1은 문서 제목이지 절이 아니다
+            if len(h.group(1)) > 1 and _wordy(typ, item_re) and not re.match(r"^\d", tok):
+                W.append(("section.unnumbered", text[:40]))
 
     # ── 참조 형식 ──
     for i, l in enumerate(body.split("\n"), start=offset + 1):
