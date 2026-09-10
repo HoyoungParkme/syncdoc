@@ -518,5 +518,5 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 - [x] `mark_deleted` 후 파일을 되살리면 항목 ID가 `item.reused` 위반에 걸린다. 되살림은 재사용이 아니라 복구 — 예외 필요 — 결정: **파일 삭제로 지워진 항목은 복구다.** 문서의 `convention_error_detail`이 `file.deleted:`로 시작하면 그 문서의 삭제 항목은 `item.reused`에서 빼고, 본문에 다시 나타나면 `is_deleted`·`deleted_at`을 되돌린다. 파일은 살아 있는데 항목만 지웠다가 같은 ID를 다시 쓰는 것만 재사용으로 남긴다
 
-- [ ] `diff`의 hunk 문맥 줄 수 (`n=1`) — 화면에서 부족할 수 있다
+- [x] `diff`의 hunk 문맥 줄 수 (`n=1`) — 화면에서 부족할 수 있다 — 결정: 설정값으로 뺀다 (`DIFF_CONTEXT_LINES`, 기본 3). 한 줄은 마크다운 문단에 부족해 어느 절의 변경인지 안 보인다. `detect_impact`와 `pipeline`은 hunk의 `item_id`만 쓰므로 동작이 안 바뀐다
 - [x] `list_versions`가 자동 강등 StatusChange(commit_hash null)를 보여줄지 — 결정: 안 보여준다. `commit_hash is not null`인 상태 변경만 (본문 커밋에 딸린 강등은 그 버전 행이 이미 보인다)
