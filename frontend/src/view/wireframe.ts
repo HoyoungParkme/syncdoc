@@ -228,8 +228,10 @@ export const vWireframe: ViewFn = ({ body, ctx }) => ({
 // view_build.py가 하듯 .wrap{max-width:1560px…}는 뺐다. header·body·footer는 페이지 틀이 맡으므로 함께 뺐다.
 
 export const wireframeCss = `
-:root{--paper:#EDEFEC;--panel:#F8F9F7;--card:#fff;--ink:#1E2A30;--soft:#5C6B73;--faint:#8A969C;--rule:#C9CFCB;--hair:#E1E5E1;--hi:#FFF1B8;--hi-b:#C9A800}
-.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+/* 스코프 없이 :root 를 쓰면 이 CSS가 body 안 <style>로 주입될 때 문서 전체를 이긴다.
+   와이어프레임이 뿜는 루트는 형제 둘(.stabs · .screens)이라 셀렉터도 둘이다. */
+.stabs,.screens{--paper:#EDEFEC;--panel:#F8F9F7;--card:#fff;--ink:#1E2A30;--soft:#5C6B73;--faint:#8A969C;--rule:#C9CFCB;--hair:#E1E5E1;--hi:#FFF1B8;--hi-b:#C9A800}
+.stabs .mono,.screens .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
 
 .stabs{display:flex;flex-wrap:wrap;margin-top:22px;border:1.5px solid var(--ink);border-bottom:none;background:var(--panel)}
 .stabs button{font:inherit;font-size:13.5px;padding:10px 16px;background:none;border:none;border-right:1px solid var(--rule);cursor:pointer;color:var(--soft);position:relative}
