@@ -504,6 +504,33 @@ async def test_process_commit_mismatched_filename_deleted_file_and_partial_failu
     )
     assert scoped.execute(text("SELECT kind FROM flags")).scalars().all() == ["broken_ref"]
     assert scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar() == head
+    # 되살리면 복구다 — 항목 ID가 item.reused 위반에 걸리면 안 된다 (#15, MS-002 미결 결정)
+    (other / RFQ_FILE).parent.mkdir(parents=True, exist_ok=True)
+    (other / RFQ_FILE).write_text(RFQ, encoding="utf-8")
+    g(other, "add", "-A")
+    g(
+        other,
+        "commit",
+        "-q",
+        "--author=hoyoung <hoyoung@users.noreply.github.com>",
+        "-m",
+        "spec(EXMP-RFQ-001): 되살림",
+    )
+    g(other, "push", "-q", "origin", "HEAD:main")
+    back = g(remote, "rev-parse", "main")
+    restored = await pipeline.process_commit(repo, back)
+    assert [x.doc_id for x in restored] == ["EXMP-RFQ-001"]
+    rfq = svc.get_document("EXMP-RFQ-001")
+    assert (rfq.has_convention_error, rfq.convention_error_detail) == (False, None)
+    assert {i.item_id for i in rfq.items} == {"Q1", "Q2"}
+    # 본문에 다시 나타난 항목은 is_deleted가 풀린다 — 안 풀면 항목 조회가 410을 계속 던진다
+    assert (
+        scoped.execute(
+            text("SELECT count(*) FROM items WHERE is_deleted AND document_id = :d"),
+            {"d": rfq.id},
+        ).scalar()
+        == 0
+    )
     # 한 파일 실패(알 수 없는 디렉터리) → 나머지는 처리, last_processed_commit 안 바뀜
     (other / "docs/specs/BOGUS").mkdir(parents=True, exist_ok=True)
     (other / "docs/specs/BOGUS/EXMP-BOGUS-001.md").write_text("# x\n", encoding="utf-8")
@@ -521,7 +548,8 @@ async def test_process_commit_mismatched_filename_deleted_file_and_partial_failu
     head3 = g(remote, "rev-parse", "main")
     results = await pipeline.process_commit(repo, head3)
     assert [(r.doc_id, r.version_no) for r in results] == [("EXMP-PRD-002", 2)]
-    assert scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar() == head
+    # 한 파일이 실패하면 last_processed_commit이 안 나간다 — 직전 성공(되살림)에 머문다
+    assert scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar() == back
 
 
 # ── rebuild (B4, UC-S6) ──
