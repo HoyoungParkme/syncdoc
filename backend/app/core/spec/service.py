@@ -577,7 +577,9 @@ class SpecService:
             )
             for c in self.repo.status_changes_with_commit(row.id)
         ]
-        rows.sort(key=lambda r: r.created_at, reverse=True)
+        # 같은 시각이면 상태 변경을 먼저. 본문 커밋 뒤에 상태를 바꾸는 순서라
+        # 시계가 같은 값을 줘도 순서가 흔들리지 않는다
+        rows.sort(key=lambda r: (r.created_at, r.version_no is None), reverse=True)
         return rows
 
     def mark_deleted(self, document: Document, commit_hash: str, author: Author) -> list[int]:
@@ -678,7 +680,9 @@ class SpecService:
             )
             for c, doc_id in self.repo.recent_status_changes(project_id, n)
         ]
-        rows.sort(key=lambda r: r.created_at, reverse=True)
+        # 같은 시각이면 상태 변경을 먼저. 본문 커밋 뒤에 상태를 바꾸는 순서라
+        # 시계가 같은 값을 줘도 순서가 흔들리지 않는다
+        rows.sort(key=lambda r: (r.created_at, r.version_no is None), reverse=True)
         return rows[:n]
 
     def versions_instructed_by(self, version_ids: list[int], user_id: int) -> list[int]:
