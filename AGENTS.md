@@ -49,6 +49,7 @@ syncdoc/            저장소 = 프로젝트
 - `python tools/validate.py` — 명세 규약 검사 (STD-001 3·4장). 위반 0·경고 0이어야 한다
 - `python tools/check_code.py` — MINISPEC↔코드 시그니처 대조 (DEV-14 첫째·둘째)
 - `python tools/check_ui.py` — 와이어프레임 요소 번호↔React `data-el` 대조 (DEV-17)
+- `python tools/check_view_css.py` — 뷰 CSS가 `view_build.py`와 바이트 단위로 같은지 (STD-002)
 - `python tools/check_dom.py` — DOM 세 문서(도메인·클래스·데이터)의 이름 일치 (STD-001 4장 `dom.name`)
 - `python tools/open_items.py` — 명세의 열린 미결 모음. `--markdown`이 STD-003 5장 내용, `--check`가 그것과 대조
 - `python tools/view_build.py --all` — 사람용 뷰 생성 → `docs/views/`. React 유저용 탭의 참조 구현
