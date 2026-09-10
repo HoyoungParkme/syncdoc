@@ -207,6 +207,9 @@ erDiagram
 | workdir_path | varchar(300) | not null | 노트북의 작업 사본 경로 | `/var/syncdoc/repos/SYNC` |
 | last_processed_commit | varchar(40) | null 허용 | 파이프라인이 마지막으로 처리한 커밋. 밀린 커밋 따라잡기 기준 | `a1b2c3…` |
 | registered_by_user_id | int | FK not null | 이 저장소를 등록한 사람. 감사용이자, private 저장소를 지원할 때 fetch에 쓸 토큰의 주인 — 폴링·재구축은 요청한 사람이 없거나 다른 사람일 수 있다. **v1은 public만 쓰므로 fetch에 토큰이 필요 없다**(MS-009 미결) | |
+| synced_at | timestamptz | null 허용 | 마지막으로 원격을 받아온 시각. 폴링이 갱신 | |
+| behind_by | int | null 허용 | 원격이 앞선 커밋 수. 0이면 최신, null이면 아직 못 받아봄 | `0` |
+| fetched_at | timestamptz | null 허용 | `behind_by`를 잰 시각. 화면이 "언제 기준인지" 보여준다 | |
 
 ### documents
 
@@ -328,7 +331,10 @@ erDiagram
 |---|---|---|---|---|
 | token_hash | varchar(64) | UK | 토큰 원문의 SHA-256. 원문은 저장 안 함 | |
 | label | varchar(50) | | 사용자가 붙인 이름 | `Claude Code 노트북` |
+| issued_at | timestamptz | not null | 발급 시각 | |
+| expires_at | timestamptz | null 허용 | 만료 시각. **v1은 항상 null**(인프라 9장 — 만료 없음). 컬럼과 검증 분기는 정책이 바뀔 때를 위해 남겨 둔다 | |
 | revoked_at | timestamptz | null 허용 | 폐기 시각. null이면 유효 | |
+| last_used_at | timestamptz | null 허용 | 이 토큰으로 마지막에 들어온 시각. null이면 한 번도 안 씀. 만료가 없으므로 안 쓰는 토큰을 찾는 단서가 이것뿐이다(UI-13 3.5) | |
 
 ---
 
