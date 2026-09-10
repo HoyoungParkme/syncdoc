@@ -1275,6 +1275,9 @@ components:
           next_doc_id:
             type: string
             nullable: true
+          project_name:
+            type: string
+            description: 브레드크럼 첫 조각(UI-5 요소 1). 코드가 아니라 사람이 부르는 이름
     ItemRef:
       type: object
       properties:

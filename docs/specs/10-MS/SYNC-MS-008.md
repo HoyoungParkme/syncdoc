@@ -126,9 +126,10 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 4. `doc.prev_doc_id, doc.next_doc_id = SpecService.neighbors(doc_id)`
 4a. `doc.missing_refs = [e.raw_target for e in ReferenceService.upstream_of_document(doc.id, include_missing=True) if e.is_missing]` — 유저용 탭이 링크를 회색 `?`로 그리는 근거
 5. `names = AccountService.users_by_ids([doc.last_author.user_id, doc.last_author.instructed_by_id])` → API `Author{kind, user: UserRef, instructed_by, via}`로 채움
+5a. `doc.project_name = ProjectService.get(doc_id.split("-")[0]).name` — 브레드크럼 첫 조각(UI-5 요소 1)은 코드가 아니라 이름이다
 6. `→ doc`
 
-**호출하는 것** `SpecService.get_document` · `TrackingService.flags_for_items` · `SpecService.neighbors` · `AccountService.users_by_ids`
+**호출하는 것** `SpecService.get_document` · `TrackingService.flags_for_items` · `SpecService.neighbors` · `AccountService.users_by_ids` · `ProjectService.get`
 
 **테스트 관점** 플래그 있는 항목 → `flags=["needs_check"]` · 규약 오류 문서 → 정상 반환 · 첫 단계 문서 → `prev_doc_id=None`
 

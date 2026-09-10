@@ -108,15 +108,16 @@ upstream: [SYNC-UI-001]
   <span class="btn" data-el="3">상태 변경 ▾</span>
 </div>
 
-<!-- 유저용 탭 (기본) -->
+<!-- 3단. 화면 높이를 채우고 가운데 열만 스크롤한다. 탭을 바꿔도 이 틀은 그대로다 -->
 <div class="body3" data-el="7">
   <nav class="toc" data-el="6">
     <div class="lbl">목차</div>
-    <div>1. 목표 / 비목표</div>
-    <div>2. 요구사항</div>
-    <div class="d1">R1 원본과 뷰</div>
-    <div class="d1">R2 참조</div>
-    <div>3. 성공지표</div>
+    <div>1. 목표</div>
+    <div>2. 비목표</div>
+    <div>3. 요구사항</div>
+    <div class="d1">R1 에이전트용 원본과 사람용 뷰</div>
+    <div class="d1">R2 ID 기반 상호참조</div>
+    <div>4. 성공지표</div>
     <div class="marked" data-el="6.1">
       <div class="lbl">표시된 항목</div>
       <div><span class="dot flag"></span> R1 <span class="lbl">확인 필요</span></div>
@@ -125,44 +126,52 @@ upstream: [SYNC-UI-001]
   </nav>
   <div class="handle" data-el="6.2"></div>
 
-  <article class="main"><!-- 안쪽 max-width는 세 탭이 같다 -->
-    <div class="tabs" data-el="2"><!-- 본문 폭 안, 밑줄로 구분 -->
+  <div class="mainwrap"><!-- 안쪽 max-width는 세 탭이 같다 -->
+    <div class="tabs" data-el="2"><!-- 본문 폭 안, 밑줄로 구분. 원본일 때만 오른쪽에 10.3·10.4·10.2 -->
       <span class="on" data-el="2.1">유저용</span><span data-el="2.2">원본</span><span data-el="2.3">이력</span>
     </div>
     <div class="banner" data-el="4">⚠ 규약 오류: frontmatter.status 누락 (커밋 a1b2c3 · 김민준)</div>
     <div class="banner warn" data-el="4a">미완성: 필수 절 「성공지표」 없음 · 승인 불가</div>
-    <h2>2. 요구사항</h2>
-    <div class="item" data-el="7.1"><span class="id">#R1</span>에이전트용 원본과 사람용 뷰 <span class="flag">확인 필요</span></div>
-    <p class="line">명세는 규약이 있는 Markdown으로 작성한다. 근거: <span class="ref" data-el="7.2">[[SYNC-RFQ-001#Q03]]</span><span class="cbtn" data-el="7.4">+</span></p>
-    <p class="line">사람용 뷰는 원본에서 파생 생성한다.<span class="cbtn has">2</span></p>
-    <div class="item"><span class="id">#R2</span>ID 기반 상호참조</div>
-    <p class="line">본문에서 <span class="ref">[[SYNC-DOM-001#참조]]</span>로 참조하면 관계가 추출된다.<span class="cbtn">+</span></p>
-    <div class="diagram" data-el="7.3"><div class="img">mermaid 렌더링 결과 (브라우저)</div></div>
-    <div class="nav" data-el="9">
+
+    <article class="main" data-el="7">
+      <h2>3. 요구사항</h2>
+      <div class="item" data-el="7.1"><span class="id">#R1</span>에이전트용 원본과 사람용 뷰 <span class="flag">확인 필요</span></div>
+      <p class="line">명세는 규약이 있는 Markdown으로 작성한다. 근거: <span class="ref" data-el="7.2">[[SYNC-RFQ-001#Q03]]</span><span class="cbtn" data-el="7.4">+</span></p>
+      <p class="line">사람용 뷰는 원본에서 파생 생성한다.<span class="cbtn has">2</span></p>
+      <div class="item"><span class="id">#R2</span>ID 기반 상호참조</div>
+      <p class="line">본문에서 <span class="ref">[[SYNC-DOM-001#참조]]</span>로 참조하면 관계가 추출된다.<span class="cbtn">+</span></p>
+      <div class="diagram" data-el="7.3"><div class="img">mermaid 렌더링 결과 (브라우저)</div></div>
+    </article>
+
+    <div class="docnav" data-el="9"><!-- 본문 열 안, 본문과 같은 폭 -->
       <span class="btn">← SYNC-RFQ-001</span>
       <span class="btn">SYNC-SCN-001 →</span>
     </div>
-  </article>
+  </div>
 
   <div class="handle" data-el="8.3"></div>
   <aside class="panel" data-el="8">
-    <div class="ptabs"><span class="on" data-el="8.1">참조</span><span data-el="8.2">댓글</span></div>
+    <div class="ptabs"><span class="on" data-el="8.1">참조</span><span data-el="8.2">댓글 2</span></div>
     <div class="pbody">
-      <div class="lbl">선택: <b>#R1</b></div>
-      <h4>상위 참조</h4><ul><li class="ref">SYNC-RFQ-001#Q03</li></ul>
-      <h4>하위 참조</h4><ul><li class="ref">SYNC-UC-001#UC-A6</li><li class="ref">SYNC-UC-001#UC-H2</li></ul>
-      <h4>플래그</h4><ul><li>확인 필요 · 원인 <span class="ref">SYNC-RFQ-001#Q03</span> v4 · 3일 전</li></ul>
+      <div class="lbl">선택</div>
+      <div class="selitem"><span class="idbadge">R1</span> 에이전트용 원본과 사람용 뷰</div>
+      <div class="lbl">상위 참조 (근거)</div>
+      <div class="rcard"><b class="mono">SYNC-RFQ-001#Q03</b><div class="lbl">명세를 어디에 어떤 형식으로 두나</div></div>
+      <div class="lbl">하위 참조 (파생) 2</div>
+      <div class="rcard"><b class="mono">SYNC-UC-001#UC-A6</b><div class="lbl">명세를 작성·수정한다</div></div>
+      <div class="rcard flagged"><b class="mono">SYNC-UC-001#UC-H2</b> <span class="flag">확인 필요</span><div class="lbl">문서를 읽는다</div></div>
+      <div class="lbl">플래그</div>
+      <div class="rcard flagged"><b>확인 필요</b><div class="lbl">원인 <span class="mono">SYNC-RFQ-001#Q03</span> v4 · 3일 전</div></div>
     </div>
   </aside>
 </div>
 
-<!-- 원본 탭 -->
-<div class="rawwrap" data-el="10">
-  <div class="tabs"><span data-el="2.1">유저용</span><span class="on" data-el="2.2">원본</span><span data-el="2.3">이력</span></div>
-  <div class="rawbar">
-    <span class="lbl">에이전트가 읽는 원본 그대로 · 읽기 전용</span>
+<!-- 원본 탭 — 3단 틀은 그대로고 본문 열만 바뀐다 -->
+<div class="mainwrap" data-el="10">
+  <div class="tabs" data-el="2">
+    <span data-el="2.1">유저용</span><span class="on" data-el="2.2">원본</span><span data-el="2.3">이력</span>
     <span class="grow"></span>
-    <span class="radio on" data-el="10.3">원문</span><span class="radio" data-el="10.4">렌더링</span>
+    <span class="radios"><span class="radio on" data-el="10.3">원문</span><span class="radio" data-el="10.4">렌더링</span></span>
     <span class="btn" data-el="10.2">복사</span>
   </div>
   <div class="editor" data-el="10.1">
@@ -172,7 +181,7 @@ doc_id: SYNC-PRD-001
 type: PRD
 status: approved
 ---
-#### #R1 에이전트용 원본과 사람용 뷰
+#### R1 에이전트용 원본과 사람용 뷰
 명세는 규약이 있는 Markdown으로 작성한다. 근거: [[SYNC-RFQ-001#Q03]]
 사람용 뷰는 원본에서 파생 생성한다.</pre>
   </div>
@@ -210,7 +219,7 @@ status: approved
 | 4 | 규약 오류 배너 | 배너 | 어긴 규약, 커밋, 작성자. 오류 없으면 안 보임. 고치려면 에이전트에게 | — |
 | 4a | 미완성 배너 | 배너 | 필수 절 누락 등 미완성 경고(STD-001 4장). 규약 오류와 색이 다르다. 저장은 됐고 승인만 막힘 | — |
 | 5 | 미해결 댓글 수 | 텍스트 | 이 문서의 미해결 댓글 개수. 0이면 안 보임 | 패널(8) 댓글 탭 |
-| 6 | 목차 | 목록 | 제목과 항목 ID. 스크롤 따라 현재 위치 표시 | 본문 해당 위치로 스크롤 |
+| 6 | 목차 | 목록 | 절 제목과 그 아래 항목. 항목은 한 칸 들여 흐리게. 각 줄은 한 줄로 자른다 | 본문 해당 위치로 스크롤 |
 | 6.1 | 표시된 항목 | 목록 | 플래그나 미해결 댓글이 붙은 항목만. 색 점 · 항목 ID · 종류. 하나도 없으면 블록 자체가 안 보인다 | 본문 해당 항목으로 스크롤하고 패널(8)을 연다 |
 | 6.2 | 사이드바 경계 | 손잡이 | 좌측 폭을 끈다. 140~400px | — |
 | 7 | 유저용 본문 | 영역 | 사람용 뷰로 렌더링된 원본. 목차·본문·패널 3단 | — |
@@ -223,10 +232,10 @@ status: approved
 | 8.1 | 참조 탭 | 패널 | 선택 항목의 상위 참조·하위 참조·플래그(원인 항목 링크, UC-H2 2c) | 참조·원인 클릭 → 7.2와 같음 |
 | 8.2 | 댓글 탭 | 패널 | 선택 줄의 스레드. 답글·해결됨 | 해결됨 → 5번 개수 줄어듦 |
 | 9 | 단계 이동 | 버튼 2개 | 이전·다음 단계 문서 ID. 없으면 비활성 | 그 문서의 UI-5 |
-| 10 | 원본 본문 | 영역 | 원본 MD 그대로. 줄 번호. 목차·패널 없음 | — |
+| 10 | 원본 본문 | 영역 | 원본 MD 그대로. 줄 번호. 3단 틀은 유저용과 같고 본문 열만 바뀐다 | — |
 | 10.1 | MD 텍스트 | 읽기 전용 텍스트 | 저장소의 파일 내용 그대로 | 선택·복사만. 편집 불가 |
 | 10.2 | 복사 | 버튼 | | 전체 원본을 클립보드로. 에이전트에게 붙여넣는 용도 |
-| 10.3 | 원문 | 라디오 | 줄번호 거터와 MD 그대로(기본) | 본문을 원문으로 |
+| 10.3 | 원문 | 라디오 | 줄번호 거터와 MD 그대로(기본). 탭 줄(2) 오른쪽에 복사(10.2)와 함께 놓인다 | 본문을 원문으로 |
 | 10.4 | 렌더링 | 라디오 | 같은 MD를 파싱해 그린 것. frontmatter는 회색 블록, 절·항목·체크박스·인라인 코드·참조를 구분해 보여준다 | 본문을 렌더링으로 |
 | 11 | 상위 대조 | 다이얼로그 | `승인`으로 갈 때만. 이 문서가 참조하는 상위 항목 전부(UC-H8 3) | — |
 | 11.1 | 상위 항목 표 | 표 | 항목·현재 버전과 상태·이 문서에서 참조한 곳 | 항목 클릭 → 새 탭으로 그 문서 UI-5 |
@@ -238,10 +247,13 @@ status: approved
 - URL로 진입 상태를 정한다 — `#item-X`는 그 항목으로 스크롤하고 선택해 참조 패널(8.1)을 연다. `?panel=comments`는 댓글 탭(8.2)을 연다. 내 할 일(UI-10) 행이 이걸로 들어온다
 
 - 유저용(2.1)이 기본. 원본(2.2)은 URL `?tab=raw`로 직접 열 수도 있다
-- 원본 탭(10)에서는 목차(6)와 패널(8)이 보이지 않는다. 원본은 항목 클릭·댓글이 없다
+- 원본 탭(10)에서도 목차(6)와 패널(8)은 그대로다. 탭을 오갈 때 3단 틀이 흔들리지 않아야 한다. 원본 본문에는 항목 클릭·댓글 버튼이 없을 뿐이다
 - **세 탭의 본문 최대 폭이 같아야 한다.** 다르면 탭을 오갈 때 가운데 정렬된 본문이 좌우로 흔들린다([[SYNC-UI-001#UI-5]] 4.1)
 - 사이드바 폭(6.2·8.3)은 사람마다 기억한다. 화면을 옮겨도 유지된다. 기본 좌 186px · 우 250px, 손잡이는 폭 9px에 좌우 -4px 물림(누르기 쉬우면서 자리는 1px만 먹는다)
 - 사이드바 바탕은 `배경 보조`다. 본문 흰색과 갈라 놔야 어디가 읽는 곳인지 바로 보인다
+- **3단은 화면 높이를 채우고 가운데 열만 스크롤한다.** 목차와 패널은 각자 안에서 스크롤하고 페이지 자체는 스크롤하지 않는다([[SYNC-UI-001#4]] 앱 셸)
+- 목차 줄은 한 줄로 자르고 넘치면 말줄임한다. 항목 제목이 길어도 아래 `표시된 항목`(6.1)이 화면 밖으로 밀려나지 않아야 한다
+- 배너(4·4a)와 단계 이동(9)은 본문 열 안, 본문과 같은 폭이다. 밖에 두면 본문 왼쪽 끝과 어긋난다
 - 원문/렌더링(10.3·10.4) 선택도 기억한다. 원본을 보는 사람은 대개 같은 쪽만 본다
 - 7.1 클릭은 패널을 참조 탭으로, 7.4 클릭은 댓글 탭으로 자동 전환
 - 처음 열면 패널(8)은 참조 탭이고 "항목을 선택하세요"
@@ -805,7 +817,7 @@ status: approved
 ### 배치
 
 ```html
-<!-- 문서 뷰와 같은 3단 틀. 좌: 버전, 가운데: diff, 우: 영향 -->
+<!-- 문서 뷰와 같은 3단 틀. 좌: 버전, 가운데: diff, 우: 영향. 화면 높이를 채우고 가운데만 스크롤한다 -->
 <div class="docbar" data-el="1">
   <span class="crumb">싱크독</span><span class="sep">›</span>
   <span class="crumb mono">2 PRD</span><span class="sep">›</span>
@@ -835,11 +847,11 @@ status: approved
       <div class="by"><span class="lbl">에이전트 · 지시 박호영</span><span class="grow"></span><span class="btn sm danger" data-el="2.2">되돌리기</span></div>
     </div>
 
-    <p class="hint">두 개까지 고른다. 세 번째를 누르면 <b class="mono">A</b>가 밀려난다. <b class="mono">status</b> 커밋은 본문이 같아 되돌리기가 없다.</p>
+    <p class="hint">두 개까지 고른다. 세 번째를 누르면 <b class="mono">A</b>가 밀려난다.</p>
   </nav>
   <div class="handle"></div>
 
-  <section class="main" data-el="3">
+  <section class="mainwrap" data-el="3">
     <div class="tabs"><span>유저용</span><span>원본</span><span class="on">이력</span></div>
     <div class="drange">
       <b class="mono" data-el="3.1">v6 → v7</b>
@@ -858,7 +870,7 @@ status: approved
       </div>
     </div>
 
-    <p class="lbl">되돌리기는 "이전 내용으로 새 버전 생성"이며 이력이 지워지지 않는다. 되돌린 결과가 현재 규약을 위반하면 거부된다.</p>
+    <p class="footnote">되돌리기는 "이전 내용으로 새 버전 생성"이며 이력이 지워지지 않는다. 되돌린 결과가 현재 규약을 위반하면 거부된다.</p>
   </section>
 
   <div class="handle"></div>
