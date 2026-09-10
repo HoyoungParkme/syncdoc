@@ -31,6 +31,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#queries.item_view]] | 항목 + 플래그 |
 | [[#queries.item_references_view]] | 상위·하위 참조 + 표시 이름 + 플래그 |
 | [[#queries.graph_view]] | 노드·간선 |
+| [[#queries.item_chain]] | 항목의 11단계 체인 |
 | [[#queries.diff_with_impact]] | diff + 하위 건수 |
 | [[#queries.todo]] | 내 할 일 여섯 묶음 |
 | [[#queries.project_items]] | 프로젝트 플래그·댓글·오류 목록 |
@@ -83,9 +84,12 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. `summary = project_summary()`에서 이 프로젝트 것 (단계·건수 계산 공유)
 3. `docs = document_list(code)` (문서별 건수 포함)
 4. `recent = SpecService.recent_changes(project_id, 10)`
-5. `→ ProjectDetail(summary, remote_url, docs, recent_changes=recent)`
+5. `repo = project.repository` — `last_processed_commit`·`behind_by`를 **DB에서 그대로 읽는다.** `git fetch`를 돌리지 않는다(UI-4 요소 7)
+6. `→ ProjectDetail(summary, remote_url, docs, recent_changes=recent, last_processed_commit, behind_by)`
 
 **호출하는 것** [[#queries.project_summary]] [[#queries.document_list]] · `SpecService.recent_changes`
+
+**테스트 관점** 폴링이 `behind_by=2`를 적어 두면 응답도 2 · 아직 한 번도 못 받아봤으면 `behind_by=null` · 이 함수가 `git.fetch`를 부르지 않는다
 
 ---
 
@@ -160,22 +164,44 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### queries.graph_view 노드·간선
 
-**시그니처** `async def graph_view(code: str, stage: int | None = None, doc: str | None = None) -> Graph`
+**시그니처** `async def graph_view(code: str, scope: GraphScope = GraphScope.all) -> Graph`
 
 근거: [[SYNC-SEQ-001#SEQ-14]] · [[SYNC-UC-001#UC-H4]] · [[SYNC-API-001#GET/api/projects/{code}/graph]]
 
 **처리**
 1. `project = ProjectService.get(code)`
-2. `nodes = SpecService.list_items_by_project(project_id, stage, doc)` — 항목 + 문서 노드(`item_id=None`)
-3. `pks = {n.pk}` · `edges = ReferenceService.references_among(pks, include_document_targets=True)`
-4. if `stage or doc` (범위 좁힘, UC-H4 2b) → `edges`의 끝점 중 `pks` 밖의 것을 모아 `SpecService.describe_items`로 노드 추가. 범위 밖이지만 이어진 것만
-5. `isolated = {n.pk} - {e.from} - {e.to}` (UC-H4 2a)
-6. 노드 `id = f"{doc_id}#{item_id}"` (문서 노드는 `doc_id`만) · 간선 `to`는 미존재면 `None`
-7. `→ Graph(nodes, edges)`. **좌표 없음**
+2. `nodes = SpecService.list_items_by_project(project_id)` — 항목 + 문서 노드(`item_id=None`). 단계는 항상 11개 다 나온다
+3. 범위로 거른다 (UC-H4 2b) — `approved`면 **문서 상태가 `approved`인 문서의 항목**만, `flagged`면 `TrackingService.flags_for_items`로 **미해결 플래그가 붙은 항목**만. `all`이면 그대로
+4. `pks = {n.pk}` · `edges = ReferenceService.references_among(pks, include_document_targets=True)`
+5. **끝점이 `pks` 밖인 간선은 버린다.** 범위를 좁혀 대상 노드가 빠진 것과, 대상 항목이 애초에 없는 것은 다르다 — 앞은 안 그리고 뒤만 `to=None`으로 그린다
+6. `isolated = {n.pk} - {e.from} - {e.to}` (UC-H4 2a)
+7. 노드 `id = f"{doc_id}#{item_id}"` (문서 노드는 `doc_id`만) · 노드에 `stage`(1~11)와 `has_flag`
+8. `→ Graph(nodes, edges)`. **좌표 없음** — 열 안 순서 정렬은 브라우저가 한다(UI-002 UI-8 규칙)
 
-**호출하는 것** `ProjectService.get` · `SpecService.list_items_by_project` `describe_items` · `ReferenceService.references_among`
+**호출하는 것** `ProjectService.get` · `SpecService.list_items_by_project` · `TrackingService.flags_for_items` · `ReferenceService.references_among`
 
-**테스트 관점** 전체 → 항목 수 = 노드 수(문서 노드 포함) · `stage=2` → PRD 항목 + 그것에 직접 이어진 것만 · 참조 없는 항목 → `isolated=True`
+**테스트 관점** `all` → 항목 수 = 노드 수(문서 노드 포함) · `approved` → 승인 문서의 항목만, 그 밖으로 나가는 간선은 없음 · `flagged` → 플래그 붙은 항목만 · 참조 없는 항목 → `isolated=True` · **범위 밖 대상 간선이 미존재 참조로 새지 않는다**
+
+---
+
+#### queries.item_chain 항목의 11단계 체인
+
+**시그니처** `async def item_chain(doc_id: str, item_id: str) -> ItemChain`
+
+근거: [[SYNC-UC-001#UC-H4]] 기본 흐름 3 · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/chain]] · [[SYNC-UI-001#UI-15]]
+
+**처리**
+1. `pk = SpecService.resolve_item(doc_id, item_id)` · 없으면 `! not-found`
+2. `ups = 폐포(pk, ReferenceService.upstream)` — 너비 우선. 방문 표시로 사이클을 멈춘다. 자기 자신은 뺀다
+3. `downs = 폐포(pk, ReferenceService.downstream)` — 같은 방식, 반대 방향
+4. `SpecService.describe_items(ups | downs | {pk})`로 문서·제목·상태를 한 번에 채운다
+5. 항목마다 **역할을 폐포 소속으로 정한다** — `ups`에 있으면 `upstream`, `downs`면 `downstream`, 자기면 `self`. **단계 번호로 정하지 않는다**: 되돌아오는 참조가 있으면 근거가 더 오른쪽 단계에 놓여 `downstream`으로 잘못 적힌다
+6. 11단계로 나눠 담는다. **항목이 없는 단계도 빈 배열로 남긴다** — 체인이 어디서 끊겼는지가 이 화면의 목적이다
+7. `→ ItemChain(item, upstream_count, downstream_count, rows[11])`
+
+**호출하는 것** `SpecService.resolve_item` `describe_items` · `ReferenceService.upstream` `downstream`
+
+**테스트 관점** 직접 참조만 있는 항목 → 상위 1·하위 0 · 3단계 건너 이어진 항목이 폐포에 들어옴 · 사이클이 있어도 안 멈춰 있음 · 항목 없는 단계도 행이 옴(길이 항상 11) · 되돌아오는 참조의 상위가 `upstream`으로 적힘
 
 ---
 
