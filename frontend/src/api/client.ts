@@ -220,6 +220,29 @@ export interface GraphNode {
   item_id: string | null
   stage: number | null
   isolated: boolean
+  /** 미해결 플래그가 붙은 항목. 노드 테두리·배경과 ▲가 이걸 본다 (UI-8 3.1) */
+  has_flag: boolean
+}
+/** UI-8 범위 — 잘라내는 게 아니라 골라낸다 */
+export type GraphScope = 'all' | 'approved' | 'flagged'
+export interface ChainItem {
+  ref: ItemRef
+  /** upstream | self | downstream. 단계 번호가 아니라 폐포 방향으로 정한다 */
+  role: string
+  status: string
+  has_flag: boolean
+}
+export interface ChainRow {
+  stage: number
+  doc_type: string
+  items: ChainItem[]
+}
+export interface ItemChain {
+  item: ItemRef
+  upstream_count: number
+  downstream_count: number
+  /** 항상 11개. 항목이 없는 단계도 빈 채로 온다 */
+  rows: ChainRow[]
 }
 export interface GraphEdge {
   from: string

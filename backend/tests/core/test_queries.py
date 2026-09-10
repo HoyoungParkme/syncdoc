@@ -478,6 +478,37 @@ async def test_item_chain_is_transitive_not_just_direct(scoped: Session) -> None
     assert {i.ref.item_id: i.role for r in up.rows for i in r.items}["Q1"] == "upstream"
 
 
+async def test_item_chain_backward_reference_role_is_upstream_not_downstream(
+    scoped: Session,
+) -> None:
+    """되돌아오는 참조 — 근거가 **오른쪽 단계**에 있을 때도 `upstream`으로 적힌다.
+
+    역할을 단계 번호로 정하면 이걸 `downstream`으로 잘못 적는다(UI-15 규칙).
+    여기서는 1단계 RFQ 항목이 6단계 DOM 항목을 근거로 삼는다.
+    """
+    svc, p, d, rfq, pks, rpk, a_rfq, a_prd = _b3(scoped)
+    ref = ReferenceService(scoped)
+    dom = "---\ndoc_id: EXMP-DOM-001\ntype: DOM\ntitle: 도메인\nstatus: draft\n---\n\n"
+    dom += "## 1. 개념\n\n#### Document 문서\n명세 원본 하나.\n"
+    v = svc.create(p.id, "EXMP-DOM-001", DocType.DOM, dom, "h3", a_prd, "spec: 초안")
+    dd = svc.get_document("EXMP-DOM-001")
+    ref.extract(dd.id, v.id, dd.body, {i.item_id: i.pk for i in dd.items}, [])
+    # RFQ(1단계) Q2가 DOM(6단계) Document를 근거로 삼는다 — 체인을 거스르는 참조
+    body = rfq.body.replace("#### Q2 둘째", "#### Q2 둘째\n근거 [[EXMP-DOM-001#Document]]")
+    v2 = svc.save(rfq, body, "h4", a_rfq, "spec: Q2가 DOM을 근거로", [])
+    rfq2 = svc.get_document("EXMP-RFQ-001")
+    ref.extract(rfq2.id, v2.id, rfq2.body, {i.item_id: i.pk for i in rfq2.items}, [])
+
+    ch = await queries.item_chain("EXMP-RFQ-001", "Q2")
+    roles = {i.ref.item_id: i.role for r in ch.rows for i in r.items}
+    assert roles["Q2"] == "self"
+    # 단계 번호로 보면 6 > 1이라 '파생'으로 보이지만, 폐포 방향으로는 근거다
+    assert roles["Document"] == "upstream"
+    dom_row = next(r for r in ch.rows if r.stage == 6)
+    assert [i.role for i in dom_row.items] == ["upstream"]
+    assert ch.upstream_count >= 1
+
+
 async def test_downstream_view_and_missing_refs(scoped: Session) -> None:
     svc, p, d, rfq, pks, rpk, a_rfq, a_prd = _b3(scoped)
     dv = await queries.downstream_view("EXMP-RFQ-001")
