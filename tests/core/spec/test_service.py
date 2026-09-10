@@ -231,9 +231,15 @@ def test_issue_doc_id_sequence_no_reuse(db_session: Session) -> None:
     p = make_project(db_session)
     a = author(db_session)
     assert svc.issue_doc_id(p.id, "EXMP", DocType.PRD) == "EXMP-PRD-001"
-    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a)
+    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
     svc.create(
-        p.id, "EXMP-PRD-002", DocType.PRD, PRD.replace("EXMP-PRD-001", "EXMP-PRD-002"), "h2", a
+        p.id,
+        "EXMP-PRD-002",
+        DocType.PRD,
+        PRD.replace("EXMP-PRD-001", "EXMP-PRD-002"),
+        "h2",
+        a,
+        "spec: 테스트",
     )
     db_session.execute(
         text(
@@ -249,8 +255,11 @@ def test_create_inserts_document_items_version(db_session: Session) -> None:
     svc = SpecService(db_session)
     p = make_project(db_session)
     a = author(db_session)
-    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "abc123", a)
+    v = svc.create(
+        p.id, "EXMP-PRD-001", DocType.PRD, PRD, "abc123", a, "spec(EXMP-PRD-001): 초안\n\n이유"
+    )
     assert v.version_no == 1 and v.author_kind == "agent" and v.instructed_by_user_id == a.user.id
+    assert v.message == "spec(EXMP-PRD-001): 초안\n\n이유"  # versions.message 사본 (DOM-003)
     d = svc.get_document("EXMP-PRD-001")
     assert d.current_version_no == 1 and d.status == "draft" and d.stage == 2
     assert [i.item_id for i in d.items] == ["G1", "R1", "N1"]
@@ -271,7 +280,7 @@ def test_get_document_not_found_convention_error_and_deleted_items(db_session: S
     with pytest.raises(NotFound) as ei:
         svc.get_document("EXMP-PRD-009")
     assert ei.value.extra == {"resource": "document", "id": "EXMP-PRD-009"}
-    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a)
+    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
     db_session.execute(
         text(
             "UPDATE documents SET has_convention_error=true, convention_error_detail='author.unknown: x', "
@@ -291,7 +300,7 @@ def test_get_item_block_not_found_deleted(db_session: Session) -> None:
     svc = SpecService(db_session)
     p = make_project(db_session)
     a = author(db_session)
-    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a)
+    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
     v = svc.get_item("EXMP-PRD-001", "R1")
     assert (
         v.body.startswith("#### R1 첫 기능")
@@ -318,7 +327,7 @@ def test_get_item_block_not_found_deleted(db_session: Session) -> None:
 def test_detect_deleted_items(db_session: Session) -> None:
     svc = SpecService(db_session)
     p = make_project(db_session)
-    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", author(db_session))
+    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", author(db_session), "spec: 테스트")
     d = svc.get_document("EXMP-PRD-001")
     n1_pk = next(i.pk for i in d.items if i.item_id == "N1")
     without_n1 = PRD.split("### 3.2 비기능")[0] + "## 4. 성공지표\n\n## 5. 미결사항\n"
@@ -336,14 +345,14 @@ def _seed(db_session: Session, status: str = "draft"):
     p = make_project(db_session)
     a = author(db_session)
     body = PRD.replace("status: draft", f"status: {status}")
-    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, body, "h1", a)
+    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, body, "h1", a, "spec: 테스트")
     return svc, a, svc.get_document("EXMP-PRD-001")
 
 
 def test_save_bumps_version_and_upserts_items(db_session: Session) -> None:
     svc, a, d = _seed(db_session)
     body = PRD.replace("#### N1 성능", "#### N1 속도") + "\n#### N2 새 항목\n내용\n"
-    v = svc.save(d, body, "h2", a, [])
+    v = svc.save(d, body, "h2", a, "spec: 테스트", [])
     assert v.version_no == 2 and v.body == body
     d2 = svc.get_document("EXMP-PRD-001")
     assert d2.current_version_no == 2 and d2.body == body and d2.status == "draft"
@@ -356,7 +365,7 @@ def test_save_bumps_version_and_upserts_items(db_session: Session) -> None:
 
 def test_save_approved_document_demotes_to_review_with_status_change(db_session: Session) -> None:
     svc, a, d = _seed(db_session, "approved")
-    svc.save(d, d.body.replace("한 줄로.", "두 줄로."), "h2", a, [])
+    svc.save(d, d.body.replace("한 줄로.", "두 줄로."), "h2", a, "spec: 테스트", [])
     assert svc.get_document("EXMP-PRD-001").status == "review"
     rows = db_session.execute(
         text("SELECT from_status, to_status, reason, commit_hash FROM status_changes")
@@ -365,7 +374,9 @@ def test_save_approved_document_demotes_to_review_with_status_change(db_session:
     # github 경로에서 frontmatter status가 진실
     d2 = svc.get_document("EXMP-PRD-001")
     gh = Author(kind=AuthorKind.human, user=a.user, instructed_by=None, via=Entry.github)
-    svc.save(d2, d2.body.replace("status: approved", "status: approved\n"), "h3", gh, [])
+    svc.save(
+        d2, d2.body.replace("status: approved", "status: approved\n"), "h3", gh, "spec: 테스트", []
+    )
     assert svc.get_document("EXMP-PRD-001").status == "approved"
 
 
@@ -378,7 +389,7 @@ def test_save_deleted_pks_and_warnings(db_session: Session) -> None:
     vr = ValidateResult(
         [Violation(3, "author.unknown", "ghost")], [W("section.missing", "성공지표")]
     )
-    svc.save(d, PRD, "h2", a, [n1], validate_result=vr)
+    svc.save(d, PRD, "h2", a, "spec: 테스트", [n1], validate_result=vr)
     row = db_session.execute(
         text("SELECT is_deleted, deleted_at FROM items WHERE item_id='N1'")
     ).one()
@@ -387,9 +398,11 @@ def test_save_deleted_pks_and_warnings(db_session: Session) -> None:
     assert d2.has_convention_error and d2.convention_error_detail == "author.unknown: ghost"
     assert d2.incomplete_warnings == ["section.missing: 성공지표"]
     assert [i.item_id for i in d2.items] == ["G1", "R1"]
-    svc.save(d2, PRD, "h3", a, [])  # validate_result 없음 → 오류·경고 컬럼 그대로
+    svc.save(d2, PRD, "h3", a, "spec: 테스트", [])  # validate_result 없음 → 오류·경고 컬럼 그대로
     assert svc.get_document("EXMP-PRD-001").has_convention_error is True
-    svc.save(d2, PRD, "h4", a, [], validate_result=ValidateResult([], []))  # 통과 → 해제
+    svc.save(
+        d2, PRD, "h4", a, "spec: 테스트", [], validate_result=ValidateResult([], [])
+    )  # 통과 → 해제
     d4 = svc.get_document("EXMP-PRD-001")
     assert (
         d4.has_convention_error is False
@@ -407,7 +420,7 @@ def test_list_by_project_filters_and_order(db_session: Session) -> None:
 
     def mk(pid: int, did: str, typ: str, status: str = "draft", title: str = "x") -> None:
         body = f"---\ndoc_id: {did}\ntype: {typ}\ntitle: {title}\nstatus: {status}\n---\n# {did}\n"
-        svc.create(pid, did, typ, body, "h", a)
+        svc.create(pid, did, typ, body, "h", a, "spec: 테스트")
 
     mk(p.id, "EXMP-DOM-003", "DOM", title="ERD·DD")
     mk(p.id, "EXMP-DOM-001", "DOM", "approved", title="도메인")
@@ -451,6 +464,7 @@ def test_last_author_neighbors_resolve_item(db_session: Session) -> None:
             f"---\ndoc_id: {did}\ntype: {typ}\ntitle: {title}\nstatus: draft\n---\n# {did}\n#### Q1 첫\n",
             "h",
             a,
+            "spec: 테스트",
         )
 
     for did, typ, title in [
@@ -489,6 +503,7 @@ def test_last_author_neighbors_resolve_item(db_session: Session) -> None:
         "---\ndoc_id: EXMP-RFQ-001\ntype: RFQ\ntitle: r\nstatus: draft\n---\n#### Q1 a\n#### Q2 b\n",
         "h",
         a,
+        "spec: 테스트",
     )
     pk = svc.resolve_item("EXMP-RFQ-001", "Q2")
     assert pk == next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q2")
@@ -502,3 +517,95 @@ def test_last_author_neighbors_resolve_item(db_session: Session) -> None:
     with pytest.raises(ItemDeleted):
         svc.resolve_item("EXMP-RFQ-001", "Q2")
     assert rfq_item.version_no == 1
+
+
+# ── apply_status ──
+def test_apply_status_records_change_without_version(db_session: Session) -> None:
+    svc, a, d = _seed(db_session)
+    new_body = PRD.replace("status: draft", "status: review")
+    svc.apply_status(d, new_body, "c0ffee", a.user, "검토 시작")
+    d2 = svc.get_document("EXMP-PRD-001")
+    assert d2.status == "review" and d2.body == new_body and d2.current_version_no == 1
+    assert db_session.execute(text("SELECT count(*) FROM versions")).scalar() == 1
+    row = db_session.execute(
+        text("SELECT from_status, to_status, reason, commit_hash FROM status_changes")
+    ).one()
+    assert row == ("draft", "review", "검토 시작", "c0ffee")
+    svc.apply_status(
+        d2,
+        new_body.replace("status: review", "status: approved"),
+        None,
+        a.user,
+        None,
+        to="approved",
+    )
+    assert svc.get_document("EXMP-PRD-001").status == "approved"
+
+
+# ── describe_items ──
+def test_describe_items_items_and_documents(db_session: Session) -> None:
+    svc, a, d = _seed(db_session)
+    pks = {i.item_id: i.pk for i in d.items}
+    db_session.execute(text("UPDATE items SET is_deleted=true WHERE item_id='N1'"))
+    got = svc.describe_items([pks["G1"], pks["N1"], 999_999])
+    assert (got[pks["G1"]].doc_id, got[pks["G1"]].item_id, got[pks["G1"]].display_name) == (
+        "EXMP-PRD-001",
+        "G1",
+        "첫 목표",
+    )
+    assert got[pks["N1"]].is_deleted is True and 999_999 not in got
+    assert svc.describe_items([]) == {}
+    # 문서 pk는 받지 않는다 — items.id와 documents.id가 겹친다. 문서는 describe_documents
+
+
+# ── describe_documents · versions_by_ids ──
+def test_describe_documents_and_versions_by_ids(db_session: Session) -> None:
+    svc, a, d = _seed(db_session)
+    got = svc.describe_documents([d.id, 999_999])
+    assert list(got) == [d.id]
+    assert (got[d.id].doc_id, got[d.id].title, got[d.id].stage, got[d.id].status) == (
+        "EXMP-PRD-001",
+        "예시 제품",
+        2,
+        "draft",
+    )
+    assert svc.describe_documents([]) == {}
+    v2 = svc.save(d, d.body + "\n", "h2", a, "spec(EXMP-PRD-001): 한 줄\n\n이유", [])
+    vb = svc.versions_by_ids([d.current_version_id, v2.id, 999_999])
+    assert sorted((b.version_no, b.message) for b in vb.values()) == [
+        (1, "spec: 테스트"),
+        (2, "spec(EXMP-PRD-001): 한 줄\n\n이유"),
+    ]
+    assert vb[v2.id].document_id == d.id and svc.versions_by_ids([]) == {}
+
+
+# ── recent_changes ──
+def test_recent_changes_merges_versions_and_status_commits_desc(db_session: Session) -> None:
+    svc, a, d = _seed(db_session)
+    v2 = svc.save(d, d.body + "\n", "h2", a, "spec(EXMP-PRD-001): 한 줄 추가\n\n이유", [])
+    d2 = svc.get_document("EXMP-PRD-001")
+    svc.apply_status(d2, d2.body.replace("status: draft", "status: review"), "c1", a.user, "검토")
+    svc.apply_status(d2, d2.body, None, a.user, "commit 없는 자동 강등은 안 나온다", to="draft")
+    pid = _project_id(db_session, "EXMP")
+    got = svc.recent_changes(pid, 10)
+    assert [(r.doc_id, r.version_no, r.commit_hash) for r in got] == [
+        ("EXMP-PRD-001", None, "c1"),
+        ("EXMP-PRD-001", 2, "h2"),
+        ("EXMP-PRD-001", 1, "h1"),
+    ]
+    assert got[0].message == "status(EXMP-PRD-001): draft → review"
+    assert (got[0].author.kind, got[0].author.user_id, got[0].author.via) == (
+        "human",
+        a.user.id,
+        "web",
+    )
+    assert (
+        got[1].message.startswith("spec(EXMP-PRD-001): 한 줄 추가")
+        and got[1].author.kind == "agent"
+    )
+    assert [r.version_no for r in svc.recent_changes(pid, 2)] == [None, 2]
+    assert v2.version_no == 2
+
+
+def _project_id(session: Session, code: str) -> int:
+    return session.execute(text("SELECT id FROM projects WHERE code=:c"), {"c": code}).scalar_one()

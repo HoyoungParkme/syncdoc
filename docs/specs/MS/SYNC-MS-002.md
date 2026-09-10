@@ -31,16 +31,17 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#SpecService.detect_deleted_items]] | 사라진 항목 찾기 |
 | [[#SpecService.create]] | 문서 행 생성 |
 | [[#SpecService.save]] | 버전·항목 저장 |
-| [[#SpecService.change_status]] | 상태 변경 |
 | [[#SpecService.apply_status]] | 상태 변경 적용 |
 | [[#SpecService.mark_deleted]] | 파일 삭제 반영 |
 | [[#SpecService.list_versions]] | 버전 + 상태변경 이력 |
 | [[#SpecService.diff]] | 두 버전 diff |
-| [[#SpecService.revert]] | 되돌리기 |
 | [[#SpecService.list_by_project]] | 프로젝트 문서 목록 |
-| [[#SpecService.describe_items]] | pk → 표시 정보 |
+| [[#SpecService.describe_items]] | 항목 pk → 표시 정보 |
+| [[#SpecService.describe_documents]] | 문서 pk → 표시 정보 |
+| [[#SpecService.versions_by_ids]] | 버전 id → 요약 |
 | [[#SpecService.resolve_item]] | doc_id·item_id → pk |
 | [[#SpecService.resolve_items]] | 여러 개 |
+| [[#SpecService.item_pks]] | 문서의 항목 pk 지도 |
 | [[#SpecService.list_items_by_project]] | 그래프용 항목 목록 |
 | [[#SpecService.neighbors]] | 앞뒤 단계 문서 |
 | [[#SpecService.last_author]] | 최근 버전 작성자 |
@@ -69,7 +70,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 1. `DB: documents where doc_id` · if 없음 → `! not-found {resource: document, id}`
 2. `DB: items where document_id and is_deleted=false` — `item_id`, `display_name`
 3. `DB: versions where document_id order by version_no desc limit 1` — 최근 작성 주체를 `AuthorRef(kind, user_id, instructed_by_id, via)`로. **users를 읽지 않는다** — 이름은 `queries`가 `AccountService.users_by_ids`로
-4. `→ Document(id, doc_id, doc_type, stage, status, current_body, current_version_no, commit_hash=최근 버전의 것, has_convention_error, convention_error_detail, incomplete_warnings, items[], last_author: AuthorRef)`. 플래그·이웃은 **넣지 않는다** — `queries.document_view`가 붙인다
+4. `missing_refs` = 이 문서 참조 중 `is_missing`인 `raw_target` 목록 — **references는 reference 묶음이라 SpecService가 읽지 않는다.** 비워 두고 `queries.document_view`가 `ReferenceService.upstream_of_document`로 채운다
+5. `→ Document(id, doc_id, doc_type, stage, status, current_body, current_version_no, current_version_id=최근 versions.id, commit_hash=최근 버전의 것, missing_refs=[], has_convention_error, convention_error_detail, incomplete_warnings, items[], last_author: AuthorRef)`. 플래그·이웃은 **넣지 않는다** — `queries.document_view`가 붙인다
 
 **출력** `Document`. `items[].flags`·`prev_doc_id`·`next_doc_id`는 비어 있다
 
@@ -185,19 +187,19 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### SpecService.create 문서 행 생성
 
-**시그니처** `create(project_id: int, doc_id: str, doc_type: DocType, body: str, commit_hash: str, author: Author) -> Version`
+**시그니처** `create(project_id: int, doc_id: str, doc_type: DocType, body: str, commit_hash: str, author: Author, message: str, validate_result: ValidateResult | None = None) -> VersionRow`
 
 근거: [[SYNC-SEQ-001#SEQ-19]] 8단계
 
 **입력** 전부 `pipeline`이 확정한 값. `commit_hash`는 push 성공 후
 
 **처리** — 호출자의 트랜잭션 안
-1. `DB: documents insert (project_id, doc_id, doc_type, status=frontmatter의 status (없으면 draft), current_body=body, current_version_no=1, has_convention_error=False)`
+1. `DB: documents insert (project_id, doc_id, doc_type, status=frontmatter의 status (없으면 draft), current_body=body, current_version_no=1, has_convention_error=bool(violations), convention_error_detail, incomplete_warnings=warnings JSON)` — `save` 7단계와 같은 규칙. **첫 저장부터 경고가 남아야** 생성 직후 승인이 막힌다
 2. `blocks = item_blocks(body, doc_type)`. `DB: items insert` 블록마다 `(document_id, item_id, display_name, is_deleted=False)`
-3. `DB: versions insert (document_id, version_no=1, commit_hash, body, author_kind, author_user_id, instructed_by_user_id, created_at)`
+3. `DB: versions insert (document_id, version_no=1, commit_hash, body, author_kind, author_user_id, instructed_by_user_id, via, message, created_at)`
 4. `→ Version`
 
-**출력** `Version(version_no=1)`
+**출력** `VersionRow(version_no=1)` (ORM)
 
 **예외** `doc_id` unique 위반 → `! project-code-conflict`는 아니고 `! not-found`도 아님 — `issue_doc_id`가 락 안에서 발급하므로 일어나지 않는다. 일어나면 버그
 
@@ -209,7 +211,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### SpecService.save 버전·항목 저장
 
-**시그니처** `save(document: Document, body: str, commit_hash: str, author: Author, deleted_item_pks: list[int], validate_result: ValidateResult | None = None, rebuild: bool = False) -> Version`
+**시그니처** `save(document: Document, body: str, commit_hash: str, author: Author, message: str, deleted_item_pks: list[int], validate_result: ValidateResult | None = None, rebuild: bool = False) -> VersionRow`
 
 근거: [[SYNC-SEQ-001#SEQ-1]] 8단계 · [[SYNC-UC-001#UC-A6]] 6a
 
@@ -217,7 +219,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **처리** — 호출자의 트랜잭션 안. **버전 충돌 검사는 하지 않는다**(`pipeline` 5단계가 이미)
 1. `new_no = document.current_version_no + 1`
-2. `DB: versions insert (document_id, version_no=new_no, commit_hash, body, author_kind, author_user_id, instructed_by_user_id, via=author.via를 mcp|web|github로 접음)`
+2. `DB: versions insert (document_id, version_no=new_no, commit_hash, body, author_kind, author_user_id, instructed_by_user_id, via=author.via를 mcp|web|github로 접음, message)`
 3. `blocks = item_blocks(body, doc_type)`. 블록마다 `DB: items where document_id and item_id` · if 있음 → `display_name` 갱신 · else → insert
 4. `deleted_item_pks`마다 `DB: items set is_deleted=true, deleted_at=now`
 5. if `author.via == github` → `new_status = fm.status` (원본이 진실) · else → `new_status = document.status`
@@ -225,7 +227,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 7. `DB: documents update (current_body, current_version_no=new_no, status=new_status)` · if `validate_result` → `has_convention_error = bool(violations)`, `convention_error_detail = violations를 "rule: message" 줄로 (없으면 null)`, `incomplete_warnings = warnings JSON (없으면 null)` · else → 오류·경고 컬럼 그대로
 8. `→ Version`
 
-**출력** 새 `Version`
+**출력** 새 `VersionRow` (ORM)
 
 **예외** 없음 (DB 오류는 트랜잭션이 잡음)
 
@@ -235,39 +237,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ---
 
-#### SpecService.change_status 상태 변경
-
-**시그니처** `async def change_status(doc_id: str, to: DocStatus, user: User, reason: str | None, upstream_reviewed: bool = False, upstream_mismatch: list[str] = []) -> DocumentSummary` — `pipeline`을 불러 async(DEV-16)
-
-근거: [[SYNC-SEQ-001#SEQ-5]] · [[SYNC-UC-001#UC-H8]] · [[SYNC-API-001#POST/api/docs/{docId}/status]]
-
-**입력** `doc_id`, 목표 상태 `to`, 누른 사람, 사유
-
-**처리**
-1. `document = get_document(doc_id)`
-2. if `to == approved and (document.has_convention_error or document.incomplete_warnings)` → `! status-blocked {convention_error_detail, warnings}` (UC-H8 1a). `review`·`draft`는 막지 않는다
-3. if `to == approved and not upstream_reviewed` → `! upstream-review-required` (UC-H8 3. 상위 대조를 건너뛸 수 없다)
-3a. if `document.status == to` → 아무것도 안 하고 현재 반환 (멱등)
-4. `new_body` = `current_body`의 frontmatter `status:` 줄만 교체
-5. `pipeline.save_pipeline(entry=web_status, doc_id, None, new_body, expected_version=current_version_no, author=Author(human, user, None, web), message=f"status({doc_id}): {from} → {to}\n\n{reason or ''}")`. 파이프라인이 push 후 `documents.status`·`StatusChange(commit_hash)`를 쓴다
-5a. if `upstream_mismatch` → `pks = [resolve_item(d, i) for "d#i" in upstream_mismatch]` · `TrackingService.raise_upstream(pks, document.id, current_version_id, cause_item_pk=None)` (UC-H8 5. 승인 대조의 사람 경로)
-6. `→ DocumentSummary`
-
-**출력** 바뀐 문서 요약
-
-**예외** `status-blocked` · `upstream-review-required` · 파이프라인의 `version-conflict`·`push-failed` 전파
-
-**호출하는 것** [[#SpecService.get_document]] [[SYNC-MS-007#pipeline.save_pipeline]]
-
-**테스트 관점** 규약 오류 문서를 `approved`로 → blocked · `approved`인데 `upstream_reviewed=false` → 거부 · `upstream_mismatch=["SYNC-UC-001#UC-A6"]` → UC-A6에 플래그 · 같은 문서를 `review`로 → 됨 · 정상 승인 → frontmatter `status: approved` 커밋 존재, Version 없음, StatusChange에 commit_hash · 같은 상태로 다시 → 커밋 없음
-
----
-
 #### SpecService.apply_status 상태 변경 적용
 
 **시그니처** `apply_status(document: Document, new_body: str, commit_hash: str | None, user: User, reason: str | None, to: DocStatus | None = None) -> None`
 
-근거: [[SYNC-SEQ-001#SEQ-5]] · `pipeline.save_pipeline` 8단계 `web_status` 분기 · `pipeline.rebuild`의 status 커밋 복원
+근거: [[SYNC-SEQ-001#SEQ-5]] · `pipeline.save_pipeline` 8단계 `web_status` 분기(`reason`은 `pipeline.change_status`가 인자로 넘긴다 — 커밋 메시지를 다시 파싱하지 않는다) · `pipeline.rebuild`의 status 커밋 복원
 
 **처리** — 호출자의 트랜잭션 안. Version을 만들지 않는다
 1. `to = to or new_body의 frontmatter status`
@@ -301,11 +275,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 근거: [[SYNC-SEQ-001#SEQ-C1]] · [[SYNC-UC-001#UC-H6]]
 
 **처리**
-1. `DB: versions where document_id` → `(version_no, commit_hash, message, author, created_at)`
-2. `DB: status_changes where document_id and commit_hash is not null` → `(version_no=None, commit_hash, message="status(...): from → to", author=changed_by, created_at=changed_at)`
+1. `DB: versions where document_id` → `Version(version_no, commit_hash, message=versions.message, author=AuthorRef, created_at)` (DTO)
+2. `DB: status_changes where document_id and commit_hash is not null` → `Version(version_no=None, commit_hash, message="status(...): from → to", author=AuthorRef(kind=human, user_id=changed_by_user_id, instructed_by_id=None, via="web"), created_at=changed_at)`
 3. 둘을 `created_at` 내림차순으로 합쳐 `→`
 
-**출력** `Version[]`. status 행은 `version_no: null`([[SYNC-API-001]] `Version` 스키마)
+**출력** `Version[]` (DTO, API 스키마 + `doc_id`). status 행은 `version_no: null`. `author`는 `AuthorRef` — 이름은 호출한 입구(라우터 또는 `queries`)가 `users_by_ids`로 채워 API `author`로 내보낸다
 
 **테스트 관점** 버전 3 + 상태변경 2 → 5행 시각순 · 자동 강등 StatusChange(commit_hash null)는 안 나옴 — 본문 커밋 행에 딸린 것
 
@@ -336,28 +310,6 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ---
 
-#### SpecService.revert 되돌리기
-
-**시그니처** `async def revert(doc_id: str, to_version: int, user: User, confirm_item_deletion: bool = False) -> SaveResult` — `pipeline`을 불러 async(DEV-16)
-
-근거: [[SYNC-SEQ-001#SEQ-7]] · [[SYNC-UC-001#UC-H7]] · [[SYNC-API-001#POST/api/docs/{docId}/revert]]
-
-**처리**
-1. `document = get_document(doc_id)`; `old_body = DB: versions where document_id and version_no=to_version` · if 없음 → `! not-found`
-2. if `to_version == document.current_version_no` → `! already-current`(422)
-3. `pipeline.save_pipeline(entry=web_revert, doc_id, None, old_body, expected_version=current_version_no, author=Author(human, user, None, web), message=f"revert({doc_id}): v{current} → v{to_version} 내용으로", changed_items=None, confirm_item_deletion)`
-4. `→ SaveResult`
-
-**출력** 새 버전의 `SaveResult`. 되돌린 결과가 v{N+1}
-
-**예외** `not-found`, `already-current`, 파이프라인의 `convention-violation`(4a)·`item-deletion-needs-confirm`·`push-failed`
-
-**호출하는 것** [[#SpecService.get_document]] [[SYNC-MS-007#pipeline.save_pipeline]]
-
-**테스트 관점** v7에서 v6으로 → v8 생성, v7 남음 · 옛 본문이 현 규약 위반 → 거부 · 옛 본문에 없는 항목이 지금 있음 → 삭제 확인 요구 → confirm 후 broken_ref 플래그
-
----
-
 #### SpecService.list_by_project 프로젝트 문서 목록
 
 **시그니처** `list_by_project(project_id: int, stage: int | None = None, status: DocStatus | None = None, has_convention_error: bool | None = None) -> list[DocumentSummary]`
@@ -376,13 +328,29 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### SpecService.describe_items pk → 표시 정보
 
-**시그니처** `describe_items(pks: list[int]) -> dict[int, ItemRef]`
+**시그니처** `describe_items(item_pks: list[int]) -> dict[int, ItemRef]`
 
 근거: [[SYNC-SEQ-001#SEQ-13]] · `ReferenceService`가 pk만 알기 때문
 
-**처리** `DB: items join documents where items.id in pks` → `{pk: ItemRef(doc_id, item_id, display_name, is_deleted)}`. 문서 pk도 받는다(`to_document_id`) — 그 경우 `item_id=None`, `display_name=title`
+**처리** `DB: items join documents where items.id in pks` → `{pk: ItemRef(doc_id, item_id, display_name, is_deleted)}`. **항목 pk만.** 문서 pk는 id 공간이 겹치므로 `describe_documents`로 따로
 
 **테스트 관점** 빈 목록 → 빈 dict · 삭제된 항목 → `is_deleted=True`로 포함
+
+---
+
+#### SpecService.describe_documents 문서 pk → 표시 정보
+
+**시그니처** `describe_documents(document_ids: list[int]) -> dict[int, DocRef]`
+
+**처리** `DB: documents where id in ids` → `{id: DocRef(document_id, doc_id, title=frontmatter title, stage, status)}`. 참조의 `to_document_id`(문서 단위 참조)·댓글 응답의 `doc_id`·미결정 목록이 쓴다. `doc_id_of(document_id)`는 이걸로 대신한다
+
+---
+
+#### SpecService.versions_by_ids 버전 id → 요약
+
+**시그니처** `versions_by_ids(version_ids: list[int]) -> dict[int, VersionBrief]`
+
+**처리** `DB: versions where id in ids` → `{id: VersionBrief(id, document_id, version_no, created_at, message)}`. 플래그의 `cause_version_id`를 `cause_version_no`로, 미결정의 `version_id`를 문서·번호·메시지로 바꿀 때. **쿼리 한 번**
 
 ---
 
@@ -401,6 +369,16 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **시그니처** `resolve_items(doc_id: str, item_ids: list[str]) -> list[int]`
 
 **처리** `resolve_item`을 IN 쿼리 하나로. 없는 것은 건너뛴다(예외 없음). `diff`의 hunk에 새로 생긴 항목이 아직 `items`에 없을 수 있어서
+
+---
+
+#### SpecService.item_pks 문서의 항목 pk 지도
+
+**시그니처** `item_pks(document_id: int) -> dict[str, int]`
+
+근거: [[SYNC-MS-007#pipeline.save_pipeline]] 10단계 — `ReferenceService.extract`에 넘길 `{item_id: pk}`. `save`가 `Version`을 돌려주므로 따로 읽는다
+
+**처리** `DB: items where document_id and is_deleted=false` → `{item_id: id}`. 저장 직후(같은 트랜잭션)에 부르므로 방금 upsert한 것이 보인다
 
 ---
 
@@ -442,7 +420,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-SEQ-001#SEQ-9]] · UI-4 요소 5
 
-**처리** `list_versions`와 같이 `versions` ∪ `status_changes(commit_hash not null)`를 프로젝트 전체로, `created_at desc limit n`
+**처리** `list_versions`와 같이 `versions` ∪ `status_changes(commit_hash not null)`를 프로젝트 전체로, `created_at desc, id desc limit n` (같은 시각 안정 정렬). 각 행에 `doc_id`
 
 ---
 

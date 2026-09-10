@@ -32,6 +32,8 @@ upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
 
 Python: 클래스 `PascalCase`, 함수·변수 `snake_case`, 상수 `UPPER`. 테이블·컬럼 `snake_case`. React: 컴포넌트 `PascalCase`, 파일명 = 컴포넌트명.
 
+**DTO와 ORM 이름이 같을 때** — DTO(API 응답·클래스 2.8)가 그 이름을 갖고, ORM 모델은 코드에서 `*Row`로 별칭한다: `Document`(DTO) / `DocumentRow`(ORM), `Version` / `VersionRow`. 서비스가 내부에서 돌려주는 건 Row, 입구로 나가는 건 DTO. MINISPEC 시그니처의 엔티티 이름은 Row다.
+
 #### DEV-3 함수 docstring 첫 줄 = MINISPEC 항목 ID
 
 ```python
@@ -40,6 +42,8 @@ async def save_pipeline(...):
 ```
 
 코드에서 명세로 돌아가는 유일한 고리. 검사기가 이걸로 MINISPEC↔코드 일치를 대조한다(4장).
+
+`_`로 시작하는 비공개 헬퍼는 MINISPEC이 없어도 된다 — 단 **그 모듈 밖에서 부르지 않는다.** 밖에서 부르게 되면 MINISPEC 항목으로 올린다.
 
 #### DEV-4 타입 힌트 필수, 형식은 도구가
 
@@ -151,9 +155,10 @@ C  통합·배포       외부 연결 · 첫 사용
 | 테스트 통과 | 단위(테스트 관점) + E2E(시나리오) 전부 |
 | 린트·포맷 통과 | `ruff check` · `ruff format --check` |
 | 명세 통과 | `validate.py` 위반 0 (코드가 명세를 고쳤으면) |
-| CODE 문서 기록 | 슬라이스 카드 완료란에 커밋 해시·PR·날짜 |
+| CODE 문서 기록 | 슬라이스 카드 완료란에 커밋 해시·PR·날짜(KST) |
+| **화면 확인** (화면이 있는 카드만) | 에이전트가 `tsc`·`build`·API 테스트까지 하고, **사람이 브라우저에서 와이어프레임 요소 번호대로 눌러 본다.** 스크린샷을 PR에. 에이전트는 눈이 없다 — 이 조건만 사람 몫 |
 
-여섯 다 되어야 다음 카드. 하나라도 빠지면 그 슬라이스는 미완이고 다음 슬라이스의 `선행` 조건이 안 된다.
+여섯(화면 카드는 일곱) 다 되어야 다음 카드. 하나라도 빠지면 그 슬라이스는 미완이고 다음 슬라이스의 `선행` 조건이 안 된다.
 
 #### DEV-15 커밋·PR
 

@@ -8,14 +8,10 @@ import json
 from urllib.parse import parse_qs, urlparse
 
 import sqlalchemy
-from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from syncdoc.core.account.models import User
 from syncdoc.core.account.service import AccountService
-from syncdoc.db import get_session
-from syncdoc.main import app
 from syncdoc.web import auth
 from tests.conftest import github_ok
 from tests.core.account.test_service import make_user
@@ -26,19 +22,6 @@ def session_of(client: TestClient) -> dict:
     raw = client.cookies.get(auth.SESSION_COOKIE)
     assert raw, "세션 쿠키 없음"
     return json.loads(base64.b64decode(raw.split(".")[0] + "=="))
-
-
-# 테스트 전용 입구 — 콜백(보류)을 대신해 auth.login으로 세션을 만든다 · current_user 확인
-@app.get("/__test/login/{login}", status_code=204)
-def _test_login(login: str, request: Request, session: Session = Depends(get_session)) -> None:
-    user = AccountService(session).user_by_login(login)
-    assert user is not None
-    auth.login(request, user)
-
-
-@app.get("/__test/whoami")
-def _test_whoami(user: User = Depends(auth.current_user)) -> dict[str, str]:
-    return {"login": user.github_login}
 
 
 # ── GET /auth/github ──
@@ -130,3 +113,30 @@ def test_oauth_callback_without_next_goes_root(client: TestClient, mock_github) 
         "/auth/github/callback", params={"code": "c", "state": state}, follow_redirects=False
     )
     assert r.status_code == 302 and r.headers["location"] == "/"
+
+
+# ── /api/me · /api/me/tokens ──
+def test_me_and_tokens_issue_list_revoke(client: TestClient, db_session: Session) -> None:
+    from tests.web.conftest import login
+
+    assert client.get("/api/me").status_code == 401
+    u = login(client, db_session)
+    me = client.get("/api/me").json()
+    assert (me["id"], me["github_login"], me["display_name"]) == (
+        u.id,
+        "hoyoung",
+        "hoyoung",
+    ) and "created_at" in me
+    r = client.post("/api/me/tokens", json={"label": "Claude Code 노트북"})
+    assert r.status_code == 201
+    issued = r.json()
+    assert issued["token"].startswith("syncdoc_pat_") and issued["label"] == "Claude Code 노트북"
+    assert (
+        issued["expires_at"] is None and issued["revoked_at"] is None and "token_hash" not in issued
+    )
+    lst = client.get("/api/me/tokens").json()
+    assert [t["label"] for t in lst] == ["Claude Code 노트북"] and "token" not in lst[0]
+    assert client.delete(f"/api/me/tokens/{issued['id']}").status_code == 204
+    assert client.get("/api/me/tokens").json()[0]["revoked_at"] is not None  # 폐기돼도 행은 남는다
+    assert client.delete("/api/me/tokens/999999").status_code == 404
+    assert AccountService(db_session).authenticate_token(issued["token"]) is None

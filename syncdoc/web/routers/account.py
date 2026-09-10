@@ -1,4 +1,4 @@
-"""routers/account — /auth/*. SYNC-API-001 3.1 · SYNC-SEQ-001#SEQ-8. AccountService만 부른다."""
+"""routers/account — /auth/* · /api/me*. SYNC-API-001 3.1·3.7 · SEQ-8·C1. AccountService만."""
 
 from __future__ import annotations
 
@@ -8,10 +8,13 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
+from syncdoc.core.account.models import User
 from syncdoc.core.account.service import AccountService
 from syncdoc.core.errors import Unauthorized
 from syncdoc.db import get_session
 from syncdoc.web import auth
+from syncdoc.web.schemas.account import AccessToken, IssuedToken, IssueToken
+from syncdoc.web.schemas.common import User as UserSchema
 
 router = APIRouter(tags=["auth"])
 
@@ -45,4 +48,42 @@ async def github_callback(
 async def logout(request: Request) -> Response:
     """SYNC-API-001#POST/auth/logout — 세션 종료."""
     auth.logout(request)
+    return Response(status_code=204)
+
+
+@router.get("/api/me", response_model=UserSchema)
+async def me(user: User = Depends(auth.current_user)) -> UserSchema:
+    """SYNC-API-001#GET/api/me"""
+    return UserSchema.model_validate(user)
+
+
+@router.get("/api/me/tokens", response_model=list[AccessToken])
+async def list_tokens(
+    user: User = Depends(auth.current_user), session: Session = Depends(get_session)
+) -> list[AccessToken]:
+    """SYNC-API-001#GET/api/me/tokens — 폐기된 것 포함, 원문·해시 없음"""
+    return [AccessToken.model_validate(t) for t in AccountService(session).list_tokens(user)]
+
+
+@router.post("/api/me/tokens", response_model=IssuedToken, status_code=201)
+async def issue_token(
+    req: IssueToken,
+    user: User = Depends(auth.current_user),
+    session: Session = Depends(get_session),
+) -> IssuedToken:
+    """SYNC-API-001#POST/api/me/tokens — 원문은 이 응답에서만"""
+    issued = AccountService(session).issue_token(user, req.label)
+    session.commit()
+    return IssuedToken(**AccessToken.model_validate(issued.token).model_dump(), token=issued.raw)
+
+
+@router.delete("/api/me/tokens/{token_id}", status_code=204)
+async def revoke_token(
+    token_id: int,
+    user: User = Depends(auth.current_user),
+    session: Session = Depends(get_session),
+) -> Response:
+    """SYNC-API-001#DELETE/api/me/tokens/{id}"""
+    AccountService(session).revoke_token(user, token_id)
+    session.commit()
     return Response(status_code=204)

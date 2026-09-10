@@ -60,7 +60,8 @@ syncdoc/
 ├── web/                    REST API. core를 호출만 한다
 │   ├── routers/
 │   ├── schemas/            요청·응답 형태
-│   └── auth.py             GitHub OAuth
+│   ├── auth.py             GitHub OAuth·세션
+│   └── static/             React 빌드 결과 (gitignore). /{path:path} SPA 폴백은 라우트 맨 끝
 │
 ├── mcp/                    MCP 도구. core를 호출만 한다
 │   └── tools.py
@@ -68,6 +69,8 @@ syncdoc/
 └── infra/                  외부 시스템 어댑터
     ├── git.py              clone·commit·push·fetch
     └── github.py           OAuth·webhook 검증
+
+frontend/                   React 소스 (Vite+TS). 빌드 → syncdoc/web/static. 유저용 탭 렌더링은 tools/view_build.py를 TS로 옮긴 것(md.ts·views.ts·uc/wireframe/seq/ms.ts)
 ```
 
 **묶음 안 구조** (6개 동일)
@@ -373,7 +376,11 @@ classDiagram
 | `ValidateResult` | `violations: list[Violation]` · `warnings: list[Warning]` | validate → pipeline |
 | `ItemBlock` | `item_id: str` · `display_name: str` · `level: int` · `start_line: int` · `end_line: int` · `text: str` | item_blocks → validate·get_item·save·diff |
 | `ItemView` | `doc_id` · `item_id` · `display_name` · `body: str` · `doc_status: DocStatus` · `doc_version_no: int` · `flags: list[str]` | get_item → queries |
-| `Document` (DTO) | API `Document` 스키마 + `id: int`(행 pk) · `last_author: AuthorRef` | get_document. ORM 모델과 이름이 같아 코드에서는 모델을 `DocumentRow`로 별칭 |
+| `Document` (DTO) | API `Document` 스키마 + `id: int`(행 pk) · `current_version_id: int`(최근 versions.id — detect_impact의 prev) · `last_author: AuthorRef` · `missing_refs: list[str]`(미존재 참조 raw_target) | get_document. ORM은 `DocumentRow`(DEV-2) |
+| `Version` (DTO) | API `Version` 스키마 — `doc_id` `version_no?` `commit_hash` `message` `author: AuthorRef` `created_at` | list_versions · recent_changes. ORM은 `VersionRow`. `create`·`save`는 `VersionRow`를 돌려준다. 내부 필드명(`author_view` 등)은 자유, **API로 나가는 필드명은 API-001 스키마 그대로**(`author`) |
+| `DocRef` | `document_id` · `doc_id` · `title` · `stage` · `status` | describe_documents. 문서 단위 참조 대상 표시 |
+| `DownstreamView` | `by_item: dict[str, list[ItemRef]]` · `by_document: list[{doc_id, title, items}]` | queries.downstream_view → 추적표 |
+| `VersionBrief` | `id` · `document_id` · `version_no` · `created_at` · `message` | versions_by_ids → 플래그의 cause_version, 미결정 목록 |
 | `ItemBrief` | `pk: int` · `doc_id` · `item_id: str \| None` · `stage: int` · `display_name` | list_items_by_project → queries.graph_view |
 | `RefEdge` | `from_item_pk: int` · `to_item_pk: int \| None` · `to_document_id: int \| None` · `raw_target: str` · `is_missing: bool` | ReferenceService (다음 묶음) |
 | `ExtractResult` | `added: int` · `removed: int` · `missing: int` | reference.extract |
@@ -438,7 +445,7 @@ flowchart LR
     mt --> RS
 ```
 
-라우터 하나가 묶음 하나를 본다. `admin.py`만 예외로 프로젝트와 파이프라인 둘을 부른다 — 재구축([[SYNC-UC-001#UC-S6]])이 운영 성격이라 어느 묶음에도 안 들어간다. `mcp/tools.py`는 tracking·collab·account를 부르지 않는다 — 사람 판단 영역이다.
+라우터 하나가 묶음 하나를 본다. `admin.py`만 예외로 프로젝트와 파이프라인 둘을 부른다 — 재구축([[SYNC-UC-001#UC-S6]])이 운영 성격이라 어느 묶음에도 안 들어간다. **예외 둘 더** — 라우터가 응답에 사람 이름을 붙이려고 `AccountService.users_by_ids`를 부르는 건 허용(댓글·이력). `documents.py`가 상태 변경·되돌리기를 `pipeline`으로 넘기는 것도 허용 — 둘은 조율이라 `pipeline`에 있다. `mcp/tools.py`는 tracking·collab·account를 부르지 않는다 — 사람 판단 영역이다.
 
 ### 3.2 Control 사이의 의존 관계
 
@@ -466,7 +473,7 @@ flowchart TB
     QR -.->|list_by_project · describe_items · resolve_item · neighbors · diff · …| SS
     QR -.->|upstream · downstream · references_among · count_downstream| RS
     QR -.->|flags_for_* · count_flags* · pending_decisions_for| TS
-    SS -.->|raise_upstream (승인 대조)| TS
+    PL -.->|raise_upstream (승인 대조)| TS
     QR -.->|count_unresolved* · unresolved_in| CS
     QR -.->|list_projects · get| PS
     QR -.->|users_by_ids| AS
@@ -478,7 +485,7 @@ flowchart TB
     AS -.->|oauth| GH
 ```
 
-**규칙** — 서비스끼리 직접 부르는 건 `TrackingService → ReferenceService·SpecService`(변경 영향 감지·담당자 결정)와 `SpecService → TrackingService.raise_upstream`(승인 대조) 셋뿐이다. 나머지 묶음 넘기는 전부 `pipeline`(쓰기)이나 `queries`(읽기)를 거친다. 서비스가 `pipeline`을 부르는 건 `ProjectService.rebuild_index`뿐이다. 4장에서 각 노드를 확대한다.
+**규칙** — 서비스끼리 직접 부르는 건 `TrackingService → ReferenceService·SpecService`(변경 영향 감지·담당자 결정) 둘뿐이다. `SpecService`는 아무도 부르지 않는다. 나머지 묶음 넘기는 전부 `pipeline`(쓰기)이나 `queries`(읽기)를 거친다. 서비스가 `pipeline`을 부르는 건 `ProjectService.rebuild_index`뿐이다. 4장에서 각 노드를 확대한다.
 
 ## 4. 설계 클래스 다이어그램 (v3)
 
@@ -546,17 +553,18 @@ classDiagram
         +validate(body: str, doc_type: DocType, entry: Entry, current_status: DocStatus?) ValidateResult
         +apply_frontmatter(body: str, doc_id: str, doc_type: DocType, status: DocStatus) str
         +detect_deleted_items(document: Document, body: str) list~int~
-        +create(project_id: int, doc_id: str, doc_type: DocType, body: str, commit_hash: str, author: Author) Version
-        +save(document: Document, body: str, commit_hash: str, author: Author, deleted_item_pks: list~int~, validate_result: ValidateResult?, rebuild: bool) Version
+        +create(project_id: int, doc_id: str, doc_type: DocType, body: str, commit_hash: str, author: Author, message: str, validate_result: ValidateResult?) VersionRow
+        +save(document: Document, body: str, commit_hash: str, author: Author, message: str, deleted_item_pks: list~int~, validate_result: ValidateResult?, rebuild: bool) VersionRow
         +apply_status(document: Document, new_body: str, commit_hash: str?, user: User, reason: str?, to: DocStatus?) None
-        +async change_status(doc_id: str, to: DocStatus, user: User, reason: str?, upstream_reviewed: bool = False, upstream_mismatch: list~str~ = []) DocumentSummary
         +list_versions(doc_id: str) list~Version~
         +diff(doc_id: str, from_no: int, to_no: int) Diff
-        +async revert(doc_id: str, to_version: int, user: User, confirm_item_deletion: bool) SaveResult
         +list_by_project(project_id: int, stage: int?, status: DocStatus?, has_convention_error: bool?) list~DocumentSummary~
-        +describe_items(pks: list~int~) dict
+        +describe_items(item_pks: list~int~) dict
+        +describe_documents(document_ids: list~int~) dict
+        +versions_by_ids(version_ids: list~int~) dict
         +resolve_item(doc_id: str, item_id: str) int
         +resolve_items(doc_id: str, item_ids: list~str~) list~int~
+        +item_pks(document_id: int) dict
         +list_items_by_project(project_id: int, stage: int?, doc_id: str?) list~ItemBrief~
         +neighbors(doc_id: str) tuple
         +last_author(document_id: int) AuthorRef?
@@ -627,10 +635,8 @@ classDiagram
 | `apply_frontmatter` | pipeline (create 시) | [[SYNC-UC-001#UC-A6]] | |
 | `detect_deleted_items` | pipeline | [[SYNC-UC-001#UC-A6]] 4b | |
 | `create` · `save` · `apply_status` | pipeline (push 성공 후) | [[SYNC-UC-001#UC-A6]], [[SYNC-UC-001#UC-H8]] | |
-| `change_status` | [[SYNC-API-001#POST/api/docs/{docId}/status]] | [[SYNC-UC-001#UC-H8]] | status-blocked |
 | `list_versions` | [[SYNC-API-001#GET/api/docs/{docId}/versions]] | [[SYNC-UC-001#UC-H6]] | |
 | `diff` | queries.diff_with_impact · TrackingService | [[SYNC-UC-001#UC-H6]], S3 | |
-| `revert` | [[SYNC-API-001#POST/api/docs/{docId}/revert]] | [[SYNC-UC-001#UC-H7]] | convention-violation, item-deletion-needs-confirm, push-failed |
 | `list_by_project` | queries | [[SYNC-UC-001#UC-A5]], H14, H16 | |
 | `describe_items` · `resolve_item(s)` · `list_items_by_project` · `neighbors` | queries | [[SYNC-UC-001#UC-H3]], H4 | |
 | `last_author` | TrackingService.raise_flags | [[SYNC-UC-001#UC-S4]] | |
@@ -642,7 +648,7 @@ classDiagram
 - `item_blocks`: 항목 = ID로 시작하는 헤딩(타입 패턴), 블록 = 같은 레벨 이상 다음 헤딩까지, `display_name` = 헤딩 제목. 코드블록·인라인 코드는 건너뜀 (STD-001 1.3). **5장 미결 둘이 여기서 풀렸다**
 - `detect_deleted_items`: 현재 `items`(is_deleted=false)와 새 본문의 항목 ID를 대조. 사라진 것의 pk 목록. 하위 참조가 있는지는 모른다 — `pipeline`이 `ReferenceService.downstream`으로 판정(되먹임 #2)
 - `save`: 버전 충돌 검사는 하지 않는다 — `pipeline`이 push 전에 한다. Version·Item·Document를 한 트랜잭션에. `status == approved` → `review` + StatusChange. `deleted_item_pks`에 `is_deleted=true`
-- `change_status`: frontmatter를 고쳐 `pipeline(entry=web_status)`로. Version은 안 만들고 StatusChange에 `commit_hash`. 규약 오류·미완성 경고가 있고 `approved`로 가면 status-blocked([[SYNC-UC-001#UC-H8]] 1a)
+- 상태 변경·되돌리기는 여기 없다 — 조율이라 `pipeline.change_status`·`pipeline.revert`(4.7). SpecService는 DB만 만지고 전부 sync
 - `list_versions`·`recent_changes`: `versions`와 `status_changes`를 시각순으로 합친다. status 행은 `version_no: null`
 - `issue_doc_id`: `{code}-{type}-{NNN}`. 같은 프로젝트·타입의 최대 번호 + 1
 - frontmatter의 status가 진실. 파이프라인이 저장 때마다 읽어 `documents.status`를 덮어쓴다
@@ -750,7 +756,7 @@ classDiagram
 | `record_decision` | [[SYNC-API-001#POST/api/decisions/{versionId}]] | [[SYNC-UC-001#UC-H10]] 2, 2a | reason-required, already-decided |
 | `raise_flags` | record_decision | [[SYNC-UC-001#UC-S4]] | |
 | `raise_broken` | pipeline (삭제 확정 시) | [[SYNC-UC-001#UC-H13]] 5 | |
-| `raise_upstream` | pipeline (`upstream_impact` 지정 시) · change_status (승인 대조) | [[SYNC-UC-001#UC-S4]], [[SYNC-UC-001#UC-H8]] 5 | |
+| `raise_upstream` | pipeline (`upstream_impact` 지정 시 · change_status 승인 대조) | [[SYNC-UC-001#UC-S4]], [[SYNC-UC-001#UC-H8]] 5 | |
 | `get_flag` | [[SYNC-API-001#GET/api/flags/{id}]] | [[SYNC-UC-001#UC-H11]] 2 | not-found |
 | `resolve` | [[SYNC-API-001#POST/api/flags/{id}/resolve]] | [[SYNC-UC-001#UC-H11]] 5~6 | |
 | `flags_for_*` · `count_flags*` · `pending_decisions_for` | queries | [[SYNC-UC-001#UC-H2]], H14, H15 | |
@@ -799,7 +805,7 @@ classDiagram
 | `add` | [[SYNC-API-001#POST/api/docs/{docId}/comments]] | [[SYNC-UC-001#UC-H9]] 1~2 |
 | `resolve` | [[SYNC-API-001#POST/api/comments/{id}/resolve]] | [[SYNC-UC-001#UC-H9]] 4, 4a |
 | `relocate` | pipeline | [[SYNC-UC-001#UC-H9]] 2a, 2b |
-| `unresolved_count` · `count_unresolved*` · `unresolved_in` | queries · change_status | [[SYNC-UC-001#UC-H8]] 2a, H14, H15 |
+| `unresolved_count` · `count_unresolved*` · `unresolved_in` | queries · pipeline.change_status | [[SYNC-UC-001#UC-H8]] 2a, H14, H15 |
 
 **규칙이 사는 곳**
 - `add`: **본문을 직접 읽지 않는다.** 라우터가 `SpecService.get_document`로 `line_text`를 뽑아 넘긴다(되먹임 #15). `line_hash = sha256(line_text.strip())`
@@ -859,7 +865,7 @@ classDiagram
 
 ### 4.7 pipeline — 쓰기 조율
 
-묶음 밖. 클래스가 아니라 함수 셋이다. 시퀀스 SEQ-1·2·5·7·19·21이 이 함수들의 시간축이다.
+묶음 밖. 클래스가 아니라 함수 다섯이다. 시퀀스 SEQ-1·2·5·7·19·21이 이 함수들의 시간축이다.
 
 ```
 save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | None,
@@ -898,6 +904,13 @@ save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | None,
     entry=web_status: 1 → 2(frontmatter만) → 3 → 5(message "status(...)") → 6은 Document.status + StatusChange(commit_hash)만.
                       Version·extract·detect_impact 없음.
 
+change_status(doc_id, to, user, reason, upstream_reviewed=False, upstream_mismatch=[]) -> DocumentSummary
+    UC-H8. 검사(status-blocked·upstream-review-required) → frontmatter status 교체 → save_pipeline(entry=web_status, reason)
+    → upstream_mismatch 있으면 tracking.raise_upstream. 세션 하나 — 자기가 열고 save_pipeline에 넘긴다.
+
+revert(doc_id, to_version, user, confirm_item_deletion=False) -> SaveResult
+    UC-H7. 옛 버전 본문 → save_pipeline(entry=web_revert). already-current 검사.
+
 process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
     webhook·폴링·기동 시 따라잡기가 부른다.
     git.changed_files(last_processed..head, "docs/specs/") → 파일마다 save_pipeline(entry=github, commit_hash=...)
@@ -934,6 +947,7 @@ project_items(code, kind) -> list                   SEQ-18  kind별로 flags_in_
 decision_view(version_id) -> DecisionDetail         SEQ-3   get_decision → diff → describe_items · last_author
 flag_view(flag_id) -> FlagDetail                    SEQ-6   get_flag → describe_items → diff(원인) 또는 get_item(하위, upstream_impact면) · get_item(대상) · 대상 변경 판정
 upstream_checklist(doc_id) -> list                  SEQ-5   이 문서의 upstream 참조 전부 → describe_items · 대상 문서 상태·버전. 승인 대조용
+downstream_view(doc_id) -> DownstreamView           —       이 문서를 참조하는 것. 추적표·하위 참조 수 (V-PRD)
 ```
 
 **규칙** — `queries`는 쓰지 않는다. 읽고 조합만 한다. 건수는 `document_ids`로 묶어 한 번에 묻는다(N+1 금지). 단계 11칸 계산(가장 낮은 상태·gate_warning)은 `project_summary` 안에 있다 — `ProjectService`가 아니라.

@@ -17,7 +17,7 @@ from tests.core.spec.test_service import author, make_project
 
 def _mk(svc, pid, did, typ, status="draft", title="x", a=None):
     body = f"---\ndoc_id: {did}\ntype: {typ}\ntitle: {title}\nstatus: {status}\n---\n# {did}\n#### Q1 첫\n"
-    svc.create(pid, did, typ, body, "h", a)
+    svc.create(pid, did, typ, body, "h", a, "spec: 테스트")
 
 
 # ── project_summary ──
@@ -56,12 +56,42 @@ async def test_project_summary_stages_counts_order(scoped: Session) -> None:
 
 
 # ── document_list ──
+async def test_project_detail_docs_and_recent_changes_with_names(scoped: Session) -> None:
+    svc = SpecService(scoped)
+    p = make_project(scoped)
+    a = author(scoped)
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec(EXMP-RFQ-001): 초안")
+    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec(EXMP-PRD-001): 초안")
+    d = svc.get_document("EXMP-PRD-001")
+    svc.apply_status(d, d.body.replace("status: draft", "status: review"), "c1", a.user, "검토")
+    pd = await queries.project_detail("EXMP")
+    assert (pd.code, pd.remote_url, [x.doc_id for x in pd.docs]) == (
+        "EXMP",
+        p.repository.remote_url,
+        ["EXMP-RFQ-001", "EXMP-PRD-001"],
+    )
+    assert pd.stages[1].status == "review" and pd.docs[1].counts["needs_check"] == 0
+    assert [(r.doc_id, r.version_no, r.message.split("\n")[0]) for r in pd.recent_changes] == [
+        ("EXMP-PRD-001", None, "status(EXMP-PRD-001): draft → review"),
+        ("EXMP-PRD-001", 1, "spec(EXMP-PRD-001): 초안"),
+        ("EXMP-RFQ-001", 1, "spec(EXMP-RFQ-001): 초안"),
+    ]
+    assert [(r.author_view.kind, r.author_view.user.github_login) for r in pd.recent_changes] == [
+        ("human", "hoyoung"),
+        ("agent", "hoyoung"),
+        ("agent", "hoyoung"),
+    ]
+    assert pd.recent_changes[1].author_view.instructed_by.github_login == "hoyoung"
+    with pytest.raises(NotFound):
+        await queries.project_detail("NOPE")
+
+
 async def test_document_list_counts_and_filters(scoped: Session) -> None:
     svc, ref, tr = SpecService(scoped), ReferenceService(scoped), TrackingService(scoped)
     p = make_project(scoped)
     a = author(scoped)
-    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a)
-    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a)
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
     d = svc.get_document("EXMP-PRD-001")
     pks = {i.item_id: i.pk for i in d.items}
     ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])
@@ -84,8 +114,8 @@ async def test_document_view_and_item_view_flags_neighbors_author(scoped: Sessio
     svc, ref, tr = SpecService(scoped), ReferenceService(scoped), TrackingService(scoped)
     p = make_project(scoped)
     a = author(scoped)
-    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a)
-    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a)
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
     _mk(svc, p.id, "EXMP-SCN-001", "SCN", a=a)
     d = svc.get_document("EXMP-PRD-001")
     pks = {i.item_id: i.pk for i in d.items}
@@ -104,3 +134,65 @@ async def test_document_view_and_item_view_flags_neighbors_author(scoped: Sessio
     assert (await queries.item_view("EXMP-PRD-001", "R1")).flags == []
     with pytest.raises(NotFound):
         await queries.document_view("EXMP-PRD-404")
+
+
+# ── item_references_view · upstream_checklist ──
+async def test_item_references_view_upstream_downstream_missing_document(scoped: Session) -> None:
+    svc, ref, tr = SpecService(scoped), ReferenceService(scoped), TrackingService(scoped)
+    p = make_project(scoped)
+    a = author(scoped)
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
+    d = svc.get_document("EXMP-PRD-001")
+    pks = {i.item_id: i.pk for i in d.items}
+    ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])
+    rfq = svc.get_document("EXMP-RFQ-001")
+    q1 = next(i.pk for i in rfq.items if i.item_id == "Q1")
+    tr.raise_broken(q1)
+    # PRD#G1: 상위 Q1·#R1, 하위 없음
+    g1 = await queries.item_references_view("EXMP-PRD-001", "G1")
+    assert sorted((r.doc_id, r.item_id) for r in g1.upstream) == [
+        ("EXMP-PRD-001", "R1"),
+        ("EXMP-RFQ-001", "Q1"),
+    ]
+    assert g1.downstream == [] and [f.kind for f in g1.flags] == ["broken_ref"]
+    assert (g1.flags[0].cause.item_id, g1.flags[0].assignee.github_login) == ("Q1", "hoyoung")
+    assert g1.flags[0].cause_version_no is None  # broken_ref는 cause_version이 없다
+    # PRD#R1: 상위 미존재 Q9(raw_target만), 하위 G1(같은 문서 #R1)
+    r1 = await queries.item_references_view("EXMP-PRD-001", "R1")
+    assert [(r.is_missing, r.raw_target) for r in r1.upstream] == [(True, "EXMP-RFQ-001#Q9")]
+    assert [(r.doc_id, r.item_id) for r in r1.downstream] == [("EXMP-PRD-001", "G1")]
+    # RFQ#Q1: 하위 G1 (문서 전체 참조는 출발 항목이 없어 패널에 안 나옴)
+    q = await queries.item_references_view("EXMP-RFQ-001", "Q1")
+    assert [(r.doc_id, r.item_id, r.display_name) for r in q.downstream] == [
+        ("EXMP-PRD-001", "G1", "목표")
+    ]
+    assert q.upstream == []
+    with pytest.raises(NotFound):
+        await queries.item_references_view("EXMP-PRD-001", "R9")
+
+
+async def test_upstream_checklist_groups_by_target_in_stage_order(scoped: Session) -> None:
+    svc, ref = SpecService(scoped), ReferenceService(scoped)
+    p = make_project(scoped)
+    a = author(scoped)
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
+    body = PRD.replace(
+        "없는 항목 [[EXMP-RFQ-001#Q9]]", "근거 [[EXMP-RFQ-001#Q1]] · 둘째 [[EXMP-RFQ-001#Q2]]"
+    )
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, body, "h1", a, "spec: 테스트")
+    d = svc.get_document("EXMP-PRD-001")
+    pks = {i.item_id: i.pk for i in d.items}
+    ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])
+    got = await queries.upstream_checklist("EXMP-PRD-001")
+    rows = [
+        (u.target.doc_id, u.target.item_id, u.target_status, u.target_version_no, u.referenced_from)
+        for u in got
+    ]
+    assert rows == [
+        ("EXMP-RFQ-001", None, "draft", 1, ["(문서)"]),  # frontmatter upstream + 절 본문
+        ("EXMP-RFQ-001", "Q1", "draft", 1, ["G1", "R1"]),  # 같은 상위를 두 항목이 참조 → 한 행
+        ("EXMP-RFQ-001", "Q2", "draft", 1, ["R1"]),
+        ("EXMP-PRD-001", "R1", "draft", 1, ["G1"]),  # 같은 문서 참조도 상위
+    ]
+    assert await queries.upstream_checklist("EXMP-RFQ-001") == []  # 참조 없는 문서 → 빈 목록

@@ -6,3 +6,6 @@ __pycache__/
 node_modules/
 tools/data.json
 .claude/WORKLOG.md
+syncdoc/web/static/
+frontend/node_modules/
+.playwright-mcp/

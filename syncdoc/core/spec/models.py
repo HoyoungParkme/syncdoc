@@ -91,6 +91,7 @@ class Version(Base):
     author_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     instructed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     via: Mapped[str] = mapped_column(String(8))  # mcp | web | github — Author.via를 접은 것
+    message: Mapped[str] = mapped_column(Text)  # 커밋 메시지 전문 사본 (DOM-003)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

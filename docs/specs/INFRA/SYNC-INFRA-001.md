@@ -113,7 +113,7 @@ graph TB
 | 층 | 선택 | 이유 |
 |---|---|---|
 | 백엔드 | Python 3.12 / FastAPI | 요청자 주력 언어. MCP 파이썬 SDK 사용 가능 |
-| 프론트엔드 | React + Vite (SPA) · `react-markdown`+`remark-gfm`(MD 렌더, 항목 헤딩·`[[ ]]`는 커스텀 플러그인) · `mermaid`(다이어그램) · `react-flow`+`dagre`(UI-8 그래프 배치) · diff는 직접(항목별 hunk 구조가 라이브러리와 안 맞음) | 참조 그래프·diff·다이어그램처럼 상태가 있는 화면이 많다. 유저용 탭은 `_tools/view_build.py`가 참조 구현 |
+| 프론트엔드 | React + Vite + TS (SPA, `frontend/`). 유저용 탭 렌더링은 **`tools/view_build.py`를 TS로 옮긴 것**(`md.ts`·`views.ts`·타입별 모듈) — `react-markdown`은 쓰지 않는다(뷰 규약과 바이트 단위로 같아야 해서). `mermaid`(다이어그램) · `react-flow`+`dagre`(UI-8 그래프 배치, B4) · diff는 직접 | 빌드 결과는 `syncdoc/web/static/`으로, FastAPI가 `/{path:path}` 폴백으로 서빙. 별도 호스팅 없음 |
 | 메타데이터 DB | PostgreSQL | 아래 참고 |
 | Git 조작 | GitPython 또는 `git` CLI 호출 | 작업 사본에서 clone·commit·push |
 | 다이어그램 | mermaid.js (브라우저 렌더링). 서버 생성물 없음 | PRD R10 |
@@ -303,5 +303,4 @@ Cloudflare Tunnel은 노트북에서 별도로 실행하며 `:8000`을 공개 �
 - [ ] 토큰 암호화 비밀키의 보관 위치와 교체 절차
 - [ ] 저장소를 여러 개 등록했을 때 작업 사본 디스크 사용량 한도
 - [ ] Cloudflare Tunnel 고정 주소용 도메인 확보 여부
-- [ ] React 빌드 결과를 FastAPI가 직접 서빙할지, Cloudflare Pages에 별도로 올릴지
 - [ ] 원격 기본 브랜치 `main` 고정 — 다른 브랜치 저장소 지원은 v2

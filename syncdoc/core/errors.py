@@ -132,3 +132,25 @@ class NotImplementedYet(Problem):
 
     def __init__(self, card: str) -> None:
         super().__init__(f"{card}: 아직 구현되지 않음", card=card)
+
+
+class StatusBlocked(Problem):
+    type = "urn:syncdoc:status-blocked"
+    status = 409
+    title = "status-blocked"
+
+    def __init__(self, convention_error_detail: str | None, warnings: list[str]) -> None:
+        super().__init__(
+            "규약 오류 또는 미완성 문서는 승인할 수 없음",
+            convention_error_detail=convention_error_detail,
+            warnings=warnings,
+        )
+
+
+class UpstreamReviewRequired(Problem):
+    type = "urn:syncdoc:upstream-review-required"
+    status = 422
+    title = "upstream-review-required"
+
+    def __init__(self) -> None:
+        super().__init__("승인은 상위 대조를 거쳐야 함")

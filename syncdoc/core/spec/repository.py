@@ -5,7 +5,8 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from syncdoc.core.spec.models import Document, Item, StatusChange, Version
+from syncdoc.core.spec.models import Document, Item, StatusChange
+from syncdoc.core.spec.models import Version as VersionRow
 
 
 class SpecRepository:
@@ -19,6 +20,11 @@ class SpecRepository:
     def document_by_id(self, document_id: int) -> Document | None:
         return self.session.get(Document, document_id)
 
+    def documents_by_ids(self, ids: list[int]) -> list[Document]:
+        if not ids:
+            return []
+        return list(self.session.scalars(select(Document).where(Document.id.in_(ids))))
+
     def documents_of_project(self, project_id: int) -> list[Document]:
         stmt = select(Document).where(Document.project_id == project_id)
         return list(self.session.scalars(stmt))
@@ -29,7 +35,7 @@ class SpecRepository:
         )
         return max((int(d.rsplit("-", 1)[1]) for d in self.session.scalars(stmt)), default=0)
 
-    def add(self, row: Document | Item | Version | StatusChange) -> None:
+    def add(self, row: Document | Item | VersionRow | StatusChange) -> None:
         self.session.add(row)
         self.session.flush()
 
@@ -50,28 +56,64 @@ class SpecRepository:
             return []
         return list(self.session.scalars(select(Item).where(Item.id.in_(pks))))
 
-    # versions
-    def latest_version(self, document_id: int) -> Version | None:
+    def items_with_doc_id(self, pks: list[int]) -> list[tuple[Item, str]]:
+        if not pks:
+            return []
         stmt = (
-            select(Version)
-            .where(Version.document_id == document_id)
-            .order_by(Version.version_no.desc())
+            select(Item, Document.doc_id)
+            .join(Document, Document.id == Item.document_id)
+            .where(Item.id.in_(pks))
+        )
+        return [(i, d) for i, d in self.session.execute(stmt)]
+
+    # versions
+    def latest_version(self, document_id: int) -> VersionRow | None:
+        stmt = (
+            select(VersionRow)
+            .where(VersionRow.document_id == document_id)
+            .order_by(VersionRow.version_no.desc())
             .limit(1)
         )
         return self.session.scalar(stmt)
 
-    def latest_versions(self, document_ids: list[int]) -> dict[int, Version]:
+    def versions_by_ids(self, ids: list[int]) -> list[VersionRow]:
+        if not ids:
+            return []
+        return list(self.session.scalars(select(VersionRow).where(VersionRow.id.in_(ids))))
+
+    def recent_versions(self, project_id: int, n: int) -> list[tuple[VersionRow, str]]:
+        stmt = (
+            select(VersionRow, Document.doc_id)
+            .join(Document, Document.id == VersionRow.document_id)
+            .where(Document.project_id == project_id)
+            .order_by(VersionRow.created_at.desc(), VersionRow.id.desc())
+            .limit(n)
+        )
+        return [(v, d) for v, d in self.session.execute(stmt)]
+
+    def recent_status_changes(self, project_id: int, n: int) -> list[tuple[StatusChange, str]]:
+        stmt = (
+            select(StatusChange, Document.doc_id)
+            .join(Document, Document.id == StatusChange.document_id)
+            .where(Document.project_id == project_id, StatusChange.commit_hash.is_not(None))
+            .order_by(StatusChange.changed_at.desc(), StatusChange.id.desc())
+            .limit(n)
+        )
+        return [(c, d) for c, d in self.session.execute(stmt)]
+
+    def latest_versions(self, document_ids: list[int]) -> dict[int, VersionRow]:
         """문서마다 최근 버전 하나. 쿼리 한 번."""
         if not document_ids:
             return {}
         latest = (
-            select(Version.document_id, func.max(Version.version_no).label("no"))
-            .where(Version.document_id.in_(document_ids))
-            .group_by(Version.document_id)
+            select(VersionRow.document_id, func.max(VersionRow.version_no).label("no"))
+            .where(VersionRow.document_id.in_(document_ids))
+            .group_by(VersionRow.document_id)
             .subquery()
         )
-        stmt = select(Version).join(
+        stmt = select(VersionRow).join(
             latest,
-            (Version.document_id == latest.c.document_id) & (Version.version_no == latest.c.no),
+            (VersionRow.document_id == latest.c.document_id)
+            & (VersionRow.version_no == latest.c.no),
         )
         return {v.document_id: v for v in self.session.scalars(stmt)}

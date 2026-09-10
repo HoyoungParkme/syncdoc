@@ -2,7 +2,7 @@
 
 세 입구(MCP·웹·GitHub)가 전부 save_pipeline로 들어온다. 저장소 단위 asyncio.Lock(프로세스 내).
 세션은 여기서 연다(DEV-10 — 서비스는 세션을 열지 않는다). push가 DB 트랜잭션 앞이다.
-B1: save_pipeline. entry=web_status 분기는 B2(apply_status)에서.
+B1: save_pipeline · B2: web_status 분기(apply_status) · change_status(조율 — SpecService에서 옮김).
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from syncdoc import db
+from syncdoc.core.account.models import User
 from syncdoc.core.collab.service import CommentService
 from syncdoc.core.errors import (
     ConventionViolation,
@@ -21,6 +22,8 @@ from syncdoc.core.errors import (
     ItemDeletionNeedsConfirm,
     NotFound,
     NotImplementedYet,
+    StatusBlocked,
+    UpstreamReviewRequired,
     VersionConflict,
 )
 from syncdoc.core.markdown import parse_frontmatter
@@ -28,7 +31,15 @@ from syncdoc.core.project.service import ProjectService
 from syncdoc.core.reference.service import ReferenceService
 from syncdoc.core.spec.service import SpecService
 from syncdoc.core.tracking.service import TrackingService
-from syncdoc.core.types import Author, DocStatus, DocType, Entry, SaveResult
+from syncdoc.core.types import (
+    Author,
+    AuthorKind,
+    DocStatus,
+    DocType,
+    DocumentSummary,
+    Entry,
+    SaveResult,
+)
 from syncdoc.infra import git
 
 _locks: dict[str, asyncio.Lock] = {}
@@ -51,28 +62,33 @@ async def save_pipeline(
     upstream_impact: list[str] | None = None,
     confirm_item_deletion: bool = False,
     commit_hash: str | None = None,
+    reason: str | None = None,
+    session: Session | None = None,
 ) -> SaveResult:
     """SYNC-MS-007#pipeline.save_pipeline"""
     code = project_code if doc_id is None else doc_id.split("-")[0]
     if code is None:
         raise NotFound("project", "None")
+    args = (
+        entry,
+        doc_id,
+        doc_type,
+        body,
+        expected_version,
+        code,
+        author,
+        message,
+        changed_items,
+        upstream_impact,
+        confirm_item_deletion,
+        commit_hash,
+        reason,
+    )
     async with _lock(code):
+        if session is not None:  # change_status·revert가 넘긴 세션 — 같은 세션에서
+            return await _run(session, *args)
         with db.session_scope() as s:
-            return await _run(
-                s,
-                entry,
-                doc_id,
-                doc_type,
-                body,
-                expected_version,
-                code,
-                author,
-                message,
-                changed_items,
-                upstream_impact,
-                confirm_item_deletion,
-                commit_hash,
-            )
+            return await _run(s, *args)
 
 
 async def _run(
@@ -89,6 +105,7 @@ async def _run(
     upstream_impact: list[str] | None,
     confirm_item_deletion: bool,
     commit_hash: str | None,
+    reason: str | None,
 ) -> SaveResult:
     """save_pipeline 본체 — 락·세션 안."""
     spec, refs = SpecService(s), ReferenceService(s)
@@ -140,33 +157,46 @@ async def _run(
     assert commit_hash is not None
     # 8. 트랜잭션
     if entry == Entry.web_status:
-        raise NotImplementedYet("save_pipeline(entry=web_status) — B2 apply_status")
+        assert document is not None
+        spec.apply_status(document, body, commit_hash, author.user, reason)
+        collab.relocate(document.id, document.body, body, document.current_version_no)
+        s.commit()
+        return SaveResult(
+            doc_id,
+            document.current_version_no,
+            commit_hash,
+            spec.get_document(doc_id).status,
+            None,
+            [],
+        )
     if document is None:
-        version = spec.create(project.id, doc_id, doc_type, body, commit_hash, author)
+        version = spec.create(
+            project.id, doc_id, doc_type, body, commit_hash, author, message, validate_result=vr
+        )
         prev_version_id = None
     else:
-        prev = spec.repo.latest_version(document.id)
-        prev_version_id = prev.id if prev else None
+        prev_version_id = document.current_version_id
         version = spec.save(
             document,
             body,
             commit_hash,
             author,
+            message,
             deleted,
-            validate_result=vr if entry == Entry.github else None,
+            validate_result=vr,  # 모든 경로 — 경고가 mcp 저장에도 남아야 승인을 막는다
         )
     document_id = version.document_id
     # 9. 끊어진 참조
     for pk in deleted:
         tracking.raise_broken(pk)
     # 10. 참조 추출
-    item_pks = {i.item_id: i.pk for i in spec.get_document(doc_id).items}
+    item_pks = spec.item_pks(document_id)
     fm, _ = parse_frontmatter(body)
     upstream_ids = re.findall(r"[\w-]+", fm.get("upstream", "").strip("[]"))
     refs.extract(document_id, version.id, body, item_pks, upstream_ids)
     # 11. 변경 영향 (B1 스텁 → 빈 목록)
     affected = tracking.detect_impact(document_id, prev_version_id, version.id, changed_items)
-    if affected:
+    if affected:  # B1 스텁이 빈 목록이라 안 걸린다 (CODE-001 B1 스텁 표)
         raise NotImplementedYet("tracking.create_pending — B3")
     pending_id = None
     # 12. 하위→상위 되먹임
@@ -188,3 +218,44 @@ async def _run(
     s.commit()
     status = spec.get_document(doc_id).status
     return SaveResult(doc_id, version.version_no, commit_hash, status, pending_id, warnings)
+
+
+async def change_status(
+    doc_id: str,
+    to: DocStatus,
+    user: User,
+    reason: str | None,
+    upstream_reviewed: bool = False,
+    upstream_mismatch: list[str] = [],  # noqa: B006 — MINISPEC 시그니처 그대로
+) -> DocumentSummary:
+    """SYNC-MS-007#pipeline.change_status"""
+    with db.session_scope() as s:
+        spec = SpecService(s)
+        document = spec.get_document(doc_id)
+        if to == DocStatus.approved and (
+            document.has_convention_error or document.incomplete_warnings
+        ):
+            raise StatusBlocked(document.convention_error_detail, document.incomplete_warnings)
+        if to == DocStatus.approved and not upstream_reviewed:
+            raise UpstreamReviewRequired()
+        if document.status == to:
+            return document
+        new_body = re.sub(r"^status: .*$", f"status: {to}", document.body, count=1, flags=re.M)
+        author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.web_status)
+        await save_pipeline(
+            Entry.web_status,
+            doc_id,
+            None,
+            new_body,
+            document.current_version_no,
+            None,
+            author,
+            f"status({doc_id}): {document.status} → {to}\n\n{reason or ''}",
+            reason=reason,
+            session=s,
+        )
+        if upstream_mismatch:
+            pks = [spec.resolve_item(*t.partition("#")[::2]) for t in upstream_mismatch]
+            TrackingService(s).raise_upstream(pks, document.id, document.current_version_id, None)
+            s.commit()
+        return spec.get_document(doc_id)

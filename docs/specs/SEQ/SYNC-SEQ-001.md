@@ -411,16 +411,16 @@ sequenceDiagram
         Note over U: 하나씩 열어 보고 어긋난 것에 체크
     end
     U->>RD: POST /api/docs/{id}/status {to, reason, upstream_reviewed, upstream_mismatch[]}
-    RD->>S: change_status(doc_id, to, user, reason, upstream_reviewed, upstream_mismatch)
-    S->>DB: Document
+    RD->>P: change_status(doc_id, to, user, reason, upstream_reviewed, upstream_mismatch)
+    P->>S: get_document(doc_id)
     alt has_convention_error or incomplete_warnings, to=approved (1a)
-        S-->>RD: status-blocked {convention_error_detail, warnings}
+        P-->>RD: status-blocked {convention_error_detail, warnings}
     end
     alt to=approved and not upstream_reviewed
-        S-->>RD: upstream-review-required
+        P-->>RD: upstream-review-required
     end
-    S->>S: frontmatter.status 교체 → new_body
-    S->>P: save_pipeline(entry=web_status, doc_id, new_body, expected_version=current, author=human)
+    P->>P: frontmatter.status 교체 → new_body
+    P->>P: save_pipeline(entry=web_status, doc_id, new_body, expected_version=current, author=human, reason) — 같은 세션
     Note over P: entry=web_status는 본문이 안 바뀐다<br/>· validate (frontmatter만)<br/>· 버전 검사<br/>· push (message: "status(doc_id): from → to")<br/>· Version 생성 안 함 · extract 안 함 · detect_impact 안 함
     P->>G: commit_push(…, "status(SYNC-PRD-001): review → approved")
     G-->>P: commit_hash
@@ -429,15 +429,15 @@ sequenceDiagram
         P->>DB: StatusChange(from, to, user, reason, commit_hash)
     end
     opt upstream_mismatch 있음 (기본 흐름 5)
-        S->>TR: raise_upstream(target_pks, cause_document_id, cause_version_id)
+        P->>TR: raise_upstream(target_pks, cause_document_id, cause_version_id)
         TR->>DB: Flag(kind=upstream_impact, target=상위 항목, assignee=상위 문서 최근 작성자)
     end
-    P-->>S: commit_hash
-    S-->>RD: DocumentSummary
+    P-->>RD: DocumentSummary
     RD-->>U: 상태 뱃지 갱신
 ```
 
 **읽을 때 볼 것**
+- 상태 변경은 `pipeline.change_status`가 조율한다(B2 되먹임으로 SpecService에서 옮김). SpecService는 `get_document`·`apply_status`만
 - `승인`은 상위 대조를 건너뛸 수 없다. `upstream_reviewed=false`면 서버가 거부한다. 체크한 상위 항목엔 `upstream_impact` 플래그가 붙어 상위 담당자의 내 할 일에 뜬다 — 하위→상위 되먹임의 사람 경로
 - 상태 변경은 **Version을 만들지 않는다.** `StatusChange`가 커밋 해시를 갖는다. UI-7 이력에서 `status` 행은 `StatusChange`에서, `spec` 행은 `Version`에서 와서 시각순으로 합친다 → 되먹일 것 (DD에 `status_changes.commit_hash`가 없다)
 - 미해결 댓글 확인([[SYNC-UC-001#UC-H8]] 2a)은 서버가 막지 않는다. UI-5가 개수를 보여주고 한 번 더 묻는 것뿐
@@ -508,13 +508,12 @@ sequenceDiagram
     RD-->>U: UI-7 다이얼로그 4
 
     U->>RD: POST /api/docs/{id}/revert {to_version}
-    RD->>S: revert(doc_id, to_version, user)
-    S->>DB: Version where version_no=to_version
-    S-->>S: old_body
-    S->>P: save_pipeline(entry=web_revert, doc_id, old_body, expected_version=current, author=human)
+    RD->>P: revert(doc_id, to_version, user, confirm)
+    P->>S: get_document · versions where version_no=to_version
+    S-->>P: old_body
+    P->>P: save_pipeline(entry=web_revert, doc_id, old_body, expected_version=current, author=human, confirm) — 같은 세션
     Note over P: SEQ-1과 같은 파이프라인. 차이는 입구뿐<br/>· validate — 옛 본문이 지금 규약을 위반하면 convention-violation (4a)<br/>· 삭제 감지 — 옛 본문에 없는 항목이 지금 있으면 4b와 같이 확인<br/>· push, save(새 Version), extract, detect_impact, relocate
-    P-->>S: SaveResult
-    S-->>RD: SaveResult
+    P-->>RD: SaveResult
     RD-->>U: UI-5 (새 버전)
 ```
 

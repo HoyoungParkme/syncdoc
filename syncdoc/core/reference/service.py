@@ -87,3 +87,17 @@ class ReferenceService:
     def downstream(self, item_pk: int) -> list[RefEdge]:
         """SYNC-MS-003#ReferenceService.downstream"""
         return [_edge(r) for r in self.repo.to_item(item_pk)]
+
+    def upstream(self, item_pk: int) -> list[RefEdge]:
+        """SYNC-MS-003#ReferenceService.upstream"""
+        return [_edge(r) for r in self.repo.from_item(item_pk)]
+
+    def upstream_of_document(
+        self, document_id: int, include_missing: bool = False
+    ) -> list[RefEdge]:
+        """SYNC-MS-003#ReferenceService.upstream_of_document"""
+        return [_edge(r) for r in self.repo.from_document(document_id, include_missing)]
+
+    def downstream_of_document(self, document_id: int) -> list[RefEdge]:
+        """SYNC-MS-003#ReferenceService.downstream_of_document"""
+        return [_edge(r) for r in self.repo.to_document_only(document_id)]

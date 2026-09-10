@@ -23,8 +23,8 @@ async def call(tool: str, **args):
 def _seed(scoped: Session, a):
     svc, ref, tr = SpecService(scoped), ReferenceService(scoped), TrackingService(scoped)
     p = make_project(scoped)
-    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a)
-    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a)
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
     d = svc.get_document("EXMP-PRD-001")
     pks = {i.item_id: i.pk for i in d.items}
     ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])

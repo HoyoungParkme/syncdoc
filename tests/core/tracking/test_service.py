@@ -20,8 +20,8 @@ def _setup(db_session: Session):
     )
     p = make_project(db_session)
     a_rfq, a_prd = author(db_session, "rfq-writer"), author(db_session, "prd-writer")
-    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a_rfq)
-    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a_prd)
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a_rfq, "spec: 테스트")
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a_prd, "spec: 테스트")
     d = svc.get_document("EXMP-PRD-001")
     pks = {i.item_id: i.pk for i in d.items}
     ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])

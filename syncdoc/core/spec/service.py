@@ -11,24 +11,34 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from syncdoc.core.errors import ConventionViolation, ItemDeleted, NotFound
+from syncdoc.core.account.models import User
+from syncdoc.core.errors import (
+    ConventionViolation,
+    ItemDeleted,
+    NotFound,
+)
 from syncdoc.core.markdown import DOC_ID, HEADING, REF, cut_blocks, masked_lines, parse_frontmatter
 from syncdoc.core.spec.models import Document as DocumentRow
-from syncdoc.core.spec.models import Item, StatusChange, Version
+from syncdoc.core.spec.models import Item, StatusChange
+from syncdoc.core.spec.models import Version as VersionRow
 from syncdoc.core.spec.repository import SpecRepository
 from syncdoc.core.types import (
     STAGE_OF,
     Author,
     AuthorRef,
     DocItem,
+    DocRef,
     DocStatus,
     DocType,
     Document,
     DocumentSummary,
     Entry,
     ItemBlock,
+    ItemRef,
     ItemView,
     ValidateResult,
+    Version,
+    VersionBrief,
     Violation,
     Warning,
     fold_via,
@@ -225,7 +235,9 @@ class SpecService:
         body: str,
         commit_hash: str,
         author: Author,
-    ) -> Version:
+        message: str,
+        validate_result: ValidateResult | None = None,
+    ) -> VersionRow:
         """SYNC-MS-002#SpecService.create"""
         fm, _ = parse_frontmatter(body)
         row = DocumentRow(
@@ -237,19 +249,21 @@ class SpecService:
             current_version_no=1,
             has_convention_error=False,
         )
+        if validate_result is not None:  # save 7단계와 같은 규칙 — 첫 저장부터 경고가 남는다
+            _apply_validate(row, validate_result)
         self.repo.add(row)
         for b in self.item_blocks(body, doc_type, fm.get("title")):
             self.session.add(
                 Item(document_id=row.id, item_id=b.item_id, display_name=b.display_name)
             )
-        version = self._new_version(row.id, 1, commit_hash, body, author)
+        version = self._new_version(row.id, 1, commit_hash, body, author, message)
         self.repo.add(version)
         return version
 
     def _new_version(
-        self, document_id: int, no: int, commit_hash: str, body: str, author: Author
-    ) -> Version:
-        return Version(
+        self, document_id: int, no: int, commit_hash: str, body: str, author: Author, message: str
+    ) -> VersionRow:
+        return VersionRow(
             document_id=document_id,
             version_no=no,
             commit_hash=commit_hash,
@@ -258,6 +272,7 @@ class SpecService:
             author_user_id=author.user.id,
             instructed_by_user_id=author.instructed_by.id if author.instructed_by else None,
             via=fold_via(author.via),
+            message=message,
             created_at=now_utc(),
         )
 
@@ -275,11 +290,12 @@ class SpecService:
             **self._summary_fields(row, latest),
             body=row.current_body,
             commit_hash=latest.commit_hash if latest else None,
+            current_version_id=latest.id if latest else None,
             convention_error_detail=row.convention_error_detail,
             items=items,
         )
 
-    def _summary_fields(self, row: DocumentRow, latest: Version | None) -> dict:
+    def _summary_fields(self, row: DocumentRow, latest: VersionRow | None) -> dict:
         return {
             "id": row.id,
             "doc_id": row.doc_id,
@@ -293,7 +309,7 @@ class SpecService:
             "last_author": self._author_of(latest),
         }
 
-    def _author_of(self, v: Version | None) -> AuthorRef | None:
+    def _author_of(self, v: VersionRow | None) -> AuthorRef | None:
         """버전 행 → AuthorRef(id만). 이름은 queries가 AccountService.users_by_ids로."""
         if v is None:
             return None
@@ -340,15 +356,16 @@ class SpecService:
         body: str,
         commit_hash: str,
         author: Author,
+        message: str,
         deleted_item_pks: list[int],
         validate_result: ValidateResult | None = None,
         rebuild: bool = False,
-    ) -> Version:
+    ) -> VersionRow:
         """SYNC-MS-002#SpecService.save"""
         row = self.repo.document_by_id(document.id)
         assert row is not None
         new_no = row.current_version_no + 1
-        version = self._new_version(row.id, new_no, commit_hash, body, author)
+        version = self._new_version(row.id, new_no, commit_hash, body, author, message)
         self.repo.add(version)
         fm, _ = parse_frontmatter(body)
         for b in self.item_blocks(body, row.doc_type, fm.get("title")):
@@ -379,12 +396,7 @@ class SpecService:
         row.current_version_no = new_no
         row.status = str(new_status)
         if validate_result is not None:
-            v, w = validate_result.violations, validate_result.warnings
-            row.has_convention_error = bool(v)
-            row.convention_error_detail = "\n".join(f"{x.rule}: {x.message}" for x in v) or None
-            row.incomplete_warnings = (
-                json.dumps([str(x) for x in w], ensure_ascii=False) if w else None
-            )
+            _apply_validate(row, validate_result)
         self.session.flush()
         return version
 
@@ -427,6 +439,10 @@ class SpecService:
 
         return first(stage - 1), first(stage + 1)
 
+    def item_pks(self, document_id: int) -> dict[str, int]:
+        """SYNC-MS-002#SpecService.item_pks"""
+        return {i.item_id: i.id for i in self.repo.items_of(document_id)}
+
     def resolve_item(self, doc_id: str, item_id: str) -> int:
         """SYNC-MS-002#SpecService.resolve_item"""
         row = self.repo.document_by_doc_id(doc_id)
@@ -437,6 +453,93 @@ class SpecService:
             raise ItemDeleted(item.deleted_at.isoformat() if item.deleted_at else None)
         return item.id
 
+    def apply_status(
+        self,
+        document: Document,
+        new_body: str,
+        commit_hash: str | None,
+        user: User,
+        reason: str | None,
+        to: DocStatus | None = None,
+    ) -> None:
+        """SYNC-MS-002#SpecService.apply_status"""
+        row = self.repo.document_by_id(document.id)
+        assert row is not None
+        to = to or parse_frontmatter(new_body)[0].get("status", row.status)
+        self.session.add(
+            StatusChange(
+                document_id=row.id,
+                from_status=row.status,
+                to_status=str(to),
+                changed_by_user_id=user.id,
+                reason=reason,
+                commit_hash=commit_hash,
+                changed_at=now_utc(),
+            )
+        )
+        row.status = str(to)
+        row.current_body = new_body
+        self.session.flush()
+
+    def recent_changes(self, project_id: int, n: int = 10) -> list[Version]:
+        """SYNC-MS-002#SpecService.recent_changes"""
+        rows: list[Version] = [
+            Version(
+                doc_id=doc_id,
+                version_no=v.version_no,
+                commit_hash=v.commit_hash,
+                message=v.message,
+                author=self._author_of(v),  # type: ignore[arg-type]
+                created_at=v.created_at,
+            )
+            for v, doc_id in self.repo.recent_versions(project_id, n)
+        ] + [
+            Version(
+                doc_id=doc_id,
+                version_no=None,
+                commit_hash=c.commit_hash,  # type: ignore[arg-type]
+                message=f"status({doc_id}): {c.from_status} → {c.to_status}",
+                author=AuthorRef("human", c.changed_by_user_id, None, "web"),
+                created_at=c.changed_at,
+            )
+            for c, doc_id in self.repo.recent_status_changes(project_id, n)
+        ]
+        rows.sort(key=lambda r: r.created_at, reverse=True)
+        return rows[:n]
+
+    def describe_items(self, item_pks: list[int]) -> dict[int, ItemRef]:
+        """SYNC-MS-002#SpecService.describe_items"""
+        out: dict[int, ItemRef] = {}
+        for item, doc_id in self.repo.items_with_doc_id(item_pks):
+            out[item.id] = ItemRef(
+                doc_id=doc_id,
+                item_id=item.item_id,
+                display_name=item.display_name,
+                is_deleted=item.is_deleted,
+            )
+        return out
+
+    def describe_documents(self, document_ids: list[int]) -> dict[int, DocRef]:
+        """SYNC-MS-002#SpecService.describe_documents"""
+        out: dict[int, DocRef] = {}
+        for row in self.repo.documents_by_ids(document_ids):
+            title = parse_frontmatter(row.current_body)[0].get("title") or row.doc_id
+            out[row.id] = DocRef(
+                document_id=row.id,
+                doc_id=row.doc_id,
+                title=title,
+                stage=STAGE_OF.get(row.doc_type),
+                status=row.status,
+            )
+        return out
+
+    def versions_by_ids(self, version_ids: list[int]) -> dict[int, VersionBrief]:
+        """SYNC-MS-002#SpecService.versions_by_ids"""
+        return {
+            v.id: VersionBrief(v.id, v.document_id, v.version_no, v.created_at, v.message)
+            for v in self.repo.versions_by_ids(version_ids)
+        }
+
     def _deleted_item_ids(self, doc_id: str | None) -> set[str]:
         if not doc_id:
             return set()
@@ -444,6 +547,14 @@ class SpecService:
         if doc is None:
             return set()
         return {i.item_id for i in self.repo.items_of(doc.id, include_deleted=True) if i.is_deleted}
+
+
+def _apply_validate(row: DocumentRow, vr: ValidateResult) -> None:
+    """규약 결과 → documents 오류·경고 컬럼 (MS-002 create 1단계 · save 7단계)."""
+    v, w = vr.violations, vr.warnings
+    row.has_convention_error = bool(v)
+    row.convention_error_detail = "\n".join(f"{x.rule}: {x.message}" for x in v) or None
+    row.incomplete_warnings = json.dumps([str(x) for x in w], ensure_ascii=False) if w else None
 
 
 _CLASS = re.compile(r"class (\w+) \{(.*?)\}", re.S)
