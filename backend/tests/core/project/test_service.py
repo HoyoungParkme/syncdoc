@@ -64,6 +64,24 @@ async def test_init_project_empty_repo_creates_specs_commit_and_11_null_stages(
     assert "docs/specs/README.md" in tree and "docs/specs/assets/.gitkeep" in tree
 
 
+async def test_init_project_accepts_repository_with_no_commits_at_all(
+    db_session: Session, repos_dir, repos: dict
+) -> None:
+    """#6 — 커밋이 하나도 없는 저장소. 새 프로젝트를 시작하는 가장 흔한 방법이다 (UC-A1 기본 흐름 3)."""
+    from tests.core.account.test_service import make_user
+    from tests.infra.conftest import git as g
+
+    user = make_user(db_session, login="hoyoung")
+    bare = repos_dir.parent / "nocommit.git"
+    g(repos_dir.parent, "init", "-q", "--bare", "-b", "main", str(bare))
+
+    project = await ProjectService(db_session).init_project(str(bare), "EMP", "빈 저장소", user)
+
+    assert project.code == "EMP"
+    assert g(bare, "log", "-1", "--format=%s", "main") == "chore(EMP): init syncdoc"
+    assert "docs/specs/_templates/PRD.md" in g(bare, "ls-tree", "-r", "--name-only", "main")
+
+
 async def test_init_project_rejects_already_registered_repository(
     db_session: Session, repos_dir, repos: dict
 ) -> None:

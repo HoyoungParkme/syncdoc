@@ -208,3 +208,18 @@ class RepositoryAlreadyRegistered(Problem):
 
     def __init__(self, code: str) -> None:
         super().__init__(f"{code} 프로젝트가 이미 쓰는 저장소", code=code)
+
+
+class Internal(Problem):
+    """SYNC-API-001 2장 — 표에 없는 예외. 포괄 핸들러가 만든다.
+
+    detail은 고정 문구다. 예외 종류·메시지·스택은 로그로만 보낸다 — 본문에 실으면
+    내부 구조가 그대로 새어 나간다.
+    """
+
+    type = "urn:syncdoc:internal"
+    status = 500
+    title = "internal"
+
+    def __init__(self) -> None:
+        super().__init__("서버에서 처리하지 못한 오류입니다. 로그를 확인하세요.")

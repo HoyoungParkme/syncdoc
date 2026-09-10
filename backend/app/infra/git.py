@@ -85,6 +85,20 @@ async def checkout(workdir: Path, ref: str) -> None:
     await _run(workdir, "checkout", "--force", ref)
 
 
+async def _has_remote_head(workdir: Path) -> bool:
+    """원격에 커밋이 하나라도 있나. 빈 저장소면 `origin/HEAD`가 없다 (#6)."""
+    rc, _, _ = await _exec(workdir, "rev-parse", "--verify", "--quiet", "origin/HEAD")
+    return rc == 0
+
+
+async def _undo(workdir: Path, onto_remote: bool) -> None:
+    """push 실패 뒷정리. 빈 저장소였으면 되돌아갈 원격 커밋이 없어 로컬 커밋만 푼다."""
+    if onto_remote:
+        await _run(workdir, "reset", "--hard", "origin/HEAD")
+    else:
+        await _exec(workdir, "update-ref", "-d", "HEAD")
+
+
 async def commit_push(
     workdir: Path,
     message: str,
@@ -103,7 +117,10 @@ async def commit_push(
     except Unauthorized as e:
         raise PushFailed("미등록") from e
     await _run(workdir, "fetch", "origin")
-    await _run(workdir, "reset", "--hard", "origin/HEAD")
+    # 빈 저장소에는 되돌아갈 곳이 없다. 이 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3)
+    onto_remote = await _has_remote_head(workdir)
+    if onto_remote:
+        await _run(workdir, "reset", "--hard", "origin/HEAD")
     to_write = files
     for p, c in to_write.items():
         f = workdir / p
@@ -129,10 +146,10 @@ async def commit_push(
             break
         if not _rejected(out):
             # 거부가 아닌 실패 — 권한·네트워크 따위. 재시도해도 같다
-            await _run(workdir, "reset", "--hard", "origin/HEAD")
+            await _undo(workdir, onto_remote)
             raise PushFailed(err.strip() or out.strip())
         if attempt == settings.PUSH_RETRIES:
-            await _run(workdir, "reset", "--hard", "origin/HEAD")
+            await _undo(workdir, onto_remote)
             raise PushFailed(err.strip() or out.strip())
         await _run(workdir, "fetch", "origin")
         try:
@@ -239,8 +256,18 @@ async def rev_list_count(workdir: Path, range: str) -> int:
 
 
 async def exists(workdir: Path, path: str) -> bool:
-    """SYNC-MS-009#git.exists"""
-    return bool((await _run(workdir, "ls-tree", "HEAD", "--", path)).strip())
+    """SYNC-MS-009#git.exists
+
+    커밋이 하나도 없는 저장소는 False. HEAD가 가리키는 것이 없어 git이 실패하는데,
+    그것을 에러로 올리면 빈 저장소로 프로젝트를 시작하는 길이 막힌다(#6).
+    HEAD 없음만 삼키고 다른 git 오류는 그대로 올린다.
+    """
+    try:
+        return bool((await _run(workdir, "ls-tree", "HEAD", "--", path)).strip())
+    except GitError as e:
+        if "Not a valid object name" in e.stderr or "unknown revision" in e.stderr:
+            return False
+        raise
 
 
 _TEMPLATES_DIR = Path(__file__).resolve().parents[3] / "docs" / "specs" / "_templates"
