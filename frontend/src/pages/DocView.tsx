@@ -1,11 +1,14 @@
 /** UI-5 문서 뷰 — SYNC-UI-002#UI-5. 유저용(기본)·원본 탭, 목차, 오른쪽 패널(참조·댓글), 상태 변경 + 상위 대조 다이얼로그.
- *  유저용 탭 본문은 view/*.ts(view_build.py 포트, STD-002)가 만든 HTML을 innerHTML로 넣고 mermaid를 돌린다. */
+ *  유저용 탭 본문은 view/*.ts(view_build.py 포트, STD-002)가 만든 HTML을 innerHTML로 넣고 mermaid를 돌린다.
+ *  1 문서 바(1.1 상태, 1.2 버전) · 2 탭(2.1~2.3) · 3 상태 변경 · 4 규약 오류 · 4a 미완성 · 5 미해결 댓글
+ *  6 목차(6.1 표시된 항목, 6.2 왼쪽 손잡이) · 7 유저용 본문(7.1~7.4) · 8 패널(8.1 참조, 8.2 댓글, 8.3 오른쪽 손잡이)
+ *  9 단계 이동 · 10 원본(10.1 MD, 10.2 복사, 10.3 원문, 10.4 렌더링) · 11 상위 대조(11.1~11.4) */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
 import { api, ApiError, FLAG_KO, STATUS_KO, type Comment, type Document, type DownstreamView, type ItemReferences, type UpstreamCheck } from '../api/client'
 import { extraCss, renderView } from '../view'
-import { esc, splitRef } from '../view/md'
+import { esc, renderBlocks, splitRef } from '../view/md'
 import { StatusPill } from '../components/ui'
 
 
@@ -28,6 +31,14 @@ export function DocView() {
   const [mismatch, setMismatch] = useState<Set<string>>(new Set())
   const [reason, setReason] = useState('')
   const mainRef = useRef<HTMLElement>(null)
+  // 규칙: 사이드바 폭과 원문/렌더링 선택은 사람마다 기억한다. 화면을 옮겨도 유지된다
+  const [tocW, addTocW] = useWidth('syncdoc.ui5.toc', 200, 140, 400)
+  const [panelW, addPanelW] = useWidth('syncdoc.ui5.panel', 300, 180, 460)
+  const [rawMode, setRawMode] = useState<'text' | 'rendered'>(() => (readStore('syncdoc.ui5.raw') === 'rendered' ? 'rendered' : 'text'))
+  const pickRaw = (m: 'text' | 'rendered') => {
+    setRawMode(m)
+    writeStore('syncdoc.ui5.raw', m)
+  }
 
   const load = useCallback(() => {
     api
@@ -136,9 +147,17 @@ export function DocView() {
   const lines = doc.body.split('\n')
   const key = (u: UpstreamCheck) => `${u.target.doc_id}${u.target.item_id ? '#' + u.target.item_id : ''}`
   const toc = tocOf(doc)
+  const marked = markedItems(doc, comments)
+  const goItem = (id: string) => {
+    document.getElementById(`item-${id}`)?.scrollIntoView({ block: 'start' })
+    setSelected(id)
+    setPanel('refs')
+  }
 
   return (
-    <>
+    // 폭 변수를 화면 전체가 쥔다 — 원본 탭도 같은 값으로 사이드바 자리를 비워 둬야
+    // 탭을 오갈 때 본문이 좌우로 안 흔들린다 (UI-5 규칙)
+    <div className="docscreen" style={{ '--toc-w': `${tocW}px`, '--panel-w': `${panelW}px` } as React.CSSProperties}>
       <div className="docbar" data-el="1">
         <span>
           <b>{doc.doc_id}</b> ·{' '}
@@ -203,9 +222,22 @@ export function DocView() {
                 {t.text}
               </div>
             ))}
+            {/* 규칙: 플래그·미해결 댓글이 붙은 항목만. 하나도 없으면 블록 자체가 안 보인다 */}
+            {marked.length > 0 && (
+              <div className="marked" data-el="6.1">
+                <div className="lbl">표시된 항목</div>
+                {marked.map((m) => (
+                  <div key={m.id} onClick={() => goItem(m.id)}>
+                    <span className={`dot ${m.kind}`} /> {m.id} <span className="lbl">{m.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </nav>
+          <Handle el="6.2" onDrag={(dx) => addTocW(dx)} />
           <style>{extraCss}</style>
           <article className="main body" ref={mainRef} />
+          <Handle el="8.3" onDrag={(dx) => addPanelW(-dx)} />
           <aside className="panel" data-el="8">
             <div className="ptabs">
               <span className={panel === 'refs' ? 'on' : ''} data-el="8.1" onClick={() => setPanel('refs')}>
@@ -225,20 +257,36 @@ export function DocView() {
         </div>
       ) : (
         <div className="rawwrap" data-el="10">
-          <div className="rawbar">
-            <span className="lbl">에이전트가 읽는 원본 그대로 · 읽기 전용</span>
-            <span className="grow" />
-            <button className="btn" data-el="10.2" onClick={() => navigator.clipboard.writeText(doc.body)}>
-              복사
-            </button>
-          </div>
-          <div className="editor" data-el="10.1">
-            <div className="gutter">
-              {lines.map((_, i) => (
-                <span key={i}>{i + 1}</span>
-              ))}
+          <div className="rawinner">
+            <div className="rawbar">
+              <span className="lbl">에이전트가 읽는 원본 그대로 · 읽기 전용</span>
+              <span className="grow" />
+              <span className={`radio${rawMode === 'text' ? ' on' : ''}`} data-el="10.3" onClick={() => pickRaw('text')}>
+                원문
+              </span>
+              <span className={`radio${rawMode === 'rendered' ? ' on' : ''}`} data-el="10.4" onClick={() => pickRaw('rendered')}>
+                렌더링
+              </span>
+              <button className="btn" data-el="10.2" onClick={() => navigator.clipboard.writeText(doc.body)}>
+                복사
+              </button>
             </div>
-            <pre className="code">{doc.body}</pre>
+            {rawMode === 'text' ? (
+              <div className="editor" data-el="10.1">
+                <div className="gutter">
+                  {lines.map((_, i) => (
+                    <span key={i}>{i + 1}</span>
+                  ))}
+                </div>
+                <pre className="code">{doc.body}</pre>
+              </div>
+            ) : (
+              // 같은 MD를 파싱해 그린 것. 사람용 뷰(7)가 아니라 원본을 읽은 결과라
+              // frontmatter를 지우지 않고 회색 블록으로 남긴다
+              <div className="rawview" data-el="10.1">
+                <RawRendered doc={doc} />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -311,8 +359,113 @@ export function DocView() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** 10.4 렌더링 — 원본 MD를 그대로 파싱한 결과. frontmatter는 회색 블록으로 남긴다.
+ *  유저용 탭(7)과 다른 점: 참조를 링크로 잇지 않는다. 원본을 읽는 화면이라 이동이 목적이 아니다 */
+function RawRendered({ doc }: { doc: Document }) {
+  const m = /^---\n([\s\S]*?)\n---\n?/.exec(doc.body)
+  const front = m ? m[1] : ''
+  const rest = m ? doc.body.slice(m[0].length) : doc.body
+  const ctx = { selfId: doc.doc_id, href: () => '', exists: () => true }
+  return (
+    <>
+      {front && <pre className="front">{front}</pre>}
+      <div className="body" dangerouslySetInnerHTML={{ __html: renderBlocks(rest, ctx) }} />
     </>
   )
+}
+
+/** 6.1 표시된 항목 — 플래그가 붙은 항목과 미해결 댓글이 달린 항목. 본문 순서를 지킨다 */
+function markedItems(doc: Document, comments: Comment[]): { id: string; kind: string; label: string }[] {
+  const owner = itemOfLine(doc)
+  const cm = new Map<string, number>()
+  for (const c of comments) {
+    if (c.is_resolved) continue
+    const id = owner(c.line_no)
+    if (id) cm.set(id, (cm.get(id) ?? 0) + 1)
+  }
+  const out: { id: string; kind: string; label: string }[] = []
+  for (const it of doc.items) {
+    const n = cm.get(it.item_id) ?? 0
+    if (it.flags.length) out.push({ id: it.item_id, kind: 'flag', label: it.flags.map((f) => FLAG_KO[f] ?? f).join(' · ') })
+    else if (n) out.push({ id: it.item_id, kind: 'cm', label: `미해결 댓글 ${n}` })
+  }
+  return out
+}
+
+/** 줄 번호 → 그 줄이 속한 항목 ID. 댓글은 줄에 붙고 표시된 항목(6.1)은 항목 단위라 이어 줘야 한다 */
+function itemOfLine(doc: Document): (line: number) => string | null {
+  const ids = new Set(doc.items.map((i) => i.item_id))
+  const owner: (string | null)[] = []
+  let cur: string | null = null
+  let inCode = false
+  for (const l of doc.body.split('\n')) {
+    if (l.startsWith('```')) inCode = !inCode
+    const h = inCode ? null : /^#{2,6} (.+)$/.exec(l)
+    if (h) {
+      const tok = h[1].split(' ')[0]
+      cur = ids.has(tok) ? tok : null // 항목이 아닌 절 헤딩을 만나면 앞 항목이 끝난다
+    }
+    owner.push(cur)
+  }
+  return (line: number) => owner[line - 1] ?? null
+}
+
+/** localStorage는 사파리 프라이빗 모드 등에서 던진다. 기억은 편의라 실패해도 화면은 떠야 한다 */
+function readStore(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+function writeStore(key: string, v: string): void {
+  try {
+    localStorage.setItem(key, v)
+  } catch {
+    /* 기억만 못 할 뿐이다 */
+  }
+}
+
+/** 손잡이가 끄는 폭. 저장해 둔 값이 명세 범위 밖일 수 있어 잘라 넣는다.
+ *  **더하기는 반드시 함수형으로.** mousemove 리스너는 mousedown 때 한 번 만들어지므로
+ *  바깥 값을 그대로 읽으면 드래그 내내 같은 시작값에 마지막 증분만 더해진다 */
+function useWidth(key: string, init: number, min: number, max: number) {
+  const [w, setW] = useState(() => {
+    const v = Number(readStore(key))
+    return Number.isFinite(v) && v > 0 ? Math.min(max, Math.max(min, v)) : init
+  })
+  const add = (dx: number) =>
+    setW((prev) => {
+      const v = Math.min(max, Math.max(min, prev + dx))
+      writeStore(key, String(v))
+      return v
+    })
+  return [w, add] as const
+}
+
+/** 세로 손잡이. 드래그하는 동안만 window에 붙는다 — 놓으면 떼어 낸다 */
+function Handle({ el, onDrag }: { el: string; onDrag: (dx: number) => void }) {
+  const down = (e: React.MouseEvent) => {
+    e.preventDefault()
+    let last = e.clientX
+    const move = (m: MouseEvent) => {
+      onDrag(m.clientX - last)
+      last = m.clientX
+    }
+    const up = () => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+      document.body.style.userSelect = ''
+    }
+    document.body.style.userSelect = 'none' // 끄는 동안 본문이 선택되지 않게
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+  }
+  return <div className="handle" data-el={el} onMouseDown={down} />
 }
 
 function tocOf(doc: Document): { id: string; text: string; depth: number }[] {
