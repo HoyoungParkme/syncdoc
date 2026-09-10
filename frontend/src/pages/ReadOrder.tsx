@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { api, docPath, STAGE_TYPES, STATUS_KO, type Document, type DocumentSummary } from '../api/client'
+import { api, docPath, STAGE_TYPES, STATUS_KO, type Document, type DocumentSummary, type ProjectDetail } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { esc, splitRef } from '../view/md'
 
@@ -16,11 +16,16 @@ export function ReadOrder() {
   const nav = useNavigate()
   const stage = Number(sp.get('stage') ?? '1')
   const [docs, setDocs] = useState<DocumentSummary[]>([])
+  // 레일 왼쪽에 프로젝트 이름이 필요하다. 문서 목록만으로는 이름을 알 수 없다
+  const [projName, setProjName] = useState('')
   const [showDraft, setShowDraft] = useState(false)
   const [bodies, setBodies] = useState<Document[]>([])
   const mainRef = useRef<HTMLElement>(null)
   useEffect(() => {
-    api.get<DocumentSummary[]>(`/api/projects/${code}/docs`).then(setDocs)
+    api.get<ProjectDetail>(`/api/projects/${code}`).then((p) => {
+      setDocs(p.docs)
+      setProjName(p.name)
+    })
   }, [code])
   const inStage = docs.filter((d) => d.stage === stage).sort((a, b) => (a.doc_id < b.doc_id ? -1 : 1))
   const approved = inStage.filter((d) => d.status === 'approved')
@@ -82,13 +87,12 @@ export function ReadOrder() {
   const nextStage = target(1)
   const go = (s: number | null) => s !== null && setSp({ stage: String(s) })
   const label = (s: number | null) => (s === null ? '' : `${s} ${STAGE_TYPES[s - 1]}`)
-  const projName = bodies[0]?.project_name || code
   return (
     <div className="readscreen">
       {/* 단계 레일은 전폭 서브바다. 페이지 제목이 아니라 자리 표시가 여기 산다 */}
       <div className="steprail" data-el="1">
         <Link className="back" to={`/p/${code}`}>
-          ← {projName}
+          ← {projName || code}
         </Link>
         <div className="steps" data-el="2">
           {STAGE_TYPES.map((t, i) => {

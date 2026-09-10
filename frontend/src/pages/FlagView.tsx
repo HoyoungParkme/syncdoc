@@ -97,7 +97,8 @@ export function FlagView() {
               <ItemIdBadge>{f.target.item_id ?? f.target.doc_id}</ItemIdBadge>
               <b>{f.target.display_name}</b>
             </div>
-            <div className="body" data-el="3.3" dangerouslySetInnerHTML={{ __html: renderBlocks(f.target_body, ctx) }} />
+            {/* 항목 헤딩은 위 뱃지 줄이 이미 말한다 — 본문에서 걷어내지 않으면 제목이 두 번 나온다 */}
+            <div className="body" data-el="3.3" dangerouslySetInnerHTML={{ __html: renderBlocks(bodyWithoutHeading(f.target_body), ctx) }} />
           </div>
         </section>
         <div className="acts" data-el="4">
@@ -115,4 +116,10 @@ export function FlagView() {
       </div>
     </div>
   )
+}
+
+/** 항목 본문에서 맨 앞 항목 헤딩 한 줄을 걷어낸다. 화면이 제목을 따로 그리기 때문이다 */
+function bodyWithoutHeading(body: string): string {
+  const lines = body.split('\n')
+  return lines[0]?.startsWith('#') ? lines.slice(1).join('\n').replace(/^\n+/, '') : body
 }

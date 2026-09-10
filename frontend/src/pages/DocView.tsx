@@ -214,7 +214,7 @@ export function DocView() {
               <div className="lbl">표시된 항목</div>
               {marked.map((m) => (
                 <div key={m.id} onClick={() => goItem(m.id)}>
-                  <span className={`dot ${m.kind}`} /> {m.id} <span className="lbl">{m.label}</span>
+                  <span className={`dot dot-${m.kind}`} /> {m.id} <span className="lbl">{m.label}</span>
                 </div>
               ))}
             </div>
@@ -284,7 +284,7 @@ export function DocView() {
                   <span key={i}>{i + 1}</span>
                 ))}
               </div>
-              <pre className="code">{doc.body}</pre>
+              <pre className="mdsrc">{doc.body}</pre>
             </div>
           ) : (
             // 같은 MD를 파싱해 그린 것. 사람용 뷰(7)가 아니라 원본을 읽은 결과라
