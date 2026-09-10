@@ -96,4 +96,4 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 3. 미결사항
 
-- [ ] `repo_status`의 fetch 캐시
+- [x] `repo_status`의 fetch 캐시 — 결정: DB에서 읽는다. 폴링이 `behind_by`·`fetched_at`을 갱신하고 `repo_status`는 조회만 ([[SYNC-DOM-002]] 7장과 같은 결정)
