@@ -1497,7 +1497,7 @@ components:
           cause_diff:
             allOf:
             - $ref: '#/components/schemas/Diff'
-            description: "부여 시점 → 현재. 그 사이 또 바뀌었으면 누적([[SYNC-UC-001#UC-H11]] 3a)"
+            description: "플래그를 만든 변경의 직전 버전 → 현재. 부여 뒤 또 바뀌었으면 누적([[SYNC-UC-001#UC-H11]] 3a)"
           cause_change_count:
             type: integer
           target_body:
