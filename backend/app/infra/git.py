@@ -11,6 +11,7 @@ import re
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
+from app.config import settings
 from app.core.account.service import AccountService
 from app.core.errors import PushFailed, Unauthorized
 from app.core.types import Author, ChangedFile, Commit, spec_dir
@@ -45,6 +46,15 @@ async def _run(workdir: Path | None, *args: str) -> str:
     if code != 0:
         raise GitError(["git", *args], err)
     return out
+
+
+def _rejected(porcelain_out: str) -> bool:
+    """push --porcelain에서 거부된 ref가 있나.
+
+    stderr 문자열(`"rejected"`)로 판정하면 git 로케일이 영어가 아닐 때 거부를 놓친다.
+    --porcelain의 첫 글자 플래그는 번역되지 않는다 — 거부는 `!`.
+    """
+    return any(line.startswith("!") for line in porcelain_out.splitlines())
 
 
 def _with_token(remote_url: str, token: str) -> str:
@@ -112,24 +122,27 @@ async def commit_push(
     )
     await _run(workdir, *ident, "commit", "-q", "-m", message)
     url = _with_token((await _run(workdir, "remote", "get-url", "origin")).strip(), token)
-    try:
-        await _run(workdir, "push", url, "HEAD:main")
-    except GitError as first:
-        if "rejected" not in first.stderr:
+    # 거부(non-fast-forward)면 rebase 후 다시 민다. PUSH_RETRIES회까지 (MS-009 6단계)
+    for attempt in range(settings.PUSH_RETRIES + 1):
+        rc, out, err = await _exec(workdir, "push", "--porcelain", url, "HEAD:main")
+        if rc == 0:
+            break
+        if not _rejected(out):
+            # 거부가 아닌 실패 — 권한·네트워크 따위. 재시도해도 같다
             await _run(workdir, "reset", "--hard", "origin/HEAD")
-            raise PushFailed(first.stderr.strip()) from first
+            raise PushFailed(err.strip() or out.strip())
+        if attempt == settings.PUSH_RETRIES:
+            await _run(workdir, "reset", "--hard", "origin/HEAD")
+            raise PushFailed(err.strip() or out.strip())
         await _run(workdir, "fetch", "origin")
         try:
             await _run(workdir, *ident, "rebase", "origin/HEAD")
         except GitError as e:
+            # 같은 줄을 남이 고쳤다. 재시도로 안 풀린다 — 에이전트가 다시 읽어 합쳐야 한다
             await _exec(workdir, "rebase", "--abort")
             await _run(workdir, "reset", "--hard", "origin/HEAD")
             raise PushFailed("conflict") from e
-        try:
-            await _run(workdir, "push", url, "HEAD:main")
-        except GitError as e:
-            await _run(workdir, "reset", "--hard", "origin/HEAD")
-            raise PushFailed(e.stderr.strip()) from e
+        # 재시도 사이에 기다리지 않는다 — 락을 쥔 채 자면 같은 프로젝트의 저장이 전부 막힌다
     return (await _run(workdir, "rev-parse", "HEAD")).strip()
 
 

@@ -84,15 +84,16 @@ async def test_commit_push_same_content_makes_no_commit(repos: dict[str, Path]) 
 async def test_commit_push_rebases_when_remote_moved_on_other_file(
     repos: dict[str, Path], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    real_run = g._run
+    real_exec = g._exec
     pushed: list[str] = []
 
-    async def racing_run(workdir: Path | None, *args: str) -> str:
+    async def racing_exec(workdir: Path | None, *args: str) -> tuple[int, str, str]:
+        # push는 _exec로 나간다 — 종료 코드와 --porcelain 출력을 함께 봐야 하므로 (MS-009)
         if args[:1] == ("push",) and not pushed:
             pushed.append(write_commit_push(repos["other"], "docs/specs/01-RFQ/X.md", "x", "race"))
-        return await real_run(workdir, *args)
+        return await real_exec(workdir, *args)
 
-    monkeypatch.setattr(g, "_run", racing_run)
+    monkeypatch.setattr(g, "_exec", racing_exec)
     h = await g.commit_push(repos["work"], "spec: mine", _author(), path=SEED, content="mine")
     assert h == git(repos["remote"], "rev-parse", "main")
     assert git(repos["remote"], "rev-parse", "main~1") == pushed[0]
@@ -102,21 +103,64 @@ async def test_commit_push_rebases_when_remote_moved_on_other_file(
 async def test_commit_push_conflict_restores_workdir(
     repos: dict[str, Path], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    real_run = g._run
+    real_exec = g._exec
     pushed: list[str] = []
 
-    async def racing_run(workdir: Path | None, *args: str) -> str:
+    async def racing_exec(workdir: Path | None, *args: str) -> tuple[int, str, str]:
         if args[:1] == ("push",) and not pushed:
             pushed.append(write_commit_push(repos["other"], SEED, "theirs", "race"))
-        return await real_run(workdir, *args)
+        return await real_exec(workdir, *args)
 
-    monkeypatch.setattr(g, "_run", racing_run)
+    monkeypatch.setattr(g, "_exec", racing_exec)
     with pytest.raises(PushFailed) as ei:
         await g.commit_push(repos["work"], "spec: mine", _author(), path=SEED, content="mine")
     assert ei.value.extra["reason"] == "conflict"
     assert git(repos["work"], "status", "--porcelain") == ""
     assert git(repos["work"], "rev-parse", "HEAD") == pushed[0]
     assert (repos["work"] / SEED).read_text(encoding="utf-8") == "theirs"
+
+
+async def test_commit_push_retries_when_remote_moves_twice(
+    repos: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """연달아 두 번 끼어들어도 건진다 — PUSH_RETRIES 기본 3 (MS-009 6단계)."""
+    real_exec = g._exec
+    races: list[str] = []
+
+    async def racing_exec(workdir: Path | None, *args: str) -> tuple[int, str, str]:
+        if args[:1] == ("push",) and len(races) < 2:  # 첫 push와 첫 재시도 직전에 각각
+            races.append(write_commit_push(repos["other"], f"docs/specs/01-RFQ/{len(races)}.md", "x", "race"))
+        return await real_exec(workdir, *args)
+
+    monkeypatch.setattr(g, "_exec", racing_exec)
+    h = await g.commit_push(repos["work"], "spec: mine", _author(), path=SEED, content="mine")
+    assert len(races) == 2
+    assert h == git(repos["remote"], "rev-parse", "main")
+
+
+async def test_commit_push_rejection_detected_without_english_stderr(
+    repos: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """거부 판정은 --porcelain의 `!` 플래그로 한다. stderr가 영어가 아니어도 잡는다."""
+    real_exec = g._exec
+    seen: list[str] = []
+    raced: list[str] = []
+
+    async def localized_exec(workdir: Path | None, *args: str) -> tuple[int, str, str]:
+        if args[:1] == ("push",) and not raced:  # 밀기 직전에 남이 끼어든다
+            raced.append(write_commit_push(repos["other"], "docs/specs/01-RFQ/Y.md", "y", "race"))
+        rc, out, err = await real_exec(workdir, *args)
+        if args[:1] == ("push",):
+            seen.append(out)
+            if rc != 0:
+                err = "오류: 일부 참조를 푸시하지 못했습니다"  # 번역된 stderr
+        return rc, out, err
+
+    monkeypatch.setattr(g, "_exec", localized_exec)
+    h = await g.commit_push(repos["work"], "spec: mine", _author(), path=SEED, content="mine")
+    # stderr에 "rejected"가 없어도 --porcelain의 `!`로 거부를 잡아 재시도했다
+    assert any(line.startswith("!") for o in seen for line in o.splitlines())
+    assert h == git(repos["remote"], "rev-parse", "main")
 
 
 async def test_commit_push_leaves_no_token_in_config(repos: dict[str, Path]) -> None:
