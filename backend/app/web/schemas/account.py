@@ -15,6 +15,7 @@ class AccessToken(Base):
     issued_at: datetime
     expires_at: datetime | None
     revoked_at: datetime | None
+    last_used_at: datetime | None  # 만료가 없어 안 쓰는 토큰을 찾는 단서 (UI-13 3.5)
 
 
 class IssuedToken(AccessToken):

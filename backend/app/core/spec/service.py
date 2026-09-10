@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.account.models import User
 from app.core.errors import (
     ConventionViolation,
@@ -467,8 +468,15 @@ class SpecService:
             return []
         return [i.id for i in self.repo.items_by_item_ids(row.id, item_ids)]
 
-    def diff(self, doc_id: str, from_no: int, to_no: int) -> Diff:
-        """SYNC-MS-002#SpecService.diff"""
+    def diff(
+        self, doc_id: str, from_no: int, to_no: int, context: int = settings.DIFF_CONTEXT_LINES
+    ) -> Diff:
+        """SYNC-MS-002#SpecService.diff
+
+        `context`는 앞뒤로 함께 보여줄 줄 수다. 한 줄이면 마크다운 문단에서 무엇이
+        바뀌었는지는 보여도 어느 절의 변경인지가 안 보인다. detect_impact와 pipeline은
+        hunk의 item_id만 쓰므로 이 값과 무관하게 같은 결과를 낸다.
+        """
         row = self.repo.document_by_doc_id(doc_id)
         if row is None:
             raise NotFound("document", doc_id)
@@ -493,7 +501,9 @@ class SpecService:
             else:
                 lines = [
                     DiffLine({"+": "add", "-": "del", " ": "ctx"}[ln[0]], ln[1:])
-                    for ln in difflib.unified_diff(a.split("\n"), b.split("\n"), n=1, lineterm="")
+                    for ln in difflib.unified_diff(
+                        a.split("\n"), b.split("\n"), n=context, lineterm=""
+                    )
                     if ln[:3] not in ("---", "+++") and not ln.startswith("@@")
                 ]
             hunks.append(Hunk(item_id=item_id, lines=lines))
