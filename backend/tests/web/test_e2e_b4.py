@@ -59,9 +59,11 @@ async def test_s7_direct_push_catch_up_rebuild_and_revert(
     # 2. 서버가 꺼진 사이(webhook 없음) 시나리오가 push됨 → 켜질 때 따라잡기 (UC-G1 1a)
     write_commit_push(other, SCN_FILE, SCN, "spec(EXMP-SCN-001): 초안")
     login(client, scoped)
-    assert client.get("/api/admin/repos").json()[0]["behind_by"] == 1
-    assert [r.doc_id for r in await scheduler.catch_up()] == ["EXMP-SCN-001"]
+    # 화면은 폴링이 적어 둔 값을 읽는다(MS-001). 아직 안 쟀으므로 밖의 push를 모른다
     assert client.get("/api/admin/repos").json()[0]["behind_by"] == 0
+    assert [r.doc_id for r in await scheduler.catch_up()] == ["EXMP-SCN-001"]
+    caught = client.get("/api/admin/repos").json()[0]
+    assert caught["behind_by"] == 0 and caught["fetched_at"] is not None
 
     # 3. 플래그·댓글이 있는 채로 재구축 → 참조·버전 복원, 플래그·댓글 유지 (UC-S6)
     write_commit_push(

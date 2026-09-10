@@ -120,6 +120,7 @@ class RepoStatus:
     last_processed_commit: str | None
     synced_at: datetime | None
     behind_by: int | None
+    fetched_at: datetime | None = None  # behind_by를 잰 시각. 화면이 "언제 기준인지"를 보여준다
     error: str | None = None  # fetch 실패 사유. API 스키마에 없다 — UI-14에 표시(MS-001, 보고)
 
 

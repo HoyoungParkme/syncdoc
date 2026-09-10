@@ -121,10 +121,12 @@ async def test_webhook_admin_and_catch_up(client: TestClient, scoped: Session, p
         ("EXMP", head, 0)
     ]
     write_commit_push(other, PRD_FILE, PRD_BODY, "spec(EXMP-PRD-001): 초안")
-    assert client.get("/api/admin/repos").json()[0]["behind_by"] == 1
+    # 화면은 DB만 읽는다(MS-001). 폴링이 재기 전까지는 밖에서 push한 걸 아직 모른다
+    assert client.get("/api/admin/repos").json()[0]["behind_by"] == 0
     results = await scheduler.catch_up()
     assert [r.doc_id for r in results] == ["EXMP-PRD-001"]
-    assert client.get("/api/admin/repos").json()[0]["behind_by"] == 0
+    after = client.get("/api/admin/repos").json()[0]
+    assert after["behind_by"] == 0 and after["fetched_at"] is not None
     # 재구축
     rb = client.post("/api/admin/repos/EXMP/rebuild").json()
     assert (rb["docs"], rb["versions"]) == (3, 3) and rb["convention_errors"][0][

@@ -348,6 +348,8 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]:
             row = s.get(Repository, repo.id)
             assert row is not None
             row.last_processed_commit, row.synced_at = head_hash, datetime.now(UTC)
+            # 방금 head까지 처리했으니 뒤처짐은 0이다. 다음 폴링까지 낡은 값을 안 보이게
+            row.behind_by, row.fetched_at = 0, datetime.now(UTC)
             s.commit()
         repo.last_processed_commit = head_hash
     return results
@@ -503,6 +505,7 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
             result.references += ex.added
         refs.resolve_missing(project.id)
         repo.last_processed_commit, repo.synced_at = head, datetime.now(UTC)
+        repo.behind_by, repo.fetched_at = 0, datetime.now(UTC)  # 재구축은 head까지 읽었다
         s.commit()
     except Exception as e:  # noqa: BLE001 — 어느 단계든 실패하면 롤백 (MS-007)
         s.rollback()
