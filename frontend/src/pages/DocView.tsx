@@ -9,7 +9,7 @@ import mermaid from 'mermaid'
 import { api, ApiError, FLAG_KO, STATUS_KO, type Comment, type Document, type DownstreamView, type ItemReferences, type UpstreamCheck } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { esc, renderBlocks, splitRef } from '../view/md'
-import { StatusPill } from '../components/ui'
+import { ItemIdBadge, StatusPill } from '../components/ui'
 
 
 export function DocView() {
@@ -148,8 +148,10 @@ export function DocView() {
   const key = (u: UpstreamCheck) => `${u.target.doc_id}${u.target.item_id ? '#' + u.target.item_id : ''}`
   const toc = tocOf(doc)
   const marked = markedItems(doc, comments)
+  // 가운데 열만 스크롤한다 — scrollIntoView는 가장 가까운 스크롤 조상을 움직인다
+  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ block: 'start' })
   const goItem = (id: string) => {
-    document.getElementById(`item-${id}`)?.scrollIntoView({ block: 'start' })
+    scrollTo(`item-${id}`)
     setSelected(id)
     setPanel('refs')
   }
@@ -161,7 +163,7 @@ export function DocView() {
       {/* 브레드크럼 — 어디서 들어왔든 지금 자리를 말하고, 앞 두 조각으로 되짚어 올라간다 */}
       <div className="docbar" data-el="1">
         <Link className="crumb" to={`/p/${code}`}>
-          {code}
+          {doc.project_name || code}
         </Link>
         <span className="sep">›</span>
         <Link className="crumb mono" to={`/p/${code}#stage-${doc.stage ?? ''}`}>
@@ -197,102 +199,125 @@ export function DocView() {
         </span>
       </div>
 
-      {doc.has_convention_error && (
-        <div className="banner" data-el="4">
-          ⚠ 규약 오류: {doc.convention_error_detail} (커밋 {doc.commit_hash?.slice(0, 7)} · {doc.last_author?.user?.display_name})
-        </div>
-      )}
-      {doc.incomplete_warnings.length > 0 && (
-        <div className="banner warn" data-el="4a">
-          미완성: {doc.incomplete_warnings.join(' · ')} · 승인 불가
-        </div>
-      )}
+      {/* 3단 틀은 탭이 바뀌어도 그대로다 — 목차·패널이 사라지면 본문이 좌우로 흔들린다 (UI-5 규칙) */}
+      <div className="body3" data-el="7">
+        <nav className="toc" data-el="6">
+          <div className="lbl">목차</div>
+          {toc.map((t) => (
+            <div key={t.id} className={t.depth ? 'd1' : ''} title={t.text} onClick={() => scrollTo(t.id)}>
+              {t.text}
+            </div>
+          ))}
+          {/* 규칙: 플래그·미해결 댓글이 붙은 항목만. 하나도 없으면 블록 자체가 안 보인다 */}
+          {marked.length > 0 && (
+            <div className="marked" data-el="6.1">
+              <div className="lbl">표시된 항목</div>
+              {marked.map((m) => (
+                <div key={m.id} onClick={() => goItem(m.id)}>
+                  <span className={`dot ${m.kind}`} /> {m.id} <span className="lbl">{m.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </nav>
+        <Handle el="6.2" onDrag={(dx) => addTocW(dx)} />
+        <style>{extraCss}</style>
 
-      {tab === 'user' ? (
-        <div className="body3" data-el="7">
-          <nav className="toc" data-el="6">
-            <div className="lbl">목차</div>
-            {toc.map((t) => (
-              <div key={t.id} className={t.depth ? 'd1' : ''} onClick={() => document.getElementById(t.id)?.scrollIntoView({ block: 'start' })}>
-                {t.text}
-              </div>
-            ))}
-            {/* 규칙: 플래그·미해결 댓글이 붙은 항목만. 하나도 없으면 블록 자체가 안 보인다 */}
-            {marked.length > 0 && (
-              <div className="marked" data-el="6.1">
-                <div className="lbl">표시된 항목</div>
-                {marked.map((m) => (
-                  <div key={m.id} onClick={() => goItem(m.id)}>
-                    <span className={`dot ${m.kind}`} /> {m.id} <span className="lbl">{m.label}</span>
-                  </div>
+        <div className="mainwrap" data-el={tab === 'raw' ? '10' : undefined}>
+          <div className="tabs" data-el="2">
+            <span className={tab === 'user' ? 'on' : ''} data-el="2.1" onClick={() => setSp({})}>
+              유저용
+            </span>
+            <span className={tab === 'raw' ? 'on' : ''} data-el="2.2" onClick={() => setSp({ tab: 'raw' })}>
+              원본
+            </span>
+            <Link data-el="2.3" to={`/p/${code}/d/${docId}/history`}>
+              이력
+            </Link>
+            {/* 원문/렌더링과 복사는 탭과 같은 줄. 아래로 내리면 본문이 한 줄 더 밀린다 */}
+            {tab === 'raw' && (
+              <>
+                <span className="grow" />
+                <span className="radios">
+                  <span className={`radio${rawMode === 'text' ? ' on' : ''}`} data-el="10.3" onClick={() => pickRaw('text')}>
+                    원문
+                  </span>
+                  <span className={`radio${rawMode === 'rendered' ? ' on' : ''}`} data-el="10.4" onClick={() => pickRaw('rendered')}>
+                    렌더링
+                  </span>
+                </span>
+                <button className="btn sm" data-el="10.2" onClick={() => navigator.clipboard.writeText(doc.body)}>
+                  복사
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* 배너는 본문 열 안, 본문과 같은 폭. 유저용·원본 양쪽에 보인다 (UI-5 규칙) */}
+          {doc.has_convention_error && (
+            <div className="banner" data-el="4">
+              ⚠ 규약 오류: {doc.convention_error_detail} (커밋 {doc.commit_hash?.slice(0, 7)} · {doc.last_author?.user?.display_name})
+            </div>
+          )}
+          {doc.incomplete_warnings.length > 0 && (
+            <div className="banner warn" data-el="4a">
+              미완성: {doc.incomplete_warnings.join(' · ')} · 승인 불가
+            </div>
+          )}
+
+          {tab === 'user' ? (
+            <article className="main body" ref={mainRef} />
+          ) : rawMode === 'text' ? (
+            <div className="editor" data-el="10.1">
+              <div className="gutter">
+                {lines.map((_, i) => (
+                  <span key={i}>{i + 1}</span>
                 ))}
               </div>
-            )}
-          </nav>
-          <Handle el="6.2" onDrag={(dx) => addTocW(dx)} />
-          <style>{extraCss}</style>
-          <div className="mainwrap">
-            <Tabs tab={tab} setSp={setSp} code={code} docId={docId} />
-            <article className="main body" ref={mainRef} />
-          </div>
-          <Handle el="8.3" onDrag={(dx) => addPanelW(-dx)} />
-          <aside className="panel" data-el="8">
-            <div className="ptabs">
-              <span className={panel === 'refs' ? 'on' : ''} data-el="8.1" onClick={() => setPanel('refs')}>
-                참조
-              </span>
-              <span className={panel === 'comments' ? 'on' : ''} data-el="8.2" onClick={() => setPanel('comments')}>
-                댓글
-              </span>
+              <pre className="code">{doc.body}</pre>
             </div>
-            <div className="pbody">
-              {panel === 'refs' && (!selected ? <div className="lbl">항목을 선택하세요</div> : refs ? <Refs refs={refs} /> : <div className="lbl">선택: #{selected}</div>)}
-              {panel === 'comments' && (
-                <Comments comments={comments} line={line} setLine={setLine} draft={draft} setDraft={setDraft} add={addComment} resolve={resolve} lines={lines} />
-              )}
+          ) : (
+            // 같은 MD를 파싱해 그린 것. 사람용 뷰(7)가 아니라 원본을 읽은 결과라
+            // frontmatter를 지우지 않고 회색 블록으로 남긴다
+            <div className="rawview" data-el="10.1">
+              <RawRendered doc={doc} />
             </div>
-          </aside>
-        </div>
-      ) : (
-        <div className="rawwrap" data-el="10">
-          <div className="rawinner">
-            <Tabs tab={tab} setSp={setSp} code={code} docId={docId} />
-            <div className="rawbar">
-              <span className="lbl">에이전트가 읽는 원본 그대로 · 읽기 전용</span>
-              <span className="grow" />
-              <span className={`radio${rawMode === 'text' ? ' on' : ''}`} data-el="10.3" onClick={() => pickRaw('text')}>
-                원문
-              </span>
-              <span className={`radio${rawMode === 'rendered' ? ' on' : ''}`} data-el="10.4" onClick={() => pickRaw('rendered')}>
-                렌더링
-              </span>
-              <button className="btn" data-el="10.2" onClick={() => navigator.clipboard.writeText(doc.body)}>
-                복사
-              </button>
-            </div>
-            {rawMode === 'text' ? (
-              <div className="editor" data-el="10.1">
-                <div className="gutter">
-                  {lines.map((_, i) => (
-                    <span key={i}>{i + 1}</span>
-                  ))}
-                </div>
-                <pre className="code">{doc.body}</pre>
-              </div>
-            ) : (
-              // 같은 MD를 파싱해 그린 것. 사람용 뷰(7)가 아니라 원본을 읽은 결과라
-              // frontmatter를 지우지 않고 회색 블록으로 남긴다
-              <div className="rawview" data-el="10.1">
-                <RawRendered doc={doc} />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+          )}
 
-      <div className="docnav" data-el="9">
-        {doc.prev_doc_id ? <Link className="btn" to={`/p/${code}/d/${doc.prev_doc_id}`}>← {doc.prev_doc_id}</Link> : <span className="btn dis">←</span>}
-        {doc.next_doc_id ? <Link className="btn" to={`/p/${code}/d/${doc.next_doc_id}`}>{doc.next_doc_id} →</Link> : <span className="btn dis">→</span>}
+          <div className="docnav" data-el="9">
+            {doc.prev_doc_id ? <Link className="btn" to={`/p/${code}/d/${doc.prev_doc_id}`}>← {doc.prev_doc_id}</Link> : <span className="btn dis">←</span>}
+            {doc.next_doc_id ? <Link className="btn" to={`/p/${code}/d/${doc.next_doc_id}`}>{doc.next_doc_id} →</Link> : <span className="btn dis">→</span>}
+          </div>
+        </div>
+
+        <Handle el="8.3" onDrag={(dx) => addPanelW(-dx)} />
+        <aside className="panel" data-el="8">
+          <div className="ptabs">
+            <span className={panel === 'refs' ? 'on' : ''} data-el="8.1" onClick={() => setPanel('refs')}>
+              참조
+            </span>
+            <span className={panel === 'comments' ? 'on' : ''} data-el="8.2" onClick={() => setPanel('comments')}>
+              댓글{unresolved > 0 ? ` ${unresolved}` : ''}
+            </span>
+          </div>
+          <div className="pbody">
+            {panel === 'refs' &&
+              (!selected ? (
+                <div className="empty">
+                  항목을 선택하세요.
+                  <br />
+                  항목 헤더를 누르면 그 항목의 상위·하위 참조와 플래그가 여기 옵니다.
+                </div>
+              ) : refs ? (
+                <Refs refs={refs} />
+              ) : (
+                <div className="lbl">선택: #{selected}</div>
+              ))}
+            {panel === 'comments' && (
+              <Comments comments={comments} line={line} setLine={setLine} draft={draft} setDraft={setDraft} add={addComment} resolve={resolve} lines={lines} />
+            )}
+          </div>
+        </aside>
       </div>
 
       {upstream !== null && (
@@ -467,23 +492,6 @@ function Handle({ el, onDrag }: { el: string; onDrag: (dx: number) => void }) {
   return <div className="handle" data-el={el} onMouseDown={down} />
 }
 
-/** 탭은 본문 안 맨 위, 본문과 같은 폭. 밖에 두면 탭과 본문의 왼쪽 끝이 어긋난다 */
-function Tabs({ tab, setSp, code, docId }: { tab: string; setSp: (v: Record<string, string>) => void; code: string; docId: string }) {
-  return (
-    <div className="tabs" data-el="2">
-      <span className={tab === 'user' ? 'on' : ''} data-el="2.1" onClick={() => setSp({})}>
-        유저용
-      </span>
-      <span className={tab === 'raw' ? 'on' : ''} data-el="2.2" onClick={() => setSp({ tab: 'raw' })}>
-        원본
-      </span>
-      <Link data-el="2.3" to={`/p/${code}/d/${docId}/history`}>
-        이력
-      </Link>
-    </div>
-  )
-}
-
 function tocOf(doc: Document): { id: string; text: string; depth: number }[] {
   const out: { id: string; text: string; depth: number }[] = []
   const ids = new Set(doc.items.map((i) => i.item_id))
@@ -500,56 +508,56 @@ function tocOf(doc: Document): { id: string; text: string; depth: number }[] {
   return out
 }
 
+/** 8.1 참조 탭 — 선택 항목의 상위(근거)·하위(파생)·플래그. 각 줄은 카드다 */
 function Refs({ refs }: { refs: ItemReferences }) {
-  const link = (r: ItemReferences['upstream'][number]) =>
+  const card = (r: ItemReferences['upstream'][number], i: number) =>
     r.is_missing ? (
-      <li className="ref missing">
-        {r.raw_target} ?
-      </li>
+      <div className="rcard missing" key={i}>
+        <b className="mono">{r.raw_target}</b>
+        <div className="lbl">가리키는 항목이 없습니다</div>
+      </div>
     ) : (
-      <li className="ref">
-        <Link to={`/p/${r.doc_id?.split('-')[0]}/d/${r.doc_id}${r.item_id ? '#item-' + r.item_id : ''}`}>
+      <Link className="rcard" key={i} to={`/p/${r.doc_id?.split('-')[0]}/d/${r.doc_id}${r.item_id ? '#item-' + r.item_id : ''}`}>
+        <b className="mono">
           {r.doc_id}
-          {r.item_id ? '#' + r.item_id : ' (문서 전체)'}
-        </Link>{' '}
-        <span className="lbl">{r.display_name}</span>
-      </li>
+          {r.item_id ? '#' + r.item_id : ''}
+        </b>
+        <div className="lbl">{r.item_id ? r.display_name : '(문서 전체)'}</div>
+      </Link>
     )
   return (
     <>
-      <div className="lbl">
-        선택: <b>#{refs.item_id}</b>
+      <div className="lbl">선택</div>
+      <div className="selitem">
+        <ItemIdBadge>{refs.item_id}</ItemIdBadge>
       </div>
-      <h4>상위 참조</h4>
-      <ul>{refs.upstream.length ? refs.upstream.map((r, i) => <span key={i}>{link(r)}</span>) : <li className="lbl">없음</li>}</ul>
-      <h4>하위 참조</h4>
-      <ul>{refs.downstream.length ? refs.downstream.map((r, i) => <span key={i}>{link(r)}</span>) : <li className="lbl">없음 — 고립 항목</li>}</ul>
-      <h4>플래그</h4>
-      <ul>
-        {refs.flags.length ? (
-          refs.flags.map((f) => (
-            <li key={f.id}>
-              {FLAG_KO[f.kind] ?? f.kind}
-              {f.cause && (
-                <>
-                  {' '}
-                  · 원인{' '}
-                  <Link className="ref" to={`/p/${f.cause.doc_id?.split('-')[0]}/d/${f.cause.doc_id}#item-${f.cause.item_id}`}>
-                    {f.cause.doc_id}#{f.cause.item_id}
-                  </Link>
-                </>
-              )}
-              {f.assignee && <span className="lbl"> · 담당 {f.assignee.display_name}</span>}
-            </li>
-          ))
-        ) : (
-          <li className="lbl">없음</li>
-        )}
-      </ul>
+      <div className="lbl">상위 참조 (근거)</div>
+      {refs.upstream.length ? refs.upstream.map(card) : <div className="empty">없음</div>}
+      <div className="lbl">하위 참조 (파생) {refs.downstream.length || ''}</div>
+      {refs.downstream.length ? refs.downstream.map(card) : <div className="empty">없음 — 고립 항목</div>}
+      {refs.flags.length > 0 && (
+        <>
+          <div className="lbl">플래그</div>
+          {refs.flags.map((f) => (
+            <div className="rcard flagged" key={f.id}>
+              <b>{FLAG_KO[f.kind] ?? f.kind}</b>
+              <div className="lbl">
+                {f.cause && (
+                  <>
+                    원인 <span className="mono">{f.cause.doc_id}#{f.cause.item_id}</span>
+                  </>
+                )}
+                {f.assignee && <> · 담당 {f.assignee.display_name}</>}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
     </>
   )
 }
 
+/** 8.2 댓글 탭 — 줄에 달린 스레드. 카드 하나가 댓글 하나다 */
 function Comments(props: {
   comments: Comment[]
   line: number | null
@@ -562,16 +570,20 @@ function Comments(props: {
 }) {
   const { comments, line, setLine, draft, setDraft, add, resolve, lines } = props
   const thread = (c: Comment, depth = 0) => (
-    <div className={`cmt${c.is_resolved ? ' done' : ''}`} style={{ marginLeft: depth * 14 }} key={c.id}>
-      <div className="lbl">
-        {c.author?.display_name} · 줄 {c.line_no}
-        {c.original_location && ` (원본 위치 ${c.original_location})`}
+    <div className={`cmt${c.is_resolved ? ' done' : ''}`} style={{ marginLeft: depth * 10 }} key={c.id}>
+      <div className="cmth">
+        <b>{c.author?.display_name}</b>
+        <span className="grow" />
+        <span className="lineno mono">
+          줄 {c.line_no}
+          {c.original_location && ` (원본 ${c.original_location})`}
+        </span>
       </div>
-      <div>{c.body}</div>
+      <div className="cmtb">{c.body}</div>
       <div className="cacts">
         {depth === 0 && (
           <button className="btn sm" onClick={() => resolve(c, !c.is_resolved)}>
-            {c.is_resolved ? '다시 열기' : '해결됨'}
+            {c.is_resolved ? '다시 열기' : '해결 처리'}
           </button>
         )}
         <button
@@ -590,16 +602,19 @@ function Comments(props: {
   )
   return (
     <>
-      <div className="row">
-        <span className="lbl">줄</span>
-        <input className="inp" type="number" min={1} max={lines.length} value={line ?? ''} onChange={(e) => setLine(e.target.value ? Number(e.target.value) : null)} style={{ width: 70 }} />
-        {line && <span className="lbl mono">{lines[line - 1]?.slice(0, 40)}</span>}
+      {comments.length ? comments.map((c) => thread(c)) : <div className="empty">아직 댓글이 없습니다.</div>}
+      {/* 새 댓글은 줄에 붙는다 — 줄 번호가 없으면 저장할 곳이 없다 */}
+      <div className="compose">
+        <div className="row">
+          <span className="lbl">줄</span>
+          <input className="inp" type="number" min={1} max={lines.length} value={line ?? ''} onChange={(e) => setLine(e.target.value ? Number(e.target.value) : null)} style={{ width: 66 }} />
+          {line && <span className="lbl mono">{lines[line - 1]?.slice(0, 30)}</span>}
+        </div>
+        <textarea className="inp wide" rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="댓글" />
+        <button className="btn sm" data-el="7.4" disabled={!draft.trim() || !line} onClick={() => add(null)}>
+          새 댓글
+        </button>
       </div>
-      <textarea className="inp wide" rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="댓글" />
-      <button className="btn" data-el="7.4" disabled={!draft.trim() || !line} onClick={() => add(null)}>
-        새 댓글
-      </button>
-      {comments.map((c) => thread(c))}
     </>
   )
 }

@@ -63,6 +63,7 @@ class Document(DocumentSummary):
     prev_doc_id: str | None
     next_doc_id: str | None
     missing_refs: list[str]  # queries.document_view 4a — 유저용 탭 회색 ?
+    project_name: str
 
     @classmethod
     def of(cls, d: DocumentDto) -> Document:  # type: ignore[override]
@@ -75,6 +76,7 @@ class Document(DocumentSummary):
             prev_doc_id=d.prev_doc_id,
             next_doc_id=d.next_doc_id,
             missing_refs=d.missing_refs,
+            project_name=d.project_name,
         )
 
 

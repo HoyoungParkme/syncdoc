@@ -112,6 +112,7 @@ export interface Document extends DocumentSummary {
   prev_doc_id: string | null
   next_doc_id: string | null
   missing_refs: string[]
+  project_name: string
 }
 export interface ItemRef {
   doc_id: string | null

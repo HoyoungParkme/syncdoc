@@ -97,11 +97,12 @@ export function History() {
   const dels = diff ? diff.hunks.reduce((n, h) => n + h.lines.filter((l) => l.op === 'del').length, 0) : 0
   const adds = diff ? diff.hunks.reduce((n, h) => n + h.lines.filter((l) => l.op === 'add').length, 0) : 0
   const plainCtx = { selfId: docId, href: (d: string, it?: string) => docPath(d, it), exists: () => true }
+  const titleOf = new Map(doc.items.map((i) => [i.item_id, i.display_name ?? '']))
   return (
-    <>
+    <div className="docscreen">
       <div className="docbar" data-el="1">
         <Link className="crumb" to={`/p/${proj}`}>
-          {proj}
+          {doc.project_name || proj}
         </Link>
         <span className="sep">›</span>
         <Link className="crumb mono" to={`/p/${proj}#stage-${doc.stage ?? ''}`}>
@@ -157,11 +158,11 @@ export function History() {
             )
           })}
           <p className="hint">
-            두 개까지 고른다. 세 번째를 누르면 <b className="mono">A</b>가 밀려난다. <b className="mono">status</b> 커밋은 본문이 같아 되돌리기가 없다.
+            두 개까지 고른다. 세 번째를 누르면 <b className="mono">A</b>가 밀려난다.
           </p>
         </nav>
         <div className="handle" />
-        <section className="main" data-el="3">
+        <section className="mainwrap" data-el="3">
           <div className="tabs">
             <Link to={docPath(docId)}>유저용</Link>
             <Link to={`${docPath(docId)}?tab=raw`}>원본</Link>
@@ -179,6 +180,7 @@ export function History() {
                 <div className="dgroup" key={h.item_id ?? `_${i}`}>
                   <div className="dhead2">
                     {h.item_id ? <span className="idbadge">{h.item_id}</span> : <span className="lbl">항목 밖</span>}
+                    {h.item_id && <b className="dtitle">{titleOf.get(h.item_id)}</b>}
                     <span className="grow" />
                     {h.item_id && h.downstream_count > 0 && (
                       <span className="hint" data-el="3.3" onClick={() => showHint(h.item_id!)}>
@@ -212,7 +214,7 @@ export function History() {
           ) : (
             <div className="mybody body" data-el="3.2" dangerouslySetInnerHTML={{ __html: renderBlocks(doc.body.replace(/^---\n[\s\S]*?\n---\n/, ''), plainCtx) }} />
           )}
-          <p className="lbl">되돌리기는 "이전 내용으로 새 버전 생성"이며 이력이 지워지지 않는다. 되돌린 결과가 현재 규약을 위반하면 거부된다.</p>
+          <p className="footnote">되돌리기는 "이전 내용으로 새 버전 생성"이며 이력이 지워지지 않는다. 되돌린 결과가 현재 규약을 위반하면 거부된다.</p>
         </section>
         <div className="handle" />
         {/* 7 — 이 변경이 저장 전에 어디까지 번지는지 */}
@@ -228,6 +230,7 @@ export function History() {
                   <span className="grow" />
                   <span className="n">{h.downstream_count}</span>
                 </div>
+                <div className="lbl">{titleOf.get(h.item_id!)}</div>
               </div>
             ))}
           <p className="hint">항목 ID가 붙은 줄이 바뀌면 그 항목을 참조하는 하위 건수가 여기 나온다. 저장 전에 어디까지 번지는지 알 수 있다.</p>
@@ -287,6 +290,6 @@ export function History() {
           </div>
         </>
       )}
-    </>
+    </div>
   )
 }

@@ -282,6 +282,7 @@ class Document(DocumentSummary):
     items: list[DocItem] = field(default_factory=list)
     prev_doc_id: str | None = None
     next_doc_id: str | None = None
+    project_name: str = ""  # 브레드크럼 첫 조각 (UI-5 요소 1). queries.document_view가 채운다
 
 
 @dataclass
