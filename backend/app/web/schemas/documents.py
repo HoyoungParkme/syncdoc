@@ -102,3 +102,28 @@ class ChangeStatus(BaseModel):
     reason: str | None = None
     upstream_mismatch: list[str] = []
     upstream_reviewed: bool = False
+
+class ChainItem(Base):
+    ref: ItemRef
+    role: str
+    status: str
+    has_flag: bool
+
+
+class ChainRow(Base):
+    stage: int
+    doc_type: str
+    items: list[ChainItem]
+
+
+class ItemChain(Base):
+    """SYNC-API-001 ItemChain — UI-15. rows는 항상 11개."""
+
+    item: ItemRef
+    upstream_count: int
+    downstream_count: int
+    rows: list[ChainRow]
+
+    @classmethod
+    def of(cls, c) -> ItemChain:
+        return cls.model_validate(c, from_attributes=True)

@@ -10,6 +10,7 @@ from app.core.account.models import User
 from app.core.project.service import ProjectService
 from app.core.types import DocumentSummary as DocumentSummaryDto
 from app.core.types import FlagSummary as FlagSummaryDto
+from app.core.types import GraphScope
 from app.db import get_session
 from app.web.auth import current_user
 from app.web.schemas.comments import CommentSummary
@@ -80,9 +81,17 @@ async def list_items(
 @router.get("/{code}/graph", response_model=Graph)
 async def graph(
     code: str,
-    stage: int | None = Query(None, ge=1, le=11),
-    doc: str | None = None,
+    scope: GraphScope = GraphScope.all,
     user: User = Depends(current_user),
 ) -> Graph:
     """SYNC-API-001#GET/api/projects/{code}/graph"""
-    return Graph.of(await queries.graph_view(code, stage, doc))
+    return Graph.of(await queries.graph_view(code, scope))
+
+
+@router.delete("/{code}", status_code=204)
+async def delete_project(
+    code: str, session: Session = Depends(get_session), user: User = Depends(current_user)
+) -> None:
+    """SYNC-API-001#DELETE/api/projects/{code}"""
+    await ProjectService(session).delete_project(code)
+    session.commit()

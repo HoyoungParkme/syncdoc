@@ -24,6 +24,8 @@ from app.core.types import (
     AffectedItem,
     ApiAuthor,
     AuthorRef,
+    ChainItem,
+    ChainRow,
     DecisionDetail,
     Diff,
     DocStatus,
@@ -37,6 +39,8 @@ from app.core.types import (
     Graph,
     GraphEdge,
     GraphNode,
+    GraphScope,
+    ItemChain,
     ItemRef,
     ItemReferences,
     ItemView,
@@ -436,12 +440,22 @@ async def flag_view(flag_id: int) -> FlagDetail:
         return detail
 
 
-async def graph_view(code: str, stage: int | None = None, doc: str | None = None) -> Graph:
-    """SYNC-MS-008#queries.graph_view"""
+async def graph_view(code: str, scope: GraphScope = GraphScope.all) -> Graph:
+    """SYNC-MS-008#queries.graph_view
+
+    11단계를 다 그리되 범위로 골라낸다. 잘라내는 게 아니다 (SYNC-UI-001#UI-8 7장 3).
+    끝점이 범위 밖인 간선은 버린다 — 범위 밖과 미존재 참조는 다르다.
+    """
     with db.session_scope() as s:
         project = ProjectService(s).get(code)
         spec, refs = SpecService(s), ReferenceService(s)
-        briefs = spec.list_items_by_project(project.id, stage, doc)
+        briefs = spec.list_items_by_project(project.id)
+        flags = TrackingService(s).flags_for_items([b.pk for b in briefs if b.item_id])
+        if scope is GraphScope.approved:
+            ok = {d.doc_id for d in spec.list_by_project(project.id, status=DocStatus.approved)}
+            briefs = [b for b in briefs if b.doc_id in ok]
+        elif scope is GraphScope.flagged:
+            briefs = [b for b in briefs if b.item_id and flags.get(b.pk)]
         item_ids = {b.pk: f"{b.doc_id}#{b.item_id}" for b in briefs if b.item_id}
         doc_ids = {b.pk: b.doc_id for b in briefs if b.item_id is None}
         edges = refs.references_among(set(item_ids), include_document_targets=True)
@@ -452,34 +466,10 @@ async def graph_view(code: str, stage: int | None = None, doc: str | None = None
                 b.item_id,
                 b.stage,
                 True,
+                bool(flags.get(b.pk)),
             )
             for b in briefs
         }
-        # 범위 밖이지만 이어진 끝점 (UC-H4 2b)
-        out_items = {
-            pk
-            for e in edges
-            for pk in (e.from_item_pk, e.to_item_pk)
-            if pk is not None and pk not in item_ids
-        }
-        out_docs = {
-            d
-            for e in edges
-            for d in (e.from_document_id if e.from_item_pk is None else None, e.to_document_id)
-            if d is not None and d not in doc_ids
-        }
-        for pk, ref in spec.describe_items(list(out_items)).items():
-            item_ids[pk] = nid = f"{ref.doc_id}#{ref.item_id}"
-            nodes[nid] = GraphNode(
-                nid,
-                ref.doc_id or "",
-                ref.item_id,
-                STAGE_OF.get((ref.doc_id or "-").split("-")[1] if ref.doc_id else "", None),
-                True,
-            )
-        for did, dref in spec.describe_documents(list(out_docs)).items():
-            doc_ids[did] = dref.doc_id
-            nodes[dref.doc_id] = GraphNode(dref.doc_id, dref.doc_id, None, dref.stage, True)
         out_edges: list[GraphEdge] = []
         touched: set[str] = set()
         for e in edges:
@@ -491,18 +481,74 @@ async def graph_view(code: str, stage: int | None = None, doc: str | None = None
             dst = None
             if e.to_item_pk is not None:
                 dst = item_ids.get(e.to_item_pk)
+                if dst is None:
+                    continue  # 대상이 범위 밖이다. 미존재 참조가 아니므로 그리지 않는다
             elif e.to_document_id is not None:
                 dst = doc_ids.get(e.to_document_id)
+                if dst is None:
+                    continue
             out_edges.append(GraphEdge(src, dst, e.raw_target, e.is_missing))
             touched.add(src)
             if dst:
                 touched.add(dst)
         return Graph(
             nodes=[
-                GraphNode(n.id, n.doc_id, n.item_id, n.stage, n.id not in touched)
+                GraphNode(n.id, n.doc_id, n.item_id, n.stage, n.id not in touched, n.has_flag)
                 for n in nodes.values()
             ],
             edges=out_edges,
+        )
+
+
+def _closure(start: int, step) -> set[int]:
+    """한 방향으로 너비 우선. 방문 표시로 사이클을 멈추고 자기 자신은 뺀다 (MS-008)."""
+    seen: set[int] = set()
+    queue = [start]
+    while queue:
+        pk = queue.pop(0)
+        for e in step(pk):
+            nxt = e.to_item_pk if step.__name__ == "upstream" else e.from_item_pk
+            if nxt is not None and nxt not in seen:
+                seen.add(nxt)
+                queue.append(nxt)
+    seen.discard(start)
+    return seen
+
+
+async def item_chain(doc_id: str, item_id: str) -> ItemChain:
+    """SYNC-MS-008#queries.item_chain
+
+    직접 참조가 아니라 전이적 폐포다. 역할은 어느 폐포에서 나왔는지로 정한다 —
+    단계 번호로 정하면 되돌아오는 참조에서 근거를 파생으로 잘못 적는다.
+    """
+    with db.session_scope() as s:
+        spec, refs = SpecService(s), ReferenceService(s)
+        pk = spec.resolve_item(doc_id, item_id)
+        ups = _closure(pk, refs.upstream)
+        downs = _closure(pk, refs.downstream)
+        described = spec.describe_items([*ups, *downs, pk])
+        flags = TrackingService(s).flags_for_items([*ups, *downs, pk])
+        doc_ids = {r.doc_id for r in described.values() if r.doc_id}
+        statuses = {did: spec.get_document(did).status for did in doc_ids}
+        by_stage: dict[int, list[ChainItem]] = {}
+        for p_, role in [(pk, "self"), *[(u, "upstream") for u in ups],
+                         *[(d, "downstream") for d in downs]]:
+            ref = described.get(p_)
+            if ref is None or ref.doc_id is None:
+                continue
+            stage = STAGE_OF.get(ref.doc_id.split("-")[1])
+            if stage is None:
+                continue  # STD는 단계 밖이라 체인에 안 놓는다
+            by_stage.setdefault(stage, []).append(
+                ChainItem(ref, role, statuses.get(ref.doc_id, "draft"), bool(flags.get(p_)))
+            )
+        types = ["RFQ", "PRD", "SCN", "UC", "INFRA", "DOM", "UI", "API", "SEQ", "MS", "CODE"]
+        return ItemChain(
+            item=described[pk],
+            upstream_count=len(ups),
+            downstream_count=len(downs),
+            # 항상 11행. 빈 단계도 남긴다 — 체인이 어디서 끊겼는지가 이 화면의 목적이다
+            rows=[ChainRow(i + 1, t, by_stage.get(i + 1, [])) for i, t in enumerate(types)],
         )
 
 
