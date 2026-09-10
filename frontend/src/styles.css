@@ -107,6 +107,8 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 /* 화면마다 주 동작 하나. 검정 채움은 그 하나에만 준다 */
 .btn.solid{background:var(--ink-body);border-color:var(--ink-body);color:#fff;font-weight:var(--w-medium);padding:var(--space-7) var(--space-13)}
 .btn.solid:hover{background:#000}
+/* `.btn.solid`가 뒤에 와서 `.btn.sm`의 padding을 덮는다 — 작은 채움 버튼은 여기서 되돌린다 */
+.btn.sm.solid{padding:var(--space-6) var(--space-12);font-size:var(--text-meta)}
 .btn.big{padding:var(--space-11) var(--space-22);font-size:15px;font-weight:var(--w-semibold)}
 .btn.dis,.btn:disabled{opacity:.4;cursor:default}.btn.dis:hover,.btn:disabled:hover{background:var(--bg-card)}
 .lbl{color:var(--ink-faint);font-size:var(--text-caption)}
@@ -216,13 +218,19 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
   background:var(--bg-subtle);border:1px solid var(--border);border-radius:var(--radius-panel-card);
   font-size:var(--text-caption)}
 .willcommit .mono{display:block;color:var(--ink-muted);font-size:var(--text-mono-sm);margin-top:var(--space-3)}
-/* UI-13 카드 넷 */
-.setdlg .dbody{background:var(--bg-app)}
+/* UI-13 카드 넷 — 토큰이 먼저다. 이 화면에 오는 이유가 토큰이라서 */
+.setdlg{width:min(620px,92vw)}
+.setdlg .dbody{background:var(--bg-subtle);padding:var(--space-16) var(--space-18)}
 .card{border:1px solid var(--border);border-radius:var(--radius-panel-card);background:var(--bg-card);
-  padding:var(--space-12) var(--space-14);margin-bottom:var(--space-12)}
+  padding:var(--space-16);margin-bottom:var(--space-14)}
 .card:last-child{margin-bottom:0}
-.cardh{display:flex;align-items:center;gap:var(--space-8);margin-bottom:var(--space-6);font-size:var(--text-card-title)}
+.cardh{display:flex;align-items:center;gap:var(--space-8);margin-bottom:var(--space-9);font-size:var(--text-card-title)}
 .cardh b{font-weight:var(--w-semibold)}
+/* 카드 머리는 제목과 동작만 든다. 설명은 아래 줄 */
+.card>.lbl{margin:0 0 var(--space-4);line-height:1.7;font-size:var(--text-ui)}
+/* 토큰 행은 두 줄 — 이름과, 고정폭으로 발급일 */
+.row .two{display:flex;flex-direction:column;gap:1px;min-width:0}
+.row .two .lbl{font-size:var(--text-mono-sm)}
 .snippet{margin:var(--space-8) 0 0;padding:var(--space-10) var(--space-12);background:var(--bg-sunken);
   border-radius:var(--radius-control);font-family:var(--font-mono);font-size:var(--text-mono-sm);
   color:var(--ink-muted);overflow-x:auto;white-space:pre}
@@ -245,12 +253,14 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .row:first-of-type{border-top:none}
 /* 폐기된 토큰 행은 흐리게 남긴다. 지우지 않는다 */
 .dimrow{opacity:.55}
-/* 4 토큰 원문 상자 — 발급 직후에만. 서버는 해시만 저장해 다시 보여줄 수 없다 */
-.tokbox{background:var(--ink-body);color:#fff;padding:var(--space-10) var(--space-12);
-  margin:var(--space-10) 0;border-radius:var(--radius-control);font-size:var(--text-caption)}
-.tokbox .tok{font-family:var(--font-mono);font-size:var(--text-mono-id);margin:var(--space-6) 0;word-break:break-all}
-.tokbox .btn{background:none;border-color:rgba(255,255,255,.4);color:#fff}
-.tokbox .btn:hover{background:rgba(255,255,255,.1)}
+/* 4 토큰 원문 상자 — 발급 직후에만. 서버는 해시만 저장해 다시 보여줄 수 없다.
+   주의색이다. 다시 못 보는 값이라는 게 색으로 먼저 읽혀야 한다 */
+.tokbox{border:1px solid var(--status-review);background:var(--caution-bg);padding:var(--space-11);
+  margin:var(--space-10) 0;border-radius:var(--radius-control);font-size:13.5px}
+.tokbox>b{display:block;margin-bottom:var(--space-5);font-weight:var(--w-semibold)}
+.tokbox .tok{font-family:var(--font-mono);font-size:13.5px;background:var(--bg-card);
+  border:1px solid var(--border);border-radius:var(--radius-chip);padding:var(--space-8) var(--space-10);
+  margin:0 0 var(--space-8);word-break:break-all}
 /* UI-4 프로젝트 상세 */
 .phead .repo{display:inline-block;margin-top:var(--space-3);font-size:var(--text-meta);color:var(--ink-muted)}
 /* 3 요약 수치 여섯 칸. 0이면 흐리게, 1 이상이면 경고색 + 경고 테두리 */
@@ -627,6 +637,8 @@ a.arow:hover{background:var(--bg-subtle)}
 .glegend svg.sw .e{marker-end:none}
 
 /* UI-15 11단계 흐름 — 11단계를 다 나열한다. 항목 없는 단계도 남긴다 */
+/* 720px — 11단계 행이 세로로 쌓인다. 넓히면 칩 사이가 벌어져 행이 헐거워진다 */
+.chaindlg{width:min(720px,92vw)}
 .chaindlg .dbody{padding-top:var(--space-12)}
 .chain{margin-top:var(--space-12);border:1px solid var(--border);border-radius:var(--radius-control);overflow:hidden}
 .crow{display:grid;grid-template-columns:120px minmax(0,1fr);gap:var(--space-10);
@@ -636,7 +648,9 @@ a.arow:hover{background:var(--bg-subtle)}
 .crow.cur{background:var(--caution-bg)}
 .crow.empty{background:var(--bg-subtle)}
 .crow.empty .cstage,.crow.empty .cchips{color:var(--ink-disabled)}
+/* 현재 항목이 있는 행은 라벨까지 주의색 — 행 배경만으로는 훑을 때 놓친다 */
 .cstage{font-family:var(--font-mono);font-size:var(--text-mono-sm);color:var(--ink-muted);line-height:1.6}
+.crow.cur .cstage,.crow.cur .cstage .lbl{color:var(--caution-ink);font-weight:var(--w-semibold)}
 .cstage .lbl{font-family:var(--font-sans);font-size:var(--text-caption)}
 .cchips{display:flex;flex-wrap:wrap;gap:var(--space-5);align-items:flex-start;font-size:var(--text-caption)}
 /* 제목이 긴 항목이 한 줄을 통째로 먹지 않게 자른다. 전체는 title 속성으로 본다 */
@@ -649,7 +663,8 @@ a.arow:hover{background:var(--bg-subtle)}
 .chip .dot-review{background:var(--status-review)}
 .chip .dot-approved{background:var(--status-approved)}
 /* 기준 항목. 여기서 다시 그릴 것이 없으니 누를 것도 아니다 */
-.chip.me{background:var(--ink-body);color:#fff;border-color:var(--ink-body);cursor:default}
+/* 이 항목 칩 — 채우지 않는다. 자리 표시는 행 배경과 왼쪽 라벨이 이미 하고 있다 */
+.chip.me{background:var(--bg-card);border:1.5px solid var(--ink-body);font-weight:var(--w-semibold);cursor:default}
 .chip.gone{border-style:dashed;color:var(--ink-disabled);cursor:default}
 /* UI-9 순서대로 읽기 */
 /* 화면 높이를 채우고 본문만 스크롤한다. 레일은 위에 붙어 있는다 */
@@ -715,19 +730,30 @@ a.arow:hover{background:var(--bg-subtle)}
 
 /* UI-16 사용 방법 — 읽기 전용 표 둘. 공통 table.grid는 칸을 가운데로 모는데
    여기는 문장이라 왼쪽 정렬이 낫다. 번호·코드 칸만 가운데 */
-.howto table.grid{width:100%;border-collapse:collapse;font-size:var(--text-meta);background:none;margin-bottom:var(--space-18)}
+/* 660px — 문장이 든 표 둘. 넓히면 설명 열이 한 줄로 늘어져 훑기 어렵다 */
+.howto{width:min(660px,92vw)}
+.howto .dlead{margin:0 0 var(--space-16);font-size:var(--text-ui);color:var(--ink-muted);line-height:1.7;text-wrap:pretty}
+/* 두 번째 표에 붙는 제목 — 위 여백을 아래보다 크게 줘야 아래 표에 딸린 것으로 읽힌다 */
+.sectitle{margin:var(--space-22) 0 var(--space-8);font-size:14px;font-weight:var(--w-semibold)}
+.howto table.grid{width:100%;border-collapse:collapse;font-size:var(--text-meta);background:none;
+  border:1px solid var(--border);border-radius:var(--radius-control);overflow:hidden;margin-bottom:0}
 .howto table.grid:last-of-type{margin-bottom:var(--space-14)}
-.howto table.grid th,.howto table.grid td{padding:var(--space-6) var(--space-8);border-bottom:1px solid var(--divider);text-align:left}
-.howto tr.hd th{background:var(--bg-subtle);color:var(--ink-muted);font-size:var(--text-caption);font-weight:var(--w-semibold);border-bottom:1px solid var(--border)}
+.howto table.grid th,.howto table.grid td{padding:var(--space-8) var(--space-11);border-bottom:1px solid var(--divider-soft);text-align:left;line-height:1.5;vertical-align:baseline}
+.howto table.grid tr:last-child td{border-bottom:none}
+/* 단계 이름이 시선 1순위다 — 뜻풀이는 그 뒤에 붙는 설명 */
+.howto table.grid td b{font-weight:var(--w-semibold);color:var(--ink-body)}
+.howto tr.hd th{background:none;color:var(--ink-faint);font-size:var(--text-caption);font-weight:var(--w-regular);border-bottom:1px solid var(--divider)}
 .howto td.no,.howto tr.hd th:first-child{width:26px;text-align:center;color:var(--ink-faint);font-family:var(--font-mono);font-size:var(--text-mono-sm)}
 .howto td.code{width:64px;font-family:var(--font-mono);font-size:var(--text-mono-id);font-weight:var(--w-semibold)}
-.howto td.where{color:var(--ink-muted);white-space:nowrap}
+.howto td.where{color:var(--ink-muted);white-space:nowrap;width:74px}
+/* 항목 ID는 고정폭 평문. 칩으로 그리면 표에 색 상자가 열한 줄 생긴다 */
+.howto td.ids{width:150px;font-family:var(--font-mono);font-size:var(--text-mono-sm);color:var(--ink-muted)}
 /* 단계 밖이라 흐리게 — 표를 훑을 때 11개와 섞이지 않게 */
 .howto tr.std td{color:var(--ink-faint)}
 .howto code{display:inline-block;padding:0 var(--space-5);border-radius:var(--radius-badge);
   background:var(--bg-sunken);color:var(--ink-muted);font-family:var(--font-mono);font-size:var(--text-mono-sm)}
 /* 칸 안에서만 띄운다. 3.3 문장에 붙으면 뒤 쉼표가 떨어져 보인다 */
 .howto td code+code{margin-left:var(--space-5)}
-.howto .lbl{color:var(--ink-muted);font-size:var(--text-meta);line-height:1.7;margin:0 0 var(--space-10)}
-.howto .note{margin:0;padding:var(--space-8) var(--space-12);border-radius:var(--radius-control);
+.howto .lbl{color:var(--ink-muted);font-size:var(--text-caption);line-height:1.7;margin:var(--space-7) 0 var(--space-12)}
+.howto .note{margin:0;padding:var(--space-10) var(--space-12);border-radius:var(--radius-control);
   background:var(--caution-bg);color:var(--caution-ink);font-size:var(--text-meta)}
