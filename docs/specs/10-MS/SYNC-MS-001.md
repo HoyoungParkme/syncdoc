@@ -28,6 +28,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#ProjectService.list_projects]] | 목록 |
 | [[#ProjectService.get]] | 코드 → 프로젝트 |
 | [[#ProjectService.repo_status]] | 동기화 상태 |
+| [[#ProjectService.delete_project]] | 등록 해제·작업 사본 회수 |
 | [[#ProjectService.rebuild_index]] | 재구축 위임 |
 
 ---
@@ -82,7 +83,41 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-SEQ-001#SEQ-20]] · UI-14 표 2
 
-**처리** 저장소마다 `git.fetch(workdir)` (public. private이면 등록자 토큰 — MS-009 8장 미결) · if fetch 실패 → `behind_by=None`, `error`를 채워 UI-14에 표시 · `behind = git.rev_list_count(workdir, f"{last_processed_commit}..origin/HEAD")` · if `last_processed_commit is None` → `behind=None`(문서 없음) · `→ RepoStatus(code, remote_url, last_processed_commit, synced_at, behind_by)`. 캐시 여부는 미결
+**처리** **DB만 읽는다. `git.fetch`를 부르지 않는다.** 저장소마다 `→ RepoStatus(code, remote_url, last_processed_commit, synced_at, behind_by, fetched_at, error=None)`.
+
+`behind_by`·`fetched_at`은 폴링([[SYNC-MS-007#scheduler.catch_up]])이 갱신한다. 예전에는 이 함수가
+저장소마다 순차로 fetch를 돌렸는데, 폴링이 5분마다 같은 일을 이미 하고 있어 이중이었고, 원격
+하나가 응답하지 않으면 관리 화면 전체가 그 요청에 매달렸다(git 명령에 타임아웃이 없다).
+
+`behind_by`가 `null`이면 아직 한 번도 못 받아본 것이다 — 방금 등록했거나 폴링이 계속 실패하는
+경우다. 화면은 `fetched_at`으로 "언제 기준인지"를 함께 보여준다.
+
+**테스트 관점** 이 함수가 `git.fetch`를 부르지 않는다 · 폴링이 적어 둔 값을 그대로 돌려준다 · 등록 직후에는 `behind_by=None`
+
+---
+
+#### ProjectService.delete_project 등록 해제
+
+**시그니처** `async def delete_project(code: str) -> None`
+
+근거: [[SYNC-API-001#DELETE/api/projects/{code}]] · 인프라 9장(작업 사본 회수)
+
+**처리** — 코드 단위 락 안에서
+1. `project = get(code)` · 없으면 `! not-found`
+2. `DB: 이 프로젝트의 flags · propagation_decisions · comments · references · items · versions · status_changes · documents · repositories · projects` 순서로 삭제. 외래키를 물고 있으므로 자식부터
+3. `shutil.rmtree(workdir, ignore_errors=True)` — 작업 사본 회수
+4. `→ None`
+
+**저장소는 건드리지 않는다.** `docs/specs/`는 원격에 그대로 남는다. 다시 등록하면
+`import_existing=true`로 문서·항목·참조가 돌아온다.
+
+**돌아오지 않는 것이 있다.** 플래그·전파결정·댓글은 원본에 없는 정보다(인프라 6장). 백업이
+있으면 그것으로만 살릴 수 있다. 그래서 이 함수는 **되돌릴 수 없는 동작**이고, 부르는 쪽이
+사람에게 확인을 받아야 한다.
+
+**호출하는 것** [[#ProjectService.get]]
+
+**테스트 관점** 삭제 후 `get` → not-found · 작업 사본 디렉터리가 사라짐 · 같은 저장소를 다시 등록할 수 있음(중복 등록 검사에 안 걸림) · 다른 프로젝트의 문서·플래그는 그대로
 
 ---
 
