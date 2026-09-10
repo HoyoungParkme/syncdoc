@@ -339,14 +339,16 @@ post: { summary: … }                          ← 이 항목의 정의
 
 `validate`가 함께 돌려주는 `warnings[{rule, message}]`. 저장은 된다. `approved`로 바꿀 때 하나라도 있으면 `status-blocked`(UC-H8 1a에 조건 추가).
 
-| rule | 검사 |
-|---|---|
-| `section.missing` | 타입 필수 절 없음 |
-| `item.none` | 항목이 하나도 없음 (CODE·STD 제외) |
-| `ref.missing` | 미존재 참조가 있음 |
-| `entity.mismatch` | DOM 클래스 명세에서 2장(엔티티)과 4장(설계) mermaid의 같은 클래스 속성이 다름 |
-| `section.unnumbered` | **단어형 ID 타입**(DOM·MS·MCP)에서 항목으로 인식되지 않은 헤딩에 번호가 없음 |
-| `dom.name` | DOM 세 문서의 이름이 어긋남. 클래스가 가리킨 테이블·도메인 항목이 없거나, 어느 클래스도 가리키지 않는 테이블이 있음 |
+| rule | 검사 | 화면 문구 |
+|---|---|---|
+| `section.missing` | 타입 필수 절 없음 | `필수 절 없음: {message}` |
+| `item.none` | 항목이 하나도 없음 (CODE·STD 제외) | `항목이 하나도 없음` |
+| `ref.missing` | 미존재 참조가 있음 | `가리키는 곳이 없는 참조: {message}` |
+| `entity.mismatch` | DOM 클래스 명세에서 2장(엔티티)과 4장(설계) mermaid의 같은 클래스 속성이 다름 | `엔티티와 설계 클래스의 속성이 다름: {message}` |
+| `section.unnumbered` | **단어형 ID 타입**(DOM·MS·MCP)에서 항목으로 인식되지 않은 헤딩에 번호가 없음 | `번호 없는 절 제목: {message}` |
+| `dom.name` | DOM 세 문서의 이름이 어긋남. 클래스가 가리킨 테이블·도메인 항목이 없거나, 어느 클래스도 가리키지 않는 테이블이 있음 | `DOM 세 문서의 이름이 어긋남: {message}` |
+
+**`화면 문구`는 사람에게 보이는 말이다.** `warnings`가 실어 나르는 것은 `{rule, message}`이고 `rule`은 기계가 읽는 ID다. 화면이 그것을 그대로 이으면 `item.none` 같은 것이 배너에 뜬다 — 나머지 화면은 전부 한국어인데 거기만 아니다(#13). 규칙을 새로 만들면 이 열도 함께 채운다. 표에 없는 `rule`이 오면 화면은 `rule` 문자열을 그대로 보여준다 — 규약을 늘렸는데 문구를 안 채운 것이 눈에 띄어야 한다.
 
 mermaid 문법 오류는 서버가 판정할 수 없다(브라우저 렌더링). 뷰가 표시한다.
 
