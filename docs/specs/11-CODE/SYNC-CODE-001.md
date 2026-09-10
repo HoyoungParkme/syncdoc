@@ -93,6 +93,79 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 선행 | B4 |
 | 완료 | — (C-1 로컬 2026-09-09: `docker compose up --build`(Dockerfile 2단계) → 마이그레이션 0001~0004 → 실제 GitHub OAuth 로그인 → `HoyoungParkme/syncdoc` `import_existing=true` → 문서 27·항목 338·참조 963(미존재 0)·규약 오류 0 = `tools/validate.py`와 일치 → MCP 토큰으로 `get_document`·`get_references`. C-2 2026-09-09: Quick Tunnel `*.trycloudflare.com` → 노트북 밖에서 접속·로그인 확인, 세션 없으면 401 · 터널로 MCP(토큰 없이 401, 토큰으로 정상) · **폴링 확인**: PR #1 머지로 main 전진 → 5분 주기 폴링이 스스로 따라잡아(약 4분 40초) 바뀐 명세 10개에 v2 생성, 전부 `via=github`, `last_processed_commit`이 새 main과 일치 · OAuth는 앱 하나에 로컬·터널 콜백 둘 등록, `redirect_uri`로 각자 주소 복귀 · webhook 없음(주소 가변, 명세대로 폴링만) · **남은 것: 팀원 로그인·팀원 토큰 MCP(다른 GitHub 계정 필요)** · 미결: 비공개 저장소 fetch 토큰(v2, MS-009 8장)) |
 
+
+#### D1 토큰과 셸
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UI-001]] 3장 디자인 토큰 · 4장 공통 틀 · [[SYNC-UI-002]] 1장 공통 컴포넌트 |
+| 구현 | CSS 변수로 옮긴 토큰(색·타이포·간격·모서리·그림자) · Pretendard·IBM Plex Mono · 앱 셸(`height:100vh`, 페이지 전체 스크롤 없음) · 상단 바(프로젝트 선택 제거, 사용 방법·로그아웃 추가) · 공통 컴포넌트 다섯 — 다이얼로그 셸·툴팁·토스트·상태 필·항목 ID 뱃지 |
+| 화면 | [[SYNC-UI-002#UI-16]] (공통 컴포넌트를 처음 쓰는 화면) |
+| 테스트 | 토큰 값이 명세 3장과 일치 · 툴팁이 클릭·스크롤·화면 이동에 지워짐 · 다이얼로그 위 다이얼로그가 겹쳐 뜸 |
+| 선행 | B4 |
+| 완료 | — |
+
+#### D2 읽기 화면
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UI-002#UI-1]] · [[SYNC-UI-002#UI-2]] · [[SYNC-UI-002#UI-4]] · [[SYNC-UI-002#UI-9]] |
+| 구현 | 로그인 11단계 색 띠 · 히트맵 규격과 범례 · 프로젝트 상세 요약 수치 여섯·동기화 상태·11단계 아코디언 · 순서대로 읽기 단계 칩 |
+| API | [[SYNC-API-001#GET/api/projects/{code}]] (동기화 상태·요약 수치 여섯) |
+| 화면 | UI-1 · UI-2 · UI-4 · UI-9 |
+| 테스트 | 요소 번호 대조(`check_ui`) · 요약 수치 여섯 칸이 플래그 세 종류를 다 셈 · 동기화 상태가 fetch 없이 DB 값을 보여줌 |
+| 선행 | D1 · D6(동기화 컬럼) |
+| 완료 | — |
+
+#### D3 문서와 이력
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UI-002#UI-5]] · [[SYNC-UI-002#UI-7]] |
+| 구현 | 사이드바 드래그 리사이즈 둘 · 표시된 항목 블록 · 원본 탭 원문/렌더링 · 세 탭 본문 폭 일치 · 버전 A/B 비교 |
+| API | [[SYNC-API-001#GET/api/docs/{docId}/diff]] (문맥 줄 수) |
+| 화면 | UI-5 · UI-7 |
+| 테스트 | 요소 번호 대조 · 탭을 오가도 본문이 좌우로 안 흔들림 · 세 번째 버전을 고르면 A가 밀려남 |
+| 선행 | D1 |
+| 완료 | — |
+
+#### D4 그래프
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UI-002#UI-8]] · [[SYNC-UI-002#UI-15]] |
+| 구현 함수 | [[SYNC-MS-008#queries.graph_view]](범위 교체) · [[SYNC-MS-008#queries.item_chain]](신설) |
+| API | [[SYNC-API-001#GET/api/projects/{code}/graph]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/chain]] |
+| 화면 | UI-8 · UI-15 |
+| 테스트 | 구현 함수의 테스트 관점 전부 · **범위 밖 대상 간선이 미존재 참조로 새지 않음** · 되돌아오는 참조의 상위가 `upstream`으로 적힘 · 빈 단계도 행이 옴 |
+| 선행 | D1 |
+| 완료 | — |
+
+#### D5 처리와 설정
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UI-002#UI-3]] · [[SYNC-UI-002#UI-10]] · [[SYNC-UI-002#UI-11]] · [[SYNC-UI-002#UI-12]] · [[SYNC-UI-002#UI-13]] · [[SYNC-UI-002#UI-14]] |
+| 구현 | 초기화를 다이얼로그로(커밋될 것 박스) · 내 할 일 묶음 순서 고정 · 플래그 확인 버튼 하나(자동 판정 미리 보기) · 설정을 다이얼로그로(카드 넷, 관리 흡수) · 토큰 마지막 사용 |
+| API | [[SYNC-API-001#GET/api/me/tokens]] (마지막 사용) |
+| 화면 | UI-3 · UI-10 · UI-11 · UI-12 · UI-13 · UI-14 |
+| 테스트 | 요소 번호 대조 · 설정을 닫으면 보던 화면 그대로 · 관리가 접힌 채로 열림 · 재구축 확인이 설정 위에 겹쳐 뜸 |
+| 선행 | D1 · D6(마지막 사용 컬럼) |
+| 완료 | — |
+
+#### D6 뒤늦은 개정
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-DOM-003]] 2장 · [[SYNC-INFRA-001]] 5.1·5.2 · [[SYNC-STD-001]] 4장 |
+| 구현 함수 | [[SYNC-MS-001#ProjectService.repo_status]](DB만 읽기) · [[SYNC-MS-001#ProjectService.delete_project]](신설) · [[SYNC-MS-002#SpecService.diff]](문맥 인자) · [[SYNC-MS-006#AccountService.issue_token]] [[SYNC-MS-006#AccountService.authenticate_token]] [[SYNC-MS-006#AccountService.github_token_for]] · [[SYNC-MS-007#scheduler.catch_up]](behind_by 기록) · [[SYNC-MS-009#git.commit_push]](재시도·거부 판정) |
+| 구현 | 마이그레이션 — `repositories.behind_by`·`fetched_at`, `access_tokens.last_used_at` · 설정값 넷(`DIFF_CONTEXT_LINES`·`PUSH_RETRIES`·`SECRET_KEY_OLD`·`SESSION_SECRET`) · `/flags` 세 스키마에 판별 필드 · 검사 규칙 둘(`section.unnumbered`·`dom.name`) · 교차 검사기 `tools/check_dom.py` |
+| API | [[SYNC-API-001#DELETE/api/projects/{code}]] · [[SYNC-API-001#GET/api/projects/{code}/flags]](판별 필드) |
+| 화면 | 없음 |
+| 테스트 | 구현 함수의 테스트 관점 전부 · `repo_status`가 `git.fetch`를 안 부름 · 비밀키를 바꾼 뒤 옛 토큰이 500이 아니라 401 · `check_dom.py`가 지금 명세에서 경고 0 |
+| 선행 | B4 |
+| 완료 | — |
+
 ---
 
 ## 2. 통합 테스트 시나리오

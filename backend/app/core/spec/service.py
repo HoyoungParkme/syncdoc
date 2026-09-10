@@ -67,7 +67,7 @@ TYPES: dict[str, tuple[list[str], list[str]]] = {
     "API": ([r"(GET|POST|PUT|PATCH|DELETE)/\S+", r"[a-z][a-z_]+"], []),
     "SEQ": ([r"SEQ-\d+", r"SEQ-C\d+"], ["생명선", "대응표", "되먹일 것"]),
     "MS": ([r"[A-Za-z_]+\.[a-z_]+"], ["함수 목록", "미결사항"]),
-    "CODE": ([r"[A-C]\d*"], ["슬라이스", "통합 테스트", "커밋", "미결사항"]),
+    "CODE": ([r"[A-Z]\d*"], ["슬라이스", "통합 테스트", "커밋", "미결사항"]),
     "STD": ([r"[A-Z]+-\d+", r"V-[A-Z]+"], ["미결사항"]),
 }
 SUBTYPES: dict[tuple[str, str], tuple[list[str], list[str]]] = {
