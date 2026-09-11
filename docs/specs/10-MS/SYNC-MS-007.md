@@ -246,31 +246,39 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 1. `project, repo = project.get(code)`. 락 획득
 2. `git.fetch(repo.workdir)`, `git.checkout(repo.workdir, "origin/HEAD")` · if fetch 실패 → `! rebuild-failed {reason}` (500으로 새지 않게)
 3. **트랜잭션 시작**
-4. `reference.clear(project_id)` · `spec.clear_index(project_id)` — `versions`만 삭제. `documents`·`items`는 유지(플래그·댓글 FK)
+3a. `old = spec.version_keys(project_id)` — **지우기 전에** `{옛 version_id: (document_id, commit_hash)}`를 뜬다. 버전 행이 사라지면 그 둘을 알 방법이 없다 — `propagation_decisions`·`flags`는 `version_id` 하나만 들고 있다(#38)
+4. `reference.clear(project_id)` · `spec.clear_index(project_id)` — `versions`와 커밋 있는 `status_changes` 삭제. `documents`·`items`는 유지(플래그·댓글 FK)
+4a. **`versions`를 가리키는 FK 셋을 여기서 센다**([[SYNC-MS-002#SpecService.clear_index]]). `references`는 4단계가 먼저 지우고, `propagation_decisions.version_id`·`flags.cause_version_id`는 **7a가 다시 잇는다.** 이 셋을 안 세서 실물 재구축이 죽었다 — 지금까지 "지우지 **않는** 테이블에 걸린 FK"만 셌다(#38)
 5. `paths = git.list(repo, "docs/specs/*/*.md")` (`_templates`·`assets` 제외. 번호 붙은 디렉터리도 `*`에 걸린다)
 6. 파일마다:
    - `log = git.log(repo, path)` 오래된 것부터 `[(hash, login, email, date, message)]`
    - 커밋마다: `body = git.read(path @ hash)` · `user = account.user_for_commit(email, login)` — `process_commit` 4단계와 **같은 순서**(이메일 → login → 자리표시)
      - if `message.startswith("status(")` → `spec.apply_status(…, commit_hash=hash)`만 (StatusChange 복원)
      - else if 이 문서의 첫 커밋 → `spec.create(...)` · else → `spec.save(document, body, hash, author, message, deleted=spec.detect_deleted_items(document, body), validate_result, rebuild=True)` — `version_no`는 남은 버전 수 + 1, `items` upsert. 커밋마다 삭제 항목도 반영한다
+   - 커밋마다 `save`가 돌려준 버전을 `new[(document_id, commit_hash)] = version.id`로 모은다 — 7a가 쓴다
    - 마지막 커밋 본문으로 `reference.extract`, `spec.mark_convention_error(document_id, violations + extra, warnings)`
    - **`extra`에 작성자 위반을 얹는다** — 마지막 **본문** 커밋(`status(`가 아닌 것)의 작성자가 `github_user_id is None`이면 `author.unknown: {login}`. `mark_convention_error`는 항상 전량 교체라 여기서 안 얹으면 그 오류가 사라진다. 그래서 실물 인덱스에 규약 오류가 0건이었다(#34)
    - **마지막 본문 커밋을 기준으로 삼는 이유** — 문서의 `author.unknown`은 UI-5 배너가 `last_author`와 함께 보여주는 값이고 `process_commit`도 방금 저장한 버전의 작성자로 판정한다. 옛 커밋이 미등록이었어도 최신 커밋이 등록자면 문서는 깨끗하다
 7. `reference.resolve_missing(project_id)` — 파일 순서 때문에 미존재였던 참조 해제
-7a. `tracking.reassign_open_flags(project_id)` — 버전을 다시 만들었으므로 열린 플래그의 담당자(= 대상 문서 최근 버전 작성자)를 다시 계산한다. `clear_index`는 flags를 안 지우고 담당자는 플래그를 만들 때 한 번만 정해지므로, 이게 없으면 **재구축이 절반만 끝난다** — 커밋 이메일을 등록해 작성자가 바뀌어도 플래그는 옛 자리표시를 계속 가리킨다([[SYNC-MS-004#TrackingService.reassign_open_flags]])
+7a. `tracking.relink_versions(project_id, new)` — `new`는 6단계에서 모은 `{(document_id, commit_hash): 새 version_id}`. 전파결정과 플래그가 옛 버전 id를 가리키므로 새 id로 갈아 끼운다. 못 잇는 행은 지우고 몇 건을 왜 버렸는지 `RebuildResult.dropped`에 싣는다([[SYNC-MS-004#TrackingService.relink_versions]])
+7b. `tracking.reassign_open_flags(project_id)` — 버전을 다시 만들었으므로 열린 플래그의 담당자(= 대상 문서 최근 버전 작성자)를 다시 계산한다. `clear_index`는 flags를 안 지우고 담당자는 플래그를 만들 때 한 번만 정해지므로, 이게 없으면 **재구축이 절반만 끝난다** — 커밋 이메일을 등록해 작성자가 바뀌어도 플래그는 옛 자리표시를 계속 가리킨다([[SYNC-MS-004#TrackingService.reassign_open_flags]])
 8. `repo.last_processed_commit = HEAD`
 9. **커밋.** 락 해제
-10. `→ RebuildResult(docs, items, references, versions, convention_errors)`
+10. `→ RebuildResult(docs, items, references, versions, convention_errors, dropped)`
 
 **출력** [[SYNC-API-001]] `RebuildResult`
 
 **예외** 어느 단계든 실패하면 트랜잭션 롤백. DB는 재구축 전 상태로. `! rebuild-failed {reason}`
 
-**호출하는 것** [[SYNC-MS-002#SpecService.clear_index]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.save]] [[SYNC-MS-002#SpecService.mark_convention_error]] · `ReferenceService.clear` `ReferenceService.extract` `ReferenceService.resolve_missing` · [[SYNC-MS-004#TrackingService.reassign_open_flags]] · `AccountService.user_for_commit` · `git.*`
+**호출하는 것** [[SYNC-MS-002#SpecService.clear_index]] [[SYNC-MS-002#SpecService.version_keys]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.save]] [[SYNC-MS-002#SpecService.mark_convention_error]] · `ReferenceService.clear` `ReferenceService.extract` `ReferenceService.resolve_missing` · [[SYNC-MS-004#TrackingService.relink_versions]] [[SYNC-MS-004#TrackingService.reassign_open_flags]] · `AccountService.user_for_commit` · `git.*`
 
 **테스트 관점**
 - DB 비운 뒤 재구축: 문서·항목·참조·버전 수가 저장소와 일치
-- 플래그·댓글이 있는 상태에서 재구축: 그대로 남음. **담당자는 다시 계산된다**(7a)
+- 플래그·댓글이 있는 상태에서 재구축: 그대로 남음. **담당자는 다시 계산된다**(7b)
+- **전파결정이 있는 상태에서 재구축**: 행이 남고 `version_id`가 새 버전을 가리킨다. `affected_pks`는 그대로(항목 pk는 `save`의 upsert가 보존한다)
+- **`cause_version_id`가 있는 플래그**(`needs_check`·`upstream_impact`)로 재구축: 그 값이 새 버전으로 바뀐다
+- 문서가 삭제된 커밋에 매달린 결정: 버려지고 `RebuildResult.dropped`에 뜬다
+- **두 번 재구축해도 `status_changes`가 안 늘어난다**(4단계가 커밋 있는 행을 지운다)
 - 파일 순서 때문에 미존재였던 참조가 7단계 후 해제됨
 - **미등록 작성자만 있는 저장소를 재구축: 문서에 `author.unknown`이 붙는다**(#34)
 - 커밋 이메일을 등록하고 재구축: 버전 작성자가 그 사람으로 바뀌고 `author.unknown`이 사라진다. 열린 플래그 담당자도 따라 바뀐다

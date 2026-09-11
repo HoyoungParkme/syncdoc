@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/spec/service.py`의 함수 27개. 클래스 명세 [[SYNC-DOM-002]] 4.2의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/spec/service.py`의 함수 31개. 클래스 명세 [[SYNC-DOM-002]] 4.2의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -51,6 +51,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#SpecService.convention_error_docs_by]] | 내 커밋의 오류 문서 |
 | [[#SpecService.documents_authored_by]] | 내 문서 |
 | [[#SpecService.clear_index]] | 재구축용 삭제 |
+| [[#SpecService.version_keys]] | 재연결용 버전 열쇠 |
 | [[#SpecService.mark_convention_error]] | 오류·경고 표시 |
 | [[#SpecService.issue_doc_id]] | 문서 ID 발급 |
 | [[#SpecService.item_blocks]] | 본문 → 항목 블록 |
@@ -471,7 +472,35 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-SEQ-001#SEQ-21]] · [[SYNC-DOM-003]] 설계 규칙
 
-**처리** `DB: delete versions where document in project`. **`documents`·`items`는 지우지 않는다** — `flags`·`comments`·`status_changes`가 FK. `items`는 재구축 `save`가 upsert. `current_version_no`는 **건드리지 않는다** — `ck_documents_version_no(>=1)` 때문에 0을 넣을 수 없다. 재구축의 `save(rebuild=True)`가 남은 버전 수 + 1로 다시 매긴다
+**처리**
+1. `DB: delete status_changes where document in project and commit_hash is not null` — 재구축이 `status(` 커밋마다 다시 만드는 것이 정확히 이 집합이다. 안 지우면 재구축할 때마다 **같은 상태 변경이 한 줄씩 쌓인다**(`apply_status`가 무조건 INSERT한다)
+2. `DB: delete versions where document in project`
+
+**`documents`·`items`는 지우지 않는다** — `flags`·`comments`·`status_changes`가 FK. `items`는 재구축 `save`가 upsert. `current_version_no`는 **건드리지 않는다** — `ck_documents_version_no(>=1)` 때문에 0을 넣을 수 없다. 재구축의 `save(rebuild=True)`가 남은 버전 수 + 1로 다시 매긴다
+
+**`versions`를 가리키는 FK 셋을 센다.** 지금까지 이 자리는 "지우지 **않는** 테이블(`documents`·`items`)에 걸린 FK"만 셌다. 정작 **지우는 테이블에 걸린 FK**는 한 번도 안 셌고, 그래서 실물에서 재구축이 죽었다(#38). 셋 다 `ON DELETE NO ACTION`이라 남은 행이 있으면 `DELETE`가 막힌다.
+
+| FK | NULL | 누가 치우나 |
+|---|---|---|
+| `references.extracted_version_id` | NOT NULL | **호출자**가 `reference.clear`를 이 함수보다 먼저 부른다 |
+| `propagation_decisions.version_id` | **NOT NULL + UNIQUE** | **호출자**가 `tracking.relink_versions`로 새 버전에 다시 잇는다 |
+| `flags.cause_version_id` | null 허용 | 위와 같다. null 허용이지만 **비우면 안 된다** — UI-11의 원인 diff·`cause_change_count`·중복 플래그 방지가 전부 이 값에 매달려 있다 |
+
+**이 함수는 재연결을 하지 않는다.** 추적 묶음(`flags`·`propagation_decisions`)은 명세 묶음 밖이고, 이 함수는 `SpecService`다([[SYNC-DOM-001]] 4장 경계). 재연결은 묶음을 잇는 `pipeline`의 몫이다([[SYNC-MS-007#pipeline.rebuild]] 3a·7b단계)
+
+---
+
+#### SpecService.version_keys 재연결용 버전 열쇠
+
+**시그니처** `version_keys(project_id: int) -> dict[int, tuple[int, str]]`
+
+근거: [[SYNC-MS-007#pipeline.rebuild]] 3a단계 · #38
+
+**처리** `DB: select id, document_id, commit_hash from versions where document in project` → `{version_id: (document_id, commit_hash)}`
+
+**`clear_index` 전에 불러야 한다.** 버전 행이 지워지면 `document_id`·`commit_hash`를 알 방법이 없다 — `propagation_decisions`·`flags`는 `version_id` 하나만 들고 있다.
+
+**`(document_id, commit_hash)`가 열쇠인 이유.** `commit_hash` 단독은 유일하지 않다 — 한 커밋이 문서 여럿을 건드리면 같은 해시의 버전이 여럿 생긴다(실물: 버전 96행에 distinct 해시 58개). `documents`는 재구축이 안 지우므로 `document_id`는 재구축을 건너 그대로다
 
 ---
 
