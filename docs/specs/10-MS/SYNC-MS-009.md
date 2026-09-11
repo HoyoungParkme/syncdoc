@@ -149,7 +149,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `async def log(workdir: Path, path: str) -> list[Commit]`
 
-**처리** `git log --follow --reverse --format="%H%x00%an%x00%ae%x00%aI%x00%s%n%b%x00" -- {path}` → 오래된 것부터 `[Commit(hash, login, date, message, email)]`. `login`·`email`은 `changed_files` 3·3a와 같은 규칙 — 재구축도 이메일로 먼저 사람을 찾는다
+**처리** `git log --follow --format="%H%x00%an%x00%ae%x00%aI%x00%s%n%b%x00" -- {path}` → 최신부터 온 것을 **파이썬에서 뒤집어** 오래된 것부터 `[Commit(hash, login, date, message, email)]`. `login`·`email`은 `changed_files` 3·3a와 같은 규칙 — 재구축도 이메일로 먼저 사람을 찾는다
+
+**`--reverse`를 git에 맡기지 않는다.** `--follow`는 revision walker의 특수 처리라 `--reverse`와 조합되지 않는다 — 둘을 같이 주면 커밋이 거의 안 나온다. 실측(`SYNC-DOM-002`): `--follow` 18건 · `--reverse` 7건 · **둘 다 1건**. 이름이 바뀐 경로(`docs/specs/DOM/` → `docs/specs/06-DOM/`)를 건너 이력을 잇는 것이 `--follow`의 목적이므로 그쪽을 남기고 순서는 받아서 뒤집는다(#39)
+
+**테스트 관점** 이름을 안 바꾼 파일 · **이름이 바뀐 경로 — 옛 이름 시절 커밋까지 나온다** · 오래된 것부터 온다 · 없는 경로는 빈 목록
 
 ---
 
