@@ -141,7 +141,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `async def list(workdir: Path, glob: str, ref: str = "HEAD") -> list[str]`
 
-**처리** `git ls-tree -r --name-only {ref} -- docs/specs` 후 glob 필터
+**처리** `git ls-tree -r --name-only {ref} -- docs/specs` 후 glob 필터. **`_templates/`·`assets/`는 뺀다** — `changed_files` 처리 4와 같은 규칙이다
+
+**부르는 쪽 둘이 같은 것을 원한다.** `pipeline.rebuild` 5단계는 재구축할 명세 목록을, `ProjectService.init_project` 6단계는 이미 있는 명세 수를 센다. 둘 다 템플릿을 세면 안 된다 — 템플릿은 `Path(path).stem`이 `API`처럼 나와 "알 수 없는 디렉터리" 규약 오류로 잡히고, 재구축 결과 화면(UI-14 5.2)이 매번 없는 오류를 세어 보여준다(#40)
+
+**테스트 관점** 번호 붙은 디렉터리가 `*`에 걸린다 · `_templates/`·`assets/`가 안 나온다 · glob에 안 맞는 경로는 빠진다
 
 ---
 
