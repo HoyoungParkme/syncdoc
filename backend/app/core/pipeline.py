@@ -492,7 +492,8 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
                 pass
             last_unknown, last_login = False, ""
             for c in await git.log(workdir, path):
-                body = await git.read(workdir, path, c.hash)
+                # c.path로 읽는다 — 이름이 바뀐 문서는 옛 커밋에서 옛 경로에 있다 (#39)
+                body = await git.read(workdir, c.path or path, c.hash)
                 user = account.user_for_commit(c.email, c.login)
                 author = Author(
                     kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.github

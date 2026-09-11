@@ -414,3 +414,25 @@ async def test_log_follows_renamed_path_oldest_first(repos: dict[str, Path]) -> 
         "code(C): 명세 디렉터리를 {NN-TYPE}로",
         "spec(SYNC-DOM-001): 옮긴 뒤 수정",
     ]
+    # path는 그 커밋 시점의 경로다 — 지금 경로로 읽으면 옛 커밋에서 죽는다
+    assert [c.path for c in got] == [old_path, old_path, new_path, new_path]
+    for c in got:
+        assert await g.read(repos["work"], c.path, c.hash)  # 전부 읽힌다
+
+
+async def test_log_separates_path_from_multiline_message(repos: dict[str, Path]) -> None:
+    """본문에 빈 줄이 있어도 경로를 제대로 떼어 낸다 (#39)."""
+    o = repos["other"]
+    path = "docs/specs/02-PRD/SYNC-PRD-002.md"
+    (o / path).parent.mkdir(parents=True, exist_ok=True)
+    (o / path).write_text("x", encoding="utf-8")
+    git(o, "add", path)
+    git(o, "commit", "-q", "-m", "spec(SYNC-PRD-002): 초안\n\n첫 줄\n\n빈 줄 뒤 둘째 줄")
+    git(o, "push", "-q", "origin", "HEAD:main")
+    await g.fetch(repos["work"])
+    await g.checkout(repos["work"], "origin/HEAD")
+
+    got = await g.log(repos["work"], path)
+
+    assert len(got) == 1 and got[0].path == path
+    assert got[0].message == "spec(SYNC-PRD-002): 초안\n\n첫 줄\n\n빈 줄 뒤 둘째 줄"

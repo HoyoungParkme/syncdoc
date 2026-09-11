@@ -176,6 +176,9 @@ class Commit:
     date: datetime
     message: str
     email: str = ""  # ChangedFile.author_email과 같은 이유
+    # 그 커밋 시점의 경로. --follow가 이름 바뀌기 전 커밋까지 주므로
+    # 지금 경로로는 본문을 못 읽는다 (SYNC-MS-009#git.log, #39)
+    path: str = ""
 
 
 @dataclass(frozen=True)

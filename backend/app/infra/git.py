@@ -248,18 +248,24 @@ async def log(workdir: Path, path: str) -> list[Commit]:
     # --reverse와 조합되지 않아, 둘을 같이 주면 rename을 건너는 순간 커밋이 끊긴다.
     # 이름이 바뀐 경로의 이력을 잇는 것이 재구축의 목적이므로 --follow를 남기고
     # 순서는 받아서 뒤집는다 (SYNC-MS-009#git.log, #39)
+    #
+    # --name-only가 커밋마다 그때의 경로를 붙인다. 그래서 커밋 경계를 앞쪽 구분자
+    # %x1e로 잡는다 — 메시지 뒤에 빈 줄과 경로가 따라붙기 때문이다.
     out = await _run(
         workdir,
         "log",
         "--follow",
-        "--format=%H%x00%an%x00%ae%x00%aI%x00%s%n%b%x00",
+        "--name-only",
+        "--format=%x1e%H%x1f%an%x1f%ae%x1f%aI%x1f%s%n%b",
         "--",
         path,
     )
-    tokens = out.split("\0")
     commits: list[Commit] = []
-    for i in range_(0, len(tokens) - 1, 5):
-        h, an, ae, date, msg = (t.strip("\n") for t in tokens[i : i + 5])
+    for block in out.split("\x1e")[1:]:
+        h, an, ae, date, rest = block.split("\x1f", 4)
+        # 메시지 본문에 빈 줄이 있어도 경로는 늘 마지막 줄이다 — --follow는 경로 하나만 받는다
+        lines = rest.rstrip("\n").split("\n")
+        at_path, msg = lines[-1], "\n".join(lines[:-1]).strip("\n")
         commits.append(
             Commit(
                 hash=h,
@@ -267,6 +273,7 @@ async def log(workdir: Path, path: str) -> list[Commit]:
                 date=datetime.fromisoformat(date),
                 message=_message(msg),
                 email=ae,
+                path=at_path,
             )
         )
     commits.reverse()  # git이 최신부터 준다 → 오래된 것부터
