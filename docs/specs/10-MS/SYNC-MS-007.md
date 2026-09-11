@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/pipeline.py`의 함수 5개와 `scheduler.py`의 폴링 함수 2개. 클래스 명세 [[SYNC-DOM-002]] 4.7의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/pipeline.py`의 함수 7개와 `scheduler.py`의 주기 함수 3개. 클래스 명세 [[SYNC-DOM-002]] 4.7의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -29,6 +29,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#pipeline.rebuild]] | 인덱스 재구축 |
 | [[#scheduler.catch_up]] | 밀린 커밋 따라잡기 |
 | [[#scheduler.poll_loop]] | 주기 폴링 |
+| [[#pipeline.export_tracking]] | 추적 데이터 백업 |
+| [[#pipeline.import_tracking]] | 백업에서 복원 |
+| [[#scheduler.backup_loop]] | 주기 백업 |
 
 ---
 
@@ -321,9 +324,121 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 **기동 시 한 번은 따로다.** 앱이 뜰 때 `catch_up`을 한 번 부르고(1a) 그다음부터 이 반복에
 들어간다. 노트북이 꺼져 있던 동안 쌓인 커밋을 첫 주기까지 기다리지 않고 바로 가져온다.
 
+**반복 전체를 감싸 잡는다.** `catch_up`은 저장소 하나가 실패해도 다음 저장소를 계속하지만, 저장소 목록을 읽는 단계에서 DB가 잠깐 죽으면 그 예외가 이 반복까지 올라와 **그 뒤로 영영 폴링이 없다.** 한 주기를 통째로 `try/except`로 감싸고 로그만 남긴다.
+
 **호출하는 것** [[#scheduler.catch_up]]
 
 **테스트 관점** `interval` 만큼 자고 부른다 · `catch_up`이 예외를 던져도 반복이 안 멈춘다
+
+---
+
+#### pipeline.export_tracking 추적 데이터 백업
+
+**시그니처**
+```python
+async def export_tracking(code: str) -> str
+```
+
+근거: [[SYNC-INFRA-001]] 6.1 · [[SYNC-UI-002#UI-14]] 요소 2.4 · #16
+
+**입력** 프로젝트 코드 하나. 인자가 이것뿐인 이유 — 파일 경로(`backup/tracking.json`)·주기·작성자가 전부 인프라 6.1에서 고정됐다
+
+**처리**
+
+1. **저장소 락 획득** — `save_pipeline`·`rebuild`와 **같은 락**이다. `git.commit_push`가 맨 앞에서 `reset --hard origin/HEAD`로 작업 사본을 갈아엎으므로, 저장 중인 파이프라인과 같은 자물쇠 아래 있어야 한다
+2. `project = ProjectService.get(code)` · `repo = project.repository` · `user = DB: users where id = repo.registered_by_user_id` · if 없음 → `! not-found {resource: user}`. **이 함수는 끝까지 DB를 읽기만 한다**
+3. `DB:` 전량 읽기 — `TrackingService.all_flags(project_id)` · `all_decisions(project_id)` · `CommentService.all_in_project(project_id)`. **해제된 플래그·결정된 전파도 싣는다** — 백업은 지금 남은 일이 아니라 그때 있었던 사실이다
+4. 지도 넷을 **한 번씩만** 뜬다 — `describe_items`(**삭제 포함**이라야 한다. `broken_ref`의 원인 항목은 `is_deleted`다) · `version_keys(project_id)` · `describe_documents` · `users_by_ids`
+5. 행을 자연키로 옮긴다(아래 표기). **`affected_pks`·`changed_pks`는 JSONB라 FK가 없다** — 지도에 없는 pk가 나오면 그 원소만 빼고 로그에 남긴다. 나머지 자리는 FK가 있어 못 옮길 수 없다
+6. 결정적으로 직렬화한다(아래)
+7. `git: git.commit_push(workdir, "chore({code}): 추적 데이터 백업 (플래그 f · 전파결정 d · 댓글 c)", Author(human, 등록자, None, Entry.backup), path="backup/tracking.json", content=본문)`. **내용이 같으면 커밋이 안 생기고 현재 HEAD가 온다** — 백업이 따로 비교하지 않는다([[SYNC-MS-009#git.commit_push]])
+8. 락 해제 · `→ 커밋 해시`
+
+**자연키 표기**
+
+| 가리키는 것 | 적는 법 | 예 |
+|---|---|---|
+| 항목 | `문서ID#항목ID` | `SYNC-PRD-001#R9` |
+| 버전 | `문서ID@커밋해시` | `SYNC-PRD-001@3f0ab95…` |
+| 문서 | `문서ID` | `SYNC-UI-002` |
+| 사람 | `github_login` | `HoyoungParkme` |
+| 댓글 | `{작성시각}|{작성자}` — 두 필드에서 **계산한다**(따로 안 적는다) | `2026-09-07T11:02:03.4+00:00|minjun` |
+
+**최상위에 `backup_version`과 `project`만 둔다.** `backup_version`은 형식이 바뀌었을 때 거절할 근거다. `project`는 **DB를 잃으면 이 파일이 어느 프로젝트 것인지 알 방법이 파일 안에만 있기 때문**이다. **내보낸 시각을 넣지 않는다** — 내용이 그대로여도 매 주기 파일이 바뀌어 빈 커밋이 쌓인다. 마지막 백업 시각은 커밋 자신이 들고 있다
+
+**결정적 직렬화.** 키 정렬 · 들여쓰기 2 · 비ASCII 그대로 · 끝 개행. 정렬 열쇠는 플래그 `(대상, 부여시각, 종류, 원인, 원인버전)` · 전파결정 `(버전)` · 댓글 `(문서, 작성시각, 작성자)` · 영향 항목 목록은 문자열 오름차순. **pk 순서를 그대로 쓰면 재구축 때마다 내용이 같아도 diff가 난다**
+
+**출력** 커밋 해시. **두 번 불러 같은 해시가 오면 새 커밋이 안 생긴 것**이다
+
+**예외** 프로젝트·등록자 없음 → `not-found` · 등록자 토큰이 풀렸거나 push 거부 → `push-failed`. 전부 [[#scheduler.backup_loop]]이 잡아 로그로 넘긴다 — **백업 실패가 앱을 멈추지 않는다.** 대신 UI-14 2.4의 늙은 시각이 사람에게 가는 신호다
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get]] · [[SYNC-MS-004#TrackingService.all_flags]] [[SYNC-MS-004#TrackingService.all_decisions]] · [[SYNC-MS-005#CommentService.all_in_project]] · [[SYNC-MS-002#SpecService.describe_items]] [[SYNC-MS-002#SpecService.describe_documents]] [[SYNC-MS-002#SpecService.version_keys]] · [[SYNC-MS-006#AccountService.users_by_ids]] · `git.commit_push`
+
+**테스트 관점** 행이 있는 프로젝트 → 파일이 커밋되고 파싱하면 행 수가 DB와 같다 · **두 번 불러도 커밋이 하나**(같은 해시) · 플래그를 해제하고 다시 부르면 커밋이 생긴다 · 파일에 댓글 본문·전파 사유·최상위 시각이 **없다** · 등록자에게 토큰이 없으면 `push-failed`이고 저장소는 그대로 · 백업 커밋이 `changed_files(…, "docs/specs/")`에 **안 잡힌다** · 행이 0건이어도 파일이 써진다(빈 배열 셋) — "백업이 도는데 아직 아무것도 없다"와 "백업이 멈췄다"가 구분돼야 한다
+
+---
+
+#### pipeline.import_tracking 백업에서 복원
+
+**시그니처**
+```python
+async def import_tracking(code: str) -> RestoreResult
+```
+
+근거: [[SYNC-INFRA-001]] 6.1 · [[SYNC-UI-002#UI-14]] 요소 6 · [[SYNC-UC-001#UC-S6]] 뒤
+
+**처리**
+
+1. **저장소 락 획득.** 이유가 `export_tracking`과 다르다 — **재구축이 같은 락 안에서 `versions`를 지우고 다시 만든다.** 복원이 그 사이에 끼면 곧 사라질 버전에 결정을 붙인다
+2. `project = ProjectService.get(code)`
+3. `git: git.fetch(workdir)` · `본문 = git.read(workdir, "backup/tracking.json", "origin/HEAD")` · 없으면 `! not-found {resource: backup, id: code}`. **`origin/HEAD`로 읽는다** — 로컬 HEAD는 뒤처질 수 있고 백업은 원격이 진실이다
+4. `backup_version`이 모르는 값이거나 `project`가 이 프로젝트가 아니면 `! backup-invalid {reason}`. **다른 프로젝트의 백업을 붓지 않는다**
+5. 지도 넷을 만든다 — 행마다 조회하지 않는다. 문서(`get_document`, 없으면 그 문서를 가리키는 행은 전부 건너뜀) · 항목(`item_pks(document_id, include_deleted=True)`를 문서마다 한 번) · 버전(`version_keys`를 **뒤집는다** — 새 함수가 필요 없다) · 사람(`user_by_login` 없으면 `create_placeholder`)
+6. 플래그를 pk로 풀어 `TrackingService.restore_flags`
+7. 전파결정을 풀어 `restore_decisions`. `version`을 못 찾으면 행 전체를 버리고, `affected`·`changed`에서 못 찾는 항목은 **그 원소만** 뺀다
+8. 댓글을 **파일 순서대로 한 행씩** `CommentService.restore`. `자연키 → 새 id` 지도를 채우며 가고, 이미 있던 행도 지도에 넣는다 — 그래야 **반쯤 복원된 상태에서 다시 눌러도** 답글이 제 부모에 붙는다. 부모가 지도에 없으면 건너뛴다
+9. 커밋 · 락 해제 · `→ RestoreResult`
+
+**멱등이다.** 플래그는 `(종류, 대상, 원인, 원인버전, 부여시각)` · 전파결정은 `version_id`(UNIQUE) · 댓글은 `(문서, 작성자, 작성시각)`으로 판정한다. **플래그 열쇠에 `부여시각`이 드는 이유** — 앞 넷만으로는 모자란다. `has_unresolved`는 미해결만 보고 `raise_broken`은 중복 검사를 아예 안 해서, 해제한 뒤 같은 원인으로 다시 서면 같은 네 값의 행이 둘이 된다
+
+**이미 결정이 있는 버전은 덮어쓰지 않고 건너뛴다.** 지금 DB의 결정은 사람이 방금 내린 것일 수 있고 백업은 옛 사실이다
+
+**이름이 안 붙는 행은 건너뛰고 센다** — `RestoreResult.dropped`에 `{kind, count, reason}`으로. [[SYNC-MS-004#TrackingService.relink_versions]]와 같은 모양이라 UI-14 5.3이 같은 자리에 그린다
+
+| 못 찾는 것 | 어떻게 |
+|---|---|
+| 문서 | 그 문서의 댓글·그 문서 항목을 가리키는 플래그를 건너뜀 |
+| 항목 | 행 건너뜀. **`원인`이 있는데 못 찾으면 비우지 않고 버린다** — 비우면 UI-11의 원인 diff·중복 방지가 죽어 판단 재료 없는 빈 카드가 남는다(`relink_versions`와 같은 판단) |
+| 커밋 | 행 건너뜀 |
+| 결정 안의 항목 | **그 원소만** 빼고 행은 넣는다 |
+| 부모 댓글 | 행 건너뜀. 최상위로 올리지 않는다 — 스레드가 아니었던 척하게 된다 |
+| 사람 | **건너뛰지 않는다.** 없으면 자리표시를 만든다. `author_user_id`가 NOT NULL이라 비울 수 없고, 재구축이 커밋 작성자로 자리표시를 만드는 길이 이미 있어 같은 규칙을 한 번 더 쓰는 것이다 |
+
+**복원된 댓글 본문.** `body`가 NOT NULL이라 무언가 들어가야 한다. 빈 문자열로 두면 화면에 빈 칸이 떠 사람이 버그로 읽는다 — **"백업에서 복원 — 본문은 백업에 없습니다"**를 넣는다. UI-14 S-1의 "자리만 살아난다"를 화면에서 말로 하는 자리다
+
+**예외** `not-found`(프로젝트·백업 파일) · `backup-invalid`(형식·프로젝트 불일치) · 중간 실패는 전체 롤백
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get]] · [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.item_pks]] [[SYNC-MS-002#SpecService.version_keys]] · [[SYNC-MS-004#TrackingService.restore_flags]] [[SYNC-MS-004#TrackingService.restore_decisions]] · [[SYNC-MS-005#CommentService.restore]] · [[SYNC-MS-006#AccountService.user_by_login]] [[SYNC-MS-006#AccountService.create_placeholder]] · `git.fetch` `git.read`
+
+**테스트 관점** 내보내고 → 세 표를 비우고 → 복원: 행 수와 값이 같다(본문·사유만 빈다) · **두 번 복원하면 둘째는 전부 0이고 `skipped`가 첫 번째의 합** · 다른 프로젝트 코드의 파일 → `backup-invalid` · 모르는 `backup_version` → `backup-invalid` · 백업 파일 없음 → `not-found` · 문서 하나를 지우고 재구축한 뒤 복원 → 그 문서 관련 행만 `dropped` · 답글이 있는 스레드의 부모·자식 순서가 살아난다 · 모르는 login → 자리표시가 하나 생긴다 · **재구축을 안 하고 빈 DB에 복원 → 전부 `dropped`, 예외 없음**
+
+---
+
+#### scheduler.backup_loop 주기 백업
+
+**시그니처** `async def backup_loop(interval: int) -> None`
+
+근거: [[SYNC-INFRA-001]] 6.1 · 5.2 `BACKUP_INTERVAL_SECONDS`
+
+**처리** `interval`초 **자고 나서** 프로젝트마다 [[#pipeline.export_tracking]]을 부르는 것을 끝없이 반복. 0 이하면 아예 켜지 않는다.
+
+**기동 시 한 번은 없다.** `poll_loop`와 다른 점이다. 기동 직후는 `catch_up`이 같은 작업 사본에서 fetch를 돌고 있고, 노트북을 자주 켰다 끄면 부팅마다 저장소 수만큼 reset이 붙는다. 백업은 하루 단위 값이라 몇 시간 늦어도 잃는 게 없다.
+
+**예외를 두 겹으로 잡는다.** 안쪽은 저장소 단위(하나가 실패해도 다음을 계속한다 — `catch_up`과 같은 규칙) · 바깥은 주기 단위(저장소 목록을 읽다 DB가 죽어도 반복이 안 멈춘다).
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.list_projects]] · [[#pipeline.export_tracking]]
+
+**테스트 관점** `interval` 만큼 자고 부른다 · `export_tracking`이 던져도 다음 저장소를 계속한다 · **DB가 죽어도 반복이 안 멈춘다** · `BACKUP_INTERVAL_SECONDS=0`이면 태스크가 안 뜬다
 
 ---
 

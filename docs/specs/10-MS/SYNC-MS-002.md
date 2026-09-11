@@ -390,11 +390,13 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### SpecService.item_pks 문서의 항목 pk 지도
 
-**시그니처** `item_pks(document_id: int) -> dict[str, int]`
+**시그니처** `item_pks(document_id: int, include_deleted: bool = False) -> dict[str, int]`
 
-근거: [[SYNC-MS-007#pipeline.save_pipeline]] 10단계 — `ReferenceService.extract`에 넘길 `{item_id: pk}`. `save`가 `Version`을 돌려주므로 따로 읽는다
+근거: [[SYNC-MS-007#pipeline.save_pipeline]] 10단계 — `ReferenceService.extract`에 넘길 `{item_id: pk}`. `save`가 `Version`을 돌려주므로 따로 읽는다. `include_deleted`는 [[SYNC-MS-007#pipeline.import_tracking]] 5단계
 
-**처리** `DB: items where document_id and is_deleted=false` → `{item_id: id}`. 저장 직후(같은 트랜잭션)에 부르므로 방금 upsert한 것이 보인다
+**처리** `DB: items where document_id` (`include_deleted=false`면 `and is_deleted=false`) → `{item_id: id}`. 저장 직후(같은 트랜잭션)에 부르므로 방금 upsert한 것이 보인다
+
+**삭제된 항목까지 받는 갈래가 필요한 이유.** 백업 복원이 `문서ID#항목ID`를 pk로 되돌려야 하는데 **`broken_ref` 플래그의 원인 항목은 정의상 `is_deleted`다**. [[#SpecService.resolve_item]]은 그 경우 `item-deleted`를 던지고 [[#SpecService.resolve_items]]는 조용히 거르므로 둘 다 못 쓴다. 기본값이 `false`라 기존 호출부는 그대로다
 
 ---
 

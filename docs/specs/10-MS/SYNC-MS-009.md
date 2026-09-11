@@ -165,6 +165,22 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ---
 
+#### git.last_commit_at 파일의 마지막 커밋 시각
+
+**시그니처** `async def last_commit_at(workdir: Path, path: str) -> datetime | None`
+
+근거: [[SYNC-INFRA-001]] 6.1 · [[SYNC-UI-002#UI-14]] 요소 2.4 · [[SYNC-MS-001#ProjectService.repo_status]]
+
+**처리** `git log -1 --format=%aI origin/HEAD -- {path}` → 출력이 비면 `None`, 아니면 시각. `origin/HEAD`가 없거나(빈 저장소) 경로가 한 번도 커밋된 적 없으면 `None`
+
+**`origin/HEAD`로 본다.** 로컬 HEAD는 뒤처질 수 있고, 이 값이 답할 질문은 "**저장소에** 백업이 언제 올라갔나"다
+
+**네트워크를 안 탄다.** `fetch`를 부르지 않는다 — 이 함수를 부르는 `repo_status`가 원격 하나 때문에 관리 화면 전체가 매달리는 것을 피하려고 DB만 읽게 만든 함수이기 때문이다
+
+**테스트 관점** 커밋된 파일 → 그 커밋 시각 · 없는 경로 → `None` · 빈 저장소 → `None` · 파일을 다시 커밋하면 시각이 올라간다
+
+---
+
 #### git.rev_list_count 밀린 커밋 수
 
 **시그니처** `async def rev_list_count(workdir: Path, range: str) -> int`

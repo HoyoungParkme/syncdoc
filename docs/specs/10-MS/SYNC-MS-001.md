@@ -83,7 +83,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-SEQ-001#SEQ-20]] · UI-14 표 2
 
-**처리** **DB만 읽는다. `git.fetch`를 부르지 않는다.** 저장소마다 `→ RepoStatus(code, remote_url, last_processed_commit, synced_at, behind_by, fetched_at, error=None)`.
+**처리** **원격을 안 탄다. `git.fetch`를 부르지 않는다.** 저장소마다 `→ RepoStatus(code, remote_url, last_processed_commit, synced_at, behind_by, fetched_at, backed_up_at, backup_stale, error=None)`.
+
+`backed_up_at`만은 DB가 아니라 **git에서 읽는다** — `git.last_commit_at(workdir, "backup/tracking.json")`. **DB를 잃어도 남아야 하는 값이라 백업 자신과 같은 곳에 산다**(인프라 6.1). 네트워크를 타지 않는 로컬 조회 하나이므로 이 함수가 피하려던 것(원격 하나가 안 응답해 관리 화면 전체가 매달리는 것)과 다르다. 저장소마다 감싸서 실패하면 `backed_up_at=None` · `error="backup: {사유}"`로 두고 다음 저장소를 계속한다 — 작업 사본이 망가진 프로젝트 하나가 표 전체를 죽이지 않는다.
+
+`backup_stale`은 **서버가 판정한다** — `backed_up_at`이 있고 `BACKUP_INTERVAL_SECONDS`의 두 배가 넘게 지났으면 참. 화면이 계산하지 않는 이유는 **화면이 주기를 모르기 때문**이고, 주기를 응답에 실으면 화면이 검사를 하게 된다. `backed_up_at`이 `None`이면 `backup_stale`도 거짓이다 — 한 번도 안 한 것과 멈춘 것은 다르다.
 
 `behind_by`·`fetched_at`은 폴링([[SYNC-MS-007#scheduler.catch_up]])이 갱신한다. 예전에는 이 함수가
 저장소마다 순차로 fetch를 돌렸는데, 폴링이 5분마다 같은 일을 이미 하고 있어 이중이었고, 원격
@@ -92,7 +96,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 `behind_by`가 `null`이면 아직 한 번도 못 받아본 것이다 — 방금 등록했거나 폴링이 계속 실패하는
 경우다. 화면은 `fetched_at`으로 "언제 기준인지"를 함께 보여준다.
 
-**테스트 관점** 이 함수가 `git.fetch`를 부르지 않는다 · 폴링이 적어 둔 값을 그대로 돌려준다 · 등록 직후에는 `behind_by=None`
+**테스트 관점** 이 함수가 `git.fetch`를 부르지 않는다 · 폴링이 적어 둔 값을 그대로 돌려준다 · 등록 직후에는 `behind_by=None` · 백업이 없으면 `backed_up_at=None`이고 `backup_stale=false` · 주기의 두 배가 지난 백업은 `backup_stale=true` · 작업 사본이 없어도 다른 저장소는 그대로 나온다
 
 ---
 

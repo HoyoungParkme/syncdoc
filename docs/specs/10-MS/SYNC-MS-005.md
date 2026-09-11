@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/collab/service.py`의 함수 8개. 클래스 명세 [[SYNC-DOM-002]] 4.5의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/collab/service.py`의 함수 10개. 클래스 명세 [[SYNC-DOM-002]] 4.5의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -32,6 +32,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#CommentService.count_unresolved]] | 프로젝트 미해결 수 |
 | [[#CommentService.count_unresolved_by_document]] | 문서별 |
 | [[#CommentService.unresolved_in]] | 문서들의 미해결 목록 |
+| [[#CommentService.all_in_project]] | 백업용 댓글 전량 |
+| [[#CommentService.restore]] | 백업에서 댓글 하나 되붙이기 |
 
 ---
 
@@ -121,6 +123,36 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **시그니처** `unresolved_in(document_ids: list[int]) -> list[CommentSummary]`
 
 **처리** `DB: comments join documents join users where document_id in ids and not is_resolved order by created_at` → `CommentSummary(id, doc_id, line_no, excerpt=body[:80], author, created_at)`. 답글도 포함
+
+---
+
+#### CommentService.all_in_project 백업용 댓글 전량
+
+**시그니처** `all_in_project(project_id: int) -> list[Comment]`
+
+근거: [[SYNC-INFRA-001]] 6.1 · [[SYNC-MS-007#pipeline.export_tracking]] 3단계
+
+**처리** `DB: comments join documents where project_id order by document_id, created_at, id` → 전부
+
+**해결된 것도 준다.** [[#CommentService.unresolved_in]]은 미해결만이라 백업에 못 쓴다. 정렬을 `(문서, 작성시각)`으로 고정하는 이유는 **부모가 자식보다 먼저 오게** 하기 위해서다 — 답글의 작성 시각은 부모가 이미 있어야 생기므로 항상 부모보다 크다
+
+---
+
+#### CommentService.restore 백업에서 댓글 하나 되붙이기
+
+**시그니처** `restore(document_id: int, parent_comment_id: int | None, line_no: int, line_hash: str, author_user_id: int, is_resolved: bool, created_at: datetime, original_location: str | None) -> tuple[Comment, bool]`
+
+근거: [[SYNC-INFRA-001]] 6.1 · [[SYNC-MS-007#pipeline.import_tracking]] 8단계
+
+**처리** `(document_id, author_user_id, created_at)`으로 찾아 있으면 `→ (그 행, False)` · 없으면 `DB: comments insert(본문 = 복원 자리표시)` · `→ (새 행, True)`
+
+**한 행씩 부른다.** 부모-자식 사슬 때문이다 — 부르는 쪽이 새 id를 받아야 다음 행의 `parent_comment_id`를 채울 수 있다. **이미 있던 행도 돌려주는** 이유가 같다: 반쯤 복원된 상태에서 다시 눌러도 답글이 제 부모에 붙어야 한다
+
+**[[#CommentService.add]]를 못 쓰는 이유.** `add`는 본문이 필수이고 `created_at`·`line_hash`·`is_resolved`를 지금 값으로 만든다. 복원은 그 셋을 **백업에 적힌 대로** 되살려야 한다
+
+**본문은 자리표시다.** 백업에 본문이 없다(저장소가 public — 인프라 6.1). `body`가 NOT NULL이라 무언가 들어가야 하는데, 빈 문자열은 화면에 빈 칸으로 떠 사람이 버그로 읽는다. **"백업에서 복원 — 본문은 백업에 없습니다"**를 넣어 왜 비었는지가 화면에서 읽히게 한다
+
+**테스트 관점** 빈 표에 넣으면 새 행 · 같은 열쇠로 두 번 부르면 둘째는 `(같은 행, False)` · `created_at`·`is_resolved`가 인자 그대로 들어간다 · 본문이 자리표시다
 
 ---
 

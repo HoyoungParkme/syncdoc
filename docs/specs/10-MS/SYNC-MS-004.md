@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/tracking/service.py`의 함수 17개. 클래스 명세 [[SYNC-DOM-002]] 4.4의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/tracking/service.py`의 함수 21개. 클래스 명세 [[SYNC-DOM-002]] 4.4의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -42,6 +42,10 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#TrackingService.pending_decisions_for]] | 미결정 버전 ID |
 | [[#TrackingService.reassign_open_flags]] | 담당자 다시 계산 |
 | [[#TrackingService.relink_versions]] | 재구축 뒤 버전 다시 잇기 |
+| [[#TrackingService.all_flags]] | 백업용 플래그 전량 |
+| [[#TrackingService.all_decisions]] | 백업용 전파결정 전량 |
+| [[#TrackingService.restore_flags]] | 백업에서 플래그 되붙이기 |
+| [[#TrackingService.restore_decisions]] | 백업에서 전파결정 되붙이기 |
 
 ---
 
@@ -237,6 +241,60 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **시그니처** `pending_decisions_for(user_id: int) -> list[int]`
 
 **처리** `DB: propagation_decisions where choice=undecided` → `version_id[]`. 누가 저장했는지는 모른다(versions는 spec 묶음) — `queries.todo`가 `SpecService.versions_instructed_by`로 거른다
+
+---
+
+#### TrackingService.all_flags 백업용 플래그 전량
+
+**시그니처** `all_flags(project_id: int) -> list[Flag]`
+
+근거: [[SYNC-INFRA-001]] 6.1 · [[SYNC-MS-007#pipeline.export_tracking]] 3단계
+
+**처리** `DB: flags join items join documents where project_id order by id` → 전부
+
+**해제된 것도 준다.** [[#TrackingService.flags_in_project]]는 미해결만이고 종류도 가려서 백업에 못 쓴다. **백업은 지금 남은 일이 아니라 그때 있었던 사실이다** — 누가 언제 무엇을 확인했는지가 이력이다
+
+---
+
+#### TrackingService.all_decisions 백업용 전파결정 전량
+
+**시그니처** `all_decisions(project_id: int) -> list[PropagationDecision]`
+
+근거: [[SYNC-INFRA-001]] 6.1 · [[SYNC-MS-007#pipeline.export_tracking]] 3단계
+
+**처리** `DB: propagation_decisions join versions join documents where project_id order by id` → 전부. **결정된 것도 준다**(`all_flags`와 같은 이유)
+
+---
+
+#### TrackingService.restore_flags 백업에서 플래그 되붙이기
+
+**시그니처** `restore_flags(rows: list[RestoreFlag]) -> tuple[int, int]`
+
+근거: [[SYNC-INFRA-001]] 6.1 · [[SYNC-MS-007#pipeline.import_tracking]] 6단계
+
+**입력** 자연키가 **이미 pk로 풀린** 행. 자연키를 푸는 것은 `pipeline`의 몫이다 — 이 묶음은 문서·항목을 모른다([[SYNC-DOM-001]] 4장 경계)
+
+**처리** 행마다 `(kind, target_item_id, cause_item_id, cause_version_id, raised_at)`이 이미 있으면 건너뛰고, 없으면 `DB: flags insert` · `→ (넣은 수, 건너뛴 수)`
+
+**열쇠에 `raised_at`이 드는 이유.** 앞 넷만으로는 모자란다 — [[#TrackingService.raise_broken]]은 중복 검사를 아예 안 하고 `has_unresolved`는 미해결만 본다. 해제한 뒤 같은 원인으로 다시 서면 같은 네 값의 행이 둘이 된다. `raise_*` 셋이 행마다 시각을 새로 찍으므로 마이크로초가 갈린다. **같은 마이크로초에 같은 네 값이 둘 생기면 복원이 하나로 접힌다** — 지금 코드에 그 경로는 없다
+
+**테스트 관점** 빈 표에 넣으면 전부 들어간다 · 같은 목록을 두 번 넣으면 둘째는 전부 건너뜀 · 해제된 플래그도 해제 정보까지 복원된다
+
+---
+
+#### TrackingService.restore_decisions 백업에서 전파결정 되붙이기
+
+**시그니처** `restore_decisions(rows: list[RestoreDecision]) -> tuple[int, int]`
+
+근거: [[SYNC-INFRA-001]] 6.1 · [[SYNC-MS-007#pipeline.import_tracking]] 7단계
+
+**처리** 행마다 `version_id`에 결정이 이미 있으면 건너뛰고, 없으면 `DB: propagation_decisions insert` · `→ (넣은 수, 건너뛴 수)`
+
+**덮어쓰지 않는다.** `version_id`가 UNIQUE이므로 둘 중 하나만 살 수 있는데, **지금 DB의 결정은 사람이 방금 내린 것일 수 있고 백업은 옛 사실이다**
+
+**`reason`은 항상 비어 있다** — 백업에 안 싣는다(인프라 6.1). nullable이라 제약에 안 걸리고, UI-12가 사유 자리를 비워 보여준다. 명세가 고른 손실이다
+
+**테스트 관점** 빈 표에 넣으면 전부 들어간다 · 같은 버전에 결정이 있으면 건너뛴다 · `reason`이 null로 들어간다
 
 ---
 
