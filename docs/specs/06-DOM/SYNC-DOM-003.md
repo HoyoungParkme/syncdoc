@@ -49,6 +49,7 @@ erDiagram
     users ||--o{ propagation_decisions : decided_by
     users ||--o{ comments : author
     users ||--o{ access_tokens : owns
+    users ||--o{ commit_emails : owns
     comments ||--o{ comments : reply
 
     projects {
@@ -161,6 +162,12 @@ erDiagram
         varchar display_name
         bytea github_token_encrypted
         timestamptz created_at
+    }
+    commit_emails {
+        int id PK
+        int user_id FK
+        varchar email UK
+        timestamptz added_at
     }
     access_tokens {
         int id PK
@@ -319,9 +326,18 @@ erDiagram
 
 | 컬럼 | 타입 | 제약 | 의미 | 예시 |
 |---|---|---|---|---|
-| github_login | varchar(50) | UK | GitHub 아이디 | `hoyoung-park` |
+| github_login | varchar(50) | UK | GitHub 아이디. **자리표시 User에서는 아이디가 아닐 수 있다** — 커밋 이메일이 noreply가 아니면 `%an`(사람 이름)이 대체값으로 들어간다([[SYNC-DOM-002]] 5장 결정 3) | `hoyoung-park` |
 | github_user_id | bigint | UK | GitHub 숫자 ID. 아이디 변경에 대비 | |
 | github_token_encrypted | bytea | null 허용 | OAuth 토큰. 앱 비밀키로 암호화. push에 사용. **null이면 미등록** — GitHub 직접 push로만 알려진 사람(자리표시). 로그인하면 채워진다 | |
+
+### commit_emails
+
+클래스: [[SYNC-DOM-002#CommitEmail]]
+
+| 컬럼 | 타입 | 제약 | 의미 | 예시 |
+|---|---|---|---|---|
+| email | varchar(255) | UK | git 커밋의 `%ae`. **소문자로 정규화해 저장한다** — git 이메일은 대소문자가 흔들린다. UK인 이유는 이메일 하나가 사람 하나여야 작성자 판정이 답을 하나로 내기 때문이다 | `you@example.com` |
+| added_at | timestamptz | not null | 등록 시각. 사람이 UI-13 2.6에서 직접 등록한다 — 시스템이 추측해 넣지 않는다 | |
 
 ### access_tokens
 
