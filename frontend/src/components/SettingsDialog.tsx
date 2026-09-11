@@ -1,8 +1,9 @@
 /** UI-13 설정 — SYNC-UI-002#UI-13. 어느 화면 위에서든 뜨는 다이얼로그. 닫으면 보던 화면 그대로.
- *  1 다이얼로그 · 2 내 계정(2.1 로그인 ID, 2.2 로그아웃) · 3 MCP 토큰(3.1 행, 3.2 폐기, 3.3 이름, 3.4 발급, 3.5 마지막 사용)
+ *  1 다이얼로그 · 2 내 계정(2.1 로그인 ID, 2.2 로그아웃, 2.3 커밋 이메일 행, 2.4 삭제, 2.5 입력, 2.6 추가)
+ *  3 MCP 토큰(3.1 행, 3.2 폐기, 3.3 이름, 3.4 발급, 3.5 마지막 사용)
  *  4 토큰 원문 상자(4.1 원문, 4.2 복사) · 5 관리 카드(5.1 열기) · 6 관리 영역(UI-14) · 7 닫기(✕) · 8 클라이언트 설정(8.1 스니펫) · 9 닫기 */
 import { useEffect, useState } from 'react'
-import { ago, api, type AccessToken, type User } from '../api/client'
+import { ago, api, ApiError, type AccessToken, type CommitEmail, type User } from '../api/client'
 import { Admin } from '../pages/Admin'
 
 const day = (iso: string) => iso.slice(0, 10)
@@ -15,9 +16,14 @@ export function SettingsDialog({ user, onClose }: { user: User; onClose: () => v
   const [naming, setNaming] = useState(false)
   // 규칙: 관리는 접힌 채로 연다. 인덱스 재구축이 위험한 동작이라 한 번 더 눌러야 보인다
   const [adminOpen, setAdminOpen] = useState(false)
+  const [emails, setEmails] = useState<CommitEmail[]>([])
+  const [email, setEmail] = useState('')
+  const [emailError, setEmailError] = useState('')
   const load = () => api.get<AccessToken[]>('/api/me/tokens').then(setTokens)
+  const loadEmails = () => api.get<CommitEmail[]>('/api/me/emails').then(setEmails)
   useEffect(() => {
     load()
+    loadEmails()
   }, [])
   async function issue() {
     const t = await api.post<AccessToken>('/api/me/tokens', { label })
@@ -31,6 +37,22 @@ export function SettingsDialog({ user, onClose }: { user: User; onClose: () => v
     if (!confirm(`'${t.label}' 토큰을 폐기할까요? 그 토큰으로 오는 MCP 요청이 거부됩니다.`)) return
     await api.del(`/api/me/tokens/${t.id}`)
     load()
+  }
+  async function addEmail() {
+    try {
+      await api.post<CommitEmail>('/api/me/emails', { email })
+      setEmail('')
+      setEmailError('')
+      loadEmails()
+    } catch (e) {
+      setEmailError(e instanceof ApiError ? e.message : '등록하지 못했습니다')
+    }
+  }
+  async function removeEmail(e: CommitEmail) {
+    // 규칙: 삭제는 확인을 받는다. 다음 재구축에서 그 이메일 커밋이 자리표시로 돌아간다
+    if (!confirm(`${e.email}을 지울까요? 다음 인덱스 재구축에서 그 이메일로 온 커밋이 내 것이 아니게 됩니다.`)) return
+    await api.del(`/api/me/emails/${e.id}`)
+    loadEmails()
   }
   const logout = () => {
     api.post('/auth/logout', {}).finally(() => (window.location.href = '/login'))
@@ -150,6 +172,31 @@ export function SettingsDialog({ user, onClose }: { user: User; onClose: () => v
                 로그아웃
               </button>
             </div>
+            <p className="lbl">
+              커밋 이메일 — GitHub에서 바로 push한 커밋을 내 계정으로 잇습니다. 등록한 뒤 관리에서 인덱스 재구축을 한 번 돌리세요.
+            </p>
+            {emails.map((e) => (
+              <div className="row" key={e.id} data-el="2.3">
+                <span className="mono">{e.email}</span>
+                <span className="grow" />
+                <button className="btn sm danger" type="button" data-el="2.4" onClick={() => removeEmail(e)}>
+                  삭제
+                </button>
+              </div>
+            ))}
+            <div className="row">
+              <input
+                className="inp wide"
+                data-el="2.5"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(ev) => setEmail(ev.target.value)}
+              />
+              <button className="btn sm" type="button" data-el="2.6" disabled={!email.trim()} onClick={addEmail}>
+                추가
+              </button>
+            </div>
+            {emailError && <p className="lbl warn">{emailError}</p>}
           </section>
         </div>
 

@@ -154,6 +154,9 @@ class ChangedFile:
     commit_hash: str
     author_login: str
     message: str
+    # login과 나란히 싣는다 — login은 noreply 메일일 때만 진짜 GitHub 아이디이고
+    # 아니면 %an(사람 이름)이라 신원의 근거가 못 된다 (MS-009 3a, #34)
+    author_email: str = ""
 
 
 @dataclass(frozen=True)
@@ -162,6 +165,7 @@ class Commit:
     login: str
     date: datetime
     message: str
+    email: str = ""  # ChangedFile.author_email과 같은 이유
 
 
 @dataclass(frozen=True)

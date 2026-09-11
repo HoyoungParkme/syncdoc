@@ -169,7 +169,12 @@ async def read(workdir: Path, path: str, ref: str = "HEAD") -> str:
 
 
 def _login_of(name: str, email: str) -> str:
-    """커밋 author → GitHub login. noreply 메일이면 앞부분(ID+ 접두어 제거), 아니면 %an."""
+    """커밋 author → GitHub login. noreply 메일이면 앞부분(ID+ 접두어 제거), 아니면 %an.
+
+    **%an 폴백은 GitHub 로그인이 아니다** — 사람 이름이고 공백이 들어 있을 수 있다.
+    그래서 이 값만으로 사람을 찾으면 안 된다. 파이프라인은 원본 %ae로 먼저 찾고
+    (AccountService.user_for_commit) 이건 2차 단서로만 쓴다(SYNC-MS-009 3a).
+    """
     if email.endswith("@users.noreply.github.com"):
         return email.split("@")[0].split("+")[-1]
     return name
@@ -220,6 +225,7 @@ async def changed_files(workdir: Path, range: str, prefix: str) -> list[ChangedF
                 commit_hash=hash_,
                 author_login=_login_of(an, ae),
                 message=_message(msg),
+                author_email=ae,
             )
         hash_ = next_hash
     return [c for _, c in sorted(seen.items()) if c is not None]
@@ -257,6 +263,7 @@ async def log(workdir: Path, path: str) -> list[Commit]:
                 login=_login_of(an, ae),
                 date=datetime.fromisoformat(date),
                 message=_message(msg),
+                email=ae,
             )
         )
     return commits

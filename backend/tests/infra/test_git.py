@@ -214,6 +214,8 @@ async def test_changed_files_keeps_last_commit_per_file_and_skips_templates(
     ]
     assert got[0].message == "spec(SYNC-PRD-001): v3\n\n이유가 있다"
     assert got[0].author_login == "seed"
+    # login과 별개로 %ae 원본이 실린다 — 파이프라인이 이메일로 먼저 사람을 찾는다 (#34)
+    assert got[0].author_email == "seed@example.com"
     assert got[1].message == "spec(SYNC-SCN-001): new"
 
 
@@ -324,6 +326,7 @@ async def test_log_lists_file_history_oldest_first(repos: dict[str, Path]) -> No
     got = await g.log(repos["work"], SEED)
     assert [c.message for c in got] == ["seed", "spec(SYNC-PRD-001): v2\n\n왜냐하면"]
     assert got[1].hash == h2 and got[1].login == "seed"
+    assert got[1].email == "seed@example.com"
     assert got[0].date.tzinfo is not None and got[0].date <= got[1].date
     assert await g.log(repos["work"], "docs/specs/none.md") == []
 

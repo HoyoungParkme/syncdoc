@@ -240,6 +240,23 @@ class TrackingService:
         """SYNC-MS-004#TrackingService.count_flags_by_document"""
         return self.repo.count_by_document_kind(document_ids)
 
+    def reassign_open_flags(self, project_id: int) -> int:
+        """SYNC-MS-004#TrackingService.reassign_open_flags
+
+        재구축은 git을 진실로 삼아 versions를 다시 만든다. assignee_user_id는
+        거기서 파생된 값인데 플래그를 만들 때 한 번만 계산되고 다시 계산되지
+        않는다 — clear_index는 flags를 남기므로, 이게 없으면 재구축이 절반만
+        끝난다(#34). 해제된 플래그는 그때의 사실이라 안 건드린다.
+        """
+        changed = 0
+        for f in self.repo.unresolved_of_project(project_id):
+            a = self._assignee_of(f.target_item_id)
+            if a != f.assignee_user_id:
+                f.assignee_user_id = a
+                changed += 1
+        self.session.flush()
+        return changed
+
     def pending_decisions_for(self, user_id: int) -> list[int]:
         """SYNC-MS-004#TrackingService.pending_decisions_for"""
         return self.repo.undecided_version_ids()  # 누가 저장했는지는 모른다 — queries가 거른다

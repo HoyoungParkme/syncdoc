@@ -156,3 +156,37 @@ def test_me_and_tokens_issue_list_revoke(client: TestClient, db_session: Session
     assert client.get("/api/me/tokens").json()[0]["revoked_at"] is not None  # 폐기돼도 행은 남는다
     assert client.delete("/api/me/tokens/999999").status_code == 404
     assert AccountService(db_session).authenticate_token(issued["token"]) is None
+
+
+# ── /api/me/emails (#34) ──
+def test_commit_emails_add_list_remove(client: TestClient, db_session: Session) -> None:
+    from tests.web.conftest import login
+
+    assert client.get("/api/me/emails").status_code == 401
+    login(client, db_session)
+    assert client.get("/api/me/emails").json() == []
+    r = client.post("/api/me/emails", json={"email": "Me@Example.COM"})
+    assert r.status_code == 201 and r.json()["email"] == "me@example.com"  # 소문자로
+    row = r.json()
+    # 같은 이메일을 두 번 → 같은 행. 두 번 눌러도 오류가 아니다
+    assert client.post("/api/me/emails", json={"email": "me@example.com"}).json()["id"] == row["id"]
+    assert [e["email"] for e in client.get("/api/me/emails").json()] == ["me@example.com"]
+    assert client.post("/api/me/emails", json={"email": "notanemail"}).status_code == 422
+    assert client.delete(f"/api/me/emails/{row['id']}").status_code == 204
+    assert client.get("/api/me/emails").json() == []
+    assert client.delete("/api/me/emails/999999").status_code == 404
+
+
+def test_commit_email_taken_by_someone_else_is_409(client: TestClient, db_session: Session) -> None:
+    from tests.web.conftest import login
+
+    other = make_user(db_session, login="somebody")
+    AccountService(db_session).add_commit_email(other, "shared@example.com")
+    db_session.flush()
+    login(client, db_session)
+    r = client.post("/api/me/emails", json={"email": "shared@example.com"})
+    assert r.status_code == 409
+    assert r.json()["type"] == "urn:syncdoc:email-taken"
+    assert r.json()["email"] == "shared@example.com"
+    # 남의 이메일은 목록에도 안 보인다
+    assert client.get("/api/me/emails").json() == []

@@ -210,6 +210,20 @@ class RepositoryAlreadyRegistered(Problem):
         super().__init__(f"{code} 프로젝트가 이미 쓰는 저장소", code=code)
 
 
+class EmailTaken(Problem):
+    """SYNC-API-001 2장 — 남이 이미 등록한 커밋 이메일.
+
+    이메일 하나는 사람 하나여야 user_for_commit이 답을 하나로 낸다.
+    """
+
+    type = "urn:syncdoc:email-taken"
+    status = 409
+    title = "email-taken"
+
+    def __init__(self, email: str) -> None:
+        super().__init__(f"{email}은 다른 사람이 이미 등록했다", email=email)
+
+
 class Internal(Problem):
     """SYNC-API-001 2장 — 표에 없는 예외. 포괄 핸들러가 만든다.
 

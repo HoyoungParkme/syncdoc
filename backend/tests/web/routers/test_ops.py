@@ -129,7 +129,11 @@ async def test_webhook_admin_and_catch_up(client: TestClient, scoped: Session, p
     assert after["behind_by"] == 0 and after["fetched_at"] is not None
     # 재구축
     rb = client.post("/api/admin/repos/EXMP/rebuild").json()
-    assert (rb["docs"], rb["versions"]) == (3, 3) and rb["convention_errors"][0][
-        "doc_id"
-    ] == "SYNC-PRD-001"
+    # 커밋 작성자 seed는 미등록이라 세 문서 전부 author.unknown (#34)
+    assert (rb["docs"], rb["versions"]) == (3, 3)
+    assert sorted(e["doc_id"] for e in rb["convention_errors"]) == [
+        "EXMP-PRD-001",
+        "EXMP-RFQ-001",
+        "SYNC-PRD-001",
+    ]
     assert client.post("/api/admin/repos/NOPE/rebuild").status_code == 404

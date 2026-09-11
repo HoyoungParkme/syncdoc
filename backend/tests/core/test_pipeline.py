@@ -579,7 +579,13 @@ async def test_rebuild_restores_versions_references_and_keeps_flags(
     r = await pipeline.rebuild("EXMP")
     # 시드 SYNC-PRD-001(repos 픽스처) + RFQ + PRD · 항목 G1·R1·N1·Q1·Q2 · 참조 R1→Q1, 문서 upstream · 버전 1+1+2
     assert (r.docs, r.items, r.references, r.versions) == (3, 5, 2, 4)
-    assert [e["doc_id"] for e in r.convention_errors] == ["SYNC-PRD-001"]  # 시드는 frontmatter 미완
+    # 커밋 작성자 seed는 미등록이라 세 문서 전부 author.unknown (#34). 시드는 frontmatter도 미완
+    assert sorted(e["doc_id"] for e in r.convention_errors) == [
+        "EXMP-PRD-001",
+        "EXMP-RFQ-001",
+        "SYNC-PRD-001",
+    ]
+    assert all("author.unknown: seed" in e["detail"] for e in r.convention_errors)
     svc = SpecService(scoped)
     prd = svc.get_document("EXMP-PRD-001")
     assert (prd.current_version_no, prd.status, "두 줄로." in prd.body) == (2, "review", True)
@@ -701,3 +707,78 @@ async def test_process_commit_treats_directory_rename_as_modify_not_delete(
     assert (d.current_version_no, d.status, len(d.items)) == (2, "draft", 2)  # 삭제 아님
     assert scoped.execute(text("SELECT count(*) FROM flags")).scalar() == 0
     assert "file.deleted" not in (d.convention_error_detail or "")
+
+
+# ── #34 커밋 작성자를 계정으로 잇는다 ──
+async def test_process_commit_marks_author_unknown_on_every_doc(scoped: Session, proj) -> None:
+    """미등록 작성자가 문서 둘을 커밋하면 둘 다 author.unknown.
+
+    판정이 「방금 자리표시를 만들었나」였을 때는 먼저 처리된 하나만 걸렸다 (#34).
+    """
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    repo = _repo_row(proj)
+    repo.last_processed_commit = g(remote, "rev-parse", "main")
+    scoped.flush()
+    (other / RFQ_FILE).parent.mkdir(parents=True, exist_ok=True)
+    (other / RFQ_FILE).write_text(RFQ, encoding="utf-8")
+    (other / PRD_FILE).write_text(PRD_BODY, encoding="utf-8")
+    g(other, "add", "-A")
+    g(other, "commit", "-q", "-m", "spec: RFQ·PRD 추가")  # 작성자 seed — 미등록
+    g(other, "push", "-q", "origin", "HEAD:main")
+    await pipeline.process_commit(repo, g(remote, "rev-parse", "main"))
+    svc = SpecService(scoped)
+    for doc_id in ("EXMP-RFQ-001", "EXMP-PRD-001"):
+        d = svc.get_document(doc_id)
+        assert d.has_convention_error and "author.unknown: seed" in d.convention_error_detail
+
+
+async def test_rebuild_attributes_by_commit_email(scoped: Session, proj) -> None:
+    """커밋 이메일을 등록하면 재구축이 그 사람에게 붙이고 author.unknown이 사라진다."""
+    from app.core.account.service import AccountService
+
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    AccountService(scoped).add_commit_email(proj["user"], "seed@example.com")
+    scoped.flush()
+    r = await pipeline.rebuild("EXMP")
+    # 시드 문서만 남는다 — frontmatter 미완이지 작성자 때문이 아니다
+    assert [e["doc_id"] for e in r.convention_errors] == ["SYNC-PRD-001"]
+    assert "author.unknown" not in r.convention_errors[0]["detail"]
+    assert (
+        scoped.execute(
+            text("SELECT count(*) FROM versions WHERE author_user_id <> :u"),
+            {"u": proj["user"].id},
+        ).scalar()
+        == 0
+    )
+
+
+async def test_rebuild_reassigns_open_flag_to_new_author(scoped: Session, proj) -> None:
+    """재구축이 열린 플래그의 담당자를 다시 계산한다 (MS-007 rebuild 7a).
+
+    clear_index는 flags를 남기고 담당자는 만들 때 한 번만 정해진다 — 이게 없으면
+    버전은 옮겨 가는데 플래그는 옛 자리표시를 계속 가리킨다 (#34).
+    """
+    from app.core.account.service import AccountService
+    from app.core.tracking.service import TrackingService
+
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    await pipeline.rebuild("EXMP")
+    svc = SpecService(scoped)
+    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
+    TrackingService(scoped).raise_broken(q1)
+    scoped.commit()
+    placeholder = scoped.execute(
+        text("SELECT assignee_user_id FROM flags WHERE resolved_at IS NULL")
+    ).scalar()
+    assert placeholder is not None and placeholder != proj["user"].id  # 자리표시가 담당
+    AccountService(scoped).add_commit_email(proj["user"], "seed@example.com")
+    scoped.commit()
+    await pipeline.rebuild("EXMP")
+    assert (
+        scoped.execute(
+            text("SELECT assignee_user_id FROM flags WHERE resolved_at IS NULL")
+        ).scalar()
+        == proj["user"].id
+    )

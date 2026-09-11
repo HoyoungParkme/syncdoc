@@ -295,6 +295,13 @@ export interface AccessToken {
   token?: string
 }
 
+/** 내가 git 커밋에 쓰는 이메일. GitHub 직접 push로 들어온 커밋을 내 계정으로 잇는 단서 (UI-13 2.3) */
+export interface CommitEmail {
+  id: number
+  email: string
+  added_at: string
+}
+
 export const STATUS_KO: Record<string, string> = { draft: '초안', review: '검토중', approved: '승인' }
 export const FLAG_KO: Record<string, string> = { needs_check: '확인 필요', broken_ref: '끊어진 참조', upstream_impact: '하위 불일치' }
 /** 미완성 경고 규칙 ID → 사람 말. SYNC-STD-001 4장 `화면 문구` 열의 전사 */

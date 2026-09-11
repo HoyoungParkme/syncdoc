@@ -67,6 +67,17 @@ class TrackingRepository:
         )
         return list(self.session.scalars(stmt))
 
+    def unresolved_of_project(self, project_id: int) -> list[Flag]:
+        """종류를 안 가린 열린 플래그. unresolved_in_project는 kind가 필수라 못 쓴다."""
+        stmt = (
+            select(Flag)
+            .join(Item, Item.id == Flag.target_item_id)
+            .join(Document, Document.id == Item.document_id)
+            .where(Document.project_id == project_id, Flag.resolved_at.is_(None))
+            .order_by(Flag.raised_at, Flag.id)
+        )
+        return list(self.session.scalars(stmt))
+
     def document_id_of_item(self, item_pk: int) -> int | None:
         return self.session.scalar(select(Item.document_id).where(Item.id == item_pk))
 
