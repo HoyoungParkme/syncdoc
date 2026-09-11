@@ -1,0 +1,341 @@
+{
+  "backup_version": 1,
+  "comments": [],
+  "flags": [
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-MS-002#SpecService.change_status",
+      "cause_version": null,
+      "kind": "broken_ref",
+      "raised_at": "2026-09-10T08:31:20.801257+00:00",
+      "resolved_at": null,
+      "resolved_by": null,
+      "resolved_with_edit": null,
+      "target": "SYNC-CODE-001#B2"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-MS-002#SpecService.revert",
+      "cause_version": null,
+      "kind": "broken_ref",
+      "raised_at": "2026-09-10T08:31:20.809791+00:00",
+      "resolved_at": null,
+      "resolved_by": null,
+      "resolved_with_edit": null,
+      "target": "SYNC-CODE-001#B4"
+    }
+  ],
+  "project": "SYNC",
+  "propagation_decisions": [
+    {
+      "affected": [
+        "SYNC-API-001#GET/api/projects/{code}/flags",
+        "SYNC-API-002#update_document",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-API-001#DELETE/api/me/emails/{id}",
+        "SYNC-API-001#GET/api/me/emails",
+        "SYNC-API-001#POST/api/me/emails"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-API-001@d16e8344967a463b667981eab6ea644017dd96ce"
+    },
+    {
+      "affected": [
+        "SYNC-DOM-002#PropagationDecision"
+      ],
+      "changed": [
+        "SYNC-DOM-001#CommitEmail",
+        "SYNC-DOM-001#PropagationDecision"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-DOM-001@d16e8344967a463b667981eab6ea644017dd96ce"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A",
+        "SYNC-DOM-003#users"
+      ],
+      "changed": [
+        "SYNC-DOM-002#AccountService",
+        "SYNC-DOM-002#CommitEmail",
+        "SYNC-DOM-002#TrackingService",
+        "SYNC-DOM-002#User"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-DOM-002@1dcf4ec9af0d00eaeefc9550b79c8cd0489db2ab"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A",
+        "SYNC-CODE-001#D6",
+        "SYNC-DOM-002#CommitEmail",
+        "SYNC-DOM-002#Flag",
+        "SYNC-DOM-002#PropagationDecision",
+        "SYNC-DOM-002#User",
+        "SYNC-MS-002#SpecService.clear_index"
+      ],
+      "changed": [
+        "SYNC-DOM-003#commit_emails",
+        "SYNC-DOM-003#flags",
+        "SYNC-DOM-003#propagation_decisions",
+        "SYNC-DOM-003#users"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-DOM-003@2533ce59c8a40373667e60b1cdd5633f38e8a685"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B4",
+        "SYNC-MS-007#pipeline.rebuild"
+      ],
+      "changed": [
+        "SYNC-MS-002#SpecService.clear_index",
+        "SYNC-MS-002#SpecService.version_keys"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-MS-002@f2aa933214faa8e2fa736bcb7745a801e931d2bb"
+    },
+    {
+      "affected": [
+        "SYNC-UI-002#UI-14"
+      ],
+      "changed": [
+        "SYNC-MS-004#TrackingService.reassign_open_flags",
+        "SYNC-MS-004#TrackingService.relink_versions"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-MS-004@2533ce59c8a40373667e60b1cdd5633f38e8a685"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A"
+      ],
+      "changed": [
+        "SYNC-MS-006#AccountService.add_commit_email",
+        "SYNC-MS-006#AccountService.commit_emails",
+        "SYNC-MS-006#AccountService.create_placeholder",
+        "SYNC-MS-006#AccountService.remove_commit_email",
+        "SYNC-MS-006#AccountService.user_for_commit"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-MS-006@526c335e9b175993f3759a5202b9c015ccc87bdf"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B2",
+        "SYNC-CODE-001#B4",
+        "SYNC-DOM-003#propagation_decisions",
+        "SYNC-MS-001#ProjectService.init_project",
+        "SYNC-MS-002#SpecService.clear_index",
+        "SYNC-MS-002#SpecService.mark_deleted",
+        "SYNC-MS-002#SpecService.version_keys",
+        "SYNC-MS-004#TrackingService.reassign_open_flags",
+        "SYNC-MS-004#TrackingService.relink_versions",
+        "SYNC-MS-007#scheduler.catch_up",
+        "SYNC-MS-009#git.changed_files"
+      ],
+      "changed": [
+        "SYNC-MS-007#pipeline.change_status",
+        "SYNC-MS-007#pipeline.process_commit",
+        "SYNC-MS-007#pipeline.rebuild"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-MS-007@1dcf4ec9af0d00eaeefc9550b79c8cd0489db2ab"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B1",
+        "SYNC-CODE-001#B4"
+      ],
+      "changed": [
+        "SYNC-MS-008#queries.document_view"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-MS-008@e13496f0d28f16dd425bc9651578a9a5d652ab7f"
+    },
+    {
+      "affected": [
+        "SYNC-MS-006#AccountService.user_for_commit"
+      ],
+      "changed": [
+        "SYNC-MS-009#git.changed_files",
+        "SYNC-MS-009#git.list",
+        "SYNC-MS-009#git.log"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-MS-009@0a1ada2324d4b49c5b976708372129f607f06285"
+    },
+    {
+      "affected": [
+        "SYNC-MS-006#AccountService.login_github"
+      ],
+      "changed": [
+        "SYNC-SEQ-001#SEQ-8"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-SEQ-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d"
+    },
+    {
+      "affected": [
+        "SYNC-MS-002#SpecService.clear_index",
+        "SYNC-MS-003#ReferenceService.resolve_missing",
+        "SYNC-MS-007#pipeline.rebuild"
+      ],
+      "changed": [
+        "SYNC-SEQ-001#SEQ-21"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-SEQ-001@d16e8344967a463b667981eab6ea644017dd96ce"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A",
+        "SYNC-CODE-001#B1",
+        "SYNC-MS-006#AccountService.login_github"
+      ],
+      "changed": [
+        "SYNC-STD-004#DEV-10",
+        "SYNC-STD-004#DEV-12",
+        "SYNC-STD-004#DEV-13",
+        "SYNC-STD-004#DEV-14",
+        "SYNC-STD-004#DEV-16",
+        "SYNC-STD-004#DEV-17",
+        "SYNC-STD-004#DEV-2",
+        "SYNC-STD-004#DEV-3",
+        "SYNC-STD-004#DEV-4"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-STD-004@07664516a9039f61e0a0400ba2c4a12385ff8bae"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A",
+        "SYNC-MS-006#AccountService.login_github"
+      ],
+      "changed": [
+        "SYNC-STD-004#DEV-16",
+        "SYNC-STD-004#DEV-6"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-STD-004@cb0a66c7c994c3050941bda521f7ea7bda017f04"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#GET/api/admin/repos",
+        "SYNC-API-001#POST/api/projects",
+        "SYNC-API-001#POST/hooks/github",
+        "SYNC-CODE-001#B1",
+        "SYNC-DOM-001#Repository",
+        "SYNC-DOM-002#AccountService",
+        "SYNC-DOM-002#ProjectService",
+        "SYNC-MS-001#ProjectService.init_project",
+        "SYNC-MS-002#SpecService.mark_deleted",
+        "SYNC-MS-007#pipeline.process_commit",
+        "SYNC-MS-009#git.init_specs",
+        "SYNC-SEQ-001#SEQ-2",
+        "SYNC-SEQ-001#SEQ-20",
+        "SYNC-SEQ-001#SEQ-4",
+        "SYNC-UI-001#UI-3",
+        "SYNC-UI-002#UI-3"
+      ],
+      "changed": [
+        "SYNC-UC-001#UC-A1",
+        "SYNC-UC-001#UC-G1"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#GET/api/docs/{docId}/upstream",
+        "SYNC-API-001#POST/api/docs/{docId}/status",
+        "SYNC-DOM-002#CommentService",
+        "SYNC-DOM-002#SpecService",
+        "SYNC-DOM-002#TrackingService",
+        "SYNC-MS-004#TrackingService.raise_upstream",
+        "SYNC-MS-007#pipeline.change_status",
+        "SYNC-MS-008#queries.upstream_checklist",
+        "SYNC-SEQ-001#SEQ-5",
+        "SYNC-UI-002#UI-5"
+      ],
+      "changed": [
+        "SYNC-UC-001#UC-H8"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-UC-001@e13496f0d28f16dd425bc9651578a9a5d652ab7f"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#DELETE/api/me/tokens/{id}",
+        "SYNC-API-001#GET/api/me",
+        "SYNC-API-001#GET/api/me/tokens",
+        "SYNC-API-001#POST/api/me/tokens",
+        "SYNC-API-001#POST/auth/logout",
+        "SYNC-CODE-001#D1",
+        "SYNC-STD-004#DEV-17",
+        "SYNC-UI-002#UI-13",
+        "SYNC-UI-002#UI-5"
+      ],
+      "changed": [
+        "SYNC-UI-001#UI-13"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-UI-001@13dc4638cf73ca1307f91c86a248fa7178402bcb"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B2",
+        "SYNC-CODE-001#B4",
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#D3",
+        "SYNC-CODE-001#D5"
+      ],
+      "changed": [
+        "SYNC-UI-002#UI-13",
+        "SYNC-UI-002#UI-14",
+        "SYNC-UI-002#UI-5"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-UI-002@d16e8344967a463b667981eab6ea644017dd96ce"
+    }
+  ]
+}
