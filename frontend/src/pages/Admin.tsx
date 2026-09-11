@@ -74,7 +74,6 @@ export function Admin() {
               <th>저장소</th>
               <th>마지막 처리 커밋</th>
               <th>동기화</th>
-              <th>마지막 백업</th>
               <th />
             </tr>
           </thead>
@@ -91,17 +90,22 @@ export function Admin() {
                   </a>{' '}
                   {r.synced_at && <span className="lbl">{ago(r.synced_at)}</span>}
                 </td>
-                <td data-el={i === 0 ? '2.3' : undefined}>{badge(r)}</td>
-                {/* 백업이 조용히 멈춘 것을 여기서 알아챈다 (INFRA 6.1) */}
-                <td data-el={i === 0 ? '2.4' : undefined}>
-                  {r.backed_up_at ? <span className={r.backup_stale ? 'warn' : 'lbl'}>{ago(r.backed_up_at)}</span> : <span className="lbl">없음</span>}
+                {/* 열을 안 늘린다 — 620px 다이얼로그에서 여섯 열이면 머리글이 전부 꺾인다.
+                    동기화와 마지막 백업은 둘 다 "지금 저장소가 어떤 상태인가"라 한 칸이 맞다 */}
+                <td data-el={i === 0 ? '2.3' : undefined}>
+                  {badge(r)}
+                  <br />
+                  {/* 백업이 조용히 멈춘 것을 여기서 알아챈다 (INFRA 6.1) */}
+                  <span className={r.backed_up_at && r.backup_stale ? 'warn' : 'lbl'} data-el={i === 0 ? '2.4' : undefined}>
+                    백업 {r.backed_up_at ? ago(r.backed_up_at) : '없음'}
+                  </span>
                 </td>
                 <td>
                   <span className="btn sm" data-el={i === 0 ? '3' : undefined} onClick={() => { setConfirmKind('rebuild'); setConfirm(r.code) }}>
                     인덱스 재구축
                   </span>{' '}
                   <span className="btn sm" data-el={i === 0 ? '6' : undefined} onClick={() => { setConfirmKind('restore'); setConfirm(r.code) }}>
-                    백업에서 복원
+                    복원
                   </span>
                 </td>
               </tr>
