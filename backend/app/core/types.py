@@ -139,6 +139,16 @@ class RebuildResult:
     references: int
     versions: int
     convention_errors: list[dict[str, str]] = field(default_factory=list)
+    # 새 버전에 이어 붙일 수 없어 버린 추적 행. 비어 있는 것이 정상이다 (#38)
+    dropped: list[dict[str, object]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RelinkResult:
+    """SYNC-MS-004#TrackingService.relink_versions — 다시 이은 수와 버린 것."""
+
+    relinked: int
+    dropped: list[dict[str, object]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

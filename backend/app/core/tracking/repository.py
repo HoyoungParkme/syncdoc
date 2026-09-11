@@ -78,6 +78,33 @@ class TrackingRepository:
         )
         return list(self.session.scalars(stmt))
 
+    def decisions_by_version_ids(self, version_ids: list[int]) -> list[PropagationDecision]:
+        """주어진 버전 id에 매달린 전파 결정. 재구축 재연결용 (#38).
+
+        **살아 있는 versions로 조인하면 안 된다** — 재연결 시점에는 옛 버전이 이미
+        지워져 있어 하나도 안 잡힌다. 지우기 전에 뜬 id 목록으로 찾는다.
+        """
+        if not version_ids:
+            return []
+        stmt = select(PropagationDecision).where(PropagationDecision.version_id.in_(version_ids))
+        return list(self.session.scalars(stmt.order_by(PropagationDecision.id)))
+
+    def flags_with_cause_version(self, project_id: int) -> list[Flag]:
+        """cause_version_id가 채워진 플래그 전부. 해제 여부를 안 가린다 — FK는 안 가린다."""
+        stmt = (
+            select(Flag)
+            .join(Item, Item.id == Flag.target_item_id)
+            .join(Document, Document.id == Item.document_id)
+            .where(Document.project_id == project_id, Flag.cause_version_id.is_not(None))
+            .order_by(Flag.id)
+        )
+        return list(self.session.scalars(stmt))
+
+    def delete_rows(self, rows: list) -> None:
+        for r in rows:
+            self.session.delete(r)
+        self.session.flush()
+
     def document_id_of_item(self, item_pk: int) -> int | None:
         return self.session.scalar(select(Item.document_id).where(Item.id == item_pk))
 

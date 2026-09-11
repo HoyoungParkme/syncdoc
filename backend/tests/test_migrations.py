@@ -64,6 +64,21 @@ def test_upgrade_creates_13_tables_and_indexes(alembic_cfg: Config) -> None:
     assert "version_no DESC" in defs["ix_versions_document_id_version_no_desc"]
     via = next(c for c in insp.get_columns("versions") if c["name"] == "via")  # 0002
     assert via["nullable"] is False and via["default"] is None
+    # 재구축이 versions를 갈아 끼우는 동안만 검사를 미룰 수 있어야 한다 (0007, #38).
+    # NOT DEFERRABLE이면 DELETE FROM versions 자체가 막혀 재구축이 아예 안 된다
+    with engine.connect() as conn:
+        deferrable = dict(
+            conn.execute(
+                text(
+                    "SELECT conname, condeferrable FROM pg_constraint WHERE conname IN"
+                    " ('propagation_decisions_version_id_fkey', 'flags_cause_version_id_fkey')"
+                )
+            ).all()
+        )
+    assert deferrable == {
+        "propagation_decisions_version_id_fkey": True,
+        "flags_cause_version_id_fkey": True,
+    }
     # FK 컬럼 전부 인덱스(DEV-8): 각 FK의 첫 컬럼이 어떤 인덱스의 선두 컬럼이다
     for table in TABLES:
         leading = {

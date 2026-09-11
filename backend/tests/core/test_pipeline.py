@@ -812,3 +812,107 @@ async def test_missing_ref_blocks_approve_and_clears_when_target_arrives(
     assert (await queries.document_view("EXMP-PRD-001")).missing_refs == []
     await pipeline.change_status("EXMP-PRD-001", "approved", user, None, upstream_reviewed=True)
     assert svc.get_document("EXMP-PRD-001").status == "approved"
+
+
+# ── #38 재구축이 versions를 가리키는 FK를 다시 잇는다 ──
+def _first_version(scoped: Session, doc_id: str) -> tuple[int, str]:
+    """(version_id, commit_hash) — 그 문서의 가장 오래된 버전."""
+    return scoped.execute(
+        text(
+            "SELECT v.id, v.commit_hash FROM versions v JOIN documents d ON d.id = v.document_id"
+            " WHERE d.doc_id = :doc ORDER BY v.id LIMIT 1"
+        ),
+        {"doc": doc_id},
+    ).one()
+
+
+async def test_rebuild_relinks_propagation_decision(scoped: Session, proj) -> None:
+    """전파결정이 재구축을 건너 새 버전을 가리킨다.
+
+    전에는 FK 위반으로 재구축이 아예 죽었다 (#38).
+    """
+    from app.core.tracking.service import TrackingService
+
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    await pipeline.rebuild("EXMP")
+    svc = SpecService(scoped)
+    vid, vhash = _first_version(scoped, "EXMP-PRD-001")
+    pks = [i.pk for i in svc.get_document("EXMP-PRD-001").items]
+    TrackingService(scoped).create_pending(vid, pks, pks[:1])
+    scoped.commit()
+
+    await pipeline.rebuild("EXMP")  # 전에는 여기서 ForeignKeyViolation
+
+    new_vid, affected = scoped.execute(
+        text("SELECT version_id, affected_pks FROM propagation_decisions")
+    ).one()
+    assert new_vid != vid  # 새 버전 행이다
+    assert (
+        scoped.execute(
+            text("SELECT commit_hash FROM versions WHERE id = :i"), {"i": new_vid}
+        ).scalar()
+        == vhash
+    )  # 같은 커밋을 가리킨다
+    assert list(affected) == pks  # 항목 pk는 upsert라 그대로
+
+
+async def test_rebuild_relinks_flag_cause_version(scoped: Session, proj) -> None:
+    """cause_version_id가 있는 플래그도 다시 이어진다. NULL로 비우지 않는다."""
+    from app.core.tracking.service import TrackingService
+
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    await pipeline.rebuild("EXMP")
+    svc, tr = SpecService(scoped), TrackingService(scoped)
+    vid, vhash = _first_version(scoped, "EXMP-PRD-001")
+    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
+    tr.raise_upstream([q1], svc.get_document("EXMP-PRD-001").id, vid, None)
+    scoped.commit()
+    assert scoped.execute(text("SELECT cause_version_id FROM flags")).scalar() == vid
+
+    await pipeline.rebuild("EXMP")
+
+    new_cause = scoped.execute(text("SELECT cause_version_id FROM flags")).scalar()
+    assert new_cause is not None and new_cause != vid
+    assert (
+        scoped.execute(
+            text("SELECT commit_hash FROM versions WHERE id = :i"), {"i": new_cause}
+        ).scalar()
+        == vhash
+    )
+
+
+async def test_rebuild_drops_unlinkable_and_reports(scoped: Session, proj) -> None:
+    """가리키던 문서가 저장소에서 사라지면 그 결정을 버리고 결과에 보고한다."""
+    from app.core.tracking.service import TrackingService
+
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    await pipeline.rebuild("EXMP")
+    svc = SpecService(scoped)
+    vid, _ = _first_version(scoped, "EXMP-RFQ-001")
+    pks = [i.pk for i in svc.get_document("EXMP-RFQ-001").items]
+    TrackingService(scoped).create_pending(vid, pks, pks[:1])
+    scoped.commit()
+    # RFQ 파일을 지운다 → git.list가 HEAD 기준이라 재구축 루프에 안 들어온다
+    g(other, "rm", "-q", RFQ_FILE)
+    g(other, "commit", "-q", "-m", "spec: RFQ 삭제")
+    g(other, "push", "-q", "origin", "HEAD:main")
+
+    r = await pipeline.rebuild("EXMP")
+
+    assert scoped.execute(text("SELECT count(*) FROM propagation_decisions")).scalar() == 0
+    assert [(d["kind"], d["count"]) for d in r.dropped] == [("propagation_decision", 1)]
+    assert "커밋" in r.dropped[0]["reason"]
+
+
+async def test_rebuild_twice_does_not_duplicate_status_changes(scoped: Session, proj) -> None:
+    """status( 커밋이 있는 저장소를 두 번 재구축해도 상태 변경이 안 쌓인다 (#38)."""
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)  # 마지막이 status(EXMP-PRD-001): draft → review
+    await pipeline.rebuild("EXMP")
+    once = scoped.execute(text("SELECT count(*) FROM status_changes")).scalar()
+    assert once == 1
+    await pipeline.rebuild("EXMP")
+    assert scoped.execute(text("SELECT count(*) FROM status_changes")).scalar() == once

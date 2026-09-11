@@ -643,8 +643,24 @@ class SpecService:
                 )
         return out
 
+    def version_keys(self, project_id: int) -> dict[int, tuple[int, str]]:
+        """SYNC-MS-002#SpecService.version_keys
+
+        clear_index 전에 불러야 한다 — 버전 행이 지워지면 document_id·commit_hash를
+        알 방법이 없다. propagation_decisions·flags는 version_id 하나만 들고 있다 (#38).
+        """
+        return self.repo.version_keys_of_project(project_id)
+
     def clear_index(self, project_id: int) -> None:
-        """SYNC-MS-002#SpecService.clear_index"""
+        """SYNC-MS-002#SpecService.clear_index
+
+        `versions`를 가리키는 FK가 셋이다 — references(호출자가 먼저 지운다) ·
+        propagation_decisions.version_id · flags.cause_version_id. 뒤 둘은 호출자가
+        relink_versions로 다시 잇는다. 여기서 재연결을 하지 않는 것은 추적 묶음이
+        명세 묶음 밖이기 때문이다 (DOM-001 4장 경계).
+        """
+        # 커밋 있는 상태 변경은 재구축이 다시 만든다. 안 지우면 재구축할 때마다 쌓인다 (#38)
+        self.repo.delete_status_changes_with_commit(project_id)
         # current_version_no=0(MS-002)은 DOM-003 ck_documents_version_no(≥1)에 걸린다 → 그대로 두고
         # save(rebuild=True)가 남은 버전 수로 번호를 매긴다 (보고)
         self.repo.delete_versions_of_project(project_id)

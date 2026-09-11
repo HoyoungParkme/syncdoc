@@ -270,6 +270,8 @@ export interface RebuildResult {
   references: number
   versions: number
   convention_errors: { doc_id: string; detail: string }[]
+  /** 새 버전에 이어 붙일 수 없어 버린 추적 행. 비어 있는 것이 정상이다 (UI-14 5.3) */
+  dropped: { kind: string; count: number; reason: string }[]
 }
 export interface SaveResult {
   doc_id: string

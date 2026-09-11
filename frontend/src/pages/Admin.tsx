@@ -1,10 +1,14 @@
 /** UI-14 관리 — SYNC-UI-002#UI-14. 저장소 동기화 상태와 인덱스 재구축. 요소 번호 = data-el.
  *  **독립 화면이 아니라 UI-13 다이얼로그 안 관리 카드(6) 영역이다.** v1.2에서 별도 페이지를 없앴다.
- *  1 헤더 · 2 저장소 표(2.1 행, 2.2 마지막 처리 커밋, 2.3 동기화 상태) · 3 인덱스 재구축 · 4 확인(4.1 재구축, 4.2 취소) · 5 결과(5.1 집계, 5.2 규약 오류) */
+ *  1 헤더 · 2 저장소 표(2.1 행, 2.2 마지막 처리 커밋, 2.3 동기화 상태) · 3 인덱스 재구축 · 4 확인(4.1 재구축, 4.2 취소)
+ *  5 결과(5.1 집계, 5.2 규약 오류, 5.3 버린 것) */
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ago, api, ApiError, docPath, type RebuildResult, type RepoStatus } from '../api/client'
 import { toast, Tooltip } from '../components/ui'
+
+/** 버린 추적 행의 종류 → 사람 말 */
+const DROPPED_KO: Record<string, string> = { propagation_decision: '전파 결정', flag: '플래그' }
 
 export function Admin() {
   const [repos, setRepos] = useState<RepoStatus[]>([])
@@ -120,6 +124,15 @@ export function Admin() {
                 ))}
               </span>
             </div>
+            {result.r.dropped.length > 0 && (
+              <div className="row">
+                {/* 확인 문구가 "건드리지 않습니다"라고 약속하므로 예외는 말해야 한다 (#38) */}
+                <span className="warn" data-el="5.3">
+                  버린 것 {result.r.dropped.reduce((n, d) => n + d.count, 0)} —{' '}
+                  {result.r.dropped.map((d) => `${DROPPED_KO[d.kind] ?? d.kind} ${d.count}건 · ${d.reason}`).join(' / ')}
+                </span>
+              </div>
+            )}
           </section>
         )}
     </div>

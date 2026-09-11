@@ -13,6 +13,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app import db
@@ -458,6 +459,18 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
     try:
         head = await git.fetch(workdir)  # 2단계도 실패하면 rebuild-failed (MS-007 예외)
         await git.checkout(workdir, "origin/HEAD")
+        # 재구축이 versions를 갈아 끼우는 동안 전파결정·플래그는 사라진 버전을 가리킨다.
+        # 이 트랜잭션에서만 검사를 끝으로 미룬다 — 평소에는 문장마다 검사한다 (0007, #38)
+        s.execute(
+            text(
+                "SET CONSTRAINTS propagation_decisions_version_id_fkey,"
+                " flags_cause_version_id_fkey DEFERRED"
+            )
+        )
+        # 3a — 지우기 전에 옛 지도를 뜬다. 버전 행이 사라지면 document_id·commit_hash를
+        # 알 방법이 없다 — 전파결정도 플래그도 version_id 하나만 들고 있다 (MS-007 3a, #38)
+        old_keys = spec.version_keys(project.id)
+        new_keys: dict[tuple[int, str], int] = {}
         refs.clear(project.id)
         spec.clear_index(project.id)
         for path in await git.list(workdir, "docs/specs/*/*.md", head):
@@ -489,14 +502,16 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
                 else:
                     vr = spec.validate(body, doc_type, Entry.github, None)
                     if document is None:
-                        spec.create(
+                        version = spec.create(
                             project.id, doc_id, doc_type, body, c.hash, author, c.message, vr
                         )
                     else:
                         deleted = spec.detect_deleted_items(document, body)
-                        spec.save(
+                        version = spec.save(
                             document, body, c.hash, author, c.message, deleted, vr, rebuild=True
                         )
+                    # 7a가 쓴다 — 옛 버전을 이 지도로 찾아 다시 잇는다
+                    new_keys[(version.document_id, c.hash)] = version.id
                     result.versions += 1
                     # 마지막 본문 커밋의 작성자로 판정한다 — UI-5 배너가 last_author와
                     # 함께 보여주는 값이고 _process_file도 방금 저장한 버전으로 본다
@@ -526,7 +541,10 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
             result.items += len(document.items)
             result.references += ex.added
         refs.resolve_missing(project.id)
-        # 7a — 버전을 다시 만들었으므로 파생값인 담당자도 다시 계산한다 (MS-007 rebuild 7a)
+        # 7a — 전파결정·플래그가 옛 버전 id를 가리킨다. 커밋 해시로 새 id에 다시 잇는다
+        relink = tracking.relink_versions(project.id, old_keys, new_keys)
+        result.dropped = relink.dropped
+        # 7b — 담당자는 대상 문서의 최근 버전에서 오므로 재연결 뒤라야 한다 (MS-007 rebuild 7b)
         tracking.reassign_open_flags(project.id)
         repo.last_processed_commit, repo.synced_at = head, datetime.now(UTC)
         repo.behind_by, repo.fetched_at = 0, datetime.now(UTC)  # 재구축은 head까지 읽었다
