@@ -137,7 +137,10 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 
 **처리**
 1. `document = get_document(doc_id)`
-2. if `to == approved and (document.has_convention_error or document.incomplete_warnings)` → `! status-blocked {convention_error_detail, warnings}` (UC-H8 1a). `review`·`draft`는 막지 않는다
+2. `missing = 중복 접은 [e.raw_target for e in ReferenceService.upstream_of_document(document.id, include_missing=True) if e.is_missing]`
+2a. if `to == approved and (document.has_convention_error or document.incomplete_warnings or missing)` → `! status-blocked {convention_error_detail, warnings: incomplete_warnings + [f"ref.missing: {t}" for t in missing]}` (UC-H8 1a). `review`·`draft`는 막지 않는다
+2b. **끊어진 참조는 읽을 때 센다 — 컬럼에 없다.** `documents.incomplete_warnings`에 넣지 않는 이유는 [[SYNC-STD-001]] 4장에 있다. 값은 UI-5 배너가 보는 `document_view.missing_refs`와 **같아야 한다** — 한쪽만 막거나 한쪽만 보여주면 사람이 이유 없이 막힌다
+2c. `warnings`에 `ref.missing: {대상}` 꼴로 섞어 보낸다. `incomplete_warnings`가 이미 `section.missing: 시나리오` 꼴이라 같은 규격이고, 화면이 `:` 앞을 rule로 잘라 한국어로 옮긴다([[SYNC-STD-001]] 4장 화면 문구 열)
 3. if `to == approved and not upstream_reviewed` → `! upstream-review-required` (UC-H8 3. 상위 대조를 건너뛸 수 없다)
 3a. if `document.status == to` → 아무것도 안 하고 현재 반환 (멱등)
 4. `new_body` = `current_body`의 frontmatter `status:` 줄만 교체
@@ -149,9 +152,9 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 
 **예외** `status-blocked` · `upstream-review-required` · 파이프라인의 `version-conflict`·`push-failed` 전파
 
-**호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-007#pipeline.save_pipeline]]
+**호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-007#pipeline.save_pipeline]] [[SYNC-MS-003#ReferenceService.upstream_of_document]]
 
-**테스트 관점** 규약 오류 문서를 `approved`로 → blocked · `approved`인데 `upstream_reviewed=false` → 거부 · `upstream_mismatch=["SYNC-UC-001#UC-A6"]` → UC-A6에 플래그 · 같은 문서를 `review`로 → 됨 · 정상 승인 → frontmatter `status: approved` 커밋 존재, Version 없음, StatusChange에 commit_hash · 같은 상태로 다시 → 커밋 없음
+**테스트 관점** 규약 오류 문서를 `approved`로 → blocked · **미존재 참조가 있는 문서를 `approved`로 → blocked이고 `warnings`에 `ref.missing:`이 있다** · 같은 문서를 `review`로 → 됨 · **상대 문서가 들어와 `resolve_missing`이 풀면 그 문서를 다시 저장하지 않아도 승인된다**(읽을 때 계산한다는 증거) · `approved`인데 `upstream_reviewed=false` → 거부 · `upstream_mismatch=["SYNC-UC-001#UC-A6"]` → UC-A6에 플래그 · 같은 문서를 `review`로 → 됨 · 정상 승인 → frontmatter `status: approved` 커밋 존재, Version 없음, StatusChange에 commit_hash · 같은 상태로 다시 → 커밋 없음
 
 
 ---
