@@ -386,3 +386,31 @@ async def test_commit_push_requires_path_content_or_files(repos: dict[str, Path]
         await g.commit_push(repos["work"], "m", _author())
     with pytest.raises(ValueError):
         await g.commit_push(repos["work"], "m", _author(), path=SEED)
+
+
+async def test_log_follows_renamed_path_oldest_first(repos: dict[str, Path]) -> None:
+    """이름이 바뀐 경로도 옛 이름 시절 커밋까지 나온다 (#39).
+
+    --follow는 revision walker의 특수 처리라 --reverse와 조합되지 않는다.
+    둘을 같이 주면 rename을 건너는 순간 커밋이 끊긴다.
+    """
+    o = repos["other"]
+    old_path, new_path = "docs/specs/DOM/SYNC-DOM-001.md", "docs/specs/06-DOM/SYNC-DOM-001.md"
+    write_commit_push(o, old_path, "v1", "spec(SYNC-DOM-001): 초안")
+    write_commit_push(o, old_path, "v2", "spec(SYNC-DOM-001): 수정")
+    (o / "docs/specs/06-DOM").mkdir(parents=True, exist_ok=True)
+    git(o, "mv", old_path, new_path)
+    git(o, "commit", "-q", "-m", "code(C): 명세 디렉터리를 {NN-TYPE}로")
+    git(o, "push", "-q", "origin", "HEAD:main")
+    write_commit_push(o, new_path, "v3", "spec(SYNC-DOM-001): 옮긴 뒤 수정")
+    await g.fetch(repos["work"])
+    await g.checkout(repos["work"], "origin/HEAD")
+
+    got = await g.log(repos["work"], new_path)
+
+    assert [c.message for c in got] == [
+        "spec(SYNC-DOM-001): 초안",
+        "spec(SYNC-DOM-001): 수정",
+        "code(C): 명세 디렉터리를 {NN-TYPE}로",
+        "spec(SYNC-DOM-001): 옮긴 뒤 수정",
+    ]

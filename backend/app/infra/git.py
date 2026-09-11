@@ -244,11 +244,14 @@ async def list(workdir: Path, glob: str, ref: str = "HEAD") -> list[str]:
 
 async def log(workdir: Path, path: str) -> list[Commit]:
     """SYNC-MS-009#git.log"""
+    # --reverse를 git에 맡기지 않는다. --follow는 revision walker의 특수 처리라
+    # --reverse와 조합되지 않아, 둘을 같이 주면 rename을 건너는 순간 커밋이 끊긴다.
+    # 이름이 바뀐 경로의 이력을 잇는 것이 재구축의 목적이므로 --follow를 남기고
+    # 순서는 받아서 뒤집는다 (SYNC-MS-009#git.log, #39)
     out = await _run(
         workdir,
         "log",
         "--follow",
-        "--reverse",
         "--format=%H%x00%an%x00%ae%x00%aI%x00%s%n%b%x00",
         "--",
         path,
@@ -266,6 +269,7 @@ async def log(workdir: Path, path: str) -> list[Commit]:
                 email=ae,
             )
         )
+    commits.reverse()  # git이 최신부터 준다 → 오래된 것부터
     return commits
 
 
