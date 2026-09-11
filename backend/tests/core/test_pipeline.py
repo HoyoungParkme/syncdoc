@@ -782,3 +782,33 @@ async def test_rebuild_reassigns_open_flag_to_new_author(scoped: Session, proj) 
         ).scalar()
         == proj["user"].id
     )
+
+
+# ── #35 끊어진 참조가 승인을 막는다 (읽을 때 계산) ──
+async def test_missing_ref_blocks_approve_and_clears_when_target_arrives(
+    scoped: Session, proj
+) -> None:
+    """미존재 참조는 컬럼이 아니라 읽을 때 센다.
+
+    그래서 상대 문서가 들어오면 이 문서를 다시 저장하지 않아도 승인된다 (#35).
+    """
+    from app.core import queries
+    from app.core.errors import StatusBlocked
+
+    user = proj["user"]
+    svc = SpecService(scoped)
+    # RFQ 없이 PRD만 — R1이 EXMP-RFQ-001#Q1을 가리키는데 아직 없다
+    await create(proj)
+    assert svc.get_document("EXMP-PRD-001").incomplete_warnings == []  # 컬럼에는 안 들어간다
+    assert "EXMP-RFQ-001#Q1" in (await queries.document_view("EXMP-PRD-001")).missing_refs
+    with pytest.raises(StatusBlocked) as ei:
+        await pipeline.change_status("EXMP-PRD-001", "approved", user, None, upstream_reviewed=True)
+    assert "ref.missing: EXMP-RFQ-001#Q1" in ei.value.extra["warnings"]
+    # review로는 간다 — 저장은 됐고 승인만 막힌다
+    await pipeline.change_status("EXMP-PRD-001", "review", user, None)
+    assert svc.get_document("EXMP-PRD-001").status == "review"
+    # 상대 문서가 들어오면 resolve_missing이 풀고, PRD를 다시 저장하지 않아도 승인된다
+    await create(proj, DocType.RFQ, RFQ)
+    assert (await queries.document_view("EXMP-PRD-001")).missing_refs == []
+    await pipeline.change_status("EXMP-PRD-001", "approved", user, None, upstream_reviewed=True)
+    assert svc.get_document("EXMP-PRD-001").status == "approved"

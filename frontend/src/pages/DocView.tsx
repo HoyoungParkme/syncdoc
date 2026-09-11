@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { api, ApiError, FLAG_KO, STATUS_KO, warnText, type Comment, type Document, type DownstreamView, type ItemReferences, type UpstreamCheck } from '../api/client'
+import { api, ApiError, FLAG_KO, incompleteOf, STATUS_KO, warnText, type Comment, type Document, type DownstreamView, type ItemReferences, type UpstreamCheck } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { esc, renderBlocks, splitRef } from '../view/md'
 import { ItemIdBadge, StatusPill } from '../components/ui'
@@ -186,6 +186,8 @@ export function DocView() {
   const key = (u: UpstreamCheck) => `${u.target.doc_id}${u.target.item_id ? '#' + u.target.item_id : ''}`
   const toc = tocOf(doc)
   const marked = markedItems(doc, comments)
+  // 배너(4a)와 승인 비활성이 같은 값을 본다. 끊어진 참조는 컬럼이 아니라 읽을 때 온다 (#35)
+  const incomplete = incompleteOf(doc)
   // 가운데 열만 스크롤한다 — scrollIntoView는 가장 가까운 스크롤 조상을 움직인다
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ block: 'start' })
   const goItem = (id: string) => {
@@ -228,7 +230,7 @@ export function DocView() {
               {['draft', 'review', 'approved']
                 .filter((s) => s !== doc.status)
                 .map((s) => (
-                  <div key={s} className={`mi${s === 'approved' && doc.incomplete_warnings.length ? ' dis' : ''}`} onClick={() => !(s === 'approved' && doc.incomplete_warnings.length) && openStatus(s)}>
+                  <div key={s} className={`mi${s === 'approved' && incomplete.length ? ' dis' : ''}`} onClick={() => !(s === 'approved' && incomplete.length) && openStatus(s)}>
                     {STATUS_KO[s]}
                   </div>
                 ))}
@@ -297,9 +299,9 @@ export function DocView() {
               ⚠ 규약 오류: {doc.convention_error_detail} (커밋 {doc.commit_hash?.slice(0, 7)} · {doc.last_author?.user?.display_name})
             </div>
           )}
-          {doc.incomplete_warnings.length > 0 && (
+          {incomplete.length > 0 && (
             <div className="banner warn" data-el="4a">
-              미완성: {doc.incomplete_warnings.map(warnText).join(' · ')} · 승인 불가
+              미완성: {incomplete.map(warnText).join(' · ')} · 승인 불가
             </div>
           )}
 

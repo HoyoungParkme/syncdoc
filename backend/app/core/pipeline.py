@@ -264,10 +264,23 @@ async def change_status(
     with db.session_scope() as s:
         spec = SpecService(s)
         document = spec.get_document(doc_id)
+        # 끊어진 참조는 읽을 때 센다 — 컬럼에 없다(SYNC-STD-001 4장, #35). 참조가 살았는지는
+        # 프로젝트 전체 상태라 문서 하나만 보는 validate가 못 만들고, 굳혀 두면 상대 문서가
+        # 들어와도 그 문서를 다시 저장하기 전까지 낡은 값이 남는다
+        missing = sorted(
+            dict.fromkeys(
+                e.raw_target
+                for e in ReferenceService(s).upstream_of_document(document.id, include_missing=True)
+                if e.is_missing
+            )
+        )
         if to == DocStatus.approved and (
-            document.has_convention_error or document.incomplete_warnings
+            document.has_convention_error or document.incomplete_warnings or missing
         ):
-            raise StatusBlocked(document.convention_error_detail, document.incomplete_warnings)
+            raise StatusBlocked(
+                document.convention_error_detail,
+                document.incomplete_warnings + [f"ref.missing: {t}" for t in missing],
+            )
         if to == DocStatus.approved and not upstream_reviewed:
             raise UpstreamReviewRequired()
         if document.status == to:

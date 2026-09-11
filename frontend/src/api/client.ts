@@ -321,6 +321,13 @@ export function warnText(w: string): string {
   const message = i < 0 ? '' : w.slice(i + 2)
   return WARN_KO[rule]?.(message) ?? w
 }
+/** UI-5 4a 배너와 승인 비활성이 보는 미완성 목록.
+ *  `ref.missing`은 컬럼에 없다 — 읽을 때 references.is_missing에서 온다(SYNC-STD-001 4장).
+ *  승인 게이트(MS-007 change_status)가 세는 값과 같아야 사람이 이유 없이 막히지 않는다 */
+export const incompleteOf = (d: Document): string[] => [
+  ...d.incomplete_warnings,
+  ...d.missing_refs.map((t) => `ref.missing: ${t}`),
+]
 /** 항목 참조 표기 DOC#ITEM · 문서 경로 */
 export const refKey = (r: ItemRef | null): string => (r ? `${r.doc_id ?? r.raw_target}${r.item_id ? '#' + r.item_id : ''}` : '')
 export const docPath = (docId: string | null, itemId?: string | null): string =>
