@@ -59,6 +59,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:rebuild-failed` | 500 | 재구축 중 실패, 롤백됨 | `reason` | [[SYNC-UC-001#UC-S6]] |
 | `urn:syncdoc:repository-already-registered` | 409 | 이미 등록된 저장소 | `code` (그 저장소를 쓰는 프로젝트) | [[SYNC-UC-001#UC-A1]] 2d |
 | `urn:syncdoc:email-taken` | 409 | 남이 이미 등록한 커밋 이메일 | `email` | UI-13 2.6 |
+| `urn:syncdoc:backup-invalid` | 422 | `backup/tracking.json`의 형식을 모르거나 다른 프로젝트의 백업 | `reason` (`version` \| `project`) | UI-14 6 |
 | `urn:syncdoc:not-implemented` | 501 | 카드 스텁 — 아직 구현 안 된 경로 (`import_existing` 등). 슬라이스 진행 중에만 존재 | `card` | [[SYNC-STD-004#DEV-12]] |
 | `urn:syncdoc:internal` | 500 | **예상 못 한 오류.** 위 어느 것도 아닌 예외가 라우터에서 샜다 | — | — |
 
@@ -1066,6 +1067,30 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
               $ref: '#/components/schemas/RebuildResult'
 ```
 
+#### POST/api/admin/repos/{code}/restore 백업에서 복원
+
+화면 [[SYNC-UI-001#UI-14]] · 유스케이스 [[SYNC-UC-001#UC-S6]] 뒤 · 서비스 `—`
+
+```yaml
+/api/admin/repos/{code}/restore:
+  post:
+    summary: "백업에서 복원 (UI-14 요소 6). backup/tracking.json의 뼈대를 DB에 되붙인다. 멱등 — 이미 있는 행은 건너뛴다"
+    parameters:
+    - $ref: '#/components/parameters/code'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreResult'
+      '404':
+        $ref: '#/components/responses/Problem'
+      '422':
+        $ref: '#/components/responses/Problem'
+```
+
+**요청 본문이 없다.** 경로의 `{code}` 하나뿐이다 — 파일 위치와 형식이 인프라 6.1에서 고정됐고 화면에 고를 것이 없다. 백업 파일이 없으면 `404 not-found {resource: backup}`, 형식이 다르면 `422 backup-invalid`
+
 ---
 
 ## 4. 스키마
@@ -1782,6 +1807,45 @@ components:
           format: date-time
           nullable: true
           description: behind_by를 잰 시각. 화면이 "언제 기준인지" 보여준다
+        backed_up_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            backup/tracking.json의 마지막 커밋 시각(UI-14 2.4). null이면 한 번도 없다.
+            DB가 아니라 git에서 읽는다 — DB를 잃어도 남아야 하는 값이다(인프라 6.1)
+        backup_stale:
+          type: boolean
+          description: >
+            백업 주기의 두 배가 넘게 지났나. **서버가 판정한다** — 화면은 주기를 모른다.
+            backed_up_at이 null이면 거짓이다: 한 번도 안 한 것과 멈춘 것은 다르다
+    RestoreResult:
+      type: object
+      properties:
+        flags:
+          type: integer
+        decisions:
+          type: integer
+        comments:
+          type: integer
+        skipped:
+          type: integer
+          description: 이미 있어서 안 넣은 행. 두 번 눌렀을 때 여기로 간다(멱등의 증거)
+        dropped:
+          type: array
+          description: >
+            이름이 안 붙어 건너뛴 행. RebuildResult.dropped와 같은 모양이라 UI-14 5.3이
+            같은 자리에 그린다. 재구축 뒤에 복원하면 비어 있는 것이 정상이다
+          items:
+            type: object
+            properties:
+              kind:
+                type: string
+                enum: [flag, propagation_decision, comment, decision_item]
+              count:
+                type: integer
+              reason:
+                type: string
     RebuildResult:
       type: object
       properties:

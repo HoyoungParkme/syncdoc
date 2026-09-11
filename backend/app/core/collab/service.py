@@ -18,6 +18,11 @@ def line_hash(line: str) -> str:
     return hashlib.sha256(line.strip().encode()).hexdigest()
 
 
+# 백업에 본문이 없다(저장소가 public — INFRA 6.1). body가 NOT NULL이라 무언가 들어가야
+# 하는데, 빈 문자열은 화면에 빈 칸으로 떠 사람이 버그로 읽는다
+RESTORED_BODY = "(백업에서 복원 — 본문은 백업에 없습니다)"
+
+
 class CommentService:
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -34,6 +39,48 @@ class CommentService:
             parent = by_id.get(c.parent_comment_id) if c.parent_comment_id else None
             (parent.replies if parent else top).append(c)
         return top
+
+    def all_in_project(self, project_id: int) -> list[Comment]:
+        """SYNC-MS-005#CommentService.all_in_project
+
+        해결된 것도 준다. 정렬이 (문서, 작성시각)이라 부모가 자식보다 먼저 온다 (#16).
+        """
+        return self.repo.all_in_project(project_id)
+
+    def restore(
+        self,
+        document_id: int,
+        parent_comment_id: int | None,
+        line_no: int,
+        line_hash: str,
+        author_user_id: int,
+        is_resolved: bool,
+        created_at: datetime,
+        original_location: str | None,
+    ) -> tuple[Comment, bool]:
+        """SYNC-MS-005#CommentService.restore
+
+        한 행씩 부른다 — 부르는 쪽이 새 id를 받아야 다음 행의 부모를 채운다.
+        이미 있던 행도 돌려주는 이유가 같다: 반쯤 복원된 상태에서 다시 눌러도
+        답글이 제 부모에 붙어야 한다.
+        """
+        existing = self.repo.by_key(document_id, author_user_id, created_at)
+        if existing is not None:
+            return existing, False
+        row = self.repo.add(
+            Comment(
+                document_id=document_id,
+                parent_comment_id=parent_comment_id,
+                line_no=line_no,
+                line_hash=line_hash,
+                body=RESTORED_BODY,
+                author_user_id=author_user_id,
+                is_resolved=is_resolved,
+                created_at=created_at,
+                original_location=original_location,
+            )
+        )
+        return row, True
 
     def add(
         self,

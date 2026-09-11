@@ -459,9 +459,14 @@ class SpecService:
 
         return first(stage - 1), first(stage + 1)
 
-    def item_pks(self, document_id: int) -> dict[str, int]:
-        """SYNC-MS-002#SpecService.item_pks"""
-        return {i.item_id: i.id for i in self.repo.items_of(document_id)}
+    def item_pks(self, document_id: int, include_deleted: bool = False) -> dict[str, int]:
+        """SYNC-MS-002#SpecService.item_pks
+
+        include_deleted는 백업 복원용 (#16). broken_ref 플래그의 원인 항목은 정의상
+        is_deleted라, resolve_item(item-deleted를 던진다)도 resolve_items(조용히 거른다)도
+        못 쓴다. 기본값이 False라 기존 호출부는 그대로다.
+        """
+        return {i.item_id: i.id for i in self.repo.items_of(document_id, include_deleted)}
 
     def resolve_item(self, doc_id: str, item_id: str) -> int:
         """SYNC-MS-002#SpecService.resolve_item"""

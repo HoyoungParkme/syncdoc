@@ -52,6 +52,8 @@ class RepoStatus(Base):
     synced_at: datetime | None
     behind_by: int | None
     fetched_at: datetime | None
+    backed_up_at: datetime | None = None
+    backup_stale: bool = False
     error: str | None
 
 
@@ -74,6 +76,16 @@ class RebuildResult(Base):
     references: int
     versions: int
     convention_errors: list[RebuildError]
+    dropped: list[Dropped] = []
+
+
+class RestoreResult(Base):
+    """SYNC-API-001 RestoreResult — dropped가 RebuildResult와 같은 모양이다 (UI-14 5.3)."""
+
+    flags: int
+    decisions: int
+    comments: int
+    skipped: int
     dropped: list[Dropped] = []
 
 

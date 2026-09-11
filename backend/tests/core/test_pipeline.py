@@ -1,6 +1,7 @@
 """SYNC-MS-007 테스트 관점 — save_pipeline (B1: mcp·github 경로) · change_status (B2)."""
 
 import asyncio
+import json
 
 import pytest
 from sqlalchemy import text
@@ -916,3 +917,134 @@ async def test_rebuild_twice_does_not_duplicate_status_changes(scoped: Session, 
     assert once == 1
     await pipeline.rebuild("EXMP")
     assert scoped.execute(text("SELECT count(*) FROM status_changes")).scalar() == once
+
+
+# ── #16 추적 데이터 백업 ──
+async def _seed_tracking(scoped: Session, proj) -> tuple[int, int]:
+    """플래그 1 · 전파결정 1 · 댓글 2(답글 포함)를 만든다. (문서 pk, 첫 버전 id)"""
+    from app.core.collab.service import CommentService
+    from app.core.tracking.service import TrackingService
+
+    svc, tr = SpecService(scoped), TrackingService(scoped)
+    d = svc.get_document("EXMP-PRD-001")
+    vid, _ = _first_version(scoped, "EXMP-PRD-001")
+    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
+    tr.raise_upstream([q1], d.id, vid, None)  # cause_version_id가 채워지는 종류
+    tr.create_pending(vid, [i.pk for i in d.items], [d.items[0].pk])
+    cs = CommentService(scoped)
+    line = d.body.split("\n")[0]
+    parent = cs.add(d.id, 1, line, "첫 댓글", proj["user"], None)
+    cs.add(d.id, 1, line, "답글", proj["user"], parent.id)
+    scoped.commit()
+    return d.id, vid
+
+
+async def test_export_tracking_writes_skeleton_and_is_stable(scoped: Session, proj) -> None:
+    """백업이 뼈대만 싣고, 내용이 같으면 커밋이 안 생긴다 (#16)."""
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    await pipeline.rebuild("EXMP")
+    await _seed_tracking(scoped, proj)
+
+    h1 = await pipeline.export_tracking("EXMP")
+    data = json.loads(g(proj["repos"]["work"], "show", f"{h1}:backup/tracking.json"))
+    assert (data["backup_version"], data["project"]) == (1, "EXMP")
+    assert len(data["flags"]) == 1 and len(data["propagation_decisions"]) == 1
+    assert [c["parent"] for c in data["comments"]] == [None, data["comments"][0]["at"] + "|hoyoung"]
+    # 자유 텍스트와 시각 헤더는 안 싣는다 — 저장소가 public이고, 시각은 매번 diff를 만든다
+    assert "body" not in data["comments"][0] and "reason" not in data["propagation_decisions"][0]
+    assert "exported_at" not in data
+    # 자연키로 적힌다
+    assert data["flags"][0]["target"] == "EXMP-RFQ-001#Q1"
+    assert "@" in data["flags"][0]["cause_version"]
+
+    assert await pipeline.export_tracking("EXMP") == h1  # 두 번 불러도 커밋이 하나
+
+
+async def test_import_tracking_round_trip_and_idempotent(scoped: Session, proj) -> None:
+    """내보내고 → 비우고 → 복원. 두 번 복원해도 안 늘어난다 (#16)."""
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    await pipeline.rebuild("EXMP")
+    await _seed_tracking(scoped, proj)
+    await pipeline.export_tracking("EXMP")
+    before = {
+        t: scoped.execute(text(f"SELECT count(*) FROM {t}")).scalar()  # noqa: S608 — 상수 목록
+        for t in ("flags", "propagation_decisions", "comments")
+    }
+    for t_ in ("comments", "propagation_decisions", "flags"):
+        scoped.execute(text(f"DELETE FROM {t_}"))  # noqa: S608
+    scoped.commit()
+
+    r = await pipeline.import_tracking("EXMP")
+
+    assert (r.flags, r.decisions, r.comments) == (
+        before["flags"],
+        before["propagation_decisions"],
+        before["comments"],
+    )
+    assert r.dropped == [] and r.skipped == 0
+    # 답글이 제 부모에 붙는다
+    assert (
+        scoped.execute(
+            text("SELECT count(*) FROM comments WHERE parent_comment_id IS NOT NULL")
+        ).scalar()
+        == 1
+    )
+    # 본문은 안 돌아온다 — 자리표시가 왜 비었는지 말한다
+    assert "백업에서 복원" in scoped.execute(text("SELECT body FROM comments LIMIT 1")).scalar()
+
+    r2 = await pipeline.import_tracking("EXMP")
+    assert (r2.flags, r2.decisions, r2.comments) == (0, 0, 0)
+    assert r2.skipped == sum(before.values())
+
+
+async def test_import_tracking_rejects_other_project_and_missing_file(
+    scoped: Session, proj
+) -> None:
+    from app.core.errors import BackupInvalid
+
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    await pipeline.rebuild("EXMP")
+    with pytest.raises(NotFound):
+        await pipeline.import_tracking("EXMP")  # 백업 파일이 아직 없다
+
+    await pipeline.export_tracking("EXMP")
+    g(other, "fetch", "-q", "origin")
+    g(other, "reset", "-q", "--hard", "origin/main")
+    write_commit_push(
+        other,
+        "backup/tracking.json",
+        '{"backup_version": 1, "project": "NOPE"}',
+        "chore: 남의 백업",
+    )
+    with pytest.raises(BackupInvalid):
+        await pipeline.import_tracking("EXMP")
+
+
+async def test_import_tracking_drops_rows_whose_names_are_gone(scoped: Session, proj) -> None:
+    """재구축을 안 하고 빈 DB에 복원하면 전부 버려지고 예외는 없다 (#16)."""
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    await pipeline.rebuild("EXMP")
+    await _seed_tracking(scoped, proj)
+    await pipeline.export_tracking("EXMP")
+    # 문서를 통째로 지운다 → 자연키가 가리킬 데가 없다
+    for t_ in (
+        "comments",
+        "propagation_decisions",
+        "flags",
+        '"references"',
+        "status_changes",
+        "versions",
+        "items",
+    ):
+        scoped.execute(text(f"DELETE FROM {t_}"))  # noqa: S608
+    scoped.execute(text("DELETE FROM documents"))
+    scoped.commit()
+
+    r = await pipeline.import_tracking("EXMP")
+
+    assert (r.flags, r.decisions, r.comments) == (0, 0, 0)
+    assert {d["kind"] for d in r.dropped} == {"flag", "propagation_decision", "comment"}

@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     POLL_INTERVAL_SECONDS: int = 300  # INFRA 7장 보조 경로. 0이면 폴링·기동 따라잡기 끔(테스트)
     DIFF_CONTEXT_LINES: int = 3  # diff에서 앞뒤로 함께 보여줄 줄 수 (INFRA 5.2)
     PUSH_RETRIES: int = 3  # push 거부 시 rebase 후 재시도 횟수 (INFRA 5.2)
+    # 추적 데이터 백업 주기 (INFRA 6.1). 0이면 백업 끔(테스트)
+    BACKUP_INTERVAL_SECONDS: int = 86400
 
     @property
     def session_secret(self) -> str:

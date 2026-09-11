@@ -16,6 +16,8 @@ os.environ.setdefault("WEBHOOK_SECRET", "test-webhook-secret")
 os.environ.setdefault("GITHUB_CLIENT_ID", "test-client-id")
 os.environ.setdefault("GITHUB_CLIENT_SECRET", "test-client-secret")
 os.environ["POLL_INTERVAL_SECONDS"] = "0"  # 폴링·기동 따라잡기를 끈다. 배경 작업이 세션을 함께 쓴다
+# 앱을 띄우는 테스트마다 하루 자는 태스크가 붙는다 (#16)
+os.environ["BACKUP_INTERVAL_SECONDS"] = "0"
 
 # 테스트 DB가 아닌 곳을 가리키면 시작하지 않는다. 스키마를 지우고 다시 만드는 픽스처가
 # 개발·운영 DB에 닿으면 그 데이터가 사라진다

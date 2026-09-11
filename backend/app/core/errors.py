@@ -210,6 +210,17 @@ class RepositoryAlreadyRegistered(Problem):
         super().__init__(f"{code} 프로젝트가 이미 쓰는 저장소", code=code)
 
 
+class BackupInvalid(Problem):
+    """SYNC-API-001 2장 — backup/tracking.json의 형식을 모르거나 다른 프로젝트의 백업."""
+
+    type = "urn:syncdoc:backup-invalid"
+    status = 422
+    title = "backup-invalid"
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"백업 파일을 읽을 수 없다: {reason}", reason=reason)
+
+
 class EmailTaken(Problem):
     """SYNC-API-001 2장 — 남이 이미 등록한 커밋 이메일.
 

@@ -23,6 +23,8 @@ from app.core.types import (
     ItemRef,
     Propagation,
     RelinkResult,
+    RestoreDecision,
+    RestoreFlag,
 )
 
 
@@ -246,6 +248,71 @@ class TrackingService:
     def count_flags_by_document(self, document_ids: list[int]) -> dict[int, dict[str, int]]:
         """SYNC-MS-004#TrackingService.count_flags_by_document"""
         return self.repo.count_by_document_kind(document_ids)
+
+    def all_flags(self, project_id: int) -> list[Flag]:
+        """SYNC-MS-004#TrackingService.all_flags
+
+        해제된 것도 준다 — 백업은 지금 남은 일이 아니라 그때 있었던 사실이다 (#16).
+        """
+        return self.repo.all_of_project(project_id)
+
+    def all_decisions(self, project_id: int) -> list[PropagationDecision]:
+        """SYNC-MS-004#TrackingService.all_decisions"""
+        return self.repo.decisions_of_project(project_id)
+
+    def restore_flags(self, rows: list[RestoreFlag]) -> tuple[int, int]:
+        """SYNC-MS-004#TrackingService.restore_flags
+
+        자연키는 이미 pk로 풀려서 온다 — 푸는 것은 pipeline의 몫이다(묶음 경계).
+        """
+        added = skipped = 0
+        for r in rows:
+            if self.repo.flag_exists(
+                r.kind, r.target_item_id, r.cause_item_id, r.cause_version_id, r.raised_at
+            ):
+                skipped += 1
+                continue
+            self.repo.add(
+                Flag(
+                    kind=r.kind,
+                    target_item_id=r.target_item_id,
+                    cause_item_id=r.cause_item_id,
+                    cause_version_id=r.cause_version_id,
+                    assignee_user_id=r.assignee_user_id,
+                    raised_at=r.raised_at,
+                    resolved_by_user_id=r.resolved_by_user_id,
+                    resolved_at=r.resolved_at,
+                    resolved_with_edit=r.resolved_with_edit,
+                )
+            )
+            added += 1
+        self.session.flush()
+        return added, skipped
+
+    def restore_decisions(self, rows: list[RestoreDecision]) -> tuple[int, int]:
+        """SYNC-MS-004#TrackingService.restore_decisions
+
+        덮어쓰지 않는다 — 지금 DB의 결정은 사람이 방금 내린 것일 수 있고 백업은 옛 사실이다.
+        """
+        added = skipped = 0
+        for r in rows:
+            if self.repo.decision_by_version(r.version_id) is not None:
+                skipped += 1
+                continue
+            self.repo.add(
+                PropagationDecision(
+                    version_id=r.version_id,
+                    choice=r.choice,
+                    affected_pks=r.affected_pks,
+                    changed_pks=r.changed_pks,
+                    reason=None,  # 백업에 안 싣는다 (INFRA 6.1)
+                    decided_by_user_id=r.decided_by_user_id,
+                    decided_at=r.decided_at,
+                )
+            )
+            added += 1
+        self.session.flush()
+        return added, skipped
 
     def relink_versions(
         self, project_id: int, old: dict[int, tuple[int, str]], new: dict[tuple[int, str], int]

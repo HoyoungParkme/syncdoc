@@ -168,6 +168,25 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 
 ---
 
+#### E 추적 데이터 백업
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-INFRA-001]] 6.1 · [[SYNC-PRD-001#N3]] · [[SYNC-UI-002#UI-14]] 요소 2.4·6 · #16 |
+| 구현 함수 | [[SYNC-MS-007#pipeline.export_tracking]] [[SYNC-MS-007#pipeline.import_tracking]] [[SYNC-MS-007#scheduler.backup_loop]] · [[SYNC-MS-004#TrackingService.all_flags]] [[SYNC-MS-004#TrackingService.all_decisions]] [[SYNC-MS-004#TrackingService.restore_flags]] [[SYNC-MS-004#TrackingService.restore_decisions]] · [[SYNC-MS-005#CommentService.all_in_project]] [[SYNC-MS-005#CommentService.restore]] · [[SYNC-MS-009#git.last_commit_at]] · [[SYNC-MS-002#SpecService.item_pks]](삭제 포함 인자) · [[SYNC-MS-001#ProjectService.repo_status]](마지막 백업) · [[SYNC-MS-007#scheduler.poll_loop]](반복 보호) |
+| 구현 | 설정값 `BACKUP_INTERVAL_SECONDS` · `main` lifespan에 백업 태스크(폴링과 **별도 if** — 하나를 끄고 다른 하나를 볼 수 있어야 한다) · `Entry.backup` · DTO 셋(`RestoreFlag`·`RestoreDecision`·`RestoreResult`) · `BackupInvalid` 예외 · 리포지터리 다섯 |
+| API | [[SYNC-API-001#POST/api/admin/repos/{code}/restore]] · `GET /api/admin/repos`에 `backed_up_at`·`backup_stale` |
+| 화면 | UI-14 요소 2.4(마지막 백업)·6(백업에서 복원) — **`check_ui.py` 15/15 회복**. 명세를 먼저 고쳐 지금 14/15다 |
+| 테스트 | 구현 함수의 테스트 관점 전부 · **내보내고 → 세 표를 비우고 → 복원** 왕복 · 두 번 복원해도 안 늘어남(`skipped`로 간다) · 파일에 댓글 본문·전파 사유·최상위 시각이 없음 · 두 번 내보내도 커밋이 하나 · 백업 커밋이 `changed_files`에 안 잡힘 · 재구축을 안 하고 복원하면 전부 `dropped`이고 예외는 없음 |
+| 선행 | D5 |
+| 완료 | 2026-09-11 · 브랜치 `card/E-backup` · 커밋 `c8f2749`~`e715423` (spec 6 + code 1) · 테스트 199 · `check_code.py` 131/131 · **`check_ui.py` 15/15 회복** · `validate.py` 위반 0·경고 0 · `check_dom.py` 경고 0 · `tsc`·`build` 통과 · **실물 확인**(도커 8000): `backup/tracking.json` 9,765바이트(341줄) — 플래그 2·전파결정 18·댓글 0 · **두 번 내보내도 같은 커밋**(`9c4abf0e`) · 복원은 20건 전부 건너뜀(`skipped=20`, 새로 넣은 것 0, 버린 것 0) · 삭제된 원인 항목(`SYNC-MS-002#SpecService.change_status`)이 자연키로 제대로 실림 · 정한 것: 댓글 자연키를 `{작성시각}|{작성자}` 합성키로(배열 index는 가운데 한 줄이 끼면 뒤 행의 부모가 전부 밀린다), 플래그 멱등 열쇠에 `raised_at`을 넣음(앞 넷만으로는 해제 후 재발한 플래그를 못 가른다) · **고친 것**: `git.last_commit_at`이 `HEAD`로도 떨어진다 — `commit_push`가 토큰 URL로 밀어 `refs/remotes/origin/*`이 안 따라온다 · `scheduler.poll_loop`에 반복 전체를 감싸는 예외 처리(테스트 관점은 "안 멈춘다"인데 `catch_up` 안쪽만 잡고 있어 우연히 성립하던 것) · **화면 확인: 2026-09-11 통과**(`dev_preview` 시드, Playwright로 직접 조작) — 동기화 칸에 `최신 / 백업 12분 전` · 백업 전에는 `백업 없음`(흐림) · `복원` 버튼 → 확인 다이얼로그(설정 z50 위 z51) → 결과 `이미 있어서 건너뜀 7`(멱등) · 토스트 · 페이지 스크롤 없음 · **화면에서 고친 것 둘**: 열을 여섯으로 늘리니 620px에서 머리글이 전부 두 줄로 꺾여(34px→55px) 동기화 칸 안으로 합쳤다 · 설정 위 확인 다이얼로그가 좌우 50px씩 잘려 있던 것(#43, D5부터 있던 버그)을 `.dialog`의 가운데 정렬에서 `transform`을 걷어 고쳤다 — 커밋 `cc5ebe2` |
+
+**왜 카드인가.** `DEV-15`는 "**버그**를 고칠 때는 이슈가 단위이고 카드를 안 건드린다"고 적는다. #16은 버그가 아니라 인프라 6.1이 설계해 놓고 구현을 안 한 기능이다. 함수 열둘·엔드포인트 하나·화면 요소 둘이 걸리므로 `DEV-14` 일곱 조건을 거치는 카드가 맞다.
+
+**왜 지금인가.** 2026-09-11에 실물에서 전파결정 39건을 잃었다(#38·#39). 그 백업이 있었으면 복구할 수 있었다 — 인프라 6.1이 "복구 불가 항목이 셋 있다. 그래서 이 셋을 저장소에 함께 커밋한다"고 적어 둔 바로 그 상황이다.
+
+---
+
 ## 2. 통합 테스트 시나리오
 
 시나리오 S1~S7을 그대로 E2E 테스트로. 각 슬라이스의 `테스트` 행에 나눠 들어가 있다. 전부 통과하면 PRD 성공지표 측정을 시작한다.
@@ -218,6 +237,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | D4 | `card/D4` | `15749ef`~`06fe01d` | #26 | 2026-09-10 |
 | D5 | `card/D5` | `39cea75`~`62d8f0f` | #27 | 2026-09-10 |
 | (핸드오프 대조) | `design/handoff` | `28a78e7`~`74d945a` | #28 | 2026-09-10 |
+| E | `card/E-backup` | `c8f2749`~`e715423` | — | 2026-09-11 |
 
 **핸드오프 대조는 카드가 아니다.** D1~D5 여러 장에 걸쳐 있어 슬라이스로 나누지 않았고, 무엇을 고쳤는지는 각 카드의 `완료` 행에 적었다. PR 하나 = 슬라이스 하나 규칙의 유일한 예외다.
 

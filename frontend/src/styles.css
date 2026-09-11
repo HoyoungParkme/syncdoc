@@ -126,7 +126,10 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
    1.1 다이얼로그: 오버레이 위 흰 카드. 머리·본문·발 세 층이고 본문만 스크롤한다.
    겹쳐 뜰 때는 여는 쪽이 style에 --depth를 준다 (UI-001 3.3 "열린 깊이만큼 더한다") */
 .backdrop{position:fixed;inset:0;background:var(--overlay);z-index:calc(var(--z-modal) + var(--depth,0))}
-.dialog{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;
+/* 가운데 정렬을 transform으로 하지 않는다 — transform이 있으면 그 요소가 자손
+   position:fixed의 컨테이닝 블록이 되고, overflow:hidden이 그 자손을 잘라낸다.
+   설정(620px) 위에 뜨는 확인 다이얼로그(720px)가 좌우 50px씩 잘리고 있었다 (#43) */
+.dialog{position:fixed;inset:0;margin:auto;height:fit-content;display:flex;flex-direction:column;
   width:min(720px,92vw);max-height:min(84vh,760px);background:var(--bg-card);border-radius:var(--radius-dialog);
   box-shadow:var(--shadow-dialog);z-index:calc(var(--z-dialog) + var(--depth,0));overflow:hidden}
 .dialog.wide{width:min(900px,94vw)}
@@ -240,6 +243,11 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 /* UI-14 저장소 표. UI-7이 카드로 바뀌면서 table.vers를 쓰는 곳은 여기 하나만 남았다 */
 .adminbody table.vers{width:100%;border-collapse:collapse;font-size:var(--text-caption);background:var(--bg-card)}
 .adminbody table.vers th{background:var(--bg-subtle);color:var(--ink-muted);font-weight:var(--w-semibold)}
+/* 620px 다이얼로그 안이라 자리가 빠듯하다 — 머리글과 버튼은 안 꺾는다.
+   저장소 주소만 줄여 남는 폭을 준다 (UI-14 규칙) */
+.adminbody table.vers th{white-space:nowrap}
+.adminbody table.vers td:last-child{white-space:nowrap}
+.adminbody table.vers td:nth-child(2){max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .adminbody table.vers th,.adminbody table.vers td{padding:var(--space-6) var(--space-8);
   border-bottom:1px solid var(--divider);text-align:left;vertical-align:middle}
 .adminbody table.vers tr:last-child td{border-bottom:none}

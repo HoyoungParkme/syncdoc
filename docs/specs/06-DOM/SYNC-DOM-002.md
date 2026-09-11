@@ -424,7 +424,7 @@ classDiagram
 
 | 타입 | 필드 | 쓰는 곳 |
 |---|---|---|
-| `Entry` | 열거 `mcp` · `web_revert` · `web_status` · `github` | pipeline |
+| `Entry` | 열거 `mcp` · `web_revert` · `web_status` · `github` · `backup` | pipeline. `backup`은 추적 데이터 백업 커밋의 작성 경로다 — **`versions.via`에 안 닿는다**(백업은 버전 행을 안 만든다) |
 | `Author` | `kind: AuthorKind` · `user: User` · `instructed_by: User \| None` · `via: Entry` | pipeline · save · Version 기록. `versions.via`에 `mcp`·`web`·`github`로 접어 저장 |
 | `AuthorRef` | `kind: AuthorKind` · `user_id: int` · `instructed_by_id: int \| None` · `via: str` | SpecService가 돌려주는 작성 주체 — **id만**. `UserRef`로 채우는 건 `queries`가 `AccountService.users_by_ids`로 |
 | `Violation` | `line: int` · `rule: str` · `message: str` | validate |
@@ -448,6 +448,10 @@ classDiagram
 | `ChangedFile` | `path: str` · `status: A\|M\|D` · `commit_hash: str` · `author_login: str` · `message: str` · `author_email: str` | git.changed_files → process_commit. **`author_login`과 `author_email`을 둘 다 싣는다** — login은 `%an` 대체값일 수 있어 신원의 근거가 못 된다([[SYNC-MS-009#git.changed_files]]) |
 | `Commit` | `hash: str` · `login: str` · `date: datetime` · `message: str` · `email: str` · `path: str` | git.log → rebuild. `ChangedFile`과 같은 이유로 이메일을 함께 싣는다. `path`는 **그 커밋 시점의 경로** — `--follow`가 이름 바뀌기 전 커밋까지 주므로 지금 경로로는 본문을 못 읽는다([[SYNC-MS-009#git.log]]) |
 | `GithubUser` | `id: int` · `login: str` · `name: str` | github.get_user → login_github |
+| `RelinkResult` | `relinked: int` · `dropped: list~dict~` | tracking.relink_versions. `dropped`는 `{kind, count, reason}` — 재구축 결과가 그대로 실어 UI-14 5.3에 나간다 |
+| `RestoreFlag` | `kind: str` · `target_item_id: int` · `cause_item_id: int \| None` · `cause_version_id: int \| None` · `assignee_user_id: int \| None` · `raised_at: datetime` · `resolved_by_user_id: int \| None` · `resolved_at: datetime \| None` · `resolved_with_edit: bool \| None` | 백업에서 읽어 **pk로 이미 푼** flags 한 행. 자연키를 푸는 것은 `pipeline`의 몫이다 — 추적 묶음은 문서·항목을 모른다 |
+| `RestoreDecision` | `version_id: int` · `choice: str` · `affected_pks: list~int~` · `changed_pks: list~int~` · `decided_by_user_id: int \| None` · `decided_at: datetime \| None` | 같음. **`reason`이 없다** — 백업에 안 싣는다(인프라 6.1) |
+| `RestoreResult` | `flags: int` · `decisions: int` · `comments: int` · `skipped: int` · `dropped: list~dict~` | pipeline.import_tracking → API. `dropped`가 `RebuildResult`와 같은 모양이라 UI-14 5.3을 그대로 쓴다 |
 
 타입은 여기 한 곳에만 정의한다.
 
@@ -785,6 +789,10 @@ classDiagram
         +count_flags_by_document(document_ids: list~int~) dict
         +pending_decisions_for(user_id: int) list~int~
         +reassign_open_flags(project_id: int) int
+        +all_flags(project_id: int) list~Flag~
+        +all_decisions(project_id: int) list~PropagationDecision~
+        +restore_flags(rows: list~RestoreFlag~) tuple~int,int~
+        +restore_decisions(rows: list~RestoreDecision~) tuple~int,int~
     }
     class Flag {
         +int id
@@ -846,6 +854,8 @@ classDiagram
         +count_unresolved(project_id: int) int
         +count_unresolved_by_document(document_ids: list~int~) dict
         +unresolved_in(document_ids: list~int~) list~Comment~
+        +all_in_project(project_id: int) list~Comment~
+        +restore(document_id: int, parent_comment_id: int?, line_no: int, line_hash: str, author_user_id: int, is_resolved: bool, created_at: datetime, original_location: str?) tuple~Comment,bool~
     }
     class Comment {
         +int id
@@ -944,7 +954,7 @@ classDiagram
 
 ### 4.7 pipeline — 쓰기 조율
 
-묶음 밖. 클래스가 아니라 함수 다섯이다. 시퀀스 SEQ-1·2·5·7·19·21이 이 함수들의 시간축이다.
+묶음 밖. 클래스가 아니라 함수 일곱이다. 시퀀스 SEQ-1·2·5·7·19·21이 이 함수들의 시간축이다.
 
 ```
 save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | None,
@@ -1002,6 +1012,15 @@ rebuild(code: str, session: Session | None = None) -> RebuildResult
     reference.clear · spec.clear_index(versions만 삭제. documents·items는 유지 — 플래그·댓글이 FK로 물려 있음)
     파일마다 git.log → 커밋마다 spec.validate · spec.save(rebuild=True. items는 upsert)
     reference.extract(최신) · spec.mark_convention_error
+    tracking.relink_versions(옛 지도, 새 지도) · tracking.reassign_open_flags
+
+export_tracking(code: str) -> str
+    [[SYNC-INFRA-001]] 6.1. 플래그·전파결정·댓글을 자연키 JSON으로 backup/tracking.json에 커밋.
+    읽기만 한다. 등록자 토큰으로 push. 내용이 같으면 커밋이 안 생긴다(git.commit_push).
+
+import_tracking(code: str) -> RestoreResult
+    UI-14 요소 6. 그 파일을 읽어 이름으로 되붙인다. 멱등 — 이미 있는 행은 건너뛴다.
+    이름이 안 붙는 행은 버리고 dropped에 센다.
 ```
 
 **트랜잭션 경계** — 검증·버전 검사·삭제 검사는 DB를 읽기만 한다. push가 성공한 뒤에야 6번 트랜잭션 하나로 쓴다. push가 실패하면 롤백할 게 없다(되먹임 #3). 락은 두 에이전트가 같은 저장소에 동시에 push해 rebase 충돌을 내는 걸 막는다(#4).
@@ -1045,6 +1064,7 @@ git.changed_files(workdir, range, prefix) -> list[ChangedFile]
 git.list(workdir, glob, ref="HEAD") -> list[str]
 git.log(workdir, path) -> list[Commit]
 git.rev_list_count(workdir, range) -> int
+git.last_commit_at(workdir, path) -> datetime | None
 git.exists(workdir, path) -> bool
 git.init_specs(workdir) -> dict[str, str]
 

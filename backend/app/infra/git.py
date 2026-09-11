@@ -287,6 +287,22 @@ async def log(workdir: Path, path: str) -> list[Commit]:
     return commits
 
 
+async def last_commit_at(workdir: Path, path: str) -> datetime | None:
+    """SYNC-MS-009#git.last_commit_at"""
+    # origin/HEAD를 먼저 본다 — 답할 질문이 "저장소에 언제 올라갔나"라서다.
+    # 없으면 HEAD로 떨어진다: commit_push가 **토큰이 박힌 URL**로 밀어 추적 ref가
+    # 안 따라오므로, 방금 민 백업은 origin/HEAD에 아직 안 보인다. 다음 fetch면 맞춰진다.
+    # fetch를 여기서 부르지 않는다 — 부르는 쪽(repo_status)이 원격을 안 타려고 만든 함수다
+    for ref in ("origin/HEAD", "HEAD"):
+        try:
+            out = (await _run(workdir, "log", "-1", "--format=%aI", ref, "--", path)).strip()
+        except GitError:
+            continue  # 그 ref가 없는 저장소
+        if out:
+            return datetime.fromisoformat(out)
+    return None
+
+
 async def rev_list_count(workdir: Path, range: str) -> int:
     """SYNC-MS-009#git.rev_list_count"""
     return int((await _run(workdir, "rev-list", "--count", range)).strip())

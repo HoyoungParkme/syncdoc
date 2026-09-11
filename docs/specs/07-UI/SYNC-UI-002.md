@@ -1604,9 +1604,9 @@ status: approved
 <div class="adminbody">
   <table class="vers" data-el="2">
     <tr><th>프로젝트</th><th>저장소</th><th>마지막 처리 커밋</th><th>동기화</th><th></th></tr>
-    <tr data-el="2.1"><td><b>SYNC</b></td><td class="lbl">dfocus/syncdoc</td><td><span class="mono" data-el="2.2">a1b2c3d</span> <span class="lbl">1시간 전</span></td><td data-el="2.3"><span class="st ok">최신</span></td><td><span class="btn sm" data-el="3">인덱스 재구축</span></td></tr>
-    <tr><td><b>DBA</b></td><td class="lbl">dfocus/dba-ax</td><td><span class="mono">9e8f7a6</span> <span class="lbl">3일 전</span></td><td><span class="st rv">밀림 2</span></td><td><span class="btn sm">인덱스 재구축</span></td></tr>
-    <tr><td><b>AIRD</b></td><td class="lbl">dfocus/airdata</td><td><span class="mono">—</span></td><td><span class="st na">문서 없음</span></td><td><span class="btn sm">인덱스 재구축</span></td></tr>
+    <tr data-el="2.1"><td><b>SYNC</b></td><td class="lbl">dfocus/syncdoc</td><td><span class="mono" data-el="2.2">a1b2c3d</span> <span class="lbl">1시간 전</span></td><td data-el="2.3"><span class="st ok">최신</span><br><span class="lbl" data-el="2.4">백업 7시간 전</span></td><td><span class="btn sm" data-el="3">인덱스 재구축</span> <span class="btn sm" data-el="6">복원</span></td></tr>
+    <tr><td><b>DBA</b></td><td class="lbl">dfocus/dba-ax</td><td><span class="mono">9e8f7a6</span> <span class="lbl">3일 전</span></td><td><span class="st rv">밀림 2</span><br><span class="warn">백업 5일 전</span></td><td><span class="btn sm">인덱스 재구축</span> <span class="btn sm">복원</span></td></tr>
+    <tr><td><b>AIRD</b></td><td class="lbl">dfocus/airdata</td><td><span class="mono">—</span></td><td><span class="st na">문서 없음</span><br><span class="lbl">백업 없음</span></td><td><span class="btn sm">인덱스 재구축</span> <span class="btn sm">복원</span></td></tr>
   </table>
 
   <div class="dialog" data-el="4">
@@ -1635,7 +1635,8 @@ status: approved
 | 2 | 저장소 표 | 표 | 프로젝트마다 저장소와 동기화 상태 | — |
 | 2.1 | 저장소 행 | 행 | 프로젝트, 저장소, 마지막 처리 커밋(2.2), 동기화(2.3) | — |
 | 2.2 | 마지막 처리 커밋 | 텍스트 | `repositories.last_processed_commit`과 시각 | 새 탭으로 GitHub 커밋 |
-| 2.3 | 동기화 상태 | 뱃지 | 원격 최신과 같으면 `최신`, 처리 안 한 커밋이 있으면 `밀림 N`(UC-G1 1a·1b) | — |
+| 2.3 | 동기화 상태 | 뱃지 | 원격 최신과 같으면 `최신`, 처리 안 한 커밋이 있으면 `밀림 N`(UC-G1 1a·1b). 아래에 마지막 백업(2.4)을 붙인다 | — |
+| 2.4 | 마지막 백업 | 텍스트 | 동기화 칸(2.3) 안, 뱃지 아래 한 줄. `backup/tracking.json`의 마지막 커밋 시각. 한 번도 없으면 `백업 없음`. **주기의 두 배가 넘게 지났으면 경고색** — 백업이 조용히 멈춘 것을 여기서 알아챈다(인프라 6.1) | — |
 | 3 | 인덱스 재구축 | 버튼 | 행마다 | 확인 다이얼로그(4) |
 | 4 | 재구축 확인 | 다이얼로그 | 무엇을 다시 만들고 무엇은 안 건드리는지(UC-S6 최소 보장) | — |
 | 4.1 | 재구축 | 버튼 | | UC-S6 실행. 끝나면 결과(5) |
@@ -1644,6 +1645,7 @@ status: approved
 | 5.1 | 집계 | 텍스트 | 읽은 문서·항목·참조·버전 수 | — |
 | 5.2 | 규약 오류 목록 | 목록 | 재구축 중 발견된 위반 문서(UC-S6 2a) | 문서 클릭 → UI-5 |
 | 5.3 | 버린 것 | 목록 | 새 버전에 이어 붙일 수 없어 사라진 전파 결정·플래그의 수와 이유. **없으면 안 보인다** | — |
+| 6 | 복원 | 버튼 | 행마다, 재구축(3) 옆 | 확인 다이얼로그(4와 같은 모양) → 실행. 끝나면 결과(5)에 들어온 수와 건너뛴 수 |
 
 ### 규칙
 
@@ -1655,6 +1657,11 @@ status: approved
 - `밀림 N`은 폴링이 잡아 처리한다(UC-G1 1b). 이 화면에 수동 동기화 버튼은 없다 — 유스케이스에 없다
 - 재구축 확인(4)은 **UI-13 위에 한 겹 더** 뜬다. 다이얼로그 위의 다이얼로그다
 - 이 화면은 누구나 들어올 수 있다. 권한 구분이 없기 때문이다(PRD 비목표). 대신 확인 다이얼로그(4)가 한 번 막는다
+- **복원(6)은 재구축 바로 뒤에 하는 일이라 같은 표에 둔다.** DB를 잃고 clone·재구축한 다음이 유일한 쓸 자리다(인프라 6.1). 재구축과 같은 확인 다이얼로그를 거친다
+- **복원은 멱등이다.** 이미 있는 행은 건너뛴다. 두 번 눌러도 플래그가 두 벌 생기지 않는다 — `flags`·`comments`에는 유일 제약이 없어 코드가 막아야 한다
+- **이름이 안 붙는 행은 건너뛰고 결과에 센다.** 가리키던 문서·항목·커밋이 저장소에 없으면 붙일 데가 없다. 5.3과 같은 모양으로 몇 건을 왜 건너뛰었는지 말한다 — 조용히 사라지게 두지 않는다
+- **마지막 백업(2.4)은 DB가 아니라 git에서 읽는다.** DB를 잃어도 남아야 하는 값이라 백업 자신과 같은 곳에 산다
+- **열을 늘리지 않고 동기화 칸(2.3) 안에 넣는다.** 이 표는 620px 다이얼로그 안에 있다([[SYNC-UI-001#UI-13]] 규칙) — 열이 여섯이 되면 머리글이 전부 두 줄로 꺾이고 버튼이 세로로 쌓인다(실측 34px → 55px). **동기화와 마지막 백업은 둘 다 「지금 저장소가 어떤 상태인가」라 한 칸에 묶이는 것이 뜻으로도 맞다.** 버튼도 `복원`으로 줄여 재구축과 가로로 선다
 
 ### 시나리오
 
@@ -1662,7 +1669,8 @@ status: approved
 1. Postgres를 다시 만들었다. 문서는 GitHub에 다 있다
 2. 프로젝트마다 인덱스 재구축(3)을 누른다. 확인(4.1)
 3. 결과(5)에 집계와 규약 오류가 뜬다. 참조 그래프가 살아난다
-4. 플래그·댓글은 돌아오지 않는다. 인프라 6장에서 감수하기로 한 것
+4. 결과(5)를 보고 **백업에서 복원(6)**을 누른다. 플래그·전파결정·댓글의 뼈대가 돌아온다
+5. **댓글 본문은 안 돌아온다.** 저장소가 public이라 백업에 안 실었다(인프라 6.1). "여기 댓글이 있었다"는 자리만 살아난다
 
 **S-2 서버를 며칠 꺼뒀다**
 1. 표(2)에서 DBA가 `밀림 2`(2.3)다. 꺼진 동안 누가 push했다
