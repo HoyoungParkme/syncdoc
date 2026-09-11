@@ -9,6 +9,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ago, api, ApiError, docPath, josa, type Diff, type Document, type ItemReferences, type Version } from '../api/client'
 import { DiffBox } from '../components/DiffBox'
 import { StatusPill } from '../components/ui'
+import { Handle, PANEL, TOC, useWidth } from '../components/panes'
 import { renderBlocks } from '../view/md'
 
 type Deleted = { item_id: string; downstream: number[] }
@@ -17,6 +18,9 @@ const keyOf = (v: Version) => `${v.commit_hash}:${v.version_no ?? 's'}`
 export function History() {
   const { code: proj = '', docId = '' } = useParams()
   const nav = useNavigate()
+  // 규칙: 사이드바 폭은 UI-5와 같다. 같은 키를 읽어 화면을 옮겨도 유지된다 (UI-7 규칙, #36)
+  const [tocW, addTocW] = useWidth(TOC)
+  const [panelW, addPanelW] = useWidth(PANEL)
   const [doc, setDoc] = useState<Document | null>(null)
   const [versions, setVersions] = useState<Version[]>([])
   const [picked, setPicked] = useState<string[]>([]) // 체크 순서 (행 키). 두 개까지
@@ -113,7 +117,9 @@ export function History() {
   const plainCtx = { selfId: docId, href: (d: string, it?: string) => docPath(d, it), exists: () => true }
   const titleOf = new Map(doc.items.map((i) => [i.item_id, i.display_name ?? '']))
   return (
-    <div className="docscreen">
+    // UI-5와 같은 3단 틀 — 폭도 손잡이도 같다. 탭을 오갈 때 틀이 바뀌면
+    // 같은 문서를 보고 있다는 감각이 끊긴다 (UI-7 규칙, #36)
+    <div className="docscreen" style={{ '--toc-w': `${tocW}px`, '--panel-w': `${panelW}px` } as React.CSSProperties}>
       <div className="docbar" data-el="1">
         <Link className="crumb" to={`/p/${proj}`}>
           {doc.project_name || proj}
@@ -175,7 +181,7 @@ export function History() {
             두 개까지 고른다. 세 번째를 누르면 <b className="mono">A</b>가 밀려난다.
           </p>
         </nav>
-        <div className="handle" />
+        <Handle onDrag={addTocW} />
         <section className="mainwrap" data-el="3">
           <div className="tabs">
             <Link to={docPath(docId)}>유저용</Link>
@@ -238,7 +244,7 @@ export function History() {
           )}
           <p className="footnote">되돌리기는 "이전 내용으로 새 버전 생성"이며 이력이 지워지지 않는다. 되돌린 결과가 현재 규약을 위반하면 거부된다.</p>
         </section>
-        <div className="handle" />
+        <Handle onDrag={(dx) => addPanelW(-dx)} />
         {/* 7 — 이 변경이 저장 전에 어디까지 번지는지 */}
         <aside className="vimpact" data-el="7">
           <div className="lbl">이 변경이 닿는 곳</div>

@@ -10,6 +10,7 @@ import { api, ApiError, FLAG_KO, STATUS_KO, warnText, type Comment, type Documen
 import { extraCss, renderView } from '../view'
 import { esc, renderBlocks, splitRef } from '../view/md'
 import { ItemIdBadge, StatusPill } from '../components/ui'
+import { Handle, PANEL, readStore, TOC, useWidth, writeStore } from '../components/panes'
 
 
 export function DocView() {
@@ -32,8 +33,8 @@ export function DocView() {
   const [reason, setReason] = useState('')
   const mainRef = useRef<HTMLElement>(null)
   // 규칙: 사이드바 폭과 원문/렌더링 선택은 사람마다 기억한다. 화면을 옮겨도 유지된다
-  const [tocW, addTocW] = useWidth('syncdoc.ui5.toc', 186, 140, 400)
-  const [panelW, addPanelW] = useWidth('syncdoc.ui5.panel', 250, 180, 460)
+  const [tocW, addTocW] = useWidth(TOC)
+  const [panelW, addPanelW] = useWidth(PANEL)
   const [rawMode, setRawMode] = useState<'text' | 'rendered'>(() => (readStore('syncdoc.ui5.raw') === 'rendered' ? 'rendered' : 'text'))
   const pickRaw = (m: 'text' | 'rendered') => {
     setRawMode(m)
@@ -484,60 +485,6 @@ function itemOfLine(doc: Document): (line: number) => string | null {
     owner.push(cur)
   }
   return (line: number) => owner[line - 1] ?? null
-}
-
-/** localStorage는 사파리 프라이빗 모드 등에서 던진다. 기억은 편의라 실패해도 화면은 떠야 한다 */
-function readStore(key: string): string | null {
-  try {
-    return localStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
-function writeStore(key: string, v: string): void {
-  try {
-    localStorage.setItem(key, v)
-  } catch {
-    /* 기억만 못 할 뿐이다 */
-  }
-}
-
-/** 손잡이가 끄는 폭. 저장해 둔 값이 명세 범위 밖일 수 있어 잘라 넣는다.
- *  **더하기는 반드시 함수형으로.** mousemove 리스너는 mousedown 때 한 번 만들어지므로
- *  바깥 값을 그대로 읽으면 드래그 내내 같은 시작값에 마지막 증분만 더해진다 */
-function useWidth(key: string, init: number, min: number, max: number) {
-  const [w, setW] = useState(() => {
-    const v = Number(readStore(key))
-    return Number.isFinite(v) && v > 0 ? Math.min(max, Math.max(min, v)) : init
-  })
-  const add = (dx: number) =>
-    setW((prev) => {
-      const v = Math.min(max, Math.max(min, prev + dx))
-      writeStore(key, String(v))
-      return v
-    })
-  return [w, add] as const
-}
-
-/** 세로 손잡이. 드래그하는 동안만 window에 붙는다 — 놓으면 떼어 낸다 */
-function Handle({ el, onDrag }: { el: string; onDrag: (dx: number) => void }) {
-  const down = (e: React.MouseEvent) => {
-    e.preventDefault()
-    let last = e.clientX
-    const move = (m: MouseEvent) => {
-      onDrag(m.clientX - last)
-      last = m.clientX
-    }
-    const up = () => {
-      window.removeEventListener('mousemove', move)
-      window.removeEventListener('mouseup', up)
-      document.body.style.userSelect = ''
-    }
-    document.body.style.userSelect = 'none' // 끄는 동안 본문이 선택되지 않게
-    window.addEventListener('mousemove', move)
-    window.addEventListener('mouseup', up)
-  }
-  return <div className="handle" data-el={el} onMouseDown={down} />
 }
 
 function tocOf(doc: Document): { id: string; text: string; depth: number }[] {
