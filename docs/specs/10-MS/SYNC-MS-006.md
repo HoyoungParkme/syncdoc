@@ -10,13 +10,13 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/account/service.py`의 함수 8개. 클래스 명세 [[SYNC-DOM-002]] 4.6의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/account/service.py`의 함수 13개. 클래스 명세 [[SYNC-DOM-002]] 4.6의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
 **표기** — `→` 반환·결과, `!` 예외, `DB:` 테이블 접근, `git:` 저장소 접근, `·` 같은 단계 안 구분.
 
-`users`·`access_tokens`만. 비밀키는 `config.SECRET_KEY`(DB 밖).
+`users`·`access_tokens`·`commit_emails`만. 비밀키는 `config.SECRET_KEY`(DB 밖).
 
 ---
 
@@ -33,6 +33,10 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#AccountService.user_by_login]] | 로그인 → User |
 | [[#AccountService.users_by_ids]] | 여러 사용자 표시 정보 |
 | [[#AccountService.create_placeholder]] | 미등록 자리표시 |
+| [[#AccountService.user_for_commit]] | 커밋 작성자 → User |
+| [[#AccountService.commit_emails]] | 내 커밋 이메일 |
+| [[#AccountService.add_commit_email]] | 커밋 이메일 등록 |
+| [[#AccountService.remove_commit_email]] | 커밋 이메일 삭제 |
 
 ---
 
@@ -153,6 +157,72 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 근거: [[SYNC-SEQ-001#SEQ-2]] · 결정: 미등록 push는 자리표시 User + `author.unknown`
 
 **처리** `DB: users insert (github_login=login, github_user_id=None, display_name=login, github_token_encrypted=None)` → User. `github_login` unique이므로 동시 호출은 한쪽이 기존 행을 받는다
+
+**`login`이 GitHub 아이디가 아닐 수 있다.** 커밋 이메일이 noreply가 아니면 `git._login_of`가 `%an`(사람 이름)을 대신 준다. 공백이 든 문자열이 `github_login`에 앉는다 — 그래도 만든다. 판정을 여기서 하면 push를 건너뛰게 되고 원본·DB가 어긋난다([[SYNC-DOM-002]] 5장 결정 3)
+
+---
+
+#### AccountService.user_for_commit 커밋 작성자 → User
+
+**시그니처** `user_for_commit(email: str, login: str) -> User`
+
+근거: [[SYNC-DOM-002]] 5장 결정 3 · [[SYNC-UC-001#UC-G1]]
+
+**입력** `email` git 커밋의 `%ae` 원본 · `login` `git._login_of`가 준 값([[SYNC-MS-009#git.changed_files]])
+
+**처리**
+1. if `email` → `u = DB: commit_emails where email=email.strip().lower() join users` · if `u` → `→ u`
+2. `u = user_by_login(login)` · if `u` → `→ u`
+3. `→ create_placeholder(login)`
+
+**순서가 규칙이다.** 이메일이 먼저인 이유는 git 커밋이 남기는 신원 중 계정으로 이어지는 것이 이메일뿐이기 때문이다. `login`은 noreply 메일일 때만 진짜 아이디이고, 아니면 `%an` 대체값이다.
+
+**자리표시를 만드는 곳은 여기 하나다.** `process_commit`과 `rebuild`가 각자 만들면 판정이 두 경로에서 어긋난다 — 실제로 어긋나 있었다(#34).
+
+**호출하는 것** `pipeline.process_commit` 4단계 · `pipeline.rebuild` 5단계
+
+**테스트 관점** 등록된 이메일 → 그 사용자(login이 달라도) · 미등록 이메일 + noreply login → login으로 찾은 사용자 · 둘 다 없음 → 자리표시 · 대소문자가 달라도 같은 이메일로 찾는다 · `email`이 빈 문자열이면 2번부터
+
+---
+
+#### AccountService.commit_emails 내 커밋 이메일
+
+**시그니처** `commit_emails(user: User) -> list[CommitEmail]`
+
+**처리** `DB: commit_emails where user_id=user.id order by added_at` → 목록
+
+**호출하는 것** `GET /api/me/emails`(UI-13 2.3)
+
+---
+
+#### AccountService.add_commit_email 커밋 이메일 등록
+
+**시그니처** `add_commit_email(user: User, email: str) -> CommitEmail`
+
+**처리**
+1. `e = email.strip().lower()` — git 이메일은 대소문자가 흔들린다
+2. `row = DB: commit_emails where email=e`
+3. if `row and row.user_id == user.id` → `→ row` — 멱등. 두 번 눌러도 오류가 아니다
+4. if `row` → `! email-taken {email: e}` — 이메일 하나는 사람 하나다
+5. `DB: commit_emails insert (user_id=user.id, email=e)` → `→ row`
+
+**등록만으로는 이미 쌓인 것이 안 옮겨진다.** 버전·플래그는 인덱스를 다시 만들 때 작성자를 다시 찾는다. 재구축을 한 번 돌려야 한다(UI-13 규칙)
+
+**예외** `email-taken` 409
+
+**테스트 관점** 남이 가진 이메일 → email-taken · 내가 이미 가진 이메일 → 같은 행(새로 안 만든다) · `Foo@Bar.COM` 등록 뒤 `foo@bar.com`으로 찾힘
+
+---
+
+#### AccountService.remove_commit_email 커밋 이메일 삭제
+
+**시그니처** `remove_commit_email(user: User, email_id: int) -> None`
+
+**처리** `row = DB: commit_emails where id=email_id` · if `row is None or row.user_id != user.id` → `! not-found` · else `DB: delete row`
+
+**남의 것인지 아닌지를 구분해 알려주지 않는다** — 둘 다 `not-found`다. 있는지 없는지가 새어 나가면 안 된다
+
+**테스트 관점** 남의 이메일 삭제 → not-found · 없는 id → not-found · 삭제 뒤 재구축하면 그 이메일 커밋이 자리표시로 돌아간다
 
 ---
 

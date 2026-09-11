@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/tracking/service.py`의 함수 15개. 클래스 명세 [[SYNC-DOM-002]] 4.4의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/tracking/service.py`의 함수 16개. 클래스 명세 [[SYNC-DOM-002]] 4.4의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -40,6 +40,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#TrackingService.count_flags]] | 프로젝트 건수 |
 | [[#TrackingService.count_flags_by_document]] | 문서별 건수 |
 | [[#TrackingService.pending_decisions_for]] | 미결정 버전 ID |
+| [[#TrackingService.reassign_open_flags]] | 담당자 다시 계산 |
 
 ---
 
@@ -235,6 +236,28 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **시그니처** `pending_decisions_for(user_id: int) -> list[int]`
 
 **처리** `DB: propagation_decisions where choice=undecided` → `version_id[]`. 누가 저장했는지는 모른다(versions는 spec 묶음) — `queries.todo`가 `SpecService.versions_instructed_by`로 거른다
+
+---
+
+#### TrackingService.reassign_open_flags 담당자 다시 계산
+
+**시그니처** `reassign_open_flags(project_id: int) -> int`
+
+근거: [[SYNC-MS-007#pipeline.rebuild]] 7a단계 · 결정: 담당자 = 대상 문서 최근 버전 작성자
+
+**처리**
+1. `flags = DB: flags join items join documents where project_id and resolved_at is null` — **종류를 안 가린다**(`flags_in_project`는 `kind`가 필수라 쓸 수 없다)
+2. 각 플래그에 `a = SpecService.last_author(대상 항목의 document_id).user_id`(None 가능)
+3. if `a != flag.assignee_user_id` → `DB: update assignee_user_id=a` · 센다
+4. `→` 바뀐 수
+
+**왜 필요한가.** 재구축은 git을 진실로 삼아 `versions`를 다시 만든다. `assignee_user_id`는 거기서 파생된 값인데 플래그를 **만들 때 한 번** 계산되고 다시 계산되지 않는다. `clear_index`는 versions·references만 지우고 flags는 남긴다 — 원본을 다시 만들고 파생값을 그대로 두면 재구축이 절반만 끝난다. 커밋 이메일을 등록해 작성자가 바뀌어도 플래그는 옛 자리표시를 계속 가리킨다(#34).
+
+**해제된 플래그는 안 건드린다.** 해제 시점의 담당자는 그때의 사실이라 이력이다.
+
+**호출하는 것** `pipeline.rebuild` 7a단계
+
+**테스트 관점** 대상 문서 작성자가 바뀌면 담당자도 바뀐다 · 해제된 플래그는 그대로 · 작성자가 없어지면 `null`(내 할 일 `담당 미지정`으로) · 안 바뀐 플래그는 세지 않는다
 
 ---
 

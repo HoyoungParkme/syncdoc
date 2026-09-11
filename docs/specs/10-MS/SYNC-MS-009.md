@@ -126,7 +126,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. 파일별로 **마지막으로 건드린 커밋**을 남긴다 (밀린 커밋 여럿이면 최종 상태 하나)
 2a. **rename(`R…`)은 새 경로의 `M`으로 접고 옛 경로는 버린다.** `--name-status`는 rename 감지가 기본이라 `R100\t옛\t새` 줄을 낸다. 파일이 옮겨진 것이지 문서가 둘이 된 게 아니다 — 옛 경로를 남기면 `process_commit`이 `git show {head}:{옛 경로}`를 읽으려다 죽고, 한 파일이 실패하면 `last_processed_commit`이 안 올라가 **따라잡기가 영원히 그 자리에 멈춘다**(#31)
 2b. 옛 경로를 버리는 것은 **그 rename보다 앞선 커밋**의 항목에만 적용한다. 커밋 목록은 최신부터 훑으므로, rename 뒤에 옛 경로로 새 파일이 생겼으면 그 항목이 이미 잡혀 있고 그것은 살린다
-3. `→ [ChangedFile(path, status=A|M|D, commit_hash, author_login, message)]`. 상태는 셋뿐이다 — `R`은 2a에서 `M`으로 접혔다. `author_login`: `%ae`가 `@users.noreply.github.com`으로 끝나면 `@` 앞부분에서 `{숫자}+` 접두를 뗀 것 (`12345+hoyoung@users.noreply.github.com` → `hoyoung`). 아니면 `%an`
+3. `→ [ChangedFile(path, status=A|M|D, commit_hash, author_login, message, author_email)]`. 상태는 셋뿐이다 — `R`은 2a에서 `M`으로 접혔다. `author_login`: `%ae`가 `@users.noreply.github.com`으로 끝나면 `@` 앞부분에서 `{숫자}+` 접두를 뗀 것 (`12345+hoyoung@users.noreply.github.com` → `hoyoung`). 아니면 `%an`. `author_email`: **`%ae` 원본 그대로**
+3a. **`author_login`과 `author_email`을 둘 다 싣는다.** `author_login`은 noreply 메일일 때만 진짜 GitHub 아이디이고, 아니면 `%an`(사람 이름)이라 신원의 근거가 못 된다 — 공백이 든 문자열일 수 있다. 파이프라인은 **이메일로 먼저** 사람을 찾는다([[SYNC-MS-006#AccountService.user_for_commit]]). 여기서 login을 고쳐 이메일만 넘기지는 않는다 — 이메일이 등록 안 됐을 때 login이 2차 단서로 남아야 한다
 4. **명세가 아닌 것은 제외한다** — `_templates/`·`assets/` 경로, 그리고 **타입 디렉터리 밖의 파일**(`docs/specs/` 바로 아래). `init_specs`가 만드는 `README.md`가 거기 있다. 제외하지 않으면 싱크독이 만든 파일이 싱크독의 따라잡기를 막는다(#32)
    - `docs/specs/BOGUS/…` 같은 **알 수 없는 타입 디렉터리**는 제외하지 않는다. 사람이 잘못 넣은 것이라 `process_commit`이 실패로 남겨 알려야 한다
 
@@ -148,7 +149,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `async def log(workdir: Path, path: str) -> list[Commit]`
 
-**처리** `git log --follow --reverse --format="%H%x00%an%x00%ae%x00%aI%x00%s%n%b%x00" -- {path}` → 오래된 것부터 `[Commit(hash, login, date, message)]`
+**처리** `git log --follow --reverse --format="%H%x00%an%x00%ae%x00%aI%x00%s%n%b%x00" -- {path}` → 오래된 것부터 `[Commit(hash, login, date, message, email)]`. `login`·`email`은 `changed_files` 3·3a와 같은 규칙 — 재구축도 이메일로 먼저 사람을 찾는다
 
 ---
 

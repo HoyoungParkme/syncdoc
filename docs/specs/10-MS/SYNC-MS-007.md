@@ -194,7 +194,7 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
 
 1. `repo.last_processed_commit == head_hash`면 `→ []`
 2. `git.fetch(repo.workdir)` (public)
-3. `files = git.changed_files(repo, f"{last}..{head}", path="docs/specs/")`. 각각 `(path, last_commit_hash_of_file, author_login, message)`. `_templates/`·`assets/`는 제외
+3. `files = git.changed_files(repo, f"{last}..{head}", path="docs/specs/")`. 각각 `(path, last_commit_hash_of_file, author_login, author_email, message)`. `_templates/`·`assets/`는 제외
 3a. **앱 자신이 만든 커밋은 거른다** — `commit_hash`가 이미 `versions.commit_hash`나 `status_changes.commit_hash`에 있으면 건너뛴다. 없으면 앱이 push한 커밋을 폴링이 github 경로로 다시 저장해 같은 커밋의 버전이 하나 더 생긴다
 3b. 남은 파일을 **문서 타입의 단계 순**으로 정렬(RFQ→…→CODE→STD). 경로순이면 하위가 먼저 저장돼 상위 참조가 미존재로 남는다
 4. 파일마다 (락은 `save_pipeline` 안에서):
@@ -202,7 +202,8 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
    - `doc_id` = **파일명**(github 경로는 `issue_doc_id`를 쓰지 않는다 — 커밋이 진실). `path_type` = 디렉터리명에서 번호를 뗀 것(`06-DOM` → `DOM`, STD-001 1.1). if `path_type != frontmatter.type` → `frontmatter.doc_id` 위반으로 처리(저장은 됨)
    - github 진입은 **항목 삭제 확인을 건너뛴다** — 물어볼 상대가 없고 커밋이 진실이다. 사라진 항목은 `is_deleted` + `raise_broken`으로 통보
    - 파일명·디렉터리·미등록 작성자 위반은 저장 뒤 `spec.mark_convention_error`로 덧붙인다
-   - `user = account.user_by_login(author_login)` · if None → `user = account.create_placeholder(author_login)`, 위반에 `author.unknown` 추가
+   - `user = account.user_for_commit(author_email, author_login)` — **이메일 → login → 자리표시** 순([[SYNC-MS-006#AccountService.user_for_commit]])
+   - if `user.github_user_id is None` → 위반에 `author.unknown: {author_login}` 추가. **판정은 「자리표시인가」이지 「방금 만들었나」가 아니다** — 후자로 하면 같은 사람의 둘째 문서부터 이미 행이 있어 오류가 안 붙는다(#34)
    - `author = Author(kind=human, user, instructed_by=None, via=github)`
    - if `status == D` (파일 삭제) → `deleted = spec.mark_deleted(document, commit_hash, author)` (`status=draft`, `file.deleted` 오류, 전 항목 `is_deleted`) · 각 pk에 `tracking.raise_broken` · 문서 행은 남는다 · 다음 파일로
    - else → `save_pipeline(entry=github, doc_id, None, body, None, author, message=원 커밋 메시지, changed_items=None, commit_hash=file_commit_hash)` → 결과 모음
@@ -213,12 +214,14 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
 
 **예외** 파일 하나 실패해도 다음 파일 계속. 실패 목록을 로그. `last_processed_commit`은 **전부 성공했을 때만** 갱신 — 아니면 다음 폴링이 다시 시도
 
-**호출하는 것** [[#pipeline.save_pipeline]] · `git.fetch` `git.changed_files` `git.read` · `AccountService.user_by_login` `AccountService.create_placeholder`
+**호출하는 것** [[#pipeline.save_pipeline]] · `git.fetch` `git.changed_files` `git.read` · `AccountService.user_for_commit`
 
 **테스트 관점**
 - 커밋 하나에 파일 둘: 결과 둘, 각각 새 버전
 - 밀린 커밋 셋에 같은 파일: 버전 하나(최종 상태)
 - 미등록 작성자: 자리표시 User 생성, 문서에 `author.unknown`
+- **같은 미등록 작성자가 문서 둘을 커밋: 둘 다 `author.unknown`** (자리표시는 하나만 생긴다)
+- 커밋 이메일이 등록된 사람: 자리표시를 안 만들고 그 사람으로 붙는다. `author.unknown` 없음
 - 파일명 ≠ frontmatter: 규약 오류로 저장됨
 - 한 파일 실패: 나머지 처리됨, `last_processed_commit` 안 바뀜
 
@@ -243,12 +246,15 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 4. `reference.clear(project_id)` · `spec.clear_index(project_id)` — `versions`만 삭제. `documents`·`items`는 유지(플래그·댓글 FK)
 5. `paths = git.list(repo, "docs/specs/*/*.md")` (`_templates`·`assets` 제외. 번호 붙은 디렉터리도 `*`에 걸린다)
 6. 파일마다:
-   - `log = git.log(repo, path)` 오래된 것부터 `[(hash, login, date, message)]`
-   - 커밋마다: `body = git.read(path @ hash)`
+   - `log = git.log(repo, path)` 오래된 것부터 `[(hash, login, email, date, message)]`
+   - 커밋마다: `body = git.read(path @ hash)` · `user = account.user_for_commit(email, login)` — `process_commit` 4단계와 **같은 순서**(이메일 → login → 자리표시)
      - if `message.startswith("status(")` → `spec.apply_status(…, commit_hash=hash)`만 (StatusChange 복원)
      - else if 이 문서의 첫 커밋 → `spec.create(...)` · else → `spec.save(document, body, hash, author, message, deleted=spec.detect_deleted_items(document, body), validate_result, rebuild=True)` — `version_no`는 남은 버전 수 + 1, `items` upsert. 커밋마다 삭제 항목도 반영한다
-   - 마지막 커밋 본문으로 `reference.extract`, `spec.mark_convention_error(document_id, violations, warnings)`
+   - 마지막 커밋 본문으로 `reference.extract`, `spec.mark_convention_error(document_id, violations + extra, warnings)`
+   - **`extra`에 작성자 위반을 얹는다** — 마지막 **본문** 커밋(`status(`가 아닌 것)의 작성자가 `github_user_id is None`이면 `author.unknown: {login}`. `mark_convention_error`는 항상 전량 교체라 여기서 안 얹으면 그 오류가 사라진다. 그래서 실물 인덱스에 규약 오류가 0건이었다(#34)
+   - **마지막 본문 커밋을 기준으로 삼는 이유** — 문서의 `author.unknown`은 UI-5 배너가 `last_author`와 함께 보여주는 값이고 `process_commit`도 방금 저장한 버전의 작성자로 판정한다. 옛 커밋이 미등록이었어도 최신 커밋이 등록자면 문서는 깨끗하다
 7. `reference.resolve_missing(project_id)` — 파일 순서 때문에 미존재였던 참조 해제
+7a. `tracking.reassign_open_flags(project_id)` — 버전을 다시 만들었으므로 열린 플래그의 담당자(= 대상 문서 최근 버전 작성자)를 다시 계산한다. `clear_index`는 flags를 안 지우고 담당자는 플래그를 만들 때 한 번만 정해지므로, 이게 없으면 **재구축이 절반만 끝난다** — 커밋 이메일을 등록해 작성자가 바뀌어도 플래그는 옛 자리표시를 계속 가리킨다([[SYNC-MS-004#TrackingService.reassign_open_flags]])
 8. `repo.last_processed_commit = HEAD`
 9. **커밋.** 락 해제
 10. `→ RebuildResult(docs, items, references, versions, convention_errors)`
@@ -257,12 +263,14 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 
 **예외** 어느 단계든 실패하면 트랜잭션 롤백. DB는 재구축 전 상태로. `! rebuild-failed {reason}`
 
-**호출하는 것** [[SYNC-MS-002#SpecService.clear_index]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.save]] [[SYNC-MS-002#SpecService.mark_convention_error]] · `ReferenceService.clear` `ReferenceService.extract` `ReferenceService.resolve_missing` · `git.*`
+**호출하는 것** [[SYNC-MS-002#SpecService.clear_index]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.save]] [[SYNC-MS-002#SpecService.mark_convention_error]] · `ReferenceService.clear` `ReferenceService.extract` `ReferenceService.resolve_missing` · [[SYNC-MS-004#TrackingService.reassign_open_flags]] · `AccountService.user_for_commit` · `git.*`
 
 **테스트 관점**
 - DB 비운 뒤 재구축: 문서·항목·참조·버전 수가 저장소와 일치
-- 플래그·댓글이 있는 상태에서 재구축: 그대로 남음
+- 플래그·댓글이 있는 상태에서 재구축: 그대로 남음. **담당자는 다시 계산된다**(7a)
 - 파일 순서 때문에 미존재였던 참조가 7단계 후 해제됨
+- **미등록 작성자만 있는 저장소를 재구축: 문서에 `author.unknown`이 붙는다**(#34)
+- 커밋 이메일을 등록하고 재구축: 버전 작성자가 그 사람으로 바뀌고 `author.unknown`이 사라진다. 열린 플래그 담당자도 따라 바뀐다
 - `status(` 커밋: Version 안 늘고 StatusChange 생김
 - 중간 실패: DB가 재구축 전과 같음
 
