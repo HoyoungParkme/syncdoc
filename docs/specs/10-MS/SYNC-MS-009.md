@@ -124,8 +124,13 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **처리**
 1. `git log --name-status --format="%H%x00%an%x00%ae%x00%s%n%b%x00" {range} -- {prefix}` — 커밋마다 파일 상태
 2. 파일별로 **마지막으로 건드린 커밋**을 남긴다 (밀린 커밋 여럿이면 최종 상태 하나)
-3. `→ [ChangedFile(path, status=A|M|D, commit_hash, author_login, message)]`. `author_login`: `%ae`가 `@users.noreply.github.com`으로 끝나면 `@` 앞부분에서 `{숫자}+` 접두를 뗀 것 (`12345+hoyoung@users.noreply.github.com` → `hoyoung`). 아니면 `%an`
-4. `_templates/`·`assets/` 경로는 제외
+2a. **rename(`R…`)은 새 경로의 `M`으로 접고 옛 경로는 버린다.** `--name-status`는 rename 감지가 기본이라 `R100\t옛\t새` 줄을 낸다. 파일이 옮겨진 것이지 문서가 둘이 된 게 아니다 — 옛 경로를 남기면 `process_commit`이 `git show {head}:{옛 경로}`를 읽으려다 죽고, 한 파일이 실패하면 `last_processed_commit`이 안 올라가 **따라잡기가 영원히 그 자리에 멈춘다**(#31)
+2b. 옛 경로를 버리는 것은 **그 rename보다 앞선 커밋**의 항목에만 적용한다. 커밋 목록은 최신부터 훑으므로, rename 뒤에 옛 경로로 새 파일이 생겼으면 그 항목이 이미 잡혀 있고 그것은 살린다
+3. `→ [ChangedFile(path, status=A|M|D, commit_hash, author_login, message)]`. 상태는 셋뿐이다 — `R`은 2a에서 `M`으로 접혔다. `author_login`: `%ae`가 `@users.noreply.github.com`으로 끝나면 `@` 앞부분에서 `{숫자}+` 접두를 뗀 것 (`12345+hoyoung@users.noreply.github.com` → `hoyoung`). 아니면 `%an`
+4. **명세가 아닌 것은 제외한다** — `_templates/`·`assets/` 경로, 그리고 **타입 디렉터리 밖의 파일**(`docs/specs/` 바로 아래). `init_specs`가 만드는 `README.md`가 거기 있다. 제외하지 않으면 싱크독이 만든 파일이 싱크독의 따라잡기를 막는다(#32)
+   - `docs/specs/BOGUS/…` 같은 **알 수 없는 타입 디렉터리**는 제외하지 않는다. 사람이 잘못 넣은 것이라 `process_commit`이 실패로 남겨 알려야 한다
+
+**테스트 관점** 범위가 rename 커밋을 **가로지를 때** 옛 경로 항목이 하나도 안 남는다(#31) · rename 커밋 하나만 처리하면 새 경로 `M` 하나 · rename 뒤 옛 경로에 새 파일 → 그 항목은 남는다
 
 **미결** `status=D`(삭제된 파일) — MS-001 미결과 같음
 
