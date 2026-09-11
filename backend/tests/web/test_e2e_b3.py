@@ -117,7 +117,7 @@ async def test_s4_change_propagates_to_downstream_owner(
     flags = td["needs_check"]
     assert td["total"] == 4 and {f["cause"]["item_id"] for f in flags} == {"R1"}
     f1 = client.get(f"/api/flags/{flags[0]['id']}").json()
-    assert (f1["cause_change_count"], f1["target_changed_since_raise"]) == (0, False)
+    assert (f1["cause_change_count"], f1["target_changed_since_raise"]) == (0, False), f1
     # 부여 직후에도 원인 변경이 보인다 (#10)
     assert f1["cause_diff"]["hunks"] and f1["target_body"].startswith("#### P1")
     assert client.post(f"/api/flags/{flags[0]['id']}/resolve").json()["resolved_at"] is not None
