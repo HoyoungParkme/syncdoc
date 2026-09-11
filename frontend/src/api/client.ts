@@ -262,7 +262,19 @@ export interface RepoStatus {
   last_processed_commit: string | null
   synced_at: string | null
   behind_by: number | null
+  /** backup/tracking.json의 마지막 커밋 시각 (UI-14 2.4). DB가 아니라 git에서 온다 */
+  backed_up_at: string | null
+  /** 주기의 두 배가 넘게 지났나. 서버가 판정한다 — 화면은 주기를 모른다 */
+  backup_stale: boolean
   error: string | null
+}
+export interface RestoreResult {
+  flags: number
+  decisions: number
+  comments: number
+  /** 이미 있어서 안 넣은 행. 두 번 눌렀을 때 여기로 간다(멱등의 증거) */
+  skipped: number
+  dropped: { kind: string; count: number; reason: string }[]
 }
 export interface RebuildResult {
   docs: number

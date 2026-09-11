@@ -461,3 +461,16 @@ async def test_log_separates_path_from_multiline_message(repos: dict[str, Path])
 
     assert len(got) == 1 and got[0].path == path
     assert got[0].message == "spec(SYNC-PRD-002): 초안\n\n첫 줄\n\n빈 줄 뒤 둘째 줄"
+
+
+async def test_last_commit_at_reads_from_origin_head(repos: dict[str, Path]) -> None:
+    """백업 파일의 마지막 커밋 시각. 원격 기준이고 fetch를 안 부른다 (#16)."""
+    o = repos["other"]
+    assert await g.last_commit_at(repos["work"], "backup/tracking.json") is None  # 없는 경로
+    write_commit_push(o, "backup/tracking.json", "{}", "chore: 백업")
+    await g.fetch(repos["work"])
+    first = await g.last_commit_at(repos["work"], "backup/tracking.json")
+    assert first is not None and first.tzinfo is not None
+    write_commit_push(o, "backup/tracking.json", '{"x": 1}', "chore: 백업")
+    await g.fetch(repos["work"])
+    assert (await g.last_commit_at(repos["work"], "backup/tracking.json")) >= first

@@ -70,4 +70,29 @@ async def poll_loop(interval: int) -> None:
     """
     while True:
         await asyncio.sleep(interval)
-        await catch_up()
+        # 반복 전체를 감싼다. catch_up은 저장소 하나가 실패해도 다음을 계속하지만,
+        # 저장소 목록을 읽다 DB가 죽으면 그 예외가 여기까지 올라와 영영 폴링이 없다
+        try:
+            await catch_up()
+        except Exception as e:  # noqa: BLE001 — 반복이 멈추면 안 된다 (MS-007)
+            log.warning("poll_loop: %s", e)
+
+
+async def backup_loop(interval: int) -> None:
+    """SYNC-MS-007#scheduler.backup_loop
+
+    기동 시 한 번은 없다 — poll_loop와 다른 점이다. 기동 직후는 catch_up이 같은 작업
+    사본에서 fetch를 돌고 있고, 백업은 하루 단위 값이라 몇 시간 늦어도 잃는 게 없다.
+    """
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            with db.session_scope() as s:
+                codes = [p.code for p in ProjectService(s).list_projects()]
+            for code in codes:
+                try:
+                    await pipeline.export_tracking(code)
+                except Exception as e:  # noqa: BLE001 — 하나가 실패해도 다음 저장소를 계속
+                    log.warning("backup %s: %s", code, e)
+        except Exception as e:  # noqa: BLE001 — 반복이 멈추면 안 된다
+            log.warning("backup_loop: %s", e)

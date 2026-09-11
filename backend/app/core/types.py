@@ -56,6 +56,9 @@ class Entry(StrEnum):
     web_revert = "web_revert"
     web_status = "web_status"
     github = "github"
+    # 추적 데이터 백업 커밋의 작성 경로. versions.via에 안 닿는다 — 백업은 버전 행을
+    # 안 만든다 (SYNC-INFRA-001 6.1, #16)
+    backup = "backup"
 
 
 def fold_via(entry: Entry) -> str:
@@ -127,6 +130,10 @@ class RepoStatus:
     synced_at: datetime | None
     behind_by: int | None
     fetched_at: datetime | None = None  # behind_by를 잰 시각. 화면이 "언제 기준인지"를 보여준다
+    # backup/tracking.json의 마지막 커밋 시각(UI-14 2.4). DB가 아니라 git에서 읽는다 —
+    # DB를 잃어도 남아야 하는 값이다 (INFRA 6.1, #16)
+    backed_up_at: datetime | None = None
+    backup_stale: bool = False  # 주기의 두 배가 넘게 지났나. 화면은 주기를 모른다
     error: str | None = None  # fetch 실패 사유. API 스키마에 없다 — UI-14에 표시(MS-001, 보고)
 
 
@@ -140,6 +147,50 @@ class RebuildResult:
     versions: int
     convention_errors: list[dict[str, str]] = field(default_factory=list)
     # 새 버전에 이어 붙일 수 없어 버린 추적 행. 비어 있는 것이 정상이다 (#38)
+    dropped: list[dict[str, object]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RestoreFlag:
+    """백업에서 읽어 **pk로 이미 푼** flags 한 행 (SYNC-DOM-002 2.8).
+
+    자연키를 푸는 것은 pipeline의 몫이다 — 추적 묶음은 문서·항목을 모른다.
+    """
+
+    kind: str
+    target_item_id: int
+    cause_item_id: int | None
+    cause_version_id: int | None
+    assignee_user_id: int | None
+    raised_at: datetime
+    resolved_by_user_id: int | None
+    resolved_at: datetime | None
+    resolved_with_edit: bool | None
+
+
+@dataclass(frozen=True)
+class RestoreDecision:
+    """같음. reason이 없다 — 백업에 안 싣는다(INFRA 6.1)."""
+
+    version_id: int
+    choice: str
+    affected_pks: list[int]
+    changed_pks: list[int]
+    decided_by_user_id: int | None
+    decided_at: datetime | None
+
+
+@dataclass
+class RestoreResult:
+    """SYNC-API-001 RestoreResult.
+
+    dropped가 RebuildResult와 같은 모양이라 UI-14 5.3을 그대로 쓴다.
+    """
+
+    flags: int = 0
+    decisions: int = 0
+    comments: int = 0
+    skipped: int = 0
     dropped: list[dict[str, object]] = field(default_factory=list)
 
 

@@ -8,6 +8,7 @@ B1 save_pipeline · B2 web_status·change_status · B3 11단계 · B4 revert·pr
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 from datetime import UTC, datetime
@@ -22,6 +23,7 @@ from app.core.account.service import AccountService
 from app.core.collab.service import CommentService
 from app.core.errors import (
     AlreadyCurrent,
+    BackupInvalid,
     ConventionViolation,
     ItemDeleted,
     ItemDeletionNeedsConfirm,
@@ -46,12 +48,16 @@ from app.core.types import (
     DocumentSummary,
     Entry,
     RebuildResult,
+    RestoreDecision,
+    RestoreFlag,
+    RestoreResult,
     SaveResult,
     Violation,
     spec_dir,
     type_of_dir,
 )
 from app.infra import git
+from app.infra.git import GitError
 
 log = logging.getLogger(__name__)
 _locks: dict[str, asyncio.Lock] = {}
@@ -555,3 +561,324 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
         log.warning("rebuild %s 실패: %s", code, e)
         raise RebuildFailed(str(e)) from e
     return result
+
+
+# ── 추적 데이터 백업 (SYNC-INFRA-001 6.1, #16) ──
+_BACKUP_PATH = "backup/tracking.json"
+_BACKUP_VERSION = 1
+
+
+def _iso(dt: datetime | None) -> str | None:
+    return dt.astimezone(UTC).isoformat() if dt is not None else None
+
+
+def _ckey(at: str | None, by: str | None) -> str:
+    """댓글 자연키 `{작성시각}|{작성자}`. 배열 index를 안 쓰는 이유는 MS-007에 적었다."""
+    return f"{at}|{by}"
+
+
+async def export_tracking(code: str) -> str:
+    """SYNC-MS-007#pipeline.export_tracking"""
+    # save_pipeline·rebuild와 같은 락이다 — commit_push가 reset --hard로 작업 사본을
+    # 갈아엎으므로 저장 중인 파이프라인과 같은 자물쇠 아래 있어야 한다
+    async with _lock(code):
+        with db.session_scope() as s:
+            project = ProjectService(s).get(code)
+            repo = project.repository
+            user = s.get(User, repo.registered_by_user_id)
+            if user is None:
+                raise NotFound("user", repo.registered_by_user_id)
+            spec, tracking, collab = SpecService(s), TrackingService(s), CommentService(s)
+            flags = tracking.all_flags(project.id)
+            decisions = tracking.all_decisions(project.id)
+            comments = collab.all_in_project(project.id)
+
+            # 지도 넷을 한 번씩만 뜬다
+            item_pks = {f.target_item_id for f in flags} | {
+                f.cause_item_id for f in flags if f.cause_item_id
+            }
+            for d in decisions:
+                item_pks |= set(d.affected_pks) | set(d.changed_pks)
+            items = spec.describe_items(sorted(item_pks))  # 삭제된 항목도 준다
+            vkeys = spec.version_keys(project.id)
+            doc_ids = {c.document_id for c in comments} | {doc for doc, _ in vkeys.values()}
+            docs = spec.describe_documents(sorted(doc_ids))
+            user_ids = {f.assignee_user_id for f in flags} | {f.resolved_by_user_id for f in flags}
+            user_ids |= {d.decided_by_user_id for d in decisions} | {
+                c.author_user_id for c in comments
+            }
+            users = AccountService(s).users_by_ids([i for i in user_ids if i])
+
+            def item_key(pk: int | None) -> str | None:
+                r = items.get(pk) if pk is not None else None
+                return f"{r.doc_id}#{r.item_id}" if r else None
+
+            def version_key(vid: int | None) -> str | None:
+                pair = vkeys.get(vid) if vid is not None else None
+                if pair is None:
+                    return None
+                doc = docs.get(pair[0])
+                return f"{doc.doc_id}@{pair[1]}" if doc else None
+
+            def login(uid: int | None) -> str | None:
+                r = users.get(uid) if uid is not None else None
+                return r.github_login if r else None
+
+            def item_keys(pks: list[int]) -> list[str]:
+                # JSONB라 FK가 없다 — 지도에 없는 pk는 원소만 뺀다
+                out = []
+                for pk in pks:
+                    k = item_key(pk)
+                    if k is None:
+                        log.warning("backup %s: 항목 pk %s를 못 찾았다", code, pk)
+                    else:
+                        out.append(k)
+                return sorted(out)
+
+            payload = {
+                "backup_version": _BACKUP_VERSION,
+                "project": code,
+                "flags": sorted(
+                    (
+                        {
+                            "kind": f.kind,
+                            "target": item_key(f.target_item_id),
+                            "cause": item_key(f.cause_item_id),
+                            "cause_version": version_key(f.cause_version_id),
+                            "assignee": login(f.assignee_user_id),
+                            "raised_at": _iso(f.raised_at),
+                            "resolved_by": login(f.resolved_by_user_id),
+                            "resolved_at": _iso(f.resolved_at),
+                            "resolved_with_edit": f.resolved_with_edit,
+                        }
+                        for f in flags
+                    ),
+                    key=lambda r: (
+                        r["target"] or "",
+                        r["raised_at"] or "",
+                        r["kind"],
+                        r["cause"] or "",
+                        r["cause_version"] or "",
+                    ),
+                ),
+                "propagation_decisions": sorted(
+                    (
+                        {
+                            "version": version_key(d.version_id),
+                            "choice": d.choice,
+                            "affected": item_keys(list(d.affected_pks)),
+                            "changed": item_keys(list(d.changed_pks)),
+                            "decided_by": login(d.decided_by_user_id),
+                            "decided_at": _iso(d.decided_at),
+                        }
+                        for d in decisions
+                    ),
+                    key=lambda r: r["version"] or "",
+                ),
+                "comments": sorted(
+                    (
+                        {
+                            "doc": (docs[c.document_id].doc_id if c.document_id in docs else None),
+                            "line_no": c.line_no,
+                            "line_hash": c.line_hash,
+                            "by": login(c.author_user_id),
+                            "is_resolved": c.is_resolved,
+                            "at": _iso(c.created_at),
+                            "original_location": c.original_location,
+                            "parent": None,  # 아래에서 채운다
+                        }
+                        for c in comments
+                    ),
+                    key=lambda r: (r["doc"] or "", r["at"] or "", r["by"] or ""),
+                ),
+            }
+            # 부모를 자연키로. 원본 행과 같은 순서가 아니므로 id로 먼저 지도를 만든다
+            by_id = {c.id: _ckey(_iso(c.created_at), login(c.author_user_id)) for c in comments}
+            key_of = {_ckey(_iso(c.created_at), login(c.author_user_id)): c for c in comments}
+            for row in payload["comments"]:
+                src = key_of[_ckey(row["at"], row["by"])]
+                row["parent"] = by_id.get(src.parent_comment_id) if src.parent_comment_id else None
+
+            # 결정적 직렬화 — 시각 필드를 안 넣는다(넣으면 매 주기 빈 커밋이 쌓인다)
+            text = json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+            author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.backup)
+            message = (
+                f"chore({code}): 추적 데이터 백업"
+                f" (플래그 {len(flags)} · 전파결정 {len(decisions)} · 댓글 {len(comments)})"
+            )
+            # 내용이 같으면 커밋이 안 생기고 현재 HEAD가 온다 (MS-009 commit_push)
+            return await git.commit_push(
+                Path(repo.workdir_path), message, author, path=_BACKUP_PATH, content=text
+            )
+
+
+async def import_tracking(code: str) -> RestoreResult:
+    """SYNC-MS-007#pipeline.import_tracking"""
+    # 재구축이 같은 락 안에서 versions를 지우고 다시 만든다 — 복원이 그 사이에 끼면
+    # 곧 사라질 버전에 결정을 붙인다
+    async with _lock(code):
+        with db.session_scope() as s:
+            project = ProjectService(s).get(code)
+            workdir = Path(project.repository.workdir_path)
+            await git.fetch(workdir)
+            try:
+                # origin/HEAD로 읽는다 — 로컬 HEAD는 뒤처질 수 있고 백업은 원격이 진실이다
+                text = await git.read(workdir, _BACKUP_PATH, "origin/HEAD")
+            except GitError as e:
+                raise NotFound("backup", code) from e
+            data = json.loads(text)
+            if data.get("backup_version") != _BACKUP_VERSION:
+                raise BackupInvalid("version")
+            if data.get("project") != code:
+                raise BackupInvalid("project")  # 다른 프로젝트의 백업을 붓지 않는다
+
+            spec, tracking, collab = SpecService(s), TrackingService(s), CommentService(s)
+            account = AccountService(s)
+            result = RestoreResult()
+            drops: dict[tuple[str, str], int] = {}
+
+            def drop(kind: str, reason: str, n: int = 1) -> None:
+                drops[(kind, reason)] = drops.get((kind, reason), 0) + n
+
+            NO_DOC = "가리키던 문서가 저장소에 없습니다"
+            NO_ITEM = "가리키던 항목이 저장소에 없습니다"
+            NO_COMMIT = "가리키던 커밋이 저장소에 없습니다"
+            NO_PARENT = "부모 댓글을 못 찾았습니다"
+
+            # 지도 넷. 행마다 조회하지 않는다
+            doc_ids = {r["doc"] for r in data["comments"] if r["doc"]}
+            for r in data["flags"]:
+                doc_ids |= {k.split("#")[0] for k in (r["target"], r["cause"]) if k}
+                if r["cause_version"]:
+                    doc_ids.add(r["cause_version"].split("@")[0])
+            for r in data["propagation_decisions"]:
+                if r["version"]:
+                    doc_ids.add(r["version"].split("@")[0])
+                doc_ids |= {k.split("#")[0] for k in r["affected"] + r["changed"]}
+            documents = {}
+            for doc_id in sorted(doc_ids):
+                try:
+                    documents[doc_id] = spec.get_document(doc_id)
+                except NotFound:
+                    pass
+            item_of: dict[str, int] = {}
+            for doc_id, doc in documents.items():
+                # 삭제 포함 — broken_ref의 원인 항목은 정의상 is_deleted다
+                for item_id, pk in spec.item_pks(doc.id, include_deleted=True).items():
+                    item_of[f"{doc_id}#{item_id}"] = pk
+            # version_keys를 뒤집는다 — 새 함수가 필요 없다
+            id_to_doc = {d.id: k for k, d in documents.items()}
+            version_of = {
+                f"{id_to_doc[doc_id]}@{h}": vid
+                for vid, (doc_id, h) in spec.version_keys(project.id).items()
+                if doc_id in id_to_doc
+            }
+            user_of: dict[str, int] = {}
+            for login in sorted(
+                {r["by"] for r in data["comments"] if r["by"]}
+                | {r[k] for r in data["flags"] for k in ("assignee", "resolved_by") if r[k]}
+                | {r["decided_by"] for r in data["propagation_decisions"] if r["decided_by"]}
+            ):
+                u = account.user_by_login(login) or account.create_placeholder(login)
+                user_of[login] = u.id
+
+            # 플래그
+            rows: list[RestoreFlag] = []
+            for r in data["flags"]:
+                target = item_of.get(r["target"])
+                if target is None:
+                    drop("flag", NO_DOC if r["target"].split("#")[0] not in documents else NO_ITEM)
+                    continue
+                if r["cause"] and r["cause"] not in item_of:
+                    # 비우지 않고 버린다 — 비우면 UI-11의 원인 diff·중복 방지가 죽는다
+                    drop("flag", NO_ITEM)
+                    continue
+                if r["cause_version"] and r["cause_version"] not in version_of:
+                    drop("flag", NO_COMMIT)
+                    continue
+                rows.append(
+                    RestoreFlag(
+                        kind=r["kind"],
+                        target_item_id=target,
+                        cause_item_id=item_of.get(r["cause"]) if r["cause"] else None,
+                        cause_version_id=version_of.get(r["cause_version"])
+                        if r["cause_version"]
+                        else None,
+                        assignee_user_id=user_of.get(r["assignee"]) if r["assignee"] else None,
+                        raised_at=datetime.fromisoformat(r["raised_at"]),
+                        resolved_by_user_id=user_of.get(r["resolved_by"])
+                        if r["resolved_by"]
+                        else None,
+                        resolved_at=datetime.fromisoformat(r["resolved_at"])
+                        if r["resolved_at"]
+                        else None,
+                        resolved_with_edit=r["resolved_with_edit"],
+                    )
+                )
+            result.flags, skipped = tracking.restore_flags(rows)
+            result.skipped += skipped
+
+            # 전파결정
+            drows: list[RestoreDecision] = []
+            for r in data["propagation_decisions"]:
+                vid = version_of.get(r["version"]) if r["version"] else None
+                if vid is None:
+                    drop("propagation_decision", NO_COMMIT)
+                    continue
+                aff = [item_of[k] for k in r["affected"] if k in item_of]
+                chg = [item_of[k] for k in r["changed"] if k in item_of]
+                missing = len(r["affected"]) + len(r["changed"]) - len(aff) - len(chg)
+                if missing:
+                    drop("decision_item", NO_ITEM, missing)  # 원소만 뺀다. 행은 넣는다
+                drows.append(
+                    RestoreDecision(
+                        version_id=vid,
+                        choice=r["choice"],
+                        affected_pks=aff,
+                        changed_pks=chg,
+                        decided_by_user_id=user_of.get(r["decided_by"])
+                        if r["decided_by"]
+                        else None,
+                        decided_at=datetime.fromisoformat(r["decided_at"])
+                        if r["decided_at"]
+                        else None,
+                    )
+                )
+            result.decisions, skipped = tracking.restore_decisions(drows)
+            result.skipped += skipped
+
+            # 댓글 — 파일 순서대로 한 행씩. 이미 있던 행도 지도에 넣는다
+            new_id: dict[str, int] = {}
+            for r in data["comments"]:
+                doc = documents.get(r["doc"])
+                if doc is None:
+                    drop("comment", NO_DOC)
+                    continue
+                parent_id = None
+                if r["parent"]:
+                    parent_id = new_id.get(r["parent"])
+                    if parent_id is None:
+                        drop("comment", NO_PARENT)  # 최상위로 올리지 않는다
+                        continue
+                row, created = collab.restore(
+                    document_id=doc.id,
+                    parent_comment_id=parent_id,
+                    line_no=r["line_no"],
+                    line_hash=r["line_hash"],
+                    author_user_id=user_of[r["by"]],
+                    is_resolved=r["is_resolved"],
+                    created_at=datetime.fromisoformat(r["at"]),
+                    original_location=r["original_location"],
+                )
+                new_id[_ckey(r["at"], r["by"])] = row.id
+                if created:
+                    result.comments += 1
+                else:
+                    result.skipped += 1
+
+            result.dropped = [
+                {"kind": k, "count": n, "reason": reason}
+                for (k, reason), n in sorted(drops.items())
+            ]
+            s.commit()
+            return result

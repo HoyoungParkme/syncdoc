@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -17,6 +19,26 @@ class CommentRepository:
     def all_of(self, document_id: int) -> list[Comment]:
         stmt = select(Comment).where(Comment.document_id == document_id)
         return list(self.session.scalars(stmt.order_by(Comment.created_at, Comment.id)))
+
+    def all_in_project(self, project_id: int) -> list[Comment]:
+        """프로젝트 전량. 정렬이 (문서, 작성시각)이라 부모가 자식보다 먼저 온다 (#16)."""
+        stmt = (
+            select(Comment)
+            .join(Document, Document.id == Comment.document_id)
+            .where(Document.project_id == project_id)
+            .order_by(Comment.document_id, Comment.created_at, Comment.id)
+        )
+        return list(self.session.scalars(stmt))
+
+    def by_key(self, document_id: int, author_user_id: int, created_at: datetime) -> Comment | None:
+        """복원 멱등 판정용 자연키. 같은 사람이 같은 문서에 같은 마이크로초에 둘 달 수 없다."""
+        return self.session.scalar(
+            select(Comment).where(
+                Comment.document_id == document_id,
+                Comment.author_user_id == author_user_id,
+                Comment.created_at == created_at,
+            )
+        )
 
     def by_id(self, comment_id: int) -> Comment | None:
         return self.session.get(Comment, comment_id)

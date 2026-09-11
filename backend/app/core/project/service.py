@@ -22,6 +22,7 @@ from app.core.errors import (
 )
 from app.core.project.models import Project, Repository
 from app.core.project.repository import ProjectRepository
+from app.core.spec.service import now_utc
 from app.core.types import Author, AuthorKind, Entry, RebuildResult, RepoStatus
 from app.infra import git
 from app.infra.git import GitError
@@ -118,20 +119,39 @@ class ProjectService:
     async def repo_status(self) -> list[RepoStatus]:
         """SYNC-MS-001#ProjectService.repo_status
 
-        DB만 읽는다. fetch는 폴링(scheduler.catch_up)이 하고 여기는 그 결과를 본다 —
+        원격을 안 탄다. fetch는 폴링(scheduler.catch_up)이 하고 여기는 그 결과를 본다 —
         화면이 열릴 때마다 저장소 수만큼 fetch가 돌면 느리고, 폴링과 이중이 된다.
+
+        backed_up_at만은 git에서 읽는다 — DB를 잃어도 남아야 하는 값이다(INFRA 6.1).
+        네트워크를 안 타는 로컬 조회 하나라 위 이유와 어긋나지 않는다.
         """
-        return [
-            RepoStatus(
-                p.code,
-                p.repository.remote_url,
-                p.repository.last_processed_commit,
-                p.repository.synced_at,
-                p.repository.behind_by,
-                p.repository.fetched_at,
+        out = []
+        for p in self.repo.all():
+            backed_up_at, err = None, None
+            try:
+                backed_up_at = await git.last_commit_at(
+                    Path(p.repository.workdir_path), "backup/tracking.json"
+                )
+            except Exception as e:  # noqa: BLE001 — 하나가 망가져도 표 전체를 죽이지 않는다
+                err = f"backup: {e}"
+            stale = False
+            if backed_up_at is not None and settings.BACKUP_INTERVAL_SECONDS > 0:
+                age = (now_utc() - backed_up_at).total_seconds()
+                stale = age > 2 * settings.BACKUP_INTERVAL_SECONDS
+            out.append(
+                RepoStatus(
+                    p.code,
+                    p.repository.remote_url,
+                    p.repository.last_processed_commit,
+                    p.repository.synced_at,
+                    p.repository.behind_by,
+                    p.repository.fetched_at,
+                    backed_up_at=backed_up_at,
+                    backup_stale=stale,
+                    error=err,
+                )
             )
-            for p in self.repo.all()
-        ]
+        return out
 
     async def delete_project(self, code: str) -> None:
         """SYNC-MS-001#ProjectService.delete_project

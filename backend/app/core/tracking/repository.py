@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -77,6 +79,50 @@ class TrackingRepository:
             .order_by(Flag.raised_at, Flag.id)
         )
         return list(self.session.scalars(stmt))
+
+    def all_of_project(self, project_id: int) -> list[Flag]:
+        """플래그 전량. 해제된 것도 준다 — 백업은 그때 있었던 사실이다 (#16)."""
+        stmt = (
+            select(Flag)
+            .join(Item, Item.id == Flag.target_item_id)
+            .join(Document, Document.id == Item.document_id)
+            .where(Document.project_id == project_id)
+            .order_by(Flag.id)
+        )
+        return list(self.session.scalars(stmt))
+
+    def decisions_of_project(self, project_id: int) -> list[PropagationDecision]:
+        """전파결정 전량. 결정된 것도 준다 (#16)."""
+        doc_ids = select(Document.id).where(Document.project_id == project_id)
+        version_ids = select(VersionRow.id).where(VersionRow.document_id.in_(doc_ids))
+        stmt = select(PropagationDecision).where(PropagationDecision.version_id.in_(version_ids))
+        return list(self.session.scalars(stmt.order_by(PropagationDecision.id)))
+
+    def flag_exists(
+        self,
+        kind: str,
+        target_item_id: int,
+        cause_item_id: int | None,
+        cause_version_id: int | None,
+        raised_at: datetime,
+    ) -> bool:
+        """복원 멱등 판정. raised_at이 드는 이유는 SYNC-MS-004#restore_flags."""
+        return (
+            self.session.scalar(
+                select(Flag.id).where(
+                    Flag.kind == kind,
+                    Flag.target_item_id == target_item_id,
+                    Flag.cause_item_id.is_(cause_item_id)
+                    if cause_item_id is None
+                    else Flag.cause_item_id == cause_item_id,
+                    Flag.cause_version_id.is_(cause_version_id)
+                    if cause_version_id is None
+                    else Flag.cause_version_id == cause_version_id,
+                    Flag.raised_at == raised_at,
+                )
+            )
+            is not None
+        )
 
     def decisions_by_version_ids(self, version_ids: list[int]) -> list[PropagationDecision]:
         """주어진 버전 id에 매달린 전파 결정. 재구축 재연결용 (#38).
