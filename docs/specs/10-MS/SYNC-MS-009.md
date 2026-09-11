@@ -149,11 +149,15 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `async def log(workdir: Path, path: str) -> list[Commit]`
 
-**처리** `git log --follow --format="%H%x00%an%x00%ae%x00%aI%x00%s%n%b%x00" -- {path}` → 최신부터 온 것을 **파이썬에서 뒤집어** 오래된 것부터 `[Commit(hash, login, date, message, email)]`. `login`·`email`은 `changed_files` 3·3a와 같은 규칙 — 재구축도 이메일로 먼저 사람을 찾는다
+**처리** `git log --follow --name-only --format="%x1e%H%x1f%an%x1f%ae%x1f%aI%x1f%s%n%b" -- {path}` → 최신부터 온 것을 **파이썬에서 뒤집어** 오래된 것부터 `[Commit(hash, login, date, message, email, path)]`. `login`·`email`은 `changed_files` 3·3a와 같은 규칙 — 재구축도 이메일로 먼저 사람을 찾는다
+
+**`path`는 「그 커밋 시점의 경로」다.** `--follow`가 이름이 바뀌기 전 커밋까지 주는데, 그 시점에는 파일이 옛 경로에 있다. 지금 경로로 `git.read`를 부르면 `fatal: path ... exists on disk, but not in {hash}`로 죽는다. `--name-only`가 커밋마다 그때의 경로를 한 줄로 붙여 주므로 그것을 싣는다(#39)
+
+**레코드 구분자를 `%x1e`·`%x1f`로 바꾼 이유.** `--name-only`가 메시지 뒤에 빈 줄과 경로를 덧붙이므로, 커밋 경계를 앞쪽 구분자로 잡아야 갈라진다. 메시지 본문에 빈 줄이 들어 있어도(이 저장소의 커밋이 그렇다) 경로는 항상 마지막 줄이다. `--follow`는 경로 하나만 받으므로 커밋마다 경로도 하나다
 
 **`--reverse`를 git에 맡기지 않는다.** `--follow`는 revision walker의 특수 처리라 `--reverse`와 조합되지 않는다 — 둘을 같이 주면 커밋이 거의 안 나온다. 실측(`SYNC-DOM-002`): `--follow` 18건 · `--reverse` 7건 · **둘 다 1건**. 이름이 바뀐 경로(`docs/specs/DOM/` → `docs/specs/06-DOM/`)를 건너 이력을 잇는 것이 `--follow`의 목적이므로 그쪽을 남기고 순서는 받아서 뒤집는다(#39)
 
-**테스트 관점** 이름을 안 바꾼 파일 · **이름이 바뀐 경로 — 옛 이름 시절 커밋까지 나온다** · 오래된 것부터 온다 · 없는 경로는 빈 목록
+**테스트 관점** 이름을 안 바꾼 파일 · **이름이 바뀐 경로 — 옛 이름 시절 커밋까지 나오고 그 커밋의 `path`가 옛 경로다** · 오래된 것부터 온다 · 여러 줄 메시지에서도 경로를 제대로 떼어 낸다 · 없는 경로는 빈 목록
 
 ---
 

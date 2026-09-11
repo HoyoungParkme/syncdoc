@@ -446,7 +446,7 @@ classDiagram
 | `UpstreamCheck` | `target: ItemRef` · `target_version_no: int` · `target_status: DocStatus` · `referenced_from: list[str]` | queries.upstream_checklist → UI-5 다이얼로그 11 |
 | `IssuedToken` | `token: AccessToken` · `raw: str` | account.issue_token. `raw`는 응답에만 |
 | `ChangedFile` | `path: str` · `status: A\|M\|D` · `commit_hash: str` · `author_login: str` · `message: str` · `author_email: str` | git.changed_files → process_commit. **`author_login`과 `author_email`을 둘 다 싣는다** — login은 `%an` 대체값일 수 있어 신원의 근거가 못 된다([[SYNC-MS-009#git.changed_files]]) |
-| `Commit` | `hash: str` · `login: str` · `date: datetime` · `message: str` · `email: str` | git.log → rebuild. `ChangedFile`과 같은 이유로 이메일을 함께 싣는다 |
+| `Commit` | `hash: str` · `login: str` · `date: datetime` · `message: str` · `email: str` · `path: str` | git.log → rebuild. `ChangedFile`과 같은 이유로 이메일을 함께 싣는다. `path`는 **그 커밋 시점의 경로** — `--follow`가 이름 바뀌기 전 커밋까지 주므로 지금 경로로는 본문을 못 읽는다([[SYNC-MS-009#git.log]]) |
 | `GithubUser` | `id: int` · `login: str` · `name: str` | github.get_user → login_github |
 
 타입은 여기 한 곳에만 정의한다.

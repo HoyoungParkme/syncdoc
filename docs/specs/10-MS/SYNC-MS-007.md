@@ -251,8 +251,8 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 4a. **`versions`를 가리키는 FK 셋을 여기서 센다**([[SYNC-MS-002#SpecService.clear_index]]). `references`는 4단계가 먼저 지우고, `propagation_decisions.version_id`·`flags.cause_version_id`는 **7a가 다시 잇는다.** 이 셋을 안 세서 실물 재구축이 죽었다 — 지금까지 "지우지 **않는** 테이블에 걸린 FK"만 셌다(#38)
 5. `paths = git.list(repo, "docs/specs/*/*.md")` (`_templates`·`assets` 제외. 번호 붙은 디렉터리도 `*`에 걸린다)
 6. 파일마다:
-   - `log = git.log(repo, path)` 오래된 것부터 `[(hash, login, email, date, message)]`
-   - 커밋마다: `body = git.read(path @ hash)` · `user = account.user_for_commit(email, login)` — `process_commit` 4단계와 **같은 순서**(이메일 → login → 자리표시)
+   - `log = git.log(repo, path)` 오래된 것부터 `[(hash, login, email, date, message, path)]`
+   - 커밋마다: `body = git.read(c.path @ hash)` — **그 커밋 시점의 경로로 읽는다.** 이름이 바뀐 문서는 옛 커밋에서 옛 경로에 있어 지금 경로로는 못 읽는다(#39) · `user = account.user_for_commit(email, login)` — `process_commit` 4단계와 **같은 순서**(이메일 → login → 자리표시)
      - if `message.startswith("status(")` → `spec.apply_status(…, commit_hash=hash)`만 (StatusChange 복원)
      - else if 이 문서의 첫 커밋 → `spec.create(...)` · else → `spec.save(document, body, hash, author, message, deleted=spec.detect_deleted_items(document, body), validate_result, rebuild=True)` — `version_no`는 남은 버전 수 + 1, `items` upsert. 커밋마다 삭제 항목도 반영한다
    - 커밋마다 `save`가 돌려준 버전을 `new[(document_id, commit_hash)] = version.id`로 모은다 — 7a가 쓴다
