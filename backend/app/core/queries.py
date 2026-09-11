@@ -185,11 +185,15 @@ async def document_view(doc_id: str) -> Document:
         for item in doc.items:
             item.flags = [f.kind for f in flags.get(item.pk, [])]
         doc.prev_doc_id, doc.next_doc_id = SpecService(s).neighbors(doc_id)
-        doc.missing_refs = [
-            e.raw_target
-            for e in ReferenceService(s).upstream_of_document(doc.id, include_missing=True)
-            if e.is_missing
-        ]  # 4a — 유저용 탭이 링크를 회색 ?로
+        # 4a — 유저용 탭이 링크를 회색 ?로, 미완성 배너가 승인 못 하는 이유로.
+        # 중복은 접는다: 승인 게이트가 보는 값과 같아야 한다(MS-007 change_status 2단계)
+        doc.missing_refs = sorted(
+            dict.fromkeys(
+                e.raw_target
+                for e in ReferenceService(s).upstream_of_document(doc.id, include_missing=True)
+                if e.is_missing
+            )
+        )
         doc.author = _api_author(s, doc.last_author)
         # 브레드크럼은 코드가 아니라 이름으로 시작한다 — 사람이 부르는 이름이 프로젝트다
         doc.project_name = ProjectService(s).get(doc_id.split("-")[0]).name

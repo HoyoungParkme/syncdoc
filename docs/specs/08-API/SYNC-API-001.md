@@ -45,7 +45,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:item-deleted` | 410 | 삭제된 항목 조회 | `deleted_at` | [[SYNC-UC-001#UC-A3]] 1a |
 | `urn:syncdoc:convention-violation` | 422 | 규약 위반 (되돌리기 시) | `violations: [{line, rule, message}]`, `warnings: [{rule, message}]` | [[SYNC-UC-001#UC-S1]] 4a, [[SYNC-UC-001#UC-H7]] 4a |
 | `urn:syncdoc:version-conflict` | 409 | 버전 불일치 | `current_version`, `current_body` | [[SYNC-UC-001#UC-A6]] 4a |
-| `urn:syncdoc:status-blocked` | 409 | 규약 오류 또는 미완성 문서를 `approved`로 | `convention_error_detail`, `warnings` | [[SYNC-UC-001#UC-H8]] 1a |
+| `urn:syncdoc:status-blocked` | 409 | 규약 오류·미완성 경고·끊어진 참조가 있는 문서를 `approved`로 | `convention_error_detail`, `warnings` — `warnings`에는 `ref.missing: {대상}`이 섞일 수 있다. **컬럼에 있는 값이 아니라 읽을 때 센 값이다**([[SYNC-STD-001]] 4장) | [[SYNC-UC-001#UC-H8]] 1a |
 | `urn:syncdoc:item-deletion-needs-confirm` | 409 | 되돌리기로 항목이 사라지고 하위 참조 있음 | `deleted_items: [{item_id, downstream}]` | [[SYNC-UC-001#UC-H7]], [[SYNC-UC-001#UC-A6]] 4b |
 | `urn:syncdoc:project-code-conflict` | 409 | 코드 중복 | `code` | [[SYNC-UC-001#UC-A1]] 2a |
 | `urn:syncdoc:project-code-invalid` | 422 | 코드 형식 | `rule` | [[SYNC-UC-001#UC-A1]] 2b |
@@ -58,6 +58,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:upstream-review-required` | 422 | `approved`인데 `upstream_reviewed`가 아님 | — | [[SYNC-UC-001#UC-H8]] 3 |
 | `urn:syncdoc:rebuild-failed` | 500 | 재구축 중 실패, 롤백됨 | `reason` | [[SYNC-UC-001#UC-S6]] |
 | `urn:syncdoc:repository-already-registered` | 409 | 이미 등록된 저장소 | `code` (그 저장소를 쓰는 프로젝트) | [[SYNC-UC-001#UC-A1]] 2d |
+| `urn:syncdoc:email-taken` | 409 | 남이 이미 등록한 커밋 이메일 | `email` | UI-13 2.6 |
 | `urn:syncdoc:not-implemented` | 501 | 카드 스텁 — 아직 구현 안 된 경로 (`import_existing` 등). 슬라이스 진행 중에만 존재 | `card` | [[SYNC-STD-004#DEV-12]] |
 | `urn:syncdoc:internal` | 500 | **예상 못 한 오류.** 위 어느 것도 아닌 예외가 라우터에서 샜다 | — | — |
 
@@ -884,6 +885,78 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
               $ref: '#/components/schemas/User'
 ```
 
+#### GET/api/me/emails 내 커밋 이메일 목록
+
+화면 [[SYNC-UI-001#UI-13]] · 유스케이스 [[SYNC-UC-001#UC-G1]] · 서비스 `AccountService.commit_emails`
+
+```yaml
+/api/me/emails:
+  get:
+    summary: 내 커밋 이메일 목록 (UI-13 요소 2.3)
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CommitEmail'
+```
+
+#### POST/api/me/emails 커밋 이메일 등록
+
+화면 [[SYNC-UI-001#UI-13]] · 유스케이스 [[SYNC-UC-001#UC-G1]] · 서비스 `AccountService.add_commit_email`
+
+```yaml
+/api/me/emails:
+  post:
+    summary: 커밋 이메일 등록 (UI-13 요소 2.6). 이미 내 것이면 그 행을 돌려준다
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - email
+            properties:
+              email:
+                type: string
+                format: email
+                maxLength: 255
+    responses:
+      '201':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitEmail'
+      '409':
+        $ref: '#/components/responses/Problem'
+      '422':
+        $ref: '#/components/responses/Problem'
+```
+
+#### DELETE/api/me/emails/{id} 커밋 이메일 삭제. 행이 사라진다
+
+화면 [[SYNC-UI-001#UI-13]] · 유스케이스 [[SYNC-UC-001#UC-G1]] · 서비스 `AccountService.remove_commit_email`
+
+```yaml
+/api/me/emails/{id}:
+  delete:
+    summary: 커밋 이메일 삭제 (UI-13 요소 2.4). 남의 것이면 404 — 있는지 없는지 안 알려준다
+    parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+    responses:
+      '204':
+        description: 삭제됨
+      '404':
+        $ref: '#/components/responses/Problem'
+```
+
 #### GET/api/me/tokens 내 MCP 토큰 목록. 폐기된 것 포함, 원문 없음
 
 화면 [[SYNC-UI-001#UI-13]] · 유스케이스 인프라 5 · 서비스 `AccountService`
@@ -1604,6 +1677,20 @@ components:
         total:
           type: integer
           description: unassigned 제외. 상단 바 배지
+    CommitEmail:
+      type: object
+      description: >
+        내가 git 커밋에 쓰는 이메일. GitHub 직접 push로 들어온 커밋을 내 계정으로 잇는 단서다.
+        등록만으로는 이미 쌓인 버전이 안 옮겨진다 — 인덱스 재구축을 한 번 돌려야 한다
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        added_at:
+          type: string
+          format: date-time
     AccessToken:
       type: object
       properties:
@@ -1714,6 +1801,23 @@ components:
               doc_id:
                 type: string
               detail:
+                type: string
+        dropped:
+          type: array
+          description: >
+            재구축이 그 버전을 다시 만들지 않아 새 버전에 이어 붙일 수 없던 추적 행.
+            force-push로 커밋이 사라졌거나, 문서가 HEAD에서 삭제됐거나, status 커밋이라
+            버전을 안 만드는 경우다. 비어 있는 것이 정상이다 — 비어 있지 않으면
+            무엇을 왜 버렸는지 화면(UI-14 5.3)이 말해야 한다
+          items:
+            type: object
+            properties:
+              kind:
+                type: string
+                enum: [propagation_decision, flag]
+              count:
+                type: integer
+              reason:
                 type: string
 ```
 

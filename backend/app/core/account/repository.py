@@ -1,11 +1,11 @@
-"""SYNC-DOM-002 4.6 — users·access_tokens 조회·저장. DB만 안다."""
+"""SYNC-DOM-002 4.6 — users·commit_emails·access_tokens 조회·저장. DB만 안다."""
 
 from __future__ import annotations
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.account.models import AccessToken, User
+from app.core.account.models import AccessToken, CommitEmail, User
 
 
 class AccountRepository:
@@ -35,6 +35,31 @@ class AccountRepository:
         self.session.add(user)
         self.session.flush()
         return user
+
+    def user_by_email(self, email: str) -> User | None:
+        stmt = select(User).join(CommitEmail, CommitEmail.user_id == User.id)
+        return self.session.scalar(stmt.where(CommitEmail.email == email))
+
+    def emails_of(self, user_id: int) -> list[CommitEmail]:
+        stmt = select(CommitEmail).where(CommitEmail.user_id == user_id)
+        return list(self.session.scalars(stmt.order_by(CommitEmail.added_at, CommitEmail.id)))
+
+    def email_by_address(self, email: str) -> CommitEmail | None:
+        return self.session.scalar(select(CommitEmail).where(CommitEmail.email == email))
+
+    def email_of_user(self, email_id: int, user_id: int) -> CommitEmail | None:
+        return self.session.scalar(
+            select(CommitEmail).where(CommitEmail.id == email_id, CommitEmail.user_id == user_id)
+        )
+
+    def add_email(self, row: CommitEmail) -> CommitEmail:
+        self.session.add(row)
+        self.session.flush()
+        return row
+
+    def delete_email(self, row: CommitEmail) -> None:
+        self.session.delete(row)
+        self.session.flush()
 
     def tokens_of(self, user_id: int) -> list[AccessToken]:
         stmt = (

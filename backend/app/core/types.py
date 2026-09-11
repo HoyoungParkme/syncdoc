@@ -139,6 +139,16 @@ class RebuildResult:
     references: int
     versions: int
     convention_errors: list[dict[str, str]] = field(default_factory=list)
+    # 새 버전에 이어 붙일 수 없어 버린 추적 행. 비어 있는 것이 정상이다 (#38)
+    dropped: list[dict[str, object]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RelinkResult:
+    """SYNC-MS-004#TrackingService.relink_versions — 다시 이은 수와 버린 것."""
+
+    relinked: int
+    dropped: list[dict[str, object]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -154,6 +164,9 @@ class ChangedFile:
     commit_hash: str
     author_login: str
     message: str
+    # login과 나란히 싣는다 — login은 noreply 메일일 때만 진짜 GitHub 아이디이고
+    # 아니면 %an(사람 이름)이라 신원의 근거가 못 된다 (MS-009 3a, #34)
+    author_email: str = ""
 
 
 @dataclass(frozen=True)
@@ -162,6 +175,10 @@ class Commit:
     login: str
     date: datetime
     message: str
+    email: str = ""  # ChangedFile.author_email과 같은 이유
+    # 그 커밋 시점의 경로. --follow가 이름 바뀌기 전 커밋까지 주므로
+    # 지금 경로로는 본문을 못 읽는다 (SYNC-MS-009#git.log, #39)
+    path: str = ""
 
 
 @dataclass(frozen=True)

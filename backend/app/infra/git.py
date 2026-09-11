@@ -169,7 +169,12 @@ async def read(workdir: Path, path: str, ref: str = "HEAD") -> str:
 
 
 def _login_of(name: str, email: str) -> str:
-    """커밋 author → GitHub login. noreply 메일이면 앞부분(ID+ 접두어 제거), 아니면 %an."""
+    """커밋 author → GitHub login. noreply 메일이면 앞부분(ID+ 접두어 제거), 아니면 %an.
+
+    **%an 폴백은 GitHub 로그인이 아니다** — 사람 이름이고 공백이 들어 있을 수 있다.
+    그래서 이 값만으로 사람을 찾으면 안 된다. 파이프라인은 원본 %ae로 먼저 찾고
+    (AccountService.user_for_commit) 이건 2차 단서로만 쓴다(SYNC-MS-009 3a).
+    """
     if email.endswith("@users.noreply.github.com"):
         return email.split("@")[0].split("+")[-1]
     return name
@@ -220,6 +225,7 @@ async def changed_files(workdir: Path, range: str, prefix: str) -> list[ChangedF
                 commit_hash=hash_,
                 author_login=_login_of(an, ae),
                 message=_message(msg),
+                author_email=ae,
             )
         hash_ = next_hash
     return [c for _, c in sorted(seen.items()) if c is not None]
@@ -233,32 +239,51 @@ def _message(subject_body: str) -> str:
 async def list(workdir: Path, glob: str, ref: str = "HEAD") -> list[str]:
     """SYNC-MS-009#git.list"""
     out = await _run(workdir, "ls-tree", "-r", "--name-only", ref, "--", "docs/specs")
-    return [p for p in out.splitlines() if PurePosixPath(p).match(glob)]
+    # 명세가 아닌 것은 뺀다 — changed_files 처리 4와 같은 규칙. 안 빼면 템플릿이
+    # "알 수 없는 디렉터리" 규약 오류로 잡혀 재구축 결과가 없는 오류를 센다 (#40)
+    skip = {"_templates", "assets"}
+    return [
+        p
+        for p in out.splitlines()
+        if PurePosixPath(p).match(glob) and not skip & set(PurePosixPath(p).parts)
+    ]
 
 
 async def log(workdir: Path, path: str) -> list[Commit]:
     """SYNC-MS-009#git.log"""
+    # --reverse를 git에 맡기지 않는다. --follow는 revision walker의 특수 처리라
+    # --reverse와 조합되지 않아, 둘을 같이 주면 rename을 건너는 순간 커밋이 끊긴다.
+    # 이름이 바뀐 경로의 이력을 잇는 것이 재구축의 목적이므로 --follow를 남기고
+    # 순서는 받아서 뒤집는다 (SYNC-MS-009#git.log, #39)
+    #
+    # --name-only가 커밋마다 그때의 경로를 붙인다. 그래서 커밋 경계를 앞쪽 구분자
+    # %x1e로 잡는다 — 메시지 뒤에 빈 줄과 경로가 따라붙기 때문이다.
     out = await _run(
         workdir,
         "log",
         "--follow",
-        "--reverse",
-        "--format=%H%x00%an%x00%ae%x00%aI%x00%s%n%b%x00",
+        "--name-only",
+        "--format=%x1e%H%x1f%an%x1f%ae%x1f%aI%x1f%s%n%b",
         "--",
         path,
     )
-    tokens = out.split("\0")
     commits: list[Commit] = []
-    for i in range_(0, len(tokens) - 1, 5):
-        h, an, ae, date, msg = (t.strip("\n") for t in tokens[i : i + 5])
+    for block in out.split("\x1e")[1:]:
+        h, an, ae, date, rest = block.split("\x1f", 4)
+        # 메시지 본문에 빈 줄이 있어도 경로는 늘 마지막 줄이다 — --follow는 경로 하나만 받는다
+        lines = rest.rstrip("\n").split("\n")
+        at_path, msg = lines[-1], "\n".join(lines[:-1]).strip("\n")
         commits.append(
             Commit(
                 hash=h,
                 login=_login_of(an, ae),
                 date=datetime.fromisoformat(date),
                 message=_message(msg),
+                email=ae,
+                path=at_path,
             )
         )
+    commits.reverse()  # git이 최신부터 준다 → 오래된 것부터
     return commits
 
 

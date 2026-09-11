@@ -270,6 +270,8 @@ export interface RebuildResult {
   references: number
   versions: number
   convention_errors: { doc_id: string; detail: string }[]
+  /** 새 버전에 이어 붙일 수 없어 버린 추적 행. 비어 있는 것이 정상이다 (UI-14 5.3) */
+  dropped: { kind: string; count: number; reason: string }[]
 }
 export interface SaveResult {
   doc_id: string
@@ -295,6 +297,13 @@ export interface AccessToken {
   token?: string
 }
 
+/** 내가 git 커밋에 쓰는 이메일. GitHub 직접 push로 들어온 커밋을 내 계정으로 잇는 단서 (UI-13 2.3) */
+export interface CommitEmail {
+  id: number
+  email: string
+  added_at: string
+}
+
 export const STATUS_KO: Record<string, string> = { draft: '초안', review: '검토중', approved: '승인' }
 export const FLAG_KO: Record<string, string> = { needs_check: '확인 필요', broken_ref: '끊어진 참조', upstream_impact: '하위 불일치' }
 /** 미완성 경고 규칙 ID → 사람 말. SYNC-STD-001 4장 `화면 문구` 열의 전사 */
@@ -314,6 +323,13 @@ export function warnText(w: string): string {
   const message = i < 0 ? '' : w.slice(i + 2)
   return WARN_KO[rule]?.(message) ?? w
 }
+/** UI-5 4a 배너와 승인 비활성이 보는 미완성 목록.
+ *  `ref.missing`은 컬럼에 없다 — 읽을 때 references.is_missing에서 온다(SYNC-STD-001 4장).
+ *  승인 게이트(MS-007 change_status)가 세는 값과 같아야 사람이 이유 없이 막히지 않는다 */
+export const incompleteOf = (d: Document): string[] => [
+  ...d.incomplete_warnings,
+  ...d.missing_refs.map((t) => `ref.missing: ${t}`),
+]
 /** 항목 참조 표기 DOC#ITEM · 문서 경로 */
 export const refKey = (r: ItemRef | null): string => (r ? `${r.doc_id ?? r.raw_target}${r.item_id ? '#' + r.item_id : ''}` : '')
 export const docPath = (docId: string | null, itemId?: string | null): string =>

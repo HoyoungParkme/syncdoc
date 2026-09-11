@@ -1,6 +1,6 @@
 """GitHub OAuth·세션. SYNC-DOM-002 1장 web/auth.py · SYNC-SEQ-001#SEQ-8 · SYNC-INFRA-001 5장.
 
-세션 = 서명 쿠키 `syncdoc_session`(SYNC-API-001 4장 securitySchemes). 세션 테이블은 없다(ERD 12개).
+세션 = 서명 쿠키 `syncdoc_session`(SYNC-API-001 4장 securitySchemes). 세션 테이블은 없다(ERD 13개).
 세션에는 github_login만 둔다 — 사용자 조회는 AccountService.user_by_login(MS-006).
 """
 

@@ -8,7 +8,7 @@ from app.core.errors import AlreadyDecided, AlreadyResolved, NotFound, ReasonReq
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
 from app.core.tracking.service import TrackingService
-from app.core.types import DocType, Propagation
+from app.core.types import DocType, Entry, Propagation
 from tests.core.reference.test_service import PRD, RFQ
 from tests.core.spec.test_service import author, make_project
 
@@ -219,3 +219,58 @@ def test_get_flag_resolve_and_lists(db_session: Session) -> None:
     db_session.expire_all()
     s2 = tr.resolve(up.id, a_prd.user, target_changed=True)
     assert (s2.assignee_id, s2.cause_version_no, s2.cause.item_id) == (None, 1, "R1")
+
+
+# ── reassign_open_flags (#34) ──
+def test_reassign_open_flags_follows_new_last_author(db_session: Session) -> None:
+    """대상 문서의 최근 버전 작성자가 바뀌면 열린 플래그 담당자도 따라간다."""
+    svc, tr, p, d, v, pks, rfq, rpk, a_rfq, a_prd = _setup(db_session)
+    tr.raise_broken(
+        rpk["Q1"]
+    )  # 플래그는 Q1을 가리키는 PRD 항목에 붙는다 → 담당자 = PRD 최근 작성자
+    open_id, assignee = db_session.execute(
+        text("SELECT id, assignee_user_id FROM flags WHERE resolved_at IS NULL")
+    ).one()
+    assert assignee == a_prd.user.id
+    # PRD에 새 버전이 생겨 최근 작성자가 바뀐다
+    svc.save(
+        d,
+        d.body + "\n",
+        "h2",
+        a_rfq,
+        "spec: 손질",
+        [],
+        svc.validate(d.body, DocType.PRD, Entry.mcp, None),
+    )
+    assert tr.reassign_open_flags(p.id) == 1
+    assert (
+        db_session.execute(
+            text("SELECT assignee_user_id FROM flags WHERE id = :i"), {"i": open_id}
+        ).scalar()
+        == a_rfq.user.id
+    )
+    assert tr.reassign_open_flags(p.id) == 0  # 안 바뀐 것은 세지 않는다
+
+
+def test_reassign_open_flags_leaves_resolved_alone(db_session: Session) -> None:
+    """해제된 플래그의 담당자는 그때의 사실이라 안 건드린다."""
+    svc, tr, p, d, v, pks, rfq, rpk, a_rfq, a_prd = _setup(db_session)
+    tr.raise_broken(rpk["Q1"])
+    fid = db_session.execute(text("SELECT id FROM flags")).scalar()
+    tr.resolve(fid, a_prd.user, target_changed=False)
+    svc.save(
+        d,
+        d.body + "\n",
+        "h2",
+        a_rfq,
+        "spec: 손질",
+        [],
+        svc.validate(d.body, DocType.PRD, Entry.mcp, None),
+    )
+    assert tr.reassign_open_flags(p.id) == 0
+    assert (
+        db_session.execute(
+            text("SELECT assignee_user_id FROM flags WHERE id = :i"), {"i": fid}
+        ).scalar()
+        == a_prd.user.id
+    )

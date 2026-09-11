@@ -1,4 +1,4 @@
-"""SYNC-DOM-002 2.6 계정 — User · AccessToken. 테이블은 SYNC-DOM-003#users · #access_tokens."""
+"""SYNC-DOM-002 2.6 계정 — User · CommitEmail · AccessToken. 테이블은 SYNC-DOM-003의 같은 이름."""
 
 from __future__ import annotations
 
@@ -21,6 +21,23 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(100))
     github_token_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CommitEmail(Base):
+    """SYNC-DOM-002#CommitEmail
+
+    User의 컬럼이 아니라 자식이다 — 한 사람이 여럿을 쓰고, email에 유일 제약이
+    걸려야 커밋 작성자 판정이 답을 하나로 낸다.
+    """
+
+    __tablename__ = "commit_emails"
+    __table_args__ = (Index("ix_commit_emails_user_id", "user_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    # 소문자로 정규화해 저장한다 — git 이메일은 대소문자가 흔들린다
+    email: Mapped[str] = mapped_column(String(255), unique=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class AccessToken(Base):

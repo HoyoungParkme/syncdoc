@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/tracking/service.py`의 함수 15개. 클래스 명세 [[SYNC-DOM-002]] 4.4의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/tracking/service.py`의 함수 17개. 클래스 명세 [[SYNC-DOM-002]] 4.4의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -40,6 +40,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#TrackingService.count_flags]] | 프로젝트 건수 |
 | [[#TrackingService.count_flags_by_document]] | 문서별 건수 |
 | [[#TrackingService.pending_decisions_for]] | 미결정 버전 ID |
+| [[#TrackingService.reassign_open_flags]] | 담당자 다시 계산 |
+| [[#TrackingService.relink_versions]] | 재구축 뒤 버전 다시 잇기 |
 
 ---
 
@@ -235,6 +237,63 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **시그니처** `pending_decisions_for(user_id: int) -> list[int]`
 
 **처리** `DB: propagation_decisions where choice=undecided` → `version_id[]`. 누가 저장했는지는 모른다(versions는 spec 묶음) — `queries.todo`가 `SpecService.versions_instructed_by`로 거른다
+
+---
+
+#### TrackingService.relink_versions 재구축 뒤 버전 다시 잇기
+
+**시그니처** `relink_versions(project_id: int, old: dict[int, tuple[int, str]], new: dict[tuple[int, str], int]) -> RelinkResult`
+
+근거: [[SYNC-MS-007#pipeline.rebuild]] 7a단계 · #38
+
+**입력**
+- `old` — 지우기 전에 뜬 `{옛 version_id: (document_id, commit_hash)}` ([[SYNC-MS-002#SpecService.version_keys]])
+- `new` — 재구축이 새로 만든 `{(document_id, commit_hash): 새 version_id}`
+
+**지도가 둘 다 필요하다.** 전파결정·플래그는 `version_id` 하나만 들고 있으므로 `old`로 열쇠를 얻고 `new`로 새 id를 찾는다.
+
+**처리**
+1. **`old`의 id 목록으로** `propagation_decisions`를 찾는다 — 살아 있는 `versions`로 조인하면 안 된다. 이 시점에는 옛 버전이 이미 지워져 하나도 안 잡힌다. 각각 옛 `version_id` → `old` → `new`로 새 id
+   - 찾으면 `DB: update version_id`
+   - 못 찾으면 `DB: delete` — `version_id`가 **NOT NULL**이라 빈 값으로 둘 수 없다. `dropped`에 센다
+2. 프로젝트의 `flags` 중 `cause_version_id is not null`인 것마다: 같은 방식
+   - 못 찾으면 `DB: delete`. **`cause_version_id`를 NULL로 비우지 않는다** — 비우면 UI-11의 원인 diff·"그 뒤로 N번 더 바뀜"·중복 플래그 방지 JOIN이 전부 죽어 **판단 재료 없는 빈 카드**가 남는다. 사람이 처리할 수 없는 플래그를 남기느니 버리고 보고하는 게 낫다
+3. `→ RelinkResult(relinked, dropped=[{kind, count, reason}])`
+
+**못 잇는 경우는 셋이고, 전부 「재구축이 그 버전을 다시 안 만든다」다.**
+- 커밋이 `origin/HEAD`에서 도달 불가 — force-push·브랜치 삭제
+- 문서 파일이 HEAD에 없다 — 삭제된 문서. `git.list`가 HEAD 기준이라 재구축 루프에 안 들어온다
+- 커밋 메시지가 `status(`로 시작 — 재구축이 상태 변경으로 처리하고 버전을 안 만든다
+
+**버린 것은 조용히 사라지지 않는다.** `RebuildResult.dropped`로 올라가 UI-14 결과(요소 5)에 뜬다. 재구축 확인 다이얼로그가 "플래그·전파 결정·댓글은 건드리지 않습니다"라고 약속하므로([[SYNC-UI-002#UI-14]]), 예외가 생겼으면 **몇 건을 왜 버렸는지 말해야** 그 약속이 거짓이 안 된다.
+
+**`version_id`는 UNIQUE다.** 두 옛 버전이 한 새 버전으로 접히면 제약 위반이다. `(document_id, commit_hash)`는 구조적으로 유일하지만(재구축이 커밋마다 버전 하나를 만든다), 충돌하면 나중 것을 버리고 `dropped`에 센다
+
+**호출하는 것** `pipeline.rebuild` 7a단계
+
+**테스트 관점** 전파결정이 새 버전을 가리킨다 · `affected_pks`가 그대로 · `needs_check` 플래그의 `cause_version_id`가 새 버전으로 · 문서가 삭제된 커밋의 결정은 버려지고 `dropped`에 센다 · 해제된 플래그도 `cause_version_id`가 있으면 다시 잇는다(FK는 해제 여부를 안 가린다)
+
+---
+
+#### TrackingService.reassign_open_flags 담당자 다시 계산
+
+**시그니처** `reassign_open_flags(project_id: int) -> int`
+
+근거: [[SYNC-MS-007#pipeline.rebuild]] 7b단계 · 결정: 담당자 = 대상 문서 최근 버전 작성자
+
+**처리**
+1. `flags = DB: flags join items join documents where project_id and resolved_at is null` — **종류를 안 가린다**(`flags_in_project`는 `kind`가 필수라 쓸 수 없다)
+2. 각 플래그에 `a = SpecService.last_author(대상 항목의 document_id).user_id`(None 가능)
+3. if `a != flag.assignee_user_id` → `DB: update assignee_user_id=a` · 센다
+4. `→` 바뀐 수
+
+**왜 필요한가.** 재구축은 git을 진실로 삼아 `versions`를 다시 만든다. `assignee_user_id`는 거기서 파생된 값인데 플래그를 **만들 때 한 번** 계산되고 다시 계산되지 않는다. `clear_index`는 versions·references만 지우고 flags는 남긴다 — 원본을 다시 만들고 파생값을 그대로 두면 재구축이 절반만 끝난다. 커밋 이메일을 등록해 작성자가 바뀌어도 플래그는 옛 자리표시를 계속 가리킨다(#34).
+
+**해제된 플래그는 안 건드린다.** 해제 시점의 담당자는 그때의 사실이라 이력이다.
+
+**호출하는 것** `pipeline.rebuild` 7b단계 — **`relink_versions`(7a) 뒤에 온다.** 담당자는 대상 문서의 최근 버전에서 오므로 버전이 다 제자리를 찾은 뒤라야 한다
+
+**테스트 관점** 대상 문서 작성자가 바뀌면 담당자도 바뀐다 · 해제된 플래그는 그대로 · 작성자가 없어지면 `null`(내 할 일 `담당 미지정`으로) · 안 바뀐 플래그는 세지 않는다
 
 ---
 

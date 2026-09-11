@@ -365,6 +365,26 @@ classDiagram
 
 관계
 - `User` 1 — * `AccessToken`
+- `User` 1 — * `CommitEmail`
+
+#### CommitEmail 커밋이메일
+
+테이블: [[SYNC-DOM-003#commit_emails]] · 도메인: [[SYNC-DOM-001#CommitEmail]]
+
+```mermaid
+classDiagram
+    class CommitEmail {
+        +int id
+        +int user_id
+        +str email
+        +datetime added_at
+    }
+```
+
+관계
+- `CommitEmail` * — 1 `User`
+
+**이메일은 `User`의 속성이 아니라 자식이다.** 한 사람이 여럿을 쓰고(회사·개인·noreply), `email`에 유일 제약이 걸려야 작성자 판정이 답을 하나로 낸다. 컬럼 안 목록으로 두면 제약을 못 걸고 조회가 부분 문자열 대조가 된다 — `a@x.com`이 `aa@x.com`에 걸린다.
 
 #### AccessToken 액세스토큰
 
@@ -425,8 +445,8 @@ classDiagram
 | `DecisionResult` | `choice: Propagation` · `flags_raised: int` | tracking.record_decision |
 | `UpstreamCheck` | `target: ItemRef` · `target_version_no: int` · `target_status: DocStatus` · `referenced_from: list[str]` | queries.upstream_checklist → UI-5 다이얼로그 11 |
 | `IssuedToken` | `token: AccessToken` · `raw: str` | account.issue_token. `raw`는 응답에만 |
-| `ChangedFile` | `path: str` · `status: A\|M\|D` · `commit_hash: str` · `author_login: str` · `message: str` | git.changed_files → process_commit |
-| `Commit` | `hash: str` · `login: str` · `date: datetime` · `message: str` | git.log → rebuild |
+| `ChangedFile` | `path: str` · `status: A\|M\|D` · `commit_hash: str` · `author_login: str` · `message: str` · `author_email: str` | git.changed_files → process_commit. **`author_login`과 `author_email`을 둘 다 싣는다** — login은 `%an` 대체값일 수 있어 신원의 근거가 못 된다([[SYNC-MS-009#git.changed_files]]) |
+| `Commit` | `hash: str` · `login: str` · `date: datetime` · `message: str` · `email: str` · `path: str` | git.log → rebuild. `ChangedFile`과 같은 이유로 이메일을 함께 싣는다. `path`는 **그 커밋 시점의 경로** — `--follow`가 이름 바뀌기 전 커밋까지 주므로 지금 경로로는 본문을 못 읽는다([[SYNC-MS-009#git.log]]) |
 | `GithubUser` | `id: int` · `login: str` · `name: str` | github.get_user → login_github |
 
 타입은 여기 한 곳에만 정의한다.
@@ -764,6 +784,7 @@ classDiagram
         +count_flags(project_id: int) dict
         +count_flags_by_document(document_ids: list~int~) dict
         +pending_decisions_for(user_id: int) list~int~
+        +reassign_open_flags(project_id: int) int
     }
     class Flag {
         +int id
@@ -870,6 +891,10 @@ classDiagram
         +user_by_login(login: str) User?
         +users_by_ids(ids: list~int~) dict
         +create_placeholder(login: str) User
+        +user_for_commit(email: str, login: str) User
+        +commit_emails(user: User) list~CommitEmail~
+        +add_commit_email(user: User, email: str) CommitEmail
+        +remove_commit_email(user: User, email_id: int) None
     }
     class User {
         +int id
@@ -889,8 +914,15 @@ classDiagram
         +datetime revoked_at
         +datetime last_used_at
     }
+    class CommitEmail {
+        +int id
+        +int user_id
+        +str email
+        +datetime added_at
+    }
     AccountService --> User
     AccountService --> AccessToken
+    AccountService --> CommitEmail
 ```
 
 | 메서드 | 부르는 곳 | 근거 |
@@ -899,12 +931,16 @@ classDiagram
 | `list_tokens` · `issue_token` · `revoke_token` | /api/me/tokens | UI-13 |
 | `authenticate_token` | MCP 모든 요청 (SEQ-C2) | 인프라 5 |
 | `github_token_for` | infra/git | 인프라 5. 복호화 |
-| `user_by_login` · `create_placeholder` | pipeline.process_commit | [[SYNC-UC-001#UC-G1]]. 커밋 작성자 → User. 미등록이면 자리표시 생성 |
+| `user_by_login` · `create_placeholder` | `AccountService.user_for_commit` · web/auth | login으로 찾기·자리표시 만들기. **파이프라인이 직접 부르지 않는다** — `user_for_commit`을 거친다 |
+| `user_for_commit` | pipeline.process_commit · pipeline.rebuild | [[SYNC-UC-001#UC-G1]]. 커밋 작성자 → User. **이메일 먼저**, 없으면 login, 없으면 자리표시 생성 |
+| `commit_emails` · `add_commit_email` · `remove_commit_email` | /api/me/emails | UI-13 2.3~2.6 |
 
 **규칙이 사는 곳**
 - `issue_token`: 원문은 반환에만. 저장은 SHA-256 해시
 - `login_github`: `github_user_id`로 upsert(로그인 ID 변경 대응). OAuth 토큰은 앱 비밀키로 암호화
 - `authenticate_token`: `revoked_at`이 있거나 `expires_at`이 지났으면 None
+- `user_for_commit`: **이메일 → login → 자리표시** 순. 자리표시를 만드는 곳이 여기 하나뿐이어야 판정이 두 경로에서 어긋나지 않는다(5장 결정 3)
+- `add_commit_email`: `strip().lower()`로 정규화. 남이 이미 가진 이메일이면 거부, 내가 이미 가졌으면 그 행을 돌려준다(멱등)
 
 ### 4.7 pipeline — 쓰기 조율
 
@@ -1025,7 +1061,21 @@ github.get_user(token) -> GithubUser
 
 **2. `display_name`과 항목 블록** — v2까지 미결이었으나 [[SYNC-STD-001]] 1.3으로 풀렸다. 항목 = ID로 시작하는 헤딩, 제목 = ID 뒤 나머지, 블록 = 같은 레벨 이상 다음 헤딩까지. `SpecService.item_blocks`가 구현한다.
 
-**3. 미등록 GitHub 사용자 — 결정: 자리표시 User + 규약 오류.** push는 이미 들어온 뒤라 거부할 수 없고 건너뛰면 원본·DB가 어긋난다. `user_by_login`이 없으면 `github_login`만 있는 User를 만들고(`github_token_encrypted` null 허용), 문서에 `author.unknown: {login}` 규약 오류를 붙여 승인을 막는다. 그 사람이 OAuth 로그인하면 `github_user_id`로 같은 행에 합쳐진다.
+**3. 미등록 GitHub 사용자 — 결정: 커밋 이메일로 먼저 잇고, 못 찾으면 자리표시 User + 규약 오류.** push는 이미 들어온 뒤라 거부할 수 없고 건너뛰면 원본·DB가 어긋난다.
+
+**작성자를 찾는 순서는 셋이고, 순서가 규칙이다.**
+
+1. **커밋 이메일**(`commit_emails`) — git 커밋이 남기는 신원 중 계정으로 이어지는 것은 이메일뿐이다
+2. **`github_login`** — 커밋 이메일이 GitHub noreply(`{id}+{login}@users.noreply.github.com`)면 앞부분이 곧 로그인 ID다
+3. **자리표시 생성** — `github_login`만 있는 User(`github_user_id`·`github_token_encrypted` null)
+
+**자리표시의 `github_login`은 GitHub 로그인이 아닐 수 있다.** noreply가 아닌 커밋에서는 `%an`(사람 이름)이 대체값으로 들어간다 — 공백이 든 문자열이 컬럼에 앉는다. 그래서 그 사람이 나중에 OAuth 로그인해도 login 대조로는 합쳐지지 않는다. **합치는 경로는 본인이 UI-13에서 커밋 이메일을 등록하고 인덱스를 재구축하는 것이다.** 앞으로의 커밋은 GitHub 설정에서 메일 비공개를 켜 noreply로 나가게 하면 2번에서 바로 잡힌다([[SYNC-INFRA-001]] 5장).
+
+**`author.unknown`은 「방금 자리표시를 만들었나」가 아니라 「작성자가 자리표시인가」(`github_user_id`가 null인가)로 판정한다.** 전자로 판정하면 같은 사람의 둘째 문서부터는 이미 행이 있어서 오류가 안 붙는다 — 첫 문서 하나만 막히고 나머지는 새어 나간다. 이 판정은 **저장 경로(`process_commit`)와 재구축 경로(`rebuild`) 둘 다**에 있어야 한다. 한쪽에만 두면 실물이 어느 경로로 만들어졌는지에 따라 오류가 0건이 된다(#34).
+
+**계정을 합쳐도 옛 문서의 규약 오류는 저절로 안 풀린다.** `login_github`은 `users` 행만 합치고 `documents.convention_error_detail`은 그대로다. 재구축이 유일한 청소 경로다 — 계정 묶음이 명세 묶음을 직접 건드리는 것은 [[SYNC-DOM-001]] 4장 경계 위반이라 자동 청소를 두지 않는다.
+
+**이메일 사칭은 막지 못한다 — 다만 권한은 안 준다.** 남의 이메일을 등록하면 그 사람 커밋이 내 이름으로 붙는다. `commit_emails.email`의 유일 제약이 1차 방어다(먼저 등록한 쪽이 임자, 둘째는 거부). push 권한은 여전히 `github_token_encrypted`가 있어야 한다. 저장소 권한이 곧 접근 권한이라는 전제([[SYNC-INFRA-001]] 5장) 아래 v1은 여기까지다.
 
 ---
 

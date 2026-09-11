@@ -13,6 +13,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app import db
@@ -264,10 +265,23 @@ async def change_status(
     with db.session_scope() as s:
         spec = SpecService(s)
         document = spec.get_document(doc_id)
+        # 끊어진 참조는 읽을 때 센다 — 컬럼에 없다(SYNC-STD-001 4장, #35). 참조가 살았는지는
+        # 프로젝트 전체 상태라 문서 하나만 보는 validate가 못 만들고, 굳혀 두면 상대 문서가
+        # 들어와도 그 문서를 다시 저장하기 전까지 낡은 값이 남는다
+        missing = sorted(
+            dict.fromkeys(
+                e.raw_target
+                for e in ReferenceService(s).upstream_of_document(document.id, include_missing=True)
+                if e.is_missing
+            )
+        )
         if to == DocStatus.approved and (
-            document.has_convention_error or document.incomplete_warnings
+            document.has_convention_error or document.incomplete_warnings or missing
         ):
-            raise StatusBlocked(document.convention_error_detail, document.incomplete_warnings)
+            raise StatusBlocked(
+                document.convention_error_detail,
+                document.incomplete_warnings + [f"ref.missing: {t}" for t in missing],
+            )
         if to == DocStatus.approved and not upstream_reviewed:
             raise UpstreamReviewRequired()
         if document.status == to:
@@ -365,11 +379,11 @@ async def _process_file(workdir: Path, code: str, f, head_hash: str) -> list[Sav
     doc_id, dir_type = Path(f.path).stem, _dir_type(f.path)
     with db.session_scope() as s:
         account = AccountService(s)
-        user = account.user_by_login(f.author_login)
-        unknown = user is None
-        if user is None:
-            user = account.create_placeholder(f.author_login)
-            s.commit()
+        user = account.user_for_commit(f.author_email, f.author_login)
+        # 「자리표시인가」로 판정한다. 「방금 만들었나」로 하면 같은 사람의 둘째
+        # 문서부터 이미 행이 있어 오류가 안 붙는다 (SYNC-DOM-002 5장 결정 3, #34)
+        unknown = user.github_user_id is None
+        s.commit()
         author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.github)
         if f.status == "D":
             spec, tracking = SpecService(s), TrackingService(s)
@@ -440,10 +454,23 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
     repo = project.repository
     workdir = Path(repo.workdir_path)
     spec, refs, account = SpecService(s), ReferenceService(s), AccountService(s)
+    tracking = TrackingService(s)
     result = RebuildResult(0, 0, 0, 0)
     try:
         head = await git.fetch(workdir)  # 2단계도 실패하면 rebuild-failed (MS-007 예외)
         await git.checkout(workdir, "origin/HEAD")
+        # 재구축이 versions를 갈아 끼우는 동안 전파결정·플래그는 사라진 버전을 가리킨다.
+        # 이 트랜잭션에서만 검사를 끝으로 미룬다 — 평소에는 문장마다 검사한다 (0007, #38)
+        s.execute(
+            text(
+                "SET CONSTRAINTS propagation_decisions_version_id_fkey,"
+                " flags_cause_version_id_fkey DEFERRED"
+            )
+        )
+        # 3a — 지우기 전에 옛 지도를 뜬다. 버전 행이 사라지면 document_id·commit_hash를
+        # 알 방법이 없다 — 전파결정도 플래그도 version_id 하나만 들고 있다 (MS-007 3a, #38)
+        old_keys = spec.version_keys(project.id)
+        new_keys: dict[tuple[int, str], int] = {}
         refs.clear(project.id)
         spec.clear_index(project.id)
         for path in await git.list(workdir, "docs/specs/*/*.md", head):
@@ -463,9 +490,11 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
                 document = spec.get_document(doc_id)
             except NotFound:
                 pass
+            last_unknown, last_login = False, ""
             for c in await git.log(workdir, path):
-                body = await git.read(workdir, path, c.hash)
-                user = account.user_by_login(c.login) or account.create_placeholder(c.login)
+                # c.path로 읽는다 — 이름이 바뀐 문서는 옛 커밋에서 옛 경로에 있다 (#39)
+                body = await git.read(workdir, c.path or path, c.hash)
+                user = account.user_for_commit(c.email, c.login)
                 author = Author(
                     kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.github
                 )
@@ -474,15 +503,20 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
                 else:
                     vr = spec.validate(body, doc_type, Entry.github, None)
                     if document is None:
-                        spec.create(
+                        version = spec.create(
                             project.id, doc_id, doc_type, body, c.hash, author, c.message, vr
                         )
                     else:
                         deleted = spec.detect_deleted_items(document, body)
-                        spec.save(
+                        version = spec.save(
                             document, body, c.hash, author, c.message, deleted, vr, rebuild=True
                         )
+                    # 7a가 쓴다 — 옛 버전을 이 지도로 찾아 다시 잇는다
+                    new_keys[(version.document_id, c.hash)] = version.id
                     result.versions += 1
+                    # 마지막 본문 커밋의 작성자로 판정한다 — UI-5 배너가 last_author와
+                    # 함께 보여주는 값이고 _process_file도 방금 저장한 버전으로 본다
+                    last_unknown, last_login = user.github_user_id is None, c.login
                 document = spec.get_document(doc_id)
             if document is None:
                 continue
@@ -496,14 +530,23 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
                 upstream_ids,
             )
             vr = spec.validate(document.body, doc_type, Entry.github, None)
-            spec.mark_convention_error(document.id, vr.violations, vr.warnings)
-            if vr.violations:
-                detail = "\n".join(f"{v.rule}: {v.message}" for v in vr.violations)
+            # 작성자 위반을 여기서 얹는다. mark_convention_error는 항상 전량 교체라
+            # 안 얹으면 사라진다 — 실물 인덱스에 규약 오류가 0건이던 이유다 (#34)
+            extra = [Violation(1, "author.unknown", last_login)] if last_unknown else []
+            violations = vr.violations + extra
+            spec.mark_convention_error(document.id, violations, vr.warnings)
+            if violations:
+                detail = "\n".join(f"{v.rule}: {v.message}" for v in violations)
                 result.convention_errors.append({"doc_id": doc_id, "detail": detail})
             result.docs += 1
             result.items += len(document.items)
             result.references += ex.added
         refs.resolve_missing(project.id)
+        # 7a — 전파결정·플래그가 옛 버전 id를 가리킨다. 커밋 해시로 새 id에 다시 잇는다
+        relink = tracking.relink_versions(project.id, old_keys, new_keys)
+        result.dropped = relink.dropped
+        # 7b — 담당자는 대상 문서의 최근 버전에서 오므로 재연결 뒤라야 한다 (MS-007 rebuild 7b)
+        tracking.reassign_open_flags(project.id)
         repo.last_processed_commit, repo.synced_at = head, datetime.now(UTC)
         repo.behind_by, repo.fetched_at = 0, datetime.now(UTC)  # 재구축은 head까지 읽었다
         s.commit()

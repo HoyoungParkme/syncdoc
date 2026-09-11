@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.account.models import User
 from app.core.account.service import AccountService, _fernet
-from app.core.errors import NotFound, Unauthorized
+from app.core.errors import EmailTaken, NotFound, Unauthorized
 from tests.conftest import github_ok
 
 
@@ -191,3 +191,55 @@ def test_users_by_ids_one_query_dict(db_session: Session) -> None:
     assert set(got) == {a.id, b.id}
     assert (got[b.id].github_login, got[b.id].display_name) == ("b", "b")
     assert AccountService(db_session).users_by_ids([]) == {}
+
+
+# ── 커밋 이메일 (#34) ──
+def test_user_for_commit_finds_by_email(db_session: Session) -> None:
+    u = make_user(db_session, login="HoyoungParkme")
+    AccountService(db_session).add_commit_email(u, "me@example.com")
+    # login이 전혀 달라도 이메일이 맞으면 그 사람이다
+    found = AccountService(db_session).user_for_commit("me@example.com", "Hoyoung Park")
+    assert found.id == u.id
+
+
+def test_user_for_commit_falls_back_to_login(db_session: Session) -> None:
+    u = make_user(db_session, login="hoyoung")
+    found = AccountService(db_session).user_for_commit("nobody@example.com", "hoyoung")
+    assert found.id == u.id
+
+
+def test_user_for_commit_creates_placeholder_when_neither_matches(db_session: Session) -> None:
+    found = AccountService(db_session).user_for_commit("nobody@example.com", "Hoyoung Park")
+    assert found.github_user_id is None and found.github_login == "Hoyoung Park"
+
+
+def test_user_for_commit_is_case_insensitive(db_session: Session) -> None:
+    u = make_user(db_session, login="hoyoung")
+    AccountService(db_session).add_commit_email(u, "Foo@Bar.COM")
+    assert AccountService(db_session).user_for_commit("foo@bar.com", "ghost").id == u.id
+
+
+def test_add_commit_email_twice_is_idempotent(db_session: Session) -> None:
+    u = make_user(db_session, login="hoyoung")
+    svc = AccountService(db_session)
+    first = svc.add_commit_email(u, "me@example.com")
+    assert svc.add_commit_email(u, "me@example.com").id == first.id
+    assert len(svc.commit_emails(u)) == 1
+
+
+def test_add_commit_email_taken_by_someone_else(db_session: Session) -> None:
+    a, b = make_user(db_session, login="a"), make_user(db_session, login="b")
+    svc = AccountService(db_session)
+    svc.add_commit_email(a, "shared@example.com")
+    with pytest.raises(EmailTaken):
+        svc.add_commit_email(b, "shared@example.com")
+
+
+def test_remove_commit_email_of_someone_else_is_not_found(db_session: Session) -> None:
+    a, b = make_user(db_session, login="a"), make_user(db_session, login="b")
+    svc = AccountService(db_session)
+    row = svc.add_commit_email(a, "mine@example.com")
+    with pytest.raises(NotFound):
+        svc.remove_commit_email(b, row.id)
+    svc.remove_commit_email(a, row.id)
+    assert svc.commit_emails(a) == []

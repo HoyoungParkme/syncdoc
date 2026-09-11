@@ -60,12 +60,21 @@ class RebuildError(Base):
     detail: str
 
 
+class Dropped(Base):
+    """새 버전에 이어 붙일 수 없어 버린 추적 행 (UI-14 5.3)."""
+
+    kind: str
+    count: int
+    reason: str
+
+
 class RebuildResult(Base):
     docs: int
     items: int
     references: int
     versions: int
     convention_errors: list[RebuildError]
+    dropped: list[Dropped] = []
 
 
 class SaveResult(Base):

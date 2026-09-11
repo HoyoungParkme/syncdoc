@@ -16,7 +16,14 @@ from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
 from app.core.tracking.models import Flag, PropagationDecision
 from app.core.tracking.repository import TrackingRepository
-from app.core.types import DecisionResult, FlagKind, FlagSummary, ItemRef, Propagation
+from app.core.types import (
+    DecisionResult,
+    FlagKind,
+    FlagSummary,
+    ItemRef,
+    Propagation,
+    RelinkResult,
+)
 
 
 class TrackingService:
@@ -239,6 +246,69 @@ class TrackingService:
     def count_flags_by_document(self, document_ids: list[int]) -> dict[int, dict[str, int]]:
         """SYNC-MS-004#TrackingService.count_flags_by_document"""
         return self.repo.count_by_document_kind(document_ids)
+
+    def relink_versions(
+        self, project_id: int, old: dict[int, tuple[int, str]], new: dict[tuple[int, str], int]
+    ) -> RelinkResult:
+        """SYNC-MS-004#TrackingService.relink_versions
+
+        재구축이 versions를 다시 만들면 id가 전부 바뀐다. 전파결정과 플래그가 옛 id를
+        가리키므로 (document_id, commit_hash)를 열쇠로 새 id에 다시 잇는다 (#38).
+
+        못 이으면 행을 지운다. cause_version_id를 NULL로 비우지 않는 것은, 비우면
+        UI-11의 원인 diff·"그 뒤로 N번 더 바뀜"·중복 방지 JOIN이 전부 죽어 판단
+        재료 없는 빈 카드가 남기 때문이다.
+        """
+        relinked, drop_dec, drop_flag, taken = 0, [], [], set()
+
+        def resolve(old_id: int | None) -> int | None:
+            key = old.get(old_id) if old_id is not None else None
+            return new.get(key) if key is not None else None
+
+        for d in self.repo.decisions_by_version_ids(list(old)):
+            nid = resolve(d.version_id)
+            # version_id는 UNIQUE다. 두 옛 버전이 한 새 버전으로 접히면 나중 것을 버린다
+            if nid is None or nid in taken:
+                drop_dec.append(d)
+                continue
+            taken.add(nid)
+            if d.version_id != nid:
+                d.version_id = nid
+                relinked += 1
+        for f in self.repo.flags_with_cause_version(project_id):
+            nid = resolve(f.cause_version_id)
+            if nid is None:
+                drop_flag.append(f)
+                continue
+            if f.cause_version_id != nid:
+                f.cause_version_id = nid
+                relinked += 1
+
+        self.repo.delete_rows(drop_dec + drop_flag)
+        self.session.flush()
+        reason = "가리키던 커밋이 저장소에 없습니다"
+        dropped: list[dict[str, object]] = []
+        for kind, rows in (("propagation_decision", drop_dec), ("flag", drop_flag)):
+            if rows:
+                dropped.append({"kind": kind, "count": len(rows), "reason": reason})
+        return RelinkResult(relinked=relinked, dropped=dropped)
+
+    def reassign_open_flags(self, project_id: int) -> int:
+        """SYNC-MS-004#TrackingService.reassign_open_flags
+
+        재구축은 git을 진실로 삼아 versions를 다시 만든다. assignee_user_id는
+        거기서 파생된 값인데 플래그를 만들 때 한 번만 계산되고 다시 계산되지
+        않는다 — clear_index는 flags를 남기므로, 이게 없으면 재구축이 절반만
+        끝난다(#34). 해제된 플래그는 그때의 사실이라 안 건드린다.
+        """
+        changed = 0
+        for f in self.repo.unresolved_of_project(project_id):
+            a = self._assignee_of(f.target_item_id)
+            if a != f.assignee_user_id:
+                f.assignee_user_id = a
+                changed += 1
+        self.session.flush()
+        return changed
 
     def pending_decisions_for(self, user_id: int) -> list[int]:
         """SYNC-MS-004#TrackingService.pending_decisions_for"""

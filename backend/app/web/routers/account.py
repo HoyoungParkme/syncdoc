@@ -13,7 +13,7 @@ from app.core.account.service import AccountService
 from app.core.errors import Unauthorized
 from app.db import get_session
 from app.web import auth
-from app.web.schemas.account import AccessToken, IssuedToken, IssueToken
+from app.web.schemas.account import AccessToken, AddEmail, CommitEmail, IssuedToken, IssueToken
 from app.web.schemas.common import User as UserSchema
 
 router = APIRouter(tags=["auth"])
@@ -55,6 +55,38 @@ async def logout(request: Request) -> Response:
 async def me(user: User = Depends(auth.current_user)) -> UserSchema:
     """SYNC-API-001#GET/api/me"""
     return UserSchema.model_validate(user)
+
+
+@router.get("/api/me/emails", response_model=list[CommitEmail])
+async def list_emails(
+    user: User = Depends(auth.current_user), session: Session = Depends(get_session)
+) -> list[CommitEmail]:
+    """SYNC-API-001#GET/api/me/emails — UI-13 2.3"""
+    return [CommitEmail.model_validate(e) for e in AccountService(session).commit_emails(user)]
+
+
+@router.post("/api/me/emails", response_model=CommitEmail, status_code=201)
+async def add_email(
+    req: AddEmail,
+    user: User = Depends(auth.current_user),
+    session: Session = Depends(get_session),
+) -> CommitEmail:
+    """SYNC-API-001#POST/api/me/emails — 이미 내 것이면 그 행. 남의 것이면 409"""
+    row = AccountService(session).add_commit_email(user, req.email)
+    session.commit()
+    return CommitEmail.model_validate(row)
+
+
+@router.delete("/api/me/emails/{email_id}", status_code=204)
+async def remove_email(
+    email_id: int,
+    user: User = Depends(auth.current_user),
+    session: Session = Depends(get_session),
+) -> Response:
+    """SYNC-API-001#DELETE/api/me/emails/{id} — 남의 것이면 404"""
+    AccountService(session).remove_commit_email(user, email_id)
+    session.commit()
+    return Response(status_code=204)
 
 
 @router.get("/api/me/tokens", response_model=list[AccessToken])

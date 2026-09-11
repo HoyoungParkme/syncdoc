@@ -1,4 +1,4 @@
-"""SYNC-MS-006 — AccountService. users·access_tokens만. 비밀키는 config.SECRET_KEY(DB 밖)."""
+"""SYNC-MS-006 — AccountService. users·commit_emails·access_tokens만. 비밀키는 config.SECRET_KEY."""
 
 from __future__ import annotations
 
@@ -12,9 +12,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.core.account.models import AccessToken, User
+from app.core.account.models import AccessToken, CommitEmail, User
 from app.core.account.repository import AccountRepository
-from app.core.errors import NotFound, Unauthorized
+from app.core.errors import EmailTaken, NotFound, Unauthorized
 from app.core.types import IssuedToken, UserRef
 from app.infra import github
 
@@ -122,6 +122,44 @@ class AccountService:
             existing = self.repo.user_by_login(login)
             assert existing is not None
             return existing
+
+    def user_for_commit(self, email: str, login: str) -> User:
+        """SYNC-MS-006#AccountService.user_for_commit
+
+        이메일 → login → 자리표시. 순서가 규칙이다 — git 커밋이 남기는 신원 중
+        계정으로 이어지는 것은 이메일뿐이고, login은 noreply 메일일 때만 진짜
+        아이디이고 아니면 %an 대체값이다(SYNC-DOM-002 5장 결정 3).
+
+        자리표시를 만드는 곳은 여기 하나다. process_commit과 rebuild가 각자
+        만들면 판정이 두 경로에서 어긋난다 — 실제로 어긋나 있었다(#34).
+        """
+        if email and (u := self.repo.user_by_email(email.strip().lower())) is not None:
+            return u
+        return self.repo.user_by_login(login) or self.create_placeholder(login)
+
+    def commit_emails(self, user: User) -> list[CommitEmail]:
+        """SYNC-MS-006#AccountService.commit_emails"""
+        return self.repo.emails_of(user.id)
+
+    def add_commit_email(self, user: User, email: str) -> CommitEmail:
+        """SYNC-MS-006#AccountService.add_commit_email"""
+        e = email.strip().lower()  # git 이메일은 대소문자가 흔들린다
+        row = self.repo.email_by_address(e)
+        if row is not None:
+            if row.user_id == user.id:
+                return row  # 멱등 — 두 번 눌러도 오류가 아니다
+            raise EmailTaken(e)
+        return self.repo.add_email(CommitEmail(user_id=user.id, email=e))
+
+    def remove_commit_email(self, user: User, email_id: int) -> None:
+        """SYNC-MS-006#AccountService.remove_commit_email
+
+        남의 것인지 없는 것인지 구분해 알려주지 않는다 — 둘 다 not-found다.
+        """
+        row = self.repo.email_of_user(email_id, user.id)
+        if row is None:
+            raise NotFound("commit_email", email_id)
+        self.repo.delete_email(row)
 
     @staticmethod
     def github_token_for(user: User) -> str:

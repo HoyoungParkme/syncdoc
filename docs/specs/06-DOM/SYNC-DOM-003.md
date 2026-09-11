@@ -49,6 +49,7 @@ erDiagram
     users ||--o{ propagation_decisions : decided_by
     users ||--o{ comments : author
     users ||--o{ access_tokens : owns
+    users ||--o{ commit_emails : owns
     comments ||--o{ comments : reply
 
     projects {
@@ -161,6 +162,12 @@ erDiagram
         varchar display_name
         bytea github_token_encrypted
         timestamptz created_at
+    }
+    commit_emails {
+        int id PK
+        int user_id FK
+        varchar email UK
+        timestamptz added_at
     }
     access_tokens {
         int id PK
@@ -285,7 +292,7 @@ erDiagram
 | kind | varchar(15) | FlagKind | `needs_check` 확인 필요 / `broken_ref` 끊어진 참조 / `upstream_impact` 하위 불일치(상위에 붙음) | |
 | target_item_id | int | FK not null | 플래그가 붙은 항목. `upstream_impact`면 상위 항목 | |
 | cause_item_id | int | FK null 허용 | 원인 항목. 삭제된 경우도 행은 남아 있으므로 FK 유지. `upstream_impact`면 지목한 하위 항목(승인 대조에서 문서 단위로 표시했으면 null) | |
-| cause_version_id | int | FK null 허용 | 원인 항목이 바뀐 버전. `broken_ref`는 삭제라 버전 없음 → null. `upstream_impact`면 하위 문서의 그 시점 버전 | |
+| cause_version_id | int | FK null 허용 **DEFERRABLE** | 원인 항목이 바뀐 버전. `broken_ref`는 삭제라 버전 없음 → null. `upstream_impact`면 하위 문서의 그 시점 버전. `propagation_decisions.version_id`와 같은 이유로 DEFERRABLE이다(#38) | |
 | assignee_user_id | int | FK null 허용 | 내 할 일에 뜨는 사람. 담당 미지정이면 null | |
 | resolved_with_edit | boolean | null 허용 | 확인 시 문서를 고쳤는지. 미해결이면 null | |
 
@@ -295,7 +302,7 @@ erDiagram
 
 | 컬럼 | 타입 | 제약 | 의미 | 예시 |
 |---|---|---|---|---|
-| version_id | int | FK UK | 버전 하나에 결정 하나 | |
+| version_id | int | FK UK **DEFERRABLE** | 버전 하나에 결정 하나. **재구축이 버전을 갈아 끼우는 동안만** 검사를 트랜잭션 끝으로 미룬다([[SYNC-MS-007#pipeline.rebuild]] 3a·7a) — `INITIALLY IMMEDIATE`라 평소에는 문장마다 검사한다. 미룰 수 없으면 `DELETE FROM versions` 자체가 막혀 재구축이 아예 안 된다(#38) | |
 | choice | varchar(12) | Propagation | `propagate` / `skip` / `undecided` | |
 | affected_pks | jsonb | not null | 저장 시점에 영향받는 하위 항목 pk 목록. 결정 시점 참조가 바뀌어도 이걸로 플래그를 붙인다 | `[412, 419]` |
 | changed_pks | jsonb | not null | 그 저장에서 바뀐 항목 pk. 플래그의 원인 항목 결정용 | `[88]` |
@@ -319,9 +326,18 @@ erDiagram
 
 | 컬럼 | 타입 | 제약 | 의미 | 예시 |
 |---|---|---|---|---|
-| github_login | varchar(50) | UK | GitHub 아이디 | `hoyoung-park` |
+| github_login | varchar(50) | UK | GitHub 아이디. **자리표시 User에서는 아이디가 아닐 수 있다** — 커밋 이메일이 noreply가 아니면 `%an`(사람 이름)이 대체값으로 들어간다([[SYNC-DOM-002]] 5장 결정 3) | `hoyoung-park` |
 | github_user_id | bigint | UK | GitHub 숫자 ID. 아이디 변경에 대비 | |
 | github_token_encrypted | bytea | null 허용 | OAuth 토큰. 앱 비밀키로 암호화. push에 사용. **null이면 미등록** — GitHub 직접 push로만 알려진 사람(자리표시). 로그인하면 채워진다 | |
+
+### commit_emails
+
+클래스: [[SYNC-DOM-002#CommitEmail]]
+
+| 컬럼 | 타입 | 제약 | 의미 | 예시 |
+|---|---|---|---|---|
+| email | varchar(255) | UK | git 커밋의 `%ae`. **소문자로 정규화해 저장한다** — git 이메일은 대소문자가 흔들린다. UK인 이유는 이메일 하나가 사람 하나여야 작성자 판정이 답을 하나로 내기 때문이다 | `you@example.com` |
+| added_at | timestamptz | not null | 등록 시각. 사람이 UI-13 2.6에서 직접 등록한다 — 시스템이 추측해 넣지 않는다 | |
 
 ### access_tokens
 

@@ -138,6 +138,25 @@ class SpecRepository:
             delete(VersionRow).where(VersionRow.document_id.in_(doc_ids))
         ).rowcount
 
+    def delete_status_changes_with_commit(self, project_id: int) -> int:
+        """커밋이 있는 상태 변경만. 재구축이 `status(` 커밋마다 다시 만드는 집합이다."""
+        doc_ids = select(Document.id).where(Document.project_id == project_id)
+        return self.session.execute(
+            delete(StatusChange).where(
+                StatusChange.document_id.in_(doc_ids), StatusChange.commit_hash.is_not(None)
+            )
+        ).rowcount
+
+    def version_keys_of_project(self, project_id: int) -> dict[int, tuple[int, str]]:
+        """{version_id: (document_id, commit_hash)}. clear_index 전에 불러야 한다."""
+        doc_ids = select(Document.id).where(Document.project_id == project_id)
+        rows = self.session.execute(
+            select(VersionRow.id, VersionRow.document_id, VersionRow.commit_hash).where(
+                VersionRow.document_id.in_(doc_ids)
+            )
+        ).all()
+        return {vid: (doc_id, h) for vid, doc_id, h in rows}
+
     def version_count(self, document_id: int) -> int:
         stmt = select(func.count()).where(VersionRow.document_id == document_id)
         return int(self.session.scalar(stmt) or 0)

@@ -214,6 +214,8 @@ async def test_changed_files_keeps_last_commit_per_file_and_skips_templates(
     ]
     assert got[0].message == "spec(SYNC-PRD-001): v3\n\n이유가 있다"
     assert got[0].author_login == "seed"
+    # login과 별개로 %ae 원본이 실린다 — 파이프라인이 이메일로 먼저 사람을 찾는다 (#34)
+    assert got[0].author_email == "seed@example.com"
     assert got[1].message == "spec(SYNC-SCN-001): new"
 
 
@@ -310,7 +312,8 @@ async def test_list_filters_by_glob_at_ref(repos: dict[str, Path]) -> None:
     write_commit_push(o, "README.md", "x", "d")
     await g.fetch(repos["work"])
     got = await g.list(repos["work"], "docs/specs/*/*.md", "origin/HEAD")
-    assert got == [SEED, "docs/specs/03-SCN/SYNC-SCN-001.md", "docs/specs/_templates/PRD.md"]
+    # _templates는 glob에 걸리지만 명세가 아니라 빠진다 (#40)
+    assert got == [SEED, "docs/specs/03-SCN/SYNC-SCN-001.md"]
     assert await g.list(repos["work"], "docs/specs/*/*.md") == [SEED]
 
 
@@ -324,6 +327,7 @@ async def test_log_lists_file_history_oldest_first(repos: dict[str, Path]) -> No
     got = await g.log(repos["work"], SEED)
     assert [c.message for c in got] == ["seed", "spec(SYNC-PRD-001): v2\n\n왜냐하면"]
     assert got[1].hash == h2 and got[1].login == "seed"
+    assert got[1].email == "seed@example.com"
     assert got[0].date.tzinfo is not None and got[0].date <= got[1].date
     assert await g.log(repos["work"], "docs/specs/none.md") == []
 
@@ -375,7 +379,9 @@ async def test_init_specs_returns_26_files_and_commit_push_writes_them(
     h = await g.commit_push(repos["work"], "chore(SYNC): init syncdoc", _author(), files=files)
     assert h == git(repos["remote"], "rev-parse", "main")
     assert await g.exists(repos["work"], "docs/specs/_templates/STD.md")
-    assert len(await g.list(repos["work"], "docs/specs/_templates/*.md")) == 12
+    # git.list는 명세만 준다 — 템플릿 수는 init_specs가 만든 파일 목록에서 센다 (#40)
+    assert len([k for k in files if k.startswith("docs/specs/_templates/")]) == 12
+    assert await g.list(repos["work"], "docs/specs/_templates/*.md") == []
 
 
 async def test_commit_push_requires_path_content_or_files(repos: dict[str, Path]) -> None:
@@ -383,3 +389,75 @@ async def test_commit_push_requires_path_content_or_files(repos: dict[str, Path]
         await g.commit_push(repos["work"], "m", _author())
     with pytest.raises(ValueError):
         await g.commit_push(repos["work"], "m", _author(), path=SEED)
+
+
+async def test_list_skips_templates_and_assets(repos: dict[str, Path]) -> None:
+    """명세가 아닌 것은 빼고 준다 (#40).
+
+    템플릿을 세면 재구축 결과가 없는 규약 오류를 보여주고, init_project가
+    세는 기존 명세 수(UI-3 2.5)도 부풀려진다.
+    """
+    o = repos["other"]
+    for path in (
+        "docs/specs/01-RFQ/SYNC-RFQ-001.md",
+        "docs/specs/_templates/RFQ.md",
+        "docs/specs/assets/메모.md",
+    ):
+        write_commit_push(o, path, "x", f"seed {path}")
+    await g.fetch(repos["work"])
+    await g.checkout(repos["work"], "origin/HEAD")
+
+    got = await g.list(repos["work"], "docs/specs/*/*.md")
+
+    assert "docs/specs/01-RFQ/SYNC-RFQ-001.md" in got
+    assert not [p for p in got if "_templates" in p or "assets" in p]
+
+
+async def test_log_follows_renamed_path_oldest_first(repos: dict[str, Path]) -> None:
+    """이름이 바뀐 경로도 옛 이름 시절 커밋까지 나온다 (#39).
+
+    --follow는 revision walker의 특수 처리라 --reverse와 조합되지 않는다.
+    둘을 같이 주면 rename을 건너는 순간 커밋이 끊긴다.
+    """
+    o = repos["other"]
+    old_path, new_path = "docs/specs/DOM/SYNC-DOM-001.md", "docs/specs/06-DOM/SYNC-DOM-001.md"
+    write_commit_push(o, old_path, "v1", "spec(SYNC-DOM-001): 초안")
+    write_commit_push(o, old_path, "v2", "spec(SYNC-DOM-001): 수정")
+    (o / "docs/specs/06-DOM").mkdir(parents=True, exist_ok=True)
+    git(o, "mv", old_path, new_path)
+    git(o, "commit", "-q", "-m", "code(C): 명세 디렉터리를 {NN-TYPE}로")
+    git(o, "push", "-q", "origin", "HEAD:main")
+    write_commit_push(o, new_path, "v3", "spec(SYNC-DOM-001): 옮긴 뒤 수정")
+    await g.fetch(repos["work"])
+    await g.checkout(repos["work"], "origin/HEAD")
+
+    got = await g.log(repos["work"], new_path)
+
+    assert [c.message for c in got] == [
+        "spec(SYNC-DOM-001): 초안",
+        "spec(SYNC-DOM-001): 수정",
+        "code(C): 명세 디렉터리를 {NN-TYPE}로",
+        "spec(SYNC-DOM-001): 옮긴 뒤 수정",
+    ]
+    # path는 그 커밋 시점의 경로다 — 지금 경로로 읽으면 옛 커밋에서 죽는다
+    assert [c.path for c in got] == [old_path, old_path, new_path, new_path]
+    for c in got:
+        assert await g.read(repos["work"], c.path, c.hash)  # 전부 읽힌다
+
+
+async def test_log_separates_path_from_multiline_message(repos: dict[str, Path]) -> None:
+    """본문에 빈 줄이 있어도 경로를 제대로 떼어 낸다 (#39)."""
+    o = repos["other"]
+    path = "docs/specs/02-PRD/SYNC-PRD-002.md"
+    (o / path).parent.mkdir(parents=True, exist_ok=True)
+    (o / path).write_text("x", encoding="utf-8")
+    git(o, "add", path)
+    git(o, "commit", "-q", "-m", "spec(SYNC-PRD-002): 초안\n\n첫 줄\n\n빈 줄 뒤 둘째 줄")
+    git(o, "push", "-q", "origin", "HEAD:main")
+    await g.fetch(repos["work"])
+    await g.checkout(repos["work"], "origin/HEAD")
+
+    got = await g.log(repos["work"], path)
+
+    assert len(got) == 1 and got[0].path == path
+    assert got[0].message == "spec(SYNC-PRD-002): 초안\n\n첫 줄\n\n빈 줄 뒤 둘째 줄"
