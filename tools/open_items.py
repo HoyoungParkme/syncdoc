@@ -20,7 +20,8 @@ import sys
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 SPECS = os.path.join(ROOT, "docs", "specs")
 MAP = os.path.join(SPECS, "STD", "SYNC-STD-003.md")
-SECTION = re.compile(r"^## \d+\.\s*미결", re.M)
+MAP_SECTION = re.compile(r"^## \d+\.\s*미결 모음", re.M)  # STD-003 5장 = 이 스크립트의 출력 사본
+SECTION = re.compile(r"^## (?:\d+\.\s*)?미결", re.M)  # 번호 없는 `## 미결사항`도 읽는다
 NEXT_SECTION = re.compile(r"^## ", re.M)
 ITEM = re.compile(r"^- \[([ x])\] (.+)$", re.M)
 DOC_ID = re.compile(r"^doc_id:\s*(\S+)", re.M)
@@ -39,8 +40,22 @@ def outside_fences(text: str) -> str:
     return "\n".join(keep)
 
 
+def strip_map_section(text: str) -> str:
+    """STD-003 5장(미결 모음)만 지운 사본. 이 스크립트가 만든 사본이라 다시 세면 두 배가 된다.
+
+    문서를 통째로 건너뛰면 그 문서 자기 미결사항까지 사라진다 — 실제로 사라져 있었다.
+    """
+    m = MAP_SECTION.search(text)
+    if not m:
+        return text
+    end = NEXT_SECTION.search(text[m.end() :])
+    return text[: m.start()] + (text[m.end() + end.start() :] if end else "")
+
+
 def items_of(path: str) -> tuple[str, list[tuple[bool, str]]]:
     text = open(path, encoding="utf-8").read()
+    if os.path.abspath(path) == os.path.abspath(MAP):
+        text = strip_map_section(text)
     m = DOC_ID.search(text)
     doc_id = m.group(1) if m else os.path.basename(path)
     out: list[tuple[bool, str]] = []
@@ -52,12 +67,10 @@ def items_of(path: str) -> tuple[str, list[tuple[bool, str]]]:
     return doc_id, out
 
 
-def collect(include_map: bool = False) -> list[tuple[str, list[tuple[bool, str]]]]:
+def collect() -> list[tuple[str, list[tuple[bool, str]]]]:
     paths = sorted(p for p in glob.glob(os.path.join(SPECS, "*", "*.md")) if "_templates" not in p)
     out = []
     for p in paths:
-        if not include_map and os.path.abspath(p) == os.path.abspath(MAP):
-            continue  # 자기 사본은 세지 않는다
         doc_id, items = items_of(p)
         if items:
             out.append((doc_id, items))
