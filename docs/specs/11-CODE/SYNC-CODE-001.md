@@ -168,6 +168,25 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 
 ---
 
+#### E 추적 데이터 백업
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-INFRA-001]] 6.1 · [[SYNC-PRD-001#N3]] · [[SYNC-UI-002#UI-14]] 요소 2.4·6 · #16 |
+| 구현 함수 | [[SYNC-MS-007#pipeline.export_tracking]] [[SYNC-MS-007#pipeline.import_tracking]] [[SYNC-MS-007#scheduler.backup_loop]] · [[SYNC-MS-004#TrackingService.all_flags]] [[SYNC-MS-004#TrackingService.all_decisions]] [[SYNC-MS-004#TrackingService.restore_flags]] [[SYNC-MS-004#TrackingService.restore_decisions]] · [[SYNC-MS-005#CommentService.all_in_project]] [[SYNC-MS-005#CommentService.restore]] · [[SYNC-MS-009#git.last_commit_at]] · [[SYNC-MS-002#SpecService.item_pks]](삭제 포함 인자) · [[SYNC-MS-001#ProjectService.repo_status]](마지막 백업) · [[SYNC-MS-007#scheduler.poll_loop]](반복 보호) |
+| 구현 | 설정값 `BACKUP_INTERVAL_SECONDS` · `main` lifespan에 백업 태스크(폴링과 **별도 if** — 하나를 끄고 다른 하나를 볼 수 있어야 한다) · `Entry.backup` · DTO 셋(`RestoreFlag`·`RestoreDecision`·`RestoreResult`) · `BackupInvalid` 예외 · 리포지터리 다섯 |
+| API | [[SYNC-API-001#POST/api/admin/repos/{code}/restore]] · `GET /api/admin/repos`에 `backed_up_at`·`backup_stale` |
+| 화면 | UI-14 요소 2.4(마지막 백업)·6(백업에서 복원) — **`check_ui.py` 15/15 회복**. 명세를 먼저 고쳐 지금 14/15다 |
+| 테스트 | 구현 함수의 테스트 관점 전부 · **내보내고 → 세 표를 비우고 → 복원** 왕복 · 두 번 복원해도 안 늘어남(`skipped`로 간다) · 파일에 댓글 본문·전파 사유·최상위 시각이 없음 · 두 번 내보내도 커밋이 하나 · 백업 커밋이 `changed_files`에 안 잡힘 · 재구축을 안 하고 복원하면 전부 `dropped`이고 예외는 없음 |
+| 선행 | D5 |
+| 완료 | — |
+
+**왜 카드인가.** `DEV-15`는 "**버그**를 고칠 때는 이슈가 단위이고 카드를 안 건드린다"고 적는다. #16은 버그가 아니라 인프라 6.1이 설계해 놓고 구현을 안 한 기능이다. 함수 열둘·엔드포인트 하나·화면 요소 둘이 걸리므로 `DEV-14` 일곱 조건을 거치는 카드가 맞다.
+
+**왜 지금인가.** 2026-09-11에 실물에서 전파결정 39건을 잃었다(#38·#39). 그 백업이 있었으면 복구할 수 있었다 — 인프라 6.1이 "복구 불가 항목이 셋 있다. 그래서 이 셋을 저장소에 함께 커밋한다"고 적어 둔 바로 그 상황이다.
+
+---
+
 ## 2. 통합 테스트 시나리오
 
 시나리오 S1~S7을 그대로 E2E 테스트로. 각 슬라이스의 `테스트` 행에 나눠 들어가 있다. 전부 통과하면 PRD 성공지표 측정을 시작한다.
