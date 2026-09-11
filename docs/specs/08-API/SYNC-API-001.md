@@ -1802,6 +1802,23 @@ components:
                 type: string
               detail:
                 type: string
+        dropped:
+          type: array
+          description: >
+            재구축이 그 버전을 다시 만들지 않아 새 버전에 이어 붙일 수 없던 추적 행.
+            force-push로 커밋이 사라졌거나, 문서가 HEAD에서 삭제됐거나, status 커밋이라
+            버전을 안 만드는 경우다. 비어 있는 것이 정상이다 — 비어 있지 않으면
+            무엇을 왜 버렸는지 화면(UI-14 5.3)이 말해야 한다
+          items:
+            type: object
+            properties:
+              kind:
+                type: string
+                enum: [propagation_decision, flag]
+              count:
+                type: integer
+              reason:
+                type: string
 ```
 
 ---

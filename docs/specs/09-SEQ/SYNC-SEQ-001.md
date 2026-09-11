@@ -1030,6 +1030,7 @@ sequenceDiagram
     participant PS as ProjectService
     participant S as SpecService
     participant R as ReferenceService
+    participant T as TrackingService
     participant G as infra/git
     participant DB
 
@@ -1040,10 +1041,12 @@ sequenceDiagram
     P->>G: fetch · checkout origin/HEAD
     rect rgb(240,244,240)
         Note over P,DB: 한 트랜잭션. 실패하면 전부 롤백
+        P->>S: version_keys(project_id)
+        S-->>P: {옛 version_id: (document_id, commit_hash)} — 지우기 전에 떠 둔다
         P->>R: clear(project_id)
         R->>DB: delete references where project
         P->>S: clear_index(project_id)
-        S->>DB: delete versions · items where project (documents 행은 유지 — 플래그·댓글이 FK로 물려 있음)
+        S->>DB: delete versions · status_changes(커밋 있는 것) where project (documents · items 행은 유지 — 플래그·댓글이 FK로 물려 있음)
         P->>G: list("docs/specs/**/*.md")
         loop 파일마다
             P->>G: log(path) → [(commit_hash, author_login, date, message)]
@@ -1052,19 +1055,26 @@ sequenceDiagram
                 P->>S: validate(body, doc_type)
                 P->>S: save(document, body, commit_hash, author=github(login), rebuild=true)
                 S->>DB: versions(version_no 순서대로) · items
+                S-->>P: 새 version — {(document_id, commit_hash): id}로 모은다
             end
             P->>R: extract(document_id, 최신 version_id, body)
             P->>S: mark_convention_error(document_id, violations or none)
         end
+        P->>T: relink_versions(project_id, 새 버전 지도)
+        T->>DB: propagation_decisions.version_id · flags.cause_version_id를 새 id로. 못 이으면 삭제
+        P->>T: reassign_open_flags(project_id)
+        T->>DB: 열린 플래그 담당자 = 대상 문서 최근 버전 작성자
         P->>DB: repositories.last_processed_commit = HEAD
     end
     P->>P: lock 해제
-    P-->>RA: RebuildResult {docs, items, references, versions, convention_errors[]}
+    P-->>RA: RebuildResult {docs, items, references, versions, convention_errors[], dropped[]}
     RA-->>U: 결과 표 5
 ```
 
 **읽을 때 볼 것**
 - `documents` 행은 지우지 않는다. `flags`·`comments`가 그 pk를 물고 있다. `items`도 마찬가지로 지우면 플래그가 끊긴다 → **items는 지우면 안 된다.** upsert해야 한다 (되먹일 것 #18)
+- **지우는 테이블에 걸린 FK도 세야 한다.** 위 문장은 "지우지 **않는** 테이블에 걸린 FK"만 센다. `versions`를 가리키는 FK가 셋이고(`references`·`propagation_decisions`·`flags.cause_version_id`) 그중 둘을 안 세서 실물 재구축이 죽었다(#38). 지금은 `version_keys`로 옛 지도를 먼저 뜨고 `relink_versions`가 새 버전에 다시 잇는다
+- **담당자 재계산은 재연결 뒤에 온다.** 담당자는 대상 문서의 최근 버전에서 오므로 버전이 다 제자리를 찾은 뒤라야 한다
 - 커밋마다 돌아서 버전 이력을 복원한다. SEQ-2(밀린 커밋)는 최종 상태만 저장하는 것과 다르다
 
 ---
