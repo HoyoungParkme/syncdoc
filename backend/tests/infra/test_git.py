@@ -223,6 +223,74 @@ async def test_changed_files_login_from_noreply_email(repos: dict[str, Path]) ->
     assert g._login_of("seed", "seed@example.com") == "seed"
 
 
+async def test_changed_files_range_across_rename_drops_the_old_path(
+    repos: dict[str, Path],
+) -> None:
+    """#31 — 범위가 rename 커밋을 가로지르면 옛 경로가 따로 남아 따라잡기를 멈춰 세웠다.
+
+    옛 경로를 남기면 process_commit이 `git show {head}:{옛 경로}`에서 죽고,
+    한 파일이 실패하면 last_processed_commit이 안 올라가 그 자리에 영원히 멈춘다.
+    """
+    base = git(repos["work"], "rev-parse", "HEAD")
+    o, new_path = repos["other"], "docs/specs/10-MS/SYNC-MS-001.md"
+    # rename 앞에 옛 경로를 건드리는 커밋 둘
+    write_commit_push(o, "docs/specs/MS/SYNC-MS-001.md", "v1", "spec(SYNC-MS-001): 초안")
+    write_commit_push(o, "docs/specs/MS/SYNC-MS-001.md", "v2", "spec(SYNC-MS-001): 보강")
+    # 디렉터리를 {NN-TYPE}로 옮긴다
+    (o / "docs/specs/10-MS").mkdir(parents=True, exist_ok=True)
+    git(o, "mv", "docs/specs/MS/SYNC-MS-001.md", new_path)
+    git(o, "commit", "-q", "-m", "chore: 디렉터리 이동")
+    git(o, "push", "-q", "origin", "HEAD:main")
+    head = await g.fetch(repos["work"])
+
+    got = await g.changed_files(repos["work"], f"{base}..{head}", "docs/specs/")
+
+    assert [c.path for c in got if "/specs/MS/" in c.path] == [], "옛 경로가 남으면 안 된다"
+    assert (new_path, "M") in [(c.path, c.status) for c in got]
+    assert {c.status for c in got} <= {"A", "M", "D"}, "R은 M으로 접힌다 (MS-009 처리 3)"
+
+
+async def test_changed_files_new_file_at_the_old_path_after_rename_survives(
+    repos: dict[str, Path],
+) -> None:
+    """#31 2b — rename 뒤에 옛 경로로 새 파일이 생겼으면 그건 살린다."""
+    base = git(repos["work"], "rev-parse", "HEAD")
+    o = repos["other"]
+    write_commit_push(o, "docs/specs/MS/SYNC-MS-001.md", "v1", "spec(SYNC-MS-001): 초안")
+    (o / "docs/specs/10-MS").mkdir(parents=True, exist_ok=True)
+    git(o, "mv", "docs/specs/MS/SYNC-MS-001.md", "docs/specs/10-MS/SYNC-MS-001.md")
+    git(o, "commit", "-q", "-m", "chore: 디렉터리 이동")
+    git(o, "push", "-q", "origin", "HEAD:main")
+    write_commit_push(o, "docs/specs/MS/SYNC-MS-002.md", "다시 생김", "spec(SYNC-MS-002): 초안")
+    head = await g.fetch(repos["work"])
+
+    got = await g.changed_files(repos["work"], f"{base}..{head}", "docs/specs/")
+
+    paths = {c.path for c in got}
+    assert "docs/specs/MS/SYNC-MS-002.md" in paths
+    assert "docs/specs/MS/SYNC-MS-001.md" not in paths
+
+
+async def test_changed_files_skips_files_outside_a_type_directory(
+    repos: dict[str, Path],
+) -> None:
+    """#32 — init_specs가 만든 docs/specs/README.md가 따라잡기를 막고 있었다."""
+    base = git(repos["work"], "rev-parse", "HEAD")
+    o = repos["other"]
+    write_commit_push(o, "docs/specs/README.md", "순서표", "chore: README")
+    h = write_commit_push(o, "docs/specs/03-SCN/SYNC-SCN-001.md", "s", "spec(SYNC-SCN-001): new")
+    # 알 수 없는 타입 디렉터리는 빼지 않는다 — 사람 실수라 process_commit이 알려야 한다
+    hb = write_commit_push(o, "docs/specs/BOGUS/EXMP-BOGUS-001.md", "x", "spec: 잘못 넣음")
+    head = await g.fetch(repos["work"])
+
+    got = await g.changed_files(repos["work"], f"{base}..{head}", "docs/specs/")
+
+    assert [(c.path, c.commit_hash) for c in got] == [
+        ("docs/specs/03-SCN/SYNC-SCN-001.md", h),
+        ("docs/specs/BOGUS/EXMP-BOGUS-001.md", hb),
+    ]
+
+
 async def test_changed_files_deleted_file_has_status_d(repos: dict[str, Path]) -> None:
     base = git(repos["work"], "rev-parse", "HEAD")
     git(repos["other"], "rm", "-q", SEED)

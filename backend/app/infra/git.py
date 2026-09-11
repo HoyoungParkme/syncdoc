@@ -186,7 +186,8 @@ async def changed_files(workdir: Path, range: str, prefix: str) -> list[ChangedF
         "--",
         prefix,
     )
-    seen: dict[str, ChangedFile] = {}
+    # None은 "rename으로 사라진 옛 경로" 표시 — 더 앞선 커밋의 같은 경로 항목을 막는다
+    seen: dict[str, ChangedFile | None] = {}
     tokens = out.split("\0")
     # 레코드: hash, an, ae, "subject\nbody", "\n<status lines>\n<next hash>" — 첫 hash 뒤로 4개 단위
     hash_ = tokens[0].strip()
@@ -199,8 +200,19 @@ async def changed_files(workdir: Path, range: str, prefix: str) -> list[ChangedF
                 continue
             status, *paths = line.split("\t")
             path = paths[-1]
+            # rename(`R…\t옛\t새`)은 새 경로의 수정으로 접고 옛 경로는 버린다 (MS-009 2a, #31).
+            # 파일이 옮겨진 것이지 문서가 둘이 된 게 아니다 — 옛 경로를 남기면 process_commit이
+            # `git show {head}:{옛 경로}`에서 죽고 따라잡기가 그 자리에 영원히 멈춘다.
+            # 커밋은 최신부터 훑는다 — rename 뒤 옛 경로에 새 파일이 생겼으면 이미 seen에 있어 산다
+            if status[0] == "R" and len(paths) == 2:
+                seen.setdefault(paths[0], None)
+                status = "M"
             parts = Path(path).parts
-            if "_templates" in parts or "assets" in parts or path in seen:
+            # 명세가 아닌 것은 뺀다 (MS-009 처리 4). 타입 디렉터리 밖의 파일 —
+            # `docs/specs/README.md` — 은 init_specs가 만든 것이라 여기서 걸러야
+            # 싱크독이 만든 파일이 싱크독의 따라잡기를 막지 않는다 (#32).
+            # 알 수 없는 타입 디렉터리(`docs/specs/BOGUS/…`)는 빼지 않는다 — 사람 실수라 알려야 한다
+            if "_templates" in parts or "assets" in parts or len(parts) <= 3 or path in seen:
                 continue
             seen[path] = ChangedFile(
                 path=path,
@@ -210,7 +222,7 @@ async def changed_files(workdir: Path, range: str, prefix: str) -> list[ChangedF
                 message=_message(msg),
             )
         hash_ = next_hash
-    return [seen[p] for p in sorted(seen)]
+    return [c for _, c in sorted(seen.items()) if c is not None]
 
 
 def _message(subject_body: str) -> str:
