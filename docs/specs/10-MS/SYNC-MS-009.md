@@ -171,9 +171,13 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-INFRA-001]] 6.1 · [[SYNC-UI-002#UI-14]] 요소 2.4 · [[SYNC-MS-001#ProjectService.repo_status]]
 
-**처리** `git log -1 --format=%aI origin/HEAD -- {path}` → 출력이 비면 `None`, 아니면 시각. `origin/HEAD`가 없거나(빈 저장소) 경로가 한 번도 커밋된 적 없으면 `None`
+**처리** `git log -1 --format=%aI {ref} -- {path}`를 `origin/HEAD` → `HEAD` 순으로. 먼저 값이 나온 것을 쓰고 둘 다 비면 `None`
 
-**`origin/HEAD`로 본다.** 로컬 HEAD는 뒤처질 수 있고, 이 값이 답할 질문은 "**저장소에** 백업이 언제 올라갔나"다
+**`origin/HEAD`를 먼저 보는 이유.** 이 값이 답할 질문은 "**저장소에** 백업이 언제 올라갔나"다
+
+**`HEAD`로 떨어지는 이유.** [[#git.commit_push]]는 **토큰이 박힌 URL**로 민다(`push {url} HEAD:main`). 이름 붙은 remote로 안 밀기 때문에 **`refs/remotes/origin/*`이 안 따라온다** — 방금 민 백업이 `origin/HEAD`에는 아직 안 보인다. 다음 `fetch`면 맞춰지지만 그 사이 관리 화면이 "백업 없음"을 보여주면 거짓말이다
+
+**`fetch`를 부르지 않는다.** 부르는 쪽([[SYNC-MS-001#ProjectService.repo_status]])이 원격을 안 타려고 만든 함수다
 
 **네트워크를 안 탄다.** `fetch`를 부르지 않는다 — 이 함수를 부르는 `repo_status`가 원격 하나 때문에 관리 화면 전체가 매달리는 것을 피하려고 DB만 읽게 만든 함수이기 때문이다
 
