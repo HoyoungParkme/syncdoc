@@ -46,8 +46,8 @@ syncdoc/            저장소 = 프로젝트
 파이썬은 `backend/`에서 돈다 — `cd backend && uv run pytest` · `uv run ruff check .` · `uv run alembic upgrade head`.
 검사기는 저장소 루트에서 돈다.
 
-**테스트는 전용 DB(5434 `syncdoc_test`)에서만 돈다.** `tests/conftest.py`가 `DATABASE_URL`을 덮어쓰고, 이름에 `test`가 없으면 아예 시작하지 않는다. 다른 DB를 쓰려면 `SYNCDOC_TEST_DATABASE_URL`로 말한다.
-**한 DB에 pytest를 둘 이상 동시에 돌리지 않는다.** 서로의 트랜잭션에 걸려 매번 다른 테스트가 401·연결 오류로 죽는다 (#17).
+**테스트는 전용 DB(5434 `syncdoc_test`)에서만 돈다.** 이름에 `test`가 없으면 시작하지 않는다. 다른 DB를 쓰려면 `SYNCDOC_TEST_DATABASE_URL`.
+**한 DB에 pytest를 둘 이상 동시에 돌리지 않는다.** 규칙과 이유는 [[SYNC-STD-004#DEV-14]].
 
 - `python tools/validate.py` — 명세 규약 검사 (STD-001 3·4장). 위반 0·경고 0이어야 한다
 - `python tools/check_code.py` — MINISPEC↔코드 시그니처 대조 (DEV-14 첫째·둘째)
