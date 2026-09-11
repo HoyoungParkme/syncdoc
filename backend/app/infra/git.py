@@ -239,7 +239,14 @@ def _message(subject_body: str) -> str:
 async def list(workdir: Path, glob: str, ref: str = "HEAD") -> list[str]:
     """SYNC-MS-009#git.list"""
     out = await _run(workdir, "ls-tree", "-r", "--name-only", ref, "--", "docs/specs")
-    return [p for p in out.splitlines() if PurePosixPath(p).match(glob)]
+    # 명세가 아닌 것은 뺀다 — changed_files 처리 4와 같은 규칙. 안 빼면 템플릿이
+    # "알 수 없는 디렉터리" 규약 오류로 잡혀 재구축 결과가 없는 오류를 센다 (#40)
+    skip = {"_templates", "assets"}
+    return [
+        p
+        for p in out.splitlines()
+        if PurePosixPath(p).match(glob) and not skip & set(PurePosixPath(p).parts)
+    ]
 
 
 async def log(workdir: Path, path: str) -> list[Commit]:

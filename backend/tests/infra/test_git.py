@@ -312,7 +312,8 @@ async def test_list_filters_by_glob_at_ref(repos: dict[str, Path]) -> None:
     write_commit_push(o, "README.md", "x", "d")
     await g.fetch(repos["work"])
     got = await g.list(repos["work"], "docs/specs/*/*.md", "origin/HEAD")
-    assert got == [SEED, "docs/specs/03-SCN/SYNC-SCN-001.md", "docs/specs/_templates/PRD.md"]
+    # _templates는 glob에 걸리지만 명세가 아니라 빠진다 (#40)
+    assert got == [SEED, "docs/specs/03-SCN/SYNC-SCN-001.md"]
     assert await g.list(repos["work"], "docs/specs/*/*.md") == [SEED]
 
 
@@ -378,7 +379,9 @@ async def test_init_specs_returns_26_files_and_commit_push_writes_them(
     h = await g.commit_push(repos["work"], "chore(SYNC): init syncdoc", _author(), files=files)
     assert h == git(repos["remote"], "rev-parse", "main")
     assert await g.exists(repos["work"], "docs/specs/_templates/STD.md")
-    assert len(await g.list(repos["work"], "docs/specs/_templates/*.md")) == 12
+    # git.list는 명세만 준다 — 템플릿 수는 init_specs가 만든 파일 목록에서 센다 (#40)
+    assert len([k for k in files if k.startswith("docs/specs/_templates/")]) == 12
+    assert await g.list(repos["work"], "docs/specs/_templates/*.md") == []
 
 
 async def test_commit_push_requires_path_content_or_files(repos: dict[str, Path]) -> None:
@@ -386,6 +389,28 @@ async def test_commit_push_requires_path_content_or_files(repos: dict[str, Path]
         await g.commit_push(repos["work"], "m", _author())
     with pytest.raises(ValueError):
         await g.commit_push(repos["work"], "m", _author(), path=SEED)
+
+
+async def test_list_skips_templates_and_assets(repos: dict[str, Path]) -> None:
+    """명세가 아닌 것은 빼고 준다 (#40).
+
+    템플릿을 세면 재구축 결과가 없는 규약 오류를 보여주고, init_project가
+    세는 기존 명세 수(UI-3 2.5)도 부풀려진다.
+    """
+    o = repos["other"]
+    for path in (
+        "docs/specs/01-RFQ/SYNC-RFQ-001.md",
+        "docs/specs/_templates/RFQ.md",
+        "docs/specs/assets/메모.md",
+    ):
+        write_commit_push(o, path, "x", f"seed {path}")
+    await g.fetch(repos["work"])
+    await g.checkout(repos["work"], "origin/HEAD")
+
+    got = await g.list(repos["work"], "docs/specs/*/*.md")
+
+    assert "docs/specs/01-RFQ/SYNC-RFQ-001.md" in got
+    assert not [p for p in got if "_templates" in p or "assets" in p]
 
 
 async def test_log_follows_renamed_path_oldest_first(repos: dict[str, Path]) -> None:
