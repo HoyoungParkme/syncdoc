@@ -9,12 +9,24 @@ SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path
 OUT = sys.argv[2] if len(sys.argv) > 2 else "/tmp/_wf.html"
 raw = open(SRC, encoding="utf-8").read()
 
+def safe_layout(html):
+    """배치 HTML을 페이지에 넣기 전에 다듬는다 — SYNC-STD-002 6장(#19).
+
+    `<script>`·`on*=`·`javascript:`는 지우고, `data-el`은 `data-wf`로 바꾼다.
+    바꾸는 이유: 그대로 두면 문서 본문에서 나온 것과 화면 자신의 요소를 셀렉터로 구분할 수 없다.
+    """
+    html = re.sub(r"<script\b[\s\S]*?</script\s*>", "", html, flags=re.I)
+    html = re.sub(r"""\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)""", "", html, flags=re.I)
+    html = re.sub(r"""\s(href|src)\s*=\s*(["']?)\s*javascript:[^"'>]*\2""", "", html, flags=re.I)
+    return re.sub(r"\bdata-el(-row)?=", r"data-wf\1=", html)
+
+
 screens = []
 for sec in re.split(r"\n## (?=UI-\d+)", raw)[1:]:
     head = sec.split("\n", 1)[0].strip()
     sid, name = head.split(" ", 1)
     meta = dict(re.findall(r"^\| (.+?) \| (.+?) \|$", sec.split("### 배치")[0], re.M))
-    layout = re.search(r"```html\n(.*?)\n```", sec, re.S).group(1)
+    layout = safe_layout(re.search(r"```html\n(.*?)\n```", sec, re.S).group(1))
     elem_block = sec.split("### 요소")[1].split("### 규칙")[0]
     elems = []
     for line in elem_block.strip().split("\n")[2:]:
@@ -78,9 +90,9 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:.88em;background:#E4E8E4
 
 /* 뼈대 (와이어프레임) 스타일 — 원본 HTML은 스타일이 없고 여기서만 입힌다 */
 .wf{font-family:system-ui,sans-serif;font-size:12.5px;color:#222;background:#f4f4f4;border:1px solid #bbb}
-.wf [data-el]{position:relative;border:1.5px dashed #999;background:#fff;transition:background .12s,border-color .12s}
-.wf [data-el]::before{content:attr(data-el);position:absolute;top:-8px;left:5px;font:600 9.5px/1 ui-monospace,monospace;background:#ffe58a;border:1px solid #c9a800;padding:2px 4px;border-radius:2px;z-index:2;cursor:pointer}
-.wf [data-el].hi{background:var(--hi);border-color:var(--hi-b);border-style:solid}
+.wf [data-wf]{position:relative;border:1.5px dashed #999;background:#fff;transition:background .12s,border-color .12s}
+.wf [data-wf]::before{content:attr(data-wf);position:absolute;top:-8px;left:5px;font:600 9.5px/1 ui-monospace,monospace;background:#ffe58a;border:1px solid #c9a800;padding:2px 4px;border-radius:2px;z-index:2;cursor:pointer}
+.wf [data-wf].hi{background:var(--hi);border-color:var(--hi-b);border-style:solid}
 .wf .lbl{color:#777;font-size:11px}
 .wf .topbar{display:flex;align-items:center;gap:12px;padding:8px 12px;background:#e8e8e8;border-bottom:1px solid #bbb}
 .wf .grow{flex:1}
@@ -269,7 +281,7 @@ D.forEach((s,i)=>{
 
   const sec=document.createElement("section"); sec.className="screen"; sec.style.display=i===0?"":"none"; sec.dataset.i=i;
   const meta=Object.entries(s.meta).map(([k,v])=>`<span><b>${esc(k)}</b>${esc(v).replace(/\[\[(.+?)\]\]/g,'<span class="mono">$1</span>')}</span>`).join("");
-  const rows=s.elems.map(e=>`<tr data-el-row="${e.no}"><td class="no">${e.no}</td><td>${esc(e.name)}</td><td class="kind">${esc(e.kind)}</td><td>${esc(e.shows)}</td><td>${esc(e.onclick)}</td></tr>`).join("");
+  const rows=s.elems.map(e=>`<tr data-wf-row="${e.no}"><td class="no">${e.no}</td><td>${esc(e.name)}</td><td class="kind">${esc(e.kind)}</td><td>${esc(e.shows)}</td><td>${esc(e.onclick)}</td></tr>`).join("");
   const rules=s.rules.map(r=>`<li>${chip(r)}</li>`).join("");
   const scen=s.scenarios.map(sc=>`<div class="scen"><div class="st"><span class="k">${sc.id}</span>${esc(sc.title)}${sc.uc?`<span class="uc">— ${esc(sc.uc)}</span>`:""}</div><ol>${sc.steps.map(st=>`<li>${chip(st)}</li>`).join("")}</ol></div>`).join("");
   sec.innerHTML=`
@@ -286,13 +298,13 @@ D.forEach((s,i)=>{
 
   /* 연동 */
   const hi=no=>{
-    sec.querySelectorAll("[data-el],[data-el-row]").forEach(n=>n.classList.remove("hi"));
-    const el=sec.querySelector(`[data-el="${no}"]`), row=sec.querySelector(`[data-el-row="${no}"]`);
+    sec.querySelectorAll("[data-wf],[data-wf-row]").forEach(n=>n.classList.remove("hi"));
+    const el=sec.querySelector(`[data-wf="${no}"]`), row=sec.querySelector(`[data-wf-row="${no}"]`);
     if(el){el.classList.add("hi");el.scrollIntoView({block:"nearest"});}
     if(row){row.classList.add("hi");row.scrollIntoView({block:"nearest"});}
   };
-  sec.querySelectorAll("[data-el]").forEach(n=>n.addEventListener("click",e=>{e.stopPropagation();hi(n.dataset.el);}));
-  sec.querySelectorAll("[data-el-row]").forEach(n=>n.addEventListener("click",()=>hi(n.dataset.elRow)));
+  sec.querySelectorAll("[data-wf]").forEach(n=>n.addEventListener("click",e=>{e.stopPropagation();hi(n.dataset.wf);}));
+  sec.querySelectorAll("[data-wf-row]").forEach(n=>n.addEventListener("click",()=>hi(n.dataset.wfRow)));
   sec.querySelectorAll(".eref").forEach(n=>n.addEventListener("click",()=>hi(n.dataset.ref)));
 });
 function show(i){stabs.querySelectorAll("button").forEach((b,j)=>b.setAttribute("aria-selected",String(i===j)));host.querySelectorAll(":scope > section.screen").forEach((s,j)=>s.style.display=i===j?"":"none");}

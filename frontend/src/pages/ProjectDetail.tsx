@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { StatusPill } from '../components/ui'
-import { ago, api, authorLabel, docPath, refKey, STAGE_NAMES, STATUS_KO, type CommentSummary, type DocumentSummary, type FlagSummary, type ProjectDetail as Detail, type ProjectSummary } from '../api/client'
+import { ago, api, authorLabel, docPath, refKey, STAGE_NAMES, STATUS_KO, warnText, type CommentSummary, type DocumentSummary, type FlagSummary, type ProjectDetail as Detail, type ProjectSummary } from '../api/client'
 
 
 /** 미니 히트맵과 문서 행 점이 쓰는 상태 → 클래스 */
@@ -232,7 +232,7 @@ function listItem(kind: string, it: unknown) {
         <Link to={docPath(d.doc_id)}>
           <b>{d.doc_id}</b>
         </Link>{' '}
-        v{d.current_version_no} · {kind === 'incomplete' ? d.incomplete_warnings.join(' · ') : '규약 오류'} · {ago(d.updated_at)}
+        v{d.current_version_no} · {kind === 'incomplete' ? d.incomplete_warnings.map(warnText).join(' · ') : '규약 오류'} · {ago(d.updated_at)}
       </li>
     )
   }

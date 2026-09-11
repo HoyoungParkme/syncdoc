@@ -264,7 +264,9 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 }
 ```
 
-저장소 `docs/specs/_templates/{TYPE}.md`와 `STD/SYNC-STD-001.md`에서 읽는다. 프로젝트마다 템플릿 사본이 있으므로 `project_code`가 필요하다. 저장소에 없으면(초기화 전·지워짐) 앱에 내장된 사본으로 대체한다.
+저장소 `docs/specs/_templates/{TYPE}.md`와 `STD/{project_code}-STD-001.md`에서 읽는다. 프로젝트마다 템플릿 사본이 있으므로 `project_code`가 필요하다. 저장소에 없으면(초기화 전·지워짐) 앱에 내장된 사본으로 대체한다.
+
+**규약 문서 이름에 프로젝트 코드가 들어간다.** 문서 ID 규칙은 `{프로젝트코드}-{TYPE}-{번호}`이고 STD도 예외가 아니다([[SYNC-STD-001]] 1.1) — `TST` 프로젝트의 규약 문서는 `TST-STD-001.md`다. 이름을 고정해 두면 싱크독이 아닌 프로젝트에서 늘 404가 난다(#8). 내장 사본으로 떨어질 때는 싱크독의 `SYNC-STD-001.md`를 쓴다 — 다른 프로젝트는 싱크독의 STD를 그대로 쓰기 때문이다([[SYNC-STD-001]] 2.12).
 
 ---
 

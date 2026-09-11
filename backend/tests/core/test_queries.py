@@ -322,15 +322,14 @@ async def test_todo_decision_view_record_and_flag_view(scoped: Session) -> None:
         "prd-writer",
     )
     assert td2.total == 1 and (await queries.todo(a_rfq.user)).total == 0
-    # 플래그 상세 (UI-11): 원인 v2 → 현재 v2, 변경 0 · 대상 문서 변경 없음
+    # 플래그 상세 (UI-11): 부여 직후에도 원인 변경이 보인다 — v1 → v2 (#10)
+    # cause_change_count는 부여 **뒤** 또 바뀐 횟수라 0이다
     fv = await queries.flag_view(f.id)
-    assert (fv.cause_change_count, fv.cause_diff.hunks, fv.target_changed_since_raise) == (
-        0,
-        [],
-        False,
-    )
+    assert (fv.cause_diff.from_version, fv.cause_diff.to_version) == (1, 2)
+    assert fv.cause_diff.hunks, "부여 직후에 diff가 비면 판단 재료가 없다"
+    assert (fv.cause_change_count, fv.target_changed_since_raise) == (0, False)
     assert fv.target_body.startswith("#### G1 목표") and fv.id == f.id
-    # 원인이 그 사이 또 바뀜(UC-H11 3a) → 누적 diff v2→v3 · 대상 저장 → 변경 있음
+    # 원인이 그 사이 또 바뀜(UC-H11 3a) → 누적 diff v1→v3 · 대상 저장 → 변경 있음
     rfq2 = svc.get_document("EXMP-RFQ-001")
     svc.save(rfq2, rfq2.body.replace("바뀐 내용", "또 바뀐 내용"), "r3", a_rfq, "spec: v3", [])
     d2 = svc.get_document("EXMP-PRD-001")
@@ -338,7 +337,7 @@ async def test_todo_decision_view_record_and_flag_view(scoped: Session) -> None:
     fv2 = await queries.flag_view(f.id)
     assert (fv2.cause_change_count, fv2.cause_diff.from_version, fv2.cause_diff.to_version) == (
         1,
-        2,
+        1,
         3,
     )
     assert [h.item_id for h in fv2.cause_diff.hunks] == [

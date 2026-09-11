@@ -312,7 +312,13 @@ async def get_template(project_code: str, doc_type: str) -> CallToolResult:
             _user(s)
             workdir = Path(ProjectService(s).get(project_code).repository.workdir_path)
         template = await _read_spec_file(workdir, f"docs/specs/_templates/{doc_type}.md")
-        std = await _read_spec_file(workdir, "docs/specs/STD/SYNC-STD-001.md")  # STD는 번호 없음
+        # 규약 문서 이름에도 프로젝트 코드가 들어간다 (STD-001 1.1) — 고정하면 SYNC 밖에서 늘 404 (#8).
+        # 저장소에 없으면 싱크독 것으로 떨어진다 — 다른 프로젝트는 싱크독 STD를 그대로 쓴다 (STD-001 2.12)
+        std = await _read_spec_file(
+            workdir,
+            f"docs/specs/STD/{project_code}-STD-001.md",
+            fallback="docs/specs/STD/SYNC-STD-001.md",
+        )
     except Problem as p:
         return _problem(p)
     item_re, secs = patterns_for(doc_type, None)
@@ -331,14 +337,21 @@ async def get_template(project_code: str, doc_type: str) -> CallToolResult:
     )
 
 
-async def _read_spec_file(workdir: Path, path: str) -> str:
-    """프로젝트 저장소의 파일. 없으면 앱에 내장된 사본(docs/specs/)으로."""
+async def _read_spec_file(workdir: Path, path: str, fallback: str | None = None) -> str:
+    """프로젝트 저장소의 파일. 없으면 앱에 내장된 사본(docs/specs/)으로.
+
+    `fallback`은 내장 사본의 이름이 다를 때 쓴다 — 규약 문서는 프로젝트마다 이름이 다르지만
+    내장된 것은 싱크독 것 하나뿐이다.
+    """
     try:
         return await git.read(workdir, path)
     except (git.GitError, OSError):  # 작업 사본이 없거나(OSError) 파일이 없으면(GitError) 내장 사본
-        local = _APP_SPECS / path.removeprefix("docs/specs/")
-        if local.exists():
-            return local.read_text(encoding="utf-8")
+        for candidate in (path, fallback):
+            if candidate is None:
+                continue
+            local = _APP_SPECS / candidate.removeprefix("docs/specs/")
+            if local.exists():
+                return local.read_text(encoding="utf-8")
         raise NotFound("file", path) from None
 
 

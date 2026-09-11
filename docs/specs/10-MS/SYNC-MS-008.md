@@ -321,7 +321,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **처리**
 1. `f = TrackingService.get_flag(flag_id)` · if 없음 → `! not-found`
 2. `names = SpecService.describe_items([f.target_item_pk, f.cause_item_pk])` · `vb = SpecService.versions_by_ids([f.cause_version_id])` → `cause_version_no`
-3. if `f.kind == needs_check and f.cause_item_pk` → `cause_doc = 원인 문서`, `cur_no = cause_doc.current_version_no` · `cause_diff = SpecService.diff(cause_doc_id, f.cause_version_no, cur_no)` · `cause_change_count = cur_no - f.cause_version_no` (UC-H11 3a 누적)
+3. if `f.kind == needs_check and f.cause_item_pk` → `cause_doc = 원인 문서`, `cur_no = cause_doc.current_version_no`
+   - **시작점은 플래그를 만든 변경의 직전 버전**이다 — `from_no = max(1, f.cause_version_no - 1)`. `f.cause_version_no`는 플래그가 붙는 순간의 버전이라 부여 직후에 시작점으로 쓰면 `v2 → v2`가 되어 diff가 빈다. 정작 판단 재료인 그 변경이 안 보인다(#10)
+   - `cause_diff = SpecService.diff(cause_doc_id, from_no, cur_no)` · `cause_change_count = cur_no - f.cause_version_no` (부여 뒤 **또** 바뀐 횟수. UC-H11 3a 누적)
 4. if `f.kind == broken_ref` → `cause_diff=None`, `cause_deleted_at = 원인 항목의 deleted_at`
 4a. if `f.kind == upstream_impact` → `cause_diff=None` · if `f.cause_item_pk` → `cause_body = SpecService.get_item(하위 항목).body` · else → `cause_body = 하위 문서 제목 + "(문서 단위 지목)"`
 5. `target = SpecService.get_item(target_doc_id, target_item_id)` → `target_body`, `target_version_no = target.doc_version_no` (UI-11 3.2 "v7" — 문서 API를 또 부르지 않게)
@@ -330,7 +332,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** `TrackingService.get_flag` · `SpecService.describe_items` `diff` `get_item`
 
-**테스트 관점** 원인이 v4→v6 바뀜 → `cause_change_count=2`, diff는 v4→v6 · 부여 후 대상 문서 저장됨 → `target_changed_since_raise=True`
+**테스트 관점** 부여 직후(원인 v2) → diff는 `v1 → v2`, `cause_change_count=0` · 원인이 그 뒤 v4까지 감 → diff는 `v1 → v4`, `cause_change_count=2` · 부여 후 대상 문서 저장됨 → `target_changed_since_raise=True`
 
 ---
 

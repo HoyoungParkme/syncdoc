@@ -389,6 +389,9 @@ class SpecService:
             item = self.repo.item_of(row.id, b.item_id)
             if item is not None:
                 item.display_name = b.display_name
+                # 본문에 다시 나타났으므로 복구 (MS-002 save 3, #15). 되돌리지 않으면
+                # 본문에는 살아 있는데 DB는 삭제 상태로 남아 항목 조회가 410을 계속 던진다
+                item.is_deleted, item.deleted_at = False, None
             else:
                 self.session.add(
                     Item(document_id=row.id, item_id=b.item_id, display_name=b.display_name)
@@ -751,10 +754,18 @@ class SpecService:
         }
 
     def _deleted_item_ids(self, doc_id: str | None) -> set[str]:
+        """`item.reused`가 볼 삭제된 ID 집합.
+
+        **파일 삭제로 지워진 항목은 뺀다.** 파일을 되살리는 것은 재사용이 아니라 복구다
+        (MS-002 미결 결정, #15). 파일은 살아 있는데 항목만 지웠다가 같은 ID를 다시 쓰는 것만
+        재사용으로 남는다.
+        """
         if not doc_id:
             return set()
         doc = self.repo.document_by_doc_id(doc_id)
         if doc is None:
+            return set()
+        if (doc.convention_error_detail or "").startswith("file.deleted:"):
             return set()
         return {i.item_id for i in self.repo.items_of(doc.id, include_deleted=True) if i.is_deleted}
 

@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { api, ApiError, FLAG_KO, STATUS_KO, type Comment, type Document, type DownstreamView, type ItemReferences, type UpstreamCheck } from '../api/client'
+import { api, ApiError, FLAG_KO, STATUS_KO, warnText, type Comment, type Document, type DownstreamView, type ItemReferences, type UpstreamCheck } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { esc, renderBlocks, splitRef } from '../view/md'
 import { ItemIdBadge, StatusPill } from '../components/ui'
@@ -83,6 +83,14 @@ export function DocView() {
         nav(`/p/${d.split('-')[0]}/d/${d}${it ? '#item-' + it : ''}`)
         return
       }
+      // 7.4 — 줄에 붙은 댓글 버튼. 그 줄을 잡고 댓글 탭으로 (UI-5 규칙)
+      const cb = t.closest<HTMLElement>('.cbtn')
+      if (cb) {
+        ev.preventDefault()
+        setLine(Number(cb.dataset.line))
+        setPanel('comments')
+        return
+      }
       const item = t.closest<HTMLElement>('[data-item]')
       if (item && item.dataset.item) {
         setSelected(item.dataset.item)
@@ -105,6 +113,35 @@ export function DocView() {
       if (typeof cleanup === 'function') cleanup()
     }
   }, [view, tab, doc, nav])
+
+  /** 7.4 줄 댓글 버튼. 본문을 다시 그리지 않고 개수만 갱신하려고 효과를 나눴다 —
+   *  댓글 하나 달 때마다 innerHTML을 다시 넣으면 읽던 자리가 날아간다 */
+  useEffect(() => {
+    const root = mainRef.current
+    if (!root || !doc || tab !== 'user') return
+    const per = new Map<number, number>()
+    for (const c of comments) per.set(c.line_no, (per.get(c.line_no) ?? 0) + 1 + c.replies.length)
+    // 문단이 실어 온 원본 첫 줄 텍스트 → 줄 번호. 같은 문장이 여러 번 나오면 위에서부터 하나씩
+    const left = new Map<string, number[]>()
+    doc.body.split('\n').forEach((text, i) => {
+      const k = text.trim()
+      if (k) (left.get(k) ?? left.set(k, []).get(k)!).push(i + 1)
+    })
+    for (const p of root.querySelectorAll<HTMLElement>('p[data-src]')) {
+      p.querySelector('.cbtn')?.remove()
+      const ln = left.get((p.dataset.src ?? '').trim())?.shift()
+      if (ln === undefined) continue
+      p.dataset.line = String(ln)
+      const n = per.get(ln) ?? 0
+      const b = document.createElement('span')
+      b.className = `cbtn${n ? ' has' : ''}`
+      b.dataset.el = '7.4'
+      b.dataset.line = String(ln)
+      b.textContent = n ? String(n) : '+'
+      b.title = n ? `줄 ${ln} · 댓글 ${n}` : `줄 ${ln}에 댓글 달기`
+      p.appendChild(b)
+    }
+  }, [view, tab, comments, doc])
 
   useEffect(() => {
     if (!selected) return
@@ -261,7 +298,7 @@ export function DocView() {
           )}
           {doc.incomplete_warnings.length > 0 && (
             <div className="banner warn" data-el="4a">
-              미완성: {doc.incomplete_warnings.join(' · ')} · 승인 불가
+              미완성: {doc.incomplete_warnings.map(warnText).join(' · ')} · 승인 불가
             </div>
           )}
 
@@ -622,7 +659,7 @@ function Comments(props: {
           {line && <span className="lbl mono">{lines[line - 1]?.slice(0, 30)}</span>}
         </div>
         <textarea className="inp wide" rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="댓글" />
-        <button className="btn sm" data-el="7.4" disabled={!draft.trim() || !line} onClick={() => add(null)}>
+        <button className="btn sm" disabled={!draft.trim() || !line} onClick={() => add(null)}>
           새 댓글
         </button>
       </div>

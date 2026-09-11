@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,7 +18,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app import scheduler
 from app.config import settings
-from app.core.errors import Problem
+from app.core.errors import Internal, Problem
 from app.mcp.auth import BearerAuth
 from app.mcp.tools import server as mcp_server
 from app.web import auth
@@ -33,6 +34,8 @@ from app.web.routers import (
     references,
     todo,
 )
+
+log = logging.getLogger(__name__)
 
 
 class MCPMount:
@@ -106,6 +109,17 @@ for r in (
 async def problem_handler(_: Request, exc: Problem) -> JSONResponse:
     return JSONResponse(
         exc.to_dict(), status_code=exc.status, media_type="application/problem+json"
+    )
+
+
+# SYNC-API-001 2장 — 표에 없는 예외도 problem+json으로 나간다.
+# 클라이언트가 problem+json을 전제로 파싱하므로 평문 500이 나가면 오류를 읽지도 못한다.
+@app.exception_handler(Exception)
+async def unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
+    log.exception("unhandled %s %s", request.method, request.url.path, exc_info=exc)
+    problem = Internal()
+    return JSONResponse(
+        problem.to_dict(), status_code=problem.status, media_type="application/problem+json"
     )
 
 
