@@ -242,14 +242,18 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### TrackingService.relink_versions 재구축 뒤 버전 다시 잇기
 
-**시그니처** `relink_versions(project_id: int, by_key: dict[tuple[int, str], int]) -> RelinkResult`
+**시그니처** `relink_versions(project_id: int, old: dict[int, tuple[int, str]], new: dict[tuple[int, str], int]) -> RelinkResult`
 
 근거: [[SYNC-MS-007#pipeline.rebuild]] 7a단계 · #38
 
-**입력** `by_key` — 재구축이 새로 만든 버전의 `{(document_id, commit_hash): version_id}`. 호출자가 [[SYNC-MS-002#SpecService.version_keys]]로 뜬 **옛** 지도와 함께 넘긴다
+**입력**
+- `old` — 지우기 전에 뜬 `{옛 version_id: (document_id, commit_hash)}` ([[SYNC-MS-002#SpecService.version_keys]])
+- `new` — 재구축이 새로 만든 `{(document_id, commit_hash): 새 version_id}`
+
+**지도가 둘 다 필요하다.** 전파결정·플래그는 `version_id` 하나만 들고 있으므로 `old`로 열쇠를 얻고 `new`로 새 id를 찾는다.
 
 **처리**
-1. 프로젝트의 `propagation_decisions`마다: 옛 `version_id` → 옛 지도로 `(document_id, commit_hash)` → `by_key`로 새 id
+1. **`old`의 id 목록으로** `propagation_decisions`를 찾는다 — 살아 있는 `versions`로 조인하면 안 된다. 이 시점에는 옛 버전이 이미 지워져 하나도 안 잡힌다. 각각 옛 `version_id` → `old` → `new`로 새 id
    - 찾으면 `DB: update version_id`
    - 못 찾으면 `DB: delete` — `version_id`가 **NOT NULL**이라 빈 값으로 둘 수 없다. `dropped`에 센다
 2. 프로젝트의 `flags` 중 `cause_version_id is not null`인 것마다: 같은 방식

@@ -260,7 +260,7 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
    - **`extra`에 작성자 위반을 얹는다** — 마지막 **본문** 커밋(`status(`가 아닌 것)의 작성자가 `github_user_id is None`이면 `author.unknown: {login}`. `mark_convention_error`는 항상 전량 교체라 여기서 안 얹으면 그 오류가 사라진다. 그래서 실물 인덱스에 규약 오류가 0건이었다(#34)
    - **마지막 본문 커밋을 기준으로 삼는 이유** — 문서의 `author.unknown`은 UI-5 배너가 `last_author`와 함께 보여주는 값이고 `process_commit`도 방금 저장한 버전의 작성자로 판정한다. 옛 커밋이 미등록이었어도 최신 커밋이 등록자면 문서는 깨끗하다
 7. `reference.resolve_missing(project_id)` — 파일 순서 때문에 미존재였던 참조 해제
-7a. `tracking.relink_versions(project_id, new)` — `new`는 6단계에서 모은 `{(document_id, commit_hash): 새 version_id}`. 전파결정과 플래그가 옛 버전 id를 가리키므로 새 id로 갈아 끼운다. 못 잇는 행은 지우고 몇 건을 왜 버렸는지 `RebuildResult.dropped`에 싣는다([[SYNC-MS-004#TrackingService.relink_versions]])
+7a. `tracking.relink_versions(project_id, old, new)` — `old`는 3a에서 뜬 옛 지도, `new`는 6단계에서 모은 `{(document_id, commit_hash): 새 version_id}`. 전파결정과 플래그가 옛 버전 id를 가리키므로 새 id로 갈아 끼운다. 못 잇는 행은 지우고 몇 건을 왜 버렸는지 `RebuildResult.dropped`에 싣는다([[SYNC-MS-004#TrackingService.relink_versions]])
 7b. `tracking.reassign_open_flags(project_id)` — 버전을 다시 만들었으므로 열린 플래그의 담당자(= 대상 문서 최근 버전 작성자)를 다시 계산한다. `clear_index`는 flags를 안 지우고 담당자는 플래그를 만들 때 한 번만 정해지므로, 이게 없으면 **재구축이 절반만 끝난다** — 커밋 이메일을 등록해 작성자가 바뀌어도 플래그는 옛 자리표시를 계속 가리킨다([[SYNC-MS-004#TrackingService.reassign_open_flags]])
 8. `repo.last_processed_commit = HEAD`
 9. **커밋.** 락 해제

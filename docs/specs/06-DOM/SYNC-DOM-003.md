@@ -292,7 +292,7 @@ erDiagram
 | kind | varchar(15) | FlagKind | `needs_check` 확인 필요 / `broken_ref` 끊어진 참조 / `upstream_impact` 하위 불일치(상위에 붙음) | |
 | target_item_id | int | FK not null | 플래그가 붙은 항목. `upstream_impact`면 상위 항목 | |
 | cause_item_id | int | FK null 허용 | 원인 항목. 삭제된 경우도 행은 남아 있으므로 FK 유지. `upstream_impact`면 지목한 하위 항목(승인 대조에서 문서 단위로 표시했으면 null) | |
-| cause_version_id | int | FK null 허용 | 원인 항목이 바뀐 버전. `broken_ref`는 삭제라 버전 없음 → null. `upstream_impact`면 하위 문서의 그 시점 버전 | |
+| cause_version_id | int | FK null 허용 **DEFERRABLE** | 원인 항목이 바뀐 버전. `broken_ref`는 삭제라 버전 없음 → null. `upstream_impact`면 하위 문서의 그 시점 버전. `propagation_decisions.version_id`와 같은 이유로 DEFERRABLE이다(#38) | |
 | assignee_user_id | int | FK null 허용 | 내 할 일에 뜨는 사람. 담당 미지정이면 null | |
 | resolved_with_edit | boolean | null 허용 | 확인 시 문서를 고쳤는지. 미해결이면 null | |
 
@@ -302,7 +302,7 @@ erDiagram
 
 | 컬럼 | 타입 | 제약 | 의미 | 예시 |
 |---|---|---|---|---|
-| version_id | int | FK UK | 버전 하나에 결정 하나 | |
+| version_id | int | FK UK **DEFERRABLE** | 버전 하나에 결정 하나. **재구축이 버전을 갈아 끼우는 동안만** 검사를 트랜잭션 끝으로 미룬다([[SYNC-MS-007#pipeline.rebuild]] 3a·7a) — `INITIALLY IMMEDIATE`라 평소에는 문장마다 검사한다. 미룰 수 없으면 `DELETE FROM versions` 자체가 막혀 재구축이 아예 안 된다(#38) | |
 | choice | varchar(12) | Propagation | `propagate` / `skip` / `undecided` | |
 | affected_pks | jsonb | not null | 저장 시점에 영향받는 하위 항목 pk 목록. 결정 시점 참조가 바뀌어도 이걸로 플래그를 붙인다 | `[412, 419]` |
 | changed_pks | jsonb | not null | 그 저장에서 바뀐 항목 pk. 플래그의 원인 항목 결정용 | `[88]` |
