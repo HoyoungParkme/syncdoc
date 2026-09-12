@@ -64,6 +64,24 @@ async def save_pipeline(...):
 - **async 함수를 하나라도 부르면 그 함수도 `async def`** — `login_github`(github), `init_project`(git), `change_status`·`revert`(pipeline), `pipeline.*`, `queries.*`, 라우터·MCP 도구 전부
 - MINISPEC 시그니처에 `async def`가 명시된다. 없으면 sync. 코드가 이걸 어기면 명세가 틀린 것 — 명세부터
 
+#### DEV-18 저장하는 시각은 뒤로 가지 않는다
+
+**DB에 넣는 시각은 `core/clock.py`의 `now_utc()`로만 만든다.** `datetime.now(UTC)`를 직접 부르지 않는다.
+
+`datetime.now(UTC)`는 **단조롭지 않다.** 시스템 시계는 NTP 보정·가상화 시간 동기화로 뒤로 튄다 — 이 프로젝트를 개발한 WSL2에서 **부하 중 최대 54ms, 30초에 한 번꼴**로 뒤로 가는 것을 쟀다(표본 5억 개).
+
+그런데 앱은 그 값으로 **순서와 인과를 판정한다.**
+
+| 자리 | 무엇을 판정하나 | 뒤로 가면 |
+|---|---|---|
+| [[SYNC-MS-002#SpecService.recent_changes]] | 버전과 상태변경을 섞어 최신순 정렬 | **이력 순서가 뒤집힌다** |
+| [[SYNC-MS-008#queries.flag_view]] | 대상 문서가 플래그 뒤에 바뀌었나 | **없던 인과가 생긴다** |
+| [[SYNC-MS-005#CommentService.all_in_project]] | 부모 댓글이 자식보다 먼저 오나 | 백업 복원이 부모를 못 찾는다 |
+
+그래서 `now_utc()`는 **직전에 내준 값보다 반드시 큰 값**을 돌려준다. 시계가 뒤로 가면 직전 값에 1μs를 더해 앞으로만 간다. 앱이 프로세스 하나라는 전제([[SYNC-INFRA-001]] 5장, 저장소 락도 같은 전제) 위에서 성립한다.
+
+**시각으로 인과를 판정하는 것 자체가 약하다.** 단조 시계는 그 약함을 줄일 뿐 없애지 못한다 — 프로세스가 둘이 되면 다시 깨진다. 인과가 중요한 자리는 **시각이 아니라 식별자로** 판정한다([[SYNC-DOM-003#flags]]의 `target_version_id`가 그 예다).
+
 #### DEV-17 React는 와이어프레임을 옮긴 것
 
 함수가 MINISPEC 항목이듯, 화면은 와이어프레임 항목이다.

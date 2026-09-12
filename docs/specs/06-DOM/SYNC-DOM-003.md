@@ -127,6 +127,7 @@ erDiagram
         int target_item_id FK
         int cause_item_id FK
         int cause_version_id FK
+        int target_version_id FK
         int assignee_user_id FK
         timestamptz raised_at
         int resolved_by_user_id FK
@@ -293,6 +294,7 @@ erDiagram
 | target_item_id | int | FK not null | 플래그가 붙은 항목. `upstream_impact`면 상위 항목 | |
 | cause_item_id | int | FK null 허용 | 원인 항목. 삭제된 경우도 행은 남아 있으므로 FK 유지. `upstream_impact`면 지목한 하위 항목(승인 대조에서 문서 단위로 표시했으면 null) | |
 | cause_version_id | int | FK null 허용 **DEFERRABLE** | 원인 항목이 바뀐 버전. `broken_ref`는 삭제라 버전 없음 → null. `upstream_impact`면 하위 문서의 그 시점 버전. `propagation_decisions.version_id`와 같은 이유로 DEFERRABLE이다(#38) | |
+| target_version_id | int | FK null 허용 **DEFERRABLE** | **플래그를 붙일 때 대상 문서의 최신 버전.** 「그 뒤로 대상이 바뀌었나」를 이 값으로 판정한다 — 시각 비교가 아니다([[SYNC-STD-004#DEV-18]], #17). 대상 문서에 버전이 없으면 null. 재구축이 버전을 갈아 끼우면 `relink_versions`가 같이 잇는다 | |
 | assignee_user_id | int | FK null 허용 | 내 할 일에 뜨는 사람. 담당 미지정이면 null | |
 | resolved_with_edit | boolean | null 허용 | 확인 시 문서를 고쳤는지. 미해결이면 null | |
 

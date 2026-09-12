@@ -111,6 +111,10 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ---
 
+**세 `raise_*`가 공통으로 하는 것 — `target_version_id`를 적는다.** 플래그를 만들 때 **대상 항목이 속한 문서의 최신 버전**을 함께 적는다. 담당자를 구하려고 이미 그 문서의 최근 작성자를 보므로(`SpecService.last_author`) 같은 자리에서 얻는다. [[SYNC-MS-008#queries.flag_view]]가 「그 뒤로 대상이 바뀌었나」를 이 값으로 판정한다 — **시각 비교가 아니다**([[SYNC-STD-004#DEV-18]], #17). 대상 문서에 버전이 없으면 null.
+
+---
+
 #### TrackingService.raise_flags 확인 필요 플래그
 
 **시그니처** `raise_flags(version_id: int, target_item_pks: list[int]) -> int`
@@ -272,7 +276,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-INFRA-001]] 6.1 · [[SYNC-MS-007#pipeline.import_tracking]] 6단계
 
-**입력** 자연키가 **이미 pk로 풀린** 행. 자연키를 푸는 것은 `pipeline`의 몫이다 — 이 묶음은 문서·항목을 모른다([[SYNC-DOM-001]] 4장 경계)
+**입력** 자연키가 **이미 pk로 풀린** 행(`target_version_id` 포함). 자연키를 푸는 것은 `pipeline`의 몫이다 — 이 묶음은 문서·항목을 모른다([[SYNC-DOM-001]] 4장 경계)
 
 **처리** 행마다 `(kind, target_item_id, cause_item_id, cause_version_id, raised_at)`이 이미 있으면 건너뛰고, 없으면 `DB: flags insert` · `→ (넣은 수, 건너뛴 수)`
 
@@ -314,8 +318,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 1. **`old`의 id 목록으로** `propagation_decisions`를 찾는다 — 살아 있는 `versions`로 조인하면 안 된다. 이 시점에는 옛 버전이 이미 지워져 하나도 안 잡힌다. 각각 옛 `version_id` → `old` → `new`로 새 id
    - 찾으면 `DB: update version_id`
    - 못 찾으면 `DB: delete` — `version_id`가 **NOT NULL**이라 빈 값으로 둘 수 없다. `dropped`에 센다
-2. 프로젝트의 `flags` 중 `cause_version_id is not null`인 것마다: 같은 방식
-   - 못 찾으면 `DB: delete`. **`cause_version_id`를 NULL로 비우지 않는다** — 비우면 UI-11의 원인 diff·"그 뒤로 N번 더 바뀜"·중복 플래그 방지 JOIN이 전부 죽어 **판단 재료 없는 빈 카드**가 남는다. 사람이 처리할 수 없는 플래그를 남기느니 버리고 보고하는 게 낫다
+2. 프로젝트의 `flags` 중 `cause_version_id`나 `target_version_id`가 채워진 것마다: 같은 방식. **두 컬럼을 따로 잇는다** — 하나를 못 이어도 다른 하나는 살린다
+   - `cause_version_id`를 못 찾으면 `DB: delete`. **NULL로 비우지 않는다** — 비우면 UI-11의 원인 diff·"그 뒤로 N번 더 바뀜"·중복 플래그 방지 JOIN이 전부 죽어 **판단 재료 없는 빈 카드**가 남는다. 사람이 처리할 수 없는 플래그를 남기느니 버리고 보고하는 게 낫다
+   - `target_version_id`를 못 찾으면 **NULL로 비운다.** 행을 버리지 않는다 — 이 값이 없으면 `target_changed_since_raise`가 `False`가 될 뿐, 플래그 자체는 여전히 쓸 수 있다. 원인과 달리 판단의 뼈대가 아니다
 3. `→ RelinkResult(relinked, dropped=[{kind, count, reason}])`
 
 **못 잇는 경우는 셋이고, 전부 「재구축이 그 버전을 다시 안 만든다」다.**
