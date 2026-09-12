@@ -31,6 +31,24 @@
       "affected": [
         "SYNC-API-001#GET/api/projects/{code}/flags",
         "SYNC-API-002#update_document",
+        "SYNC-CODE-001#B4",
+        "SYNC-DOM-002#ProjectService",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-API-001#POST/api/admin/repos/{code}/rebuild",
+        "SYNC-API-001#POST/api/admin/repos/{code}/restore"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-API-001@04197c7d2cc65189b0d1a909f72d300a98057068"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#GET/api/projects/{code}/flags",
+        "SYNC-API-002#update_document",
         "SYNC-MS-007#pipeline.rebuild",
         "SYNC-MS-007#pipeline.save_pipeline"
       ],
@@ -56,6 +74,22 @@
       "decided_at": null,
       "decided_by": null,
       "version": "SYNC-DOM-001@d16e8344967a463b667981eab6ea644017dd96ce"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A",
+        "SYNC-DOM-003#users",
+        "SYNC-MS-006#AccountService.create_placeholder",
+        "SYNC-MS-006#AccountService.user_for_commit"
+      ],
+      "changed": [
+        "SYNC-DOM-002#CommentService",
+        "SYNC-DOM-002#TrackingService"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-DOM-002@04197c7d2cc65189b0d1a909f72d300a98057068"
     },
     {
       "affected": [
@@ -93,6 +127,20 @@
       "decided_at": null,
       "decided_by": null,
       "version": "SYNC-DOM-003@2533ce59c8a40373667e60b1cdd5633f38e8a685"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B4",
+        "SYNC-CODE-001#D6",
+        "SYNC-MS-007#scheduler.catch_up"
+      ],
+      "changed": [
+        "SYNC-MS-001#ProjectService.repo_status"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-MS-001@c5340ef8b0145fde7f7a7a5c7e1e6c6604fd9259"
     },
     {
       "affected": [
@@ -163,6 +211,27 @@
     },
     {
       "affected": [
+        "SYNC-MS-002#SpecService.item_pks",
+        "SYNC-MS-004#TrackingService.all_decisions",
+        "SYNC-MS-004#TrackingService.all_flags",
+        "SYNC-MS-004#TrackingService.restore_decisions",
+        "SYNC-MS-004#TrackingService.restore_flags",
+        "SYNC-MS-005#CommentService.all_in_project",
+        "SYNC-MS-005#CommentService.restore"
+      ],
+      "changed": [
+        "SYNC-MS-007#pipeline.export_tracking",
+        "SYNC-MS-007#pipeline.import_tracking",
+        "SYNC-MS-007#scheduler.backup_loop",
+        "SYNC-MS-007#scheduler.poll_loop"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-MS-007@c5340ef8b0145fde7f7a7a5c7e1e6c6604fd9259"
+    },
+    {
+      "affected": [
         "SYNC-CODE-001#B1",
         "SYNC-CODE-001#B4"
       ],
@@ -187,6 +256,20 @@
       "decided_at": null,
       "decided_by": null,
       "version": "SYNC-MS-009@0a1ada2324d4b49c5b976708372129f607f06285"
+    },
+    {
+      "affected": [
+        "SYNC-INFRA-001#C2",
+        "SYNC-INFRA-001#C5",
+        "SYNC-UI-002#UI-13"
+      ],
+      "changed": [
+        "SYNC-PRD-001#N3"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-PRD-001@c8f2749c0fc42d778808f459a9adf5ff9d907a89"
     },
     {
       "affected": [
@@ -318,6 +401,21 @@
       "decided_at": null,
       "decided_by": null,
       "version": "SYNC-UI-001@13dc4638cf73ca1307f91c86a248fa7178402bcb"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B4",
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#D5",
+        "SYNC-MS-004#TrackingService.relink_versions"
+      ],
+      "changed": [
+        "SYNC-UI-002#UI-14"
+      ],
+      "choice": "undecided",
+      "decided_at": null,
+      "decided_by": null,
+      "version": "SYNC-UI-002@99e390ebdfed747d2388660bd579ee4b7384399e"
     },
     {
       "affected": [
