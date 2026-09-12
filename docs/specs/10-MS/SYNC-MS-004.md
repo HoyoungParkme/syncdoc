@@ -334,7 +334,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** `pipeline.rebuild` 7a단계
 
-**테스트 관점** 전파결정이 새 버전을 가리킨다 · `affected_pks`가 그대로 · `needs_check` 플래그의 `cause_version_id`가 새 버전으로 · 문서가 삭제된 커밋의 결정은 버려지고 `dropped`에 센다 · 해제된 플래그도 `cause_version_id`가 있으면 다시 잇는다(FK는 해제 여부를 안 가린다)
+**테스트 관점** 전파결정이 새 버전을 가리킨다 · `affected_pks`가 그대로 · `needs_check` 플래그의 `cause_version_id`·`target_version_id`가 새 버전으로 · **대상 문서가 HEAD에서 사라지면 `target_version_id`만 null이 되고 행은 남는다** · 문서가 삭제된 커밋의 결정은 버려지고 `dropped`에 센다 · 해제된 플래그도 `cause_version_id`가 있으면 다시 잇는다(FK는 해제 여부를 안 가린다)
 
 ---
 

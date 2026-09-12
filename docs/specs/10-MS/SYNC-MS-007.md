@@ -251,7 +251,7 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 3. **트랜잭션 시작**
 3a. `old = spec.version_keys(project_id)` — **지우기 전에** `{옛 version_id: (document_id, commit_hash)}`를 뜬다. 버전 행이 사라지면 그 둘을 알 방법이 없다 — `propagation_decisions`·`flags`는 `version_id` 하나만 들고 있다(#38)
 4. `reference.clear(project_id)` · `spec.clear_index(project_id)` — `versions`와 커밋 있는 `status_changes` 삭제. `documents`·`items`는 유지(플래그·댓글 FK)
-4a. **`versions`를 가리키는 FK 셋을 여기서 센다**([[SYNC-MS-002#SpecService.clear_index]]). `references`는 4단계가 먼저 지우고, `propagation_decisions.version_id`·`flags.cause_version_id`는 **7a가 다시 잇는다.** 이 셋을 안 세서 실물 재구축이 죽었다 — 지금까지 "지우지 **않는** 테이블에 걸린 FK"만 셌다(#38)
+4a. **`versions`를 가리키는 FK 넷을 여기서 센다**([[SYNC-MS-002#SpecService.clear_index]]). `references`는 4단계가 먼저 지우고, `propagation_decisions.version_id`·`flags.cause_version_id`·`flags.target_version_id`는 **7a가 다시 잇는다.** 이것들을 안 세서 실물 재구축이 죽었다 — 지금까지 "지우지 **않는** 테이블에 걸린 FK"만 셌다(#38)
 5. `paths = git.list(repo, "docs/specs/*/*.md")` (`_templates`·`assets` 제외. 번호 붙은 디렉터리도 `*`에 걸린다)
 6. 파일마다:
    - `log = git.log(repo, path)` 오래된 것부터 `[(hash, login, email, date, message, path)]`
@@ -364,7 +364,7 @@ async def export_tracking(code: str) -> str
 | 사람 | `github_login` | `HoyoungParkme` |
 | 댓글 | `{작성시각}|{작성자}` — 두 필드에서 **계산한다**(따로 안 적는다) | `2026-09-07T11:02:03.4+00:00|minjun` |
 
-**최상위에 `backup_version`과 `project`만 둔다.** `backup_version`은 형식이 바뀌었을 때 거절할 근거다. `project`는 **DB를 잃으면 이 파일이 어느 프로젝트 것인지 알 방법이 파일 안에만 있기 때문**이다. **내보낸 시각을 넣지 않는다** — 내용이 그대로여도 매 주기 파일이 바뀌어 빈 커밋이 쌓인다. 마지막 백업 시각은 커밋 자신이 들고 있다
+**최상위에 `backup_version`과 `project`만 둔다.** `backup_version`은 형식이 바뀌었을 때 거절할 근거다. **지금은 2다** — 플래그에 `target_version`이 생겼다(#17). **1도 계속 읽는다**: 형식을 올렸다고 이미 떠 둔 백업을 못 읽게 만들면 정작 DB를 잃은 날 쓸모가 없다. 1에는 `target_version`이 없으므로 null로 읽는다. `project`는 **DB를 잃으면 이 파일이 어느 프로젝트 것인지 알 방법이 파일 안에만 있기 때문**이다. **내보낸 시각을 넣지 않는다** — 내용이 그대로여도 매 주기 파일이 바뀌어 빈 커밋이 쌓인다. 마지막 백업 시각은 커밋 자신이 들고 있다
 
 **결정적 직렬화.** 키 정렬 · 들여쓰기 2 · 비ASCII 그대로 · 끝 개행. 정렬 열쇠는 플래그 `(대상, 부여시각, 종류, 원인, 원인버전)` · 전파결정 `(버전)` · 댓글 `(문서, 작성시각, 작성자)` · 영향 항목 목록은 문자열 오름차순. **pk 순서를 그대로 쓰면 재구축 때마다 내용이 같아도 diff가 난다**
 
@@ -392,7 +392,7 @@ async def import_tracking(code: str) -> RestoreResult
 1. **저장소 락 획득.** 이유가 `export_tracking`과 다르다 — **재구축이 같은 락 안에서 `versions`를 지우고 다시 만든다.** 복원이 그 사이에 끼면 곧 사라질 버전에 결정을 붙인다
 2. `project = ProjectService.get(code)`
 3. `git: git.fetch(workdir)` · `본문 = git.read(workdir, "backup/tracking.json", "origin/HEAD")` · 없으면 `! not-found {resource: backup, id: code}`. **`origin/HEAD`로 읽는다** — 로컬 HEAD는 뒤처질 수 있고 백업은 원격이 진실이다
-4. `backup_version`이 모르는 값이거나 `project`가 이 프로젝트가 아니면 `! backup-invalid {reason}`. **다른 프로젝트의 백업을 붓지 않는다**
+4. `backup_version`이 **1도 2도 아니거나** `project`가 이 프로젝트가 아니면 `! backup-invalid {reason}`. **다른 프로젝트의 백업을 붓지 않는다**. 1이면 플래그의 `target_version`을 null로 본다
 5. 지도 넷을 만든다 — 행마다 조회하지 않는다. 문서(`get_document`, 없으면 그 문서를 가리키는 행은 전부 건너뜀) · 항목(`item_pks(document_id, include_deleted=True)`를 문서마다 한 번) · 버전(`version_keys`를 **뒤집는다** — 새 함수가 필요 없다) · 사람(`user_by_login` 없으면 `create_placeholder`)
 6. 플래그를 pk로 풀어 `TrackingService.restore_flags`
 7. 전파결정을 풀어 `restore_decisions`. `version`을 못 찾으면 행 전체를 버리고, `affected`·`changed`에서 못 찾는 항목은 **그 원소만** 뺀다
@@ -409,7 +409,8 @@ async def import_tracking(code: str) -> RestoreResult
 |---|---|
 | 문서 | 그 문서의 댓글·그 문서 항목을 가리키는 플래그를 건너뜀 |
 | 항목 | 행 건너뜀. **`원인`이 있는데 못 찾으면 비우지 않고 버린다** — 비우면 UI-11의 원인 diff·중복 방지가 죽어 판단 재료 없는 빈 카드가 남는다(`relink_versions`와 같은 판단) |
-| 커밋 | 행 건너뜀 |
+| 커밋 (전파결정의 버전 · 플래그의 `원인 버전`) | 행 건너뜀 |
+| 커밋 (플래그의 `대상 버전`) | **비우고 행은 넣는다.** 없으면 `target_changed_since_raise`가 `False`가 될 뿐이라 플래그는 여전히 쓸 수 있다 — 원인과 달리 판단의 뼈대가 아니다([[SYNC-MS-004#TrackingService.relink_versions]] 2단계와 같은 판단) |
 | 결정 안의 항목 | **그 원소만** 빼고 행은 넣는다 |
 | 부모 댓글 | 행 건너뜀. 최상위로 올리지 않는다 — 스레드가 아니었던 척하게 된다 |
 | 사람 | **건너뛰지 않는다.** 없으면 자리표시를 만든다. `author_user_id`가 NOT NULL이라 비울 수 없고, 재구축이 커밋 작성자로 자리표시를 만드는 길이 이미 있어 같은 규칙을 한 번 더 쓰는 것이다 |
@@ -420,7 +421,7 @@ async def import_tracking(code: str) -> RestoreResult
 
 **호출하는 것** [[SYNC-MS-001#ProjectService.get]] · [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.item_pks]] [[SYNC-MS-002#SpecService.version_keys]] · [[SYNC-MS-004#TrackingService.restore_flags]] [[SYNC-MS-004#TrackingService.restore_decisions]] · [[SYNC-MS-005#CommentService.restore]] · [[SYNC-MS-006#AccountService.user_by_login]] [[SYNC-MS-006#AccountService.create_placeholder]] · `git.fetch` `git.read`
 
-**테스트 관점** 내보내고 → 세 표를 비우고 → 복원: 행 수와 값이 같다(본문·사유만 빈다) · **두 번 복원하면 둘째는 전부 0이고 `skipped`가 첫 번째의 합** · 다른 프로젝트 코드의 파일 → `backup-invalid` · 모르는 `backup_version` → `backup-invalid` · 백업 파일 없음 → `not-found` · 문서 하나를 지우고 재구축한 뒤 복원 → 그 문서 관련 행만 `dropped` · 답글이 있는 스레드의 부모·자식 순서가 살아난다 · 모르는 login → 자리표시가 하나 생긴다 · **재구축을 안 하고 빈 DB에 복원 → 전부 `dropped`, 예외 없음**
+**테스트 관점** 내보내고 → 세 표를 비우고 → 복원: 행 수와 값이 같다(본문·사유만 빈다) · **두 번 복원하면 둘째는 전부 0이고 `skipped`가 첫 번째의 합** · 다른 프로젝트 코드의 파일 → `backup-invalid` · 모르는 `backup_version` → `backup-invalid` · **`backup_version: 1` 파일(대상 버전 없음) → 복원되고 그 플래그의 `target_version_id`가 null** · 백업 파일 없음 → `not-found` · 문서 하나를 지우고 재구축한 뒤 복원 → 그 문서 관련 행만 `dropped` · 답글이 있는 스레드의 부모·자식 순서가 살아난다 · 모르는 login → 자리표시가 하나 생긴다 · **재구축을 안 하고 빈 DB에 복원 → 전부 `dropped`, 예외 없음**
 
 ---
 
