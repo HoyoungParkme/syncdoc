@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.spec.models import Document, Item
@@ -135,16 +135,32 @@ class TrackingRepository:
         stmt = select(PropagationDecision).where(PropagationDecision.version_id.in_(version_ids))
         return list(self.session.scalars(stmt.order_by(PropagationDecision.id)))
 
-    def flags_with_cause_version(self, project_id: int) -> list[Flag]:
-        """cause_version_id가 채워진 플래그 전부. 해제 여부를 안 가린다 — FK는 안 가린다."""
+    def flags_with_version(self, project_id: int) -> list[Flag]:
+        """버전을 가리키는 플래그 전부 — 원인이든 대상이든.
+
+        해제 여부를 안 가린다 — FK는 안 가린다.
+        """
         stmt = (
             select(Flag)
             .join(Item, Item.id == Flag.target_item_id)
             .join(Document, Document.id == Item.document_id)
-            .where(Document.project_id == project_id, Flag.cause_version_id.is_not(None))
+            .where(
+                Document.project_id == project_id,
+                or_(Flag.cause_version_id.is_not(None), Flag.target_version_id.is_not(None)),
+            )
             .order_by(Flag.id)
         )
         return list(self.session.scalars(stmt))
+
+    def latest_version_id_of_document(self, document_id: int) -> int | None:
+        """대상 문서의 최신 버전 id — 플래그의 target_version_id (MS-004 raise_* 공통)."""
+        stmt = (
+            select(VersionRow.id)
+            .where(VersionRow.document_id == document_id)
+            .order_by(VersionRow.version_no.desc())
+            .limit(1)
+        )
+        return self.session.scalar(stmt)
 
     def delete_rows(self, rows: list) -> None:
         for r in rows:

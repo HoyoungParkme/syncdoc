@@ -24,6 +24,7 @@ class Flag(Base):
         Index("ix_flags_kind_resolved_at", "kind", "resolved_at"),
         Index("ix_flags_cause_item_id", "cause_item_id"),
         Index("ix_flags_cause_version_id", "cause_version_id"),
+        Index("ix_flags_target_version_id", "target_version_id"),
         Index("ix_flags_resolved_by_user_id", "resolved_by_user_id"),
     )
 
@@ -32,6 +33,9 @@ class Flag(Base):
     target_item_id: Mapped[int] = mapped_column(ForeignKey("items.id"))
     cause_item_id: Mapped[int | None] = mapped_column(ForeignKey("items.id"))
     cause_version_id: Mapped[int | None] = mapped_column(ForeignKey("versions.id"))
+    # 부여 시점 대상 문서의 최신 버전. 「그 뒤로 대상이 바뀌었나」를 이 id로 판정한다 —
+    # 시각 비교가 아니다 (SYNC-STD-004#DEV-18, #17). 대상 문서에 버전이 없으면 null
+    target_version_id: Mapped[int | None] = mapped_column(ForeignKey("versions.id"))
     assignee_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     raised_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     resolved_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))

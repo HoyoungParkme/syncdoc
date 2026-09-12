@@ -75,6 +75,7 @@ app/
 │   ├── account/            사용자, 액세스토큰
 │   │
 │   ├── types.py            2.7 열거형 · 2.8 DTO. 묶음 전부가 쓰므로 묶음 밖
+│   ├── clock.py            저장하는 시각. **프로세스 안에서 절대 뒤로 안 간다** (STD-004 DEV-18). 묶음 전부가 쓴다
 │   ├── markdown.py         순수 함수 — frontmatter 파싱 · 코드 마스킹 · 헤딩/참조 정규식 · 항목 블록 자르기. spec·reference가 같이 쓴다. DB 없음
 │   ├── errors.py           problem+json 타입마다 예외 클래스 하나 (STD-004 DEV-5)
 │   ├── pipeline.py         쓰기 조율. 묶음들을 순서대로 부른다
@@ -294,6 +295,7 @@ classDiagram
         +int target_item_id
         +int cause_item_id
         +int cause_version_id
+        +int target_version_id
         +int assignee_user_id
         +datetime raised_at
         +int resolved_by_user_id
@@ -449,7 +451,7 @@ classDiagram
 | `Commit` | `hash: str` · `login: str` · `date: datetime` · `message: str` · `email: str` · `path: str` | git.log → rebuild. `ChangedFile`과 같은 이유로 이메일을 함께 싣는다. `path`는 **그 커밋 시점의 경로** — `--follow`가 이름 바뀌기 전 커밋까지 주므로 지금 경로로는 본문을 못 읽는다([[SYNC-MS-009#git.log]]) |
 | `GithubUser` | `id: int` · `login: str` · `name: str` | github.get_user → login_github |
 | `RelinkResult` | `relinked: int` · `dropped: list~dict~` | tracking.relink_versions. `dropped`는 `{kind, count, reason}` — 재구축 결과가 그대로 실어 UI-14 5.3에 나간다 |
-| `RestoreFlag` | `kind: str` · `target_item_id: int` · `cause_item_id: int \| None` · `cause_version_id: int \| None` · `assignee_user_id: int \| None` · `raised_at: datetime` · `resolved_by_user_id: int \| None` · `resolved_at: datetime \| None` · `resolved_with_edit: bool \| None` | 백업에서 읽어 **pk로 이미 푼** flags 한 행. 자연키를 푸는 것은 `pipeline`의 몫이다 — 추적 묶음은 문서·항목을 모른다 |
+| `RestoreFlag` | `kind: str` · `target_item_id: int` · `cause_item_id: int \| None` · `cause_version_id: int \| None` · `target_version_id: int \| None` · `assignee_user_id: int \| None` · `raised_at: datetime` · `resolved_by_user_id: int \| None` · `resolved_at: datetime \| None` · `resolved_with_edit: bool \| None` | 백업에서 읽어 **pk로 이미 푼** flags 한 행. 자연키를 푸는 것은 `pipeline`의 몫이다 — 추적 묶음은 문서·항목을 모른다 |
 | `RestoreDecision` | `version_id: int` · `choice: str` · `affected_pks: list~int~` · `changed_pks: list~int~` · `decided_by_user_id: int \| None` · `decided_at: datetime \| None` | 같음. **`reason`이 없다** — 백업에 안 싣는다(인프라 6.1) |
 | `RestoreResult` | `flags: int` · `decisions: int` · `comments: int` · `skipped: int` · `dropped: list~dict~` | pipeline.import_tracking → API. `dropped`가 `RebuildResult`와 같은 모양이라 UI-14 5.3을 그대로 쓴다 |
 
@@ -800,6 +802,7 @@ classDiagram
         +int target_item_id
         +int cause_item_id
         +int cause_version_id
+        +int target_version_id
         +int assignee_user_id
         +datetime raised_at
         +int resolved_by_user_id

@@ -14,7 +14,6 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from mcp.server.transport_security import TransportSecuritySettings
-from starlette.middleware.sessions import SessionMiddleware
 
 from app import scheduler
 from app.config import settings
@@ -22,6 +21,7 @@ from app.core.errors import Internal, Problem
 from app.mcp.auth import BearerAuth
 from app.mcp.tools import server as mcp_server
 from app.web import auth
+from app.web.auth import SessionMiddleware
 from app.web.routers import (
     account,
     admin,

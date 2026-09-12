@@ -332,6 +332,8 @@ async def test_todo_decision_view_record_and_flag_view(scoped: Session) -> None:
     # 원인이 그 사이 또 바뀜(UC-H11 3a) → 누적 diff v1→v3 · 대상 저장 → 변경 있음
     rfq2 = svc.get_document("EXMP-RFQ-001")
     svc.save(rfq2, rfq2.body.replace("바뀐 내용", "또 바뀐 내용"), "r3", a_rfq, "spec: v3", [])
+    # 원인만 바뀌었다 — 대상은 그대로다. 버전 id로 견주므로 저장 순서·시각과 무관하다 (#17)
+    assert (await queries.flag_view(f.id)).target_changed_since_raise is False
     d2 = svc.get_document("EXMP-PRD-001")
     svc.save(d2, d2.body + "\n", "h2", a_prd, "spec: v2", [])
     fv2 = await queries.flag_view(f.id)

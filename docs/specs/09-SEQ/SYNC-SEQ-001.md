@@ -1062,6 +1062,7 @@ sequenceDiagram
         end
         P->>T: relink_versions(project_id, 새 버전 지도)
         T->>DB: propagation_decisions.version_id · flags.cause_version_id를 새 id로. 못 이으면 삭제
+        T->>DB: flags.target_version_id도 새 id로. 못 이으면 NULL (행은 남는다)
         P->>T: reassign_open_flags(project_id)
         T->>DB: 열린 플래그 담당자 = 대상 문서 최근 버전 작성자
         P->>DB: repositories.last_processed_commit = HEAD
@@ -1073,7 +1074,7 @@ sequenceDiagram
 
 **읽을 때 볼 것**
 - `documents` 행은 지우지 않는다. `flags`·`comments`가 그 pk를 물고 있다. `items`도 마찬가지로 지우면 플래그가 끊긴다 → **items는 지우면 안 된다.** upsert해야 한다 (되먹일 것 #18)
-- **지우는 테이블에 걸린 FK도 세야 한다.** 위 문장은 "지우지 **않는** 테이블에 걸린 FK"만 센다. `versions`를 가리키는 FK가 셋이고(`references`·`propagation_decisions`·`flags.cause_version_id`) 그중 둘을 안 세서 실물 재구축이 죽었다(#38). 지금은 `version_keys`로 옛 지도를 먼저 뜨고 `relink_versions`가 새 버전에 다시 잇는다
+- **지우는 테이블에 걸린 FK도 세야 한다.** 위 문장은 "지우지 **않는** 테이블에 걸린 FK"만 센다. `versions`를 가리키는 FK가 넷이고(`references`·`propagation_decisions`·`flags.cause_version_id`·`flags.target_version_id`) 그중 둘을 안 세서 실물 재구축이 죽었다(#38). 지금은 `version_keys`로 옛 지도를 먼저 뜨고 `relink_versions`가 새 버전에 다시 잇는다
 - **담당자 재계산은 재연결 뒤에 온다.** 담당자는 대상 문서의 최근 버전에서 오므로 버전이 다 제자리를 찾은 뒤라야 한다
 - 커밋마다 돌아서 버전 이력을 복원한다. SEQ-2(밀린 커밋)는 최종 상태만 저장하는 것과 다르다
 

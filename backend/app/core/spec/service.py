@@ -8,12 +8,12 @@ from __future__ import annotations
 import difflib
 import json
 import re
-from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.account.models import User
+from app.core.clock import now_utc
 from app.core.errors import (
     ConventionViolation,
     ItemDeleted,
@@ -829,7 +829,3 @@ def _entity_mismatch(body: str) -> list[Warning]:
         for name in sorted(a2)
         if name in a4 and a2[name] != a4[name]
     ]
-
-
-def now_utc() -> datetime:
-    return datetime.now(UTC)

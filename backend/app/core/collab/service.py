@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 
 from app.core.account.models import User
+from app.core.clock import now_utc
 from app.core.collab.models import Comment
 from app.core.collab.repository import CommentRepository
 from app.core.errors import NotFound
@@ -105,7 +106,7 @@ class CommentService:
                 body=body,
                 author_user_id=user.id,
                 is_resolved=False,
-                created_at=datetime.now(UTC),
+                created_at=now_utc(),
             )
         )
 

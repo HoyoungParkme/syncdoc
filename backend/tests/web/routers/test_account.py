@@ -7,6 +7,7 @@ import base64
 import json
 from urllib.parse import parse_qs, urlparse
 
+import pytest
 import sqlalchemy
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -79,6 +80,28 @@ def test_login_session_then_logout_clears(client: TestClient, db_session: Sessio
     assert session_of(client) == {"login": "hoyoung"}  # OAuth 임시값은 지워진다
     assert client.get("/__test/whoami").json() == {"login": "hoyoung"}
     assert client.post("/auth/logout").status_code == 204
+    assert client.get("/__test/whoami").status_code == 401
+
+
+def test_session_survives_a_clock_that_went_backward(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """시계가 1초 뒤로 가도 방금 발급한 세션이 살아 있어야 한다 (#17).
+
+    itsdangerous는 서명 시각이 미래면 만료로 보고 거절하고, Starlette은 그걸 조용히
+    빈 세션으로 바꾼다. 위쪽 만료만 보게 고쳤다 — 여기가 그 자리다.
+    """
+    import time
+
+    make_user(db_session, login="hoyoung")
+    assert client.get("/__test/login/hoyoung").status_code == 204
+
+    real = time.time
+    monkeypatch.setattr(time, "time", lambda: real() - 1.0)
+    assert client.get("/__test/whoami").json() == {"login": "hoyoung"}
+
+    # 위쪽 만료는 그대로 본다 — 15일 뒤면 거절이다
+    monkeypatch.setattr(time, "time", lambda: real() + 15 * 24 * 3600)
     assert client.get("/__test/whoami").status_code == 401
 
 

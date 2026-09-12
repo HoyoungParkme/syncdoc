@@ -480,13 +480,14 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **`documents`·`items`는 지우지 않는다** — `flags`·`comments`·`status_changes`가 FK. `items`는 재구축 `save`가 upsert. `current_version_no`는 **건드리지 않는다** — `ck_documents_version_no(>=1)` 때문에 0을 넣을 수 없다. 재구축의 `save(rebuild=True)`가 남은 버전 수 + 1로 다시 매긴다
 
-**`versions`를 가리키는 FK 셋을 센다.** 지금까지 이 자리는 "지우지 **않는** 테이블(`documents`·`items`)에 걸린 FK"만 셌다. 정작 **지우는 테이블에 걸린 FK**는 한 번도 안 셌고, 그래서 실물에서 재구축이 죽었다(#38). 셋 다 `ON DELETE NO ACTION`이라 남은 행이 있으면 `DELETE`가 막힌다.
+**`versions`를 가리키는 FK 넷을 센다.** 지금까지 이 자리는 "지우지 **않는** 테이블(`documents`·`items`)에 걸린 FK"만 셌다. 정작 **지우는 테이블에 걸린 FK**는 한 번도 안 셌고, 그래서 실물에서 재구축이 죽었다(#38). 넷 다 `ON DELETE NO ACTION`이라 남은 행이 있으면 `DELETE`가 막힌다.
 
 | FK | NULL | 누가 치우나 |
 |---|---|---|
 | `references.extracted_version_id` | NOT NULL | **호출자**가 `reference.clear`를 이 함수보다 먼저 부른다 |
 | `propagation_decisions.version_id` | **NOT NULL + UNIQUE** | **호출자**가 `tracking.relink_versions`로 새 버전에 다시 잇는다 |
 | `flags.cause_version_id` | null 허용 | 위와 같다. null 허용이지만 **비우면 안 된다** — UI-11의 원인 diff·`cause_change_count`·중복 플래그 방지가 전부 이 값에 매달려 있다 |
+| `flags.target_version_id` | null 허용 | 위와 같다. 이쪽은 **못 이으면 비운다** — 없으면 `target_changed_since_raise`가 `False`가 될 뿐 플래그는 여전히 쓸 수 있다(#17) |
 
 **이 함수는 재연결을 하지 않는다.** 추적 묶음(`flags`·`propagation_decisions`)은 명세 묶음 밖이고, 이 함수는 `SpecService`다([[SYNC-DOM-001]] 4장 경계). 재연결은 묶음을 잇는 `pipeline`의 몫이다([[SYNC-MS-007#pipeline.rebuild]] 3a·7b단계)
 

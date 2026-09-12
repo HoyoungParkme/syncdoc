@@ -327,7 +327,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 4. if `f.kind == broken_ref` → `cause_diff=None`, `cause_deleted_at = 원인 항목의 deleted_at`
 4a. if `f.kind == upstream_impact` → `cause_diff=None` · if `f.cause_item_pk` → `cause_body = SpecService.get_item(하위 항목).body` · else → `cause_body = 하위 문서 제목 + "(문서 단위 지목)"`
 5. `target = SpecService.get_item(target_doc_id, target_item_id)` → `target_body`, `target_version_no = target.doc_version_no` (UI-11 3.2 "v7" — 문서 API를 또 부르지 않게)
-6. `target_changed_since_raise = DB: versions where document=target_doc and created_at > f.raised_at` 존재 여부 (SpecService 경유)
+6. `target_changed_since_raise = 대상 문서의 current_version_id != f.target_version_id`
+
+**시각으로 판정하지 않는다.** 예전에는 `versions.created_at > f.raised_at`이었는데, 두 값 다 앱이 찍는 벽시계라 **시계가 뒤로 한 번 튀면 없던 인과가 생겼다** — 실물에서 이 테스트가 간헐로 깨졌다(#17). 시계는 단조롭지 않다([[SYNC-STD-004#DEV-18]]). 플래그를 붙일 때 대상 문서의 버전을 적어 두고 **그 버전이 아직도 최신인가**로 묻는다 — 시계와 무관하고, 재구축으로 버전이 갈려도 `relink_versions`가 같이 이어 준다.
+
+`f.target_version_id`가 null이면(대상 문서에 버전이 없던 옛 플래그) `False`로 본다 — 바뀌었다고 말할 근거가 없다.
 7. `→ FlagDetail(…)`
 
 **호출하는 것** `TrackingService.get_flag` · `SpecService.describe_items` `diff` `get_item`

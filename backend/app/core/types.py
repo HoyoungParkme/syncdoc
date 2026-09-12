@@ -161,6 +161,7 @@ class RestoreFlag:
     target_item_id: int
     cause_item_id: int | None
     cause_version_id: int | None
+    target_version_id: int | None
     assignee_user_id: int | None
     raised_at: datetime
     resolved_by_user_id: int | None

@@ -19,6 +19,7 @@ from app.core.errors import (
 )
 from app.core.project.models import Project, Repository
 from app.core.spec.service import SpecService
+from app.core.tracking.models import Flag
 from app.core.types import Author, AuthorKind, DocType, Entry
 from tests.conftest import git as g
 from tests.conftest import write_commit_push
@@ -859,7 +860,7 @@ async def test_rebuild_relinks_propagation_decision(scoped: Session, proj) -> No
 
 
 async def test_rebuild_relinks_flag_cause_version(scoped: Session, proj) -> None:
-    """cause_version_id가 있는 플래그도 다시 이어진다. NULL로 비우지 않는다."""
+    """cause_version_id·target_version_id 둘 다 다시 이어진다 (#38 · #17)."""
     from app.core.tracking.service import TrackingService
 
     other, remote = proj["repos"]["other"], proj["repos"]["remote"]
@@ -871,17 +872,54 @@ async def test_rebuild_relinks_flag_cause_version(scoped: Session, proj) -> None
     tr.raise_upstream([q1], svc.get_document("EXMP-PRD-001").id, vid, None)
     scoped.commit()
     assert scoped.execute(text("SELECT cause_version_id FROM flags")).scalar() == vid
+    tvid, tvhash = _first_version(scoped, "EXMP-RFQ-001")  # 대상 문서는 버전이 하나뿐이다
+    assert scoped.execute(text("SELECT target_version_id FROM flags")).scalar() == tvid
 
     await pipeline.rebuild("EXMP")
 
-    new_cause = scoped.execute(text("SELECT cause_version_id FROM flags")).scalar()
+    new_cause, new_target = scoped.execute(
+        text("SELECT cause_version_id, target_version_id FROM flags")
+    ).one()
     assert new_cause is not None and new_cause != vid
-    assert (
+    assert new_target is not None and new_target != tvid
+    hashes = dict(
         scoped.execute(
-            text("SELECT commit_hash FROM versions WHERE id = :i"), {"i": new_cause}
-        ).scalar()
-        == vhash
+            text("SELECT id, commit_hash FROM versions WHERE id IN (:a, :b)"),
+            {"a": new_cause, "b": new_target},
+        ).all()
     )
+    assert (hashes[new_cause], hashes[new_target]) == (vhash, tvhash)
+
+
+async def test_rebuild_empties_target_version_but_keeps_the_flag(scoped: Session, proj) -> None:
+    """대상 버전을 못 이으면 비우고 행은 남긴다 — 원인과 달리 판단의 뼈대가 아니다 (#17)."""
+    from app.core.tracking.service import TrackingService
+
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    await pipeline.rebuild("EXMP")
+    svc, tr = SpecService(scoped), TrackingService(scoped)
+    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
+    # 원인 없는 종류(broken_ref)라야 대상 버전만 못 이었을 때를 볼 수 있다
+    tr.repo.add(
+        Flag(
+            kind="broken_ref",
+            target_item_id=q1,
+            assignee_user_id=None,
+            target_version_id=_first_version(scoped, "EXMP-RFQ-001")[0],
+        )
+    )
+    scoped.commit()
+    # 대상 문서를 지운다 → 그 버전이 재구축에서 다시 안 만들어진다
+    g(other, "rm", "-q", RFQ_FILE)
+    g(other, "commit", "-q", "-m", "spec: RFQ 삭제")
+    g(other, "push", "-q", "origin", "HEAD:main")
+
+    r = await pipeline.rebuild("EXMP")
+
+    assert scoped.execute(text("SELECT count(*) FROM flags")).scalar() == 1  # 행은 남는다
+    assert scoped.execute(text("SELECT target_version_id FROM flags")).scalar() is None
+    assert [d for d in r.dropped if d["kind"] == "flag"] == []  # 버린 게 아니다
 
 
 async def test_rebuild_drops_unlinkable_and_reports(scoped: Session, proj) -> None:
@@ -948,7 +986,7 @@ async def test_export_tracking_writes_skeleton_and_is_stable(scoped: Session, pr
 
     h1 = await pipeline.export_tracking("EXMP")
     data = json.loads(g(proj["repos"]["work"], "show", f"{h1}:backup/tracking.json"))
-    assert (data["backup_version"], data["project"]) == (1, "EXMP")
+    assert (data["backup_version"], data["project"]) == (2, "EXMP")
     assert len(data["flags"]) == 1 and len(data["propagation_decisions"]) == 1
     assert [c["parent"] for c in data["comments"]] == [None, data["comments"][0]["at"] + "|hoyoung"]
     # 자유 텍스트와 시각 헤더는 안 싣는다 — 저장소가 public이고, 시각은 매번 diff를 만든다
@@ -957,6 +995,8 @@ async def test_export_tracking_writes_skeleton_and_is_stable(scoped: Session, pr
     # 자연키로 적힌다
     assert data["flags"][0]["target"] == "EXMP-RFQ-001#Q1"
     assert "@" in data["flags"][0]["cause_version"]
+    # 대상 버전도 자연키로 — 2에서 생겼다 (#17)
+    assert "@" in data["flags"][0]["target_version"]
 
     assert await pipeline.export_tracking("EXMP") == h1  # 두 번 불러도 커밋이 하나
 
@@ -997,6 +1037,31 @@ async def test_import_tracking_round_trip_and_idempotent(scoped: Session, proj) 
     r2 = await pipeline.import_tracking("EXMP")
     assert (r2.flags, r2.decisions, r2.comments) == (0, 0, 0)
     assert r2.skipped == sum(before.values())
+
+
+async def test_import_tracking_reads_backup_version_1(scoped: Session, proj) -> None:
+    """형식 1(대상 버전이 없던 판)도 계속 읽는다 — 그 플래그는 대상 버전이 null (#17)."""
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    await pipeline.rebuild("EXMP")
+    await _seed_tracking(scoped, proj)
+    h = await pipeline.export_tracking("EXMP")
+    data = json.loads(g(proj["repos"]["work"], "show", f"{h}:backup/tracking.json"))
+    # 형식을 1로 되돌린다 — 그때 파일에는 target_version 자체가 없었다
+    data["backup_version"] = 1
+    for row in data["flags"]:
+        del row["target_version"]
+    g(other, "fetch", "-q", "origin")
+    g(other, "reset", "-q", "--hard", "origin/main")
+    write_commit_push(other, "backup/tracking.json", json.dumps(data), "chore: 옛 형식 백업")
+    for t_ in ("comments", "propagation_decisions", "flags"):
+        scoped.execute(text(f"DELETE FROM {t_}"))  # noqa: S608 — 상수 목록
+    scoped.commit()
+
+    r = await pipeline.import_tracking("EXMP")
+
+    assert (r.flags, r.dropped) == (1, [])  # 거절하지 않는다
+    assert scoped.execute(text("SELECT target_version_id FROM flags")).scalar() is None
 
 
 async def test_import_tracking_rejects_other_project_and_missing_file(
