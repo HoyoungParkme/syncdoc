@@ -34,10 +34,17 @@ class TrackingService:
         self.spec = SpecService(session)
         self.references = ReferenceService(session)
 
-    def _assignee_of(self, target_pk: int) -> int | None:
+    def _target_of(self, target_pk: int) -> tuple[int | None, int | None]:
+        """(담당자, 대상 문서의 최신 버전 id) — 세 raise_*가 공통으로 쓴다 (MS-004).
+
+        담당자를 구하려고 이미 그 문서의 최근 작성자를 보므로 대상 버전도 같은 자리에서
+        얻는다. 대상 문서에 버전이 없으면 둘 다 None.
+        """
         doc_id = self.repo.document_id_of_item(target_pk)
-        la = self.spec.last_author(doc_id) if doc_id is not None else None
-        return la.user_id if la else None
+        if doc_id is None:
+            return None, None
+        la = self.spec.last_author(doc_id)
+        return (la.user_id if la else None), self.repo.latest_version_id_of_document(doc_id)
 
     def detect_impact(
         self,
@@ -120,7 +127,7 @@ class TrackingService:
             causes = [
                 e.to_item_pk for e in self.references.upstream(target_pk) if e.to_item_pk in changed
             ]
-            assignee = self._assignee_of(target_pk)
+            assignee, target_version = self._target_of(target_pk)
             for cause_pk in causes or [
                 None
             ]:  # 원인 하나에 플래그 하나. 문서 단위 참조면 원인 항목 없음
@@ -132,6 +139,7 @@ class TrackingService:
                         target_item_id=target_pk,
                         cause_item_id=cause_pk,
                         cause_version_id=version_id,
+                        target_version_id=target_version,
                         assignee_user_id=assignee,
                         raised_at=now_utc(),
                     )
@@ -145,13 +153,15 @@ class TrackingService:
         for ref in self.references.downstream(cause_item_pk):
             if ref.from_item_pk is None:
                 continue
+            assignee, target_version = self._target_of(ref.from_item_pk)
             self.repo.add(
                 Flag(
                     kind=FlagKind.broken_ref,
                     target_item_id=ref.from_item_pk,
                     cause_item_id=cause_item_pk,
                     cause_version_id=None,
-                    assignee_user_id=self._assignee_of(ref.from_item_pk),
+                    target_version_id=target_version,
+                    assignee_user_id=assignee,
                     raised_at=now_utc(),
                 )
             )
@@ -170,13 +180,15 @@ class TrackingService:
         for target_pk in target_item_pks:
             if self.repo.has_unresolved_upstream(target_pk, cause_document_id):
                 continue
+            assignee, target_version = self._target_of(target_pk)
             self.repo.add(
                 Flag(
                     kind=FlagKind.upstream_impact,
                     target_item_id=target_pk,
                     cause_item_id=cause_item_pk,
                     cause_version_id=cause_version_id,
-                    assignee_user_id=self._assignee_of(target_pk),
+                    target_version_id=target_version,
+                    assignee_user_id=assignee,
                     raised_at=now_utc(),
                 )
             )
@@ -277,6 +289,7 @@ class TrackingService:
                     target_item_id=r.target_item_id,
                     cause_item_id=r.cause_item_id,
                     cause_version_id=r.cause_version_id,
+                    target_version_id=r.target_version_id,
                     assignee_user_id=r.assignee_user_id,
                     raised_at=r.raised_at,
                     resolved_by_user_id=r.resolved_by_user_id,
@@ -321,9 +334,11 @@ class TrackingService:
         재구축이 versions를 다시 만들면 id가 전부 바뀐다. 전파결정과 플래그가 옛 id를
         가리키므로 (document_id, commit_hash)를 열쇠로 새 id에 다시 잇는다 (#38).
 
-        못 이으면 행을 지운다. cause_version_id를 NULL로 비우지 않는 것은, 비우면
+        두 버전 컬럼을 따로 잇는다 — 하나를 못 이어도 다른 하나는 살린다.
+        cause_version_id를 못 이으면 행을 지운다. NULL로 비우지 않는 것은, 비우면
         UI-11의 원인 diff·"그 뒤로 N번 더 바뀜"·중복 방지 JOIN이 전부 죽어 판단
-        재료 없는 빈 카드가 남기 때문이다.
+        재료 없는 빈 카드가 남기 때문이다. target_version_id는 반대로 비운다 —
+        없으면 target_changed_since_raise가 False가 될 뿐 플래그는 여전히 쓸 수 있다.
         """
         relinked, drop_dec, drop_flag, taken = 0, [], [], set()
 
@@ -341,7 +356,13 @@ class TrackingService:
             if d.version_id != nid:
                 d.version_id = nid
                 relinked += 1
-        for f in self.repo.flags_with_cause_version(project_id):
+        for f in self.repo.flags_with_version(project_id):
+            tid = resolve(f.target_version_id)
+            if f.target_version_id != tid:  # 못 찾으면 None — 비우고 행은 남긴다
+                f.target_version_id = tid
+                relinked += 1
+            if f.cause_version_id is None:
+                continue
             nid = resolve(f.cause_version_id)
             if nid is None:
                 drop_flag.append(f)
@@ -369,7 +390,10 @@ class TrackingService:
         """
         changed = 0
         for f in self.repo.unresolved_of_project(project_id):
-            a = self._assignee_of(f.target_item_id)
+            # target_version_id는 여기서 안 건드린다 — 부여 **시점**의 값이라 지금 것으로
+            # 다시 계산하면 늘 최신과 같아져 「그 뒤로 바뀌었나」가 영영 False가 된다.
+            # 재구축으로 id가 바뀐 것은 relink_versions가 7a에서 이미 이었다
+            a, _ = self._target_of(f.target_item_id)
             if a != f.assignee_user_id:
                 f.assignee_user_id = a
                 changed += 1

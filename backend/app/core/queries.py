@@ -463,8 +463,12 @@ async def flag_view(flag_id: int) -> FlagDetail:
         item = spec.get_item(target.doc_id, target.item_id)
         detail.target_body, detail.target_version_no = item.body, item.doc_version_no
         tdoc = spec.get_document(target.doc_id)
-        latest = spec.versions_by_ids([tdoc.current_version_id])[tdoc.current_version_id]  # type: ignore[index]
-        detail.target_changed_since_raise = latest.created_at > f.raised_at
+        # 시각 비교가 아니다 — 부여 시점 버전의 **id**와 지금 최신 버전의 id를 견준다.
+        # `datetime.now(UTC)`가 뒤로 갈 수 있어 부여 직후의 버전이 더 옛날로 보였다
+        # (SYNC-STD-004#DEV-18, #17). null이면 바뀌었다고 말할 근거가 없어 False
+        detail.target_changed_since_raise = (
+            f.target_version_id is not None and tdoc.current_version_id != f.target_version_id
+        )
         return detail
 
 

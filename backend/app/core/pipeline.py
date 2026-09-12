@@ -471,7 +471,7 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
         s.execute(
             text(
                 "SET CONSTRAINTS propagation_decisions_version_id_fkey,"
-                " flags_cause_version_id_fkey DEFERRED"
+                " flags_cause_version_id_fkey, flags_target_version_id_fkey DEFERRED"
             )
         )
         # 3a — 지우기 전에 옛 지도를 뜬다. 버전 행이 사라지면 document_id·commit_hash를
@@ -566,7 +566,8 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
 
 # ── 추적 데이터 백업 (SYNC-INFRA-001 6.1, #16) ──
 _BACKUP_PATH = "backup/tracking.json"
-_BACKUP_VERSION = 1
+_BACKUP_VERSION = 2  # 2에서 플래그에 target_version이 생겼다 (#17)
+_BACKUP_VERSIONS_READ = (1, 2)  # 형식을 올려도 이미 떠 둔 백업은 계속 읽는다 (MS-007)
 
 
 def _iso(dt: datetime | None) -> str | None:
@@ -646,6 +647,7 @@ async def export_tracking(code: str) -> str:
                             "target": item_key(f.target_item_id),
                             "cause": item_key(f.cause_item_id),
                             "cause_version": version_key(f.cause_version_id),
+                            "target_version": version_key(f.target_version_id),
                             "assignee": login(f.assignee_user_id),
                             "raised_at": _iso(f.raised_at),
                             "resolved_by": login(f.resolved_by_user_id),
@@ -728,7 +730,7 @@ async def import_tracking(code: str) -> RestoreResult:
             except GitError as e:
                 raise NotFound("backup", code) from e
             data = json.loads(text)
-            if data.get("backup_version") != _BACKUP_VERSION:
+            if data.get("backup_version") not in _BACKUP_VERSIONS_READ:
                 raise BackupInvalid("version")
             if data.get("project") != code:
                 raise BackupInvalid("project")  # 다른 프로젝트의 백업을 붓지 않는다
@@ -750,8 +752,10 @@ async def import_tracking(code: str) -> RestoreResult:
             doc_ids = {r["doc"] for r in data["comments"] if r["doc"]}
             for r in data["flags"]:
                 doc_ids |= {k.split("#")[0] for k in (r["target"], r["cause"]) if k}
-                if r["cause_version"]:
-                    doc_ids.add(r["cause_version"].split("@")[0])
+                # 형식 1에는 target_version이 없다 — get으로 읽어 null로 본다 (MS-007)
+                for key in (r["cause_version"], r.get("target_version")):
+                    if key:
+                        doc_ids.add(key.split("@")[0])
             for r in data["propagation_decisions"]:
                 if r["version"]:
                     doc_ids.add(r["version"].split("@")[0])
@@ -805,6 +809,8 @@ async def import_tracking(code: str) -> RestoreResult:
                         cause_version_id=version_of.get(r["cause_version"])
                         if r["cause_version"]
                         else None,
+                        # 못 찾으면 비우고 행은 넣는다 — 원인과 달리 판단의 뼈대가 아니다
+                        target_version_id=version_of.get(r.get("target_version") or ""),
                         assignee_user_id=user_of.get(r["assignee"]) if r["assignee"] else None,
                         raised_at=datetime.fromisoformat(r["raised_at"]),
                         resolved_by_user_id=user_of.get(r["resolved_by"])
