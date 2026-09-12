@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app import db
 from app.core.account.models import User
 from app.core.account.service import AccountService
+from app.core.clock import now_utc
 from app.core.collab.service import CommentService
 from app.core.errors import (
     AlreadyCurrent,
@@ -367,9 +368,9 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]:
         with db.session_scope() as s:
             row = s.get(Repository, repo.id)
             assert row is not None
-            row.last_processed_commit, row.synced_at = head_hash, datetime.now(UTC)
+            row.last_processed_commit, row.synced_at = head_hash, now_utc()
             # 방금 head까지 처리했으니 뒤처짐은 0이다. 다음 폴링까지 낡은 값을 안 보이게
-            row.behind_by, row.fetched_at = 0, datetime.now(UTC)
+            row.behind_by, row.fetched_at = 0, now_utc()
             s.commit()
         repo.last_processed_commit = head_hash
     return results
@@ -553,8 +554,8 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
         result.dropped = relink.dropped
         # 7b — 담당자는 대상 문서의 최근 버전에서 오므로 재연결 뒤라야 한다 (MS-007 rebuild 7b)
         tracking.reassign_open_flags(project.id)
-        repo.last_processed_commit, repo.synced_at = head, datetime.now(UTC)
-        repo.behind_by, repo.fetched_at = 0, datetime.now(UTC)  # 재구축은 head까지 읽었다
+        repo.last_processed_commit, repo.synced_at = head, now_utc()
+        repo.behind_by, repo.fetched_at = 0, now_utc()  # 재구축은 head까지 읽었다
         s.commit()
     except Exception as e:  # noqa: BLE001 — 어느 단계든 실패하면 롤백 (MS-007)
         s.rollback()

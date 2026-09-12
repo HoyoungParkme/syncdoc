@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import secrets
-from datetime import UTC, datetime
 
 from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from sqlalchemy.exc import IntegrityError
@@ -14,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.account.models import AccessToken, CommitEmail, User
 from app.core.account.repository import AccountRepository
+from app.core.clock import now_utc
 from app.core.errors import EmailTaken, NotFound, Unauthorized
 from app.core.types import IssuedToken, UserRef
 from app.infra import github
@@ -72,7 +72,7 @@ class AccountService:
             user_id=user.id,
             token_hash=_sha256(raw),
             label=label,
-            issued_at=datetime.now(UTC),
+            issued_at=now_utc(),
             expires_at=None,  # v1은 만료 없음 (INFRA 9장). 컬럼과 검증 분기는 남긴다
             last_used_at=None,
         )
@@ -83,15 +83,15 @@ class AccountService:
         t = self.repo.token_of_user(token_id, user.id)
         if t is None:
             raise NotFound("access_token", token_id)
-        t.revoked_at = datetime.now(UTC)
+        t.revoked_at = now_utc()
         self.session.flush()
 
     def authenticate_token(self, raw: str) -> User | None:
         """SYNC-MS-006#AccountService.authenticate_token"""
         t = self.repo.token_by_hash(_sha256(raw))
-        if t is None or t.revoked_at or (t.expires_at and t.expires_at < datetime.now(UTC)):
+        if t is None or t.revoked_at or (t.expires_at and t.expires_at < now_utc()):
             return None
-        t.last_used_at = datetime.now(UTC)  # 통과한 요청만. 만료가 없어 이게 유일한 사용 흔적
+        t.last_used_at = now_utc()  # 통과한 요청만. 만료가 없어 이게 유일한 사용 흔적
         self.session.flush()
         return self.repo.user_by_id(t.user_id)
 

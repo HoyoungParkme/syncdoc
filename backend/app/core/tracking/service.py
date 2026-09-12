@@ -6,11 +6,10 @@ B1: raise_broken · raise_upstream · flags_for_items · count_flags*. B3: 나�
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 from sqlalchemy.orm import Session
 
 from app.core.account.models import User
+from app.core.clock import now_utc
 from app.core.errors import AlreadyDecided, AlreadyResolved, NotFound, ReasonRequired
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
@@ -104,7 +103,7 @@ class TrackingService:
         if choice == Propagation.skip and not reason:
             raise ReasonRequired()
         dec.choice, dec.reason = str(choice), reason
-        dec.decided_by_user_id, dec.decided_at = user.id, datetime.now(UTC)
+        dec.decided_by_user_id, dec.decided_at = user.id, now_utc()
         self.session.flush()
         n = (
             self.raise_flags(version_id, list(dec.affected_pks))
@@ -134,7 +133,7 @@ class TrackingService:
                         cause_item_id=cause_pk,
                         cause_version_id=version_id,
                         assignee_user_id=assignee,
-                        raised_at=datetime.now(UTC),
+                        raised_at=now_utc(),
                     )
                 )
                 n += 1
@@ -153,7 +152,7 @@ class TrackingService:
                     cause_item_id=cause_item_pk,
                     cause_version_id=None,
                     assignee_user_id=self._assignee_of(ref.from_item_pk),
-                    raised_at=datetime.now(UTC),
+                    raised_at=now_utc(),
                 )
             )
             n += 1
@@ -178,7 +177,7 @@ class TrackingService:
                     cause_item_id=cause_item_pk,
                     cause_version_id=cause_version_id,
                     assignee_user_id=self._assignee_of(target_pk),
-                    raised_at=datetime.now(UTC),
+                    raised_at=now_utc(),
                 )
             )
             n += 1
@@ -198,7 +197,7 @@ class TrackingService:
             raise AlreadyResolved(f.resolved_at.isoformat())
         f.resolved_by_user_id, f.resolved_at, f.resolved_with_edit = (
             user.id,
-            datetime.now(UTC),
+            now_utc(),
             target_changed,
         )
         self.session.flush()

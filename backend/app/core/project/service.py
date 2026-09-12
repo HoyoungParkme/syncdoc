@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import AccountService
+from app.core.clock import now_utc
 from app.core.errors import (
     ExistingSpecs,
     NotFound,
@@ -22,7 +23,6 @@ from app.core.errors import (
 )
 from app.core.project.models import Project, Repository
 from app.core.project.repository import ProjectRepository
-from app.core.spec.service import now_utc
 from app.core.types import Author, AuthorKind, Entry, RebuildResult, RepoStatus
 from app.infra import git
 from app.infra.git import GitError

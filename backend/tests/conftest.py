@@ -47,15 +47,20 @@ def _schema() -> None:
 @pytest.fixture
 def db_session(_schema: None) -> Session:
     engine = create_engine(settings.DATABASE_URL)
-    with engine.connect() as conn:
-        tx = conn.begin()
-        session = Session(bind=conn, join_transaction_mode="create_savepoint")
-        try:
-            yield session
-        finally:
-            session.close()
-            tx.rollback()
-    engine.dispose()
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            session = Session(bind=conn, join_transaction_mode="create_savepoint")
+            try:
+                yield session
+            finally:
+                session.close()
+                tx.rollback()
+    finally:
+        # dispose를 try 밖에 두면 **테스트가 실패했을 때 건너뛴다** — 예외가 yield로
+        # 올라오기 때문이다. 그러면 엔진과 풀의 연결이 GC 전까지 남아, 한 번 실패한
+        # 뒤로는 실행 환경이 달라진다. 간헐 실패를 재는 통계가 오염된다 (#17)
+        engine.dispose()
 
 
 @pytest.fixture
@@ -151,14 +156,28 @@ def repos(tmp_path: Path) -> dict[str, Path]:
 
 
 # ── FastAPI TestClient (web·mcp 공유) ──
-@pytest.fixture
-def client(db_session: Session):
+def _client(db_session: Session, raise_server_exceptions: bool):
+    """TestClient 하나. **동시에 둘을 열지 않는다** — 전역 app의 lifespan이 두 번
+    드나들면서 MCP 세션 매니저의 태스크 그룹이 안쪽 클라이언트 퇴장에 취소된다 (#17)."""
     from fastapi.testclient import TestClient  # noqa: E402
 
     from app.db import get_session  # noqa: E402
     from app.main import app  # noqa: E402
 
     app.dependency_overrides[get_session] = lambda: db_session
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app, raise_server_exceptions=raise_server_exceptions) as c:
+            yield c
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def client(db_session: Session):
+    yield from _client(db_session, raise_server_exceptions=True)
+
+
+@pytest.fixture
+def client_raw(db_session: Session):
+    """서버 예외를 다시 던지지 않는 클라이언트 — 실제 problem+json 응답을 봐야 할 때."""
+    yield from _client(db_session, raise_server_exceptions=False)

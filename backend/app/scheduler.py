@@ -15,9 +15,9 @@ from sqlalchemy import update
 
 from app import db
 from app.core import pipeline
+from app.core.clock import now_utc
 from app.core.project.models import Repository
 from app.core.project.service import ProjectService
-from app.core.spec.service import now_utc
 from app.core.types import SaveResult
 from app.infra import git
 
