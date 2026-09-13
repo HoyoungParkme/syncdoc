@@ -647,6 +647,50 @@ async def test_repo_status_and_rebuild_index(scoped: Session, proj) -> None:
         await ps.rebuild_index("NOPE")
 
 
+async def test_catch_up_records_fetch_error_and_a_good_round_clears_it(
+    scoped: Session, proj
+) -> None:
+    """#46 — 폴링 실패를 로그로만 남기면 그 프로젝트는 조용히 멈춘다."""
+    import shutil
+    from pathlib import Path
+
+    from app import scheduler
+    from app.core.project.service import ProjectService
+
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    repo = _repo_row(proj)
+    good_workdir = repo.workdir_path
+
+    # 작업 사본을 치워 fetch가 실패하게 한다 (원인은 무엇이든 좋다)
+    broken = Path(good_workdir).parent / "gone"
+    repo.workdir_path = str(broken)
+    scoped.flush()
+    scoped.commit()
+
+    await scheduler.catch_up()  # 예외로 죽지 않는다
+
+    scoped.expire_all()
+    assert _repo_row(proj).fetch_error, "실패 사유가 DB에 남아야 한다"
+    # 화면에도 올라간다. 여기서는 백업 읽기도 같은 이유로 실패해 그쪽 문구가 이긴다
+    # (MS-001 — 둘 다 "이 저장소를 지금 못 보고 있다"는 같은 말이라 한 칸에 모은다)
+    st = (await ProjectService(scoped).repo_status())[0]
+    assert st.error and "gone" in st.error
+
+    # 고치면 다음 주기가 지운다
+    shutil.rmtree(broken, ignore_errors=True)
+    r = _repo_row(proj)
+    r.workdir_path = good_workdir
+    scoped.flush()
+    scoped.commit()
+
+    await scheduler.catch_up()
+
+    scoped.expire_all()
+    assert _repo_row(proj).fetch_error is None
+    assert (await ProjectService(scoped).repo_status())[0].error is None
+
+
 async def test_process_commit_skips_commits_the_app_pushed_itself(scoped: Session, proj) -> None:
     """mcp 저장·상태 변경 커밋은 이미 기록돼 있다 — 폴링이 다시 저장하면 안 된다."""
     remote = proj["repos"]["remote"]
