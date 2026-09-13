@@ -42,3 +42,5 @@ class Repository(Base):
     # 폴링이 적고 화면은 읽기만 (MS-001 repo_status). null = 아직 한 번도 안 재봄
     behind_by: Mapped[int | None] = mapped_column()
     fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # 마지막 폴링이 실패한 이유. 성공하면 비운다 — 폴링이 조용히 멈추는 것을 막는다 (#46)
+    fetch_error: Mapped[str | None] = mapped_column(String(300))

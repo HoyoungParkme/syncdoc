@@ -386,7 +386,7 @@ async def create_document(
 
 
 @server.tool(
-    description="기존 문서의 본문을 교체해 새 버전을 만든다. 반드시 get_document로 받은 version_no를 expected_version에 넣어야 한다. 그 사이 문서가 바뀌었으면 version-conflict 에러에 현재 버전과 본문이 담기니, 그것을 읽고 병합해 다시 부른다. 본문에서 항목 ID가 사라지면 하위 참조 목록과 함께 item-deletion-needs-confirm 에러가 나며, 사람에게 확인받은 뒤 confirm_item_deletion=true로 다시 부른다. 저장 후 하위에 영향이 있으면 결과의 pending_decision_version_id가 채워지고, 전파 여부는 지시한 사람이 웹에서 결정한다. 승인 상태 문서를 고치면 검토중으로 내려간다. 이 변경이 상위 항목과 어긋나게 됐음을 알면 upstream_impact에 그 상위 항목을 넣는다."
+    description="기존 문서의 본문을 교체해 새 버전을 만든다. 반드시 get_document를 먼저 부르고 그 응답의 body를 고쳐 보낸다 — version_no만 받아 오고 본문은 예전 것을 쓰면 안 된다. create_document는 frontmatter의 doc_id가 비어도 받지만(서버가 발급한다) 그 본문을 그대로 보내면 frontmatter.doc_id 위반이 된다. expected_version에는 그 응답의 version_no를 넣는다. 그 사이 문서가 바뀌었으면 version-conflict 에러에 현재 버전과 본문이 담기니, 그것을 읽고 병합해 다시 부른다. 본문에서 항목 ID가 사라지면 item-deletion-needs-confirm 에러에 끊어질 하위 항목이 문서ID#항목ID와 이름으로 담겨 오며, 그것을 사람에게 보여주고 확인받은 뒤 confirm_item_deletion=true로 다시 부른다. 저장 후 하위에 영향이 있으면 결과의 pending_decision_version_id가 채워지고, 전파 여부는 지시한 사람이 웹에서 결정한다. 승인 상태 문서를 고치면 검토중으로 내려간다. 이 변경이 상위 항목과 어긋나게 됐음을 알면 upstream_impact에 그 상위 항목을 넣는다."
 )
 async def update_document(
     doc_id: str,

@@ -32,6 +32,11 @@ class BearerAuth:
             with db.session_scope() as s:
                 user = AccountService(s).authenticate_token(raw)
                 user_id = user.id if user else None
+                # **커밋해야 last_used_at이 남는다.** authenticate_token은 flush만 하고
+                # session_scope는 커밋 없이 닫으므로 그대로 롤백됐다 (#49). v1은 토큰에
+                # 만료가 없어 이 값이 「아직 쓰는 토큰인가」를 아는 유일한 단서다(INFRA 9장)
+                if user_id is not None:
+                    s.commit()
         if user_id is None:
             body = json.dumps(
                 Unauthorized("토큰 없음·폐기·만료").to_dict(), ensure_ascii=False

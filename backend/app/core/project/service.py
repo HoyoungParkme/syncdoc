@@ -127,7 +127,9 @@ class ProjectService:
         """
         out = []
         for p in self.repo.all():
-            backed_up_at, err = None, None
+            # 폴링이 적어 둔 실패 사유 (#46). 백업 읽기도 실패하면 그쪽이 이긴다 —
+            # 둘 다 "이 저장소를 지금 못 보고 있다"는 같은 말이라 한 칸에 모은다
+            backed_up_at, err = None, p.repository.fetch_error
             try:
                 backed_up_at = await git.last_commit_at(
                     Path(p.repository.workdir_path), "backup/tracking.json"

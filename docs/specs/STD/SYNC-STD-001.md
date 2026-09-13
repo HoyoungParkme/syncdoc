@@ -42,6 +42,7 @@ docs/specs/
 - 경로 `docs/specs/{NN-TYPE}/{doc_id}.md`. **디렉터리 이름은 `{2자리 단계번호}-{TYPE}`** — 저장소를 열었을 때 읽는 순서대로 보이게(2장 11단계). 단계 밖인 `STD`는 번호 없이 `STD/`
 - 디렉터리의 `TYPE` 부분과 frontmatter `type`이 다르면 **위반**. 파일명과 frontmatter `doc_id`가 다르면 **위반**
 - 문서 ID `{프로젝트코드}-{TYPE}-{NNN}`. 세 자리. 시스템이 발급(`create_document`)하며 에이전트는 비워도 된다
+- **`_templates/`와 `assets/`는 명세 문서가 아니다.** 검사기도 파이프라인도 이 둘을 건너뛴다 — 템플릿은 `doc_id`가 빈 채로 있는 것이 정상이라, 세면 있지도 않은 위반이 잔뜩 뜬다([[SYNC-MS-009#git.list]]는 이미 거르는데 `validate.py`가 안 걸러 새 프로젝트에 돌리면 가짜 위반 12건이 떴다, #52)
 - 인코딩 UTF-8, 줄바꿈 LF
 
 ### 1.2 frontmatter

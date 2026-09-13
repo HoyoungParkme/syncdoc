@@ -124,6 +124,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 3. 코드블록·인라인 코드를 빈 칸으로 치환한 본문에서 헤딩 순회. 타입의 항목 패턴(STD-001 2장 표 — DOM·UI·API는 `title`로 세분)으로 항목 판정
    - if 이미 본 ID → `item.duplicate` · if 토큰 끝이 `.`·`:`이고 떼면 패턴에 맞음 → `item.punct` · if 번호 앞자리 0 → `item.padding` · if `^[A-Z]+-?\d+$`인데 패턴 밖 → `item.pattern`
    - `deleted = DB: items where document_id and is_deleted=true` · if `item_id in deleted` → `item.reused`. 단 문서의 `convention_error_detail`이 `file.deleted:`로 시작하면 그 문서의 삭제 항목은 `deleted`에서 뺀다 — 파일 삭제로 지워진 것을 되살리는 것은 재사용이 아니라 복구다
+   - **`entry == web_revert`면 이 검사를 통째로 건너뛴다.** 되돌리기는 재사용이 아니라 **복원**이다. 그러지 않으면 항목을 한 번 지운 순간 그 이전 버전으로 가는 길이 영구히 닫힌다 — 지우는 데는 확인 한 번이면 되는데(`confirm_item_deletion`) 되돌리는 길은 아예 없어 비대칭이었다(#48). 되돌리기는 사람이 UI-7에서 고른 명시적 행위이고 `revert(…)` 커밋으로 이력에 남는다. **에이전트가 실수로 지운 ID를 다시 쓰는 것은 그대로 막힌다** — 그 경로는 `mcp`다
 4. `[[ ]]` 전부 형식 검사 → `ref.format`
 5. **경고**: 필수 절마다 if 해당 절 없음 → `section.missing` · if `not items and doc_type not in (CODE, STD)` → `item.none`
 6. DOM 클래스 명세면 2장·4장 mermaid의 같은 클래스 속성 대조 → `entity.mismatch` 경고
@@ -135,7 +136,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** [[#SpecService.item_blocks]](헤딩 순회 공유)
 
-**테스트 관점** `_tools/validate.py`가 15개 문서에 대해 위반 0·경고 0을 내는 것이 첫 테스트 · frontmatter 없는 본문 → 위반 하나만 · `R01` → `item.padding` · `R1.` → `item.punct` · 삭제된 `R15` 재사용 → `item.reused` · MCP에서 status 바꿈 → `frontmatter.status_change`, GitHub에서는 통과 · 필수 절 하나 빼면 경고 하나, 저장은 됨
+**테스트 관점** `_tools/validate.py`가 15개 문서에 대해 위반 0·경고 0을 내는 것이 첫 테스트 · frontmatter 없는 본문 → 위반 하나만 · `R01` → `item.padding` · `R1.` → `item.punct` · 삭제된 `R15` 재사용 → `item.reused` · **같은 본문이 `web_revert`로 들어오면 통과** · MCP에서 status 바꿈 → `frontmatter.status_change`, GitHub에서는 통과 · 필수 절 하나 빼면 경고 하나, 저장은 됨
 
 ---
 
@@ -552,7 +553,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 3. 미결사항
 
-- [x] `mark_deleted` 후 파일을 되살리면 항목 ID가 `item.reused` 위반에 걸린다. 되살림은 재사용이 아니라 복구 — 예외 필요 — 결정: **파일 삭제로 지워진 항목은 복구다.** 문서의 `convention_error_detail`이 `file.deleted:`로 시작하면 그 문서의 삭제 항목은 `item.reused`에서 빼고, 본문에 다시 나타나면 `is_deleted`·`deleted_at`을 되돌린다. 파일은 살아 있는데 항목만 지웠다가 같은 ID를 다시 쓰는 것만 재사용으로 남긴다
+- [x] `mark_deleted` 후 파일을 되살리면 항목 ID가 `item.reused` 위반에 걸린다. 되살림은 재사용이 아니라 복구 — 예외 필요 — 결정: **파일 삭제로 지워진 항목은 복구다.** 문서의 `convention_error_detail`이 `file.deleted:`로 시작하면 그 문서의 삭제 항목은 `item.reused`에서 빼고, 본문에 다시 나타나면 `is_deleted`·`deleted_at`을 되돌린다. 파일은 살아 있는데 항목만 지웠다가 같은 ID를 다시 쓰는 것만 재사용으로 남긴다. **되돌리기(`entry=web_revert`)도 마찬가지로 뺀다** — 같은 이유이고, 그러지 않으면 지운 항목이 있는 버전으로 영영 못 돌아간다(#48)
 
 - [x] `diff`의 hunk 문맥 줄 수 (`n=1`) — 화면에서 부족할 수 있다 — 결정: 설정값으로 뺀다 (`DIFF_CONTEXT_LINES`, 기본 3). 한 줄은 마크다운 문단에 부족해 어느 절의 변경인지 안 보인다. `detect_impact`와 `pipeline`은 hunk의 `item_id`만 쓰므로 동작이 안 바뀐다
 - [x] `list_versions`가 자동 강등 StatusChange(commit_hash null)를 보여줄지 — 결정: 안 보여준다. `commit_hash is not null`인 상태 변경만 (본문 커밋에 딸린 강등은 그 버전 행이 이미 보인다)

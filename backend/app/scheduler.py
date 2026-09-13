@@ -49,7 +49,8 @@ async def catch_up() -> list[SaveResult]:
                 s.execute(
                     update(Repository)
                     .where(Repository.id == repo_id)
-                    .values(behind_by=behind, fetched_at=now_utc())
+                    # 성공한 주기가 옛 사유를 지운다 — 낡은 오류가 화면에 남으면 안 된다
+                    .values(behind_by=behind, fetched_at=now_utc(), fetch_error=None)
                 )
                 s.commit()
             if head != last:
@@ -59,7 +60,21 @@ async def catch_up() -> list[SaveResult]:
         except Exception as e:  # noqa: BLE001 — 저장소 하나가 죽어도 다음 저장소를 계속한다
             # 실패한 저장소의 behind_by는 건드리지 않는다. 낡은 값이 남지만
             # fetched_at이 언제 기준인지 말해 준다.
+            #
+            # **로그로만 남기지 않는다.** 그러면 폴링이 죽은 프로젝트가 조용히 멈추고
+            # 사람은 "아무도 push를 안 했나 보다"로 읽는다 (#46). 사유를 DB에 적어
+            # repo_status가 UI-14로 올린다
             log.warning("catch_up %s: %s", remote_url, e)
+            try:
+                with db.session_scope() as s:
+                    s.execute(
+                        update(Repository)
+                        .where(Repository.id == repo_id)
+                        .values(fetch_error=str(e)[:300])
+                    )
+                    s.commit()
+            except Exception as e2:  # noqa: BLE001 — 사유를 못 적어도 폴링은 계속한다
+                log.warning("catch_up %s: 실패 사유를 못 적었다: %s", remote_url, e2)
     return out
 
 

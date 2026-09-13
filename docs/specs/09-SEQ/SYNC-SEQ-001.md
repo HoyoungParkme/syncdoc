@@ -142,6 +142,9 @@ sequenceDiagram
 
     P->>G: commit_push(repo, path, body, "spec(doc_id): …", author)
     G->>AC: github_token_for(author.user)
+    opt document.status == approved (6a)
+        P->>P: body 의 `status:` 를 review 로 — **push 전에** frontmatter를 맞춘다 (#47)
+    end
     AC-->>G: token
     G->>G: write · commit · push
     alt push 거부
@@ -160,6 +163,7 @@ sequenceDiagram
         S->>DB: Version 생성 · Item 갱신(is_deleted) · Document.current_*
         opt status == approved (6a)
             S->>DB: Document.status=review · StatusChange
+            Note over S,DB: 본문은 이미 review 로 밀었다 — 저장소·DB·응답이 같다
         end
         S-->>P: Version
         opt deleted 있음
@@ -196,6 +200,7 @@ sequenceDiagram
 - 삭제 확인은 `SpecService`가 아니라 `pipeline`이 한다. `SpecService`는 하위 참조를 모르기 때문이다(묶음 경계) → 되먹일 것
 - 전파 결정은 여기서 안 한다. `undecided` 행만 남기고 끝. 사람이 SEQ-3에서
 - `upstream_impact`는 하위→상위 되먹임의 에이전트 경로. 사람 경로는 SEQ-5 승인 대조
+- **자동 강등(6a)은 push 전에 본문에도 쓴다.** DB에만 적으면 저장소 frontmatter가 `approved`로 남아 「`status`가 진실」이 깨지고, 다음 저장이 `frontmatter.status_change`로 막힌다 — 서버가 준 본문을 서버가 거부한다(#47). **서버가 에이전트의 본문을 고치는 유일한 자리다**
 
 ---
 
@@ -1006,7 +1011,7 @@ sequenceDiagram
     PS->>DB: repositories
     loop 저장소마다
         PS->>G: fetch(repo) (원격만 갱신, 작업 사본 안 건드림)
-        PS->>G: rev_list_count(last_processed_commit..origin/HEAD)
+        PS->>G: rev_list_count(last_processed_commit..origin/main)
         G-->>PS: behind_by
     end
     PS-->>RA: RepoStatus[]
@@ -1038,7 +1043,7 @@ sequenceDiagram
     RA->>P: rebuild(code)
     P->>PS: get(code) → repo
     P->>P: repo lock
-    P->>G: fetch · checkout origin/HEAD
+    P->>G: fetch · checkout origin/main
     rect rgb(240,244,240)
         Note over P,DB: 한 트랜잭션. 실패하면 전부 롤백
         P->>S: version_keys(project_id)

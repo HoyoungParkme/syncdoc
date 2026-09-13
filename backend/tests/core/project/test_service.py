@@ -1,5 +1,7 @@
 """SYNC-MS-001 테스트 관점 — ProjectService."""
 
+from pathlib import Path
+
 import pytest
 from sqlalchemy.orm import Session
 
@@ -80,6 +82,34 @@ async def test_init_project_accepts_repository_with_no_commits_at_all(
     assert project.code == "EMP"
     assert g(bare, "log", "-1", "--format=%s", "main") == "chore(EMP): init syncdoc"
     assert "docs/specs/_templates/PRD.md" in g(bare, "ls-tree", "-r", "--name-only", "main")
+
+
+async def test_empty_repo_project_can_fetch_afterwards(
+    db_session: Session, repos_dir, repos: dict
+) -> None:
+    """#45 — 빈 저장소로 만든 프로젝트도 그 뒤 fetch가 돼야 한다.
+
+    `git clone`은 빈 저장소에서 `refs/remotes/origin/HEAD`를 만들지 않는다. 그걸 보던
+    시절에는 이 프로젝트의 폴링·재구축·복원·push 재시도가 **전부** 죽었다 — 그런데
+    빈 저장소가 새 프로젝트를 시작하는 가장 흔한 방법이다 (UC-A1 기본 흐름 3).
+    """
+    from app.infra import git as gi
+    from tests.core.account.test_service import make_user
+    from tests.infra.conftest import git as g
+
+    user = make_user(db_session, login="hoyoung")
+    bare = repos_dir.parent / "later.git"
+    g(repos_dir.parent, "init", "-q", "--bare", "-b", "main", str(bare))
+    project = await ProjectService(db_session).init_project(str(bare), "LATE", "나중", user)
+    workdir = Path(project.repository.workdir_path)
+
+    # 빈 저장소를 clone하면 origin/HEAD가 **영영 안 생긴다**. fetch는 origin/main만 만든다
+    assert not (workdir / ".git" / "refs" / "remotes" / "origin" / "HEAD").exists()
+    head = await gi.fetch(workdir)
+
+    assert head == g(bare, "rev-parse", "main")
+    await gi.checkout(workdir, "origin/main")
+    assert await gi.rev_list_count(workdir, f"HEAD..{head}") == 0
 
 
 async def test_init_project_rejects_already_registered_repository(

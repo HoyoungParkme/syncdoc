@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 
 import pytest
 from sqlalchemy import text
@@ -20,7 +21,7 @@ from app.core.errors import (
 from app.core.project.models import Project, Repository
 from app.core.spec.service import SpecService
 from app.core.tracking.models import Flag
-from app.core.types import Author, AuthorKind, DocType, Entry
+from app.core.types import Author, AuthorKind, DocStatus, DocType, Entry
 from tests.conftest import git as g
 from tests.conftest import write_commit_push
 from tests.core.account.test_service import make_user
@@ -645,6 +646,188 @@ async def test_repo_status_and_rebuild_index(scoped: Session, proj) -> None:
     assert (await ps.repo_status())[0].behind_by == 0
     with pytest.raises(NotFound):
         await ps.rebuild_index("NOPE")
+
+
+async def test_revert_can_restore_a_deleted_item(scoped: Session, proj) -> None:
+    """#48 — 항목을 지운 뒤에도 그 이전 버전으로 되돌릴 수 있어야 한다."""
+    from app.core.spec.service import SpecService
+
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    await pipeline.rebuild("EXMP")
+    svc = SpecService(scoped)
+    d = svc.get_document("EXMP-RFQ-001")
+    before = d.current_version_no
+    assert [i.item_id for i in d.items] == ["Q1", "Q2"]
+
+    # Q2를 지운다 (하위 참조가 있어 확인이 필요하다)
+    body = d.body[: d.body.index("#### Q2")]
+    await pipeline.save_pipeline(
+        Entry.mcp,
+        "EXMP-RFQ-001",
+        None,
+        body,
+        before,
+        None,
+        proj["author"],
+        "spec(EXMP-RFQ-001): Q2를 뺀다",
+        changed_items=[],
+        confirm_item_deletion=True,
+    )
+    assert [i.item_id for i in svc.get_document("EXMP-RFQ-001").items] == ["Q1"]
+
+    # 지우기 전으로 되돌린다 — 예전에는 item.reused 로 영영 막혔다
+    r = await pipeline.revert("EXMP-RFQ-001", before, proj["user"])
+
+    assert r.version_no == before + 2
+    assert [i.item_id for i in svc.get_document("EXMP-RFQ-001").items] == ["Q1", "Q2"]
+
+
+async def test_agent_still_cannot_reuse_a_deleted_item_id(scoped: Session, proj) -> None:
+    """#48 — 면제는 되돌리기 경로만이다. MCP 저장은 그대로 막힌다."""
+    from app.core.errors import ConventionViolation
+    from app.core.spec.service import SpecService
+
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    await pipeline.rebuild("EXMP")
+    svc = SpecService(scoped)
+    d = svc.get_document("EXMP-RFQ-001")
+    body = d.body[: d.body.index("#### Q2")]
+    await pipeline.save_pipeline(
+        Entry.mcp,
+        "EXMP-RFQ-001",
+        None,
+        body,
+        d.current_version_no,
+        None,
+        proj["author"],
+        "spec(EXMP-RFQ-001): Q2를 뺀다",
+        changed_items=[],
+        confirm_item_deletion=True,
+    )
+    d2 = svc.get_document("EXMP-RFQ-001")
+
+    with pytest.raises(ConventionViolation) as e:
+        await pipeline.save_pipeline(
+            Entry.mcp,
+            "EXMP-RFQ-001",
+            None,
+            d2.body + "#### Q2 다른 뜻으로 재사용\n",
+            d2.current_version_no,
+            None,
+            proj["author"],
+            "spec(EXMP-RFQ-001): Q2 재사용",
+            changed_items=[],
+        )
+    assert any(v["rule"] == "item.reused" for v in e.value.to_dict()["violations"])
+
+
+async def test_editing_an_approved_doc_keeps_frontmatter_and_db_in_step(
+    scoped: Session, proj
+) -> None:
+    """#47 — 자동 강등이 저장소에도 써져야 에이전트가 그 문서를 계속 고칠 수 있다."""
+    from app.core.spec.service import SpecService
+
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    await pipeline.rebuild("EXMP")
+    svc = SpecService(scoped)
+    # 승인 게이트(미완성 경고)를 우회해 상태만 만든다 — 여기서 보려는 것은 강등 경로다
+    d0 = svc.get_document("EXMP-RFQ-001")
+    approved_body = re.sub(
+        r"^status: .*$", f"status: {DocStatus.approved}", d0.body, count=1, flags=re.M
+    )
+    await pipeline.save_pipeline(
+        Entry.web_status,
+        "EXMP-RFQ-001",
+        None,
+        approved_body,
+        d0.current_version_no,
+        None,
+        proj["author"],
+        "status(EXMP-RFQ-001): review → approved",
+        reason=None,
+    )
+    assert svc.get_document("EXMP-RFQ-001").status == DocStatus.approved
+
+    d = svc.get_document("EXMP-RFQ-001")
+    r = await pipeline.save_pipeline(
+        Entry.mcp,
+        "EXMP-RFQ-001",
+        None,
+        d.body + "\n<!-- 한 줄 -->\n",
+        d.current_version_no,
+        None,
+        proj["author"],
+        "spec(EXMP-RFQ-001): 한 줄",
+        changed_items=[],
+    )
+
+    assert r.status == DocStatus.review  # 자동 강등 (SEQ-1 6a)
+    d2 = svc.get_document("EXMP-RFQ-001")
+    assert d2.status == DocStatus.review
+    # **본문의 frontmatter도 같이 내려가야 한다** — 저장소가 진실이다 (STD-001 1.2)
+    assert "status: review" in d2.body and "status: approved" not in d2.body
+    assert "status: review" in g(remote, "show", "HEAD:docs/specs/01-RFQ/EXMP-RFQ-001.md")
+
+    # 그래서 받은 본문을 그대로 되돌려줘도 막히지 않는다 (막히면 그 문서는 영영 못 고친다)
+    r2 = await pipeline.save_pipeline(
+        Entry.mcp,
+        "EXMP-RFQ-001",
+        None,
+        d2.body + "<!-- 또 한 줄 -->\n",
+        d2.current_version_no,
+        None,
+        proj["author"],
+        "spec(EXMP-RFQ-001): 또",
+        changed_items=[],
+    )
+    assert r2.version_no == d2.current_version_no + 1
+
+
+async def test_catch_up_records_fetch_error_and_a_good_round_clears_it(
+    scoped: Session, proj
+) -> None:
+    """#46 — 폴링 실패를 로그로만 남기면 그 프로젝트는 조용히 멈춘다."""
+    import shutil
+    from pathlib import Path
+
+    from app import scheduler
+    from app.core.project.service import ProjectService
+
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    repo = _repo_row(proj)
+    good_workdir = repo.workdir_path
+
+    # 작업 사본을 치워 fetch가 실패하게 한다 (원인은 무엇이든 좋다)
+    broken = Path(good_workdir).parent / "gone"
+    repo.workdir_path = str(broken)
+    scoped.flush()
+    scoped.commit()
+
+    await scheduler.catch_up()  # 예외로 죽지 않는다
+
+    scoped.expire_all()
+    assert _repo_row(proj).fetch_error, "실패 사유가 DB에 남아야 한다"
+    # 화면에도 올라간다. 여기서는 백업 읽기도 같은 이유로 실패해 그쪽 문구가 이긴다
+    # (MS-001 — 둘 다 "이 저장소를 지금 못 보고 있다"는 같은 말이라 한 칸에 모은다)
+    st = (await ProjectService(scoped).repo_status())[0]
+    assert st.error and "gone" in st.error
+
+    # 고치면 다음 주기가 지운다
+    shutil.rmtree(broken, ignore_errors=True)
+    r = _repo_row(proj)
+    r.workdir_path = good_workdir
+    scoped.flush()
+    scoped.commit()
+
+    await scheduler.catch_up()
+
+    scoped.expire_all()
+    assert _repo_row(proj).fetch_error is None
+    assert (await ProjectService(scoped).repo_status())[0].error is None
 
 
 async def test_process_commit_skips_commits_the_app_pushed_itself(scoped: Session, proj) -> None:
