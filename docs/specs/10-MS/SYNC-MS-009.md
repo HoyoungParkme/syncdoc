@@ -55,7 +55,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `async def fetch(workdir: Path, token: str | None = None) -> str`
 
-**처리** if `token` → `git fetch {url with token} +refs/heads/*:refs/remotes/origin/*` · else → `git fetch origin` → `git rev-parse origin/HEAD` · `→ 해시`. 작업 사본은 건드리지 않는다.
+**처리** if `token` → `git fetch {url with token} +refs/heads/*:refs/remotes/origin/*` · else → `git fetch origin` → `git rev-parse origin/main` · `→ 해시`. 작업 사본은 건드리지 않는다.
+
+**`origin/HEAD`가 아니라 `origin/main`을 본다.** `origin/HEAD`는 상징 ref이고 **`git clone`이 빈 저장소에서는 그것을 만들지 않는다**. 그런데 새 프로젝트를 시작하는 가장 흔한 방법이 빈 저장소다([[SYNC-UC-001#UC-A1]] 기본 흐름 3). 그 프로젝트는 폴링·재구축·복원·push 재시도가 전부 죽는데, 실패가 `fetch` 안에서 나므로 어디가 원인인지도 안 보인다(#45). 기본 브랜치는 `main` 고정이므로([[#git.commit_push]] 6단계) 상징 ref를 거칠 이유가 없다. `main`이 아닌 기본 브랜치는 v1에서 지원하지 않는다(8장 미결).
 
 **public 저장소는 토큰 없이 된다** — v1은 public만 쓴다. `clone`이 `.git/config`에서 토큰을 지우므로 private이면 매번 URL에 붙여야 하고, 그때 호출자가 `AccountService.github_token_for(repo.registered_by_user)`로 얻어 넘긴다. private 지원은 v2(8장 미결)
 
@@ -79,14 +81,14 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **처리**
 1. `token = AccountService.github_token_for(author.user)` · if 실패 → `! push-failed {reason: 미등록}`
-2. `git fetch origin` · `git reset --hard origin/HEAD` — 작업 사본을 원격 최신으로 (락 안이라 안전)
-   - **원격에 커밋이 하나도 없으면 `origin/HEAD`가 없다.** 되돌아갈 곳이 없으므로 reset을 건너뛴다. 이 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3, #6)
+2. `git fetch origin` · `git reset --hard origin/main` — 작업 사본을 원격 최신으로 (락 안이라 안전)
+   - **원격에 커밋이 하나도 없으면 `origin/main`이 없다.** 되돌아갈 곳이 없으므로 reset을 건너뛴다. 이 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3, #6)
 3. 파일 쓰기 (`path` 또는 `files`). 상위 디렉터리 없으면 생성
 4. `git add {paths}` · if `git diff --cached --quiet` (변경 없음) → `→ 현재 HEAD` (커밋 안 만듦. 같은 내용 재저장)
 5. `git -c user.name={display_name} -c user.email={login}@users.noreply.github.com commit -m {message}`
 6. `git push {url with token} HEAD:main` — 기본 브랜치는 `main` 고정(결정). 다른 브랜치 저장소는 v1에서 지원 안 함
-   - if 거부(non-fast-forward, UC-S7 2a) → `git fetch` · `git rebase origin/HEAD` · if rebase 충돌 → `git rebase --abort`, `git reset --hard origin/HEAD`, `! push-failed {reason: conflict}` · else → push 재시도. **`PUSH_RETRIES`회까지**(기본 3)
-   - if 다 쓰고도 실패 → `git reset --hard origin/HEAD`, `! push-failed {reason: stderr}`
+   - if 거부(non-fast-forward, UC-S7 2a) → `git fetch` · `git rebase origin/main` · if rebase 충돌 → `git rebase --abort`, `git reset --hard origin/main`, `! push-failed {reason: conflict}` · else → push 재시도. **`PUSH_RETRIES`회까지**(기본 3)
+   - if 다 쓰고도 실패 → `git reset --hard origin/main`, `! push-failed {reason: stderr}`
    - **빈 저장소였으면 되돌릴 원격 커밋이 없다.** reset 대신 `git update-ref -d HEAD`로 방금 만든 로컬 커밋만 푼다
 7. `→ git rev-parse HEAD`
 
@@ -171,11 +173,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-INFRA-001]] 6.1 · [[SYNC-UI-002#UI-14]] 요소 2.4 · [[SYNC-MS-001#ProjectService.repo_status]]
 
-**처리** `git log -1 --format=%aI {ref} -- {path}`를 `origin/HEAD` → `HEAD` 순으로. 먼저 값이 나온 것을 쓰고 둘 다 비면 `None`
+**처리** `git log -1 --format=%aI {ref} -- {path}`를 `origin/main` → `HEAD` 순으로. 먼저 값이 나온 것을 쓰고 둘 다 비면 `None`
 
-**`origin/HEAD`를 먼저 보는 이유.** 이 값이 답할 질문은 "**저장소에** 백업이 언제 올라갔나"다
+**`origin/main`를 먼저 보는 이유.** 이 값이 답할 질문은 "**저장소에** 백업이 언제 올라갔나"다
 
-**`HEAD`로 떨어지는 이유.** [[#git.commit_push]]는 **토큰이 박힌 URL**로 민다(`push {url} HEAD:main`). 이름 붙은 remote로 안 밀기 때문에 **`refs/remotes/origin/*`이 안 따라온다** — 방금 민 백업이 `origin/HEAD`에는 아직 안 보인다. 다음 `fetch`면 맞춰지지만 그 사이 관리 화면이 "백업 없음"을 보여주면 거짓말이다
+**`HEAD`로 떨어지는 이유.** [[#git.commit_push]]는 **토큰이 박힌 URL**로 민다(`push {url} HEAD:main`). 이름 붙은 remote로 안 밀기 때문에 **`refs/remotes/origin/*`이 안 따라온다** — 방금 민 백업이 `origin/main`에는 아직 안 보인다. 다음 `fetch`면 맞춰지지만 그 사이 관리 화면이 "백업 없음"을 보여주면 거짓말이다
 
 **`fetch`를 부르지 않는다.** 부르는 쪽([[SYNC-MS-001#ProjectService.repo_status]])이 원격을 안 타려고 만든 함수다
 

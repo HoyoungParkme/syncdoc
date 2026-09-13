@@ -324,7 +324,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 3. `→ RelinkResult(relinked, dropped=[{kind, count, reason}])`
 
 **못 잇는 경우는 셋이고, 전부 「재구축이 그 버전을 다시 안 만든다」다.**
-- 커밋이 `origin/HEAD`에서 도달 불가 — force-push·브랜치 삭제
+- 커밋이 `origin/main`에서 도달 불가 — force-push·브랜치 삭제
 - 문서 파일이 HEAD에 없다 — 삭제된 문서. `git.list`가 HEAD 기준이라 재구축 루프에 안 들어온다
 - 커밋 메시지가 `status(`로 시작 — 재구축이 상태 변경으로 처리하고 버전을 안 만든다
 

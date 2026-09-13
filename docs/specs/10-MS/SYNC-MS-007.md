@@ -85,7 +85,14 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
    - if `violations and entry == github` → 계속. 8단계에 `has_convention_error=True`로 전달
 5. if `entry != github and expected_version != document.current_version_no` → `! version-conflict {current_version, current_body}`
 6. if `entry != web_status and document` → `deleted = spec.detect_deleted_items(document, body)`; `deleted`의 pk마다 `refs = reference.downstream(pk)`
-   - if `any(refs) and not confirm_item_deletion` → `! item-deletion-needs-confirm {deleted_items: [{item_id, downstream}]}`
+   - if `any(refs) and not confirm_item_deletion` → `! item-deletion-needs-confirm {deleted_items: [{item_id, downstream: [{doc_id, item_id, display_name}]}]}`
+   - **`downstream`은 pk가 아니라 이름이다.** [[SYNC-API-002]] 4장이 에이전트에게 "사람에게 보여주고 확인받은 뒤" 다시 부르라고 시키는데, `items.id` 숫자는 사람에게 보여줄 수 없고 그것을 이름으로 바꾸는 MCP 도구도 없다. 그러면 사람은 **무엇이 끊어지는지 모르는 채로 승낙**하게 되어 확인 절차의 뜻이 사라진다(#50). `SpecService.describe_items`가 이미 그 변환을 한다 — 여기서 한 번 부른다
+6a. **승인 상태 문서를 고치면 여기서 본문의 `status:`를 `review`로 낮춘다** — `entry not in (github, web_status)`이고 `document.status == approved`일 때. 자동 강등(9단계 뒤 SEQ-1 6a)을 **push 전에** 본문에 반영하는 것이다
+
+   **왜 여기인가.** 강등을 DB에만 적으면 저장소 frontmatter는 `approved`로 남아 [[SYNC-STD-001]] 1.2의 "`status`가 진실이다"가 깨진다. 그리고 다음 저장이 막힌다 — 에이전트가 `get_document`로 받은 본문(`approved`)을 그대로 돌려주면 `frontmatter.status_change` 위반이 된다. **서버가 준 것을 서버가 거부하므로 그 문서는 영영 못 고친다**(#47)
+
+   **서버가 에이전트의 본문을 고치는 유일한 자리다.** 커밋은 하나로 둔다 — 저장마다 `status(…)` 커밋이 하나씩 더 쌓이면 이력이 본문 변경보다 상태 줄로 더 두꺼워진다
+
 7. if `entry != github` → `commit_hash = git.commit_push(repo.workdir, message, author, path=STD-001 1.1 경로, content=body)` · if 실패 → `! push-failed {reason}`, 락 해제. **여기까지 DB 쓰기 없음**
 8. **트랜잭션 시작**
    - if 생성 → `version = spec.create(project_id, doc_id, doc_type, body, commit_hash, author, message, validate_result=4단계 결과)`
@@ -194,7 +201,7 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
 
 근거: [[SYNC-SEQ-001#SEQ-2]] · [[SYNC-UC-001#UC-G1]]
 
-**입력** `repo` 등록된 저장소. `head_hash` 처리할 끝 커밋 (webhook의 `after` 또는 `origin/HEAD`)
+**입력** `repo` 등록된 저장소. `head_hash` 처리할 끝 커밋 (webhook의 `after` 또는 `origin/main`)
 
 **처리**
 
@@ -247,7 +254,7 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 **처리**
 
 1. `project, repo = project.get(code)`. 락 획득
-2. `git.fetch(repo.workdir)`, `git.checkout(repo.workdir, "origin/HEAD")` · if fetch 실패 → `! rebuild-failed {reason}` (500으로 새지 않게)
+2. `git.fetch(repo.workdir)`, `git.checkout(repo.workdir, "origin/main")` · if fetch 실패 → `! rebuild-failed {reason}` (500으로 새지 않게)
 3. **트랜잭션 시작**
 3a. `old = spec.version_keys(project_id)` — **지우기 전에** `{옛 version_id: (document_id, commit_hash)}`를 뜬다. 버전 행이 사라지면 그 둘을 알 방법이 없다 — `propagation_decisions`·`flags`는 `version_id` 하나만 들고 있다(#38)
 4. `reference.clear(project_id)` · `spec.clear_index(project_id)` — `versions`와 커밋 있는 `status_changes` 삭제. `documents`·`items`는 유지(플래그·댓글 FK)
@@ -298,17 +305,23 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 
 **처리** — 저장소마다
 1. `head = git.fetch(workdir)`
-2. `DB: repositories update behind_by = git.rev_list_count(f"{last_processed_commit}..{head}"), fetched_at = now` — **화면이 읽는 값을 여기서 적는다.** `last_processed_commit`이 없으면 `behind_by=None`
+2. `DB: repositories update behind_by = git.rev_list_count(f"{last_processed_commit}..{head}"), fetched_at = now, fetch_error = null` — **화면이 읽는 값을 여기서 적는다.** `last_processed_commit`이 없으면 `behind_by=None`
 3. if `head != repository.last_processed_commit` → [[#pipeline.process_commit]]
 4. `→ 처리 결과 목록`
 
-**예외** **저장소 하나가 실패해도 다음 저장소를 계속한다.** 로그만 남기고 그 저장소의
-`behind_by`는 건드리지 않는다 — 낡은 값이 남지만 `fetched_at`이 언제 기준인지 말해 준다.
+**예외** **저장소 하나가 실패해도 다음 저장소를 계속한다.** 그 저장소의 `behind_by`는 건드리지
+않는다 — 낡은 값이 남지만 `fetched_at`이 언제 기준인지 말해 준다.
 폴링이 예외로 죽으면 그 뒤로 아무 저장소도 안 따라잡는다.
+
+**실패를 로그로만 남기지 않는다.** `DB: repositories update fetch_error = {사유}`를 함께 적는다
+([[SYNC-DOM-003#repositories]]). 로그만 남기면 **폴링이 죽은 프로젝트가 조용히 멈추고, 사람은
+「아무도 push를 안 했나 보다」로 읽는다.** 실제로 빈 저장소로 만든 프로젝트가 30분 동안 매 주기
+같은 오류로 실패했는데 관리 화면에는 아무 표시가 없었다(#46). 이 값은 [[SYNC-MS-001#ProjectService.repo_status]]가
+`RepoStatus.error`로 올려 UI-14 2.3에 뜬다. **성공한 주기가 지우므로 낡은 오류가 남지 않는다.**
 
 **호출하는 것** `ProjectService.list_projects` · `git.fetch` `rev_list_count` · [[#pipeline.process_commit]]
 
-**테스트 관점** 원격이 앞서 있으면 `process_commit`이 불림 · 같으면 안 불리고 `fetched_at`만 갱신 · 저장소 둘 중 앞엣것이 실패해도 뒤엣것이 처리됨 · `behind_by`가 DB에 남아 `repo_status`가 그걸 읽음
+**테스트 관점** 원격이 앞서 있으면 `process_commit`이 불림 · 같으면 안 불리고 `fetched_at`만 갱신 · 저장소 둘 중 앞엣것이 실패해도 뒤엣것이 처리됨 · `behind_by`가 DB에 남아 `repo_status`가 그걸 읽음 · **실패한 저장소의 `fetch_error`에 사유가 남고, 다음 성공이 그것을 비운다**
 
 ---
 
@@ -345,7 +358,7 @@ async def export_tracking(code: str) -> str
 
 **처리**
 
-1. **저장소 락 획득** — `save_pipeline`·`rebuild`와 **같은 락**이다. `git.commit_push`가 맨 앞에서 `reset --hard origin/HEAD`로 작업 사본을 갈아엎으므로, 저장 중인 파이프라인과 같은 자물쇠 아래 있어야 한다
+1. **저장소 락 획득** — `save_pipeline`·`rebuild`와 **같은 락**이다. `git.commit_push`가 맨 앞에서 `reset --hard origin/main`로 작업 사본을 갈아엎으므로, 저장 중인 파이프라인과 같은 자물쇠 아래 있어야 한다
 2. `project = ProjectService.get(code)` · `repo = project.repository` · `user = DB: users where id = repo.registered_by_user_id` · if 없음 → `! not-found {resource: user}`. **이 함수는 끝까지 DB를 읽기만 한다**
 3. `DB:` 전량 읽기 — `TrackingService.all_flags(project_id)` · `all_decisions(project_id)` · `CommentService.all_in_project(project_id)`. **해제된 플래그·결정된 전파도 싣는다** — 백업은 지금 남은 일이 아니라 그때 있었던 사실이다
 4. 지도 넷을 **한 번씩만** 뜬다 — `describe_items`(**삭제 포함**이라야 한다. `broken_ref`의 원인 항목은 `is_deleted`다) · `version_keys(project_id)` · `describe_documents` · `users_by_ids`
@@ -391,7 +404,7 @@ async def import_tracking(code: str) -> RestoreResult
 
 1. **저장소 락 획득.** 이유가 `export_tracking`과 다르다 — **재구축이 같은 락 안에서 `versions`를 지우고 다시 만든다.** 복원이 그 사이에 끼면 곧 사라질 버전에 결정을 붙인다
 2. `project = ProjectService.get(code)`
-3. `git: git.fetch(workdir)` · `본문 = git.read(workdir, "backup/tracking.json", "origin/HEAD")` · 없으면 `! not-found {resource: backup, id: code}`. **`origin/HEAD`로 읽는다** — 로컬 HEAD는 뒤처질 수 있고 백업은 원격이 진실이다
+3. `git: git.fetch(workdir)` · `본문 = git.read(workdir, "backup/tracking.json", "origin/main")` · 없으면 `! not-found {resource: backup, id: code}`. **`origin/main`로 읽는다** — 로컬 HEAD는 뒤처질 수 있고 백업은 원격이 진실이다
 4. `backup_version`이 **1도 2도 아니거나** `project`가 이 프로젝트가 아니면 `! backup-invalid {reason}`. **다른 프로젝트의 백업을 붓지 않는다**. 1이면 플래그의 `target_version`을 null로 본다
 5. 지도 넷을 만든다 — 행마다 조회하지 않는다. 문서(`get_document`, 없으면 그 문서를 가리키는 행은 전부 건너뜀) · 항목(`item_pks(document_id, include_deleted=True)`를 문서마다 한 번) · 버전(`version_keys`를 **뒤집는다** — 새 함수가 필요 없다) · 사람(`user_by_login` 없으면 `create_placeholder`)
 6. 플래그를 pk로 풀어 `TrackingService.restore_flags`

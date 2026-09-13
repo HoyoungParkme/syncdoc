@@ -66,6 +66,7 @@ erDiagram
         varchar last_processed_commit
         int registered_by_user_id FK
         timestamptz synced_at
+        varchar fetch_error
     }
     documents {
         int id PK
@@ -218,6 +219,7 @@ erDiagram
 | synced_at | timestamptz | null 허용 | 마지막으로 원격을 받아온 시각. 폴링이 갱신 | |
 | behind_by | int | null 허용 | 원격이 앞선 커밋 수. 0이면 최신, null이면 아직 못 받아봄 | `0` |
 | fetched_at | timestamptz | null 허용 | `behind_by`를 잰 시각. 화면이 "언제 기준인지" 보여준다 | |
+| fetch_error | varchar(300) | null 허용 | **마지막 폴링이 실패한 이유.** 성공하면 비운다. 폴링은 저장소 하나가 죽어도 다음을 계속하고 로그만 남기므로([[SYNC-MS-007#scheduler.catch_up]]), 이 값이 없으면 **사람은 「아무도 push를 안 했나 보다」로 읽는다**(#46) | `git rev-parse origin/main: fatal…` |
 
 ### documents
 
