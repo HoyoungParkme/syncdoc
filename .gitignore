@@ -9,3 +9,6 @@ tools/data.json
 backend/app/web/static/
 frontend/node_modules/
 .playwright-mcp/
+# 화면 확인 스크린샷은 저장소에 안 넣는다 — PR 본문에 붙인다 (DEV-14)
+/*.png
+
