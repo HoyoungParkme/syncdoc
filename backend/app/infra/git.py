@@ -71,13 +71,20 @@ async def clone(remote_url: str, workdir: Path, token: str) -> None:
 
 
 async def fetch(workdir: Path, token: str | None = None) -> str:
-    """SYNC-MS-009#git.fetch"""
+    """SYNC-MS-009#git.fetch
+
+    `origin/HEAD`가 아니라 `origin/main`을 본다. `origin/HEAD`는 상징 ref이고
+    **git clone이 빈 저장소에서는 그것을 만들지 않는다** — 그런데 새 프로젝트를
+    시작하는 가장 흔한 방법이 빈 저장소다(UC-A1 기본 흐름 3). 그러면 이 함수가
+    매번 실패하고, 그것을 부르는 폴링·재구축·복원이 통째로 죽는다 (#45).
+    기본 브랜치는 main 고정이라(commit_push가 HEAD:main으로 민다) 상징 ref가 필요 없다.
+    """
     if token is None:  # v1은 public 저장소만 — 토큰 없이 된다
         await _run(workdir, "fetch", "origin")
     else:  # private(v2): clone이 config에서 토큰을 지웠으므로 URL에 다시 붙인다
         url = _with_token((await _run(workdir, "remote", "get-url", "origin")).strip(), token)
         await _run(workdir, "fetch", url, "+refs/heads/*:refs/remotes/origin/*")
-    return (await _run(workdir, "rev-parse", "origin/HEAD")).strip()
+    return (await _run(workdir, "rev-parse", "origin/main")).strip()
 
 
 async def checkout(workdir: Path, ref: str) -> None:
@@ -86,15 +93,15 @@ async def checkout(workdir: Path, ref: str) -> None:
 
 
 async def _has_remote_head(workdir: Path) -> bool:
-    """원격에 커밋이 하나라도 있나. 빈 저장소면 `origin/HEAD`가 없다 (#6)."""
-    rc, _, _ = await _exec(workdir, "rev-parse", "--verify", "--quiet", "origin/HEAD")
+    """원격에 커밋이 하나라도 있나. 빈 저장소면 `origin/main`이 없다 (#6)."""
+    rc, _, _ = await _exec(workdir, "rev-parse", "--verify", "--quiet", "origin/main")
     return rc == 0
 
 
 async def _undo(workdir: Path, onto_remote: bool) -> None:
     """push 실패 뒷정리. 빈 저장소였으면 되돌아갈 원격 커밋이 없어 로컬 커밋만 푼다."""
     if onto_remote:
-        await _run(workdir, "reset", "--hard", "origin/HEAD")
+        await _run(workdir, "reset", "--hard", "origin/main")
     else:
         await _exec(workdir, "update-ref", "-d", "HEAD")
 
@@ -120,7 +127,7 @@ async def commit_push(
     # 빈 저장소에는 되돌아갈 곳이 없다. 이 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3)
     onto_remote = await _has_remote_head(workdir)
     if onto_remote:
-        await _run(workdir, "reset", "--hard", "origin/HEAD")
+        await _run(workdir, "reset", "--hard", "origin/main")
     to_write = files
     for p, c in to_write.items():
         f = workdir / p
@@ -153,11 +160,11 @@ async def commit_push(
             raise PushFailed(err.strip() or out.strip())
         await _run(workdir, "fetch", "origin")
         try:
-            await _run(workdir, *ident, "rebase", "origin/HEAD")
+            await _run(workdir, *ident, "rebase", "origin/main")
         except GitError as e:
             # 같은 줄을 남이 고쳤다. 재시도로 안 풀린다 — 에이전트가 다시 읽어 합쳐야 한다
             await _exec(workdir, "rebase", "--abort")
-            await _run(workdir, "reset", "--hard", "origin/HEAD")
+            await _run(workdir, "reset", "--hard", "origin/main")
             raise PushFailed("conflict") from e
         # 재시도 사이에 기다리지 않는다 — 락을 쥔 채 자면 같은 프로젝트의 저장이 전부 막힌다
     return (await _run(workdir, "rev-parse", "HEAD")).strip()
@@ -289,11 +296,11 @@ async def log(workdir: Path, path: str) -> list[Commit]:
 
 async def last_commit_at(workdir: Path, path: str) -> datetime | None:
     """SYNC-MS-009#git.last_commit_at"""
-    # origin/HEAD를 먼저 본다 — 답할 질문이 "저장소에 언제 올라갔나"라서다.
+    # origin/main을 먼저 본다 — 답할 질문이 "저장소에 언제 올라갔나"라서다.
     # 없으면 HEAD로 떨어진다: commit_push가 **토큰이 박힌 URL**로 밀어 추적 ref가
-    # 안 따라오므로, 방금 민 백업은 origin/HEAD에 아직 안 보인다. 다음 fetch면 맞춰진다.
+    # 안 따라오므로, 방금 민 백업은 origin/main에 아직 안 보인다. 다음 fetch면 맞춰진다.
     # fetch를 여기서 부르지 않는다 — 부르는 쪽(repo_status)이 원격을 안 타려고 만든 함수다
-    for ref in ("origin/HEAD", "HEAD"):
+    for ref in ("origin/main", "HEAD"):
         try:
             out = (await _run(workdir, "log", "-1", "--format=%aI", ref, "--", path)).strip()
         except GitError:

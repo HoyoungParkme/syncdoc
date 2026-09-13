@@ -465,7 +465,7 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
     result = RebuildResult(0, 0, 0, 0)
     try:
         head = await git.fetch(workdir)  # 2단계도 실패하면 rebuild-failed (MS-007 예외)
-        await git.checkout(workdir, "origin/HEAD")
+        await git.checkout(workdir, "origin/main")
         # 재구축이 versions를 갈아 끼우는 동안 전파결정·플래그는 사라진 버전을 가리킨다.
         # 이 트랜잭션에서만 검사를 끝으로 미룬다 — 평소에는 문장마다 검사한다 (0007, #38)
         s.execute(
@@ -725,8 +725,8 @@ async def import_tracking(code: str) -> RestoreResult:
             workdir = Path(project.repository.workdir_path)
             await git.fetch(workdir)
             try:
-                # origin/HEAD로 읽는다 — 로컬 HEAD는 뒤처질 수 있고 백업은 원격이 진실이다
-                text = await git.read(workdir, _BACKUP_PATH, "origin/HEAD")
+                # origin/main로 읽는다 — 로컬 HEAD는 뒤처질 수 있고 백업은 원격이 진실이다
+                text = await git.read(workdir, _BACKUP_PATH, "origin/main")
             except GitError as e:
                 raise NotFound("backup", code) from e
             data = json.loads(text)
