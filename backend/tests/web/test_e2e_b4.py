@@ -116,6 +116,10 @@ async def test_s7_direct_push_catch_up_rebuild_and_revert(
     r = client.post("/api/docs/EXMP-PRD-001/revert", json={"to_version": 3})
     assert r.status_code == 409 and r.json()["type"] == "urn:syncdoc:item-deletion-needs-confirm"
     assert r.json()["deleted_items"][0]["item_id"] == "R2"
+    # 하위 참조는 pk 숫자가 아니라 이름으로 온다 — 에이전트가 사람에게 보여줘야 한다 (#50)
+    down = r.json()["deleted_items"][0]["downstream"]
+    assert down and all(set(d) == {"doc_id", "item_id", "display_name"} for d in down)
+    assert all(d["doc_id"] and d["item_id"] for d in down)
     r = client.post(
         "/api/docs/EXMP-PRD-001/revert", json={"to_version": 3, "confirm_item_deletion": True}
     )
@@ -123,7 +127,8 @@ async def test_s7_direct_push_catch_up_rebuild_and_revert(
     assert (
         scoped.execute(text("SELECT count(*) FROM flags WHERE kind='broken_ref'")).scalar() == 2
     )  # P2에 추가
-    # 삭제된 R2 ID를 되살리는 본문(v4)으로는 못 돌아간다 — item.reused 규약 위반 (UC-H7 4a · MS-002 미결)
+    # 삭제된 R2 ID를 되살리는 본문(v4)으로 **돌아갈 수 있다** — 되돌리기는 재사용이 아니라
+    # 복원이다. 막으면 항목을 한 번 지운 순간 그 이전으로 가는 길이 영구히 닫힌다 (#48)
     r = client.post("/api/docs/EXMP-PRD-001/revert", json={"to_version": 4})
-    assert r.status_code == 422 and r.json()["type"] == "urn:syncdoc:convention-violation"
-    assert any(v["rule"] == "item.reused" for v in r.json()["violations"])
+    assert r.status_code == 201
+    assert "R2" in [i["item_id"] for i in client.get("/api/docs/EXMP-PRD-001").json()["items"]]

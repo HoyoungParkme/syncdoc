@@ -162,16 +162,41 @@ async def _run(
         # github 진입은 물어볼 상대가 없다 — 커밋이 진실(SEQ-2). 삭제는 끊어진 참조로 통보 (보고)
         if any(downstream.values()) and not confirm_item_deletion and entry != Entry.github:
             names = {i.pk: i.item_id for i in document.items}
+            # 하위 참조는 **이름으로** 준다. 에이전트는 이걸 사람에게 보여주고 확인을 받아야
+            # 하는데(API-002 4장) items.id 숫자는 보여줄 수 없고 그것을 이름으로 바꾸는 MCP
+            # 도구도 없다. 그러면 사람이 무엇이 끊어지는지 모르는 채로 승낙한다 (#50)
+            down_pks = [
+                e.from_item_pk for edges in downstream.values() for e in edges if e.from_item_pk
+            ]
+            refnames = spec.describe_items(down_pks)
             raise ItemDeletionNeedsConfirm(
                 [
                     {
                         "item_id": names[pk],
-                        "downstream": [e.from_item_pk for e in edges if e.from_item_pk],
+                        "downstream": [
+                            {
+                                "doc_id": r.doc_id,
+                                "item_id": r.item_id,
+                                "display_name": r.display_name,
+                            }
+                            for e in edges
+                            if e.from_item_pk and (r := refnames.get(e.from_item_pk))
+                        ],
                     }
                     for pk, edges in downstream.items()
                     if edges
                 ]
             )
+    # 6a. 승인 문서를 고치면 여기서 본문의 status도 낮춘다 — **push 전에**.
+    # DB에만 적으면 저장소 frontmatter가 approved로 남아 "status가 진실"(STD-001 1.2)이
+    # 깨지고, 다음 저장이 frontmatter.status_change로 막힌다 — 서버가 준 본문을 서버가
+    # 거부해 그 문서를 영영 못 고친다 (#47). 서버가 에이전트의 본문을 고치는 유일한 자리다
+    if (
+        document is not None
+        and document.status == DocStatus.approved
+        and entry not in (Entry.github, Entry.web_status)
+    ):
+        body = re.sub(r"^status: .*$", f"status: {DocStatus.review}", body, count=1, flags=re.M)
     # 7. push — 여기까지 DB 쓰기 없음
     if entry != Entry.github:
         commit_hash = await git.commit_push(

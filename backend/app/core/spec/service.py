@@ -142,7 +142,17 @@ class SpecService:
                 V.append(Violation(2, "frontmatter.status", str(fm.get("status"))))
             did = fm.get("doc_id", "")
             if not DOC_ID.match(did):
-                V.append(Violation(2, "frontmatter.doc_id", f"형식 {did!r}"))
+                # 빈 값은 "create_document에 보낸 본문을 그대로 되돌려준" 흔한 실수다.
+                # `형식 ''`만 주면 무엇이 문제인지 알 수 없다 (#51)
+                V.append(
+                    Violation(
+                        2,
+                        "frontmatter.doc_id",
+                        "비어 있음 — get_document가 돌려준 본문에서 시작하라"
+                        if not did
+                        else f"형식 {did!r}",
+                    )
+                )
             elif did.split("-")[1] != doc_type:
                 V.append(Violation(2, "frontmatter.doc_id", f"{did}의 타입 ≠ {doc_type}"))
             for u in re.findall(r"[\w-]+", fm.get("upstream", "").strip("[]")):
@@ -168,7 +178,11 @@ class SpecService:
                     V.append(Violation(i, "item.duplicate", tok))
                 seen.add(tok)
                 items.append(tok)
-                if tok in deleted:
+                # 되돌리기는 재사용이 아니라 **복원**이다. 이 검사를 걸면 항목을 한 번
+                # 지운 순간 그 이전 버전으로 가는 길이 영구히 닫힌다 — 지우는 데는 확인
+                # 한 번이면 되는데 되돌리는 길은 아예 없어 비대칭이었다 (#48).
+                # 에이전트가 실수로 지운 ID를 다시 쓰는 것(entry=mcp)은 그대로 막힌다
+                if tok in deleted and entry != Entry.web_revert:
                     V.append(Violation(i, "item.reused", f"{tok} — 삭제된 항목 ID 재사용"))
                 if re.search(r"(?<![0-9])0\d", tok):
                     V.append(Violation(i, "item.padding", tok))

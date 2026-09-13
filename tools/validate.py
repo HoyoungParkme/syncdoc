@@ -130,7 +130,12 @@ def validate(path, deleted_ids=()):
 
 if __name__ == "__main__":
     import glob
-    paths = sys.argv[1:] or sorted(p for p in glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "specs", "*", "*.md")) if "/_templates/" not in p)
+    paths = sys.argv[1:] or sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "specs", "*", "*.md")))
+    # _templates·assets는 명세 문서가 아니다 (STD-001 1.1). 인자로 받아도 거른다 —
+    # 템플릿은 doc_id가 빈 채로 있는 것이 정상이라, 세면 있지도 않은 위반이 잔뜩 뜬다.
+    # 파이프라인(MS-009 git.list)은 이미 거르는데 여기가 안 걸러 새 프로젝트에 돌리면
+    # 가짜 위반 12건이 떴다 (#52)
+    paths = [p for p in paths if not {"_templates", "assets"} & set(p.replace("\\", "/").split("/"))]
     total_v = total_w = 0
     for p in paths:
         V, W, info = validate(p)
