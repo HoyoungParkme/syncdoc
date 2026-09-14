@@ -781,6 +781,9 @@ a.arow:hover{background:var(--bg-subtle)}
 .howto tr.hd th{background:none;color:var(--ink-faint);font-size:var(--text-caption);font-weight:var(--w-regular);border-bottom:1px solid var(--divider)}
 .howto td.no,.howto tr.hd th:first-child{width:26px;text-align:center;color:var(--ink-faint);font-family:var(--font-mono);font-size:var(--text-mono-sm)}
 .howto td.code{width:64px;font-family:var(--font-mono);font-size:var(--text-mono-id);font-weight:var(--w-semibold)}
+/* 3.5 문서 구성 — 첫 줄의 이름을 가리지 않게 흐린 색·작은 글자 (UI-16 규칙) */
+.howto td .sub{margin-top:var(--space-3);font-size:var(--text-caption);color:var(--ink-faint);line-height:1.55}
+.howto td .sub b{color:var(--ink-muted)}
 .howto td.where{color:var(--ink-muted);white-space:nowrap;width:74px}
 /* 항목 ID는 고정폭 평문. 칩으로 그리면 표에 색 상자가 열한 줄 생긴다 */
 .howto td.ids{width:150px;font-family:var(--font-mono);font-size:var(--text-mono-sm);color:var(--ink-muted)}
