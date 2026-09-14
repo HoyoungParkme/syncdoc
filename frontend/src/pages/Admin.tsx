@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ago, api, ApiError, docPath, type RebuildResult, type RepoStatus, type RestoreResult } from '../api/client'
-import { toast, Tooltip } from '../components/ui'
+import { ProjName, toast, Tooltip } from '../components/ui'
 
 /** 버린 추적 행의 종류 → 사람 말 */
 const DROPPED_KO: Record<string, string> = { propagation_decision: '전파 결정', flag: '플래그', comment: '댓글', decision_item: '전파 결정의 항목' }
@@ -93,7 +93,7 @@ export function Admin() {
             {repos.map((r, i) => (
               <tr key={r.code} data-el={i === 0 ? '2.1' : undefined}>
                 <td>
-                  <b>{r.code}</b>
+                  <ProjName code={r.code} name={r.name} />
                 </td>
                 <td className="lbl">{r.remote_url.replace(/^https?:\/\/(www\.)?github\.com\//, '').replace(/\.git$/, '')}</td>
                 <td>

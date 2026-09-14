@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { ago, STAGE_TYPES, type ProjectSummary } from '../api/client'
 import { ProjectInit } from './ProjectInit'
-import { Tooltip } from '../components/ui'
+import { ProjName, Tooltip } from '../components/ui'
 
 /** 행 아래 요약과 경고 툴팁이 같은 목록을 쓴다 — 한쪽만 고쳐 어긋나는 일이 없게 */
 const KINDS: [string, string][] = [
@@ -65,7 +65,7 @@ export function ProjectList() {
                   </span>
                   <span className="pname" onClick={() => nav(`/p/${p.code}`)}>
                     <span>
-                      <b className="mono">{p.code}</b> {p.name}
+                      <ProjName code={p.code} name={p.name} />
                     </span>
                     <span className="sub">
                       {workN > 0 && (

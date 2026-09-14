@@ -125,6 +125,7 @@ class RepoStatus:
     """SYNC-API-001 RepoStatus — UI-14 표 2. behind_by=None이면 처리한 커밋이 아직 없다."""
 
     code: str
+    name: str  # UI-14 표가 「[코드] 이름」으로 적는다 (UI-002 1.6)
     remote_url: str
     last_processed_commit: str | None
     synced_at: datetime | None

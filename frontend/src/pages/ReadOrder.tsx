@@ -1,6 +1,7 @@
 /** UI-9 순서대로 읽기 — SYNC-UI-002#UI-9. 승인 문서만, 없으면 배너(3)와 초안 보기(3.1). 요소 번호 = data-el.
  *  1 헤더 · 2 단계 표시(칩마다 대표 상태 점, 현재는 채워서) · 3 미확정 배너(3.1)
  *  4 본문(4.1 위치) · 5 이동(5.1 이전, 5.2 다음, 5.3 이 문서 열기) */
+import { ProjName } from '../components/ui'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
@@ -92,7 +93,7 @@ export function ReadOrder() {
       {/* 단계 레일은 전폭 서브바다. 페이지 제목이 아니라 자리 표시가 여기 산다 */}
       <div className="steprail" data-el="1">
         <Link className="back" to={`/p/${code}`}>
-          ← {projName || code}
+          ← <ProjName code={code} name={projName} />
         </Link>
         <div className="steps" data-el="2">
           {STAGE_TYPES.map((t, i) => {

@@ -5,6 +5,7 @@
  *  배치는 브라우저가 한다 — 서버는 노드·간선 목록만 준다(MS-008 graph_view 8).
  *  라이브러리를 안 쓴다: 열이 고정이고 간선 넷이 저마다 다른 길로 가야 해서
  *  범용 그래프 엔진의 배치·라우팅과 계속 싸우게 된다. */
+import { ProjName } from '../components/ui'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
@@ -143,7 +144,9 @@ export function Graph() {
       <div className="phead" data-el="1">
         <div>
           <div className="crumbs">
-            <Link to={`/p/${code}`}>{g?.project_name || code}</Link>
+            <Link to={`/p/${code}`}>
+              <ProjName code={code} name={g?.project_name} />
+            </Link>
             <span className="sep">›</span>
             <span>참조 그래프</span>
           </div>

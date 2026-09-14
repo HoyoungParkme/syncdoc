@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ago, api, ApiError, docPath, josa, type Diff, type Document, type ItemReferences, type Version } from '../api/client'
 import { DiffBox } from '../components/DiffBox'
-import { StatusPill } from '../components/ui'
+import { StatusPill, ProjName } from '../components/ui'
 import { Handle, PANEL, TOC, useWidth } from '../components/panes'
 import { renderBlocks } from '../view/md'
 
@@ -122,7 +122,7 @@ export function History() {
     <div className="docscreen" style={{ '--toc-w': `${tocW}px`, '--panel-w': `${panelW}px` } as React.CSSProperties}>
       <div className="docbar" data-el="1">
         <Link className="crumb" to={`/p/${proj}`}>
-          {doc.project_name || proj}
+          <ProjName code={proj} name={doc.project_name} />
         </Link>
         <span className="sep">›</span>
         <Link className="crumb mono" to={`/p/${proj}#stage-${doc.stage ?? ''}`}>

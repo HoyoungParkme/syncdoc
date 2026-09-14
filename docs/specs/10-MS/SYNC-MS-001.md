@@ -89,7 +89,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-SEQ-001#SEQ-20]] · UI-14 표 2
 
-**처리** **원격을 안 탄다. `git.fetch`를 부르지 않는다.** 저장소마다 `→ RepoStatus(code, remote_url, last_processed_commit, synced_at, behind_by, fetched_at, backed_up_at, backup_stale, error)`.
+**처리** **원격을 안 탄다. `git.fetch`를 부르지 않는다.** 저장소마다 `→ RepoStatus(code, name, remote_url, last_processed_commit, synced_at, behind_by, fetched_at, backed_up_at, backup_stale, error)` — `name`은 UI-14 표가 「[코드] 이름」으로 적기 위해서다(UI-002 1.6).
 
 `error`는 **폴링이 적어 둔 `repositories.fetch_error`**다([[SYNC-MS-007#scheduler.catch_up]]). 백업 읽기가 실패하면 그 사유가 앞에 온다 — 둘 다 있으면 `"backup: {사유}"`를 쓴다. **둘 다 "이 저장소를 지금 못 보고 있다"는 같은 말이라 한 칸에 모은다.**
 
