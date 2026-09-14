@@ -12,12 +12,15 @@ export function ProjectInit({ onClose, onDone }: { onClose: () => void; onDone: 
   const [codeErr, setCodeErr] = useState('')
   const [existing, setExisting] = useState<number | null>(null)
   const [banner, setBanner] = useState('')
+  // 카드 F — 끄면 지금과 같다(없는 저장소면 push-failed). 켜면 공개 저장소를 만들어 준다.
+  // 기본값을 거짓으로 두는 이유는 주소 오타가 조용히 새 저장소를 만들지 않게 하려는 것
+  const [createRepo, setCreateRepo] = useState(false)
 
   async function submit(importExisting = false) {
     setCodeErr('')
     setBanner('')
     try {
-      await api.post('/api/projects', { remote_url: remote, code, name, import_existing: importExisting })
+      await api.post('/api/projects', { remote_url: remote, code, name, import_existing: importExisting, create_repo: createRepo })
       onDone()
     } catch (e) {
       if (!(e instanceof ApiError)) throw e
@@ -27,6 +30,8 @@ export function ProjectInit({ onClose, onDone }: { onClose: () => void; onDone: 
       else if (k === 'repository-already-registered') setBanner(`이미 ${String(e.problem.code ?? '')} 프로젝트가 쓰는 저장소입니다`)
       else if (k === 'existing-specs') setExisting(Number(e.problem.doc_count ?? 0))
       else if (k === 'push-failed') setBanner(`push 실패: ${String(e.problem.reason ?? '')}. 만들던 작업물은 버렸습니다. 저장소 권한을 확인하세요.`)
+      // 저장소는 만들어졌을 수도 있다 — 앱이 남의 저장소를 지우지 않는다(카드 F)
+      else if (k === 'repo-create-failed') setBanner(`저장소를 만들지 못했습니다: ${String(e.problem.reason ?? '')}`)
       else if (k === 'not-implemented') setBanner('기존 명세 가져오기는 아직 구현되지 않았습니다(B4).')
       else setBanner(e.message)
       setExisting((x) => (k === 'existing-specs' ? x : null))
@@ -61,6 +66,10 @@ export function ProjectInit({ onClose, onDone }: { onClose: () => void; onDone: 
         )}
         <label>이름</label>
         <input className="inp wide" data-el="2.3" value={name} onChange={(e) => setName(e.target.value)} placeholder="에어데이터" />
+        <label className="chk">
+          <input type="checkbox" data-el="2.6" checked={createRepo} onChange={(e) => setCreateRepo(e.target.checked)} />{' '}
+          저장소가 없으면 새로 만든다 <span className="lbl">(공개로 만들어집니다)</span>
+        </label>
         {/* 등록하면 저장소에 무엇이 생기는지. 기존 명세가 발견되면(빈 저장소가 아니면) 감춘다 */}
         {existing === null && (
           <div className="willcommit" data-el="2.5">

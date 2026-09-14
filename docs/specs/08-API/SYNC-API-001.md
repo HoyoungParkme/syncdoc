@@ -50,6 +50,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:project-code-conflict` | 409 | 코드 중복 | `code` | [[SYNC-UC-001#UC-A1]] 2a |
 | `urn:syncdoc:project-code-invalid` | 422 | 코드 형식 | `rule` | [[SYNC-UC-001#UC-A1]] 2b |
 | `urn:syncdoc:existing-specs` | 409 | `docs/specs/` 이미 있음 | `doc_count` | [[SYNC-UC-001#UC-A1]] 3a |
+| `urn:syncdoc:repo-create-failed` | 502 | `create_repo`로 저장소를 못 만듦 — 이름 규칙·권한·다른 소유자 점유 | `reason` | [[SYNC-CODE-001#F]] |
 | `urn:syncdoc:push-failed` | 502 | GitHub push 실패 | `reason` | [[SYNC-UC-001#UC-A1]] 4a, [[SYNC-UC-001#UC-S7]] 2b |
 | `urn:syncdoc:reason-required` | 422 | skip인데 사유 없음 | — | [[SYNC-UC-001#UC-H10]] 2a |
 | `urn:syncdoc:already-decided` | 409 | 이미 결정된 전파 | `choice`, `decided_at` | [[SYNC-UC-001#UC-H10]] |
@@ -212,6 +213,10 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
                 type: boolean
                 default: false
                 description: "docs/specs/가 이미 있을 때 true로 재요청하면 가져와서 등록 ([[SYNC-UC-001#UC-A1]] 3a2)"
+              create_repo:
+                type: boolean
+                default: false
+                description: "저장소가 없으면 공개 저장소로 만든다. 이미 있으면 만들지 않는다 ([[SYNC-CODE-001#F]])"
     responses:
       '201':
         content:

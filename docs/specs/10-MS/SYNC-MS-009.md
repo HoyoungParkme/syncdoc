@@ -38,6 +38,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#github.verify_signature]] | webhook 서명 |
 | [[#github.exchange_code]] | OAuth code → token |
 | [[#github.get_user]] | token → 사용자 정보 |
+| [[#github.create_repo]] | 공개 저장소 만들기 |
 
 ---
 
@@ -236,6 +237,29 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **시그니처** `async def get_user(token: str) -> GithubUser`
 
 **처리** `GET https://api.github.com/user` (Bearer) → `{id, login, name}`. `name`이 null이면 `login`
+
+---
+
+#### github.create_repo 공개 저장소 만들기
+
+**시그니처** `async def create_repo(token: str, owner: str, name: str) -> str`
+
+근거: [[SYNC-CODE-001#F]] · [[SYNC-UC-001#UC-A1]] 기본 흐름 3
+
+**처리**
+1. `GET https://api.github.com/repos/{owner}/{name}` — 이미 있으면 **만들지 않고** 그 `clone_url`을 돌려준다
+2. 없으면 `POST https://api.github.com/user/repos` (Bearer) · `{name, private: false, auto_init: false}`
+3. `→ clone_url`
+
+**출력** `https://github.com/{owner}/{name}.git`
+
+**예외** `! repo-create-failed {reason}` — 이름이 GitHub 규칙에 안 맞거나, 토큰 권한이 모자라거나, 같은 이름이 **다른 소유자 아래** 있어 접근이 안 될 때
+
+**항상 공개로 만든다.** v1은 공개 저장소만 지원한다 — [[#git.fetch]]가 토큰 없이 돌기 때문이다. 비공개로 만들면 등록은 되고 **폴링이 조용히 죽는다.** 선택지를 안 두어 그 함정을 없앤다(8장 미결이 풀리면 그때 인자를 연다)
+
+**`auto_init`을 쓰지 않는다.** 초기 커밋을 GitHub이 만들면 README가 생기고, 그러면 [[SYNC-MS-001#ProjectService.init_project]]의 "빈 저장소" 경로가 아니라 "내용 있는 저장소" 경로를 타 흐름이 갈린다. 골격 커밋이 그 저장소의 첫 커밋이어야 한다
+
+**이미 있으면 만들지 않는 이유.** 같은 인자로 두 번 불러도 결과가 같아야 한다 — 등록이 중간에 실패해 사람이 다시 부를 때 "이미 있다"로 막히면 손으로 지워야 한다
 
 ---
 

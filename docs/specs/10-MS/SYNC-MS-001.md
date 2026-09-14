@@ -37,7 +37,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### ProjectService.init_project 프로젝트 초기화
 
-**시그니처** `async def init_project(remote_url: str, code: str, name: str, user: User, import_existing: bool = False) -> Project`
+**시그니처** `async def init_project(remote_url: str, code: str, name: str, user: User, import_existing: bool = False, create_repo: bool = False) -> Project`
 
 근거: [[SYNC-SEQ-001#SEQ-4]] · [[SYNC-UC-001#UC-A1]] · [[SYNC-API-001#POST/api/projects]] · [[SYNC-API-002#init_project]]
 
@@ -47,7 +47,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. if `DB: projects where code` → `! project-code-conflict {code}` (2a)
 2a. if `DB: repositories where remote_url 정규화 일치` → `! repository-already-registered {code: 그 프로젝트}` (UC-A1 2d). 정규화는 소문자 + 끝 `/`·`.git` 제거 — `web/routers/hooks.py`가 webhook 저장소를 찾을 때와 같은 규칙
 3. `workdir = config.REPOS_DIR / code` · if 이미 있음 → 지운다 (이전 실패 잔재)
-4. `token = AccountService.github_token_for(user)` · `git.clone(remote_url, workdir, token)` · if 실패 → workdir 삭제, `! push-failed {reason: clone}`
+3a. `token = AccountService.github_token_for(user)`
+3b. if `create_repo` → `github.create_repo(token, owner, name)` — `owner`·`name`은 `remote_url`에서 뜬다. **이미 있으면 만들지 않고 넘어간다**([[SYNC-MS-009#github.create_repo]]). if 실패 → workdir 삭제, `! repo-create-failed {reason}`
+4. `git.clone(remote_url, workdir, token)` · if 실패 → workdir 삭제, `! push-failed {reason: clone}`
 5. `has = git.exists(workdir, "docs/specs")` — 커밋이 하나도 없는 빈 저장소는 `false`다([[SYNC-MS-009#git.exists]]). 9단계가 만드는 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3)
 6. if `has and not import_existing` → `n = len(git.list(workdir, "docs/specs/*/*.md"))`, workdir 삭제, `! existing-specs {doc_count: n}` (3a)
 7. **트랜잭션**: `DB: projects insert (code, name)`, `DB: repositories insert (project_id, remote_url, workdir_path, last_processed_commit=None, registered_by_user_id=user.id)` — 누가 등록했는지 기록. private 지원 때 이 사람 토큰으로 fetch한다
@@ -55,9 +57,13 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 9. else → `files = git.init_specs(workdir)` (11단계 + `STD/` 디렉터리, `_templates/` 12개, `assets/`) · `hash = git.commit_push(workdir, message=f"chore({code}): init syncdoc", author=Author(human, user, None, web), files=files)` · if 실패 → 7단계 롤백, workdir 삭제, `! push-failed` (4a) · `DB: repositories update last_processed_commit=hash`
 10. `→ Project`. **`ProjectSummary`는 입구(MCP 도구·라우터)가 `queries.project_summary()`로 만든다** — 서비스가 `queries`를 부르면 순환이다(클래스 3.2에 PS→QR 없음). 신규면 11칸 null
 
-**호출하는 것** `AccountService.github_token_for` · `git.clone` `exists` `list` `init_specs` `commit_push` · [[SYNC-MS-007#pipeline.rebuild]]
+**저장소를 만든 뒤 실패하면 저장소는 남는다.** 7~9단계가 실패하면 DB와 작업 사본은 지금처럼 되돌리되 **GitHub 저장소는 지우지 않는다.** 앱이 남의 저장소를 지우는 권한을 쓰는 것이 위험하고, 되돌리는 사이 사람이 넣은 것까지 사라진다. 사용자가 직접 지우거나 `import_existing`으로 다시 등록하면 된다 — 오류 메시지에 그 사실을 적는다
 
-**테스트 관점** 빈 저장소 → `docs/specs/` 생김, 커밋 하나, 11칸 null · `docs/specs/` 있는 저장소 → `existing-specs`, workdir 없음, DB 행 없음 · `import_existing=true` → 재구축 결과 · clone 권한 없음 → `push-failed`, 아무것도 안 남음
+**`create_repo`의 기본값이 거짓인 이유.** 참으로 두면 주소에 오타를 내도 조용히 새 저장소가 생긴다. 지금은 그럴 때 clone이 실패해 `push-failed`가 나므로 오타를 알아챌 수 있다. 에이전트가 이 인자를 붙이려면 사람의 지시가 있어야 한다
+
+**호출하는 것** `AccountService.github_token_for` · [[SYNC-MS-009#github.create_repo]] · `git.clone` `exists` `list` `init_specs` `commit_push` · [[SYNC-MS-007#pipeline.rebuild]]
+
+**테스트 관점** 빈 저장소 → `docs/specs/` 생김, 커밋 하나, 11칸 null · `docs/specs/` 있는 저장소 → `existing-specs`, workdir 없음, DB 행 없음 · `import_existing=true` → 재구축 결과 · clone 권한 없음 → `push-failed`, 아무것도 안 남음 · **없는 저장소 + `create_repo=false` → `push-failed`**(지금 동작) · **없는 저장소 + `true` → 공개 저장소가 생기고 골격 커밋까지** · **이미 있는 저장소 + `true` → 만들지 않고 그대로 쓴다** · 만든 뒤 등록이 실패해도 **저장소는 남는다**
 
 ---
 
