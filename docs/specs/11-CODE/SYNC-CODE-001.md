@@ -222,7 +222,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 화면 | UI-16에 절 하나 — 「에이전트를 붙이는 법」 표(6) + `claude mcp add` 명령 상자(6.2, 주소 채움) + 그 다음(6.3) + 앱 밖 화면 그림 셋(6.4~6.6) |
 | 테스트 | `check_ui.py` UI-16 요소 17/17 · 명령 상자의 주소가 지금 화면의 origin과 같다 · 그림 셋이 200으로 서빙된다 |
 | 선행 | F |
-| 완료 | 2026-09-14 · 브랜치 `card/G-howto-connect` · 커밋 `26e501f`(spec) `4e193d8`(code) · PR #62 · `check_ui.py` UI-16 **14/14**, 전체 15/15 · `validate.py` 위반 0·경고 0 · `tsc`·`build` 통과 · 백엔드 무변경(213) · **실물 확인**(터널, 1875px): 절 4행 · 명령에 `https://…trycloudflare.com/mcp` 채워짐 · 토큰 자리표시 · 다이얼로그 660px · **걸린 것 하나**: import를 화면 docstring 앞에 두었더니 `check_ui`가 UI-16을 "컴포넌트 없음"으로 빠뜨리면서 전체가 14/14로 통과해 버렸다 — 안 본 화면이 통과로 세어진 것(STD-004 4장). docstring 뒤로 옮겨 15/15 |
+| 완료 | 2026-09-14 · 브랜치 `card/G-howto-connect` · 커밋 `26e501f`(spec) `4e193d8`(code) · PR #62 · `check_ui.py` UI-16 **14/14**, 전체 15/15 · `validate.py` 위반 0·경고 0 · `tsc`·`build` 통과 · 백엔드 무변경(213) · **실물 확인**(터널, 1875px): 절 4행 · 명령에 `https://…trycloudflare.com/mcp` 채워짐 · 토큰 자리표시 · 다이얼로그 660px · **걸린 것 하나**: import를 화면 docstring 앞에 두었더니 `check_ui`가 UI-16을 "컴포넌트 없음"으로 빠뜨리면서 전체가 14/14로 통과해 버렸다 — 안 본 화면이 통과로 세어진 것(STD-004 4장). docstring 뒤로 옮겨 15/15 · **추가(PR #63, 커밋 `e3bbfdf` spec · `b0773bc` code)**: 앱 밖 화면 그림 셋(6.4~6.6) — 발급 순간은 실제 캡처(원문 가림, 토큰 폐기), 터미널 둘은 실제 출력을 렌더한 것. 셋 67KB. `check_ui` UI-16 17/17 · `/howto/*.png` 셋 200 |
 
 **왜 카드인가.** 새 절이 화면에 생긴다. 요소 번호가 넷 늘고 `check_ui`의 집합이 바뀐다. 버그가 아니라 기능이다(DEV-15).
 
