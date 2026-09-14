@@ -47,7 +47,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ```json
 {
   "name": "init_project",
-  "description": "GitHub 저장소를 싱크독 프로젝트로 등록한다. docs/specs/ 아래 11단계 디렉터리와 템플릿을 만들어 커밋한다. 새 프로젝트를 시작할 때 한 번만 부른다. 이미 등록된 저장소면 project-code-conflict, 저장소에 docs/specs/가 이미 있으면 existing-specs 에러가 나며 import_existing=true로 다시 부르면 기존 명세를 가져와 등록한다.",
+  "description": "GitHub 저장소를 싱크독 프로젝트로 등록한다. docs/specs/ 아래 11단계 디렉터리와 템플릿을 만들어 커밋한다. 새 프로젝트를 시작할 때 한 번만 부른다. 이미 등록된 저장소면 project-code-conflict, 저장소에 docs/specs/가 이미 있으면 existing-specs 에러가 나며 import_existing=true로 다시 부르면 기존 명세를 가져와 등록한다. **저장소가 아직 없으면 create_repo=true로 부른다** — 공개 저장소를 만들어 주고 이어서 등록까지 한다. 사람이 저장소를 만들어 달라고 했을 때만 이 인자를 붙인다.",
   "inputSchema": {
     "type": "object",
     "required": ["remote_url", "code", "name"],
@@ -55,7 +55,8 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
       "remote_url": { "type": "string", "format": "uri", "description": "GitHub 저장소 주소" },
       "code": { "type": "string", "pattern": "^[A-Z]{1,4}$", "description": "프로젝트 코드. 영문 대문자 4자 이내. 문서 ID 앞부분이 된다" },
       "name": { "type": "string", "maxLength": 100, "description": "표시 이름" },
-      "import_existing": { "type": "boolean", "default": false, "description": "docs/specs/가 이미 있을 때 덮어쓰지 않고 가져와 등록" }
+      "import_existing": { "type": "boolean", "default": false, "description": "docs/specs/가 이미 있을 때 덮어쓰지 않고 가져와 등록" },
+      "create_repo": { "type": "boolean", "default": false, "description": "저장소가 없으면 공개로 만든다. 이미 있으면 만들지 않는다" }
     }
   }
 }

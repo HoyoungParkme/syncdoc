@@ -1177,6 +1177,8 @@ status: approved
     <label>이름</label>
     <input class="inp wide" data-el="2.3" placeholder="에어데이터">
 
+    <label class="chk"><input type="checkbox" data-el="2.6"> 저장소가 없으면 새로 만든다 <span class="lbl">(공개로 만들어집니다)</span></label>
+
     <div class="willcommit" data-el="2.5">
       <b>커밋될 것</b>
       <div class="mono">docs/specs/_templates/ · 12개</div>
@@ -1213,6 +1215,7 @@ status: approved
 | 2.1 | 저장소 주소 | 입력 | GitHub 저장소 URL | — |
 | 2.2 | 프로젝트 코드 | 입력 | 영문 대문자 4자 이내 | — |
 | 2.3 | 이름 | 입력 | 표시 이름 | — |
+| 2.6 | 없으면 만든다 | 체크박스 | 끄면 지금과 같다 — 없는 저장소면 `push-failed`. 켜면 **공개 저장소**를 만들어 준다([[SYNC-CODE-001#F]]). **비공개 선택지는 없다** — v1의 폴링이 토큰 없이 돌아 비공개면 조용히 죽는다 | — |
 | 2.4 | 코드 오류 | 텍스트 | 초기화 시도 후 서버가 거부한 이유. 중복(UC-A1 2a) 또는 형식(2b). 시도 전엔 안 보임 | — |
 | 2.5 | 커밋될 것 | 영역 | 등록하면 저장소에 무엇이 생기는지. 빈 저장소가 아니면 안 보인다 | — |
 | 3.1 | 초기화 | 버튼 | | 서버에 요청. 결과에 따라 2.4 / 4 / 5 / UI-2 |
