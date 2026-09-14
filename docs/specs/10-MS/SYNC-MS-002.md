@@ -214,11 +214,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### SpecService.save 버전·항목 저장
 
-**시그니처** `save(document: Document, body: str, commit_hash: str, author: Author, message: str, deleted_item_pks: list[int], validate_result: ValidateResult | None = None, rebuild: bool = False) -> VersionRow`
+**시그니처** `save(document: Document, body: str, commit_hash: str, author: Author, message: str, deleted_item_pks: list[int], validate_result: ValidateResult | None = None, rebuild: bool = False, status_commit_hash: str | None = None) -> VersionRow`
 
 근거: [[SYNC-SEQ-001#SEQ-1]] 8단계 · [[SYNC-UC-001#UC-A6]] 6a
 
-**입력** `document` 현재 행(DTO의 `id`로 다시 읽는다). `body` 새 본문. `commit_hash`. `author`. `deleted_item_pks` — `pipeline`이 확인 끝낸 것. `validate_result` — github 경로에서 위반이어도 저장할 때. 위반·경고 둘 다 여기서. `rebuild` — 재구축이면 `version_no`를 커밋 순서대로
+**입력** `document` 현재 행(DTO의 `id`로 다시 읽는다). `body` 새 본문. `commit_hash`. `author`. `deleted_item_pks` — `pipeline`이 확인 끝낸 것. `validate_result` — github 경로에서 위반이어도 저장할 때. 위반·경고 둘 다 여기서. `rebuild` — 재구축이면 `version_no`를 커밋 순서대로. `status_commit_hash` — 6단계 자동 강등을 저장소에 반영한 커밋. github 경로에서만 온다([[SYNC-MS-007#pipeline.save_pipeline]] 6a)
 
 **처리** — 호출자의 트랜잭션 안. **버전 충돌 검사는 하지 않는다**(`pipeline` 5단계가 이미)
 1. `new_no = document.current_version_no + 1`
@@ -226,7 +226,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 3. `blocks = item_blocks(body, doc_type)`. 블록마다 `DB: items where document_id and item_id` · if 있음 → `display_name` 갱신, **`is_deleted=false, deleted_at=null`로 되돌림**(본문에 다시 나타났으므로 복구) · else → insert
 4. `deleted_item_pks`마다 `DB: items set is_deleted=true, deleted_at=now`
 5. if `author.via == github` → `new_status = fm.status` (원본이 진실) · else → `new_status = document.status`
-6. if `document.status == approved and body != document.current_body` → `new_status = review`, `DB: status_changes insert (from=approved, to=review, changed_by=author.user, reason="본문 수정으로 자동 강등", commit_hash=None)` (UC-A6 6a)
+6. if `document.status == approved and body != document.current_body and new_status == approved` → `new_status = review`, `DB: status_changes insert (from=approved, to=review, changed_by=author.user, reason="본문 수정으로 자동 강등", commit_hash=status_commit_hash)` (UC-A6 6a)
+   - **`new_status == approved`를 함께 보는 것은 github 경로 때문이다.** 5단계에서 작성자가 frontmatter로 스스로 `draft`를 적었으면 그게 원본의 진실이다. 그것까지 `review`로 덮으면 저장소는 `draft`, DB는 `review`로 또 갈린다
+   - **이 강등은 저장소에도 반영돼야 한다**([[SYNC-STD-001]] 1.2 「`status`가 진실」). mcp·web_revert 경로는 [[SYNC-MS-007#pipeline.save_pipeline]] 6a가 **push 전에** 본문을 고쳐 한 커밋으로 끝낸다. **github 경로는 커밋이 이미 저장소에 있어 그럴 수 없다** — 같은 6a가 `status(…)` 커밋을 하나 더 밀고, 그 해시가 `status_commit_hash`로 여기 온다 (#58)
 7. `DB: documents update (current_body, current_version_no=new_no, status=new_status)` · if `validate_result` → `has_convention_error = bool(violations)`, `convention_error_detail = violations를 "rule: message" 줄로 (없으면 null)`, `incomplete_warnings = warnings JSON (없으면 null)` · else → 오류·경고 컬럼 그대로
 8. `→ Version`
 
@@ -236,7 +238,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** [[#SpecService.item_blocks]]
 
-**테스트 관점** 저장 후 `version_no` +1 · 승인 문서 저장 → `review` + StatusChange · github 경로에서 frontmatter status가 `approved`로 바뀐 본문 → 그대로 `approved` · 삭제 pk → `is_deleted=true`이고 행은 남음 · 경고 있는 저장 → `incomplete_warnings` 채워짐
+**테스트 관점** 저장 후 `version_no` +1 · 승인 문서 저장 → `review` + StatusChange · github 경로에서 frontmatter status가 `approved`로 바뀐 본문 → 그대로 `approved` · **승인 문서를 github로 고치면 DB는 `review`가 되고 저장소 frontmatter도 뒤이어 `review`가 된다** · 삭제 pk → `is_deleted=true`이고 행은 남음 · 경고 있는 저장 → `incomplete_warnings` 채워짐
 
 ---
 

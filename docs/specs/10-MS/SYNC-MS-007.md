@@ -87,17 +87,19 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 6. if `entry != web_status and document` → `deleted = spec.detect_deleted_items(document, body)`; `deleted`의 pk마다 `refs = reference.downstream(pk)`
    - if `any(refs) and not confirm_item_deletion` → `! item-deletion-needs-confirm {deleted_items: [{item_id, downstream: [{doc_id, item_id, display_name}]}]}`
    - **`downstream`은 pk가 아니라 이름이다.** [[SYNC-API-002]] 4장이 에이전트에게 "사람에게 보여주고 확인받은 뒤" 다시 부르라고 시키는데, `items.id` 숫자는 사람에게 보여줄 수 없고 그것을 이름으로 바꾸는 MCP 도구도 없다. 그러면 사람은 **무엇이 끊어지는지 모르는 채로 승낙**하게 되어 확인 절차의 뜻이 사라진다(#50). `SpecService.describe_items`가 이미 그 변환을 한다 — 여기서 한 번 부른다
-6a. **승인 상태 문서를 고치면 여기서 본문의 `status:`를 `review`로 낮춘다** — `entry not in (github, web_status)`이고 `document.status == approved`일 때. 자동 강등(9단계 뒤 SEQ-1 6a)을 **push 전에** 본문에 반영하는 것이다
+6a. **승인 상태 문서를 고치면 여기서 본문의 `status:`를 `review`로 낮춘다** — `entry != web_status`이고 `document.status == approved`이고 `body != document.current_body`일 때. github 경로는 **frontmatter가 아직 `approved`일 때만** — 작성자가 같은 커밋에서 스스로 내렸으면 그게 원본의 진실이다. 자동 강등(9단계 뒤 SEQ-1 6a)을 **push 전에** 본문에 반영하는 것이다
 
    **왜 여기인가.** 강등을 DB에만 적으면 저장소 frontmatter는 `approved`로 남아 [[SYNC-STD-001]] 1.2의 "`status`가 진실이다"가 깨진다. 그리고 다음 저장이 막힌다 — 에이전트가 `get_document`로 받은 본문(`approved`)을 그대로 돌려주면 `frontmatter.status_change` 위반이 된다. **서버가 준 것을 서버가 거부하므로 그 문서는 영영 못 고친다**(#47)
 
-   **서버가 에이전트의 본문을 고치는 유일한 자리다.** 커밋은 하나로 둔다 — 저장마다 `status(…)` 커밋이 하나씩 더 쌓이면 이력이 본문 변경보다 상태 줄로 더 두꺼워진다
+   **github 경로는 본문만 고쳐서는 저장소가 안 바뀐다** — 커밋이 이미 저장소에 있기 때문이다. 그래서 여기서 커밋을 하나 더 민다: `status_commit_hash = git.commit_push(repo.workdir, f"status({doc_id}): approved → review\n\n본문 수정으로 자동 강등", author, path, content=body)`. 8단계가 이 해시를 `spec.save`에 넘겨 `status_changes.commit_hash`에 적는다. **적지 않으면 다음 폴링이 [[#pipeline.process_commit]] 3a에서 걸러내지 못해, 앱이 민 커밋을 남의 편집으로 다시 저장한다.** 작성자는 그 커밋을 유발한 사람 그대로 둔다 — 판단은 앱이 했지만 원인은 그 사람의 편집이고, 그래야 `user_for_commit`이 사람을 찾는다 (#58)
+
+   **서버가 에이전트의 본문을 고치는 유일한 자리다.** mcp·web_revert는 커밋을 하나로 둔다 — 저장마다 `status(…)` 커밋이 하나씩 더 쌓이면 이력이 본문 변경보다 상태 줄로 더 두꺼워진다. github만 둘이 되는 것은 첫 커밋을 우리가 만들지 않았기 때문이다
 
 7. if `entry != github` → `commit_hash = git.commit_push(repo.workdir, message, author, path=STD-001 1.1 경로, content=body)` · if 실패 → `! push-failed {reason}`, 락 해제. **여기까지 DB 쓰기 없음**
 8. **트랜잭션 시작**
    - if 생성 → `version = spec.create(project_id, doc_id, doc_type, body, commit_hash, author, message, validate_result=4단계 결과)`
    - if `entry == web_status` → `spec.apply_status(document, body, commit_hash, author.user, reason)` (Document.status·current_body 갱신 + StatusChange). **Version 없음.** 9~13 건너뛰고 14로
-   - else → `version = spec.save(document, body, commit_hash, author, message, deleted, validate_result=4단계 결과)` — **모든 경로.** 경고(`incomplete_warnings`)는 mcp 저장에도 남아야 승인을 막는다. 위반은 github 경로에서만 저장까지 온다
+   - else → `version = spec.save(document, body, commit_hash, author, message, deleted, validate_result=4단계 결과, status_commit_hash=6a가 민 해시)` — **모든 경로.** 경고(`incomplete_warnings`)는 mcp 저장에도 남아야 승인을 막는다. 위반은 github 경로에서만 저장까지 온다
 9. `deleted`마다 `tracking.raise_broken(pk)`
 10. `reference.extract(document_id, version.id, body, item_pks=spec.item_pks(document_id), upstream_doc_ids=frontmatter upstream)`
 10a. `reference.resolve_missing(project_id, target_doc_id=doc_id)` — 이 문서(또는 항목)를 기다리던 미존재 참조를 푼다. 하위가 먼저 저장된 경우가 재구축까지 안 기다려도 되게(UC-S2 2a2)
@@ -130,6 +132,9 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 - 항목 삭제 미확인: 저장 안 됨. `confirm=True`로 재요청 시 `broken_ref` 플래그 생김
 - push 실패: DB 변경 없음
 - 승인 문서 수정: 상태가 `review`, StatusChange 행 하나
+- **승인 문서를 github 커밋으로 고침: DB가 `review`이고 저장소 frontmatter도 `review`다. `status(…)` 커밋이 하나 더 있고 `StatusChange.commit_hash`가 그 해시다** (#58)
+- **그 status 커밋은 다음 `process_commit`에서 3a로 걸러진다** — 버전이 하나 더 생기지 않는다
+- **github 커밋이 frontmatter를 `draft`로 내리면서 본문도 고침: `draft`. 강등이 덮지 않는다**
 - `web_status`: Version 없음, StatusChange에 commit_hash
 - 동시 저장 둘: 락 때문에 직렬화. 둘째가 version-conflict
 - `upstream_impact=["SYNC-UC-001#UC-A6"]` → UC-A6에 `upstream_impact` 플래그, 담당은 UC 문서 최근 작성자 · 없는 항목 → 경고, 저장은 됨

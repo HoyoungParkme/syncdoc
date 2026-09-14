@@ -12,26 +12,29 @@
 타이포만 예외로 범위를 허용한다 — 명세가 `14.5~15px`처럼 폭으로 적은 행이 있다.
 
 사용: python3 tools/check_tokens.py
+      python3 tools/check_tokens.py --specs <저장소>/docs/specs [--css <그 저장소>/…/styles.css]
+
+프로젝트 코드는 명세에서 읽는다 — `SYNC-`를 박아 두지 않는다 (STD-004 4장, #57).
+CSS가 아직 없는 프로젝트면 「볼 것이 없다」고 말하고 통과한다.
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import re
 import sys
 
-ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-SPEC = os.path.join(ROOT, "docs", "specs", "07-UI", "SYNC-UI-001.md")
-CSS = os.path.join(ROOT, "frontend", "src", "styles.css")
+import proj
 
 COLOR = re.compile(r"#[0-9a-fA-F]{6}|rgba?\([^)]*\)")
 PX = re.compile(r"(\d+(?:\.\d+)?)px")
 SHADOW = re.compile(r"`(\d[^`]*rgba\([^)]*\))`")
 
 
-def spec_chapter() -> str:
+def spec_chapter(spec: str) -> str:
     """3장만. 4장부터는 배치 이야기라 값이 예시로 섞여 있다."""
-    text = open(SPEC, encoding="utf-8").read()
+    text = open(spec, encoding="utf-8").read()
     return text.split("## 3. 디자인 토큰", 1)[1].split("\n## 4.", 1)[0]
 
 
@@ -40,8 +43,8 @@ def spec_section(ch: str, num: str) -> str:
     return body.split("\n### ", 1)[0]
 
 
-def css_root() -> dict[str, str]:
-    text = open(CSS, encoding="utf-8").read()
+def css_root(css: str) -> dict[str, str]:
+    text = open(css, encoding="utf-8").read()
     block = text.split(":root{", 1)[1].split("\n}", 1)[0]
     block = re.sub(r"/\*.*?\*/", "", block, flags=re.S)  # 주석 안 값은 설명이다
     return dict(re.findall(r"(--[\w-]+)\s*:\s*([^;]+);", block))
@@ -66,8 +69,22 @@ def norm(v: str) -> str:
 
 
 def main() -> int:
-    ch = spec_chapter()
-    tok = css_root()
+    ap = argparse.ArgumentParser()
+    proj.add_specs(ap)
+    ap.add_argument("--css", help=":root가 있는 CSS (기본: 명세와 같은 저장소)")
+    a = ap.parse_args()
+    code = proj.code_of(a.specs)
+    # 번호가 아니라 제목으로 찾는다 — 서브타입은 제목이 가른다 (#57)
+    spec_path = proj.by_title(a.specs, "UI", "화면 설계")
+    if spec_path is None or "## 3. 디자인 토큰" not in open(spec_path, encoding="utf-8").read():
+        print(f"{code}: 디자인 토큰 절(화면 설계 3장)이 없다 — 대조할 것이 없다")
+        return 0
+    css = a.css or os.path.join(proj.repo_of(a.specs), "frontend", "src", "styles.css")
+    ch = spec_chapter(spec_path)
+    if not os.path.exists(css):
+        print(f"{code}: 토큰 명세는 읽었다 · 대조할 CSS가 없다 ({css})")
+        return 0
+    tok = css_root(css)
     bad: list[str] = []
 
     # 3.1 색 — 값 열의 hex·rgba 전부. var(...)로 다른 토큰을 가리키는 별칭은 새 값이 아니다
@@ -120,7 +137,7 @@ def main() -> int:
 
     for m in bad:
         print(f"⚠  {m}")
-    print(f"\n합계: :root 토큰 {len(tok)} · 어긋남 {len(bad)}")
+    print(f"\n합계: {code} · :root 토큰 {len(tok)} · 어긋남 {len(bad)}")
     return 1 if bad else 0
 
 

@@ -9,7 +9,11 @@ UI-002 각 화면의 배치 HTML에 있는 요소 번호(data-el) 집합과, 그
 코드는 import하지 않고 텍스트만 읽는다.
 
 사용: python tools/check_ui.py [--screens UI-10 UI-11 ...]   필터 없으면 컴포넌트가 있는 화면 전부.
+      python tools/check_ui.py --specs <저장소>/docs/specs --frontend <저장소>/frontend/src
       종료 코드 1 = 어느 화면이든 불일치.
+
+프로젝트 코드는 명세에서 읽는다 — `SYNC-`를 박아 두지 않는다 (STD-004 4장, #57).
+코드가 아직 없는 프로젝트면 「볼 것이 없다」고 말하고 통과한다 — 명세만 있는 단계가 정상이다.
 """
 
 from __future__ import annotations
@@ -20,9 +24,8 @@ import os
 import re
 import sys
 
-ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-SPEC = os.path.join(ROOT, "docs", "specs", "07-UI", "SYNC-UI-002.md")  # STD-001 1.1 {NN-TYPE}
-SRC = os.path.join(ROOT, "frontend", "src")
+import proj
+
 SECTION = re.compile(r"^## (UI-\d+) ", re.M)
 HTML_BLOCK = re.compile(r"```html\n(.*?)```", re.S)
 DATA_EL = re.compile(r'data-el="([^"]+)"')
@@ -30,11 +33,10 @@ JSX_EL = re.compile(r'data-el=(?:"([^"]+)"|\{([^}]*)\})')
 PROP_EL = re.compile(r"""\bel(?:[A-Z]\w*)?(?:="([^"]+)"|: '([^']+)')""")
 DATASET_EL = re.compile(r"dataset\.el = '([^']+)'")
 LITERAL = re.compile(r"'([0-9]+(?:\.[0-9]+)?[a-z]?)'")
-SCREEN_OF = re.compile(r"SYNC-UI-002#(UI-\d+)")
 
 
-def spec_elements() -> dict[str, set[str]]:
-    text = open(SPEC, encoding="utf-8").read()
+def spec_elements(spec: str) -> dict[str, set[str]]:
+    text = open(spec, encoding="utf-8").read()
     heads = list(SECTION.finditer(text))
     out: dict[str, set[str]] = {}
     for i, m in enumerate(heads):
@@ -46,13 +48,13 @@ def spec_elements() -> dict[str, set[str]]:
     return out
 
 
-def code_elements() -> dict[str, tuple[str, set[str]]]:
-    """화면 → (파일, data-el 집합). 화면은 파일 첫 주석의 SYNC-UI-002#UI-N."""
+def code_elements(src: str, screen_of: re.Pattern[str]) -> dict[str, tuple[str, set[str]]]:
+    """화면 → (파일, data-el 집합). 화면은 파일 첫 주석의 {CODE}-UI-002#UI-N."""
     out: dict[str, tuple[str, set[str]]] = {}
-    for path in sorted(glob.glob(os.path.join(SRC, "**", "*.tsx"), recursive=True)):
+    for path in sorted(glob.glob(os.path.join(src, "**", "*.tsx"), recursive=True)):
         text = open(path, encoding="utf-8").read()
         head = text.split("*/", 1)[0] if text.startswith("/**") else ""
-        m = SCREEN_OF.search(head)
+        m = screen_of.search(head)
         if not m:
             continue
         els: set[str] = set()
@@ -63,7 +65,7 @@ def code_elements() -> dict[str, tuple[str, set[str]]]:
                 els.update(LITERAL.findall(expr))
         els.update(a or b for a, b in PROP_EL.findall(text))
         els.update(DATASET_EL.findall(text))
-        out[m.group(1)] = (os.path.relpath(path, ROOT), els)
+        out[m.group(1)] = (os.path.relpath(path, os.path.dirname(src)), els)
     return out
 
 
@@ -74,9 +76,23 @@ def sort_key(el: str) -> tuple:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
+    proj.add_specs(ap)
+    ap.add_argument("--frontend", help="React 소스 뿌리 (기본: 명세와 같은 저장소의 frontend/src)")
     ap.add_argument("--screens", nargs="*", help="UI-10 UI-11 ...")
     args = ap.parse_args()
-    spec, code = spec_elements(), code_elements()
+    project = proj.code_of(args.specs)
+    # 번호가 아니라 제목으로 찾는다 — 서브타입은 제목이 가른다 (#57)
+    spec_path = proj.by_title(args.specs, "UI", "와이어프레임")
+    if spec_path is None:
+        print(f"{project}: 와이어프레임 문서가 없다 (UI 제목에 「와이어프레임」)")
+        return 0
+    src = args.frontend or os.path.join(proj.repo_of(args.specs), "frontend", "src")
+    spec = spec_elements(spec_path)
+    if not os.path.isdir(src):
+        print(f"{project}: 화면 명세 {len(spec)}개 · 대조할 코드가 없다 ({src})")
+        return 0
+    doc_id = os.path.basename(spec_path)[:-3]
+    code = code_elements(src, re.compile(rf"{doc_id}#(UI-\d+)"))
     screens = args.screens or sorted(code, key=lambda s: int(s.split("-")[1]))
     bad = 0
     for screen in screens:
@@ -85,7 +101,7 @@ def main() -> int:
             bad += 1
             continue
         if screen not in code:
-            print(f"✗  {screen:6} 컴포넌트 없음 (docstring에 SYNC-UI-002#{screen})")
+            print(f"✗  {screen:6} 컴포넌트 없음 (docstring에 {doc_id}#{screen})")
             bad += 1
             continue
         path, got = code[screen]
@@ -100,7 +116,7 @@ def main() -> int:
         if only_code:
             print(f"      코드에만: {' '.join(only_code)}")
         bad += not ok
-    print(f"\n합계: 화면 {len(screens)}, 일치 {len(screens) - bad}, 불일치 {bad}")
+    print(f"\n합계: {project} · 화면 {len(screens)}, 일치 {len(screens) - bad}, 불일치 {bad}")
     return 1 if bad else 0
 
 

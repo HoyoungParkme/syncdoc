@@ -27,9 +27,11 @@ def load_all():
             tok = h[1].split(" ")[0]
             if not re.match(r"^\d", tok) and re.match(r"^[A-Za-z]", tok): items.append((tok, h[1][len(tok):].strip()))
         refs = re.findall(r"\[\[([^\]]+)\]\]", nocode)
-        docs[fm["doc_id"]] = {"fm": fm, "body": body, "items": dict(items), "refs": refs, "file": os.path.basename(f)}
+        docs[fm["doc_id"]] = {"fm": fm, "body": body, "items": dict(items), "refs": refs, "file": os.path.basename(f), "path": f}
     return docs
 ALL = load_all()
+# 프로젝트 코드는 문서 이름에서 읽는다 — 한 저장소 = 한 프로젝트 (STD-004 4장, #57)
+CODE = sorted({d.split("-")[0] for d in ALL})[0] if ALL else "?"
 
 def view_href(doc_id): return f"view_{doc_id}.html"
 
@@ -153,7 +155,9 @@ def downstream_of(doc_id):
 
 def shell(doc, body_html, extra_nav=""):
     fm = doc["fm"]; did = fm["doc_id"]
-    ups = re.findall(r"SYNC-[A-Z]+-\d+", fm.get("upstream", ""))
+    # 프로젝트 코드를 박지 않는다 — `SYNC-`로 고정돼 있어 남의 프로젝트에서는 실패하지
+    # 않고 상위 링크만 통째로 비었다 (STD-004 4장, #57)
+    ups = re.findall(r"[A-Z]{1,4}-[A-Z]+-\d+", fm.get("upstream", ""))
     up_html = " · ".join(f'<a class="ref" href="{view_href(u)}">{u}</a>' for u in ups) or "—"
     downs = downstream_of(did)
     down_html = " · ".join(f'<a class="ref" href="{view_href(d)}" title="{esc(", ".join(sorted(v)))}">{d}</a>' for d, v in sorted(downs.items())) or "—"
@@ -384,7 +388,7 @@ def absorb(script, src, tmp):
 def v_ui(doc):
     did = doc["fm"]["doc_id"]
     if "와이어프레임" in doc["fm"]["title"]:
-        return absorb("wf_build.py", os.path.join(SRC_DIR, "UI", doc["file"]), "/tmp/_wf.html").replace('.wrap{max-width:1560px;margin:0 auto;padding:28px 22px 80px}', '')
+        return absorb("wf_build.py", doc["path"], "/tmp/_wf.html").replace('.wrap{max-width:1560px;margin:0 auto;padding:28px 22px 80px}', '')
     # 화면 설계: UI 항목 표로 재조립 + 나머지 원본
     out = []
     for title, text in split_sections(doc["body"]):
@@ -404,10 +408,10 @@ def v_ui(doc):
     return "\n".join(out)
 
 def v_seq(doc):
-    return absorb("seq_build.py", os.path.join(SRC_DIR, "SEQ", doc["file"]), "/tmp/_seq.html")
+    return absorb("seq_build.py", doc["path"], "/tmp/_seq.html")
 
 def v_ms(doc):
-    return absorb("ms_build.py", os.path.join(SRC_DIR, "MS", doc["file"]), "/tmp/_ms.html")
+    return absorb("ms_build.py", doc["path"], "/tmp/_ms.html")
 
 # ───────────────────────── V-DOM ─────────────────────────
 def v_dom(doc):
@@ -592,8 +596,8 @@ def build_index():
             fm = d["fm"]; st = STAGE.get(typ)
             rows += f'<tr><td class="num">{st or "—"}</td><td class="mono"><a href="{view_href(fm["doc_id"])}">{fm["doc_id"]}</a></td><td>{esc(fm["title"])}</td><td><span class="st st-{fm["status"]}">{STATUS_KO[fm["status"]]}</span></td><td class="num">{len(d["items"])}</td></tr>'
     html_ = f"""<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>싱크독 — 문서</title><style>{CSS}</style></head><body><div class="wrap">
-<header class="tb"><div class="tb-main"><div class="tb-kicker">싱크독 · SYNC</div><h1>명세 체인 — 문서 {len(ALL)}개</h1><p>11단계 + 단계 밖 STD. 클릭하면 사람용 뷰. 이 목록이 웹 UI-4 프로젝트 상세의 정적 판이다.</p></div>
-<div class="tb-meta"><div>프로젝트</div><div class="mono">SYNC</div><div>항목</div><div>{sum(len(d["items"]) for d in ALL.values())}개</div><div>참조</div><div>{sum(len(d["refs"]) for d in ALL.values())}개</div></div></header>
+<header class="tb"><div class="tb-main"><div class="tb-kicker">싱크독 · {CODE}</div><h1>명세 체인 — 문서 {len(ALL)}개</h1><p>11단계 + 단계 밖 STD. 클릭하면 사람용 뷰. 이 목록이 웹 UI-4 프로젝트 상세의 정적 판이다.</p></div>
+<div class="tb-meta"><div>프로젝트</div><div class="mono">{CODE}</div><div>항목</div><div>{sum(len(d["items"]) for d in ALL.values())}개</div><div>참조</div><div>{sum(len(d["refs"]) for d in ALL.values())}개</div></div></header>
 <main class="body"><table><thead><tr><th>단계</th><th>문서</th><th>제목</th><th>상태</th><th>항목</th></tr></thead><tbody>{rows}</tbody></table></main>
 <footer>생성: _tools/view_build.py</footer></div></body></html>"""
     open(os.path.join(OUT_DIR, "index.html"), "w", encoding="utf-8").write(html_)
@@ -601,7 +605,7 @@ def build_index():
 
 if __name__ == "__main__":
     if sys.argv[1:] == ["--all"]:
-        for d in ALL.values(): build(os.path.join(SRC_DIR, d["fm"]["type"], d["file"]))
+        for d in ALL.values(): build(d["path"])
         build_index()
     else:
         for s in sys.argv[1:]: build(s)

@@ -191,12 +191,39 @@ async def _run(
     # DB에만 적으면 저장소 frontmatter가 approved로 남아 "status가 진실"(STD-001 1.2)이
     # 깨지고, 다음 저장이 frontmatter.status_change로 막힌다 — 서버가 준 본문을 서버가
     # 거부해 그 문서를 영영 못 고친다 (#47). 서버가 에이전트의 본문을 고치는 유일한 자리다
+    status_commit_hash: str | None = None
     if (
         document is not None
         and document.status == DocStatus.approved
-        and entry not in (Entry.github, Entry.web_status)
+        and entry != Entry.web_status
+        and body != document.body
+        # github는 작성자가 스스로 내렸으면 그게 진실이다 (MS-002 save 5·6)
+        and (entry != Entry.github or parse_frontmatter(body)[0].get("status") == "approved")
     ):
         body = re.sub(r"^status: .*$", f"status: {DocStatus.review}", body, count=1, flags=re.M)
+        if entry == Entry.github:
+            # github 경로는 커밋이 이미 저장소에 있어 본문을 고치는 것만으로는 저장소가
+            # 안 바뀐다. 커밋을 하나 더 민다. **그 해시를 StatusChange에 적어야** 다음
+            # 폴링이 process_commit 3a에서 앱 커밋을 걸러낸다 — 안 적으면 앱이 민 커밋을
+            # 남의 편집으로 다시 저장한다 (#58)
+            #
+            # **미는 사람은 저장소를 등록한 사람이다.** 커밋을 올린 사람이 아니다 —
+            # 그 사람은 싱크독에 로그인한 적 없는 자리표시일 수 있어 토큰이 없다.
+            # 등록자는 OAuth로 들어와 저장소를 붙인 사람이라 토큰이 있는 유일한 쪽이다.
+            # 강등을 **누가 유발했는지**는 StatusChange.changed_by가 따로 들고 있다
+            pusher = s.get(User, repo.registered_by_user_id)
+            assert pusher is not None
+            status_commit_hash = await git.commit_push(
+                Path(repo.workdir_path),
+                f"status({doc_id}): {DocStatus.approved} → {DocStatus.review}"
+                "\n\n본문 수정으로 자동 강등",
+                # via는 커밋 신원에만 쓰인다 — 이 Author는 저장되지 않는다
+                Author(
+                    kind=AuthorKind.human, user=pusher, instructed_by=None, via=Entry.web_status
+                ),
+                path=f"docs/specs/{spec_dir(doc_type)}/{doc_id}.md",
+                content=body,
+            )
     # 7. push — 여기까지 DB 쓰기 없음
     if entry != Entry.github:
         commit_hash = await git.commit_push(
@@ -236,6 +263,7 @@ async def _run(
             message,
             deleted,
             validate_result=vr,  # 모든 경로 — 경고가 mcp 저장에도 남아야 승인을 막는다
+            status_commit_hash=status_commit_hash,
         )
     document_id = version.document_id
     # 9. 끊어진 참조
