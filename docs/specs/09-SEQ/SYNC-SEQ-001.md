@@ -244,8 +244,13 @@ sequenceDiagram
         P->>P: save_pipeline(entry=github, doc_id, body, expected_version=None, author=github(login), commit_hash)
         Note over P: entry=github는 SEQ-1과 이렇게 다르다
         Note over P,S: · 버전 검사 없음 (커밋이 진실)<br/>· push 없음 (이미 원격에 있음)<br/>· 규약 위반이면 저장은 하되 has_convention_error=true (3a)<br/>· 파일명 ≠ frontmatter doc_id면 규약 오류 (3b)
-        P->>S: save(…, commit_hash)
-        S->>DB: Version · Document
+        opt 승인 문서인데 본문이 바뀜 (UC-A6 6a)
+            P->>G: commit_push("status(문서ID): approved → review")
+            G-->>P: status_commit_hash
+            Note over P,G: 커밋이 이미 저장소에 있어 본문만 고칠 수 없다.<br/>이 해시를 StatusChange에 적어야 다음 폴링이 걸러낸다 (#58)
+        end
+        P->>S: save(…, commit_hash, status_commit_hash)
+        S->>DB: Version · Document · StatusChange
         Note over P: 이후 extract · detect_impact · relocate는 SEQ-1과 같음
     end
     opt 여러 파일에서 affected가 나옴 (3c1)
