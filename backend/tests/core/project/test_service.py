@@ -84,6 +84,84 @@ async def test_init_project_accepts_repository_with_no_commits_at_all(
     assert "docs/specs/_templates/PRD.md" in g(bare, "ls-tree", "-r", "--name-only", "main")
 
 
+async def test_create_repo_false_leaves_missing_repo_alone(
+    db_session: Session, repos_dir, repos: dict, monkeypatch
+) -> None:
+    """#카드 F — 기본값은 거짓. 주소 오타가 조용히 새 저장소를 만들면 안 된다."""
+    from app.core.errors import PushFailed
+    from app.infra import github
+    from tests.core.account.test_service import make_user
+
+    calls: list[tuple] = []
+
+    async def spy(token, owner, name):
+        calls.append((owner, name))
+        return "x"
+
+    monkeypatch.setattr(github, "create_repo", spy)
+    user = make_user(db_session, login="hoyoung")
+    missing = repos_dir.parent / "does-not-exist.git"
+
+    with pytest.raises(PushFailed):
+        await ProjectService(db_session).init_project(str(missing), "MIS", "없는 것", user)
+
+    assert calls == [], "create_repo=false면 저장소를 만들지 않는다"
+
+
+async def test_create_repo_true_creates_then_registers(
+    db_session: Session, repos_dir, repos: dict, monkeypatch
+) -> None:
+    """#카드 F — create_repo=true면 만들고 이어서 골격 커밋까지 간다."""
+    from app.infra import github
+    from tests.core.account.test_service import make_user
+    from tests.infra.conftest import git as g
+
+    bare = repos_dir.parent / "made.git"
+    calls: list[tuple] = []
+
+    async def fake_create(token, owner, name):
+        calls.append((owner, name))
+        g(repos_dir.parent, "init", "-q", "--bare", "-b", "main", str(bare))
+        return str(bare)
+
+    monkeypatch.setattr(github, "create_repo", fake_create)
+    user = make_user(db_session, login="hoyoung")
+
+    project = await ProjectService(db_session).init_project(
+        str(bare), "NEW", "새 것", user, create_repo=True
+    )
+
+    assert calls and calls[0][1] == "made"  # 주소에서 이름을 떴다
+    assert project.code == "NEW"
+    assert g(bare, "log", "-1", "--format=%s", "main") == "chore(NEW): init syncdoc"
+    assert "docs/specs/_templates/PRD.md" in g(bare, "ls-tree", "-r", "--name-only", "main")
+
+
+async def test_create_repo_true_does_not_recreate_existing(
+    db_session: Session, repos_dir, repos: dict, monkeypatch
+) -> None:
+    """#카드 F — 이미 있으면 만들지 않는다. 같은 인자로 두 번 불러도 결과가 같아야 한다."""
+    from app.infra import github
+    from tests.core.account.test_service import make_user
+
+    made: list[tuple] = []
+
+    async def fake_create(token, owner, name):
+        made.append((owner, name))
+        return str(repos["remote"])
+
+    monkeypatch.setattr(github, "create_repo", fake_create)
+    user = make_user(db_session, login="hoyoung")
+
+    await ProjectService(db_session).init_project(
+        str(repos["remote"]), "EXI", "있는 것", user, import_existing=True, create_repo=True
+    )
+
+    # create_repo는 불리되(있으면 만들지 않는 판정은 그 안에서 한다) 등록이 정상 완료된다
+    assert made, "create_repo는 호출된다"
+    assert ProjectService(db_session).get("EXI").code == "EXI"
+
+
 async def test_empty_repo_project_can_fetch_afterwards(
     db_session: Session, repos_dir, repos: dict
 ) -> None:

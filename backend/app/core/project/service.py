@@ -19,12 +19,13 @@ from app.core.errors import (
     ProjectCodeConflict,
     ProjectCodeInvalid,
     PushFailed,
+    RepoCreateFailed,
     RepositoryAlreadyRegistered,
 )
 from app.core.project.models import Project, Repository
 from app.core.project.repository import ProjectRepository
 from app.core.types import Author, AuthorKind, Entry, RebuildResult, RepoStatus
-from app.infra import git
+from app.infra import git, github
 from app.infra.git import GitError
 
 _locks: dict[str, asyncio.Lock] = {}
@@ -33,6 +34,23 @@ _locks: dict[str, asyncio.Lock] = {}
 def _lock(code: str) -> asyncio.Lock:
     """코드 단위 락 (MS-001 0단계 · UC-A1 2c) — 동시 초기화가 서로의 작업 사본을 지운다."""
     return _locks.setdefault(code, asyncio.Lock())
+
+
+def _split_remote(remote_url: str) -> tuple[str, str]:
+    """`https://github.com/owner/repo(.git)` → `(owner, repo)` (MS-001 3b).
+
+    ssh 형태(`git@github.com:owner/repo.git`)도 받는다 — clone은 그것도 되므로
+    여기서만 막으면 경로가 갈린다.
+    """
+    s = remote_url.strip().rstrip("/")
+    if s.endswith(".git"):
+        s = s[: -len(".git")]
+    if ":" in s and "//" not in s:  # ssh
+        s = s.split(":", 1)[1]
+    parts = [x for x in s.split("/") if x]
+    if len(parts) < 2:
+        raise RepoCreateFailed(f"저장소 주소에서 소유자·이름을 못 읽었다: {remote_url}")
+    return parts[-2], parts[-1]
 
 
 class ProjectService:
@@ -47,13 +65,20 @@ class ProjectService:
         name: str,
         user: User,
         import_existing: bool = False,
+        create_repo: bool = False,
     ) -> Project:
         """SYNC-MS-001#ProjectService.init_project"""
         async with _lock(code):  # 0. 같은 코드 동시 초기화 (UC-A1 2c)
-            return await self._init(remote_url, code, name, user, import_existing)
+            return await self._init(remote_url, code, name, user, import_existing, create_repo)
 
     async def _init(
-        self, remote_url: str, code: str, name: str, user: User, import_existing: bool
+        self,
+        remote_url: str,
+        code: str,
+        name: str,
+        user: User,
+        import_existing: bool,
+        create_repo: bool = False,
     ) -> Project:
         if not re.fullmatch(r"[A-Z]{1,4}", code):
             raise ProjectCodeInvalid("^[A-Z]{1,4}$")
@@ -66,6 +91,11 @@ class ProjectService:
         workdir = settings.REPOS_DIR / code
         shutil.rmtree(workdir, ignore_errors=True)
         token = AccountService.github_token_for(user)
+        # 3b — 없으면 만든다. **기본값이 거짓인 이유**: 참이면 주소 오타가 조용히 새
+        # 저장소를 만든다. 지금은 clone이 실패해 push-failed가 나서 오타를 알아챈다 (카드 F)
+        if create_repo:
+            owner_name, repo_name = _split_remote(remote_url)
+            await github.create_repo(token, owner_name, repo_name)
         try:
             await git.clone(remote_url, workdir, token)
         except GitError as e:

@@ -50,6 +50,15 @@ class PushFailed(Problem):
         super().__init__(reason, reason=reason)
 
 
+class RepoCreateFailed(Problem):
+    type = "urn:syncdoc:repo-create-failed"
+    status = 502
+    title = "repo-create-failed"
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason, reason=reason)
+
+
 class ItemDeleted(Problem):
     type = "urn:syncdoc:item-deleted"
     status = 410

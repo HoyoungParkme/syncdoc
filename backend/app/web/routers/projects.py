@@ -34,7 +34,7 @@ async def init_project(
 ) -> ProjectSummary:
     """SYNC-API-001#POST/api/projects"""
     await ProjectService(session).init_project(
-        req.remote_url, req.code, req.name, user, req.import_existing
+        req.remote_url, req.code, req.name, user, req.import_existing, req.create_repo
     )
     session.commit()
     summary = next(p for p in await queries.project_summary() if p.code == req.code)

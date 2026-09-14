@@ -198,7 +198,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 화면 | UI-3에 체크박스 하나 — 「없으면 새로 만든다」 |
 | 테스트 | 없는 저장소 + `create_repo=false` → `push-failed`(지금 동작 유지) · 없는 저장소 + `true` → 만들어지고 골격 커밋까지 · 이미 있는 저장소 + `true` → **만들지 않고 그대로 쓴다** · 이름이 GitHub 규칙에 안 맞으면 `repo-create-failed` · 만든 뒤 등록이 실패해도 **저장소는 남는다** |
 | 선행 | C |
-| 완료 | — |
+| 완료 | 2026-09-14 · 브랜치 `card/F-repo-create` · 테스트 211 · `check_ui.py` 15/15 회복 · `validate.py` 위반 0·경고 0 · `tsc`·`build` 통과 · **실물 확인**(도커 8000, MCP 한 번 호출): 없던 `HoyoungParkme/cardf-demo`가 **공개·기본 브랜치 main**으로 생기고 이어서 `chore(CF): init syncdoc` 골격 커밋까지 — `docs/specs/` 11단계 + `STD` + `_templates` + `assets` + README · **가드 셋 실측**: ① `create_repo` 생략 + 없는 저장소 → `push-failed`(지금 동작 유지), 저장소 안 생김 ② 이미 있는 저장소 + `create_repo=true` → 저장소 수 23 → 23, 만들지 않고 `repository-already-registered`로 막힘 ③ 코드에 숫자를 넣으면 `project-code-invalid`가 먼저 걸려 저장소를 만들기 전에 멈춘다 · 정한 것: `auto_init=false`(GitHub이 README를 만들면 "빈 저장소" 경로가 아니라 "내용 있는 저장소" 경로를 타 흐름이 갈린다) · `_split_remote`가 https·ssh·끝 슬래시·`.git`을 다 받는다 |
 
 **왜 카드인가.** 새 기능이다. 함수 하나가 늘고 MCP 도구·REST·화면의 입력이 함께 바뀐다. `DEV-15`의 "버그는 이슈, 기능은 카드"에서 뒤쪽이다.
 
@@ -266,7 +266,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | D5 | `card/D5` | `39cea75`~`62d8f0f` | #27 | 2026-09-10 |
 | (핸드오프 대조) | `design/handoff` | `28a78e7`~`74d945a` | #28 | 2026-09-10 |
 | E | `card/E-backup` | `c8f2749`~`e715423` | — | 2026-09-11 |
-| F | `card/F-repo-create` | — | — | — |
+| F | `card/F-repo-create` | `a11f698`~ | — | 2026-09-14 |
 
 **핸드오프 대조는 카드가 아니다.** D1~D5 여러 장에 걸쳐 있어 슬라이스로 나누지 않았고, 무엇을 고쳤는지는 각 카드의 `완료` 행에 적었다. PR 하나 = 슬라이스 하나 규칙의 유일한 예외다.
 

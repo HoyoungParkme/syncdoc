@@ -124,15 +124,19 @@ def _project_json(p: ProjectSummary) -> dict:
 @server.tool(
     description="GitHub 저장소를 싱크독 프로젝트로 등록한다. docs/specs/ 아래 11단계 디렉터리와 템플릿을 만들어 "
     "커밋한다. 새 프로젝트를 시작할 때 한 번만 부른다. 이미 등록된 저장소면 project-code-conflict, 저장소에 "
-    "docs/specs/가 이미 있으면 existing-specs 에러가 나며 import_existing=true로 다시 부르면 기존 명세를 가져와 등록한다."
+    "docs/specs/가 이미 있으면 existing-specs 에러가 나며 import_existing=true로 다시 부르면 기존 명세를 가져와 등록한다. "
+    "저장소가 아직 없으면 create_repo=true로 부른다 — 공개 저장소를 만들어 주고 이어서 등록까지 한다. "
+    "사람이 저장소를 만들어 달라고 했을 때만 이 인자를 붙인다."
 )
 async def init_project(
-    remote_url: str, code: str, name: str, import_existing: bool = False
+    remote_url: str, code: str, name: str, import_existing: bool = False, create_repo: bool = False
 ) -> CallToolResult:
     """SYNC-API-002#init_project"""
     try:
         with db.session_scope() as s:
-            await ProjectService(s).init_project(remote_url, code, name, _user(s), import_existing)
+            await ProjectService(s).init_project(
+                remote_url, code, name, _user(s), import_existing, create_repo
+            )
             s.commit()
         summary = next(p for p in await queries.project_summary() if p.code == code)
         return _ok(_project_json(summary))
