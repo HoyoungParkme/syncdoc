@@ -1804,6 +1804,18 @@ status: approved
       <tr><td class="no">6</td><td>수정은 다시 에이전트에게</td><td>확인하다 영향이 있으면 화면 밖에서 에이전트에게 고치게 하고 돌아와 확인한다.</td><td class="where">에이전트</td></tr>
     </table>
 
+    <h4 class="sectitle">에이전트를 붙이는 법</h4>
+    <table class="grid" data-el="6"><!-- 2의 둘째 단계를 손 순서로 편 것. 머리 행 없음 -->
+      <tr data-el="6.1"><td class="no">1</td><td>토큰을 발급한다</td><td>설정 → MCP 토큰 → 발급. 이름을 적는다. 원문은 그때 한 번만 보이니 바로 복사한다.</td><td class="where">설정</td></tr>
+      <tr><td class="no">2</td><td>터미널에서 한 줄</td><td>아래 명령. <code>--scope user</code>면 어느 폴더에서 켜도 붙는다. Codex·Gemini CLI는 설정의 클라이언트 설정 JSON을 각자 설정 파일에 넣는다.</td><td class="where">터미널</td></tr>
+      <tr><td class="no">3</td><td>Claude Code를 새로 켠다</td><td>MCP 서버는 세션이 시작될 때 읽힌다. 켜져 있던 창에는 방금 넣은 서버가 안 보인다 — 나갔다가 다시 켠다.</td><td class="where">터미널</td></tr>
+      <tr><td class="no">4</td><td>붙었는지 본다</td><td><code>claude mcp list</code>에 <code>syncdoc … ✔ Connected</code>, 또는 세션 안에서 <code>/mcp</code>. claude.ai 커넥터 목록에는 안 나온다 — 이 컴퓨터 설정에만 있는 것이 정상이다.</td><td class="where">터미널</td></tr>
+    </table>
+    <pre class="snippet" data-el="6.2">claude mcp add --transport http --scope user syncdoc \
+    https://{이 화면의 주소}/mcp \
+    --header "Authorization: Bearer syncdoc_pat_…"</pre>
+    <p class="note" data-el="6.3">그 뒤로는 에이전트에게 「싱크독으로 프로젝트 하나 만들어 줘」라고 말하면 된다. 주소가 바뀌면 <code>claude mcp remove syncdoc</code> 후 다시 넣는다.</p>
+
     <h4 class="sectitle">11단계가 뜻하는 것</h4>
     <table class="grid" data-el="3"><!-- 머리 행 없음. 위 소제목이 그 일을 한다 -->
       <tr data-el="3.1"><td class="no">1</td><td class="code">RFQ</td><td><b>요구·인터뷰</b> — 무엇을 왜 만드나. 고객이 말한 것만 적는다</td><td class="ids">Q1</td></tr>
@@ -1832,6 +1844,10 @@ status: approved
 | 3.4 | 주의 | 텍스트 | 11단계 순서는 강제가 아니라는 안내 | — |
 | 4 | 닫기(✕) | 버튼 | | 닫힘 |
 | 5 | 닫기 | 버튼 | | 닫힘 |
+| 6 | 붙이는 법 표 | 표 | 토큰 → 명령 → 새 세션 → 확인. 2의 둘째 단계를 손 순서로 편 것 | — |
+| 6.1 | 붙이는 행 | 행 | 한 단계 | — |
+| 6.2 | 명령 | 코드 상자 | `claude mcp add …` 한 줄. **주소는 이 화면의 주소로 채워져 있다.** 토큰만 자리표시 | — |
+| 6.3 | 그 다음 | 텍스트 | 붙은 뒤 첫마디와, 주소가 바뀌었을 때 하는 일 | — |
 
 ### 규칙
 
@@ -1843,6 +1859,8 @@ status: approved
 - 설명은 문장으로 쓴다. 키워드 단문으로 줄이면 행이 얇아져 표가 목록처럼 읽힌다
 - 항목 ID는 고정폭 평문이다. 칩으로 그리면 표에 색 상자가 열한 줄 생겨 단계 이름보다 먼저 눈에 든다
 - 다이얼로그 폭은 `660px`
+- **명령(6.2)의 주소는 채워서 보여준다.** UI-13 클라이언트 설정(8.1)과 같은 원천 — 지금 열려 있는 화면의 origin — 을 쓴다. `{주소}`를 사람이 바꿔 넣게 두면 터널 주소를 옮겨 적다가 틀린다. 토큰은 발급 화면에서 한 번만 보이는 값이라 여기 채울 수 없고, 자리표시로 둔다
+- **「새로 켠다」(6 셋째 행)를 빼지 않는다.** 실제로 붙이는 사람이 가장 먼저 걸리는 자리다 — 켜져 있던 세션에 서버가 안 보여서 잘못 넣은 줄 안다. 설명서가 앱 밖에 있으면 이 한 줄을 못 보고, 그래서 앱 안에 둔다
 
 ### 시나리오
 
@@ -1854,4 +1872,9 @@ status: approved
 **S-2 항목 ID 형식이 기억 안 난다**
 1. 다이얼로그를 열어 11단계 표(3)에서 그 타입의 항목 ID 형식을 본다
 2. 닫으면 보던 화면 그대로다
+
+**S-3 다른 컴퓨터에서 에이전트를 붙인다**
+1. 그 컴퓨터의 브라우저로 로그인하고 `사용 방법`을 연다
+2. 붙이는 법 표(6)를 따라 토큰을 발급하고 명령(6.2)을 복사해 터미널에 붙인다 — 주소가 이미 채워져 있다
+3. Claude Code를 새로 켜고 `/mcp`로 확인한다
 
