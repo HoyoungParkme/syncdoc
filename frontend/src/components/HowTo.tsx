@@ -17,53 +17,61 @@ const ORDER: [string, string, string][] = [
 
 /** 11단계와 항목 ID 형식 — SYNC-STD-001 2장의 전사. 규약이 바뀌면 여기도 바뀐다.
  *  뜻풀이는 각 절의 `필수 절`·`항목 블록`을 한 줄로 줄인 것이다.
- *  다섯째(3.5 문서 구성)는 그 단계에 문서가 몇 개고 **왜 그 수인지** — 표만 보면 DOM이 왜 셋이고
- *  UI·API가 왜 둘인지 모른다. 실질/선택은 SYNC-STD-003 결정을 그대로 옮긴 것 */
-const STAGES: [string, string, string, string[], ReactNode][] = [
-  ['RFQ', '요구·인터뷰', '무엇을 왜 만드나. 고객이 말한 것만 적는다', ['Q1'], '문서 하나. 고객이 말한 것을 Q 항목으로'],
-  ['PRD', '제품 요구', '목표·비목표·요구사항. 요구에는 인수기준까지', ['G1', 'R12', 'N3'], '문서 하나. 목표 G · 요구 R · 비목표 N'],
-  ['SCN', '사용자 시나리오', '페르소나와 실제 사용 흐름', ['P1', 'S1'], '문서 하나. 페르소나 P · 시나리오 S. 선택 — 한 사람이 전체를 쥘 수 있으면 건너뛴다'],
-  ['UC', '유스케이스', '액터별 유스케이스. 기본 흐름과 확장', ['UC-H2', 'UC-A1'], '문서 하나. 액터별로 — 사람 H · 에이전트 A · GitHub G · 시스템 S'],
-  ['INFRA', '인프라 아키텍처', '제약·구성도·기술 스택·데이터가 사는 곳', ['C1'], '문서 하나. 앞 단계에서 확정된 제약 C가 설계를 묶는다. 선택'],
+ *  docs(3.5 문서 구성)는 그 단계에 문서가 몇 개고 **왜 그 수인지** — 줄글로 쓰지 않는다(UI-16 규칙):
+ *  수는 라벨, 문서는 줄마다 하나, 선택은 태그. 실질/선택은 SYNC-STD-003 결정을 그대로 옮긴 것 */
+type Docs = { n: string; why: ReactNode; list?: [string, ReactNode, boolean?][]; opt?: boolean }
+const STAGES: [string, string, string, string[], Docs][] = [
+  ['RFQ', '요구·인터뷰', '무엇을 왜 만드나. 고객이 말한 것만 적는다', ['Q1'], { n: '1', why: '고객이 말한 것 → Q 항목' }],
+  ['PRD', '제품 요구', '목표·비목표·요구사항. 요구에는 인수기준까지', ['G1', 'R12', 'N3'], { n: '1', why: '목표 G · 요구 R · 비목표 N' }],
+  ['SCN', '사용자 시나리오', '페르소나와 실제 사용 흐름', ['P1', 'S1'], { n: '1', why: '페르소나 P · 시나리오 S', opt: true }],
+  ['UC', '유스케이스', '액터별 유스케이스. 기본 흐름과 확장', ['UC-H2', 'UC-A1'], { n: '1', why: '액터별 — 사람 H · 에이전트 A · GitHub G · 시스템 S' }],
+  ['INFRA', '인프라 아키텍처', '제약·구성도·기술 스택·데이터가 사는 곳', ['C1'], { n: '1', why: '앞 단계에서 확정된 제약 C', opt: true }],
   [
     'DOM',
     '도메인·클래스·데이터',
     '도메인 모델·클래스 명세·ERD를 한 단계에',
     ['Document', 'documents'],
-    <>
-      <b>문서 셋.</b> 같은 것을 세 층으로 — 도메인 모델(개념 <code>Document</code>) · 클래스 명세(클래스 <code>Document</code>) · ERD·DD(테이블{' '}
-      <code>documents</code>). 이름으로 서로 참조하려고 한 단계에 둔다
-    </>,
+    {
+      n: '3',
+      why: '같은 것을 세 층으로. 이름으로 서로 참조한다',
+      list: [
+        ['도메인 모델', <>개념 <code>Document</code></>],
+        ['클래스 명세', <>클래스 <code>Document</code></>],
+        ['ERD·DD', <>테이블 <code>documents</code></>],
+      ],
+    },
   ],
   [
     'UI',
     '화면',
     '화면 목록·흐름·화면별 요소',
     ['UI-5'],
-    <>
-      <b>문서 둘.</b> 화면 설계(무엇이 있나 — 목록·흐름) · 와이어프레임(어떻게 생겼나 — 같은 <code>UI-5</code>의 배치·요소·규칙). 와이어프레임은 선택
-    </>,
+    {
+      n: '2',
+      why: '무엇이 있나 / 어떻게 생겼나',
+      list: [
+        ['화면 설계', <>목록·흐름 <code>UI-5</code></>],
+        ['와이어프레임', <>같은 <code>UI-5</code>의 배치·요소·규칙</>, true],
+      ],
+    },
   ],
   [
     'API',
     '인터페이스',
     'REST 엔드포인트와 MCP 도구',
     ['GET/api/docs/{docId}', 'get_doc'],
-    <>
-      <b>문서 둘.</b> 입구가 둘이라서 — REST(사람·화면이 부르는 <code>GET/api/…</code>) · MCP(에이전트가 부르는 도구 <code>get_document</code>)
-    </>,
+    {
+      n: '2',
+      why: '입구가 둘',
+      list: [
+        ['REST', <>사람·화면이 부른다 <code>GET/api/…</code></>],
+        ['MCP', <>에이전트가 부른다 <code>get_document</code></>],
+      ],
+    },
   ],
-  ['SEQ', '시퀀스', '저장·판단·조회 흐름을 생명선으로', ['SEQ-12'], '문서 하나. 함수가 아니라 흐름 단위 — 저장 하나가 시퀀스 하나. 선택'],
-  [
-    'MS',
-    'MINISPEC',
-    '함수 하나하나의 시그니처와 처리 순서',
-    ['SpecService.save'],
-    <>
-      <b>문서 여러 개.</b> MS 문서 하나 = 클래스 명세의 절 하나 = 코드 파일 하나. 크기가 아니라 구조로 나눈다(싱크독은 9개). 선택
-    </>,
-  ],
-  ['CODE', '구현 계획', '슬라이스와 통합 테스트, 커밋 목록', ['B2', 'D1'], '문서 하나. 슬라이스 카드 A · B1… 와 완료 기록. 코드가 아니라 코드로 가는 계획'],
+  ['SEQ', '시퀀스', '저장·판단·조회 흐름을 생명선으로', ['SEQ-12'], { n: '1', why: '저장 하나 = 시퀀스 하나', opt: true }],
+  ['MS', 'MINISPEC', '함수 하나하나의 시그니처와 처리 순서', ['SpecService.save'], { n: 'N', why: 'MS 하나 = 클래스 명세 절 하나 = 코드 파일 하나 (싱크독 9개)', opt: true }],
+  ['CODE', '구현 계획', '슬라이스와 통합 테스트, 커밋 목록', ['B2', 'D1'], { n: '1', why: '슬라이스 카드 A · B1… 와 완료 기록' }],
 ]
 
 /** 에이전트를 붙이는 손 순서 — 2의 둘째 단계를 편 것. 셋째 행을 빼지 않는다(UI-16 규칙):
@@ -175,7 +183,18 @@ export function HowTo({ onClose }: { onClose: () => void }) {
                   <td>
                     <b>{name}</b> — {what}
                     <div className="sub" data-el={i === 0 ? '3.5' : undefined}>
-                      {docs}
+                      <span className="cnt">문서 {docs.n}</span> {docs.why}
+                      {docs.opt && <span className="tag">선택</span>}
+                      {docs.list && (
+                        <ul className="docs">
+                          {docs.list.map(([name, ex, opt]) => (
+                            <li key={name}>
+                              <b>{name}</b> — {ex}
+                              {opt && <span className="tag">선택</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   </td>
                   <td className="ids">{ids.join(' · ')}</td>

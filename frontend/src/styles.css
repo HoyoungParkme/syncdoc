@@ -782,8 +782,14 @@ a.arow:hover{background:var(--bg-subtle)}
 .howto td.no,.howto tr.hd th:first-child{width:26px;text-align:center;color:var(--ink-faint);font-family:var(--font-mono);font-size:var(--text-mono-sm)}
 .howto td.code{width:64px;font-family:var(--font-mono);font-size:var(--text-mono-id);font-weight:var(--w-semibold)}
 /* 3.5 문서 구성 — 첫 줄의 이름을 가리지 않게 흐린 색·작은 글자 (UI-16 규칙) */
-.howto td .sub{margin-top:var(--space-3);font-size:var(--text-caption);color:var(--ink-faint);line-height:1.55}
-.howto td .sub b{color:var(--ink-muted)}
+.howto td .sub{margin-top:var(--space-5);font-size:var(--text-meta);color:var(--ink-muted);line-height:1.6}
+/* 수는 라벨, 문서는 줄마다 하나, 선택은 태그 — 줄글로 쓰면 세 줄로 접혀 안 읽힌다 */
+.howto td .sub .cnt{display:inline-block;font-family:var(--font-mono);font-size:var(--text-mono-sm);font-weight:var(--w-semibold);
+  color:var(--ink-body);background:var(--bg-sunken);border-radius:var(--radius-badge);padding:0 var(--space-6);margin-right:var(--space-5)}
+.howto td .sub .tag{display:inline-block;font-family:var(--font-mono);font-size:11px;color:var(--ink-faint);line-height:1.5;
+  border:1px solid var(--border-strong);border-radius:var(--radius-badge);padding:0 var(--space-5);margin-left:var(--space-6);vertical-align:1px}
+.howto td .sub ul.docs{list-style:none;margin:var(--space-4) 0 0;padding:0;display:flex;flex-direction:column;gap:2px}
+.howto td .sub ul.docs b{color:var(--ink-body);font-weight:var(--w-medium)}
 .howto td.where{color:var(--ink-muted);white-space:nowrap;width:74px}
 /* 항목 ID는 고정폭 평문. 칩으로 그리면 표에 색 상자가 열한 줄 생긴다 */
 .howto td.ids{width:150px;font-family:var(--font-mono);font-size:var(--text-mono-sm);color:var(--ink-muted)}
