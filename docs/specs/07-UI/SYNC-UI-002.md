@@ -1811,9 +1811,12 @@ status: approved
       <tr><td class="no">3</td><td>Claude Code를 새로 켠다</td><td>MCP 서버는 세션이 시작될 때 읽힌다. 켜져 있던 창에는 방금 넣은 서버가 안 보인다 — 나갔다가 다시 켠다.</td><td class="where">터미널</td></tr>
       <tr><td class="no">4</td><td>붙었는지 본다</td><td><code>claude mcp list</code>에 <code>syncdoc … ✔ Connected</code>, 또는 세션 안에서 <code>/mcp</code>. claude.ai 커넥터 목록에는 안 나온다 — 이 컴퓨터 설정에만 있는 것이 정상이다.</td><td class="where">터미널</td></tr>
     </table>
+    <figure data-el="6.4"><img src="/howto/token-issued.png" alt="발급 직후 — 토큰 원문이 한 번만 보이는 화면"><figcaption>1. 발급 직후. 원문은 이 화면에서 한 번만 보인다 (캡처에서는 가렸다)</figcaption></figure>
     <pre class="snippet" data-el="6.2">claude mcp add --transport http --scope user syncdoc \
     https://{이 화면의 주소}/mcp \
     --header "Authorization: Bearer syncdoc_pat_…"</pre>
+    <figure data-el="6.5"><img src="/howto/term-add.png" alt="터미널 — claude mcp add 실행 결과"><figcaption>2. 붙이면 이렇게 답한다. 토큰은 [REDACTED]로 가려진다</figcaption></figure>
+    <figure data-el="6.6"><img src="/howto/term-list.png" alt="터미널 — claude mcp list에 syncdoc Connected"><figcaption>4. 새로 켠 뒤 <code>claude mcp list</code> — 이 줄이 보이면 붙은 것이다</figcaption></figure>
     <p class="note" data-el="6.3">그 뒤로는 에이전트에게 「싱크독으로 프로젝트 하나 만들어 줘」라고 말하면 된다. 주소가 바뀌면 <code>claude mcp remove syncdoc</code> 후 다시 넣는다.</p>
 
     <h4 class="sectitle">11단계가 뜻하는 것</h4>
@@ -1848,6 +1851,9 @@ status: approved
 | 6.1 | 붙이는 행 | 행 | 한 단계 | — |
 | 6.2 | 명령 | 코드 상자 | `claude mcp add …` 한 줄. **주소는 이 화면의 주소로 채워져 있다.** 토큰만 자리표시 | — |
 | 6.3 | 그 다음 | 텍스트 | 붙은 뒤 첫마디와, 주소가 바뀌었을 때 하는 일 | — |
+| 6.4 | 발급 순간 그림 | 그림 | 토큰 원문이 한 번만 보이는 화면. 원문은 가려져 있다 | — |
+| 6.5 | 터미널 그림 (add) | 그림 | `claude mcp add`가 답하는 모양. 주소는 자리표시 | — |
+| 6.6 | 터미널 그림 (list) | 그림 | `claude mcp list`의 `syncdoc … ✔ Connected` 한 줄 | — |
 
 ### 규칙
 
@@ -1860,6 +1866,7 @@ status: approved
 - 항목 ID는 고정폭 평문이다. 칩으로 그리면 표에 색 상자가 열한 줄 생겨 단계 이름보다 먼저 눈에 든다
 - 다이얼로그 폭은 `660px`
 - **명령(6.2)의 주소는 채워서 보여준다.** UI-13 클라이언트 설정(8.1)과 같은 원천 — 지금 열려 있는 화면의 origin — 을 쓴다. `{주소}`를 사람이 바꿔 넣게 두면 터널 주소를 옮겨 적다가 틀린다. 토큰은 발급 화면에서 한 번만 보이는 값이라 여기 채울 수 없고, 자리표시로 둔다
+- **그림(6.4~6.6)은 앱 밖 화면만이다.** 토큰이 한 번만 보이는 순간과 터미널 둘 — 앱 안에서 볼 수 없는 것이다. 앱 화면은 캡처로 넣지 않는다 — 한 클릭 거리고, 화면이 바뀌면 캡처가 낡는다. 터미널 그림의 주소는 `{싱크독 주소}` 자리표시다 — 실제 주소는 6.2가 채운다. 파일은 `frontend/public/howto/`, 경로 `/howto/*.png`
 - **「새로 켠다」(6 셋째 행)를 빼지 않는다.** 실제로 붙이는 사람이 가장 먼저 걸리는 자리다 — 켜져 있던 세션에 서버가 안 보여서 잘못 넣은 줄 안다. 설명서가 앱 밖에 있으면 이 한 줄을 못 보고, 그래서 앱 안에 둔다
 
 ### 시나리오
