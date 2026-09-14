@@ -4,7 +4,7 @@
  *  4 표(4.1 단계, 4.2 문서, 4.3 상위 미승인, 4.4 표준) · 5 최근 변경 · 6 목록 다이얼로그 · 7 동기화 상태(7.1 커밋, 7.2 밀림) */
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import { StatusPill } from '../components/ui'
+import { StatusPill, ProjName } from '../components/ui'
 import { ago, api, authorLabel, docPath, refKey, STAGE_NAMES, STATUS_KO, warnText, type CommentSummary, type DocumentSummary, type FlagSummary, type ProjectDetail as Detail, type ProjectSummary } from '../api/client'
 
 
@@ -62,10 +62,7 @@ export function ProjectDetail() {
       <div className="phead" data-el="1">
         <div>
           <div>
-            <b className="mono" data-el="1.1">
-              {sum.code}
-            </b>{' '}
-            <span data-el="1.2">{sum.name}</span>
+            <ProjName code={sum.code} name={sum.name} elCode="1.1" elName="1.2" />
           </div>
           <a className="repo mono" data-el="1.3" href={sum.remote_url} target="_blank" rel="noreferrer">
             {sum.remote_url.replace(/^https?:\/\//, '').replace(/\.git$/, '')}

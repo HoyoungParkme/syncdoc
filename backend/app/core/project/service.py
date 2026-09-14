@@ -173,6 +173,7 @@ class ProjectService:
             out.append(
                 RepoStatus(
                     p.code,
+                    p.name,
                     p.repository.remote_url,
                     p.repository.last_processed_commit,
                     p.repository.synced_at,

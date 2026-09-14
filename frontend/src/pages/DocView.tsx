@@ -9,7 +9,7 @@ import mermaid from 'mermaid'
 import { api, ApiError, FLAG_KO, incompleteOf, STATUS_KO, warnText, type Comment, type Document, type DownstreamView, type ItemReferences, type UpstreamCheck } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { esc, renderBlocks, splitRef } from '../view/md'
-import { ItemIdBadge, StatusPill } from '../components/ui'
+import { ItemIdBadge, StatusPill, ProjName } from '../components/ui'
 import { Handle, PANEL, readStore, TOC, useWidth, writeStore } from '../components/panes'
 
 
@@ -203,7 +203,7 @@ export function DocView() {
       {/* 브레드크럼 — 어디서 들어왔든 지금 자리를 말하고, 앞 두 조각으로 되짚어 올라간다 */}
       <div className="docbar" data-el="1">
         <Link className="crumb" to={`/p/${code}`}>
-          {doc.project_name || code}
+          <ProjName code={code} name={doc.project_name} />
         </Link>
         <span className="sep">›</span>
         <Link className="crumb mono" to={`/p/${code}#stage-${doc.stage ?? ''}`}>
@@ -309,7 +309,7 @@ export function DocView() {
           {tab === 'user' && (
             <div className="dochead">
               <div className="kicker mono">
-                {doc.project_name} · {doc.stage ? `${doc.stage}단계 ${doc.doc_type}` : `단계 밖 ${doc.doc_type}`}
+                [{code}] {doc.project_name} · {doc.stage ? `${doc.stage}단계 ${doc.doc_type}` : `단계 밖 ${doc.doc_type}`}
               </div>
               <h1>{view.title}</h1>
               {view.lead && <p className="lead">{view.lead}</p>}

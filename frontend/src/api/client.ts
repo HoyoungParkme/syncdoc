@@ -258,6 +258,8 @@ export interface Graph {
 }
 export interface RepoStatus {
   code: string
+  /** UI-14 표가 「[코드] 이름」으로 적는다 (UI-002 1.6) */
+  name: string
   remote_url: string
   last_processed_commit: string | null
   synced_at: string | null

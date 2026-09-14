@@ -32,6 +32,24 @@ export function ItemIdBadge({ children, el }: { children: ReactNode; el?: string
  *  그래서 화면 이동·스크롤·아무 곳 클릭에도 지운다.
  *
  *  body로 포털을 쓴다. 대상이 `overflow:auto` 안(문서 목차·오른쪽 패널)에 있으면 잘리기 때문. */
+/** UI-002 1.6 프로젝트 표기 — 「[코드] 이름」. 코드는 고정폭·굵게, 대괄호까지. 여덟 자리가 이 하나를 쓴다 —
+ *  한 곳만 다르면 어휘가 아니라 실수로 보인다. 이름이 없는 자리는 이걸 쓰지 않는다(대괄호는 이름과 가르는 표시다) */
+export function ProjName({ code, name, elCode, elName }: { code: string; name?: string | null; elCode?: string; elName?: string }) {
+  return (
+    <>
+      <b className="mono" data-el={elCode}>
+        [{code}]
+      </b>
+      {name ? (
+        <>
+          {' '}
+          <span data-el={elName}>{name}</span>
+        </>
+      ) : null}
+    </>
+  )
+}
+
 export function Tooltip({ text, children }: { text: string; children: ReactNode }) {
   const [at, setAt] = useState<{ x: number; y: number } | null>(null)
   const loc = useLocation()
