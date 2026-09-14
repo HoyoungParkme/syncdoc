@@ -76,6 +76,14 @@ upstream: [SYNC-UI-001]
 
 ---
 
+### 1.6 프로젝트 표기
+
+프로젝트는 어디서든 **`[코드] 이름`**으로 적는다 — `[SYNC] 싱크독`. 코드는 고정폭·굵게, **대괄호까지 고정폭**이고, 이름은 본문체다.
+
+- **대괄호가 있어야 코드가 문서 ID와 같은 어휘로 읽힌다.** `SYNC-PRD-001`의 접두가 `[SYNC]`다 — 목록에서 코드가 한 열처럼 훑히고, 이름이 코드의 일부인지 헷갈리지 않는다(`INS 보험청구심사 어시스턴트`는 어디까지가 코드인지 한 번 읽어야 안다)
+- **여덟 자리가 전부 이 하나를 쓴다** — UI-2 목록 행 · UI-4 상세 머리(1.1·1.2) · UI-5 문서 바 브레드크럼과 킥커 · UI-7 문서 바 · UI-8 브레드크럼 · UI-9 단계 레일 `← [코드] 이름` · UI-14 관리 표. 한 곳만 다르면 어휘가 아니라 실수로 보인다
+- 코드만 있고 이름이 없는 자리(결과 라벨의 `SYNC · 방금`)는 대괄호를 안 친다 — 대괄호는 이름과 붙을 때 코드를 가르는 표시다
+
 ## UI-5 문서 뷰
 
 | 항목 | 내용 |
@@ -98,7 +106,7 @@ upstream: [SYNC-UI-001]
 </div>
 
 <div class="docbar" data-el="1"><!-- 브레드크럼. 어디서 들어왔든 지금 자리를 말한다 -->
-  <span class="crumb">싱크독</span><span class="sep">›</span>
+  <span class="crumb"><b class="mono">[SYNC]</b> 싱크독</span><span class="sep">›</span>
   <span class="crumb mono">2 PRD</span><span class="sep">›</span>
   <b class="mono">SYNC-PRD-001</b>
   <span class="pill pill-approved" data-el="1.1">승인</span>
@@ -134,7 +142,7 @@ upstream: [SYNC-UI-001]
     <div class="banner warn" data-el="4a">미완성: 필수 절 「성공지표」 없음 · 승인 불가</div>
 
     <div class="dochead"><!-- 킥커·제목·리드. 본문(7)은 innerHTML로 갈아 끼워서 형제로 둔다 -->
-      <div class="kicker mono">싱크독 · 2단계 PRD</div>
+      <div class="kicker mono">[SYNC] 싱크독 · 2단계 PRD</div>
       <h1>PRD — 싱크독</h1>
       <p class="lead">바이브코딩 시대에 개발자가 PM 없이 11단계 명세 체인을 쓰고, 에이전트가 그 명세를 따르게 하는 플랫폼.</p>
     </div>
@@ -314,7 +322,7 @@ status: approved
 ```html
 <div class="phead" data-el="1">
   <div>
-    <div><b class="mono" data-el="1.1">SYNC</b> <span data-el="1.2">싱크독</span></div>
+    <div><b class="mono" data-el="1.1">[SYNC]</b> <span data-el="1.2">싱크독</span></div>
     <a class="repo mono" data-el="1.3">github.com/dfocus/syncdoc</a>
   </div>
   <span class="grow"></span>
@@ -841,7 +849,7 @@ status: approved
 ```html
 <!-- 문서 뷰와 같은 3단 틀. 좌: 버전, 가운데: diff, 우: 영향. 화면 높이를 채우고 가운데만 스크롤한다 -->
 <div class="docbar" data-el="1">
-  <span class="crumb">싱크독</span><span class="sep">›</span>
+  <span class="crumb"><b class="mono">[SYNC]</b> 싱크독</span><span class="sep">›</span>
   <span class="crumb mono">2 PRD</span><span class="sep">›</span>
   <b class="mono">SYNC-PRD-001</b>
   <span class="pill pill-approved">승인</span><span class="ver mono">v7</span>
@@ -1016,7 +1024,7 @@ status: approved
   <div class="hrow" data-el="2.1">
     <span class="warn" data-el="2.3">⚠</span>
     <span class="pname">
-      <span><b class="mono">SYNC</b> 싱크독</span>
+      <span><b class="mono">[SYNC]</b> 싱크독</span>
       <span class="sub"><b class="work">처리할 것 9</b> · 21문서 · 12분 전</span>
     </span>
     <span class="cell ok" data-el="2.2">1</span>
@@ -1269,7 +1277,7 @@ status: approved
 ```html
 <div class="phead" data-el="1">
   <div>
-    <div class="crumbs"><a href="/p/SYNC">싱크독</a><span class="sep">›</span><span>참조 그래프</span></div>
+    <div class="crumbs"><a href="/p/SYNC"><b class="mono">[SYNC]</b> 싱크독</a><span class="sep">›</span><span>참조 그래프</span></div>
     <b>참조 그래프</b>
   </div>
   <span class="grow"></span>
@@ -1413,7 +1421,7 @@ status: approved
 
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
-| 1 | 단계 레일 | 영역 | 화면 맨 위 전폭 서브바. 왼쪽에 `← 프로젝트 이름`, 그 뒤로 단계 칩(2) | 왼쪽 링크 → UI-4 |
+| 1 | 단계 레일 | 영역 | 화면 맨 위 전폭 서브바. 왼쪽에 `← [코드] 이름`(1.6), 그 뒤로 단계 칩(2) | 왼쪽 링크 → UI-4 |
 | 2 | 단계 표시 | 진행 표시 | 11단계 칩. 번호와 타입 코드는 항상 보인다. 번호는 흐리게, 상태 점은 **라벨 뒤**. 현재 단계는 채워서 | 단계 클릭 → 그 단계로 |
 | 3 | 미확정 배너 | 배너 | 이 단계에 승인 문서가 없을 때. 있는 문서와 상태(UC-H16 2a) | — |
 | 3.1 | 초안 보기 | 버튼 | | 승인 아닌 문서를 본문(4)에 띄운다(UC-H16 2a1) |
@@ -1607,9 +1615,9 @@ status: approved
 <div class="adminbody">
   <table class="vers" data-el="2">
     <tr><th>프로젝트</th><th>저장소</th><th>마지막 처리 커밋</th><th>동기화</th><th></th></tr>
-    <tr data-el="2.1"><td><b>SYNC</b></td><td class="lbl">dfocus/syncdoc</td><td><span class="mono" data-el="2.2">a1b2c3d</span> <span class="lbl">1시간 전</span></td><td data-el="2.3"><span class="st ok">최신</span><br><span class="lbl" data-el="2.4">백업 7시간 전</span></td><td><span class="btn sm" data-el="3">인덱스 재구축</span> <span class="btn sm" data-el="6">복원</span> <span class="btn sm danger" data-el="7">해제</span></td></tr>
-    <tr><td><b>DBA</b></td><td class="lbl">dfocus/dba-ax</td><td><span class="mono">9e8f7a6</span> <span class="lbl">3일 전</span></td><td><span class="st rv">밀림 2</span><br><span class="warn">백업 5일 전</span></td><td><span class="btn sm">인덱스 재구축</span> <span class="btn sm">복원</span> <span class="btn sm danger">해제</span></td></tr>
-    <tr><td><b>AIRD</b></td><td class="lbl">dfocus/airdata</td><td><span class="mono">—</span></td><td><span class="st na">문서 없음</span><br><span class="lbl">백업 없음</span></td><td><span class="btn sm">인덱스 재구축</span> <span class="btn sm">복원</span> <span class="btn sm danger">해제</span></td></tr>
+    <tr data-el="2.1"><td><b class="mono">[SYNC]</b> 싱크독</td><td class="lbl">dfocus/syncdoc</td><td><span class="mono" data-el="2.2">a1b2c3d</span> <span class="lbl">1시간 전</span></td><td data-el="2.3"><span class="st ok">최신</span><br><span class="lbl" data-el="2.4">백업 7시간 전</span></td><td><span class="btn sm" data-el="3">인덱스 재구축</span> <span class="btn sm" data-el="6">복원</span> <span class="btn sm danger" data-el="7">해제</span></td></tr>
+    <tr><td><b class="mono">[DBA]</b> 데이터베이스 관리</td><td class="lbl">dfocus/dba-ax</td><td><span class="mono">9e8f7a6</span> <span class="lbl">3일 전</span></td><td><span class="st rv">밀림 2</span><br><span class="warn">백업 5일 전</span></td><td><span class="btn sm">인덱스 재구축</span> <span class="btn sm">복원</span> <span class="btn sm danger">해제</span></td></tr>
+    <tr><td><b class="mono">[AIRD]</b> 에어데이터</td><td class="lbl">dfocus/airdata</td><td><span class="mono">—</span></td><td><span class="st na">문서 없음</span><br><span class="lbl">백업 없음</span></td><td><span class="btn sm">인덱스 재구축</span> <span class="btn sm">복원</span> <span class="btn sm danger">해제</span></td></tr>
   </table>
 
   <div class="dialog" data-el="4">
@@ -1638,7 +1646,7 @@ status: approved
 |---|---|---|---|---|
 | 1 | 경고 줄 | 텍스트 | 위험한 동작이 있다는 안내. 제목은 카드가 이미 달고 있다 | — |
 | 2 | 저장소 표 | 표 | 프로젝트마다 저장소와 동기화 상태 | — |
-| 2.1 | 저장소 행 | 행 | 프로젝트, 저장소, 마지막 처리 커밋(2.2), 동기화(2.3) | — |
+| 2.1 | 저장소 행 | 행 | 프로젝트(「[코드] 이름」, 1.6), 저장소, 마지막 처리 커밋(2.2), 동기화(2.3) | — |
 | 2.2 | 마지막 처리 커밋 | 텍스트 | `repositories.last_processed_commit`과 시각 | 새 탭으로 GitHub 커밋 |
 | 2.3 | 동기화 상태 | 뱃지 | 원격 최신과 같으면 `최신`, 처리 안 한 커밋이 있으면 `밀림 N`(UC-G1 1a·1b). 아래에 마지막 백업(2.4)을 붙인다 | — |
 | 2.4 | 마지막 백업 | 텍스트 | 동기화 칸(2.3) 안, 뱃지 아래 한 줄. `backup/tracking.json`의 마지막 커밋 시각. 한 번도 없으면 `백업 없음`. **주기의 두 배가 넘게 지났으면 경고색** — 백업이 조용히 멈춘 것을 여기서 알아챈다(인프라 6.1) | — |

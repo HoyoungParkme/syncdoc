@@ -1792,6 +1792,8 @@ components:
       properties:
         code:
           type: string
+        name:
+          type: string   # UI-14 표가 「[코드] 이름」(UI-002 1.6)으로 적는다
         remote_url:
           type: string
         last_processed_commit:
