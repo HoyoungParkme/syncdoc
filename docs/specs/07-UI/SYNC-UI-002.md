@@ -1842,13 +1842,17 @@ status: approved
 
     <h4 class="sectitle">11단계가 뜻하는 것</h4>
     <table class="grid" data-el="3"><!-- 머리 행 없음. 위 소제목이 그 일을 한다 -->
-      <tr data-el="3.1"><td class="no">1</td><td class="code">RFQ</td><td><b>요구·인터뷰</b> — 무엇을 왜 만드나. 고객이 말한 것만 적는다</td><td class="ids">Q1</td></tr>
-      <tr><td class="no">2</td><td class="code">PRD</td><td><b>제품 요구</b> — 목표·비목표·요구사항. 요구에는 인수기준까지</td><td class="ids">G1 · R12 · N3</td></tr>
+      <tr data-el="3.1"><td class="no">1</td><td class="code">RFQ</td><td><b>요구·인터뷰</b> — 무엇을 왜 만드나. 고객이 말한 것만 적는다<div class="sub" data-el="3.5">문서 하나. 고객이 말한 것을 Q 항목으로</div></td><td class="ids">Q1</td></tr>
+      <tr><td class="no">2</td><td class="code">PRD</td><td><b>제품 요구</b> — 목표·비목표·요구사항. 요구에는 인수기준까지<div class="sub">문서 하나. 목표 G · 요구 R · 비목표 N</div></td><td class="ids">G1 · R12 · N3</td></tr>
+      <tr><td class="no">6</td><td class="code">DOM</td><td><b>도메인·클래스·데이터</b> — 도메인 모델·클래스 명세·ERD를 한 단계에<div class="sub"><b>문서 셋.</b> 같은 것을 세 층으로 — 도메인 모델(개념 <code>Document</code>) · 클래스 명세(클래스 <code>Document</code>) · ERD·DD(테이블 <code>documents</code>). 이름으로 서로 참조하려고 한 단계에 둔다</div></td><td class="ids">Document · documents</td></tr>
+      <tr><td class="no">7</td><td class="code">UI</td><td><b>화면</b> — 화면 목록·흐름·화면별 요소<div class="sub"><b>문서 둘.</b> 화면 설계(무엇이 있나 — 목록·흐름) · 와이어프레임(어떻게 생겼나 — 같은 <code>UI-5</code>의 배치·요소·규칙). 와이어프레임은 선택</div></td><td class="ids">UI-5</td></tr>
+      <tr><td class="no">8</td><td class="code">API</td><td><b>인터페이스</b> — REST 엔드포인트와 MCP 도구<div class="sub"><b>문서 둘.</b> 입구가 둘이라서 — REST(사람·화면이 부르는 <code>GET/api/…</code>) · MCP(에이전트가 부르는 도구 <code>get_document</code>)</div></td><td class="ids">GET/api/docs/{docId} · get_doc</td></tr>
+      <tr><td class="no">10</td><td class="code">MS</td><td><b>MINISPEC</b> — 함수 하나하나의 시그니처와 처리 순서<div class="sub"><b>문서 여러 개.</b> MS 문서 하나 = 클래스 명세의 절 하나 = 코드 파일 하나. 크기가 아니라 구조로 나눈다(싱크독은 9개). 선택</div></td><td class="ids">SpecService.save</td></tr>
       <tr class="std" data-el="3.2"><td class="no">—</td><td class="code">STD</td><td><b>표준 (단계 밖)</b> — 명세가 아니라 명세를 쓰는 법. 싱크독 프로젝트에만 있다</td><td class="ids">규칙 항목</td></tr>
     </table>
 
     <p class="lbl" data-el="3.3">오른쪽은 그 단계 문서 안에서 쓰는 항목 ID 형식. 문서 ID는 <code>{프로젝트코드}-{타입}-{번호}</code>, 항목 ID는 <code>{문서ID}#{항목번호}</code>, 참조는 <code>[[항목ID]]</code>.</p>
-    <p class="note" data-el="3.4">11단계 순서는 권장이지 강제가 아니다. 건너뛰어도 막지 않고 표시만 한다.</p>
+    <p class="note" data-el="3.4">11단계 순서는 권장이지 강제가 아니다. 건너뛰어도 막지 않고 표시만 한다. <b>여섯(RFQ·PRD·UC·DOM·API·CODE)이 실질이고 나머지는 규모가 정한다</b> — 가르는 것은 사람 수가 아니라 「머리에 안 들어가는가」다. 빈 단계는 「미작성」으로 남아 건너뛰었다는 사실이 보인다.</p>
   </div>
   <div class="dfoot"><span class="grow"></span><span class="btn" data-el="5">닫기</span></div>
 </div>
@@ -1865,7 +1869,8 @@ status: approved
 | 3.1 | 단계 행 | 행 | 한 단계 | — |
 | 3.2 | 표준 행 | 행 | `STD`. 단계 밖이라 회색으로 마지막에 | — |
 | 3.3 | ID 문법 | 텍스트 | 문서 ID·항목 ID·참조 표기 | — |
-| 3.4 | 주의 | 텍스트 | 11단계 순서는 강제가 아니라는 안내 | — |
+| 3.4 | 주의 | 텍스트 | 11단계 순서는 강제가 아니라는 안내와, 여섯(RFQ·PRD·UC·DOM·API·CODE)이 실질이고 나머지는 규모가 정한다는 것([[SYNC-STD-003]] 결정) | — |
+| 3.5 | 문서 구성 | 텍스트 | 단계 행 안 둘째 줄. 그 단계에 문서가 몇 개고 **왜 그 수인지** — DOM은 개념→클래스→테이블 세 층이라 셋, UI는 무엇이 있나/어떻게 생겼나라 둘, API는 입구가 둘이라 둘, MS는 코드 파일마다 하나. 선택인 단계는 「선택」이라고 적는다 | — |
 | 4 | 닫기(✕) | 버튼 | | 닫힘 |
 | 5 | 닫기 | 버튼 | | 닫힘 |
 | 6 | 붙이는 법 표 | 표 | 토큰 → 명령 → 새 세션 → 확인. 2의 둘째 단계를 손 순서로 편 것 | — |
@@ -1884,6 +1889,7 @@ status: approved
 - 본문 맨 위 문단이 이 도구가 무엇인지 한 번에 말한다. 표만 있으면 처음 온 사람이 무엇을 읽고 있는지 모른다
 - 두 표 사이에 소제목 `11단계가 뜻하는 것`을 둔다. 두 번째 표에는 머리 행이 없다 — 소제목이 그 일을 한다
 - 설명은 문장으로 쓴다. 키워드 단문으로 줄이면 행이 얇아져 표가 목록처럼 읽힌다
+- **단계마다 문서 구성(3.5)을 둘째 줄로 붙인다.** 표만 보면 DOM이 왜 셋이고 UI·API가 왜 둘인지 모른다 — 실제로 목록 화면에서 `SYNC-DOM-001·002·003`을 보고 물었다. 근거는 [[SYNC-STD-001]] 2장의 서브타입이고, 실질/선택은 [[SYNC-STD-003]] 결정을 그대로 옮긴다. 둘째 줄은 흐린 색·작은 글자라 첫 줄의 이름을 가리지 않는다
 - 항목 ID는 고정폭 평문이다. 칩으로 그리면 표에 색 상자가 열한 줄 생겨 단계 이름보다 먼저 눈에 든다
 - 다이얼로그 폭은 `660px`
 - **명령(6.2)의 주소는 채워서 보여준다.** UI-13 클라이언트 설정(8.1)과 같은 원천 — 지금 열려 있는 화면의 origin — 을 쓴다. `{주소}`를 사람이 바꿔 넣게 두면 터널 주소를 옮겨 적다가 틀린다. 토큰은 발급 화면에서 한 번만 보이는 값이라 여기 채울 수 없고, 자리표시로 둔다
