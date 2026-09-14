@@ -1,6 +1,6 @@
 /** UI-16 사용 방법 — SYNC-UI-002#UI-16. 상단 바에서 어느 화면 위로든 뜨는 안내 다이얼로그.
  *  1 다이얼로그 · 2 사용 순서(2.1 행) · 3 11단계 표(3.1 단계 행, 3.2 STD 행, 3.3 ID 문법, 3.4 주의) · 4 ✕ · 5 닫기
- *  6 붙이는 법 표(6.1 행) · 6.2 명령 상자(주소 채움) · 6.3 그 다음
+ *  6 붙이는 법 표(6.1 행) · 6.2 명령 상자(주소 채움) · 6.3 그 다음 · 6.4 발급 순간 그림 · 6.5 터미널 add · 6.6 터미널 list
  *  읽기 전용이고 상태가 없다 — 어디서 열든 같은 내용이고 닫으면 원래 화면 그대로다. */
 
 import type { ReactNode } from 'react'
@@ -107,9 +107,24 @@ export function HowTo({ onClose }: { onClose: () => void }) {
               ))}
             </tbody>
           </table>
+          {/* 그림은 앱 밖 화면만 — 토큰이 한 번만 보이는 순간과 터미널. 앱 화면은 한 클릭 거리고 바뀌면 낡는다 (UI-16 규칙) */}
+          <figure data-el="6.4">
+            <img src="/howto/token-issued.png" alt="발급 직후 — 토큰 원문이 한 번만 보이는 화면" />
+            <figcaption>1. 발급 직후. 원문은 이 화면에서 한 번만 보인다 (캡처에서는 가렸다)</figcaption>
+          </figure>
           <pre className="snippet" data-el="6.2">
             {cmd}
           </pre>
+          <figure data-el="6.5">
+            <img src="/howto/term-add.png" alt="터미널 — claude mcp add 실행 결과" />
+            <figcaption>2. 붙이면 이렇게 답한다. 토큰은 [REDACTED]로 가려진다</figcaption>
+          </figure>
+          <figure data-el="6.6">
+            <img src="/howto/term-list.png" alt="터미널 — claude mcp list에 syncdoc Connected" />
+            <figcaption>
+              4. 새로 켠 뒤 <code>claude mcp list</code> — 이 줄이 보이면 붙은 것이다
+            </figcaption>
+          </figure>
           <p className="note" data-el="6.3">
             그 뒤로는 에이전트에게 「싱크독으로 프로젝트 하나 만들어 줘」라고 말하면 된다. 주소가 바뀌면 <code>claude mcp remove syncdoc</code> 후 다시
             넣는다.
