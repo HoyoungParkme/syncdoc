@@ -1,6 +1,9 @@
 /** UI-16 사용 방법 — SYNC-UI-002#UI-16. 상단 바에서 어느 화면 위로든 뜨는 안내 다이얼로그.
  *  1 다이얼로그 · 2 사용 순서(2.1 행) · 3 11단계 표(3.1 단계 행, 3.2 STD 행, 3.3 ID 문법, 3.4 주의) · 4 ✕ · 5 닫기
+ *  6 붙이는 법 표(6.1 행) · 6.2 명령 상자(주소 채움) · 6.3 그 다음
  *  읽기 전용이고 상태가 없다 — 어디서 열든 같은 내용이고 닫으면 원래 화면 그대로다. */
+
+import type { ReactNode } from 'react'
 
 /** 여섯 단계. 웹에 편집이 없다는 것을 3에서 말한다 — 처음 온 사람이 가장 자주 헤매는 지점이다 */
 const ORDER: [string, string, string][] = [
@@ -28,7 +31,35 @@ const STAGES: [string, string, string, string[]][] = [
   ['CODE', '구현 계획', '슬라이스와 통합 테스트, 커밋 목록', ['B2', 'D1']],
 ]
 
+/** 에이전트를 붙이는 손 순서 — 2의 둘째 단계를 편 것. 셋째 행을 빼지 않는다(UI-16 규칙):
+ *  켜져 있던 세션에 서버가 안 보여서 잘못 넣은 줄 아는 것이, 붙이는 사람이 가장 먼저 걸리는 자리다 */
+const CONNECT: [string, ReactNode, string][] = [
+  ['토큰을 발급한다', '설정 → MCP 토큰 → 발급. 이름을 적는다. 원문은 그때 한 번만 보이니 바로 복사한다.', '설정'],
+  [
+    '터미널에서 한 줄',
+    <>
+      아래 명령. <code>--scope user</code>면 어느 폴더에서 켜도 붙는다. Codex·Gemini CLI는 설정의 클라이언트 설정 JSON을 각자 설정
+      파일에 넣는다.
+    </>,
+    '터미널',
+  ],
+  ['Claude Code를 새로 켠다', 'MCP 서버는 세션이 시작될 때 읽힌다. 켜져 있던 창에는 방금 넣은 서버가 안 보인다 — 나갔다가 다시 켠다.', '터미널'],
+  [
+    '붙었는지 본다',
+    <>
+      <code>claude mcp list</code>에 <code>syncdoc … ✔ Connected</code>, 또는 세션 안에서 <code>/mcp</code>. claude.ai 커넥터 목록에는 안
+      나온다 — 이 컴퓨터 설정에만 있는 것이 정상이다.
+    </>,
+    '터미널',
+  ],
+]
+
 export function HowTo({ onClose }: { onClose: () => void }) {
+  // 주소는 UI-13 클라이언트 설정(8.1)과 같은 원천 — 사람이 옮겨 적으면 터널 주소를 틀린다.
+  // 토큰은 발급 화면에서 한 번만 보이고 서버도 다시 못 준다 — 자리표시
+  const cmd = `claude mcp add --transport http --scope user syncdoc \\
+    ${window.location.origin}/mcp \\
+    --header "Authorization: Bearer syncdoc_pat_…"`
   return (
     <>
       <div className="backdrop" onClick={onClose} />
@@ -62,6 +93,27 @@ export function HowTo({ onClose }: { onClose: () => void }) {
               ))}
             </tbody>
           </table>
+
+          <h4 className="sectitle">에이전트를 붙이는 법</h4>
+          <table className="grid" data-el="6">
+            <tbody>
+              {CONNECT.map(([what, how, where], i) => (
+                <tr key={what} data-el={i === 0 ? '6.1' : undefined}>
+                  <td className="no">{i + 1}</td>
+                  <td>{what}</td>
+                  <td>{how}</td>
+                  <td className="where">{where}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <pre className="snippet" data-el="6.2">
+            {cmd}
+          </pre>
+          <p className="note" data-el="6.3">
+            그 뒤로는 에이전트에게 「싱크독으로 프로젝트 하나 만들어 줘」라고 말하면 된다. 주소가 바뀌면 <code>claude mcp remove syncdoc</code> 후 다시
+            넣는다.
+          </p>
 
           <h4 className="sectitle">11단계가 뜻하는 것</h4>
           <table className="grid" data-el="3">
