@@ -253,7 +253,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 #### DELETE/api/projects/{code} 프로젝트 등록 해제
 
-화면 없음 — v1은 API만 · 서비스 [[SYNC-MS-001#ProjectService.delete_project]]
+화면 [[SYNC-UI-002#UI-14]] 7(해제) · 유스케이스 [[SYNC-UC-001#UC-H17]] · 서비스 [[SYNC-MS-001#ProjectService.delete_project]] · GitHub 저장소는 손대지 않는다
 
 ```yaml
 /api/projects/{code}:
