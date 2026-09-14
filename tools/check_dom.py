@@ -19,19 +19,21 @@ DD 표가 `id`·외래키·표준 시각을 싣기도 하고 빼기도 해서 �
 
 사용: python3 tools/check_dom.py          경고만
       python3 tools/check_dom.py --all    맞는 것까지
+      python3 tools/check_dom.py --specs <다른 저장소>/docs/specs
+
+프로젝트 코드는 명세에서 읽는다 — `SYNC-`를 박아 두지 않는다 (STD-004 4장, #57).
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import re
 import sys
 
-ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-DOM = os.path.join(ROOT, "docs", "specs", "06-DOM")
-CLASS_DOC = os.path.join(DOM, "SYNC-DOM-002.md")
+import proj
+
 ITEM = re.compile(r"^#{1,6} ([A-Za-z_][A-Za-z0-9_]*)\s", re.M)
-LINK = re.compile(r"(테이블|도메인):\s*\[\[SYNC-DOM-00[13]#([^\]]+)\]\]")
 
 
 def read(path: str) -> str:
@@ -58,21 +60,21 @@ CLASS_BLOCK = re.compile(r"class (\w+) \{(.*?)\}", re.S)
 DD_TABLE = re.compile(r"^### ([a-z_][a-z0-9_]*)\n(.*?)(?=^### |\Z)", re.S | re.M)
 
 
-def class_attrs() -> dict[str, set[str]]:
+def class_attrs(class_doc: str) -> dict[str, set[str]]:
     """클래스 2장(엔티티) mermaid의 `+타입 이름` 속성.
 
     4장(설계)과의 대조는 validate의 `entity.mismatch`가 이미 한다.
     """
-    text = read(CLASS_DOC).split("## 3.")[0]
+    text = read(class_doc).split("## 3.")[0]
     return {
         m.group(1): {a.split()[-1] for a in m.group(2).split("\n") if a.strip().startswith("+")}
         for m in CLASS_BLOCK.finditer(text)
     }
 
 
-def table_columns() -> dict[str, set[str]]:
+def table_columns(data_doc: str) -> dict[str, set[str]]:
     """DD 표의 첫 열. 표는 `id`처럼 자명한 것을 줄여 적으므로 있는 것만 모은다."""
-    text = outside_fences(read(os.path.join(DOM, "SYNC-DOM-003.md")))
+    text = outside_fences(read(data_doc))
     out: dict[str, set[str]] = {}
     for m in DD_TABLE.finditer(text):
         names = set()
@@ -86,9 +88,9 @@ def table_columns() -> dict[str, set[str]]:
     return out
 
 
-def class_links() -> dict[str, dict[str, str]]:
+def class_links(class_doc: str, link: re.Pattern[str]) -> dict[str, dict[str, str]]:
     """{클래스: {"테이블": 이름, "도메인": 이름}}. 항목 헤딩 바로 아래 줄만 본다."""
-    text = outside_fences(read(CLASS_DOC))
+    text = outside_fences(read(class_doc))
     out: dict[str, dict[str, str]] = {}
     current = None
     for line in text.split("\n"):
@@ -97,7 +99,7 @@ def class_links() -> dict[str, dict[str, str]]:
             current = m.group(1)
             continue
         if current:
-            found = dict(LINK.findall(line))
+            found = dict(link.findall(line))
             if found:
                 out[current] = found
                 current = None
@@ -105,24 +107,41 @@ def class_links() -> dict[str, dict[str, str]]:
 
 
 def main() -> int:
-    show_ok = "--all" in sys.argv[1:]
-    domain = items_of(os.path.join(DOM, "SYNC-DOM-001.md"))
-    tables = items_of(os.path.join(DOM, "SYNC-DOM-003.md"))
-    links = class_links()
+    ap = argparse.ArgumentParser()
+    proj.add_specs(ap)
+    ap.add_argument("--all", action="store_true", help="맞는 것까지 보인다")
+    a = ap.parse_args()
+    code = proj.code_of(a.specs)
+    show_ok = a.all
+    # **번호가 아니라 제목으로 찾는다** — 싱크독은 DOM-001이 도메인이지만 게시판
+    # 프로젝트는 DOM-001이 ERD다. 번호로 찾으면 엉뚱한 문서를 읽고도 답을 낸다 (#57)
+    paths = {k: proj.by_title(a.specs, "DOM", k) for k in ("도메인", "클래스", "ERD")}
+    missing = [k for k, v in paths.items() if v is None]
+    if missing:
+        print(f"{code}: DOM 문서를 못 찾았다 — 제목에 {' · '.join(missing)}이(가) 없다")
+        return 0
+    domain = items_of(paths["도메인"])
+    tables = items_of(paths["ERD"])
+    links = class_links(
+        paths["클래스"],
+        # 링크 대상 문서 번호는 안 본다 — 어느 문서의 항목인지는 뒤에서 집합으로 가른다
+        re.compile(r"(테이블|도메인):\s*\[\[[^\]#]+#([^\]]+)\]\]"),
+    )
     warnings: list[tuple[str, str]] = []
 
     linked_tables = set()
+    name = {k: os.path.basename(v)[:-3] for k, v in paths.items()}
     for cls, refs in links.items():
         table, concept = refs.get("테이블"), refs.get("도메인")
         if table:
             linked_tables.add(table)
             if table not in tables:
-                warnings.append((cls, f"테이블 `{table}`이 SYNC-DOM-003에 없다"))
+                warnings.append((cls, f"테이블 `{table}`이 {name['ERD']}에 없다"))
             elif show_ok:
                 print(f"✓  {cls:24} 테이블 {table}")
         if concept:
             if concept not in domain:
-                warnings.append((cls, f"도메인 `{concept}`이 SYNC-DOM-001에 없다"))
+                warnings.append((cls, f"도메인 `{concept}`이 {name['도메인']}에 없다"))
             elif show_ok:
                 print(f"✓  {cls:24} 도메인 {concept}")
 
@@ -132,7 +151,7 @@ def main() -> int:
     for cls, msg in warnings:
         print(f"⚠  {cls:24} dom.name: {msg}")
     print(
-        f"\n합계: 클래스 {len(links)} · 테이블 {len(tables)}"
+        f"\n합계: {code} · 클래스 {len(links)} · 테이블 {len(tables)}"
         f" · 개념 {len(domain)} · 경고 {len(warnings)}"
     )
     return 1 if warnings else 0
