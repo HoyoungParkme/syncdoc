@@ -8,6 +8,25 @@ SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path
 OUT = sys.argv[2] if len(sys.argv) > 2 else "/tmp/_seq.html"
 raw = open(SRC, encoding="utf-8").read()
 
+def section(title):
+    """절 제목으로 그 절의 본문을 뜬다. 다음 `## ` 앞까지.
+
+    **번호가 붙은 제목도 잡는다** — `## 되먹일 것`과 `## 2. 되먹일 것` 둘 다.
+    STD-001이 절 헤딩에 번호를 권하면서 원본이 번호를 달았고, 문자열 split로
+    자르던 이 파일이 그때 둘로 깨졌다: `## 되먹일 것`은 IndexError로 죽었고,
+    `## 1. 입구`는 **조용히 빗나가 개요 절이 문서 전체를 삼켰다.**
+    뒤엣것이 더 나쁘다 — 아무도 모른다 (SYNC-STD-004 4장).
+
+    그래서 못 찾으면 멈춘다. 빈 절을 내지 않는다.
+    """
+    m = re.search(rf"^#{{2,3}} (?:[\d.]+\s*)?{re.escape(title)}", raw, re.M)
+    if not m:
+        sys.exit(f"seq_build: 「{title}」 절을 못 찾았다 — {os.path.basename(SRC)}")
+    rest = raw[m.end():]
+    nxt = re.search(r"^## ", rest, re.M)
+    return rest[: nxt.start()] if nxt else rest
+
+
 def md_inline(s):
     s = html.escape(s)
     s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s)
@@ -48,7 +67,7 @@ def md_block(text):
 
 # 생명선 표 (0장) → {약어: (이름, 실체, 종류, 정의)}
 LIFE = {}
-lt = raw.split("### 0.1 생명선")[1].split("\n---\n")[0]
+lt = section("생명선").split("\n---\n")[0]
 for row in re.findall(r"^\| (.+?) \| (.+?) \| (.+?) \| (.+?) \| (.+?) \|$", lt, re.M):
     if row[0] in ("생명선",) or set(row[0]) <= set("-: "): continue
     for ab in re.split(r"[·,]\s*", row[1]):
@@ -76,8 +95,8 @@ def parse_mermaid(mer):
 
 sections = []
 # 0장·1장
-intro = raw.split("## 0. 이 문서가 다루는 것")[1].split("## 1. 입구")[0]
-table = raw.split("## 1. 대응표 — 입구 → 시퀀스")[1].split("\n---\n")[0]
+intro = section("이 문서가 다루는 것")
+table = section("대응표").split("\n---\n")[0]
 sections.append({"id": "overview", "title": "개요 · 대응표", "kind": "text",
                  "html": md_block(intro) + "<h3>입구 → 시퀀스 대응표</h3>" + md_block(table)})
 
@@ -100,9 +119,9 @@ for m in re.finditer(r"## (SEQ-\w+) (.+?)\n(.*?)(?=\n---\n\n## |\Z)", raw, re.S)
                      "lead": md_block(lead), "mermaid": mer, "after": md_block(after),
                      "life": life, "steps": steps})
 
-fb = raw.split("## 되먹일 것")[1].split("\n---\n\n## 미결사항")[0]
+fb = section("되먹일 것")
 sections.append({"id": "feedback", "title": "되먹일 것", "kind": "text", "html": md_block(fb)})
-pend = raw.split("## 미결사항")[1]
+pend = section("미결사항")
 sections.append({"id": "pending", "title": "미결사항", "kind": "text", "html": md_block(pend)})
 
 fmb = re.match(r"^---\n(.*?)\n---", raw, re.S).group(1)
