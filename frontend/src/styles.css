@@ -62,8 +62,11 @@
   --topbar-h:50px;
   /* 문서 바(UI-001 4.2). 목차·패널이 그 아래에 붙어야 해서 값이 필요하다 */
   --docbar-h:50px;
-  /* UI-5 본문 최대 폭. 세 탭이 같아야 한다(UI-002 UI-5 규칙) — 그래서 한 곳에 둔다 */
-  --doc-w:820px;
+  /* UI-5 본문 폭. 세 탭이 같아야 한다(UI-002 UI-5 규칙) — 그래서 한 곳에 둔다.
+     **열을 채운다**(UI-001 4.1). 820px 고정이던 때는 넓은 화면에서 양옆에 300px씩
+     빈 자리가 남는데 그 옆에서 MS 함수 표와 UC 패키지 그림이 짜부라졌다.
+     min()의 앞 값은 아주 넓은 화면에서 한 줄이 너무 길어지지 않게 하는 최대치다 */
+  --doc-w:min(1440px,100%);
   /* 사이드바 기본 폭. 손잡이가 끌면 인라인 스타일이 이 값을 덮는다 */
   --toc-w:186px; --panel-w:250px;
 }
@@ -623,7 +626,10 @@ a.arow:hover{background:var(--bg-subtle)}
 .gbar .sep{width:1px;height:16px;background:var(--border-strong);margin:0 var(--space-4)}
 .gbar .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* 3 캔버스 — 안에서 스크롤한다. 전체보기면 남은 높이를 다 쓴다 */
-.canvas{position:relative;overflow:auto;height:calc(100vh - var(--topbar-h) - 190px);background:var(--bg-card)}
+/* **`.gcard` 안으로 묶는다.** 맨 이름 `.canvas`로 두면 UC 유저용 뷰의 패키지 그림 상자
+   (`.v-uc .canvas`)까지 이 높이를 물려받아, 1178px짜리 그림이 660px 상자 안에서 또 스크롤됐다.
+   `.dot.flag`·`svg.sw`와 같은 이름 충돌이다 (UI-001 4.1) */
+.gcard .canvas{position:relative;overflow:auto;height:calc(100vh - var(--topbar-h) - 190px);background:var(--bg-card)}
 .gcard.full .canvas{flex:1;height:auto}
 .cinner{position:relative}
 .colh{position:absolute;top:0;text-align:center;font-family:var(--font-mono);font-size:11.5px;
