@@ -389,6 +389,7 @@ class SpecService:
         deleted_item_pks: list[int],
         validate_result: ValidateResult | None = None,
         rebuild: bool = False,
+        status_commit_hash: str | None = None,
     ) -> VersionRow:
         """SYNC-MS-002#SpecService.save"""
         row = self.repo.document_by_id(document.id)
@@ -413,7 +414,18 @@ class SpecService:
         for item in self.repo.items_by_pks(deleted_item_pks):
             item.is_deleted, item.deleted_at = True, now_utc()
         new_status = fm.get("status", row.status) if author.via == Entry.github else row.status
-        if row.status == DocStatus.approved and body != row.current_body:
+        # 6. 자동 강등. **어느 쪽이 이미 status를 정했는지를 함께 본다** (#58)
+        # · mcp·되돌리기: 5단계가 row.status(approved)를 그대로 뒀다 → 여기서 내린다
+        # · github에서 파이프라인이 내림: 6a가 본문 frontmatter를 이미 review로 고쳤고
+        #   (그래서 new_status가 벌써 review다) 그 사실을 저장소에 민 해시를 준다
+        # · github에서 작성자가 스스로 내림: frontmatter가 원본의 진실이다. 여기서 review로
+        #   덮으면 저장소는 draft, DB는 review로 또 갈린다. 다른 github frontmatter 상태
+        #   변경과 같이 status_changes에는 안 남는다 — 커밋이 이미 Version으로 남아 있다
+        if (
+            row.status == DocStatus.approved
+            and body != row.current_body
+            and (new_status == DocStatus.approved or status_commit_hash is not None)
+        ):
             new_status = DocStatus.review
             self.session.add(
                 StatusChange(
@@ -422,7 +434,9 @@ class SpecService:
                     to_status=DocStatus.review,
                     changed_by_user_id=author.user.id,
                     reason="본문 수정으로 자동 강등",
-                    commit_hash=None,
+                    # mcp·되돌리기는 본문 커밋 하나에 담기므로 None. github는 강등을
+                    # 저장소에 반영한 status 커밋이 따로 있다 (MS-007 save_pipeline 6a)
+                    commit_hash=status_commit_hash,
                     changed_at=now_utc(),
                 )
             )

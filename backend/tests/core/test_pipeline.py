@@ -786,6 +786,105 @@ async def test_editing_an_approved_doc_keeps_frontmatter_and_db_in_step(
     assert r2.version_no == d2.current_version_no + 1
 
 
+async def test_github_edit_of_approved_doc_pushes_the_demotion(scoped: Session, proj) -> None:
+    """#58 — #47이 고친 것은 mcp·되돌리기뿐이다. github는 커밋이 이미 저장소에 있어
+    본문만 고쳐서는 저장소가 안 바뀌므로 6a에서 아예 빠져 있었고, 그래서 남이 승인 문서를
+    push로 고치면 **DB=검토중 · 저장소=approved**로 갈렸다. 이제 status 커밋을 하나 더 민다.
+
+    그 해시를 StatusChange에 적는 것도 같이 본다 — 안 적으면 다음 폴링이 3a에서
+    앱 커밋을 못 걸러 앱이 민 커밋을 남의 편집으로 다시 저장한다.
+    """
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    repo = _repo_row(proj)
+    repo.last_processed_commit = g(remote, "rev-parse", "main")
+    scoped.flush()
+    svc = SpecService(scoped)
+    await create(proj, DocType.RFQ, RFQ)
+    # 승인 게이트(미완성 경고)를 우회해 상태만 만든다 — 여기서 보려는 것은 강등 경로다
+    d0 = svc.get_document("EXMP-RFQ-001")
+    await pipeline.save_pipeline(
+        Entry.web_status,
+        "EXMP-RFQ-001",
+        None,
+        re.sub(r"^status: .*$", f"status: {DocStatus.approved}", d0.body, count=1, flags=re.M),
+        d0.current_version_no,
+        None,
+        proj["author"],
+        "status(EXMP-RFQ-001): review → approved",
+        reason=None,
+    )
+    assert svc.get_document("EXMP-RFQ-001").status == DocStatus.approved
+    repo.last_processed_commit = g(remote, "rev-parse", "main")
+    scoped.flush()
+
+    # 남이 저장소에서 직접 고쳐 push한다
+    g(other, "pull", "-q", "--rebase")
+    body = (other / RFQ_FILE).read_text(encoding="utf-8")
+    assert "status: approved" in body
+    head = write_commit_push(
+        other, RFQ_FILE, body + "\n<!-- 밖에서 한 줄 -->\n", "spec(EXMP-RFQ-001): 밖에서 한 줄"
+    )
+
+    results = await pipeline.process_commit(repo, head)
+
+    assert [(r.doc_id, r.status) for r in results] == [("EXMP-RFQ-001", DocStatus.review)]
+    d = svc.get_document("EXMP-RFQ-001")
+    in_repo = g(remote, "show", f"main:{RFQ_FILE}")
+    assert d.status == DocStatus.review
+    assert "status: review" in in_repo, f"갈렸다 — DB={d.status} 저장소=approved"
+    status_head = g(remote, "rev-parse", "main")
+    assert g(remote, "log", "-1", "--format=%s", status_head) == (
+        "status(EXMP-RFQ-001): approved → review"
+    )
+    # 그 커밋이 StatusChange에 적혀 있어야 다음 폴링이 3a에서 걸러낸다
+    rows = scoped.execute(
+        text("SELECT reason, commit_hash FROM status_changes WHERE to_status='review'")
+    ).all()
+    assert [(r.reason, r.commit_hash) for r in rows] == [("본문 수정으로 자동 강등", status_head)]
+    assert await pipeline.process_commit(repo, status_head) == []
+    assert svc.get_document("EXMP-RFQ-001").current_version_no == d.current_version_no
+
+
+async def test_github_author_lowering_status_themselves_is_not_overridden(
+    scoped: Session, proj
+) -> None:
+    """#58 — 같은 커밋에서 작성자가 frontmatter를 스스로 내렸으면 그게 원본의 진실이다.
+    자동 강등이 그것까지 `review`로 덮으면 저장소=draft · DB=review로 또 갈린다."""
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    repo = _repo_row(proj)
+    scoped.flush()
+    svc = SpecService(scoped)
+    await create(proj, DocType.RFQ, RFQ)
+    d0 = svc.get_document("EXMP-RFQ-001")
+    await pipeline.save_pipeline(
+        Entry.web_status,
+        "EXMP-RFQ-001",
+        None,
+        re.sub(r"^status: .*$", f"status: {DocStatus.approved}", d0.body, count=1, flags=re.M),
+        d0.current_version_no,
+        None,
+        proj["author"],
+        "status(EXMP-RFQ-001): review → approved",
+        reason=None,
+    )
+    repo.last_processed_commit = g(remote, "rev-parse", "main")
+    scoped.flush()
+
+    g(other, "pull", "-q", "--rebase")
+    body = (other / RFQ_FILE).read_text(encoding="utf-8")
+    head = write_commit_push(
+        other,
+        RFQ_FILE,
+        re.sub(r"^status: .*$", "status: draft", body, count=1, flags=re.M) + "\n<!-- 한 줄 -->\n",
+        "spec(EXMP-RFQ-001): 초안으로 되돌리며 수정",
+    )
+
+    await pipeline.process_commit(repo, head)
+
+    assert svc.get_document("EXMP-RFQ-001").status == DocStatus.draft
+    assert g(remote, "rev-parse", "main") == head  # status 커밋을 만들지 않는다
+
+
 async def test_catch_up_records_fetch_error_and_a_good_round_clears_it(
     scoped: Session, proj
 ) -> None:
