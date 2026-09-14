@@ -791,5 +791,10 @@ a.arow:hover{background:var(--bg-subtle)}
 /* 칸 안에서만 띄운다. 3.3 문장에 붙으면 뒤 쉼표가 떨어져 보인다 */
 .howto td code+code{margin-left:var(--space-5)}
 .howto .lbl{color:var(--ink-muted);font-size:var(--text-caption);line-height:1.7;margin:var(--space-7) 0 var(--space-12)}
+/* UI-16 6.4~6.6 앱 밖 화면 그림. 앱 화면은 캡처로 넣지 않는다 — 바뀌면 낡는다 */
+.howto figure{margin:var(--space-12) 0 0}
+.howto figure img{display:block;width:100%;border:1px solid var(--border);border-radius:var(--radius-control)}
+.howto figcaption{margin-top:var(--space-5);font-size:var(--text-caption);color:var(--ink-faint);line-height:1.6}
+.howto figure+.snippet{margin-top:var(--space-12)}
 .howto .note{margin:0;padding:var(--space-10) var(--space-12);border-radius:var(--radius-control);
   background:var(--caution-bg);color:var(--caution-ink);font-size:var(--text-meta)}
