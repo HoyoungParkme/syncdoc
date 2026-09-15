@@ -123,6 +123,10 @@ class CommentService:
         """SYNC-MS-005#CommentService.unresolved_count"""
         return self.repo.unresolved_count_of(document_id)
 
+    def count(self, document_id: int) -> int:
+        """SYNC-MS-005#CommentService.count"""
+        return self.repo.count_of(document_id)
+
     def unresolved_in(self, document_ids: list[int]) -> list[CommentSummary]:
         """SYNC-MS-005#CommentService.unresolved_in"""
         return [

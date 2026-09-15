@@ -37,6 +37,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 | `get_references` | [[SYNC-UC-001#UC-A4]] | ReferenceService.upstream/downstream | |
 | `create_document` | [[SYNC-UC-001#UC-A6]] (생성) | SpecService.create | ○ |
 | `update_document` | [[SYNC-UC-001#UC-A6]] (수정) | SpecService.save | ○ |
+| `delete_document` | [[SYNC-UC-001#UC-A7]] | pipeline.delete_document | ○ |
 | `get_template` | (STD-001 전달) | — 저장소 `_templates/` 읽기 | |
 
 ---
@@ -317,6 +318,41 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 ---
 
+### delete_document
+
+```json
+{
+  "name": "delete_document",
+  "description": "이력이 없는 초안 문서를 파일째 지운다 — 에이전트가 예측으로 잘못 만든 문서를 버리는 길이다. 초안이고, 다른 문서에서 들어오는 참조·댓글·플래그·전파 결정·상태 변경이 하나도 없어야 한다. 하나라도 있으면 document-has-history 에러에 무엇이 걸리는지 담겨 온다 — 참조가 걸렸으면 그 문서를 update_document로 먼저 고친다. 조건을 채우면 첫 호출은 document-deletion-needs-confirm 에러로 제목·버전 수를 돌려주고 아직 지우지 않는다. 그것을 사람에게 보여주고 확인받은 뒤 confirm=true로 다시 부른다. 되돌릴 수 없다 — 버전까지 지워지고 저장소에 삭제 커밋만 남는다.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["doc_id"],
+    "properties": {
+      "doc_id": { "type": "string" },
+      "confirm": { "type": "boolean", "default": false, "description": "사람이 확인했을 때 true" }
+    }
+  }
+}
+```
+
+**결과**
+```json
+{ "doc_id": "VA-DOM-003", "commit_hash": "...", "next_step": "VA-DOM-003 지워짐. 사람에게 알리고 멈춘다" }
+```
+
+**에러**
+
+| type | 언제 | 확장 필드 | 유스케이스 |
+|---|---|---|---|
+| `not-found` | 문서 없음 | `resource`, `id` | — |
+| `document-has-history` | 초안이 아니거나 참조·댓글·플래그·결정·상태 변경이 있음 | `status`, `inbound_refs`, `comments`, `flags`, `decisions`, `status_changes` | [[SYNC-UC-001#UC-A7]] 2a |
+| `document-deletion-needs-confirm` | 조건은 채웠고 `confirm=false` | `doc_id`, `title`, `version_count` | [[SYNC-UC-001#UC-A7]] 3 |
+| `push-failed` | 삭제 커밋 push 실패 | `reason` | [[SYNC-UC-001#UC-A7]] 6a |
+
+`document-deletion-needs-confirm`은 `item-deletion-needs-confirm`과 같은 두 번 호출 패턴이다(5장 2). 에이전트가 첫 에러를 사람에게 안 보여주고 바로 `confirm=true`로 부르면 확인이 무의미해진다 — 도구 설명이 그러지 말라고 말하지만 강제할 방법은 없다.
+
+---
+
 ## 4. 에이전트 순서
 
 도구 설명에 흩어진 것을 한 번에 적는다. 이 절이 에이전트의 시스템 프롬프트나 스킬 파일에 들어갈 내용이다.
@@ -356,6 +392,12 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
   - 상태를 바꾸려 하지 않는다    → 도구가 없다. 사람이 웹에서
   - get_references 결과를 전부 get_item으로 펼치지 않는다 → 필요한 것만
   - 한 대화에서 한 단계의 문서 여럿을 연달아 만들지 않는다 → 문서 하나가 단위다 (STD-001 1.8)
+
+지울 때 (잘못 만든 문서)
+  1. delete_document(doc_id)
+     - document-has-history            → 걸리는 것을 사람에게 보여준다. inbound_refs면 그 문서를 먼저 고친다
+     - document-deletion-needs-confirm → 제목·버전 수를 사람에게 보여주고 확인
+  2. 확인되면 delete_document(doc_id, confirm=true). 되돌릴 수 없다
 ```
 
 ---

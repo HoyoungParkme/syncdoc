@@ -1395,3 +1395,83 @@ async def test_import_tracking_drops_rows_whose_names_are_gone(scoped: Session, 
 
     assert (r.flags, r.decisions, r.comments) == (0, 0, 0)
     assert {d["kind"] for d in r.dropped} == {"flag", "propagation_decision", "comment"}
+
+
+# ── 카드 N — 이력 없는 문서 삭제 (MS-007 delete_document) ──
+async def test_delete_document_gatekeepers_confirm_and_polling_skips_the_commit(
+    scoped: Session, proj
+) -> None:
+    from app.core.errors import DocumentDeletionNeedsConfirm, DocumentHasHistory
+
+    remote = proj["repos"]["remote"]
+    await create(proj, DocType.RFQ, RFQ)
+    await create(proj)  # PRD → RFQ#Q1 참조
+    a = proj["author"]
+    # 남이 가리키는 RFQ는 못 지운다 — inbound_refs에 이름으로
+    with pytest.raises(DocumentHasHistory) as ex:
+        await pipeline.delete_document("EXMP-RFQ-001", a, confirm=True)
+    assert ex.value.extra["inbound_refs"] == ["EXMP-PRD-001", "EXMP-PRD-001#R1"]
+    assert (ex.value.extra["comments"], ex.value.extra["flags"]) == (0, 0)
+    # PRD는 아무도 안 가리킨다 — confirm 없이는 needs-confirm에 제목·버전 수
+    v1 = SpecService(scoped).get_document("EXMP-PRD-001").body
+    await update(proj, "EXMP-PRD-001", v1 + "#### R2 둘째\n내용\n", 1, changed_items=[])
+    with pytest.raises(DocumentDeletionNeedsConfirm) as ex2:
+        await pipeline.delete_document("EXMP-PRD-001", a, confirm=False)
+    assert (ex2.value.extra["title"], ex2.value.extra["version_count"]) == ("예시 제품", 2)
+    assert "docs/specs/02-PRD/EXMP-PRD-001.md" in remote_files(proj["repos"])
+    # 댓글 하나 → 이력
+    from app.core.collab.service import CommentService
+
+    d = SpecService(scoped).get_document("EXMP-PRD-001")
+    c = CommentService(scoped).add(d.id, 1, "---", "한마디", proj["user"], None)
+    scoped.flush()
+    with pytest.raises(DocumentHasHistory) as ex3:
+        await pipeline.delete_document("EXMP-PRD-001", a, confirm=True)
+    assert ex3.value.extra["comments"] == 1
+    scoped.execute(text("DELETE FROM comments WHERE id=:i"), {"i": c.id})
+    scoped.flush()
+    # 검토중 → 이력
+    from app.core.spec.service import SpecService as _S
+
+    _S(scoped).apply_status(d, d.body, None, proj["user"], None, DocStatus.review)
+    scoped.flush()
+    with pytest.raises(DocumentHasHistory) as ex4:
+        await pipeline.delete_document("EXMP-PRD-001", a, confirm=True)
+    assert (ex4.value.extra["status"], ex4.value.extra["status_changes"]) == ("review", 1)
+    scoped.execute(text("UPDATE documents SET status='draft'; DELETE FROM status_changes"))
+    scoped.flush()
+    # 진짜 삭제 — 원격에서 파일이 사라지고 커밋 메시지, 행 다섯 종류 0, 다른 문서는 그대로
+    before = g(remote, "rev-parse", "main")
+    r = await pipeline.delete_document("EXMP-PRD-001", a, confirm=True)
+    assert r.doc_id == "EXMP-PRD-001" and "지워짐" in r.next_step
+    assert r.commit_hash == g(remote, "rev-parse", "main")
+    assert (
+        g(remote, "log", "-1", "--format=%s", "main") == "spec(EXMP-PRD-001): 삭제 — 이력 없는 초안"
+    )
+    assert "docs/specs/02-PRD/EXMP-PRD-001.md" not in remote_files(proj["repos"])
+    for t in ("documents", "items", "versions", "status_changes"):
+        n = scoped.execute(
+            text(
+                f"SELECT count(*) FROM {t} WHERE {'id' if t == 'documents' else 'document_id'}=:d"
+            ),
+            {"d": d.id},
+        ).scalar()
+        assert n == 0, t
+    assert scoped.execute(text('SELECT count(*) FROM "references"')).scalar() == 0
+    assert {i.item_id for i in SpecService(scoped).get_document("EXMP-RFQ-001").items} == {
+        "Q1",
+        "Q2",
+    }
+    # 지운 번호는 다시 쓰인다 (STD-001 1.1)
+    assert (
+        SpecService(scoped).issue_doc_id(proj["project"].id, "EXMP", DocType.PRD) == "EXMP-PRD-001"
+    )
+    # 폴링이 삭제 커밋의 D를 건너뛰고 last_processed_commit이 나아간다 (MS-007 process_commit 4)
+    repo = _repo_row(proj)
+    repo.last_processed_commit = before
+    scoped.flush()
+    assert await pipeline.process_commit(repo, r.commit_hash) == []
+    assert (
+        scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar()
+        == r.commit_hash
+    )

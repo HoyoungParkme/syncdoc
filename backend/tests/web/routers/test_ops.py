@@ -147,3 +147,16 @@ async def test_webhook_admin_and_catch_up(client: TestClient, scoped: Session, p
     assert st["backed_up_at"] is not None and st["backup_stale"] is False, st
     r = client.post("/api/admin/repos/EXMP/restore")
     assert r.status_code == 200 and r.json()["dropped"] == []
+
+
+async def test_delete_document_via_api(client: TestClient, scoped: Session, proj) -> None:
+    """API-001 DELETE /api/docs/{docId} — 204 · 409 document-has-history (카드 N)."""
+    login(client, scoped)
+    await create(proj, DocType.RFQ, RFQ)
+    await create(proj)
+    r = client.delete("/api/docs/EXMP-RFQ-001")
+    assert r.status_code == 409 and r.json()["type"] == "urn:syncdoc:document-has-history"
+    assert r.json()["inbound_refs"] == ["EXMP-PRD-001", "EXMP-PRD-001#R1"]
+    assert client.delete("/api/docs/EXMP-PRD-001").status_code == 204
+    assert client.get("/api/docs/EXMP-PRD-001").status_code == 404
+    assert client.delete("/api/docs/EXMP-PRD-001").status_code == 404

@@ -647,6 +647,8 @@ classDiagram
         +mark_convention_error(document_id: int, violations: list?, warnings: list?) None
         -issue_doc_id(project_id: int, code: str, doc_type: DocType) str
         -precondition(project_id: int, doc_type: DocType, title: str) tuple?
+        +status_change_count(document_id: int) int
+        +delete_document(document: Document) int
         -item_blocks(body: str, doc_type: DocType, title: str?) list~ItemBlock~
     }
     class Document {
@@ -737,6 +739,7 @@ classDiagram
         +downstream(item_pk: int) list~RefEdge~
         +upstream_of_document(document_id: int) list~RefEdge~
         +downstream_of_document(document_id: int) list~RefEdge~
+        +inbound_of_document(document_id: int) list~RefEdge~
         +references_among(item_pks: list~int~, include_document_targets: bool) list~RefEdge~
         +count_downstream(item_pks: list~int~) dict
         +resolve_missing(project_id: int) int
@@ -787,6 +790,7 @@ classDiagram
         +get_flag(flag_id: int) FlagDetail
         +resolve(flag_id: int, user: User, target_changed: bool) FlagSummary
         +flags_for_items(item_pks: list~int~) dict
+        +history_of_document(document_id: int, item_pks: list~int~) tuple~int,int~
         +flags_for_assignee(user_id: int) list~Flag~
         +flags_unassigned() list~Flag~
         +flags_in_project(project_id: int, kind: FlagKind) list~Flag~
@@ -857,6 +861,7 @@ classDiagram
         +resolve(comment_id: int, resolved: bool) Comment
         +relocate(document_id: int, old_body: str, new_body: str, old_version_no: int) int
         +unresolved_count(document_id: int) int
+        +count(document_id: int) int
         +count_unresolved(project_id: int) int
         +count_unresolved_by_document(document_ids: list~int~) dict
         +unresolved_in(document_ids: list~int~) list~Comment~
@@ -960,7 +965,7 @@ classDiagram
 
 ### 4.7 pipeline — 쓰기 조율
 
-묶음 밖. 클래스가 아니라 함수 일곱이다. 시퀀스 SEQ-1·2·5·7·19·21이 이 함수들의 시간축이다.
+묶음 밖. 클래스가 아니라 함수 여덟이다. 시퀀스 SEQ-1·2·5·7·19·21·22가 이 함수들의 시간축이다.
 
 ```
 save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | None,
@@ -1005,6 +1010,10 @@ change_status(doc_id, to, user, reason, upstream_reviewed=False, upstream_mismat
     → upstream_mismatch 있으면 tracking.raise_upstream. 세션 하나 — 자기가 열고 save_pipeline에 넘긴다.
 
 revert(doc_id, to_version, user, confirm_item_deletion=False) -> SaveResult
+
+delete_document(doc_id, author, confirm) -> DeleteResult
+    이력 없는 초안만 (PRD N3 예외). 문지기 넷(reference·collab·tracking·spec)을 센 뒤
+    git.commit_push(delete=[path]) → spec.delete_document. 시퀀스 SEQ-22
     UC-H7. 옛 버전 본문 → save_pipeline(entry=web_revert). already-current 검사.
 
 process_commit(repo: Repository, head_hash: str) -> list[SaveResult]

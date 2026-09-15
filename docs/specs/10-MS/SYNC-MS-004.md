@@ -34,6 +34,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#TrackingService.get_flag]] | 플래그 행 |
 | [[#TrackingService.resolve]] | 확인함 |
 | [[#TrackingService.flags_for_items]] | 항목별 플래그 종류 |
+| [[#TrackingService.history_of_document]] | 문서에 걸린 플래그·결정 수 (삭제 가능 판정) |
 | [[#TrackingService.flags_for_assignee]] | 내 담당 플래그 |
 | [[#TrackingService.flags_unassigned]] | 담당 미지정 |
 | [[#TrackingService.flags_in_project]] | 프로젝트 플래그 |
@@ -197,6 +198,18 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **시그니처** `flags_for_items(item_pks: list[int]) -> dict[int, list[Flag]]`
 
 **처리** `DB: flags where target_item_pk in pks and resolved_at is null` → pk별 `Flag` 행 묶음. 미해결만. **행을 그대로 준다** — `kind` 문자열 목록으로 접거나 `FlagSummary`(ItemRef·UserRef 채움)로 만드는 건 `queries`가 `describe_items`·`users_by_ids`로
+
+---
+
+#### TrackingService.history_of_document 문서에 걸린 플래그·결정 수
+
+**시그니처** `history_of_document(document_id: int, item_pks: list[int]) -> tuple[int, int]` — `(flags, decisions)`
+
+근거: [[SYNC-UC-001#UC-A7]] 2 · [[SYNC-PRD-001#N3]]
+
+**처리** `vids = (select id from versions where document_id)` — 서브쿼리. 호출자에게 버전 ID 목록을 시키지 않는다(`Version` DTO에 id가 없다) · `flags = DB: count(*) flags where target_item_id in pks or cause_item_id in pks or cause_version_id in vids or target_version_id in vids` — **해결된 것도 센다.** 확인한 이력도 이력이다 · `decisions = DB: count(*) propagation_decisions where version_id in vids` — 결정 여부와 무관 · `→ (flags, decisions)`. 0·0이어야 지울 수 있다. FK 넷(`flags` 둘·`propagation_decisions`·`flags.*_version_id`)이 이 문서를 물고 있는지를 한 번에 센다
+
+**테스트 관점** 새 문서 → `(0, 0)` · 그 항목에 플래그가 붙었다 확인함 → `(1, 0)` · 그 버전에 전파 결정 skip → `(0, 1)`
 
 ---
 

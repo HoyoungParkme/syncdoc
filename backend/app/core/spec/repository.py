@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.orm import Session
 
 from app.core.spec.models import Document, Item, StatusChange
@@ -191,6 +191,27 @@ class SpecRepository:
             .limit(n)
         )
         return [(c, d) for c, d in self.session.execute(stmt)]
+
+    def status_change_count(self, document_id: int) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(StatusChange)
+            .where(StatusChange.document_id == document_id)
+        )
+        return self.session.scalar(stmt) or 0
+
+    def delete_document_rows(self, document_id: int) -> int:
+        """문서에 딸린 행을 자식부터 지운다 (MS-002 delete_document). 이력 검사는 호출자 몫."""
+        n = 0
+        for stmt in (
+            'delete from "references" where from_document_id = :d',
+            "delete from items where document_id = :d",
+            "delete from versions where document_id = :d",
+            "delete from status_changes where document_id = :d",
+            "delete from documents where id = :d",
+        ):
+            n += self.session.execute(text(stmt), {"d": document_id}).rowcount
+        return n
 
     def latest_versions(self, document_ids: list[int]) -> dict[int, VersionRow]:
         """문서마다 최근 버전 하나. 쿼리 한 번."""

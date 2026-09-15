@@ -690,3 +690,15 @@ class SaveResult:
             "warnings": self.warnings,
             "next_step": self.next_step,
         }
+
+
+@dataclass(frozen=True)
+class DeleteResult:
+    """pipeline.delete_document 결과 (MS-007). 웹은 204라 안 쓰고 MCP가 그대로 돌려준다."""
+
+    doc_id: str
+    commit_hash: str
+    next_step: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"doc_id": self.doc_id, "commit_hash": self.commit_hash, "next_step": self.next_step}

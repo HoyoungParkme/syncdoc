@@ -56,6 +56,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:already-decided` | 409 | 이미 결정된 전파 | `choice`, `decided_at` | [[SYNC-UC-001#UC-H10]] |
 | `urn:syncdoc:already-resolved` | 409 | 이미 확인된 플래그 | `resolved_at` | [[SYNC-UC-001#UC-H11]] |
 | `urn:syncdoc:already-current` | 422 | 현재 버전으로 되돌리기 | — | [[SYNC-UC-001#UC-H7]] |
+| `urn:syncdoc:document-has-history` | 409 | 이력 있는 문서를 지우려 함 | `status`, `inbound_refs: [문서ID#항목ID…]`, `comments`, `flags`, `decisions`, `status_changes` — 0이 아닌 것이 걸린 이유 | [[SYNC-UC-001#UC-A7]] 2a, [[SYNC-UC-001#UC-H18]] 3a |
 | `urn:syncdoc:upstream-review-required` | 422 | `approved`인데 `upstream_reviewed`가 아님 | — | [[SYNC-UC-001#UC-H8]] 3 |
 | `urn:syncdoc:rebuild-failed` | 500 | 재구축 중 실패, 롤백됨 | `reason` | [[SYNC-UC-001#UC-S6]] |
 | `urn:syncdoc:repository-already-registered` | 409 | 이미 등록된 저장소 | `code` (그 저장소를 쓰는 프로젝트) | [[SYNC-UC-001#UC-A1]] 2d |
@@ -650,6 +651,32 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
       '502':
         $ref: '#/components/responses/Problem'
 ```
+
+#### DELETE/api/docs/{docId} 이력 없는 문서 삭제
+
+화면 [[SYNC-UI-002#UI-5]] 12·13 · 유스케이스 [[SYNC-UC-001#UC-H18]] · 서비스 [[SYNC-MS-007#pipeline.delete_document]] · 확인은 화면(13)이 받으므로 인자가 없다
+
+```yaml
+/api/docs/{docId}:
+  delete:
+    summary: 초안이고 이력이 없는 문서를 파일째 지운다 (PRD N3 예외)
+    parameters:
+    - $ref: '#/components/parameters/docId'
+    responses:
+      '204':
+        description: 파일 삭제 커밋이 push되고 행이 사라짐
+      '404':
+        $ref: '#/components/responses/Problem'
+      '409':
+        description: document-has-history
+        $ref: '#/components/responses/Problem'
+      '502':
+        $ref: '#/components/responses/Problem'
+```
+
+**이력이 없다**는 — `초안` · 다른 문서에서 들어오는 참조 0 · 댓글 0 · 이 문서 항목이 대상이거나 원인인 플래그 0 · 이 문서 버전의 전파 결정 0 · 상태 변경 0. 하나라도 있으면 `409`에 그 값이 실려 온다. 무엇을 먼저 걷어내야 하는지 화면이 보여준다.
+
+**되돌릴 수 없다.** 되돌리기(revert)는 버전을 남기지만 이것은 버전째 지운다. 저장소 이력에는 삭제 커밋과 그 전 내용이 남는다 — 그것이 유일한 흔적이다.
 
 #### GET/api/docs/{docId}/comments 댓글 목록. 스레드 구조
 

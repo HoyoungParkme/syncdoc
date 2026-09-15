@@ -74,18 +74,18 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### git.commit_push 쓰기·커밋·push·재시도
 
-**시그니처** `async def commit_push(workdir: Path, message: str, author: Author, path: str | None = None, content: str | None = None, files: dict[str, str] | None = None) -> str`
+**시그니처** `async def commit_push(workdir: Path, message: str, author: Author, path: str | None = None, content: str | None = None, files: dict[str, str] | None = None, delete: list[str] | None = None) -> str`
 
 근거: [[SYNC-SEQ-001#SEQ-1]] 7단계 · [[SYNC-UC-001#UC-S7]] · [[SYNC-INFRA-001]] 4.3
 
-**입력** `path`+`content` 하나 또는 `files` 여럿(초기화용) — 둘 중 하나는 있어야 한다. `author.user` — 커밋 작성자
+**입력** `path`+`content` 하나 또는 `files` 여럿(초기화용) 또는 `delete` 경로 목록(문서 삭제, [[SYNC-MS-007#pipeline.delete_document]]) — 셋 중 하나는 있어야 한다. `author.user` — 커밋 작성자
 
 **처리**
 1. `token = AccountService.github_token_for(author.user)` · if 실패 → `! push-failed {reason: 미등록}`
 2. `git fetch origin` · `git reset --hard origin/main` — 작업 사본을 원격 최신으로 (락 안이라 안전)
    - **원격에 커밋이 하나도 없으면 `origin/main`이 없다.** 되돌아갈 곳이 없으므로 reset을 건너뛴다. 이 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3, #6)
-3. 파일 쓰기 (`path` 또는 `files`). 상위 디렉터리 없으면 생성
-4. `git add {paths}` · if `git diff --cached --quiet` (변경 없음) → `→ 현재 HEAD` (커밋 안 만듦. 같은 내용 재저장)
+3. 파일 쓰기 (`path` 또는 `files`). 상위 디렉터리 없으면 생성 · `delete`면 `git rm -q --ignore-unmatch {paths}`
+4. `git add {paths}` · if `git diff --cached --quiet` (변경 없음) → `→ 현재 HEAD` (커밋 안 만듦. 같은 내용 재저장 · 이미 없는 파일 삭제)
 5. `git -c user.name={display_name} -c user.email={login}@users.noreply.github.com commit -m {message}`
 6. `git push {url with token} HEAD:main` — 기본 브랜치는 `main` 고정(결정). 다른 브랜치 저장소는 v1에서 지원 안 함
    - if 거부(non-fast-forward, UC-S7 2a) → `git fetch` · `git rebase origin/main` · if rebase 충돌 → `git rebase --abort`, `git reset --hard origin/main`, `! push-failed {reason: conflict}` · else → push 재시도. **`PUSH_RETRIES`회까지**(기본 3)

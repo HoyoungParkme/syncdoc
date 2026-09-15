@@ -5,14 +5,14 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core import pipeline, queries
 from app.core.account.models import User
 from app.core.account.service import AccountService
 from app.core.spec.service import SpecService
-from app.core.types import ApiAuthor, DocStatus
+from app.core.types import ApiAuthor, Author, AuthorKind, DocStatus, Entry
 from app.db import get_session
 from app.web.auth import current_user
 from app.web.schemas.documents import ChangeStatus, Document, DocumentSummary, UpstreamCheck
@@ -27,6 +27,15 @@ router = APIRouter(prefix="/api/docs", tags=["documents"])
 async def get_document(doc_id: str, user: User = Depends(current_user)) -> Document:
     """SYNC-API-001#GET/api/docs/{docId}"""
     return Document.of(await queries.document_view(doc_id))
+
+
+@router.delete("/{doc_id}", status_code=204, response_class=Response)
+async def delete_document(doc_id: str, user: User = Depends(current_user)) -> Response:
+    """SYNC-API-001#DELETE/api/docs/{docId}"""
+    # 확인은 화면(UI-5 13)이 받았다 — confirm=True
+    author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.web_status)
+    await pipeline.delete_document(doc_id, author, confirm=True)
+    return Response(status_code=204)
 
 
 @router.get("/{doc_id}/upstream", response_model=list[UpstreamCheck])

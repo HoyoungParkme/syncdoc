@@ -170,6 +170,22 @@ class TrackingRepository:
     def document_id_of_item(self, item_pk: int) -> int | None:
         return self.session.scalar(select(Item.document_id).where(Item.id == item_pk))
 
+    def history_count(self, document_id: int, item_pks: list[int]) -> tuple[int, int]:
+        """문서를 무는 FK 넷을 한 번에 센다 — 해결된 플래그·결정된 전파도 (MS-004)."""
+        from app.core.spec.models import Version
+
+        vids = select(Version.id).where(Version.document_id == document_id)
+        conds = [Flag.cause_version_id.in_(vids), Flag.target_version_id.in_(vids)]
+        if item_pks:
+            conds += [Flag.target_item_id.in_(item_pks), Flag.cause_item_id.in_(item_pks)]
+        flags = self.session.scalar(select(func.count()).select_from(Flag).where(or_(*conds)))
+        decisions = self.session.scalar(
+            select(func.count())
+            .select_from(PropagationDecision)
+            .where(PropagationDecision.version_id.in_(vids))
+        )
+        return flags or 0, decisions or 0
+
     def unresolved_for_items(self, item_pks: list[int]) -> list[Flag]:
         if not item_pks:
             return []

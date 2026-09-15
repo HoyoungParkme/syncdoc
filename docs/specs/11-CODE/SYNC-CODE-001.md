@@ -379,6 +379,31 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 
 ---
 
+#### N 이력 없는 문서를 지운다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#N3]] 예외 · [[SYNC-UC-001#UC-A7]] · [[SYNC-UC-001#UC-H18]] · [[SYNC-API-001#DELETE/api/docs/{docId}]] · [[SYNC-API-002#delete_document]] · [[SYNC-SEQ-001#SEQ-22]] · [[SYNC-STD-001]] 1.1 · [[SYNC-DOM-003]] 설계 규칙 |
+| 구현 함수 | [[SYNC-MS-007#pipeline.delete_document]] · [[SYNC-MS-007#pipeline.process_commit]] 4(행 없는 D 건너뜀) · [[SYNC-MS-002#SpecService.delete_document]] · [[SYNC-MS-002#SpecService.status_change_count]] · [[SYNC-MS-003#ReferenceService.inbound_of_document]] · [[SYNC-MS-004#TrackingService.history_of_document]] · [[SYNC-MS-005#CommentService.count]] · [[SYNC-MS-009#git.commit_push]] `delete` |
+| 화면 | UI-5 12 문서 삭제(초안만) · 13 확인 다이얼로그(13.1~13.4) |
+| 테스트 | 문지기 넷 각각 한 번씩 걸림(`document-has-history`에 값) · confirm 없이 → needs-confirm에 `version_count` · confirm → 원격 파일 사라짐 + 커밋 메시지 + 행 다섯 종류 0 · 다른 문서 참조·항목 그대로 · 지운 번호 재발급 · 폴링이 삭제 커밋 D를 건너뛰고 `last_processed_commit` 전진 · 웹 DELETE 204/409 · MCP 도구 두 번 호출 · `check_ui.py` UI-5 |
+| 선행 | M |
+
+**왜 카드인가.** PRD N3의 규칙에 예외가 생기고, 엔드포인트·MCP 도구·에러 둘·함수 일곱이 는다. 기능이다(DEV-15).
+
+**왜 지금인가.** 카드 M의 원인이 된 VA 프로젝트에서 사용자가 에이전트에게 "DOM-002·003을 날려줘"라고 했더니, 에이전트가 싱크독에는 문서를 지우는 길이 없다고 답했다. 맞는 답이었다 — PRD N3·DOM-003이 "문서는 삭제하지 않는다"라고 못 박았고, 파일을 지워 push하면 `file.deleted` 규약 오류로 영원히 남는다. 그 결정은 "쓰다가 폐기된 문서"를 위한 것이지 "예측으로 잘못 만든 초안"을 생각한 것이 아니었다.
+
+**정한 것 넷.**
+
+| 질문 | 결정 | 이유 |
+|---|---|---|
+| 무엇을 지울 수 있나 | **이력 없는 초안만** — 초안 · 들어오는 참조 0 · 댓글 0 · 플래그 0(해결된 것 포함) · 전파 결정 0 · 상태 변경 0 | N3의 뜻("이력은 남긴다")을 정확히 지키면서 쓰레기만 거른다. FK를 물고 있는 표가 곧 이력이다 |
+| 누가 지우나 | **웹 + MCP 둘 다.** MCP는 항목 삭제처럼 두 번 호출(needs-confirm → confirm) | 사용자 흐름이 "에이전트에게 말한다"라 웹 버튼만 있으면 오늘처럼 막힌다. 사용자 결정 |
+| 지운 번호 | **다시 쓰인다** | 되살아날 참조가 없다. 번호를 영구 예약하려면 삭제된 문서 표가 필요한데, 그러면 "행째 지운다"가 아니다 |
+| 폴링이 삭제 커밋을 어떻게 보나 | **행 없는 D는 건너뛴다** | 앱이 지운 커밋에는 해시를 적어 둘 행이 없다. `mark_deleted`로 가면 not-found로 그 커밋이 영영 처리 실패가 되고 저장소가 멈춘다 |
+
+---
+
 ## 2. 통합 테스트 시나리오
 
 시나리오 S1~S7을 그대로 E2E 테스트로. 각 슬라이스의 `테스트` 행에 나눠 들어가 있다. 전부 통과하면 PRD 성공지표 측정을 시작한다.

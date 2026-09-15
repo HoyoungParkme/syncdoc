@@ -477,3 +477,14 @@ async def test_last_commit_at_reads_from_origin_head(repos: dict[str, Path]) -> 
     write_commit_push(o, "backup/tracking.json", '{"x": 1}', "chore: 백업")
     await g.fetch(repos["work"])
     assert (await g.last_commit_at(repos["work"], "backup/tracking.json")) >= first
+
+
+async def test_commit_push_delete_removes_file_and_noops_when_absent(
+    repos: dict[str, Path],
+) -> None:
+    """MS-009 commit_push delete — 문서 삭제 (카드 N)."""
+    h = await g.commit_push(repos["work"], "spec(SYNC-PRD-001): 삭제", _author(), delete=[SEED])
+    assert h == git(repos["remote"], "rev-parse", "main")
+    assert SEED not in git(repos["remote"], "ls-tree", "-r", "--name-only", "main")
+    # 이미 없는 파일 → 커밋이 안 생긴다
+    assert await g.commit_push(repos["work"], "noop", _author(), delete=[SEED]) == h

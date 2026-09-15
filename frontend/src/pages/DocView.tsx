@@ -1,6 +1,7 @@
 /** UI-5 문서 뷰 — SYNC-UI-002#UI-5. 유저용(기본)·원본 탭, 목차, 오른쪽 패널(참조·댓글), 상태 변경 + 상위 대조 다이얼로그.
  *  유저용 탭 본문은 view/*.ts(view_build.py 포트, STD-002)가 만든 HTML을 innerHTML로 넣고 mermaid를 돌린다.
  *  1 문서 바(1.1 상태, 1.2 버전) · 2 탭(2.1~2.3) · 3 상태 변경 · 4 규약 오류 · 4a 미완성 · 5 미해결 댓글
+ *  12 문서 삭제(초안만) · 13 삭제 확인(13.1 무엇이 지워지나 · 13.2 걸리는 것 · 13.3 삭제 · 13.4 닫기)
  *  6 목차(6.1 표시된 항목, 6.2 왼쪽 손잡이) · 7 유저용 본문(7.1~7.4) · 8 패널(8.1 참조, 8.2 댓글, 8.3 오른쪽 손잡이)
  *  9 단계 이동 · 10 원본(10.1 MD, 10.2 복사, 10.3 원문, 10.4 렌더링) · 11 상위 대조(11.1~11.4) */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -33,6 +34,8 @@ export function DocView() {
   const [upstream, setUpstream] = useState<UpstreamCheck[] | null>(null)
   const [mismatch, setMismatch] = useState<Set<string>>(new Set())
   const [reason, setReason] = useState('')
+  const [delOpen, setDelOpen] = useState(false) // 13
+  const [delBlock, setDelBlock] = useState<Record<string, unknown> | null>(null) // 13.2 — 서버 답으로만 채운다
   const mainRef = useRef<HTMLElement>(null)
   // 규칙: 사이드바 폭과 원문/렌더링 선택은 사람마다 기억한다. 화면을 옮겨도 유지된다
   const [tocW, addTocW] = useWidth(TOC)
@@ -177,6 +180,16 @@ export function DocView() {
       alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
     }
   }
+  // UC-H18 — 화면이 먼저 물어보지 않는다. 판정은 pipeline.delete_document 한 곳, 409면 13.2를 채운다
+  async function deleteDoc() {
+    try {
+      await api.del(`/api/docs/${docId}`)
+      nav(`/p/${code}`)
+    } catch (e) {
+      if (e instanceof ApiError && e.kind === 'document-has-history') setDelBlock(e.problem)
+      else alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
+    }
+  }
   async function addComment(parent: number | null) {
     if (!draft.trim() || !line) return
     await api.post(`/api/docs/${docId}/comments`, { line_no: line, body: draft, parent_comment_id: parent })
@@ -247,6 +260,19 @@ export function DocView() {
             </div>
           )}
         </span>
+        {doc.status === 'draft' && (
+          // 12 — 초안에만. 검토중·승인은 그 자체가 이력이다 (UI-5 규칙)
+          <button
+            className="btn danger"
+            data-el="12"
+            onClick={() => {
+              setDelBlock(null)
+              setDelOpen(true)
+            }}
+          >
+            문서 삭제
+          </button>
+        )}
       </div>
 
       {/* 3단 틀은 탭이 바뀌어도 그대로다 — 목차·패널이 사라지면 본문이 좌우로 흔들린다 (UI-5 규칙) */}
@@ -380,6 +406,39 @@ export function DocView() {
           </div>
         </aside>
       </div>
+
+      {delOpen && (
+        <div className="dialog narrow" data-el="13">
+          <div className="dhead">문서 삭제 — {doc.doc_id}</div>
+          <div className="dbody">
+            <p data-el="13.1">
+              <b>{titleOf(doc.body)}</b> · 버전 {doc.current_version_no}개 · 파일이 저장소에서 지워지고 버전째 사라집니다. <b>되돌릴 수 없습니다.</b>
+            </p>
+            {delBlock && (
+              <div className="banner warn" data-el="13.2">
+                지울 수 없습니다 — 이력이 있습니다
+                <br />· 상태 <b>{STATUS_KO[String(delBlock.status)]}</b> (초안만 지울 수 있다)
+                <br />· 들어오는 참조 {(delBlock.inbound_refs as string[]).length}
+                {(delBlock.inbound_refs as string[]).map((r) => (
+                  <span key={r}>
+                    {' '}
+                    — <a href={`/p/${r.split('-')[0]}/d/${r.split('#')[0]}${r.includes('#') ? '#item-' + r.split('#')[1] : ''}`} target="_blank" rel="noreferrer"><b>{r}</b></a>
+                  </span>
+                ))}
+                <br />· 댓글 {String(delBlock.comments)} · 플래그 {String(delBlock.flags)} · 전파 결정 {String(delBlock.decisions)} · 상태 변경 {String(delBlock.status_changes)}
+              </div>
+            )}
+            <div className="dacts">
+              <button className="btn" data-el="13.4" onClick={() => setDelOpen(false)}>
+                닫기
+              </button>{' '}
+              <button className="btn danger" data-el="13.3" disabled={delBlock !== null} onClick={deleteDoc}>
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {upstream !== null && (
         <div className="dialog" data-el="11">
@@ -624,4 +683,10 @@ function Comments(props: {
       </div>
     </>
   )
+}
+
+/** frontmatter title — Document DTO에 제목이 없어 본문에서 읽는다 (13.1) */
+function titleOf(body: string): string {
+  const fm = body.startsWith('---') ? body.slice(3).split('\n---', 1)[0] : ''
+  return /^title:\s*(.*)$/m.exec(fm)?.[1]?.trim() ?? ''
 }

@@ -48,6 +48,10 @@ class CommentRepository:
         self.session.flush()
         return row
 
+    def count_of(self, document_id: int) -> int:
+        stmt = select(func.count()).select_from(Comment).where(Comment.document_id == document_id)
+        return self.session.scalar(stmt) or 0
+
     def unresolved_count_of(self, document_id: int) -> int:
         stmt = (
             select(func.count())
