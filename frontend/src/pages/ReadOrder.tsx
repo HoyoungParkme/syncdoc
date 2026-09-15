@@ -7,6 +7,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
 import { api, docPath, STAGE_TYPES, STATUS_KO, type Document, type DocumentSummary, type ProjectDetail } from '../api/client'
 import { extraCss, renderView } from '../view'
+import { attachDiagramButtons, DiagramFull, type FullDiagram } from '../components/DiagramFull'
 import { esc, splitRef } from '../view/md'
 
 const ORDER: Record<string, number> = { draft: 0, review: 1, approved: 2 }
@@ -19,6 +20,7 @@ export function ReadOrder() {
   const [docs, setDocs] = useState<DocumentSummary[]>([])
   // 레일 왼쪽에 프로젝트 이름이 필요하다. 문서 목록만으로는 이름을 알 수 없다
   const [projName, setProjName] = useState('')
+  const [full, setFull] = useState<FullDiagram | null>(null)
   const [showDraft, setShowDraft] = useState(false)
   const [bodies, setBodies] = useState<Document[]>([])
   const mainRef = useRef<HTMLElement>(null)
@@ -49,7 +51,7 @@ export function ReadOrder() {
     root.innerHTML = bodies
       .map((d) => {
         const v = renderView(d, code)
-        const kicker = `${esc(d.project_name)} · ${stage}/11 · ${esc(d.doc_id)} · ${esc(STATUS_KO[d.status])} v${d.current_version_no}`
+        const kicker = `[${esc(code)}] ${esc(d.project_name)} · ${stage}/11 · ${esc(d.doc_id)} · ${esc(STATUS_KO[d.status])} v${d.current_version_no}` // 1.6
         return (
           `<div class="dochead"><div class="kicker mono" data-el="4.1">${kicker}</div>` +
           `<h1>${esc(v.title ?? d.doc_id)}</h1>` +
@@ -60,7 +62,10 @@ export function ReadOrder() {
       })
       .join('<hr/>')
     mermaid.initialize({ startOnLoad: false, theme: 'neutral' })
-    mermaid.run({ nodes: root.querySelectorAll<HTMLElement>('pre.mermaid') }).catch(() => undefined)
+    mermaid
+      .run({ nodes: root.querySelectorAll<HTMLElement>('pre.mermaid') })
+      .catch(() => undefined)
+      .then(() => mainRef.current === root && attachDiagramButtons(root, setFull)) // 공통 1.7 — UI-9는 번호 없음
     const onClick = (ev: MouseEvent) => {
       const a = (ev.target as HTMLElement).closest<HTMLAnchorElement>('a[data-ref]')
       if (!a) return
@@ -90,6 +95,7 @@ export function ReadOrder() {
   const label = (s: number | null) => (s === null ? '' : `${s} ${STAGE_TYPES[s - 1]}`)
   return (
     <div className="readscreen">
+      {full && <DiagramFull d={full} onClose={() => setFull(null)} />}
       {/* 단계 레일은 전폭 서브바다. 페이지 제목이 아니라 자리 표시가 여기 산다 */}
       <div className="steprail" data-el="1">
         <Link className="back" to={`/p/${code}`}>
