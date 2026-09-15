@@ -2,7 +2,7 @@
  *  「전체보기」를 붙이고, 누르면 UI-8 전체보기와 같은 층(--z-graph-full)에 화면 전체로 띄운다.
  *  UI-5는 7.5(버튼)·7.6(층)이고 UI-9는 번호가 없다 — 번호는 부르는 쪽이 붙인다.
  *  그림은 원본 SVG를 **복제**한다. 옮기면 닫을 때 제자리에 돌려놔야 하고 mermaid가 붙인 id가 겹친다. */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 export type FullDiagram = { svg: string; title: string; w: number; h: number }
@@ -28,11 +28,13 @@ export function attachDiagramButtons(root: HTMLElement, open: (d: FullDiagram) =
       const box = svg.getBoundingClientRect()
       const w = vb?.width || box.width || 800
       const h = vb?.height || box.height || 600
-      // 이름 — 항목 안이면 항목 ID, 아니면 가장 가까운 소제목
-      const title =
-        host.closest('[data-item]')?.querySelector('.iid')?.textContent?.trim() ||
-        host.closest('section, .ms-card, details, .seq-body')?.querySelector('h2, h3, h4')?.textContent?.trim() ||
-        '그림'
+      // 이름 — 문서 순서로 이 그림 **앞에** 있는 마지막 헤딩(항목 ID면 그것). 가장 가까운 조상의 첫 헤딩을
+      // 쓰면 SEQ에서 「생명선 표」 제목이 잡힌다 — 앞선 형제의 제목이지 이 그림의 제목이 아니다
+      let title = '그림'
+      for (const h of root.querySelectorAll<HTMLElement>('h1, h2, h3, h4, [data-item] .iid')) {
+        if (h.compareDocumentPosition(host) & Node.DOCUMENT_POSITION_FOLLOWING) title = h.textContent?.trim() || title
+        else break
+      }
       open({ svg: svg.outerHTML, title, w, h })
     })
     host.appendChild(b)
@@ -45,6 +47,12 @@ const STEP = 0.25
 
 export function DiagramFull({ d, onClose, el }: { d: FullDiagram; onClose: () => void; el?: string }) {
   const [z, setZ] = useState(1)
+  const stage = useRef<HTMLDivElement>(null)
+  // 열릴 때는 무대 폭에 맞춘다(100% 이하) — 시퀀스 하나가 3천px이라 100%로 열면 가로 스크롤부터 만난다 (1.7)
+  useEffect(() => {
+    const s = stage.current
+    if (s) setZ(Math.max(0.25, Math.min(1, +((s.clientWidth - 44) / d.w).toFixed(2))))
+  }, [d])
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', k)
@@ -72,7 +80,7 @@ export function DiagramFull({ d, onClose, el }: { d: FullDiagram; onClose: () =>
         </button>
       </div>
       {/* 바깥(빈 무대) 클릭은 닫는다. 그림 위 클릭은 아니다 */}
-      <div className="stage" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="stage" ref={stage} onClick={(e) => e.target === e.currentTarget && onClose()}>
         <div className="pic" style={{ width: d.w * z, height: d.h * z }} dangerouslySetInnerHTML={{ __html: d.svg }} />
       </div>
     </div>,
