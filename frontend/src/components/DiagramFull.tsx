@@ -36,7 +36,9 @@ export function attachDiagramButtons(root: HTMLElement, open: (d: FullDiagram) =
         else break
       }
       // 「흐름」 같은 소제목만으로는 어느 시퀀스인지 모른다 — 그 절의 h2를 앞에 붙인다
-      const sec = host.closest('details, section, .ms-card')?.querySelector('h2')?.textContent?.trim()
+      const h2 = host.closest('details, section, .ms-card')?.querySelector('h2')
+      // h2 안의 <span class=k>SEQ-1</span> 뒤에 띄어쓰기가 없어 붙어 나온다 — 자식 노드마다 끊어 잇는다
+      const sec = h2 ? [...h2.childNodes].map((n) => n.textContent?.trim() ?? '').filter(Boolean).join(' ') : ''
       if (sec && sec !== title) title = `${sec} · ${title}`
       open({ svg: svg.outerHTML, title, w, h })
     })
@@ -54,7 +56,7 @@ export function DiagramFull({ d, onClose, el }: { d: FullDiagram; onClose: () =>
   // 열릴 때는 무대 폭에 맞춘다(100% 이하) — 시퀀스 하나가 3천px이라 100%로 열면 가로 스크롤부터 만난다 (1.7)
   useEffect(() => {
     const s = stage.current
-    if (s) setZ(Math.max(0.25, Math.min(1, +((s.clientWidth - 48) / d.w).toFixed(2)))) // 여백 22×2 + 테두리
+    if (s) setZ(Math.max(0.25, Math.min(1, Math.floor(((s.clientWidth - 48) / d.w) * 100) / 100))) // 여백 22×2 + 테두리. 내림 — 올리면 10px가 넘쳐 가로 스크롤이 생긴다
   }, [d])
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
