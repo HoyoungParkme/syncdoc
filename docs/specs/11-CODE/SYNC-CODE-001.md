@@ -360,6 +360,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 화면 | UI-16 3.4·3.5 — DOM 행 줄마다 언제 쓰는지, 주의에 예외 하나 |
 | 테스트 | `precondition` 여섯 갈래(API 없이 클래스 → 거부 · API 초안 하나면 통과 · 클래스 없이 ERD → 거부 · 클래스 초안이면 통과 · 도메인 모델은 늘 통과 · DOM 아니면 늘 통과) · `validate` DOM 제목에 키워드 없음 → `frontmatter.title.subtype` · e2e: API 없이 클래스 명세 → `precondition-unmet {requires, have}`, API 만든 뒤 통과, 결과에 `next_step` · README에 순서·작업 단위 문장 · 기존 명세 전부 여전히 위반 0 · `check_ui.py` UI-16 |
 | 선행 | L |
+| 완료 | 2026-09-15 · 브랜치 `card/M-dom-order` · 커밋 `9506137`(spec) `dfaf411`(code) · PR #71 · pytest **215 passed** · `check_code` 133/133 · `check_dom` 경고 0 · `check_ui` 15/15(UI-16 18/18) · `check_tokens` 0 · `validate.py` 위반 0·경고 0 · `tsc`·`build` 통과 · **실물 확인**(터널·MCP 토큰): `tools/list`의 `create_document` 설명에 `precondition-unmet`·`next_step` 있음 · API 문서가 없는 VA에 「클래스 명세」 → `precondition-unmet {requires: "API 문서(REST 또는 MCP) — …", have: [VA-DOM-001·002·003]}`, 문서 수 8 그대로(부작용 없음) · 제목 「데이터」 → `frontmatter.title.subtype` · UI-16 DOM 행에 「여기서 · 8 API 뒤에 돌아와서 · 클래스 명세 뒤에」, 3.4에 예외 한 줄 · 머지 뒤 폴링이 명세 13개를 받아 10개를 `검토중`으로 내렸고 전파 미결정 9건은 「안 붙임」, 13개 재승인 |
 
 **왜 카드인가.** 저장을 막는 조건이 하나 늘고(`precondition-unmet`), 위반 규칙이 하나 늘고, 응답 필드가 하나 는다. 기능이다(DEV-15).
 
