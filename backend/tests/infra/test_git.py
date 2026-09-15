@@ -376,6 +376,9 @@ async def test_init_specs_returns_26_files_and_commit_push_writes_them(
     assert "| 6 | `06-DOM` |" in files["docs/specs/README.md"]  # 읽는 순서표
     assert files["docs/specs/_templates/PRD.md"].startswith("---\ndoc_id:")
     assert "SYNC-STD-001" in files["docs/specs/README.md"]
+    # 에이전트가 저장소에서 처음 읽는 글 — DOM 셋의 순서와 작업 단위가 여기 있어야 한다 (MS-009)
+    assert "8 API 뒤에 돌아와서" in files["docs/specs/README.md"]
+    assert "문서 하나를 만들거나 고치면 멈춘다" in files["docs/specs/README.md"]
     h = await g.commit_push(repos["work"], "chore(SYNC): init syncdoc", _author(), files=files)
     assert h == git(repos["remote"], "rev-parse", "main")
     assert await g.exists(repos["work"], "docs/specs/_templates/STD.md")

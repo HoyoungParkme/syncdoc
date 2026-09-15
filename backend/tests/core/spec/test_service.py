@@ -175,6 +175,22 @@ def test_validate_example_passes_and_variants(db_session: Session) -> None:
     assert "frontmatter.doc_id" in [v.rule for v in r.violations]
 
 
+def test_validate_dom_title_needs_subtype_keyword(db_session: Session) -> None:
+    """STD-001 2.6 — DOM은 제목 키워드로 셋 중 무엇인지 안다. 없으면 frontmatter.title.subtype."""
+    svc = SpecService(db_session)
+    dom = "---\ndoc_id: EXMP-DOM-001\ntype: DOM\ntitle: {t}\nstatus: draft\n---\n# DOM\n#### Document 문서\n"
+    for t in ("도메인 모델 — 예시", "클래스 명세 — 예시", "ERD·DD — 예시", "ERD와 DD"):
+        assert svc.validate(dom.format(t=t), DocType.DOM, Entry.mcp).violations == [], t
+    r = svc.validate(dom.format(t="데이터 — 예시"), DocType.DOM, Entry.mcp)
+    assert [v.rule for v in r.violations] == ["frontmatter.title.subtype"]
+    # github 경로도 같다 — 규약 위반이지 상태 규칙이 아니다
+    r = svc.validate(dom.format(t="데이터 — 예시"), DocType.DOM, Entry.github)
+    assert [v.rule for v in r.violations] == ["frontmatter.title.subtype"]
+    # UI·API는 아직 안 본다 (기존 문서에 키워드 없는 제목이 있다)
+    api = "---\ndoc_id: EXMP-API-001\ntype: API\ntitle: 에이전트 도구\nstatus: draft\n---\n# API\n"
+    assert svc.validate(api, DocType.API, Entry.mcp).violations == []
+
+
 def test_validate_entity_mismatch_warning(db_session: Session) -> None:
     body = """---
 doc_id: X-DOM-002
@@ -263,6 +279,37 @@ def test_issue_doc_id_sequence_no_reuse(db_session: Session) -> None:
     )
     assert svc.issue_doc_id(p.id, "EXMP", DocType.PRD) == "EXMP-PRD-003"
     assert svc.issue_doc_id(p.id, "EXMP", DocType.RFQ) == "EXMP-RFQ-001"
+
+
+def test_precondition_dom_order(db_session: Session) -> None:
+    """STD-001 2.6 — 클래스 명세 ← API 문서, ERD ← 클래스 명세. 존재만 본다."""
+    svc = SpecService(db_session)
+    p = make_project(db_session)
+    a = author(db_session)
+    dom = lambda t, did: (  # noqa: E731
+        f"---\ndoc_id: {did}\ntype: DOM\ntitle: {t}\nstatus: draft\n---\n# DOM\n#### Document 문서\n"
+    )
+    # DOM 아니면 늘 통과 · 도메인 모델은 늘 통과 · 키워드 없음은 validate 몫이라 통과
+    assert svc.precondition(p.id, DocType.PRD, "클래스") is None
+    assert svc.precondition(p.id, DocType.DOM, "도메인 모델 — 예시") is None
+    assert svc.precondition(p.id, DocType.DOM, "데이터") is None
+    # API 없이 클래스 명세 → 거부. have는 그 프로젝트의 DOM 문서
+    svc.create(p.id, "EXMP-DOM-001", DocType.DOM, dom("도메인 모델", "EXMP-DOM-001"), "h1", a, "m")
+    assert svc.precondition(p.id, DocType.DOM, "클래스 명세 — 예시") == (
+        "API 문서(REST 또는 MCP) — 클래스의 메서드는 API가 정한다",
+        ["EXMP-DOM-001"],
+    )
+    # API 초안 하나 있으면 통과 — 상태는 안 본다
+    api = "---\ndoc_id: EXMP-API-001\ntype: API\ntitle: REST\nstatus: draft\n---\n# API\n"
+    svc.create(p.id, "EXMP-API-001", DocType.API, api, "h2", a, "m")
+    assert svc.precondition(p.id, DocType.DOM, "클래스 명세 — 예시") is None
+    # 클래스 명세 없이 ERD → 거부
+    assert svc.precondition(p.id, DocType.DOM, "ERD·DD — 예시") == (
+        "DOM 클래스 명세 — 테이블은 엔티티 클래스에서 나온다",
+        ["EXMP-DOM-001"],
+    )
+    svc.create(p.id, "EXMP-DOM-002", DocType.DOM, dom("클래스 명세", "EXMP-DOM-002"), "h3", a, "m")
+    assert svc.precondition(p.id, DocType.DOM, "ERD·DD — 예시") is None
 
 
 # ── create ──

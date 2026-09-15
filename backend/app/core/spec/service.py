@@ -94,11 +94,19 @@ SUBTYPES: dict[tuple[str, str], tuple[list[str], list[str]]] = {
 }
 
 
+def subtype_of(doc_type: str, title: str | None) -> str | None:
+    """제목 키워드로 서브타입(STD-001 2장 — 도메인·클래스·ERD / 화면·와이어프레임 / REST·MCP)."""
+    for t, key in SUBTYPES:
+        if t == doc_type and title and key in title:
+            return key
+    return None
+
+
 def patterns_for(doc_type: str, title: str | None) -> tuple[re.Pattern[str] | None, list[str]]:
     pats, secs = TYPES.get(doc_type, ([], []))
-    for (t, key), (p, s) in SUBTYPES.items():
-        if t == doc_type and title and key in title:
-            pats, secs = p, s
+    key = subtype_of(doc_type, title)
+    if key is not None:
+        pats, secs = SUBTYPES[(doc_type, key)]
     return (re.compile("^(?:" + "|".join(pats) + ")$") if pats else None), secs
 
 
@@ -158,6 +166,17 @@ class SpecService:
             for u in re.findall(r"[\w-]+", fm.get("upstream", "").strip("[]")):
                 if not DOC_ID.match(u):
                     V.append(Violation(2, "frontmatter.ref", f"upstream {u!r}"))
+            # DOM은 제목의 키워드로 셋 중 무엇인지 안다 (STD-001 2.6). 없으면 3의 항목 패턴도
+            # 5의 필수 절도 못 정해 그동안 조용히 건너뛰었다. UI·API는 아직 안 본다 — 기존 문서에
+            # 키워드 없는 제목이 있다
+            if doc_type == DocType.DOM and subtype_of(doc_type, fm.get("title")) is None:
+                V.append(
+                    Violation(
+                        2,
+                        "frontmatter.title.subtype",
+                        "DOM 제목에 「도메인」「클래스」「ERD」 중 하나가 있어야 한다",
+                    )
+                )
             # 2. MCP 경로의 status 변경
             if entry == Entry.mcp and current_status and fm.get("status") != current_status:
                 V.append(Violation(2, "frontmatter.status_change", "상태 변경은 웹에서만(UC-H8)"))
@@ -255,6 +274,32 @@ class SpecService:
     def issue_doc_id(self, project_id: int, code: str, doc_type: DocType) -> str:
         """SYNC-MS-002#SpecService.issue_doc_id"""
         return f"{code}-{doc_type}-{self.repo.max_doc_number(project_id, doc_type) + 1:03d}"
+
+    def precondition(
+        self, project_id: int, doc_type: DocType, title: str
+    ) -> tuple[str, list[str]] | None:
+        """SYNC-MS-002#SpecService.precondition"""
+        if doc_type != DocType.DOM:
+            return None
+        sub = subtype_of(doc_type, title)
+        if sub not in ("클래스", "ERD"):
+            return None  # 도메인 모델은 첫 문서다. 키워드 없음은 validate가 잡는다
+        docs = self.repo.documents_of_project(project_id)
+        if sub == "클래스":
+            ok = any(d.doc_type == DocType.API for d in docs)
+            requires = "API 문서(REST 또는 MCP) — 클래스의 메서드는 API가 정한다"
+        else:
+            # title은 documents에 열이 없다 — current_body의 frontmatter에서
+            ok = any(
+                d.doc_type == DocType.DOM
+                and subtype_of(DocType.DOM, parse_frontmatter(d.current_body)[0].get("title"))
+                == "클래스"
+                for d in docs
+            )
+            requires = "DOM 클래스 명세 — 테이블은 엔티티 클래스에서 나온다"
+        if ok:  # 존재만 본다. 상태·승인은 신호다 (PRD R6)
+            return None
+        return requires, sorted(d.doc_id for d in docs if d.doc_type == DocType.DOM)
 
     def create(
         self,

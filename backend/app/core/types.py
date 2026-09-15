@@ -678,6 +678,7 @@ class SaveResult:
     status: str
     pending_decision_version_id: int | None
     warnings: list[str] = field(default_factory=list)
+    next_step: str | None = None  # mcp만 — 사람에게 보여주고 멈추라는 한 문장 (STD-001 1.8)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -687,4 +688,5 @@ class SaveResult:
             "status": self.status,
             "pending_decision_version_id": self.pending_decision_version_id,
             "warnings": self.warnings,
+            "next_step": self.next_step,
         }

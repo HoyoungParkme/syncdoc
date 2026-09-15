@@ -97,6 +97,7 @@ class SaveResult(Base):
     status: str
     pending_decision_version_id: int | None
     warnings: list[str]
+    next_step: str | None = None  # 웹 되돌리기는 null (API-001 SaveResult)
 
 
 class Revert(BaseModel):
