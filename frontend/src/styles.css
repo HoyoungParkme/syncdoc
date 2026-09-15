@@ -631,6 +631,17 @@ a.arow:hover{background:var(--bg-subtle)}
    `.dot.flag`·`svg.sw`와 같은 이름 충돌이다 (UI-001 4.1) */
 .gcard .canvas{position:relative;overflow:auto;height:calc(100vh - var(--topbar-h) - 190px);background:var(--bg-card)}
 .gcard.full .canvas{flex:1;height:auto}
+/* 공통 1.7 그림 전체보기 — 본문 안 그림 상자(뷰 모듈 이름 .mer/.dia/.canvas)에 버튼을 얹고, 층은 그래프 전체보기와 같은 80 */
+.dhost{position:relative}
+.dfull-btn{position:absolute;top:var(--space-6);right:var(--space-6);opacity:.75;background:var(--bg-card)}
+.dhost:hover .dfull-btn,.dfull-btn:focus-visible{opacity:1}
+.dfull{position:fixed;inset:0;z-index:var(--z-graph-full);display:flex;flex-direction:column;background:var(--bg-card)}
+.dfull .gbar b{font-weight:var(--w-semibold)}
+.dfull .zv{min-width:44px;text-align:center;font-size:var(--text-mono-sm)}
+.dfull .stage{flex:1;min-height:0;overflow:auto;padding:var(--space-22);background:var(--bg-subtle)}
+.dfull .pic{margin:0 auto;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-control)}
+/* mermaid가 svg에 max-width를 인라인으로 박는다 — 복제본은 상자 크기를 따라야 확대가 된다. 인라인을 이기는 !important */
+.dfull .pic svg{display:block;width:100%!important;height:100%!important;max-width:none!important}
 .cinner{position:relative}
 .colh{position:absolute;top:0;text-align:center;font-family:var(--font-mono);font-size:11.5px;
   color:var(--ink-faint);letter-spacing:.3px;box-sizing:border-box}

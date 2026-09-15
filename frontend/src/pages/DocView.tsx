@@ -8,6 +8,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
 import { api, ApiError, FLAG_KO, incompleteOf, STATUS_KO, warnText, type Comment, type Document, type DownstreamView, type ItemReferences, type UpstreamCheck } from '../api/client'
 import { extraCss, renderView } from '../view'
+import { attachDiagramButtons, DiagramFull, type FullDiagram } from '../components/DiagramFull'
 import { esc, renderBlocks, splitRef } from '../view/md'
 import { ItemIdBadge, StatusPill, ProjName } from '../components/ui'
 import { Handle, PANEL, readStore, TOC, useWidth, writeStore } from '../components/panes'
@@ -21,6 +22,7 @@ export function DocView() {
   const [doc, setDoc] = useState<Document | null>(null)
   const [err, setErr] = useState('')
   const [panel, setPanel] = useState<'refs' | 'comments'>(sp.get('panel') === 'comments' ? 'comments' : 'refs')
+  const [full, setFull] = useState<FullDiagram | null>(null) // 7.6
   const [selected, setSelected] = useState<string | null>(null)
   const [refs, setRefs] = useState<ItemReferences | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
@@ -68,7 +70,14 @@ export function DocView() {
     for (const el of root.querySelectorAll<HTMLElement>('a[data-ref]')) el.dataset.el = '7.2'
     for (const el of root.querySelectorAll<HTMLElement>('pre.mermaid')) el.dataset.el = '7.3'
     mermaid.initialize({ startOnLoad: false, theme: 'neutral' })
-    mermaid.run({ nodes: root.querySelectorAll<HTMLElement>('pre.mermaid') }).catch(() => undefined) // 문법 오류면 코드가 남는다 (UC-H2 2a)
+    // 7.5 전체보기 — svg가 생긴 뒤(mermaid 끝난 뒤)에 붙인다. 그 사이 본문이 갈렸으면 붙이지 않는다 (공통 1.7)
+    mermaid
+      .run({ nodes: root.querySelectorAll<HTMLElement>('pre.mermaid') })
+      .catch(() => undefined) // 문법 오류면 코드가 남는다 (UC-H2 2a)
+      .then(() => {
+        if (mainRef.current !== root) return
+        for (const b of attachDiagramButtons(root, setFull)) b.dataset.el = '7.5'
+      })
     for (const el of root.querySelectorAll<HTMLElement>('[data-item]')) {
       const badge = el.querySelector('.iid') ?? el
       const fl = doc?.items.find((i) => i.item_id === el.dataset.item)?.flags ?? []
@@ -200,6 +209,7 @@ export function DocView() {
     // 폭 변수를 화면 전체가 쥔다 — 원본 탭도 같은 값으로 사이드바 자리를 비워 둬야
     // 탭을 오갈 때 본문이 좌우로 안 흔들린다 (UI-5 규칙)
     <div className="docscreen" style={{ '--toc-w': `${tocW}px`, '--panel-w': `${panelW}px` } as React.CSSProperties}>
+      {full && <DiagramFull d={full} el="7.6" onClose={() => setFull(null)} />}
       {/* 브레드크럼 — 어디서 들어왔든 지금 자리를 말하고, 앞 두 조각으로 되짚어 올라간다 */}
       <div className="docbar" data-el="1">
         <Link className="crumb" to={`/p/${code}`}>
