@@ -274,3 +274,21 @@ def test_reassign_open_flags_leaves_resolved_alone(db_session: Session) -> None:
         ).scalar()
         == a_prd.user.id
     )
+
+
+# ── history_of_document (카드 N — 삭제 문지기) ──
+def test_history_of_document_counts_resolved_flags_and_decisions_too(db_session: Session) -> None:
+    svc, tr, p, d, v, pks, rfq, rpk, a_rfq, a_prd = _setup(db_session)
+    assert tr.history_of_document(d.id, list(pks.values())) == (0, 0)
+    assert tr.history_of_document(rfq.id, list(rpk.values())) == (0, 0)
+    tr.raise_broken(rpk["Q1"])  # 대상 G1(PRD) · 원인 Q1(RFQ) — 양쪽 다 이력
+    assert tr.history_of_document(d.id, list(pks.values())) == (1, 0)
+    assert tr.history_of_document(rfq.id, list(rpk.values())) == (1, 0)
+    db_session.execute(text("UPDATE flags SET resolved_at=now()"))
+    assert tr.history_of_document(d.id, list(pks.values())) == (1, 0)  # 확인한 것도 이력
+    tr.create_pending(v.id, [pks["G1"]], [pks["R1"]])
+    assert tr.history_of_document(d.id, list(pks.values())) == (1, 1)
+    assert tr.history_of_document(d.id, []) == (
+        1,
+        1,
+    )  # 항목 없이도 — target_version_id가 PRD 버전을 문다

@@ -496,7 +496,8 @@ li.ref.missing{color:var(--ink-disabled)}
 .vcard.sel{border:1.5px solid var(--ink-body);background:var(--caution-bg)}
 .ab{font-family:var(--font-mono);font-size:11px;font-weight:var(--w-bold);background:var(--ink-body);
   color:#fff;border-radius:var(--radius-badge);padding:0 var(--space-5)}
-.btn.sm.danger{border-color:var(--danger);color:var(--danger);font-weight:var(--w-medium)}
+.btn.danger,.btn.sm.danger{border-color:var(--danger);color:var(--danger);font-weight:var(--w-medium)}
+.btn.danger:disabled{opacity:.45;cursor:not-allowed}
 .btn.sm.danger:hover{background:var(--danger-bg)}
 .hint{color:var(--ink-muted);font-size:var(--text-caption);line-height:1.6}
 .vlist .hint{margin-top:var(--space-8);padding-top:var(--space-9);border-top:1px solid var(--border)}

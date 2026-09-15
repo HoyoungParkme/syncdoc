@@ -672,6 +672,20 @@ class SpecService:
         rows.sort(key=lambda r: (r.created_at, r.version_no is None), reverse=True)
         return rows
 
+    def status_change_count(self, document_id: int) -> int:
+        """SYNC-MS-002#SpecService.status_change_count"""
+        return self.repo.status_change_count(document_id)
+
+    def delete_document(self, document: Document) -> int:
+        """SYNC-MS-002#SpecService.delete_document
+
+        이력 검사는 하지 않는다 — pipeline.delete_document가 넷을 다 세고 부른다. 여기서 또 세면
+        두 곳이 어긋난다. FK가 걸리면 호출자가 검사를 빠뜨린 것이라 DB 오류로 드러나야 한다.
+        """
+        n = self.repo.delete_document_rows(document.id)
+        self.session.flush()
+        return n
+
     def mark_deleted(self, document: Document, commit_hash: str, author: Author) -> list[int]:
         """SYNC-MS-002#SpecService.mark_deleted"""
         row = self.repo.document_by_id(document.id)

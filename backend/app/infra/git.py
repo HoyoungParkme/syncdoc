@@ -113,11 +113,12 @@ async def commit_push(
     path: str | None = None,
     content: str | None = None,
     files: dict[str, str] | None = None,
+    delete: list[str] | None = None,
 ) -> str:
     """SYNC-MS-009#git.commit_push"""
-    if files is None:
+    if files is None and delete is None:
         if path is None or content is None:
-            raise ValueError("path+content 또는 files 중 하나는 있어야 한다")
+            raise ValueError("path+content · files · delete 중 하나는 있어야 한다")
         files = {path: content}
     try:
         token = AccountService.github_token_for(author.user)
@@ -128,12 +129,17 @@ async def commit_push(
     onto_remote = await _has_remote_head(workdir)
     if onto_remote:
         await _run(workdir, "reset", "--hard", "origin/main")
-    to_write = files
+    to_write = files or {}
     for p, c in to_write.items():
         f = workdir / p
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_text(c, encoding="utf-8")
-    await _run(workdir, "add", "--", *to_write)
+    if to_write:
+        await _run(workdir, "add", "--", *to_write)
+    if (
+        delete
+    ):  # 문서 삭제 (MS-007 delete_document). 이미 없는 파일이면 아래 diff가 비어 커밋이 안 생긴다
+        await _run(workdir, "rm", "-q", "--ignore-unmatch", "--", *delete)
     unchanged, _, _ = await _exec(workdir, "diff", "--cached", "--quiet")
     if unchanged == 0:
         return (await _run(workdir, "rev-parse", "HEAD")).strip()

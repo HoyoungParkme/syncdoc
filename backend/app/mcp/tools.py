@@ -421,3 +421,17 @@ async def update_document(
     except Problem as p:
         return _problem(p)
     return _ok(r.to_dict())
+
+
+@server.tool(
+    description="이력이 없는 초안 문서를 파일째 지운다 — 에이전트가 예측으로 잘못 만든 문서를 버리는 길이다. 초안이고, 다른 문서에서 들어오는 참조·댓글·플래그·전파 결정·상태 변경이 하나도 없어야 한다. 하나라도 있으면 document-has-history 에러에 무엇이 걸리는지 담겨 온다 — 참조가 걸렸으면 그 문서를 update_document로 먼저 고친다. 조건을 채우면 첫 호출은 document-deletion-needs-confirm 에러로 제목·버전 수를 돌려주고 아직 지우지 않는다. 그것을 사람에게 보여주고 확인받은 뒤 confirm=true로 다시 부른다. 되돌릴 수 없다 — 버전까지 지워지고 저장소에 삭제 커밋만 남는다."
+)
+async def delete_document(doc_id: str, confirm: bool = False) -> CallToolResult:
+    """SYNC-API-002#delete_document"""
+    try:
+        with db.session_scope() as s:
+            author = _agent_author(s)
+        r = await pipeline.delete_document(doc_id, author, confirm)
+    except Problem as p:
+        return _problem(p)
+    return _ok(r.to_dict())

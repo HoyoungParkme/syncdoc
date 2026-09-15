@@ -30,6 +30,17 @@ class ReferenceRepository:
             stmt = stmt.where(Reference.is_missing.is_(False))
         return list(self.session.scalars(stmt.order_by(Reference.id)))
 
+    def inbound_of_document(self, document_id: int) -> list[Reference]:
+        """남이 이 문서(항목 포함)에 건 참조. 자기 참조는 뺀다 (MS-003 inbound_of_document)."""
+        from app.core.spec.models import Item
+
+        mine = select(Item.id).where(Item.document_id == document_id)
+        stmt = select(Reference).where(
+            or_(Reference.to_document_id == document_id, Reference.to_item_id.in_(mine)),
+            Reference.from_document_id != document_id,
+        )
+        return list(self.session.scalars(stmt.order_by(Reference.id)))
+
     def to_item(self, item_pk: int) -> list[Reference]:
         return list(self.session.scalars(select(Reference).where(Reference.to_item_id == item_pk)))
 

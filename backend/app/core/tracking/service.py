@@ -238,6 +238,10 @@ class TrackingService:
             out.setdefault(f.target_item_id, []).append(f)
         return out
 
+    def history_of_document(self, document_id: int, item_pks: list[int]) -> tuple[int, int]:
+        """SYNC-MS-004#TrackingService.history_of_document"""
+        return self.repo.history_count(document_id, item_pks)
+
     def flags_for_assignee(self, user_id: int) -> tuple[list[Flag], list[Flag], list[Flag]]:
         """SYNC-MS-004#TrackingService.flags_for_assignee"""
         rows = self.repo.unresolved_by_assignee(user_id)

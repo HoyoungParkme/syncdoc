@@ -231,3 +231,18 @@ async def test_s1_agent_builds_specs_over_mcp(
         message="m",
     )
     assert not err and p["doc_id"] == "EXMP-DOM-002"
+
+    # 잘못 만든 문서를 버린다 (UC-A7) — 두 번 호출. 아무도 안 가리키는 ERD
+    err, p = await call("delete_document", doc_id="EXMP-DOM-002")
+    assert err and p["type"] == "urn:syncdoc:document-deletion-needs-confirm"
+    assert (p["title"], p["version_count"]) == ("ERD·DD", 1)
+    err, p = await call("delete_document", doc_id="EXMP-DOM-002", confirm=True)
+    assert not err and p["doc_id"] == "EXMP-DOM-002" and "지워짐" in p["next_step"]
+    err, p = await call("get_document", doc_id="EXMP-DOM-002")
+    assert err and p["type"] == "urn:syncdoc:not-found"
+    assert "docs/specs/06-DOM/EXMP-DOM-002.md" not in g(
+        bare, "ls-tree", "-r", "--name-only", "main"
+    )
+    # 남이 가리키는 RFQ는 못 지운다
+    err, p = await call("delete_document", doc_id="EXMP-RFQ-001", confirm=True)
+    assert err and p["type"] == "urn:syncdoc:document-has-history" and p["inbound_refs"]

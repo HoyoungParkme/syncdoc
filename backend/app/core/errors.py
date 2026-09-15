@@ -116,6 +116,49 @@ class PreconditionUnmet(Problem):
         super().__init__(f"먼저 있어야 한다: {requires}", requires=requires, have=have)
 
 
+class DocumentHasHistory(Problem):
+    """이력 있는 문서는 지우지 않는다 (PRD N3). 걸린 것을 전부 담는다 — 사람이 한 번에 본다."""
+
+    type = "urn:syncdoc:document-has-history"
+    status = 409
+    title = "document-has-history"
+
+    def __init__(
+        self,
+        status: str,
+        inbound_refs: list[str],
+        comments: int,
+        flags: int,
+        decisions: int,
+        status_changes: int,
+    ) -> None:
+        super().__init__(
+            "이력 있는 문서는 지우지 않는다",
+            status=status,
+            inbound_refs=inbound_refs,
+            comments=comments,
+            flags=flags,
+            decisions=decisions,
+            status_changes=status_changes,
+        )
+
+
+class DocumentDeletionNeedsConfirm(Problem):
+    """조건은 채웠다. 사람 확인 뒤 confirm=true로 다시 (UC-A7 3·4)."""
+
+    type = "urn:syncdoc:document-deletion-needs-confirm"
+    status = 409
+    title = "document-deletion-needs-confirm"
+
+    def __init__(self, doc_id: str, title: str, version_count: int) -> None:
+        super().__init__(
+            "문서 삭제는 사람 확인이 필요함",
+            doc_id=doc_id,
+            title=title,
+            version_count=version_count,
+        )
+
+
 class ProjectCodeConflict(Problem):
     type = "urn:syncdoc:project-code-conflict"
     status = 409

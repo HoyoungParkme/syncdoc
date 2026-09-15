@@ -107,6 +107,10 @@ class ReferenceService:
         """SYNC-MS-003#ReferenceService.downstream_of_document"""
         return [_edge(r) for r in self.repo.to_document_only(document_id)]
 
+    def inbound_of_document(self, document_id: int) -> list[RefEdge]:
+        """SYNC-MS-003#ReferenceService.inbound_of_document"""
+        return [_edge(r) for r in self.repo.inbound_of_document(document_id)]
+
     def references_among(
         self, item_pks: set[int], include_document_targets: bool = True
     ) -> list[RefEdge]:

@@ -26,6 +26,8 @@ from app.core.errors import (
     AlreadyCurrent,
     BackupInvalid,
     ConventionViolation,
+    DocumentDeletionNeedsConfirm,
+    DocumentHasHistory,
     ItemDeleted,
     ItemDeletionNeedsConfirm,
     NotFound,
@@ -45,6 +47,7 @@ from app.core.types import (
     STAGE_OF,
     Author,
     AuthorKind,
+    DeleteResult,
     DocStatus,
     DocType,
     DocumentSummary,
@@ -409,6 +412,63 @@ async def revert(
         )
 
 
+async def delete_document(doc_id: str, author: Author, confirm: bool) -> DeleteResult:
+    """SYNC-MS-007#pipeline.delete_document"""
+    code = doc_id.split("-")[0]
+    async with _lock(code):
+        with db.session_scope() as s:
+            spec, refs = SpecService(s), ReferenceService(s)
+            tracking, collab = TrackingService(s), CommentService(s)
+            document = spec.get_document(doc_id)
+            repo = ProjectService(s).get(code).repository
+            # 2. 문지기 넷 — 하나만 걸려도 전부 담는다. 사람이 한 번에 본다
+            item_pks = [i.pk for i in document.items]
+            inbound = refs.inbound_of_document(document.id)
+            comments = collab.count(document.id)
+            flags, decisions = tracking.history_of_document(document.id, item_pks)
+            changes = spec.status_change_count(document.id)
+            if (
+                document.status != DocStatus.draft
+                or inbound
+                or comments
+                or flags
+                or decisions
+                or changes
+            ):
+                names = spec.describe_items([e.from_item_pk for e in inbound if e.from_item_pk])
+                docs = spec.describe_documents(
+                    [e.from_document_id for e in inbound if not e.from_item_pk]
+                )
+                raise DocumentHasHistory(
+                    document.status,
+                    sorted(
+                        f"{r.doc_id}#{r.item_id}"
+                        if e.from_item_pk and (r := names.get(e.from_item_pk))
+                        else (d.doc_id if (d := docs.get(e.from_document_id or -1)) else "?")
+                        for e in inbound
+                    ),
+                    comments,
+                    flags,
+                    decisions,
+                    changes,
+                )
+            # 3. 확인 — 웹은 다이얼로그 13이 이미 받았다
+            if not confirm:
+                title = parse_frontmatter(document.body)[0].get("title", "")
+                raise DocumentDeletionNeedsConfirm(doc_id, title, document.current_version_no)
+            # 4. push — 여기까지 DB 쓰기 없음
+            commit_hash = await git.commit_push(
+                Path(repo.workdir_path),
+                f"spec({doc_id}): 삭제 — 이력 없는 초안",
+                author,
+                delete=[f"docs/specs/{spec_dir(document.doc_type)}/{doc_id}.md"],
+            )
+            # 5. 트랜잭션
+            spec.delete_document(document)
+            s.commit()
+    return DeleteResult(doc_id, commit_hash, f"{doc_id} 지워짐. 사람에게 알리고 멈춘다")
+
+
 async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]:
     """SYNC-MS-007#pipeline.process_commit"""
     if repo.last_processed_commit == head_hash:
@@ -464,7 +524,13 @@ async def _process_file(workdir: Path, code: str, f, head_hash: str) -> list[Sav
         author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.github)
         if f.status == "D":
             spec, tracking = SpecService(s), TrackingService(s)
-            document = spec.get_document(doc_id)
+            try:
+                document = spec.get_document(doc_id)
+            except NotFound:
+                # 앱이 delete_document로 지운 문서의 삭제 커밋이거나 등록 전에 사라진 파일이다.
+                # mark_deleted로 가면 not-found가 나서 이 커밋이 영영 「처리 실패」로 남고
+                # last_processed_commit이 안 나아간다 (MS-007 process_commit 4)
+                return []
             for pk in spec.mark_deleted(document, f.commit_hash, author):
                 tracking.raise_broken(pk)
             s.commit()
