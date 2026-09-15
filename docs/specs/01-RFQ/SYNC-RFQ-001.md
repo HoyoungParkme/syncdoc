@@ -2,7 +2,7 @@
 doc_id: SYNC-RFQ-001
 type: RFQ
 title: RFQ — 프로젝트 명세 관리 플랫폼
-status: review
+status: approved
 ---
 
 # RFQ: 프로젝트 명세 관리 플랫폼
