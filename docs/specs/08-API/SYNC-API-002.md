@@ -2,7 +2,7 @@
 doc_id: SYNC-API-002
 type: API
 title: API 명세 MCP — 싱크독
-status: approved
+status: review
 upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ---
 
