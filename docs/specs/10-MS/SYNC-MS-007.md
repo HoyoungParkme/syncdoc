@@ -187,7 +187,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 
 **처리** — 저장소 락 안
 1. `document = spec.get_document(doc_id)` · 없으면 `! not-found`
-2. 문지기 넷 — `inbound = reference.inbound_of_document(id)` · `comments = collab.count(id)` · `(flags, decisions) = tracking.history_of_document(item_pks, version_ids)` · `changes = spec.status_change_count(id)`
+2. 문지기 넷 — `inbound = reference.inbound_of_document(id)` · `comments = collab.count(id)` · `(flags, decisions) = tracking.history_of_document(id, item_pks)` · `changes = spec.status_change_count(id)`
    - if `document.status != draft or inbound or comments or flags or decisions or changes` → `! document-has-history {status, inbound_refs: [문서ID#항목ID…], comments, flags, decisions, status_changes}`. **하나만 걸려도 전부 담는다** — 사람이 한 번에 본다
 3. if `not confirm` → `! document-deletion-needs-confirm {doc_id, title, version_count}`. 웹은 여기 안 온다
 4. `commit_hash = git.commit_push(repo.workdir, f"spec({doc_id}): 삭제 — 이력 없는 초안", author, delete=[STD-001 1.1 경로])` · 실패 → `! push-failed`. **여기까지 DB 쓰기 없음**

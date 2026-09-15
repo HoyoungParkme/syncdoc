@@ -1124,7 +1124,7 @@ sequenceDiagram
     S-->>P: Document (status, items, version_count)
     P->>R: inbound_of_document(document_id)
     P->>C: count(document_id)
-    P->>TR: history_of_document(document_id, item_pks, version_ids)
+    P->>TR: history_of_document(document_id, item_pks)
     P->>S: status_change_count(document_id)
     alt 초안이 아니거나 하나라도 0이 아님 (2a)
         P-->>T: document-has-history {status, inbound_refs, comments, flags, decisions, status_changes}

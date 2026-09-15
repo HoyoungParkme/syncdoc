@@ -790,7 +790,7 @@ classDiagram
         +get_flag(flag_id: int) FlagDetail
         +resolve(flag_id: int, user: User, target_changed: bool) FlagSummary
         +flags_for_items(item_pks: list~int~) dict
-        +history_of_document(item_pks: list~int~, version_ids: list~int~) tuple~int,int~
+        +history_of_document(document_id: int, item_pks: list~int~) tuple~int,int~
         +flags_for_assignee(user_id: int) list~Flag~
         +flags_unassigned() list~Flag~
         +flags_in_project(project_id: int, kind: FlagKind) list~Flag~
