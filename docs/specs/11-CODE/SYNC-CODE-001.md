@@ -388,6 +388,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 화면 | UI-5 12 문서 삭제(초안만) · 13 확인 다이얼로그(13.1~13.4) |
 | 테스트 | 문지기 넷 각각 한 번씩 걸림(`document-has-history`에 값) · confirm 없이 → needs-confirm에 `version_count` · confirm → 원격 파일 사라짐 + 커밋 메시지 + 행 다섯 종류 0 · 다른 문서 참조·항목 그대로 · 지운 번호 재발급 · 폴링이 삭제 커밋 D를 건너뛰고 `last_processed_commit` 전진 · 웹 DELETE 204/409 · MCP 도구 두 번 호출 · `check_ui.py` UI-5 |
 | 선행 | M |
+| 완료 | 2026-09-15 · 브랜치 `card/N-delete-document` · 커밋 `bd80906`·`26a7aae`(spec) `21de246`(code) · PR #73 · pytest **219 passed** · `check_code` 139/139 · `check_dom` 경고 0 · `check_ui` 15/15(UI-5 42/42) · `check_tokens` 0 · `validate.py` 위반 0·경고 0 · `tsc`·`build` 통과 · **실물 확인**(터널·MCP 토큰·HoyoungParkme 세션): `tools/list`에 `delete_document` · MCP `delete_document(VA-DOM-003)` → `document-has-history {status: draft, inbound_refs: 13건(VA-DOM-001·VA-DOM-002·VA-DOM-002#AnalysisJob…), comments 0, flags 0, decisions 0, status_changes 0}`, 문서 수 3 그대로 · UI-5 `VA-DOM-003`에 「문서 삭제」(12) → 확인(13.1 「ERD·DD — 영상 분석 에이전트 · 버전 1개 · … 되돌릴 수 없습니다」) → 삭제(13.3) → 409 → 13.2에 걸리는 것 13건이 링크로, 13.3 비활성 · 머지 뒤 폴링이 명세 17개를 받아 검토중으로 내렸고 전파 미결정 7건은 「안 붙임」, 15개 재승인 · **걸린 것**: `Version` DTO에 id가 없어 `history_of_document`가 버전 ID를 서브쿼리로 센다(`26a7aae`) · 삭제 커밋의 `D`를 폴링이 `mark_deleted`로 보내 not-found가 나던 것을 「행 없는 D는 건너뜀」으로 |
 
 **왜 카드인가.** PRD N3의 규칙에 예외가 생기고, 엔드포인트·MCP 도구·에러 둘·함수 일곱이 는다. 기능이다(DEV-15).
 
