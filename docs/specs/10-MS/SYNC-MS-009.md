@@ -212,7 +212,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-UC-001#UC-A1]] 4 · [[SYNC-STD-001]] 1.1
 
-**처리** 반환할 `files` dict 구성 — `docs/specs/{NN-TYPE}/.gitkeep` 12개(11단계는 `01-RFQ`…`11-CODE`, 단계 밖 `STD`는 번호 없이 — STD-001 1.1), `docs/specs/_templates/{TYPE}.md` 12개(템플릿 파일명은 타입만. 앱에 내장된 `_templates/` 사본), `docs/specs/assets/.gitkeep`, `docs/specs/README.md`(규약 링크 + 11단계 순서표). `→ files` — 실제 쓰기·커밋은 `commit_push(files=…)`
+**처리** 반환할 `files` dict 구성 — `docs/specs/{NN-TYPE}/.gitkeep` 12개(11단계는 `01-RFQ`…`11-CODE`, 단계 밖 `STD`는 번호 없이 — STD-001 1.1), `docs/specs/_templates/{TYPE}.md` 12개(템플릿 파일명은 타입만. 앱에 내장된 `_templates/` 사본), `docs/specs/assets/.gitkeep`, `docs/specs/README.md`(규약 링크 + 11단계 순서표. **DOM 행에 셋의 순서** — 도메인 모델은 여기서, 클래스 명세·ERD는 API 뒤에([[SYNC-STD-001]] 2.6) — 와 **작업 단위 한 줄** — 문서 하나마다 멈춘다(STD-001 1.8) — 가 들어간다. 에이전트가 저장소에서 처음 읽는 글이라 여기 없으면 규약이 없는 것과 같다). `→ files` — 실제 쓰기·커밋은 `commit_push(files=…)`
 
 ---
 

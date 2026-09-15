@@ -23,6 +23,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 - 에러: 도구 결과의 `isError: true` + 본문에 [[SYNC-API-001]]과 **같은 problem+json**. 에이전트가 `type`으로 분기한다
 - 모든 조회 결과에 문서 상태와 버전이 담긴다(PRD R9). 에이전트는 이걸로 확정 명세와 초안을 구분한다
 - 상태 변경·댓글·플래그 확인·전파 결정은 MCP에 **없다**. 사람의 판단이라 웹에서만 한다([[SYNC-UC-001#UC-H8]]·H9·H10·H11 주 액터 사람)
+- 쓰기의 단위는 **문서 하나**다([[SYNC-STD-001]] 1.8). `create_document`·`update_document`의 결과에 `next_step`이 실린다 — 에이전트는 그것을 사람에게 그대로 전하고 멈춘다. DOM 셋의 순서(STD-001 2.6)만은 서버가 `precondition-unmet`으로 막는다
 
 ## 2. 도구 이름
 
@@ -209,7 +210,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ```json
 {
   "name": "create_document",
-  "description": "새 문서를 만든다. 문서 ID는 서버가 발급한다({코드}-{타입}-{번호}). 저장소의 docs/specs/_templates/ 템플릿이 적용되므로 body는 템플릿 구조를 따라야 한다. 항목 ID(#R12 같은 것)는 body에 직접 붙인다. 서버는 발급하지 않고 형식·유일성만 검사한다. 기존 문서를 고치려면 이 도구가 아니라 update_document를 써야 한다.",
+  "description": "새 문서를 만든다. 문서 ID는 서버가 발급한다({코드}-{타입}-{번호}). 저장소의 docs/specs/_templates/ 템플릿이 적용되므로 body는 템플릿 구조를 따라야 한다. 항목 ID(#R12 같은 것)는 body에 직접 붙인다. 서버는 발급하지 않고 형식·유일성만 검사한다. 기존 문서를 고치려면 이 도구가 아니라 update_document를 써야 한다. 문서 하나를 만들면 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 같은 단계라도 다음 문서는 사람이 웹에서 읽고 난 뒤에 만든다. DOM 셋은 순서가 있다: 클래스 명세는 API 문서가, ERD는 클래스 명세가 같은 프로젝트에 있어야 받는다(precondition-unmet). DOM 제목에는 도메인·클래스·ERD 중 하나가 들어가야 한다.",
   "inputSchema": {
     "type": "object",
     "required": ["project_code", "doc_type", "body", "message"],
@@ -226,10 +227,13 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 **결과** — `SaveResult`
 ```json
-{ "doc_id": "SYNC-PRD-002", "version_no": 1, "commit_hash": "...", "status": "draft", "pending_decision_version_id": null }
+{ "doc_id": "SYNC-PRD-002", "version_no": 1, "commit_hash": "...", "status": "draft", "pending_decision_version_id": null, "warnings": [],
+  "next_step": "SYNC-PRD-002 v1 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)" }
 ```
 
-**에러**: `convention-violation`([[SYNC-UC-001#UC-A6]] 2a, 확장 필드 `violations: [{line, rule, message}]`), `push-failed`(5a).
+**에러**: `convention-violation`([[SYNC-UC-001#UC-A6]] 2a, 확장 필드 `violations: [{line, rule, message}]`), `precondition-unmet`(3a, DOM 셋의 순서 — 확장 필드 `requires`: 먼저 있어야 하는 것 한 줄, `have`: 그 프로젝트의 DOM 문서 ID 목록. [[SYNC-STD-001]] 2.6), `push-failed`(5a).
+
+**`next_step`은 매번 온다.** 규약(STD-001 1.8)을 에이전트가 잊어도 응답이 다시 말한다 — 사람에게 그대로 전하고 멈춘다.
 
 **결과에 `warnings`가 실릴 수 있다** — 미완성 경고(STD-001 4장). 저장은 됐고 승인만 막힌다. 에이전트는 사람에게 "필수 절 N개가 비어 있다"고 알린다.
 
@@ -276,7 +280,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ```json
 {
   "name": "update_document",
-  "description": "기존 문서의 본문을 교체해 새 버전을 만든다. **반드시 get_document를 먼저 부르고, 그 응답의 body를 고쳐 보낸다 — version_no만 받아 오고 본문은 예전 것을 쓰면 안 된다.** create_document는 frontmatter의 doc_id가 비어도 받지만(서버가 발급한다) 그 본문을 그대로 update_document에 보내면 frontmatter.doc_id 위반이 된다. expected_version에는 get_document가 준 version_no를 넣는다. 그 사이 문서가 바뀌었으면 version-conflict 에러에 현재 버전과 본문이 담기니, 그것을 읽고 병합해 다시 부른다. 본문에서 항목 ID가 사라지면 item-deletion-needs-confirm 에러에 끊어질 하위 항목이 문서ID#항목ID와 이름으로 담겨 오며, 그것을 사람에게 보여주고 확인받은 뒤 confirm_item_deletion=true로 다시 부른다. 저장 후 하위에 영향이 있으면 결과의 pending_decision_version_id가 채워지고, 전파 여부는 지시한 사람이 웹에서 결정한다. 승인 상태 문서를 고치면 검토중으로 내려간다. 이 변경이 상위 항목과 어긋나게 됐음을 알면 upstream_impact에 그 상위 항목을 넣는다.",
+  "description": "기존 문서의 본문을 교체해 새 버전을 만든다. **반드시 get_document를 먼저 부르고, 그 응답의 body를 고쳐 보낸다 — version_no만 받아 오고 본문은 예전 것을 쓰면 안 된다.** create_document는 frontmatter의 doc_id가 비어도 받지만(서버가 발급한다) 그 본문을 그대로 update_document에 보내면 frontmatter.doc_id 위반이 된다. expected_version에는 get_document가 준 version_no를 넣는다. 그 사이 문서가 바뀌었으면 version-conflict 에러에 현재 버전과 본문이 담기니, 그것을 읽고 병합해 다시 부른다. 본문에서 항목 ID가 사라지면 item-deletion-needs-confirm 에러에 끊어질 하위 항목이 문서ID#항목ID와 이름으로 담겨 오며, 그것을 사람에게 보여주고 확인받은 뒤 confirm_item_deletion=true로 다시 부른다. 저장 후 하위에 영향이 있으면 결과의 pending_decision_version_id가 채워지고, 전파 여부는 지시한 사람이 웹에서 결정한다. 승인 상태 문서를 고치면 검토중으로 내려간다. 이 변경이 상위 항목과 어긋나게 됐음을 알면 upstream_impact에 그 상위 항목을 넣는다. 저장 뒤에는 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 사람이 웹에서 읽기 전에 다음 문서로 가지 않는다.",
   "inputSchema": {
     "type": "object",
     "required": ["doc_id", "body", "expected_version", "message", "changed_items"],
@@ -295,7 +299,8 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 **결과** — `SaveResult`
 ```json
-{ "doc_id": "SYNC-PRD-001", "version_no": 8, "commit_hash": "...", "status": "review", "pending_decision_version_id": 4127, "warnings": [] }
+{ "doc_id": "SYNC-PRD-001", "version_no": 8, "commit_hash": "...", "status": "review", "pending_decision_version_id": 4127, "warnings": [],
+  "next_step": "SYNC-PRD-001 v8 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)" }
 ```
 
 **에러**
@@ -319,6 +324,11 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ```
 쓸 때 (신규)
   0. get_template(project, doc_type)  규약·뼈대·예시. 이걸 안 보고 쓰면 규약 위반이 난다
+  1. create_document(project, doc_type, body, message)
+     - precondition-unmet → DOM 셋의 순서다. requires에 적힌 것(API 문서 또는 클래스 명세)이 먼저다. 사람에게 말한다
+  2. 멈춘다. 결과의 next_step을 사람에게 그대로 전한다. 사람이 웹에서 읽고 「다음」이라고 하기 전에는
+     같은 단계라도 다음 문서를 만들지 않는다 (STD-001 1.8)
+     DOM은 도메인 모델 → (7 화면 · 8 API) → 클래스 명세 → ERD. 한 대화에 셋을 만들지 않는다
 
 읽을 때
   1. list_documents(project)          어느 단계에 뭐가 있나. approved인지 확인
@@ -336,6 +346,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
      - convention-violation        → violations 고치고 다시
   3. 결과에 pending_decision_version_id가 있으면
      "하위 N건에 영향. 전파 여부는 내 할 일에서 결정하세요"라고 사람에게 알린다
+     그리고 next_step을 전하고 멈춘다 — 신규와 같다
   4. 이 변경이 상위 문서의 결정과 어긋난다는 걸 알면 upstream_impact에 그 항목을 넣는다
      예: API에서 "바뀐 항목은 에이전트가 지정"으로 정했는데 UC-A6는 "diff로 찾는다"라고 되어 있으면 ["SYNC-UC-001#UC-A6"]
 
@@ -344,6 +355,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
   - expected_version 없이 update  → 스키마에서 거부
   - 상태를 바꾸려 하지 않는다    → 도구가 없다. 사람이 웹에서
   - get_references 결과를 전부 get_item으로 펼치지 않는다 → 필요한 것만
+  - 한 대화에서 한 단계의 문서 여럿을 연달아 만들지 않는다 → 문서 하나가 단위다 (STD-001 1.8)
 ```
 
 ---
