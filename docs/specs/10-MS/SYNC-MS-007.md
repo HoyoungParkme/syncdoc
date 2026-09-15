@@ -80,6 +80,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 2. if `doc_id is not None` → `document = spec.get_document(doc_id)`, `doc_type = document.doc_type` · if 없음 → `! not-found`
    (`entry == github`도 같다 · if github 경로에서 없음 → process_commit이 `doc_id=None`으로 다시 부른다)
 3. if `doc_id is None` (생성) → `doc_id = spec.issue_doc_id(project_id, project.code, doc_type)`, `body = spec.apply_frontmatter(body, doc_id, doc_type, "draft")`
+3a. if 생성이고 `entry == mcp` → `unmet = spec.precondition(project.id, doc_type, fm.title)` · if `unmet` → `! precondition-unmet {requires, have}`, 락 해제. **push·DB 쓰기 전.** github 경로는 안 본다 — 원본이 진실이다. DOM이 아니면 `precondition`이 `None`을 준다([[SYNC-STD-001]] 2.6)
 4. `(violations, warnings) = spec.validate(body, doc_type, entry, current_status=document.status if document else None)`
    - if `violations and entry != github` → `! convention-violation {violations, warnings}`, 락 해제
    - if `violations and entry == github` → 계속. 8단계에 `has_convention_error=True`로 전달
@@ -107,7 +108,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 12. if `upstream_impact` → 각각 `spec.resolve_item(doc, item)` · if 못 찾음 → `warnings`에 `upstream_impact.unknown` 추가하고 건너뜀 · `tracking.raise_upstream(pks, document_id, version.id, cause_item_pk=None)`
 13. `collab.relocate(document_id, old_body, body, old_version_no=document.current_version_no)`
 14. **커밋.** 락 해제
-15. `→ SaveResult(doc_id, version_no, commit_hash, status, pending_decision_version_id=pending_id, warnings)`
+15. `→ SaveResult(doc_id, version_no, commit_hash, status, pending_decision_version_id=pending_id, warnings, next_step)` — `next_step`은 `entry == mcp`면 `f"{doc_id} v{version_no} 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)"`, 아니면 `None`. 규약을 에이전트가 잊어도 응답이 매번 다시 말한다([[SYNC-STD-001]] 1.8)
 
 **출력** `SaveResult`. [[SYNC-API-001]] 4장 스키마와 같다.
 
@@ -116,6 +117,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 | 조건 | 에러 | 단계 |
 |---|---|---|
 | 문서 없음 | `not-found` | 2 |
+| DOM 선행조건 미충족 (생성·mcp) | `precondition-unmet` | 3a |
 | 규약 위반 (mcp·web) | `convention-violation` | 4 |
 | 버전 불일치 | `version-conflict` | 5 |
 | 삭제 항목에 하위 참조, 미확인 | `item-deletion-needs-confirm` | 6 |

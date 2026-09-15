@@ -29,6 +29,7 @@ from app.core.errors import (
     ItemDeleted,
     ItemDeletionNeedsConfirm,
     NotFound,
+    PreconditionUnmet,
     RebuildFailed,
     StatusBlocked,
     UpstreamReviewRequired,
@@ -147,6 +148,13 @@ async def _run(
         assert doc_type is not None
         doc_id = spec.issue_doc_id(project.id, code, doc_type)
         body = spec.apply_frontmatter(body, doc_id, doc_type, DocStatus.draft)
+        # 3a. DOM 셋의 순서 — push·DB 쓰기 전. github는 원본이 진실이라 안 본다 (STD-001 2.6)
+        if entry == Entry.mcp:
+            unmet = spec.precondition(
+                project.id, doc_type, parse_frontmatter(body)[0].get("title", "")
+            )
+            if unmet:
+                raise PreconditionUnmet(*unmet)
     # 4. 규약
     vr = spec.validate(body, doc_type, entry, document.status if document else None)
     if vr.violations and entry != Entry.github:
@@ -310,7 +318,16 @@ async def _run(
     # 14. 커밋
     s.commit()
     status = spec.get_document(doc_id).status
-    return SaveResult(doc_id, version.version_no, commit_hash, status, pending_id, warnings)
+    # 15. 문서 하나 쓰고 멈추라는 규약(STD-001 1.8)을 응답이 매번 다시 말한다 — mcp만
+    next_step = (
+        f"{doc_id} v{version.version_no} 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — "
+        "다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)"
+        if entry == Entry.mcp
+        else None
+    )
+    return SaveResult(
+        doc_id, version.version_no, commit_hash, status, pending_id, warnings, next_step
+    )
 
 
 async def change_status(

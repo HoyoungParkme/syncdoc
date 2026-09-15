@@ -1533,6 +1533,10 @@ components:
           type: array
           items:
             type: string
+        next_step:
+          type: string
+          nullable: true
+          description: 에이전트가 다음에 할 일 한 문장 — 사람에게 웹에서 읽으라고 하고 멈춘다(STD-001 1.8). MCP 경로만. 웹 되돌리기는 null
           description: 미완성 경고(STD-001 4장). 저장은 됐고 approved만 막힌다
 
     Comment:

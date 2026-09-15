@@ -190,7 +190,7 @@ sequenceDiagram
         C->>DB: Comment.line_no 갱신
     end
     P->>P: repo lock 해제
-    P-->>T: SaveResult {version_no, commit_hash, status, pending_decision_version_id}
+    P-->>T: SaveResult {version_no, commit_hash, status, pending_decision_version_id, next_step}
     T-->>A: 결과
 ```
 
@@ -974,6 +974,13 @@ sequenceDiagram
     P->>S: apply_frontmatter(body, doc_id, doc_type, status=draft)
     Note over S: 에이전트가 doc_id를 비워 보냈으면 채우고,<br/>적어 보냈으면 발급한 것과 같은지 확인
     S-->>P: body'
+    opt doc_type == DOM (3a)
+        P->>S: precondition(project_id, doc_type, title)
+        S->>DB: documents where project·type (API 있나 · 클래스 명세 있나)
+        alt 선행 문서 없음
+            P-->>T: precondition-unmet {requires, have}
+        end
+    end
     P->>S: validate(body', doc_type)
     alt 위반 (2a)
         P-->>T: convention-violation
@@ -988,13 +995,14 @@ sequenceDiagram
         Note over P: detect_impact 생략 — 신규는 하위 참조 없음 ([[SYNC-UC-001#UC-S3]] 1a)
     end
     P->>P: lock 해제
-    P-->>T: SaveResult {doc_id, version_no: 1, pending: null}
+    P-->>T: SaveResult {doc_id, version_no: 1, pending: null, next_step}
     T-->>A: 결과
 ```
 
 **읽을 때 볼 것**
 - 파일 경로가 `docs/specs/{type}/{doc_id}.md`다. 11단계 디렉터리가 타입 코드다 → 인프라·PRD에 경로 규약이 없다 (되먹일 것 #16)
 - `apply_frontmatter`가 새 메서드. 에이전트가 frontmatter를 비워도 서버가 채운다 → #17
+- DOM 선행조건(3a)은 **push 전에** 끝난다. 존재만 본다 — 상태는 신호다([[SYNC-PRD-001#R6]]). `next_step`은 결과에 매번 실린다 — 문서 하나 쓰고 멈추라는 규약([[SYNC-STD-001]] 1.8)을 응답이 다시 말한다
 
 ---
 

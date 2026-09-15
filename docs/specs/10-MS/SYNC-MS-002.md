@@ -54,6 +54,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#SpecService.version_keys]] | 재연결용 버전 열쇠 |
 | [[#SpecService.mark_convention_error]] | 오류·경고 표시 |
 | [[#SpecService.issue_doc_id]] | 문서 ID 발급 |
+| [[#SpecService.precondition]] | DOM 선행조건 |
 | [[#SpecService.item_blocks]] | 본문 → 항목 블록 |
 
 ---
@@ -119,7 +120,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **입력** `body` 전체 MD. `doc_type` 타입. `entry` 입구(`mcp`면 status 변경 검사). `current_status` DB의 현재 상태(수정 시)
 
 **처리** — 규약 3장 순서대로. 위반은 **전부** 모은다(첫 것에서 멈추지 않음)
-1. frontmatter 블록 파싱 · if 없음 → `frontmatter.missing` 추가하고 3으로 · else → 필수 필드 · `type` 목록 · `status` 값 · `doc_id` 형식과 `type` 일치 · `upstream` 형식을 각각 검사, 어긋나면 해당 rule 추가
+1. frontmatter 블록 파싱 · if 없음 → `frontmatter.missing` 추가하고 3으로 · else → 필수 필드 · `type` 목록 · `status` 값 · `doc_id` 형식과 `type` 일치 · `upstream` 형식을 각각 검사, 어긋나면 해당 rule 추가 · if `doc_type == DOM`이고 `title`에 「도메인」「클래스」「ERD」 중 하나도 없음 → `frontmatter.title.subtype` (STD-001 2.6 — 서브타입은 제목으로 가른다. 없으면 3의 항목 패턴도 5의 필수 절도 정하지 못한다)
 2. if `entry == mcp and current_status and fm.status != current_status` → `frontmatter.status_change` 추가
 3. 코드블록·인라인 코드를 빈 칸으로 치환한 본문에서 헤딩 순회. 타입의 항목 패턴(STD-001 2장 표 — DOM·UI·API는 `title`로 세분)으로 항목 판정
    - if 이미 본 ID → `item.duplicate` · if 토큰 끝이 `.`·`:`이고 떼면 패턴에 맞음 → `item.punct` · if 번호 앞자리 0 → `item.padding` · if `^[A-Z]+-?\d+$`인데 패턴 밖 → `item.pattern`
@@ -527,6 +528,18 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **처리** `DB: max(번호) from documents where project_id and doc_type` — `doc_id`의 마지막 세 자리. +1, 세 자리 패딩. `→ f"{code}-{doc_type}-{n:03d}"`. `code`는 pipeline이 `ProjectService.get`에서 얻어 넘긴다. **저장소 락 안에서만** 부른다(동시 발급 방지)
 
 **테스트 관점** 첫 PRD → `-001` · 002 삭제 후 → `-003`(재사용 안 함. 문서는 삭제 안 하지만 규칙은 같다)
+
+---
+
+#### SpecService.precondition DOM 선행조건
+
+**시그니처** `precondition(project_id: int, doc_type: DocType, title: str) -> tuple[str, list[str]] | None` (private)
+
+근거: [[SYNC-STD-001]] 2.6 · [[SYNC-UC-001#UC-A6]] 3a · [[SYNC-PRD-001#R6]]
+
+**처리** if `doc_type != DOM` → `None`. `title`의 키워드로 서브타입 판정(`patterns_for`와 같은 표) · 「클래스」 → `DB: documents where project_id and doc_type = API` 하나라도 있으면 `None` · 「ERD」 → `documents where project_id and doc_type = DOM` 중 `title`에 「클래스」가 있는 것이 하나라도 있으면 `None` · 「도메인」·키워드 없음 → `None`(제목 검사는 `validate` 몫) · 못 채우면 `→ (requires, have)` — `requires`는 사람이 읽을 한 줄(`"API 문서(REST 또는 MCP)"` · `"DOM 클래스 명세"`), `have`는 그 프로젝트의 DOM 문서 ID 목록. **존재만 본다** — 상태·승인은 안 본다(PRD R6). `title`은 `documents`에 열이 없어 `current_body`의 frontmatter에서 읽는다
+
+**테스트 관점** API 없는 프로젝트에 「클래스 명세」 → `("API 문서…", [DOM-001])` · API 초안 하나 있으면 `None` · 클래스 명세 없이 「ERD·DD」 → 거부 · 클래스 명세가 초안이어도 있으면 통과 · 「도메인 모델」은 늘 `None` · DOM 아닌 타입은 늘 `None`
 
 ---
 

@@ -351,6 +351,33 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 
 ---
 
+#### M DOM 셋의 순서와 문서 하나의 작업 단위
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-STD-001]] 1.8·2.6·3장 · [[SYNC-PRD-001#R6]] · [[SYNC-UC-001#UC-A6]] 3·3a·8 · [[SYNC-API-002#create_document]] · [[SYNC-API-002#update_document]] · [[SYNC-SEQ-001#SEQ-19]] 3a · [[SYNC-RFQ-001]] 2장 |
+| 구현 함수 | [[SYNC-MS-002#SpecService.precondition]] · [[SYNC-MS-002#SpecService.validate]] 1(`frontmatter.title.subtype`) · [[SYNC-MS-007#pipeline.save_pipeline]] 3a·15(`next_step`) · [[SYNC-MS-009#git.init_specs]] README · `mcp/tools` 도구 설명(API-002 전사) |
+| 화면 | UI-16 3.4·3.5 — DOM 행 줄마다 언제 쓰는지, 주의에 예외 하나 |
+| 테스트 | `precondition` 여섯 갈래(API 없이 클래스 → 거부 · API 초안 하나면 통과 · 클래스 없이 ERD → 거부 · 클래스 초안이면 통과 · 도메인 모델은 늘 통과 · DOM 아니면 늘 통과) · `validate` DOM 제목에 키워드 없음 → `frontmatter.title.subtype` · e2e: API 없이 클래스 명세 → `precondition-unmet {requires, have}`, API 만든 뒤 통과, 결과에 `next_step` · README에 순서·작업 단위 문장 · 기존 명세 전부 여전히 위반 0 · `check_ui.py` UI-16 |
+| 선행 | L |
+
+**왜 카드인가.** 저장을 막는 조건이 하나 늘고(`precondition-unmet`), 위반 규칙이 하나 늘고, 응답 필드가 하나 는다. 기능이다(DEV-15).
+
+**왜 지금인가.** 싱크독으로 다른 프로젝트(VA)를 쓰던 중 에이전트가 DOM 단계에서 **도메인 모델·클래스 명세·ERD 셋을 한 대화에 한꺼번에** 만들었다. 사용자는 싱크독을 만들 때 "도메인 모델을 쓰고 화면·API로 갔다가 돌아와서 클래스 명세와 ERD를 썼다"고 기억했고, 데이터가 맞다 — `SYNC-DOM-002`의 `upstream`이 `API-001`·`API-002`다. 그런데 RFQ 2장·STD-001 2.6·저장소 README는 셋을 한 칸에 「문서 셋」으로만 적어 에이전트가 예측으로 셋을 채우는 게 당연했다. 어디에도 "문서 하나 쓰고 멈춰라"가 없었다.
+
+**정한 것 넷.**
+
+| 질문 | 결정 | 이유 |
+|---|---|---|
+| 물리적으로 단계를 나누나 | **안 나눈다.** 타입·ID 그대로, 규약 + 서버 검사 | 나누면 다섯 프로젝트 DOM 문서 12개의 ID가 바뀌고 들어오는 참조 60건이 끊긴다. 규약과 `precondition-unmet`으로도 "예측으로 셋"은 막힌다 |
+| 선행조건을 무엇으로 판정하나 | **존재.** 상태는 안 본다 | PRD R6 "상태는 게이트가 아니다"를 지킨다. 막는 건 순서지 승인이 아니다 |
+| ERD의 선행 | **클래스 명세가 있어야** (싱크독 방식) | 사용자 결정. JSD·TBL은 클래스 명세 없이 ERD를 먼저 썼는데, 그건 이미 있는 문서라 안 건드린다 — 앞으로는 클래스 명세가 먼저다 |
+| 단계 사이 멈춤을 서버가 막나 | **안 막는다.** 규약(1.8) + 응답 `next_step` | "초안이 있으면 새 문서 거부"는 R6과 정면 충돌이고 직접 push는 못 막는다. 대신 응답이 매번 말한다 |
+
+**제목 키워드 검사는 DOM만.** UI·API도 서브타입을 제목으로 가르지만 기존 문서에 키워드 없는 제목(`JSD-API-002 에이전트 도구`)이 있어 지금 넣으면 재구축이 위반을 만든다. 따로 정한다.
+
+---
+
 ## 2. 통합 테스트 시나리오
 
 시나리오 S1~S7을 그대로 E2E 테스트로. 각 슬라이스의 `테스트` 행에 나눠 들어가 있다. 전부 통과하면 PRD 성공지표 측정을 시작한다.

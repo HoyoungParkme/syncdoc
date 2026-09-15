@@ -50,6 +50,10 @@ async def test_s1_agent_builds_specs_over_mcp(
         "draft",
     )
     assert rfq["pending_decision_version_id"] is None and "section.missing: 요구" in rfq["warnings"]
+    # 문서 하나 쓰고 멈추라는 규약(STD-001 1.8)을 응답이 매번 말한다
+    assert rfq["next_step"].startswith(
+        "EXMP-RFQ-001 v1 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다"
+    )
 
     # 4. PRD — RFQ를 읽고 [[EXMP-RFQ-001#Q1]] 참조
     err, doc = await call("get_document", doc_id="EXMP-RFQ-001")
@@ -175,3 +179,55 @@ async def test_s1_agent_builds_specs_over_mcp(
         "RFQ": 1,
         "PRD": 1,
     }
+
+    # DOM 셋의 순서 (STD-001 2.6) — API 없이 클래스 명세 → precondition-unmet. 커밋도 DB도 없다
+    dom = "---\ndoc_id: \ntype: DOM\ntitle: {t}\nstatus: draft\n---\n# DOM\n#### Document 문서\n속성\n"
+    err, p = await call(
+        "create_document",
+        project_code="EXMP",
+        doc_type="DOM",
+        body=dom.format(t="클래스 명세"),
+        message="m",
+    )
+    assert err and p["type"] == "urn:syncdoc:precondition-unmet"
+    assert p["requires"].startswith("API 문서") and p["have"] == []
+    assert scoped.execute(text("SELECT count(*) FROM versions")).scalar() == 4
+    # 제목에 키워드가 없으면 규약 위반 — 선행조건보다 먼저가 아니라 validate에서
+    err, p = await call(
+        "create_document",
+        project_code="EXMP",
+        doc_type="DOM",
+        body=dom.format(t="데이터"),
+        message="m",
+    )
+    assert err and p["violations"][0]["rule"] == "frontmatter.title.subtype"
+    # API 문서를 만든 뒤에는 통과하고, ERD는 그 클래스 명세 뒤에
+    api = "---\ndoc_id: \ntype: API\ntitle: REST\nstatus: draft\n---\n# API\n#### GET/api/x 조회\n한 줄\n"
+    err, _ = await call(
+        "create_document", project_code="EXMP", doc_type="API", body=api, message="spec(API): 첫"
+    )
+    assert not err
+    err, p = await call(
+        "create_document",
+        project_code="EXMP",
+        doc_type="DOM",
+        body=dom.format(t="ERD·DD"),
+        message="m",
+    )
+    assert err and p["type"] == "urn:syncdoc:precondition-unmet" and p["have"] == []
+    err, cls = await call(
+        "create_document",
+        project_code="EXMP",
+        doc_type="DOM",
+        body=dom.format(t="클래스 명세"),
+        message="spec(DOM): 클래스",
+    )
+    assert not err and cls["doc_id"] == "EXMP-DOM-001" and "멈춘다" in cls["next_step"]
+    err, p = await call(
+        "create_document",
+        project_code="EXMP",
+        doc_type="DOM",
+        body=dom.format(t="ERD·DD"),
+        message="m",
+    )
+    assert not err and p["doc_id"] == "EXMP-DOM-002"

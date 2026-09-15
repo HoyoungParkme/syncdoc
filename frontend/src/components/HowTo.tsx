@@ -33,11 +33,21 @@ const STAGES: [string, string, string, string[], Docs][] = [
     ['Document', 'documents'],
     {
       n: '3',
-      why: '같은 것을 세 층으로. 이름으로 서로 참조한다',
+      why: (
+        <>
+          같은 것을 세 층으로. 이름으로 서로 참조한다 — <b>한 번에 쓰지 않는다</b>
+        </>
+      ),
+      // 셋은 순서가 있고 사이에 다른 단계가 낀다 (STD-001 2.6) — 줄마다 언제 쓰는지
       list: [
-        ['도메인 모델', <>개념 <code>Document</code></>],
-        ['클래스 명세', <>클래스 <code>Document</code></>],
-        ['ERD·DD', <>테이블 <code>documents</code></>],
+        ['도메인 모델', <>개념 <code>Document</code> · 여기서</>],
+        [
+          '클래스 명세',
+          <>
+            클래스 <code>Document</code> · <b>8 API 뒤에</b> 돌아와서
+          </>,
+        ],
+        ['ERD·DD', <>테이블 <code>documents</code> · 클래스 명세 뒤에</>],
       ],
     },
   ],
@@ -217,7 +227,8 @@ export function HowTo({ onClose }: { onClose: () => void }) {
             <code>{'{문서ID}#{항목번호}'}</code>, 참조는 <code>{'[[항목ID]]'}</code>.
           </p>
           <p className="note" data-el="3.4">
-            11단계 순서는 권장이지 강제가 아니다. 건너뛰어도 막지 않고 표시만 한다. <b>여섯(RFQ·PRD·UC·DOM·API·CODE)이 실질이고 나머지는 규모가 정한다</b> —
+            11단계 순서는 권장이지 강제가 아니다. 건너뛰어도 막지 않고 표시만 한다 — DOM 셋의 순서만 예외다(클래스 명세는 API 뒤, ERD는 클래스 명세 뒤).{' '}
+            <b>여섯(RFQ·PRD·UC·DOM·API·CODE)이 실질이고 나머지는 규모가 정한다</b> —
             가르는 것은 사람 수가 아니라 「머리에 안 들어가는가」다. 빈 단계는 「미작성」으로 남아 건너뛰었다는 사실이 보인다.
           </p>
         </div>

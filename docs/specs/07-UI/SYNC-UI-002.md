@@ -1881,7 +1881,7 @@ status: approved
     <table class="grid" data-el="3"><!-- 머리 행 없음. 위 소제목이 그 일을 한다 -->
       <tr data-el="3.1"><td class="no">1</td><td class="code">RFQ</td><td><b>요구·인터뷰</b> — 무엇을 왜 만드나. 고객이 말한 것만 적는다<div class="sub" data-el="3.5"><span class="cnt">문서 1</span> 고객이 말한 것 → Q 항목</div></td><td class="ids">Q1</td></tr>
       <tr><td class="no">2</td><td class="code">PRD</td><td><b>제품 요구</b> — 목표·비목표·요구사항. 요구에는 인수기준까지<div class="sub"><span class="cnt">문서 1</span> 목표 G · 요구 R · 비목표 N</div></td><td class="ids">G1 · R12 · N3</td></tr>
-      <tr><td class="no">6</td><td class="code">DOM</td><td><b>도메인·클래스·데이터</b> — 도메인 모델·클래스 명세·ERD를 한 단계에<div class="sub"><span class="cnt">문서 3</span> 같은 것을 세 층으로. 이름으로 서로 참조한다<ul class="docs"><li><b>도메인 모델</b> — 개념 <code>Document</code></li><li><b>클래스 명세</b> — 클래스 <code>Document</code></li><li><b>ERD·DD</b> — 테이블 <code>documents</code></li></ul></div></td><td class="ids">Document · documents</td></tr>
+      <tr><td class="no">6</td><td class="code">DOM</td><td><b>도메인·클래스·데이터</b> — 도메인 모델·클래스 명세·ERD를 한 단계에<div class="sub"><span class="cnt">문서 3</span> 같은 것을 세 층으로. 이름으로 서로 참조한다 — <b>한 번에 쓰지 않는다</b><ul class="docs"><li><b>도메인 모델</b> — 개념 <code>Document</code> · 여기서</li><li><b>클래스 명세</b> — 클래스 <code>Document</code> · <b>8 API 뒤에</b> 돌아와서</li><li><b>ERD·DD</b> — 테이블 <code>documents</code> · 클래스 명세 뒤에</li></ul></div></td><td class="ids">Document · documents</td></tr>
       <tr><td class="no">7</td><td class="code">UI</td><td><b>화면</b> — 화면 목록·흐름·화면별 요소<div class="sub"><span class="cnt">문서 2</span> 무엇이 있나 / 어떻게 생겼나<ul class="docs"><li><b>화면 설계</b> — 목록·흐름 <code>UI-5</code></li><li><b>와이어프레임</b> — 같은 <code>UI-5</code>의 배치·요소·규칙 <span class="tag">선택</span></li></ul></div></td><td class="ids">UI-5</td></tr>
       <tr><td class="no">8</td><td class="code">API</td><td><b>인터페이스</b> — REST 엔드포인트와 MCP 도구<div class="sub"><span class="cnt">문서 2</span> 입구가 둘<ul class="docs"><li><b>REST</b> — 사람·화면이 부른다 <code>GET/api/…</code></li><li><b>MCP</b> — 에이전트가 부른다 <code>get_document</code></li></ul></div></td><td class="ids">GET/api/docs/{docId} · get_doc</td></tr>
       <tr><td class="no">10</td><td class="code">MS</td><td><b>MINISPEC</b> — 함수 하나하나의 시그니처와 처리 순서<div class="sub"><span class="cnt">문서 N</span> MS 하나 = 클래스 명세 절 하나 = 코드 파일 하나 (싱크독 9개) <span class="tag">선택</span></div></td><td class="ids">SpecService.save</td></tr>
@@ -1889,7 +1889,7 @@ status: approved
     </table>
 
     <p class="lbl" data-el="3.3">오른쪽은 그 단계 문서 안에서 쓰는 항목 ID 형식. 문서 ID는 <code>{프로젝트코드}-{타입}-{번호}</code>, 항목 ID는 <code>{문서ID}#{항목번호}</code>, 참조는 <code>[[항목ID]]</code>.</p>
-    <p class="note" data-el="3.4">11단계 순서는 권장이지 강제가 아니다. 건너뛰어도 막지 않고 표시만 한다. <b>여섯(RFQ·PRD·UC·DOM·API·CODE)이 실질이고 나머지는 규모가 정한다</b> — 가르는 것은 사람 수가 아니라 「머리에 안 들어가는가」다. 빈 단계는 「미작성」으로 남아 건너뛰었다는 사실이 보인다.</p>
+    <p class="note" data-el="3.4">11단계 순서는 권장이지 강제가 아니다. 건너뛰어도 막지 않고 표시만 한다 — DOM 셋의 순서만 예외다(클래스 명세는 API 뒤, ERD는 클래스 명세 뒤). <b>여섯(RFQ·PRD·UC·DOM·API·CODE)이 실질이고 나머지는 규모가 정한다</b> — 가르는 것은 사람 수가 아니라 「머리에 안 들어가는가」다. 빈 단계는 「미작성」으로 남아 건너뛰었다는 사실이 보인다.</p>
   </div>
   <div class="dfoot"><span class="grow"></span><span class="btn" data-el="5">닫기</span></div>
 </div>
@@ -1906,8 +1906,8 @@ status: approved
 | 3.1 | 단계 행 | 행 | 한 단계 | — |
 | 3.2 | 표준 행 | 행 | `STD`. 단계 밖이라 회색으로 마지막에 | — |
 | 3.3 | ID 문법 | 텍스트 | 문서 ID·항목 ID·참조 표기 | — |
-| 3.4 | 주의 | 텍스트 | 11단계 순서는 강제가 아니라는 안내와, 여섯(RFQ·PRD·UC·DOM·API·CODE)이 실질이고 나머지는 규모가 정한다는 것([[SYNC-STD-003]] 결정) | — |
-| 3.5 | 문서 구성 | 텍스트 | 단계 행 안 둘째 줄. **문서 수 라벨**(`문서 3`) + 이유 한 줄 + 문서가 여럿이면 **줄마다 하나**(이름 — 항목 예) + 선택이면 **「선택」 태그**. DOM은 개념→클래스→테이블 세 층이라 셋, UI는 무엇이 있나/어떻게 생겼나라 둘, API는 입구가 둘이라 둘, MS는 코드 파일마다 하나 | — |
+| 3.4 | 주의 | 텍스트 | 11단계 순서는 강제가 아니라는 안내와, 그 예외 하나(DOM 셋의 순서 — [[SYNC-STD-001]] 2.6), 여섯(RFQ·PRD·UC·DOM·API·CODE)이 실질이고 나머지는 규모가 정한다는 것([[SYNC-STD-003]] 결정) | — |
+| 3.5 | 문서 구성 | 텍스트 | 단계 행 안 둘째 줄. **문서 수 라벨**(`문서 3`) + 이유 한 줄 + 문서가 여럿이면 **줄마다 하나**(이름 — 항목 예) + 선택이면 **「선택」 태그**. DOM은 개념→클래스→테이블 세 층이라 셋 — **순서가 있어 줄마다 언제 쓰는지도 적는다**(도메인 모델은 여기서, 클래스 명세는 API 뒤에, ERD는 그 뒤 — [[SYNC-STD-001]] 2.6), UI는 무엇이 있나/어떻게 생겼나라 둘, API는 입구가 둘이라 둘, MS는 코드 파일마다 하나 | — |
 | 4 | 닫기(✕) | 버튼 | | 닫힘 |
 | 5 | 닫기 | 버튼 | | 닫힘 |
 | 6 | 붙이는 법 표 | 표 | 토큰 → 명령 → 새 세션 → 확인. 2의 둘째 단계를 손 순서로 편 것 | — |

@@ -646,6 +646,7 @@ classDiagram
         +clear_index(project_id: int) None
         +mark_convention_error(document_id: int, violations: list?, warnings: list?) None
         -issue_doc_id(project_id: int, code: str, doc_type: DocType) str
+        -precondition(project_id: int, doc_type: DocType, title: str) tuple?
         -item_blocks(body: str, doc_type: DocType, title: str?) list~ItemBlock~
     }
     class Document {
@@ -978,6 +979,7 @@ save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | None,
 
     0. repo lock 획득 (저장소 단위. 프로세스 내 락)
     1. spec.get_document(doc_id)                 (수정·되돌리기·상태 변경일 때)
+    1a. spec.precondition(project_id, doc_type, title)  (생성·mcp·DOM만) → precondition-unmet
     2. spec.validate(body, doc_type, entry)      → 위반이면 convention-violation
                                                    github 경로는 거부 대신 has_convention_error 표시
                                                    warnings는 incomplete_warnings에 저장
@@ -993,7 +995,7 @@ save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | None,
          tracking.detect_impact                  → 있으면 tracking.create_pending
          tracking.raise_upstream                 (upstream_impact 지정 시. 대상은 spec.resolve_item으로. 못 찾으면 경고)
          collab.relocate
-    7. repo lock 해제. 반환 SaveResult
+    7. repo lock 해제. 반환 SaveResult (next_step은 mcp만 — 사람에게 보여주고 멈추라는 한 문장)
 
     entry=web_status: 1 → 2(frontmatter만) → 3 → 5(message "status(...)") → 6은 Document.status + StatusChange(commit_hash)만.
                       Version·extract·detect_impact 없음.

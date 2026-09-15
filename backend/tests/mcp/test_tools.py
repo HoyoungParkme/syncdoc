@@ -47,6 +47,11 @@ async def test_tools_listed_with_descriptions() -> None:
         "update_document",
     }
     assert names["get_template"].startswith("문서 타입의 템플릿과 작성 규약")
+    # STD-001 1.8·2.6 — 도구 설명이 멈춤과 DOM 순서를 말한다
+    assert (
+        "next_step" in names["create_document"] and "precondition-unmet" in names["create_document"]
+    )
+    assert "next_step" in names["update_document"]
 
 
 async def test_get_document_and_get_item(scoped: Session, as_user) -> None:

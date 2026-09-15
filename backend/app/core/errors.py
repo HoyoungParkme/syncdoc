@@ -105,6 +105,17 @@ class ItemDeletionNeedsConfirm(Problem):
         super().__init__("항목 삭제에 하위 참조가 있음", deleted_items=deleted_items)
 
 
+class PreconditionUnmet(Problem):
+    """DOM 셋의 순서 — 클래스 명세 ← API 문서, ERD ← 클래스 명세 (STD-001 2.6)."""
+
+    type = "urn:syncdoc:precondition-unmet"
+    status = 422
+    title = "precondition-unmet"
+
+    def __init__(self, requires: str, have: list[str]) -> None:
+        super().__init__(f"먼저 있어야 한다: {requires}", requires=requires, have=have)
+
+
 class ProjectCodeConflict(Problem):
     type = "urn:syncdoc:project-code-conflict"
     status = 409
