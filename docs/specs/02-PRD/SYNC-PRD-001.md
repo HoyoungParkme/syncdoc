@@ -2,7 +2,7 @@
 doc_id: SYNC-PRD-001
 type: PRD
 title: PRD — 싱크독
-status: approved
+status: review
 upstream: [SYNC-RFQ-001]
 ---
 
