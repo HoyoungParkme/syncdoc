@@ -29,6 +29,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#ReferenceService.downstream]] | 이 항목을 근거로 삼은 것 |
 | [[#ReferenceService.upstream_of_document]] | 문서의 상위 참조 전부 (승인 대조) |
 | [[#ReferenceService.downstream_of_document]] | 문서 전체를 참조한 것 |
+| [[#ReferenceService.inbound_of_document]] | 남이 이 문서(항목 포함)에 건 참조 |
 | [[#ReferenceService.references_among]] | 노드 집합 사이 간선 |
 | [[#ReferenceService.count_downstream]] | 하위 건수 |
 | [[#ReferenceService.resolve_missing]] | 미존재 참조 해제 |
@@ -94,6 +95,18 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **시그니처** `downstream_of_document(document_id: int) -> list[RefEdge]`
 
 **처리** `DB: references where to_document_id = document_id and to_item_pk is null` → `RefEdge[]`. **이 문서의 어느 항목이 바뀌어도 이것들이 영향받는다** — `detect_impact`가 합쳐 본다
+
+---
+
+#### ReferenceService.inbound_of_document 남이 이 문서에 건 참조
+
+**시그니처** `inbound_of_document(document_id: int) -> list[RefEdge]`
+
+근거: [[SYNC-UC-001#UC-A7]] 2 · [[SYNC-PRD-001#N3]]
+
+**처리** `DB: references where (to_document_id = id or to_item_id in (items of id)) and from_document_id != id` → `RefEdge[]`. **자기 참조는 뺀다** — 문서 안에서 자기 항목을 가리킨 것은 이력이 아니다. `downstream_of_document`(문서 전체 참조만)와 `downstream`(항목 하나)을 합친 것에 자기 참조를 뺀 것 — 삭제 문지기용이라 따로 둔다
+
+**테스트 관점** 아무도 안 가리키면 `[]` · 다른 문서가 `[[X#A]]`를 걸면 하나 · 같은 문서 안 `[[#A]]`는 안 센다 · 미존재 참조(`is_missing`)는 `to_*`가 비어 안 센다
 
 ---
 

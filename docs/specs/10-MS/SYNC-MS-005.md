@@ -29,6 +29,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#CommentService.resolve]] | 해결됨 토글 |
 | [[#CommentService.relocate]] | 새 버전에서 줄 찾기 |
 | [[#CommentService.unresolved_count]] | 문서 미해결 수 |
+| [[#CommentService.count]] | 문서 댓글 전부 수 (삭제 가능 판정) |
 | [[#CommentService.count_unresolved]] | 프로젝트 미해결 수 |
 | [[#CommentService.count_unresolved_by_document]] | 문서별 |
 | [[#CommentService.unresolved_in]] | 문서들의 미해결 목록 |
@@ -99,6 +100,16 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **시그니처** `unresolved_count(document_id: int) -> int`
 
 **처리** `DB: count(*) comments where document_id and parent_comment_id is null and is_resolved=false`. UI-5 요소 5·`change_status` 확인용
+
+---
+
+#### CommentService.count 문서 댓글 전부 수
+
+**시그니처** `count(document_id: int) -> int`
+
+근거: [[SYNC-UC-001#UC-A7]] 2 · [[SYNC-PRD-001#N3]]
+
+**처리** `DB: count(*) comments where document_id` — 답글·해결된 것까지 전부. 누가 한마디라도 남긴 문서는 이력이 있는 문서다. `unresolved_count`와 다른 점이 그것이다
 
 ---
 

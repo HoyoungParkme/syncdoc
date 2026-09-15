@@ -27,6 +27,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#pipeline.save_pipeline]] | 본문 저장 파이프라인 |
 | [[#pipeline.process_commit]] | GitHub 커밋 처리 |
 | [[#pipeline.rebuild]] | 인덱스 재구축 |
+| [[#pipeline.delete_document]] | 이력 없는 문서 삭제 |
 | [[#scheduler.catch_up]] | 밀린 커밋 따라잡기 |
 | [[#scheduler.poll_loop]] | 주기 폴링 |
 | [[#pipeline.export_tracking]] | 추적 데이터 백업 |
@@ -176,6 +177,38 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 
 ---
 
+#### pipeline.delete_document 이력 없는 문서 삭제
+
+**시그니처** `async def delete_document(doc_id: str, author: Author, confirm: bool) -> DeleteResult` — `DeleteResult(doc_id, commit_hash, next_step)`
+
+근거: [[SYNC-SEQ-001#SEQ-22]] · [[SYNC-UC-001#UC-A7]] · [[SYNC-UC-001#UC-H18]] · [[SYNC-API-002#delete_document]] · [[SYNC-API-001#DELETE/api/docs/{docId}]] · [[SYNC-PRD-001#N3]] 예외 · 넷을 조율하므로 pipeline
+
+**입력** `doc_id` · `author` — MCP면 `_agent_author`, 웹이면 `Author(human, user, None, web_status)` · `confirm` — MCP는 에이전트가 준 것, 웹은 `True`(다이얼로그 13이 이미 받았다)
+
+**처리** — 저장소 락 안
+1. `document = spec.get_document(doc_id)` · 없으면 `! not-found`
+2. 문지기 넷 — `inbound = reference.inbound_of_document(id)` · `comments = collab.count(id)` · `(flags, decisions) = tracking.history_of_document(item_pks, version_ids)` · `changes = spec.status_change_count(id)`
+   - if `document.status != draft or inbound or comments or flags or decisions or changes` → `! document-has-history {status, inbound_refs: [문서ID#항목ID…], comments, flags, decisions, status_changes}`. **하나만 걸려도 전부 담는다** — 사람이 한 번에 본다
+3. if `not confirm` → `! document-deletion-needs-confirm {doc_id, title, version_count}`. 웹은 여기 안 온다
+4. `commit_hash = git.commit_push(repo.workdir, f"spec({doc_id}): 삭제 — 이력 없는 초안", author, delete=[STD-001 1.1 경로])` · 실패 → `! push-failed`. **여기까지 DB 쓰기 없음**
+5. **트랜잭션** — `spec.delete_document(document)` · 커밋 · 락 해제
+6. `→ DeleteResult(doc_id, commit_hash, next_step=f"{doc_id} 지워짐. 사람에게 알리고 멈춘다")`
+
+**예외**
+
+| 조건 | 에러 | 단계 |
+|---|---|---|
+| 문서 없음 | `not-found` | 1 |
+| 이력 있음 | `document-has-history` | 2 |
+| 확인 안 됨 (MCP) | `document-deletion-needs-confirm` | 3 |
+| push 실패 | `push-failed` | 4 |
+
+**호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-003#ReferenceService.inbound_of_document]] [[SYNC-MS-005#CommentService.count]] [[SYNC-MS-004#TrackingService.history_of_document]] [[SYNC-MS-002#SpecService.status_change_count]] [[SYNC-MS-009#git.commit_push]] [[SYNC-MS-002#SpecService.delete_document]]
+
+**테스트 관점** 초안 v2, 아무도 안 가리킴 → `confirm=false`면 needs-confirm에 `version_count=2` · `confirm=true`면 원격에서 파일이 사라지고 커밋 메시지가 `spec(…): 삭제`, 행 다섯 종류 없음 · 다른 문서가 참조 중 → has-history에 `inbound_refs=["X#A"]`, 아무것도 안 지워짐 · 검토중 → has-history `status=review` · 댓글 하나 → `comments=1` · 그 뒤 폴링(`process_commit`)이 삭제 커밋의 `D`를 건너뛰고 `last_processed_commit`이 나아간다
+
+---
+
 #### pipeline.revert 되돌리기
 
 **시그니처** `async def revert(doc_id: str, to_version: int, user: User, confirm_item_deletion: bool = False) -> SaveResult` — `pipeline`을 불러 async(DEV-16)
@@ -225,7 +258,7 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
    - `user = account.user_for_commit(author_email, author_login)` — **이메일 → login → 자리표시** 순([[SYNC-MS-006#AccountService.user_for_commit]])
    - if `user.github_user_id is None` → 위반에 `author.unknown: {author_login}` 추가. **판정은 「자리표시인가」이지 「방금 만들었나」가 아니다** — 후자로 하면 같은 사람의 둘째 문서부터 이미 행이 있어 오류가 안 붙는다(#34)
    - `author = Author(kind=human, user, instructed_by=None, via=github)`
-   - if `status == D` (파일 삭제) → `deleted = spec.mark_deleted(document, commit_hash, author)` (`status=draft`, `file.deleted` 오류, 전 항목 `is_deleted`) · 각 pk에 `tracking.raise_broken` · 문서 행은 남는다 · 다음 파일로
+   - if `status == D` (파일 삭제) → **문서 행이 없으면 건너뛴다** — 앱이 [[#pipeline.delete_document]]로 지운 문서의 삭제 커밋이거나 등록 전에 사라진 파일이다. `mark_deleted`로 가면 `not-found`가 나서 그 커밋이 영영 「처리 실패」로 남고 `last_processed_commit`이 안 나아간다 · else → `deleted = spec.mark_deleted(document, commit_hash, author)` (`status=draft`, `file.deleted` 오류, 전 항목 `is_deleted`) · 각 pk에 `tracking.raise_broken` · 문서 행은 남는다 · 다음 파일로
    - else → `save_pipeline(entry=github, doc_id, None, body, None, author, message=원 커밋 메시지, changed_items=None, commit_hash=file_commit_hash)` → 결과 모음
 5. `repo.last_processed_commit = head_hash`, `synced_at = now`
 6. `→ results`

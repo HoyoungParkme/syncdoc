@@ -72,6 +72,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | GET /api/docs/{docId}/versions | [[#SEQ-C1]] | |
 | GET /api/docs/{docId}/diff | [[#SEQ-15]] | ○ |
 | POST /api/docs/{docId}/revert | [[#SEQ-7]] | ○ |
+| DELETE /api/docs/{docId} | [[#SEQ-22]] | ○ |
 | GET /api/docs/{docId}/comments | [[#SEQ-C1]] | |
 | POST /api/docs/{docId}/comments | [[#SEQ-16]] | ○ |
 | POST /api/comments/{id}/resolve | [[#SEQ-C1]] | |
@@ -84,6 +85,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | POST /api/admin/repos/{code}/rebuild | [[#SEQ-21]] | ○ |
 | MCP create_document | [[#SEQ-19]] | ○ |
 | MCP update_document | [[#SEQ-1]] | ○ |
+| MCP delete_document | [[#SEQ-22]] | ○ |
 | MCP 모든 도구의 인증 | [[#SEQ-C2]] | |
 
 묶음을 넘는 입구가 37개 중 20개다. v1.0에서 안 그린 14개 중 9개가 묶음을 넘었다.
@@ -1095,6 +1097,59 @@ sequenceDiagram
 - **지우는 테이블에 걸린 FK도 세야 한다.** 위 문장은 "지우지 **않는** 테이블에 걸린 FK"만 센다. `versions`를 가리키는 FK가 넷이고(`references`·`propagation_decisions`·`flags.cause_version_id`·`flags.target_version_id`) 그중 둘을 안 세서 실물 재구축이 죽었다(#38). 지금은 `version_keys`로 옛 지도를 먼저 뜨고 `relink_versions`가 새 버전에 다시 잇는다
 - **담당자 재계산은 재연결 뒤에 온다.** 담당자는 대상 문서의 최근 버전에서 오므로 버전이 다 제자리를 찾은 뒤라야 한다
 - 커밋마다 돌아서 버전 이력을 복원한다. SEQ-2(밀린 커밋)는 최종 상태만 저장하는 것과 다르다
+
+---
+
+## SEQ-22 이력 없는 문서를 지운다
+
+[[SYNC-UC-001#UC-A7]] 기본 흐름 1~7, 확장 2a · [[SYNC-UC-001#UC-H18]]. MCP `delete_document` · `DELETE /api/docs/{docId}`. 입구가 둘이고 파이프라인은 하나다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor A as 에이전트·사람
+    participant T as mcp/tools · routers/documents
+    participant P as pipeline
+    participant S as SpecService
+    participant R as ReferenceService
+    participant C as CommentService
+    participant TR as TrackingService
+    participant G as infra/git
+    participant DB
+
+    A->>T: delete_document(doc_id, confirm) · DELETE /api/docs/{id}
+    T->>P: delete_document(doc_id, author, confirm) — 웹은 confirm=true (다이얼로그 13이 받았다)
+    P->>P: repo lock
+    P->>S: get_document(doc_id)
+    S-->>P: Document (status, items, version_count)
+    P->>R: inbound_of_document(document_id)
+    P->>C: count(document_id)
+    P->>TR: history_of_document(document_id, item_pks, version_ids)
+    P->>S: status_change_count(document_id)
+    alt 초안이 아니거나 하나라도 0이 아님 (2a)
+        P-->>T: document-has-history {status, inbound_refs, comments, flags, decisions, status_changes}
+        T-->>A: isError
+    end
+    alt confirm=false (3)
+        P-->>T: document-deletion-needs-confirm {doc_id, title, version_count}
+        T-->>A: isError
+    end
+    P->>G: commit_push(repo, "spec(doc_id): 삭제 — 이력 없는 초안", author, delete=[path])
+    G-->>P: commit_hash
+    rect rgb(240,244,240)
+        Note over P,DB: 한 트랜잭션 — push 뒤
+        P->>S: delete_document(document)
+        S->>DB: references(from) · items · versions · status_changes · documents 삭제
+    end
+    P->>P: lock 해제
+    P-->>T: DeleteResult {doc_id, commit_hash, next_step}
+    T-->>A: 결과 · 204
+```
+
+**읽을 때 볼 것**
+- 이력 검사가 **push 전**이고 행 삭제가 **push 뒤**다. push가 실패하면 아무것도 안 지워진다(SEQ-1과 같은 원칙)
+- 삭제 커밋은 다음 폴링에 `D`로 온다. 그때 문서 행이 없으므로 [[SYNC-MS-007#pipeline.process_commit]]은 **행 없는 D를 건너뛴다** — 앱이 지운 것이다. `mark_deleted`로 가면 `not-found`로 그 커밋이 영영 처리 실패로 남는다
+- 지운 문서의 번호는 `issue_doc_id`가 다시 준다([[SYNC-STD-001]] 1.1)
 
 ---
 

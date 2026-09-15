@@ -55,6 +55,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#SpecService.mark_convention_error]] | 오류·경고 표시 |
 | [[#SpecService.issue_doc_id]] | 문서 ID 발급 |
 | [[#SpecService.precondition]] | DOM 선행조건 |
+| [[#SpecService.status_change_count]] | 상태 변경 수 (삭제 가능 판정) |
+| [[#SpecService.delete_document]] | 이력 없는 문서 행 삭제 |
 | [[#SpecService.item_blocks]] | 본문 → 항목 블록 |
 
 ---
@@ -540,6 +542,35 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **처리** if `doc_type != DOM` → `None`. `title`의 키워드로 서브타입 판정(`patterns_for`와 같은 표) · 「클래스」 → `DB: documents where project_id and doc_type = API` 하나라도 있으면 `None` · 「ERD」 → `documents where project_id and doc_type = DOM` 중 `title`에 「클래스」가 있는 것이 하나라도 있으면 `None` · 「도메인」·키워드 없음 → `None`(제목 검사는 `validate` 몫) · 못 채우면 `→ (requires, have)` — `requires`는 사람이 읽을 한 줄(`"API 문서(REST 또는 MCP)"` · `"DOM 클래스 명세"`), `have`는 그 프로젝트의 DOM 문서 ID 목록. **존재만 본다** — 상태·승인은 안 본다(PRD R6). `title`은 `documents`에 열이 없어 `current_body`의 frontmatter에서 읽는다
 
 **테스트 관점** API 없는 프로젝트에 「클래스 명세」 → `("API 문서…", [DOM-001])` · API 초안 하나 있으면 `None` · 클래스 명세 없이 「ERD·DD」 → 거부 · 클래스 명세가 초안이어도 있으면 통과 · 「도메인 모델」은 늘 `None` · DOM 아닌 타입은 늘 `None`
+
+---
+
+#### SpecService.status_change_count 상태 변경 수
+
+**시그니처** `status_change_count(document_id: int) -> int`
+
+근거: [[SYNC-UC-001#UC-A7]] 2 · [[SYNC-PRD-001#N3]]
+
+**처리** `DB: count(*) status_changes where document_id`. 상태가 한 번이라도 바뀐 문서는 이력이 있는 문서다 — `delete_document`의 문지기 넷 중 하나
+
+---
+
+#### SpecService.delete_document 이력 없는 문서 행 삭제
+
+**시그니처** `delete_document(document: Document) -> int` — 지운 행 수
+
+근거: [[SYNC-UC-001#UC-A7]] 6 · [[SYNC-PRD-001#N3]] · [[SYNC-DOM-003]] 설계 규칙(예외 하나)
+
+**처리** — 호출자의 트랜잭션 안. **이력 검사는 하지 않는다** — `pipeline.delete_document`가 넷을 다 세고 부른다. 여기서 또 세면 두 곳이 어긋난다
+1. `DB: delete references where from_document_id = id` — 이 문서가 남에게 건 참조. 들어오는 참조는 호출자가 0임을 확인했다
+2. `DB: delete items where document_id` · `delete versions where document_id` · `delete status_changes where document_id`(0건이지만 순서상) · `delete documents where id`
+3. `→` 지운 행 수 합
+
+**예외** 던지지 않는다. FK가 걸리면 그건 호출자가 검사를 빠뜨린 것이다 — DB 오류로 드러나야 한다
+
+**호출하는 것** —
+
+**테스트 관점** 초안 v3 문서 → 행 다섯 종류가 다 사라짐 · 같은 프로젝트의 다른 문서·참조는 그대로 · 지운 뒤 `issue_doc_id`가 그 번호를 다시 준다
 
 ---
 
