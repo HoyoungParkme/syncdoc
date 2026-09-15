@@ -527,6 +527,18 @@ li.ref.missing{color:var(--ink-disabled)}
 .thead b{font-size:var(--text-screen-title);font-weight:var(--w-semibold);letter-spacing:-.3px}
 .thead .cnt{color:var(--danger)}
 .thead .lbl{margin-top:2px;font-size:var(--text-ui)}
+/* 10 프로젝트 칩 — 필터일 뿐. 켜진 것 하나는 그래프 툴바(.gbar .btn.on)와 같은 검정 채움 */
+.tchips{display:flex;flex-wrap:wrap;gap:var(--space-6);margin:0 0 var(--space-16)}
+.tchips .btn.on{background:var(--ink-body);color:#fff;border-color:var(--ink-body)}
+.tchips .btn .cnt{margin-left:var(--space-3);font-family:var(--font-mono);font-size:var(--text-mono-sm);color:var(--ink-muted)}
+.tchips .btn.on .cnt{color:rgba(255,255,255,.75)}
+/* 11 프로젝트 묶음 — 머리는 종류 묶음 머리보다 한 단계 크고 실선이 짙다. 안의 종류 묶음은 조금 들여 쓴다 */
+.tproj{margin-bottom:var(--space-22)}
+.tproj .tph{display:flex;align-items:center;gap:var(--space-8);margin:0 0 var(--space-12);
+  font-size:var(--text-section-title);font-weight:var(--w-semibold)}
+.tproj .tph .cnt{font-family:var(--font-mono);font-size:var(--text-caption);font-weight:var(--w-regular);color:var(--ink-muted)}
+.tproj .tph .rule{flex:1;height:1px;background:var(--border-strong)}
+.tproj .tgroup{margin-left:var(--space-12)}
 /* 카드 경계는 묶음이 아니라 항목에 있다. 묶음 머리는 배경 위 맨 텍스트다 */
 .tgroup{margin-bottom:var(--space-18)}
 .tgroup h4{display:flex;align-items:center;gap:var(--space-8);margin:0 0 var(--space-7);
