@@ -384,7 +384,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-PRD-001#N3]] 예외 · [[SYNC-UC-001#UC-A7]] · [[SYNC-UC-001#UC-H18]] · [[SYNC-API-001#DELETE/api/docs/{docId}]] · [[SYNC-API-002#delete_document]] · [[SYNC-SEQ-001#SEQ-22]] · [[SYNC-STD-001]] 1.1 · [[SYNC-DOM-003]] 설계 규칙 |
-| 구현 함수 | [[SYNC-MS-007#pipeline.delete_document]] · [[SYNC-MS-007#pipeline.process_commit]] 4(행 없는 D 건너뜀) · [[SYNC-MS-002#SpecService.delete_document]] · [[SYNC-MS-002#SpecService.status_change_count]] · [[SYNC-MS-003#ReferenceService.inbound_of_document]] · [[SYNC-MS-004#TrackingService.history_of_document]] · [[SYNC-MS-005#CommentService.count]] · [[SYNC-MS-009#git.commit_push]] `delete` |
+| 구현 함수 | [[SYNC-MS-007#pipeline.trash_document]](카드 R이 `delete_document`를 대체) · [[SYNC-MS-007#pipeline.process_commit]] 4(행 없는 D 건너뜀) · [[SYNC-MS-002#SpecService.delete_document]] · [[SYNC-MS-002#SpecService.status_change_count]] · [[SYNC-MS-003#ReferenceService.inbound_of_document]] · [[SYNC-MS-004#TrackingService.history_of_document]] · [[SYNC-MS-005#CommentService.count]] · [[SYNC-MS-009#git.commit_push]] `delete` |
 | 화면 | UI-5 12 문서 삭제(초안만) · 13 확인 다이얼로그(13.1~13.4) |
 | 테스트 | 문지기 넷 각각 한 번씩 걸림(`document-has-history`에 값) · confirm 없이 → needs-confirm에 `version_count` · confirm → 원격 파일 사라짐 + 커밋 메시지 + 행 다섯 종류 0 · 다른 문서 참조·항목 그대로 · 지운 번호 재발급 · 폴링이 삭제 커밋 D를 건너뛰고 `last_processed_commit` 전진 · 웹 DELETE 204/409 · MCP 도구 두 번 호출 · `check_ui.py` UI-5 |
 | 선행 | M |

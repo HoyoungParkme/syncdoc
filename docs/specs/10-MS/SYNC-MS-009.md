@@ -78,7 +78,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-SEQ-001#SEQ-1]] 7단계 · [[SYNC-UC-001#UC-S7]] · [[SYNC-INFRA-001]] 4.3
 
-**입력** `path`+`content` 하나 또는 `files` 여럿(초기화용) 또는 `delete` 경로 목록(문서 삭제, [[SYNC-MS-007#pipeline.delete_document]]) — 셋 중 하나는 있어야 한다. `author.user` — 커밋 작성자
+**입력** `path`+`content` 하나 또는 `files` 여럿(초기화용) 또는 `delete` 경로 목록(문서를 휴지통에, [[SYNC-MS-007#pipeline.trash_document]]) — 셋 중 하나는 있어야 한다. `author.user` — 커밋 작성자
 
 **처리**
 1. `token = AccountService.github_token_for(author.user)` · if 실패 → `! push-failed {reason: 미등록}`
