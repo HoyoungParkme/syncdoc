@@ -53,7 +53,8 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
                         confirm_item_deletion: bool = False,
                         commit_hash: str | None = None,
                         reason: str | None = None,
-                        session: Session | None = None) -> SaveResult
+                        session: Session | None = None,
+                        restore: bool = False) -> SaveResult
 ```
 
 근거: [[SYNC-SEQ-001#SEQ-1]] · [[SYNC-UC-001#UC-A6]] · [[SYNC-DOM-002#SpecService]] 4.7
@@ -76,6 +77,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 | `commit_hash` | 이미 있는 커밋 | `github`만. push 단계 건너뜀 |
 | `reason` | 상태 변경 사유 | `web_status`만. `apply_status`로 |
 | `session` | 호출자 세션 | `change_status`·`revert`가 넘긴다. None이면 스스로 연다(DEV-10) |
+| `restore` | 되살리기 중 | `restore_document`만 True — 2단계의 `document-trashed` 검사를 지난다 |
 
 **처리**
 
