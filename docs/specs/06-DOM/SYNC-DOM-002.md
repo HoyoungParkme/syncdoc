@@ -786,6 +786,7 @@ classDiagram
         +record_decision(version_id: int, choice: Propagation, reason: str?, user: User) DecisionResult
         +raise_flags(version_id: int, target_item_pks: list~int~) int
         +raise_broken(cause_item_pk: int) int
+        +release_broken(item_pks: list~int~, user: User) int
         +raise_upstream(target_item_pks: list~int~, cause_document_id: int, cause_version_id: int, cause_item_pk: int?) int
         +get_flag(flag_id: int) FlagDetail
         +resolve(flag_id: int, user: User, target_changed: bool) FlagSummary

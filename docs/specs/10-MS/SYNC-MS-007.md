@@ -105,6 +105,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 9. `deleted`마다 `tracking.raise_broken(pk)`
 10. `reference.extract(document_id, version.id, body, item_pks=spec.item_pks(document_id), upstream_doc_ids=frontmatter upstream)`
 10a. `reference.resolve_missing(project_id, target_doc_id=doc_id)` — 이 문서(또는 항목)를 기다리던 미존재 참조를 푼다. 하위가 먼저 저장된 경우가 재구축까지 안 기다려도 되게(UC-S2 2a2)
+10b. `tracking.release_broken(item_pks, author.user)` — 이 문서 항목에 붙은 끊어진 참조 중 **원인 항목을 더 이상 가리키지 않는 것**을 `resolved_with_edit=True`로 푼다(UC-H12 3, #70). 확인자는 저장시킨 사람. `entry`를 가리지 않는다 — GitHub push로 고쳐도 풀린다
 11. `affected = tracking.detect_impact(document_id, prev_version_id=document.current_version_id (2단계에서 읽은 것. 신규면 None), version.id, changed_items)` · if `affected` → `changed_pks = spec.resolve_items(doc_id, changed_items)` (선언) 또는 `detect_impact`가 diff로 판정한 것 · `pending_id = tracking.create_pending(version.id, affected, changed_pks)` · else `pending_id = None`
 12. if `upstream_impact` → 각각 `spec.resolve_item(doc, item)` · if 못 찾음 → `warnings`에 `upstream_impact.unknown` 추가하고 건너뜀 · `tracking.raise_upstream(pks, document_id, version.id, cause_item_pk=None)`
 13. `collab.relocate(document_id, old_body, body, old_version_no=document.current_version_no)`
