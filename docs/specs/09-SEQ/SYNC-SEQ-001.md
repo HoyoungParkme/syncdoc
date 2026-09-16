@@ -174,6 +174,8 @@ sequenceDiagram
         end
         P->>R: extract(document_id, version_id, body)
         R->>DB: Reference 갱신 (사라진 것 삭제, 미존재 표시)
+        P->>TR: release_broken(item_pks, user) — 원인을 더 이상 안 가리키는 broken_ref를 푼다 (UC-H12 3, #70)
+        TR->>DB: Flag.resolved_at·resolved_with_edit=true
         P->>TR: detect_impact(document_id, prev_version_id, version_id)
         TR->>S: diff(doc_id, prev_no, new_no)
         S-->>TR: 변경된 item_id[]
@@ -200,6 +202,7 @@ sequenceDiagram
 - 검증(2a)·버전 충돌(4a)·삭제 확인(4b)은 **push 전에** 끝난다. push까지 갔으면 저장은 된다
 - push가 DB 트랜잭션 **앞**이다. push가 실패하면 DB에 아무것도 안 남는다. 클래스 명세 4.7은 반대로 적혀 있었다 → 되먹일 것
 - 삭제 확인은 `SpecService`가 아니라 `pipeline`이 한다. `SpecService`는 하위 참조를 모르기 때문이다(묶음 경계) → 되먹일 것
+- **끊어진 참조는 저장이 푼다.** 참조를 고친 본문이 추출된 뒤 `release_broken`이 아직 원인을 가리키는지 본다. 사람이 누르는 버튼이 없다 — UC-H12 3이 그렇게 정했는데 v1.0에는 이 단계가 빠져 있었다(#70)
 - 전파 결정은 여기서 안 한다. `undecided` 행만 남기고 끝. 사람이 SEQ-3에서
 - `upstream_impact`는 하위→상위 되먹임의 에이전트 경로. 사람 경로는 SEQ-5 승인 대조
 - **자동 강등(6a)은 push 전에 본문에도 쓴다.** DB에만 적으면 저장소 frontmatter가 `approved`로 남아 「`status`가 진실」이 깨지고, 다음 저장이 `frontmatter.status_change`로 막힌다 — 서버가 준 본문을 서버가 거부한다(#47). **서버가 에이전트의 본문을 고치는 유일한 자리다**

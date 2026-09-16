@@ -186,6 +186,16 @@ class TrackingRepository:
         )
         return flags or 0, decisions or 0
 
+    def unresolved_broken_for_items(self, item_pks: list[int]) -> list[Flag]:
+        if not item_pks:
+            return []
+        stmt = select(Flag).where(
+            Flag.kind == "broken_ref",
+            Flag.target_item_id.in_(item_pks),
+            Flag.resolved_at.is_(None),
+        )
+        return list(self.session.scalars(stmt.order_by(Flag.id)))
+
     def unresolved_for_items(self, item_pks: list[int]) -> list[Flag]:
         if not item_pks:
             return []
