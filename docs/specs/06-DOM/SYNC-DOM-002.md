@@ -57,6 +57,8 @@ syncdoc/                        저장소 = 프로젝트
 ├── tools/                      validate.py · check_code.py · check_ui.py · view_build.py · dev_preview.py
 ├── scripts/                    tunnel.sh — Quick Tunnel 기동 (INFRA 5장)
 ├── Dockerfile · docker-compose.yml   배치 (INFRA 8장). 프런트를 빌드해 백엔드 이미지에 담는 2단계
+├── .env.example               필요한 환경 변수의 이름만. 값은 비운다. `.env`는 커밋하지 않는다
+├── .gitignore · .dockerignore
 └── AGENTS.md · README.md
 ```
 
@@ -118,6 +120,28 @@ core/spec/
 - `pipeline.py`·`queries.py`는 묶음 밖에 있다. 여러 묶음을 부르는 조율자·조합자라 어느 묶음에도 속하지 않는다. 쓰기는 `pipeline`, 읽기 집계는 `queries`
 - 라우터·MCP 도구는 한 묶음만 필요하면 그 서비스를, 여러 묶음을 모아야 하면 `queries`를 부른다. 서비스가 다른 서비스를 직접 부르는 건 3.2에 그려진 것뿐
 - `infra`는 core가 부른다. core는 git 명령이나 GitHub API를 직접 호출하지 않는다
+
+**frontend/ 안**
+
+```
+frontend/
+├── index.html
+├── vite.config.ts · tsconfig*.json · package.json   화면만 설정하므로 여기 (STD-001 1.9)
+├── public/                    그대로 서빙 — favicon · icons.svg · howto/
+└── src/
+    ├── main.tsx               진입
+    ├── App.tsx                라우팅
+    ├── pages/                 화면 하나 = 파일 하나. 와이어프레임 항목과 1:1 (STD-004 DEV-17)
+    ├── components/            두 화면 이상이 쓰는 조각만 — Shell · ui · panes · DiffBox · ItemChain · DiagramFull · HowTo · 다이얼로그 둘
+    ├── api/client.ts          서버 호출 한곳. 화면이 직접 fetch 하지 않는다
+    ├── view/                  원본 탭 렌더링 — md · views · uc · wireframe · seq · ms
+    ├── assets/                번들에 들어가는 이미지
+    └── styles.css · styles.view.css   [[SYNC-UI-001]] 3장 토큰의 전사
+```
+
+**기본형과 다른 점, 그리고 왜.** [[SYNC-STD-001]] 1.9의 프런트 기본형에 `view/`는 없다. 원본 탭 렌더링은 화면도 아니고 서버 호출도 아닌 **순수 변환**이라 `pages`·`components`·`api` 어디에도 맞지 않는다 — 백엔드의 `shared/`에 해당하는 자리다. `tools/view_build.py`를 TS로 옮긴 것이라 파이썬 쪽과 짝이 맞아야 해서 파일 이름까지 같이 간다. 나머지는 기본형 그대로다.
+
+**빌드 결과는 백엔드 이미지로 간다** — `frontend` 빌드 산출물이 `backend/app/web/static`에 들어가고 거기서 서빙된다(INFRA 8장). 그래서 컨테이너가 하나다.
 
 ---
 
