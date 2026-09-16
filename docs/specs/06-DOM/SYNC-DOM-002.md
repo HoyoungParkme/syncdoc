@@ -39,6 +39,8 @@ upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 
 프로젝트 `syncdoc` 하나에 **백엔드와 프런트엔드를 나눠 둔다.** 명세·도구는 둘 다 쓰므로 루트에 둔다.
 
+**기본형과 다른 점, 그리고 왜.** [[SYNC-STD-001]] 1.9의 기본형은 라우터를 도메인 폴더 안에 둔다(`app/domains/<도메인>/router.py`). 싱크독은 도메인 밖 `web/routers`·`mcp`에 둔다 — 입구가 사람(웹)과 에이전트(MCP) 둘이고([[SYNC-INFRA-001#C3]]) 그 둘이 **같은 저장 파이프라인**을 타야 하기 때문이다([[SYNC-INFRA-001#C4]]). 입구를 도메인마다 두면 `save_pipeline` 하나로 모을 자리가 없어진다. 나머지는 기본형 그대로다 — `core/{묶음}/`이 `domains/<도메인>/`에 해당하고 `repository.py`가 `crud.py`에 해당하며, 조건부 어댑터(`infra/`)와 거울 테스트도 같다.
+
 ```
 syncdoc/                        저장소 = 프로젝트
 ├── backend/                    파이썬. FastAPI(웹) + MCP 서버

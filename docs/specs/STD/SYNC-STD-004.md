@@ -22,7 +22,11 @@ upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
 
 #### DEV-1 폴더와 파일은 클래스 명세 1장 그대로
 
-`syncdoc/core/{묶음}/models.py · repository.py · service.py`, `core/pipeline.py`, `core/queries.py`, `web/routers/*.py`, `mcp/tools.py`, `infra/git.py · github.py`. 새 폴더를 만들려면 클래스 명세를 먼저 고친다.
+**일반 규칙은 [[SYNC-STD-001]] 1.9에 있다** — 도메인별 폴더 + 계층 파일이 기본형이고, 벗어나려면 클래스 명세에 이유를 적는다. 아래는 싱크독이 그 규칙을 적용한 결과다.
+
+**싱크독의 예** `syncdoc/core/{묶음}/models.py · repository.py · service.py`, `core/pipeline.py`, `core/queries.py`, `web/routers/*.py`, `mcp/tools.py`, `infra/git.py · github.py`. 새 폴더를 만들려면 도메인 모델과 클래스 명세를 먼저 고친다.
+
+**기본형과 다른 점** — 라우터가 도메인 폴더 밖에 있다(`web/routers`·`mcp`). 입구가 둘이고([[SYNC-INFRA-001#C3]]) 그 둘이 같은 저장 파이프라인을 타야 해서([[SYNC-INFRA-001#C4]]), 입구를 도메인마다 두면 `save_pipeline` 하나로 모을 자리가 없어진다. 같은 이유가 [[SYNC-DOM-002]] 1장에도 적혀 있다.
 
 테스트는 거울 구조 — `tests/core/spec/test_service.py`가 `core/spec/service.py`를 검사한다.
 
