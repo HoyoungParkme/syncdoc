@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: str = ""
     WEBHOOK_SECRET: str = ""
     REPOS_DIR: Path = Path("/var/syncdoc/repos")
-    PUBLIC_BASE_URL: str = ""  # Quick Tunnel 주소 (INFRA 5장). 비면 로컬만
+    PUBLIC_BASE_URL: str = ""  # 공개 주소 — Named Tunnel 고정 호스트 또는 Quick Tunnel (INFRA 5장). 비면 로컬만
     POLL_INTERVAL_SECONDS: int = 300  # INFRA 7장 보조 경로. 0이면 폴링·기동 따라잡기 끔(테스트)
     DIFF_CONTEXT_LINES: int = 3  # diff에서 앞뒤로 함께 보여줄 줄 수 (INFRA 5.2)
     PUSH_RETRIES: int = 3  # push 거부 시 rebase 후 재시도 횟수 (INFRA 5.2)
