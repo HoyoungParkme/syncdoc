@@ -28,6 +28,7 @@ class DocumentSummary(Base):
     updated_at: datetime
     last_author: Author | None
     counts: dict[str, int]
+    trashed_at: datetime | None = None  # 휴지통 (카드 R)
 
     @classmethod
     def of(cls, d: DocumentSummaryDto) -> DocumentSummary:
@@ -46,6 +47,7 @@ class DocumentSummary(Base):
             "updated_at": d.updated_at,
             "last_author": Author.of(d.author),
             "counts": d.counts,
+            "trashed_at": d.trashed_at,
         }
 
 

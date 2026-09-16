@@ -196,6 +196,30 @@ class TrackingRepository:
         )
         return list(self.session.scalars(stmt.order_by(Flag.id)))
 
+    def unresolved_broken_by_causes(self, cause_pks: list[int]) -> list[Flag]:
+        if not cause_pks:
+            return []
+        stmt = select(Flag).where(
+            Flag.kind == "broken_ref",
+            Flag.cause_item_id.in_(cause_pks),
+            Flag.resolved_at.is_(None),
+        )
+        return list(self.session.scalars(stmt.order_by(Flag.id)))
+
+    def open_flag_count(self, item_pks: list[int]) -> int:
+        """대상이든 원인이든 이 항목들에 걸린 미해결 플래그 수 (MS-004 open_flags_of_document)."""
+        if not item_pks:
+            return 0
+        stmt = (
+            select(func.count())
+            .select_from(Flag)
+            .where(
+                or_(Flag.target_item_id.in_(item_pks), Flag.cause_item_id.in_(item_pks)),
+                Flag.resolved_at.is_(None),
+            )
+        )
+        return self.session.scalar(stmt) or 0
+
     def unresolved_for_items(self, item_pks: list[int]) -> list[Flag]:
         if not item_pks:
             return []

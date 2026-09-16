@@ -27,6 +27,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#queries.project_summary]] | 프로젝트 목록 + 단계 11칸 + 건수 |
 | [[#queries.project_detail]] | + 문서 목록 + 최근 변경 |
 | [[#queries.document_list]] | 문서 목록 + 문서별 건수 |
+| [[#queries.trash_list]] | 휴지통 목록 |
 | [[#queries.document_view]] | 문서 + 항목 플래그 + 이웃 |
 | [[#queries.item_view]] | 항목 + 플래그 |
 | [[#queries.item_references_view]] | 상위·하위 참조 + 표시 이름 + 플래그 |
@@ -43,6 +44,16 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
 ## 2. 함수
+
+#### queries.trash_list 휴지통 목록
+
+**시그니처** `async def trash_list(code: str) -> list[DocumentSummary]`
+
+근거: [[SYNC-API-001#GET/api/projects/{code}/trash]] · [[SYNC-UI-002#UI-4]] 8
+
+**처리** `project = ProjectService.get(code)` · `SpecService.list_trashed(project_id)` · 작성자 이름은 `users_by_ids`로(`trashed_by`). 건수는 안 센다 — 휴지통에서 플래그·댓글을 볼 일이 없다 · `→ docs`
+
+---
 
 #### queries.project_summary 프로젝트 목록 + 단계 11칸 + 건수
 

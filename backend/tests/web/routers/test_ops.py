@@ -149,14 +149,28 @@ async def test_webhook_admin_and_catch_up(client: TestClient, scoped: Session, p
     assert r.status_code == 200 and r.json()["dropped"] == []
 
 
-async def test_delete_document_via_api(client: TestClient, scoped: Session, proj) -> None:
-    """API-001 DELETE /api/docs/{docId} — 204 · 409 document-has-history (카드 N)."""
+async def test_trash_restore_purge_via_api(client: TestClient, scoped: Session, proj) -> None:
+    """API-001 DELETE(휴지통)·restore·purge·GET trash (카드 R)."""
     login(client, scoped)
     await create(proj, DocType.RFQ, RFQ)
     await create(proj)
+    # confirm 없이 → 끊어질 것 (13.2)
     r = client.delete("/api/docs/EXMP-RFQ-001")
-    assert r.status_code == 409 and r.json()["type"] == "urn:syncdoc:document-has-history"
+    assert (
+        r.status_code == 409 and r.json()["type"] == "urn:syncdoc:document-deletion-needs-confirm"
+    )
     assert r.json()["inbound_refs"] == ["EXMP-PRD-001", "EXMP-PRD-001#R1"]
-    assert client.delete("/api/docs/EXMP-PRD-001").status_code == 204
+    r = client.delete("/api/docs/EXMP-RFQ-001?confirm=true")
+    assert r.status_code == 200 and r.json()["broken_refs"] == 1
+    assert [d["doc_id"] for d in client.get("/api/projects/EXMP/trash").json()] == ["EXMP-RFQ-001"]
+    assert [d["doc_id"] for d in client.get("/api/projects/EXMP/docs").json()] == ["EXMP-PRD-001"]
+    assert client.get("/api/docs/EXMP-RFQ-001").json()["trashed_at"] is not None
+    r = client.post("/api/docs/EXMP-RFQ-001/purge")
+    assert r.status_code == 409 and r.json()["type"] == "urn:syncdoc:document-has-history"
+    r = client.post("/api/docs/EXMP-RFQ-001/restore")
+    assert r.status_code == 201 and r.json()["version_no"] == 2
+    assert client.get("/api/projects/EXMP/trash").json() == []
+    assert client.post("/api/docs/EXMP-RFQ-001/restore").status_code == 409
+    assert client.delete("/api/docs/EXMP-PRD-001?confirm=true").status_code == 200
+    assert client.post("/api/docs/EXMP-PRD-001/purge").status_code == 204
     assert client.get("/api/docs/EXMP-PRD-001").status_code == 404
-    assert client.delete("/api/docs/EXMP-PRD-001").status_code == 404

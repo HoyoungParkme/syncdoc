@@ -191,6 +191,20 @@ class TrackingService:
         self.session.flush()
         return n
 
+    def release_broken_causes(self, cause_item_pks: list[int], user: User) -> int:
+        """SYNC-MS-004#TrackingService.release_broken_causes"""
+        n = 0
+        for f in self.repo.unresolved_broken_by_causes(cause_item_pks):
+            # 가리키던 쪽은 손대지 않았다 — 수정 동반이 아니다
+            f.resolved_by_user_id, f.resolved_at, f.resolved_with_edit = user.id, now_utc(), False
+            n += 1
+        self.session.flush()
+        return n
+
+    def open_flags_of_document(self, item_pks: list[int]) -> int:
+        """SYNC-MS-004#TrackingService.open_flags_of_document"""
+        return self.repo.open_flag_count(item_pks)
+
     def raise_upstream(
         self,
         target_item_pks: list[int],

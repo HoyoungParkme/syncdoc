@@ -73,6 +73,9 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | GET /api/docs/{docId}/diff | [[#SEQ-15]] | ○ |
 | POST /api/docs/{docId}/revert | [[#SEQ-7]] | ○ |
 | DELETE /api/docs/{docId} | [[#SEQ-22]] | ○ |
+| POST /api/docs/{docId}/restore | [[#SEQ-23]] | ○ |
+| POST /api/docs/{docId}/purge | [[#SEQ-22]] 끝 | ○ |
+| GET /api/projects/{code}/trash | [[#SEQ-C1]] | |
 | GET /api/docs/{docId}/comments | [[#SEQ-C1]] | |
 | POST /api/docs/{docId}/comments | [[#SEQ-16]] | ○ |
 | POST /api/comments/{id}/resolve | [[#SEQ-C1]] | |
@@ -86,6 +89,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | MCP create_document | [[#SEQ-19]] | ○ |
 | MCP update_document | [[#SEQ-1]] | ○ |
 | MCP delete_document | [[#SEQ-22]] | ○ |
+| MCP restore_document | [[#SEQ-23]] | ○ |
 | MCP 모든 도구의 인증 | [[#SEQ-C2]] | |
 
 묶음을 넘는 입구가 37개 중 20개다. v1.0에서 안 그린 14개 중 9개가 묶음을 넘었다.
@@ -1103,9 +1107,9 @@ sequenceDiagram
 
 ---
 
-## SEQ-22 이력 없는 문서를 지운다
+## SEQ-22 문서를 휴지통에 넣는다 · 완전히 지운다
 
-[[SYNC-UC-001#UC-A7]] 기본 흐름 1~7, 확장 2a · [[SYNC-UC-001#UC-H18]]. MCP `delete_document` · `DELETE /api/docs/{docId}`. 입구가 둘이고 파이프라인은 하나다.
+[[SYNC-UC-001#UC-A7]] 기본 흐름 1~6 · [[SYNC-UC-001#UC-H18]] 1~3·6~8. MCP `delete_document` · `DELETE /api/docs/{docId}` · `POST …/purge`. 입구가 둘이고 파이프라인은 하나다.
 
 ```mermaid
 sequenceDiagram
@@ -1121,38 +1125,88 @@ sequenceDiagram
     participant DB
 
     A->>T: delete_document(doc_id, confirm) · DELETE /api/docs/{id}
-    T->>P: delete_document(doc_id, author, confirm) — 웹은 confirm=true (다이얼로그 13이 받았다)
+    T->>P: trash_document(doc_id, author, confirm) — 웹은 confirm=true (다이얼로그 13이 받았다)
     P->>P: repo lock
     P->>S: get_document(doc_id)
-    S-->>P: Document (status, items, version_count)
+    S-->>P: Document (trashed_at, items, version_count)
+    alt trashed_at 있음 (1a)
+        P-->>T: document-trashed
+    end
     P->>R: inbound_of_document(document_id)
     P->>C: count(document_id)
-    P->>TR: history_of_document(document_id, item_pks)
-    P->>S: status_change_count(document_id)
-    alt 초안이 아니거나 하나라도 0이 아님 (2a)
-        P-->>T: document-has-history {status, inbound_refs, comments, flags, decisions, status_changes}
-        T-->>A: isError
+    alt confirm=false (2)
+        P-->>T: document-deletion-needs-confirm {title, version_count, inbound_refs, comments}
+        T-->>A: isError — 사람에게 보여준다
     end
-    alt confirm=false (3)
-        P-->>T: document-deletion-needs-confirm {doc_id, title, version_count}
-        T-->>A: isError
-    end
-    P->>G: commit_push(repo, "spec(doc_id): 삭제 — 이력 없는 초안", author, delete=[path])
+    P->>G: commit_push(repo, "spec(doc_id): 휴지통", author, delete=[path])
     G-->>P: commit_hash
     rect rgb(240,244,240)
         Note over P,DB: 한 트랜잭션 — push 뒤
-        P->>S: delete_document(document)
-        S->>DB: references(from) · items · versions · status_changes · documents 삭제
+        P->>S: trash(document, commit_hash, author)
+        S->>DB: items.is_deleted · documents.status=draft·trashed_at·trashed_by · StatusChange(reason=휴지통, commit_hash)
+        S-->>P: deleted item pks
+        P->>TR: raise_broken(pk) ×N
+        TR->>DB: Flag(kind=broken_ref, target=하위 항목, cause=pk)
     end
     P->>P: lock 해제
-    P-->>T: DeleteResult {doc_id, commit_hash, next_step}
-    T-->>A: 결과 · 204
+    P-->>T: TrashResult {doc_id, commit_hash, broken_refs, next_step}
+    T-->>A: 결과
+
+    Note over A,DB: 완전 삭제 — POST /api/docs/{id}/purge (웹만)
+    A->>T: POST /api/docs/{id}/purge
+    T->>P: purge_document(doc_id, author)
+    P->>S: get_document — trashed_at 없으면 document-not-trashed
+    P->>R: inbound_of_document · C: count · TR: open_flags_of_document
+    alt 하나라도 0이 아님 (7)
+        P-->>T: document-has-history {inbound_refs, comments, flags}
+    end
+    P->>S: delete_document(document)
+    S->>DB: flags(대상)·전파결정·상태변경·references(from)·items·versions·documents 삭제 · 남의 flags의 원인 칸 null
+    P-->>T: 204
 ```
 
 **읽을 때 볼 것**
-- 이력 검사가 **push 전**이고 행 삭제가 **push 뒤**다. push가 실패하면 아무것도 안 지워진다(SEQ-1과 같은 원칙)
-- 삭제 커밋은 다음 폴링에 `D`로 온다. 그때 문서 행이 없으므로 [[SYNC-MS-007#pipeline.process_commit]]은 **행 없는 D를 건너뛴다** — 앱이 지운 것이다. `mark_deleted`로 가면 `not-found`로 그 커밋이 영영 처리 실패로 남는다
-- 지운 문서의 번호는 `issue_doc_id`가 다시 준다([[SYNC-STD-001]] 1.1)
+- 휴지통 넣기는 **하드 삭제가 아니다.** GitHub에서 파일을 지워 push한 것(UC-G1 3d)과 같은 상태에 `trashed_at`만 더한 것이다 — 규약 오류로 세지 않고, 목록·단계 칸·그래프에서 빠지고, 저장·상태 변경이 `document-trashed`로 막힌다
+- 삭제 커밋은 다음 폴링에 `D`로 온다. `trashed_at`이 있는 문서의 `D`는 앱이 만든 것이라 [[SYNC-MS-007#pipeline.process_commit]]이 건너뛴다
+- 완전 삭제의 문지기는 셋 — 들어오는 참조(끊어진 채 남은 것 포함)·댓글·**미해결** 플래그. 해결된 플래그·결정된 전파·상태 변경은 이 문서의 것이라 함께 지운다. 남의 플래그가 이 문서 항목을 원인으로 물고 있으면 원인 칸만 비운다(FK)
+
+---
+
+## SEQ-23 휴지통에서 되살린다
+
+[[SYNC-UC-001#UC-A8]] 기본 흐름 1~5 · [[SYNC-UC-001#UC-H18]] 4~5. MCP `restore_document` · `POST /api/docs/{docId}/restore`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor A as 에이전트·사람
+    participant T as mcp/tools · routers/documents
+    participant P as pipeline
+    participant S as SpecService
+    participant G as infra/git
+    participant TR as TrackingService
+    participant DB
+
+    A->>T: restore_document(doc_id) · POST /api/docs/{id}/restore
+    T->>P: restore_document(doc_id, author)
+    P->>S: get_document — trashed_at 없으면 document-not-trashed (1a)
+    P->>S: trash_commit(document_id)
+    S-->>P: 휴지통 커밋 해시
+    P->>G: read(repo, path, "{hash}^")
+    G-->>P: 지우기 직전 본문
+    P->>P: frontmatter status를 draft로 (DB가 draft다 — mcp 경로의 status_change 검사)
+    P->>P: save_pipeline(entry=web_revert|mcp, doc_id, body, expected_version=current, message="spec(doc_id): 되살림 — 휴지통에서") — 같은 세션
+    Note over P,S: validate — 휴지통 문서의 삭제 항목은 item.reused에서 뺀다(복구)<br/>save — 항목 is_deleted 되돌림 · trashed_at·trashed_by null
+    P->>TR: release_broken_causes(되살아난 item_pks, user)
+    TR->>DB: 원인이 이 항목들인 broken_ref → resolved_with_edit=false, 확인자=user
+    P-->>T: SaveResult
+    T-->>A: 결과 (201)
+```
+
+**읽을 때 볼 것**
+- 되살리기는 **새 버전**이다(되돌리기와 같은 원칙 — 이력을 안 지운다). 휴지통 사이의 시간도 이력에 남는다
+- `save`가 `trashed_at`을 비운다 — **어느 입구든** 저장되면 휴지통에서 나온다. GitHub에서 파일을 되살려 push해도 같다
+- 끊어진 참조는 원인이 돌아왔으니 푼다. 가리키던 쪽 문서는 손대지 않았으므로 `resolved_with_edit=false`
 
 ---
 

@@ -37,6 +37,7 @@ class Document(Base):
             "has_convention_error",
             postgresql_where="has_convention_error",
         ),
+        Index("ix_documents_trashed_by_user_id", "trashed_by_user_id"),  # FK 컬럼 (DEV-8)
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -49,6 +50,9 @@ class Document(Base):
     has_convention_error: Mapped[bool] = mapped_column(Boolean, server_default=false())
     convention_error_detail: Mapped[str | None] = mapped_column(Text)
     incomplete_warnings: Mapped[str | None] = mapped_column(Text)
+    # 휴지통 (카드 R, PRD N3). null이면 살아 있는 문서
+    trashed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    trashed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

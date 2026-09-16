@@ -177,6 +177,16 @@ async def document_list(
         return docs
 
 
+async def trash_list(code: str) -> list[DocumentSummary]:
+    """SYNC-MS-008#queries.trash_list"""
+    with db.session_scope() as s:
+        project = ProjectService(s).get(code)
+        docs = SpecService(s).list_trashed(project.id)
+        for d in docs:
+            d.author = _api_author(s, d.last_author)
+        return docs
+
+
 async def document_view(doc_id: str) -> Document:
     """SYNC-MS-008#queries.document_view"""
     with db.session_scope() as s:

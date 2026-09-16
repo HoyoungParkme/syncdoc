@@ -188,6 +188,8 @@ classDiagram
         +bool has_convention_error
         +str convention_error_detail
         +str incomplete_warnings
+        +datetime trashed_at
+        +int trashed_by_user_id
         +datetime updated_at
     }
 ```
@@ -648,6 +650,9 @@ classDiagram
         -issue_doc_id(project_id: int, code: str, doc_type: DocType) str
         -precondition(project_id: int, doc_type: DocType, title: str) tuple?
         +status_change_count(document_id: int) int
+        +trash(document: Document, commit_hash: str, author: Author) list~int~
+        +trash_commit(document_id: int) str?
+        +list_trashed(project_id: int) list~DocumentSummary~
         +delete_document(document: Document) int
         -item_blocks(body: str, doc_type: DocType, title: str?) list~ItemBlock~
     }
@@ -662,6 +667,8 @@ classDiagram
         +bool has_convention_error
         +str convention_error_detail
         +str incomplete_warnings
+        +datetime trashed_at
+        +int trashed_by_user_id
         +datetime updated_at
     }
     class Item {
@@ -787,6 +794,8 @@ classDiagram
         +raise_flags(version_id: int, target_item_pks: list~int~) int
         +raise_broken(cause_item_pk: int) int
         +release_broken(item_pks: list~int~, user: User) int
+        +release_broken_causes(cause_item_pks: list~int~, user: User) int
+        +open_flags_of_document(item_pks: list~int~) int
         +raise_upstream(target_item_pks: list~int~, cause_document_id: int, cause_version_id: int, cause_item_pk: int?) int
         +get_flag(flag_id: int) FlagDetail
         +resolve(flag_id: int, user: User, target_changed: bool) FlagSummary
@@ -966,7 +975,7 @@ classDiagram
 
 ### 4.7 pipeline — 쓰기 조율
 
-묶음 밖. 클래스가 아니라 함수 여덟이다. 시퀀스 SEQ-1·2·5·7·19·21·22가 이 함수들의 시간축이다.
+묶음 밖. 클래스가 아니라 함수 열이다. 시퀀스 SEQ-1·2·5·7·19·21·22·23이 이 함수들의 시간축이다.
 
 ```
 save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | None,
@@ -1012,9 +1021,16 @@ change_status(doc_id, to, user, reason, upstream_reviewed=False, upstream_mismat
 
 revert(doc_id, to_version, user, confirm_item_deletion=False) -> SaveResult
 
-delete_document(doc_id, author, confirm) -> DeleteResult
-    이력 없는 초안만 (PRD N3 예외). 문지기 넷(reference·collab·tracking·spec)을 센 뒤
-    git.commit_push(delete=[path]) → spec.delete_document. 시퀀스 SEQ-22
+trash_document(doc_id, author, confirm) -> TrashResult
+    휴지통에 넣기 (PRD N3). 끊어질 것을 세어 확인받고 git.commit_push(delete=[path]) → spec.trash
+    → 항목마다 tracking.raise_broken. 시퀀스 SEQ-22
+
+restore_document(doc_id, author) -> SaveResult
+    되살리기. 휴지통 커밋의 부모에서 파일을 읽어 save_pipeline(entry=web_revert|mcp)로 다시 저장
+    → spec.save가 trashed_at을 비우고 항목을 복구 → tracking.release_broken_causes. 시퀀스 SEQ-23
+
+purge_document(doc_id, author) -> DeleteResult
+    완전 삭제. 휴지통 안에서만. 들어오는 참조·댓글·미해결 플래그가 0이어야. spec.delete_document
     UC-H7. 옛 버전 본문 → save_pipeline(entry=web_revert). already-current 검사.
 
 process_commit(repo: Repository, head_hash: str) -> list[SaveResult]

@@ -28,6 +28,8 @@ from app.core.errors import (
     ConventionViolation,
     DocumentDeletionNeedsConfirm,
     DocumentHasHistory,
+    DocumentNotTrashed,
+    DocumentTrashed,
     ItemDeleted,
     ItemDeletionNeedsConfirm,
     NotFound,
@@ -47,7 +49,6 @@ from app.core.types import (
     STAGE_OF,
     Author,
     AuthorKind,
-    DeleteResult,
     DocStatus,
     DocType,
     DocumentSummary,
@@ -57,6 +58,7 @@ from app.core.types import (
     RestoreFlag,
     RestoreResult,
     SaveResult,
+    TrashResult,
     Violation,
     spec_dir,
     type_of_dir,
@@ -87,8 +89,12 @@ async def save_pipeline(
     commit_hash: str | None = None,
     reason: str | None = None,
     session: Session | None = None,
+    restore: bool = False,
 ) -> SaveResult:
-    """SYNC-MS-007#pipeline.save_pipeline"""
+    """SYNC-MS-007#pipeline.save_pipeline
+
+    restore: restore_document가 부를 때 True — 휴지통 문서 저장을 막는 2단계 검사를 지난다.
+    """
     code = project_code or (doc_id.split("-")[0] if doc_id else None)
     if code is None:
         raise NotFound("project", "None")
@@ -106,6 +112,7 @@ async def save_pipeline(
         confirm_item_deletion,
         commit_hash,
         reason,
+        restore,
     )
     async with _lock(code):
         if session is not None:  # change_status·revert가 넘긴 세션 — 같은 세션에서
@@ -129,6 +136,7 @@ async def _run(
     confirm_item_deletion: bool,
     commit_hash: str | None,
     reason: str | None,
+    restore: bool = False,
 ) -> SaveResult:
     """save_pipeline 본체 — 락·세션 안."""
     spec, refs = SpecService(s), ReferenceService(s)
@@ -144,6 +152,15 @@ async def _run(
         except NotFound:
             if entry != Entry.github:
                 raise
+        # 2. 휴지통 문서는 되살린 뒤 고친다. github는 파일이 다시 push된 것 — 그 자체가
+        # 되살리기다(save 7이 trashed_at을 비운다) (MS-007 save_pipeline 2, 카드 R)
+        if (
+            document is not None
+            and document.trashed_at is not None
+            and entry != Entry.github
+            and not restore
+        ):
+            raise DocumentTrashed(document.trashed_at.isoformat())
             assert (
                 doc_type is not None
             )  # github 신규 파일 — 파일명이 doc_id, frontmatter는 그대로 (보고)
@@ -347,6 +364,8 @@ async def change_status(
     with db.session_scope() as s:
         spec = SpecService(s)
         document = spec.get_document(doc_id)
+        if document.trashed_at is not None:
+            raise DocumentTrashed(document.trashed_at.isoformat())
         # 끊어진 참조는 읽을 때 센다 — 컬럼에 없다(SYNC-STD-001 4장, #35). 참조가 살았는지는
         # 프로젝트 전체 상태라 문서 하나만 보는 validate가 못 만들고, 굳혀 두면 상대 문서가
         # 들어와도 그 문서를 다시 저장하기 전까지 낡은 값이 남는다
@@ -414,61 +433,112 @@ async def revert(
         )
 
 
-async def delete_document(doc_id: str, author: Author, confirm: bool) -> DeleteResult:
-    """SYNC-MS-007#pipeline.delete_document"""
+async def trash_document(doc_id: str, author: Author, confirm: bool) -> TrashResult:
+    """SYNC-MS-007#pipeline.trash_document"""
     code = doc_id.split("-")[0]
     async with _lock(code):
         with db.session_scope() as s:
             spec, refs = SpecService(s), ReferenceService(s)
             tracking, collab = TrackingService(s), CommentService(s)
             document = spec.get_document(doc_id)
+            if document.trashed_at is not None:
+                raise DocumentTrashed(document.trashed_at.isoformat())
             repo = ProjectService(s).get(code).repository
-            # 2. 문지기 넷 — 하나만 걸려도 전부 담는다. 사람이 한 번에 본다
-            item_pks = [i.pk for i in document.items]
-            inbound = refs.inbound_of_document(document.id)
+            # 2. 끊어질 것 — 막지 않는다, 보여준다
+            inbound = _inbound_names(spec, refs.inbound_of_document(document.id))
             comments = collab.count(document.id)
-            flags, decisions = tracking.history_of_document(document.id, item_pks)
-            changes = spec.status_change_count(document.id)
-            if (
-                document.status != DocStatus.draft
-                or inbound
-                or comments
-                or flags
-                or decisions
-                or changes
-            ):
-                names = spec.describe_items([e.from_item_pk for e in inbound if e.from_item_pk])
-                docs = spec.describe_documents(
-                    [e.from_document_id for e in inbound if not e.from_item_pk]
-                )
-                raise DocumentHasHistory(
-                    document.status,
-                    sorted(
-                        f"{r.doc_id}#{r.item_id}"
-                        if e.from_item_pk and (r := names.get(e.from_item_pk))
-                        else (d.doc_id if (d := docs.get(e.from_document_id or -1)) else "?")
-                        for e in inbound
-                    ),
-                    comments,
-                    flags,
-                    decisions,
-                    changes,
-                )
-            # 3. 확인 — 웹은 다이얼로그 13이 이미 받았다
             if not confirm:
                 title = parse_frontmatter(document.body)[0].get("title", "")
-                raise DocumentDeletionNeedsConfirm(doc_id, title, document.current_version_no)
+                raise DocumentDeletionNeedsConfirm(
+                    doc_id, title, document.current_version_no, inbound, comments
+                )
             # 4. push — 여기까지 DB 쓰기 없음
             commit_hash = await git.commit_push(
                 Path(repo.workdir_path),
-                f"spec({doc_id}): 삭제 — 이력 없는 초안",
+                f"spec({doc_id}): 휴지통",
                 author,
                 delete=[f"docs/specs/{spec_dir(document.doc_type)}/{doc_id}.md"],
             )
-            # 5. 트랜잭션
+            # 5. 트랜잭션 — 항목 삭제됨 + 휴지통 표시 + 하위에 끊어진 참조
+            pks = spec.trash(document, commit_hash, author)
+            broken = sum(tracking.raise_broken(pk) for pk in pks)
+            s.commit()
+    return TrashResult(
+        doc_id,
+        commit_hash,
+        broken,
+        f"{doc_id} 휴지통에 넣음 — 끊어진 참조 {broken}. 사람에게 알리고 멈춘다",
+    )
+
+
+async def restore_document(doc_id: str, author: Author) -> SaveResult:
+    """SYNC-MS-007#pipeline.restore_document"""
+    code = doc_id.split("-")[0]
+    with db.session_scope() as s:
+        spec = SpecService(s)
+        document = spec.get_document(doc_id)
+        if document.trashed_at is None:
+            raise DocumentNotTrashed()
+        repo = ProjectService(s).get(code).repository
+        h = spec.trash_commit(document.id)
+        assert h is not None  # trash가 늘 남긴다
+        path = f"docs/specs/{spec_dir(document.doc_type)}/{doc_id}.md"
+        body = await git.read(Path(repo.workdir_path), path, f"{h}^")
+        # 3. DB가 draft다 — mcp 경로의 frontmatter.status_change에 안 걸리게
+        body = re.sub(r"^status: .*$", f"status: {DocStatus.draft}", body, count=1, flags=re.M)
+        entry = Entry.mcp if author.via == Entry.mcp else Entry.web_revert
+        r = await save_pipeline(
+            entry,
+            doc_id,
+            None,
+            body,
+            document.current_version_no,
+            None,
+            author,
+            f"spec({doc_id}): 되살림 — 휴지통에서",
+            changed_items=[] if entry == Entry.mcp else None,
+            session=s,
+            restore=True,
+        )
+        # 5. 원인이 돌아왔다 — 하위의 끊어진 참조를 푼다. 가리키던 쪽은 안 고쳤다
+        revived = list(spec.item_pks(document.id).values())
+        TrackingService(s).release_broken_causes(revived, author.user)
+        s.commit()
+    return r
+
+
+async def purge_document(doc_id: str, author: Author) -> None:
+    """SYNC-MS-007#pipeline.purge_document"""
+    code = doc_id.split("-")[0]
+    async with _lock(code):
+        with db.session_scope() as s:
+            spec, refs = SpecService(s), ReferenceService(s)
+            tracking, collab = TrackingService(s), CommentService(s)
+            document = spec.get_document(doc_id)
+            if document.trashed_at is None:
+                raise DocumentNotTrashed()
+            # 2. 문지기 셋 — 아직 가리키는 곳·댓글·미해결 플래그
+            item_pks = list(spec.item_pks(document.id, include_deleted=True).values())
+            inbound = _inbound_names(spec, refs.inbound_of_document(document.id))
+            comments = collab.count(document.id)
+            flags = tracking.open_flags_of_document(item_pks)
+            if inbound or comments or flags:
+                raise DocumentHasHistory(inbound, comments, flags)
+            # 3. 파일은 이미 저장소에 없다(휴지통 커밋) — push 없음
             spec.delete_document(document)
             s.commit()
-    return DeleteResult(doc_id, commit_hash, f"{doc_id} 지워짐. 사람에게 알리고 멈춘다")
+
+
+def _inbound_names(spec: SpecService, inbound: list) -> list[str]:
+    """들어오는 참조를 사람이 읽을 이름으로 — 문서ID#항목ID 또는 문서ID."""
+    names = spec.describe_items([e.from_item_pk for e in inbound if e.from_item_pk])
+    docs = spec.describe_documents([e.from_document_id for e in inbound if not e.from_item_pk])
+    return sorted(
+        f"{r.doc_id}#{r.item_id}"
+        if e.from_item_pk and (r := names.get(e.from_item_pk))
+        else (d.doc_id if (d := docs.get(e.from_document_id or -1)) else "?")
+        for e in inbound
+    )
 
 
 async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]:
@@ -529,10 +599,12 @@ async def _process_file(workdir: Path, code: str, f, head_hash: str) -> list[Sav
             try:
                 document = spec.get_document(doc_id)
             except NotFound:
-                # 앱이 delete_document로 지운 문서의 삭제 커밋이거나 등록 전에 사라진 파일이다.
+                # 앱이 purge_document로 지운 문서의 삭제 커밋이거나 등록 전에 사라진 파일이다.
                 # mark_deleted로 가면 not-found가 나서 이 커밋이 영영 「처리 실패」로 남고
                 # last_processed_commit이 안 나아간다 (MS-007 process_commit 4)
                 return []
+            if document.trashed_at is not None:
+                return []  # 앱이 trash_document로 만든 삭제 커밋 — 이미 반영돼 있다 (카드 R)
             for pk in spec.mark_deleted(document, f.commit_hash, author):
                 tracking.raise_broken(pk)
             s.commit()

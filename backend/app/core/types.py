@@ -338,6 +338,9 @@ class DocumentSummary:
     last_author: AuthorRef | None
     counts: dict[str, int] = field(default_factory=dict)
     author: ApiAuthor | None = None  # queries가 채운다 (API Author)
+    trashed_at: datetime | None = (
+        None  # 휴지통 (카드 R). 목록에는 안 나온다 — trash_list·get_document에만
+    )
 
 
 @dataclass
@@ -688,6 +691,24 @@ class SaveResult:
             "status": self.status,
             "pending_decision_version_id": self.pending_decision_version_id,
             "warnings": self.warnings,
+            "next_step": self.next_step,
+        }
+
+
+@dataclass(frozen=True)
+class TrashResult:
+    """pipeline.trash_document 결과 (MS-007). broken_refs는 하위에 붙은 끊어진 참조 수."""
+
+    doc_id: str
+    commit_hash: str
+    broken_refs: int
+    next_step: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "doc_id": self.doc_id,
+            "commit_hash": self.commit_hash,
+            "broken_refs": self.broken_refs,
             "next_step": self.next_step,
         }
 

@@ -424,14 +424,28 @@ async def update_document(
 
 
 @server.tool(
-    description="이력이 없는 초안 문서를 파일째 지운다 — 에이전트가 예측으로 잘못 만든 문서를 버리는 길이다. 초안이고, 다른 문서에서 들어오는 참조·댓글·플래그·전파 결정·상태 변경이 하나도 없어야 한다. 하나라도 있으면 document-has-history 에러에 무엇이 걸리는지 담겨 온다 — 참조가 걸렸으면 그 문서를 update_document로 먼저 고친다. 조건을 채우면 첫 호출은 document-deletion-needs-confirm 에러로 제목·버전 수를 돌려주고 아직 지우지 않는다. 그것을 사람에게 보여주고 확인받은 뒤 confirm=true로 다시 부른다. 되돌릴 수 없다 — 버전까지 지워지고 저장소에 삭제 커밋만 남는다."
+    description="문서를 휴지통에 넣는다 — 파일은 저장소에서 지워지고(커밋) 행·버전은 남아 restore_document로 되살릴 수 있다. 잘못 만든 문서를 치우는 길이다. 첫 호출은 document-deletion-needs-confirm 에러로 제목·버전 수·끊어질 참조 목록·댓글 수를 돌려주고 아직 넣지 않는다. 그것을 사람에게 보여주고 확인받은 뒤 confirm=true로 다시 부른다. 넣으면 이 문서를 가리키던 항목에 끊어진 참조가 붙는다 — 되살리면 풀린다. 행까지 지우는 완전 삭제는 웹에서만."
 )
 async def delete_document(doc_id: str, confirm: bool = False) -> CallToolResult:
     """SYNC-API-002#delete_document"""
     try:
         with db.session_scope() as s:
             author = _agent_author(s)
-        r = await pipeline.delete_document(doc_id, author, confirm)
+        r = await pipeline.trash_document(doc_id, author, confirm)
+    except Problem as p:
+        return _problem(p)
+    return _ok(r.to_dict())
+
+
+@server.tool(
+    description="휴지통의 문서를 되살린다 — 휴지통에 넣기 직전 내용으로 새 버전이 생기고 항목이 돌아오며, 그 항목을 가리키던 끊어진 참조가 풀린다. 휴지통에 없는 문서는 document-not-trashed. 옛 본문이 지금 규약을 위반하면 convention-violation으로 그대로 남는다."
+)
+async def restore_document(doc_id: str) -> CallToolResult:
+    """SYNC-API-002#restore_document"""
+    try:
+        with db.session_scope() as s:
+            author = _agent_author(s)
+        r = await pipeline.restore_document(doc_id, author)
     except Problem as p:
         return _problem(p)
     return _ok(r.to_dict())

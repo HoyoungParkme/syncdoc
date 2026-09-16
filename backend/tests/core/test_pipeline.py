@@ -1397,76 +1397,55 @@ async def test_import_tracking_drops_rows_whose_names_are_gone(scoped: Session, 
     assert {d["kind"] for d in r.dropped} == {"flag", "propagation_decision", "comment"}
 
 
-# ── 카드 N — 이력 없는 문서 삭제 (MS-007 delete_document) ──
-async def test_delete_document_gatekeepers_confirm_and_polling_skips_the_commit(
-    scoped: Session, proj
-) -> None:
-    from app.core.errors import DocumentDeletionNeedsConfirm, DocumentHasHistory
+# ── 카드 R — 휴지통 (MS-007 trash·restore·purge_document) ──
+async def test_trash_restore_purge_document(scoped: Session, proj) -> None:
+    from app.core.errors import (
+        DocumentDeletionNeedsConfirm,
+        DocumentHasHistory,
+        DocumentNotTrashed,
+        DocumentTrashed,
+    )
 
     remote = proj["repos"]["remote"]
     await create(proj, DocType.RFQ, RFQ)
-    await create(proj)  # PRD → RFQ#Q1 참조
+    await create(proj)  # PRD R1 → RFQ#Q1
     a = proj["author"]
-    # 남이 가리키는 RFQ는 못 지운다 — inbound_refs에 이름으로
-    with pytest.raises(DocumentHasHistory) as ex:
-        await pipeline.delete_document("EXMP-RFQ-001", a, confirm=True)
+    svc = SpecService(scoped)
+    # confirm 없이 → 끊어질 것을 담아 되묻는다. 막지 않는다
+    with pytest.raises(DocumentDeletionNeedsConfirm) as ex:
+        await pipeline.trash_document("EXMP-RFQ-001", a, confirm=False)
     assert ex.value.extra["inbound_refs"] == ["EXMP-PRD-001", "EXMP-PRD-001#R1"]
-    assert (ex.value.extra["comments"], ex.value.extra["flags"]) == (0, 0)
-    # PRD는 아무도 안 가리킨다 — confirm 없이는 needs-confirm에 제목·버전 수
-    v1 = SpecService(scoped).get_document("EXMP-PRD-001").body
-    await update(proj, "EXMP-PRD-001", v1 + "#### R2 둘째\n내용\n", 1, changed_items=[])
-    with pytest.raises(DocumentDeletionNeedsConfirm) as ex2:
-        await pipeline.delete_document("EXMP-PRD-001", a, confirm=False)
-    assert (ex2.value.extra["title"], ex2.value.extra["version_count"]) == ("예시 제품", 2)
-    assert "docs/specs/02-PRD/EXMP-PRD-001.md" in remote_files(proj["repos"])
-    # 댓글 하나 → 이력
-    from app.core.collab.service import CommentService
-
-    d = SpecService(scoped).get_document("EXMP-PRD-001")
-    c = CommentService(scoped).add(d.id, 1, "---", "한마디", proj["user"], None)
-    scoped.flush()
-    with pytest.raises(DocumentHasHistory) as ex3:
-        await pipeline.delete_document("EXMP-PRD-001", a, confirm=True)
-    assert ex3.value.extra["comments"] == 1
-    scoped.execute(text("DELETE FROM comments WHERE id=:i"), {"i": c.id})
-    scoped.flush()
-    # 검토중 → 이력
-    from app.core.spec.service import SpecService as _S
-
-    _S(scoped).apply_status(d, d.body, None, proj["user"], None, DocStatus.review)
-    scoped.flush()
-    with pytest.raises(DocumentHasHistory) as ex4:
-        await pipeline.delete_document("EXMP-PRD-001", a, confirm=True)
-    assert (ex4.value.extra["status"], ex4.value.extra["status_changes"]) == ("review", 1)
-    scoped.execute(text("UPDATE documents SET status='draft'; DELETE FROM status_changes"))
-    scoped.flush()
-    # 진짜 삭제 — 원격에서 파일이 사라지고 커밋 메시지, 행 다섯 종류 0, 다른 문서는 그대로
+    assert (ex.value.extra["title"], ex.value.extra["version_count"]) == ("요구", 1)
+    assert "docs/specs/01-RFQ/EXMP-RFQ-001.md" in remote_files(proj["repos"])
+    # 남이 가리켜도 confirm이면 들어간다 — 하위 R1에 끊어진 참조
     before = g(remote, "rev-parse", "main")
-    r = await pipeline.delete_document("EXMP-PRD-001", a, confirm=True)
-    assert r.doc_id == "EXMP-PRD-001" and "지워짐" in r.next_step
-    assert r.commit_hash == g(remote, "rev-parse", "main")
+    r = await pipeline.trash_document("EXMP-RFQ-001", a, confirm=True)
+    assert r.broken_refs == 1 and "휴지통" in r.next_step
+    assert g(remote, "log", "-1", "--format=%s", "main") == "spec(EXMP-RFQ-001): 휴지통"
+    assert "docs/specs/01-RFQ/EXMP-RFQ-001.md" not in remote_files(proj["repos"])
+    rfq = svc.get_document("EXMP-RFQ-001")
+    assert rfq.trashed_at is not None and rfq.status == "draft" and rfq.items == []
+    assert not rfq.has_convention_error  # 규약 오류가 아니라 휴지통
     assert (
-        g(remote, "log", "-1", "--format=%s", "main") == "spec(EXMP-PRD-001): 삭제 — 이력 없는 초안"
-    )
-    assert "docs/specs/02-PRD/EXMP-PRD-001.md" not in remote_files(proj["repos"])
-    for t in ("documents", "items", "versions", "status_changes"):
-        n = scoped.execute(
-            text(
-                f"SELECT count(*) FROM {t} WHERE {'id' if t == 'documents' else 'document_id'}=:d"
-            ),
-            {"d": d.id},
+        scoped.execute(
+            text("SELECT count(*) FROM versions WHERE document_id=:d"), {"d": rfq.id}
         ).scalar()
-        assert n == 0, t
-    assert scoped.execute(text('SELECT count(*) FROM "references"')).scalar() == 0
-    assert {i.item_id for i in SpecService(scoped).get_document("EXMP-RFQ-001").items} == {
-        "Q1",
-        "Q2",
-    }
-    # 지운 번호는 다시 쓰인다 (STD-001 1.1)
-    assert (
-        SpecService(scoped).issue_doc_id(proj["project"].id, "EXMP", DocType.PRD) == "EXMP-PRD-001"
+        == 1
     )
-    # 폴링이 삭제 커밋의 D를 건너뛰고 last_processed_commit이 나아간다 (MS-007 process_commit 4)
+    assert scoped.execute(text("SELECT kind, resolved_at FROM flags")).all() == [
+        ("broken_ref", None)
+    ]
+    # 목록·단계에서 빠진다. 문서 조회는 된다
+    assert [d.doc_id for d in svc.list_by_project(proj["project"].id)] == ["EXMP-PRD-001"]
+    assert [d.doc_id for d in svc.list_trashed(proj["project"].id)] == ["EXMP-RFQ-001"]
+    # 휴지통 문서는 다시 못 넣고, 저장·상태 변경이 막힌다
+    with pytest.raises(DocumentTrashed):
+        await pipeline.trash_document("EXMP-RFQ-001", a, confirm=True)
+    with pytest.raises(DocumentTrashed):
+        await update(proj, "EXMP-RFQ-001", RFQ, 1, changed_items=[])
+    with pytest.raises(DocumentTrashed):
+        await pipeline.change_status("EXMP-RFQ-001", DocStatus.review, proj["user"], None)
+    # 폴링은 휴지통 커밋의 D를 건너뛰고 나아간다
     repo = _repo_row(proj)
     repo.last_processed_commit = before
     scoped.flush()
@@ -1475,6 +1454,50 @@ async def test_delete_document_gatekeepers_confirm_and_polling_skips_the_commit(
         scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar()
         == r.commit_hash
     )
+    # 완전 삭제는 남이 가리키는 동안 막힌다
+    with pytest.raises(DocumentHasHistory) as ex2:
+        await pipeline.purge_document("EXMP-RFQ-001", a)
+    assert ex2.value.extra["inbound_refs"] == ["EXMP-PRD-001", "EXMP-PRD-001#R1"]
+    assert ex2.value.extra["flags"] == 1
+    # 되살리기 — 직전 본문으로 새 버전, 항목 복구, 끊어진 참조가 with_edit=false로 풀림
+    r2 = await pipeline.restore_document("EXMP-RFQ-001", a)
+    assert r2.version_no == 2
+    rfq = svc.get_document("EXMP-RFQ-001")
+    assert rfq.trashed_at is None and {i.item_id for i in rfq.items} == {"Q1", "Q2"}
+    assert rfq.body.strip() == RFQ.strip()
+    assert "docs/specs/01-RFQ/EXMP-RFQ-001.md" in remote_files(proj["repos"])
+    assert (
+        scoped.execute(
+            text("SELECT resolved_with_edit FROM flags WHERE kind='broken_ref'")
+        ).scalar()
+        is False
+    )
+    assert [d.doc_id for d in svc.list_by_project(proj["project"].id)] == [
+        "EXMP-RFQ-001",
+        "EXMP-PRD-001",
+    ]
+    with pytest.raises(DocumentNotTrashed):
+        await pipeline.restore_document("EXMP-RFQ-001", a)
+    with pytest.raises(DocumentNotTrashed):
+        await pipeline.purge_document("EXMP-RFQ-001", a)
+    # 아무도 안 가리키는 PRD — 넣고, 완전히 지운다. 남의 해결된 플래그(원인=RFQ 항목)는 그대로
+    prd = svc.get_document("EXMP-PRD-001")
+    await pipeline.trash_document("EXMP-PRD-001", a, confirm=True)
+    await pipeline.purge_document("EXMP-PRD-001", a)
+    for t in ("documents", "items", "versions", "status_changes"):
+        n = scoped.execute(
+            text(
+                f"SELECT count(*) FROM {t} WHERE {'id' if t == 'documents' else 'document_id'}=:d"
+            ),
+            {"d": prd.id},
+        ).scalar()
+        assert n == 0, t
+    assert (
+        scoped.execute(text("SELECT count(*) FROM flags")).scalar() == 0
+    )  # 대상이 PRD 항목이던 플래그도 함께
+    assert (
+        svc.issue_doc_id(proj["project"].id, "EXMP", DocType.PRD) == "EXMP-PRD-001"
+    )  # 번호 재발급
 
 
 # ── 카드 O — 저장이 끊어진 참조를 푼다 (MS-004 release_broken, #70) ──

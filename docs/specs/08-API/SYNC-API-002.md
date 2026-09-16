@@ -37,7 +37,8 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 | `get_references` | [[SYNC-UC-001#UC-A4]] | ReferenceService.upstream/downstream | |
 | `create_document` | [[SYNC-UC-001#UC-A6]] (생성) | SpecService.create | ○ |
 | `update_document` | [[SYNC-UC-001#UC-A6]] (수정) | SpecService.save | ○ |
-| `delete_document` | [[SYNC-UC-001#UC-A7]] | pipeline.delete_document | ○ |
+| `delete_document` | [[SYNC-UC-001#UC-A7]] | pipeline.trash_document | ○ |
+| `restore_document` | [[SYNC-UC-001#UC-A8]] | pipeline.restore_document | ○ |
 | `get_template` | (STD-001 전달) | — 저장소 `_templates/` 읽기 | |
 
 ---
@@ -323,7 +324,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ```json
 {
   "name": "delete_document",
-  "description": "이력이 없는 초안 문서를 파일째 지운다 — 에이전트가 예측으로 잘못 만든 문서를 버리는 길이다. 초안이고, 다른 문서에서 들어오는 참조·댓글·플래그·전파 결정·상태 변경이 하나도 없어야 한다. 하나라도 있으면 document-has-history 에러에 무엇이 걸리는지 담겨 온다 — 참조가 걸렸으면 그 문서를 update_document로 먼저 고친다. 조건을 채우면 첫 호출은 document-deletion-needs-confirm 에러로 제목·버전 수를 돌려주고 아직 지우지 않는다. 그것을 사람에게 보여주고 확인받은 뒤 confirm=true로 다시 부른다. 되돌릴 수 없다 — 버전까지 지워지고 저장소에 삭제 커밋만 남는다.",
+  "description": "문서를 휴지통에 넣는다 — 파일은 저장소에서 지워지고(커밋) 행·버전은 남아 restore_document로 되살릴 수 있다. 잘못 만든 문서를 치우는 길이다. 첫 호출은 document-deletion-needs-confirm 에러로 제목·버전 수·끊어질 참조 목록·댓글 수를 돌려주고 아직 넣지 않는다. 그것을 사람에게 보여주고 확인받은 뒤 confirm=true로 다시 부른다. 넣으면 이 문서를 가리키던 항목에 끊어진 참조가 붙는다 — 되살리면 풀린다. 행까지 지우는 완전 삭제는 웹에서만.",
   "inputSchema": {
     "type": "object",
     "required": ["doc_id"],
@@ -335,9 +336,9 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 }
 ```
 
-**결과**
+**결과** — `TrashResult`
 ```json
-{ "doc_id": "VA-DOM-003", "commit_hash": "...", "next_step": "VA-DOM-003 지워짐. 사람에게 알리고 멈춘다" }
+{ "doc_id": "VA-DOM-003", "commit_hash": "...", "broken_refs": 13, "next_step": "VA-DOM-003 휴지통에 넣음 — 끊어진 참조 13. 사람에게 알리고 멈춘다" }
 ```
 
 **에러**
@@ -345,11 +346,31 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 | type | 언제 | 확장 필드 | 유스케이스 |
 |---|---|---|---|
 | `not-found` | 문서 없음 | `resource`, `id` | — |
-| `document-has-history` | 초안이 아니거나 참조·댓글·플래그·결정·상태 변경이 있음 | `status`, `inbound_refs`, `comments`, `flags`, `decisions`, `status_changes` | [[SYNC-UC-001#UC-A7]] 2a |
-| `document-deletion-needs-confirm` | 조건은 채웠고 `confirm=false` | `doc_id`, `title`, `version_count` | [[SYNC-UC-001#UC-A7]] 3 |
-| `push-failed` | 삭제 커밋 push 실패 | `reason` | [[SYNC-UC-001#UC-A7]] 6a |
+| `document-trashed` | 이미 휴지통 | `trashed_at` | [[SYNC-UC-001#UC-A7]] 1a |
+| `document-deletion-needs-confirm` | `confirm=false` | `doc_id`, `title`, `version_count`, `inbound_refs`, `comments` | [[SYNC-UC-001#UC-A7]] 2 |
+| `push-failed` | 삭제 커밋 push 실패 | `reason` | [[SYNC-UC-001#UC-A7]] 5a |
 
-`document-deletion-needs-confirm`은 `item-deletion-needs-confirm`과 같은 두 번 호출 패턴이다(5장 2). 에이전트가 첫 에러를 사람에게 안 보여주고 바로 `confirm=true`로 부르면 확인이 무의미해진다 — 도구 설명이 그러지 말라고 말하지만 강제할 방법은 없다.
+`document-deletion-needs-confirm`은 `item-deletion-needs-confirm`과 같은 두 번 호출 패턴이다(5장 2). 에이전트가 첫 에러를 사람에게 안 보여주고 바로 `confirm=true`로 부르면 확인이 무의미해진다 — 도구 설명이 그러지 말라고 말하지만 강제할 방법은 없다. 휴지통이라 되살릴 수는 있다.
+
+---
+
+### restore_document
+
+```json
+{
+  "name": "restore_document",
+  "description": "휴지통의 문서를 되살린다 — 휴지통에 넣기 직전 내용으로 새 버전이 생기고 항목이 돌아오며, 그 항목을 가리키던 끊어진 참조가 풀린다. 휴지통에 없는 문서는 document-not-trashed. 옛 본문이 지금 규약을 위반하면 convention-violation으로 그대로 남는다.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["doc_id"],
+    "properties": { "doc_id": { "type": "string" } }
+  }
+}
+```
+
+**결과** — `SaveResult` (되살린 버전, `next_step` 포함)
+
+**에러**: `not-found` · `document-not-trashed`([[SYNC-UC-001#UC-A8]] 1a) · `convention-violation`(3a) · `push-failed`
 
 ---
 
@@ -395,9 +416,10 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 지울 때 (잘못 만든 문서)
   1. delete_document(doc_id)
-     - document-has-history            → 걸리는 것을 사람에게 보여준다. inbound_refs면 그 문서를 먼저 고친다
-     - document-deletion-needs-confirm → 제목·버전 수를 사람에게 보여주고 확인
-  2. 확인되면 delete_document(doc_id, confirm=true). 되돌릴 수 없다
+     - document-deletion-needs-confirm → 제목·버전 수·끊어질 참조·댓글 수를 사람에게 보여주고 확인
+  2. 확인되면 delete_document(doc_id, confirm=true). 휴지통이다 — 되살릴 수 있다
+  3. 잘못 넣었으면 restore_document(doc_id). 완전 삭제는 사람이 웹에서
+
 ```
 
 ---

@@ -100,6 +100,13 @@ class SaveResult(Base):
     next_step: str | None = None  # 웹 되돌리기는 null (API-001 SaveResult)
 
 
+class TrashResult(Base):
+    doc_id: str
+    commit_hash: str
+    broken_refs: int
+    next_step: str | None = None
+
+
 class Revert(BaseModel):
     to_version: int = Field(ge=1)
     confirm_item_deletion: bool = False

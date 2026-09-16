@@ -117,46 +117,61 @@ class PreconditionUnmet(Problem):
 
 
 class DocumentHasHistory(Problem):
-    """이력 있는 문서는 지우지 않는다 (PRD N3). 걸린 것을 전부 담는다 — 사람이 한 번에 본다."""
+    """완전 삭제 문지기 (UC-H18 7) — 아직 가리키는 곳·댓글·미해결 플래그. 전부 담는다."""
 
     type = "urn:syncdoc:document-has-history"
     status = 409
     title = "document-has-history"
 
-    def __init__(
-        self,
-        status: str,
-        inbound_refs: list[str],
-        comments: int,
-        flags: int,
-        decisions: int,
-        status_changes: int,
-    ) -> None:
+    def __init__(self, inbound_refs: list[str], comments: int, flags: int) -> None:
         super().__init__(
-            "이력 있는 문서는 지우지 않는다",
-            status=status,
+            "아직 가리키는 곳이 있어 완전히 지울 수 없다",
             inbound_refs=inbound_refs,
             comments=comments,
             flags=flags,
-            decisions=decisions,
-            status_changes=status_changes,
         )
 
 
 class DocumentDeletionNeedsConfirm(Problem):
-    """조건은 채웠다. 사람 확인 뒤 confirm=true로 다시 (UC-A7 3·4)."""
+    """휴지통 넣기 전 확인 (UC-A7 2~4). 끊어질 것을 담는다 — 막지 않는다."""
 
     type = "urn:syncdoc:document-deletion-needs-confirm"
     status = 409
     title = "document-deletion-needs-confirm"
 
-    def __init__(self, doc_id: str, title: str, version_count: int) -> None:
+    def __init__(
+        self, doc_id: str, title: str, version_count: int, inbound_refs: list[str], comments: int
+    ) -> None:
         super().__init__(
-            "문서 삭제는 사람 확인이 필요함",
+            "휴지통에 넣기는 사람 확인이 필요함",
             doc_id=doc_id,
             title=title,
             version_count=version_count,
+            inbound_refs=inbound_refs,
+            comments=comments,
         )
+
+
+class DocumentTrashed(Problem):
+    """휴지통에 있는 문서 — 저장·상태 변경·다시 넣기 불가. 되살린 뒤에 (UC-A7 1a)."""
+
+    type = "urn:syncdoc:document-trashed"
+    status = 409
+    title = "document-trashed"
+
+    def __init__(self, trashed_at: str) -> None:
+        super().__init__("휴지통에 있는 문서", trashed_at=trashed_at)
+
+
+class DocumentNotTrashed(Problem):
+    """휴지통에 없는 문서를 되살리거나 완전히 지우려 함 (UC-A8 1a)."""
+
+    type = "urn:syncdoc:document-not-trashed"
+    status = 409
+    title = "document-not-trashed"
+
+    def __init__(self) -> None:
+        super().__init__("휴지통에 없는 문서")
 
 
 class ProjectCodeConflict(Problem):

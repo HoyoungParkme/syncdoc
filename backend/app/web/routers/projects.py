@@ -47,6 +47,12 @@ async def get_project(code: str, user: User = Depends(current_user)) -> ProjectD
     return ProjectDetail.of(await queries.project_detail(code))
 
 
+@router.get("/{code}/trash", response_model=list[DocumentSummary])
+async def trash_list(code: str, user: User = Depends(current_user)) -> list[DocumentSummary]:
+    """SYNC-API-001#GET/api/projects/{code}/trash"""
+    return [DocumentSummary.of(d) for d in await queries.trash_list(code)]
+
+
 @router.get("/{code}/docs", response_model=list[DocumentSummary])
 async def list_docs(
     code: str,

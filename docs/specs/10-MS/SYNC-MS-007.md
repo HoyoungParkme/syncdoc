@@ -27,7 +27,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#pipeline.save_pipeline]] | 본문 저장 파이프라인 |
 | [[#pipeline.process_commit]] | GitHub 커밋 처리 |
 | [[#pipeline.rebuild]] | 인덱스 재구축 |
-| [[#pipeline.delete_document]] | 이력 없는 문서 삭제 |
+| [[#pipeline.trash_document]] | 휴지통에 넣기 |
+| [[#pipeline.restore_document]] | 휴지통에서 되살리기 |
+| [[#pipeline.purge_document]] | 완전 삭제 |
 | [[#scheduler.catch_up]] | 밀린 커밋 따라잡기 |
 | [[#scheduler.poll_loop]] | 주기 폴링 |
 | [[#pipeline.export_tracking]] | 추적 데이터 백업 |
@@ -51,7 +53,8 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
                         confirm_item_deletion: bool = False,
                         commit_hash: str | None = None,
                         reason: str | None = None,
-                        session: Session | None = None) -> SaveResult
+                        session: Session | None = None,
+                        restore: bool = False) -> SaveResult
 ```
 
 근거: [[SYNC-SEQ-001#SEQ-1]] · [[SYNC-UC-001#UC-A6]] · [[SYNC-DOM-002#SpecService]] 4.7
@@ -74,11 +77,12 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 | `commit_hash` | 이미 있는 커밋 | `github`만. push 단계 건너뜀 |
 | `reason` | 상태 변경 사유 | `web_status`만. `apply_status`로 |
 | `session` | 호출자 세션 | `change_status`·`revert`가 넘긴다. None이면 스스로 연다(DEV-10) |
+| `restore` | 되살리기 중 | `restore_document`만 True — 2단계의 `document-trashed` 검사를 지난다 |
 
 **처리**
 
 1. `code = project_code if doc_id is None else doc_id.split("-")[0]` · `project = ProjectService.get(code)`, `repo = project.repository`. **저장소 락 획득** (`asyncio.Lock`, 저장소별). 이후 전부 락 안. **세션도 여기서 연다** — 서비스는 세션을 열지 않는다(DEV-10)
-2. if `doc_id is not None` → `document = spec.get_document(doc_id)`, `doc_type = document.doc_type` · if 없음 → `! not-found`
+2. if `doc_id is not None` → `document = spec.get_document(doc_id)`, `doc_type = document.doc_type` · if 없음 → `! not-found` · **if `document.trashed_at`이고 `entry != github`이고 되살리기가 아니면 → `! document-trashed`** — 휴지통 문서는 되살린 뒤 고친다. github는 파일이 다시 push된 것이니 그 자체가 되살리기(`save` 7이 `trashed_at`을 비운다)
    (`entry == github`도 같다 · if github 경로에서 없음 → process_commit이 `doc_id=None`으로 다시 부른다)
 3. if `doc_id is None` (생성) → `doc_id = spec.issue_doc_id(project_id, project.code, doc_type)`, `body = spec.apply_frontmatter(body, doc_id, doc_type, "draft")`
 3a. if 생성이고 `entry == mcp` → `unmet = spec.precondition(project.id, doc_type, fm.title)` · if `unmet` → `! precondition-unmet {requires, have}`, 락 해제. **push·DB 쓰기 전.** github 경로는 안 본다 — 원본이 진실이다. DOM이 아니면 `precondition`이 `None`을 준다([[SYNC-STD-001]] 2.6)
@@ -178,35 +182,65 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 
 ---
 
-#### pipeline.delete_document 이력 없는 문서 삭제
+#### pipeline.trash_document 휴지통에 넣기
 
-**시그니처** `async def delete_document(doc_id: str, author: Author, confirm: bool) -> DeleteResult` — `DeleteResult(doc_id, commit_hash, next_step)`
+**시그니처** `async def trash_document(doc_id: str, author: Author, confirm: bool) -> TrashResult` — `TrashResult(doc_id, commit_hash, broken_refs, next_step)`
 
-근거: [[SYNC-SEQ-001#SEQ-22]] · [[SYNC-UC-001#UC-A7]] · [[SYNC-UC-001#UC-H18]] · [[SYNC-API-002#delete_document]] · [[SYNC-API-001#DELETE/api/docs/{docId}]] · [[SYNC-PRD-001#N3]] 예외 · 넷을 조율하므로 pipeline
+근거: [[SYNC-SEQ-001#SEQ-22]] · [[SYNC-UC-001#UC-A7]] · [[SYNC-UC-001#UC-H18]] 1~3 · [[SYNC-API-002#delete_document]] · [[SYNC-API-001#DELETE/api/docs/{docId}]] · [[SYNC-PRD-001#N3]]
 
-**입력** `doc_id` · `author` — MCP면 `_agent_author`, 웹이면 `Author(human, user, None, web_status)` · `confirm` — MCP는 에이전트가 준 것, 웹은 `True`(다이얼로그 13이 이미 받았다)
+**입력** `doc_id` · `author` — MCP면 `_agent_author`, 웹이면 `Author(human, user, None, web_status)` · `confirm` — MCP는 에이전트가 준 것, 웹은 `True`(다이얼로그 13이 받았다)
 
 **처리** — 저장소 락 안
-1. `document = spec.get_document(doc_id)` · 없으면 `! not-found`
-2. 문지기 넷 — `inbound = reference.inbound_of_document(id)` · `comments = collab.count(id)` · `(flags, decisions) = tracking.history_of_document(id, item_pks)` · `changes = spec.status_change_count(id)`
-   - if `document.status != draft or inbound or comments or flags or decisions or changes` → `! document-has-history {status, inbound_refs: [문서ID#항목ID…], comments, flags, decisions, status_changes}`. **하나만 걸려도 전부 담는다** — 사람이 한 번에 본다
-3. if `not confirm` → `! document-deletion-needs-confirm {doc_id, title, version_count}`. 웹은 여기 안 온다
-4. `commit_hash = git.commit_push(repo.workdir, f"spec({doc_id}): 삭제 — 이력 없는 초안", author, delete=[STD-001 1.1 경로])` · 실패 → `! push-failed`. **여기까지 DB 쓰기 없음**
-5. **트랜잭션** — `spec.delete_document(document)` · 커밋 · 락 해제
-6. `→ DeleteResult(doc_id, commit_hash, next_step=f"{doc_id} 지워짐. 사람에게 알리고 멈춘다")`
+1. `document = spec.get_document(doc_id)` · 없으면 `! not-found` · `trashed_at`이면 `! document-trashed`
+2. 끊어질 것 — `inbound = reference.inbound_of_document(id)`(이름으로) · `comments = collab.count(id)`. **막지 않는다** — 보여준다
+3. if `not confirm` → `! document-deletion-needs-confirm {doc_id, title, version_count, inbound_refs, comments}`. 웹은 여기 안 온다
+4. `commit_hash = git.commit_push(repo.workdir, f"spec({doc_id}): 휴지통", author, delete=[STD-001 1.1 경로])` · 실패 → `! push-failed`. **여기까지 DB 쓰기 없음**
+5. **트랜잭션** — `pks = spec.trash(document, commit_hash, author)` · `broken = sum(tracking.raise_broken(pk) for pk in pks)` · 커밋 · 락 해제
+6. `→ TrashResult(doc_id, commit_hash, broken, next_step=f"{doc_id} 휴지통에 넣음 — 끊어진 참조 {broken}. 사람에게 알리고 멈춘다")`
 
-**예외**
+**예외** `not-found`(1) · `document-trashed`(1) · `document-deletion-needs-confirm`(3) · `push-failed`(4)
 
-| 조건 | 에러 | 단계 |
-|---|---|---|
-| 문서 없음 | `not-found` | 1 |
-| 이력 있음 | `document-has-history` | 2 |
-| 확인 안 됨 (MCP) | `document-deletion-needs-confirm` | 3 |
-| push 실패 | `push-failed` | 4 |
+**호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-003#ReferenceService.inbound_of_document]] [[SYNC-MS-005#CommentService.count]] [[SYNC-MS-009#git.commit_push]] [[SYNC-MS-002#SpecService.trash]] [[SYNC-MS-004#TrackingService.raise_broken]]
 
-**호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-003#ReferenceService.inbound_of_document]] [[SYNC-MS-005#CommentService.count]] [[SYNC-MS-004#TrackingService.history_of_document]] [[SYNC-MS-002#SpecService.status_change_count]] [[SYNC-MS-009#git.commit_push]] [[SYNC-MS-002#SpecService.delete_document]]
+**테스트 관점** 남이 가리키는 문서도 confirm이면 들어간다 — `broken_refs`가 그 수 · 원격에서 파일 사라짐, 커밋 메시지 `spec(…): 휴지통` · 행·버전 남음, `trashed_at` 있음, 목록에서 빠짐 · 두 번 넣으면 `document-trashed` · 그 뒤 폴링이 `D`를 건너뛰고 `last_processed_commit`이 나아감 · 휴지통 문서에 `update_document`·상태 변경 → `document-trashed`
 
-**테스트 관점** 초안 v2, 아무도 안 가리킴 → `confirm=false`면 needs-confirm에 `version_count=2` · `confirm=true`면 원격에서 파일이 사라지고 커밋 메시지가 `spec(…): 삭제`, 행 다섯 종류 없음 · 다른 문서가 참조 중 → has-history에 `inbound_refs=["X#A"]`, 아무것도 안 지워짐 · 검토중 → has-history `status=review` · 댓글 하나 → `comments=1` · 그 뒤 폴링(`process_commit`)이 삭제 커밋의 `D`를 건너뛰고 `last_processed_commit`이 나아간다
+---
+
+#### pipeline.restore_document 휴지통에서 되살리기
+
+**시그니처** `async def restore_document(doc_id: str, author: Author) -> SaveResult`
+
+근거: [[SYNC-SEQ-001#SEQ-23]] · [[SYNC-UC-001#UC-A8]] · [[SYNC-UC-001#UC-H18]] 4~5 · [[SYNC-API-002#restore_document]] · [[SYNC-API-001#POST/api/docs/{docId}/restore]]
+
+**처리**
+1. `document = spec.get_document(doc_id)` · `trashed_at` 없으면 `! document-not-trashed`
+2. `hash = spec.trash_commit(document.id)` · `body = git.read(repo.workdir, path, f"{hash}^")` — 지우기 직전 내용
+3. `body`의 frontmatter `status:`를 `draft`로 — DB가 `draft`라 mcp 경로의 `frontmatter.status_change`에 안 걸리게
+4. `r = save_pipeline(entry=author.via가 mcp면 mcp 아니면 web_revert, doc_id, None, body, expected_version=current_version_no, project_code=None, author, message=f"spec({doc_id}): 되살림 — 휴지통에서", changed_items=[] (mcp) | None, session=같은 세션)` — `validate`는 휴지통 문서의 삭제 항목을 `item.reused`에서 빼고(MS-002 validate 3), `save`가 항목을 복구하고 `trashed_at`을 비운다(MS-002 save 3·7)
+5. `tracking.release_broken_causes(되살아난 item_pks, author.user)` · 커밋
+6. `→ r`
+
+**예외** `not-found` · `document-not-trashed`(1) · 파이프라인의 `convention-violation`(3a)·`push-failed`
+
+**호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.trash_commit]] [[SYNC-MS-009#git.read]] [[#pipeline.save_pipeline]] [[SYNC-MS-004#TrackingService.release_broken_causes]]
+
+**테스트 관점** 넣기 → 되살리기 → 본문이 지우기 직전과 같고 버전 +1 · `trashed_at` null · 항목 `is_deleted` 풀림 · 하위의 broken_ref가 `with_edit=false`로 풀림 · 목록에 다시 나옴 · 휴지통에 없는 문서 → `document-not-trashed`
+
+---
+
+#### pipeline.purge_document 완전 삭제
+
+**시그니처** `async def purge_document(doc_id: str, author: Author) -> None`
+
+근거: [[SYNC-SEQ-001#SEQ-22]] 끝 · [[SYNC-UC-001#UC-H18]] 6~8 · [[SYNC-API-001#POST/api/docs/{docId}/purge]] · [[SYNC-PRD-001#N3]]
+
+**처리** — 저장소 락 안. 웹에서만 부른다
+1. `document = spec.get_document(doc_id)` · `trashed_at` 없으면 `! document-not-trashed`
+2. 문지기 셋 — `inbound = reference.inbound_of_document(id)` · `comments = collab.count(id)` · `flags = tracking.open_flags_of_document(item_pks)` · 하나라도 있으면 `! document-has-history {inbound_refs(이름), comments, flags}`
+3. **트랜잭션** — `spec.delete_document(document)` · 커밋. 파일은 이미 저장소에 없다(휴지통 커밋) — push 없음
+4. `→ None`
+
+**테스트 관점** 휴지통 아닌 문서 → `document-not-trashed` · 남이 아직 가리킴 → `document-has-history`에 `inbound_refs` · 다 걷어낸 뒤 → 행 다섯 종류 0, 남의 해결된 플래그는 원인 칸만 null · 번호 재발급
 
 ---
 
@@ -259,7 +293,7 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
    - `user = account.user_for_commit(author_email, author_login)` — **이메일 → login → 자리표시** 순([[SYNC-MS-006#AccountService.user_for_commit]])
    - if `user.github_user_id is None` → 위반에 `author.unknown: {author_login}` 추가. **판정은 「자리표시인가」이지 「방금 만들었나」가 아니다** — 후자로 하면 같은 사람의 둘째 문서부터 이미 행이 있어 오류가 안 붙는다(#34)
    - `author = Author(kind=human, user, instructed_by=None, via=github)`
-   - if `status == D` (파일 삭제) → **문서 행이 없으면 건너뛴다** — 앱이 [[#pipeline.delete_document]]로 지운 문서의 삭제 커밋이거나 등록 전에 사라진 파일이다. `mark_deleted`로 가면 `not-found`가 나서 그 커밋이 영영 「처리 실패」로 남고 `last_processed_commit`이 안 나아간다 · else → `deleted = spec.mark_deleted(document, commit_hash, author)` (`status=draft`, `file.deleted` 오류, 전 항목 `is_deleted`) · 각 pk에 `tracking.raise_broken` · 문서 행은 남는다 · 다음 파일로
+   - if `status == D` (파일 삭제) → **문서 행이 없거나 `trashed_at`이 있으면 건너뛴다** — 앱이 [[#pipeline.trash_document]]·[[#pipeline.purge_document]]로 만든 삭제 커밋이거나 등록 전에 사라진 파일이다. `mark_deleted`로 가면 `not-found`가 나서 그 커밋이 영영 「처리 실패」로 남고 `last_processed_commit`이 안 나아간다 · else → `deleted = spec.mark_deleted(document, commit_hash, author)` (`status=draft`, `file.deleted` 오류, 전 항목 `is_deleted`) · 각 pk에 `tracking.raise_broken` · 문서 행은 남는다 · 다음 파일로
    - else → `save_pipeline(entry=github, doc_id, None, body, None, author, message=원 커밋 메시지, changed_items=None, commit_hash=file_commit_hash)` → 결과 모음
 5. `repo.last_processed_commit = head_hash`, `synced_at = now`
 6. `→ results`
