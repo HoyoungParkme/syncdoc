@@ -48,7 +48,7 @@ if [ -n "$TUNNEL_TOKEN" ]; then
   # Named Tunnel — 주소는 Cloudflare 대시보드에서 호스트를 이 터널에 이어 둔 것. 재부팅해도 같다
   [ -n "$PUBLIC_BASE_URL" ] || { echo "TUNNEL_TOKEN 이 있으면 PUBLIC_BASE_URL(고정 호스트)도 .env 에 있어야 합니다" >&2; exit 1; }
   echo "[2/4] cloudflared named tunnel → $PUBLIC_BASE_URL"
-  nohup cloudflared tunnel run --no-autoupdate --token "$TUNNEL_TOKEN" >"$LOG" 2>&1 &
+  nohup cloudflared tunnel --no-autoupdate run --token "$TUNNEL_TOKEN" >"$LOG" 2>&1 &
   echo $! > "$PIDF"
   for _ in $(seq 1 60); do
     grep -q "Registered tunnel connection" "$LOG" && break
