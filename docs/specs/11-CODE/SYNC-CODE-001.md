@@ -414,6 +414,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 화면 | 없음 — 저장이 푼다. UI-10 끊어진 참조 묶음에서 그 행이 사라진다 |
 | 테스트 | Q1 삭제 → R1 broken_ref → R1의 참조를 지워 저장 → `resolved_with_edit=True`, 확인자 = 저장시킨 사람 · 참조를 둔 채 저장 → 남음 · 원인 이름은 삭제 항목 포함(`describe_items`) |
 | 선행 | N |
+| 완료 | 2026-09-16 · 브랜치 `card/O-release-broken` · 커밋 `8dd6d7c`(spec) `code(O)`(code) · PR #77 · pytest **220 passed** · `check_code` 140/140 · `check_dom` 0 · `check_ui` 15/15 · `validate.py` 0·0 · 실물은 테스트로 갈음 — 끊어진 참조를 실제로 만들려면 남의 프로젝트에서 항목을 지워야 한다. 이슈 #70 닫힘 |
 
 **왜 카드인가.** 파이프라인 단계가 하나 늘고 함수가 하나 는다. 기능이다(DEV-15). 이슈 #70에서 왔지만 "버그 수정"이 아니라 **빠진 단계를 넣는 것**이다.
 
@@ -437,6 +438,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 화면 | 없음 |
 | 테스트 | UI 제목 「목록」 → 위반 · 「화면 설계」·「와이어프레임」·둘 다 → 통과 · API 「에이전트 도구」 → 위반 · 「REST」·「MCP」 → 통과 · 기존 명세 전부 여전히 위반 0 |
 | 선행 | M |
+| 완료 | 2026-09-16 · 브랜치 `card/P-title-keyword` · 커밋 `0ba1a28`(spec) `code(P)`(code) · PR #78 · pytest **220 passed** · `validate.py` 0·0(싱크독 문서는 전부 키워드 있음) · `JSD-API-002 에이전트 도구`는 사용자가 고치기로 — 그 전 재구축이면 그 문서에 규약 오류 하나 |
 
 **왜 카드인가.** 위반 규칙의 범위가 넓어진다 — 기존 문서가 걸릴 수 있는 변경이다(DEV-15).
 
