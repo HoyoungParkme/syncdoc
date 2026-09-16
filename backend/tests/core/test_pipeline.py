@@ -1475,3 +1475,32 @@ async def test_delete_document_gatekeepers_confirm_and_polling_skips_the_commit(
         scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar()
         == r.commit_hash
     )
+
+
+# ── 카드 O — 저장이 끊어진 참조를 푼다 (MS-004 release_broken, #70) ──
+async def test_saving_a_fixed_reference_releases_the_broken_ref_flag(scoped: Session, proj) -> None:
+    await create(proj, DocType.RFQ, RFQ)
+    await create(proj)  # PRD R1 → RFQ#Q1
+    no_q1 = RFQ.replace("#### Q1 첫 요구\n내용\n", "")
+    await update(proj, "EXMP-RFQ-001", no_q1, 1, confirm_item_deletion=True)
+    row = lambda: scoped.execute(  # noqa: E731
+        text("SELECT resolved_with_edit, resolved_by_user_id FROM flags WHERE kind='broken_ref'")
+    ).one()
+    assert row() == (None, None)
+    prd = SpecService(scoped).get_document("EXMP-PRD-001").body
+    assert "[[EXMP-RFQ-001#Q1]]" in prd
+    # 참조를 둔 채 다른 곳만 고치면 남는다
+    await update(
+        proj, "EXMP-PRD-001", prd.replace("한 줄로.", "한 줄로 정리."), 1, changed_items=[]
+    )
+    assert row() == (None, None)
+    # 참조를 지워 저장하면 풀린다 — 확인자는 저장시킨 사람, 수정 동반
+    fixed = prd.replace("한 줄로.", "한 줄로 정리.").replace(
+        "[[EXMP-RFQ-001#Q1]]", "요구 Q1(삭제됨)"
+    )
+    await update(proj, "EXMP-PRD-001", fixed, 2, changed_items=["R1"])
+    assert row() == (True, proj["user"].id)
+    # 풀린 뒤에는 내 할 일·문서 뷰에서 사라진다 (미해결만 센다)
+    assert (
+        scoped.execute(text("SELECT count(*) FROM flags WHERE resolved_at IS NULL")).scalar() == 0
+    )

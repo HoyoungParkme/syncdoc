@@ -287,6 +287,8 @@ async def _run(
     refs.extract(document_id, version.id, body, item_pks, upstream_ids)
     # 10a. 이 문서를 기다리던 미존재 참조를 푼다 (UC-S2 2a2)
     refs.resolve_missing(project.id, target_doc_id=doc_id)
+    # 10b. 참조를 고친 저장이 끊어진 참조를 푼다 (UC-H12 3, #70). 입구를 가리지 않는다
+    tracking.release_broken(list(item_pks.values()), author.user)
     # 11. 변경 영향 → 전파 미결정 (UC-S3 3)
     affected = tracking.detect_impact(document_id, prev_version_id, version.id, changed_items)
     pending_id = None

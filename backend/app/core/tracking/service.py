@@ -168,6 +168,29 @@ class TrackingService:
             n += 1
         return n
 
+    def release_broken(self, item_pks: list[int], user: User) -> int:
+        """SYNC-MS-004#TrackingService.release_broken"""
+        flags = self.repo.unresolved_broken_for_items(item_pks)
+        if not flags:
+            return 0
+        # 원인은 is_deleted라 describe_items가 삭제 포함으로 이름을 준다 (#70)
+        names = self.spec.describe_items([f.cause_item_id for f in flags if f.cause_item_id])
+        n = 0
+        for f in flags:
+            cause = names.get(f.cause_item_id) if f.cause_item_id else None
+            cause_name = f"{cause.doc_id}#{cause.item_id}" if cause and cause.doc_id else None
+            still = any(
+                e.to_item_pk == f.cause_item_id
+                or (e.is_missing and cause_name is not None and e.raw_target == cause_name)
+                for e in self.references.upstream(f.target_item_id)
+            )
+            if still:
+                continue  # 아직 가리킨다 — 사람이 고칠 때까지 남는다
+            f.resolved_by_user_id, f.resolved_at, f.resolved_with_edit = user.id, now_utc(), True
+            n += 1
+        self.session.flush()
+        return n
+
     def raise_upstream(
         self,
         target_item_pks: list[int],
