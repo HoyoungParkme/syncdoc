@@ -188,6 +188,8 @@ classDiagram
         +bool has_convention_error
         +str convention_error_detail
         +str incomplete_warnings
+        +datetime trashed_at
+        +int trashed_by_user_id
         +datetime updated_at
     }
 ```

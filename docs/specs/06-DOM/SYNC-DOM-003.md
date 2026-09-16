@@ -368,6 +368,7 @@ erDiagram
 |---|---|---|
 | documents | `(project_id, doc_type)` | 단계별 목록 · `list_by_project(stage)` |
 | documents | `(has_convention_error) where true` 부분 | 규약 오류 문서 · `convention_error_docs_by` |
+| documents | `(trashed_by_user_id)` | FK 컬럼(DEV-8). 휴지통 목록은 프로젝트 단위라 `(project_id, doc_type)`로 충분 |
 | items | `(document_id, is_deleted)` | 현재 항목 목록 · `detect_deleted_items` · `item_blocks` 대조 |
 | versions | `(document_id, version_no desc)` | 최근 버전 · `last_author` · `current` |
 | versions | `(author_user_id, created_at)` · `(instructed_by_user_id)` | 내 할 일 · `versions_instructed_by` |
