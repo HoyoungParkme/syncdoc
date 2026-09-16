@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-001
 type: STD
 title: 명세 작성 규약
-status: review
+status: approved
 upstream: [SYNC-PRD-001]
 ---
 
