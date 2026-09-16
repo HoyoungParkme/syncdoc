@@ -508,6 +508,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 화면 | 없음 |
 | 테스트 | `validate.py` 위반 0·경고 0 · **실물**: MCP `get_template(VA, "DOM")`의 `common_rules`에 1.9가 실려 오는지 — VA 저장소엔 STD 파일이 없어 싱크독 것으로 폴백하는 경로가 그대로 증명된다 |
 | 선행 | R |
+| 완료 | 2026-09-16 · 브랜치 `card/S-code-structure` · 커밋 `fec9dd8`(spec) · PR #87 · `validate.py` 위반 0·경고 0 · `check_dom` 0 · `check_code` 148/148 · `check_ui` 15/15 · `check_tokens` 0 · pytest **220 passed** · **실물 확인**: 앱을 다시 빌드한 뒤 MCP `get_template(VA, "DOM")` → `common_rules` 6842자에 **1.9 코드 구조·기본형 트리·「벗어나려면 클래스 명세에 이유」가 모두 실려 나갔다.** VA 저장소엔 STD 파일이 없으므로 싱크독 STD-001로 폴백하는 경로가 그대로 증명됐다 · **걸린 것 둘** — (1) 그 폴백은 SYNC 저장소 작업 사본이 아니라 **앱 이미지에 구워진 `docs/specs/`** 를 읽는다([[SYNC-API-002#get_template]]). 폴링이 명세를 받아도 규약은 안 바뀌고 **앱을 다시 빌드해야** 에이전트에게 내려간다 (2) `get_template`은 `doc_type`만 받고 `title`을 모르므로 DOM·UI·API의 `required_sections`가 `[]`로 온다 — 서브타입별 필수 절(2.6~2.8)이 에이전트에게 닿지 않는다. 카드 S 범위 밖이라 적어만 둔다 |
 
 **왜 카드인가.** 코드는 안 바뀌지만 규약이 바뀌고, 그 규약이 모든 프로젝트 에이전트에게 전달된다. 기록이 남아야 한다(DEV-15).
 
