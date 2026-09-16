@@ -446,6 +446,29 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 
 ---
 
+#### Q Named Tunnel — 고정 주소
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-INFRA-001]] 5장 공개 경로 · 9장 미결(도메인) · [[SYNC-INFRA-001#C7]] |
+| 구현 함수 | 없음 — `scripts/tunnel.sh`(`TUNNEL_TOKEN` 있으면 `cloudflared tunnel run --token`, 없으면 Quick) · `.env.example` `TUNNEL_TOKEN` · `config.py` 주석 · README |
+| 화면 | 없음 |
+| 테스트 | 손으로 — 토큰 넣고 `scripts/tunnel.sh` → 고정 주소로 `/health` · 재부팅 뒤 같은 주소 · `TUNNEL_TOKEN` 비우면 Quick으로 뜨고 `PUBLIC_BASE_URL`이 새 주소로 바뀜 |
+| 선행 | C |
+
+**왜 카드인가.** 인프라 문서의 결정이 바뀐다(INFRA 9장 미결 하나를 뒤집는다). 코드는 스크립트뿐이라 작지만 기록해야 한다.
+
+**왜 지금인가.** 재부팅 두 번에 두 번 다 터널 주소가 바뀌어 OAuth 콜백을 고치고 WSL·Windows의 MCP 등록을 고치고 에이전트 세션을 재시작했다. 사용자가 도메인이 있다고 했다.
+
+**정한 것 둘.**
+
+| 질문 | 결정 | 이유 |
+|---|---|---|
+| Quick Tunnel을 없애나 | **남긴다.** `TUNNEL_TOKEN`이 비면 Quick | 도메인 없는 사람이 같은 스크립트로 시작할 수 있어야 한다 |
+| webhook을 켜나 | **선택.** 폴링은 그대로 | 폴링 5분이면 충분했고, webhook은 저장소마다 사람이 걸어야 한다. 켜고 싶은 사람은 켠다 |
+
+---
+
 ## 2. 통합 테스트 시나리오
 
 시나리오 S1~S7을 그대로 E2E 테스트로. 각 슬라이스의 `테스트` 행에 나눠 들어가 있다. 전부 통과하면 PRD 성공지표 측정을 시작한다.

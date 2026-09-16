@@ -234,12 +234,14 @@ C6이 요구하는 것은 권한 구분이 아니라 **누가 들어올 수 있�
 - 커밋 작성자 — 각자의 계정으로 커밋이 남는다. 한 계정으로 몰지 않는다
 - 저장소 접근 — 각자의 토큰으로 push한다
 
-**공개 경로 — Quick Tunnel**: 도메인 없이 `cloudflared tunnel --url http://localhost:8000`으로 `https://xxx.trycloudflare.com` 임시 주소를 받는다. 공짜지만 **켤 때마다 주소가 바뀐다.**
+**공개 경로 — Named Tunnel (고정 주소)**: Cloudflare에 올린 도메인 아래 호스트 하나(`PUBLIC_BASE_URL`)를 Zero Trust → Tunnels에서 만든 터널에 잇고, 노트북에서 `cloudflared tunnel run --token $TUNNEL_TOKEN`으로 붙인다. **재부팅해도 주소가 같다** — OAuth 콜백·MCP 등록·에이전트 설정을 한 번만 한다. `.env`에 `TUNNEL_TOKEN`(터널 토큰 — 대시보드가 준다. 비밀이므로 채팅·커밋에 안 적는다)과 `PUBLIC_BASE_URL`(고정 호스트)을 둔다. `scripts/tunnel.sh`가 `TUNNEL_TOKEN`이 있으면 이 모드로 뜬다.
 
-- **webhook은 걸지 않는다.** Payload URL이 매번 바뀌어 못 쓴다. 대신 **폴링만으로 간다** — `POLL_INTERVAL_SECONDS`(기본 300). GitHub 직접 push(UC-G1·S7)는 5분 안에 반영된다. 기동 시 따라잡기가 있어 꺼져 있던 동안의 커밋도 들어온다
-- **OAuth 앱**은 켤 때마다 callback URL을 새 주소로 고친다(3분). 앱 하나에 로컬용(`http://localhost:8000/auth/github/callback`)과 공개용 콜백을 **둘 다 등록해 두면** 양쪽에서 로그인된다 — 앱이 `redirect_uri`를 보내기 때문이다(SEQ-8). `.env`의 `PUBLIC_BASE_URL`을 같이 바꾼다
+**대안 — Quick Tunnel (도메인 없음)**: `TUNNEL_TOKEN`이 비어 있으면 `cloudflared tunnel --url http://localhost:8000`으로 `https://xxx.trycloudflare.com` 임시 주소를 받는다. 공짜지만 **켤 때마다 주소가 바뀐다** — 스크립트가 `PUBLIC_BASE_URL`을 새 주소로 덮어쓰고, 사람이 OAuth 콜백·MCP 등록을 다시 한다.
+
+- **webhook**: Named Tunnel이면 걸 수 있다(Payload URL `{PUBLIC_BASE_URL}/hooks/github`, Secret = `WEBHOOK_SECRET`) — **선택이다.** 폴링은 어느 모드든 그대로 돈다 — `POLL_INTERVAL_SECONDS`(기본 300). GitHub 직접 push(UC-G1·S7)는 5분 안에 반영되고, 기동 시 따라잡기가 있어 꺼져 있던 동안의 커밋도 들어온다. Quick Tunnel이면 Payload URL이 매번 바뀌어 못 건다
+- **OAuth 앱**: 앱 하나에 로컬용(`http://localhost:8000/auth/github/callback`)과 공개용 콜백을 **둘 다 등록해 두면** 양쪽에서 로그인된다 — 앱이 `redirect_uri`를 보내기 때문이다(SEQ-8). Named Tunnel이면 한 번, Quick Tunnel이면 켤 때마다 공개용 콜백을 고친다(3분)
 - **`PUBLIC_BASE_URL`의 쓰임**: 앱이 `redirect_uri`를 만들 때 쓴다. 요청 Host가 이 값의 host와 같으면 이 값을, 아니면 요청에서 만든다(`auth.callback_url`). 터널 뒤에서는 프록시가 https를 http로 보이게 하므로 요청만으로는 스킴을 못 믿는다. 비어 있으면 요청에서만 만든다
-- 고정 주소가 필요해지면 도메인을 사서 Named Tunnel로 바꾼다 — 그때 webhook도 켠다(v2)
+- Quick → Named로 바꾸는 날: `.env`에 `TUNNEL_TOKEN`·`PUBLIC_BASE_URL` 넣고 `scripts/tunnel.sh` → OAuth 콜백을 고정 주소로 한 번 고침 → 팀원·에이전트의 MCP 등록을 고정 주소로. 그 뒤로는 재부팅 때 `scripts/tunnel.sh`만
 
 **저장소는 public**: v1은 public 저장소만 다룬다 — `git.fetch`가 토큰 없이 돌기 때문. private 지원은 v2(MS-009 미결). `clone`·`push`는 등록자 토큰을 쓰므로 public이어도 쓰기에는 권한이 필요하다.
 
@@ -389,5 +391,5 @@ Cloudflare Tunnel은 노트북에서 별도로 실행하며 `:8000`을 공개 �
 - [x] MCP 토큰의 만료·회수 정책 — 결정: 만료는 두지 않는다(`expires_at=None`, MS-006 그대로). 회수는 사람이 UI-13에서 폐기하는 것 하나. `access_tokens.expires_at` 컬럼과 검증 분기는 남겨 둔다 — 정책이 바뀌면 발급만 고치면 된다
 - [x] 토큰 암호화 비밀키의 보관 위치와 교체 절차 — 결정: 보관 위치는 지금대로 `.env`(DB 밖). 교체를 대비한다 — (1) 복호화 실패(`InvalidToken`)를 잡아 읽을 수 있는 오류로 바꾸고, (2) 옛 키를 함께 받아 복호화는 둘 다·암호화는 새 키로(`MultiFernet`), (3) 재암호화 유틸을 둔다. **세션 서명 키를 토큰 암호화 키와 분리한다** — 지금은 같은 키라 교체가 곧 전원 로그아웃이다
 - [x] 저장소를 여러 개 등록했을 때 작업 사본 디스크 사용량 한도 — 결정: 한도보다 **회수 경로가 먼저다.** 지금은 프로젝트 삭제 API도 MCP 도구도 없어 한 번 등록하면 작업 사본이 디스크에서 사라지지 않는다. `ProjectService.delete_project`와 `DELETE /api/projects/{code}`를 만든다. 용량 한도·쿼터는 v2 — 노트북 한 대에 프로젝트 몇 개 수준에서는 이르다
-- [x] Cloudflare Tunnel 고정 주소용 도메인 확보 여부 — 결정: v1은 Quick Tunnel(도메인 없음, 5장). 고정 주소가 필요해지면 도메인을 사서 Named Tunnel — v2
+- [x] Cloudflare Tunnel 고정 주소용 도메인 확보 여부 — 결정: v1은 Quick Tunnel(도메인 없음, 5장). 고정 주소가 필요해지면 도메인을 사서 Named Tunnel — v2 → **2026-09-16 도메인이 있어 Named Tunnel로 바꾼다**(카드 Q). 재부팅마다 OAuth 콜백·MCP 등록을 다시 하는 것이 두 번 반복되자 바꿨다. Quick Tunnel은 도메인 없는 사람의 대안으로 남긴다
 - [x] 원격 기본 브랜치 `main` 고정 — 다른 브랜치 저장소 지원은 v2 — 결정: `main` 고정 (CODE-001 3장). 다른 브랜치 저장소는 v2

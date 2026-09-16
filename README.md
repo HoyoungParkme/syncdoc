@@ -24,6 +24,6 @@ docker compose up -d --build
 ```
 
 `http://localhost:8000` — GitHub 로그인 뒤 프로젝트를 등록한다.
-노트북 밖에서 쓰려면 `scripts/tunnel.sh` (Cloudflare Quick Tunnel).
+노트북 밖에서 쓰려면 `scripts/tunnel.sh` — `.env`에 `TUNNEL_TOKEN`·`PUBLIC_BASE_URL`이 있으면 Cloudflare Named Tunnel(고정 주소), 없으면 Quick Tunnel(주소 가변).
 
 이 저장소는 싱크독으로 싱크독을 만드는 첫 프로젝트다.
