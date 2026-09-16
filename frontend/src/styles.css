@@ -295,6 +295,7 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .stgh .sw.ok{background:var(--status-approved)}
 .stgh .sw.na{background:var(--bg-card);border-color:var(--border)}
 .stg{display:flex;align-items:center;gap:var(--space-9);padding:var(--space-6) var(--space-13);
+.stg.dim,.doc.dim{opacity:.58}  /* 휴지통 (UI-4 8) — 살아 있는 문서와 한눈에 갈린다 */
   border-bottom:1px solid var(--divider-soft);cursor:pointer}
 .stg:hover{background:var(--bg-subtle)}
 .stg .no{width:20px;flex:none;font-size:var(--text-mono-sm);color:var(--ink-muted)}

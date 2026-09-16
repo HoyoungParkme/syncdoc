@@ -1,11 +1,12 @@
 /** UI-4 프로젝트 상세 — SYNC-UI-002#UI-4. 11단계 표 + 문서 행, 요약 수치, 표준 묶음, 최근 변경(status 커밋 포함).
  *  GET /api/projects/{code}(ProjectDetail) 하나로 그린다. 요소 번호 = data-el.
  *  1 헤더(1.1·1.2·1.3) · 2.1·2.2 그래프·순서 · 3 요약 수치 여섯(3.1·3.2·3.6·3.3·3.4·3.5 → 다이얼로그 6)
- *  4 표(4.1 단계, 4.2 문서, 4.3 상위 미승인, 4.4 표준) · 5 최근 변경 · 6 목록 다이얼로그 · 7 동기화 상태(7.1 커밋, 7.2 밀림) */
+ *  4 표(4.1 단계, 4.2 문서, 4.3 상위 미승인, 4.4 표준) · 5 최근 변경 · 6 목록 다이얼로그 · 7 동기화 상태(7.1 커밋, 7.2 밀림)
+ *  8 휴지통 묶음(8.1 행 · 8.2 되살리기 · 8.3 완전 삭제 · 8.4 확인) — 0건이면 묶음 자체가 없다 */
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { StatusPill, ProjName } from '../components/ui'
-import { ago, api, authorLabel, docPath, refKey, STAGE_NAMES, STATUS_KO, warnText, type CommentSummary, type DocumentSummary, type FlagSummary, type ProjectDetail as Detail, type ProjectSummary } from '../api/client'
+import { ago, api, ApiError, authorLabel, docPath, refKey, STAGE_NAMES, STATUS_KO, warnText, type CommentSummary, type DocumentSummary, type FlagSummary, type ProjectDetail as Detail, type ProjectSummary } from '../api/client'
 
 
 /** 미니 히트맵과 문서 행 점이 쓰는 상태 → 클래스 */
@@ -21,10 +22,30 @@ export function ProjectDetail() {
   // UI-2 칸에서 #stage-N으로 들어오면 그 단계만 펼친 채로 연다
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [dialog, setDialog] = useState<{ kind: string; label: string; items: unknown[] } | null>(null)
+  const [trash, setTrash] = useState<DocumentSummary[]>([]) // 8 — 별도 조회. 목록 응답엔 휴지통이 없다
+  const [purge, setPurge] = useState<{ doc: DocumentSummary; block: Record<string, unknown> | null } | null>(null) // 8.4
   useEffect(() => {
     setD(null)
     api.get<Detail>(`/api/projects/${code}`).then(setD)
+    api.get<DocumentSummary[]>(`/api/projects/${code}/trash`).then(setTrash)
   }, [code])
+  const restore = (doc: DocumentSummary) =>
+    api
+      .post(`/api/docs/${doc.doc_id}/restore`)
+      .then(() => nav(`/p/${code}/d/${doc.doc_id}`))
+      .catch((e: unknown) => alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e)))
+  const doPurge = (doc: DocumentSummary) =>
+    api
+      .post(`/api/docs/${doc.doc_id}/purge`)
+      .then(() => {
+        setPurge(null)
+        api.get<DocumentSummary[]>(`/api/projects/${code}/trash`).then(setTrash)
+      })
+      .catch((e: unknown) => {
+        // 서버가 막았다 — 걸리는 것을 8.4 안에 보여준다. 판정은 한 곳(pipeline.purge_document)
+        if (e instanceof ApiError && e.kind === 'document-has-history') setPurge({ doc, block: e.problem })
+        else alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
+      })
   // UI-2 칸 클릭으로 들어온 경우 — 그 단계만 펼친다
   useEffect(() => {
     const m = /^#stage-(\d+)$/.exec(window.location.hash)
@@ -140,6 +161,48 @@ export function ProjectDetail() {
               {open.STD && byType('STD').map(row)}
             </div>
           )}
+          {trash.length > 0 && (
+            // 8 — 단계 표의 일부가 아니다. 살아 있는 문서와 갈리게 흐리다 (UI-4 규칙)
+            <div>
+              <div className="stg dim" data-el="8" onClick={() => toggle('TRASH')}>
+                <span className="no mono">—</span>
+                <span className="nm">휴지통</span>
+                <span className="grow" />
+                <span className="lbl">{trash.length}개</span>
+                <span className="caret">{open.TRASH ? '▾' : '▸'}</span>
+              </div>
+              {open.TRASH &&
+                trash.map((t) => (
+                  <div className="doc dim" data-el="8.1" key={t.doc_id} onClick={() => nav(`/p/${code}/d/${t.doc_id}`)}>
+                    <span className="mono">{t.doc_id}</span>
+                    <span className="lbl">
+                      v{t.current_version_no} · {t.trashed_at ? `${ago(t.trashed_at)} 넣음` : ''} · {authorLabel(t.last_author)}
+                    </span>
+                    <span className="grow" />
+                    <button
+                      className="btn sm"
+                      data-el="8.2"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        restore(t)
+                      }}
+                    >
+                      되살리기
+                    </button>{' '}
+                    <button
+                      className="btn sm danger"
+                      data-el="8.3"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setPurge({ doc: t, block: null })
+                      }}
+                    >
+                      완전 삭제
+                    </button>
+                  </div>
+                ))}
+            </div>
+          )}
         </div>
         <aside className="panel" data-el="5">
           <div className="pbody">
@@ -187,6 +250,48 @@ export function ProjectDetail() {
           </div>
         </aside>
       </div>
+      {purge && (
+        <>
+          <div className="backdrop" onClick={() => setPurge(null)} />
+          <div className="dialog narrow" data-el="8.4">
+            <div className="dhead">완전 삭제 — {purge.doc.doc_id}</div>
+            <div className="dbody">
+              행까지 지워지고 <b>되돌릴 수 없습니다.</b> 번호는 다시 쓰일 수 있습니다.
+              {purge.block && (
+                <div className="banner warn">
+                  지울 수 없습니다 — 아직 가리키는 곳이 있습니다
+                  {(purge.block.inbound_refs as string[]).map((r) => (
+                    <span key={r}>
+                      <br />·{' '}
+                      <a href={`/p/${r.split('-')[0]}/d/${r.split('#')[0]}`} target="_blank" rel="noreferrer">
+                        <b>{r}</b>
+                      </a>
+                    </span>
+                  ))}
+                  {Number(purge.block.comments) > 0 && (
+                    <>
+                      <br />· 댓글 {String(purge.block.comments)}
+                    </>
+                  )}
+                  {Number(purge.block.flags) > 0 && (
+                    <>
+                      <br />· 미해결 플래그 {String(purge.block.flags)}
+                    </>
+                  )}
+                </div>
+              )}
+              <div className="dacts">
+                <button className="btn" onClick={() => setPurge(null)}>
+                  닫기
+                </button>{' '}
+                <button className="btn danger" disabled={purge.block !== null} onClick={() => doPurge(purge.doc)}>
+                  완전 삭제
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
       {dialog && (
         <>
           <div className="backdrop" onClick={() => setDialog(null)} />

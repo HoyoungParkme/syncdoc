@@ -16,7 +16,7 @@ from app.core.types import ApiAuthor, Author, AuthorKind, DocStatus, Entry
 from app.db import get_session
 from app.web.auth import current_user
 from app.web.schemas.documents import ChangeStatus, Document, DocumentSummary, UpstreamCheck
-from app.web.schemas.ops import DownstreamView, Revert, SaveResult
+from app.web.schemas.ops import DownstreamView, Revert, SaveResult, TrashResult
 from app.web.schemas.projects import Version
 from app.web.schemas.tracking import Diff
 
@@ -29,12 +29,33 @@ async def get_document(doc_id: str, user: User = Depends(current_user)) -> Docum
     return Document.of(await queries.document_view(doc_id))
 
 
-@router.delete("/{doc_id}", status_code=204, response_class=Response)
-async def delete_document(doc_id: str, user: User = Depends(current_user)) -> Response:
-    """SYNC-API-001#DELETE/api/docs/{docId}"""
-    # 확인은 화면(UI-5 13)이 받았다 — confirm=True
-    author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.web_status)
-    await pipeline.delete_document(doc_id, author, confirm=True)
+def _human(user: User) -> Author:
+    return Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.web_status)
+
+
+@router.delete("/{doc_id}", response_model=TrashResult)
+async def trash_document(
+    doc_id: str, confirm: bool = Query(False), user: User = Depends(current_user)
+) -> TrashResult:
+    """SYNC-API-001#DELETE/api/docs/{docId}
+
+    confirm 없이 부르면 끊어질 것을 담은 document-deletion-needs-confirm이 온다 — 화면(UI-5 13.2)이
+    그것을 보여주고 confirm=true로 다시 부른다.
+    """
+    return TrashResult.model_validate(await pipeline.trash_document(doc_id, _human(user), confirm))
+
+
+@router.post("/{doc_id}/restore", response_model=SaveResult, status_code=201)
+async def restore_document(doc_id: str, user: User = Depends(current_user)) -> SaveResult:
+    """SYNC-API-001#POST/api/docs/{docId}/restore"""
+    author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.web_revert)
+    return SaveResult.model_validate(await pipeline.restore_document(doc_id, author))
+
+
+@router.post("/{doc_id}/purge", status_code=204, response_class=Response)
+async def purge_document(doc_id: str, user: User = Depends(current_user)) -> Response:
+    """SYNC-API-001#POST/api/docs/{docId}/purge"""
+    await pipeline.purge_document(doc_id, _human(user))
     return Response(status_code=204)
 
 

@@ -201,9 +201,23 @@ class SpecRepository:
         return self.session.scalar(stmt) or 0
 
     def delete_document_rows(self, document_id: int) -> int:
-        """문서에 딸린 행을 자식부터 지운다 (MS-002 delete_document). 이력 검사는 호출자 몫."""
+        """문서에 딸린 행을 자식부터 지운다 (MS-002 delete_document). 문지기는 호출자 몫.
+
+        남의 플래그가 이 문서 항목·버전을 원인으로 물고 있으면 원인 칸만 비운다 — 미해결은
+        호출자가 막았으니 여기 오는 건 해결된 것뿐이다.
+        """
         n = 0
         for stmt in (
+            "update flags set cause_item_id = null where cause_item_id in"
+            " (select id from items where document_id = :d)",
+            "update flags set cause_version_id = null where cause_version_id in"
+            " (select id from versions where document_id = :d)",
+            "update flags set target_version_id = null where target_version_id in"
+            " (select id from versions where document_id = :d)",
+            "delete from flags where target_item_id in"
+            " (select id from items where document_id = :d)",
+            "delete from propagation_decisions where version_id in"
+            " (select id from versions where document_id = :d)",
             'delete from "references" where from_document_id = :d',
             "delete from items where document_id = :d",
             "delete from versions where document_id = :d",
@@ -212,6 +226,23 @@ class SpecRepository:
         ):
             n += self.session.execute(text(stmt), {"d": document_id}).rowcount
         return n
+
+    def trashed_of_project(self, project_id: int) -> list[Document]:
+        stmt = (
+            select(Document)
+            .where(Document.project_id == project_id, Document.trashed_at.is_not(None))
+            .order_by(Document.trashed_at.desc())
+        )
+        return list(self.session.scalars(stmt))
+
+    def trash_commit(self, document_id: int) -> str | None:
+        stmt = (
+            select(StatusChange.commit_hash)
+            .where(StatusChange.document_id == document_id, StatusChange.reason == "휴지통")
+            .order_by(StatusChange.changed_at.desc(), StatusChange.id.desc())
+            .limit(1)
+        )
+        return self.session.scalar(stmt)
 
     def latest_versions(self, document_ids: list[int]) -> dict[int, VersionRow]:
         """문서마다 최근 버전 하나. 쿼리 한 번."""

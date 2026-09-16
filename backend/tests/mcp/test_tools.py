@@ -46,8 +46,12 @@ async def test_tools_listed_with_descriptions() -> None:
         "create_document",
         "update_document",
         "delete_document",
+        "restore_document",
     }
     assert "document-deletion-needs-confirm" in names["delete_document"]
+    assert (
+        "휴지통" in names["delete_document"] and "document-not-trashed" in names["restore_document"]
+    )
     assert names["get_template"].startswith("문서 타입의 템플릿과 작성 규약")
     # STD-001 1.8·2.6 — 도구 설명이 멈춤과 DOM 순서를 말한다
     assert (

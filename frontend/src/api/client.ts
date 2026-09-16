@@ -74,6 +74,14 @@ export interface DocumentSummary {
   updated_at: string
   last_author: Author | null
   counts: Record<string, number>
+  /** 휴지통 (카드 R). 목록엔 안 나오고 /trash·문서 조회에만 값이 찬다 */
+  trashed_at?: string | null
+}
+export interface TrashResult {
+  doc_id: string
+  commit_hash: string
+  broken_refs: number
+  next_step: string | null
 }
 export interface ProjectSummary {
   code: string

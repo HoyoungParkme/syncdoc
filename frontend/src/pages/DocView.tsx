@@ -1,7 +1,7 @@
 /** UI-5 문서 뷰 — SYNC-UI-002#UI-5. 유저용(기본)·원본 탭, 목차, 오른쪽 패널(참조·댓글), 상태 변경 + 상위 대조 다이얼로그.
  *  유저용 탭 본문은 view/*.ts(view_build.py 포트, STD-002)가 만든 HTML을 innerHTML로 넣고 mermaid를 돌린다.
  *  1 문서 바(1.1 상태, 1.2 버전) · 2 탭(2.1~2.3) · 3 상태 변경 · 4 규약 오류 · 4a 미완성 · 5 미해결 댓글
- *  12 문서 삭제(초안만) · 13 삭제 확인(13.1 무엇이 지워지나 · 13.2 걸리는 것 · 13.3 삭제 · 13.4 닫기)
+ *  12 휴지통에 넣기 · 13 휴지통 확인(13.1 무엇이 되나 · 13.2 끊어지는 것 · 13.3 넣기 · 13.4 닫기) · 4b 휴지통 배너(4b.1 되살리기)
  *  6 목차(6.1 표시된 항목, 6.2 왼쪽 손잡이) · 7 유저용 본문(7.1~7.4) · 8 패널(8.1 참조, 8.2 댓글, 8.3 오른쪽 손잡이)
  *  9 단계 이동 · 10 원본(10.1 MD, 10.2 복사, 10.3 원문, 10.4 렌더링) · 11 상위 대조(11.1~11.4) */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -35,7 +35,7 @@ export function DocView() {
   const [mismatch, setMismatch] = useState<Set<string>>(new Set())
   const [reason, setReason] = useState('')
   const [delOpen, setDelOpen] = useState(false) // 13
-  const [delBlock, setDelBlock] = useState<Record<string, unknown> | null>(null) // 13.2 — 서버 답으로만 채운다
+  const [delInfo, setDelInfo] = useState<Record<string, unknown> | null>(null) // 13.2 — 서버 답(needs-confirm)으로만 채운다
   const mainRef = useRef<HTMLElement>(null)
   // 규칙: 사이드바 폭과 원문/렌더링 선택은 사람마다 기억한다. 화면을 옮겨도 유지된다
   const [tocW, addTocW] = useWidth(TOC)
@@ -180,14 +180,31 @@ export function DocView() {
       alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
     }
   }
-  // UC-H18 — 화면이 먼저 물어보지 않는다. 판정은 pipeline.delete_document 한 곳, 409면 13.2를 채운다
-  async function deleteDoc() {
+  // UC-H18 — 확인(13)을 열면 confirm 없이 한 번 불러 끊어질 것을 받는다. 판정은 pipeline.trash_document 한 곳
+  async function openTrash() {
+    setDelInfo(null)
+    setDelOpen(true)
     try {
       await api.del(`/api/docs/${docId}`)
+    } catch (e) {
+      if (e instanceof ApiError && e.kind === 'document-deletion-needs-confirm') setDelInfo(e.problem)
+      else alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
+    }
+  }
+  async function trashDoc() {
+    try {
+      await api.del(`/api/docs/${docId}?confirm=true`)
       nav(`/p/${code}`)
     } catch (e) {
-      if (e instanceof ApiError && e.kind === 'document-has-history') setDelBlock(e.problem)
-      else alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
+      alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
+    }
+  }
+  async function restoreDoc() {
+    try {
+      await api.post(`/api/docs/${docId}/restore`)
+      load()
+    } catch (e) {
+      alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
     }
   }
   async function addComment(parent: number | null) {
@@ -239,11 +256,13 @@ export function DocView() {
           v{doc.current_version_no}
         </Link>
         <span className="grow" />
-        {unresolved > 0 && (
+        {unresolved > 0 && !doc.trashed_at && (
           <span data-el="5" className="lbl" onClick={() => setPanel('comments')}>
             미해결 댓글 {unresolved}
           </span>
         )}
+        {/* 휴지통에 있으면 상태 변경(3)·넣기(12)가 없다 — 4b 배너 하나로 말한다 (UI-5 규칙) */}
+        {!doc.trashed_at && (
         <span className="statuswrap">
           <button className="btn" data-el="3" disabled={doc.has_convention_error} onClick={() => setStatusOpen((o) => !o)}>
             상태 변경 ▾
@@ -260,17 +279,11 @@ export function DocView() {
             </div>
           )}
         </span>
-        {doc.status === 'draft' && (
-          // 12 — 초안에만. 검토중·승인은 그 자체가 이력이다 (UI-5 규칙)
-          <button
-            className="btn danger"
-            data-el="12"
-            onClick={() => {
-              setDelBlock(null)
-              setDelOpen(true)
-            }}
-          >
-            문서 삭제
+        )}
+        {!doc.trashed_at && (
+          // 12 — 어떤 문서든 휴지통엔 넣을 수 있다. 되돌릴 수 있으니 문지기가 없다 (PRD N3)
+          <button className="btn danger" data-el="12" onClick={openTrash}>
+            휴지통에 넣기
           </button>
         )}
       </div>
@@ -330,6 +343,14 @@ export function DocView() {
           </div>
 
           {/* 배너는 본문 열 안, 본문과 같은 폭. 유저용·원본 양쪽에 보인다 (UI-5 규칙) */}
+          {doc.trashed_at && (
+            <div className="banner warn" data-el="4b">
+              휴지통에 있는 문서입니다 — {new Date(doc.trashed_at).toLocaleString()} · 파일은 저장소에 없고 되살리면 돌아옵니다{' '}
+              <button className="btn sm" data-el="4b.1" onClick={restoreDoc}>
+                되살리기
+              </button>
+            </div>
+          )}
           {doc.has_convention_error && (
             <div className="banner" data-el="4">
               ⚠ 규약 오류: {doc.convention_error_detail} (커밋 {doc.commit_hash?.slice(0, 7)} · {doc.last_author?.user?.display_name})
@@ -409,31 +430,39 @@ export function DocView() {
 
       {delOpen && (
         <div className="dialog narrow" data-el="13">
-          <div className="dhead">문서 삭제 — {doc.doc_id}</div>
+          <div className="dhead">휴지통에 넣기 — {doc.doc_id}</div>
           <div className="dbody">
             <p data-el="13.1">
-              <b>{titleOf(doc.body)}</b> · 버전 {doc.current_version_no}개 · 파일이 저장소에서 지워지고 버전째 사라집니다. <b>되돌릴 수 없습니다.</b>
+              <b>{titleOf(doc.body)}</b> · 버전 {doc.current_version_no}개 · 파일이 저장소에서 지워집니다. 행과 이력은 남아 <b>되살릴 수 있습니다.</b>
             </p>
-            {delBlock && (
+            {delInfo && ((delInfo.inbound_refs as string[]).length > 0 || Number(delInfo.comments) > 0) && (
               <div className="banner warn" data-el="13.2">
-                지울 수 없습니다 — 이력이 있습니다
-                <br />· 상태 <b>{STATUS_KO[String(delBlock.status)]}</b> (초안만 지울 수 있다)
-                <br />· 들어오는 참조 {(delBlock.inbound_refs as string[]).length}
-                {(delBlock.inbound_refs as string[]).map((r) => (
-                  <span key={r}>
-                    {' '}
-                    — <a href={`/p/${r.split('-')[0]}/d/${r.split('#')[0]}${r.includes('#') ? '#item-' + r.split('#')[1] : ''}`} target="_blank" rel="noreferrer"><b>{r}</b></a>
-                  </span>
-                ))}
-                <br />· 댓글 {String(delBlock.comments)} · 플래그 {String(delBlock.flags)} · 전파 결정 {String(delBlock.decisions)} · 상태 변경 {String(delBlock.status_changes)}
+                넣으면 끊어지는 것
+                {(delInfo.inbound_refs as string[]).length > 0 && (
+                  <>
+                    <br />· 들어오는 참조 {(delInfo.inbound_refs as string[]).length}
+                    {(delInfo.inbound_refs as string[]).map((r) => (
+                      <span key={r}>
+                        {' '}
+                        — <a href={`/p/${r.split('-')[0]}/d/${r.split('#')[0]}${r.includes('#') ? '#item-' + r.split('#')[1] : ''}`} target="_blank" rel="noreferrer"><b>{r}</b></a>
+                      </span>
+                    ))}{' '}
+                    → 그 항목에 <b>끊어진 참조</b>가 붙습니다
+                  </>
+                )}
+                {Number(delInfo.comments) > 0 && (
+                  <>
+                    <br />· 댓글 {String(delInfo.comments)} — 휴지통에 같이 있다가 되살리면 돌아옵니다
+                  </>
+                )}
               </div>
             )}
             <div className="dacts">
               <button className="btn" data-el="13.4" onClick={() => setDelOpen(false)}>
                 닫기
               </button>{' '}
-              <button className="btn danger" data-el="13.3" disabled={delBlock !== null} onClick={deleteDoc}>
-                삭제
+              <button className="btn danger" data-el="13.3" disabled={delInfo === null} onClick={trashDoc}>
+                휴지통에 넣기
               </button>
             </div>
           </div>

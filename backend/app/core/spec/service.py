@@ -382,6 +382,7 @@ class SpecService:
             "incomplete_warnings": json.loads(row.incomplete_warnings or "[]"),
             "updated_at": row.updated_at,
             "last_author": self._author_of(latest),
+            "trashed_at": row.trashed_at,
         }
 
     def _author_of(self, v: VersionRow | None) -> AuthorRef | None:
@@ -491,6 +492,8 @@ class SpecService:
         row.status = str(new_status)
         if validate_result is not None:
             _apply_validate(row, validate_result)
+        # 7. 어느 입구든 저장되면 휴지통에서 나온다 — GitHub로 파일을 되살려 push해도 같다 (UC-A8 4)
+        row.trashed_at, row.trashed_by_user_id = None, None
         self.session.flush()
         return version
 
@@ -502,7 +505,7 @@ class SpecService:
         has_convention_error: bool | None = None,
     ) -> list[DocumentSummary]:
         """SYNC-MS-002#SpecService.list_by_project"""
-        rows = self.repo.documents_of_project(project_id)
+        rows = [r for r in self.repo.documents_of_project(project_id) if r.trashed_at is None]
         if stage is not None:
             rows = [r for r in rows if STAGE_OF.get(r.doc_type) == stage]
         if status is not None:
@@ -525,7 +528,7 @@ class SpecService:
         stage = STAGE_OF.get(row.doc_type)
         if stage is None:
             return None, None
-        docs = self.repo.documents_of_project(row.project_id)
+        docs = [d for d in self.repo.documents_of_project(row.project_id) if d.trashed_at is None]
 
         def first(n: int) -> str | None:
             ids = sorted(d.doc_id for d in docs if STAGE_OF.get(d.doc_type) == n)
@@ -676,6 +679,41 @@ class SpecService:
     def status_change_count(self, document_id: int) -> int:
         """SYNC-MS-002#SpecService.status_change_count"""
         return self.repo.status_change_count(document_id)
+
+    def trash(self, document: Document, commit_hash: str, author: Author) -> list[int]:
+        """SYNC-MS-002#SpecService.trash"""
+        row = self.repo.document_by_id(document.id)
+        assert row is not None
+        pks: list[int] = []
+        for item in self.repo.items_of(row.id):
+            item.is_deleted, item.deleted_at = True, now_utc()
+            pks.append(item.id)
+        # 이 커밋 해시가 되살릴 때 「직전 내용」을 찾는 열쇠다 (trash_commit)
+        self.session.add(
+            StatusChange(
+                document_id=row.id,
+                from_status=row.status,
+                to_status=DocStatus.draft,
+                changed_by_user_id=author.user.id,
+                reason="휴지통",
+                commit_hash=commit_hash,
+                changed_at=now_utc(),
+            )
+        )
+        row.status = str(DocStatus.draft)
+        row.trashed_at, row.trashed_by_user_id = now_utc(), author.user.id
+        self.session.flush()
+        return pks
+
+    def trash_commit(self, document_id: int) -> str | None:
+        """SYNC-MS-002#SpecService.trash_commit"""
+        return self.repo.trash_commit(document_id)
+
+    def list_trashed(self, project_id: int) -> list[DocumentSummary]:
+        """SYNC-MS-002#SpecService.list_trashed"""
+        rows = self.repo.trashed_of_project(project_id)
+        latest = self.repo.latest_versions([r.id for r in rows])
+        return [DocumentSummary(**self._summary_fields(r, latest.get(r.id))) for r in rows]
 
     def delete_document(self, document: Document) -> int:
         """SYNC-MS-002#SpecService.delete_document
@@ -874,7 +912,8 @@ class SpecService:
         doc = self.repo.document_by_doc_id(doc_id)
         if doc is None:
             return set()
-        if (doc.convention_error_detail or "").startswith("file.deleted:"):
+        # 파일 삭제·휴지통으로 지워진 항목을 되살리는 것은 재사용이 아니라 복구 (MS-002 validate 3)
+        if (doc.convention_error_detail or "").startswith("file.deleted:") or doc.trashed_at:
             return set()
         return {i.item_id for i in self.repo.items_of(doc.id, include_deleted=True) if i.is_deleted}
 
