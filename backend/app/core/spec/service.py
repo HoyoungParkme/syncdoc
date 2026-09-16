@@ -166,15 +166,16 @@ class SpecService:
             for u in re.findall(r"[\w-]+", fm.get("upstream", "").strip("[]")):
                 if not DOC_ID.match(u):
                     V.append(Violation(2, "frontmatter.ref", f"upstream {u!r}"))
-            # DOM은 제목의 키워드로 셋 중 무엇인지 안다 (STD-001 2.6). 없으면 3의 항목 패턴도
-            # 5의 필수 절도 못 정해 그동안 조용히 건너뛰었다. UI·API는 아직 안 본다 — 기존 문서에
-            # 키워드 없는 제목이 있다
-            if doc_type == DocType.DOM and subtype_of(doc_type, fm.get("title")) is None:
+            # 서브타입이 있는 타입(DOM·UI·API)은 제목의 키워드로 무엇인지 안다 (STD-001 2.6~2.8).
+            # 없으면 3의 항목 패턴도 5의 필수 절도 못 정해 그동안 조용히 건너뛰었다
+            keys = [k for t, k in SUBTYPES if t == doc_type]
+            if keys and subtype_of(doc_type, fm.get("title")) is None:
+                want = "·".join(f"「{k}」" for k in keys)
                 V.append(
                     Violation(
                         2,
                         "frontmatter.title.subtype",
-                        "DOM 제목에 「도메인」「클래스」「ERD」 중 하나가 있어야 한다",
+                        f"{doc_type} 제목에 {want} 중 하나가 있어야 한다",
                     )
                 )
             # 2. MCP 경로의 status 변경

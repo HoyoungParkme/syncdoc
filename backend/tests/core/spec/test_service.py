@@ -175,7 +175,7 @@ def test_validate_example_passes_and_variants(db_session: Session) -> None:
     assert "frontmatter.doc_id" in [v.rule for v in r.violations]
 
 
-def test_validate_dom_title_needs_subtype_keyword(db_session: Session) -> None:
+def test_validate_subtype_title_needs_keyword(db_session: Session) -> None:
     """STD-001 2.6 — DOM은 제목 키워드로 셋 중 무엇인지 안다. 없으면 frontmatter.title.subtype."""
     svc = SpecService(db_session)
     dom = "---\ndoc_id: EXMP-DOM-001\ntype: DOM\ntitle: {t}\nstatus: draft\n---\n# DOM\n#### Document 문서\n"
@@ -186,9 +186,19 @@ def test_validate_dom_title_needs_subtype_keyword(db_session: Session) -> None:
     # github 경로도 같다 — 규약 위반이지 상태 규칙이 아니다
     r = svc.validate(dom.format(t="데이터 — 예시"), DocType.DOM, Entry.github)
     assert [v.rule for v in r.violations] == ["frontmatter.title.subtype"]
-    # UI·API는 아직 안 본다 (기존 문서에 키워드 없는 제목이 있다)
-    api = "---\ndoc_id: EXMP-API-001\ntype: API\ntitle: 에이전트 도구\nstatus: draft\n---\n# API\n"
-    assert svc.validate(api, DocType.API, Entry.mcp).violations == []
+    # UI·API도 같다 (카드 P) — 둘 다 들어간 UI 제목은 통과
+    ui = (
+        "---\ndoc_id: EXMP-UI-001\ntype: UI\ntitle: {t}\nstatus: draft\n---\n# UI\n#### UI-1 목록\n"
+    )
+    for t in ("화면 설계 — 예시", "와이어프레임 — 예시", "화면 설계·와이어프레임"):
+        assert svc.validate(ui.format(t=t), DocType.UI, Entry.mcp).violations == [], t
+    r = svc.validate(ui.format(t="목록"), DocType.UI, Entry.mcp)
+    assert [v.rule for v in r.violations] == ["frontmatter.title.subtype"]
+    api = "---\ndoc_id: EXMP-API-001\ntype: API\ntitle: {t}\nstatus: draft\n---\n# API\n"
+    for t in ("REST API", "MCP 도구"):
+        assert svc.validate(api.format(t=t), DocType.API, Entry.mcp).violations == [], t
+    r = svc.validate(api.format(t="에이전트 도구"), DocType.API, Entry.mcp)
+    assert [v.rule for v in r.violations] == ["frontmatter.title.subtype"]
 
 
 def test_validate_entity_mismatch_warning(db_session: Session) -> None:
