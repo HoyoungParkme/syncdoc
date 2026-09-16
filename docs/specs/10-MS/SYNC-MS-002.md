@@ -55,8 +55,10 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#SpecService.mark_convention_error]] | 오류·경고 표시 |
 | [[#SpecService.issue_doc_id]] | 문서 ID 발급 |
 | [[#SpecService.precondition]] | DOM 선행조건 |
-| [[#SpecService.status_change_count]] | 상태 변경 수 (삭제 가능 판정) |
-| [[#SpecService.delete_document]] | 이력 없는 문서 행 삭제 |
+| [[#SpecService.trash]] | 휴지통에 넣기 |
+| [[#SpecService.trash_commit]] | 휴지통 커밋 해시 |
+| [[#SpecService.list_trashed]] | 휴지통 목록 |
+| [[#SpecService.delete_document]] | 완전 삭제 — 행 삭제 |
 | [[#SpecService.item_blocks]] | 본문 → 항목 블록 |
 
 ---
@@ -126,7 +128,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. if `entry == mcp and current_status and fm.status != current_status` → `frontmatter.status_change` 추가
 3. 코드블록·인라인 코드를 빈 칸으로 치환한 본문에서 헤딩 순회. 타입의 항목 패턴(STD-001 2장 표 — DOM·UI·API는 `title`로 세분)으로 항목 판정
    - if 이미 본 ID → `item.duplicate` · if 토큰 끝이 `.`·`:`이고 떼면 패턴에 맞음 → `item.punct` · if 번호 앞자리 0 → `item.padding` · if `^[A-Z]+-?\d+$`인데 패턴 밖 → `item.pattern`
-   - `deleted = DB: items where document_id and is_deleted=true` · if `item_id in deleted` → `item.reused`. 단 문서의 `convention_error_detail`이 `file.deleted:`로 시작하면 그 문서의 삭제 항목은 `deleted`에서 뺀다 — 파일 삭제로 지워진 것을 되살리는 것은 재사용이 아니라 복구다
+   - `deleted = DB: items where document_id and is_deleted=true` · if `item_id in deleted` → `item.reused`. 단 문서의 `convention_error_detail`이 `file.deleted:`로 시작하거나 **`trashed_at`이 있으면** 그 문서의 삭제 항목은 `deleted`에서 뺀다 — 파일 삭제·휴지통으로 지워진 것을 되살리는 것은 재사용이 아니라 복구다
    - **`entry == web_revert`면 이 검사를 통째로 건너뛴다.** 되돌리기는 재사용이 아니라 **복원**이다. 그러지 않으면 항목을 한 번 지운 순간 그 이전 버전으로 가는 길이 영구히 닫힌다 — 지우는 데는 확인 한 번이면 되는데(`confirm_item_deletion`) 되돌리는 길은 아예 없어 비대칭이었다(#48). 되돌리기는 사람이 UI-7에서 고른 명시적 행위이고 `revert(…)` 커밋으로 이력에 남는다. **에이전트가 실수로 지운 ID를 다시 쓰는 것은 그대로 막힌다** — 그 경로는 `mcp`다
 4. `[[ ]]` 전부 형식 검사 → `ref.format`
 5. **경고**: 필수 절마다 if 해당 절 없음 → `section.missing` · if `not items and doc_type not in (CODE, STD)` → `item.none`
@@ -232,7 +234,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 6. if `document.status == approved and body != document.current_body and new_status == approved` → `new_status = review`, `DB: status_changes insert (from=approved, to=review, changed_by=author.user, reason="본문 수정으로 자동 강등", commit_hash=status_commit_hash)` (UC-A6 6a)
    - **`new_status == approved`를 함께 보는 것은 github 경로 때문이다.** 5단계에서 작성자가 frontmatter로 스스로 `draft`를 적었으면 그게 원본의 진실이다. 그것까지 `review`로 덮으면 저장소는 `draft`, DB는 `review`로 또 갈린다
    - **이 강등은 저장소에도 반영돼야 한다**([[SYNC-STD-001]] 1.2 「`status`가 진실」). mcp·web_revert 경로는 [[SYNC-MS-007#pipeline.save_pipeline]] 6a가 **push 전에** 본문을 고쳐 한 커밋으로 끝낸다. **github 경로는 커밋이 이미 저장소에 있어 그럴 수 없다** — 같은 6a가 `status(…)` 커밋을 하나 더 밀고, 그 해시가 `status_commit_hash`로 여기 온다 (#58)
-7. `DB: documents update (current_body, current_version_no=new_no, status=new_status)` · if `validate_result` → `has_convention_error = bool(violations)`, `convention_error_detail = violations를 "rule: message" 줄로 (없으면 null)`, `incomplete_warnings = warnings JSON (없으면 null)` · else → 오류·경고 컬럼 그대로
+7. `DB: documents update (current_body, current_version_no=new_no, status=new_status)` · if `validate_result` → `has_convention_error = bool(violations)`, `convention_error_detail = violations를 "rule: message" 줄로 (없으면 null)`, `incomplete_warnings = warnings JSON (없으면 null)` · else → 오류·경고 컬럼 그대로 · **`trashed_at·trashed_by_user_id = null`** — 어느 입구든 저장되면 휴지통에서 나온다(UC-A8 4, GitHub로 파일을 되살려도 같다)
 8. `→ Version`
 
 **출력** 새 `VersionRow` (ORM)
@@ -549,28 +551,56 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `status_change_count(document_id: int) -> int`
 
-근거: [[SYNC-UC-001#UC-A7]] 2 · [[SYNC-PRD-001#N3]]
-
-**처리** `DB: count(*) status_changes where document_id`. 상태가 한 번이라도 바뀐 문서는 이력이 있는 문서다 — `delete_document`의 문지기 넷 중 하나
+**처리** `DB: count(*) status_changes where document_id`. 카드 N에서 삭제 문지기였다. 휴지통(카드 R)이 오면서 문지기에서 빠졌고 남겨 둔다 — 쓰는 곳이 없으면 지운다
 
 ---
 
-#### SpecService.delete_document 이력 없는 문서 행 삭제
+#### SpecService.trash 휴지통에 넣기
+
+**시그니처** `trash(document: Document, commit_hash: str, author: Author) -> list[int]` — 삭제된 항목 pk
+
+근거: [[SYNC-UC-001#UC-A7]] 5 · [[SYNC-SEQ-001#SEQ-22]] · [[SYNC-PRD-001#N3]]
+
+**처리** — 호출자의 트랜잭션 안. `mark_deleted`와 같되 규약 오류가 아니라 휴지통이다
+1. `DB: items where document_id and is_deleted=false` → 전부 `is_deleted=true, deleted_at=now` · pk 목록
+2. `DB: status_changes insert (from=document.status, to=draft, changed_by=author.user, reason="휴지통", commit_hash)` — 이 커밋 해시가 되살릴 때 「직전 내용」을 찾는 열쇠다
+3. `DB: documents update status=draft, trashed_at=now, trashed_by_user_id=author.user.id` · `has_convention_error`는 건드리지 않는다
+4. `→` pk 목록 (호출자가 `raise_broken`)
+
+**테스트 관점** 넣은 뒤 `trashed_at` 있음 · 항목 전부 삭제됨 · 규약 오류 아님 · `list_by_project`에 안 나옴 · `get_document`는 됨
+
+---
+
+#### SpecService.trash_commit 휴지통 커밋 해시
+
+**시그니처** `trash_commit(document_id: int) -> str | None`
+
+**처리** `DB: status_changes where document_id and reason="휴지통" order by changed_at desc limit 1` → `commit_hash`. 되살리기가 `git.read(path, f"{hash}^")`로 직전 본문을 읽는다
+
+---
+
+#### SpecService.list_trashed 휴지통 목록
+
+**시그니처** `list_trashed(project_id: int) -> list[DocumentSummary]`
+
+**처리** `DB: documents where project_id and trashed_at is not null order by trashed_at desc` → `DocumentSummary[]`(`trashed_at` 채움). `list_by_project`는 반대로 `trashed_at is null`만 준다 — 목록·단계 칸·그래프·순서 읽기 전부 휴지통을 안 본다
+
+---
+
+#### SpecService.delete_document 완전 삭제 — 행 삭제
 
 **시그니처** `delete_document(document: Document) -> int` — 지운 행 수
 
-근거: [[SYNC-UC-001#UC-A7]] 6 · [[SYNC-PRD-001#N3]] · [[SYNC-DOM-003]] 설계 규칙(예외 하나)
+근거: [[SYNC-UC-001#UC-H18]] 8 · [[SYNC-PRD-001#N3]] · [[SYNC-DOM-003]] 설계 규칙
 
-**처리** — 호출자의 트랜잭션 안. **이력 검사는 하지 않는다** — `pipeline.delete_document`가 넷을 다 세고 부른다. 여기서 또 세면 두 곳이 어긋난다
-1. `DB: delete references where from_document_id = id` — 이 문서가 남에게 건 참조. 들어오는 참조는 호출자가 0임을 확인했다
-2. `DB: delete items where document_id` · `delete versions where document_id` · `delete status_changes where document_id`(0건이지만 순서상) · `delete documents where id`
+**처리** — 호출자의 트랜잭션 안. **문지기 검사는 하지 않는다** — `pipeline.purge_document`가 셋을 세고 부른다
+1. `DB: update flags set cause_item_id=null where cause_item_id in (items of id)` · `update flags set cause_version_id=null where cause_version_id in (versions of id)` — 남의 플래그가 이 문서를 원인으로 물고 있던 것. 해결된 것들이다(미해결은 호출자가 막았다)
+2. `DB: delete flags where target_item_id in (items of id)` · `delete propagation_decisions where version_id in (versions of id)` · `delete references where from_document_id = id` · `delete status_changes where document_id` · `delete items` · `delete versions` · `delete documents where id`
 3. `→` 지운 행 수 합
 
-**예외** 던지지 않는다. FK가 걸리면 그건 호출자가 검사를 빠뜨린 것이다 — DB 오류로 드러나야 한다
+**예외** 던지지 않는다. FK가 걸리면 호출자가 검사를 빠뜨린 것 — DB 오류로 드러나야 한다
 
-**호출하는 것** —
-
-**테스트 관점** 초안 v3 문서 → 행 다섯 종류가 다 사라짐 · 같은 프로젝트의 다른 문서·참조는 그대로 · 지운 뒤 `issue_doc_id`가 그 번호를 다시 준다
+**테스트 관점** 휴지통 문서 → 행 전부 사라짐 · 다른 문서의 해결된 broken_ref는 남고 원인 칸만 null · 같은 프로젝트의 다른 문서·참조는 그대로 · 지운 뒤 `issue_doc_id`가 그 번호를 다시 준다
 
 ---
 

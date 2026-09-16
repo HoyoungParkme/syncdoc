@@ -472,6 +472,32 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 
 ---
 
+#### R 휴지통 — 지우기는 되돌릴 수 있게
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#N3]] · [[SYNC-UC-001#UC-A7]] · [[SYNC-UC-001#UC-A8]] · [[SYNC-UC-001#UC-H18]] · [[SYNC-API-001#DELETE/api/docs/{docId}]] · [[SYNC-API-001#POST/api/docs/{docId}/restore]] · [[SYNC-API-001#POST/api/docs/{docId}/purge]] · [[SYNC-API-001#GET/api/projects/{code}/trash]] · [[SYNC-API-002#delete_document]] · [[SYNC-API-002#restore_document]] · [[SYNC-SEQ-001#SEQ-22]] · [[SYNC-SEQ-001#SEQ-23]] · [[SYNC-DOM-003]] `documents.trashed_at` |
+| 구현 함수 | [[SYNC-MS-007#pipeline.trash_document]] · [[SYNC-MS-007#pipeline.restore_document]] · [[SYNC-MS-007#pipeline.purge_document]] · [[SYNC-MS-007#pipeline.save_pipeline]] 2(`document-trashed`) · [[SYNC-MS-007#pipeline.process_commit]] 4 · [[SYNC-MS-002#SpecService.trash]] · [[SYNC-MS-002#SpecService.trash_commit]] · [[SYNC-MS-002#SpecService.list_trashed]] · [[SYNC-MS-002#SpecService.delete_document]] · [[SYNC-MS-002#SpecService.save]] 7 · [[SYNC-MS-002#SpecService.validate]] 3 · [[SYNC-MS-004#TrackingService.release_broken_causes]] · [[SYNC-MS-004#TrackingService.open_flags_of_document]] · [[SYNC-MS-008#queries.trash_list]] · 마이그레이션 `0010` |
+| 화면 | UI-5 12·13(휴지통에 넣기·끊어질 것) · 4b 휴지통 배너 + 되살리기 · UI-4 8 휴지통 묶음(8.1~8.4) |
+| 테스트 | 남이 가리키는 문서도 넣힘 + 하위 broken_ref · 두 번 넣기 `document-trashed` · 휴지통 문서 저장·상태 변경 막힘 · 목록·단계 칸에서 빠짐 · 되살리기 → 직전 본문·버전 +1·항목 복구·broken_ref `with_edit=false` 해제·목록 복귀 · 폴링이 휴지통 커밋 D 건너뜀 · 완전 삭제: 가리키는 곳 있으면 `document-has-history`, 없으면 행 0·남의 플래그 원인 칸 null·번호 재발급 · 웹 DELETE/restore/purge/trash 목록 · MCP 두 도구 · `check_ui.py` UI-4·UI-5 |
+| 선행 | N · O |
+
+**왜 카드인가.** PRD N3의 삭제 규칙이 바뀌고(하드 삭제 → 휴지통), 엔드포인트 셋·MCP 도구 하나·컬럼 둘·함수 아홉이 는다. 카드 N을 덮어쓴다(DEV-15).
+
+**왜 지금인가.** 카드 N의 「이력 없는 초안만 지운다」가 실물에서 바로 막혔다 — VA-DOM-002는 하위를 걷어내는 저장 자체가 전파 결정을 남겨 영영 못 지웠다. 사용자가 "물어보고 지우되 휴지통으로 되돌릴 수 있게"를 냈고, 그것이 N3의 원래 뜻(문서를 잃지 않는다)에 더 가까웠다. 되살리기의 반은 이미 있었다 — GitHub에서 파일을 지웠다 되살리는 경로(UC-G1 3d, MS-002 복구 결정).
+
+**정한 것 다섯.**
+
+| 질문 | 결정 | 이유 |
+|---|---|---|
+| 휴지통이 무엇인가 | `documents.trashed_at` + 파일 삭제 커밋. 행·버전·항목(삭제됨)·댓글·플래그 전부 남음 | UC-G1 3d의 상태에 표시 하나 더한 것. 새 표가 아니다 |
+| 넣을 때 막나 | **안 막는다.** 끊어질 참조·댓글 수를 보여주고 확인만 받는다 | 되돌릴 수 있으니 문지기가 필요 없다. 끊어진 참조 플래그가 통보다 |
+| 되살리기의 본문 | 휴지통 커밋의 **부모**에서 `git.read` — 새 버전으로 저장 | 되돌리기와 같은 원칙: 이력을 안 지운다. `status_changes.commit_hash`가 열쇠 |
+| 되살리면 끊어진 참조는 | 원인이 이 문서 항목인 broken_ref를 `with_edit=false`로 푼다 | 가리키던 쪽은 안 고쳤다. 카드 O의 `release_broken`(대상 쪽)과 짝 |
+| 완전 삭제의 문지기 | 들어오는 참조 · 댓글 · **미해결** 플래그. 나머지(해결된 플래그·결정·상태 변경)는 함께 지움, 남의 플래그는 원인 칸만 null | 카드 N의 「이력 전부」는 휴지통 자체가 이력(상태 변경·플래그)을 만들어 자기 모순이었다 |
+
+---
+
 ## 2. 통합 테스트 시나리오
 
 시나리오 S1~S7을 그대로 E2E 테스트로. 각 슬라이스의 `테스트` 행에 나눠 들어가 있다. 전부 통과하면 PRD 성공지표 측정을 시작한다.

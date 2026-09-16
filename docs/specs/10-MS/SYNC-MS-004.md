@@ -31,6 +31,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#TrackingService.raise_flags]] | 확인 필요 플래그 |
 | [[#TrackingService.raise_broken]] | 끊어진 참조 플래그 |
 | [[#TrackingService.release_broken]] | 참조를 고쳐 저장하면 끊어진 참조 해제 |
+| [[#TrackingService.release_broken_causes]] | 원인 항목이 되살아나면 끊어진 참조 해제 |
+| [[#TrackingService.open_flags_of_document]] | 문서에 걸린 미해결 플래그 수 (완전 삭제 문지기) |
 | [[#TrackingService.raise_upstream]] | 하위 불일치 플래그 (상위에) |
 | [[#TrackingService.get_flag]] | 플래그 행 |
 | [[#TrackingService.resolve]] | 확인함 |
@@ -164,6 +166,28 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **왜 여기인가.** UC-H12 3은 "시스템이 참조를 다시 추출하고 플래그를 해제한다"인데 SEQ·MS·코드 어디에도 해제 단계가 없어 참조를 고쳐도 플래그가 영영 남았다(#70). UI-11 확인함은 `needs_check`·`upstream_impact`용이고 끊어진 참조를 닫는 버튼은 화면에 없다 — 사람이 아니라 저장이 푼다
 
 **테스트 관점** Q1 삭제로 PRD R1에 broken_ref → R1에서 `[[…#Q1]]`을 지워 저장 → 플래그 `resolved_with_edit=True`, 확인자 = 저장시킨 사람 · 참조를 그대로 둔 채 다른 곳만 고쳐 저장 → 그대로 남음 · 다른 항목(R2)만 고친 저장도 R1 플래그를 본다(문서 단위)
+
+---
+
+#### TrackingService.release_broken_causes 원인 항목이 되살아나면 끊어진 참조 해제
+
+**시그니처** `release_broken_causes(cause_item_pks: list[int], user: User) -> int` — 푼 수
+
+근거: [[SYNC-UC-001#UC-A8]] 4 · [[SYNC-SEQ-001#SEQ-23]]
+
+**처리** `DB: flags where kind=broken_ref and cause_item_id in pks and resolved_at is null` → 전부 `resolved_by=user, resolved_at=now, resolved_with_edit=False`. 가리키던 쪽은 손대지 않았으니 수정 동반이 아니다. `release_broken`(대상 쪽이 참조를 고침)과 짝이다
+
+**테스트 관점** 휴지통 → 되살리기 → 하위의 broken_ref가 `with_edit=false`로 풀림 · 되살아나지 않은 항목의 플래그는 남음
+
+---
+
+#### TrackingService.open_flags_of_document 문서에 걸린 미해결 플래그 수
+
+**시그니처** `open_flags_of_document(item_pks: list[int]) -> int`
+
+근거: [[SYNC-UC-001#UC-H18]] 7
+
+**처리** `DB: count(*) flags where (target_item_id in pks or cause_item_id in pks) and resolved_at is null`. 완전 삭제 문지기 — 미해결만. 해결된 것은 문서와 함께 지운다(`SpecService.delete_document`). `history_of_document`(해결된 것까지)는 카드 N의 문지기였고 이제 안 쓴다 — 남겨 둔다
 
 ---
 

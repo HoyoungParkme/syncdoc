@@ -186,7 +186,7 @@ erDiagram
 - 모든 테이블 PK는 `int` 자동 증가. 사람이 부르는 ID(`doc_id`, `item_id`, `code`)는 UK
 - 시각은 전부 `timestamptz`
 - 열거형은 DB enum이 아니라 `varchar` + 앱 검증. 값 추가 시 마이그레이션을 피하기 위해서
-- 삭제 컬럼은 `items`에만 있다. 문서·버전·플래그·댓글은 삭제하지 않는다 — **예외 하나**: 이력이 없는 초안 문서는 행째 지운다([[SYNC-MS-002#SpecService.delete_document]]). 물고 있는 FK가 없다는 것을 먼저 확인한 뒤라 순서 문제가 없다
+- 삭제 컬럼은 `items`에만 있다. 문서·버전·플래그·댓글은 삭제하지 않는다 — 문서는 `documents.trashed_at`으로 **휴지통**에 넣는다(행은 남는다). **행까지 지우는 것**은 휴지통 안에서 다른 문서가 가리키지 않을 때만([[SYNC-MS-002#SpecService.delete_document]]) — 그 문서에 딸린 플래그·전파결정·상태변경은 같이 지우고, 남의 플래그가 이 문서 항목을 원인으로 물고 있으면 원인 칸만 비운다
 - **재구축(UC-S6)은 `versions`·`references`만 지운다.** `documents`·`items`는 `flags`·`comments`가 FK로 물고 있어 지우면 안 된다. `items`는 upsert
 - 상태 변경은 `versions` 행을 만들지 않는다. `status_changes.commit_hash`가 그 커밋을 가리킨다
 - `references`의 `to_item_id`와 `to_document_id`는 CHECK로 하나만 채워지게 한다. `is_missing=true`면 둘 다 null
@@ -235,6 +235,8 @@ erDiagram
 | has_convention_error | boolean | default false | GitHub 경로로 들어온 규약 위반 문서 | |
 | convention_error_detail | text | null 허용 | 어느 규약을 어떻게 어겼는지. STD-001 3장 rule | `frontmatter.field: status` |
 | incomplete_warnings | text | null 허용 | 미완성 경고(STD-001 4장). 있으면 `approved` 불가. JSON 배열 | `["section.missing: 성공지표"]` |
+| trashed_at | timestamptz | null 허용 | 휴지통에 넣은 시각. null이면 살아 있는 문서. 목록·단계 칸·그래프에서 빠지고 저장·상태 변경이 막힌다(`document-trashed`). 되살리면 null | |
+| trashed_by_user_id | int | FK users, null 허용 | 누가 넣었나 | |
 
 ### items
 

@@ -56,7 +56,9 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:already-decided` | 409 | 이미 결정된 전파 | `choice`, `decided_at` | [[SYNC-UC-001#UC-H10]] |
 | `urn:syncdoc:already-resolved` | 409 | 이미 확인된 플래그 | `resolved_at` | [[SYNC-UC-001#UC-H11]] |
 | `urn:syncdoc:already-current` | 422 | 현재 버전으로 되돌리기 | — | [[SYNC-UC-001#UC-H7]] |
-| `urn:syncdoc:document-has-history` | 409 | 이력 있는 문서를 지우려 함 | `status`, `inbound_refs: [문서ID#항목ID…]`, `comments`, `flags`, `decisions`, `status_changes` — 0이 아닌 것이 걸린 이유 | [[SYNC-UC-001#UC-A7]] 2a, [[SYNC-UC-001#UC-H18]] 3a |
+| `urn:syncdoc:document-has-history` | 409 | 휴지통의 문서를 완전 삭제하려는데 아직 남이 가리키거나 댓글·미해결 플래그가 있음 | `inbound_refs: [문서ID#항목ID…]`, `comments`, `flags` — 0이 아닌 것이 걸린 이유 | [[SYNC-UC-001#UC-H18]] 7 |
+| `urn:syncdoc:document-trashed` | 409 | 휴지통에 있는 문서를 저장·상태 변경·다시 휴지통에 넣으려 함 | `trashed_at` | [[SYNC-UC-001#UC-A7]] 1a |
+| `urn:syncdoc:document-not-trashed` | 409 | 휴지통에 없는 문서를 되살리거나 완전 삭제하려 함 | — | [[SYNC-UC-001#UC-A8]] 1a |
 | `urn:syncdoc:upstream-review-required` | 422 | `approved`인데 `upstream_reviewed`가 아님 | — | [[SYNC-UC-001#UC-H8]] 3 |
 | `urn:syncdoc:rebuild-failed` | 500 | 재구축 중 실패, 롤백됨 | `reason` | [[SYNC-UC-001#UC-S6]] |
 | `urn:syncdoc:repository-already-registered` | 409 | 이미 등록된 저장소 | `code` (그 저장소를 쓰는 프로젝트) | [[SYNC-UC-001#UC-A1]] 2d |
@@ -652,31 +654,102 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
         $ref: '#/components/responses/Problem'
 ```
 
-#### DELETE/api/docs/{docId} 이력 없는 문서 삭제
+#### DELETE/api/docs/{docId} 휴지통에 넣기
 
-화면 [[SYNC-UI-002#UI-5]] 12·13 · 유스케이스 [[SYNC-UC-001#UC-H18]] · 서비스 [[SYNC-MS-007#pipeline.delete_document]] · 확인은 화면(13)이 받으므로 인자가 없다
+화면 [[SYNC-UI-002#UI-5]] 12·13 · 유스케이스 [[SYNC-UC-001#UC-H18]] 1~3 · 서비스 [[SYNC-MS-007#pipeline.trash_document]] · 확인은 화면(13)이 받으므로 인자가 없다
 
 ```yaml
 /api/docs/{docId}:
   delete:
-    summary: 초안이고 이력이 없는 문서를 파일째 지운다 (PRD N3 예외)
+    summary: 파일을 저장소에서 지우고 문서를 휴지통에 표시한다. 행·버전은 남는다 (PRD N3)
     parameters:
     - $ref: '#/components/parameters/docId'
     responses:
-      '204':
-        description: 파일 삭제 커밋이 push되고 행이 사라짐
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrashResult'
       '404':
         $ref: '#/components/responses/Problem'
       '409':
-        description: document-has-history
+        description: document-trashed (이미 휴지통)
         $ref: '#/components/responses/Problem'
       '502':
         $ref: '#/components/responses/Problem'
 ```
 
-**이력이 없다**는 — `초안` · 다른 문서에서 들어오는 참조 0 · 댓글 0 · 이 문서 항목이 대상이거나 원인인 플래그 0 · 이 문서 버전의 전파 결정 0 · 상태 변경 0. 하나라도 있으면 `409`에 그 값이 실려 온다. 무엇을 먼저 걷어내야 하는지 화면이 보여준다.
+참조하던 항목에는 `끊어진 참조`가 붙는다 — 그게 통보다. 되살리면 풀린다.
 
-**되돌릴 수 없다.** 되돌리기(revert)는 버전을 남기지만 이것은 버전째 지운다. 저장소 이력에는 삭제 커밋과 그 전 내용이 남는다 — 그것이 유일한 흔적이다.
+#### POST/api/docs/{docId}/restore 휴지통에서 되살리기
+
+화면 [[SYNC-UI-002#UI-4]] 8.2 · [[SYNC-UI-002#UI-5]] 4b.1 · 유스케이스 [[SYNC-UC-001#UC-H18]] 4~5 · 서비스 [[SYNC-MS-007#pipeline.restore_document]]
+
+```yaml
+/api/docs/{docId}/restore:
+  post:
+    summary: 휴지통 커밋 직전 내용으로 새 버전을 만들고 휴지통 표시를 지운다
+    parameters:
+    - $ref: '#/components/parameters/docId'
+    responses:
+      '201':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveResult'
+      '404':
+        $ref: '#/components/responses/Problem'
+      '409':
+        description: document-not-trashed
+        $ref: '#/components/responses/Problem'
+      '422':
+        description: convention-violation — 옛 본문이 지금 규약을 위반
+        $ref: '#/components/responses/Problem'
+      '502':
+        $ref: '#/components/responses/Problem'
+```
+
+#### POST/api/docs/{docId}/purge 완전 삭제
+
+화면 [[SYNC-UI-002#UI-4]] 8.3·8.4 · 유스케이스 [[SYNC-UC-001#UC-H18]] 6~8 · 서비스 [[SYNC-MS-007#pipeline.purge_document]] · 휴지통 안에서만
+
+```yaml
+/api/docs/{docId}/purge:
+  post:
+    summary: 휴지통의 문서를 행까지 지운다. 되돌릴 수 없다
+    parameters:
+    - $ref: '#/components/parameters/docId'
+    responses:
+      '204':
+        description: 행이 사라짐. 번호는 다시 쓰일 수 있다 (STD-001 1.1)
+      '404':
+        $ref: '#/components/responses/Problem'
+      '409':
+        description: document-not-trashed · document-has-history
+        $ref: '#/components/responses/Problem'
+```
+
+**막는 것** — 다른 문서에서 들어오는 참조(끊어진 채로 남아 있는 것 포함) · 댓글 · 이 문서 항목이 대상이거나 원인인 **미해결** 플래그. 하나라도 있으면 `409 document-has-history`에 그 값. 그 문서에 딸린 나머지(해결된 플래그·전파 결정·상태 변경·버전)는 문서와 함께 지운다.
+
+#### GET/api/projects/{code}/trash 휴지통 목록
+
+화면 [[SYNC-UI-002#UI-4]] 8 · 서비스 [[SYNC-MS-008#queries.trash_list]]
+
+```yaml
+/api/projects/{code}/trash:
+  get:
+    summary: 휴지통에 있는 문서 (trashed_at 내림차순)
+    parameters:
+    - $ref: '#/components/parameters/code'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/DocumentSummary'
+```
 
 #### GET/api/docs/{docId}/comments 댓글 목록. 스레드 구조
 
@@ -1341,6 +1414,11 @@ components:
     DocumentSummary:
       type: object
       properties:
+        trashed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 휴지통에 넣은 시각. 목록(GET …/docs)에는 안 나오고 GET …/trash와 문서 조회에만 값이 찬다
         type:
           type: string
           enum: [document]
@@ -1564,6 +1642,19 @@ components:
           type: string
           nullable: true
           description: 에이전트가 다음에 할 일 한 문장 — 사람에게 웹에서 읽으라고 하고 멈춘다(STD-001 1.8). MCP 경로만. 웹 되돌리기는 null
+    TrashResult:
+      type: object
+      properties:
+        doc_id:
+          type: string
+        commit_hash:
+          type: string
+        broken_refs:
+          type: integer
+          description: 이 문서 항목을 가리키던 하위에 붙은 끊어진 참조 수
+        next_step:
+          type: string
+          nullable: true
           description: 미완성 경고(STD-001 4장). 저장은 됐고 approved만 막힌다
 
     Comment:
