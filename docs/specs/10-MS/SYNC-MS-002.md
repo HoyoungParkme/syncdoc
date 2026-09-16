@@ -122,7 +122,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **입력** `body` 전체 MD. `doc_type` 타입. `entry` 입구(`mcp`면 status 변경 검사). `current_status` DB의 현재 상태(수정 시)
 
 **처리** — 규약 3장 순서대로. 위반은 **전부** 모은다(첫 것에서 멈추지 않음)
-1. frontmatter 블록 파싱 · if 없음 → `frontmatter.missing` 추가하고 3으로 · else → 필수 필드 · `type` 목록 · `status` 값 · `doc_id` 형식과 `type` 일치 · `upstream` 형식을 각각 검사, 어긋나면 해당 rule 추가 · if `doc_type == DOM`이고 `title`에 「도메인」「클래스」「ERD」 중 하나도 없음 → `frontmatter.title.subtype` (STD-001 2.6 — 서브타입은 제목으로 가른다. 없으면 3의 항목 패턴도 5의 필수 절도 정하지 못한다)
+1. frontmatter 블록 파싱 · if 없음 → `frontmatter.missing` 추가하고 3으로 · else → 필수 필드 · `type` 목록 · `status` 값 · `doc_id` 형식과 `type` 일치 · `upstream` 형식을 각각 검사, 어긋나면 해당 rule 추가 · if `doc_type`에 서브타입이 있고(DOM·UI·API — `SUBTYPES` 표) `title`에 그 타입의 키워드가 하나도 없음 → `frontmatter.title.subtype` (STD-001 2.6~2.8 — 서브타입은 제목으로 가른다. 없으면 3의 항목 패턴도 5의 필수 절도 정하지 못한다)
 2. if `entry == mcp and current_status and fm.status != current_status` → `frontmatter.status_change` 추가
 3. 코드블록·인라인 코드를 빈 칸으로 치환한 본문에서 헤딩 순회. 타입의 항목 패턴(STD-001 2장 표 — DOM·UI·API는 `title`로 세분)으로 항목 판정
    - if 이미 본 ID → `item.duplicate` · if 토큰 끝이 `.`·`:`이고 떼면 패턴에 맞음 → `item.punct` · if 번호 앞자리 0 → `item.padding` · if `^[A-Z]+-?\d+$`인데 패턴 밖 → `item.pattern`
