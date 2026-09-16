@@ -2,7 +2,7 @@
 doc_id: SYNC-UC-001
 type: UC
 title: USECASE — 싱크독
-status: review
+status: approved
 upstream: [SYNC-PRD-001, SYNC-SCN-001]
 ---
 
