@@ -457,6 +457,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 화면 | 없음 |
 | 테스트 | 손으로 — 토큰 넣고 `scripts/tunnel.sh` → 고정 주소로 `/health` · 재부팅 뒤 같은 주소 · `TUNNEL_TOKEN` 비우면 Quick으로 뜨고 `PUBLIC_BASE_URL`이 새 주소로 바뀜 |
 | 선행 | C |
+| 완료 | 2026-09-16 · 브랜치 `card/Q-named-tunnel` · 커밋 `12b39a5`(spec) `chore(Q)`(script) · PR #79 · #81(플래그 순서 — `--no-autoupdate`는 `run` 앞) · **실물**: 무료 도메인 `syncdoc.dpdns.org`(DigitalPlat FreeDomain, 만료 2027-09-16, 120일 전부터 무료 갱신) → Cloudflare 존(Free, NS owen·serena) → Zero Trust 터널 `syncdoc`(Healthy, 커넥터 `hoyoung` linux_amd64) → Published application route `syncdoc.dpdns.org → http://localhost:8000` → `.env` `TUNNEL_TOKEN`·`PUBLIC_BASE_URL` → `scripts/tunnel.sh` 「named tunnel → https://syncdoc.dpdns.org」 → `/health` ok · OAuth 콜백 고정 주소로 갱신, 고정 주소로 GitHub 로그인 통과 · MCP 등록(WSL·Windows) 고정 주소, `tools/list` 9개 · **걸린 것**: 경로를 만들기 전에 이름을 조회한 WSL DNS 중계기(10.255.255.254)가 「없음」을 캐시해 이 노트북에서만 한동안 못 찾음 — `/etc/hosts`로 우회. 순서는 「경로 저장 → 조회」 · 셋업 기록(캡처 9장): claude.ai/artifact/BetNPr14t6npa2H3vANcnX |
 
 **왜 카드인가.** 인프라 문서의 결정이 바뀐다(INFRA 9장 미결 하나를 뒤집는다). 코드는 스크립트뿐이라 작지만 기록해야 한다.
 
