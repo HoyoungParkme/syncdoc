@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: review
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
