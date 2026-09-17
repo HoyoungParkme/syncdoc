@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/queries.py`의 함수 12개. 클래스 명세 [[SYNC-DOM-002]] 4.8의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/queries.py`의 함수 17개. 클래스 명세 [[SYNC-DOM-002]] 4.8의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -40,6 +40,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#queries.downstream_view]] | 이 문서를 참조하는 것 (추적표) |
 | [[#queries.decision_view]] | 전파 미결정 상세 |
 | [[#queries.flag_view]] | 플래그 상세 |
+| [[#queries.ask_item]] | 보고 있는 항목에 대해 묻는다 |
 
 ---
 
@@ -52,6 +53,53 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 근거: [[SYNC-API-001#GET/api/projects/{code}/trash]] · [[SYNC-UI-002#UI-4]] 8
 
 **처리** `project = ProjectService.get(code)` · `SpecService.list_trashed(project_id)` · 작성자 이름은 `users_by_ids`로(`trashed_by`). 건수는 안 센다 — 휴지통에서 플래그·댓글을 볼 일이 없다 · `→ docs`
+
+---
+
+#### queries.ask_item 보고 있는 항목에 대해 묻는다
+
+**시그니처** `async def ask_item(doc_id: str, item_id: str, question: str, history: list[dict]) -> AskAnswer`
+
+근거: [[SYNC-PRD-001#R11]] · [[SYNC-UC-001#UC-H19]] · [[SYNC-SEQ-001#SEQ-24]]
+
+**입력** `question` 사람이 쓴 질문 · `history` 앞선 대화. 클라이언트가 들고 있다가 통째로 보낸 것
+
+**처리**
+1. `if not settings.LLM_API_KEY → ! LlmNotConfigured` — 네트워크를 타기 전에 막는다
+2. `history`를 뒤에서부터 `settings.LLM_MAX_TURNS`턴만 남긴다
+3. `v = SpecService.get_item(doc_id, item_id)` (없음·삭제 예외 전파)
+4. `up = ReferenceService.upstream(v.pk)` · `down = ReferenceService.downstream(v.pk)` — **표시 이름만 쓰고 본문은 안 읽는다**
+5. 맥락 조립 — 아래 지시문에 문서 제목·상태·버전, 항목 ID·제목·본문, 상위·하위 항목 ID와 이름을 채운다
+6. `answer = llm.ask(system, messages)` ([[SYNC-MS-009#llm.ask]])
+7. `→ AskAnswer(answer, context_item_ids=[v.item_id] + up.ids + down.ids)`
+
+**지시문 원문** — 코드가 이것을 그대로 옮긴다. 「모른다고 답한다」가 [[SYNC-UC-001#UC-H19]] 확장 3a를 실행하는 문장이라 명세 쪽에 산다.
+
+```
+당신은 명세를 읽는 사람 옆에서 그 자리를 설명한다.
+
+아래 맥락에 있는 것만으로 답한다. 맥락에 없으면 모른다고 말하고, 어느 단계가
+아직 안 쓰였는지 짚어 준다. 지어내지 않는다.
+
+답에 근거를 댈 때는 맥락에 있는 항목 ID를 그대로 쓴다. 없는 ID를 만들지 않는다.
+
+명세를 고치라고 하지 않는다. 당신은 읽기를 돕는 자리이고, 본문을 쓰는 것은
+사람과 그 사람의 에이전트가 한다.
+
+[문서] {doc_id} {title} · 상태 {status} · v{version_no}
+[보고 있는 항목] {item_id} {display_name}
+{body}
+[이 항목의 근거 (상위)] {upstream_ids_and_names}
+[이 항목에서 나온 것 (하위)] {downstream_ids_and_names}
+```
+
+**출력** `AskAnswer` — 답과 맥락으로 실은 항목 ID 목록
+
+**예외** 항목 없음·삭제 → `not-found` 전파 · 키 없음 → `llm-not-configured` · 모델 실패 → `llm-unavailable`
+
+**호출하는 것** [[SYNC-MS-002#SpecService.get_item]] · [[SYNC-MS-003#ReferenceService.upstream]] [[SYNC-MS-003#ReferenceService.downstream]] · [[SYNC-MS-009#llm.ask]]
+
+**테스트 관점** **DB에 아무것도 안 쓴다**(호출 전후 행 수가 같다) · 키가 비면 `SpecService`를 부르기도 전에 막힌다 · 맥락에 문서 전문이 안 들어간다(항목 본문만) · 상위·하위는 이름만 싣고 본문을 안 읽는다 · `history`가 상한을 넘으면 뒤에서부터 잘린다 · `context_item_ids`가 실제로 실어 보낸 것과 같다 · **MINISPEC이 빈 프로젝트**의 항목을 물으면 맥락이 비고 모델이 「아직 안 쓰였다」고 답할 재료를 받는다
 
 ---
 

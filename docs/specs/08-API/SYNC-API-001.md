@@ -65,6 +65,8 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:email-taken` | 409 | 남이 이미 등록한 커밋 이메일 | `email` | UI-13 2.6 |
 | `urn:syncdoc:backup-invalid` | 422 | `backup/tracking.json`의 형식을 모르거나 다른 프로젝트의 백업 | `reason` (`version` \| `project`) | UI-14 6 |
 | `urn:syncdoc:not-implemented` | 501 | 카드 스텁 — 아직 구현 안 된 경로 (`import_existing` 등). 슬라이스 진행 중에만 존재 | `card` | [[SYNC-STD-004#DEV-12]] |
+| `urn:syncdoc:llm-not-configured` | 503 | 모델 키가 없다 — 읽는 중 질의가 꺼져 있다 | — | [[SYNC-UC-001#UC-H19]] 2a |
+| `urn:syncdoc:llm-unavailable` | 502 | 모델 호출 실패. **사용량 초과도 여기 접힌다** | `reason` | [[SYNC-UC-001#UC-H19]] 4a |
 | `urn:syncdoc:internal` | 500 | **예상 못 한 오류.** 위 어느 것도 아닌 예외가 라우터에서 샜다 | — | — |
 
 ---
@@ -805,6 +807,33 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
           application/json:
             schema:
               $ref: '#/components/schemas/Comment'
+```
+
+#### POST/api/docs/{docId}/items/{itemId}/ask 보고 있는 항목에 대해 묻는다
+
+화면 [[SYNC-UI-001#UI-5]] · 유스케이스 [[SYNC-UC-001#UC-H19]] · 서비스 `queries.ask_item`
+
+**아무것도 저장하지 않는다.** 대화는 클라이언트가 들고 있다가 요청마다 `history`로 통째로 보낸다. 서버는 `LLM_MAX_TURNS`턴까지만 받는다([[SYNC-INFRA-001]] 5.3). 키가 없으면 `llm-not-configured`이고 화면은 탭 자체를 감춘다.
+
+```yaml
+/api/docs/{docId}/items/{itemId}/ask:
+  post:
+    summary: "읽는 중 질의 ([[SYNC-UC-001#UC-H19]])"
+    parameters:
+    - $ref: '#/components/parameters/docId'
+    - $ref: '#/components/parameters/itemId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AskRequest'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AskAnswer'
 ```
 
 ### 3.5 댓글
@@ -2012,6 +2041,40 @@ components:
                 type: integer
               reason:
                 type: string
+    AskRequest:
+      type: object
+      required:
+      - question
+      properties:
+        question:
+          type: string
+        history:
+          type: array
+          description: 앞선 대화. 클라이언트가 들고 있다가 통째로 보낸다
+          items:
+            type: object
+            required:
+            - role
+            - text
+            properties:
+              role:
+                type: string
+                enum: [user, assistant]
+              text:
+                type: string
+    AskAnswer:
+      type: object
+      required:
+      - answer
+      - context_item_ids
+      properties:
+        answer:
+          type: string
+        context_item_ids:
+          type: array
+          description: 맥락으로 실어 보낸 항목들. 화면이 「본 것」으로 보여준다
+          items:
+            type: string
 ```
 
 ---
@@ -2025,6 +2088,10 @@ components:
 **3. 되돌리기(revert)가 웹에 남은 유일한 본문 쓰기다.** MCP `update_document`와 같은 파이프라인·같은 에러(`convention-violation`, `push-failed`)를 낸다. 다른 응답 형식을 만들지 않는다.
 
 **4. 그래프 응답에 좌표가 없다.** 배치는 브라우저가 한다. 서버는 노드·간선만.
+
+**5. 읽는 중 질의가 아무것도 저장하지 않는다.** 대화는 클라이언트가 들고 요청마다 통째로 보낸다. 표를 만들면 백업([[SYNC-INFRA-001]] 6.1)과 재구축([[SYNC-UC-001#UC-S6]])과 완전 삭제가 전부 그것을 알아야 한다. 그런데 **저장해도 DB 유실에는 대비하지 못한다** — 저장소가 공개라 자유 텍스트를 백업에 못 싣는 것이 댓글 본문과 같은 이유로 여기에도 걸리고, 그러면 남는 것이 「질문이 있었다」는 껍데기뿐이다. 휘발하는 것에 치를 값이 아니라고 봤다. 남길 값이 있는 답은 사람이 댓글로 옮긴다([[SYNC-UC-001#UC-H9]]).
+
+**6. 429를 만들지 않는다.** 모델 쪽이 사용량 초과를 주면 `llm-unavailable`(502)의 `reason`으로 접는다 — GitHub 실패를 `push-failed`로 접는 것과 같은 모양이다. **우리가 한도를 세지 않으므로 우리 429가 생길 일이 없다.** 비용은 맥락 상한과 대화 길이 상한으로 눌리고, 회수 경로는 키를 비우는 것이다([[SYNC-INFRA-001]] 5.3). 디스크 한도를 「한도보다 회수 경로가 먼저다」로 닫은 것과 같은 판단이다.
 
 ---
 

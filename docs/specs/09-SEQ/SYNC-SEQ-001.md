@@ -45,6 +45,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | AccountService | AS·AC | `core/account/service.py` | Control | 클래스 4.6 |
 | infra/git | G | `infra/git.py` — clone·commit·push·fetch | 어댑터 | 인프라 4.3 |
 | infra/github | GHI | `infra/github.py` — OAuth·webhook 검증 | 어댑터 | 인프라 5 |
+| infra/llm | LLM | `infra/llm.py` — 모델 호출 | 어댑터 | 인프라 5.3 |
 | DB | DB | PostgreSQL. 어느 묶음이든 자기 테이블 | 저장소 | ERD·DD |
 | 입구 (공통) | B | 라우터 또는 mcp/tools — 흐름이 웹·MCP 공통일 때 | Boundary | 클래스 3.1 |
 | 서비스 (공통) | SV | 여섯 서비스 중 하나 — SEQ-C1의 표가 지정 | Control | 클래스 4장 |
@@ -86,13 +87,14 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | GET · POST /api/me/tokens · DELETE …/{id} | [[#SEQ-C1]] | |
 | GET /api/admin/repos | [[#SEQ-20]] | |
 | POST /api/admin/repos/{code}/rebuild | [[#SEQ-21]] | ○ |
+| POST /api/docs/{docId}/items/{itemId}/ask | [[#SEQ-24]] | ○ |
 | MCP create_document | [[#SEQ-19]] | ○ |
 | MCP update_document | [[#SEQ-1]] | ○ |
 | MCP delete_document | [[#SEQ-22]] | ○ |
 | MCP restore_document | [[#SEQ-23]] | ○ |
 | MCP 모든 도구의 인증 | [[#SEQ-C2]] | |
 
-묶음을 넘는 입구가 37개 중 20개다. v1.0에서 안 그린 14개 중 9개가 묶음을 넘었다.
+묶음을 넘는 입구가 38개 중 21개다. v1.0에서 안 그린 14개 중 9개가 묶음을 넘었다.
 
 ---
 
@@ -1207,6 +1209,45 @@ sequenceDiagram
 - 되살리기는 **새 버전**이다(되돌리기와 같은 원칙 — 이력을 안 지운다). 휴지통 사이의 시간도 이력에 남는다
 - `save`가 `trashed_at`을 비운다 — **어느 입구든** 저장되면 휴지통에서 나온다. GitHub에서 파일을 되살려 push해도 같다
 - 끊어진 참조는 원인이 돌아왔으니 푼다. 가리키던 쪽 문서는 손대지 않았으므로 `resolved_with_edit=false`
+
+---
+
+## SEQ-24 읽다가 항목에 대해 묻는다
+
+[[SYNC-UC-001#UC-H19]] 기본 흐름 1~5. `POST /api/docs/{docId}/items/{itemId}/ask`. **쓰지 않는다 — `pipeline`을 거치지 않는 유일한 외부 호출이다.**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사람
+    participant RD as routers/documents
+    participant Q as queries
+    participant S as SpecService
+    participant R as ReferenceService
+    participant LLM as infra/llm
+    participant DB
+
+    U->>RD: POST /api/docs/{id}/items/{itemId}/ask {question, history}
+    RD->>Q: ask_item(doc_id, item_id, question, history)
+    Q->>Q: 키 없으면 llm-not-configured (2a) · history를 LLM_MAX_TURNS턴으로 자른다
+    Q->>S: get_item(doc_id, item_id) — 없으면 not-found
+    S->>DB: items · documents
+    S-->>Q: 항목 본문 · 문서 제목 · 상태 · 버전
+    Q->>R: upstream(pk) · downstream(pk)
+    R->>DB: references
+    R-->>Q: 상위·하위 항목 ID와 표시 이름 (본문은 안 읽는다)
+    Q->>Q: 맥락 조립 — 항목 본문 + 참조 이름 + 문서 제목·상태. 문서 전문은 안 싣는다
+    Q->>LLM: ask(system, messages)
+    LLM-->>Q: 답 문자열 — 실패하면 llm-unavailable (4a)
+    Q-->>RD: AskAnswer {answer, context_item_ids}
+    RD-->>U: 200
+```
+
+**읽을 때 볼 것**
+- **DB에 쓰지 않는다.** 대화는 클라이언트가 들고 요청마다 `history`로 온다. 서버에 상태가 없으므로 같은 질문을 두 번 보내면 두 번 나간다
+- `queries`가 어댑터를 직접 부르는 유일한 자리다([[SYNC-DOM-002]] 3.2). 쓰기가 없어 `pipeline`을 거칠 이유가 없다
+- **상위·하위는 이름만 싣는다.** 본문까지 실으면 맥락이 문서 여러 개로 번진다 — 맥락 상한이 곧 비용 상한이다([[SYNC-INFRA-001]] 5.3)
+- 항목이 없거나 삭제됐으면 `not-found`다. 화면은 애초에 선택된 항목에서만 묻게 한다(UI-5 8.5)
 
 ---
 
