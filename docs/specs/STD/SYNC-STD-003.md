@@ -16,36 +16,36 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 
 ## 1. 체인과 문서
 
-11단계 + 단계 밖 STD. 문서 27개(이 문서 포함), 항목 337개, 문서 간·안 참조 947개.
+11단계 + 단계 밖 STD. 문서 27개(이 문서 포함), 항목 440개, 문서 간·안 참조 1653개.
 
 | 단계 | 문서 ID | 제목 | 파일 | 항목 | 절 | 상위(frontmatter) |
 |---|---|---|---|---|---|---|
 | 1 | `SYNC-RFQ-001` | RFQ — 프로젝트 명세 관리 플랫폼 | `RFQ_싱크독.md` | 5 | 6 | — |
-| 2 | `SYNC-PRD-001` | PRD — 싱크독 | `PRD_싱크독.md` | 20 | 6 | RFQ-001 |
+| 2 | `SYNC-PRD-001` | PRD — 싱크독 | `PRD_싱크독.md` | 21 | 6 | RFQ-001 |
 | 3 | `SYNC-SCN-001` | 사용자 시나리오 — 싱크독 | `사용자시나리오_싱크독.md` | 9 | 4 | PRD-001 |
-| 4 | `SYNC-UC-001` | USECASE — 싱크독 | `USECASE_싱크독.md` | 28 | 5 | PRD-001, SCN-001 |
+| 4 | `SYNC-UC-001` | USECASE — 싱크독 | `USECASE_싱크독.md` | 33 | 5 | PRD-001, SCN-001 |
 | 5 | `SYNC-INFRA-001` | 인프라 아키텍처 — 싱크독 | `인프라아키텍처_싱크독.md` | 9 | 10 | PRD-001, UC-001 |
-| 6 | `SYNC-DOM-001` | 도메인 모델 — 싱크독 | `도메인모델_싱크독.md` | 12 | 7 | UC-001, INFRA-001 |
-| 6 | `SYNC-DOM-002` | 클래스 명세 — 싱크독 | `클래스명세_싱크독.md` | 18 | 8 | DOM-001, INFRA-001, API-001, API-002 |
-| 6 | `SYNC-DOM-003` | ERD·DD — 싱크독 | `ERD_DD_싱크독.md` | 12 | 6 | DOM-002, DOM-001 |
-| 7 | `SYNC-UI-001` | 화면 설계 — 싱크독 | `화면설계_싱크독.md` | 13 | 8 | UC-001, DOM-002 |
-| 7 | `SYNC-UI-002` | 와이어프레임 — 싱크독 | `와이어프레임_싱크독.md` | 13 | 1 | UI-001 |
-| 8 | `SYNC-API-001` | API 명세 REST — 싱크독 | `API_REST_싱크독.md` | 31 | 7 | UI-002, DOM-002, DOM-003 |
-| 8 | `SYNC-API-002` | API 명세 MCP — 싱크독 | `API_MCP_싱크독.md` | 8 | 7 | UC-001, DOM-002, DOM-003, STD-001 |
-| 9 | `SYNC-SEQ-001` | SEQUENCE — 싱크독 | `SEQUENCE_싱크독.md` | 23 | 2 | DOM-002, API-001, API-002, UC-001 |
-| 10 | `SYNC-MS-001` | MINISPEC — ProjectService | `MINISPEC_001_project_싱크독.md` | 5 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
-| 10 | `SYNC-MS-002` | MINISPEC — SpecService | `MINISPEC_002_spec_싱크독.md` | 27 | 3 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
-| 10 | `SYNC-MS-003` | MINISPEC — ReferenceService | `MINISPEC_003_reference_싱크독.md` | 9 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
-| 10 | `SYNC-MS-004` | MINISPEC — TrackingService | `MINISPEC_004_tracking_싱크독.md` | 16 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
-| 10 | `SYNC-MS-005` | MINISPEC — CommentService | `MINISPEC_005_collab_싱크독.md` | 8 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
-| 10 | `SYNC-MS-006` | MINISPEC — AccountService | `MINISPEC_006_account_싱크독.md` | 8 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
-| 10 | `SYNC-MS-007` | MINISPEC — pipeline — 쓰기 조율 | `MINISPEC_007_pipeline_싱크독.md` | 3 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
-| 10 | `SYNC-MS-008` | MINISPEC — queries — 읽기 조합 | `MINISPEC_008_queries_싱크독.md` | 13 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
-| 10 | `SYNC-MS-009` | MINISPEC — infra — git·github 어댑터 | `MINISPEC_009_infra_싱크독.md` | 14 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
-| 11 | `SYNC-CODE-001` | 구현 계획 — 슬라이스 카드와 커밋 기록 | `CODE_구현계획_싱크독.md` | 6 | 6 | STD-004, MS-001, MS-002, MS-003, MS-004, MS-005, MS-006, MS- |
+| 6 | `SYNC-DOM-001` | 도메인 모델 — 싱크독 | `도메인모델_싱크독.md` | 13 | 7 | UC-001, INFRA-001 |
+| 6 | `SYNC-DOM-002` | 클래스 명세 — 싱크독 | `클래스명세_싱크독.md` | 19 | 8 | DOM-001, INFRA-001, API-001, API-002 |
+| 6 | `SYNC-DOM-003` | ERD·DD — 싱크독 | `ERD_DD_싱크독.md` | 13 | 6 | DOM-002, DOM-001 |
+| 7 | `SYNC-UI-001` | 화면 설계 — 싱크독 | `화면설계_싱크독.md` | 15 | 8 | UC-001, DOM-002 |
+| 7 | `SYNC-UI-002` | 와이어프레임 — 싱크독 | `와이어프레임_싱크독.md` | 15 | 1 | UI-001 |
+| 8 | `SYNC-API-001` | API 명세 REST — 싱크독 | `API_REST_싱크독.md` | 43 | 7 | UI-002, DOM-002, DOM-003 |
+| 8 | `SYNC-API-002` | API 명세 MCP — 싱크독 | `API_MCP_싱크독.md` | 10 | 7 | UC-001, DOM-002, DOM-003, STD-001 |
+| 9 | `SYNC-SEQ-001` | SEQUENCE — 싱크독 | `SEQUENCE_싱크독.md` | 26 | 2 | DOM-002, API-001, API-002, UC-001 |
+| 10 | `SYNC-MS-001` | MINISPEC — ProjectService | `MINISPEC_001_project_싱크독.md` | 6 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
+| 10 | `SYNC-MS-002` | MINISPEC — SpecService | `MINISPEC_002_spec_싱크독.md` | 37 | 3 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
+| 10 | `SYNC-MS-003` | MINISPEC — ReferenceService | `MINISPEC_003_reference_싱크독.md` | 10 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
+| 10 | `SYNC-MS-004` | MINISPEC — TrackingService | `MINISPEC_004_tracking_싱크독.md` | 26 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
+| 10 | `SYNC-MS-005` | MINISPEC — CommentService | `MINISPEC_005_collab_싱크독.md` | 11 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
+| 10 | `SYNC-MS-006` | MINISPEC — AccountService | `MINISPEC_006_account_싱크독.md` | 13 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
+| 10 | `SYNC-MS-007` | MINISPEC — pipeline — 쓰기 조율 | `MINISPEC_007_pipeline_싱크독.md` | 13 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
+| 10 | `SYNC-MS-008` | MINISPEC — queries — 읽기 조합 | `MINISPEC_008_queries_싱크독.md` | 17 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
+| 10 | `SYNC-MS-009` | MINISPEC — infra — git·github 어댑터 | `MINISPEC_009_infra_싱크독.md` | 17 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
+| 11 | `SYNC-CODE-001` | 구현 계획 — 슬라이스 카드와 커밋 기록 | `CODE_구현계획_싱크독.md` | 29 | 6 | STD-004, MS-001, MS-002, MS-003, MS-004, MS-005, MS-006, MS- |
 | — | `SYNC-STD-001` | 명세 작성 규약 | `STD_명세작성규약_싱크독.md` | 0 | 9 | PRD-001 |
 | — | `SYNC-STD-002` | 뷰 규약 — 사람용 뷰 타입별 렌더링 | `STD_뷰규약_싱크독.md` | 12 | 8 | STD-001, UI-002 |
-| — | `SYNC-STD-004` | 개발 규약 — 코드 파트 표준 | `STD_개발규약_싱크독.md` | 15 | 6 | STD-001, DOM-002, DOM-003 |
+| — | `SYNC-STD-004` | 개발 규약 — 코드 파트 표준 | `STD_개발규약_싱크독.md` | 18 | 6 | STD-001, DOM-002, DOM-003 |
 **아직 없는 것**: 프로토타입(`SYNC-UI-004`, 선택 — `view_*.html` 25개가 대신함). 명세 파트 전부 + CODE 구현 계획까지 있다. 남은 건 코드 자체.
 
 **되돌아오는 문서**: `SYNC-DOM-002` 클래스 명세는 6단계에서 엔티티(v1)까지, API(8) 뒤 컨트롤(v2), SEQUENCE(9) 뒤 되먹임(v3). SEQ 승인 조건이 그 v3다. 지금 v3까지 반영됐다.
@@ -443,9 +443,6 @@ flowchart BT
 **SYNC-SEQ-001**
 - [ ] `detect_impact`의 "변경된 항목" 판정 — 한 글자라도 바뀌면 변경인지
 - [ ] SEQ-12 항목 블록 경계 — 문서 타입별 헤더 형식. 템플릿 규약과 함께
-
-**SYNC-STD-003**
-- [x] 다음 프로젝트가 이 체인을 따를 때 15개 중 무엇을 빼도 되는지 — 2~3명 프로젝트가 화면 13개·시퀀스 23개를 다 쓰지는 않을 것 — **결정: 규모가 정한다. RFQ·PRD·UC·DOM·API·CODE 여섯이 실질이고 SCN·INFRA·UI 와이어프레임·SEQ·MS는 선택이다.** 실물로 둘을 써 보고 얻은 답이다 — 40명짜리 동아리 게시판(문서 14개)에서는 SEQ가 시퀀스 3개, MS가 함수 8개로 끝나 형식만 남았고 UI 와이어프레임도 그랬다. 반면 45,000줄짜리 보험 서비스(문서 14개)에서는 열한 단계가 다 필요했다 — 특히 DOM 셋과 SEQ가 「이 함수 하나가 사실상 제품 명세」인 자리를 드러냈다. **가르는 것은 사람 수가 아니라 「머리에 안 들어가는가」다.** 한 사람이 전체를 쥘 수 있으면 여섯으로 충분하고, 그렇지 않으면 나머지가 지도가 된다. 건너뛰어도 시스템은 막지 않는다([[SYNC-RFQ-001]] 2장) — 빈 단계는 화면에 「미작성」으로 남아 선택했다는 사실 자체가 보인다
 
 ---
 

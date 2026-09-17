@@ -99,7 +99,8 @@ app/
 │
 └── infra/                  외부 시스템 어댑터
     ├── git.py              clone·commit·push·fetch
-    └── github.py           OAuth·webhook 검증
+    ├── github.py           OAuth·webhook 검증
+    └── llm.py              모델 호출. 읽는 중 질의에만 (INFRA 5.3)
 ```
 
 **패키지 이름이 `app`인 이유** — 마지막 폴더 이름이 곧 임포트 이름이다. 프로젝트 이름(`syncdoc`)을 그대로 쓰면 `backend/syncdoc/`처럼 이름이 두 번 나온다. `src/`는 담는 상자일 뿐 패키지가 아니라 안에 이름이 또 필요하고(PyPI 배포 라이브러리 관례), 싱크독은 컨테이너로 띄우는 앱이라 그 이점이 없다.
@@ -483,6 +484,7 @@ classDiagram
 | `RestoreFlag` | `kind: str` · `target_item_id: int` · `cause_item_id: int \| None` · `cause_version_id: int \| None` · `target_version_id: int \| None` · `assignee_user_id: int \| None` · `raised_at: datetime` · `resolved_by_user_id: int \| None` · `resolved_at: datetime \| None` · `resolved_with_edit: bool \| None` | 백업에서 읽어 **pk로 이미 푼** flags 한 행. 자연키를 푸는 것은 `pipeline`의 몫이다 — 추적 묶음은 문서·항목을 모른다 |
 | `RestoreDecision` | `version_id: int` · `choice: str` · `affected_pks: list~int~` · `changed_pks: list~int~` · `decided_by_user_id: int \| None` · `decided_at: datetime \| None` | 같음. **`reason`이 없다** — 백업에 안 싣는다(인프라 6.1) |
 | `RestoreResult` | `flags: int` · `decisions: int` · `comments: int` · `skipped: int` · `dropped: list~dict~` | pipeline.import_tracking → API. `dropped`가 `RebuildResult`와 같은 모양이라 UI-14 5.3을 그대로 쓴다 |
+| `AskAnswer` | `answer: str` · `context_item_ids: list~str~` | queries.ask_item → API. `context_item_ids`는 맥락으로 실어 보낸 항목들 — 화면이 「무엇을 보고 답했는지」를 보여준다. **저장하지 않는다**([[SYNC-INFRA-001]] 6장) |
 
 타입은 여기 한 곳에만 정의한다.
 
@@ -556,6 +558,7 @@ flowchart TB
     AS[AccountService]
     GIT[infra/git.py]
     GH[infra/github.py]
+    LLM[infra/llm.py]
 
     PL -.->|get_document · validate · detect_deleted_items · create · save · apply_frontmatter| SS
     PL -.->|commit_push · read · changed_files| GIT
@@ -576,9 +579,12 @@ flowchart TB
     TS -.->|diff · last_author| SS
     GIT -.->|github_token_for| AS
     AS -.->|oauth| GH
+    QR -.->|ask| LLM
 ```
 
 **규칙** — 서비스끼리 직접 부르는 건 `TrackingService → ReferenceService·SpecService`(변경 영향 감지·담당자 결정) 둘뿐이다. `SpecService`는 아무도 부르지 않는다. 나머지 묶음 넘기는 전부 `pipeline`(쓰기)이나 `queries`(읽기)를 거친다. 서비스가 `pipeline`을 부르는 건 `ProjectService.rebuild_index`뿐이다. 4장에서 각 노드를 확대한다.
+
+**`queries`가 어댑터를 직접 부르는 것은 `llm` 하나뿐이다.** 읽는 중 질의([[SYNC-PRD-001#R11]])는 쓰지 않고 읽기만 하므로 `pipeline`을 거칠 이유가 없고, 맥락을 조립하는 데 필요한 것이 이미 전부 `queries`에 있다. 새 묶음을 만들지 않는 이유는 5장에 적는다.
 
 ## 4. 설계 클래스 다이어그램 (v3)
 
@@ -1130,9 +1136,13 @@ git.init_specs(workdir) -> dict[str, str]
 github.verify_signature(body, header) -> bool
 github.exchange_code(code) -> str
 github.get_user(token) -> GithubUser
+
+llm.ask(system, messages) -> str               모델 호출 한 번. 답 문자열만
 ```
 
 **규칙** — `git.commit_push`만 `AccountService.github_token_for`를 부른다(3.2). 토큰은 push URL에만 쓰고 `.git/config`에 남기지 않는다.
+
+`llm`은 키를 `config`에서 읽는다. 키가 비면 부르기 전에 `llm-not-configured`로 막고, 외부가 실패하면 `llm-unavailable`로 접는다 — 사용량 초과도 여기 들어간다([[SYNC-INFRA-001]] 5.3).
 
 ## 5. 판단이 필요한 지점
 
@@ -1155,6 +1165,8 @@ github.get_user(token) -> GithubUser
 **계정을 합쳐도 옛 문서의 규약 오류는 저절로 안 풀린다.** `login_github`은 `users` 행만 합치고 `documents.convention_error_detail`은 그대로다. 재구축이 유일한 청소 경로다 — 계정 묶음이 명세 묶음을 직접 건드리는 것은 [[SYNC-DOM-001]] 4장 경계 위반이라 자동 청소를 두지 않는다.
 
 **이메일 사칭은 막지 못한다 — 다만 권한은 안 준다.** 남의 이메일을 등록하면 그 사람 커밋이 내 이름으로 붙는다. `commit_emails.email`의 유일 제약이 1차 방어다(먼저 등록한 쪽이 임자, 둘째는 거부). push 권한은 여전히 `github_token_encrypted`가 있어야 한다. 저장소 권한이 곧 접근 권한이라는 전제([[SYNC-INFRA-001]] 5장) 아래 v1은 여기까지다.
+
+**4. 읽는 중 질의에 새 묶음을 만들지 않는다 — 결정: `queries.ask_item`.** 엔티티가 없어 `models.py`가 빈 채로 일곱째 묶음이 생기고, 그러면 [[SYNC-DOM-001]] 4장 경계 표에 개념 없는 묶음을 넣어야 한다. [[SYNC-STD-001]] 1.9의 「과설계 금지 — 두 번째 구현체가 실제로 생길 때 만든다」에 걸린다. 맥락을 조립하는 데 필요한 것(항목 본문·상위·하위 참조·문서 상태)이 이미 전부 `queries`에 있고, 이 기능은 **쓰지 않고 읽기만 하므로** `pipeline`을 거칠 이유도 없다. 두 번째 모델 기능이 실제로 생기면 그때 묶음으로 옮긴다.
 
 ---
 

@@ -39,10 +39,31 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#github.exchange_code]] | OAuth code → token |
 | [[#github.get_user]] | token → 사용자 정보 |
 | [[#github.create_repo]] | 공개 저장소 만들기 |
+| [[#llm.ask]] | 모델 한 번 호출 |
 
 ---
 
 ## 2. 함수
+
+#### llm.ask 모델 한 번 호출
+
+**시그니처** `async def ask(system: str, messages: list[dict]) -> str`
+
+근거: [[SYNC-INFRA-001]] 5.3 · [[SYNC-PRD-001#R11]]
+
+**입력** `system` 맥락과 지켜야 할 것을 담은 지시문 · `messages` `[{role: user|assistant, text}]` 차례대로. 맥락 조립과 자르기는 부르는 쪽([[SYNC-MS-008#queries.ask_item]])이 끝낸 상태로 온다
+
+**처리** `if not settings.LLM_API_KEY → ! LlmNotConfigured` · `httpx`로 `settings.LLM_MODEL`에 한 번 요청 · 답 문자열 하나를 꺼낸다 · 스트리밍하지 않는다
+
+**출력** 답 문자열
+
+**예외** 키 없음 → `llm-not-configured` · 그 밖의 모든 실패 → `llm-unavailable`에 `reason`. **사용량 초과·요청 한도도 여기 접힌다** — `git.commit_push`가 GitHub 실패를 `push-failed`로 접는 것과 같다. 우리 에러 표에 429를 만들지 않는다([[SYNC-API-001]] 5장 6)
+
+**호출하는 것** 없음. 바깥만 만진다
+
+**테스트 관점** 키가 비면 부르기 전에 막는다(네트워크를 타지 않는다) · 외부가 429를 줘도 `llm-unavailable`이다 · 외부가 느려도 예외로 끝나지 앱이 멈추지 않는다 · `system`과 `messages`를 그대로 싣는다(여기서 맥락을 더하거나 자르지 않는다)
+
+---
 
 #### git.clone clone
 
