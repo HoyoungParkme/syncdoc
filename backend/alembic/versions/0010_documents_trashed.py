@@ -1,6 +1,7 @@
 """0010_documents_trashed — 휴지통. 문서를 지우는 대신 표시한다 (카드 R).
 
-SYNC-DOM-003#documents trashed_at·trashed_by_user_id · SYNC-PRD-001#N3 · SYNC-MS-002#SpecService.trash.
+SYNC-DOM-003#documents trashed_at·trashed_by_user_id ·
+SYNC-PRD-001#N3 · SYNC-MS-002#SpecService.trash.
 
 카드 N의 하드 삭제는 「이력 없는 초안」에만 열려 있어 실물에서 바로 막혔다. 휴지통은
 파일 삭제 커밋 + 이 두 컬럼이 전부다 — 행·버전·항목은 남고 되살리면 돌아온다.
@@ -12,6 +13,7 @@ Revises: 0009
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "0010"
