@@ -1,17 +1,66 @@
 {
-  "backup_version": 1,
+  "backup_version": 2,
   "comments": [],
   "flags": [
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-G1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.294225+00:00",
+      "resolved_at": "2026-09-15T05:43:42.432509+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-API-001#GET/api/admin/repos",
+      "target_version": "SYNC-API-001@7d5b179e53f529fee207a202e2ac694b70d9a15b"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-A1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.290041+00:00",
+      "resolved_at": "2026-09-15T05:43:42.360764+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-API-001#POST/api/projects",
+      "target_version": "SYNC-API-001@7d5b179e53f529fee207a202e2ac694b70d9a15b"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-G1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.282392+00:00",
+      "resolved_at": "2026-09-15T05:43:42.281935+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-API-001#POST/hooks/github",
+      "target_version": "SYNC-API-001@7d5b179e53f529fee207a202e2ac694b70d9a15b"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-A1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.298454+00:00",
+      "resolved_at": "2026-09-15T05:43:42.500822+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": true,
+      "target": "SYNC-CODE-001#B1",
+      "target_version": "SYNC-CODE-001@e912ebd3a0c58d0f64e30588292fbdf8525e250d"
+    },
     {
       "assignee": "HoyoungParkme",
       "cause": "SYNC-MS-002#SpecService.change_status",
       "cause_version": null,
       "kind": "broken_ref",
       "raised_at": "2026-09-10T08:31:20.801257+00:00",
-      "resolved_at": null,
-      "resolved_by": null,
-      "resolved_with_edit": null,
-      "target": "SYNC-CODE-001#B2"
+      "resolved_at": "2026-09-15T05:43:43.591799+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-CODE-001#B2",
+      "target_version": null
     },
     {
       "assignee": "HoyoungParkme",
@@ -19,10 +68,203 @@
       "cause_version": null,
       "kind": "broken_ref",
       "raised_at": "2026-09-10T08:31:20.809791+00:00",
-      "resolved_at": null,
-      "resolved_by": null,
-      "resolved_with_edit": null,
-      "target": "SYNC-CODE-001#B4"
+      "resolved_at": "2026-09-15T05:43:43.680140+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-CODE-001#B4",
+      "target_version": null
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-MS-007#pipeline.delete_document",
+      "cause_version": null,
+      "kind": "broken_ref",
+      "raised_at": "2026-09-16T06:23:50.317231+00:00",
+      "resolved_at": "2026-09-16T06:32:40.978896+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": true,
+      "target": "SYNC-CODE-001#N",
+      "target_version": "SYNC-CODE-001@6c26e5e6b88f467246399311f04abd6c4fc868f1"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-G1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.302122+00:00",
+      "resolved_at": "2026-09-15T05:43:42.561758+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-DOM-001#Repository",
+      "target_version": "SYNC-DOM-001@d16e8344967a463b667981eab6ea644017dd96ce"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-G1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.312877+00:00",
+      "resolved_at": "2026-09-15T05:43:42.752176+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-DOM-002#AccountService",
+      "target_version": "SYNC-DOM-002@a3afa24e4227667f9d134d68e2160cd7b9f5fd56"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-A1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.307179+00:00",
+      "resolved_at": "2026-09-15T05:43:42.627817+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-DOM-002#ProjectService",
+      "target_version": "SYNC-DOM-002@a3afa24e4227667f9d134d68e2160cd7b9f5fd56"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-G1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.309136+00:00",
+      "resolved_at": "2026-09-15T05:43:42.689024+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-DOM-002#ProjectService",
+      "target_version": "SYNC-DOM-002@a3afa24e4227667f9d134d68e2160cd7b9f5fd56"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-A1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.316188+00:00",
+      "resolved_at": "2026-09-15T05:43:42.821719+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-MS-001#ProjectService.init_project",
+      "target_version": "SYNC-MS-001@7d5b179e53f529fee207a202e2ac694b70d9a15b"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-G1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.319806+00:00",
+      "resolved_at": "2026-09-15T05:43:42.893829+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-MS-002#SpecService.mark_deleted",
+      "target_version": "SYNC-MS-002@ef1c974d6c78834b89c8a031948b13888b578083"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-G1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.323711+00:00",
+      "resolved_at": "2026-09-15T05:43:42.968768+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-MS-007#pipeline.process_commit",
+      "target_version": "SYNC-MS-007@ef1c974d6c78834b89c8a031948b13888b578083"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-MS-007#pipeline.delete_document",
+      "cause_version": null,
+      "kind": "broken_ref",
+      "raised_at": "2026-09-16T06:23:50.320153+00:00",
+      "resolved_at": "2026-09-16T06:23:50.444947+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": true,
+      "target": "SYNC-MS-007#pipeline.process_commit",
+      "target_version": "SYNC-MS-007@397d19fc660f6acdf09db0964f89c5809fa8584a"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-MS-007#pipeline.delete_document",
+      "cause_version": null,
+      "kind": "broken_ref",
+      "raised_at": "2026-09-16T06:23:50.310553+00:00",
+      "resolved_at": "2026-09-16T06:32:38.202602+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": true,
+      "target": "SYNC-MS-009#git.commit_push",
+      "target_version": "SYNC-MS-009@4bf950f6301a8ed6d81d05b53185ce94a781e721"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-A1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.326851+00:00",
+      "resolved_at": "2026-09-15T05:43:43.040421+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-MS-009#git.init_specs",
+      "target_version": "SYNC-MS-009@a11f6982f0ae51374d9be90160b90543995b731a"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-G1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.330221+00:00",
+      "resolved_at": "2026-09-15T05:43:43.108433+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-SEQ-001#SEQ-2",
+      "target_version": "SYNC-SEQ-001@ef1c974d6c78834b89c8a031948b13888b578083"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-G1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.336841+00:00",
+      "resolved_at": "2026-09-15T05:43:43.272421+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-SEQ-001#SEQ-20",
+      "target_version": "SYNC-SEQ-001@ef1c974d6c78834b89c8a031948b13888b578083"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-A1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.333648+00:00",
+      "resolved_at": "2026-09-15T05:43:43.177310+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": false,
+      "target": "SYNC-SEQ-001#SEQ-4",
+      "target_version": "SYNC-SEQ-001@ef1c974d6c78834b89c8a031948b13888b578083"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-A1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.339770+00:00",
+      "resolved_at": "2026-09-15T05:43:43.373337+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": true,
+      "target": "SYNC-UI-001#UI-3",
+      "target_version": "SYNC-UI-001@e912ebd3a0c58d0f64e30588292fbdf8525e250d"
+    },
+    {
+      "assignee": "HoyoungParkme",
+      "cause": "SYNC-UC-001#UC-A1",
+      "cause_version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d",
+      "kind": "needs_check",
+      "raised_at": "2026-09-15T05:09:04.345046+00:00",
+      "resolved_at": "2026-09-15T05:43:43.499834+00:00",
+      "resolved_by": "HoyoungParkme",
+      "resolved_with_edit": true,
+      "target": "SYNC-UI-002#UI-3",
+      "target_version": "SYNC-UI-002@e912ebd3a0c58d0f64e30588292fbdf8525e250d"
     }
   ],
   "project": "SYNC",
@@ -40,10 +282,81 @@
         "SYNC-API-001#POST/api/admin/repos/{code}/rebuild",
         "SYNC-API-001#POST/api/admin/repos/{code}/restore"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.334237+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-API-001@04197c7d2cc65189b0d1a909f72d300a98057068"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#GET/api/projects/{code}/flags",
+        "SYNC-API-002#update_document",
+        "SYNC-CODE-001#D6",
+        "SYNC-MS-001#ProjectService.delete_project",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-MS-007#pipeline.save_pipeline",
+        "SYNC-UI-002#UI-14"
+      ],
+      "changed": [
+        "SYNC-API-001#DELETE/api/projects/{code}"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.839378+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-API-001@14f14488b6f58697238e1e35d036e9dc148923af"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#GET/api/projects/{code}/flags",
+        "SYNC-API-002#update_document",
+        "SYNC-CODE-001#N",
+        "SYNC-MS-007#pipeline.delete_document",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-API-001#DELETE/api/docs/{docId}",
+        "SYNC-API-001#GET/api/projects/{code}/trash",
+        "SYNC-API-001#POST/api/docs/{docId}/purge",
+        "SYNC-API-001#POST/api/docs/{docId}/restore"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T06:28:18.542872+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-API-001@397d19fc660f6acdf09db0964f89c5809fa8584a"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#GET/api/projects/{code}/flags",
+        "SYNC-API-002#update_document",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-API-001#DELETE/api/docs/{docId}"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T07:26:25.251471+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-API-001@4bf950f6301a8ed6d81d05b53185ce94a781e721"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#GET/api/projects/{code}/flags",
+        "SYNC-API-002#update_document",
+        "SYNC-CODE-001#B2",
+        "SYNC-DOM-002#ProjectService",
+        "SYNC-MS-001#ProjectService.init_project",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-API-001#POST/api/projects"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.268391+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-API-001@a11f6982f0ae51374d9be90160b90543995b731a"
     },
     {
       "affected": [
@@ -57,10 +370,138 @@
         "SYNC-API-001#GET/api/me/emails",
         "SYNC-API-001#POST/api/me/emails"
       ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.052437+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-API-001@d16e8344967a463b667981eab6ea644017dd96ce"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#GET/api/projects/{code}/flags",
+        "SYNC-API-002#update_document",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-API-001#POST/api/docs/{docId}/items/{itemId}/ask"
+      ],
       "choice": "undecided",
       "decided_at": null,
       "decided_by": null,
-      "version": "SYNC-API-001@d16e8344967a463b667981eab6ea644017dd96ce"
+      "version": "SYNC-API-001@df4b5215890af8fb0b7436aca73c500dbf708fc1"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B1",
+        "SYNC-CODE-001#M",
+        "SYNC-MS-002#SpecService.apply_frontmatter",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-API-002#create_document"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T01:27:29.361357+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-API-002@218c506c3ae9d669b69fee69cc2ffd58c71fa42f"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#N",
+        "SYNC-MS-007#pipeline.delete_document",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-API-002#delete_document",
+        "SYNC-API-002#restore_document"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T06:28:18.881006+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-API-002@397d19fc660f6acdf09db0964f89c5809fa8584a"
+    },
+    {
+      "affected": [
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-API-002#delete_document"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T07:26:25.307260+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-API-002@4bf950f6301a8ed6d81d05b53185ce94a781e721"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B1",
+        "SYNC-DOM-002#ProjectService",
+        "SYNC-MS-001#ProjectService.init_project",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-API-002#init_project"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.306803+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-API-002@a11f6982f0ae51374d9be90160b90543995b731a"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B1"
+      ],
+      "changed": [
+        "SYNC-API-002#update_document"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.889611+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-API-002@a3afa24e4227667f9d134d68e2160cd7b9f5fd56"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B1",
+        "SYNC-MS-002#SpecService.apply_frontmatter",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-API-002#create_document",
+        "SYNC-API-002#update_document"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T06:54:06.942014+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-API-002@f37b66e19a18849317a3c2327d3de50823af36df"
+    },
+    {
+      "affected": [
+        "SYNC-MS-009#github.create_repo",
+        "SYNC-UI-001#UI-3",
+        "SYNC-UI-002#UI-3"
+      ],
+      "changed": [
+        "SYNC-CODE-001#F",
+        "SYNC-CODE-001#G"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.688255+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-CODE-001@1f3ec080fed013354fc7d84efa4948c86e5a7f9f"
+    },
+    {
+      "affected": [
+        "SYNC-MS-009#github.create_repo",
+        "SYNC-UI-001#UI-3",
+        "SYNC-UI-002#UI-3"
+      ],
+      "changed": [
+        "SYNC-CODE-001#F"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.421106+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-CODE-001@f90cf8e0a198687f2e0fd30d8d027585d27e460f"
     },
     {
       "affected": [
@@ -70,9 +511,9 @@
         "SYNC-DOM-001#CommitEmail",
         "SYNC-DOM-001#PropagationDecision"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:39.550817+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-DOM-001@d16e8344967a463b667981eab6ea644017dd96ce"
     },
     {
@@ -86,10 +527,42 @@
         "SYNC-DOM-002#CommentService",
         "SYNC-DOM-002#TrackingService"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.244311+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-DOM-002@04197c7d2cc65189b0d1a909f72d300a98057068"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A",
+        "SYNC-DOM-003#users",
+        "SYNC-MS-006#AccountService.create_placeholder",
+        "SYNC-MS-006#AccountService.user_for_commit"
+      ],
+      "changed": [
+        "SYNC-DOM-002#TrackingService"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T01:27:29.159592+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-DOM-002@06ca6064eda78bb9b788d1acdb10c73b1f9ded40"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A",
+        "SYNC-DOM-003#flags",
+        "SYNC-DOM-003#users",
+        "SYNC-MS-006#AccountService.create_placeholder",
+        "SYNC-MS-006#AccountService.user_for_commit"
+      ],
+      "changed": [
+        "SYNC-DOM-002#Flag",
+        "SYNC-DOM-002#TrackingService"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.450626+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-DOM-002@153fbaa44f19f2da1bf0aaccde3c31fdcbb2fd05"
     },
     {
       "affected": [
@@ -102,10 +575,97 @@
         "SYNC-DOM-002#TrackingService",
         "SYNC-DOM-002#User"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:39.720674+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-DOM-002@1dcf4ec9af0d00eaeefc9550b79c8cd0489db2ab"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A",
+        "SYNC-DOM-003#documents",
+        "SYNC-DOM-003#users",
+        "SYNC-MS-006#AccountService.create_placeholder",
+        "SYNC-MS-006#AccountService.user_for_commit",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-DOM-002#Document",
+        "SYNC-DOM-002#SpecService",
+        "SYNC-DOM-002#TrackingService"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T06:28:17.531199+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-DOM-002@397d19fc660f6acdf09db0964f89c5809fa8584a"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A",
+        "SYNC-DOM-003#users",
+        "SYNC-MS-006#AccountService.create_placeholder",
+        "SYNC-MS-006#AccountService.user_for_commit",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-DOM-002#CommentService",
+        "SYNC-DOM-002#ReferenceService",
+        "SYNC-DOM-002#SpecService",
+        "SYNC-DOM-002#TrackingService"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T07:26:25.116789+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-DOM-002@4bf950f6301a8ed6d81d05b53185ce94a781e721"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A",
+        "SYNC-DOM-003#repositories",
+        "SYNC-DOM-003#users",
+        "SYNC-MS-006#AccountService.create_placeholder",
+        "SYNC-MS-006#AccountService.user_for_commit",
+        "SYNC-UI-002#UI-14"
+      ],
+      "changed": [
+        "SYNC-DOM-002#ProjectService",
+        "SYNC-DOM-002#Repository"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.798445+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-DOM-002@a3afa24e4227667f9d134d68e2160cd7b9f5fd56"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A",
+        "SYNC-DOM-003#users",
+        "SYNC-MS-006#AccountService.create_placeholder",
+        "SYNC-MS-006#AccountService.user_for_commit",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-DOM-002#SpecService"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T06:54:06.861615+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-DOM-002@f37b66e19a18849317a3c2327d3de50823af36df"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A",
+        "SYNC-CODE-001#D6",
+        "SYNC-DOM-002#Flag",
+        "SYNC-MS-002#SpecService.clear_index"
+      ],
+      "changed": [
+        "SYNC-DOM-003#flags"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.503548+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-DOM-003@153fbaa44f19f2da1bf0aaccde3c31fdcbb2fd05"
     },
     {
       "affected": [
@@ -123,10 +683,87 @@
         "SYNC-DOM-003#propagation_decisions",
         "SYNC-DOM-003#users"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:39.793598+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-DOM-003@2533ce59c8a40373667e60b1cdd5633f38e8a685"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A",
+        "SYNC-CODE-001#D6",
+        "SYNC-CODE-001#N",
+        "SYNC-DOM-002#Document",
+        "SYNC-MS-002#SpecService.clear_index",
+        "SYNC-MS-002#SpecService.delete_document"
+      ],
+      "changed": [
+        "SYNC-DOM-003#documents"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T06:28:17.868456+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-DOM-003@397d19fc660f6acdf09db0964f89c5809fa8584a"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A",
+        "SYNC-CODE-001#D6",
+        "SYNC-DOM-002#Repository",
+        "SYNC-MS-002#SpecService.clear_index",
+        "SYNC-UI-002#UI-14"
+      ],
+      "changed": [
+        "SYNC-DOM-003#repositories"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.837294+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-DOM-003@a3afa24e4227667f9d134d68e2160cd7b9f5fd56"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B4",
+        "SYNC-CODE-001#D6",
+        "SYNC-CODE-001#E",
+        "SYNC-MS-007#scheduler.catch_up",
+        "SYNC-MS-009#git.last_commit_at"
+      ],
+      "changed": [
+        "SYNC-MS-001#ProjectService.repo_status"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.930394+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-001@7d5b179e53f529fee207a202e2ac694b70d9a15b"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B1"
+      ],
+      "changed": [
+        "SYNC-MS-001#ProjectService.init_project"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.347099+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-001@a11f6982f0ae51374d9be90160b90543995b731a"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B4",
+        "SYNC-CODE-001#D6",
+        "SYNC-CODE-001#E",
+        "SYNC-MS-007#scheduler.catch_up",
+        "SYNC-MS-009#git.last_commit_at"
+      ],
+      "changed": [
+        "SYNC-MS-001#ProjectService.repo_status"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.967408+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-001@a3afa24e4227667f9d134d68e2160cd7b9f5fd56"
     },
     {
       "affected": [
@@ -137,10 +774,90 @@
       "changed": [
         "SYNC-MS-001#ProjectService.repo_status"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.379519+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-MS-001@c5340ef8b0145fde7f7a7a5c7e1e6c6604fd9259"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B4",
+        "SYNC-MS-007#pipeline.rebuild"
+      ],
+      "changed": [
+        "SYNC-MS-002#SpecService.clear_index"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.581221+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-002@0ee6ec7c13ef9ea9f0f45d4e833f6854236e7a96"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B1",
+        "SYNC-CODE-001#M",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-MS-002#SpecService.validate"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T01:27:29.404164+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-002@218c506c3ae9d669b69fee69cc2ffd58c71fa42f"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B1",
+        "SYNC-CODE-001#M",
+        "SYNC-CODE-001#N",
+        "SYNC-CODE-001#P",
+        "SYNC-MS-007#pipeline.delete_document",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-MS-002#SpecService.delete_document",
+        "SYNC-MS-002#SpecService.list_trashed",
+        "SYNC-MS-002#SpecService.save",
+        "SYNC-MS-002#SpecService.status_change_count",
+        "SYNC-MS-002#SpecService.trash",
+        "SYNC-MS-002#SpecService.trash_commit",
+        "SYNC-MS-002#SpecService.validate"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T06:28:19.554151+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-002@397d19fc660f6acdf09db0964f89c5809fa8584a"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B1",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-MS-002#SpecService.validate"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.007440+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-002@d5d17ff31888675b387b3973be95b12ef7fcdbe5"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B1",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-MS-002#SpecService.save"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.531458+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-002@ef1c974d6c78834b89c8a031948b13888b578083"
     },
     {
       "affected": [
@@ -151,10 +868,43 @@
         "SYNC-MS-002#SpecService.clear_index",
         "SYNC-MS-002#SpecService.version_keys"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.127978+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-MS-002@f2aa933214faa8e2fa736bcb7745a801e931d2bb"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B1",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "changed": [
+        "SYNC-MS-002#SpecService.precondition",
+        "SYNC-MS-002#SpecService.validate"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T06:54:07.014269+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-002@f37b66e19a18849317a3c2327d3de50823af36df"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B3",
+        "SYNC-CODE-001#E",
+        "SYNC-MS-007#pipeline.import_tracking",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-UI-002#UI-14"
+      ],
+      "changed": [
+        "SYNC-MS-004#TrackingService.record_decision",
+        "SYNC-MS-004#TrackingService.relink_versions",
+        "SYNC-MS-004#TrackingService.restore_flags"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.615651+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-004@0ee6ec7c13ef9ea9f0f45d4e833f6854236e7a96"
     },
     {
       "affected": [
@@ -164,10 +914,24 @@
         "SYNC-MS-004#TrackingService.reassign_open_flags",
         "SYNC-MS-004#TrackingService.relink_versions"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.176676+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-MS-004@2533ce59c8a40373667e60b1cdd5633f38e8a685"
+    },
+    {
+      "affected": [
+        "SYNC-MS-007#pipeline.import_tracking",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-UI-002#UI-14"
+      ],
+      "changed": [
+        "SYNC-MS-004#TrackingService.relink_versions"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.051891+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-004@a3afa24e4227667f9d134d68e2160cd7b9f5fd56"
     },
     {
       "affected": [
@@ -180,10 +944,57 @@
         "SYNC-MS-006#AccountService.remove_commit_email",
         "SYNC-MS-006#AccountService.user_for_commit"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:39.497959+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-MS-006@526c335e9b175993f3759a5202b9c015ccc87bdf"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B1",
+        "SYNC-CODE-001#M",
+        "SYNC-MS-002#SpecService.item_pks",
+        "SYNC-MS-002#SpecService.save",
+        "SYNC-MS-007#pipeline.change_status",
+        "SYNC-MS-007#pipeline.process_commit",
+        "SYNC-MS-007#pipeline.revert"
+      ],
+      "changed": [
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T01:27:29.311473+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-007@06ca6064eda78bb9b788d1acdb10c73b1f9ded40"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B4",
+        "SYNC-CODE-001#E",
+        "SYNC-DOM-003#propagation_decisions",
+        "SYNC-MS-001#ProjectService.init_project",
+        "SYNC-MS-002#SpecService.clear_index",
+        "SYNC-MS-002#SpecService.item_pks",
+        "SYNC-MS-002#SpecService.version_keys",
+        "SYNC-MS-004#TrackingService.all_decisions",
+        "SYNC-MS-004#TrackingService.all_flags",
+        "SYNC-MS-004#TrackingService.reassign_open_flags",
+        "SYNC-MS-004#TrackingService.relink_versions",
+        "SYNC-MS-004#TrackingService.restore_decisions",
+        "SYNC-MS-004#TrackingService.restore_flags",
+        "SYNC-MS-005#CommentService.all_in_project",
+        "SYNC-MS-005#CommentService.restore",
+        "SYNC-MS-007#scheduler.backup_loop"
+      ],
+      "changed": [
+        "SYNC-MS-007#pipeline.export_tracking",
+        "SYNC-MS-007#pipeline.import_tracking",
+        "SYNC-MS-007#pipeline.rebuild"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.655601+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-007@0ee6ec7c13ef9ea9f0f45d4e833f6854236e7a96"
     },
     {
       "affected": [
@@ -204,10 +1015,101 @@
         "SYNC-MS-007#pipeline.process_commit",
         "SYNC-MS-007#pipeline.rebuild"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:39.675827+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-MS-007@1dcf4ec9af0d00eaeefc9550b79c8cd0489db2ab"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#DELETE/api/docs/{docId}",
+        "SYNC-API-001#POST/api/docs/{docId}/purge",
+        "SYNC-API-001#POST/api/docs/{docId}/restore",
+        "SYNC-CODE-001#B1",
+        "SYNC-CODE-001#B4",
+        "SYNC-CODE-001#M",
+        "SYNC-CODE-001#N",
+        "SYNC-CODE-001#O",
+        "SYNC-MS-002#SpecService.item_pks",
+        "SYNC-MS-002#SpecService.mark_deleted",
+        "SYNC-MS-002#SpecService.save",
+        "SYNC-MS-007#pipeline.change_status",
+        "SYNC-MS-007#pipeline.revert",
+        "SYNC-MS-007#scheduler.catch_up",
+        "SYNC-MS-009#git.changed_files",
+        "SYNC-SEQ-001#SEQ-22"
+      ],
+      "changed": [
+        "SYNC-MS-007#pipeline.process_commit",
+        "SYNC-MS-007#pipeline.purge_document",
+        "SYNC-MS-007#pipeline.restore_document",
+        "SYNC-MS-007#pipeline.save_pipeline",
+        "SYNC-MS-007#pipeline.trash_document"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T06:28:19.890390+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-007@397d19fc660f6acdf09db0964f89c5809fa8584a"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#DELETE/api/docs/{docId}",
+        "SYNC-CODE-001#B4",
+        "SYNC-MS-002#SpecService.mark_deleted",
+        "SYNC-MS-007#pipeline.save_pipeline",
+        "SYNC-MS-007#scheduler.catch_up",
+        "SYNC-MS-009#git.changed_files",
+        "SYNC-SEQ-001#SEQ-22"
+      ],
+      "changed": [
+        "SYNC-MS-007#pipeline.delete_document",
+        "SYNC-MS-007#pipeline.process_commit"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T07:26:25.380304+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-007@4bf950f6301a8ed6d81d05b53185ce94a781e721"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B1",
+        "SYNC-CODE-001#B4",
+        "SYNC-CODE-001#D6",
+        "SYNC-CODE-001#E",
+        "SYNC-DOM-003#propagation_decisions",
+        "SYNC-DOM-003#repositories",
+        "SYNC-MS-001#ProjectService.init_project",
+        "SYNC-MS-001#ProjectService.repo_status",
+        "SYNC-MS-002#SpecService.clear_index",
+        "SYNC-MS-002#SpecService.item_pks",
+        "SYNC-MS-002#SpecService.mark_deleted",
+        "SYNC-MS-002#SpecService.version_keys",
+        "SYNC-MS-004#TrackingService.all_decisions",
+        "SYNC-MS-004#TrackingService.all_flags",
+        "SYNC-MS-004#TrackingService.reassign_open_flags",
+        "SYNC-MS-004#TrackingService.relink_versions",
+        "SYNC-MS-004#TrackingService.restore_decisions",
+        "SYNC-MS-004#TrackingService.restore_flags",
+        "SYNC-MS-005#CommentService.all_in_project",
+        "SYNC-MS-005#CommentService.restore",
+        "SYNC-MS-007#pipeline.change_status",
+        "SYNC-MS-007#pipeline.revert",
+        "SYNC-MS-007#scheduler.backup_loop",
+        "SYNC-MS-007#scheduler.poll_loop",
+        "SYNC-MS-009#git.changed_files"
+      ],
+      "changed": [
+        "SYNC-MS-007#pipeline.export_tracking",
+        "SYNC-MS-007#pipeline.import_tracking",
+        "SYNC-MS-007#pipeline.process_commit",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-MS-007#pipeline.save_pipeline",
+        "SYNC-MS-007#scheduler.catch_up"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.089052+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-007@a3afa24e4227667f9d134d68e2160cd7b9f5fd56"
     },
     {
       "affected": [
@@ -225,10 +1127,69 @@
         "SYNC-MS-007#scheduler.backup_loop",
         "SYNC-MS-007#scheduler.poll_loop"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.413402+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-MS-007@c5340ef8b0145fde7f7a7a5c7e1e6c6604fd9259"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B1",
+        "SYNC-MS-002#SpecService.item_pks",
+        "SYNC-MS-002#SpecService.save",
+        "SYNC-MS-007#pipeline.change_status",
+        "SYNC-MS-007#pipeline.process_commit",
+        "SYNC-MS-007#pipeline.revert"
+      ],
+      "changed": [
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.576542+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-007@ef1c974d6c78834b89c8a031948b13888b578083"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B1",
+        "SYNC-MS-002#SpecService.item_pks",
+        "SYNC-MS-002#SpecService.save",
+        "SYNC-MS-007#pipeline.change_status",
+        "SYNC-MS-007#pipeline.process_commit",
+        "SYNC-MS-007#pipeline.revert"
+      ],
+      "changed": [
+        "SYNC-MS-007#pipeline.save_pipeline"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T06:54:07.049427+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-007@f37b66e19a18849317a3c2327d3de50823af36df"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B3",
+        "SYNC-MS-004#TrackingService.record_decision"
+      ],
+      "changed": [
+        "SYNC-MS-008#queries.flag_view"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.687585+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-008@153fbaa44f19f2da1bf0aaccde3c31fdcbb2fd05"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#GET/api/projects/{code}/trash"
+      ],
+      "changed": [
+        "SYNC-MS-008#queries.trash_list"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T06:28:20.224946+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-008@397d19fc660f6acdf09db0964f89c5809fa8584a"
     },
     {
       "affected": [
@@ -238,9 +1199,9 @@
       "changed": [
         "SYNC-MS-008#queries.document_view"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:39.759685+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-MS-008@e13496f0d28f16dd425bc9651578a9a5d652ab7f"
     },
     {
@@ -252,10 +1213,134 @@
         "SYNC-MS-009#git.list",
         "SYNC-MS-009#git.log"
       ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:39.833888+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-009@0a1ada2324d4b49c5b976708372129f607f06285"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#D6",
+        "SYNC-CODE-001#N",
+        "SYNC-MS-007#pipeline.export_tracking",
+        "SYNC-MS-007#pipeline.trash_document",
+        "SYNC-MS-009#git.fetch",
+        "SYNC-MS-009#git.last_commit_at"
+      ],
+      "changed": [
+        "SYNC-MS-009#git.commit_push"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T06:33:31.652442+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-009@1b7067da27f2e3078b75504f9b4095e3c15a03d2"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#D6",
+        "SYNC-MS-007#pipeline.delete_document",
+        "SYNC-MS-007#pipeline.export_tracking",
+        "SYNC-MS-009#git.fetch",
+        "SYNC-MS-009#git.last_commit_at"
+      ],
+      "changed": [
+        "SYNC-MS-009#git.commit_push"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T07:26:25.444394+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-009@4bf950f6301a8ed6d81d05b53185ce94a781e721"
+    },
+    {
+      "affected": [
+        "SYNC-MS-001#ProjectService.init_project"
+      ],
+      "changed": [
+        "SYNC-MS-009#github.create_repo"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.384912+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-009@a11f6982f0ae51374d9be90160b90543995b731a"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#D6",
+        "SYNC-CODE-001#E",
+        "SYNC-MS-007#pipeline.export_tracking"
+      ],
+      "changed": [
+        "SYNC-MS-009#git.commit_push",
+        "SYNC-MS-009#git.fetch",
+        "SYNC-MS-009#git.last_commit_at"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.131999+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-009@a3afa24e4227667f9d134d68e2160cd7b9f5fd56"
+    },
+    {
+      "affected": [
+        "SYNC-MS-008#queries.ask_item"
+      ],
+      "changed": [
+        "SYNC-MS-009#llm.ask"
+      ],
       "choice": "undecided",
       "decided_at": null,
       "decided_by": null,
-      "version": "SYNC-MS-009@0a1ada2324d4b49c5b976708372129f607f06285"
+      "version": "SYNC-MS-009@df4b5215890af8fb0b7436aca73c500dbf708fc1"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#A"
+      ],
+      "changed": [
+        "SYNC-MS-009#git.init_specs"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T06:54:07.085107+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-MS-009@f37b66e19a18849317a3c2327d3de50823af36df"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#E",
+        "SYNC-CODE-001#N",
+        "SYNC-INFRA-001#C2",
+        "SYNC-INFRA-001#C5",
+        "SYNC-MS-002#SpecService.delete_document",
+        "SYNC-MS-002#SpecService.status_change_count",
+        "SYNC-MS-003#ReferenceService.inbound_of_document",
+        "SYNC-MS-004#TrackingService.history_of_document",
+        "SYNC-MS-005#CommentService.count",
+        "SYNC-MS-007#pipeline.delete_document",
+        "SYNC-UC-001#UC-A7",
+        "SYNC-UC-001#UC-H18",
+        "SYNC-UI-002#UI-13"
+      ],
+      "changed": [
+        "SYNC-PRD-001#N3"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T06:28:16.838449+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-PRD-001@397d19fc660f6acdf09db0964f89c5809fa8584a"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#E",
+        "SYNC-INFRA-001#C2",
+        "SYNC-INFRA-001#C5",
+        "SYNC-UI-002#UI-13"
+      ],
+      "changed": [
+        "SYNC-PRD-001#N3"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T07:26:25.071815+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-PRD-001@4bf950f6301a8ed6d81d05b53185ce94a781e721"
     },
     {
       "affected": [
@@ -266,10 +1351,117 @@
       "changed": [
         "SYNC-PRD-001#N3"
       ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.209897+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-PRD-001@c8f2749c0fc42d778808f459a9adf5ff9d907a89"
+    },
+    {
+      "affected": [
+        "SYNC-UI-002#UI-13"
+      ],
+      "changed": [
+        "SYNC-PRD-001#N1",
+        "SYNC-PRD-001#R11"
+      ],
       "choice": "undecided",
       "decided_at": null,
       "decided_by": null,
-      "version": "SYNC-PRD-001@c8f2749c0fc42d778808f459a9adf5ff9d907a89"
+      "version": "SYNC-PRD-001@df4b5215890af8fb0b7436aca73c500dbf708fc1"
+    },
+    {
+      "affected": [
+        "SYNC-SCN-001#S2",
+        "SYNC-SCN-001#S3",
+        "SYNC-SCN-001#S5",
+        "SYNC-UC-001#UC-A2",
+        "SYNC-UC-001#UC-A5",
+        "SYNC-UC-001#UC-H8",
+        "SYNC-UI-002#UI-13"
+      ],
+      "changed": [
+        "SYNC-PRD-001#R6"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T06:54:06.783841+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-PRD-001@f37b66e19a18849317a3c2327d3de50823af36df"
+    },
+    {
+      "affected": [
+        "SYNC-MS-002#SpecService.detect_deleted_items",
+        "SYNC-MS-002#SpecService.save",
+        "SYNC-MS-003#ReferenceService.extract",
+        "SYNC-MS-004#TrackingService.create_pending",
+        "SYNC-MS-004#TrackingService.detect_impact",
+        "SYNC-MS-004#TrackingService.raise_broken",
+        "SYNC-MS-004#TrackingService.raise_upstream",
+        "SYNC-MS-005#CommentService.relocate",
+        "SYNC-MS-007#pipeline.save_pipeline",
+        "SYNC-MS-009#git.commit_push"
+      ],
+      "changed": [
+        "SYNC-SEQ-001#SEQ-1"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T01:27:29.269757+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-SEQ-001@06ca6064eda78bb9b788d1acdb10c73b1f9ded40"
+    },
+    {
+      "affected": [
+        "SYNC-MS-002#SpecService.clear_index",
+        "SYNC-MS-003#ReferenceService.resolve_missing",
+        "SYNC-MS-007#pipeline.rebuild"
+      ],
+      "changed": [
+        "SYNC-SEQ-001#SEQ-21"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.539690+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-SEQ-001@0ee6ec7c13ef9ea9f0f45d4e833f6854236e7a96"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#N",
+        "SYNC-MS-007#pipeline.delete_document"
+      ],
+      "changed": [
+        "SYNC-SEQ-001#SEQ-22",
+        "SYNC-SEQ-001#SEQ-23"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T06:28:19.217995+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-SEQ-001@397d19fc660f6acdf09db0964f89c5809fa8584a"
+    },
+    {
+      "affected": [
+        "SYNC-MS-001#ProjectService.repo_status",
+        "SYNC-MS-002#SpecService.clear_index",
+        "SYNC-MS-002#SpecService.detect_deleted_items",
+        "SYNC-MS-002#SpecService.save",
+        "SYNC-MS-003#ReferenceService.extract",
+        "SYNC-MS-003#ReferenceService.resolve_missing",
+        "SYNC-MS-004#TrackingService.create_pending",
+        "SYNC-MS-004#TrackingService.detect_impact",
+        "SYNC-MS-004#TrackingService.raise_broken",
+        "SYNC-MS-004#TrackingService.raise_upstream",
+        "SYNC-MS-005#CommentService.relocate",
+        "SYNC-MS-007#pipeline.rebuild",
+        "SYNC-MS-007#pipeline.save_pipeline",
+        "SYNC-MS-009#git.commit_push"
+      ],
+      "changed": [
+        "SYNC-SEQ-001#SEQ-1",
+        "SYNC-SEQ-001#SEQ-20",
+        "SYNC-SEQ-001#SEQ-21"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.932971+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-SEQ-001@a3afa24e4227667f9d134d68e2160cd7b9f5fd56"
     },
     {
       "affected": [
@@ -278,9 +1470,9 @@
       "changed": [
         "SYNC-SEQ-001#SEQ-8"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:39.293642+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-SEQ-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d"
     },
     {
@@ -292,10 +1484,49 @@
       "changed": [
         "SYNC-SEQ-001#SEQ-21"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.090737+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-SEQ-001@d16e8344967a463b667981eab6ea644017dd96ce"
+    },
+    {
+      "affected": [
+        "SYNC-MS-006#AccountService.create_placeholder",
+        "SYNC-MS-007#pipeline.process_commit",
+        "SYNC-MS-009#git.changed_files"
+      ],
+      "changed": [
+        "SYNC-SEQ-001#SEQ-2"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.498180+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-SEQ-001@ef1c974d6c78834b89c8a031948b13888b578083"
+    },
+    {
+      "affected": [
+        "SYNC-MS-002#SpecService.apply_frontmatter",
+        "SYNC-MS-002#SpecService.create",
+        "SYNC-MS-002#SpecService.detect_deleted_items",
+        "SYNC-MS-002#SpecService.issue_doc_id",
+        "SYNC-MS-002#SpecService.save",
+        "SYNC-MS-003#ReferenceService.extract",
+        "SYNC-MS-004#TrackingService.create_pending",
+        "SYNC-MS-004#TrackingService.detect_impact",
+        "SYNC-MS-004#TrackingService.raise_broken",
+        "SYNC-MS-004#TrackingService.raise_upstream",
+        "SYNC-MS-005#CommentService.relocate",
+        "SYNC-MS-007#pipeline.save_pipeline",
+        "SYNC-MS-009#git.commit_push"
+      ],
+      "changed": [
+        "SYNC-SEQ-001#SEQ-1",
+        "SYNC-SEQ-001#SEQ-19"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T06:54:06.979059+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-SEQ-001@f37b66e19a18849317a3c2327d3de50823af36df"
     },
     {
       "affected": [
@@ -314,10 +1545,24 @@
         "SYNC-STD-004#DEV-3",
         "SYNC-STD-004#DEV-4"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:39.407688+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-STD-004@07664516a9039f61e0a0400ba2c4a12385ff8bae"
+    },
+    {
+      "affected": [
+        "SYNC-DOM-003#flags",
+        "SYNC-MS-004#TrackingService.record_decision",
+        "SYNC-MS-008#queries.flag_view"
+      ],
+      "changed": [
+        "SYNC-STD-004#DEV-18"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.723512+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-STD-004@beba726745f0b8c0e6d48409be9c40dccc642f31"
     },
     {
       "affected": [
@@ -328,10 +1573,45 @@
         "SYNC-STD-004#DEV-16",
         "SYNC-STD-004#DEV-6"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:39.341476+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-STD-004@cb0a66c7c994c3050941bda521f7ea7bda017f04"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#S"
+      ],
+      "changed": [
+        "SYNC-STD-004#DEV-1"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T08:42:17.495587+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-STD-004@fec9dd85bc4bc714ea6ddd213b0843dec44a0b43"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#DELETE/api/docs/{docId}",
+        "SYNC-API-002#delete_document",
+        "SYNC-CODE-001#N",
+        "SYNC-MS-002#SpecService.delete_document",
+        "SYNC-MS-002#SpecService.status_change_count",
+        "SYNC-MS-003#ReferenceService.inbound_of_document",
+        "SYNC-MS-004#TrackingService.history_of_document",
+        "SYNC-MS-005#CommentService.count",
+        "SYNC-MS-007#pipeline.delete_document",
+        "SYNC-SEQ-001#SEQ-22"
+      ],
+      "changed": [
+        "SYNC-UC-001#UC-A7",
+        "SYNC-UC-001#UC-A8",
+        "SYNC-UC-001#UC-H18"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T06:28:17.192497+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UC-001@397d19fc660f6acdf09db0964f89c5809fa8584a"
     },
     {
       "affected": [
@@ -356,10 +1636,25 @@
         "SYNC-UC-001#UC-A1",
         "SYNC-UC-001#UC-G1"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "propagate",
+      "decided_at": "2026-09-15T05:09:04.273893+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-UC-001@a6e3ed6aa9f9af49ee8f8f95574b388e0ee8471d"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#POST/api/docs/{docId}/revert",
+        "SYNC-MS-007#pipeline.revert",
+        "SYNC-SEQ-001#SEQ-7",
+        "SYNC-UI-002#UI-7"
+      ],
+      "changed": [
+        "SYNC-UC-001#UC-H7"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.759468+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UC-001@d5d17ff31888675b387b3973be95b12ef7fcdbe5"
     },
     {
       "affected": [
@@ -377,10 +1672,52 @@
       "changed": [
         "SYNC-UC-001#UC-H8"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:39.452949+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-UC-001@e13496f0d28f16dd425bc9651578a9a5d652ab7f"
+    },
+    {
+      "affected": [
+        "SYNC-API-002#create_document",
+        "SYNC-API-002#update_document",
+        "SYNC-CODE-001#B1",
+        "SYNC-DOM-002#SpecService",
+        "SYNC-MS-002#SpecService.detect_deleted_items",
+        "SYNC-MS-002#SpecService.save",
+        "SYNC-MS-007#pipeline.save_pipeline",
+        "SYNC-SEQ-001#SEQ-1",
+        "SYNC-SEQ-001#SEQ-19",
+        "SYNC-UC-001#UC-H11"
+      ],
+      "changed": [
+        "SYNC-UC-001#UC-A6"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.455636+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UC-001@ef1c974d6c78834b89c8a031948b13888b578083"
+    },
+    {
+      "affected": [
+        "SYNC-API-002#create_document",
+        "SYNC-API-002#update_document",
+        "SYNC-CODE-001#B1",
+        "SYNC-DOM-002#SpecService",
+        "SYNC-MS-002#SpecService.detect_deleted_items",
+        "SYNC-MS-002#SpecService.save",
+        "SYNC-MS-007#pipeline.save_pipeline",
+        "SYNC-SEQ-001#SEQ-1",
+        "SYNC-SEQ-001#SEQ-19",
+        "SYNC-UC-001#UC-H11"
+      ],
+      "changed": [
+        "SYNC-UC-001#UC-A6"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T06:54:06.821005+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UC-001@f37b66e19a18849317a3c2327d3de50823af36df"
     },
     {
       "affected": [
@@ -397,10 +1734,243 @@
       "changed": [
         "SYNC-UI-001#UI-13"
       ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:39.876112+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-001@13dc4638cf73ca1307f91c86a248fa7178402bcb"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#GET/api/admin/repos",
+        "SYNC-API-001#POST/api/admin/repos/{code}/rebuild",
+        "SYNC-API-001#POST/api/admin/repos/{code}/restore",
+        "SYNC-CODE-001#D1",
+        "SYNC-STD-004#DEV-17",
+        "SYNC-UI-002#UI-13",
+        "SYNC-UI-002#UI-14",
+        "SYNC-UI-002#UI-4",
+        "SYNC-UI-002#UI-5"
+      ],
+      "changed": [
+        "SYNC-UI-001#UI-14"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.767417+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-001@14f14488b6f58697238e1e35d036e9dc148923af"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#D1",
+        "SYNC-STD-004#DEV-17",
+        "SYNC-UI-002#UI-16",
+        "SYNC-UI-002#UI-5"
+      ],
+      "changed": [
+        "SYNC-UI-001#UI-16"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.610375+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-001@1f3ec080fed013354fc7d84efa4948c86e5a7f9f"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#GET/api/todo",
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#K",
+        "SYNC-STD-004#DEV-17",
+        "SYNC-UI-002#UI-10",
+        "SYNC-UI-002#UI-5"
+      ],
+      "changed": [
+        "SYNC-UI-001#UI-10"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:42.171664+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-001@671bdd6b84c304eb0b4a74571388671ec85e07b0"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#POST/api/projects",
+        "SYNC-CODE-001#D1",
+        "SYNC-STD-004#DEV-17",
+        "SYNC-UI-002#UI-3",
+        "SYNC-UI-002#UI-5"
+      ],
+      "changed": [
+        "SYNC-UI-001#UI-3"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.172529+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-001@a11f6982f0ae51374d9be90160b90543995b731a"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#G",
+        "SYNC-STD-004#DEV-17",
+        "SYNC-UI-002#UI-16",
+        "SYNC-UI-002#UI-5"
+      ],
+      "changed": [
+        "SYNC-UI-001#UI-16"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.968562+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-001@d3d7a79f7115b4f2a62e8ab49f508e093d897d9b"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#GET/api/docs/{docId}",
+        "SYNC-API-001#GET/api/docs/{docId}/comments",
+        "SYNC-API-001#GET/api/docs/{docId}/downstream",
+        "SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/references",
+        "SYNC-API-001#GET/api/docs/{docId}/upstream",
+        "SYNC-API-001#POST/api/comments/{id}/resolve",
+        "SYNC-API-001#POST/api/docs/{docId}/comments",
+        "SYNC-API-001#POST/api/docs/{docId}/status",
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#K",
+        "SYNC-STD-004#DEV-17",
+        "SYNC-UI-002#UI-5"
+      ],
+      "changed": [
+        "SYNC-UI-001#UI-5"
+      ],
       "choice": "undecided",
       "decided_at": null,
       "decided_by": null,
-      "version": "SYNC-UI-001@13dc4638cf73ca1307f91c86a248fa7178402bcb"
+      "version": "SYNC-UI-001@df4b5215890af8fb0b7436aca73c500dbf708fc1"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B4",
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#D5",
+        "SYNC-CODE-001#E",
+        "SYNC-MS-004#TrackingService.relink_versions",
+        "SYNC-MS-007#pipeline.export_tracking",
+        "SYNC-MS-007#pipeline.import_tracking",
+        "SYNC-MS-009#git.last_commit_at"
+      ],
+      "changed": [
+        "SYNC-UI-002#UI-14"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.800263+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-002@14f14488b6f58697238e1e35d036e9dc148923af"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#D1"
+      ],
+      "changed": [
+        "SYNC-UI-002#UI-16"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.646501+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-002@1f3ec080fed013354fc7d84efa4948c86e5a7f9f"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#DELETE/api/docs/{docId}",
+        "SYNC-CODE-001#B2",
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#D2",
+        "SYNC-CODE-001#D3",
+        "SYNC-CODE-001#I",
+        "SYNC-CODE-001#K"
+      ],
+      "changed": [
+        "SYNC-UI-002#UI-4",
+        "SYNC-UI-002#UI-5"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-16T06:28:18.205675+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-002@397d19fc660f6acdf09db0964f89c5809fa8584a"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#G"
+      ],
+      "changed": [
+        "SYNC-UI-002#UI-16"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.725423+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-002@3bfc60e8f24bb6a6deeb67182af06c0fe0333d73"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B2",
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#D3",
+        "SYNC-CODE-001#I",
+        "SYNC-CODE-001#K"
+      ],
+      "changed": [
+        "SYNC-UI-002#UI-5"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T07:26:25.172632+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-002@4bf950f6301a8ed6d81d05b53185ce94a781e721"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B3",
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#D5",
+        "SYNC-CODE-001#I",
+        "SYNC-CODE-001#K"
+      ],
+      "changed": [
+        "SYNC-UI-002#UI-10"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:42.205265+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-002@671bdd6b84c304eb0b4a74571388671ec85e07b0"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#DELETE/api/projects/{code}",
+        "SYNC-CODE-001#B2",
+        "SYNC-CODE-001#B4",
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#D2",
+        "SYNC-CODE-001#D3",
+        "SYNC-CODE-001#D4",
+        "SYNC-CODE-001#D5",
+        "SYNC-CODE-001#E",
+        "SYNC-CODE-001#H",
+        "SYNC-MS-004#TrackingService.relink_versions",
+        "SYNC-MS-007#pipeline.export_tracking",
+        "SYNC-MS-007#pipeline.import_tracking",
+        "SYNC-MS-009#git.last_commit_at"
+      ],
+      "changed": [
+        "SYNC-UI-002#UI-14",
+        "SYNC-UI-002#UI-2",
+        "SYNC-UI-002#UI-4",
+        "SYNC-UI-002#UI-5",
+        "SYNC-UI-002#UI-7",
+        "SYNC-UI-002#UI-8",
+        "SYNC-UI-002#UI-9"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.879111+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-002@7d5b179e53f529fee207a202e2ac694b70d9a15b"
     },
     {
       "affected": [
@@ -412,10 +1982,24 @@
       "changed": [
         "SYNC-UI-002#UI-14"
       ],
-      "choice": "undecided",
-      "decided_at": null,
-      "decided_by": null,
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:40.297715+00:00",
+      "decided_by": "HoyoungParkme",
       "version": "SYNC-UI-002@99e390ebdfed747d2388660bd579ee4b7384399e"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B2",
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#D5"
+      ],
+      "changed": [
+        "SYNC-UI-002#UI-3"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:41.226567+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-002@a11f6982f0ae51374d9be90160b90543995b731a"
     },
     {
       "affected": [
@@ -430,10 +2014,91 @@
         "SYNC-UI-002#UI-14",
         "SYNC-UI-002#UI-5"
       ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:39.957464+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-002@d16e8344967a463b667981eab6ea644017dd96ce"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#G",
+        "SYNC-CODE-001#I"
+      ],
+      "changed": [
+        "SYNC-UI-002#UI-16"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:42.002376+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-002@d3d7a79f7115b4f2a62e8ab49f508e093d897d9b"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#G",
+        "SYNC-CODE-001#I",
+        "SYNC-CODE-001#J"
+      ],
+      "changed": [
+        "SYNC-UI-002#UI-16"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:42.042381+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-002@d93c1b3b4a4dcff4d0362d4b3e7f829f2c92106f"
+    },
+    {
+      "affected": [
+        "SYNC-API-001#DELETE/api/docs/{docId}",
+        "SYNC-API-001#POST/api/docs/{docId}/restore",
+        "SYNC-CODE-001#B2",
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#D3",
+        "SYNC-CODE-001#I",
+        "SYNC-CODE-001#K"
+      ],
+      "changed": [
+        "SYNC-UI-002#UI-5"
+      ],
       "choice": "undecided",
       "decided_at": null,
       "decided_by": null,
-      "version": "SYNC-UI-002@d16e8344967a463b667981eab6ea644017dd96ce"
+      "version": "SYNC-UI-002@df4b5215890af8fb0b7436aca73c500dbf708fc1"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#B2",
+        "SYNC-CODE-001#B4",
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#D2",
+        "SYNC-CODE-001#D3",
+        "SYNC-CODE-001#I"
+      ],
+      "changed": [
+        "SYNC-UI-002#UI-5",
+        "SYNC-UI-002#UI-9"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T05:43:42.085293+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-002@e912ebd3a0c58d0f64e30588292fbdf8525e250d"
+    },
+    {
+      "affected": [
+        "SYNC-CODE-001#D1",
+        "SYNC-CODE-001#G",
+        "SYNC-CODE-001#I",
+        "SYNC-CODE-001#J",
+        "SYNC-CODE-001#K"
+      ],
+      "changed": [
+        "SYNC-UI-002#UI-16"
+      ],
+      "choice": "skip",
+      "decided_at": "2026-09-15T06:54:06.905295+00:00",
+      "decided_by": "HoyoungParkme",
+      "version": "SYNC-UI-002@f37b66e19a18849317a3c2327d3de50823af36df"
     }
   ]
 }
