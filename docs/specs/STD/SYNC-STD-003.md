@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-003
 type: STD
 title: 명세 체인 지도 — 싱크독 첫 프로젝트의 실제 구조
-status: review
+status: approved
 upstream: [SYNC-STD-001, SYNC-STD-002]
 ---
 
