@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-009
 type: MS
 title: MINISPEC — infra — git·github 어댑터
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -53,7 +53,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **입력** `system` 맥락과 지켜야 할 것을 담은 지시문 · `messages` `[{role: user|assistant, text}]` 차례대로. 맥락 조립과 자르기는 부르는 쪽([[SYNC-MS-008#queries.ask_item]])이 끝낸 상태로 온다
 
-**처리** `if not settings.LLM_API_KEY → ! LlmNotConfigured` · `httpx`로 `settings.LLM_MODEL`에 한 번 요청 · 답 문자열 하나를 꺼낸다 · 스트리밍하지 않는다
+**처리** `if not settings.LLM_API_KEY → ! LlmNotConfigured` · `httpx`로 `settings.LLM_API_URL`(OpenAI 호환 Chat Completions)에 한 번 요청 — `Authorization: Bearer {LLM_API_KEY}`, 본문 `{model: LLM_MODEL, messages: [{role: system, content: system}, …{role, content: text}]}` · 답 `choices[0].message.content` 하나를 꺼낸다 · 스트리밍하지 않는다 · 타임아웃은 코드 상수(60초)
 
 **출력** 답 문자열
 
