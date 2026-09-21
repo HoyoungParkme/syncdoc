@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -27,6 +27,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 - 문서 ID(`SYNC-PRD-001`)는 프로젝트 코드를 포함해 전역 유일하므로 `/api/docs/{docId}`로 바로 접근한다
 - 항목 ID는 `#` 없이 경로에 넣는다. `/items/R12`, `/items/POST~orders` (`/`는 `~`로)
 - 목록은 페이지 없음. 한 사람이 쓰는 프로젝트의 문서가 수십 개다
+- **프로젝트는 등록한 사람의 것이다**([[SYNC-PRD-001#R12]]). 목록(`GET /api/projects`·`GET /api/admin/repos`)은 내가 소유한 것만 준다. 소유하지 않은 프로젝트를 코드나 문서 ID로 열면 **없는 것과 같다** — `404 urn:syncdoc:not-found {resource: "project", id: code}`. 403이 아니다: 남의 프로젝트가 있다는 사실이 새지 않고, 에러 종류가 늘지 않는다. 프로젝트나 문서를 고르는 모든 엔드포인트가 그렇다 — 아래 각 정의의 404는 「없음」과 「남의 것」을 구분하지 않는다
 
 **웹이 쓰지 않는 것** — 본문 생성·수정 엔드포인트는 없다. 본문 쓰기는 MCP와 GitHub push뿐이다(PRD R9). 웹의 쓰기는 상태 토글·되돌리기·휴지통·토큰·재구축까지다.
 
@@ -165,12 +166,12 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 #### GET/api/projects 프로젝트 목록과 단계 요약
 
-화면 [[SYNC-UI-001#UI-2]] · 유스케이스 [[SYNC-UC-001#UC-H14]] · 서비스 `ProjectService.list_projects`
+화면 [[SYNC-UI-001#UI-2]] · 유스케이스 [[SYNC-UC-001#UC-H14]] · 서비스 [[SYNC-MS-001#ProjectService.list_owned]] → [[SYNC-MS-008#queries.project_summary]]
 
 ```yaml
 /api/projects:
   get:
-    summary: 프로젝트 목록과 단계 요약 (UI-2)
+    summary: 프로젝트 목록과 단계 요약 (UI-2). 내가 소유한 것만 — 없으면 빈 배열
     responses:
       '200':
         content:
@@ -188,7 +189,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ```yaml
 /api/projects:
   post:
-    summary: "프로젝트 초기화 (UI-3, [[SYNC-UC-001#UC-A1]])"
+    summary: "프로젝트 초기화 (UI-3, [[SYNC-UC-001#UC-A1]]). 등록하는 사람이 소유자가 된다 ([[SYNC-PRD-001#R12]])"
     requestBody:
       required: true
       content:
@@ -895,12 +896,12 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 #### GET/api/admin/repos 저장소 동기화 상태
 
-화면 [[SYNC-UI-001#UI-14]] · 유스케이스 [[SYNC-UC-001#UC-G1]] · 서비스 `—`
+화면 [[SYNC-UI-001#UI-14]] · 유스케이스 [[SYNC-UC-001#UC-G1]] · 서비스 [[SYNC-MS-001#ProjectService.repo_status]]
 
 ```yaml
 /api/admin/repos:
   get:
-    summary: 저장소 동기화 상태 (UI-14)
+    summary: 저장소 동기화 상태 (UI-14). 내가 소유한 저장소만
     responses:
       '200':
         content:
@@ -913,12 +914,12 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 #### POST/api/admin/repos/{code}/rebuild 인덱스 재구축
 
-화면 [[SYNC-UI-001#UI-14]] · 유스케이스 [[SYNC-UC-001#UC-S6]] · 서비스 `—`
+화면 [[SYNC-UI-001#UI-14]] · 유스케이스 [[SYNC-UC-001#UC-S6]] · 서비스 [[SYNC-MS-001#ProjectService.rebuild_index]]
 
 ```yaml
 /api/admin/repos/{code}/rebuild:
   post:
-    summary: "인덱스 재구축 (UI-14, [[SYNC-UC-001#UC-S6]]). 참조·버전·항목을 저장소에서 다시 만든다"
+    summary: "인덱스 재구축 (UI-14, [[SYNC-UC-001#UC-S6]]). 참조·버전·항목을 저장소에서 다시 만든다. 소유자만"
     parameters:
     - $ref: '#/components/parameters/code'
     responses:
@@ -927,6 +928,8 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
           application/json:
             schema:
               $ref: '#/components/schemas/RebuildResult'
+      '404':
+        $ref: '#/components/responses/Problem'
 ```
 
 ---
