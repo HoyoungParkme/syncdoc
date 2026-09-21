@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-009
 type: MS
 title: MINISPEC — infra — git·github 어댑터
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`infra/git.py · infra/github.py`의 함수 14개. 클래스 명세 [[SYNC-DOM-002]] 4.9의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`infra/git.py · infra/github.py · infra/llm.py`의 함수 16개. 클래스 명세 [[SYNC-DOM-002]] 4.9의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -186,26 +186,6 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **`--reverse`를 git에 맡기지 않는다.** `--follow`는 revision walker의 특수 처리라 `--reverse`와 조합되지 않는다 — 둘을 같이 주면 커밋이 거의 안 나온다. 실측(`SYNC-DOM-002`): `--follow` 18건 · `--reverse` 7건 · **둘 다 1건**. 이름이 바뀐 경로(`docs/specs/DOM/` → `docs/specs/06-DOM/`)를 건너 이력을 잇는 것이 `--follow`의 목적이므로 그쪽을 남기고 순서는 받아서 뒤집는다(#39)
 
 **테스트 관점** 이름을 안 바꾼 파일 · **이름이 바뀐 경로 — 옛 이름 시절 커밋까지 나오고 그 커밋의 `path`가 옛 경로다** · 오래된 것부터 온다 · 여러 줄 메시지에서도 경로를 제대로 떼어 낸다 · 없는 경로는 빈 목록
-
----
-
-#### git.last_commit_at 파일의 마지막 커밋 시각
-
-**시그니처** `async def last_commit_at(workdir: Path, path: str) -> datetime | None`
-
-근거: [[SYNC-INFRA-001]] 6.1 · [[SYNC-UI-002#UI-14]] 요소 2.4 · [[SYNC-MS-001#ProjectService.repo_status]]
-
-**처리** `git log -1 --format=%aI {ref} -- {path}`를 `origin/main` → `HEAD` 순으로. 먼저 값이 나온 것을 쓰고 둘 다 비면 `None`
-
-**`origin/main`를 먼저 보는 이유.** 이 값이 답할 질문은 "**저장소에** 백업이 언제 올라갔나"다
-
-**`HEAD`로 떨어지는 이유.** [[#git.commit_push]]는 **토큰이 박힌 URL**로 민다(`push {url} HEAD:main`). 이름 붙은 remote로 안 밀기 때문에 **`refs/remotes/origin/*`이 안 따라온다** — 방금 민 백업이 `origin/main`에는 아직 안 보인다. 다음 `fetch`면 맞춰지지만 그 사이 관리 화면이 "백업 없음"을 보여주면 거짓말이다
-
-**`fetch`를 부르지 않는다.** 부르는 쪽([[SYNC-MS-001#ProjectService.repo_status]])이 원격을 안 타려고 만든 함수다
-
-**네트워크를 안 탄다.** `fetch`를 부르지 않는다 — 이 함수를 부르는 `repo_status`가 원격 하나 때문에 관리 화면 전체가 매달리는 것을 피하려고 DB만 읽게 만든 함수이기 때문이다
-
-**테스트 관점** 커밋된 파일 → 그 커밋 시각 · 없는 경로 → `None` · 빈 저장소 → `None` · 파일을 다시 커밋하면 시각이 올라간다
 
 ---
 

@@ -1,4 +1,4 @@
-"""SYNC-API-001 4장 공통 스키마 — UserRef · User · Author · ItemRef · FlagSummary."""
+"""SYNC-API-001 4장 공통 스키마 — UserRef · User · Author · ItemRef · BrokenRefSummary."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from app.core.types import ApiAuthor
-from app.core.types import FlagSummary as FlagSummaryDto
+from app.core.types import BrokenRefSummary as BrokenRefSummaryDto
 from app.core.types import ItemRef as ItemRefDto
 
 
@@ -49,19 +49,16 @@ class ItemRef(Base):
         return cls.model_validate(r) if r else None
 
 
-class FlagSummary(Base):
-    # 판별 필드 (SYNC-API-001 GET/api/projects/{code}/flags). 클라이언트가 kind로
-    # 되짚지 않게 서버가 고정값을 채운다
-    type: Literal["flag"] = "flag"
-    id: int
-    kind: str
-    target: ItemRef
-    cause: ItemRef | None
-    cause_version_no: int | None
-    assignee: UserRef | None
-    raised_at: datetime
-    resolved_at: datetime | None
+class BrokenRefSummary(Base):
+    """SYNC-API-001 BrokenRefSummary — 대상이 없는 참조 하나. UI-4 다이얼로그 6의 행.
+
+    판별 필드 type (GET/api/projects/{code}/flags) — 클라이언트가 kind로 되짚지 않게 서버가 채운다.
+    """
+
+    type: Literal["broken_ref"] = "broken_ref"
+    source: ItemRef  # 참조하는 쪽 — 이 프로젝트의 항목. 항목 밖 참조면 item_id=None
+    raw_target: str
 
     @classmethod
-    def of(cls, f: FlagSummaryDto) -> FlagSummary:
-        return cls.model_validate(f)
+    def of(cls, b: BrokenRefSummaryDto) -> BrokenRefSummary:
+        return cls.model_validate(b)

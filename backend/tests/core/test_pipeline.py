@@ -1,7 +1,6 @@
-"""SYNC-MS-007 테스트 관점 — save_pipeline (B1: mcp·github 경로) · change_status (B2)."""
+"""SYNC-MS-007 테스트 관점 — save_pipeline (B1: mcp·github 경로) · change_status (B2·V 토글)."""
 
 import asyncio
-import json
 import re
 
 import pytest
@@ -20,7 +19,6 @@ from app.core.errors import (
 )
 from app.core.project.models import Project, Repository
 from app.core.spec.service import SpecService
-from app.core.tracking.models import Flag
 from app.core.types import Author, AuthorKind, DocStatus, DocType, Entry
 from tests.conftest import git as g
 from tests.conftest import write_commit_push
@@ -78,12 +76,7 @@ def remote_files(repos):
 # ── 생성 ──
 async def test_create_issues_id_applies_frontmatter_commits_extracts(scoped: Session, proj) -> None:
     r = await create(proj, DocType.RFQ, RFQ.replace("doc_id: EXMP-RFQ-001", "doc_id: "))
-    assert (r.doc_id, r.version_no, r.status, r.pending_decision_version_id) == (
-        "EXMP-RFQ-001",
-        1,
-        "draft",
-        None,
-    )
+    assert (r.doc_id, r.version_no, r.status) == ("EXMP-RFQ-001", 1, "draft")
     assert "section.missing: 요구" in r.warnings  # 미완성 경고는 저장되고 실린다
     assert "docs/specs/01-RFQ/EXMP-RFQ-001.md" in remote_files(proj["repos"])
     assert r.commit_hash == g(proj["repos"]["remote"], "rev-parse", "main")
@@ -145,9 +138,12 @@ async def test_update_item_deletion_needs_confirm_then_broken_ref(scoped: Sessio
     assert [d["item_id"] for d in ei.value.extra["deleted_items"]] == ["Q1"]
     assert SpecService(scoped).get_document("EXMP-RFQ-001").current_version_no == 1
     r = await update(proj, "EXMP-RFQ-001", no_q1, 1, confirm_item_deletion=True)
-    assert r.version_no == 2
-    flags = scoped.execute(text("SELECT kind, assignee_user_id FROM flags")).all()
-    assert flags == [("broken_ref", proj["user"].id)]
+    assert r.version_no == 2 and "ref.broken: 1" in r.warnings
+    # 그 항목을 가리키던 참조가 그 자리에서 미존재가 된다 — 플래그가 아니다 (MS-003 mark_missing)
+    missing = scoped.execute(
+        text('SELECT to_item_id, to_document_id, raw_target FROM "references" WHERE is_missing')
+    ).all()
+    assert missing == [(None, None, "EXMP-RFQ-001#Q1")]
     assert [i.item_id for i in SpecService(scoped).get_document("EXMP-RFQ-001").items] == ["Q2"]
     assert rfq.id == SpecService(scoped).get_document("EXMP-RFQ-001").id
 
@@ -170,11 +166,9 @@ async def test_update_approved_document_demotes(scoped: Session, proj) -> None:
     scoped.execute(text("UPDATE documents SET status='approved'"))
     body = PRD_BODY.replace("status: draft", "status: approved").replace("한 줄로.", "두 줄로.")
     r = await update(proj, "EXMP-PRD-001", body, 1)
-    assert r.status == "review"
+    assert r.status == "draft"  # 완료 문서를 고치면 초안으로 (MS-002 save 6)
     assert (
-        scoped.execute(
-            text("SELECT count(*) FROM status_changes WHERE to_status='review'")
-        ).scalar()
+        scoped.execute(text("SELECT count(*) FROM status_changes WHERE to_status='draft'")).scalar()
         == 1
     )
 
@@ -197,7 +191,7 @@ async def test_web_status_entry_commits_status_only(scoped: Session, proj) -> No
     human = Author(
         kind=AuthorKind.human, user=proj["user"], instructed_by=None, via=Entry.web_status
     )
-    body = PRD_BODY.replace("status: draft", "status: review")
+    body = PRD_BODY.replace("status: draft", "status: approved")
     r = await pipeline.save_pipeline(
         Entry.web_status,
         "EXMP-PRD-001",
@@ -206,10 +200,10 @@ async def test_web_status_entry_commits_status_only(scoped: Session, proj) -> No
         1,
         None,
         human,
-        "status(EXMP-PRD-001): draft → review\n\n이유",
+        "status(EXMP-PRD-001): draft → approved\n\n이유",
         reason="이유",  # 커밋 메시지를 다시 파싱하지 않는다 (MS-002 apply_status 근거)
     )
-    assert (r.version_no, r.status, r.pending_decision_version_id) == (1, "review", None)
+    assert (r.version_no, r.status) == (1, "approved")
     assert scoped.execute(text("SELECT count(*) FROM versions")).scalar() == 1
     assert scoped.execute(text("SELECT reason, commit_hash FROM status_changes")).one() == (
         "이유",
@@ -227,49 +221,25 @@ async def test_concurrent_saves_are_serialized_second_conflicts(scoped: Session,
     assert SpecService(scoped).get_document("EXMP-PRD-001").current_version_no == 2
 
 
-async def test_upstream_impact_flags_upstream_item_or_warns(scoped: Session, proj) -> None:
-    await create(proj, DocType.RFQ, RFQ)
-    r = await create(proj, upstream_impact=["EXMP-RFQ-001#Q2", "EXMP-RFQ-001#Q9"])
-    assert r.warnings == ["upstream_impact.unknown: EXMP-RFQ-001#Q9"]
-    q2 = next(
-        i.pk for i in SpecService(scoped).get_document("EXMP-RFQ-001").items if i.item_id == "Q2"
-    )
-    flags = scoped.execute(text("SELECT kind, target_item_id, assignee_user_id FROM flags")).all()
-    assert flags == [("upstream_impact", q2, proj["user"].id)]
-
-
-async def test_relocate_moves_comment_on_update(scoped: Session, proj) -> None:
-    from tests.core.collab.test_service import _comment
-
-    await create(proj)
-    d = SpecService(scoped).get_document("EXMP-PRD-001")
-    n = PRD_BODY.split("\n").index("#### R1 첫 기능") + 1
-    c = _comment(scoped, d.id, proj["user"].id, n, "#### R1 첫 기능")
-    await update(
-        proj, "EXMP-PRD-001", PRD_BODY.replace("# 예시 제품 PRD", "# 예시 제품 PRD\n추가"), 1
-    )
-    assert c.line_no == n + 1
-
-
-# ── change_status (pipeline — 검사 → web_status 저장 → 승인 대조 플래그) ──
+# ── change_status (pipeline — 검사 → web_status 저장. 초안 ⇄ 완료 토글, 카드 V) ──
 async def test_change_status_commits_frontmatter_no_version(scoped: Session, proj) -> None:
-    from app.core.errors import StatusBlocked, UpstreamReviewRequired
+    from app.core.errors import StatusBlocked
 
     await create(proj, DocType.RFQ, RFQ)
     r = await create(proj)
     svc = SpecService(scoped)
     user = proj["user"]
-    # review로 — 상위 대조 없이 됨
-    d = await pipeline.change_status("EXMP-PRD-001", "review", user, "검토 시작")
-    assert d.status == "review" and d.current_version_no == 1
+    # 완료로 — 상위 대조 없이, 다이얼로그 없이
+    d = await pipeline.change_status("EXMP-PRD-001", "approved", user, "다 썼다")
+    assert d.status == "approved" and d.current_version_no == 1
     assert (
         g(proj["repos"]["remote"], "log", "-1", "--format=%s", "main")
-        == "status(EXMP-PRD-001): draft → review"
+        == "status(EXMP-PRD-001): draft → approved"
     )
     row = scoped.execute(
         text("SELECT from_status, to_status, reason, commit_hash FROM status_changes")
     ).one()
-    assert row[:3] == ("draft", "review", "검토 시작") and row[3] == g(
+    assert row[:3] == ("draft", "approved", "다 썼다") and row[3] == g(
         proj["repos"]["remote"], "rev-parse", "main"
     )
     assert (
@@ -278,34 +248,20 @@ async def test_change_status_commits_frontmatter_no_version(scoped: Session, pro
         ).scalar()
         == 1
     )
-    assert "status: review" in svc.get_document("EXMP-PRD-001").body
-    # 같은 상태로 다시 → 커밋 없음
+    assert "status: approved" in svc.get_document("EXMP-PRD-001").body
+    # 같은 상태로 다시 → 커밋 없음 (멱등)
     head = g(proj["repos"]["remote"], "rev-parse", "main")
-    await pipeline.change_status("EXMP-PRD-001", "review", user, None)
+    await pipeline.change_status("EXMP-PRD-001", "approved", user, None)
     assert g(proj["repos"]["remote"], "rev-parse", "main") == head
-    # approved인데 upstream_reviewed=false → 거부
-    with pytest.raises(UpstreamReviewRequired):
-        await pipeline.change_status("EXMP-PRD-001", "approved", user, None)
-    # 정상 승인 + 어긋난 상위 지정 → Q2에 upstream_impact 플래그
-    d2 = await pipeline.change_status(
-        "EXMP-PRD-001",
-        "approved",
-        user,
-        "합의",
-        upstream_reviewed=True,
-        upstream_mismatch=["EXMP-RFQ-001#Q2"],
-    )
-    assert d2.status == "approved"
-    q2 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q2")
-    assert scoped.execute(text("SELECT kind, target_item_id FROM flags")).all() == [
-        ("upstream_impact", q2)
-    ]
+    # 초안으로 되돌리기 — 사유 없이. 막는 검사가 없다
+    d2 = await pipeline.change_status("EXMP-PRD-001", "draft", user)
+    assert d2.status == "draft" and "status: draft" in svc.get_document("EXMP-PRD-001").body
     # 미완성 경고가 있는 문서는 approved 불가 — 생성 직후부터 경고가 남는다 (MS-002 create 1단계)
     scn = await create(proj, DocType.SCN, "# 시나리오\n\n## 배경\n\n아직 항목이 없다.\n")
     assert "item.none" in scn.warnings
     assert "item.none" in svc.get_document(scn.doc_id).incomplete_warnings
     with pytest.raises(StatusBlocked) as ei:
-        await pipeline.change_status(scn.doc_id, "approved", user, None, upstream_reviewed=True)
+        await pipeline.change_status(scn.doc_id, "approved", user, None)
     assert "item.none" in ei.value.extra["warnings"]
     # mcp 수정 저장에도 남는다 (MS-007 8단계, 모든 경로)
     body = svc.get_document(scn.doc_id).body + "\n한 줄 더.\n"
@@ -313,39 +269,26 @@ async def test_change_status_commits_frontmatter_no_version(scoped: Session, pro
     assert "item.none" in r3.warnings
     assert "item.none" in svc.get_document(scn.doc_id).incomplete_warnings
     with pytest.raises(StatusBlocked):
-        await pipeline.change_status(scn.doc_id, "approved", user, None, upstream_reviewed=True)
+        await pipeline.change_status(scn.doc_id, "approved", user, None)
     assert r.doc_id == "EXMP-PRD-001"
 
 
-# ── 11단계: 변경 영향 → 전파 미결정 (B3, detect_impact 스텁 해제) ──
-async def test_update_with_changed_items_creates_pending_decision(scoped: Session, proj) -> None:
+async def test_convention_error_document_cannot_be_completed(scoped: Session, proj) -> None:
+    """규약 오류 문서는 완료로 못 올린다 — 게이트는 혼자 써도 남는다 (MS-007 change_status 2a)."""
+    from app.core.errors import StatusBlocked
+
     await create(proj, DocType.RFQ, RFQ)
-    r1 = await create(proj)
-    svc = SpecService(scoped)
-    rfq = svc.get_document("EXMP-RFQ-001")
-    r = await update(
-        proj, "EXMP-RFQ-001", rfq.body.replace("내용", "바뀐 내용"), 1, changed_items=["Q1"]
+    await create(proj)
+    scoped.execute(
+        text(
+            "UPDATE documents SET has_convention_error=true,"
+            " convention_error_detail='author.unknown: x' WHERE doc_id='EXMP-PRD-001'"
+        )
     )
-    assert r.pending_decision_version_id is not None and r.version_no == 2
-    dec = scoped.execute(
-        text("SELECT version_id, choice, affected_pks, changed_pks FROM propagation_decisions")
-    ).one()
-    r1_pk = next(i.pk for i in svc.get_document("EXMP-PRD-001").items if i.item_id == "R1")
-    q1 = next(i.pk for i in rfq.items if i.item_id == "Q1")
-    assert dec == (r.pending_decision_version_id, "undecided", [r1_pk], [q1])  # R1이 Q1 참조
-    # 영향 없음 선언 → 미결정 없음 · diff 판정(changed_items None)도 같은 결과
-    r2 = await update(
-        proj, "EXMP-RFQ-001", svc.get_document("EXMP-RFQ-001").body + "\n", 2, changed_items=[]
-    )
-    assert r2.pending_decision_version_id is None
-    body = svc.get_document("EXMP-RFQ-001").body.replace("바뀐 내용", "또 바뀐 내용")
-    r3 = await update(proj, "EXMP-RFQ-001", body, 3, changed_items=None)
-    assert (
-        r3.pending_decision_version_id == r3.version_no
-        and False
-        or r3.pending_decision_version_id is not None
-    )
-    assert r1.doc_id == "EXMP-PRD-001"
+    with pytest.raises(StatusBlocked) as ei:
+        await pipeline.change_status("EXMP-PRD-001", "approved", proj["user"], None)
+    assert ei.value.extra["convention_error_detail"] == "author.unknown: x"
+    assert SpecService(scoped).get_document("EXMP-PRD-001").status == "draft"
 
 
 # ── revert (B4) ──
@@ -389,7 +332,8 @@ async def test_revert_creates_new_version_and_asks_confirm_for_vanishing_items(
     assert scoped.execute(
         text("SELECT via, author_kind FROM versions WHERE version_no=3")
     ).one() == ("web", "human")
-    assert scoped.execute(text("SELECT kind FROM flags")).scalars().all() == ["broken_ref"]  # P1에
+    # P1을 가리키던 참조가 미존재로 (카드 V — 플래그가 아니라 참조 행 자신)
+    assert scoped.execute(text('SELECT count(*) FROM "references" WHERE is_missing')).scalar() == 1
     assert r1.version_no == 1 and scn.doc_id == "EXMP-SCN-001"
 
 
@@ -505,7 +449,7 @@ async def test_process_commit_mismatched_filename_deleted_file_and_partial_failu
         f"file.deleted: {head}",
         [],
     )
-    assert scoped.execute(text("SELECT kind FROM flags")).scalars().all() == ["broken_ref"]
+    assert scoped.execute(text('SELECT count(*) FROM "references" WHERE is_missing')).scalar() == 1
     assert scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar() == head
     # 되살리면 복구다 — 항목 ID가 item.reused 위반에 걸리면 안 된다 (#15, MS-002 미결 결정)
     (other / RFQ_FILE).parent.mkdir(parents=True, exist_ok=True)
@@ -557,7 +501,7 @@ async def test_process_commit_mismatched_filename_deleted_file_and_partial_failu
 
 # ── rebuild (B4, UC-S6) ──
 def _push_history(other, remote):
-    """RFQ v1 · PRD v1(→Q1) · PRD v2 · status 커밋(review) — 저장소에만. DB는 비어 있다."""
+    """RFQ v1 · PRD v1(→Q1) · PRD v2 · status 커밋(approved) — 저장소에만. DB는 비어 있다."""
     (other / RFQ_FILE).parent.mkdir(parents=True, exist_ok=True)
     (other / PRD_FILE).parent.mkdir(parents=True, exist_ok=True)
     write_commit_push(other, RFQ_FILE, RFQ, "spec(EXMP-RFQ-001): 초안")
@@ -568,13 +512,13 @@ def _push_history(other, remote):
     write_commit_push(
         other,
         PRD_FILE,
-        PRD_BODY.replace("한 줄로.", "두 줄로.").replace("status: draft", "status: review"),
-        "status(EXMP-PRD-001): draft → review",
+        PRD_BODY.replace("한 줄로.", "두 줄로.").replace("status: draft", "status: approved"),
+        "status(EXMP-PRD-001): draft → approved",
     )
     return g(remote, "rev-parse", "main")
 
 
-async def test_rebuild_restores_versions_references_and_keeps_flags(
+async def test_rebuild_restores_versions_references_and_survives_rerun(
     scoped: Session, proj, monkeypatch
 ) -> None:
     other, remote = proj["repos"]["other"], proj["repos"]["remote"]
@@ -591,7 +535,7 @@ async def test_rebuild_restores_versions_references_and_keeps_flags(
     assert all("author.unknown: seed" in e["detail"] for e in r.convention_errors)
     svc = SpecService(scoped)
     prd = svc.get_document("EXMP-PRD-001")
-    assert (prd.current_version_no, prd.status, "두 줄로." in prd.body) == (2, "review", True)
+    assert (prd.current_version_no, prd.status, "두 줄로." in prd.body) == (2, "approved", True)
     assert [v.version_no for v in svc.list_versions("EXMP-PRD-001")] == [
         None,
         2,
@@ -607,14 +551,9 @@ async def test_rebuild_restores_versions_references_and_keeps_flags(
         scoped.execute(text('SELECT count(*) FROM "references" WHERE is_missing')).scalar() == 0
     )  # 7단계 해제
     assert scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar() == head
-    # 플래그·댓글이 있는 상태에서 다시 → 그대로 남고 버전은 다시 3
-    from app.core.tracking.service import TrackingService
-
-    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
-    TrackingService(scoped).raise_broken(q1)
-    scoped.commit()
+    # 다시 돌려도 같다 — 버전은 다시 4, 문서는 2
     r2 = await pipeline.rebuild("EXMP")
-    assert r2.versions == 4 and scoped.execute(text("SELECT count(*) FROM flags")).scalar() == 1
+    assert r2.versions == 4
     assert svc.get_document("EXMP-PRD-001").current_version_no == 2
     # 중간 실패 → 롤백, DB는 재구축 전과 같음
     from app.infra import git as gitmod
@@ -746,7 +685,7 @@ async def test_editing_an_approved_doc_keeps_frontmatter_and_db_in_step(
         d0.current_version_no,
         None,
         proj["author"],
-        "status(EXMP-RFQ-001): review → approved",
+        "status(EXMP-RFQ-001): draft → approved",
         reason=None,
     )
     assert svc.get_document("EXMP-RFQ-001").status == DocStatus.approved
@@ -764,12 +703,12 @@ async def test_editing_an_approved_doc_keeps_frontmatter_and_db_in_step(
         changed_items=[],
     )
 
-    assert r.status == DocStatus.review  # 자동 강등 (SEQ-1 6a)
+    assert r.status == DocStatus.draft  # 자동 강등 (SEQ-1 6a)
     d2 = svc.get_document("EXMP-RFQ-001")
-    assert d2.status == DocStatus.review
+    assert d2.status == DocStatus.draft
     # **본문의 frontmatter도 같이 내려가야 한다** — 저장소가 진실이다 (STD-001 1.2)
-    assert "status: review" in d2.body and "status: approved" not in d2.body
-    assert "status: review" in g(remote, "show", "HEAD:docs/specs/01-RFQ/EXMP-RFQ-001.md")
+    assert "status: draft" in d2.body and "status: approved" not in d2.body
+    assert "status: draft" in g(remote, "show", "HEAD:docs/specs/01-RFQ/EXMP-RFQ-001.md")
 
     # 그래서 받은 본문을 그대로 되돌려줘도 막히지 않는다 (막히면 그 문서는 영영 못 고친다)
     r2 = await pipeline.save_pipeline(
@@ -789,7 +728,7 @@ async def test_editing_an_approved_doc_keeps_frontmatter_and_db_in_step(
 async def test_github_edit_of_approved_doc_pushes_the_demotion(scoped: Session, proj) -> None:
     """#58 — #47이 고친 것은 mcp·되돌리기뿐이다. github는 커밋이 이미 저장소에 있어
     본문만 고쳐서는 저장소가 안 바뀌므로 6a에서 아예 빠져 있었고, 그래서 남이 승인 문서를
-    push로 고치면 **DB=검토중 · 저장소=approved**로 갈렸다. 이제 status 커밋을 하나 더 민다.
+    push로 고치면 **DB=초안 · 저장소=approved**로 갈렸다. 이제 status 커밋을 하나 더 민다.
 
     그 해시를 StatusChange에 적는 것도 같이 본다 — 안 적으면 다음 폴링이 3a에서
     앱 커밋을 못 걸러 앱이 민 커밋을 남의 편집으로 다시 저장한다.
@@ -810,7 +749,7 @@ async def test_github_edit_of_approved_doc_pushes_the_demotion(scoped: Session, 
         d0.current_version_no,
         None,
         proj["author"],
-        "status(EXMP-RFQ-001): review → approved",
+        "status(EXMP-RFQ-001): draft → approved",
         reason=None,
     )
     assert svc.get_document("EXMP-RFQ-001").status == DocStatus.approved
@@ -827,18 +766,18 @@ async def test_github_edit_of_approved_doc_pushes_the_demotion(scoped: Session, 
 
     results = await pipeline.process_commit(repo, head)
 
-    assert [(r.doc_id, r.status) for r in results] == [("EXMP-RFQ-001", DocStatus.review)]
+    assert [(r.doc_id, r.status) for r in results] == [("EXMP-RFQ-001", DocStatus.draft)]
     d = svc.get_document("EXMP-RFQ-001")
     in_repo = g(remote, "show", f"main:{RFQ_FILE}")
-    assert d.status == DocStatus.review
-    assert "status: review" in in_repo, f"갈렸다 — DB={d.status} 저장소=approved"
+    assert d.status == DocStatus.draft
+    assert "status: draft" in in_repo, f"갈렸다 — DB={d.status} 저장소=approved"
     status_head = g(remote, "rev-parse", "main")
     assert g(remote, "log", "-1", "--format=%s", status_head) == (
-        "status(EXMP-RFQ-001): approved → review"
+        "status(EXMP-RFQ-001): approved → draft"
     )
     # 그 커밋이 StatusChange에 적혀 있어야 다음 폴링이 3a에서 걸러낸다
     rows = scoped.execute(
-        text("SELECT reason, commit_hash FROM status_changes WHERE to_status='review'")
+        text("SELECT reason, commit_hash FROM status_changes WHERE to_status='draft'")
     ).all()
     assert [(r.reason, r.commit_hash) for r in rows] == [("본문 수정으로 자동 강등", status_head)]
     assert await pipeline.process_commit(repo, status_head) == []
@@ -849,7 +788,7 @@ async def test_github_author_lowering_status_themselves_is_not_overridden(
     scoped: Session, proj
 ) -> None:
     """#58 — 같은 커밋에서 작성자가 frontmatter를 스스로 내렸으면 그게 원본의 진실이다.
-    자동 강등이 그것까지 `review`로 덮으면 저장소=draft · DB=review로 또 갈린다."""
+    자동 강등이 status 커밋을 하나 더 밀면 안 된다 — 같은 값이어도 이력이 는다."""
     other, remote = proj["repos"]["other"], proj["repos"]["remote"]
     repo = _repo_row(proj)
     scoped.flush()
@@ -864,7 +803,7 @@ async def test_github_author_lowering_status_themselves_is_not_overridden(
         d0.current_version_no,
         None,
         proj["author"],
-        "status(EXMP-RFQ-001): review → approved",
+        "status(EXMP-RFQ-001): draft → approved",
         reason=None,
     )
     repo.last_processed_commit = g(remote, "rev-parse", "main")
@@ -937,11 +876,11 @@ async def test_process_commit_skips_commits_the_app_pushed_itself(scoped: Sessio
     scoped.flush()
     await create(proj, DocType.RFQ, RFQ)
     r = await create(proj)
-    await pipeline.change_status("EXMP-PRD-001", "review", proj["user"], "검토")
+    await pipeline.change_status("EXMP-PRD-001", "approved", proj["user"], "완료")
     head = g(remote, "rev-parse", "main")
     assert await pipeline.process_commit(repo, head) == []
     d = SpecService(scoped).get_document("EXMP-PRD-001")
-    assert (d.current_version_no, d.status) == (1, "review")
+    assert (d.current_version_no, d.status) == (1, "approved")
     assert scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar() == head
     assert r.doc_id == "EXMP-PRD-001"
 
@@ -989,7 +928,7 @@ async def test_process_commit_treats_directory_rename_as_modify_not_delete(
     assert [x.doc_id for x in r] == ["EXMP-RFQ-001"]
     d = svc.get_document("EXMP-RFQ-001")
     assert (d.current_version_no, d.status, len(d.items)) == (2, "draft", 2)  # 삭제 아님
-    assert scoped.execute(text("SELECT count(*) FROM flags")).scalar() == 0
+    assert scoped.execute(text('SELECT count(*) FROM "references" WHERE is_missing')).scalar() == 0
     assert "file.deleted" not in (d.convention_error_detail or "")
 
 
@@ -1037,44 +976,13 @@ async def test_rebuild_attributes_by_commit_email(scoped: Session, proj) -> None
     )
 
 
-async def test_rebuild_reassigns_open_flag_to_new_author(scoped: Session, proj) -> None:
-    """재구축이 열린 플래그의 담당자를 다시 계산한다 (MS-007 rebuild 7a).
-
-    clear_index는 flags를 남기고 담당자는 만들 때 한 번만 정해진다 — 이게 없으면
-    버전은 옮겨 가는데 플래그는 옛 자리표시를 계속 가리킨다 (#34).
-    """
-    from app.core.account.service import AccountService
-    from app.core.tracking.service import TrackingService
-
-    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
-    _push_history(other, remote)
-    await pipeline.rebuild("EXMP")
-    svc = SpecService(scoped)
-    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
-    TrackingService(scoped).raise_broken(q1)
-    scoped.commit()
-    placeholder = scoped.execute(
-        text("SELECT assignee_user_id FROM flags WHERE resolved_at IS NULL")
-    ).scalar()
-    assert placeholder is not None and placeholder != proj["user"].id  # 자리표시가 담당
-    AccountService(scoped).add_commit_email(proj["user"], "seed@example.com")
-    scoped.commit()
-    await pipeline.rebuild("EXMP")
-    assert (
-        scoped.execute(
-            text("SELECT assignee_user_id FROM flags WHERE resolved_at IS NULL")
-        ).scalar()
-        == proj["user"].id
-    )
-
-
-# ── #35 끊어진 참조가 승인을 막는다 (읽을 때 계산) ──
+# ── #35 끊어진 참조가 완료를 막는다 (읽을 때 계산) ──
 async def test_missing_ref_blocks_approve_and_clears_when_target_arrives(
     scoped: Session, proj
 ) -> None:
     """미존재 참조는 컬럼이 아니라 읽을 때 센다.
 
-    그래서 상대 문서가 들어오면 이 문서를 다시 저장하지 않아도 승인된다 (#35).
+    그래서 상대 문서가 들어오면 이 문서를 다시 저장하지 않아도 완료된다 (#35).
     """
     from app.core import queries
     from app.core.errors import StatusBlocked
@@ -1086,315 +994,27 @@ async def test_missing_ref_blocks_approve_and_clears_when_target_arrives(
     assert svc.get_document("EXMP-PRD-001").incomplete_warnings == []  # 컬럼에는 안 들어간다
     assert "EXMP-RFQ-001#Q1" in (await queries.document_view("EXMP-PRD-001")).missing_refs
     with pytest.raises(StatusBlocked) as ei:
-        await pipeline.change_status("EXMP-PRD-001", "approved", user, None, upstream_reviewed=True)
+        await pipeline.change_status("EXMP-PRD-001", "approved", user, None)
     assert "ref.missing: EXMP-RFQ-001#Q1" in ei.value.extra["warnings"]
-    # review로는 간다 — 저장은 됐고 승인만 막힌다
-    await pipeline.change_status("EXMP-PRD-001", "review", user, None)
-    assert svc.get_document("EXMP-PRD-001").status == "review"
-    # 상대 문서가 들어오면 resolve_missing이 풀고, PRD를 다시 저장하지 않아도 승인된다
+    # 초안은 막히지 않는다 — 저장은 됐고 완료만 막힌다
+    await pipeline.change_status("EXMP-PRD-001", "draft", user, None)
+    assert svc.get_document("EXMP-PRD-001").status == "draft"
+    # 상대 문서가 들어오면 resolve_missing이 풀고, PRD를 다시 저장하지 않아도 완료된다
     await create(proj, DocType.RFQ, RFQ)
     assert (await queries.document_view("EXMP-PRD-001")).missing_refs == []
-    await pipeline.change_status("EXMP-PRD-001", "approved", user, None, upstream_reviewed=True)
+    await pipeline.change_status("EXMP-PRD-001", "approved", user, None)
     assert svc.get_document("EXMP-PRD-001").status == "approved"
-
-
-# ── #38 재구축이 versions를 가리키는 FK를 다시 잇는다 ──
-def _first_version(scoped: Session, doc_id: str) -> tuple[int, str]:
-    """(version_id, commit_hash) — 그 문서의 가장 오래된 버전."""
-    return scoped.execute(
-        text(
-            "SELECT v.id, v.commit_hash FROM versions v JOIN documents d ON d.id = v.document_id"
-            " WHERE d.doc_id = :doc ORDER BY v.id LIMIT 1"
-        ),
-        {"doc": doc_id},
-    ).one()
-
-
-async def test_rebuild_relinks_propagation_decision(scoped: Session, proj) -> None:
-    """전파결정이 재구축을 건너 새 버전을 가리킨다.
-
-    전에는 FK 위반으로 재구축이 아예 죽었다 (#38).
-    """
-    from app.core.tracking.service import TrackingService
-
-    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
-    _push_history(other, remote)
-    await pipeline.rebuild("EXMP")
-    svc = SpecService(scoped)
-    vid, vhash = _first_version(scoped, "EXMP-PRD-001")
-    pks = [i.pk for i in svc.get_document("EXMP-PRD-001").items]
-    TrackingService(scoped).create_pending(vid, pks, pks[:1])
-    scoped.commit()
-
-    await pipeline.rebuild("EXMP")  # 전에는 여기서 ForeignKeyViolation
-
-    new_vid, affected = scoped.execute(
-        text("SELECT version_id, affected_pks FROM propagation_decisions")
-    ).one()
-    assert new_vid != vid  # 새 버전 행이다
-    assert (
-        scoped.execute(
-            text("SELECT commit_hash FROM versions WHERE id = :i"), {"i": new_vid}
-        ).scalar()
-        == vhash
-    )  # 같은 커밋을 가리킨다
-    assert list(affected) == pks  # 항목 pk는 upsert라 그대로
-
-
-async def test_rebuild_relinks_flag_cause_version(scoped: Session, proj) -> None:
-    """cause_version_id·target_version_id 둘 다 다시 이어진다 (#38 · #17)."""
-    from app.core.tracking.service import TrackingService
-
-    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
-    _push_history(other, remote)
-    await pipeline.rebuild("EXMP")
-    svc, tr = SpecService(scoped), TrackingService(scoped)
-    vid, vhash = _first_version(scoped, "EXMP-PRD-001")
-    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
-    tr.raise_upstream([q1], svc.get_document("EXMP-PRD-001").id, vid, None)
-    scoped.commit()
-    assert scoped.execute(text("SELECT cause_version_id FROM flags")).scalar() == vid
-    tvid, tvhash = _first_version(scoped, "EXMP-RFQ-001")  # 대상 문서는 버전이 하나뿐이다
-    assert scoped.execute(text("SELECT target_version_id FROM flags")).scalar() == tvid
-
-    await pipeline.rebuild("EXMP")
-
-    new_cause, new_target = scoped.execute(
-        text("SELECT cause_version_id, target_version_id FROM flags")
-    ).one()
-    assert new_cause is not None and new_cause != vid
-    assert new_target is not None and new_target != tvid
-    hashes = dict(
-        scoped.execute(
-            text("SELECT id, commit_hash FROM versions WHERE id IN (:a, :b)"),
-            {"a": new_cause, "b": new_target},
-        ).all()
-    )
-    assert (hashes[new_cause], hashes[new_target]) == (vhash, tvhash)
-
-
-async def test_rebuild_empties_target_version_but_keeps_the_flag(scoped: Session, proj) -> None:
-    """대상 버전을 못 이으면 비우고 행은 남긴다 — 원인과 달리 판단의 뼈대가 아니다 (#17)."""
-    from app.core.tracking.service import TrackingService
-
-    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
-    _push_history(other, remote)
-    await pipeline.rebuild("EXMP")
-    svc, tr = SpecService(scoped), TrackingService(scoped)
-    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
-    # 원인 없는 종류(broken_ref)라야 대상 버전만 못 이었을 때를 볼 수 있다
-    tr.repo.add(
-        Flag(
-            kind="broken_ref",
-            target_item_id=q1,
-            assignee_user_id=None,
-            target_version_id=_first_version(scoped, "EXMP-RFQ-001")[0],
-        )
-    )
-    scoped.commit()
-    # 대상 문서를 지운다 → 그 버전이 재구축에서 다시 안 만들어진다
-    g(other, "rm", "-q", RFQ_FILE)
-    g(other, "commit", "-q", "-m", "spec: RFQ 삭제")
-    g(other, "push", "-q", "origin", "HEAD:main")
-
-    r = await pipeline.rebuild("EXMP")
-
-    assert scoped.execute(text("SELECT count(*) FROM flags")).scalar() == 1  # 행은 남는다
-    assert scoped.execute(text("SELECT target_version_id FROM flags")).scalar() is None
-    assert [d for d in r.dropped if d["kind"] == "flag"] == []  # 버린 게 아니다
-
-
-async def test_rebuild_drops_unlinkable_and_reports(scoped: Session, proj) -> None:
-    """가리키던 문서가 저장소에서 사라지면 그 결정을 버리고 결과에 보고한다."""
-    from app.core.tracking.service import TrackingService
-
-    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
-    _push_history(other, remote)
-    await pipeline.rebuild("EXMP")
-    svc = SpecService(scoped)
-    vid, _ = _first_version(scoped, "EXMP-RFQ-001")
-    pks = [i.pk for i in svc.get_document("EXMP-RFQ-001").items]
-    TrackingService(scoped).create_pending(vid, pks, pks[:1])
-    scoped.commit()
-    # RFQ 파일을 지운다 → git.list가 HEAD 기준이라 재구축 루프에 안 들어온다
-    g(other, "rm", "-q", RFQ_FILE)
-    g(other, "commit", "-q", "-m", "spec: RFQ 삭제")
-    g(other, "push", "-q", "origin", "HEAD:main")
-
-    r = await pipeline.rebuild("EXMP")
-
-    assert scoped.execute(text("SELECT count(*) FROM propagation_decisions")).scalar() == 0
-    assert [(d["kind"], d["count"]) for d in r.dropped] == [("propagation_decision", 1)]
-    assert "커밋" in r.dropped[0]["reason"]
 
 
 async def test_rebuild_twice_does_not_duplicate_status_changes(scoped: Session, proj) -> None:
     """status( 커밋이 있는 저장소를 두 번 재구축해도 상태 변경이 안 쌓인다 (#38)."""
     other, remote = proj["repos"]["other"], proj["repos"]["remote"]
-    _push_history(other, remote)  # 마지막이 status(EXMP-PRD-001): draft → review
+    _push_history(other, remote)  # 마지막이 status(EXMP-PRD-001): draft → approved
     await pipeline.rebuild("EXMP")
     once = scoped.execute(text("SELECT count(*) FROM status_changes")).scalar()
     assert once == 1
     await pipeline.rebuild("EXMP")
     assert scoped.execute(text("SELECT count(*) FROM status_changes")).scalar() == once
-
-
-# ── #16 추적 데이터 백업 ──
-async def _seed_tracking(scoped: Session, proj) -> tuple[int, int]:
-    """플래그 1 · 전파결정 1 · 댓글 2(답글 포함)를 만든다. (문서 pk, 첫 버전 id)"""
-    from app.core.collab.service import CommentService
-    from app.core.tracking.service import TrackingService
-
-    svc, tr = SpecService(scoped), TrackingService(scoped)
-    d = svc.get_document("EXMP-PRD-001")
-    vid, _ = _first_version(scoped, "EXMP-PRD-001")
-    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
-    tr.raise_upstream([q1], d.id, vid, None)  # cause_version_id가 채워지는 종류
-    tr.create_pending(vid, [i.pk for i in d.items], [d.items[0].pk])
-    cs = CommentService(scoped)
-    line = d.body.split("\n")[0]
-    parent = cs.add(d.id, 1, line, "첫 댓글", proj["user"], None)
-    cs.add(d.id, 1, line, "답글", proj["user"], parent.id)
-    scoped.commit()
-    return d.id, vid
-
-
-async def test_export_tracking_writes_skeleton_and_is_stable(scoped: Session, proj) -> None:
-    """백업이 뼈대만 싣고, 내용이 같으면 커밋이 안 생긴다 (#16)."""
-    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
-    _push_history(other, remote)
-    await pipeline.rebuild("EXMP")
-    await _seed_tracking(scoped, proj)
-
-    h1 = await pipeline.export_tracking("EXMP")
-    data = json.loads(g(proj["repos"]["work"], "show", f"{h1}:backup/tracking.json"))
-    assert (data["backup_version"], data["project"]) == (2, "EXMP")
-    assert len(data["flags"]) == 1 and len(data["propagation_decisions"]) == 1
-    assert [c["parent"] for c in data["comments"]] == [None, data["comments"][0]["at"] + "|hoyoung"]
-    # 자유 텍스트와 시각 헤더는 안 싣는다 — 저장소가 public이고, 시각은 매번 diff를 만든다
-    assert "body" not in data["comments"][0] and "reason" not in data["propagation_decisions"][0]
-    assert "exported_at" not in data
-    # 자연키로 적힌다
-    assert data["flags"][0]["target"] == "EXMP-RFQ-001#Q1"
-    assert "@" in data["flags"][0]["cause_version"]
-    # 대상 버전도 자연키로 — 2에서 생겼다 (#17)
-    assert "@" in data["flags"][0]["target_version"]
-
-    assert await pipeline.export_tracking("EXMP") == h1  # 두 번 불러도 커밋이 하나
-
-
-async def test_import_tracking_round_trip_and_idempotent(scoped: Session, proj) -> None:
-    """내보내고 → 비우고 → 복원. 두 번 복원해도 안 늘어난다 (#16)."""
-    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
-    _push_history(other, remote)
-    await pipeline.rebuild("EXMP")
-    await _seed_tracking(scoped, proj)
-    await pipeline.export_tracking("EXMP")
-    before = {
-        t: scoped.execute(text(f"SELECT count(*) FROM {t}")).scalar()  # noqa: S608 — 상수 목록
-        for t in ("flags", "propagation_decisions", "comments")
-    }
-    for t_ in ("comments", "propagation_decisions", "flags"):
-        scoped.execute(text(f"DELETE FROM {t_}"))  # noqa: S608
-    scoped.commit()
-
-    r = await pipeline.import_tracking("EXMP")
-
-    assert (r.flags, r.decisions, r.comments) == (
-        before["flags"],
-        before["propagation_decisions"],
-        before["comments"],
-    )
-    assert r.dropped == [] and r.skipped == 0
-    # 답글이 제 부모에 붙는다
-    assert (
-        scoped.execute(
-            text("SELECT count(*) FROM comments WHERE parent_comment_id IS NOT NULL")
-        ).scalar()
-        == 1
-    )
-    # 본문은 안 돌아온다 — 자리표시가 왜 비었는지 말한다
-    assert "백업에서 복원" in scoped.execute(text("SELECT body FROM comments LIMIT 1")).scalar()
-
-    r2 = await pipeline.import_tracking("EXMP")
-    assert (r2.flags, r2.decisions, r2.comments) == (0, 0, 0)
-    assert r2.skipped == sum(before.values())
-
-
-async def test_import_tracking_reads_backup_version_1(scoped: Session, proj) -> None:
-    """형식 1(대상 버전이 없던 판)도 계속 읽는다 — 그 플래그는 대상 버전이 null (#17)."""
-    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
-    _push_history(other, remote)
-    await pipeline.rebuild("EXMP")
-    await _seed_tracking(scoped, proj)
-    h = await pipeline.export_tracking("EXMP")
-    data = json.loads(g(proj["repos"]["work"], "show", f"{h}:backup/tracking.json"))
-    # 형식을 1로 되돌린다 — 그때 파일에는 target_version 자체가 없었다
-    data["backup_version"] = 1
-    for row in data["flags"]:
-        del row["target_version"]
-    g(other, "fetch", "-q", "origin")
-    g(other, "reset", "-q", "--hard", "origin/main")
-    write_commit_push(other, "backup/tracking.json", json.dumps(data), "chore: 옛 형식 백업")
-    for t_ in ("comments", "propagation_decisions", "flags"):
-        scoped.execute(text(f"DELETE FROM {t_}"))  # noqa: S608 — 상수 목록
-    scoped.commit()
-
-    r = await pipeline.import_tracking("EXMP")
-
-    assert (r.flags, r.dropped) == (1, [])  # 거절하지 않는다
-    assert scoped.execute(text("SELECT target_version_id FROM flags")).scalar() is None
-
-
-async def test_import_tracking_rejects_other_project_and_missing_file(
-    scoped: Session, proj
-) -> None:
-    from app.core.errors import BackupInvalid
-
-    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
-    _push_history(other, remote)
-    await pipeline.rebuild("EXMP")
-    with pytest.raises(NotFound):
-        await pipeline.import_tracking("EXMP")  # 백업 파일이 아직 없다
-
-    await pipeline.export_tracking("EXMP")
-    g(other, "fetch", "-q", "origin")
-    g(other, "reset", "-q", "--hard", "origin/main")
-    write_commit_push(
-        other,
-        "backup/tracking.json",
-        '{"backup_version": 1, "project": "NOPE"}',
-        "chore: 남의 백업",
-    )
-    with pytest.raises(BackupInvalid):
-        await pipeline.import_tracking("EXMP")
-
-
-async def test_import_tracking_drops_rows_whose_names_are_gone(scoped: Session, proj) -> None:
-    """재구축을 안 하고 빈 DB에 복원하면 전부 버려지고 예외는 없다 (#16)."""
-    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
-    _push_history(other, remote)
-    await pipeline.rebuild("EXMP")
-    await _seed_tracking(scoped, proj)
-    await pipeline.export_tracking("EXMP")
-    # 문서를 통째로 지운다 → 자연키가 가리킬 데가 없다
-    for t_ in (
-        "comments",
-        "propagation_decisions",
-        "flags",
-        '"references"',
-        "status_changes",
-        "versions",
-        "items",
-    ):
-        scoped.execute(text(f"DELETE FROM {t_}"))  # noqa: S608
-    scoped.execute(text("DELETE FROM documents"))
-    scoped.commit()
-
-    r = await pipeline.import_tracking("EXMP")
-
-    assert (r.flags, r.decisions, r.comments) == (0, 0, 0)
-    assert {d["kind"] for d in r.dropped} == {"flag", "propagation_decision", "comment"}
 
 
 # ── 카드 R — 휴지통 (MS-007 trash·restore·purge_document) ──
@@ -1432,9 +1052,10 @@ async def test_trash_restore_purge_document(scoped: Session, proj) -> None:
         ).scalar()
         == 1
     )
-    assert scoped.execute(text("SELECT kind, resolved_at FROM flags")).all() == [
-        ("broken_ref", None)
-    ]
+    # 하위 R1의 참조가 미존재로 — raw_target은 남는다 (MS-003 mark_missing)
+    assert scoped.execute(
+        text('SELECT raw_target FROM "references" WHERE is_missing ORDER BY raw_target')
+    ).scalars().all() == ["EXMP-RFQ-001#Q1"]  # 문서 단위 참조는 행이 남아 있어 그대로
     # 목록·단계에서 빠진다. 문서 조회는 된다
     assert [d.doc_id for d in svc.list_by_project(proj["project"].id)] == ["EXMP-PRD-001"]
     assert [d.doc_id for d in svc.list_trashed(proj["project"].id)] == ["EXMP-RFQ-001"]
@@ -1444,7 +1065,7 @@ async def test_trash_restore_purge_document(scoped: Session, proj) -> None:
     with pytest.raises(DocumentTrashed):
         await update(proj, "EXMP-RFQ-001", RFQ, 1, changed_items=[])
     with pytest.raises(DocumentTrashed):
-        await pipeline.change_status("EXMP-RFQ-001", DocStatus.review, proj["user"], None)
+        await pipeline.change_status("EXMP-RFQ-001", DocStatus.approved, proj["user"], None)
     # 폴링은 휴지통 커밋의 D를 건너뛰고 나아간다
     repo = _repo_row(proj)
     repo.last_processed_commit = before
@@ -1454,24 +1075,20 @@ async def test_trash_restore_purge_document(scoped: Session, proj) -> None:
         scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar()
         == r.commit_hash
     )
-    # 완전 삭제는 남이 가리키는 동안 막힌다
+    # 완전 삭제는 남이 가리키는 동안 막힌다 — 그런데 방금 미존재가 된 참조는 to_*가 비어
+    # inbound에 안 잡힌다. 문서 단위 참조([[EXMP-RFQ-001]])는 to_document_id가 남아 잡힌다
     with pytest.raises(DocumentHasHistory) as ex2:
         await pipeline.purge_document("EXMP-RFQ-001", a)
-    assert ex2.value.extra["inbound_refs"] == ["EXMP-PRD-001", "EXMP-PRD-001#R1"]
-    assert ex2.value.extra["flags"] == 1
-    # 되살리기 — 직전 본문으로 새 버전, 항목 복구, 끊어진 참조가 with_edit=false로 풀림
+    assert ex2.value.extra["inbound_refs"] == ["EXMP-PRD-001"]
+    assert "flags" not in ex2.value.extra and "comments" not in ex2.value.extra
+    # 되살리기 — 직전 본문으로 새 버전, 항목 복구, 미존재 참조가 다시 이어진다 (10a)
     r2 = await pipeline.restore_document("EXMP-RFQ-001", a)
     assert r2.version_no == 2
     rfq = svc.get_document("EXMP-RFQ-001")
     assert rfq.trashed_at is None and {i.item_id for i in rfq.items} == {"Q1", "Q2"}
     assert rfq.body.strip() == RFQ.strip()
     assert "docs/specs/01-RFQ/EXMP-RFQ-001.md" in remote_files(proj["repos"])
-    assert (
-        scoped.execute(
-            text("SELECT resolved_with_edit FROM flags WHERE kind='broken_ref'")
-        ).scalar()
-        is False
-    )
+    assert scoped.execute(text('SELECT count(*) FROM "references" WHERE is_missing')).scalar() == 0
     assert [d.doc_id for d in svc.list_by_project(proj["project"].id)] == [
         "EXMP-RFQ-001",
         "EXMP-PRD-001",
@@ -1480,50 +1097,44 @@ async def test_trash_restore_purge_document(scoped: Session, proj) -> None:
         await pipeline.restore_document("EXMP-RFQ-001", a)
     with pytest.raises(DocumentNotTrashed):
         await pipeline.purge_document("EXMP-RFQ-001", a)
-    # 아무도 안 가리키는 PRD — 넣고, 완전히 지운다. 남의 해결된 플래그(원인=RFQ 항목)는 그대로
+    # 아무도 안 가리키는 PRD — 넣고, 완전히 지운다
     prd = svc.get_document("EXMP-PRD-001")
     await pipeline.trash_document("EXMP-PRD-001", a, confirm=True)
     await pipeline.purge_document("EXMP-PRD-001", a)
-    for t in ("documents", "items", "versions", "status_changes"):
-        n = scoped.execute(
-            text(
-                f"SELECT count(*) FROM {t} WHERE {'id' if t == 'documents' else 'document_id'}=:d"
-            ),
-            {"d": prd.id},
-        ).scalar()
+    for t in ("documents", "items", "versions", "status_changes", '"references"'):
+        col = "id" if t == "documents" else ("from_document_id" if "ref" in t else "document_id")
+        n = scoped.execute(text(f"SELECT count(*) FROM {t} WHERE {col}=:d"), {"d": prd.id}).scalar()
         assert n == 0, t
-    assert (
-        scoped.execute(text("SELECT count(*) FROM flags")).scalar() == 0
-    )  # 대상이 PRD 항목이던 플래그도 함께
     assert (
         svc.issue_doc_id(proj["project"].id, "EXMP", DocType.PRD) == "EXMP-PRD-001"
     )  # 번호 재발급
 
 
-# ── 카드 O — 저장이 끊어진 참조를 푼다 (MS-004 release_broken, #70) ──
-async def test_saving_a_fixed_reference_releases_the_broken_ref_flag(scoped: Session, proj) -> None:
+# ── 저장이 끊어진 참조를 정리한다 (#70 — 카드 V에서 플래그 대신 참조 행 자신) ──
+async def test_saving_a_fixed_reference_clears_the_missing_ref(scoped: Session, proj) -> None:
     await create(proj, DocType.RFQ, RFQ)
     await create(proj)  # PRD R1 → RFQ#Q1
     no_q1 = RFQ.replace("#### Q1 첫 요구\n내용\n", "")
     await update(proj, "EXMP-RFQ-001", no_q1, 1, confirm_item_deletion=True)
-    row = lambda: scoped.execute(  # noqa: E731
-        text("SELECT resolved_with_edit, resolved_by_user_id FROM flags WHERE kind='broken_ref'")
-    ).one()
-    assert row() == (None, None)
+
+    def missing():
+        return (
+            scoped.execute(text('SELECT raw_target FROM "references" WHERE is_missing'))
+            .scalars()
+            .all()
+        )
+
+    assert missing() == ["EXMP-RFQ-001#Q1"]
     prd = SpecService(scoped).get_document("EXMP-PRD-001").body
     assert "[[EXMP-RFQ-001#Q1]]" in prd
     # 참조를 둔 채 다른 곳만 고치면 남는다
     await update(
         proj, "EXMP-PRD-001", prd.replace("한 줄로.", "한 줄로 정리."), 1, changed_items=[]
     )
-    assert row() == (None, None)
-    # 참조를 지워 저장하면 풀린다 — 확인자는 저장시킨 사람, 수정 동반
+    assert missing() == ["EXMP-RFQ-001#Q1"]
+    # 참조를 지워 저장하면 참조 행이 사라진다 — extract가 없어진 참조를 지운다
     fixed = prd.replace("한 줄로.", "한 줄로 정리.").replace(
         "[[EXMP-RFQ-001#Q1]]", "요구 Q1(삭제됨)"
     )
     await update(proj, "EXMP-PRD-001", fixed, 2, changed_items=["R1"])
-    assert row() == (True, proj["user"].id)
-    # 풀린 뒤에는 내 할 일·문서 뷰에서 사라진다 (미해결만 센다)
-    assert (
-        scoped.execute(text("SELECT count(*) FROM flags WHERE resolved_at IS NULL")).scalar() == 0
-    )
+    assert missing() == []

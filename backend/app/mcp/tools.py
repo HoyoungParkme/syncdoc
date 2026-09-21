@@ -163,7 +163,7 @@ async def list_documents(
         if stage is not None and n != stage:
             continue
         mine = [d for d in docs if d.stage == n]
-        order = {"draft": 0, "review": 1, "approved": 2}
+        order = {"draft": 0, "approved": 1}
         lowest = min((d.status for d in mine), key=lambda x: order[x], default=None)
         stages.append(
             {
@@ -197,7 +197,11 @@ async def get_document(doc_id: str) -> CallToolResult:
             "convention_error_detail": d.convention_error_detail,
             "body": d.body,
             "items": [
-                {"item_id": i.item_id, "display_name": i.display_name, "flags": i.flags}
+                {
+                    "item_id": i.item_id,
+                    "display_name": i.display_name,
+                    "missing_refs": i.missing_refs,  # 대상이 없는 참조의 raw_target (API-002)
+                }
                 for i in d.items
             ],
             "prev_doc_id": d.prev_doc_id,
@@ -227,7 +231,6 @@ async def get_item(doc_id: str, item_id: str) -> CallToolResult:
             "doc_status": v.doc_status,
             "doc_version_no": v.doc_version_no,
             "body": v.body,
-            "flags": v.flags,
         }
     )
 
@@ -261,15 +264,6 @@ async def get_references(doc_id: str, item_id: str) -> CallToolResult:
             "item_id": r.item_id,
             "upstream": [ref(x) for x in r.upstream],
             "downstream": [ref(x) for x in r.downstream],
-            "flags": [
-                {
-                    "kind": f.kind,
-                    "cause": f"{f.cause.doc_id}#{f.cause.item_id}" if f.cause else None,
-                    "cause_version_no": f.cause_version_no,
-                    "raised_at": f.raised_at,
-                }
-                for f in r.flags
-            ],
         }
     )
 
@@ -363,11 +357,7 @@ async def _read_spec_file(workdir: Path, path: str, fallback: str | None = None)
     description="새 문서를 만든다. 문서 ID는 서버가 발급한다({코드}-{타입}-{번호}). 저장소의 docs/specs/_templates/ 템플릿이 적용되므로 body는 템플릿 구조를 따라야 한다. 항목 ID(#R12 같은 것)는 body에 직접 붙인다. 서버는 발급하지 않고 형식·유일성만 검사한다. 기존 문서를 고치려면 이 도구가 아니라 update_document를 써야 한다. 문서 하나를 만들면 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 같은 단계라도 다음 문서는 사람이 웹에서 읽고 난 뒤에 만든다. DOM 셋은 순서가 있다: 클래스 명세는 API 문서가, ERD는 클래스 명세가 같은 프로젝트에 있어야 받는다(precondition-unmet). DOM 제목에는 도메인·클래스·ERD 중, UI 제목에는 화면 설계·와이어프레임 중, API 제목에는 REST·MCP 중 하나가 들어가야 한다."
 )
 async def create_document(
-    project_code: str,
-    doc_type: str,
-    body: str,
-    message: str,
-    upstream_impact: list[str] | None = None,
+    project_code: str, doc_type: str, body: str, message: str
 ) -> CallToolResult:
     """SYNC-API-002#create_document"""
     try:
@@ -382,7 +372,6 @@ async def create_document(
             project_code,
             author,
             message,
-            upstream_impact=upstream_impact,
         )
     except Problem as p:
         return _problem(p)
@@ -390,7 +379,7 @@ async def create_document(
 
 
 @server.tool(
-    description="기존 문서의 본문을 교체해 새 버전을 만든다. 반드시 get_document를 먼저 부르고 그 응답의 body를 고쳐 보낸다 — version_no만 받아 오고 본문은 예전 것을 쓰면 안 된다. create_document는 frontmatter의 doc_id가 비어도 받지만(서버가 발급한다) 그 본문을 그대로 보내면 frontmatter.doc_id 위반이 된다. expected_version에는 그 응답의 version_no를 넣는다. 그 사이 문서가 바뀌었으면 version-conflict 에러에 현재 버전과 본문이 담기니, 그것을 읽고 병합해 다시 부른다. 본문에서 항목 ID가 사라지면 item-deletion-needs-confirm 에러에 끊어질 하위 항목이 문서ID#항목ID와 이름으로 담겨 오며, 그것을 사람에게 보여주고 확인받은 뒤 confirm_item_deletion=true로 다시 부른다. 저장 후 하위에 영향이 있으면 결과의 pending_decision_version_id가 채워지고, 전파 여부는 지시한 사람이 웹에서 결정한다. 승인 상태 문서를 고치면 검토중으로 내려간다. 이 변경이 상위 항목과 어긋나게 됐음을 알면 upstream_impact에 그 상위 항목을 넣는다. 저장 뒤에는 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 사람이 웹에서 읽기 전에 다음 문서로 가지 않는다."
+    description="기존 문서의 본문을 교체해 새 버전을 만든다. 반드시 get_document를 먼저 부르고 그 응답의 body를 고쳐 보낸다 — version_no만 받아 오고 본문은 예전 것을 쓰면 안 된다. create_document는 frontmatter의 doc_id가 비어도 받지만(서버가 발급한다) 그 본문을 그대로 보내면 frontmatter.doc_id 위반이 된다. expected_version에는 그 응답의 version_no를 넣는다. 그 사이 문서가 바뀌었으면 version-conflict 에러에 현재 버전과 본문이 담기니, 그것을 읽고 병합해 다시 부른다. 본문에서 항목 ID가 사라지면 item-deletion-needs-confirm 에러에 끊어질 하위 항목이 문서ID#항목ID와 이름으로 담겨 오며, 그것을 사람에게 보여주고 확인받은 뒤 confirm_item_deletion=true로 다시 부른다. 완료 상태 문서를 고치면 초안으로 내려간다. 저장 뒤에는 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 사람이 웹에서 읽기 전에 다음 문서로 가지 않는다."
 )
 async def update_document(
     doc_id: str,
@@ -398,7 +387,6 @@ async def update_document(
     expected_version: int,
     message: str,
     changed_items: list[str],
-    upstream_impact: list[str] | None = None,
     confirm_item_deletion: bool = False,
 ) -> CallToolResult:
     """SYNC-API-002#update_document"""
@@ -415,7 +403,6 @@ async def update_document(
             author,
             message,
             changed_items=changed_items,
-            upstream_impact=upstream_impact,
             confirm_item_deletion=confirm_item_deletion,
         )
     except Problem as p:
@@ -424,7 +411,7 @@ async def update_document(
 
 
 @server.tool(
-    description="문서를 휴지통에 넣는다 — 파일은 저장소에서 지워지고(커밋) 행·버전은 남아 restore_document로 되살릴 수 있다. 잘못 만든 문서를 치우는 길이다. 첫 호출은 document-deletion-needs-confirm 에러로 제목·버전 수·끊어질 참조 목록·댓글 수를 돌려주고 아직 넣지 않는다. 그것을 사람에게 보여주고 확인받은 뒤 confirm=true로 다시 부른다. 넣으면 이 문서를 가리키던 항목에 끊어진 참조가 붙는다 — 되살리면 풀린다. 행까지 지우는 완전 삭제는 웹에서만."
+    description="문서를 휴지통에 넣는다 — 파일은 저장소에서 지워지고(커밋) 행·버전은 남아 restore_document로 되살릴 수 있다. 잘못 만든 문서를 치우는 길이다. 첫 호출은 document-deletion-needs-confirm 에러로 제목·버전 수·끊어질 참조 목록을 돌려주고 아직 넣지 않는다. 그것을 사람에게 보여주고 확인받은 뒤 confirm=true로 다시 부른다. 넣으면 이 문서를 가리키던 참조가 미존재(is_missing)로 돌아간다 — 되살리면 풀린다. 행까지 지우는 완전 삭제는 웹에서만."
 )
 async def delete_document(doc_id: str, confirm: bool = False) -> CallToolResult:
     """SYNC-API-002#delete_document"""

@@ -26,7 +26,7 @@ def test_list_and_docs(client: TestClient, scoped: Session) -> None:
     assert lst[0]["counts"]["convention_errors"] == 0
     docs = client.get("/api/projects/EXMP/docs").json()
     assert [d["doc_id"] for d in docs] == ["EXMP-PRD-001"]
-    assert docs[0]["counts"] == {"needs_check": 0, "broken_ref": 0, "unresolved_comments": 0}
+    assert docs[0]["counts"] == {"broken_ref": 0}
     assert (
         docs[0]["last_author"]["user"]["github_login"] == "hoyoung"
         and docs[0]["last_author"]["via"] == "mcp"
@@ -38,7 +38,7 @@ def test_list_and_docs(client: TestClient, scoped: Session) -> None:
     # 상세 (UI-4): 요약 + 문서 목록 + 최근 변경
     d = SpecService(scoped).get_document("EXMP-PRD-001")
     SpecService(scoped).apply_status(
-        d, d.body.replace("status: draft", "status: review"), "c1", a.user, "검토"
+        d, d.body.replace("status: draft", "status: approved"), "c1", a.user, None
     )
     det = client.get("/api/projects/EXMP").json()
     assert det["code"] == "EXMP" and [x["doc_id"] for x in det["docs"]] == ["EXMP-PRD-001"]
@@ -46,7 +46,7 @@ def test_list_and_docs(client: TestClient, scoped: Session) -> None:
         (v["doc_id"], v["version_no"], v["message"], v["author"]["kind"], v["author"]["via"])
         for v in det["recent_changes"]
     ] == [
-        ("EXMP-PRD-001", None, "status(EXMP-PRD-001): draft → review", "human", "web"),
+        ("EXMP-PRD-001", None, "status(EXMP-PRD-001): draft → approved", "human", "web"),
         ("EXMP-PRD-001", 1, "spec: 테스트", "agent", "mcp"),
     ]
     assert det["recent_changes"][0]["author"]["user"]["github_login"] == "hoyoung"

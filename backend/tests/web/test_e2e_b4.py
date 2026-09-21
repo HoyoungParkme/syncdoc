@@ -67,21 +67,14 @@ async def test_s7_direct_push_catch_up_rebuild_and_revert(
     caught = _r.json()[0]
     assert caught["behind_by"] == 0 and caught["fetched_at"] is not None
 
-    # 3. 플래그·댓글이 있는 채로 재구축 → 참조·버전 복원, 플래그·댓글 유지 (UC-S6)
+    # 3. 재구축 → 참조·버전 복원 (UC-S6). 추적 표가 없으니 이어 붙일 것도 없다 (카드 V)
     write_commit_push(
         other, PRD_FILE, PRD_BODY.replace("한 줄로.", "두 줄로."), "spec(EXMP-PRD-001): 수정"
     )
     assert _hook(client, remote, g(remote, "rev-parse", "main")) == 202
-    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
-    from app.core.tracking.service import TrackingService
-
-    TrackingService(scoped).raise_broken(q1)
-    client.post("/api/docs/EXMP-PRD-001/comments", json={"line_no": 3, "body": "댓글"})
-    scoped.commit()
     rb = client.post("/api/admin/repos/EXMP/rebuild").json()
     assert (rb["docs"], rb["versions"]) == (4, 5)  # 시드 SYNC-PRD-001 + RFQ 1 + PRD 2 + SCN 1
-    assert scoped.execute(text("SELECT count(*) FROM flags")).scalar() == 1
-    assert scoped.execute(text("SELECT count(*) FROM comments")).scalar() == 1
+    assert "dropped" not in rb
     assert scoped.execute(text('SELECT count(*) FROM "references" WHERE is_missing')).scalar() == 0
     vs = client.get("/api/docs/EXMP-PRD-001/versions").json()
     assert [v["version_no"] for v in vs] == [2, 1] and vs[0]["author"]["via"] == "github"
@@ -124,9 +117,8 @@ async def test_s7_direct_push_catch_up_rebuild_and_revert(
         "/api/docs/EXMP-PRD-001/revert", json={"to_version": 3, "confirm_item_deletion": True}
     )
     assert r.status_code == 201 and r.json()["version_no"] == 5
-    assert (
-        scoped.execute(text("SELECT count(*) FROM flags WHERE kind='broken_ref'")).scalar() == 2
-    )  # P2에 추가
+    # R2가 사라지면 그것을 가리키던 SCN P2의 참조가 미존재로 돌아간다 (MS-003 mark_missing)
+    assert scoped.execute(text('SELECT count(*) FROM "references" WHERE is_missing')).scalar() == 1
     # 삭제된 R2 ID를 되살리는 본문(v4)으로 **돌아갈 수 있다** — 되돌리기는 재사용이 아니라
     # 복원이다. 막으면 항목을 한 번 지운 순간 그 이전으로 가는 길이 영구히 닫힌다 (#48)
     r = client.post("/api/docs/EXMP-PRD-001/revert", json={"to_version": 4})

@@ -117,19 +117,14 @@ class PreconditionUnmet(Problem):
 
 
 class DocumentHasHistory(Problem):
-    """완전 삭제 문지기 (UC-H18 7) — 아직 가리키는 곳·댓글·미해결 플래그. 전부 담는다."""
+    """완전 삭제 문지기 (UC-H18 7) — 아직 가리키는 곳. 미존재 참조는 안 센다 (MS-007 purge 2)."""
 
     type = "urn:syncdoc:document-has-history"
     status = 409
     title = "document-has-history"
 
-    def __init__(self, inbound_refs: list[str], comments: int, flags: int) -> None:
-        super().__init__(
-            "아직 가리키는 곳이 있어 완전히 지울 수 없다",
-            inbound_refs=inbound_refs,
-            comments=comments,
-            flags=flags,
-        )
+    def __init__(self, inbound_refs: list[str]) -> None:
+        super().__init__("아직 가리키는 곳이 있어 완전히 지울 수 없다", inbound_refs=inbound_refs)
 
 
 class DocumentDeletionNeedsConfirm(Problem):
@@ -140,7 +135,7 @@ class DocumentDeletionNeedsConfirm(Problem):
     title = "document-deletion-needs-confirm"
 
     def __init__(
-        self, doc_id: str, title: str, version_count: int, inbound_refs: list[str], comments: int
+        self, doc_id: str, title: str, version_count: int, inbound_refs: list[str]
     ) -> None:
         super().__init__(
             "휴지통에 넣기는 사람 확인이 필요함",
@@ -148,7 +143,6 @@ class DocumentDeletionNeedsConfirm(Problem):
             title=title,
             version_count=version_count,
             inbound_refs=inbound_refs,
-            comments=comments,
         )
 
 
@@ -219,46 +213,10 @@ class StatusBlocked(Problem):
 
     def __init__(self, convention_error_detail: str | None, warnings: list[str]) -> None:
         super().__init__(
-            "규약 오류 또는 미완성 문서는 승인할 수 없음",
+            "규약 오류 또는 미완성 문서는 완료로 올릴 수 없음",
             convention_error_detail=convention_error_detail,
             warnings=warnings,
         )
-
-
-class UpstreamReviewRequired(Problem):
-    type = "urn:syncdoc:upstream-review-required"
-    status = 422
-    title = "upstream-review-required"
-
-    def __init__(self) -> None:
-        super().__init__("승인은 상위 대조를 거쳐야 함")
-
-
-class ReasonRequired(Problem):
-    type = "urn:syncdoc:reason-required"
-    status = 422
-    title = "reason-required"
-
-    def __init__(self) -> None:
-        super().__init__("skip에는 사유가 필요함")
-
-
-class AlreadyDecided(Problem):
-    type = "urn:syncdoc:already-decided"
-    status = 409
-    title = "already-decided"
-
-    def __init__(self, choice: str, decided_at: str | None) -> None:
-        super().__init__("이미 결정된 전파", choice=choice, decided_at=decided_at)
-
-
-class AlreadyResolved(Problem):
-    type = "urn:syncdoc:already-resolved"
-    status = 409
-    title = "already-resolved"
-
-    def __init__(self, resolved_at: str | None) -> None:
-        super().__init__("이미 확인된 플래그", resolved_at=resolved_at)
 
 
 class AlreadyCurrent(Problem):
@@ -286,17 +244,6 @@ class RepositoryAlreadyRegistered(Problem):
 
     def __init__(self, code: str) -> None:
         super().__init__(f"{code} 프로젝트가 이미 쓰는 저장소", code=code)
-
-
-class BackupInvalid(Problem):
-    """SYNC-API-001 2장 — backup/tracking.json의 형식을 모르거나 다른 프로젝트의 백업."""
-
-    type = "urn:syncdoc:backup-invalid"
-    status = 422
-    title = "backup-invalid"
-
-    def __init__(self, reason: str) -> None:
-        super().__init__(f"백업 파일을 읽을 수 없다: {reason}", reason=reason)
 
 
 class EmailTaken(Problem):

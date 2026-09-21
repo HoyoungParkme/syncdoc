@@ -364,7 +364,7 @@ def test_get_document_not_found_convention_error_and_deleted_items(db_session: S
     assert d.has_convention_error and d.convention_error_detail == "author.unknown: x"
     assert d.incomplete_warnings == ["section.missing: 목표"]
     assert [i.item_id for i in d.items] == ["G1", "R1"]
-    assert d.items[0].flags == [] and d.prev_doc_id is None
+    assert d.prev_doc_id is None
 
 
 # ── get_item ──
@@ -379,7 +379,7 @@ def test_get_item_block_not_found_deleted(db_session: Session) -> None:
         and "##### 인수기준" in v.body
         and "### 3.2" not in v.body
     )
-    assert (v.doc_status, v.doc_version_no, v.display_name, v.flags) == ("draft", 1, "첫 기능", [])
+    assert (v.doc_status, v.doc_version_no, v.display_name) == ("draft", 1, "첫 기능")
     last = svc.get_item("EXMP-PRD-001", "N1")
     assert last.body.rstrip().endswith("- [ ] 1초 이내")  # 코드블록 포함, 다음 절 전까지
     with pytest.raises(NotFound) as ei:
@@ -435,14 +435,14 @@ def test_save_bumps_version_and_upserts_items(db_session: Session) -> None:
     assert d2.incomplete_warnings == []
 
 
-def test_save_approved_document_demotes_to_review_with_status_change(db_session: Session) -> None:
+def test_save_approved_document_demotes_to_draft_with_status_change(db_session: Session) -> None:
     svc, a, d = _seed(db_session, "approved")
     svc.save(d, d.body.replace("한 줄로.", "두 줄로."), "h2", a, "spec: 테스트", [])
-    assert svc.get_document("EXMP-PRD-001").status == "review"
+    assert svc.get_document("EXMP-PRD-001").status == "draft"
     rows = db_session.execute(
         text("SELECT from_status, to_status, reason, commit_hash FROM status_changes")
     ).all()
-    assert rows == [("approved", "review", "본문 수정으로 자동 강등", None)]
+    assert rows == [("approved", "draft", "본문 수정으로 자동 강등", None)]
     # github 경로에서 frontmatter status가 진실
     d2 = svc.get_document("EXMP-PRD-001")
     gh = Author(kind=AuthorKind.human, user=a.user, instructed_by=None, via=Entry.github)
@@ -594,24 +594,24 @@ def test_last_author_neighbors_resolve_item(db_session: Session) -> None:
 # ── apply_status ──
 def test_apply_status_records_change_without_version(db_session: Session) -> None:
     svc, a, d = _seed(db_session)
-    new_body = PRD.replace("status: draft", "status: review")
-    svc.apply_status(d, new_body, "c0ffee", a.user, "검토 시작")
+    new_body = PRD.replace("status: draft", "status: approved")
+    svc.apply_status(d, new_body, "c0ffee", a.user, "다 썼다")
     d2 = svc.get_document("EXMP-PRD-001")
-    assert d2.status == "review" and d2.body == new_body and d2.current_version_no == 1
+    assert d2.status == "approved" and d2.body == new_body and d2.current_version_no == 1
     assert db_session.execute(text("SELECT count(*) FROM versions")).scalar() == 1
     row = db_session.execute(
         text("SELECT from_status, to_status, reason, commit_hash FROM status_changes")
     ).one()
-    assert row == ("draft", "review", "검토 시작", "c0ffee")
+    assert row == ("draft", "approved", "다 썼다", "c0ffee")
     svc.apply_status(
         d2,
-        new_body.replace("status: review", "status: approved"),
+        new_body.replace("status: approved", "status: draft"),
         None,
         a.user,
         None,
-        to="approved",
+        to="draft",
     )
-    assert svc.get_document("EXMP-PRD-001").status == "approved"
+    assert svc.get_document("EXMP-PRD-001").status == "draft"
 
 
 # ── describe_items ──
@@ -656,7 +656,7 @@ def test_recent_changes_merges_versions_and_status_commits_desc(db_session: Sess
     svc, a, d = _seed(db_session)
     v2 = svc.save(d, d.body + "\n", "h2", a, "spec(EXMP-PRD-001): 한 줄 추가\n\n이유", [])
     d2 = svc.get_document("EXMP-PRD-001")
-    svc.apply_status(d2, d2.body.replace("status: draft", "status: review"), "c1", a.user, "검토")
+    svc.apply_status(d2, d2.body.replace("status: draft", "status: approved"), "c1", a.user, "완료")
     svc.apply_status(d2, d2.body, None, a.user, "commit 없는 자동 강등은 안 나온다", to="draft")
     pid = _project_id(db_session, "EXMP")
     got = svc.recent_changes(pid, 10)
@@ -665,7 +665,7 @@ def test_recent_changes_merges_versions_and_status_commits_desc(db_session: Sess
         ("EXMP-PRD-001", 2, "h2"),
         ("EXMP-PRD-001", 1, "h1"),
     ]
-    assert got[0].message == "status(EXMP-PRD-001): draft → review"
+    assert got[0].message == "status(EXMP-PRD-001): draft → approved"
     assert (got[0].author.kind, got[0].author.user_id, got[0].author.via) == (
         "human",
         a.user.id,
@@ -720,26 +720,6 @@ def test_diff_hunks_per_item_whitespace_ignored_new_item_reverse(db_session: Ses
     )
 
 
-# ── versions_instructed_by · convention_error_docs_by · documents_authored_by ──
-def test_my_versions_error_docs_and_authored_documents(db_session: Session) -> None:
-    svc = SpecService(db_session)
-    p = make_project(db_session)
-    a, b = author(db_session, "aa"), author(db_session, "bb")
-    v1 = svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ_MIN, "h0", a, "spec: 테스트")
-    v2 = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", b, "spec: 테스트")
-    d = svc.get_document("EXMP-PRD-001")
-    v3 = svc.save(d, d.body + "\n", "h2", a, "spec: v2", [])  # PRD 최근 작성자 → a
-    assert svc.versions_instructed_by([v1.id, v2.id, v3.id], a.user.id) == [v1.id, v3.id]
-    assert svc.versions_instructed_by([], a.user.id) == []
-    assert sorted(svc.documents_authored_by(a.user.id)) == sorted([v1.document_id, d.id])
-    assert svc.documents_authored_by(b.user.id) == []  # b의 PRD는 a가 덮어썼다
-    db_session.execute(
-        text("UPDATE documents SET has_convention_error=true WHERE doc_id='EXMP-PRD-001'")
-    )
-    assert [x.doc_id for x in svc.convention_error_docs_by(a.user.id)] == ["EXMP-PRD-001"]
-    assert svc.convention_error_docs_by(b.user.id) == []
-
-
 RFQ_MIN = """---
 doc_id: EXMP-RFQ-001
 type: RFQ
@@ -754,14 +734,14 @@ status: draft
 """
 
 
-# ── B4: list_versions · mark_deleted · list_items_by_project · clear_index · mark_convention_error ──
 def test_list_versions_merges_status_commits_and_skips_auto_demotion(db_session: Session) -> None:
     svc, a, d = _seed(db_session, status="approved")
     svc.save(
         d, d.body + "\n", "h2", a, "spec: v2", []
     )  # 승인 문서 수정 → 자동 강등(commit_hash null)
     d2 = svc.get_document("EXMP-PRD-001")
-    svc.apply_status(d2, d2.body, "c1", a.user, "재승인", to="approved")  # 강등된 review → approved
+    # 강등된 draft → approved
+    svc.apply_status(d2, d2.body, "c1", a.user, "다시 완료", to="approved")
     d3 = svc.get_document("EXMP-PRD-001")
     svc.save(d3, d3.body + "\n", "h3", a, "spec: v3", [])
     got = svc.list_versions("EXMP-PRD-001")
@@ -771,7 +751,7 @@ def test_list_versions_merges_status_commits_and_skips_auto_demotion(db_session:
         (2, "h2"),
         (1, "h1"),
     ]
-    assert got[1].message == "status(EXMP-PRD-001): review → approved"
+    assert got[1].message == "status(EXMP-PRD-001): draft → approved"
     assert (
         got[1].author.kind == "human"
         and got[0].author.kind == "agent"

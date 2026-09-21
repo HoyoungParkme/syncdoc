@@ -1,7 +1,7 @@
 """화면 확인용 미리보기 서버 (DEV-14 일곱째 조건 — 사람이 브라우저에서 눌러 본다).
 
 GitHub OAuth 없이 본다: 개발 DB(syncdoc_dev, 테스트 컨테이너)를 새로 만들고 이 저장소의 docs/specs를
-파이프라인으로 올린 뒤 S4 상태(전파 미결정·확인 필요·끊어진 참조·하위 불일치·규약 오류·댓글·담당 미지정)를 심는다.
+파이프라인으로 올린 뒤 S4 상태(끊어진 참조·규약 오류)를 심는다.
 로그인은 /__dev/login/{login} (hoyoung · minjun). 앱 코드는 건드리지 않는다 — 라우트는 여기서 붙인다.
 
     uv run python tools/dev_preview.py            # 시드 + 서버 (http://localhost:8000/__dev/login/hoyoung)
@@ -31,18 +31,15 @@ from sqlalchemy.orm import Session  # noqa: E402
 from app import db  # noqa: E402
 from app.core import pipeline  # noqa: E402
 from app.core.account.service import AccountService  # noqa: E402
-from app.core.collab.service import CommentService  # noqa: E402
 from app.core.errors import Problem  # noqa: E402
 from app.core.project.models import Project, Repository  # noqa: E402
 from app.core.reference.service import ReferenceService  # noqa: E402
 from app.core.spec.service import SpecService  # noqa: E402
-from app.core.tracking.service import TrackingService  # noqa: E402
 from app.core.types import (  # noqa: E402
     Author,
     AuthorKind,
     DocType,
     Entry,
-    Propagation,
     spec_dir,
 )
 from app.main import app  # noqa: E402
@@ -193,11 +190,10 @@ async def seed() -> None:
         spec = SpecService(s)
         q_edit, _ = with_downstream(s, "SYNC-RFQ-001")
         q_del, _ = with_downstream(s, "SYNC-RFQ-001", {q_edit})
-        r_edit, r_pk = with_downstream(s, "SYNC-PRD-001")
         rfq_no = spec.get_document("SYNC-RFQ-001").current_version_no
         body_rfq = edited(s, "SYNC-RFQ-001", q_edit)
-    # 2. 민준의 에이전트가 RFQ 항목 수정 → 민준이 전파 → PRD 등 하위(호영)에 확인 필요
-    r = await save(
+    # 2. 민준의 에이전트가 RFQ 항목 수정 — v2에서는 아무것도 붙지 않는다(전파 없음). 버전만 는다
+    await save(
         m,
         "SYNC-RFQ-001",
         body_rfq,
@@ -205,39 +201,8 @@ async def seed() -> None:
         f"spec(SYNC-RFQ-001): {q_edit} 보강",
         changed_items=[q_edit],
     )
-    with db.SessionLocal() as s:
-        tr = TrackingService(s)
-        minjun = AccountService(s).user_by_login("minjun")
-        n = tr.record_decision(
-            r.pending_decision_version_id, Propagation.propagate, None, minjun
-        ).flags_raised
-        s.commit()
-        print(f"  RFQ {q_edit} 수정 → 확인 필요 {n}건")
-        prd_no = SpecService(s).get_document("SYNC-PRD-001").current_version_no
-        body_prd = edited(s, "SYNC-PRD-001", r_edit)
-    # 3. 호영의 에이전트가 PRD 항목 수정 → 호영에게 전파 미결정 (UI-12)
-    r = await save(
-        h,
-        "SYNC-PRD-001",
-        body_prd,
-        prd_no,
-        f"spec(SYNC-PRD-001): {r_edit} 범위 변경\n\n하위 문서 영향 검토 필요",
-        changed_items=[r_edit],
-    )
-    print(f"  PRD {r_edit} 수정 → 미결정 version {r.pending_decision_version_id}")
-    # 4. 민준의 에이전트가 SCN 저장하며 PRD 항목이 어긋났다고 지정 → 호영에게 하위 불일치
-    with db.SessionLocal() as s:
-        scn = SpecService(s).get_document("SYNC-SCN-001")
-    await save(
-        m,
-        "SYNC-SCN-001",
-        scn.body + "\n",
-        scn.current_version_no,
-        "spec(SYNC-SCN-001): 상위 어긋남 지목",
-        changed_items=[],
-        upstream_impact=[f"SYNC-PRD-001#{r_edit}"],
-    )
-    # 5. 민준의 에이전트가 RFQ 항목 삭제(확인) → 하위(호영)에 끊어진 참조
+    print(f"  RFQ {q_edit} 수정 → 버전 하나")
+    # 3. 민준의 에이전트가 RFQ 항목 삭제(확인) → 하위 참조가 미존재로 (끊어진 참조)
     with db.SessionLocal() as s:
         rfq = SpecService(s).get_document("SYNC-RFQ-001")
         body_del = without(s, "SYNC-RFQ-001", q_del)
@@ -250,26 +215,11 @@ async def seed() -> None:
         changed_items=[],
         confirm_item_deletion=True,
     )
-    # 6. 규약 오류 · 미해결 댓글 · 담당 미지정
+    # 4. 규약 오류
     with db.SessionLocal() as s:
         s.execute(
             text(
                 "UPDATE documents SET has_convention_error=true, convention_error_detail='frontmatter.status: 미리보기용 오류' WHERE doc_id='SYNC-UC-001'"
-            )
-        )
-        prd = SpecService(s).get_document("SYNC-PRD-001")
-        minjun = AccountService(s).user_by_login("minjun")
-        CommentService(s).add(
-            prd.id,
-            12,
-            prd.body.split("\n")[11],
-            "이 부분 에이전트가 파싱 가능한지 확인이 필요해요",
-            minjun,
-            None,
-        )
-        s.execute(
-            text(
-                "UPDATE flags SET assignee_user_id=NULL WHERE id=(SELECT max(id) FROM flags WHERE kind='needs_check')"
             )
         )
         s.commit()
@@ -282,7 +232,7 @@ def _dev_login(login: str, request: Request, session: Session = Depends(db.get_s
     if user is None:
         return {"error": f"없는 사용자 {login}"}
     auth.login(request, user)
-    return RedirectResponse("/todo", status_code=302)
+    return RedirectResponse("/", status_code=302)
 
 
 if __name__ == "__main__":

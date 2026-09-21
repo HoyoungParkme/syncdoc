@@ -1,4 +1,4 @@
-"""SYNC-API-001 4장 — DocumentSummary · Document · ItemReferences · UpstreamCheck · ChangeStatus."""
+"""SYNC-API-001 4장 — DocumentSummary · Document · ItemReferences · ChangeStatus · Diff · Chain."""
 
 from __future__ import annotations
 
@@ -7,11 +7,11 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from app.core.types import Diff as DiffDto
 from app.core.types import Document as DocumentDto
 from app.core.types import DocumentSummary as DocumentSummaryDto
 from app.core.types import ItemReferences as ItemReferencesDto
-from app.core.types import UpstreamCheck as UpstreamCheckDto
-from app.web.schemas.common import Author, Base, FlagSummary, ItemRef
+from app.web.schemas.common import Author, Base, ItemRef
 
 
 class DocumentSummary(Base):
@@ -54,7 +54,7 @@ class DocumentSummary(Base):
 class DocItem(Base):
     item_id: str
     display_name: str | None
-    flags: list[str]  # kind 문자열 (SYNC-MS-008#queries.document_view 3단계)
+    missing_refs: list[str]  # 이 항목에서 나간 참조 중 대상이 없는 것의 raw_target (UI-5 6.1 뱃지)
 
 
 class Document(DocumentSummary):
@@ -87,36 +87,44 @@ class ItemReferences(Base):
     item_id: str
     upstream: list[ItemRef]
     downstream: list[ItemRef]
-    flags: list[FlagSummary]
 
     @classmethod
     def of(cls, r: ItemReferencesDto) -> ItemReferences:
         return cls.model_validate(r)
 
 
-class UpstreamCheck(Base):
-    target: ItemRef
-    target_version_no: int
-    target_status: str
-    referenced_from: list[str]
+class ChangeStatus(BaseModel):
+    """POST /api/docs/{docId}/status — 토글 (UC-H8). 상위 대조는 없다 (카드 V)."""
+
+    to: Literal["draft", "approved"]
+    reason: str | None = None  # 선택. 이력(UI-7)에 남는다
+
+
+class DiffLine(Base):
+    op: Literal["add", "del", "ctx"]
+    text: str
+
+
+class Hunk(Base):
+    item_id: str | None
+    downstream_count: int
+    lines: list[DiffLine]
+
+
+class Diff(Base):
+    from_version: int
+    to_version: int
+    hunks: list[Hunk]
 
     @classmethod
-    def of(cls, u: UpstreamCheckDto) -> UpstreamCheck:
-        return cls.model_validate(u)
-
-
-class ChangeStatus(BaseModel):
-    to: str
-    reason: str | None = None
-    upstream_mismatch: list[str] = []
-    upstream_reviewed: bool = False
+    def of(cls, d: DiffDto | None) -> Diff | None:
+        return cls.model_validate(d) if d else None
 
 
 class ChainItem(Base):
     ref: ItemRef
     role: str
     status: str
-    has_flag: bool
 
 
 class ChainRow(Base):

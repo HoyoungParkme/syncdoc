@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-001
 type: STD
 title: 명세 작성 규약
-status: approved
+status: draft
 upstream: [SYNC-PRD-001]
 ---
 
@@ -18,7 +18,7 @@ PRD R1이 "원본 규약이 정의되고 위반 시 오류를 낸다"고만 했�
 
 **두 가지 판정**
 - **규약 위반** — 저장이 거부된다. 시스템이 문서를 파싱할 수 없는 경우. 3장
-- **미완성** — 저장은 되고 경고만. 필수 절이 없는 경우. 승인 조건에서 막힌다. 4장
+- **미완성** — 저장은 되고 경고만. 필수 절이 없는 경우. 완료 조건에서 막힌다. 4장
 
 초안은 미완성이어도 된다. 명세는 왔다갔다하며 쓰는 것이라 중간에 끊겨도 저장되어야 한다.
 
@@ -54,7 +54,7 @@ docs/specs/
 | `doc_id` | ○ | `SYNC-PRD-001` | 시스템 (생성 시). 이후 변경 불가 |
 | `type` | ○ | 11단계 타입 코드 또는 `STD` | 에이전트 |
 | `title` | ○ | 한 줄 | 에이전트 |
-| `status` | ○ | `draft` / `review` / `approved` | 생성 시 `draft`. 이후 사람이 웹에서 |
+| `status` | ○ | `draft` / `approved` — 초안·완료 | 생성 시 `draft`. 이후 사람이 웹에서. 완료 문서를 고치면 `draft`로 내려간다 |
 | `upstream` | | 문서 ID 배열. 이 문서가 근거로 삼은 문서 | 에이전트 |
 
 `status`가 진실이다. DB의 `documents.status`는 이 값의 사본이다. 웹에서 상태를 바꾸면 이 줄이 고쳐지고 커밋된다. **MCP로 이 값을 바꿔 보내면 위반이다** — 상태 변경은 사람이 웹에서만 한다(UC-H8). GitHub에 직접 push한 경우는 원본이 진실이므로 그대로 받는다.
@@ -63,7 +63,7 @@ docs/specs/
 
 `upstream`은 **문서 단위 참조**다. 본문의 `[[ ]]`가 항목 단위 참조고, 이건 "이 문서 전체가 저 문서를 전제로 한다"는 뜻. 둘 다 참조 테이블에 들어간다.
 
-**위반**: 필수 필드 누락, `type`이 목록에 없음, `status`가 셋 중 하나가 아님, `doc_id` 형식 불일치.
+**위반**: 필수 필드 누락, `type`이 목록에 없음, `status`가 둘 중 하나가 아님, `doc_id` 형식 불일치.
 
 ### 1.3 항목
 
@@ -97,7 +97,7 @@ docs/specs/
 
 - 문서: `[[SYNC-PRD-001]]` · 항목: `[[SYNC-PRD-001#R12]]` · **같은 문서 안 항목: `[[#R12]]`** (문서 ID 생략)
 - 방향은 **하위 → 상위**로만 적는다. 이 문서가 근거로 삼는 것을 적는다. 역방향(누가 나를 참조하나)은 시스템이 계산한다
-- **연관은 글이 아니라 참조로 적는다.** "연관: R5"라고 쓰면 시스템이 못 읽는다. `[[SYNC-PRD-001#R5]]`라고 써야 R5가 바뀔 때 이 항목에 플래그가 붙는다. 유스케이스의 포함·확장점, 시퀀스의 근거 유스케이스, 화면의 주 유스케이스, 제약의 출처 — 전부 참조다
+- **연관은 글이 아니라 참조로 적는다.** "연관: R5"라고 쓰면 시스템이 못 읽는다. `[[SYNC-PRD-001#R5]]`라고 써야 시스템이 R5와 이 항목을 잇는다 — 뷰에서 건너가고, R5가 사라지면 이 항목에 끊어진 참조가 표시된다. 유스케이스의 포함·확장점, 시퀀스의 근거 유스케이스, 화면의 주 유스케이스, 제약의 출처 — 전부 참조다
 - 대상이 아직 없어도 저장된다. `미존재` 표시가 붙고, 대상이 생기면 다음 저장 때 풀린다 (UC-S2 2a)
 - 코드블록·인라인 코드(백틱) 안의 `[[ ]]`는 참조로 보지 않는다. 규약 문서처럼 문법을 설명할 때 쓴다
 - 항목 ID에 `/`·`{}`가 있으면(`POST/api/docs/{docId}`) 그대로 쓴다. `[[SYNC-API-001#POST/api/docs/{docId}]]`. 항목 ID 부분은 공백만 없으면 된다
@@ -389,7 +389,7 @@ frontend/
 
 | | |
 |---|---|
-| 항목 패턴 | `[A-Za-z_]+\.[a-z_]+` 예: `SpecService.save` · `pipeline.save_pipeline` · `queries.todo` · `git.commit_push` |
+| 항목 패턴 | `[A-Za-z_]+\.[a-z_]+` 예: `SpecService.save` · `pipeline.save_pipeline` · `queries.document_view` · `git.commit_push` |
 | 필수 절 | 함수 목록 · 미결사항 |
 | 문서 분할 | **클래스 명세 4장 절 하나 = MS 문서 하나** (`MS-001` project … `MS-009` infra). 크기가 아니라 코드 파일 기준 |
 | 항목 블록 | 시그니처(코드블록) · 근거(참조) · 입력 · 처리(번호 단계) · 출력 · 예외 · 호출하는 것 · 테스트 관점. **간략형** — 처리가 몇 줄이면 시그니처·처리·테스트만. **분기는 `if 조건 → 결과 · else → 결과`** 기호로, 문장으로 쓰지 않는다. 내부 타입은 클래스 명세 2.8(DTO)에 한 곳만 |
@@ -431,7 +431,7 @@ frontend/
 | `frontmatter.missing` | frontmatter 블록 없음 |
 | `frontmatter.field` | 필수 필드(`doc_id` `type` `title` `status`) 없음 |
 | `frontmatter.type` | `type`이 11단계 코드 또는 `STD`가 아님 |
-| `frontmatter.status` | `status`가 셋 중 하나 아님 |
+| `frontmatter.status` | `status`가 둘 중 하나(`draft`·`approved`) 아님 |
 | `frontmatter.doc_id` | 형식 `^[A-Z]{1,4}-[A-Z]+-\d{3}$` 아님, 또는 파일명과 다름, 또는 `type`과 다름 |
 | `frontmatter.ref` | `upstream`에 문서 ID 형식 아닌 것 |
 | `frontmatter.status_change` | MCP 경로 저장에서 `status`가 현재 DB 값과 다름. 상태 변경은 웹(UC-H8)에서만. GitHub 경로는 검사 안 함 |
@@ -442,7 +442,7 @@ frontend/
 | `item.padding` | 번호에 앞자리 0 |
 | `item.pattern` | 첫 토큰이 ID처럼 보이는데(`^[A-Z]+-?\d`) 타입 패턴에 안 맞음 — 오타 방지 |
 | `ref.format` | `[[ ]]` 안이 `문서ID` · `문서ID#항목ID` · `#항목ID`(같은 문서) 형식 아님. 항목ID는 `\S+` |
-| `author.unknown` | GitHub 경로 커밋 작성자가 미등록 (자리표시 User). 저장은 되고 승인만 막힌다 |
+| `author.unknown` | GitHub 경로 커밋 작성자가 미등록 (자리표시 User). 저장은 되고 완료만 막힌다 |
 | `file.deleted` | GitHub 경로에서 명세 파일이 삭제됨. 문서는 남기고 `draft`로 내리며 항목 전부 `is_deleted`. 파일을 되살리면 풀린다 |
 
 **위반이 아닌 것**: mermaid 문법 오류, 미존재 참조, 필수 절 누락, 빈 항목 블록, 번호 없는 절 헤딩(4장 `section.unnumbered` 경고까지다 — 저장은 된다).
@@ -480,10 +480,10 @@ mermaid 문법 오류는 서버가 판정할 수 없다(브라우저 렌더링).
 **프로젝트 전체 상태**다 — 상대 문서가 나중에 들어오면 저절로 풀린다(`ReferenceService.resolve_missing`).
 게다가 파이프라인에서 참조 추출은 규약 결과 기록보다 **뒤**라, 저장하는 그 시점에는 아직 답이 없다.
 그래서 **`documents.incomplete_warnings` 컬럼에 넣지 않고 읽을 때 `references.is_missing`에서 센다.**
-읽는 곳은 둘 — 승인 게이트(`pipeline.change_status`)와 UI-5 미완성 배너 4a(`document_view.missing_refs`)이고
+읽는 곳은 둘 — 완료 게이트(`pipeline.change_status`)와 UI-5 미완성 배너 4a(`document_view.missing_refs`)이고
 둘은 **같은 값**을 본다. 컬럼에 굳혀 두면 상대 문서가 들어와도 그 문서를 다시 저장하기 전까지 낡은 값이 남는다.
 대신 **문서 목록의 `미완성` 뱃지에는 안 들어간다** — 목록에서 문서마다 참조를 훑으면 쿼리가 문서 수만큼 늘어난다.
-목록에서 끊어진 참조는 `끊어진 참조` 플래그 수(UI-4 3.2)가 말한다.
+목록에서 끊어진 참조는 UI-4 3.2(끊어진 참조 수 — 같은 `references.is_missing`을 프로젝트 단위로 한 번 센 것)가 말한다.
 
 **`dom.name`은 이름 규칙을 추측하지 않는다.** 클래스 명세가 이미 항목마다
 `테이블: [[…]] · 도메인: [[…]]`을 적어 두었다. 그 링크를 정답으로 삼는다. 링크가 없는 클래스는

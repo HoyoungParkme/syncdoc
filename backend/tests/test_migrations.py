@@ -1,6 +1,6 @@
-"""SYNC-CODE-001#A 테스트 — 마이그레이션 up/down.
+"""SYNC-CODE-001#A·V 테스트 — 마이그레이션 up/down.
 
-테이블 13개 · 인덱스(DOM-003 3장) · downgrade 후 빈 스키마.
+테이블 10개(0011이 협업 테이블 셋을 지웠다) · 인덱스(DOM-003 3장) · downgrade 후 빈 스키마.
 """
 
 import re
@@ -20,9 +20,6 @@ TABLES = {
     "versions",
     "status_changes",
     "references",
-    "flags",
-    "propagation_decisions",
-    "comments",
     "users",
     "access_tokens",
     "commit_emails",
@@ -30,7 +27,6 @@ TABLES = {
 PARTIAL_INDEXES = {
     "ix_documents_has_convention_error",
     "ix_references_is_missing",
-    "ix_propagation_decisions_choice_undecided",
 }
 
 
@@ -48,7 +44,7 @@ def _reset_schema() -> None:
     engine.dispose()
 
 
-def test_upgrade_creates_13_tables_and_indexes(alembic_cfg: Config) -> None:
+def test_upgrade_creates_10_tables_and_indexes(alembic_cfg: Config) -> None:
     _reset_schema()
     command.upgrade(alembic_cfg, "head")
     engine = create_engine(settings.DATABASE_URL)
@@ -64,21 +60,6 @@ def test_upgrade_creates_13_tables_and_indexes(alembic_cfg: Config) -> None:
     assert "version_no DESC" in defs["ix_versions_document_id_version_no_desc"]
     via = next(c for c in insp.get_columns("versions") if c["name"] == "via")  # 0002
     assert via["nullable"] is False and via["default"] is None
-    # 재구축이 versions를 갈아 끼우는 동안만 검사를 미룰 수 있어야 한다 (0007, #38).
-    # NOT DEFERRABLE이면 DELETE FROM versions 자체가 막혀 재구축이 아예 안 된다
-    with engine.connect() as conn:
-        deferrable = dict(
-            conn.execute(
-                text(
-                    "SELECT conname, condeferrable FROM pg_constraint WHERE conname IN"
-                    " ('propagation_decisions_version_id_fkey', 'flags_cause_version_id_fkey')"
-                )
-            ).all()
-        )
-    assert deferrable == {
-        "propagation_decisions_version_id_fkey": True,
-        "flags_cause_version_id_fkey": True,
-    }
     # FK 컬럼 전부 인덱스(DEV-8): 각 FK의 첫 컬럼이 어떤 인덱스의 선두 컬럼이다
     for table in TABLES:
         leading = {
@@ -94,6 +75,32 @@ def test_upgrade_creates_13_tables_and_indexes(alembic_cfg: Config) -> None:
 def test_downgrade_removes_everything(alembic_cfg: Config) -> None:
     _reset_schema()
     command.upgrade(alembic_cfg, "head")
+    # 0011 왕복 — downgrade가 협업 테이블 셋을 0001·0007·0008 모양 그대로 되살린다 (DEV-7)
+    command.downgrade(alembic_cfg, "0010")
+    engine = create_engine(settings.DATABASE_URL)
+    insp = inspect(engine)
+    assert {"flags", "propagation_decisions", "comments"} <= set(insp.get_table_names())
+    assert "target_version_id" in {c["name"] for c in insp.get_columns("flags")}
+    with engine.connect() as conn:
+        deferrable = dict(
+            conn.execute(
+                text(
+                    "SELECT conname, condeferrable FROM pg_constraint WHERE conname IN"
+                    " ('propagation_decisions_version_id_fkey', 'flags_cause_version_id_fkey',"
+                    " 'flags_target_version_id_fkey')"
+                )
+            ).all()
+        )
+    assert deferrable == {
+        "propagation_decisions_version_id_fkey": True,
+        "flags_cause_version_id_fkey": True,
+        "flags_target_version_id_fkey": True,
+    }
+    engine.dispose()
+    command.upgrade(alembic_cfg, "head")
+    engine = create_engine(settings.DATABASE_URL)
+    assert set(inspect(engine).get_table_names()) - {"alembic_version"} == TABLES
+    engine.dispose()
     command.downgrade(alembic_cfg, "0001")
     engine = create_engine(settings.DATABASE_URL)
     assert "via" not in {c["name"] for c in inspect(engine).get_columns("versions")}

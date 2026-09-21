@@ -36,7 +36,7 @@ def test_graph_versions_downstream_via_api(client: TestClient, scoped: Session) 
     assert client.get("/api/projects/EXMP/graph", params={"scope": "nope"}).status_code == 422
     d2 = svc.get_document("EXMP-PRD-001")
     svc.apply_status(
-        d2, d2.body.replace("status: draft", "status: review"), "c1", a_prd.user, "검토"
+        d2, d2.body.replace("status: draft", "status: approved"), "c1", a_prd.user, None
     )
     vs = client.get("/api/docs/EXMP-PRD-001/versions").json()
     assert [
@@ -137,16 +137,8 @@ async def test_webhook_admin_and_catch_up(client: TestClient, scoped: Session, p
         "SYNC-PRD-001",
     ]
     assert client.post("/api/admin/repos/NOPE/rebuild").status_code == 404
-    # 백업·복원 (#16) — 관리 표에 마지막 백업이 뜨고, 복원이 멱등이다
-    assert client.get("/api/admin/repos").json()[0]["backed_up_at"] is None
-    assert client.post("/api/admin/repos/EXMP/restore").status_code == 404  # 백업 파일이 없다
-    from app.core import pipeline as _pl
-
-    await _pl.export_tracking("EXMP")
-    st = client.get("/api/admin/repos").json()[0]
-    assert st["backed_up_at"] is not None and st["backup_stale"] is False, st
-    r = client.post("/api/admin/repos/EXMP/restore")
-    assert r.status_code == 200 and r.json()["dropped"] == []
+    # 관리 표에 백업 칸이 없다 (카드 V)
+    assert "backed_up_at" not in client.get("/api/admin/repos").json()[0]
 
 
 async def test_trash_restore_purge_via_api(client: TestClient, scoped: Session, proj) -> None:

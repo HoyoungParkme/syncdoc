@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import AccountService
-from app.core.clock import now_utc
 from app.core.errors import (
     ExistingSpecs,
     NotFound,
@@ -151,40 +150,20 @@ class ProjectService:
 
         원격을 안 탄다. fetch는 폴링(scheduler.catch_up)이 하고 여기는 그 결과를 본다 —
         화면이 열릴 때마다 저장소 수만큼 fetch가 돌면 느리고, 폴링과 이중이 된다.
-
-        backed_up_at만은 git에서 읽는다 — DB를 잃어도 남아야 하는 값이다(INFRA 6.1).
-        네트워크를 안 타는 로컬 조회 하나라 위 이유와 어긋나지 않는다.
         """
-        out = []
-        for p in self.repo.all():
-            # 폴링이 적어 둔 실패 사유 (#46). 백업 읽기도 실패하면 그쪽이 이긴다 —
-            # 둘 다 "이 저장소를 지금 못 보고 있다"는 같은 말이라 한 칸에 모은다
-            backed_up_at, err = None, p.repository.fetch_error
-            try:
-                backed_up_at = await git.last_commit_at(
-                    Path(p.repository.workdir_path), "backup/tracking.json"
-                )
-            except Exception as e:  # noqa: BLE001 — 하나가 망가져도 표 전체를 죽이지 않는다
-                err = f"backup: {e}"
-            stale = False
-            if backed_up_at is not None and settings.BACKUP_INTERVAL_SECONDS > 0:
-                age = (now_utc() - backed_up_at).total_seconds()
-                stale = age > 2 * settings.BACKUP_INTERVAL_SECONDS
-            out.append(
-                RepoStatus(
-                    p.code,
-                    p.name,
-                    p.repository.remote_url,
-                    p.repository.last_processed_commit,
-                    p.repository.synced_at,
-                    p.repository.behind_by,
-                    p.repository.fetched_at,
-                    backed_up_at=backed_up_at,
-                    backup_stale=stale,
-                    error=err,
-                )
+        return [
+            RepoStatus(
+                p.code,
+                p.name,
+                p.repository.remote_url,
+                p.repository.last_processed_commit,
+                p.repository.synced_at,
+                p.repository.behind_by,
+                p.repository.fetched_at,
+                error=p.repository.fetch_error,  # 폴링이 적어 둔 실패 사유 (#46)
             )
-        return out
+            for p in self.repo.all()
+        ]
 
     async def delete_project(self, code: str) -> None:
         """SYNC-MS-001#ProjectService.delete_project

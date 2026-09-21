@@ -1,5 +1,5 @@
 /** UI-2 프로젝트 목록 — SYNC-UI-002#UI-2. 프로젝트가 행, 11단계가 열. UC-H14 1~2, 1a·1b·3a.
- *  1 헤더(1.1 초기화) · 2 현황판(2.1 행, 2.2 단계 칸, 2.3 경고, 2.4 상위 미승인) · 3 빈 상태 · 4 범례
+ *  1 헤더(1.1 초기화) · 2 현황판(2.1 행, 2.2 단계 칸, 2.3 경고, 2.4 상위 미완료) · 3 빈 상태 · 4 범례
  *
  *  표가 아니라 격자다 — 칸이 열 폭을 꽉 채워야 색이 띠로 읽힌다. */
 import { useState } from 'react'
@@ -10,12 +10,10 @@ import { ProjName, Tooltip } from '../components/ui'
 
 /** 행 아래 요약과 경고 툴팁이 같은 목록을 쓴다 — 한쪽만 고쳐 어긋나는 일이 없게 */
 const KINDS: [string, string][] = [
-  ['needs_check', '확인 필요'],
   ['broken_ref', '끊어진 참조'],
-  ['upstream_impact', '하위 불일치'],
   ['convention_errors', '규약 오류'],
 ]
-const CELL: Record<string, string> = { approved: 'ok', review: 'rv', draft: 'dr' }
+const CELL: Record<string, string> = { approved: 'ok', draft: 'dr' }
 
 const breakdown = (counts: Record<string, number>) =>
   KINDS.filter(([k]) => counts[k]).map(([k, ko]) => `${ko} ${counts[k]}`)
@@ -50,7 +48,6 @@ export function ProjectList() {
             {projects.map((p) => {
               const work = breakdown(p.counts)
               const docs = p.stages.reduce((n, s) => n + s.doc_count, 0) + p.std_docs.length
-              const workN = KINDS.reduce((n, [k]) => n + (p.counts[k] ?? 0), 0)
               return (
                 <div className="hrow" data-el="2.1" key={p.code}>
                   <span>
@@ -68,9 +65,10 @@ export function ProjectList() {
                       <ProjName code={p.code} name={p.name} />
                     </span>
                     <span className="sub">
-                      {workN > 0 && (
+                      {/* 규칙: 둘째 줄은 `끊어진 참조 N · 규약 오류 M` — 0이 아닌 것만, 경고색 */}
+                      {work.length > 0 && (
                         <>
-                          <b className="work">처리할 것 {workN}</b>
+                          <b className="work">{work.join(' · ')}</b>
                           <span className="mid">·</span>
                         </>
                       )}
@@ -89,16 +87,13 @@ export function ProjectList() {
               <i className="sw dr" /> 초안
             </span>
             <span>
-              <i className="sw rv" /> 검토중
-            </span>
-            <span>
-              <i className="sw ok" /> 승인
+              <i className="sw ok" /> 완료
             </span>
             <span>
               <i className="sw na" /> 미작성
             </span>
-            <span className="warn">⚠ 플래그·규약 오류 있음</span>
-            <span className="warn">▲ 상위 미승인 (막지는 않는다)</span>
+            <span className="warn">⚠ 끊어진 참조·규약 오류 있음</span>
+            <span className="warn">▲ 상위 미완료 (막지는 않는다)</span>
           </div>
         </>
       )}
@@ -113,18 +108,18 @@ export function ProjectList() {
   )
 }
 
-/** 색은 상태, 테두리는 플래그. 두 정보가 한 칸에 겹치지 않게 나눈다 (UI-2 규칙).
+/** 색은 상태, 테두리는 끊어진 참조. 두 정보가 한 칸에 겹치지 않게 나눈다 (UI-2 규칙).
  *  칸 하나에 툴팁도 하나다 — 칸과 ▲에 따로 걸면 ▲ 위에서 둘이 같이 뜬다. */
 function StageCell({ s, onOpen }: { s: ProjectSummary['stages'][number]; onOpen: () => void }) {
   const lines = [
     s.status ? `${s.doc_count}문서` : '미작성',
-    s.flag_count ? `플래그 ${s.flag_count}` : '',
-    s.gate_warning ? '앞 단계 미승인 (막지는 않는다)' : '',
+    s.broken_count ? `끊어진 참조 ${s.broken_count}` : '',
+    s.gate_warning ? '앞 단계 미완료 (막지는 않는다)' : '',
   ].filter(Boolean)
   return (
     <Tooltip text={lines.join('\n')}>
       <span
-        className={`cell ${s.status ? CELL[s.status] : 'na'}${s.flag_count ? ' flagged' : ''}`}
+        className={`cell ${s.status ? CELL[s.status] : 'na'}${s.broken_count ? ' missing' : ''}`}
         data-el="2.2"
         onClick={onOpen}
       >

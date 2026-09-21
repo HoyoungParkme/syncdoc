@@ -1,4 +1,4 @@
-/** UI-9 순서대로 읽기 — SYNC-UI-002#UI-9. 승인 문서만, 없으면 배너(3)와 초안 보기(3.1). 요소 번호 = data-el.
+/** UI-9 순서대로 읽기 — SYNC-UI-002#UI-9. 완료 문서만, 없으면 배너(3)와 초안 보기(3.1). 요소 번호 = data-el.
  *  1 헤더 · 2 단계 표시(칩마다 대표 상태 점, 현재는 채워서) · 3 미확정 배너(3.1)
  *  4 본문(4.1 위치) · 5 이동(5.1 이전, 5.2 다음, 5.3 이 문서 열기) */
 import { ProjName } from '../components/ui'
@@ -10,7 +10,7 @@ import { extraCss, renderView } from '../view'
 import { attachDiagramButtons, DiagramFull, type FullDiagram } from '../components/DiagramFull'
 import { esc, splitRef } from '../view/md'
 
-const ORDER: Record<string, number> = { draft: 0, review: 1, approved: 2 }
+const ORDER: Record<string, number> = { draft: 0, approved: 1 }
 
 export function ReadOrder() {
   const { code = '' } = useParams()
@@ -77,7 +77,7 @@ export function ReadOrder() {
     return () => root.removeEventListener('click', onClick)
   }, [bodies, code, nav, stage])
   const hasDocs = (s: number) => docs.some((d) => d.stage === s)
-  /** 그 단계 문서들 중 가장 낮은 상태. 승인 2 + 초안 1이면 초안 (UC-H14 1a와 같은 기준) */
+  /** 그 단계 문서들 중 가장 낮은 상태. 완료 2 + 초안 1이면 초안 (UC-H14 1a와 같은 기준) */
   const stageStatus = (s: number) =>
     docs
       .filter((d) => d.stage === s)
@@ -123,7 +123,7 @@ export function ReadOrder() {
       <div className="readbody">
         {approved.length === 0 && inStage.length > 0 && (
           <div className="banner warn" data-el="3">
-            이 단계에 승인된 문서가 없습니다. {inStage.map((d) => `${d.doc_id}은(는) ${STATUS_KO[d.status]}`).join(', ')}입니다.{' '}
+            이 단계에 완료된 문서가 없습니다. {inStage.map((d) => `${d.doc_id}은(는) ${STATUS_KO[d.status]}`).join(', ')}입니다.{' '}
             {!showDraft && (
               <span className="btn sm" data-el="3.1" onClick={() => setShowDraft(true)}>
                 초안 보기

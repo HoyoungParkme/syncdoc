@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-002
 type: MS
 title: MINISPEC — SpecService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/spec/service.py`의 함수 31개. 클래스 명세 [[SYNC-DOM-002]] 4.2의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/spec/service.py`의 함수 34개. 클래스 명세 [[SYNC-DOM-002]] 4.2의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -47,9 +47,6 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#SpecService.neighbors]] | 앞뒤 단계 문서 |
 | [[#SpecService.last_author]] | 최근 버전 작성자 |
 | [[#SpecService.recent_changes]] | 최근 변경 N건 |
-| [[#SpecService.versions_instructed_by]] | 내가 저장시킨 버전 |
-| [[#SpecService.convention_error_docs_by]] | 내 커밋의 오류 문서 |
-| [[#SpecService.documents_authored_by]] | 내 문서 |
 | [[#SpecService.clear_index]] | 재구축용 삭제 |
 | [[#SpecService.version_keys]] | 재연결용 버전 열쇠 |
 | [[#SpecService.mark_convention_error]] | 오류·경고 표시 |
@@ -78,9 +75,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. `DB: items where document_id and is_deleted=false` — `item_id`, `display_name`
 3. `DB: versions where document_id order by version_no desc limit 1` — 최근 작성 주체를 `AuthorRef(kind, user_id, instructed_by_id, via)`로. **users를 읽지 않는다** — 이름은 `queries`가 `AccountService.users_by_ids`로
 4. `missing_refs` = 이 문서 참조 중 `is_missing`인 `raw_target` 목록 — **references는 reference 묶음이라 SpecService가 읽지 않는다.** 비워 두고 `queries.document_view`가 `ReferenceService.upstream_of_document`로 채운다
-5. `→ Document(id, doc_id, doc_type, stage, status, current_body, current_version_no, current_version_id=최근 versions.id, commit_hash=최근 버전의 것, missing_refs=[], has_convention_error, convention_error_detail, incomplete_warnings, items[], last_author: AuthorRef)`. 플래그·이웃은 **넣지 않는다** — `queries.document_view`가 붙인다
+5. `→ Document(id, doc_id, doc_type, stage, status, current_body, current_version_no, current_version_id=최근 versions.id, commit_hash=최근 버전의 것, missing_refs=[], has_convention_error, convention_error_detail, incomplete_warnings, items[], last_author: AuthorRef)`. 이웃은 **넣지 않는다** — `queries.document_view`가 붙인다
 
-**출력** `Document`. `items[].flags`·`prev_doc_id`·`next_doc_id`는 비어 있다
+**출력** `Document`. `prev_doc_id`·`next_doc_id`는 비어 있다
 
 **예외** 없는 문서 → `not-found`. 규약 오류 문서는 예외가 아니다(UC-A2 2a)
 
@@ -103,7 +100,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. `item = DB: items where document_id and item_id` · if 없음 → `! not-found {resource: item, id, available_items: [모든 item_id]}` (UC-A3 1b)
 3. if `item.is_deleted` → `! item-deleted {deleted_at}` (1a)
 4. `blocks = item_blocks(document.current_body, doc_type)`. `item_id`에 해당하는 블록 본문
-5. `→ ItemView(doc_id, item_id, display_name, body=블록, doc_status, doc_version_no)`. `flags`는 비움 — `queries`가
+5. `→ ItemView(doc_id, item_id, display_name, body=블록, doc_status, doc_version_no)`
 
 **출력** `ItemView`
 
@@ -231,8 +228,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 3. `blocks = item_blocks(body, doc_type)`. 블록마다 `DB: items where document_id and item_id` · if 있음 → `display_name` 갱신, **`is_deleted=false, deleted_at=null`로 되돌림**(본문에 다시 나타났으므로 복구) · else → insert
 4. `deleted_item_pks`마다 `DB: items set is_deleted=true, deleted_at=now`
 5. if `author.via == github` → `new_status = fm.status` (원본이 진실) · else → `new_status = document.status`
-6. if `document.status == approved and body != document.current_body and new_status == approved` → `new_status = review`, `DB: status_changes insert (from=approved, to=review, changed_by=author.user, reason="본문 수정으로 자동 강등", commit_hash=status_commit_hash)` (UC-A6 6a)
-   - **`new_status == approved`를 함께 보는 것은 github 경로 때문이다.** 5단계에서 작성자가 frontmatter로 스스로 `draft`를 적었으면 그게 원본의 진실이다. 그것까지 `review`로 덮으면 저장소는 `draft`, DB는 `review`로 또 갈린다
+6. if `document.status == approved and body != document.current_body and new_status == approved` → `new_status = draft`, `DB: status_changes insert (from=approved, to=draft, changed_by=author.user, reason="본문 수정으로 자동 강등", commit_hash=status_commit_hash)` (UC-A6 6a). **완료 문서를 고치면 초안으로 돌아간다** — 혼자 써도 「고쳤으니 다시 봐야 한다」는 신호는 필요하다
+   - **`new_status == approved`를 함께 보는 것은 github 경로 때문이다.** 5단계에서 작성자가 frontmatter로 스스로 `draft`를 적었으면 그게 원본의 진실이다. 이미 초안이라 강등할 것이 없고, 덮으면 StatusChange가 거짓으로 하나 는다
    - **이 강등은 저장소에도 반영돼야 한다**([[SYNC-STD-001]] 1.2 「`status`가 진실」). mcp·web_revert 경로는 [[SYNC-MS-007#pipeline.save_pipeline]] 6a가 **push 전에** 본문을 고쳐 한 커밋으로 끝낸다. **github 경로는 커밋이 이미 저장소에 있어 그럴 수 없다** — 같은 6a가 `status(…)` 커밋을 하나 더 밀고, 그 해시가 `status_commit_hash`로 여기 온다 (#58)
 7. `DB: documents update (current_body, current_version_no=new_no, status=new_status)` · if `validate_result` → `has_convention_error = bool(violations)`, `convention_error_detail = violations를 "rule: message" 줄로 (없으면 null)`, `incomplete_warnings = warnings JSON (없으면 null)` · else → 오류·경고 컬럼 그대로 · **`trashed_at·trashed_by_user_id = null`** — 어느 입구든 저장되면 휴지통에서 나온다(UC-A8 4, GitHub로 파일을 되살려도 같다)
 8. `→ Version`
@@ -243,7 +240,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** [[#SpecService.item_blocks]]
 
-**테스트 관점** 저장 후 `version_no` +1 · 승인 문서 저장 → `review` + StatusChange · github 경로에서 frontmatter status가 `approved`로 바뀐 본문 → 그대로 `approved` · **승인 문서를 github로 고치면 DB는 `review`가 되고 저장소 frontmatter도 뒤이어 `review`가 된다** · 삭제 pk → `is_deleted=true`이고 행은 남음 · 경고 있는 저장 → `incomplete_warnings` 채워짐
+**테스트 관점** 저장 후 `version_no` +1 · 완료 문서 저장 → `draft` + StatusChange · github 경로에서 frontmatter status가 `approved`로 바뀐 본문 → 그대로 `approved` · **완료 문서를 github로 고치면 DB는 `draft`가 되고 저장소 frontmatter도 뒤이어 `draft`가 된다** · 삭제 pk → `is_deleted=true`이고 행은 남음 · 경고 있는 저장 → `incomplete_warnings` 채워짐
 
 ---
 
@@ -272,7 +269,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 1. `DB: items where document_id and is_deleted=false` → 전부 `is_deleted=true, deleted_at=now` · pk 목록 기억
 2. `DB: status_changes insert (from=document.status, to=draft, changed_by=author.user, reason="파일 삭제됨", commit_hash)`
 3. `DB: documents update status=draft, has_convention_error=true, convention_error_detail="file.deleted: {commit_hash}"`
-4. `→` 삭제된 항목 pk 목록 (호출자가 `raise_broken`)
+4. `→` 삭제된 항목 pk 목록 (호출자가 `ReferenceService.mark_missing`)
 
 **테스트 관점** 파일 삭제 push → 문서 행 남음, `draft`, 항목 전부 삭제됨, 하위에 끊어진 참조 · 파일 되살려 push → 다음 저장이 `file.deleted`를 지우고, 되살아난 항목 ID는 위반이 아니며 `is_deleted`가 풀린다(복구)
 
@@ -309,7 +306,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `diff(doc_id: str, from_no: int, to_no: int, context: int = settings.DIFF_CONTEXT_LINES) -> Diff`
 
-근거: [[SYNC-SEQ-001#SEQ-15]] · [[SYNC-UC-001#UC-H6]] · `TrackingService.detect_impact`·`get_flag`도 쓴다
+근거: [[SYNC-SEQ-001#SEQ-15]] · [[SYNC-UC-001#UC-H6]]
 
 **입력** 문서 ID, 두 버전 번호. `from_no > to_no`도 허용(역방향 diff)
 
@@ -318,7 +315,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. 각 본문을 `item_blocks`로 자른다. 항목 ID → 블록 텍스트. 항목 밖 텍스트는 `item_id=None` 블록 하나
 3. 두 쪽에 있는 항목 ID 합집합마다 `difflib.unified_diff(from_block, to_block, n=context)` → 줄 목록 `(op: add|del|ctx, text)`. 양쪽 같으면 hunk 없음
 
-   `context`는 앞뒤로 몇 줄을 함께 보여줄지다. 기본은 `DIFF_CONTEXT_LINES`(3). 한 줄이면 마크다운 문단에서 무엇이 바뀌었는지는 보여도 **어느 절의 변경인지가 안 보인다.** 이 diff는 이력(UI-7)·플래그(UI-11)·전파(UI-12) 세 화면에 쓰인다
+   `context`는 앞뒤로 몇 줄을 함께 보여줄지다. 기본은 `DIFF_CONTEXT_LINES`(3). 한 줄이면 마크다운 문단에서 무엇이 바뀌었는지는 보여도 **어느 절의 변경인지가 안 보인다.** 이 diff는 이력(UI-7)이 쓴다
 4. 새로 생긴 항목은 전부 `add`, 사라진 항목은 전부 `del`
 5. `→ Diff(from_version, to_version, hunks=[{item_id, lines}])`. `downstream_count`는 **비움** — `queries.diff_with_impact`가 붙인다
 
@@ -328,7 +325,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** [[#SpecService.item_blocks]]
 
-**테스트 관점** `context`를 키우면 `ctx` 줄만 늘고 `add`·`del` 수는 그대로 · `detect_impact`와 `pipeline`은 hunk의 `item_id`만 쓰므로 `context`와 무관하게 같은 결과
+**테스트 관점** `context`를 키우면 `ctx` 줄만 늘고 `add`·`del` 수는 그대로
 
 **테스트 관점** 항목 하나만 고침 → hunk 하나 · 공백만 바꿈 → hunk 없음(`text.strip()` 비교) · 항목 추가 → 전부 add인 hunk · 역방향 → op가 뒤집힘
 
@@ -366,7 +363,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `describe_documents(document_ids: list[int]) -> dict[int, DocRef]`
 
-**처리** `DB: documents where id in ids` → `{id: DocRef(document_id, doc_id, title=frontmatter title, stage, status)}`. 참조의 `to_document_id`(문서 단위 참조)·댓글 응답의 `doc_id`·미결정 목록이 쓴다. `doc_id_of(document_id)`는 이걸로 대신한다
+**처리** `DB: documents where id in ids` → `{id: DocRef(document_id, doc_id, title=frontmatter title, stage, status)}`. 참조의 `to_document_id`(문서 단위 참조)를 표시할 때 쓴다. `doc_id_of(document_id)`는 이걸로 대신한다
 
 ---
 
@@ -374,7 +371,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `versions_by_ids(version_ids: list[int]) -> dict[int, VersionBrief]`
 
-**처리** `DB: versions where id in ids` → `{id: VersionBrief(id, document_id, version_no, created_at, message)}`. 플래그의 `cause_version_id`를 `cause_version_no`로, 미결정의 `version_id`를 문서·번호·메시지로 바꿀 때. **쿼리 한 번**
+**처리** `DB: versions where id in ids` → `{id: VersionBrief(id, document_id, version_no, created_at, message)}`. 버전 id를 문서·번호·메시지로 바꿀 때. **쿼리 한 번**
 
 ---
 
@@ -398,13 +395,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### SpecService.item_pks 문서의 항목 pk 지도
 
-**시그니처** `item_pks(document_id: int, include_deleted: bool = False) -> dict[str, int]`
+**시그니처** `item_pks(document_id: int) -> dict[str, int]`
 
-근거: [[SYNC-MS-007#pipeline.save_pipeline]] 10단계 — `ReferenceService.extract`에 넘길 `{item_id: pk}`. `save`가 `Version`을 돌려주므로 따로 읽는다. `include_deleted`는 [[SYNC-MS-007#pipeline.import_tracking]] 5단계
+근거: [[SYNC-MS-007#pipeline.save_pipeline]] 10단계 — `ReferenceService.extract`에 넘길 `{item_id: pk}`. `save`가 `Version`을 돌려주므로 따로 읽는다
 
-**처리** `DB: items where document_id` (`include_deleted=false`면 `and is_deleted=false`) → `{item_id: id}`. 저장 직후(같은 트랜잭션)에 부르므로 방금 upsert한 것이 보인다
-
-**삭제된 항목까지 받는 갈래가 필요한 이유.** 백업 복원이 `문서ID#항목ID`를 pk로 되돌려야 하는데 **`broken_ref` 플래그의 원인 항목은 정의상 `is_deleted`다**. [[#SpecService.resolve_item]]은 그 경우 `item-deleted`를 던지고 [[#SpecService.resolve_items]]는 조용히 거르므로 둘 다 못 쓴다. 기본값이 `false`라 기존 호출부는 그대로다
+**처리** `DB: items where document_id and is_deleted=false` → `{item_id: id}`. 저장 직후(같은 트랜잭션)에 부르므로 방금 upsert한 것이 보인다
 
 ---
 
@@ -434,9 +429,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `last_author(document_id: int) -> AuthorRef | None`
 
-근거: [[SYNC-SEQ-001#SEQ-3]] · `TrackingService.raise_flags` 담당자 결정 (클래스 5장 1)
+근거: [[SYNC-SEQ-001#SEQ-9]]
 
-**처리** `v = DB: versions where document_id order by version_no desc limit 1` · if 없음 → None · else → `AuthorRef(v.author_kind, v.author_user_id, v.instructed_by_user_id, v.via)`. 담당자 결정은 `.user_id`. 자리표시 User도 그대로 — 담당은 되지만 로그인 전엔 못 본다
+**처리** `v = DB: versions where document_id order by version_no desc limit 1` · if 없음 → None · else → `AuthorRef(v.author_kind, v.author_user_id, v.instructed_by_user_id, v.via)`. 자리표시 User도 그대로
 
 ---
 
@@ -450,32 +445,6 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ---
 
-#### SpecService.versions_instructed_by 내가 저장시킨 버전
-
-**시그니처** `versions_instructed_by(version_ids: list[int], user_id: int) -> list[int]`
-
-근거: [[SYNC-SEQ-001#SEQ-17]] · 내 할 일 전파 미결정 묶음
-
-**처리** `DB: versions where id in ids and (instructed_by_user_id=user_id or author_user_id=user_id)` → id 목록. 에이전트 저장이면 지시자, 되돌리기면 작성자
-
----
-
-#### SpecService.convention_error_docs_by 내 커밋의 오류 문서
-
-**시그니처** `convention_error_docs_by(user_id: int) -> list[DocumentSummary]`
-
-**처리** `DB: documents where has_convention_error and 최근 version의 author_user_id=user_id`
-
----
-
-#### SpecService.documents_authored_by 내 문서
-
-**시그니처** `documents_authored_by(user_id: int) -> list[int]`
-
-**처리** 최근 버전 작성자가 `user_id`인 `document_id` 목록. 내 할 일 미해결 댓글 묶음의 "내 문서" 기준(클래스 5장 1과 같은 결정)
-
----
-
 #### SpecService.clear_index 재구축용 삭제
 
 **시그니처** `clear_index(project_id: int) -> None`
@@ -486,18 +455,13 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 1. `DB: delete status_changes where document in project and commit_hash is not null` — 재구축이 `status(` 커밋마다 다시 만드는 것이 정확히 이 집합이다. 안 지우면 재구축할 때마다 **같은 상태 변경이 한 줄씩 쌓인다**(`apply_status`가 무조건 INSERT한다)
 2. `DB: delete versions where document in project`
 
-**`documents`·`items`는 지우지 않는다** — `flags`·`comments`·`status_changes`가 FK. `items`는 재구축 `save`가 upsert. `current_version_no`는 **건드리지 않는다** — `ck_documents_version_no(>=1)` 때문에 0을 넣을 수 없다. 재구축의 `save(rebuild=True)`가 남은 버전 수 + 1로 다시 매긴다
+**`documents`·`items`는 지우지 않는다** — `status_changes`가 FK이고 항목 pk가 재구축을 건너 그대로여야 한다. `items`는 재구축 `save`가 upsert. `current_version_no`는 **건드리지 않는다** — `ck_documents_version_no(>=1)` 때문에 0을 넣을 수 없다. 재구축의 `save(rebuild=True)`가 남은 버전 수 + 1로 다시 매긴다
 
-**`versions`를 가리키는 FK 넷을 센다.** 지금까지 이 자리는 "지우지 **않는** 테이블(`documents`·`items`)에 걸린 FK"만 셌다. 정작 **지우는 테이블에 걸린 FK**는 한 번도 안 셌고, 그래서 실물에서 재구축이 죽었다(#38). 넷 다 `ON DELETE NO ACTION`이라 남은 행이 있으면 `DELETE`가 막힌다.
+**`versions`를 가리키는 FK는 하나다** — `references.extracted_version_id`(NOT NULL). **호출자**가 `reference.clear`를 이 함수보다 먼저 부른다. 지우는 테이블에 걸린 FK를 세지 않아 실물 재구축이 죽은 적이 있다(#38) — 지금은 하나뿐이지만 표를 남기는 이유다
 
 | FK | NULL | 누가 치우나 |
 |---|---|---|
 | `references.extracted_version_id` | NOT NULL | **호출자**가 `reference.clear`를 이 함수보다 먼저 부른다 |
-| `propagation_decisions.version_id` | **NOT NULL + UNIQUE** | **호출자**가 `tracking.relink_versions`로 새 버전에 다시 잇는다 |
-| `flags.cause_version_id` | null 허용 | 위와 같다. null 허용이지만 **비우면 안 된다** — UI-11의 원인 diff·`cause_change_count`·중복 플래그 방지가 전부 이 값에 매달려 있다 |
-| `flags.target_version_id` | null 허용 | 위와 같다. 이쪽은 **못 이으면 비운다** — 없으면 `target_changed_since_raise`가 `False`가 될 뿐 플래그는 여전히 쓸 수 있다(#17) |
-
-**이 함수는 재연결을 하지 않는다.** 추적 묶음(`flags`·`propagation_decisions`)은 명세 묶음 밖이고, 이 함수는 `SpecService`다([[SYNC-DOM-001]] 4장 경계). 재연결은 묶음을 잇는 `pipeline`의 몫이다([[SYNC-MS-007#pipeline.rebuild]] 3a·7b단계)
 
 ---
 
@@ -505,11 +469,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `version_keys(project_id: int) -> dict[int, tuple[int, str]]`
 
-근거: [[SYNC-MS-007#pipeline.rebuild]] 3a단계 · #38
+근거: #38 — 재구축이 버전을 새로 만들 때 옛 버전 id를 새 id로 잇는 열쇠. **카드 V 뒤로 부르는 곳이 없다** — 버전을 가리키던 전파결정·플래그가 사라졌다. 남겨 둔다. 쓰는 곳이 안 생기면 지운다
 
 **처리** `DB: select id, document_id, commit_hash from versions where document in project` → `{version_id: (document_id, commit_hash)}`
 
-**`clear_index` 전에 불러야 한다.** 버전 행이 지워지면 `document_id`·`commit_hash`를 알 방법이 없다 — `propagation_decisions`·`flags`는 `version_id` 하나만 들고 있다.
+**`clear_index` 전에 불러야 한다.** 버전 행이 지워지면 `document_id`·`commit_hash`를 알 방법이 없다.
 
 **`(document_id, commit_hash)`가 열쇠인 이유.** `commit_hash` 단독은 유일하지 않다 — 한 커밋이 문서 여럿을 건드리면 같은 해시의 버전이 여럿 생긴다(실물: 버전 96행에 distinct 해시 58개). `documents`는 재구축이 안 지우므로 `document_id`는 재구축을 건너 그대로다
 
@@ -565,7 +529,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 1. `DB: items where document_id and is_deleted=false` → 전부 `is_deleted=true, deleted_at=now` · pk 목록
 2. `DB: status_changes insert (from=document.status, to=draft, changed_by=author.user, reason="휴지통", commit_hash)` — 이 커밋 해시가 되살릴 때 「직전 내용」을 찾는 열쇠다
 3. `DB: documents update status=draft, trashed_at=now, trashed_by_user_id=author.user.id` · `has_convention_error`는 건드리지 않는다
-4. `→` pk 목록 (호출자가 `raise_broken`)
+4. `→` pk 목록 (호출자가 `ReferenceService.mark_missing`)
 
 **테스트 관점** 넣은 뒤 `trashed_at` 있음 · 항목 전부 삭제됨 · 규약 오류 아님 · `list_by_project`에 안 나옴 · `get_document`는 됨
 
@@ -593,14 +557,13 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-UC-001#UC-H18]] 8 · [[SYNC-PRD-001#N3]] · [[SYNC-DOM-003]] 설계 규칙
 
-**처리** — 호출자의 트랜잭션 안. **문지기 검사는 하지 않는다** — `pipeline.purge_document`가 셋을 세고 부른다
-1. `DB: update flags set cause_item_id=null where cause_item_id in (items of id)` · `update flags set cause_version_id=null where cause_version_id in (versions of id)` — 남의 플래그가 이 문서를 원인으로 물고 있던 것. 해결된 것들이다(미해결은 호출자가 막았다)
-2. `DB: delete flags where target_item_id in (items of id)` · `delete propagation_decisions where version_id in (versions of id)` · `delete references where from_document_id = id` · `delete status_changes where document_id` · `delete items` · `delete versions` · `delete documents where id`
-3. `→` 지운 행 수 합
+**처리** — 호출자의 트랜잭션 안. **문지기 검사는 하지 않는다** — `pipeline.purge_document`가 세고 부른다
+1. `DB: delete references where from_document_id = id` · `delete status_changes where document_id` · `delete items` · `delete versions` · `delete documents where id`
+2. `→` 지운 행 수 합
 
 **예외** 던지지 않는다. FK가 걸리면 호출자가 검사를 빠뜨린 것 — DB 오류로 드러나야 한다
 
-**테스트 관점** 휴지통 문서 → 행 전부 사라짐 · 다른 문서의 해결된 broken_ref는 남고 원인 칸만 null · 같은 프로젝트의 다른 문서·참조는 그대로 · 지운 뒤 `issue_doc_id`가 그 번호를 다시 준다
+**테스트 관점** 휴지통 문서 → 행 전부 사라짐 · 같은 프로젝트의 다른 문서·참조는 그대로 · 지운 뒤 `issue_doc_id`가 그 번호를 다시 준다
 
 ---
 
