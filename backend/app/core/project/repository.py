@@ -25,6 +25,16 @@ class ProjectRepository:
         stmt = select(Project).options(joinedload(Project.repository)).order_by(Project.code)
         return list(self.session.scalars(stmt))
 
+    def owned_by(self, user_id: int) -> list[Project]:
+        """소유자의 프로젝트만 (MS-001 list_owned). 없으면 빈 목록 — UI-2 빈 상태."""
+        stmt = (
+            select(Project)
+            .options(joinedload(Project.repository))
+            .where(Project.owner_user_id == user_id)
+            .order_by(Project.code)
+        )
+        return list(self.session.scalars(stmt))
+
     def by_remote_url(self, remote_url: str) -> Project | None:
         """같은 저장소를 쓰는 프로젝트. 정규화 비교라 파이썬에서 — 행이 적다."""
         want = normalize_remote(remote_url)
@@ -39,18 +49,9 @@ class ProjectRepository:
     def delete_all_of(self, project_id: int) -> None:
         """프로젝트에 딸린 행을 자식부터 지운다 (MS-001 delete_project 2단계).
 
-        ORM cascade를 안 쓴다 — 관계가 flags·references처럼 항목을 건너 물려 있어
+        ORM cascade를 안 쓴다 — references처럼 항목을 건너 물려 있는 관계가 있어
         지우는 순서를 코드가 쥐고 있어야 한다.
         """
-        self.session.execute(
-            text("""
-            with d as (select id from documents where project_id = :pid),
-                 i as (select id from items where document_id in (select id from d))
-            delete from flags
-             where target_item_id in (select id from i) or cause_item_id in (select id from i)
-            """),
-            {"pid": project_id},
-        )
         for stmt in (
             'delete from "references" where from_document_id in'
             " (select id from documents where project_id = :pid)",
@@ -58,10 +59,6 @@ class ProjectRepository:
             " (select id from documents where project_id = :pid)",
             'delete from "references" where to_item_id in (select id from items'
             " where document_id in (select id from documents where project_id = :pid))",
-            "delete from propagation_decisions where version_id in (select id from versions"
-            " where document_id in (select id from documents where project_id = :pid))",
-            "delete from comments where document_id in"
-            " (select id from documents where project_id = :pid)",
             "delete from status_changes where document_id in"
             " (select id from documents where project_id = :pid)",
             "delete from items where document_id in"

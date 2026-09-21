@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import NotFound
 from app.core.project.service import ProjectService
-from tests.core.spec.test_service import make_project
+from tests.core.account.test_service import make_user
+from tests.core.spec.test_service import make_project, owner
 
 
 # ── get ──
@@ -26,6 +27,26 @@ def test_list_projects_ordered_by_code_with_repository(db_session: Session) -> N
     make_project(db_session, "AB")
     got = ProjectService(db_session).list_projects()
     assert [p.code for p in got] == ["AB", "ZZ"] and all(p.repository is not None for p in got)
+
+
+# ── get_owned · list_owned (카드 W) ──
+def test_get_owned_and_list_owned_hide_someone_elses_project(db_session: Session) -> None:
+    me = owner(db_session)
+    other = make_user(db_session, login="other")
+    make_project(db_session, "MINE")
+    make_project(db_session, "THEI", owner_user=other)
+    svc = ProjectService(db_session)
+    assert svc.get_owned("MINE", me).code == "MINE"
+    # 남의 것 → get의 없음과 같은 not-found. 없는 코드도 같다
+    for code in ("THEI", "NOPE"):
+        with pytest.raises(NotFound) as ei:
+            svc.get_owned(code, me)
+        assert ei.value.extra == {"resource": "project", "id": code}
+    assert [p.code for p in svc.list_owned(me)] == ["MINE"]
+    assert [p.code for p in svc.list_owned(other)] == ["THEI"]
+    nobody = make_user(db_session, login="nobody")
+    assert svc.list_owned(nobody) == []  # 등록한 적 없는 계정 — 빈 목록, 에러 아님
+    assert [p.code for p in svc.list_projects()] == ["MINE", "THEI"]  # 시스템 경로는 둘 다
 
 
 # ── init_project ──
@@ -56,6 +77,7 @@ async def test_init_project_empty_repo_creates_specs_commit_and_11_null_stages(
     g(seed, "push", "-q", "origin", "HEAD:main")
     svc = ProjectService(db_session)
     project = await svc.init_project(str(bare), "NEW", "새 프로젝트", user)
+    assert project.owner_user_id == user.id  # 등록한 사람이 소유자 (카드 W)
     assert project.code == "NEW" and project.repository.remote_url == str(bare)
     p = svc.get("NEW")
     assert p.repository.workdir_path == str(repos_dir / "NEW")
