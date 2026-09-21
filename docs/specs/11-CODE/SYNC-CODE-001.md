@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
 
-**진행 상황**: 카드 30장. **A~T 28장 완료**, V 진행 중, U는 V 뒤에.
+**진행 상황**: 카드 30장. **A~T·V 29장 완료**, U 남음.
 
 ---
 
@@ -567,7 +567,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 화면 | UI-10·11·12 삭제 · UI-5 요소 3(토글)·5·7.4·8.2·8.8·11~11.4 · UI-4 요약 셋 · UI-2 2색 · UI-8 범위 둘 · UI-14 백업 칸 |
 | 테스트 | 협업 테스트 삭제(`tests/core/tracking`·`tests/core/collab`·`test_tracking.py`·`test_e2e_b3.py` 등) · 상태 테스트는 둘로 · `mark_missing`이 `to_item_id`·`to_document_id`를 **둘 다** 비운다 · 항목 삭제 저장 → `is_missing` 참조 → 상대 문서 저장 시 풀림 · 완료 문서를 MCP로 고치면 초안 · 규약 오류 문서는 완료로 못 올림 · 마이그레이션 up→down→up 왕복 · `check_dom` 10·10·10 · `check_ui` 화면 12 · **사람 확인**: 아래 열 가지 |
 | 선행 | T |
-| 완료 | — |
+| 완료 | 2026-09-21 · 브랜치 `card/V-solo` · 커밋 `9019be1`~`a3eba3f` (spec 25 + code 10) · 테스트 190(삭제 27·수정 20·신설 5) · `validate` 0/0 · `check_code` 142 중 일치 103, 미완 39(MS-004 26·MS-005 11은 휴지통 예정, `ask_item`·`llm.ask`는 U) · `check_ui` 12화면 중 11 일치(UI-5의 8.4~8.7은 U) · `check_dom` 10·10·10 · `check_tokens` 91/0 · 0011 up→down→up 왕복 · 사람 확인 열 가지는 배포 뒤 브라우저에서(아래 기록) · 되먹임: 상태 라벨 「완료」, `SaveResult.warnings`에 `ref.broken: n`, STD-002 `data-src` 규약 삭제, RFQ 7장 Q6 신설 |
 
 **왜 카드인가.** 걷어내기가 테이블·파이프라인·화면·검사기에 한꺼번에 걸려 있어 자르면 중간 상태가 뜨지 않는다 — `core/tracking`을 지우는 순간 `queries`·`types`·`env.py`가 같이 깨진다. 그리고 걷어내는 일은 이슈(DEV-15 `fix`)가 아니다. 틀린 게 아니라 **전제가 바뀌었다.**
 
@@ -694,7 +694,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | E | `card/E-backup` | `c8f2749`~`e715423` | — | 2026-09-11 |
 | F | `card/F-repo-create` | `a11f698`~ | — | 2026-09-14 |
 | U | `card/U-ask-panel` | — | — | 2026-09-17 |
-| V | `card/V-solo` | — | — | 2026-09-21 |
+| V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 
 **핸드오프 대조는 카드가 아니다.** D1~D5 여러 장에 걸쳐 있어 슬라이스로 나누지 않았고, 무엇을 고쳤는지는 각 카드의 `완료` 행에 적었다. PR 하나 = 슬라이스 하나 규칙의 유일한 예외다.
 
