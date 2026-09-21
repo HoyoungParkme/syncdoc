@@ -130,6 +130,25 @@ class ReferenceService:
         self.session.flush()
         return n
 
+    def mark_missing(self, item_pks: list[int]) -> int:
+        """SYNC-MS-003#ReferenceService.mark_missing
+
+        raw_target은 그대로 — 상대가 돌아오면 resolve_missing이 다시 잇는다.
+        """
+        if not item_pks:
+            return 0
+        n = self.repo.mark_missing(item_pks)
+        self.session.flush()
+        return n
+
+    def count_missing_by_document(self, document_ids: list[int]) -> dict[int, int]:
+        """SYNC-MS-003#ReferenceService.count_missing_by_document"""
+        return self.repo.count_missing_by_document(document_ids)
+
+    def missing_in_project(self, project_id: int) -> list[RefEdge]:
+        """SYNC-MS-003#ReferenceService.missing_in_project"""
+        return [_edge(r) for r in self.repo.missing_in_project(project_id)]
+
     def clear(self, project_id: int) -> None:
         """SYNC-MS-003#ReferenceService.clear"""
         self.repo.delete_in_project(project_id)

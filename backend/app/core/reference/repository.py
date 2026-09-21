@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.reference.models import Reference
@@ -66,6 +66,26 @@ class ReferenceRepository:
                 | Reference.raw_target.startswith(target_doc_id + "#")
             )
         return list(self.session.scalars(stmt.order_by(Reference.id)))
+
+    def mark_missing(self, item_pks: list[int]) -> int:
+        """to_item_id가 pks에 든 참조를 미존재로 — to_* 둘 다 NULL (ck_references_target)."""
+        if not item_pks:
+            return 0
+        return self.session.execute(
+            update(Reference)
+            .where(Reference.to_item_id.in_(item_pks))
+            .values(to_item_id=None, to_document_id=None, is_missing=True)
+        ).rowcount
+
+    def count_missing_by_document(self, document_ids: list[int]) -> dict[int, int]:
+        if not document_ids:
+            return {}
+        stmt = (
+            select(Reference.from_document_id, func.count())
+            .where(Reference.from_document_id.in_(document_ids), Reference.is_missing.is_(True))
+            .group_by(Reference.from_document_id)
+        )
+        return {d: n for d, n in self.session.execute(stmt)}
 
     def delete_in_project(self, project_id: int) -> int:
         doc_ids = select(Document.id).where(Document.project_id == project_id)

@@ -182,3 +182,30 @@ def test_references_among_resolve_missing_and_clear(db_session: Session) -> None
     # clear: 이 프로젝트의 참조 전부
     ref.clear(pid)
     assert db_session.execute(text('SELECT count(*) FROM "references"')).scalar() == 0
+
+
+# ── 카드 V: mark_missing · count_missing_by_document · missing_in_project ──
+def test_mark_missing_empties_both_targets_and_resolve_relinks(db_session: Session) -> None:
+    svc, ref, d, v, pks, a = _setup(db_session)
+    ref.extract(d.id, v.id, d.body, pks, UPSTREAM)
+    rfq = svc.get_document("EXMP-RFQ-001")
+    q1 = next(i.pk for i in rfq.items if i.item_id == "Q1")
+    pid = db_session.execute(
+        text("SELECT project_id FROM documents WHERE id=:i"), {"i": d.id}
+    ).scalar()
+    assert ref.mark_missing([]) == 0
+    assert ref.mark_missing([pks["R1"] + 1000]) == 0  # 아무도 안 가리키던 항목
+    # Q1을 가리키던 G1의 참조 하나 — to_* 둘 다 NULL, raw_target은 그대로 (ck_references_target)
+    assert ref.mark_missing([q1]) == 1
+    assert (pks["G1"], None, None, "EXMP-RFQ-001#Q1", True) in set(rows(db_session))
+    assert ref.count_missing_by_document([d.id]) == {d.id: 3}  # Q9 · NONE-001 · 방금 Q1
+    assert ref.count_missing_by_document([]) == {}
+    assert sorted(e.raw_target for e in ref.missing_in_project(pid)) == [
+        "EXMP-NONE-001",
+        "EXMP-RFQ-001#Q1",
+        "EXMP-RFQ-001#Q9",
+    ]
+    # 항목이 살아 있으니(is_deleted가 아니다) resolve_missing이 바로 다시 잇는다
+    assert ref.resolve_missing(pid, target_doc_id="EXMP-RFQ-001") == 1
+    assert (pks["G1"], q1, None, "EXMP-RFQ-001#Q1", False) in set(rows(db_session))
+    assert ref.count_missing_by_document([d.id]) == {d.id: 2}
