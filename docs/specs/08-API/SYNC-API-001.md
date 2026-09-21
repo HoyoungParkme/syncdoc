@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -746,7 +746,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/User'
+              $ref: '#/components/schemas/Me'
 ```
 
 #### GET/api/me/emails 내 커밋 이메일 목록
@@ -1044,6 +1044,15 @@ components:
           created_at:
             type: string
             format: date-time
+    Me:
+      description: 내 계정. User에 화면이 켜고 끌 것을 얹는다 — llm_enabled가 거짓이면 UI-5 질문 탭(8.4)이 없다([[SYNC-INFRA-001]] 5.3)
+      allOf:
+      - $ref: '#/components/schemas/User'
+      - type: object
+        properties:
+          llm_enabled:
+            type: boolean
+            description: 서버에 LLM_API_KEY가 있는가. 로그인 때 이미 부르는 응답이라 요청이 늘지 않는다
     Author:
       type: object
       description: 버전의 작성 주체. 에이전트면 instructed_by가 있다
