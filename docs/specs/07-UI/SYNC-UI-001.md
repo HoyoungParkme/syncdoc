@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-001
 type: UI
 title: 화면 설계 — 싱크독
-status: draft
+status: approved
 upstream: [SYNC-UC-001, SYNC-DOM-002]
 ---
 
