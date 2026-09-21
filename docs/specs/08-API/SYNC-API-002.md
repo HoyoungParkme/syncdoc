@@ -2,7 +2,7 @@
 doc_id: SYNC-API-002
 type: API
 title: API 명세 MCP — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ---
 
@@ -20,6 +20,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 - 전송: MCP streamable HTTP. 엔드포인트 `POST /mcp`
 - 인증: `Authorization: Bearer {토큰}`. 토큰은 사람이 웹 설정(UI-13)에서 발급한다. 요청은 발급자 계정으로 기록된다
+- **발급자가 소유한 프로젝트만 열린다**([[SYNC-PRD-001#R12]]). 남의 프로젝트 코드나 문서 ID를 주면 `not-found {resource: "project"}` — 없는 것과 같다. `init_project`로 등록한 사람이 그 프로젝트의 소유자다
 - 에러: 도구 결과의 `isError: true` + 본문에 [[SYNC-API-001]]과 **같은 problem+json**. 에이전트가 `type`으로 분기한다
 - 모든 조회 결과에 문서 상태와 버전이 담긴다(PRD R9). 에이전트는 이걸로 확정 명세와 초안을 구분한다
 - 상태 변경은 MCP에 **없다**. 초안인지 완료인지는 사람의 판단이라 웹에서만 한다([[SYNC-UC-001#UC-H8]] 주 액터 사람)
@@ -70,7 +71,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 { "code": "SYNC", "name": "싱크독", "remote_url": "...", "stages": [ { "stage": 1, "doc_type": "RFQ", "status": null, "doc_count": 0 }, "..." ] }
 ```
 
-**에러**: `project-code-conflict`(2a), `project-code-invalid`(2b), `existing-specs`(3a, 확장 필드 `doc_count`), `push-failed`(4a)
+**에러**: `project-code-conflict`(2a), `project-code-invalid`(2b), `existing-specs`(3a, 확장 필드 `doc_count`), `push-failed`(4a). 등록한 토큰의 발급자가 소유자가 된다(1장)
 
 ---
 
@@ -106,6 +107,8 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 문서가 없는 단계는 `status: null`, `docs: []`([[SYNC-UC-001#UC-A5]] 2a).
 
+**에러**: `not-found` — 발급자가 소유하지 않은 프로젝트(`resource: project`, 1장). 없는 프로젝트와 같은 답이다
+
 ---
 
 ### get_document
@@ -138,7 +141,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 `items[].missing_refs`는 그 항목에서 나간 참조 중 대상이 없는 것(`raw_target`). 에이전트가 "이 항목이 가리키는 것이 아직 안 쓰였거나 지워졌다"를 알 수 있다.
 
-**에러**: `not-found`([[SYNC-UC-001#UC-A2]] 1a). 규약 오류 문서는 에러가 아니라 `has_convention_error: true`와 함께 정상 반환(2a).
+**에러**: `not-found`([[SYNC-UC-001#UC-A2]] 1a) — 문서가 없거나 **발급자가 소유하지 않은 프로젝트**(`resource: project`, 1장). 규약 오류 문서는 에러가 아니라 `has_convention_error: true`와 함께 정상 반환(2a).
 
 ---
 
@@ -168,7 +171,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 }
 ```
 
-**에러**: `not-found`(문서 없음), `item-deleted`(1a, 확장 필드 `deleted_at`), 문서는 있는데 항목이 없으면 `not-found` + 확장 필드 `available_items: [...]`(1b).
+**에러**: `not-found`(문서 없음 · 남의 프로젝트는 `resource: project`), `item-deleted`(1a, 확장 필드 `deleted_at`), 문서는 있는데 항목이 없으면 `not-found` + 확장 필드 `available_items: [...]`(1b).
 
 ---
 
@@ -230,7 +233,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
   "next_step": "SYNC-PRD-002 v1 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)" }
 ```
 
-**에러**: `convention-violation`([[SYNC-UC-001#UC-A6]] 2a, 확장 필드 `violations: [{line, rule, message}]`), `precondition-unmet`(3a, DOM 셋의 순서 — 확장 필드 `requires`: 먼저 있어야 하는 것 한 줄, `have`: 그 프로젝트의 DOM 문서 ID 목록. [[SYNC-STD-001]] 2.6), `push-failed`(5a).
+**에러**: `not-found`(남의 프로젝트 — `resource: project`, 1장), `convention-violation`([[SYNC-UC-001#UC-A6]] 2a, 확장 필드 `violations: [{line, rule, message}]`), `precondition-unmet`(3a, DOM 셋의 순서 — 확장 필드 `requires`: 먼저 있어야 하는 것 한 줄, `have`: 그 프로젝트의 DOM 문서 ID 목록. [[SYNC-STD-001]] 2.6), `push-failed`(5a).
 
 **`next_step`은 매번 온다.** 규약(STD-001 1.8)을 에이전트가 잊어도 응답이 다시 말한다 — 사람에게 그대로 전하고 멈춘다.
 
@@ -271,6 +274,8 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 **규약 문서 이름에 프로젝트 코드가 들어간다.** 문서 ID 규칙은 `{프로젝트코드}-{TYPE}-{번호}`이고 STD도 예외가 아니다([[SYNC-STD-001]] 1.1) — `TST` 프로젝트의 규약 문서는 `TST-STD-001.md`다. 이름을 고정해 두면 싱크독이 아닌 프로젝트에서 늘 404가 난다(#8). 내장 사본으로 떨어질 때는 싱크독의 `SYNC-STD-001.md`를 쓴다 — 다른 프로젝트는 싱크독의 STD를 그대로 쓰기 때문이다([[SYNC-STD-001]] 2.12).
 
+**에러**: `not-found` — 발급자가 소유하지 않은 프로젝트(`resource: project`, 1장). 없는 프로젝트와 같은 답이다
+
 ---
 
 ### update_document
@@ -304,7 +309,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 | type | 언제 | 확장 필드 | 유스케이스 |
 |---|---|---|---|
-| `not-found` | 문서 없음 | `resource`, `id` | — |
+| `not-found` | 문서 없음 · 남의 프로젝트(`resource: project`) | `resource`, `id` | — |
 | `convention-violation` | 규약 위반 | `violations`, `warnings` | [[SYNC-UC-001#UC-A6]] 2a |
 | `version-conflict` | 버전 불일치 | `current_version`, `current_body` | [[SYNC-UC-001#UC-A6]] 4a |
 | `item-deletion-needs-confirm` | 항목이 사라짐, 하위 있음 | `deleted_items: [{item_id, downstream: [...]}]` | [[SYNC-UC-001#UC-A6]] 4b |
@@ -340,7 +345,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 | type | 언제 | 확장 필드 | 유스케이스 |
 |---|---|---|---|
-| `not-found` | 문서 없음 | `resource`, `id` | — |
+| `not-found` | 문서 없음 · 남의 프로젝트(`resource: project`) | `resource`, `id` | — |
 | `document-trashed` | 이미 휴지통 | `trashed_at` | [[SYNC-UC-001#UC-A7]] 1a |
 | `document-deletion-needs-confirm` | `confirm=false` | `doc_id`, `title`, `version_count`, `inbound_refs` | [[SYNC-UC-001#UC-A7]] 2 |
 | `push-failed` | 삭제 커밋 push 실패 | `reason` | [[SYNC-UC-001#UC-A7]] 5a |
@@ -365,7 +370,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 **결과** — `SaveResult` (되살린 버전, `next_step` 포함)
 
-**에러**: `not-found` · `document-not-trashed`([[SYNC-UC-001#UC-A8]] 1a) · `convention-violation`(3a) · `push-failed`
+**에러**: `not-found`(문서 없음 · 남의 프로젝트는 `resource: project`) · `document-not-trashed`([[SYNC-UC-001#UC-A8]] 1a) · `convention-violation`(3a) · `push-failed`
 
 ---
 
@@ -402,6 +407,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 하지 말 것
   - update_document에 doc_id 오타 → not-found. 새 문서가 생기지 않는다
+  - 남의 프로젝트 코드·문서 ID → not-found(project). 토큰 발급자가 소유한 프로젝트만 열린다 — list_documents로 코드를 다시 확인한다
   - expected_version 없이 update  → 스키마에서 거부
   - 상태를 바꾸려 하지 않는다    → 도구가 없다. 사람이 웹에서
   - get_references 결과를 전부 get_item으로 펼치지 않는다 → 필요한 것만
