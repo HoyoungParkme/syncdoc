@@ -2,7 +2,7 @@
 doc_id: SYNC-API-002
 type: API
 title: API 명세 MCP — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ---
 
@@ -22,7 +22,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 - 인증: `Authorization: Bearer {토큰}`. 토큰은 사람이 웹 설정(UI-13)에서 발급한다. 요청은 발급자 계정으로 기록된다
 - 에러: 도구 결과의 `isError: true` + 본문에 [[SYNC-API-001]]과 **같은 problem+json**. 에이전트가 `type`으로 분기한다
 - 모든 조회 결과에 문서 상태와 버전이 담긴다(PRD R9). 에이전트는 이걸로 확정 명세와 초안을 구분한다
-- 상태 변경·댓글·플래그 확인·전파 결정은 MCP에 **없다**. 사람의 판단이라 웹에서만 한다([[SYNC-UC-001#UC-H8]]·H9·H10·H11 주 액터 사람)
+- 상태 변경은 MCP에 **없다**. 초안인지 완료인지는 사람의 판단이라 웹에서만 한다([[SYNC-UC-001#UC-H8]] 주 액터 사람)
 - 쓰기의 단위는 **문서 하나**다([[SYNC-STD-001]] 1.8). `create_document`·`update_document`의 결과에 `next_step`이 실린다 — 에이전트는 그것을 사람에게 그대로 전하고 멈춘다. DOM 셋의 순서(STD-001 2.6)만은 서버가 `precondition-unmet`으로 막는다
 
 ## 2. 도구 이름
@@ -86,7 +86,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
     "properties": {
       "project_code": { "type": "string", "pattern": "^[A-Z]{1,4}$" },
       "stage": { "type": "integer", "minimum": 1, "maximum": 11, "description": "한 단계만 보려면" },
-      "status": { "type": "string", "enum": ["draft", "review", "approved"], "description": "특정 상태만 보려면. 예: 승인 문서만" }
+      "status": { "type": "string", "enum": ["draft", "approved"], "description": "특정 상태만 보려면. 예: 완료 문서만" }
     }
   }
 }
@@ -132,11 +132,11 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
   "has_convention_error": false, "convention_error_detail": null,
   "last_author": { "kind": "agent", "user": "hoyoung-park", "instructed_by": "hoyoung-park", "via": "mcp" },
   "body": "---\ndoc_id: SYNC-PRD-001\n...",
-  "items": [ { "item_id": "R1", "display_name": "에이전트용 원본과 사람용 뷰", "flags": ["needs_check"] } ]
+  "items": [ { "item_id": "R1", "display_name": "에이전트용 원본과 사람용 뷰", "missing_refs": [] } ]
 }
 ```
 
-`items[].flags`는 그 항목에 붙은 플래그 종류. 에이전트가 "이 항목은 상위가 바뀌어 확인 대기 중"임을 알 수 있다.
+`items[].missing_refs`는 그 항목에서 나간 참조 중 대상이 없는 것(`raw_target`). 에이전트가 "이 항목이 가리키는 것이 아직 안 쓰였거나 지워졌다"를 알 수 있다.
 
 **에러**: `not-found`([[SYNC-UC-001#UC-A2]] 1a). 규약 오류 문서는 에러가 아니라 `has_convention_error: true`와 함께 정상 반환(2a).
 
@@ -164,8 +164,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 {
   "doc_id": "SYNC-PRD-001", "item_id": "R12", "display_name": "...",
   "doc_status": "approved", "doc_version_no": 7,
-  "body": "#### R12 ...\n본문 블록만",
-  "flags": ["needs_check"]
+  "body": "#### R12 ...\n본문 블록만"
 }
 ```
 
@@ -198,8 +197,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
   "downstream": [
     { "doc_id": "SYNC-UC-001", "item_id": "[[SYNC-UC-001#UC-A6]]", "display_name": "...", "is_missing": false },
     { "doc_id": "SYNC-DOM-001", "item_id": null, "display_name": "도메인모델 (문서 전체)", "is_missing": false }
-  ],
-  "flags": [ { "kind": "needs_check", "cause": "SYNC-RFQ-001#Q03", "cause_version_no": 4, "raised_at": "..." } ]
+  ]
 }
 ```
 
@@ -219,7 +217,6 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
     "properties": {
       "project_code": { "type": "string", "pattern": "^[A-Z]{1,4}$" },
       "message": { "type": "string", "description": "커밋 메시지. 첫 줄 요약, 둘째 줄부터 이유" },
-      "upstream_impact": { "type": "array", "items": { "type": "string" }, "description": "새 문서가 상위 항목과 어긋남을 알면 지정" },
       "doc_type": { "type": "string", "enum": ["RFQ", "PRD", "SCN", "UC", "INFRA", "DOM", "UI", "API", "SEQ", "MS", "CODE"] },
       "body": { "type": "string", "description": "원본 MD 전체. frontmatter 포함. doc_id는 서버가 채우므로 비워도 된다" }
     }
@@ -229,7 +226,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 **결과** — `SaveResult`
 ```json
-{ "doc_id": "SYNC-PRD-002", "version_no": 1, "commit_hash": "...", "status": "draft", "pending_decision_version_id": null, "warnings": [],
+{ "doc_id": "SYNC-PRD-002", "version_no": 1, "commit_hash": "...", "status": "draft", "warnings": [],
   "next_step": "SYNC-PRD-002 v1 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)" }
 ```
 
@@ -237,9 +234,8 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 **`next_step`은 매번 온다.** 규약(STD-001 1.8)을 에이전트가 잊어도 응답이 다시 말한다 — 사람에게 그대로 전하고 멈춘다.
 
-**결과에 `warnings`가 실릴 수 있다** — 미완성 경고(STD-001 4장). 저장은 됐고 승인만 막힌다. 에이전트는 사람에게 "필수 절 N개가 비어 있다"고 알린다.
+**결과에 `warnings`가 실릴 수 있다** — 미완성 경고(STD-001 4장). 저장은 됐고 완료만 막힌다. 에이전트는 사람에게 "필수 절 N개가 비어 있다"고 알린다.
 
-신규 문서는 하위 참조가 없으므로 `pending_decision_version_id`가 항상 null([[SYNC-UC-001#UC-S3]] 1a).
 
 ---
 
@@ -282,7 +278,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ```json
 {
   "name": "update_document",
-  "description": "기존 문서의 본문을 교체해 새 버전을 만든다. **반드시 get_document를 먼저 부르고, 그 응답의 body를 고쳐 보낸다 — version_no만 받아 오고 본문은 예전 것을 쓰면 안 된다.** create_document는 frontmatter의 doc_id가 비어도 받지만(서버가 발급한다) 그 본문을 그대로 update_document에 보내면 frontmatter.doc_id 위반이 된다. expected_version에는 get_document가 준 version_no를 넣는다. 그 사이 문서가 바뀌었으면 version-conflict 에러에 현재 버전과 본문이 담기니, 그것을 읽고 병합해 다시 부른다. 본문에서 항목 ID가 사라지면 item-deletion-needs-confirm 에러에 끊어질 하위 항목이 문서ID#항목ID와 이름으로 담겨 오며, 그것을 사람에게 보여주고 확인받은 뒤 confirm_item_deletion=true로 다시 부른다. 저장 후 하위에 영향이 있으면 결과의 pending_decision_version_id가 채워지고, 전파 여부는 지시한 사람이 웹에서 결정한다. 승인 상태 문서를 고치면 검토중으로 내려간다. 이 변경이 상위 항목과 어긋나게 됐음을 알면 upstream_impact에 그 상위 항목을 넣는다. 저장 뒤에는 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 사람이 웹에서 읽기 전에 다음 문서로 가지 않는다.",
+  "description": "기존 문서의 본문을 교체해 새 버전을 만든다. **반드시 get_document를 먼저 부르고, 그 응답의 body를 고쳐 보낸다 — version_no만 받아 오고 본문은 예전 것을 쓰면 안 된다.** create_document는 frontmatter의 doc_id가 비어도 받지만(서버가 발급한다) 그 본문을 그대로 update_document에 보내면 frontmatter.doc_id 위반이 된다. expected_version에는 get_document가 준 version_no를 넣는다. 그 사이 문서가 바뀌었으면 version-conflict 에러에 현재 버전과 본문이 담기니, 그것을 읽고 병합해 다시 부른다. 본문에서 항목 ID가 사라지면 item-deletion-needs-confirm 에러에 끊어질 하위 항목이 문서ID#항목ID와 이름으로 담겨 오며, 그것을 사람에게 보여주고 확인받은 뒤 confirm_item_deletion=true로 다시 부른다. 완료 상태 문서를 고치면 초안으로 내려간다. 저장 뒤에는 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 사람이 웹에서 읽기 전에 다음 문서로 가지 않는다.",
   "inputSchema": {
     "type": "object",
     "required": ["doc_id", "body", "expected_version", "message", "changed_items"],
@@ -291,8 +287,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
       "body": { "type": "string", "description": "원본 MD 전체. 부분 수정 없음" },
       "expected_version": { "type": "integer", "minimum": 1, "description": "get_document로 받은 version_no. body도 같은 응답의 것에서 시작한다" },
       "message": { "type": "string", "description": "커밋 메시지. 첫 줄 요약, 둘째 줄부터 왜 바꿨는지. 변경 이력은 여기에만 남는다 (STD-001 1.7)" },
-      "changed_items": { "type": "array", "items": { "type": "string" }, "description": "이번에 바꾼 항목 ID 목록. 이 항목들의 하위 참조에 확인 필요가 걸린다. 오탈자 수정이면 빈 배열" },
-      "upstream_impact": { "type": "array", "items": { "type": "string" }, "description": "이 변경으로 이 문서와 어긋나게 된 상위 항목. 예: [\"SYNC-UC-001#UC-A6\"]. 그 항목에 하위 불일치 플래그가 붙어 상위 담당자의 내 할 일에 뜬다. 모르면 생략 — 승인 때 사람이 대조한다" },
+      "changed_items": { "type": "array", "items": { "type": "string" }, "description": "이번에 바꾼 항목 ID 목록. 커밋 메시지와 함께 이력이 된다. 오탈자 수정이면 빈 배열" },
       "confirm_item_deletion": { "type": "boolean", "default": false, "description": "항목 삭제를 사람이 확인했을 때 true" }
     }
   }
@@ -301,7 +296,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 **결과** — `SaveResult`
 ```json
-{ "doc_id": "SYNC-PRD-001", "version_no": 8, "commit_hash": "...", "status": "review", "pending_decision_version_id": 4127, "warnings": [],
+{ "doc_id": "SYNC-PRD-001", "version_no": 8, "commit_hash": "...", "status": "draft", "warnings": [],
   "next_step": "SYNC-PRD-001 v8 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)" }
 ```
 
@@ -324,7 +319,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ```json
 {
   "name": "delete_document",
-  "description": "문서를 휴지통에 넣는다 — 파일은 저장소에서 지워지고(커밋) 행·버전은 남아 restore_document로 되살릴 수 있다. 잘못 만든 문서를 치우는 길이다. 첫 호출은 document-deletion-needs-confirm 에러로 제목·버전 수·끊어질 참조 목록·댓글 수를 돌려주고 아직 넣지 않는다. 그것을 사람에게 보여주고 확인받은 뒤 confirm=true로 다시 부른다. 넣으면 이 문서를 가리키던 항목에 끊어진 참조가 붙는다 — 되살리면 풀린다. 행까지 지우는 완전 삭제는 웹에서만.",
+  "description": "문서를 휴지통에 넣는다 — 파일은 저장소에서 지워지고(커밋) 행·버전은 남아 restore_document로 되살릴 수 있다. 잘못 만든 문서를 치우는 길이다. 첫 호출은 document-deletion-needs-confirm 에러로 제목·버전 수·끊어질 참조 목록을 돌려주고 아직 넣지 않는다. 그것을 사람에게 보여주고 확인받은 뒤 confirm=true로 다시 부른다. 넣으면 이 문서를 가리키던 참조가 미존재로 돌아간다 — 되살리면 다시 이어진다. 행까지 지우는 완전 삭제는 웹에서만.",
   "inputSchema": {
     "type": "object",
     "required": ["doc_id"],
@@ -347,7 +342,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 |---|---|---|---|
 | `not-found` | 문서 없음 | `resource`, `id` | — |
 | `document-trashed` | 이미 휴지통 | `trashed_at` | [[SYNC-UC-001#UC-A7]] 1a |
-| `document-deletion-needs-confirm` | `confirm=false` | `doc_id`, `title`, `version_count`, `inbound_refs`, `comments` | [[SYNC-UC-001#UC-A7]] 2 |
+| `document-deletion-needs-confirm` | `confirm=false` | `doc_id`, `title`, `version_count`, `inbound_refs` | [[SYNC-UC-001#UC-A7]] 2 |
 | `push-failed` | 삭제 커밋 push 실패 | `reason` | [[SYNC-UC-001#UC-A7]] 5a |
 
 `document-deletion-needs-confirm`은 `item-deletion-needs-confirm`과 같은 두 번 호출 패턴이다(5장 2). 에이전트가 첫 에러를 사람에게 안 보여주고 바로 `confirm=true`로 부르면 확인이 무의미해진다 — 도구 설명이 그러지 말라고 말하지만 강제할 방법은 없다. 휴지통이라 되살릴 수는 있다.
@@ -359,7 +354,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ```json
 {
   "name": "restore_document",
-  "description": "휴지통의 문서를 되살린다 — 휴지통에 넣기 직전 내용으로 새 버전이 생기고 항목이 돌아오며, 그 항목을 가리키던 끊어진 참조가 풀린다. 휴지통에 없는 문서는 document-not-trashed. 옛 본문이 지금 규약을 위반하면 convention-violation으로 그대로 남는다.",
+  "description": "휴지통의 문서를 되살린다 — 휴지통에 넣기 직전 내용으로 새 버전이 생기고 항목이 돌아오며, 그 항목을 가리키던 미존재 참조가 다시 이어진다. 휴지통에 없는 문서는 document-not-trashed. 옛 본문이 지금 규약을 위반하면 convention-violation으로 그대로 남는다.",
   "inputSchema": {
     "type": "object",
     "required": ["doc_id"],
@@ -401,11 +396,9 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
      - item-deletion-needs-confirm → 사람에게 deleted_items 보여주고 확인
                                      → confirm_item_deletion=true로 다시
      - convention-violation        → violations 고치고 다시
-  3. 결과에 pending_decision_version_id가 있으면
-     "하위 N건에 영향. 전파 여부는 내 할 일에서 결정하세요"라고 사람에게 알린다
-     그리고 next_step을 전하고 멈춘다 — 신규와 같다
-  4. 이 변경이 상위 문서의 결정과 어긋난다는 걸 알면 upstream_impact에 그 항목을 넣는다
-     예: API에서 "바뀐 항목은 에이전트가 지정"으로 정했는데 UC-A6는 "diff로 찾는다"라고 되어 있으면 ["SYNC-UC-001#UC-A6"]
+  3. next_step을 전하고 멈춘다 — 신규와 같다. 완료 문서를 고쳤으면 초안으로 내려갔다고 말한다
+  4. 이 변경이 상위 문서의 결정과 어긋난다는 걸 알면 사람에게 말한다 — 상위를 고치는 것도 사람이 시킨다
+     예: API에서 "바뀐 항목은 에이전트가 지정"으로 정했는데 UC-A6는 "diff로 찾는다"라고 되어 있으면 그 둘을 짚어 준다
 
 하지 말 것
   - update_document에 doc_id 오타 → not-found. 새 문서가 생기지 않는다
@@ -416,7 +409,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 지울 때 (잘못 만든 문서)
   1. delete_document(doc_id)
-     - document-deletion-needs-confirm → 제목·버전 수·끊어질 참조·댓글 수를 사람에게 보여주고 확인
+     - document-deletion-needs-confirm → 제목·버전 수·끊어질 참조를 사람에게 보여주고 확인
   2. 확인되면 delete_document(doc_id, confirm=true). 휴지통이다 — 되살릴 수 있다
   3. 잘못 넣었으면 restore_document(doc_id). 완전 삭제는 사람이 웹에서
 
