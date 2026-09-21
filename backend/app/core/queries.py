@@ -11,6 +11,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app import db
+from app.core.account.models import User
 from app.core.account.service import AccountService
 from app.core.project.models import Project
 from app.core.project.service import ProjectService
@@ -93,11 +94,11 @@ def _api_author(session: Session, ref: AuthorRef | None) -> ApiAuthor | None:
     )
 
 
-async def project_summary() -> list[ProjectSummary]:
+async def project_summary(user: User) -> list[ProjectSummary]:
     """SYNC-MS-008#queries.project_summary"""
     with db.session_scope() as s:
         out = []
-        for p in ProjectService(s).list_projects():
+        for p in ProjectService(s).list_owned(user):  # 내 것만 — 없으면 빈 목록(UI-2 빈 상태)
             docs = SpecService(s).list_by_project(p.id)
             # 프로젝트당 한 번. 단계마다 부르면 같은 프로젝트를 11번 훑는다
             per_doc = ReferenceService(s).count_missing_by_document([d.id for d in docs])
@@ -106,10 +107,10 @@ async def project_summary() -> list[ProjectSummary]:
         return out
 
 
-async def project_detail(code: str) -> ProjectDetail:
+async def project_detail(code: str, user: User) -> ProjectDetail:
     """SYNC-MS-008#queries.project_detail"""
     with db.session_scope() as s:
-        project = ProjectService(s).get(code)
+        project = ProjectService(s).get_owned(code, user)
         recent = SpecService(s).recent_changes(project.id, 10)
         ids = [r.author.user_id for r in recent] + [
             r.author.instructed_by_id for r in recent if r.author.instructed_by_id
@@ -127,8 +128,8 @@ async def project_detail(code: str) -> ProjectDetail:
         # DB에 적힌 값 그대로 (MS-008 5). 폴링이 갱신하고 화면은 읽기만 한다
         repo = project.repository
         last_commit, behind = repo.last_processed_commit, repo.behind_by
-    summary = next(p for p in await project_summary() if p.code == code)
-    docs = await document_list(code)
+    summary = next(p for p in await project_summary(user) if p.code == code)
+    docs = await document_list(code, user)
     return ProjectDetail(
         **vars(summary),
         docs=docs,
@@ -139,11 +140,11 @@ async def project_detail(code: str) -> ProjectDetail:
 
 
 async def document_list(
-    code: str, stage: int | None = None, status: DocStatus | None = None
+    code: str, user: User, stage: int | None = None, status: DocStatus | None = None
 ) -> list[DocumentSummary]:
     """SYNC-MS-008#queries.document_list"""
     with db.session_scope() as s:
-        project = ProjectService(s).get(code)
+        project = ProjectService(s).get_owned(code, user)
         docs = SpecService(s).list_by_project(project.id, stage, status)
         ids = [d.id for d in docs]
         missing = ReferenceService(s).count_missing_by_document(ids)  # 쿼리 한 번 (N+1 금지)
@@ -153,19 +154,21 @@ async def document_list(
         return docs
 
 
-async def trash_list(code: str) -> list[DocumentSummary]:
+async def trash_list(code: str, user: User) -> list[DocumentSummary]:
     """SYNC-MS-008#queries.trash_list"""
     with db.session_scope() as s:
-        project = ProjectService(s).get(code)
+        project = ProjectService(s).get_owned(code, user)
         docs = SpecService(s).list_trashed(project.id)
         for d in docs:
             d.author = _api_author(s, d.last_author)
         return docs
 
 
-async def document_view(doc_id: str) -> Document:
+async def document_view(doc_id: str, user: User) -> Document:
     """SYNC-MS-008#queries.document_view"""
     with db.session_scope() as s:
+        # 0. 본문을 읽기 전에 소유를 가른다 — 남의 문서가 잠깐이라도 비치면 안 된다
+        project = ProjectService(s).get_owned(doc_id.split("-")[0], user)
         doc = SpecService(s).get_document(doc_id)
         doc.prev_doc_id, doc.next_doc_id = SpecService(s).neighbors(doc_id)
         # 4a — 유저용 탭이 링크를 회색 ?로, 미완성 배너가 완료 못 하는 이유로.
@@ -188,13 +191,14 @@ async def document_view(doc_id: str) -> Document:
             item.missing_refs = by_item.get(item.pk, [])
         doc.author = _api_author(s, doc.last_author)
         # 브레드크럼은 코드가 아니라 이름으로 시작한다 — 사람이 부르는 이름이 프로젝트다
-        doc.project_name = ProjectService(s).get(doc_id.split("-")[0]).name
+        doc.project_name = project.name
         return doc
 
 
-async def item_view(doc_id: str, item_id: str) -> ItemView:
+async def item_view(doc_id: str, item_id: str, user: User) -> ItemView:
     """SYNC-MS-008#queries.item_view"""
     with db.session_scope() as s:
+        ProjectService(s).get_owned(doc_id.split("-")[0], user)
         return SpecService(s).get_item(doc_id, item_id)
 
 
@@ -216,9 +220,10 @@ def _to_ref(e: RefEdge, names: dict[int, ItemRef]) -> ItemRef:
     return ref
 
 
-async def item_references_view(doc_id: str, item_id: str) -> ItemReferences:
+async def item_references_view(doc_id: str, item_id: str, user: User) -> ItemReferences:
     """SYNC-MS-008#queries.item_references_view"""
     with db.session_scope() as s:
+        ProjectService(s).get_owned(doc_id.split("-")[0], user)
         spec, refs = SpecService(s), ReferenceService(s)
         pk = spec.resolve_item(doc_id, item_id)
         document_id = spec.get_document(doc_id).id
@@ -244,9 +249,10 @@ async def item_references_view(doc_id: str, item_id: str) -> ItemReferences:
         return ItemReferences(doc_id, item_id, upstream, downstream)
 
 
-async def diff_with_impact(doc_id: str, from_no: int, to_no: int) -> Diff:
+async def diff_with_impact(doc_id: str, from_no: int, to_no: int, user: User) -> Diff:
     """SYNC-MS-008#queries.diff_with_impact"""
     with db.session_scope() as s:
+        ProjectService(s).get_owned(doc_id.split("-")[0], user)
         spec = SpecService(s)
         d = spec.diff(doc_id, from_no, to_no)
         ids = [h.item_id for h in d.hunks if h.item_id]
@@ -258,10 +264,10 @@ async def diff_with_impact(doc_id: str, from_no: int, to_no: int) -> Diff:
         return d
 
 
-async def project_items(code: str, kind: str) -> list:
+async def project_items(code: str, kind: str, user: User) -> list:
     """SYNC-MS-008#queries.project_items"""
     with db.session_scope() as s:
-        project = ProjectService(s).get(code)
+        project = ProjectService(s).get_owned(code, user)
         spec = SpecService(s)
         if kind == "broken_ref":
             edges = ReferenceService(s).missing_in_project(project.id)
@@ -281,14 +287,14 @@ async def project_items(code: str, kind: str) -> list:
         raise ValueError(f"unknown kind {kind}")  # 라우터가 enum으로 422를 낸다
 
 
-async def graph_view(code: str, scope: GraphScope = GraphScope.all) -> Graph:
+async def graph_view(code: str, user: User, scope: GraphScope = GraphScope.all) -> Graph:
     """SYNC-MS-008#queries.graph_view
 
     11단계를 다 그리되 범위로 골라낸다. 잘라내는 게 아니다 (SYNC-UI-001#UI-8 7장 3).
     끝점이 범위 밖인 간선은 버린다 — 범위 밖과 미존재 참조는 다르다.
     """
     with db.session_scope() as s:
-        project = ProjectService(s).get(code)
+        project = ProjectService(s).get_owned(code, user)
         spec, refs = SpecService(s), ReferenceService(s)
         briefs = spec.list_items_by_project(project.id)
         if scope is GraphScope.approved:
@@ -353,13 +359,14 @@ def _closure(start: int, step) -> set[int]:
     return seen
 
 
-async def item_chain(doc_id: str, item_id: str) -> ItemChain:
+async def item_chain(doc_id: str, item_id: str, user: User) -> ItemChain:
     """SYNC-MS-008#queries.item_chain
 
     직접 참조가 아니라 전이적 폐포다. 역할은 어느 폐포에서 나왔는지로 정한다 —
     단계 번호로 정하면 되돌아오는 참조에서 근거를 파생으로 잘못 적는다.
     """
     with db.session_scope() as s:
+        ProjectService(s).get_owned(doc_id.split("-")[0], user)
         spec, refs = SpecService(s), ReferenceService(s)
         pk = spec.resolve_item(doc_id, item_id)
         ups = _closure(pk, refs.upstream)
@@ -392,9 +399,10 @@ async def item_chain(doc_id: str, item_id: str) -> ItemChain:
         )
 
 
-async def downstream_view(doc_id: str) -> DownstreamView:
+async def downstream_view(doc_id: str, user: User) -> DownstreamView:
     """SYNC-MS-008#queries.downstream_view"""
     with db.session_scope() as s:
+        ProjectService(s).get_owned(doc_id.split("-")[0], user)
         spec, refs = SpecService(s), ReferenceService(s)
         document = spec.get_document(doc_id)
         pks = spec.item_pks(document.id)

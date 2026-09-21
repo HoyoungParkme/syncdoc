@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
 
-**진행 상황**: 카드 30장. **A~T·V 29장 완료**, U 남음.
+**진행 상황**: 카드 31장. **A~T·V·W 30장 완료**, X·U 남음.
 
 ---
 
@@ -600,6 +600,42 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 ---
 
+#### W 프로젝트는 등록한 사람의 것
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-RFQ-001#Q6]] · [[SYNC-PRD-001#R12]] · [[SYNC-UC-001#UC-H14]] · [[SYNC-INFRA-001]] 5장 · [[SYNC-DOM-003]] `projects` · #91 · #75 |
+| 구현 함수 | 신설 [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-001#ProjectService.list_owned]] · 변경 [[SYNC-MS-001#ProjectService.init_project]] · [[SYNC-MS-001#ProjectService.repo_status]] · [[SYNC-MS-001#ProjectService.delete_project]] · [[SYNC-MS-001#ProjectService.rebuild_index]] · [[SYNC-MS-007#pipeline.save_pipeline]](사람 경로는 `get_owned`) · [[SYNC-MS-007#pipeline.change_status]] · [[SYNC-MS-007#pipeline.trash_document]] · [[SYNC-MS-007#pipeline.restore_document]] · [[SYNC-MS-007#pipeline.purge_document]] · [[SYNC-MS-007#pipeline.revert]] · MS-008 사람용 조회 전부에 `user` |
+| DB | Alembic `0012_add_projects_owner` — `projects.owner_user_id` nullable 추가 → 등록자로 UPDATE → not null → FK·인덱스. downgrade는 역순 |
+| API | 규칙 한 줄 「소유하지 않은 프로젝트는 없는 것과 같다」. 엔드포인트·에러 표 변경 없음. OAuth scope `public_repo` |
+| 화면 | UI-2 「내 프로젝트만」 + 빈 상태 · UI-14 규칙 · UI-1·UI-3 한 줄 |
+| 테스트 | 웹·MCP 각각 「남의 프로젝트는 목록에 없음 · 주소로 not-found · 저장도 not-found」 · 폴링·웹훅은 소유 무관 · 백필 뒤 `owner_user_id is null` 0건 · 마이그레이션 up→down→up · 픽스처의 등록자 = 요청자 · **사람 확인**: 아래 다섯 |
+| 선행 | V |
+| 완료 | 2026-09-21 · 브랜치 `card/W-owner` · 커밋 `79a10bb`~`8ad75f9` (spec 15 + code 7) · 테스트 197(신설 7·수정 12) · `validate` 0/0 · `check_code` 107 중 105(미완 2는 U) · `check_ui` 12 중 11(UI-5 8.4~8.7은 U) · `check_dom` 10·10·10 · 0012 왕복+백필 · 사람 확인은 배포 뒤(아래 기록) · 되먹임: `delete_all_of`에 남아 있던 협업 표 delete(V 잔재) 제거, `user`는 마지막 필수 인자(선택 인자 앞) |
+
+**왜 카드인가.** 게이트 함수 둘과 그것을 지나는 자리 20여 곳이 한 덩어리다. 반만 걸면 「목록엔 없는데 주소로는 열린다」가 되어 안 한 것보다 나쁘다.
+
+**왜 지금인가.** 프로젝트 8개 중 하나가 다른 계정으로 등록됐고, 두 계정에 서로의 프로젝트가 전부 보이고 있다. v1이 「저장소 접근 권한이 곧 접근 권한」이라 적어 놓고 그 검사를 한 번도 안 했다(#75). 협업 장치를 걷어낸 지금(V) 남은 다인 전제가 이것 하나다.
+
+**정한 것 넷.**
+
+| 질문 | 결정 | 이유 |
+|---|---|---|
+| 소유를 어디에 두나 | **`projects.owner_user_id`** 신설 | `repositories.registered_by_user_id`는 push 토큰의 주인이다. 소유권이 옮겨가는 일과 토큰 주인이 바뀌는 일은 다른 사건인데 한 칸에 묶이면 갈라낼 수 없다. 접근 단위도 저장소가 아니라 프로젝트(`code`)다 |
+| 남의 것을 열면 | **없는 것과 같다 — 기존 `not-found`** | 403을 두면 남의 프로젝트가 있다는 사실이 샌다. 새 에러 타입도 안 는다 |
+| 게이트 모양 | **`get_owned(code, user)`·`list_owned(user)` 신설, `get`·`list_projects`는 배치용으로 남긴다** | `get(code, user \| None)`이나 ContextVar는 「빠뜨린 자리 = 조용히 전체 열람」이다. 두 이름이면 `grep`으로 남은 자리를 세고 `check_code`가 시그니처를 대조한다 |
+| 공유·초대 | **안 만든다** | 교차 작성 0건. 필요해지면 `project_members` 표 하나와 게이트 조건 한 줄 — 첫 변경이 자리를 다 만들어 두므로 두 번째가 싸다 |
+
+**사람이 브라우저에서 볼 다섯.** 두 계정이 필요하다.
+
+1. A로 들어오면 목록에 A가 등록한 것만 뜨는가
+2. B가 A의 `/p/{code}`를 직접 치면 없다고 나오는가 (본문이 잠깐이라도 비치지 않는가)
+3. B의 MCP 토큰으로 A 프로젝트에 `get_document`·`create_document`를 부르면 not-found인가
+4. UI-14 표에 자기 것만 뜨고, 폴링은 두 프로젝트 다 도는가(동기화 칸)
+5. 프로젝트가 하나도 없는 계정이 빈 상태를 보는가
+
+---
+
 #### U 읽다가 항목에 대해 묻는다
 
 | 항목 | 내용 |
@@ -695,6 +731,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | F | `card/F-repo-create` | `a11f698`~ | — | 2026-09-14 |
 | U | `card/U-ask-panel` | — | — | 2026-09-17 |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
+| W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 
 **핸드오프 대조는 카드가 아니다.** D1~D5 여러 장에 걸쳐 있어 슬라이스로 나누지 않았고, 무엇을 고쳤는지는 각 카드의 `완료` 행에 적었다. PR 하나 = 슬라이스 하나 규칙의 유일한 예외다.
 

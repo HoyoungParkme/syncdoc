@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/projects", tags=["projects"])
 @router.get("", response_model=list[ProjectSummary])
 async def list_projects(user: User = Depends(current_user)) -> list[ProjectSummary]:
     """SYNC-API-001#GET/api/projects"""
-    return [ProjectSummary.of(p) for p in await queries.project_summary()]
+    return [ProjectSummary.of(p) for p in await queries.project_summary(user)]
 
 
 @router.post("", response_model=ProjectSummary, status_code=201)
@@ -35,20 +35,20 @@ async def init_project(
         req.remote_url, req.code, req.name, user, req.import_existing, req.create_repo
     )
     session.commit()
-    summary = next(p for p in await queries.project_summary() if p.code == req.code)
+    summary = next(p for p in await queries.project_summary(user) if p.code == req.code)
     return ProjectSummary.of(summary)
 
 
 @router.get("/{code}", response_model=ProjectDetail)
 async def get_project(code: str, user: User = Depends(current_user)) -> ProjectDetail:
     """SYNC-API-001#GET/api/projects/{code}"""
-    return ProjectDetail.of(await queries.project_detail(code))
+    return ProjectDetail.of(await queries.project_detail(code, user))
 
 
 @router.get("/{code}/trash", response_model=list[DocumentSummary])
 async def trash_list(code: str, user: User = Depends(current_user)) -> list[DocumentSummary]:
     """SYNC-API-001#GET/api/projects/{code}/trash"""
-    return [DocumentSummary.of(d) for d in await queries.trash_list(code)]
+    return [DocumentSummary.of(d) for d in await queries.trash_list(code, user)]
 
 
 @router.get("/{code}/docs", response_model=list[DocumentSummary])
@@ -59,7 +59,7 @@ async def list_docs(
     user: User = Depends(current_user),
 ) -> list[DocumentSummary]:
     """SYNC-API-001#GET/api/projects/{code}/docs"""
-    return [DocumentSummary.of(d) for d in await queries.document_list(code, stage, status)]
+    return [DocumentSummary.of(d) for d in await queries.document_list(code, user, stage, status)]
 
 
 @router.get("/{code}/flags", response_model=list[BrokenRefSummary | DocumentSummary])
@@ -74,7 +74,7 @@ async def list_items(
     """
     return [
         DocumentSummary.of(x) if isinstance(x, DocumentSummaryDto) else BrokenRefSummary.of(x)
-        for x in await queries.project_items(code, kind)
+        for x in await queries.project_items(code, kind, user)
     ]
 
 
@@ -85,7 +85,7 @@ async def graph(
     user: User = Depends(current_user),
 ) -> Graph:
     """SYNC-API-001#GET/api/projects/{code}/graph"""
-    return Graph.of(await queries.graph_view(code, scope))
+    return Graph.of(await queries.graph_view(code, user, scope))
 
 
 @router.delete("/{code}", status_code=204)
@@ -93,5 +93,5 @@ async def delete_project(
     code: str, session: Session = Depends(get_session), user: User = Depends(current_user)
 ) -> None:
     """SYNC-API-001#DELETE/api/projects/{code}"""
-    await ProjectService(session).delete_project(code)
+    await ProjectService(session).delete_project(code, user)
     session.commit()

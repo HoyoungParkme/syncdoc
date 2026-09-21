@@ -15,7 +15,7 @@ def test_projects_requires_session(client: TestClient) -> None:
 
 
 def test_list_and_docs(client: TestClient, scoped: Session) -> None:
-    login(client, scoped, "minjun")
+    login(client, scoped, "hoyoung")  # make_project의 소유자
     p = make_project(scoped, "EXMP")
     a = author(scoped)
     SpecService(scoped).create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
@@ -104,3 +104,30 @@ def test_init_project_web_path(
     assert (
         prd["doc_count"] == 1 and r.json()["counts"]["convention_errors"] == 1
     )  # 시드 PRD는 frontmatter 미완
+
+
+def test_other_owner_project_is_invisible(client: TestClient, scoped: Session) -> None:
+    """R12 — 목록에 안 뜨고, 주소를 직접 쳐도 없는 프로젝트와 같은 답이다."""
+    p = make_project(scoped, "EXMP")
+    SpecService(scoped).create(
+        p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", author(scoped), "spec: 테스트"
+    )
+    login(client, scoped, "minjun")
+    assert client.get("/api/projects").json() == []
+    mine = client.get("/api/projects/EXMP")
+    nope = client.get("/api/projects/NOPE")
+    assert mine.status_code == nope.status_code == 404
+    body, none = mine.json(), nope.json()
+    assert body["type"] == "urn:syncdoc:not-found" and body["resource"] == "project"
+    assert set(body) == set(
+        none
+    )  # 「남의 것」과 「없는 것」의 응답 모양이 같다 — 존재가 새지 않는다
+    for path in ("/docs", "/trash", "/graph", "/flags?kind=broken_ref"):
+        assert client.get(f"/api/projects/EXMP{path}").status_code == 404, path
+    assert client.delete("/api/projects/EXMP").status_code == 404
+    assert client.get("/api/admin/repos").json() == []
+    assert client.post("/api/admin/repos/EXMP/rebuild").status_code == 404
+    # 소유자에게는 하나
+    login(client, scoped, "hoyoung")
+    assert [x["code"] for x in client.get("/api/projects").json()] == ["EXMP"]
+    assert [x["code"] for x in client.get("/api/admin/repos").json()] == ["EXMP"]

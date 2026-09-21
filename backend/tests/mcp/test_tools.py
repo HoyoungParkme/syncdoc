@@ -9,7 +9,9 @@ from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
 from app.core.types import DocType
 from app.mcp import tools
+from tests.core.account.test_service import make_user
 from tests.core.reference.test_service import PRD, RFQ
+from tests.core.spec.test_service import PRD as PRD_BODY
 from tests.core.spec.test_service import make_project
 
 
@@ -22,6 +24,8 @@ async def call(tool: str, **args):
 def _seed(scoped: Session, a):
     svc, ref = SpecService(scoped), ReferenceService(scoped)
     p = make_project(scoped)
+    p.owner_user_id = a.user.id  # R12 — 도구를 부르는 사람이 소유자
+    scoped.flush()
     svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
     v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
     d = svc.get_document("EXMP-PRD-001")
@@ -209,3 +213,31 @@ async def test_get_references_splits_upstream_downstream(scoped: Session, as_use
     assert [(x["doc_id"], x["item_id"]) for x in r["downstream"]] == [("EXMP-PRD-001", "G1")]
     err, p = await call("get_references", doc_id="EXMP-PRD-001", item_id="R9")
     assert err and p["type"] == "urn:syncdoc:not-found"
+
+
+async def test_other_owner_project_is_not_found(scoped: Session, as_user) -> None:
+    """R12 — 발급자가 소유하지 않은 프로젝트는 도구 어디서나 not-found(project)다."""
+    _seed(scoped, as_user)
+    other = make_user(scoped, login="minjun")
+    tok = tools.current_user_id.set(other.id)
+    try:
+        for tool, args in [
+            ("list_documents", {"project_code": "EXMP"}),
+            ("get_document", {"doc_id": "EXMP-PRD-001"}),
+            ("get_item", {"doc_id": "EXMP-PRD-001", "item_id": "R1"}),
+            ("get_references", {"doc_id": "EXMP-PRD-001", "item_id": "R1"}),
+            ("get_template", {"project_code": "EXMP", "doc_type": "SCN"}),
+            (
+                "create_document",
+                {"project_code": "EXMP", "doc_type": "SCN", "body": PRD_BODY, "message": "x"},
+            ),
+            ("delete_document", {"doc_id": "EXMP-PRD-001"}),
+        ]:
+            err, p = await call(tool, **args)
+            assert err and p["type"] == "urn:syncdoc:not-found", tool
+            assert (p["resource"], p["id"]) == ("project", "EXMP"), tool
+    finally:
+        tools.current_user_id.reset(tok)
+    # 소유자에게는 그대로
+    err, _ = await call("get_document", doc_id="EXMP-PRD-001")
+    assert not err

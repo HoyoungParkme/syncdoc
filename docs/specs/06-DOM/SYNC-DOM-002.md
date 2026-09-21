@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -160,12 +160,14 @@ classDiagram
         +int id
         +str code
         +str name
+        +int owner_user_id
         +datetime created_at
     }
 ```
 
 관계
 - `Project` 1 — 1 `Repository`
+- `Project` * — 1 `User` (소유자. `owner_user_id`. 등록한 사람이고 바뀌지 않는다 — [[SYNC-PRD-001#R12]], 5장 결정 6)
 
 #### Repository 저장소
 
@@ -330,6 +332,7 @@ classDiagram
 관계
 - `User` 1 — * `AccessToken`
 - `User` 1 — * `CommitEmail`
+- `User` 1 — * `Project` (소유. 자리표시 User는 소유할 수 없다 — 5장 결정 3)
 
 #### CommitEmail 커밋이메일
 
@@ -479,10 +482,10 @@ flowchart TB
     PL -.->|get_document · validate · detect_deleted_items · create · save · apply_frontmatter| SS
     PL -.->|commit_push · read · changed_files| GIT
     PL -.->|extract · mark_missing · resolve_missing · downstream · clear| RS
-    PL -.->|get| PS
+    PL -.->|get · get_owned| PS
     QR -.->|list_by_project · describe_items · resolve_item · neighbors · diff · …| SS
     QR -.->|upstream · downstream · references_among · count_downstream| RS
-    QR -.->|list_projects · get| PS
+    QR -.->|list_owned · get_owned| PS
     QR -.->|users_by_ids| AS
     PS -.->|rebuild| PL
     PS -.->|clone · fetch · rev_list_count| GIT
@@ -513,14 +516,18 @@ classDiagram
         «service»
         +init_project(remote_url: str, code: str, name: str, user: User, import_existing: bool = False) Project
         +list_projects() list~Project~
+        +list_owned(user: User) list~Project~
         +get(code: str) Project
-        +repo_status() list~RepoStatus~
-        +rebuild_index(code: str) RebuildResult
+        +get_owned(code: str, user: User) Project
+        +repo_status(user: User) list~RepoStatus~
+        +rebuild_index(code: str, user: User) RebuildResult
+        +delete_project(code: str, user: User) None
     }
     class Project {
         +int id
         +str code
         +str name
+        +int owner_user_id
         +datetime created_at
     }
     class Repository {
@@ -542,13 +549,17 @@ classDiagram
 | 메서드 | 부르는 곳 | 유스케이스 | 던지는 에러 |
 |---|---|---|---|
 | `init_project` | [[SYNC-API-001#POST/api/projects]] · MCP [[SYNC-API-002#init_project]] | [[SYNC-UC-001#UC-A1]] | project-code-conflict, project-code-invalid, existing-specs, push-failed |
-| `list_projects` | queries.project_summary | [[SYNC-UC-001#UC-H14]] | |
-| `get` | queries · pipeline | — | not-found |
+| `list_projects` | scheduler · hooks (사람이 없는 경로) | [[SYNC-UC-001#UC-G1]] | |
+| `list_owned` | queries.project_summary · repo_status | [[SYNC-UC-001#UC-H14]] | |
+| `get` | pipeline(github 경로) · scheduler · hooks | — | not-found |
+| `get_owned` | queries · pipeline(사람 경로) | — | not-found (남의 것도 같은 답) |
 | `repo_status` | [[SYNC-API-001#GET/api/admin/repos]] | [[SYNC-UC-001#UC-G1]] | |
-| `rebuild_index` | [[SYNC-API-001#POST/api/admin/repos/{code}/rebuild]] | [[SYNC-UC-001#UC-S6]] | |
+| `rebuild_index` | [[SYNC-API-001#POST/api/admin/repos/{code}/rebuild]] | [[SYNC-UC-001#UC-S6]] | not-found |
+| `delete_project` | [[SYNC-API-001#DELETE/api/projects/{code}]] | [[SYNC-UC-001#UC-H17]] | not-found |
 
 **규칙이 사는 곳**
-- `init_project`: 코드는 `^[A-Z]{1,4}$`. `docs/specs/`가 이미 있으면 덮어쓰지 않고 `import_existing`으로 분기([[SYNC-UC-001#UC-A1]] 3a). `existing-specs`로 거부할 때 clone한 작업 사본을 지운다(SEQ-4)
+- **소유 게이트는 `get_owned` 하나다.** `project.owner_user_id != user.id`면 `NotFound("project", code)` — 있다는 사실이 새지 않는다(있는데 못 본다가 아니라 없다). 사람이 부르는 경로(웹·MCP)는 전부 `get_owned`·`list_owned`를 지나고, 사람이 없는 경로(폴링·웹훅·GitHub 커밋 처리)만 `get`·`list_projects`를 쓴다. `get(code, user: User | None)`처럼 인자를 선택으로 두지 않는다 — `None`이 「필터 없음」이라는 합법 값이 되면 빠뜨린 자리가 조용히 전체 열람이 된다
+- `init_project`: `owner_user_id = user.id`. 코드는 `^[A-Z]{1,4}$`. `docs/specs/`가 이미 있으면 덮어쓰지 않고 `import_existing`으로 분기([[SYNC-UC-001#UC-A1]] 3a). `existing-specs`로 거부할 때 clone한 작업 사본을 지운다(SEQ-4)
 - `repo_status`: 저장소마다 `git.fetch` + `rev_list_count`로 `behind_by`. 캐시할지는 미결
 - **`documents` 테이블을 모른다.** 단계 요약·건수는 `queries.project_summary`가 `SpecService.list_by_project`와 `ReferenceService.count_missing_by_document`로 만든다(되먹임 #13)
 
@@ -809,6 +820,9 @@ save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | None,
 
     entry ∈ {mcp, web_revert, web_status, github}
 
+    0a. project = entry == github ? project.get(code) : project.get_owned(code, author.user)
+        사람 경로에서 남의 프로젝트는 not-found. purge·trash·restore·revert·change_status도 같은 줄로 시작한다
+
     0. repo lock 획득 (저장소 단위. 프로세스 내 락)
     1. spec.get_document(doc_id)                 (수정·되돌리기·상태 변경일 때)
     1a. spec.precondition(project_id, doc_type, title)  (생성·mcp·DOM만) → precondition-unmet
@@ -856,7 +870,7 @@ process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
     끝나면 repositories.last_processed_commit = head
 
 rebuild(code: str, session: Session | None = None) -> RebuildResult
-    [[SYNC-UC-001#UC-S6]]. 한 트랜잭션:
+    [[SYNC-UC-001#UC-S6]]. 폴링·관리 화면이 부른다 — 관리 화면 쪽은 ProjectService.rebuild_index(code, user)가 get_owned를 먼저 지난다. 한 트랜잭션:
     reference.clear · spec.clear_index(versions만 삭제. documents·items는 유지 — 항목 ID 이력과 휴지통 상태가 거기 산다)
     파일마다 git.log → 커밋마다 spec.validate · spec.save(rebuild=True. items는 upsert)
     reference.extract(최신) · reference.resolve_missing · spec.mark_convention_error
@@ -869,20 +883,24 @@ rebuild(code: str, session: Session | None = None) -> RebuildResult
 묶음 밖. 라우터·MCP 도구가 여러 묶음에서 모아야 하는 응답을 여기서 만든다. 시퀀스 SEQ-9~15·17·18이 이 함수들의 시간축이다. 서비스는 자기 묶음 테이블만 알고, `queries`가 ID로 이어 붙인다.
 
 ```
-project_summary() -> list[ProjectSummary]           SEQ-9   projects → list_by_project → 단계 11칸 계산 → 규약 오류·미완성·끊어진 참조 수
-project_detail(code) -> ProjectDetail               SEQ-9   + recent_changes
-document_list(code, stage?, status?) -> list        SEQ-10  list_by_project
-document_view(doc_id) -> Document                   SEQ-11  get_document → neighbors
-item_view(doc_id, item_id) -> ItemView              SEQ-12  get_item
-item_references_view(doc_id, item_id) -> ItemReferences
+project_summary(user) -> list[ProjectSummary]       SEQ-9   list_owned → list_by_project → 단계 11칸 계산 → 규약 오류·미완성·끊어진 참조 수
+project_detail(code, user) -> ProjectDetail         SEQ-9   + recent_changes
+document_list(code, user, stage?, status?) -> list  SEQ-10  list_by_project
+trash_list(code, user) -> list                      —       휴지통 목록
+document_view(doc_id, user) -> Document             SEQ-11  get_owned → get_document → neighbors (본문을 읽기 전에 소유를 본다)
+item_view(doc_id, item_id, user) -> ItemView        SEQ-12  get_item
+item_references_view(doc_id, item_id, user) -> ItemReferences
                                                     SEQ-13  resolve_item → upstream · downstream · downstream_of_document → describe_items
-graph_view(code, stage?, doc?) -> Graph             SEQ-14  list_items_by_project → references_among → isolated 계산 (좌표 없음)
-diff_with_impact(doc_id, from, to) -> Diff          SEQ-15  diff → resolve_items → count_downstream
-project_items(code, kind) -> list                   SEQ-18  kind별로 list_by_project(has_convention_error) | 미완성 | 끊어진 참조(is_missing)
-downstream_view(doc_id) -> DownstreamView           —       이 문서를 참조하는 것. 추적표·하위 참조 수 (V-PRD)
+graph_view(code, user, scope?) -> Graph             SEQ-14  list_items_by_project → references_among → isolated 계산 (좌표 없음)
+diff_with_impact(doc_id, from, to, user) -> Diff    SEQ-15  diff → resolve_items → count_downstream
+project_items(code, kind, user) -> list             SEQ-18  kind별로 list_by_project(has_convention_error) | 미완성 | 끊어진 참조(is_missing)
+item_chain(doc_id, item_id, user) -> ItemChain      —       전이적 폐포 (UI-15)
+downstream_view(doc_id, user) -> DownstreamView     —       이 문서를 참조하는 것. 추적표·하위 참조 수 (V-PRD)
+ask_item(doc_id, item_id, question, history, user) -> AskAnswer
+                                                    SEQ-24  맥락 조립 → llm.ask
 ```
 
-**규칙** — `queries`는 쓰지 않는다. 읽고 조합만 한다. 건수는 `document_ids`로 묶어 한 번에 묻는다(N+1 금지). 단계 11칸 계산(가장 낮은 상태·gate_warning)은 `project_summary` 안에 있다 — `ProjectService`가 아니라.
+**규칙** — **모든 함수가 `user: User`를 명시 인자로 받고 첫 줄에서 `ProjectService.get_owned`(목록은 `list_owned`)를 지난다.** `doc_id`로 들어오는 것은 `doc_id.split("-")[0]`이 코드다. 소유가 아니면 본문·항목·참조를 읽기 전에 not-found로 끝난다. `queries`는 쓰지 않는다. 읽고 조합만 한다. 건수는 `document_ids`로 묶어 한 번에 묻는다(N+1 금지). 단계 11칸 계산(가장 낮은 상태·gate_warning)은 `project_summary` 안에 있다 — `ProjectService`가 아니라.
 
 ### 4.9 infra — 어댑터
 
@@ -926,17 +944,21 @@ llm.ask(system, messages) -> str               모델 호출 한 번. 답 문자
 2. **`github_login`** — 커밋 이메일이 GitHub noreply(`{id}+{login}@users.noreply.github.com`)면 앞부분이 곧 로그인 ID다
 3. **자리표시 생성** — `github_login`만 있는 User(`github_user_id`·`github_token_encrypted` null)
 
+**자리표시는 프로젝트를 소유할 수 없다.** 소유는 등록 시점에 정해지고(결정 6), 등록에는 토큰이 필요하며(`init_project`의 clone·push), 자리표시에는 토큰이 없다. 그래서 `projects.owner_user_id`에 자리표시가 앉는 길이 없다.
+
 **자리표시의 `github_login`은 GitHub 로그인이 아닐 수 있다.** noreply가 아닌 커밋에서는 `%an`(사람 이름)이 대체값으로 들어간다 — 공백이 든 문자열이 컬럼에 앉는다. 그래서 그 사람이 나중에 OAuth 로그인해도 login 대조로는 합쳐지지 않는다. **합치는 경로는 본인이 UI-13에서 커밋 이메일을 등록하고 인덱스를 재구축하는 것이다.** 앞으로의 커밋은 GitHub 설정에서 메일 비공개를 켜 noreply로 나가게 하면 2번에서 바로 잡힌다([[SYNC-INFRA-001]] 5장).
 
 **`author.unknown`은 「방금 자리표시를 만들었나」가 아니라 「작성자가 자리표시인가」(`github_user_id`가 null인가)로 판정한다.** 전자로 판정하면 같은 사람의 둘째 문서부터는 이미 행이 있어서 오류가 안 붙는다 — 첫 문서 하나만 막히고 나머지는 새어 나간다. 이 판정은 **저장 경로(`process_commit`)와 재구축 경로(`rebuild`) 둘 다**에 있어야 한다. 한쪽에만 두면 실물이 어느 경로로 만들어졌는지에 따라 오류가 0건이 된다(#34).
 
 **계정을 합쳐도 옛 문서의 규약 오류는 저절로 안 풀린다.** `login_github`은 `users` 행만 합치고 `documents.convention_error_detail`은 그대로다. 재구축이 유일한 청소 경로다 — 계정 묶음이 명세 묶음을 직접 건드리는 것은 [[SYNC-DOM-001]] 4장 경계 위반이라 자동 청소를 두지 않는다.
 
-**이메일 사칭은 막지 못한다 — 다만 권한은 안 준다.** 남의 이메일을 등록하면 그 사람 커밋이 내 이름으로 붙는다. `commit_emails.email`의 유일 제약이 1차 방어다(먼저 등록한 쪽이 임자, 둘째는 거부). push 권한은 여전히 `github_token_encrypted`가 있어야 한다. 저장소 권한이 곧 접근 권한이라는 전제([[SYNC-INFRA-001]] 5장) 아래 v1은 여기까지다.
+**이메일 사칭은 막지 못한다 — 다만 권한은 안 준다.** 남의 이메일을 등록하면 그 사람 커밋이 내 이름으로 붙는다. `commit_emails.email`의 유일 제약이 1차 방어다(먼저 등록한 쪽이 임자, 둘째는 거부). push 권한은 여전히 `github_token_encrypted`가 있어야 한다. v2는 접근을 소유로 가른다(결정 6) — 이메일을 사칭해도 남의 프로젝트는 보이지 않는다.
 
 **4. 읽는 중 질의에 새 묶음을 만들지 않는다 — 결정: `queries.ask_item`.** 엔티티가 없어 `models.py`가 빈 채로 일곱째 묶음이 생기고, 그러면 [[SYNC-DOM-001]] 4장 경계 표에 개념 없는 묶음을 넣어야 한다. [[SYNC-STD-001]] 1.9의 「과설계 금지 — 두 번째 구현체가 실제로 생길 때 만든다」에 걸린다. 맥락을 조립하는 데 필요한 것(항목 본문·상위·하위 참조·문서 상태)이 이미 전부 `queries`에 있고, 이 기능은 **쓰지 않고 읽기만 하므로** `pipeline`을 거칠 이유도 없다. 두 번째 모델 기능이 실제로 생기면 그때 묶음으로 옮긴다.
 
 **5. 끊어진 참조를 어디에 두나 — 결정: `references.is_missing`을 되돌린다.** v1은 상위 항목이 삭제되면 `broken_ref` 플래그를 세웠다. 추적 묶음을 빼면서 갈 곳이 없어졌는데, 참조 표에 이미 「대상이 없다」를 뜻하는 자리가 있다. 삭제된 대상을 아직 안 쓰인 대상과 같이 다루면 새 표·새 개념 없이 미완성 배너(UI-5 4a)·`get_references`·항목 표시가 전부 그대로 쓰인다. 상대가 되살아나면 `resolve_missing`이 잇는다 — 이미 있던 경로다. 「언제 끊어졌나」는 잃는다. 혼자 쓰는 도구에서 그 시각을 물을 사람이 없다.
+
+**6. 소유를 어디에 두나 — 결정: `projects.owner_user_id`. `repositories.registered_by_user_id`를 겸용하지 않는다.** 둘은 다른 사건이다. `registered_by_user_id`는 **push 토큰의 주인**이다 — GitHub 경로 자동 강등 커밋(`pipeline.process_commit`)을 미는 사람이고, 앞으로 private 저장소를 지원하면 fetch 토큰의 주인이다. 소유자는 **누구에게 보이나**다. 지금은 둘 다 등록한 사람이라 값이 같지만, 한 칸에 두면 나중에 토큰 주인을 바꾸는 일과 소유를 바꾸는 일이 갈라지지 않는다. 접근 단위도 프로젝트(`code`)다 — 모든 입구가 `code`로 들어오고 락도 `code` 단위라, 소유를 `repositories`에 두면 판정마다 조인이 붙는다. 프로젝트와 저장소가 1:1이라 어디에 두든 동작은 같으니 순수하게 뜻의 문제고, 뜻은 `projects`다. 리비전 `0012_add_projects_owner`가 컬럼을 더하고 등록자로 채운다([[SYNC-DOM-003#projects]]). 초대·공유·역할은 만들지 않는다 — 실측으로 여덟 프로젝트에 교차 작성이 한 건도 없었고, 필요해지면 `project_members` 표 하나와 `get_owned` 조건 한 줄이면 된다.
 
 ---
 

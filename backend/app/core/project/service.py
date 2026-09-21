@@ -106,7 +106,7 @@ class ProjectService:
             shutil.rmtree(workdir, ignore_errors=True)
             raise ExistingSpecs(n)
         savepoint = self.session.begin_nested()
-        project = Project(code=code, name=name)
+        project = Project(code=code, name=name, owner_user_id=user.id)  # 등록한 사람이 소유자
         self.repo.add(project)
         repository = Repository(
             project_id=project.id,
@@ -135,21 +135,44 @@ class ProjectService:
         return self.repo.by_code(code)
 
     def list_projects(self) -> list[Project]:
-        """SYNC-MS-001#ProjectService.list_projects"""
+        """SYNC-MS-001#ProjectService.list_projects
+
+        시스템 경로 전용(폴링·웹훅). 사람 경로는 list_owned — 여기서 부르면 남의 것이 샌다.
+        """
         return self.repo.all()
 
     def get(self, code: str) -> Project:
-        """SYNC-MS-001#ProjectService.get"""
+        """SYNC-MS-001#ProjectService.get
+
+        시스템 경로 전용(GitHub 처리·폴링·재구축). 사람 경로는 get_owned.
+        """
         project = self.repo.by_code(code)
         if project is None:
             raise NotFound("project", code)
         return project
 
-    async def repo_status(self) -> list[RepoStatus]:
+    def get_owned(self, code: str, user: User) -> Project:
+        """SYNC-MS-001#ProjectService.get_owned
+
+        남의 프로젝트는 없는 것과 같다 — get의 없음과 **같은** not-found를 낸다. 403을 두면
+        남의 프로젝트가 있다는 사실이 샌다. `get(code, user | None)`으로 합치지 않는 이유는
+        None이 「필터 없음」이 되어 빠뜨린 자리가 조용히 전체 열람이 되기 때문이다(DOM-002 4.1).
+        """
+        project = self.get(code)
+        if project.owner_user_id != user.id:
+            raise NotFound("project", code)
+        return project
+
+    def list_owned(self, user: User) -> list[Project]:
+        """SYNC-MS-001#ProjectService.list_owned"""
+        return self.repo.owned_by(user.id)
+
+    async def repo_status(self, user: User) -> list[RepoStatus]:
         """SYNC-MS-001#ProjectService.repo_status
 
         원격을 안 탄다. fetch는 폴링(scheduler.catch_up)이 하고 여기는 그 결과를 본다 —
         화면이 열릴 때마다 저장소 수만큼 fetch가 돌면 느리고, 폴링과 이중이 된다.
+        내가 소유한 저장소만 — 관리 화면(UI-14)도 소유로 가른다.
         """
         return [
             RepoStatus(
@@ -162,26 +185,26 @@ class ProjectService:
                 p.repository.fetched_at,
                 error=p.repository.fetch_error,  # 폴링이 적어 둔 실패 사유 (#46)
             )
-            for p in self.repo.all()
+            for p in self.repo.owned_by(user.id)
         ]
 
-    async def delete_project(self, code: str) -> None:
+    async def delete_project(self, code: str, user: User) -> None:
         """SYNC-MS-001#ProjectService.delete_project
 
         저장소는 건드리지 않는다 — docs/specs/는 원격에 그대로 남고 다시 등록하면
-        import_existing으로 돌아온다. 다만 플래그·전파결정·댓글은 원본에 없는 정보라
-        돌아오지 않는다(인프라 6장). 부르는 쪽이 사람에게 확인을 받아야 한다.
+        import_existing으로 돌아온다. 돌아오지 않는 것은 상태 변경 이력뿐이다.
+        부르는 쪽이 사람에게 확인을 받아야 한다. 소유자만 지운다.
         """
         async with _lock(code):
-            project = self.get(code)
+            project = self.get_owned(code, user)
             workdir = Path(project.repository.workdir_path)
             self.repo.delete_all_of(project.id)
             self.session.flush()
             shutil.rmtree(workdir, ignore_errors=True)
 
-    async def rebuild_index(self, code: str) -> RebuildResult:
+    async def rebuild_index(self, code: str, user: User) -> RebuildResult:
         """SYNC-MS-001#ProjectService.rebuild_index"""
         from app.core import pipeline  # 서비스가 pipeline을 부르는 유일한 곳(DOM-002 3.2)
 
-        self.get(code)
+        self.get_owned(code, user)  # 소유 검사는 여기서. pipeline.rebuild는 시스템 경로라 get
         return await pipeline.rebuild(code)

@@ -22,7 +22,7 @@ from tests.web.conftest import login
 
 def test_graph_versions_downstream_via_api(client: TestClient, scoped: Session) -> None:
     svc, p, d, rfq, pks, rpk, a_rfq, a_prd = _b3(scoped)
-    login(client, scoped, "minjun")
+    login(client, scoped, "hoyoung")  # make_project의 소유자
     gr = client.get("/api/projects/EXMP/graph").json()
     assert {n["id"] for n in gr["nodes"]} >= {"EXMP-PRD-001#G1", "EXMP-RFQ-001#Q1", "EXMP-RFQ-001"}
     assert {
@@ -114,6 +114,9 @@ async def test_webhook_admin_and_catch_up(client: TestClient, scoped: Session, p
     assert r.status_code == 202
     assert SpecService(scoped).get_document("EXMP-RFQ-001").current_version_no == 1
     assert scoped.execute(text("SELECT last_processed_commit FROM repositories")).scalar() == head
+    # webhook은 소유를 보지 않는다(UC-G1) — 남의 계정으로 봐도 처리는 이미 됐고, 표에는 안 뜬다
+    login(client, scoped, "minjun")
+    assert client.get("/api/admin/repos").json() == []
     # 관리: 동기화 상태 · 서버 꺼둔 사이 push → 밀림 1 → catch_up이 따라잡음 (UC-G1 1a)
     login(client, scoped)
     st = client.get("/api/admin/repos").json()

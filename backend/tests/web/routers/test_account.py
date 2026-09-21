@@ -32,7 +32,7 @@ def test_auth_github_redirects_to_consent_and_keeps_state_in_session(client: Tes
     url = urlparse(r.headers["location"])
     assert f"{url.scheme}://{url.netloc}{url.path}" == auth.AUTHORIZE_URL
     q = parse_qs(url.query)
-    assert q["client_id"] == ["test-client-id"] and q["scope"] == ["repo"]
+    assert q["client_id"] == ["test-client-id"] and q["scope"] == ["public_repo"]
     assert q["redirect_uri"] == ["http://testserver/auth/github/callback"]  # SEQ-8
     sess = session_of(client)
     assert sess["oauth_state"] == q["state"][0] and len(q["state"][0]) >= 16

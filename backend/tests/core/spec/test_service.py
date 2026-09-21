@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.account.models import User
 from app.core.account.service import AccountService
 from app.core.errors import ConventionViolation, ItemDeleted, NotFound
 from app.core.markdown import parse_frontmatter
@@ -16,8 +17,14 @@ from app.core.types import Author, AuthorKind, DocType, Entry, Violation, Warnin
 from tests.core.account.test_service import make_user
 
 
-def make_project(session: Session, code: str = "EXMP") -> Project:
-    p = Project(code=code, name="예시")
+def owner(session: Session, login: str = "hoyoung") -> User:
+    """프로젝트 소유자(= 테스트의 기본 작성자). 있으면 그 행, 없으면 만든다."""
+    return AccountService(session).user_by_login(login) or make_user(session, login=login)
+
+
+def make_project(session: Session, code: str = "EXMP", owner_user: User | None = None) -> Project:
+    o = owner_user or owner(session)
+    p = Project(code=code, name="예시", owner_user_id=o.id)  # 등록한 사람이 소유자 (카드 W)
     session.add(p)
     session.flush()
     u = AccountService(session).user_by_login("repo-owner") or make_user(
@@ -36,7 +43,7 @@ def make_project(session: Session, code: str = "EXMP") -> Project:
 
 
 def author(session: Session, login: str = "hoyoung", kind: AuthorKind = AuthorKind.agent) -> Author:
-    u = make_user(session, login=login)
+    u = owner(session, login)  # 소유자와 같은 사람 — 남이면 사람 경로가 not-found를 낸다
     return Author(
         kind=kind, user=u, instructed_by=u if kind == AuthorKind.agent else None, via=Entry.mcp
     )

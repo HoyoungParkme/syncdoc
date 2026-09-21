@@ -17,10 +17,11 @@ async def item_references(
     doc_id: str, item_id: str, user: User = Depends(current_user)
 ) -> ItemReferences:
     """SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/references — itemId '~'→'/'"""
-    return ItemReferences.of(await queries.item_references_view(doc_id, item_id.replace("~", "/")))
+    r = await queries.item_references_view(doc_id, item_id.replace("~", "/"), user)
+    return ItemReferences.of(r)
 
 
 @router.get("/{doc_id}/items/{item_id}/chain", response_model=ItemChain)
 async def item_chain(doc_id: str, item_id: str, user: User = Depends(current_user)) -> ItemChain:
     """SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/chain — itemId '~'→'/'"""
-    return ItemChain.of(await queries.item_chain(doc_id, item_id.replace("~", "/")))
+    return ItemChain.of(await queries.item_chain(doc_id, item_id.replace("~", "/"), user))

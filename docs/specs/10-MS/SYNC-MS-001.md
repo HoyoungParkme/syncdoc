@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-001
 type: MS
 title: MINISPEC — ProjectService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -10,13 +10,15 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/project/service.py`의 함수 5개. 클래스 명세 [[SYNC-DOM-002]] 4.1의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/project/service.py`의 함수 8개. 클래스 명세 [[SYNC-DOM-002]] 4.1의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
 **표기** — `→` 반환·결과, `!` 예외, `DB:` 테이블 접근, `git:` 저장소 접근, `·` 같은 단계 안 구분.
 
 `projects`·`repositories`만. **`documents`를 모른다** — 단계 요약은 `queries`.
+
+**소유가 여기 산다.** `projects.owner_user_id`가 「누구 것인가」이고([[SYNC-PRD-001#R12]]), 사람 경로는 전부 [[#ProjectService.get_owned]]·[[#ProjectService.list_owned]]로 들어온다. `get`·`list_projects`는 사람이 없는 경로(폴링·웹훅) 전용이다 — 사람 경로에서 부르면 남의 프로젝트가 열린다.
 
 ---
 
@@ -25,8 +27,10 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | 함수 | 한 줄 |
 |---|---|
 | [[#ProjectService.init_project]] | 프로젝트 초기화 |
-| [[#ProjectService.list_projects]] | 목록 |
-| [[#ProjectService.get]] | 코드 → 프로젝트 |
+| [[#ProjectService.list_projects]] | 목록 — 시스템 경로 |
+| [[#ProjectService.list_owned]] | 내가 소유한 목록 — 사람 경로 |
+| [[#ProjectService.get]] | 코드 → 프로젝트 — 시스템 경로 |
+| [[#ProjectService.get_owned]] | 코드 → 내 프로젝트 — 사람 경로 |
 | [[#ProjectService.repo_status]] | 동기화 상태 |
 | [[#ProjectService.delete_project]] | 등록 해제·작업 사본 회수 |
 | [[#ProjectService.rebuild_index]] | 재구축 위임 |
@@ -39,7 +43,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `async def init_project(remote_url: str, code: str, name: str, user: User, import_existing: bool = False, create_repo: bool = False) -> Project`
 
-근거: [[SYNC-SEQ-001#SEQ-4]] · [[SYNC-UC-001#UC-A1]] · [[SYNC-API-001#POST/api/projects]] · [[SYNC-API-002#init_project]]
+근거: [[SYNC-SEQ-001#SEQ-4]] · [[SYNC-UC-001#UC-A1]] · [[SYNC-API-001#POST/api/projects]] · [[SYNC-API-002#init_project]] · [[SYNC-PRD-001#R12]]
 
 **처리**
 0. **코드 단위 락**을 잡는다(`asyncio.Lock`, code별). 같은 코드로 동시에 두 번 들어오면 서로의 작업 사본을 지운다(UC-A1 2c)
@@ -52,7 +56,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 4. `git.clone(remote_url, workdir, token)` · if 실패 → workdir 삭제, `! push-failed {reason: clone}`
 5. `has = git.exists(workdir, "docs/specs")` — 커밋이 하나도 없는 빈 저장소는 `false`다([[SYNC-MS-009#git.exists]]). 9단계가 만드는 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3)
 6. if `has and not import_existing` → `n = len(git.list(workdir, "docs/specs/*/*.md"))`, workdir 삭제, `! existing-specs {doc_count: n}` (3a)
-7. **트랜잭션**: `DB: projects insert (code, name)`, `DB: repositories insert (project_id, remote_url, workdir_path, last_processed_commit=None, registered_by_user_id=user.id)` — 누가 등록했는지 기록. private 지원 때 이 사람 토큰으로 fetch한다
+7. **트랜잭션**: `DB: projects insert (code, name, owner_user_id=user.id)` — **등록하는 사람이 소유자다**([[SYNC-PRD-001#R12]]). 바뀌지 않고 나뉘지 않는다 · `DB: repositories insert (project_id, remote_url, workdir_path, last_processed_commit=None, registered_by_user_id=user.id)` — push 토큰의 주인. 지금은 소유자와 같은 사람이지만 뜻이 다르다(DOM-003 `repositories`)
 8. if `has and import_existing` → `pipeline.rebuild(code)` (3a2. 락·트랜잭션은 그쪽) · `last_processed_commit`은 rebuild가 채움
 9. else → `files = git.init_specs(workdir)` (11단계 + `STD/` 디렉터리, `_templates/` 12개, `assets/`) · `hash = git.commit_push(workdir, message=f"chore({code}): init syncdoc", author=Author(human, user, None, web), files=files)` · if 실패 → 7단계 롤백, workdir 삭제, `! push-failed` (4a) · `DB: repositories update last_processed_commit=hash`
 10. `→ Project`. **`ProjectSummary`는 입구(MCP 도구·라우터)가 `queries.project_summary()`로 만든다** — 서비스가 `queries`를 부르면 순환이다(클래스 3.2에 PS→QR 없음). 신규면 11칸 null
@@ -63,33 +67,63 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** `AccountService.github_token_for` · [[SYNC-MS-009#github.create_repo]] · `git.clone` `exists` `list` `init_specs` `commit_push` · [[SYNC-MS-007#pipeline.rebuild]]
 
-**테스트 관점** 빈 저장소 → `docs/specs/` 생김, 커밋 하나, 11칸 null · `docs/specs/` 있는 저장소 → `existing-specs`, workdir 없음, DB 행 없음 · `import_existing=true` → 재구축 결과 · clone 권한 없음 → `push-failed`, 아무것도 안 남음 · **없는 저장소 + `create_repo=false` → `push-failed`**(지금 동작) · **없는 저장소 + `true` → 공개 저장소가 생기고 골격 커밋까지** · **이미 있는 저장소 + `true` → 만들지 않고 그대로 쓴다** · 만든 뒤 등록이 실패해도 **저장소는 남는다**
+**테스트 관점** 빈 저장소 → `docs/specs/` 생김, 커밋 하나, 11칸 null · **`owner_user_id`가 등록한 사람** · `docs/specs/` 있는 저장소 → `existing-specs`, workdir 없음, DB 행 없음 · `import_existing=true` → 재구축 결과 · clone 권한 없음 → `push-failed`, 아무것도 안 남음 · **없는 저장소 + `create_repo=false` → `push-failed`**(지금 동작) · **없는 저장소 + `true` → 공개 저장소가 생기고 골격 커밋까지** · **이미 있는 저장소 + `true` → 만들지 않고 그대로 쓴다** · 만든 뒤 등록이 실패해도 **저장소는 남는다**
 
 ---
 
-#### ProjectService.list_projects 목록
+#### ProjectService.list_projects 목록 — 시스템 경로
 
 **시그니처** `list_projects() -> list[Project]`
 
-**처리** `DB: projects join repositories order by code`
+**처리** `DB: projects join repositories order by code`. **전부다** — 폴링([[SYNC-MS-007#scheduler.catch_up]])·웹훅이 쓴다. 배치는 사람이 없으니 소유와 무관하게 모든 저장소를 돌아야 한다. **사람 경로에서 부르지 않는다** — 목록 화면은 [[#ProjectService.list_owned]]
 
 ---
 
-#### ProjectService.get 코드 → 프로젝트
+#### ProjectService.list_owned 내가 소유한 목록 — 사람 경로
+
+**시그니처** `list_owned(user: User) -> list[Project]`
+
+근거: [[SYNC-PRD-001#R12]] · [[SYNC-UC-001#UC-H14]] · [[SYNC-API-001#GET/api/projects]]
+
+**처리** `DB: projects join repositories where owner_user_id = user.id order by code` · `→ list[Project]`. 없으면 빈 목록 — 에러가 아니다(프로젝트를 아직 등록 안 한 계정, UI-2 빈 상태)
+
+**호출되는 것** [[SYNC-MS-008#queries.project_summary]] · [[#ProjectService.repo_status]]
+
+**테스트 관점** 두 사람이 각각 등록 → 각자 자기 것만 · 등록한 적 없는 사람 → 빈 목록 · `list_projects`는 둘 다 준다
+
+---
+
+#### ProjectService.get 코드 → 프로젝트 — 시스템 경로
 
 **시그니처** `get(code: str) -> Project`
 
-**처리** `DB: projects join repositories where code` · if 없음 → `! not-found {resource: project, id: code}`. `Project.repository`로 저장소 접근
+**처리** `DB: projects join repositories where code` · if 없음 → `! not-found {resource: project, id: code}`. `Project.repository`로 저장소 접근. **소유를 안 본다** — GitHub 경로([[SYNC-MS-007#pipeline.process_commit]])·폴링·`init_project(import_existing)`처럼 사람이 없는 자리 전용. **사람 경로에서 부르지 않는다** — 새 코드가 이 함수를 사람 경로에서 부르면 남의 프로젝트가 열린다. `grep get(`으로 남은 자리를 셀 수 있게 이름을 하나로 둔다
+
+---
+
+#### ProjectService.get_owned 코드 → 내 프로젝트 — 사람 경로
+
+**시그니처** `get_owned(code: str, user: User) -> Project`
+
+근거: [[SYNC-PRD-001#R12]] · [[SYNC-API-001]] 1장 · [[SYNC-API-002]] 1장
+
+**처리** `project = get(code)` · if `project.owner_user_id != user.id` → `! not-found {resource: project, id: code}` — **없는 것과 같은 답**이다. 남의 프로젝트가 있다는 사실이 새지 않는다. 새 에러 타입은 없다(403을 두지 않는 이유: 「있지만 못 본다」를 알려줄 상대가 없다 — 혼자 쓰는 도구다) · `→ project`
+
+**왜 `get(code, user)`가 아니라 함수를 하나 더 두나.** `user: User | None`으로 만들면 `None`이 「필터 없음」이라는 합법 값이 되어 **빠뜨린 자리가 조용히 전체 열람**이 된다. 함수가 둘이면 호출 자리마다 「시스템 경로인가 사람 경로인가」가 코드에 읽히고, `check_code`가 시그니처를 대조한다
+
+**호출되는 것** [[SYNC-MS-007#pipeline.save_pipeline]](github가 아닌 입구) · [[SYNC-MS-007#pipeline.change_status]] · `trash_document` `restore_document` `purge_document` `revert` · [[SYNC-MS-008]]의 사람용 조회 전부 · [[#ProjectService.delete_project]] · [[#ProjectService.rebuild_index]]
+
+**테스트 관점** 소유자 → `Project` · 다른 사람 → `not-found`이고 확장 필드가 `get`의 없음과 **같다**(`resource: project`) · 없는 코드 → 같은 `not-found`
 
 ---
 
 #### ProjectService.repo_status 동기화 상태
 
-**시그니처** `async def repo_status() -> list[RepoStatus]`
+**시그니처** `async def repo_status(user: User) -> list[RepoStatus]`
 
-근거: [[SYNC-SEQ-001#SEQ-20]] · UI-14 표 2
+근거: [[SYNC-SEQ-001#SEQ-20]] · UI-14 표 2 · [[SYNC-PRD-001#R12]]
 
-**처리** **원격을 안 탄다. `git.fetch`를 부르지 않는다.** 저장소마다 `→ RepoStatus(code, name, remote_url, last_processed_commit, synced_at, behind_by, fetched_at)` — `name`은 UI-14 표가 「[코드] 이름」으로 적기 위해서다(UI-002 1.6).
+**처리** `projects = list_owned(user)` — **내가 소유한 저장소만.** v1은 전부를 줬고 그것이 관리 화면에서 남의 저장소 주소가 보이던 자리다(#91). **원격을 안 탄다. `git.fetch`를 부르지 않는다.** 저장소마다 `→ RepoStatus(code, name, remote_url, last_processed_commit, synced_at, behind_by, fetched_at)` — `name`은 UI-14 표가 「[코드] 이름」으로 적기 위해서다(UI-002 1.6).
 
 `error`는 **폴링이 적어 둔 `repositories.fetch_error`**다([[SYNC-MS-007#scheduler.catch_up]]). v1에는 백업 읽기 실패도 이 칸에 모았는데, 백업이 사라지면서(카드 V) 폴링 오류만 남았다.
 
@@ -100,40 +134,43 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 `behind_by`가 `null`이면 아직 한 번도 못 받아본 것이다 — 방금 등록했거나 폴링이 계속 실패하는
 경우다. **그 둘을 화면이 구분할 수 있어야 한다** — 계속 실패하는 쪽은 `error`가 채워져 있다(#46).
 
-**테스트 관점** 폴링이 적어 둔 `fetch_error`가 `error`로 나온다 · 이 함수가 `git.fetch`를 부르지 않는다 · 폴링이 적어 둔 값을 그대로 돌려준다 · 등록 직후에는 `behind_by=None` · 작업 사본이 없어도 다른 저장소는 그대로 나온다
+**호출하는 것** [[#ProjectService.list_owned]]
+
+**테스트 관점** 폴링이 적어 둔 `fetch_error`가 `error`로 나온다 · 이 함수가 `git.fetch`를 부르지 않는다 · 폴링이 적어 둔 값을 그대로 돌려준다 · 등록 직후에는 `behind_by=None` · 작업 사본이 없어도 다른 저장소는 그대로 나온다 · **남의 저장소는 목록에 없다**
 
 ---
 
 #### ProjectService.delete_project 등록 해제
 
-**시그니처** `async def delete_project(code: str) -> None`
+**시그니처** `async def delete_project(code: str, user: User) -> None`
 
-근거: [[SYNC-API-001#DELETE/api/projects/{code}]] · 인프라 9장(작업 사본 회수)
+근거: [[SYNC-API-001#DELETE/api/projects/{code}]] · 인프라 9장(작업 사본 회수) · [[SYNC-PRD-001#R12]]
 
 **처리** — 코드 단위 락 안에서
-1. `project = get(code)` · 없으면 `! not-found`
-2. `DB: 이 프로젝트의 flags · propagation_decisions · comments · references · items · versions · status_changes · documents · repositories · projects` 순서로 삭제. 외래키를 물고 있으므로 자식부터
+1. `project = get_owned(code, user)` · 없거나 남의 것이면 `! not-found`. 해제는 소유자만 한다
+2. `DB: 이 프로젝트의 references · items · versions · status_changes · documents · repositories · projects` 순서로 삭제. 외래키를 물고 있으므로 자식부터
 3. `shutil.rmtree(workdir, ignore_errors=True)` — 작업 사본 회수
 4. `→ None`
 
 **저장소는 건드리지 않는다.** `docs/specs/`는 원격에 그대로 남는다. 다시 등록하면
 `import_existing=true`로 문서·항목·참조가 돌아온다.
 
-**돌아오지 않는 것이 있다.** 플래그·전파결정·댓글은 원본에 없는 정보다(인프라 6장). 백업이
-있으면 그것으로만 살릴 수 있다. 그래서 이 함수는 **되돌릴 수 없는 동작**이고, 부르는 쪽이
+**돌아오지 않는 것이 있다.** 상태 변경 이력(`status_changes`)은 원본에 없는 정보다(인프라 6장). 그래서 이 함수는 **되돌릴 수 없는 동작**이고, 부르는 쪽이
 사람에게 확인을 받아야 한다.
 
-**호출하는 것** [[#ProjectService.get]]
+**호출하는 것** [[#ProjectService.get_owned]]
 
-**테스트 관점** 삭제 후 `get` → not-found · 작업 사본 디렉터리가 사라짐 · 같은 저장소를 다시 등록할 수 있음(중복 등록 검사에 안 걸림) · 다른 프로젝트의 문서·플래그는 그대로
+**테스트 관점** 삭제 후 `get` → not-found · 작업 사본 디렉터리가 사라짐 · 같은 저장소를 다시 등록할 수 있음(중복 등록 검사에 안 걸림) · 다른 프로젝트의 문서는 그대로 · **남의 프로젝트 → `not-found`, 아무것도 안 지워짐**
 
 ---
 
 #### ProjectService.rebuild_index 재구축 위임
 
-**시그니처** `async def rebuild_index(code: str) -> RebuildResult`
+**시그니처** `async def rebuild_index(code: str, user: User) -> RebuildResult`
 
-**처리** `get(code)` 확인 후 `pipeline.rebuild(code)`. 서비스가 pipeline을 부르는 유일한 곳(클래스 3.2)
+**처리** `get_owned(code, user)` 확인 후 `pipeline.rebuild(code)`. 서비스가 pipeline을 부르는 유일한 곳(클래스 3.2). 소유 검사는 여기서 끝난다 — `rebuild`는 `get`을 쓴다(`init_project(import_existing)`도 부르므로)
+
+**테스트 관점** 남의 프로젝트 → `not-found`, 재구축 안 돎
 
 ---
 

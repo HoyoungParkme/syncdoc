@@ -19,7 +19,7 @@ async def repos(
     user: User = Depends(current_user), session: Session = Depends(get_session)
 ) -> list[RepoStatus]:
     """SYNC-API-001#GET/api/admin/repos"""
-    return [RepoStatus.model_validate(r) for r in await ProjectService(session).repo_status()]
+    return [RepoStatus.model_validate(r) for r in await ProjectService(session).repo_status(user)]
 
 
 @router.post("/repos/{code}/rebuild", response_model=RebuildResult)
@@ -27,4 +27,4 @@ async def rebuild(
     code: str, user: User = Depends(current_user), session: Session = Depends(get_session)
 ) -> RebuildResult:
     """SYNC-API-001#POST/api/admin/repos/{code}/rebuild"""
-    return RebuildResult.model_validate(await ProjectService(session).rebuild_index(code))
+    return RebuildResult.model_validate(await ProjectService(session).rebuild_index(code, user))

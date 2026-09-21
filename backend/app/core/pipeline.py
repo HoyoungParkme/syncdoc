@@ -126,7 +126,10 @@ async def _run(
 ) -> SaveResult:
     """save_pipeline 본체 — 락·세션 안."""
     spec, refs = SpecService(s), ReferenceService(s)
-    project = ProjectService(s).get(code)
+    # 1. 사람 경로(mcp·웹)는 소유를 가른다 — 남의 프로젝트는 없는 것과 같다(MS-007 1단계).
+    # github 경로는 사람이 없는 배치라 get — 거르면 남의 프로젝트가 조용히 뒤처진다
+    ps = ProjectService(s)
+    project = ps.get(code) if entry == Entry.github else ps.get_owned(code, author.user)
     repo = project.repository
     # 2·3. 대상 문서 또는 생성
     document = None
@@ -309,6 +312,7 @@ async def change_status(
 ) -> DocumentSummary:
     """SYNC-MS-007#pipeline.change_status"""
     with db.session_scope() as s:
+        ProjectService(s).get_owned(doc_id.split("-")[0], user)  # 0. 문서를 읽기 전에
         spec = SpecService(s)
         document = spec.get_document(doc_id)
         if document.trashed_at is not None:
@@ -355,6 +359,7 @@ async def revert(
 ) -> SaveResult:
     """SYNC-MS-007#pipeline.revert"""
     with db.session_scope() as s:
+        ProjectService(s).get_owned(doc_id.split("-")[0], user)  # 0. 문서를 읽기 전에
         spec = SpecService(s)
         document = spec.get_document(doc_id)
         old_body = spec.version_body(doc_id, to_version)
@@ -380,11 +385,11 @@ async def trash_document(doc_id: str, author: Author, confirm: bool) -> TrashRes
     code = doc_id.split("-")[0]
     async with _lock(code):
         with db.session_scope() as s:
+            repo = ProjectService(s).get_owned(code, author.user).repository  # 0. 소유 먼저
             spec, refs = SpecService(s), ReferenceService(s)
             document = spec.get_document(doc_id)
             if document.trashed_at is not None:
                 raise DocumentTrashed(document.trashed_at.isoformat())
-            repo = ProjectService(s).get(code).repository
             # 2. 끊어질 것 — 막지 않는다, 보여준다
             inbound = _inbound_names(spec, refs.inbound_of_document(document.id))
             if not confirm:
@@ -415,11 +420,11 @@ async def restore_document(doc_id: str, author: Author) -> SaveResult:
     """SYNC-MS-007#pipeline.restore_document"""
     code = doc_id.split("-")[0]
     with db.session_scope() as s:
+        repo = ProjectService(s).get_owned(code, author.user).repository  # 0. 소유 먼저
         spec = SpecService(s)
         document = spec.get_document(doc_id)
         if document.trashed_at is None:
             raise DocumentNotTrashed()
-        repo = ProjectService(s).get(code).repository
         h = spec.trash_commit(document.id)
         assert h is not None  # trash가 늘 남긴다
         path = f"docs/specs/{spec_dir(document.doc_type)}/{doc_id}.md"
@@ -449,6 +454,7 @@ async def purge_document(doc_id: str, author: Author) -> None:
     code = doc_id.split("-")[0]
     async with _lock(code):
         with db.session_scope() as s:
+            ProjectService(s).get_owned(code, author.user)  # 0. v1은 여기만 프로젝트를 안 열었다
             spec, refs = SpecService(s), ReferenceService(s)
             document = spec.get_document(doc_id)
             if document.trashed_at is None:

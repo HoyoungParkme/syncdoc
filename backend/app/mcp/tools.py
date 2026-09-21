@@ -134,11 +134,12 @@ async def init_project(
     """SYNC-API-002#init_project"""
     try:
         with db.session_scope() as s:
+            user = _user(s)
             await ProjectService(s).init_project(
-                remote_url, code, name, _user(s), import_existing, create_repo
+                remote_url, code, name, user, import_existing, create_repo
             )
             s.commit()
-        summary = next(p for p in await queries.project_summary() if p.code == code)
+        summary = next(p for p in await queries.project_summary(user) if p.code == code)
         return _ok(_project_json(summary))
     except Problem as p:
         return _problem(p)
@@ -154,8 +155,8 @@ async def list_documents(
     """SYNC-API-002#list_documents"""
     try:
         with db.session_scope() as s:
-            _user(s)
-        docs = await queries.document_list(project_code, stage, status)
+            user = _user(s)
+        docs = await queries.document_list(project_code, user, stage, status)
     except Problem as p:
         return _problem(p)
     stages = []
@@ -186,8 +187,8 @@ async def get_document(doc_id: str) -> CallToolResult:
     """SYNC-API-002#get_document"""
     try:
         with db.session_scope() as s:
-            _user(s)
-        d: Document = await queries.document_view(doc_id)
+            user = _user(s)
+        d: Document = await queries.document_view(doc_id, user)
     except Problem as p:
         return _problem(p)
     return _ok(
@@ -219,8 +220,8 @@ async def get_item(doc_id: str, item_id: str) -> CallToolResult:
     """SYNC-API-002#get_item"""
     try:
         with db.session_scope() as s:
-            _user(s)
-        v: ItemView = await queries.item_view(doc_id, item_id)
+            user = _user(s)
+        v: ItemView = await queries.item_view(doc_id, item_id, user)
     except Problem as p:
         return _problem(p)
     return _ok(
@@ -244,8 +245,8 @@ async def get_references(doc_id: str, item_id: str) -> CallToolResult:
     """SYNC-API-002#get_references"""
     try:
         with db.session_scope() as s:
-            _user(s)
-        r = await queries.item_references_view(doc_id, item_id)
+            user = _user(s)
+        r = await queries.item_references_view(doc_id, item_id, user)
     except Problem as p:
         return _problem(p)
 
@@ -307,8 +308,9 @@ async def get_template(project_code: str, doc_type: str) -> CallToolResult:
         if doc_type not in TYPES:
             raise NotFound("doc_type", doc_type)
         with db.session_scope() as s:
-            _user(s)
-            workdir = Path(ProjectService(s).get(project_code).repository.workdir_path)
+            # 소유한 프로젝트만 연다 — 남의 것은 없는 것과 같다 (MS-001 get_owned)
+            project = ProjectService(s).get_owned(project_code, _user(s))
+            workdir = Path(project.repository.workdir_path)
         template = await _read_spec_file(workdir, f"docs/specs/_templates/{doc_type}.md")
         # 규약 문서 이름에도 프로젝트 코드가 들어간다 (STD-001 1.1) — 고정하면 SYNC 밖에서 늘 404 (#8).
         # 저장소에 없으면 싱크독 것으로 떨어진다 — 다른 프로젝트는 싱크독 STD를 그대로 쓴다 (STD-001 2.12)

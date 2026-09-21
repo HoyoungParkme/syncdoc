@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-003
 type: DOM
 title: ERD·DD — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-001]
 ---
 
@@ -41,11 +41,13 @@ erDiagram
     users ||--o{ status_changes : changed_by
     users ||--o{ access_tokens : owns
     users ||--o{ commit_emails : owns
+    users ||--o{ projects : owns
 
     projects {
         int id PK
         varchar code UK
         varchar name
+        int owner_user_id FK
         timestamptz created_at
     }
     repositories {
@@ -146,6 +148,7 @@ erDiagram
 - 상태 변경은 `versions` 행을 만들지 않는다. `status_changes.commit_hash`가 그 커밋을 가리킨다
 - `references`의 `to_item_id`와 `to_document_id`는 CHECK로 하나만 채워지게 한다. `is_missing=true`면 둘 다 null
 - **끊어진 참조는 별도 표가 아니다.** 대상 항목이 삭제되면 그것을 가리키던 참조의 `to_*`를 비우고 `is_missing=true`로 되돌린다([[SYNC-MS-003#ReferenceService.mark_missing]]). `raw_target`이 남아 있어 상대가 돌아오면 `resolve_missing`이 다시 잇는다. v1의 `flags`·`propagation_decisions`·`comments`는 v2에서 뺐다([[SYNC-DOM-001]] 3.3) — 리비전 0011이 세 표를 지운다. `downgrade`는 0001·0007·0008의 정의를 복원하지만 데이터는 돌아오지 않는다. 옛 행은 각 저장소의 `backup/tracking.json`과 태그 `v1-collab`의 `import_tracking`으로만 되살릴 수 있다
+- **소유는 `projects.owner_user_id` 한 컬럼이다.** 별도 권한 표가 없다. 리비전 `0012_add_projects_owner`가 nullable로 더하고 `repositories.registered_by_user_id`(없으면 `min(users.id)`)로 채운 뒤 not null·FK로 조인다(0004 선례). `downgrade`는 컬럼을 지운다
 
 ---
 
@@ -161,6 +164,7 @@ erDiagram
 |---|---|---|---|---|
 | code | varchar(4) | UK, `^[A-Z]{1,4}$` | 프로젝트 코드. 문서 ID 앞부분 | `SYNC` |
 | name | varchar(100) | not null | 표시 이름 | `싱크독` |
+| owner_user_id | int | FK not null | **소유자.** 등록한 사람이고 바뀌지 않는다([[SYNC-PRD-001#R12]]). 소유자가 아니면 이 프로젝트는 목록에도 없고 주소로 열어도 not-found — `ProjectService.get_owned`가 이 컬럼 하나로 판정한다. 자리표시 User는 앉을 수 없다(등록에 토큰이 필요). `repositories.registered_by_user_id`와 값이 같아도 뜻이 다르다([[SYNC-DOM-002]] 5장 결정 6) | |
 
 ### repositories
 
@@ -171,7 +175,7 @@ erDiagram
 | remote_url | varchar(300) | not null | GitHub 저장소 주소 | `https://github.com/dfocus/syncdoc` |
 | workdir_path | varchar(300) | not null | 노트북의 작업 사본 경로 | `/var/syncdoc/repos/SYNC` |
 | last_processed_commit | varchar(40) | null 허용 | 파이프라인이 마지막으로 처리한 커밋. 밀린 커밋 따라잡기 기준 | `a1b2c3…` |
-| registered_by_user_id | int | FK not null | 이 저장소를 등록한 사람. 감사용이자, private 저장소를 지원할 때 fetch에 쓸 토큰의 주인 — 폴링·재구축은 요청한 사람이 없거나 다른 사람일 수 있다. **v1은 public만 쓰므로 fetch에 토큰이 필요 없다**(MS-009 미결) | |
+| registered_by_user_id | int | FK not null | **push 토큰의 주인.** GitHub 경로 자동 강등 커밋을 이 사람 토큰으로 민다. private 저장소를 지원할 때 fetch에 쓸 토큰의 주인이기도 하다. 소유자가 아니다 — 소유는 `projects.owner_user_id` — 폴링·재구축은 요청한 사람이 없거나 다른 사람일 수 있다. **v1은 public만 쓰므로 fetch에 토큰이 필요 없다**(MS-009 미결) | |
 | synced_at | timestamptz | null 허용 | 마지막으로 원격을 받아온 시각. 폴링이 갱신 | |
 | behind_by | int | null 허용 | 원격이 앞선 커밋 수. 0이면 최신, null이면 아직 못 받아봄 | `0` |
 | fetched_at | timestamptz | null 허용 | `behind_by`를 잰 시각. 화면이 "언제 기준인지" 보여준다 | |
@@ -284,6 +288,7 @@ erDiagram
 
 | 테이블 | 인덱스 | 이유 (어느 쿼리) |
 |---|---|---|
+| projects | `(owner_user_id)` | FK 컬럼(DEV-8) · `list_owned` |
 | documents | `(project_id, doc_type)` | 단계별 목록 · `list_by_project(stage)` |
 | documents | `(has_convention_error) where true` 부분 | 규약 오류 문서 · `convention_error_docs_by` |
 | documents | `(trashed_by_user_id)` | FK 컬럼(DEV-8). 휴지통 목록은 프로젝트 단위라 `(project_id, doc_type)`로 충분 |

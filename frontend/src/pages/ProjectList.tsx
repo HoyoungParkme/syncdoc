@@ -99,7 +99,7 @@ export function ProjectList() {
       )}
       {projects.length === 0 && (
         <div className="empty" data-el="3">
-          등록된 프로젝트가 없습니다. 위의 프로젝트 초기화로 시작하세요.
+          내 프로젝트가 없습니다. 위의 프로젝트 초기화로 시작하세요.
         </div>
       )}
       {/* 성공하면 목록에 새 행이 보여야 한다. 목록은 셸이 들고 있으므로 다시 읽는다 */}

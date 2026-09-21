@@ -22,6 +22,8 @@ class Project(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(String(4), unique=True)
     name: Mapped[str] = mapped_column(String(100))
+    # 등록한 사람이 소유자. 한 명이고 바뀌지 않는다 — 아닌 사람에겐 없는 것과 같다 (PRD R12)
+    owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     repository: Mapped[Repository] = relationship(uselist=False)  # MS-001 "Project.repository"
