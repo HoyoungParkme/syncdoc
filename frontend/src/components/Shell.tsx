@@ -3,7 +3,7 @@
  *  UI-1만 예외. 프로젝트 전환 경로는 로고 하나다 — 목록 화면 자체가 고르는 화면이라 선택기가 겹친다. */
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { api, ApiError, type ProjectSummary, type User } from '../api/client'
+import { api, ApiError, type ProjectSummary, type Me } from '../api/client'
 import { HowTo } from './HowTo'
 import { SettingsDialog } from './SettingsDialog'
 import { ToastHost } from './ui'
@@ -11,13 +11,13 @@ import { ToastHost } from './ui'
 export function Shell() {
   const nav = useNavigate()
   const loc = useLocation()
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<Me | null>(null)
   const [projects, setProjects] = useState<ProjectSummary[]>([])
   const [howTo, setHowTo] = useState(false)
   const [settings, setSettings] = useState(false)
   useEffect(() => {
     api
-      .get<User>('/api/me')
+      .get<Me>('/api/me')
       .then(setUser)
       .catch((e: unknown) => {
         if (e instanceof ApiError && e.problem.status === 401) nav(`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`)

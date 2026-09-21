@@ -6,9 +6,9 @@
  *  9 단계 이동 · 10 원본(10.1 MD, 10.2 복사, 10.3 원문, 10.4 렌더링)
  *  질문 탭(8.4~8.7)은 카드 U가 더한다. 패널은 그때까지 참조 하나라 탭 줄이 없다 */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { api, ApiError, incompleteOf, warnText, type Document, type DownstreamView, type ItemReferences } from '../api/client'
+import { api, ApiError, incompleteOf, warnText, type AskAnswer, type AskTurn, type Document, type DownstreamView, type ItemReferences, type Me } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { attachDiagramButtons, DiagramFull, type FullDiagram } from '../components/DiagramFull'
 import { esc, renderBlocks, splitRef } from '../view/md'
@@ -29,6 +29,24 @@ export function DocView() {
   const [downstream, setDownstream] = useState<DownstreamView | null>(null)
   const [delOpen, setDelOpen] = useState(false) // 13
   const [delInfo, setDelInfo] = useState<Record<string, unknown> | null>(null) // 13.2 — 서버 답(needs-confirm)으로만 채운다
+  // 8 패널 탭 — 기본은 참조. 질문 탭(8.4)은 사람이 누를 때만, URL은 ?panel=ask. 키가 없으면 탭 자체가 없다
+  const { user } = useOutletContext<{ user: Me }>()
+  const askOn = user.llm_enabled
+  const panelParam = sp.get('panel') === 'ask' ? 'ask' : 'refs'
+  const setPanel = useCallback(
+    (p: 'refs' | 'ask') =>
+      // 함수형 갱신 — 본문 클릭 핸들러(effect 안 클로저)에서 불러도 낡은 sp를 안 쓴다
+      setSp(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          if (p === 'ask') next.set('panel', 'ask')
+          else next.delete('panel')
+          return next
+        },
+        { replace: true },
+      ),
+    [setSp],
+  )
   const mainRef = useRef<HTMLElement>(null)
   // 규칙: 사이드바 폭과 원문/렌더링 선택은 사람마다 기억한다. 화면을 옮겨도 유지된다
   const [tocW, addTocW] = useWidth(TOC)
@@ -90,7 +108,10 @@ export function DocView() {
         return
       }
       const item = t.closest<HTMLElement>('[data-item]')
-      if (item && item.dataset.item) setSelected(item.dataset.item)
+      if (item && item.dataset.item) {
+        setSelected(item.dataset.item)
+        setPanel('refs') // 7.1 클릭은 참조 탭으로 — 질문 탭은 사람이 직접 누를 때만
+      }
     }
     root.addEventListener('click', onClick)
     if (window.location.hash) {
@@ -102,7 +123,7 @@ export function DocView() {
       root.removeEventListener('click', onClick)
       if (typeof cleanup === 'function') cleanup()
     }
-  }, [view, tab, doc, nav])
+  }, [view, tab, doc, nav, setPanel])
 
   useEffect(() => {
     if (!selected) return
@@ -319,25 +340,46 @@ export function DocView() {
 
         <Handle el="8.3" onDrag={(dx) => addPanelW(-dx)} />
         <aside className="panel" data-el="8">
-          {/* 8.1 참조 — 탭이 하나뿐이라 탭 줄 없이 머리로만. 질문 탭(8.4)이 오면 탭 줄이 생긴다 */}
-          <div className="ptabs">
-            <span className="on" data-el="8.1">
-              참조
-            </span>
-          </div>
-          <div className="pbody">
-            {!selected ? (
-              <div className="pempty">
-                항목을 선택하세요.
-                <br />
-                항목 헤더를 누르면 그 항목의 상위·하위 참조가 여기 옵니다.
-              </div>
-            ) : refs ? (
-              <Refs refs={refs} />
-            ) : (
-              <div className="lbl">선택: #{selected}</div>
-            )}
-          </div>
+          {(() => {
+            const askTab = askOn && !doc.trashed_at // 키 없음·휴지통 문서(4b)면 탭이 없다
+            const panel = askTab && panelParam === 'ask' ? 'ask' : 'refs'
+            return (
+              <>
+                <div className="ptabs">
+                  <span className={panel === 'refs' ? 'on' : ''} data-el="8.1" onClick={() => setPanel('refs')}>
+                    참조
+                  </span>
+                  {askTab && (
+                    <span className={panel === 'ask' ? 'on' : ''} data-el="8.4" onClick={() => setPanel('ask')}>
+                      질문
+                    </span>
+                  )}
+                </div>
+                <div className="pbody">
+                  {panel === 'ask' ? (
+                    // key — 문서나 항목이 바뀌면 대화를 비운다(저장되지 않는다)
+                    <AskPanel
+                      key={`${docId}#${selected ?? ''}`}
+                      docId={docId}
+                      itemId={selected}
+                      displayName={doc.items.find((i) => i.item_id === selected)?.display_name ?? ''}
+                      goItem={goItem}
+                    />
+                  ) : !selected ? (
+                    <div className="pempty">
+                      항목을 선택하세요.
+                      <br />
+                      항목 헤더를 누르면 그 항목의 상위·하위 참조가 여기 옵니다.
+                    </div>
+                  ) : refs ? (
+                    <Refs refs={refs} />
+                  ) : (
+                    <div className="lbl">선택: #{selected}</div>
+                  )}
+                </div>
+              </>
+            )
+          })()}
         </aside>
       </div>
 
@@ -452,4 +494,123 @@ function Refs({ refs }: { refs: ItemReferences }) {
 function titleOf(body: string): string {
   const fm = body.startsWith('---') ? body.slice(3).split('\n---', 1)[0] : ''
   return /^title:\s*(.*)$/m.exec(fm)?.[1]?.trim() ?? ''
+}
+
+interface Turn {
+  q: string
+  a?: string
+  src?: string[]
+  err?: string
+}
+
+/** 8.5 맥락 줄 · 8.6 질문 입력 · 8.7 대화(.qa · 본 것 .qsrc) — UC-H19. 대화는 state에만 있고 문서·항목이 바뀌면 key로 비운다 */
+function AskPanel({
+  docId,
+  itemId,
+  displayName,
+  goItem,
+}: {
+  docId: string
+  itemId: string | null
+  displayName: string
+  goItem: (id: string) => void
+}) {
+  const [turns, setTurns] = useState<Turn[]>([])
+  const [question, setQuestion] = useState('')
+  const [pending, setPending] = useState(false)
+
+  const send = async () => {
+    const q = question.trim()
+    if (!q || !itemId || pending) return
+    // history = 지금까지의 질문·답 전부(실패한 턴은 빼고). 서버가 LLM_MAX_TURNS에서 자른다
+    const history: AskTurn[] = turns
+      .filter((t) => t.a !== undefined)
+      .flatMap((t) => [
+        { role: 'user' as const, text: t.q },
+        { role: 'assistant' as const, text: t.a as string },
+      ])
+    setQuestion('')
+    setPending(true)
+    setTurns((ts) => [...ts, { q }])
+    try {
+      const r = await api.post<AskAnswer>(`/api/docs/${docId}/items/${itemId.replace(/\//g, '~')}/ask`, { question: q, history })
+      setTurns((ts) => ts.map((t, i) => (i === ts.length - 1 ? { ...t, a: r.answer, src: r.context_item_ids } : t)))
+    } catch (e) {
+      const reason = e instanceof ApiError ? String(e.problem.reason ?? e.message) : String(e)
+      setTurns((ts) => ts.map((t, i) => (i === ts.length - 1 ? { ...t, err: reason } : t)))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  const srcLink = (id: string) => {
+    // 본 것의 항목 ID → 7.2와 같음. 이 문서 안 항목이면 스크롤·선택, 남의 문서면 링크
+    const [d, it] = id.includes('#') ? [id.split('#')[0], id.split('#')[1]] : [docId, id]
+    if (d === docId) {
+      return (
+        <a key={id} href={`#item-${it}`} onClick={(e) => { e.preventDefault(); goItem(it) }}>
+          {it}
+        </a>
+      )
+    }
+    return (
+      <Link key={id} to={`/p/${d.split('-')[0]}/d/${d}${it ? '#item-' + it : ''}`}>
+        {id}
+      </Link>
+    )
+  }
+
+  return (
+    <>
+      <div className="lbl" data-el="8.5">
+        {itemId ? (
+          <>
+            <b className="mono">{itemId}</b> {displayName} · 이 항목에 대해 묻습니다
+          </>
+        ) : (
+          '항목을 선택하세요'
+        )}
+      </div>
+      <div className="qa" data-el="8.7">
+        {turns.map((t, i) => (
+          <div key={i} className="turn">
+            <div className="q">{t.q}</div>
+            {t.a !== undefined ? (
+              <>
+                <div className="a">{t.a}</div>
+                {t.src && t.src.length > 0 && (
+                  <div className="qsrc">
+                    본 것:{' '}
+                    {t.src.map((id, k) => (
+                      <span key={id}>
+                        {k > 0 && ' · '}
+                        {srcLink(id)}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : t.err ? (
+              <div className="a fail">답을 못 받았습니다 — {t.err}</div>
+            ) : (
+              <div className="a wait">답을 기다리는 중…</div>
+            )}
+          </div>
+        ))}
+      </div>
+      <textarea
+        data-el="8.6"
+        value={question}
+        disabled={!itemId || pending}
+        placeholder={itemId ? '이 항목에 대해 묻습니다 — Enter로 보냅니다' : '항목을 먼저 선택하세요'}
+        onChange={(e) => setQuestion(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            void send()
+          }
+        }}
+      />
+    </>
+  )
 }

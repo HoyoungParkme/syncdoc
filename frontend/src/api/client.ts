@@ -48,6 +48,10 @@ export interface UserRef {
 export interface User extends UserRef {
   created_at: string
 }
+/** GET /api/me — llm_enabled가 거짓이면 UI-5 질문 탭(8.4)이 없다 */
+export interface Me extends User {
+  llm_enabled: boolean
+}
 export interface Author {
   kind: 'human' | 'agent'
   user: UserRef | null
@@ -221,6 +225,17 @@ export interface SaveResult {
   status: DocStatus
   warnings: string[]
 }
+/** UI-5 8.4~8.7 · POST /api/docs/{docId}/items/{itemId}/ask (SYNC-API-001 3.4). 대화는 저장되지 않는다 —
+ *  클라이언트가 들고 있다가 요청마다 history로 통째로 보낸다. */
+export interface AskTurn {
+  role: 'user' | 'assistant'
+  text: string
+}
+export interface AskAnswer {
+  answer: string
+  context_item_ids: string[]
+}
+
 export interface DownstreamView {
   by_item: Record<string, ItemRef[]>
   by_document: { doc_id: string; title: string; items: string[] }[]

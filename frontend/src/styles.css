@@ -714,3 +714,19 @@ a.arow:hover{background:var(--bg-subtle)}
 .howto figure+.snippet{margin-top:var(--space-12)}
 .howto .note{margin:0;padding:var(--space-10) var(--space-12);border-radius:var(--radius-control);
   background:var(--caution-bg);color:var(--caution-ink);font-size:var(--text-meta)}
+
+/* UI-5 질문 탭 (8.5~8.7) — 대화는 패널 안에서만 스크롤한다 */
+.qa{display:flex;flex-direction:column;gap:var(--space-9);margin:var(--space-9) 0}
+.qa .turn{display:flex;flex-direction:column;gap:var(--space-4)}
+.qa .q{align-self:flex-end;max-width:92%;padding:var(--space-5) var(--space-9);border-radius:var(--radius-chip);
+  background:var(--bg-sunken);color:var(--ink-body);font-size:var(--text-ui);white-space:pre-wrap}
+.qa .a{padding:var(--space-5) var(--space-9);border:1px solid var(--border);border-radius:var(--radius-chip);
+  background:var(--bg-card);color:var(--ink-prose);font-size:var(--text-ui);line-height:1.6;white-space:pre-wrap}
+.qa .a.wait{color:var(--ink-faint);border-style:dashed}
+.qa .a.fail{color:var(--danger);background:var(--danger-bg);border-color:var(--danger-bg)}
+.qa .qsrc{font-size:var(--text-caption);color:var(--ink-faint);font-family:var(--font-mono)}
+.qa .qsrc a{color:var(--ink-muted)}
+.pbody textarea[data-el="8.6"]{width:100%;box-sizing:border-box;min-height:64px;resize:vertical;padding:var(--space-6) var(--space-9);
+  border:1px solid var(--border);border-radius:var(--radius-chip);background:var(--bg-card);color:var(--ink-body);
+  font:inherit;font-size:var(--text-ui)}
+.pbody textarea[data-el="8.6"]:disabled{color:var(--ink-disabled);background:var(--bg-subtle)}
