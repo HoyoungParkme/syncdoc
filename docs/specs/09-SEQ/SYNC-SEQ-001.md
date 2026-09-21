@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: review
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -14,10 +14,12 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 
 유스케이스 흐름을 **객체 수준**으로 내린다. 누가 누굴 어떤 순서로 부르고, 어디서 갈라지는지. 생명선은 클래스 명세 4장의 서비스와 인프라 4.1의 구성 요소다.
 
-**입구 37개(REST 30 + MCP 7)를 전부 다룬다.** v1.0에서는 "단순 조회는 안 그린다"고 했으나, 그려보니 단순해 보이던 조회가 묶음을 넘는 호출을 숨기고 있었다(`get_document`의 플래그, 프로젝트 목록의 건수). 시퀀스는 그런 걸 잡으려고 그리는 것이므로 빠뜨리면 안 된다.
+**1장 대응표의 입구 전부(REST 33 엔드포인트 + MCP 도구)를 다룬다.** v1.0에서는 "단순 조회는 안 그린다"고 했으나, 그려보니 단순해 보이던 조회가 묶음을 넘는 호출을 숨기고 있었다(`get_document`의 미존재 참조, 프로젝트 목록의 건수). 시퀀스는 그런 걸 잡으려고 그리는 것이므로 빠뜨리면 안 된다.
+
+**v2에서 협업 장치를 걷어냈다.** 전파·플래그·댓글·내 할 일·백업의 시퀀스(SEQ-3·6·16·17)는 은퇴했고 번호는 비워 둔다. 남은 것 중 그 장치를 부르던 단계는 지웠다.
 
 **두 종류로 나눈다.**
-- **고유 흐름** SEQ-1~21 — 분기가 있거나 묶음을 넘는 것. 각자 그림
+- **고유 흐름** SEQ-1·2·4·5·7~15·18~24 — 분기가 있거나 묶음을 넘는 것. 각자 그림
 - **공통 형태** SEQ-C1·C2 — 정말로 `입구 → 서비스 하나 → DB → 반환`인 것. 그림 하나에 표로 어느 입구가 따르는지. **그려서 확인한 뒤에** 넣었다
 
 **표기** — `alt` 분기, `opt` 조건부, `loop` 반복. 실선 호출, 점선 반환. `DB`는 어느 묶음이든 자기 테이블. 트랜잭션은 `rect`. `Q`는 `core/queries.py` — 읽기 집계 조합자(되먹일 것 #12).
@@ -40,15 +42,13 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | ProjectService | PS | `core/project/service.py` | Control | 클래스 4.1 |
 | SpecService | S | `core/spec/service.py` | Control | 클래스 4.2 |
 | ReferenceService | R | `core/reference/service.py` | Control | 클래스 4.3 |
-| TrackingService | TR | `core/tracking/service.py` | Control | 클래스 4.4 |
-| CommentService | C | `core/collab/service.py` | Control | 클래스 4.5 |
-| AccountService | AS·AC | `core/account/service.py` | Control | 클래스 4.6 |
+| AccountService | AS·AC | `core/account/service.py` | Control | 클래스 4.4 |
 | infra/git | G | `infra/git.py` — clone·commit·push·fetch | 어댑터 | 인프라 4.3 |
 | infra/github | GHI | `infra/github.py` — OAuth·webhook 검증 | 어댑터 | 인프라 5 |
 | infra/llm | LLM | `infra/llm.py` — 모델 호출 | 어댑터 | 인프라 5.3 |
 | DB | DB | PostgreSQL. 어느 묶음이든 자기 테이블 | 저장소 | ERD·DD |
 | 입구 (공통) | B | 라우터 또는 mcp/tools — 흐름이 웹·MCP 공통일 때 | Boundary | 클래스 3.1 |
-| 서비스 (공통) | SV | 여섯 서비스 중 하나 — SEQ-C1의 표가 지정 | Control | 클래스 4장 |
+| 서비스 (공통) | SV | 네 서비스 중 하나 — SEQ-C1의 표가 지정 | Control | 클래스 4장 |
 
 ---
 
@@ -69,7 +69,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | GET /api/docs/{docId} · MCP get_document | [[#SEQ-11]] | ○ |
 | MCP get_item | [[#SEQ-12]] | ○ |
 | GET …/items/{itemId}/references · MCP get_references | [[#SEQ-13]] | ○ |
-| GET /api/docs/{docId}/upstream · POST …/status | [[#SEQ-5]] | ○ |
+| POST /api/docs/{docId}/status | [[#SEQ-5]] | ○ |
 | GET /api/docs/{docId}/versions | [[#SEQ-C1]] | |
 | GET /api/docs/{docId}/diff | [[#SEQ-15]] | ○ |
 | POST /api/docs/{docId}/revert | [[#SEQ-7]] | ○ |
@@ -77,12 +77,6 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | POST /api/docs/{docId}/restore | [[#SEQ-23]] | ○ |
 | POST /api/docs/{docId}/purge | [[#SEQ-22]] 끝 | ○ |
 | GET /api/projects/{code}/trash | [[#SEQ-C1]] | |
-| GET /api/docs/{docId}/comments | [[#SEQ-C1]] | |
-| POST /api/docs/{docId}/comments | [[#SEQ-16]] | ○ |
-| POST /api/comments/{id}/resolve | [[#SEQ-C1]] | |
-| GET /api/todo | [[#SEQ-17]] | ○ |
-| GET /api/flags/{id} · POST …/resolve | [[#SEQ-6]] | ○ |
-| GET · POST /api/decisions/{versionId} | [[#SEQ-3]] | ○ |
 | GET /api/me | [[#SEQ-C1]] | |
 | GET · POST /api/me/tokens · DELETE …/{id} | [[#SEQ-C1]] | |
 | GET /api/admin/repos | [[#SEQ-20]] | |
@@ -94,7 +88,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | MCP restore_document | [[#SEQ-23]] | ○ |
 | MCP 모든 도구의 인증 | [[#SEQ-C2]] | |
 
-묶음을 넘는 입구가 38개 중 21개다. v1.0에서 안 그린 14개 중 9개가 묶음을 넘었다.
+묶음을 넘는 것이 대응표 31행 중 22행이다(입구 여럿을 한 행에 묶은 것이 있다). v1.0에서 안 그린 조회 중 절반 이상이 묶음을 넘었다.
 
 ---
 
@@ -111,12 +105,10 @@ sequenceDiagram
     participant P as pipeline
     participant S as SpecService
     participant R as ReferenceService
-    participant TR as TrackingService
-    participant C as CommentService
     participant G as infra/git
     participant DB
 
-    A->>T: update_document(doc_id, body, expected_version, message, changed_items, upstream_impact?, confirm)
+    A->>T: update_document(doc_id, body, expected_version, message, changed_items, confirm)
     T->>AC: authenticate_token(bearer)
     AC-->>T: User
     T->>P: save_pipeline(entry=mcp, doc_id, body, expected_version, author, confirm)
@@ -151,7 +143,7 @@ sequenceDiagram
     P->>G: commit_push(repo, path, body, "spec(doc_id): …", author)
     G->>AC: github_token_for(author.user)
     opt document.status == approved (6a)
-        P->>P: body 의 `status:` 를 review 로 — **push 전에** frontmatter를 맞춘다 (#47)
+        P->>P: body 의 `status:` 를 draft 로 — **push 전에** frontmatter를 맞춘다 (#47)
     end
     AC-->>G: token
     G->>G: write · commit · push
@@ -170,37 +162,21 @@ sequenceDiagram
         P->>S: save(document, body, commit_hash, author, deleted_item_pks)
         S->>DB: Version 생성 · Item 갱신(is_deleted) · Document.current_*
         opt status == approved (6a)
-            S->>DB: Document.status=review · StatusChange
-            Note over S,DB: 본문은 이미 review 로 밀었다 — 저장소·DB·응답이 같다
+            S->>DB: Document.status=draft · StatusChange
+            Note over S,DB: 본문은 이미 draft 로 밀었다 — 저장소·DB·응답이 같다
         end
         S-->>P: Version
         opt deleted 있음
-            P->>TR: raise_broken(item_pk) ×N
-            TR->>DB: Flag(kind=broken_ref)
+            P->>R: mark_missing(deleted_item_pks)
+            R->>DB: references where to_item in … → to_item·to_document NULL · is_missing=true
         end
         P->>R: extract(document_id, version_id, body)
         R->>DB: Reference 갱신 (사라진 것 삭제, 미존재 표시)
-        P->>TR: release_broken(item_pks, user) — 원인을 더 이상 안 가리키는 broken_ref를 푼다 (UC-H12 3, #70)
-        TR->>DB: Flag.resolved_at·resolved_with_edit=true
-        P->>TR: detect_impact(document_id, prev_version_id, version_id)
-        TR->>S: diff(doc_id, prev_no, new_no)
-        S-->>TR: 변경된 item_id[]
-        TR->>R: downstream(item_pk) ×N
-        R-->>TR: affected[]
-        opt affected 있음
-            TR->>DB: PropagationDecision(choice=undecided)
-        end
-        TR-->>P: pending_version_id | null
-        opt upstream_impact 지정됨 (에이전트 경로)
-            P->>S: resolve_item(각 상위 doc_id, item_id)
-            P->>TR: raise_upstream(target_pks, document_id, version.id)
-            TR->>DB: Flag(kind=upstream_impact, target=상위 항목)
-        end
-        P->>C: relocate(document_id, old_body, body)
-        C->>DB: Comment.line_no 갱신
+        P->>R: resolve_missing(document_id, item_pks)
+        R->>DB: 이 문서·항목을 raw_target으로 기다리던 참조를 잇는다
     end
     P->>P: repo lock 해제
-    P-->>T: SaveResult {version_no, commit_hash, status, pending_decision_version_id, next_step}
+    P-->>T: SaveResult {version_no, commit_hash, status, next_step}
     T-->>A: 결과
 ```
 
@@ -208,9 +184,7 @@ sequenceDiagram
 - 검증(2a)·버전 충돌(4a)·삭제 확인(4b)은 **push 전에** 끝난다. push까지 갔으면 저장은 된다
 - push가 DB 트랜잭션 **앞**이다. push가 실패하면 DB에 아무것도 안 남는다. 클래스 명세 4.7은 반대로 적혀 있었다 → 되먹일 것
 - 삭제 확인은 `SpecService`가 아니라 `pipeline`이 한다. `SpecService`는 하위 참조를 모르기 때문이다(묶음 경계) → 되먹일 것
-- **끊어진 참조는 저장이 푼다.** 참조를 고친 본문이 추출된 뒤 `release_broken`이 아직 원인을 가리키는지 본다. 사람이 누르는 버튼이 없다 — UC-H12 3이 그렇게 정했는데 v1.0에는 이 단계가 빠져 있었다(#70)
-- 전파 결정은 여기서 안 한다. `undecided` 행만 남기고 끝. 사람이 SEQ-3에서
-- `upstream_impact`는 하위→상위 되먹임의 에이전트 경로. 사람 경로는 SEQ-5 승인 대조
+- **끊어진 참조는 표가 아니라 `references.is_missing`이다.** 항목이 지워지면 그것을 가리키던 참조가 미존재로 돌아가고(`mark_missing`), 대상이 다시 생기면 `resolve_missing`이 잇는다. 사람이 누르는 버튼이 없다 — 저장이 푼다
 - **자동 강등(6a)은 push 전에 본문에도 쓴다.** DB에만 적으면 저장소 frontmatter가 `approved`로 남아 「`status`가 진실」이 깨지고, 다음 저장이 `frontmatter.status_change`로 막힌다 — 서버가 준 본문을 서버가 거부한다(#47). **서버가 에이전트의 본문을 고치는 유일한 자리다**
 
 ---
@@ -255,17 +229,14 @@ sequenceDiagram
         P->>P: save_pipeline(entry=github, doc_id, body, expected_version=None, author=github(login), commit_hash)
         Note over P: entry=github는 SEQ-1과 이렇게 다르다
         Note over P,S: · 버전 검사 없음 (커밋이 진실)<br/>· push 없음 (이미 원격에 있음)<br/>· 규약 위반이면 저장은 하되 has_convention_error=true (3a)<br/>· 파일명 ≠ frontmatter doc_id면 규약 오류 (3b)
-        opt 승인 문서인데 본문이 바뀜 (UC-A6 6a)
-            P->>G: commit_push("status(문서ID): approved → review")
+        opt 완료 문서인데 본문이 바뀜 (UC-A6 6a)
+            P->>G: commit_push("status(문서ID): approved → draft")
             G-->>P: status_commit_hash
             Note over P,G: 커밋이 이미 저장소에 있어 본문만 고칠 수 없다.<br/>이 해시를 StatusChange에 적어야 다음 폴링이 걸러낸다 (#58)
         end
         P->>S: save(…, commit_hash, status_commit_hash)
         S->>DB: Version · Document · StatusChange
-        Note over P: 이후 extract · detect_impact · relocate는 SEQ-1과 같음
-    end
-    opt 여러 파일에서 affected가 나옴 (3c1)
-        P->>DB: PropagationDecision은 버전마다 하나. 내 할 일에 묶여 보인다
+        Note over P: 이후 mark_missing · extract · resolve_missing은 SEQ-1과 같음
     end
     P->>DB: Repository.last_processed_commit = head
     P->>P: repo lock 해제
@@ -274,69 +245,6 @@ sequenceDiagram
 **읽을 때 볼 것**
 - `author`는 커밋 작성자 GitHub 로그인으로 User를 찾는다. 등록 안 된 사람이면? → 되먹일 것
 - 밀린 커밋이 여럿이면 `changed_files`가 범위 전체를 한 번에 준다. 커밋마다 돌지 않고 **최종 상태**만 저장한다. 중간 버전은 git에만 있다 → 되먹일 것
-
----
-
-## SEQ-3 전파를 결정하고 플래그가 붙는다
-
-[[SYNC-UC-001#UC-H10]] 기본 흐름 1~3, 확장 2a·2b → [[SYNC-UC-001#UC-S4]]. UI-10 → UI-12.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor U as 사람 (지시자)
-    participant RT as routers/tracking
-    participant TR as TrackingService
-    participant S as SpecService
-    participant R as ReferenceService
-    participant DB
-
-    U->>RT: GET /api/todo
-    RT->>TR: todo_for(user)
-    TR->>DB: Flag(assignee=me) · PropagationDecision(undecided, instructed_by=me) · Document(convention_error, my commit) · Comment(unresolved, my docs)
-    TR-->>RT: Todo {pending_decisions: [...]}
-    RT-->>U: UI-10
-
-    U->>RT: GET /api/decisions/{version_id}
-    RT->>TR: get_decision(version_id)
-    TR->>DB: PropagationDecision · Version
-    TR->>S: diff(doc_id, prev_no, new_no)
-    S-->>TR: Diff (항목별)
-    TR->>R: downstream(item_pk) ×N (변경 항목마다)
-    R-->>TR: affected[] with assignee
-    TR-->>RT: DecisionDetail
-    RT-->>U: UI-12
-
-    alt 예 (기본 흐름 2)
-        U->>RT: POST /api/decisions/{id} {choice: propagate}
-        RT->>TR: record_decision(id, propagate, null, user)
-        alt 이미 결정됨
-            TR-->>RT: already-decided
-        end
-        TR->>DB: PropagationDecision.choice=propagate, decided_by, decided_at
-        TR->>TR: raise_flags(version_id, affected)
-        loop affected마다
-            TR->>S: last_author(target_document_id)
-            S-->>TR: User | null
-            TR->>DB: Flag(needs_check, target, cause, cause_version, assignee)
-        end
-        TR-->>RT: {choice, flags_raised: N}
-    else 하위 전파 안 함 (2a)
-        U->>RT: POST {choice: skip, reason}
-        alt reason 없음
-            TR-->>RT: reason-required
-        end
-        TR->>DB: choice=skip, reason
-        TR-->>RT: {choice: skip, flags_raised: 0}
-    else 닫기 (2b)
-        Note over U,DB: 아무 요청 없음. undecided 유지
-    end
-    RT-->>U: UI-10 (행 사라짐 또는 유지)
-```
-
-**읽을 때 볼 것**
-- `raise_flags`가 담당자를 정하려고 `SpecService.last_author`를 부른다. 클래스 명세 3.2에 없는 화살표 → 되먹일 것
-- 담당자가 null이면 `unassigned` 묶음에 뜬다([[SYNC-UC-001#UC-S4]] 3b)
 
 ---
 
@@ -412,7 +320,7 @@ sequenceDiagram
 
 ## SEQ-5 문서 상태를 바꾼다
 
-[[SYNC-UC-001#UC-H8]] 기본 흐름 1~4, 확장 1a. UI-5 요소 3.
+[[SYNC-UC-001#UC-H8]] 기본 흐름 1~3, 확장 1a. UI-5 요소 3. 초안 ⇄ 완료 토글.
 
 ```mermaid
 sequenceDiagram
@@ -421,37 +329,23 @@ sequenceDiagram
     participant RD as routers/documents
     participant S as SpecService
     participant P as pipeline
-    participant TR as TrackingService
     participant G as infra/git
     participant DB
 
-    opt to == approved (기본 흐름 3)
-        U->>RD: GET /api/docs/{id}/upstream
-        RD->>S: queries.upstream_checklist(doc_id) — 이 문서의 upstream 참조 전부 + 대상 상태·버전
-        RD-->>U: UI-5 다이얼로그 11 (상위 대조)
-        Note over U: 하나씩 열어 보고 어긋난 것에 체크
-    end
-    U->>RD: POST /api/docs/{id}/status {to, reason, upstream_reviewed, upstream_mismatch[]}
-    RD->>P: change_status(doc_id, to, user, reason, upstream_reviewed, upstream_mismatch)
+    U->>RD: POST /api/docs/{id}/status {to, reason?}
+    RD->>P: change_status(doc_id, to, user, reason)
     P->>S: get_document(doc_id)
-    alt has_convention_error or incomplete_warnings, to=approved (1a)
+    alt to=approved and (has_convention_error or incomplete_warnings or 미존재 참조) (1a)
         P-->>RD: status-blocked {convention_error_detail, warnings}
-    end
-    alt to=approved and not upstream_reviewed
-        P-->>RD: upstream-review-required
     end
     P->>P: frontmatter.status 교체 → new_body
     P->>P: save_pipeline(entry=web_status, doc_id, new_body, expected_version=current, author=human, reason) — 같은 세션
-    Note over P: entry=web_status는 본문이 안 바뀐다<br/>· validate (frontmatter만)<br/>· 버전 검사<br/>· push (message: "status(doc_id): from → to")<br/>· Version 생성 안 함 · extract 안 함 · detect_impact 안 함
-    P->>G: commit_push(…, "status(SYNC-PRD-001): review → approved")
+    Note over P: entry=web_status는 본문이 안 바뀐다<br/>· validate (frontmatter만)<br/>· 버전 검사<br/>· push (message: "status(doc_id): from → to")<br/>· Version 생성 안 함 · extract 안 함
+    P->>G: commit_push(…, "status(SYNC-PRD-001): draft → approved")
     G-->>P: commit_hash
     rect rgb(240,244,240)
         P->>DB: Document.status=to · current_body=new_body
         P->>DB: StatusChange(from, to, user, reason, commit_hash)
-    end
-    opt upstream_mismatch 있음 (기본 흐름 5)
-        P->>TR: raise_upstream(target_pks, cause_document_id, cause_version_id)
-        TR->>DB: Flag(kind=upstream_impact, target=상위 항목, assignee=상위 문서 최근 작성자)
     end
     P-->>RD: DocumentSummary
     RD-->>U: 상태 뱃지 갱신
@@ -459,54 +353,8 @@ sequenceDiagram
 
 **읽을 때 볼 것**
 - 상태 변경은 `pipeline.change_status`가 조율한다(B2 되먹임으로 SpecService에서 옮김). SpecService는 `get_document`·`apply_status`만
-- `승인`은 상위 대조를 건너뛸 수 없다. `upstream_reviewed=false`면 서버가 거부한다. 체크한 상위 항목엔 `upstream_impact` 플래그가 붙어 상위 담당자의 내 할 일에 뜬다 — 하위→상위 되먹임의 사람 경로
-- 상태 변경은 **Version을 만들지 않는다.** `StatusChange`가 커밋 해시를 갖는다. UI-7 이력에서 `status` 행은 `StatusChange`에서, `spec` 행은 `Version`에서 와서 시각순으로 합친다 → 되먹일 것 (DD에 `status_changes.commit_hash`가 없다)
-- 미해결 댓글 확인([[SYNC-UC-001#UC-H8]] 2a)은 서버가 막지 않는다. UI-5가 개수를 보여주고 한 번 더 묻는 것뿐
-
----
-
-## SEQ-6 확인 필요를 처리한다
-
-[[SYNC-UC-001#UC-H11]] 기본 흐름 1~6, 확장 3a·3b. UI-10 → UI-11.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor U as 사람 (담당자)
-    participant RT as routers/tracking
-    participant TR as TrackingService
-    participant S as SpecService
-    participant DB
-
-    U->>RT: GET /api/flags/{id}
-    RT->>TR: get_flag(id)
-    TR->>DB: Flag (target_item, cause_item, cause_version, raised_at)
-    TR->>S: diff(cause_doc_id, cause_version_no, current_no)
-    Note over S: 원인이 그 사이 또 바뀌었으면 누적 diff (3a)
-    S-->>TR: Diff, change_count
-    TR->>S: get_item(target_doc_id, target_item_id)
-    S-->>TR: ItemView (body, doc_version_no)
-    TR->>DB: Version where document=target_doc and created_at > raised_at
-    TR-->>RT: FlagDetail {cause_diff, cause_change_count, target_body, target_changed_since_raise}
-    RT-->>U: UI-11
-
-    opt 영향 있음 (기본 흐름 4)
-        Note over U: 화면 밖. 에이전트에게 수정을 시킨다 → SEQ-1
-        U->>RT: GET /api/flags/{id} (다시)
-        RT-->>U: target_changed_since_raise=true
-    end
-
-    U->>RT: POST /api/flags/{id}/resolve
-    RT->>TR: resolve(id, user)
-    TR->>DB: Version where document=target_doc and created_at > raised_at
-    TR->>DB: Flag.resolved_by=user, resolved_at=now, resolved_with_edit=(있으면 true)
-    TR-->>RT: FlagSummary
-    RT-->>U: UI-10
-```
-
-**읽을 때 볼 것**
-- `resolved_with_edit`는 사람이 체크하는 게 아니라 **플래그 부여 후 대상 문서에 새 버전이 있었나**로 서버가 판정(3b)
-- 담당 미지정 플래그를 resolve하면 `resolved_by`가 그 사람. `assignee`는 null로 남는다
+- 완료로 올리는 조건은 셋뿐이다 — 규약 오류·미완성·미존재 참조가 없을 것. 셋 다 한 문서만 보고 판정된다. 상위 대조·댓글 확인은 v2에서 사라졌다
+- 상태 변경은 **Version을 만들지 않는다.** `StatusChange`가 커밋 해시를 갖는다. UI-7 이력에서 `status` 행은 `StatusChange`에서, `spec` 행은 `Version`에서 와서 시각순으로 합친다
 
 ---
 
@@ -533,7 +381,7 @@ sequenceDiagram
     P->>S: get_document · versions where version_no=to_version
     S-->>P: old_body
     P->>P: save_pipeline(entry=web_revert, doc_id, old_body, expected_version=current, author=human, confirm) — 같은 세션
-    Note over P: SEQ-1과 같은 파이프라인. 차이는 입구뿐<br/>· validate — 옛 본문이 지금 규약을 위반하면 convention-violation (4a)<br/>· 삭제 감지 — 옛 본문에 없는 항목이 지금 있으면 4b와 같이 확인<br/>· push, save(새 Version), extract, detect_impact, relocate
+    Note over P: SEQ-1과 같은 파이프라인. 차이는 입구뿐<br/>· validate — 옛 본문이 지금 규약을 위반하면 convention-violation (4a)<br/>· 삭제 감지 — 옛 본문에 없는 항목이 지금 있으면 4b와 같이 확인<br/>· push, save(새 Version), mark_missing, extract, resolve_missing
     P-->>RD: SaveResult
     RD-->>U: UI-5 (새 버전)
 ```
@@ -595,8 +443,7 @@ sequenceDiagram
     participant Q as queries
     participant PS as ProjectService
     participant S as SpecService
-    participant TR as TrackingService
-    participant C as CommentService
+    participant R as ReferenceService
     participant DB
 
     U->>RP: GET /api/projects (또는 /api/projects/{code})
@@ -608,10 +455,10 @@ sequenceDiagram
         Q->>S: list_by_project(project_id)
         S->>DB: documents where project
         S-->>Q: DocumentSummary[] (status, doc_type, has_convention_error)
-        Q->>Q: 단계 11칸 계산 — 문서 여럿이면 가장 낮은 상태(1a), 없으면 null(3a), 앞 단계 미승인이면 gate_warning(1b)
-        Q->>TR: count_flags(project_id) → {needs_check, broken_ref}
-        Q->>C: count_unresolved(project_id)
-        Q->>Q: convention_errors = has_convention_error인 문서 수
+        Q->>Q: 단계 11칸 계산 — 문서 여럿이면 가장 낮은 상태(1a), 없으면 null(3a), 앞 단계 미완료면 gate_warning(1b)
+        Q->>R: count_missing_by_document(document_ids)
+        R-->>Q: {document_id: n} → 합이 counts.broken_ref, 단계별 합이 broken_count
+        Q->>Q: convention_errors = has_convention_error인 문서 수 · incomplete = 미완성 경고가 있는 문서 수
     end
     opt 상세
         Q->>S: recent_changes(project_id, n=10)
@@ -639,8 +486,7 @@ sequenceDiagram
     participant B as routers/projects 또는 mcp/tools
     participant Q as queries
     participant S as SpecService
-    participant TR as TrackingService
-    participant C as CommentService
+    participant R as ReferenceService
     participant DB
 
     A->>B: docs(code, stage?, status?)
@@ -648,15 +494,13 @@ sequenceDiagram
     Q->>S: list_by_project(project_id, stage, status)
     S->>DB: documents · 최근 version (last_author)
     S-->>Q: DocumentSummary[]
-    Q->>TR: count_flags_by_document(document_ids)
-    TR-->>Q: {document_id: {needs_check, broken_ref}}
-    Q->>C: count_unresolved_by_document(document_ids)
-    C-->>Q: {document_id: n}
+    Q->>R: count_missing_by_document(document_ids)
+    R-->>Q: {document_id: broken_ref}
     Q-->>B: DocumentSummary[] (counts 채움)
     B-->>A: 목록 (MCP는 stages로 묶어서)
 ```
 
-**읽을 때 볼 것** — 문서마다 건수 세 개. 문서 N개면 쿼리 N번이 아니라 `document_ids`로 한 번에 묶어 묻는다 → MINISPEC.
+**읽을 때 볼 것** — 문서마다 건수 하나. 문서 N개면 쿼리 N번이 아니라 `document_ids`로 한 번에 묶어 묻는다 → MINISPEC.
 
 ---
 
@@ -671,7 +515,7 @@ sequenceDiagram
     participant B as routers/documents 또는 mcp/tools
     participant Q as queries
     participant S as SpecService
-    participant TR as TrackingService
+    participant R as ReferenceService
     participant DB
 
     A->>B: get(doc_id)
@@ -683,18 +527,18 @@ sequenceDiagram
     end
     S->>DB: documents · items(is_deleted=false) · 최근 version
     S-->>Q: Document (body, status, version_no, items[], convention_error)
-    Q->>TR: flags_for_items(item_pks)
-    TR->>DB: flags where target in … and resolved_at is null
-    TR-->>Q: {item_pk: [kind]}
+    Q->>R: upstream_of_document(document_id, include_missing=True)
+    R->>DB: references where from document and is_missing
+    R-->>Q: RefEdge[] → 항목별 missing_refs[raw_target]
     Q->>S: neighbors(doc_id)
     S->>DB: 같은 프로젝트에서 stage-1·stage+1의 첫 문서
     S-->>Q: prev_doc_id, next_doc_id
-    Q-->>B: Document (items[].flags 채움, prev/next)
+    Q-->>B: Document (items[].missing_refs 채움, prev/next)
     B-->>A: 유저용 탭은 React가 렌더링 · 원본 탭은 body 그대로 · MCP는 JSON
 ```
 
 **읽을 때 볼 것**
-- `items[].flags`를 붙이려고 `TrackingService`를 부른다. `SpecService`가 직접 부르면 묶음 경계 위반 → `queries`가 조합 (되먹일 것 #12)
+- `items[].missing_refs`를 붙이려고 `ReferenceService`를 부른다. `SpecService`가 직접 부르면 묶음 경계 위반 → `queries`가 조합 (되먹일 것 #12)
 - 규약 오류 문서는 에러가 아니라 정상 반환 + `has_convention_error`([[SYNC-UC-001#UC-A2]] 2a)
 
 ---
@@ -710,7 +554,6 @@ sequenceDiagram
     participant T as mcp/tools
     participant Q as queries
     participant S as SpecService
-    participant TR as TrackingService
     participant DB
 
     A->>T: get_item(doc_id, item_id)
@@ -727,9 +570,7 @@ sequenceDiagram
     end
     S->>S: current_body에서 항목 블록 잘라내기 (헤더부터 다음 항목 헤더 전까지)
     S-->>Q: ItemView (body 블록, doc_status, doc_version_no)
-    Q->>TR: flags_for_items([item_pk])
-    TR-->>Q: [kind]
-    Q-->>T: ItemView (flags 채움)
+    Q-->>T: ItemView
     T-->>A: JSON
 ```
 
@@ -749,7 +590,6 @@ sequenceDiagram
     participant Q as queries
     participant S as SpecService
     participant R as ReferenceService
-    participant TR as TrackingService
     participant DB
 
     A->>B: references(doc_id, item_id)
@@ -768,9 +608,7 @@ sequenceDiagram
     R-->>Q: [(from_item_pk, …)]
     Q->>S: describe_items(item_pks ∪ document_ids)
     S-->>Q: {pk: (doc_id, item_id, display_name)}
-    Q->>TR: flags_for_items([item_pk])
-    TR-->>Q: FlagSummary[]
-    Q-->>B: ItemReferences {upstream, downstream, flags}
+    Q-->>B: ItemReferences {upstream, downstream}
     B-->>A: 패널 | JSON
 ```
 
@@ -843,87 +681,11 @@ sequenceDiagram
     RD-->>U: UI-7 요소 3
 ```
 
-**읽을 때 볼 것** — `SpecService.diff`는 참조를 모른다. 건수는 `queries`가 붙인다. `TrackingService.detect_impact`(SEQ-1)도 같은 `diff`를 쓰지만 건수 대신 `downstream` 목록을 받는다.
+**읽을 때 볼 것** — `SpecService.diff`는 참조를 모른다. 건수는 `queries`가 붙인다.
 
 ---
 
-## SEQ-16 댓글을 단다
-
-[[SYNC-UC-001#UC-H9]] 기본 흐름 1~2. UI-5 패널 8.2. 줄 내용 해시를 만들려면 본문이 필요하다.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor U as 사람
-    participant RC as routers/comments
-    participant S as SpecService
-    participant C as CommentService
-    participant DB
-
-    U->>RC: POST /api/docs/{id}/comments {line_no, body, parent_id?}
-    RC->>S: get_document(doc_id)
-    S-->>RC: Document (current_body)
-    RC->>RC: line_text = current_body.lines[line_no]
-    alt line_no 범위 밖
-        RC-->>U: 422
-    end
-    RC->>C: add(document_id, line_no, line_text, body, user, parent_id)
-    C->>C: line_hash = sha256(line_text.strip())
-    C->>DB: comments
-    C-->>RC: Comment
-    RC-->>U: 스레드 갱신
-```
-
-**읽을 때 볼 것** — `CommentService.add`가 `line_text`를 인자로 받는다. 본문을 직접 읽지 않는다(묶음 경계). 클래스 4.5 시그니처에 `line_text`가 없다 → 되먹일 것 #15
-
----
-
-## SEQ-17 내 할 일을 본다
-
-[[SYNC-UC-001#UC-H15]] 기본 흐름 1~2, 확장 2a. UI-10. 여섯 묶음을 네 서비스에서 모은다.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor U as 사람
-    participant RT as routers/tracking
-    participant Q as queries
-    participant TR as TrackingService
-    participant S as SpecService
-    participant C as CommentService
-    participant DB
-
-    U->>RT: GET /api/todo
-    RT->>Q: todo(user)
-    Q->>TR: flags_for_assignee(user_id) → needs_check[], broken_ref[]
-    TR->>DB: flags where assignee=me and resolved_at is null
-    Q->>TR: flags_unassigned() → unassigned[]
-    TR->>DB: flags where assignee is null and resolved_at is null
-    Q->>TR: pending_decisions_for(user_id)
-    TR->>DB: propagation_decisions where choice=undecided
-    TR-->>Q: version_ids[]
-    Q->>S: versions_instructed_by(version_ids, user_id)
-    S->>DB: versions where id in … and (instructed_by=me or author=me)
-    S-->>Q: 내가 저장시킨 것만
-    Q->>S: convention_error_docs_by(user_id)
-    S->>DB: documents where has_convention_error and 최근 version author=me
-    Q->>S: documents_authored_by(user_id) → doc_ids
-    Q->>C: unresolved_in(doc_ids)
-    C->>DB: comments where document in … and is_resolved=false
-    Q->>S: describe_items(모든 target·cause pk)
-    Q->>Q: 각 묶음 경과일 내림차순 · total = 다섯 묶음 합 (unassigned 제외)
-    Q-->>RT: Todo
-    RT-->>U: UI-10
-```
-
-**읽을 때 볼 것**
-- 쿼리 7번. 화면 하나에 한 번 부르는 거라 감수한다(API 판단 지점 2)
-- "내가 저장시킨 것" = `instructed_by=me or author=me`. 에이전트가 저장했으면 지시자, 사람이 되돌렸으면 작성자
-- "내 문서" 기준은 미결(클래스 7장). 지금은 "최근 버전 작성자가 나"
-
----
-
-## SEQ-18 프로젝트의 플래그·댓글·오류 목록을 본다
+## SEQ-18 프로젝트의 끊어진 참조·오류·미완성 목록을 본다
 
 [[SYNC-UC-001#UC-H14]] 기본 흐름 4. UI-4 다이얼로그 6.
 
@@ -933,28 +695,26 @@ sequenceDiagram
     actor U as 사람
     participant RP as routers/projects
     participant Q as queries
-    participant TR as TrackingService
+    participant R as ReferenceService
     participant S as SpecService
-    participant C as CommentService
 
     U->>RP: GET /api/projects/{code}/flags?kind
     RP->>Q: project_items(code, kind)
-    alt kind = needs_check | broken_ref
-        Q->>TR: flags_in_project(project_id, kind)
-        Q->>S: describe_items(target·cause pk)
-        Q-->>RP: FlagSummary[]
-    else kind = comments
-        Q->>S: list_by_project(project_id) → doc_ids
-        Q->>C: unresolved_in(doc_ids)
-        Q-->>RP: CommentSummary[]
+    alt kind = broken_ref
+        Q->>R: missing_in_project(project_id)
+        Q->>S: describe_items(from pk)
+        Q-->>RP: BrokenRefSummary[]
     else kind = convention_errors
         Q->>S: list_by_project(project_id, has_convention_error=true)
+        Q-->>RP: DocumentSummary[]
+    else kind = incomplete
+        Q->>S: list_by_project(project_id) → incomplete_warnings가 있는 것
         Q-->>RP: DocumentSummary[]
     end
     RP-->>U: 다이얼로그
 ```
 
-**읽을 때 볼 것** — `kind`로 세 서비스 중 하나로 갈린다. API 미결에 "넷으로 쪼갤지"가 있는데, 쪼개도 시퀀스는 같다.
+**읽을 때 볼 것** — `kind`로 두 서비스 중 하나로 갈린다. 경로 이름 `flags`는 v1의 것이 남은 것이다([[SYNC-API-001]] 3.3).
 
 ---
 
@@ -1003,10 +763,10 @@ sequenceDiagram
         P->>S: create(project_id, doc_id, doc_type, body', commit_hash, author)
         S->>DB: documents · items · versions(v1)
         P->>R: extract(document_id, version_id, body')
-        Note over P: detect_impact 생략 — 신규는 하위 참조 없음 ([[SYNC-UC-001#UC-S3]] 1a)
+        P->>R: resolve_missing(document_id, item_pks) — 이 문서를 기다리던 참조를 잇는다
     end
     P->>P: lock 해제
-    P-->>T: SaveResult {doc_id, version_no: 1, pending: null, next_step}
+    P-->>T: SaveResult {doc_id, version_no: 1, next_step}
     T-->>A: 결과
 ```
 
@@ -1048,7 +808,7 @@ sequenceDiagram
 
 ## SEQ-21 인덱스를 재구축한다
 
-[[SYNC-UC-001#UC-S6]]. UI-14 요소 3~5. 플래그·전파결정·댓글은 건드리지 않는다.
+[[SYNC-UC-001#UC-S6]]. UI-14 요소 3~5. 참조·버전·항목을 저장소에서 다시 만든다.
 
 ```mermaid
 sequenceDiagram
@@ -1059,7 +819,6 @@ sequenceDiagram
     participant PS as ProjectService
     participant S as SpecService
     participant R as ReferenceService
-    participant T as TrackingService
     participant G as infra/git
     participant DB
 
@@ -1070,12 +829,10 @@ sequenceDiagram
     P->>G: fetch · checkout origin/main
     rect rgb(240,244,240)
         Note over P,DB: 한 트랜잭션. 실패하면 전부 롤백
-        P->>S: version_keys(project_id)
-        S-->>P: {옛 version_id: (document_id, commit_hash)} — 지우기 전에 떠 둔다
         P->>R: clear(project_id)
         R->>DB: delete references where project
         P->>S: clear_index(project_id)
-        S->>DB: delete versions · status_changes(커밋 있는 것) where project (documents · items 행은 유지 — 플래그·댓글이 FK로 물려 있음)
+        S->>DB: delete versions · status_changes(커밋 있는 것) where project (documents · items 행은 유지 — pk가 바뀌면 안 된다)
         P->>G: list("docs/specs/**/*.md")
         loop 파일마다
             P->>G: log(path) → [(commit_hash, author_login, date, message)]
@@ -1084,27 +841,21 @@ sequenceDiagram
                 P->>S: validate(body, doc_type)
                 P->>S: save(document, body, commit_hash, author=github(login), rebuild=true)
                 S->>DB: versions(version_no 순서대로) · items
-                S-->>P: 새 version — {(document_id, commit_hash): id}로 모은다
+                S-->>P: 새 version
             end
             P->>R: extract(document_id, 최신 version_id, body)
             P->>S: mark_convention_error(document_id, violations or none)
         end
-        P->>T: relink_versions(project_id, 새 버전 지도)
-        T->>DB: propagation_decisions.version_id · flags.cause_version_id를 새 id로. 못 이으면 삭제
-        T->>DB: flags.target_version_id도 새 id로. 못 이으면 NULL (행은 남는다)
-        P->>T: reassign_open_flags(project_id)
-        T->>DB: 열린 플래그 담당자 = 대상 문서 최근 버전 작성자
+        P->>R: resolve_missing(project_id) — 순서상 앞 문서가 뒤 문서를 가리킨 것을 잇는다
         P->>DB: repositories.last_processed_commit = HEAD
     end
     P->>P: lock 해제
-    P-->>RA: RebuildResult {docs, items, references, versions, convention_errors[], dropped[]}
+    P-->>RA: RebuildResult {docs, items, references, versions, convention_errors[]}
     RA-->>U: 결과 표 5
 ```
 
 **읽을 때 볼 것**
-- `documents` 행은 지우지 않는다. `flags`·`comments`가 그 pk를 물고 있다. `items`도 마찬가지로 지우면 플래그가 끊긴다 → **items는 지우면 안 된다.** upsert해야 한다 (되먹일 것 #18)
-- **지우는 테이블에 걸린 FK도 세야 한다.** 위 문장은 "지우지 **않는** 테이블에 걸린 FK"만 센다. `versions`를 가리키는 FK가 넷이고(`references`·`propagation_decisions`·`flags.cause_version_id`·`flags.target_version_id`) 그중 둘을 안 세서 실물 재구축이 죽었다(#38). 지금은 `version_keys`로 옛 지도를 먼저 뜨고 `relink_versions`가 새 버전에 다시 잇는다
-- **담당자 재계산은 재연결 뒤에 온다.** 담당자는 대상 문서의 최근 버전에서 오므로 버전이 다 제자리를 찾은 뒤라야 한다
+- `documents`·`items` 행은 지우지 않는다. 문서 pk는 상태 변경·휴지통이 물고 있고, 항목은 upsert한다 (되먹일 것 #18). v1에서는 플래그·댓글이 이 pk를 물어 재구축이 `relink`·`reassign` 두 단계를 더 가졌다 — v2에서 그 표가 사라지면서 `versions`를 가리키는 FK는 `references.extracted_version_id` 하나만 남았고, 지우고 다시 만드는 것으로 끝난다
 - 커밋마다 돌아서 버전 이력을 복원한다. SEQ-2(밀린 커밋)는 최종 상태만 저장하는 것과 다르다
 
 ---
@@ -1121,8 +872,6 @@ sequenceDiagram
     participant P as pipeline
     participant S as SpecService
     participant R as ReferenceService
-    participant C as CommentService
-    participant TR as TrackingService
     participant G as infra/git
     participant DB
 
@@ -1135,9 +884,8 @@ sequenceDiagram
         P-->>T: document-trashed
     end
     P->>R: inbound_of_document(document_id)
-    P->>C: count(document_id)
     alt confirm=false (2)
-        P-->>T: document-deletion-needs-confirm {title, version_count, inbound_refs, comments}
+        P-->>T: document-deletion-needs-confirm {title, version_count, inbound_refs}
         T-->>A: isError — 사람에게 보여준다
     end
     P->>G: commit_push(repo, "spec(doc_id): 휴지통", author, delete=[path])
@@ -1147,8 +895,8 @@ sequenceDiagram
         P->>S: trash(document, commit_hash, author)
         S->>DB: items.is_deleted · documents.status=draft·trashed_at·trashed_by · StatusChange(reason=휴지통, commit_hash)
         S-->>P: deleted item pks
-        P->>TR: raise_broken(pk) ×N
-        TR->>DB: Flag(kind=broken_ref, target=하위 항목, cause=pk)
+        P->>R: mark_missing(deleted item pks)
+        R->>DB: 이 문서 항목을 가리키던 참조 → to_item·to_document NULL · is_missing=true
     end
     P->>P: lock 해제
     P-->>T: TrashResult {doc_id, commit_hash, broken_refs, next_step}
@@ -1158,19 +906,19 @@ sequenceDiagram
     A->>T: POST /api/docs/{id}/purge
     T->>P: purge_document(doc_id, author)
     P->>S: get_document — trashed_at 없으면 document-not-trashed
-    P->>R: inbound_of_document · C: count · TR: open_flags_of_document
-    alt 하나라도 0이 아님 (7)
-        P-->>T: document-has-history {inbound_refs, comments, flags}
+    P->>R: inbound_of_document (미존재로 남은 것 포함)
+    alt 0이 아님 (7)
+        P-->>T: document-has-history {inbound_refs}
     end
     P->>S: delete_document(document)
-    S->>DB: flags(대상)·전파결정·상태변경·references(from)·items·versions·documents 삭제 · 남의 flags의 원인 칸 null
+    S->>DB: 상태변경·references(from)·items·versions·documents 삭제
     P-->>T: 204
 ```
 
 **읽을 때 볼 것**
 - 휴지통 넣기는 **하드 삭제가 아니다.** GitHub에서 파일을 지워 push한 것(UC-G1 3d)과 같은 상태에 `trashed_at`만 더한 것이다 — 규약 오류로 세지 않고, 목록·단계 칸·그래프에서 빠지고, 저장·상태 변경이 `document-trashed`로 막힌다
 - 삭제 커밋은 다음 폴링에 `D`로 온다. `trashed_at`이 있는 문서의 `D`는 앱이 만든 것이라 [[SYNC-MS-007#pipeline.process_commit]]이 건너뛴다
-- 완전 삭제의 문지기는 셋 — 들어오는 참조(끊어진 채 남은 것 포함)·댓글·**미해결** 플래그. 해결된 플래그·결정된 전파·상태 변경은 이 문서의 것이라 함께 지운다. 남의 플래그가 이 문서 항목을 원인으로 물고 있으면 원인 칸만 비운다(FK)
+- 완전 삭제의 문지기는 하나 — 들어오는 참조(미존재로 남은 것 포함). 상태 변경·버전·항목·나가는 참조는 이 문서의 것이라 함께 지운다
 
 ---
 
@@ -1186,7 +934,7 @@ sequenceDiagram
     participant P as pipeline
     participant S as SpecService
     participant G as infra/git
-    participant TR as TrackingService
+    participant R as ReferenceService
     participant DB
 
     A->>T: restore_document(doc_id) · POST /api/docs/{id}/restore
@@ -1199,8 +947,7 @@ sequenceDiagram
     P->>P: frontmatter status를 draft로 (DB가 draft다 — mcp 경로의 status_change 검사)
     P->>P: save_pipeline(entry=web_revert|mcp, doc_id, body, expected_version=current, message="spec(doc_id): 되살림 — 휴지통에서") — 같은 세션
     Note over P,S: validate — 휴지통 문서의 삭제 항목은 item.reused에서 뺀다(복구)<br/>save — 항목 is_deleted 되돌림 · trashed_at·trashed_by null
-    P->>TR: release_broken_causes(되살아난 item_pks, user)
-    TR->>DB: 원인이 이 항목들인 broken_ref → resolved_with_edit=false, 확인자=user
+    Note over P,R: save_pipeline 안의 resolve_missing이 되살아난 문서·항목을 기다리던 참조를 다시 잇는다
     P-->>T: SaveResult
     T-->>A: 결과 (201)
 ```
@@ -1208,7 +955,7 @@ sequenceDiagram
 **읽을 때 볼 것**
 - 되살리기는 **새 버전**이다(되돌리기와 같은 원칙 — 이력을 안 지운다). 휴지통 사이의 시간도 이력에 남는다
 - `save`가 `trashed_at`을 비운다 — **어느 입구든** 저장되면 휴지통에서 나온다. GitHub에서 파일을 되살려 push해도 같다
-- 끊어진 참조는 원인이 돌아왔으니 푼다. 가리키던 쪽 문서는 손대지 않았으므로 `resolved_with_edit=false`
+- 미존재 참조는 대상이 돌아왔으니 다시 잇는다(`resolve_missing`). 가리키던 쪽 문서는 손대지 않는다
 
 ---
 
@@ -1279,8 +1026,6 @@ sequenceDiagram
 | GET /auth/github | (라우터만) | state 생성, 302 |
 | POST /auth/logout | (라우터만) | 세션 삭제 |
 | GET /api/docs/{docId}/versions | SpecService.list_versions | `versions ∪ status_changes` 시각순 — 한 서비스 안이지만 두 테이블 |
-| GET /api/docs/{docId}/comments | CommentService.list | 스레드로 조립 |
-| POST /api/comments/{id}/resolve | CommentService.resolve | |
 | GET /api/me | (세션 User) | |
 | GET /api/me/tokens | AccountService.list_tokens | 폐기된 것 포함 |
 | POST /api/me/tokens | AccountService.issue_token | raw 생성 → sha256 저장 → raw는 응답에만 |
@@ -1288,7 +1033,7 @@ sequenceDiagram
 
 **읽을 때 볼 것**
 - 여기 있는 것은 전부 서비스 하나만 부른다. 두 번째 서비스가 필요해지는 순간 고유 시퀀스로 옮긴다
-- `GET /api/docs/{docId}`는 처음엔 여기 넣으려 했으나 플래그 때문에 SEQ-11로. `GET /api/projects`도 건수 때문에 SEQ-9로
+- `GET /api/docs/{docId}`는 처음엔 여기 넣으려 했으나 미존재 참조 뱃지 때문에 SEQ-11로. `GET /api/projects`도 건수 때문에 SEQ-9로
 
 ---
 
@@ -1324,7 +1069,7 @@ sequenceDiagram
 
 ## 2. 되먹일 것
 
-시퀀스를 그려서 드러난 구멍. **클래스 명세 v3, ERD·DD, API, 인프라, 와이어프레임에 반영했다** (#22는 다른 문서에서 닫혔다 — 아래 미결사항). 이 절은 v3가 왜 그렇게 됐는지의 기록이다.
+시퀀스를 그려서 드러난 구멍. **클래스 명세 v3, ERD·DD, API, 인프라, 와이어프레임에 반영했다** (#22는 다른 문서에서 닫혔다 — 아래 미결사항). 이 절은 v3가 왜 그렇게 됐는지의 기록이다. **기록이라 고치지 않는다** — `TrackingService`·`CommentService`와 그 메서드(#5·#15·#19·#20·#21)는 v2에서 걷어냈고 지금 코드에 없다.
 
 ### 저장 파이프라인 (v1.0에서 발견)
 
@@ -1367,5 +1112,4 @@ sequenceDiagram
 - [x] #8 — 미등록 GitHub 사용자의 push — 결정: 커밋 이메일(`commit_emails`)로 먼저 잇고, 못 찾으면 `github_login`, 그것도 없으면 자리표시 User + `author.unknown`으로 승인만 막는다. git 커밋이 남기는 신원 중 계정으로 이어지는 것은 이메일뿐이다. 앞으로의 커밋은 GitHub 메일 비공개(noreply)로 로그인 ID가 바로 잡힌다. 이미 쌓인 것은 인덱스 재구축으로 옮긴다 ([[SYNC-DOM-002]] 5장 결정 3, [[SYNC-MS-006#AccountService.user_for_commit]])
 - [x] #4 — 락 범위. 저장소 단위 vs 문서 단위 — 결정: 저장소(프로젝트 코드) 단위. `core/pipeline.py`의 `_lock(code)`. 파일 단위로 좁히는 건 경합이 실제로 보일 때 ([[SYNC-DOM-002]] 7장에서 이미 닫힌 것의 사본이었다)
 - [x] #22 — 저장소 동기화 상태를 실시간 fetch할지 캐시할지 — 결정: DB에서 읽는다. 폴링이 `behind_by`·`fetched_at`을 갱신하고 `repo_status`는 조회만 ([[SYNC-MS-001#ProjectService.repo_status]]에서 이미 닫힌 것의 사본이었다)
-- [ ] `detect_impact`의 "변경된 항목" 판정 — 한 글자라도 바뀌면 변경인지
 - [ ] SEQ-12 항목 블록 경계 — 문서 타입별 헤더 형식. 템플릿 규약과 함께
