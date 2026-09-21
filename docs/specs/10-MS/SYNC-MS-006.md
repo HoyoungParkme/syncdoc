@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-006
 type: MS
 title: MINISPEC — AccountService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -146,7 +146,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `users_by_ids(ids: list[int]) -> dict[int, UserRef]`
 
-**처리** `DB: users where id in ids` → `{id: UserRef(id, github_login, display_name)}`. `queries`가 `AuthorRef`·`assignee_user_id`를 이름으로 바꿀 때. **쿼리 한 번**
+**처리** `DB: users where id in ids` → `{id: UserRef(id, github_login, display_name)}`. `queries`·라우터가 `AuthorRef`를 이름으로 바꿀 때(이력·최근 변경·휴지통 `trashed_by`). **쿼리 한 번**
 
 ---
 
@@ -206,7 +206,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 4. if `row` → `! email-taken {email: e}` — 이메일 하나는 사람 하나다
 5. `DB: commit_emails insert (user_id=user.id, email=e)` → `→ row`
 
-**등록만으로는 이미 쌓인 것이 안 옮겨진다.** 버전·플래그는 인덱스를 다시 만들 때 작성자를 다시 찾는다. 재구축을 한 번 돌려야 한다(UI-13 규칙)
+**등록만으로는 이미 쌓인 것이 안 옮겨진다.** 버전은 인덱스를 다시 만들 때 작성자를 다시 찾는다. 재구축을 한 번 돌려야 한다(UI-13 규칙)
 
 **예외** `email-taken` 409
 
