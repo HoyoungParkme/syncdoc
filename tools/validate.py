@@ -69,7 +69,7 @@ def validate(path, deleted_ids=()):
         if f not in fm: V.append((2, "frontmatter.field", f"필수 필드 {f} 없음"))
     typ = fm.get("type", "")
     if typ not in TYPES: V.append((2, "frontmatter.type", f"type {typ!r}"))
-    if fm.get("status") not in ("draft", "review", "approved"): V.append((2, "frontmatter.status", fm.get("status")))
+    if fm.get("status") not in ("draft", "approved"): V.append((2, "frontmatter.status", fm.get("status")))
     did = fm.get("doc_id", "")
     if not DOC_ID.match(did): V.append((2, "frontmatter.doc_id", f"형식 {did!r}"))
     elif did.split("-")[1] != typ: V.append((2, "frontmatter.doc_id", f"{did}의 타입 ≠ {typ}"))

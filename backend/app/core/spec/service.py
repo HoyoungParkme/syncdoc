@@ -146,7 +146,7 @@ class SpecService:
                     V.append(Violation(2, "frontmatter.field", f"필수 필드 {f} 없음"))
             if fm.get("type", "") not in TYPES:
                 V.append(Violation(2, "frontmatter.type", f"type {fm.get('type')!r}"))
-            if fm.get("status") not in ("draft", "review", "approved"):
+            if fm.get("status") not in ("draft", "approved"):
                 V.append(Violation(2, "frontmatter.status", str(fm.get("status"))))
             did = fm.get("doc_id", "")
             if not DOC_ID.match(did):
@@ -463,22 +463,22 @@ class SpecService:
         new_status = fm.get("status", row.status) if author.via == Entry.github else row.status
         # 6. 자동 강등. **어느 쪽이 이미 status를 정했는지를 함께 본다** (#58)
         # · mcp·되돌리기: 5단계가 row.status(approved)를 그대로 뒀다 → 여기서 내린다
-        # · github에서 파이프라인이 내림: 6a가 본문 frontmatter를 이미 review로 고쳤고
-        #   (그래서 new_status가 벌써 review다) 그 사실을 저장소에 민 해시를 준다
-        # · github에서 작성자가 스스로 내림: frontmatter가 원본의 진실이다. 여기서 review로
-        #   덮으면 저장소는 draft, DB는 review로 또 갈린다. 다른 github frontmatter 상태
-        #   변경과 같이 status_changes에는 안 남는다 — 커밋이 이미 Version으로 남아 있다
+        # · github에서 파이프라인이 내림: 6a가 본문 frontmatter를 이미 draft로 고쳤고
+        #   (그래서 new_status가 벌써 draft다) 그 사실을 저장소에 민 해시를 준다
+        # · github에서 작성자가 스스로 내림: frontmatter가 원본의 진실이다. 다른 github
+        #   frontmatter 상태 변경과 같이 status_changes에는 안 남는다 — 커밋이 이미
+        #   Version으로 남아 있다
         if (
             row.status == DocStatus.approved
             and body != row.current_body
             and (new_status == DocStatus.approved or status_commit_hash is not None)
         ):
-            new_status = DocStatus.review
+            new_status = DocStatus.draft
             self.session.add(
                 StatusChange(
                     document_id=row.id,
                     from_status=DocStatus.approved,
-                    to_status=DocStatus.review,
+                    to_status=DocStatus.draft,
                     changed_by_user_id=author.user.id,
                     reason="본문 수정으로 자동 강등",
                     # mcp·되돌리기는 본문 커밋 하나에 담기므로 None. github는 강등을
@@ -536,14 +536,9 @@ class SpecService:
 
         return first(stage - 1), first(stage + 1)
 
-    def item_pks(self, document_id: int, include_deleted: bool = False) -> dict[str, int]:
-        """SYNC-MS-002#SpecService.item_pks
-
-        include_deleted는 백업 복원용 (#16). broken_ref 플래그의 원인 항목은 정의상
-        is_deleted라, resolve_item(item-deleted를 던진다)도 resolve_items(조용히 거른다)도
-        못 쓴다. 기본값이 False라 기존 호출부는 그대로다.
-        """
-        return {i.item_id: i.id for i in self.repo.items_of(document_id, include_deleted)}
+    def item_pks(self, document_id: int) -> dict[str, int]:
+        """SYNC-MS-002#SpecService.item_pks"""
+        return {i.item_id: i.id for i in self.repo.items_of(document_id)}
 
     def resolve_item(self, doc_id: str, item_id: str) -> int:
         """SYNC-MS-002#SpecService.resolve_item"""
@@ -777,18 +772,16 @@ class SpecService:
     def version_keys(self, project_id: int) -> dict[int, tuple[int, str]]:
         """SYNC-MS-002#SpecService.version_keys
 
-        clear_index 전에 불러야 한다 — 버전 행이 지워지면 document_id·commit_hash를
-        알 방법이 없다. propagation_decisions·flags는 version_id 하나만 들고 있다 (#38).
+        부르는 곳이 없다 — 재연결(옛 rebuild 3a)이 카드 V에서 사라졌다. 쓰는 곳이 안 생기면
+        지운다 (MS-002).
         """
         return self.repo.version_keys_of_project(project_id)
 
     def clear_index(self, project_id: int) -> None:
         """SYNC-MS-002#SpecService.clear_index
 
-        `versions`를 가리키는 FK가 셋이다 — references(호출자가 먼저 지운다) ·
-        propagation_decisions.version_id · flags.cause_version_id. 뒤 둘은 호출자가
-        relink_versions로 다시 잇는다. 여기서 재연결을 하지 않는 것은 추적 묶음이
-        명세 묶음 밖이기 때문이다 (DOM-001 4장 경계).
+        `versions`를 가리키는 FK는 references.extracted_version_id 하나다 — 호출자가
+        먼저 지운다 (MS-007 rebuild 4a).
         """
         # 커밋 있는 상태 변경은 재구축이 다시 만든다. 안 지우면 재구축할 때마다 쌓인다 (#38)
         self.repo.delete_status_changes_with_commit(project_id)
@@ -843,20 +836,6 @@ class SpecService:
         # 시계가 같은 값을 줘도 순서가 흔들리지 않는다
         rows.sort(key=lambda r: (r.created_at, r.version_no is None), reverse=True)
         return rows[:n]
-
-    def versions_instructed_by(self, version_ids: list[int], user_id: int) -> list[int]:
-        """SYNC-MS-002#SpecService.versions_instructed_by"""
-        return self.repo.version_ids_by_user(version_ids, user_id)
-
-    def convention_error_docs_by(self, user_id: int) -> list[DocumentSummary]:
-        """SYNC-MS-002#SpecService.convention_error_docs_by"""
-        rows = [r for r in self.repo.documents_last_authored_by(user_id) if r.has_convention_error]
-        latest = self.repo.latest_versions([r.id for r in rows])
-        return [DocumentSummary(**self._summary_fields(r, latest.get(r.id))) for r in rows]
-
-    def documents_authored_by(self, user_id: int) -> list[int]:
-        """SYNC-MS-002#SpecService.documents_authored_by"""
-        return [r.id for r in self.repo.documents_last_authored_by(user_id)]
 
     def describe_items(self, item_pks: list[int]) -> dict[int, ItemRef]:
         """SYNC-MS-002#SpecService.describe_items"""
