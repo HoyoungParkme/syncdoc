@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     POLL_INTERVAL_SECONDS: int = 300  # INFRA 7장 보조 경로. 0이면 폴링·기동 따라잡기 끔(테스트)
     DIFF_CONTEXT_LINES: int = 3  # diff에서 앞뒤로 함께 보여줄 줄 수 (INFRA 5.2)
     PUSH_RETRIES: int = 3  # push 거부 시 rebase 후 재시도 횟수 (INFRA 5.2)
+    # 읽는 중 질의 (INFRA 5.3). 키가 비면 기능이 꺼진다 — 켜는 쪽이 선택이다
+    LLM_API_KEY: str = ""
+    LLM_API_URL: str = "https://api.openai.com/v1/chat/completions"  # OpenAI 호환 Chat Completions
+    LLM_MODEL: str = "gpt-4o-mini"
+    LLM_MAX_TURNS: int = 10  # 한 대화에서 서버가 받는 최대 턴 수
 
     @property
     def session_secret(self) -> str:
