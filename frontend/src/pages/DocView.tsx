@@ -1,17 +1,18 @@
-/** UI-5 문서 뷰 — SYNC-UI-002#UI-5. 유저용(기본)·원본 탭, 목차, 오른쪽 패널(참조·댓글), 상태 변경 + 상위 대조 다이얼로그.
+/** UI-5 문서 뷰 — SYNC-UI-002#UI-5. 유저용(기본)·원본 탭, 목차, 오른쪽 패널(참조), 상태 토글.
  *  유저용 탭 본문은 view/*.ts(view_build.py 포트, STD-002)가 만든 HTML을 innerHTML로 넣고 mermaid를 돌린다.
- *  1 문서 바(1.1 상태, 1.2 버전) · 2 탭(2.1~2.3) · 3 상태 변경 · 4 규약 오류 · 4a 미완성 · 5 미해결 댓글
+ *  1 문서 바(1.1 상태, 1.2 버전) · 2 탭(2.1~2.3) · 3 상태 토글 · 4 규약 오류 · 4a 미완성
  *  12 휴지통에 넣기 · 13 휴지통 확인(13.1 무엇이 되나 · 13.2 끊어지는 것 · 13.3 넣기 · 13.4 닫기) · 4b 휴지통 배너(4b.1 되살리기)
- *  6 목차(6.1 표시된 항목, 6.2 왼쪽 손잡이) · 7 유저용 본문(7.1~7.4) · 8 패널(8.1 참조, 8.2 댓글, 8.3 오른쪽 손잡이)
- *  9 단계 이동 · 10 원본(10.1 MD, 10.2 복사, 10.3 원문, 10.4 렌더링) · 11 상위 대조(11.1~11.4) */
+ *  6 목차(6.1 표시된 항목, 6.2 왼쪽 손잡이) · 7 유저용 본문(7.1·7.2·7.3·7.5·7.6) · 8 패널(8.1 참조, 8.3 오른쪽 손잡이)
+ *  9 단계 이동 · 10 원본(10.1 MD, 10.2 복사, 10.3 원문, 10.4 렌더링)
+ *  질문 탭(8.4~8.7)은 카드 U가 더한다. 패널은 그때까지 참조 하나라 탭 줄이 없다 */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { api, ApiError, FLAG_KO, incompleteOf, STATUS_KO, warnText, type Comment, type Document, type DownstreamView, type ItemReferences, type UpstreamCheck } from '../api/client'
+import { api, ApiError, incompleteOf, warnText, type Document, type DownstreamView, type ItemReferences } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { attachDiagramButtons, DiagramFull, type FullDiagram } from '../components/DiagramFull'
 import { esc, renderBlocks, splitRef } from '../view/md'
-import { ItemIdBadge, StatusPill, ProjName } from '../components/ui'
+import { ItemIdBadge, StatusPill, ProjName, toast } from '../components/ui'
 import { Handle, PANEL, readStore, TOC, useWidth, writeStore } from '../components/panes'
 
 
@@ -22,18 +23,10 @@ export function DocView() {
   const tab = sp.get('tab') === 'raw' ? 'raw' : 'user'
   const [doc, setDoc] = useState<Document | null>(null)
   const [err, setErr] = useState('')
-  const [panel, setPanel] = useState<'refs' | 'comments'>(sp.get('panel') === 'comments' ? 'comments' : 'refs')
   const [full, setFull] = useState<FullDiagram | null>(null) // 7.6
   const [selected, setSelected] = useState<string | null>(null)
   const [refs, setRefs] = useState<ItemReferences | null>(null)
-  const [comments, setComments] = useState<Comment[]>([])
   const [downstream, setDownstream] = useState<DownstreamView | null>(null)
-  const [line, setLine] = useState<number | null>(null)
-  const [draft, setDraft] = useState('')
-  const [statusOpen, setStatusOpen] = useState(false)
-  const [upstream, setUpstream] = useState<UpstreamCheck[] | null>(null)
-  const [mismatch, setMismatch] = useState<Set<string>>(new Set())
-  const [reason, setReason] = useState('')
   const [delOpen, setDelOpen] = useState(false) // 13
   const [delInfo, setDelInfo] = useState<Record<string, unknown> | null>(null) // 13.2 — 서버 답(needs-confirm)으로만 채운다
   const mainRef = useRef<HTMLElement>(null)
@@ -51,7 +44,6 @@ export function DocView() {
       .get<Document>(`/api/docs/${docId}`)
       .then(setDoc)
       .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : String(e)))
-    api.get<Comment[]>(`/api/docs/${docId}/comments`).then(setComments)
     api.get<DownstreamView>(`/api/docs/${docId}/downstream`).then(setDownstream).catch(() => setDownstream(null))
   }, [docId])
   useEffect(() => {
@@ -81,10 +73,11 @@ export function DocView() {
         if (mainRef.current !== root) return
         for (const b of attachDiagramButtons(root, setFull)) b.dataset.el = '7.5'
       })
+    // 7.1 항목 헤더에 끊어진 참조 수(있으면, 경고색)
     for (const el of root.querySelectorAll<HTMLElement>('[data-item]')) {
       const badge = el.querySelector('.iid') ?? el
-      const fl = doc?.items.find((i) => i.item_id === el.dataset.item)?.flags ?? []
-      if (fl.length && !el.querySelector('.flagx')) badge.insertAdjacentHTML('afterend', fl.map((f) => `<span class="flag flagx">${FLAG_KO[f] ?? f}</span>`).join(''))
+      const n = doc?.items.find((i) => i.item_id === el.dataset.item)?.missing_refs.length ?? 0
+      if (n && !el.querySelector('.missx')) badge.insertAdjacentHTML('afterend', `<span class="miss missx">끊어진 참조 ${n}</span>`)
     }
     const onClick = (ev: MouseEvent) => {
       const t = ev.target as HTMLElement
@@ -96,30 +89,14 @@ export function DocView() {
         nav(`/p/${d.split('-')[0]}/d/${d}${it ? '#item-' + it : ''}`)
         return
       }
-      // 7.4 — 줄에 붙은 댓글 버튼. 그 줄을 잡고 댓글 탭으로 (UI-5 규칙)
-      const cb = t.closest<HTMLElement>('.cbtn')
-      if (cb) {
-        ev.preventDefault()
-        setLine(Number(cb.dataset.line))
-        setPanel('comments')
-        return
-      }
       const item = t.closest<HTMLElement>('[data-item]')
-      if (item && item.dataset.item) {
-        setSelected(item.dataset.item)
-        setPanel('refs')
-      }
+      if (item && item.dataset.item) setSelected(item.dataset.item)
     }
     root.addEventListener('click', onClick)
     if (window.location.hash) {
       document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: 'start' })
       const it = window.location.hash.startsWith('#item-') ? window.location.hash.slice(6) : ''
-      if (it && doc?.items.some((i) => i.item_id === it)) setSelected(it) // 내 할 일 3.1·7.1 진입 — 패널에 플래그 정보
-      const ln = /^#line-(\d+)$/.exec(window.location.hash)
-      if (ln) {
-        setLine(Number(ln[1])) // 내 할 일 6.1 진입 — ?panel=comments#line-N
-        setPanel('comments')
-      }
+      if (it && doc?.items.some((i) => i.item_id === it)) setSelected(it) // UI-4 다이얼로그(6) 진입 — 참조 패널을 연다
     }
     return () => {
       root.removeEventListener('click', onClick)
@@ -127,57 +104,24 @@ export function DocView() {
     }
   }, [view, tab, doc, nav])
 
-  /** 7.4 줄 댓글 버튼. 본문을 다시 그리지 않고 개수만 갱신하려고 효과를 나눴다 —
-   *  댓글 하나 달 때마다 innerHTML을 다시 넣으면 읽던 자리가 날아간다 */
-  useEffect(() => {
-    const root = mainRef.current
-    if (!root || !doc || tab !== 'user') return
-    const per = new Map<number, number>()
-    for (const c of comments) per.set(c.line_no, (per.get(c.line_no) ?? 0) + 1 + c.replies.length)
-    // 문단이 실어 온 원본 첫 줄 텍스트 → 줄 번호. 같은 문장이 여러 번 나오면 위에서부터 하나씩
-    const left = new Map<string, number[]>()
-    doc.body.split('\n').forEach((text, i) => {
-      const k = text.trim()
-      if (k) (left.get(k) ?? left.set(k, []).get(k)!).push(i + 1)
-    })
-    for (const p of root.querySelectorAll<HTMLElement>('p[data-src]')) {
-      p.querySelector('.cbtn')?.remove()
-      const ln = left.get((p.dataset.src ?? '').trim())?.shift()
-      if (ln === undefined) continue
-      p.dataset.line = String(ln)
-      const n = per.get(ln) ?? 0
-      const b = document.createElement('span')
-      b.className = `cbtn${n ? ' has' : ''}`
-      b.dataset.el = '7.4'
-      b.dataset.line = String(ln)
-      b.textContent = n ? String(n) : '+'
-      b.title = n ? `줄 ${ln} · 댓글 ${n}` : `줄 ${ln}에 댓글 달기`
-      p.appendChild(b)
-    }
-  }, [view, tab, comments, doc])
-
   useEffect(() => {
     if (!selected) return
     api.get<ItemReferences>(`/api/docs/${docId}/items/${selected.replace(/\//g, '~')}/references`).then(setRefs).catch(() => setRefs(null))
   }, [selected, docId])
 
-  async function openStatus(to: string) {
-    setStatusOpen(false)
-    if (to !== 'approved') {
-      await changeStatus(to, false, [])
-      return
-    }
-    const u = await api.get<UpstreamCheck[]>(`/api/docs/${docId}/upstream`)
-    setUpstream(u)
-    setMismatch(new Set())
-  }
-  async function changeStatus(to: string, reviewed: boolean, mism: string[]) {
+  /** 3 상태 토글 — 갈 곳이 하나라 고를 것이 없다(UC-H8). 완료로 올릴 때 서버가 `status-blocked`로 거절하면
+   *  토스트에 이유 — 배너(4·4a)가 이미 말하는 값이다. 다이얼로그 없음 */
+  async function toggleStatus() {
+    if (!doc) return
+    const to = doc.status === 'approved' ? 'draft' : 'approved'
     try {
-      await api.post(`/api/docs/${docId}/status`, { to, reason: reason || null, upstream_reviewed: reviewed, upstream_mismatch: mism })
-      setUpstream(null)
+      await api.post(`/api/docs/${docId}/status`, { to })
       load()
     } catch (e) {
-      alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
+      if (e instanceof ApiError && e.kind === 'status-blocked') {
+        const w = (e.problem.warnings as string[] | undefined) ?? []
+        toast(`완료로 못 올립니다 — ${[e.problem.convention_error_detail, ...w.map(warnText)].filter(Boolean).join(' · ') || e.message}`)
+      } else alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
     }
   }
   // UC-H18 — 확인(13)을 열면 confirm 없이 한 번 불러 끊어질 것을 받는다. 판정은 pipeline.trash_document 한 곳
@@ -207,32 +151,19 @@ export function DocView() {
       alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
     }
   }
-  async function addComment(parent: number | null) {
-    if (!draft.trim() || !line) return
-    await api.post(`/api/docs/${docId}/comments`, { line_no: line, body: draft, parent_comment_id: parent })
-    setDraft('')
-    load()
-  }
-  async function resolve(c: Comment, v: boolean) {
-    await api.post(`/api/comments/${c.id}/resolve`, { resolved: v })
-    load()
-  }
 
   if (err) return <div className="page banner err">{err}</div>
   if (!doc || !view) return null
-  const unresolved = comments.filter((c) => !c.is_resolved).length
   const lines = doc.body.split('\n')
-  const key = (u: UpstreamCheck) => `${u.target.doc_id}${u.target.item_id ? '#' + u.target.item_id : ''}`
   const toc = tocOf(doc)
-  const marked = markedItems(doc, comments)
-  // 배너(4a)와 승인 비활성이 같은 값을 본다. 끊어진 참조는 컬럼이 아니라 읽을 때 온다 (#35)
+  const marked = markedItems(doc)
+  // 배너(4a)와 `완료로` 비활성이 같은 값을 본다. 끊어진 참조는 컬럼이 아니라 읽을 때 온다 (#35)
   const incomplete = incompleteOf(doc)
   // 가운데 열만 스크롤한다 — scrollIntoView는 가장 가까운 스크롤 조상을 움직인다
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ block: 'start' })
   const goItem = (id: string) => {
     scrollTo(`item-${id}`)
     setSelected(id)
-    setPanel('refs')
   }
 
   return (
@@ -256,29 +187,17 @@ export function DocView() {
           v{doc.current_version_no}
         </Link>
         <span className="grow" />
-        {unresolved > 0 && !doc.trashed_at && (
-          <span data-el="5" className="lbl" onClick={() => setPanel('comments')}>
-            미해결 댓글 {unresolved}
-          </span>
-        )}
-        {/* 휴지통에 있으면 상태 변경(3)·넣기(12)가 없다 — 4b 배너 하나로 말한다 (UI-5 규칙) */}
+        {/* 휴지통에 있으면 상태 토글(3)·넣기(12)가 없다 — 4b 배너 하나로 말한다 (UI-5 규칙).
+            규약 오류(4)면 토글이 비활성, 미완성(4a)이면 `완료로`만 비활성 — `초안으로`는 언제나 된다 */}
         {!doc.trashed_at && (
-        <span className="statuswrap">
-          <button className="btn" data-el="3" disabled={doc.has_convention_error} onClick={() => setStatusOpen((o) => !o)}>
-            상태 변경 ▾
+          <button
+            className="btn"
+            data-el="3"
+            disabled={doc.has_convention_error || (doc.status !== 'approved' && incomplete.length > 0)}
+            onClick={toggleStatus}
+          >
+            {doc.status === 'approved' ? '초안으로' : '완료로'}
           </button>
-          {statusOpen && (
-            <div className="menu">
-              {['draft', 'review', 'approved']
-                .filter((s) => s !== doc.status)
-                .map((s) => (
-                  <div key={s} className={`mi${s === 'approved' && incomplete.length ? ' dis' : ''}`} onClick={() => !(s === 'approved' && incomplete.length) && openStatus(s)}>
-                    {STATUS_KO[s]}
-                  </div>
-                ))}
-            </div>
-          )}
-        </span>
         )}
         {!doc.trashed_at && (
           // 12 — 어떤 문서든 휴지통엔 넣을 수 있다. 되돌릴 수 있으니 문지기가 없다 (PRD N3)
@@ -297,13 +216,13 @@ export function DocView() {
               {t.text}
             </div>
           ))}
-          {/* 규칙: 플래그·미해결 댓글이 붙은 항목만. 하나도 없으면 블록 자체가 안 보인다 */}
+          {/* 규칙: 끊어진 참조(is_missing)를 가진 항목만. 하나도 없으면 블록 자체가 안 보인다 */}
           {marked.length > 0 && (
             <div className="marked" data-el="6.1">
               <div className="lbl">표시된 항목</div>
               {marked.map((m) => (
                 <div key={m.id} onClick={() => goItem(m.id)}>
-                  <span className={`dot dot-${m.kind}`} /> {m.id} <span className="lbl">{m.label}</span>
+                  <span className="dot dot-miss" /> {m.id} <span className="lbl">{m.label}</span>
                 </div>
               ))}
             </div>
@@ -358,7 +277,7 @@ export function DocView() {
           )}
           {incomplete.length > 0 && (
             <div className="banner warn" data-el="4a">
-              미완성: {incomplete.map(warnText).join(' · ')} · 승인 불가
+              미완성: {incomplete.map(warnText).join(' · ')} · 완료 불가
             </div>
           )}
 
@@ -400,29 +319,23 @@ export function DocView() {
 
         <Handle el="8.3" onDrag={(dx) => addPanelW(-dx)} />
         <aside className="panel" data-el="8">
+          {/* 8.1 참조 — 탭이 하나뿐이라 탭 줄 없이 머리로만. 질문 탭(8.4)이 오면 탭 줄이 생긴다 */}
           <div className="ptabs">
-            <span className={panel === 'refs' ? 'on' : ''} data-el="8.1" onClick={() => setPanel('refs')}>
+            <span className="on" data-el="8.1">
               참조
-            </span>
-            <span className={panel === 'comments' ? 'on' : ''} data-el="8.2" onClick={() => setPanel('comments')}>
-              댓글{unresolved > 0 ? ` ${unresolved}` : ''}
             </span>
           </div>
           <div className="pbody">
-            {panel === 'refs' &&
-              (!selected ? (
-                <div className="pempty">
-                  항목을 선택하세요.
-                  <br />
-                  항목 헤더를 누르면 그 항목의 상위·하위 참조와 플래그가 여기 옵니다.
-                </div>
-              ) : refs ? (
-                <Refs refs={refs} />
-              ) : (
-                <div className="lbl">선택: #{selected}</div>
-              ))}
-            {panel === 'comments' && (
-              <Comments comments={comments} line={line} setLine={setLine} draft={draft} setDraft={setDraft} add={addComment} resolve={resolve} lines={lines} />
+            {!selected ? (
+              <div className="pempty">
+                항목을 선택하세요.
+                <br />
+                항목 헤더를 누르면 그 항목의 상위·하위 참조가 여기 옵니다.
+              </div>
+            ) : refs ? (
+              <Refs refs={refs} />
+            ) : (
+              <div className="lbl">선택: #{selected}</div>
             )}
           </div>
         </aside>
@@ -435,7 +348,7 @@ export function DocView() {
             <p data-el="13.1">
               <b>{titleOf(doc.body)}</b> · 버전 {doc.current_version_no}개 · 파일이 저장소에서 지워집니다. 행과 이력은 남아 <b>되살릴 수 있습니다.</b>
             </p>
-            {delInfo && ((delInfo.inbound_refs as string[]).length > 0 || Number(delInfo.comments) > 0) && (
+            {delInfo && (delInfo.inbound_refs as string[]).length > 0 && (
               <div className="banner warn" data-el="13.2">
                 넣으면 끊어지는 것
                 {(delInfo.inbound_refs as string[]).length > 0 && (
@@ -447,12 +360,7 @@ export function DocView() {
                         — <a href={`/p/${r.split('-')[0]}/d/${r.split('#')[0]}${r.includes('#') ? '#item-' + r.split('#')[1] : ''}`} target="_blank" rel="noreferrer"><b>{r}</b></a>
                       </span>
                     ))}{' '}
-                    → 그 항목에 <b>끊어진 참조</b>가 붙습니다
-                  </>
-                )}
-                {Number(delInfo.comments) > 0 && (
-                  <>
-                    <br />· 댓글 {String(delInfo.comments)} — 휴지통에 같이 있다가 되살리면 돌아옵니다
+                    → 그 참조가 <b>끊어진 참조</b>가 됩니다
                   </>
                 )}
               </div>
@@ -469,69 +377,6 @@ export function DocView() {
         </div>
       )}
 
-      {upstream !== null && (
-        <div className="dialog" data-el="11">
-          <div className="dhead">승인 전 상위 대조 — {doc.doc_id}</div>
-          <div className="dbody">
-            {upstream.length === 0 ? (
-              <p>상위 없음 — 이 문서는 근거로 삼은 상위 항목이 없습니다.</p>
-            ) : (
-              <>
-                이 문서가 근거로 삼은 상위 항목입니다. 이 문서의 내용과 <b>어긋난 것</b>이 있으면 표시하세요. 표시한 항목에 <b>하위 불일치</b> 플래그가 붙어 상위 담당자에게 갑니다.
-                <table className="uptbl" data-el="11.1">
-                  <thead>
-                    <tr>
-                      <th />
-                      <th>상위 항목</th>
-                      <th>현재</th>
-                      <th>참조한 곳</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {upstream.map((u) => (
-                      <tr key={key(u)} data-el="11.2">
-                        <td>
-                          <input
-                            type="checkbox"
-                            disabled={!u.target.item_id}
-                            checked={mismatch.has(key(u))}
-                            onChange={(e) => {
-                              const n = new Set(mismatch)
-                              if (e.target.checked) n.add(key(u))
-                              else n.delete(key(u))
-                              setMismatch(n)
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <a href={`/p/${u.target.doc_id?.split('-')[0]}/d/${u.target.doc_id}${u.target.item_id ? '#item-' + u.target.item_id : ''}`} target="_blank" rel="noreferrer">
-                            <b>{key(u)}</b>
-                          </a>{' '}
-                          {u.target.item_id ? u.target.display_name : '(문서 전체)'}
-                        </td>
-                        <td>
-                          v{u.target_version_no} · {STATUS_KO[u.target_status]}
-                          {u.target_status !== 'approved' && <span className="lbl"> (상위 미승인)</span>}
-                        </td>
-                        <td>{u.referenced_from.join(', ')}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            )}
-            <input className="inp wide" placeholder="사유 (선택)" value={reason} onChange={(e) => setReason(e.target.value)} />
-            <div className="dacts">
-              <button className="btn" data-el="11.4" onClick={() => setUpstream(null)}>
-                닫기
-              </button>{' '}
-              <button className="btn" data-el="11.3" style={{ fontWeight: 600 }} onClick={() => changeStatus('approved', true, [...mismatch])}>
-                {mismatch.size ? `어긋남 ${mismatch.size}건 표시하고 승인` : '어긋난 곳 없음 · 승인'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -551,40 +396,9 @@ function RawRendered({ doc }: { doc: Document }) {
   )
 }
 
-/** 6.1 표시된 항목 — 플래그가 붙은 항목과 미해결 댓글이 달린 항목. 본문 순서를 지킨다 */
-function markedItems(doc: Document, comments: Comment[]): { id: string; kind: string; label: string }[] {
-  const owner = itemOfLine(doc)
-  const cm = new Map<string, number>()
-  for (const c of comments) {
-    if (c.is_resolved) continue
-    const id = owner(c.line_no)
-    if (id) cm.set(id, (cm.get(id) ?? 0) + 1)
-  }
-  const out: { id: string; kind: string; label: string }[] = []
-  for (const it of doc.items) {
-    const n = cm.get(it.item_id) ?? 0
-    if (it.flags.length) out.push({ id: it.item_id, kind: 'flag', label: it.flags.map((f) => FLAG_KO[f] ?? f).join(' · ') })
-    else if (n) out.push({ id: it.item_id, kind: 'cm', label: `미해결 댓글 ${n}` })
-  }
-  return out
-}
-
-/** 줄 번호 → 그 줄이 속한 항목 ID. 댓글은 줄에 붙고 표시된 항목(6.1)은 항목 단위라 이어 줘야 한다 */
-function itemOfLine(doc: Document): (line: number) => string | null {
-  const ids = new Set(doc.items.map((i) => i.item_id))
-  const owner: (string | null)[] = []
-  let cur: string | null = null
-  let inCode = false
-  for (const l of doc.body.split('\n')) {
-    if (l.startsWith('```')) inCode = !inCode
-    const h = inCode ? null : /^#{2,6} (.+)$/.exec(l)
-    if (h) {
-      const tok = h[1].split(' ')[0]
-      cur = ids.has(tok) ? tok : null // 항목이 아닌 절 헤딩을 만나면 앞 항목이 끝난다
-    }
-    owner.push(cur)
-  }
-  return (line: number) => owner[line - 1] ?? null
+/** 6.1 표시된 항목 — 가리키는 곳이 없는 참조를 가진 항목. 본문 순서를 지킨다 */
+function markedItems(doc: Document): { id: string; label: string }[] {
+  return doc.items.filter((it) => it.missing_refs.length).map((it) => ({ id: it.item_id, label: `끊어진 참조 ${it.missing_refs.length}` }))
 }
 
 function tocOf(doc: Document): { id: string; text: string; depth: number }[] {
@@ -603,13 +417,13 @@ function tocOf(doc: Document): { id: string; text: string; depth: number }[] {
   return out
 }
 
-/** 8.1 참조 탭 — 선택 항목의 상위(근거)·하위(파생)·플래그. 각 줄은 카드다 */
+/** 8.1 참조 — 선택 항목의 상위(근거)·하위(파생). 각 줄은 카드다 */
 function Refs({ refs }: { refs: ItemReferences }) {
   const card = (r: ItemReferences['upstream'][number], i: number) =>
     r.is_missing ? (
       <div className="rcard missing" key={i}>
-        <b className="mono">{r.raw_target}</b>
-        <div className="lbl">가리키는 항목이 없습니다</div>
+        <b className="mono">{r.raw_target}</b> <span className="miss">가리키는 곳 없음</span>
+        <div className="lbl">항목이 삭제됐거나 아직 안 쓰였다</div>
       </div>
     ) : (
       <Link className="rcard" key={i} to={`/p/${r.doc_id?.split('-')[0]}/d/${r.doc_id}${r.item_id ? '#item-' + r.item_id : ''}`}>
@@ -630,86 +444,6 @@ function Refs({ refs }: { refs: ItemReferences }) {
       {refs.upstream.length ? refs.upstream.map(card) : <div className="pempty">없음</div>}
       <div className="lbl">하위 참조 (파생) {refs.downstream.length || ''}</div>
       {refs.downstream.length ? refs.downstream.map(card) : <div className="pempty">없음 — 고립 항목</div>}
-      {refs.flags.length > 0 && (
-        <>
-          <div className="lbl">플래그</div>
-          {refs.flags.map((f) => (
-            <div className="rcard flagged" key={f.id}>
-              <b>{FLAG_KO[f.kind] ?? f.kind}</b>
-              <div className="lbl">
-                {f.cause && (
-                  <>
-                    원인 <span className="mono">{f.cause.doc_id}#{f.cause.item_id}</span>
-                  </>
-                )}
-                {f.assignee && <> · 담당 {f.assignee.display_name}</>}
-              </div>
-            </div>
-          ))}
-        </>
-      )}
-    </>
-  )
-}
-
-/** 8.2 댓글 탭 — 줄에 달린 스레드. 카드 하나가 댓글 하나다 */
-function Comments(props: {
-  comments: Comment[]
-  line: number | null
-  setLine: (n: number | null) => void
-  draft: string
-  setDraft: (s: string) => void
-  add: (parent: number | null) => void
-  resolve: (c: Comment, v: boolean) => void
-  lines: string[]
-}) {
-  const { comments, line, setLine, draft, setDraft, add, resolve, lines } = props
-  const thread = (c: Comment, depth = 0) => (
-    <div className={`cmt${c.is_resolved ? ' done' : ''}`} style={{ marginLeft: depth * 10 }} key={c.id}>
-      <div className="cmth">
-        <b>{c.author?.display_name}</b>
-        <span className="grow" />
-        <span className="lineno mono">
-          줄 {c.line_no}
-          {c.original_location && ` (원본 ${c.original_location})`}
-        </span>
-      </div>
-      <div className="cmtb">{c.body}</div>
-      <div className="cacts">
-        {depth === 0 && (
-          <button className="btn sm" onClick={() => resolve(c, !c.is_resolved)}>
-            {c.is_resolved ? '다시 열기' : '해결 처리'}
-          </button>
-        )}
-        <button
-          className="btn sm"
-          onClick={() => {
-            setLine(c.line_no)
-            add(c.id)
-          }}
-          disabled={!draft.trim()}
-        >
-          답글로 저장
-        </button>
-      </div>
-      {c.replies.map((r) => thread(r, depth + 1))}
-    </div>
-  )
-  return (
-    <>
-      {comments.length ? comments.map((c) => thread(c)) : <div className="pempty">아직 댓글이 없습니다.</div>}
-      {/* 새 댓글은 줄에 붙는다 — 줄 번호가 없으면 저장할 곳이 없다 */}
-      <div className="compose">
-        <div className="row">
-          <span className="lbl">줄</span>
-          <input className="inp" type="number" min={1} max={lines.length} value={line ?? ''} onChange={(e) => setLine(e.target.value ? Number(e.target.value) : null)} style={{ width: 66 }} />
-          {line && <span className="lbl mono">{lines[line - 1]?.slice(0, 30)}</span>}
-        </div>
-        <textarea className="inp wide" rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="댓글" />
-        <button className="btn sm" disabled={!draft.trim() || !line} onClick={() => add(null)}>
-          새 댓글
-        </button>
-      </div>
     </>
   )
 }

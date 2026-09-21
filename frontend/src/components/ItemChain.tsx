@@ -94,7 +94,6 @@ export function ItemChain({
                           <i className={`dot dot-${it.status}`} />
                           {short(refKey(it.ref))}
                           {it.ref.display_name ? ` ${it.ref.display_name}` : ''}
-                          {it.has_flag && ' ▲'}
                           {it.ref.is_missing && ' (없는 항목)'}
                         </span>
                       ))}

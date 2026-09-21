@@ -1,16 +1,16 @@
 /** UI-4 프로젝트 상세 — SYNC-UI-002#UI-4. 11단계 표 + 문서 행, 요약 수치, 표준 묶음, 최근 변경(status 커밋 포함).
  *  GET /api/projects/{code}(ProjectDetail) 하나로 그린다. 요소 번호 = data-el.
- *  1 헤더(1.1·1.2·1.3) · 2.1·2.2 그래프·순서 · 3 요약 수치 여섯(3.1·3.2·3.6·3.3·3.4·3.5 → 다이얼로그 6)
- *  4 표(4.1 단계, 4.2 문서, 4.3 상위 미승인, 4.4 표준) · 5 최근 변경 · 6 목록 다이얼로그 · 7 동기화 상태(7.1 커밋, 7.2 밀림)
+ *  1 헤더(1.1·1.2·1.3) · 2.1·2.2 그래프·순서 · 3 요약 수치 셋(3.2 끊어진 참조·3.4 규약 오류·3.5 미완성 → 다이얼로그 6)
+ *  4 표(4.1 단계, 4.2 문서, 4.3 상위 미완료, 4.4 표준) · 5 최근 변경 · 6 목록 다이얼로그 · 7 동기화 상태(7.1 커밋, 7.2 밀림)
  *  8 휴지통 묶음(8.1 행 · 8.2 되살리기 · 8.3 완전 삭제 · 8.4 확인) — 0건이면 묶음 자체가 없다 */
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { StatusPill, ProjName } from '../components/ui'
-import { ago, api, ApiError, authorLabel, docPath, refKey, STAGE_NAMES, STATUS_KO, warnText, type CommentSummary, type DocumentSummary, type FlagSummary, type ProjectDetail as Detail, type ProjectSummary } from '../api/client'
+import { ago, api, ApiError, authorLabel, docPath, refKey, STAGE_NAMES, STATUS_KO, warnText, type BrokenRefSummary, type DocumentSummary, type ProjectDetail as Detail, type ProjectSummary } from '../api/client'
 
 
 /** 미니 히트맵과 문서 행 점이 쓰는 상태 → 클래스 */
-const ST: Record<string, string> = { approved: 'ok', review: 'rv', draft: 'dr' }
+const ST: Record<string, string> = { approved: 'ok', draft: 'dr' }
 
 export function ProjectDetail() {
   const { code = '' } = useParams()
@@ -59,6 +59,7 @@ export function ProjectDetail() {
   const docs = d?.docs ?? []
   const recent = d?.recent_changes ?? []
   const openList = (kind: string, label: string) => {
+    // 경로 이름은 v1 그대로(항목 ID라 바꾸면 은퇴+신설) — kind는 끊어진 참조·규약 오류·미완성 셋
     api.get<unknown[]>(`/api/projects/${code}/flags?kind=${kind}`).then((items) => setDialog({ kind, label, items }))
   }
   const byType = (t: string) => docs.filter((d) => d.doc_type === t)
@@ -71,9 +72,7 @@ export function ProjectDetail() {
         {STATUS_KO[d.status]} · v{d.current_version_no} · {ago(d.updated_at)} · {authorLabel(d.last_author)}
       </span>
       <span className="grow" />
-      {d.counts.needs_check > 0 && <span className="flag">확인 필요 {d.counts.needs_check}</span>}
-      {d.counts.broken_ref > 0 && <span className="flag">끊어진 참조 {d.counts.broken_ref}</span>}
-      {d.counts.unresolved_comments > 0 && <span className="cm">댓글 {d.counts.unresolved_comments}</span>}
+      {d.counts.broken_ref > 0 && <span className="miss">끊어진 참조 {d.counts.broken_ref}</span>}
       {d.has_convention_error && <span className="err">규약 오류</span>}
       {d.incomplete_warnings.length > 0 && <span className="warnx">미완성</span>}
     </div>
@@ -98,12 +97,9 @@ export function ProjectDetail() {
         </Link>
       </div>
       <div className="stats" data-el="3">
+        {/* 세 칸 — 셋 다 문서를 읽어 판정한 값. 번호는 v1 자리 그대로(3.1·3.3·3.6은 은퇴) */}
         {[
-          { el: '3.1', k: 'needs_check', kind: 'needs_check', label: '확인 필요' },
           { el: '3.2', k: 'broken_ref', kind: 'broken_ref', label: '끊어진 참조' },
-          // 3.6은 명세의 자리 순서를 따른다 — 플래그 셋을 붙여 놓고 그 뒤가 댓글·오류다
-          { el: '3.6', k: 'upstream_impact', kind: 'upstream_impact', label: '하위 불일치' },
-          { el: '3.3', k: 'unresolved_comments', kind: 'comments', label: '미해결 댓글' },
           { el: '3.4', k: 'convention_errors', kind: 'convention_errors', label: '규약 오류' },
           { el: '3.5', k: 'incomplete', kind: 'incomplete', label: '미완성' },
         ].map(({ el, k, kind, label }) => (
@@ -137,7 +133,7 @@ export function ProjectDetail() {
                   <StatusPill status={s.status} />
                   {s.gate_warning && (
                     <span className="gate" data-el="4.3">
-                      상위 미승인
+                      상위 미완료
                     </span>
                   )}
                   <span className="grow" />
@@ -268,16 +264,6 @@ export function ProjectDetail() {
                       </a>
                     </span>
                   ))}
-                  {Number(purge.block.comments) > 0 && (
-                    <>
-                      <br />· 댓글 {String(purge.block.comments)}
-                    </>
-                  )}
-                  {Number(purge.block.flags) > 0 && (
-                    <>
-                      <br />· 미해결 플래그 {String(purge.block.flags)}
-                    </>
-                  )}
                 </div>
               )}
               <div className="dacts">
@@ -314,19 +300,8 @@ export function ProjectDetail() {
   )
 }
 
-/** 다이얼로그 6의 행 — kind에 따라 FlagSummary · CommentSummary · DocumentSummary. 항목 클릭 → 그 문서의 UI-5 */
+/** 다이얼로그 6의 행 — kind에 따라 BrokenRefSummary · DocumentSummary. 항목 클릭 → 그 문서의 UI-5 */
 function listItem(kind: string, it: unknown) {
-  if (kind === 'comments') {
-    const c = it as CommentSummary
-    return (
-      <li key={c.id}>
-        <Link to={`${docPath(c.doc_id)}?panel=comments#line-${c.line_no}`}>
-          <b>{c.doc_id}</b>
-        </Link>{' '}
-        {c.line_no}행 · {c.author?.display_name}: {c.excerpt} · {ago(c.created_at)}
-      </li>
-    )
-  }
   if (kind === 'convention_errors' || kind === 'incomplete') {
     const d = it as DocumentSummary
     return (
@@ -338,18 +313,19 @@ function listItem(kind: string, it: unknown) {
       </li>
     )
   }
-  const f = it as FlagSummary
+  // 끊어진 참조 행 — `항목 → 가리키는 곳 없음`. 시각은 참조에 없어 적지 않는다
+  const b = it as BrokenRefSummary
   return (
-    <li key={f.id}>
-      <Link to={docPath(f.target.doc_id, f.target.item_id)}>
-        <b>{refKey(f.target)}</b>
+    <li key={`${refKey(b.source)}→${b.raw_target}`}>
+      <Link to={docPath(b.source.doc_id, b.source.item_id)}>
+        <b>{refKey(b.source)}</b>
       </Link>{' '}
-      · 원인 {refKey(f.cause)}{f.cause_version_no ? ` v${f.cause_version_no}` : ''} · {ago(f.raised_at)} · 담당 {f.assignee?.display_name ?? '미지정'}
+      → <span className="mono">{b.raw_target}</span> <span className="lbl">가리키는 곳 없음</span>
     </li>
   )
 }
 
 function lowest(ds: DocumentSummary[]): string {
-  const order: Record<string, number> = { draft: 0, review: 1, approved: 2 }
+  const order: Record<string, number> = { draft: 0, approved: 1 }
   return ds.map((d) => d.status).sort((a, b) => order[a] - order[b])[0] ?? 'draft'
 }

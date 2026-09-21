@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import { STATUS_KO } from '../api/client'
 
-/** 1.4 상태 필. 상태색 바탕에 작은 알약. 승인만 글씨가 희다.
+/** 1.4 상태 필. 상태색 바탕에 작은 알약. 완료만 글씨가 희다.
  *  `status`가 없으면 `미작성` — 단계에 문서가 아직 없는 칸(UI-4)이 그렇다. */
 export function StatusPill({ status, el }: { status: string | null; el?: string }) {
   return (

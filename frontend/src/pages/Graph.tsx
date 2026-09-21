@@ -1,5 +1,5 @@
 /** UI-8 참조 그래프 — SYNC-UI-002#UI-8. 열은 11단계 고정, 노드는 항목.
- *  1 헤더(1.1 통계) · 2 툴바(2.1 전체, 2.2 승인만, 2.3 플래그, 2.4 포커스 라벨, 2.5 전체보기)
+ *  1 헤더(1.1 통계) · 2 툴바(2.1 전체, 2.2 완료만, 2.4 포커스 라벨, 2.5 전체보기)
  *  3 캔버스(3.1 노드, 3.2 참조 간선, 3.3 되돌아오는 간선, 3.4 미존재 참조, 3.5 고립 노드) · 4 범례
  *
  *  배치는 브라우저가 한다 — 서버는 노드·간선 목록만 준다(MS-008 graph_view 8).
@@ -24,7 +24,7 @@ const LANE_GAP = 12
 /** 되돌아오는 간선이 꺾이는 모서리 반지름 */
 const R = 8
 
-type Placed = { id: string; col: number; row: number; label: string; title: string; flag: boolean; iso: boolean; docId: string; itemId: string | null }
+type Placed = { id: string; col: number; row: number; label: string; title: string; iso: boolean; docId: string; itemId: string | null }
 
 export function Graph() {
   const { code = '' } = useParams()
@@ -67,10 +67,7 @@ export function Graph() {
           전체
         </span>
         <span className={`btn sm${scope === 'approved' ? ' on' : ''}`} data-el="2.2" onClick={() => setSp({ scope: 'approved' })}>
-          승인만
-        </span>
-        <span className={`btn sm${scope === 'flagged' ? ' on' : ''}`} data-el="2.3" onClick={() => setSp({ scope: 'flagged' })}>
-          플래그 있는 것
+          완료만
         </span>
         <span className="sep" />
         <span className="lbl" data-el="2.4">
@@ -93,7 +90,7 @@ export function Graph() {
             {layout.nodes.map((n) => (
               <div
                 key={n.id}
-                className={`node${n.flag ? ' flag' : ''}${n.iso ? ' iso' : ''}${near && !near.all.has(n.id) ? ' dim' : ''}`}
+                className={`node${n.iso ? ' iso' : ''}${near && !near.all.has(n.id) ? ' dim' : ''}`}
                 data-el={n.iso ? '3.5' : '3.1'}
                 style={{ left: colX(n.col), top: rowY(n.row), width: NODE_W, height: NODE_H }}
                 onMouseEnter={() => setFocus(n.id)}
@@ -105,8 +102,6 @@ export function Graph() {
                   {n.iso && '◌ '}
                   {n.label}
                 </span>
-                {/* 플래그 표시는 오른쪽 끝 — 라벨에 붙으면 길이에 따라 자리가 흔들린다 */}
-                {n.flag && <span className="nflag">▲</span>}
               </div>
             ))}
           </div>
@@ -208,7 +203,6 @@ function place(g: GraphData) {
         row,
         label: n.item_id ? `${short}#${n.item_id}` : short,
         title: n.item_id ? `${n.doc_id}#${n.item_id}` : n.doc_id,
-        flag: n.has_flag,
         iso: n.isolated,
         docId: n.doc_id,
         itemId: n.item_id,
