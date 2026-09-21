@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-003
 type: DOM
 title: ERD·DD — 싱크독
-status: draft
+status: approved
 upstream: [SYNC-DOM-002, SYNC-DOM-001]
 ---
 
