@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # 읽는 중 질의 (INFRA 5.3). 키가 비면 기능이 꺼진다 — 켜는 쪽이 선택이다
     LLM_API_KEY: str = ""
     LLM_API_URL: str = "https://api.openai.com/v1/chat/completions"  # OpenAI 호환 Chat Completions
-    LLM_MODEL: str = "gpt-4o-mini"
+    LLM_MODEL: str = "gpt-4o"
     LLM_MAX_TURNS: int = 10  # 한 대화에서 서버가 받는 최대 턴 수
 
     @property
