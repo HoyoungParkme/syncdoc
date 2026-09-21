@@ -199,7 +199,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **입력** 전부 `pipeline`이 확정한 값. `commit_hash`는 push 성공 후
 
 **처리** — 호출자의 트랜잭션 안
-1. `DB: documents insert (project_id, doc_id, doc_type, status=frontmatter의 status (없으면 draft), current_body=body, current_version_no=1, has_convention_error=bool(violations), convention_error_detail, incomplete_warnings=warnings JSON)` — `save` 7단계와 같은 규칙. **첫 저장부터 경고가 남아야** 생성 직후 승인이 막힌다
+1. `DB: documents insert (project_id, doc_id, doc_type, status=frontmatter의 status (없거나 `draft`·`approved` 밖이면 `draft` — #99), current_body=body, current_version_no=1, has_convention_error=bool(violations), convention_error_detail, incomplete_warnings=warnings JSON)` — `save` 7단계와 같은 규칙. **첫 저장부터 경고가 남아야** 생성 직후 승인이 막힌다
 2. `blocks = item_blocks(body, doc_type)`. `DB: items insert` 블록마다 `(document_id, item_id, display_name, is_deleted=False)`
 3. `DB: versions insert (document_id, version_no=1, commit_hash, body, author_kind, author_user_id, instructed_by_user_id, via, message, created_at)`
 4. `→ Version`
@@ -227,7 +227,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. `DB: versions insert (document_id, version_no=new_no, commit_hash, body, author_kind, author_user_id, instructed_by_user_id, via=author.via를 mcp|web|github로 접음, message)`
 3. `blocks = item_blocks(body, doc_type)`. 블록마다 `DB: items where document_id and item_id` · if 있음 → `display_name` 갱신, **`is_deleted=false, deleted_at=null`로 되돌림**(본문에 다시 나타났으므로 복구) · else → insert
 4. `deleted_item_pks`마다 `DB: items set is_deleted=true, deleted_at=now`
-5. if `author.via == github` → `new_status = fm.status` (원본이 진실) · else → `new_status = document.status`
+5. if `author.via == github` → `new_status = fm.status` (원본이 진실) · else → `new_status = document.status`. **단 `fm.status`가 `draft`·`approved` 밖이면 `new_status = document.status`** — 값이 틀린 frontmatter는 `validate`가 이미 `frontmatter.status` 위반으로 남겼다(규약 오류 배너). DB에는 둘 밖의 값이 들어오지 않는다. 옛 값 `review`가 남은 저장소가 그 경우다(#99)
 6. if `document.status == approved and body != document.current_body and new_status == approved` → `new_status = draft`, `DB: status_changes insert (from=approved, to=draft, changed_by=author.user, reason="본문 수정으로 자동 강등", commit_hash=status_commit_hash)` (UC-A6 6a). **완료 문서를 고치면 초안으로 돌아간다** — 혼자 써도 「고쳤으니 다시 봐야 한다」는 신호는 필요하다
    - **`new_status == approved`를 함께 보는 것은 github 경로 때문이다.** 5단계에서 작성자가 frontmatter로 스스로 `draft`를 적었으면 그게 원본의 진실이다. 이미 초안이라 강등할 것이 없고, 덮으면 StatusChange가 거짓으로 하나 는다
    - **이 강등은 저장소에도 반영돼야 한다**([[SYNC-STD-001]] 1.2 「`status`가 진실」). mcp·web_revert 경로는 [[SYNC-MS-007#pipeline.save_pipeline]] 6a가 **push 전에** 본문을 고쳐 한 커밋으로 끝낸다. **github 경로는 커밋이 이미 저장소에 있어 그럴 수 없다** — 같은 6a가 `status(…)` 커밋을 하나 더 밀고, 그 해시가 `status_commit_hash`로 여기 온다 (#58)
