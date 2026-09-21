@@ -82,11 +82,11 @@ def callback_url(request: Request) -> str:
 
 
 def authorize_url(state: str, redirect_uri: str) -> str:
-    """GitHub 동의 화면 주소. scope=repo(인프라 5장 — 저장소 범위만) · redirect_uri(SEQ-8)."""
+    """GitHub 동의 화면 주소. scope=public_repo(인프라 5장) · redirect_uri(SEQ-8)."""
     q = urlencode(
         {
             "client_id": settings.GITHUB_CLIENT_ID,
-            "scope": "repo",
+            "scope": "public_repo",
             "state": state,
             "redirect_uri": redirect_uri,
         }
