@@ -2,8 +2,8 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
-upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYNC-MS-005, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
+status: draft
+upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
 # 구현 계획
@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 
 슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
 
-**진행 상황**: 카드 29장. **A~T 28장 완료**, U 진행 중.
+**진행 상황**: 카드 30장. **A~T 28장 완료**, V 진행 중, U는 V 뒤에.
 
 ---
 
@@ -38,7 +38,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-SCN-001#S1]] · [[SYNC-UC-001#UC-A1]] · [[SYNC-UC-001#UC-A6]] · [[SYNC-UC-001#UC-S1]] · [[SYNC-UC-001#UC-S2]] · [[SYNC-UC-001#UC-S7]] |
-| 구현 함수 | **project** [[SYNC-MS-001#ProjectService.init_project]] · [[SYNC-MS-001#ProjectService.get]] · [[SYNC-MS-001#ProjectService.list_projects]] · **spec** [[SYNC-MS-002#SpecService.validate]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-002#SpecService.issue_doc_id]] · [[SYNC-MS-002#SpecService.apply_frontmatter]] · [[SYNC-MS-002#SpecService.detect_deleted_items]] · [[SYNC-MS-002#SpecService.create]] · [[SYNC-MS-002#SpecService.save]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.get_item]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-002#SpecService.last_author]] · [[SYNC-MS-002#SpecService.neighbors]] · [[SYNC-MS-002#SpecService.resolve_item]] · **reference** [[SYNC-MS-003#ReferenceService.extract]] · [[SYNC-MS-003#ReferenceService.downstream]] · **tracking** [[SYNC-MS-004#TrackingService.raise_broken]] · [[SYNC-MS-004#TrackingService.raise_upstream]] · [[SYNC-MS-004#TrackingService.flags_for_items]] · [[SYNC-MS-004#TrackingService.count_flags]] · [[SYNC-MS-004#TrackingService.count_flags_by_document]] · **collab** [[SYNC-MS-005#CommentService.relocate]] · [[SYNC-MS-005#CommentService.count_unresolved]] · [[SYNC-MS-005#CommentService.count_unresolved_by_document]] · **account** [[SYNC-MS-006#AccountService.users_by_ids]] · **pipeline** [[SYNC-MS-007#pipeline.save_pipeline]] · **queries** [[SYNC-MS-008#queries.project_summary]] · [[SYNC-MS-008#queries.document_list]] · [[SYNC-MS-008#queries.document_view]] · [[SYNC-MS-008#queries.item_view]] — 32개. `core/markdown.py` 순수 함수 포함 |
+| 구현 함수 | **project** [[SYNC-MS-001#ProjectService.init_project]] · [[SYNC-MS-001#ProjectService.get]] · [[SYNC-MS-001#ProjectService.list_projects]] · **spec** [[SYNC-MS-002#SpecService.validate]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-002#SpecService.issue_doc_id]] · [[SYNC-MS-002#SpecService.apply_frontmatter]] · [[SYNC-MS-002#SpecService.detect_deleted_items]] · [[SYNC-MS-002#SpecService.create]] · [[SYNC-MS-002#SpecService.save]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.get_item]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-002#SpecService.last_author]] · [[SYNC-MS-002#SpecService.neighbors]] · [[SYNC-MS-002#SpecService.resolve_item]] · **reference** [[SYNC-MS-003#ReferenceService.extract]] · [[SYNC-MS-003#ReferenceService.downstream]] · **tracking** `SYNC-MS-004#TrackingService.raise_broken` · `SYNC-MS-004#TrackingService.raise_upstream` · `SYNC-MS-004#TrackingService.flags_for_items` · `SYNC-MS-004#TrackingService.count_flags` · `SYNC-MS-004#TrackingService.count_flags_by_document` · **collab** `SYNC-MS-005#CommentService.relocate` · `SYNC-MS-005#CommentService.count_unresolved` · `SYNC-MS-005#CommentService.count_unresolved_by_document` · **account** [[SYNC-MS-006#AccountService.users_by_ids]] · **pipeline** [[SYNC-MS-007#pipeline.save_pipeline]] · **queries** [[SYNC-MS-008#queries.project_summary]] · [[SYNC-MS-008#queries.document_list]] · [[SYNC-MS-008#queries.document_view]] · [[SYNC-MS-008#queries.item_view]] — 32개. `core/markdown.py` 순수 함수 포함 |
 | API | [[SYNC-API-002#init_project]] · [[SYNC-API-002#get_template]] · [[SYNC-API-002#list_documents]] · [[SYNC-API-002#get_document]] · [[SYNC-API-002#get_item]] · [[SYNC-API-002#create_document]] · [[SYNC-API-002#update_document]] · MCP 서버·인증([[SYNC-SEQ-001#SEQ-C2]]) |
 | 화면 | 없음. 이 슬라이스는 MCP만 |
 | 테스트 | 구현 함수의 테스트 관점 전부 · **E2E**: 에이전트가 `init_project` → `create_document` → `get_document` → `update_document`(버전 충돌·규약 위반·삭제 확인 세 갈래) → 저장소에 커밋이 있고 참조가 추출됨 |
@@ -51,8 +51,8 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-SCN-001#S2]] · [[SYNC-SCN-001#S5]] · [[SYNC-SCN-001#S6]] · [[SYNC-UC-001#UC-H2]] · UC-H3 · UC-H8 · UC-H9 · UC-H14 · UC-H15(댓글·규약 오류 묶음만) |
-| 구현 함수 | [[SYNC-MS-007#pipeline.change_status]] · [[SYNC-MS-002#SpecService.apply_status]] · [[SYNC-MS-002#SpecService.describe_items]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-002#SpecService.versions_by_ids]] · [[SYNC-MS-002#SpecService.recent_changes]] · [[SYNC-MS-003#ReferenceService.upstream]] · [[SYNC-MS-003#ReferenceService.downstream_of_document]] · [[SYNC-MS-003#ReferenceService.upstream_of_document]] · [[SYNC-MS-005#CommentService.list]] · [[SYNC-MS-005#CommentService.add]] · [[SYNC-MS-005#CommentService.resolve]] · [[SYNC-MS-005#CommentService.unresolved_count]] · [[SYNC-MS-005#CommentService.unresolved_in]] · [[SYNC-MS-008#queries.project_detail]] · [[SYNC-MS-008#queries.item_references_view]] · [[SYNC-MS-008#queries.upstream_checklist]] · [[SYNC-MS-006#AccountService.issue_token]] · [[SYNC-MS-006#AccountService.list_tokens]] · [[SYNC-MS-006#AccountService.revoke_token]] |
-| API | [[SYNC-API-001#GET/api/projects]] · [[SYNC-API-001#GET/api/projects/{code}]] · [[SYNC-API-001#GET/api/projects/{code}/docs]] · [[SYNC-API-001#GET/api/docs/{docId}]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/references]] · [[SYNC-API-001#GET/api/docs/{docId}/upstream]] · [[SYNC-API-001#POST/api/docs/{docId}/status]] · [[SYNC-API-001#GET/api/docs/{docId}/comments]] · [[SYNC-API-001#POST/api/docs/{docId}/comments]] · [[SYNC-API-001#POST/api/comments/{id}/resolve]] · [[SYNC-API-001#GET/api/me]] · [[SYNC-API-001#GET/api/me/tokens]] · [[SYNC-API-001#POST/api/me/tokens]] · [[SYNC-API-001#DELETE/api/me/tokens/{id}]] · [[SYNC-API-001#POST/api/projects]] |
+| 구현 함수 | [[SYNC-MS-007#pipeline.change_status]] · [[SYNC-MS-002#SpecService.apply_status]] · [[SYNC-MS-002#SpecService.describe_items]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-002#SpecService.versions_by_ids]] · [[SYNC-MS-002#SpecService.recent_changes]] · [[SYNC-MS-003#ReferenceService.upstream]] · [[SYNC-MS-003#ReferenceService.downstream_of_document]] · [[SYNC-MS-003#ReferenceService.upstream_of_document]] · `SYNC-MS-005#CommentService.list` · `SYNC-MS-005#CommentService.add` · `SYNC-MS-005#CommentService.resolve` · `SYNC-MS-005#CommentService.unresolved_count` · `SYNC-MS-005#CommentService.unresolved_in` · [[SYNC-MS-008#queries.project_detail]] · [[SYNC-MS-008#queries.item_references_view]] · `SYNC-MS-008#queries.upstream_checklist` · [[SYNC-MS-006#AccountService.issue_token]] · [[SYNC-MS-006#AccountService.list_tokens]] · [[SYNC-MS-006#AccountService.revoke_token]] |
+| API | [[SYNC-API-001#GET/api/projects]] · [[SYNC-API-001#GET/api/projects/{code}]] · [[SYNC-API-001#GET/api/projects/{code}/docs]] · [[SYNC-API-001#GET/api/docs/{docId}]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/references]] · `SYNC-API-001#GET/api/docs/{docId}/upstream` · [[SYNC-API-001#POST/api/docs/{docId}/status]] · `SYNC-API-001#GET/api/docs/{docId}/comments` · `SYNC-API-001#POST/api/docs/{docId}/comments` · [[SYNC-API-001#POST/api/comments/{id}/resolve]] · [[SYNC-API-001#GET/api/me]] · [[SYNC-API-001#GET/api/me/tokens]] · [[SYNC-API-001#POST/api/me/tokens]] · [[SYNC-API-001#DELETE/api/me/tokens/{id}]] · [[SYNC-API-001#POST/api/projects]] |
 | 화면 | [[SYNC-UI-002#UI-1]] · [[SYNC-UI-002#UI-2]] · [[SYNC-UI-002#UI-3]] · [[SYNC-UI-002#UI-4]] · [[SYNC-UI-002#UI-5]](유저용·원본 탭, 참조 패널, 댓글 패널, 상태 변경 + 상위 대조 다이얼로그) · [[SYNC-UI-002#UI-13]] · 유저용 탭 렌더링은 [[SYNC-STD-002]] V-* — `_tools/view_build.py`가 참조 구현 |
 | 테스트 | 구현 함수의 테스트 관점 · **E2E**: 민준이 웹에서 로그인 → 프로젝트 목록 → 문서 뷰 → 댓글 → 승인(상위 대조 포함) → 토큰 발급 → 그 토큰으로 MCP `get_document` |
 | 선행 | B1 |
@@ -62,10 +62,10 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 
 | 항목 | 내용 |
 |---|---|
-| 근거 | [[SYNC-SCN-001#S4]] · [[SYNC-UC-001#UC-S3]] · UC-S4 · UC-H10 · UC-H11 · UC-H12 · UC-H13 · UC-H15 |
-| 구현 함수 | [[SYNC-MS-004#TrackingService.detect_impact]](스텁 해제) · [[SYNC-MS-004#TrackingService.create_pending]] · [[SYNC-MS-004#TrackingService.get_decision]] · [[SYNC-MS-004#TrackingService.record_decision]] · [[SYNC-MS-004#TrackingService.raise_flags]] · [[SYNC-MS-004#TrackingService.get_flag]] · [[SYNC-MS-004#TrackingService.resolve]] · [[SYNC-MS-004#TrackingService.flags_for_assignee]] · [[SYNC-MS-004#TrackingService.flags_unassigned]] · [[SYNC-MS-004#TrackingService.flags_in_project]] · [[SYNC-MS-004#TrackingService.pending_decisions_for]] · [[SYNC-MS-002#SpecService.diff]] · [[SYNC-MS-002#SpecService.resolve_items]] · [[SYNC-MS-002#SpecService.versions_instructed_by]] · [[SYNC-MS-002#SpecService.convention_error_docs_by]] · [[SYNC-MS-002#SpecService.documents_authored_by]] · [[SYNC-MS-003#ReferenceService.count_downstream]] · [[SYNC-MS-008#queries.todo]] · [[SYNC-MS-008#queries.decision_view]] · [[SYNC-MS-008#queries.flag_view]] · [[SYNC-MS-008#queries.project_items]] · [[SYNC-MS-008#queries.diff_with_impact]] |
-| API | [[SYNC-API-001#GET/api/todo]] · [[SYNC-API-001#GET/api/flags/{id}]] · [[SYNC-API-001#POST/api/flags/{id}/resolve]] · [[SYNC-API-001#GET/api/decisions/{versionId}]] · [[SYNC-API-001#POST/api/decisions/{versionId}]] · [[SYNC-API-001#GET/api/projects/{code}/flags]] · [[SYNC-API-001#GET/api/docs/{docId}/diff]] · MCP `update_document`의 `changed_items`·`upstream_impact` 실동작 |
-| 화면 | [[SYNC-UI-002#UI-10]] · [[SYNC-UI-002#UI-11]] · [[SYNC-UI-002#UI-12]] |
+| 근거 | [[SYNC-SCN-001#S4]] · `SYNC-UC-001#UC-S3` · UC-S4 · UC-H10 · UC-H11 · UC-H12 · UC-H13 · UC-H15 |
+| 구현 함수 | `SYNC-MS-004#TrackingService.detect_impact`(스텁 해제) · `SYNC-MS-004#TrackingService.create_pending` · `SYNC-MS-004#TrackingService.get_decision` · `SYNC-MS-004#TrackingService.record_decision` · `SYNC-MS-004#TrackingService.raise_flags` · `SYNC-MS-004#TrackingService.get_flag` · `SYNC-MS-004#TrackingService.resolve` · `SYNC-MS-004#TrackingService.flags_for_assignee` · `SYNC-MS-004#TrackingService.flags_unassigned` · `SYNC-MS-004#TrackingService.flags_in_project` · `SYNC-MS-004#TrackingService.pending_decisions_for` · [[SYNC-MS-002#SpecService.diff]] · [[SYNC-MS-002#SpecService.resolve_items]] · `SYNC-MS-002#SpecService.versions_instructed_by` · `SYNC-MS-002#SpecService.convention_error_docs_by` · `SYNC-MS-002#SpecService.documents_authored_by` · [[SYNC-MS-003#ReferenceService.count_downstream]] · `SYNC-MS-008#queries.todo` · `SYNC-MS-008#queries.decision_view` · `SYNC-MS-008#queries.flag_view` · [[SYNC-MS-008#queries.project_items]] · [[SYNC-MS-008#queries.diff_with_impact]] |
+| API | `SYNC-API-001#GET/api/todo` · `SYNC-API-001#GET/api/flags/{id}` · `SYNC-API-001#POST/api/flags/{id}/resolve` · `SYNC-API-001#GET/api/decisions/{versionId}` · `SYNC-API-001#POST/api/decisions/{versionId}` · [[SYNC-API-001#GET/api/projects/{code}/flags]] · [[SYNC-API-001#GET/api/docs/{docId}/diff]] · MCP `update_document`의 `changed_items`·`upstream_impact` 실동작 |
+| 화면 | `SYNC-UI-002#UI-10` · `SYNC-UI-002#UI-11` · `SYNC-UI-002#UI-12` |
 | 테스트 | 구현 함수의 테스트 관점 · **E2E**: 에이전트가 PRD R12 수정(`changed_items`) → 호영 내 할 일에 전파 미결정 → 예 → 하위 4건 플래그 → 민준 내 할 일 → 확인 처리(수정 동반·수정 없음 둘 다) · 항목 삭제 → 끊어진 참조 · API가 UC-A6 어긋남 지정 → 하위 불일치 |
 | 선행 | B2 |
 | 완료 | 2026-09-09 · 브랜치 `feat/a-foundation` · 커밋 `021cded`~`193dcf6` (code 9, PR #4 `hoyoungparkme/syncdoc`) · 테스트 136(E2E S4 포함) · `check_code.py` 22/22 · 화면 UI-10·11·12 (`Todo.tsx`·`FlagView.tsx`·`DecisionDialog.tsx`, 요소 번호 = `data-el`) · 스텁 해제: `detect_impact`, `create_pending`(501) · 정한 것: `create_pending` 3인자(MS-004; MS-007 11단계는 1인자), `resolve → FlagSummary`는 `assignee_id`만 채우고 이름은 라우터가, `VersionBrief`에 commit_hash·author, `ItemRef.deleted_at`, `FlagDetail`에 cause_deleted_at·cause_body(API 스키마에 없음), 문서 단위 참조 대상은 원인 항목 없는 플래그 하나 · **화면 확인: 2026-09-11 전부 통과** (DEV-14 일곱째) |
@@ -145,7 +145,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 
 | 항목 | 내용 |
 |---|---|
-| 근거 | [[SYNC-UI-002#UI-3]] · [[SYNC-UI-002#UI-10]] · [[SYNC-UI-002#UI-11]] · [[SYNC-UI-002#UI-12]] · [[SYNC-UI-002#UI-13]] · [[SYNC-UI-002#UI-14]] |
+| 근거 | [[SYNC-UI-002#UI-3]] · `SYNC-UI-002#UI-10` · `SYNC-UI-002#UI-11` · `SYNC-UI-002#UI-12` · [[SYNC-UI-002#UI-13]] · [[SYNC-UI-002#UI-14]] |
 | 구현 | 초기화를 다이얼로그로(커밋될 것 박스) · 내 할 일 묶음 순서 고정 · 플래그 확인 버튼 하나(자동 판정 미리 보기) · 설정을 다이얼로그로(카드 넷, 관리 흡수) · 토큰 마지막 사용 |
 | API | [[SYNC-API-001#GET/api/me/tokens]] (마지막 사용) |
 | 화면 | UI-3 · UI-10 · UI-11 · UI-12 · UI-13 · UI-14 |
@@ -173,9 +173,9 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-INFRA-001]] 6.1 · [[SYNC-PRD-001#N3]] · [[SYNC-UI-002#UI-14]] 요소 2.4·6 · #16 |
-| 구현 함수 | [[SYNC-MS-007#pipeline.export_tracking]] [[SYNC-MS-007#pipeline.import_tracking]] [[SYNC-MS-007#scheduler.backup_loop]] · [[SYNC-MS-004#TrackingService.all_flags]] [[SYNC-MS-004#TrackingService.all_decisions]] [[SYNC-MS-004#TrackingService.restore_flags]] [[SYNC-MS-004#TrackingService.restore_decisions]] · [[SYNC-MS-005#CommentService.all_in_project]] [[SYNC-MS-005#CommentService.restore]] · [[SYNC-MS-009#git.last_commit_at]] · [[SYNC-MS-002#SpecService.item_pks]](삭제 포함 인자) · [[SYNC-MS-001#ProjectService.repo_status]](마지막 백업) · [[SYNC-MS-007#scheduler.poll_loop]](반복 보호) |
+| 구현 함수 | `SYNC-MS-007#pipeline.export_tracking` `SYNC-MS-007#pipeline.import_tracking` `SYNC-MS-007#scheduler.backup_loop` · `SYNC-MS-004#TrackingService.all_flags` `SYNC-MS-004#TrackingService.all_decisions` `SYNC-MS-004#TrackingService.restore_flags` `SYNC-MS-004#TrackingService.restore_decisions` · `SYNC-MS-005#CommentService.all_in_project` `SYNC-MS-005#CommentService.restore` · `SYNC-MS-009#git.last_commit_at` · [[SYNC-MS-002#SpecService.item_pks]](삭제 포함 인자) · [[SYNC-MS-001#ProjectService.repo_status]](마지막 백업) · [[SYNC-MS-007#scheduler.poll_loop]](반복 보호) |
 | 구현 | 설정값 `BACKUP_INTERVAL_SECONDS` · `main` lifespan에 백업 태스크(폴링과 **별도 if** — 하나를 끄고 다른 하나를 볼 수 있어야 한다) · `Entry.backup` · DTO 셋(`RestoreFlag`·`RestoreDecision`·`RestoreResult`) · `BackupInvalid` 예외 · 리포지터리 다섯 |
-| API | [[SYNC-API-001#POST/api/admin/repos/{code}/restore]] · `GET /api/admin/repos`에 `backed_up_at`·`backup_stale` |
+| API | `SYNC-API-001#POST/api/admin/repos/{code}/restore` · `GET /api/admin/repos`에 `backed_up_at`·`backup_stale` |
 | 화면 | UI-14 요소 2.4(마지막 백업)·6(백업에서 복원) — **`check_ui.py` 15/15 회복**. 명세를 먼저 고쳐 지금 14/15다 |
 | 테스트 | 구현 함수의 테스트 관점 전부 · **내보내고 → 세 표를 비우고 → 복원** 왕복 · 두 번 복원해도 안 늘어남(`skipped`로 간다) · 파일에 댓글 본문·전파 사유·최상위 시각이 없음 · 두 번 내보내도 커밋이 하나 · 백업 커밋이 `changed_files`에 안 잡힘 · 재구축을 안 하고 복원하면 전부 `dropped`이고 예외는 없음 |
 | 선행 | D5 |
@@ -330,7 +330,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 
 | 항목 | 내용 |
 |---|---|
-| 근거 | [[SYNC-UI-002#UI-10]] 10·10.1·11·11.1 · [[SYNC-UC-001#UC-H15]] |
+| 근거 | `SYNC-UI-002#UI-10` 10·10.1·11·11.1 · `SYNC-UC-001#UC-H15` |
 | 구현 함수 | 없음 — 화면만. `/api/todo`는 그대로고 코드는 문서 ID 접두에서, 이름은 셸이 든 프로젝트 목록에서 얻는다 |
 | 화면 | UI-10에 프로젝트 칩 줄(10)과 프로젝트 묶음(11). 프로젝트가 둘 이상일 때만 |
 | 테스트 | `check_ui.py` UI-10 요소 21/21 · 프로젝트 넷 → 칩 다섯(전체 포함)·묶음 넷, 가장 오래된 일이 있는 묶음이 위 · 칩을 눌러도 부제 건수 그대로 · 프로젝트 하나면 지금과 같은 화면 |
@@ -384,7 +384,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-PRD-001#N3]] 예외 · [[SYNC-UC-001#UC-A7]] · [[SYNC-UC-001#UC-H18]] · [[SYNC-API-001#DELETE/api/docs/{docId}]] · [[SYNC-API-002#delete_document]] · [[SYNC-SEQ-001#SEQ-22]] · [[SYNC-STD-001]] 1.1 · [[SYNC-DOM-003]] 설계 규칙 |
-| 구현 함수 | [[SYNC-MS-007#pipeline.trash_document]](카드 R이 `delete_document`를 대체) · [[SYNC-MS-007#pipeline.process_commit]] 4(행 없는 D 건너뜀) · [[SYNC-MS-002#SpecService.delete_document]] · [[SYNC-MS-002#SpecService.status_change_count]] · [[SYNC-MS-003#ReferenceService.inbound_of_document]] · [[SYNC-MS-004#TrackingService.history_of_document]] · [[SYNC-MS-005#CommentService.count]] · [[SYNC-MS-009#git.commit_push]] `delete` |
+| 구현 함수 | [[SYNC-MS-007#pipeline.trash_document]](카드 R이 `delete_document`를 대체) · [[SYNC-MS-007#pipeline.process_commit]] 4(행 없는 D 건너뜀) · [[SYNC-MS-002#SpecService.delete_document]] · [[SYNC-MS-002#SpecService.status_change_count]] · [[SYNC-MS-003#ReferenceService.inbound_of_document]] · `SYNC-MS-004#TrackingService.history_of_document` · `SYNC-MS-005#CommentService.count` · [[SYNC-MS-009#git.commit_push]] `delete` |
 | 화면 | UI-5 12 문서 삭제(초안만) · 13 확인 다이얼로그(13.1~13.4) |
 | 테스트 | 문지기 넷 각각 한 번씩 걸림(`document-has-history`에 값) · confirm 없이 → needs-confirm에 `version_count` · confirm → 원격 파일 사라짐 + 커밋 메시지 + 행 다섯 종류 0 · 다른 문서 참조·항목 그대로 · 지운 번호 재발급 · 폴링이 삭제 커밋 D를 건너뛰고 `last_processed_commit` 전진 · 웹 DELETE 204/409 · MCP 도구 두 번 호출 · `check_ui.py` UI-5 |
 | 선행 | M |
@@ -409,8 +409,8 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 
 | 항목 | 내용 |
 |---|---|
-| 근거 | [[SYNC-UC-001#UC-H12]] 3 · [[SYNC-SEQ-001#SEQ-1]] 10b · #70 |
-| 구현 함수 | [[SYNC-MS-004#TrackingService.release_broken]] · [[SYNC-MS-007#pipeline.save_pipeline]] 10b |
+| 근거 | `SYNC-UC-001#UC-H12` 3 · [[SYNC-SEQ-001#SEQ-1]] 10b · #70 |
+| 구현 함수 | `SYNC-MS-004#TrackingService.release_broken` · [[SYNC-MS-007#pipeline.save_pipeline]] 10b |
 | 화면 | 없음 — 저장이 푼다. UI-10 끊어진 참조 묶음에서 그 행이 사라진다 |
 | 테스트 | Q1 삭제 → R1 broken_ref → R1의 참조를 지워 저장 → `resolved_with_edit=True`, 확인자 = 저장시킨 사람 · 참조를 둔 채 저장 → 남음 · 원인 이름은 삭제 항목 포함(`describe_items`) |
 | 선행 | N |
@@ -477,7 +477,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-PRD-001#N3]] · [[SYNC-UC-001#UC-A7]] · [[SYNC-UC-001#UC-A8]] · [[SYNC-UC-001#UC-H18]] · [[SYNC-API-001#DELETE/api/docs/{docId}]] · [[SYNC-API-001#POST/api/docs/{docId}/restore]] · [[SYNC-API-001#POST/api/docs/{docId}/purge]] · [[SYNC-API-001#GET/api/projects/{code}/trash]] · [[SYNC-API-002#delete_document]] · [[SYNC-API-002#restore_document]] · [[SYNC-SEQ-001#SEQ-22]] · [[SYNC-SEQ-001#SEQ-23]] · [[SYNC-DOM-003]] `documents.trashed_at` |
-| 구현 함수 | [[SYNC-MS-007#pipeline.trash_document]] · [[SYNC-MS-007#pipeline.restore_document]] · [[SYNC-MS-007#pipeline.purge_document]] · [[SYNC-MS-007#pipeline.save_pipeline]] 2(`document-trashed`) · [[SYNC-MS-007#pipeline.process_commit]] 4 · [[SYNC-MS-002#SpecService.trash]] · [[SYNC-MS-002#SpecService.trash_commit]] · [[SYNC-MS-002#SpecService.list_trashed]] · [[SYNC-MS-002#SpecService.delete_document]] · [[SYNC-MS-002#SpecService.save]] 7 · [[SYNC-MS-002#SpecService.validate]] 3 · [[SYNC-MS-004#TrackingService.release_broken_causes]] · [[SYNC-MS-004#TrackingService.open_flags_of_document]] · [[SYNC-MS-008#queries.trash_list]] · 마이그레이션 `0010` |
+| 구현 함수 | [[SYNC-MS-007#pipeline.trash_document]] · [[SYNC-MS-007#pipeline.restore_document]] · [[SYNC-MS-007#pipeline.purge_document]] · [[SYNC-MS-007#pipeline.save_pipeline]] 2(`document-trashed`) · [[SYNC-MS-007#pipeline.process_commit]] 4 · [[SYNC-MS-002#SpecService.trash]] · [[SYNC-MS-002#SpecService.trash_commit]] · [[SYNC-MS-002#SpecService.list_trashed]] · [[SYNC-MS-002#SpecService.delete_document]] · [[SYNC-MS-002#SpecService.save]] 7 · [[SYNC-MS-002#SpecService.validate]] 3 · `SYNC-MS-004#TrackingService.release_broken_causes` · `SYNC-MS-004#TrackingService.open_flags_of_document` · [[SYNC-MS-008#queries.trash_list]] · 마이그레이션 `0010` |
 | 화면 | UI-5 12·13(휴지통에 넣기·끊어질 것) · 4b 휴지통 배너 + 되살리기 · UI-4 8 휴지통 묶음(8.1~8.4) |
 | 테스트 | 남이 가리키는 문서도 넣힘 + 하위 broken_ref · 두 번 넣기 `document-trashed` · 휴지통 문서 저장·상태 변경 막힘 · 목록·단계 칸에서 빠짐 · 되살리기 → 직전 본문·버전 +1·항목 복구·broken_ref `with_edit=false` 해제·목록 복귀 · 폴링이 휴지통 커밋 D 건너뜀 · 완전 삭제: 가리키는 곳 있으면 `document-has-history`, 없으면 행 0·남의 플래그 원인 칸 null·번호 재발급 · 웹 DELETE/restore/purge/trash 목록 · MCP 두 도구 · `check_ui.py` UI-4·UI-5 |
 | 선행 | N · O |
@@ -556,18 +556,62 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 
 ---
 
+#### V 한 사람의 도구 — 협업 기능을 걷어낸다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-RFQ-001#Q6]] · [[SYNC-PRD-001#R4]] · [[SYNC-PRD-001#R6]] · [[SYNC-UC-001#UC-H8]] · [[SYNC-INFRA-001]] 6장 · [[SYNC-DOM-003]] · [[SYNC-STD-004#DEV-7]] |
+| 구현 함수 | 신설 [[SYNC-MS-003#ReferenceService.mark_missing]] · 축소 [[SYNC-MS-007#pipeline.save_pipeline]] · [[SYNC-MS-007#pipeline.change_status]] · [[SYNC-MS-007#pipeline.purge_document]] · [[SYNC-MS-007#pipeline.rebuild]] · [[SYNC-MS-002#SpecService.validate]] · [[SYNC-MS-002#SpecService.save]] · [[SYNC-MS-008#queries.project_summary]] · [[SYNC-MS-008#queries.project_detail]] · [[SYNC-MS-008#queries.project_items]] · [[SYNC-MS-008#queries.graph_view]] · 삭제 MS-004 전부 · MS-005 댓글 전부 · MS-007 `export_tracking`·`import_tracking`·`backup_loop` · MS-008 `flag_summaries`·`todo`·`decision_view`·`flag_view`·`upstream_checklist` · MS-009 `git.last_commit_at` |
+| DB | Alembic `0011_drop_flags_decisions_comments` — 테이블 셋 삭제. `downgrade`는 0001·0007·0008의 정의를 복원하되 데이터는 안 돌아온다(`v1-collab` 태그의 `import_tracking`으로) |
+| API | 엔드포인트 10개 삭제(플래그 2·전파 2·댓글 3·내 할 일·백업 복원·상위 대조) · `POST …/status`는 `{to}`만 · 에러 5개 삭제 |
+| 화면 | UI-10·11·12 삭제 · UI-5 요소 3(토글)·5·7.4·8.2·8.8·11~11.4 · UI-4 요약 셋 · UI-2 2색 · UI-8 범위 둘 · UI-14 백업 칸 |
+| 테스트 | 협업 테스트 삭제(`tests/core/tracking`·`tests/core/collab`·`test_tracking.py`·`test_e2e_b3.py` 등) · 상태 테스트는 둘로 · `mark_missing`이 `to_item_id`·`to_document_id`를 **둘 다** 비운다 · 항목 삭제 저장 → `is_missing` 참조 → 상대 문서 저장 시 풀림 · 완료 문서를 MCP로 고치면 초안 · 규약 오류 문서는 완료로 못 올림 · 마이그레이션 up→down→up 왕복 · `check_dom` 10·10·10 · `check_ui` 화면 12 · **사람 확인**: 아래 열 가지 |
+| 선행 | T |
+| 완료 | — |
+
+**왜 카드인가.** 걷어내기가 테이블·파이프라인·화면·검사기에 한꺼번에 걸려 있어 자르면 중간 상태가 뜨지 않는다 — `core/tracking`을 지우는 순간 `queries`·`types`·`env.py`가 같이 깨진다. 그리고 걷어내는 일은 이슈(DEV-15 `fix`)가 아니다. 틀린 게 아니라 **전제가 바뀌었다.**
+
+**왜 지금인가.** 써 보니 한 사람이 프로젝트 하나를 혼자 다 쓴다([[SYNC-RFQ-001]] 7장). 승인·전파·플래그·댓글은 두세 명이 서로 확인하라고 만든 장치라 혼자면 일만 늘린다 — 자기가 쓴 것을 자기가 승인하고, 자기 변경의 전파를 자기가 결정한다. 실측으로도 여덟 프로젝트에 교차 작성이 한 건도 없다. RFQ 6장이 처음부터 「실사용 2~3명이라 얼마나 필요한지」를 미정으로 남겨 뒀고, 이것이 그 답이다.
+
+**정한 것 다섯.**
+
+| 질문 | 결정 | 이유 |
+|---|---|---|
+| 상태를 없애나 | **초안·완료 둘로 줄인다** | 없애면 목록 히트맵·그래프 범위·순서대로 읽기·MCP `get_document`의 「확정인가」 신호가 전부 축을 잃는다. `review`만 지우면 frontmatter 변경은 세 건 |
+| 끊어진 참조는 | **`references.is_missing`으로 되돌린다** | 플래그는 「누가 확인했나」를 얹은 것이었다. 혼자면 확인할 사람이 없다. 참조 추출이 이미 갖고 있던 `is_missing`으로 돌아가면 4a 배너·참조 패널·`resolve_missing`이 그대로 일한다 |
+| `status_changes`는 | **남긴다** | 휴지통 되살리기가 `reason='휴지통'` 행의 커밋 해시를 열쇠로 쓰고, 이력이 상태 줄을 보여준다. 협업 표가 아니다 |
+| 백업은 | **없앤다** | 백업 대상이 플래그·전파·댓글이었다. 남는 데이터는 전부 저장소에서 재구축된다 |
+| 옛 데이터는 | **`v1-collab` 태그와 `backup/tracking.json`으로 남긴다** | 마지막 export를 돌리고 태그를 찍었다. 되돌릴 일이 생기면 그 태그의 코드가 읽는다. 저장소의 파일은 파이프라인 감지 밖이라 두어도 아무 일이 없다 |
+
+**상태의 닭과 달걀.** 이 카드가 승인 게이트를 없애는데 명세를 고치는 동안은 옛 게이트가 살아 있다. 고친 문서는 전부 frontmatter를 같은 커밋에서 `draft`로 내렸다 — GitHub 경로 자동 강등은 frontmatter가 `approved`일 때만 `review` 커밋을 밀므로(MS-002 save 6) 작성자가 스스로 내리면 `review`가 생기지 않는다. 코드가 들어간 뒤 새 토글로 한 번에 완료로 올린다.
+
+**사람이 브라우저에서 볼 열 가지.**
+
+1. UI-5에서 토글 하나로 초안⇄완료가 되고 다이얼로그가 없는가
+2. 규약 오류나 미완성이 있는 문서는 완료로 눌러도 막히고 이유가 보이는가
+3. 완료 문서를 MCP로 고치면 초안으로 내려가고 이력에 그 줄이 남는가
+4. 오른쪽 패널이 참조 하나뿐인가 (질문 탭은 U가 더한다)
+5. 항목을 지운 저장 뒤 UI-4 끊어진 참조 수가 늘고, 상대 문서를 다시 저장하면 주는가
+6. UI-4 요약이 셋이고 문서 행에 플래그·댓글 열이 없는가
+7. UI-8 범위가 둘이고 ▲가 없는가
+8. UI-2 히트맵이 두 색과 미작성뿐인가
+9. UI-14에 백업 칸과 복원 버튼이 없는가
+10. 휴지통 → 되살리기 → 완전 삭제가 전과 같은가
+
+---
+
 #### U 읽다가 항목에 대해 묻는다
 
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-PRD-001#R11]] · [[SYNC-UC-001#UC-H19]] · [[SYNC-SEQ-001#SEQ-24]] · [[SYNC-INFRA-001]] 5.3 |
 | 구현 함수 | [[SYNC-MS-009#llm.ask]] · [[SYNC-MS-008#queries.ask_item]] · 엔드포인트 `POST /api/docs/{docId}/items/{itemId}/ask` ([[SYNC-API-001]] 3.4) |
-| 화면 | [[SYNC-UI-002]] UI-5 요소 8.4~8.8 — 질문 탭 · 맥락 줄 · 입력 · 대화 · 댓글로 남기기 |
-| 테스트 | 구현 함수의 테스트 관점 전부 · **DB에 아무것도 안 쓴다**(호출 전후 행 수가 같다) · 맥락에 문서 전문이 안 들어간다 · 키가 비면 네트워크를 타기 전에 막힌다 · 외부 429가 `llm-unavailable`로 접힌다 · 댓글로 남기면 `comments` 행 하나가 생기고 **작성자가 누른 사람**이다 · `check_ui` UI-5 49/49 · **사람 확인**: 아래 열 가지 |
-| 선행 | T |
+| 화면 | [[SYNC-UI-002]] UI-5 요소 8.4~8.7 — 질문 탭 · 맥락 줄 · 입력 · 대화 |
+| 테스트 | 구현 함수의 테스트 관점 전부 · **DB에 아무것도 안 쓴다**(호출 전후 행 수가 같다) · 맥락에 문서 전문이 안 들어간다 · 키가 비면 네트워크를 타기 전에 막힌다 · 외부 429가 `llm-unavailable`로 접힌다 · `check_ui` UI-5 전부 · **사람 확인**: 아래 아홉 가지 |
+| 선행 | V |
 | 완료 | — |
 
-**왜 카드인가.** 함수 둘과 엔드포인트 하나와 화면 요소 다섯이 한 호출 그래프로 닫힌다(DEV-12). 백엔드와 화면으로 자르면 뒷 카드가 앞 카드 함수를 전부 쓰는 직선이 되고, 화면 없는 카드는 DEV-14의 일곱째 조건(사람이 눌러 본다)을 못 채운 채 닫힌다.
+**왜 카드인가.** 함수 둘과 엔드포인트 하나와 화면 요소 넷이 한 호출 그래프로 닫힌다(DEV-12). 백엔드와 화면으로 자르면 뒷 카드가 앞 카드 함수를 전부 쓰는 직선이 되고, 화면 없는 카드는 DEV-14의 일곱째 조건(사람이 눌러 본다)을 못 채운 채 닫힌다.
 
 **왜 지금인가.** 명세를 읽다 막히면 화면을 떠나야 했다. 에이전트로 옮겨가 프로젝트와 문서를 다시 지정하는 동안 읽던 맥락이 버려진다. 처음에는 「코드가 어떻게 구현됐나」를 묻는 챗봇을 검토했으나, 그 일은 각자의 에이전트가 이미 하고 있었다. 목적을 **읽는 중 질의**로 좁히자 설계가 크게 싸졌다 — 보고 있는 항목이 곧 맥락이라 검색이 필요 없고, 새 화면도 표도 필요 없다.
 
@@ -581,12 +625,12 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 키는 누구 것인가 | **서버에 하나** | 사람마다 키면 `users`에 컬럼이 늘고 5.1 재암호화가 하나 더 생긴다. 그 유틸이 한쪽만 돌면 **모델 키만 못 푸는 채로 옛 키가 지워진다** |
 | 비용을 어떻게 막나 | **한도가 아니라 상한과 스위치** | 맥락은 항목 본문까지, 대화는 `LLM_MAX_TURNS`턴까지. 회수 경로는 키를 비우는 것이다. 디스크 한도를 「한도보다 회수 경로가 먼저다」로 닫은 것과 같은 판단이고, 429를 만들지 않으므로 에러 표가 안 는다 |
 
-**답을 남기는 길은 댓글이다.** 새 표를 만들지 않고 `POST /api/docs/{docId}/comments`를 그대로 쓴다. 항목 헤딩 줄에 달리고 **작성자는 누른 사람**이다 — 모델은 계정이 없다. 이것이 「모델이 명세에 쓴다」가 아니라는 증거다. 사람이 읽고 골라서 자기 이름으로 남긴다.
+**답을 남기는 길은 없다.** 처음에는 댓글로 옮기는 길을 뒀으나 V가 댓글을 걷어냈다. 남는 경계는 둘 — 답은 저장되지 않고, 명세를 바꾸지 않는다. 남길 값이 있으면 사람이 읽고 자기 에이전트에게 말한다. 그 경로가 R9 그대로라 「모델이 명세에 쓴다」가 되지 않는다.
 
-**사람이 브라우저에서 볼 열 가지.** 검사기가 못 잡는 몫이다(DEV-17이 그 한계를 적어 뒀다).
+**사람이 브라우저에서 볼 아홉 가지.** 검사기가 못 잡는 몫이다(DEV-17이 그 한계를 적어 뒀다).
 
 1. 처음 열면 패널이 여전히 참조 탭이고 「항목을 선택하세요」인가
-2. 7.1은 참조 탭으로, 7.4는 댓글 탭으로 가는 기존 전환이 안 바뀌었나
+2. 7.1이 참조 탭으로 가는 기존 전환이 안 바뀌었나
 3. `?panel=ask`로 직접 열리고 `#item-X`와 함께 오면 항목까지 잡히나
 4. 원본 탭으로 바꿔도 패널이 그대로 있고 3단이 안 흔들리나
 5. 답이 길어져도 패널 안에서만 스크롤하나
@@ -594,7 +638,6 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 7. MINISPEC이 빈 프로젝트에서 「아직 안 쓰였다」고 답하나
 8. 새로고침하면 대화가 사라지나
 9. 키를 비우고 띄우면 탭이 안 보이고 나머지가 멀쩡한가
-10. 댓글로 남기면 그 줄 스레드로 뜨고 미해결 댓글 수(5)가 1 느는가
 
 ---
 
@@ -605,10 +648,10 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 | 시나리오 | 슬라이스 | 검증하는 것 |
 |---|---|---|
 | [[SYNC-SCN-001#S1]] | B1 | MCP로 문서가 쌓이고 커밋·참조가 생긴다 |
-| [[SYNC-SCN-001#S2]] | B2 | 웹에서 읽고 댓글 달고 승인한다 |
+| [[SYNC-SCN-001#S2]] | B2 · V | 웹에서 읽고 완료로 올린다 |
 | [[SYNC-SCN-001#S3]] | B1·B4 | 코딩 중 에이전트가 항목·참조를 조회한다 |
-| [[SYNC-SCN-001#S4]] | B3 | 상위 변경이 하위 플래그로, 하위 불일치가 상위 플래그로 |
-| [[SYNC-SCN-001#S5]] | B2 | 다른 툴 팀원이 토큰 발급 후 MCP로 붙는다 |
+| [[SYNC-SCN-001#S4]] | B3 · V | 상위 항목이 사라지면 하위 참조가 끊어진 것으로 보인다 |
+| [[SYNC-SCN-001#S5]] | B2 | 다른 툴을 쓰는 사람이 토큰 발급 후 MCP로 붙는다 |
 | [[SYNC-SCN-001#S6]] | B2·B4 | 그래프·순서 읽기·원본 탭 |
 | [[SYNC-SCN-001#S7]] | B4 | 플랫폼 없이 push한 것이 반영된다 |
 
@@ -619,8 +662,8 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-004, SYN
 MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 
 - [x] **삭제된 파일 push** → 문서는 남기고 `draft` + 규약 오류 `file.deleted`, 항목 전부 `is_deleted`, 하위에 끊어진 참조. `SpecService.mark_deleted` 신설 (B4)
-- [x] **같은 문서 안 참조 전파** → 전파한다. 같은 문서 항목도 대상 (B3)
-- [x] **원인 항목이 여럿일 때** → 원인마다 플래그 따로. 확인도 따로 (B3)
+- [x] **같은 문서 안 참조 전파** → 전파한다. 같은 문서 항목도 대상 (B3) — V에서 전파 자체가 사라짐
+- [x] **원인 항목이 여럿일 때** → 원인마다 플래그 따로. 확인도 따로 (B3) — V에서 플래그 자체가 사라짐
 
 - [x] **원격 기본 브랜치** → `main` 고정 (B1)
 - [x] **React 라이브러리** → react-markdown+remark-gfm · mermaid · react-flow+dagre · diff 직접 (B2·B4). 인프라 3장에 기록
@@ -651,6 +694,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | E | `card/E-backup` | `c8f2749`~`e715423` | — | 2026-09-11 |
 | F | `card/F-repo-create` | `a11f698`~ | — | 2026-09-14 |
 | U | `card/U-ask-panel` | — | — | 2026-09-17 |
+| V | `card/V-solo` | — | — | 2026-09-21 |
 
 **핸드오프 대조는 카드가 아니다.** D1~D5 여러 장에 걸쳐 있어 슬라이스로 나누지 않았고, 무엇을 고쳤는지는 각 카드의 `완료` 행에 적었다. PR 하나 = 슬라이스 하나 규칙의 유일한 예외다.
 
