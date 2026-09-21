@@ -1,4 +1,4 @@
-/** V-PRD · V-RFQ · V-SCN · V-INFRA · V-DOM · V-API · V-STD · V-UI(화면 설계) — tools/view_build.py 포트.
+/** V-PRD · V-RFQ · V-SCN · V-INFRA · V-DOM · V-API · V-STD — tools/view_build.py 포트. V-UI는 wireframe.ts(vUi).
  *  하위 참조 수·추적표·"근거로 삼은 문서"는 ctx.downstream(GET /api/docs/{id}/downstream, B4)에서 계산한다 —
  *  view_build.downstream_of와 같은 모양 {문서ID: [항목ID들]}. */
 import { esc, h2, inline, itemBlocks, renderBlocks, secName, splitSections, type RenderCtx } from './md'
@@ -8,12 +8,12 @@ const card = (id: string, title: string, inner: string, ctx: RenderCtx, cls = 'c
   `<article class="${cls}" id="item-${esc(id)}" data-item="${esc(id)}"><div class="card-h"><span class="iid">${esc(id)}</span><b>${inline(title, ctx)}</b></div>${inner}</article>`
 
 /** view_build.downstream_of(did)에서 항목 id를 참조한 문서들 (정렬) */
-const downsWith = (ctx: RenderCtx, id: string): string[] =>
+export const downsWith = (ctx: RenderCtx, id: string): string[] =>
   Object.entries(ctx.downstream ?? {})
     .filter(([, v]) => v.includes(id))
     .map(([d]) => d)
     .sort()
-const refLink = (ctx: RenderCtx, d: string) => `<a class="ref" href="${esc(ctx.href(d))}" data-ref="${esc(d)}">${esc(d)}</a>`
+export const refLink = (ctx: RenderCtx, d: string) => `<a class="ref" href="${esc(ctx.href(d))}" data-ref="${esc(d)}">${esc(d)}</a>`
 /** 추적표 — 이 문서를 근거로 삼은 문서 (원본에 없음. 참조에서 계산) */
 const traceTable = (ctx: RenderCtx): string => {
   const downs = Object.entries(ctx.downstream ?? {}).sort(([a], [b]) => (a < b ? -1 : 1))
@@ -318,31 +318,5 @@ export const vApi: ViewFn = ({ title: t, body, ctx }) => {
 }
 
 export const vStd: ViewFn = ({ body, ctx }) => ({ html: renderBlocks(body, ctx, ITEM_PAT.STD) })
-
-/** 화면 설계(UI-001): UI 항목 표로 재조립. 와이어프레임은 wireframe.ts */
-export const vUiDesign: ViewFn = ({ body, ctx }) => {
-  const out: string[] = []
-  for (const [title, text] of splitSections(body)) {
-    if (secName(title).startsWith('화면 목록')) {
-      const rows = itemBlocks(text, /UI-\d+/)
-        .map((b) => {
-          const first = b.text.trim().split('\n')[0]
-          const kind = first.includes('.') ? first.split('.')[0] : ''
-          const uc = /주 유스케이스: (.+)$/.exec(first)
-          const purpose = first.includes('. ') ? first.split('. ').slice(1).join('. ').split(' 주 유스케이스')[0] : first
-          const downs = downsWith(ctx, b.id)
-          return `<tr id="item-${esc(b.id)}" data-item="${esc(b.id)}"><td class="iid">${esc(b.id)}</td><td>${inline(b.title, ctx)}</td><td>${esc(kind)}</td><td>${inline(purpose, ctx)}</td><td>${uc ? inline(uc[1], ctx) : ''}</td><td>${downs.map((d) => refLink(ctx, d)).join(' · ')}</td></tr>`
-        })
-        .join('')
-      const lead = text.split(/^#### /m)[0]
-      out.push(
-        `${h2(title)}${renderBlocks(lead, ctx)}<table class="reassembled"><thead><tr><th>#</th><th>화면</th><th>종류</th><th>목적</th><th>주 유스케이스</th><th>참조한 곳</th></tr></thead><tbody>${rows}</tbody></table>`,
-      )
-      continue
-    }
-    out.push(h2(title) + renderBlocks(text, ctx, /UI-\d+/))
-  }
-  return { html: out.join('\n') }
-}
 
 export const vCode: ViewFn = (i) => plain(i)

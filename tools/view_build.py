@@ -386,26 +386,10 @@ def absorb(script, src, tmp):
     return out
 
 def v_ui(doc):
-    did = doc["fm"]["doc_id"]
-    if "와이어프레임" in doc["fm"]["title"]:
-        return absorb("wf_build.py", doc["path"], "/tmp/_wf.html").replace('.wrap{max-width:1560px;margin:0 auto;padding:28px 22px 80px}', '')
-    # 화면 설계: UI 항목 표로 재조립 + 나머지 원본
-    out = []
-    for title, text in split_sections(doc["body"]):
-        name = re.sub(r"^\d+\.\s*", "", title)
-        if name.startswith("화면 목록"):
-            rows = ""
-            for uid, ut, _, ub in item_blocks(text, r"UI-\d+"):
-                first = ub.strip().split("\n")[0]
-                kind = first.split(".")[0] if "." in first else ""
-                uc = re.search(r"주 유스케이스: (.+)$", first)
-                downs = sorted(d for d, v in downstream_of(did).items() if uid in v)
-                rows += f'<tr id="item-{uid}"><td class="iid">{uid}</td><td>{inline(ut, did)}</td><td>{esc(kind)}</td><td>{inline(first.split(". ",1)[1].split(" 주 유스케이스")[0] if ". " in first else first, did)}</td><td>{inline(uc.group(1), did) if uc else ""}</td><td>{" · ".join(f"<a class=\"ref\" href=\"{view_href(d)}\">{d}</a>" for d in downs)}</td></tr>'
-            lead = re.split(r"^#### ", text, flags=re.M)[0]
-            out.append(f'<h2>{esc(title)}</h2>{render_blocks(lead, did)}<table class="reassembled"><thead><tr><th>#</th><th>화면</th><th>종류</th><th>목적</th><th>주 유스케이스</th><th>참조한 곳</th></tr></thead><tbody>{rows}</tbody></table>')
-            continue
-        out.append(f"<h2>{esc(title)}</h2>" + render_blocks(text, did, r"UI-\d+"))
-    return "\n".join(out)
+    """V-UI — 화면 문서는 하나여도 둘이어도 같은 렌더러(카드 X). 규칙은 wf_build.py에."""
+    import wf_build as wf
+    blocks = wf.parse_ui(doc["body"])
+    return f'<style>{wf.WF_CSS}</style><div class="uiview">{wf.render_ui(blocks, doc["fm"]["doc_id"])}<script>{wf.WF_JS}</script></div>'
 
 def v_seq(doc):
     return absorb("seq_build.py", doc["path"], "/tmp/_seq.html")

@@ -2,13 +2,13 @@
 import type { Document, DownstreamView } from '../api/client'
 import type { RenderCtx } from './md'
 import { ITEM_PAT, plain, type ViewFn, type ViewOutput } from './types'
-import { vApi, vCode, vDom, vInfra, vPrd, vRfq, vScn, vStd, vUiDesign } from './views'
+import { vApi, vCode, vDom, vInfra, vPrd, vRfq, vScn, vStd } from './views'
 import { ucCss, vUc } from './uc'
-import { vWireframe, wireframeCss } from './wireframe'
+import { vUi, wireframeCss } from './wireframe'
 import { seqCss, vSeq } from './seq'
 import { msCss, vMs } from './ms'
 
-function pick(type: string, title: string): ViewFn {
+function pick(type: string): ViewFn {
   switch (type) {
     case 'PRD':
       return vPrd
@@ -23,7 +23,7 @@ function pick(type: string, title: string): ViewFn {
     case 'DOM':
       return vDom
     case 'UI':
-      return title.includes('와이어프레임') ? vWireframe : vUiDesign
+      return vUi // 화면 설계·와이어프레임 하나로 — 화면마다 html 유무로 갈린다 (STD-002 V-UI)
     case 'API':
       return vApi
     case 'SEQ':
@@ -59,7 +59,7 @@ export function renderView(doc: Document, code: string, downstream?: DownstreamV
     downstream: downstream ? Object.fromEntries(downstream.by_document.map((x) => [x.doc_id, x.items])) : undefined,
     titles: downstream ? Object.fromEntries(downstream.by_document.map((x) => [x.doc_id, x.title])) : undefined,
   }
-  const out = pick(doc.doc_type, fm.title ?? '')({ type: doc.doc_type, title: fm.title ?? '', body, ctx })
+  const out = pick(doc.doc_type)({ type: doc.doc_type, title: fm.title ?? '', body, ctx })
   return { html: out.html, onMount: out.onMount, title: fm.title ?? doc.doc_id, lead: leadOf(body) }
 }
 
