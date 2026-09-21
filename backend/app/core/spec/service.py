@@ -319,7 +319,8 @@ class SpecService:
             project_id=project_id,
             doc_id=doc_id,
             doc_type=str(doc_type),
-            status=fm.get("status") or "draft",
+            # 둘 밖의 값(옛 review 등)은 DB에 들이지 않는다 — 위반은 validate가 남겼다 (#99)
+            status=fm.get("status") if fm.get("status") in ("draft", "approved") else "draft",
             current_body=body,
             current_version_no=1,
             has_convention_error=False,
@@ -460,7 +461,10 @@ class SpecService:
                 )
         for item in self.repo.items_by_pks(deleted_item_pks):
             item.is_deleted, item.deleted_at = True, now_utc()
-        new_status = fm.get("status", row.status) if author.via == Entry.github else row.status
+        fm_status = fm.get("status")
+        # frontmatter 값이 둘 밖이면 DB를 안 바꾼다 — 위반은 validate가 남겼다 (#99)
+        github_status = fm_status if fm_status in ("draft", "approved") else row.status
+        new_status = github_status if author.via == Entry.github else row.status
         # 6. 자동 강등. **어느 쪽이 이미 status를 정했는지를 함께 본다** (#58)
         # · mcp·되돌리기: 5단계가 row.status(approved)를 그대로 뒀다 → 여기서 내린다
         # · github에서 파이프라인이 내림: 6a가 본문 frontmatter를 이미 draft로 고쳤고

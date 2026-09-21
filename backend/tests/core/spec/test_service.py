@@ -452,6 +452,26 @@ def test_save_approved_document_demotes_to_draft_with_status_change(db_session: 
     assert svc.get_document("EXMP-PRD-001").status == "approved"
 
 
+def test_github_frontmatter_status_outside_two_values_does_not_reach_db(
+    db_session: Session,
+) -> None:
+    # #99 — 옛 값 review가 남은 저장소를 push해도 DB는 둘 밖의 값을 들이지 않는다
+    svc, a, d = _seed(db_session, "draft")
+    gh = Author(kind=AuthorKind.human, user=a.user, instructed_by=None, via=Entry.github)
+    svc.save(d, d.body.replace("status: draft", "status: review"), "h2", gh, "spec: 테스트", [])
+    assert svc.get_document("EXMP-PRD-001").status == "draft"
+    # create도 같다
+    fm_review = d.body.replace("EXMP-PRD-001", "EXMP-SCN-001").replace(
+        "status: draft", "status: review"
+    )
+    body = fm_review.replace("type: PRD", "type: SCN")
+    project_id = db_session.execute(
+        text("SELECT project_id FROM documents WHERE id=:i"), {"i": d.id}
+    ).scalar()
+    svc.create(project_id, "EXMP-SCN-001", DocType.SCN, body, "h3", gh, "spec: 테스트")
+    assert svc.get_document("EXMP-SCN-001").status == "draft"
+
+
 def test_save_deleted_pks_and_warnings(db_session: Session) -> None:
     svc, a, d = _seed(db_session)
     n1 = next(i.pk for i in d.items if i.item_id == "N1")
