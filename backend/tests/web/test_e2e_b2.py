@@ -1,6 +1,7 @@
 """CODE-001 B2 E2E — SYNC-SCN-001#S2·S5 흐름 그대로 (카드 V 뒤: 댓글·상위 대조 없음).
 
-민준이 웹에서 로그인 → 프로젝트 목록 → 문서 뷰 → 완료로 올림(토글) → 토큰 발급 → 그 토큰으로 MCP get_document.
+소유자(호영)가 웹에서 로그인 → 프로젝트 목록 → 문서 뷰 → 완료로 올림(토글) → 토큰 발급 → 그 토큰으로 MCP get_document.
+카드 W 뒤: 프로젝트는 등록한 사람의 것이라 다른 계정(민준)에게는 보이지 않는다(R12).
 GitHub OAuth는 모킹, 저장소는 임시 bare, MCP는 Bearer로 HTTP(/mcp) 초기화까지 + 인프로세스 도구 호출.
 """
 
@@ -23,15 +24,15 @@ from tests.core.test_pipeline import create
 PRD_BODY = PRD.replace("EXMP-RFQ-001#Q2", "EXMP-RFQ-001#Q1")
 
 
-async def test_s2_minjun_reads_completes_and_connects_mcp(
+async def test_s2_owner_reads_completes_and_connects_mcp(
     client: TestClient, scoped: Session, proj, mock_github
 ) -> None:
     # 에이전트(호영)가 미리 쌓아 둔 RFQ·PRD (B1 파이프라인)
     await create(proj, DocType.RFQ, RFQ)
     await create(proj, DocType.PRD, PRD_BODY)
 
-    # 1. 민준이 GitHub로 로그인한다 (SEQ-8)
-    mock_github(github_ok(77, "minjun", "김민준"))
+    # 1. 소유자 호영이 GitHub로 로그인한다 (SEQ-8). 같은 GitHub 계정이라 User 행이 합쳐진다
+    mock_github(github_ok(proj["user"].github_user_id, "hoyoung", "박호영"))
     r = client.get(
         "/auth/github", params={"next": "/p/EXMP/d/EXMP-PRD-001"}, follow_redirects=False
     )
@@ -40,7 +41,7 @@ async def test_s2_minjun_reads_completes_and_connects_mcp(
         "/auth/github/callback", params={"code": "c", "state": state}, follow_redirects=False
     )
     assert r.status_code == 302 and r.headers["location"] == "/p/EXMP/d/EXMP-PRD-001"
-    assert client.get("/api/me").json()["github_login"] == "minjun"
+    assert client.get("/api/me").json()["github_login"] == "hoyoung"
 
     # 2. 프로젝트 목록 → 상세 문서 목록 (UI-2 → UI-4)
     projects = client.get("/api/projects").json()
@@ -56,12 +57,12 @@ async def test_s2_minjun_reads_completes_and_connects_mcp(
     refs = client.get("/api/docs/EXMP-PRD-001/items/R1/references").json()
     assert [(u["doc_id"], u["item_id"]) for u in refs["upstream"]] == [("EXMP-RFQ-001", "Q1")]
 
-    # 4. 읽고 완료로 올린다 — 토글 하나, 다이얼로그 없음 (UC-H8). frontmatter 커밋은 민준 이름으로
+    # 4. 읽고 완료로 올린다 — 토글 하나, 다이얼로그 없음 (UC-H8). frontmatter 커밋은 소유자 이름으로
     r = client.post("/api/docs/EXMP-PRD-001/status", json={"to": "approved"})
     assert r.status_code == 200 and r.json()["status"] == "approved"
     assert g(proj["repos"]["remote"], "log", "-1", "--format=%s%n%an", "main").split("\n") == [
         "status(EXMP-PRD-001): draft → approved",
-        "김민준",
+        "박호영",
     ]
     # 5. 토글은 되돌아온다 — 완료 문서를 다시 초안으로
     assert (
@@ -92,7 +93,7 @@ async def test_s2_minjun_reads_completes_and_connects_mcp(
         == 200
     )
     user = AccountService(scoped).authenticate_token(tok["token"])
-    assert user is not None and user.github_login == "minjun"
+    assert user is not None and user.github_login == "hoyoung"
     ctx = tools.current_user_id.set(user.id)
     try:
         async with Client(tools.server) as mcp_client:

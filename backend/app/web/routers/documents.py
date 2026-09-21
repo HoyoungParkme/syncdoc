@@ -25,7 +25,7 @@ router = APIRouter(prefix="/api/docs", tags=["documents"])
 @router.get("/{doc_id}", response_model=Document)
 async def get_document(doc_id: str, user: User = Depends(current_user)) -> Document:
     """SYNC-API-001#GET/api/docs/{docId}"""
-    return Document.of(await queries.document_view(doc_id))
+    return Document.of(await queries.document_view(doc_id, user))
 
 
 def _human(user: User) -> Author:
@@ -69,7 +69,7 @@ async def change_status(
     토글. 완료로 올릴 때 규약 오류·미완성·끊어진 참조가 있으면 status-blocked (UC-H8 1a).
     """
     d = await pipeline.change_status(doc_id, DocStatus(req.to), user, req.reason)
-    return DocumentSummary.of(await queries.document_view(d.doc_id))
+    return DocumentSummary.of(await queries.document_view(d.doc_id, user))
 
 
 @router.get("/{doc_id}/diff", response_model=Diff)
@@ -80,7 +80,7 @@ async def diff(
     user: User = Depends(current_user),
 ) -> Diff:
     """SYNC-API-001#GET/api/docs/{docId}/diff"""
-    return Diff.model_validate(await queries.diff_with_impact(doc_id, from_, to))
+    return Diff.model_validate(await queries.diff_with_impact(doc_id, from_, to, user))
 
 
 @router.get("/{doc_id}/versions", response_model=list[Version])
@@ -108,7 +108,7 @@ async def versions(
 @router.get("/{doc_id}/downstream", response_model=DownstreamView)
 async def downstream(doc_id: str, user: User = Depends(current_user)) -> DownstreamView:
     """SYNC-API-001#GET/api/docs/{docId}/downstream"""
-    return DownstreamView.of(await queries.downstream_view(doc_id))
+    return DownstreamView.of(await queries.downstream_view(doc_id, user))
 
 
 @router.post("/{doc_id}/revert", response_model=SaveResult, status_code=201)

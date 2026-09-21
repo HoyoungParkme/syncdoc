@@ -27,7 +27,7 @@ def _seed(scoped: Session):
 
 
 def test_get_document_upstream_references(client: TestClient, scoped: Session) -> None:
-    login(client, scoped, "minjun")
+    login(client, scoped, "hoyoung")  # make_project의 소유자
     _seed(scoped)
     d = client.get("/api/docs/EXMP-PRD-001").json()
     assert (d["doc_id"], d["stage"], d["status"], d["current_version_no"], d["commit_hash"]) == (
@@ -109,3 +109,19 @@ async def test_change_status_via_api(client: TestClient, scoped: Session, proj) 
     )
     r = client.post("/api/docs/EXMP-RFQ-001/status", json={"to": "approved"})
     assert r.status_code == 409 and r.json()["type"] == "urn:syncdoc:status-blocked"
+
+
+def test_other_owner_document_is_not_found(client: TestClient, scoped: Session) -> None:
+    """R12 — 남의 프로젝트 문서는 없는 것과 같다. 없는 문서와 답이 구분되지 않는다(UC-A2 1a)."""
+    _seed(scoped)
+    login(client, scoped, "minjun")
+    r = client.get("/api/docs/EXMP-PRD-001")
+    assert r.status_code == 404 and r.json()["type"] == "urn:syncdoc:not-found"
+    assert (r.json()["resource"], r.json()["id"]) == ("project", "EXMP")
+    assert client.get("/api/docs/EXMP-PRD-001/items/R1/references").status_code == 404
+    assert client.get("/api/docs/EXMP-PRD-001/downstream").status_code == 404
+    assert client.post("/api/docs/EXMP-PRD-001/status", json={"to": "approved"}).status_code == 404
+    assert client.delete("/api/docs/EXMP-PRD-001").status_code == 404
+    # 소유자에게는 그대로 열린다
+    login(client, scoped, "hoyoung")
+    assert client.get("/api/docs/EXMP-PRD-001").status_code == 200
