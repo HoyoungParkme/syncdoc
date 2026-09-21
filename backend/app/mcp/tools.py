@@ -300,7 +300,8 @@ def _block_structure(std_text: str, doc_type: str, title_key: str | None) -> str
 @server.tool(
     description="문서 타입의 템플릿과 작성 규약을 돌려준다. create_document 전에 반드시 부른다. 반환에는 (1) 그 타입의 "
     "항목 ID 패턴·필수 절·항목 블록 구조, (2) 템플릿 MD 뼈대, (3) 채워진 예시가 담긴다. 항목은 ID로 시작하는 헤딩이어야 "
-    "하고, 표 행은 항목이 아니며, 번호에 패딩을 두지 않는다는 공통 규약도 함께 온다."
+    "하고, 표 행은 항목이 아니며, 번호에 패딩을 두지 않는다는 공통 규약도 함께 온다. 템플릿은 싱크독에 내장된 최신 것이다 — "
+    "저장소의 docs/specs/_templates/ 사본이 아니다."
 )
 async def get_template(project_code: str, doc_type: str) -> CallToolResult:
     """SYNC-API-002#get_template"""
@@ -311,7 +312,11 @@ async def get_template(project_code: str, doc_type: str) -> CallToolResult:
             # 소유한 프로젝트만 연다 — 남의 것은 없는 것과 같다 (MS-001 get_owned)
             project = ProjectService(s).get_owned(project_code, _user(s))
             workdir = Path(project.repository.workdir_path)
-        template = await _read_spec_file(workdir, f"docs/specs/_templates/{doc_type}.md")
+        # 템플릿은 앱에 내장된 것이 먼저다 — 저장소 사본은 init 때 복사된 뒤 다시 맞춰지지 않아
+        # 규약이 바뀌면 낡은 채 남는다 (#94). 내장에 없는 타입만 저장소 사본으로.
+        template = await _read_spec_file(
+            workdir, f"docs/specs/_templates/{doc_type}.md", prefer_builtin=True
+        )
         # 규약 문서 이름에도 프로젝트 코드가 들어간다 (STD-001 1.1) — 고정하면 SYNC 밖에서 늘 404 (#8).
         # 저장소에 없으면 싱크독 것으로 떨어진다 — 다른 프로젝트는 싱크독 STD를 그대로 쓴다 (STD-001 2.12)
         std = await _read_spec_file(
@@ -337,12 +342,19 @@ async def get_template(project_code: str, doc_type: str) -> CallToolResult:
     )
 
 
-async def _read_spec_file(workdir: Path, path: str, fallback: str | None = None) -> str:
+async def _read_spec_file(
+    workdir: Path, path: str, fallback: str | None = None, *, prefer_builtin: bool = False
+) -> str:
     """프로젝트 저장소의 파일. 없으면 앱에 내장된 사본(docs/specs/)으로.
 
     `fallback`은 내장 사본의 이름이 다를 때 쓴다 — 규약 문서는 프로젝트마다 이름이 다르지만
     내장된 것은 싱크독 것 하나뿐이다.
+    `prefer_builtin`이면 순서를 뒤집는다 — 내장 사본이 먼저, 저장소는 내장에 없을 때만 (#94).
     """
+    if prefer_builtin:
+        local = _APP_SPECS / path.removeprefix("docs/specs/")
+        if local.exists():
+            return local.read_text(encoding="utf-8")
     try:
         return await git.read(workdir, path)
     except (git.GitError, OSError):  # 작업 사본이 없거나(OSError) 파일이 없으면(GitError) 내장 사본

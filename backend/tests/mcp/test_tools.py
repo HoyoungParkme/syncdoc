@@ -141,6 +141,8 @@ async def test_get_template_reads_the_project_own_std_document(
     assert not err
     assert "docs/specs/STD/EXMP-STD-001.md" in asked
     assert "docs/specs/STD/SYNC-STD-001.md" not in asked
+    # 템플릿은 저장소를 묻지 않는다 — 내장된 최신 것이 먼저다 (#94, 카드 X)
+    assert "docs/specs/_templates/PRD.md" not in asked
     # 저장소에 없으면 싱크독 내장 사본으로 떨어진다 (STD-001 2.12)
     assert t["common_rules"] and t["template"]
 
