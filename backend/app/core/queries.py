@@ -1,9 +1,9 @@
 """SYNC-MS-008 — queries. 읽기 조합. 서비스는 자기 묶음만 알고 여기서 ID로 잇는다. 쓰지 않는다.
 
 B1: project_summary · document_list · document_view · item_view.
-B2: project_detail · item_references_view · upstream_checklist.
-B3: todo · decision_view · flag_view · project_items · diff_with_impact.
+B2: project_detail · item_references_view. B3: project_items · diff_with_impact.
 B4: graph_view · downstream_view · document_view 4a. 세션은 db.session_scope().
+카드 V가 플래그·댓글·전파 조회(todo·decision_view·flag_view·upstream_checklist)를 걷어냈다.
 """
 
 from __future__ import annotations
@@ -11,31 +11,24 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app import db
-from app.core.account.models import User
 from app.core.account.service import AccountService
-from app.core.collab.service import CommentService
 from app.core.project.models import Project
 from app.core.project.service import ProjectService
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
-from app.core.tracking.service import TrackingService
 from app.core.types import (
     STAGE_OF,
-    AffectedItem,
     ApiAuthor,
     AuthorRef,
+    BrokenRefSummary,
     ChainItem,
     ChainRow,
-    DecisionDetail,
     Diff,
     DocStatus,
     Document,
     DocumentSummary,
     DownstreamDoc,
     DownstreamView,
-    FlagDetail,
-    FlagKind,
-    FlagSummary,
     Graph,
     GraphEdge,
     GraphNode,
@@ -44,28 +37,23 @@ from app.core.types import (
     ItemRef,
     ItemReferences,
     ItemView,
-    PendingDecision,
     ProjectDetail,
     ProjectSummary,
     RefEdge,
     StageSummary,
-    Todo,
-    UpstreamCheck,
     UserRef,
-    Version,
 )
 
-_ORDER = {"draft": 0, "review": 1, "approved": 2}
+_ORDER = {"draft": 0, "approved": 1}  # 둘뿐이다 — 하나라도 초안이면 초안 (UC-H14 1a)
 
 
 def _summarize(
-    project: Project,
-    docs: list[DocumentSummary],
-    flags: dict[str, int],
-    unresolved: int,
-    per_doc: dict[int, dict[str, int]],
+    project: Project, docs: list[DocumentSummary], per_doc: dict[int, int]
 ) -> ProjectSummary:
-    """단계 11칸 계산(UC-H14 1a·1b). per_doc은 문서별 플래그 건수 — 단계 테두리(UI-2 2.2)에 쓴다."""
+    """단계 11칸 계산(UC-H14 1a·1b).
+
+    per_doc은 문서별 미존재 참조 수 — 단계 테두리(UI-2 2.2)에 쓴다.
+    """
     stages: list[StageSummary] = []
     for doc_type, n in STAGE_OF.items():
         stage_docs = [d for d in docs if d.stage == n]
@@ -73,14 +61,10 @@ def _summarize(
         gate = bool(stage_docs) and any(
             s.doc_count > 0 and s.status != DocStatus.approved for s in stages
         )
-        flag_count = sum(sum(per_doc.get(d.id, {}).values()) for d in stage_docs)
-        stages.append(StageSummary(n, doc_type, status, len(stage_docs), gate, flag_count))
+        broken = sum(per_doc.get(d.id, 0) for d in stage_docs)
+        stages.append(StageSummary(n, doc_type, status, len(stage_docs), gate, broken))
     counts = {
-        "needs_check": flags.get("needs_check", 0),
-        "broken_ref": flags.get("broken_ref", 0),
-        # 세 종류를 다 싣는다. 빼면 내 할 일에는 뜨는데 요약에는 안 잡힌다 (UI-4 3.6)
-        "upstream_impact": flags.get("upstream_impact", 0),
-        "unresolved_comments": unresolved,
+        "broken_ref": sum(per_doc.values()),  # 위에서 뜬 것을 다시 쓴다 (MS-008)
         "convention_errors": sum(d.has_convention_error for d in docs),
         "incomplete": sum(bool(d.incomplete_warnings) for d in docs),
     }
@@ -115,11 +99,9 @@ async def project_summary() -> list[ProjectSummary]:
         out = []
         for p in ProjectService(s).list_projects():
             docs = SpecService(s).list_by_project(p.id)
-            flags = TrackingService(s).count_flags(p.id)
             # 프로젝트당 한 번. 단계마다 부르면 같은 프로젝트를 11번 훑는다
-            per_doc = TrackingService(s).count_flags_by_document([d.id for d in docs])
-            unresolved = CommentService(s).count_unresolved(p.id)
-            out.append(_summarize(p, docs, flags, unresolved, per_doc))
+            per_doc = ReferenceService(s).count_missing_by_document([d.id for d in docs])
+            out.append(_summarize(p, docs, per_doc))
         out.sort(key=lambda x: (x.updated_at is not None, x.updated_at), reverse=True)
         return out
 
@@ -164,15 +146,9 @@ async def document_list(
         project = ProjectService(s).get(code)
         docs = SpecService(s).list_by_project(project.id, stage, status)
         ids = [d.id for d in docs]
-        flags = TrackingService(s).count_flags_by_document(ids)
-        comments = CommentService(s).count_unresolved_by_document(ids)
+        missing = ReferenceService(s).count_missing_by_document(ids)  # 쿼리 한 번 (N+1 금지)
         for d in docs:
-            f = flags.get(d.id, {})
-            d.counts = {
-                "needs_check": f.get("needs_check", 0),
-                "broken_ref": f.get("broken_ref", 0),
-                "unresolved_comments": comments.get(d.id, 0),
-            }
+            d.counts = {"broken_ref": missing.get(d.id, 0)}
             d.author = _api_author(s, d.last_author)
         return docs
 
@@ -191,19 +167,25 @@ async def document_view(doc_id: str) -> Document:
     """SYNC-MS-008#queries.document_view"""
     with db.session_scope() as s:
         doc = SpecService(s).get_document(doc_id)
-        flags = TrackingService(s).flags_for_items([i.pk for i in doc.items])
-        for item in doc.items:
-            item.flags = [f.kind for f in flags.get(item.pk, [])]
         doc.prev_doc_id, doc.next_doc_id = SpecService(s).neighbors(doc_id)
-        # 4a — 유저용 탭이 링크를 회색 ?로, 미완성 배너가 승인 못 하는 이유로.
-        # 중복은 접는다: 승인 게이트가 보는 값과 같아야 한다(MS-007 change_status 2단계)
-        doc.missing_refs = sorted(
-            dict.fromkeys(
-                e.raw_target
-                for e in ReferenceService(s).upstream_of_document(doc.id, include_missing=True)
-                if e.is_missing
-            )
-        )
+        # 4a — 유저용 탭이 링크를 회색 ?로, 미완성 배너가 완료 못 하는 이유로.
+        # 중복은 접는다: 완료 게이트가 보는 값과 같아야 한다(MS-007 change_status 2단계)
+        missing = [
+            e
+            for e in ReferenceService(s).upstream_of_document(doc.id, include_missing=True)
+            if e.is_missing
+        ]
+        doc.missing_refs = sorted(dict.fromkeys(e.raw_target for e in missing))
+        # 항목마다 자기 것 — UI-5 6.1 표시된 항목의 근거. 절 본문에서 온 것은 항목이 없다
+        by_item: dict[int, list[str]] = {}
+        for e in missing:
+            if e.from_item_pk is None:
+                continue
+            targets = by_item.setdefault(e.from_item_pk, [])
+            if e.raw_target not in targets:
+                targets.append(e.raw_target)
+        for item in doc.items:
+            item.missing_refs = by_item.get(item.pk, [])
         doc.author = _api_author(s, doc.last_author)
         # 브레드크럼은 코드가 아니라 이름으로 시작한다 — 사람이 부르는 이름이 프로젝트다
         doc.project_name = ProjectService(s).get(doc_id.split("-")[0]).name
@@ -213,34 +195,7 @@ async def document_view(doc_id: str) -> Document:
 async def item_view(doc_id: str, item_id: str) -> ItemView:
     """SYNC-MS-008#queries.item_view"""
     with db.session_scope() as s:
-        v = SpecService(s).get_item(doc_id, item_id)
-        v.flags = [f.kind for f in TrackingService(s).flags_for_items([v.pk]).get(v.pk, [])]
-        return v
-
-
-def flag_summaries(s: Session, rows: list) -> list[FlagSummary]:
-    """Flag 행 → FlagSummary. target·cause는 describe_items, assignee는 users_by_ids. 각 한 번."""
-    spec = SpecService(s)
-    names = spec.describe_items(
-        [f.target_item_id for f in rows] + [f.cause_item_id for f in rows if f.cause_item_id]
-    )
-    users = AccountService(s).users_by_ids([f.assignee_user_id for f in rows if f.assignee_user_id])
-    versions = spec.versions_by_ids([f.cause_version_id for f in rows if f.cause_version_id])
-    return [
-        FlagSummary(
-            id=f.id,
-            kind=f.kind,
-            target=names.get(f.target_item_id) or ItemRef(None, None, None),
-            cause=names.get(f.cause_item_id) if f.cause_item_id else None,
-            cause_version_no=(
-                versions[f.cause_version_id].version_no if f.cause_version_id in versions else None
-            ),
-            assignee=users.get(f.assignee_user_id) if f.assignee_user_id else None,
-            raised_at=f.raised_at,
-            resolved_at=f.resolved_at,
-        )
-        for f in rows
-    ]
+        return SpecService(s).get_item(doc_id, item_id)
 
 
 def _doc_refs(spec: SpecService, document_ids: list[int]) -> dict[int, ItemRef]:
@@ -286,41 +241,7 @@ async def item_references_view(doc_id: str, item_id: str) -> ItemReferences:
                 downstream.append(
                     ItemRef(r.doc_id, r.item_id, r.display_name, raw_target=e.raw_target)
                 )
-        rows = TrackingService(s).flags_for_items([pk]).get(pk, [])
-        return ItemReferences(doc_id, item_id, upstream, downstream, flag_summaries(s, rows))
-
-
-async def upstream_checklist(doc_id: str) -> list[UpstreamCheck]:
-    """SYNC-MS-008#queries.upstream_checklist"""
-    with db.session_scope() as s:
-        spec, refs = SpecService(s), ReferenceService(s)
-        doc = spec.get_document(doc_id)
-        by_item = {i.pk: i.item_id for i in doc.items}
-        grouped: dict[tuple[str, int], list[str]] = {}
-        for e in refs.upstream_of_document(doc.id):
-            key = ("item", e.to_item_pk) if e.to_item_pk else ("doc", e.to_document_id)
-            src = by_item.get(e.from_item_pk, "(문서)") if e.from_item_pk else "(문서)"
-            if src not in grouped.setdefault(key, []):
-                grouped[key].append(src)
-        item_names = spec.describe_items([k[1] for k in grouped if k[0] == "item"])
-        doc_names = _doc_refs(spec, [k[1] for k in grouped if k[0] == "doc"])
-        out: list[UpstreamCheck] = []
-        for (kind, pk), sources in grouped.items():
-            ref = (item_names if kind == "item" else doc_names).get(pk)
-            if ref is None or ref.doc_id is None:
-                continue
-            target_doc = spec.get_document(ref.doc_id)
-            out.append(
-                UpstreamCheck(ref, target_doc.current_version_no, target_doc.status, sources)
-            )
-        out.sort(
-            key=lambda u: (
-                STAGE_OF.get(u.target.doc_id.split("-")[1], 99),
-                u.target.doc_id,
-                u.target.item_id or "",
-            )
-        )
-        return out
+        return ItemReferences(doc_id, item_id, upstream, downstream)
 
 
 async def diff_with_impact(doc_id: str, from_no: int, to_no: int) -> Diff:
@@ -342,144 +263,22 @@ async def project_items(code: str, kind: str) -> list:
     with db.session_scope() as s:
         project = ProjectService(s).get(code)
         spec = SpecService(s)
-        if kind in ("needs_check", "broken_ref", "upstream_impact"):
-            return flag_summaries(
-                s, TrackingService(s).flags_in_project(project.id, FlagKind(kind))
-            )
-        if kind == "comments":
-            ids = [d.id for d in spec.list_by_project(project.id)]
-            return CommentService(s).unresolved_in(ids)
+        if kind == "broken_ref":
+            edges = ReferenceService(s).missing_in_project(project.id)
+            names = spec.describe_items([e.from_item_pk for e in edges if e.from_item_pk])
+            docs = _doc_refs(spec, [e.from_document_id for e in edges if e.from_item_pk is None])
+            out: list[BrokenRefSummary] = []
+            for e in edges:
+                src = names.get(e.from_item_pk) if e.from_item_pk else docs.get(e.from_document_id)
+                if src is None:
+                    continue
+                out.append(BrokenRefSummary(src, e.raw_target))
+            return out
         if kind == "convention_errors":
             return spec.list_by_project(project.id, has_convention_error=True)
         if kind == "incomplete":
             return [d for d in spec.list_by_project(project.id) if d.incomplete_warnings]
         raise ValueError(f"unknown kind {kind}")  # 라우터가 enum으로 422를 낸다
-
-
-async def todo(user: User) -> Todo:
-    """SYNC-MS-008#queries.todo"""
-    with db.session_scope() as s:
-        spec, tracking, collab = SpecService(s), TrackingService(s), CommentService(s)
-        nc, br, ui = tracking.flags_for_assignee(user.id)
-        un = tracking.flags_unassigned()
-        summaries = {f.id: f for f in flag_summaries(s, nc + br + ui + un)}  # describe 한 번
-        pick = lambda rows: sorted((summaries[f.id] for f in rows), key=lambda f: f.raised_at)  # noqa: E731
-        mine = spec.versions_instructed_by(tracking.pending_decisions_for(user.id), user.id)
-        vb = spec.versions_by_ids(mine)
-        docs = spec.describe_documents([v.document_id for v in vb.values()])
-        pending = sorted(
-            (
-                PendingDecision(
-                    version_id=v.id,
-                    doc_id=docs[v.document_id].doc_id,
-                    version_no=v.version_no,
-                    message=v.message,
-                    affected_count=tracking.get_decision(v.id).affected_count,
-                    created_at=v.created_at,
-                )
-                for v in vb.values()
-            ),
-            key=lambda p: p.created_at,
-        )
-        errors = spec.convention_error_docs_by(user.id)
-        for d in errors:
-            d.author = _api_author(s, d.last_author)
-        comments = sorted(
-            collab.unresolved_in(spec.documents_authored_by(user.id)), key=lambda c: c.created_at
-        )
-        groups = (pick(nc), pick(br), pick(ui), pending, errors, comments)
-        return Todo(*groups, unassigned=pick(un), total=sum(len(g) for g in groups))
-
-
-async def decision_view(version_id: int) -> DecisionDetail:
-    """SYNC-MS-008#queries.decision_view"""
-    with db.session_scope() as s:
-        spec, tracking, refs = SpecService(s), TrackingService(s), ReferenceService(s)
-        dec = tracking.get_decision(version_id)
-        vb = spec.versions_by_ids([version_id])[version_id]
-        doc_id = spec.describe_documents([vb.document_id])[vb.document_id].doc_id
-        prev_no = vb.version_no - 1
-        # 미결정은 이전 버전이 있을 때만 생긴다(UC-S3 1a) — prev_no == 0은 오지 않는다
-        change_diff = spec.diff(doc_id, prev_no, vb.version_no) if prev_no else Diff(0, 1, [])
-        changed = set(dec.changed_pks)
-        names = spec.describe_items(list(dec.affected_pks) + list(changed))
-        authors: dict[str, AuthorRef | None] = {}
-        affected: list[AffectedItem] = []
-        for pk in dec.affected_pks:
-            ref = names.get(pk)
-            if ref is None:
-                continue
-            if ref.doc_id not in authors:
-                authors[ref.doc_id] = spec.get_document(ref.doc_id).last_author
-            causes = [
-                names[e.to_item_pk].item_id for e in refs.upstream(pk) if e.to_item_pk in changed
-            ]
-            affected.append(
-                AffectedItem(
-                    **vars(ref),
-                    caused_by_items=[c for c in causes if c],
-                    assignee=_user_ref(s, authors[ref.doc_id]),
-                )
-            )
-        version = Version(
-            doc_id=doc_id,
-            version_no=vb.version_no,
-            commit_hash=vb.commit_hash,
-            message=vb.message,
-            author=vb.author,  # type: ignore[arg-type]
-            created_at=vb.created_at,
-            author_view=_api_author(s, vb.author),
-        )
-        return DecisionDetail(version, doc_id, change_diff, affected, dec.choice)
-
-
-def _user_ref(s: Session, ref: AuthorRef | None) -> UserRef | None:
-    return AccountService(s).users_by_ids([ref.user_id]).get(ref.user_id) if ref else None
-
-
-async def flag_view(flag_id: int) -> FlagDetail:
-    """SYNC-MS-008#queries.flag_view"""
-    with db.session_scope() as s:
-        spec, tracking = SpecService(s), TrackingService(s)
-        f = tracking.get_flag(flag_id)
-        base = flag_summaries(s, [f])[0]
-        names = spec.describe_items(
-            [f.target_item_id] + ([f.cause_item_id] if f.cause_item_id else [])
-        )
-        cause = names.get(f.cause_item_id) if f.cause_item_id else None
-        detail = FlagDetail(**vars(base))
-        if f.kind == FlagKind.needs_check and cause and cause.doc_id and base.cause_version_no:
-            cur_no = spec.get_document(cause.doc_id).current_version_no
-            detail.cause_change_count = cur_no - base.cause_version_no
-            # 시작점은 플래그를 만든 변경의 **직전** 버전이다. 부여 시점 버전으로 잡으면
-            # 부여 직후에 v2 → v2가 되어 정작 판단 재료인 그 변경이 안 보인다 (#10)
-            from_no = max(1, base.cause_version_no - 1)
-            detail.cause_diff = (
-                spec.diff(cause.doc_id, from_no, cur_no)
-                if cur_no != from_no
-                else Diff(cur_no, cur_no, [])
-            )
-        elif f.kind == FlagKind.broken_ref and cause:
-            detail.cause_deleted_at = cause.deleted_at
-        elif f.kind == FlagKind.upstream_impact:
-            if cause and cause.doc_id and cause.item_id:
-                detail.cause_body = spec.get_item(cause.doc_id, cause.item_id).body
-            elif f.cause_version_id:
-                vb = spec.versions_by_ids([f.cause_version_id])[f.cause_version_id]
-                doc = spec.describe_documents([vb.document_id])[vb.document_id]
-                detail.cause_body = f"{doc.title} (문서 단위 지목)"
-        target = names[f.target_item_id]
-        assert target.doc_id and target.item_id
-        item = spec.get_item(target.doc_id, target.item_id)
-        detail.target_body, detail.target_version_no = item.body, item.doc_version_no
-        tdoc = spec.get_document(target.doc_id)
-        # 시각 비교가 아니다 — 부여 시점 버전의 **id**와 지금 최신 버전의 id를 견준다.
-        # `datetime.now(UTC)`가 뒤로 갈 수 있어 부여 직후의 버전이 더 옛날로 보였다
-        # (SYNC-STD-004#DEV-18, #17). null이면 바뀌었다고 말할 근거가 없어 False
-        detail.target_changed_since_raise = (
-            f.target_version_id is not None and tdoc.current_version_id != f.target_version_id
-        )
-        return detail
 
 
 async def graph_view(code: str, scope: GraphScope = GraphScope.all) -> Graph:
@@ -492,12 +291,9 @@ async def graph_view(code: str, scope: GraphScope = GraphScope.all) -> Graph:
         project = ProjectService(s).get(code)
         spec, refs = SpecService(s), ReferenceService(s)
         briefs = spec.list_items_by_project(project.id)
-        flags = TrackingService(s).flags_for_items([b.pk for b in briefs if b.item_id])
         if scope is GraphScope.approved:
             ok = {d.doc_id for d in spec.list_by_project(project.id, status=DocStatus.approved)}
             briefs = [b for b in briefs if b.doc_id in ok]
-        elif scope is GraphScope.flagged:
-            briefs = [b for b in briefs if b.item_id and flags.get(b.pk)]
         item_ids = {b.pk: f"{b.doc_id}#{b.item_id}" for b in briefs if b.item_id}
         doc_ids = {b.pk: b.doc_id for b in briefs if b.item_id is None}
         edges = refs.references_among(set(item_ids), include_document_targets=True)
@@ -508,7 +304,6 @@ async def graph_view(code: str, scope: GraphScope = GraphScope.all) -> Graph:
                 b.item_id,
                 b.stage,
                 True,
-                bool(flags.get(b.pk)),
             )
             for b in briefs
         }
@@ -535,7 +330,7 @@ async def graph_view(code: str, scope: GraphScope = GraphScope.all) -> Graph:
                 touched.add(dst)
         return Graph(
             nodes=[
-                GraphNode(n.id, n.doc_id, n.item_id, n.stage, n.id not in touched, n.has_flag)
+                GraphNode(n.id, n.doc_id, n.item_id, n.stage, n.id not in touched)
                 for n in nodes.values()
             ],
             edges=out_edges,
@@ -570,7 +365,6 @@ async def item_chain(doc_id: str, item_id: str) -> ItemChain:
         ups = _closure(pk, refs.upstream)
         downs = _closure(pk, refs.downstream)
         described = spec.describe_items([*ups, *downs, pk])
-        flags = TrackingService(s).flags_for_items([*ups, *downs, pk])
         doc_ids = {r.doc_id for r in described.values() if r.doc_id}
         statuses = {did: spec.get_document(did).status for did in doc_ids}
         by_stage: dict[int, list[ChainItem]] = {}
@@ -586,7 +380,7 @@ async def item_chain(doc_id: str, item_id: str) -> ItemChain:
             if stage is None:
                 continue  # STD는 단계 밖이라 체인에 안 놓는다
             by_stage.setdefault(stage, []).append(
-                ChainItem(ref, role, statuses.get(ref.doc_id, "draft"), bool(flags.get(p_)))
+                ChainItem(ref, role, statuses.get(ref.doc_id, "draft"))
             )
         types = ["RFQ", "PRD", "SCN", "UC", "INFRA", "DOM", "UI", "API", "SEQ", "MS", "CODE"]
         return ItemChain(

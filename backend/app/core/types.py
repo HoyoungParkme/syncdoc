@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from app.core.account.models import AccessToken, User
 
@@ -30,8 +30,7 @@ class DocType(StrEnum):
 
 class DocStatus(StrEnum):
     draft = "draft"
-    review = "review"
-    approved = "approved"
+    approved = "approved"  # 라벨 「완료」. 둘뿐이다 — 카드 V
 
 
 class AuthorKind(StrEnum):
@@ -39,26 +38,11 @@ class AuthorKind(StrEnum):
     agent = "agent"
 
 
-class FlagKind(StrEnum):
-    needs_check = "needs_check"
-    broken_ref = "broken_ref"
-    upstream_impact = "upstream_impact"
-
-
-class Propagation(StrEnum):
-    propagate = "propagate"
-    skip = "skip"
-    undecided = "undecided"
-
-
 class Entry(StrEnum):
     mcp = "mcp"
     web_revert = "web_revert"
     web_status = "web_status"
     github = "github"
-    # 추적 데이터 백업 커밋의 작성 경로. versions.via에 안 닿는다 — 백업은 버전 행을
-    # 안 만든다 (SYNC-INFRA-001 6.1, #16)
-    backup = "backup"
 
 
 def fold_via(entry: Entry) -> str:
@@ -91,12 +75,15 @@ class StageSummary:
     status: str | None
     doc_count: int
     gate_warning: bool = False
-    flag_count: int = 0
+    broken_count: int = 0  # 그 단계 문서들의 미존재 참조 합 — UI-2 2.2 테두리
 
 
 @dataclass
 class ProjectSummary:
-    """SYNC-API-001 ProjectSummary. stages는 항상 11개."""
+    """SYNC-API-001 ProjectSummary. stages는 항상 11개.
+
+    counts는 broken_ref·convention_errors·incomplete 셋 (카드 V).
+    """
 
     code: str
     name: str
@@ -131,10 +118,6 @@ class RepoStatus:
     synced_at: datetime | None
     behind_by: int | None
     fetched_at: datetime | None = None  # behind_by를 잰 시각. 화면이 "언제 기준인지"를 보여준다
-    # backup/tracking.json의 마지막 커밋 시각(UI-14 2.4). DB가 아니라 git에서 읽는다 —
-    # DB를 잃어도 남아야 하는 값이다 (INFRA 6.1, #16)
-    backed_up_at: datetime | None = None
-    backup_stale: bool = False  # 주기의 두 배가 넘게 지났나. 화면은 주기를 모른다
     error: str | None = None  # fetch 실패 사유. API 스키마에 없다 — UI-14에 표시(MS-001, 보고)
 
 
@@ -147,61 +130,6 @@ class RebuildResult:
     references: int
     versions: int
     convention_errors: list[dict[str, str]] = field(default_factory=list)
-    # 새 버전에 이어 붙일 수 없어 버린 추적 행. 비어 있는 것이 정상이다 (#38)
-    dropped: list[dict[str, object]] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
-class RestoreFlag:
-    """백업에서 읽어 **pk로 이미 푼** flags 한 행 (SYNC-DOM-002 2.8).
-
-    자연키를 푸는 것은 pipeline의 몫이다 — 추적 묶음은 문서·항목을 모른다.
-    """
-
-    kind: str
-    target_item_id: int
-    cause_item_id: int | None
-    cause_version_id: int | None
-    target_version_id: int | None
-    assignee_user_id: int | None
-    raised_at: datetime
-    resolved_by_user_id: int | None
-    resolved_at: datetime | None
-    resolved_with_edit: bool | None
-
-
-@dataclass(frozen=True)
-class RestoreDecision:
-    """같음. reason이 없다 — 백업에 안 싣는다(INFRA 6.1)."""
-
-    version_id: int
-    choice: str
-    affected_pks: list[int]
-    changed_pks: list[int]
-    decided_by_user_id: int | None
-    decided_at: datetime | None
-
-
-@dataclass
-class RestoreResult:
-    """SYNC-API-001 RestoreResult.
-
-    dropped가 RebuildResult와 같은 모양이라 UI-14 5.3을 그대로 쓴다.
-    """
-
-    flags: int = 0
-    decisions: int = 0
-    comments: int = 0
-    skipped: int = 0
-    dropped: list[dict[str, object]] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
-class RelinkResult:
-    """SYNC-MS-004#TrackingService.relink_versions — 다시 이은 수와 버린 것."""
-
-    relinked: int
-    dropped: list[dict[str, object]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -300,7 +228,8 @@ class DocItem:
     pk: int
     item_id: str
     display_name: str | None
-    flags: list[str] = field(default_factory=list)
+    # 이 항목이 가리키는데 없는 대상(raw_target). UI-5 6.1 표시된 항목의 근거 (카드 V)
+    missing_refs: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -345,11 +274,11 @@ class DocumentSummary:
 
 @dataclass
 class Document(DocumentSummary):
-    """SYNC-API-001 Document. items[].flags·prev/next는 queries.document_view가 붙인다."""
+    """SYNC-API-001 Document. items[].missing_refs·prev/next는 queries.document_view가 붙인다."""
 
     body: str = ""
     commit_hash: str | None = None  # 최근 버전의 커밋 (API-002 get_document)
-    current_version_id: int | None = None  # 최근 versions.id — detect_impact의 prev
+    current_version_id: int | None = None  # 최근 versions.id
     missing_refs: list[str] = field(default_factory=list)  # queries.document_view 4a가 채운다(B4)
     convention_error_detail: str | None = None
     items: list[DocItem] = field(default_factory=list)
@@ -367,7 +296,6 @@ class ItemView:
     body: str
     doc_status: str
     doc_version_no: int
-    flags: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -380,7 +308,7 @@ class ItemRef:
     raw_target: str = ""
     is_missing: bool = False
     is_deleted: bool = False
-    deleted_at: datetime | None = None  # API에 없음 — flag_view의 cause_deleted_at용(보고)
+    deleted_at: datetime | None = None  # API에 없음 — 내부용(DOM-002 2.8)
 
 
 @dataclass(frozen=True)
@@ -459,120 +387,25 @@ class VersionBrief:
     author: AuthorRef | None = None
 
 
-@dataclass(frozen=True)
-class PendingDecision:
-    """SYNC-API-001 Todo.pending_decisions[]."""
-
-    version_id: int
-    doc_id: str
-    version_no: int
-    message: str
-    affected_count: int
-    created_at: datetime
-
-
-@dataclass
-class Todo:
-    """SYNC-API-001 Todo — 여섯 묶음 + 담당 미지정. total은 unassigned 제외."""
-
-    needs_check: list[FlagSummary]
-    broken_ref: list[FlagSummary]
-    upstream_impact: list[FlagSummary]
-    pending_decisions: list[PendingDecision]
-    convention_errors: list[DocumentSummary]
-    unresolved_comments: list[CommentSummary]
-    unassigned: list[FlagSummary]
-    total: int
-
-
-@dataclass
-class AffectedItem(ItemRef):
-    """SYNC-API-001 DecisionDetail.affected[] — ItemRef + 어느 변경 항목의 하위인지 + 담당."""
-
-    caused_by_items: list[str] = field(default_factory=list)
-    assignee: UserRef | None = None
-
-
-@dataclass
-class DecisionDetail:
-    """SYNC-API-001 DecisionDetail."""
-
-    version: Version
-    doc_id: str
-    change_diff: Diff
-    affected: list[AffectedItem]
-    choice: str
-
-
 @dataclass
 class ItemReferences:
     doc_id: str
     item_id: str
     upstream: list[ItemRef]
     downstream: list[ItemRef]
-    flags: list[FlagSummary]
-
-
-@dataclass
-class UpstreamCheck:
-    target: ItemRef
-    target_version_no: int
-    target_status: str
-    referenced_from: list[str]
-
-
-@dataclass
-class FlagSummary:
-    """SYNC-API-001 FlagSummary — Flag 행에 ItemRef·UserRef를 채운 것.
-
-    assignee_id는 API에 없다 — TrackingService.resolve가 돌려줄 때 UserRef는 입구(라우터)가
-    users_by_ids로 채운다(AuthorRef→Author와 같은 방식. tracking은 account를 못 부른다, 3.2).
-    """
-
-    id: int
-    kind: str
-    target: ItemRef
-    cause: ItemRef | None
-    cause_version_no: int | None
-    assignee: UserRef | None
-    raised_at: datetime
-    resolved_at: datetime | None
-    assignee_id: int | None = None
-
-
-@dataclass
-class FlagDetail(FlagSummary):
-    """SYNC-API-001 FlagDetail — FlagSummary + 원인 diff·내 항목 본문.
-
-    cause_deleted_at(broken_ref)·cause_body(upstream_impact)는 MS-008 flag_view 4·4a에만 있고
-    API 스키마에는 없다(보고).
-    """
-
-    cause_diff: Diff | None = None
-    cause_change_count: int = 0
-    target_body: str = ""
-    target_version_no: int = 0  # UI-11 3.2 "v7" — 문서 API를 또 부르지 않게 (MS-008 5단계)
-    target_changed_since_raise: bool = False
-    cause_deleted_at: datetime | None = None
-    cause_body: str | None = None
 
 
 @dataclass(frozen=True)
-class DecisionResult:
-    """SYNC-DOM-002 2.8 DecisionResult — record_decision."""
+class BrokenRefSummary:
+    """SYNC-API-001 BrokenRefSummary — UI-4 목록 다이얼로그(6)의 끊어진 참조 한 행.
 
-    choice: str
-    flags_raised: int
+    source는 참조가 시작된 항목. 절 본문·frontmatter에서 온 참조면 item_id=None
+    (MS-008 project_items 2).
+    """
 
-
-@dataclass
-class CommentSummary:
-    id: int
-    doc_id: str
-    line_no: int
-    excerpt: str
-    author: UserRef | None
-    created_at: datetime
+    source: ItemRef
+    raw_target: str
+    type: Literal["broken_ref"] = "broken_ref"
 
 
 @dataclass(frozen=True)
@@ -592,7 +425,6 @@ class ChainItem:
     ref: ItemRef
     role: str  # upstream | self | downstream. 단계 번호가 아니라 폐포 방향으로 정한다
     status: str
-    has_flag: bool
 
 
 @dataclass(frozen=True)
@@ -618,8 +450,7 @@ class GraphScope(StrEnum):
     """UI-8 범위 — 잘라내는 게 아니라 골라낸다 (SYNC-UI-001#UI-8 7장 3)."""
 
     all = "all"
-    approved = "approved"  # 문서 상태가 승인인 문서의 항목만
-    flagged = "flagged"  # 미해결 플래그가 붙은 항목만
+    approved = "approved"  # 문서 상태가 완료인 문서의 항목만. 범위는 이 둘뿐이다
 
 
 @dataclass(frozen=True)
@@ -631,7 +462,6 @@ class GraphNode:
     item_id: str | None
     stage: int | None
     isolated: bool
-    has_flag: bool = False  # UI-8 3.1 — 미해결 플래그가 붙은 항목
 
 
 @dataclass(frozen=True)
@@ -679,7 +509,6 @@ class SaveResult:
     version_no: int
     commit_hash: str
     status: str
-    pending_decision_version_id: int | None
     warnings: list[str] = field(default_factory=list)
     next_step: str | None = None  # mcp만 — 사람에게 보여주고 멈추라는 한 문장 (STD-001 1.8)
 
@@ -689,7 +518,6 @@ class SaveResult:
             "version_no": self.version_no,
             "commit_hash": self.commit_hash,
             "status": self.status,
-            "pending_decision_version_id": self.pending_decision_version_id,
             "warnings": self.warnings,
             "next_step": self.next_step,
         }

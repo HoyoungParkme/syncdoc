@@ -1,4 +1,4 @@
-"""SYNC-MS-008 테스트 관점 — queries (B1 넷)."""
+"""SYNC-MS-008 테스트 관점 — queries. 카드 V로 플래그·댓글·전파 조회는 사라졌다."""
 
 import pytest
 from sqlalchemy import text
@@ -8,10 +8,8 @@ from app.core import queries
 from app.core.errors import NotFound
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
-from app.core.tracking.service import TrackingService
-from app.core.types import DocType, GraphScope, Propagation
-from tests.core.collab.test_service import _comment
-from tests.core.reference.test_service import PRD, RFQ
+from app.core.types import BrokenRefSummary, DocType, GraphScope
+from tests.core.reference.test_service import PRD, RFQ, UPSTREAM
 from tests.core.spec.test_service import author, make_project
 
 
@@ -29,8 +27,8 @@ async def test_project_summary_stages_counts_order(scoped: Session) -> None:
     _mk(svc, p.id, "EXMP-RFQ-001", "RFQ", "approved", a=a)
     _mk(svc, p.id, "EXMP-PRD-001", "PRD", "approved", a=a)
     _mk(svc, p.id, "EXMP-PRD-002", "PRD", "draft", a=a)
-    _mk(svc, p.id, "EXMP-SCN-001", "SCN", "review", a=a)
-    _mk(svc, p.id, "EXMP-UC-001", "UC", "draft", a=a)  # 3단계 검토중인데 4단계 문서 → gate
+    _mk(svc, p.id, "EXMP-SCN-001", "SCN", "draft", a=a)
+    _mk(svc, p.id, "EXMP-UC-001", "UC", "draft", a=a)  # 3단계 초안인데 4단계 문서 → gate
     _mk(svc, p.id, "EXMP-STD-001", "STD", a=a)
     scoped.execute(
         text("UPDATE documents SET has_convention_error=true WHERE doc_id='EXMP-UC-001'")
@@ -45,37 +43,34 @@ async def test_project_summary_stages_counts_order(scoped: Session) -> None:
     assert by["RFQ"].gate_warning is False and by["PRD"].gate_warning is False
     assert by["UC"].gate_warning is True and by["SCN"].gate_warning is True  # 앞 단계 미승인
     assert [d.doc_id for d in x.std_docs] == ["EXMP-STD-001"] and by["CODE"].doc_count == 0
-    # 여섯 칸. 플래그 세 종류를 다 센다 (UI-4 3.6)
-    assert x.counts == {
-        "needs_check": 0,
-        "broken_ref": 0,
-        "upstream_impact": 0,
-        "unresolved_comments": 0,
-        "convention_errors": 1,
-        "incomplete": 0,
-    }
-    assert all(s.flag_count == 0 for s in x.stages)
+    # 세 칸 (UI-4 3.2·3.4·3.5). 플래그·댓글은 없다 — 카드 V
+    assert x.counts == {"broken_ref": 0, "convention_errors": 1, "incomplete": 0}
+    assert all(s.broken_count == 0 for s in x.stages)
     assert x.remote_url == "https://x/r.git" and x.updated_at is not None
 
 
-async def test_project_summary_stage_flag_count_sums_documents(scoped: Session) -> None:
-    """UI-2 2.2 테두리 — 한 단계에 플래그 있는 문서가 둘이면 그 단계는 둘의 합."""
-    svc, ref, tr = SpecService(scoped), ReferenceService(scoped), TrackingService(scoped)
+async def test_project_summary_stage_broken_count_sums_documents(scoped: Session) -> None:
+    """한 단계에 미존재 참조 있는 문서 둘 → 그 단계 broken_count가 둘의 합 · counts.broken_ref = 전 단계 합."""
+    svc, ref = SpecService(scoped), ReferenceService(scoped)
     p = make_project(scoped)
     a = author(scoped)
     svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
-    for did in ("EXMP-PRD-001", "EXMP-PRD-002"):  # 둘 다 RFQ#Q1을 참조한다
-        v = svc.create(p.id, did, DocType.PRD, PRD.replace("EXMP-PRD-001", did), "h", a, "spec: x")
-        d = svc.get_document(did)
-        ref.extract(d.id, v.id, d.body, {i.item_id: i.pk for i in d.items}, ["EXMP-RFQ-001"])
-    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
-    tr.raise_broken(q1)  # 끊어진 참조는 가리키는 쪽에 붙는다 — PRD 문서 둘에 하나씩
-    by = {s.doc_type: s for s in (await queries.project_summary())[0].stages}
-    assert (by["PRD"].doc_count, by["PRD"].flag_count) == (2, 2)
-    assert by["RFQ"].flag_count == 0
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
+    d = svc.get_document("EXMP-PRD-001")
+    ref.extract(d.id, v.id, d.body, {i.item_id: i.pk for i in d.items}, ["EXMP-RFQ-001"])
+    body2 = PRD.replace("EXMP-PRD-001", "EXMP-PRD-002").replace(
+        "없는 항목 [[EXMP-RFQ-001#Q9]]", "없는 항목 [[EXMP-RFQ-001#Q8]] · [[EXMP-RFQ-001#Q7]]"
+    )
+    v2 = svc.create(p.id, "EXMP-PRD-002", DocType.PRD, body2, "h2", a, "spec: 테스트")
+    d2 = svc.get_document("EXMP-PRD-002")
+    ref.extract(d2.id, v2.id, d2.body, {i.item_id: i.pk for i in d2.items}, ["EXMP-RFQ-001"])
+    x = next(s for s in await queries.project_summary() if s.code == "EXMP")
+    by = {s.doc_type: s for s in x.stages}
+    assert (by["PRD"].doc_count, by["PRD"].broken_count) == (2, 3)  # Q9 + Q8·Q7
+    assert by["RFQ"].broken_count == 0
+    assert x.counts["broken_ref"] == 3  # 전 단계 합
 
 
-# ── document_list ──
 async def test_project_detail_docs_and_recent_changes_with_names(scoped: Session) -> None:
     svc = SpecService(scoped)
     p = make_project(scoped)
@@ -83,16 +78,16 @@ async def test_project_detail_docs_and_recent_changes_with_names(scoped: Session
     svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec(EXMP-RFQ-001): 초안")
     svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec(EXMP-PRD-001): 초안")
     d = svc.get_document("EXMP-PRD-001")
-    svc.apply_status(d, d.body.replace("status: draft", "status: review"), "c1", a.user, "검토")
+    svc.apply_status(d, d.body.replace("status: draft", "status: approved"), "c1", a.user, None)
     pd = await queries.project_detail("EXMP")
     assert (pd.code, pd.remote_url, [x.doc_id for x in pd.docs]) == (
         "EXMP",
         p.repository.remote_url,
         ["EXMP-RFQ-001", "EXMP-PRD-001"],
     )
-    assert pd.stages[1].status == "review" and pd.docs[1].counts["needs_check"] == 0
+    assert pd.stages[1].status == "approved" and pd.docs[1].counts == {"broken_ref": 0}
     assert [(r.doc_id, r.version_no, r.message.split("\n")[0]) for r in pd.recent_changes] == [
-        ("EXMP-PRD-001", None, "status(EXMP-PRD-001): draft → review"),
+        ("EXMP-PRD-001", None, "status(EXMP-PRD-001): draft → approved"),
         ("EXMP-PRD-001", 1, "spec(EXMP-PRD-001): 초안"),
         ("EXMP-RFQ-001", 1, "spec(EXMP-RFQ-001): 초안"),
     ]
@@ -126,21 +121,18 @@ async def test_project_detail_sync_fields_read_db_without_fetch(
 
 
 async def test_document_list_counts_and_filters(scoped: Session) -> None:
-    svc, ref, tr = SpecService(scoped), ReferenceService(scoped), TrackingService(scoped)
+    svc, ref = SpecService(scoped), ReferenceService(scoped)
     p = make_project(scoped)
     a = author(scoped)
     svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
     v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
     d = svc.get_document("EXMP-PRD-001")
     pks = {i.item_id: i.pk for i in d.items}
-    ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])
-    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
-    tr.raise_broken(q1)
-    _comment(scoped, d.id, a.user.id, 1, "x")
+    ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])  # R1 → Q9 미존재
     got = await queries.document_list("EXMP")
     assert [x.doc_id for x in got] == ["EXMP-RFQ-001", "EXMP-PRD-001"]
-    assert got[1].counts == {"needs_check": 0, "broken_ref": 1, "unresolved_comments": 1}
-    assert got[0].counts == {"needs_check": 0, "broken_ref": 0, "unresolved_comments": 0}
+    assert got[1].counts == {"broken_ref": 1}
+    assert got[0].counts == {"broken_ref": 0}  # 미존재 참조 없는 문서 → 0
     assert got[0].author.user.github_login == "hoyoung" and got[0].author.kind == "agent"
     assert [x.doc_id for x in await queries.document_list("EXMP", stage=2)] == ["EXMP-PRD-001"]
     assert await queries.document_list("EXMP", status="approved") == []
@@ -149,8 +141,8 @@ async def test_document_list_counts_and_filters(scoped: Session) -> None:
 
 
 # ── document_view · item_view ──
-async def test_document_view_and_item_view_flags_neighbors_author(scoped: Session) -> None:
-    svc, ref, tr = SpecService(scoped), ReferenceService(scoped), TrackingService(scoped)
+async def test_document_view_and_item_view_missing_refs_neighbors_author(scoped: Session) -> None:
+    svc, ref = SpecService(scoped), ReferenceService(scoped)
     p = make_project(scoped)
     a = author(scoped)
     svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
@@ -159,25 +151,24 @@ async def test_document_view_and_item_view_flags_neighbors_author(scoped: Sessio
     d = svc.get_document("EXMP-PRD-001")
     pks = {i.item_id: i.pk for i in d.items}
     ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])
-    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
-    tr.raise_broken(q1)  # G1에 broken_ref
     doc = await queries.document_view("EXMP-PRD-001")
-    assert {i.item_id: i.flags for i in doc.items} == {"G1": ["broken_ref"], "R1": []}
+    # 항목마다 자기 미존재 참조 (UI-5 6.1) · 문서 전체는 접은 목록 (4a)
+    assert {i.item_id: i.missing_refs for i in doc.items} == {"G1": [], "R1": ["EXMP-RFQ-001#Q9"]}
+    assert doc.missing_refs == ["EXMP-RFQ-001#Q9"]
     assert (doc.prev_doc_id, doc.next_doc_id) == ("EXMP-RFQ-001", "EXMP-SCN-001")
     assert doc.author.user.github_login == "hoyoung" and doc.author.instructed_by.id == a.user.id
     assert doc.author.via == "mcp" and doc.body == PRD
     first = await queries.document_view("EXMP-RFQ-001")
     assert first.prev_doc_id is None
     iv = await queries.item_view("EXMP-PRD-001", "G1")
-    assert iv.flags == ["broken_ref"] and iv.body.startswith("#### G1 목표")
-    assert (await queries.item_view("EXMP-PRD-001", "R1")).flags == []
+    assert iv.body.startswith("#### G1 목표") and iv.doc_status == "draft"
     with pytest.raises(NotFound):
         await queries.document_view("EXMP-PRD-404")
 
 
-# ── item_references_view · upstream_checklist ──
+# ── item_references_view ──
 async def test_item_references_view_upstream_downstream_missing_document(scoped: Session) -> None:
-    svc, ref, tr = SpecService(scoped), ReferenceService(scoped), TrackingService(scoped)
+    svc, ref = SpecService(scoped), ReferenceService(scoped)
     p = make_project(scoped)
     a = author(scoped)
     svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
@@ -185,18 +176,13 @@ async def test_item_references_view_upstream_downstream_missing_document(scoped:
     d = svc.get_document("EXMP-PRD-001")
     pks = {i.item_id: i.pk for i in d.items}
     ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])
-    rfq = svc.get_document("EXMP-RFQ-001")
-    q1 = next(i.pk for i in rfq.items if i.item_id == "Q1")
-    tr.raise_broken(q1)
     # PRD#G1: 상위 Q1·#R1, 하위 없음
     g1 = await queries.item_references_view("EXMP-PRD-001", "G1")
     assert sorted((r.doc_id, r.item_id) for r in g1.upstream) == [
         ("EXMP-PRD-001", "R1"),
         ("EXMP-RFQ-001", "Q1"),
     ]
-    assert g1.downstream == [] and [f.kind for f in g1.flags] == ["broken_ref"]
-    assert (g1.flags[0].cause.item_id, g1.flags[0].assignee.github_login) == ("Q1", "hoyoung")
-    assert g1.flags[0].cause_version_no is None  # broken_ref는 cause_version이 없다
+    assert g1.downstream == []
     # PRD#R1: 상위 미존재 Q9(raw_target만), 하위 G1(같은 문서 #R1)
     r1 = await queries.item_references_view("EXMP-PRD-001", "R1")
     assert [(r.is_missing, r.raw_target) for r in r1.upstream] == [(True, "EXMP-RFQ-001#Q9")]
@@ -211,33 +197,7 @@ async def test_item_references_view_upstream_downstream_missing_document(scoped:
         await queries.item_references_view("EXMP-PRD-001", "R9")
 
 
-async def test_upstream_checklist_groups_by_target_in_stage_order(scoped: Session) -> None:
-    svc, ref = SpecService(scoped), ReferenceService(scoped)
-    p = make_project(scoped)
-    a = author(scoped)
-    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
-    body = PRD.replace(
-        "없는 항목 [[EXMP-RFQ-001#Q9]]", "근거 [[EXMP-RFQ-001#Q1]] · 둘째 [[EXMP-RFQ-001#Q2]]"
-    )
-    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, body, "h1", a, "spec: 테스트")
-    d = svc.get_document("EXMP-PRD-001")
-    pks = {i.item_id: i.pk for i in d.items}
-    ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])
-    got = await queries.upstream_checklist("EXMP-PRD-001")
-    rows = [
-        (u.target.doc_id, u.target.item_id, u.target_status, u.target_version_no, u.referenced_from)
-        for u in got
-    ]
-    assert rows == [
-        ("EXMP-RFQ-001", None, "draft", 1, ["(문서)"]),  # frontmatter upstream + 절 본문
-        ("EXMP-RFQ-001", "Q1", "draft", 1, ["G1", "R1"]),  # 같은 상위를 두 항목이 참조 → 한 행
-        ("EXMP-RFQ-001", "Q2", "draft", 1, ["R1"]),
-        ("EXMP-PRD-001", "R1", "draft", 1, ["G1"]),  # 같은 문서 참조도 상위
-    ]
-    assert await queries.upstream_checklist("EXMP-RFQ-001") == []  # 참조 없는 문서 → 빈 목록
-
-
-# ── B3: diff_with_impact · todo · decision_view · flag_view · project_items ──
+# ── B3: diff_with_impact · project_items ──
 def _b3(scoped: Session):
     """RFQ(Q1·Q2, rfq-writer) ← PRD(G1→Q1, G1→#R1, prd-writer). 참조 추출까지."""
     svc, ref = SpecService(scoped), ReferenceService(scoped)
@@ -265,114 +225,15 @@ async def test_diff_with_impact_counts_downstream_per_hunk(scoped: Session) -> N
         await queries.diff_with_impact("EXMP-PRD-001", 1, 9)
 
 
-async def test_todo_decision_view_record_and_flag_view(scoped: Session) -> None:
+async def test_project_items_broken_ref_and_other_kinds(scoped: Session) -> None:
+    """UI-4 목록 다이얼로그(6) — 미존재 참조마다 한 행, 출발 항목 이름이 있다. 상대가 들어오면 사라진다."""
     svc, p, d, rfq, pks, rpk, a_rfq, a_prd = _b3(scoped)
-    tr = TrackingService(scoped)
-    # 아무것도 없는 사용자 → 여섯 묶음 빈 배열
-    empty = await queries.todo(a_prd.user)
-    assert (empty.total, empty.needs_check, empty.pending_decisions, empty.unassigned) == (
-        0,
-        [],
-        [],
-        [],
-    )
-    # 에이전트(rfq-writer 지시)가 RFQ Q1 수정 → 미결정 (pipeline 11단계와 같은 호출)
-    v2 = svc.save(
-        rfq, rfq.body.replace("내용", "바뀐 내용"), "r2", a_rfq, "spec(EXMP-RFQ-001): Q1 수정", []
-    )
-    affected = tr.detect_impact(rfq.id, rfq.current_version_id, v2.id, ["Q1"])
-    assert affected == [pks["G1"]]
-    tr.create_pending(v2.id, affected, [rpk["Q1"]])
-    td = await queries.todo(a_rfq.user)
+    rows = await queries.project_items("EXMP", "broken_ref")
     assert [
-        (x.version_id, x.doc_id, x.version_no, x.affected_count) for x in td.pending_decisions
-    ] == [(v2.id, "EXMP-RFQ-001", 2, 1)]
-    assert td.total == 1 and (await queries.todo(a_prd.user)).pending_decisions == []  # 지시자만
-    # 전파 미결정 상세 (UI-12)
-    dv = await queries.decision_view(v2.id)
-    assert (dv.doc_id, dv.choice, dv.version.version_no, dv.version.commit_hash) == (
-        "EXMP-RFQ-001",
-        "undecided",
-        2,
-        "r2",
-    )
-    assert dv.version.author_view.user.github_login == "rfq-writer"
-    assert (dv.change_diff.from_version, dv.change_diff.to_version) == (1, 2)
-    assert [h.item_id for h in dv.change_diff.hunks] == ["Q1"]
-    assert [
-        (a.doc_id, a.item_id, a.caused_by_items, a.assignee.github_login) for a in dv.affected
-    ] == [("EXMP-PRD-001", "G1", ["Q1"], "prd-writer")]
-    with pytest.raises(NotFound):
-        await queries.decision_view(999_999)
-    # 예 → G1에 확인 필요 → prd-writer 내 할 일
-    assert tr.record_decision(v2.id, Propagation.propagate, None, a_rfq.user).flags_raised == 1
-    td2 = await queries.todo(a_prd.user)
-    f = td2.needs_check[0]
-    assert (
-        f.kind,
-        f.target.item_id,
-        f.cause.item_id,
-        f.cause_version_no,
-        f.assignee.github_login,
-    ) == (
-        "needs_check",
-        "G1",
-        "Q1",
-        2,
-        "prd-writer",
-    )
-    assert td2.total == 1 and (await queries.todo(a_rfq.user)).total == 0
-    # 플래그 상세 (UI-11): 부여 직후에도 원인 변경이 보인다 — v1 → v2 (#10)
-    # cause_change_count는 부여 **뒤** 또 바뀐 횟수라 0이다
-    fv = await queries.flag_view(f.id)
-    assert (fv.cause_diff.from_version, fv.cause_diff.to_version) == (1, 2)
-    assert fv.cause_diff.hunks, "부여 직후에 diff가 비면 판단 재료가 없다"
-    assert (fv.cause_change_count, fv.target_changed_since_raise) == (0, False)
-    assert fv.target_body.startswith("#### G1 목표") and fv.id == f.id
-    # 원인이 그 사이 또 바뀜(UC-H11 3a) → 누적 diff v1→v3 · 대상 저장 → 변경 있음
-    rfq2 = svc.get_document("EXMP-RFQ-001")
-    svc.save(rfq2, rfq2.body.replace("바뀐 내용", "또 바뀐 내용"), "r3", a_rfq, "spec: v3", [])
-    # 원인만 바뀌었다 — 대상은 그대로다. 버전 id로 견주므로 저장 순서·시각과 무관하다 (#17)
-    assert (await queries.flag_view(f.id)).target_changed_since_raise is False
-    d2 = svc.get_document("EXMP-PRD-001")
-    svc.save(d2, d2.body + "\n", "h2", a_prd, "spec: v2", [])
-    fv2 = await queries.flag_view(f.id)
-    assert (fv2.cause_change_count, fv2.cause_diff.from_version, fv2.cause_diff.to_version) == (
-        1,
-        1,
-        3,
-    )
-    assert [h.item_id for h in fv2.cause_diff.hunks] == [
-        "Q1"
-    ] and fv2.target_changed_since_raise is True
-    # broken_ref → cause_deleted_at · upstream_impact → cause_body · 담당 미지정 → unassigned
-    scoped.execute(
-        text("UPDATE items SET is_deleted=true, deleted_at=now() WHERE id=:i"), {"i": rpk["Q2"]}
-    )
-    scoped.expire_all()
-    scoped.execute(text("UPDATE flags SET assignee_user_id=NULL WHERE id=:i"), {"i": f.id})
-    tr.raise_upstream([rpk["Q1"]], d.id, d2.current_version_id, pks["R1"])
-    bid = tr.repo.add(
-        __import__("app.core.tracking.models", fromlist=["Flag"]).Flag(
-            kind="broken_ref",
-            target_item_id=pks["G1"],
-            cause_item_id=rpk["Q2"],
-            assignee_user_id=None,
-        )
-    ).id
-    td3 = await queries.todo(a_rfq.user)
-    assert [x.kind for x in td3.upstream_impact] == ["upstream_impact"] and td3.total == 1
-    assert sorted(x.id for x in td3.unassigned) == sorted([f.id, bid])
-    bv = await queries.flag_view(bid)
-    assert bv.cause_deleted_at is not None and bv.cause_diff is None
-    uv = await queries.flag_view(td3.upstream_impact[0].id)
-    assert uv.cause_body.startswith("#### R1 기능") and uv.cause_diff is None
-    with pytest.raises(NotFound):
-        await queries.flag_view(999_999)
-    # 프로젝트 목록 다이얼로그 (UI-4 6)
-    assert [x.id for x in await queries.project_items("EXMP", "needs_check")] == [f.id]
-    assert [x.id for x in await queries.project_items("EXMP", "upstream_impact")] == [uv.id]
-    assert await queries.project_items("EXMP", "comments") == []
+        (r.type, r.source.doc_id, r.source.item_id, r.source.display_name, r.raw_target)
+        for r in rows
+    ] == [("broken_ref", "EXMP-PRD-001", "R1", "기능", "EXMP-RFQ-001#Q9")]
+    assert all(isinstance(r, BrokenRefSummary) for r in rows)
     assert await queries.project_items("EXMP", "convention_errors") == []
     scoped.execute(
         text(
@@ -383,22 +244,27 @@ async def test_todo_decision_view_record_and_flag_view(scoped: Session) -> None:
     with pytest.raises(ValueError):
         await queries.project_items("EXMP", "bogus")
     with pytest.raises(NotFound):
-        await queries.project_items("NOPE", "comments")
+        await queries.project_items("NOPE", "broken_ref")
+    # 상대(Q9)가 들어오면 그 행이 사라진다 (UC-S2 2a2)
+    body = rfq.body + "#### Q9 아홉째\n내용\n"
+    svc.save(rfq, body, "h9", a_rfq, "spec: Q9 추가", [])
+    ReferenceService(scoped).resolve_missing(p.id)
+    assert await queries.project_items("EXMP", "broken_ref") == []
 
 
-async def test_todo_convention_errors_and_comments_of_my_documents(scoped: Session) -> None:
-    svc, p, d, rfq, pks, rpk, a_rfq, a_prd = _b3(scoped)
-    scoped.execute(
-        text("UPDATE documents SET has_convention_error=true WHERE doc_id='EXMP-PRD-001'")
-    )
-    _comment(scoped, d.id, a_rfq.user.id, 3, "이 줄이 애매하다")
-    _comment(scoped, rfq.id, a_prd.user.id, 2, "해결됨", resolved=True)
-    td = await queries.todo(a_prd.user)
-    assert [x.doc_id for x in td.convention_errors] == ["EXMP-PRD-001"]
-    assert [(c.doc_id, c.line_no, c.author.github_login) for c in td.unresolved_comments] == [
-        ("EXMP-PRD-001", 3, "rfq-writer")
-    ]
-    assert td.total == 2 and (await queries.todo(a_rfq.user)).total == 0
+async def test_project_items_broken_ref_outside_items_has_no_source_item(scoped: Session) -> None:
+    """절 본문·frontmatter에서 온 참조는 source.item_id=None (MS-008 project_items 2)."""
+    svc, ref = SpecService(scoped), ReferenceService(scoped)
+    p = make_project(scoped)
+    a = author(scoped)
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
+    d = svc.get_document("EXMP-PRD-001")
+    # upstream에 EXMP-NONE-001 — 문서 단위 미존재 참조. RFQ 문서 자체도 없으니 절 본문 참조도 미존재
+    ref.extract(d.id, v.id, d.body, {i.item_id: i.pk for i in d.items}, UPSTREAM)
+    rows = await queries.project_items("EXMP", "broken_ref")
+    outside = [r for r in rows if r.source.item_id is None]
+    assert outside and all(r.source.doc_id == "EXMP-PRD-001" for r in outside)
+    assert {r.raw_target for r in outside} >= {"EXMP-NONE-001"}
 
 
 # ── B4: graph_view · downstream_view · document_view 4a ──
@@ -427,14 +293,17 @@ async def test_graph_view_full_stage_scope_and_isolated(scoped: Session) -> None
     # 승인만: 문서 상태가 승인인 문서의 항목만. EXMP 시드는 전부 draft라 비어야 한다
     g_ok = await queries.graph_view("EXMP", GraphScope.approved)
     assert g_ok.nodes == [] and g_ok.edges == []
-    # 플래그 있는 것: 미해결 플래그가 붙은 항목만
-    TrackingService(scoped).raise_broken(rpk["Q1"])  # Q1은 RFQ 항목
-    g_fl = await queries.graph_view("EXMP", GraphScope.flagged)
-    flagged = {n.id for n in g_fl.nodes}
-    assert flagged and all(n.has_flag for n in g_fl.nodes)
-    # 범위 밖을 가리키는 간선은 그리지 않는다 — 미존재 참조와 다르다 (MS-008 5단계)
-    assert all(e.from_ in flagged and (e.to is None or e.to in flagged) for e in g_fl.edges)
-    assert not any(e.is_missing and e.to is None and e.from_ not in flagged for e in g_fl.edges)
+    # 범위 밖을 가리키는 간선은 그리지 않는다 — 미존재 참조와 다르다 (MS-008 5단계).
+    # PRD만 완료로 올리면 G1→Q1(RFQ, 범위 밖)은 안 그리고 R1→Q9(미존재)만 남는다
+    svc.apply_status(d, d.body.replace("status: draft", "status: approved"), "c1", a_prd.user, None)
+    g_ok = await queries.graph_view("EXMP", GraphScope.approved)
+    ok_ids = {n.id for n in g_ok.nodes}
+    assert ok_ids == {"EXMP-PRD-001", "EXMP-PRD-001#G1", "EXMP-PRD-001#R1"}
+    assert all(e.from_ in ok_ids and (e.to is None or e.to in ok_ids) for e in g_ok.edges)
+    assert {(e.from_, e.to, e.is_missing) for e in g_ok.edges} == {
+        ("EXMP-PRD-001#G1", "EXMP-PRD-001#R1", False),
+        ("EXMP-PRD-001#R1", None, True),
+    }
     with pytest.raises(NotFound):
         await queries.graph_view("NOPE")
 
