@@ -4,8 +4,9 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core import queries
-from app.core.errors import NotFound
+from app.core.errors import LlmNotConfigured, NotFound
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
 from app.core.types import BrokenRefSummary, DocType, GraphScope
@@ -429,3 +430,96 @@ async def test_queries_hide_someone_elses_project(scoped: Session) -> None:
         with pytest.raises(NotFound) as ei:
             await coro
         assert ei.value.extra == {"resource": "project", "id": "EXMP"}
+
+
+# ── ask_item (카드 U) ──
+def _seed_refs(scoped: Session):
+    svc, ref = SpecService(scoped), ReferenceService(scoped)
+    p = make_project(scoped)
+    a = author(scoped)
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
+    d = svc.get_document("EXMP-PRD-001")
+    ref.extract(d.id, v.id, d.body, {i.item_id: i.pk for i in d.items}, UPSTREAM)
+    return d
+
+
+def _rows(scoped: Session) -> dict[str, int]:
+    return {
+        t: scoped.execute(text(f'SELECT count(*) FROM "{t}"')).scalar()
+        for t in ("documents", "items", "versions", "references", "status_changes")
+    }
+
+
+@pytest.fixture
+def fake_llm(monkeypatch):
+    """llm.ask를 가짜로. 받은 system·messages를 기록한다."""
+    seen: list[tuple[str, list[dict]]] = []
+
+    async def ask(system: str, messages: list[dict]) -> str:
+        seen.append((system, messages))
+        return "답"
+
+    monkeypatch.setattr(queries.llm, "ask", ask)
+    monkeypatch.setattr(settings, "LLM_API_KEY", "sk-test")
+    return seen
+
+
+async def test_ask_item_context_is_item_body_and_names_only(scoped: Session, fake_llm) -> None:
+    _seed_refs(scoped)
+    before = _rows(scoped)
+    got = await queries.ask_item("EXMP-PRD-001", "G1", "왜?", [], owner(scoped))
+    assert got.answer == "답" and _rows(scoped) == before  # DB에 아무것도 안 쓴다
+    system, messages = fake_llm[0]
+    # 문서 제목·상태·버전, 항목 ID·제목·본문 — 문서 전문은 아니다
+    assert "[문서] EXMP-PRD-001 제품 · 상태 draft · v1" in system
+    assert "[보고 있는 항목] G1 목표" in system and "근거 [[EXMP-RFQ-001#Q1]]" in system
+    assert "#### R1 기능" not in system and "절 본문의 참조" not in system
+    # 상위·하위는 ID와 이름만 — 본문(「내용」·「무시」)은 안 실린다
+    assert "EXMP-RFQ-001#Q1 첫 요구" in system and "EXMP-PRD-001#R1 기능" in system
+    assert "내용" not in system.split("[이 항목의 근거")[1]
+    assert "(하위)] 없음" in system
+    assert messages == [{"role": "user", "text": "왜?"}]
+    assert got.context_item_ids == ["G1", "EXMP-RFQ-001#Q1", "EXMP-PRD-001#R1"]
+
+
+async def test_ask_item_downstream_names_and_missing_upstream(scoped: Session, fake_llm) -> None:
+    _seed_refs(scoped)
+    got = await queries.ask_item("EXMP-PRD-001", "R1", "?", [], owner(scoped))
+    system, _ = fake_llm[0]
+    assert "(하위)] EXMP-PRD-001#G1 목표" in system
+    assert "EXMP-RFQ-001#Q9" in system  # 미존재 참조는 raw_target 그대로
+    assert got.context_item_ids[0] == "R1" and "EXMP-PRD-001#G1" in got.context_item_ids
+
+
+async def test_ask_item_trims_history_to_max_turns(scoped: Session, fake_llm, monkeypatch) -> None:
+    _seed_refs(scoped)
+    monkeypatch.setattr(settings, "LLM_MAX_TURNS", 2)
+    hist = [{"role": "user", "text": f"q{i}"} for i in range(5)]
+    await queries.ask_item("EXMP-PRD-001", "G1", "마지막", hist, owner(scoped))
+    _, messages = fake_llm[0]
+    assert [m["text"] for m in messages] == ["q3", "q4", "마지막"]  # 뒤에서 2턴 + 지금 질문
+
+
+async def test_ask_item_without_key_blocks_before_reading(scoped: Session, monkeypatch) -> None:
+    _seed_refs(scoped)
+    monkeypatch.setattr(settings, "LLM_API_KEY", "")
+
+    def boom(*a, **k):
+        raise AssertionError("SpecService를 부르면 안 된다")
+
+    monkeypatch.setattr(SpecService, "get_item", boom)
+    with pytest.raises(LlmNotConfigured):
+        await queries.ask_item("EXMP-PRD-001", "G1", "?", [], owner(scoped))
+
+
+async def test_ask_item_of_other_owner_or_missing_item_is_not_found(
+    scoped: Session, fake_llm
+) -> None:
+    _seed_refs(scoped)
+    with pytest.raises(NotFound) as e:
+        await queries.ask_item("EXMP-PRD-001", "G1", "?", [], owner(scoped, "minjun"))
+    assert e.value.extra["resource"] == "project"
+    with pytest.raises(NotFound):
+        await queries.ask_item("EXMP-PRD-001", "G9", "?", [], owner(scoped))
+    assert fake_llm == []  # 모델을 부르기 전에 막힌다

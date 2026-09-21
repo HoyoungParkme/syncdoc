@@ -11,8 +11,10 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app import db
+from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import AccountService
+from app.core.errors import LlmNotConfigured
 from app.core.project.models import Project
 from app.core.project.service import ProjectService
 from app.core.reference.service import ReferenceService
@@ -20,6 +22,7 @@ from app.core.spec.service import SpecService
 from app.core.types import (
     STAGE_OF,
     ApiAuthor,
+    AskAnswer,
     AuthorRef,
     BrokenRefSummary,
     ChainItem,
@@ -44,6 +47,7 @@ from app.core.types import (
     StageSummary,
     UserRef,
 )
+from app.infra import llm
 
 _ORDER = {"draft": 0, "approved": 1}  # 둘뿐이다 — 하나라도 초안이면 초안 (UC-H14 1a)
 
@@ -451,3 +455,74 @@ def _title_of(spec: SpecService, doc_id: str) -> str:
         return doc_id
     refs = spec.describe_documents([d.id])
     return refs[d.id].title if d.id in refs else doc_id
+
+
+_ASK_SYSTEM = """당신은 명세를 읽는 사람 옆에서 그 자리를 설명한다.
+
+아래 맥락에 있는 것만으로 답한다. 맥락에 없으면 모른다고 말하고, 어느 단계가
+아직 안 쓰였는지 짚어 준다. 지어내지 않는다.
+
+답에 근거를 댈 때는 맥락에 있는 항목 ID를 그대로 쓴다. 없는 ID를 만들지 않는다.
+
+명세를 고치라고 하지 않는다. 당신은 읽기를 돕는 자리이고, 본문을 쓰는 것은
+사람과 그 사람의 에이전트가 한다.
+
+[문서] {doc_id} {title} · 상태 {status} · v{version_no}
+[보고 있는 항목] {item_id} {display_name}
+{body}
+[이 항목의 근거 (상위)] {upstream_ids_and_names}
+[이 항목에서 나온 것 (하위)] {downstream_ids_and_names}"""
+
+
+def _ids_and_names(refs: list[ItemRef]) -> tuple[list[str], str]:
+    ids = [f"{r.doc_id}#{r.item_id}" if r.item_id else (r.doc_id or r.raw_target) for r in refs]
+    names = [
+        f"{i} {r.display_name}" if r.display_name else i for i, r in zip(ids, refs, strict=True)
+    ]
+    return ids, ", ".join(names) if names else "없음"
+
+
+async def ask_item(
+    doc_id: str, item_id: str, question: str, history: list[dict], user: User
+) -> AskAnswer:
+    """SYNC-MS-008#queries.ask_item
+
+    DOM-002 3.2 — queries가 어댑터를 직접 부르는 것은 llm 하나뿐이다. DB에 아무것도 쓰지 않는다.
+    """
+    if not settings.LLM_API_KEY:
+        raise LlmNotConfigured()  # 네트워크를 타기 전에 막는다 (MS-008 1)
+    history = history[-settings.LLM_MAX_TURNS :] if settings.LLM_MAX_TURNS > 0 else []
+    with db.session_scope() as s:
+        ProjectService(s).get_owned(doc_id.split("-")[0], user)
+        spec, refs = SpecService(s), ReferenceService(s)
+        v = spec.get_item(doc_id, item_id)
+        up = refs.upstream(v.pk)
+        down = refs.downstream(v.pk)
+        # 표시 이름만 쓰고 본문은 안 읽는다 (MS-008 4)
+        need = [e.to_item_pk for e in up if e.to_item_pk]
+        need += [e.from_item_pk for e in down if e.from_item_pk]
+        names = spec.describe_items(need)
+        doc_names = _doc_refs(
+            spec, [e.to_document_id for e in up if e.to_document_id and not e.to_item_pk]
+        )
+        up_refs = [_to_ref(e, {**doc_names, **names} if e.to_item_pk else doc_names) for e in up]
+        down_refs = [names[e.from_item_pk] for e in down if e.from_item_pk in names]
+        title = _title_of(spec, doc_id)
+    up_ids, up_txt = _ids_and_names(up_refs)
+    down_ids, down_txt = _ids_and_names(down_refs)
+    system = _ASK_SYSTEM.format(
+        doc_id=doc_id,
+        title=title,
+        status=v.doc_status,
+        version_no=v.doc_version_no,
+        item_id=v.item_id,
+        display_name=v.display_name or "",
+        body=v.body,
+        upstream_ids_and_names=up_txt,
+        downstream_ids_and_names=down_txt,
+    )
+    messages = [{"role": m["role"], "text": m["text"]} for m in history] + [
+        {"role": "user", "text": question}
+    ]
+    answer = await llm.ask(system, messages)
+    return AskAnswer(answer=answer, context_item_ids=[v.item_id] + up_ids + down_ids)
