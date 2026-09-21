@@ -645,7 +645,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 화면 | 새 화면·요소 없음. UI-5 유저용 탭이 UI 문서를 그리는 방식만 바뀐다 |
 | 테스트 | `check_ui` 싱크독 12화면 중 11(UI-5 8.4~8.7은 U) · 다른 프로젝트 화면 문서 8개를 새 `validate`·`check_ui`·`view_build --all`로 돌려 **손대지 않고** 통과 · INS-UI-002가 비지 않고 · TBL-UI-001의 html 9개가 보이고 · JSD·VA·SYNC의 비화면 절이 살아나고 · 우측 셋 비면 좌측 전폭 · `get_template`이 저장소 사본이 낡아도 이미지 것을 준다 · **사람 확인**: 아래 다섯 |
 | 선행 | V |
-| 완료 | 2026-09-21 · 브랜치 `card/X-ui-doc` · 커밋 `7a4e821`~ (spec 7 + code 4) · 테스트 197 · `validate` 0/0 · `check_ui` 12 중 11(UI-5 8.4~8.7은 U) + 새 대조(요소 표↔data-el) `!` 0 · `check_code` 105/107 · `check_view_css` 같음 · `view_build --all` 오류 0 · 다른 프로젝트 문서 손 안 대고: INS-UI-002 화면 4(전엔 0) · TBL-UI-001 화면 7·배치 7(전엔 배치 0) · JSD 화면 5 + 비화면 절 7 · SYNC-UI-002 화면 12 + 절 3 · SYNC-UI-001 설계 표 12행 · 사람 확인 다섯은 배포 뒤(아래 기록) · 되먹임: `check_ui`가 UI-002의 빠진 요소 표 행(1.1·1.2)을 잡아 채웠고, UI-002에 `미결사항` 절이 생겼다 |
+| 완료 | 2026-09-21 · 브랜치 `card/X-ui-doc` · 커밋 `7a4e821`~ (spec 7 + code 4) · 테스트 197 · `validate` 0/0 · `check_ui` 12 중 11(UI-5 8.4~8.7은 U) + 새 대조(요소 표↔data-el) `!` 0 · `check_code` 105/107 · `check_view_css` 같음 · `view_build --all` 오류 0 · 다른 프로젝트 문서 손 안 대고: INS-UI-002 화면 4(전엔 0) · TBL-UI-001 화면 7·배치 7(전엔 배치 0) · JSD 화면 5 + 비화면 절 7 · SYNC-UI-002 화면 12 + 절 3 · SYNC-UI-001 설계 표 12행 · 사람 확인 다섯은 배포 뒤(아래 기록) · 되먹임: `check_ui`가 UI-002의 빠진 요소 표 행(1.1·1.2)을 잡아 채웠고, UI-002에 `미결사항` 절이 생겼다 · **놓친 것**: 앱의 `SpecService.validate`에도 같은 `SUBTYPES` 표가 있는데 `tools/validate.py`만 고쳤다 — 디자인 스킬 산출물 시험(CCR-UI-001)이 잡아 #105로 고침 |
 
 **왜 카드인가.** 규약(STD-001)·뷰 규약(STD-002)·검사기·정적 뷰 생성기·React 렌더러·템플릿이 같은 한 문장을 각자 코드로 갖고 있다. 하나만 고치면 「검사는 통과하는데 뷰는 빈다」가 된다 — 바로 지금 상태다.
 
