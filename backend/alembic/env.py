@@ -4,13 +4,11 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
-# 모델 12개 전부 metadata에 올린다 (import 부작용)
+# 모델 10개 전부 metadata에 올린다 (import 부작용)
 import app.core.account.models  # noqa: E402, F401
-import app.core.collab.models  # noqa: E402, F401
 import app.core.project.models  # noqa: E402, F401
 import app.core.reference.models  # noqa: E402, F401
 import app.core.spec.models  # noqa: E402, F401
-import app.core.tracking.models  # noqa: E402, F401
 from alembic import context
 from app.config import settings
 from app.db import Base
