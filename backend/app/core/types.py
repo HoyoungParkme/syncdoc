@@ -551,3 +551,11 @@ class DeleteResult:
 
     def to_dict(self) -> dict[str, Any]:
         return {"doc_id": self.doc_id, "commit_hash": self.commit_hash, "next_step": self.next_step}
+
+
+@dataclass
+class AskAnswer:
+    """SYNC-DOM-002 2.8 — queries.ask_item → API AskAnswer. 저장되지 않는다."""
+
+    answer: str
+    context_item_ids: list[str]

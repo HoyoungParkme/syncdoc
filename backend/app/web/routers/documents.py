@@ -15,7 +15,14 @@ from app.core.spec.service import SpecService
 from app.core.types import ApiAuthor, Author, AuthorKind, DocStatus, Entry
 from app.db import get_session
 from app.web.auth import current_user
-from app.web.schemas.documents import ChangeStatus, Diff, Document, DocumentSummary
+from app.web.schemas.documents import (
+    AskAnswer,
+    AskRequest,
+    ChangeStatus,
+    Diff,
+    Document,
+    DocumentSummary,
+)
 from app.web.schemas.ops import DownstreamView, Revert, SaveResult, TrashResult
 from app.web.schemas.projects import Version
 
@@ -116,3 +123,17 @@ async def revert(doc_id: str, req: Revert, user: User = Depends(current_user)) -
     """SYNC-API-001#POST/api/docs/{docId}/revert"""
     r = await pipeline.revert(doc_id, req.to_version, user, req.confirm_item_deletion)
     return SaveResult.model_validate(r)
+
+
+@router.post("/{doc_id}/items/{item_id}/ask", response_model=AskAnswer)
+async def ask_item(
+    doc_id: str, item_id: str, req: AskRequest, user: User = Depends(current_user)
+) -> AskAnswer:
+    """SYNC-API-001#POST/api/docs/{docId}/items/{itemId}/ask
+
+    보고 있는 항목이 맥락이다(UC-H19). 아무것도 저장하지 않는다. 키가 없으면 llm-not-configured.
+    """
+    history = [{"role": t.role, "text": t.text} for t in req.history]
+    return AskAnswer.model_validate(
+        await queries.ask_item(doc_id, item_id, req.question, history, user)
+    )

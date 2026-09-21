@@ -260,6 +260,28 @@ class EmailTaken(Problem):
         super().__init__(f"{email}은 다른 사람이 이미 등록했다", email=email)
 
 
+class LlmNotConfigured(Problem):
+    """SYNC-API-001 2장 — 모델 키가 없다. 읽는 중 질의가 꺼져 있다 (UC-H19 2a)."""
+
+    type = "urn:syncdoc:llm-not-configured"
+    status = 503
+    title = "llm-not-configured"
+
+    def __init__(self) -> None:
+        super().__init__("모델 키가 없다 — 읽는 중 질의가 꺼져 있다")
+
+
+class LlmUnavailable(Problem):
+    """SYNC-API-001 2장 — 모델 호출 실패. 사용량 초과도 여기 접힌다 (UC-H19 4a)."""
+
+    type = "urn:syncdoc:llm-unavailable"
+    status = 502
+    title = "llm-unavailable"
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason, reason=reason)
+
+
 class Internal(Problem):
     """SYNC-API-001 2장 — 표에 없는 예외. 포괄 핸들러가 만든다.
 

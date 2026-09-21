@@ -161,6 +161,7 @@ def test_me_and_tokens_issue_list_revoke(client: TestClient, db_session: Session
     assert client.get("/api/me").status_code == 401
     u = login(client, db_session)
     me = client.get("/api/me").json()
+    assert me["llm_enabled"] is False  # 키가 비어 있다 — UI-5 질문 탭이 없다
     assert (me["id"], me["github_login"], me["display_name"]) == (
         u.id,
         "hoyoung",

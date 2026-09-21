@@ -4,6 +4,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.config import settings
+from app.core import queries
+from app.core.errors import LlmUnavailable
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
 from app.core.types import DocType
@@ -125,3 +128,48 @@ def test_other_owner_document_is_not_found(client: TestClient, scoped: Session) 
     # 소유자에게는 그대로 열린다
     login(client, scoped, "hoyoung")
     assert client.get("/api/docs/EXMP-PRD-001").status_code == 200
+
+
+def test_ask_item_endpoint(client: TestClient, scoped: Session, monkeypatch) -> None:
+    """POST /api/docs/{docId}/items/{itemId}/ask (UC-H19). 저장하지 않고, 키·모델 실패는 문제 유형 둘."""
+    _seed(scoped)
+    login(client, scoped, "hoyoung")
+    seen: list[list[dict]] = []
+
+    async def ok(system: str, messages: list[dict]) -> str:
+        seen.append(messages)
+        return "그 항목은 Q1을 근거로 한다"
+
+    monkeypatch.setattr(queries.llm, "ask", ok)
+    monkeypatch.setattr(settings, "LLM_API_KEY", "sk-test")
+    body = {
+        "question": "이게 뭐야?",
+        "history": [{"role": "user", "text": "앞"}, {"role": "assistant", "text": "답"}],
+    }
+    r = client.post("/api/docs/EXMP-PRD-001/items/G1/ask", json=body)
+    assert r.status_code == 200
+    assert r.json() == {
+        "answer": "그 항목은 Q1을 근거로 한다",
+        "context_item_ids": ["G1", "EXMP-RFQ-001#Q1", "EXMP-PRD-001#R1"],
+    }
+    assert seen[0][-1] == {"role": "user", "text": "이게 뭐야?"} and len(seen[0]) == 3
+    assert scoped.execute(text("SELECT count(*) FROM versions")).scalar() == 2  # 아무것도 안 쓴다
+
+    # 모델 실패 → 502 llm-unavailable (reason)
+    async def down(system: str, messages: list[dict]) -> str:
+        raise LlmUnavailable("HTTP 429")
+
+    monkeypatch.setattr(queries.llm, "ask", down)
+    r = client.post("/api/docs/EXMP-PRD-001/items/G1/ask", json={"question": "?"})
+    assert r.status_code == 502 and r.json()["type"] == "urn:syncdoc:llm-unavailable"
+    assert r.json()["reason"] == "HTTP 429"
+    # 키 없음 → 503 llm-not-configured
+    monkeypatch.setattr(settings, "LLM_API_KEY", "")
+    r = client.post("/api/docs/EXMP-PRD-001/items/G1/ask", json={"question": "?"})
+    assert r.status_code == 503 and r.json()["type"] == "urn:syncdoc:llm-not-configured"
+    # 남의 문서 → 404 (R12). 키가 있어도 소유 검사가 먼저는 아니다 — 키 없음이 먼저 막는다(MS-008 1)
+    monkeypatch.setattr(settings, "LLM_API_KEY", "sk-test")
+    monkeypatch.setattr(queries.llm, "ask", ok)
+    login(client, scoped, "minjun")
+    r = client.post("/api/docs/EXMP-PRD-001/items/G1/ask", json={"question": "?"})
+    assert r.status_code == 404 and r.json()["resource"] == "project"

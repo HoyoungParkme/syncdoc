@@ -26,6 +26,12 @@ class User(UserRef):
     created_at: datetime
 
 
+class Me(User):
+    """SYNC-API-001 Me — 내 계정. llm_enabled가 거짓이면 UI-5 질문 탭이 없다."""
+
+    llm_enabled: bool = False
+
+
 class Author(Base):
     kind: str
     user: UserRef | None

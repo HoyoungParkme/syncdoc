@@ -144,3 +144,22 @@ class ItemChain(Base):
     @classmethod
     def of(cls, c) -> ItemChain:
         return cls.model_validate(c, from_attributes=True)
+
+
+class AskTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    text: str
+
+
+class AskRequest(BaseModel):
+    """POST /api/docs/{docId}/items/{itemId}/ask — 대화는 클라이언트가 들고 있다가 통째로 보낸다."""
+
+    question: str
+    history: list[AskTurn] = []
+
+
+class AskAnswer(Base):
+    """SYNC-API-001 AskAnswer. 저장되지 않는다 — 응답이 전부다."""
+
+    answer: str
+    context_item_ids: list[str]

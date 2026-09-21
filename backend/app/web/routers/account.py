@@ -8,12 +8,14 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import AccountService
 from app.core.errors import Unauthorized
 from app.db import get_session
 from app.web import auth
 from app.web.schemas.account import AccessToken, AddEmail, CommitEmail, IssuedToken, IssueToken
+from app.web.schemas.common import Me
 from app.web.schemas.common import User as UserSchema
 
 router = APIRouter(tags=["auth"])
@@ -51,10 +53,11 @@ async def logout(request: Request) -> Response:
     return Response(status_code=204)
 
 
-@router.get("/api/me", response_model=UserSchema)
-async def me(user: User = Depends(auth.current_user)) -> UserSchema:
-    """SYNC-API-001#GET/api/me"""
-    return UserSchema.model_validate(user)
+@router.get("/api/me", response_model=Me)
+async def me(user: User = Depends(auth.current_user)) -> Me:
+    """SYNC-API-001#GET/api/me — llm_enabled는 서버에 키가 있는가(인프라 5.3)"""
+    base = UserSchema.model_validate(user).model_dump()
+    return Me(**base, llm_enabled=bool(settings.LLM_API_KEY))
 
 
 @router.get("/api/me/emails", response_model=list[CommitEmail])
