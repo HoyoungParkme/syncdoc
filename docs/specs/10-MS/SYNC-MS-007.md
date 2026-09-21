@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-007
 type: MS
 title: MINISPEC — pipeline — 쓰기 조율
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/pipeline.py`의 함수 7개와 `scheduler.py`의 주기 함수 3개. 클래스 명세 [[SYNC-DOM-002]] 4.7의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/pipeline.py`의 함수 8개와 `scheduler.py`의 주기 함수 2개. 클래스 명세 [[SYNC-DOM-002]] 4.7의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -25,6 +25,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | 함수 | 한 줄 |
 |---|---|
 | [[#pipeline.save_pipeline]] | 본문 저장 파이프라인 |
+| [[#pipeline.change_status]] | 초안 ⇄ 완료 토글 |
+| [[#pipeline.revert]] | 되돌리기 |
 | [[#pipeline.process_commit]] | GitHub 커밋 처리 |
 | [[#pipeline.rebuild]] | 인덱스 재구축 |
 | [[#pipeline.trash_document]] | 휴지통에 넣기 |
@@ -32,9 +34,6 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#pipeline.purge_document]] | 완전 삭제 |
 | [[#scheduler.catch_up]] | 밀린 커밋 따라잡기 |
 | [[#scheduler.poll_loop]] | 주기 폴링 |
-| [[#pipeline.export_tracking]] | 추적 데이터 백업 |
-| [[#pipeline.import_tracking]] | 백업에서 복원 |
-| [[#scheduler.backup_loop]] | 주기 백업 |
 
 ---
 
@@ -49,7 +48,6 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
                         project_code: str | None,
                         author: Author, message: str,
                         changed_items: list[str] | None = None,
-                        upstream_impact: list[str] | None = None,
                         confirm_item_deletion: bool = False,
                         commit_hash: str | None = None,
                         reason: str | None = None,
@@ -72,7 +70,6 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 | `author` | 작성 주체 | `kind`·`user`·`instructed_by`·`via` |
 | `message` | 커밋 메시지 | `mcp`: 에이전트가 준 것. `web_status`: `status(…)`. `web_revert`: `revert(…)`. `github`: 원 커밋 메시지 |
 | `changed_items` | 바뀐 항목 ID | `mcp`만. 나머지는 None → diff 판정 |
-| `upstream_impact` | 어긋난 상위 항목 | `mcp`만. `"SYNC-UC-001#UC-A6"` 형식. 하위→상위 되먹임의 에이전트 경로 |
 | `confirm_item_deletion` | 삭제 확인됨 | |
 | `commit_hash` | 이미 있는 커밋 | `github`만. push 단계 건너뜀 |
 | `reason` | 상태 변경 사유 | `web_status`만. `apply_status`로 |
@@ -93,28 +90,25 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 6. if `entry != web_status and document` → `deleted = spec.detect_deleted_items(document, body)`; `deleted`의 pk마다 `refs = reference.downstream(pk)`
    - if `any(refs) and not confirm_item_deletion` → `! item-deletion-needs-confirm {deleted_items: [{item_id, downstream: [{doc_id, item_id, display_name}]}]}`
    - **`downstream`은 pk가 아니라 이름이다.** [[SYNC-API-002]] 4장이 에이전트에게 "사람에게 보여주고 확인받은 뒤" 다시 부르라고 시키는데, `items.id` 숫자는 사람에게 보여줄 수 없고 그것을 이름으로 바꾸는 MCP 도구도 없다. 그러면 사람은 **무엇이 끊어지는지 모르는 채로 승낙**하게 되어 확인 절차의 뜻이 사라진다(#50). `SpecService.describe_items`가 이미 그 변환을 한다 — 여기서 한 번 부른다
-6a. **승인 상태 문서를 고치면 여기서 본문의 `status:`를 `review`로 낮춘다** — `entry != web_status`이고 `document.status == approved`이고 `body != document.current_body`일 때. github 경로는 **frontmatter가 아직 `approved`일 때만** — 작성자가 같은 커밋에서 스스로 내렸으면 그게 원본의 진실이다. 자동 강등(9단계 뒤 SEQ-1 6a)을 **push 전에** 본문에 반영하는 것이다
+6a. **완료 상태 문서를 고치면 여기서 본문의 `status:`를 `draft`로 낮춘다** — `entry != web_status`이고 `document.status == approved`이고 `body != document.current_body`일 때. github 경로는 **frontmatter가 아직 `approved`일 때만** — 작성자가 같은 커밋에서 스스로 내렸으면 그게 원본의 진실이다. 자동 강등(9단계 뒤 SEQ-1 6a)을 **push 전에** 본문에 반영하는 것이다
 
    **왜 여기인가.** 강등을 DB에만 적으면 저장소 frontmatter는 `approved`로 남아 [[SYNC-STD-001]] 1.2의 "`status`가 진실이다"가 깨진다. 그리고 다음 저장이 막힌다 — 에이전트가 `get_document`로 받은 본문(`approved`)을 그대로 돌려주면 `frontmatter.status_change` 위반이 된다. **서버가 준 것을 서버가 거부하므로 그 문서는 영영 못 고친다**(#47)
 
-   **github 경로는 본문만 고쳐서는 저장소가 안 바뀐다** — 커밋이 이미 저장소에 있기 때문이다. 그래서 여기서 커밋을 하나 더 민다: `status_commit_hash = git.commit_push(repo.workdir, f"status({doc_id}): approved → review\n\n본문 수정으로 자동 강등", author, path, content=body)`. 8단계가 이 해시를 `spec.save`에 넘겨 `status_changes.commit_hash`에 적는다. **적지 않으면 다음 폴링이 [[#pipeline.process_commit]] 3a에서 걸러내지 못해, 앱이 민 커밋을 남의 편집으로 다시 저장한다.** 작성자는 그 커밋을 유발한 사람 그대로 둔다 — 판단은 앱이 했지만 원인은 그 사람의 편집이고, 그래야 `user_for_commit`이 사람을 찾는다 (#58)
+   **github 경로는 본문만 고쳐서는 저장소가 안 바뀐다** — 커밋이 이미 저장소에 있기 때문이다. 그래서 여기서 커밋을 하나 더 민다: `status_commit_hash = git.commit_push(repo.workdir, f"status({doc_id}): approved → draft\n\n본문 수정으로 자동 강등", author, path, content=body)`. 8단계가 이 해시를 `spec.save`에 넘겨 `status_changes.commit_hash`에 적는다. **적지 않으면 다음 폴링이 [[#pipeline.process_commit]] 3a에서 걸러내지 못해, 앱이 민 커밋을 남의 편집으로 다시 저장한다.** 작성자는 그 커밋을 유발한 사람 그대로 둔다 — 판단은 앱이 했지만 원인은 그 사람의 편집이고, 그래야 `user_for_commit`이 사람을 찾는다 (#58)
 
    **서버가 에이전트의 본문을 고치는 유일한 자리다.** mcp·web_revert는 커밋을 하나로 둔다 — 저장마다 `status(…)` 커밋이 하나씩 더 쌓이면 이력이 본문 변경보다 상태 줄로 더 두꺼워진다. github만 둘이 되는 것은 첫 커밋을 우리가 만들지 않았기 때문이다
 
 7. if `entry != github` → `commit_hash = git.commit_push(repo.workdir, message, author, path=STD-001 1.1 경로, content=body)` · if 실패 → `! push-failed {reason}`, 락 해제. **여기까지 DB 쓰기 없음**
 8. **트랜잭션 시작**
    - if 생성 → `version = spec.create(project_id, doc_id, doc_type, body, commit_hash, author, message, validate_result=4단계 결과)`
-   - if `entry == web_status` → `spec.apply_status(document, body, commit_hash, author.user, reason)` (Document.status·current_body 갱신 + StatusChange). **Version 없음.** 9~13 건너뛰고 14로
-   - else → `version = spec.save(document, body, commit_hash, author, message, deleted, validate_result=4단계 결과, status_commit_hash=6a가 민 해시)` — **모든 경로.** 경고(`incomplete_warnings`)는 mcp 저장에도 남아야 승인을 막는다. 위반은 github 경로에서만 저장까지 온다
-9. `deleted`마다 `tracking.raise_broken(pk)`
+   - if `entry == web_status` → `spec.apply_status(document, body, commit_hash, author.user, reason)` (Document.status·current_body 갱신 + StatusChange). **Version 없음.** 9~10a 건너뛰고 14로
+   - else → `version = spec.save(document, body, commit_hash, author, message, deleted, validate_result=4단계 결과, status_commit_hash=6a가 민 해시)` — **모든 경로.** 경고(`incomplete_warnings`)는 mcp 저장에도 남아야 완료 전환을 막는다. 위반은 github 경로에서만 저장까지 온다
+9. `broken = reference.mark_missing(deleted)` — 사라진 항목을 가리키던 참조가 **그 자리에서** 미존재가 된다([[SYNC-MS-003#ReferenceService.mark_missing]]). 플래그를 세우지 않는다 — 참조 행이 스스로 끊어졌다고 말하고, UI-5 4a 배너·UI-4 3.2가 그것을 보여준다
 10. `reference.extract(document_id, version.id, body, item_pks=spec.item_pks(document_id), upstream_doc_ids=frontmatter upstream)`
 10a. `reference.resolve_missing(project_id, target_doc_id=doc_id)` — 이 문서(또는 항목)를 기다리던 미존재 참조를 푼다. 하위가 먼저 저장된 경우가 재구축까지 안 기다려도 되게(UC-S2 2a2)
-10b. `tracking.release_broken(item_pks, author.user)` — 이 문서 항목에 붙은 끊어진 참조 중 **원인 항목을 더 이상 가리키지 않는 것**을 `resolved_with_edit=True`로 푼다(UC-H12 3, #70). 확인자는 저장시킨 사람. `entry`를 가리지 않는다 — GitHub push로 고쳐도 풀린다
-11. `affected = tracking.detect_impact(document_id, prev_version_id=document.current_version_id (2단계에서 읽은 것. 신규면 None), version.id, changed_items)` · if `affected` → `changed_pks = spec.resolve_items(doc_id, changed_items)` (선언) 또는 `detect_impact`가 diff로 판정한 것 · `pending_id = tracking.create_pending(version.id, affected, changed_pks)` · else `pending_id = None`
-12. if `upstream_impact` → 각각 `spec.resolve_item(doc, item)` · if 못 찾음 → `warnings`에 `upstream_impact.unknown` 추가하고 건너뜀 · `tracking.raise_upstream(pks, document_id, version.id, cause_item_pk=None)`
-13. `collab.relocate(document_id, old_body, body, old_version_no=document.current_version_no)`
+10b~13. 없음 — 끊어진 참조 해제·전파 감지·상위 불일치·댓글 재배치가 있던 자리. 카드 V에서 걷어냈다. 되살아난 참조는 10a가 이미 잇는다
 14. **커밋.** 락 해제
-15. `→ SaveResult(doc_id, version_no, commit_hash, status, pending_decision_version_id=pending_id, warnings, next_step)` — `next_step`은 `entry == mcp`면 `f"{doc_id} v{version_no} 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)"`, 아니면 `None`. 규약을 에이전트가 잊어도 응답이 매번 다시 말한다([[SYNC-STD-001]] 1.8)
+15. `→ SaveResult(doc_id, version_no, commit_hash, status, warnings, next_step)` — `deleted`가 있었으면 `warnings`에 `ref.broken: {n}`(9단계의 `broken`)을 섞는다. 에이전트가 「무엇이 끊어졌나」를 응답에서 본다 — `next_step`은 `entry == mcp`면 `f"{doc_id} v{version_no} 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)"`, 아니면 `None`. 규약을 에이전트가 잊어도 응답이 매번 다시 말한다([[SYNC-STD-001]] 1.8)
 
 **출력** `SaveResult`. [[SYNC-API-001]] 4장 스키마와 같다.
 
@@ -128,57 +122,54 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 | 버전 불일치 | `version-conflict` | 5 |
 | 삭제 항목에 하위 참조, 미확인 | `item-deletion-needs-confirm` | 6 |
 | push 실패 | `push-failed` | 7 |
-| 8~12 중 DB 오류 | 트랜잭션 롤백. 커밋은 이미 원격에 있으므로 `repository.last_processed_commit`을 갱신하지 않아 폴링이 다시 처리한다 | 8 |
+| 8~10a 중 DB 오류 | 트랜잭션 롤백. 커밋은 이미 원격에 있으므로 `repository.last_processed_commit`을 갱신하지 않아 폴링이 다시 처리한다 | 8 |
 
-**호출하는 것** [[SYNC-MS-004#TrackingService.raise_upstream]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.issue_doc_id]] [[SYNC-MS-002#SpecService.apply_frontmatter]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.detect_deleted_items]] [[SYNC-MS-002#SpecService.create]] [[SYNC-MS-002#SpecService.save]] · `ReferenceService.downstream` · `ReferenceService.extract` · `TrackingService.raise_broken` · `TrackingService.detect_impact` · `TrackingService.create_pending` · `CommentService.relocate` · `git.commit_push`
+**호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.issue_doc_id]] [[SYNC-MS-002#SpecService.apply_frontmatter]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.detect_deleted_items]] [[SYNC-MS-002#SpecService.create]] [[SYNC-MS-002#SpecService.save]] · `ReferenceService.downstream` · [[SYNC-MS-003#ReferenceService.mark_missing]] · `ReferenceService.extract` · `ReferenceService.resolve_missing` · `git.commit_push`
 
 **테스트 관점**
 - 정상 수정: 새 버전 번호 +1, 커밋 존재, 참조 갱신
 - 규약 위반 mcp: DB 변경 없음, 커밋 없음
 - 규약 위반 github: 저장됨, `has_convention_error=True`
 - 버전 불일치: `current_body`가 응답에 있음
-- 항목 삭제 미확인: 저장 안 됨. `confirm=True`로 재요청 시 `broken_ref` 플래그 생김
+- 항목 삭제 미확인: 저장 안 됨. `confirm=True`로 재요청 시 그 항목을 가리키던 참조가 `is_missing`이고 응답 `warnings`에 `ref.broken`
 - push 실패: DB 변경 없음
-- 승인 문서 수정: 상태가 `review`, StatusChange 행 하나
-- **승인 문서를 github 커밋으로 고침: DB가 `review`이고 저장소 frontmatter도 `review`다. `status(…)` 커밋이 하나 더 있고 `StatusChange.commit_hash`가 그 해시다** (#58)
+- 완료 문서 수정: 상태가 `draft`, StatusChange 행 하나
+- **완료 문서를 github 커밋으로 고침: DB가 `draft`이고 저장소 frontmatter도 `draft`다. `status(…)` 커밋이 하나 더 있고 `StatusChange.commit_hash`가 그 해시다** (#58)
 - **그 status 커밋은 다음 `process_commit`에서 3a로 걸러진다** — 버전이 하나 더 생기지 않는다
 - **github 커밋이 frontmatter를 `draft`로 내리면서 본문도 고침: `draft`. 강등이 덮지 않는다**
 - `web_status`: Version 없음, StatusChange에 commit_hash
 - 동시 저장 둘: 락 때문에 직렬화. 둘째가 version-conflict
-- `upstream_impact=["SYNC-UC-001#UC-A6"]` → UC-A6에 `upstream_impact` 플래그, 담당은 UC 문서 최근 작성자 · 없는 항목 → 경고, 저장은 됨
 - 8단계 이후 DB 오류: 트랜잭션 롤백, `last_processed_commit` 그대로
 
 ---
 
-#### pipeline.change_status 상태 변경
+#### pipeline.change_status 초안 ⇄ 완료 토글
 
-**시그니처** `async def change_status(doc_id: str, to: DocStatus, user: User, reason: str | None, upstream_reviewed: bool = False, upstream_mismatch: list[str] = []) -> DocumentSummary`
+**시그니처** `async def change_status(doc_id: str, to: DocStatus, user: User, reason: str | None = None) -> DocumentSummary`
 
-근거: [[SYNC-SEQ-001#SEQ-5]] · [[SYNC-UC-001#UC-H8]] · [[SYNC-API-001#POST/api/docs/{docId}/status]] · **조율이라 pipeline에 있다** — 검사·frontmatter·push·상태 기록·플래그를 잇는다. SpecService는 DB만
+근거: [[SYNC-SEQ-001#SEQ-5]] · [[SYNC-UC-001#UC-H8]] · [[SYNC-API-001#POST/api/docs/{docId}/status]] · **조율이라 pipeline에 있다** — 검사·frontmatter·push·상태 기록을 잇는다. SpecService는 DB만
 
-**입력** `doc_id`, 목표 상태 `to`, 누른 사람, 사유
+**입력** `doc_id`, 목표 상태 `to`(`draft` | `approved`), 누른 사람, 사유(선택 — 웹 토글은 안 보낸다)
 
 **처리**
-1. `document = get_document(doc_id)`
+1. `document = get_document(doc_id)` · `trashed_at`이면 `! document-trashed`
 2. `missing = 중복 접은 [e.raw_target for e in ReferenceService.upstream_of_document(document.id, include_missing=True) if e.is_missing]`
-2a. if `to == approved and (document.has_convention_error or document.incomplete_warnings or missing)` → `! status-blocked {convention_error_detail, warnings: incomplete_warnings + [f"ref.missing: {t}" for t in missing]}` (UC-H8 1a). `review`·`draft`는 막지 않는다
+2a. if `to == approved and (document.has_convention_error or document.incomplete_warnings or missing)` → `! status-blocked {convention_error_detail, warnings: incomplete_warnings + [f"ref.missing: {t}" for t in missing]}` (UC-H8 1a). `draft`로 내리는 것은 막지 않는다. **혼자 써도 이 검사는 남는다** — 완료는 「규약에 맞고 참조가 다 이어진 문서」라는 뜻이고, 그 뜻이 없으면 UI-5 4a 배너가 「알아두세요」로 약해진다
 2b. **끊어진 참조는 읽을 때 센다 — 컬럼에 없다.** `documents.incomplete_warnings`에 넣지 않는 이유는 [[SYNC-STD-001]] 4장에 있다. 값은 UI-5 배너가 보는 `document_view.missing_refs`와 **같아야 한다** — 한쪽만 막거나 한쪽만 보여주면 사람이 이유 없이 막힌다
 2c. `warnings`에 `ref.missing: {대상}` 꼴로 섞어 보낸다. `incomplete_warnings`가 이미 `section.missing: 시나리오` 꼴이라 같은 규격이고, 화면이 `:` 앞을 rule로 잘라 한국어로 옮긴다([[SYNC-STD-001]] 4장 화면 문구 열)
-3. if `to == approved and not upstream_reviewed` → `! upstream-review-required` (UC-H8 3. 상위 대조를 건너뛸 수 없다)
+3. 없음 — 상위 대조가 있던 자리. 카드 V에서 걷어냈다. 완료는 사람 하나가 누르는 토글이다
 3a. if `document.status == to` → 아무것도 안 하고 현재 반환 (멱등)
 4. `new_body` = `current_body`의 frontmatter `status:` 줄만 교체
 5. `save_pipeline(entry=web_status, doc_id, None, new_body, expected_version=current_version_no, project_code=None, author=Author(human, user, None, web), message=f"status({doc_id}): {from} → {to}\n\n{reason or ''}", reason=reason)` — **같은 세션**. `save_pipeline`이 세션을 인자로 받거나(있으면 재사용) 없으면 연다. push 후 `spec.apply_status(…, reason)`
-5a. if `upstream_mismatch` → `pks = [resolve_item(d, i) for "d#i" in upstream_mismatch]` · `TrackingService.raise_upstream(pks, document.id, current_version_id, cause_item_pk=None)` (UC-H8 5. 승인 대조의 사람 경로)
 6. `→ DocumentSummary`
 
 **출력** 바뀐 문서 요약
 
-**예외** `status-blocked` · `upstream-review-required` · 파이프라인의 `version-conflict`·`push-failed` 전파
+**예외** `status-blocked` · `document-trashed` · 파이프라인의 `version-conflict`·`push-failed` 전파
 
 **호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-007#pipeline.save_pipeline]] [[SYNC-MS-003#ReferenceService.upstream_of_document]]
 
-**테스트 관점** 규약 오류 문서를 `approved`로 → blocked · **미존재 참조가 있는 문서를 `approved`로 → blocked이고 `warnings`에 `ref.missing:`이 있다** · 같은 문서를 `review`로 → 됨 · **상대 문서가 들어와 `resolve_missing`이 풀면 그 문서를 다시 저장하지 않아도 승인된다**(읽을 때 계산한다는 증거) · `approved`인데 `upstream_reviewed=false` → 거부 · `upstream_mismatch=["SYNC-UC-001#UC-A6"]` → UC-A6에 플래그 · 같은 문서를 `review`로 → 됨 · 정상 승인 → frontmatter `status: approved` 커밋 존재, Version 없음, StatusChange에 commit_hash · 같은 상태로 다시 → 커밋 없음
-
+**테스트 관점** 규약 오류 문서를 `approved`로 → blocked · **미존재 참조가 있는 문서를 `approved`로 → blocked이고 `warnings`에 `ref.missing:`이 있다** · 같은 문서를 `draft`로 → 됨 · **상대 문서가 들어와 `resolve_missing`이 풀면 그 문서를 다시 저장하지 않아도 완료된다**(읽을 때 계산한다는 증거) · 정상 완료 → frontmatter `status: approved` 커밋 존재, Version 없음, StatusChange에 commit_hash · 같은 상태로 다시 → 커밋 없음 · `reason` 없이 불러도 된다 · 휴지통 문서 → `document-trashed`
 
 ---
 
@@ -192,17 +183,17 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 
 **처리** — 저장소 락 안
 1. `document = spec.get_document(doc_id)` · 없으면 `! not-found` · `trashed_at`이면 `! document-trashed`
-2. 끊어질 것 — `inbound = reference.inbound_of_document(id)`(이름으로) · `comments = collab.count(id)`. **막지 않는다** — 보여준다
-3. if `not confirm` → `! document-deletion-needs-confirm {doc_id, title, version_count, inbound_refs, comments}`. 웹은 여기 안 온다
+2. 끊어질 것 — `inbound = reference.inbound_of_document(id)`(이름으로). **막지 않는다** — 보여준다
+3. if `not confirm` → `! document-deletion-needs-confirm {doc_id, title, version_count, inbound_refs}`. 웹은 여기 안 온다
 4. `commit_hash = git.commit_push(repo.workdir, f"spec({doc_id}): 휴지통", author, delete=[STD-001 1.1 경로])` · 실패 → `! push-failed`. **여기까지 DB 쓰기 없음**
-5. **트랜잭션** — `pks = spec.trash(document, commit_hash, author)` · `broken = sum(tracking.raise_broken(pk) for pk in pks)` · 커밋 · 락 해제
+5. **트랜잭션** — `pks = spec.trash(document, commit_hash, author)` · `broken = reference.mark_missing(pks)` · 커밋 · 락 해제
 6. `→ TrashResult(doc_id, commit_hash, broken, next_step=f"{doc_id} 휴지통에 넣음 — 끊어진 참조 {broken}. 사람에게 알리고 멈춘다")`
 
 **예외** `not-found`(1) · `document-trashed`(1) · `document-deletion-needs-confirm`(3) · `push-failed`(4)
 
-**호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-003#ReferenceService.inbound_of_document]] [[SYNC-MS-005#CommentService.count]] [[SYNC-MS-009#git.commit_push]] [[SYNC-MS-002#SpecService.trash]] [[SYNC-MS-004#TrackingService.raise_broken]]
+**호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-003#ReferenceService.inbound_of_document]] [[SYNC-MS-009#git.commit_push]] [[SYNC-MS-002#SpecService.trash]] [[SYNC-MS-003#ReferenceService.mark_missing]]
 
-**테스트 관점** 남이 가리키는 문서도 confirm이면 들어간다 — `broken_refs`가 그 수 · 원격에서 파일 사라짐, 커밋 메시지 `spec(…): 휴지통` · 행·버전 남음, `trashed_at` 있음, 목록에서 빠짐 · 두 번 넣으면 `document-trashed` · 그 뒤 폴링이 `D`를 건너뛰고 `last_processed_commit`이 나아감 · 휴지통 문서에 `update_document`·상태 변경 → `document-trashed`
+**테스트 관점** 남이 가리키는 문서도 confirm이면 들어간다 — `broken_refs`가 그 수이고 그 참조들이 `is_missing` · 원격에서 파일 사라짐, 커밋 메시지 `spec(…): 휴지통` · 행·버전 남음, `trashed_at` 있음, 목록에서 빠짐 · 두 번 넣으면 `document-trashed` · 그 뒤 폴링이 `D`를 건너뛰고 `last_processed_commit`이 나아감 · 휴지통 문서에 `update_document`·상태 변경 → `document-trashed`
 
 ---
 
@@ -217,14 +208,14 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 2. `hash = spec.trash_commit(document.id)` · `body = git.read(repo.workdir, path, f"{hash}^")` — 지우기 직전 내용
 3. `body`의 frontmatter `status:`를 `draft`로 — DB가 `draft`라 mcp 경로의 `frontmatter.status_change`에 안 걸리게
 4. `r = save_pipeline(entry=author.via가 mcp면 mcp 아니면 web_revert, doc_id, None, body, expected_version=current_version_no, project_code=None, author, message=f"spec({doc_id}): 되살림 — 휴지통에서", changed_items=[] (mcp) | None, session=같은 세션)` — `validate`는 휴지통 문서의 삭제 항목을 `item.reused`에서 빼고(MS-002 validate 3), `save`가 항목을 복구하고 `trashed_at`을 비운다(MS-002 save 3·7)
-5. `tracking.release_broken_causes(되살아난 item_pks, author.user)` · 커밋
+5. 없음 — 되살아난 항목을 가리키던 미존재 참조는 `save_pipeline` 10a의 `resolve_missing(target_doc_id=doc_id)`가 이미 다시 이었다. 따로 할 일이 없다
 6. `→ r`
 
 **예외** `not-found` · `document-not-trashed`(1) · 파이프라인의 `convention-violation`(3a)·`push-failed`
 
-**호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.trash_commit]] [[SYNC-MS-009#git.read]] [[#pipeline.save_pipeline]] [[SYNC-MS-004#TrackingService.release_broken_causes]]
+**호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.trash_commit]] [[SYNC-MS-009#git.read]] [[#pipeline.save_pipeline]]
 
-**테스트 관점** 넣기 → 되살리기 → 본문이 지우기 직전과 같고 버전 +1 · `trashed_at` null · 항목 `is_deleted` 풀림 · 하위의 broken_ref가 `with_edit=false`로 풀림 · 목록에 다시 나옴 · 휴지통에 없는 문서 → `document-not-trashed`
+**테스트 관점** 넣기 → 되살리기 → 본문이 지우기 직전과 같고 버전 +1 · `trashed_at` null · 항목 `is_deleted` 풀림 · 하위에서 이 문서 항목을 가리키던 미존재 참조가 다시 이어진다 · 목록에 다시 나옴 · 휴지통에 없는 문서 → `document-not-trashed`
 
 ---
 
@@ -236,11 +227,11 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 
 **처리** — 저장소 락 안. 웹에서만 부른다
 1. `document = spec.get_document(doc_id)` · `trashed_at` 없으면 `! document-not-trashed`
-2. 문지기 셋 — `inbound = reference.inbound_of_document(id)` · `comments = collab.count(id)` · `flags = tracking.open_flags_of_document(item_pks)` · 하나라도 있으면 `! document-has-history {inbound_refs(이름), comments, flags}`
+2. 문지기 하나 — `inbound = reference.inbound_of_document(id)` · 있으면 `! document-has-history {inbound_refs(이름)}`. **미존재 참조는 안 센다** — `to_*`가 비어 `inbound`에 안 잡히고, 그것은 이 문서가 아니라 가리키는 쪽의 사정이다
 3. **트랜잭션** — `spec.delete_document(document)` · 커밋. 파일은 이미 저장소에 없다(휴지통 커밋) — push 없음
 4. `→ None`
 
-**테스트 관점** 휴지통 아닌 문서 → `document-not-trashed` · 남이 아직 가리킴 → `document-has-history`에 `inbound_refs` · 다 걷어낸 뒤 → 행 다섯 종류 0, 남의 해결된 플래그는 원인 칸만 null · 번호 재발급
+**테스트 관점** 휴지통 아닌 문서 → `document-not-trashed` · 남이 아직 가리킴 → `document-has-history`에 `inbound_refs` · 다 걷어낸 뒤 → 행 다섯 종류(documents·items·versions·status_changes·references) 0 · 남이 이 문서를 미존재로 가리키는 것은 막지 않는다 · 번호 재발급
 
 ---
 
@@ -262,7 +253,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 
 **호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-007#pipeline.save_pipeline]]
 
-**테스트 관점** v7에서 v6으로 → v8 생성, v7 남음 · 옛 본문이 현 규약 위반 → 거부 · 옛 본문에 없는 항목이 지금 있음 → 삭제 확인 요구 → confirm 후 broken_ref 플래그
+**테스트 관점** v7에서 v6으로 → v8 생성, v7 남음 · 옛 본문이 현 규약 위반 → 거부 · 옛 본문에 없는 항목이 지금 있음 → 삭제 확인 요구 → confirm 후 그 항목을 가리키던 참조가 미존재
 
 
 ---
@@ -288,12 +279,12 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
 4. 파일마다 (락은 `save_pipeline` 안에서):
    - `body = git.read(repo, path, head_hash)`
    - `doc_id` = **파일명**(github 경로는 `issue_doc_id`를 쓰지 않는다 — 커밋이 진실). `path_type` = 디렉터리명에서 번호를 뗀 것(`06-DOM` → `DOM`, STD-001 1.1). if `path_type != frontmatter.type` → `frontmatter.doc_id` 위반으로 처리(저장은 됨)
-   - github 진입은 **항목 삭제 확인을 건너뛴다** — 물어볼 상대가 없고 커밋이 진실이다. 사라진 항목은 `is_deleted` + `raise_broken`으로 통보
+   - github 진입은 **항목 삭제 확인을 건너뛴다** — 물어볼 상대가 없고 커밋이 진실이다. 사라진 항목은 `is_deleted` + `mark_missing`으로 통보
    - 파일명·디렉터리·미등록 작성자 위반은 저장 뒤 `spec.mark_convention_error`로 덧붙인다
    - `user = account.user_for_commit(author_email, author_login)` — **이메일 → login → 자리표시** 순([[SYNC-MS-006#AccountService.user_for_commit]])
    - if `user.github_user_id is None` → 위반에 `author.unknown: {author_login}` 추가. **판정은 「자리표시인가」이지 「방금 만들었나」가 아니다** — 후자로 하면 같은 사람의 둘째 문서부터 이미 행이 있어 오류가 안 붙는다(#34)
    - `author = Author(kind=human, user, instructed_by=None, via=github)`
-   - if `status == D` (파일 삭제) → **문서 행이 없거나 `trashed_at`이 있으면 건너뛴다** — 앱이 [[#pipeline.trash_document]]·[[#pipeline.purge_document]]로 만든 삭제 커밋이거나 등록 전에 사라진 파일이다. `mark_deleted`로 가면 `not-found`가 나서 그 커밋이 영영 「처리 실패」로 남고 `last_processed_commit`이 안 나아간다 · else → `deleted = spec.mark_deleted(document, commit_hash, author)` (`status=draft`, `file.deleted` 오류, 전 항목 `is_deleted`) · 각 pk에 `tracking.raise_broken` · 문서 행은 남는다 · 다음 파일로
+   - if `status == D` (파일 삭제) → **문서 행이 없거나 `trashed_at`이 있으면 건너뛴다** — 앱이 [[#pipeline.trash_document]]·[[#pipeline.purge_document]]로 만든 삭제 커밋이거나 등록 전에 사라진 파일이다. `mark_deleted`로 가면 `not-found`가 나서 그 커밋이 영영 「처리 실패」로 남고 `last_processed_commit`이 안 나아간다 · else → `deleted = spec.mark_deleted(document, commit_hash, author)` (`status=draft`, `file.deleted` 오류, 전 항목 `is_deleted`) · `reference.mark_missing(deleted)` · 문서 행은 남는다 · 다음 파일로
    - else → `save_pipeline(entry=github, doc_id, None, body, None, author, message=원 커밋 메시지, changed_items=None, commit_hash=file_commit_hash)` → 결과 모음
 5. `repo.last_processed_commit = head_hash`, `synced_at = now`
 6. `→ results`
@@ -302,7 +293,7 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
 
 **예외** 파일 하나 실패해도 다음 파일 계속. 실패 목록을 로그. `last_processed_commit`은 **전부 성공했을 때만** 갱신 — 아니면 다음 폴링이 다시 시도
 
-**호출하는 것** [[#pipeline.save_pipeline]] · `git.fetch` `git.changed_files` `git.read` · `AccountService.user_for_commit`
+**호출하는 것** [[#pipeline.save_pipeline]] · [[SYNC-MS-002#SpecService.mark_deleted]] [[SYNC-MS-003#ReferenceService.mark_missing]] · `git.fetch` `git.changed_files` `git.read` · `AccountService.user_for_commit`
 
 **테스트 관점**
 - 커밋 하나에 파일 둘: 결과 둘, 각각 새 버전
@@ -331,42 +322,37 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 1. `project, repo = project.get(code)`. 락 획득
 2. `git.fetch(repo.workdir)`, `git.checkout(repo.workdir, "origin/main")` · if fetch 실패 → `! rebuild-failed {reason}` (500으로 새지 않게)
 3. **트랜잭션 시작**
-3a. `old = spec.version_keys(project_id)` — **지우기 전에** `{옛 version_id: (document_id, commit_hash)}`를 뜬다. 버전 행이 사라지면 그 둘을 알 방법이 없다 — `propagation_decisions`·`flags`는 `version_id` 하나만 들고 있다(#38)
-4. `reference.clear(project_id)` · `spec.clear_index(project_id)` — `versions`와 커밋 있는 `status_changes` 삭제. `documents`·`items`는 유지(플래그·댓글 FK)
-4a. **`versions`를 가리키는 FK 넷을 여기서 센다**([[SYNC-MS-002#SpecService.clear_index]]). `references`는 4단계가 먼저 지우고, `propagation_decisions.version_id`·`flags.cause_version_id`·`flags.target_version_id`는 **7a가 다시 잇는다.** 이것들을 안 세서 실물 재구축이 죽었다 — 지금까지 "지우지 **않는** 테이블에 걸린 FK"만 셌다(#38)
+4. `reference.clear(project_id)` · `spec.clear_index(project_id)` — `versions`와 커밋 있는 `status_changes` 삭제. `documents`·`items`는 유지(`status_changes` FK, 항목 pk 보존)
+4a. **`versions`를 가리키는 FK는 `references.extracted_version_id` 하나다**([[SYNC-MS-002#SpecService.clear_index]]) — 4단계가 먼저 지운다. 지우는 테이블에 걸린 FK를 안 세서 실물 재구축이 죽은 적이 있다(#38). 전파결정·플래그가 사라지면서 재연결 단계(옛 3a·7a·7b)도 사라졌다
 5. `paths = git.list(repo, "docs/specs/*/*.md")` (`_templates`·`assets` 제외. 번호 붙은 디렉터리도 `*`에 걸린다)
 6. 파일마다:
    - `log = git.log(repo, path)` 오래된 것부터 `[(hash, login, email, date, message, path)]`
    - 커밋마다: `body = git.read(c.path @ hash)` — **그 커밋 시점의 경로로 읽는다.** 이름이 바뀐 문서는 옛 커밋에서 옛 경로에 있어 지금 경로로는 못 읽는다(#39) · `user = account.user_for_commit(email, login)` — `process_commit` 4단계와 **같은 순서**(이메일 → login → 자리표시)
      - if `message.startswith("status(")` → `spec.apply_status(…, commit_hash=hash)`만 (StatusChange 복원)
      - else if 이 문서의 첫 커밋 → `spec.create(...)` · else → `spec.save(document, body, hash, author, message, deleted=spec.detect_deleted_items(document, body), validate_result, rebuild=True)` — `version_no`는 남은 버전 수 + 1, `items` upsert. 커밋마다 삭제 항목도 반영한다
-   - 커밋마다 `save`가 돌려준 버전을 `new[(document_id, commit_hash)] = version.id`로 모은다 — 7a가 쓴다
-   - 마지막 커밋 본문으로 `reference.extract`, `spec.mark_convention_error(document_id, violations + extra, warnings)`
+   - 마지막 커밋 본문으로 `reference.extract`, `spec.mark_convention_error(document_id, violations + extra, warnings)`. 삭제된 항목을 가리키는 참조는 `extract` 4단계가 `is_deleted=false`만 찾으므로 **저절로 미존재**가 된다 — `mark_missing`을 따로 부르지 않는다
    - **`extra`에 작성자 위반을 얹는다** — 마지막 **본문** 커밋(`status(`가 아닌 것)의 작성자가 `github_user_id is None`이면 `author.unknown: {login}`. `mark_convention_error`는 항상 전량 교체라 여기서 안 얹으면 그 오류가 사라진다. 그래서 실물 인덱스에 규약 오류가 0건이었다(#34)
    - **마지막 본문 커밋을 기준으로 삼는 이유** — 문서의 `author.unknown`은 UI-5 배너가 `last_author`와 함께 보여주는 값이고 `process_commit`도 방금 저장한 버전의 작성자로 판정한다. 옛 커밋이 미등록이었어도 최신 커밋이 등록자면 문서는 깨끗하다
 7. `reference.resolve_missing(project_id)` — 파일 순서 때문에 미존재였던 참조 해제
-7a. `tracking.relink_versions(project_id, old, new)` — `old`는 3a에서 뜬 옛 지도, `new`는 6단계에서 모은 `{(document_id, commit_hash): 새 version_id}`. 전파결정과 플래그가 옛 버전 id를 가리키므로 새 id로 갈아 끼운다. 못 잇는 행은 지우고 몇 건을 왜 버렸는지 `RebuildResult.dropped`에 싣는다([[SYNC-MS-004#TrackingService.relink_versions]])
-7b. `tracking.reassign_open_flags(project_id)` — 버전을 다시 만들었으므로 열린 플래그의 담당자(= 대상 문서 최근 버전 작성자)를 다시 계산한다. `clear_index`는 flags를 안 지우고 담당자는 플래그를 만들 때 한 번만 정해지므로, 이게 없으면 **재구축이 절반만 끝난다** — 커밋 이메일을 등록해 작성자가 바뀌어도 플래그는 옛 자리표시를 계속 가리킨다([[SYNC-MS-004#TrackingService.reassign_open_flags]])
+7a~7b. 없음 — 전파결정·플래그를 새 버전에 다시 잇던 자리. 카드 V에서 걷어냈다
 8. `repo.last_processed_commit = HEAD`
 9. **커밋.** 락 해제
-10. `→ RebuildResult(docs, items, references, versions, convention_errors, dropped)`
+10. `→ RebuildResult(docs, items, references, versions, convention_errors)`
 
 **출력** [[SYNC-API-001]] `RebuildResult`
 
 **예외** 어느 단계든 실패하면 트랜잭션 롤백. DB는 재구축 전 상태로. `! rebuild-failed {reason}`
 
-**호출하는 것** [[SYNC-MS-002#SpecService.clear_index]] [[SYNC-MS-002#SpecService.version_keys]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.save]] [[SYNC-MS-002#SpecService.mark_convention_error]] · `ReferenceService.clear` `ReferenceService.extract` `ReferenceService.resolve_missing` · [[SYNC-MS-004#TrackingService.relink_versions]] [[SYNC-MS-004#TrackingService.reassign_open_flags]] · `AccountService.user_for_commit` · `git.*`
+**호출하는 것** [[SYNC-MS-002#SpecService.clear_index]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.save]] [[SYNC-MS-002#SpecService.mark_convention_error]] · `ReferenceService.clear` `ReferenceService.extract` `ReferenceService.resolve_missing` · `AccountService.user_for_commit` · `git.*`
 
 **테스트 관점**
 - DB 비운 뒤 재구축: 문서·항목·참조·버전 수가 저장소와 일치
-- 플래그·댓글이 있는 상태에서 재구축: 그대로 남음. **담당자는 다시 계산된다**(7b)
-- **전파결정이 있는 상태에서 재구축**: 행이 남고 `version_id`가 새 버전을 가리킨다. `affected_pks`는 그대로(항목 pk는 `save`의 upsert가 보존한다)
-- **`cause_version_id`가 있는 플래그**(`needs_check`·`upstream_impact`)로 재구축: 그 값이 새 버전으로 바뀐다
-- 문서가 삭제된 커밋에 매달린 결정: 버려지고 `RebuildResult.dropped`에 뜬다
+- 항목 pk가 재구축 전후로 같다(`items`는 안 지운다)
+- 삭제된 항목을 가리키던 참조: 재구축 뒤에도 `is_missing`이고 `raw_target`이 남는다
 - **두 번 재구축해도 `status_changes`가 안 늘어난다**(4단계가 커밋 있는 행을 지운다)
 - 파일 순서 때문에 미존재였던 참조가 7단계 후 해제됨
 - **미등록 작성자만 있는 저장소를 재구축: 문서에 `author.unknown`이 붙는다**(#34)
-- 커밋 이메일을 등록하고 재구축: 버전 작성자가 그 사람으로 바뀌고 `author.unknown`이 사라진다. 열린 플래그 담당자도 따라 바뀐다
+- 커밋 이메일을 등록하고 재구축: 버전 작성자가 그 사람으로 바뀌고 `author.unknown`이 사라진다
 - `status(` 커밋: Version 안 늘고 StatusChange 생김
 - 중간 실패: DB가 재구축 전과 같음
 
@@ -417,119 +403,6 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 **호출하는 것** [[#scheduler.catch_up]]
 
 **테스트 관점** `interval` 만큼 자고 부른다 · `catch_up`이 예외를 던져도 반복이 안 멈춘다
-
----
-
-#### pipeline.export_tracking 추적 데이터 백업
-
-**시그니처**
-```python
-async def export_tracking(code: str) -> str
-```
-
-근거: [[SYNC-INFRA-001]] 6.1 · [[SYNC-UI-002#UI-14]] 요소 2.4 · #16
-
-**입력** 프로젝트 코드 하나. 인자가 이것뿐인 이유 — 파일 경로(`backup/tracking.json`)·주기·작성자가 전부 인프라 6.1에서 고정됐다
-
-**처리**
-
-1. **저장소 락 획득** — `save_pipeline`·`rebuild`와 **같은 락**이다. `git.commit_push`가 맨 앞에서 `reset --hard origin/main`로 작업 사본을 갈아엎으므로, 저장 중인 파이프라인과 같은 자물쇠 아래 있어야 한다
-2. `project = ProjectService.get(code)` · `repo = project.repository` · `user = DB: users where id = repo.registered_by_user_id` · if 없음 → `! not-found {resource: user}`. **이 함수는 끝까지 DB를 읽기만 한다**
-3. `DB:` 전량 읽기 — `TrackingService.all_flags(project_id)` · `all_decisions(project_id)` · `CommentService.all_in_project(project_id)`. **해제된 플래그·결정된 전파도 싣는다** — 백업은 지금 남은 일이 아니라 그때 있었던 사실이다
-4. 지도 넷을 **한 번씩만** 뜬다 — `describe_items`(**삭제 포함**이라야 한다. `broken_ref`의 원인 항목은 `is_deleted`다) · `version_keys(project_id)` · `describe_documents` · `users_by_ids`
-5. 행을 자연키로 옮긴다(아래 표기). **`affected_pks`·`changed_pks`는 JSONB라 FK가 없다** — 지도에 없는 pk가 나오면 그 원소만 빼고 로그에 남긴다. 나머지 자리는 FK가 있어 못 옮길 수 없다
-6. 결정적으로 직렬화한다(아래)
-7. `git: git.commit_push(workdir, "chore({code}): 추적 데이터 백업 (플래그 f · 전파결정 d · 댓글 c)", Author(human, 등록자, None, Entry.backup), path="backup/tracking.json", content=본문)`. **내용이 같으면 커밋이 안 생기고 현재 HEAD가 온다** — 백업이 따로 비교하지 않는다([[SYNC-MS-009#git.commit_push]])
-8. 락 해제 · `→ 커밋 해시`
-
-**자연키 표기**
-
-| 가리키는 것 | 적는 법 | 예 |
-|---|---|---|
-| 항목 | `문서ID#항목ID` | `SYNC-PRD-001#R9` |
-| 버전 | `문서ID@커밋해시` | `SYNC-PRD-001@3f0ab95…` |
-| 문서 | `문서ID` | `SYNC-UI-002` |
-| 사람 | `github_login` | `HoyoungParkme` |
-| 댓글 | `{작성시각}|{작성자}` — 두 필드에서 **계산한다**(따로 안 적는다) | `2026-09-07T11:02:03.4+00:00|minjun` |
-
-**최상위에 `backup_version`과 `project`만 둔다.** `backup_version`은 형식이 바뀌었을 때 거절할 근거다. **지금은 2다** — 플래그에 `target_version`이 생겼다(#17). **1도 계속 읽는다**: 형식을 올렸다고 이미 떠 둔 백업을 못 읽게 만들면 정작 DB를 잃은 날 쓸모가 없다. 1에는 `target_version`이 없으므로 null로 읽는다. `project`는 **DB를 잃으면 이 파일이 어느 프로젝트 것인지 알 방법이 파일 안에만 있기 때문**이다. **내보낸 시각을 넣지 않는다** — 내용이 그대로여도 매 주기 파일이 바뀌어 빈 커밋이 쌓인다. 마지막 백업 시각은 커밋 자신이 들고 있다
-
-**결정적 직렬화.** 키 정렬 · 들여쓰기 2 · 비ASCII 그대로 · 끝 개행. 정렬 열쇠는 플래그 `(대상, 부여시각, 종류, 원인, 원인버전)` · 전파결정 `(버전)` · 댓글 `(문서, 작성시각, 작성자)` · 영향 항목 목록은 문자열 오름차순. **pk 순서를 그대로 쓰면 재구축 때마다 내용이 같아도 diff가 난다**
-
-**출력** 커밋 해시. **두 번 불러 같은 해시가 오면 새 커밋이 안 생긴 것**이다
-
-**예외** 프로젝트·등록자 없음 → `not-found` · 등록자 토큰이 풀렸거나 push 거부 → `push-failed`. 전부 [[#scheduler.backup_loop]]이 잡아 로그로 넘긴다 — **백업 실패가 앱을 멈추지 않는다.** 대신 UI-14 2.4의 늙은 시각이 사람에게 가는 신호다
-
-**호출하는 것** [[SYNC-MS-001#ProjectService.get]] · [[SYNC-MS-004#TrackingService.all_flags]] [[SYNC-MS-004#TrackingService.all_decisions]] · [[SYNC-MS-005#CommentService.all_in_project]] · [[SYNC-MS-002#SpecService.describe_items]] [[SYNC-MS-002#SpecService.describe_documents]] [[SYNC-MS-002#SpecService.version_keys]] · [[SYNC-MS-006#AccountService.users_by_ids]] · `git.commit_push`
-
-**테스트 관점** 행이 있는 프로젝트 → 파일이 커밋되고 파싱하면 행 수가 DB와 같다 · **두 번 불러도 커밋이 하나**(같은 해시) · 플래그를 해제하고 다시 부르면 커밋이 생긴다 · 파일에 댓글 본문·전파 사유·최상위 시각이 **없다** · 등록자에게 토큰이 없으면 `push-failed`이고 저장소는 그대로 · 백업 커밋이 `changed_files(…, "docs/specs/")`에 **안 잡힌다** · 행이 0건이어도 파일이 써진다(빈 배열 셋) — "백업이 도는데 아직 아무것도 없다"와 "백업이 멈췄다"가 구분돼야 한다
-
----
-
-#### pipeline.import_tracking 백업에서 복원
-
-**시그니처**
-```python
-async def import_tracking(code: str) -> RestoreResult
-```
-
-근거: [[SYNC-INFRA-001]] 6.1 · [[SYNC-UI-002#UI-14]] 요소 6 · [[SYNC-UC-001#UC-S6]] 뒤
-
-**처리**
-
-1. **저장소 락 획득.** 이유가 `export_tracking`과 다르다 — **재구축이 같은 락 안에서 `versions`를 지우고 다시 만든다.** 복원이 그 사이에 끼면 곧 사라질 버전에 결정을 붙인다
-2. `project = ProjectService.get(code)`
-3. `git: git.fetch(workdir)` · `본문 = git.read(workdir, "backup/tracking.json", "origin/main")` · 없으면 `! not-found {resource: backup, id: code}`. **`origin/main`로 읽는다** — 로컬 HEAD는 뒤처질 수 있고 백업은 원격이 진실이다
-4. `backup_version`이 **1도 2도 아니거나** `project`가 이 프로젝트가 아니면 `! backup-invalid {reason}`. **다른 프로젝트의 백업을 붓지 않는다**. 1이면 플래그의 `target_version`을 null로 본다
-5. 지도 넷을 만든다 — 행마다 조회하지 않는다. 문서(`get_document`, 없으면 그 문서를 가리키는 행은 전부 건너뜀) · 항목(`item_pks(document_id, include_deleted=True)`를 문서마다 한 번) · 버전(`version_keys`를 **뒤집는다** — 새 함수가 필요 없다) · 사람(`user_by_login` 없으면 `create_placeholder`)
-6. 플래그를 pk로 풀어 `TrackingService.restore_flags`
-7. 전파결정을 풀어 `restore_decisions`. `version`을 못 찾으면 행 전체를 버리고, `affected`·`changed`에서 못 찾는 항목은 **그 원소만** 뺀다
-8. 댓글을 **파일 순서대로 한 행씩** `CommentService.restore`. `자연키 → 새 id` 지도를 채우며 가고, 이미 있던 행도 지도에 넣는다 — 그래야 **반쯤 복원된 상태에서 다시 눌러도** 답글이 제 부모에 붙는다. 부모가 지도에 없으면 건너뛴다
-9. 커밋 · 락 해제 · `→ RestoreResult`
-
-**멱등이다.** 플래그는 `(종류, 대상, 원인, 원인버전, 부여시각)` · 전파결정은 `version_id`(UNIQUE) · 댓글은 `(문서, 작성자, 작성시각)`으로 판정한다. **플래그 열쇠에 `부여시각`이 드는 이유** — 앞 넷만으로는 모자란다. `has_unresolved`는 미해결만 보고 `raise_broken`은 중복 검사를 아예 안 해서, 해제한 뒤 같은 원인으로 다시 서면 같은 네 값의 행이 둘이 된다
-
-**이미 결정이 있는 버전은 덮어쓰지 않고 건너뛴다.** 지금 DB의 결정은 사람이 방금 내린 것일 수 있고 백업은 옛 사실이다
-
-**이름이 안 붙는 행은 건너뛰고 센다** — `RestoreResult.dropped`에 `{kind, count, reason}`으로. [[SYNC-MS-004#TrackingService.relink_versions]]와 같은 모양이라 UI-14 5.3이 같은 자리에 그린다
-
-| 못 찾는 것 | 어떻게 |
-|---|---|
-| 문서 | 그 문서의 댓글·그 문서 항목을 가리키는 플래그를 건너뜀 |
-| 항목 | 행 건너뜀. **`원인`이 있는데 못 찾으면 비우지 않고 버린다** — 비우면 UI-11의 원인 diff·중복 방지가 죽어 판단 재료 없는 빈 카드가 남는다(`relink_versions`와 같은 판단) |
-| 커밋 (전파결정의 버전 · 플래그의 `원인 버전`) | 행 건너뜀 |
-| 커밋 (플래그의 `대상 버전`) | **비우고 행은 넣는다.** 없으면 `target_changed_since_raise`가 `False`가 될 뿐이라 플래그는 여전히 쓸 수 있다 — 원인과 달리 판단의 뼈대가 아니다([[SYNC-MS-004#TrackingService.relink_versions]] 2단계와 같은 판단) |
-| 결정 안의 항목 | **그 원소만** 빼고 행은 넣는다 |
-| 부모 댓글 | 행 건너뜀. 최상위로 올리지 않는다 — 스레드가 아니었던 척하게 된다 |
-| 사람 | **건너뛰지 않는다.** 없으면 자리표시를 만든다. `author_user_id`가 NOT NULL이라 비울 수 없고, 재구축이 커밋 작성자로 자리표시를 만드는 길이 이미 있어 같은 규칙을 한 번 더 쓰는 것이다 |
-
-**복원된 댓글 본문.** `body`가 NOT NULL이라 무언가 들어가야 한다. 빈 문자열로 두면 화면에 빈 칸이 떠 사람이 버그로 읽는다 — **"백업에서 복원 — 본문은 백업에 없습니다"**를 넣는다. UI-14 S-1의 "자리만 살아난다"를 화면에서 말로 하는 자리다
-
-**예외** `not-found`(프로젝트·백업 파일) · `backup-invalid`(형식·프로젝트 불일치) · 중간 실패는 전체 롤백
-
-**호출하는 것** [[SYNC-MS-001#ProjectService.get]] · [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.item_pks]] [[SYNC-MS-002#SpecService.version_keys]] · [[SYNC-MS-004#TrackingService.restore_flags]] [[SYNC-MS-004#TrackingService.restore_decisions]] · [[SYNC-MS-005#CommentService.restore]] · [[SYNC-MS-006#AccountService.user_by_login]] [[SYNC-MS-006#AccountService.create_placeholder]] · `git.fetch` `git.read`
-
-**테스트 관점** 내보내고 → 세 표를 비우고 → 복원: 행 수와 값이 같다(본문·사유만 빈다) · **두 번 복원하면 둘째는 전부 0이고 `skipped`가 첫 번째의 합** · 다른 프로젝트 코드의 파일 → `backup-invalid` · 모르는 `backup_version` → `backup-invalid` · **`backup_version: 1` 파일(대상 버전 없음) → 복원되고 그 플래그의 `target_version_id`가 null** · 백업 파일 없음 → `not-found` · 문서 하나를 지우고 재구축한 뒤 복원 → 그 문서 관련 행만 `dropped` · 답글이 있는 스레드의 부모·자식 순서가 살아난다 · 모르는 login → 자리표시가 하나 생긴다 · **재구축을 안 하고 빈 DB에 복원 → 전부 `dropped`, 예외 없음**
-
----
-
-#### scheduler.backup_loop 주기 백업
-
-**시그니처** `async def backup_loop(interval: int) -> None`
-
-근거: [[SYNC-INFRA-001]] 6.1 · 5.2 `BACKUP_INTERVAL_SECONDS`
-
-**처리** `interval`초 **자고 나서** 프로젝트마다 [[#pipeline.export_tracking]]을 부르는 것을 끝없이 반복. 0 이하면 아예 켜지 않는다.
-
-**기동 시 한 번은 없다.** `poll_loop`와 다른 점이다. 기동 직후는 `catch_up`이 같은 작업 사본에서 fetch를 돌고 있고, 노트북을 자주 켰다 끄면 부팅마다 저장소 수만큼 reset이 붙는다. 백업은 하루 단위 값이라 몇 시간 늦어도 잃는 게 없다.
-
-**예외를 두 겹으로 잡는다.** 안쪽은 저장소 단위(하나가 실패해도 다음을 계속한다 — `catch_up`과 같은 규칙) · 바깥은 주기 단위(저장소 목록을 읽다 DB가 죽어도 반복이 안 멈춘다).
-
-**호출하는 것** [[SYNC-MS-001#ProjectService.list_projects]] · [[#pipeline.export_tracking]]
-
-**테스트 관점** `interval` 만큼 자고 부른다 · `export_tracking`이 던져도 다음 저장소를 계속한다 · **DB가 죽어도 반복이 안 멈춘다** · `BACKUP_INTERVAL_SECONDS=0`이면 태스크가 안 뜬다
-
----
 
 ---
 
