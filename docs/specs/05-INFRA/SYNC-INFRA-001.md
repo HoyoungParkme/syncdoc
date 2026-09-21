@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -288,7 +288,8 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 | `PUSH_RETRIES` | 3 | push 거부 시 rebase 후 재시도 횟수 |
 | `REPOS_DIR` | `/var/syncdoc/repos` | 작업 사본이 사는 곳 |
 | `LLM_API_KEY` | **빈 값** | 모델 키. 비면 읽는 중 질의가 꺼진다 (5.3) |
-| `LLM_MODEL` | — | 쓸 모델 이름 (5.3) |
+| `LLM_API_URL` | `https://api.openai.com/v1/chat/completions` | OpenAI 호환 Chat Completions 주소. 호환 서버면 바꾼다 (5.3) |
+| `LLM_MODEL` | `gpt-4o-mini` | 쓸 모델 이름 (5.3) |
 | `LLM_MAX_TURNS` | 10 | 한 대화에서 서버가 받는 최대 턴 수 (5.3) |
 
 `TUNNEL_TOKEN`은 앱이 읽지 않는다. `scripts/tunnel.sh`가 쓰는 값이라 `.env`에만 있다 (8장).
@@ -299,6 +300,7 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 
 | 항목 | 결정 |
 |---|---|
+| 어디에 | **OpenAI 호환 Chat Completions**(`LLM_API_URL`). 회사를 고정하지 않는다 — 같은 모양의 API를 내는 서버(OpenAI·로컬 모델 등)면 주소만 바꾼다. 요청은 `POST {LLM_API_URL}`, `Authorization: Bearer`, 본문 `{model, messages}`, 답은 `choices[0].message.content` |
 | 키 | **서버에 하나**(`LLM_API_KEY`). 사람마다 넣지 않는다 — 혼자 쓰는 도구고([[#C6]]), 사람마다 키를 두면 `users`에 컬럼이 늘고 5.1 재암호화가 하나 더 생긴다 |
 | 켜고 끄기 | 키가 비면 **기능이 꺼진다.** 화면에서 탭이 사라지고 나머지는 그대로 돈다. **기본이 빈 값이므로 켜는 쪽이 선택이다** |
 | 나가는 것 | 보고 있는 항목의 본문 · 그 항목의 상위·하위 참조 이름 · 문서 제목과 상태. **문서 전문이나 프로젝트 전체는 안 나간다** |
