@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -289,7 +289,7 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 | `REPOS_DIR` | `/var/syncdoc/repos` | 작업 사본이 사는 곳 |
 | `LLM_API_KEY` | **빈 값** | 모델 키. 비면 읽는 중 질의가 꺼진다 (5.3) |
 | `LLM_API_URL` | `https://api.openai.com/v1/chat/completions` | OpenAI 호환 Chat Completions 주소. 호환 서버면 바꾼다 (5.3) |
-| `LLM_MODEL` | `gpt-4o-mini` | 쓸 모델 이름 (5.3) |
+| `LLM_MODEL` | `gpt-4o` | 쓸 모델 이름 (5.3). mini는 항목 본문에 있는 것도 「모른다」고 내 첫날 바꿨다 |
 | `LLM_MAX_TURNS` | 10 | 한 대화에서 서버가 받는 최대 턴 수 (5.3) |
 
 `TUNNEL_TOKEN`은 앱이 읽지 않는다. `scripts/tunnel.sh`가 쓰는 값이라 `.env`에만 있다 (8장).
