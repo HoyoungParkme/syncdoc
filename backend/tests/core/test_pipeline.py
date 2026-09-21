@@ -32,10 +32,10 @@ PRD_BODY = PRD.replace("EXMP-RFQ-001#Q2", "EXMP-RFQ-001#Q1")
 @pytest.fixture
 def proj(scoped: Session, repos: dict) -> dict:
     """프로젝트 EXMP + 작업 사본(repos['work']) + 에이전트 작성자."""
-    p = Project(code="EXMP", name="예시")
+    u = make_user(scoped, login="hoyoung")
+    p = Project(code="EXMP", name="예시", owner_user_id=u.id)  # 등록한 사람이 소유자 (카드 W)
     scoped.add(p)
     scoped.flush()
-    u = make_user(scoped, login="hoyoung")
     scoped.add(
         Repository(
             project_id=p.id,
@@ -573,18 +573,25 @@ async def test_repo_status_and_rebuild_index(scoped: Session, proj) -> None:
 
     other, remote = proj["repos"]["other"], proj["repos"]["remote"]
     ps = ProjectService(scoped)
-    st = (await ps.repo_status())[0]
+    user = proj["user"]
+    st = (await ps.repo_status(user))[0]
     assert (st.code, st.last_processed_commit, st.behind_by) == ("EXMP", None, None)
     head = _push_history(other, remote)
-    r = await ps.rebuild_index("EXMP")
+    r = await ps.rebuild_index("EXMP", user)
     assert r.docs == 3
-    st = (await ps.repo_status())[0]
+    st = (await ps.repo_status(user))[0]
     assert (st.last_processed_commit, st.behind_by) == (head, 0) and st.synced_at is not None
     write_commit_push(other, RFQ_FILE, RFQ + "\n", "spec: 하나 더")
     # repo_status는 DB만 읽는다(MS-001). 폴링이 재기 전까지는 밖의 push를 모른다
-    assert (await ps.repo_status())[0].behind_by == 0
+    assert (await ps.repo_status(user))[0].behind_by == 0
     with pytest.raises(NotFound):
-        await ps.rebuild_index("NOPE")
+        await ps.rebuild_index("NOPE", user)
+    # 남의 프로젝트 — 없는 것과 같다. 관리 표에도 안 뜬다 (카드 W)
+    stranger = make_user(scoped, login="stranger")
+    with pytest.raises(NotFound) as ei:
+        await ps.rebuild_index("EXMP", stranger)
+    assert ei.value.extra == {"resource": "project", "id": "EXMP"}
+    assert await ps.repo_status(stranger) == []
 
 
 async def test_revert_can_restore_a_deleted_item(scoped: Session, proj) -> None:
@@ -851,7 +858,7 @@ async def test_catch_up_records_fetch_error_and_a_good_round_clears_it(
     assert _repo_row(proj).fetch_error, "실패 사유가 DB에 남아야 한다"
     # 화면에도 올라간다. 여기서는 백업 읽기도 같은 이유로 실패해 그쪽 문구가 이긴다
     # (MS-001 — 둘 다 "이 저장소를 지금 못 보고 있다"는 같은 말이라 한 칸에 모은다)
-    st = (await ProjectService(scoped).repo_status())[0]
+    st = (await ProjectService(scoped).repo_status(proj["user"]))[0]
     assert st.error and "gone" in st.error
 
     # 고치면 다음 주기가 지운다
@@ -865,7 +872,7 @@ async def test_catch_up_records_fetch_error_and_a_good_round_clears_it(
 
     scoped.expire_all()
     assert _repo_row(proj).fetch_error is None
-    assert (await ProjectService(scoped).repo_status())[0].error is None
+    assert (await ProjectService(scoped).repo_status(proj["user"]))[0].error is None
 
 
 async def test_process_commit_skips_commits_the_app_pushed_itself(scoped: Session, proj) -> None:
@@ -992,7 +999,7 @@ async def test_missing_ref_blocks_approve_and_clears_when_target_arrives(
     # RFQ 없이 PRD만 — R1이 EXMP-RFQ-001#Q1을 가리키는데 아직 없다
     await create(proj)
     assert svc.get_document("EXMP-PRD-001").incomplete_warnings == []  # 컬럼에는 안 들어간다
-    assert "EXMP-RFQ-001#Q1" in (await queries.document_view("EXMP-PRD-001")).missing_refs
+    assert "EXMP-RFQ-001#Q1" in (await queries.document_view("EXMP-PRD-001", user)).missing_refs
     with pytest.raises(StatusBlocked) as ei:
         await pipeline.change_status("EXMP-PRD-001", "approved", user, None)
     assert "ref.missing: EXMP-RFQ-001#Q1" in ei.value.extra["warnings"]
@@ -1001,7 +1008,7 @@ async def test_missing_ref_blocks_approve_and_clears_when_target_arrives(
     assert svc.get_document("EXMP-PRD-001").status == "draft"
     # 상대 문서가 들어오면 resolve_missing이 풀고, PRD를 다시 저장하지 않아도 완료된다
     await create(proj, DocType.RFQ, RFQ)
-    assert (await queries.document_view("EXMP-PRD-001")).missing_refs == []
+    assert (await queries.document_view("EXMP-PRD-001", user)).missing_refs == []
     await pipeline.change_status("EXMP-PRD-001", "approved", user, None)
     assert svc.get_document("EXMP-PRD-001").status == "approved"
 
@@ -1138,3 +1145,39 @@ async def test_saving_a_fixed_reference_clears_the_missing_ref(scoped: Session, 
     )
     await update(proj, "EXMP-PRD-001", fixed, 2, changed_items=["R1"])
     assert missing() == []
+
+
+# ── 카드 W — 소유 (MS-007 1단계 · get_owned) ──
+async def test_human_paths_hide_someone_elses_project_but_github_path_does_not(
+    scoped: Session, proj
+) -> None:
+    from app import scheduler
+
+    await create(proj, DocType.RFQ, RFQ)
+    await create(proj)
+    stranger = make_user(scoped, login="stranger")
+    s_author = Author(kind=AuthorKind.agent, user=stranger, instructed_by=stranger, via=Entry.mcp)
+    # mcp 저장 — 없는 것과 같다. get의 없음과 같은 필드라 존재가 새지 않는다
+    with pytest.raises(NotFound) as ei:
+        await pipeline.save_pipeline(
+            Entry.mcp, "EXMP-PRD-001", None, PRD_BODY + "\n", 1, None, s_author, "spec: 남"
+        )
+    assert ei.value.extra == {"resource": "project", "id": "EXMP"}
+    for coro in (
+        pipeline.change_status("EXMP-PRD-001", "approved", stranger, None),
+        pipeline.revert("EXMP-PRD-001", 1, stranger),
+        pipeline.trash_document("EXMP-PRD-001", s_author, confirm=True),
+        pipeline.restore_document("EXMP-PRD-001", s_author),
+        pipeline.purge_document("EXMP-PRD-001", s_author),
+    ):
+        with pytest.raises(NotFound):
+            await coro
+    assert SpecService(scoped).get_document("EXMP-PRD-001").current_version_no == 1
+    # github 경로는 사람이 없는 배치 — 소유와 무관하게 들어온다
+    other = proj["repos"]["other"]
+    g(other, "pull", "-q", "origin", "main")
+    head = write_commit_push(
+        other, "docs/specs/02-PRD/EXMP-PRD-001.md", PRD_BODY + "\n", "spec: 밖에서"
+    )
+    await scheduler.catch_up()
+    assert SpecService(scoped).get_document("EXMP-PRD-001").commit_hash == head
