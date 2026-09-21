@@ -49,7 +49,7 @@ async def test_s1_agent_builds_specs_over_mcp(
         1,
         "draft",
     )
-    assert rfq["pending_decision_version_id"] is None and "section.missing: 요구" in rfq["warnings"]
+    assert "pending_decision_version_id" not in rfq and "section.missing: 요구" in rfq["warnings"]
     # 문서 하나 쓰고 멈추라는 규약(STD-001 1.8)을 응답이 매번 말한다
     assert rfq["next_step"].startswith(
         "EXMP-RFQ-001 v1 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다"
@@ -146,9 +146,9 @@ async def test_s1_agent_builds_specs_over_mcp(
     )
     assert not err and r3["version_no"] == 2
     err, doc = await call("get_document", doc_id="EXMP-PRD-001")
-    assert not err and {i["item_id"]: i["flags"] for i in doc["items"]}["R1"] == [
-        "broken_ref"
-    ]  # 끊어진 참조
+    assert not err and {i["item_id"]: i["missing_refs"] for i in doc["items"]}["R1"] == [
+        "EXMP-RFQ-001#Q1"
+    ]  # 끊어진 참조 — 지워진 Q1을 가리키던 참조가 미존재로 돌아갔다 (mark_missing)
 
     # 저장소에 커밋이 있고 참조가 추출됨
     subjects = g(bare, "log", "--format=%s", "main").split("\n")
@@ -170,8 +170,8 @@ async def test_s1_agent_builds_specs_over_mcp(
     refs = scoped.execute(
         text('SELECT raw_target, is_missing FROM "references" ORDER BY raw_target')
     ).all()
-    # 참조 행은 PRD를 다시 저장할 때까지 그대로(MS-003 6단계). 끊어짐은 broken_ref 플래그가 알린다
-    assert ("EXMP-RFQ-001", False) in refs and ("EXMP-RFQ-001#Q1", False) in refs
+    # 항목이 지워지면 그것을 가리키던 참조는 미존재로 돌아간다(MS-003 mark_missing). 문서 참조는 그대로
+    assert ("EXMP-RFQ-001", False) in refs and ("EXMP-RFQ-001#Q1", True) in refs
     assert scoped.execute(text("SELECT is_deleted FROM items WHERE item_id='Q1'")).scalar() is True
     assert scoped.execute(text("SELECT count(*) FROM versions")).scalar() == 4
     err, lst = await call("list_documents", project_code="EXMP")

@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
-from app.core.tracking.service import TrackingService
 from app.core.types import DocType
 from app.mcp import tools
 from tests.core.reference.test_service import PRD, RFQ
@@ -21,15 +20,13 @@ async def call(tool: str, **args):
 
 
 def _seed(scoped: Session, a):
-    svc, ref, tr = SpecService(scoped), ReferenceService(scoped), TrackingService(scoped)
+    svc, ref = SpecService(scoped), ReferenceService(scoped)
     p = make_project(scoped)
     svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
     v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec: 테스트")
     d = svc.get_document("EXMP-PRD-001")
     pks = {i.item_id: i.pk for i in d.items}
     ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])
-    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
-    tr.raise_broken(q1)
     return p
 
 
@@ -78,13 +75,14 @@ async def test_get_document_and_get_item(scoped: Session, as_user) -> None:
         "instructed_by": "hoyoung",
         "via": "mcp",
     }
+    # 항목마다 대상이 없는 참조의 raw_target (API-002 get_document). R1 → Q9는 아직 없다
     assert d["items"] == [
-        {"item_id": "G1", "display_name": "목표", "flags": ["broken_ref"]},
-        {"item_id": "R1", "display_name": "기능", "flags": []},
+        {"item_id": "G1", "display_name": "목표", "missing_refs": []},
+        {"item_id": "R1", "display_name": "기능", "missing_refs": ["EXMP-RFQ-001#Q9"]},
     ]
     assert d["prev_doc_id"] == "EXMP-RFQ-001" and d["next_doc_id"] is None
     err, it = await call("get_item", doc_id="EXMP-PRD-001", item_id="G1")
-    assert not err and it["body"].startswith("#### G1 목표") and it["flags"] == ["broken_ref"]
+    assert not err and it["body"].startswith("#### G1 목표") and "flags" not in it
     assert (it["doc_status"], it["doc_version_no"]) == ("draft", 1)
 
 
@@ -114,11 +112,7 @@ async def test_list_documents_grouped_by_stage(scoped: Session, as_user) -> None
     assert not err and r["project_code"] == "EXMP" and len(r["stages"]) == 11
     by = {s["doc_type"]: s for s in r["stages"]}
     assert by["RFQ"]["doc_count"] == 1 and by["RFQ"]["docs"][0]["doc_id"] == "EXMP-RFQ-001"
-    assert by["PRD"]["docs"][0]["counts"] == {
-        "needs_check": 0,
-        "broken_ref": 1,
-        "unresolved_comments": 0,
-    }
+    assert by["PRD"]["docs"][0]["counts"] == {"broken_ref": 1}  # R1 → Q9 미존재
     assert by["UI"] == {"stage": 7, "doc_type": "UI", "status": None, "doc_count": 0, "docs": []}
     err, r = await call("list_documents", project_code="EXMP", stage=2)
     assert not err and [s["doc_type"] for s in r["stages"]] == ["PRD"]
@@ -199,9 +193,7 @@ async def test_init_project_tool(scoped: Session, as_user, repos, tmp_path, monk
     assert next(s for s in p["stages"] if s["doc_type"] == "PRD")["doc_count"] == 1
 
 
-async def test_get_references_splits_upstream_downstream_and_flags(
-    scoped: Session, as_user
-) -> None:
+async def test_get_references_splits_upstream_downstream(scoped: Session, as_user) -> None:
     _seed(scoped, as_user)
     err, r = await call("get_references", doc_id="EXMP-PRD-001", item_id="G1")
     assert not err and (r["doc_id"], r["item_id"]) == ("EXMP-PRD-001", "G1")
@@ -209,10 +201,7 @@ async def test_get_references_splits_upstream_downstream_and_flags(
         ("EXMP-PRD-001", "R1", False),
         ("EXMP-RFQ-001", "Q1", False),
     ]
-    assert r["downstream"] == []
-    assert [(f["kind"], f["cause"], f["cause_version_no"]) for f in r["flags"]] == [
-        ("broken_ref", "EXMP-RFQ-001#Q1", None)
-    ]
+    assert r["downstream"] == [] and "flags" not in r
     err, r = await call("get_references", doc_id="EXMP-PRD-001", item_id="R1")
     assert not err and [(u["raw_target"], u["is_missing"]) for u in r["upstream"]] == [
         ("EXMP-RFQ-001#Q9", True)
