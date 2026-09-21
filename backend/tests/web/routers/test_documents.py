@@ -1,4 +1,4 @@
-"""SYNC-API-001 3.4 — GET /api/docs/{docId} · /upstream · POST /status · 참조 · 댓글."""
+"""SYNC-API-001 3.4 — GET /api/docs/{docId} · POST /status(토글) · 참조."""
 
 from fastapi.testclient import TestClient
 from sqlalchemy import text
@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
-from app.core.tracking.service import TrackingService
 from app.core.types import DocType
 from tests.core.reference.test_service import PRD, RFQ
 from tests.core.spec.test_service import PRD as FULL_PRD
@@ -16,7 +15,7 @@ from tests.web.conftest import login
 
 
 def _seed(scoped: Session):
-    svc, ref, tr = SpecService(scoped), ReferenceService(scoped), TrackingService(scoped)
+    svc, ref = SpecService(scoped), ReferenceService(scoped)
     p = make_project(scoped)
     a = author(scoped)
     svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
@@ -24,8 +23,6 @@ def _seed(scoped: Session):
     d = svc.get_document("EXMP-PRD-001")
     pks = {i.item_id: i.pk for i in d.items}
     ref.extract(d.id, v.id, d.body, pks, ["EXMP-RFQ-001"])
-    q1 = next(i.pk for i in svc.get_document("EXMP-RFQ-001").items if i.item_id == "Q1")
-    tr.raise_broken(q1)
     return d
 
 
@@ -40,9 +37,10 @@ def test_get_document_upstream_references(client: TestClient, scoped: Session) -
         1,
         "h1",
     )
+    # 항목마다 대상이 없는 참조의 raw_target (API-002 items[].missing_refs). R1 → Q9는 아직 없다
     assert d["items"] == [
-        {"item_id": "G1", "display_name": "목표", "flags": ["broken_ref"]},
-        {"item_id": "R1", "display_name": "기능", "flags": []},
+        {"item_id": "G1", "display_name": "목표", "missing_refs": []},
+        {"item_id": "R1", "display_name": "기능", "missing_refs": ["EXMP-RFQ-001#Q9"]},
     ]
     assert (
         d["prev_doc_id"] == "EXMP-RFQ-001"
@@ -50,19 +48,12 @@ def test_get_document_upstream_references(client: TestClient, scoped: Session) -
         and d["last_author"]["kind"] == "agent"
     )
     assert client.get("/api/docs/EXMP-PRD-404").status_code == 404
-    up = client.get("/api/docs/EXMP-PRD-001/upstream").json()
-    assert [(u["target"]["doc_id"], u["target"]["item_id"], u["referenced_from"]) for u in up] == [
-        ("EXMP-RFQ-001", None, ["(문서)"]),
-        ("EXMP-RFQ-001", "Q1", ["G1"]),
-        ("EXMP-PRD-001", "R1", ["G1"]),
-    ]
     refs = client.get("/api/docs/EXMP-PRD-001/items/G1/references").json()
     assert sorted((r["doc_id"], r["item_id"]) for r in refs["upstream"]) == [
         ("EXMP-PRD-001", "R1"),
         ("EXMP-RFQ-001", "Q1"),
     ]
-    assert refs["flags"][0]["kind"] == "broken_ref" and refs["flags"][0]["cause"]["item_id"] == "Q1"
-    assert refs["flags"][0]["assignee"]["github_login"] == "hoyoung"
+    assert "flags" not in refs
     r1 = client.get("/api/docs/EXMP-PRD-001/items/R1/references").json()
     assert r1["upstream"] == [
         {
@@ -84,12 +75,16 @@ def test_get_document_upstream_references(client: TestClient, scoped: Session) -
 
 
 async def test_change_status_via_api(client: TestClient, scoped: Session, proj) -> None:
+    """토글 하나 — 초안 ⇄ 완료 (UC-H8). 상위 대조가 없고, 완료 게이트(status-blocked)만 남는다."""
     login(client, scoped)
     await create(proj, DocType.RFQ, RFQ)
     await create(proj, DocType.PRD, FULL_PRD.replace("EXMP-RFQ-001#Q2", "EXMP-RFQ-001#Q1"))
     r = client.post("/api/docs/EXMP-PRD-001/status", json={"to": "approved"})
-    assert r.status_code == 422 and r.json()["type"] == "urn:syncdoc:upstream-review-required"
-    # 절이 빠진(미완성) 문서는 생성 직후부터 승인 불가 — upstream 검사보다 먼저
+    assert r.status_code == 200 and r.json()["status"] == "approved"
+    assert r.json()["current_version_no"] == 1  # 상태 변경은 Version을 안 만든다
+    # 검토중은 없다 — 값 자체가 안 받아진다
+    assert client.post("/api/docs/EXMP-PRD-001/status", json={"to": "review"}).status_code == 422
+    # 절이 빠진(미완성) 문서는 생성 직후부터 완료 불가
     incomplete = await create(
         proj,
         DocType.PRD,
@@ -98,84 +93,19 @@ async def test_change_status_via_api(client: TestClient, scoped: Session, proj) 
         ),
     )
     r = client.post(f"/api/docs/{incomplete.doc_id}/status", json={"to": "approved"})
-    assert r.status_code == 409 and "section.missing: 비목표" in r.json()["warnings"]
-    r = client.post("/api/docs/EXMP-PRD-001/status", json={"to": "review", "reason": "검토"})
+    assert r.status_code == 409 and r.json()["type"] == "urn:syncdoc:status-blocked"
+    assert "section.missing: 비목표" in r.json()["warnings"]
+    # 다시 초안으로. reason은 선택 — 이력(UI-7)에 남는다
+    r = client.post("/api/docs/EXMP-PRD-001/status", json={"to": "draft", "reason": "다시 본다"})
     assert (
         r.status_code == 200
-        and r.json()["status"] == "review"
+        and r.json()["status"] == "draft"
         and r.json()["current_version_no"] == 1
-    )
-    r = client.post(
-        "/api/docs/EXMP-PRD-001/status",
-        json={
-            "to": "approved",
-            "upstream_reviewed": True,
-            "upstream_mismatch": ["EXMP-RFQ-001#Q1"],
-        },
-    )
-    assert r.status_code == 200 and r.json()["status"] == "approved"
-    assert (
-        scoped.execute(text("SELECT count(*) FROM flags WHERE kind='upstream_impact'")).scalar()
-        == 1
     )
     scoped.execute(
         text(
             "UPDATE documents SET has_convention_error=true, convention_error_detail='x' WHERE doc_id='EXMP-RFQ-001'"
         )
     )
-    r = client.post(
-        "/api/docs/EXMP-RFQ-001/status", json={"to": "approved", "upstream_reviewed": True}
-    )
+    r = client.post("/api/docs/EXMP-RFQ-001/status", json={"to": "approved"})
     assert r.status_code == 409 and r.json()["type"] == "urn:syncdoc:status-blocked"
-
-
-def test_comments_thread_and_resolve(client: TestClient, scoped: Session) -> None:
-    login(client, scoped, "minjun")
-    _seed(scoped)
-    assert client.get("/api/docs/EXMP-PRD-001/comments").json() == []
-    r = client.post("/api/docs/EXMP-PRD-001/comments", json={"line_no": 10, "body": "애매하다"})
-    assert (
-        r.status_code == 201
-        and r.json()["author"]["github_login"] == "minjun"
-        and r.json()["line_no"] == 10
-    )
-    top = r.json()
-    r = client.post(
-        "/api/docs/EXMP-PRD-001/comments",
-        json={"line_no": 10, "body": "답글", "parent_comment_id": top["id"]},
-    )
-    assert r.status_code == 201
-    assert (
-        client.post(
-            "/api/docs/EXMP-PRD-001/comments", json={"line_no": 999, "body": "x"}
-        ).status_code
-        == 422
-    )
-    assert (
-        client.post(
-            "/api/docs/EXMP-PRD-001/comments",
-            json={"line_no": 1, "body": "x", "parent_comment_id": 999999},
-        ).status_code
-        == 404
-    )
-    lst = client.get("/api/docs/EXMP-PRD-001/comments").json()
-    assert (
-        len(lst) == 1
-        and [x["body"] for x in lst[0]["replies"]] == ["답글"]
-        and lst[0]["doc_id"] == "EXMP-PRD-001"
-    )
-    docs = client.get("/api/projects/EXMP/docs").json()
-    assert (
-        next(d for d in docs if d["doc_id"] == "EXMP-PRD-001")["counts"]["unresolved_comments"] == 1
-    )
-    r = client.post(f"/api/comments/{top['id']}/resolve")
-    assert r.status_code == 200 and r.json()["is_resolved"] is True
-    assert (
-        next(
-            d for d in client.get("/api/projects/EXMP/docs").json() if d["doc_id"] == "EXMP-PRD-001"
-        )["counts"]["unresolved_comments"]
-        == 0
-    )
-    r = client.post(f"/api/comments/{top['id']}/resolve", json={"resolved": False})
-    assert r.json()["is_resolved"] is False
-    assert client.post("/api/comments/999999/resolve").status_code == 404

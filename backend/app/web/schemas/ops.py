@@ -17,7 +17,6 @@ class GraphNode(Base):
     item_id: str | None
     stage: int | None
     isolated: bool
-    has_flag: bool  # UI-8 3.1 — 노드 테두리·배경과 ▲
 
 
 class GraphEdge(Base):
@@ -53,8 +52,6 @@ class RepoStatus(Base):
     synced_at: datetime | None
     behind_by: int | None
     fetched_at: datetime | None
-    backed_up_at: datetime | None = None
-    backup_stale: bool = False
     error: str | None
 
 
@@ -63,31 +60,12 @@ class RebuildError(Base):
     detail: str
 
 
-class Dropped(Base):
-    """새 버전에 이어 붙일 수 없어 버린 추적 행 (UI-14 5.3)."""
-
-    kind: str
-    count: int
-    reason: str
-
-
 class RebuildResult(Base):
     docs: int
     items: int
     references: int
     versions: int
     convention_errors: list[RebuildError]
-    dropped: list[Dropped] = []
-
-
-class RestoreResult(Base):
-    """SYNC-API-001 RestoreResult — dropped가 RebuildResult와 같은 모양이다 (UI-14 5.3)."""
-
-    flags: int
-    decisions: int
-    comments: int
-    skipped: int
-    dropped: list[Dropped] = []
 
 
 class SaveResult(Base):
@@ -95,7 +73,6 @@ class SaveResult(Base):
     version_no: int
     commit_hash: str
     status: str
-    pending_decision_version_id: int | None
     warnings: list[str]
     next_step: str | None = None  # 웹 되돌리기는 null (API-001 SaveResult)
 

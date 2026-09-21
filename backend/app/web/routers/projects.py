@@ -9,12 +9,10 @@ from app.core import queries
 from app.core.account.models import User
 from app.core.project.service import ProjectService
 from app.core.types import DocumentSummary as DocumentSummaryDto
-from app.core.types import FlagSummary as FlagSummaryDto
 from app.core.types import GraphScope
 from app.db import get_session
 from app.web.auth import current_user
-from app.web.schemas.comments import CommentSummary
-from app.web.schemas.common import FlagSummary
+from app.web.schemas.common import BrokenRefSummary
 from app.web.schemas.documents import DocumentSummary
 from app.web.schemas.ops import Graph
 from app.web.schemas.projects import InitProject, ProjectDetail, ProjectSummary
@@ -57,31 +55,27 @@ async def trash_list(code: str, user: User = Depends(current_user)) -> list[Docu
 async def list_docs(
     code: str,
     stage: int | None = Query(None, ge=1, le=11),
-    status: str | None = Query(None, pattern="^(draft|review|approved)$"),
+    status: str | None = Query(None, pattern="^(draft|approved)$"),
     user: User = Depends(current_user),
 ) -> list[DocumentSummary]:
     """SYNC-API-001#GET/api/projects/{code}/docs"""
     return [DocumentSummary.of(d) for d in await queries.document_list(code, stage, status)]
 
 
-@router.get("/{code}/flags", response_model=list[FlagSummary | CommentSummary | DocumentSummary])
+@router.get("/{code}/flags", response_model=list[BrokenRefSummary | DocumentSummary])
 async def list_items(
     code: str,
-    kind: str = Query(
-        pattern="^(needs_check|broken_ref|upstream_impact|comments|convention_errors|incomplete)$"
-    ),
+    kind: str = Query(pattern="^(broken_ref|convention_errors|incomplete)$"),
     user: User = Depends(current_user),
 ) -> list:
-    """SYNC-API-001#GET/api/projects/{code}/flags"""
-    out = []
-    for x in await queries.project_items(code, kind):
-        if isinstance(x, FlagSummaryDto):
-            out.append(FlagSummary.of(x))
-        elif isinstance(x, DocumentSummaryDto):
-            out.append(DocumentSummary.of(x))
-        else:
-            out.append(CommentSummary.model_validate(x))
-    return out
+    """SYNC-API-001#GET/api/projects/{code}/flags
+
+    경로 이름은 flags로 남았다 — 항목 ID라 바꾸면 은퇴+신설. 끊어진 참조는 references.is_missing.
+    """
+    return [
+        DocumentSummary.of(x) if isinstance(x, DocumentSummaryDto) else BrokenRefSummary.of(x)
+        for x in await queries.project_items(code, kind)
+    ]
 
 
 @router.get("/{code}/graph", response_model=Graph)

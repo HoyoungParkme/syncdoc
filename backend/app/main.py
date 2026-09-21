@@ -22,18 +22,7 @@ from app.mcp.auth import BearerAuth
 from app.mcp.tools import server as mcp_server
 from app.web import auth
 from app.web.auth import SessionMiddleware
-from app.web.routers import (
-    account,
-    admin,
-    comments,
-    decisions,
-    documents,
-    flags,
-    hooks,
-    projects,
-    references,
-    todo,
-)
+from app.web.routers import account, admin, documents, hooks, projects, references
 
 log = logging.getLogger(__name__)
 
@@ -76,12 +65,6 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
         if settings.POLL_INTERVAL_SECONDS > 0:  # INFRA 7장 — 기동 시 따라잡기(1a) + 폴링(1b)
             tasks.append(asyncio.create_task(scheduler.catch_up()))
             tasks.append(asyncio.create_task(scheduler.poll_loop(settings.POLL_INTERVAL_SECONDS)))
-        # 폴링과 별도 if — 하나를 끄고 다른 하나를 볼 수 있어야 한다.
-        # 기동 시 한 번은 없다 (INFRA 6.1)
-        if settings.BACKUP_INTERVAL_SECONDS > 0:
-            tasks.append(
-                asyncio.create_task(scheduler.backup_loop(settings.BACKUP_INTERVAL_SECONDS))
-            )
         try:
             yield
         finally:
@@ -101,10 +84,6 @@ for r in (
     projects.router,
     documents.router,
     references.router,
-    comments.router,
-    todo.router,
-    flags.router,
-    decisions.router,
     admin.router,
     hooks.router,
 ):

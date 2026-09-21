@@ -19,7 +19,7 @@ class StageSummary(Base):
     status: str | None
     doc_count: int
     gate_warning: bool
-    flag_count: int
+    broken_count: int = 0  # 그 단계 문서들의 미존재 참조 합 (UI-2 2.2 테두리)
 
 
 class ProjectSummary(Base):
