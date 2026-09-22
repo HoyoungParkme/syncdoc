@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-001
 type: MS
 title: MINISPEC — ProjectService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -169,9 +169,13 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `async def rebuild_index(code: str, user: User) -> RebuildResult`
 
-**처리** `get_owned(code, user)` 확인 후 `pipeline.rebuild(code)`. 서비스가 pipeline을 부르는 유일한 곳(클래스 3.2). 소유 검사는 여기서 끝난다 — `rebuild`는 `get`을 쓴다(`init_project(import_existing)`도 부르므로)
+**처리**
+1. `get_owned(code, user)` — 소유 검사는 여기서 끝난다. `rebuild`는 `get`을 쓴다(`init_project(import_existing)`도 부르므로)
+2. `hash = git.sync_readme(repo.workdir, Author(human, user, None, web_status), code)` — README가 낡았으면 새 판으로 커밋·push([[SYNC-MS-009#git.sync_readme]], 카드 AB). **인덱스보다 먼저**: 그 커밋이 3의 `fetch` head에 들어가 밀림이 0으로 끝난다. `PushFailed`는 그대로 올린다 — 저장소에 쓰는 일이 실패했으면 인덱스는 건드리지 않는다(UC-S6 1a)
+3. `pipeline.rebuild(code)` — 서비스가 pipeline을 부르는 유일한 곳(클래스 3.2)
+4. `→ RebuildResult(…, readme_updated=hash is not None)`
 
-**테스트 관점** 남의 프로젝트 → `not-found`, 재구축 안 돎
+**테스트 관점** 남의 프로젝트 → `not-found`, 재구축 안 돎 · 낡은 README면 커밋이 하나 생기고 `readme_updated=true`, 이어서 재구축하면 밀림 0 · 같은 README면 커밋 없고 `false` · README push 실패면 인덱스가 그대로
 
 ---
 
