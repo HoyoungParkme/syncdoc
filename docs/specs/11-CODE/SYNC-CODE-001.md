@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
 
-**진행 상황**: 카드 37장. **A~AA 35장 완료**(2026-09-22), AB·AC 진행 중.
+**진행 상황**: 카드 37장. **A~AC 37장 완료**(2026-09-22).
 
 ---
 
@@ -850,7 +850,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | 화면 섹션을 좌우(`.split`)에서 **세로**(`.wfstack`)로 — 배치가 본문 전폭(1280이 넓은 창에서 1:1), 요소 표·규칙·시나리오는 아래. 배치 위 도구 줄(자연폭·배율 · 맞춤/원래 크기 · 전체보기)로 #130. 「전체보기」는 그림 전체보기(7.6)와 같은 층에 같은 srcdoc을 scale. FRAME_CSS를 문서 `<style>` **앞**으로(#132) · 정적 뷰 `#item-UI-N` 해시(#135) · `check_view_css` 넷째 쌍 `wireframeCss`↔`WF_SCREEN_CSS` |
 | 테스트 | `check_ui` 12/12(UI-5에 7.7~7.10) · `check_view_css` 넷 · `wf_build --selftest` · `view_build --all` · 사람이 넓은 창·좁은 창·전체보기·정적 뷰를 본다 |
 | 선행 | Z · AA |
-| 완료 | — |
+| 완료 | 2026-09-22 · 브랜치 `card/AC-wf-stack` · spec 5 + code 1 · `validate` 0/0 · `check_code` 110/110 · `check_ui` 12/12(UI-5 요소 45) · `check_dom` 10·10·10 · `check_tokens` 91/0 · **`check_view_css` 네 쌍 다 같음** · `wf_build --selftest` · `view_build --all` 오류 0 · 테스트 220 · 사람 확인(배포 뒤 브라우저): 정적 뷰 UI-5가 `#item-UI-5`로 바로 열리고 1406폭 1:1 · 앱 UI-5도 1361폭 1:1(창 1600) · 「전체보기」가 7.6 층에 같은 srcdoc을 100%로 띄우고 Esc로 닫힘 · 표 행↔배치 양방향 강조 · 창 1100에서 43% 축소와 「원래 크기」↔「맞춤」(가로 스크롤) · HB UI-1이 82%로 본문을 채우고 폰트·배지 그대로 · `[data-el]` 42개 전부 `position:relative` 유지(FRAME_CSS를 앞으로 옮겨도 배지가 산다) · 되먹임: 창이 1930px보다 좁으면 여전히 축소된다(목차 186 + 패널 250 + 여백) — 1:1로 보는 길은 「전체보기」다 |
 
 **왜 카드인가.** 카드 AA가 12화면을 제대로 그려 놨는데 뷰가 늘 57%로 줄여 보여 준다. 원인이 세 겹(`--doc-w` 1440 → `.split` 53:47 → `.left` 패딩)이라 한 줄로 안 고쳐지고, 같은 파일을 만지는 #130·#132·#135가 함께 붙는다.
 
@@ -913,7 +913,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | Z | `card/Z-wf-iframe` | `bccf473`~ | #121 | 2026-09-22 |
 | AA | `card/AA-sync-redesign` · hb#1 | `9fab38b` | #131 | 2026-09-22 |
 | AB | `card/AB-readme-links` | `6a0fd97`~ | — | 2026-09-22 |
-| AC | `card/AC-wf-stack` | — | — | — |
+| AC | `card/AC-wf-stack` | `f2a6f4d`~ | — | 2026-09-22 |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 | X | `card/X-ui-doc` | `7a4e821`~ | #103 | 2026-09-21 |
