@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -533,7 +533,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ```yaml
 /api/docs/{docId}/status:
   post:
-    summary: "상태 토글 — 초안 ⇄ 완료 (UI-5 요소 3, [[SYNC-UC-001#UC-H8]])"
+    summary: "상태 토글 — 초안 ⇄ 완료 (UI-5 요소 3, [[SYNC-UC-001#UC-H8]]). 밀린 커밋이 있으면 먼저 읽고, 저장소의 그 파일에서 status 줄만 바꿔 커밋한다"
     parameters:
     - $ref: '#/components/parameters/docId'
     requestBody:
@@ -616,7 +616,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ```yaml
 /api/docs/{docId}/revert:
   post:
-    summary: "되돌리기 (UI-7 다이얼로그 4, [[SYNC-UC-001#UC-H7]]). 새 버전 생성. 파이프라인 전부 탄다"
+    summary: "되돌리기 (UI-7 다이얼로그 4, [[SYNC-UC-001#UC-H7]]). 새 버전 생성. 파이프라인 전부 탄다. 밀린 커밋이 있으면 먼저 읽는다"
     parameters:
     - $ref: '#/components/parameters/docId'
     requestBody:
@@ -655,7 +655,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ```yaml
 /api/docs/{docId}:
   delete:
-    summary: 파일을 저장소에서 지우고 문서를 휴지통에 표시한다. 행·버전은 남는다 (PRD N3)
+    summary: 파일을 저장소에서 지우고 문서를 휴지통에 표시한다. 행·버전은 남는다 (PRD N3). 밀린 커밋이 있으면 먼저 읽는다
     parameters:
     - $ref: '#/components/parameters/docId'
     responses:
@@ -682,7 +682,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ```yaml
 /api/docs/{docId}/restore:
   post:
-    summary: 휴지통 커밋 직전 내용으로 새 버전을 만들고 휴지통 표시를 지운다
+    summary: 휴지통 커밋 직전 내용으로 새 버전을 만들고 휴지통 표시를 지운다. 밀린 커밋이 있으면 먼저 읽는다
     parameters:
     - $ref: '#/components/parameters/docId'
     responses:
