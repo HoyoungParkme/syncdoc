@@ -1,15 +1,29 @@
 """SYNC-MS-008 테스트 관점 — queries. 카드 V로 플래그·댓글·전파 조회는 사라졌다."""
 
+import itertools
+import json
+
 import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core import queries
-from app.core.errors import LlmNotConfigured, NotFound
+from app.core.errors import LlmNotConfigured, LlmUnavailable, NotFound
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
-from app.core.types import BrokenRefSummary, DocType, GraphScope
+from app.core.types import (
+    AskAnswer,
+    AskNote,
+    AskRead,
+    AskStart,
+    BrokenRefSummary,
+    DocType,
+    GraphScope,
+    LlmStep,
+    LlmUsage,
+    ToolCall,
+)
 from tests.core.reference.test_service import PRD, RFQ, UPSTREAM
 from tests.core.spec.test_service import author, make_project, owner
 
@@ -432,7 +446,7 @@ async def test_queries_hide_someone_elses_project(scoped: Session) -> None:
         assert ei.value.extra == {"resource": "project", "id": "EXMP"}
 
 
-# ── ask_item (카드 U) ──
+# ── ask_item · ask_tool (카드 Y — ReAct) ──
 def _seed_refs(scoped: Session):
     svc, ref = SpecService(scoped), ReferenceService(scoped)
     p = make_project(scoped)
@@ -451,75 +465,253 @@ def _rows(scoped: Session) -> dict[str, int]:
     }
 
 
+def _call(name: str, **args) -> ToolCall:
+    return ToolCall(f"c{len(args)}-{name}", name, args)
+
+
+def _step(text: str | None = None, calls: list[ToolCall] | None = None) -> LlmStep:
+    return LlmStep(text=text, tool_calls=calls or [], usage=LlmUsage(10, 2))
+
+
 @pytest.fixture
-def fake_llm(monkeypatch):
-    """llm.ask를 가짜로. 받은 system·messages를 기록한다."""
-    seen: list[tuple[str, list[dict]]] = []
+def script(monkeypatch):
+    """llm.step을 대본으로. install([LlmStep, …]) → 받은 (system, messages, tool_choice) 기록."""
+    seen: list[tuple[str, list[dict], str]] = []
 
-    async def ask(system: str, messages: list[dict]) -> str:
-        seen.append((system, messages))
-        return "답"
+    def install(steps: list[LlmStep]):
+        it = iter(steps)
 
-    monkeypatch.setattr(queries.llm, "ask", ask)
+        async def step(system, messages, tools, tool_choice="auto"):
+            seen.append((system, list(messages), tool_choice))
+            try:
+                return next(it)
+            except StopIteration:
+                raise AssertionError("대본이 끝났는데 또 불렀다") from None
+
+        monkeypatch.setattr(queries.llm, "step", step)
+        return seen
+
     monkeypatch.setattr(settings, "LLM_API_KEY", "sk-test")
-    return seen
+    return install
 
 
-async def test_ask_item_context_is_item_body_and_names_only(scoped: Session, fake_llm) -> None:
+async def _collect(gen):
+    return [e async for e in gen]
+
+
+async def test_ask_item_start_context_has_titles_and_item_names_but_no_body(
+    scoped: Session, script
+) -> None:
     _seed_refs(scoped)
     before = _rows(scoped)
-    got = await queries.ask_item("EXMP-PRD-001", "G1", "왜?", [], owner(scoped))
-    assert got.answer == "답" and _rows(scoped) == before  # DB에 아무것도 안 쓴다
-    system, messages = fake_llm[0]
-    # 문서 제목·상태·버전, 항목 ID·제목·본문 — 문서 전문은 아니다
+    seen = script([_step("답")])
+    events = await _collect(queries.ask_item("EXMP-PRD-001", "G1", "왜?", [], owner(scoped)))
+    assert events == [AskStart("EXMP-PRD-001", "G1"), AskAnswer("답", [])]
+    system, messages, choice = seen[0]
     assert "[문서] EXMP-PRD-001 제품 · 상태 draft · v1" in system
-    assert "[보고 있는 항목] G1 목표" in system and "근거 [[EXMP-RFQ-001#Q1]]" in system
-    assert "#### R1 기능" not in system and "절 본문의 참조" not in system
-    # 상위·하위는 ID와 이름만 — 본문(「내용」·「무시」)은 안 실린다
-    assert "EXMP-RFQ-001#Q1 첫 요구" in system and "EXMP-PRD-001#R1 기능" in system
-    assert "내용" not in system.split("[이 항목의 근거")[1]
-    assert "(하위)] 없음" in system
-    assert messages == [{"role": "user", "text": "왜?"}]
-    assert got.context_item_ids == ["G1", "EXMP-RFQ-001#Q1", "EXMP-PRD-001#R1"]
+    assert "[이 문서의 항목]\nG1 목표\nR1 기능" in system
+    assert "[지금 보는 항목] G1 목표" in system
+    assert "근거 [[EXMP-RFQ-001#Q1]]" not in system  # 본문은 안 실린다 — 도구로 읽는다
+    assert messages == [{"role": "user", "text": "왜?"}] and choice == "auto"
+    assert _rows(scoped) == before
 
 
-async def test_ask_item_downstream_names_and_missing_upstream(scoped: Session, fake_llm) -> None:
+async def test_ask_item_without_item_has_no_viewing_line(scoped: Session, script) -> None:
     _seed_refs(scoped)
-    got = await queries.ask_item("EXMP-PRD-001", "R1", "?", [], owner(scoped))
-    system, _ = fake_llm[0]
-    assert "(하위)] EXMP-PRD-001#G1 목표" in system
-    assert "EXMP-RFQ-001#Q9" in system  # 미존재 참조는 raw_target 그대로
-    assert got.context_item_ids[0] == "R1" and "EXMP-PRD-001#G1" in got.context_item_ids
+    seen = script([_step("답")])
+    events = await _collect(queries.ask_item("EXMP-PRD-001", None, "?", [], owner(scoped)))
+    assert events[0] == AskStart("EXMP-PRD-001", None)
+    assert "[지금 보는 항목]" not in seen[0][0]
 
 
-async def test_ask_item_trims_history_to_max_turns(scoped: Session, fake_llm, monkeypatch) -> None:
+async def test_ask_item_loop_emits_note_read_in_order_and_records_reads(
+    scoped: Session, script
+) -> None:
+    _seed_refs(scoped)
+    before = _rows(scoped)
+    seen = script(
+        [
+            _step(
+                "먼저 읽자",
+                [_call("get_item", doc_id="EXMP-PRD-001", item_id="G1", reason="G1 본문을 본다")],
+            ),
+            _step(
+                None,
+                [
+                    _call(
+                        "get_references",
+                        doc_id="EXMP-PRD-001",
+                        item_id="G1",
+                        reason="근거를 따라간다",
+                    ),
+                    _call("get_item", doc_id="EXMP-RFQ-001", item_id="Q1", reason="Q1을 읽는다"),
+                ],
+            ),
+            _step("Q1이 근거다"),
+        ]
+    )
+    events = await _collect(
+        queries.ask_item("EXMP-PRD-001", "G1", "근거가 뭐야?", [], owner(scoped))
+    )
+    assert events == [
+        AskStart("EXMP-PRD-001", "G1"),
+        AskNote("먼저 읽자"),
+        AskNote("G1 본문을 본다"),
+        AskRead("get_item", "EXMP-PRD-001#G1"),
+        AskNote("근거를 따라간다"),
+        AskRead("get_references", "EXMP-PRD-001#G1"),
+        AskNote("Q1을 읽는다"),
+        AskRead("get_item", "EXMP-RFQ-001#Q1"),
+        AskAnswer("Q1이 근거다", ["EXMP-PRD-001#G1", "EXMP-RFQ-001#Q1"]),  # 중복은 접힌다
+    ]
+    # 대화록: 도구 결과가 tool 항목으로 쌓여 다음 호출에 실린다
+    _, messages, _ = seen[2]
+    roles = [m["role"] for m in messages]
+    assert roles == ["user", "assistant", "tool", "assistant", "tool", "tool"]
+    assert '"body"' in messages[2]["text"] and "근거 [[EXMP-RFQ-001#Q1]]" in messages[2]["text"]
+    assert _rows(scoped) == before
+
+
+async def test_ask_item_wraps_up_after_eight_calls(scoped: Session, script) -> None:
+    _seed_refs(scoped)
+    steps = [
+        _step(None, [_call("get_item", doc_id="EXMP-PRD-001", item_id="G1", reason="또")])
+        for _ in range(8)
+    ]
+    steps.append(_step("읽은 것으로 답"))
+    seen = script(steps)
+    events = await _collect(queries.ask_item("EXMP-PRD-001", "G1", "?", [], owner(scoped)))
+    assert events[-1] == AskAnswer("읽은 것으로 답", ["EXMP-PRD-001#G1"])
+    assert len(seen) == 9  # 도구 8번 + 마무리 1번
+    system, messages, choice = seen[8]
+    assert choice == "none" and messages[-1] == {"role": "user", "text": queries._ASK_WRAP_UP}
+
+
+async def test_ask_item_wraps_up_on_time_limit_and_fails_if_still_no_answer(
+    scoped: Session, script, monkeypatch
+) -> None:
+    _seed_refs(scoped)
+    clock = itertools.chain([0.0], itertools.repeat(200.0))
+    monkeypatch.setattr(queries.time, "monotonic", lambda: next(clock))
+    script(
+        [
+            _step(None, [_call("get_item", doc_id="EXMP-PRD-001", item_id="G1", reason="한 번")]),
+            _step(None),
+        ]
+    )
+    with pytest.raises(LlmUnavailable) as e:
+        await _collect(queries.ask_item("EXMP-PRD-001", "G1", "?", [], owner(scoped)))
+    assert e.value.extra["reason"] == "상한 뒤에도 답이 없다"
+
+
+async def test_ask_item_trims_history_and_logs_usage(
+    scoped: Session, script, monkeypatch, caplog
+) -> None:
     _seed_refs(scoped)
     monkeypatch.setattr(settings, "LLM_MAX_TURNS", 2)
+    seen = script([_step("답")])
     hist = [{"role": "user", "text": f"q{i}"} for i in range(5)]
-    await queries.ask_item("EXMP-PRD-001", "G1", "마지막", hist, owner(scoped))
-    _, messages = fake_llm[0]
-    assert [m["text"] for m in messages] == ["q3", "q4", "마지막"]  # 뒤에서 2턴 + 지금 질문
+    with caplog.at_level("INFO", logger="app.core.queries"):
+        await _collect(queries.ask_item("EXMP-PRD-001", "G1", "마지막", hist, owner(scoped)))
+    _, messages, _ = seen[0]
+    assert [m["text"] for m in messages] == ["q3", "q4", "마지막"]
+    line = next(r.message for r in caplog.records if r.message.startswith("ask "))
+    assert "calls=0" in line and "prompt=10" in line and "completion=2" in line
+    assert "목표" not in line and "마지막" not in line  # 본문·질문은 로그에 없다
 
 
 async def test_ask_item_without_key_blocks_before_reading(scoped: Session, monkeypatch) -> None:
     _seed_refs(scoped)
     monkeypatch.setattr(settings, "LLM_API_KEY", "")
-
-    def boom(*a, **k):
-        raise AssertionError("SpecService를 부르면 안 된다")
-
-    monkeypatch.setattr(SpecService, "get_item", boom)
+    called = []
+    monkeypatch.setattr(SpecService, "get_document", lambda *a, **k: called.append(1))
     with pytest.raises(LlmNotConfigured):
-        await queries.ask_item("EXMP-PRD-001", "G1", "?", [], owner(scoped))
+        await _collect(queries.ask_item("EXMP-PRD-001", "G1", "?", [], owner(scoped)))
+    assert called == []
 
 
-async def test_ask_item_of_other_owner_or_missing_item_is_not_found(
-    scoped: Session, fake_llm
+async def test_ask_item_of_other_owner_or_missing_item_is_not_found_before_start(
+    scoped: Session, script
 ) -> None:
     _seed_refs(scoped)
+    seen = script([_step("답")])
+    gen = queries.ask_item("EXMP-PRD-001", "G1", "?", [], owner(scoped, "minjun"))
     with pytest.raises(NotFound) as e:
-        await queries.ask_item("EXMP-PRD-001", "G1", "?", [], owner(scoped, "minjun"))
+        await anext(gen)
     assert e.value.extra["resource"] == "project"
+    gen = queries.ask_item("EXMP-PRD-001", "G9", "?", [], owner(scoped))
+    with pytest.raises(NotFound) as e:
+        await anext(gen)
+    assert e.value.extra["resource"] == "item"
+    assert seen == []  # 모델을 부르기 전에 막힌다
+
+
+async def test_ask_tool_get_item_references_chain_documents_list(scoped: Session) -> None:
+    _seed_refs(scoped)
+    u = owner(scoped)
+    r = await queries.ask_tool(
+        "get_item", {"doc_id": "EXMP-PRD-001", "item_id": "G1", "reason": "r"}, "EXMP", u
+    )
+    got = json.loads(r.text)
+    assert r.target == "EXMP-PRD-001#G1"
+    assert set(got) == {"doc_id", "item_id", "display_name", "doc_status", "doc_version_no", "body"}
+    assert got["body"].startswith("#### G1 목표")
+
+    r = await queries.ask_tool(
+        "get_references", {"doc_id": "EXMP-PRD-001", "item_id": "R1", "reason": "r"}, "EXMP", u
+    )
+    got = json.loads(r.text)
+    assert r.target == "EXMP-PRD-001#R1"
+    assert {"raw_target": "EXMP-RFQ-001#Q9", "note": "아직 없음"} in got["upstream"]  # 끊어진 참조
+    assert got["downstream"] == [{"id": "EXMP-PRD-001#G1", "name": "목표"}]
+
+    r = await queries.ask_tool(
+        "item_chain", {"doc_id": "EXMP-PRD-001", "item_id": "G1", "reason": "r"}, "EXMP", u
+    )
+    got = json.loads(r.text)
+    assert got["item"] == {"id": "EXMP-PRD-001#G1", "name": "목표"}
+    assert len(got["rows"]) == 11 and got["rows"][3]["items"] == []  # 빈 단계도 행으로
+    assert {
+        "id": "EXMP-RFQ-001#Q1",
+        "name": "첫 요구",
+        "role": "upstream",
+        "status": "draft",
+    } in got["rows"][0]["items"]
+
+    r = await queries.ask_tool("list_documents", {"reason": "r"}, "EXMP", u)
+    got = json.loads(r.text)
+    assert r.target is None
+    assert [(d["doc_id"], d["title"], d["status"]) for d in got] == [
+        ("EXMP-RFQ-001", "요구", "draft"),
+        ("EXMP-PRD-001", "제품", "draft"),
+    ]
+
+    r = await queries.ask_tool("get_document", {"doc_id": "EXMP-RFQ-001", "reason": "r"}, "EXMP", u)
+    got = json.loads(r.text)
+    assert (
+        r.target == "EXMP-RFQ-001" and got["title"] == "요구" and "#### Q1 첫 요구" in got["body"]
+    )
+    assert got["items"] == [
+        {"item_id": "Q1", "display_name": "첫 요구"},
+        {"item_id": "Q2", "display_name": "둘째"},
+    ]
+
+
+async def test_ask_tool_errors_are_text_not_exceptions(scoped: Session) -> None:
+    _seed_refs(scoped)
+    u = owner(scoped)
+    r = await queries.ask_tool(
+        "get_item", {"doc_id": "EXMP-PRD-001", "item_id": "G9", "reason": "r"}, "EXMP", u
+    )
+    assert r.target is None and json.loads(r.text)["error"] == "없음"
+    r = await queries.ask_tool(
+        "get_item", {"doc_id": "OTHR-PRD-001", "item_id": "G1", "reason": "r"}, "EXMP", u
+    )
+    assert json.loads(r.text) == {"error": "없음", "doc_id": "OTHR-PRD-001"}
+    r = await queries.ask_tool("get_item", {"doc_id": "EXMP-PRD-001"}, "EXMP", u)
+    assert "item_id" in json.loads(r.text)["error"] and "reason" in json.loads(r.text)["error"]
+    r = await queries.ask_tool("write_document", {"reason": "r"}, "EXMP", u)
+    assert "모르는 도구" in json.loads(r.text)["error"]
+    # 남의 프로젝트는 텍스트가 아니라 not-found 전파(→ error 이벤트)
     with pytest.raises(NotFound):
-        await queries.ask_item("EXMP-PRD-001", "G9", "?", [], owner(scoped))
-    assert fake_llm == []  # 모델을 부르기 전에 막힌다
+        await queries.ask_tool("list_documents", {"reason": "r"}, "EXMP", owner(scoped, "minjun"))

@@ -4,9 +4,16 @@ B1: project_summary · document_list · document_view · item_view.
 B2: project_detail · item_references_view. B3: project_items · diff_with_impact.
 B4: graph_view · downstream_view · document_view 4a. 세션은 db.session_scope().
 카드 V가 플래그·댓글·전파 조회(todo·decision_view·flag_view·upstream_checklist)를 걷어냈다.
+카드 Y: ask_item이 ReAct 루프가 됐고, 도구 실행은 ask_tool이 여기 있는 조회로 닫는다.
 """
 
 from __future__ import annotations
+
+import json
+import logging
+import time
+from collections.abc import AsyncIterator
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -14,7 +21,7 @@ from app import db
 from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import AccountService
-from app.core.errors import LlmNotConfigured
+from app.core.errors import ItemDeleted, LlmNotConfigured, LlmUnavailable, NotFound
 from app.core.project.models import Project
 from app.core.project.service import ProjectService
 from app.core.reference.service import ReferenceService
@@ -23,6 +30,10 @@ from app.core.types import (
     STAGE_OF,
     ApiAuthor,
     AskAnswer,
+    AskEvent,
+    AskNote,
+    AskRead,
+    AskStart,
     AuthorRef,
     BrokenRefSummary,
     ChainItem,
@@ -45,6 +56,8 @@ from app.core.types import (
     ProjectSummary,
     RefEdge,
     StageSummary,
+    ToolResult,
+    ToolSpec,
     UserRef,
 )
 from app.infra import llm
@@ -457,73 +470,284 @@ def _title_of(spec: SpecService, doc_id: str) -> str:
     return refs[d.id].title if d.id in refs else doc_id
 
 
-_ASK_SYSTEM = """당신은 명세를 읽는 사람 옆에서 그 자리를 설명한다.
+_log = logging.getLogger(__name__)
 
-아래 맥락에 있는 것만으로 답한다. 보고 있는 항목 자체를 묻는 질문(이게 뭐야·왜 이렇게
-했어·어떻게 만들었어)은 본문으로 답한다. 모른다는 맥락에 정말 없을 때만 말하고,
-그때는 어느 명세 단계(RFQ~CODE)가 아직 안 쓰였는지 짚어 준다. 지어내지 않는다.
+_ASK_SYSTEM = """당신은 명세를 읽는 사람 옆에서 그 자리를 설명한다. 문서 하나가 열려 있고, 당신은 도구로
+같은 프로젝트의 다른 문서와 항목을 읽을 수 있다. 읽기만 한다 — 쓰는 도구는 없다.
 
-답에 근거를 댈 때는 맥락에 있는 항목 ID를 그대로 쓴다. 없는 ID를 만들지 않는다.
+읽은 것만으로 답한다. 처음에는 아래 문서의 항목 목록만 있고 본문은 없다. 답에 필요한
+본문은 도구로 읽는다. 보고 있는 항목 자체를 묻는 질문(이게 뭐야·왜 이렇게 했어)은 그
+항목을 get_item으로 읽고 본문으로 답한다. 근거·영향을 물으면 get_references나
+item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽는다. get_document는
+문서 전체를 훑어야 할 때만 쓴다 — 크다. 앞 대화에서 읽은 것은 다시 실리지 않으므로
+필요하면 다시 읽는다.
 
-명세를 고치라고 하지 않는다. 당신은 읽기를 돕는 자리이고, 본문을 쓰는 것은
-사람과 그 사람의 에이전트가 한다.
+도구를 부를 때마다 reason에 한 줄로 무엇을 왜 읽는지 적는다. 그 줄이 사람에게 보인다.
+
+도구는 여덟 번까지, 전체 두 분 안이다. 「지금까지 읽은 것으로 답하라」는 말을 받으면
+더 읽지 않고 그때까지 읽은 것으로 답한다.
+
+모른다는 읽어도 정말 없을 때만 말하고, 그때는 어느 명세 단계(RFQ~CODE)가 아직 안
+쓰였는지 짚어 준다 — item_chain의 빈 단계나 「아직 없음」 참조가 그 근거다.
+지어내지 않는다.
+
+답에 근거를 댈 때는 읽은 항목 ID(문서ID#항목ID)를 그대로 쓴다. 없는 ID를 만들지 않는다.
+
+명세를 고치라고 하지 않는다. 당신은 읽기를 돕는 자리이고, 본문을 쓰는 것은 사람과
+그 사람의 에이전트가 한다.
 
 [문서] {doc_id} {title} · 상태 {status} · v{version_no}
-[보고 있는 항목] {item_id} {display_name}
-{body}
-[이 항목의 근거 (상위)] {upstream_ids_and_names}
-[이 항목에서 나온 것 (하위)] {downstream_ids_and_names}"""
+[이 문서의 항목]
+{items}
+{viewing}"""
+
+_ASK_WRAP_UP = "도구 호출 상한(또는 시간 상한)에 닿았다. 지금까지 읽은 것으로 답하라. 못 읽은 것이 있으면 무엇을 못 읽었는지 말한다."
+
+_ASK_MAX_CALLS = 8  # 도구 호출 상한. 설정이 아니라 상수다 (사용자 결정 2026-09-22)
+_ASK_TIME_LIMIT = 120.0  # 초. 호출 사이에서만 본다 — 호출 하나가 60초라 최악 180초
+
+_REASON = {"type": "string", "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"}
+_DOC = {"type": "string", "description": "문서 ID. 예: SYNC-PRD-001"}
+_ITEM = {"type": "string", "description": "항목 ID. 예: R11, queries.ask_item"}
 
 
-def _ids_and_names(refs: list[ItemRef]) -> tuple[list[str], str]:
-    ids = [f"{r.doc_id}#{r.item_id}" if r.item_id else (r.doc_id or r.raw_target) for r in refs]
-    names = [
-        f"{i} {r.display_name}" if r.display_name else i for i, r in zip(ids, refs, strict=True)
-    ]
-    return ids, ", ".join(names) if names else "없음"
+def _tool(name: str, description: str, props: dict[str, Any]) -> ToolSpec:
+    return ToolSpec(
+        name=name,
+        description=description,
+        parameters={
+            "type": "object",
+            "properties": {**props, "reason": _REASON},
+            "required": [*props, "reason"],
+        },
+    )
+
+
+# 설명은 SYNC-API-002 도구 설명 원문. 같은 이름·같은 뜻 — 에이전트가 이미 보는 것과 같다
+_ASK_TOOLS: list[ToolSpec] = [
+    _tool(
+        "get_item",
+        "문서 안 항목 하나의 본문 블록과 소속 문서의 상태·버전을 돌려준다. get_document로 문서 전체를 받는 대신 필요한 항목만 볼 때, 또는 본문에서 발견한 [[문서ID#항목ID]] 참조를 따라갈 때 부른다.",
+        {"doc_id": _DOC, "item_id": _ITEM},
+    ),
+    _tool(
+        "get_references",
+        "항목의 상위 참조(이 항목이 근거로 삼은 것)와 하위 참조(이 항목을 근거로 삼은 것)를 나눠 돌려준다. 이 항목이 왜 있는지, 바꾸면 어디에 영향이 가는지 알아야 할 때 부른다. 목록만 주고 본문은 펼치지 않는다. 필요한 항목만 get_item으로 다시 요청한다. 문서 단위 참조는 제목·상태만, 아직 없는 대상은 note가 「아직 없음」이다.",
+        {"doc_id": _DOC, "item_id": _ITEM},
+    ),
+    _tool(
+        "item_chain",
+        "항목에서 전이적으로 이어지는 상위·하위 항목을 11단계(RFQ~CODE) 행으로 돌려준다. ID와 이름만. 빈 단계도 행으로 남는다 — 어느 명세 단계가 아직 안 쓰였는지의 근거다.",
+        {"doc_id": _DOC, "item_id": _ITEM},
+    ),
+    _tool(
+        "list_documents",
+        "이 프로젝트의 11단계별 문서 목록과 각 문서의 제목·상태·버전을 돌려준다. 어느 단계까지 채워졌는지 알아야 할 때 부른다. 문서 본문은 포함하지 않는다.",
+        {},
+    ),
+    _tool(
+        "get_document",
+        "문서 원본 MD 전체와 상태·버전·항목 목록을 돌려준다. 크다 — 문서 전체를 훑어야 할 때만 쓴다. 본문 안 [[문서ID#항목ID]]는 다른 항목 참조이며 get_item으로 따라갈 수 있다.",
+        {"doc_id": _DOC},
+    ),
+]
+
+
+def _err(text: str, **extra: Any) -> ToolResult:
+    return ToolResult(target=None, text=json.dumps({"error": text, **extra}, ensure_ascii=False))
+
+
+def _ref_json(r: ItemRef) -> dict[str, Any]:
+    if r.is_missing or (r.doc_id is None and r.item_id is None):
+        return {"raw_target": r.raw_target, "note": "아직 없음"}
+    if r.item_id is None:
+        return {"doc_id": r.doc_id, "title": r.display_name}
+    return {"id": f"{r.doc_id}#{r.item_id}", "name": r.display_name}
+
+
+async def ask_tool(name: str, args: dict, code: str, user: User) -> ToolResult:
+    """SYNC-MS-008#queries.ask_tool
+
+    도구 하나 실행. 없음·삭제·다른 프로젝트·인자 빠짐은 예외가 아니라 {"error": …} 텍스트다 —
+    모델이 되짚게 한다. 그 밖의 예외는 전파한다(→ error 이벤트). 소유 검사는 get_owned.
+    """
+    spec = next((t for t in _ASK_TOOLS if t.name == name), None)
+    if spec is None:
+        return _err(f"모르는 도구 {name}")
+    missing = [k for k in spec.parameters["required"] if k not in args]
+    if missing:
+        return _err(f"인자 {'·'.join(missing)}가 없다")
+    doc_id = str(args.get("doc_id", ""))
+    if "doc_id" in spec.parameters["properties"] and doc_id.split("-")[0] != code:
+        return _err("없음", doc_id=doc_id)  # 다른 프로젝트는 소유해도 없는 것과 같다
+    item_id = str(args.get("item_id", "")).replace("~", "/")
+    with db.session_scope() as s:  # 남의 프로젝트는 텍스트가 아니라 not-found 전파(→ error 이벤트)
+        ProjectService(s).get_owned(code, user)
+    try:
+        if name == "get_item":
+            v = await item_view(doc_id, item_id, user)
+            data = {
+                "doc_id": v.doc_id,
+                "item_id": v.item_id,
+                "display_name": v.display_name,
+                "doc_status": v.doc_status,
+                "doc_version_no": v.doc_version_no,
+                "body": v.body,
+            }
+            return ToolResult(f"{doc_id}#{v.item_id}", json.dumps(data, ensure_ascii=False))
+        if name == "get_references":
+            r = await item_references_view(doc_id, item_id, user)
+            with db.session_scope() as s:
+                spec_svc = SpecService(s)
+                doc_ids = [x.doc_id for x in r.upstream if x.item_id is None and x.doc_id]
+                status = {}
+                for did in doc_ids:
+                    try:
+                        status[did] = spec_svc.get_document(did).status
+                    except NotFound:
+                        pass
+            up = [_ref_json(x) for x in r.upstream]
+            for u in up:
+                if "doc_id" in u:
+                    u["status"] = status.get(u["doc_id"])
+            data = {"upstream": up, "downstream": [_ref_json(x) for x in r.downstream]}
+            return ToolResult(f"{doc_id}#{item_id}", json.dumps(data, ensure_ascii=False))
+        if name == "item_chain":
+            c = await item_chain(doc_id, item_id, user)
+            data = {
+                "item": _ref_json(c.item),
+                "rows": [
+                    {
+                        "stage": row.stage,
+                        "doc_type": row.doc_type,
+                        "items": [
+                            {**_ref_json(ci.ref), "role": ci.role, "status": ci.status}
+                            for ci in row.items
+                        ],
+                    }
+                    for row in c.rows
+                ],
+            }
+            return ToolResult(f"{doc_id}#{item_id}", json.dumps(data, ensure_ascii=False))
+        if name == "list_documents":
+            docs = await document_list(code, user)
+            with db.session_scope() as s:
+                titles = SpecService(s).describe_documents([d.id for d in docs])
+            data = [
+                {
+                    "doc_id": d.doc_id,
+                    "stage": d.stage,
+                    "doc_type": d.doc_type,
+                    "title": titles[d.id].title if d.id in titles else "",
+                    "status": d.status,
+                    "version_no": d.current_version_no,
+                }
+                for d in docs
+            ]
+            return ToolResult(None, json.dumps(data, ensure_ascii=False))
+        # get_document
+        d = await document_view(doc_id, user)
+        with db.session_scope() as s:
+            title = _title_of(SpecService(s), doc_id)
+        data = {
+            "doc_id": d.doc_id,
+            "title": title,
+            "status": d.status,
+            "version_no": d.current_version_no,
+            "items": [{"item_id": i.item_id, "display_name": i.display_name} for i in d.items],
+            "body": d.body,
+        }
+        return ToolResult(doc_id, json.dumps(data, ensure_ascii=False))
+    except NotFound as e:
+        return _err("없음", **{k: v for k, v in e.extra.items() if k in ("resource", "id")})
+    except ItemDeleted:
+        return _err("삭제된 항목", doc_id=doc_id, item_id=item_id)
+
+
+def _start_context(spec: SpecService, doc_id: str, item_id: str | None) -> tuple[str, Document]:
+    """시작 맥락 — 제목·상태·버전·항목 ID·이름. 본문은 안 실는다(사용자 결정 3)."""
+    d = spec.get_document(doc_id)
+    refs = spec.describe_documents([d.id])
+    title = refs[d.id].title if d.id in refs else doc_id
+    viewing = ""
+    if item_id is not None:
+        item_id = item_id.replace("~", "/")
+        it = next((i for i in d.items if i.item_id == item_id), None)
+        if it is None:
+            raise NotFound("item", f"{doc_id}#{item_id}")
+        viewing = f"[지금 보는 항목] {it.item_id} {it.display_name or ''}".rstrip()
+    items = "\n".join(f"{i.item_id} {i.display_name or ''}".rstrip() for i in d.items) or "(없음)"
+    return _ASK_SYSTEM.format(
+        doc_id=doc_id,
+        title=title,
+        status=d.status,
+        version_no=d.current_version_no,
+        items=items,
+        viewing=viewing,
+    ), d
 
 
 async def ask_item(
-    doc_id: str, item_id: str, question: str, history: list[dict], user: User
-) -> AskAnswer:
+    doc_id: str, item_id: str | None, question: str, history: list[dict], user: User
+) -> AsyncIterator[AskEvent]:
     """SYNC-MS-008#queries.ask_item
 
-    DOM-002 3.2 — queries가 어댑터를 직접 부르는 것은 llm 하나뿐이다. DB에 아무것도 쓰지 않는다.
+    ReAct 루프. DOM-002 3.2 — queries가 어댑터를 직접 부르는 것은 llm 하나뿐이고, 도구 실행은
+    여기 있는 조회(ask_tool)로 닫힌다. DB에 아무것도 쓰지 않는다. 첫 이벤트(start) 전의 오류는
+    예외(상태 코드), 뒤의 오류는 라우터가 error 이벤트로 낸다.
     """
     if not settings.LLM_API_KEY:
-        raise LlmNotConfigured()  # 네트워크를 타기 전에 막는다 (MS-008 1)
+        raise LlmNotConfigured()  # 네트워크를 타기 전에 막는다 (MS-008 0)
     history = history[-settings.LLM_MAX_TURNS :] if settings.LLM_MAX_TURNS > 0 else []
+    code = doc_id.split("-")[0]
     with db.session_scope() as s:
-        ProjectService(s).get_owned(doc_id.split("-")[0], user)
-        spec, refs = SpecService(s), ReferenceService(s)
-        v = spec.get_item(doc_id, item_id)
-        up = refs.upstream(v.pk)
-        down = refs.downstream(v.pk)
-        # 표시 이름만 쓰고 본문은 안 읽는다 (MS-008 4)
-        need = [e.to_item_pk for e in up if e.to_item_pk]
-        need += [e.from_item_pk for e in down if e.from_item_pk]
-        names = spec.describe_items(need)
-        doc_names = _doc_refs(
-            spec, [e.to_document_id for e in up if e.to_document_id and not e.to_item_pk]
-        )
-        up_refs = [_to_ref(e, {**doc_names, **names} if e.to_item_pk else doc_names) for e in up]
-        down_refs = [names[e.from_item_pk] for e in down if e.from_item_pk in names]
-        title = _title_of(spec, doc_id)
-    up_ids, up_txt = _ids_and_names(up_refs)
-    down_ids, down_txt = _ids_and_names(down_refs)
-    system = _ASK_SYSTEM.format(
-        doc_id=doc_id,
-        title=title,
-        status=v.doc_status,
-        version_no=v.doc_version_no,
-        item_id=v.item_id,
-        display_name=v.display_name or "",
-        body=v.body,
-        upstream_ids_and_names=up_txt,
-        downstream_ids_and_names=down_txt,
+        ProjectService(s).get_owned(code, user)
+        system, _ = _start_context(SpecService(s), doc_id, item_id)
+    yield AskStart(doc_id=doc_id, item_id=item_id)
+    t0 = time.monotonic()
+    calls = 0
+    reads: list[str] = []
+    prompt_tokens = completion_tokens = 0
+    log: list[dict] = [{"role": m["role"], "text": m["text"]} for m in history]
+    log.append({"role": "user", "text": question})
+    answer: str | None = None
+    while True:
+        step = await llm.step(system, log, _ASK_TOOLS)
+        prompt_tokens += step.usage.prompt_tokens
+        completion_tokens += step.usage.completion_tokens
+        if not step.tool_calls:
+            answer = step.text or ""
+            break
+        if step.text:
+            yield AskNote(step.text)
+        log.append({"role": "assistant", "text": step.text or "", "tool_calls": step.tool_calls})
+        for call in step.tool_calls:
+            reason = str(call.arguments.get("reason") or "").strip()
+            if reason:
+                yield AskNote(reason)
+            r = await ask_tool(call.name, call.arguments, code, user)
+            yield AskRead(call.name, r.target)
+            if r.target and r.target not in reads:
+                reads.append(r.target)
+            log.append({"role": "tool", "tool_call_id": call.id, "text": r.text})
+            calls += 1
+        if calls >= _ASK_MAX_CALLS or time.monotonic() - t0 >= _ASK_TIME_LIMIT:
+            log.append({"role": "user", "text": _ASK_WRAP_UP})
+            last = await llm.step(system, log, _ASK_TOOLS, tool_choice="none")
+            prompt_tokens += last.usage.prompt_tokens
+            completion_tokens += last.usage.completion_tokens
+            if not last.text:
+                raise LlmUnavailable("상한 뒤에도 답이 없다")
+            answer = last.text
+            break
+    _log.info(
+        "ask doc=%s item=%s user=%s calls=%d prompt=%d completion=%d elapsed=%.1fs",
+        doc_id,
+        item_id,
+        user.id,
+        calls,
+        prompt_tokens,
+        completion_tokens,
+        time.monotonic() - t0,
     )
-    messages = [{"role": m["role"], "text": m["text"]} for m in history] + [
-        {"role": "user", "text": question}
-    ]
-    answer = await llm.ask(system, messages)
-    return AskAnswer(answer=answer, context_item_ids=[v.item_id] + up_ids + down_ids)
+    yield AskAnswer(answer=answer, context_item_ids=reads)
