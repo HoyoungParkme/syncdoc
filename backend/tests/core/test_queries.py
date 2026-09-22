@@ -507,6 +507,7 @@ async def test_ask_item_start_context_has_titles_and_item_names_but_no_body(
     seen = script([_step("답")])
     events = await _collect(queries.ask_item("EXMP-PRD-001", "G1", "왜?", [], owner(scoped)))
     assert events == [AskStart("EXMP-PRD-001", "G1"), AskAnswer("답", [])]
+    assert "먼저 보고 있는 항목을 get_item으로 읽는다" in seen[0][0]  # #110
     system, messages, choice = seen[0]
     assert "[문서] EXMP-PRD-001 제품 · 상태 draft · v1" in system
     assert "[이 문서의 항목]\nG1 목표\nR1 기능" in system
@@ -704,6 +705,7 @@ async def test_ask_tool_errors_are_text_not_exceptions(scoped: Session) -> None:
         "get_item", {"doc_id": "EXMP-PRD-001", "item_id": "G9", "reason": "r"}, "EXMP", u
     )
     assert r.target is None and json.loads(r.text)["error"] == "없음"
+    assert "get_references" in json.loads(r.text)["hint"]  # 되짚을 실마리 (#110)
     r = await queries.ask_tool(
         "get_item", {"doc_id": "OTHR-PRD-001", "item_id": "G1", "reason": "r"}, "EXMP", u
     )

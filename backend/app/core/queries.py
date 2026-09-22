@@ -487,6 +487,9 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 도구는 여덟 번까지, 전체 두 분 안이다. 「지금까지 읽은 것으로 답하라」는 말을 받으면
 더 읽지 않고 그때까지 읽은 것으로 답한다.
 
+근거나 참조를 물으면 먼저 보고 있는 항목을 get_item으로 읽는다 — 본문의 [[문서#항목]]
+링크가 정확한 문서 ID다. 항목 ID만으로 지금 문서를 짚지 않는다.
+
 모른다는 읽어도 정말 없을 때만 말하고, 그때는 어느 명세 단계(RFQ~CODE)가 아직 안
 쓰였는지 짚어 준다 — item_chain의 빈 단계나 「아직 없음」 참조가 그 근거다.
 지어내지 않는다.
@@ -503,6 +506,7 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 
 _ASK_WRAP_UP = "도구 호출 상한(또는 시간 상한)에 닿았다. 지금까지 읽은 것으로 답하라. 못 읽은 것이 있으면 무엇을 못 읽었는지 말한다."
 
+_ASK_MISSING_HINT = "이 문서에 그 항목이 없다. 다른 문서의 항목일 수 있다 — 보고 있는 항목을 get_item으로 읽어 본문의 참조 링크(문서ID#항목ID)에서 문서 ID를 확인하거나, get_references로 실제 위치를 찾아라"
 _ASK_MAX_CALLS = 8  # 도구 호출 상한. 설정이 아니라 상수다 (사용자 결정 2026-09-22)
 _ASK_TIME_LIMIT = 120.0  # 초. 호출 사이에서만 본다 — 호출 하나가 60초라 최악 180초
 
@@ -659,7 +663,8 @@ async def ask_tool(name: str, args: dict, code: str, user: User) -> ToolResult:
         }
         return ToolResult(doc_id, json.dumps(data, ensure_ascii=False))
     except NotFound as e:
-        return _err("없음", **{k: v for k, v in e.extra.items() if k in ("resource", "id")})
+        extra = {k: v for k, v in e.extra.items() if k in ("resource", "id")}
+        return _err("없음", hint=_ASK_MISSING_HINT, **extra)  # 되짚을 실마리 (#110)
     except ItemDeleted:
         return _err("삭제된 항목", doc_id=doc_id, item_id=item_id)
 
