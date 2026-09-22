@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -334,13 +334,15 @@ sequenceDiagram
 
     U->>RD: POST /api/docs/{id}/status {to, reason?}
     RD->>P: change_status(doc_id, to, user, reason)
+    P->>G: read_pending — fetch · 밀렸으면 process_commit (UC-H8 1d, #137)
     P->>S: get_document(doc_id)
     alt to=approved and (has_convention_error or incomplete_warnings or 미존재 참조) (1a)
         P-->>RD: status-blocked {convention_error_detail, warnings}
     end
-    P->>P: frontmatter.status 교체 → new_body
+    P->>G: read(경로, origin/main) — 원본이 진실 (DOM-001)
+    P->>P: 그 본문의 frontmatter.status 줄만 교체 → new_body
     P->>P: save_pipeline(entry=web_status, doc_id, new_body, expected_version=current, author=human, reason) — 같은 세션
-    Note over P: entry=web_status는 본문이 안 바뀐다<br/>· validate (frontmatter만)<br/>· 버전 검사<br/>· push (message: "status(doc_id): from → to")<br/>· Version 생성 안 함 · extract 안 함
+    Note over P: 상태 줄 하나만 바뀐다 — 본문은 저장소에서 읽은 그대로<br/>· validate (frontmatter만)<br/>· 버전 검사<br/>· push (message: "status(doc_id): from → to")<br/>· Version 생성 안 함 · extract 안 함
     P->>G: commit_push(…, "status(SYNC-PRD-001): draft → approved")
     G-->>P: commit_hash
     rect rgb(240,244,240)
@@ -354,6 +356,7 @@ sequenceDiagram
 **읽을 때 볼 것**
 - 상태 변경은 `pipeline.change_status`가 조율한다(B2 되먹임으로 SpecService에서 옮김). SpecService는 `get_document`·`apply_status`만
 - 완료로 올리는 조건은 셋뿐이다 — 규약 오류·미완성·미존재 참조가 없을 것. 셋 다 한 문서만 보고 판정된다. 상위 대조·댓글 확인은 v2에서 사라졌다
+- **쓰기 전에 읽는다 (#137).** 저장소에 아직 안 읽은 커밋이 있으면 먼저 읽어 반영하고(1단계), 커밋할 본문도 `origin/main`에서 읽는다. 예전에는 DB의 `current_body`로 본문을 만들어 커밋해서, 밀린 커밋의 내용이 통째로 되돌아갔다 — `git.commit_push`가 `reset --hard` 뒤에 덮어쓰므로 push가 거부되지도 않아 조용히 사라졌다. 저장소에 쓰는 다른 일(SEQ-7·SEQ-22·SEQ-23·SEQ-1)도 같은 읽기가 앞선다
 - 상태 변경은 **Version을 만들지 않는다.** `StatusChange`가 커밋 해시를 갖는다. UI-7 이력에서 `status` 행은 `StatusChange`에서, `spec` 행은 `Version`에서 와서 시각순으로 합친다
 
 ---
