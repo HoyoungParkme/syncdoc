@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -299,7 +299,7 @@ sequenceDiagram
             P-->>PS: RebuildResult
         end
     else 없음 (기본 흐름 4)
-        PS->>G: mkdir 11단계 · copy _templates/
+        PS->>G: mkdir 11단계 · README.md(규약 링크 — 사본 없음, 카드 AB)
         PS->>G: commit_push("chore: init syncdoc", author)
         alt push 실패 (4a)
             G-->>PS: PushFailed
@@ -810,6 +810,8 @@ sequenceDiagram
 
 [[SYNC-UC-001#UC-S6]]. UI-14 요소 3~5. 참조·버전·항목을 저장소에서 다시 만든다.
 
+**README를 먼저 맞춘다(카드 AB).** 재구축이 저장소에 쓰는 유일한 것이다 — 인덱스를 다시 만들기 전에 `docs/specs/README.md`가 지금 판과 다르면 새 판으로 커밋한다. 먼저 하는 이유는 그 커밋이 뒤이은 `fetch`의 head에 들어가 밀림이 0으로 끝나기 때문이다. push가 실패하면 인덱스는 건드리지 않는다(UC-S6 1a).
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -823,7 +825,11 @@ sequenceDiagram
     participant DB
 
     U->>RA: POST /api/admin/repos/{code}/rebuild
-    RA->>P: rebuild(code)
+    RA->>PS: rebuild_index(code, user)
+    PS->>PS: get_owned(code, user)
+    PS->>G: sync_readme(workdir, author) — README가 낡았으면 새 판으로 커밋·push (카드 AB)
+    G-->>PS: commit_hash 또는 None
+    PS->>P: rebuild(code)
     P->>PS: get(code) → repo
     P->>P: repo lock
     P->>G: fetch · checkout origin/main
@@ -850,7 +856,8 @@ sequenceDiagram
         P->>DB: repositories.last_processed_commit = HEAD
     end
     P->>P: lock 해제
-    P-->>RA: RebuildResult {docs, items, references, versions, convention_errors[]}
+    P-->>PS: RebuildResult {docs, items, references, versions, convention_errors[]}
+    PS-->>RA: RebuildResult + readme_updated
     RA-->>U: 결과 표 5
 ```
 
