@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/queries.py`의 함수 13개. 클래스 명세 [[SYNC-DOM-002]] 4.8의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/queries.py`의 함수 14개. 클래스 명세 [[SYNC-DOM-002]] 4.8의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -18,7 +18,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 `queries`는 `pipeline`과 대칭이다. 서비스는 자기 테이블만 알고, `queries`가 pk·ID로 이어 붙여 응답 형태([[SYNC-API-001]] 4장)를 만든다. **절대 쓰지 않는다.**
 
-**사람용 조회는 전부 `user: User`를 받는다** — 여기 13개 전부가 그렇다. 첫 단계에서 [[SYNC-MS-001#ProjectService.get_owned]](목록은 `list_owned`)로 소유를 가르고, 남의 프로젝트는 문서·항목을 **읽기 전에** `not-found {resource: project}`로 끝난다([[SYNC-PRD-001#R12]]). 프로젝트 코드는 `code` 인자 또는 `doc_id.split("-")[0]`. **`user`의 자리는 마지막 필수 인자다** — 기본값이 있는 선택 인자(`stage`·`status`·`scope`) 앞. `user`는 필수라 기본값 뒤에 올 수 없고, 필수 인자 중 맨 뒤에 두면 열세 함수가 같은 모양이 된다. 라우터는 `Depends(current_user)`를, MCP는 `_user(session)`을 그 자리에 넣는다.
+**사람용 조회는 전부 `user: User`를 받는다** — 여기 14개 전부가 그렇다. 첫 단계에서 [[SYNC-MS-001#ProjectService.get_owned]](목록은 `list_owned`)로 소유를 가르고, 남의 프로젝트는 문서·항목을 **읽기 전에** `not-found {resource: project}`로 끝난다([[SYNC-PRD-001#R12]]). 프로젝트 코드는 `code` 인자 또는 `doc_id.split("-")[0]`. **`user`의 자리는 마지막 필수 인자다** — 기본값이 있는 선택 인자(`stage`·`status`·`scope`) 앞. `user`는 필수라 기본값 뒤에 올 수 없고, 필수 인자 중 맨 뒤에 두면 열네 함수가 같은 모양이 된다. 라우터는 `Depends(current_user)`를, MCP는 `_user(session)`을 그 자리에 넣는다.
 
 ---
 
@@ -38,7 +38,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#queries.diff_with_impact]] | diff + 하위 건수 |
 | [[#queries.project_items]] | 프로젝트 끊어진 참조·오류·미완성 목록 |
 | [[#queries.downstream_view]] | 이 문서를 참조하는 것 (추적표) |
-| [[#queries.ask_item]] | 보고 있는 항목에 대해 묻는다 |
+| [[#queries.ask_item]] | 문서를 읽다가 묻는다 — 모델이 관계도를 따라 읽는다 |
+| [[#queries.ask_tool]] | 모델이 부른 읽기 도구 하나를 실행한다 |
 
 ---
 
@@ -54,55 +55,119 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ---
 
-#### queries.ask_item 보고 있는 항목에 대해 묻는다
+#### queries.ask_item 문서를 읽다가 묻는다 — 모델이 관계도를 따라 읽는다
 
-**시그니처** `async def ask_item(doc_id: str, item_id: str, question: str, history: list[dict], user: User) -> AskAnswer`
+**시그니처** `async def ask_item(doc_id: str, item_id: str | None, question: str, history: list[dict], user: User) -> AsyncIterator[AskEvent]`
 
-근거: [[SYNC-PRD-001#R11]] · [[SYNC-UC-001#UC-H19]] · [[SYNC-SEQ-001#SEQ-24]]
+근거: [[SYNC-PRD-001#R11]] · [[SYNC-UC-001#UC-H19]] · [[SYNC-SEQ-001#SEQ-24]] · [[SYNC-INFRA-001]] 5.3 · 사용자 결정 2026-09-22(카드 Y — [[SYNC-CODE-001#Y]])
 
-**입력** `question` 사람이 쓴 질문 · `history` 앞선 대화. 클라이언트가 들고 있다가 통째로 보낸 것
+**입력** `doc_id` 지금 열린 문서 — 시작 맥락 · `item_id` 보고 있는 항목. 힌트일 뿐이라 `None`이면 문서 전체로 시작한다 · `question` 사람이 쓴 질문 · `history` 앞선 대화 `[{role: user|assistant, text}]`. 클라이언트가 들고 있다가 통째로 보낸 것. 앞 턴의 도구 호출·읽은 본문은 여기 없다
 
-**처리**
-0. `ProjectService.get_owned(doc_id.split("-")[0], user)` — 남의 것이면 `! not-found {resource: project}`
-1. `if not settings.LLM_API_KEY → ! LlmNotConfigured` — 네트워크를 타기 전에 막는다
-2. `history`를 뒤에서부터 `settings.LLM_MAX_TURNS`턴만 남긴다
-3. `v = SpecService.get_item(doc_id, item_id)` (없음·삭제 예외 전파)
-4. `up = ReferenceService.upstream(v.pk)` · `down = ReferenceService.downstream(v.pk)` — **표시 이름만 쓰고 본문은 안 읽는다**
-5. 맥락 조립 — 아래 지시문에 문서 제목·상태·버전, 항목 ID·제목·본문, 상위·하위 항목 ID와 이름을 채운다
-6. `answer = llm.ask(system, messages)` ([[SYNC-MS-009#llm.ask]])
-7. `→ AskAnswer(answer, context_item_ids=[v.item_id] + up.ids + down.ids)`
+**처리** — ReAct 루프. 모델이 읽기 도구를 스스로 부르고, 진행이 이벤트로 흘러 나간다
+0. `if not settings.LLM_API_KEY → ! LlmNotConfigured`(네트워크 전) · `ProjectService.get_owned(doc_id.split("-")[0], user)` — 남의 것이면 `! not-found {resource: project}` · `history`를 뒤에서부터 `settings.LLM_MAX_TURNS`턴만 남긴다
+1. 세션 하나에서 `doc = SpecService.get_document(doc_id)` + `describe_documents([doc.id])`(제목) → 시작 맥락: 제목·상태·버전 + 이 문서의 **모든 항목 `ID 이름`** + `item_id`가 있으면 `[지금 보는 항목] {item_id} {display_name}` · `item_id`가 이 문서에 없으면 `! not-found {resource: item}` · **본문은 싣지 않는다** — 필요한 본문은 모델이 도구로 읽는다
+2. `yield AskStart(doc_id, item_id)` — 이 앞의 예외는 HTTP 상태로, 이 뒤는 `error` 이벤트로 나간다([[SYNC-API-001]] 1장)
+3. `t0 = monotonic()` · `calls = 0` · `reads: list[str] = []` · 대화록 = `history` + `{role: user, text: question}`
+4. `step = llm.step(system, 대화록, _ASK_TOOLS)` ([[SYNC-MS-009#llm.step]]) · usage 누적 · `if not step.tool_calls → answer = step.text → 7`
+5. `if step.text → yield AskNote(step.text)` · 도구 호출마다: `yield AskNote(args["reason"])` → `r = ask_tool(name, args, code, user)` → `yield AskRead(name, r.target)` · `r.target`이 있고 `reads`에 없으면 `reads.append` · 대화록에 `{role: assistant, text: step.text, tool_calls}`와 `{role: tool, tool_call_id, text: r.text}` 추가 · `calls += 1`(호출마다)
+6. `if calls >= _ASK_MAX_CALLS or monotonic() - t0 >= _ASK_TIME_LIMIT` → 대화록에 마무리 문장(아래)을 `user`로 추가 → `llm.step(system, 대화록, _ASK_TOOLS, tool_choice="none")` **한 번** → `step.text`가 비면 `! LlmUnavailable("상한 뒤에도 답이 없다")` → `answer = step.text` → 7 · 아니면 4로
+7. `log.info("ask doc=%s item=%s user=%s calls=%d prompt=%d completion=%d elapsed=%.1fs", …)` — 한 줄, 본문·질문·답은 안 남긴다(DEV-6) · `yield AskAnswer(answer, context_item_ids=reads)`
 
-**지시문 원문** — 코드가 이것을 그대로 옮긴다. 「모른다고 답한다」가 [[SYNC-UC-001#UC-H19]] 확장 3a를 실행하는 문장이라 명세 쪽에 산다.
+**상수** `_ASK_MAX_CALLS = 8` · `_ASK_TIME_LIMIT = 120.0`(초). 설정값이 아니라 코드 상수다 — 회수 경로는 키를 비우는 것 하나로 둔다([[SYNC-INFRA-001]] 5.3). 시간은 **호출 사이**에서만 본다 — 한 호출의 60초 타임아웃이 더해져 최악 180초(마무리 호출 포함)
+
+**대화록 항목** — 우리 키로 쌓고 와이어 형식은 어댑터가 옮긴다([[SYNC-MS-009#llm.step]]): `{role: user|assistant, text}` · `{role: assistant, text, tool_calls: [ToolCall]}` · `{role: tool, tool_call_id, text}`
+
+**DB 세션** 도구 실행([[#queries.ask_tool]]) 안에서만 잠깐 연다. 모델을 기다리는 동안 세션을 쥐지 않는다
+
+**지시문 원문** — 코드 `_ASK_SYSTEM`이 이것을 그대로 옮긴다. `{items}`는 줄마다 `ID 이름`, `{viewing}`은 `[지금 보는 항목] {item_id} {display_name}` 또는 빈 줄. 「모른다」 조건이 [[SYNC-UC-001#UC-H19]] 확장 3a를 실행하는 문장이라 명세 쪽에 산다.
 
 ```
-당신은 명세를 읽는 사람 옆에서 그 자리를 설명한다.
+당신은 명세를 읽는 사람 옆에서 그 자리를 설명한다. 문서 하나가 열려 있고, 당신은 도구로
+같은 프로젝트의 다른 문서와 항목을 읽을 수 있다. 읽기만 한다 — 쓰는 도구는 없다.
 
-아래 맥락에 있는 것만으로 답한다. 보고 있는 항목 자체를 묻는 질문(이게 뭐야·왜 이렇게
-했어·어떻게 만들었어)은 본문으로 답한다. 모른다는 맥락에 정말 없을 때만 말하고,
-그때는 어느 명세 단계(RFQ~CODE)가 아직 안 쓰였는지 짚어 준다. 지어내지 않는다.
+읽은 것만으로 답한다. 처음에는 아래 문서의 항목 목록만 있고 본문은 없다. 답에 필요한
+본문은 도구로 읽는다. 보고 있는 항목 자체를 묻는 질문(이게 뭐야·왜 이렇게 했어)은 그
+항목을 get_item으로 읽고 본문으로 답한다. 근거·영향을 물으면 get_references나
+item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽는다. get_document는
+문서 전체를 훑어야 할 때만 쓴다 — 크다. 앞 대화에서 읽은 것은 다시 실리지 않으므로
+필요하면 다시 읽는다.
 
-답에 근거를 댈 때는 맥락에 있는 항목 ID를 그대로 쓴다. 없는 ID를 만들지 않는다.
+도구를 부를 때마다 reason에 한 줄로 무엇을 왜 읽는지 적는다. 그 줄이 사람에게 보인다.
 
-명세를 고치라고 하지 않는다. 당신은 읽기를 돕는 자리이고, 본문을 쓰는 것은
-사람과 그 사람의 에이전트가 한다.
+도구는 여덟 번까지, 전체 두 분 안이다. 「지금까지 읽은 것으로 답하라」는 말을 받으면
+더 읽지 않고 그때까지 읽은 것으로 답한다.
+
+모른다는 읽어도 정말 없을 때만 말하고, 그때는 어느 명세 단계(RFQ~CODE)가 아직 안
+쓰였는지 짚어 준다 — item_chain의 빈 단계나 「아직 없음」 참조가 그 근거다.
+지어내지 않는다.
+
+답에 근거를 댈 때는 읽은 항목 ID(문서ID#항목ID)를 그대로 쓴다. 없는 ID를 만들지 않는다.
+
+명세를 고치라고 하지 않는다. 당신은 읽기를 돕는 자리이고, 본문을 쓰는 것은 사람과
+그 사람의 에이전트가 한다.
 
 [문서] {doc_id} {title} · 상태 {status} · v{version_no}
-[보고 있는 항목] {item_id} {display_name}
-{body}
-[이 항목의 근거 (상위)] {upstream_ids_and_names}
-[이 항목에서 나온 것 (하위)] {downstream_ids_and_names}
+[이 문서의 항목]
+{items}
+{viewing}
 ```
 
-**출력** `AskAnswer` — 답과 맥락으로 실은 항목 ID 목록
+**마무리 문장 원문** — 6단계에서 `user` 역할로 대화록에 넣는다.
 
-**예외** 남의 프로젝트(0)·항목 없음·삭제 → `not-found` · 키 없음 → `llm-not-configured` · 모델 실패 → `llm-unavailable`
+```
+도구 호출 상한(또는 시간 상한)에 닿았다. 지금까지 읽은 것으로 답하라. 못 읽은 것이 있으면 무엇을 못 읽었는지 말한다.
+```
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_item]] · [[SYNC-MS-003#ReferenceService.upstream]] [[SYNC-MS-003#ReferenceService.downstream]] · [[SYNC-MS-009#llm.ask]]
+**출력** `AskEvent`의 비동기 흐름 — `AskStart` 하나 → `AskNote`·`AskRead` 0개 이상 → `AskAnswer` 하나. `context_item_ids`는 모델이 **실제로 읽은 대상**(`DOC#ITEM`·`DOC`)을 부른 순서로, 중복 없이
 
-**테스트 관점** **DB에 아무것도 안 쓴다**(호출 전후 행 수가 같다) · 키가 비면 `SpecService`를 부르기도 전에 막힌다 · 맥락에 문서 전문이 안 들어간다(항목 본문만) · 상위·하위는 이름만 싣고 본문을 안 읽는다 · `history`가 상한을 넘으면 뒤에서부터 잘린다 · `context_item_ids`가 실제로 실어 보낸 것과 같다 · **MINISPEC이 빈 프로젝트**의 항목을 물으면 맥락이 비고 모델이 「아직 안 쓰였다」고 답할 재료를 받는다
+**예외** 남의 프로젝트·없는 `item_id` → `not-found`(`AskStart` 전이라 HTTP 상태) · 키 없음 → `llm-not-configured`(전) · 모델 실패·마무리 뒤에도 답 없음 → `llm-unavailable`(`AskStart` 뒤라 `error` 이벤트) · 도구 안의 「없음」은 예외가 아니라 결과다([[#queries.ask_tool]])
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-009#llm.step]] · [[#queries.ask_tool]]
+
+**테스트 관점** 가짜 `llm.step`에 대본을 주어 돈다 · 대본 [도구 2번 → 답] → 이벤트 순서가 `start·note·read·note·read·answer`이고 `context_item_ids`가 read 순서·중복 접힘 · 대본이 도구만 9번 → 8번째 뒤 마무리 호출이 `tool_choice="none"`이고 그 뒤 호출이 없다 · `monotonic`을 패치해 120초 → 같은 마무리 · 마무리도 답이 비면 `llm-unavailable` · 시작 맥락에 항목 ID·이름은 있고 **본문은 없다** · `item_id=None`이면 「지금 보는 항목」 줄이 없다 · 없는 `item_id` → `not-found`가 `start` 전 · **DB에 아무것도 안 쓴다**(호출 전후 행 수가 같다) · `history`가 상한을 넘으면 뒤에서부터 잘린다 · usage 로그 한 줄에 calls·tokens·elapsed가 있고 본문이 없다 · 키가 비면 `SpecService`를 부르기도 전에 막힌다 · **MINISPEC이 빈 프로젝트**에서 물으면 `item_chain`의 빈 단계로 「아직 안 쓰였다」고 답할 재료를 받는다
 
 ---
 
+#### queries.ask_tool 모델이 부른 읽기 도구 하나를 실행한다
+
+**시그니처** `async def ask_tool(name: str, args: dict, code: str, user: User) -> ToolResult`
+
+근거: [[SYNC-PRD-001#R11]] · [[SYNC-UC-001#UC-H19]] · [[SYNC-API-002]] 3장(같은 이름·같은 모양)
+
+**입력** `name` 도구 이름 · `args` 모델이 준 인자 · `code` 지금 열린 문서의 프로젝트 · `user` 묻는 사람
+
+**도구 다섯** — 전부 읽기. 쓰기 도구는 어떤 경우에도 없다([[SYNC-PRD-001]] 2장 비목표). 모든 도구에 필수 인자 `reason: str`(무엇을 왜 읽는지 한 줄 — 진행 줄이 된다. 모델이 `tool_calls`와 함께 본문을 비우는 일이 잦아 인자로 못 박는다)
+
+| 도구 | 인자 | 부르는 것 | 돌려주는 JSON | target |
+|---|---|---|---|---|
+| `get_item` | `doc_id, item_id, reason` | [[SYNC-MS-002#SpecService.get_item]] | `{doc_id, item_id, display_name, doc_status, doc_version_no, body}` — [[SYNC-API-002#get_item]]과 같은 키 | `DOC#ITEM` |
+| `get_references` | `doc_id, item_id, reason` | [[#queries.item_references_view]] + 문서 참조는 `SpecService.get_document(doc_id).status`로 상태 보강 | `{upstream: [{id, name} \| {doc_id, title, status} \| {raw_target, note: "아직 없음"}], downstream: [{id, name}]}` | `DOC#ITEM` |
+| `item_chain` | `doc_id, item_id, reason` | [[#queries.item_chain]] | `{item, rows: [{stage, doc_type, items: [{id, name, role, status}]}]}` — **빈 단계도 그대로**(어느 단계가 안 쓰였는지의 근거) | `DOC#ITEM` |
+| `list_documents` | `reason` | [[#queries.document_list]] + [[SYNC-MS-002#SpecService.describe_documents]](제목) | `[{doc_id, stage, doc_type, title, status, version_no}]` | 없음 |
+| `get_document` | `doc_id, reason` | [[SYNC-MS-002#SpecService.get_document]] + 제목 | `{doc_id, title, status, version_no, items: [{item_id, display_name}], body}` 전문 | `DOC` |
+
+**처리**
+1. `name`이 다섯 밖 → `ToolResult(None, {"error": "없는 도구"})` · 필수 인자가 빠짐 → `{"error": "인자 X가 없다"}`
+2. `args["doc_id"]`가 있고 `doc_id.split("-")[0] != code` → `{"error": "없음", "doc_id": …}` — 소유한 다른 프로젝트여도 같다. 이 대화는 같은 프로젝트 안이다
+3. 세션을 열고 `ProjectService.get_owned(code, user)` → 위 표의 함수 → JSON 조립 → 세션 닫기
+4. `NotFound`·`ItemDeleted`는 **던지지 않고** `{"error": "없음", …}` 텍스트로 — 모델이 되짚는다. 그 밖의 예외는 전파(`error` 이벤트)
+5. `→ ToolResult(target, json.dumps(결과, ensure_ascii=False))`
+
+**결과 형식** JSON 문자열. MCP 도구([[SYNC-API-002]])와 같은 모양이라 에이전트가 이미 보는 것과 같고, 마크다운 본문을 안에 그대로 담아도 경계가 안 흐트러진다. 크기 상한 없음(사용자 결정) — 큰 문서 전문이 맥락을 넘기면 모델이 400을 주고 `llm-unavailable`로 접힌다
+
+**`_ASK_TOOLS`** — `ToolSpec` 다섯. `description`은 [[SYNC-API-002]] 3장의 도구 설명 문장을 가져다 쓴다. `parameters`는 JSON Schema `{type: object, properties: {doc_id: {type: string}, item_id: {type: string}, reason: {type: string}}, required: [...]}` — 도구마다 위 표의 인자가 `required`
+
+**출력** `ToolResult(target, text)` — `target`은 「본 것」에 실을 `DOC#ITEM`·`DOC`, 목록 도구는 `None`
+
+**예외** 남의 프로젝트 → `not-found`(전파) · 도구 안의 없음·삭제·인자 오류는 예외가 아니라 결과
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_item]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.describe_documents]] · [[#queries.item_references_view]] [[#queries.item_chain]] [[#queries.document_list]]
+
+**호출되는 것** [[#queries.ask_item]] 5단계
+
+**테스트 관점** 다섯 도구 각각 돌려주는 JSON의 키 집합 · 다른 프로젝트 문서 ID(소유해도) → `없음` 텍스트, 예외 아님 · 남의 프로젝트 → `not-found` 전파 · 끊어진 참조 → `note: "아직 없음"` · `item_chain` 빈 단계 행 유지 · `list_documents`에 제목이 있다 · `reason` 빠짐 → `인자 reason이 없다` · 없는 도구 이름 → `없는 도구` · **DB에 아무것도 안 쓴다**
+
+---
 #### queries.project_summary 프로젝트 목록 + 단계 11칸 + 건수
 
 **시그니처** `async def project_summary(user: User) -> list[ProjectSummary]`
