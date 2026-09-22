@@ -558,6 +558,8 @@ classDiagram
         +int behind_by
         +datetime fetched_at
         +str fetch_error
+        +int hook_id
+        +str hook_error
     }
     ProjectService --> Project
     ProjectService --> Repository
