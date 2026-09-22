@@ -25,7 +25,7 @@ export function Admin() {
       setResult({ code, at: new Date().toISOString(), r })
       setConfirm(null)
       load()
-      toast(`${code} 인덱스를 다시 세웠습니다 — 문서 ${r.docs} · 항목 ${r.items} · 참조 ${r.references}`)
+      toast(`${code} 인덱스를 다시 세웠습니다 — 문서 ${r.docs} · 항목 ${r.items} · 참조 ${r.references}${r.readme_updated ? ' · README 갱신됨' : ''}`)
     } catch (e) {
       alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
     } finally {
@@ -110,6 +110,9 @@ export function Admin() {
                 {confirmKind === 'rebuild' ? (
                   <>
                     저장소의 모든 MD를 다시 읽어 참조 관계와 버전 목록을 처음부터 만듭니다. 문서가 많으면 몇 분 걸립니다.
+                    <br />
+                    {/* 재구축이 저장소에 쓰는 유일한 것 — 무엇이 커밋되는지 미리 말한다 (카드 AB) */}
+                    <code>docs/specs/README.md</code>가 낡았으면 싱크독 규약 링크가 든 새 판으로 커밋합니다. 다른 파일은 읽기만 합니다.
                   </>
                 ) : (
                   <>
@@ -146,6 +149,7 @@ export function Admin() {
             <div className="row">
               <span data-el="5.1">
                 문서 {result.r.docs} · 항목 {result.r.items} · 참조 {result.r.references} · 버전 {result.r.versions}
+                {result.r.readme_updated && <span className="lbl"> · README 갱신됨</span>}
               </span>
             </div>
             <div className="row">

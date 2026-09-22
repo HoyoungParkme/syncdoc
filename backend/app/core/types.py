@@ -130,6 +130,7 @@ class RebuildResult:
     references: int
     versions: int
     convention_errors: list[dict[str, str]] = field(default_factory=list)
+    readme_updated: bool = False  # README를 새 판으로 커밋했나 (카드 AB)
 
 
 @dataclass(frozen=True)

@@ -84,7 +84,9 @@ async def test_init_project_empty_repo_creates_specs_commit_and_11_null_stages(
     assert p.repository.last_processed_commit == g(bare, "rev-parse", "main")
     assert g(bare, "log", "-1", "--format=%s", "main") == "chore(NEW): init syncdoc"
     tree = g(bare, "ls-tree", "-r", "--name-only", "main")
-    assert "docs/specs/_templates/PRD.md" in tree and "docs/specs/STD/.gitkeep" in tree
+    # 규약·템플릿 사본은 넣지 않는다 — README가 링크로 가리킨다 (카드 AB)
+    assert "docs/specs/STD/.gitkeep" in tree and "docs/specs/README.md" in tree
+    assert "_templates" not in tree
     assert "docs/specs/README.md" in tree and "docs/specs/assets/.gitkeep" in tree
 
 
@@ -103,7 +105,7 @@ async def test_init_project_accepts_repository_with_no_commits_at_all(
 
     assert project.code == "EMP"
     assert g(bare, "log", "-1", "--format=%s", "main") == "chore(EMP): init syncdoc"
-    assert "docs/specs/_templates/PRD.md" in g(bare, "ls-tree", "-r", "--name-only", "main")
+    assert "docs/specs/README.md" in g(bare, "ls-tree", "-r", "--name-only", "main")
 
 
 async def test_create_repo_false_leaves_missing_repo_alone(
@@ -156,7 +158,7 @@ async def test_create_repo_true_creates_then_registers(
     assert calls and calls[0][1] == "made"  # 주소에서 이름을 떴다
     assert project.code == "NEW"
     assert g(bare, "log", "-1", "--format=%s", "main") == "chore(NEW): init syncdoc"
-    assert "docs/specs/_templates/PRD.md" in g(bare, "ls-tree", "-r", "--name-only", "main")
+    assert "docs/specs/README.md" in g(bare, "ls-tree", "-r", "--name-only", "main")
 
 
 async def test_create_repo_true_does_not_recreate_existing(

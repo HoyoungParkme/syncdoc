@@ -61,6 +61,7 @@ class RebuildError(Base):
 
 
 class RebuildResult(Base):
+    readme_updated: bool
     docs: int
     items: int
     references: int

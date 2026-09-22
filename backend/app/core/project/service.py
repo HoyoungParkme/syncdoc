@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import re
 import shutil
+from dataclasses import replace
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -227,5 +228,10 @@ class ProjectService:
         """SYNC-MS-001#ProjectService.rebuild_index"""
         from app.core import pipeline  # 서비스가 pipeline을 부르는 유일한 곳(DOM-002 3.2)
 
-        self.get_owned(code, user)  # 소유 검사는 여기서. pipeline.rebuild는 시스템 경로라 get
-        return await pipeline.rebuild(code)
+        project = self.get_owned(code, user)  # 소유 검사는 여기서. pipeline.rebuild는 get을 쓴다
+        # README를 인덱스보다 **먼저** 맞춘다 — 그 커밋이 rebuild의 fetch head에 들어가 밀림이 0으로
+        # 끝난다. push가 실패하면 인덱스는 건드리지 않는다 (UC-S6 1a, 카드 AB)
+        author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.web_status)
+        hash_ = await git.sync_readme(Path(project.repository.workdir_path), author, code)
+        result = await pipeline.rebuild(code)
+        return replace(result, readme_updated=hash_ is not None)
