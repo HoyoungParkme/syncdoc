@@ -375,6 +375,9 @@ async def test_ensure_hook_records_error_and_then_succeeds(
     assert (r2.hook, r2.hook_error, r2.created) == ("ok", None, True)
     st = (await ps.repo_status(user))[0]
     assert st.hook == "ok" and st.hook_error is None
+    # 같은 훅을 다시 걸면 created는 False — 저장된 hook_id를 보고 판단한다 (#145)
+    r3 = await ps.ensure_hook("EXMP", user)
+    assert (r3.hook, r3.created) == ("ok", False)
 
 
 async def test_sync_now_reads_pending_and_touches_fetched_at(scoped: Session, repos: dict) -> None:
