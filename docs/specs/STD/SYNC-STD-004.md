@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-004
 type: STD
 title: 개발 규약 — 코드 파트 표준
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -67,6 +67,20 @@ async def save_pipeline(...):
 - DB만 만지는 서비스 메서드는 `def` (SQLAlchemy sync 세션. 2~3명 규모)
 - **async 함수를 하나라도 부르면 그 함수도 `async def`** — `login_github`(github), `init_project`(git), `change_status`·`revert`(pipeline), `pipeline.*`, `queries.*`, 라우터·MCP 도구 전부
 - MINISPEC 시그니처에 `async def`가 명시된다. 없으면 sync. 코드가 이걸 어기면 명세가 틀린 것 — 명세부터
+
+#### DEV-19 저장소에 쓰기 전에 읽는다
+
+**저장소를 고치는 일은 시작하기 전에 밀린 커밋을 먼저 읽는다**(`pipeline.read_pending`). 그리고 **덮어쓸 본문은 DB 사본이 아니라 `origin/main`에서 읽는다.**
+
+원본은 GitHub에 있고 DB는 그것을 읽어 만든 사본이다([[SYNC-DOM-001#StatusChange]]). 사본으로 원본을 덮으면, 사본을 만든 뒤에 원본에 들어온 것이 사라진다. `git.commit_push`는 `reset --hard origin/main` 뒤에 파일을 통째로 쓰므로 그 커밋의 부모가 최신이 되어 **push가 거부되지도 않는다** — 되돌리는 커밋이 정상으로 들어가고, 뒤늦게 폴링이 그것을 다시 읽어 확정한다. 아무도 오류를 못 본다.
+
+실제로 그랬다(#137). PR 머지 커밋이 넣은 세 줄을 그다음 상태 토글이 되돌렸다. 상태 커밋의 diff가 `1 1`이 아니라 `4 4`인 것이 유일한 흔적이었다.
+
+**그래서 둘을 지킨다.**
+- 쓰기 경로(상태 토글·되돌리기·되살리기·휴지통·MCP 저장)는 세션·락을 열기 **전에** `read_pending`을 부른다. 락 안에서 부르면 교착한다 — `process_commit`이 같은 락을 잡는다
+- 상태 토글처럼 **한 줄만 바꾸는 일**은 그 파일을 저장소에서 읽어 그 줄만 갈아 끼운다. 본문 전체를 DB에서 가져오지 않는다
+
+**테스트로 고정한다.** 저장소를 앞세워 놓고 그 동작을 부른 뒤, 앞세운 내용이 살아 있는지 본다. 상태 커밋은 `git show --numstat`이 `1 1`이어야 한다 — 커밋 **제목**만 보는 테스트는 이 사고를 못 잡는다.
 
 #### DEV-18 저장하는 시각은 뒤로 가지 않는다
 

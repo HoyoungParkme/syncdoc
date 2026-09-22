@@ -222,6 +222,80 @@ async def test_concurrent_saves_are_serialized_second_conflicts(scoped: Session,
 
 
 # ── change_status (pipeline — 검사 → web_status 저장. 초안 ⇄ 완료 토글, 카드 V) ──
+async def test_write_paths_do_not_revert_unread_commits(scoped: Session, proj) -> None:
+    """#137 — 저장소에 아직 안 읽은 커밋이 있어도 그 내용이 사라지지 않는다 (DEV-19).
+
+    옛 구현은 DB의 current_body로 본문을 만들어 커밋했다. commit_push가 reset --hard 뒤에
+    그것을 덮어쓰므로 push가 거부되지도 않고, 밀린 커밋이 통째로 되돌아갔다.
+    """
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    await create(proj, DocType.RFQ, RFQ)
+    await create(proj)
+    user = proj["user"]
+    g(other, "pull", "-q", "--rebase", "origin", "main")
+
+    # 밖에서 한 줄 더한 뒤(앱은 아직 안 읽었다) 상태 토글
+    ahead = PRD_BODY.replace("한 줄로.", "한 줄로. 밖에서 더한 문장.")
+    write_commit_push(other, PRD_FILE, ahead, "spec(EXMP-PRD-001): 밖에서 수정")
+    d = await pipeline.change_status("EXMP-PRD-001", "approved", user, None)
+
+    pushed = g(remote, "show", f"main:{PRD_FILE}")
+    assert "밖에서 더한 문장." in pushed  # 밀린 커밋의 내용이 살아 있다
+    assert "status: approved" in pushed
+    # 상태 커밋은 한 줄만 바꾼다 — 제목만 보던 테스트가 못 잡던 것 (DEV-19)
+    assert g(remote, "show", "--numstat", "--format=", "main").split()[:2] == ["1", "1"]
+    assert d.status == "approved"
+    assert "밖에서 더한 문장." in SpecService(scoped).get_document("EXMP-PRD-001").body
+
+
+async def test_read_pending_is_idempotent_and_skips_github_path(scoped: Session, proj) -> None:
+    """읽을 것이 없으면 0이고 커밋도 안 생긴다. github 경로는 부르지 않는다(무한 재귀)."""
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    await create(proj)
+    user = proj["user"]
+    # 등록된 프로젝트 모양으로 — init_project가 첫 커밋 해시를 적어 둔다 (MS-001)
+    proj["project"].repository.last_processed_commit = g(remote, "rev-parse", "main")
+    scoped.flush()
+    g(other, "pull", "-q", "--rebase", "origin", "main")
+    write_commit_push(other, RFQ_FILE, RFQ, "spec(EXMP-RFQ-001): 밖에서 생성")
+
+    assert await pipeline.read_pending("EXMP", user) == 1
+    head = g(remote, "rev-parse", "main")
+    assert await pipeline.read_pending("EXMP", user) == 0  # 멱등
+    assert g(remote, "rev-parse", "main") == head  # 커밋이 안 생긴다
+    assert SpecService(scoped).get_document("EXMP-RFQ-001").current_version_no == 1
+    with pytest.raises(NotFound):
+        await pipeline.read_pending("EXMP", make_user(scoped, login="stranger"))
+
+
+async def test_revert_and_trash_do_not_revert_unread_commits(scoped: Session, proj) -> None:
+    """되돌리기·휴지통도 쓰기 전에 읽는다 (DEV-19, #137)."""
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    await create(proj, DocType.RFQ, RFQ)
+    await create(proj)
+    user, author = proj["user"], proj["author"]
+    await update(proj, "EXMP-PRD-001", PRD_BODY.replace("한 줄로.", "두 줄로."), 1)
+    proj["project"].repository.last_processed_commit = g(remote, "rev-parse", "main")
+    scoped.flush()
+    g(other, "pull", "-q", "--rebase", "origin", "main")
+
+    # 밖에서 **다른 문서**를 고친 뒤(앱은 아직 안 읽었다) 되돌리기
+    write_commit_push(other, RFQ_FILE, RFQ + "\n밖에서 더한 줄.\n", "spec(EXMP-RFQ-001): 밖에서")
+    await pipeline.revert("EXMP-PRD-001", 1, user)
+    assert "밖에서 더한 줄." in g(remote, "show", f"main:{RFQ_FILE}")
+    # 밀린 커밋을 읽었으니 그 문서가 DB에도 들어와 있다
+    assert "밖에서 더한 줄." in SpecService(scoped).get_document("EXMP-RFQ-001").body
+
+    # 휴지통도 같다
+    g(other, "pull", "-q", "--rebase", "origin", "main")
+    write_commit_push(
+        other, PRD_FILE, PRD_BODY.replace("한 줄로.", "셋."), "spec(EXMP-PRD-001): 밖에서"
+    )
+    await pipeline.trash_document("EXMP-RFQ-001", author, confirm=True)
+    assert "셋." in g(remote, "show", f"main:{PRD_FILE}")
+    assert RFQ_FILE not in remote_files(proj["repos"])
+
+
 async def test_change_status_commits_frontmatter_no_version(scoped: Session, proj) -> None:
     from app.core.errors import StatusBlocked
 

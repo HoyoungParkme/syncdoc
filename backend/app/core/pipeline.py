@@ -63,6 +63,46 @@ def _lock(code: str) -> asyncio.Lock:
     return _locks.setdefault(code, asyncio.Lock())
 
 
+# 읽기 전용 락 — read_pending이 같은 작업 사본에 동시에 git fetch를 걸지 않게. 쓰기 락(_lock)과
+# 따로인 이유: read_pending 안의 process_commit이 _lock을 잡는다. 같은 락이면 교착한다
+_read_locks: dict[str, asyncio.Lock] = {}
+
+
+def _read_lock(code: str) -> asyncio.Lock:
+    return _read_locks.setdefault(code, asyncio.Lock())
+
+
+def _set_status(body: str, to: DocStatus) -> str:
+    """frontmatter의 `status:` 줄 하나만 갈아 끼운다 — 본문은 건드리지 않는다."""
+    return re.sub(r"^status: .*$", f"status: {to}", body, count=1, flags=re.M)
+
+
+async def read_pending(code: str, user: User) -> int:
+    """SYNC-MS-007#pipeline.read_pending
+
+    저장소에 쓰기 전에 밀린 커밋을 먼저 읽는다 (DEV-19, #137). **락 밖에서 부른다** —
+    process_commit이 파일마다 save_pipeline을 통해 같은 _lock(code)를 잡았다 논다.
+    """
+    with db.session_scope() as s:
+        repo = ProjectService(s).get_owned(code, user).repository  # 쓰기 경로의 소유 검사를 겸한다
+        repo_id, workdir = repo.id, Path(repo.workdir_path)
+    async with _read_lock(code):
+        # 락 안에서 다시 읽는다 — 앞서 기다린 요청이 이미 따라잡아 놨을 수 있다
+        with db.session_scope() as s:
+            row = s.get(Repository, repo_id)
+            assert row is not None
+            last = row.last_processed_commit
+        head = await git.fetch(workdir)
+        # last가 None인 것은 **등록 중**뿐이다 — init_project가 첫 커밋 해시를, import_existing은
+        # rebuild가 head를 적는다. 그 둘은 자기가 저장소를 읽으므로 여기서 또 읽지 않는다
+        if last is None or head == last:
+            return 0
+        with db.session_scope() as s:
+            row = s.get(Repository, repo_id)
+            assert row is not None
+            return len(await process_commit(row, head))
+
+
 async def save_pipeline(
     entry: Entry,
     doc_id: str | None,
@@ -86,6 +126,11 @@ async def save_pipeline(
     code = project_code or (doc_id.split("-")[0] if doc_id else None)
     if code is None:
         raise NotFound("project", "None")
+    # 0. 쓰기 전에 밀린 커밋을 읽는다 (MS-007 save_pipeline 0, DEV-19). 세션이 넘어왔으면
+    # 부른 쪽(change_status·revert·restore_document)이 이미 읽었고, github는 자기가
+    # 처리 중이라 부르면 무한 재귀다. 락 **밖**이라 교착하지 않는다
+    if session is None and entry != Entry.github:
+        await read_pending(code, author.user)
     args = (
         entry,
         doc_id,
@@ -149,9 +194,8 @@ async def _run(
             and not restore
         ):
             raise DocumentTrashed(document.trashed_at.isoformat())
-            assert (
-                doc_type is not None
-            )  # github 신규 파일 — 파일명이 doc_id, frontmatter는 그대로 (보고)
+        # github 신규 파일 — 파일명이 doc_id, frontmatter는 그대로
+        assert doc_type is not None
     else:
         assert doc_type is not None
         doc_id = spec.issue_doc_id(project.id, code, doc_type)
@@ -216,7 +260,7 @@ async def _run(
         # github는 작성자가 스스로 내렸으면 그게 진실이다 (MS-002 save 5·6)
         and (entry != Entry.github or parse_frontmatter(body)[0].get("status") == "approved")
     ):
-        body = re.sub(r"^status: .*$", f"status: {DocStatus.draft}", body, count=1, flags=re.M)
+        body = _set_status(body, DocStatus.draft)
         if entry == Entry.github:
             # github 경로는 커밋이 이미 저장소에 있어 본문을 고치는 것만으로는 저장소가
             # 안 바뀐다. 커밋을 하나 더 민다. **그 해시를 StatusChange에 적어야** 다음
@@ -311,8 +355,11 @@ async def change_status(
     reason: str | None = None,
 ) -> DocumentSummary:
     """SYNC-MS-007#pipeline.change_status"""
+    code = doc_id.split("-")[0]
+    # 0. 밀린 커밋을 먼저 읽는다 — 소유 검사도 여기서. 락·세션 밖 (MS-007 change_status 0)
+    await read_pending(code, user)
     with db.session_scope() as s:
-        ProjectService(s).get_owned(doc_id.split("-")[0], user)  # 0. 문서를 읽기 전에
+        repo = ProjectService(s).get_owned(code, user).repository
         spec = SpecService(s)
         document = spec.get_document(doc_id)
         if document.trashed_at is not None:
@@ -337,7 +384,18 @@ async def change_status(
         # 3. 없음 — 상위 대조가 있던 자리. 완료는 사람 하나가 누르는 토글이다 (카드 V)
         if document.status == to:
             return document
-        new_body = re.sub(r"^status: .*$", f"status: {to}", document.body, count=1, flags=re.M)
+        # 4. 커밋할 본문은 **저장소**에서 읽는다 — 원본이 진실이고 current_body는 조회
+        # 캐시다(DOM-001 StatusChange, DEV-19). DB 본문으로 커밋하면 아직 읽지 않은
+        # 커밋의 내용이 통째로 되돌아간다 — reset --hard 뒤에 덮어쓰므로 push가 거부되지도
+        # 않아 조용히 사라진다 (#137). 0단계가 방금 fetch해서 origin/main이 최신이다
+        path = f"docs/specs/{spec_dir(document.doc_type)}/{doc_id}.md"
+        try:
+            src = await git.read(Path(repo.workdir_path), path, "origin/main")
+        except (git.GitError, OSError):
+            # 저장소에 아직 파일이 없다 — 이 커밋이 파일을 만드는 복구가 된다
+            log.warning("change_status %s: origin/main에 %s가 없다 — DB 본문으로", doc_id, path)
+            src = document.body
+        new_body = _set_status(src, to)
         author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.web_status)
         await save_pipeline(
             Entry.web_status,
@@ -358,10 +416,13 @@ async def revert(
     doc_id: str, to_version: int, user: User, confirm_item_deletion: bool = False
 ) -> SaveResult:
     """SYNC-MS-007#pipeline.revert"""
+    # 0. 밀린 커밋을 먼저 읽는다 — 소유 검사도 여기서 (MS-007 revert 0, DEV-19)
+    await read_pending(doc_id.split("-")[0], user)
     with db.session_scope() as s:
-        ProjectService(s).get_owned(doc_id.split("-")[0], user)  # 0. 문서를 읽기 전에
         spec = SpecService(s)
         document = spec.get_document(doc_id)
+        # 1a. 본문은 versions.body에서 온다 — 되돌리기는 옛 버전을 쓰는 것이 목적이다.
+        # 0단계가 밀린 것을 먼저 흡수하므로 남의 커밋을 덮지 않는다
         old_body = spec.version_body(doc_id, to_version)
         if to_version == document.current_version_no:
             raise AlreadyCurrent()
@@ -383,6 +444,8 @@ async def revert(
 async def trash_document(doc_id: str, author: Author, confirm: bool) -> TrashResult:
     """SYNC-MS-007#pipeline.trash_document"""
     code = doc_id.split("-")[0]
+    # 0. 밀린 커밋을 먼저 읽는다 — 락 **밖**에서 (MS-007 trash_document 0, DEV-19)
+    await read_pending(code, author.user)
     async with _lock(code):
         with db.session_scope() as s:
             repo = ProjectService(s).get_owned(code, author.user).repository  # 0. 소유 먼저
@@ -419,6 +482,8 @@ async def trash_document(doc_id: str, author: Author, confirm: bool) -> TrashRes
 async def restore_document(doc_id: str, author: Author) -> SaveResult:
     """SYNC-MS-007#pipeline.restore_document"""
     code = doc_id.split("-")[0]
+    # 0. 밀린 커밋을 먼저 읽는다 (MS-007 restore_document 0, DEV-19)
+    await read_pending(code, author.user)
     with db.session_scope() as s:
         repo = ProjectService(s).get_owned(code, author.user).repository  # 0. 소유 먼저
         spec = SpecService(s)
@@ -430,7 +495,7 @@ async def restore_document(doc_id: str, author: Author) -> SaveResult:
         path = f"docs/specs/{spec_dir(document.doc_type)}/{doc_id}.md"
         body = await git.read(Path(repo.workdir_path), path, f"{h}^")
         # 3. DB가 draft다 — mcp 경로의 frontmatter.status_change에 안 걸리게
-        body = re.sub(r"^status: .*$", f"status: {DocStatus.draft}", body, count=1, flags=re.M)
+        body = _set_status(body, DocStatus.draft)
         entry = Entry.mcp if author.via == Entry.mcp else Entry.web_revert
         r = await save_pipeline(
             entry,
