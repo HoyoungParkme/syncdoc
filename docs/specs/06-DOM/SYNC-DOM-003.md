@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-003
 type: DOM
 title: ERD·DD — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-001]
 ---
 
@@ -59,6 +59,8 @@ erDiagram
         int registered_by_user_id FK
         timestamptz synced_at
         varchar fetch_error
+        int hook_id
+        varchar hook_error
     }
     documents {
         int id PK
@@ -148,6 +150,7 @@ erDiagram
 - 상태 변경은 `versions` 행을 만들지 않는다. `status_changes.commit_hash`가 그 커밋을 가리킨다
 - `references`의 `to_item_id`와 `to_document_id`는 CHECK로 하나만 채워지게 한다. `is_missing=true`면 둘 다 null
 - **끊어진 참조는 별도 표가 아니다.** 대상 항목이 삭제되면 그것을 가리키던 참조의 `to_*`를 비우고 `is_missing=true`로 되돌린다([[SYNC-MS-003#ReferenceService.mark_missing]]). `raw_target`이 남아 있어 상대가 돌아오면 `resolve_missing`이 다시 잇는다. v1의 `flags`·`propagation_decisions`·`comments`는 v2에서 뺐다([[SYNC-DOM-001]] 3.3) — 리비전 0011이 세 표를 지운다. `downgrade`는 0001·0007·0008의 정의를 복원하지만 데이터는 돌아오지 않는다. 옛 행은 각 저장소의 `backup/tracking.json`과 태그 `v1-collab`의 `import_tracking`으로만 되살릴 수 있다
+- **`repositories.hook_id`·`hook_error`는 리비전 `0013_add_repo_hook`이 둘 다 nullable로 더한다**(카드 AF). 기본값 없이 비운 채 시작한다 — 「아직 안 걸어 본 것」이 맞는 초기 상태다. `downgrade`는 두 컬럼을 지운다
 - **소유는 `projects.owner_user_id` 한 컬럼이다.** 별도 권한 표가 없다. 리비전 `0012_add_projects_owner`가 nullable로 더하고 `repositories.registered_by_user_id`(없으면 `min(users.id)`)로 채운 뒤 not null·FK로 조인다(0004 선례). `downgrade`는 컬럼을 지운다
 
 ---
@@ -180,6 +183,8 @@ erDiagram
 | behind_by | int | null 허용 | 원격이 앞선 커밋 수. 0이면 최신, null이면 아직 못 받아봄 | `0` |
 | fetched_at | timestamptz | null 허용 | `behind_by`를 잰 시각. 화면이 "언제 기준인지" 보여준다 | |
 | fetch_error | varchar(300) | null 허용 | **마지막 폴링이 실패한 이유.** 성공하면 비운다. 폴링은 저장소 하나가 죽어도 다음을 계속하고 로그만 남기므로([[SYNC-MS-007#scheduler.catch_up]]), 이 값이 없으면 **사람은 「아무도 push를 안 했나 보다」로 읽는다**(#46) | `git rev-parse origin/main: fatal…` |
+| hook_id | int | null 허용 | **GitHub이 준 push 통지 번호**(카드 AF). 있으면 이 저장소에 통지가 걸려 있다 — 반영이 몇 초다. 없으면 주기 확인(최대 5분)에만 기댄다. 앱은 만들기만 하고 지우지 않는다 | `512345678` |
+| hook_error | varchar(300) | null 허용 | **통지를 걸지 못한 이유.** 권한이 없거나(`admin:repo_hook`), 공개 주소·비밀번호가 비었거나, GitHub이 거절했을 때. 성공하면 비운다. 이 값이 없고 `hook_id`도 없으면 **아직 안 걸어 본 것**이다 | `admin:repo_hook 권한이 없다` |
 
 ### documents
 
