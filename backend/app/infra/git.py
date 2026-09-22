@@ -320,11 +320,27 @@ async def exists(workdir: Path, path: str) -> bool:
         raise
 
 
-_TEMPLATES_DIR = Path(__file__).resolve().parents[3] / "docs" / "specs" / "_templates"
 _TYPES = ("RFQ", "PRD", "SCN", "UC", "INFRA", "DOM", "UI", "API", "SEQ", "MS", "CODE", "STD")
-_README = """# docs/specs — 명세 원본
+README_PATH = "docs/specs/README.md"
 
-싱크독 명세 체인 11단계 + STD. 쓰는 법은 명세 작성 규약 SYNC-STD-001, 타입별 뼈대는 `_templates/`.
+
+def _readme() -> str:
+    """새 저장소의 `docs/specs/README.md` (SYNC-MS-009#git.init_specs).
+
+    **규약 본문 사본을 두지 않는다** — 링크로 가리킨다(카드 AB, #113·#129). 복사한 사본은
+    규약이 바뀌어도 갱신되지 않아 저장소 여덟이 낡은 안내를 들고 있었다.
+    """
+    u = settings.SPECS_URL.rstrip("/")
+    return f"""# docs/specs — 명세 원본
+
+싱크독 명세 체인 11단계 + STD. 쓰는 법은 아래 셋이다.
+
+- [명세 작성 규약 SYNC-STD-001]({u}/STD/SYNC-STD-001.md) — 필수 절과 항목 ID 형식은 그 2장
+- [개발 규약 SYNC-STD-004]({u}/STD/SYNC-STD-004.md)
+- [타입별 뼈대 `_templates/`]({u}/_templates)
+
+**이 저장소에는 규약·템플릿 사본을 두지 않는다.** 규약이 바뀌면 위 링크 끝이 바뀐다.
+에이전트는 싱크독 MCP의 `get_template`으로 타입별 뼈대와 규약을 받는다.
 
 **위에서 아래로 읽는다.** 디렉터리 번호가 그 순서다.
 
@@ -341,9 +357,9 @@ _README = """# docs/specs — 명세 원본
 | 9 | `09-SEQ` | 시퀀스 |
 | 10 | `10-MS` | MINISPEC — 함수 단위 |
 | 11 | `11-CODE` | 구현 슬라이스 카드 |
-| — | `STD` | 작성 규약·뷰 규약·개발 규약 (단계 밖) |
+| — | `STD` | 작성 규약·뷰 규약·개발 규약 (단계 밖 — 싱크독 저장소에 있다) |
 
-- 경로 `docs/specs/{NN-TYPE}/{doc_id}.md` · 문서 ID `{프로젝트코드}-{TYPE}-{NNN}`
+- 경로 `docs/specs/{{NN-TYPE}}/{{doc_id}}.md` · 문서 ID `{{프로젝트코드}}-{{TYPE}}-{{NNN}}`
 - 상태(`status`)는 frontmatter가 진실. 변경은 싱크독 웹에서만
 - 첨부는 `assets/` — 문서에서는 문서 폴더 기준 상대 경로(`../assets/x.png`)
 - 화면(UI) 배치는 디자인 도구 산출물(스타일까지 든 자기 완결 html)을 그대로 넣는다(규약 2.7)
@@ -355,14 +371,32 @@ _README = """# docs/specs — 명세 원본
 """
 
 
+async def sync_readme(workdir: Path, author: Author, code: str) -> str | None:
+    """SYNC-MS-009#git.sync_readme
+
+    재구축이 저장소에 쓰는 유일한 것. 같으면 아무것도 하지 않는다 — 커밋이 안 생긴다.
+    """
+    want = _readme()
+    # push는 토큰을 붙인 URL로 밀어 origin/main 추적 참조가 갱신되지 않는다 — 비교 전에 받아 온다
+    await _run(workdir, "fetch", "origin")
+    try:
+        have = await read(workdir, README_PATH, "origin/main")
+    except (GitError, OSError):
+        have = ""  # README가 없는 저장소(가져와서 등록했거나 지워짐)
+    if have == want:
+        return None
+    return await commit_push(
+        workdir,
+        f"chore({code}): README를 싱크독 규약 링크로",
+        author,
+        path=README_PATH,
+        content=want,
+    )
+
+
 async def init_specs(workdir: Path) -> dict[str, str]:
     """SYNC-MS-009#git.init_specs"""
-    files: dict[str, str] = {}
-    for t in _TYPES:
-        files[f"docs/specs/{spec_dir(t)}/.gitkeep"] = ""
-        files[f"docs/specs/_templates/{t}.md"] = (_TEMPLATES_DIR / f"{t}.md").read_text(
-            encoding="utf-8"
-        )
+    files: dict[str, str] = {f"docs/specs/{spec_dir(t)}/.gitkeep": "" for t in _TYPES}
     files["docs/specs/assets/.gitkeep"] = ""
-    files["docs/specs/README.md"] = _README
+    files[README_PATH] = _readme()
     return files

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import _fernet
 from app.core.errors import PushFailed
@@ -352,11 +353,12 @@ async def test_exists_is_committed_not_workdir(repos: dict[str, Path]) -> None:
 
 
 # ── init_specs ──
-async def test_init_specs_returns_26_files_and_commit_push_writes_them(
+async def test_init_specs_returns_14_files_without_template_copies(
     repos: dict[str, Path],
 ) -> None:
+    """규약·템플릿 사본은 넣지 않는다 — README가 링크로 가리킨다 (카드 AB, #113·#129)."""
     files = await g.init_specs(repos["work"])
-    assert len(files) == 26
+    assert len(files) == 14
     dirs = {p.split("/")[2] for p in files if p.endswith("/.gitkeep")}
     assert dirs == {  # 11단계는 번호 + 타입, 단계 밖 STD는 번호 없음 (STD-001 1.1)
         "01-RFQ",
@@ -373,18 +375,48 @@ async def test_init_specs_returns_26_files_and_commit_push_writes_them(
         "STD",
         "assets",
     }
-    assert "| 6 | `06-DOM` |" in files["docs/specs/README.md"]  # 읽는 순서표
-    assert files["docs/specs/_templates/PRD.md"].startswith("---\ndoc_id:")
-    assert "SYNC-STD-001" in files["docs/specs/README.md"]
+    assert [k for k in files if k.startswith("docs/specs/_templates/")] == []
+    readme = files[g.README_PATH]
+    assert "| 6 | `06-DOM` |" in readme  # 읽는 순서표
+    # 규약은 사본이 아니라 링크다 — 싱크독 저장소를 가리킨다
+    assert f"{settings.SPECS_URL}/STD/SYNC-STD-001.md" in readme
+    assert f"{settings.SPECS_URL}/_templates" in readme
     # 에이전트가 저장소에서 처음 읽는 글 — DOM 셋의 순서와 작업 단위가 여기 있어야 한다 (MS-009)
-    assert "8 API 뒤에 돌아와서" in files["docs/specs/README.md"]
-    assert "문서 하나를 만들거나 고치면 멈춘다" in files["docs/specs/README.md"]
+    assert "8 API 뒤에 돌아와서" in readme
+    assert "문서 하나를 만들거나 고치면 멈춘다" in readme
     h = await g.commit_push(repos["work"], "chore(SYNC): init syncdoc", _author(), files=files)
     assert h == git(repos["remote"], "rev-parse", "main")
-    assert await g.exists(repos["work"], "docs/specs/_templates/STD.md")
-    # git.list는 명세만 준다 — 템플릿 수는 init_specs가 만든 파일 목록에서 센다 (#40)
-    assert len([k for k in files if k.startswith("docs/specs/_templates/")]) == 12
-    assert await g.list(repos["work"], "docs/specs/_templates/*.md") == []
+    assert await g.exists(repos["work"], "docs/specs/STD/.gitkeep")
+    assert await g.exists(repos["work"], "docs/specs/_templates/PRD.md") is False
+
+
+# ── sync_readme ──
+async def test_sync_readme_commits_when_stale(repos: dict[str, Path]) -> None:
+    await g.commit_push(
+        repos["work"], "chore(SYNC): 옛 README", _author(), path=g.README_PATH, content="옛것\n"
+    )
+    before = git(repos["remote"], "rev-parse", "main")
+    h = await g.sync_readme(repos["work"], _author(), "SYNC")
+    assert h is not None and h != before
+    pushed = git(repos["remote"], "show", f"main:{g.README_PATH}")
+    assert settings.SPECS_URL in pushed
+    assert "옛것" not in pushed
+    assert "chore(SYNC): README" in git(repos["remote"], "log", "-1", "--format=%s", "main")
+
+
+async def test_sync_readme_noop_when_same(repos: dict[str, Path]) -> None:
+    await g.sync_readme(repos["work"], _author(), "SYNC")
+    before = git(repos["remote"], "rev-parse", "main")
+    assert await g.sync_readme(repos["work"], _author(), "SYNC") is None
+    assert git(repos["remote"], "rev-parse", "main") == before
+
+
+async def test_sync_readme_creates_when_missing(repos: dict[str, Path]) -> None:
+    """README가 아예 없는 저장소(가져와서 등록했거나 지워짐)에도 만든다."""
+    assert await g.exists(repos["work"], g.README_PATH) is False
+    h = await g.sync_readme(repos["work"], _author(), "ABC")
+    assert h is not None
+    assert "chore(ABC): README" in git(repos["remote"], "log", "-1", "--format=%s", "main")
 
 
 async def test_commit_push_requires_path_content_or_files(repos: dict[str, Path]) -> None:
