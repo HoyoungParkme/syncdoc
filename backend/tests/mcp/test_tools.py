@@ -187,7 +187,9 @@ async def test_init_project_tool(scoped: Session, as_user, repos, tmp_path, monk
     err, r = await call("init_project", remote_url=str(bare), code="NEW", name="새")
     assert not err and r["code"] == "NEW" and len(r["stages"]) == 11
     assert all(s["status"] is None and s["doc_count"] == 0 for s in r["stages"])
-    assert "docs/specs/_templates/RFQ.md" in g(bare, "ls-tree", "-r", "--name-only", "main")
+    # 규약·템플릿 사본은 안 넣는다 — README가 링크로 가리킨다 (카드 AB)
+    tree = g(bare, "ls-tree", "-r", "--name-only", "main")
+    assert "docs/specs/README.md" in tree and "_templates" not in tree
     err, p = await call("init_project", remote_url=str(bare), code="NEW", name="새")
     assert err and p["type"] == "urn:syncdoc:project-code-conflict"
     err, p = await call("init_project", remote_url=str(repos["remote"]), code="EXST", name="n")

@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -287,6 +287,7 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 | `DIFF_CONTEXT_LINES` | 3 | diff에서 앞뒤로 함께 보여줄 줄 수 |
 | `PUSH_RETRIES` | 3 | push 거부 시 rebase 후 재시도 횟수 |
 | `REPOS_DIR` | `/var/syncdoc/repos` | 작업 사본이 사는 곳 |
+| `SPECS_URL` | `https://github.com/HoyoungParkme/syncdoc/blob/main/docs/specs` | 새 저장소 README가 규약·템플릿을 가리키는 주소. 싱크독 저장소를 옮기면 바꾼다 (카드 AB) |
 | `LLM_API_KEY` | **빈 값** | 모델 키. 비면 읽는 중 질의가 꺼진다 (5.3) |
 | `LLM_API_URL` | `https://api.openai.com/v1/chat/completions` | OpenAI 호환 Chat Completions 주소. 호환 서버면 바꾼다 (5.3) |
 | `LLM_MODEL` | `gpt-4o` | 쓸 모델 이름 (5.3). mini는 항목 본문에 있는 것도 「모른다」고 내 첫날 바꿨다 |
@@ -360,7 +361,7 @@ docker compose up
 
 Cloudflare Tunnel은 노트북에서 별도로 실행하며 `:8000`을 공개 주소에 연결한다.
 
-**이미지에 담기는 것** — 백엔드 코드, React 빌드 결과, 그리고 `docs/specs/`의 `_templates/`와 `STD/` 사본. 저장소 작업 사본에서 규약·템플릿을 못 읽을 때 [[SYNC-API-002#get_template]]이 이 사본으로 대체한다. 둘 중 하나라도 빠지면 그 대체가 배포본에서만 조용히 실패한다.
+**이미지에 담기는 것** — 백엔드 코드, React 빌드 결과, 그리고 `docs/specs/`의 `_templates/`와 `STD/` 사본. [[SYNC-API-002#get_template]]이 템플릿은 **늘** 이 사본으로 주고(사용자 저장소에는 사본이 없다, 카드 AB), 규약은 그 프로젝트 저장소에 `STD/`가 있으면 그것을 먼저 준다. 둘 중 하나라도 이미지에서 빠지면 배포본에서만 조용히 실패한다.
 
 **운영상 전제**
 - 노트북이 꺼지면 웹과 MCP가 모두 멈춘다. 이 구조의 근본 한계이며 C5(저장소 직접 읽기)가 대비책이다.

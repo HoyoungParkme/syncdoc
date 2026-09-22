@@ -268,6 +268,8 @@ export interface RepoStatus {
   error: string | null
 }
 export interface RebuildResult {
+  /** README를 새 판으로 커밋했나 (카드 AB) */
+  readme_updated: boolean
   docs: number
   items: number
   references: number

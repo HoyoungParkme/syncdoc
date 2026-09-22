@@ -12,6 +12,7 @@ from app import scheduler
 from app.config import settings
 from app.core.spec.service import SpecService
 from app.core.types import DocType
+from app.infra.git import README_PATH
 from tests.conftest import git as g
 from tests.conftest import write_commit_push
 from tests.core.reference.test_service import RFQ
@@ -139,6 +140,11 @@ async def test_webhook_admin_and_catch_up(client: TestClient, scoped: Session, p
         "EXMP-RFQ-001",
         "SYNC-PRD-001",
     ]
+    # 재구축이 저장소에 쓰는 유일한 것 — 낡은 README를 새 판으로 커밋한다 (카드 AB, #129)
+    assert rb["readme_updated"] is True
+    assert settings.SPECS_URL in g(proj["repos"]["remote"], "show", f"main:{README_PATH}")
+    # 두 번째 재구축은 README가 이미 같으니 커밋이 없다
+    assert client.post("/api/admin/repos/EXMP/rebuild").json()["readme_updated"] is False
     assert client.post("/api/admin/repos/NOPE/rebuild").status_code == 404
     # 관리 표에 백업 칸이 없다 (카드 V)
     assert "backed_up_at" not in client.get("/api/admin/repos").json()[0]

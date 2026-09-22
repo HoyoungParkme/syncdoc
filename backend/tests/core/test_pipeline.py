@@ -579,8 +579,14 @@ async def test_repo_status_and_rebuild_index(scoped: Session, proj) -> None:
     head = _push_history(other, remote)
     r = await ps.rebuild_index("EXMP", user)
     assert r.docs == 3
+    # 재구축은 README를 먼저 새 판으로 커밋한다 — head가 그만큼 앞선다 (카드 AB)
+    assert r.readme_updated is True
+    new_head = g(remote, "rev-parse", "main")
+    assert new_head != head
     st = (await ps.repo_status(user))[0]
-    assert (st.last_processed_commit, st.behind_by) == (head, 0) and st.synced_at is not None
+    assert (st.last_processed_commit, st.behind_by) == (new_head, 0) and st.synced_at is not None
+    # 앱이 README를 밀었으니 밖의 클론은 뒤처져 있다 — 받아 와야 push된다 (카드 AB)
+    g(other, "pull", "-q", "--rebase", "origin", "main")
     write_commit_push(other, RFQ_FILE, RFQ + "\n", "spec: 하나 더")
     # repo_status는 DB만 읽는다(MS-001). 폴링이 재기 전까지는 밖의 push를 모른다
     assert (await ps.repo_status(user))[0].behind_by == 0

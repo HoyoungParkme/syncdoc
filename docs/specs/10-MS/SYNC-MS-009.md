@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-009
 type: MS
 title: MINISPEC — infra — git·github 어댑터
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -232,7 +232,34 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-UC-001#UC-A1]] 4 · [[SYNC-STD-001]] 1.1
 
-**처리** 반환할 `files` dict 구성 — `docs/specs/{NN-TYPE}/.gitkeep` 12개(11단계는 `01-RFQ`…`11-CODE`, 단계 밖 `STD`는 번호 없이 — STD-001 1.1), `docs/specs/_templates/{TYPE}.md` 12개(템플릿 파일명은 타입만. 앱에 내장된 `_templates/` 사본), `docs/specs/assets/.gitkeep`, `docs/specs/README.md`(규약 링크 + 11단계 순서표. **DOM 행에 셋의 순서** — 도메인 모델은 여기서, 클래스 명세·ERD는 API 뒤에([[SYNC-STD-001]] 2.6) — 와 **작업 단위 한 줄** — 문서 하나마다 멈춘다(STD-001 1.8) — 가 들어간다. 에이전트가 저장소에서 처음 읽는 글이라 여기 없으면 규약이 없는 것과 같다). `→ files` — 실제 쓰기·커밋은 `commit_push(files=…)`
+**처리** 반환할 `files` dict 구성 — `docs/specs/{NN-TYPE}/.gitkeep` 12개(11단계는 `01-RFQ`…`11-CODE`, 단계 밖 `STD`는 번호 없이 — STD-001 1.1), `docs/specs/assets/.gitkeep`, `docs/specs/README.md` — **모두 14개**. **템플릿·규약 사본은 넣지 않는다**(카드 AB, #113·#129) — 한 번 복사된 사본은 규약이 바뀌어도 갱신되지 않아 여덟 저장소가 낡은 안내를 들고 있었다. 대신 README가 `SPECS_URL`로 싱크독 저장소의 규약·템플릿을 가리키고, 에이전트는 [[SYNC-API-002#get_template]]으로 내장 원본을 받는다. `docs/specs/README.md`(규약 링크 + 11단계 순서표. **DOM 행에 셋의 순서** — 도메인 모델은 여기서, 클래스 명세·ERD는 API 뒤에([[SYNC-STD-001]] 2.6) — 와 **작업 단위 한 줄** — 문서 하나마다 멈춘다(STD-001 1.8) — 가 들어간다. 에이전트가 저장소에서 처음 읽는 글이라 여기 없으면 규약이 없는 것과 같다. **규약 본문은 링크다** — 첫 문단이 `SPECS_URL`로 SYNC-STD-001·STD-004·`_templates/`를 가리킨다). `→ files` — 실제 쓰기·커밋은 `commit_push(files=…)`
+
+**테스트 관점** 파일 14개 · `.gitkeep` 디렉터리가 11단계 + `STD` + `assets` · `_templates/`가 **없다** · README에 `SPECS_URL` 링크와 11단계 표·작업 단위 한 줄·DOM 셋 순서가 있다
+
+---
+
+#### git.sync_readme 저장소 README를 지금 판으로
+
+**시그니처**
+```python
+async def sync_readme(workdir: Path, author: Author, code: str) -> str | None
+```
+
+근거: [[SYNC-UC-001#UC-S6]] 1 · [[SYNC-SEQ-001#SEQ-21]] · 카드 AB(#129)
+
+**입력** 작업 사본, 커밋 주체(재구축을 누른 소유자), 프로젝트 코드(커밋 메시지용)
+
+**처리**
+1. `fetch origin` — push는 토큰을 붙인 URL로 밀어 `origin/main` 추적 참조가 갱신되지 않는다. 비교 전에 받아 온다
+2. `git.read(workdir, "docs/specs/README.md", "origin/main")` — 없으면(`GitError`) 빈 문자열로 본다
+3. 지금 판(`init_specs`가 쓰는 것과 같은 글)과 같으면 `→ None`. 저장소에 아무것도 쓰지 않는다
+4. 다르면 `commit_push(workdir, f"chore({code}): README를 싱크독 규약 링크로", author, path="docs/specs/README.md", content=...)` → `→ commit_hash`
+
+**출력** 커밋 해시 또는 `None`(이미 같음)
+
+**예외** `PushFailed` — 부르는 쪽이 그대로 올린다([[SYNC-MS-001#ProjectService.rebuild_index]] 2)
+
+**테스트 관점** 낡은 README → 커밋 하나, 파일 내용이 새 판 · 같은 README → `None`이고 HEAD 그대로 · README가 아예 없는 저장소 → 만든다 · 커밋 메시지에 프로젝트 코드
 
 ---
 

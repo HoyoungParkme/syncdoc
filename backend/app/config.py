@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: str = ""
     WEBHOOK_SECRET: str = ""
     REPOS_DIR: Path = Path("/var/syncdoc/repos")
+    # 새 저장소 README가 규약·템플릿을 가리키는 주소 (INFRA 5.2, 카드 AB). 저장소를 옮기면 바꾼다
+    SPECS_URL: str = "https://github.com/HoyoungParkme/syncdoc/blob/main/docs/specs"
     PUBLIC_BASE_URL: str = ""  # 공개 주소 — Named 고정 호스트 또는 Quick (INFRA 5장). 비면 로컬만
     POLL_INTERVAL_SECONDS: int = 300  # INFRA 7장 보조 경로. 0이면 폴링·기동 따라잡기 끔(테스트)
     DIFF_CONTEXT_LINES: int = 3  # diff에서 앞뒤로 함께 보여줄 줄 수 (INFRA 5.2)

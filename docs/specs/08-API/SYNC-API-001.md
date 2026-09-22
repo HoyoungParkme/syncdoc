@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -980,7 +980,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ```yaml
 /api/admin/repos/{code}/rebuild:
   post:
-    summary: "인덱스 재구축 (UI-14, [[SYNC-UC-001#UC-S6]]). 참조·버전·항목을 저장소에서 다시 만든다. 소유자만"
+    summary: "인덱스 재구축 (UI-14, [[SYNC-UC-001#UC-S6]]). 저장소의 README가 낡았으면 새 판으로 커밋한 뒤, 참조·버전·항목을 저장소에서 다시 만든다. 소유자만"
     parameters:
     - $ref: '#/components/parameters/code'
     responses:
@@ -1558,6 +1558,9 @@ components:
     RebuildResult:
       type: object
       properties:
+        readme_updated:
+          type: boolean
+          description: "docs/specs/README.md를 새 판으로 커밋했나 (카드 AB). 이미 같으면 false"
         docs:
           type: integer
         items:
