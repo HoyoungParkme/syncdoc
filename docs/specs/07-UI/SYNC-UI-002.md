@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -16,16 +16,16 @@ upstream: [SYNC-UI-001]
 
 | 부분 | 무엇 | 형태 |
 |---|---|---|
-| 배치 | 요소가 어디 있나 | HTML. 스타일은 자기 완결 — 공통 틀 절의 `<style>` + 화면 자신의 `<style>`. 요소마다 `data-el` 번호. 뷰는 iframe으로 그대로 그린다(카드 Z) |
+| 배치 | 요소가 어디 있나 | 디자인 도구가 만든 자기 완결 html — 공통 틀 절의 `<link>`·`<style>` + 화면 자신의 `<style>` + 마크업. 아트보드 폭 1280, 높이 800이 기본이고 내용이 길면 자란다. 요소마다 `data-el` 번호. 뷰는 iframe으로 격리해 그대로 그린다(카드 Z·AA). 한 화면에 상태가 여럿이면(원본 탭·다이얼로그·배너) 주 아트보드 아래에 작은 보드로 잇고 앞에 회색 주석 한 줄을 둔다 |
 | 요소 | 각 요소가 뭘 보여주고 누르면 뭐 되나 | 표 |
 | 규칙 | 상태별 표시, 조건부 노출, 유효성 | 목록 |
 | 시나리오 | 요소들이 이어져 무엇을 이루나 | 번호 매긴 흐름. 유스케이스 흐름을 이 화면 동작으로 옮긴 것 |
 
 사람용 뷰는 배치를 왼쪽에, 요소·규칙·시나리오를 오른쪽에 나란히 렌더링한다. 요소 번호를 누르면 양쪽이 서로 강조된다.
 
-**공통 틀**(상단 바)은 UI-5에서 한 번 정의하고 다른 화면에서는 생략한다. 여러 화면이 같이 쓰는 조각은 1장 공통 컴포넌트에 모았다. **스타일**은 「공통 틀」 절의 html 블록(`<style>`만)에 있고, 뷰가 그것을 이 문서 모든 화면의 iframe 앞에 넣는다([[SYNC-STD-001]] 2.7).
+**상단 바**(UI-001 4장)는 셸 안 화면(UI-2·4·5·7·8·9)마다 배치가 품는다 — 공통 틀 마크업으로 두면 상단 바가 없는 UI-1과 다이얼로그 화면에도 들어가서다. 여러 화면이 같이 쓰는 조각은 1장 공통 컴포넌트에 모았다. **스타일**은 「공통 틀」 절의 html 블록(`<link>`·`<style>`)에 있고, 뷰가 그것을 이 문서 모든 화면의 iframe 앞에 넣는다([[SYNC-STD-001]] 2.7).
 
-**색·글꼴·간격 값은 여기 없다.** [[SYNC-UI-001]] 3장 디자인 토큰이 원본이다. 이 문서는 무엇이 어디 있고 누르면 뭐가 되는지만 정한다.
+**색·글꼴·간격 값의 원본은 [[SYNC-UI-001]] 3장 디자인 토큰이다.** 배치 html이 자기 완결이라 이 문서의 공통 틀 `<style>`에도 같은 값이 CSS 변수로 들어 있지만, 그것은 토큰의 전사다 — 값을 바꾸려면 UI-001을 먼저 고친다. 이 문서가 정하는 것은 무엇이 어디 있고 누르면 뭐가 되는지다.
 
 **UI-6 원본 편집은 v0.2에서 삭제됐다.** 그려보니 명세에 없는 기능(실시간 검사 등)을 끌어들이게 되고, 명세대로 그려도 사람이 손으로 검사·충돌·삭제를 다루는 화면이 되어 에이전트가 쓰는 흐름과 어긋났다. 이 판단이 화면 설계로 되먹임되어 UI-6이 빠졌다.
 
@@ -97,417 +97,116 @@ upstream: [SYNC-UI-001]
 
 ## 공통 틀
 
-이 절의 첫 html 블록은 뷰가 **이 문서 모든 화면의 iframe 앞에** 넣는다([[SYNC-STD-001]] 2.7). 마크업은 없고 `<style>`만이다 — 상단 바 같은 공통 조각은 UI-5 배치가 이미 품고 있어 마크업을 여기 두면 두 번 나온다. 카드 Z에서 렌더러 안에 있던 클래스 사전을 여기로 옮겼고, 앱 CSS에 우연히 맞아 보이던 클래스도 토큰을 값으로 풀어 옮겼다. 12화면을 디자인 도구로 다시 그리면(카드 AA) 뒤쪽은 줄어든다.
+이 절의 첫 html 블록은 뷰가 **이 문서 모든 화면의 iframe 앞에** 넣는다([[SYNC-STD-001]] 2.7). 마크업은 없고 `<link>`(글꼴)와 `<style>`뿐이다 — 상단 바는 셸 안 화면 배치가 각자 품는다(0장). 카드 AA에서 12화면을 디자인 도구로 다시 그리며 카드 Z의 클래스 사전을 이 디자인 체계 하나로 바꿨다: 토큰(CSS 변수, 값은 UI-001 3장) · 아트보드 `.sd` · 상단 바 `.top` · 문서 바 `.docbar` · 버튼 `.b`(채움 `solid` · 위험 `danger` · 작게 `sm`) · 상태 필 `.pill` · 항목 ID 뱃지 `.idb` · 점 `.dot` · 배너 `.ban` · 입력 `.in` · 카드 `.card` · 다이얼로그 `.ov`+`.dlg`(머리 `.dh` · 본문 `.db` · 발 `.df`) · 탭 `.tabs` · 3단 틀 `.body3` · 히트맵 칸 `.cell` · diff 줄 `.dl` · 코드 상자 `.snip` · 단계 칩 `.stp`. 화면에만 있는 것은 그 화면의 `<style>`에 둔다.
 
 ```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
-/* 카드 Z — 렌더러 사전에서 옮김. 이 블록은 이 문서 모든 화면의 iframe 앞에 들어간다 */
-body{margin:0;font-family:system-ui,sans-serif;font-size:12.5px;color:#222;background:#f4f4f4}
-.lbl{color:#777;font-size:11px}
-.topbar{display:flex;align-items:center;gap:12px;padding:8px 12px;background:#e8e8e8;border-bottom:1px solid #bbb}
-.grow{flex:1}
-.badge{display:inline-block;background:#d33;color:#fff;font-size:10px;padding:0 5px;border-radius:8px}
-.btn{padding:3px 8px;border:1px solid #666;background:#fafafa;display:inline-block}
-.docbar{display:flex;align-items:center;gap:12px;padding:7px 12px;background:#f0f0f0;border-bottom:1px solid #bbb}
-.tabs span{padding:3px 8px;border:1px solid #999;margin-right:-1px}
-.tabs span.on{background:#fff;font-weight:600}
-.body3{display:grid;grid-template-columns:150px 1fr 220px;gap:10px;padding:10px}
-.toc{padding:8px;line-height:1.8;height:fit-content}
-.toc .d1{padding-left:12px}
-.main{padding:14px 16px;min-height:420px}
-.banner{padding:6px 10px;background:#fff3cd;border:1px solid #d9a800;margin-bottom:10px}
-.item{padding:5px 8px;margin:10px 0 4px;background:#f7f7f7;border-left:3px solid #666}
-.item .id{font:600 11px ui-monospace,monospace;color:#555;margin-right:6px}
-.flag{display:inline-block;font-size:10px;padding:0 6px;border:1px solid #d33;color:#d33;margin-left:6px;border-radius:2px}
-.ref{color:#1a5fb4;border-bottom:1px dashed #1a5fb4}
-.line{position:relative;padding-right:24px;margin:4px 0}
-.cbtn{position:absolute;right:0;top:0;width:18px;height:18px;border:1px solid #999;font-size:10px;text-align:center;line-height:16px;color:#777;background:#fff}
-.cbtn.has{border-color:#1a5fb4;color:#1a5fb4;font-weight:600}
-.diagram{margin:12px 0;padding:10px;background:#fafafa;border:1px solid #ccc;text-align:center}
-.diagram .img{height:110px;background:repeating-linear-gradient(45deg,#eee 0 10px,#f8f8f8 10px 20px);border:1px solid #ddd;display:flex;align-items:center;justify-content:center;color:#888}
-.diagram .acts{margin-top:6px;text-align:right}
-.nav{display:flex;justify-content:space-between;margin-top:20px;padding-top:10px;border-top:1px solid #ddd}
-.panel{height:fit-content}
-.ptabs{display:flex;border-bottom:1px solid #999}
-.ptabs span{flex:1;text-align:center;padding:6px;border-right:1px solid #999}
-.ptabs span:last-child{border-right:none}
-.ptabs span.on{background:#fff;font-weight:600}
-.pbody{padding:10px}
-.pbody h4{margin:8px 0 4px;font-size:11px;color:#666}
-.pbody ul{margin:0 0 8px;padding-left:14px;line-height:1.7}
-h2{font-size:15px;margin:6px 0 10px}
-.body2{display:grid;grid-template-columns:1fr 240px;gap:10px;padding:10px}
-.editor{display:grid;grid-template-columns:28px 1fr;min-height:300px;background:#fff}
-.gutter{display:flex;flex-direction:column;background:#f0f0f0;color:#999;font:11px/1.55 ui-monospace,monospace;text-align:right;padding:8px 4px}
-.gutter .err{color:#d33;font-weight:700}.gutter .del{color:#c60;font-weight:700}
-.code{margin:0;padding:8px;font:11.5px/1.55 ui-monospace,monospace;white-space:pre-wrap}
-.errline{background:#ffe0e0;display:block}.delline{background:#fff0e0;display:block;text-decoration:line-through}
-.chk{margin:0 0 8px;padding-left:16px;line-height:1.6}
-.chk .bad{color:#b00}.chk .ok{color:#3a7}.chk .warn{color:#a60}
-.btn.sm{font-size:10px;padding:1px 6px;margin-top:3px}
-.dialog{margin:12px;border:2px solid #444;background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.18)}
-.dhead{padding:7px 12px;background:#444;color:#fff;font-weight:600}
-.dbody{padding:12px}
-.diffbox{margin:8px 0;padding:8px;background:#fafafa;border:1px solid #ddd;font:11px/1.6 ui-monospace,monospace}
-.dl{color:#b00}.dl.add{color:#080}
-.dacts{text-align:right;margin-top:8px}
-.rawwrap{margin:10px;background:#fff}
-.phead{display:flex;align-items:center;gap:14px;padding:10px 12px;background:#f0f0f0;border-bottom:1px solid #bbb}
-.stats{display:flex;gap:8px;padding:8px 12px}
-.stat{padding:5px 10px;border:1px solid #999;background:#fff}
-.stat b{font-size:14px;margin-right:4px}
-table.stages{border-collapse:collapse;width:100%;background:#fff;font-size:12px}
-table.stages td{padding:5px 8px;border-bottom:1px solid #e5e5e5;vertical-align:middle}
-table.stages tr.stg td{background:#f7f7f7;font-weight:600}
-table.stages tr.doc td{padding-left:14px;font-weight:400;color:#333}
-table.stages td.no{width:24px;color:#999;text-align:right}
-.st{display:inline-block;padding:1px 7px;border-radius:2px;font-size:10.5px;font-weight:600}
-.st.ok{background:#d6f0d6;color:#1a6}.st.rv{background:#fff0b3;color:#960}.st.dr{background:#e8e8e8;color:#666}.st.na{background:#fff;color:#bbb;border:1px dashed #ccc}
-.gate{font-size:10px;color:#c60;border:1px solid #c60;padding:0 5px;margin-left:4px}
-.cm{font-size:10px;color:#1a5fb4;border:1px solid #1a5fb4;padding:0 5px;margin-left:4px}
-.err{font-size:10px;color:#b00;border:1px solid #b00;padding:0 5px;margin-left:4px}
-.recent{margin:0;padding-left:14px;line-height:1.5}
-.recent li{margin-bottom:6px}
-.todo{padding:10px 12px}
-.grp{margin-bottom:12px;background:#fff}
-.grp.dim{opacity:.6}
-.grp h4{margin:0;padding:6px 10px;background:#f0f0f0;font-size:12px;border-bottom:1px solid #ccc}
-.cnt{display:inline-block;background:#666;color:#fff;font-size:10px;padding:0 6px;border-radius:8px;margin-left:6px}
-.row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid #eee;font-size:12px}
-.row .k{font:600 11px ui-monospace,monospace;color:#444}
-.age{font-size:11px;color:#c60;font-weight:600;white-space:nowrap}
-.empty{padding:24px;text-align:center;color:#999;border:1px dashed #ccc;background:#fafafa}
-.stack{padding:10px 12px;display:flex;flex-direction:column;gap:10px}
-.cause,.mine{background:#fff}
-.sech{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f0f0f0;border-bottom:1px solid #ccc;font-size:12px}
-.mybody{padding:10px 12px;font-size:12px;line-height:1.6}
-.mybody p{margin:4px 0}
-.acts{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f7f7f7;border:1px solid #ccc}
-.dialog.wide{margin:18px 30px}
-.dhead{display:flex;align-items:center;gap:10px}
-.dhead .lbl{color:#ddd}
-.x{cursor:pointer;padding:0 6px}
-.propacts{display:flex;align-items:flex-end;gap:10px;margin-top:12px}
-.skipbox{display:flex;flex-direction:column;gap:5px}
-.inp{border:1px solid #999;padding:4px 8px;font-size:11px;width:260px;background:#fff}
-.body2.hist{grid-template-columns:1fr 1fr}
-table.vers{border-collapse:collapse;width:100%;background:#fff;font-size:11.5px}
-table.vers th{text-align:left;padding:5px 8px;background:#f0f0f0;border-bottom:1px solid #ccc;font-weight:600}
-table.vers td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top}
-table.vers tr.cur td{background:#fffbe6}
-.diffpane{background:#fff}
-.hint{font-size:10px;color:#1a5fb4;border:1px solid #1a5fb4;padding:0 5px;margin-left:6px}
-table.grid{border-collapse:collapse;width:calc(100% - 24px);margin:10px 12px;background:#fff;font-size:11.5px}
-table.grid th{padding:6px 5px;background:#f0f0f0;border-bottom:1px solid #ccc;font-weight:600;font-size:10.5px;text-align:center}
-table.grid th:nth-child(2){text-align:left}
-table.grid td{padding:7px 5px;border-bottom:1px solid #eee;text-align:center;vertical-align:middle}
-table.grid td:nth-child(2){text-align:left}
-.cell{display:inline-block;width:26px;height:22px;line-height:22px;border-radius:2px;font-size:10.5px;font-weight:600;position:relative}
-.cell.ok{background:#d6f0d6;color:#1a6}.cell.rv{background:#fff0b3;color:#960}.cell.dr{background:#e8e8e8;color:#666}.cell.na{background:#fff;border:1px dashed #ddd}
-.cell i{position:absolute;top:-6px;right:-6px;font-style:normal;font-size:9px;color:#c60}
-.warn{color:#c60;font-size:14px}
-.login{max-width:360px;margin:60px auto;padding:30px;background:#fff;text-align:center}
-.logo{font-size:20px;margin-bottom:10px}
-.btn.big{display:block;padding:10px;margin:14px 0;font-size:13px}
-.form{padding:12px}
-.form label{display:block;font-size:11px;font-weight:600;margin:10px 0 3px}
-.inp.wide{width:100%}
-.ferr{color:#b00;font-size:11px;margin-top:3px}
-.facts{margin-top:14px;text-align:right}
-.banner.err{background:#ffe0e0;border-color:#b00;margin:0 12px}
-.banner.warn{background:#e8f0ff;border-color:#3a5ba0}
-.btn.on{background:#fff;font-weight:600}
-.graph{display:flex;gap:18px;padding:14px 12px;background:#fff;margin:10px 12px;min-height:200px;position:relative}
-.col{display:flex;flex-direction:column;gap:6px;min-width:120px}
-.colh{font-size:10px;font-weight:700;color:#888;text-align:center;border-bottom:1px solid #ddd;padding-bottom:3px}
-.node{font:10.5px ui-monospace,monospace;padding:4px 6px;border:1.5px solid #3a5ba0;border-radius:12px;background:#eef2fa;text-align:center}
-.node.sel{background:#fff6d9;border-color:#c9a800}
-.node.iso{background:#fff;border-style:dashed;border-color:#999;color:#777}
-.edges{position:absolute;bottom:6px;left:12px}
-.legend{padding:0 12px 10px;display:flex;gap:14px}
-.steps{display:flex;gap:3px}
-.stp{font-size:10px;padding:2px 6px;border:1px solid #bbb;background:#fff}
-.stp.done{background:#d6f0d6;border-color:#8c8}.stp.cur{background:#fff0b3;border-color:#c9a800;font-weight:700}.stp.na{color:#bbb;border-style:dashed}
-.readbody{padding:10px 12px}
-.row.dimrow{opacity:.5}
-.tokbox{font:12px ui-monospace,monospace;padding:8px;background:#f4f4f4;border:1px solid #ccc;margin:8px 0}
-.mono{font-family:ui-monospace,monospace;font-size:11px}
-table.uptbl{border-collapse:collapse;width:100%;font-size:11.5px;margin:8px 0}
-table.uptbl th{text-align:left;padding:4px 6px;background:#f0f0f0;border-bottom:1px solid #ccc}
-table.uptbl td{padding:5px 6px;border-bottom:1px solid #eee}
-.rawbar{display:flex;align-items:center;gap:10px;padding:6px 10px;background:#f0f0f0;border-bottom:1px solid #bbb}
-
-/* 카드 Z — 앱 styles.css에 우연히 맞아 보이던 클래스. 토큰은 값으로 풀었다. 12화면을 디자인 도구로 다시 그리면(카드 AA) 줄어든다 */
-.btn.solid{background:#17181c;border-color:#17181c;color:#fff;font-weight:500;padding:7px 13px}
-.btn.solid:hover{background:#000}
-.btn.sm.solid{padding:6px 12px;font-size:13px}
-.dialog.narrow{width:min(560px,92vw)}
-.dfoot{flex:none;display:flex;align-items:center;gap:10px;padding:12px 18px;
-  border-top:1px solid #e2e0da;background:#fbfaf8;font-size:13px;color:#46443f}
-.login .cap{margin:0;color:#6b6862;font-size:12.5px}
-.heat{background:#ffffff;border:1px solid #e2e0da;border-radius:8px;overflow:hidden}
-.hrow{display:grid;grid-template-columns:20px 196px repeat(11,minmax(0,1fr));gap:4px;
-  align-items:center;padding:11px 14px;border-bottom:1px solid #f0eeea}
-.hrow:last-child{border-bottom:none}
-.hrow.head{padding:7px 14px 6px;background:#fbfaf8;
-  border-bottom:1px solid #e2e0da;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:11px;
-  color:#46443f;letter-spacing:.2px;text-align:center}
-.hrow .warn{text-align:center;font-size:13px}
-.pname{display:flex;flex-direction:column;gap:0;min-width:0;cursor:pointer;font-size:15.5px;line-height:1.15}
-.pname .mono{font-size:13px;font-weight:600}
-.pname .sub{display:flex;align-items:center;gap:6px;font-size:12.5px;
-  color:#46443f;white-space:nowrap;line-height:1.2}
-.pname .sub .work{color:#b8342a;font-weight:600}
-.pname .sub .mid{color:#cfccc4}
-.cell.na{background:#ffffff;border-color:#e2e0da}
-.cell.missing{border-width:1.5px;border-color:#b8342a}
-.legend i.sw{width:11px;height:11px;border:1px solid transparent;border-radius:2px;background:#9c9891}
-.legend i.sw.ok{background:#2f7d5b}
-.legend i.sw.na{background:#ffffff;border-color:#e2e0da}
-.willcommit{margin-top:18px;padding:10px 12px;
-  background:#fbfaf8;border:1px solid #e2e0da;border-radius:8px;
-  font-size:12.5px}
-.willcommit .mono{display:block;color:#46443f;font-size:12px;margin-top:3px}
-.setdlg{width:min(620px,92vw)}
-.setdlg .dbody{background:#fbfaf8;padding:16px 18px}
-.card{border:1px solid #e2e0da;border-radius:8px;background:#ffffff;
-  padding:16px;margin-bottom:14px}
-.card:last-child{margin-bottom:0}
-.cardh{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:15px}
-.cardh b{font-weight:600}
-.card>.lbl{margin:0 0 4px;line-height:1.7;font-size:14px}
-.row .two{display:flex;flex-direction:column;gap:1px;min-width:0}
-.row .two .lbl{font-size:12px}
-.snippet{margin:8px 0 0;padding:10px 12px;background:#f3f1ec;
-  border-radius:6px;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;
-  color:#46443f;overflow-x:auto;white-space:pre}
-.admin{margin-top:10px;border-top:1px solid #f0eeea;padding-top:10px}
-.adminh{margin-bottom:8px}
-.adminbody table.vers{width:100%;border-collapse:collapse;font-size:12.5px;background:#ffffff}
-.adminbody table.vers th{background:#fbfaf8;color:#46443f;font-weight:600}
-.adminbody table.vers td:last-child{white-space:nowrap}
-.adminbody table.vers td:nth-child(2){max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.adminbody table.vers th,.adminbody table.vers td{padding:6px 8px;
-  border-bottom:1px solid #f0eeea;text-align:left;vertical-align:middle}
-.adminbody table.vers tr:last-child td{border-bottom:none}
-.tokbox .tok{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;background:#ffffff;
-  border:1px solid #e2e0da;border-radius:5px;padding:8px 10px;
-  margin:0 0 8px;word-break:break-all}
-.phead .repo{display:inline-block;margin-top:3px;font-size:13px;color:#46443f}
-.stgh{display:flex;align-items:center;gap:8px;padding:9px 13px;
-  border-bottom:1px solid #e2e0da;background:#fbfaf8;font-size:14px}
-.stgh b{font-weight:600}
-.stgh .sw{width:14px;height:14px;border-radius:2px;border:1px solid transparent;background:#9c9891}
-.stgh .sw.ok{background:#2f7d5b}
-.stgh .sw.na{background:#ffffff;border-color:#e2e0da}
-.stg .nm{font-size:14.5px;font-weight:500}
-.stg .caret{width:10px;text-align:center;font-size:11.5px;color:#46443f}
-.doc .dot{width:8px;height:8px;border-radius:50%;flex:none;background:#9c9891}
-.doc .dot.ok{background:#2f7d5b}
-.st.dr,.st-draft{background:#9c9891;color:#17181c}
-.st.na{background:none;color:#a8a49c}
-.miss{font-size:12px;font-weight:600;color:#b8342a;
-  border:1px solid #b8342a;border-radius:9px;padding:1px 7px}
-.rc{padding:7px 0;border-bottom:1px solid #f4f2ee;cursor:pointer}
-.rc>div:first-child{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}
-.rc .mono{font-size:12.5px;font-weight:500}
-.rc .msg{margin-top:2px;color:#1f2024}
-.rc .lbl{margin-top:1px}
-.sync{margin-top:11px;padding-top:10px;border-top:1px solid #f0eeea;line-height:1.7}
-.sync .behind{color:#b8342a;font-weight:600}
-.docbar .crumb{color:#46443f;text-decoration:none;cursor:pointer;font-size:13.5px}
-.docbar .crumb:hover{color:#17181c}
-.docbar .crumb.mono{font-size:12.5px}
-.docbar .sep{color:#6b6862;font-size:12px}
-.docbar .ver{color:#46443f;font-size:12.5px;text-decoration:none;
-  border-bottom:1px dashed #cfccc4;cursor:pointer}
-.handle{position:relative;width:1px;background:#e2e0da;cursor:col-resize}
-.handle::after{content:"";position:absolute;top:0;bottom:0;left:-4px;width:9px}
-.handle:hover{background:#b8342a}
-.toc,.vlist{background:#fbfaf8;padding:13px 12px;
-  overflow:auto;min-height:0}
-.marked{margin-top:14px;padding-top:10px;border-top:1px solid #e2e0da}
-.marked>div{display:flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
-  font-size:12px;cursor:pointer;padding:2px 0}
-.marked>div .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.marked .lbl{font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif}
-.marked .dot{flex:none;width:6px;height:6px;border-radius:50%}
-.marked .dot-miss{background:#b8342a}
-.mainwrap,.body3>.main{overflow:auto;scrollbar-gutter:stable;padding:20px 26px 60px;
-  background:#ffffff;min-width:0;min-height:0}
-.mainwrap>*,.body3>.main>*{max-width:min(1440px,100%);margin-left:auto;margin-right:auto}
-.dochead{margin-bottom:22px}
-.kicker{font-size:12px;color:#46443f;letter-spacing:.3px}
-.dochead h1{display:block;margin:4px 0 0;font-size:27px;font-weight:600;letter-spacing:-.4px}
-.lead{margin:6px 0 0;font-size:15px;color:#46443f;line-height:1.65;text-wrap:pretty}
-.tabs .btn,.tabs .radios{border-bottom:none;padding-bottom:0}
-.body3 .panel,.vimpact{background:#fbfaf8;border:none;border-left:1px solid #e2e0da;
-  border-radius:0;box-shadow:none;padding:0;min-height:0}
-.vimpact{padding:13px 12px;font-size:13px;overflow:auto}
-.selitem{display:flex;align-items:center;gap:6px;margin-bottom:12px;font-size:14px;font-weight:500}
-.rcard{display:block;border:1px solid #e2e0da;background:#ffffff;border-radius:5px;
-  padding:6px 8px;margin-bottom:5px;text-decoration:none;color:inherit;cursor:pointer}
-.rcard b{font-size:12px;font-weight:500}
-.rcard .lbl{margin:1px 0 0}
-.rcard.missing{border-style:dashed;color:#a8a49c}
-.docnav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  padding-top:14px;margin-top:26px;border-top:1px solid #e2e0da}
-.docnav .grow{flex:1}
-.radios{display:inline-flex;align-items:center;gap:2px;border:1px solid #e2e0da;
-  border-radius:6px;padding:2px;background:#fbfaf8}
-.radio{display:flex;align-items:center;gap:6px;padding:4px 10px;
-  border-radius:4px;cursor:pointer;font-size:13px;color:#46443f}
-.radio::before{content:"";width:11px;height:11px;flex:none;border-radius:50%;
-  border:1px solid #cfccc4;background:#ffffff;box-shadow:inset 0 0 0 2.5px #ffffff}
-.radio.on{background:#ffffff;color:#17181c;font-weight:500}
-.radio.on::before{border-color:#17181c;box-shadow:inset 0 0 0 2.5px #ffffff,inset 0 0 0 5px #17181c}
-.editor pre.mdsrc{margin:0;padding:12px 14px;background:transparent;
-  color:#1f2024;font:inherit;white-space:pre-wrap;border-radius:0}
-li.ref.missing{color:#a8a49c}
-.vcard{border:1px solid #e2e0da;background:#ffffff;border-radius:6px;
-  padding:7px 8px;margin-bottom:5px;cursor:pointer;font-size:12.5px}
-.vcard:hover{border-color:#cfccc4}
-.vcard>div{display:flex;align-items:center;gap:6px}
-.vcard .mono{font-size:13px}
-.vcard .msg{display:block;margin-top:3px;color:#1f2024;line-height:1.45}
-.vcard .by{margin-top:4px;align-items:flex-start}
-.vcard .msg,.vcard .by .lbl{word-break:keep-all}
-.vcard .by .lbl{min-width:0;flex:1;line-height:1.4}
-.vcard .btn.sm{flex:none;white-space:nowrap;padding:1px 6px;font-size:11.5px}
-.vcard.sel{border:1.5px solid #17181c;background:#fdf8ec}
-.ab{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:11px;font-weight:700;background:#17181c;
-  color:#fff;border-radius:3px;padding:0 5px}
-.btn.danger,.btn.sm.danger{border-color:#b8342a;color:#b8342a;font-weight:500}
-.btn.danger:disabled{opacity:.45;cursor:not-allowed}
-.btn.sm.danger:hover{background:#fdf1ef}
-.vlist .hint{margin-top:8px;padding-top:9px;border-top:1px solid #e2e0da}
-.drange{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-.drange .mono{font-size:19px;font-weight:600}
-.dgroup{border:1px solid #e2e0da;border-radius:7px;overflow:hidden;margin-bottom:10px}
-.dhead2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;
-  background:#fbfaf8;border-bottom:1px solid #e2e0da;font-size:14px}
-.dhead2 b{font-weight:600}
-.footnote{color:#46443f;font-size:12.5px;line-height:1.6;
-  margin-top:22px;padding-top:12px;border-top:1px solid #e2e0da}
-.dgroup .hint{border:1px solid #cfccc4;background:#ffffff;border-radius:9px;
-  padding:1px 8px;cursor:pointer;white-space:nowrap}
-.icard{border:1px solid #e2e0da;background:#ffffff;border-radius:6px;
-  padding:7px 9px;margin-bottom:6px;cursor:pointer}
-.icard>div{display:flex;align-items:center}
-.icard .n{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-weight:600;color:#46443f}
-.dl .mk{width:26px;flex:none;text-align:center;font-weight:600}
-.dl.add{background:#eef6f0}
-.dl.add .mk,.dl.add>span:last-child{color:#2f7d5b}
-.dl.del{background:#fdf1ef}
-.dl.del .mk,.dl.del>span:last-child{color:#b8342a}
-.dlead{margin:0 0 14px;color:#1f2024;line-height:1.65;text-wrap:pretty}
-.crumbs{display:flex;align-items:center;gap:8px;margin-bottom:3px;font-size:13.5px}
-.crumbs a{color:#46443f;text-decoration:none}
-.crumbs a:hover{color:#17181c}
-.crumbs>span:last-child{color:#6b6862}
-.crumbs .sep{color:#6b6862;font-size:12px}
-.gcard{border:1px solid #e2e0da;border-radius:8px;background:#ffffff;overflow:hidden}
-.gcard.full{position:fixed;inset:0;z-index:80;border:none;border-radius:0;
-  display:flex;flex-direction:column;background:#ffffff}
-.gbar{display:flex;align-items:center;gap:8px;padding:10px 14px;
-  border-bottom:1px solid #e2e0da;background:#fbfaf8;font-size:13px}
-.gbar .btn.on{background:#17181c;color:#fff;border-color:#17181c}
-.gbar .sep{width:1px;height:16px;background:#cfccc4;margin:0 4px}
-.gbar .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.gcard .canvas{position:relative;overflow:auto;height:calc(100vh - 50px - 190px);background:#ffffff}
-.gcard.full .canvas{flex:1;height:auto}
-.dfull{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;background:#ffffff}
-.dfull .gbar b{font-weight:600}
-.dfull .zv{min-width:44px;text-align:center;font-size:12px}
-.dfull .stage{flex:1;min-height:0;overflow:auto;padding:22px;background:#fbfaf8}
-.dfull .pic{margin:0 auto;background:#ffffff;border:1px solid #e2e0da;border-radius:6px}
-.dfull .pic svg{display:block;width:100%!important;height:100%!important;max-width:none!important}
-.nlabel{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.edges .e{fill:none;stroke:#8f8b83;stroke-width:1.2;marker-end:url(#ah)}
-.edges .e.back{stroke:#b8860b;stroke-width:1.4;stroke-dasharray:5 3;marker-end:url(#ahr)}
-.edges .e.gone{stroke:#b8342a;stroke-width:1.6;stroke-dasharray:3 3;marker-end:url(#ahb)}
-.edges .e.dim{opacity:.1}
-.glegend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;
-  padding:8px 14px;border-top:1px solid #f0eeea;
-  background:#fbfaf8;font-size:12.5px}
-.glegend span{display:inline-flex;align-items:center;gap:5px}
-.glegend .back{color:#8a6410}
-.glegend .gone{color:#b8342a}
-.glegend .grow{flex:1}
-.glegend svg.sw{width:22px;height:8px;vertical-align:middle}
-.glegend svg.sw .e{fill:none;stroke:#8f8b83;stroke-width:1}
-.glegend svg.sw .e.back{stroke:#b8860b;stroke-dasharray:4 3}
-.glegend svg.sw .e.gone{stroke:#b8342a;stroke-dasharray:3 3}
-.chain{margin-top:12px;border:1px solid #e2e0da;border-radius:6px;overflow:hidden}
-.crow{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px;
-  padding:8px 12px;border-bottom:1px solid #f0eeea}
-.crow:last-child{border-bottom:none}
-.crow.cur{background:#fdf8ec}
-.crow.empty{background:#fbfaf8}
-.crow.empty .cstage,.crow.empty .cchips{color:#a8a49c}
-.cstage{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:#46443f;line-height:1.6}
-.crow.cur .cstage,.crow.cur .cstage .lbl{color:#8a6410;font-weight:600}
-.cstage .lbl{font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;font-size:12.5px}
-.cchips{display:flex;flex-wrap:wrap;gap:5px;align-items:flex-start;font-size:12.5px}
-.chip{display:inline-flex;align-items:center;gap:5px;max-width:320px;
-  padding:2px 8px;border:1px solid #e2e0da;border-radius:5px;
-  background:#ffffff;font-size:12.5px;cursor:pointer;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chip:hover{border-color:#cfccc4}
-.chip .dot{flex:none;width:6px;height:6px;border-radius:50%;background:#9c9891}
-.chip .dot-approved{background:#2f7d5b}
-.chip.me{background:#ffffff;border:1.5px solid #17181c;font-weight:600;cursor:default}
-.chip.gone{border-style:dashed;color:#a8a49c;cursor:default}
-.steprail{display:flex;align-items:center;gap:9px;flex:none;
-  padding:11px 18px;background:#ffffff;
-  border-bottom:1px solid #e2e0da;overflow-x:auto;overflow-y:hidden}
-.steprail .back{flex:none;font-size:13.5px;color:#46443f;text-decoration:none;white-space:nowrap}
-.steprail .back:hover{color:#17181c}
-.stp.na{opacity:.45;cursor:default}
-.dot{width:6px;height:6px;border-radius:50%;background:#9c9891}
-.dot-approved{background:#2f7d5b}
-.dot-none{background:none;border:1px solid #cfccc4}
-.dot-miss{background:#b8342a}
-.stp.cur .dot-none{border-color:rgba(255,255,255,.5)}
-.readbody .dochead{margin:0 0 18px}
-.pill{display:inline-block;padding:1px 8px;border-radius:9px;
-  font-size:12px;font-weight:600;line-height:1.55;white-space:nowrap;
-  background:#9c9891;color:#17181c}
-.pill-approved{background:#2f7d5b;color:#ffffff}
-.idbadge{display:inline-block;padding:0 5px;border-radius:3px;
-  background:#d99b1e;color:#17181c;
-  font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;font-weight:600}
-.howto .dlead{margin:0 0 16px;font-size:14px;color:#46443f;line-height:1.7;text-wrap:pretty}
-.sectitle{margin:22px 0 8px;font-size:14px;font-weight:600}
-.howto tr.hd th{background:none;color:#6b6862;font-size:12.5px;font-weight:400;border-bottom:1px solid #f0eeea}
-.howto td.no,.howto tr.hd th:first-child{width:26px;text-align:center;color:#6b6862;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px}
-.howto td .sub{margin-top:5px;font-size:13px;color:#46443f;line-height:1.6}
-.howto td .sub .cnt{display:inline-block;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;font-weight:600;
-  color:#17181c;background:#f3f1ec;border-radius:3px;padding:0 6px;margin-right:5px}
-.howto td .sub .tag{display:inline-block;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:#6b6862;line-height:1.5;
-  border:1px solid #cfccc4;border-radius:3px;padding:0 5px;margin-left:6px;vertical-align:1px}
-.howto td .sub ul.docs{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:2px}
-.howto td .sub ul.docs b{color:#17181c;font-weight:500}
-.howto td.where{color:#46443f;white-space:nowrap;width:74px}
-.howto td.ids{width:150px;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:#46443f}
-.howto tr.std td{color:#6b6862}
-.howto figure+.snippet{margin-top:12px}
-.howto .note{margin:0;padding:10px 12px;border-radius:6px;
-  background:#fdf8ec;color:#8a6410;font-size:13px}
-.qa{display:flex;flex-direction:column;gap:9px;margin:9px 0}
-.qa .turn{display:flex;flex-direction:column;gap:4px}
-.qa .q{align-self:flex-end;max-width:92%;padding:5px 9px;border-radius:5px;
-  background:#f3f1ec;color:#17181c;font-size:14px;white-space:pre-wrap}
-.qa .a{padding:5px 9px;border:1px solid #e2e0da;border-radius:5px;
-  background:#ffffff;color:#1f2024;font-size:14px;line-height:1.6;white-space:pre-wrap}
-.qa .a.wait{color:#6b6862;border-style:dashed}
-.qa .a.fail{color:#b8342a;background:#fdf1ef;border-color:#fdf1ef}
-.qa .qsrc{font-size:12.5px;color:#6b6862;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
-.qa .qprog{display:flex;flex-direction:column;gap:3px;padding:4px 9px;border-left:2px solid #e2e0da;
-  font-size:13px;color:#46443f}
-.qa .qprog .read{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;color:#6b6862}
-.qa .qprog.done{font-size:12.5px;color:#6b6862}
-.qa .qsrc a{color:#46443f}
+/* 공통 틀 — 카드 AA. 값은 SYNC-UI-001 3장 토큰과 같다. 이 블록은 이 문서 모든 화면의 iframe 앞에 들어간다 */
+:root{
+  --bg:#f7f6f3;--card:#ffffff;--sub:#fbfaf8;--sub2:#f3f1ec;--row:#fdfdfc;
+  --ink:#17181c;--ink2:#1f2024;--ink3:#46443f;--dim:#6b6862;--mute:#a8a49c;
+  --line:#e2e0da;--line2:#cfccc4;--hair:#f0eeea;--hair2:#f4f2ee;
+  --draft:#9c9891;--ok:#2f7d5b;--id:#d99b1e;
+  --warn:#b8342a;--warnbg:#fdf1ef;--warnline:#f0d5d1;--note:#fdf8ec;--noteink:#8a6410;
+  --back:#b8860b;--addbg:#eef6f0;--edge:#8f8b83;--overlay:rgba(23,24,28,.42);
+  --sans:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+body{background:#e9e8e4;padding:0;margin:0}
+/* 아트보드. 폭 1280, 높이 800이 기본이고 내용이 길면 자란다 */
+.sd{position:relative;width:1280px;min-height:800px;margin:0;background:var(--bg);color:var(--ink);
+  font:400 14px/1.5 var(--sans);display:flex;flex-direction:column;overflow:hidden;letter-spacing:-.1px}
+.sd *{box-sizing:border-box}
+.sd.h{min-height:0}
+/* 상태 변형 보드 앞의 주석 줄 — 화면이 아니라 문서의 말 */
+.var{box-sizing:border-box;width:1280px;padding:14px 0 6px 2px;font:500 12px var(--mono);color:#6b6862}
+/* 상단 바 — UI-001 4장. 50px, 잉크 바탕 */
+.top{flex:none;height:50px;background:var(--ink);color:#fff;display:flex;align-items:center;gap:4px;padding:0 22px}
+.top .logo{font-size:16px;font-weight:700;margin-right:auto;letter-spacing:-.2px}
+.top .tb{font-size:13.5px;color:rgba(255,255,255,.8);padding:6px 10px;border-radius:6px}
+.top .tb.on{color:#fff;background:rgba(255,255,255,.12)}
+/* 문서 바 — 42px, 흰 바탕. 브레드크럼은 [코드] 이름 › 단계 › 문서 ID */
+.docbar{flex:none;height:42px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;padding:0 22px;font-size:13.5px;color:var(--ink3)}
+.docbar .sep{color:var(--mute);font-size:12px}
+.docbar .cur{color:var(--ink);font-weight:600}
+.docbar .ver{font-family:var(--mono);font-size:12.5px;border-bottom:1px dashed var(--line2)}
+.sp{flex:1}
+/* 글자 */
+.m{font-family:var(--mono);font-size:12.5px}
+.m.bd{font-weight:600}
+.lbl{color:var(--ink3);font-size:13px}
+.cap{color:var(--dim);font-size:12px}
+.mute{color:var(--mute)}
+.h1{font-size:22px;font-weight:600;letter-spacing:-.3px;line-height:1.25}
+/* 버튼 — 채움 · 테두리 · 위험 셋 */
+.b{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 13px;border:1px solid var(--line2);border-radius:6px;background:#fff;font:500 13.5px var(--sans);color:var(--ink);white-space:nowrap;line-height:1}
+.b.solid{background:var(--ink);border-color:var(--ink);color:#fff}
+.b.danger{border-color:var(--warn);color:var(--warn)}
+.b.sm{height:26px;padding:0 9px;font-size:12.5px;border-radius:4px}
+.b.dis{opacity:.45}
+.b.on{background:var(--ink);border-color:var(--ink);color:#fff}
+/* 상태 필 · 항목 ID 뱃지 · 점 */
+.pill{display:inline-block;padding:1px 8px;border-radius:9px;font-size:12px;font-weight:600;line-height:1.55;background:var(--draft);color:var(--ink);white-space:nowrap}
+.pill.ok{background:var(--ok);color:#fff}
+.idb{display:inline-block;padding:0 5px;border-radius:3px;background:var(--id);color:var(--ink);font:600 12.5px/1.6 var(--mono)}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--draft);flex:none}
+.dot.ok{background:var(--ok)}.dot.miss{background:var(--warn)}.dot.none{background:none;border:1px solid var(--line2)}
+.mis{display:inline-block;font-size:12px;font-weight:600;color:var(--warn);border:1px solid var(--warn);border-radius:9px;padding:0 7px;line-height:1.6;white-space:nowrap}
+.gate{display:inline-block;font-size:11.5px;color:var(--noteink);background:var(--note);border-radius:9px;padding:0 7px;line-height:1.7;white-space:nowrap}
+/* 참조 표기 — 점선 밑줄 */
+.ref{color:var(--ink);border-bottom:1px dashed var(--line2);font-family:var(--mono);font-size:12.5px}
+.ref.miss{color:var(--mute)}
+/* 배너 */
+.ban{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:6px;font-size:13.5px;border:1px solid var(--line);background:#fff}
+.ban.err{background:var(--warnbg);border-color:var(--warnline);color:var(--warn)}
+.ban.note{background:var(--note);border-color:var(--id);color:var(--noteink)}
+/* 입력 */
+.in{height:34px;padding:0 10px;border:1px solid var(--line2);border-radius:6px;background:#fff;font:14px var(--sans);color:var(--ink);width:100%}
+.in.m{font-family:var(--mono);font-size:13px}
+.in::placeholder{color:var(--mute)}
+textarea.in{height:auto;min-height:64px;padding:8px 10px;resize:none;line-height:1.5}
+/* 카드 · 패널 */
+.card{background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 3px rgba(23,24,28,.05)}
+.card .ch{display:flex;align-items:center;gap:8px;padding:12px 16px 0;font-size:15px;font-weight:600}
+.card .cb{padding:8px 16px 14px}
+/* 다이얼로그 — 오버레이 위 흰 카드. 머리·본문·발 세 층 */
+.ov{position:absolute;inset:0;background:var(--overlay);display:flex;align-items:flex-start;justify-content:center;padding:56px 0 40px}
+.dlg{background:#fff;border-radius:10px;box-shadow:0 18px 50px rgba(23,24,28,.3);display:flex;flex-direction:column;width:560px}
+.dh{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);font-size:16px;font-weight:600;line-height:1.3}
+.dh .x{margin-left:auto;font-weight:400;font-size:16px;color:var(--dim);padding:0 4px}
+.db{padding:16px 18px;font-size:14px;line-height:1.6;color:var(--ink2)}
+.df{display:flex;align-items:center;gap:10px;padding:12px 18px;border-top:1px solid var(--line);background:var(--sub);border-radius:0 0 10px 10px;font-size:13px;color:var(--ink3)}
+/* 탭 — 본문 안 맨 위, 활성만 굵고 2px 잉크선 */
+.tabs{display:flex;align-items:center;gap:2px;border-bottom:1px solid var(--line)}
+.tabs .t{padding:8px 12px;font-size:14px;color:var(--ink3);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tabs .t.on{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+/* 3단 문서 틀 — 좌 186 · 손잡이 · 본문 · 손잡이 · 우 250 */
+.body3{flex:1;min-height:0;display:grid;grid-template-columns:186px 1px minmax(0,1fr) 1px 250px}
+.side{background:var(--sub);padding:14px 12px;font-size:13px;overflow:hidden}
+.hd{background:var(--line)}
+.main{background:#fff;padding:20px 26px 40px;overflow:hidden}
+/* 히트맵 칸 — 열 폭을 꽉 채우는 막대 */
+.cell{height:22px;border-radius:3px;display:flex;align-items:center;justify-content:center;gap:3px;font:600 11.5px var(--mono);position:relative}
+.cell.ok{background:var(--ok);color:#fff}
+.cell.dr{background:var(--draft);color:var(--ink)}
+.cell.na{background:#fff;border:1px solid var(--line)}
+.cell.missing{box-shadow:inset 0 0 0 1.5px var(--warn)}
+.cell i{font-style:normal;font-size:9px;position:absolute;top:-6px;right:-4px;color:var(--noteink)}
+/* diff 줄 */
+.dl{display:flex;gap:8px;padding:3px 10px;font:12.5px/1.6 var(--mono)}
+.dl .mk{width:12px;flex:none;font-weight:600}
+.dl.del{background:var(--warnbg);color:var(--warn)}
+.dl.add{background:var(--addbg);color:var(--ok)}
+/* 코드 상자 */
+.snip{margin:0;padding:10px 12px;background:var(--sub2);border-radius:6px;font:12.5px/1.6 var(--mono);color:var(--ink3);white-space:pre;overflow:hidden}
+/* 단계 칩 — 번호 흐리게, 상태 점은 라벨 뒤 */
+.stp{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border:1px solid var(--line);border-radius:5px;background:#fff;font-size:12.5px;white-space:nowrap}
+.stp .no{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+.stp.cur{background:var(--ink);border-color:var(--ink);color:#fff}
+.stp.cur .no{color:rgba(255,255,255,.6)}
+.stp.na{opacity:.45}
 </style>
 ```
 
@@ -525,145 +224,218 @@ li.ref.missing{color:#a8a49c}
 ### 배치
 
 ```html
-<div class="topbar"><!-- 공통 틀. SYNC-UI-001 4장 -->
-  <strong>싱크독</strong>
-  <span class="grow"></span>
-  <span class="btn">사용 방법</span>
-  <span class="btn">설정</span>
-  <span class="btn">로그아웃</span>
-</div>
-
-<div class="docbar" data-el="1"><!-- 브레드크럼. 어디서 들어왔든 지금 자리를 말한다 -->
-  <span class="crumb"><b class="mono">[SYNC]</b> 싱크독</span><span class="sep">›</span>
-  <span class="crumb mono">2 PRD</span><span class="sep">›</span>
-  <b class="mono">SYNC-PRD-001</b>
-  <span class="pill pill-approved" data-el="1.1">완료</span>
-  <span class="ver mono" data-el="1.2">v7</span>
-  <span class="grow"></span>
-  <span class="btn" data-el="3">초안으로</span><!-- 토글 하나. 초안이면 「완료로」 -->
-  <span class="btn danger" data-el="12">휴지통에 넣기</span><!-- 휴지통에 있는 문서면 이 자리에 없다(4b 배너가 대신) -->
-</div>
-
-<!-- 3단. 화면 높이를 채우고 가운데 열만 스크롤한다. 탭을 바꿔도 이 틀은 그대로다 -->
-<div class="body3" data-el="7">
-  <nav class="toc" data-el="6">
-    <div class="lbl">목차</div>
-    <div>1. 목표</div>
-    <div>2. 비목표</div>
-    <div>3. 요구사항</div>
-    <div class="d1">R1 에이전트용 원본과 사람용 뷰</div>
-    <div class="d1">R2 ID 기반 상호참조</div>
-    <div>4. 성공지표</div>
-    <div class="marked" data-el="6.1">
-      <div class="lbl">표시된 항목</div>
-      <div><span class="dot dot-miss"></span> R2 <span class="lbl">끊어진 참조 1</span></div>
-    </div>
-  </nav>
-  <div class="handle" data-el="6.2"></div>
-
-  <div class="mainwrap"><!-- 안쪽 max-width는 세 탭이 같다 -->
-    <div class="tabs" data-el="2"><!-- 본문 폭 안, 밑줄로 구분. 원본일 때만 오른쪽에 10.3·10.4·10.2 -->
-      <span class="on" data-el="2.1">유저용</span><span data-el="2.2">원본</span><span data-el="2.3">이력</span>
-    </div>
-    <div class="banner" data-el="4">⚠ 규약 오류: frontmatter.status 누락 (커밋 a1b2c3 · 김민준)</div>
-    <div class="banner warn" data-el="4a">미완성: 필수 절 「성공지표」 없음 · 완료 불가</div>
-
-    <div class="dochead"><!-- 킥커·제목·리드. 본문(7)은 innerHTML로 갈아 끼워서 형제로 둔다 -->
-      <div class="kicker mono">[SYNC] 싱크독 · 2단계 PRD</div>
-      <h1>PRD — 싱크독</h1>
-      <p class="lead">바이브코딩 시대에 개발자가 PM 없이 11단계 명세 체인을 쓰고, 에이전트가 그 명세를 따르게 하는 플랫폼.</p>
-    </div>
-
-    <article class="main" data-el="7">
-      <h2>3. 요구사항</h2>
-      <div class="item" data-el="7.1"><span class="id">#R1</span>에이전트용 원본과 사람용 뷰</div>
-      <p class="line">명세는 규약이 있는 Markdown으로 작성한다. 근거: <span class="ref" data-el="7.2">[[SYNC-RFQ-001#Q03]]</span></p>
-      <p class="line">사람용 뷰는 원본에서 파생 생성한다.</p>
-      <div class="item"><span class="id">#R2</span>ID 기반 상호참조 <span class="miss">끊어진 참조 1</span></div>
-      <p class="line">본문에서 <span class="ref missing">[[SYNC-DOM-001#참조]]</span>로 참조하면 관계가 추출된다.</p>
-      <div class="diagram" data-el="7.3"><span class="btn sm" data-el="7.5">전체보기</span><div class="img">mermaid 렌더링 결과 (브라우저)</div></div>
-      <!-- 7.5를 누르면 화면 전체에 그림(7.6, 공통 1.7). 위 바에 이름 · －100%＋ · 닫기 -->
-      <div class="dfull" data-el="7.6"><div class="gbar"><b>SEQ-1</b> <span class="lbl">전체보기</span><span class="grow"></span><span class="btn sm">－</span><span class="mono">100%</span><span class="btn sm">＋</span><span class="btn sm">100%</span><span class="btn sm">닫기</span></div><div class="stage"><div class="pic">원본 SVG 복제</div></div></div>
-    </article>
-
-    <div class="docnav" data-el="9"><!-- 본문 열 안, 본문과 같은 폭 -->
-      <span class="btn">← SYNC-RFQ-001</span>
-      <span class="btn">SYNC-SCN-001 →</span>
-    </div>
+<style>
+  .toc div{padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink2)}
+  .toc .h{font-size:12px;color:var(--dim);margin-bottom:6px}
+  .toc .d1{padding-left:12px;color:var(--ink3)}
+  .marked{margin-top:14px;padding-top:10px;border-top:1px solid var(--line)}
+  .marked .it{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px}
+  .marked .it .lbl{font-family:var(--sans);font-size:12px;overflow:hidden;text-overflow:ellipsis}
+  .col{display:flex;flex-direction:column;gap:12px;max-width:1440px}
+  .dochead .kick{font-size:12px;color:var(--ink3);letter-spacing:.3px}
+  .dochead h1{margin:4px 0 0;font-size:27px;font-weight:600;letter-spacing:-.4px;line-height:1.25}
+  .dochead .lead{margin:6px 0 0;font-size:15px;color:var(--ink3);line-height:1.65}
+  .art{font-size:14.5px;line-height:1.7;color:var(--ink2)}
+  .art h2{margin:14px 0 8px;font-size:16.5px;font-weight:600;padding-bottom:4px;border-bottom:1px solid var(--line);color:var(--ink)}
+  .item{display:flex;align-items:center;gap:8px;margin:12px 0 2px;font-size:15px;font-weight:600;color:var(--ink)}
+  .art p{margin:2px 0}
+  .fig{margin:12px 0;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;position:relative}
+  .fig .b{position:absolute;top:8px;right:8px;opacity:.6}
+  .fig .img{height:120px;border-radius:6px;background:repeating-linear-gradient(45deg,var(--sub2) 0 10px,var(--sub) 10px 20px);display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px}
+  .docnav{display:flex;gap:10px;padding-top:14px;margin-top:8px;border-top:1px solid var(--line)}
+  /* 오른쪽 패널 */
+  .ptabs{display:flex;border-bottom:1px solid var(--line);margin:-14px -12px 12px}
+  .ptabs span{flex:1;text-align:center;padding:9px 0;font-size:13.5px;color:var(--ink3);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .ptabs span.on{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+  .side .k{font-size:12px;color:var(--dim);margin:10px 0 4px}
+  .sel{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:500}
+  .rcard{display:block;background:#fff;border:1px solid var(--line);border-radius:5px;padding:6px 8px;margin-bottom:5px}
+  .rcard .m{font-weight:500}
+  .rcard .lbl{display:block;font-size:12px;margin-top:1px}
+  .rcard.miss{border-style:dashed;color:var(--mute)}
+  .rcard.miss .m{color:var(--mute)}
+  /* 질문 탭 */
+  .qa{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+  .qa .q{align-self:flex-end;max-width:92%;padding:5px 9px;border-radius:5px;background:var(--sub2);font-size:13.5px}
+  .qa .prog{display:flex;flex-direction:column;gap:2px;padding:3px 9px;border-left:2px solid var(--line);font-size:12.5px;color:var(--dim)}
+  .qa .prog .r{font-family:var(--mono);font-size:11.5px}
+  .qa .a{padding:6px 9px;border:1px solid var(--line);border-radius:5px;background:#fff;font-size:13.5px;line-height:1.55}
+  .qa .src{font:12px var(--mono);color:var(--dim)}
+  /* 원본 탭 */
+  .editor{display:grid;grid-template-columns:32px 1fr;border:1px solid var(--line);border-radius:6px;background:#fff;overflow:hidden}
+  .gutter{background:var(--sub2);color:var(--dim);font:12px/1.65 var(--mono);text-align:right;padding:10px 6px}
+  .gutter span{display:block}
+  .src{margin:0;padding:10px 14px;font:12.5px/1.65 var(--mono);color:var(--ink2);white-space:pre}
+  .radios{display:inline-flex;gap:2px;border:1px solid var(--line);border-radius:6px;padding:2px;background:var(--sub);margin-left:auto}
+  .radio{display:flex;align-items:center;gap:6px;padding:3px 10px;border-radius:4px;font-size:13px;color:var(--ink3)}
+  .radio::before{content:"";width:11px;height:11px;border-radius:50%;border:1px solid var(--line2);background:#fff}
+  .radio.on{background:#fff;color:var(--ink);font-weight:500}
+  .radio.on::before{border-color:var(--ink);box-shadow:inset 0 0 0 2.5px #fff,inset 0 0 0 5px var(--ink)}
+  /* 그림 전체보기 층 */
+  .gbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--sub);font-size:13px}
+  .gbar b{font-family:var(--mono);font-weight:600}
+  .stage{flex:1;background:var(--sub);padding:22px;display:flex;align-items:flex-start;justify-content:center}
+  .pic{width:760px;height:220px;background:#fff;border:1px solid var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px}
+</style>
+<div class="sd">
+  <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb">설정</span><span class="tb">로그아웃</span></div>
+  <div class="docbar" data-el="1">
+    <span><span class="m bd">[SYNC]</span> 싱크독</span><span class="sep">›</span>
+    <span class="m">2 PRD</span><span class="sep">›</span>
+    <span class="m bd cur">SYNC-PRD-001</span>
+    <span class="pill ok" data-el="1.1">완료</span>
+    <span class="ver" data-el="1.2">v7</span>
+    <span class="sp"></span>
+    <span class="b sm" data-el="3">초안으로</span>
+    <span class="b sm danger" data-el="12">휴지통에 넣기</span>
   </div>
 
-  <div class="handle" data-el="8.3"></div>
-  <aside class="panel" data-el="8">
-    <div class="ptabs"><span class="on" data-el="8.1">참조</span><span data-el="8.4">질문</span></div>
-    <div class="pbody">
-      <div class="lbl">선택</div>
-      <div class="selitem"><span class="idbadge">R1</span> 에이전트용 원본과 사람용 뷰</div>
-      <div class="lbl">상위 참조 (근거)</div>
-      <div class="rcard"><b class="mono">SYNC-RFQ-001#Q03</b><div class="lbl">명세를 어디에 어떤 형식으로 두나</div></div>
-      <div class="lbl">하위 참조 (파생) 2</div>
-      <div class="rcard"><b class="mono">SYNC-UC-001#UC-A6</b><div class="lbl">명세를 작성·수정한다</div></div>
-      <div class="rcard"><b class="mono">SYNC-UC-001#UC-H2</b><div class="lbl">문서를 읽는다</div></div>
-      <!-- 가리키는 곳이 없는 참조(is_missing)는 회색 카드 + 경고 아이콘. 상위 쪽에 뜬다 -->
-      <div class="rcard missing"><b class="mono">SYNC-DOM-001#참조</b> <span class="miss">가리키는 곳 없음</span><div class="lbl">항목이 삭제됐거나 아직 안 쓰였다</div></div>
+  <div class="body3">
+    <nav class="side toc" data-el="6">
+      <div class="h">목차</div>
+      <div>1. 목표</div>
+      <div>2. 비목표</div>
+      <div>3. 요구사항</div>
+      <div class="d1">R1 에이전트용 원본과 사람용 뷰</div>
+      <div class="d1">R2 ID 기반 상호참조</div>
+      <div class="d1">R3 상태는 둘</div>
+      <div>4. 성공지표</div>
+      <div>5. 미결사항</div>
+      <div class="marked" data-el="6.1">
+        <div class="h">표시된 항목</div>
+        <div class="it"><span class="dot miss"></span>R2<span class="lbl">끊어진 참조 1</span></div>
+      </div>
+    </nav>
+    <div class="hd" data-el="6.2"></div>
+
+    <div class="main">
+      <div class="col">
+        <div class="tabs" data-el="2">
+          <span class="t on" data-el="2.1">유저용</span><span class="t" data-el="2.2">원본</span><span class="t" data-el="2.3">이력</span>
+        </div>
+        <div class="ban err" data-el="4">규약 오류 — frontmatter.status 누락 <span class="cap" style="color:inherit;opacity:.8">커밋 a1b2c3 · 박호영</span></div>
+        <div class="ban note" data-el="4a">미완성 — 필수 절 「성공지표」 없음 · 가리키는 곳 없는 참조 1 · 완료 불가</div>
+
+        <div class="dochead">
+          <div class="kick"><span class="m">[SYNC]</span> 싱크독 · 2단계 PRD</div>
+          <h1>제품 요구사항 — 싱크독</h1>
+          <p class="lead">바이브코딩 시대에 개발자가 PM 없이 11단계 명세 체인을 쓰고, 에이전트가 그 명세를 따르게 하는 플랫폼.</p>
+        </div>
+
+        <article class="art" data-el="7">
+          <h2>3. 요구사항</h2>
+          <div class="item" data-el="7.1"><span class="idb">R1</span>에이전트용 원본과 사람용 뷰</div>
+          <p>명세는 규약이 있는 Markdown으로 작성한다. 근거: <span class="ref" data-el="7.2">[[SYNC-RFQ-001#Q03]]</span></p>
+          <p>사람용 뷰는 원본에서 파생 생성한다.</p>
+          <div class="item"><span class="idb">R2</span>ID 기반 상호참조<span class="mis">끊어진 참조 1</span></div>
+          <p>본문에서 <span class="ref miss">[[SYNC-DOM-001#참조]]</span>로 참조하면 관계가 추출된다.</p>
+          <div class="fig" data-el="7.3"><span class="b sm" data-el="7.5">전체보기</span><div class="img">mermaid 렌더링 결과 (브라우저)</div></div>
+        </article>
+
+        <div class="docnav" data-el="9">
+          <span class="b">← SYNC-RFQ-001</span><span class="sp"></span><span class="b">SYNC-SCN-001 →</span>
+        </div>
+      </div>
     </div>
-  </aside>
+
+    <div class="hd" data-el="8.3"></div>
+    <aside class="side" data-el="8">
+      <div class="ptabs"><span class="on" data-el="8.1">참조</span><span data-el="8.4">질문</span></div>
+      <div class="k">선택</div>
+      <div class="sel"><span class="idb">R1</span>에이전트용 원본과 사람용 뷰</div>
+      <div class="k">상위 참조 (근거)</div>
+      <div class="rcard"><span class="m">SYNC-RFQ-001#Q03</span><span class="lbl">명세를 어디에 어떤 형식으로 두나</span></div>
+      <div class="k">하위 참조 (파생) 2</div>
+      <div class="rcard"><span class="m">SYNC-UC-001#UC-A6</span><span class="lbl">명세를 작성·수정한다</span></div>
+      <div class="rcard"><span class="m">SYNC-UC-001#UC-H2</span><span class="lbl">문서를 읽는다</span></div>
+      <div class="rcard miss"><span class="m">SYNC-DOM-001#참조</span> <span class="mis">가리키는 곳 없음</span><span class="lbl">항목이 삭제됐거나 아직 안 쓰였다</span></div>
+    </aside>
+  </div>
 </div>
 
-<!-- 원본 탭 — 3단 틀은 그대로고 본문 열만 바뀐다 -->
-<div class="mainwrap" data-el="10">
-  <div class="tabs" data-el="2">
-    <span data-el="2.1">유저용</span><span class="on" data-el="2.2">원본</span><span data-el="2.3">이력</span>
-    <span class="grow"></span>
-    <span class="radios"><span class="radio on" data-el="10.3">원문</span><span class="radio" data-el="10.4">렌더링</span></span>
-    <span class="btn" data-el="10.2">복사</span>
-  </div>
-  <div class="editor" data-el="10.1">
-    <div class="gutter"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div>
-    <pre class="mdsrc">---
+<div class="var">원본 탭 — 3단 틀은 그대로고 본문 열만 바뀐다. 탭 줄 오른쪽에 원문/렌더링 라디오와 복사</div>
+<div class="sd h" style="min-height:420px">
+  <div class="body3">
+    <nav class="side toc"><div class="h">목차</div><div>1. 목표</div><div>2. 비목표</div><div>3. 요구사항</div><div class="d1">R1 에이전트용 원본과 사람용 뷰</div><div class="d1">R2 ID 기반 상호참조</div><div>4. 성공지표</div></nav>
+    <div class="hd"></div>
+    <div class="main" data-el="10">
+      <div class="col">
+        <div class="tabs">
+          <span class="t">유저용</span><span class="t on">원본</span><span class="t">이력</span>
+          <span class="radios"><span class="radio on" data-el="10.3">원문</span><span class="radio" data-el="10.4">렌더링</span></span>
+          <span class="b sm" data-el="10.2" style="margin-left:8px">복사</span>
+        </div>
+        <div class="editor" data-el="10.1">
+          <div class="gutter"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span></div>
+          <pre class="src">---
 doc_id: SYNC-PRD-001
 type: PRD
+title: 제품 요구사항 — 싱크독
 status: approved
 ---
+
 #### R1 에이전트용 원본과 사람용 뷰
 명세는 규약이 있는 Markdown으로 작성한다. 근거: [[SYNC-RFQ-001#Q03]]
 사람용 뷰는 원본에서 파생 생성한다.</pre>
+        </div>
+      </div>
+    </div>
+    <div class="hd"></div>
+    <aside class="side"><div class="ptabs"><span class="on">참조</span><span>질문</span></div><div class="k">선택</div><div class="cap">항목을 선택하세요</div></aside>
   </div>
 </div>
 
-<!-- 문서 삭제 확인 (12). 걸리는 것이 있으면 13.2가 보이고 13.3이 막힌다 -->
-<div class="dialog narrow" data-el="13">
-  <div class="dhead">휴지통에 넣기 — SYNC-PRD-001</div>
-  <div class="dbody">
-    <p data-el="13.1"><b>제품 요구사항 — 싱크독</b> · 버전 7개 · 파일이 저장소에서 지워집니다. 행과 이력은 남아 <b>되살릴 수 있습니다.</b></p>
-    <div class="banner warn" data-el="13.2">넣으면 끊어지는 것<br>
-      · 들어오는 참조 3 — <b>SYNC-UC-001#UC-A6</b> · <b>SYNC-UC-001#UC-A1</b> · <b>SYNC-API-002</b> → 그 참조가 <b>끊어진 참조</b>가 됩니다</div>
-    <div class="dacts"><span class="btn" data-el="13.4">닫기</span> <span class="btn danger" data-el="13.3">휴지통에 넣기</span></div>
-  </div>
-</div>
-
-<!-- 질문 탭(8.4)을 눌렀을 때의 패널 본문. 참조 탭 본문과 자리를 바꿔 든다 -->
-<aside class="panel">
-  <div class="ptabs"><span data-el="8.1">참조</span><span class="on">질문</span></div>
-  <div class="pbody">
-    <div class="lbl" data-el="8.5">R1 에이전트용 원본과 사람용 뷰 · 이 항목을 보며 묻습니다</div><!-- 항목이 없으면 「문서 전체 · SYNC-PRD-001에 대해 묻습니다」 -->
+<div class="var">질문 탭 — 패널 본문이 참조에서 질문으로 바뀐다. 진행 줄은 답이 오기 전엔 또렷이, 온 뒤엔 흐리게</div>
+<div class="sd h" style="width:250px;min-height:0">
+  <aside class="side" style="min-height:480px">
+    <div class="ptabs"><span data-el="8.1">참조</span><span class="on">질문</span></div>
+    <div class="cap" data-el="8.5"><span class="idb">R1</span> 에이전트용 원본과 사람용 뷰 · 이 항목을 보며 묻습니다</div>
     <div class="qa" data-el="8.7">
       <div class="q">원본과 뷰를 왜 나눴나요?</div>
-      <div class="qprog" data-el="8.9"><!-- 진행 줄. 답이 오기 전엔 또렷이, 온 뒤엔 작고 흐리게 남는다 -->
+      <div class="prog" data-el="8.9">
         <div>R1 본문을 읽는다 — 왜 나눴는지가 거기 적혀 있을 것이다</div>
-        <div class="dim">읽음 · SYNC-PRD-001#R1</div>
+        <div class="r">읽음 · SYNC-PRD-001#R1</div>
         <div>근거 Q1을 읽는다 — 상위가 무엇을 요구했는지</div>
-        <div class="dim">읽음 · SYNC-RFQ-001#Q1</div>
+        <div class="r">읽음 · SYNC-RFQ-001#Q1</div>
       </div>
-      <div class="a">에이전트가 읽을 것을 전제로 규약이 있는 MD를 원본으로 두고, 사람용은 거기서 파생 생성합니다. 근거는 <b>SYNC-RFQ-001#Q1</b>이고 이 항목의 상위입니다.</div>
-      <div class="qsrc">본 것: SYNC-PRD-001#R1 · SYNC-RFQ-001#Q1</div>
+      <div class="a">에이전트가 읽을 것을 전제로 규약이 있는 MD를 원본으로 두고, 사람용은 거기서 파생 생성합니다. 근거는 <span class="m bd">SYNC-RFQ-001#Q1</span>이고 이 항목의 상위입니다.</div>
+      <div class="src">본 것: SYNC-PRD-001#R1 · SYNC-RFQ-001#Q1</div>
     </div>
-    <textarea data-el="8.6" placeholder="이 문서에 대해 묻습니다"></textarea>
+    <textarea class="in" data-el="8.6" placeholder="이 문서에 대해 묻습니다"></textarea>
+  </aside>
+</div>
+
+<div class="var">휴지통 확인(13) — 막지 않고 무엇이 끊어지는지 보여준다</div>
+<div class="sd h" style="min-height:320px">
+  <div class="ov" style="padding-top:36px">
+    <div class="dlg" data-el="13">
+      <div class="dh">휴지통에 넣기 — SYNC-PRD-001</div>
+      <div class="db">
+        <p style="margin:0 0 12px" data-el="13.1"><b>제품 요구사항 — 싱크독</b> · 버전 7개 · 파일이 저장소에서 지워집니다. 행과 이력은 남아 <b>되살릴 수 있습니다.</b></p>
+        <div class="ban note" style="display:block" data-el="13.2">넣으면 끊어지는 것<br>· 들어오는 참조 3 — <span class="m bd">SYNC-UC-001#UC-A6</span> · <span class="m bd">SYNC-UC-001#UC-A1</span> · <span class="m bd">SYNC-API-002</span> → 그 참조가 <b>끊어진 참조</b>가 됩니다</div>
+      </div>
+      <div class="df"><span class="sp"></span><span class="b" data-el="13.4">닫기</span><span class="b danger" data-el="13.3">휴지통에 넣기</span></div>
+    </div>
   </div>
-</aside>
+</div>
 
-<!-- 휴지통에 있는 문서를 열면 (4b). 상태 토글(3)·삭제(12)는 없다 -->
-<div class="banner warn" data-el="4b">휴지통에 있는 문서입니다 — 2026-09-16 박호영 · 파일은 저장소에 없고 되살리면 돌아옵니다 <span class="btn sm" data-el="4b.1">되살리기</span></div>
+<div class="var">휴지통에 있는 문서를 열면(4b) — 상태 토글(3)·넣기(12)가 없고 배너 하나가 말한다</div>
+<div class="sd h">
+  <div class="docbar">
+    <span><span class="m bd">[SYNC]</span> 싱크독</span><span class="sep">›</span><span class="m">6 DOM</span><span class="sep">›</span><span class="m bd cur">SYNC-DOM-003</span><span class="pill">초안</span><span class="ver">v3</span>
+  </div>
+  <div style="padding:14px 26px;background:#fff">
+    <div class="ban note" data-el="4b">휴지통에 있는 문서입니다 — 2026-09-16 박호영 · 파일은 저장소에 없고 되살리면 돌아옵니다<span class="sp"></span><span class="b sm" data-el="4b.1">되살리기</span></div>
+  </div>
+</div>
 
+<div class="var">그림 전체보기(7.6) — 상단 바까지 덮는 층. 위 바에 그림 이름 · －100%＋ · 닫기</div>
+<div class="sd h" style="min-height:320px">
+  <div style="position:absolute;inset:0;display:flex;flex-direction:column;background:#fff" data-el="7.6">
+    <div class="gbar"><b>R2</b><span class="lbl">전체보기</span><span class="sp"></span><span class="b sm">－</span><span class="m" style="min-width:44px;text-align:center">100%</span><span class="b sm">＋</span><span class="b sm">100%</span><span class="b sm">닫기</span></div>
+    <div class="stage"><div class="pic">원본 SVG 복제</div></div>
+  </div>
+</div>
 ```
 
 ### 요소
@@ -782,98 +554,140 @@ status: approved
 ### 배치
 
 ```html
-<div class="phead" data-el="1">
-  <div>
-    <div><b class="mono" data-el="1.1">[SYNC]</b> <span data-el="1.2">싱크독</span></div>
-    <a class="repo mono" data-el="1.3">github.com/dfocus/syncdoc</a>
-  </div>
-  <span class="grow"></span>
-  <span class="btn" data-el="2.1">참조 그래프</span>
-  <span class="btn" data-el="2.2">순서대로 읽기</span>
-</div>
-
-<div class="stats" data-el="3"><!-- 세 칸. 0이면 흐리게, 1 이상이면 경고색 + 경고 테두리 -->
-  <span class="stat" data-el="3.2"><b>1</b> 끊어진 참조</span>
-  <span class="stat" data-el="3.4"><b>1</b> 규약 오류</span>
-  <span class="stat dim" data-el="3.5"><b>0</b> 미완성</span>
-</div>
-
-<div class="body2">
-  <div class="stages" data-el="4">
-    <div class="stgh"><!-- 머리에 미니 히트맵 11칸 — UI-2에서 본 그 프로젝트 행이 여기 다시 있다 -->
-      <b>11단계</b><span class="grow"></span>
-      <i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i>
-      <i class="sw ok"></i><i class="sw dr"></i><i class="sw dr"></i><i class="sw dr"></i><i class="sw dr"></i><i class="sw na"></i>
-    </div>
-
-    <div class="stg" data-el="4.1">
-      <span class="no mono">1</span><span class="nm">RFQ</span>
-      <span class="st ok">완료</span><span class="grow"></span>
-      <span class="lbl">1개</span><span class="caret">▾</span>
-    </div>
-    <div class="doc" data-el="4.2">
-      <span class="mono">SYNC-RFQ-001</span><span class="dot ok"></span>
-      <span class="lbl">완료 · v3 · 2일 전 · 박호영</span>
-    </div>
-
-    <div class="stg">
-      <span class="no mono">7</span><span class="nm">화면</span>
-      <span class="st dr">초안</span><span class="gate" data-el="4.3">상위 미완료</span>
-      <span class="grow"></span><span class="lbl">2개</span><span class="caret">▸</span>
-    </div>
-    <div class="doc">
-      <span class="mono">SYNC-UI-002</span><span class="dot dr"></span>
-      <span class="lbl">초안 · v2 · 3시간 전 · 에이전트(박호영)</span>
-      <span class="grow"></span>
-      <span class="miss">끊어진 참조 1</span>
-    </div>
-
-    <div class="stg" data-el="4.4">
-      <span class="no mono">—</span><span class="nm">표준 (STD)</span>
-      <span class="st dr">초안</span><span class="grow"></span>
-      <span class="lbl">4개</span><span class="caret">▸</span>
-    </div>
-
-    <!-- 휴지통 (8). 0건이면 묶음 자체가 없다. 접혀 있고 흐리다 -->
-    <div class="stg dim" data-el="8">
-      <span class="no mono">—</span><span class="nm">휴지통</span><span class="grow"></span>
-      <span class="lbl">2개</span><span class="caret">▾</span>
-    </div>
-    <div class="doc dim" data-el="8.1">
-      <span class="mono">SYNC-DOM-003</span> <span class="lbl">ERD·DD — 싱크독</span>
-      <span class="lbl">v3 · 2026-09-16 박호영이 넣음</span><span class="grow"></span>
-      <span class="btn sm" data-el="8.2">되살리기</span> <span class="btn sm danger" data-el="8.3">완전 삭제</span>
-    </div>
-  </div>
-
-  <aside class="panel" data-el="5">
-    <div class="pbody">
-      <h4>최근 변경</h4>
-      <div class="rc">
-        <div><span class="mono">SYNC-SCN-001</span> <span class="mono lbl">v4</span><span class="grow"></span><span class="lbl">3시간 전</span></div>
-        <div class="msg">spec: 페르소나 P2 툴 목록 갱신</div>
-        <div class="lbl">에이전트 · 지시 김민준</div>
+<style>
+  .pg{padding:22px 26px 30px;display:flex;flex-direction:column;gap:14px;flex:1}
+  .phead{display:flex;align-items:flex-start;gap:10px}
+  .phead .nm{display:flex;align-items:baseline;gap:6px}
+  .phead .nm .m{font-size:16px;font-weight:600}
+  .phead .repo{display:block;margin-top:4px;font-family:var(--mono);font-size:12.5px;color:var(--ink3);border-bottom:1px dashed var(--line2);width:fit-content}
+  /* 요약 수치 — 세 칸. 0이면 흐리게, 1 이상이면 경고색 숫자에 경고 테두리 */
+  .stats{display:flex;gap:8px}
+  .stat{display:inline-flex;align-items:baseline;gap:7px;padding:7px 12px;background:#fff;border:1px solid var(--line);border-radius:6px;font-size:13px;color:var(--ink3)}
+  .stat b{font:600 17.5px var(--mono);color:var(--ink)}
+  .stat.hot{border-color:var(--warnline)}
+  .stat.hot b{color:var(--warn)}
+  .stat.dim{opacity:.55}
+  .body2{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+  /* 11단계 표 — 아코디언. 머리에 미니 히트맵 11칸 */
+  .stages{background:#fff;border:1px solid var(--line);border-radius:8px}
+  .stgh{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--sub);border-radius:8px 8px 0 0;font-size:14px;font-weight:600}
+  .stgh .mini{display:flex;gap:3px}
+  .stgh .sw{width:14px;height:14px;border-radius:2px;background:var(--draft)}
+  .stgh .sw.ok{background:var(--ok)}
+  .stgh .sw.na{background:#fff;border:1px solid var(--line)}
+  .stg{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--hair);font-size:14px}
+  .stg .no{width:20px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--dim)}
+  .stg .nm{font-weight:500;width:110px}
+  .stg .n{font-size:12.5px;color:var(--ink3)}
+  .stg .caret{width:12px;text-align:center;color:var(--ink3);font-size:11.5px}
+  .stg.dim{opacity:.55}
+  .doc{display:flex;align-items:center;gap:10px;padding:7px 14px 7px 46px;background:var(--row);border-bottom:1px solid var(--hair);font-size:13px}
+  .doc .m{font-size:13px;font-weight:500}
+  .doc.dim{opacity:.55}
+  .stages > :last-child{border-bottom:none}
+  /* 최근 변경 */
+  .panel{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+  .panel h4{margin:0 0 6px;font-size:13px;font-weight:600;color:var(--ink3)}
+  .rc{padding:8px 0;border-bottom:1px solid var(--hair2);font-size:13px}
+  .rc .l1{display:flex;align-items:baseline;gap:6px}
+  .rc .msg{margin-top:2px;color:var(--ink2)}
+  .rc .by{margin-top:1px;font-size:12px;color:var(--dim)}
+  .sync{margin-top:10px;padding-top:10px;border-top:1px solid var(--hair);font-size:12.5px;color:var(--ink3);line-height:1.7}
+  .sync .m{color:var(--ink)}
+  .lst{margin:0;padding:0 0 0 2px;list-style:none;line-height:1.7}
+  .lst li{display:flex;gap:8px;align-items:baseline}
+</style>
+<div class="sd">
+  <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb">설정</span><span class="tb">로그아웃</span></div>
+  <div class="pg">
+    <div class="phead" data-el="1">
+      <div>
+        <div class="nm h1"><span class="m" data-el="1.1">[SYNC]</span><span data-el="1.2">싱크독</span></div>
+        <a class="repo" data-el="1.3">github.com/dfocus/syncdoc</a>
       </div>
-      <div class="sync lbl" data-el="7">마지막 처리 커밋 <span class="mono" data-el="7.1">eb30fd6</span><br>밀린 커밋 <span data-el="7.2">0</span></div>
+      <span class="sp"></span>
+      <span class="b" data-el="2.1">참조 그래프</span>
+      <span class="b" data-el="2.2">순서대로 읽기</span>
     </div>
-  </aside>
-</div>
 
-<!-- 완전 삭제 확인 (8.4) -->
-<div class="dialog narrow" data-el="8.4">
-  <div class="dhead">완전 삭제 — SYNC-DOM-003</div>
-  <div class="dbody">행까지 지워지고 <b>되돌릴 수 없습니다.</b> 번호는 다시 쓰일 수 있습니다.
-    <div class="banner warn">지울 수 없습니다 — 아직 가리키는 곳이 있습니다<br>· <b>SYNC-DOM-002#Document</b></div>
-    <div class="dacts"><span class="btn">닫기</span> <span class="btn danger">완전 삭제</span></div>
+    <div class="stats" data-el="3">
+      <span class="stat hot" data-el="3.2"><b>1</b>끊어진 참조</span>
+      <span class="stat hot" data-el="3.4"><b>1</b>규약 오류</span>
+      <span class="stat dim" data-el="3.5"><b>0</b>미완성</span>
+    </div>
+
+    <div class="body2">
+      <div class="stages" data-el="4">
+        <div class="stgh">11단계<span class="sp"></span>
+          <span class="mini"><i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i><i class="sw"></i><i class="sw"></i><i class="sw"></i><i class="sw"></i><i class="sw na"></i></span>
+        </div>
+
+        <div class="stg" data-el="4.1"><span class="no">1</span><span class="nm">RFQ</span><span class="pill ok">완료</span><span class="sp"></span><span class="n">1개</span><span class="caret">▾</span></div>
+        <div class="doc" data-el="4.2"><span class="m">SYNC-RFQ-001</span><span class="dot ok"></span><span class="lbl">완료 · v3 · 2일 전 · 박호영</span></div>
+
+        <div class="stg"><span class="no">2</span><span class="nm">PRD</span><span class="pill ok">완료</span><span class="sp"></span><span class="n">1개</span><span class="caret">▸</span></div>
+        <div class="stg"><span class="no">3</span><span class="nm">SCN</span><span class="pill ok">완료</span><span class="sp"></span><span class="n">1개</span><span class="caret">▸</span></div>
+        <div class="stg"><span class="no">4</span><span class="nm">UC</span><span class="pill ok">완료</span><span class="gate" data-el="4.3">상위 미완료</span><span class="sp"></span><span class="n">1개</span><span class="caret">▸</span></div>
+        <div class="stg"><span class="no">5</span><span class="nm">INFRA</span><span class="pill ok">완료</span><span class="sp"></span><span class="n">1개</span><span class="caret">▸</span></div>
+        <div class="stg"><span class="no">6</span><span class="nm">DOM</span><span class="pill ok">완료</span><span class="sp"></span><span class="n">3개</span><span class="caret">▸</span></div>
+
+        <div class="stg"><span class="no">7</span><span class="nm">UI</span><span class="pill">초안</span><span class="sp"></span><span class="n">2개</span><span class="caret">▾</span></div>
+        <div class="doc"><span class="m">SYNC-UI-001</span><span class="dot ok"></span><span class="lbl">완료 · v5 · 어제 · 에이전트(박호영)</span></div>
+        <div class="doc"><span class="m">SYNC-UI-002</span><span class="dot"></span><span class="lbl">초안 · v2 · 3시간 전 · 에이전트(박호영)</span><span class="sp"></span><span class="mis">끊어진 참조 1</span></div>
+
+        <div class="stg"><span class="no">8</span><span class="nm">API</span><span class="pill">초안</span><span class="sp"></span><span class="n">2개</span><span class="caret">▸</span></div>
+        <div class="stg"><span class="no">9</span><span class="nm">SEQ</span><span class="pill">초안</span><span class="sp"></span><span class="n">1개</span><span class="caret">▸</span></div>
+        <div class="stg"><span class="no">10</span><span class="nm">MS</span><span class="pill">초안</span><span class="sp"></span><span class="n">3개</span><span class="caret">▸</span></div>
+        <div class="stg"><span class="no">11</span><span class="nm">CODE</span><span class="mute" style="font-size:12.5px">미작성</span><span class="sp"></span></div>
+
+        <div class="stg" data-el="4.4"><span class="no">—</span><span class="nm">표준 (STD)</span><span class="pill">초안</span><span class="sp"></span><span class="n">4개</span><span class="caret">▸</span></div>
+
+        <!-- 휴지통. 0건이면 묶음 자체가 없다. 흐리게 -->
+        <div class="stg dim" data-el="8"><span class="no">—</span><span class="nm">휴지통</span><span class="sp"></span><span class="n">1개</span><span class="caret">▾</span></div>
+        <div class="doc dim" data-el="8.1"><span class="m">SYNC-DOM-003</span><span class="lbl">ERD·DD — 싱크독</span><span class="lbl">v3 · 2026-09-16 박호영이 넣음</span><span class="sp"></span><span class="b sm" data-el="8.2">되살리기</span><span class="b sm danger" data-el="8.3">완전 삭제</span></div>
+      </div>
+
+      <aside class="panel" data-el="5">
+        <h4>최근 변경</h4>
+        <div class="rc">
+          <div class="l1"><span class="m bd">SYNC-SCN-001</span><span class="m cap">v4</span><span class="sp"></span><span class="cap">3시간 전</span></div>
+          <div class="msg">spec: 페르소나 P2 툴 목록 갱신</div>
+          <div class="by">에이전트 · 지시 박호영</div>
+        </div>
+        <div class="rc">
+          <div class="l1"><span class="m bd">SYNC-PRD-001</span><span class="m cap">status</span><span class="sp"></span><span class="cap">어제</span></div>
+          <div class="msg">status: 초안 → 완료</div>
+          <div class="by">박호영</div>
+        </div>
+        <div class="rc">
+          <div class="l1"><span class="m bd">SYNC-UI-002</span><span class="m cap">v2</span><span class="sp"></span><span class="cap">3시간 전</span></div>
+          <div class="msg">spec(SYNC-UI-002): 12화면 디자인 도구로 다시 그림</div>
+          <div class="by">에이전트 · 지시 박호영</div>
+        </div>
+        <div class="sync" data-el="7">마지막 처리 커밋 <span class="m" data-el="7.1">eb30fd6</span><br>밀린 커밋 <b data-el="7.2">0</b></div>
+      </aside>
+    </div>
   </div>
 </div>
 
-<div class="dialog" data-el="6">
-  <div class="dhead">끊어진 참조 1건</div>
-  <div class="dbody">
-    <ul class="chk">
-      <li><b>SYNC-PRD-001#R2</b> → <span class="mono">SYNC-DOM-001#참조</span> 가리키는 곳 없음 · 3일 전</li>
-    </ul>
+<div class="var">다이얼로그 둘 — 요약 수치를 누른 목록(6) · 휴지통 행의 완전 삭제 확인(8.4)</div>
+<div class="sd h" style="min-height:330px">
+  <div class="ov" style="padding-top:36px;gap:24px;align-items:flex-start">
+    <div class="dlg" data-el="6" style="width:520px">
+      <div class="dh">끊어진 참조 1건<span class="x">✕</span></div>
+      <div class="db">
+        <ul class="lst">
+          <li><span class="idb">R2</span><span><span class="m bd">SYNC-PRD-001</span> → <span class="ref miss">[[SYNC-DOM-001#참조]]</span> 가리키는 곳 없음 <span class="cap">· 3일 전</span></span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="dlg" data-el="8.4" style="width:480px">
+      <div class="dh">완전 삭제 — SYNC-DOM-003</div>
+      <div class="db">행까지 지워지고 <b>되돌릴 수 없습니다.</b> 번호는 다시 쓰일 수 있습니다.
+        <div class="ban note" style="margin-top:12px;display:block">지울 수 없습니다 — 아직 가리키는 곳이 있습니다<br>· <span class="m bd">SYNC-DOM-002#Document</span></div>
+      </div>
+      <div class="df"><span class="sp"></span><span class="b">닫기</span><span class="b danger dis">완전 삭제</span></div>
+    </div>
   </div>
 </div>
 ```
@@ -960,90 +774,139 @@ status: approved
 ### 배치
 
 ```html
-<!-- 문서 뷰와 같은 3단 틀. 좌: 버전, 가운데: diff, 우: 영향. 화면 높이를 채우고 가운데만 스크롤한다 -->
-<div class="docbar" data-el="1">
-  <span class="crumb"><b class="mono">[SYNC]</b> 싱크독</span><span class="sep">›</span>
-  <span class="crumb mono">2 PRD</span><span class="sep">›</span>
-  <b class="mono">SYNC-PRD-001</b>
-  <span class="pill pill-approved">완료</span><span class="ver mono">v7</span>
+<style>
+  .vlist .h{font-size:12px;color:var(--dim);margin-bottom:8px}
+  .vcard{background:#fff;border:1px solid var(--line);border-radius:6px;padding:7px 8px;margin-bottom:5px;font-size:12.5px}
+  .vcard .l1{display:flex;align-items:center;gap:6px}
+  .vcard .l1 .m{font-size:13px;font-weight:600}
+  .vcard .msg{display:block;margin-top:3px;color:var(--ink2);line-height:1.45}
+  .vcard .by{display:flex;align-items:center;gap:6px;margin-top:4px;color:var(--ink3);font-size:12px}
+  .vcard.sel{border:1.5px solid var(--ink);background:var(--note)}
+  .ab{font:700 11px/1.5 var(--mono);background:var(--ink);color:#fff;border-radius:3px;padding:0 5px}
+  .hint{margin:10px 0 0;padding-top:9px;border-top:1px solid var(--line);font-size:12px;color:var(--ink3);line-height:1.6}
+  .col{display:flex;flex-direction:column;gap:12px;max-width:1440px}
+  .drange{display:flex;align-items:baseline;gap:10px}
+  .drange .m{font-size:19px;font-weight:600}
+  .dgroup{border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .dhead2{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--sub);border-bottom:1px solid var(--line);font-size:14px}
+  .dhead2 b{font-weight:600}
+  .cnt{display:inline-block;border:1px solid var(--line2);border-radius:9px;padding:0 8px;font-size:12px;color:var(--ink3);white-space:nowrap}
+  .diffbox{padding:4px 0;background:#fff}
+  .footnote{margin:6px 0 0;padding-top:12px;border-top:1px solid var(--line);color:var(--ink3);font-size:12.5px;line-height:1.6}
+  .vimpact .h{font-size:12px;color:var(--dim);margin-bottom:8px}
+  .icard{background:#fff;border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin-bottom:6px;font-size:12.5px}
+  .icard .l1{display:flex;align-items:center;gap:6px}
+  .icard .n{font-family:var(--mono);font-weight:600;color:var(--ink3);margin-left:auto}
+  .icard .lbl{display:block;font-size:12px;margin-top:1px}
+  .dlg .diffbox{margin-top:12px;border:1px solid var(--line);border-radius:6px}
+  .lst{margin:8px 0 0;padding-left:18px;font-family:var(--mono);font-size:12.5px;line-height:1.8}
+</style>
+<div class="sd">
+  <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb">설정</span><span class="tb">로그아웃</span></div>
+  <div class="docbar" data-el="1">
+    <span><span class="m bd">[SYNC]</span> 싱크독</span><span class="sep">›</span>
+    <span class="m">2 PRD</span><span class="sep">›</span>
+    <span class="m bd cur">SYNC-PRD-001</span>
+    <span class="pill ok">완료</span>
+    <span class="ver">v7</span>
+    <span class="sp"></span>
+    <span class="b sm">초안으로</span>
+  </div>
+
+  <div class="body3">
+    <nav class="side vlist" data-el="2">
+      <div class="h">버전 7</div>
+      <div class="vcard sel" data-el="2.1">
+        <div class="l1"><span class="m">v7</span><span class="ab" data-el="2.3">B</span><span class="sp"></span><span class="cap">1일 전</span></div>
+        <span class="msg">spec: R10 다이어그램 렌더링으로 변경</span>
+        <div class="by">에이전트 · 지시 박호영</div>
+      </div>
+      <div class="vcard">
+        <div class="l1"><span class="m">status</span><span class="sp"></span><span class="cap">1일 전</span></div>
+        <span class="msg">status: 초안 → 완료</span>
+        <div class="by">박호영</div>
+      </div>
+      <div class="vcard sel">
+        <div class="l1"><span class="m">v6</span><span class="ab">A</span><span class="sp"></span><span class="cap">2일 전</span></div>
+        <span class="msg">spec: 웹 편집 삭제</span>
+        <div class="by">에이전트 · 지시 박호영<span class="sp"></span><span class="b sm danger" data-el="2.2">되돌리기</span></div>
+      </div>
+      <div class="vcard">
+        <div class="l1"><span class="m">v5</span><span class="sp"></span><span class="cap">3일 전</span></div>
+        <span class="msg">spec: 요약 수치 세 칸으로</span>
+        <div class="by">에이전트 · 지시 박호영<span class="sp"></span><span class="b sm danger">되돌리기</span></div>
+      </div>
+      <div class="vcard">
+        <div class="l1"><span class="m">v4</span><span class="sp"></span><span class="cap">5일 전</span></div>
+        <span class="msg">spec: N3 휴지통</span>
+        <div class="by">GitHub push · 박호영<span class="sp"></span><span class="b sm danger">되돌리기</span></div>
+      </div>
+      <p class="hint">두 개까지 고른다. 세 번째를 누르면 <b class="m">A</b>가 밀려난다.</p>
+    </nav>
+    <div class="hd"></div>
+
+    <section class="main" data-el="3">
+      <div class="col">
+        <div class="tabs"><span class="t">유저용</span><span class="t">원본</span><span class="t on">이력</span></div>
+        <div class="drange">
+          <span class="m" data-el="3.1">v6 → v7</span>
+          <span class="lbl">항목 2개 변경 · 삭제 3줄 · 추가 4줄</span>
+        </div>
+
+        <div class="dgroup">
+          <div class="dhead2"><span class="idb">R10</span><b>다이어그램 렌더링</b><span class="sp"></span><span class="cnt" data-el="3.3">하위 참조 2건</span></div>
+          <div class="diffbox" data-el="3.2">
+            <div class="dl del"><span class="mk">-</span><span>텍스트 원본에서 사람이 보는 그림을 자동 생성한다.</span></div>
+            <div class="dl add"><span class="mk">+</span><span>원본의 다이어그램 코드블록을 사람용 뷰에서 그림으로 렌더링한다.</span></div>
+            <div class="dl add"><span class="mk">+</span><span>문법 오류면 원본 코드와 오류 메시지를 그대로 보여준다.</span></div>
+          </div>
+        </div>
+
+        <div class="dgroup">
+          <div class="dhead2"><span class="idb">R1</span><b>에이전트용 원본과 사람용 뷰</b><span class="sp"></span><span class="cnt">하위 참조 4건</span></div>
+          <div class="diffbox">
+            <div class="dl del"><span class="mk">-</span><span>웹에서도 원본을 편집할 수 있다.</span></div>
+            <div class="dl del"><span class="mk">-</span><span>편집 중 실시간으로 규약을 검사한다.</span></div>
+            <div class="dl add"><span class="mk">+</span><span>명세 본문이 들어오는 길은 MCP와 GitHub push 둘뿐이다.</span></div>
+            <div class="dl add"><span class="mk">+</span><span>웹에는 편집 화면이 없다.</span></div>
+          </div>
+        </div>
+
+        <p class="footnote">되돌리기는 "이전 내용으로 새 버전 생성"이며 이력이 지워지지 않는다. 되돌린 결과가 현재 규약을 위반하면 거부된다.</p>
+      </div>
+    </section>
+
+    <div class="hd"></div>
+    <aside class="side vimpact" data-el="7">
+      <div class="h">이 변경이 닿는 곳</div>
+      <div class="icard"><div class="l1"><span class="idb">R10</span><span class="n">2</span></div><span class="lbl">다이어그램 렌더링</span></div>
+      <div class="icard"><div class="l1"><span class="idb">R1</span><span class="n">4</span></div><span class="lbl">에이전트용 원본과 사람용 뷰</span></div>
+      <p class="hint">항목 ID가 붙은 줄이 바뀌면 그 항목을 참조하는 하위 건수가 여기 나온다.</p>
+    </aside>
+  </div>
 </div>
 
-<div class="body3">
-  <nav class="vlist" data-el="2">
-    <div class="lbl">버전 7</div>
-
-    <div class="vcard sel" data-el="2.1">
-      <div><b class="mono">v7</b> <span class="ab" data-el="2.3">B</span><span class="grow"></span><span class="lbl">1일 전</span></div>
-      <div class="msg">spec: R10 다이어그램 렌더링으로 변경</div>
-      <div class="by"><span class="lbl">에이전트 · 지시 박호영</span></div>
-    </div>
-
-    <div class="vcard">
-      <div><b class="mono">status</b><span class="grow"></span><span class="lbl">1일 전</span></div>
-      <div class="msg">status: 초안 → 완료</div>
-      <div class="by"><span class="lbl">박호영</span></div>
-    </div>
-
-    <div class="vcard sel">
-      <div><b class="mono">v6</b> <span class="ab">A</span><span class="grow"></span><span class="lbl">2일 전</span></div>
-      <div class="msg">spec: 웹 편집 삭제</div>
-      <div class="by"><span class="lbl">에이전트 · 지시 박호영</span><span class="grow"></span><span class="btn sm danger" data-el="2.2">되돌리기</span></div>
-    </div>
-
-    <p class="hint">두 개까지 고른다. 세 번째를 누르면 <b class="mono">A</b>가 밀려난다.</p>
-  </nav>
-  <div class="handle"></div>
-
-  <section class="mainwrap" data-el="3">
-    <div class="tabs"><span>유저용</span><span>원본</span><span class="on">이력</span></div>
-    <div class="drange">
-      <b class="mono" data-el="3.1">v6 → v7</b>
-      <span class="lbl">항목 2개 변경 · 삭제 3줄 · 추가 4줄</span>
-    </div>
-
-    <div class="dgroup"><!-- 항목마다 카드. 어느 항목이 바뀌었는지가 먼저 읽혀야 한다 -->
-      <div class="dhead2">
-        <span class="idbadge">R10</span><b>다이어그램 렌더링</b>
-        <span class="grow"></span>
-        <span class="hint" data-el="3.3">하위 참조 2건</span>
+<div class="var">되돌리기 확인(4)과, 되돌린 본문에 지금 있는 항목이 없을 때 한 번 더 뜨는 삭제 확인(6)</div>
+<div class="sd h" style="min-height:360px">
+  <div class="ov" style="padding-top:36px;gap:24px">
+    <div class="dlg" data-el="4" style="width:520px">
+      <div class="dh">v6으로 되돌리기</div>
+      <div class="db">현재 v7을 v6 내용으로 되돌립니다. 이력은 지워지지 않고 <b>v8</b>이 새로 생깁니다.
+        <div class="diffbox" data-el="4.1">
+          <div class="dl del"><span class="mk">-</span><span>원본의 다이어그램 코드블록을…</span></div>
+          <div class="dl add"><span class="mk">+</span><span>텍스트 원본에서 사람이 보는 그림을…</span></div>
+        </div>
       </div>
-      <div class="diffbox" data-el="3.2">
-        <div class="dl del"><span class="mk">-</span><span>텍스트 원본에서 사람이 보는 그림을 자동 생성한다.</span></div>
-        <div class="dl add"><span class="mk">+</span><span>원본의 다이어그램 코드블록을 사람용 뷰에서 그림으로 렌더링한다.</span></div>
-      </div>
+      <div class="df"><span class="sp"></span><span class="b" data-el="4.3">취소</span><span class="b solid" data-el="4.2">되돌리기</span></div>
     </div>
-
-    <p class="footnote">되돌리기는 "이전 내용으로 새 버전 생성"이며 이력이 지워지지 않는다. 되돌린 결과가 현재 규약을 위반하면 거부된다.</p>
-  </section>
-
-  <div class="handle"></div>
-  <aside class="vimpact" data-el="7">
-    <div class="lbl">이 변경이 닿는 곳</div>
-    <div class="icard"><b class="mono">R10</b> <span class="n">2</span><div class="lbl">다이어그램 렌더링</div></div>
-    <div class="icard"><b class="mono">R1</b> <span class="n">4</span><div class="lbl">에이전트용 원본과 사람용 뷰</div></div>
-    <p class="hint">항목 ID가 붙은 줄이 바뀌면 그 항목을 참조하는 하위 건수가 여기 나온다.</p>
-  </aside>
-</div>
-
-<div class="dialog" data-el="4">
-  <div class="dhead">v6으로 되돌리기</div>
-  <div class="dbody">
-    현재 v7을 v6 내용으로 되돌립니다. 이력은 지워지지 않고 <b>v8</b>이 새로 생깁니다.
-    <div class="diffbox" data-el="4.1">
-      <div class="dl del"><span class="mk">-</span><span>원본의 다이어그램 코드블록을…</span></div>
-      <div class="dl add"><span class="mk">+</span><span>텍스트 원본에서 사람이 보는 그림을…</span></div>
+    <div class="dlg" data-el="6" style="width:480px">
+      <div class="dh">항목 삭제 확인</div>
+      <div class="db">v3에는 <span class="idb">R15</span>가 없습니다. 되돌리면 이 항목이 사라지고 하위 참조 2건이 <b>끊어진 참조</b>가 됩니다.
+        <ul class="lst"><li>SYNC-UC-001#UC-H7</li><li>SYNC-DOM-003#versions</li></ul>
+      </div>
+      <div class="df"><span class="sp"></span><span class="b" data-el="6.2">취소</span><span class="b solid" data-el="6.1">삭제하고 되돌리기</span></div>
     </div>
   </div>
-  <div class="dfoot"><span class="grow"></span><span class="btn" data-el="4.3">취소</span> <span class="btn solid" data-el="4.2">되돌리기</span></div>
-</div>
-
-<div class="dialog" data-el="6">
-  <div class="dhead">항목 삭제 확인</div>
-  <div class="dbody">
-    v3에는 <b>#R15</b>가 없습니다. 되돌리면 이 항목이 사라지고 하위 참조 2건이 <b>끊어진 참조</b>가 됩니다.
-    <ul class="chk"><li>SYNC-UC-001#UC-H7</li><li>SYNC-DOM-003#versions</li></ul>
-  </div>
-  <div class="dfoot"><span class="grow"></span><span class="btn" data-el="6.2">취소</span> <span class="btn solid" data-el="6.1">삭제하고 되돌리기</span></div>
 </div>
 ```
 
@@ -1119,56 +982,102 @@ status: approved
 ### 배치
 
 ```html
-<!-- 표가 아니라 격자다. 칸이 열 폭을 꽉 채우는 막대여야 색 띠로 읽힌다 -->
-<div class="phead" data-el="1">
-  <div><b>프로젝트</b> <span class="lbl">4개</span></div>
-  <span class="grow"></span>
-  <span class="btn solid" data-el="1.1">+ 프로젝트 초기화</span>
+<style>
+  .pg{padding:24px 26px 30px}
+  .phead{display:flex;align-items:flex-end;gap:10px;margin-bottom:16px}
+  .phead .cnt{font-size:14px;color:var(--ink3);padding-bottom:3px}
+  /* 격자 — 20px 196px repeat(11,1fr) · gap 4px. 칸이 열 폭을 채워야 색 띠로 읽힌다 */
+  .heat{background:#fff;border:1px solid var(--line);border-radius:8px}
+  .hrow{display:grid;grid-template-columns:20px 196px repeat(11,minmax(0,1fr));gap:4px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--hair)}
+  .hrow:last-child{border-bottom:none}
+  .hrow.head{padding:8px 14px 7px;background:var(--sub);border-radius:8px 8px 0 0;border-bottom:1px solid var(--line);font:500 11px var(--mono);color:var(--ink3);text-align:center}
+  .hrow .w{text-align:center;color:var(--warn);font-size:13px}
+  .pn{display:flex;flex-direction:column;min-width:0;line-height:1.2}
+  .pn .nm{font-size:15.5px}
+  .pn .nm .m{font-size:13px;font-weight:600;margin-right:4px}
+  .pn .sub{margin-top:3px;font-size:12.5px;color:var(--ink3);white-space:nowrap}
+  .pn .sub .work{color:var(--warn);font-weight:600}
+  .legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:12.5px;color:var(--ink3)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend .sw{width:11px;height:11px;border-radius:2px;background:var(--draft)}
+  .legend .sw.ok{background:var(--ok)}
+  .legend .sw.na{background:#fff;border:1px solid var(--line)}
+  .legend .w{color:var(--warn)}
+  .empty{margin-top:14px;padding:28px;text-align:center;color:var(--mute);border:1px dashed var(--line2);border-radius:8px;font-size:14px}
+</style>
+<div class="sd">
+  <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb">설정</span><span class="tb">로그아웃</span></div>
+  <div class="pg">
+    <div class="phead" data-el="1">
+      <span class="h1">프로젝트</span><span class="cnt">4개</span>
+      <span class="sp"></span>
+      <span class="b solid" data-el="1.1">+ 프로젝트 초기화</span>
+    </div>
+
+    <div class="heat" data-el="2">
+      <div class="hrow head">
+        <span></span><span></span>
+        <span>1 RFQ</span><span>2 PRD</span><span>3 SCN</span><span>4 UC</span><span>5 INFRA</span><span>6 DOM</span>
+        <span>7 UI</span><span>8 API</span><span>9 SEQ</span><span>10 MS</span><span>11 CODE</span>
+      </div>
+      <div class="hrow" data-el="2.1">
+        <span class="w" data-el="2.3">⚠</span>
+        <span class="pn">
+          <span class="nm"><span class="m">[SYNC]</span>싱크독</span>
+          <span class="sub"><span class="work">끊어진 참조 1 · 규약 오류 1</span> · 21문서 · 12분 전</span>
+        </span>
+        <span class="cell ok" data-el="2.2">1</span>
+        <span class="cell ok missing">1</span>
+        <span class="cell ok">1</span>
+        <span class="cell ok">1</span>
+        <span class="cell ok">1</span>
+        <span class="cell dr missing">3</span>
+        <span class="cell dr">2<i data-el="2.4">▲</i></span>
+        <span class="cell dr">2<i>▲</i></span>
+        <span class="cell dr">1<i>▲</i></span>
+        <span class="cell dr">3<i>▲</i></span>
+        <span class="cell na"></span>
+      </div>
+      <div class="hrow">
+        <span></span>
+        <span class="pn"><span class="nm"><span class="m">[DBA]</span>데이터베이스 관리</span><span class="sub">6문서 · 어제</span></span>
+        <span class="cell ok">1</span><span class="cell ok">1</span><span class="cell dr">1</span><span class="cell dr">1</span>
+        <span class="cell na"></span><span class="cell dr">2</span>
+        <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
+      </div>
+      <div class="hrow">
+        <span></span>
+        <span class="pn"><span class="nm"><span class="m">[RHYM]</span>리듬핏</span><span class="sub">1문서 · 3일 전</span></span>
+        <span class="cell dr">1</span>
+        <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
+        <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
+      </div>
+      <div class="hrow">
+        <span></span>
+        <span class="pn"><span class="nm"><span class="m">[AIRD]</span>에어데이터</span><span class="sub">0문서 · 2주 전</span></span>
+        <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
+        <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
+      </div>
+    </div>
+
+    <div class="legend" data-el="4">
+      <span><i class="sw"></i>초안</span>
+      <span><i class="sw ok"></i>완료</span>
+      <span><i class="sw na"></i>미작성</span>
+      <span class="w">⚠ 끊어진 참조·규약 오류 있음</span>
+      <span class="w">▲ 상위 미완료 (막지는 않는다)</span>
+    </div>
+  </div>
 </div>
 
-<div class="heat" data-el="2"><!-- grid-template-columns: 20px 196px repeat(11,1fr) · gap 4px -->
-  <div class="hrow head">
-    <span></span><span></span>
-    <span>1 RFQ</span><span>2 PRD</span><span>3 SCN</span><span>4 UC</span><span>5 INFRA</span><span>6 DOM</span>
-    <span>7 UI</span><span>8 API</span><span>9 SEQ</span><span>10 MS</span><span>11 CODE</span>
-  </div>
-
-  <div class="hrow" data-el="2.1">
-    <span class="warn" data-el="2.3">⚠</span>
-    <span class="pname">
-      <span><b class="mono">[SYNC]</b> 싱크독</span>
-      <span class="sub"><b class="work">끊어진 참조 1 · 규약 오류 1</b> · 21문서 · 12분 전</span>
-    </span>
-    <span class="cell ok" data-el="2.2">1</span>
-    <span class="cell ok missing">1</span>
-    <span class="cell ok">1</span>
-    <span class="cell ok">1</span>
-    <span class="cell ok">1</span>
-    <span class="cell dr missing">3</span>
-    <span class="cell dr">2 <i data-el="2.4">▲</i></span>
-    <span class="cell dr">2 <i>▲</i></span>
-    <span class="cell dr">1 <i>▲</i></span>
-    <span class="cell dr">3 <i>▲</i></span>
-    <span class="cell na"></span>
-  </div>
-
-  <div class="hrow">
-    <span></span>
-    <span class="pname"><span><b class="mono">RHYM</b> 리듬핏</span><span class="sub">1문서 · 어제</span></span>
-    <span class="cell dr">1</span>
-    <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
-    <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
-    <span class="cell na"></span><span class="cell na"></span>
+<div class="var">빈 상태 — 내가 소유한 프로젝트가 하나도 없을 때. 격자·범례 대신 이것 하나</div>
+<div class="sd h">
+  <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb">설정</span><span class="tb">로그아웃</span></div>
+  <div class="pg">
+    <div class="phead"><span class="h1">프로젝트</span><span class="cnt">0개</span><span class="sp"></span><span class="b solid">+ 프로젝트 초기화</span></div>
+    <div class="empty" data-el="3">내 프로젝트가 없습니다. 위의 프로젝트 초기화로 시작하세요.</div>
   </div>
 </div>
-
-<div class="legend lbl" data-el="4">
-  <span><i class="sw dr"></i> 초안</span>
-  <span><i class="sw ok"></i> 완료</span> <span><i class="sw na"></i> 미작성</span>
-  <span class="warn">⚠ 끊어진 참조·규약 오류 있음</span> <span class="warn">▲ 상위 미완료 (막지는 않는다)</span>
-</div>
-
-<div class="empty" data-el="3">내 프로젝트가 없습니다. 위의 프로젝트 초기화로 시작하세요.</div>
 ```
 
 ### 요소
@@ -1227,12 +1136,21 @@ status: approved
 ### 배치
 
 ```html
-<!-- 카드가 없다. 앱 배경 위에 그대로 놓고 화면 세로 가운데에 둔다 -->
-<div class="login" data-el="1">
-  <div class="logo"><b>싱크독</b> <span class="mono">SyncDoc</span></div>
-  <p class="lbl" data-el="1.1">개발자가 PM 없이 11단계 명세 체인을 쓰고,<br>에이전트가 그 명세를 따르게 하는 플랫폼</p>
-  <a class="btn solid big" data-el="2">GitHub로 로그인</a>
-  <p class="cap" data-el="3">로그인 후 원래 가려던 화면으로 돌아갑니다</p>
+<style>
+  .login{margin:auto;width:360px;text-align:center;padding-bottom:40px}
+  .login .logo{font-size:27px;font-weight:700;letter-spacing:-.6px;line-height:1.2}
+  .login .logo .m{font-size:13px;font-weight:500;color:var(--ink3);margin-left:6px;letter-spacing:0}
+  .login .desc{margin:14px 0 26px;font-size:14.5px;line-height:1.7;color:var(--ink3)}
+  .login .b{width:100%;height:42px;font-size:14.5px;font-weight:600}
+  .login .cap{margin-top:14px}
+</style>
+<div class="sd"><!-- 상단 바가 없는 유일한 화면. 카드 없이 앱 배경 위에 세로 가운데 -->
+  <div class="login" data-el="1">
+    <div class="logo">싱크독<span class="m">SyncDoc</span></div>
+    <p class="desc" data-el="1.1">개발자가 PM 없이 11단계 명세 체인을 쓰고,<br>에이전트가 그 명세를 따르게 하는 플랫폼</p>
+    <a class="b solid" data-el="2">GitHub로 로그인</a>
+    <p class="cap" data-el="3">로그인 후 원래 가려던 화면으로 돌아갑니다</p>
+  </div>
 </div>
 ```
 
@@ -1282,49 +1200,70 @@ status: approved
 ### 배치
 
 ```html
-<div class="dialog narrow" data-el="1"><!-- 폭 560. 입력 셋이라 넓힐 이유가 없다 -->
-<div class="dhead"><b>프로젝트 초기화</b><span class="grow"></span><span class="x" data-el="3.3">✕</span></div>
-<div class="dbody">
-  <div class="form" data-el="2"><!-- 입력 넷을 한 상자로 묶는다 -->
-    <label>저장소 주소</label>
-    <input class="inp wide mono" data-el="2.1" placeholder="https://github.com/owner/repo">
-    <div class="lbl">싱크독이 이 저장소에 쓰기 권한이 있어야 합니다</div>
+<style>
+  .pg{padding:24px 26px}
+  .phead{display:flex;align-items:flex-end;gap:10px;margin-bottom:16px}
+  .ghost{height:120px;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .form{border:1px solid var(--line);border-radius:8px;padding:4px 16px 16px;background:#fff}
+  .form label{display:block;font-size:13px;font-weight:600;margin:14px 0 5px}
+  .form .hint{margin-top:5px;font-size:12.5px;color:var(--ink3)}
+  .form .hint code{font-family:var(--mono);font-size:12px;background:var(--sub2);padding:0 4px;border-radius:3px}
+  .form .err{margin-top:5px;font-size:12.5px;color:var(--warn)}
+  .form .chk{display:flex;align-items:center;gap:8px;font-weight:400;font-size:13.5px}
+  .form .chk input{width:14px;height:14px;margin:0}
+  .will{margin-top:14px;padding:10px 12px;background:var(--sub);border:1px solid var(--line);border-radius:8px;font-size:12.5px}
+  .will b{display:block;margin-bottom:4px}
+  .will .m{display:block;color:var(--ink3);font-size:12px;line-height:1.6}
+  .db .ban{margin-bottom:12px}
+  .found .db b{font-weight:600}
+</style>
+<div class="sd">
+  <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb">설정</span><span class="tb">로그아웃</span></div>
+  <div class="pg"><div class="phead"><span class="h1">프로젝트</span><span class="lbl">4개</span><span class="sp"></span><span class="b solid">+ 프로젝트 초기화</span></div><div class="ghost"></div></div>
 
-    <label>프로젝트 코드</label>
-    <input class="inp mono" data-el="2.2" placeholder="AIRD" style="width:140px">
-    <div class="lbl">영문 대문자 4자 이내. 문서 ID 앞부분이 됩니다 — 예: <code>AIRD-PRD-001</code></div>
-    <div class="ferr" data-el="2.4">이미 쓰이는 코드입니다</div>
+  <div class="ov">
+    <div class="dlg" data-el="1"><!-- 폭 560. 입력 셋이라 넓힐 이유가 없다 -->
+      <div class="dh">프로젝트 초기화<span class="x" data-el="3.3">✕</span></div>
+      <div class="db">
+        <div class="ban err" data-el="5">push 실패: 권한 없음 (403). 만들던 작업물은 버렸습니다. 저장소 권한을 확인하세요.</div>
+        <div class="form" data-el="2"><!-- 입력 넷을 상자 하나로 -->
+          <label>저장소 주소</label>
+          <input class="in m" data-el="2.1" placeholder="https://github.com/owner/repo">
+          <div class="hint">싱크독이 이 저장소에 쓰기 권한이 있어야 합니다</div>
 
-    <label>이름</label>
-    <input class="inp wide" data-el="2.3" placeholder="에어데이터">
+          <label>프로젝트 코드</label>
+          <input class="in m" data-el="2.2" placeholder="AIRD" style="width:140px">
+          <div class="hint">영문 대문자 4자 이내. 문서 ID 앞부분이 됩니다 — 예: <code>AIRD-PRD-001</code></div>
+          <div class="err" data-el="2.4">이미 쓰이는 코드입니다</div>
 
-    <label class="chk"><input type="checkbox" data-el="2.6"> 저장소가 없으면 새로 만든다 <span class="lbl">(공개로 만들어집니다)</span></label>
+          <label>이름</label>
+          <input class="in" data-el="2.3" placeholder="에어데이터">
 
-    <div class="willcommit" data-el="2.5">
-      <b>커밋될 것</b>
-      <div class="mono">docs/specs/_templates/ · 12개</div>
-      <div class="mono">docs/specs/{01-RFQ, 02-PRD, … , 11-CODE}/</div>
-      <div class="mono">docs/specs/assets/</div>
+          <label class="chk"><input type="checkbox" data-el="2.6"> 저장소가 없으면 새로 만든다 <span class="lbl">(공개로 만들어집니다)</span></label>
+
+          <div class="will" data-el="2.5">
+            <b>커밋될 것</b>
+            <span class="m">docs/specs/_templates/ · 12개</span>
+            <span class="m">docs/specs/{01-RFQ, 02-PRD, … , 11-CODE}/</span>
+            <span class="m">docs/specs/assets/</span>
+          </div>
+        </div>
+      </div>
+      <div class="df"><span class="sp"></span><span class="b" data-el="3.2">취소</span><span class="b solid" data-el="3.1">초기화</span></div>
     </div>
   </div>
 </div>
-<div class="dfoot">
-  <span class="grow"></span>
-  <span class="btn" data-el="3.2">취소</span>
-  <span class="btn solid" data-el="3.1">초기화</span>
-</div>
-</div>
 
-<div class="dialog" data-el="4">
-  <div class="dhead">기존 명세 발견</div>
-  <div class="dbody">
-    이 저장소에 이미 <code>docs/specs/</code>가 있습니다. 문서 12개.
-    덮어쓰지 않고 그대로 가져와 등록할까요?
-    <div class="dacts"><span class="btn" data-el="4.2">취소</span> <span class="btn" data-el="4.1" style="font-weight:600">가져와서 등록</span></div>
+<div class="var">기존 명세 발견 — 저장소에 docs/specs/가 이미 있을 때 초기화 위에 한 겹 더 뜬다</div>
+<div class="sd h" style="min-height:300px">
+  <div class="ov" style="padding-top:40px">
+    <div class="dlg found" data-el="4" style="width:480px">
+      <div class="dh">기존 명세 발견</div>
+      <div class="db">이 저장소에 이미 <code class="m">docs/specs/</code>가 있습니다. 문서 <b>12개</b>.<br>덮어쓰지 않고 그대로 가져와 등록할까요?</div>
+      <div class="df"><span class="sp"></span><span class="b" data-el="4.2">취소</span><span class="b solid" data-el="4.1">가져와서 등록</span></div>
+    </div>
   </div>
 </div>
-
-<div class="banner err" data-el="5">push 실패: 권한 없음 (403). 만들던 작업물은 버렸습니다. 저장소 권한을 확인하세요.</div>
 ```
 
 ### 요소
@@ -1389,43 +1328,109 @@ status: approved
 ### 배치
 
 ```html
-<div class="phead" data-el="1">
-  <div>
-    <div class="crumbs"><a href="/p/SYNC"><b class="mono">[SYNC]</b> 싱크독</a><span class="sep">›</span><span>참조 그래프</span></div>
-    <b>참조 그래프</b>
-  </div>
-  <span class="grow"></span>
-  <span class="lbl" data-el="1.1">SYNC · 문서 21 · 항목 339 · 참조 949</span>
-</div>
+<style>
+  .pg{padding:22px 26px 26px;display:flex;flex-direction:column;gap:14px;flex:1}
+  .phead{display:flex;align-items:flex-end;gap:10px}
+  .crumbs{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink3);margin-bottom:3px}
+  .crumbs .sep{color:var(--mute);font-size:12px}
+  .gcard{flex:1;display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .gbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--sub);font-size:13px}
+  .gbar .vsep{width:1px;height:16px;background:var(--line2);margin:0 4px}
+  /* 캔버스 — 열 간격 150 · 노드 118×26 · 행 간격 40 · 여백 18. 안에서 스크롤 */
+  .canvas{flex:1;overflow:auto;position:relative;background:#fff}
+  .inner{position:relative;width:1668px;height:270px}
+  .colh{position:absolute;top:12px;width:118px;text-align:center;font:600 11px var(--mono);color:var(--dim);border-bottom:1px solid var(--line);padding-bottom:4px}
+  .node{position:absolute;width:118px;height:26px;display:flex;align-items:center;padding:0 8px;border:1px solid var(--line2);border-radius:5px;background:#fff;font:12px var(--mono);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:1}
+  .node.focus{border-color:var(--ink);box-shadow:0 3px 10px rgba(23,24,28,.18)}
+  .node.iso{border-style:dashed;color:var(--dim)}
+  .edges{position:absolute;inset:0;width:1668px;height:270px}
+  .edges .e{fill:none;stroke:var(--edge);stroke-width:1.2;marker-end:url(#ah)}
+  .edges .e.back{stroke:var(--back);stroke-width:1.4;stroke-dasharray:5 3;marker-end:url(#ahr)}
+  .edges .e.gone{stroke:var(--warn);stroke-width:1.6;stroke-dasharray:3 3;marker-end:url(#ahb)}
+  .glegend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;padding:8px 14px;border-top:1px solid var(--hair);background:var(--sub);font-size:12.5px;color:var(--ink3)}
+  .glegend span{display:inline-flex;align-items:center;gap:5px}
+  .glegend .back{color:var(--back)}
+  .glegend .gone{color:var(--warn)}
+  .glegend svg{width:22px;height:8px}
+  .glegend svg path{fill:none;stroke:var(--edge);stroke-width:1}
+  .glegend svg path.back{stroke:var(--back);stroke-dasharray:4 3}
+  .glegend svg path.gone{stroke:var(--warn);stroke-dasharray:3 3}
+</style>
+<div class="sd">
+  <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb">설정</span><span class="tb">로그아웃</span></div>
+  <div class="pg">
+    <div class="phead" data-el="1">
+      <div>
+        <div class="crumbs"><span><span class="m bd">[SYNC]</span> 싱크독</span><span class="sep">›</span><span>참조 그래프</span></div>
+        <span class="h1">참조 그래프</span>
+      </div>
+      <span class="sp"></span>
+      <span class="lbl" data-el="1.1">SYNC · 문서 21 · 항목 339 · 참조 949</span>
+    </div>
 
-<div class="gcard">
-  <div class="gbar" data-el="2">
-    <span class="lbl">범위</span>
-    <span class="btn on" data-el="2.1">전체</span>
-    <span class="btn" data-el="2.2">완료만</span>
-    <span class="sep"></span>
-    <span class="lbl" data-el="2.4">노드에 마우스를 올려 그 항목만 보기</span>
-    <span class="grow"></span>
-    <span class="btn" data-el="2.5">전체보기</span>
-  </div>
+    <div class="gcard">
+      <div class="gbar" data-el="2">
+        <span class="lbl">범위</span>
+        <span class="b sm on" data-el="2.1">전체</span>
+        <span class="b sm" data-el="2.2">완료만</span>
+        <span class="vsep"></span>
+        <span class="lbl" data-el="2.4">PRD-001#R1 — 상위 1 · 하위 4</span>
+        <span class="sp"></span>
+        <span class="b sm" data-el="2.5">전체보기</span>
+      </div>
 
-  <div class="canvas" data-el="3">
-    <div class="colh">1 RFQ</div><div class="colh">2 PRD</div><div class="colh">3 SCN</div><div class="colh">…</div>
-    <div class="node" data-el="3.1"><span class="nlabel">RFQ-001#Q1</span></div>
-    <div class="node"><span class="nlabel">PRD-001#R1</span></div>
-    <div class="node iso" data-el="3.5"><span class="nlabel">◌ PRD-001#R11</span></div>
-    <svg class="edges">
-      <path class="e" data-el="3.2"></path>
-      <path class="e back" data-el="3.3"></path>
-      <path class="e gone" data-el="3.4"></path>
-    </svg>
-  </div>
+      <div class="canvas" data-el="3">
+        <div class="inner">
+          <div class="colh" style="left:18px">1 RFQ</div><div class="colh" style="left:168px">2 PRD</div><div class="colh" style="left:318px">3 SCN</div><div class="colh" style="left:468px">4 UC</div><div class="colh" style="left:618px">5 INFRA</div><div class="colh" style="left:768px">6 DOM</div><div class="colh" style="left:918px">7 UI</div><div class="colh" style="left:1068px">8 API</div><div class="colh" style="left:1218px">9 SEQ</div><div class="colh" style="left:1368px">10 MS</div><div class="colh" style="left:1518px">11 CODE</div>
 
-  <div class="glegend lbl" data-el="4">
-    <span>노드 = 항목 · 열 = 11단계</span> <span>─ 참조 (하위 → 상위)</span>
-    <span class="back">┈ 되돌아오는 참조</span> <span class="gone">┈ 미존재 참조</span> <span>◌ 고립 (참조 없음)</span>
-    <span class="grow"></span>
-    <span>노드에 마우스를 올리면 그 항목의 참조만 남는다 · 클릭 → 11단계 흐름</span>
+          <svg class="edges">
+            <defs>
+              <marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#8f8b83"/></marker>
+              <marker id="ahr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#b8860b"/></marker>
+              <marker id="ahb" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#b8342a"/></marker>
+            </defs>
+            <path class="e" d="M168,61 C156,61 150,61 138,61"/>
+            <path class="e" data-el="3.2" d="M468,61 C400,61 360,61 288,61"/>
+            <path class="e" d="M468,101 C400,101 360,61 288,61"/>
+            <path class="e" d="M768,61 C620,61 440,61 288,61"/>
+            <path class="e" d="M918,61 C800,61 700,101 588,101"/>
+            <path class="e" d="M1068,101 C900,101 760,61 588,61"/>
+            <path class="e" d="M318,61 C306,61 300,101 288,101"/>
+            <path class="e" d="M1218,101 C1206,101 1200,101 1188,101"/>
+            <path class="e" d="M1368,141 C1200,141 1050,101 888,101"/>
+            <path class="e" d="M1518,141 C1506,141 1500,141 1488,141"/>
+            <path class="e back" data-el="3.3" d="M886,101 L906,101 Q914,101 914,109 L914,228 Q914,236 922,236 L1052,236 Q1060,236 1060,228 L1060,109 Q1060,101 1068,101"/>
+            <path class="e gone" data-el="3.4" d="M168,101 L146,101"/>
+          </svg>
+
+          <div class="node" style="left:18px;top:48px">RFQ-001#Q1</div>
+          <div class="node" style="left:18px;top:128px">RFQ-001#Q3</div>
+          <div class="node focus" data-el="3.1" style="left:168px;top:48px">PRD-001#R1</div>
+          <div class="node" style="left:168px;top:88px">PRD-001#R2</div>
+          <div class="node iso" data-el="3.5" style="left:168px;top:168px">◌ PRD-001#R11</div>
+          <div class="node" style="left:318px;top:48px">SCN-001#S1</div>
+          <div class="node" style="left:468px;top:48px">UC-001#UC-A6</div>
+          <div class="node" style="left:468px;top:88px">UC-001#UC-H2</div>
+          <div class="node" style="left:768px;top:48px">DOM-001#Document</div>
+          <div class="node" style="left:768px;top:88px">DOM-002#SpecService</div>
+          <div class="node" style="left:918px;top:48px">UI-002#UI-5</div>
+          <div class="node" style="left:1068px;top:88px">API-002#get_document</div>
+          <div class="node" style="left:1218px;top:88px">SEQ-001#SEQ-1</div>
+          <div class="node" style="left:1368px;top:128px">MS-002#SpecService.save</div>
+          <div class="node" style="left:1518px;top:128px">CODE-001#V</div>
+        </div>
+      </div>
+
+      <div class="glegend" data-el="4">
+        <span>노드 = 항목 · 열 = 11단계</span>
+        <span><svg><path d="M0,4 L22,4"/></svg>참조 (하위 → 상위)</span>
+        <span class="back"><svg><path class="back" d="M0,4 L22,4"/></svg>되돌아오는 참조</span>
+        <span class="gone"><svg><path class="gone" d="M0,4 L22,4"/></svg>미존재 참조</span>
+        <span>◌ 고립 (참조 없음)</span>
+        <span class="sp"></span>
+        <span>노드에 마우스를 올리면 그 항목의 참조만 남는다 · 클릭 → 11단계 흐름</span>
+      </div>
+    </div>
   </div>
 </div>
 ```
@@ -1496,35 +1501,66 @@ status: approved
 ### 배치
 
 ```html
-<!-- 단계 레일은 전폭 서브바다. 제목은 여기가 아니라 본문 머리에 있다 -->
-<div class="steprail" data-el="1">
-  <a class="back" href="/p/SYNC">← 싱크독</a>
-  <div class="steps" data-el="2">
-    <span class="stp"><span class="no">1</span> RFQ<i class="dot dot-approved"></i></span><span class="stp"><span class="no">2</span> PRD<i class="dot dot-approved"></i></span><span class="stp cur"><span class="no">3</span> SCN<i class="dot dot-review"></i></span><span class="stp"><span class="no">4</span> UC<i class="dot dot-draft"></i></span><span class="stp na"><span class="no">5</span> INFRA<i class="dot dot-none"></i></span>
-  </div>
-</div>
-
-<div class="readbody">
-  <div class="banner" data-el="3">이 단계에 완료된 문서가 없습니다. <b>SYNC-SCN-001</b>은 <b>초안</b>입니다. <span class="btn sm" data-el="3.1">초안 보기</span></div>
-
-  <article class="main" data-el="4">
-    <div class="dochead">
-      <div class="kicker mono" data-el="4.1">싱크독 · 3/11 · SYNC-SCN-001 · 초안 v4</div>
-      <h1>사용자 시나리오 — 싱크독</h1>
-      <p class="lead">누가 어떤 상황에서 싱크독을 쓰는지. 여기서 정한 시나리오가 유스케이스의 근거가 된다.</p>
+<style>
+  /* 단계 레일 — 전폭 서브바. 가로로만 넘친다 */
+  .rail{flex:none;display:flex;align-items:center;gap:9px;padding:11px 22px;background:#fff;border-bottom:1px solid var(--line);overflow:hidden;white-space:nowrap}
+  .rail .back{font-size:13.5px;color:var(--ink3);margin-right:6px}
+  .steps{display:flex;gap:4px}
+  .rb{flex:1;overflow:hidden;padding:22px 0 30px}
+  .colw{width:760px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+  .art{background:#fff;border:1px solid var(--line);border-radius:8px;padding:26px 30px 30px;font-size:14.5px;line-height:1.7;color:var(--ink2)}
+  .art .kick{font-size:12px;color:var(--ink3);letter-spacing:.3px}
+  .art h1{margin:4px 0 0;font-size:27px;font-weight:600;letter-spacing:-.4px;line-height:1.25;color:var(--ink)}
+  .art .lead{margin:6px 0 18px;font-size:15px;color:var(--ink3);line-height:1.65}
+  .art h2{margin:16px 0 6px;font-size:16.5px;font-weight:600;padding-bottom:4px;border-bottom:1px solid var(--line);color:var(--ink)}
+  .art p{margin:4px 0}
+  .art .item{display:flex;align-items:center;gap:8px;margin:10px 0 2px;font-size:15px;font-weight:600;color:var(--ink)}
+  .docnav{display:flex;align-items:center;gap:10px}
+</style>
+<div class="sd">
+  <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb">설정</span><span class="tb">로그아웃</span></div>
+  <div class="rail" data-el="1">
+    <a class="back">← <span class="m bd">[SYNC]</span> 싱크독</a>
+    <div class="steps" data-el="2">
+      <span class="stp"><span class="no">1</span>RFQ<i class="dot ok"></i></span>
+      <span class="stp"><span class="no">2</span>PRD<i class="dot ok"></i></span>
+      <span class="stp cur"><span class="no">3</span>SCN<i class="dot"></i></span>
+      <span class="stp"><span class="no">4</span>UC<i class="dot ok"></i></span>
+      <span class="stp"><span class="no">5</span>INFRA<i class="dot ok"></i></span>
+      <span class="stp"><span class="no">6</span>DOM<i class="dot ok"></i></span>
+      <span class="stp"><span class="no">7</span>UI<i class="dot"></i></span>
+      <span class="stp"><span class="no">8</span>API<i class="dot"></i></span>
+      <span class="stp"><span class="no">9</span>SEQ<i class="dot"></i></span>
+      <span class="stp"><span class="no">10</span>MS<i class="dot"></i></span>
+      <span class="stp na"><span class="no">11</span>CODE<i class="dot none"></i></span>
     </div>
-    <h2>1. 페르소나</h2>
-    <p>박호영 — 디포커스 AI팀 개발자. 싱크독을 만들었고 자기 프로젝트에도 쓴다…</p>
-    <h2>2. 시나리오</h2>
-    <p>S1 대화하다가 명세가 쌓인다 …</p>
-  </article>
+  </div>
 
-  <!-- 이동 줄은 본문 밖. 안에 넣으면 문서의 일부처럼 읽힌다 -->
-  <div class="docnav" data-el="5">
-    <span class="btn" data-el="5.1">← 2 PRD</span>
-    <span class="btn" data-el="5.3">이 문서 열기</span>
-    <span class="grow"></span>
-    <span class="btn solid" data-el="5.2">4 USECASE →</span>
+  <div class="rb">
+    <div class="colw">
+      <div class="ban note" data-el="3">이 단계에 완료된 문서가 없습니다. <span class="m bd">SYNC-SCN-001</span>은 <b>초안</b>입니다.<span class="sp"></span><span class="b sm" data-el="3.1">초안 보기</span></div>
+
+      <article class="art" data-el="4">
+        <div class="kick" data-el="4.1"><span class="m">[SYNC]</span> 싱크독 · 3/11 · <span class="m">SYNC-SCN-001</span> · 초안 v4</div>
+        <h1>사용자 시나리오 — 싱크독</h1>
+        <p class="lead">누가 어떤 상황에서 싱크독을 쓰는지. 여기서 정한 시나리오가 유스케이스의 근거가 된다.</p>
+        <h2>1. 페르소나</h2>
+        <div class="item"><span class="idb">P1</span>혼자 만드는 개발자</div>
+        <p>박호영 — 싱크독을 만들었고 자기 프로젝트에도 쓴다. PM이 없고, 명세는 에이전트와 대화하며 쌓인다.</p>
+        <h2>2. 시나리오</h2>
+        <div class="item"><span class="idb">S1</span>대화하다가 명세가 쌓인다</div>
+        <p>에이전트에게 요구를 말하면 <span class="ref">[[SYNC-PRD-001#R1]]</span>처럼 항목이 생기고, 웹에서 읽어 완료로 올린다.</p>
+        <div class="item"><span class="idb">S2</span>끊어진 곳을 잡는다</div>
+        <p>상위 항목이 사라지면 프로젝트 상세의 수치가 알려 준다. 알림은 없다.</p>
+      </article>
+
+      <div class="docnav" data-el="5">
+        <span class="b" data-el="5.1">← 2 PRD</span>
+        <span class="b" data-el="5.3">이 문서 열기</span>
+        <span class="sp"></span>
+        <span class="b solid" data-el="5.2">4 UC →</span>
+      </div>
+    </div>
   </div>
 </div>
 ```
@@ -1585,56 +1621,89 @@ status: approved
 ### 배치
 
 ```html
-<div class="dialog setdlg" data-el="1"><!-- 폭 620px. 카드 넷이 드는 폭이다 -->
-  <div class="dhead"><span>설정</span><span class="grow"></span><span class="x" data-el="7">✕</span></div>
-  <div class="dbody">
+<style>
+  .pg{padding:24px 26px}
+  .phead{display:flex;align-items:flex-end;gap:10px;margin-bottom:16px}
+  .ghost{height:120px;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .dlg.set{width:620px}
+  .dlg.set .db{background:var(--sub);padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+  .card .ch .lbl{font-weight:400}
+  .card .desc{margin:6px 0 4px;font-size:13px;color:var(--ink3);line-height:1.6}
+  .row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--hair)}
+  .row:last-child{border-bottom:none}
+  .row .two{display:flex;flex-direction:column;gap:1px;min-width:0;font-size:13.5px}
+  .row .two .m{font-size:12px;color:var(--ink3)}
+  .row.dim{opacity:.55}
+  .row .in{flex:1}
+  .tokbox{margin:8px 0;padding:10px 12px;background:var(--note);border:1px solid var(--id);border-radius:6px;font-size:13px}
+  .tokbox b{display:block;margin-bottom:6px;color:var(--noteink)}
+  .tokbox .tok{font:13.5px var(--mono);background:#fff;border:1px solid var(--line);border-radius:5px;padding:8px 10px;margin-bottom:8px;word-break:break-all}
+  .adm{margin-top:8px;padding:10px 12px;border:1px dashed var(--line2);border-radius:6px;color:var(--mute);font-size:12.5px}
+</style>
+<div class="sd" style="min-height:1000px">
+  <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb on">설정</span><span class="tb">로그아웃</span></div>
+  <div class="pg"><div class="phead"><span class="h1">프로젝트</span><span class="lbl">4개</span><span class="sp"></span><span class="b solid">+ 프로젝트 초기화</span></div><div class="ghost"></div></div>
 
-    <!-- 토큰이 맨 위다. 이 화면에 오는 이유가 토큰이라서 -->
-    <section class="card" data-el="3">
-      <div class="cardh"><b>MCP 토큰</b><span class="grow"></span><span class="btn sm solid" data-el="3.4">+ 발급</span></div>
-      <p class="lbl">에이전트가 싱크독에 붙을 때 씁니다. 남에게 주면 그 사람 작업이 내 이름으로 남습니다.</p>
-      <div class="row"><input class="inp wide" data-el="3.3" placeholder="이름 — 예: Gemini 노트북"><span class="btn sm solid">발급</span></div>
-      <div class="tokbox" data-el="4">
-        <b>한 번만 보입니다. 지금 복사하세요.</b>
-        <div class="tok" data-el="4.1">syncdoc_pat_7f3a…c91e</div>
-        <span class="btn sm" data-el="4.2">복사</span>
-      </div>
-      <div class="row" data-el="3.1">
-        <span class="two"><b>Claude Code 노트북</b><span class="lbl mono">발급 2026-09-01</span></span>
-        <span class="grow"></span> <span class="lbl" data-el="3.5">마지막 사용 12분 전</span> <span class="btn sm danger" data-el="3.2">폐기</span>
-      </div>
-      <div class="row dimrow"><span class="two"><b>테스트용</b><span class="lbl mono">발급 2026-08-28 · <s>폐기됨 2026-09-02</s></span></span></div>
-    </section>
+  <div class="ov" style="padding-top:40px">
+    <div class="dlg set" data-el="1"><!-- 폭 620. 카드 넷이 드는 폭 -->
+      <div class="dh">설정<span class="x" data-el="7">✕</span></div>
+      <div class="db">
 
-    <section class="card" data-el="8">
-      <div class="cardh"><b>클라이언트 설정</b></div>
-      <p class="lbl">Claude Code · Codex · Gemini CLI가 같은 엔드포인트를 씁니다.</p>
-      <pre class="snippet" data-el="8.1">{
+        <!-- 토큰이 맨 위다. 이 화면에 오는 이유가 토큰이라서 -->
+        <section class="card" data-el="3">
+          <div class="ch">MCP 토큰<span class="sp"></span><span class="b sm solid" data-el="3.4">+ 발급</span></div>
+          <div class="cb">
+            <p class="desc">에이전트가 싱크독에 붙을 때 씁니다. 남에게 주면 그 사람 작업이 내 이름으로 남습니다.</p>
+            <div class="row"><input class="in" data-el="3.3" placeholder="이름 — 예: Gemini 노트북"><span class="b sm solid">발급</span></div>
+            <div class="tokbox" data-el="4">
+              <b>한 번만 보입니다. 지금 복사하세요.</b>
+              <div class="tok" data-el="4.1">syncdoc_pat_7f3a9c2e1b4d8f6a0e5c7b9d2a1f4e6c8b3d5a7f9e1c3b5d7a9f2e4c6b8d0a1c91e</div>
+              <span class="b sm" data-el="4.2">복사</span>
+            </div>
+            <div class="row" data-el="3.1">
+              <span class="two"><b>Claude Code 노트북</b><span class="m">발급 2026-09-01</span></span>
+              <span class="sp"></span><span class="cap" data-el="3.5">마지막 사용 12분 전</span><span class="b sm danger" data-el="3.2">폐기</span>
+            </div>
+            <div class="row"><span class="two"><b>Gemini 노트북</b><span class="m">발급 2026-09-20</span></span><span class="sp"></span><span class="cap">마지막 사용 없음</span><span class="b sm danger">폐기</span></div>
+            <div class="row dim"><span class="two"><b>테스트용</b><span class="m">발급 2026-08-28 · <s>폐기됨 2026-09-02</s></span></span></div>
+          </div>
+        </section>
+
+        <section class="card" data-el="8">
+          <div class="ch">클라이언트 설정</div>
+          <div class="cb">
+            <p class="desc">Claude Code · Codex · Gemini CLI가 같은 엔드포인트를 씁니다.</p>
+            <pre class="snip" data-el="8.1">{
   "mcpServers": {
     "syncdoc": {
-      "url": "https://…/mcp",
+      "url": "https://syncdoc.example.dev/mcp",
       "headers": { "Authorization": "Bearer syncdoc_pat_…" }
     }
   }
 }</pre>
-    </section>
+          </div>
+        </section>
 
-    <section class="card" data-el="5">
-      <div class="cardh"><b>관리</b> <span class="lbl">인덱스 재구축 · 저장소 동기화</span><span class="grow"></span><span class="btn sm" data-el="5.1">열기</span></div>
-      <div class="admin" data-el="6"><!-- UI-14 --></div>
-    </section>
+        <section class="card" data-el="5">
+          <div class="ch">관리<span class="lbl">인덱스 재구축 · 저장소 동기화 · 해제</span><span class="sp"></span><span class="b sm" data-el="5.1">열기</span></div>
+          <div class="cb"><div class="adm" data-el="6">접혀 있습니다 — 열기를 누르면 여기에 관리 영역(UI-14)이 펼쳐집니다</div></div>
+        </section>
 
-    <!-- 계정은 맨 아래. 로그아웃은 상단 바에도 있다 -->
-    <section class="card" data-el="2">
-      <div class="cardh"><b>내 계정</b></div>
-      <div class="row"><span data-el="2.1">HoyoungParkme</span> <span class="lbl">GitHub · 박호영</span><span class="grow"></span><span class="btn sm" data-el="2.2">로그아웃</span></div>
-      <p class="lbl">커밋 이메일 — GitHub에서 바로 push한 커밋을 내 계정으로 잇습니다. 등록 뒤 관리에서 인덱스 재구축을 한 번 돌리세요.</p>
-      <div class="row" data-el="2.3"><span class="mono">you@example.com</span><span class="grow"></span><span class="btn sm danger" data-el="2.4">삭제</span></div>
-      <div class="row"><input class="inp wide" data-el="2.5" placeholder="you@example.com"><span class="btn sm" data-el="2.6">추가</span></div>
-    </section>
+        <!-- 계정은 맨 아래. 로그아웃은 상단 바에도 있다 -->
+        <section class="card" data-el="2">
+          <div class="ch">내 계정</div>
+          <div class="cb">
+            <div class="row"><b data-el="2.1">HoyoungParkme</b><span class="cap">GitHub · 박호영</span><span class="sp"></span><span class="b sm" data-el="2.2">로그아웃</span></div>
+            <p class="desc">커밋 이메일 — GitHub에서 바로 push한 커밋을 내 계정으로 잇습니다. 등록 뒤 관리에서 인덱스 재구축을 한 번 돌리세요.</p>
+            <div class="row" data-el="2.3"><span class="m">hoyoung@example.com</span><span class="sp"></span><span class="b sm danger" data-el="2.4">삭제</span></div>
+            <div class="row"><input class="in m" data-el="2.5" placeholder="you@example.com"><span class="b sm" data-el="2.6">추가</span></div>
+          </div>
+        </section>
 
+      </div>
+      <div class="df"><span class="sp"></span><span class="b solid" data-el="9">닫기</span></div>
+    </div>
   </div>
-  <div class="dfoot"><span class="grow"></span><span class="btn solid" data-el="9">닫기</span></div>
 </div>
 ```
 
@@ -1721,32 +1790,93 @@ status: approved
 ### 배치
 
 ```html
-<!-- UI-13 다이얼로그 안 관리 카드(6)를 펼친 모습 -->
-<div class="adminh" data-el="1"><span class="lbl">위험한 동작이 있습니다</span></div>
+<style>
+  .dlg.set{width:620px}
+  .dlg.set .db{background:var(--sub);padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+  .card .ch .lbl{font-weight:400}
+  .card.fold{opacity:.6}
+  .adminh{margin:6px 0 8px;font-size:12.5px;color:var(--warn)}
+  .vers{display:flex;flex-direction:column;font-size:12.5px;background:#fff;border:1px solid var(--line);border-radius:6px}
+  .vr{display:grid;grid-template-columns:140px 96px 112px 62px minmax(0,1fr);gap:0 6px;align-items:center;padding:7px 8px;border-bottom:1px solid var(--hair);white-space:nowrap}
+  .vr:last-child{border-bottom:none}
+  .vr.hd{background:var(--sub);color:var(--ink3);font-weight:600;font-size:12px;border-bottom:1px solid var(--line);border-radius:6px 6px 0 0}
+  .vr .repo{overflow:hidden;text-overflow:ellipsis;color:var(--ink3)}
+  .vr .acts{display:flex;justify-content:flex-end;gap:4px}
+  .vr .acts .b.sm{padding:0 7px}
+  .st{display:inline-block;padding:0 7px;border-radius:9px;font-size:11.5px;font-weight:600;line-height:1.7;white-space:nowrap}
+  .st.ok{background:var(--ok);color:#fff}
+  .st.behind{background:var(--warnbg);color:var(--warn)}
+  .st.na{color:var(--mute);border:1px dashed var(--line2)}
+  .res{margin-top:12px;border:1px solid var(--line);border-radius:6px;background:#fff}
+  .res h4{margin:0;padding:7px 10px;background:var(--sub);border-bottom:1px solid var(--line);font-size:12.5px;font-weight:600;border-radius:6px 6px 0 0}
+  .res h4 .cap{font-weight:400;margin-left:6px}
+  .res div{padding:7px 10px;border-bottom:1px solid var(--hair);font-size:13px}
+  .res div:last-child{border-bottom:none}
+</style>
+<div class="sd" style="min-height:720px">
+  <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb on">설정</span><span class="tb">로그아웃</span></div>
+  <div class="ov" style="padding-top:40px">
+    <div class="dlg set"><!-- UI-13 다이얼로그 안 관리 카드(6)를 펼친 모습. 다른 카드는 접힌 채로 흐리게 -->
+      <div class="dh">설정<span class="x">✕</span></div>
+      <div class="db">
+        <section class="card fold"><div class="ch">MCP 토큰<span class="sp"></span><span class="b sm solid">+ 발급</span></div><div class="cb"><span class="cap">토큰 2개 · 폐기 1개</span></div></section>
+        <section class="card fold"><div class="ch">클라이언트 설정</div><div class="cb"><span class="cap">MCP 설정 JSON</span></div></section>
 
-<div class="adminbody">
-  <table class="vers" data-el="2">
-    <tr><th>프로젝트</th><th>저장소</th><th>마지막 처리 커밋</th><th>동기화</th><th></th></tr>
-    <tr data-el="2.1"><td><b class="mono">[SYNC]</b> 싱크독</td><td class="lbl">dfocus/syncdoc</td><td><span class="mono" data-el="2.2">a1b2c3d</span> <span class="lbl">1시간 전</span></td><td data-el="2.3"><span class="st ok">최신</span></td><td><span class="btn sm" data-el="3">인덱스 재구축</span> <span class="btn sm danger" data-el="7">해제</span></td></tr>
-    <tr><td><b class="mono">[DBA]</b> 데이터베이스 관리</td><td class="lbl">dfocus/dba-ax</td><td><span class="mono">9e8f7a6</span> <span class="lbl">3일 전</span></td><td><span class="st behind">밀림 2</span></td><td><span class="btn sm">인덱스 재구축</span> <span class="btn sm danger">해제</span></td></tr>
-    <tr><td><b class="mono">[AIRD]</b> 에어데이터</td><td class="lbl">dfocus/airdata</td><td><span class="mono">—</span></td><td><span class="st na">문서 없음</span></td><td><span class="btn sm">인덱스 재구축</span> <span class="btn sm danger">해제</span></td></tr>
-  </table>
+        <section class="card">
+          <div class="ch">관리<span class="lbl">인덱스 재구축 · 저장소 동기화 · 해제</span><span class="sp"></span><span class="b sm">접기</span></div>
+          <div class="cb">
+            <div class="adminh" data-el="1">위험한 동작이 있습니다</div>
+            <div class="vers" data-el="2">
+              <div class="vr hd"><span>프로젝트</span><span>저장소</span><span>마지막 처리 커밋</span><span>동기화</span><span></span></div>
+              <div class="vr" data-el="2.1">
+                <span><span class="m bd">[SYNC]</span> 싱크독</span>
+                <span class="repo m">dfocus/syncdoc</span>
+                <span><span class="m" data-el="2.2">a1b2c3d</span> <span class="cap">1시간 전</span></span>
+                <span data-el="2.3"><span class="st ok">최신</span></span>
+                <span class="acts"><span class="b sm" data-el="3">인덱스 재구축</span><span class="b sm danger" data-el="7">해제</span></span>
+              </div>
+              <div class="vr">
+                <span><span class="m bd">[DBA]</span> 데이터베이스 관리</span>
+                <span class="repo m">dfocus/dba-ax</span>
+                <span><span class="m">9e8f7a6</span> <span class="cap">3일 전</span></span>
+                <span><span class="st behind">밀림 2</span></span>
+                <span class="acts"><span class="b sm">인덱스 재구축</span><span class="b sm danger">해제</span></span>
+              </div>
+              <div class="vr">
+                <span><span class="m bd">[AIRD]</span> 에어데이터</span>
+                <span class="repo m">dfocus/airdata</span>
+                <span><span class="m">—</span></span>
+                <span><span class="st na">문서 없음</span></span>
+                <span class="acts"><span class="b sm">인덱스 재구축</span><span class="b sm danger">해제</span></span>
+              </div>
+            </div>
 
-  <div class="dialog" data-el="4">
-    <div class="dhead">SYNC 인덱스 재구축</div>
-    <div class="dbody">
-      저장소의 모든 MD를 다시 읽어 참조 관계와 버전 목록을 처음부터 만듭니다. 문서가 많으면 몇 분 걸립니다.
-      <!-- 해제(7)일 때는 머리가 「SYNC 싱크독에서 해제」, 본문이 「등록과 작업 사본을 지웁니다」이고 아래 안내(4.3)가 붙는다. 다이얼로그는 하나다 -->
-      <div class="banner warn" data-el="4.3"><b>GitHub 저장소는 그대로 남습니다</b> — 다시 등록하면 문서와 이력이 git에서 복원됩니다</div>
-      <div class="dacts"><span class="btn" data-el="4.2">취소</span> <span class="btn" data-el="4.1" style="font-weight:600">재구축</span></div>
+            <div class="res" data-el="5">
+              <h4>재구축 결과<span class="cap">SYNC · 방금</span></h4>
+              <div data-el="5.1">문서 9 · 항목 87 · 참조 142 · 버전 41</div>
+              <div data-el="5.2">규약 오류 1 — <span class="m bd">SYNC-UC-001</span> frontmatter.status 누락</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card fold"><div class="ch">내 계정</div><div class="cb"><span class="cap">HoyoungParkme · 커밋 이메일 1개</span></div></section>
+      </div>
+      <div class="df"><span class="sp"></span><span class="b solid">닫기</span></div>
     </div>
   </div>
+</div>
 
-  <section class="grp" data-el="5">
-    <h4>재구축 결과 <span class="lbl">SYNC · 방금</span></h4>
-    <div class="row"><span data-el="5.1">문서 9 · 항목 87 · 참조 142 · 버전 41</span></div>
-    <div class="row"><span data-el="5.2">규약 오류 1 — <b>SYNC-UC-001</b> frontmatter.status 누락</span></div>
-  </section>
+<div class="var">재구축 확인(4) — 설정 위에 한 겹 더 뜬다. 해제(7)일 때는 머리가 「SYNC 싱크독에서 해제」이고 안내(4.3)가 붙는다. 다이얼로그는 하나다</div>
+<div class="sd h" style="min-height:300px">
+  <div class="ov" style="padding-top:36px">
+    <div class="dlg" data-el="4" style="width:480px">
+      <div class="dh">SYNC 인덱스 재구축</div>
+      <div class="db">저장소의 모든 MD를 다시 읽어 참조 관계와 버전 목록을 처음부터 만듭니다. 문서가 많으면 몇 분 걸립니다.
+        <div class="ban note" style="display:block;margin-top:12px" data-el="4.3"><b>GitHub 저장소는 그대로 남습니다</b> — 다시 등록하면 문서와 이력이 git에서 복원됩니다</div>
+      </div>
+      <div class="df"><span class="sp"></span><span class="b" data-el="4.2">취소</span><span class="b solid" data-el="4.1">재구축</span></div>
+    </div>
+  </div>
 </div>
 ```
 
@@ -1813,40 +1943,63 @@ status: approved
 ### 배치
 
 ```html
-<div class="dialog" data-el="1">
-  <div class="dhead">
-    <span data-el="1.1">SYNC-UC-001#UC-A6 — 명세를 작성·수정한다</span>
-    <span class="lbl" data-el="1.2">상위로 3개 · 하위로 5개 이어짐</span>
-    <span class="grow"></span>
-    <span class="x" data-el="5">✕</span>
-  </div>
-  <div class="dbody">
-    <p class="lbl" data-el="2">이 항목이 11단계 체인에서 어디에 있고 어디로 흐르는지. 위는 이 항목이 근거로 삼은 것, 아래는 이 항목을 근거로 삼은 것. 항목을 누르면 그 항목 기준으로 다시 봅니다.</p>
+<style>
+  .pg{padding:22px 26px;display:flex;flex-direction:column;gap:14px;flex:1}
+  .ghost{flex:1;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .dlg.chain{width:720px}
+  .dh .ttl{font-family:var(--mono);font-size:14.5px}
+  .dh .cap{font-weight:400}
+  .lead{margin:0 0 14px;font-size:13.5px;color:var(--ink3);line-height:1.65}
+  .ch3{border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .crow{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px;padding:8px 12px;border-bottom:1px solid var(--hair)}
+  .crow:last-child{border-bottom:none}
+  .crow.cur{background:var(--note)}
+  .crow.empty{background:var(--sub)}
+  .cst{font:12px/1.6 var(--mono);color:var(--ink3)}
+  .cst .role{display:block;font-family:var(--sans);font-size:12.5px}
+  .crow.cur .cst,.crow.cur .cst .role{color:var(--noteink);font-weight:600}
+  .crow.empty .cst{color:var(--mute)}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:12.5px;color:var(--mute)}
+  .chip{display:inline-flex;align-items:center;gap:5px;max-width:320px;padding:2px 8px;border:1px solid var(--line);border-radius:5px;background:#fff;font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chip .m{font-size:12px}
+  .chip.me{border:1.5px solid var(--ink);font-weight:600}
+  .chip.gone{border-style:dashed;color:var(--mute)}
+</style>
+<div class="sd">
+  <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb">설정</span><span class="tb">로그아웃</span></div>
+  <div class="pg"><div style="display:flex;align-items:flex-end;gap:10px"><span class="h1">참조 그래프</span><span class="sp"></span><span class="lbl">SYNC · 문서 21 · 항목 339 · 참조 949</span></div><div class="ghost"></div></div>
 
-    <div class="chain" data-el="3">
-      <div class="crow">
-        <div class="cstage" data-el="3.2">1 RFQ<br><span class="lbl">근거 ↑</span></div>
-        <div class="cchips"><span class="chip" data-el="3.1"><i class="dot dot-approved"></i>RFQ-001#Q1 원본은 누가 읽는가</span></div>
+  <div class="ov" style="padding-top:44px">
+    <div class="dlg chain" data-el="1">
+      <div class="dh">
+        <span class="ttl" data-el="1.1">SYNC-UC-001#UC-A6 — 명세를 작성·수정한다</span>
+        <span class="cap" data-el="1.2">상위로 3개 · 하위로 5개 이어짐</span>
+        <span class="x" data-el="5">✕</span>
       </div>
-      <div class="crow cur">
-        <div class="cstage">4 UC<br><span class="lbl">이 항목</span></div>
-        <div class="cchips"><span class="chip me">UC-001#UC-A6 명세를 작성·수정한다</span></div>
+      <div class="db">
+        <p class="lead" data-el="2">이 항목이 11단계 체인에서 어디에 있고 어디로 흐르는지. 위는 이 항목이 근거로 삼은 것, 아래는 이 항목을 근거로 삼은 것. 항목을 누르면 그 항목 기준으로 다시 봅니다.</p>
+
+        <div class="ch3" data-el="3"><!-- 11단계를 다 나열한다. 항목이 없는 단계도 남긴다 -->
+          <div class="crow"><div class="cst" data-el="3.2">1 RFQ<span class="role">근거 ↑</span></div><div class="chips"><span class="chip" data-el="3.1"><i class="dot ok"></i><span class="m">RFQ-001#Q1</span>원본은 누가 읽는가</span><span class="chip"><i class="dot ok"></i><span class="m">RFQ-001#Q3</span>명세를 어디에 두나</span></div></div>
+          <div class="crow"><div class="cst">2 PRD<span class="role">근거 ↑</span></div><div class="chips"><span class="chip"><i class="dot ok"></i><span class="m">PRD-001#R1</span>에이전트용 원본과 사람용 뷰</span></div></div>
+          <div class="crow empty"><div class="cst">3 SCN</div><div class="chips">이 단계에는 이어지는 항목이 없다</div></div>
+          <div class="crow cur"><div class="cst">4 UC<span class="role">이 항목</span></div><div class="chips"><span class="chip me"><span class="m">UC-001#UC-A6</span>명세를 작성·수정한다</span></div></div>
+          <div class="crow empty"><div class="cst">5 INFRA</div><div class="chips" data-el="3.3">이 단계에는 이어지는 항목이 없다</div></div>
+          <div class="crow"><div class="cst">6 DOM<span class="role">파생 ↓</span></div><div class="chips"><span class="chip"><i class="dot ok"></i><span class="m">DOM-002#SpecService</span>명세 저장</span><span class="chip"><i class="dot ok"></i><span class="m">DOM-001#Document</span>문서</span></div></div>
+          <div class="crow"><div class="cst">7 UI<span class="role">파생 ↓</span></div><div class="chips"><span class="chip"><i class="dot"></i><span class="m">UI-002#UI-5</span>문서 뷰</span></div></div>
+          <div class="crow"><div class="cst">8 API<span class="role">파생 ↓</span></div><div class="chips"><span class="chip"><i class="dot"></i><span class="m">API-002#save_document</span>명세 저장</span></div></div>
+          <div class="crow empty"><div class="cst">9 SEQ</div><div class="chips">이 단계에는 이어지는 항목이 없다</div></div>
+          <div class="crow"><div class="cst">10 MS<span class="role">파생 ↓</span></div><div class="chips"><span class="chip"><i class="dot"></i><span class="m">MS-002#SpecService.save</span>저장</span><span class="chip gone"><span class="m">MS-009#Pipeline.run</span>(없는 항목)</span></div></div>
+          <div class="crow empty"><div class="cst">11 CODE</div><div class="chips">이 단계에는 이어지는 항목이 없다</div></div>
+        </div>
       </div>
-      <div class="crow empty">
-        <div class="cstage">5 INFRA</div>
-        <div class="cchips" data-el="3.3">이 단계에는 이어지는 항목이 없다</div>
-      </div>
-      <div class="crow">
-        <div class="cstage">6 DOM<br><span class="lbl">파생 ↓</span></div>
-        <div class="cchips"><span class="chip">DOM-002#SpecService 명세 저장</span></div>
+      <div class="df">
+        <span>참조는 하위 → 상위로만 적히고, 역방향은 계산된 것이다</span>
+        <span class="sp"></span>
+        <span class="b" data-el="6">닫기</span>
+        <span class="b solid" data-el="4">문서 뷰로 열기</span>
       </div>
     </div>
-  </div>
-  <div class="dfoot">
-    <span class="lbl">참조는 하위 → 상위로만 적히고, 역방향은 계산된 것이다</span>
-    <span class="grow"></span>
-    <span class="btn" data-el="6">닫기</span>
-    <span class="btn solid" data-el="4">문서 뷰로 열기</span>
   </div>
 </div>
 ```
@@ -1909,51 +2062,99 @@ status: approved
 ### 배치
 
 ```html
-<div class="dialog" data-el="1">
-  <div class="dhead"><span>싱크독 사용 방법</span><span class="grow"></span><span class="x" data-el="4">✕</span></div>
-  <div class="dbody">
-    <p class="dlead">개발자가 PM 없이 11단계 명세 체인을 쓰고, 에이전트가 그 명세를 따르게 하는 플랫폼입니다. 쓰는 것은 에이전트, 판단하고 확정하는 것은 웹입니다.</p>
+<style>
+  .pg{padding:22px 26px;display:flex;flex-direction:column;gap:14px;flex:1}
+  .ghost{flex:1;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .dlg.howto{width:660px}
+  .howto .db{padding:18px 20px 10px}
+  .howto .lead{margin:0 0 16px;font-size:14px;color:var(--ink3);line-height:1.7}
+  .howto .st{margin:22px 0 8px;font-size:14px;font-weight:600}
+  .g{display:flex;flex-direction:column;font-size:13.5px;line-height:1.55}
+  .gr{display:grid;grid-template-columns:26px 150px minmax(0,1fr) 80px;gap:0 8px;padding:8px 0;border-bottom:1px solid var(--hair);color:var(--ink2)}
+  .gr:last-child{border-bottom:none}
+  .gr.hd{padding:4px 0;font-size:12.5px;color:var(--dim)}
+  .g.stages .gr{grid-template-columns:26px 56px minmax(0,1fr) 150px}
+  .gr .no{text-align:center;color:var(--dim);font:12px var(--mono);padding-top:2px}
+  .gr .nm{font-weight:600;color:var(--ink)}
+  .gr .where{white-space:nowrap;color:var(--ink3)}
+  .gr .code{font:600 12.5px var(--mono);color:var(--ink);padding-top:2px}
+  .gr .ids{font:12px var(--mono);color:var(--ink3);padding-top:2px}
+  .gr.std{color:var(--dim)}
+  .gr.std .code{color:var(--dim)}
+  .gr code,.howto p code{font:12px var(--mono);background:var(--sub2);padding:0 4px;border-radius:3px}
+  .sub{margin-top:5px;font-size:13px;color:var(--ink3);line-height:1.6}
+  .sub .cnt{display:inline-block;font:600 12px var(--mono);color:var(--ink);background:var(--sub2);border-radius:3px;padding:0 6px;margin-right:5px}
+  .sub .tag{display:inline-block;font:11px/1.5 var(--mono);color:var(--dim);border:1px solid var(--line2);border-radius:3px;padding:0 5px;margin-left:6px;vertical-align:1px}
+  .sub ul{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:2px}
+  .sub ul b{color:var(--ink);font-weight:500}
+  figure{margin:12px 0;padding:0}
+  figure .shot{height:110px;border:1px solid var(--line);border-radius:6px;background:repeating-linear-gradient(45deg,var(--sub2) 0 10px,var(--sub) 10px 20px);display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:12.5px}
+  figure .shot.term{background:var(--ink);color:rgba(255,255,255,.8);font:12px/1.6 var(--mono);justify-content:flex-start;align-items:flex-start;padding:10px 14px;white-space:pre}
+  figcaption{margin-top:6px;font-size:12.5px;color:var(--ink3)}
+  .note{margin:12px 0 0;padding:10px 12px;border-radius:6px;background:var(--note);color:var(--noteink);font-size:13px;line-height:1.6}
+  .idsyn{margin:10px 0 0;font-size:12.5px;color:var(--ink3);line-height:1.7}
+</style>
+<div class="sd" style="min-height:1560px">
+  <div class="top"><span class="logo">싱크독</span><span class="tb on">사용 방법</span><span class="tb">설정</span><span class="tb">로그아웃</span></div>
+  <div class="pg"><div style="display:flex;align-items:flex-end;gap:10px"><span class="h1">프로젝트</span><span class="lbl">4개</span></div><div class="ghost"></div></div>
 
-    <table class="grid" data-el="2">
-      <tr class="hd"><th></th><th></th><th></th><th>어디서</th></tr>
-      <tr data-el="2.1"><td class="no">1</td><td>저장소를 등록한다</td><td>명세 원본은 저장소의 docs/specs/에 둔다. 프로젝트 하나가 저장소 하나다.</td><td class="where">프로젝트 목록</td></tr>
-      <tr><td class="no">2</td><td>에이전트를 붙인다</td><td>설정에서 MCP 토큰을 발급해 Claude Code·Codex·Gemini에 넣는다. 클라이언트는 상관없다.</td><td class="where">설정</td></tr>
-      <tr><td class="no">3</td><td>에이전트와 대화하며 명세를 쓴다</td><td>명세 본문이 들어오는 길은 MCP와 GitHub push 둘뿐이다. 웹에는 편집 화면이 없다. <b>커밋·PR에 에이전트 표시(Co-Authored-By 등)를 남기지 않는다.</b></td><td class="where">에이전트</td></tr>
-      <tr><td class="no">4</td><td>웹에서 읽고 완료로 올린다</td><td>유저용 탭으로 읽고, 참조를 따라가고, 막히면 그 자리에서 묻고, 다 됐으면 완료로 올린다. 완료 문서를 고치면 초안으로 돌아온다.</td><td class="where">문서 뷰</td></tr>
-      <tr><td class="no">5</td><td>끊어진 것을 잡는다</td><td>상위 항목이 사라지면 그것을 가리키던 참조가 끊어진 참조로 뜬다. 알림은 없다 — 프로젝트 상세의 수치가 알림이다.</td><td class="where">프로젝트 상세</td></tr>
-      <tr><td class="no">6</td><td>수정은 다시 에이전트에게</td><td>어긋남이 보이면 화면 밖에서 에이전트에게 고치게 하고 돌아와 확인한다.</td><td class="where">에이전트</td></tr>
-    </table>
+  <div class="ov" style="padding-top:40px">
+    <div class="dlg howto" data-el="1">
+      <div class="dh">싱크독 사용 방법<span class="x" data-el="4">✕</span></div>
+      <div class="db">
+        <p class="lead">개발자가 PM 없이 11단계 명세 체인을 쓰고, 에이전트가 그 명세를 따르게 하는 플랫폼입니다. 쓰는 것은 에이전트, 판단하고 확정하는 것은 웹입니다.</p>
 
-    <h4 class="sectitle">에이전트를 붙이는 법</h4>
-    <table class="grid" data-el="6"><!-- 2의 둘째 단계를 손 순서로 편 것. 머리 행 없음 -->
-      <tr data-el="6.1"><td class="no">1</td><td>토큰을 발급한다</td><td>설정 → MCP 토큰 → 발급. 이름을 적는다. 원문은 그때 한 번만 보이니 바로 복사한다.</td><td class="where">설정</td></tr>
-      <tr><td class="no">2</td><td>터미널에서 한 줄</td><td>아래 명령. <code>--scope user</code>면 어느 폴더에서 켜도 붙는다. Codex·Gemini CLI는 설정의 클라이언트 설정 JSON을 각자 설정 파일에 넣는다.</td><td class="where">터미널</td></tr>
-      <tr><td class="no">3</td><td>Claude Code를 새로 켠다</td><td>MCP 서버는 세션이 시작될 때 읽힌다. 켜져 있던 창에는 방금 넣은 서버가 안 보인다 — 나갔다가 다시 켠다.</td><td class="where">터미널</td></tr>
-      <tr><td class="no">4</td><td>붙었는지 본다</td><td><code>claude mcp list</code>에 <code>syncdoc … ✔ Connected</code>, 또는 세션 안에서 <code>/mcp</code>. claude.ai 커넥터 목록에는 안 나온다 — 이 컴퓨터 설정에만 있는 것이 정상이다.</td><td class="where">터미널</td></tr>
-    </table>
-    <figure data-el="6.4"><img src="/howto/token-issued.png" alt="발급 직후 — 토큰 원문이 한 번만 보이는 화면"><figcaption>1. 발급 직후. 원문은 이 화면에서 한 번만 보인다 (캡처에서는 가렸다)</figcaption></figure>
-    <pre class="snippet" data-el="6.2">claude mcp add --transport http --scope user syncdoc \
-    https://{이 화면의 주소}/mcp \
+        <div class="g" data-el="2">
+          <div class="gr"><span class="no"></span><span></span><span></span><span>어디서</span></div>
+          <div class="gr" data-el="2.1"><span class="no">1</span><span class="nm">저장소를 등록한다</span><span class="tx">명세 원본은 저장소의 docs/specs/에 둔다. 프로젝트 하나가 저장소 하나다.</span><span class="where">프로젝트 목록</span></div>
+          <div class="gr"><span class="no">2</span><span class="nm">에이전트를 붙인다</span><span class="tx">설정에서 MCP 토큰을 발급해 Claude Code·Codex·Gemini에 넣는다. 클라이언트는 상관없다.</span><span class="where">설정</span></div>
+          <div class="gr"><span class="no">3</span><span class="nm">에이전트와 대화하며 명세를 쓴다</span><span class="tx">명세 본문이 들어오는 길은 MCP와 GitHub push 둘뿐이다. 웹에는 편집 화면이 없다. <b>커밋·PR에 에이전트 표시(Co-Authored-By 등)를 남기지 않는다.</b></span><span class="where">에이전트</span></div>
+          <div class="gr"><span class="no">4</span><span class="nm">웹에서 읽고 완료로 올린다</span><span class="tx">유저용 탭으로 읽고, 참조를 따라가고, 막히면 그 자리에서 묻고, 다 됐으면 완료로 올린다. 완료 문서를 고치면 초안으로 돌아온다.</span><span class="where">문서 뷰</span></div>
+          <div class="gr"><span class="no">5</span><span class="nm">끊어진 것을 잡는다</span><span class="tx">상위 항목이 사라지면 그것을 가리키던 참조가 끊어진 참조로 뜬다. 알림은 없다 — 프로젝트 상세의 수치가 알림이다.</span><span class="where">프로젝트 상세</span></div>
+          <div class="gr"><span class="no">6</span><span class="nm">수정은 다시 에이전트에게</span><span class="tx">어긋남이 보이면 화면 밖에서 에이전트에게 고치게 하고 돌아와 확인한다.</span><span class="where">에이전트</span></div>
+        </div>
+
+        <h4 class="st">에이전트를 붙이는 법</h4>
+        <div class="g" data-el="6"><!-- 2의 둘째 단계를 손 순서로 편 것. 머리 행 없음 -->
+          <div class="gr" data-el="6.1"><span class="no">1</span><span class="nm">토큰을 발급한다</span><span class="tx">설정 → MCP 토큰 → 발급. 이름을 적는다. 원문은 그때 한 번만 보이니 바로 복사한다.</span><span class="where">설정</span></div>
+          <div class="gr"><span class="no">2</span><span class="nm">터미널에서 한 줄</span><span class="tx">아래 명령. <code>--scope user</code>면 어느 폴더에서 켜도 붙는다. Codex·Gemini CLI는 설정의 클라이언트 설정 JSON을 각자 설정 파일에 넣는다.</span><span class="where">터미널</span></div>
+          <div class="gr"><span class="no">3</span><span class="nm">Claude Code를 새로 켠다</span><span class="tx">MCP 서버는 세션이 시작될 때 읽힌다. 켜져 있던 창에는 방금 넣은 서버가 안 보인다 — 나갔다가 다시 켠다.</span><span class="where">터미널</span></div>
+          <div class="gr"><span class="no">4</span><span class="nm">붙었는지 본다</span><span class="tx"><code>claude mcp list</code>에 <code>syncdoc … ✔ Connected</code>, 또는 세션 안에서 <code>/mcp</code>. claude.ai 커넥터 목록에는 안 나온다 — 이 컴퓨터 설정에만 있는 것이 정상이다.</span><span class="where">터미널</span></div>
+        </div>
+        <figure data-el="6.4"><div class="shot">그림 — 발급 직후, 토큰 원문이 한 번만 보이는 화면 (/howto/token-issued.png)</div><figcaption>1. 발급 직후. 원문은 이 화면에서 한 번만 보인다 (캡처에서는 가렸다)</figcaption></figure>
+        <pre class="snip" data-el="6.2">claude mcp add --transport http --scope user syncdoc \
+    https://syncdoc.example.dev/mcp \
     --header "Authorization: Bearer syncdoc_pat_…"</pre>
-    <figure data-el="6.5"><img src="/howto/term-add.png" alt="터미널 — claude mcp add 실행 결과"><figcaption>2. 붙이면 이렇게 답한다. 토큰은 [REDACTED]로 가려진다</figcaption></figure>
-    <figure data-el="6.6"><img src="/howto/term-list.png" alt="터미널 — claude mcp list에 syncdoc Connected"><figcaption>4. 새로 켠 뒤 <code>claude mcp list</code> — 이 줄이 보이면 붙은 것이다</figcaption></figure>
-    <p class="note" data-el="6.3">그 뒤로는 에이전트에게 「싱크독으로 프로젝트 하나 만들어 줘」라고 말하면 된다. 주소가 바뀌면 <code>claude mcp remove syncdoc</code> 후 다시 넣는다.</p>
+        <figure data-el="6.5"><div class="shot term">$ claude mcp add --transport http --scope user syncdoc https://{싱크독 주소}/mcp --header "Authorization: Bearer [REDACTED]"
+Added HTTP MCP server syncdoc with URL: https://{싱크독 주소}/mcp to user config</div><figcaption>2. 붙이면 이렇게 답한다. 토큰은 [REDACTED]로 가려진다</figcaption></figure>
+        <figure data-el="6.6"><div class="shot term">$ claude mcp list
+Checking MCP server health...
 
-    <h4 class="sectitle">11단계가 뜻하는 것</h4>
-    <table class="grid" data-el="3"><!-- 머리 행 없음. 위 소제목이 그 일을 한다 -->
-      <tr data-el="3.1"><td class="no">1</td><td class="code">RFQ</td><td><b>요구·인터뷰</b> — 무엇을 왜 만드나. 고객이 말한 것만 적는다<div class="sub" data-el="3.5"><span class="cnt">문서 1</span> 고객이 말한 것 → Q 항목</div></td><td class="ids">Q1</td></tr>
-      <tr><td class="no">2</td><td class="code">PRD</td><td><b>제품 요구</b> — 목표·비목표·요구사항. 요구에는 인수기준까지<div class="sub"><span class="cnt">문서 1</span> 목표 G · 요구 R · 비목표 N</div></td><td class="ids">G1 · R12 · N3</td></tr>
-      <tr><td class="no">6</td><td class="code">DOM</td><td><b>도메인·클래스·데이터</b> — 도메인 모델·클래스 명세·ERD를 한 단계에<div class="sub"><span class="cnt">문서 3</span> 같은 것을 세 층으로. 이름으로 서로 참조한다 — <b>한 번에 쓰지 않는다</b><ul class="docs"><li><b>도메인 모델</b> — 개념 <code>Document</code> · 여기서</li><li><b>클래스 명세</b> — 클래스 <code>Document</code> · <b>8 API 뒤에</b> 돌아와서</li><li><b>ERD·DD</b> — 테이블 <code>documents</code> · 클래스 명세 뒤에</li></ul></div></td><td class="ids">Document · documents</td></tr>
-      <tr><td class="no">7</td><td class="code">UI</td><td><b>화면</b> — 화면 목록·흐름·화면별 요소<div class="sub"><span class="cnt">문서 2</span> 무엇이 있나 / 어떻게 생겼나<ul class="docs"><li><b>화면 설계</b> — 목록·흐름 <code>UI-5</code></li><li><b>와이어프레임</b> — 같은 <code>UI-5</code>의 배치·요소·규칙. 배치는 <b>디자인 도구 산출물을 그대로</b>(스타일까지 든 자기 완결 html) <span class="tag">선택</span></li></ul></div></td><td class="ids">UI-5</td></tr>
-      <tr><td class="no">8</td><td class="code">API</td><td><b>인터페이스</b> — REST 엔드포인트와 MCP 도구<div class="sub"><span class="cnt">문서 2</span> 입구가 둘<ul class="docs"><li><b>REST</b> — 사람·화면이 부른다 <code>GET/api/…</code></li><li><b>MCP</b> — 에이전트가 부른다 <code>get_document</code></li></ul></div></td><td class="ids">GET/api/docs/{docId} · get_doc</td></tr>
-      <tr><td class="no">10</td><td class="code">MS</td><td><b>MINISPEC</b> — 함수 하나하나의 시그니처와 처리 순서<div class="sub"><span class="cnt">문서 N</span> MS 하나 = 클래스 명세 절 하나 = 코드 파일 하나 (싱크독 9개) <span class="tag">선택</span></div></td><td class="ids">SpecService.save</td></tr>
-      <tr class="std" data-el="3.2"><td class="no">—</td><td class="code">STD</td><td><b>표준 (단계 밖)</b> — 명세가 아니라 명세를 쓰는 법. 싱크독 프로젝트에만 있다</td><td class="ids">규칙 항목</td></tr>
-    </table>
+syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>4. 새로 켠 뒤 <code>claude mcp list</code> — 이 줄이 보이면 붙은 것이다</figcaption></figure>
+        <p class="note" data-el="6.3">그 뒤로는 에이전트에게 「싱크독으로 프로젝트 하나 만들어 줘」라고 말하면 된다. 주소가 바뀌면 <code>claude mcp remove syncdoc</code> 후 다시 넣는다.</p>
 
-    <p class="lbl" data-el="3.3">오른쪽은 그 단계 문서 안에서 쓰는 항목 ID 형식. 문서 ID는 <code>{프로젝트코드}-{타입}-{번호}</code>, 항목 ID는 <code>{문서ID}#{항목번호}</code>, 참조는 <code>[[항목ID]]</code>.</p>
-    <p class="note" data-el="3.4">11단계 순서는 권장이지 강제가 아니다. 건너뛰어도 막지 않고 표시만 한다 — DOM 셋의 순서만 예외다(클래스 명세는 API 뒤, ERD는 클래스 명세 뒤). <b>여섯(RFQ·PRD·UC·DOM·API·CODE)이 실질이고 나머지는 규모가 정한다</b> — 가르는 것은 사람 수가 아니라 「머리에 안 들어가는가」다. 빈 단계는 「미작성」으로 남아 건너뛰었다는 사실이 보인다.</p>
+        <h4 class="st">11단계가 뜻하는 것</h4>
+        <div class="g stages" data-el="3"><!-- 머리 행 없음. 위 소제목이 그 일을 한다 -->
+          <div class="gr" data-el="3.1"><span class="no">1</span><span class="code">RFQ</span><span class="tx"><b>요구·인터뷰</b> — 무엇을 왜 만드나. 고객이 말한 것만 적는다<div class="sub" data-el="3.5"><span class="cnt">문서 1</span>고객이 말한 것 → Q 항목</div></span><span class="ids">Q1</span></div>
+          <div class="gr"><span class="no">2</span><span class="code">PRD</span><span class="tx"><b>제품 요구</b> — 목표·비목표·요구사항. 요구에는 인수기준까지<div class="sub"><span class="cnt">문서 1</span>목표 G · 요구 R · 비목표 N</div></span><span class="ids">G1 · R12 · N3</span></div>
+          <div class="gr"><span class="no">3</span><span class="code">SCN</span><span class="tx"><b>사용자 시나리오</b> — 누가 어떤 상황에서 쓰나<div class="sub"><span class="cnt">문서 1</span>페르소나 P · 시나리오 S <span class="tag">선택</span></div></span><span class="ids">P1 · S1</span></div>
+          <div class="gr"><span class="no">4</span><span class="code">UC</span><span class="tx"><b>유스케이스</b> — 액터가 목표를 이루는 흐름과 확장<div class="sub"><span class="cnt">문서 1</span>액터별 접두 A·H·G·S</div></span><span class="ids">UC-H2</span></div>
+          <div class="gr"><span class="no">5</span><span class="code">INFRA</span><span class="tx"><b>인프라</b> — 어디서 도나. 구성도와 운영 조건<div class="sub"><span class="cnt">문서 1</span>절로 쓴다 <span class="tag">선택</span></div></span><span class="ids">절 번호</span></div>
+          <div class="gr"><span class="no">6</span><span class="code">DOM</span><span class="tx"><b>도메인·클래스·데이터</b> — 도메인 모델·클래스 명세·ERD를 한 단계에<div class="sub"><span class="cnt">문서 3</span>같은 것을 세 층으로. 이름으로 서로 참조한다 — <b>한 번에 쓰지 않는다</b><ul><li><b>도메인 모델</b> — 개념 <code>Document</code> · 여기서</li><li><b>클래스 명세</b> — 클래스 <code>Document</code> · <b>8 API 뒤에</b> 돌아와서</li><li><b>ERD·DD</b> — 테이블 <code>documents</code> · 클래스 명세 뒤에</li></ul></div></span><span class="ids">Document · documents</span></div>
+          <div class="gr"><span class="no">7</span><span class="code">UI</span><span class="tx"><b>화면</b> — 화면 목록·흐름·화면별 요소<div class="sub"><span class="cnt">문서 2</span>무엇이 있나 / 어떻게 생겼나<ul><li><b>화면 설계</b> — 목록·흐름 <code>UI-5</code></li><li><b>와이어프레임</b> — 같은 <code>UI-5</code>의 배치·요소·규칙. 배치는 <b>디자인 도구 산출물을 그대로</b>(스타일까지 든 자기 완결 html) <span class="tag">선택</span></li></ul></div></span><span class="ids">UI-5</span></div>
+          <div class="gr"><span class="no">8</span><span class="code">API</span><span class="tx"><b>인터페이스</b> — REST 엔드포인트와 MCP 도구<div class="sub"><span class="cnt">문서 2</span>입구가 둘<ul><li><b>REST</b> — 사람·화면이 부른다 <code>GET/api/…</code></li><li><b>MCP</b> — 에이전트가 부른다 <code>get_document</code></li></ul></div></span><span class="ids">GET/api/docs/{docId} · get_doc</span></div>
+          <div class="gr"><span class="no">9</span><span class="code">SEQ</span><span class="tx"><b>시퀀스</b> — 한 유스케이스가 어느 클래스를 어떤 순서로 부르나<div class="sub"><span class="cnt">문서 1</span>시퀀스 SEQ <span class="tag">선택</span></div></span><span class="ids">SEQ-1</span></div>
+          <div class="gr"><span class="no">10</span><span class="code">MS</span><span class="tx"><b>MINISPEC</b> — 함수 하나하나의 시그니처와 처리 순서<div class="sub"><span class="cnt">문서 N</span>MS 하나 = 클래스 명세 절 하나 = 코드 파일 하나 (싱크독 9개) <span class="tag">선택</span></div></span><span class="ids">SpecService.save</span></div>
+          <div class="gr"><span class="no">11</span><span class="code">CODE</span><span class="tx"><b>구현 계획</b> — 카드 하나가 슬라이스 하나. 에이전트가 여기서 일을 받는다<div class="sub"><span class="cnt">문서 1</span>카드 A·B·… 완료란에 커밋 범위</div></span><span class="ids">V</span></div>
+          <div class="gr std" data-el="3.2"><span class="no">—</span><span class="code">STD</span><span class="tx"><b>표준 (단계 밖)</b> — 명세가 아니라 명세를 쓰는 법. 싱크독 프로젝트에만 있다</span><span class="ids">규칙 항목</span></div>
+        </div>
+
+        <p class="idsyn" data-el="3.3">오른쪽은 그 단계 문서 안에서 쓰는 항목 ID 형식. 문서 ID는 <code>{프로젝트코드}-{타입}-{번호}</code>, 항목 ID는 <code>{문서ID}#{항목번호}</code>, 참조는 <code>[[항목ID]]</code>.</p>
+        <p class="note" data-el="3.4">11단계 순서는 권장이지 강제가 아니다. 건너뛰어도 막지 않고 표시만 한다 — DOM 셋의 순서만 예외다(클래스 명세는 API 뒤, ERD는 클래스 명세 뒤). <b>여섯(RFQ·PRD·UC·DOM·API·CODE)이 실질이고 나머지는 규모가 정한다</b> — 가르는 것은 사람 수가 아니라 「머리에 안 들어가는가」다. 빈 단계는 「미작성」으로 남아 건너뛰었다는 사실이 보인다.</p>
+      </div>
+      <div class="df"><span class="sp"></span><span class="b" data-el="5">닫기</span></div>
+    </div>
   </div>
-  <div class="dfoot"><span class="grow"></span><span class="btn" data-el="5">닫기</span></div>
 </div>
 ```
 
@@ -2019,4 +2220,4 @@ status: approved
 ## 미결사항
 
 - [x] UI 문서의 필수 절이 `미결사항` 하나가 되면서(카드 X, [[SYNC-STD-001]] 2.7) 이 문서에도 절이 생겼다. 열린 것은 없다 — 화면별 미결은 [[SYNC-UI-001]] 7장 판단 지점에 있다
-- [x] 공통 틀 `<style>`의 뒤쪽(앱 CSS에서 옮긴 100여 클래스)은 12화면을 디자인 도구로 다시 그리면(카드 AA) 줄어든다. 그때 정리한다
+- [x] 공통 틀 `<style>`의 뒤쪽(앱 CSS에서 옮긴 100여 클래스)은 12화면을 디자인 도구로 다시 그리면(카드 AA) 줄어든다. 그때 정리한다 — 카드 AA에서 정리했다. 공통 틀은 토큰과 공통 부품만 남았다
