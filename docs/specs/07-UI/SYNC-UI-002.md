@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -16,14 +16,14 @@ upstream: [SYNC-UI-001]
 
 | 부분 | 무엇 | 형태 |
 |---|---|---|
-| 배치 | 요소가 어디 있나 | HTML 뼈대. 요소마다 `data-el` 번호. 스타일 없음 |
+| 배치 | 요소가 어디 있나 | HTML. 스타일은 자기 완결 — 공통 틀 절의 `<style>` + 화면 자신의 `<style>`. 요소마다 `data-el` 번호. 뷰는 iframe으로 그대로 그린다(카드 Z) |
 | 요소 | 각 요소가 뭘 보여주고 누르면 뭐 되나 | 표 |
 | 규칙 | 상태별 표시, 조건부 노출, 유효성 | 목록 |
 | 시나리오 | 요소들이 이어져 무엇을 이루나 | 번호 매긴 흐름. 유스케이스 흐름을 이 화면 동작으로 옮긴 것 |
 
 사람용 뷰는 배치를 왼쪽에, 요소·규칙·시나리오를 오른쪽에 나란히 렌더링한다. 요소 번호를 누르면 양쪽이 서로 강조된다.
 
-**공통 틀**(상단 바)은 UI-5에서 한 번 정의하고 다른 화면에서는 생략한다. 여러 화면이 같이 쓰는 조각은 1장 공통 컴포넌트에 모았다.
+**공통 틀**(상단 바)은 UI-5에서 한 번 정의하고 다른 화면에서는 생략한다. 여러 화면이 같이 쓰는 조각은 1장 공통 컴포넌트에 모았다. **스타일**은 「공통 틀」 절의 html 블록(`<style>`만)에 있고, 뷰가 그것을 이 문서 모든 화면의 iframe 앞에 넣는다([[SYNC-STD-001]] 2.7).
 
 **색·글꼴·간격 값은 여기 없다.** [[SYNC-UI-001]] 3장 디자인 토큰이 원본이다. 이 문서는 무엇이 어디 있고 누르면 뭐가 되는지만 정한다.
 
@@ -94,6 +94,424 @@ upstream: [SYNC-UI-001]
 - 닫는 길 셋 — 닫기 버튼 · `Esc` · 그림 바깥 클릭
 - **SEQ의 자기 확대 바(－/100%/＋)는 그대로 둔다.** 그건 본문 안에서 조금 키우는 것이고, 전체보기는 화면을 통째로 쓰는 것이다
 - 쓰는 곳: UI-5 유저용 본문(7.3 → 7.5·7.6) · UI-9 본문(4)의 그림. UI-8 그래프는 자기 전체보기(2.5)가 있다
+
+## 공통 틀
+
+이 절의 첫 html 블록은 뷰가 **이 문서 모든 화면의 iframe 앞에** 넣는다([[SYNC-STD-001]] 2.7). 마크업은 없고 `<style>`만이다 — 상단 바 같은 공통 조각은 UI-5 배치가 이미 품고 있어 마크업을 여기 두면 두 번 나온다. 카드 Z에서 렌더러 안에 있던 클래스 사전을 여기로 옮겼고, 앱 CSS에 우연히 맞아 보이던 클래스도 토큰을 값으로 풀어 옮겼다. 12화면을 디자인 도구로 다시 그리면(카드 AA) 뒤쪽은 줄어든다.
+
+```html
+<style>
+/* 카드 Z — 렌더러 사전에서 옮김. 이 블록은 이 문서 모든 화면의 iframe 앞에 들어간다 */
+body{margin:0;font-family:system-ui,sans-serif;font-size:12.5px;color:#222;background:#f4f4f4}
+.lbl{color:#777;font-size:11px}
+.topbar{display:flex;align-items:center;gap:12px;padding:8px 12px;background:#e8e8e8;border-bottom:1px solid #bbb}
+.grow{flex:1}
+.badge{display:inline-block;background:#d33;color:#fff;font-size:10px;padding:0 5px;border-radius:8px}
+.btn{padding:3px 8px;border:1px solid #666;background:#fafafa;display:inline-block}
+.docbar{display:flex;align-items:center;gap:12px;padding:7px 12px;background:#f0f0f0;border-bottom:1px solid #bbb}
+.tabs span{padding:3px 8px;border:1px solid #999;margin-right:-1px}
+.tabs span.on{background:#fff;font-weight:600}
+.body3{display:grid;grid-template-columns:150px 1fr 220px;gap:10px;padding:10px}
+.toc{padding:8px;line-height:1.8;height:fit-content}
+.toc .d1{padding-left:12px}
+.main{padding:14px 16px;min-height:420px}
+.banner{padding:6px 10px;background:#fff3cd;border:1px solid #d9a800;margin-bottom:10px}
+.item{padding:5px 8px;margin:10px 0 4px;background:#f7f7f7;border-left:3px solid #666}
+.item .id{font:600 11px ui-monospace,monospace;color:#555;margin-right:6px}
+.flag{display:inline-block;font-size:10px;padding:0 6px;border:1px solid #d33;color:#d33;margin-left:6px;border-radius:2px}
+.ref{color:#1a5fb4;border-bottom:1px dashed #1a5fb4}
+.line{position:relative;padding-right:24px;margin:4px 0}
+.cbtn{position:absolute;right:0;top:0;width:18px;height:18px;border:1px solid #999;font-size:10px;text-align:center;line-height:16px;color:#777;background:#fff}
+.cbtn.has{border-color:#1a5fb4;color:#1a5fb4;font-weight:600}
+.diagram{margin:12px 0;padding:10px;background:#fafafa;border:1px solid #ccc;text-align:center}
+.diagram .img{height:110px;background:repeating-linear-gradient(45deg,#eee 0 10px,#f8f8f8 10px 20px);border:1px solid #ddd;display:flex;align-items:center;justify-content:center;color:#888}
+.diagram .acts{margin-top:6px;text-align:right}
+.nav{display:flex;justify-content:space-between;margin-top:20px;padding-top:10px;border-top:1px solid #ddd}
+.panel{height:fit-content}
+.ptabs{display:flex;border-bottom:1px solid #999}
+.ptabs span{flex:1;text-align:center;padding:6px;border-right:1px solid #999}
+.ptabs span:last-child{border-right:none}
+.ptabs span.on{background:#fff;font-weight:600}
+.pbody{padding:10px}
+.pbody h4{margin:8px 0 4px;font-size:11px;color:#666}
+.pbody ul{margin:0 0 8px;padding-left:14px;line-height:1.7}
+h2{font-size:15px;margin:6px 0 10px}
+.body2{display:grid;grid-template-columns:1fr 240px;gap:10px;padding:10px}
+.editor{display:grid;grid-template-columns:28px 1fr;min-height:300px;background:#fff}
+.gutter{display:flex;flex-direction:column;background:#f0f0f0;color:#999;font:11px/1.55 ui-monospace,monospace;text-align:right;padding:8px 4px}
+.gutter .err{color:#d33;font-weight:700}.gutter .del{color:#c60;font-weight:700}
+.code{margin:0;padding:8px;font:11.5px/1.55 ui-monospace,monospace;white-space:pre-wrap}
+.errline{background:#ffe0e0;display:block}.delline{background:#fff0e0;display:block;text-decoration:line-through}
+.chk{margin:0 0 8px;padding-left:16px;line-height:1.6}
+.chk .bad{color:#b00}.chk .ok{color:#3a7}.chk .warn{color:#a60}
+.btn.sm{font-size:10px;padding:1px 6px;margin-top:3px}
+.dialog{margin:12px;border:2px solid #444;background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.18)}
+.dhead{padding:7px 12px;background:#444;color:#fff;font-weight:600}
+.dbody{padding:12px}
+.diffbox{margin:8px 0;padding:8px;background:#fafafa;border:1px solid #ddd;font:11px/1.6 ui-monospace,monospace}
+.dl{color:#b00}.dl.add{color:#080}
+.dacts{text-align:right;margin-top:8px}
+.rawwrap{margin:10px;background:#fff}
+.phead{display:flex;align-items:center;gap:14px;padding:10px 12px;background:#f0f0f0;border-bottom:1px solid #bbb}
+.stats{display:flex;gap:8px;padding:8px 12px}
+.stat{padding:5px 10px;border:1px solid #999;background:#fff}
+.stat b{font-size:14px;margin-right:4px}
+table.stages{border-collapse:collapse;width:100%;background:#fff;font-size:12px}
+table.stages td{padding:5px 8px;border-bottom:1px solid #e5e5e5;vertical-align:middle}
+table.stages tr.stg td{background:#f7f7f7;font-weight:600}
+table.stages tr.doc td{padding-left:14px;font-weight:400;color:#333}
+table.stages td.no{width:24px;color:#999;text-align:right}
+.st{display:inline-block;padding:1px 7px;border-radius:2px;font-size:10.5px;font-weight:600}
+.st.ok{background:#d6f0d6;color:#1a6}.st.rv{background:#fff0b3;color:#960}.st.dr{background:#e8e8e8;color:#666}.st.na{background:#fff;color:#bbb;border:1px dashed #ccc}
+.gate{font-size:10px;color:#c60;border:1px solid #c60;padding:0 5px;margin-left:4px}
+.cm{font-size:10px;color:#1a5fb4;border:1px solid #1a5fb4;padding:0 5px;margin-left:4px}
+.err{font-size:10px;color:#b00;border:1px solid #b00;padding:0 5px;margin-left:4px}
+.recent{margin:0;padding-left:14px;line-height:1.5}
+.recent li{margin-bottom:6px}
+.todo{padding:10px 12px}
+.grp{margin-bottom:12px;background:#fff}
+.grp.dim{opacity:.6}
+.grp h4{margin:0;padding:6px 10px;background:#f0f0f0;font-size:12px;border-bottom:1px solid #ccc}
+.cnt{display:inline-block;background:#666;color:#fff;font-size:10px;padding:0 6px;border-radius:8px;margin-left:6px}
+.row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid #eee;font-size:12px}
+.row .k{font:600 11px ui-monospace,monospace;color:#444}
+.age{font-size:11px;color:#c60;font-weight:600;white-space:nowrap}
+.empty{padding:24px;text-align:center;color:#999;border:1px dashed #ccc;background:#fafafa}
+.stack{padding:10px 12px;display:flex;flex-direction:column;gap:10px}
+.cause,.mine{background:#fff}
+.sech{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f0f0f0;border-bottom:1px solid #ccc;font-size:12px}
+.mybody{padding:10px 12px;font-size:12px;line-height:1.6}
+.mybody p{margin:4px 0}
+.acts{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f7f7f7;border:1px solid #ccc}
+.dialog.wide{margin:18px 30px}
+.dhead{display:flex;align-items:center;gap:10px}
+.dhead .lbl{color:#ddd}
+.x{cursor:pointer;padding:0 6px}
+.propacts{display:flex;align-items:flex-end;gap:10px;margin-top:12px}
+.skipbox{display:flex;flex-direction:column;gap:5px}
+.inp{border:1px solid #999;padding:4px 8px;font-size:11px;width:260px;background:#fff}
+.body2.hist{grid-template-columns:1fr 1fr}
+table.vers{border-collapse:collapse;width:100%;background:#fff;font-size:11.5px}
+table.vers th{text-align:left;padding:5px 8px;background:#f0f0f0;border-bottom:1px solid #ccc;font-weight:600}
+table.vers td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top}
+table.vers tr.cur td{background:#fffbe6}
+.diffpane{background:#fff}
+.hint{font-size:10px;color:#1a5fb4;border:1px solid #1a5fb4;padding:0 5px;margin-left:6px}
+table.grid{border-collapse:collapse;width:calc(100% - 24px);margin:10px 12px;background:#fff;font-size:11.5px}
+table.grid th{padding:6px 5px;background:#f0f0f0;border-bottom:1px solid #ccc;font-weight:600;font-size:10.5px;text-align:center}
+table.grid th:nth-child(2){text-align:left}
+table.grid td{padding:7px 5px;border-bottom:1px solid #eee;text-align:center;vertical-align:middle}
+table.grid td:nth-child(2){text-align:left}
+.cell{display:inline-block;width:26px;height:22px;line-height:22px;border-radius:2px;font-size:10.5px;font-weight:600;position:relative}
+.cell.ok{background:#d6f0d6;color:#1a6}.cell.rv{background:#fff0b3;color:#960}.cell.dr{background:#e8e8e8;color:#666}.cell.na{background:#fff;border:1px dashed #ddd}
+.cell i{position:absolute;top:-6px;right:-6px;font-style:normal;font-size:9px;color:#c60}
+.warn{color:#c60;font-size:14px}
+.login{max-width:360px;margin:60px auto;padding:30px;background:#fff;text-align:center}
+.logo{font-size:20px;margin-bottom:10px}
+.btn.big{display:block;padding:10px;margin:14px 0;font-size:13px}
+.form{padding:12px}
+.form label{display:block;font-size:11px;font-weight:600;margin:10px 0 3px}
+.inp.wide{width:100%}
+.ferr{color:#b00;font-size:11px;margin-top:3px}
+.facts{margin-top:14px;text-align:right}
+.banner.err{background:#ffe0e0;border-color:#b00;margin:0 12px}
+.banner.warn{background:#e8f0ff;border-color:#3a5ba0}
+.btn.on{background:#fff;font-weight:600}
+.graph{display:flex;gap:18px;padding:14px 12px;background:#fff;margin:10px 12px;min-height:200px;position:relative}
+.col{display:flex;flex-direction:column;gap:6px;min-width:120px}
+.colh{font-size:10px;font-weight:700;color:#888;text-align:center;border-bottom:1px solid #ddd;padding-bottom:3px}
+.node{font:10.5px ui-monospace,monospace;padding:4px 6px;border:1.5px solid #3a5ba0;border-radius:12px;background:#eef2fa;text-align:center}
+.node.sel{background:#fff6d9;border-color:#c9a800}
+.node.iso{background:#fff;border-style:dashed;border-color:#999;color:#777}
+.edges{position:absolute;bottom:6px;left:12px}
+.legend{padding:0 12px 10px;display:flex;gap:14px}
+.steps{display:flex;gap:3px}
+.stp{font-size:10px;padding:2px 6px;border:1px solid #bbb;background:#fff}
+.stp.done{background:#d6f0d6;border-color:#8c8}.stp.cur{background:#fff0b3;border-color:#c9a800;font-weight:700}.stp.na{color:#bbb;border-style:dashed}
+.readbody{padding:10px 12px}
+.row.dimrow{opacity:.5}
+.tokbox{font:12px ui-monospace,monospace;padding:8px;background:#f4f4f4;border:1px solid #ccc;margin:8px 0}
+.mono{font-family:ui-monospace,monospace;font-size:11px}
+table.uptbl{border-collapse:collapse;width:100%;font-size:11.5px;margin:8px 0}
+table.uptbl th{text-align:left;padding:4px 6px;background:#f0f0f0;border-bottom:1px solid #ccc}
+table.uptbl td{padding:5px 6px;border-bottom:1px solid #eee}
+.rawbar{display:flex;align-items:center;gap:10px;padding:6px 10px;background:#f0f0f0;border-bottom:1px solid #bbb}
+
+/* 카드 Z — 앱 styles.css에 우연히 맞아 보이던 클래스. 토큰은 값으로 풀었다. 12화면을 디자인 도구로 다시 그리면(카드 AA) 줄어든다 */
+.btn.solid{background:#17181c;border-color:#17181c;color:#fff;font-weight:500;padding:7px 13px}
+.btn.solid:hover{background:#000}
+.btn.sm.solid{padding:6px 12px;font-size:13px}
+.dialog.narrow{width:min(560px,92vw)}
+.dfoot{flex:none;display:flex;align-items:center;gap:10px;padding:12px 18px;
+  border-top:1px solid #e2e0da;background:#fbfaf8;font-size:13px;color:#46443f}
+.login .cap{margin:0;color:#6b6862;font-size:12.5px}
+.heat{background:#ffffff;border:1px solid #e2e0da;border-radius:8px;overflow:hidden}
+.hrow{display:grid;grid-template-columns:20px 196px repeat(11,minmax(0,1fr));gap:4px;
+  align-items:center;padding:11px 14px;border-bottom:1px solid #f0eeea}
+.hrow:last-child{border-bottom:none}
+.hrow.head{padding:7px 14px 6px;background:#fbfaf8;
+  border-bottom:1px solid #e2e0da;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:11px;
+  color:#46443f;letter-spacing:.2px;text-align:center}
+.hrow .warn{text-align:center;font-size:13px}
+.pname{display:flex;flex-direction:column;gap:0;min-width:0;cursor:pointer;font-size:15.5px;line-height:1.15}
+.pname .mono{font-size:13px;font-weight:600}
+.pname .sub{display:flex;align-items:center;gap:6px;font-size:12.5px;
+  color:#46443f;white-space:nowrap;line-height:1.2}
+.pname .sub .work{color:#b8342a;font-weight:600}
+.pname .sub .mid{color:#cfccc4}
+.cell.na{background:#ffffff;border-color:#e2e0da}
+.cell.missing{border-width:1.5px;border-color:#b8342a}
+.legend i.sw{width:11px;height:11px;border:1px solid transparent;border-radius:2px;background:#9c9891}
+.legend i.sw.ok{background:#2f7d5b}
+.legend i.sw.na{background:#ffffff;border-color:#e2e0da}
+.willcommit{margin-top:18px;padding:10px 12px;
+  background:#fbfaf8;border:1px solid #e2e0da;border-radius:8px;
+  font-size:12.5px}
+.willcommit .mono{display:block;color:#46443f;font-size:12px;margin-top:3px}
+.setdlg{width:min(620px,92vw)}
+.setdlg .dbody{background:#fbfaf8;padding:16px 18px}
+.card{border:1px solid #e2e0da;border-radius:8px;background:#ffffff;
+  padding:16px;margin-bottom:14px}
+.card:last-child{margin-bottom:0}
+.cardh{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:15px}
+.cardh b{font-weight:600}
+.card>.lbl{margin:0 0 4px;line-height:1.7;font-size:14px}
+.row .two{display:flex;flex-direction:column;gap:1px;min-width:0}
+.row .two .lbl{font-size:12px}
+.snippet{margin:8px 0 0;padding:10px 12px;background:#f3f1ec;
+  border-radius:6px;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;
+  color:#46443f;overflow-x:auto;white-space:pre}
+.admin{margin-top:10px;border-top:1px solid #f0eeea;padding-top:10px}
+.adminh{margin-bottom:8px}
+.adminbody table.vers{width:100%;border-collapse:collapse;font-size:12.5px;background:#ffffff}
+.adminbody table.vers th{background:#fbfaf8;color:#46443f;font-weight:600}
+.adminbody table.vers td:last-child{white-space:nowrap}
+.adminbody table.vers td:nth-child(2){max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adminbody table.vers th,.adminbody table.vers td{padding:6px 8px;
+  border-bottom:1px solid #f0eeea;text-align:left;vertical-align:middle}
+.adminbody table.vers tr:last-child td{border-bottom:none}
+.tokbox .tok{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;background:#ffffff;
+  border:1px solid #e2e0da;border-radius:5px;padding:8px 10px;
+  margin:0 0 8px;word-break:break-all}
+.phead .repo{display:inline-block;margin-top:3px;font-size:13px;color:#46443f}
+.stgh{display:flex;align-items:center;gap:8px;padding:9px 13px;
+  border-bottom:1px solid #e2e0da;background:#fbfaf8;font-size:14px}
+.stgh b{font-weight:600}
+.stgh .sw{width:14px;height:14px;border-radius:2px;border:1px solid transparent;background:#9c9891}
+.stgh .sw.ok{background:#2f7d5b}
+.stgh .sw.na{background:#ffffff;border-color:#e2e0da}
+.stg .nm{font-size:14.5px;font-weight:500}
+.stg .caret{width:10px;text-align:center;font-size:11.5px;color:#46443f}
+.doc .dot{width:8px;height:8px;border-radius:50%;flex:none;background:#9c9891}
+.doc .dot.ok{background:#2f7d5b}
+.st.dr,.st-draft{background:#9c9891;color:#17181c}
+.st.na{background:none;color:#a8a49c}
+.miss{font-size:12px;font-weight:600;color:#b8342a;
+  border:1px solid #b8342a;border-radius:9px;padding:1px 7px}
+.rc{padding:7px 0;border-bottom:1px solid #f4f2ee;cursor:pointer}
+.rc>div:first-child{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}
+.rc .mono{font-size:12.5px;font-weight:500}
+.rc .msg{margin-top:2px;color:#1f2024}
+.rc .lbl{margin-top:1px}
+.sync{margin-top:11px;padding-top:10px;border-top:1px solid #f0eeea;line-height:1.7}
+.sync .behind{color:#b8342a;font-weight:600}
+.docbar .crumb{color:#46443f;text-decoration:none;cursor:pointer;font-size:13.5px}
+.docbar .crumb:hover{color:#17181c}
+.docbar .crumb.mono{font-size:12.5px}
+.docbar .sep{color:#6b6862;font-size:12px}
+.docbar .ver{color:#46443f;font-size:12.5px;text-decoration:none;
+  border-bottom:1px dashed #cfccc4;cursor:pointer}
+.handle{position:relative;width:1px;background:#e2e0da;cursor:col-resize}
+.handle::after{content:"";position:absolute;top:0;bottom:0;left:-4px;width:9px}
+.handle:hover{background:#b8342a}
+.toc,.vlist{background:#fbfaf8;padding:13px 12px;
+  overflow:auto;min-height:0}
+.marked{margin-top:14px;padding-top:10px;border-top:1px solid #e2e0da}
+.marked>div{display:flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  font-size:12px;cursor:pointer;padding:2px 0}
+.marked>div .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.marked .lbl{font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif}
+.marked .dot{flex:none;width:6px;height:6px;border-radius:50%}
+.marked .dot-miss{background:#b8342a}
+.mainwrap,.body3>.main{overflow:auto;scrollbar-gutter:stable;padding:20px 26px 60px;
+  background:#ffffff;min-width:0;min-height:0}
+.mainwrap>*,.body3>.main>*{max-width:min(1440px,100%);margin-left:auto;margin-right:auto}
+.dochead{margin-bottom:22px}
+.kicker{font-size:12px;color:#46443f;letter-spacing:.3px}
+.dochead h1{display:block;margin:4px 0 0;font-size:27px;font-weight:600;letter-spacing:-.4px}
+.lead{margin:6px 0 0;font-size:15px;color:#46443f;line-height:1.65;text-wrap:pretty}
+.tabs .btn,.tabs .radios{border-bottom:none;padding-bottom:0}
+.body3 .panel,.vimpact{background:#fbfaf8;border:none;border-left:1px solid #e2e0da;
+  border-radius:0;box-shadow:none;padding:0;min-height:0}
+.vimpact{padding:13px 12px;font-size:13px;overflow:auto}
+.selitem{display:flex;align-items:center;gap:6px;margin-bottom:12px;font-size:14px;font-weight:500}
+.rcard{display:block;border:1px solid #e2e0da;background:#ffffff;border-radius:5px;
+  padding:6px 8px;margin-bottom:5px;text-decoration:none;color:inherit;cursor:pointer}
+.rcard b{font-size:12px;font-weight:500}
+.rcard .lbl{margin:1px 0 0}
+.rcard.missing{border-style:dashed;color:#a8a49c}
+.docnav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding-top:14px;margin-top:26px;border-top:1px solid #e2e0da}
+.docnav .grow{flex:1}
+.radios{display:inline-flex;align-items:center;gap:2px;border:1px solid #e2e0da;
+  border-radius:6px;padding:2px;background:#fbfaf8}
+.radio{display:flex;align-items:center;gap:6px;padding:4px 10px;
+  border-radius:4px;cursor:pointer;font-size:13px;color:#46443f}
+.radio::before{content:"";width:11px;height:11px;flex:none;border-radius:50%;
+  border:1px solid #cfccc4;background:#ffffff;box-shadow:inset 0 0 0 2.5px #ffffff}
+.radio.on{background:#ffffff;color:#17181c;font-weight:500}
+.radio.on::before{border-color:#17181c;box-shadow:inset 0 0 0 2.5px #ffffff,inset 0 0 0 5px #17181c}
+.editor pre.mdsrc{margin:0;padding:12px 14px;background:transparent;
+  color:#1f2024;font:inherit;white-space:pre-wrap;border-radius:0}
+li.ref.missing{color:#a8a49c}
+.vcard{border:1px solid #e2e0da;background:#ffffff;border-radius:6px;
+  padding:7px 8px;margin-bottom:5px;cursor:pointer;font-size:12.5px}
+.vcard:hover{border-color:#cfccc4}
+.vcard>div{display:flex;align-items:center;gap:6px}
+.vcard .mono{font-size:13px}
+.vcard .msg{display:block;margin-top:3px;color:#1f2024;line-height:1.45}
+.vcard .by{margin-top:4px;align-items:flex-start}
+.vcard .msg,.vcard .by .lbl{word-break:keep-all}
+.vcard .by .lbl{min-width:0;flex:1;line-height:1.4}
+.vcard .btn.sm{flex:none;white-space:nowrap;padding:1px 6px;font-size:11.5px}
+.vcard.sel{border:1.5px solid #17181c;background:#fdf8ec}
+.ab{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:11px;font-weight:700;background:#17181c;
+  color:#fff;border-radius:3px;padding:0 5px}
+.btn.danger,.btn.sm.danger{border-color:#b8342a;color:#b8342a;font-weight:500}
+.btn.danger:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm.danger:hover{background:#fdf1ef}
+.vlist .hint{margin-top:8px;padding-top:9px;border-top:1px solid #e2e0da}
+.drange{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.drange .mono{font-size:19px;font-weight:600}
+.dgroup{border:1px solid #e2e0da;border-radius:7px;overflow:hidden;margin-bottom:10px}
+.dhead2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;
+  background:#fbfaf8;border-bottom:1px solid #e2e0da;font-size:14px}
+.dhead2 b{font-weight:600}
+.footnote{color:#46443f;font-size:12.5px;line-height:1.6;
+  margin-top:22px;padding-top:12px;border-top:1px solid #e2e0da}
+.dgroup .hint{border:1px solid #cfccc4;background:#ffffff;border-radius:9px;
+  padding:1px 8px;cursor:pointer;white-space:nowrap}
+.icard{border:1px solid #e2e0da;background:#ffffff;border-radius:6px;
+  padding:7px 9px;margin-bottom:6px;cursor:pointer}
+.icard>div{display:flex;align-items:center}
+.icard .n{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-weight:600;color:#46443f}
+.dl .mk{width:26px;flex:none;text-align:center;font-weight:600}
+.dl.add{background:#eef6f0}
+.dl.add .mk,.dl.add>span:last-child{color:#2f7d5b}
+.dl.del{background:#fdf1ef}
+.dl.del .mk,.dl.del>span:last-child{color:#b8342a}
+.dlead{margin:0 0 14px;color:#1f2024;line-height:1.65;text-wrap:pretty}
+.crumbs{display:flex;align-items:center;gap:8px;margin-bottom:3px;font-size:13.5px}
+.crumbs a{color:#46443f;text-decoration:none}
+.crumbs a:hover{color:#17181c}
+.crumbs>span:last-child{color:#6b6862}
+.crumbs .sep{color:#6b6862;font-size:12px}
+.gcard{border:1px solid #e2e0da;border-radius:8px;background:#ffffff;overflow:hidden}
+.gcard.full{position:fixed;inset:0;z-index:80;border:none;border-radius:0;
+  display:flex;flex-direction:column;background:#ffffff}
+.gbar{display:flex;align-items:center;gap:8px;padding:10px 14px;
+  border-bottom:1px solid #e2e0da;background:#fbfaf8;font-size:13px}
+.gbar .btn.on{background:#17181c;color:#fff;border-color:#17181c}
+.gbar .sep{width:1px;height:16px;background:#cfccc4;margin:0 4px}
+.gbar .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gcard .canvas{position:relative;overflow:auto;height:calc(100vh - 50px - 190px);background:#ffffff}
+.gcard.full .canvas{flex:1;height:auto}
+.dfull{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;background:#ffffff}
+.dfull .gbar b{font-weight:600}
+.dfull .zv{min-width:44px;text-align:center;font-size:12px}
+.dfull .stage{flex:1;min-height:0;overflow:auto;padding:22px;background:#fbfaf8}
+.dfull .pic{margin:0 auto;background:#ffffff;border:1px solid #e2e0da;border-radius:6px}
+.dfull .pic svg{display:block;width:100%!important;height:100%!important;max-width:none!important}
+.nlabel{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.edges .e{fill:none;stroke:#8f8b83;stroke-width:1.2;marker-end:url(#ah)}
+.edges .e.back{stroke:#b8860b;stroke-width:1.4;stroke-dasharray:5 3;marker-end:url(#ahr)}
+.edges .e.gone{stroke:#b8342a;stroke-width:1.6;stroke-dasharray:3 3;marker-end:url(#ahb)}
+.edges .e.dim{opacity:.1}
+.glegend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;
+  padding:8px 14px;border-top:1px solid #f0eeea;
+  background:#fbfaf8;font-size:12.5px}
+.glegend span{display:inline-flex;align-items:center;gap:5px}
+.glegend .back{color:#8a6410}
+.glegend .gone{color:#b8342a}
+.glegend .grow{flex:1}
+.glegend svg.sw{width:22px;height:8px;vertical-align:middle}
+.glegend svg.sw .e{fill:none;stroke:#8f8b83;stroke-width:1}
+.glegend svg.sw .e.back{stroke:#b8860b;stroke-dasharray:4 3}
+.glegend svg.sw .e.gone{stroke:#b8342a;stroke-dasharray:3 3}
+.chain{margin-top:12px;border:1px solid #e2e0da;border-radius:6px;overflow:hidden}
+.crow{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px;
+  padding:8px 12px;border-bottom:1px solid #f0eeea}
+.crow:last-child{border-bottom:none}
+.crow.cur{background:#fdf8ec}
+.crow.empty{background:#fbfaf8}
+.crow.empty .cstage,.crow.empty .cchips{color:#a8a49c}
+.cstage{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:#46443f;line-height:1.6}
+.crow.cur .cstage,.crow.cur .cstage .lbl{color:#8a6410;font-weight:600}
+.cstage .lbl{font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;font-size:12.5px}
+.cchips{display:flex;flex-wrap:wrap;gap:5px;align-items:flex-start;font-size:12.5px}
+.chip{display:inline-flex;align-items:center;gap:5px;max-width:320px;
+  padding:2px 8px;border:1px solid #e2e0da;border-radius:5px;
+  background:#ffffff;font-size:12.5px;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip:hover{border-color:#cfccc4}
+.chip .dot{flex:none;width:6px;height:6px;border-radius:50%;background:#9c9891}
+.chip .dot-approved{background:#2f7d5b}
+.chip.me{background:#ffffff;border:1.5px solid #17181c;font-weight:600;cursor:default}
+.chip.gone{border-style:dashed;color:#a8a49c;cursor:default}
+.steprail{display:flex;align-items:center;gap:9px;flex:none;
+  padding:11px 18px;background:#ffffff;
+  border-bottom:1px solid #e2e0da;overflow-x:auto;overflow-y:hidden}
+.steprail .back{flex:none;font-size:13.5px;color:#46443f;text-decoration:none;white-space:nowrap}
+.steprail .back:hover{color:#17181c}
+.stp.na{opacity:.45;cursor:default}
+.dot{width:6px;height:6px;border-radius:50%;background:#9c9891}
+.dot-approved{background:#2f7d5b}
+.dot-none{background:none;border:1px solid #cfccc4}
+.dot-miss{background:#b8342a}
+.stp.cur .dot-none{border-color:rgba(255,255,255,.5)}
+.readbody .dochead{margin:0 0 18px}
+.pill{display:inline-block;padding:1px 8px;border-radius:9px;
+  font-size:12px;font-weight:600;line-height:1.55;white-space:nowrap;
+  background:#9c9891;color:#17181c}
+.pill-approved{background:#2f7d5b;color:#ffffff}
+.idbadge{display:inline-block;padding:0 5px;border-radius:3px;
+  background:#d99b1e;color:#17181c;
+  font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;font-weight:600}
+.howto .dlead{margin:0 0 16px;font-size:14px;color:#46443f;line-height:1.7;text-wrap:pretty}
+.sectitle{margin:22px 0 8px;font-size:14px;font-weight:600}
+.howto tr.hd th{background:none;color:#6b6862;font-size:12.5px;font-weight:400;border-bottom:1px solid #f0eeea}
+.howto td.no,.howto tr.hd th:first-child{width:26px;text-align:center;color:#6b6862;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+.howto td .sub{margin-top:5px;font-size:13px;color:#46443f;line-height:1.6}
+.howto td .sub .cnt{display:inline-block;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;font-weight:600;
+  color:#17181c;background:#f3f1ec;border-radius:3px;padding:0 6px;margin-right:5px}
+.howto td .sub .tag{display:inline-block;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:#6b6862;line-height:1.5;
+  border:1px solid #cfccc4;border-radius:3px;padding:0 5px;margin-left:6px;vertical-align:1px}
+.howto td .sub ul.docs{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:2px}
+.howto td .sub ul.docs b{color:#17181c;font-weight:500}
+.howto td.where{color:#46443f;white-space:nowrap;width:74px}
+.howto td.ids{width:150px;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:#46443f}
+.howto tr.std td{color:#6b6862}
+.howto figure+.snippet{margin-top:12px}
+.howto .note{margin:0;padding:10px 12px;border-radius:6px;
+  background:#fdf8ec;color:#8a6410;font-size:13px}
+.qa{display:flex;flex-direction:column;gap:9px;margin:9px 0}
+.qa .turn{display:flex;flex-direction:column;gap:4px}
+.qa .q{align-self:flex-end;max-width:92%;padding:5px 9px;border-radius:5px;
+  background:#f3f1ec;color:#17181c;font-size:14px;white-space:pre-wrap}
+.qa .a{padding:5px 9px;border:1px solid #e2e0da;border-radius:5px;
+  background:#ffffff;color:#1f2024;font-size:14px;line-height:1.6;white-space:pre-wrap}
+.qa .a.wait{color:#6b6862;border-style:dashed}
+.qa .a.fail{color:#b8342a;background:#fdf1ef;border-color:#fdf1ef}
+.qa .qsrc{font-size:12.5px;color:#6b6862;font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
+.qa .qprog{display:flex;flex-direction:column;gap:3px;padding:4px 9px;border-left:2px solid #e2e0da;
+  font-size:13px;color:#46443f}
+.qa .qprog .read{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;color:#6b6862}
+.qa .qprog.done{font-size:12.5px;color:#6b6862}
+.qa .qsrc a{color:#46443f}
+</style>
+```
+
+---
 
 ## UI-5 문서 뷰
 
@@ -1500,7 +1918,7 @@ status: approved
       <tr class="hd"><th></th><th></th><th></th><th>어디서</th></tr>
       <tr data-el="2.1"><td class="no">1</td><td>저장소를 등록한다</td><td>명세 원본은 저장소의 docs/specs/에 둔다. 프로젝트 하나가 저장소 하나다.</td><td class="where">프로젝트 목록</td></tr>
       <tr><td class="no">2</td><td>에이전트를 붙인다</td><td>설정에서 MCP 토큰을 발급해 Claude Code·Codex·Gemini에 넣는다. 클라이언트는 상관없다.</td><td class="where">설정</td></tr>
-      <tr><td class="no">3</td><td>에이전트와 대화하며 명세를 쓴다</td><td>명세 본문이 들어오는 길은 MCP와 GitHub push 둘뿐이다. 웹에는 편집 화면이 없다.</td><td class="where">에이전트</td></tr>
+      <tr><td class="no">3</td><td>에이전트와 대화하며 명세를 쓴다</td><td>명세 본문이 들어오는 길은 MCP와 GitHub push 둘뿐이다. 웹에는 편집 화면이 없다. <b>커밋·PR에 에이전트 표시(Co-Authored-By 등)를 남기지 않는다.</b></td><td class="where">에이전트</td></tr>
       <tr><td class="no">4</td><td>웹에서 읽고 완료로 올린다</td><td>유저용 탭으로 읽고, 참조를 따라가고, 막히면 그 자리에서 묻고, 다 됐으면 완료로 올린다. 완료 문서를 고치면 초안으로 돌아온다.</td><td class="where">문서 뷰</td></tr>
       <tr><td class="no">5</td><td>끊어진 것을 잡는다</td><td>상위 항목이 사라지면 그것을 가리키던 참조가 끊어진 참조로 뜬다. 알림은 없다 — 프로젝트 상세의 수치가 알림이다.</td><td class="where">프로젝트 상세</td></tr>
       <tr><td class="no">6</td><td>수정은 다시 에이전트에게</td><td>어긋남이 보이면 화면 밖에서 에이전트에게 고치게 하고 돌아와 확인한다.</td><td class="where">에이전트</td></tr>
@@ -1526,7 +1944,7 @@ status: approved
       <tr data-el="3.1"><td class="no">1</td><td class="code">RFQ</td><td><b>요구·인터뷰</b> — 무엇을 왜 만드나. 고객이 말한 것만 적는다<div class="sub" data-el="3.5"><span class="cnt">문서 1</span> 고객이 말한 것 → Q 항목</div></td><td class="ids">Q1</td></tr>
       <tr><td class="no">2</td><td class="code">PRD</td><td><b>제품 요구</b> — 목표·비목표·요구사항. 요구에는 인수기준까지<div class="sub"><span class="cnt">문서 1</span> 목표 G · 요구 R · 비목표 N</div></td><td class="ids">G1 · R12 · N3</td></tr>
       <tr><td class="no">6</td><td class="code">DOM</td><td><b>도메인·클래스·데이터</b> — 도메인 모델·클래스 명세·ERD를 한 단계에<div class="sub"><span class="cnt">문서 3</span> 같은 것을 세 층으로. 이름으로 서로 참조한다 — <b>한 번에 쓰지 않는다</b><ul class="docs"><li><b>도메인 모델</b> — 개념 <code>Document</code> · 여기서</li><li><b>클래스 명세</b> — 클래스 <code>Document</code> · <b>8 API 뒤에</b> 돌아와서</li><li><b>ERD·DD</b> — 테이블 <code>documents</code> · 클래스 명세 뒤에</li></ul></div></td><td class="ids">Document · documents</td></tr>
-      <tr><td class="no">7</td><td class="code">UI</td><td><b>화면</b> — 화면 목록·흐름·화면별 요소<div class="sub"><span class="cnt">문서 2</span> 무엇이 있나 / 어떻게 생겼나<ul class="docs"><li><b>화면 설계</b> — 목록·흐름 <code>UI-5</code></li><li><b>와이어프레임</b> — 같은 <code>UI-5</code>의 배치·요소·규칙 <span class="tag">선택</span></li></ul></div></td><td class="ids">UI-5</td></tr>
+      <tr><td class="no">7</td><td class="code">UI</td><td><b>화면</b> — 화면 목록·흐름·화면별 요소<div class="sub"><span class="cnt">문서 2</span> 무엇이 있나 / 어떻게 생겼나<ul class="docs"><li><b>화면 설계</b> — 목록·흐름 <code>UI-5</code></li><li><b>와이어프레임</b> — 같은 <code>UI-5</code>의 배치·요소·규칙. 배치는 <b>디자인 도구 산출물을 그대로</b>(스타일까지 든 자기 완결 html) <span class="tag">선택</span></li></ul></div></td><td class="ids">UI-5</td></tr>
       <tr><td class="no">8</td><td class="code">API</td><td><b>인터페이스</b> — REST 엔드포인트와 MCP 도구<div class="sub"><span class="cnt">문서 2</span> 입구가 둘<ul class="docs"><li><b>REST</b> — 사람·화면이 부른다 <code>GET/api/…</code></li><li><b>MCP</b> — 에이전트가 부른다 <code>get_document</code></li></ul></div></td><td class="ids">GET/api/docs/{docId} · get_doc</td></tr>
       <tr><td class="no">10</td><td class="code">MS</td><td><b>MINISPEC</b> — 함수 하나하나의 시그니처와 처리 순서<div class="sub"><span class="cnt">문서 N</span> MS 하나 = 클래스 명세 절 하나 = 코드 파일 하나 (싱크독 9개) <span class="tag">선택</span></div></td><td class="ids">SpecService.save</td></tr>
       <tr class="std" data-el="3.2"><td class="no">—</td><td class="code">STD</td><td><b>표준 (단계 밖)</b> — 명세가 아니라 명세를 쓰는 법. 싱크독 프로젝트에만 있다</td><td class="ids">규칙 항목</td></tr>
@@ -1566,6 +1984,8 @@ status: approved
 
 - 이 화면은 **읽기 전용이고 상태가 없다.** 어디서 열든 같은 내용이고, 닫으면 원래 화면 그대로다
 - 항목 ID 형식은 [[SYNC-STD-001]] 2장의 타입별 패턴을 사람 말로 옮긴 것이다. 규약이 바뀌면 여기도 바뀐다
+- **화면 단계의 안내는 「디자인 도구 산출물을 그대로」다.** 회색 상자 뼈대를 가르치지 않는다 — 에이전트가 가진 디자인 도구로 만든 자기 완결 html을 그대로 넣는다([[SYNC-STD-001]] 2.7, 카드 Z)
+- **사용 순서 3행에 커밋 표시 규약을 적는다.** GitHub에 올리는 커밋·PR에 에이전트 표시(Co-Authored-By·세션 링크·Generated with)를 남기지 않는다 — 작성자는 사람의 계정이다([[SYNC-STD-001]] 1장)
 - **"순서는 강제가 아니다"를 빼지 않는다.** 11단계를 보면 차례로 다 채워야 하는 것처럼 읽힌다. 실제로는 건너뛴 단계를 표시만 하고 막지 않는다([[SYNC-UC-001#UC-H14]] 1b)
 - 본문 맨 위 문단이 이 도구가 무엇인지 한 번에 말한다. 표만 있으면 처음 온 사람이 무엇을 읽고 있는지 모른다
 - 두 표 사이에 소제목 `11단계가 뜻하는 것`을 둔다. 두 번째 표에는 머리 행이 없다 — 소제목이 그 일을 한다
@@ -1599,3 +2019,4 @@ status: approved
 ## 미결사항
 
 - [x] UI 문서의 필수 절이 `미결사항` 하나가 되면서(카드 X, [[SYNC-STD-001]] 2.7) 이 문서에도 절이 생겼다. 열린 것은 없다 — 화면별 미결은 [[SYNC-UI-001]] 7장 판단 지점에 있다
+- [x] 공통 틀 `<style>`의 뒤쪽(앱 CSS에서 옮긴 100여 클래스)은 12화면을 디자인 도구로 다시 그리면(카드 AA) 줄어든다. 그때 정리한다
