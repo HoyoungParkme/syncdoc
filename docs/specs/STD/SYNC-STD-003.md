@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-003
 type: STD
 title: 명세 체인 지도 — 싱크독 첫 프로젝트의 실제 구조
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-STD-002]
 ---
 
@@ -18,7 +18,7 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 
 ## 1. 체인과 문서
 
-11단계 + 단계 밖 STD. 문서 25개(이 문서 포함), 항목 364개, 문서 간·안 참조 1221개.
+11단계 + 단계 밖 STD. 문서 25개(이 문서 포함), 항목 367개, 문서 간·안 참조 1243개.
 
 | 단계 | 문서 ID | 제목 | 파일 | 항목 | 절 | 상위(frontmatter) |
 |---|---|---|---|---|---|---|
@@ -31,19 +31,19 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 | 6 | `SYNC-DOM-002` | 클래스 명세 — 싱크독 | `클래스명세_싱크독.md` | 14 | 8 | DOM-001, INFRA-001, API-001, API-002 |
 | 6 | `SYNC-DOM-003` | ERD·DD — 싱크독 | `ERD_DD_싱크독.md` | 10 | 6 | DOM-002, DOM-001 |
 | 7 | `SYNC-UI-001` | 화면 설계 — 싱크독 | `화면설계_싱크독.md` | 12 | 9 | UC-001, DOM-002 |
-| 7 | `SYNC-UI-002` | 와이어프레임 — 싱크독 | `와이어프레임_싱크독.md` | 12 | 15 | UI-001 |
-| 8 | `SYNC-API-001` | API 명세 REST — 싱크독 | `API_REST_싱크독.md` | 33 | 7 | UI-002, DOM-002, DOM-003 |
+| 7 | `SYNC-UI-002` | 와이어프레임 — 싱크독 | `와이어프레임_싱크독.md` | 12 | 16 | UI-001 |
+| 8 | `SYNC-API-001` | API 명세 REST — 싱크독 | `API_REST_싱크독.md` | 34 | 7 | UI-002, DOM-002, DOM-003 |
 | 8 | `SYNC-API-002` | API 명세 MCP — 싱크독 | `API_MCP_싱크독.md` | 10 | 7 | UC-001, DOM-002, DOM-003, STD-001 |
 | 9 | `SYNC-SEQ-001` | SEQUENCE — 싱크독 | `SEQUENCE_싱크독.md` | 22 | 26 | DOM-002, API-001, API-002, UC-001 |
-| 10 | `SYNC-MS-001` | MINISPEC — ProjectService | `MINISPEC_001_project_싱크독.md` | 8 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
+| 10 | `SYNC-MS-001` | MINISPEC — ProjectService | `MINISPEC_001_project_싱크독.md` | 9 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
 | 10 | `SYNC-MS-002` | MINISPEC — SpecService | `MINISPEC_002_spec_싱크독.md` | 34 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
 | 10 | `SYNC-MS-003` | MINISPEC — ReferenceService | `MINISPEC_003_reference_싱크독.md` | 13 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
 | 10 | `SYNC-MS-006` | MINISPEC — AccountService | `MINISPEC_006_account_싱크독.md` | 13 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
 | 10 | `SYNC-MS-007` | MINISPEC — pipeline — 쓰기 조율 | `MINISPEC_007_pipeline_싱크독.md` | 10 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
 | 10 | `SYNC-MS-008` | MINISPEC — queries — 읽기 조합 | `MINISPEC_008_queries_싱크독.md` | 14 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
 | 10 | `SYNC-MS-009` | MINISPEC — infra — git·github 어댑터 | `MINISPEC_009_infra_싱크독.md` | 16 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
-| 11 | `SYNC-CODE-001` | 구현 계획 — 슬라이스 카드와 커밋 기록 | `CODE_구현계획_싱크독.md` | 33 | 6 | STD-004, MS-001, MS-002, MS-003, MS-006, MS-007, MS-008, MS-009, API-001, API-002, UI-002, SCN-001 |
-| — | `SYNC-STD-001` | 명세 작성 규약 | `STD_명세작성규약_싱크독.md` | 0 | 9 | PRD-001 |
+| 11 | `SYNC-CODE-001` | 구현 계획 — 슬라이스 카드와 커밋 기록 | `CODE_구현계획_싱크독.md` | 34 | 6 | STD-004, MS-001, MS-002, MS-003, MS-006, MS-007, MS-008, MS-009, API-001, API-002, UI-002, SCN-001 |
+| — | `SYNC-STD-001` | 명세 작성 규약 | `STD_명세작성규약_싱크독.md` | 0 | 11 | PRD-001 |
 | — | `SYNC-STD-002` | 뷰 규약 — 사람용 뷰 타입별 렌더링 | `STD_뷰규약_싱크독.md` | 12 | 8 | STD-001, UI-002 |
 | — | `SYNC-STD-004` | 개발 규약 — 코드 파트 표준 | `STD_개발규약_싱크독.md` | 18 | 6 | STD-001, DOM-002, DOM-003 |
 **아직 없는 것**: 프로토타입(`SYNC-UI-004`, 선택 — `view_*.html` 25개가 대신함). 명세 파트 전부 + CODE 구현 계획까지 있다. 남은 건 코드 자체.
@@ -137,6 +137,7 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 **SYNC-UI-002** 와이어프레임 — 싱크독
 - 0. 형식
 - 1. 공통 컴포넌트
+- 공통 틀
 - UI-5 문서 뷰
 - UI-4 프로젝트 상세
 - UI-7 버전 이력
@@ -251,9 +252,11 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 - 0. 이 문서가 다루는 것
 - 1. 공통 규약
 - 2. 타입별 구조
-- 3. 규약 위반 — 저장 거부
-- 4. 미완성 — 경고
-- 5. 예시 — 규약을 다 지킨 최소 문서
+- 1. 목표
+- 2. 비목표
+- 3. 요구사항
+- 4. 성공지표
+- 5. 미결사항
 - 6. 규약 적용 기록 — 13개 문서에 한 것
 - 7. 되먹인 것
 - 8. 미결사항
