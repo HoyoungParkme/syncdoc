@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-009
 type: MS
 title: MINISPEC — infra — git·github 어댑터
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -267,7 +267,11 @@ async def sync_readme(workdir: Path, author: Author, code: str) -> str | None
 
 **시그니처** `verify_signature(body: bytes, header: str) -> bool`
 
-**처리** `expected = "sha256=" + hmac.new(config.WEBHOOK_SECRET, body, sha256).hexdigest()` · `→ hmac.compare_digest(expected, header)`. 상수 시간 비교
+**처리**
+1. `WEBHOOK_SECRET`이 **비어 있으면 `→ False`.** 빈 키로 HMAC을 계산하면 유효한 서명이 되어 **소스를 본 누구나 통과한다** — 검증을 끄는 것이 아니라 누구나 통과시키는 것이다(카드 AF)
+2. `expected = "sha256=" + hmac.new(config.WEBHOOK_SECRET, body, sha256).hexdigest()` · `→ hmac.compare_digest(expected, header)`. 상수 시간 비교
+
+**테스트 관점** 올바른 서명 True · 다른 비밀번호 False · 본문 1바이트 변조 False · **비밀번호가 비면 올바른 계산값이어도 False**
 
 ---
 
@@ -307,6 +311,31 @@ async def sync_readme(workdir: Path, author: Author, code: str) -> str | None
 **`auto_init`을 쓰지 않는다.** 초기 커밋을 GitHub이 만들면 README가 생기고, 그러면 [[SYNC-MS-001#ProjectService.init_project]]의 "빈 저장소" 경로가 아니라 "내용 있는 저장소" 경로를 타 흐름이 갈린다. 골격 커밋이 그 저장소의 첫 커밋이어야 한다
 
 **이미 있으면 만들지 않는 이유.** 같은 인자로 두 번 불러도 결과가 같아야 한다 — 등록이 중간에 실패해 사람이 다시 부를 때 "이미 있다"로 막히면 손으로 지워야 한다
+
+
+---
+
+#### github.create_hook push 통지 걸기
+
+**시그니처**
+```python
+async def create_hook(token: str, owner: str, name: str, url: str, secret: str) -> int
+```
+
+근거: [[SYNC-INFRA-001]] 7장 · [[SYNC-UC-001#UC-A1]] 4 · [[SYNC-MS-001#ProjectService.ensure_hook]] · #115
+
+**입력** 토큰, 저장소 소유자·이름, 통지 주소(`{PUBLIC_BASE_URL}/hooks/github`), 비밀번호(`WEBHOOK_SECRET`)
+
+**처리**
+1. `GET /repos/{owner}/{name}/hooks` — **같은 주소의 훅이 이미 있으면 그 id를 `→`.** 같은 인자로 두 번 불러도 결과가 같아야 한다(`create_repo`와 같은 원칙)
+2. `POST /repos/{owner}/{name}/hooks` · 본문 `{name: "web", active: true, events: ["push"], config: {url, content_type: "json", secret, insecure_ssl: "0"}}`
+3. `→ id`
+
+**출력** 훅 번호
+
+**예외** `! unauthorized {reason}` — 토큰에 `admin:repo_hook`이 없거나(403·404) GitHub이 거절. **사유를 그대로 싣되 비밀번호는 절대 싣지 않는다**
+
+**테스트 관점** 없을 때 만든다 · **이미 같은 주소면 안 만들고 그 id** · 권한 없으면 `unauthorized` · 보낸 본문에 `events: ["push"]`가 있다 · 예외 메시지에 비밀번호가 없다
 
 ---
 
