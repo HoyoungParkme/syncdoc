@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
 
-**진행 상황**: 카드 35장. **A~Y 33장 완료**, Z 진행 중, AA는 Z 뒤에.
+**진행 상황**: 카드 37장. **A~AA 35장 완료**(2026-09-22), AB·AC 진행 중.
 
 ---
 
@@ -820,9 +820,39 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | 코드 없음. 새 에이전트(내 맥락 없음)가 새 안내만 보고 (a) HB 화면 문서, (b) `SYNC-UI-002` 12화면을 디자인 도구로 다시 쓴다 — **`data-el` 번호·요소 표·규칙·시나리오는 그대로**. 되먹임은 이슈로, 공통 틀의 「우연히 맞던 101개」 정리 |
 | 테스트 | `check_ui` 12/12 · `validate` 0/0 · `view_build --all` · 사람이 12화면을 본다 |
 | 선행 | Z |
-| 완료 | — |
+| 완료 | 2026-09-22 · 새 에이전트 둘(내 맥락 없음) · (a) HB `HoyoungParkme/hb#1` — 클로드 디자인 캔버스로 4화면, `data-el` 집합 그대로, `validate` 0/0 · (b) SYNC `#131`(브랜치 `card/AA-sync-redesign`, 커밋 `9fab38b`) — 그 세션엔 캔버스가 없어 `frontend-design` 스킬로 12화면을 직접 씀, `check_ui` 12/12 · `validate` 0/0 · `view_build` 오류 0 · 공통 틀의 옛 사전 300여 줄 삭제 → UI-001 3.1 토큰을 CSS 변수로 한 체계 · 사람 확인: HB UI-1·SYNC UI-5를 정적 뷰와 배포본에서 봄 — 폰트·배지·축소 다 됨, 실제 목업 수준 · **되먹임 이슈 열**: #126 view_build 외부 저장소 · #127 STD-001 2.7 빈 곳(자기 완결↔공통 틀·요소 표 부분집합·대화상자) · #128 캔버스 인라인 스타일·도구 이름 · #129 새 저장소 STD 사본 갱신 · #130 토글이 배치 가림 · #132 FRAME_CSS 제약(tr·svg·순서) · #133 check_tokens 제목 열쇠 · #134 배치 열 폭(늘 60% 축소) · #135 정적 뷰 해시 · 검토: #131이 UI-16 그림 셋을 자리표시로 바꿈(절대경로면 앱에선 뜬다) |
 
 **왜 카드인가.** 문서만 바뀌지만 12화면·HB·안내 되먹임이 한 시험이다. 시험이 안내를 고치면 Z의 규약이 바뀐다.
+
+---
+
+#### AB 새 저장소는 규약 링크만
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-STD-001]] 1.1 · [[SYNC-UC-001#UC-A1]] 4 · [[SYNC-UC-001#UC-S6]] 1 · [[SYNC-MS-009#git.sync_readme]] · #113 · #129 · 사용자 결정 2026-09-22 |
+| 구현 | `init_specs`가 템플릿 12개를 복사하지 않는다 — 빈 단계 디렉터리 13 + README, **14파일**. README 첫 문단이 `SPECS_URL`로 싱크독 저장소의 규약·템플릿을 가리킨다. `git.sync_readme` 신설, `ProjectService.rebuild_index`가 인덱스보다 **먼저** 부른다. `RebuildResult.readme_updated` |
+| 테스트 | `init_specs` 14파일·링크·`_templates` 없음 · `sync_readme` 셋(낡음·같음·없음) · `rebuild_index`가 README 먼저, 두 번째는 커밋 없음 · 남의 프로젝트 not-found |
+| 선행 | — |
+| 완료 | — |
+
+**왜 카드인가.** 사본을 복사하는 구조 자체가 틀렸다. 실측으로 저장소 8/8이 낡은 README를 들고 있었고 그중 넷은 두 세대 전이라 작업 단위 규약(1.8)과 DOM 셋 순서(2.6)가 아예 없었다 — MS-009가 「여기 없으면 규약이 없는 것과 같다」고 못 박은 두 줄이다. 템플릿은 `get_template`이 이미 내장본으로 우회하고 있었으므로(#94) 저장소 사본은 아무도 안 읽는 낡은 짐이었다.
+
+**왜 재구축 버튼인가.** 이미 만들어진 여덟 저장소는 앞으로의 규칙으로는 안 고쳐진다. 사람이 프로젝트마다 한 번 누르면 README가 새 판이 된다 — 앱이 사용자 저장소에 쓰는 유일한 일이라 버튼 뒤에 둔다. 옛 `_templates/`는 지우지 않는다(사용자 파일을 지우는 일은 더 위험하다).
+
+---
+
+#### AC 배치는 위, 요소 표는 아래
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-STD-002]] V-UI · [[SYNC-UI-002#UI-5]] · #134 · #130 · #135 · #132 · 사용자 결정 2026-09-22 |
+| 구현 | 화면 섹션을 좌우(`.split`)에서 **세로**(`.wfstack`)로 — 배치가 본문 전폭(1280이 넓은 창에서 1:1), 요소 표·규칙·시나리오는 아래. 배치 위 도구 줄(자연폭·배율 · 맞춤/원래 크기 · 전체보기)로 #130. 「전체보기」는 그림 전체보기(7.6)와 같은 층에 같은 srcdoc을 scale. FRAME_CSS를 문서 `<style>` **앞**으로(#132) · 정적 뷰 `#item-UI-N` 해시(#135) · `check_view_css` 넷째 쌍 `wireframeCss`↔`WF_SCREEN_CSS` |
+| 테스트 | `check_ui` 12/12(UI-5에 7.7~7.10) · `check_view_css` 넷 · `wf_build --selftest` · `view_build --all` · 사람이 넓은 창·좁은 창·전체보기·정적 뷰를 본다 |
+| 선행 | Z · AA |
+| 완료 | — |
+
+**왜 카드인가.** 카드 AA가 12화면을 제대로 그려 놨는데 뷰가 늘 57%로 줄여 보여 준다. 원인이 세 겹(`--doc-w` 1440 → `.split` 53:47 → `.left` 패딩)이라 한 줄로 안 고쳐지고, 같은 파일을 만지는 #130·#132·#135가 함께 붙는다.
 
 ---
 
@@ -881,7 +911,9 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | U | `card/U-ask-panel` | `3fa72d0`~ | #95 · #104 | 2026-09-21 |
 | Y | `card/Y-ask-react` | `eef87b6`~ | #109 | 2026-09-22 |
 | Z | `card/Z-wf-iframe` | `bccf473`~ | #121 | 2026-09-22 |
-| AA | `card/AA-sync-redesign` | — | — | — |
+| AA | `card/AA-sync-redesign` · hb#1 | `9fab38b` | #131 | 2026-09-22 |
+| AB | `card/AB-readme-links` | — | — | — |
+| AC | `card/AC-wf-stack` | — | — | — |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 | X | `card/X-ui-doc` | `7a4e821`~ | #103 | 2026-09-21 |
