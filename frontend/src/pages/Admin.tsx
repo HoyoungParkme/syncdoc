@@ -4,7 +4,7 @@
  *  5 결과(5.1 집계, 5.2 규약 오류) */
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ago, api, ApiError, docPath, type RebuildResult, type RepoStatus } from '../api/client'
+import { ago, api, ApiError, docPath, type HookStatus, type RebuildResult, type RepoStatus, type SyncResult } from '../api/client'
 import { ProjName, toast, Tooltip } from '../components/ui'
 
 export function Admin() {
@@ -44,13 +44,34 @@ export function Admin() {
       setBusy(false)
     }
   }
+  // 지금 가져오기 (UC-G2) — 주기 확인을 기다리지 않고 당긴다
+  const sync = async (code: string) => {
+    try {
+      const r = await api.post<SyncResult>(`/api/admin/repos/${code}/sync`, {})
+      toast(r.docs ? `${code} 문서 ${r.docs}개를 읽었습니다` : `${code} 이미 최신입니다`)
+      load()
+    } catch (e) {
+      alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
+    }
+  }
+  // push 통지 걸기 — 못 걸어도 등록은 그대로다. 사유를 말해 준다
+  const hook = async (code: string) => {
+    try {
+      const r = await api.post<HookStatus>(`/api/admin/repos/${code}/hook`, {})
+      toast(r.hook === 'ok' ? `${code} 통지를 걸었습니다` : `${code} 통지를 못 걸었습니다 — ${r.hook_error ?? ''}`)
+      load()
+    } catch (e) {
+      alert(e instanceof ApiError ? `${e.kind}: ${e.message}` : String(e))
+    }
+  }
   const badge = (r: RepoStatus) =>
     r.error ? (
       <Tooltip text={r.error}>
         <span className="st dr">조회 실패</span>
       </Tooltip>
     ) : r.behind_by == null ? (
-      <span className="st na">문서 없음</span>
+      // 「문서 없음」이 아니다 — 아직 한 번도 재보지 않았다는 뜻이다 (카드 AF)
+      <span className="st na">아직 안 재봄</span>
     ) : r.behind_by === 0 ? (
       <span className="st ok">최신</span>
     ) : (
@@ -68,6 +89,7 @@ export function Admin() {
               <th>저장소</th>
               <th>마지막 처리 커밋</th>
               <th>동기화</th>
+              <th>통지</th>
               <th />
             </tr>
           </thead>
@@ -84,8 +106,38 @@ export function Admin() {
                   </a>{' '}
                   {r.synced_at && <span className="lbl">{ago(r.synced_at)}</span>}
                 </td>
-                <td data-el={i === 0 ? '2.3' : undefined}>{badge(r)}</td>
                 <td>
+                  <span data-el={i === 0 ? '2.3' : undefined}>{badge(r)}</span>{' '}
+                  {/* 「최신」은 마지막으로 확인했을 때의 말이다 — 언제 기준인지 옆에 (카드 AF) */}
+                  {r.fetched_at && (
+                    <span className="lbl" data-el={i === 0 ? '2.4' : undefined}>
+                      {ago(r.fetched_at)} 확인
+                    </span>
+                  )}
+                </td>
+                <td data-el={i === 0 ? '2.5' : undefined}>
+                  {r.hook === 'ok' ? (
+                    <span className="lbl">걸림</span>
+                  ) : (
+                    <>
+                      {r.hook === 'error' && r.hook_error ? (
+                        <Tooltip text={r.hook_error}>
+                          <span className="lbl">실패</span>
+                        </Tooltip>
+                      ) : (
+                        <span className="lbl">안 걸림</span>
+                      )}{' '}
+                      {/* 이미 걸린 행에 버튼이 남아 있으면 눌러도 아무 일이 없어 고장처럼 읽힌다 */}
+                      <span className="btn sm" data-el={i === 0 ? '8' : undefined} onClick={() => hook(r.code)}>
+                        통지 걸기
+                      </span>
+                    </>
+                  )}
+                </td>
+                <td>
+                  <span className="btn sm" data-el={i === 0 ? '6' : undefined} onClick={() => sync(r.code)}>
+                    지금 가져오기
+                  </span>{' '}
                   <span className="btn sm" data-el={i === 0 ? '3' : undefined} onClick={() => { setConfirmKind('rebuild'); setConfirm(r.code) }}>
                     인덱스 재구축
                   </span>{' '}

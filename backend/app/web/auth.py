@@ -82,11 +82,16 @@ def callback_url(request: Request) -> str:
 
 
 def authorize_url(state: str, redirect_uri: str) -> str:
-    """GitHub 동의 화면 주소. scope=public_repo(인프라 5장) · redirect_uri(SEQ-8)."""
+    """GitHub 동의 화면 주소.
+
+    scope=public_repo + admin:repo_hook (인프라 5.1·7장) · redirect_uri(SEQ-8).
+    """
     q = urlencode(
         {
             "client_id": settings.GITHUB_CLIENT_ID,
-            "scope": "public_repo",
+            # admin:repo_hook은 앱이 push 통지를 걸기 위한 것이다 (INFRA 7장, 카드 AF).
+            # 범위를 넓히기 전에 받은 토큰은 다음 로그인까지 옛 범위로 남아 통지 걸기가 실패한다
+            "scope": "public_repo admin:repo_hook",
             "state": state,
             "redirect_uri": redirect_uri,
         }

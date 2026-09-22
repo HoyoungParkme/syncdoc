@@ -96,6 +96,14 @@ async def read_pending(code: str, user: User) -> int:
         # last가 None인 것은 **등록 중**뿐이다 — init_project가 첫 커밋 해시를, import_existing은
         # rebuild가 head를 적는다. 그 둘은 자기가 저장소를 읽으므로 여기서 또 읽지 않는다
         if last is None or head == last:
+            if last is not None:
+                # 방금 확인했다는 사실 자체가 화면이 보여줄 값이다 (카드 AF) — 안 적으면
+                # 1초 전에 확인한 저장소가 5분 전으로 보인다
+                with db.session_scope() as s:
+                    row = s.get(Repository, repo_id)
+                    assert row is not None
+                    row.behind_by, row.fetched_at = 0, now_utc()
+                    s.commit()
             return 0
         with db.session_scope() as s:
             row = s.get(Repository, repo_id)

@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-001
 type: MS
 title: MINISPEC — ProjectService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -60,6 +60,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 7. **트랜잭션**: `DB: projects insert (code, name, owner_user_id=user.id)` — **등록하는 사람이 소유자다**([[SYNC-PRD-001#R12]]). 바뀌지 않고 나뉘지 않는다 · `DB: repositories insert (project_id, remote_url, workdir_path, last_processed_commit=None, registered_by_user_id=user.id)` — push 토큰의 주인. 지금은 소유자와 같은 사람이지만 뜻이 다르다(DOM-003 `repositories`)
 8. if `has and import_existing` → `pipeline.rebuild(code)` (3a2. 락·트랜잭션은 그쪽) · `last_processed_commit`은 rebuild가 채움
 9. else → `files = git.init_specs(workdir)` (11단계 + `STD/` 디렉터리, `_templates/` 12개, `assets/`) · `hash = git.commit_push(workdir, message=f"chore({code}): init syncdoc", author=Author(human, user, None, web), files=files)` · if 실패 → 7단계 롤백, workdir 삭제, `! push-failed` (4a) · `DB: repositories update last_processed_commit=hash`
+9a. `ensure_hook(code, user)` — push 통지를 건다([[#ProjectService.ensure_hook]], UC-A1 4). **실패해도 등록을 깨지 않는다**(4a) — 통지는 빠르게 하려는 수단이고, 못 걸어도 주기 확인(UC-G1 1b)이 메운다. 사유는 `repositories.hook_error`에 남아 화면이 말한다
 10. `→ Project`. **`ProjectSummary`는 입구(MCP 도구·라우터)가 `queries.project_summary()`로 만든다** — 서비스가 `queries`를 부르면 순환이다(클래스 3.2에 PS→QR 없음). 신규면 11칸 null
 
 **저장소를 만든 뒤 실패하면 저장소는 남는다.** 7~9단계가 실패하면 DB와 작업 사본은 지금처럼 되돌리되 **GitHub 저장소는 지우지 않는다.** 앱이 남의 저장소를 지우는 권한을 쓰는 것이 위험하고, 되돌리는 사이 사람이 넣은 것까지 사라진다. 사용자가 직접 지우거나 `import_existing`으로 다시 등록하면 된다 — 오류 메시지에 그 사실을 적는다
@@ -68,7 +69,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** `AccountService.github_token_for` · [[SYNC-MS-009#github.create_repo]] · `git.clone` `exists` `list` `init_specs` `commit_push` · [[SYNC-MS-007#pipeline.rebuild]]
 
-**테스트 관점** 빈 저장소 → `docs/specs/` 생김, 커밋 하나, 11칸 null · **`owner_user_id`가 등록한 사람** · `docs/specs/` 있는 저장소 → `existing-specs`, workdir 없음, DB 행 없음 · `import_existing=true` → 재구축 결과 · clone 권한 없음 → `push-failed`, 아무것도 안 남음 · **없는 저장소 + `create_repo=false` → `push-failed`**(지금 동작) · **없는 저장소 + `true` → 공개 저장소가 생기고 골격 커밋까지** · **이미 있는 저장소 + `true` → 만들지 않고 그대로 쓴다** · 만든 뒤 등록이 실패해도 **저장소는 남는다**
+**테스트 관점** **통지 걸기가 실패해도 프로젝트는 등록된다**(hook_error에 사유) · 빈 저장소 → `docs/specs/` 생김, 커밋 하나, 11칸 null · **`owner_user_id`가 등록한 사람** · `docs/specs/` 있는 저장소 → `existing-specs`, workdir 없음, DB 행 없음 · `import_existing=true` → 재구축 결과 · clone 권한 없음 → `push-failed`, 아무것도 안 남음 · **없는 저장소 + `create_repo=false` → `push-failed`**(지금 동작) · **없는 저장소 + `true` → 공개 저장소가 생기고 골격 커밋까지** · **이미 있는 저장소 + `true` → 만들지 않고 그대로 쓴다** · 만든 뒤 등록이 실패해도 **저장소는 남는다**
 
 ---
 
@@ -124,7 +125,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-SEQ-001#SEQ-20]] · UI-14 표 2 · [[SYNC-PRD-001#R12]]
 
-**처리** `projects = list_owned(user)` — **내가 소유한 저장소만.** v1은 전부를 줬고 그것이 관리 화면에서 남의 저장소 주소가 보이던 자리다(#91). **원격을 안 탄다. `git.fetch`를 부르지 않는다.** 저장소마다 `→ RepoStatus(code, name, remote_url, last_processed_commit, synced_at, behind_by, fetched_at)` — `name`은 UI-14 표가 「[코드] 이름」으로 적기 위해서다(UI-002 1.6).
+**처리** `projects = list_owned(user)` — **내가 소유한 저장소만.** v1은 전부를 줬고 그것이 관리 화면에서 남의 저장소 주소가 보이던 자리다(#91). **원격을 안 탄다. `git.fetch`를 부르지 않는다.** 저장소마다 `→ RepoStatus(code, name, remote_url, last_processed_commit, synced_at, behind_by, fetched_at, error, hook, hook_error)` — `hook`은 `hook_id`·`hook_error`로 정하는 셋(`ok`/`none`/`error`, 카드 AF) — `name`은 UI-14 표가 「[코드] 이름」으로 적기 위해서다(UI-002 1.6).
 
 `error`는 **폴링이 적어 둔 `repositories.fetch_error`**다([[SYNC-MS-007#scheduler.catch_up]]). v1에는 백업 읽기 실패도 이 칸에 모았는데, 백업이 사라지면서(카드 V) 폴링 오류만 남았다.
 
@@ -162,6 +163,50 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **호출하는 것** [[#ProjectService.get_owned]]
 
 **테스트 관점** 삭제 후 `get` → not-found · 작업 사본 디렉터리가 사라짐 · 같은 저장소를 다시 등록할 수 있음(중복 등록 검사에 안 걸림) · 다른 프로젝트의 문서는 그대로 · **남의 프로젝트 → `not-found`, 아무것도 안 지워짐**
+
+---
+
+#### ProjectService.ensure_hook push 통지를 건다
+
+**시그니처**
+```python
+async def ensure_hook(code: str, user: User) -> HookStatus
+```
+
+근거: [[SYNC-INFRA-001]] 7장 · [[SYNC-UC-001#UC-A1]] 4·4a · [[SYNC-API-001#POST/api/admin/repos/{code}/hook]] · #115
+
+**처리**
+1. `get_owned(code, user)` — 남의 것이면 `! not-found {resource: project}`
+2. `PUBLIC_BASE_URL`이나 `WEBHOOK_SECRET`이 비면 → `HookStatus("none", "공개 주소나 비밀번호가 없어 걸지 못한다", created=False)`. **걸지 않는다** — 받는 쪽이 빈 비밀번호를 전부 거부하므로 걸어 봐야 안 통한다
+3. `hook_id = github.create_hook(token, owner, name, f"{PUBLIC_BASE_URL}/hooks/github", WEBHOOK_SECRET)` · `Unauthorized`면 `repo.hook_error = 사유`, `→ HookStatus("error", 사유, False)`
+4. `repo.hook_id = hook_id` · `repo.hook_error = None` · `→ HookStatus("ok", None, created=이번에 만들었나)`
+
+**출력** [[SYNC-API-001]] `HookStatus`
+
+**예외** `not-found`(1). 3의 실패는 **예외로 올리지 않고 상태로 돌려준다** — 사람이 화면에서 사유를 읽고 다시 누르면 된다
+
+**테스트 관점** 주소·비밀번호가 비면 `none`이고 GitHub을 안 부른다 · 권한 없으면 `error`이고 `hook_error`가 남는다 · 성공하면 `ok`·`hook_id` 저장 · **두 번째 호출은 `created=False`** · 남의 프로젝트 → `not-found`
+
+---
+
+#### ProjectService.sync_now 지금 가져오기
+
+**시그니처**
+```python
+async def sync_now(code: str, user: User) -> SyncResult
+```
+
+근거: [[SYNC-UC-001#UC-G2]] · [[SYNC-API-001#POST/api/admin/repos/{code}/sync]] · #115
+
+**처리**
+1. `docs = pipeline.read_pending(code, user)` — **그대로 쓴다**([[SYNC-MS-007#pipeline.read_pending]]). 소유 검사·읽기 락·`process_commit`이 그 안에 다 있다. 같은 일을 두 벌 만들지 않는다
+2. `→ SyncResult(docs, fetched_at=repo.fetched_at)`
+
+**출력** [[SYNC-API-001]] `SyncResult` — 읽은 문서 수와 방금 확인한 시각
+
+**예외** `not-found`(read_pending 1단계) · `git.fetch` 실패는 그대로 올린다(UC-G2 2b)
+
+**테스트 관점** 밀린 것을 읽고 수를 돌려준다 · 읽을 것이 없으면 0이고 **`fetched_at`이 갱신된다** · 남의 프로젝트 → `not-found`
 
 ---
 

@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -248,7 +248,7 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 
 둘 중 하나도 안 하면 같은 사람이 계정 둘로 갈리고, 로그인한 쪽 계정에는 아무것도 안 달려 **이력의 작성자가 남으로 뜬다**(#34). 이건 사람이 한 번 해 두는 설정이라 앱이 대신 못 한다.
 
-**GitHub 토큰 보관**: 각자의 계정으로 커밋·push하려면 서버가 각 사용자의 GitHub OAuth 토큰을 갖고 있어야 한다. 요청자 노트북이지만 역할은 서버이므로, **토큰은 앱 비밀키로 암호화해 DB에 보관한다.** 비밀키는 DB 밖(환경 변수 또는 별도 파일)에 두어 DB만 유출되어도 토큰이 풀리지 않게 한다. 토큰은 `public_repo` 범위만 요청한다 — v1은 public 저장소만 다루고(`git.fetch`가 토큰 없이 돈다), push와 저장소 생성은 그 범위로 충분하다. `repo`는 그 사람의 모든 비공개 저장소 전체 권한이라 쓰지 않는 것을 받는 셈이었다. 범위를 줄이기 전에 받은 토큰은 다음 로그인 때까지 옛 범위로 남는다. OAuth 앱에서 **"Expire user access tokens"를 끈다** — 토큰 갱신 경로가 없어(MS-006 미결) 만료되면 push가 죽는다. git 작업 사본의 `.git/config`에는 토큰을 남기지 않는다 — push할 때만 URL에 붙인다(MS-009 `git.clone`·`commit_push`).
+**GitHub 토큰 보관**: 각자의 계정으로 커밋·push하려면 서버가 각 사용자의 GitHub OAuth 토큰을 갖고 있어야 한다. 요청자 노트북이지만 역할은 서버이므로, **토큰은 앱 비밀키로 암호화해 DB에 보관한다.** 비밀키는 DB 밖(환경 변수 또는 별도 파일)에 두어 DB만 유출되어도 토큰이 풀리지 않게 한다. 토큰은 `public_repo`와 `admin:repo_hook` 두 범위를 요청한다 — v1은 public 저장소만 다루고(`git.fetch`가 토큰 없이 돈다), push와 저장소 생성은 `public_repo`로 충분하다. `admin:repo_hook`은 앱이 push 통지를 걸기 위한 것이다(7장, 카드 AF) — 그 계정의 저장소 훅을 읽고 쓸 수 있으므로 **훅 말고는 쓰지 않는다**(만들기만 하고 지우지 않는다). 범위를 넓히기 전에 받은 토큰은 **다음 로그인까지 옛 범위로 남아** 통지 걸기가 실패한다. `repo`는 그 사람의 모든 비공개 저장소 전체 권한이라 쓰지 않는 것을 받는 셈이었다. 범위를 줄이기 전에 받은 토큰은 다음 로그인 때까지 옛 범위로 남는다. OAuth 앱에서 **"Expire user access tokens"를 끈다** — 토큰 갱신 경로가 없어(MS-006 미결) 만료되면 push가 죽는다. git 작업 사본의 `.git/config`에는 토큰을 남기지 않는다 — push할 때만 URL에 붙인다(MS-009 `git.clone`·`commit_push`).
 
 ### 5.1 비밀키 교체
 
@@ -281,8 +281,8 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 | `SESSION_SECRET` | 없으면 `SECRET_KEY` | 세션 쿠키 서명. 토큰 키와 나눈다 (5.1) |
 | `GITHUB_CLIENT_ID` | — | OAuth 앱 |
 | `GITHUB_CLIENT_SECRET` | — | OAuth 앱 |
-| `WEBHOOK_SECRET` | 없음 | push webhook 서명 검증 (7장) |
-| `PUBLIC_BASE_URL` | 없음 | 공개 주소. 비면 로컬만 (8장) |
+| `WEBHOOK_SECRET` | 없음 | push webhook 서명 검증 (7장). **비면 통지를 걸지도 받지도 않는다** |
+| `PUBLIC_BASE_URL` | 없음 | 공개 주소. 비면 로컬만 (8장). OAuth 콜백과 **webhook 주소**(7장) 둘에 쓴다 |
 | `POLL_INTERVAL_SECONDS` | 300 | 폴링 주기. 0 이하면 폴링을 켜지 않는다 |
 | `DIFF_CONTEXT_LINES` | 3 | diff에서 앞뒤로 함께 보여줄 줄 수 |
 | `PUSH_RETRIES` | 3 | push 거부 시 rebase 후 재시도 횟수 |
@@ -345,7 +345,11 @@ C7 때문에 원래는 webhook을 받을 수 없었으나, Cloudflare Tunnel로 
 - **주 경로**: GitHub webhook → `/hooks/github` → 서명 검증 → fetch → 변경 파일 파이프라인 (UC-G1 기본 흐름)
 - **보조 경로**: 5분 주기 폴링. webhook 유실과 서버가 꺼져 있던 구간을 메운다 (UC-G1 확장 `1a`, `1b`)
 
-두 경로 모두 있지만 **v1은 폴링만 쓴다** — Quick Tunnel 주소가 바뀌어 webhook을 걸 수 없다(5장). webhook 수신 엔드포인트(`POST /hooks/github`)는 구현되어 있고 서명 검증도 되므로, 고정 주소가 생기면 저장소에 등록만 하면 된다. 노트북이 꺼져 있던 동안의 커밋은 켜질 때 따라잡기가 가져온다 — 이 절차가 폴링만 쓸 때 더 중요하다.
+**앱이 통지를 건다(카드 AF).** 프로젝트를 등록할 때 `POST /repos/{owner}/{repo}/hooks`로 push 통지를 걸고, 이미 있는 저장소는 관리 화면(UI-14)에서 눌러 건다. 주소는 `{PUBLIC_BASE_URL}/hooks/github`, 비밀번호는 `WEBHOOK_SECRET`. **둘 중 하나라도 비면 걸지 않는다** — 받는 쪽도 비밀번호가 비면 전부 거부한다(빈 키로 HMAC을 계산하면 소스를 본 누구나 통과한다). 거는 데 실패해도 **등록은 그대로 마친다**(UC-A1 4a) — 통지는 빠르게 하려는 수단이고 폴링이 메운다.
+
+**받는 쪽은 좁게 받는다.** `push` 이벤트의 `refs/heads/main`만 처리한다. 작업 브랜치 push를 받으면 그 브랜치 끝이 「마지막 처리 커밋」에 박혀 이후 밀림 계산이 어긋나고, 브랜치 삭제 통지는 지울 커밋이 없다. 무시한 것도 202로 답하되 사유를 본문에 담는다 — GitHub 전달 로그에서 보이게.
+
+**v1 초기에는 폴링만 썼다** — Quick Tunnel 주소가 바뀌어 통지를 걸 수 없었다. 고정 주소(Named Tunnel)는 카드 Q에서 생겼고, 카드 AF가 그 위에 등록을 붙였다. 노트북이 꺼져 있던 동안의 커밋은 켜질 때 따라잡기가 가져온다.
 
 **밀린 커밋이 여럿이면 최종 상태만 저장한다.** `last_processed_commit..HEAD` 범위의 변경 파일을 한 번에 읽어 파일마다 버전 하나. 중간 커밋은 git에만 남는다. 커밋마다 버전을 복원하는 건 재구축(UC-S6)뿐이다.
 

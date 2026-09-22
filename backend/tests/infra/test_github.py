@@ -16,6 +16,44 @@ def _sig(body: bytes, secret: str = settings.WEBHOOK_SECRET) -> str:
 
 
 # ── verify_signature ──
+def test_verify_signature_rejects_everything_when_secret_is_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """비밀번호가 비면 전부 거부 — 빈 키 HMAC은 소스를 본 누구나 만든다 (카드 AF)."""
+    monkeypatch.setattr(settings, "WEBHOOK_SECRET", "")
+    body = b'{"ref":"refs/heads/main"}'
+    assert gh.verify_signature(body, _sig(body, "")) is False  # 올바른 계산값이어도
+    assert gh.verify_signature(body, "") is False
+
+
+# ── create_hook ──
+async def test_create_hook_creates_once_and_reuses_same_url(mock_github) -> None:
+    url = "https://syncdoc.example/hooks/github"
+    existing: list[dict] = []
+
+    def h(req: httpx.Request) -> httpx.Response:
+        if req.method == "GET":
+            return httpx.Response(200, json=existing)
+        return httpx.Response(201, json={"id": 77})
+
+    calls = mock_github(h)
+    assert await gh.create_hook("t", "o", "r", url, "s") == 77
+    body = calls[-1].content.decode()
+    assert '"events": ["push"]' in body.replace("'", '"') or "push" in body
+    assert "s" in body  # 비밀번호는 GitHub에만 보낸다
+
+    existing.append({"id": 77, "config": {"url": url}})
+    n = len(calls)
+    assert await gh.create_hook("t", "o", "r", url, "s") == 77  # 이미 있으면 안 만든다
+    assert all(c.method == "GET" for c in calls[n:])
+
+
+async def test_create_hook_without_permission_is_unauthorized(mock_github) -> None:
+    mock_github(lambda req: httpx.Response(404, json={"message": "Not Found"}))
+    with pytest.raises(Unauthorized):
+        await gh.create_hook("t", "o", "r", "https://x/hooks/github", "s")
+
+
 def test_verify_signature_accepts_valid_and_rejects_others() -> None:
     body = b'{"ref":"refs/heads/main"}'
     assert gh.verify_signature(body, _sig(body)) is True

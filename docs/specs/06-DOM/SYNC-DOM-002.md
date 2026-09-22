@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -186,11 +186,18 @@ classDiagram
         +int behind_by
         +datetime fetched_at
         +str fetch_error
+        +int hook_id
+        +str hook_error
     }
 ```
 
 관계
 - `Repository` 1 — 1 `Project`
+
+`hook_id`·`hook_error`는 **push 통지를 걸었는지**를 들고 있다(카드 AF). 걸었으면 GitHub이 준 훅
+번호, 못 걸었으면 사유. 둘 다 비면 아직 안 걸어 본 것이다. 화면이 이 셋을 「걸림 / 안 걸림 /
+실패」로 보여주고, 실패면 사유를 말한다 — 통지가 없으면 반영이 최대 5분 늦는데 그 사실을
+사람이 알 길이 있어야 한다.
 
 `behind_by`·`fetched_at`은 **폴링이 갱신하고 화면은 읽기만 한다.** 관리 화면(UI-14)과 프로젝트
 상세(UI-4)가 이 값을 그대로 보여준다. 화면이 열릴 때마다 `git fetch`를 돌리면 저장소 수만큼
@@ -551,6 +558,8 @@ classDiagram
         +int behind_by
         +datetime fetched_at
         +str fetch_error
+        +int hook_id
+        +str hook_error
     }
     ProjectService --> Project
     ProjectService --> Repository

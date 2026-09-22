@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -152,16 +152,29 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
       required: true
       schema:
         type: string
+    - in: header
+      name: X-GitHub-Event
+      required: true
+      schema:
+        type: string
+      description: "push만 처리한다. 그 밖(ping 등)은 202 ignored"
     requestBody:
       content:
         application/json:
           schema:
             type: object
+            description: >
+              GitHub push 페이로드. ref가 refs/heads/main이 아니거나 after가 0으로만 된
+              해시(브랜치 삭제)면 처리하지 않는다 (UC-G1 1c·1d)
     responses:
       '202':
-        description: 접수. 파이프라인은 비동기
+        description: >
+          접수. 파이프라인은 비동기. 처리하지 않은 통지도 202이고 본문 ignored에 사유가 담긴다 —
+          GitHub 전달 로그에서 보이게
       '401':
-        description: 서명 불일치
+        description: 서명 불일치. **WEBHOOK_SECRET이 비면 전부 여기로** (빈 키 HMAC은 누구나 만든다)
+      '404':
+        description: 등록되지 않은 저장소
 ```
 
 ### 3.3 프로젝트
@@ -993,6 +1006,52 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
         $ref: '#/components/responses/Problem'
 ```
 
+#### POST/api/admin/repos/{code}/hook push 통지를 건다
+
+화면 [[SYNC-UI-001#UI-14]] · 유스케이스 [[SYNC-UC-001#UC-A1]] 4 · 서비스 [[SYNC-MS-001#ProjectService.ensure_hook]]
+
+```yaml
+/api/admin/repos/{code}/hook:
+  post:
+    summary: >
+      저장소에 push 통지를 건다 (UI-14). 이미 걸려 있으면 그대로 둔다. 소유자만.
+      공개 주소나 비밀번호가 비면 걸지 않고 사유를 돌려준다
+    parameters:
+    - $ref: '#/components/parameters/code'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HookStatus'
+      '404':
+        $ref: '#/components/responses/Problem'
+```
+
+---
+
+#### POST/api/admin/repos/{code}/sync 지금 가져오기
+
+화면 [[SYNC-UI-001#UI-14]] · 유스케이스 [[SYNC-UC-001#UC-G2]] · 서비스 [[SYNC-MS-001#ProjectService.sync_now]]
+
+```yaml
+/api/admin/repos/{code}/sync:
+  post:
+    summary: >
+      아직 읽지 않은 커밋을 지금 읽는다 (UI-14, [[SYNC-UC-001#UC-G2]]). 주기 확인을
+      기다리지 않는 길. 읽을 것이 없으면 0이고 확인 시각만 새로 적힌다. 소유자만
+    parameters:
+    - $ref: '#/components/parameters/code'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncResult'
+      '404':
+        $ref: '#/components/responses/Problem'
+```
+
 ---
 
 ## 4. 스키마
@@ -1555,6 +1614,38 @@ components:
           format: date-time
           nullable: true
           description: behind_by를 잰 시각. 화면이 "언제 기준인지" 보여준다
+        hook:
+          type: string
+          enum: [ok, none, error]
+          description: >
+            push 통지가 걸려 있나 (카드 AF). ok면 반영이 몇 초, none이면 주기 확인(최대 5분)에만
+            기댄다. error면 hook_error에 사유
+        hook_error:
+          type: string
+          nullable: true
+          description: 통지를 걸지 못한 이유. hook이 error일 때만 채워진다
+    HookStatus:
+      type: object
+      properties:
+        hook:
+          type: string
+          enum: [ok, none, error]
+        hook_error:
+          type: string
+          nullable: true
+        created:
+          type: boolean
+          description: 이번에 새로 걸었나. 이미 있었으면 false
+    SyncResult:
+      type: object
+      properties:
+        docs:
+          type: integer
+          description: 이번에 읽은 문서 수. 0이면 이미 최신이었다
+        fetched_at:
+          type: string
+          format: date-time
+          description: 방금 확인한 시각
     RebuildResult:
       type: object
       properties:

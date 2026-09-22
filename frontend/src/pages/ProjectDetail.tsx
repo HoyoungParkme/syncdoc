@@ -240,7 +240,9 @@ export function ProjectDetail() {
                 밀린 커밋{' '}
                 <span data-el="7.2" className={d.behind_by ? 'behind' : undefined}>
                   {d.behind_by ?? '—'}
-                </span>
+                </span>{' '}
+                {/* 언제 기준인지 — 없으면 낡은 값이 「지금」처럼 읽힌다 (카드 AF) */}
+                {d.fetched_at && <span data-el="7.3">{ago(d.fetched_at)} 확인</span>}
               </div>
             )}
           </div>

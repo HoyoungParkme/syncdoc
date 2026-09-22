@@ -46,3 +46,6 @@ class Repository(Base):
     fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # 마지막 폴링이 실패한 이유. 성공하면 비운다 — 폴링이 조용히 멈추는 것을 막는다 (#46)
     fetch_error: Mapped[str | None] = mapped_column(String(300))
+    # push 통지 (카드 AF). 걸렸으면 GitHub이 준 번호, 못 걸었으면 사유. 둘 다 비면 안 걸어 봤다
+    hook_id: Mapped[int | None] = mapped_column()
+    hook_error: Mapped[str | None] = mapped_column(String(300))

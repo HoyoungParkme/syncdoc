@@ -87,30 +87,73 @@ async def test_webhook_admin_and_catch_up(client: TestClient, scoped: Session, p
     write_commit_push(other, RFQ_FILE, RFQ, "spec(EXMP-RFQ-001): 초안")
     head = g(remote, "rev-parse", "main")
     payload = json.dumps(
-        {"after": head, "repository": {"clone_url": str(remote), "html_url": "x"}}
+        {
+            "ref": "refs/heads/main",
+            "after": head,
+            "repository": {"clone_url": str(remote), "html_url": "x"},
+        }
     ).encode()
+    push = {"X-GitHub-Event": "push", "Content-Type": "application/json"}
     # 서명 불일치 → 401 · 모르는 저장소 → 404 · 정상 → 202, 응답 뒤 파이프라인이 돈다
     assert (
         client.post(
             "/hooks/github",
             content=payload,
-            headers={"X-Hub-Signature-256": "sha256=bad", "Content-Type": "application/json"},
+            headers={"X-Hub-Signature-256": "sha256=bad", **push},
         ).status_code
         == 401
     )
-    bogus = json.dumps({"after": head, "repository": {"clone_url": "https://x/none.git"}}).encode()
+    bogus = json.dumps(
+        {"ref": "refs/heads/main", "after": head, "repository": {"clone_url": "https://x/none.git"}}
+    ).encode()
     assert (
         client.post(
             "/hooks/github",
             content=bogus,
-            headers={"X-Hub-Signature-256": _sign(bogus), "Content-Type": "application/json"},
+            headers={"X-Hub-Signature-256": _sign(bogus), **push},
         ).status_code
         == 404
     )
+    # push·main만 받는다 (카드 AF) — 무시한 것도 202이고 사유가 본문에 담긴다
+    for hdr, body, why in (
+        ({"X-GitHub-Event": "ping"}, payload, "event="),
+        (
+            {"X-GitHub-Event": "push"},
+            json.dumps(
+                {
+                    "ref": "refs/heads/card/X",
+                    "after": head,
+                    "repository": {"clone_url": str(remote)},
+                }
+            ).encode(),
+            "ref=",
+        ),
+        (
+            {"X-GitHub-Event": "push"},
+            json.dumps(
+                {
+                    "ref": "refs/heads/main",
+                    "after": "0" * 40,
+                    "repository": {"clone_url": str(remote)},
+                }
+            ).encode(),
+            "branch-deleted",
+        ),
+    ):
+        rr = client.post(
+            "/hooks/github",
+            content=body,
+            headers={
+                "X-Hub-Signature-256": _sign(body),
+                "Content-Type": "application/json",
+                **hdr,
+            },
+        )
+        assert rr.status_code == 202 and why in rr.json()["ignored"]
     r = client.post(
         "/hooks/github",
         content=payload,
-        headers={"X-Hub-Signature-256": _sign(payload), "Content-Type": "application/json"},
+        headers={"X-Hub-Signature-256": _sign(payload), **push},
     )
     assert r.status_code == 202
     assert SpecService(scoped).get_document("EXMP-RFQ-001").current_version_no == 1

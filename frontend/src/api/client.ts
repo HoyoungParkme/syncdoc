@@ -168,6 +168,8 @@ export interface ProjectDetail extends ProjectSummary {
   /** 폴링이 DB에 적어 둔 값 그대로. 이 화면이 fetch를 돌리지 않는다 (UI-4 요소 7) */
   last_processed_commit: string | null
   behind_by: number | null
+  /** behind_by를 잰 시각 (카드 AF) */
+  fetched_at: string | null
 }
 export interface DocItem {
   item_id: string
@@ -265,7 +267,21 @@ export interface RepoStatus {
   last_processed_commit: string | null
   synced_at: string | null
   behind_by: number | null
+  /** behind_by를 잰 시각. 「최신」이 언제 기준인지 (카드 AF) */
+  fetched_at: string | null
   error: string | null
+  /** push 통지 — ok · none · error */
+  hook: string
+  hook_error: string | null
+}
+export interface HookStatus {
+  hook: string
+  hook_error: string | null
+  created: boolean
+}
+export interface SyncResult {
+  docs: number
+  fetched_at: string | null
 }
 export interface RebuildResult {
   /** README를 새 판으로 커밋했나 (카드 AB) */

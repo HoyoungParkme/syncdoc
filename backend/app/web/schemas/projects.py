@@ -73,6 +73,7 @@ class ProjectDetail(ProjectSummary):
     recent_changes: list[Version]
     last_processed_commit: str | None
     behind_by: int | None
+    fetched_at: datetime | None
 
     @classmethod
     def of(cls, p: ProjectDetailDto) -> ProjectDetail:  # type: ignore[override]
@@ -82,6 +83,7 @@ class ProjectDetail(ProjectSummary):
             recent_changes=[Version.of(v) for v in p.recent_changes],
             last_processed_commit=p.last_processed_commit,
             behind_by=p.behind_by,
+            fetched_at=p.fetched_at,
         )
 
 
