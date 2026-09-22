@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-007
 type: MS
 title: MINISPEC — pipeline — 쓰기 조율
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -77,6 +77,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 | `restore` | 되살리기 중 | `restore_document`만 True — 2단계의 `document-trashed` 검사를 지난다 |
 
 **처리**
+0. if `session is None and entry != github` → `read_pending(code, author.user)` — **락 밖에서, 쓰기 전에**([[#pipeline.read_pending]]). 세션이 넘어왔으면 부른 쪽(`change_status`·`revert`·`restore_document`)이 이미 읽었고, `github`는 자기가 처리 중이라 부르면 무한 재귀다
 
 1. `code = project_code if doc_id is None else doc_id.split("-")[0]` · `project = ProjectService.get(code) if entry == github else ProjectService.get_owned(code, author.user)` — 사람이 있는 입구(mcp·web_revert·web_status)는 소유자만 연다. 남의 것이면 `! not-found {resource: project}`, **문서를 읽기 전에** · `repo = project.repository`. **저장소 락 획득** (`asyncio.Lock`, 저장소별). 이후 전부 락 안. **세션도 여기서 연다** — 서비스는 세션을 열지 않는다(DEV-10)
 2. if `doc_id is not None` → `document = spec.get_document(doc_id)`, `doc_type = document.doc_type` · if 없음 → `! not-found` · **if `document.trashed_at`이고 `entry != github`이고 되살리기가 아니면 → `! document-trashed`** — 휴지통 문서는 되살린 뒤 고친다. github는 파일이 다시 push된 것이니 그 자체가 되살리기(`save` 7이 `trashed_at`을 비운다)
@@ -98,7 +99,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 
    **서버가 에이전트의 본문을 고치는 유일한 자리다.** mcp·web_revert는 커밋을 하나로 둔다 — 저장마다 `status(…)` 커밋이 하나씩 더 쌓이면 이력이 본문 변경보다 상태 줄로 더 두꺼워진다. github만 둘이 되는 것은 첫 커밋을 우리가 만들지 않았기 때문이다
 
-7. if `entry != github` → `commit_hash = git.commit_push(repo.workdir, message, author, path=STD-001 1.1 경로, content=body)` · if 실패 → `! push-failed {reason}`, 락 해제. **여기까지 DB 쓰기 없음**
+7. if `entry != github` → `commit_hash = git.commit_push(repo.workdir, message, author, path=STD-001 1.1 경로, content=body)` — **본문은 부른 쪽이 정한다.** 상태 토글은 저장소에서 읽은 것(change_status 4), 되돌리기는 옛 버전, MCP는 에이전트가 준 것이다. 0단계가 밀린 것을 먼저 읽었으므로 여기서 덮을 남의 커밋이 없다 · if 실패 → `! push-failed {reason}`, 락 해제. **여기까지 DB 쓰기 없음**
 8. **트랜잭션 시작**
    - if 생성 → `version = spec.create(project_id, doc_id, doc_type, body, commit_hash, author, message, validate_result=4단계 결과)`
    - if `entry == web_status` → `spec.apply_status(document, body, commit_hash, author.user, reason)` (Document.status·current_body 갱신 + StatusChange). **Version 없음.** 9~10a 건너뛰고 14로
@@ -145,6 +146,37 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 
 ---
 
+#### pipeline.read_pending 쓰기 전에 밀린 커밋을 읽는다
+
+**시그니처**
+```python
+async def read_pending(code: str, user: User) -> int
+```
+
+근거: [[SYNC-UC-001#UC-H8]] 1d · [[SYNC-UC-001#UC-G1]] · #137
+
+**입력** 프로젝트 코드, 누른 사람
+
+**처리**
+1. `ProjectService.get_owned(code, user)` — 남의 것이면 `! not-found {resource: project}`. **쓰기 경로의 소유 검사를 겸한다**
+2. `head = git.fetch(repo.workdir)`
+3. if `head == repo.last_processed_commit` → `→ 0`. 밀린 것이 없으면 `fetch` 한 번으로 끝난다
+4. `results = process_commit(repo, head)` → `→ len(results)`
+
+**왜 이것이 먼저인가 (#137).** 저장소에 쓰는 일은 전부 「덮어쓰기」다. 아직 읽지 않은 커밋이 있는 채로 쓰면 그 내용이 사라지는데, `git.commit_push`가 `reset --hard origin/main` 뒤에 본문을 덮으므로 push가 거부되지도 않아 **조용히** 사라진다. 읽기를 먼저 하면 덮을 것이 없다.
+
+**락 밖에서 부른다.** `process_commit`은 파일마다 `save_pipeline`이 같은 `_lock(code)`를 잡았다 논다 — 락 안에서 부르면 교착한다(재진입 불가). 그래서 부르는 자리는 전부 세션·락을 열기 **전**이다.
+
+**부르는 곳** [[#pipeline.change_status]] 0 · [[#pipeline.revert]] 0 · [[#pipeline.restore_document]] 0 · [[#pipeline.trash_document]] 0 · [[#pipeline.save_pipeline]] 0(세션을 안 받았고 `entry != github`일 때만 — 세션이 넘어온 것은 부른 쪽이 이미 읽었다는 뜻이고, `github`는 자기가 처리 중이라 부르면 무한 재귀다)
+
+**출력** 읽어 반영한 문서 수. 밀린 것이 없으면 0
+
+**예외** `not-found`(1) · `git.fetch` 실패는 그대로 올린다 — 저장소에 닿지 못하면 쓰지도 못한다
+
+**테스트 관점** 밀린 것이 없으면 0이고 커밋이 안 생긴다 · 밖에서 push한 뒤 부르면 그 문서가 DB에 들어오고 `last_processed_commit`이 head가 된다 · 두 번 불러도 두 번째는 0(멱등) · 남의 프로젝트 → `not-found` · **`github` 경로에서는 불리지 않는다**(재귀 방지)
+
+---
+
 #### pipeline.change_status 초안 ⇄ 완료 토글
 
 **시그니처** `async def change_status(doc_id: str, to: DocStatus, user: User, reason: str | None = None) -> DocumentSummary`
@@ -154,7 +186,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 **입력** `doc_id`, 목표 상태 `to`(`draft` | `approved`), 누른 사람, 사유(선택 — 웹 토글은 안 보낸다)
 
 **처리**
-0. `ProjectService.get_owned(doc_id.split("-")[0], user)` — 남의 것이면 `! not-found {resource: project}`. 문서를 읽기 전에
+0. `read_pending(code, user)` — **밀린 커밋을 먼저 읽는다**([[#pipeline.read_pending]], UC-H8 1d). 소유 검사도 여기서 끝난다. 문서를 읽기 전에, 락 밖에서
 1. `document = get_document(doc_id)` · `trashed_at`이면 `! document-trashed`
 2. `missing = 중복 접은 [e.raw_target for e in ReferenceService.upstream_of_document(document.id, include_missing=True) if e.is_missing]`
 2a. if `to == approved and (document.has_convention_error or document.incomplete_warnings or missing)` → `! status-blocked {convention_error_detail, warnings: incomplete_warnings + [f"ref.missing: {t}" for t in missing]}` (UC-H8 1a). `draft`로 내리는 것은 막지 않는다. **혼자 써도 이 검사는 남는다** — 완료는 「규약에 맞고 참조가 다 이어진 문서」라는 뜻이고, 그 뜻이 없으면 UI-5 4a 배너가 「알아두세요」로 약해진다
@@ -162,7 +194,9 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 2c. `warnings`에 `ref.missing: {대상}` 꼴로 섞어 보낸다. `incomplete_warnings`가 이미 `section.missing: 시나리오` 꼴이라 같은 규격이고, 화면이 `:` 앞을 rule로 잘라 한국어로 옮긴다([[SYNC-STD-001]] 4장 화면 문구 열)
 3. 없음 — 상위 대조가 있던 자리. 카드 V에서 걷어냈다. 완료는 사람 하나가 누르는 토글이다
 3a. if `document.status == to` → 아무것도 안 하고 현재 반환 (멱등)
-4. `new_body` = `current_body`의 frontmatter `status:` 줄만 교체
+4. `body = git.read(repo.workdir, STD-001 1.1 경로, "origin/main")` → `new_body` = 그 본문의 frontmatter `status:` 줄만 교체. **원본이 진실이다**([[SYNC-DOM-001#StatusChange]]) — `current_body`는 조회 캐시라 쓰기 출처로 쓰지 않는다. 0단계가 방금 `fetch`했으므로 `origin/main`이 최신이다
+4a. 저장소에서 못 읽으면(`GitError` — 파일이 아직 없다) `current_body`로 떨어지고 경고 로그 한 줄. 이때 커밋은 파일을 만드는 복구가 된다
+4b. **왜 저장소에서 읽나 (#137).** `current_body`로 만든 본문을 커밋하면, 아직 읽지 않은 커밋이 있을 때 그 내용이 통째로 되돌아간다. `git.commit_push`가 `reset --hard origin/main` 뒤에 본문을 덮어쓰므로 push가 거부되지도 않아 조용히 사라진다. 실제로 카드 AA 완료란이 그렇게 날아갔다
 5. `save_pipeline(entry=web_status, doc_id, None, new_body, expected_version=current_version_no, project_code=None, author=Author(human, user, None, web), message=f"status({doc_id}): {from} → {to}\n\n{reason or ''}", reason=reason)` — **같은 세션**. `save_pipeline`이 세션을 인자로 받거나(있으면 재사용) 없으면 연다. push 후 `spec.apply_status(…, reason)`
 6. `→ DocumentSummary`
 
@@ -170,9 +204,9 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 
 **예외** `not-found`(0) · `status-blocked` · `document-trashed` · 파이프라인의 `version-conflict`·`push-failed` 전파
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-007#pipeline.save_pipeline]] [[SYNC-MS-003#ReferenceService.upstream_of_document]]
+**호출하는 것** [[SYNC-MS-007#pipeline.read_pending]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-007#pipeline.save_pipeline]] [[SYNC-MS-003#ReferenceService.upstream_of_document]] · `git.read`
 
-**테스트 관점** 규약 오류 문서를 `approved`로 → blocked · **미존재 참조가 있는 문서를 `approved`로 → blocked이고 `warnings`에 `ref.missing:`이 있다** · 같은 문서를 `draft`로 → 됨 · **상대 문서가 들어와 `resolve_missing`이 풀면 그 문서를 다시 저장하지 않아도 완료된다**(읽을 때 계산한다는 증거) · 정상 완료 → frontmatter `status: approved` 커밋 존재, Version 없음, StatusChange에 commit_hash · 같은 상태로 다시 → 커밋 없음 · `reason` 없이 불러도 된다 · 휴지통 문서 → `document-trashed` · **남의 프로젝트 문서 → `not-found`(project), 상태 그대로**
+**테스트 관점** **저장소를 앞세워 놓고 토글 → 그 커밋의 내용이 살아 있고 상태 커밋의 diff가 한 줄 추가·한 줄 삭제(#137)** · 규약 오류 문서를 `approved`로 → blocked · **미존재 참조가 있는 문서를 `approved`로 → blocked이고 `warnings`에 `ref.missing:`이 있다** · 같은 문서를 `draft`로 → 됨 · **상대 문서가 들어와 `resolve_missing`이 풀면 그 문서를 다시 저장하지 않아도 완료된다**(읽을 때 계산한다는 증거) · 정상 완료 → frontmatter `status: approved` 커밋 존재, Version 없음, StatusChange에 commit_hash · 같은 상태로 다시 → 커밋 없음 · `reason` 없이 불러도 된다 · 휴지통 문서 → `document-trashed` · **남의 프로젝트 문서 → `not-found`(project), 상태 그대로**
 
 ---
 
@@ -184,8 +218,9 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 
 **입력** `doc_id` · `author` — MCP면 `_agent_author`, 웹이면 `Author(human, user, None, web_status)` · `confirm` — MCP는 에이전트가 준 것, 웹은 `True`(다이얼로그 13이 받았다)
 
-**처리** — 저장소 락 안
-0. `ProjectService.get_owned(doc_id.split("-")[0], author.user)` — 남의 것이면 `! not-found {resource: project}`
+**처리**
+0. `read_pending(code, author.user)` — **락 밖에서, 쓰기 전에**([[#pipeline.read_pending]]). 소유 검사도 여기서 끝난다
+— 아래는 저장소 락 안 —
 1. `document = spec.get_document(doc_id)` · 없으면 `! not-found` · `trashed_at`이면 `! document-trashed`
 2. 끊어질 것 — `inbound = reference.inbound_of_document(id)`(이름으로). **막지 않는다** — 보여준다
 3. if `not confirm` → `! document-deletion-needs-confirm {doc_id, title, version_count, inbound_refs}`. 웹은 여기 안 온다
@@ -208,7 +243,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 근거: [[SYNC-SEQ-001#SEQ-23]] · [[SYNC-UC-001#UC-A8]] · [[SYNC-UC-001#UC-H18]] 4~5 · [[SYNC-API-002#restore_document]] · [[SYNC-API-001#POST/api/docs/{docId}/restore]]
 
 **처리**
-0. `ProjectService.get_owned(doc_id.split("-")[0], author.user)` — 남의 것이면 `! not-found {resource: project}`
+0. `read_pending(code, author.user)` — **밀린 커밋을 먼저 읽는다**([[#pipeline.read_pending]]). 소유 검사도 여기서. 락 밖
 1. `document = spec.get_document(doc_id)` · `trashed_at` 없으면 `! document-not-trashed`
 2. `hash = spec.trash_commit(document.id)` · `body = git.read(repo.workdir, path, f"{hash}^")` — 지우기 직전 내용
 3. `body`의 frontmatter `status:`를 `draft`로 — DB가 `draft`라 mcp 경로의 `frontmatter.status_change`에 안 걸리게
@@ -250,8 +285,9 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 근거: [[SYNC-SEQ-001#SEQ-7]] · [[SYNC-UC-001#UC-H7]] · [[SYNC-API-001#POST/api/docs/{docId}/revert]] · 조율이라 pipeline
 
 **처리**
-0. `ProjectService.get_owned(doc_id.split("-")[0], user)` — 남의 것이면 `! not-found {resource: project}`
+0. `read_pending(code, user)` — **밀린 커밋을 먼저 읽는다**([[#pipeline.read_pending]]). 소유 검사도 여기서. 락 밖
 1. `document = spec.get_document(doc_id)`; `old_body = spec.version_body(doc_id, to_version)` · 없으면 그쪽에서 `! not-found`
+1a. 본문은 **`versions.body`에서 온다** — 되돌리기는 옛 버전을 쓰는 것이 목적이라 지금 저장소를 읽을 수 없다. 이름이 바뀐 문서는 옛 커밋에서 옛 경로에 살아(#39) 해시로 읽는 길도 안전하지 않다. 0단계가 밀린 것을 먼저 흡수하므로 남의 커밋을 덮지는 않는다
 2. if `to_version == document.current_version_no` → `! already-current`(422)
 3. `save_pipeline(entry=web_revert, doc_id, None, old_body, expected_version=current_version_no, project_code=None, author=Author(human, user, None, web), message=f"revert({doc_id}): v{current} → v{to_version} 내용으로", changed_items=None, confirm_item_deletion)`
 4. `→ SaveResult`
