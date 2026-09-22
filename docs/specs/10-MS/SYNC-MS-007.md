@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-007
 type: MS
 title: MINISPEC — pipeline — 쓰기 조율
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -162,7 +162,7 @@ async def read_pending(code: str, user: User) -> int
 1a. **읽기 락**(`_read_lock(code)`, 쓰기 락과 다른 것)을 잡는다 — 두 요청이 같은 작업 사본에 동시에 `git fetch`를 걸면 git이 인덱스 잠금으로 죽는다. 락 안에서 `last_processed_commit`을 **다시 읽는다**: 앞서 기다린 요청이 이미 따라잡아 놨을 수 있다
 1b. **쓰기 락과 따로인 이유** — 4단계의 `process_commit`이 파일마다 쓰기 락을 잡는다. 같은 락이면 교착한다
 2. `head = git.fetch(repo.workdir)`
-3. if `head == repo.last_processed_commit` → `→ 0`. 밀린 것이 없으면 `fetch` 한 번으로 끝난다
+3. if `head == repo.last_processed_commit` → **`fetched_at`을 지금으로 적고** `→ 0`. 방금 확인했다는 사실 자체가 화면이 보여줄 값이다(카드 AF) — 안 적으면 1초 전에 확인한 저장소가 5분 전으로 보인다. `behind_by`도 0으로 둔다(방금 재서 같았다)
 3a. `last_processed_commit`이 **비어 있어도 `→ 0`.** 그 값이 비는 것은 등록 중뿐이고([[SYNC-MS-001#ProjectService.init_project]]가 첫 커밋 해시를, `import_existing`은 재구축이 head를 적는다) 그 둘은 자기가 저장소를 읽는다
 4. `results = process_commit(repo, head)` → `→ len(results)`
 
@@ -176,7 +176,7 @@ async def read_pending(code: str, user: User) -> int
 
 **예외** `not-found`(1) · `git.fetch` 실패는 그대로 올린다 — 저장소에 닿지 못하면 쓰지도 못한다
 
-**테스트 관점** 같은 프로젝트에 동시에 둘이 써도 `fetch`가 겹치지 않는다(읽기 락) · 밀린 것이 없으면 0이고 커밋이 안 생긴다 · 밖에서 push한 뒤 부르면 그 문서가 DB에 들어오고 `last_processed_commit`이 head가 된다 · 두 번 불러도 두 번째는 0(멱등) · 남의 프로젝트 → `not-found` · **`github` 경로에서는 불리지 않는다**(재귀 방지)
+**테스트 관점** 같은 프로젝트에 동시에 둘이 써도 `fetch`가 겹치지 않는다(읽기 락) · 밀린 것이 없으면 0이고 커밋이 안 생긴다 · **밀린 것이 없어도 `fetched_at`이 갱신된다** · 밖에서 push한 뒤 부르면 그 문서가 DB에 들어오고 `last_processed_commit`이 head가 된다 · 두 번 불러도 두 번째는 0(멱등) · 남의 프로젝트 → `not-found` · **`github` 경로에서는 불리지 않는다**(재귀 방지)
 
 ---
 
