@@ -834,7 +834,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `init_specs`가 템플릿 12개를 복사하지 않는다 — 빈 단계 디렉터리 13 + README, **14파일**. README 첫 문단이 `SPECS_URL`로 싱크독 저장소의 규약·템플릿을 가리킨다. `git.sync_readme` 신설, `ProjectService.rebuild_index`가 인덱스보다 **먼저** 부른다. `RebuildResult.readme_updated` |
 | 테스트 | `init_specs` 14파일·링크·`_templates` 없음 · `sync_readme` 셋(낡음·같음·없음) · `rebuild_index`가 README 먼저, 두 번째는 커밋 없음 · 남의 프로젝트 not-found |
 | 선행 | — |
-| 완료 | — |
+| 완료 | 2026-09-22 · 브랜치 `card/AB-readme-links` · spec 11 + code 2 · 테스트 220(신설 4, 고침 5) · `validate` 0/0 · `check_code` 110/110 · `check_ui` 12/12 · `check_dom` 10·10·10 · `check_tokens` 91/0 · `check_view_css` 셋 다 같음 · 사람 확인은 배포 뒤(HB에서 재구축 한 번) · 되먹임: `sync_readme`는 `fetch` 뒤에 비교해야 한다 — `commit_push`가 토큰 URL로 밀어 `origin/main` 추적 참조가 안 갱신된다(MS-009에 반영) · 발견 #137(상태 토글이 아직 처리 안 된 커밋을 되돌린다 — 카드 AA 완료란이 실제로 날아갔다) |
 
 **왜 카드인가.** 사본을 복사하는 구조 자체가 틀렸다. 실측으로 저장소 8/8이 낡은 README를 들고 있었고 그중 넷은 두 세대 전이라 작업 단위 규약(1.8)과 DOM 셋 순서(2.6)가 아예 없었다 — MS-009가 「여기 없으면 규약이 없는 것과 같다」고 못 박은 두 줄이다. 템플릿은 `get_template`이 이미 내장본으로 우회하고 있었으므로(#94) 저장소 사본은 아무도 안 읽는 낡은 짐이었다.
 
@@ -912,7 +912,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | Y | `card/Y-ask-react` | `eef87b6`~ | #109 | 2026-09-22 |
 | Z | `card/Z-wf-iframe` | `bccf473`~ | #121 | 2026-09-22 |
 | AA | `card/AA-sync-redesign` · hb#1 | `9fab38b` | #131 | 2026-09-22 |
-| AB | `card/AB-readme-links` | — | — | — |
+| AB | `card/AB-readme-links` | `6a0fd97`~ | — | 2026-09-22 |
 | AC | `card/AC-wf-stack` | — | — | — |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
