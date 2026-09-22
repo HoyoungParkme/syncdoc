@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
 
-**진행 상황**: 카드 40장. **A~AE 39장 완료**(2026-09-22), AF 진행 중.
+**진행 상황**: 카드 40장. **A~AF 40장 완료**(2026-09-22).
 
 ---
 
@@ -896,7 +896,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `github.create_hook` 신설 — 등록할 때 앱이 push 통지를 걸고(실패해도 등록은 마친다), 이미 있는 저장소는 관리 화면 버튼으로. 받는 쪽은 `push`·`refs/heads/main`만, 비밀번호가 비면 전부 거부. `ProjectService.ensure_hook`·`sync_now`(본체는 `read_pending` 재사용) · `read_pending`이 밀린 게 없어도 `fetched_at`을 적는다 · 화면에 **확인 시각**·**통지 상태**·**지금 가져오기**·**통지 걸기** · OAuth 범위에 `admin:repo_hook` |
 | 테스트 | `create_hook` 멱등·권한 없으면 예외 · `verify_signature`가 빈 비밀번호에 항상 False · `ping`·작업 브랜치·삭제 push 무시 · `ensure_hook` 넷 · `sync_now` · `read_pending`이 밀린 게 없어도 `fetched_at` 갱신 |
 | 선행 | AD |
-| 완료 | — |
+| 완료 | 2026-09-22 · 브랜치 `card/AF-webhook` · spec 10 + code 1 + `fix(#145)` · 테스트 **230**(신설 7) · 리비전 `0013` · `validate` 0/0 · `check_code` 114/114 · `check_ui` 12/12 · `check_dom` 10·10·10 · `check_tokens` 91/0 · `check_view_css` 네 쌍 · 사람 확인(배포 뒤): **저장소 아홉 전부에 통지를 걸었다**(`gh api … /hooks`로 확인 — `https://syncdoc.dpdns.org/hooks/github` events=push) · 두 번째로 눌러도 훅이 안 늘고 `created=false` · 「지금 가져오기」가 0을 돌려주며 확인 시각을 갱신 · **기존 토큰이 옛 범위(`repo`)를 들고 있어 다시 로그인하지 않고도 걸렸다** — 새 범위는 앞으로 받을 토큰을 위한 것 · 되먹임 **#145**: `ensure_hook`이 `flush`만 하고 라우터가 커밋하지 않아 GitHub에는 훅이 생기는데 `hook_id`가 안 남았다. 같은 세션만 보던 테스트가 못 잡아 **다른 요청에서도 보이는지**를 고정했다 |
 
 **왜 카드인가.** 명세가 **주 경로**라고 적어 둔 통지를 코드가 한 번도 등록하지 않았다. 실측으로 두 저장소 다 훅이 비어 있었고(`gh api … /hooks` → `[]`), 실제 경로는 5분 폴링 하나였다. INFRA 7장은 이유를 「Quick Tunnel 주소가 바뀌어 못 건다」로 적었는데 고정 주소는 카드 Q에서 이미 생겼다 — 전제가 사라진 채 숙제만 남아 있었다.
 
@@ -966,7 +966,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AC | `card/AC-wf-stack` | `f2a6f4d`~ | — | 2026-09-22 |
 | AD | `card/AD-read-before-write` | `9ea83ca`~ | — | 2026-09-22 |
 | AE | `card/AE-ui-guidance` | `8331a96`~ | #142 | 2026-09-22 |
-| AF | `card/AF-webhook` | — | — | — |
+| AF | `card/AF-webhook` | `1770920`~ | #144 · #146 | 2026-09-22 |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 | X | `card/X-ui-doc` | `7a4e821`~ | #103 | 2026-09-21 |
