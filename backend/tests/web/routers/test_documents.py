@@ -1,4 +1,6 @@
-"""SYNC-API-001 3.4 — GET /api/docs/{docId} · POST /status(토글) · 참조."""
+"""SYNC-API-001 3.4 — GET /api/docs/{docId} · POST /status(토글) · 참조 · ask(SSE)."""
+
+import json
 
 from fastapi.testclient import TestClient
 from sqlalchemy import text
@@ -9,7 +11,7 @@ from app.core import queries
 from app.core.errors import LlmUnavailable
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
-from app.core.types import DocType
+from app.core.types import DocType, LlmStep, LlmUsage, ToolCall
 from tests.core.reference.test_service import PRD, RFQ
 from tests.core.spec.test_service import PRD as FULL_PRD
 from tests.core.spec.test_service import author, make_project
@@ -130,46 +132,90 @@ def test_other_owner_document_is_not_found(client: TestClient, scoped: Session) 
     assert client.get("/api/docs/EXMP-PRD-001").status_code == 200
 
 
-def test_ask_item_endpoint(client: TestClient, scoped: Session, monkeypatch) -> None:
-    """POST /api/docs/{docId}/items/{itemId}/ask (UC-H19). 저장하지 않고, 키·모델 실패는 문제 유형 둘."""
+def _sse(text: str) -> list[tuple[str, dict]]:
+    """event:/data: 프레임 → (이름, JSON) 목록."""
+    out = []
+    for frame in text.strip().split("\n\n"):
+        lines = dict(line.split(": ", 1) for line in frame.splitlines())
+        out.append((lines["event"], json.loads(lines["data"])))
+    return out
+
+
+def test_ask_endpoint_streams_start_note_read_answer(
+    client: TestClient, scoped: Session, monkeypatch
+) -> None:
+    """POST /api/docs/{docId}/ask (UC-H19, 카드 Y). SSE — 첫 이벤트 전 오류는 상태 코드, 뒤는 error 이벤트."""
     _seed(scoped)
     login(client, scoped, "hoyoung")
+    monkeypatch.setattr(settings, "LLM_API_KEY", "sk-test")
+    steps: list = [
+        LlmStep(
+            None,
+            [
+                ToolCall(
+                    "c1",
+                    "get_item",
+                    {"doc_id": "EXMP-PRD-001", "item_id": "G1", "reason": "G1을 읽는다"},
+                )
+            ],
+            LlmUsage(),
+        ),
+        LlmStep("G1은 Q1을 근거로 한다", [], LlmUsage()),
+    ]
     seen: list[list[dict]] = []
 
-    async def ok(system: str, messages: list[dict]) -> str:
-        seen.append(messages)
-        return "그 항목은 Q1을 근거로 한다"
+    async def step(system, messages, tools, tool_choice="auto"):
+        seen.append(list(messages))
+        return steps.pop(0)
 
-    monkeypatch.setattr(queries.llm, "ask", ok)
-    monkeypatch.setattr(settings, "LLM_API_KEY", "sk-test")
+    monkeypatch.setattr(queries.llm, "step", step)
     body = {
         "question": "이게 뭐야?",
         "history": [{"role": "user", "text": "앞"}, {"role": "assistant", "text": "답"}],
+        "item_id": "G1",
     }
-    r = client.post("/api/docs/EXMP-PRD-001/items/G1/ask", json=body)
-    assert r.status_code == 200
-    assert r.json() == {
-        "answer": "그 항목은 Q1을 근거로 한다",
-        "context_item_ids": ["G1", "EXMP-RFQ-001#Q1", "EXMP-PRD-001#R1"],
-    }
+    r = client.post("/api/docs/EXMP-PRD-001/ask", json=body)
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")
+    assert r.headers["cache-control"] == "no-cache" and r.headers["x-accel-buffering"] == "no"
+    assert _sse(r.text) == [
+        ("start", {"doc_id": "EXMP-PRD-001", "item_id": "G1"}),
+        ("note", {"text": "G1을 읽는다"}),
+        ("read", {"tool": "get_item", "target": "EXMP-PRD-001#G1"}),
+        ("answer", {"answer": "G1은 Q1을 근거로 한다", "context_item_ids": ["EXMP-PRD-001#G1"]}),
+    ]
     assert seen[0][-1] == {"role": "user", "text": "이게 뭐야?"} and len(seen[0]) == 3
     assert scoped.execute(text("SELECT count(*) FROM versions")).scalar() == 2  # 아무것도 안 쓴다
 
-    # 모델 실패 → 502 llm-unavailable (reason)
-    async def down(system: str, messages: list[dict]) -> str:
+    # 항목 없이도 묻는다 — 문서 단위 시작
+    steps.append(LlmStep("문서 전체 답", [], LlmUsage()))
+    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "이 문서가 뭐야?"})
+    assert _sse(r.text)[0] == ("start", {"doc_id": "EXMP-PRD-001", "item_id": None})
+
+    # 루프 중 모델 실패 → 200 스트림 안 error 이벤트(problem+json 그대로)
+    async def down(system, messages, tools, tool_choice="auto"):
         raise LlmUnavailable("HTTP 429")
 
-    monkeypatch.setattr(queries.llm, "ask", down)
-    r = client.post("/api/docs/EXMP-PRD-001/items/G1/ask", json={"question": "?"})
-    assert r.status_code == 502 and r.json()["type"] == "urn:syncdoc:llm-unavailable"
-    assert r.json()["reason"] == "HTTP 429"
-    # 키 없음 → 503 llm-not-configured
+    monkeypatch.setattr(queries.llm, "step", down)
+    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "?"})
+    assert r.status_code == 200
+    ev = _sse(r.text)
+    assert ev[0][0] == "start" and ev[1][0] == "error"
+    assert ev[1][1]["type"] == "urn:syncdoc:llm-unavailable" and ev[1][1]["reason"] == "HTTP 429"
+
+    # 키 없음 → 스트림 전 503 (상태 코드)
     monkeypatch.setattr(settings, "LLM_API_KEY", "")
-    r = client.post("/api/docs/EXMP-PRD-001/items/G1/ask", json={"question": "?"})
+    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "?"})
     assert r.status_code == 503 and r.json()["type"] == "urn:syncdoc:llm-not-configured"
-    # 남의 문서 → 404 (R12). 키가 있어도 소유 검사가 먼저는 아니다 — 키 없음이 먼저 막는다(MS-008 1)
+    # 없는 항목 힌트 → 스트림 전 404
     monkeypatch.setattr(settings, "LLM_API_KEY", "sk-test")
-    monkeypatch.setattr(queries.llm, "ask", ok)
+    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "?", "item_id": "G9"})
+    assert r.status_code == 404 and r.json()["resource"] == "item"
+    # 남의 문서 → 404 (R12)
     login(client, scoped, "minjun")
-    r = client.post("/api/docs/EXMP-PRD-001/items/G1/ask", json={"question": "?"})
+    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "?"})
     assert r.status_code == 404 and r.json()["resource"] == "project"
+    # 옛 경로는 없다
+    login(client, scoped, "hoyoung")
+    assert client.post(
+        "/api/docs/EXMP-PRD-001/items/G1/ask", json={"question": "?"}
+    ).status_code in (404, 405)

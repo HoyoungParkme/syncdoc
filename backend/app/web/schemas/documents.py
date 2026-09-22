@@ -152,14 +152,35 @@ class AskTurn(BaseModel):
 
 
 class AskRequest(BaseModel):
-    """POST /api/docs/{docId}/items/{itemId}/ask — 대화는 클라이언트가 들고 있다가 통째로 보낸다."""
+    """POST /api/docs/{docId}/ask — 대화는 클라이언트가 통째로 보낸다. item_id는 힌트다."""
 
     question: str
     history: list[AskTurn] = []
+    item_id: str | None = None
+
+
+class AskStart(Base):
+    """SYNC-API-001 start 이벤트. 이 앞의 오류는 상태 코드, 뒤는 error 이벤트."""
+
+    doc_id: str
+    item_id: str | None
+
+
+class AskNote(Base):
+    """SYNC-API-001 note 이벤트 — 모델이 읽기 전에 쓴 한 줄(UI-5 8.9)."""
+
+    text: str
+
+
+class AskRead(Base):
+    """SYNC-API-001 read 이벤트 — 도구 실행이 끝났다."""
+
+    tool: str
+    target: str | None
 
 
 class AskAnswer(Base):
-    """SYNC-API-001 AskAnswer. 저장되지 않는다 — 응답이 전부다."""
+    """SYNC-API-001 answer 이벤트. 저장되지 않는다 — 스트림이 전부다."""
 
     answer: str
     context_item_ids: list[str]
