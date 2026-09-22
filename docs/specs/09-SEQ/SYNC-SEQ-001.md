@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -1039,6 +1039,7 @@ sequenceDiagram
 | GET /api/me/tokens | AccountService.list_tokens | 폐기된 것 포함 |
 | POST /api/me/tokens | AccountService.issue_token | raw 생성 → sha256 저장 → raw는 응답에만 |
 | DELETE /api/me/tokens/{id} | AccountService.revoke_token | 본인 것만. 아니면 404 |
+| GET /api/projects/{code}/files/{path} | ProjectService.asset_path | 작업 사본 `docs/specs/` 아래만, 소유 검사. DB는 `get_owned`뿐, 파일은 디스크 |
 
 **읽을 때 볼 것**
 - 여기 있는 것은 전부 서비스 하나만 부른다. 두 번째 서비스가 필요해지는 순간 고유 시퀀스로 옮긴다
