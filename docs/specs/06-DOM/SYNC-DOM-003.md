@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-003
 type: DOM
 title: ERD·DD — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-001]
 ---
 
@@ -190,7 +190,7 @@ erDiagram
 | doc_id | varchar(30) | UK | 사람이 부르는 문서 ID | `SYNC-PRD-001` |
 | doc_type | varchar(10) | DocType 중 하나 | 11단계 타입 코드 | `PRD` |
 | status | varchar(10) | DocStatus (`draft` · `approved`) | frontmatter의 status와 같아야 한다. DB는 사본 | `approved` |
-| current_body | text | not null | 현재 버전 본문 캐시. `versions.body`와 같다 | |
+| current_body | text | not null | 현재 버전 본문 캐시. `versions.body`와 같다. **조회용이다 — 저장소에 쓸 본문의 출처로 쓰지 않는다**([[SYNC-STD-004#DEV-19]], #137) | |
 | current_version_no | int | not null, ≥1 | 낙관적 잠금용. save 시 대조 | `7` |
 | has_convention_error | boolean | default false | GitHub 경로로 들어온 규약 위반 문서 | |
 | convention_error_detail | text | null 허용 | 어느 규약을 어떻게 어겼는지. STD-001 3장 rule | `frontmatter.field: status` |
@@ -300,7 +300,7 @@ erDiagram
 | status_changes | `(document_id, changed_at)` | 이력 병합 |
 | access_tokens | `(token_hash)` unique — 이미 | MCP 인증 |
 
-**정규화** — 전 테이블 3NF. 의도적 비정규화 하나([[SYNC-STD-004#DEV-9]]): `documents.current_body`(조회 캐시, `versions.body`와 같음). `versions.body` 전체 저장은 비정규화가 아니라 git 사본이다.
+**정규화** — 전 테이블 3NF. 의도적 비정규화 하나([[SYNC-STD-004#DEV-9]]): `documents.current_body`(조회 캐시, `versions.body`와 같음 — **읽기 전용 캐시다**, DEV-19). `versions.body` 전체 저장은 비정규화가 아니라 git 사본이다.
 
 ## 4. 판단이 필요한 지점
 
