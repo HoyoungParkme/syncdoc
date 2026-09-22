@@ -159,13 +159,16 @@ async def read_pending(code: str, user: User) -> int
 
 **처리**
 1. `ProjectService.get_owned(code, user)` — 남의 것이면 `! not-found {resource: project}`. **쓰기 경로의 소유 검사를 겸한다**
+1a. **읽기 락**(`_read_lock(code)`, 쓰기 락과 다른 것)을 잡는다 — 두 요청이 같은 작업 사본에 동시에 `git fetch`를 걸면 git이 인덱스 잠금으로 죽는다. 락 안에서 `last_processed_commit`을 **다시 읽는다**: 앞서 기다린 요청이 이미 따라잡아 놨을 수 있다
+1b. **쓰기 락과 따로인 이유** — 4단계의 `process_commit`이 파일마다 쓰기 락을 잡는다. 같은 락이면 교착한다
 2. `head = git.fetch(repo.workdir)`
 3. if `head == repo.last_processed_commit` → `→ 0`. 밀린 것이 없으면 `fetch` 한 번으로 끝난다
+3a. `last_processed_commit`이 **비어 있어도 `→ 0`.** 그 값이 비는 것은 등록 중뿐이고([[SYNC-MS-001#ProjectService.init_project]]가 첫 커밋 해시를, `import_existing`은 재구축이 head를 적는다) 그 둘은 자기가 저장소를 읽는다
 4. `results = process_commit(repo, head)` → `→ len(results)`
 
 **왜 이것이 먼저인가 (#137).** 저장소에 쓰는 일은 전부 「덮어쓰기」다. 아직 읽지 않은 커밋이 있는 채로 쓰면 그 내용이 사라지는데, `git.commit_push`가 `reset --hard origin/main` 뒤에 본문을 덮으므로 push가 거부되지도 않아 **조용히** 사라진다. 읽기를 먼저 하면 덮을 것이 없다.
 
-**락 밖에서 부른다.** `process_commit`은 파일마다 `save_pipeline`이 같은 `_lock(code)`를 잡았다 논다 — 락 안에서 부르면 교착한다(재진입 불가). 그래서 부르는 자리는 전부 세션·락을 열기 **전**이다.
+**쓰기 락 밖에서 부른다.** `process_commit`은 파일마다 `save_pipeline`이 같은 `_lock(code)`를 잡았다 논다 — 쓰기 락 안에서 부르면 교착한다(재진입 불가). 그래서 부르는 자리는 전부 세션·쓰기 락을 열기 **전**이다. 대신 자기 읽기 락으로 동시 `fetch`를 막는다(1a).
 
 **부르는 곳** [[#pipeline.change_status]] 0 · [[#pipeline.revert]] 0 · [[#pipeline.restore_document]] 0 · [[#pipeline.trash_document]] 0 · [[#pipeline.save_pipeline]] 0(세션을 안 받았고 `entry != github`일 때만 — 세션이 넘어온 것은 부른 쪽이 이미 읽었다는 뜻이고, `github`는 자기가 처리 중이라 부르면 무한 재귀다)
 
@@ -173,7 +176,7 @@ async def read_pending(code: str, user: User) -> int
 
 **예외** `not-found`(1) · `git.fetch` 실패는 그대로 올린다 — 저장소에 닿지 못하면 쓰지도 못한다
 
-**테스트 관점** 밀린 것이 없으면 0이고 커밋이 안 생긴다 · 밖에서 push한 뒤 부르면 그 문서가 DB에 들어오고 `last_processed_commit`이 head가 된다 · 두 번 불러도 두 번째는 0(멱등) · 남의 프로젝트 → `not-found` · **`github` 경로에서는 불리지 않는다**(재귀 방지)
+**테스트 관점** 같은 프로젝트에 동시에 둘이 써도 `fetch`가 겹치지 않는다(읽기 락) · 밀린 것이 없으면 0이고 커밋이 안 생긴다 · 밖에서 push한 뒤 부르면 그 문서가 DB에 들어오고 `last_processed_commit`이 head가 된다 · 두 번 불러도 두 번째는 0(멱등) · 남의 프로젝트 → `not-found` · **`github` 경로에서는 불리지 않는다**(재귀 방지)
 
 ---
 
