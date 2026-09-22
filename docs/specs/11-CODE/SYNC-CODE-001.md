@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
 
-**진행 상황**: 카드 33장. **A~X·U 32장 완료**, Y 진행 중.
+**진행 상황**: 카드 33장. **전부 완료** (2026-09-22).
 
 ---
 
@@ -721,7 +721,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 화면 | [[SYNC-UI-002]] UI-5 요소 8.5(문서 전체)·8.6(항상 활성)·8.7(본 것 = 읽은 순서)·**8.9 진행 줄** 신설. 대화는 프로젝트 단위로 `Shell`이 든다 |
 | 테스트 | `llm.step`(tools·tool_choice 실림·tool_calls 파싱·비JSON→unavailable·usage 0) · `ask_tool` 다섯(키 집합·다른 프로젝트 ID→「없음」 텍스트·남의 프로젝트→not-found·끊어진 참조 「아직 없음」·빈 단계 유지) · `ask_item` 가짜 대본(이벤트 순서 `start·note·read·…·answer` · `context_item_ids` 순서·중복 접힘 · 9번째에서 `tool_choice="none"` 마무리 · 120초 · 마무리도 답 없음→unavailable · 시작 맥락에 본문 없음 · `item_id=None` · 없는 item_id→not-found가 start 전 · **DB 행 수 불변** · usage 로그 한 줄) · 라우터(404·503은 상태 코드, 루프 중 unavailable은 `error` 이벤트) · `check_ui` 12/12 · **사람 확인**: 아래 열둘 |
 | 선행 | U |
-| 완료 | — |
+| 완료 | 2026-09-22 · 브랜치 `card/Y-ask-react` · 커밋 `eef87b6`~ (spec 11 + code 5) · 테스트 215(신설 18) · `validate` 0/0 · `check_code` 108/108 · `check_ui` 12/12 · `check_tokens` 91/0 · `check_dom` 10·10·10 · 사람 확인 열둘은 배포 뒤(아래 기록) · 되먹임: 카드 U 명세의 맥락 상한은 내가 채운 값이었다 — 이번엔 plan 모드에서 열셋을 물어 정했다 · `alembic/env.py`의 `fileConfig`가 앱 로거를 끄고 있어 usage 로그 테스트가 못 보던 것을 `disable_existing_loggers=False`로 |
 
 **왜 카드인가.** 어댑터(한 번 호출→도구 파싱)·루프·도구 실행·SSE·화면이 한 호출 그래프다. 어느 하나만 바꾸면 「모델은 도구를 부르는데 아무도 실행하지 않는다」거나 「진행이 오는데 화면이 못 받는다」가 된다.
 
@@ -817,7 +817,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | E | `card/E-backup` | `c8f2749`~`e715423` | — | 2026-09-11 |
 | F | `card/F-repo-create` | `a11f698`~ | — | 2026-09-14 |
 | U | `card/U-ask-panel` | `3fa72d0`~ | #95 · #104 | 2026-09-21 |
-| Y | `card/Y-ask-react` | — | — | 2026-09-22 |
+| Y | `card/Y-ask-react` | `eef87b6`~ | #109 | 2026-09-22 |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 | X | `card/X-ui-doc` | `7a4e821`~ | #103 | 2026-09-21 |
