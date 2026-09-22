@@ -33,10 +33,66 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<T> 
   return data as T
 }
 
+/** SSE 수신 — SYNC-API-001 1장 규칙: 첫 이벤트 전 오류는 상태 코드(problem+json → ApiError), 뒤는 `error` 이벤트.
+ *  EventSource는 GET뿐이라 fetch POST + ReadableStream으로 `event:`/`data:` 프레임을 읽는다. */
+async function stream(
+  url: string,
+  body: unknown,
+  onEvent: (name: string, data: unknown) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+    body: JSON.stringify(body),
+    credentials: 'same-origin',
+    signal,
+  })
+  if (!r.ok) {
+    const text = await r.text()
+    const data = text ? JSON.parse(text) : null
+    throw new ApiError(data && data.type ? data : { type: 'urn:syncdoc:http', title: r.statusText, status: r.status })
+  }
+  if (!r.body) return
+  const reader = r.body.getReader()
+  const dec = new TextDecoder()
+  let buf = ''
+  const frame = (chunk: string) => {
+    let name = 'message'
+    const datas: string[] = []
+    for (const line of chunk.split('\n')) {
+      if (line.startsWith('event:')) name = line.slice(6).trim()
+      else if (line.startsWith('data:')) datas.push(line.slice(5).trimStart())
+    }
+    if (!datas.length) return
+    const raw = datas.join('\n')
+    let data: unknown = raw
+    try {
+      data = JSON.parse(raw)
+    } catch {
+      /* 문자열 그대로 */
+    }
+    onEvent(name, data)
+  }
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buf += dec.decode(value, { stream: true })
+    let i: number
+    while ((i = buf.indexOf('\n\n')) >= 0) {
+      frame(buf.slice(0, i))
+      buf = buf.slice(i + 2)
+    }
+  }
+  buf += dec.decode()
+  if (buf.trim()) frame(buf)
+}
+
 export const api = {
   get: <T>(url: string) => call<T>('GET', url),
   post: <T>(url: string, body?: unknown) => call<T>('POST', url, body),
   del: <T>(url: string) => call<T>('DELETE', url),
+  stream,
 }
 
 // ── SYNC-API-001 4장 스키마 ──
@@ -225,11 +281,28 @@ export interface SaveResult {
   status: DocStatus
   warnings: string[]
 }
-/** UI-5 8.4~8.7 · POST /api/docs/{docId}/items/{itemId}/ask (SYNC-API-001 3.4). 대화는 저장되지 않는다 —
- *  클라이언트가 들고 있다가 요청마다 history로 통째로 보낸다. */
+/** UI-5 8.4~8.9 · POST /api/docs/{docId}/ask (SYNC-API-001 3.4, SSE). 대화는 서버에 저장되지 않는다 —
+ *  클라이언트가 프로젝트 단위로 들고 있다가 요청마다 history로 통째로 보낸다. 항목은 힌트(item_id?)다. */
 export interface AskTurn {
   role: 'user' | 'assistant'
   text: string
+}
+export interface AskRequest {
+  question: string
+  history: AskTurn[]
+  item_id?: string
+}
+/** 스트림 이벤트 — start · note · read · answer · error(problem) */
+export interface AskStart {
+  doc_id: string
+  item_id: string | null
+}
+export interface AskNote {
+  text: string
+}
+export interface AskRead {
+  tool: string
+  target: string | null
 }
 export interface AskAnswer {
   answer: string

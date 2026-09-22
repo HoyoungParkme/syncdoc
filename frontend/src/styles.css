@@ -725,6 +725,11 @@ a.arow:hover{background:var(--bg-subtle)}
 .qa .a.wait{color:var(--ink-faint);border-style:dashed}
 .qa .a.fail{color:var(--danger);background:var(--danger-bg);border-color:var(--danger-bg)}
 .qa .qsrc{font-size:var(--text-caption);color:var(--ink-faint);font-family:var(--font-mono)}
+/* 8.9 진행 줄 — 모델이 읽기 전에 쓰는 한 줄(note)과 읽은 대상(read)이 차례로. 답이 오면 작고 흐리게 남는다 */
+.qa .qprog{display:flex;flex-direction:column;gap:var(--space-3);padding:var(--space-4) var(--space-9);border-left:2px solid var(--border);
+  font-size:var(--text-meta);color:var(--ink-muted)}
+.qa .qprog .read{font-family:var(--font-mono);color:var(--ink-faint)}
+.qa .qprog.done{font-size:var(--text-caption);color:var(--ink-faint)}
 .qa .qsrc a{color:var(--ink-muted)}
 .pbody textarea[data-el="8.6"]{width:100%;box-sizing:border-box;min-height:64px;resize:vertical;padding:var(--space-6) var(--space-9);
   border:1px solid var(--border);border-radius:var(--radius-chip);background:var(--bg-card);color:var(--ink-body);
