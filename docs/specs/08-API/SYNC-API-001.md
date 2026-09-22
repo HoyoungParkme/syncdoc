@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -28,6 +28,8 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 - 항목 ID는 `#` 없이 경로에 넣는다. `/items/R12`, `/items/POST~orders` (`/`는 `~`로)
 - 목록은 페이지 없음. 한 사람이 쓰는 프로젝트의 문서가 수십 개다
 - **프로젝트는 등록한 사람의 것이다**([[SYNC-PRD-001#R12]]). 목록(`GET /api/projects`·`GET /api/admin/repos`)은 내가 소유한 것만 준다. 소유하지 않은 프로젝트를 코드나 문서 ID로 열면 **없는 것과 같다** — `404 urn:syncdoc:not-found {resource: "project", id: code}`. 403이 아니다: 남의 프로젝트가 있다는 사실이 새지 않고, 에러 종류가 늘지 않는다. 프로젝트나 문서를 고르는 모든 엔드포인트가 그렇다 — 아래 각 정의의 404는 「없음」과 「남의 것」을 구분하지 않는다
+
+- **스트리밍은 `POST /api/docs/{docId}/ask` 하나다**(SSE, `text/event-stream`). 첫 이벤트(`start`) 전에 난 오류는 지금처럼 HTTP 상태 코드로, 뒤에 난 오류는 `error` 이벤트로 온다. 규칙 한 줄 — **첫 이벤트 전은 상태 코드, 뒤는 이벤트**
 
 **웹이 쓰지 않는 것** — 본문 생성·수정 엔드포인트는 없다. 본문 쓰기는 MCP와 GitHub push뿐이다(PRD R9). 웹의 쓰기는 상태 토글·되돌리기·휴지통·토큰·재구축까지다.
 
@@ -62,7 +64,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:email-taken` | 409 | 남이 이미 등록한 커밋 이메일 | `email` | UI-13 2.6 |
 | `urn:syncdoc:not-implemented` | 501 | 카드 스텁 — 아직 구현 안 된 경로 (`import_existing` 등). 슬라이스 진행 중에만 존재 | `card` | [[SYNC-STD-004#DEV-12]] |
 | `urn:syncdoc:llm-not-configured` | 503 | 모델 키가 없다 — 읽는 중 질의가 꺼져 있다 | — | [[SYNC-UC-001#UC-H19]] 2a |
-| `urn:syncdoc:llm-unavailable` | 502 | 모델 호출 실패. **사용량 초과도 여기 접힌다** | `reason` | [[SYNC-UC-001#UC-H19]] 4a |
+| `urn:syncdoc:llm-unavailable` | 502 | 모델 호출 실패. **사용량 초과도 여기 접힌다.** 스트림 중이면 `error` 이벤트로 온다(1장) | `reason` | [[SYNC-UC-001#UC-H19]] 4a |
 | `urn:syncdoc:internal` | 500 | **예상 못 한 오류.** 위 어느 것도 아닌 예외가 라우터에서 샜다 | — | — |
 
 ---
@@ -704,19 +706,30 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
                 $ref: '#/components/schemas/DocumentSummary'
 ```
 
-#### POST/api/docs/{docId}/items/{itemId}/ask 보고 있는 항목에 대해 묻는다
+#### POST/api/docs/{docId}/ask 읽다가 묻는다 — 모델이 관계도를 따라 읽는다
 
-화면 [[SYNC-UI-001#UI-5]] · 유스케이스 [[SYNC-UC-001#UC-H19]] · 서비스 `queries.ask_item`
+화면 [[SYNC-UI-001#UI-5]] 8.5~8.9 · 유스케이스 [[SYNC-UC-001#UC-H19]] · 서비스 `queries.ask_item`
 
-**아무것도 저장하지 않는다.** 대화는 클라이언트가 들고 있다가 요청마다 `history`로 통째로 보낸다. 서버는 `LLM_MAX_TURNS`턴까지만 받는다([[SYNC-INFRA-001]] 5.3). 키가 없으면 `llm-not-configured`이고 화면은 탭 자체를 감춘다.
+**문서가 시작점이고 항목은 힌트다.** `item_id`를 주면 「지금 보는 항목」으로 맥락에 한 줄 실릴 뿐, 없어도 묻는다. 모델은 같은 프로젝트의 문서·항목·참조를 읽기 도구로 스스로 읽고([[SYNC-INFRA-001]] 5.3), 무엇을 왜 읽는지가 이벤트로 차례로 온다. 도구 호출은 8번, 전체 120초까지 — 넘으면 그때까지 읽은 것으로 답한다.
+
+**아무것도 저장하지 않는다.** 대화는 클라이언트가 들고 있다가 요청마다 `history`로 통째로 보낸다. 서버는 `LLM_MAX_TURNS`턴까지만 받는다. 키가 없으면 `llm-not-configured`이고 화면은 탭 자체를 감춘다(`GET /api/me`의 `llm_enabled`).
+
+**응답은 SSE다.** `200 text/event-stream`, 헤더 `Cache-Control: no-cache` · `X-Accel-Buffering: no`. 프레임은 `event: {이름}\ndata: {JSON}\n\n`. 이벤트 다섯:
+
+| 이벤트 | data | 언제 |
+|---|---|---|
+| `start` | `AskStart {doc_id, item_id}` | 시작 맥락 조립 직후, 첫 모델 호출 전. **이 앞의 오류(404·503·401)는 HTTP 상태 코드** |
+| `note` | `AskNote {text}` | 모델이 읽기 전에 쓴 한 줄(도구 인자 `reason`). 도구마다 하나 |
+| `read` | `AskRead {tool, target}` | 도구 실행이 끝났다. `target`은 `DOC#ITEM`·`DOC`, 목록이면 null |
+| `answer` | `AskAnswer {answer, context_item_ids}` | 마지막. 스트림 종료 |
+| `error` | problem+json 본문 그대로 `{type, title, status, detail, reason?}` | 루프 중 실패(`llm-unavailable` 등). 스트림 종료 |
 
 ```yaml
-/api/docs/{docId}/items/{itemId}/ask:
+/api/docs/{docId}/ask:
   post:
-    summary: "읽는 중 질의 ([[SYNC-UC-001#UC-H19]])"
+    summary: "읽는 중 질의 ([[SYNC-UC-001#UC-H19]]) — SSE"
     parameters:
     - $ref: '#/components/parameters/docId'
-    - $ref: '#/components/parameters/itemId'
     requestBody:
       required: true
       content:
@@ -725,10 +738,19 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
             $ref: '#/components/schemas/AskRequest'
     responses:
       '200':
+        description: 이벤트 스트림. start → (note·read)* → answer | error
         content:
-          application/json:
+          text/event-stream:
             schema:
-              $ref: '#/components/schemas/AskAnswer'
+              oneOf:
+              - $ref: '#/components/schemas/AskStart'
+              - $ref: '#/components/schemas/AskNote'
+              - $ref: '#/components/schemas/AskRead'
+              - $ref: '#/components/schemas/AskAnswer'
+      '404':
+        description: 문서 없음 · 소유하지 않은 프로젝트 · item_id가 이 문서에 없음
+      '503':
+        description: llm-not-configured
 ```
 
 ### 3.7 계정·토큰
@@ -1521,9 +1543,12 @@ components:
       properties:
         question:
           type: string
+        item_id:
+          type: string
+          description: 지금 보고 있는 항목. 힌트일 뿐이라 없어도 된다. 이 문서에 없는 ID면 404
         history:
           type: array
-          description: 앞선 대화. 클라이언트가 들고 있다가 통째로 보낸다
+          description: 앞선 대화. 클라이언트가 들고 있다가 통째로 보낸다 — 앞 턴에서 모델이 읽은 본문은 안 실리므로 필요하면 다시 읽는다
           items:
             type: object
             required:
@@ -1535,6 +1560,38 @@ components:
                 enum: [user, assistant]
               text:
                 type: string
+    AskStart:
+      type: object
+      description: 첫 이벤트. 이 앞의 오류는 HTTP 상태 코드로 온다
+      required:
+      - doc_id
+      properties:
+        doc_id:
+          type: string
+        item_id:
+          type: string
+          nullable: true
+    AskNote:
+      type: object
+      description: 모델이 읽기 전에 쓴 한 줄 — 무엇을 왜 읽는지. 화면 8.9
+      required:
+      - text
+      properties:
+        text:
+          type: string
+    AskRead:
+      type: object
+      description: 도구 실행이 끝났다
+      required:
+      - tool
+      properties:
+        tool:
+          type: string
+          enum: [get_item, get_references, item_chain, list_documents, get_document]
+        target:
+          type: string
+          nullable: true
+          description: DOC#ITEM 또는 DOC. list_documents는 대상이 없어 null
     AskAnswer:
       type: object
       required:
@@ -1545,7 +1602,7 @@ components:
           type: string
         context_item_ids:
           type: array
-          description: 맥락으로 실어 보낸 항목들. 화면이 「본 것」으로 보여준다
+          description: 모델이 실제로 읽은 대상, 부른 순서(중복은 접는다). 화면이 「본 것」으로 보여준다. list_documents는 대상이 없어 안 실린다
           items:
             type: string
 ```
@@ -1562,7 +1619,7 @@ components:
 
 **5. 읽는 중 질의가 아무것도 저장하지 않는다.** 대화는 클라이언트가 들고 요청마다 통째로 보낸다. 표를 만들면 백업([[SYNC-INFRA-001]] 6.1)과 재구축([[SYNC-UC-001#UC-S6]])과 완전 삭제가 전부 그것을 알아야 한다. 그런데 **저장해도 DB 유실에는 대비하지 못한다** — 저장소가 공개라 자유 텍스트를 백업에 못 싣는 것이 댓글 본문과 같은 이유로 여기에도 걸리고, 그러면 남는 것이 「질문이 있었다」는 껍데기뿐이다. 휘발하는 것에 치를 값이 아니라고 봤다. 답은 화면에만 있다 — 남길 값이 있으면 사람이 자기 에이전트에게 옮겨 말한다.
 
-**6. 429를 만들지 않는다.** 모델 쪽이 사용량 초과를 주면 `llm-unavailable`(502)의 `reason`으로 접는다 — GitHub 실패를 `push-failed`로 접는 것과 같은 모양이다. **우리가 한도를 세지 않으므로 우리 429가 생길 일이 없다.** 비용은 맥락 상한과 대화 길이 상한으로 눌리고, 회수 경로는 키를 비우는 것이다([[SYNC-INFRA-001]] 5.3). 디스크 한도를 「한도보다 회수 경로가 먼저다」로 닫은 것과 같은 판단이다.
+**6. 429를 만들지 않는다.** 모델 쪽이 사용량 초과를 주면 `llm-unavailable`(502)의 `reason`으로 접는다 — GitHub 실패를 `push-failed`로 접는 것과 같은 모양이다. **우리가 한도를 세지 않으므로 우리 429가 생길 일이 없다.** 비용은 **도구 호출 수(8번)와 시간(120초)** 상한과 대화 길이 상한으로 눌리고 — 맥락 글자 상한은 두지 않는다(카드 Y) — 회수 경로는 키를 비우는 것이다([[SYNC-INFRA-001]] 5.3). 디스크 한도를 「한도보다 회수 경로가 먼저다」로 닫은 것과 같은 판단이다.
 
 ---
 

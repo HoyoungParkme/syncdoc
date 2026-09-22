@@ -5,19 +5,26 @@
 
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, Depends, Query, Response
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core import pipeline, queries
 from app.core.account.models import User
 from app.core.account.service import AccountService
+from app.core.errors import Problem
 from app.core.spec.service import SpecService
-from app.core.types import ApiAuthor, Author, AuthorKind, DocStatus, Entry
+from app.core.types import ApiAuthor, AskEvent, Author, AuthorKind, DocStatus, Entry
 from app.db import get_session
 from app.web.auth import current_user
 from app.web.schemas.documents import (
     AskAnswer,
+    AskNote,
+    AskRead,
     AskRequest,
+    AskStart,
     ChangeStatus,
     Diff,
     Document,
@@ -125,15 +132,43 @@ async def revert(doc_id: str, req: Revert, user: User = Depends(current_user)) -
     return SaveResult.model_validate(r)
 
 
-@router.post("/{doc_id}/items/{item_id}/ask", response_model=AskAnswer)
-async def ask_item(
-    doc_id: str, item_id: str, req: AskRequest, user: User = Depends(current_user)
-) -> AskAnswer:
-    """SYNC-API-001#POST/api/docs/{docId}/items/{itemId}/ask
+def _frame(name: str, data: dict) -> str:
+    return f"event: {name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
-    보고 있는 항목이 맥락이다(UC-H19). 아무것도 저장하지 않는다. 키가 없으면 llm-not-configured.
+
+def _event(ev: AskEvent) -> str:
+    """queries의 이벤트 DTO → SSE 프레임. 이름은 API-001 3.4 표 그대로."""
+    if isinstance(ev, queries.AskStart):
+        return _frame("start", AskStart.model_validate(ev).model_dump())
+    if isinstance(ev, queries.AskNote):
+        return _frame("note", AskNote.model_validate(ev).model_dump())
+    if isinstance(ev, queries.AskRead):
+        return _frame("read", AskRead.model_validate(ev).model_dump())
+    return _frame("answer", AskAnswer.model_validate(ev).model_dump())
+
+
+@router.post("/{doc_id}/ask")
+async def ask(doc_id: str, req: AskRequest, user: User = Depends(current_user)) -> Response:
+    """SYNC-API-001#POST/api/docs/{docId}/ask
+
+    보고 있는 문서가 시작 맥락이고 항목은 힌트다(UC-H19). 모델이 도구로 같은 프로젝트를 읽는
+    동안 note·read 이벤트를 흘리고 answer로 끝난다(SSE). 첫 이벤트(start) 전의 오류는 상태 코드,
+    뒤의 오류는 error 이벤트. 아무것도 저장하지 않는다.
     """
     history = [{"role": t.role, "text": t.text} for t in req.history]
-    return AskAnswer.model_validate(
-        await queries.ask_item(doc_id, item_id, req.question, history, user)
+    gen = queries.ask_item(doc_id, req.item_id, req.question, history, user)
+    first = await anext(gen)  # 여기서 나는 Problem은 problem_handler가 상태 코드로 낸다
+
+    async def body():
+        yield _event(first)
+        try:
+            async for ev in gen:
+                yield _event(ev)
+        except Problem as p:
+            yield _frame("error", p.to_dict())
+
+    return StreamingResponse(
+        body(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

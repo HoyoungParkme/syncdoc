@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -81,7 +81,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | GET · POST /api/me/tokens · DELETE …/{id} | [[#SEQ-C1]] | |
 | GET /api/admin/repos | [[#SEQ-20]] | |
 | POST /api/admin/repos/{code}/rebuild | [[#SEQ-21]] | ○ |
-| POST /api/docs/{docId}/items/{itemId}/ask | [[#SEQ-24]] | ○ |
+| POST /api/docs/{docId}/ask | [[#SEQ-24]] | ○ |
 | MCP create_document | [[#SEQ-19]] | ○ |
 | MCP update_document | [[#SEQ-1]] | ○ |
 | MCP delete_document | [[#SEQ-22]] | ○ |
@@ -961,7 +961,7 @@ sequenceDiagram
 
 ## SEQ-24 읽다가 항목에 대해 묻는다
 
-[[SYNC-UC-001#UC-H19]] 기본 흐름 1~5. `POST /api/docs/{docId}/items/{itemId}/ask`. **쓰지 않는다 — `pipeline`을 거치지 않는 유일한 외부 호출이다.**
+[[SYNC-UC-001#UC-H19]] 기본 흐름 1~4. `POST /api/docs/{docId}/ask` — 응답은 SSE(`text/event-stream`). **쓰지 않는다 — `pipeline`을 거치지 않는 유일한 외부 호출이다.** 모델이 도구로 같은 프로젝트를 읽는 ReAct 루프다(사용자 결정 2026-09-22).
 
 ```mermaid
 sequenceDiagram
@@ -974,27 +974,36 @@ sequenceDiagram
     participant LLM as infra/llm
     participant DB
 
-    U->>RD: POST /api/docs/{id}/items/{itemId}/ask {question, history}
-    RD->>Q: ask_item(doc_id, item_id, question, history)
-    Q->>Q: 키 없으면 llm-not-configured (2a) · history를 LLM_MAX_TURNS턴으로 자른다
-    Q->>S: get_item(doc_id, item_id) — 없으면 not-found
-    S->>DB: items · documents
-    S-->>Q: 항목 본문 · 문서 제목 · 상태 · 버전
-    Q->>R: upstream(pk) · downstream(pk)
-    R->>DB: references
-    R-->>Q: 상위·하위 항목 ID와 표시 이름 (본문은 안 읽는다)
-    Q->>Q: 맥락 조립 — 항목 본문 + 참조 이름 + 문서 제목·상태. 문서 전문은 안 싣는다
-    Q->>LLM: ask(system, messages)
-    LLM-->>Q: 답 문자열 — 실패하면 llm-unavailable (4a)
-    Q-->>RD: AskAnswer {answer, context_item_ids}
-    RD-->>U: 200
+    U->>RD: POST /api/docs/{id}/ask {question, history, item_id?}
+    RD->>Q: ask_item(doc_id, item_id, question, history, user)
+    Q->>Q: 키 없으면 llm-not-configured (2a) · get_owned · history를 LLM_MAX_TURNS턴으로 자른다
+    Q->>S: get_document(doc_id) — 제목·상태·버전·항목 ID·이름 (본문은 안 싣는다)
+    S->>DB: documents · items
+    S-->>Q: 시작 맥락
+    Q-->>RD: start {doc_id, item_id}
+    RD-->>U: 200 text/event-stream — 이 앞의 오류는 상태 코드, 뒤는 error 이벤트
+    loop 도구 8번 · 전체 120초 안
+        Q->>LLM: step(system, 대화록, tools)
+        LLM-->>Q: tool_calls 또는 답 문자열 — 실패하면 llm-unavailable → error 이벤트 (4a)
+        Q-->>U: note {reason} — 무엇을 왜 읽는지
+        Q->>Q: ask_tool(name, args, code, user)
+        Q->>S: get_item · get_document · list
+        Q->>R: upstream · downstream · 사슬
+        S-->>Q: 본문·목록 (없으면 「없음」 텍스트, 예외 아님 — 3c)
+        R-->>Q: 참조 (문서는 제목·상태, 끊어진 건 「아직 없음」)
+        Q-->>U: read {tool, target}
+    end
+    Q->>LLM: 상한에 닿으면 마무리 호출 한 번 (tool_choice none) — 읽은 것으로 답하라 (3b)
+    Q->>Q: usage 로그 한 줄 (DB에는 아무것도 없다)
+    Q-->>U: answer {answer, context_item_ids} — 읽은 대상, 부른 순서
 ```
 
 **읽을 때 볼 것**
 - **DB에 쓰지 않는다.** 대화는 클라이언트가 들고 요청마다 `history`로 온다. 서버에 상태가 없으므로 같은 질문을 두 번 보내면 두 번 나간다
-- `queries`가 어댑터를 직접 부르는 유일한 자리다([[SYNC-DOM-002]] 3.2). 쓰기가 없어 `pipeline`을 거칠 이유가 없다
-- **상위·하위는 이름만 싣는다.** 본문까지 실으면 맥락이 문서 여러 개로 번진다 — 맥락 상한이 곧 비용 상한이다([[SYNC-INFRA-001]] 5.3)
-- 항목이 없거나 삭제됐으면 `not-found`다. 화면은 애초에 선택된 항목에서만 묻게 한다(UI-5 8.5)
+- `queries`가 어댑터를 직접 부르는 유일한 자리다([[SYNC-DOM-002]] 3.2). 도구 실행도 `queries`가 이미 가진 조회로 닫힌다 — 쓰기가 없어 `pipeline`을 거칠 이유가 없다
+- **모델이 고른 것만 읽는다.** 시작 맥락에는 본문이 없다. 상한은 호출 수(8)와 시간(120초)이지 글자가 아니다([[SYNC-INFRA-001]] 5.3)
+- **첫 이벤트(`start`) 전의 오류는 HTTP 상태 코드**(404·503)이고, 뒤의 오류는 `error` 이벤트다. 라우터가 제너레이터를 한 번 당겨 `start`를 받은 뒤에야 스트림을 연다
+- 항목은 힌트다. 없어도 문서 전체로 묻는다(1a). 항목 ID가 문서에 없으면 `start` 전에 `not-found`
 
 ---
 

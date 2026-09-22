@@ -555,7 +555,79 @@ class DeleteResult:
 
 @dataclass
 class AskAnswer:
-    """SYNC-DOM-002 2.8 — queries.ask_item → API AskAnswer. 저장되지 않는다."""
+    """SYNC-DOM-002 2.8 — queries.ask_item → API AskAnswer. 저장되지 않는다.
+
+    context_item_ids는 모델이 실제로 읽은 대상(항목·문서 ID), 부른 순서(카드 Y).
+    """
 
     answer: str
     context_item_ids: list[str]
+
+
+@dataclass(frozen=True)
+class ToolSpec:
+    """SYNC-DOM-002 2.8 — queries가 llm.step에 넘기는 읽기 도구 정의(JSON Schema)."""
+
+    name: str
+    description: str
+    parameters: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    """SYNC-DOM-002 2.8 — 모델이 부른 도구 하나. arguments는 어댑터가 JSON으로 풀어 준다."""
+
+    id: str
+    name: str
+    arguments: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class LlmUsage:
+    """SYNC-DOM-002 2.8 — 호출 하나의 토큰. 응답에 없으면 0. 로그에만 쓴다."""
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+
+@dataclass(frozen=True)
+class LlmStep:
+    """SYNC-DOM-002 2.8 — llm.step의 결과. text가 답이거나 tool_calls가 다음 읽기다."""
+
+    text: str | None
+    tool_calls: list[ToolCall]
+    usage: LlmUsage
+
+
+@dataclass(frozen=True)
+class ToolResult:
+    """SYNC-DOM-002 2.8 — queries.ask_tool의 결과. target은 「본 것」에 실을 ID(없으면 None)."""
+
+    target: str | None
+    text: str
+
+
+@dataclass(frozen=True)
+class AskStart:
+    """SYNC-DOM-002 2.8 — 스트림의 첫 이벤트. 이 앞의 오류는 상태 코드, 뒤는 error 이벤트."""
+
+    doc_id: str
+    item_id: str | None
+
+
+@dataclass(frozen=True)
+class AskNote:
+    """SYNC-DOM-002 2.8 — 모델이 읽기 전에 쓴 한 줄(reason). 진행 줄(UI-5 8.9)."""
+
+    text: str
+
+
+@dataclass(frozen=True)
+class AskRead:
+    """SYNC-DOM-002 2.8 — 도구 실행이 끝났다. target은 읽은 대상 ID."""
+
+    tool: str
+    target: str | None
+
+
+AskEvent = AskStart | AskNote | AskRead | AskAnswer

@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -98,7 +98,7 @@ app/
 └── infra/                  외부 시스템 어댑터
     ├── git.py              clone·commit·push·fetch
     ├── github.py           OAuth·webhook 검증
-    └── llm.py              모델 호출. 읽는 중 질의에만 (INFRA 5.3)
+    └── llm.py              모델 호출 — 한 번 호출 + 도구 호출 파싱. 읽는 중 질의에만 (INFRA 5.3)
 ```
 
 **패키지 이름이 `app`인 이유** — 마지막 폴더 이름이 곧 임포트 이름이다. 프로젝트 이름(`syncdoc`)을 그대로 쓰면 `backend/syncdoc/`처럼 이름이 두 번 나온다. `src/`는 담는 상자일 뿐 패키지가 아니라 안에 이름이 또 필요하고(PyPI 배포 라이브러리 관례), 싱크독은 컨테이너로 띄우는 앱이라 그 이점이 없다.
@@ -411,7 +411,16 @@ classDiagram
 | `ChangedFile` | `path: str` · `status: A\|M\|D` · `commit_hash: str` · `author_login: str` · `message: str` · `author_email: str` | git.changed_files → process_commit. **`author_login`과 `author_email`을 둘 다 싣는다** — login은 `%an` 대체값일 수 있어 신원의 근거가 못 된다([[SYNC-MS-009#git.changed_files]]) |
 | `Commit` | `hash: str` · `login: str` · `date: datetime` · `message: str` · `email: str` · `path: str` | git.log → rebuild. `ChangedFile`과 같은 이유로 이메일을 함께 싣는다. `path`는 **그 커밋 시점의 경로** — `--follow`가 이름 바뀌기 전 커밋까지 주므로 지금 경로로는 본문을 못 읽는다([[SYNC-MS-009#git.log]]) |
 | `GithubUser` | `id: int` · `login: str` · `name: str` | github.get_user → login_github |
-| `AskAnswer` | `answer: str` · `context_item_ids: list~str~` | queries.ask_item → API. `context_item_ids`는 맥락으로 실어 보낸 항목들 — 화면이 「무엇을 보고 답했는지」를 보여준다. **저장하지 않는다**([[SYNC-INFRA-001]] 6장) |
+| `ToolSpec` | `name: str` · `description: str` · `parameters: dict`(JSON Schema) | queries 상수 `_ASK_TOOLS` → llm.step. 읽기 도구 다섯의 선언 |
+| `ToolCall` | `id: str` · `name: str` · `arguments: dict` | llm.step → queries.ask_item. 모델이 부르겠다고 한 도구 하나 |
+| `LlmUsage` | `prompt_tokens: int` · `completion_tokens: int`(없으면 0) | llm.step → ask_item이 누적해 로그 한 줄. DB에 안 쓴다 |
+| `LlmStep` | `text: str \| None` · `tool_calls: list~ToolCall~` · `usage: LlmUsage` | llm.step → ask_item. 한 번 호출의 결과 — 답이거나 도구 호출이거나 둘 다 |
+| `ToolResult` | `target: str \| None`(`DOC#ITEM`·`DOC`. 목록은 None) · `text: str`(모델에 줄 JSON) | queries.ask_tool → ask_item |
+| `AskStart` | `doc_id: str` · `item_id: str \| None` | ask_item → 라우터 `start` 이벤트. 이 앞의 오류는 HTTP 상태, 뒤는 `error` 이벤트 |
+| `AskNote` | `text: str` | ask_item → `note` 이벤트. 모델이 읽기 전에 쓴 한 줄(도구 인자 `reason`) |
+| `AskRead` | `tool: str` · `target: str \| None` | ask_item → `read` 이벤트. 도구 실행이 끝났다 |
+| `AskAnswer` | `answer: str` · `context_item_ids: list~str~` | ask_item → `answer` 이벤트. `context_item_ids`는 **모델이 실제로 읽은 대상**(부른 순서) — 화면이 「본 것」으로 보여준다. **저장하지 않는다**([[SYNC-INFRA-001]] 6장) |
+| `AskEvent` | `= AskStart \| AskNote \| AskRead \| AskAnswer` | ask_item이 차례로 yield하는 것. 라우터가 SSE로 흘린다 |
 
 타입은 여기 한 곳에만 정의한다.
 
@@ -491,7 +500,7 @@ flowchart TB
     PS -.->|clone · fetch · rev_list_count| GIT
     GIT -.->|github_token_for| AS
     AS -.->|oauth| GH
-    QR -.->|ask| LLM
+    QR -.->|step| LLM
 ```
 
 **규칙** — 서비스끼리 직접 부르지 않는다. 묶음을 넘는 호출은 전부 `pipeline`(쓰기)이나 `queries`(읽기)를 거친다. v1에는 `TrackingService → ReferenceService·SpecService` 둘이 예외였으나 추적 묶음과 함께 사라졌다. 서비스가 `pipeline`을 부르는 건 `ProjectService.rebuild_index`뿐이다. 4장에서 각 노드를 확대한다.
@@ -896,8 +905,9 @@ diff_with_impact(doc_id, from, to, user) -> Diff    SEQ-15  diff → resolve_ite
 project_items(code, kind, user) -> list             SEQ-18  kind별로 list_by_project(has_convention_error) | 미완성 | 끊어진 참조(is_missing)
 item_chain(doc_id, item_id, user) -> ItemChain      —       전이적 폐포 (UI-15)
 downstream_view(doc_id, user) -> DownstreamView     —       이 문서를 참조하는 것. 추적표·하위 참조 수 (V-PRD)
-ask_item(doc_id, item_id, question, history, user) -> AskAnswer
-                                                    SEQ-24  맥락 조립 → llm.ask
+ask_item(doc_id, item_id?, question, history, user) -> AsyncIterator[AskEvent]
+                                                    SEQ-24  시작 맥락(제목·항목 목록) → llm.step ↔ ask_tool 루프(8번·120초) → AskAnswer
+ask_tool(name, args, code, user) -> ToolResult     SEQ-24  도구 하나 실행 — get_item · get_references · item_chain · list_documents · get_document. 같은 프로젝트·소유 검사
 ```
 
 **규칙** — **모든 함수가 `user: User`를 명시 인자로 받고 첫 줄에서 `ProjectService.get_owned`(목록은 `list_owned`)를 지난다.** `doc_id`로 들어오는 것은 `doc_id.split("-")[0]`이 코드다. 소유가 아니면 본문·항목·참조를 읽기 전에 not-found로 끝난다. `queries`는 쓰지 않는다. 읽고 조합만 한다. 건수는 `document_ids`로 묶어 한 번에 묻는다(N+1 금지). 단계 11칸 계산(가장 낮은 상태·gate_warning)은 `project_summary` 안에 있다 — `ProjectService`가 아니라.
@@ -923,12 +933,13 @@ github.verify_signature(body, header) -> bool
 github.exchange_code(code) -> str
 github.get_user(token) -> GithubUser
 
-llm.ask(system, messages) -> str               모델 호출 한 번. 답 문자열만
+llm.step(system, messages, tools, tool_choice="auto") -> LlmStep
+                                               모델 호출 한 번. 답 텍스트이거나 도구 호출 목록이거나 둘 다. usage 포함
 ```
 
 **규칙** — `git.commit_push`만 `AccountService.github_token_for`를 부른다(3.2). 토큰은 push URL에만 쓰고 `.git/config`에 남기지 않는다.
 
-`llm`은 키를 `config`에서 읽는다. 키가 비면 부르기 전에 `llm-not-configured`로 막고, 외부가 실패하면 `llm-unavailable`로 접는다 — 사용량 초과도 여기 들어간다([[SYNC-INFRA-001]] 5.3).
+`llm`은 키를 `config`에서 읽는다. 키가 비면 부르기 전에 `llm-not-configured`로 막고, 외부가 실패하면 `llm-unavailable`로 접는다 — 사용량 초과도 여기 들어간다([[SYNC-INFRA-001]] 5.3). **어댑터는 한 번 호출만 안다.** 도구 선언(`tools`)과 `tool_choice`를 와이어 형식(`{type: function, function: {name, description, parameters}}`)으로 옮겨 싣고, 응답의 `tool_calls`를 `ToolCall`로 파싱해 돌려준다. `arguments`가 JSON이 아니면 `llm-unavailable`. 루프는 어댑터에 없다 — `queries.ask_item`이 돈다.
 
 ## 5. 판단이 필요한 지점
 
@@ -954,7 +965,7 @@ llm.ask(system, messages) -> str               모델 호출 한 번. 답 문자
 
 **이메일 사칭은 막지 못한다 — 다만 권한은 안 준다.** 남의 이메일을 등록하면 그 사람 커밋이 내 이름으로 붙는다. `commit_emails.email`의 유일 제약이 1차 방어다(먼저 등록한 쪽이 임자, 둘째는 거부). push 권한은 여전히 `github_token_encrypted`가 있어야 한다. v2는 접근을 소유로 가른다(결정 6) — 이메일을 사칭해도 남의 프로젝트는 보이지 않는다.
 
-**4. 읽는 중 질의에 새 묶음을 만들지 않는다 — 결정: `queries.ask_item`.** 엔티티가 없어 `models.py`가 빈 채로 일곱째 묶음이 생기고, 그러면 [[SYNC-DOM-001]] 4장 경계 표에 개념 없는 묶음을 넣어야 한다. [[SYNC-STD-001]] 1.9의 「과설계 금지 — 두 번째 구현체가 실제로 생길 때 만든다」에 걸린다. 맥락을 조립하는 데 필요한 것(항목 본문·상위·하위 참조·문서 상태)이 이미 전부 `queries`에 있고, 이 기능은 **쓰지 않고 읽기만 하므로** `pipeline`을 거칠 이유도 없다. 두 번째 모델 기능이 실제로 생기면 그때 묶음으로 옮긴다.
+**4. 읽는 중 질의에 새 묶음을 만들지 않는다 — 결정: `queries.ask_item`.** 엔티티가 없어 `models.py`가 빈 채로 일곱째 묶음이 생기고, 그러면 [[SYNC-DOM-001]] 4장 경계 표에 개념 없는 묶음을 넣어야 한다. [[SYNC-STD-001]] 1.9의 「과설계 금지 — 두 번째 구현체가 실제로 생길 때 만든다」에 걸린다. 맥락을 조립하는 데 필요한 것(항목 본문·상위·하위 참조·문서 상태)이 이미 전부 `queries`에 있고, 이 기능은 **쓰지 않고 읽기만 하므로** `pipeline`을 거칠 이유도 없다. 카드 Y에서 모델이 도구로 스스로 읽게 됐는데도 자리는 그대로다 — **도구 실행(`queries.ask_tool`)도 `queries`가 이미 가진 조회(`get_item`·`item_references_view`·`item_chain`·`document_list`·`get_document`)로 닫힌다.** 새로 만지는 테이블이 없다. 두 번째 모델 기능이 실제로 생기면 그때 묶음으로 옮긴다.
 
 **5. 끊어진 참조를 어디에 두나 — 결정: `references.is_missing`을 되돌린다.** v1은 상위 항목이 삭제되면 `broken_ref` 플래그를 세웠다. 추적 묶음을 빼면서 갈 곳이 없어졌는데, 참조 표에 이미 「대상이 없다」를 뜻하는 자리가 있다. 삭제된 대상을 아직 안 쓰인 대상과 같이 다루면 새 표·새 개념 없이 미완성 배너(UI-5 4a)·`get_references`·항목 표시가 전부 그대로 쓰인다. 상대가 되살아나면 `resolve_missing`이 잇는다 — 이미 있던 경로다. 「언제 끊어졌나」는 잃는다. 혼자 쓰는 도구에서 그 시각을 물을 사람이 없다.
 

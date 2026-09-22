@@ -4,16 +4,17 @@
  *  12 휴지통에 넣기 · 13 휴지통 확인(13.1 무엇이 되나 · 13.2 끊어지는 것 · 13.3 넣기 · 13.4 닫기) · 4b 휴지통 배너(4b.1 되살리기)
  *  6 목차(6.1 표시된 항목, 6.2 왼쪽 손잡이) · 7 유저용 본문(7.1·7.2·7.3·7.5·7.6) · 8 패널(8.1 참조, 8.3 오른쪽 손잡이)
  *  9 단계 이동 · 10 원본(10.1 MD, 10.2 복사, 10.3 원문, 10.4 렌더링)
- *  질문 탭(8.4~8.7)은 카드 U가 더한다. 패널은 그때까지 참조 하나라 탭 줄이 없다 */
+ *  질문 탭(8.4 탭 · 8.5 맥락 줄 · 8.6 입력 · 8.7 대화 · 8.9 진행 줄) — 카드 U·Y. 대화는 Shell이 프로젝트 단위로 든다 */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { api, ApiError, incompleteOf, warnText, type AskAnswer, type AskTurn, type Document, type DownstreamView, type ItemReferences, type Me } from '../api/client'
+import { api, ApiError, incompleteOf, warnText, type AskAnswer, type AskNote, type AskRead, type AskTurn, type Document, type DownstreamView, type ItemReferences, type Me, type Problem } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { attachDiagramButtons, DiagramFull, type FullDiagram } from '../components/DiagramFull'
 import { esc, renderBlocks, splitRef } from '../view/md'
 import { ItemIdBadge, StatusPill, ProjName, toast } from '../components/ui'
 import { Handle, PANEL, readStore, TOC, useWidth, writeStore } from '../components/panes'
+import type { AskChat, AskTurnView } from '../components/Shell'
 
 
 export function DocView() {
@@ -30,7 +31,7 @@ export function DocView() {
   const [delOpen, setDelOpen] = useState(false) // 13
   const [delInfo, setDelInfo] = useState<Record<string, unknown> | null>(null) // 13.2 — 서버 답(needs-confirm)으로만 채운다
   // 8 패널 탭 — 기본은 참조. 질문 탭(8.4)은 사람이 누를 때만, URL은 ?panel=ask. 키가 없으면 탭 자체가 없다
-  const { user } = useOutletContext<{ user: Me }>()
+  const { user, ask } = useOutletContext<{ user: Me; ask: AskChat }>()
   const askOn = user.llm_enabled
   const panelParam = sp.get('panel') === 'ask' ? 'ask' : 'refs'
   const setPanel = useCallback(
@@ -357,9 +358,9 @@ export function DocView() {
                 </div>
                 <div className="pbody">
                   {panel === 'ask' ? (
-                    // key — 문서나 항목이 바뀌면 대화를 비운다(저장되지 않는다)
+                    // 대화는 Shell이 프로젝트 단위로 든다 — 문서·항목을 옮겨도 남고, 프로젝트가 바뀌면 새 대화
                     <AskPanel
-                      key={`${docId}#${selected ?? ''}`}
+                      ask={ask}
                       docId={docId}
                       itemId={selected}
                       displayName={doc.items.find((i) => i.item_id === selected)?.display_name ?? ''}
@@ -496,32 +497,36 @@ function titleOf(body: string): string {
   return /^title:\s*(.*)$/m.exec(fm)?.[1]?.trim() ?? ''
 }
 
-interface Turn {
-  q: string
-  a?: string
-  src?: string[]
-  err?: string
-}
 
-/** 8.5 맥락 줄 · 8.6 질문 입력 · 8.7 대화(.qa · 본 것 .qsrc) — UC-H19. 대화는 state에만 있고 문서·항목이 바뀌면 key로 비운다 */
+/** 8.5 맥락 줄 · 8.6 질문 입력 · 8.7 대화(.qa · 본 것 .qsrc) · 8.9 진행 줄 — UC-H19, 카드 Y.
+ *  POST /api/docs/{docId}/ask(SSE): note·read가 진행 줄에 차례로, answer가 답, error가 실패.
+ *  항목은 힌트(item_id) — 안 골라도 문서 전체로 묻는다. 대화는 Shell이 프로젝트 단위로 든다 */
 function AskPanel({
+  ask,
   docId,
   itemId,
   displayName,
   goItem,
 }: {
+  ask: AskChat
   docId: string
   itemId: string | null
   displayName: string
   goItem: (id: string) => void
 }) {
-  const [turns, setTurns] = useState<Turn[]>([])
+  const { turns, setTurns } = ask
   const [question, setQuestion] = useState('')
   const [pending, setPending] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+  // 언마운트(문서·프로젝트 이동, 탭 전환)면 스트림을 끊는다 — 답은 오던 자리에 안 남는다
+  useEffect(() => () => abortRef.current?.abort(), [])
+
+  const patchLast = (f: (t: AskTurnView) => AskTurnView) =>
+    setTurns((ts) => ts.map((t, i) => (i === ts.length - 1 ? f(t) : t)))
 
   const send = async () => {
     const q = question.trim()
-    if (!q || !itemId || pending) return
+    if (!q || pending) return
     // history = 지금까지의 질문·답 전부(실패한 턴은 빼고). 서버가 LLM_MAX_TURNS에서 자른다
     const history: AskTurn[] = turns
       .filter((t) => t.a !== undefined)
@@ -531,22 +536,46 @@ function AskPanel({
       ])
     setQuestion('')
     setPending(true)
-    setTurns((ts) => [...ts, { q }])
+    setTurns((ts) => [...ts, { q, prog: [] }])
+    const ac = new AbortController()
+    abortRef.current = ac
     try {
-      const r = await api.post<AskAnswer>(`/api/docs/${docId}/items/${itemId.replace(/\//g, '~')}/ask`, { question: q, history })
-      setTurns((ts) => ts.map((t, i) => (i === ts.length - 1 ? { ...t, a: r.answer, src: r.context_item_ids } : t)))
+      await api.stream(
+        `/api/docs/${docId}/ask`,
+        { question: q, history, item_id: itemId ?? undefined },
+        (name, data) => {
+          if (name === 'note') {
+            const d = data as AskNote
+            patchLast((t) => ({ ...t, prog: [...t.prog, { kind: 'note', text: d.text }] }))
+          } else if (name === 'read') {
+            const d = data as AskRead
+            patchLast((t) => ({ ...t, prog: [...t.prog, { kind: 'read', text: d.target ? `${d.tool} ${d.target}` : d.tool }] }))
+          } else if (name === 'answer') {
+            const d = data as AskAnswer
+            patchLast((t) => ({ ...t, a: d.answer, src: d.context_item_ids }))
+          } else if (name === 'error') {
+            const d = data as Problem
+            patchLast((t) => ({ ...t, err: String(d.reason ?? d.detail ?? d.title) }))
+          }
+        },
+        ac.signal,
+      )
+      // 스트림이 answer도 error도 없이 닫혔다
+      patchLast((t) => (t.a === undefined && t.err === undefined ? { ...t, err: '답 없이 끊겼습니다' } : t))
     } catch (e) {
+      if (ac.signal.aborted) return
       const reason = e instanceof ApiError ? String(e.problem.reason ?? e.message) : String(e)
-      setTurns((ts) => ts.map((t, i) => (i === ts.length - 1 ? { ...t, err: reason } : t)))
+      patchLast((t) => ({ ...t, err: reason }))
     } finally {
+      if (abortRef.current === ac) abortRef.current = null
       setPending(false)
     }
   }
 
   const srcLink = (id: string) => {
-    // 본 것의 항목 ID → 7.2와 같음. 이 문서 안 항목이면 스크롤·선택, 남의 문서면 링크
-    const [d, it] = id.includes('#') ? [id.split('#')[0], id.split('#')[1]] : [docId, id]
-    if (d === docId) {
+    // 본 것의 ID → 7.2와 같음. 이 문서 안 항목이면 스크롤·선택, 남의 문서·문서 자체면 링크
+    const [d, it] = id.includes('#') ? [id.split('#')[0], id.split('#')[1]] : [id, '']
+    if (d === docId && it) {
       return (
         <a key={id} href={`#item-${it}`} onClick={(e) => { e.preventDefault(); goItem(it) }}>
           {it}
@@ -565,16 +594,28 @@ function AskPanel({
       <div className="lbl" data-el="8.5">
         {itemId ? (
           <>
-            <b className="mono">{itemId}</b> {displayName} · 이 항목에 대해 묻습니다
+            <b className="mono">{itemId}</b> {displayName} · 이 항목을 보며 묻습니다
           </>
         ) : (
-          '항목을 선택하세요'
+          <>
+            문서 전체 · <b className="mono">{docId}</b>에 대해 묻습니다
+          </>
         )}
       </div>
       <div className="qa" data-el="8.7">
         {turns.map((t, i) => (
           <div key={i} className="turn">
             <div className="q">{t.q}</div>
+            {t.prog.length > 0 && (
+              <div className={'qprog' + (t.a !== undefined || t.err ? ' done' : '')} data-el="8.9">
+                {t.prog.map((pg, k) => (
+                  <div key={k} className={pg.kind}>
+                    {pg.kind === 'read' ? '읽음 · ' : ''}
+                    {pg.text}
+                  </div>
+                ))}
+              </div>
+            )}
             {t.a !== undefined ? (
               <>
                 <div className="a">{t.a}</div>
@@ -593,7 +634,7 @@ function AskPanel({
             ) : t.err ? (
               <div className="a fail">답을 못 받았습니다 — {t.err}</div>
             ) : (
-              <div className="a wait">답을 기다리는 중…</div>
+              <div className="a wait">{t.prog.length ? '읽는 중…' : '답을 기다리는 중…'}</div>
             )}
           </div>
         ))}
@@ -601,8 +642,8 @@ function AskPanel({
       <textarea
         data-el="8.6"
         value={question}
-        disabled={!itemId || pending}
-        placeholder={itemId ? '이 항목에 대해 묻습니다 — Enter로 보냅니다' : '항목을 먼저 선택하세요'}
+        disabled={pending}
+        placeholder={itemId ? '이 항목을 보며 묻습니다 — Enter로 보냅니다' : '이 문서에 대해 묻습니다 — Enter로 보냅니다'}
         onChange={(e) => setQuestion(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {

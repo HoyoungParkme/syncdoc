@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-009
 type: MS
 title: MINISPEC — infra — git·github 어댑터
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -39,29 +39,48 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#github.exchange_code]] | OAuth code → token |
 | [[#github.get_user]] | token → 사용자 정보 |
 | [[#github.create_repo]] | 공개 저장소 만들기 |
-| [[#llm.ask]] | 모델 한 번 호출 |
+| [[#llm.step]] | 모델 한 번 호출 + 도구 호출 파싱 |
 
 ---
 
 ## 2. 함수
 
-#### llm.ask 모델 한 번 호출
+#### llm.step 한 번 호출 + 도구 호출 파싱
 
-**시그니처** `async def ask(system: str, messages: list[dict]) -> str`
+**시그니처** `async def step(system: str, messages: list[dict], tools: list[ToolSpec], tool_choice: str = "auto") -> LlmStep`
 
-근거: [[SYNC-INFRA-001]] 5.3 · [[SYNC-PRD-001#R11]]
+근거: [[SYNC-INFRA-001]] 5.3 · [[SYNC-PRD-001#R11]] · [[SYNC-MS-008#queries.ask_item]]
 
-**입력** `system` 맥락과 지켜야 할 것을 담은 지시문 · `messages` `[{role: user|assistant, text}]` 차례대로. 맥락 조립과 자르기는 부르는 쪽([[SYNC-MS-008#queries.ask_item]])이 끝낸 상태로 온다
+**입력** `system` 지시문 · `messages` 우리 키로 쌓인 대화록 — `{role: user|assistant, text}` · `{role: assistant, text, tool_calls: [ToolCall]}` · `{role: tool, tool_call_id, text}` · `tools` 모델이 부를 수 있는 도구 명세(`ToolSpec`) · `tool_choice` `"auto"`(모델이 고른다) 또는 `"none"`(도구 없이 답만 — 마무리 호출). 맥락 조립·자르기·루프는 전부 부르는 쪽([[SYNC-MS-008#queries.ask_item]])의 일이다. 여기서는 더하거나 자르지 않는다
 
-**처리** `if not settings.LLM_API_KEY → ! LlmNotConfigured` · `httpx`로 `settings.LLM_API_URL`(OpenAI 호환 Chat Completions)에 한 번 요청 — `Authorization: Bearer {LLM_API_KEY}`, 본문 `{model: LLM_MODEL, messages: [{role: system, content: system}, …{role, content: text}]}` · 답 `choices[0].message.content` 하나를 꺼낸다 · 스트리밍하지 않는다 · 타임아웃은 코드 상수(60초)
+**처리**
+1. `if not settings.LLM_API_KEY → ! LlmNotConfigured` — 네트워크 전
+2. 대화록을 와이어 형식으로 옮긴다 — 아래 표
+3. `httpx`로 `POST settings.LLM_API_URL`(OpenAI 호환 Chat Completions), `Authorization: Bearer {LLM_API_KEY}`, 본문 `{model: settings.LLM_MODEL, messages: [{role: "system", content: system}, …], tools: [{type: "function", function: {name, description, parameters}}], tool_choice}` — `tools`가 비면 `tools`·`tool_choice`를 아예 싣지 않는다 · 타임아웃 코드 상수 60초 · 스트리밍하지 않는다
+4. 응답 `choices[0].message` — `content`(없으면 `None`) · `tool_calls[]`마다 `ToolCall(id, function.name, json.loads(function.arguments))` · `usage`가 있으면 `LlmUsage(prompt_tokens, completion_tokens)`, 없으면 둘 다 0
+5. `→ LlmStep(text=content, tool_calls, usage)`
 
-**출력** 답 문자열
+**와이어 변환** — 우리 키 → OpenAI 호환
 
-**예외** 키 없음 → `llm-not-configured` · 그 밖의 모든 실패 → `llm-unavailable`에 `reason`. **사용량 초과·요청 한도도 여기 접힌다** — `git.commit_push`가 GitHub 실패를 `push-failed`로 접는 것과 같다. 우리 에러 표에 429를 만들지 않는다([[SYNC-API-001]] 5장 6)
+| 대화록 항목 | 보내는 것 |
+|---|---|
+| `{role: user\|assistant, text}` | `{role, content: text}` |
+| `{role: assistant, text, tool_calls}` | `{role: "assistant", content: text or null, tool_calls: [{id, type: "function", function: {name, arguments: json.dumps(arguments)}}]}` |
+| `{role: tool, tool_call_id, text}` | `{role: "tool", tool_call_id, content: text}` |
+
+응답은 `finish_reason`이 `tool_calls`든 `stop`이든 같은 규칙으로 읽는다 — 판단은 `tool_calls`의 유무로 부르는 쪽이 한다
+
+**출력** `LlmStep` — `text`(답 또는 도구 호출에 곁들인 말, 없으면 `None`) · `tool_calls` · `usage`
+
+**예외** 키 없음 → `llm-not-configured` · 비2xx·`httpx.HTTPError`·타임아웃·응답 형식 불일치·`arguments`가 JSON이 아님 → `llm-unavailable`에 `reason`. **사용량 초과·요청 한도·맥락 초과(400)도 여기 접힌다** — `git.commit_push`가 GitHub 실패를 `push-failed`로 접는 것과 같다. 우리 에러 표에 429를 만들지 않는다([[SYNC-API-001]] 5장 6)
+
+**호환 서버 대안** — `tool_choice: "none"`을 받지 않는 OpenAI 호환 서버가 있다. 그때는 마무리 호출을 `tools=[]`(도구·`tool_choice` 둘 다 없이)로 보내면 같은 뜻이다. 기본은 `"none"`이고, 안 받는 서버가 확인되면 이 줄을 근거로 바꾼다
 
 **호출하는 것** 없음. 바깥만 만진다
 
-**테스트 관점** 키가 비면 부르기 전에 막는다(네트워크를 타지 않는다) · 외부가 429를 줘도 `llm-unavailable`이다 · 외부가 느려도 예외로 끝나지 앱이 멈추지 않는다 · `system`과 `messages`를 그대로 싣는다(여기서 맥락을 더하거나 자르지 않는다)
+**호출되는 것** [[SYNC-MS-008#queries.ask_item]] 4·6단계
+
+**테스트 관점** 키가 비면 부르기 전에 막는다(네트워크를 타지 않는다) · `tools`·`tool_choice`가 요청 본문에 그대로 실린다 · `tools`가 비면 두 키가 없다 · `tool_calls` 응답 → `ToolCall`의 `arguments`가 dict · `content`만 온 응답 → `text`, `tool_calls` 빈 목록 · `arguments`가 JSON이 아니면 `llm-unavailable` · `usage`가 없으면 0 · 외부가 429·400을 줘도 `llm-unavailable` · 외부가 느려도 예외로 끝나지 앱이 멈추지 않는다 · 대화록의 tool 항목이 `tool_call_id`와 함께 실린다 · `system`과 대화록을 그대로 싣는다(여기서 맥락을 더하거나 자르지 않는다)
 
 ---
 
