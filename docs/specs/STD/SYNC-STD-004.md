@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-004
 type: STD
 title: 개발 규약 — 코드 파트 표준
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -110,6 +110,7 @@ async def save_pipeline(...):
 
 - **화면 하나 = 컴포넌트 하나.** `UI-4` → `pages/ProjectDetail.tsx`. 경로 없이 다른 화면 위에 뜨는 다이얼로그(설정 UI-13)는 `components/`에 두고 여는 화면이 부른다
 - **요소 번호 = `data-el`.** 와이어프레임 배치 HTML의 `data-el="2.1"`이 JSX의 같은 DOM 노드에 그대로. 반복 행(`2.1`, `4.1`)은 첫 행에만 — 배치 HTML과 같게
+- **검사기는 본 것이 0이면 실패한다.** 「화면 0, 불일치 0」은 통과가 아니라 **안 봤다**는 뜻일 수 있다. 실제로 화면 문서를 제목 낱말로 고르던 때, 규약이 권한 대로 제목에 두 낱말을 다 넣으면 엉뚱한 파일을 골라 화면을 하나도 못 찾은 채 통과가 났다(#127). 지금은 배치 html이 든 문서를 찾고, 못 찾으면 실패한다
 - **요소를 컴포넌트로 쪼개지 않는다.** 하위 요소는 JSX 블록. 두 화면 이상이 같은 요소를 쓸 때만 `components/`로 빼고 `el` prop으로 자기 번호를 받는다 (`DiffBox`가 UI-7 3.2·4.1을 `el`로 받는다)
 - 컴포넌트 첫 docstring에 그 화면의 요소 번호 목록 — DEV-3의 화면판
 - 화면 간 진입은 URL로 — `#item-X`(항목 선택·패널), `?panel=ask`(패널 탭). 와이어프레임 "누르면" 열이 정한다
