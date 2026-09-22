@@ -5,7 +5,7 @@
   · 화면 항목 `UI-N`은 헤딩 단계와 무관하게 잡는다(`#`~`#####`). 코드블록 안은 보지 않는다
   · 화면 블록은 다음 「같은 단계 이상」 헤딩 전까지. 이어진 화면 항목은 한 묶음(탭) — 묶음 안 번호순,
     묶음 간 문서 순서
-  · 화면마다 갈리는 것은 배치(```html 코드블록) 유무다. 있으면 좌 배치(iframe 격리) / 우 요소 표·규칙·시나리오.
+  · 화면마다 갈리는 것은 배치(```html 코드블록) 유무다. 있으면 위에 배치(iframe 격리) / 아래에 요소 표·규칙·시나리오 (카드 AC).
     우측 셋이 다 비면 좌측 전폭. 없으면 「설계만 있는 화면」 — 잇따른 것끼리 표 한 장에 행 하나씩
   · 화면 아닌 절은 문서 순서 그대로 산문으로 그린다(화면 목록·공통 틀·화면 흐름·미결사항 …)
   · 배치는 iframe(srcdoc, allow-same-origin)에 넣는다 — 사이트 CSS가 안 스며든다. 「공통 틀」 절의 첫
@@ -34,6 +34,8 @@ FRAME_CSS = r"""html,body{margin:0}
 [data-el]{position:relative}
 [data-el]::before{content:attr(data-el);position:absolute;top:-8px;left:5px;font:600 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;background:#ffe58a;border:1px solid #c9a800;color:#222;padding:2px 4px;border-radius:2px;z-index:2147483000;pointer-events:none}
 [data-el].hi{outline:2px solid #c9a800;outline-offset:1px}
+.wfbadge{position:absolute;font:600 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;background:#ffe58a;border:1px solid #c9a800;color:#222;padding:2px 4px;border-radius:2px;z-index:2147483000;pointer-events:none}
+.wfbadge.hi{outline:2px solid #c9a800;outline-offset:1px}
 a{cursor:default}"""
 
 COMMON_HEAD = re.compile(r"^#{1,6} (?:\d+(?:\.\d+)*\.?\s+)?공통 틀\s*$", re.M)
@@ -372,10 +374,11 @@ WF_JS = r"""
   const secOf=f=>f.closest('section.screen');
   const hi=(sec,no)=>{
     const f=sec.querySelector('iframe.wfframe-if'), d=f&&docOf(f);
-    if(d) d.querySelectorAll('[data-el].hi').forEach(n=>n.classList.remove('hi'));
+    if(d) d.querySelectorAll('[data-el].hi, .wfbadge.hi').forEach(n=>n.classList.remove('hi'));
     sec.querySelectorAll('[data-wf-row].hi').forEach(n=>n.classList.remove('hi'));
     const el=d&&d.querySelector(`[data-el="${CSS.escape(no)}"]`), row=sec.querySelector(`[data-wf-row="${CSS.escape(no)}"]`);
-    if(el){el.classList.add('hi'); el.scrollIntoView({block:'nearest'});}
+    if(el){el.classList.add('hi'); el.scrollIntoView({block:'nearest'});
+      if(d) d.querySelectorAll('.wfbadge').forEach(t=>{if(t.textContent===no) t.classList.add('hi');});}
     if(row){row.classList.add('hi');row.scrollIntoView({block:'nearest'});}
   };
   // 전체보기 층 — 같은 srcdoc을 화면 전체에 1:1로 띄운다 (UI-5 7.6과 같은 자리, 카드 AC)
@@ -406,10 +409,28 @@ WF_JS = r"""
     // 열릴 때는 무대 폭에 맞춘다(100% 이하) — 1280은 넓은 창에서 그대로 1:1
     z=Math.max(.25,Math.min(1,Math.floor(((stage.clientWidth-48)/w)*100)/100));draw();
   };
+  // ::before가 상자를 안 만드는 곳(svg 도형·치환 요소·표 행)에 배지를 얹어 준다 (#132).
+  // frontend/src/view/frame.ts needsOverlay·overlay와 같은 규칙
+  const NO_BEFORE=/^(input|textarea|select|img|br|hr|progress|meter|iframe|video|canvas|embed|object)$/i;
+  const ROW=/^table-(row|row-group|header-group|footer-group)$/;
+  const overlay=f=>{
+    const d=docOf(f), w=d&&d.defaultView; if(!d||!w||!d.body) return;
+    d.querySelectorAll('[data-el]').forEach(el=>{
+      const no=el.getAttribute('data-el');
+      const svg=el.namespaceURI==='http://www.w3.org/2000/svg';
+      if(!svg&&!NO_BEFORE.test(el.tagName)&&!ROW.test(w.getComputedStyle(el).display)) return;
+      let t=el.__wfbadge;
+      if(!t){t=d.createElement('span');t.className='wfbadge';t.textContent=no;d.body.appendChild(t);el.__wfbadge=t;}
+      const r=el.getBoundingClientRect();
+      t.style.left=Math.round(r.left+w.scrollX+5)+'px';
+      t.style.top=Math.round(r.top+w.scrollY-8)+'px';
+      t.classList.toggle('hi', el.classList.contains('hi'));
+    });
+  };
   const wire=f=>{
     const d=docOf(f); if(!d||f.dataset.wired) return; f.dataset.wired='1';
-    try{new ResizeObserver(()=>fit(f)).observe(d.documentElement);}catch(e){}
-    fit(f);
+    try{new ResizeObserver(()=>{fit(f);overlay(f);}).observe(d.documentElement);}catch(e){}
+    fit(f); overlay(f);
     const box=f.parentElement.parentElement;
     const b=box&&box.querySelector('.wfframe-fit');
     if(b) b.addEventListener('click',()=>{f.dataset.orig=f.dataset.orig==='1'?'0':'1';fit(f);});

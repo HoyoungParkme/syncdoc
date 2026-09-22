@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-002
 type: STD
 title: 뷰 규약 — 사람용 뷰 타입별 렌더링
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-UI-002]
 ---
 
@@ -156,9 +156,12 @@ html,body{margin:0}
 [data-el]{position:relative}
 [data-el]::before{content:attr(data-el);position:absolute;top:-8px;left:5px;font:600 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;background:#ffe58a;border:1px solid #c9a800;color:#222;padding:2px 4px;border-radius:2px;z-index:2147483000;pointer-events:none}
 [data-el].hi{outline:2px solid #c9a800;outline-offset:1px}
+.wfbadge{position:absolute;font:600 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;background:#ffe58a;border:1px solid #c9a800;color:#222;padding:2px 4px;border-radius:2px;z-index:2147483000;pointer-events:none}
+.wfbadge.hi{outline:2px solid #c9a800;outline-offset:1px}
 a{cursor:default}
 ```
 
+- **배지를 못 그리는 곳은 얹어 준다 (#132).** `::before`는 svg 도형·치환 요소(`<input>`·`<textarea>`·`<select>`·`<img>`)에 상자를 만들지 않고, `<tr>`에는 익명 표 셀을 만들어 열을 민다. 그런 요소에는 부모가 `getBoundingClientRect`로 위치를 재서 `.wfbadge` span을 문서 `<body>`에 **얹는다** — 문서 DOM 구조는 안 건드린다. 강조(`.hi`)도 얹은 배지에 같이 건다(svg에는 `outline`이 브라우저마다 다르다). 높이를 다시 잴 때 함께 갱신한다
 - **배지만 붙인다.** 테두리·배경은 건드리지 않는다 — 디자인이 그린 모양이 그대로다. 강조는 `outline`이라 문서의 `border`를 안 덮는다
 - **공통 틀** — 「공통 틀」 절(이름으로 찾는다, `## 3. 공통 틀`처럼 번호 접두 허용)의 **첫 html 블록**을 모든 화면 앞에 앞세운다. `<link>`·`<style>`은 `<head>`로, 나머지 마크업은 `<body>` 맨 앞으로. 그 블록이 산문 자리에서 보일 때는 마크업이 있으면 같은 iframe, `<style>`·`<link>`뿐이면 코드로 보인다
 - **높이** — 부모가 `contentDocument.documentElement`를 `ResizeObserver`로 재서 `iframe.style.height`를 맞춘다. 이전 값과 같으면 갱신하지 않는다(문서가 `height:100%`를 쓰면 순환하므로). 탭을 열면 크기가 바뀌어 다시 잰다
@@ -229,7 +232,7 @@ a{cursor:default}
 | 뷰 | 지금 | 규약 | 고칠 것 |
 |---|---|---|---|
 | 유스케이스 | 패키지 탭 + 좌우 + 추적표 | V-UC 그대로 | 타이틀 블록을 frontmatter에서. 그 외 없음 |
-| 와이어프레임 | 화면 탭 + 좌우 | V-UI 그대로 | 타이틀 블록 |
+| 와이어프레임 | 화면 탭 + 배치 위·표 아래 | V-UI 그대로 | 타이틀 블록 |
 | 시퀀스 | 좌 목록 + 생명선 + 그림/단계 | V-SEQ 그대로 | 타이틀 블록. 좌 목록 묶음 이름을 규약에 적은 것으로 |
 
 셋 다 규약 초안 역할을 했으니 거의 그대로다. 나머지 8타입 뷰는 아직 없고, 이 문서대로 만든다.

@@ -11,7 +11,18 @@ export const FRAME_CSS = `html,body{margin:0}
 [data-el]{position:relative}
 [data-el]::before{content:attr(data-el);position:absolute;top:-8px;left:5px;font:600 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;background:#ffe58a;border:1px solid #c9a800;color:#222;padding:2px 4px;border-radius:2px;z-index:2147483000;pointer-events:none}
 [data-el].hi{outline:2px solid #c9a800;outline-offset:1px}
+.wfbadge{position:absolute;font:600 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;background:#ffe58a;border:1px solid #c9a800;color:#222;padding:2px 4px;border-radius:2px;z-index:2147483000;pointer-events:none}
+.wfbadge.hi{outline:2px solid #c9a800;outline-offset:1px}
 a{cursor:default}`
+
+/** `::before`가 상자를 안 만드는 곳 — svg 도형, 치환 요소, 표 행. 여기엔 뷰가 배지를 얹어 준다.
+ *  `<tr>`은 그리기까지 하면 익명 표 셀이 생겨 열이 밀린다 (STD-001 2.7 「data-el 붙이는 곳」, #132) */
+const NO_BEFORE = /^(input|textarea|select|img|br|hr|progress|meter|iframe|video|canvas|embed|object)$/i
+const ROW_DISPLAY = /^table-(row|row-group|header-group|footer-group)$/
+
+export function needsOverlay(el: Element, display: string): boolean {
+  return el.namespaceURI === 'http://www.w3.org/2000/svg' || NO_BEFORE.test(el.tagName) || ROW_DISPLAY.test(display)
+}
 
 export interface CommonParts {
   /** <link …>·<style>…</style> — srcdoc <head>로 */
@@ -138,10 +149,12 @@ const STATE = new WeakMap<HTMLIFrameElement, FrameState>()
 export function hiIn(frame: HTMLIFrameElement, no: string): HTMLElement | null {
   const doc = frame.contentDocument
   if (!doc) return null
-  doc.querySelectorAll('[data-el].hi').forEach((n) => n.classList.remove('hi'))
+  doc.querySelectorAll('[data-el].hi, .wfbadge.hi').forEach((n) => n.classList.remove('hi'))
   const el = doc.querySelector<HTMLElement>(`[data-el="${no.replace(/["\\]/g, '\\$&')}"]`)
   if (!el) return null
   el.classList.add('hi')
+  // 얹은 배지에도 같이 — svg에는 outline이 브라우저마다 다르게 먹는다 (#132)
+  for (const t of doc.querySelectorAll<HTMLElement>('.wfbadge')) if (t.textContent === no) t.classList.add('hi')
   // iframe 자체는 내용만큼 커서 스크롤이 없다 — 강조된 요소가 화면에 들어오게 본문을 옮긴다.
   // 배치는 본문에 세로로 쌓이므로(카드 AC) 스크롤 상자는 본문 열이다
   const st = STATE.get(frame)
@@ -166,6 +179,7 @@ function setup(f: HTMLIFrameElement, onPick?: (no: string, frame: HTMLIFrameElem
   if (STATE.has(f)) STATE.get(f)?.cleanup()
   const st: FrameState = { scale: 1, fit: true, natW: 0, natH: 0, measure: () => undefined, cleanup: () => undefined }
   let lastH = -1
+  const badges = new Map<Element, HTMLElement>()
   const box = wrap.parentElement // .wfbox — 도구 줄이 산다
   const btn = box?.querySelector<HTMLButtonElement>('.wfframe-fit') ?? null
   const dim = box?.querySelector<HTMLElement>('.wfdim') ?? null
@@ -212,6 +226,29 @@ function setup(f: HTMLIFrameElement, onPick?: (no: string, frame: HTMLIFrameElem
   const full = box?.querySelector<HTMLButtonElement>('.wffull') ?? null
   full?.addEventListener('click', onFull)
 
+  // 배지를 못 그리는 요소에 얹어 준다 (#132). 문서 DOM 구조는 안 건드린다 — body에 span 하나씩
+  const overlay = () => {
+    const win = doc.defaultView
+    if (!win || !doc.body) return
+    for (const el of doc.querySelectorAll<HTMLElement>('[data-el]')) {
+      const no = el.dataset.el ?? el.getAttribute('data-el') ?? ''
+      if (!needsOverlay(el, win.getComputedStyle(el).display)) continue
+      let tag = badges.get(el)
+      if (!tag) {
+        tag = doc.createElement('span')
+        tag.className = 'wfbadge'
+        tag.textContent = no
+        doc.body.appendChild(tag)
+        badges.set(el, tag)
+      }
+      const r = el.getBoundingClientRect()
+      // 문서 좌표 — iframe은 안에서 스크롤하지 않지만 문서가 스크롤을 만들 수 있다
+      tag.style.left = `${Math.round(r.left + win.scrollX + 5)}px`
+      tag.style.top = `${Math.round(r.top + win.scrollY - 8)}px`
+      tag.classList.toggle('hi', el.classList.contains('hi'))
+    }
+  }
+
   st.measure = () => {
     const de = doc.documentElement
     const b = doc.body
@@ -227,6 +264,7 @@ function setup(f: HTMLIFrameElement, onPick?: (no: string, frame: HTMLIFrameElem
     st.natH = h
     st.natW = w
     apply()
+    overlay()
   }
 
   const onClick = (e: Event) => {
@@ -254,6 +292,8 @@ function setup(f: HTMLIFrameElement, onPick?: (no: string, frame: HTMLIFrameElem
     ro.disconnect()
     wro.disconnect()
     doc.removeEventListener('click', onClick)
+    for (const t of badges.values()) t.remove()
+    badges.clear()
     btn?.removeEventListener('click', onFit)
     full?.removeEventListener('click', onFull)
     STATE.delete(f)

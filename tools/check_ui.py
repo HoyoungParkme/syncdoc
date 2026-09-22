@@ -28,6 +28,7 @@ import glob
 import os
 import re
 import sys
+from typing import NamedTuple
 
 import proj
 
@@ -37,6 +38,12 @@ NEXT_HEAD = re.compile(r"^#{1,6} ", re.M)
 ELNO = re.compile(r"^\d+[a-z]?(?:\.\d+[a-z]?)*$")  # 4b.1처럼 가운데 글자도
 HTML_BLOCK = re.compile(r"```html\n(.*?)```", re.S)
 DATA_EL = re.compile(r'data-el="([^"]+)"')
+# ::before가 상자를 안 만드는 태그 — frontend/src/view/frame.ts NO_BEFORE와 같은 목록 + tr·svg 도형
+BADGELESS = re.compile(
+    r"<(input|textarea|select|img|br|hr|progress|meter|iframe|video|canvas|embed|object"
+    r"|tr|path|rect|circle|ellipse|line|polyline|polygon|text)\b[^>]*?data-el=\"([^\"]+)\"",
+    re.I,
+)
 JSX_EL = re.compile(r'data-el=(?:"([^"]+)"|\{([^}]*)\})')
 PROP_EL = re.compile(r"""\bel(?:[A-Z]\w*)?(?:="([^"]+)"|: '([^']+)')""")
 DATASET_EL = re.compile(r"dataset\.el = '([^']+)'")
@@ -64,19 +71,34 @@ def table_elements(masked_body: str) -> set[str] | None:
     return out
 
 
-def spec_elements(spec: str) -> dict[str, tuple[set[str], set[str] | None]]:
-    """화면 → (배치의 data-el 집합, 요소 표의 # 집합 또는 None)."""
+class Screen(NamedTuple):
+    """화면 하나에서 읽어낸 것."""
+
+    layout: set[str]  # 배치의 data-el
+    table: set[str] | None  # 요소 표의 # 열. 「요소」 소제목이 없으면 None
+    badgeless: set[str]  # 배지가 안 그려지는 태그에 붙은 번호
+
+
+def spec_elements(spec: str) -> dict[str, Screen]:
+    """화면 → Screen.
+
+    배치는 **첫 html 블록만** 본다 — 뷰도 그것만 그린다(STD-001 2.7 「항목 블록 — 필수」).
+    둘째 블록까지 세면 뷰에 없는 번호가 「명세에만」으로 무더기로 뜬다.
+    """
     text = open(spec, encoding="utf-8").read()
     masked = mask_code(text)
     heads = list(SECTION.finditer(masked))
-    out: dict[str, tuple[set[str], set[str] | None]] = {}
+    out: dict[str, Screen] = {}
     for i, m in enumerate(heads):
         end = heads[i + 1].start() if i + 1 < len(heads) else len(text)
         body, mbody = text[m.end() : end], masked[m.end() : end]
-        els: set[str] = set()
-        for block in HTML_BLOCK.findall(body):
-            els.update(DATA_EL.findall(block))
-        out[m.group(1)] = (els, table_elements(mbody))
+        block = HTML_BLOCK.search(body)
+        layout = block.group(1) if block else ""
+        out[m.group(1)] = Screen(
+            set(DATA_EL.findall(layout)),
+            table_elements(mbody),
+            {no for tag, no in BADGELESS.findall(layout) if tag},
+        )
     return out
 
 
@@ -106,6 +128,20 @@ def sort_key(el: str) -> tuple:
     return nums, el[-1] if el[-1].isalpha() else ""
 
 
+def ui_specs(specs: str) -> list[str]:
+    """화면 문서 — 제목이 아니라 **배치 html이 있는지**로 고른다.
+
+    제목 낱말로 고르면, 규약이 허용하는 「문서 둘」에서 엉뚱한 파일을 골라 화면을 하나도
+    못 찾은 채 통과가 난다(#127 조사). 화면 절과 html 블록이 있는 UI 문서를 전부 본다.
+    """
+    out = []
+    for path in sorted(glob.glob(os.path.join(proj.type_dir(specs, "UI"), "*.md"))):
+        text = open(path, encoding="utf-8").read()
+        if SECTION.search(mask_code(text)) and HTML_BLOCK.search(text):
+            out.append(path)
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     proj.add_specs(ap)
@@ -113,50 +149,62 @@ def main() -> int:
     ap.add_argument("--screens", nargs="*", help="UI-10 UI-11 ...")
     args = ap.parse_args()
     project = proj.code_of(args.specs)
-    # 번호가 아니라 제목으로 찾는다 — 서브타입은 제목이 가른다 (#57)
-    spec_path = proj.by_title(args.specs, "UI", "와이어프레임") or proj.by_title(
-        args.specs, "UI", "화면 설계"
-    )
-    if spec_path is None:
-        print(f"{project}: 화면 문서가 없다 (UI 제목에 「와이어프레임」이나 「화면 설계」)")
-        return 0
+    paths = ui_specs(args.specs)
+    if not paths:
+        # 「0건 통과」를 내지 않는다 — 안 본 것과 볼 것이 없는 것은 다르다 (STD-004 DEV-17)
+        print(f"{project}: 배치 html이 든 화면 문서를 못 찾았다 (docs/specs/07-UI/)")
+        return 1
+    spec: dict[str, Screen] = {}
+    owner: dict[str, str] = {}
+    for path in paths:
+        for screen, sc in spec_elements(path).items():
+            if screen in spec:
+                print(f"!  {screen} 화면 절이 둘 — {owner[screen]} · {os.path.basename(path)}")
+            spec[screen] = sc
+            owner[screen] = os.path.basename(path)
     src = args.frontend or os.path.join(proj.repo_of(args.specs), "frontend", "src")
-    spec = spec_elements(spec_path)
-    if not os.path.isdir(src):
-        print(f"{project}: 화면 명세 {len(spec)}개 · 대조할 코드가 없다 ({src})")
-        return 0
-    doc_id = os.path.basename(spec_path)[:-3]
-    code = code_elements(src, re.compile(rf"{doc_id}#(UI-\d+)"))
-    screens = args.screens or sorted(code, key=lambda s: int(s.split("-")[1]))
-    bad = 0
+    code: dict[str, tuple[str, set[str]]] = {}
+    if os.path.isdir(src):
+        for path in paths:
+            doc_id = os.path.basename(path)[:-3]
+            for screen, v in code_elements(src, re.compile(rf"{doc_id}#(UI-\d+)")).items():
+                if screen in code:
+                    print(f"!  {screen} 컴포넌트가 둘 — {code[screen][0]} · {v[0]}")
+                code[screen] = v
+    screens = args.screens or sorted(spec | code, key=lambda s: int(s.split("-")[1]))
+    bad = warn = 0
     for screen in screens:
         if screen not in spec:
             print(f"✗  {screen:6} 화면 절 없음")
             bad += 1
             continue
-        if screen not in code:
-            print(f"✗  {screen:6} 컴포넌트 없음 (docstring에 {doc_id}#{screen})")
-            bad += 1
-            continue
-        path, got = code[screen]
-        want, table = spec[screen]
-        only_spec, only_code = sorted(want - got, key=sort_key), sorted(got - want, key=sort_key)
-        ok = not only_spec and not only_code
-        print(
-            f"{'✓' if ok else '✗'}  {screen:6} {path:45} 요소 {len(want)} · 일치 {len(want & got)}"
-        )
-        if only_spec:
-            print(f"      명세에만: {' '.join(only_spec)}")
-        if only_code:
-            print(f"      코드에만: {' '.join(only_code)}")
-        if table is not None and table != want:
-            # 요소 표는 사람용 설명이라 종료 코드에는 안 넣는다 — 그래도 침묵하지는 않는다
+        sc = spec[screen]
+        want, table = sc.layout, sc.table
+        if screen in code:
+            path, got = code[screen]
+            only_spec = sorted(want - got, key=sort_key)
+            only_code = sorted(got - want, key=sort_key)
+            ok = not only_spec and not only_code
+            print(f"{'✓' if ok else '✗'}  {screen:6} {path:45} 요소 {len(want)} · 일치 {len(want & got)}")
+            if only_spec:
+                print(f"      명세에만: {' '.join(only_spec)}")
+            if only_code:
+                print(f"      코드에만: {' '.join(only_code)}")
+            bad += not ok
+        else:
+            # 코드가 아직 없는 화면 — 대조는 못 해도 요소 표·배지는 봐 준다(막 그린 사람에게 되먹임)
+            print(f"·  {screen:6} {'(컴포넌트 없음)':45} 요소 {len(want)}")
+        # 요소 표는 배치의 부분집합이어도 된다 (STD-001 2.7) — 종료 코드에는 안 넣고 알리기만
+        if table is not None:
             if table - want:
                 print(f"   !  요소 표에만: {' '.join(sorted(table - want, key=sort_key))}")
-            if want - table:
-                print(f"   !  배치에만(요소 표 없음): {' '.join(sorted(want - table, key=sort_key))}")
-        bad += not ok
-    print(f"\n합계: {project} · 화면 {len(screens)}, 일치 {len(screens) - bad}, 불일치 {bad}")
+                warn += 1
+        if sc.badgeless:
+            nos = " ".join(sorted(sc.badgeless, key=sort_key))
+            print(f"   !  배지가 안 그려지는 태그: {nos} — 뷰가 얹어 준다. 감싸는 요소가 낫다")
+            warn += 1
+    tail = f", 알림 {warn}" if warn else ""
+    print(f"\n합계: {project} · 화면 {len(screens)}, 일치 {len(screens) - bad}, 불일치 {bad}{tail}")
     return 1 if bad else 0
 
 
