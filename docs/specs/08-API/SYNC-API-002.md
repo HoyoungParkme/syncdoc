@@ -2,7 +2,7 @@
 doc_id: SYNC-API-002
 type: API
 title: API 명세 MCP — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ---
 
@@ -40,7 +40,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 | `update_document` | [[SYNC-UC-001#UC-A6]] (수정) | SpecService.save | ○ |
 | `delete_document` | [[SYNC-UC-001#UC-A7]] | pipeline.trash_document | ○ |
 | `restore_document` | [[SYNC-UC-001#UC-A8]] | pipeline.restore_document | ○ |
-| `get_template` | (STD-001 전달) | — 저장소 `_templates/` 읽기 | |
+| `get_template` | (STD-001 전달) | — 내장 템플릿 · 저장소 `STD/` 읽기 | |
 
 ---
 
@@ -213,7 +213,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ```json
 {
   "name": "create_document",
-  "description": "새 문서를 만든다. 문서 ID는 서버가 발급한다({코드}-{타입}-{번호}). 저장소의 docs/specs/_templates/ 템플릿이 적용되므로 body는 템플릿 구조를 따라야 한다. 항목 ID(#R12 같은 것)는 body에 직접 붙인다. 서버는 발급하지 않고 형식·유일성만 검사한다. 기존 문서를 고치려면 이 도구가 아니라 update_document를 써야 한다. 문서 하나를 만들면 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 같은 단계라도 다음 문서는 사람이 웹에서 읽고 난 뒤에 만든다. DOM 셋은 순서가 있다: 클래스 명세는 API 문서가, ERD는 클래스 명세가 같은 프로젝트에 있어야 받는다(precondition-unmet). DOM 제목에는 도메인·클래스·ERD 중, UI 제목에는 화면 설계·와이어프레임 중, API 제목에는 REST·MCP 중 하나가 들어가야 한다.",
+  "description": "새 문서를 만든다. 문서 ID는 서버가 발급한다({코드}-{타입}-{번호}). 싱크독이 관리하는 타입별 템플릿이 적용되므로 body는 그 구조를 따라야 한다(get_template으로 받는다). 항목 ID(#R12 같은 것)는 body에 직접 붙인다. 서버는 발급하지 않고 형식·유일성만 검사한다. 기존 문서를 고치려면 이 도구가 아니라 update_document를 써야 한다. 문서 하나를 만들면 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 같은 단계라도 다음 문서는 사람이 웹에서 읽고 난 뒤에 만든다. DOM 셋은 순서가 있다: 클래스 명세는 API 문서가, ERD는 클래스 명세가 같은 프로젝트에 있어야 받는다(precondition-unmet). DOM 제목에는 도메인·클래스·ERD 중, UI 제목에는 화면 설계·와이어프레임 중, API 제목에는 REST·MCP 중 하나가 들어가야 한다.",
   "inputSchema": {
     "type": "object",
     "required": ["project_code", "doc_type", "body", "message"],
@@ -270,7 +270,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 }
 ```
 
-저장소 `docs/specs/_templates/{TYPE}.md`와 `STD/{project_code}-STD-001.md`에서 읽는다. 프로젝트마다 템플릿 사본이 있으므로 `project_code`가 필요하다. 저장소에 없으면(초기화 전·지워짐) 앱에 내장된 사본으로 대체한다.
+**템플릿은 앱에 내장된 원본을 준다**(#94, 카드 AB) — 사용자 저장소에는 사본이 없고, 있더라도 초기화 때 복사된 뒤 갱신되지 않아 낡는다. **규약**은 그 프로젝트 저장소의 `STD/{project_code}-STD-001.md`를 먼저 읽고, 없으면 내장 `SYNC-STD-001.md`로 대체한다 — 자기 규약을 따로 쓰는 프로젝트가 있을 수 있어서다. `project_code`는 그 규약 문서를 찾는 데 쓴다.
 
 **규약 문서 이름에 프로젝트 코드가 들어간다.** 문서 ID 규칙은 `{프로젝트코드}-{TYPE}-{번호}`이고 STD도 예외가 아니다([[SYNC-STD-001]] 1.1) — `TST` 프로젝트의 규약 문서는 `TST-STD-001.md`다. 이름을 고정해 두면 싱크독이 아닌 프로젝트에서 늘 404가 난다(#8). 내장 사본으로 떨어질 때는 싱크독의 `SYNC-STD-001.md`를 쓴다 — 다른 프로젝트는 싱크독의 STD를 그대로 쓰기 때문이다([[SYNC-STD-001]] 2.12).
 
