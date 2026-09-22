@@ -35,7 +35,9 @@ async def hook(
     code: str, user: User = Depends(current_user), session: Session = Depends(get_session)
 ) -> HookStatus:
     """SYNC-API-001#POST/api/admin/repos/{code}/hook"""
-    return HookStatus.model_validate(await ProjectService(session).ensure_hook(code, user))
+    r = await ProjectService(session).ensure_hook(code, user)
+    session.commit()  # 트랜잭션은 호출자(DEV-10) — 안 하면 hook_id가 안 남는다 (#145)
+    return HookStatus.model_validate(r)
 
 
 @router.post("/repos/{code}/sync", response_model=SyncResult)

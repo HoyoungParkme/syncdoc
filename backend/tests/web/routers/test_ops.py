@@ -218,3 +218,31 @@ async def test_trash_restore_purge_via_api(client: TestClient, scoped: Session, 
     assert client.delete("/api/docs/EXMP-PRD-001?confirm=true").status_code == 200
     assert client.post("/api/docs/EXMP-PRD-001/purge").status_code == 204
     assert client.get("/api/docs/EXMP-PRD-001").status_code == 404
+
+
+async def test_hook_button_persists_hook_id_across_requests(
+    client: TestClient, scoped: Session, proj, monkeypatch, mock_github
+) -> None:
+    """통지 걸기가 저장돼야 화면이 「걸림」이 된다 — 라우터가 커밋한다 (#145, DEV-10)."""
+    login(client, scoped)
+    proj["project"].repository.remote_url = "https://github.com/o/r.git"
+    scoped.flush()
+    monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "https://syncdoc.example")
+    monkeypatch.setattr(settings, "WEBHOOK_SECRET", "s3cret")
+    made: list[dict] = []
+
+    def h(req):
+        import httpx
+
+        if req.method == "GET":
+            return httpx.Response(200, json=made)
+        made.append({"id": 42, "config": {"url": "https://syncdoc.example/hooks/github"}})
+        return httpx.Response(201, json={"id": 42})
+
+    mock_github(h)
+    first = client.post("/api/admin/repos/EXMP/hook").json()
+    assert (first["hook"], first["created"]) == ("ok", True)
+    # 다른 요청에서도 보인다 — flush만 하면 세션이 닫히며 롤백돼 계속 「안 걸림」이었다
+    assert client.get("/api/admin/repos").json()[0]["hook"] == "ok"
+    second = client.post("/api/admin/repos/EXMP/hook").json()
+    assert (second["hook"], second["created"]) == ("ok", False)
