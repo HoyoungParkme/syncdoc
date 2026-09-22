@@ -735,3 +735,9 @@ a.arow:hover{background:var(--bg-subtle)}
   border:1px solid var(--border);border-radius:var(--radius-chip);background:var(--bg-card);color:var(--ink-body);
   font:inherit;font-size:var(--text-ui)}
 .pbody textarea[data-el="8.6"]:disabled{color:var(--ink-disabled);background:var(--bg-subtle)}
+
+/* 배치 iframe (frame.ts, 카드 Z) — 문서의 html은 자기 문서 안에서 산다. 부모가 높이·축소를 잡는다 */
+.wfframe{position:relative;overflow:hidden;background:var(--bg-card)}
+.wfframe-if{border:0;display:block;width:100%}
+.wfframe.scaled .wfframe-if{position:absolute;left:0;top:0}
+.wfframe-fit{position:absolute;right:var(--space-8);top:var(--space-8);z-index:2;box-shadow:var(--shadow-card)}

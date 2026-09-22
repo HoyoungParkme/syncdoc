@@ -38,7 +38,7 @@ details.ep{border:1px solid var(--rule);margin:8px 0;background:#fff}details.ep 
 ul,ol{margin:6px 0 12px;padding-left:22px}li{margin:3px 0}blockquote{margin:10px 0;padding:8px 14px;border-left:3px solid var(--ink);background:var(--panel);color:var(--soft)}
 hr{border:none;border-top:1px solid var(--hair);margin:22px 0}
 .soft{color:var(--soft)}.warn{color:#b00;font-size:13px;border:1px solid #b00;padding:6px 10px;background:#fff5f5}.mer{background:#fff;border:1px solid var(--rule);padding:10px;margin:8px 0 16px;overflow-x:auto}pre.mermaid{margin:0;font:12px ui-monospace,monospace;white-space:pre-wrap}pre.mermaid.nomer::before{content:"mermaid.js를 불러오지 못해 코드로 표시";display:block;color:#b00;margin-bottom:6px}
-.wfbox{border:1px dashed var(--rule);padding:10px;background:#f4f4f4;margin:8px 0 16px;font-size:12px}
+.wfbox{margin:8px 0}
 footer{margin-top:20px;font-size:12.5px;color:var(--soft)}
 .tabs{display:flex;border:1.5px solid var(--ink);border-top:none;background:var(--panel)}.tabs button{font:inherit;font-size:13px;padding:9px 16px;background:none;border:none;border-right:1px solid var(--rule);cursor:pointer;color:var(--soft)}.tabs button.on{background:#fff;color:var(--ink);font-weight:600}
 @media (max-width:860px){.tb{grid-template-columns:1fr}.tb-main{border-right:none;border-bottom:1.5px solid var(--ink)}.body{padding:18px}}
