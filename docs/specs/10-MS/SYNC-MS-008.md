@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -97,6 +97,9 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 도구는 여덟 번까지, 전체 두 분 안이다. 「지금까지 읽은 것으로 답하라」는 말을 받으면
 더 읽지 않고 그때까지 읽은 것으로 답한다.
 
+근거나 참조를 물으면 먼저 보고 있는 항목을 get_item으로 읽는다 — 본문의 [[문서#항목]]
+링크가 정확한 문서 ID다. 항목 ID만으로 지금 문서를 짚지 않는다.
+
 모른다는 읽어도 정말 없을 때만 말하고, 그때는 어느 명세 단계(RFQ~CODE)가 아직 안
 쓰였는지 짚어 준다 — item_chain의 빈 단계나 「아직 없음」 참조가 그 근거다.
 지어내지 않는다.
@@ -150,7 +153,7 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 1. `name`이 다섯 밖 → `ToolResult(None, {"error": "없는 도구"})` · 필수 인자가 빠짐 → `{"error": "인자 X가 없다"}`
 2. `args["doc_id"]`가 있고 `doc_id.split("-")[0] != code` → `{"error": "없음", "doc_id": …}` — 소유한 다른 프로젝트여도 같다. 이 대화는 같은 프로젝트 안이다
 3. 세션을 열고 `ProjectService.get_owned(code, user)` → 위 표의 함수 → JSON 조립 → 세션 닫기
-4. `NotFound`·`ItemDeleted`는 **던지지 않고** `{"error": "없음", …}` 텍스트로 — 모델이 되짚는다. 그 밖의 예외는 전파(`error` 이벤트)
+4. `NotFound`·`ItemDeleted`는 **던지지 않고** `{"error": "없음", …}` 텍스트로 — 모델이 되짚는다. `NotFound`에는 `hint`를 붙인다: 「이 문서에 그 항목이 없다. 다른 문서의 항목일 수 있다 — 보고 있는 항목을 get_item으로 읽어 본문의 참조 링크(문서ID#항목ID)에서 문서 ID를 확인하거나, get_references로 실제 위치를 찾아라」 — 모델이 항목 ID만으로 지금 문서를 짚었다가 포기하던 것을 막는다(#110). 그 밖의 예외는 전파(`error` 이벤트)
 5. `→ ToolResult(target, json.dumps(결과, ensure_ascii=False))`
 
 **결과 형식** JSON 문자열. MCP 도구([[SYNC-API-002]])와 같은 모양이라 에이전트가 이미 보는 것과 같고, 마크다운 본문을 안에 그대로 담아도 경계가 안 흐트러진다. 크기 상한 없음(사용자 결정) — 큰 문서 전문이 맥락을 넘기면 모델이 400을 주고 `llm-unavailable`로 접힌다
@@ -160,6 +163,8 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 **출력** `ToolResult(target, text)` — `target`은 「본 것」에 실을 `DOC#ITEM`·`DOC`, 목록 도구는 `None`
 
 **예외** 남의 프로젝트 → `not-found`(전파) · 도구 안의 없음·삭제·인자 오류는 예외가 아니라 결과
+
+**테스트 관점(추가, #110)** 없는 항목의 「없음」에 `hint`가 있다 · 지시문에 「먼저 보고 있는 항목을 get_item으로 읽는다」가 있다
 
 **호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_item]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.describe_documents]] · [[#queries.item_references_view]] [[#queries.item_chain]] [[#queries.document_list]]
 
