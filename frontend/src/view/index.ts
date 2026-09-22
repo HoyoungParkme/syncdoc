@@ -7,6 +7,12 @@ import { ucCss, vUc } from './uc'
 import { vUi, wireframeCss } from './wireframe'
 import { seqCss, vSeq } from './seq'
 import { msCss, vMs } from './ms'
+import { mountFrames } from './frame'
+
+/** 문서 타입 → docs/specs 아래 폴더. 배치 iframe의 <base href>가 이 폴더를 가리켜 상대 경로(../assets/x.png)가 맞다 */
+const DIR: Record<string, string> = {
+  RFQ: '01-RFQ', PRD: '02-PRD', SCN: '03-SCN', UC: '04-UC', INFRA: '05-INFRA', DOM: '06-DOM', UI: '07-UI', API: '08-API', SEQ: '09-SEQ', MS: '10-MS', CODE: '11-CODE', STD: 'STD',
+}
 
 function pick(type: string): ViewFn {
   switch (type) {
@@ -58,9 +64,19 @@ export function renderView(doc: Document, code: string, downstream?: DownstreamV
     exists: (d, it) => (d === doc.doc_id ? !it || items.has(it) : !missing.has(it ? `${d}#${it}` : d)),
     downstream: downstream ? Object.fromEntries(downstream.by_document.map((x) => [x.doc_id, x.items])) : undefined,
     titles: downstream ? Object.fromEntries(downstream.by_document.map((x) => [x.doc_id, x.title])) : undefined,
+    assetBase: `/api/projects/${doc.doc_id.split('-')[0] || code}/files/${DIR[doc.doc_type] ?? doc.doc_type}/`,
   }
   const out = pick(doc.doc_type)({ type: doc.doc_type, title: fm.title ?? '', body, ctx })
-  return { html: out.html, onMount: out.onMount, title: fm.title ?? doc.doc_id, lead: leadOf(body) }
+  // 타입별 onMount 뒤에 html 블록 iframe(wfbox)도 산다 — 이미 산 것(V-UI)은 mountFrames가 건너뛴다. 정리도 둘 다
+  const onMount = (root: HTMLElement) => {
+    const a = out.onMount?.(root)
+    const b = mountFrames(root)
+    return () => {
+      if (typeof a === 'function') a()
+      b()
+    }
+  }
+  return { html: out.html, onMount, title: fm.title ?? doc.doc_id, lead: leadOf(body) }
 }
 
 /** 본문 맨 앞 문단 — 화면이 제목 아래 리드로 쓴다(UI-5·UI-9 헤더 블록).

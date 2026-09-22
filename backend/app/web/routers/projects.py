@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core import queries
@@ -95,3 +96,18 @@ async def delete_project(
     """SYNC-API-001#DELETE/api/projects/{code}"""
     await ProjectService(session).delete_project(code, user)
     session.commit()
+
+
+@router.get("/{code}/files/{path:path}")
+async def get_file(
+    code: str,
+    path: str,
+    session: Session = Depends(get_session),
+    user: User = Depends(current_user),
+) -> FileResponse:
+    """SYNC-API-001#GET/api/projects/{code}/files/{path} — 첨부(이미지·폰트·css)를 작업 사본에서"""
+    target = ProjectService(session).asset_path(code, path, user)
+    headers = {"Cache-Control": "private, max-age=60"}
+    if target.suffix.lower() == ".svg":
+        headers["Content-Security-Policy"] = "sandbox"  # 직접 열어도 스크립트가 앱 출처에서 못 돈다
+    return FileResponse(target, headers=headers)

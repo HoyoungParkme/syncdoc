@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-001
 type: MS
 title: MINISPEC — ProjectService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/project/service.py`의 함수 8개. 클래스 명세 [[SYNC-DOM-002]] 4.1의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/project/service.py`의 함수 9개. 클래스 명세 [[SYNC-DOM-002]] 4.1의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -34,6 +34,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#ProjectService.repo_status]] | 동기화 상태 |
 | [[#ProjectService.delete_project]] | 등록 해제·작업 사본 회수 |
 | [[#ProjectService.rebuild_index]] | 재구축 위임 |
+| [[#ProjectService.asset_path]] | 첨부 파일 경로 — 사람 경로 |
 
 ---
 
@@ -171,6 +172,36 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **처리** `get_owned(code, user)` 확인 후 `pipeline.rebuild(code)`. 서비스가 pipeline을 부르는 유일한 곳(클래스 3.2). 소유 검사는 여기서 끝난다 — `rebuild`는 `get`을 쓴다(`init_project(import_existing)`도 부르므로)
 
 **테스트 관점** 남의 프로젝트 → `not-found`, 재구축 안 돎
+
+---
+
+#### ProjectService.asset_path 첨부 파일 경로
+
+**시그니처** `def asset_path(code: str, path: str, user: User) -> Path`
+
+근거: [[SYNC-PRD-001#R5]] · [[SYNC-API-001#GET/api/projects/{code}/files/{path}]]
+
+**입력** `path` — `docs/specs/` 기준 상대 경로. 라우터가 URL의 나머지를 그대로 넘긴다(`07-UI/../assets/x.png`처럼 문서 폴더 기준으로 쓴 것이 브라우저에서 이미 풀려 `assets/x.png`로 온다)
+
+**처리**
+1. `get_owned(code, user)` — 남의 프로젝트는 `! not-found {resource: project, id: code}`([[#ProjectService.get_owned]]과 같은 답)
+2. `base = REPOS_DIR / code / "docs" / "specs"`
+3. `target = (base / path).resolve()` · if `target`이 `base.resolve()` 안이 아니면(`..`·바깥으로 나가는 심볼릭 링크) → `! not-found {resource: file, id: path}`
+4. if 확장자가 `png jpg jpeg gif webp svg css woff woff2 ttf` 밖이면 → `! not-found {resource: file, id: path}` — 문서(`.md`)는 이 길로 안 준다
+5. if 파일이 없으면 → `! not-found {resource: file, id: path}`
+6. `→ target`
+
+**출력** `Path` — 라우터가 `FileResponse`로 보낸다. 작업 사본은 `git checkout --force`로 `origin/main`과 같다([[SYNC-MS-009#git.checkout]]·[[SYNC-MS-007#pipeline.process_commit]]) — 폴링이 받은 뒤의 파일이다
+
+**왜 [[SYNC-MS-009#git.read]]가 아닌가.** `git.read`는 `str`을 돌려줘 이진 파일(png·woff2)이 깨진다. 작업 사본의 파일을 그대로 준다
+
+**예외** 남의 프로젝트 → `not-found`(project) · 경로 밖·허용 밖 확장자·없는 파일 → `not-found`(file). 새 에러 타입은 없다
+
+**호출하는 것** [[#ProjectService.get_owned]]
+
+**호출되는 것** [[SYNC-API-001#GET/api/projects/{code}/files/{path}]] 라우터
+
+**테스트 관점** 소유자·있는 파일 → `Path`가 `base` 안 · 남의 프로젝트 → `not-found`이고 확장 필드가 `get_owned`의 것과 같다(`resource: project`) · `../../etc/passwd` → `not-found`(file) · `base` 밖을 가리키는 심볼릭 링크 → `not-found` · `01-RFQ/X-RFQ-001.md` → `not-found`(허용 밖 확장자) · 없는 파일 → `not-found`
 
 ---
 

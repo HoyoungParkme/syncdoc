@@ -66,7 +66,12 @@ def render_blocks(text, self_id, item_pat=None):
             while j < len(lines) and not lines[j].startswith("```"): code.append(lines[j]); j += 1
             src = "\n".join(code)
             if lang == "mermaid": out.append(f'<div class="mer"><pre class="mermaid">{esc(src)}</pre></div>')
-            elif lang == "html": out.append(f'<div class="wfbox">{src}</div>')
+            elif lang == "html":
+                # html 블록은 iframe에 격리한다(STD-002 V-UI, 카드 Z). 스타일·링크뿐이면 코드로 보인다
+                import wf_build as wf
+                layout = wf.safe_layout(src)
+                if wf.split_common(layout)[1]: out.append(wf.frame_html(layout, "", wf.base_for(self_id)))
+                else: out.append(f'<pre class="code" data-lang="html"><code>{esc(src)}</code></pre>')
             else: out.append(f'<pre class="code" data-lang="{esc(lang)}"><code>{esc(src)}</code></pre>')
             i = j + 1; continue
         h = re.match(r"^(#{1,6}) (.+)$", l)
@@ -389,7 +394,9 @@ def v_ui(doc):
     """V-UI — 화면 문서는 하나여도 둘이어도 같은 렌더러(카드 X). 규칙은 wf_build.py에."""
     import wf_build as wf
     blocks = wf.parse_ui(doc["body"])
-    return f'<style>{wf.WF_CSS}</style><div class="uiview">{wf.render_ui(blocks, doc["fm"]["doc_id"])}<script>{wf.WF_JS}</script></div>'
+    sid = doc["fm"]["doc_id"]
+    ui = wf.render_ui(blocks, sid, wf.common_block(doc["body"]), wf.base_for(sid))
+    return f'<style>{wf.WF_CSS}</style><div class="uiview">{ui}<script>{wf.WF_JS}</script></div>'
 
 def v_seq(doc):
     return absorb("seq_build.py", doc["path"], "/tmp/_seq.html")
@@ -552,7 +559,7 @@ details.ep{border:1px solid var(--rule);margin:8px 0;background:#fff}details.ep 
 ul,ol{margin:6px 0 12px;padding-left:22px}li{margin:3px 0}blockquote{margin:10px 0;padding:8px 14px;border-left:3px solid var(--ink);background:var(--panel);color:var(--soft)}
 hr{border:none;border-top:1px solid var(--hair);margin:22px 0}
 .soft{color:var(--soft)}.warn{color:#b00;font-size:13px;border:1px solid #b00;padding:6px 10px;background:#fff5f5}.mer{background:#fff;border:1px solid var(--rule);padding:10px;margin:8px 0 16px;overflow-x:auto}pre.mermaid{margin:0;font:12px ui-monospace,monospace;white-space:pre-wrap}pre.mermaid.nomer::before{content:"mermaid.js를 불러오지 못해 코드로 표시";display:block;color:#b00;margin-bottom:6px}
-.wfbox{border:1px dashed var(--rule);padding:10px;background:#f4f4f4;margin:8px 0 16px;font-size:12px}
+.wfbox{margin:8px 0}
 footer{margin-top:20px;font-size:12.5px;color:var(--soft)}
 .tabs{display:flex;border:1.5px solid var(--ink);border-top:none;background:var(--panel)}.tabs button{font:inherit;font-size:13px;padding:9px 16px;background:none;border:none;border-right:1px solid var(--rule);cursor:pointer;color:var(--soft)}.tabs button.on{background:#fff;color:var(--ink);font-weight:600}
 @media (max-width:860px){.tb{grid-template-columns:1fr}.tb-main{border-right:none;border-bottom:1.5px solid var(--ink)}.body{padding:18px}}

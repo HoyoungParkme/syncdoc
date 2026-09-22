@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -531,6 +531,7 @@ classDiagram
         +repo_status(user: User) list~RepoStatus~
         +rebuild_index(code: str, user: User) RebuildResult
         +delete_project(code: str, user: User) None
+        +asset_path(code: str, path: str, user: User) Path
     }
     class Project {
         +int id
@@ -565,6 +566,7 @@ classDiagram
 | `repo_status` | [[SYNC-API-001#GET/api/admin/repos]] | [[SYNC-UC-001#UC-G1]] | |
 | `rebuild_index` | [[SYNC-API-001#POST/api/admin/repos/{code}/rebuild]] | [[SYNC-UC-001#UC-S6]] | not-found |
 | `delete_project` | [[SYNC-API-001#DELETE/api/projects/{code}]] | [[SYNC-UC-001#UC-H17]] | not-found |
+| `asset_path` | [[SYNC-API-001#GET/api/projects/{code}/files/{path}]] (사람 경로, `get_owned`) | [[SYNC-PRD-001#R5]] | not-found (project·file) |
 
 **규칙이 사는 곳**
 - **소유 게이트는 `get_owned` 하나다.** `project.owner_user_id != user.id`면 `NotFound("project", code)` — 있다는 사실이 새지 않는다(있는데 못 본다가 아니라 없다). 사람이 부르는 경로(웹·MCP)는 전부 `get_owned`·`list_owned`를 지나고, 사람이 없는 경로(폴링·웹훅·GitHub 커밋 처리)만 `get`·`list_projects`를 쓴다. `get(code, user: User | None)`처럼 인자를 선택으로 두지 않는다 — `None`이 「필터 없음」이라는 합법 값이 되면 빠뜨린 자리가 조용히 전체 열람이 된다

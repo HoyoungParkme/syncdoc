@@ -27,6 +27,9 @@ from app.core.types import Author, AuthorKind, Entry, RebuildResult, RepoStatus
 from app.infra import git, github
 from app.infra.git import GitError
 
+# 첨부로 주는 확장자 — 이 밖은 없는 것과 같다 (API-001 GET …/files/{path})
+_ASSET_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "svg", "css", "woff", "woff2", "ttf"}
+
 _locks: dict[str, asyncio.Lock] = {}
 
 
@@ -162,6 +165,24 @@ class ProjectService:
         if project.owner_user_id != user.id:
             raise NotFound("project", code)
         return project
+
+    def asset_path(self, code: str, path: str, user: User) -> Path:
+        """SYNC-MS-001#ProjectService.asset_path
+
+        작업 사본 `docs/specs/` 아래의 첨부 파일 경로. 소유 검사는 get_owned. `..`·바깥
+        심볼릭 링크·허용 밖 확장자·없는 파일은 전부 같은 not-found(file) — 무엇이 있는지 새지
+        않는다. 이진 파일이라 git.read(str)를 쓰지 않는다.
+        """
+        self.get_owned(code, user)
+        base = (settings.REPOS_DIR / code / "docs" / "specs").resolve()
+        target = (base / path).resolve()
+        if not target.is_relative_to(base):
+            raise NotFound("file", path)
+        if target.suffix.lower().lstrip(".") not in _ASSET_EXTENSIONS:
+            raise NotFound("file", path)
+        if not target.is_file():
+            raise NotFound("file", path)
+        return target
 
     def list_owned(self, user: User) -> list[Project]:
         """SYNC-MS-001#ProjectService.list_owned"""

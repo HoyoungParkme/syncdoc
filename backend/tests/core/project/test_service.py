@@ -284,3 +284,33 @@ async def test_init_project_clone_failure_leaves_nothing(
     assert not (repos_dir / "GONE").exists()
     with pytest.raises(NotFound):
         ProjectService(db_session).get("GONE")
+
+
+def test_asset_path_serves_only_owned_specs_files(
+    db_session: Session, tmp_path: Path, monkeypatch
+) -> None:
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "REPOS_DIR", tmp_path / "repos")
+    me = owner(db_session)
+    other = make_user(db_session, login="other")
+    make_project(db_session, "MINE")
+    make_project(db_session, "THEI", owner_user=other)
+    specs = tmp_path / "repos" / "MINE" / "docs" / "specs"
+    (specs / "assets").mkdir(parents=True)
+    (specs / "assets" / "a.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    (specs / "assets" / "note.md").write_text("x")
+    (tmp_path / "secret.png").write_bytes(b"\x89PNG")
+    (specs / "assets" / "link.png").symlink_to(tmp_path / "secret.png")
+    svc = ProjectService(db_session)
+    assert svc.asset_path("MINE", "assets/a.png", me) == (specs / "assets" / "a.png").resolve()
+    assert svc.asset_path("MINE", "07-UI/../assets/a.png", me).name == "a.png"  # 안쪽 ..는 된다
+    # 남의 프로젝트 → get과 같은 not-found(project)
+    with pytest.raises(NotFound) as ei:
+        svc.asset_path("THEI", "assets/a.png", me)
+    assert ei.value.extra == {"resource": "project", "id": "THEI"}
+    # 탈출·바깥 심볼릭 링크·허용 밖 확장자·없는 파일 → 전부 같은 not-found(file)
+    for path in ("../../secret.png", "assets/link.png", "assets/note.md", "assets/none.png"):
+        with pytest.raises(NotFound) as ei:
+            svc.asset_path("MINE", path, me)
+        assert ei.value.extra == {"resource": "file", "id": path}

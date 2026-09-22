@@ -7,6 +7,9 @@
 
 첫 주석 블록은 파일마다 다르므로 벗기고 나머지를 문자열로 비교한다.
 
+둘째·셋째 쌍(카드 Z): 배치 iframe의 FRAME_CSS·SANDBOX — `frontend/src/view/frame.ts` ↔ `tools/wf_build.py`.
+같은 srcdoc 조립이어야 웹과 정적 뷰의 배치가 같은 그림이다.
+
 사용: python3 tools/check_view_css.py
 """
 
@@ -20,6 +23,12 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 VIEW_CSS = os.path.join(ROOT, "frontend", "src", "styles.view.css")
 BUILDER = os.path.join(ROOT, "tools", "view_build.py")
 CSS_CONST = re.compile(r'CSS = r"""(.*?)"""', re.S)
+FRAME_TS = os.path.join(ROOT, "frontend", "src", "view", "frame.ts")
+WF_PY = os.path.join(ROOT, "tools", "wf_build.py")
+TS_FRAME = re.compile(r"export const FRAME_CSS = `(.*?)`", re.S)
+PY_FRAME = re.compile(r'FRAME_CSS = r"""(.*?)"""', re.S)
+TS_SANDBOX = re.compile(r"""export const SANDBOX = ["'](.*?)["']""")
+PY_SANDBOX = re.compile(r'SANDBOX = "(.*?)"')
 
 
 def strip_header(text: str) -> str:
@@ -27,31 +36,47 @@ def strip_header(text: str) -> str:
     return re.sub(r"\A\s*/\*.*?\*/\s*", "", text, count=1, flags=re.S).strip()
 
 
+def _diff(a: str, b: str, la: str, lb: str) -> None:
+    xs, ys = a.split("\n"), b.split("\n")
+    for i in range(max(len(xs), len(ys))):
+        x, y = xs[i] if i < len(xs) else "(없음)", ys[i] if i < len(ys) else "(없음)"
+        if x != y:
+            print(f"   첫 차이 {i + 1}행")
+            print(f"     {la}: {x[:120]}")
+            print(f"     {lb}: {y[:120]}")
+            break
+
+
+def _pair(name: str, a: str | None, b: str | None, la: str, lb: str) -> bool:
+    if a is None or b is None:
+        print(f"✗  {name}: {'없음' if a is None else '있음'} / {'없음' if b is None else '있음'} — 상수를 못 찾았다")
+        return False
+    if a == b:
+        print(f"{name}: 같음 ({len(a)} 바이트)")
+        return True
+    print(f"✗  {name}가 갈라졌다")
+    print(f"   {la}: {len(a)} 바이트 / {lb}: {len(b)} 바이트")
+    _diff(a, b, la, lb)
+    return False
+
+
 def main() -> int:
     css = strip_header(open(VIEW_CSS, encoding="utf-8").read())
     m = CSS_CONST.search(open(BUILDER, encoding="utf-8").read())
-    if not m:
-        print(f"✗  {BUILDER} 에서 CSS 상수를 못 찾았다")
-        return 1
-    built = m.group(1).strip()
+    built = m.group(1).strip() if m else None
+    ok = _pair("뷰 CSS", css, built, "frontend/src/styles.view.css", "tools/view_build.py CSS")
+    if not ok:
+        print("   고칠 때는 view_build.py 를 먼저 고치고 그 내용을 styles.view.css 로 옮긴다")
 
-    if css == built:
-        print(f"뷰 CSS: 같음 ({len(css)} 바이트)")
-        return 0
-
-    print("✗  뷰 CSS가 갈라졌다")
-    print(f"   frontend/src/styles.view.css : {len(css)} 바이트")
-    print(f"   tools/view_build.py CSS      : {len(built)} 바이트")
-    a, b = css.split("\n"), built.split("\n")
-    for i in range(max(len(a), len(b))):
-        x, y = a[i] if i < len(a) else "(없음)", b[i] if i < len(b) else "(없음)"
-        if x != y:
-            print(f"   첫 차이 {i + 1}행")
-            print(f"     styles.view.css : {x[:120]}")
-            print(f"     view_build.py   : {y[:120]}")
-            break
-    print("   고칠 때는 view_build.py 를 먼저 고치고 그 내용을 styles.view.css 로 옮긴다")
-    return 1
+    ts = open(FRAME_TS, encoding="utf-8").read() if os.path.exists(FRAME_TS) else ""
+    py = open(WF_PY, encoding="utf-8").read()
+    tf, pf = TS_FRAME.search(ts), PY_FRAME.search(py)
+    ok &= _pair("프레임 CSS", tf.group(1).strip() if tf else None, pf.group(1).strip() if pf else None,
+                "frontend/src/view/frame.ts", "tools/wf_build.py")
+    ts_sb, py_sb = TS_SANDBOX.search(ts), PY_SANDBOX.search(py)
+    ok &= _pair("sandbox", ts_sb.group(1) if ts_sb else None, py_sb.group(1) if py_sb else None,
+                "frame.ts", "wf_build.py")
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

@@ -1,6 +1,8 @@
 /** tools/view_build.py의 공통 렌더러 포트 — inline · render_blocks · split_sections · item_blocks (STD-002 1장 공통 렌더링).
  *  React 유저용 탭은 이 HTML과 같게 그린다(STD-002 4장). 문자열 HTML을 만들고 페이지가 innerHTML로 넣는다. */
 
+import { frameHtml, isStyleOnly, NO_COMMON, safeLayout } from './frame'
+
 export interface RenderCtx {
   selfId: string
   /** 참조 링크 href. itemId 없으면 문서. */
@@ -17,6 +19,8 @@ export interface RenderCtx {
    *  `render_blocks`를 부르므로, 블록 안 상대 위치로는 원본 줄 번호를 알 수 없다.
    *  정적 뷰(view_build.py)는 주지 않는다 — 거기엔 댓글이 없다 (STD-002 6장) */
   lineSrc?: boolean
+  /** 배치 iframe의 <base href> — 이 문서 폴더(`/api/projects/{code}/files/07-UI/`). 상대 경로 이미지가 저장소 파일을 가리킨다 */
+  assetBase?: string
 }
 
 const NUL = '\uE000' // 코드 스팬 자리표시 (사용자 영역 문자)
@@ -75,7 +79,9 @@ export function renderBlocks(text: string, ctx: RenderCtx, itemPat?: RegExp): st
       }
       const src = code.join('\n')
       if (lang === 'mermaid') out.push(`<div class="mer"><pre class="mermaid">${esc(src)}</pre></div>`)
-      else if (lang === 'html') out.push(`<div class="wfbox">${src}</div>`)
+      // html 블록은 iframe으로 격리해 그린다(STD-002 1장). 스타일·링크뿐인 블록(공통 틀)은 그릴 것이 없으니 코드로
+      else if (lang === 'html' && !isStyleOnly(safeLayout(src))) out.push(`<div class="wfbox">${frameHtml(safeLayout(src), NO_COMMON, ctx.assetBase ?? '')}</div>`)
+      else if (lang === 'html') out.push(`<pre class="code" data-lang="html"><code>${esc(src)}</code></pre>`)
       else out.push(`<pre class="code" data-lang="${esc(lang)}"><code>${esc(src)}</code></pre>`)
       i = j + 1
       continue

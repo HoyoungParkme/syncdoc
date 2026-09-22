@@ -80,7 +80,7 @@ export function DocView() {
     root.innerHTML = view.html
     const cleanup = view.onMount?.(root)
     // 와이어프레임 요소 번호 (DEV-17) — 뷰 포트 HTML은 view_build와 같아야 하므로 여기서 붙인다
-    for (const el of root.querySelectorAll<HTMLElement>('[data-item]')) el.dataset.el = '7.1'
+    for (const el of root.querySelectorAll<HTMLElement>('[data-item]:not(section.screen)')) el.dataset.el = '7.1' // 화면 섹션은 항목 헤더가 아니다
     for (const el of root.querySelectorAll<HTMLElement>('a[data-ref]')) el.dataset.el = '7.2'
     for (const el of root.querySelectorAll<HTMLElement>('pre.mermaid')) el.dataset.el = '7.3'
     mermaid.initialize({ startOnLoad: false, theme: 'neutral' })

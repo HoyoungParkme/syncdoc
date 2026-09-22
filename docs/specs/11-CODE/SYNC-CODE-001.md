@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
 
-**진행 상황**: 카드 33장. **전부 완료** (2026-09-22).
+**진행 상황**: 카드 35장. **A~Y 33장 완료**, Z 진행 중, AA는 Z 뒤에.
 
 ---
 
@@ -764,6 +764,68 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 ---
 
+#### Z 화면 문서는 디자인 산출물 그대로
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-RFQ-001#Q6]] 2 · [[SYNC-STD-001]] 2.7 · [[SYNC-STD-002]] V-UI · [[SYNC-PRD-001#R5]] · #118 · 사용자 결정 2026-09-22 |
+| 구현 | `frontend/src/view/frame.ts`(srcdoc 조립·`mountFrames`) · `wireframe.ts`(클래스 사전·강제 테두리 삭제, iframe) · `md.ts` 화면 밖 html 블록도 iframe · `tools/wf_build.py`·`view_build.py` 같은 srcdoc · `tools/check_view_css.py`에 `FRAME_CSS`·`SANDBOX` 쌍 · [[SYNC-MS-001#ProjectService.asset_path]] + `GET /api/projects/{code}/files/{path}` · `infra/git.py` 새 저장소 README 두 줄 · `HowTo.tsx` |
+| 화면 | 새 요소 없음. UI-5 유저용 탭에서 배치가 iframe으로 그려진다. UI-002에 `공통 틀` 절 신설(렌더러 사전을 문서로) · UI-16 문구 둘 |
+| 테스트 | `asset_path`(소유자·남·`..`·심볼릭 링크·확장자·없음) · 라우터(200·Content-Type·Cache-Control·svg CSP·401·404) · `safe_layout` 정규식 자체 검사 · `check_view_css` 셋 다 같음 · `view_build --all` 오류 0 · 다른 프로젝트 화면 문서 8개 + HB + CCR이 손 안 대고 열림 · `check_ui` 12/12 · **사람 확인**: 아래 열하나 |
+| 선행 | X |
+| 완료 | 2026-09-22 · 브랜치 `card/Z-wf-iframe` · 커밋 `bccf473`~ (spec 12 + code 3) · 테스트 217(신설 2) · `validate` 0/0 · `check_code` 109/109 · `check_ui` 12/12 · `check_tokens` 91/0 · `check_dom` 10·10·10 · `check_view_css` 셋 다 같음 · `wf_build --selftest` 통과 · `view_build --all` 오류 0(UI-002 iframe 12) · 사람 확인 열하나는 배포 뒤(아래 기록) · 되먹임: UI-002 공통 틀에 옮긴 CSS가 사전 134줄 + 앱에서 우연히 맞던 105개 클래스 218규칙 — 12화면을 다시 그리면(AA) 줄인다 · `.wfbox`의 점선·회색도 같이 뺐다(배지만 규칙) |
+
+**왜 카드인가.** 격리(iframe)·배지·공통 틀·첨부·안내가 한 덩어리다. 격리만 하면 싱크독 12화면이 벗겨지고, 안내만 고치면 디자인 산출물이 사이트 CSS에 먹힌다.
+
+**왜 지금인가.** HB 온보딩 시험의 화면이 회색 상자로 보였다. 사용자: 「디자인 스킬로 더 이쁘게 만들 텐데 반드시 저 구조로 올려야 하나?」 — 필수는 html 블록 하나뿐인데, 렌더러가 `data-el` 요소마다 점선 테두리·흰 배경을 강제하고, 사이트 CSS가 스며들고(#118), 템플릿이 회색 상자를 가르치고 있었다.
+
+**사용자가 정한 것 열.**
+
+| 질문 | 결정 |
+|---|---|
+| 격리 | iframe(srcdoc). 정적 뷰도 같게 |
+| 만드는 법 | 도구 중립 — 에이전트의 디자인 도구로 만든 자기 완결 html을 그대로 |
+| 이미지 | 앱 엔드포인트 `GET /api/projects/{code}/files/{path}` |
+| 폰트 | 외부 `<link>` 허용 |
+| 배지 | 배지만 붙이고 모양은 안 건드린다 |
+| 공통 스타일 | 공통 틀 절의 첫 html 블록을 모든 화면 앞에 |
+| 폭 | 넓으면 축소, 누르면 원래 크기 |
+| 싱크독 12화면 | CSS 전부 공통 틀로 옮겨 지금 모습 유지(Z) + 디자인 도구로 다시 그린다(AA) |
+| 시험 | HB 화면 문서를 새 에이전트가 새 안내만 보고 다시 쓴다(AA) |
+| 커밋 표시 | 클로드 표시 금지 — 싱크독 저장소 포함, 이 카드부터 |
+
+**설계 단계에서 정한 것.** `sandbox="allow-same-origin"`(스크립트 없음) · `data-el`→`data-wf` 치환 폐지 · 제거 태그에 `iframe·object·embed·meta http-equiv·form` 추가 · 첨부 확장자 열 개, svg에 CSP sandbox · 공통 틀 절은 이름으로 찾고 `<style>/<link>`는 head · 화면 밖 html 블록도 같은 iframe.
+
+**사람이 브라우저에서 볼 열하나.**
+
+1. 싱크독 12화면이 격리 뒤에도 지금 모습인가 (iframe 안 computed style에 앱 CSS 없음)
+2. 요소 표 ↔ 배치 양방향 강조, `#item-UI-N` 진입
+3. 탭을 바꿔도 높이가 0으로 남지 않는가
+4. 1280 고정폭이 축소되고 「원래 크기」 토글이 되는가
+5. `../assets/x.png`가 뜨고 남의 프로젝트 파일은 404인가
+6. Google Fonts `<link>`가 iframe 안에서 적용되는가
+7. UI-9 순서대로 읽기에서 높이가 잡히는가
+8. 다른 타입 문서의 html 블록이 전처럼 보이는가
+9. 정적 뷰 파일로 열어 같은가
+10. 배치 안 `<a href="#x">`를 눌러도 iframe이 이동하지 않는가
+11. HB UI-1의 `topbar`가 더는 흰 글씨가 아닌가
+
+---
+
+#### AA 싱크독 화면을 디자인 도구로 다시 그린다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-STD-001]] 2.7 「만드는 법」 · [[#Z]] · 사용자 결정 2026-09-22 |
+| 구현 | 코드 없음. 새 에이전트(내 맥락 없음)가 새 안내만 보고 (a) HB 화면 문서, (b) `SYNC-UI-002` 12화면을 디자인 도구로 다시 쓴다 — **`data-el` 번호·요소 표·규칙·시나리오는 그대로**. 되먹임은 이슈로, 공통 틀의 「우연히 맞던 101개」 정리 |
+| 테스트 | `check_ui` 12/12 · `validate` 0/0 · `view_build --all` · 사람이 12화면을 본다 |
+| 선행 | Z |
+| 완료 | — |
+
+**왜 카드인가.** 문서만 바뀌지만 12화면·HB·안내 되먹임이 한 시험이다. 시험이 안내를 고치면 Z의 규약이 바뀐다.
+
+---
+
 ## 2. 통합 테스트 시나리오
 
 시나리오 S1~S7을 그대로 E2E 테스트로. 각 슬라이스의 `테스트` 행에 나눠 들어가 있다. 전부 통과하면 PRD 성공지표 측정을 시작한다.
@@ -818,6 +880,8 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | F | `card/F-repo-create` | `a11f698`~ | — | 2026-09-14 |
 | U | `card/U-ask-panel` | `3fa72d0`~ | #95 · #104 | 2026-09-21 |
 | Y | `card/Y-ask-react` | `eef87b6`~ | #109 | 2026-09-22 |
+| Z | `card/Z-wf-iframe` | `bccf473`~ | #121 | 2026-09-22 |
+| AA | `card/AA-sync-redesign` | — | — | — |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 | X | `card/X-ui-doc` | `7a4e821`~ | #103 | 2026-09-21 |

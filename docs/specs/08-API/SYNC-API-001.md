@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -44,7 +44,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | type | status | 언제 | 확장 필드 | 유스케이스 |
 |---|---|---|---|---|
 | `urn:syncdoc:unauthorized` | 401 | 세션 없음 | — | — |
-| `urn:syncdoc:not-found` | 404 | 문서·항목·프로젝트 없음 | `resource`, `id` | [[SYNC-UC-001#UC-A2]] 1a |
+| `urn:syncdoc:not-found` | 404 | 문서·항목·프로젝트·파일 없음 | `resource`, `id` | [[SYNC-UC-001#UC-A2]] 1a |
 | `urn:syncdoc:item-deleted` | 410 | 삭제된 항목 조회 | `deleted_at` | [[SYNC-UC-001#UC-A3]] 1a |
 | `urn:syncdoc:convention-violation` | 422 | 규약 위반 (되돌리기 시) | `violations: [{line, rule, message}]`, `warnings: [{rule, message}]` | [[SYNC-UC-001#UC-S1]] 4a, [[SYNC-UC-001#UC-H7]] 4a |
 | `urn:syncdoc:version-conflict` | 409 | 버전 불일치 | `current_version`, `current_body` | [[SYNC-UC-001#UC-A6]] 4a |
@@ -348,6 +348,45 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 이게 없으면 클라이언트가 `kind` 문자열로 어느 타입인지 되짚어야 한다 — 그 지식이 서버와 클라이언트 두 곳에 생기고, 서버가 `kind`를 늘려도 컴파일이 못 잡는다. 엔드포인트를 쪼개는 것보다 이쪽이 싸다([[SYNC-API-001]] 6장).
 
 **경로 이름은 `flags`로 남았다.** 플래그가 사라진 뒤에도 바꾸지 않았다 — 경로가 곧 항목 ID라 바꾸면 은퇴와 신설이 되고, 화면·미니스펙·React가 같이 움직인다. 끊어진 참조는 `references.is_missing`에서 센다([[SYNC-MS-003#ReferenceService.mark_missing]]).
+
+#### GET/api/projects/{code}/files/{path} 첨부 파일
+
+화면 [[SYNC-UI-001#UI-5]](배치 iframe 안의 이미지·폰트) · 요구사항 [[SYNC-PRD-001#R5]] · 서비스 [[SYNC-MS-001#ProjectService.asset_path]]
+
+```yaml
+/api/projects/{code}/files/{path}:
+  get:
+    summary: "첨부 파일 — 작업 사본 docs/specs/ 아래 (카드 Z)"
+    parameters:
+    - $ref: '#/components/parameters/code'
+    - in: path
+      name: path
+      required: true
+      schema:
+        type: string
+      description: >
+        docs/specs/ 기준 상대 경로. 슬래시를 포함한다(path:path).
+        허용 확장자는 png jpg jpeg gif webp svg css woff woff2 ttf —
+        문서(.md)는 이 길로 주지 않는다
+    responses:
+      '200':
+        description: 파일 그대로. Content-Type은 확장자로 정한다
+        headers:
+          Cache-Control:
+            schema:
+              type: string
+            description: "private, max-age=60"
+          Content-Security-Policy:
+            schema:
+              type: string
+            description: "svg일 때만 sandbox — 직접 열어도 스크립트가 앱 출처에서 돌지 않는다"
+      '401':
+        $ref: '#/components/responses/Problem'
+      '404':
+        $ref: '#/components/responses/NotFound'
+```
+
+**문서 폴더 기준 상대 경로가 그대로 통한다.** 화면 배치를 그리는 iframe에 `<base href="/api/projects/{code}/files/07-UI/">`가 들어가므로, 문서가 `../assets/x.png`라고 쓰면 브라우저가 `/api/projects/{code}/files/assets/x.png`로 푼다([[SYNC-STD-002]] V-UI). 경로 밖(`..`으로 `docs/specs/`를 벗어남·바깥 심볼릭 링크)은 `404 not-found {resource: "file"}` — 있는지 없는지를 구분하지 않는다. 남의 프로젝트는 여느 엔드포인트처럼 `not-found {resource: "project"}`.
 
 #### GET/api/projects/{code}/graph 참조 그래프
 

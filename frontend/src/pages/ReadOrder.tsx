@@ -48,19 +48,22 @@ export function ReadOrder() {
     const root = mainRef.current
     if (!root) return
     // 문서마다 머리(킥커·제목·리드)를 얹는다. 킥커가 위치(4.1)다
+    const views = bodies.map((d) => renderView(d, code))
     root.innerHTML = bodies
-      .map((d) => {
-        const v = renderView(d, code)
+      .map((d, i) => {
+        const v = views[i]
         const kicker = `[${esc(code)}] ${esc(d.project_name)} · ${stage}/11 · ${esc(d.doc_id)} · ${esc(STATUS_KO[d.status])} v${d.current_version_no}` // 1.6
         return (
           `<div class="dochead"><div class="kicker mono" data-el="4.1">${kicker}</div>` +
           `<h1>${esc(v.title ?? d.doc_id)}</h1>` +
           (v.lead ? `<p class="lead">${esc(v.lead)}</p>` : '') +
           `</div>` +
-          v.html
+          `<div class="docroot">${v.html}</div>`
         )
       })
       .join('<hr/>')
+    // 문서마다 동작(탭·좌우 연동·배치 iframe 높이)을 붙인다 — 문서 하나의 root는 그 문서의 .docroot
+    const cleanups = Array.from(root.querySelectorAll<HTMLElement>(':scope > .docroot')).map((el, i) => views[i]?.onMount?.(el))
     mermaid.initialize({ startOnLoad: false, theme: 'neutral' })
     mermaid
       .run({ nodes: root.querySelectorAll<HTMLElement>('pre.mermaid') })
@@ -74,7 +77,10 @@ export function ReadOrder() {
       nav(docPath(d, it || undefined)) // 규칙: 안에서 점프하지 않고 UI-5로
     }
     root.addEventListener('click', onClick)
-    return () => root.removeEventListener('click', onClick)
+    return () => {
+      root.removeEventListener('click', onClick)
+      for (const c of cleanups) if (typeof c === 'function') c()
+    }
   }, [bodies, code, nav, stage])
   const hasDocs = (s: number) => docs.some((d) => d.stage === s)
   /** 그 단계 문서들 중 가장 낮은 상태. 완료 2 + 초안 1이면 초안 (UC-H14 1a와 같은 기준) */

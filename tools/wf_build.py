@@ -5,9 +5,12 @@
   · 화면 항목 `UI-N`은 헤딩 단계와 무관하게 잡는다(`#`~`#####`). 코드블록 안은 보지 않는다
   · 화면 블록은 다음 「같은 단계 이상」 헤딩 전까지. 이어진 화면 항목은 한 묶음(탭) — 묶음 안 번호순,
     묶음 간 문서 순서
-  · 화면마다 갈리는 것은 배치(```html 코드블록) 유무다. 있으면 좌 배치 뼈대 / 우 요소 표·규칙·시나리오.
+  · 화면마다 갈리는 것은 배치(```html 코드블록) 유무다. 있으면 좌 배치(iframe 격리) / 우 요소 표·규칙·시나리오.
     우측 셋이 다 비면 좌측 전폭. 없으면 「설계만 있는 화면」 — 잇따른 것끼리 표 한 장에 행 하나씩
   · 화면 아닌 절은 문서 순서 그대로 산문으로 그린다(화면 목록·공통 틀·화면 흐름·미결사항 …)
+  · 배치는 iframe(srcdoc, allow-same-origin)에 넣는다 — 사이트 CSS가 안 스며든다. 「공통 틀」 절의 첫
+    html 블록이 모든 화면 앞에 함께 들어간다. FRAME_CSS·SANDBOX는 frontend/src/view/frame.ts와 같아야
+    한다(check_view_css.py가 대조)
 frontend/src/view/wireframe.ts가 같은 규칙을 웹에서 그린다.
 
 사용: wf_build.py <원본.md> [출력.html]   — 혼자 돌리면 페이지 틀까지 만든다.
@@ -25,16 +28,90 @@ SUB = re.compile(r"^#{1,6} (요소|규칙|시나리오)\s*$", re.M)
 HTML_BLOCK = re.compile(r"```html\n(.*?)\n```", re.S)
 
 
-def safe_layout(layout):
-    """배치 HTML을 페이지에 넣기 전에 다듬는다 — SYNC-STD-002 6장(#19).
+SANDBOX = "allow-same-origin"
 
-    `<script>`·`on*=`·`javascript:`는 지우고, `data-el`은 `data-wf`로 바꾼다.
-    바꾸는 이유: 그대로 두면 문서 본문에서 나온 것과 화면 자신의 요소를 셀렉터로 구분할 수 없다.
+FRAME_CSS = r"""html,body{margin:0}
+[data-el]{position:relative}
+[data-el]::before{content:attr(data-el);position:absolute;top:-8px;left:5px;font:600 9.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;background:#ffe58a;border:1px solid #c9a800;color:#222;padding:2px 4px;border-radius:2px;z-index:2147483000;pointer-events:none}
+[data-el].hi{outline:2px solid #c9a800;outline-offset:1px}
+a{cursor:default}"""
+
+COMMON_HEAD = re.compile(r"^#{1,6} (?:\d+(?:\.\d+)*\.?\s+)?공통 틀\s*$", re.M)
+TYPE_STAGE = {"RFQ": 1, "PRD": 2, "SCN": 3, "UC": 4, "INFRA": 5, "DOM": 6, "UI": 7, "API": 8, "SEQ": 9, "MS": 10, "CODE": 11}
+
+
+def safe_layout(layout):
+    """배치 HTML을 iframe에 넣기 전에 다듬는다 — SYNC-STD-002 1장(#19, 카드 Z).
+
+    문서가 넣은 동작은 지운다: `<script>`, `on*=`, `href/src`의 `javascript:`. iframe 안에서 또 iframe이
+    열리거나 자동 이동이 일어나지 않게 `<iframe>`·`<object>`·`<embed>`·`<meta http-equiv>`도 지우고,
+    `<form>`은 태그만 벗긴다(안의 배치는 남긴다). `data-el`은 그대로 둔다 — iframe이라 페이지의
+    `data-el`과 다른 문서여서 셀렉터가 부딪히지 않는다.
     """
     layout = re.sub(r"<script\b[\s\S]*?</script\s*>", "", layout, flags=re.I)
+    layout = re.sub(r"<(iframe|object)\b[\s\S]*?</\1\s*>", "", layout, flags=re.I)
+    layout = re.sub(r"<(?:iframe|object|embed)\b[^>]*/?>", "", layout, flags=re.I)
+    layout = re.sub(r"<meta\b[^>]*http-equiv[^>]*>", "", layout, flags=re.I)
+    layout = re.sub(r"</?form\b[^>]*>", "", layout, flags=re.I)
     layout = re.sub(r"""\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)""", "", layout, flags=re.I)
     layout = re.sub(r"""\s(href|src)\s*=\s*(["']?)\s*javascript:[^"'>]*\2""", "", layout, flags=re.I)
-    return re.sub(r"\bdata-el(-row)?=", r"data-wf\1=", layout)
+    return layout
+
+
+def split_common(common_html):
+    """공통 틀 html → (head, body). `<link>`·`<style>`은 head로, 나머지 마크업은 body 앞으로."""
+    head = "".join(re.findall(r"<link\b[^>]*>|<style\b[\s\S]*?</style\s*>", common_html, flags=re.I))
+    body = re.sub(r"<link\b[^>]*>|<style\b[\s\S]*?</style\s*>", "", common_html, flags=re.I).strip()
+    return head, body
+
+
+def common_block(body):
+    """「공통 틀」 절(번호 접두 허용, 헤딩 단계 무관)의 첫 ```html 블록. 없으면 ''.
+
+    STD-001 2.7 — 이 블록은 그 문서 모든 화면의 iframe 앞에 함께 들어간다.
+    """
+    masked = mask_code(body)
+    m = COMMON_HEAD.search(masked)
+    if not m:
+        return ""
+    level = len(m.group(0)) - len(m.group(0).lstrip("#"))
+    end = len(body)
+    for h in HEAD.finditer(masked, m.end()):
+        if len(h.group(1)) <= level:
+            end = h.start()
+            break
+    lm = HTML_BLOCK.search(body, m.end(), end)
+    return safe_layout(lm.group(1)) if lm else ""
+
+
+def spec_dir(doc_id):
+    """문서 ID → docs/specs 아래 폴더 이름 (`07-UI`, `STD`)."""
+    typ = doc_id.split("-")[1] if "-" in doc_id else ""
+    n = TYPE_STAGE.get(typ)
+    return f"{n:02d}-{typ}" if n else typ
+
+
+def base_for(doc_id):
+    """정적 뷰(docs/views/)에서 문서 폴더 기준 상대 경로가 맞도록 하는 `<base href>`."""
+    return f"../specs/{spec_dir(doc_id)}/"
+
+
+def frame_html(layout, common, base):
+    """배치 html → 격리된 iframe 조각 (STD-002 V-UI, 카드 Z).
+
+    srcdoc 문서: `<base>`(문서 폴더) → 공통 틀의 `<link>`·`<style>` → 뷰의 FRAME_CSS(배지·강조만) →
+    공통 틀 마크업 → 배치. sandbox에 allow-scripts가 없어 스크립트는 돌지 않는다 — 높이·강조·클릭은
+    부모 문서가 contentDocument로 한다.
+    """
+    head, body = split_common(common or "")
+    doc = (
+        f'<!doctype html><html><head><meta charset="utf-8"><base href="{html.escape(base, quote=True)}">'
+        f"{head}<style>{FRAME_CSS}</style></head><body>{body}{layout}</body></html>"
+    )
+    return (
+        f'<div class="wfframe"><iframe class="wfframe-if" sandbox="{SANDBOX}" '
+        f'srcdoc="{html.escape(doc, quote=True)}"></iframe></div>'
+    )
 
 
 def mask_code(text):
@@ -160,7 +237,7 @@ def _chip(s, vb, sid):
     return re.sub(r"\((\d+(?:\.\d+)?[a-z]?)\)", r'(<span class="eref" data-ref="\1">\1</span>)', vb.inline(s, sid))
 
 
-def _screen_html(sc, vb, sid, i):
+def _screen_html(sc, vb, sid, i, common, base):
     esc, inline = vb.esc, vb.inline
     meta = "".join(f"<span><b>{esc(k)}</b>{inline(v, sid)}</span>" for k, v in sc["meta"])
     desc = f'<div class="s-desc">{vb.render_blocks(sc["desc"], sid)}</div>' if sc["desc"] else ""
@@ -196,11 +273,11 @@ def _screen_html(sc, vb, sid, i):
         right.append(f'<div class="rsec"><h3>시나리오</h3>{scen}</div>')
     if right:
         body = (
-            f'<div class="split"><div class="left"><div class="wf">{sc["layout"]}</div></div>'
+            f'<div class="split"><div class="left">{frame_html(sc["layout"], common, base)}</div>'
             f'<div class="right">{"".join(right)}</div></div>'
         )
     else:  # 우측 셋이 다 비면 좌측 전폭
-        body = f'<div class="split full"><div class="left"><div class="wf">{sc["layout"]}</div></div></div>'
+        body = f'<div class="split full"><div class="left">{frame_html(sc["layout"], common, base)}</div></div>'
     hidden = "" if i == 0 else ' style="display:none"'
     return (
         f'<section class="screen" id="item-{esc(sc["id"])}" data-item="{esc(sc["id"])}" data-i="{i}"{hidden}>'
@@ -229,7 +306,7 @@ def _design_table(screens, vb, sid):
     )
 
 
-def _group_html(screens, vb, sid):
+def _group_html(screens, vb, sid, common, base):
     """묶음 하나: 배치 없는 화면은 표, 배치 있는 화면은 탭 + 화면들."""
     out = []
     plain = [s for s in screens if s["layout"] is None]
@@ -242,44 +319,83 @@ def _group_html(screens, vb, sid):
             f'<span class="k">{vb.esc(s["id"])}</span>{vb.esc(s["name"])}</button>'
             for i, s in enumerate(wired)
         )
-        shown = "".join(_screen_html(s, vb, sid, i) for i, s in enumerate(wired))
+        shown = "".join(_screen_html(s, vb, sid, i, common, base) for i, s in enumerate(wired))
         out.append(f'<div class="stabs" role="tablist">{tabs}</div><div class="screens">{shown}</div>')
     return f'<div class="wfgroup">{"".join(out)}</div>'
 
 
-def render_ui(blocks, sid):
-    """블록 목록 → 본문 HTML (문서 순서). 페이지 틀·CSS·JS는 밖에서."""
+def render_ui(blocks, sid, common="", base=""):
+    """블록 목록 → 본문 HTML (문서 순서). 페이지 틀·CSS·JS는 밖에서.
+
+    common = 공통 틀 절의 첫 html 블록(common_block), base = 문서 폴더 `<base href>`.
+    공통 틀은 화면에만 앞선다 — 산문 자리의 html 블록은 render_blocks가 공통 틀 없이 iframe으로.
+    """
     vb = _lib()
     out = []
     for kind, b in blocks:
         if kind == "prose":
             out.append(f'<div class="prose">{vb.render_blocks(b, sid)}</div>')
         else:
-            out.append(_group_html(b, vb, sid))
+            out.append(_group_html(b, vb, sid, common, base))
     return "\n".join(out)
 
 
 WF_JS = r"""
 (function(){
   const root=document.currentScript.parentElement;
+  // 배치는 iframe(srcdoc, allow-same-origin)에 격리돼 있다 — 높이·축소·강조·클릭은 전부 여기(부모)가 한다.
+  const frames=()=>[...root.querySelectorAll('iframe.wfframe-if')];
+  const docOf=f=>{try{return f.contentDocument;}catch(e){return null;}};
+  const fit=f=>{
+    const d=docOf(f); if(!d||!d.documentElement) return;
+    const wrap=f.parentElement, avail=wrap.clientWidth;
+    if(!avail) return;
+    f.style.width='100%'; f.style.transform=''; wrap.style.height='';
+    const de=d.documentElement, first=d.body&&d.body.firstElementChild;
+    let h=Math.max(de.scrollHeight, first?first.getBoundingClientRect().bottom+de.scrollTop:0);
+    const w=de.scrollWidth;
+    const big=w>avail+1, shrink=big&&f.dataset.orig!=='1';
+    if(big){f.style.width=w+'px';}
+    if(shrink){const k=avail/w; f.style.transformOrigin='0 0'; f.style.transform=`scale(${k})`; wrap.style.height=Math.ceil(h*k)+'px';}
+    else if(big){wrap.style.overflowX='auto';}
+    if(f.dataset.h!==String(h)){f.dataset.h=String(h); f.style.height=h+'px';}
+    let b=wrap.querySelector('.orig');
+    if(big&&!b){b=document.createElement('button');b.type='button';b.className='orig';wrap.appendChild(b);b.addEventListener('click',()=>{f.dataset.orig=f.dataset.orig==='1'?'0':'1';fit(f);});}
+    if(b){b.textContent=f.dataset.orig==='1'?'맞춤':'원래 크기';b.style.display=big?'':'none';}
+  };
+  const secOf=f=>f.closest('section.screen');
+  const hi=(sec,no)=>{
+    const f=sec.querySelector('iframe.wfframe-if'), d=f&&docOf(f);
+    if(d) d.querySelectorAll('[data-el].hi').forEach(n=>n.classList.remove('hi'));
+    sec.querySelectorAll('[data-wf-row].hi').forEach(n=>n.classList.remove('hi'));
+    const el=d&&d.querySelector(`[data-el="${CSS.escape(no)}"]`), row=sec.querySelector(`[data-wf-row="${CSS.escape(no)}"]`);
+    if(el){el.classList.add('hi'); const left=f.closest('.left'); if(left){const k=parseFloat((f.style.transform.match(/scale\(([\d.]+)\)/)||[])[1]||'1'); left.scrollTop=Math.max(0,el.getBoundingClientRect().top*k+f.offsetTop-40);}}
+    if(row){row.classList.add('hi');row.scrollIntoView({block:'nearest'});}
+  };
+  const wire=f=>{
+    const d=docOf(f); if(!d||f.dataset.wired) return; f.dataset.wired='1';
+    try{new ResizeObserver(()=>fit(f)).observe(d.documentElement);}catch(e){}
+    fit(f);
+    d.addEventListener('click',e=>{
+      const a=e.target.closest&&e.target.closest('a[href]'); if(a) e.preventDefault();
+      const el=e.target.closest&&e.target.closest('[data-el]'); const sec=secOf(f);
+      if(el&&sec){e.stopPropagation();hi(sec,el.getAttribute('data-el'));}
+    });
+  };
+  frames().forEach(f=>{const d=docOf(f); if(d&&d.readyState==='complete'&&d.body) wire(f); f.addEventListener('load',()=>wire(f));});
   root.querySelectorAll('section.screen').forEach(sec=>{
-    const hi=no=>{
-      sec.querySelectorAll('[data-wf],[data-wf-row]').forEach(n=>n.classList.remove('hi'));
-      const el=sec.querySelector(`[data-wf="${no}"]`), row=sec.querySelector(`[data-wf-row="${no}"]`);
-      if(el){el.classList.add('hi');el.scrollIntoView({block:'nearest'});}
-      if(row){row.classList.add('hi');row.scrollIntoView({block:'nearest'});}
-    };
-    sec.querySelectorAll('[data-wf]').forEach(n=>n.addEventListener('click',e=>{e.stopPropagation();hi(n.dataset.wf);}));
-    sec.querySelectorAll('[data-wf-row]').forEach(n=>n.addEventListener('click',()=>hi(n.dataset.wfRow)));
-    sec.querySelectorAll('.eref').forEach(n=>n.addEventListener('click',()=>hi(n.dataset.ref)));
+    sec.querySelectorAll('[data-wf-row]').forEach(n=>n.addEventListener('click',()=>hi(sec,n.dataset.wfRow)));
+    sec.querySelectorAll('.eref').forEach(n=>n.addEventListener('click',()=>hi(sec,n.dataset.ref)));
   });
   root.querySelectorAll('.wfgroup').forEach(g=>{
     const tabs=[...g.querySelectorAll('.stabs button')], secs=[...g.querySelectorAll(':scope > .screens > section.screen')];
     tabs.forEach((b,i)=>b.addEventListener('click',()=>{
       tabs.forEach((x,j)=>x.setAttribute('aria-selected',String(i===j)));
       secs.forEach((s,j)=>s.style.display=i===j?'':'none');
+      secs[i]&&secs[i].querySelectorAll('iframe.wfframe-if').forEach(fit);
     }));
   });
+  window.addEventListener('resize',()=>frames().forEach(fit));
 })();
 """
 
@@ -314,146 +430,13 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:.88em;background:#E4E8E4
 .split.full{grid-template-columns:1fr}
 .split.full .left{border-right:none}
 .left{padding:18px;border-right:1.5px solid var(--ink);background:#F2F3F0;overflow:auto}
+/* 배치는 iframe에 격리 — 사이트 CSS가 스며들지 않는다 (STD-002 V-UI, 카드 Z) */
+.wfframe{position:relative;background:#fff;border:1px solid #bbb;overflow:hidden}
+.wfframe-if{display:block;border:0;width:100%;min-height:40px}
+.wfframe .orig{position:absolute;top:6px;right:6px;font:600 11px/1 ui-monospace,Menlo,monospace;padding:4px 7px;background:#fff;border:1px solid var(--ink);cursor:pointer;z-index:3;opacity:.85}
+.wfframe .orig:hover{opacity:1}
 .right{padding:0;max-height:88vh;overflow-y:auto}
 
-/* 뼈대 (와이어프레임) 스타일 — 원본 HTML은 스타일이 없고 여기서만 입힌다 */
-.wf{font-family:system-ui,sans-serif;font-size:12.5px;color:#222;background:#f4f4f4;border:1px solid #bbb}
-.wf [data-wf]{position:relative;border:1.5px dashed #999;background:#fff;transition:background .12s,border-color .12s}
-.wf [data-wf]::before{content:attr(data-wf);position:absolute;top:-8px;left:5px;font:600 9.5px/1 ui-monospace,monospace;background:#ffe58a;border:1px solid #c9a800;padding:2px 4px;border-radius:2px;z-index:2;cursor:pointer}
-.wf [data-wf].hi{background:var(--hi);border-color:var(--hi-b);border-style:solid}
-.wf .lbl{color:#777;font-size:11px}
-.wf .topbar{display:flex;align-items:center;gap:12px;padding:8px 12px;background:#e8e8e8;border-bottom:1px solid #bbb}
-.wf .grow{flex:1}
-.wf .badge{display:inline-block;background:#d33;color:#fff;font-size:10px;padding:0 5px;border-radius:8px}
-.wf .btn{padding:3px 8px;border:1px solid #666;background:#fafafa;display:inline-block}
-.wf .docbar{display:flex;align-items:center;gap:12px;padding:7px 12px;background:#f0f0f0;border-bottom:1px solid #bbb}
-.wf .tabs span{padding:3px 8px;border:1px solid #999;margin-right:-1px}
-.wf .tabs span.on{background:#fff;font-weight:600}
-.wf .body3{display:grid;grid-template-columns:150px 1fr 220px;gap:10px;padding:10px}
-.wf .toc{padding:8px;line-height:1.8;height:fit-content}
-.wf .toc .d1{padding-left:12px}
-.wf .main{padding:14px 16px;min-height:420px}
-.wf .banner{padding:6px 10px;background:#fff3cd;border:1px solid #d9a800;margin-bottom:10px}
-.wf .item{padding:5px 8px;margin:10px 0 4px;background:#f7f7f7;border-left:3px solid #666}
-.wf .item .id{font:600 11px ui-monospace,monospace;color:#555;margin-right:6px}
-.wf .flag{display:inline-block;font-size:10px;padding:0 6px;border:1px solid #d33;color:#d33;margin-left:6px;border-radius:2px}
-.wf .ref{color:#1a5fb4;border-bottom:1px dashed #1a5fb4}
-.wf .line{position:relative;padding-right:24px;margin:4px 0}
-.wf .cbtn{position:absolute;right:0;top:0;width:18px;height:18px;border:1px solid #999;font-size:10px;text-align:center;line-height:16px;color:#777;background:#fff}
-.wf .cbtn.has{border-color:#1a5fb4;color:#1a5fb4;font-weight:600}
-.wf .diagram{margin:12px 0;padding:10px;background:#fafafa;border:1px solid #ccc;text-align:center}
-.wf .diagram .img{height:110px;background:repeating-linear-gradient(45deg,#eee 0 10px,#f8f8f8 10px 20px);border:1px solid #ddd;display:flex;align-items:center;justify-content:center;color:#888}
-.wf .diagram .acts{margin-top:6px;text-align:right}
-.wf .nav{display:flex;justify-content:space-between;margin-top:20px;padding-top:10px;border-top:1px solid #ddd}
-.wf .panel{height:fit-content}
-.wf .ptabs{display:flex;border-bottom:1px solid #999}
-.wf .ptabs span{flex:1;text-align:center;padding:6px;border-right:1px solid #999}
-.wf .ptabs span:last-child{border-right:none}
-.wf .ptabs span.on{background:#fff;font-weight:600}
-.wf .pbody{padding:10px}
-.wf .pbody h4{margin:8px 0 4px;font-size:11px;color:#666}
-.wf .pbody ul{margin:0 0 8px;padding-left:14px;line-height:1.7}
-.wf h2{font-size:15px;margin:6px 0 10px}
-.wf .body2{display:grid;grid-template-columns:1fr 240px;gap:10px;padding:10px}
-.wf .editor{display:grid;grid-template-columns:28px 1fr;min-height:300px;background:#fff}
-.wf .gutter{display:flex;flex-direction:column;background:#f0f0f0;color:#999;font:11px/1.55 ui-monospace,monospace;text-align:right;padding:8px 4px}
-.wf .gutter .err{color:#d33;font-weight:700}.wf .gutter .del{color:#c60;font-weight:700}
-.wf .code{margin:0;padding:8px;font:11.5px/1.55 ui-monospace,monospace;white-space:pre-wrap}
-.wf .errline{background:#ffe0e0;display:block}.wf .delline{background:#fff0e0;display:block;text-decoration:line-through}
-.wf .chk{margin:0 0 8px;padding-left:16px;line-height:1.6}
-.wf .chk .bad{color:#b00}.wf .chk .ok{color:#3a7}.wf .chk .warn{color:#a60}
-.wf .btn.sm{font-size:10px;padding:1px 6px;margin-top:3px}
-.wf .dialog{margin:12px;border:2px solid #444;background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.18)}
-.wf .dhead{padding:7px 12px;background:#444;color:#fff;font-weight:600}
-.wf .dbody{padding:12px}
-.wf .diffbox{margin:8px 0;padding:8px;background:#fafafa;border:1px solid #ddd;font:11px/1.6 ui-monospace,monospace}
-.wf .dl{color:#b00}.wf .dl.add{color:#080}
-.wf .dacts{text-align:right;margin-top:8px}
-.wf .rawwrap{margin:10px;background:#fff}
-.wf .phead{display:flex;align-items:center;gap:14px;padding:10px 12px;background:#f0f0f0;border-bottom:1px solid #bbb}
-.wf .stats{display:flex;gap:8px;padding:8px 12px}
-.wf .stat{padding:5px 10px;border:1px solid #999;background:#fff}
-.wf .stat b{font-size:14px;margin-right:4px}
-.wf table.stages{border-collapse:collapse;width:100%;background:#fff;font-size:12px}
-.wf table.stages td{padding:5px 8px;border-bottom:1px solid #e5e5e5;vertical-align:middle}
-.wf table.stages tr.stg td{background:#f7f7f7;font-weight:600}
-.wf table.stages tr.doc td{padding-left:14px;font-weight:400;color:#333}
-.wf table.stages td.no{width:24px;color:#999;text-align:right}
-.wf .st{display:inline-block;padding:1px 7px;border-radius:2px;font-size:10.5px;font-weight:600}
-.wf .st.ok{background:#d6f0d6;color:#1a6}.wf .st.dr{background:#e8e8e8;color:#666}.wf .st.na{background:#fff;color:#bbb;border:1px dashed #ccc}
-.wf .gate{font-size:10px;color:#c60;border:1px solid #c60;padding:0 5px;margin-left:4px}
-.wf .cm{font-size:10px;color:#1a5fb4;border:1px solid #1a5fb4;padding:0 5px;margin-left:4px}
-.wf .err{font-size:10px;color:#b00;border:1px solid #b00;padding:0 5px;margin-left:4px}
-.wf .recent{margin:0;padding-left:14px;line-height:1.5}
-.wf .recent li{margin-bottom:6px}
-.wf .todo{padding:10px 12px}
-.wf .grp{margin-bottom:12px;background:#fff}
-.wf .grp.dim{opacity:.6}
-.wf .grp h4{margin:0;padding:6px 10px;background:#f0f0f0;font-size:12px;border-bottom:1px solid #ccc}
-.wf .cnt{display:inline-block;background:#666;color:#fff;font-size:10px;padding:0 6px;border-radius:8px;margin-left:6px}
-.wf .row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid #eee;font-size:12px}
-.wf .row .k{font:600 11px ui-monospace,monospace;color:#444}
-.wf .age{font-size:11px;color:#c60;font-weight:600;white-space:nowrap}
-.wf .empty{padding:24px;text-align:center;color:#999;border:1px dashed #ccc;background:#fafafa}
-.wf .stack{padding:10px 12px;display:flex;flex-direction:column;gap:10px}
-.wf .cause,.wf .mine{background:#fff}
-.wf .sech{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f0f0f0;border-bottom:1px solid #ccc;font-size:12px}
-.wf .mybody{padding:10px 12px;font-size:12px;line-height:1.6}
-.wf .mybody p{margin:4px 0}
-.wf .acts{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f7f7f7;border:1px solid #ccc}
-.wf .dialog.wide{margin:18px 30px}
-.wf .dhead{display:flex;align-items:center;gap:10px}
-.wf .dhead .lbl{color:#ddd}
-.wf .x{cursor:pointer;padding:0 6px}
-.wf .propacts{display:flex;align-items:flex-end;gap:10px;margin-top:12px}
-.wf .skipbox{display:flex;flex-direction:column;gap:5px}
-.wf .inp{border:1px solid #999;padding:4px 8px;font-size:11px;width:260px;background:#fff}
-.wf .body2.hist{grid-template-columns:1fr 1fr}
-.wf table.vers{border-collapse:collapse;width:100%;background:#fff;font-size:11.5px}
-.wf table.vers th{text-align:left;padding:5px 8px;background:#f0f0f0;border-bottom:1px solid #ccc;font-weight:600}
-.wf table.vers td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top}
-.wf table.vers tr.cur td{background:#fffbe6}
-.wf .diffpane{background:#fff}
-.wf .hint{font-size:10px;color:#1a5fb4;border:1px solid #1a5fb4;padding:0 5px;margin-left:6px}
-.wf table.grid{border-collapse:collapse;width:calc(100% - 24px);margin:10px 12px;background:#fff;font-size:11.5px}
-.wf table.grid th{padding:6px 5px;background:#f0f0f0;border-bottom:1px solid #ccc;font-weight:600;font-size:10.5px;text-align:center}
-.wf table.grid th:nth-child(2){text-align:left}
-.wf table.grid td{padding:7px 5px;border-bottom:1px solid #eee;text-align:center;vertical-align:middle}
-.wf table.grid td:nth-child(2){text-align:left}
-.wf .cell{display:inline-block;width:26px;height:22px;line-height:22px;border-radius:2px;font-size:10.5px;font-weight:600;position:relative}
-.wf .cell.ok{background:#d6f0d6;color:#1a6}.wf .cell.dr{background:#e8e8e8;color:#666}.wf .cell.na{background:#fff;border:1px dashed #ddd}
-.wf .cell i{position:absolute;top:-6px;right:-6px;font-style:normal;font-size:9px;color:#c60}
-.wf .warn{color:#c60;font-size:14px}
-.wf .login{max-width:360px;margin:60px auto;padding:30px;background:#fff;text-align:center}
-.wf .logo{font-size:20px;margin-bottom:10px}
-.wf .btn.big{display:block;padding:10px;margin:14px 0;font-size:13px}
-.wf .form{padding:12px}
-.wf .form label{display:block;font-size:11px;font-weight:600;margin:10px 0 3px}
-.wf .inp.wide{width:100%}
-.wf .ferr{color:#b00;font-size:11px;margin-top:3px}
-.wf .facts{margin-top:14px;text-align:right}
-.wf .banner.err{background:#ffe0e0;border-color:#b00;margin:0 12px}
-.wf .banner.warn{background:#e8f0ff;border-color:#3a5ba0}
-.wf .btn.on{background:#fff;font-weight:600}
-.wf .graph{display:flex;gap:18px;padding:14px 12px;background:#fff;margin:10px 12px;min-height:200px;position:relative}
-.wf .col{display:flex;flex-direction:column;gap:6px;min-width:120px}
-.wf .colh{font-size:10px;font-weight:700;color:#888;text-align:center;border-bottom:1px solid #ddd;padding-bottom:3px}
-.wf .node{font:10.5px ui-monospace,monospace;padding:4px 6px;border:1.5px solid #3a5ba0;border-radius:12px;background:#eef2fa;text-align:center}
-.wf .node.sel{background:#fff6d9;border-color:#c9a800}
-.wf .node.iso{background:#fff;border-style:dashed;border-color:#999;color:#777}
-.wf .edges{position:absolute;bottom:6px;left:12px}
-.wf .legend{padding:0 12px 10px;display:flex;gap:14px}
-.wf .steps{display:flex;gap:3px}
-.wf .stp{font-size:10px;padding:2px 6px;border:1px solid #bbb;background:#fff}
-.wf .stp.done{background:#d6f0d6;border-color:#8c8}.wf .stp.cur{background:#fff0b3;border-color:#c9a800;font-weight:700}.wf .stp.na{color:#bbb;border-style:dashed}
-.wf .readbody{padding:10px 12px}
-.wf .row.dimrow{opacity:.5}
-.wf .tokbox{font:12px ui-monospace,monospace;padding:8px;background:#f4f4f4;border:1px solid #ccc;margin:8px 0}
-.wf .mono{font-family:ui-monospace,monospace;font-size:11px}
-.wf table.uptbl{border-collapse:collapse;width:100%;font-size:11.5px;margin:8px 0}
-.wf table.uptbl th{text-align:left;padding:4px 6px;background:#f0f0f0;border-bottom:1px solid #ccc}
-.wf table.uptbl td{padding:5px 6px;border-bottom:1px solid #eee}
-.wf .rawbar{display:flex;align-items:center;gap:10px;padding:6px 10px;background:#f0f0f0;border-bottom:1px solid #bbb}
 
 /* 오른쪽 */
 .rsec{padding:16px 20px;border-bottom:1px solid var(--hair)}
@@ -493,12 +476,36 @@ footer{margin-top:22px;font-size:12.5px;color:var(--soft);max-width:80ch}
 .screen{margin-top:14px}
 .s-desc{padding:8px 18px;border-bottom:1px solid var(--hair);font-size:13px;color:var(--soft)}
 .s-desc p{margin:2px 0}
-.wfgroup{margin-bottom:22px}
 table.reassembled{border-collapse:collapse;width:100%;font-size:12.5px;margin:8px 0 14px;background:var(--card);border:1.5px solid var(--ink)}
 table.reassembled th{text-align:left;padding:6px 8px;border-bottom:1.5px solid var(--ink);background:var(--panel);font-weight:600}
 table.reassembled td{padding:6px 8px;border-bottom:1px solid var(--hair);vertical-align:top}
 table.reassembled td.iid{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;white-space:nowrap}
 """
+
+
+def _selftest():
+    """safe_layout이 지워야 할 것을 지우는지 — iframe에 allow-scripts가 없어도 이것이 첫 방어다.
+
+    사용: wf_build.py --selftest
+    """
+    cases = [
+        ('<div><script >alert(1)</script ></div>', "<script"),
+        ('<p><SCRIPT src="x"></SCRIPT></p>', "SCRIPT"),
+        ('<a href="#" onclick = "x()">a</a>', "onclick"),
+        ('<a href=" javascript:alert(1)">a</a>', "javascript"),
+        ('<div><iframe src="x"></iframe></div>', "<iframe"),
+        ('<form action="/x"><input></form>', "<form"),
+        ('<meta http-equiv="refresh" content="0;url=x">', "http-equiv"),
+        ('<object data="x"><p>y</p></object>', "<object"),
+    ]
+    bad = [(src, tok) for src, tok in cases if tok.lower() in safe_layout(src).lower()]
+    kept = safe_layout('<form><div data-el="1" style="color:red">x</div></form>')
+    if 'data-el="1"' not in kept or "style=" not in kept or "<div" not in kept:
+        bad.append((kept, "keep"))
+    for src, tok in bad:
+        print("✗ ", tok, "남음:", src)
+    print("safe_layout: 통과" if not bad else f"safe_layout: {len(bad)} 실패")
+    return 0 if not bad else 1
 
 
 def main():
@@ -510,6 +517,7 @@ def main():
     body = raw[fmm.end():] if fmm else raw
     sid = fm.get("doc_id", "?")
     blocks = parse_ui(body)
+    common = common_block(body)
     groups = [b for k, b in blocks if k == "group"]
     screens = [s for g in groups for s in g]
     masked = mask_code(body)
@@ -527,7 +535,7 @@ def main():
 <p>화면마다 왼쪽은 배치 뼈대, 오른쪽은 요소·규칙·시나리오. 노란 번호나 표의 행을 누르면 양쪽이 서로 강조된다. 배치가 없는 화면은 표 한 행이다. 이어진 화면은 한 묶음이고 탭으로 오간다.</p></div>
 <div class="t-meta"><div>문서</div><div class="mono">{html.escape(sid)}</div><div>상태</div><div>{html.escape(status)}</div>
 <div>상위</div><div class="mono">{html.escape(fm.get("upstream", ""))}</div></div></header>
-<div id="ui">{render_ui(blocks, sid)}<script>{WF_JS}</script></div>
+<div id="ui">{render_ui(blocks, sid, common, base_for(sid))}<script>{WF_JS}</script></div>
 <footer>이 화면은 <code>{html.escape(os.path.basename(src))}</code>에서 생성된 사람용 뷰다. 배치 HTML·요소 표·규칙·시나리오가 모두 원본에 있고, 여기서는 나란히 놓고 연동만 한다.</footer>
 </div></body></html>"""
     open(out, "w", encoding="utf-8").write(page)
@@ -536,4 +544,4 @@ def main():
 
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    main()
+    sys.exit(_selftest()) if "--selftest" in sys.argv else main()
