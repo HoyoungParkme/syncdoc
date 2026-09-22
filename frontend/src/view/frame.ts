@@ -203,8 +203,9 @@ function setup(f: HTMLIFrameElement, onPick?: (no: string, frame: HTMLIFrameElem
   }
 
   const onClick = (e: Event) => {
-    const t = e.target
-    if (!(t instanceof Element)) return
+    // iframe 문서의 노드는 다른 realm이라 instanceof Element가 거짓이다 (#122)
+    const t = e.target as Element | null
+    if (!t || t.nodeType !== 1 || typeof t.closest !== 'function') return
     // <base>가 있어 #x도 밖으로 나간다 — 배치 안 링크는 누를 것이 아니다
     if (t.closest('a[href]')) e.preventDefault()
     const el = t.closest<HTMLElement>('[data-el]')
