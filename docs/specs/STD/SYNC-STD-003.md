@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-003
 type: STD
 title: 명세 체인 지도 — 싱크독 첫 프로젝트의 실제 구조
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-STD-002]
 ---
 
@@ -18,7 +18,7 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 
 ## 1. 체인과 문서
 
-11단계 + 단계 밖 STD. 문서 25개(이 문서 포함), 항목 370개, 문서 간·안 참조 1269개.
+11단계 + 단계 밖 STD. 문서 25개(이 문서 포함), 항목 370개, 문서 간·안 참조 1273개.
 
 | 단계 | 문서 ID | 제목 | 파일 | 항목 | 절 | 상위(frontmatter) |
 |---|---|---|---|---|---|---|
