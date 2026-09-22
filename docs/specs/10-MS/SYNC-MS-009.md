@@ -250,9 +250,10 @@ async def sync_readme(workdir: Path, author: Author, code: str) -> str | None
 **입력** 작업 사본, 커밋 주체(재구축을 누른 소유자), 프로젝트 코드(커밋 메시지용)
 
 **처리**
-1. `git.read(workdir, "docs/specs/README.md", "origin/main")` — 없으면(`GitError`) 빈 문자열로 본다
-2. 지금 판(`init_specs`가 쓰는 것과 같은 글)과 같으면 `→ None`. 저장소에 아무것도 쓰지 않는다
-3. 다르면 `commit_push(workdir, f"chore({code}): README를 싱크독 규약 링크로", author, path="docs/specs/README.md", content=...)` → `→ commit_hash`
+1. `fetch origin` — push는 토큰을 붙인 URL로 밀어 `origin/main` 추적 참조가 갱신되지 않는다. 비교 전에 받아 온다
+2. `git.read(workdir, "docs/specs/README.md", "origin/main")` — 없으면(`GitError`) 빈 문자열로 본다
+3. 지금 판(`init_specs`가 쓰는 것과 같은 글)과 같으면 `→ None`. 저장소에 아무것도 쓰지 않는다
+4. 다르면 `commit_push(workdir, f"chore({code}): README를 싱크독 규약 링크로", author, path="docs/specs/README.md", content=...)` → `→ commit_hash`
 
 **출력** 커밋 해시 또는 `None`(이미 같음)
 
