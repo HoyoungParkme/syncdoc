@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -81,6 +81,8 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | GET · POST /api/me/tokens · DELETE …/{id} | [[#SEQ-C1]] | |
 | GET /api/admin/repos | [[#SEQ-20]] | |
 | POST /api/admin/repos/{code}/rebuild | [[#SEQ-21]] | ○ |
+| POST /api/admin/repos/{code}/sync | [[#SEQ-25]] | ○ |
+| POST /api/admin/repos/{code}/hook | [[#SEQ-4]] | |
 | POST /api/docs/{docId}/ask | [[#SEQ-24]] | ○ |
 | MCP create_document | [[#SEQ-19]] | ○ |
 | MCP update_document | [[#SEQ-1]] | ○ |
@@ -205,10 +207,13 @@ sequenceDiagram
     participant DB
 
     alt webhook
-        GH->>H: POST /hooks/github {commits}
+        GH->>H: POST /hooks/github {ref, after, repository}
         H->>GHI: verify_signature(X-Hub-Signature-256)
-        alt 서명 불일치
+        alt 서명 불일치 · 비밀번호가 비어 있음
             H-->>GH: 401
+        end
+        alt push가 아님 · ref != refs/heads/main · 브랜치 삭제 (1c·1d)
+            H-->>GH: 202 {ignored: 사유}
         end
         H-->>GH: 202
         H->>P: process_commit(repo, head_hash) (비동기)
@@ -300,6 +305,7 @@ sequenceDiagram
         end
     else 없음 (기본 흐름 4)
         PS->>G: mkdir 11단계 · README.md(규약 링크 — 사본 없음, 카드 AB)
+        PS->>GH: create_hook(push 통지) — 실패해도 등록은 계속 (UC-A1 4a, 카드 AF)
         PS->>G: commit_push("chore: init syncdoc", author)
         alt push 실패 (4a)
             G-->>PS: PushFailed
@@ -1014,6 +1020,45 @@ sequenceDiagram
 - **모델이 고른 것만 읽는다.** 시작 맥락에는 본문이 없다. 상한은 호출 수(8)와 시간(120초)이지 글자가 아니다([[SYNC-INFRA-001]] 5.3)
 - **첫 이벤트(`start`) 전의 오류는 HTTP 상태 코드**(404·503)이고, 뒤의 오류는 `error` 이벤트다. 라우터가 제너레이터를 한 번 당겨 `start`를 받은 뒤에야 스트림을 연다
 - 항목은 힌트다. 없어도 문서 전체로 묻는다(1a). 항목 ID가 문서에 없으면 `start` 전에 `not-found`
+
+
+---
+
+## SEQ-25 지금 가져오기
+
+[[SYNC-UC-001#UC-G2]]. UI-14 요소 6. 주기 확인을 기다리지 않고 사람이 당긴다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사람
+    participant RA as routers/admin
+    participant PS as ProjectService
+    participant P as pipeline
+    participant G as infra/git
+    participant DB
+
+    U->>RA: POST /api/admin/repos/{code}/sync
+    RA->>PS: sync_now(code, user)
+    PS->>P: read_pending(code, user)
+    P->>P: get_owned · 읽기 락
+    P->>G: fetch → head
+    alt head == last_processed_commit (2a)
+        P->>DB: repositories.fetched_at = now
+        P-->>PS: 0
+    else 밀린 커밋이 있다
+        P->>P: process_commit(repo, head) — SEQ-2 9~20과 같다
+        P->>DB: last_processed_commit · behind_by=0 · fetched_at
+        P-->>PS: 읽은 문서 수
+    end
+    PS-->>RA: SyncResult {docs, fetched_at}
+    RA-->>U: 「N개를 읽었습니다」 또는 「이미 최신」
+```
+
+**읽을 때 볼 것**
+- **새 흐름을 만들지 않았다.** 본체는 카드 AD가 만든 `read_pending` 그대로다 — 소유 검사·읽기 락·`process_commit`이 이미 그 안에 있다. 이 시퀀스는 그것을 사람이 부를 수 있게 문 하나를 낸 것이다
+- 읽을 것이 없어도 **`fetched_at`은 새로 적는다.** 「지금 확인했다」가 이 동작의 절반이다 — 화면이 그 시각을 보여주므로(UI-14 2.4) 사람은 「최신」이 언제 기준인지 알게 된다
+- 통지(SEQ-2)가 걸려 있으면 이 버튼을 누를 일이 거의 없다. 통지를 못 건 저장소와 통지가 유실된 경우를 위한 길이다
 
 ---
 
