@@ -10,7 +10,7 @@ import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 
 import mermaid from 'mermaid'
 import { api, ApiError, incompleteOf, warnText, type AskAnswer, type AskNote, type AskRead, type AskTurn, type Document, type DownstreamView, type ItemReferences, type Me, type Problem } from '../api/client'
 import { extraCss, renderView } from '../view'
-import { attachDiagramButtons, DiagramFull, type FullDiagram } from '../components/DiagramFull'
+import { attachDiagramButtons, DiagramFull, type FullDiagram, type WfFullDetail } from '../components/DiagramFull'
 import { esc, renderBlocks, splitRef } from '../view/md'
 import { ItemIdBadge, StatusPill, ProjName, toast } from '../components/ui'
 import { Handle, PANEL, readStore, TOC, useWidth, writeStore } from '../components/panes'
@@ -83,6 +83,11 @@ export function DocView() {
     for (const el of root.querySelectorAll<HTMLElement>('[data-item]:not(section.screen)')) el.dataset.el = '7.1' // 화면 섹션은 항목 헤더가 아니다
     for (const el of root.querySelectorAll<HTMLElement>('a[data-ref]')) el.dataset.el = '7.2'
     for (const el of root.querySelectorAll<HTMLElement>('pre.mermaid')) el.dataset.el = '7.3'
+    // 배치(7.7)와 그 도구 줄(7.8·7.9·7.10) — 카드 AC. 뷰가 만드는 DOM이라 번호는 여기서 붙인다
+    for (const el of root.querySelectorAll<HTMLElement>('iframe.wfframe-if')) el.dataset.el = '7.7'
+    for (const el of root.querySelectorAll<HTMLElement>('.wfbar')) el.dataset.el = '7.8'
+    for (const el of root.querySelectorAll<HTMLElement>('.wfframe-fit')) el.dataset.el = '7.9'
+    for (const el of root.querySelectorAll<HTMLElement>('.wffull')) el.dataset.el = '7.10'
     mermaid.initialize({ startOnLoad: false, theme: 'neutral' })
     // 7.5 전체보기 — svg가 생긴 뒤(mermaid 끝난 뒤)에 붙인다. 그 사이 본문이 갈렸으면 붙이지 않는다 (공통 1.7)
     mermaid
@@ -98,6 +103,9 @@ export function DocView() {
       const n = doc?.items.find((i) => i.item_id === el.dataset.item)?.missing_refs.length ?? 0
       if (n && !el.querySelector('.missx')) badge.insertAdjacentHTML('afterend', `<span class="miss missx">끊어진 참조 ${n}</span>`)
     }
+    // 배치 「전체보기」(7.10) — 뷰가 쏘고 페이지가 층(7.6)을 그린다 (카드 AC)
+    const onWfFull = (ev: Event) => setFull((ev as CustomEvent<WfFullDetail>).detail)
+    root.addEventListener('wf:full', onWfFull)
     const onClick = (ev: MouseEvent) => {
       const t = ev.target as HTMLElement
       const a = t.closest<HTMLAnchorElement>('a[data-ref]')
@@ -122,6 +130,7 @@ export function DocView() {
     }
     return () => {
       root.removeEventListener('click', onClick)
+      root.removeEventListener('wf:full', onWfFull)
       if (typeof cleanup === 'function') cleanup()
     }
   }, [view, tab, doc, nav, setPanel])

@@ -94,14 +94,32 @@ export function isStyleOnly(html: string): boolean {
 
 const attr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
 
-/** srcdoc 문서 한 벌. wf_build.frame_html과 같은 구조 */
-export function frameDoc(layout: string, common: CommonParts, base: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><base href="${attr(base)}">${common.head}<style>${FRAME_CSS}</style></head><body>${common.body}${layout}</body></html>`
+/** 화면 밖 html 블록(wfbox)의 이름 — 문서 순서로 이 블록 앞에 있는 마지막 헤딩 (DiagramFull과 같은 규칙) */
+function headingBefore(box: Element | null | undefined): string {
+  if (!box) return ''
+  let el: Element | null = box
+  while (el) {
+    let p: Element | null = el.previousElementSibling
+    while (p) {
+      const h = p.matches('h1, h2, h3, h4, h5') ? p : p.querySelector('h1, h2, h3, h4, h5')
+      if (h) return h.textContent?.trim() ?? ''
+      p = p.previousElementSibling
+    }
+    el = el.parentElement
+  }
+  return ''
 }
 
-/** iframe 하나 = 배치 하나. .wfframe이 감싸고 부모(mountFrames)가 높이·축소를 잡는다 */
+/** srcdoc 문서 한 벌. wf_build.frame_html과 같은 구조 */
+export function frameDoc(layout: string, common: CommonParts, base: string): string {
+  // FRAME_CSS가 공통 틀·배치의 <style>보다 **앞**이다 — 문서가 정한 것이 이긴다 (#132)
+  return `<!doctype html><html><head><meta charset="utf-8"><base href="${attr(base)}"><style>${FRAME_CSS}</style>${common.head}</head><body>${common.body}${layout}</body></html>`
+}
+
+/** iframe 하나 = 배치 하나 + 위에 도구 줄. 부모(mountFrames)가 높이·축소·도구 줄을 잡는다.
+ *  버튼은 마크업에 정적으로 둔다 — 정적 뷰와 DOM이 같아야 하고(DEV-17) 요소 번호를 붙일 수 있다 */
 export function frameHtml(layout: string, common: CommonParts, base: string): string {
-  return `<div class="wfframe"><iframe class="wfframe-if" sandbox="${SANDBOX}" srcdoc="${attr(frameDoc(layout, common, base))}"></iframe></div>`
+  return `<div class="wfbox"><div class="wfbar"><span class="wfdim mono"></span><span class="grow"></span><button type="button" class="wfframe-fit btn sm" hidden>원래 크기</button><button type="button" class="wffull btn sm">전체보기</button></div><div class="wfframe"><iframe class="wfframe-if" sandbox="${SANDBOX}" srcdoc="${attr(frameDoc(layout, common, base))}"></iframe></div></div>`
 }
 
 // ───────────────────────── 동작 (부모 쪽) ─────────────────────────
@@ -124,13 +142,14 @@ export function hiIn(frame: HTMLIFrameElement, no: string): HTMLElement | null {
   const el = doc.querySelector<HTMLElement>(`[data-el="${no.replace(/["\\]/g, '\\$&')}"]`)
   if (!el) return null
   el.classList.add('hi')
-  // iframe 자체는 내용만큼 커서 스크롤이 없다 — 감싸는 .left(overflow:auto)를 요소 위치(축소 비율 반영)로 옮긴다
+  // iframe 자체는 내용만큼 커서 스크롤이 없다 — 강조된 요소가 화면에 들어오게 본문을 옮긴다.
+  // 배치는 본문에 세로로 쌓이므로(카드 AC) 스크롤 상자는 본문 열이다
   const st = STATE.get(frame)
   const k = st?.scale ?? 1
-  const box = frame.parentElement?.closest<HTMLElement>('.left, .wfbox')
+  const box = frame.closest<HTMLElement>('.mainwrap, .readbody, .left')
   if (box) {
-    const y = el.getBoundingClientRect().top * k + (frame.parentElement?.offsetTop ?? 0)
-    if (y < box.scrollTop || y > box.scrollTop + box.clientHeight - 40) box.scrollTop = Math.max(0, y - 24)
+    const y = box.scrollTop + frame.getBoundingClientRect().top - box.getBoundingClientRect().top + el.getBoundingClientRect().top * k
+    if (y < box.scrollTop + 40 || y > box.scrollTop + box.clientHeight - 40) box.scrollTop = Math.max(0, y - 80)
   }
   return el
 }
@@ -147,7 +166,9 @@ function setup(f: HTMLIFrameElement, onPick?: (no: string, frame: HTMLIFrameElem
   if (STATE.has(f)) STATE.get(f)?.cleanup()
   const st: FrameState = { scale: 1, fit: true, natW: 0, natH: 0, measure: () => undefined, cleanup: () => undefined }
   let lastH = -1
-  let btn: HTMLButtonElement | null = null
+  const box = wrap.parentElement // .wfbox — 도구 줄이 산다
+  const btn = box?.querySelector<HTMLButtonElement>('.wfframe-fit') ?? null
+  const dim = box?.querySelector<HTMLElement>('.wfdim') ?? null
 
   const apply = () => {
     const avail = wrap.clientWidth
@@ -168,22 +189,28 @@ function setup(f: HTMLIFrameElement, onPick?: (no: string, frame: HTMLIFrameElem
       wrap.style.height = ''
       wrap.classList.remove('scaled')
     }
-    // 「원래 크기」 토글은 넓을 때만
-    if (wide && !btn) {
-      btn = document.createElement('button')
-      btn.type = 'button'
-      btn.className = 'wfframe-fit btn sm'
-      btn.addEventListener('click', () => {
-        st.fit = !st.fit
-        apply()
-      })
-      wrap.appendChild(btn)
-    }
+    // 도구 줄 — 자연폭과 지금 배율. 「원래 크기」 토글은 넓을 때만 (#130: 배치 위에 있고 가리지 않는다)
+    if (dim && st.natW) dim.textContent = `${st.natW}×${st.natH}${st.scale < 1 ? ` · ${Math.round(st.scale * 100)}%` : ''}`
     if (btn) {
       btn.textContent = st.fit ? '원래 크기' : '맞춤'
-      btn.style.display = wide ? '' : 'none'
+      btn.hidden = !wide
     }
   }
+  const onFit = () => {
+    st.fit = !st.fit
+    apply()
+  }
+  btn?.addEventListener('click', onFit)
+
+  // 「전체보기」 — 같은 srcdoc을 층에 띄운다. 층은 페이지가 그린다(UI-5 7.6) → 이벤트로 넘긴다
+  const onFull = () => {
+    const title = box?.closest('section.screen')?.querySelector('.s-head b')?.textContent?.trim() || headingBefore(box) || '배치'
+    box?.dispatchEvent(
+      new CustomEvent('wf:full', { bubbles: true, detail: { srcdoc: f.getAttribute('srcdoc') ?? '', title, w: st.natW, h: st.natH } }),
+    )
+  }
+  const full = box?.querySelector<HTMLButtonElement>('.wffull') ?? null
+  full?.addEventListener('click', onFull)
 
   st.measure = () => {
     const de = doc.documentElement
@@ -227,6 +254,8 @@ function setup(f: HTMLIFrameElement, onPick?: (no: string, frame: HTMLIFrameElem
     ro.disconnect()
     wro.disconnect()
     doc.removeEventListener('click', onClick)
+    btn?.removeEventListener('click', onFit)
+    full?.removeEventListener('click', onFull)
     STATE.delete(f)
   }
   STATE.set(f, st)

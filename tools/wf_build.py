@@ -99,18 +99,23 @@ def base_for(doc_id):
 def frame_html(layout, common, base):
     """배치 html → 격리된 iframe 조각 (STD-002 V-UI, 카드 Z).
 
-    srcdoc 문서: `<base>`(문서 폴더) → 공통 틀의 `<link>`·`<style>` → 뷰의 FRAME_CSS(배지·강조만) →
-    공통 틀 마크업 → 배치. sandbox에 allow-scripts가 없어 스크립트는 돌지 않는다 — 높이·강조·클릭은
-    부모 문서가 contentDocument로 한다.
+    srcdoc 문서: `<base>`(문서 폴더) → 뷰의 FRAME_CSS(배지·강조만) → 공통 틀의 `<link>`·`<style>` →
+    공통 틀 마크업 → 배치. **FRAME_CSS가 앞**이라 문서가 정한 것이 이긴다(#132). sandbox에
+    allow-scripts가 없어 스크립트는 돌지 않는다 — 높이·강조·클릭은 부모 문서가 contentDocument로 한다.
+    위에 도구 줄(자연폭·배율 · 맞춤/원래 크기 · 전체보기)이 붙는다 (카드 AC).
     """
     head, body = split_common(common or "")
     doc = (
         f'<!doctype html><html><head><meta charset="utf-8"><base href="{html.escape(base, quote=True)}">'
-        f"{head}<style>{FRAME_CSS}</style></head><body>{body}{layout}</body></html>"
+        f"<style>{FRAME_CSS}</style>{head}</head><body>{body}{layout}</body></html>"
     )
     return (
+        '<div class="wfbox"><div class="wfbar"><span class="wfdim mono"></span>'
+        '<span class="grow"></span>'
+        '<button type="button" class="wfframe-fit" hidden>원래 크기</button>'
+        '<button type="button" class="wffull">전체보기</button></div>'
         f'<div class="wfframe"><iframe class="wfframe-if" sandbox="{SANDBOX}" '
-        f'srcdoc="{html.escape(doc, quote=True)}"></iframe></div>'
+        f'srcdoc="{html.escape(doc, quote=True)}"></iframe></div></div>'
     )
 
 
@@ -271,13 +276,11 @@ def _screen_html(sc, vb, sid, i, common, base):
             for x in sc["scenarios"]
         )
         right.append(f'<div class="rsec"><h3>시나리오</h3>{scen}</div>')
+    # 배치가 위, 요소 표·규칙·시나리오가 아래 (카드 AC) — 배치가 본문 폭을 다 쓴다
+    inner = frame_html(sc["layout"], common, base)
     if right:
-        body = (
-            f'<div class="split"><div class="left">{frame_html(sc["layout"], common, base)}</div>'
-            f'<div class="right">{"".join(right)}</div></div>'
-        )
-    else:  # 우측 셋이 다 비면 좌측 전폭
-        body = f'<div class="split full"><div class="left">{frame_html(sc["layout"], common, base)}</div></div>'
+        inner += f'<div class="rsecs">{"".join(right)}</div>'
+    body = f'<div class="wfstack">{inner}</div>'
     hidden = "" if i == 0 else ' style="display:none"'
     return (
         f'<section class="screen" id="item-{esc(sc["id"])}" data-item="{esc(sc["id"])}" data-i="{i}"{hidden}>'
@@ -346,22 +349,25 @@ WF_JS = r"""
   // 배치는 iframe(srcdoc, allow-same-origin)에 격리돼 있다 — 높이·축소·강조·클릭은 전부 여기(부모)가 한다.
   const frames=()=>[...root.querySelectorAll('iframe.wfframe-if')];
   const docOf=f=>{try{return f.contentDocument;}catch(e){return null;}};
+  const natOf=f=>({w:+(f.dataset.w||0), h:+(f.dataset.h||0)});
   const fit=f=>{
     const d=docOf(f); if(!d||!d.documentElement) return;
-    const wrap=f.parentElement, avail=wrap.clientWidth;
+    const wrap=f.parentElement, box=wrap.parentElement, avail=wrap.clientWidth;
     if(!avail) return;
-    f.style.width='100%'; f.style.transform=''; wrap.style.height='';
+    f.style.width='100%'; f.style.transform=''; wrap.style.height=''; wrap.classList.remove('scaled');
     const de=d.documentElement, first=d.body&&d.body.firstElementChild;
     let h=Math.max(de.scrollHeight, first?first.getBoundingClientRect().bottom+de.scrollTop:0);
     const w=de.scrollWidth;
+    f.dataset.w=w; f.dataset.h=h;
     const big=w>avail+1, shrink=big&&f.dataset.orig!=='1';
+    let k=1;
     if(big){f.style.width=w+'px';}
-    if(shrink){const k=avail/w; f.style.transformOrigin='0 0'; f.style.transform=`scale(${k})`; wrap.style.height=Math.ceil(h*k)+'px';}
-    else if(big){wrap.style.overflowX='auto';}
-    if(f.dataset.h!==String(h)){f.dataset.h=String(h); f.style.height=h+'px';}
-    let b=wrap.querySelector('.orig');
-    if(big&&!b){b=document.createElement('button');b.type='button';b.className='orig';wrap.appendChild(b);b.addEventListener('click',()=>{f.dataset.orig=f.dataset.orig==='1'?'0':'1';fit(f);});}
-    if(b){b.textContent=f.dataset.orig==='1'?'맞춤':'원래 크기';b.style.display=big?'':'none';}
+    if(shrink){k=avail/w; f.style.transformOrigin='0 0'; f.style.transform=`scale(${k})`; wrap.style.height=Math.ceil(h*k)+'px'; wrap.classList.add('scaled');}
+    if(f.dataset.h!==String(h)||f.style.height!==h+'px'){f.style.height=h+'px';}
+    // 도구 줄 — 자연폭과 배율. 배치 위에 있어 그림을 가리지 않는다 (#130)
+    const dim=box&&box.querySelector('.wfdim'); if(dim) dim.textContent=w+'×'+h+(k<1?' · '+Math.round(k*100)+'%':'');
+    const b=box&&box.querySelector('.wfframe-fit');
+    if(b){b.textContent=f.dataset.orig==='1'?'맞춤':'원래 크기'; b.hidden=!big;}
   };
   const secOf=f=>f.closest('section.screen');
   const hi=(sec,no)=>{
@@ -369,13 +375,49 @@ WF_JS = r"""
     if(d) d.querySelectorAll('[data-el].hi').forEach(n=>n.classList.remove('hi'));
     sec.querySelectorAll('[data-wf-row].hi').forEach(n=>n.classList.remove('hi'));
     const el=d&&d.querySelector(`[data-el="${CSS.escape(no)}"]`), row=sec.querySelector(`[data-wf-row="${CSS.escape(no)}"]`);
-    if(el){el.classList.add('hi'); const left=f.closest('.left'); if(left){const k=parseFloat((f.style.transform.match(/scale\(([\d.]+)\)/)||[])[1]||'1'); left.scrollTop=Math.max(0,el.getBoundingClientRect().top*k+f.offsetTop-40);}}
+    if(el){el.classList.add('hi'); el.scrollIntoView({block:'nearest'});}
     if(row){row.classList.add('hi');row.scrollIntoView({block:'nearest'});}
+  };
+  // 전체보기 층 — 같은 srcdoc을 화면 전체에 1:1로 띄운다 (UI-5 7.6과 같은 자리, 카드 AC)
+  const openFull=(f,title)=>{
+    const nat=natOf(f), w=nat.w||1280, h=nat.h||800;
+    const lay=document.createElement('div'); lay.className='wffull-layer';
+    lay.innerHTML='<div class="gbar"><b></b><span class="grow"></span>'
+      +'<button type="button" data-z="-1">－</button><span class="mono zv">100%</span>'
+      +'<button type="button" data-z="1">＋</button><button type="button" data-z="0">100%</button>'
+      +'<button type="button" data-close="1">닫기</button></div>'
+      +'<div class="stage"><div class="pic"><iframe sandbox="'+f.getAttribute('sandbox')+'"></iframe></div></div>';
+    lay.querySelector('b').textContent=title||'배치';
+    const pic=lay.querySelector('.pic'), inner=lay.querySelector('.pic iframe'), stage=lay.querySelector('.stage'), zv=lay.querySelector('.zv');
+    inner.setAttribute('srcdoc', f.getAttribute('srcdoc'));
+    let z=1;
+    const draw=()=>{pic.style.width=Math.ceil(w*z)+'px';pic.style.height=Math.ceil(h*z)+'px';
+      inner.style.width=w+'px';inner.style.height=h+'px';inner.style.transform=`scale(${z})`;zv.textContent=Math.round(z*100)+'%';};
+    const close=()=>{document.removeEventListener('keydown',onKey);lay.remove();};
+    const onKey=e=>{if(e.key==='Escape')close();};
+    lay.addEventListener('click',e=>{
+      const t=e.target;
+      if(t===stage||t.dataset.close){close();return;}
+      if(t.dataset.z===undefined) return;
+      z=t.dataset.z==='0'?1:Math.min(4,Math.max(.25,+(z+(+t.dataset.z)*.25).toFixed(2)));draw();
+    });
+    document.addEventListener('keydown',onKey);
+    document.body.appendChild(lay);
+    // 열릴 때는 무대 폭에 맞춘다(100% 이하) — 1280은 넓은 창에서 그대로 1:1
+    z=Math.max(.25,Math.min(1,Math.floor(((stage.clientWidth-48)/w)*100)/100));draw();
   };
   const wire=f=>{
     const d=docOf(f); if(!d||f.dataset.wired) return; f.dataset.wired='1';
     try{new ResizeObserver(()=>fit(f)).observe(d.documentElement);}catch(e){}
     fit(f);
+    const box=f.parentElement.parentElement;
+    const b=box&&box.querySelector('.wfframe-fit');
+    if(b) b.addEventListener('click',()=>{f.dataset.orig=f.dataset.orig==='1'?'0':'1';fit(f);});
+    const fu=box&&box.querySelector('.wffull');
+    if(fu) fu.addEventListener('click',()=>{
+      const sec=secOf(f), head=sec&&sec.querySelector('.s-head b');
+      openFull(f, head?head.textContent.trim():'배치');
+    });
     d.addEventListener('click',e=>{
       const a=e.target.closest&&e.target.closest('a[href]'); if(a) e.preventDefault();
       const el=e.target.closest&&e.target.closest('[data-el]'); const sec=secOf(f);
@@ -387,19 +429,31 @@ WF_JS = r"""
     sec.querySelectorAll('[data-wf-row]').forEach(n=>n.addEventListener('click',()=>hi(sec,n.dataset.wfRow)));
     sec.querySelectorAll('.eref').forEach(n=>n.addEventListener('click',()=>hi(sec,n.dataset.ref)));
   });
-  root.querySelectorAll('.wfgroup').forEach(g=>{
+  const show=(g,i)=>{
     const tabs=[...g.querySelectorAll('.stabs button')], secs=[...g.querySelectorAll(':scope > .screens > section.screen')];
-    tabs.forEach((b,i)=>b.addEventListener('click',()=>{
-      tabs.forEach((x,j)=>x.setAttribute('aria-selected',String(i===j)));
-      secs.forEach((s,j)=>s.style.display=i===j?'':'none');
-      secs[i]&&secs[i].querySelectorAll('iframe.wfframe-if').forEach(fit);
-    }));
+    tabs.forEach((x,j)=>x.setAttribute('aria-selected',String(i===j)));
+    secs.forEach((s,j)=>s.style.display=i===j?'':'none');
+    secs[i]&&secs[i].querySelectorAll('iframe.wfframe-if').forEach(fit);
+  };
+  root.querySelectorAll('.wfgroup').forEach(g=>{
+    [...g.querySelectorAll('.stabs button')].forEach((b,i)=>b.addEventListener('click',()=>show(g,i)));
   });
+  // #item-UI-N 으로 들어오면 그 화면 탭을 연다 — 숨긴 section은 앵커로 못 간다 (#135, React와 같게)
+  const openHash=()=>{
+    const m=/^#item-(UI-\d+)$/.exec(location.hash); if(!m) return;
+    for(const g of root.querySelectorAll('.wfgroup')){
+      const secs=[...g.querySelectorAll(':scope > .screens > section.screen')];
+      const i=secs.findIndex(s=>s.dataset.item===m[1]);
+      if(i>=0){show(g,i);secs[i].scrollIntoView({block:'start'});return;}
+    }
+  };
+  openHash();
+  window.addEventListener('hashchange',openHash);
   window.addEventListener('resize',()=>frames().forEach(fit));
 })();
 """
 
-WF_CSS = r"""
+WF_PAGE_CSS = r"""
 :root{--paper:#EDEFEC;--panel:#F8F9F7;--card:#fff;--ink:#1E2A30;--soft:#5C6B73;--faint:#8A969C;--rule:#C9CFCB;--hair:#E1E5E1;--hi:#FFF1B8;--hi-b:#C9A800}
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
@@ -415,6 +469,36 @@ header{border:1.5px solid var(--ink);background:var(--panel);display:grid;grid-t
 .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
 code{font-family:ui-monospace,Menlo,monospace;font-size:.88em;background:#E4E8E4;padding:1px 5px;border-radius:2px}
 
+footer{margin-top:22px;font-size:12.5px;color:var(--soft);max-width:80ch}
+
+/* 화면 아닌 절 — 문서 순서대로 */
+.prose{padding:6px 2px 14px}
+.prose h2{font-size:18px;margin:26px 0 8px;padding-bottom:6px;border-bottom:1.5px solid var(--ink)}
+.prose h3{font-size:15px;margin:18px 0 6px}
+.prose h4,.prose h5{font-size:13.5px;margin:14px 0 4px}
+.prose p{margin:6px 0;max-width:80ch}
+.prose ul,.prose ol{margin:4px 0 8px;padding-left:22px;line-height:1.7}
+.prose table{border-collapse:collapse;font-size:12.5px;margin:8px 0}
+.prose th{text-align:left;padding:5px 8px;border-bottom:1.5px solid var(--ink);background:var(--panel)}
+.prose td{padding:5px 8px;border-bottom:1px solid var(--hair);vertical-align:top}
+.prose .mer{margin:10px 0}
+.prose a.ref{color:#1a5fb4}.prose a.ref.missing{color:#b00;border-bottom:1px dashed #b00}
+.screen{margin-top:14px}
+.s-desc p{margin:2px 0}
+table.reassembled{border-collapse:collapse;width:100%;font-size:12.5px;margin:8px 0 14px;background:var(--card);border:1.5px solid var(--ink)}
+table.reassembled th{text-align:left;padding:6px 8px;border-bottom:1.5px solid var(--ink);background:var(--panel);font-weight:600}
+table.reassembled td{padding:6px 8px;border-bottom:1px solid var(--hair);vertical-align:top}
+table.reassembled td.iid{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;white-space:nowrap}
+"""
+
+# 화면 부분은 React(frontend/src/view/wireframe.ts wireframeCss)와 **바이트 단위로 같다** —
+# check_view_css 넷째 쌍이 대조한다. 고칠 때 둘 다 고친다 (카드 AC)
+WF_SCREEN_CSS = r"""
+/* 스코프 없이 :root 를 쓰면 이 CSS가 body 안 <style>로 주입될 때 문서 전체를 이긴다.
+   와이어프레임이 뿜는 루트는 형제 둘(.stabs · .screens)이라 셀렉터도 둘이다. */
+.stabs,.screens{--paper:#EDEFEC;--panel:#F8F9F7;--card:#fff;--ink:#1E2A30;--soft:#5C6B73;--faint:#8A969C;--rule:#C9CFCB;--hair:#E1E5E1;--hi:#FFF1B8;--hi-b:#C9A800}
+.stabs .mono,.screens .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+
 .stabs{display:flex;flex-wrap:wrap;margin-top:22px;border:1.5px solid var(--ink);border-bottom:none;background:var(--panel)}
 .stabs button{font:inherit;font-size:13.5px;padding:10px 16px;background:none;border:none;border-right:1px solid var(--rule);cursor:pointer;color:var(--soft);position:relative}
 .stabs button[aria-selected=true]{background:var(--card);color:var(--ink);font-weight:700}
@@ -426,19 +510,26 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:.88em;background:#E4E8E4
 .s-head b{font-size:16px;margin-right:6px}
 .s-head span{color:var(--soft)}
 .s-head span b{font-size:13px;color:var(--ink);font-weight:600;margin-right:4px}
-.split{display:grid;grid-template-columns:minmax(560px,1.15fr) minmax(420px,1fr)}
-.split.full{grid-template-columns:1fr}
-.split.full .left{border-right:none}
-.left{padding:18px;border-right:1.5px solid var(--ink);background:#F2F3F0;overflow:auto}
-/* 배치는 iframe에 격리 — 사이트 CSS가 스며들지 않는다 (STD-002 V-UI, 카드 Z) */
-.wfframe{position:relative;background:#fff;border:1px solid #bbb;overflow:hidden}
-.wfframe-if{display:block;border:0;width:100%;min-height:40px}
-.wfframe .orig{position:absolute;top:6px;right:6px;font:600 11px/1 ui-monospace,Menlo,monospace;padding:4px 7px;background:#fff;border:1px solid var(--ink);cursor:pointer;z-index:3;opacity:.85}
-.wfframe .orig:hover{opacity:1}
-.right{padding:0;max-height:88vh;overflow-y:auto}
+.s-desc{padding:8px 18px;border-bottom:1px solid var(--hair);font-size:13px;color:var(--soft)}
+.wfgroup{margin-bottom:22px}
+/* 배치가 위, 요소 표·규칙·시나리오가 아래 (카드 AC, #134) — 좌우로 나누면 배치가 본문의 절반만 받아
+   1280 아트보드가 늘 60%로 줄어 보였다. 세로로 쌓으면 본문 폭을 다 쓴다 */
+.wfstack{padding:18px;background:#F2F3F0}
+.rsecs{margin-top:14px;background:var(--card);border:1px solid var(--rule)}
 
+/* 배치 틀 — 도구 줄 + iframe. 정적 뷰(wf_build.py)와 같아야 한다 */
+.wfbox{margin:8px 0}
+.wfbar{display:flex;align-items:center;gap:8px;padding:0 0 6px;font-size:11.5px;color:var(--soft)}
+.wfbar .grow{flex:1}
+.wfbar .wfdim{font-family:ui-monospace,Menlo,monospace}
+.wfbar button{font:inherit;font-size:11.5px;padding:3px 9px;background:var(--card);border:1px solid var(--rule);border-radius:2px;cursor:pointer;color:var(--ink)}
+.wfbar button:hover{border-color:var(--ink)}
+.wfframe{position:relative;overflow:auto;background:var(--card);border:1px solid var(--rule)}
+.wfframe-if{border:0;display:block;width:100%}
+.wfframe.scaled{overflow:hidden}
+.wfframe.scaled .wfframe-if{position:absolute;left:0;top:0}
 
-/* 오른쪽 */
+/* 아래 */
 .rsec{padding:16px 20px;border-bottom:1px solid var(--hair)}
 .rsec:last-child{border-bottom:none}
 .rsec h3{margin:0 0 10px;font-size:13px;font-weight:700;padding-bottom:6px;border-bottom:1.5px solid var(--ink)}
@@ -458,29 +549,18 @@ table.el td.kind{color:var(--soft);white-space:nowrap}
 .scen ol{margin:4px 0 0;padding-left:22px;font-size:13px;line-height:1.7}
 .scen ol li span.eref{font-family:ui-monospace,Menlo,monospace;font-size:11px;background:#EEF0EC;padding:0 5px;border-radius:2px;cursor:pointer;border:1px solid var(--hair)}
 .scen ol li span.eref:hover{border-color:var(--ink)}
-footer{margin-top:22px;font-size:12.5px;color:var(--soft);max-width:80ch}
-@media (max-width:1100px){.split{grid-template-columns:1fr}.left{border-right:none;border-bottom:1.5px solid var(--ink)}.right{max-height:none}}
 
-/* 화면 아닌 절 — 문서 순서대로 */
-.prose{padding:6px 2px 14px}
-.prose h2{font-size:18px;margin:26px 0 8px;padding-bottom:6px;border-bottom:1.5px solid var(--ink)}
-.prose h3{font-size:15px;margin:18px 0 6px}
-.prose h4,.prose h5{font-size:13.5px;margin:14px 0 4px}
-.prose p{margin:6px 0;max-width:80ch}
-.prose ul,.prose ol{margin:4px 0 8px;padding-left:22px;line-height:1.7}
-.prose table{border-collapse:collapse;font-size:12.5px;margin:8px 0}
-.prose th{text-align:left;padding:5px 8px;border-bottom:1.5px solid var(--ink);background:var(--panel)}
-.prose td{padding:5px 8px;border-bottom:1px solid var(--hair);vertical-align:top}
-.prose .mer{margin:10px 0}
-.prose a.ref{color:#1a5fb4}.prose a.ref.missing{color:#b00;border-bottom:1px dashed #b00}
-.screen{margin-top:14px}
-.s-desc{padding:8px 18px;border-bottom:1px solid var(--hair);font-size:13px;color:var(--soft)}
-.s-desc p{margin:2px 0}
-table.reassembled{border-collapse:collapse;width:100%;font-size:12.5px;margin:8px 0 14px;background:var(--card);border:1.5px solid var(--ink)}
-table.reassembled th{text-align:left;padding:6px 8px;border-bottom:1.5px solid var(--ink);background:var(--panel);font-weight:600}
-table.reassembled td{padding:6px 8px;border-bottom:1px solid var(--hair);vertical-align:top}
-table.reassembled td.iid{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;white-space:nowrap}
+/* 정적 뷰의 전체보기 층 — 앱은 React가 그린다(UI-5 7.6). 규칙을 한 곳에 두려고 같이 산다 */
+.wffull-layer{position:fixed;inset:0;z-index:2147483100;display:flex;flex-direction:column;background:var(--card)}
+.wffull-layer .gbar{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1.5px solid var(--ink);background:var(--panel);font-size:12.5px}
+.wffull-layer .gbar .grow{flex:1}
+.wffull-layer .gbar button{font:inherit;font-size:12px;padding:4px 10px;background:var(--card);border:1px solid var(--rule);cursor:pointer}
+.wffull-layer .stage{flex:1;min-height:0;overflow:auto;padding:22px;background:#F2F3F0}
+.wffull-layer .pic{margin:0 auto;background:var(--card);border:1px solid var(--rule);position:relative;overflow:hidden}
+.wffull-layer .pic iframe{border:0;display:block;position:absolute;left:0;top:0;transform-origin:0 0}
 """
+
+WF_CSS = WF_PAGE_CSS + WF_SCREEN_CSS
 
 
 def _selftest():
