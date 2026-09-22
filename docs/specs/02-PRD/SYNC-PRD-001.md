@@ -2,7 +2,7 @@
 doc_id: SYNC-PRD-001
 type: PRD
 title: PRD — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-RFQ-001]
 ---
 
@@ -122,7 +122,7 @@ upstream: [SYNC-RFQ-001]
 - [ ] 플랫폼에서 저장하면 해당 저장소에 커밋된다
 - [ ] GitHub에 직접 push된 변경이 플랫폼에 반영된다
 - [ ] DB가 유실되어도 저장소만으로 참조 관계를 재구축할 수 있다
-- [ ] 첨부 파일은 `docs/specs/assets/` 경로에 두고 MD에서 상대 경로로 참조한다
+- [x] 첨부 파일은 `docs/specs/assets/` 경로에 두고 MD에서 상대 경로로 참조한다 — 앱이 `GET /api/projects/{code}/files/{path}`로 작업 사본의 파일을 준다. 화면 배치 html의 이미지·폰트가 이 길로 뜬다(카드 Z)
 
 #### R6 단계별 상태
 
