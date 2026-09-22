@@ -26,12 +26,18 @@ SCN = "---\ndoc_id: EXMP-SCN-001\ntype: SCN\ntitle: 시나리오\nstatus: draft\
 
 
 def _hook(client: TestClient, remote, head: str) -> int:
-    body = json.dumps({"after": head, "repository": {"clone_url": str(remote)}}).encode()
+    body = json.dumps(
+        {"ref": "refs/heads/main", "after": head, "repository": {"clone_url": str(remote)}}
+    ).encode()
     sig = "sha256=" + hmac.new(settings.WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
     return client.post(
         "/hooks/github",
         content=body,
-        headers={"X-Hub-Signature-256": sig, "Content-Type": "application/json"},
+        headers={
+            "X-Hub-Signature-256": sig,
+            "X-GitHub-Event": "push",
+            "Content-Type": "application/json",
+        },
     ).status_code
 
 

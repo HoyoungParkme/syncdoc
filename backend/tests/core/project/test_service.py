@@ -2,12 +2,18 @@
 
 from pathlib import Path
 
+import httpx
 import pytest
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.errors import NotFound
+from app.core.project.models import Project, Repository
 from app.core.project.service import ProjectService
+from tests.conftest import git as g
+from tests.conftest import write_commit_push
 from tests.core.account.test_service import make_user
+from tests.core.reference.test_service import RFQ
 from tests.core.spec.test_service import make_project, owner
 
 
@@ -316,3 +322,70 @@ def test_asset_path_serves_only_owned_specs_files(
         with pytest.raises(NotFound) as ei:
             svc.asset_path("MINE", path, me)
         assert ei.value.extra == {"resource": "file", "id": path}
+
+
+def _registered(scoped: Session, repos: dict) -> tuple[ProjectService, object]:
+    """EXMP 프로젝트 + 실제 작업 사본. ensure_hook·sync_now 시험용 (카드 AF)."""
+    u = make_user(scoped, login="hoyoung")
+    p = Project(code="EXMP", name="예시", owner_user_id=u.id)
+    scoped.add(p)
+    scoped.flush()
+    scoped.add(
+        Repository(
+            project_id=p.id,
+            remote_url="https://github.com/o/r.git",
+            workdir_path=str(repos["work"]),
+            registered_by_user_id=u.id,
+            last_processed_commit=g(repos["remote"], "rev-parse", "main"),
+        )
+    )
+    scoped.flush()
+    return ProjectService(scoped), u
+
+
+# ── ensure_hook · sync_now (카드 AF) ──
+async def test_ensure_hook_skips_when_no_public_url(
+    scoped: Session, repos: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """주소나 비밀번호가 비면 걸지 않는다 — 받는 쪽이 빈 비밀번호를 전부 거부한다."""
+    ps, user = _registered(scoped, repos)
+    monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "")
+    r = await ps.ensure_hook("EXMP", user)
+    assert (r.hook, r.created) == ("none", False) and "주소" in (r.hook_error or "")
+
+
+async def test_ensure_hook_records_error_and_then_succeeds(
+    scoped: Session, repos: dict, monkeypatch: pytest.MonkeyPatch, mock_github
+) -> None:
+    ps, user = _registered(scoped, repos)
+    monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "https://syncdoc.example")
+    monkeypatch.setattr(settings, "WEBHOOK_SECRET", "s3cret")
+    mock_github(lambda req: httpx.Response(404, json={"message": "Not Found"}))
+    r = await ps.ensure_hook("EXMP", user)
+    assert r.hook == "error" and r.hook_error
+    # 사람이 화면에서 사유를 읽고 다시 누른다 — 예외로 올리지 않는다
+    assert (await ps.repo_status(user))[0].hook == "error"
+
+    mock_github(
+        lambda req: httpx.Response(200, json=[])
+        if req.method == "GET"
+        else httpx.Response(201, json={"id": 9})
+    )
+    r2 = await ps.ensure_hook("EXMP", user)
+    assert (r2.hook, r2.hook_error, r2.created) == ("ok", None, True)
+    st = (await ps.repo_status(user))[0]
+    assert st.hook == "ok" and st.hook_error is None
+
+
+async def test_sync_now_reads_pending_and_touches_fetched_at(scoped: Session, repos: dict) -> None:
+    ps, user = _registered(scoped, repos)
+    g(repos["other"], "pull", "-q", "--rebase", "origin", "main")
+    write_commit_push(repos["other"], "docs/specs/01-RFQ/EXMP-RFQ-001.md", RFQ, "spec: 밖에서")
+    r = await ps.sync_now("EXMP", user)
+    assert r.docs == 1 and r.fetched_at is not None
+    # 읽을 것이 없어도 확인 시각은 새로 적힌다 (UC-G2 2a)
+    before = (await ps.repo_status(user))[0].fetched_at
+    r2 = await ps.sync_now("EXMP", user)
+    assert r2.docs == 0 and r2.fetched_at is not None and r2.fetched_at >= before
+    with pytest.raises(NotFound):
+        await ps.sync_now("EXMP", make_user(scoped, login="stranger"))

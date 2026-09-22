@@ -53,11 +53,25 @@ class RepoStatus(Base):
     behind_by: int | None
     fetched_at: datetime | None
     error: str | None
+    hook: str
+    hook_error: str | None
+
 
 
 class RebuildError(Base):
     doc_id: str
     detail: str
+
+
+class HookStatus(Base):
+    hook: str
+    hook_error: str | None
+    created: bool
+
+
+class SyncResult(Base):
+    docs: int
+    fetched_at: datetime | None
 
 
 class RebuildResult(Base):

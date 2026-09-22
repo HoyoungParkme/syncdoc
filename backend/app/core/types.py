@@ -105,6 +105,7 @@ class ProjectDetail(ProjectSummary):
     recent_changes: list[Version] = field(default_factory=list)
     last_processed_commit: str | None = None
     behind_by: int | None = None
+    fetched_at: datetime | None = None  # behind_by를 잰 시각 (UI-4 7.3, 카드 AF)
 
 
 @dataclass(frozen=True)
@@ -119,6 +120,25 @@ class RepoStatus:
     behind_by: int | None
     fetched_at: datetime | None = None  # behind_by를 잰 시각. 화면이 "언제 기준인지"를 보여준다
     error: str | None = None  # fetch 실패 사유. API 스키마에 없다 — UI-14에 표시(MS-001, 보고)
+    hook: str = "none"  # push 통지 — ok · none · error (카드 AF)
+    hook_error: str | None = None
+
+
+@dataclass(frozen=True)
+class HookStatus:
+    """SYNC-API-001 HookStatus — 통지를 걸었나 (카드 AF)."""
+
+    hook: str  # ok · none · error
+    hook_error: str | None
+    created: bool  # 이번에 새로 걸었나. 이미 있었으면 False
+
+
+@dataclass(frozen=True)
+class SyncResult:
+    """SYNC-API-001 SyncResult — 지금 가져오기 (UC-G2)."""
+
+    docs: int
+    fetched_at: datetime | None
 
 
 @dataclass

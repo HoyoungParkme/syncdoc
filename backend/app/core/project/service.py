@@ -21,10 +21,19 @@ from app.core.errors import (
     PushFailed,
     RepoCreateFailed,
     RepositoryAlreadyRegistered,
+    Unauthorized,
 )
 from app.core.project.models import Project, Repository
 from app.core.project.repository import ProjectRepository
-from app.core.types import Author, AuthorKind, Entry, RebuildResult, RepoStatus
+from app.core.types import (
+    Author,
+    AuthorKind,
+    Entry,
+    HookStatus,
+    RebuildResult,
+    RepoStatus,
+    SyncResult,
+)
 from app.infra import git, github
 from app.infra.git import GitError
 
@@ -206,6 +215,8 @@ class ProjectService:
                 p.repository.behind_by,
                 p.repository.fetched_at,
                 error=p.repository.fetch_error,  # 폴링이 적어 둔 실패 사유 (#46)
+                hook=_hook_state(p.repository),
+                hook_error=p.repository.hook_error,
             )
             for p in self.repo.owned_by(user.id)
         ]
@@ -224,6 +235,42 @@ class ProjectService:
             self.session.flush()
             shutil.rmtree(workdir, ignore_errors=True)
 
+    async def ensure_hook(self, code: str, user: User) -> HookStatus:
+        """SYNC-MS-001#ProjectService.ensure_hook"""
+        project = self.get_owned(code, user)  # 남의 것이면 not-found
+        repo = project.repository
+        url, secret = settings.PUBLIC_BASE_URL.rstrip("/"), settings.WEBHOOK_SECRET
+        if not url or not secret:
+            # 받는 쪽이 빈 비밀번호를 전부 거부한다 — 걸어 봐야 안 통하므로 걸지 않는다
+            return HookStatus("none", "공개 주소나 비밀번호가 없어 걸지 못한다", created=False)
+        had = repo.hook_id
+        owner_name, repo_name = _split_remote(repo.remote_url)
+        try:
+            hook_id = await github.create_hook(
+                AccountService.github_token_for(user),
+                owner_name,
+                repo_name,
+                f"{url}/hooks/github",
+                secret,
+            )
+        except Unauthorized as e:
+            # 예외로 올리지 않는다 — 사람이 화면에서 사유를 읽고 다시 누르면 된다 (MS-001)
+            repo.hook_error = str(e)[:300]
+            self.session.flush()
+            return HookStatus("error", repo.hook_error, created=False)
+        repo.hook_id, repo.hook_error = hook_id, None
+        self.session.flush()
+        return HookStatus("ok", None, created=had != hook_id)
+
+    async def sync_now(self, code: str, user: User) -> SyncResult:
+        """SYNC-MS-001#ProjectService.sync_now"""
+        from app.core import pipeline  # 서비스가 pipeline을 부르는 유일한 곳(DOM-002 3.2)
+
+        # 소유 검사·읽기 락·process_commit이 read_pending 안에 있다 (카드 AD) — 두 벌 만들지 않는다
+        docs = await pipeline.read_pending(code, user)
+        self.session.expire_all()  # read_pending이 다른 세션에서 적었다
+        return SyncResult(docs, self.get_owned(code, user).repository.fetched_at)
+
     async def rebuild_index(self, code: str, user: User) -> RebuildResult:
         """SYNC-MS-001#ProjectService.rebuild_index"""
         from app.core import pipeline  # 서비스가 pipeline을 부르는 유일한 곳(DOM-002 3.2)
@@ -235,3 +282,10 @@ class ProjectService:
         hash_ = await git.sync_readme(Path(project.repository.workdir_path), author, code)
         result = await pipeline.rebuild(code)
         return replace(result, readme_updated=hash_ is not None)
+
+
+def _hook_state(repo: Repository) -> str:
+    """push 통지 상태 — ok · none · error (카드 AF). 둘 다 비면 아직 안 걸어 본 것이다."""
+    if repo.hook_id:
+        return "ok"
+    return "error" if repo.hook_error else "none"

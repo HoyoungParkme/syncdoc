@@ -144,7 +144,7 @@ async def project_detail(code: str, user: User) -> ProjectDetail:
             )
         # DB에 적힌 값 그대로 (MS-008 5). 폴링이 갱신하고 화면은 읽기만 한다
         repo = project.repository
-        last_commit, behind = repo.last_processed_commit, repo.behind_by
+        last_commit, behind, fetched = repo.last_processed_commit, repo.behind_by, repo.fetched_at
     summary = next(p for p in await project_summary(user) if p.code == code)
     docs = await document_list(code, user)
     return ProjectDetail(
@@ -153,6 +153,7 @@ async def project_detail(code: str, user: User) -> ProjectDetail:
         recent_changes=recent,
         last_processed_commit=last_commit,
         behind_by=behind,
+        fetched_at=fetched,
     )
 
 
