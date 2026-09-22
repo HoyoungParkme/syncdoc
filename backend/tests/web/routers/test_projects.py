@@ -131,3 +131,30 @@ def test_other_owner_project_is_invisible(client: TestClient, scoped: Session) -
     login(client, scoped, "hoyoung")
     assert [x["code"] for x in client.get("/api/projects").json()] == ["EXMP"]
     assert [x["code"] for x in client.get("/api/admin/repos").json()] == ["EXMP"]
+
+
+def test_files_endpoint_serves_assets_with_cache_and_svg_sandbox(
+    client: TestClient, scoped: Session, tmp_path, monkeypatch
+) -> None:
+    from pathlib import Path
+
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "REPOS_DIR", tmp_path / "repos")
+    make_project(scoped, "EXMP")
+    assets = Path(tmp_path) / "repos" / "EXMP" / "docs" / "specs" / "assets"
+    assets.mkdir(parents=True)
+    (assets / "a.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    (assets / "a.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'/>")
+    assert client.get("/api/projects/EXMP/files/assets/a.png").status_code == 401
+    login(client, scoped, "hoyoung")
+    r = client.get("/api/projects/EXMP/files/assets/a.png")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+    assert r.headers["cache-control"] == "private, max-age=60" and r.content.startswith(b"\x89PNG")
+    assert "content-security-policy" not in r.headers
+    r = client.get("/api/projects/EXMP/files/assets/a.svg")
+    assert r.status_code == 200 and r.headers["content-security-policy"] == "sandbox"
+    r = client.get("/api/projects/EXMP/files/assets/none.png")
+    assert r.status_code == 404 and r.json()["resource"] == "file"
+    r = client.get("/api/projects/NOPE/files/assets/a.png")
+    assert r.status_code == 404 and r.json()["resource"] == "project"
