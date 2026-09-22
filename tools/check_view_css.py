@@ -10,6 +10,10 @@
 둘째·셋째 쌍(카드 Z): 배치 iframe의 FRAME_CSS·SANDBOX — `frontend/src/view/frame.ts` ↔ `tools/wf_build.py`.
 같은 srcdoc 조립이어야 웹과 정적 뷰의 배치가 같은 그림이다.
 
+넷째 쌍(카드 AC): 화면 뷰 CSS — `frontend/src/view/wireframe.ts wireframeCss` ↔ `tools/wf_build.py WF_SCREEN_CSS`.
+탭·배치 틀·도구 줄·요소 표의 값이 여기 산다. 지금까지 우연히 같았을 뿐 대조하는 장치가 없어
+한쪽만 고쳐도 잡히지 않았다(#134 조사에서 드러났다).
+
 사용: python3 tools/check_view_css.py
 """
 
@@ -29,6 +33,9 @@ TS_FRAME = re.compile(r"export const FRAME_CSS = `(.*?)`", re.S)
 PY_FRAME = re.compile(r'FRAME_CSS = r"""(.*?)"""', re.S)
 TS_SANDBOX = re.compile(r"""export const SANDBOX = ["'](.*?)["']""")
 PY_SANDBOX = re.compile(r'SANDBOX = "(.*?)"')
+WF_TS = os.path.join(ROOT, "frontend", "src", "view", "wireframe.ts")
+TS_SCREEN = re.compile(r"export const wireframeCss = `(.*?)`", re.S)
+PY_SCREEN = re.compile(r'WF_SCREEN_CSS = r"""(.*?)"""', re.S)
 
 
 def strip_header(text: str) -> str:
@@ -76,6 +83,10 @@ def main() -> int:
     ts_sb, py_sb = TS_SANDBOX.search(ts), PY_SANDBOX.search(py)
     ok &= _pair("sandbox", ts_sb.group(1) if ts_sb else None, py_sb.group(1) if py_sb else None,
                 "frame.ts", "wf_build.py")
+    wts = open(WF_TS, encoding="utf-8").read() if os.path.exists(WF_TS) else ""
+    tw, pw = TS_SCREEN.search(wts), PY_SCREEN.search(py)
+    ok &= _pair("화면 뷰 CSS", tw.group(1) if tw else None, pw.group(1) if pw else None,
+                "frontend/src/view/wireframe.ts", "tools/wf_build.py WF_SCREEN_CSS")
     return 0 if ok else 1
 
 

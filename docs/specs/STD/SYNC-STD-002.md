@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-002
 type: STD
 title: 뷰 규약 — 사람용 뷰 타입별 렌더링
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-UI-002]
 ---
 
@@ -132,7 +132,7 @@ upstream: [SYNC-STD-001, SYNC-UI-002]
 
 - **화면이 아닌 절**(0장·유스케이스 대응·화면 목록·공통 틀·화면 흐름·미결사항)은 버리지 않고 **문서 순서대로 함께** 렌더한다. 흐름도 mermaid·대응 표는 그대로
 - **화면 항목**(`UI-\d+`, 헤딩 단계 무관)은 화면마다 **html 블록 유무**로 갈린다
-  - 있으면: 상단 화면 탭, 탭마다 **좌 배치 / 우 요소 표·규칙·시나리오**. 요소 번호로 양쪽 연동 강조 — 배치의 `data-el`과 요소 표의 `#` 열이 같은 번호. 우측 셋이 다 비면 **좌측 전폭**
+  - 있으면: 상단 화면 탭, 탭마다 **위에 배치 / 아래에 요소 표·규칙·시나리오**. 요소 번호로 양쪽 연동 강조 — 배치의 `data-el`과 요소 표의 `#` 열이 같은 번호. 셋이 다 비면 배치만. **좌우로 나누지 않는다**(카드 AC, #134) — 나누면 배치가 본문의 절반만 받아 권장 폭 1280이 늘 60%로 줄어 보였다
   - 없으면: 설계만 있는 화면. ID·이름·한 줄 목적·유스케이스를 **표 한 행**으로
 - 블록 안 조각은 소제목 **이름**으로 찾는다(「배치」「요소」「규칙」「시나리오」). 헤딩 단계는 보지 않는다. 메타 표는 html 블록 앞의 첫 표, 한 줄 목적은 그 앞 산문
 
@@ -141,8 +141,8 @@ upstream: [SYNC-STD-001, SYNC-UI-002]
 ```
 <!doctype html><html><head><meta charset="utf-8">
 <base href="{문서 폴더}">          앱: /api/projects/{code}/files/{NN-TYPE}/   정적 뷰: ../specs/{NN-TYPE}/
+<style>{FRAME_CSS}</style>          뷰가 넣는 최소 — 배지·강조뿐. **문서보다 앞**이라 문서가 이긴다 (#132)
 {공통 틀 블록의 <link>·<style>}
-<style>{FRAME_CSS}</style>          뷰가 넣는 최소 — 배지·강조뿐
 </head><body>
 {공통 틀 블록의 나머지 마크업}
 {배치}
@@ -162,7 +162,10 @@ a{cursor:default}
 - **배지만 붙인다.** 테두리·배경은 건드리지 않는다 — 디자인이 그린 모양이 그대로다. 강조는 `outline`이라 문서의 `border`를 안 덮는다
 - **공통 틀** — 「공통 틀」 절(이름으로 찾는다, `## 3. 공통 틀`처럼 번호 접두 허용)의 **첫 html 블록**을 모든 화면 앞에 앞세운다. `<link>`·`<style>`은 `<head>`로, 나머지 마크업은 `<body>` 맨 앞으로. 그 블록이 산문 자리에서 보일 때는 마크업이 있으면 같은 iframe, `<style>`·`<link>`뿐이면 코드로 보인다
 - **높이** — 부모가 `contentDocument.documentElement`를 `ResizeObserver`로 재서 `iframe.style.height`를 맞춘다. 이전 값과 같으면 갱신하지 않는다(문서가 `height:100%`를 쓰면 순환하므로). 탭을 열면 크기가 바뀌어 다시 잰다
-- **폭** — 배치의 자연폭이 가용폭보다 넓으면 `transform: scale`로 **축소해 맞춘다**. 「원래 크기」 토글로 1:1과 오간다
+- **폭** — 배치가 본문 폭을 다 쓴다. 자연폭이 그보다 넓으면 `transform: scale`로 **축소해 맞춘다**. 「원래 크기」 토글로 1:1과 오간다
+- **도구 줄** — 배치 **위**에 얇은 줄 하나: 왼쪽에 자연폭과 배율(`1280×800 · 74%`), 오른쪽에 「맞춤/원래 크기」와 「전체보기」. 배치 위에 겹쳐 놓으면 그림의 오른쪽 위를 가린다(#130). 화면 밖 html 블록에도 같은 줄이 붙는다
+- **전체보기** — 그림 전체보기와 **같은 층**([[SYNC-UI-002#UI-5]] 7.6)에 같은 srcdoc을 1:1로 띄운다. 열 때 무대 폭에 맞추고(≤100%), `－ 100% ＋`·닫기·Esc·바깥 클릭. 앱은 React가, 정적 뷰는 자기 스크립트가 그린다
+- **해시** — `#item-UI-N`으로 들어오면 그 화면 탭을 연다. 숨긴 `section`은 앵커로 갈 수 없어서다. **정적 뷰도 같다**(#135)
 - **연동** — 요소 표 행 클릭 → 부모가 `contentDocument`의 `[data-el="n"]`에 `.hi`; iframe 안 클릭 → 부모가 `load` 때 건 리스너로 표 행 강조. iframe 안 `a[href]` 클릭은 막는다 — `<base>` 때문에 `#x`도 밖으로 나간다
 - **화면 밖 html 블록**(다른 타입 문서 포함)도 같은 iframe이다 — 탭·요소 표·공통 틀 없이 배치만
 - 뷰는 iframe 안에 스크립트를 넣지 않는다. 높이·폭·연동은 전부 **부모** 스크립트가 `contentDocument`로 한다. `sandbox`가 안의 스크립트를 막는 것이 그 증거다
@@ -217,7 +220,7 @@ a{cursor:default}
 
 ## 4. 구현
 
-`_tools/view_build.py` 하나가 전부 만든다. frontmatter `type`을 보고 `V-*` 함수로 본문을 그리고, `shell()`이 공통 틀을 씌운다. 타입마다 함수 하나. 출력은 `view_{doc_id}.html` — 파일 하나에 CSS·스크립트 내장. 이 스크립트가 React 유저용 탭의 **참조 구현**이다 — React는 이 HTML과 같게 그려야 한다. 배치의 srcdoc 조립·`FRAME_CSS`·`sandbox`도 같다 — `tools/check_view_css.py`가 뷰 CSS 쌍에 더해 `FRAME_CSS`·`SANDBOX` 쌍을 대조한다.
+`_tools/view_build.py` 하나가 전부 만든다. frontmatter `type`을 보고 `V-*` 함수로 본문을 그리고, `shell()`이 공통 틀을 씌운다. 타입마다 함수 하나. 출력은 `view_{doc_id}.html` — 파일 하나에 CSS·스크립트 내장. 이 스크립트가 React 유저용 탭의 **참조 구현**이다 — React는 이 HTML과 같게 그려야 한다. 배치의 srcdoc 조립·`FRAME_CSS`·`sandbox`도 같다 — `tools/check_view_css.py`가 **네 쌍**을 대조한다: 뷰 CSS(`styles.view.css`↔`view_build.py CSS`) · `FRAME_CSS` · `SANDBOX` · **화면 뷰 CSS**(`view/wireframe.ts wireframeCss`↔`wf_build.py WF_SCREEN_CSS`, 카드 AC). 넷째 쌍에는 탭·배치 틀·도구 줄·요소 표의 값이 산다 — 지금까지 우연히 같았을 뿐이라 한쪽만 고쳐도 조용히 갈라졌다. 정적 뷰 전용 스타일(페이지 껍데기·산문)은 `WF_PAGE_CSS`로 갈라 두었다.
 
 확정된 것: 공통 틀과 12타입 전부. `view_build.py --all`이 문서 25개 + `index.html`을 만든다. 스콥을 줄여 **재배치·재조립·그림 렌더·참조 링크·추적표**까지로 했다 — 아래 6장 참조. 나머지 타입은 하나씩 만들어 보고 확정한다.
 

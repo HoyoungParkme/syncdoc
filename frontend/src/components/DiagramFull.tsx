@@ -5,7 +5,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-export type FullDiagram = { svg: string; title: string; w: number; h: number }
+import { SANDBOX } from '../view/frame'
+
+export type FullDiagram = { title: string; w: number; h: number } & ({ svg: string; srcdoc?: undefined } | { srcdoc: string; svg?: undefined })
+
+/** 배치 iframe이 쏘는 이벤트(view/frame.ts wf:full)의 짐 — 같은 층에 같은 srcdoc을 띄운다 (카드 AC) */
+export type WfFullDetail = { srcdoc: string; title: string; w: number; h: number }
 
 /** svg가 드는 상자들. 뷰 모듈이 만드는 클래스 이름 그대로(md.ts .mer · seq.ts .dia · uc.ts .canvas) */
 const HOSTS = '.mer, .seqv .dia, .v-uc .canvas'
@@ -86,7 +91,19 @@ export function DiagramFull({ d, onClose, el }: { d: FullDiagram; onClose: () =>
       </div>
       {/* 바깥(빈 무대) 클릭은 닫는다. 그림 위 클릭은 아니다 */}
       <div className="stage" ref={stage} onClick={(e) => e.target === e.currentTarget && onClose()}>
-        <div className="pic" style={{ width: d.w * z, height: d.h * z }} dangerouslySetInnerHTML={{ __html: d.svg }} />
+        {/* 그림은 SVG를 복제하고, 배치는 같은 srcdoc의 iframe을 scale한다 (카드 AC) */}
+        {d.srcdoc !== undefined ? (
+          <div className="pic frame" style={{ width: d.w * z, height: d.h * z }}>
+            <iframe
+              className="wffull-if"
+              sandbox={SANDBOX}
+              srcDoc={d.srcdoc}
+              style={{ width: d.w, height: d.h, transform: `scale(${z})`, transformOrigin: '0 0' }}
+            />
+          </div>
+        ) : (
+          <div className="pic" style={{ width: d.w * z, height: d.h * z }} dangerouslySetInnerHTML={{ __html: d.svg }} />
+        )}
       </div>
     </div>,
     document.body,

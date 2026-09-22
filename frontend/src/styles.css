@@ -546,6 +546,9 @@ a.arow:hover{background:var(--bg-subtle)}
 .dfull .pic{margin:0 auto;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-control)}
 /* mermaid가 svg에 max-width를 인라인으로 박는다 — 복제본은 상자 크기를 따라야 확대가 된다. 인라인을 이기는 !important */
 .dfull .pic svg{display:block;width:100%!important;height:100%!important;max-width:none!important}
+/* 배치 전체보기(7.6, 카드 AC) — 같은 srcdoc을 1:1로 띄우고 scale한다 */
+.dfull .pic.frame{position:relative;overflow:hidden}
+.dfull .wffull-if{border:0;display:block;position:absolute;left:0;top:0}
 .cinner{position:relative}
 .colh{position:absolute;top:0;text-align:center;font-family:var(--font-mono);font-size:11.5px;
   color:var(--ink-faint);letter-spacing:.3px;box-sizing:border-box}
@@ -736,8 +739,5 @@ a.arow:hover{background:var(--bg-subtle)}
   font:inherit;font-size:var(--text-ui)}
 .pbody textarea[data-el="8.6"]:disabled{color:var(--ink-disabled);background:var(--bg-subtle)}
 
-/* 배치 iframe (frame.ts, 카드 Z) — 문서의 html은 자기 문서 안에서 산다. 부모가 높이·축소를 잡는다 */
-.wfframe{position:relative;overflow:hidden;background:var(--bg-card)}
-.wfframe-if{border:0;display:block;width:100%}
-.wfframe.scaled .wfframe-if{position:absolute;left:0;top:0}
-.wfframe-fit{position:absolute;right:var(--space-8);top:var(--space-8);z-index:2;box-shadow:var(--shadow-card)}
+/* 배치 iframe(.wfbox·.wfbar·.wfframe)의 규칙은 view/wireframe.ts wireframeCss에 있다 (카드 AC).
+   정적 뷰(wf_build.py WF_SCREEN_CSS)와 바이트 단위로 같아야 해서 한 곳에 모았다 — check_view_css 넷째 쌍 */

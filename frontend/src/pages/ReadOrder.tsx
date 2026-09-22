@@ -7,7 +7,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
 import { api, docPath, STAGE_TYPES, STATUS_KO, type Document, type DocumentSummary, type ProjectDetail } from '../api/client'
 import { extraCss, renderView } from '../view'
-import { attachDiagramButtons, DiagramFull, type FullDiagram } from '../components/DiagramFull'
+import { attachDiagramButtons, DiagramFull, type FullDiagram, type WfFullDetail } from '../components/DiagramFull'
 import { esc, splitRef } from '../view/md'
 
 const ORDER: Record<string, number> = { draft: 0, approved: 1 }
@@ -69,6 +69,9 @@ export function ReadOrder() {
       .run({ nodes: root.querySelectorAll<HTMLElement>('pre.mermaid') })
       .catch(() => undefined)
       .then(() => mainRef.current === root && attachDiagramButtons(root, setFull)) // 공통 1.7 — UI-9는 번호 없음
+    // 배치 「전체보기」 — 뷰가 쏘고 페이지가 층을 그린다 (카드 AC). UI-9는 번호 없음
+    const onWfFull = (ev: Event) => setFull((ev as CustomEvent<WfFullDetail>).detail)
+    root.addEventListener('wf:full', onWfFull)
     const onClick = (ev: MouseEvent) => {
       const a = (ev.target as HTMLElement).closest<HTMLAnchorElement>('a[data-ref]')
       if (!a) return
@@ -79,6 +82,7 @@ export function ReadOrder() {
     root.addEventListener('click', onClick)
     return () => {
       root.removeEventListener('click', onClick)
+      root.removeEventListener('wf:full', onWfFull)
       for (const c of cleanups) if (typeof c === 'function') c()
     }
   }, [bodies, code, nav, stage])

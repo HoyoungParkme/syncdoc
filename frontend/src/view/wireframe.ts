@@ -194,7 +194,7 @@ function screenHtml(s: WfScreen, i: number, ctx: RenderCtx, common: CommonParts)
         `<div class="scen"><div class="st"><span class="k">${esc(sc.id)}</span>${inline(sc.title, ctx)}${sc.uc ? `<span class="uc">— ${inline(sc.uc, ctx)}</span>` : ''}</div><ol>${sc.steps.map((st) => `<li>${chip(st, ctx)}</li>`).join('')}</ol></div>`,
     )
     .join('')
-  // 우측 셋이 다 비면 배치만 전폭으로 — 「html 블록만 필수」(STD-001 2.7)를 화면에서도 지킨다
+  // 셋이 다 비면 배치만 — 「html 블록만 필수」(STD-001 2.7)를 화면에서도 지킨다
   const rsecs = [
     s.elems.length
       ? `<div class="rsec"><h3>요소</h3><table class="el"><thead><tr><th>#</th><th>이름</th><th>종류</th><th>보여주는 것</th><th>누르면</th></tr></thead><tbody>${rows}</tbody></table></div>`
@@ -203,12 +203,11 @@ function screenHtml(s: WfScreen, i: number, ctx: RenderCtx, common: CommonParts)
     s.scenarios.length ? `<div class="rsec"><h3>시나리오</h3>${scen}</div>` : '',
   ].join('')
   const frame = frameHtml(s.layout, common, ctx.assetBase ?? '')
-  const split = rsecs
-    ? `<div class="split"><div class="left">${frame}</div><div class="right">${rsecs}</div></div>`
-    : `<div class="split full"><div class="left">${frame}</div></div>`
+  // 배치가 위, 요소 표·규칙·시나리오가 아래 (카드 AC) — 배치가 본문 폭을 다 쓴다
+  const stack = `<div class="wfstack">${frame}${rsecs ? `<div class="rsecs">${rsecs}</div>` : ''}</div>`
   return `<section class="screen" id="item-${esc(s.id)}" data-item="${esc(s.id)}" data-i="${i}"${i === 0 ? '' : ' style="display:none"'}>
     <div class="s-head"><b>${esc(s.id)} ${esc(s.name)}</b>${meta}</div>${desc}
-    ${split}
+    ${stack}
   </section>`
 }
 
@@ -413,15 +412,26 @@ export const wireframeCss = `
 .s-head b{font-size:16px;margin-right:6px}
 .s-head span{color:var(--soft)}
 .s-head span b{font-size:13px;color:var(--ink);font-weight:600;margin-right:4px}
-.split{display:grid;grid-template-columns:minmax(560px,1.15fr) minmax(420px,1fr)}
-.split.full{grid-template-columns:1fr}
-.split.full .left{border-right:none}
 .s-desc{padding:8px 18px;border-bottom:1px solid var(--hair);font-size:13px;color:var(--soft)}
 .wfgroup{margin-bottom:22px}
-.left{padding:18px;border-right:1.5px solid var(--ink);background:#F2F3F0;overflow:auto}
-.right{padding:0;max-height:88vh;overflow-y:auto}
+/* 배치가 위, 요소 표·규칙·시나리오가 아래 (카드 AC, #134) — 좌우로 나누면 배치가 본문의 절반만 받아
+   1280 아트보드가 늘 60%로 줄어 보였다. 세로로 쌓으면 본문 폭을 다 쓴다 */
+.wfstack{padding:18px;background:#F2F3F0}
+.rsecs{margin-top:14px;background:var(--card);border:1px solid var(--rule)}
 
-/* 오른쪽 */
+/* 배치 틀 — 도구 줄 + iframe. 정적 뷰(wf_build.py)와 같아야 한다 */
+.wfbox{margin:8px 0}
+.wfbar{display:flex;align-items:center;gap:8px;padding:0 0 6px;font-size:11.5px;color:var(--soft)}
+.wfbar .grow{flex:1}
+.wfbar .wfdim{font-family:ui-monospace,Menlo,monospace}
+.wfbar button{font:inherit;font-size:11.5px;padding:3px 9px;background:var(--card);border:1px solid var(--rule);border-radius:2px;cursor:pointer;color:var(--ink)}
+.wfbar button:hover{border-color:var(--ink)}
+.wfframe{position:relative;overflow:auto;background:var(--card);border:1px solid var(--rule)}
+.wfframe-if{border:0;display:block;width:100%}
+.wfframe.scaled{overflow:hidden}
+.wfframe.scaled .wfframe-if{position:absolute;left:0;top:0}
+
+/* 아래 */
 .rsec{padding:16px 20px;border-bottom:1px solid var(--hair)}
 .rsec:last-child{border-bottom:none}
 .rsec h3{margin:0 0 10px;font-size:13px;font-weight:700;padding-bottom:6px;border-bottom:1.5px solid var(--ink)}
@@ -441,5 +451,13 @@ table.el td.kind{color:var(--soft);white-space:nowrap}
 .scen ol{margin:4px 0 0;padding-left:22px;font-size:13px;line-height:1.7}
 .scen ol li span.eref{font-family:ui-monospace,Menlo,monospace;font-size:11px;background:#EEF0EC;padding:0 5px;border-radius:2px;cursor:pointer;border:1px solid var(--hair)}
 .scen ol li span.eref:hover{border-color:var(--ink)}
-@media (max-width:1100px){.split{grid-template-columns:1fr}.left{border-right:none;border-bottom:1.5px solid var(--ink)}.right{max-height:none}}
+
+/* 정적 뷰의 전체보기 층 — 앱은 React가 그린다(UI-5 7.6). 규칙을 한 곳에 두려고 같이 산다 */
+.wffull-layer{position:fixed;inset:0;z-index:2147483100;display:flex;flex-direction:column;background:var(--card)}
+.wffull-layer .gbar{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1.5px solid var(--ink);background:var(--panel);font-size:12.5px}
+.wffull-layer .gbar .grow{flex:1}
+.wffull-layer .gbar button{font:inherit;font-size:12px;padding:4px 10px;background:var(--card);border:1px solid var(--rule);cursor:pointer}
+.wffull-layer .stage{flex:1;min-height:0;overflow:auto;padding:22px;background:#F2F3F0}
+.wffull-layer .pic{margin:0 auto;background:var(--card);border:1px solid var(--rule);position:relative;overflow:hidden}
+.wffull-layer .pic iframe{border:0;display:block;position:absolute;left:0;top:0;transform-origin:0 0}
 `
