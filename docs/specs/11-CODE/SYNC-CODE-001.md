@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
 
-**진행 상황**: 카드 38장. **A~AC 37장 완료**(2026-09-22), AD 진행 중.
+**진행 상황**: 카드 38장. **A~AD 38장 완료**(2026-09-22).
 
 ---
 
@@ -864,7 +864,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `pipeline.read_pending(code, user)` 신설 — `fetch` 후 밀렸으면 `process_commit`. 저장소에 쓰는 다섯 경로(상태 토글·되돌리기·되살리기·휴지통·MCP 저장)가 **세션·락을 열기 전에** 부른다. `change_status`는 커밋할 본문도 `origin/main`에서 읽어 `status:` 줄만 교체. `_set_status` 하나로 모음 |
 | 테스트 | 저장소를 앞세운 뒤 각 동작 → 그 커밋 내용이 살아 있다 · 상태 커밋 `--numstat`이 `1 1` · `read_pending` 멱등 · `github` 경로에선 안 불린다 |
 | 선행 | — |
-| 완료 | — |
+| 완료 | 2026-09-22 · 브랜치 `card/AD-read-before-write` · spec 9 + code 1 · 테스트 **223**(신설 3) · `validate` 0/0 · `check_code` 111/111 · `check_ui` 12/12 · `check_dom` 10·10·10 · `check_tokens` 91/0 · `check_view_css` 네 쌍 · 사람 확인은 배포 뒤 · **되먹임 둘**: ① 쓰기 경로 다섯이 쓰기 락 밖에서 `fetch`하니 동시 저장 둘이 같은 작업 사본을 동시에 건드려 git이 죽었다 — **읽기 락**(`_read_lock`, 쓰기 락과 다른 것)을 따로 두고 락 안에서 `last_processed_commit`을 다시 읽는다 ② `last_processed_commit`이 비어 있으면 읽지 않는다 — 그 값이 비는 것은 등록 중뿐이고 초기화·재구축이 자기가 읽는다 |
 
 **왜 카드인가.** 한 줄 고침이 아니다. 저장소에 쓰는 모든 경로의 순서가 바뀌고(읽기가 앞선다), 명세가 붙들고 있던 전제 둘(MS-007 4단계의 `current_body`, SEQ-5 Note 「본문이 안 바뀐다」)이 함께 바뀐다. 데이터가 실제로 사라진 사고라 회귀 장치도 같이 둔다.
 
@@ -930,7 +930,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AA | `card/AA-sync-redesign` · hb#1 | `9fab38b` | #131 | 2026-09-22 |
 | AB | `card/AB-readme-links` | `6a0fd97`~ | — | 2026-09-22 |
 | AC | `card/AC-wf-stack` | `f2a6f4d`~ | — | 2026-09-22 |
-| AD | `card/AD-read-before-write` | — | — | — |
+| AD | `card/AD-read-before-write` | `9ea83ca`~ | — | 2026-09-22 |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 | X | `card/X-ui-doc` | `7a4e821`~ | #103 | 2026-09-21 |
