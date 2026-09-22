@@ -773,7 +773,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 화면 | 새 요소 없음. UI-5 유저용 탭에서 배치가 iframe으로 그려진다. UI-002에 `공통 틀` 절 신설(렌더러 사전을 문서로) · UI-16 문구 둘 |
 | 테스트 | `asset_path`(소유자·남·`..`·심볼릭 링크·확장자·없음) · 라우터(200·Content-Type·Cache-Control·svg CSP·401·404) · `safe_layout` 정규식 자체 검사 · `check_view_css` 셋 다 같음 · `view_build --all` 오류 0 · 다른 프로젝트 화면 문서 8개 + HB + CCR이 손 안 대고 열림 · `check_ui` 12/12 · **사람 확인**: 아래 열하나 |
 | 선행 | X |
-| 완료 | — |
+| 완료 | 2026-09-22 · 브랜치 `card/Z-wf-iframe` · 커밋 `bccf473`~ (spec 12 + code 3) · 테스트 217(신설 2) · `validate` 0/0 · `check_code` 109/109 · `check_ui` 12/12 · `check_tokens` 91/0 · `check_dom` 10·10·10 · `check_view_css` 셋 다 같음 · `wf_build --selftest` 통과 · `view_build --all` 오류 0(UI-002 iframe 12) · 사람 확인 열하나는 배포 뒤(아래 기록) · 되먹임: UI-002 공통 틀에 옮긴 CSS가 사전 134줄 + 앱에서 우연히 맞던 105개 클래스 218규칙 — 12화면을 다시 그리면(AA) 줄인다 · `.wfbox`의 점선·회색도 같이 뺐다(배지만 규칙) |
 
 **왜 카드인가.** 격리(iframe)·배지·공통 틀·첨부·안내가 한 덩어리다. 격리만 하면 싱크독 12화면이 벗겨지고, 안내만 고치면 디자인 산출물이 사이트 CSS에 먹힌다.
 
@@ -880,7 +880,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | F | `card/F-repo-create` | `a11f698`~ | — | 2026-09-14 |
 | U | `card/U-ask-panel` | `3fa72d0`~ | #95 · #104 | 2026-09-21 |
 | Y | `card/Y-ask-react` | `eef87b6`~ | #109 | 2026-09-22 |
-| Z | `card/Z-wf-iframe` | — | — | 2026-09-22 |
+| Z | `card/Z-wf-iframe` | `bccf473`~ | #121 | 2026-09-22 |
 | AA | `card/AA-sync-redesign` | — | — | — |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
