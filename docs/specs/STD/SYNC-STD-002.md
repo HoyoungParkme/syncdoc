@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-002
 type: STD
 title: 뷰 규약 — 사람용 뷰 타입별 렌더링
-status: draft
+status: approved
 upstream: [SYNC-STD-001, SYNC-UI-002]
 ---
 
