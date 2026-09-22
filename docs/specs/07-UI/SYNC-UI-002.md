@@ -684,7 +684,7 @@ status: draft
           <div class="msg">spec(SYNC-UI-002): 12화면 디자인 도구로 다시 그림</div>
           <div class="by">에이전트 · 지시 박호영</div>
         </div>
-        <div class="sync" data-el="7">마지막 처리 커밋 <span class="m" data-el="7.1">eb30fd6</span><br>밀린 커밋 <b data-el="7.2">0</b></div>
+        <div class="sync" data-el="7">마지막 처리 커밋 <span class="m" data-el="7.1">eb30fd6</span><br>밀린 커밋 <b data-el="7.2">0</b> <span data-el="7.3">12초 전 확인</span></div>
       </aside>
     </div>
   </div>
@@ -736,7 +736,8 @@ status: draft
 | 6 | 목록 다이얼로그 | 다이얼로그 | 3.x에서 누른 종류의 항목 목록. 항목·원인·시각 | 항목 클릭 → 그 문서의 UI-5 해당 위치 |
 | 7 | 동기화 상태 | 영역 | 최근 변경 아래. 이 저장소를 어디까지 처리했나 | — |
 | 7.1 | 마지막 처리 커밋 | 텍스트 | `repositories.last_processed_commit` | 새 탭으로 GitHub 커밋 |
-| 7.2 | 밀린 커밋 | 수치 | 원격이 앞선 커밋 수. 0이면 최신 | — |
+| 7.2 | 밀린 커밋 | 수치 | 원격이 앞선 커밋 수. 0이면 **마지막 확인 때** 최신이었다 | — |
+| 7.3 | 확인 시각 | 텍스트 | 그 값을 언제 쟀나(`fetched_at`). 없으면 낡은 값이 「지금」처럼 읽힌다(카드 AF) | — |
 | 8 | 휴지통 | 묶음 | 11단계 표 맨 아래(표준 묶음 아래). `GET /api/projects/{code}/trash`. **0건이면 묶음 자체가 없다.** 흐리게 — 살아 있는 문서와 한눈에 갈린다 | 펼침/접힘 |
 | 8.1 | 휴지통 문서 행 | 행 | 문서 ID·제목·마지막 버전·언제 누가 넣었나 | 그 문서의 UI-5 (4b 배너) |
 | 8.2 | 되살리기 | 버튼 | 행마다 | `POST …/restore` → 그 문서의 UI-5(UC-H18 5) |
