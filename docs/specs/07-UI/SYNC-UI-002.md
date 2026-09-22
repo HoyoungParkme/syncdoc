@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -1847,19 +1847,21 @@ status: draft
           <div class="cb">
             <div class="adminh" data-el="1">위험한 동작이 있습니다</div>
             <div class="vers" data-el="2">
-              <div class="vr hd"><span>프로젝트</span><span>저장소</span><span>마지막 처리 커밋</span><span>동기화</span><span></span></div>
+              <div class="vr hd"><span>프로젝트</span><span>저장소</span><span>마지막 처리 커밋</span><span>동기화</span><span>통지</span><span></span></div>
               <div class="vr" data-el="2.1">
                 <span><span class="m bd">[SYNC]</span> 싱크독</span>
                 <span class="repo m">dfocus/syncdoc</span>
                 <span><span class="m" data-el="2.2">a1b2c3d</span> <span class="cap">1시간 전</span></span>
-                <span data-el="2.3"><span class="st ok">최신</span></span>
-                <span class="acts"><span class="b sm" data-el="3">인덱스 재구축</span><span class="b sm danger" data-el="7">해제</span></span>
+                <span><span class="st ok" data-el="2.3">최신</span> <span class="cap" data-el="2.4">12초 전 확인</span></span>
+                <span class="cap" data-el="2.5">걸림</span>
+                <span class="acts"><span class="b sm" data-el="6">지금 가져오기</span><span class="b sm" data-el="3">인덱스 재구축</span><span class="b sm danger" data-el="7">해제</span></span>
               </div>
               <div class="vr">
                 <span><span class="m bd">[DBA]</span> 데이터베이스 관리</span>
                 <span class="repo m">dfocus/dba-ax</span>
                 <span><span class="m">9e8f7a6</span> <span class="cap">3일 전</span></span>
-                <span><span class="st behind">밀림 2</span></span>
+                <span><span class="st behind">밀림 2</span> <span class="cap">4분 전 확인</span></span>
+                <span class="cap"><span class="b sm" data-el="8">통지 걸기</span></span>
                 <span class="acts"><span class="b sm">인덱스 재구축</span><span class="b sm danger">해제</span></span>
               </div>
               <div class="vr">
@@ -1907,8 +1909,12 @@ status: draft
 | 1 | 경고 줄 | 텍스트 | 위험한 동작이 있다는 안내. 제목은 카드가 이미 달고 있다 | — |
 | 2 | 저장소 표 | 표 | 프로젝트마다 저장소와 동기화 상태 | — |
 | 2.1 | 저장소 행 | 행 | 프로젝트(「[코드] 이름」, 1.6), 저장소, 마지막 처리 커밋(2.2), 동기화(2.3) | — |
-| 2.2 | 마지막 처리 커밋 | 텍스트 | `repositories.last_processed_commit`과 시각 | 새 탭으로 GitHub 커밋 |
-| 2.3 | 동기화 상태 | 뱃지 | 원격 최신과 같으면 `최신`, 처리 안 한 커밋이 있으면 `밀림 N`(UC-G1 1a·1b) | — |
+| 2.2 | 마지막 처리 커밋 | 텍스트 | `repositories.last_processed_commit`과 **처리한** 시각(`synced_at`). 확인한 시각(2.4)과 다른 값이다 | 새 탭으로 GitHub 커밋 |
+| 2.3 | 동기화 상태 | 뱃지 | **마지막으로 확인했을 때** 원격 최신과 같았으면 `최신`, 처리 안 한 커밋이 있으면 `밀림 N`(UC-G1 1a·1b), 아직 한 번도 안 재봤으면 `아직 안 재봄` | — |
+| 2.4 | 확인 시각 | 텍스트 | 뱃지(2.3) 옆에 흐리게 — `fetched_at` 기준 「3분 전 확인」. **이 값이 없으면 `최신`이 언제 기준인지 알 수 없다** | — |
+| 2.5 | 통지 상태 | 텍스트 | push 통지가 걸렸나 — `걸림` / `안 걸림` / `실패`. 실패면 사유를 툴팁으로. 안 걸린 저장소는 반영이 최대 5분 늦는다 | — |
+| 6 | 지금 가져오기 | 버튼 | 행마다. 주기 확인을 기다리지 않고 당긴다([[SYNC-UC-001#UC-G2]]) | 읽은 문서 수를 토스트로. 읽을 것이 없으면 「이미 최신」, 확인 시각(2.4)은 새로 적힌다 |
+| 8 | 통지 걸기 | 버튼 | 통지가 안 걸린 행에만(2.5가 `걸림`이 아닐 때) | 걸고 2.5를 갱신. 못 걸면 사유를 토스트로 |
 | 3 | 인덱스 재구축 | 버튼 | 행마다 | 확인 다이얼로그(4) |
 | 4 | 재구축 확인 | 다이얼로그 | 무엇을 다시 만들고 무엇은 안 건드리는지(UC-S6 최소 보장). **저장소 README가 낡았으면 새 판으로 커밋한다는 것도 여기서 말한다**(카드 AB) | — |
 | 4.1 | 재구축 | 버튼 | | UC-S6 실행. 끝나면 결과(5) |
@@ -1926,7 +1932,9 @@ status: draft
 - 재구축은 참조 테이블·버전 목록·항목 테이블을 지우고 다시 만든다(UC-S6). 저장소에 있는 것은 전부 되살아난다 — v2에서는 저장소 밖에 사는 추적 데이터가 없어 「건드리지 않는 것」을 약속할 필요가 없어졌다([[SYNC-CODE-001#V]])
 - **버전 번호는 바뀔 수 있다.** 재구축은 커밋마다 버전을 만들므로 번호가 전부 다시 매겨진다. 버전을 가리키는 것은 참조뿐이고 참조도 함께 다시 만들어지므로 어긋날 것이 없다
 - 동기화 상태(2.3)는 **DB에서 읽는다.** 폴링이 `behind_by`·`fetched_at`을 갱신하므로 이 카드를 열 때마다 fetch가 돌지 않는다([[SYNC-DOM-002#Repository]])
-- `밀림 N`은 폴링이 잡아 처리한다(UC-G1 1b). 이 화면에 수동 동기화 버튼은 없다 — 유스케이스에 없다
+- **`최신`은 「마지막으로 확인했을 때」의 말이다.** 그래서 확인 시각(2.4)을 옆에 붙인다 — 붙이지 않으면 최대 5분 낡은 값이 「지금 최신」처럼 읽힌다(#115). 통지(2.5)가 걸린 저장소는 몇 초 만에 갱신되므로 이 차이가 거의 없다
+- **「지금 가져오기」(6)가 있다.** 예전에는 「유스케이스에 없다」는 이유로 두지 않았는데, 통지를 못 건 저장소에서는 사람이 기다리는 것 말고 할 수 있는 일이 없었다. 유스케이스를 만들고([[SYNC-UC-001#UC-G2]]) 버튼을 두었다(카드 AF). 재구축(3)은 이력을 다시 만드는 큰 동작이라 이 용도로 쓸 것이 아니다
+- **통지 걸기(8)는 안 걸린 행에만 보인다.** 이미 걸린 저장소에 버튼이 남아 있으면 눌러도 아무 일이 없어 고장처럼 읽힌다
 - 재구축 확인(4)은 **UI-13 위에 한 겹 더** 뜬다. 다이얼로그 위의 다이얼로그다
 - 이 표에는 내가 소유한 프로젝트만 뜬다([[SYNC-PRD-001#R12]]). 역할 구분은 여전히 없다 — 소유자는 셋(재구축·해제·동기화 보기) 다 할 수 있다. 위험한 동작이라 확인 다이얼로그(4)가 한 번 더 막는다
 - **해제(7)는 싱크독의 등록·색인·작업 사본만 지운다.** GitHub 저장소는 손대지 않는다 — 명세 원본은 거기 있고, 다시 등록하면 문서가 git에서 복원된다(UC-A1 3a2). 그래서 재구축과 같은 표에 둔다: 둘 다 「이 저장소를 싱크독이 어떻게 들고 있나」를 만지는 일이다
