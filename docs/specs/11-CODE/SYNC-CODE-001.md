@@ -974,7 +974,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `view_build.py`·`views.ts` V-SCN — 페르소나·시나리오 절을 `split_items`/`splitItems`로 가른다(절 머리·소절 제목·소절 머리 그대로, 항목 헤딩 단계 무관 — 절을 두 번 그리던 것이 없어진다). S 블록을 조각으로 가르는 `scn_parts`/`scnParts` — 단계의 이어진 줄·들여 쓴 줄은 그 단계 안, 변형은 다음 변형·성공 조건·연관 줄까지 전부 접힌 칸 안, 코드블록 안은 가르지 않음, 나머지는 「그 밖」. 카드 끝 「그 밖」은 공통 `etc_block`/`etcBlock`. CSS: 단계 원은 바깥 단계에만(`ol.steps>li`) · `.etc` · 변형 안 목록 글자 크기 |
 | 테스트 | `view_build --selftest`에 V-SCN(시험 문서 하나 — P `###`·S `####` · 소절 · 단계 밑 목록 · 흐름 뒤 문단 · 모르는 굵은 머리 · 여러 줄 변형과 그 안 번호 줄 · 한 줄 변형 · 코드블록 안 번호 줄 · 구분선뿐인 그 밖) · SCN 넷(SYNC·VA·QBOT·BBS)에서 겹친 줄·사라진 줄 0 · 앱 포트를 일회성으로 묶어 정적 뷰와 같은 HTML · 사람이 배포 뒤 SCN을 브라우저에서 |
 | 선행 | — |
-| 완료 | — |
+| 완료 | 2026-09-23 · 브랜치 `card/AK-scn-view` · spec 3 + code 2 · 테스트 243 · `validate` 0/0 · `check_code` 114/114 · `check_ui` 12/12 · `check_dom` 10·10·10 · `check_tokens` 91/0 · `check_view_css` 네 쌍 · `check_templates` 16/16 · `open_items --check` · `wf_build --selftest` · **`view_build --selftest` V-SCN 14건**(옛 `v_scn`으로 바꿔 돌리면 12건 실패) · SCN 넷(SYNC·VA·QBOT·BBS, 원본 줄 392)을 정적으로 그려 사라진 줄 0 · 원본보다 많이 나온 줄 0 — 전에는 11·75·160·13줄이 겹쳤다 · 앱 포트를 일회성으로 묶어 시험 문서 + SCN 넷에서 정적 뷰와 **같은 HTML**(앱 전용 `data-item`·`data-ref` 빼고) · 배포 뒤 `get_template(VA, SCN)`이 새 항목 블록 문장을 준다 · 사람 확인(배포 뒤 2026-09-23, 브라우저): 운영 SCN 아홉(SYNC·VA·CCR·QBOT·HB·JSD·TBL·IMBC·INS) 전부 S·P 카드 수 = 원본 항목 수, 사라진 줄 0, 절이 한 번만 · VA S1 4단계 밑 목록 다섯 줄이 그 단계 안, 번호 원은 바깥 단계에만 · TBL 소절 2.1~2.4 제목이 처음으로 보인다 · 실제 문서에는 「그 밖」으로 갈 줄이 없었다(시험 문서로만 봤다) · **되먹임**: 앱 CSS `.steps`(UI-9 단계 레일)가 유저용 탭의 시나리오 단계와 시퀀스 단계 표까지 가로로 눕히고 있었다(B4부터, 정적 뷰는 멀쩡) — #169로 레일 안으로 좁혔다 · 남은 것: #152의 UI·UC 카드 |
 
 **왜 카드인가.** 규약(STD-002 V-SCN)이 「구조를 안 지킨 시나리오는 뷰에서 깨진다」고 허용했다 — 고칠 것은 규약이라 DEV-15의 `fix`가 아니다(카드 AH와 같은 기준). 절을 두 번 그리던 것은 규약에 없는 코드 버그지만 같은 함수라 같이 고친다. #152는 SCN·UI·UC 셋에 걸쳐 카드 셋으로 나눴다 — 이 카드가 SCN, UI·UC는 뒤 카드다(사용자 결정).
 
@@ -1048,6 +1048,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AH | `card/AH-item-bodies` | `f0ae4f5` | #154 | 2026-09-23 |
 | AI | `card/AI-424` | `88d026e` | #156 | 2026-09-23 |
 | AJ | `card/AJ-handles` · `card/AJ-align` | `07f45ce` · `d222b20` | #161 · #162 | 2026-09-23 |
+| AK | `card/AK-scn-view` | `243cfa6` | #168 | 2026-09-23 |
 | (#119) | `fix/119-single-render` | — | #119 | 2026-09-23 |
 | (#126) | `fix/126-view-build-specs` | — | #126 | 2026-09-23 |
 | (#133) | `fix/133-tokens-by-chapter` | — | #133 | 2026-09-23 |
