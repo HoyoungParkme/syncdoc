@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """싱크독 사람용 뷰 생성기. STD-002 뷰 규약의 구현.
-사용: view_build.py <원본.md> [출력.html]
+사용: view_build.py <원본.md> [출력.html] · --all(전부 + index.html) · --selftest(원본 문장을 버리지 않는지)
 frontmatter type을 보고 V-* 모듈로 본문을 그린다. 공통 틀은 한 곳."""
 import re, json, html, sys, glob, os
 
@@ -12,22 +12,26 @@ STATUS_KO = {"draft": "초안", "review": "검토중", "approved": "승인"}
 STAGE = {"RFQ": 1, "PRD": 2, "SCN": 3, "UC": 4, "INFRA": 5, "DOM": 6, "UI": 7, "API": 8, "SEQ": 9, "MS": 10, "CODE": 11, "STD": None}
 
 # ───────────────────────── 전체 문서 인덱스 (참조·하위 계산용) ─────────────────────────
+def parse_doc(raw, path):
+    """원본 MD → {fm, body, items, refs, file, path}. frontmatter가 없으면 None"""
+    m = re.match(r"^---\n(.*?)\n---\n", raw, re.S)
+    if not m: return None
+    fm = {k.strip(): v.strip() for k, v in (l.partition(":")[::2] for l in m.group(1).split("\n"))}
+    body = raw[m.end():]
+    nocode = re.sub(r"```.*?```", "", body, flags=re.S); nocode = re.sub(r"`[^`]*`", "", nocode)
+    items = []
+    for h in re.findall(r"^(#{1,6}) (.+)$", nocode, re.M):
+        tok = h[1].split(" ")[0]
+        if not re.match(r"^\d", tok) and re.match(r"^[A-Za-z]", tok): items.append((tok, h[1][len(tok):].strip()))
+    refs = re.findall(r"\[\[([^\]]+)\]\]", nocode)
+    return {"fm": fm, "body": body, "items": dict(items), "refs": refs, "file": os.path.basename(path), "path": path}
+
 def load_all():
     docs = {}
     for f in glob.glob(os.path.join(SRC_DIR, "*", "*.md")):
         if "/_templates/" in f: continue
-        raw = open(f, encoding="utf-8").read()
-        m = re.match(r"^---\n(.*?)\n---\n", raw, re.S)
-        if not m: continue
-        fm = {k.strip(): v.strip() for k, v in (l.partition(":")[::2] for l in m.group(1).split("\n"))}
-        body = raw[m.end():]
-        nocode = re.sub(r"```.*?```", "", body, flags=re.S); nocode = re.sub(r"`[^`]*`", "", nocode)
-        items = []
-        for h in re.findall(r"^(#{1,6}) (.+)$", nocode, re.M):
-            tok = h[1].split(" ")[0]
-            if not re.match(r"^\d", tok) and re.match(r"^[A-Za-z]", tok): items.append((tok, h[1][len(tok):].strip()))
-        refs = re.findall(r"\[\[([^\]]+)\]\]", nocode)
-        docs[fm["doc_id"]] = {"fm": fm, "body": body, "items": dict(items), "refs": refs, "file": os.path.basename(f), "path": f}
+        d = parse_doc(open(f, encoding="utf-8").read(), f)
+        if d: docs[d["fm"]["doc_id"]] = d
     return docs
 ALL = load_all()
 # 프로젝트 코드는 문서 이름에서 읽는다 — 한 저장소 = 한 프로젝트 (STD-004 4장, #57)
@@ -131,20 +135,28 @@ def split_sections(body):
         title, _, rest = p.partition("\n"); out.append((title.strip(), rest))
     return out
 
-def item_blocks(body, pat):
-    """항목 헤딩 블록 → [(id, title, level, text)]"""
-    lines = body.split("\n"); out = []; i = 0
+def split_items(body, pat):
+    """본문을 원본 순서대로 가른다 → [("text", md) | ("item", (id, title, level, text))].
+    항목 블록은 헤딩 다음 줄부터 같은 레벨 이상 다음 헤딩 직전까지. 항목 밖 문장(절 머리·소절 제목·
+    소절 머리)도 "text"로 남는다 — 버리면 유저용 탭에서 조용히 사라진다 (STD-002 V-PRD, #120)"""
+    lines = body.split("\n"); out = []; buf = []; i = 0
     while i < len(lines):
         h = re.match(r"^(#{1,6}) (\S+)(?: (.*))?$", lines[i])
         if h and re.fullmatch(pat, h.group(2)) and not re.match(r"^\d", h.group(2)):
+            if buf: out.append(("text", "\n".join(buf))); buf = []
             lvl = len(h.group(1)); j = i + 1
             while j < len(lines):
                 h2 = re.match(r"^(#{1,6}) ", lines[j])
                 if h2 and len(h2.group(1)) <= lvl: break
                 j += 1
-            out.append((h.group(2), h.group(3) or "", lvl, "\n".join(lines[i + 1:j]))); i = j
-        else: i += 1
+            out.append(("item", (h.group(2), h.group(3) or "", lvl, "\n".join(lines[i + 1:j])))); i = j
+        else: buf.append(lines[i]); i += 1
+    if buf: out.append(("text", "\n".join(buf)))
     return out
+
+def item_blocks(body, pat):
+    """항목 헤딩 블록 → [(id, title, level, text)]. split_items에서 항목만"""
+    return [x for k, x in split_items(body, pat) if k == "item"]
 
 # ───────────────────────── 공통 틀 ─────────────────────────
 def downstream_of(doc_id):
@@ -198,41 +210,43 @@ def shell(doc, body_html, extra_nav=""):
 document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{{const g=b.dataset.group;document.querySelectorAll(`[data-tab][data-group="${{g}}"]`).forEach(x=>x.classList.toggle("on",x===b));document.querySelectorAll(`[data-pane][data-group="${{g}}"]`).forEach(p=>p.style.display=p.dataset.pane===b.dataset.tab?"":"none");}});
 </script></body></html>"""
 
+# ───────────────────────── 항목 카드 (V-PRD 목표·요구사항, V-INFRA 제약) ─────────
+def item_card(did, iid, title, inner, down, label, pills=""):
+    """머리 ID 뱃지·제목·필·`하위 N` · 몸 · 바닥 "{label}: 문서들". 하위가 없으면 필·바닥을 안 그린다"""
+    card = f'<article class="card" id="item-{iid}"><div class="card-h"><span class="iid">{iid}</span><b>{inline(title, did)}</b>{pills}'
+    if down: card += f'<span class="pill soft">하위 {len(down)}</span>'
+    card += "</div>" + inner
+    if down: card += f'<div class="down">{label}: ' + " · ".join(f'<a class="ref" href="{view_href(d)}">{d}</a>' for d in down) + "</div>"
+    return card + "</article>"
+
+def item_cards(did, text, pat, label, dmap):
+    """절 본문 → 항목 밖 문장은 그대로, 항목은 본문 전부를 몸으로 한 카드 (V-PRD 목표·V-INFRA 제약, #120)"""
+    return "".join(render_blocks(x, did) if k == "text" else
+                   item_card(did, x[0], x[1], render_blocks(x[3], did), sorted(d for d, v in dmap.items() if x[0] in v), label)
+                   for k, x in split_items(text, pat))
+
 # ───────────────────────── V-PRD ─────────────────────────
 def v_prd(doc):
     did = doc["fm"]["doc_id"]; body = doc["body"]; pat = r"G\d+|R\d+|N\d+"
-    secs = split_sections(body); out = []
+    secs = split_sections(body); out = []; dmap = downstream_of(did)
     for title, text in secs:
         name = re.sub(r"^\d+\.\s*", "", title)
         if name.startswith("목표"):
-            # G 항목 → 표로 재조립
-            blocks = item_blocks(text, r"G\d+")
-            rows = ""
-            for gid, gt, _, gb in blocks:
-                down = sum(1 for d, v in downstream_of(did).items() if gid in v)
-                rows += f'<tr id="item-{gid}"><td class="iid">{gid}</td><td>{inline(gt, did)}</td><td class="num">{down or ""}</td></tr>'
-            out.append(f'<h2>{esc(title)}</h2><table class="reassembled"><thead><tr><th>#</th><th>목표</th><th>하위 참조</th></tr></thead><tbody>{rows}</tbody></table>')
+            out.append(f"<h2>{esc(title)}</h2>" + item_cards(did, text, r"G\d+", "이 목표를 근거로 삼은 문서", dmap))
             continue
         if name.startswith("요구사항"):
             out.append(f"<h2>{esc(title)}</h2>")
-            # 소절(### 3.1 …) 유지, 항목은 카드
-            for sub in re.split(r"^### ", text, flags=re.M):
-                if not sub.strip(): continue
-                st, _, srest = sub.partition("\n")
-                if not srest.strip() and "####" not in sub: continue
-                if not sub.startswith("####"): out.append(f"<h3>{esc(st)}</h3>")
-                for rid, rt, _, rb in item_blocks(("#### " + sub) if sub.startswith("####") else srest, r"R\d+|N\d+"):
-                    ac = re.findall(r"^- \[([ x])\] (.+)$", rb, re.M)
-                    done = sum(1 for c, _ in ac if c == "x")
-                    desc = re.sub(r"^- \[[ x]\] .+$", "", rb, flags=re.M).strip()
-                    down = sorted(d for d, v in downstream_of(did).items() if rid in v)
-                    card = f'<article class="card" id="item-{rid}"><div class="card-h"><span class="iid">{rid}</span><b>{inline(rt, did)}</b>'
-                    if ac: card += f'<span class="pill">인수기준 {done}/{len(ac)}</span>'
-                    if down: card += f'<span class="pill soft">하위 {len(down)}</span>'
-                    card += "</div>" + render_blocks(desc, did)
-                    if ac: card += '<ul class="ac">' + "".join(f'<li class="{"done" if c=="x" else ""}"><span class="box">{"✓" if c=="x" else ""}</span>{inline(t, did)}</li>' for c, t in ac) + "</ul>"
-                    if down: card += '<div class="down">이 요구사항을 근거로 삼은 문서: ' + " · ".join(f'<a class="ref" href="{view_href(d)}">{d}</a>' for d in down) + "</div>"
-                    out.append(card + "</article>")
+            # 절 머리·소절(### 3.1 …) 제목·소절 머리는 그대로, 항목은 카드
+            for k, x in split_items(text, r"R\d+|N\d+"):
+                if k == "text": out.append(render_blocks(x, did)); continue
+                rid, rt, _, rb = x
+                ac = re.findall(r"^- \[([ x])\] (.+)$", rb, re.M)
+                done = sum(1 for c, _ in ac if c == "x")
+                desc = re.sub(r"^- \[[ x]\] .+$", "", rb, flags=re.M).strip()
+                inner = render_blocks(desc, did)
+                if ac: inner += '<ul class="ac">' + "".join(f'<li class="{"done" if c=="x" else ""}"><span class="box">{"✓" if c=="x" else ""}</span>{inline(t, did)}</li>' for c, t in ac) + "</ul>"
+                pills = f'<span class="pill">인수기준 {done}/{len(ac)}</span>' if ac else ""
+                out.append(item_card(did, rid, rt, inner, sorted(d for d, v in dmap.items() if rid in v), "이 요구사항을 근거로 삼은 문서", pills))
             continue
         out.append(f"<h2>{esc(title)}</h2>" + render_blocks(text, did, pat))
     # 추적표 (원본에 없음. 참조 테이블에서)
@@ -353,19 +367,14 @@ def v_uc(doc):
 
 # ───────────────────────── V-INFRA ─────────────────────────
 def v_infra(doc):
-    """제약 C 항목 → 표로 재조립(ID·내용·출처·이 제약을 근거로 삼은 문서). 구성도·시퀀스 mermaid 그대로. 나머지 원본 순서."""
-    did = doc["fm"]["doc_id"]; out = []
+    """제약 C 항목 → 카드(ID·제목·하위 N · 본문 전부 · 이 제약을 근거로 삼은 문서). 절 머리 그대로.
+    마지막 제약 뒤 문단은 그 제약의 본문이다 — 특정 문장으로 꼬리를 알아보지 않는다(#120).
+    구성도·시퀀스 mermaid 그대로. 나머지 원본 순서."""
+    did = doc["fm"]["doc_id"]; out = []; dmap = downstream_of(did)
     for title, text in split_sections(doc["body"]):
         name = re.sub(r"^\d+\.\s*", "", title)
         if name.startswith("제약"):
-            lead = re.split(r"^#### ", text, flags=re.M)[0]
-            rows = ""
-            for cid, ct, _, cb in item_blocks(text, r"C\d+"):
-                src = re.search(r"^출처: (.+)$", cb, re.M)
-                downs = sorted(d for d, v in downstream_of(did).items() if cid in v)
-                rows += f'<tr id="item-{cid}"><td class="iid">{cid}</td><td>{inline(ct, did)}</td><td>{inline(src.group(1), did) if src else ""}</td><td>{" · ".join(f"<a class=\"ref\" href=\"{view_href(d)}\">{d}</a>" for d in downs)}</td></tr>'
-            tail = text[text.rfind("\n\n**"):] if "\n\n**" in text and "이 설계의 두 축" in text else ""
-            out.append(f'<h2>{esc(title)}</h2>{render_blocks(lead, did)}<table class="reassembled"><thead><tr><th>#</th><th>제약</th><th>출처 (근거)</th><th>이 제약을 근거로 삼은 곳</th></tr></thead><tbody>{rows}</tbody></table>{render_blocks(tail, did)}')
+            out.append(f"<h2>{esc(title)}</h2>" + item_cards(did, text, r"C\d+", "이 제약을 근거로 삼은 문서", dmap))
             continue
         out.append(f"<h2>{esc(title)}</h2>" + render_blocks(text, did, r"C\d+"))
     return "\n".join(out)
@@ -594,7 +603,115 @@ def build_index():
     open(os.path.join(OUT_DIR, "index.html"), "w", encoding="utf-8").write(html_)
     print("index.html")
 
+_SELF_PRD = """---
+doc_id: T-PRD-001
+type: PRD
+title: 시험 PRD
+status: draft
+upstream: []
+---
+
+# 시험 PRD
+
+## 1. 목표
+
+목표 절 머리 문장.
+
+#### G1 첫 목표
+
+G1 본문 문장. 근거: [[T-PRD-001#R1]]
+
+#### G2 제목뿐인 목표
+
+## 2. 비목표
+
+없음.
+
+## 3. 요구사항
+
+요구사항 절 머리 문장.
+
+### 3.1 기능
+
+소절 머리 문장.
+
+#### R1 첫 기능
+
+R1 설명.
+
+- [ ] 인수기준 하나
+
+### 3.2 비워 둔 소절
+
+## 4. 성공지표
+
+없음.
+"""
+_SELF_INFRA = """---
+doc_id: T-INFRA-001
+type: INFRA
+title: 시험 INFRA
+status: draft
+upstream: [T-PRD-001]
+---
+
+# 시험 INFRA
+
+## 1. 제약
+
+제약 절 머리 문장.
+
+#### C1 첫 제약
+
+출처: [[T-PRD-001#G1]]
+
+C1 설명 문장.
+
+#### C2 마지막 제약
+
+출처: RFQ
+
+C2 뒤 문단.
+
+## 2. 구성도
+
+없음.
+"""
+
+def _selftest():
+    """V-PRD·V-INFRA가 원본 문장을 버리지 않는지 (#120). 앱 포트(views.ts)는 대조하지 않는다(#153).
+
+    사용: view_build.py --selftest
+    """
+    saved = dict(ALL)
+    for raw, name in ((_SELF_PRD, "T-PRD-001.md"), (_SELF_INFRA, "T-INFRA-001.md")):
+        d = parse_doc(raw, name); ALL[d["fm"]["doc_id"]] = d
+    try: p, i = v_prd(ALL["T-PRD-001"]), v_infra(ALL["T-INFRA-001"])
+    finally: ALL.clear(); ALL.update(saved)
+    c2 = i.find('id="item-C2"')
+    cases = [
+        ("목표 절 머리", "목표 절 머리 문장" in p),
+        ("G 본문", "G1 본문 문장" in p),
+        ("G 카드·앵커(본문 없는 G도)", 'class="card" id="item-G1"' in p and 'class="card" id="item-G2"' in p),
+        ("G 하위·바닥 줄", "이 목표를 근거로 삼은 문서" in p and 'href="view_T-INFRA-001.html"' in p),
+        ("요구사항 절 머리", "요구사항 절 머리 문장" in p),
+        ("소절 제목·소절 머리", "3.1 기능</h3>" in p and "소절 머리 문장" in p and "3.2 비워 둔 소절</h3>" in p),
+        ("빈 소제목 없음", "<h3></h3>" not in p),
+        ("R 카드 그대로", 'id="item-R1"' in p and "인수기준 0/1" in p and "R1 설명." in p),
+        ("제약 절 머리", "제약 절 머리 문장" in i),
+        ("C 본문·출처 줄", "C1 설명 문장" in i and "출처: " in i and 'class="card" id="item-C1"' in i),
+        ("마지막 제약 뒤 문단은 그 카드 안", 0 <= c2 < i.find("C2 뒤 문단") < i.find("</article>", c2)),
+        ("목표·제약을 표로 모으지 않음", 'class="reassembled"' not in p + i),
+    ]
+    bad = [name for name, ok in cases if not ok]
+    for name in bad:
+        print("✗ ", name)
+    print("V-PRD·V-INFRA: 통과" if not bad else f"V-PRD·V-INFRA: {len(bad)} 실패")
+    return 0 if not bad else 1
+
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--selftest"]:
+        sys.exit(_selftest())
     if sys.argv[1:] == ["--all"]:
         for d in ALL.values(): build(d["path"])
         build_index()
