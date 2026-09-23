@@ -56,7 +56,7 @@ const cells = (line: string): string[] =>
 const isSep = (r: string[]) => r.every((c) => /^[-: ]*$/.test(c))
 
 /** wf_build._fences — 줄마다 펜스 줄(여는·안·닫는)인가, [여는 줄, 닫는 줄, 언어]. 안 닫힌 펜스는 끝까지 */
-function fences(lines: string[]): [boolean[], [number, number, string][]] {
+export function fences(lines: string[]): [boolean[], [number, number, string][]] {
   const flags = lines.map(() => false)
   const spans: [number, number, string][] = []
   let openAt = -1
@@ -78,7 +78,7 @@ function fences(lines: string[]): [boolean[], [number, number, string][]] {
 }
 
 /** wf_build._first_table — [start, end)의 첫 표 → [행들(구분선 제외), 시작 줄, 끝 줄(제외)] */
-function firstTable(lines: string[], fenced: boolean[], start: number, end: number): [string[][], number, number] {
+export function firstTable(lines: string[], fenced: boolean[], start: number, end: number): [string[][], number, number] {
   for (let i = start; i < end; i++) {
     if (fenced[i] || !lines[i].trim().startsWith('|')) continue
     const rows: string[][] = []
