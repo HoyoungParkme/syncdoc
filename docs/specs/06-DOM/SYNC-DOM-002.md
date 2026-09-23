@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -126,7 +126,7 @@ core/spec/
 frontend/
 ├── index.html
 ├── vite.config.ts · tsconfig*.json · package.json   화면만 설정하므로 여기 (STD-001 1.9)
-├── public/                    그대로 서빙 — favicon · icons.svg · howto/
+├── public/                    그대로 서빙 — howto/(사용 방법 그림)
 └── src/
     ├── main.tsx               진입
     ├── App.tsx                라우팅
