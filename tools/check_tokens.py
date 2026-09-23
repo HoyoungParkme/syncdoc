@@ -21,6 +21,7 @@ CSS가 아직 없는 프로젝트면 「볼 것이 없다」고 말하고 통과
 from __future__ import annotations
 
 import argparse
+import glob
 import os
 import re
 import sys
@@ -30,6 +31,19 @@ import proj
 COLOR = re.compile(r"#[0-9a-fA-F]{6}|rgba?\([^)]*\)")
 PX = re.compile(r"(\d+(?:\.\d+)?)px")
 SHADOW = re.compile(r"`(\d[^`]*rgba\([^)]*\))`")
+
+
+TOKEN_CHAPTER = re.compile(r"^## 3\. 디자인 토큰", re.M)
+
+
+def token_docs(specs: str) -> list[str]:
+    """`## 3. 디자인 토큰` 장이 있는 UI 문서들. **제목으로 고르지 않는다** (#133).
+
+    제목(「화면 설계」)으로 고르면 토큰 장이 다른 문서에 있을 때 장 없는 문서를 잡고
+    「대조할 것이 없다」로 통과했다 — 안 본 것이 통과로 보였다(STD-004 「0건이 안 봤다일 수 있다」).
+    """
+    paths = sorted(glob.glob(os.path.join(proj.type_dir(specs, "UI"), "*.md")))
+    return [p for p in paths if TOKEN_CHAPTER.search(open(p, encoding="utf-8").read())]
 
 
 def spec_chapter(spec: str) -> str:
@@ -74,11 +88,17 @@ def main() -> int:
     ap.add_argument("--css", help=":root가 있는 CSS (기본: 명세와 같은 저장소)")
     a = ap.parse_args()
     code = proj.code_of(a.specs)
-    # 번호가 아니라 제목으로 찾는다 — 서브타입은 제목이 가른다 (#57)
-    spec_path = proj.by_title(a.specs, "UI", "화면 설계")
-    if spec_path is None or "## 3. 디자인 토큰" not in open(spec_path, encoding="utf-8").read():
-        print(f"{code}: 디자인 토큰 절(화면 설계 3장)이 없다 — 대조할 것이 없다")
+    # 번호도 제목도 아니라 토큰 장으로 찾는다 — 제목은 둘 다 넣어도 되는 말이다 (STD-001 2.7, #133)
+    docs = token_docs(a.specs)
+    if len(docs) > 1:
+        names = " · ".join(os.path.basename(p) for p in docs)
+        print(f"{code}: 디자인 토큰 장이 둘 이상 — {names}. 원본은 하나여야 한다")
+        return 1
+    if not docs:
+        print(f"{code}: 디자인 토큰 장(## 3. 디자인 토큰)이 있는 UI 문서가 없다 — 대조할 것이 없다")
         return 0
+    spec_path = docs[0]
+    spec_id = os.path.basename(spec_path).removesuffix(".md")
     css = a.css or os.path.join(proj.repo_of(a.specs), "frontend", "src", "styles.css")
     ch = spec_chapter(spec_path)
     if not os.path.exists(css):
@@ -137,7 +157,7 @@ def main() -> int:
 
     for m in bad:
         print(f"⚠  {m}")
-    print(f"\n합계: {code} · :root 토큰 {len(tok)} · 어긋남 {len(bad)}")
+    print(f"\n합계: {code} · {spec_id} · :root 토큰 {len(tok)} · 어긋남 {len(bad)}")
     return 1 if bad else 0
 
 
