@@ -1,7 +1,7 @@
 /** V-PRD · V-RFQ · V-SCN · V-INFRA · V-DOM · V-API · V-STD — tools/view_build.py 포트. V-UI는 wireframe.ts(vUi).
  *  하위 참조 수·추적표·"근거로 삼은 문서"는 ctx.downstream(GET /api/docs/{id}/downstream, B4)에서 계산한다 —
  *  view_build.downstream_of와 같은 모양 {문서ID: [항목ID들]}. */
-import { esc, h2, inline, itemBlocks, renderBlocks, secName, splitItems, splitSections, type ItemBlock, type RenderCtx } from './md'
+import { BLOCK_START, esc, etcBlock, h2, inline, itemBlocks, renderBlocks, secName, splitItems, splitSections, type ItemBlock, type RenderCtx } from './md'
 import { ITEM_PAT, plain, type ViewFn } from './types'
 
 const card = (id: string, title: string, inner: string, ctx: RenderCtx, cls = 'card') =>
@@ -106,54 +106,99 @@ export const vRfq: ViewFn = ({ body, ctx }) => {
   return { html: out.join('\n') }
 }
 
+/** view_build.scn_parts — S 블록 → 머리·단계들·변형들·꼬리·그 밖 줄 목록. 규약 조각대로 가르고 안 맞는 줄은 그 밖
+ *  (STD-002 V-SCN, #152). 단계는 번호 줄 + 빈 줄 없이 이어진 줄·들여 쓴 줄. 변형은 `**변형` 줄부터 다음 변형·성공 조건·
+ *  연관 줄 전까지 전부. 꼬리는 `**성공 조건`·`**연관` 줄부터 다음 변형 전까지. 코드블록 안 줄은 여는 줄이 든 조각을 따른다 */
+const scnParts = (text: string) => {
+  const head: string[] = []
+  const steps: string[][] = []
+  const variants: string[][] = []
+  const tail: string[] = []
+  const etc: string[] = []
+  let cur = head
+  let mode = 'head'
+  let fence = false
+  let blank = false
+  for (const l of text.split('\n')) {
+    if (fence) {
+      cur.push(l)
+      fence = !l.trimStart().startsWith('```')
+      continue
+    }
+    if (l.startsWith('**변형')) {
+      variants.push([])
+      cur = variants[variants.length - 1]
+      mode = 'var'
+    } else if (l.startsWith('**성공 조건') || l.startsWith('**연관')) {
+      cur = tail
+      mode = 'tail'
+    } else if (mode === 'var' || mode === 'tail') {
+      // 그 변형·꼬리에 그대로
+    } else if (/^\d+\. /.test(l)) {
+      steps.push([])
+      cur = steps[steps.length - 1]
+      mode = 'steps'
+    } else if (mode === 'steps' && (!l.trim() || l[0] === ' ' || l[0] === '\t' || !blank)) {
+      // 그 단계에 — 빈 줄·들여 쓴 줄·빈 줄 없이 이어진 줄
+    } else if (mode === 'steps' || mode === 'etc') {
+      cur = etc
+      mode = 'etc'
+    }
+    cur.push(l)
+    fence = l.trimStart().startsWith('```')
+    blank = !l.trim()
+  }
+  return { head, steps, variants, tail, etc }
+}
+
+/** view_build.step_html — 첫 문단은 번호 옆, 나머지(밑 목록·둘째 문단)는 번호 너비만큼 들여쓰기를 떼고 그 아래 (#152) */
+const stepHtml = (lines: string[], ctx: RenderCtx): string => {
+  const num = /^\d+\. /.exec(lines[0])![0]
+  const rest = lines.slice(1).map((l) => l.replace(new RegExp(`^ {1,${num.length}}`), ''))
+  const lead = [lines[0].slice(num.length)]
+  while (rest.length && rest[0].trim() && !BLOCK_START.test(rest[0])) lead.push(rest.shift()!)
+  return inline(lead.join(' '), ctx) + renderBlocks(rest.join('\n'), ctx)
+}
+
+/** view_build.variant_html — 접힘. 이름은 summary, 첫 줄 나머지부터 다음 표시 줄 전까지가 몸 (#152) */
+const variantHtml = (lines: string[], ctx: RenderCtx): string => {
+  const m = /^\*\*(변형[^*]*)\*\*:?\s*(.*)/.exec(lines[0])
+  const [name, first] = m ? [m[1], m[2]] : ['변형', lines[0]]
+  return `<details class="variant"><summary>${esc(name)}</summary>${renderBlocks([first, ...lines.slice(1)].join('\n'), ctx)}</details>`
+}
+
+/** view_build.scn_card — 머리 ID·제목·`N단계` / 주체·상황 → 단계 타임라인 → 변형(접힘) → 성공 조건·연관 → 그 밖 */
+const scnCard = (b: ItemBlock, ctx: RenderCtx): string => {
+  const p = scnParts(b.text)
+  const lis = p.steps.map((s) => `<li>${stepHtml(s, ctx)}</li>`).join('')
+  const vars = p.variants.map((v) => variantHtml(v, ctx)).join('')
+  return `<article class="scard" id="item-${esc(b.id)}" data-item="${esc(b.id)}"><div class="card-h"><span class="iid">${esc(b.id)}</span><b>${inline(b.title, ctx)}</b><span class="pill soft">${p.steps.length}단계</span></div>${renderBlocks(p.head.join('\n'), ctx)}<ol class="steps">${lis}</ol>${vars}${renderBlocks(p.tail.join('\n'), ctx)}${etcBlock(p.etc, ctx)}</article>`
+}
+
+/** view_build.v_scn — 항목 밖 문장(절 머리·소절 제목·소절 머리)은 원본 순서 그대로, 항목 헤딩 단계와 무관.
+ *  전에는 절 머리를 `### `·`#### ` 글자로 잘라 항목 헤딩이 다른 단계면 절 전체가 한 번 더 그려졌다 (#152) */
 export const vScn: ViewFn = ({ body, ctx }) => {
   const out: string[] = []
   for (const [title, text] of splitSections(body)) {
     const name = secName(title)
     if (name.startsWith('페르소나')) {
-      const cards = itemBlocks(text, /P\d+/)
-        .map((b) => card(b.id, b.title, renderBlocks(b.text, ctx), ctx, 'pcard'))
-        .join('')
-      const lead = text.split(/^#### /m)[0]
-      out.push(`${h2(title)}${renderBlocks(lead, ctx)}<div class="pgrid">${cards}</div>`)
+      let html = ''
+      let grid = '' // 이어진 P 카드끼리 한 그리드
+      for (const p of splitItems(text, /P\d+/)) {
+        if (p.kind === 'item') {
+          grid += card(p.block.id, p.block.title, renderBlocks(p.block.text, ctx), ctx, 'pcard')
+          continue
+        }
+        if (grid) html += `<div class="pgrid">${grid}</div>`
+        grid = ''
+        html += renderBlocks(p.text, ctx)
+      }
+      if (grid) html += `<div class="pgrid">${grid}</div>`
+      out.push(h2(title) + html)
       continue
     }
     if (name.startsWith('시나리오')) {
-      out.push(h2(title) + renderBlocks(text.split(/^### /m)[0], ctx))
-      for (const b of itemBlocks(text, /S\d+/)) {
-        const hd: string[] = []
-        const steps: string[] = []
-        const variants: string[] = []
-        const tail: string[] = []
-        let mode = 'head'
-        for (const l of b.text.split('\n')) {
-          if (/^\d+\. /.test(l)) {
-            mode = 'steps'
-            steps.push(l)
-          } else if (l.startsWith('**변형')) {
-            mode = 'var'
-            variants.push(l)
-          } else if (l.startsWith('**성공 조건') || l.startsWith('**연관')) {
-            mode = 'tail'
-            tail.push(l)
-          } else if (mode === 'head') hd.push(l)
-          else if (mode === 'steps' && l.trim() && !l.startsWith('**')) {
-            if (steps.length) steps[steps.length - 1] += '\n' + l
-          } else if (mode === 'var') variants.push(l)
-          else if (mode === 'tail') tail.push(l)
-        }
-        let varHtml = ''
-        for (const v of variants.filter((x) => x.trim())) {
-          const m = /\*\*(변형[^*]*)\*\*:?\s*(.*)/.exec(v)
-          varHtml += m
-            ? `<details class="variant"><summary>${esc(m[1])}</summary><p>${inline(m[2], ctx)}</p></details>`
-            : `<p>${inline(v, ctx)}</p>`
-        }
-        const stepHtml = steps.map((x) => `<li>${inline(x.split('\n')[0].replace(/^\d+\. /, ''), ctx)}</li>`).join('')
-        out.push(
-          `<article class="scard" id="item-${esc(b.id)}" data-item="${esc(b.id)}"><div class="card-h"><span class="iid">${esc(b.id)}</span><b>${inline(b.title, ctx)}</b><span class="pill soft">${steps.length}단계</span></div>${renderBlocks(hd.join('\n'), ctx)}<ol class="steps">${stepHtml}</ol>${varHtml}${renderBlocks(tail.join('\n'), ctx)}</article>`,
-        )
-      }
+      out.push(h2(title) + splitItems(text, /S\d+/).map((p) => (p.kind === 'text' ? renderBlocks(p.text, ctx) : scnCard(p.block, ctx))).join(''))
       continue
     }
     out.push(h2(title) + renderBlocks(text, ctx, ITEM_PAT.SCN))
