@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -922,6 +922,22 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 ---
 
+#### AH 목표·제약도 본문까지 — 뷰는 원본 문장을 버리지 않는다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-STD-002]] V-PRD·V-INFRA · [[SYNC-STD-001]] 2.2·2.5·4장 · [[SYNC-MS-002#SpecService.validate]] · #120 · 사용자 결정 2026-09-23 |
+| 구현 | `view_build.py`·`md.ts`·`views.ts`에 `split_items`/`splitItems` — 절 본문을 원본 순서대로 항목과 항목 밖 문장으로 가른다(`item_blocks`는 그것을 거른 것). 목표·제약을 R·N과 같은 **카드**로(카드 하나를 셋이 같이 — 머리 ID·제목·`하위 N`, 몸 본문 전부, 바닥 「이 목표/제약을 근거로 삼은 문서」). 요구사항 절 머리·소절 머리 문장을 그대로, 빈 소제목을 없앤다. 제약 꼬리 하드코딩(「이 설계의 두 축」)을 지우고 SYNC-INFRA-001의 그 문단을 절 머리로 옮긴다. `SpecService.validate` 7 `constraint.source`(원형 `tools/validate.py`·화면 문구도) · `view_build.py --selftest` 신설 |
+| 테스트 | `constraint.source` — 출처 있음·없음·`출처: RFQ`(링크 아님)·문단 끝 `근거:`만·코드블록 안 `출처:`만 · SYNC 명세 전부 위반 0·경고 0 유지 · `view_build --selftest`(G·C 본문 · 절 머리·소절 머리 · 빈 소제목 없음 · 앵커) · `check_templates` · 사람이 배포 뒤 HB·SYNC·QBOT의 PRD·INFRA를 브라우저에서 |
+| 선행 | — |
+| 완료 | — |
+
+**왜 카드인가.** 코드는 규약(STD-002 V-PRD·V-INFRA)대로 버리고 있었다 — 고칠 것은 규약이라 DEV-15의 `fix`가 아니다. 규약은 「G: 한 줄」·「제약 한 줄 + 출처」라 표가 맞았는데, STD-001 5장 예시와 `get_template`은 제목 아래에 본문을 두었다. 에이전트는 예시를 따라 근거 문장을 쓰고, 뷰는 규약을 따라 그것을 버렸다. 규약·예시·뷰가 서로 다른 말을 하고 있어서 셋을 같이 고친다.
+
+**왜 아무도 못 봤나.** SYNC 자기 문서는 G가 제목뿐이고 C가 출처 한 줄이라 표로 잃는 것이 없었다. 처음 쓰는 사람(HB 온보딩 시험)이 예시대로 본문을 쓰자 드러났다. 꼬리 문단 하드코딩은 카드 V가 원본 문장을 바꾼 날부터 SYNC에서도 틀렸지만, 정적 뷰와 앱이 **똑같이** 틀려 대조로도 못 잡았다(#153).
+
+---
+
 ## 2. 통합 테스트 시나리오
 
 시나리오 S1~S7을 그대로 E2E 테스트로. 각 슬라이스의 `테스트` 행에 나눠 들어가 있다. 전부 통과하면 PRD 성공지표 측정을 시작한다.
@@ -985,6 +1001,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AF | `card/AF-webhook` | `1770920`~ | #144 · #146 | 2026-09-22 |
 | AG | `card/AG-subtype-templates` | `8850433` | #148 | 2026-09-23 |
 | (#124) | `fix/124-cache-headers` | — | #124 | 2026-09-23 |
+| AH | `card/AH-item-bodies` | — | — | 2026-09-23 |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 | X | `card/X-ui-doc` | `7a4e821`~ | #103 | 2026-09-21 |
