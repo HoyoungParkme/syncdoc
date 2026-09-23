@@ -93,9 +93,14 @@ def spec_dir(doc_id):
     return f"{n:02d}-{typ}" if n else typ
 
 
+# 정적 뷰가 배치의 상대 경로를 푸는 기준. 싱크독 자기 뷰(docs/views/)면 ../specs/, 다른 저장소의 뷰
+# (싱크독 docs/views/{코드}/)면 그 저장소 docs/specs의 file:// 절대 경로 — view_build.use_root가 바꾼다 (#126)
+SPECS_BASE = "../specs/"
+
+
 def base_for(doc_id):
-    """정적 뷰(docs/views/)에서 문서 폴더 기준 상대 경로가 맞도록 하는 `<base href>`."""
-    return f"../specs/{spec_dir(doc_id)}/"
+    """정적 뷰에서 문서 폴더 기준 상대 경로가 맞도록 하는 `<base href>`."""
+    return f"{SPECS_BASE}{spec_dir(doc_id)}/"
 
 
 def frame_html(layout, common, base):

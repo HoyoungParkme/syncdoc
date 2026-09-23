@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
 """싱크독 사람용 뷰 생성기. STD-002 뷰 규약의 구현.
-사용: view_build.py <원본.md> [출력.html] · --all(전부 + index.html) · --selftest(원본 문장을 버리지 않는지)
+사용: view_build.py [--specs <저장소>/docs/specs] (--all | <원본.md>…) · --selftest
+  --all       그 뿌리의 문서 전부 + index.html
+  <원본.md>   그 문서만. --specs 없이 경로만 주면 그 문서가 있는 docs/specs를 색인한다
+  다른 저장소의 뷰는 싱크독 docs/views/{코드}/에 쓴다 — 그 저장소를 건드리지 않는다 (#126)
 frontmatter type을 보고 V-* 모듈로 본문을 그린다. 공통 틀은 한 곳."""
-import re, json, html, sys, glob, os
+import re, json, html, sys, glob, os, pathlib
+
+# 스크립트로 돌면 이 파일은 __main__이다. wf_build가 안에서 `import view_build`를 하면 모듈이 한 벌 더
+# 떠서 색인(ALL)을 따로 든다 — 다른 저장소를 색인해도 화면 문서의 참조가 싱크독 색인으로 판정됐다 (#126)
+if __name__ == "__main__":
+    sys.modules.setdefault("view_build", sys.modules[__name__])
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SRC_DIR = os.path.join(ROOT, "docs", "specs")
@@ -36,6 +44,20 @@ def load_all():
 ALL = load_all()
 # 프로젝트 코드는 문서 이름에서 읽는다 — 한 저장소 = 한 프로젝트 (STD-004 4장, #57)
 CODE = sorted({d.split("-")[0] for d in ALL})[0] if ALL else "?"
+
+def use_root(specs_dir, out_dir=None):
+    """명세 뿌리를 바꾼다 — 기본값만 자기 저장소다 (STD-004, #126).
+    싱크독 자기 뿌리면 출력은 docs/views/, 다른 뿌리면 docs/views/{코드}/ — 그 저장소를 건드리지 않는다.
+    그때 배치의 상대 경로(<base>)는 그 저장소 docs/specs를 file:// 절대 경로로 가리킨다"""
+    global SRC_DIR, OUT_DIR, CODE
+    import wf_build as wf
+    SRC_DIR = os.path.abspath(specs_dir)
+    ALL.clear(); ALL.update(load_all())
+    CODE = sorted({d.split("-")[0] for d in ALL})[0] if ALL else "?"
+    own = SRC_DIR == os.path.join(ROOT, "docs", "specs")
+    OUT_DIR = out_dir or (os.path.join(ROOT, "docs", "views") if own else os.path.join(ROOT, "docs", "views", CODE))
+    wf.SPECS_BASE = "../specs/" if own else pathlib.Path(SRC_DIR).as_uri() + "/"
+    os.makedirs(OUT_DIR, exist_ok=True)
 
 def view_href(doc_id): return f"view_{doc_id}.html"
 
@@ -575,10 +597,14 @@ footer{margin-top:20px;font-size:12.5px;color:var(--soft)}
 """
 
 def build(src):
+    """문서 하나 → OUT_DIR/view_{ID}.html. 색인에 없는 문서면 안내 한 줄과 1 (전에는 KeyError, #126)"""
     raw = open(src, encoding="utf-8").read()
     m = re.match(r"^---\n(.*?)\n---\n", raw, re.S)
-    fm = {k.strip(): v.strip() for k, v in (l.partition(":")[::2] for l in m.group(1).split("\n"))}
-    doc = ALL[fm["doc_id"]]
+    fm = {k.strip(): v.strip() for k, v in (l.partition(":")[::2] for l in m.group(1).split("\n"))} if m else {}
+    doc = ALL.get(fm.get("doc_id", ""))
+    if doc is None:
+        print(f"모르는 문서 {fm.get('doc_id') or os.path.basename(src)} — 그 문서가 있는 docs/specs를 --specs로 준다 (지금 뿌리: {SRC_DIR})")
+        return 1
     typ = fm["type"]
     fn = VIEWS.get(typ)
     body_html = fn(doc) if fn else v_plain(doc, ITEM_PAT.get(typ, r"\S+"))
@@ -586,6 +612,7 @@ def build(src):
     path = os.path.join(OUT_DIR, view_href(fm["doc_id"]))
     open(path, "w", encoding="utf-8").write(out)
     print(f"{fm['doc_id']} ({typ}, {'V-'+typ if fn else '원본 순서'}) → {os.path.basename(path)}")
+    return 0
 
 def build_index():
     order = ["RFQ","PRD","SCN","UC","INFRA","DOM","UI","API","SEQ","MS","CODE","STD"]
@@ -709,11 +736,100 @@ def _selftest():
     print("V-PRD·V-INFRA: 통과" if not bad else f"V-PRD·V-INFRA: {len(bad)} 실패")
     return 0 if not bad else 1
 
-if __name__ == "__main__":
-    if sys.argv[1:] == ["--selftest"]:
-        sys.exit(_selftest())
-    if sys.argv[1:] == ["--all"]:
+_ROOT_PRD = """---
+doc_id: TX-PRD-001
+type: PRD
+title: 다른 저장소 PRD
+status: draft
+upstream: []
+---
+
+# 다른 저장소 PRD
+
+## 1. 목표
+
+#### G1 첫 목표
+"""
+_ROOT_UI = """---
+doc_id: TX-UI-001
+type: UI
+title: 화면 설계 — 다른 저장소
+status: draft
+upstream: [TX-PRD-001]
+---
+
+# 화면 설계
+
+## UI-1 첫 화면
+
+```html
+<div data-el="1"><img src="../assets/a.png">상자</div>
+```
+
+### 요소
+
+| # | 이름 | 종류 | 보여주는 것 | 누르면 |
+|---|---|---|---|---|
+| 1 | 상자 | 영역 | 근거 [[TX-PRD-001#G1]] | — |
+"""
+
+def _selftest_root():
+    """다른 저장소의 docs/specs를 색인하는지 (#126). 임시 폴더에 문서 둘 — 전역은 끝나면 되돌린다"""
+    global SRC_DIR, OUT_DIR, CODE
+    import io, tempfile, contextlib, wf_build as wf
+    saved = (SRC_DIR, OUT_DIR, CODE, dict(ALL), wf.SPECS_BASE)
+    cases = []
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            specs = os.path.join(tmp, "docs", "specs")
+            for sub, name, raw in (("02-PRD", "TX-PRD-001.md", _ROOT_PRD), ("07-UI", "TX-UI-001.md", _ROOT_UI)):
+                os.makedirs(os.path.join(specs, sub))
+                open(os.path.join(specs, sub, name), "w", encoding="utf-8").write(raw)
+            out = os.path.join(tmp, "views")
+            use_root(specs, out)
+            with contextlib.redirect_stdout(io.StringIO()):
+                ok_ui = build(os.path.join(specs, "07-UI", "TX-UI-001.md"))
+                own_doc = build(os.path.join(ROOT, "docs", "specs", "02-PRD", "SYNC-PRD-001.md"))
+            page = open(os.path.join(out, "view_TX-UI-001.html"), encoding="utf-8").read() if ok_ui == 0 else ""
+            cases = [
+                ("그 뿌리만 색인", sorted(ALL) == ["TX-PRD-001", "TX-UI-001"] and CODE == "TX"),
+                ("배치 기준은 file:// 절대 경로", wf.base_for("TX-UI-001") == pathlib.Path(specs).as_uri() + "/07-UI/" and "file://" in page),
+                ("화면 문서의 참조도 그 뿌리로 판정", 'class="ref" href="view_TX-PRD-001.html#item-G1"' in page),
+                ("색인 밖 문서는 KeyError 대신 1", own_doc == 1),
+            ]
+    finally:
+        SRC_DIR, OUT_DIR, CODE, all_, wf.SPECS_BASE = saved
+        ALL.clear(); ALL.update(all_)
+    bad = [name for name, ok in cases if not ok] or ([] if cases else ["돌지 못함"])
+    for name in bad:
+        print("✗ ", name)
+    print("다른 저장소 뿌리: 통과" if not bad else f"다른 저장소 뿌리: {len(bad)} 실패")
+    return 0 if not bad else 1
+
+def main(argv):
+    """[--specs <저장소>/docs/specs] (--all | <원본.md>…) · --selftest"""
+    if argv == ["--selftest"]:
+        return _selftest() | _selftest_root()
+    specs = None
+    if "--specs" in argv:
+        i = argv.index("--specs")
+        if i + 1 >= len(argv):
+            print("--specs 뒤에 <저장소>/docs/specs를 준다"); return 2
+        specs, argv = argv[i + 1], argv[:i] + argv[i + 2:]
+    files = [a for a in argv if a != "--all"]
+    if specs is None and files:
+        # 경로만 주면 그 문서가 있는 docs/specs — 파일은 docs/specs/{NN-TYPE}/{ID}.md다 (STD-001 1.1)
+        roots = {os.path.dirname(os.path.dirname(os.path.abspath(f))) for f in files}
+        if len(roots) > 1:
+            print("한 번에 준 문서들은 같은 저장소여야 한다 — 뿌리: " + " · ".join(sorted(roots))); return 2
+        specs = roots.pop()
+    if specs is not None:
+        use_root(specs)
+    if "--all" in argv:
         for d in ALL.values(): build(d["path"])
         build_index()
-    else:
-        for s in sys.argv[1:]: build(s)
+        return 0
+    return max([build(f) for f in files], default=0)
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
