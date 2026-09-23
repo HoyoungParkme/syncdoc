@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -43,6 +43,7 @@ upstream: [SYNC-UI-001]
 - 머리: 제목 · 메타 · 닫기(`✕`)
 - 발: 왼쪽에 힌트 텍스트, 오른쪽에 취소·확인 버튼
 - 바깥을 누르면 닫힌다. 카드 안 클릭은 바깥으로 새지 않는다
+- **Esc로 닫힌다** — 바깥을 누른 것과 같다. 겹쳐 떠 있으면 맨 위 하나만 닫는다. 한글 조합 중에는 닫지 않는다 — 조합을 끝내는 Esc가 다이얼로그까지 닫으면 쓰던 글이 날아간다. 진행 중이라 바깥 클릭을 막은 때(UI-14 재구축 중)는 Esc도 막는다. 그림 전체보기(1.7)도 같은 방식이다(#117)
 - **확인 버튼의 라벨이 상태를 말한다.** `휴지통에 넣기` / `삭제하고 되돌리기`처럼, 누르면 무슨 일이 생기는지 버튼에 적는다
 - 다이얼로그 위에 다이얼로그가 뜰 수 있다 — UI-13 위의 재구축 확인이 그렇다
 
@@ -597,7 +598,10 @@ status: draft
   .stgh .sw.na{background:#fff;border:1px solid var(--line)}
   .stg{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--hair);font-size:14px}
   .stg .no{width:20px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--dim)}
-  .stg .nm{font-weight:500;width:110px}
+  .stg .nm{font-weight:500;width:190px;flex:none}
+  .stg .nm .cd{margin-left:6px;font-family:var(--mono);font-size:11px;font-weight:400;color:var(--mute)}
+  .stg .ids{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:2px 12px}
+  .stg .ids a{font-family:var(--mono);font-size:12.5px;color:var(--ink3);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
   .stg .n{font-size:12.5px;color:var(--ink3)}
   .stg .caret{width:12px;text-align:center;color:var(--ink3);font-size:11.5px}
   .stg.dim{opacity:.55}
@@ -642,25 +646,25 @@ status: draft
           <span class="mini"><i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i><i class="sw ok"></i><i class="sw"></i><i class="sw"></i><i class="sw"></i><i class="sw"></i><i class="sw na"></i></span>
         </div>
 
-        <div class="stg" data-el="4.1"><span class="no">1</span><span class="nm">RFQ</span><span class="pill ok">완료</span><span class="sp"></span><span class="n">1개</span><span class="caret">▾</span></div>
+        <div class="stg" data-el="4.1"><span class="no">1</span><span class="nm">요구·인터뷰<span class="cd">RFQ</span></span><span class="pill ok">완료</span><span class="sp"></span><span class="n">문서 1개</span><span class="caret">▾</span></div>
         <div class="doc" data-el="4.2"><span class="m">SYNC-RFQ-001</span><span class="dot ok"></span><span class="lbl">완료 · v3 · 2일 전 · 박호영</span></div>
 
-        <div class="stg"><span class="no">2</span><span class="nm">PRD</span><span class="pill ok">완료</span><span class="sp"></span><span class="n">1개</span><span class="caret">▸</span></div>
-        <div class="stg"><span class="no">3</span><span class="nm">SCN</span><span class="pill ok">완료</span><span class="sp"></span><span class="n">1개</span><span class="caret">▸</span></div>
-        <div class="stg"><span class="no">4</span><span class="nm">UC</span><span class="pill ok">완료</span><span class="gate" data-el="4.3">상위 미완료</span><span class="sp"></span><span class="n">1개</span><span class="caret">▸</span></div>
-        <div class="stg"><span class="no">5</span><span class="nm">INFRA</span><span class="pill ok">완료</span><span class="sp"></span><span class="n">1개</span><span class="caret">▸</span></div>
-        <div class="stg"><span class="no">6</span><span class="nm">DOM</span><span class="pill ok">완료</span><span class="sp"></span><span class="n">3개</span><span class="caret">▸</span></div>
+        <div class="stg"><span class="no">2</span><span class="nm">제품 요구<span class="cd">PRD</span></span><span class="pill ok">완료</span><span class="ids" data-el="4.5"><a>SYNC-PRD-001</a></span><span class="n">문서 1개</span><span class="caret">▸</span></div>
+        <div class="stg"><span class="no">3</span><span class="nm">사용자 시나리오<span class="cd">SCN</span></span><span class="pill ok">완료</span><span class="ids"><a>SYNC-SCN-001</a></span><span class="n">문서 1개</span><span class="caret">▸</span></div>
+        <div class="stg"><span class="no">4</span><span class="nm">유스케이스<span class="cd">UC</span></span><span class="pill ok">완료</span><span class="gate" data-el="4.3">상위 미완료</span><span class="ids"><a>SYNC-UC-001</a></span><span class="n">문서 1개</span><span class="caret">▸</span></div>
+        <div class="stg"><span class="no">5</span><span class="nm">인프라 아키텍처<span class="cd">INFRA</span></span><span class="pill ok">완료</span><span class="ids"><a>SYNC-INFRA-001</a></span><span class="n">문서 1개</span><span class="caret">▸</span></div>
+        <div class="stg"><span class="no">6</span><span class="nm">도메인·클래스·데이터<span class="cd">DOM</span></span><span class="pill ok">완료</span><span class="ids"><a>SYNC-DOM-001</a><a>SYNC-DOM-002</a><a>SYNC-DOM-003</a></span><span class="n">문서 3개</span><span class="caret">▸</span></div>
 
-        <div class="stg"><span class="no">7</span><span class="nm">UI</span><span class="pill">초안</span><span class="sp"></span><span class="n">2개</span><span class="caret">▾</span></div>
+        <div class="stg"><span class="no">7</span><span class="nm">화면<span class="cd">UI</span></span><span class="pill">초안</span><span class="sp"></span><span class="n">문서 2개</span><span class="caret">▾</span></div>
         <div class="doc"><span class="m">SYNC-UI-001</span><span class="dot ok"></span><span class="lbl">완료 · v5 · 어제 · 에이전트(박호영)</span></div>
         <div class="doc"><span class="m">SYNC-UI-002</span><span class="dot"></span><span class="lbl">초안 · v2 · 3시간 전 · 에이전트(박호영)</span><span class="sp"></span><span class="mis">끊어진 참조 1</span></div>
 
-        <div class="stg"><span class="no">8</span><span class="nm">API</span><span class="pill">초안</span><span class="sp"></span><span class="n">2개</span><span class="caret">▸</span></div>
-        <div class="stg"><span class="no">9</span><span class="nm">SEQ</span><span class="pill">초안</span><span class="sp"></span><span class="n">1개</span><span class="caret">▸</span></div>
-        <div class="stg"><span class="no">10</span><span class="nm">MS</span><span class="pill">초안</span><span class="sp"></span><span class="n">3개</span><span class="caret">▸</span></div>
-        <div class="stg"><span class="no">11</span><span class="nm">CODE</span><span class="mute" style="font-size:12.5px">미작성</span><span class="sp"></span></div>
+        <div class="stg"><span class="no">8</span><span class="nm">인터페이스<span class="cd">API</span></span><span class="pill">초안</span><span class="ids"><a>SYNC-API-001</a><a>SYNC-API-002</a></span><span class="n">문서 2개</span><span class="caret">▸</span></div>
+        <div class="stg"><span class="no">9</span><span class="nm">시퀀스<span class="cd">SEQ</span></span><span class="pill">초안</span><span class="ids"><a>SYNC-SEQ-001</a></span><span class="n">문서 1개</span><span class="caret">▸</span></div>
+        <div class="stg"><span class="no">10</span><span class="nm">MINISPEC<span class="cd">MS</span></span><span class="pill">초안</span><span class="ids"><a>SYNC-MS-001</a><a>SYNC-MS-002</a><a>SYNC-MS-003</a></span><span class="n">문서 3개</span><span class="caret">▸</span></div>
+        <div class="stg"><span class="no">11</span><span class="nm">구현 계획<span class="cd">CODE</span></span><span class="mute" style="font-size:12.5px">미작성</span><span class="sp"></span></div>
 
-        <div class="stg" data-el="4.4"><span class="no">—</span><span class="nm">표준 (STD)</span><span class="pill">초안</span><span class="sp"></span><span class="n">4개</span><span class="caret">▸</span></div>
+        <div class="stg" data-el="4.4"><span class="no">—</span><span class="nm">표준<span class="cd">STD</span></span><span class="pill">초안</span><span class="ids"><a>SYNC-STD-001</a><a>SYNC-STD-002</a><a>SYNC-STD-003</a><a>SYNC-STD-004</a></span><span class="n">문서 4개</span><span class="caret">▸</span></div>
 
         <!-- 휴지통. 0건이면 묶음 자체가 없다. 흐리게 -->
         <div class="stg dim" data-el="8"><span class="no">—</span><span class="nm">휴지통</span><span class="sp"></span><span class="n">1개</span><span class="caret">▾</span></div>
@@ -728,10 +732,11 @@ status: draft
 | 3.4 | 규약 오류 | 수치 | has_convention_error 문서 수 | 목록 다이얼로그(6) |
 | 3.5 | 미완성 | 수치 | incomplete_warnings가 있는 문서 수 | 목록 다이얼로그(6) |
 | 4 | 11단계 표 | 표 | 단계 행(4.1)과 그 아래 문서 행(4.2) | — |
-| 4.1 | 단계 행 | 행 | 순번, 단계 이름, 대표 상태, 문서 수. 문서가 여럿이면 **가장 낮은 상태**(UC-H14 1a). 문서 없으면 `미작성`(3a) | 문서 행 접기/펼치기 |
+| 4.1 | 단계 행 | 행 | 순번, 단계 이름(사람 말 — 사용 방법 UI-16과 같은 이름) + 코드(작은 회색), 대표 상태, `문서 N개`. 접혀 있으면 문서 링크(4.5). 문서가 여럿이면 **가장 낮은 상태**(UC-H14 1a). 문서 없으면 `미작성`(3a)이고 수는 `—` | 문서 행 접기/펼치기 |
 | 4.2 | 문서 행 | 행 | 문서 ID, 상태, 버전, 최근 수정 시각·주체, 끊어진 참조 수, 규약 오류 | UI-5로 |
 | 4.3 | 상위 미완료 표시 | 뱃지 | 이 단계에 문서가 있는데 앞 단계에 초안 문서가 있을 때(UC-H14 1b). 막지 않는다 | — |
-| 4.4 | 표준 묶음 | 행 | 11단계 밖 `STD` 문서. 대표 상태·문서 수. 없으면(다른 프로젝트) 행 자체가 없음 | 문서 행 접기/펼치기 |
+| 4.4 | 표준 묶음 | 행 | 11단계 밖 `STD` 문서. 모양은 4.1과 같다 — 이름 `표준` + 코드 `STD`, 대표 상태, `문서 N개`, 접혀 있으면 문서 링크(4.5). 없으면(다른 프로젝트) 행 자체가 없음 | 문서 행 접기/펼치기 |
+| 4.5 | 문서 링크 | 링크 | **접힌** 단계 행(4.1·4.4) 안의 그 단계 문서 ID 전부. 한 줄에 안 들어가면 행 안에서 줄을 바꾼다. 펼치면 사라진다 — 아래 문서 행(4.2)과 겹치지 않게 | UI-5로. 행의 접기/펼치기는 일어나지 않는다 |
 | 5 | 최근 변경 | 목록 | 이 프로젝트의 최근 버전·상태 변경 N건. 커밋 메시지 접두어(`spec`/`status`)로 구분 | 문서 클릭 → UI-5 |
 | 6 | 목록 다이얼로그 | 다이얼로그 | 3.x에서 누른 종류의 항목 목록. 항목·원인·시각 | 항목 클릭 → 그 문서의 UI-5 해당 위치 |
 | 7 | 동기화 상태 | 영역 | 최근 변경 아래. 이 저장소를 어디까지 처리했나 | — |
@@ -755,6 +760,8 @@ status: draft
   시나리오 S-1도 "단계 행을 누르면 문서 행이 펼쳐지고"로 접힌 상태에서 출발한다
 - UI-2 칸에서 `#stage-N`으로 들어오면 **그 단계만 펼친 채로** 연다(UI-2 요소 2.2 "그 단계 위치")
 - 문서 행은 46px 들여쓰고 바탕을 한 톤 낮춘다(`#fdfdfc`). 단계 행과 같은 높이로 두면 어느 쪽이 묶음인지 안 보인다
+- **단계 행이 문서처럼 보이면 안 된다(#116).** 코드만 적으면(`PRD`) 문서 ID(`HB-PRD-001`)의 일부처럼 읽혀, 처음 온 사람이 단계 행을 문서로 알고 눌렀다. 그래서 이름은 사람 말로 앞에 두고 코드는 작게, 오른쪽은 `1개`가 아니라 `문서 1개`로 무엇이 펼쳐지는지 말한다. 접힌 행에는 그 단계 문서 ID를 링크로 보여, 펼치지 않고도 들어가는 길을 둔다(4.5)
+- 단계 이름과 `문서 N개 ▸`에 마우스를 올리면 툴팁(1.2) 「눌러서 문서 펼치기」(펼쳐져 있으면 「눌러서 접기」). 문서 링크(4.5) 위에서는 뜨지 않는다 — 누르면 문서로 가기 때문이다. 문서가 없는 단계는 펼칠 것이 없어 툴팁·캐럿이 없다
 - 요약 수치(3)는 **17.5px 고정폭**. 0이면 흐리게(`opacity .55`), 1 이상이면 경고색 숫자에 경고 테두리
 - 4.1의 대표 상태는 그 단계 문서들 중 가장 낮은 것. 완료 2개 + 초안 1개면 `초안`
 - 4.3은 표시만 한다. 순서는 권장이지 강제가 아니다(PRD 비목표)
