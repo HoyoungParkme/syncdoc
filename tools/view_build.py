@@ -378,59 +378,362 @@ def v_scn(doc):
     return "\n".join(out)
 
 # ───────────────────────── V-UC ─────────────────────────
-def v_uc(doc):
-    """1 액터 → 2 유스케이스 발견·명세(좌 목록 / 우 상세) → 3 패키지(탭 + UML 다이어그램) → 4 대응표.
-    파싱과 다이어그램 JS는 기존 parse.py·build.py에서 가져온다."""
-    import subprocess, importlib.util
-    did = doc["fm"]["doc_id"]
-    subprocess.run(["python3", os.path.join(os.path.dirname(__file__), "parse.py")], capture_output=True)
-    data = json.load(open(os.path.join(os.path.dirname(__file__), "data.json"), encoding="utf-8"))
-    bp = open(os.path.join(os.path.dirname(__file__), "build.py"), encoding="utf-8").read()
-    css = re.search(r"<style>(.*?)</style>", bp, re.S).group(1)
-    js = re.search(r'<script>\n(const D=JSON.*?)</script>\n</body>', bp, re.S).group(1)
-    # 패키지 목록은 데이터에서
-    pkgs = []
-    for u in data["ucs"]:
-        if u["package"] not in pkgs: pkgs.append(u["package"])
-    js = js.replace('const PKGS=["명세 조회","명세 작성","변경 추적","검토·확정","연동·표현"];', "const PKGS=" + json.dumps(pkgs, ensure_ascii=False) + ";")
-    # 상세 안 [[ ]] 참조를 링크로
-    js = js.replace('const linkUC=s=>md(s).replace(/(UC-[AHGS]\\d+)/g,\'<span class="jump" data-jump="$1">$1</span>\');',
-        'const linkUC=s=>md(s).replace(/\\[\\[#(UC-[AHGS]\\d+)\\]\\]/g,\'<span class="jump" data-jump="$1">$1</span>\').replace(/\\[\\[([A-Z]+-[A-Z]+-\\d+)#([^\\]]+)\\]\\]/g,\'<a class="ref" href="view_$1.html#item-$2">$1#$2</a>\').replace(/\\[\\[([A-Z]+-[A-Z]+-\\d+)\\]\\]/g,\'<a class="ref" href="view_$1.html">$1</a>\').replace(/(?<![\\w#-])(UC-[AHGS]\\d+)(?![\\w"])/g,\'<span class="jump" data-jump="$1">$1</span>\');')
-    # 1. 액터 표 (원본 1장)
-    actor_sec = next((t for n, t in split_sections(doc["body"]) if re.sub(r"^\d+\.\s*", "", n).startswith("액터")), "")
-    # 3장 서문(하위기능 설명)
-    body = f"""
-<h2><span class="n">1</span>액터 식별</h2>
-{render_blocks(actor_sec, did)}
+UC_PAT = r"UC-[AHGS]\d+"
+UC_ACTOR = {"A": "agent", "H": "human", "G": "github", "S": "system"}
+UC_HEX = {"agent": "#12776A", "human": "#3A5BA0", "github": "#6B4A9E", "system": "#8A6D1F"}
+UC_LABEL = {"agent": "에이전트", "human": "사람", "github": "GitHub", "system": "하위기능"}
+UC_REL = ("패키지", "포함", "확장점", "일반화")
+UC_FLOW = re.compile(r"^\*\*(기본 흐름[^*]*)\*\*(.*)$")
+UC_EXT = re.compile(r"^\*\*(확장(?!점)[^*]*)\*\*(.*)$")
+UC_NOTE = re.compile(r"^\*\*(사후조건 참고[^*]*)\*\*(.*)$")
+UC_LINK = re.compile(r"^\*\*(연관[^*]*)\*\*(.*)$")
+UC_EXT_ITEM = re.compile(r"^- \*\*(.+?)\*\*(.*)$")
+UC_STEP = re.compile(r"^(\d+\.\s+)")
+UC_CHIP = re.compile(r"(?<![A-Za-z0-9_#-])(UC-[AHGS]\d+|[AHGS]\d+)(?![A-Za-z0-9_])")  # 대응표 칩 — 맨몸 UC-A1·짧은 A1
 
-<h2><span class="n">2</span>유스케이스 발견·명세</h2>
-<p class="soft">왼쪽에서 고르면 오른쪽에 Cockburn 12행 표 + 기본 흐름 + 확장. 흐름 안 <span class="jump">UC-xx</span>를 누르면 그리로.</p>
-<div class="spec" id="spec">
-  <nav class="nav" id="nav"></nav>
-  <article class="detail" id="detail" aria-live="polite"></article>
-</div>
+def uc_key(k):
+    """항목 표 행 이름 — 괄호 앞만 본다(`포함(include)` = `포함`)"""
+    return re.sub(r"\s*\(.*\)\s*$", "", k).strip()
 
-<h2><span class="n">3</span>패키지</h2>
-<p class="soft">유스케이스를 기능 영역으로 묶은 것. 다이어그램의 관계선은 원본 표의 <code>포함</code>·<code>확장점</code>·<code>일반화</code>에서 그려진다. 타원을 누르면 2번 명세로.</p>
-<div class="tabs" id="tabs" role="tablist"></div>
-<div class="canvas"><svg id="dg" xmlns="http://www.w3.org/2000/svg"></svg></div>
-<div class="key">
+def _uc_after(s):
+    """`**연관**: …`의 머리 뒤 글 — 쌍점과 빈칸을 뗀다"""
+    return re.sub(r"^\s*:?\s*", "", s)
+
+def uc_parts(text):
+    """유스케이스 블록 하나를 줄 단위로 가른다(코드 펜스 인식) → {rows, flows, exts, note, links, etc} (STD-002 V-UC, #152).
+    항목 표 = 첫 두 칸 표(머리 행은 뺀다). `**기본 흐름…**`·`**확장…**`·`**사후조건 참고**`·`**연관**` 줄이 조각을 연다 —
+    흐름은 번호 줄이 단계, 확장은 `- **2a. 제목**` 줄이 한 확장이고, 빈 줄 없이 이어진 줄·들여 쓴 줄은 그 안.
+    어디에도 안 맞는 줄은 etc(「그 밖」). frontend uc.ts ucParts와 같은 규칙"""
+    import wf_build as wf
+    lines = text.split("\n"); n = len(lines)
+    fenced, _ = wf._fences(lines)
+    used, rows = set(), []
+    trows, a, b = wf._first_table(lines, fenced, 0, n)
+    if len(trows) >= 2 and all(len(r) == 2 for r in trows):
+        rows = [(r[0], r[1]) for r in trows[1:]]
+        used.update(range(a, b))
+    flows, exts, note, links = [], [], None, None
+    mode, into, blank, fence = "", None, False, False
+    for i in range(n):
+        if i in used: continue
+        l = lines[i]
+        if fence:
+            if into is not None: into.append(l); used.add(i)
+            fence = not l.lstrip().startswith("```")
+            continue
+        if (m := UC_FLOW.match(l)):
+            flows.append({"name": m.group(1).strip(), "lead": _uc_after(m.group(2)), "steps": []}); mode, into = "flow", None; used.add(i)
+        elif (m := UC_EXT.match(l)):
+            exts.append({"name": m.group(1).strip(), "lead": _uc_after(m.group(2)), "items": []}); mode, into = "ext", None; used.add(i)
+        elif (m := UC_NOTE.match(l)):
+            note = {"name": m.group(1).strip(), "lines": [_uc_after(m.group(2))]}; mode, into = "note", note["lines"]; used.add(i)
+        elif (m := UC_LINK.match(l)):
+            links = {"name": m.group(1).strip(), "lines": [_uc_after(m.group(2))]}; mode, into = "link", links["lines"]; used.add(i)
+        elif mode == "flow" and UC_STEP.match(l):
+            into = [l]; flows[-1]["steps"].append(into); used.add(i)
+        elif mode == "ext" and (m := UC_EXT_ITEM.match(l)):
+            it = {"on": m.group(1).strip(), "extra": m.group(2), "lines": []}; exts[-1]["items"].append(it); into = it["lines"]; used.add(i)
+        elif into is not None and (not l.strip() or l[:1] in (" ", "\t") or not blank):
+            into.append(l); used.add(i)  # 이어진 줄 — 빈 줄 없이 이어지거나 들여 쓴 줄
+        else:
+            into = None  # 그 밖 — 모드는 그대로(다음 번호 줄은 같은 흐름)
+        fence = l.lstrip().startswith("```"); blank = not l.strip()
+    etc, gap = [], False
+    for i in range(n):
+        if i in used: gap = True; continue
+        if gap and etc and etc[-1].strip(): etc.append("")  # 쓰인 줄을 건너뛴 자리 — 앞뒤 문단이 붙지 않게
+        gap = False; etc.append(lines[i])
+    return {"rows": rows, "flows": flows, "exts": exts, "note": note, "links": links, "etc": etc}
+
+def uc_inner(uid, p, did):
+    """카드 몸 — 항목 표 → 기본 흐름 → 확장 → 사후조건 참고 → 연관 → 그 밖 (문서 순서, STD-002 V-UC)"""
+    hexc = UC_HEX[UC_ACTOR.get(uid[3:4], "system")]
+    h = ""
+    if p["rows"]:
+        trs = ""
+        for k, v in p["rows"]:
+            key = uc_key(k)
+            # 표 칸 안 줄바꿈은 <br>로 쓴다(마크다운 표는 줄을 못 나눈다) — 예전 상세 칸처럼 줄바꿈으로 되살린다
+            val = re.sub(r"&lt;br\s*/?&gt;", "<br>", inline(v, did))
+            val = f'<span class="lv">{val}</span>' if key == "수준" else val
+            trs += f'<tr{" class=\"rel\"" if key in UC_REL else ""}><th>{inline(k, did)}</th><td>{val}</td></tr>'
+        h += f'<table class="attrs">{trs}</table>'
+    for f in p["flows"]:
+        h += f'<p class="sec-t">{esc(f["name"])}</p>' + (render_blocks(f["lead"], did) if f["lead"].strip() else "")
+        lis = ""
+        for st in f["steps"]:
+            w = len(UC_STEP.match(st[0]).group(1))
+            lead, rest = lead_rest(st[0][w:].strip(), st[1:], w)
+            lis += f"<li>{inline(lead, did)}{render_blocks(rest, did)}</li>"
+        h += f'<ol class="flow">{lis}</ol>'
+    for e in p["exts"]:
+        h += f'<p class="sec-t">{esc(e["name"])}</p>' + (render_blocks(e["lead"], did) if e["lead"].strip() else "")
+        items = ""
+        for it in e["items"]:
+            m = re.match(r"^((?:\d+|\*)[a-z])\.\s*(.+)$", it["on"])
+            title = (m.group(2) if m else it["on"]) + it["extra"]
+            _, rest = lead_rest("", it["lines"], 2)
+            items += (f'<div class="ext-item" style="border-left-color:{hexc}"><div class="ext-on"><span class="br">{esc(m.group(1)) if m else ""}</span>'
+                      f'{inline(title, did)}</div>{render_blocks(rest, did)}</div>')
+        h += f'<div class="ext">{items}</div>'
+    for piece in (p["note"], p["links"]):
+        if piece: h += f'<p class="sec-t">{esc(piece["name"])}</p><div class="note">{render_blocks(chr(10).join(piece["lines"]), did)}</div>'
+    # 조각이 하나도 없는 항목(Cockburn이 아닌 문서)은 본문 전부를 그대로 — 「그 밖」 머리를 달지 않는다(V-SCN과 같다)
+    return h + etc_block(p["etc"], did) if h else render_blocks(chr(10).join(p["etc"]), did)
+
+def _map_text(h, fn):
+    """HTML의 글자 조각에만 fn — 태그 속성과 <a> 안 글자는 건드리지 않는다"""
+    out, depth = [], 0
+    for tok in re.split(r"(<[^>]+>)", h):
+        if tok.startswith("<"):
+            if re.match(r"<a[\s>]", tok): depth += 1
+            elif tok.startswith("</a"): depth = max(0, depth - 1)
+            out.append(tok)
+        else: out.append(fn(tok) if depth == 0 and tok else tok)
+    return "".join(out)
+
+def _uc_a(uid, did, cls, text):
+    return f'<a class="{cls}" href="{view_href(did)}#item-{uid}">{esc(text)}</a>'
+
+def uc_jumps(h, ids, did):
+    """글자 속 맨몸 `UC-xx`(`#` 뒤 제외)를 그 카드로 가는 링크로. 있는 유스케이스만 (STD-002 V-UC)"""
+    return _map_text(h, lambda t: re.sub(r"(?<![A-Za-z0-9_#-])(UC-[AHGS]\d+)(?![A-Za-z0-9_])",
+                                         lambda m: _uc_a(m.group(1), did, "jump", m.group(1)) if m.group(1) in ids else m.group(1), t))
+
+def uc_chips(h, ids, did):
+    """대응표의 표마다 머리 칸에 「유스케이스」가 든 열의 `UC-A1`·`A1`을 칩으로. 다른 열은 글자 그대로 (사용자 결정, #152)"""
+    def chip(m):
+        uid = m.group(1) if m.group(1).startswith("UC-") else "UC-" + m.group(1)
+        return _uc_a(uid, did, "chip", m.group(1)) if uid in ids else m.group(1)
+    def table(tm):
+        inner = tm.group(1)
+        head = re.search(r"<thead>(.*?)</thead>", inner, re.S)
+        cols = {j for j, c in enumerate(re.findall(r"<th>(.*?)</th>", head.group(1) if head else "", re.S)) if "유스케이스" in re.sub(r"<[^>]+>", "", c)}
+        def row(rm):
+            cells = re.findall(r"<td>(.*?)</td>", rm.group(1), re.S)
+            return "<tr>" + "".join("<td>" + (_map_text(c, lambda t: UC_CHIP.sub(chip, t)) if j in cols else c) + "</td>" for j, c in enumerate(cells)) + "</tr>"
+        body = re.sub(r"<tbody>(.*?)</tbody>", lambda bm: "<tbody>" + re.sub(r"<tr>(.*?)</tr>", row, bm.group(1), flags=re.S) + "</tbody>", inner, flags=re.S)
+        return f"<table>{body}</table>"
+    return re.sub(r"<table>(.*?)</table>", table, h, flags=re.S)
+
+def uc_node(uid, name, p):
+    """패키지 그림 한 개 — 항목 표에서 관계(행 이름 두 가지 다)"""
+    row = lambda k: next((v for x, v in p["rows"] if uc_key(x) == k), "")
+    return {"id": uid, "name": name, "actor": UC_ACTOR.get(uid[3:4], "system"), "package": row("패키지"),
+            "include": row("포함"), "extPoint": row("확장점"), "general": row("일반화")}
+
+def uc_actors(sec):
+    """`액터` 절 표에서 코드(A·H·G·S) 칸이 있는 행의 이름. 없으면 기본 이름"""
+    out = dict(UC_LABEL)
+    for line in sec.split("\n"):
+        if not line.strip().startswith("|"): continue
+        cs = [c.strip() for c in line.strip().strip("|").split("|")]
+        code = next((c for c in cs if re.fullmatch(r"[AHGS]", c)), None)
+        label = next((c for c in cs if c and c != code), None)
+        if code and label: out[UC_ACTOR[code]] = label
+    return out
+
+UC_LEGEND = """<div class="key">
   <span><svg width="34" height="10"><line x1="0" y1="5" x2="34" y2="5" stroke="#5C6B73" stroke-width="1.2"/></svg>연결</span>
   <span><svg width="34" height="10"><line x1="0" y1="5" x2="27" y2="5" stroke="#5C6B73" stroke-width="1.2" stroke-dasharray="6 4"/><path d="M27,1 L34,5 L27,9" fill="none" stroke="#5C6B73" stroke-width="1.2"/></svg>«include» / «extend»</span>
   <span><svg width="34" height="12"><line x1="0" y1="6" x2="24" y2="6" stroke="#5C6B73" stroke-width="1.2"/><path d="M24,1 L34,6 L24,11 Z" fill="#fff" stroke="#5C6B73" stroke-width="1.2"/></svg>일반화</span>
   <span><svg width="30" height="14"><ellipse cx="15" cy="7" rx="13" ry="6" fill="#F8F9F7" stroke="#5C6B73" stroke-width="1.4" stroke-dasharray="6 4"/></svg>추상·다른 패키지</span>
-</div>
+</div>"""
 
-<h2><span class="n">4</span>대응표</h2>
-<table class="matrix" id="mx1"></table>
-<div style="height:18px"></div>
-<table class="matrix" id="mx2"></table>
+def v_uc(doc):
+    """V-UC — 원본 순서로 펼친다. 절·소절 머리는 그대로, 유스케이스는 제자리에 카드, 대응표는 원본 표 + 「유스케이스」 열 칩,
+    패키지 그림은 뷰 끝 (STD-002 V-UC, 카드 AM). frontend uc.ts vUc와 한 쌍.
+    전에는 옛 parse.py가 옛 경로를 읽다 실패해 어느 문서를 넣든 낡은 싱크독 데이터(data.json)를 그렸다 (#152)"""
+    did = doc["fm"]["doc_id"]; body = doc["body"]
+    ids = {x[0] for x in item_blocks(body, UC_PAT)}
+    dmap = downstream_of(did); out = []; nodes = []; actor_sec = ""
+    for title, text in split_sections(body):
+        name = re.sub(r"^\d+\.\s*", "", title)
+        if name.startswith("액터"): actor_sec = text
+        if name.startswith("대응표"):
+            out.append(f"<h2>{esc(title)}</h2>" + uc_jumps(uc_chips(render_blocks(text, did), ids, did), ids, did)); continue
+        html_ = ""
+        for k, x in split_items(text, UC_PAT):
+            if k == "text": html_ += uc_jumps(render_blocks(x, did), ids, did); continue
+            parts = uc_parts(x[3]); nodes.append(uc_node(x[0], x[1], parts))
+            html_ += item_card(did, x[0], x[1], uc_jumps(uc_inner(x[0], parts, did), ids, did),
+                               sorted(d for d, v in dmap.items() if x[0] in v), "이 유스케이스를 근거로 삼은 문서")
+        out.append(f"<h2>{esc(title)}</h2>{html_}")
+    diagram = ("<h2>패키지 그림</h2>\n<p class=\"soft\">원본에 없다 — 항목 표의 패키지·포함·확장점·일반화 행과 주 액터(ID 글자)에서 그렸다. 타원을 누르면 그 유스케이스 카드로.</p>\n"
+               "<div class=\"tabs\" id=\"tabs\" role=\"tablist\"></div>\n<div class=\"canvas\"><svg id=\"dg\" xmlns=\"http://www.w3.org/2000/svg\"></svg></div>\n" + UC_LEGEND)
+    data = json.dumps({"ucs": nodes, "labels": uc_actors(actor_sec)}, ensure_ascii=False).replace("</", "<\\/")
+    return (f'<style>{UC_CSS}</style><div class="v-uc">{chr(10).join(out)}\n{diagram}'
+            f'<script type="application/json" id="uc-data">{data}</script><script>{UC_JS}</script></div>')
 
-<style>{css}</style>
-<script id="DATA" type="application/json">{json.dumps(data, ensure_ascii=False)}</script>
-<script>{js.replace('if(scroll)document.getElementById("spec").scrollIntoView({block:"start"});','if(scroll)document.getElementById("spec").scrollIntoView({block:"start"});')}</script>
+UC_CSS = r"""
+.v-uc{
+  --paper:#EDEFEC; --panel:#F8F9F7; --card:#fff;
+  --ink:#1E2A30; --soft:#5C6B73; --faint:#8A969C;
+  --rule:#C9CFCB; --hair:#E1E5E1;
+  --agent:#12776A; --human:#3A5BA0; --github:#6B4A9E; --system:#8A6D1F;
+  color:var(--ink); font-feature-settings:"tnum"; line-height:1.65}
+.v-uc *{box-sizing:border-box}
+.v-uc code,.v-uc .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+.v-uc code{font-size:.88em; background:#E4E8E4; padding:1px 5px; border-radius:2px}
+
+.v-uc .tabs{display:flex; flex-wrap:wrap; border:1.5px solid var(--ink); border-bottom:none; background:var(--panel)}
+.v-uc .tabs button{font:inherit; font-size:14px; padding:11px 18px; background:none; border:none;
+  border-right:1px solid var(--rule); cursor:pointer; color:var(--soft); position:relative}
+.v-uc .tabs button:last-child{border-right:none}
+.v-uc .tabs button[aria-selected="true"]{background:var(--card); color:var(--ink); font-weight:700}
+.v-uc .tabs button[aria-selected="true"]::after{content:""; position:absolute; left:0; right:0; bottom:-1.5px; height:3px; background:var(--ink)}
+.v-uc .tabs button:focus-visible{outline:2px solid var(--ink); outline-offset:-4px}
+.v-uc .tabs .cnt{color:var(--faint); font-size:12px; margin-left:6px; font-weight:400}
+.v-uc .canvas{border:1.5px solid var(--ink); background:var(--card); overflow-x:auto}
+.v-uc .canvas svg{display:block}
+
+.v-uc .uc-el{fill:#fff; stroke-width:1.6; transition:fill .12s}
+.v-uc .uc-el.abstract{stroke-dasharray:6 4; fill:var(--panel)}
+.v-uc .uc-t{font-size:12.5px; fill:var(--ink); text-anchor:middle; pointer-events:none}
+.v-uc .uc-k{font-size:10px; font-family:ui-monospace,Menlo,monospace; fill:var(--faint); text-anchor:middle; pointer-events:none}
+.v-uc .uc-xp{font-size:9.5px; fill:var(--soft); text-anchor:middle; pointer-events:none}
+.v-uc .uc-xp-h{font-size:9px; fill:var(--faint); text-anchor:middle; font-weight:600; pointer-events:none}
+.v-uc g.uc{cursor:pointer}
+.v-uc g.uc:hover .uc-el{fill:#F0F4F0}
+.v-uc g.uc.sel .uc-el{fill:#FFF6D9; stroke-width:2.6}
+.v-uc .assoc{stroke-width:1.2; fill:none}
+.v-uc .dep{stroke-dasharray:6 4; stroke-width:1.2; fill:none}
+.v-uc .gen{stroke-width:1.2; fill:none}
+.v-uc .stereo{font-size:10px; fill:var(--soft); font-style:italic; text-anchor:middle}
+.v-uc .a-name{font-size:13px; font-weight:600; text-anchor:middle}
+.v-uc .ext-only{font-size:11px; fill:var(--faint); font-style:italic}
+
+.v-uc .key{display:flex; flex-wrap:wrap; gap:20px; margin-top:10px; font-size:12.5px; color:var(--soft); align-items:center}
+.v-uc .key span{display:inline-flex; align-items:center; gap:7px}
+.v-uc .key svg{display:inline-block}
+
+/* 유스케이스 카드 몸 — 항목 표 → 기본 흐름 → 확장 → 사후조건 참고·연관 (카드 AM) */
+.v-uc table.attrs{border-collapse:collapse; width:100%; margin:4px 0 22px; font-size:14px; background:var(--card)}
+.v-uc table.attrs th{text-align:left; vertical-align:top; width:158px; font-weight:600; color:var(--soft);
+  padding:9px 14px 9px 0; border-bottom:1px solid var(--hair); white-space:nowrap}
+.v-uc table.attrs td{vertical-align:top; padding:9px 0; border-bottom:1px solid var(--hair)}
+.v-uc table.attrs tr:last-child th,.v-uc table.attrs tr:last-child td{border-bottom:none}
+.v-uc table.attrs tr.rel th{background:#F4F7F3; padding-left:10px}
+.v-uc table.attrs tr.rel td{background:#F4F7F3; padding-right:10px}
+.v-uc .lv{display:inline-block; font-size:12px; padding:1px 9px; border:1px solid var(--rule); background:var(--panel)}
+.v-uc .sec-t{font-size:13px; font-weight:700; margin:0 0 11px; padding-bottom:7px; border-bottom:1.5px solid var(--ink)}
+.v-uc ol.flow{margin:0 0 22px; padding-left:0; list-style:none; counter-reset:f}
+.v-uc ol.flow>li{counter-increment:f; position:relative; padding:6px 0 6px 38px; border-bottom:1px solid var(--hair)}
+.v-uc ol.flow>li:last-child{border-bottom:none}
+.v-uc ol.flow>li::before{content:counter(f); position:absolute; left:0; top:6px;
+  font-family:ui-monospace,Menlo,monospace; font-size:12px; color:var(--faint); width:24px; text-align:right}
+.v-uc .ext{margin-bottom:22px}
+.v-uc .ext-item{border-left:2.5px solid var(--rule); padding:2px 0 2px 15px; margin-bottom:14px}
+.v-uc .ext-on{font-weight:600; font-size:14px}
+.v-uc .ext-on .br{font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:var(--soft); margin-right:7px}
+.v-uc .ext-item ul{margin:5px 0 0; padding-left:17px; color:var(--soft); font-size:14px}
+.v-uc .note{background:var(--card); border-left:2.5px solid var(--rule); padding:11px 15px; margin-bottom:22px; font-size:13.5px; color:var(--soft)}
+.v-uc .note p{margin:0}
+/* 맨몸 UC-xx·대응표 칩 → 그 카드 */
+.v-uc a.jump{color:inherit; text-decoration:none; cursor:pointer; border-bottom:1px dashed currentColor}
+.v-uc a.chip{color:inherit; text-decoration:none}
+.v-uc .chip{display:inline-block; font-family:ui-monospace,Menlo,monospace; font-size:11.5px;
+  padding:1px 7px; margin:2px 3px 2px 0; border:1px solid var(--rule); background:var(--panel); cursor:pointer}
+.v-uc .chip:hover{border-color:var(--ink)}
+@media (prefers-reduced-motion:reduce){.v-uc *{transition:none!important}}
 """
-    return body
+
+# 패키지 그림 — frontend uc.ts mount를 그대로 옮긴 것(옛 build.py JS 대신, 카드 AM). 고치면 둘 다 고친다
+UC_JS = r"""
+(function(){
+  const root=document.currentScript.parentElement;
+  const DATA=JSON.parse(root.querySelector('#uc-data').textContent);
+  const ucs=DATA.ucs;
+  const svg=root.querySelector('#dg'), tabs=root.querySelector('#tabs');
+  if(!svg||!tabs||!ucs.length)return;
+  const HEX={agent:'#12776A',human:'#3A5BA0',github:'#6B4A9E',system:'#8A6D1F'};
+  const ACT={};for(const k of ['agent','human','github','system'])ACT[k]={label:DATA.labels[k],hex:HEX[k]};
+  const NS='http://www.w3.org/2000/svg', RX=94, RY=30;
+  const el=(t,a={})=>{const n=document.createElementNS(NS,t);for(const k in a)n.setAttribute(k,String(a[k]));return n;};
+  const parseIds=s=>(!s||s==='—')?[]:(s.match(/UC-[AHGS]\d+/g)||[]);
+  const firstId=s=>{const m=/UC-[AHGS]\d+/.exec(s||'');return m?m[0]:undefined;};
+  const edgePt=(cx,cy,tx,ty,ry)=>{if(ry===undefined)ry=RY;const a=Math.atan2((ty-cy)*RX,(tx-cx)*ry);return [cx+RX*Math.cos(a),cy+ry*Math.sin(a)];};
+  const wrap=(text,max)=>{const lines=[];let cur='';for(const w of text.split(' ')){if((cur+' '+w).trim().length>max){if(cur.trim())lines.push(cur.trim());cur=w;}else cur+=' '+w;}if(cur.trim())lines.push(cur.trim());return lines.length?lines:[text];};
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  function buildDefs(){
+    const defs=el('defs');
+    const m=el('marker',{id:'open',viewBox:'0 0 10 10',refX:'9.5',refY:'5',markerWidth:'9',markerHeight:'9',orient:'auto-start-reverse'});
+    m.appendChild(el('path',{d:'M0,0 L10,5 L0,10',fill:'none',stroke:'#5C6B73','stroke-width':'1.3'}));defs.appendChild(m);
+    const g=el('marker',{id:'tri',viewBox:'0 0 12 12',refX:'11',refY:'6',markerWidth:'13',markerHeight:'13',orient:'auto-start-reverse'});
+    g.appendChild(el('path',{d:'M0,0.5 L11,6 L0,11.5 Z',fill:'#fff',stroke:'#5C6B73','stroke-width':'1.2'}));defs.appendChild(g);
+    return defs;
+  }
+  const UCMAP=Object.fromEntries(ucs.map(u=>[u.id,u]));
+  const PKGS=[];for(const u of ucs)if(!PKGS.includes(u.package))PKGS.push(u.package);
+  let curPkg=PKGS[0]||'', curId=null;
+  function drawPackage(pkg){
+    svg.innerHTML='';svg.appendChild(buildDefs());
+    const list=ucs.filter(u=>u.package===pkg), inPkg=new Set(list.map(u=>u.id)), outside=[];
+    list.forEach(u=>[...parseIds(u.include),...parseIds(u.extPoint)].forEach(id=>{if(!inPkg.has(id)&&!outside.includes(id))outside.push(id);}));
+    const abstracts=[...new Set(list.map(u=>firstId(u.general)).filter(x=>!!x))];
+    const actors=[...new Set(list.map(u=>u.actor))].filter(a=>a!=='system');
+    const main=list.filter(u=>u.actor!=='system'), sub=list.filter(u=>u.actor==='system');
+    const rowH=88, colMid=530, colRight=890, P={}, RYs={};
+    const ryOf=u=>(u&&u.extPoint&&u.extPoint!=='—')?RY+16:RY;
+    main.forEach((u,i)=>{P[u.id]={x:colMid,y:110+i*rowH};RYs[u.id]=ryOf(u);});
+    const ry0=110+main.length*rowH;
+    abstracts.forEach((id,i)=>{P[id]={x:colMid,y:ry0+i*rowH,abstract:true};RYs[id]=RY;});
+    [...sub.map(u=>u.id),...outside].forEach((id,i)=>{P[id]={x:colRight,y:110+i*82,outside:!inPkg.has(id)};RYs[id]=ryOf(UCMAP[id]);});
+    const maxY=Math.max(...Object.values(P).map(p=>p.y),260)+100, W=1150;
+    svg.setAttribute('viewBox',`0 0 ${W} ${maxY}`);svg.setAttribute('style',`min-width:${W}px;height:${maxY}px`);
+    svg.appendChild(el('rect',{x:300,y:56,width:790,height:maxY-100,fill:'none',stroke:'#1E2A30','stroke-width':'1.5'}));
+    const title=el('text',{x:316,y:79,'font-size':'13.5','font-weight':'600',fill:'#1E2A30'});title.textContent=pkg;svg.appendChild(title);
+    const anchors={};
+    actors.forEach((k,i)=>{
+      const a=ACT[k], x=155, y=150+i*(maxY>420?190:150), s={stroke:a.hex,'stroke-width':1.8,fill:'none'}, g=el('g');
+      g.appendChild(el('circle',Object.assign({cx:x,cy:y,r:10},s,{fill:'#fff'})));
+      g.appendChild(el('line',Object.assign({x1:x,y1:y+10,x2:x,y2:y+36},s)));
+      g.appendChild(el('line',Object.assign({x1:x-16,y1:y+19,x2:x+16,y2:y+19},s)));
+      g.appendChild(el('line',Object.assign({x1:x,y1:y+36,x2:x-13,y2:y+55},s)));
+      g.appendChild(el('line',Object.assign({x1:x,y1:y+36,x2:x+13,y2:y+55},s)));
+      const n=el('text',{x,y:y+74,class:'a-name',fill:a.hex});n.textContent=a.label;g.appendChild(n);
+      svg.appendChild(g);anchors[k]={x,y:y+22};
+    });
+    main.forEach(u=>{const a=anchors[u.actor], p=P[u.id];if(!a)return;const [ex,ey]=edgePt(p.x,p.y,a.x,a.y,RYs[u.id]);
+      svg.appendChild(el('line',{x1:a.x,y1:a.y,x2:ex,y2:ey,class:'assoc',stroke:ACT[u.actor].hex}));});
+    const dep=(from,to,label)=>{const f=P[from], g=P[to];if(!f||!g)return;
+      const [sx,sy]=edgePt(f.x,f.y,g.x,g.y,RYs[from]), [tx,ty]=edgePt(g.x,g.y,f.x,f.y,RYs[to]);
+      svg.appendChild(el('line',{x1:sx,y1:sy,x2:tx,y2:ty,class:'dep',stroke:'#5C6B73','marker-end':'url(#open)'}));
+      const l=el('text',{x:(sx+tx)/2,y:(sy+ty)/2-6,class:'stereo'});l.textContent=label;svg.appendChild(l);};
+    list.forEach(u=>{parseIds(u.include).forEach(id=>dep(u.id,id,'«include»'));parseIds(u.extPoint).forEach(id=>dep(u.id,id,'«extend»'));
+      const gi=firstId(u.general);
+      if(gi&&P[gi]){const f=P[u.id], g=P[gi];const [sx,sy]=edgePt(f.x,f.y,g.x,g.y,RYs[u.id]), [tx,ty]=edgePt(g.x,g.y,f.x,f.y,RYs[gi]);
+        svg.appendChild(el('line',{x1:sx,y1:sy,x2:tx,y2:ty,class:'gen',stroke:'#5C6B73','marker-end':'url(#tri)'}));}});
+    Object.entries(P).forEach(([id,p])=>{
+      const u=UCMAP[id], isAbs=!!p.abstract, isOut=!!p.outside, name=u?u.name:id, color=u?ACT[u.actor].hex:'#5C6B73';
+      const xp=!!(u&&u.extPoint&&u.extPoint!=='—');
+      const g=el('g',Object.assign({class:'uc'},u?{'data-uc':id,tabindex:'0',role:'button','aria-label':id+' '+name}:{}));
+      g.appendChild(el('ellipse',Object.assign({cx:p.x,cy:p.y,rx:RX,ry:RYs[id],class:'uc-el'+(isAbs?' abstract':''),stroke:color},isOut?{'stroke-dasharray':'3 3'}:{})));
+      const k=el('text',{x:p.x,y:p.y-(xp?18:13),class:'uc-k'});k.textContent=isAbs?'추상':id.replace('UC-','');g.appendChild(k);
+      const lines=wrap(name,13);
+      lines.forEach((ln,i)=>{const tn=el('text',{x:p.x,y:p.y+(xp?-1:5)+i*15-(lines.length-1)*7,class:'uc-t'});tn.textContent=ln;g.appendChild(tn);});
+      if(xp&&u){const h=el('text',{x:p.x,y:p.y+24,class:'uc-xp-h'});h.textContent='Extension Points';g.appendChild(h);
+        const c=el('text',{x:p.x,y:p.y+36,class:'uc-xp'});const mm=/`(.+?)`/.exec(u.extPoint);c.textContent=mm?mm[1]:'';g.appendChild(c);}
+      svg.appendChild(g);
+    });
+    if(outside.length){const n=el('text',{x:colRight,y:maxY-46,class:'ext-only','text-anchor':'middle'});n.textContent='점선 타원은 다른 패키지의 유스케이스';svg.appendChild(n);}
+    refreshSel();
+  }
+  PKGS.forEach((p,i)=>{const b=document.createElement('button');b.type='button';b.setAttribute('role','tab');b.dataset.pkg=p;
+    b.setAttribute('aria-selected',String(i===0));b.innerHTML=esc(p||'(패키지 없음)')+`<span class="cnt">${ucs.filter(u=>u.package===p).length}</span>`;tabs.appendChild(b);});
+  const setTab=p=>{curPkg=p;tabs.querySelectorAll('button').forEach(x=>x.setAttribute('aria-selected',String(x.dataset.pkg===p)));drawPackage(p);};
+  function refreshSel(){svg.querySelectorAll('g.uc').forEach(g=>g.classList.toggle('sel',g.dataset.uc===curId));}
+  function select(id,scroll){const u=UCMAP[id];if(!u)return;curId=id;if(u.package!==curPkg)setTab(u.package);else refreshSel();
+    if(scroll){const c=root.querySelector('#item-'+id);if(c)c.scrollIntoView({block:'start'});}}
+  root.addEventListener('click',e=>{const t=e.target;if(!(t instanceof Element))return;
+    const b=t.closest('#tabs button[data-pkg]');if(b){setTab(b.dataset.pkg);return;}
+    const g=t.closest('g.uc[data-uc]');if(g)select(g.dataset.uc,true);});
+  root.addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const t=e.target;if(!(t instanceof Element))return;
+    const g=t.closest('g.uc[data-uc]');if(g){e.preventDefault();select(g.dataset.uc,true);}});
+  drawPackage(curPkg);
+  const hm=/^#item-(UC-[AHGS]\d+)$/.exec(location.hash);if(hm&&UCMAP[hm[1]])select(hm[1],false);
+})();
+"""
 
 # ───────────────────────── V-INFRA ─────────────────────────
 def v_infra(doc):
@@ -1041,6 +1344,131 @@ def _selftest_ui():
     print("V-UI: 통과" if not bad else f"V-UI: {len(bad)} 실패")
     return 0 if not bad else 1
 
+_SELF_UC = """---
+doc_id: T-UC-001
+type: UC
+title: 시험 유스케이스
+status: draft
+upstream: []
+---
+
+# 시험 유스케이스
+
+## 0. 이 문서의 형식
+
+형식 문장.
+
+## 1. 액터
+
+| 코드 | 액터 |
+|---|---|
+| H | 운영자 |
+
+## 2. 사용자 목표 수준 유스케이스
+
+### 2.1 첫 묶음
+
+묶음 머리 문장.
+
+#### UC-H1 첫 유스케이스
+
+| 항목 | 내용 |
+|---|---|
+| 범위 | 시험 범위 |
+| 수준 | 사용자 목표 |
+| 주 액터 | 운영자<br>둘째 줄 |
+| 패키지 | 첫 패키지 |
+| 포함 | [[#UC-S1]] |
+| 확장점 | `조건` → [[#UC-H2]] |
+| 새 행 | 모르는 행 값 |
+
+표 뒤 문단.
+
+**기본 흐름 — 넣기**
+1. 첫 단계 UC-S1을 부른다
+   단계 둘째 줄
+2. 둘째 단계
+
+**기본 흐름 — 빼기**
+1. 빼는 단계
+
+**확장**
+- **1a. 첫 확장** — 머리 뒤 설명
+  - 1a1. 확장 단계
+- **2a. 둘째 확장**
+  - 2a1. 둘째 확장 단계
+
+**사후조건 참고**: 사후 첫 줄
+사후 둘째 줄
+
+**연관**: 연관 문장
+
+**왜 있나.** 모르는 굵은 머리 문단.
+
+#### UC-H2 둘째 유스케이스
+
+**주 액터** 운영자 · **선행** 없음
+1. 표 없는 흐름 단계
+
+## 3. 하위기능 수준 유스케이스
+
+#### UC-S1 하위 기능
+
+| 항목 | 내용 |
+|---|---|
+| 패키지 | 첫 패키지 |
+
+---
+
+## 4. 대응표
+
+| 시나리오 | 유스케이스 | 비고 |
+|---|---|---|
+| S1 시나리오 | H1, S1 | S1 글자 |
+
+## 5. 미결사항
+
+- [ ] 없음
+"""
+
+def _selftest_uc():
+    """V-UC가 원본 문장을 버리지 않는지 — 원본 순서·카드·대응표 칩 (#152). 앱 포트(uc.ts)는 대조하지 않는다(#153)"""
+    saved = dict(ALL)
+    d = parse_doc(_SELF_UC, "T-UC-001.md"); ALL[d["fm"]["doc_id"]] = d
+    try: h = v_uc(d)
+    finally: ALL.clear(); ALL.update(saved)
+    card = {m.group(1): m.group(0) for m in re.finditer(r'<article class="card" id="item-(UC-[AHGS]\d+)">.*?</article>', h, re.S)}
+    h1, h2_, s1 = card.get("UC-H1", ""), card.get("UC-H2", ""), card.get("UC-S1", "")
+    rows = re.findall(r"<tr(?: class=\"rel\")?><th>(.*?)</th>", h1)
+    rel = re.findall(r'<tr class="rel"><th>(.*?)</th>', h1)
+    data = json.loads(re.search(r'<script type="application/json" id="uc-data">(.*?)</script>', h, re.S).group(1).replace("<\\/", "</"))
+    node = next((u for u in data["ucs"] if u["id"] == "UC-H1"), {})
+    matrix = h[h.find("4. 대응표"):h.find("5. 미결사항")]
+    at = [h1.find(x) for x in ("기본 흐름 — 넣기", "기본 흐름 — 빼기", "첫 확장", "사후 첫 줄", "연관 문장", 'class="etc"')]
+    cases = [
+        ("항목 밖 문장이 제자리", all(x in h for x in ("형식 문장", "2.1 첫 묶음</h3>", "묶음 머리 문장", "5. 미결사항</h2>"))
+         and h.find("형식 문장") < h.find("묶음 머리 문장") < h.find('id="item-UC-H1"')),
+        ("유스케이스는 카드", h1 != "" and h2_ != "" and s1 != ""),
+        ("표 칸 <br>은 줄바꿈", "운영자<br>둘째 줄" in h1),
+        ("원문 표 순서·모르는 행·머리 행 없음", rows == ["범위", "수준", "주 액터", "패키지", "포함", "확장점", "새 행"] and "모르는 행 값" in h1),
+        ("규약 이름도 관계 행과 그림", rel == ["패키지", "포함", "확장점"] and "UC-S1" in node.get("include", "") and "UC-H2" in node.get("extPoint", "")),
+        ("기본 흐름 둘과 단계 둘째 줄", "기본 흐름 — 빼기" in h1 and "단계 둘째 줄" in h1 and "빼는 단계" in h1),
+        ("확장 머리 뒤 글·번호 글자", "머리 뒤 설명" in h1 and "1a1. 확장 단계" in h1 and '<span class="br">2a</span>' in h1),
+        ("사후조건 둘째 줄", "사후 둘째 줄" in h1),
+        ("조각은 문서 순서", all(x >= 0 for x in at) and at == sorted(at)),
+        ("그 밖 — 표 뒤 문단·모르는 굵은 머리", h1.find('class="etc"') < h1.find("표 뒤 문단") and "왜 있나." in h1[h1.find('class="etc"'):]),
+        ("표 없는 항목은 본문 그대로(그 밖 머리 없이)", "선행" in h2_ and "표 없는 흐름 단계" in h2_ and 'class="etc"' not in h2_),
+        ("맨몸 UC-S1은 그 카드로", '<a class="jump" href="view_T-UC-001.html#item-UC-S1">UC-S1</a>' in h1),
+        ("칩은 「유스케이스」 열만", '>H1</a>' in matrix and '>S1</a>' in matrix and "<td>S1 시나리오</td>" in matrix and "<td>S1 글자</td>" in matrix),
+        ("구분선뿐인 카드는 그 밖 없음", 'class="etc"' not in s1 and "<hr>" not in s1),
+        ("옛 싱크독 데이터가 안 나온다", "UC-A1" not in h and data["labels"]["human"] == "운영자"),
+    ]
+    bad = [name for name, ok in cases if not ok]
+    for name in bad:
+        print("✗ ", name)
+    print("V-UC: 통과" if not bad else f"V-UC: {len(bad)} 실패")
+    return 0 if not bad else 1
+
 _ROOT_PRD = """---
 doc_id: TX-PRD-001
 type: PRD
@@ -1114,7 +1542,7 @@ def _selftest_root():
 def main(argv):
     """[--specs <저장소>/docs/specs] (--all | <원본.md>…) · --selftest"""
     if argv == ["--selftest"]:
-        return _selftest() | _selftest_scn() | _selftest_ui() | _selftest_root()
+        return _selftest() | _selftest_scn() | _selftest_ui() | _selftest_uc() | _selftest_root()
     specs = None
     if "--specs" in argv:
         i = argv.index("--specs")
