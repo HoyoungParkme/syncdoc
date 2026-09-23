@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-004
 type: STD
 title: 개발 규약 — 코드 파트 표준
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -56,6 +56,8 @@ async def save_pipeline(...):
 #### DEV-5 에러는 problem+json 타입 하나에 예외 클래스 하나
 
 `urn:syncdoc:version-conflict` ↔ `VersionConflict(Problem)`. API 명세 2장 에러 표와 1:1. 새 에러는 API 명세부터.
+
+**상태 코드 502·504는 쓰지 않는다** — 앞단 Cloudflare가 자기 오류 페이지로 바꿔 problem+json이 사라진다. 앱 밖(GitHub·모델)이 실패한 것은 424다([[SYNC-API-001]] 2장, #76). `tests/core/test_errors.py`가 모든 에러 클래스를 훑어 막는다.
 
 #### DEV-6 로그에 남기지 않는 것
 

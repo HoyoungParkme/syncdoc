@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -237,6 +237,7 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 - **webhook**: Named Tunnel이면 걸 수 있다(Payload URL `{PUBLIC_BASE_URL}/hooks/github`, Secret = `WEBHOOK_SECRET`) — **선택이다.** 폴링은 어느 모드든 그대로 돈다 — `POLL_INTERVAL_SECONDS`(기본 300). GitHub 직접 push(UC-G1·S7)는 5분 안에 반영되고, 기동 시 따라잡기가 있어 꺼져 있던 동안의 커밋도 들어온다. Quick Tunnel이면 Payload URL이 매번 바뀌어 못 건다
 - **OAuth 앱**: 앱 하나에 로컬용(`http://localhost:8000/auth/github/callback`)과 공개용 콜백을 **둘 다 등록해 두면** 양쪽에서 로그인된다 — 앱이 `redirect_uri`를 보내기 때문이다(SEQ-8). Named Tunnel이면 한 번, Quick Tunnel이면 켤 때마다 공개용 콜백을 고친다(3분)
 - **`PUBLIC_BASE_URL`의 쓰임**: 앱이 `redirect_uri`를 만들 때 쓴다. 요청 Host가 이 값의 host와 같으면 이 값을, 아니면 요청에서 만든다(`auth.callback_url`). 터널 뒤에서는 프록시가 https를 http로 보이게 하므로 요청만으로는 스킴을 못 믿는다. 비어 있으면 요청에서만 만든다
+- **502·504는 앞단이 덮는다**: Cloudflare는 원본이 보낸 502·504를 자기 오류 페이지로 바꾼다 — Named·Quick 둘 다, 무료 플랜에는 끄는 설정이 없다. 그러면 problem+json의 `reason`이 사람에게 닿지 않으므로 앱은 두 코드를 쓰지 않고, 앱 밖(GitHub·모델) 실패는 424로 보낸다([[SYNC-API-001]] 2장, #76). 500·503은 원본 본문이 통과한다
 - Quick → Named로 바꾸는 날: `.env`에 `TUNNEL_TOKEN`·`PUBLIC_BASE_URL` 넣고 `scripts/tunnel.sh` → OAuth 콜백을 고정 주소로 한 번 고침 → 팀원·에이전트의 MCP 등록을 고정 주소로. 그 뒤로는 재부팅 때 `scripts/tunnel.sh`만
 
 **저장소는 public**: v1은 public 저장소만 다룬다 — `git.fetch`가 토큰 없이 돌기 때문. private 지원은 v2(MS-009 미결 — 그때 OAuth 범위도 `repo`로 넓혀야 한다). `clone`·`push`는 각자의 토큰을 쓰므로 public이어도 쓰기에는 권한이 필요하다. **소유와 저장소 권한은 다른 축이다** — 싱크독은 소유로 보이는 것을 가르고, GitHub는 push에서 저장소 권한을 가른다.

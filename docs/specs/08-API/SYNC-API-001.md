@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -41,6 +41,10 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 **표에 없는 예외도 problem+json으로 나간다.** 서버는 포괄 핸들러로 `urn:syncdoc:internal`(500)을 만든다. `detail`에는 짧은 고정 문구만 담고 예외 종류·메시지·스택은 로그로만 보낸다 — 클라이언트가 problem+json을 전제로 파싱하는데 평문 500이 나가면 오류를 읽지도 못한다.
 
+**502·504는 쓰지 않는다.** 앞단 Cloudflare는 원본이 보낸 502·504를 자기 오류 페이지로 바꾼다 — problem+json이 사라져 사람이 `reason`을 못 본다(#76). 앱 밖(GitHub·모델)이 실패한 것은 **424**(Failed Dependency — 요청이 기대던 다른 작업이 실패했다)로 보낸다. 500·503은 원본 본문이 그대로 통과한다. `tests/core/test_errors.py`가 모든 에러 클래스를 훑어 막는다([[SYNC-STD-004#DEV-5]]).
+
+**JSON이 아닌 오류 본문은 앞단이 보낸 것이다.** 앱이 내는 오류 본문은 JSON이다 — problem+json이거나, FastAPI 기본 오류(입력 검증 422·없는 경로 등)의 `{"detail": …}`다. JSON이 아닌 본문은 서버가 꺼졌거나 터널이 끊겼을 때 앞단이 보낸 HTML이다. 웹 클라이언트는 그것을 `urn:syncdoc:http`로 접고 「HTTP {status} — 서버 앞단(Cloudflare)이 보낸 오류 페이지입니다. 서버가 꺼져 있거나 터널이 끊겼을 수 있습니다.」를 보인다 — JSON 해석 오류(`SyntaxError: Unexpected token '<'`)가 화면에 새지 않게. `type` 없는 JSON은 지금처럼 `urn:syncdoc:http`에 상태 문구만 담는다.
+
 | type | status | 언제 | 확장 필드 | 유스케이스 |
 |---|---|---|---|---|
 | `urn:syncdoc:unauthorized` | 401 | 세션 없음 | — | — |
@@ -53,8 +57,8 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:project-code-conflict` | 409 | 코드 중복 | `code` | [[SYNC-UC-001#UC-A1]] 2a |
 | `urn:syncdoc:project-code-invalid` | 422 | 코드 형식 | `rule` | [[SYNC-UC-001#UC-A1]] 2b |
 | `urn:syncdoc:existing-specs` | 409 | `docs/specs/` 이미 있음 | `doc_count` | [[SYNC-UC-001#UC-A1]] 3a |
-| `urn:syncdoc:repo-create-failed` | 502 | `create_repo`로 저장소를 못 만듦 — 이름 규칙·권한·다른 소유자 점유 | `reason` | [[SYNC-CODE-001#F]] |
-| `urn:syncdoc:push-failed` | 502 | GitHub push 실패 | `reason` | [[SYNC-UC-001#UC-A1]] 4a, [[SYNC-UC-001#UC-S7]] 2b |
+| `urn:syncdoc:repo-create-failed` | 424 | `create_repo`로 저장소를 못 만듦 — 이름 규칙·권한·다른 소유자 점유 | `reason` | [[SYNC-CODE-001#F]] |
+| `urn:syncdoc:push-failed` | 424 | GitHub push 실패 | `reason` | [[SYNC-UC-001#UC-A1]] 4a, [[SYNC-UC-001#UC-S7]] 2b |
 | `urn:syncdoc:already-current` | 422 | 현재 버전으로 되돌리기 | — | [[SYNC-UC-001#UC-H7]] |
 | `urn:syncdoc:document-has-history` | 409 | 휴지통의 문서를 완전 삭제하려는데 아직 다른 문서가 가리킴 | `inbound_refs: [문서ID#항목ID…]` | [[SYNC-UC-001#UC-H18]] 7 |
 | `urn:syncdoc:document-trashed` | 409 | 휴지통에 있는 문서를 저장·상태 변경·다시 휴지통에 넣으려 함 | `trashed_at` | [[SYNC-UC-001#UC-A7]] 1a |
@@ -64,7 +68,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:email-taken` | 409 | 남이 이미 등록한 커밋 이메일 | `email` | UI-13 2.6 |
 | `urn:syncdoc:not-implemented` | 501 | 카드 스텁 — 아직 구현 안 된 경로 (`import_existing` 등). 슬라이스 진행 중에만 존재 | `card` | [[SYNC-STD-004#DEV-12]] |
 | `urn:syncdoc:llm-not-configured` | 503 | 모델 키가 없다 — 읽는 중 질의가 꺼져 있다 | — | [[SYNC-UC-001#UC-H19]] 2a |
-| `urn:syncdoc:llm-unavailable` | 502 | 모델 호출 실패. **사용량 초과도 여기 접힌다.** 스트림 중이면 `error` 이벤트로 온다(1장) | `reason` | [[SYNC-UC-001#UC-H19]] 4a |
+| `urn:syncdoc:llm-unavailable` | 424 | 모델 호출 실패. **사용량 초과도 여기 접힌다.** 스트림 중이면 `error` 이벤트로 온다(1장) | `reason` | [[SYNC-UC-001#UC-H19]] 4a |
 | `urn:syncdoc:internal` | 500 | **예상 못 한 오류.** 위 어느 것도 아닌 예외가 라우터에서 샜다 | — | — |
 
 ---
@@ -243,7 +247,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
         $ref: '#/components/responses/Problem'
       '422':
         $ref: '#/components/responses/Problem'
-      '502':
+      '424':
         $ref: '#/components/responses/Problem'
 ```
 
@@ -572,6 +576,8 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
               $ref: '#/components/schemas/DocumentSummary'
       '409':
         $ref: '#/components/responses/Problem'
+      '424':
+        $ref: '#/components/responses/Problem'
 ```
 
 #### GET/api/docs/{docId}/versions 버전 목록
@@ -657,7 +663,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
         $ref: '#/components/responses/Problem'
       '422':
         $ref: '#/components/responses/Problem'
-      '502':
+      '424':
         $ref: '#/components/responses/Problem'
 ```
 
@@ -682,7 +688,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
       '409':
         description: document-trashed (이미 휴지통)
         $ref: '#/components/responses/Problem'
-      '502':
+      '424':
         $ref: '#/components/responses/Problem'
 ```
 
@@ -712,7 +718,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
       '422':
         description: convention-violation — 옛 본문이 지금 규약을 위반
         $ref: '#/components/responses/Problem'
-      '502':
+      '424':
         $ref: '#/components/responses/Problem'
 ```
 
@@ -1003,6 +1009,8 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
             schema:
               $ref: '#/components/schemas/RebuildResult'
       '404':
+        $ref: '#/components/responses/Problem'
+      '424':
         $ref: '#/components/responses/Problem'
 ```
 
@@ -1752,7 +1760,7 @@ components:
 
 **5. 읽는 중 질의가 아무것도 저장하지 않는다.** 대화는 클라이언트가 들고 요청마다 통째로 보낸다. 표를 만들면 백업([[SYNC-INFRA-001]] 6.1)과 재구축([[SYNC-UC-001#UC-S6]])과 완전 삭제가 전부 그것을 알아야 한다. 그런데 **저장해도 DB 유실에는 대비하지 못한다** — 저장소가 공개라 자유 텍스트를 백업에 못 싣는 것이 댓글 본문과 같은 이유로 여기에도 걸리고, 그러면 남는 것이 「질문이 있었다」는 껍데기뿐이다. 휘발하는 것에 치를 값이 아니라고 봤다. 답은 화면에만 있다 — 남길 값이 있으면 사람이 자기 에이전트에게 옮겨 말한다.
 
-**6. 429를 만들지 않는다.** 모델 쪽이 사용량 초과를 주면 `llm-unavailable`(502)의 `reason`으로 접는다 — GitHub 실패를 `push-failed`로 접는 것과 같은 모양이다. **우리가 한도를 세지 않으므로 우리 429가 생길 일이 없다.** 비용은 **도구 호출 수(8번)와 시간(120초)** 상한과 대화 길이 상한으로 눌리고 — 맥락 글자 상한은 두지 않는다(카드 Y) — 회수 경로는 키를 비우는 것이다([[SYNC-INFRA-001]] 5.3). 디스크 한도를 「한도보다 회수 경로가 먼저다」로 닫은 것과 같은 판단이다.
+**6. 429를 만들지 않는다.** 모델 쪽이 사용량 초과를 주면 `llm-unavailable`(424)의 `reason`으로 접는다 — GitHub 실패를 `push-failed`로 접는 것과 같은 모양이다. **우리가 한도를 세지 않으므로 우리 429가 생길 일이 없다.** 비용은 **도구 호출 수(8번)와 시간(120초)** 상한과 대화 길이 상한으로 눌리고 — 맥락 글자 상한은 두지 않는다(카드 Y) — 회수 경로는 키를 비우는 것이다([[SYNC-INFRA-001]] 5.3). 디스크 한도를 「한도보다 회수 경로가 먼저다」로 닫은 것과 같은 판단이다.
 
 ---
 

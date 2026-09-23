@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
 
-**진행 상황**: 카드 42장. **A~AH 42장 완료**(2026-09-23).
+**진행 상황**: 카드 43장. **A~AH 42장 완료**(2026-09-23), AI 진행 중.
 
 ---
 
@@ -938,6 +938,20 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 ---
 
+#### AI 앱 밖이 실패한 오류는 424 — 앞단이 덮지 않게
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-API-001]] 2장 · [[SYNC-STD-004#DEV-5]] · [[SYNC-INFRA-001]] 5장 · #76 · 사용자 결정 2026-09-23 |
+| 구현 | `PushFailed`·`RepoCreateFailed`·`LlmUnavailable`의 status 502 → **424**. `tests/core/test_errors.py` 신설 — 에러 클래스 전부를 훑어 502·504가 있으면 실패. 웹 클라이언트(`client.ts`)는 JSON이 아닌 오류 본문을 `urn:syncdoc:http`로 접고 「HTTP {status} — 서버 앞단(Cloudflare)이 보낸 오류 페이지입니다. 서버가 꺼져 있거나 터널이 끊겼을 수 있습니다.」를 보인다(`call`·`stream` 둘 다) |
+| 테스트 | 가드 둘(502·504 없음 · 셋이 424) · 라우터에서 `PushFailed`가 나면 424 + problem+json(`type`·`reason`) · 임시 터널(Quick Tunnel) 실험으로 Cloudflare가 502·504만 덮고 424는 통과시키는지 · `client.ts`를 묶어 가짜 fetch로 한 줄 문구 확인 |
+| 선행 | — |
+| 완료 | — |
+
+**왜 카드인가.** 명세(API-001 2장)가 502라고 적었고 코드는 그대로 따랐다 — 바꾸는 것은 명세다(카드 AH와 같은 기준). 502는 뜻으로는 맞는 코드였다(앱 밖이 실패했다). 그런데 Cloudflare가 원본의 502·504를 자기 페이지로 바꾸는 것은 문서에 적힌 기본 동작이고 무료 플랜에는 끄는 설정이 없다. 앞단을 바꿀 수 없으니 코드를 고른다.
+
+---
+
 ## 2. 통합 테스트 시나리오
 
 시나리오 S1~S7을 그대로 E2E 테스트로. 각 슬라이스의 `테스트` 행에 나눠 들어가 있다. 전부 통과하면 PRD 성공지표 측정을 시작한다.
@@ -1002,6 +1016,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AG | `card/AG-subtype-templates` | `8850433` | #148 | 2026-09-23 |
 | (#124) | `fix/124-cache-headers` | — | #124 | 2026-09-23 |
 | AH | `card/AH-item-bodies` | `f0ae4f5` | #154 | 2026-09-23 |
+| AI | `card/AI-424` | — | — | 2026-09-23 |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 | X | `card/X-ui-doc` | `7a4e821`~ | #103 | 2026-09-21 |
