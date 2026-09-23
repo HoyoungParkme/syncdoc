@@ -943,7 +943,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-API-001]] 2장 · [[SYNC-STD-004#DEV-5]] · [[SYNC-INFRA-001]] 5장 · #76 · 사용자 결정 2026-09-23 |
-| 구현 | `PushFailed`·`RepoCreateFailed`·`LlmUnavailable`의 status 502 → **424**. `tests/core/test_errors.py` 신설 — 에러 클래스 전부를 훑어 502·504가 있으면 실패. 웹 클라이언트(`client.ts`)는 problem+json이 아닌 오류 본문을 `urn:syncdoc:http`로 접고 「HTTP {status} — 서버 앞단(Cloudflare)이 보낸 오류 페이지입니다. 서버가 꺼져 있거나 터널이 끊겼을 수 있습니다.」를 보인다(`call`·`stream` 둘 다) |
+| 구현 | `PushFailed`·`RepoCreateFailed`·`LlmUnavailable`의 status 502 → **424**. `tests/core/test_errors.py` 신설 — 에러 클래스 전부를 훑어 502·504가 있으면 실패. 웹 클라이언트(`client.ts`)는 JSON이 아닌 오류 본문을 `urn:syncdoc:http`로 접고 「HTTP {status} — 서버 앞단(Cloudflare)이 보낸 오류 페이지입니다. 서버가 꺼져 있거나 터널이 끊겼을 수 있습니다.」를 보인다(`call`·`stream` 둘 다) |
 | 테스트 | 가드 둘(502·504 없음 · 셋이 424) · 라우터에서 `PushFailed`가 나면 424 + problem+json(`type`·`reason`) · 임시 터널(Quick Tunnel) 실험으로 Cloudflare가 502·504만 덮고 424는 통과시키는지 · `client.ts`를 묶어 가짜 fetch로 한 줄 문구 확인 |
 | 선행 | — |
 | 완료 | — |
