@@ -62,6 +62,9 @@ export function fullMatch(re: RegExp, s: string): boolean {
   return new RegExp(`^(?:${re.source})$`).test(s)
 }
 
+/** 문단을 끊는 줄 — 헤딩·코드블록·표·목록·인용·구분선. 시나리오 단계의 첫 문단도 여기서 끊는다 (view_build.BLOCK_START) */
+export const BLOCK_START = /^(#{1,6} |```|\||\s*- |\d+\. |> |---$)/
+
 /** 헤딩·문단·목록·표·코드블록. 항목 헤딩은 뱃지. mermaid는 <pre class=mermaid>. */
 export function renderBlocks(text: string, ctx: RenderCtx, itemPat?: RegExp): string {
   const out: string[] = []
@@ -178,7 +181,7 @@ export function renderBlocks(text: string, ctx: RenderCtx, itemPat?: RegExp): st
       continue
     }
     const para: string[] = []
-    while (i < lines.length && lines[i].trim() && !/^(#{1,6} |```|\||\s*- |\d+\. |> |---$)/.test(lines[i])) {
+    while (i < lines.length && lines[i].trim() && !BLOCK_START.test(lines[i])) {
       para.push(lines[i])
       i++
     }
@@ -240,6 +243,14 @@ export function splitItems(body: string, pat: RegExp): ItemPart[] {
 /** 항목 헤딩 블록 → [{id, title, level, text}]. splitItems에서 항목만 */
 export const itemBlocks = (body: string, pat: RegExp): ItemBlock[] =>
   splitItems(body, pat).flatMap((p) => (p.kind === 'item' ? [p.block] : []))
+
+/** view_build.etc_block — 「그 밖」: 뷰가 조각으로 가르고 남은 줄을 항목 카드 끝에 원본 순서로 (STD-002 1장, #152).
+ *  구분선·빈 줄뿐이면 머리 없이 그대로 — 절 구분선 `---`이 마지막 항목 블록에 들어온다 */
+export function etcBlock(lines: string[], ctx: RenderCtx): string {
+  const body = renderBlocks(lines.join('\n'), ctx)
+  if (lines.every((l) => l.trim() === '' || l.trim() === '---')) return body
+  return `<div class="etc"><div class="etc-t">그 밖</div>${body}</div>`
+}
 
 export const secName = (title: string) => title.replace(/^\d+\.\s*/, '')
 export const h2 = (title: string) => `<h2>${esc(title)}</h2>`

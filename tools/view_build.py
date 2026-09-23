@@ -82,6 +82,9 @@ def inline(s, self_id):
     return s
 
 # ───────────────────────── 블록 마크다운 → HTML (공통 렌더러) ─────────────────────────
+# 문단을 끊는 줄 — 헤딩·코드블록·표·목록·인용·구분선. 시나리오 단계의 첫 문단도 여기서 끊는다
+BLOCK_START = re.compile(r"^(#{1,6} |```|\||\s*- |\d+\. |> |---$)")
+
 def render_blocks(text, self_id, item_pat=None):
     """헤딩·문단·목록·표·코드블록. 항목 헤딩은 뱃지. mermaid는 <pre class=mermaid>."""
     out, lines, i = [], text.split("\n"), 0
@@ -144,7 +147,7 @@ def render_blocks(text, self_id, item_pat=None):
         if l.strip() == "---": out.append("<hr>"); i += 1; continue
         if l.strip() == "": i += 1; continue
         para = []
-        while i < len(lines) and lines[i].strip() and not re.match(r"^(#{1,6} |```|\||\s*- |\d+\. |> |---$)", lines[i]):
+        while i < len(lines) and lines[i].strip() and not BLOCK_START.match(lines[i]):
             para.append(lines[i]); i += 1
         out.append(f"<p>{inline(' '.join(para), self_id)}</p>")
     return "\n".join(out)
@@ -247,6 +250,13 @@ def item_cards(did, text, pat, label, dmap):
                    item_card(did, x[0], x[1], render_blocks(x[3], did), sorted(d for d, v in dmap.items() if x[0] in v), label)
                    for k, x in split_items(text, pat))
 
+def etc_block(lines, did):
+    """「그 밖」 — 뷰가 조각으로 가르고 남은 줄을 항목 카드 끝에 원본 순서로 (STD-002 1장, #152).
+    구분선·빈 줄뿐이면 머리 없이 그대로 — 절 구분선 `---`이 마지막 항목 블록에 들어온다"""
+    body = render_blocks("\n".join(lines), did)
+    if all(l.strip() in ("", "---") for l in lines): return body
+    return f'<div class="etc"><div class="etc-t">그 밖</div>{body}</div>'
+
 # ───────────────────────── V-PRD ─────────────────────────
 def v_prd(doc):
     did = doc["fm"]["doc_id"]; body = doc["body"]; pat = r"G\d+|R\d+|N\d+"
@@ -296,38 +306,68 @@ def v_rfq(doc):
     return "\n".join(out)
 
 # ───────────────────────── V-SCN ─────────────────────────
+def scn_parts(text):
+    """S 블록 → (머리, [단계], [변형], 꼬리, 그 밖) 줄 목록. 규약 조각대로 가르고 안 맞는 줄은 그 밖 (STD-002 V-SCN, #152).
+    단계는 번호 줄 + 빈 줄 없이 이어진 줄·들여 쓴 줄. 변형은 `**변형` 줄부터 다음 변형·성공 조건·연관 줄 전까지 전부.
+    꼬리는 `**성공 조건`·`**연관` 줄부터 다음 변형 전까지. 코드블록 안 줄은 여는 줄이 든 조각을 따른다"""
+    head, steps, variants, tail, etc = [], [], [], [], []
+    cur, mode, fence, blank = head, "head", False, False
+    for l in text.split("\n"):
+        if fence:
+            cur.append(l); fence = not l.lstrip().startswith("```"); continue
+        if l.startswith("**변형"): variants.append([]); cur, mode = variants[-1], "var"
+        elif l.startswith(("**성공 조건", "**연관")): cur, mode = tail, "tail"
+        elif mode in ("var", "tail"): pass
+        elif re.match(r"^\d+\. ", l): steps.append([]); cur, mode = steps[-1], "steps"
+        elif mode == "steps" and (not l.strip() or l[:1] in (" ", "\t") or not blank): pass
+        elif mode in ("steps", "etc"): cur, mode = etc, "etc"
+        cur.append(l)
+        fence = l.lstrip().startswith("```"); blank = not l.strip()
+    return head, steps, variants, tail, etc
+
+def step_html(lines, did):
+    """단계 하나 — 첫 문단은 번호 옆, 나머지(밑 목록·둘째 문단)는 번호 너비만큼 들여쓰기를 떼고 그 아래.
+    한 줄 단계는 전과 같은 HTML이다 (#152)"""
+    num = re.match(r"^\d+\. ", lines[0]).group(0)
+    rest = [re.sub("^ {1,%d}" % len(num), "", l) for l in lines[1:]]
+    lead = [lines[0][len(num):]]
+    while rest and rest[0].strip() and not BLOCK_START.match(rest[0]): lead.append(rest.pop(0))
+    return inline(" ".join(lead), did) + render_blocks("\n".join(rest), did)
+
+def variant_html(lines, did):
+    """변형 하나 — 접힘. 이름은 summary, 첫 줄 나머지부터 다음 표시 줄 전까지가 몸. 한 줄 변형은 전과 같은 HTML (#152)"""
+    m = re.match(r"\*\*(변형[^*]*)\*\*:?\s*(.*)", lines[0])
+    name, first = (m.group(1), m.group(2)) if m else ("변형", lines[0])
+    return f'<details class="variant"><summary>{esc(name)}</summary>{render_blocks(chr(10).join([first] + lines[1:]), did)}</details>'
+
+def scn_card(did, sid, title, text):
+    """S 카드 — 머리 ID·제목·`N단계` / 주체·상황 → 단계 타임라인 → 변형(접힘) → 성공 조건·연관 → 그 밖"""
+    head, steps, variants, tail, etc = scn_parts(text)
+    lis = "".join(f"<li>{step_html(s, did)}</li>" for s in steps)
+    vars_ = "".join(variant_html(v, did) for v in variants)
+    return (f'<article class="scard" id="item-{sid}"><div class="card-h"><span class="iid">{sid}</span><b>{inline(title, did)}</b><span class="pill soft">{len(steps)}단계</span></div>'
+            f'{render_blocks(chr(10).join(head), did)}<ol class="steps">{lis}</ol>{vars_}{render_blocks(chr(10).join(tail), did)}{etc_block(etc, did)}</article>')
+
 def v_scn(doc):
-    """페르소나 P 카드 나란히 · 시나리오 S 항목마다 번호 흐름을 단계 목록으로, 변형은 접힘 · 대응표 그대로."""
+    """페르소나 P 카드 나란히 · 시나리오 S 카드(scn_card) · 대응표 그대로.
+    항목 밖 문장(절 머리·소절 제목·소절 머리)은 원본 순서 그대로 — 항목 헤딩 단계와 무관하다. 전에는 절 머리를
+    `### `·`#### ` 글자로 잘라, 항목 헤딩이 다른 단계면 절 전체가 한 번 더 그려졌다 (STD-002 V-SCN, #152)"""
     did = doc["fm"]["doc_id"]; out = []
     for title, text in split_sections(doc["body"]):
         name = re.sub(r"^\d+\.\s*", "", title)
         if name.startswith("페르소나"):
-            cards = ""
-            for pid, pt, _, pb in item_blocks(text, r"P\d+"):
-                cards += f'<article class="pcard" id="item-{pid}"><div class="card-h"><span class="iid">{pid}</span><b>{inline(pt, did)}</b></div>{render_blocks(pb, did)}</article>'
-            lead = re.split(r"^#### ", text, flags=re.M)[0]
-            out.append(f"<h2>{esc(title)}</h2>{render_blocks(lead, did)}<div class=\"pgrid\">{cards}</div>"); continue
+            body = grid = ""  # 이어진 P 카드끼리 한 그리드
+            for k, x in split_items(text, r"P\d+"):
+                if k == "item":
+                    grid += f'<article class="pcard" id="item-{x[0]}"><div class="card-h"><span class="iid">{x[0]}</span><b>{inline(x[1], did)}</b></div>{render_blocks(x[3], did)}</article>'
+                    continue
+                if grid: body += f'<div class="pgrid">{grid}</div>'; grid = ""
+                body += render_blocks(x, did)
+            if grid: body += f'<div class="pgrid">{grid}</div>'
+            out.append(f"<h2>{esc(title)}</h2>{body}"); continue
         if name.startswith("시나리오"):
-            out.append(f"<h2>{esc(title)}</h2>" + render_blocks(re.split(r"^### ", text, flags=re.M)[0], did))
-            for sid, st, _, sb in item_blocks(text, r"S\d+"):
-                # 머리(주체·상황) / 번호 흐름 / 변형 / 성공 조건·연관
-                head = []; steps = []; variants = []; tail = []
-                mode = "head"
-                for l in sb.split("\n"):
-                    if re.match(r"^\d+\. ", l): mode = "steps"; steps.append(l)
-                    elif l.startswith("**변형"): mode = "var"; variants.append(l)
-                    elif l.startswith("**성공 조건") or l.startswith("**연관"): mode = "tail"; tail.append(l)
-                    elif mode == "head": head.append(l)
-                    elif mode == "steps" and l.strip() and not l.startswith("**"): steps[-1] += "\n" + l if steps else ""
-                    elif mode == "var": variants.append(l)
-                    elif mode == "tail": tail.append(l)
-                var_html = ""
-                for v in [x for x in variants if x.strip()]:
-                    m = re.match(r"\*\*(변형[^*]*)\*\*:?\s*(.*)", v)
-                    if m: var_html += f'<details class="variant"><summary>{esc(m.group(1))}</summary><p>{inline(m.group(2), did)}</p></details>'
-                    else: var_html += f"<p>{inline(v, did)}</p>"
-                out.append(f'<article class="scard" id="item-{sid}"><div class="card-h"><span class="iid">{sid}</span><b>{inline(st, did)}</b><span class="pill soft">{len(steps)}단계</span></div>'
-                           f'{render_blocks(chr(10).join(head), did)}<ol class="steps">{"".join(f"<li>{inline(re.sub(chr(94)+chr(92)+"d+"+chr(92)+". ", "", x.split(chr(10))[0]), did)}</li>" for x in steps)}</ol>{var_html}{render_blocks(chr(10).join(tail), did)}</article>')
+            out.append(f"<h2>{esc(title)}</h2>" + "".join(render_blocks(x, did) if k == "text" else scn_card(did, x[0], x[1], x[3])
+                                                         for k, x in split_items(text, r"S\d+")))
             continue
         out.append(f"<h2>{esc(title)}</h2>" + render_blocks(text, did, r"P\d+|S\d+"))
     return "\n".join(out)
@@ -579,14 +619,15 @@ table.reassembled td.iid,table.trace td:first-child{white-space:nowrap}td.num{te
 .pill{font-size:11px;padding:1px 8px;border:1px solid var(--ink);border-radius:10px;white-space:nowrap}.pill.soft{border-color:var(--rule);color:var(--soft)}
 ul.ac{list-style:none;padding:0;margin:8px 0 0}ul.ac li{display:flex;gap:8px;align-items:flex-start;margin:4px 0;font-size:13.5px}ul.ac .box{display:inline-block;width:16px;height:16px;border:1.5px solid var(--ink);border-radius:2px;font-size:11px;line-height:13px;text-align:center;flex:none;margin-top:4px;background:#fff}ul.ac li.done{color:var(--soft)}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:10px 0 20px}.pcard{border:1px solid var(--rule);background:var(--panel);padding:14px 16px}.pcard ul{margin:4px 0}
-.scard{border:1px solid var(--rule);background:#fff;padding:16px 20px;margin:14px 0}.scard ol.steps{counter-reset:s;list-style:none;padding:0;margin:10px 0}.scard ol.steps li{counter-increment:s;position:relative;padding:6px 0 6px 38px;border-left:2px solid var(--rule);margin-left:12px}.scard ol.steps li::before{content:counter(s);position:absolute;left:-13px;top:6px;width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;font-size:11.5px;text-align:center;line-height:24px;font-weight:600}
-.variant{margin:8px 0;border:1px dashed var(--rule);padding:6px 12px;background:var(--panel)}.variant summary{cursor:pointer;font-weight:600;font-size:13px}.variant p{margin:6px 0 2px;font-size:13.5px}
+.scard{border:1px solid var(--rule);background:#fff;padding:16px 20px;margin:14px 0}.scard ol.steps{counter-reset:s;list-style:none;padding:0;margin:10px 0}.scard ol.steps>li{counter-increment:s;position:relative;padding:6px 0 6px 38px;border-left:2px solid var(--rule);margin-left:12px}.scard ol.steps>li::before{content:counter(s);position:absolute;left:-13px;top:6px;width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;font-size:11.5px;text-align:center;line-height:24px;font-weight:600}
+.variant{margin:8px 0;border:1px dashed var(--rule);padding:6px 12px;background:var(--panel)}.variant summary{cursor:pointer;font-weight:600;font-size:13px}.variant p{margin:6px 0 2px;font-size:13.5px}.variant ul,.variant ol{font-size:13.5px}
 .pgrid.dom{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
 .meth{display:inline-block;font:600 10.5px ui-monospace,monospace;padding:1px 6px;border-radius:2px;color:#fff;background:#666}.m-get{background:#2b7a4b}.m-post{background:#2a5db0}.m-delete{background:#b03030}.m-put,.m-patch{background:#a06a00}
 table.eps tr.grp td{background:var(--panel);font-weight:600;color:var(--soft)}td.small{font-size:12px;color:var(--soft)}
 details.ep{border:1px solid var(--rule);margin:8px 0;background:#fff}details.ep summary{cursor:pointer;padding:8px 12px;font-size:13.5px}details.ep>*:not(summary){padding:0 14px 8px}
 .desc{color:var(--soft);font-size:13.5px}table.schema{font-size:12.5px}
 .down{margin-top:10px;padding-top:8px;border-top:1px dashed var(--rule);font-size:12.5px;color:var(--soft)}
+.etc{margin-top:10px;padding-top:8px;border-top:1px dashed var(--rule)}.etc-t{font-size:12px;font-weight:600;color:var(--soft)}
 ul,ol{margin:6px 0 12px;padding-left:22px}li{margin:3px 0}blockquote{margin:10px 0;padding:8px 14px;border-left:3px solid var(--ink);background:var(--panel);color:var(--soft)}
 hr{border:none;border-top:1px solid var(--hair);margin:22px 0}
 .soft{color:var(--soft)}.warn{color:#b00;font-size:13px;border:1px solid #b00;padding:6px 10px;background:#fff5f5}.mer{background:#fff;border:1px solid var(--rule);padding:10px;margin:8px 0 16px;overflow-x:auto}pre.mermaid{margin:0;font:12px ui-monospace,monospace;white-space:pre-wrap}pre.mermaid.nomer::before{content:"mermaid.js를 불러오지 못해 코드로 표시";display:block;color:#b00;margin-bottom:6px}
@@ -736,6 +777,111 @@ def _selftest():
     print("V-PRD·V-INFRA: 통과" if not bad else f"V-PRD·V-INFRA: {len(bad)} 실패")
     return 0 if not bad else 1
 
+_SELF_SCN = """---
+doc_id: T-SCN-001
+type: SCN
+title: 시험 시나리오
+status: draft
+upstream: []
+---
+
+# 시험 시나리오
+
+## 1. 페르소나
+
+페르소나 절 머리 문장.
+
+### P1 첫 사람
+
+- 역할 문장.
+
+## 2. 시나리오
+
+시나리오 절 머리 문장.
+
+#### S1 첫 시나리오
+
+**주체**: [[#P1]]
+**상황**: 상황 문장.
+
+1. 첫 단계
+2. 둘째 단계 첫 줄
+   - 둘째 단계 밑 목록
+3. 셋째 단계
+이어 쓴 줄.
+
+흐름 뒤 문단.
+
+**참고**: 모르는 굵은 머리.
+
+**변형 — 여러 줄**: 변형 첫 줄.
+
+변형 둘째 문단.
+
+1. 변형 안 번호 줄
+
+**변형 — 한 줄**: 한 줄 변형.
+
+**성공 조건**: 성공 문장.
+**연관 요구사항**: 연관 문장.
+
+### 2.1 둘째 묶음
+
+소절 머리 문장.
+
+#### S2 코드블록
+
+1. 코드를 넣는다
+
+```text
+1. 코드블록 안 번호 줄
+```
+
+#### S3 구분선뿐
+
+1. 한 단계
+
+---
+
+## 3. 대응표
+
+없음.
+"""
+
+def _selftest_scn():
+    """V-SCN이 원본 문장을 버리지 않고 절을 두 번 그리지 않는지 (#152). 앱 포트(views.ts)는 대조하지 않는다(#153)"""
+    saved = dict(ALL)
+    d = parse_doc(_SELF_SCN, "T-SCN-001.md"); ALL[d["fm"]["doc_id"]] = d
+    try: h = v_scn(d)
+    finally: ALL.clear(); ALL.update(saved)
+    card = {m.group(1): m.group(0) for m in re.finditer(r'<article class="scard" id="item-(S\d+)">.*?</article>', h, re.S)}
+    s1, s2, s3 = card.get("S1", ""), card.get("S2", ""), card.get("S3", "")
+    steps = s1[s1.find('<ol class="steps">'):s1.find("</ol>")]
+    many = s1[s1.find("<summary>변형 — 여러 줄</summary>"):]
+    many = many[:many.find("</details>")]
+    etc = s1.find('class="etc"')
+    cases = [
+        ("페르소나 절 머리", "페르소나 절 머리 문장" in h),
+        ("P가 ###여도 페르소나 절은 한 번", h.count("역할 문장") == 1 and 'class="pcard" id="item-P1"' in h),
+        ("S가 ####여도 시나리오 절은 한 번", h.count("상황 문장") == 1 and h.count("흐름 뒤 문단") == 1),
+        ("절 머리·소절 제목·소절 머리", "시나리오 절 머리 문장" in h and "2.1 둘째 묶음</h3>" in h and "소절 머리 문장" in h),
+        ("단계 밑 목록은 그 단계 안", '<li>둘째 단계 첫 줄<ul><li style="margin-left:0px">둘째 단계 밑 목록</li></ul></li>' in steps),
+        ("빈 줄 없이 이어 쓴 줄은 그 단계", "<li>셋째 단계 이어 쓴 줄.</li>" in steps),
+        ("필은 주 흐름만 센다", '<span class="pill soft">3단계</span>' in s1),
+        ("흐름 뒤 문단·모르는 굵은 머리는 끝의 그 밖", 0 <= s1.rfind("</details>") < etc < s1.find("흐름 뒤 문단") and "모르는 굵은 머리" in s1[etc:]),
+        ("그 밖 머리", '<div class="etc-t">그 밖</div>' in s1),
+        ("여러 줄 변형은 접힌 칸 안", "변형 첫 줄." in many and "변형 둘째 문단." in many and "<li>변형 안 번호 줄</li>" in many),
+        ("한 줄 변형은 전과 같은 HTML", '<details class="variant"><summary>변형 — 한 줄</summary><p>한 줄 변형.</p></details>' in s1),
+        ("성공 조건·연관은 변형 뒤 그 밖 앞", s1.rfind("</details>") < s1.find("성공 문장") < s1.find("연관 문장") < etc),
+        ("코드블록 안 번호 줄은 단계가 아니다", '<span class="pill soft">1단계</span>' in s2 and "<code>1. 코드블록 안 번호 줄</code>" in s2),
+        ("구분선뿐이면 그 밖 머리 없음", 'class="etc"' not in s3 and "<hr>" in s3),
+    ]
+    bad = [name for name, ok in cases if not ok]
+    for name in bad:
+        print("✗ ", name)
+    print("V-SCN: 통과" if not bad else f"V-SCN: {len(bad)} 실패")
+    return 0 if not bad else 1
+
 _ROOT_PRD = """---
 doc_id: TX-PRD-001
 type: PRD
@@ -809,7 +955,7 @@ def _selftest_root():
 def main(argv):
     """[--specs <저장소>/docs/specs] (--all | <원본.md>…) · --selftest"""
     if argv == ["--selftest"]:
-        return _selftest() | _selftest_root()
+        return _selftest() | _selftest_scn() | _selftest_root()
     specs = None
     if "--specs" in argv:
         i = argv.index("--specs")
