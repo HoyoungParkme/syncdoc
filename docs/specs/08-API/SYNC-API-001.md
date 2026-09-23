@@ -43,7 +43,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 **502·504는 쓰지 않는다.** 앞단 Cloudflare는 원본이 보낸 502·504를 자기 오류 페이지로 바꾼다 — problem+json이 사라져 사람이 `reason`을 못 본다(#76). 앱 밖(GitHub·모델)이 실패한 것은 **424**(Failed Dependency — 요청이 기대던 다른 작업이 실패했다)로 보낸다. 500·503은 원본 본문이 그대로 통과한다. `tests/core/test_errors.py`가 모든 에러 클래스를 훑어 막는다([[SYNC-STD-004#DEV-5]]).
 
-**problem+json이 아닌 오류 본문은 앞단이 보낸 것이다.** 앱의 오류는 전부 problem+json이므로(위 포괄 핸들러), JSON이 아닌 본문은 서버가 꺼졌거나 터널이 끊겼을 때 앞단이 보낸 HTML이다. 웹 클라이언트는 그것을 `urn:syncdoc:http`로 접고 「HTTP {status} — 서버 앞단(Cloudflare)이 보낸 오류 페이지입니다. 서버가 꺼져 있거나 터널이 끊겼을 수 있습니다.」를 보인다 — JSON 해석 오류(`SyntaxError: Unexpected token '<'`)가 화면에 새지 않게.
+**JSON이 아닌 오류 본문은 앞단이 보낸 것이다.** 앱이 내는 오류 본문은 JSON이다 — problem+json이거나, FastAPI 기본 오류(입력 검증 422·없는 경로 등)의 `{"detail": …}`다. JSON이 아닌 본문은 서버가 꺼졌거나 터널이 끊겼을 때 앞단이 보낸 HTML이다. 웹 클라이언트는 그것을 `urn:syncdoc:http`로 접고 「HTTP {status} — 서버 앞단(Cloudflare)이 보낸 오류 페이지입니다. 서버가 꺼져 있거나 터널이 끊겼을 수 있습니다.」를 보인다 — JSON 해석 오류(`SyntaxError: Unexpected token '<'`)가 화면에 새지 않게. `type` 없는 JSON은 지금처럼 `urn:syncdoc:http`에 상태 문구만 담는다.
 
 | type | status | 언제 | 확장 필드 | 유스케이스 |
 |---|---|---|---|---|
