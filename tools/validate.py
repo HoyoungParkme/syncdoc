@@ -130,6 +130,16 @@ def validate(path, deleted_ids=()):
             W.append(("section.missing", s))
     if not items and typ not in ("CODE", "STD"):
         W.append(("item.none", ""))
+    # INFRA 제약 — 줄 머리 「출처:」 (STD-001 2.5·4장, #120). body는 코드를 비운 것
+    if typ == "INFRA" and item_re:
+        cur, lvl, found = None, 0, False
+        for l in body.split("\n") + ["# 끝"]:
+            h = re.match(r"^(#{1,6}) (\S+)", l)
+            if h and (cur is None or len(h.group(1)) <= lvl):
+                if cur and not found: W.append(("constraint.source", cur))
+                cur = h.group(2) if item_re.match(h.group(2)) else None
+                lvl, found = len(h.group(1)), False
+            elif cur and l.startswith("출처:"): found = True
 
     return V, W, {"doc_id": did, "type": typ, "items": items, "sections": sections}
 

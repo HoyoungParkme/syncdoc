@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -507,7 +507,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 화면 [[SYNC-UI-001#UI-5]] · 유스케이스 [[SYNC-UC-001#UC-H3]] · 서비스 `queries.downstream_view`
 
-뷰 규약 V-PRD·V-RFQ의 **추적표**와 카드 바닥 "근거로 삼은 문서", 목표 표의 하위 참조 수가 이걸 쓴다.
+뷰 규약 V-PRD·V-RFQ의 **추적표**와 V-PRD·V-INFRA 카드(목표·요구사항·제약)의 `하위 N` 필·바닥 "근거로 삼은 문서"가 이걸 쓴다.
 
 ```yaml
 /api/docs/{docId}/downstream:

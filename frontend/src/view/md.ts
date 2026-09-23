@@ -205,14 +205,23 @@ export interface ItemBlock {
   text: string
 }
 
-/** 항목 헤딩 블록 → [{id, title, level, text}] (헤딩 다음 줄부터, 같은 레벨 이상 헤딩 전까지) */
-export function itemBlocks(body: string, pat: RegExp): ItemBlock[] {
+export type ItemPart = { kind: 'text'; text: string } | { kind: 'item'; block: ItemBlock }
+
+/** view_build.split_items — 본문을 원본 순서대로 가른다. 항목 블록은 헤딩 다음 줄부터 같은 레벨 이상
+ *  헤딩 전까지. 항목 밖 문장(절 머리·소절 제목·소절 머리)도 text로 남는다 — 버리면 유저용 탭에서
+ *  조용히 사라진다 (STD-002 V-PRD, #120) */
+export function splitItems(body: string, pat: RegExp): ItemPart[] {
   const lines = body.split('\n')
-  const out: ItemBlock[] = []
+  const out: ItemPart[] = []
+  let buf: string[] = []
   let i = 0
   while (i < lines.length) {
     const h = /^(#{1,6}) (\S+)(?: (.*))?$/.exec(lines[i])
     if (h && fullMatch(pat, h[2]) && !/^\d/.test(h[2])) {
+      if (buf.length) {
+        out.push({ kind: 'text', text: buf.join('\n') })
+        buf = []
+      }
       const lvl = h[1].length
       let j = i + 1
       while (j < lines.length) {
@@ -220,12 +229,17 @@ export function itemBlocks(body: string, pat: RegExp): ItemBlock[] {
         if (h2 && h2[1].length <= lvl) break
         j++
       }
-      out.push({ id: h[2], title: h[3] || '', level: lvl, text: lines.slice(i + 1, j).join('\n') })
+      out.push({ kind: 'item', block: { id: h[2], title: h[3] || '', level: lvl, text: lines.slice(i + 1, j).join('\n') } })
       i = j
-    } else i++
+    } else buf.push(lines[i++])
   }
+  if (buf.length) out.push({ kind: 'text', text: buf.join('\n') })
   return out
 }
+
+/** 항목 헤딩 블록 → [{id, title, level, text}]. splitItems에서 항목만 */
+export const itemBlocks = (body: string, pat: RegExp): ItemBlock[] =>
+  splitItems(body, pat).flatMap((p) => (p.kind === 'item' ? [p.block] : []))
 
 export const secName = (title: string) => title.replace(/^\d+\.\s*/, '')
 export const h2 = (title: string) => `<h2>${esc(title)}</h2>`

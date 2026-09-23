@@ -1,7 +1,7 @@
 /** V-PRD · V-RFQ · V-SCN · V-INFRA · V-DOM · V-API · V-STD — tools/view_build.py 포트. V-UI는 wireframe.ts(vUi).
  *  하위 참조 수·추적표·"근거로 삼은 문서"는 ctx.downstream(GET /api/docs/{id}/downstream, B4)에서 계산한다 —
  *  view_build.downstream_of와 같은 모양 {문서ID: [항목ID들]}. */
-import { esc, h2, inline, itemBlocks, renderBlocks, secName, splitSections, type RenderCtx } from './md'
+import { esc, h2, inline, itemBlocks, renderBlocks, secName, splitItems, splitSections, type ItemBlock, type RenderCtx } from './md'
 import { ITEM_PAT, plain, type ViewFn } from './types'
 
 const card = (id: string, title: string, inner: string, ctx: RenderCtx, cls = 'card') =>
@@ -29,52 +29,55 @@ const head = (s: string): [string, string] => {
   return nl < 0 ? [s, ''] : [s.slice(0, nl), s.slice(nl + 1)]
 }
 
+/** view_build.item_card — 머리 ID 뱃지·제목·필·`하위 N` · 몸 · 바닥 "{label}: 문서들". 하위가 없으면 필·바닥을 안 그린다 */
+const itemCard = (ctx: RenderCtx, b: ItemBlock, inner: string, label: string, pills = ''): string => {
+  const down = downsWith(ctx, b.id)
+  let c = `<article class="card" id="item-${esc(b.id)}" data-item="${esc(b.id)}"><div class="card-h"><span class="iid">${esc(b.id)}</span><b>${inline(b.title, ctx)}</b>${pills}`
+  if (down.length) c += `<span class="pill soft">하위 ${down.length}</span>`
+  c += '</div>' + inner
+  if (down.length) c += `<div class="down">${label}: ` + down.map((d) => refLink(ctx, d)).join(' · ') + '</div>'
+  return c + '</article>'
+}
+
+/** view_build.item_cards — 항목 밖 문장은 그대로, 항목은 본문 전부를 몸으로 한 카드 (V-PRD 목표·V-INFRA 제약, #120) */
+const itemCards = (ctx: RenderCtx, text: string, pat: RegExp, label: string): string =>
+  splitItems(text, pat)
+    .map((p) => (p.kind === 'text' ? renderBlocks(p.text, ctx) : itemCard(ctx, p.block, renderBlocks(p.block.text, ctx), label)))
+    .join('')
+
 export const vPrd: ViewFn = ({ body, ctx }) => {
   const out: string[] = []
   for (const [title, text] of splitSections(body)) {
     const name = secName(title)
     if (name.startsWith('목표')) {
-      const rows = itemBlocks(text, /G\d+/)
-        .map(
-          (b) =>
-            `<tr id="item-${esc(b.id)}" data-item="${esc(b.id)}"><td class="iid">${esc(b.id)}</td><td>${inline(b.title, ctx)}</td><td class="num">${downsWith(ctx, b.id).length || ''}</td></tr>`,
-        )
-        .join('')
-      out.push(
-        `${h2(title)}<table class="reassembled"><thead><tr><th>#</th><th>목표</th><th>하위 참조</th></tr></thead><tbody>${rows}</tbody></table>`,
-      )
+      out.push(h2(title) + itemCards(ctx, text, /G\d+/, '이 목표를 근거로 삼은 문서'))
       continue
     }
     if (name.startsWith('요구사항')) {
       out.push(h2(title))
-      for (const sub of text.split(/^### /m)) {
-        if (!sub.trim()) continue
-        const [st, srest] = head(sub)
-        if (!srest.trim() && !sub.includes('####')) continue
-        if (!sub.startsWith('####')) out.push(`<h3>${esc(st)}</h3>`)
-        const src = sub.startsWith('####') ? '#### ' + sub : srest
-        for (const b of itemBlocks(src, /R\d+|N\d+/)) {
-          const ac = [...b.text.matchAll(/^- \[([ x])\] (.+)$/gm)]
-          const done = ac.filter((m) => m[1] === 'x').length
-          const desc = b.text.replace(/^- \[[ x]\] .+$/gm, '').trim()
-          const down = downsWith(ctx, b.id)
-          let c = `<article class="card" id="item-${esc(b.id)}" data-item="${esc(b.id)}"><div class="card-h"><span class="iid">${esc(b.id)}</span><b>${inline(b.title, ctx)}</b>`
-          if (ac.length) c += `<span class="pill">인수기준 ${done}/${ac.length}</span>`
-          if (down.length) c += `<span class="pill soft">하위 ${down.length}</span>`
-          c += '</div>' + renderBlocks(desc, ctx)
-          if (ac.length)
-            c +=
-              '<ul class="ac">' +
-              ac
-                .map(
-                  (m) =>
-                    `<li class="${m[1] === 'x' ? 'done' : ''}"><span class="box">${m[1] === 'x' ? '✓' : ''}</span>${inline(m[2], ctx)}</li>`,
-                )
-                .join('') +
-              '</ul>'
-          if (down.length) c += '<div class="down">이 요구사항을 근거로 삼은 문서: ' + down.map((d) => refLink(ctx, d)).join(' · ') + '</div>'
-          out.push(c + '</article>')
+      // 절 머리·소절(### 3.1 …) 제목·소절 머리는 그대로, 항목은 카드
+      for (const p of splitItems(text, /R\d+|N\d+/)) {
+        if (p.kind === 'text') {
+          out.push(renderBlocks(p.text, ctx))
+          continue
         }
+        const b = p.block
+        const ac = [...b.text.matchAll(/^- \[([ x])\] (.+)$/gm)]
+        const done = ac.filter((m) => m[1] === 'x').length
+        const desc = b.text.replace(/^- \[[ x]\] .+$/gm, '').trim()
+        let inner = renderBlocks(desc, ctx)
+        if (ac.length)
+          inner +=
+            '<ul class="ac">' +
+            ac
+              .map(
+                (m) =>
+                  `<li class="${m[1] === 'x' ? 'done' : ''}"><span class="box">${m[1] === 'x' ? '✓' : ''}</span>${inline(m[2], ctx)}</li>`,
+              )
+              .join('') +
+            '</ul>'
+        const pills = ac.length ? `<span class="pill">인수기준 ${done}/${ac.length}</span>` : ''
+        out.push(itemCard(ctx, b, inner, '이 요구사항을 근거로 삼은 문서', pills))
       }
       continue
     }
@@ -158,23 +161,12 @@ export const vScn: ViewFn = ({ body, ctx }) => {
   return { html: out.join('\n') }
 }
 
+/** V-INFRA — 제약은 카드, 절 머리 그대로. 마지막 제약 뒤 문단은 그 제약의 본문이다 — 특정 문장으로 꼬리를 알아보지 않는다(#120) */
 export const vInfra: ViewFn = ({ body, ctx }) => {
   const out: string[] = []
   for (const [title, text] of splitSections(body)) {
     if (secName(title).startsWith('제약')) {
-      const lead = text.split(/^#### /m)[0]
-      const rows = itemBlocks(text, /C\d+/)
-        .map((b) => {
-          const src = /^출처: (.+)$/m.exec(b.text)
-          const downs = downsWith(ctx, b.id)
-          return `<tr id="item-${esc(b.id)}" data-item="${esc(b.id)}"><td class="iid">${esc(b.id)}</td><td>${inline(b.title, ctx)}</td><td>${src ? inline(src[1], ctx) : ''}</td><td>${downs.map((d) => refLink(ctx, d)).join(' · ')}</td></tr>`
-        })
-        .join('')
-      const tailIdx = text.lastIndexOf('\n\n**')
-      const tail = tailIdx >= 0 && text.includes('이 설계의 두 축') ? text.slice(tailIdx) : ''
-      out.push(
-        `${h2(title)}${renderBlocks(lead, ctx)}<table class="reassembled"><thead><tr><th>#</th><th>제약</th><th>출처 (근거)</th><th>이 제약을 근거로 삼은 곳</th></tr></thead><tbody>${rows}</tbody></table>${renderBlocks(tail, ctx)}`,
-      )
+      out.push(h2(title) + itemCards(ctx, text, /C\d+/, '이 제약을 근거로 삼은 문서'))
       continue
     }
     out.push(h2(title) + renderBlocks(text, ctx, /C\d+/))

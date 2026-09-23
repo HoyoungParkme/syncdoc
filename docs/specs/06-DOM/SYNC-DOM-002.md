@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -693,7 +693,7 @@ classDiagram
 | `clear_index` · `mark_convention_error` · `mark_deleted` | pipeline.rebuild · process_commit | [[SYNC-UC-001#UC-S6]], G1 | |
 
 **규칙이 사는 곳**
-- `validate`: [[SYNC-STD-001]] 3장(위반 13종)·4장(미완성 2종)을 그대로. DOM 타입이면 클래스 명세 2장·4장의 엔티티 속성 일치도 검사해 `entity.mismatch` 경고. 반환은 `(violations, warnings)`. `entry=github`면 위반이어도 저장은 되고 `has_convention_error`로 표시. `entry=mcp`면 frontmatter `status`가 현재와 다르면 `frontmatter.status_change` 위반
+- `validate`: [[SYNC-STD-001]] 3장(위반 13종)·4장(미완성 중 본문 하나로 판정되는 다섯 — `section.missing`·`item.none`·`section.unnumbered`·`entity.mismatch`·`constraint.source`)을 그대로. DOM 타입이면 클래스 명세 2장·4장의 엔티티 속성 일치도 검사해 `entity.mismatch` 경고. INFRA면 제약마다 줄 머리 `출처:`를 찾아 없으면 `constraint.source` 경고. 반환은 `(violations, warnings)`. `entry=github`면 위반이어도 저장은 되고 `has_convention_error`로 표시. `entry=mcp`면 frontmatter `status`가 현재와 다르면 `frontmatter.status_change` 위반
 - `item_blocks`: 항목 = ID로 시작하는 헤딩(타입 패턴), 블록 = 같은 레벨 이상 다음 헤딩까지, `display_name` = 헤딩 제목. 코드블록·인라인 코드는 건너뜀 (STD-001 1.3). **5장 미결 둘이 여기서 풀렸다**
 - `detect_deleted_items`: 현재 `items`(is_deleted=false)와 새 본문의 항목 ID를 대조. 사라진 것의 pk 목록. 하위 참조가 있는지는 모른다 — `pipeline`이 `ReferenceService.downstream`으로 판정(되먹임 #2)
 - `save`: 버전 충돌 검사는 하지 않는다 — `pipeline`이 push 전에 한다. Version·Item·Document를 한 트랜잭션에. `status == approved` → `draft` + StatusChange(자동 강등). `deleted_item_pks`에 `is_deleted=true`
