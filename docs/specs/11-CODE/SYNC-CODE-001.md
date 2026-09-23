@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
 
-**진행 상황**: 카드 41장. **A~AG 41장 완료**(2026-09-23).
+**진행 상황**: 카드 42장. **A~AH 42장 완료**(2026-09-23).
 
 ---
 
@@ -930,7 +930,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `view_build.py`·`md.ts`·`views.ts`에 `split_items`/`splitItems` — 절 본문을 원본 순서대로 항목과 항목 밖 문장으로 가른다(`item_blocks`는 그것을 거른 것). 목표·제약을 R·N과 같은 **카드**로(카드 하나를 셋이 같이 — 머리 ID·제목·`하위 N`, 몸 본문 전부, 바닥 「이 목표/제약을 근거로 삼은 문서」). 요구사항 절 머리·소절 머리 문장을 그대로, 빈 소제목을 없앤다. 제약 꼬리 하드코딩(「이 설계의 두 축」)을 지우고 SYNC-INFRA-001의 그 문단을 절 머리로 옮긴다. `SpecService.validate` 7 `constraint.source`(원형 `tools/validate.py`·화면 문구도) · `view_build.py --selftest` 신설 |
 | 테스트 | `constraint.source` — 출처 있음·없음·`출처: RFQ`(링크 아님)·문단 끝 `근거:`만·코드블록 안 `출처:`만 · SYNC 명세 전부 위반 0·경고 0 유지 · `view_build --selftest`(G·C 본문 · 절 머리·소절 머리 · 빈 소제목 없음 · 앵커) · `check_templates` · 사람이 배포 뒤 HB·SYNC·QBOT의 PRD·INFRA를 브라우저에서 |
 | 선행 | — |
-| 완료 | — |
+| 완료 | 2026-09-23 · 브랜치 `card/AH-item-bodies` · spec 8 + code 2 · 테스트 **239**(신설 1) · `validate` 0/0 · `check_code` 114/114 · `check_ui` 12/12 · `check_dom` 10·10·10 · `check_tokens` 91/0 · `check_view_css` 네 쌍 · `check_templates` 16/16 · **`view_build --selftest`**(신설 — 옛 동작을 흉내 내면 4건씩 실패) · 앱 포트를 일회성으로 묶어 돌려 SYNC PRD·INFRA와 시험 문서 둘에서 정적 뷰와 **같은 HTML**(앱 전용 `data-item`·`data-ref` 빼고) · 사람 확인(배포 뒤 2026-09-23, 브라우저): HB PRD G1·G2와 HB INFRA C1~C5가 카드로 본문까지 보인다 · SYNC PRD 목표 카드 7장, 「11개 기능 전부 v1 범위다」, 빈 소제목 0 · SYNC INFRA 절 머리에 「C7이 이 설계의 축이다」 · QBOT 목표 머리 문단과 C9 한도 표 · 카드를 누르면 참조 패널, `#item-C1`로 진입 · `get_template`이 새 항목 블록 문장과 템플릿을 준다 · 새 경고는 로컬로 돌려 보니 BBS 제약 넷·QBOT C14에만 걸린다(VA·HB·SYNC 통과) — 그 저장소들은 손대지 않았다 · **되먹임 둘**: ① 절 구분선 `---`가 마지막 항목 블록에 들어가 마지막 카드 바닥에 빈 가로줄이 생긴다(SYNC C9. 요구사항 마지막 카드는 전부터) ② 카드의 `하위 N`과 참조 패널(UI-5 8.1)의 하위 참조가 다른 기준으로 센다 — 패널은 항목 밖에서 건 참조(HB-SCN-001 대응표 → G1)를 빼고, 문서 전체를 가리킨 참조(`[[QBOT-INFRA-001]]`)는 모든 항목 아래에 보인다. 표였을 때도 같았고 카드와 패널이 나란히 보이며 드러났다 · 남긴 것: #152 · #153 |
 
 **왜 카드인가.** 코드는 규약(STD-002 V-PRD·V-INFRA)대로 버리고 있었다 — 고칠 것은 규약이라 DEV-15의 `fix`가 아니다. 규약은 「G: 한 줄」·「제약 한 줄 + 출처」라 표가 맞았는데, STD-001 5장 예시와 `get_template`은 제목 아래에 본문을 두었다. 에이전트는 예시를 따라 근거 문장을 쓰고, 뷰는 규약을 따라 그것을 버렸다. 규약·예시·뷰가 서로 다른 말을 하고 있어서 셋을 같이 고친다.
 
@@ -1001,7 +1001,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AF | `card/AF-webhook` | `1770920`~ | #144 · #146 | 2026-09-22 |
 | AG | `card/AG-subtype-templates` | `8850433` | #148 | 2026-09-23 |
 | (#124) | `fix/124-cache-headers` | — | #124 | 2026-09-23 |
-| AH | `card/AH-item-bodies` | — | — | 2026-09-23 |
+| AH | `card/AH-item-bodies` | `f0ae4f5` | #154 | 2026-09-23 |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 | X | `card/X-ui-doc` | `7a4e821`~ | #103 | 2026-09-21 |
