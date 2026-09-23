@@ -59,12 +59,21 @@ export function DocView() {
     writeStore('syncdoc.ui5.raw', m)
   }
 
+  // 본문과 하위 참조를 다 받은 뒤 한 번에 넣는다. 따로 넣으면 본문이 먼저 온 때 본문을 통째로 두 번
+  // 그리고 mermaid도 두 번 돈다 — 첫 번째가 그리는 도중에 본문이 갈리는 경쟁이다 (#119).
+  // 하위 참조를 못 받으면 그것 없이 그린다
   const load = useCallback(() => {
-    api
-      .get<Document>(`/api/docs/${docId}`)
-      .then(setDoc)
-      .catch((e: unknown) => setErr(e instanceof ApiError ? e.message : String(e)))
-    api.get<DownstreamView>(`/api/docs/${docId}/downstream`).then(setDownstream).catch(() => setDownstream(null))
+    Promise.allSettled([api.get<Document>(`/api/docs/${docId}`), api.get<DownstreamView>(`/api/docs/${docId}/downstream`)]).then(
+      ([d, ds]) => {
+        if (d.status === 'rejected') {
+          const e: unknown = d.reason
+          setErr(e instanceof ApiError ? e.message : String(e))
+          return
+        }
+        setDownstream(ds.status === 'fulfilled' ? ds.value : null)
+        setDoc(d.value)
+      },
+    )
   }, [docId])
   useEffect(() => {
     setSelected(null)
