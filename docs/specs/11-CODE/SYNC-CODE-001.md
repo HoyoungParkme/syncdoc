@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
 
-**진행 상황**: 카드 43장. **A~AH 42장 완료**(2026-09-23), AI 진행 중.
+**진행 상황**: 카드 43장. **A~AI 43장 완료**(2026-09-23).
 
 ---
 
@@ -946,7 +946,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `PushFailed`·`RepoCreateFailed`·`LlmUnavailable`의 status 502 → **424**. `tests/core/test_errors.py` 신설 — 에러 클래스 전부를 훑어 502·504가 있으면 실패. 웹 클라이언트(`client.ts`)는 JSON이 아닌 오류 본문을 `urn:syncdoc:http`로 접고 「HTTP {status} — 서버 앞단(Cloudflare)이 보낸 오류 페이지입니다. 서버가 꺼져 있거나 터널이 끊겼을 수 있습니다.」를 보인다(`call`·`stream` 둘 다) |
 | 테스트 | 가드 둘(502·504 없음 · 셋이 424) · 라우터에서 `PushFailed`가 나면 424 + problem+json(`type`·`reason`) · 임시 터널(Quick Tunnel) 실험으로 Cloudflare가 502·504만 덮고 424는 통과시키는지 · `client.ts`를 묶어 가짜 fetch로 한 줄 문구 확인 |
 | 선행 | — |
-| 완료 | — |
+| 완료 | 2026-09-23 · 브랜치 `card/AI-424` · spec 6 + code 2 · 테스트 **242**(신설 3) · `validate` 0/0 · `check_code` 114/114 · `check_ui` 12/12 · `check_dom` 10·10·10 · `check_tokens` 91/0 · `check_view_css` 네 쌍 · `check_templates` 16/16 · `view_build --selftest` · **임시 터널 실험**(Quick Tunnel, 시험 서버는 고정 JSON만 — 끝나고 바로 닫음): 424·503·500은 우리 problem+json이 그대로 오고, 502·504만 `text/html` 「trycloudflare.com | 502: Bad gateway」·「504: Gateway time-out」로 바뀌어 reason이 사라졌다. 닫은 뒤 그 주소는 530(Cloudflare HTML) — 새 화면 문구가 받는 경우다 · `client.ts`를 묶어 가짜 fetch로: HTML 502·빈 본문 530 → 한 줄 문구, 424 → `reason`, FastAPI 422 → 상태 문구. 고치기 전에는 HTML 502에서 「SyntaxError: Unexpected token '<'…」 · 배포 뒤: 배포 코드가 셋 다 424, 배포 번들(`index-DdSQuhTm.js`)에 새 문구, 화면 틀 `no-cache`라 브라우저가 새 번들을 받음, 상태 토글 네 번이 그대로 동작 · 배포본에서 push 실패를 일부러 만들 길이 없어 424 실응답은 테스트와 실험으로만 봤다 · **되먹임**: FastAPI 기본 오류(입력 검증 422·없는 경로 404/405)는 `{"detail": …}` JSON이라 problem+json이 아니다 — 2장 「에러는 problem+json」과 어긋난다(이번 범위 밖) |
 
 **왜 카드인가.** 명세(API-001 2장)가 502라고 적었고 코드는 그대로 따랐다 — 바꾸는 것은 명세다(카드 AH와 같은 기준). 502는 뜻으로는 맞는 코드였다(앱 밖이 실패했다). 그런데 Cloudflare가 원본의 502·504를 자기 페이지로 바꾸는 것은 문서에 적힌 기본 동작이고 무료 플랜에는 끄는 설정이 없다. 앞단을 바꿀 수 없으니 코드를 고른다.
 
@@ -1016,7 +1016,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AG | `card/AG-subtype-templates` | `8850433` | #148 | 2026-09-23 |
 | (#124) | `fix/124-cache-headers` | — | #124 | 2026-09-23 |
 | AH | `card/AH-item-bodies` | `f0ae4f5` | #154 | 2026-09-23 |
-| AI | `card/AI-424` | — | — | 2026-09-23 |
+| AI | `card/AI-424` | `88d026e` | #156 | 2026-09-23 |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 | X | `card/X-ui-doc` | `7a4e821`~ | #103 | 2026-09-21 |
