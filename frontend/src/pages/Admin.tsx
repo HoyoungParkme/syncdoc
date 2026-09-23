@@ -5,12 +5,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ago, api, ApiError, docPath, type HookStatus, type RebuildResult, type RepoStatus, type SyncResult } from '../api/client'
-import { ProjName, toast, Tooltip } from '../components/ui'
+import { ProjName, toast, Tooltip, useEscape } from '../components/ui'
 
 export function Admin() {
   const [repos, setRepos] = useState<RepoStatus[]>([])
   const [confirm, setConfirm] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // 1.1 — Esc는 바깥 클릭과 같다. 진행 중이면 바깥 클릭처럼 막는다 (#117)
+  useEscape(confirm ? () => !busy && setConfirm(null) : null)
   const [result, setResult] = useState<{ code: string; at: string; r: RebuildResult } | null>(null)
   // 재구축(3)과 해제(7)가 같은 확인 다이얼로그를 쓴다. 무엇을 확인 중인지만 다르다
   const [confirmKind, setConfirmKind] = useState<'rebuild' | 'delete'>('rebuild')

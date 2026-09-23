@@ -404,9 +404,11 @@ export const josa = (n: number, withFinal: string, without: string): string =>
   (HAS_FINAL[Math.abs(n) % 10] ? withFinal : without)
 
 export const STAGE_TYPES = ['RFQ', 'PRD', 'SCN', 'UC', 'INFRA', 'DOM', 'UI', 'API', 'SEQ', 'MS', 'CODE']
+/** 11단계 이름 — 사람 말. 사용 방법(UI-16) 11단계 표와 UI-4 단계 행이 같이 쓴다. 코드만 쓰면(PRD)
+ *  문서 ID(HB-PRD-001)의 일부처럼 읽혀 단계 행을 문서로 알고 눌렀다 (#116) */
 export const STAGE_NAMES: Record<string, string> = {
-  RFQ: 'RFQ', PRD: 'PRD', SCN: '사용자 시나리오', UC: 'USECASE', INFRA: '인프라', DOM: '도메인·클래스·데이터',
-  UI: '화면', API: 'API', SEQ: 'SEQUENCE', MS: 'MINISPEC', CODE: 'CODE',
+  RFQ: '요구·인터뷰', PRD: '제품 요구', SCN: '사용자 시나리오', UC: '유스케이스', INFRA: '인프라 아키텍처', DOM: '도메인·클래스·데이터',
+  UI: '화면', API: '인터페이스', SEQ: '시퀀스', MS: 'MINISPEC', CODE: '구현 계획',
 }
 
 /** 상대 시각 — "3시간 전" */

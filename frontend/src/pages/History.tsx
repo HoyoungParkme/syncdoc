@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ago, api, ApiError, docPath, josa, type Diff, type Document, type ItemReferences, type Version } from '../api/client'
 import { DiffBox } from '../components/DiffBox'
-import { StatusPill, ProjName } from '../components/ui'
+import { StatusPill, ProjName, useEscape } from '../components/ui'
 import { Handle, PANEL, TOC, useWidth } from '../components/panes'
 import { renderBlocks } from '../view/md'
 
@@ -29,6 +29,9 @@ export function History() {
   const [revertTo, setRevertTo] = useState<number | null>(null)
   const [revertDiff, setRevertDiff] = useState<Diff | null>(null)
   const [deleted, setDeleted] = useState<Deleted[] | null>(null)
+  // 1.1 — Esc는 바깥 클릭과 같다. 삭제 확인(6)의 바깥 클릭·Esc는 「취소」(6.2)다 (#117)
+  useEscape(revertTo != null && !deleted ? () => setRevertTo(null) : null)
+  useEscape(deleted ? () => setDeleted(null) : null)
   const [err, setErr] = useState('')
 
   useEffect(() => {
@@ -293,7 +296,7 @@ export function History() {
       )}
       {deleted && (
         <>
-          <div className="backdrop" />
+          <div className="backdrop" onClick={() => setDeleted(null)} />
           <div className="dialog" data-el="6">
             <div className="dhead">항목 삭제 확인</div>
             <div className="dbody">

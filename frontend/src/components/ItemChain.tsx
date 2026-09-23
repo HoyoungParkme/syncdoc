@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, docPath, refKey, type ItemChain as Chain } from '../api/client'
+import { useEscape } from './ui'
 
 /** 단계 라벨의 역할 말. 한 단계에 두 방향이 다 걸리면 함께 적는다 */
 const ROLE_KO: Record<string, string> = { upstream: '근거 ↑', self: '이 항목', downstream: '파생 ↓' }
@@ -25,6 +26,7 @@ export function ItemChain({
 }) {
   const [ch, setCh] = useState<Chain | null>(null)
   const nav = useNavigate()
+  useEscape(onClose) // 1.1 — 불러오는 중이어도 Esc면 열기를 그만둔다
   useEffect(() => {
     setCh(null)
     api
