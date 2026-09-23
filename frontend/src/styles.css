@@ -1,6 +1,8 @@
 /* 앱 틀 — SYNC-UI-002 배치 뼈대의 클래스. 값은 SYNC-UI-001 3장 디자인 토큰.
    **styles.view.css 뒤에 로드돼야 한다** — 두 파일이 클래스를 여럿 공유하고
-   앱이 이기는 근거가 로드 순서뿐이다 (.tabs .st .warn .grp .mono .steps .on .done .ref .missing).
+   앱이 이기는 근거가 로드 순서뿐이다 (.tabs .st .warn .grp .mono .on .done .ref .missing).
+   앱 틀 한 곳에만 쓰는 규칙은 그 틀 안으로 좁힌다 — `.steps` 하나로 두었더니 뷰 안 같은 이름
+   (시나리오 단계·시퀀스 단계 표)까지 가로로 눕혔다 (#169).
    순서가 뒤집히면 먼저 드러나는 곳: UI-5 문서 바 탭 · UI-9 미확정 배너 · V-API 엔드포인트 행. */
 /* ── 디자인 토큰 — SYNC-UI-001 3장의 전사. 값을 바꾸려면 명세를 먼저 고친다 ──
    뷰 본문 변수(--paper --panel --card --ink --soft --faint --rule --hair --hi --blue)는
@@ -632,7 +634,7 @@ a.arow:hover{background:var(--bg-subtle)}
 .steprail .back{flex:none;font-size:13.5px;color:var(--ink-muted);text-decoration:none;white-space:nowrap}
 .steprail .back:hover{color:var(--ink-body)}
 /* 2 단계 표시 — 가로로만 넘친다. 세로로 흐르게 두면 칩 줄이 본문을 밀어낸다 (UI-9 규칙) */
-.steps{display:flex;gap:var(--space-4);flex-wrap:nowrap;overflow-x:auto;min-width:0}
+.steprail .steps{display:flex;gap:var(--space-4);flex-wrap:nowrap;overflow-x:auto;min-width:0}
 /* 상태 점은 라벨 뒤. 앞에 두면 번호와 점이 붙어 칩 왼쪽이 어수선하다 */
 .stp{display:inline-flex;align-items:center;gap:var(--space-5);flex:none;white-space:nowrap;
   font-size:11.5px;font-family:var(--font-mono);padding:var(--space-4) var(--space-8);
