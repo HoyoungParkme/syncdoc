@@ -9,6 +9,7 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -125,13 +126,46 @@ STATIC = Path(__file__).resolve().parent / "web" / "static"
 # 캐시 규칙 — 서버가 말하지 않으면 Cloudflare 기본값(4시간)과 브라우저 추측이 채워 배포 뒤에도
 # 옛 화면이 떴다 (SYNC-INFRA-001 4.1, #124)
 _BUNDLE = "public, max-age=31536000, immutable"  # 이름에 해시 — 내용이 바뀌면 이름이 바뀐다
-_PLAIN = "public, max-age=3600"  # 이름이 안 바뀌는 파일(아이콘·사용 방법 그림)
+# 이름이 안 바뀌는 파일(사용 방법 그림)도 매번 묻는다 — 같으면 304라 가볍다. 1시간으로 두었더니
+# 그림을 바꿔도 이미 본 사람은 옛 그림을 봤다(에지가 4시간으로 덮어 최대 4시간, #151)
+_PLAIN = "no-cache"
 _SHELL = "no-cache"  # 화면 틀 — 매번 새 판인지 묻는다. 같으면 304
 _ASSETS = "assets/"  # Vite 기본 assetsDir. 빌드 설정을 바꾸면 여기도 바꾼다
 
 
+def _file(request: Request, target: Path, cache: str) -> Response:
+    """정적 파일. 요청의 If-None-Match가 이 파일의 ETag와 같으면 본문 없이 304 (#151).
+
+    FileResponse는 ETag를 붙이기만 하고 304를 돌려주지 않았다 — 「매번 묻되 같으면 가볍다」가
+    Cloudflare 에지에서만 됐고, 에지가 서버에 다시 물을 때마다 본문이 터널로 다시 왔다.
+    약한 ETag(`W/`)는 에지가 압축하며 붙이므로 떼고 비교한다. ETag 없이 수정 시각으로만 묻는
+    요청(If-Modified-Since)도 받는다 — 에지를 거친 화면 틀에는 ETag가 떨어져 이것만 온다.
+    """
+    resp = FileResponse(target, stat_result=target.stat(), headers={"Cache-Control": cache})
+    etag = resp.headers.get("etag", "")
+    header = request.headers.get("if-none-match", "")
+    if header:
+        asked = {t.strip().removeprefix("W/") for t in header.split(",")}
+        unchanged = bool(etag) and (etag.removeprefix("W/") in asked or "*" in asked)
+    else:
+        unchanged = _not_modified_since(request.headers.get("if-modified-since"), resp)
+    if unchanged:
+        return Response(status_code=304, headers={"ETag": etag, "Cache-Control": cache})
+    return resp
+
+
+def _not_modified_since(since: str | None, resp: Response) -> bool:
+    """If-Modified-Since가 파일 수정 시각보다 늦거나 같으면 참. 못 읽는 날짜는 거짓(본문을 준다)"""
+    if not since or "last-modified" not in resp.headers:
+        return False
+    try:
+        return parsedate_to_datetime(resp.headers["last-modified"]) <= parsedate_to_datetime(since)
+    except (TypeError, ValueError):
+        return False
+
+
 @app.get("/{path:path}", include_in_schema=False)
-async def spa(path: str) -> Response:
+async def spa(path: str, request: Request) -> Response:
     """정적 파일이면 그것, 아니면 index.html(SPA). /api·/auth·/mcp는 위 라우트가 먼저."""
     if not STATIC.exists():
         raise Problem("React 빌드 결과가 없다 — frontend/에서 npm run build")
@@ -139,12 +173,12 @@ async def spa(path: str) -> Response:
     found = bool(path) and target.is_file() and target.resolve().is_relative_to(STATIC)
     if path.startswith(_ASSETS):
         if found:
-            return FileResponse(target, headers={"Cache-Control": _BUNDLE})
+            return _file(request, target, _BUNDLE)
         # 번들 폴더에 없는 파일을 화면 틀로 떨어뜨리지 않는다 — 떨어뜨리면 배포 전에 열린 탭이
         # 옛 조각 대신 HTML을 스크립트로 읽다 깨지고, 그 HTML이 에지에 4시간 남았다
         return Response(status_code=404, headers={"Cache-Control": "no-store"})
     # 화면 틀은 주소로 직접 불러도(`/index.html`) 화면 틀이다 —
     # 한 시간 두면 배포가 한 시간 늦게 보인다
     if found and target.name != "index.html":
-        return FileResponse(target, headers={"Cache-Control": _PLAIN})
-    return FileResponse(STATIC / "index.html", headers={"Cache-Control": _SHELL})
+        return _file(request, target, _PLAIN)
+    return _file(request, STATIC / "index.html", _SHELL)

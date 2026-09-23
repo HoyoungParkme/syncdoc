@@ -18,7 +18,8 @@ def built(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (tmp_path / "assets").mkdir()
     (tmp_path / "index.html").write_text("<!doctype html><div id=root></div>", encoding="utf-8")
     (tmp_path / "assets" / "index-Ab12Cd34.js").write_text("export {}", encoding="utf-8")
-    (tmp_path / "favicon.svg").write_text("<svg/>", encoding="utf-8")
+    (tmp_path / "howto").mkdir()
+    (tmp_path / "howto" / "term-add.png").write_bytes(b"\x89PNG")
     monkeypatch.setattr(main, "STATIC", tmp_path)
     return tmp_path
 
@@ -45,10 +46,34 @@ def test_missing_bundle_is_404_not_the_shell(client: TestClient, built: Path) ->
     assert "id=root" not in r.text
 
 
-def test_plain_file_is_kept_an_hour(client: TestClient, built: Path) -> None:
-    r = client.get("/favicon.svg")
+def test_plain_file_revalidates_every_time(client: TestClient, built: Path) -> None:
+    """이름이 안 바뀌는 그림(사용 방법)은 매번 묻는다 — 바꿔도 옛 그림이 보였다 (#151)."""
+    r = client.get("/howto/term-add.png")
     assert r.status_code == 200
-    assert r.headers["cache-control"] == "public, max-age=3600"
+    assert r.headers["cache-control"] == "no-cache"
+    # 바뀌지 않았으면 본문 없이 304 — 매번 묻는 값이 싸다. 에지가 붙이는 약한 표시(W/)도 같다
+    etag = r.headers["etag"]
+    for asked in (etag, f"W/{etag}", f'"other", {etag}'):
+        again = client.get("/howto/term-add.png", headers={"If-None-Match": asked})
+        assert again.status_code == 304 and again.content == b"", asked
+        assert again.headers["cache-control"] == "no-cache" and again.headers["etag"] == etag
+    # 바뀌었으면(다른 ETag) 새 본문
+    assert client.get("/howto/term-add.png", headers={"If-None-Match": '"old"'}).status_code == 200
+
+
+def test_shell_answers_304_when_unchanged(client: TestClient, built: Path) -> None:
+    """화면 틀도 같은 규칙 — 서버가 304를 돌려준다 (#151, INFRA 4.1).
+
+    Cloudflare를 거친 화면 틀에는 ETag가 떨어져 브라우저는 수정 시각으로만 묻는다.
+    """
+    first = client.get("/")
+    r = client.get("/p/SYNC", headers={"If-None-Match": first.headers["etag"]})
+    assert r.status_code == 304 and r.headers["cache-control"] == "no-cache"
+    since = first.headers["last-modified"]
+    assert client.get("/p/SYNC", headers={"If-Modified-Since": since}).status_code == 304
+    before = "Thu, 01 Jan 1970 00:00:00 GMT"
+    assert client.get("/p/SYNC", headers={"If-Modified-Since": before}).status_code == 200
+    assert client.get("/p/SYNC", headers={"If-Modified-Since": "not a date"}).status_code == 200
 
 
 def test_path_escape_still_falls_to_the_shell(client: TestClient, built: Path) -> None:
