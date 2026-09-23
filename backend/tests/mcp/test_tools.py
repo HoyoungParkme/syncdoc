@@ -170,6 +170,56 @@ async def test_get_template_rules_template_example(scoped: Session, as_user) -> 
     assert err and p["type"] == "urn:syncdoc:not-found"
 
 
+async def test_get_template_by_subtype_gives_that_subtypes_rules(scoped: Session, as_user) -> None:
+    """#114 — 서브타입을 주면 그 서브타입의 필수 절·항목 패턴·항목 블록·뼈대가 온다 (카드 AG).
+
+    전에는 서브타입을 받을 자리가 없어 DOM의 필수 절이 늘 빈 배열이었고, 템플릿은 도메인
+    모델 골격 하나라 그대로 쓴 클래스 명세·ERD가 반드시 미완성이 됐다.
+    """
+    make_project(scoped, "SYNC")
+    err, t = await call("get_template", project_code="SYNC", doc_type="DOM", subtype="클래스")
+    assert not err and t["subtype"] == "클래스"
+    assert t["type_rules"]["required_sections"] == [
+        "폴더 구조",
+        "엔티티",
+        "의존 관계",
+        "설계 클래스",
+        "미결사항",
+    ]
+    assert t["type_rules"]["item_patterns"] == ["[A-Z][A-Za-z]+"]
+    assert "classDiagram" in t["type_rules"]["block_structure"]
+    assert "## 1. 폴더 구조" in t["template"] and "title: 클래스 명세" in t["template"]
+
+    err, t = await call("get_template", project_code="SYNC", doc_type="DOM", subtype="ERD")
+    assert not err and t["type_rules"]["item_patterns"] == ["[a-z][a-z0-9_]+"]
+    assert "컬럼 표" in t["type_rules"]["block_structure"]
+    assert "#### documents" in t["template"]
+
+    err, t = await call("get_template", project_code="SYNC", doc_type="API", subtype="MCP")
+    assert not err
+    assert t["type_rules"]["required_sections"] == ["규칙", "도구", "에이전트 순서", "미결사항"]
+    assert "inputSchema" in t["type_rules"]["block_structure"]
+    assert "## 3. 에이전트 순서" in t["template"]
+
+    # UI는 두 서브타입의 필수 절이 같아 뼈대가 하나다 — 서브타입을 줘도 UI.md
+    err, t = await call("get_template", project_code="SYNC", doc_type="UI", subtype="와이어프레임")
+    assert not err and "### 배치" in t["template"]
+
+
+async def test_get_template_without_subtype_lists_choices(scoped: Session, as_user) -> None:
+    make_project(scoped, "SYNC")
+    err, t = await call("get_template", project_code="SYNC", doc_type="DOM")
+    assert not err and t["type_rules"]["required_sections"] == []
+    assert t["subtypes"] == ["도메인", "클래스", "ERD"]
+    assert "셋 중 하나를 고른다" in t["template"]  # 뼈대가 아니라 고르는 안내
+    # 서브타입이 없는 타입은 subtypes가 없다
+    err, t = await call("get_template", project_code="SYNC", doc_type="PRD")
+    assert not err and "subtypes" not in t
+    # 그 타입의 서브타입이 아니면 doc_type이 틀렸을 때와 같은 답
+    err, p = await call("get_template", project_code="SYNC", doc_type="DOM", subtype="REST")
+    assert err and p["type"] == "urn:syncdoc:not-found"
+
+
 async def test_init_project_tool(scoped: Session, as_user, repos, tmp_path, monkeypatch) -> None:
     from app.config import settings
     from tests.conftest import git as g
