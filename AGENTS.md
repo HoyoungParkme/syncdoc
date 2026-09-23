@@ -58,7 +58,7 @@ syncdoc/            저장소 = 프로젝트
 - `python tools/check_templates.py` — 템플릿이 타입·서브타입의 필수 절을 다 갖췄는지. 템플릿대로 쓰면 미완성이 안 나야 한다 (STD-001 1.1)
 - `python tools/open_items.py` — 명세의 열린 미결 모음. `--markdown`이 STD-003 5장 내용, `--check`가 그것과 대조
 - `python tools/view_build.py --all` — 사람용 뷰 생성 → `docs/views/`. React 유저용 탭의 참조 구현. 다른 저장소는 `--specs <저장소>/docs/specs --all`(또는 문서 경로만) → `docs/views/{코드}/`
-- `python tools/view_build.py --selftest` — V-PRD·V-INFRA가 원본 문장(항목 본문·절 머리·소절 머리)을 버리지 않는지. 뷰 코드를 고치면 돌린다
+- `python tools/view_build.py --selftest` — V-PRD·V-INFRA·V-SCN이 원본 문장(항목 본문·절 머리·소절 머리·시나리오 단계와 변형의 둘째 줄부터·「그 밖」)을 버리지 않고 절을 두 번 그리지 않는지. 뷰 코드를 고치면 돌린다
 - `python tools/dev_preview.py` — 개발 DB에 시드를 넣고 앱을 띄운다. 화면 확인용
 - 커밋 메시지: 코드 `code(슬라이스): 함수 — 요약` · 명세 `spec(문서ID): 요약` · 상태 `status(문서ID): a → b` · 끝난 슬라이스 수정 `fix(#이슈번호): 요약`(DEV-15). 둘째 줄부터 이유
 
