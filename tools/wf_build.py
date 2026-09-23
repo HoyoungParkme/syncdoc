@@ -5,8 +5,8 @@
   · 화면 항목 `UI-N`은 헤딩 단계와 무관하게 잡는다(`#`~`#####`). 코드블록 안은 보지 않는다
   · 화면 블록은 다음 「같은 단계 이상」 헤딩 전까지. 이어진 화면 항목은 한 묶음(탭) — 묶음 안 번호순,
     묶음 간 문서 순서
-  · 화면마다 갈리는 것은 배치(```html 코드블록) 유무다. 있으면 위에 배치(iframe 격리) / 아래에 요소 표·규칙·시나리오 (카드 AC).
-    우측 셋이 다 비면 좌측 전폭. 없으면 「설계만 있는 화면」 — 잇따른 것끼리 표 한 장에 행 하나씩
+  · 화면마다 갈리는 것은 배치(```html 코드블록) 유무다. 있으면 위에 배치(iframe 격리) / 아래에 요소 표·규칙·시나리오 (카드 AC)
+    와 조각에 안 맞는 줄 「그 밖」. 없으면 「설계만 있는 화면」 — 화면마다 카드에 블록 전부 (#152)
   · 화면 아닌 절은 문서 순서 그대로 산문으로 그린다(화면 목록·공통 틀·화면 흐름·미결사항 …)
   · 배치는 iframe(srcdoc, allow-same-origin)에 넣는다 — 사이트 CSS가 안 스며든다. 「공통 틀」 절의 첫
     html 블록이 모든 화면 앞에 함께 들어간다. FRAME_CSS·SANDBOX는 frontend/src/view/frame.ts와 같아야
@@ -152,50 +152,140 @@ def _table_rows(text):
     return rows
 
 
-def _sub(masked, name):
-    """소제목 `^#{1,6} 요소` 뒤 ~ 다음 헤딩 앞. 없으면 ''"""
-    for m in SUB.finditer(masked):
-        if m.group(1) == name:
-            nxt = HEAD.search(masked, m.end())
-            return masked[m.end() : nxt.start() if nxt else len(masked)]
-    return ""
+KNOWN = ("배치", "요소", "규칙", "시나리오")
+HEAD_LINE = re.compile(r"^#{1,6} (.+?)\s*$")
+SCEN_HEAD = re.compile(r"^\*\*(S-\d+) (.+?)\*\*(.*)$")
+STEP = re.compile(r"^(\s*\d+\.\s+)")
+
+
+def _fences(lines):
+    """코드 펜스 → (줄마다 펜스 줄(여는·안·닫는)인가, [(여는 줄, 닫는 줄, 언어)]). 안 닫힌 펜스는 끝까지"""
+    flags, spans, open_ = [False] * len(lines), [], None
+    for i, l in enumerate(lines):
+        if l.lstrip().startswith("```"):
+            if open_ is None:
+                open_ = (i, l.strip()[3:].strip())
+            else:
+                spans.append((open_[0], i, open_[1]))
+                open_ = None
+            flags[i] = True
+        elif open_ is not None:
+            flags[i] = True
+    if open_ is not None:
+        spans.append((open_[0], len(lines) - 1, open_[1]))
+    return flags, spans
+
+
+def _first_table(lines, fenced, start, end):
+    """[start, end)의 첫 표 → (행들(구분선 제외), 시작 줄, 끝 줄(제외)). 없으면 ([], -1, -1)"""
+    for i in range(start, end):
+        if not fenced[i] and lines[i].strip().startswith("|"):
+            j, rows = i, []
+            while j < end and not fenced[j] and lines[j].strip().startswith("|"):
+                r = _cells(lines[j])
+                if not _is_sep(r):
+                    rows.append(r)
+                j += 1
+            return rows, i, j
+    return [], -1, -1
+
+
+def _items(lines, start, end, is_head, heads=None):
+    """[start, end) → 항목마다 줄 번호 목록. is_head(줄)인 줄이 새 항목이고, 빈 줄 없이 이어진 줄·들여 쓴 줄·빈 줄은
+    그 항목 안(V-SCN 단계와 같은 규칙, #152). 코드 펜스는 여는 줄이 든 자리를 따른다. heads가 있으면
+    heads(줄)인 줄에서 항목이 끊긴다 — 그 줄 번호는 heads 목록으로 돌려준다(시나리오 머리)"""
+    items, cur, blank, fence, into, marks = [], None, False, False, None, []
+    for i in range(start, end):
+        l = lines[i]
+        if fence:
+            if into is not None:
+                into.append(i)
+            fence = not l.lstrip().startswith("```")
+            continue
+        if heads and heads(l):
+            marks.append((i, len(items)))
+            cur = into = None
+        elif is_head(l):
+            cur = [i]
+            items.append(cur)
+            into = cur
+        elif cur is not None and (not l.strip() or l[:1] in (" ", "\t") or not blank):
+            cur.append(i)
+            into = cur
+        else:
+            cur = into = None
+        fence = l.lstrip().startswith("```")
+        blank = not l.strip()
+    return items, marks
 
 
 def parse_screen(block, level):
-    """화면 블록 하나 → dict. block은 헤딩 줄을 뺀 본문. frontend wireframe.ts와 같은 규칙."""
-    masked = mask_code(block)
-    lm = HTML_BLOCK.search(block)  # 배치 = 블록 안 첫 html 펜스
-    head = masked[: lm.start()] if lm else masked
-    first_head = HEAD.search(head)
-    head = head[: first_head.start()] if first_head else head  # 소제목 전까지가 머리
-    meta = [r[:2] for r in _table_rows(head)[1:] if len(r) >= 2]  # html 앞 첫 표
-    desc = "\n".join(l for l in head.split("\n") if l.strip() and not l.strip().startswith("|"))
-    rows = _table_rows(_sub(masked, "요소"))
-    if rows and len(rows[0]) < 5:  # 요소 표는 5열부터
-        rows = []
-    rules = [l[2:].strip() for l in _sub(masked, "규칙").split("\n") if l.startswith("- ")]
-    scenarios = []
-    for chunk in re.split(r"\n(?=\*\*S-\d+)", _sub(masked, "시나리오").strip()):
-        m = re.match(r"\*\*(S-\d+) (.+?)\*\*(?: — (.+))?\n", chunk + "\n")
-        if not m:
+    """화면 블록 하나(헤딩 줄을 뺀 본문) → dict. frontend wireframe.ts와 같은 규칙 (STD-002 V-UI, #152).
+
+    줄 단위로 가른다(코드 펜스 안은 가르지 않는다). 머리 = 첫 소제목·배치 전 — 행이 전부 두 칸인 첫 표는 메타,
+    나머지는 한 줄 목적(desc). 배치 = 첫 html 펜스. 소제목은 이름(「배치」「요소」「규칙」「시나리오」, 이름마다 처음
+    것)으로 찾는다: 요소 = 첫 표(문서 머리·칸 그대로), 규칙 = `- ` 줄과 이어진 줄, 시나리오 = `**S-N 제목**` 줄(굵은
+    글 뒤 나머지는 유스케이스 자리)과 번호 단계. 어디에도 쓰이지 않은 줄은 원본 순서대로 etc(「그 밖」) —
+    전에는 버렸다.
+    """
+    lines = block.split("\n")
+    n = len(lines)
+    fenced, spans = _fences(lines)
+    used = set()
+    layout, lay_at = None, n
+    for a, b, lang in spans:
+        if lang == "html":
+            layout, lay_at = "\n".join(lines[a + 1 : b]), a
+            used.update(range(a, b + 1))
+            break
+    heads = [i for i in range(n) if not fenced[i] and HEAD_LINE.match(lines[i])]
+    head_end = min([lay_at] + heads[:1])
+    meta = []
+    rows, a, b = _first_table(lines, fenced, 0, head_end)
+    if len(rows) >= 2 and all(len(r) == 2 for r in rows):
+        meta = [(r[0], r[1]) for r in rows[1:]]
+        used.update(range(a, b))
+    desc = "\n".join(lines[i] for i in range(head_end) if i not in used)
+    used.update(range(head_end))
+    elems, rules, scenarios, seen = {"header": [], "rows": []}, [], [], set()
+    for k, h in enumerate(heads):
+        name = HEAD_LINE.match(lines[h]).group(1).strip()
+        if name not in KNOWN or name in seen:
+            continue  # 모르는 소절은 제목째 그 밖
+        seen.add(name)
+        used.add(h)
+        stop = heads[k + 1] if k + 1 < len(heads) else n
+        if name == "요소":
+            rows, a, b = _first_table(lines, fenced, h + 1, stop)
+            if len(rows) >= 2:
+                elems = {"header": rows[0], "rows": rows[1:]}
+                used.update(range(a, b))
+        elif name == "규칙":
+            items, _ = _items(lines, h + 1, stop, lambda l: l.startswith("- "))
+            rules = [[lines[i] for i in it] for it in items]
+            used.update(i for it in items for i in it)
+        elif name == "시나리오":
+            items, marks = _items(lines, h + 1, stop, STEP.match, SCEN_HEAD.match)
+            for j, (i, first) in enumerate(marks):
+                m = SCEN_HEAD.match(lines[i])
+                last = marks[j + 1][1] if j + 1 < len(marks) else len(items)
+                steps = items[first:last]
+                scenarios.append({"id": m.group(1), "title": m.group(2),
+                                  "uc": re.sub(r"^\s*[—–\-.·:]*\s*", "", m.group(3)).strip(),
+                                  "steps": [[lines[x] for x in st] for st in steps]})
+                used.add(i)
+                used.update(x for st in steps for x in st)
+    etc, gap = [], False
+    for i in range(n):
+        if i in used:
+            gap = True
             continue
-        steps = [
-            re.sub(r"^\d+\.\s*", "", l).strip()
-            for l in chunk.split("\n")[1:]
-            if re.match(r"^\d+\.", l.strip())
-        ]
-        scenarios.append({"id": m.group(1), "title": m.group(2), "uc": m.group(3) or "", "steps": steps})
-    first = next((l.strip() for l in head.split("\n") if l.strip()), "")
-    return {
-        "level": level,
-        "meta": meta,
-        "desc": desc,
-        "layout": safe_layout(lm.group(1)) if lm else None,
-        "elems": {"header": rows[0] if rows else [], "rows": rows[1:]},
-        "rules": rules,
-        "scenarios": scenarios,
-        "first": first,
-    }
+        if gap and etc and etc[-1].strip():
+            etc.append("")  # 쓰인 줄을 건너뛴 자리 — 앞뒤 문단이 한 문단으로 붙지 않게
+        gap = False
+        etc.append(lines[i])
+    return {"level": level, "text": block, "meta": meta, "desc": desc, "layout": safe_layout(layout) if layout is not None else None,
+            "elems": elems, "rules": rules, "scenarios": scenarios, "etc": etc}
 
 
 def parse_ui(body):
@@ -244,22 +334,37 @@ def _lib():
     return vb
 
 
-def _chip(s, vb, sid):
-    """문장 속 "(7.1)" 같은 요소 번호를 클릭 가능한 칩으로"""
-    return re.sub(r"\((\d+(?:\.\d+)?[a-z]?)\)", r'(<span class="eref" data-ref="\1">\1</span>)', vb.inline(s, sid))
+def _chip(h):
+    """글자 속 "(7.1)" 같은 요소 번호를 누를 수 있는 칩으로. 태그 속성은 건드리지 않는다 — 규칙·단계의
+    이어진 줄(render_blocks 결과)에도 붙이고, 링크 주소 속 "(1)"은 깨지 않게 (#152)"""
+    ref = re.compile(r"\((\d+(?:\.\d+)?[a-z]?)\)")
+    return re.sub(r">([^<]+)<", lambda m: ">" + ref.sub(r'(<span class="eref" data-ref="\1">\1</span>)', m.group(1)) + "<", f">{h}<")[1:-1]
+
+
+def _item_html(lines, width, vb, sid):
+    """규칙 하나·시나리오 단계 하나 — 첫 문단은 칩을 붙여 그 자리, 이어진 줄(밑 목록·둘째 문단)은 그 아래 (#152)"""
+    lead, rest = vb.lead_rest(lines[0][width:].strip(), lines[1:], width)
+    return _chip(vb.inline(lead, sid) + vb.render_blocks(rest, sid))
 
 
 def _screen_html(sc, vb, sid, i, common, base):
     esc, inline = vb.esc, vb.inline
     meta = "".join(f"<span><b>{esc(k)}</b>{inline(v, sid)}</span>" for k, v in sc["meta"])
-    desc = f'<div class="s-desc">{vb.render_blocks(sc["desc"], sid)}</div>' if sc["desc"] else ""
+    d = vb.render_blocks(sc["desc"], sid)
+    desc = f'<div class="s-desc">{d}</div>' if d else ""
     right = []
     hdr, rows = sc["elems"]["header"], sc["elems"]["rows"]
     if rows:
+        # 문서가 쓴 머리 행·칸 그대로 — 앱이 다섯 칸으로 고정해 칸 모자란 행을 버리던 것(#152). 「종류」 칸만 좁게
+        kind = [c == "종류" for c in hdr]
+
+        def td(j, c):
+            return f'<td class="kind">{inline(c, sid)}</td>' if j < len(kind) and kind[j] else f"<td>{inline(c, sid)}</td>"
+
         th = "".join(f"<th>{inline(c, sid)}</th>" for c in hdr)
         tb = "".join(
             f'<tr data-wf-row="{esc(r[0])}"><td class="no">{esc(r[0])}</td>'
-            + "".join(f"<td>{inline(c, sid)}</td>" for c in r[1:])
+            + "".join(td(j, c) for j, c in enumerate(r[1:], 1))
             + "</tr>"
             for r in rows
         )
@@ -270,7 +375,7 @@ def _screen_html(sc, vb, sid, i, common, base):
     if sc["rules"]:
         right.append(
             '<div class="rsec"><h3>규칙</h3><ul class="rules">'
-            + "".join(f"<li>{_chip(r, vb, sid)}</li>" for r in sc["rules"])
+            + "".join(f"<li>{_item_html(r, 2, vb, sid)}</li>" for r in sc["rules"])
             + "</ul></div>"
         )
     if sc["scenarios"]:
@@ -278,14 +383,16 @@ def _screen_html(sc, vb, sid, i, common, base):
             f'<div class="scen"><div class="st"><span class="k">{esc(x["id"])}</span>{inline(x["title"], sid)}'
             + (f'<span class="uc">— {inline(x["uc"], sid)}</span>' if x["uc"] else "")
             + "</div><ol>"
-            + "".join(f"<li>{_chip(st, vb, sid)}</li>" for st in x["steps"])
+            + "".join(f"<li>{_item_html(st, len(STEP.match(st[0]).group(1)), vb, sid)}</li>" for st in x["steps"])
             + "</ol></div>"
             for x in sc["scenarios"]
         )
         right.append(f'<div class="rsec"><h3>시나리오</h3>{scen}</div>')
+    # 조각에 안 맞는 줄은 아래 판 끝 「그 밖」 — 둘째 html 블록은 공통 틀과 함께 (STD-002 V-UI, #152)
+    right.append(vb.etc_block(sc["etc"], sid, common))
     # 배치가 위, 요소 표·규칙·시나리오가 아래 (카드 AC) — 배치가 본문 폭을 다 쓴다
     inner = frame_html(sc["layout"], common, base)
-    if right:
+    if "".join(right):
         inner += f'<div class="rsecs">{"".join(right)}</div>'
     body = f'<div class="wfstack">{inner}</div>'
     hidden = "" if i == 0 else ' style="display:none"'
@@ -295,33 +402,24 @@ def _screen_html(sc, vb, sid, i, common, base):
     )
 
 
-def _design_table(screens, vb, sid):
-    """배치가 없는 화면들 — 표 한 장에 행 하나씩 (옛 화면 설계 뷰의 재조립 표)."""
-    rows = ""
-    for sc in screens:
-        first = sc["first"]
-        kind = first.split(".")[0] if "." in first else ""
-        uc = re.search(r"주 유스케이스: (.+)$", first)
-        goal = first.split(". ", 1)[1].split(" 주 유스케이스")[0] if ". " in first else first
-        downs = sorted(d for d, v in vb.downstream_of(sid).items() if sc["id"] in v)
-        links = " · ".join(f'<a class="ref" href="{vb.view_href(d)}">{d}</a>' for d in downs)
-        rows += (
-            f'<tr id="item-{vb.esc(sc["id"])}"><td class="iid">{vb.esc(sc["id"])}</td>'
-            f'<td>{vb.inline(sc["name"], sid)}</td><td>{vb.esc(kind)}</td><td>{vb.inline(goal, sid)}</td>'
-            f'<td>{vb.inline(uc.group(1), sid) if uc else ""}</td><td>{links}</td></tr>'
-        )
-    return (
-        '<table class="reassembled"><thead><tr><th>#</th><th>화면</th><th>종류</th><th>목적</th>'
-        f"<th>주 유스케이스</th><th>참조한 곳</th></tr></thead><tbody>{rows}</tbody></table>"
+def _design_cards(screens, vb, sid):
+    """배치가 없는 화면 → 화면마다 카드: 머리 ID·이름·하위 N, 몸은 블록 전부, 바닥 「이 화면을 근거로 삼은 문서」.
+    전에는 표 한 행에 첫 줄만 실려 나머지가 사라졌다 (STD-002 V-UI, #152). 종류·유스케이스는 머리로 뽑지 않는다 —
+    문서마다 쓰는 모양이 달라 뽑으면 틀린다"""
+    dmap = vb.downstream_of(sid)
+    return "".join(
+        vb.item_card(sid, sc["id"], sc["name"], vb.render_blocks(sc["text"], sid),
+                     sorted(d for d, v in dmap.items() if sc["id"] in v), "이 화면을 근거로 삼은 문서")
+        for sc in screens
     )
 
 
 def _group_html(screens, vb, sid, common, base):
-    """묶음 하나: 배치 없는 화면은 표, 배치 있는 화면은 탭 + 화면들."""
+    """묶음 하나: 배치 없는 화면은 카드, 배치 있는 화면은 탭 + 화면들."""
     out = []
     plain = [s for s in screens if s["layout"] is None]
     if plain:
-        out.append(_design_table(plain, vb, sid))
+        out.append(_design_cards(plain, vb, sid))
     wired = [s for s in screens if s["layout"] is not None]
     if wired:
         tabs = "".join(
@@ -510,11 +608,6 @@ footer{margin-top:22px;font-size:12.5px;color:var(--soft);max-width:80ch}
 .prose .mer{margin:10px 0}
 .prose a.ref{color:#1a5fb4}.prose a.ref.missing{color:#b00;border-bottom:1px dashed #b00}
 .screen{margin-top:14px}
-.s-desc p{margin:2px 0}
-table.reassembled{border-collapse:collapse;width:100%;font-size:12.5px;margin:8px 0 14px;background:var(--card);border:1.5px solid var(--ink)}
-table.reassembled th{text-align:left;padding:6px 8px;border-bottom:1.5px solid var(--ink);background:var(--panel);font-weight:600}
-table.reassembled td{padding:6px 8px;border-bottom:1px solid var(--hair);vertical-align:top}
-table.reassembled td.iid{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;white-space:nowrap}
 """
 
 # 화면 부분은 React(frontend/src/view/wireframe.ts wireframeCss)와 **바이트 단위로 같다** —
@@ -537,6 +630,7 @@ WF_SCREEN_CSS = r"""
 .s-head span{color:var(--soft)}
 .s-head span b{font-size:13px;color:var(--ink);font-weight:600;margin-right:4px}
 .s-desc{padding:8px 18px;border-bottom:1px solid var(--hair);font-size:13px;color:var(--soft)}
+.s-desc p{margin:2px 0}
 .wfgroup{margin-bottom:22px}
 /* 배치가 위, 요소 표·규칙·시나리오가 아래 (카드 AC, #134) — 좌우로 나누면 배치가 본문의 절반만 받아
    1280 아트보드가 늘 60%로 줄어 보였다. 세로로 쌓으면 본문 폭을 다 쓴다 */
@@ -556,8 +650,10 @@ WF_SCREEN_CSS = r"""
 .wfframe.scaled .wfframe-if{position:absolute;left:0;top:0}
 
 /* 아래 */
-.rsec{padding:16px 20px;border-bottom:1px solid var(--hair)}
-.rsec:last-child{border-bottom:none}
+.rsec{padding:16px 20px}
+.rsec+.rsec{border-top:1px solid var(--hair)}
+/* 「그 밖」 — 아래 판 끝. 점선은 .etc(뷰 CSS)가 긋는다 (#152) */
+.rsecs>.etc{margin:0;padding:12px 20px 16px}
 .rsec h3{margin:0 0 10px;font-size:13px;font-weight:700;padding-bottom:6px;border-bottom:1.5px solid var(--ink)}
 table.el{border-collapse:collapse;width:100%;font-size:12.5px}
 table.el th{text-align:left;font-weight:600;color:var(--soft);padding:6px 8px;border-bottom:1.5px solid var(--ink);background:var(--panel)}
@@ -636,9 +732,9 @@ def main():
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(fm.get("title", sid))}</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<style>{WF_CSS}</style></head><body><div class="wrap">
+<style>{_lib().CSS}{WF_CSS}</style></head><body><div class="wrap">
 <header><div class="t-main"><h1>{html.escape(fm.get("title", sid))}</h1>
-<p>화면마다 왼쪽은 배치 뼈대, 오른쪽은 요소·규칙·시나리오. 노란 번호나 표의 행을 누르면 양쪽이 서로 강조된다. 배치가 없는 화면은 표 한 행이다. 이어진 화면은 한 묶음이고 탭으로 오간다.</p></div>
+<p>화면마다 위에 배치, 아래에 요소·규칙·시나리오와 「그 밖」. 노란 번호나 표의 행을 누르면 양쪽이 서로 강조된다. 배치가 없는 화면은 카드다. 이어진 화면은 한 묶음이고 탭으로 오간다.</p></div>
 <div class="t-meta"><div>문서</div><div class="mono">{html.escape(sid)}</div><div>상태</div><div>{html.escape(status)}</div>
 <div>상위</div><div class="mono">{html.escape(fm.get("upstream", ""))}</div></div></header>
 <div id="ui">{render_ui(blocks, sid, common, base_for(sid))}<script>{WF_JS}</script></div>

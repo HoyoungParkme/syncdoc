@@ -85,8 +85,9 @@ def inline(s, self_id):
 # 문단을 끊는 줄 — 헤딩·코드블록·표·목록·인용·구분선. 시나리오 단계의 첫 문단도 여기서 끊는다
 BLOCK_START = re.compile(r"^(#{1,6} |```|\||\s*- |\d+\. |> |---$)")
 
-def render_blocks(text, self_id, item_pat=None):
-    """헤딩·문단·목록·표·코드블록. 항목 헤딩은 뱃지. mermaid는 <pre class=mermaid>."""
+def render_blocks(text, self_id, item_pat=None, common=""):
+    """헤딩·문단·목록·표·코드블록. 항목 헤딩은 뱃지. mermaid는 <pre class=mermaid>.
+    common = 그 문서 공통 틀 html — 화면 「그 밖」의 둘째 html 블록만 준다(STD-002 V-UI, #152). 나머지 html 블록은 공통 틀 없이"""
     out, lines, i = [], text.split("\n"), 0
     while i < len(lines):
         l = lines[i]
@@ -99,7 +100,7 @@ def render_blocks(text, self_id, item_pat=None):
                 # html 블록은 iframe에 격리한다(STD-002 V-UI, 카드 Z). 스타일·링크뿐이면 코드로 보인다
                 import wf_build as wf
                 layout = wf.safe_layout(src)
-                if wf.split_common(layout)[1]: out.append(wf.frame_html(layout, "", wf.base_for(self_id)))
+                if wf.split_common(layout)[1]: out.append(wf.frame_html(layout, common, wf.base_for(self_id)))
                 else: out.append(f'<pre class="code" data-lang="html"><code>{esc(src)}</code></pre>')
             else: out.append(f'<pre class="code" data-lang="{esc(lang)}"><code>{esc(src)}</code></pre>')
             i = j + 1; continue
@@ -250,12 +251,11 @@ def item_cards(did, text, pat, label, dmap):
                    item_card(did, x[0], x[1], render_blocks(x[3], did), sorted(d for d, v in dmap.items() if x[0] in v), label)
                    for k, x in split_items(text, pat))
 
-def etc_block(lines, did):
+def etc_block(lines, did, common=""):
     """「그 밖」 — 뷰가 조각으로 가르고 남은 줄을 항목 카드 끝에 원본 순서로 (STD-002 1장, #152).
-    구분선·빈 줄뿐이면 머리 없이 그대로 — 절 구분선 `---`이 마지막 항목 블록에 들어온다"""
-    body = render_blocks("\n".join(lines), did)
-    if all(l.strip() in ("", "---") for l in lines): return body
-    return f'<div class="etc"><div class="etc-t">그 밖</div>{body}</div>'
+    구분선·빈 줄뿐이면 그리지 않는다 — 문장이 아니라 절 사이 표시다(절 구분선 `---`이 마지막 항목 블록에 들어온다)"""
+    if all(l.strip() in ("", "---") for l in lines): return ""
+    return f'<div class="etc"><div class="etc-t">그 밖</div>{render_blocks(chr(10).join(lines), did, common=common)}</div>'
 
 # ───────────────────────── V-PRD ─────────────────────────
 def v_prd(doc):
@@ -325,14 +325,19 @@ def scn_parts(text):
         fence = l.lstrip().startswith("```"); blank = not l.strip()
     return head, steps, variants, tail, etc
 
-def step_html(lines, did):
-    """단계 하나 — 첫 문단은 번호 옆, 나머지(밑 목록·둘째 문단)는 번호 너비만큼 들여쓰기를 떼고 그 아래.
-    한 줄 단계는 전과 같은 HTML이다 (#152)"""
-    num = re.match(r"^\d+\. ", lines[0]).group(0)
-    rest = [re.sub("^ {1,%d}" % len(num), "", l) for l in lines[1:]]
-    lead = [lines[0][len(num):]]
+def lead_rest(first, more, width):
+    """목록 항목 하나 → (첫 문단, 나머지). 첫 문단은 빈 줄 없이 이어진 줄까지 공백으로 잇고, 나머지는 표시 너비만큼
+    들여쓰기를 뗀다 — 시나리오 단계(V-SCN)·화면 규칙·화면 시나리오 단계(V-UI)가 같이 쓴다 (#152)"""
+    rest = [re.sub("^ {1,%d}" % width, "", l) for l in more]
+    lead = [first]
     while rest and rest[0].strip() and not BLOCK_START.match(rest[0]): lead.append(rest.pop(0))
-    return inline(" ".join(lead), did) + render_blocks("\n".join(rest), did)
+    return " ".join(lead), "\n".join(rest)
+
+def step_html(lines, did):
+    """단계 하나 — 첫 문단은 번호 옆, 나머지(밑 목록·둘째 문단)는 그 아래. 한 줄 단계는 전과 같은 HTML이다 (#152)"""
+    num = re.match(r"^\d+\. ", lines[0]).group(0)
+    lead, rest = lead_rest(lines[0][len(num):], lines[1:], len(num))
+    return inline(lead, did) + render_blocks(rest, did)
 
 def variant_html(lines, did):
     """변형 하나 — 접힘. 이름은 summary, 첫 줄 나머지부터 다음 표시 줄 전까지가 몸. 한 줄 변형은 전과 같은 HTML (#152)"""
@@ -874,12 +879,166 @@ def _selftest_scn():
         ("한 줄 변형은 전과 같은 HTML", '<details class="variant"><summary>변형 — 한 줄</summary><p>한 줄 변형.</p></details>' in s1),
         ("성공 조건·연관은 변형 뒤 그 밖 앞", s1.rfind("</details>") < s1.find("성공 문장") < s1.find("연관 문장") < etc),
         ("코드블록 안 번호 줄은 단계가 아니다", '<span class="pill soft">1단계</span>' in s2 and "<code>1. 코드블록 안 번호 줄</code>" in s2),
-        ("구분선뿐이면 그 밖 머리 없음", 'class="etc"' not in s3 and "<hr>" in s3),
+        ("구분선뿐이면 그 밖을 그리지 않음", 'class="etc"' not in s3 and "<hr>" not in s3),
     ]
     bad = [name for name, ok in cases if not ok]
     for name in bad:
         print("✗ ", name)
     print("V-SCN: 통과" if not bad else f"V-SCN: {len(bad)} 실패")
+    return 0 if not bad else 1
+
+_SELF_UI = """---
+doc_id: T-UI-001
+type: UI
+title: 시험 화면 설계·와이어프레임
+status: draft
+upstream: []
+---
+
+# 시험 화면
+
+## 1. 화면 목록
+
+목록 절 머리 문장.
+
+#### UI-1 설계만 있는 화면
+
+페이지. 첫 문단 문장.
+
+- **진입** 목록 한 줄
+- **이탈** 목록 둘째 줄
+
+| 상태 | 모습 |
+|---|---|
+| 기본 | 빈 목록 칸 |
+
+#### UI-2 둘째 설계 화면
+
+둘째 화면 문장.
+
+마지막 설계 화면 뒤 문단.
+
+## UI-3 배치 있는 화면
+
+| 항목 | 내용 |
+|---|---|
+| 경로 | `/x` |
+
+머리 설명 문장.
+
+### 배치
+
+배치 앞 글.
+
+```html
+<div class="box" data-el="1">상자</div>
+```
+
+배치 뒤 글.
+
+### 요소
+
+| # | 이름 | 보여주는 것 | 누르면 |
+|---|---|---|---|
+| 1 | 상자 | 상자 설명 | — |
+| 2 | 칸 모자란 행 |
+
+요소 표 뒤 문단.
+
+### 규칙
+
+- 첫 규칙 (1)
+  이어 쓴 둘째 줄 (2)
+  - 규칙 밑 목록
+- 둘째 규칙
+
+규칙 뒤 문단.
+
+### 시나리오
+
+**S-1 첫 시나리오** . [[#UI-1]]
+1. 첫 단계 (1)
+   단계 둘째 줄
+2. 둘째 단계
+
+시나리오 뒤 문단.
+
+### 예외 상태
+
+모르는 소절 문장.
+
+```html
+<div class="box">둘째 배치</div>
+```
+
+---
+
+## UI-4 구분선만 남는 화면
+
+```html
+<div>넷째 배치</div>
+```
+
+---
+
+## 3. 공통 틀
+
+모든 화면 앞에 들어가는 틀.
+
+```html
+<style>.box{border:1px solid red}</style>
+```
+
+## 4. 미결사항
+
+- [ ] 없음
+"""
+_SELF_UI_REF = """---
+doc_id: T-API-001
+type: API
+title: 시험 참조
+status: draft
+upstream: []
+---
+
+# 시험 참조
+
+근거 [[T-UI-001#UI-1]]
+"""
+
+def _selftest_ui():
+    """V-UI가 원본 문장을 버리지 않는지 (#152). 앱 포트(wireframe.ts)는 대조하지 않는다(#153)"""
+    saved = dict(ALL)
+    for raw, name in ((_SELF_UI, "T-UI-001.md"), (_SELF_UI_REF, "T-API-001.md")):
+        d = parse_doc(raw, name); ALL[d["fm"]["doc_id"]] = d
+    try: h = v_ui(ALL["T-UI-001"])
+    finally: ALL.clear(); ALL.update(saved)
+    card = {m.group(1): m.group(0) for m in re.finditer(r'<article class="card" id="item-(UI-\d+)">.*?</article>', h, re.S)}
+    scr = {m.group(1): m.group(0) for m in re.finditer(r'<section class="screen" id="item-(UI-\d+)".*?</section>', h, re.S)}
+    c1, c2, s3, s4 = card.get("UI-1", ""), card.get("UI-2", ""), scr.get("UI-3", ""), scr.get("UI-4", "")
+    etc = s3[s3.find('class="etc"'):] if 'class="etc"' in s3 else ""
+    rules = s3[s3.find('<ul class="rules">'):s3.find("</ul></div>", s3.find('<ul class="rules">'))]
+    order = ["배치 앞 글", "배치 뒤 글", "요소 표 뒤 문단", "규칙 뒤 문단", "시나리오 뒤 문단", "예외 상태", "모르는 소절 문장", "둘째 배치"]
+    at = [etc.find(x) for x in order]
+    frames = re.findall(r'srcdoc="([^"]*)"', etc)
+    cases = [
+        ("설계 화면은 카드(표 없음)", c1 != "" and c2 != "" and 'class="reassembled"' not in h),
+        ("설계 카드 몸 전부", all(x in c1 for x in ("첫 문단 문장", "목록 한 줄", "목록 둘째 줄", "빈 목록 칸"))),
+        ("마지막 설계 화면 뒤 문단은 그 카드", "마지막 설계 화면 뒤 문단" in c2),
+        ("하위 N과 바닥 줄", "하위 1" in c1 and "이 화면을 근거로 삼은 문서" in c1 and 'href="view_T-API-001.html"' in c1),
+        ("메타·머리 설명", "<b>경로</b>" in s3 and '<div class="s-desc"><p>머리 설명 문장.</p></div>' in s3),
+        ("요소 표는 문서 머리·칸 그대로", "<th>보여주는 것</th>" in s3 and "<th>종류</th>" not in s3 and "칸 모자란 행" in s3 and 'class="kind"' not in s3),
+        ("규칙 이어진 줄·밑 목록·칩", "이어 쓴 둘째 줄" in rules and "규칙 밑 목록</li></ul>" in rules and 'data-ref="2"' in rules),
+        ("시나리오 머리 뒤는 유스케이스 자리", '<span class="uc">— <a class="ref" href="view_T-UI-001.html#item-UI-1">#UI-1</a></span>' in s3),
+        ("시나리오 단계 둘째 줄", "첫 단계 (<span" in s3 and "단계 둘째 줄" in s3),
+        ("그 밖은 원본 순서", all(x >= 0 for x in at) and at == sorted(at)),
+        ("둘째 html은 공통 틀과 함께", len(frames) == 1 and ".box{border:1px solid red}" in html.unescape(frames[0]) and "둘째 배치" in html.unescape(frames[0])),
+        ("구분선만 남은 화면은 그 밖 없음", s4 != "" and 'class="etc"' not in s4 and "<hr>" not in s4),
+    ]
+    bad = [name for name, ok in cases if not ok]
+    for name in bad:
+        print("✗ ", name)
+    print("V-UI: 통과" if not bad else f"V-UI: {len(bad)} 실패")
     return 0 if not bad else 1
 
 _ROOT_PRD = """---
@@ -955,7 +1114,7 @@ def _selftest_root():
 def main(argv):
     """[--specs <저장소>/docs/specs] (--all | <원본.md>…) · --selftest"""
     if argv == ["--selftest"]:
-        return _selftest() | _selftest_scn() | _selftest_root()
+        return _selftest() | _selftest_scn() | _selftest_ui() | _selftest_root()
     specs = None
     if "--specs" in argv:
         i = argv.index("--specs")
