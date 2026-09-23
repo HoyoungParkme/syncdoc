@@ -19,6 +19,29 @@ export class ApiError extends Error {
   }
 }
 
+/** SYNC-API-001 2장 — 오류 본문 → Problem. problem+json이면 그대로, `type` 없는 JSON(FastAPI 기본 오류)은
+ *  상태 문구만. **JSON이 아니면 앞단(Cloudflare)이 보낸 HTML이다** — 상태 코드와 한 줄로 접는다.
+ *  전에는 그대로 JSON.parse해 「SyntaxError: Unexpected token '<'」가 화면에 떴다 (#76) */
+function problemOf(r: Response, text: string): Problem {
+  let data: unknown = null
+  try {
+    data = text ? JSON.parse(text) : null
+  } catch {
+    data = null
+  }
+  if (data && typeof data === 'object') {
+    const p = data as Problem
+    return typeof p.type === 'string' ? p : { type: 'urn:syncdoc:http', title: r.statusText, status: r.status }
+  }
+  const title = `HTTP ${r.status}`
+  return {
+    type: 'urn:syncdoc:http',
+    title,
+    status: r.status,
+    detail: `${title} — 서버 앞단(Cloudflare)이 보낸 오류 페이지입니다. 서버가 꺼져 있거나 터널이 끊겼을 수 있습니다.`,
+  }
+}
+
 async function call<T>(method: string, url: string, body?: unknown): Promise<T> {
   const r = await fetch(url, {
     method,
@@ -28,9 +51,8 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<T> 
   })
   if (r.status === 204) return undefined as T
   const text = await r.text()
-  const data = text ? JSON.parse(text) : null
-  if (!r.ok) throw new ApiError(data && data.type ? data : { type: 'urn:syncdoc:http', title: r.statusText, status: r.status })
-  return data as T
+  if (!r.ok) throw new ApiError(problemOf(r, text))
+  return (text ? JSON.parse(text) : null) as T
 }
 
 /** SSE 수신 — SYNC-API-001 1장 규칙: 첫 이벤트 전 오류는 상태 코드(problem+json → ApiError), 뒤는 `error` 이벤트.
@@ -48,11 +70,7 @@ async function stream(
     credentials: 'same-origin',
     signal,
   })
-  if (!r.ok) {
-    const text = await r.text()
-    const data = text ? JSON.parse(text) : null
-    throw new ApiError(data && data.type ? data : { type: 'urn:syncdoc:http', title: r.statusText, status: r.status })
-  }
+  if (!r.ok) throw new ApiError(problemOf(r, await r.text()))
   if (!r.body) return
   const reader = r.body.getReader()
   const dec = new TextDecoder()
