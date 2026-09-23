@@ -8,128 +8,205 @@
  *  「공통 틀」 절의 첫 html 블록은 이 문서 모든 화면 앞에 함께 들어간다.
  *  wf_build.py는 DATA json + script로 런타임에 그렸지만 여기서는 HTML을 정적으로 만들고 onMount가 탭·연동만 붙인다. */
 import { commonBlock, frameHtml, hiIn, mountFrames, remeasure, safeLayout, splitCommon, type CommonParts } from './frame'
-import { esc, h2, inline, renderBlocks, type ItemBlock, type RenderCtx } from './md'
+import { esc, etcBlock, h2, inline, leadRest, renderBlocks, type ItemBlock, type RenderCtx } from './md'
 import { ITEM_PAT, type ViewFn } from './types'
-import { downsWith, refLink } from './views'
+import { itemCard } from './views'
 
-export interface WfElem {
-  no: string
-  name: string
-  kind: string
-  shows: string
-  onclick: string
-}
 export interface WfScenario {
   id: string
   title: string
   uc: string
-  steps: string[]
+  /** 단계마다 원본 줄 — 첫 줄이 번호 줄, 뒤는 이어진 줄 */
+  steps: string[][]
 }
 export interface WfScreen {
   id: string
   name: string
-  /** 메타 표 앞·뒤의 산문(TBL·VA식 「페이지. 목적. 주 유스케이스: …」). 없으면 '' */
-  desc: string
+  /** 화면 블록 원문(헤딩 줄 뺀 것). 설계만 있는 화면은 이것이 카드 몸이다 */
+  text: string
   meta: [string, string][]
-  /** 첫 ```html 코드블록. 없으면 '' — 그 화면은 설계 표 한 행으로 간다 */
-  layout: string
-  elems: WfElem[]
-  rules: string[]
+  /** 머리 중 메타 표를 뺀 원문 — 한 줄 목적 자리. renderBlocks로 그린다 */
+  desc: string
+  /** 첫 ```html 블록. 없으면 null — 그 화면은 카드로 간다 */
+  layout: string | null
+  /** 요소 소절의 첫 표 — 문서의 머리 행·칸 그대로 */
+  elems: { header: string[]; rows: string[][] }
+  /** 규칙마다 원본 줄 — 첫 줄이 `- `, 뒤는 이어진 줄 */
+  rules: string[][]
   scenarios: WfScenario[]
+  /** 어느 조각에도 쓰이지 않은 줄(원본 순서) — 화면 끝 「그 밖」 */
+  etc: string[]
 }
 
 // ───────────────────────── 파싱 ─────────────────────────
 
+const KNOWN = ['배치', '요소', '규칙', '시나리오']
+const HEAD_LINE = /^#{1,6} (.+?)\s*$/
+const SCEN_HEAD = /^\*\*(S-\d+) (.+?)\*\*(.*)$/
+const STEP = /^(\s*\d+\.\s+)/
+
+/** wf_build._cells — 앞뒤 `|`를 전부 떼고 칸으로 */
 const cells = (line: string): string[] =>
   line
     .trim()
-    .replace(/^\||\|$/g, '')
+    .replace(/^\|+|\|+$/g, '')
     .split('|')
     .map((c) => c.trim())
 
 const isSep = (r: string[]) => r.every((c) => /^[-: ]*$/.test(c))
 
-/** 코드 펜스 안 줄을 같은 길이의 공백으로 가린다(길이·줄 수 유지 — 가린 문자열의 index가 원문 index다).
- *  헤딩·표를 찾을 때 코드 안 `#`·`|`에 속지 않게 */
-function maskFences(text: string): string {
-  let inFence = false
-  return text
-    .split('\n')
-    .map((l) => {
-      if (/^\s*```/.test(l)) {
-        inFence = !inFence
-        return ' '.repeat(l.length)
+/** wf_build._fences — 줄마다 펜스 줄(여는·안·닫는)인가, [여는 줄, 닫는 줄, 언어]. 안 닫힌 펜스는 끝까지 */
+function fences(lines: string[]): [boolean[], [number, number, string][]] {
+  const flags = lines.map(() => false)
+  const spans: [number, number, string][] = []
+  let openAt = -1
+  let lang = ''
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trimStart().startsWith('```')) {
+      if (openAt < 0) {
+        openAt = i
+        lang = lines[i].trim().slice(3).trim()
+      } else {
+        spans.push([openAt, i, lang])
+        openAt = -1
       }
-      return inFence ? ' '.repeat(l.length) : l
-    })
-    .join('\n')
-}
-
-/** `#… 이름` 소제목(단계 무관) 뒤 ~ 다음 헤딩(단계 무관) 앞. 없으면 '' */
-function subSection(text: string, name: string): string {
-  const masked = maskFences(text)
-  const re = new RegExp(`^#{1,6} ${name}\\s*$`, 'm')
-  const m = re.exec(masked)
-  if (!m) return ''
-  const from = m.index + m[0].length
-  const next = /^#{1,6} /m.exec(masked.slice(from))
-  return text.slice(from, next ? from + next.index : undefined)
-}
-
-/** 표 한 장(첫 것) → 행들(구분선 제외). 표가 없으면 [] */
-function firstTable(text: string): string[][] {
-  const lines = maskFences(text).split('\n')
-  const i = lines.findIndex((l) => l.trim().startsWith('|'))
-  if (i < 0) return []
-  const rows: string[][] = []
-  for (let j = i; j < lines.length && lines[j].trim().startsWith('|'); j++) rows.push(cells(lines[j]))
-  return rows.filter((r) => !isSep(r))
-}
-
-/** 항목 블록(헤딩 다음 줄부터) → 화면. 소제목 단계·문자열에 매이지 않는다 */
-export function parseScreen(id: string, name: string, text: string): WfScreen {
-  const lm = /```html\n([\s\S]*?)\n```/.exec(text)
-  const layout = lm ? safeLayout(lm[1]) : ''
-  const before = lm ? text.slice(0, lm.index) : text
-
-  // 메타 표 = html 앞의 첫 표(헤더 행은 뺀다). 산문 = html 앞의 표·헤딩 아닌 줄
-  const meta: [string, string][] = []
-  for (const r of firstTable(before).slice(1)) if (r.length >= 2) meta.push([r[0], r[1]])
-  const desc = maskFences(before)
-    .split('\n')
-    .filter((l) => l.trim() && !l.trim().startsWith('|') && !/^#{1,6} /.test(l))
-    .map((l) => l.trim())
-    .join(' ')
-
-  const elems: WfElem[] = []
-  for (const r of firstTable(subSection(text, '요소')).slice(1))
-    if (r.length >= 5) elems.push({ no: r[0], name: r[1], kind: r[2], shows: r[3], onclick: r[4] })
-
-  const rules = subSection(text, '규칙')
-    .split('\n')
-    .filter((l) => l.startsWith('- '))
-    .map((l) => l.slice(2).trim())
-
-  const scenarios: WfScenario[] = []
-  for (const chunk of subSection(text, '시나리오').trim().split(/\n(?=\*\*S-\d+)/)) {
-    const m = /^\*\*(S-\d+) (.+?)\*\*(?: — (.+))?\n/.exec(chunk + '\n')
-    if (!m) continue
-    const steps = chunk
-      .split('\n')
-      .slice(1)
-      .filter((l) => /^\d+\./.test(l.trim()))
-      .map((l) => l.trim().replace(/^\d+\.\s*/, ''))
-    scenarios.push({ id: m[1], title: m[2], uc: m[3] ?? '', steps })
+      flags[i] = true
+    } else if (openAt >= 0) flags[i] = true
   }
+  if (openAt >= 0) spans.push([openAt, lines.length - 1, lang])
+  return [flags, spans]
+}
 
-  return { id, name, desc, meta, layout, elems, rules, scenarios }
+/** wf_build._first_table — [start, end)의 첫 표 → [행들(구분선 제외), 시작 줄, 끝 줄(제외)] */
+function firstTable(lines: string[], fenced: boolean[], start: number, end: number): [string[][], number, number] {
+  for (let i = start; i < end; i++) {
+    if (fenced[i] || !lines[i].trim().startsWith('|')) continue
+    const rows: string[][] = []
+    let j = i
+    while (j < end && !fenced[j] && lines[j].trim().startsWith('|')) {
+      const r = cells(lines[j])
+      if (!isSep(r)) rows.push(r)
+      j++
+    }
+    return [rows, i, j]
+  }
+  return [[], -1, -1]
+}
+
+/** wf_build._items — [start, end) → 항목마다 줄 번호 목록. isHead인 줄이 새 항목이고 빈 줄 없이 이어진 줄·들여 쓴 줄·빈 줄은
+ *  그 항목 안(V-SCN 단계와 같은 규칙, #152). 코드 펜스는 여는 줄이 든 자리를 따른다. heads인 줄에서 항목이 끊긴다 —
+ *  [그 줄, 그 뒤 첫 항목 번호]를 marks로 돌려준다(시나리오 머리) */
+function items(lines: string[], start: number, end: number, isHead: (l: string) => boolean, heads?: (l: string) => boolean): [number[][], [number, number][]] {
+  const out: number[][] = []
+  const marks: [number, number][] = []
+  let cur: number[] | null = null
+  let into: number[] | null = null
+  let blank = false
+  let fence = false
+  for (let i = start; i < end; i++) {
+    const l = lines[i]
+    if (fence) {
+      if (into) into.push(i)
+      fence = !l.trimStart().startsWith('```')
+      continue
+    }
+    if (heads && heads(l)) {
+      marks.push([i, out.length])
+      cur = into = null
+    } else if (isHead(l)) {
+      cur = [i]
+      out.push(cur)
+      into = cur
+    } else if (cur && (!l.trim() || l[0] === ' ' || l[0] === '\t' || !blank)) {
+      cur.push(i)
+      into = cur
+    } else cur = into = null
+    fence = l.trimStart().startsWith('```')
+    blank = !l.trim()
+  }
+  return [out, marks]
+}
+
+/** wf_build.parse_screen — 화면 블록 하나(헤딩 줄을 뺀 본문)를 줄 단위로 가른다 (STD-002 V-UI, #152).
+ *  머리 = 첫 소제목·배치 전(행이 전부 두 칸인 첫 표는 메타, 나머지는 한 줄 목적). 배치 = 첫 html 펜스. 소제목은 이름
+ *  (「배치」「요소」「규칙」「시나리오」, 이름마다 처음 것)으로 찾는다. 어디에도 쓰이지 않은 줄은 원본 순서대로 etc(「그 밖」) */
+export function parseScreen(id: string, name: string, text: string): WfScreen {
+  const lines = text.split('\n')
+  const n = lines.length
+  const [fenced, spans] = fences(lines)
+  const used = new Set<number>()
+  const mark = (from: number, to: number) => {
+    for (let k = from; k < to; k++) used.add(k)
+  }
+  let layout: string | null = null
+  let layAt = n
+  const html = spans.find(([, , lang]) => lang === 'html')
+  if (html) {
+    layout = safeLayout(lines.slice(html[0] + 1, html[1]).join('\n'))
+    layAt = html[0]
+    mark(html[0], html[1] + 1)
+  }
+  const heads: number[] = []
+  for (let i = 0; i < n; i++) if (!fenced[i] && HEAD_LINE.test(lines[i])) heads.push(i)
+  const headEnd = Math.min(layAt, heads.length ? heads[0] : n)
+  let meta: [string, string][] = []
+  const [mrows, ma, mb] = firstTable(lines, fenced, 0, headEnd)
+  if (mrows.length >= 2 && mrows.every((r) => r.length === 2)) {
+    meta = mrows.slice(1).map((r): [string, string] => [r[0], r[1]])
+    mark(ma, mb)
+  }
+  const desc = lines.filter((_, i) => i < headEnd && !used.has(i)).join('\n')
+  mark(0, headEnd)
+  let elems: WfScreen['elems'] = { header: [], rows: [] }
+  let rules: string[][] = []
+  const scenarios: WfScenario[] = []
+  const seen = new Set<string>()
+  heads.forEach((h, k) => {
+    const nm = HEAD_LINE.exec(lines[h])![1].trim()
+    if (!KNOWN.includes(nm) || seen.has(nm)) return // 모르는 소절은 제목째 그 밖
+    seen.add(nm)
+    used.add(h)
+    const stop = k + 1 < heads.length ? heads[k + 1] : n
+    if (nm === '요소') {
+      const [rows, a, b] = firstTable(lines, fenced, h + 1, stop)
+      if (rows.length >= 2) {
+        elems = { header: rows[0], rows: rows.slice(1) }
+        mark(a, b)
+      }
+    } else if (nm === '규칙') {
+      const [its] = items(lines, h + 1, stop, (l) => l.startsWith('- '))
+      rules = its.map((it) => it.map((x) => lines[x]))
+      its.forEach((it) => it.forEach((x) => used.add(x)))
+    } else if (nm === '시나리오') {
+      const [its, marks] = items(lines, h + 1, stop, (l) => STEP.test(l), (l) => SCEN_HEAD.test(l))
+      marks.forEach(([i, first], j) => {
+        const m = SCEN_HEAD.exec(lines[i])!
+        const steps = its.slice(first, j + 1 < marks.length ? marks[j + 1][1] : its.length)
+        scenarios.push({ id: m[1], title: m[2], uc: m[3].replace(/^\s*[—–\-.·:]*\s*/, '').trim(), steps: steps.map((st) => st.map((x) => lines[x])) })
+        used.add(i)
+        steps.forEach((st) => st.forEach((x) => used.add(x)))
+      })
+    }
+  })
+  const etc: string[] = []
+  let gap = false
+  for (let i = 0; i < n; i++) {
+    if (used.has(i)) {
+      gap = true
+      continue
+    }
+    if (gap && etc.length && etc[etc.length - 1].trim()) etc.push('') // 쓰인 줄을 건너뛴 자리 — 앞뒤 문단이 붙지 않게
+    gap = false
+    etc.push(lines[i])
+  }
+  return { id, name, text, meta, desc, layout, elems, rules, scenarios, etc }
 }
 
 /** 본문 전체 → 화면(html 있는 것만, 문서 순서). 검사·다른 도구용 — 뷰는 vUi가 절 순서대로 그린다 */
 export function parseWireframe(body: string): WfScreen[] {
   const out: WfScreen[] = []
   for (const seg of segments(body)) if (seg.kind === 'item') out.push(parseScreen(seg.block.id, seg.block.title, seg.block.text))
-  return out.filter((s) => s.layout)
+  return out.filter((s) => s.layout !== null)
 }
 
 type Segment = { kind: 'prose'; text: string } | { kind: 'item'; block: ItemBlock }
@@ -174,41 +251,55 @@ function segments(text: string): Segment[] {
 
 // ───────────────────────── HTML ─────────────────────────
 
-/** 문장 속 "(7.1)" 같은 요소 번호를 클릭 가능한 칩으로 (wf_build.py chip) */
-const chip = (s: string, ctx: RenderCtx): string =>
-  inline(s, ctx).replace(/\((\d+(?:\.\d+)?[a-z]?)\)/g, '(<span class="eref" data-ref="$1">$1</span>)')
+/** wf_build._chip — 글자 속 "(7.1)" 같은 요소 번호를 누를 수 있는 칩으로. 태그 속성은 건드리지 않는다 — 규칙·단계의
+ *  이어진 줄에도 붙이고, 링크 주소 속 "(1)"은 깨지 않게 (#152) */
+const chip = (h: string): string =>
+  `>${h}<`
+    .replace(/>([^<]+)</g, (_m, t: string) => '>' + t.replace(/\((\d+(?:\.\d+)?[a-z]?)\)/g, '(<span class="eref" data-ref="$1">$1</span>)') + '<')
+    .slice(1, -1)
 
+/** wf_build._item_html — 규칙 하나·시나리오 단계 하나: 첫 문단은 칩을 붙여 그 자리, 이어진 줄은 그 아래 (#152) */
+const itemHtml = (lines: string[], width: number, ctx: RenderCtx): string => {
+  const [lead, rest] = leadRest(lines[0].slice(width).trim(), lines.slice(1), width)
+  return chip(inline(lead, ctx) + renderBlocks(rest, ctx))
+}
+
+/** wf_build._screen_html — 정적 뷰와 같은 HTML(카드 AL). 배치가 위, 요소 표·규칙·시나리오·「그 밖」이 아래 */
 function screenHtml(s: WfScreen, i: number, ctx: RenderCtx, common: CommonParts): string {
   const meta = s.meta.map(([k, v]) => `<span><b>${esc(k)}</b>${inline(v, ctx)}</span>`).join('')
-  const desc = s.desc ? `<div class="s-desc">${inline(s.desc, ctx)}</div>` : ''
-  const rows = s.elems
-    .map(
-      (e) =>
-        `<tr data-wf-row="${esc(e.no)}"><td class="no">${esc(e.no)}</td><td>${inline(e.name, ctx)}</td><td class="kind">${inline(e.kind, ctx)}</td><td>${inline(e.shows, ctx)}</td><td>${inline(e.onclick, ctx)}</td></tr>`,
-    )
-    .join('')
-  const rules = s.rules.map((r) => `<li>${chip(r, ctx)}</li>`).join('')
-  const scen = s.scenarios
-    .map(
-      (sc) =>
-        `<div class="scen"><div class="st"><span class="k">${esc(sc.id)}</span>${inline(sc.title, ctx)}${sc.uc ? `<span class="uc">— ${inline(sc.uc, ctx)}</span>` : ''}</div><ol>${sc.steps.map((st) => `<li>${chip(st, ctx)}</li>`).join('')}</ol></div>`,
-    )
-    .join('')
-  // 셋이 다 비면 배치만 — 「html 블록만 필수」(STD-001 2.7)를 화면에서도 지킨다
-  const rsecs = [
-    s.elems.length
-      ? `<div class="rsec"><h3>요소</h3><table class="el"><thead><tr><th>#</th><th>이름</th><th>종류</th><th>보여주는 것</th><th>누르면</th></tr></thead><tbody>${rows}</tbody></table></div>`
-      : '',
-    s.rules.length ? `<div class="rsec"><h3>규칙</h3><ul class="rules">${rules}</ul></div>` : '',
-    s.scenarios.length ? `<div class="rsec"><h3>시나리오</h3>${scen}</div>` : '',
-  ].join('')
-  const frame = frameHtml(s.layout, common, ctx.assetBase ?? '')
-  // 배치가 위, 요소 표·규칙·시나리오가 아래 (카드 AC) — 배치가 본문 폭을 다 쓴다
-  const stack = `<div class="wfstack">${frame}${rsecs ? `<div class="rsecs">${rsecs}</div>` : ''}</div>`
-  return `<section class="screen" id="item-${esc(s.id)}" data-item="${esc(s.id)}" data-i="${i}"${i === 0 ? '' : ' style="display:none"'}>
-    <div class="s-head"><b>${esc(s.id)} ${esc(s.name)}</b>${meta}</div>${desc}
-    ${stack}
-  </section>`
+  const d = renderBlocks(s.desc, ctx)
+  const desc = d ? `<div class="s-desc">${d}</div>` : ''
+  const right: string[] = []
+  const { header, rows } = s.elems
+  if (rows.length) {
+    // 문서가 쓴 머리 행·칸 그대로 — 다섯 칸으로 고정해 칸 모자란 행을 버리던 것(#152). 「종류」 칸만 좁게
+    const kind = header.map((c) => c === '종류')
+    const td = (j: number, c: string) => (j < kind.length && kind[j] ? `<td class="kind">${inline(c, ctx)}</td>` : `<td>${inline(c, ctx)}</td>`)
+    const th = header.map((c) => `<th>${inline(c, ctx)}</th>`).join('')
+    const tb = rows
+      .map((r) => `<tr data-wf-row="${esc(r[0])}"><td class="no">${esc(r[0])}</td>` + r.slice(1).map((c, j) => td(j + 1, c)).join('') + '</tr>')
+      .join('')
+    right.push(`<div class="rsec"><h3>요소</h3><table class="el"><thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table></div>`)
+  }
+  if (s.rules.length) right.push('<div class="rsec"><h3>규칙</h3><ul class="rules">' + s.rules.map((r) => `<li>${itemHtml(r, 2, ctx)}</li>`).join('') + '</ul></div>')
+  if (s.scenarios.length) {
+    const scen = s.scenarios
+      .map(
+        (x) =>
+          `<div class="scen"><div class="st"><span class="k">${esc(x.id)}</span>${inline(x.title, ctx)}` +
+          (x.uc ? `<span class="uc">— ${inline(x.uc, ctx)}</span>` : '') +
+          '</div><ol>' +
+          x.steps.map((st) => `<li>${itemHtml(st, STEP.exec(st[0])![1].length, ctx)}</li>`).join('') +
+          '</ol></div>',
+      )
+      .join('')
+    right.push(`<div class="rsec"><h3>시나리오</h3>${scen}</div>`)
+  }
+  // 조각에 안 맞는 줄은 아래 판 끝 「그 밖」 — 둘째 html 블록은 공통 틀과 함께 (STD-002 V-UI, #152)
+  right.push(etcBlock(s.etc, { ...ctx, common }))
+  let inner = frameHtml(s.layout ?? '', common, ctx.assetBase ?? '')
+  if (right.join('')) inner += `<div class="rsecs">${right.join('')}</div>`
+  return `<section class="screen" id="item-${esc(s.id)}" data-item="${esc(s.id)}" data-i="${i}"${i === 0 ? '' : ' style="display:none"'}><div class="s-head"><b>${esc(s.id)} ${esc(s.name)}</b>${meta}</div>${desc}<div class="wfstack">${inner}</div></section>`
 }
 
 /** `## 절` 단위 → [제목, 본문]. md.splitSections와 같되 코드 펜스 안 `## `은 절이 아니다 —
@@ -232,42 +323,27 @@ function sections(body: string): [string, string][] {
   return out
 }
 
-/** 화면 묶음 하나 = 탭 줄 + 화면들. 문서에 묶음이 여럿일 수 있어(TBL식 「2.1 C 리포트 / 2.2 A 리포트」) .wfgroup으로 싼다 */
-export function wireframeHtml(screens: WfScreen[], ctx: RenderCtx, common: CommonParts = { head: '', body: '' }): string {
-  const tabs = screens
-    .map(
-      (s, i) =>
-        `<button type="button" role="tab" aria-selected="${i === 0}" data-i="${i}"><span class="k">${esc(s.id)}</span>${esc(s.name)}</button>`,
-    )
-    .join('')
-  return `<div class="wfgroup"><div class="stabs" role="tablist">${tabs}</div>\n<div class="screens">${screens.map((s, i) => screenHtml(s, i, ctx, common)).join('\n')}</div></div>`
-}
+/** wf_build._design_cards — 배치가 없는 화면은 화면마다 카드: 머리 ID·이름·하위 N, 몸은 블록 전부, 바닥 「이 화면을 근거로 삼은
+ *  문서」. 전에는 표 한 행에 첫 줄만 실려 나머지가 사라졌다 (STD-002 V-UI, #152). 종류·유스케이스는 머리로 뽑지 않는다 */
+const designCards = (screens: WfScreen[], ctx: RenderCtx): string =>
+  screens.map((s) => itemCard(ctx, { id: s.id, title: s.name, level: 0, text: s.text }, renderBlocks(s.text, ctx), '이 화면을 근거로 삼은 문서')).join('')
 
-/** html 없는 화면 → 화면 설계 표 한 행 (옛 vUiDesign). 첫 줄 산문에서 종류·목적·주 유스케이스를 뽑는다 */
-function designTable(blocks: ItemBlock[], ctx: RenderCtx): string {
-  const rows = blocks
-    .map((b) => {
-      const first = b.text.trim().split('\n')[0] ?? ''
-      const kind = first.includes('.') ? first.split('.')[0] : ''
-      const uc = /주 유스케이스: (.+)$/.exec(first)
-      const purpose = first.includes('. ') ? first.split('. ').slice(1).join('. ').split(' 주 유스케이스')[0] : first
-      const downs = downsWith(ctx, b.id)
-      return `<tr id="item-${esc(b.id)}" data-item="${esc(b.id)}"><td class="iid">${esc(b.id)}</td><td>${inline(b.title, ctx)}</td><td>${esc(kind)}</td><td>${inline(purpose, ctx)}</td><td>${uc ? inline(uc[1], ctx) : ''}</td><td>${downs.map((d) => refLink(ctx, d)).join(' · ')}</td></tr>`
-    })
-    .join('')
-  return `<table class="reassembled"><thead><tr><th>#</th><th>화면</th><th>종류</th><th>목적</th><th>주 유스케이스</th><th>참조한 곳</th></tr></thead><tbody>${rows}</tbody></table>`
-}
-
-/** 이어진 화면 항목 묶음 → html 없는 것은 표, 있는 것은 탭 묶음. 둘 다 있으면 표가 먼저 */
+/** wf_build._group_html — 이어진 화면 항목 묶음 하나(.wfgroup) = 카드(배치 없는 화면) + 탭 줄·화면들(배치 있는 화면).
+ *  묶음 안은 번호순, 묶음(절) 순서는 문서 순서. 문서에 묶음이 여럿일 수 있다(TBL식 「2.1 C 리포트 / 2.2 A 리포트」) */
 function renderRun(blocks: ItemBlock[], ctx: RenderCtx, common: CommonParts): string {
-  const screens = blocks.map((b) => parseScreen(b.id, b.title, b.text))
-  const design = blocks.filter((_, i) => !screens[i].layout)
-  // 묶음 안에서는 번호순 — 옛 와이어프레임 뷰와 같다. 묶음(절) 순서는 문서 순서
-  const wf = screens.filter((s) => s.layout).sort((a, b) => Number(a.id.split('-')[1]) - Number(b.id.split('-')[1]))
-  return (design.length ? designTable(design, ctx) : '') + (wf.length ? wireframeHtml(wf, ctx, common) : '')
+  const screens = blocks.map((b) => parseScreen(b.id, b.title, b.text)).sort((a, b) => Number(a.id.split('-')[1]) - Number(b.id.split('-')[1]))
+  const plain = screens.filter((s) => s.layout === null)
+  const wired = screens.filter((s) => s.layout !== null)
+  const out: string[] = []
+  if (plain.length) out.push(designCards(plain, ctx))
+  if (wired.length) {
+    const tabs = wired.map((s, i) => `<button type="button" role="tab" aria-selected="${i === 0}" data-i="${i}"><span class="k">${esc(s.id)}</span>${esc(s.name)}</button>`).join('')
+    out.push(`<div class="stabs" role="tablist">${tabs}</div><div class="screens">${wired.map((s, i) => screenHtml(s, i, ctx, common)).join('')}</div>`)
+  }
+  return `<div class="wfgroup">${out.join('')}</div>`
 }
 
-/** 절 본문 → 산문은 그대로, 화면 항목 묶음은 표·탭으로. 항목이 절 자체(`## UI-N`)인 경우는 vUi가 모은다 */
+/** 절 본문 → 산문은 그대로, 화면 항목 묶음은 카드·탭으로. 항목이 절 자체(`## UI-N`)인 경우는 vUi가 모은다 */
 function renderSection(text: string, ctx: RenderCtx, common: CommonParts): string {
   const out: string[] = []
   let run: ItemBlock[] = []
@@ -413,6 +489,7 @@ export const wireframeCss = `
 .s-head span{color:var(--soft)}
 .s-head span b{font-size:13px;color:var(--ink);font-weight:600;margin-right:4px}
 .s-desc{padding:8px 18px;border-bottom:1px solid var(--hair);font-size:13px;color:var(--soft)}
+.s-desc p{margin:2px 0}
 .wfgroup{margin-bottom:22px}
 /* 배치가 위, 요소 표·규칙·시나리오가 아래 (카드 AC, #134) — 좌우로 나누면 배치가 본문의 절반만 받아
    1280 아트보드가 늘 60%로 줄어 보였다. 세로로 쌓으면 본문 폭을 다 쓴다 */
@@ -432,8 +509,10 @@ export const wireframeCss = `
 .wfframe.scaled .wfframe-if{position:absolute;left:0;top:0}
 
 /* 아래 */
-.rsec{padding:16px 20px;border-bottom:1px solid var(--hair)}
-.rsec:last-child{border-bottom:none}
+.rsec{padding:16px 20px}
+.rsec+.rsec{border-top:1px solid var(--hair)}
+/* 「그 밖」 — 아래 판 끝. 점선은 .etc(뷰 CSS)가 긋는다 (#152) */
+.rsecs>.etc{margin:0;padding:12px 20px 16px}
 .rsec h3{margin:0 0 10px;font-size:13px;font-weight:700;padding-bottom:6px;border-bottom:1.5px solid var(--ink)}
 table.el{border-collapse:collapse;width:100%;font-size:12.5px}
 table.el th{text-align:left;font-weight:600;color:var(--soft);padding:6px 8px;border-bottom:1.5px solid var(--ink);background:var(--panel)}

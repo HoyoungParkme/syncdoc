@@ -1,7 +1,7 @@
 /** tools/view_build.py의 공통 렌더러 포트 — inline · render_blocks · split_sections · item_blocks (STD-002 1장 공통 렌더링).
  *  React 유저용 탭은 이 HTML과 같게 그린다(STD-002 4장). 문자열 HTML을 만들고 페이지가 innerHTML로 넣는다. */
 
-import { frameHtml, isStyleOnly, NO_COMMON, safeLayout } from './frame'
+import { frameHtml, isStyleOnly, NO_COMMON, safeLayout, type CommonParts } from './frame'
 
 export interface RenderCtx {
   selfId: string
@@ -21,6 +21,8 @@ export interface RenderCtx {
   lineSrc?: boolean
   /** 배치 iframe의 <base href> — 이 문서 폴더(`/api/projects/{code}/files/07-UI/`). 상대 경로 이미지가 저장소 파일을 가리킨다 */
   assetBase?: string
+  /** 그 문서 공통 틀 — 화면 「그 밖」의 둘째 html 블록만 받는다(STD-002 V-UI, #152). 나머지 html 블록은 공통 틀 없이 */
+  common?: CommonParts
 }
 
 const NUL = '\uE000' // 코드 스팬 자리표시 (사용자 영역 문자)
@@ -83,7 +85,8 @@ export function renderBlocks(text: string, ctx: RenderCtx, itemPat?: RegExp): st
       const src = code.join('\n')
       if (lang === 'mermaid') out.push(`<div class="mer"><pre class="mermaid">${esc(src)}</pre></div>`)
       // html 블록은 iframe으로 격리해 그린다(STD-002 1장). 스타일·링크뿐인 블록(공통 틀)은 그릴 것이 없으니 코드로
-      else if (lang === 'html' && !isStyleOnly(safeLayout(src))) out.push(`<div class="wfbox">${frameHtml(safeLayout(src), NO_COMMON, ctx.assetBase ?? '')}</div>`)
+      // frameHtml이 이미 .wfbox다 — 한 겹 더 싸면 정적 뷰와 다르고 여백이 두 번 붙었다 (#152)
+      else if (lang === 'html' && !isStyleOnly(safeLayout(src))) out.push(frameHtml(safeLayout(src), ctx.common ?? NO_COMMON, ctx.assetBase ?? ''))
       else if (lang === 'html') out.push(`<pre class="code" data-lang="html"><code>${esc(src)}</code></pre>`)
       else out.push(`<pre class="code" data-lang="${esc(lang)}"><code>${esc(src)}</code></pre>`)
       i = j + 1
@@ -245,11 +248,19 @@ export const itemBlocks = (body: string, pat: RegExp): ItemBlock[] =>
   splitItems(body, pat).flatMap((p) => (p.kind === 'item' ? [p.block] : []))
 
 /** view_build.etc_block — 「그 밖」: 뷰가 조각으로 가르고 남은 줄을 항목 카드 끝에 원본 순서로 (STD-002 1장, #152).
- *  구분선·빈 줄뿐이면 머리 없이 그대로 — 절 구분선 `---`이 마지막 항목 블록에 들어온다 */
+ *  구분선·빈 줄뿐이면 그리지 않는다 — 문장이 아니라 절 사이 표시다(절 구분선 `---`이 마지막 항목 블록에 들어온다) */
 export function etcBlock(lines: string[], ctx: RenderCtx): string {
-  const body = renderBlocks(lines.join('\n'), ctx)
-  if (lines.every((l) => l.trim() === '' || l.trim() === '---')) return body
-  return `<div class="etc"><div class="etc-t">그 밖</div>${body}</div>`
+  if (lines.every((l) => l.trim() === '' || l.trim() === '---')) return ''
+  return `<div class="etc"><div class="etc-t">그 밖</div>${renderBlocks(lines.join('\n'), ctx)}</div>`
+}
+
+/** view_build.lead_rest — 목록 항목 하나 → [첫 문단, 나머지]. 첫 문단은 빈 줄 없이 이어진 줄까지 공백으로 잇고, 나머지는
+ *  표시 너비만큼 들여쓰기를 뗀다 — 시나리오 단계(V-SCN)·화면 규칙·화면 시나리오 단계(V-UI)가 같이 쓴다 (#152) */
+export function leadRest(first: string, more: string[], width: number): [string, string] {
+  const rest = more.map((l) => l.replace(new RegExp(`^ {1,${width}}`), ''))
+  const lead = [first]
+  while (rest.length && rest[0].trim() && !BLOCK_START.test(rest[0])) lead.push(rest.shift()!)
+  return [lead.join(' '), rest.join('\n')]
 }
 
 export const secName = (title: string) => title.replace(/^\d+\.\s*/, '')
