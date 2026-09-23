@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
 
-**진행 상황**: 카드 41장. **A~AF 40장 완료**(2026-09-22), AG 진행 중.
+**진행 상황**: 카드 41장. **A~AG 41장 완료**(2026-09-23).
 
 ---
 
@@ -914,7 +914,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | DOM·API 템플릿을 서브타입별로 — `DOM-도메인.md`·`DOM-클래스.md`·`DOM-ERD.md`·`API-REST.md`·`API-MCP.md`. `DOM.md`·`API.md`는 고르는 안내. `get_template`이 `subtype`을 받아 그 서브타입의 항목 패턴·필수 절·항목 블록·뼈대를 준다(안 주면 필수 절이 비고 `subtypes`가 온다). `tools/check_templates.py` 신설 · `validate.py`의 서브타입 판정을 서버처럼 첫 매치로 · 검사기가 찾은 둘(SEQ 항목 예시 없음 · UI 예시 제목 없음)도 고침 |
 | 테스트 | `get_template` 서브타입별 넷 · 서브타입 없이 · 틀린 서브타입 · **템플릿 열다섯을 문서 ID만 채워 서버 validate에 넣으면 위반 0·경고 0** |
 | 선행 | — |
-| 완료 | — |
+| 완료 | 2026-09-23 · 브랜치 `card/AG-subtype-templates` · spec 6 + 템플릿 9 + code 1 · 테스트 **233**(신설 3) · `validate` 0/0 · **`check_templates` 16/16**(신설) · `check_code` 114/114 · `check_ui` 12/12 · `check_dom` 10·10·10 · `check_tokens` 91/0 · `check_view_css` 네 쌍 · 사람 확인(배포 뒤): 실제 MCP 연결로 `get_template(HB, DOM, subtype="클래스")`가 필수 절 다섯·항목 패턴·항목 블록·클래스 뼈대를 준다. 서브타입 없이 부르면 필수 절이 비고 `subtypes`에 셋이 온다 · **되먹임**: 새 검사기가 돌자마자 DOM·API 밖의 결손 둘을 더 찾았다 — SEQ 템플릿에 항목 예시가 없었고 UI 템플릿 제목이 비어 있었다. 함께 고쳤다 · MCP 클라이언트는 도구 목록을 연결할 때 받아 두므로, 이미 붙어 있던 세션은 다시 붙어야 새 설명(`subtype`)이 보인다 — 인자는 그 전에도 통한다 |
 
 **왜 카드인가.** 템플릿은 타입마다 한 파일인데 필수 절은 서브타입마다 다르다. DOM 템플릿은 도메인 모델 골격 하나라, 그대로 쓴 클래스 명세는 네 절, ERD는 세 절이 **반드시** 비었다. HB에서 세 문서가 전부 같은 골격으로 시작해 두 개를 다시 올렸다(커밋 제목이 「필수 절 이름 맞춤」). 같은 병이 API 템플릿에도 있었다 — 괄호로 겸업시킨 절 제목(`엔드포인트 (또는 도구)`)을 검사기가 못 읽는다.
 
@@ -983,7 +983,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AD | `card/AD-read-before-write` | `9ea83ca`~ | — | 2026-09-22 |
 | AE | `card/AE-ui-guidance` | `8331a96`~ | #142 | 2026-09-22 |
 | AF | `card/AF-webhook` | `1770920`~ | #144 · #146 | 2026-09-22 |
-| AG | `card/AG-subtype-templates` | — | — | — |
+| AG | `card/AG-subtype-templates` | `8850433` | #148 | 2026-09-23 |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 | X | `card/X-ui-doc` | `7a4e821`~ | #103 | 2026-09-21 |
