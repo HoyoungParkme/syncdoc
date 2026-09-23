@@ -42,8 +42,13 @@ class NotFound(Problem):
 
 
 class PushFailed(Problem):
+    """SYNC-API-001 2장 — 앱 밖(GitHub)이 실패했다.
+
+    424다. 502면 앞단 Cloudflare가 자기 오류 페이지로 덮어 reason이 사라진다 (#76).
+    """
+
     type = "urn:syncdoc:push-failed"
-    status = 502
+    status = 424
     title = "push-failed"
 
     def __init__(self, reason: str) -> None:
@@ -51,8 +56,10 @@ class PushFailed(Problem):
 
 
 class RepoCreateFailed(Problem):
+    """SYNC-API-001 2장 — GitHub가 저장소를 안 만들어 줬다. PushFailed와 같은 이유로 424 (#76)."""
+
     type = "urn:syncdoc:repo-create-failed"
-    status = 502
+    status = 424
     title = "repo-create-failed"
 
     def __init__(self, reason: str) -> None:
@@ -275,7 +282,7 @@ class LlmUnavailable(Problem):
     """SYNC-API-001 2장 — 모델 호출 실패. 사용량 초과도 여기 접힌다 (UC-H19 4a)."""
 
     type = "urn:syncdoc:llm-unavailable"
-    status = 502
+    status = 424  # 앱 밖(모델) 실패 — PushFailed와 같은 규칙 (#76)
     title = "llm-unavailable"
 
     def __init__(self, reason: str) -> None:

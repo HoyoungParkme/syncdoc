@@ -1,11 +1,31 @@
-"""SYNC-API-001 2장 — 표에 없는 예외도 problem+json으로 나간다 (#7)."""
+"""SYNC-API-001 2장 — 표에 없는 예외도 problem+json으로 나간다 (#7). 앱 밖 실패는 424 (#76)."""
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.web.routers import projects
+from app.core.errors import PushFailed
+from app.web.routers import documents, projects
 from tests.web.conftest import login
+
+
+def test_push_failed_is_424_problem_json(
+    client: TestClient, scoped: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """502면 앞단 Cloudflare가 자기 오류 페이지로 바꿔 reason이 사라진다 — 424로 나가야 한다."""
+    login(client, scoped)
+
+    async def fail(*_: object, **__: object) -> None:
+        raise PushFailed("conflict")
+
+    monkeypatch.setattr(documents.pipeline, "change_status", fail)
+    r = client.post("/api/docs/SYNC-PRD-001/status", json={"to": "approved"})
+
+    assert r.status_code == 424
+    assert r.headers["content-type"].startswith("application/problem+json")
+    body = r.json()
+    assert body["type"] == "urn:syncdoc:push-failed"
+    assert body["status"] == 424 and body["reason"] == "conflict"
 
 
 def test_unhandled_exception_is_problem_json(
