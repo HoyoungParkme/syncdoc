@@ -357,6 +357,7 @@ const WARN_KO: Record<string, (m: string) => string> = {
   'item.none': () => '항목이 하나도 없음',
   'ref.missing': (m) => `가리키는 곳이 없는 참조: ${m}`,
   'entity.mismatch': (m) => `엔티티와 설계 클래스의 속성이 다름: ${m}`,
+  'constraint.source': (m) => `출처 없는 제약: ${m}`,
   'section.unnumbered': (m) => `번호 없는 절 제목: ${m}`,
   'dom.name': (m) => `DOM 세 문서의 이름이 어긋남: ${m}`,
 }

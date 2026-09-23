@@ -240,6 +240,12 @@ class SpecService:
         # 6. DOM 클래스 명세 — 2장·4장 엔티티 속성 대조
         if doc_type == "DOM" and "클래스" in (fm.get("title") or ""):
             W.extend(_entity_mismatch(body))
+        # 7. INFRA 제약 — 줄 머리 「출처:」 (STD-001 2.5·4장, #120). 마스킹한 줄이라 코드블록 안은
+        # 안 센다. 링크가 아니어도 통과하고, 문단 끝 「근거:」는 출처가 아니다
+        if doc_type == "INFRA":
+            for b in self.item_blocks(body, doc_type, fm.get("title")):
+                if not any(x.startswith("출처:") for x in lines[b.start_line : b.end_line]):
+                    W.append(Warning("constraint.source", b.item_id))
         return ValidateResult(V, W)
 
     def apply_frontmatter(

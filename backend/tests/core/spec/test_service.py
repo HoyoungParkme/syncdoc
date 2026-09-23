@@ -260,6 +260,48 @@ classDiagram
     assert r.violations == [] and [str(w) for w in r.warnings] == ["entity.mismatch: Foo"]
 
 
+def test_validate_constraint_source_warning(db_session: Session) -> None:
+    """INFRA 제약마다 줄 머리 「출처:」 — 없으면 그 항목에 constraint.source 하나 (STD-001 2.5, #120)."""
+    head = """---
+doc_id: X-INFRA-001
+type: INFRA
+title: 인프라 — X
+status: draft
+---
+## 1. 제약
+
+절 전체에 대한 말.
+
+#### C1 링크가 있는 출처
+
+출처: [[X-PRD-001#R1]]
+
+설명.
+
+#### C2 글로 쓴 출처
+
+출처: RFQ
+"""
+    tail = """
+## 2. 구성도
+## 3. 기술 스택
+## 4. 데이터가 사는 곳
+## 5. 인증과 접근
+## 6. 미결사항
+"""
+    svc = SpecService(db_session)
+    r = svc.validate(head + tail, DocType.INFRA, Entry.github)
+    assert r.violations == [] and r.warnings == []
+    no_source = {
+        "문단 끝 근거만": "#### C3 셋\n\n설명 끝에. 근거: [[X-PRD-001#R1]]\n",
+        "코드블록 안 출처만": "#### C3 셋\n\n```\n출처: RFQ\n```\n",
+        "본문 없음": "#### C3 셋\n",
+    }
+    for why, block in no_source.items():
+        r = svc.validate(head + "\n" + block + tail, DocType.INFRA, Entry.github)
+        assert [str(w) for w in r.warnings] == ["constraint.source: C3"], why
+
+
 # ── apply_frontmatter ──
 def test_apply_frontmatter_creates_fills_and_rejects(db_session: Session) -> None:
     svc = SpecService(db_session)
