@@ -1,7 +1,7 @@
 /** V-PRD · V-RFQ · V-SCN · V-INFRA · V-DOM · V-API · V-STD — tools/view_build.py 포트. V-UI는 wireframe.ts(vUi).
  *  하위 참조 수·추적표·"근거로 삼은 문서"는 ctx.downstream(GET /api/docs/{id}/downstream, B4)에서 계산한다 —
  *  view_build.downstream_of와 같은 모양 {문서ID: [항목ID들]}. */
-import { BLOCK_START, esc, etcBlock, h2, inline, itemBlocks, renderBlocks, secName, splitItems, splitSections, type ItemBlock, type RenderCtx } from './md'
+import { esc, etcBlock, h2, inline, itemBlocks, leadRest, renderBlocks, secName, splitItems, splitSections, type ItemBlock, type RenderCtx } from './md'
 import { ITEM_PAT, plain, type ViewFn } from './types'
 
 const card = (id: string, title: string, inner: string, ctx: RenderCtx, cls = 'card') =>
@@ -30,7 +30,7 @@ const head = (s: string): [string, string] => {
 }
 
 /** view_build.item_card — 머리 ID 뱃지·제목·필·`하위 N` · 몸 · 바닥 "{label}: 문서들". 하위가 없으면 필·바닥을 안 그린다 */
-const itemCard = (ctx: RenderCtx, b: ItemBlock, inner: string, label: string, pills = ''): string => {
+export const itemCard = (ctx: RenderCtx, b: ItemBlock, inner: string, label: string, pills = ''): string => {
   const down = downsWith(ctx, b.id)
   let c = `<article class="card" id="item-${esc(b.id)}" data-item="${esc(b.id)}"><div class="card-h"><span class="iid">${esc(b.id)}</span><b>${inline(b.title, ctx)}</b>${pills}`
   if (down.length) c += `<span class="pill soft">하위 ${down.length}</span>`
@@ -151,13 +151,11 @@ const scnParts = (text: string) => {
   return { head, steps, variants, tail, etc }
 }
 
-/** view_build.step_html — 첫 문단은 번호 옆, 나머지(밑 목록·둘째 문단)는 번호 너비만큼 들여쓰기를 떼고 그 아래 (#152) */
+/** view_build.step_html — 첫 문단은 번호 옆, 나머지(밑 목록·둘째 문단)는 그 아래 (#152) */
 const stepHtml = (lines: string[], ctx: RenderCtx): string => {
   const num = /^\d+\. /.exec(lines[0])![0]
-  const rest = lines.slice(1).map((l) => l.replace(new RegExp(`^ {1,${num.length}}`), ''))
-  const lead = [lines[0].slice(num.length)]
-  while (rest.length && rest[0].trim() && !BLOCK_START.test(rest[0])) lead.push(rest.shift()!)
-  return inline(lead.join(' '), ctx) + renderBlocks(rest.join('\n'), ctx)
+  const [lead, rest] = leadRest(lines[0].slice(num.length), lines.slice(1), num.length)
+  return inline(lead, ctx) + renderBlocks(rest, ctx)
 }
 
 /** view_build.variant_html — 접힘. 이름은 summary, 첫 줄 나머지부터 다음 표시 줄 전까지가 몸 (#152) */
