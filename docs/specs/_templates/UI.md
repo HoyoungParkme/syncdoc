@@ -1,7 +1,7 @@
 ---
 doc_id: 
 type: UI
-title: 
+title: 화면 설계·와이어프레임 — {프로젝트}
 status: draft
 upstream: []
 ---

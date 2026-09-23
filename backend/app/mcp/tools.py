@@ -23,7 +23,7 @@ from app.core.account.models import User
 from app.core.errors import NotFound, Problem, Unauthorized
 from app.core.markdown import masked_lines
 from app.core.project.service import ProjectService
-from app.core.spec.service import TYPES, patterns_for
+from app.core.spec.service import SUBTYPES, TYPES
 from app.core.types import (
     STAGE_OF,
     Author,
@@ -282,15 +282,25 @@ def _section(text: str, heading_prefix: str) -> str:
     return "\n".join(lines[start:end]).strip()
 
 
-def _block_structure(std_text: str, doc_type: str, title_key: str | None) -> str:
-    """STD-001 2장의 타입 표에서 '항목 블록' 행."""
+def _block_structure(std_text: str, doc_type: str, subtype: str | None) -> str:
+    """STD-001 2장의 타입 표에서 '항목 블록' 행.
+
+    서브타입이 있는 타입(2.6 DOM·2.8 API)은 한 절 안에 `**클래스 명세**`처럼 굵은 머리로 표가
+    여럿이다 — 서브타입을 주면 그 머리 아래 표만 본다(카드 AG). 전에는 절 전체에서 첫 표를
+    읽어 DOM이면 늘 도메인 모델의 항목 블록이 왔다.
+    """
     sec = _section(std_text, "2.")
     part = re.split(r"^### 2\.\d+ ", sec, flags=re.M)
     for chunk in part[1:]:
         if not chunk.startswith(doc_type):
             continue
-        if title_key and title_key not in chunk:
-            continue
+        if subtype:
+            heads = list(re.finditer(r"^\*\*([^*\n]+)\*\*\s*$", chunk, re.M))
+            for i, h in enumerate(heads):
+                if subtype in h.group(1):
+                    end = heads[i + 1].start() if i + 1 < len(heads) else len(chunk)
+                    chunk = chunk[h.end() : end]
+                    break
         m = re.search(r"^\| 항목 블록 \| (.+?) \|$", chunk, re.M)
         if m:
             return m.group(1)
@@ -301,21 +311,33 @@ def _block_structure(std_text: str, doc_type: str, title_key: str | None) -> str
     description="문서 타입의 템플릿과 작성 규약을 돌려준다. create_document 전에 반드시 부른다. 반환에는 (1) 그 타입의 "
     "항목 ID 패턴·필수 절·항목 블록 구조, (2) 템플릿 MD 뼈대, (3) 채워진 예시가 담긴다. 항목은 ID로 시작하는 헤딩이어야 "
     "하고, 표 행은 항목이 아니며, 번호에 패딩을 두지 않는다는 공통 규약도 함께 온다. 템플릿은 싱크독에 내장된 최신 것이다 — "
-    "저장소의 docs/specs/_templates/ 사본이 아니다."
+    "저장소의 docs/specs/_templates/ 사본이 아니다. DOM·API·UI는 무엇을 쓸지 subtype으로 말한다 — DOM은 도메인·클래스·ERD, "
+    "API는 REST·MCP, UI는 화면 설계·와이어프레임. DOM·API는 서브타입마다 필수 절과 뼈대가 달라 subtype 없이 받으면 "
+    "필수 절이 비어 오고 고를 수 있는 것이 subtypes에 온다."
 )
-async def get_template(project_code: str, doc_type: str) -> CallToolResult:
+async def get_template(
+    project_code: str, doc_type: str, subtype: str | None = None
+) -> CallToolResult:
     """SYNC-API-002#get_template"""
     try:
         if doc_type not in TYPES:
             raise NotFound("doc_type", doc_type)
+        subs = [k for t, k in SUBTYPES if t == doc_type]
+        if subtype is not None and subtype not in subs:
+            raise NotFound("subtype", subtype)  # doc_type이 틀렸을 때와 같은 답 (API-002)
         with db.session_scope() as s:
             # 소유한 프로젝트만 연다 — 남의 것은 없는 것과 같다 (MS-001 get_owned)
             project = ProjectService(s).get_owned(project_code, _user(s))
             workdir = Path(project.repository.workdir_path)
         # 템플릿은 앱에 내장된 것이 먼저다 — 저장소 사본은 init 때 복사된 뒤 다시 맞춰지지 않아
         # 규약이 바뀌면 낡은 채 남는다 (#94). 내장에 없는 타입만 저장소 사본으로.
+        # 서브타입마다 필수 절이 다른 타입(DOM·API)은 뼈대가 따로다 — 있으면 그것, 없으면 타입 것
+        # (UI는 두 서브타입의 필수 절이 같아 하나다). 서브타입 없이 부르면 고르는 안내가 온다 (카드 AG)
+        name = f"{doc_type}-{subtype}" if subtype else doc_type
+        if subtype and not (_APP_SPECS / "_templates" / f"{name}.md").exists():
+            name = doc_type
         template = await _read_spec_file(
-            workdir, f"docs/specs/_templates/{doc_type}.md", prefer_builtin=True
+            workdir, f"docs/specs/_templates/{name}.md", prefer_builtin=True
         )
         # 규약 문서 이름에도 프로젝트 코드가 들어간다 (STD-001 1.1) — 고정하면 SYNC 밖에서 늘 404 (#8).
         # 저장소에 없으면 싱크독 것으로 떨어진다 — 다른 프로젝트는 싱크독 STD를 그대로 쓴다 (STD-001 2.12)
@@ -326,20 +348,25 @@ async def get_template(project_code: str, doc_type: str) -> CallToolResult:
         )
     except Problem as p:
         return _problem(p)
-    item_re, secs = patterns_for(doc_type, None)
-    return _ok(
-        {
-            "doc_type": doc_type,
-            "common_rules": _section(std, "1."),
-            "type_rules": {
-                "item_patterns": TYPES[doc_type][0],
-                "required_sections": secs,
-                "block_structure": _block_structure(std, doc_type, None),
-            },
-            "template": template,
-            "example": _section(std, "5."),
-        }
-    )
+    # 서브타입을 주면 그것의 항목 패턴·필수 절·항목 블록이 온다. 안 주면 필수 절이 비고 고를 수 있는
+    # 것이 subtypes에 온다 — 전에는 서브타입을 받을 자리가 없어 DOM의 필수 절이 늘 빈 배열이었다 (#114)
+    pats, secs = SUBTYPES[(doc_type, subtype)] if subtype else (TYPES[doc_type][0], TYPES[doc_type][1])
+    out: dict[str, object] = {
+        "doc_type": doc_type,
+        "common_rules": _section(std, "1."),
+        "type_rules": {
+            "item_patterns": pats,
+            "required_sections": secs,
+            "block_structure": _block_structure(std, doc_type, subtype),
+        },
+        "template": template,
+        "example": _section(std, "5."),
+    }
+    if subtype:
+        out["subtype"] = subtype
+    elif subs:
+        out["subtypes"] = subs
+    return _ok(out)
 
 
 async def _read_spec_file(
@@ -368,7 +395,7 @@ async def _read_spec_file(
 
 
 @server.tool(
-    description="새 문서를 만든다. 문서 ID는 서버가 발급한다({코드}-{타입}-{번호}). 저장소의 docs/specs/_templates/ 템플릿이 적용되므로 body는 템플릿 구조를 따라야 한다. 항목 ID(#R12 같은 것)는 body에 직접 붙인다. 서버는 발급하지 않고 형식·유일성만 검사한다. 기존 문서를 고치려면 이 도구가 아니라 update_document를 써야 한다. 문서 하나를 만들면 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 같은 단계라도 다음 문서는 사람이 웹에서 읽고 난 뒤에 만든다. DOM 셋은 순서가 있다: 클래스 명세는 API 문서가, ERD는 클래스 명세가 같은 프로젝트에 있어야 받는다(precondition-unmet). DOM 제목에는 도메인·클래스·ERD 중, UI 제목에는 화면 설계·와이어프레임 중, API 제목에는 REST·MCP 중 하나가 들어가야 한다."
+    description="새 문서를 만든다. 문서 ID는 서버가 발급한다({코드}-{타입}-{번호}). 서버는 템플릿을 적용하지 않는다 — body가 get_template으로 받은 뼈대를 따라야 한다. DOM·API는 subtype을 주고 받는다(서브타입마다 필수 절이 다르다). 항목 ID(#R12 같은 것)는 body에 직접 붙인다. 서버는 발급하지 않고 형식·유일성만 검사한다. 기존 문서를 고치려면 이 도구가 아니라 update_document를 써야 한다. 문서 하나를 만들면 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 같은 단계라도 다음 문서는 사람이 웹에서 읽고 난 뒤에 만든다. DOM 셋은 순서가 있다: 클래스 명세는 API 문서가, ERD는 클래스 명세가 같은 프로젝트에 있어야 받는다(precondition-unmet). DOM 제목에는 도메인·클래스·ERD 중, UI 제목에는 화면 설계·와이어프레임 중, API 제목에는 REST·MCP 중 하나가 들어가야 한다."
 )
 async def create_document(
     project_code: str, doc_type: str, body: str, message: str

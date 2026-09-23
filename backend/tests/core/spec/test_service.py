@@ -150,6 +150,26 @@ def test_validate_all_27_specs_pass(db_session: Session) -> None:
         assert (r.violations, r.warnings) == ([], []), (path, r)
 
 
+def test_every_template_filled_with_an_id_passes_validate(db_session: Session) -> None:
+    """템플릿대로 쓰면 미완성이 안 난다 — 서버 규약(entity.mismatch 포함)으로 본다 (#114, 카드 AG).
+
+    DOM·API의 고르는 안내(DOM.md·API.md)는 뼈대가 아니라 뺀다.
+    """
+    svc = SpecService(db_session)
+    tdir = os.path.join(os.path.dirname(SPECS[0]), "..", "_templates")
+    seen = 0
+    for name in sorted(os.listdir(tdir)):
+        if name in ("DOM.md", "API.md") or not name.endswith(".md"):
+            continue
+        body = open(os.path.join(tdir, name), encoding="utf-8").read()
+        typ = name.split("-")[0].removesuffix(".md")
+        body = body.replace("doc_id: \n", f"doc_id: XXXX-{typ}-001\n", 1)
+        r = svc.validate(body, typ, Entry.github)
+        assert (r.violations, r.warnings) == ([], []), (name, r)
+        seen += 1
+    assert seen == 15  # 본 것의 수 — 0이면 안 본 것이다 (DEV-17)
+
+
 def test_validate_example_passes_and_variants(db_session: Session) -> None:
     svc = SpecService(db_session)
     r = svc.validate(PRD, DocType.PRD, Entry.mcp)

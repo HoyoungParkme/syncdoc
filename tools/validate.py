@@ -83,8 +83,12 @@ def validate(path, deleted_ids=()):
     # 타입·서브타입 패턴
     pats, secs = TYPES.get(typ, ([], []))
     title = fm.get("title", "")
+    # 첫 번째로 맞는 서브타입 — 서버 subtype_of와 같다(카드 AG). 마지막 것이 이기면 제목에 「클래스」와
+    # 「ERD」가 둘 다 든 문서를 서버는 클래스로, 이 검사기는 ERD로 읽어 서로 다른 답을 냈다
     for (t, key), (p, s) in SUBTYPES.items():
-        if t == typ and key in title: pats, secs = p, s
+        if t == typ and key in title:
+            pats, secs = p, s
+            break
     if secs is None: secs = []
     item_re = re.compile(r"^(?:" + "|".join(pats) + r")$") if pats else None
 

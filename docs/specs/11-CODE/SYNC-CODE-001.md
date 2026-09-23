@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 슬라이스는 시나리오([[SYNC-SCN-001]]) 우선순위 순서 — S1이 최우선이었으므로 B1이 첫 슬라이스. 기반 A가 끝나야 B가 시작되고, B1이 끝나면 에이전트가 MCP로 문서를 올릴 수 있어 그때부터 싱크독으로 싱크독을 만든다.
 
-**진행 상황**: 카드 40장. **A~AF 40장 완료**(2026-09-22).
+**진행 상황**: 카드 41장. **A~AF 40장 완료**(2026-09-22), AG 진행 중.
 
 ---
 
@@ -906,6 +906,22 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 ---
 
+#### AG 템플릿은 서브타입마다, 에이전트는 서브타입을 말하고 받는다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-STD-001]] 1.1·2.6·2.8 · [[SYNC-API-002#get_template]] · [[SYNC-STD-004#DEV-17]] · #114 · 사용자 결정 2026-09-23 |
+| 구현 | DOM·API 템플릿을 서브타입별로 — `DOM-도메인.md`·`DOM-클래스.md`·`DOM-ERD.md`·`API-REST.md`·`API-MCP.md`. `DOM.md`·`API.md`는 고르는 안내. `get_template`이 `subtype`을 받아 그 서브타입의 항목 패턴·필수 절·항목 블록·뼈대를 준다(안 주면 필수 절이 비고 `subtypes`가 온다). `tools/check_templates.py` 신설 · `validate.py`의 서브타입 판정을 서버처럼 첫 매치로 · 검사기가 찾은 둘(SEQ 항목 예시 없음 · UI 예시 제목 없음)도 고침 |
+| 테스트 | `get_template` 서브타입별 넷 · 서브타입 없이 · 틀린 서브타입 · **템플릿 열다섯을 문서 ID만 채워 서버 validate에 넣으면 위반 0·경고 0** |
+| 선행 | — |
+| 완료 | — |
+
+**왜 카드인가.** 템플릿은 타입마다 한 파일인데 필수 절은 서브타입마다 다르다. DOM 템플릿은 도메인 모델 골격 하나라, 그대로 쓴 클래스 명세는 네 절, ERD는 세 절이 **반드시** 비었다. HB에서 세 문서가 전부 같은 골격으로 시작해 두 개를 다시 올렸다(커밋 제목이 「필수 절 이름 맞춤」). 같은 병이 API 템플릿에도 있었다 — 괄호로 겸업시킨 절 제목(`엔드포인트 (또는 도구)`)을 검사기가 못 읽는다.
+
+**왜 아무도 못 봤나.** 물어볼 길이 없었다 — `get_template`에 서브타입 자리가 없어 DOM의 필수 절이 늘 빈 배열로 왔다. 그리고 모든 검사기가 `_templates/`를 건너뛰어 템플릿이 규약을 못 지키는 것을 잡을 장치가 없었다.
+
+---
+
 ## 2. 통합 테스트 시나리오
 
 시나리오 S1~S7을 그대로 E2E 테스트로. 각 슬라이스의 `테스트` 행에 나눠 들어가 있다. 전부 통과하면 PRD 성공지표 측정을 시작한다.
@@ -967,6 +983,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AD | `card/AD-read-before-write` | `9ea83ca`~ | — | 2026-09-22 |
 | AE | `card/AE-ui-guidance` | `8331a96`~ | #142 | 2026-09-22 |
 | AF | `card/AF-webhook` | `1770920`~ | #144 · #146 | 2026-09-22 |
+| AG | `card/AG-subtype-templates` | — | — | — |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 | X | `card/X-ui-doc` | `7a4e821`~ | #103 | 2026-09-21 |
