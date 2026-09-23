@@ -295,7 +295,13 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
   border-bottom:1px solid var(--divider-soft);cursor:pointer}
 .stg:hover{background:var(--bg-subtle)}
 .stg .no{width:20px;flex:none;font-size:var(--text-mono-sm);color:var(--ink-muted)}
-.stg .nm{font-size:14.5px;font-weight:var(--w-medium)}
+.stg .nm{font-size:14.5px;font-weight:var(--w-medium);width:190px;flex:none}
+/* 코드는 작게 — 이름이 앞이다. 코드만 있으면 문서 ID(HB-PRD-001)의 일부처럼 읽혀 단계 행을 문서로 알고 눌렀다 (#116) */
+.stg .nm .cd{margin-left:var(--space-6);font-family:var(--font-mono);font-size:11px;font-weight:var(--w-regular);color:var(--ink-disabled)}
+/* 4.5 접힌 단계 행의 문서 링크 — 전부 보이고, 넘치면 행 안에서 줄을 바꾼다 */
+.stg .ids{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:var(--space-2) var(--space-12)}
+.stg .ids a{font-size:var(--text-mono-id);color:var(--ink-muted);text-decoration:underline;text-decoration-color:var(--border-strong);text-underline-offset:3px}
+.stg .ids a:hover{color:var(--ink-body)}
 .stg .caret{width:10px;text-align:center;font-size:11.5px;color:var(--ink-muted)}
 /* 문서 행 — 46px 들여쓰고 바탕을 한 톤 낮춘다. 안 그러면 어느 쪽이 묶음인지 안 보인다 */
 .doc{display:flex;align-items:center;gap:var(--space-8);flex-wrap:wrap;cursor:pointer;

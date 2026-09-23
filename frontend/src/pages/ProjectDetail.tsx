@@ -3,9 +3,9 @@
  *  1 헤더(1.1·1.2·1.3) · 2.1·2.2 그래프·순서 · 3 요약 수치 셋(3.2 끊어진 참조·3.4 규약 오류·3.5 미완성 → 다이얼로그 6)
  *  4 표(4.1 단계, 4.2 문서, 4.3 상위 미완료, 4.4 표준) · 5 최근 변경 · 6 목록 다이얼로그 · 7 동기화 상태(7.1 커밋, 7.2 밀림)
  *  8 휴지통 묶음(8.1 행 · 8.2 되살리기 · 8.3 완전 삭제 · 8.4 확인) — 0건이면 묶음 자체가 없다 */
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import { StatusPill, ProjName, useEscape } from '../components/ui'
+import { StatusPill, ProjName, Tooltip, useEscape } from '../components/ui'
 import { ago, api, ApiError, authorLabel, docPath, refKey, STAGE_NAMES, STATUS_KO, warnText, type BrokenRefSummary, type DocumentSummary, type ProjectDetail as Detail, type ProjectSummary } from '../api/client'
 
 
@@ -66,6 +66,53 @@ export function ProjectDetail() {
     api.get<unknown[]>(`/api/projects/${code}/flags?kind=${kind}`).then((items) => setDialog({ kind, label, items }))
   }
   const byType = (t: string) => docs.filter((d) => d.doc_type === t)
+  /** 4.1·4.4 단계 행의 이름부터 끝까지 — 단계 행이 문서처럼 보이지 않게 (#116).
+   *  이름은 사람 말 + 작은 코드, 오른쪽은 「문서 N개」, 접혀 있으면 그 단계 문서 ID 전부를 링크로(4.5, 넘치면 줄바꿈).
+   *  툴팁은 이름과 오른쪽에만 — 링크 위에서 「펼치기」라고 하면 틀린 안내다. 수는 요약에서, 링크는 상세가 온 뒤에 */
+  const stageCells = (name: string, type: string, count: number, isOpen: boolean, badges: ReactNode) => {
+    const tip = isOpen ? '눌러서 접기' : '눌러서 문서 펼치기'
+    const nm = (
+      <span className="nm">
+        {name}
+        <span className="cd">{type}</span>
+      </span>
+    )
+    const links = isOpen ? [] : byType(type)
+    return (
+      <>
+        {count ? <Tooltip text={tip}>{nm}</Tooltip> : nm}
+        {badges}
+        {links.length ? (
+          <span className="ids" data-el="4.5">
+            {links.map((doc) => (
+              <a
+                key={doc.doc_id}
+                className="mono"
+                href={`/p/${code}/d/${doc.doc_id}`}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation() // 행의 접기/펼치기는 일어나지 않는다 (4.5)
+                  nav(`/p/${code}/d/${doc.doc_id}`)
+                }}
+              >
+                {doc.doc_id}
+              </a>
+            ))}
+          </span>
+        ) : (
+          <span className="grow" />
+        )}
+        {count ? (
+          <Tooltip text={tip}>
+            <span className="lbl">문서 {count}개</span>
+            <span className="caret">{isOpen ? '▾' : '▸'}</span>
+          </Tooltip>
+        ) : (
+          <span className="lbl">—</span>
+        )}
+      </>
+    )
+  }
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
   const row = (d: DocumentSummary) => (
     <div className="doc" data-el="4.2" key={d.doc_id} onClick={() => nav(`/p/${code}/d/${d.doc_id}`)}>
@@ -132,16 +179,20 @@ export function ProjectDetail() {
               <div key={s.doc_type}>
                 <div className="stg" data-el="4.1" id={`stage-${s.stage}`} onClick={() => toggle(s.doc_type)}>
                   <span className="no mono">{s.stage}</span>
-                  <span className="nm">{STAGE_NAMES[s.doc_type]}</span>
-                  <StatusPill status={s.status} />
-                  {s.gate_warning && (
-                    <span className="gate" data-el="4.3">
-                      상위 미완료
-                    </span>
+                  {stageCells(
+                    STAGE_NAMES[s.doc_type],
+                    s.doc_type,
+                    s.doc_count,
+                    isOpen,
+                    <>
+                      <StatusPill status={s.status} />
+                      {s.gate_warning && (
+                        <span className="gate" data-el="4.3">
+                          상위 미완료
+                        </span>
+                      )}
+                    </>,
                   )}
-                  <span className="grow" />
-                  <span className="lbl">{s.doc_count ? `${s.doc_count}개` : '—'}</span>
-                  <span className="caret">{s.doc_count ? (isOpen ? '▾' : '▸') : ''}</span>
                 </div>
                 {isOpen && byType(s.doc_type).map(row)}
               </div>
@@ -151,11 +202,7 @@ export function ProjectDetail() {
             <div>
               <div className="stg" data-el="4.4" onClick={() => toggle('STD')}>
                 <span className="no mono">—</span>
-                <span className="nm">표준 (STD)</span>
-                <StatusPill status={lowest(sum.std_docs)} />
-                <span className="grow" />
-                <span className="lbl">{sum.std_docs.length}개</span>
-                <span className="caret">{open.STD ? '▾' : '▸'}</span>
+                {stageCells('표준', 'STD', sum.std_docs.length, open.STD ?? false, <StatusPill status={lowest(sum.std_docs)} />)}
               </div>
               {open.STD && byType('STD').map(row)}
             </div>

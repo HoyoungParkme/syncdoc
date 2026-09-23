@@ -4,6 +4,7 @@
  *  읽기 전용이고 상태가 없다 — 어디서 열든 같은 내용이고 닫으면 원래 화면 그대로다. */
 
 import type { ReactNode } from 'react'
+import { STAGE_NAMES } from '../api/client'
 import { useEscape } from './ui'
 
 /** 여섯 단계. 웹에 편집이 없다는 것을 3에서 말한다 — 처음 온 사람이 가장 자주 헤매는 지점이다 */
@@ -22,14 +23,14 @@ const ORDER: [string, string, string][] = [
  *  수는 라벨, 문서는 줄마다 하나, 선택은 태그. 실질/선택은 SYNC-STD-003 결정을 그대로 옮긴 것 */
 type Docs = { n: string; why: ReactNode; list?: [string, ReactNode, boolean?][]; opt?: boolean }
 const STAGES: [string, string, string, string[], Docs][] = [
-  ['RFQ', '요구·인터뷰', '무엇을 왜 만드나. 고객이 말한 것만 적는다', ['Q1'], { n: '1', why: '고객이 말한 것 → Q 항목' }],
-  ['PRD', '제품 요구', '목표·비목표·요구사항. 요구에는 인수기준까지', ['G1', 'R12', 'N3'], { n: '1', why: '목표 G · 요구 R · 비목표 N' }],
-  ['SCN', '사용자 시나리오', '페르소나와 실제 사용 흐름', ['P1', 'S1'], { n: '1', why: '페르소나 P · 시나리오 S', opt: true }],
-  ['UC', '유스케이스', '액터별 유스케이스. 기본 흐름과 확장', ['UC-H2', 'UC-A1'], { n: '1', why: '액터별 — 사람 H · 에이전트 A · GitHub G · 시스템 S' }],
-  ['INFRA', '인프라 아키텍처', '제약·구성도·기술 스택·데이터가 사는 곳', ['C1'], { n: '1', why: '앞 단계에서 확정된 제약 C', opt: true }],
+  ['RFQ', STAGE_NAMES.RFQ, '무엇을 왜 만드나. 고객이 말한 것만 적는다', ['Q1'], { n: '1', why: '고객이 말한 것 → Q 항목' }],
+  ['PRD', STAGE_NAMES.PRD, '목표·비목표·요구사항. 요구에는 인수기준까지', ['G1', 'R12', 'N3'], { n: '1', why: '목표 G · 요구 R · 비목표 N' }],
+  ['SCN', STAGE_NAMES.SCN, '페르소나와 실제 사용 흐름', ['P1', 'S1'], { n: '1', why: '페르소나 P · 시나리오 S', opt: true }],
+  ['UC', STAGE_NAMES.UC, '액터별 유스케이스. 기본 흐름과 확장', ['UC-H2', 'UC-A1'], { n: '1', why: '액터별 — 사람 H · 에이전트 A · GitHub G · 시스템 S' }],
+  ['INFRA', STAGE_NAMES.INFRA, '제약·구성도·기술 스택·데이터가 사는 곳', ['C1'], { n: '1', why: '앞 단계에서 확정된 제약 C', opt: true }],
   [
     'DOM',
-    '도메인·클래스·데이터',
+    STAGE_NAMES.DOM,
     '도메인 모델·클래스 명세·ERD를 한 단계에',
     ['Document', 'documents'],
     {
@@ -54,7 +55,7 @@ const STAGES: [string, string, string, string[], Docs][] = [
   ],
   [
     'UI',
-    '화면',
+    STAGE_NAMES.UI,
     '화면 목록·흐름·화면별 요소',
     ['UI-5'],
     {
@@ -69,7 +70,7 @@ const STAGES: [string, string, string, string[], Docs][] = [
   ],
   [
     'API',
-    '인터페이스',
+    STAGE_NAMES.API,
     'REST 엔드포인트와 MCP 도구',
     ['GET/api/docs/{docId}', 'get_doc'],
     {
@@ -81,9 +82,9 @@ const STAGES: [string, string, string, string[], Docs][] = [
       ],
     },
   ],
-  ['SEQ', '시퀀스', '저장·판단·조회 흐름을 생명선으로', ['SEQ-12'], { n: '1', why: '저장 하나 = 시퀀스 하나', opt: true }],
-  ['MS', 'MINISPEC', '함수 하나하나의 시그니처와 처리 순서', ['SpecService.save'], { n: 'N', why: 'MS 하나 = 클래스 명세 절 하나 = 코드 파일 하나 (싱크독 9개)', opt: true }],
-  ['CODE', '구현 계획', '슬라이스와 통합 테스트, 커밋 목록', ['B2', 'D1'], { n: '1', why: '슬라이스 카드 A · B1… 와 완료 기록' }],
+  ['SEQ', STAGE_NAMES.SEQ, '저장·판단·조회 흐름을 생명선으로', ['SEQ-12'], { n: '1', why: '저장 하나 = 시퀀스 하나', opt: true }],
+  ['MS', STAGE_NAMES.MS, '함수 하나하나의 시그니처와 처리 순서', ['SpecService.save'], { n: 'N', why: 'MS 하나 = 클래스 명세 절 하나 = 코드 파일 하나 (싱크독 9개)', opt: true }],
+  ['CODE', STAGE_NAMES.CODE, '슬라이스와 통합 테스트, 커밋 목록', ['B2', 'D1'], { n: '1', why: '슬라이스 카드 A · B1… 와 완료 기록' }],
 ]
 
 /** 에이전트를 붙이는 손 순서 — 2의 둘째 단계를 편 것. 셋째 행을 빼지 않는다(UI-16 규칙):
