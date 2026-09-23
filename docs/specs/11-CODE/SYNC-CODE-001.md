@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1032,6 +1032,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AH | `card/AH-item-bodies` | `f0ae4f5` | #154 | 2026-09-23 |
 | AI | `card/AI-424` | `88d026e` | #156 | 2026-09-23 |
 | AJ | `card/AJ-handles` · `card/AJ-align` | `07f45ce` · `d222b20` | #161 · #162 | 2026-09-23 |
+| (#119) | `fix/119-single-render` | — | #119 | 2026-09-23 |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 | X | `card/X-ui-doc` | `7a4e821`~ | #103 | 2026-09-21 |
