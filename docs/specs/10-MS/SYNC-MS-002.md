@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-002
 type: MS
 title: MINISPEC — SpecService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -130,7 +130,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 4. `[[ ]]` 전부 형식 검사 → `ref.format`
 5. **경고**: 필수 절마다 if 해당 절 없음 → `section.missing` · if `not items and doc_type not in (CODE, STD)` → `item.none`
 6. DOM 클래스 명세면 2장·4장 mermaid의 같은 클래스 속성 대조 → `entity.mismatch` 경고
-7. `→ ValidateResult(violations: [{line, rule, message}], warnings: [{rule, message}])`
+7. INFRA면 `C` 항목 블록마다([[#SpecService.item_blocks]]) 3의 마스킹한 줄에서 줄 머리 `출처:`를 찾는다 · if 없음 → `constraint.source` 경고, message = 항목 ID. 링크가 아니어도 통과(`출처: RFQ`), 문단 끝 「근거:」는 출처가 아니다 · 코드블록 안 `출처:`는 세지 않는다 (STD-001 2.5·4장, #120)
+8. `→ ValidateResult(violations: [{line, rule, message}], warnings: [{rule, message}])`
 
 **출력** `ValidateResult`. `violations`가 비면 통과
 
@@ -138,7 +139,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** [[#SpecService.item_blocks]](헤딩 순회 공유)
 
-**테스트 관점** `_tools/validate.py`가 15개 문서에 대해 위반 0·경고 0을 내는 것이 첫 테스트 · frontmatter 없는 본문 → 위반 하나만 · `R01` → `item.padding` · `R1.` → `item.punct` · 삭제된 `R15` 재사용 → `item.reused` · **같은 본문이 `web_revert`로 들어오면 통과** · MCP에서 status 바꿈 → `frontmatter.status_change`, GitHub에서는 통과 · 필수 절 하나 빼면 경고 하나, 저장은 됨
+**테스트 관점** `_tools/validate.py`가 15개 문서에 대해 위반 0·경고 0을 내는 것이 첫 테스트 · frontmatter 없는 본문 → 위반 하나만 · `R01` → `item.padding` · `R1.` → `item.punct` · 삭제된 `R15` 재사용 → `item.reused` · **같은 본문이 `web_revert`로 들어오면 통과** · MCP에서 status 바꿈 → `frontmatter.status_change`, GitHub에서는 통과 · 필수 절 하나 빼면 경고 하나, 저장은 됨 · INFRA 제약 둘 중 하나에만 `출처:` 줄 → `constraint.source` 하나(그 항목 ID) · `출처: RFQ`는 통과 · 문단 끝 `근거: [[…]]`만 → 경고 · 코드블록 안 `출처:`만 → 경고
 
 ---
 
