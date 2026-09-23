@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-002
 type: STD
 title: 뷰 규약 — 사람용 뷰 타입별 렌더링
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-UI-002]
 ---
 
@@ -231,6 +231,8 @@ a{cursor:default}
 `_tools/view_build.py` 하나가 전부 만든다. frontmatter `type`을 보고 `V-*` 함수로 본문을 그리고, `shell()`이 공통 틀을 씌운다. 타입마다 함수 하나. 출력은 `view_{doc_id}.html` — 파일 하나에 CSS·스크립트 내장. 이 스크립트가 React 유저용 탭의 **참조 구현**이다 — React는 이 HTML과 같게 그려야 한다. 배치의 srcdoc 조립·`FRAME_CSS`·`sandbox`도 같다 — `tools/check_view_css.py`가 **네 쌍**을 대조한다: 뷰 CSS(`styles.view.css`↔`view_build.py CSS`) · `FRAME_CSS` · `SANDBOX` · **화면 뷰 CSS**(`view/wireframe.ts wireframeCss`↔`wf_build.py WF_SCREEN_CSS`, 카드 AC). 넷째 쌍에는 탭·배치 틀·도구 줄·요소 표의 값이 산다 — 지금까지 우연히 같았을 뿐이라 한쪽만 고쳐도 조용히 갈라졌다. 정적 뷰 전용 스타일(페이지 껍데기·산문)은 `WF_PAGE_CSS`로 갈라 두었다.
 
 확정된 것: 공통 틀과 12타입 전부. `view_build.py --all`이 문서 25개 + `index.html`을 만든다. 스콥을 줄여 **재배치·재조립·그림 렌더·참조 링크·추적표**까지로 했다 — 아래 6장 참조. 나머지 타입은 하나씩 만들어 보고 확정한다.
+
+**다른 저장소의 문서도 만든다(#126).** 명세 뿌리는 `--specs <저장소>/docs/specs`로 받고, 문서 경로만 주면 그 문서가 있는 `docs/specs`를 색인한다 — 기본값만 싱크독 자신이다([[SYNC-STD-004]] 「검사기는 프로젝트 코드를 박아 두지 않는다」). 출력은 싱크독 `docs/views/{코드}/` — 그 저장소를 건드리지 않는다. 그때 배치의 상대 경로(`<base>`)는 그 저장소 `docs/specs/{NN-TYPE}/`을 `file://` 절대 경로로 가리킨다. 전에는 싱크독 자기 문서만 색인해 남의 문서를 주면 `KeyError`로 멈췄다.
 
 ## 5. 이미 만든 뷰 셋과의 차이
 
