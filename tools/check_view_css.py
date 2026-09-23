@@ -14,6 +14,9 @@
 탭·배치 틀·도구 줄·요소 표의 값이 여기 산다. 지금까지 우연히 같았을 뿐 대조하는 장치가 없어
 한쪽만 고쳐도 잡히지 않았다(#134 조사에서 드러났다).
 
+다섯째 쌍(카드 AM): 유스케이스 뷰 CSS — `frontend/src/view/uc.ts ucCss` ↔ `tools/view_build.py UC_CSS`.
+정적 뷰가 옛 `build.py`의 CSS를 따로 쓰다 되살리며 한 벌로 맞췄다.
+
 사용: python3 tools/check_view_css.py
 """
 
@@ -26,7 +29,7 @@ import sys
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 VIEW_CSS = os.path.join(ROOT, "frontend", "src", "styles.view.css")
 BUILDER = os.path.join(ROOT, "tools", "view_build.py")
-CSS_CONST = re.compile(r'CSS = r"""(.*?)"""', re.S)
+CSS_CONST = re.compile(r'^CSS = r"""(.*?)"""', re.S | re.M)  # 줄 머리 — UC_CSS 같은 다른 상수와 헷갈리지 않게
 FRAME_TS = os.path.join(ROOT, "frontend", "src", "view", "frame.ts")
 WF_PY = os.path.join(ROOT, "tools", "wf_build.py")
 TS_FRAME = re.compile(r"export const FRAME_CSS = `(.*?)`", re.S)
@@ -36,6 +39,9 @@ PY_SANDBOX = re.compile(r'SANDBOX = "(.*?)"')
 WF_TS = os.path.join(ROOT, "frontend", "src", "view", "wireframe.ts")
 TS_SCREEN = re.compile(r"export const wireframeCss = `(.*?)`", re.S)
 PY_SCREEN = re.compile(r'WF_SCREEN_CSS = r"""(.*?)"""', re.S)
+UC_TS = os.path.join(ROOT, "frontend", "src", "view", "uc.ts")
+TS_UC = re.compile(r"export const ucCss = `(.*?)`", re.S)
+PY_UC = re.compile(r'^UC_CSS = r"""(.*?)"""', re.S | re.M)
 
 
 def strip_header(text: str) -> str:
@@ -87,6 +93,10 @@ def main() -> int:
     tw, pw = TS_SCREEN.search(wts), PY_SCREEN.search(py)
     ok &= _pair("화면 뷰 CSS", tw.group(1) if tw else None, pw.group(1) if pw else None,
                 "frontend/src/view/wireframe.ts", "tools/wf_build.py WF_SCREEN_CSS")
+    uts = open(UC_TS, encoding="utf-8").read() if os.path.exists(UC_TS) else ""
+    tu, pu = TS_UC.search(uts), PY_UC.search(open(BUILDER, encoding="utf-8").read())
+    ok &= _pair("유스케이스 뷰 CSS", tu.group(1) if tu else None, pu.group(1) if pu else None,
+                "frontend/src/view/uc.ts ucCss", "tools/view_build.py UC_CSS")
     return 0 if ok else 1
 
 
