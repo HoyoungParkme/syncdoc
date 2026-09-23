@@ -5,7 +5,7 @@
  *  8 휴지통 묶음(8.1 행 · 8.2 되살리기 · 8.3 완전 삭제 · 8.4 확인) — 0건이면 묶음 자체가 없다 */
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import { StatusPill, ProjName } from '../components/ui'
+import { StatusPill, ProjName, useEscape } from '../components/ui'
 import { ago, api, ApiError, authorLabel, docPath, refKey, STAGE_NAMES, STATUS_KO, warnText, type BrokenRefSummary, type DocumentSummary, type ProjectDetail as Detail, type ProjectSummary } from '../api/client'
 
 
@@ -24,6 +24,9 @@ export function ProjectDetail() {
   const [dialog, setDialog] = useState<{ kind: string; label: string; items: unknown[] } | null>(null)
   const [trash, setTrash] = useState<DocumentSummary[]>([]) // 8 — 별도 조회. 목록 응답엔 휴지통이 없다
   const [purge, setPurge] = useState<{ doc: DocumentSummary; block: Record<string, unknown> | null } | null>(null) // 8.4
+  // 1.1 — Esc는 바깥 클릭과 같다 (#117)
+  useEscape(purge ? () => setPurge(null) : null)
+  useEscape(dialog ? () => setDialog(null) : null)
   useEffect(() => {
     setD(null)
     api.get<Detail>(`/api/projects/${code}`).then(setD)

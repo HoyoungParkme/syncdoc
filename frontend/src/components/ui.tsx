@@ -1,10 +1,41 @@
 /** 공통 컴포넌트 — SYNC-UI-002 1장. 화면마다 다시 그리지 않는 것들.
  *  1.2 툴팁 · 1.3 토스트 · 1.4 상태 필 · 1.5 항목 ID 뱃지.
- *  1.1 다이얼로그는 컴포넌트가 아니라 CSS 셸이다(styles.css `.dialog`) — 화면마다 속이 달라서. */
-import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
+ *  1.1 다이얼로그는 컴포넌트가 아니라 CSS 셸이다(styles.css `.dialog`) — 화면마다 속이 달라서. 닫는 Esc만 여기(useEscape). */
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import { STATUS_KO } from '../api/client'
+
+/** 열려 있는 다이얼로그들의 닫기 — 나중에 연 것이 위. 창에 keydown 하나만 듣는다 */
+const escStack: { close: () => void }[] = []
+function onEscape(e: KeyboardEvent): void {
+  // 한글 조합 중의 Esc는 조합을 끝내는 키다 — 다이얼로그까지 닫으면 쓰던 글이 날아간다
+  if (e.key !== 'Escape' || e.isComposing || e.defaultPrevented) return
+  const top = escStack[escStack.length - 1]
+  if (!top) return
+  e.preventDefault()
+  top.close()
+}
+
+/** 1.1 다이얼로그 · 1.7 그림 전체보기 — Esc는 바깥을 누른 것과 같다. 겹쳐 떠 있으면 맨 위 하나만 닫는다 (#117).
+ *  `onClose`가 null이면 열려 있지 않은 것. 진행 중이라 바깥 클릭을 막는 곳은 onClose 안에서 똑같이 막는다 */
+export function useEscape(onClose: (() => void) | null): void {
+  const latest = useRef(onClose)
+  useEffect(() => {
+    latest.current = onClose
+  })
+  const open = onClose !== null
+  useEffect(() => {
+    if (!open) return
+    const entry = { close: () => latest.current?.() }
+    escStack.push(entry)
+    if (escStack.length === 1) window.addEventListener('keydown', onEscape)
+    return () => {
+      escStack.splice(escStack.indexOf(entry), 1)
+      if (escStack.length === 0) window.removeEventListener('keydown', onEscape)
+    }
+  }, [open])
+}
 
 /** 1.4 상태 필. 상태색 바탕에 작은 알약. 완료만 글씨가 희다.
  *  `status`가 없으면 `미작성` — 단계에 문서가 아직 없는 칸(UI-4)이 그렇다. */

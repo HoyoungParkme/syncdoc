@@ -4,6 +4,7 @@
  *  읽기 전용이고 상태가 없다 — 어디서 열든 같은 내용이고 닫으면 원래 화면 그대로다. */
 
 import type { ReactNode } from 'react'
+import { useEscape } from './ui'
 
 /** 여섯 단계. 웹에 편집이 없다는 것을 3에서 말한다 — 처음 온 사람이 가장 자주 헤매는 지점이다 */
 const ORDER: [string, string, string][] = [
@@ -109,6 +110,7 @@ const CONNECT: [string, ReactNode, string][] = [
 ]
 
 export function HowTo({ onClose }: { onClose: () => void }) {
+  useEscape(onClose) // 1.1 — 바깥 클릭과 같다 (#117)
   // 주소는 UI-13 클라이언트 설정(8.1)과 같은 원천 — 사람이 옮겨 적으면 터널 주소를 틀린다.
   // 토큰은 발급 화면에서 한 번만 보이고 서버도 다시 못 준다 — 자리표시
   const cmd = `claude mcp add --transport http --scope user syncdoc \\

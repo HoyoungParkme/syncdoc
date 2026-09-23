@@ -12,7 +12,7 @@ import { api, ApiError, incompleteOf, warnText, type AskAnswer, type AskNote, ty
 import { extraCss, renderView } from '../view'
 import { attachDiagramButtons, DiagramFull, type FullDiagram, type WfFullDetail } from '../components/DiagramFull'
 import { esc, renderBlocks, splitRef } from '../view/md'
-import { ItemIdBadge, StatusPill, ProjName, toast } from '../components/ui'
+import { ItemIdBadge, StatusPill, ProjName, toast, useEscape } from '../components/ui'
 import { Handle, PANEL, readStore, TOC, useWidth, writeStore } from '../components/panes'
 import type { AskChat, AskTurnView } from '../components/Shell'
 
@@ -29,6 +29,7 @@ export function DocView() {
   const [refs, setRefs] = useState<ItemReferences | null>(null)
   const [downstream, setDownstream] = useState<DownstreamView | null>(null)
   const [delOpen, setDelOpen] = useState(false) // 13
+  useEscape(delOpen ? () => setDelOpen(false) : null) // 1.1 — 바깥 클릭과 같다 (#117)
   const [delInfo, setDelInfo] = useState<Record<string, unknown> | null>(null) // 13.2 — 서버 답(needs-confirm)으로만 채운다
   // 8 패널 탭 — 기본은 참조. 질문 탭(8.4)은 사람이 누를 때만, URL은 ?panel=ask. 키가 없으면 탭 자체가 없다
   const { user, ask } = useOutletContext<{ user: Me; ask: AskChat }>()
@@ -394,39 +395,43 @@ export function DocView() {
       </div>
 
       {delOpen && (
-        <div className="dialog narrow" data-el="13">
-          <div className="dhead">휴지통에 넣기 — {doc.doc_id}</div>
-          <div className="dbody">
-            <p data-el="13.1">
-              <b>{titleOf(doc.body)}</b> · 버전 {doc.current_version_no}개 · 파일이 저장소에서 지워집니다. 행과 이력은 남아 <b>되살릴 수 있습니다.</b>
-            </p>
-            {delInfo && (delInfo.inbound_refs as string[]).length > 0 && (
-              <div className="banner warn" data-el="13.2">
-                넣으면 끊어지는 것
-                {(delInfo.inbound_refs as string[]).length > 0 && (
-                  <>
-                    <br />· 들어오는 참조 {(delInfo.inbound_refs as string[]).length}
-                    {(delInfo.inbound_refs as string[]).map((r) => (
-                      <span key={r}>
-                        {' '}
-                        — <a href={`/p/${r.split('-')[0]}/d/${r.split('#')[0]}${r.includes('#') ? '#item-' + r.split('#')[1] : ''}`} target="_blank" rel="noreferrer"><b>{r}</b></a>
-                      </span>
-                    ))}{' '}
-                    → 그 참조가 <b>끊어진 참조</b>가 됩니다
-                  </>
-                )}
+        <>
+          {/* 1.1 — 배경이 없어 뒤 화면을 그대로 누를 수 있었다 */}
+          <div className="backdrop" onClick={() => setDelOpen(false)} />
+          <div className="dialog narrow" data-el="13">
+            <div className="dhead">휴지통에 넣기 — {doc.doc_id}</div>
+            <div className="dbody">
+              <p data-el="13.1">
+                <b>{titleOf(doc.body)}</b> · 버전 {doc.current_version_no}개 · 파일이 저장소에서 지워집니다. 행과 이력은 남아 <b>되살릴 수 있습니다.</b>
+              </p>
+              {delInfo && (delInfo.inbound_refs as string[]).length > 0 && (
+                <div className="banner warn" data-el="13.2">
+                  넣으면 끊어지는 것
+                  {(delInfo.inbound_refs as string[]).length > 0 && (
+                    <>
+                      <br />· 들어오는 참조 {(delInfo.inbound_refs as string[]).length}
+                      {(delInfo.inbound_refs as string[]).map((r) => (
+                        <span key={r}>
+                          {' '}
+                          — <a href={`/p/${r.split('-')[0]}/d/${r.split('#')[0]}${r.includes('#') ? '#item-' + r.split('#')[1] : ''}`} target="_blank" rel="noreferrer"><b>{r}</b></a>
+                        </span>
+                      ))}{' '}
+                      → 그 참조가 <b>끊어진 참조</b>가 됩니다
+                    </>
+                  )}
+                </div>
+              )}
+              <div className="dacts">
+                <button className="btn" data-el="13.4" onClick={() => setDelOpen(false)}>
+                  닫기
+                </button>{' '}
+                <button className="btn danger" data-el="13.3" disabled={delInfo === null} onClick={trashDoc}>
+                  휴지통에 넣기
+                </button>
               </div>
-            )}
-            <div className="dacts">
-              <button className="btn" data-el="13.4" onClick={() => setDelOpen(false)}>
-                닫기
-              </button>{' '}
-              <button className="btn danger" data-el="13.3" disabled={delInfo === null} onClick={trashDoc}>
-                휴지통에 넣기
-              </button>
             </div>
           </div>
-        </div>
+        </>
       )}
 
     </div>

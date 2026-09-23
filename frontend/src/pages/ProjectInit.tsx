@@ -4,6 +4,7 @@
  *  화면은 검사하지 않는다 — 서버가 코드 형식·중복 → 저장소 접근 → docs/specs 존재 순으로 판정한다. */
 import { useState } from 'react'
 import { api, ApiError } from '../api/client'
+import { useEscape } from '../components/ui'
 
 export function ProjectInit({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [remote, setRemote] = useState('')
@@ -11,6 +12,9 @@ export function ProjectInit({ onClose, onDone }: { onClose: () => void; onDone: 
   const [name, setName] = useState('')
   const [codeErr, setCodeErr] = useState('')
   const [existing, setExisting] = useState<number | null>(null)
+  // 1.1 — Esc는 바깥 클릭과 같다. 기존 명세 발견(4)이 떠 있으면 그것만 닫는다 (#117)
+  useEscape(onClose)
+  useEscape(existing !== null ? () => setExisting(null) : null)
   const [banner, setBanner] = useState('')
   // 카드 F — 끄면 지금과 같다(없는 저장소면 push-failed). 켜면 공개 저장소를 만들어 준다.
   // 기본값을 거짓으로 두는 이유는 주소 오타가 조용히 새 저장소를 만들지 않게 하려는 것
@@ -98,20 +102,24 @@ export function ProjectInit({ onClose, onDone }: { onClose: () => void; onDone: 
         </div>
       </div>
       {existing !== null && (
-        <div className="dialog" data-el="4" style={{ '--depth': 1 } as React.CSSProperties}>
-          <div className="dhead">기존 명세 발견</div>
-          <div className="dbody">
-            이 저장소에 이미 <code>docs/specs/</code>가 있습니다. 문서 {existing}개. 덮어쓰지 않고 그대로 가져와 등록할까요?
-            <div className="dacts">
-              <button className="btn" data-el="4.2" onClick={() => setExisting(null)}>
-                취소
-              </button>{' '}
-              <button className="btn" data-el="4.1" style={{ fontWeight: 600 }} onClick={() => submit(true)}>
-                가져와서 등록
-              </button>
+        <>
+          {/* 초기화(1) 위에 겹친다 — 자기 배경이 없으면 바깥 클릭이 아래 초기화까지 닫았다 */}
+          <div className="backdrop" style={{ '--depth': 1 } as React.CSSProperties} onClick={() => setExisting(null)} />
+          <div className="dialog" data-el="4" style={{ '--depth': 1 } as React.CSSProperties}>
+            <div className="dhead">기존 명세 발견</div>
+            <div className="dbody">
+              이 저장소에 이미 <code>docs/specs/</code>가 있습니다. 문서 {existing}개. 덮어쓰지 않고 그대로 가져와 등록할까요?
+              <div className="dacts">
+                <button className="btn" data-el="4.2" onClick={() => setExisting(null)}>
+                  취소
+                </button>{' '}
+                <button className="btn" data-el="4.1" style={{ fontWeight: 600 }} onClick={() => submit(true)}>
+                  가져와서 등록
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </>
   )

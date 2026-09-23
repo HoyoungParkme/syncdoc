@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { SANDBOX } from '../view/frame'
+import { useEscape } from './ui'
 
 export type FullDiagram = { title: string; w: number; h: number } & ({ svg: string; srcdoc?: undefined } | { srcdoc: string; svg?: undefined })
 
@@ -63,11 +64,7 @@ export function DiagramFull({ d, onClose, el }: { d: FullDiagram; onClose: () =>
     const s = stage.current
     if (s) setZ(Math.max(0.25, Math.min(1, Math.floor(((s.clientWidth - 48) / d.w) * 100) / 100))) // 여백 22×2 + 테두리. 내림 — 올리면 10px가 넘쳐 가로 스크롤이 생긴다
   }, [d])
-  useEffect(() => {
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', k)
-    return () => window.removeEventListener('keydown', k)
-  }, [onClose])
+  useEscape(onClose) // 1.7 — 다이얼로그와 같은 스택. 다이얼로그 위에서 열렸으면 이것이 먼저 닫힌다
   return createPortal(
     <div className="dfull" data-el={el}>
       <div className="gbar">

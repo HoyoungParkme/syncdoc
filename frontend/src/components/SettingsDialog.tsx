@@ -5,10 +5,12 @@
 import { useEffect, useState } from 'react'
 import { ago, api, ApiError, type AccessToken, type CommitEmail, type User } from '../api/client'
 import { Admin } from '../pages/Admin'
+import { useEscape } from './ui'
 
 const day = (iso: string) => iso.slice(0, 10)
 
 export function SettingsDialog({ user, onClose }: { user: User; onClose: () => void }) {
+  useEscape(onClose) // 1.1 — 재구축 확인(UI-14 4)이 위에 떠 있으면 그것이 먼저 닫힌다
   const [tokens, setTokens] = useState<AccessToken[]>([])
   const [label, setLabel] = useState('')
   const [issued, setIssued] = useState<AccessToken | null>(null)
