@@ -49,14 +49,16 @@ def safe_layout(layout):
 
     문서가 넣은 동작은 지운다: `<script>`, `on*=`, `href/src`의 `javascript:`. iframe 안에서 또 iframe이
     열리거나 자동 이동이 일어나지 않게 `<iframe>`·`<object>`·`<embed>`·`<meta http-equiv>`도 지우고,
-    `<form>`은 태그만 벗긴다(안의 배치는 남긴다). `data-el`은 그대로 둔다 — iframe이라 페이지의
+    `<form>`은 `<div>`로 바꾼다(속성·안의 배치는 남긴다 — 폼 자신의 번호·모양도). `data-el`은 그대로 둔다 — iframe이라 페이지의
     `data-el`과 다른 문서여서 셀렉터가 부딪히지 않는다.
     """
     layout = re.sub(r"<script\b[\s\S]*?</script\s*>", "", layout, flags=re.I)
     layout = re.sub(r"<(iframe|object)\b[\s\S]*?</\1\s*>", "", layout, flags=re.I)
     layout = re.sub(r"<(?:iframe|object|embed)\b[^>]*/?>", "", layout, flags=re.I)
     layout = re.sub(r"<meta\b[^>]*http-equiv[^>]*>", "", layout, flags=re.I)
-    layout = re.sub(r"</?form\b[^>]*>", "", layout, flags=re.I)
+    # 폼은 <div>로 — 속성(번호·클래스)과 안의 입력칸·버튼이 그대로 남고, 폼이 아니니 전송할 곳이 없다 (#173)
+    layout = re.sub(r"<form(?=[\s>/])", "<div", layout, flags=re.I)
+    layout = re.sub(r"</form\s*>", "</div>", layout, flags=re.I)
     layout = re.sub(r"""\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)""", "", layout, flags=re.I)
     layout = re.sub(r"""\s(href|src)\s*=\s*(["']?)\s*javascript:[^"'>]*\2""", "", layout, flags=re.I)
     return layout
@@ -699,6 +701,7 @@ def _selftest():
         ('<a href=" javascript:alert(1)">a</a>', "javascript"),
         ('<div><iframe src="x"></iframe></div>', "<iframe"),
         ('<form action="/x"><input></form>', "<form"),
+        ('<FORM data-el="9"><input></FORM >', "form"),
         ('<meta http-equiv="refresh" content="0;url=x">', "http-equiv"),
         ('<object data="x"><p>y</p></object>', "<object"),
     ]
@@ -710,6 +713,9 @@ def _selftest():
     kept = safe_layout('<form><div data-el="1" style="color:red">x</div></form>')
     if 'data-el="1"' not in kept or "style=" not in kept or "<div" not in kept:
         bad.append((kept, "keep"))
+    own = safe_layout('<form class="row" data-el="6"><input data-el="6.1"></form>')  # 폼 자신의 번호·클래스도 남는다 (#173)
+    if own != '<div class="row" data-el="6"><input data-el="6.1"></div>':
+        bad.append((own, "form→div"))
     for src, tok in bad:
         print("✗ ", tok, "남음:", src)
     print("safe_layout·common_block: 통과" if not bad else f"safe_layout·common_block: {len(bad)} 실패")
