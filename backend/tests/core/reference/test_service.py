@@ -104,7 +104,7 @@ def test_downstream_lists_edges_pointing_to_item(db_session: Session) -> None:
     assert ref.downstream(pks["G1"]) == []
 
 
-# ── upstream · upstream_of_document · downstream_of_document ──
+# ── upstream · upstream_of_document ──
 def test_upstream_edges_including_missing(db_session: Session) -> None:
     svc, ref, d, v, pks, _ = _setup(db_session)
     ref.extract(d.id, v.id, d.body, pks, UPSTREAM)
@@ -127,17 +127,6 @@ def test_upstream_of_document_excludes_missing_includes_frontmatter(db_session: 
         "EXMP-RFQ-001#Q9",
         "EXMP-NONE-001",
     ]  # 항목·frontmatter 미존재 둘 다 (document_view.missing_refs용)
-
-
-def test_downstream_of_document_only_whole_document_refs(db_session: Session) -> None:
-    svc, ref, d, v, pks, _ = _setup(db_session)
-    ref.extract(d.id, v.id, d.body, pks, UPSTREAM)
-    rfq = svc.get_document("EXMP-RFQ-001")
-    edges = ref.downstream_of_document(rfq.id)
-    assert [(e.from_item_pk, e.raw_target) for e in edges] == [
-        (None, "EXMP-RFQ-001")
-    ]  # 절 본문·upstream
-    assert ref.downstream_of_document(d.id) == []
 
 
 def test_count_downstream_groups_by_target(db_session: Session) -> None:

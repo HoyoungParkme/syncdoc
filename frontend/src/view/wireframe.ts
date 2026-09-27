@@ -324,7 +324,7 @@ function sections(body: string): [string, string][] {
   return out
 }
 
-/** wf_build._design_cards — 배치가 없는 화면은 화면마다 카드: 머리 ID·이름·하위 N, 몸은 블록 전부, 바닥 「이 화면을 근거로 삼은
+/** wf_build._design_cards — 배치가 없는 화면은 화면마다 카드: 머리 ID·이름·하위 문서 N, 몸은 블록 전부, 바닥 「이 화면을 근거로 삼은
  *  문서」. 전에는 표 한 행에 첫 줄만 실려 나머지가 사라졌다 (STD-002 V-UI, #152). 종류·유스케이스는 머리로 뽑지 않는다 */
 const designCards = (screens: WfScreen[], ctx: RenderCtx): string =>
   screens.map((s) => itemCard(ctx, { id: s.id, title: s.name, level: 0, text: s.text }, renderBlocks(s.text, ctx), '이 화면을 근거로 삼은 문서')).join('')

@@ -420,6 +420,9 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .rcard .lbl{margin:1px 0 0}
 .rcard.missing{border-style:dashed;color:var(--ink-disabled)}
 .pempty{font-size:var(--text-ui);color:var(--ink-muted);line-height:1.6;margin:var(--space-4) 0}
+/* 8.10 문서 전체를 참조 — 항목의 하위가 아니라 맨 아래 접힌 묶음 (#160) */
+.docrefs{margin-top:var(--space-11)}
+.docrefs>summary{cursor:pointer}
 /* 문서 앞뒤 이동. `.nav`라는 이름은 상단 바가 이미 쓰고 있어 세 번 충돌했다 — 갈라놓는다
    (margin-top이 상단 바 항목을 26px 밀어내 배지가 잘려 보였다) */
 .docnav{display:flex;align-items:center;gap:var(--space-10);flex-wrap:wrap;

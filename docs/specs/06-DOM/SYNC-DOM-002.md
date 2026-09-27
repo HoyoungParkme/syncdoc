@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -714,7 +714,6 @@ classDiagram
         +upstream(item_pk: int) list~RefEdge~
         +downstream(item_pk: int) list~RefEdge~
         +upstream_of_document(document_id: int) list~RefEdge~
-        +downstream_of_document(document_id: int) list~RefEdge~
         +inbound_of_document(document_id: int) list~RefEdge~
         +references_among(item_pks: list~int~, include_document_targets: bool) list~RefEdge~
         +count_downstream(item_pks: list~int~) dict
@@ -740,7 +739,7 @@ classDiagram
 | 메서드 | 부르는 곳 | 유스케이스 |
 |---|---|---|
 | `extract` | pipeline | [[SYNC-UC-001#UC-S2]] |
-| `upstream` · `downstream` · `downstream_of_document` | queries · pipeline | [[SYNC-UC-001#UC-A4]], H3 |
+| `upstream` · `downstream` | queries · pipeline | [[SYNC-UC-001#UC-A4]], H3 |
 | `references_among` | queries.graph_view | [[SYNC-UC-001#UC-H4]] |
 | `count_downstream` | queries.diff_with_impact | [[SYNC-UC-001#UC-H6]] 3a |
 | `resolve_missing` | pipeline | [[SYNC-UC-001#UC-S2]] 2a2 |
@@ -910,7 +909,7 @@ trash_list(code, user) -> list                      —       휴지통 목록
 document_view(doc_id, user) -> Document             SEQ-11  get_owned → get_document → neighbors (본문을 읽기 전에 소유를 본다)
 item_view(doc_id, item_id, user) -> ItemView        SEQ-12  get_item
 item_references_view(doc_id, item_id, user) -> ItemReferences
-                                                    SEQ-13  resolve_item → upstream · downstream · downstream_of_document → describe_items
+                                                    SEQ-13  resolve_item → upstream · downstream → describe_items · describe_documents
 graph_view(code, user, scope?) -> Graph             SEQ-14  list_items_by_project → references_among → isolated 계산 (좌표 없음)
 diff_with_impact(doc_id, from, to, user) -> Diff    SEQ-15  diff → resolve_items → count_downstream
 project_items(code, kind, user) -> list             SEQ-18  kind별로 list_by_project(has_convention_error) | 미완성 | 끊어진 참조(is_missing)

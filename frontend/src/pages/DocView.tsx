@@ -2,13 +2,13 @@
  *  유저용 탭 본문은 view/*.ts(view_build.py 포트, STD-002)가 만든 HTML을 innerHTML로 넣고 mermaid를 돌린다.
  *  1 문서 바(1.1 상태, 1.2 버전) · 2 탭(2.1~2.3) · 3 상태 토글 · 4 규약 오류 · 4a 미완성
  *  12 휴지통에 넣기 · 13 휴지통 확인(13.1 무엇이 되나 · 13.2 끊어지는 것 · 13.3 넣기 · 13.4 닫기) · 4b 휴지통 배너(4b.1 되살리기)
- *  6 목차(6.1 표시된 항목, 6.2 왼쪽 손잡이) · 7 유저용 본문(7.1·7.2·7.3·7.5·7.6) · 8 패널(8.1 참조, 8.3 오른쪽 손잡이)
+ *  6 목차(6.1 표시된 항목, 6.2 왼쪽 손잡이) · 7 유저용 본문(7.1·7.2·7.3·7.5·7.6) · 8 패널(8.1 참조, 8.10 문서 전체를 참조, 8.3 오른쪽 손잡이)
  *  9 단계 이동 · 10 원본(10.1 MD, 10.2 복사, 10.3 원문, 10.4 렌더링)
  *  질문 탭(8.4 탭 · 8.5 맥락 줄 · 8.6 입력 · 8.7 대화 · 8.9 진행 줄) — 카드 U·Y. 대화는 Shell이 프로젝트 단위로 든다 */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { api, ApiError, incompleteOf, warnText, type AskAnswer, type AskNote, type AskRead, type AskTurn, type Document, type DownstreamView, type ItemReferences, type Me, type Problem } from '../api/client'
+import { api, ApiError, incompleteOf, warnText, type AskAnswer, type AskNote, type AskRead, type AskTurn, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { attachDiagramButtons, DiagramFull, type FullDiagram, type WfFullDetail } from '../components/DiagramFull'
 import { esc, renderBlocks, splitRef } from '../view/md'
@@ -385,16 +385,21 @@ export function DocView() {
                       displayName={doc.items.find((i) => i.item_id === selected)?.display_name ?? ''}
                       goItem={goItem}
                     />
-                  ) : !selected ? (
-                    <div className="pempty">
-                      항목을 선택하세요.
-                      <br />
-                      항목 헤더를 누르면 그 항목의 상위·하위 참조가 여기 옵니다.
-                    </div>
-                  ) : refs ? (
-                    <Refs refs={refs} />
                   ) : (
-                    <div className="lbl">선택: #{selected}</div>
+                    <>
+                      {!selected ? (
+                        <div className="pempty">
+                          항목을 선택하세요.
+                          <br />
+                          항목 헤더를 누르면 그 항목의 상위·하위 참조가 여기 옵니다.
+                        </div>
+                      ) : refs ? (
+                        <Refs refs={refs} />
+                      ) : (
+                        <div className="lbl">선택: #{selected}</div>
+                      )}
+                      <DocRefs refs={downstream?.by_item['(문서)'] ?? []} />
+                    </>
                   )}
                 </div>
               </>
@@ -483,23 +488,33 @@ function tocOf(doc: Document): { id: string; text: string; depth: number }[] {
   return out
 }
 
-/** 8.1 참조 — 선택 항목의 상위(근거)·하위(파생). 각 줄은 카드다 */
-function Refs({ refs }: { refs: ItemReferences }) {
-  const card = (r: ItemReferences['upstream'][number], i: number) =>
-    r.is_missing ? (
-      <div className="rcard missing" key={i}>
+/** 참조 카드 한 장 — 문서 ID(#항목 ID)와 이름. 가리키는 곳이 없으면 점선·흐리게.
+ *  항목이 없으면(item_id null) 문서다 — 상위에서는 문서 전체를 가리킨 것(`(문서 전체)`), 하위·8.10에서는 항목 밖
+ *  (절 본문·표·frontmatter)에서 건 참조의 출발 문서(`항목 밖 · 제목`, #160) */
+function RefCard({ r, from }: { r: ItemRef; from?: boolean }) {
+  if (r.is_missing)
+    return (
+      <div className="rcard missing">
         <b className="mono">{r.raw_target}</b> <span className="miss">가리키는 곳 없음</span>
         <div className="lbl">항목이 삭제됐거나 아직 안 쓰였다</div>
       </div>
-    ) : (
-      <Link className="rcard" key={i} to={`/p/${r.doc_id?.split('-')[0]}/d/${r.doc_id}${r.item_id ? '#item-' + r.item_id : ''}`}>
-        <b className="mono">
-          {r.doc_id}
-          {r.item_id ? '#' + r.item_id : ''}
-        </b>
-        <div className="lbl">{r.item_id ? r.display_name : '(문서 전체)'}</div>
-      </Link>
     )
+  return (
+    <Link className="rcard" to={`/p/${r.doc_id?.split('-')[0]}/d/${r.doc_id}${r.item_id ? '#item-' + r.item_id : ''}`}>
+      <b className="mono">
+        {r.doc_id}
+        {r.item_id ? '#' + r.item_id : ''}
+      </b>
+      <div className="lbl">{r.item_id ? r.display_name : from ? `항목 밖 · ${r.display_name ?? ''}` : '(문서 전체)'}</div>
+    </Link>
+  )
+}
+
+/** 8.1 참조 — 선택 항목의 상위(근거)·하위(파생). 각 줄은 카드다.
+ *  하위는 이 항목을 가리키는 참조 하나하나 — 카드·관계도와 같은 것을 센다. 문서 전체를 가리킨 참조는 8.10에 (#160).
+ *  「고립 항목」은 상위도 하위도 없을 때만 — 관계도(UI-8 3.5)와 같은 정의 */
+function Refs({ refs }: { refs: ItemReferences }) {
+  const isolated = !refs.upstream.length && !refs.downstream.length
   return (
     <>
       <div className="lbl">선택</div>
@@ -507,10 +522,28 @@ function Refs({ refs }: { refs: ItemReferences }) {
         <ItemIdBadge>{refs.item_id}</ItemIdBadge>
       </div>
       <div className="lbl">상위 참조 (근거)</div>
-      {refs.upstream.length ? refs.upstream.map(card) : <div className="pempty">없음</div>}
+      {refs.upstream.length ? refs.upstream.map((r, i) => <RefCard key={i} r={r} />) : <div className="pempty">없음</div>}
       <div className="lbl">하위 참조 (파생) {refs.downstream.length || ''}</div>
-      {refs.downstream.length ? refs.downstream.map(card) : <div className="pempty">없음 — 고립 항목</div>}
+      {refs.downstream.length ? (
+        refs.downstream.map((r, i) => <RefCard key={i} r={r} from />)
+      ) : (
+        <div className="pempty">{isolated ? '없음 — 고립 항목' : '없음'}</div>
+      )}
     </>
+  )
+}
+
+/** 8.10 문서 전체를 참조 — 이 문서 **전체**를 가리킨 참조(`GET …/downstream`의 `(문서)`, 다른 문서에서 건 것만).
+ *  항목의 하위가 아니라 따로 접어 둔다. 항목을 고르기 전에도 있다. 0이면 없다 (#160) */
+function DocRefs({ refs }: { refs: ItemRef[] }) {
+  if (!refs.length) return null
+  return (
+    <details className="docrefs" data-el="8.10">
+      <summary className="lbl">문서 전체를 참조 {refs.length}</summary>
+      {refs.map((r, i) => (
+        <RefCard key={i} r={r} from />
+      ))}
+    </details>
   )
 }
 

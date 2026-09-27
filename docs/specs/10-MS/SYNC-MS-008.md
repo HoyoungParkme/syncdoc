@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -144,7 +144,7 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 | 도구 | 인자 | 부르는 것 | 돌려주는 JSON | target |
 |---|---|---|---|---|
 | `get_item` | `doc_id, item_id, reason` | [[SYNC-MS-002#SpecService.get_item]] | `{doc_id, item_id, display_name, doc_status, doc_version_no, body}` — [[SYNC-API-002#get_item]]과 같은 키 | `DOC#ITEM` |
-| `get_references` | `doc_id, item_id, reason` | [[#queries.item_references_view]] + 문서 참조는 `SpecService.get_document(doc_id).status`로 상태 보강 | `{upstream: [{id, name} \| {doc_id, title, status} \| {raw_target, note: "아직 없음"}], downstream: [{id, name}]}` | `DOC#ITEM` |
+| `get_references` | `doc_id, item_id, reason` | [[#queries.item_references_view]] + 문서 참조는 `SpecService.get_document(doc_id).status`로 상태 보강 | `{upstream: [{id, name} \| {doc_id, title, status} \| {raw_target, note: "아직 없음"}], downstream: [{id, name} \| {doc_id, title}]}` — 하위의 `{doc_id, title}`은 항목 밖에서 건 참조의 출발 문서(#160) | `DOC#ITEM` |
 | `item_chain` | `doc_id, item_id, reason` | [[#queries.item_chain]] | `{item, rows: [{stage, doc_type, items: [{id, name, role, status}]}]}` — **빈 단계도 그대로**(어느 단계가 안 쓰였는지의 근거) | `DOC#ITEM` |
 | `list_documents` | `reason` | [[#queries.document_list]] + [[SYNC-MS-002#SpecService.describe_documents]](제목) | `[{doc_id, stage, doc_type, title, status, version_no}]` | 없음 |
 | `get_document` | `doc_id, reason` | [[SYNC-MS-002#SpecService.get_document]] + 제목 | `{doc_id, title, status, version_no, items: [{item_id, display_name}], body}` 전문 | `DOC` |
@@ -280,15 +280,14 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 **처리**
 0. `ProjectService.get_owned(doc_id.split("-")[0], user)` — 남의 것 → `not-found`
 1. `pk = SpecService.resolve_item(doc_id, item_id)` · 예외 전파 (`not-found` · `item-deleted`)
-2. `document_id = pk의 문서`
-3. `up = ReferenceService.upstream(pk)` · `down = ReferenceService.downstream(pk) + ReferenceService.downstream_of_document(document_id)` — 문서 전체 참조도 이 항목의 하위로 본다
-4. `need = {e.to_item_pk for e in up} ∪ {e.to_document_id…} ∪ {e.from_item_pk for e in down}` · `names = SpecService.describe_items(need)` — **한 번**
-5. `RefEdge` → `ItemRef`: `to_item_pk`가 있으면 `names[pk]` · `to_document_id`만 있으면 `SpecService.describe_documents`로 `ItemRef(doc_id, item_id=None, display_name=문서 제목)` — 항목·문서 id 공간이 겹치므로 따로 · `is_missing`이면 `ItemRef(raw_target만, is_missing=True)`
-6. `→ ItemReferences(doc_id, item_id, upstream, downstream)`
+2. `up = ReferenceService.upstream(pk)` · `down = ReferenceService.downstream(pk)` — 이 항목을 가리키는 참조 하나하나. 어디서 걸었든(항목 블록 안이든, 절 본문·표처럼 항목 밖이든) 다 든다. **문서 전체를 가리킨 참조는 항목의 하위가 아니다** — 전에는 그 문서 모든 항목 아래에 섞여 카드·관계도와 수가 달랐다(#160). 화면은 그것을 `GET …/downstream`의 `(문서)`로 따로 보인다([[SYNC-UI-002#UI-5]] 8.10)
+3. `need = {e.to_item_pk for e in up} ∪ {e.from_item_pk for e in down}` · `names = SpecService.describe_items(need)` — **한 번**. 문서 쪽(상위의 `to_document_id`·하위의 출발 항목 없는 `from_document_id`)은 `SpecService.describe_documents`로 따로
+4. `RefEdge` → `ItemRef`: 상위는 `to_item_pk`가 있으면 `names[pk]` · `to_document_id`만 있으면 `ItemRef(doc_id, item_id=None, display_name=문서 제목)` · `is_missing`이면 `ItemRef(raw_target만, is_missing=True)`. 하위는 `from_item_pk`가 있으면 `names[pk]` · 없으면(항목 밖) **출발 문서** `ItemRef(doc_id, item_id=None, display_name=문서 제목)` — 전에는 건너뛰어 패널이 「고립 항목」이라 했다(#160). 항목·문서 id 공간이 겹치므로 따로 · `raw_target`은 둘 다 싣는다
+5. `→ ItemReferences(doc_id, item_id, upstream, downstream)`
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.resolve_item` `SpecService.describe_items` · `ReferenceService.upstream` `downstream` `downstream_of_document`
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.resolve_item` `SpecService.describe_items` `SpecService.describe_documents` · `ReferenceService.upstream` `downstream`
 
-**테스트 관점** 남의 프로젝트 → `not-found` · 미존재 참조 → `upstream`에 `is_missing=True, raw_target` · 문서 전체 참조 → `downstream`에 `item_id=None` · 고립 항목 → 둘 다 빈 목록
+**테스트 관점** 남의 프로젝트 → `not-found` · 미존재 참조 → `upstream`에 `is_missing=True, raw_target` · 문서 전체를 가리킨 참조 → `upstream`에 `item_id=None` · 항목 밖(절 본문·표)에서 이 항목을 건 참조 → `downstream`에 출발 문서(`item_id=None`, 문서 제목) · 이 문서 전체를 가리킨 참조(`[[문서]]`)는 어느 항목의 `downstream`에도 없다(#160) · 고립 항목 → 둘 다 빈 목록
 
 ---
 
@@ -382,7 +381,7 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 **처리**
 0. `ProjectService.get_owned(doc_id.split("-")[0], user)` — 남의 것 → `not-found`
 1. `doc = SpecService.get_document(doc_id)` · `pks = SpecService.item_pks(doc.id)`
-2. `edges = ReferenceService.references_among(set(pks.values()) ∪ {문서}, include_document_targets=True)`에서 `to`가 이 문서인 것만 (또는 `downstream(pk)` ×N + `downstream_of_document`)
+2. `edges = ReferenceService.references_among(set(pks.values()) ∪ {문서}, include_document_targets=True)`에서 `to`가 이 문서인 것만
 3. `from` pk를 `describe_items`로, 문서를 `describe_documents`로
 4. `by_item = {item_id: [ItemRef…]}` (문서 단위는 키 `"(문서)"`) · `by_document = [{doc_id, title, items: [이 문서 항목 ID들]}]` 문서 단계순
 5. `→ DownstreamView(by_item, by_document)`
