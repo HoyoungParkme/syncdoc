@@ -19,8 +19,8 @@ export class ApiError extends Error {
   }
 }
 
-/** SYNC-API-001 2장 — 오류 본문 → Problem. problem+json이면 그대로, `type` 없는 JSON(FastAPI 기본 오류)은
- *  상태 문구만. **JSON이 아니면 앞단(Cloudflare)이 보낸 HTML이다** — 상태 코드와 한 줄로 접는다.
+/** SYNC-API-001 2장 — 오류 본문 → Problem. problem+json이면 그대로, `type` 없는 JSON(앞단이 JSON으로 답한 경우 —
+ *  앱은 FastAPI 기본 오류까지 problem+json으로 낸다, #158)은 상태 문구만. **JSON이 아니면 앞단(Cloudflare)이 보낸 HTML이다** — 상태 코드와 한 줄로 접는다.
  *  전에는 그대로 JSON.parse해 「SyntaxError: Unexpected token '<'」가 화면에 떴다 (#76) */
 function problemOf(r: Response, text: string): Problem {
   let data: unknown = null
