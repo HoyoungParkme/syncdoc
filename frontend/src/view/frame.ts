@@ -38,26 +38,20 @@ export const NO_COMMON: CommonParts = { head: '', body: '' }
 export function safeLayout(html: string): string {
   return html
     .replace(/<script\b[\s\S]*?<\/script\s*>/gi, '')
-    .replace(/<(iframe|object|embed|form)\b[\s\S]*?<\/\1\s*>/gi, '')
-    .replace(/<\/?(iframe|object|embed|form)\b[^>]*>/gi, '')
+    .replace(/<(iframe|object)\b[\s\S]*?<\/\1\s*>/gi, '')
+    .replace(/<(?:iframe|object|embed)\b[^>]*\/?>/gi, '')
     .replace(/<meta\b[^>]*http-equiv[^>]*>/gi, '')
+    // <form>은 태그만 벗긴다 — 안의 입력칸·버튼은 배치다. 내용째 지우면 요소 표의 번호가 배치에서 사라졌다 (#173, wf_build.safe_layout)
+    .replace(/<\/?form\b[^>]*>/gi, '')
     .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
     .replace(/\s(href|src)\s*=\s*(["']?)\s*javascript:[^"'>]*\2/gi, '')
 }
 
 /** 공통 틀 블록 → head(<link>·<style>) / body(나머지) */
 export function splitCommon(html: string): CommonParts {
-  const head: string[] = []
-  const body = html
-    .replace(/<style\b[\s\S]*?<\/style\s*>/gi, (m) => {
-      head.push(m)
-      return ''
-    })
-    .replace(/<link\b[^>]*>/gi, (m) => {
-      head.push(m)
-      return ''
-    })
-  return { head: head.join('\n'), body: body.trim() }
+  // 문서 순서대로 — <link>와 <style>이 같은 선택자를 정하면 뒤에 온 것이 이긴다. 스타일을 먼저 모으면 순서가 바뀐다 (#173, wf_build.split_common)
+  const tag = /<link\b[^>]*>|<style\b[\s\S]*?<\/style\s*>/gi
+  return { head: (html.match(tag) ?? []).join(''), body: html.replace(tag, '').trim() }
 }
 
 /** 코드 펜스 안 줄을 같은 길이의 공백으로(길이·줄 수 유지 — index가 원문 index다) */
