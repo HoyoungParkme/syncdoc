@@ -18,12 +18,6 @@ class ReferenceRepository:
             self.session.scalars(select(Reference).where(Reference.from_item_id == item_pk))
         )
 
-    def to_document_only(self, document_id: int) -> list[Reference]:
-        stmt = select(Reference).where(
-            Reference.to_document_id == document_id, Reference.to_item_id.is_(None)
-        )
-        return list(self.session.scalars(stmt))
-
     def from_document(self, document_id: int, include_missing: bool = True) -> list[Reference]:
         stmt = select(Reference).where(Reference.from_document_id == document_id)
         if not include_missing:

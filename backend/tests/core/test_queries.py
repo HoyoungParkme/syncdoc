@@ -204,7 +204,7 @@ async def test_item_references_view_upstream_downstream_missing_document(scoped:
     r1 = await queries.item_references_view("EXMP-PRD-001", "R1", owner(scoped))
     assert [(r.is_missing, r.raw_target) for r in r1.upstream] == [(True, "EXMP-RFQ-001#Q9")]
     assert [(r.doc_id, r.item_id) for r in r1.downstream] == [("EXMP-PRD-001", "G1")]
-    # RFQ#Q1: 하위 G1 (문서 전체 참조는 출발 항목이 없어 패널에 안 나옴)
+    # RFQ#Q1: 하위 G1. PRD의 [[EXMP-RFQ-001]]·upstream은 문서 전체를 가리켜 Q1의 하위가 아니다 (#160)
     q = await queries.item_references_view("EXMP-RFQ-001", "Q1", owner(scoped))
     assert [(r.doc_id, r.item_id, r.display_name) for r in q.downstream] == [
         ("EXMP-PRD-001", "G1", "목표")
@@ -212,6 +212,36 @@ async def test_item_references_view_upstream_downstream_missing_document(scoped:
     assert q.upstream == []
     with pytest.raises(NotFound):
         await queries.item_references_view("EXMP-PRD-001", "R9", owner(scoped))
+
+
+async def test_item_references_view_outside_item_and_whole_document(scoped: Session) -> None:
+    """항목 밖에서 건 참조는 출발 문서로, 문서 전체를 가리킨 참조는 어느 항목의 하위도 아니다 (#160).
+
+    전에는 앞의 것을 건너뛰어 카드는 「하위 1」인데 패널은 「고립 항목」이었고, 뒤의 것은 그 문서
+    모든 항목 아래에 섞였다.
+    """
+    svc, ref = SpecService(scoped), ReferenceService(scoped)
+    p = make_project(scoped)
+    a = author(scoped)
+    svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec: 테스트")
+    scn = (
+        "---\ndoc_id: EXMP-SCN-001\ntype: SCN\ntitle: 시나리오\nstatus: draft\nupstream: []\n---\n"
+        "# SCN\n## 1. 대응표\n| 요구 | 근거 |\n|---|---|\n| Q1 | [[EXMP-RFQ-001#Q1]] |\n"
+        "## 2. 시나리오\n#### S1 첫\n문서 전체 [[EXMP-RFQ-001]]\n"
+    )
+    v = svc.create(p.id, "EXMP-SCN-001", DocType.SCN, scn, "h1", a, "spec: 테스트")
+    d = svc.get_document("EXMP-SCN-001")
+    ref.extract(d.id, v.id, d.body, {i.item_id: i.pk for i in d.items}, [])
+    q1 = await queries.item_references_view("EXMP-RFQ-001", "Q1", owner(scoped))
+    assert [(r.doc_id, r.item_id, r.display_name, r.raw_target) for r in q1.downstream] == [
+        ("EXMP-SCN-001", None, "시나리오", "EXMP-RFQ-001#Q1")
+    ]
+    q2 = await queries.item_references_view("EXMP-RFQ-001", "Q2", owner(scoped))
+    assert q2.downstream == [] and q2.upstream == []  # S1의 [[EXMP-RFQ-001]]은 문서 전체
+    s1 = await queries.item_references_view("EXMP-SCN-001", "S1", owner(scoped))
+    assert [(r.doc_id, r.item_id, r.display_name) for r in s1.upstream] == [
+        ("EXMP-RFQ-001", None, "요구")
+    ]  # 상위에서는 문서 전체를 가리킨 참조가 그대로 문서로
 
 
 # ── B3: diff_with_impact · project_items ──

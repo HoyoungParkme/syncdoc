@@ -244,9 +244,10 @@ async def item_references_view(doc_id: str, item_id: str, user: User) -> ItemRef
         ProjectService(s).get_owned(doc_id.split("-")[0], user)
         spec, refs = SpecService(s), ReferenceService(s)
         pk = spec.resolve_item(doc_id, item_id)
-        document_id = spec.get_document(doc_id).id
         up = refs.upstream(pk)
-        down = refs.downstream(pk) + refs.downstream_of_document(document_id)
+        # 이 항목을 가리키는 참조만. 문서 전체를 가리킨 것은 항목의 하위가 아니다 — 전에는 그 문서
+        # 모든 항목 아래에 섞여 카드·관계도와 수가 달랐다 (#160). 화면은 /downstream의 (문서)로 따로 본다
+        down = refs.downstream(pk)
         need = [e.to_item_pk for e in up if e.to_item_pk] + [
             e.from_item_pk for e in down if e.from_item_pk
         ]
@@ -255,11 +256,11 @@ async def item_references_view(doc_id: str, item_id: str, user: User) -> ItemRef
             spec, [e.to_document_id for e in up if e.to_document_id and not e.to_item_pk]
         )
         upstream = [_to_ref(e, {**doc_names, **names} if e.to_item_pk else doc_names) for e in up]
+        # 항목 밖(절 본문·표)에서 건 참조는 출발 문서로 — 건너뛰면 패널이 「고립 항목」이라 했다 (#160)
+        froms = _doc_refs(spec, [e.from_document_id for e in down if e.from_item_pk is None])
         downstream = []
         for e in down:
-            if e.from_item_pk is None:
-                continue  # 절 본문·frontmatter에서 온 참조 — 출발 항목이 없어 패널에 못 그린다
-            r = names.get(e.from_item_pk)
+            r = names.get(e.from_item_pk) if e.from_item_pk else froms.get(e.from_document_id)
             if r is not None:
                 downstream.append(
                     ItemRef(r.doc_id, r.item_id, r.display_name, raw_target=e.raw_target)
