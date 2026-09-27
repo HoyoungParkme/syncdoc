@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -145,6 +145,8 @@ FastAPI 단일 앱
 | `/auth/*` | GitHub OAuth 콜백 |
 | `/hooks/github` | GitHub webhook 수신 |
 | `/` 및 정적 | React 빌드 결과 |
+
+**API 앞머리는 화면 틀로 떨어지지 않는다(#158).** `/api`·`/auth`·`/hooks`·`/mcp` 아래 없는 경로는 메서드와 무관하게 404 problem+json(`not-found`, [[SYNC-API-001]] 2장)이다. 화면 틀 대체 라우트가 이 앞머리를 받지 않는다 — 전에는 `GET /api/없는경로`에 화면 틀(HTML, 200)이 나가 오타 난 호출이 성공처럼 보였고, `POST`는 대체 라우트 때문에 405가 났다.
 
 **정적 파일은 서버가 캐시 규칙을 말한다**(#124). 말하지 않으면 Cloudflare 기본값(4시간)과 브라우저 추측이 채워, 배포 뒤에도 옛 화면이 뜬다.
 

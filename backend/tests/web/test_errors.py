@@ -50,3 +50,59 @@ def test_unhandled_exception_is_problem_json(
     # 예외 종류·메시지·스택은 본문에 안 담는다 — 로그로만 (내부 구조가 새어 나간다)
     assert "설계에 없는 예외" not in body["detail"]
     assert "RuntimeError" not in body["detail"]
+
+
+# ── FastAPI·Starlette가 먼저 처리하는 오류도 problem+json (#158) ──────────────────────
+
+
+def test_validation_error_is_invalid_request(client: TestClient, scoped: Session) -> None:
+    """입력 검증 실패 — 전에는 {"detail": […]}라 화면이 상태 문구만 보였다. 어느 칸이 왜 틀렸는지 싣는다."""
+    login(client, scoped)
+    r = client.post("/api/docs/SYNC-PRD-001/status", json={"to": 5})
+
+    assert r.status_code == 422
+    assert r.headers["content-type"].startswith("application/problem+json")
+    body = r.json()
+    assert body["type"] == "urn:syncdoc:invalid-request"
+    assert body["errors"] and body["errors"][0]["loc"] == "body.to"
+    assert body["detail"].startswith("body.to — ")
+
+
+@pytest.mark.parametrize("method", ["GET", "POST", "DELETE"])
+@pytest.mark.parametrize(
+    "path", ["/api/nonexistent", "/api/docs/SYNC-PRD-001/nonexistent", "/auth/x", "/mcp/x"]
+)
+def test_unknown_api_path_is_not_found(client: TestClient, method: str, path: str) -> None:
+    """API 앞머리 아래 없는 경로는 메서드와 무관하게 404 — 화면 틀(HTML 200)이나 405가 아니다."""
+    r = client.request(method, path)
+
+    assert r.status_code == 404, (method, path, r.text[:80])
+    assert r.headers["content-type"].startswith("application/problem+json")
+    body = r.json()
+    assert body["type"] == "urn:syncdoc:not-found"
+    assert body["resource"] == "path" and body["id"] == path
+
+
+def test_wrong_method_is_method_not_allowed(client: TestClient) -> None:
+    """경로는 있는데 메서드가 없으면 405 — Allow는 그 경로의 라우트 전부(Starlette는 처음 맞은 것만 줬다)."""
+    r = client.request("DELETE", "/api/projects")
+
+    assert r.status_code == 405
+    assert r.headers["content-type"].startswith("application/problem+json")
+    body = r.json()
+    assert body["type"] == "urn:syncdoc:method-not-allowed"
+    assert body["allow"] == ["GET", "POST"]
+    assert r.headers["allow"] == "GET, POST"
+
+
+def test_shell_still_serves_screen_paths(
+    client: TestClient, tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """화면 주소와 비슷한 이름(`/apix`·`/p/api`)은 여전히 화면 틀이다 — 앞머리만 뺐다."""
+    from app import main
+
+    (tmp_path / "index.html").write_text("<!doctype html><div id=root></div>", encoding="utf-8")
+    monkeypatch.setattr(main, "STATIC", tmp_path)
+    for url in ("/", "/apix", "/p/api", "/p/SYNC/d/SYNC-PRD-001"):
+        r = client.get(url)
+        assert r.status_code == 200 and "id=root" in r.text, url

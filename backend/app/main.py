@@ -13,12 +13,16 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
 from mcp.server.transport_security import TransportSecuritySettings
+from starlette.convertors import Convertor, register_url_convertor
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.routing import Match
 
 from app import scheduler
 from app.config import settings
-from app.core.errors import Internal, Problem
+from app.core.errors import HttpError, Internal, InvalidRequest, MethodNotAllowed, NotFound, Problem
 from app.mcp.auth import BearerAuth
 from app.mcp.tools import server as mcp_server
 from app.web import auth
@@ -91,10 +95,52 @@ for r in (
     app.include_router(r)
 
 
+def _problem(p: Problem, headers: dict[str, str] | None = None) -> JSONResponse:
+    return JSONResponse(
+        p.to_dict(), status_code=p.status, media_type="application/problem+json", headers=headers
+    )
+
+
 @app.exception_handler(Problem)
 async def problem_handler(_: Request, exc: Problem) -> JSONResponse:
-    return JSONResponse(
-        exc.to_dict(), status_code=exc.status, media_type="application/problem+json"
+    return _problem(exc)
+
+
+# SYNC-API-001 2장 — FastAPI·Starlette가 먼저 처리하는 오류도 problem+json으로 (#158).
+# 포괄 핸들러(Exception)까지 오지 않아 전에는 {"detail": …}로 새었다
+@app.exception_handler(RequestValidationError)
+async def validation_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+    errors = [
+        {"loc": ".".join(str(x) for x in e.get("loc", ())), "msg": str(e.get("msg", ""))}
+        for e in exc.errors()
+    ]
+    return _problem(InvalidRequest(errors))
+
+
+_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE")
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    if exc.status_code == 404:
+        return _problem(NotFound("path", request.url.path))
+    if exc.status_code == 405:
+        # Starlette는 처음 경로가 맞은 라우트의 메서드만 Allow에 싣는다. 메서드마다 넣어 보고
+        # 완전히 맞는 라우트가 있는 것을 모은다 — FastAPI는 포함한 라우터를 묶음으로 들고 있어
+        # 라우트의 methods를 바로 읽을 수 없다
+        allow = [
+            m
+            for m in _METHODS
+            if any(
+                r.matches({**request.scope, "method": m})[0] == Match.FULL
+                for r in request.app.routes
+            )
+        ]
+        return _problem(
+            MethodNotAllowed(request.method, allow), headers={"Allow": ", ".join(allow)}
+        )
+    return _problem(
+        HttpError(exc.status_code, str(exc.detail)), headers=getattr(exc, "headers", None)
     )
 
 
@@ -103,10 +149,7 @@ async def problem_handler(_: Request, exc: Problem) -> JSONResponse:
 @app.exception_handler(Exception)
 async def unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
     log.exception("unhandled %s %s", request.method, request.url.path, exc_info=exc)
-    problem = Internal()
-    return JSONResponse(
-        problem.to_dict(), status_code=problem.status, media_type="application/problem+json"
-    )
+    return _problem(Internal())
 
 
 @app.get("/health")
@@ -164,9 +207,29 @@ def _not_modified_since(since: str | None, resp: Response) -> bool:
         return False
 
 
-@app.get("/{path:path}", include_in_schema=False)
+class _SpaPath(Convertor):
+    """화면 틀 대체 라우트의 경로 — API 앞머리(`/api`·`/auth`·`/hooks`·`/mcp`)는 받지 않는다.
+
+    받으면 `/api/없는경로`에 화면 틀(HTML, 200)이 나가고, POST는 이 GET 라우트와 경로만 맞아
+    405가 났다. 여기서 빼면 그 경로는 어느 라우트와도 안 맞아 메서드와 무관하게
+    404 problem+json이다 (SYNC-INFRA-001 4.1, #158).
+    """
+
+    regex = r"(?!(?:api|auth|hooks|mcp)(?:/|$)).*"
+
+    def convert(self, value: str) -> str:
+        return value
+
+    def to_string(self, value: str) -> str:
+        return value
+
+
+register_url_convertor("spa", _SpaPath())
+
+
+@app.get("/{path:spa}", include_in_schema=False)
 async def spa(path: str, request: Request) -> Response:
-    """정적 파일이면 그것, 아니면 index.html(SPA). /api·/auth·/mcp는 위 라우트가 먼저."""
+    """정적 파일이면 그것, 아니면 index.html(SPA). /api·/auth·/hooks·/mcp 아래는 안 받는다."""
     if not STATIC.exists():
         raise Problem("React 빌드 결과가 없다 — frontend/에서 npm run build")
     target = STATIC / path

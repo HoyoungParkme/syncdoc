@@ -289,6 +289,49 @@ class LlmUnavailable(Problem):
         super().__init__(reason, reason=reason)
 
 
+class InvalidRequest(Problem):
+    """SYNC-API-001 2장 — 요청 본문·쿼리·경로 값이 정의에 안 맞다(입력 검증).
+
+    FastAPI가 먼저 잡는 것을 처리기가 바꿔 낸다 — 전에는 `{"detail": […]}`로 새어 화면이
+    상태 문구만 보였다 (#158).
+    """
+
+    type = "urn:syncdoc:invalid-request"
+    status = 422
+    title = "invalid-request"
+
+    def __init__(self, errors: list[dict[str, str]]) -> None:
+        first = errors[0] if errors else {"loc": "", "msg": "입력이 정의에 맞지 않습니다"}
+        super().__init__(
+            f"{first['loc']} — {first['msg']}" if first["loc"] else first["msg"], errors=errors
+        )
+
+
+class MethodNotAllowed(Problem):
+    """SYNC-API-001 2장 — 경로는 있는데 그 메서드는 없다. `allow`는 그 경로의 라우트 전부 (#158)."""
+
+    type = "urn:syncdoc:method-not-allowed"
+    status = 405
+    title = "method-not-allowed"
+
+    def __init__(self, method: str, allow: list[str]) -> None:
+        super().__init__(f"{method}는 이 경로에 없습니다", allow=allow)
+
+
+class HttpError(Problem):
+    """SYNC-API-001 2장 — 위 어느 것도 아닌 프레임워크 HTTP 오류.
+
+    `about:blank` + 상태 문구(RFC 9457) (#158).
+    """
+
+    type = "about:blank"
+
+    def __init__(self, status: int, title: str) -> None:
+        self.status = status
+        self.title = title
+        super().__init__(None)
+
+
 class Internal(Problem):
     """SYNC-API-001 2장 — 표에 없는 예외. 포괄 핸들러가 만든다.
 
