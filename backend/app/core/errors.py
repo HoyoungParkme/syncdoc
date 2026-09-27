@@ -315,7 +315,7 @@ class MethodNotAllowed(Problem):
     title = "method-not-allowed"
 
     def __init__(self, method: str, allow: list[str]) -> None:
-        super().__init__(f"{method}는 이 경로에 없습니다", allow=allow)
+        super().__init__(f"이 경로에 {method} 메서드는 없습니다", allow=allow)
 
 
 class HttpError(Problem):
