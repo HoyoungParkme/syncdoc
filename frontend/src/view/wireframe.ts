@@ -8,7 +8,7 @@
  *  「공통 틀」 절의 첫 html 블록은 이 문서 모든 화면 앞에 함께 들어간다.
  *  wf_build.py는 DATA json + script로 런타임에 그렸지만 여기서는 HTML을 정적으로 만들고 onMount가 탭·연동만 붙인다. */
 import { commonBlock, frameHtml, hiIn, mountFrames, remeasure, safeLayout, splitCommon, type CommonParts } from './frame'
-import { esc, etcBlock, h2, inline, leadRest, renderBlocks, type ItemBlock, type RenderCtx } from './md'
+import { cardBody, esc, etcBlock, h2, inline, leadRest, renderBlocks, type ItemBlock, type RenderCtx } from './md'
 import { ITEM_PAT, type ViewFn } from './types'
 import { itemCard } from './views'
 
@@ -242,7 +242,8 @@ function segments(text: string): Segment[] {
       if (h2 && h2[1].length <= lvl) break
       j++
     }
-    out.push({ kind: 'item', block: { id: h[2], title: h[3] ?? '', level: lvl, text: lines.slice(i + 1, j).join('\n') } })
+    // 끝의 절 구분선은 카드·화면에 그리지 않는다 — 조각으로 가르기 전에 뗀다 (STD-002 1장, #159)
+    out.push({ kind: 'item', block: { id: h[2], title: h[3] ?? '', level: lvl, text: cardBody(lines.slice(i + 1, j).join('\n')) } })
     i = j
   }
   flush()

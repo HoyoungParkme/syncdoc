@@ -320,7 +320,8 @@ def parse_ui(body):
         if gap.strip():
             flush()
             blocks.append(("prose", gap))
-        sc = parse_screen(body[m.end() : end], level)
+        # 끝의 절 구분선은 카드·화면에 그리지 않는다 — 조각으로 가르기 전에 뗀다 (STD-002 1장, #159)
+        sc = parse_screen(_lib().card_body(body[m.end() : end]), level)
         sc["id"], sc["name"] = m.group(2), (m.group(3) or "").strip()
         group.append(sc)
         pos = end

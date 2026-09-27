@@ -216,6 +216,14 @@ export type ItemPart = { kind: 'text'; text: string } | { kind: 'item'; block: I
 /** view_build.split_items — 본문을 원본 순서대로 가른다. 항목 블록은 헤딩 다음 줄부터 같은 레벨 이상
  *  헤딩 전까지. 항목 밖 문장(절 머리·소절 제목·소절 머리)도 text로 남는다 — 버리면 유저용 탭에서
  *  조용히 사라진다 (STD-002 V-PRD, #120) */
+/** view_build.card_body — 카드 몸: 끝의 구분선(`---`)과 빈 줄을 뗀다. 절 사이 표시가 STD-001 1.3 경계(다음 같은 레벨 이상
+ *  헤딩까지) 때문에 그 절 마지막 항목 블록에 들어온 것이라, 두면 카드 바닥에 빈 가로줄이 남는다. 가운데 `---`는 그대로 (STD-002 1장, #159) */
+export function cardBody(text: string): string {
+  const lines = text.split('\n')
+  while (lines.length && ['', '---'].includes(lines[lines.length - 1].trim())) lines.pop()
+  return lines.join('\n')
+}
+
 export function splitItems(body: string, pat: RegExp): ItemPart[] {
   const lines = body.split('\n')
   const out: ItemPart[] = []
@@ -235,7 +243,7 @@ export function splitItems(body: string, pat: RegExp): ItemPart[] {
         if (h2 && h2[1].length <= lvl) break
         j++
       }
-      out.push({ kind: 'item', block: { id: h[2], title: h[3] || '', level: lvl, text: lines.slice(i + 1, j).join('\n') } })
+      out.push({ kind: 'item', block: { id: h[2], title: h[3] || '', level: lvl, text: cardBody(lines.slice(i + 1, j).join('\n')) } })
       i = j
     } else buf.push(lines[i++])
   }
@@ -248,10 +256,11 @@ export const itemBlocks = (body: string, pat: RegExp): ItemBlock[] =>
   splitItems(body, pat).flatMap((p) => (p.kind === 'item' ? [p.block] : []))
 
 /** view_build.etc_block — 「그 밖」: 뷰가 조각으로 가르고 남은 줄을 항목 카드 끝에 원본 순서로 (STD-002 1장, #152).
- *  구분선·빈 줄뿐이면 그리지 않는다 — 문장이 아니라 절 사이 표시다(절 구분선 `---`이 마지막 항목 블록에 들어온다) */
+ *  끝의 구분선·빈 줄은 떼고(cardBody, #159), 남는 것이 없으면 그리지 않는다 — 문장이 아니라 절 사이 표시다 */
 export function etcBlock(lines: string[], ctx: RenderCtx): string {
-  if (lines.every((l) => l.trim() === '' || l.trim() === '---')) return ''
-  return `<div class="etc"><div class="etc-t">그 밖</div>${renderBlocks(lines.join('\n'), ctx)}</div>`
+  const body = cardBody(lines.join('\n'))
+  if (!body) return ''
+  return `<div class="etc"><div class="etc-t">그 밖</div>${renderBlocks(body, ctx)}</div>`
 }
 
 /** view_build.lead_rest — 목록 항목 하나 → [첫 문단, 나머지]. 첫 문단은 빈 줄 없이 이어진 줄까지 공백으로 잇고, 나머지는
