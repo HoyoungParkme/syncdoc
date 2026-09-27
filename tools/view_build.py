@@ -1286,8 +1286,6 @@ upstream: []
 
 ## 3. 공통 틀
 
-모든 화면 앞에 들어가는 틀.
-
 ```html
 <style>.box{border:1px solid red}</style>
 ```

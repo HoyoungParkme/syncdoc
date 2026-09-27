@@ -38,7 +38,9 @@ FRAME_CSS = r"""html,body{margin:0}
 .wfbadge.hi{outline:2px solid #c9a800;outline-offset:1px}
 a{cursor:default}"""
 
-COMMON_HEAD = re.compile(r"^#{1,6} (?:\d+(?:\.\d+)*\.?\s+)?공통 틀\s*$", re.M)
+# 줄 안의 빈칸만 본다([ \t]) — \s는 줄바꿈도 먹어, 헤딩 바로 아래 빈 줄과 (가린) html 블록까지 매치에 들어가
+# 첫 블록을 지나쳤다 (#172)
+COMMON_HEAD = re.compile(r"^#{1,6} (?:\d+(?:\.\d+)*\.?[ \t]+)?공통 틀[ \t]*$", re.M)
 TYPE_STAGE = {"RFQ": 1, "PRD": 2, "SCN": 3, "UC": 4, "INFRA": 5, "DOM": 6, "UI": 7, "API": 8, "SEQ": 9, "MS": 10, "CODE": 11}
 
 
@@ -701,12 +703,16 @@ def _selftest():
         ('<object data="x"><p>y</p></object>', "<object"),
     ]
     bad = [(src, tok) for src, tok in cases if tok.lower() in safe_layout(src).lower()]
+    # 「공통 틀」 헤딩 바로 아래(빈 줄만 두고) html 블록 — 전에는 빈 것으로 읽었다 (#172)
+    for body in ("## 3. 공통 틀\n\n```html\n<style>.x{}</style>\n```\n", "## 공통 틀\n```html\n<style>.x{}</style>\n```\n"):
+        if ".x{}" not in common_block(body):
+            bad.append((body, "common_block"))
     kept = safe_layout('<form><div data-el="1" style="color:red">x</div></form>')
     if 'data-el="1"' not in kept or "style=" not in kept or "<div" not in kept:
         bad.append((kept, "keep"))
     for src, tok in bad:
         print("✗ ", tok, "남음:", src)
-    print("safe_layout: 통과" if not bad else f"safe_layout: {len(bad)} 실패")
+    print("safe_layout·common_block: 통과" if not bad else f"safe_layout·common_block: {len(bad)} 실패")
     return 0 if not bad else 1
 
 

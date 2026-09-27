@@ -79,7 +79,8 @@ function maskFences(text: string): string {
  *  절은 그 헤딩부터 같은 단계 이상의 다음 헤딩 전까지 */
 export function commonBlock(body: string): string {
   const masked = maskFences(body)
-  const m = /^(#{1,6}) (?:\d+(?:\.\d+)*\.?\s+)?공통 틀\s*$/m.exec(masked)
+  // 줄 안의 빈칸만 본다([ \t]) — \s는 줄바꿈도 먹어 헤딩 바로 아래 html 블록을 지나쳤다 (#172)
+  const m = /^(#{1,6}) (?:\d+(?:\.\d+)*\.?[ \t]+)?공통 틀[ \t]*$/m.exec(masked)
   if (!m) return ''
   const lvl = m[1].length
   const from = m.index + m[0].length
