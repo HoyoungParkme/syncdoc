@@ -246,9 +246,9 @@ document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{{const g=b.dat
 
 # ───────────────────────── 항목 카드 (V-PRD 목표·요구사항, V-INFRA 제약) ─────────
 def item_card(did, iid, title, inner, down, label, pills=""):
-    """머리 ID 뱃지·제목·필·`하위 N` · 몸 · 바닥 "{label}: 문서들". 하위가 없으면 필·바닥을 안 그린다"""
+    """머리 ID 뱃지·제목·필·`하위 문서 N` · 몸 · 바닥 "{label}: 문서들". 하위가 없으면 필·바닥을 안 그린다"""
     card = f'<article class="card" id="item-{iid}"><div class="card-h"><span class="iid">{iid}</span><b>{inline(title, did)}</b>{pills}'
-    if down: card += f'<span class="pill soft">하위 {len(down)}</span>'
+    if down: card += f'<span class="pill soft">하위 문서 {len(down)}</span>'  # 근거로 삼은 다른 문서 수 = 바닥 줄 (#160)
     card += "</div>" + inner
     if down: card += f'<div class="down">{label}: ' + " · ".join(f'<a class="ref" href="{view_href(d)}">{d}</a>' for d in down) + "</div>"
     return card + "</article>"
@@ -746,7 +746,7 @@ UC_JS = r"""
 
 # ───────────────────────── V-INFRA ─────────────────────────
 def v_infra(doc):
-    """제약 C 항목 → 카드(ID·제목·하위 N · 본문 전부 · 이 제약을 근거로 삼은 문서). 절 머리 그대로.
+    """제약 C 항목 → 카드(ID·제목·하위 문서 N · 본문 전부 · 이 제약을 근거로 삼은 문서). 절 머리 그대로.
     마지막 제약 뒤 문단은 그 제약의 본문이다 — 특정 문장으로 꼬리를 알아보지 않는다(#120).
     구성도·시퀀스 mermaid 그대로. 나머지 원본 순서."""
     did = doc["fm"]["doc_id"]; out = []; dmap = downstream_of(did)
@@ -1355,7 +1355,7 @@ def _selftest_ui():
         ("설계 화면은 카드(표 없음)", c1 != "" and c2 != "" and 'class="reassembled"' not in h),
         ("설계 카드 몸 전부", all(x in c1 for x in ("첫 문단 문장", "목록 한 줄", "목록 둘째 줄", "빈 목록 칸"))),
         ("마지막 설계 화면 뒤 문단은 그 카드", "마지막 설계 화면 뒤 문단" in c2),
-        ("하위 N과 바닥 줄", "하위 1" in c1 and "이 화면을 근거로 삼은 문서" in c1 and 'href="view_T-API-001.html"' in c1),
+        ("하위 문서 N과 바닥 줄", "하위 문서 1" in c1 and "이 화면을 근거로 삼은 문서" in c1 and 'href="view_T-API-001.html"' in c1),
         ("메타·머리 설명", "<b>경로</b>" in s3 and '<div class="s-desc"><p>머리 설명 문장.</p></div>' in s3),
         ("요소 표는 문서 머리·칸 그대로", "<th>보여주는 것</th>" in s3 and "<th>종류</th>" not in s3 and "칸 모자란 행" in s3 and 'class="kind"' not in s3),
         ("규칙 이어진 줄·밑 목록·칩", "이어 쓴 둘째 줄" in rules and "규칙 밑 목록</li></ul>" in rules and 'data-ref="2"' in rules),

@@ -29,11 +29,11 @@ const head = (s: string): [string, string] => {
   return nl < 0 ? [s, ''] : [s.slice(0, nl), s.slice(nl + 1)]
 }
 
-/** view_build.item_card — 머리 ID 뱃지·제목·필·`하위 N` · 몸 · 바닥 "{label}: 문서들". 하위가 없으면 필·바닥을 안 그린다 */
+/** view_build.item_card — 머리 ID 뱃지·제목·필·`하위 문서 N` · 몸 · 바닥 "{label}: 문서들". 하위가 없으면 필·바닥을 안 그린다 */
 export const itemCard = (ctx: RenderCtx, b: ItemBlock, inner: string, label: string, pills = ''): string => {
   const down = downsWith(ctx, b.id)
   let c = `<article class="card" id="item-${esc(b.id)}" data-item="${esc(b.id)}"><div class="card-h"><span class="iid">${esc(b.id)}</span><b>${inline(b.title, ctx)}</b>${pills}`
-  if (down.length) c += `<span class="pill soft">하위 ${down.length}</span>`
+  if (down.length) c += `<span class="pill soft">하위 문서 ${down.length}</span>` // 근거로 삼은 다른 문서 수 = 바닥 줄 (#160)
   c += '</div>' + inner
   if (down.length) c += `<div class="down">${label}: ` + down.map((d) => refLink(ctx, d)).join(' · ') + '</div>'
   return c + '</article>'
