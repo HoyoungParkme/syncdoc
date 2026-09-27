@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -612,18 +612,20 @@ sequenceDiagram
     R-->>Q: [(to_item_pk | to_document_id, raw_target, is_missing)]
     Q->>R: downstream(item_pk)
     R->>DB: references where to_item=item_pk
-    Q->>R: downstream_of_document(document_id)
-    Note over Q,R: 이 항목의 문서 전체를 참조한 것도 하위로 본다
-    R-->>Q: [(from_item_pk, …)]
-    Q->>S: describe_items(item_pks ∪ document_ids)
+    R-->>Q: [(from_item_pk | from_document_id, raw_target)]
+    Note over Q,R: 문서 전체를 가리킨 참조는 항목의 하위가 아니다
+    Q->>S: describe_items(item_pks)
     S-->>Q: {pk: (doc_id, item_id, display_name)}
+    Q->>S: describe_documents(document_ids)
+    S-->>Q: {id: (doc_id, title)}
     Q-->>B: ItemReferences {upstream, downstream}
     B-->>A: 패널 | JSON
 ```
 
 **읽을 때 볼 것**
 - `ReferenceService`는 pk만 안다. 사람이 읽을 `doc_id#item_id`와 표시 이름은 `SpecService.describe_items`로 채운다 → 되먹일 것 #14
-- 문서 전체를 참조한 것(`to_document_id`)이 하위 목록에 섞인다. `item_id: null`로 구분
+- `item_id: null`은 문서다 — 상위에서는 문서 전체를 가리킨 참조, 하위에서는 항목 밖(절 본문·표)에서 이 항목을 건 참조의 출발 문서
+- 이 문서 전체를 가리킨 참조(`[[문서]]`)는 어느 항목의 하위에도 섞지 않는다. 전에는 모든 항목 아래에 섞여 카드·관계도와 수가 달랐다(#160). 화면은 `GET …/downstream`의 `(문서)`로 따로 보인다(UI-5 8.10)
 
 ---
 
