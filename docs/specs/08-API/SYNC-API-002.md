@@ -2,7 +2,7 @@
 doc_id: SYNC-API-002
 type: API
 title: API 명세 MCP — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ---
 
@@ -198,13 +198,13 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
   "doc_id": "SYNC-PRD-001", "item_id": "R1",
   "upstream": [ { "doc_id": "SYNC-RFQ-001", "item_id": "Q03", "display_name": "...", "is_missing": false } ],
   "downstream": [
-    { "doc_id": "SYNC-UC-001", "item_id": "[[SYNC-UC-001#UC-A6]]", "display_name": "...", "is_missing": false },
-    { "doc_id": "SYNC-DOM-001", "item_id": null, "display_name": "도메인모델 (문서 전체)", "is_missing": false }
+    { "doc_id": "SYNC-UC-001", "item_id": "UC-A6", "display_name": "...", "is_missing": false },
+    { "doc_id": "SYNC-STD-001", "item_id": null, "display_name": "명세 작성 규약", "is_missing": false }
   ]
 }
 ```
 
-`item_id: null`은 문서 전체를 참조한 것. 미존재 참조는 `is_missing: true`에 `raw_target`만([[SYNC-UC-001#UC-A4]] 2a).
+`item_id: null`은 문서다 — `upstream`에서는 문서 전체를 가리킨 참조, `downstream`에서는 항목 밖(절 본문·표)에서 이 항목을 건 참조의 **출발 문서**(`display_name`은 문서 제목). 이 항목의 문서 **전체**를 가리킨 참조는 항목의 하위가 아니라 `downstream`에 없다(#160). 미존재 참조는 `is_missing: true`에 `raw_target`만([[SYNC-UC-001#UC-A4]] 2a).
 
 ---
 
