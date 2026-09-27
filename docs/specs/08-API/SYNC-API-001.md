@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -43,12 +43,15 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 **502·504는 쓰지 않는다.** 앞단 Cloudflare는 원본이 보낸 502·504를 자기 오류 페이지로 바꾼다 — problem+json이 사라져 사람이 `reason`을 못 본다(#76). 앱 밖(GitHub·모델)이 실패한 것은 **424**(Failed Dependency — 요청이 기대던 다른 작업이 실패했다)로 보낸다. 500·503은 원본 본문이 그대로 통과한다. `tests/core/test_errors.py`가 모든 에러 클래스를 훑어 막는다([[SYNC-STD-004#DEV-5]]).
 
-**JSON이 아닌 오류 본문은 앞단이 보낸 것이다.** 앱이 내는 오류 본문은 JSON이다 — problem+json이거나, FastAPI 기본 오류(입력 검증 422·없는 경로 등)의 `{"detail": …}`다. JSON이 아닌 본문은 서버가 꺼졌거나 터널이 끊겼을 때 앞단이 보낸 HTML이다. 웹 클라이언트는 그것을 `urn:syncdoc:http`로 접고 「HTTP {status} — 서버 앞단(Cloudflare)이 보낸 오류 페이지입니다. 서버가 꺼져 있거나 터널이 끊겼을 수 있습니다.」를 보인다 — JSON 해석 오류(`SyntaxError: Unexpected token '<'`)가 화면에 새지 않게. `type` 없는 JSON은 지금처럼 `urn:syncdoc:http`에 상태 문구만 담는다.
+**앱이 내는 오류 본문은 전부 problem+json이다.** FastAPI·Starlette가 먼저 처리하는 입력 검증(422)·없는 경로(404)·없는 메서드(405)도 처리기가 아래 표의 종류로 바꿔 낸다. 전에는 이 셋이 `{"detail": …}`로 나가 화면이 「Unprocessable Content」 같은 상태 문구만 보였고, `/api` 아래 없는 경로에는 화면 틀(HTML, 200)이 나갔다(#158).
+
+**JSON이 아닌 오류 본문은 앞단이 보낸 것이다.** JSON이 아닌 본문은 서버가 꺼졌거나 터널이 끊겼을 때 앞단이 보낸 HTML이다. 웹 클라이언트는 그것을 `urn:syncdoc:http`로 접고 「HTTP {status} — 서버 앞단(Cloudflare)이 보낸 오류 페이지입니다. 서버가 꺼져 있거나 터널이 끊겼을 수 있습니다.」를 보인다 — JSON 해석 오류(`SyntaxError: Unexpected token '<'`)가 화면에 새지 않게. `type` 없는 JSON(앞단이 JSON으로 답한 경우)은 `urn:syncdoc:http`에 상태 문구만 담는다.
 
 | type | status | 언제 | 확장 필드 | 유스케이스 |
 |---|---|---|---|---|
 | `urn:syncdoc:unauthorized` | 401 | 세션 없음 | — | — |
-| `urn:syncdoc:not-found` | 404 | 문서·항목·프로젝트·파일 없음 | `resource`, `id` | [[SYNC-UC-001#UC-A2]] 1a |
+| `urn:syncdoc:not-found` | 404 | 문서·항목·프로젝트·파일 없음. **API 경로**가 없을 때도 — `/api`·`/auth`·`/hooks`·`/mcp` 아래 없는 경로는 메서드와 무관하게 이것이다(`resource: "path"`, `id`는 요청 경로) | `resource`, `id` | [[SYNC-UC-001#UC-A2]] 1a |
+| `urn:syncdoc:method-not-allowed` | 405 | 경로는 있는데 그 메서드는 없다. 응답 헤더 `Allow`도 같은 값 | `allow: [메서드…]` — 그 경로의 라우트 전부 | — |
 | `urn:syncdoc:item-deleted` | 410 | 삭제된 항목 조회 | `deleted_at` | [[SYNC-UC-001#UC-A3]] 1a |
 | `urn:syncdoc:convention-violation` | 422 | 규약 위반 (되돌리기 시) | `violations: [{line, rule, message}]`, `warnings: [{rule, message}]` | [[SYNC-UC-001#UC-S1]] 4a, [[SYNC-UC-001#UC-H7]] 4a |
 | `urn:syncdoc:version-conflict` | 409 | 버전 불일치 | `current_version`, `current_body` | [[SYNC-UC-001#UC-A6]] 4a |
@@ -56,6 +59,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:item-deletion-needs-confirm` | 409 | 되돌리기로 항목이 사라지고 하위 참조 있음 | `deleted_items: [{item_id, downstream}]` | [[SYNC-UC-001#UC-H7]], [[SYNC-UC-001#UC-A6]] 4b |
 | `urn:syncdoc:project-code-conflict` | 409 | 코드 중복 | `code` | [[SYNC-UC-001#UC-A1]] 2a |
 | `urn:syncdoc:project-code-invalid` | 422 | 코드 형식 | `rule` | [[SYNC-UC-001#UC-A1]] 2b |
+| `urn:syncdoc:invalid-request` | 422 | 요청 본문·쿼리·경로 값이 정의(아래 3장 스키마)에 안 맞다 — 입력 검증. `detail`은 첫 오류 한 줄(`body.to — …`) | `errors: [{loc, msg}]` — `loc`은 `body.to`처럼 점으로 이은 위치 | — |
 | `urn:syncdoc:existing-specs` | 409 | `docs/specs/` 이미 있음 | `doc_count` | [[SYNC-UC-001#UC-A1]] 3a |
 | `urn:syncdoc:repo-create-failed` | 424 | `create_repo`로 저장소를 못 만듦 — 이름 규칙·권한·다른 소유자 점유 | `reason` | [[SYNC-CODE-001#F]] |
 | `urn:syncdoc:push-failed` | 424 | GitHub push 실패 | `reason` | [[SYNC-UC-001#UC-A1]] 4a, [[SYNC-UC-001#UC-S7]] 2b |
@@ -69,6 +73,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:not-implemented` | 501 | 카드 스텁 — 아직 구현 안 된 경로 (`import_existing` 등). 슬라이스 진행 중에만 존재 | `card` | [[SYNC-STD-004#DEV-12]] |
 | `urn:syncdoc:llm-not-configured` | 503 | 모델 키가 없다 — 읽는 중 질의가 꺼져 있다 | — | [[SYNC-UC-001#UC-H19]] 2a |
 | `urn:syncdoc:llm-unavailable` | 424 | 모델 호출 실패. **사용량 초과도 여기 접힌다.** 스트림 중이면 `error` 이벤트로 온다(1장) | `reason` | [[SYNC-UC-001#UC-H19]] 4a |
+| `about:blank` | 그 코드 | 위 어느 것도 아닌 **프레임워크 HTTP 오류**. `title`은 상태 문구(RFC 9457) | — | — |
 | `urn:syncdoc:internal` | 500 | **예상 못 한 오류.** 위 어느 것도 아닌 예외가 라우터에서 샜다 | — | — |
 
 ---
