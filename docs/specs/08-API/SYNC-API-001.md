@@ -493,6 +493,8 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 화면 [[SYNC-UI-001#UI-5]] · 유스케이스 [[SYNC-UC-001#UC-H3]] · 서비스 `ReferenceService`
 
+`downstream`은 이 항목을 가리키는 참조 하나하나다. 항목 밖(절 본문·표)에서 건 것은 출발 항목이 없어 `item_id` 없이 **출발 문서**로 온다(`display_name` = 문서 제목). 이 문서 **전체**를 가리킨 참조(`[[문서]]`)는 항목의 하위가 아니라 여기 없다 — 화면은 `GET …/downstream`의 `(문서)`로 따로 보인다([[SYNC-UI-002#UI-5]] 8.10). 전에는 그것을 모든 항목 아래에 섞고 항목 밖 참조는 빼서, 카드의 `하위 문서 N`·관계도와 수가 달랐다(#160)
+
 ```yaml
 /api/docs/{docId}/items/{itemId}/references:
   get:
@@ -516,7 +518,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 화면 [[SYNC-UI-001#UI-5]] · 유스케이스 [[SYNC-UC-001#UC-H3]] · 서비스 `queries.downstream_view`
 
-뷰 규약 V-PRD·V-RFQ의 **추적표**와 V-PRD·V-INFRA 카드(목표·요구사항·제약)의 `하위 N` 필·바닥 "근거로 삼은 문서"가 이걸 쓴다.
+뷰 규약 V-PRD·V-RFQ의 **추적표**와 V-PRD·V-INFRA 카드(목표·요구사항·제약)의 `하위 문서 N` 필·바닥 "근거로 삼은 문서"가 이걸 쓴다. UI-5 패널의 「문서 전체를 참조」(8.10)는 `by_item`의 `(문서)`다.
 
 ```yaml
 /api/docs/{docId}/downstream:
