@@ -33,7 +33,7 @@ export interface CommonParts {
 export const NO_COMMON: CommonParts = { head: '', body: '' }
 
 /** 배치 HTML을 넣기 전에 다듬는다 — SYNC-STD-002 1장(#19).
- *  <script>·on*=·javascript:·<iframe|object|embed|form>·<meta http-equiv>는 지운다. 나머지 태그·속성은 그대로 —
+ *  <script>·on*=·javascript:·<iframe|object|embed>·<meta http-equiv>는 지우고 <form>은 <div>로 바꾼다. 나머지 태그·속성은 그대로 —
  *  와이어프레임은 자기 완결 html이라 <style>·<link>·인라인 style이 필요하다. data-el은 그대로 둔다(iframe이라 부모와 안 섞인다) */
 export function safeLayout(html: string): string {
   return html
@@ -41,8 +41,9 @@ export function safeLayout(html: string): string {
     .replace(/<(iframe|object)\b[\s\S]*?<\/\1\s*>/gi, '')
     .replace(/<(?:iframe|object|embed)\b[^>]*\/?>/gi, '')
     .replace(/<meta\b[^>]*http-equiv[^>]*>/gi, '')
-    // <form>은 태그만 벗긴다 — 안의 입력칸·버튼은 배치다. 내용째 지우면 요소 표의 번호가 배치에서 사라졌다 (#173, wf_build.safe_layout)
-    .replace(/<\/?form\b[^>]*>/gi, '')
+    // <form>은 <div>로 — 속성(번호·클래스)과 안의 입력칸·버튼이 그대로 남고 전송할 곳이 없다. 내용째 지우면 요소 표의 번호가 배치에서 사라졌다 (#173, wf_build.safe_layout)
+    .replace(/<form(?=[\s>/])/gi, '<div')
+    .replace(/<\/form\s*>/gi, '</div>')
     .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
     .replace(/\s(href|src)\s*=\s*(["']?)\s*javascript:[^"'>]*\2/gi, '')
 }
