@@ -1,7 +1,7 @@
 /** V-PRD · V-RFQ · V-SCN · V-INFRA · V-DOM · V-API · V-STD — tools/view_build.py 포트. V-UI는 wireframe.ts(vUi).
  *  하위 참조 수·추적표·"근거로 삼은 문서"는 ctx.downstream(GET /api/docs/{id}/downstream, B4)에서 계산한다 —
  *  view_build.downstream_of와 같은 모양 {문서ID: [항목ID들]}. */
-import { esc, etcBlock, h2, inline, itemBlocks, leadRest, renderBlocks, secName, splitItems, splitSections, type ItemBlock, type RenderCtx } from './md'
+import { cardBody, esc, etcBlock, h2, inline, itemBlocks, leadRest, renderBlocks, secName, splitItems, splitSections, type ItemBlock, type RenderCtx } from './md'
 import { ITEM_PAT, plain, type ViewFn } from './types'
 
 const card = (id: string, title: string, inner: string, ctx: RenderCtx, cls = 'card') =>
@@ -304,7 +304,7 @@ export const vApi: ViewFn = ({ title: t, body, ctx }) => {
         out.push(
           h2(title) +
             renderBlocks(text.split('```')[0], ctx) +
-            `<details class="ep"><summary>공통 스키마 (components) 펼치기</summary>${renderBlocks(text, ctx)}</details><p class="soft">OpenAPI 전체 합치기(조각 ${n}개)는 정적 뷰(view_build.py)에서. React 탭은 조각 그대로.</p>`,
+            `<details class="ep"><summary>공통 스키마 (components) 펼치기</summary>${renderBlocks(cardBody(text), ctx)}</details><p class="soft">OpenAPI 전체 합치기(조각 ${n}개)는 정적 뷰(view_build.py)에서. React 탭은 조각 그대로.</p>`,
         )
         continue
       }

@@ -161,10 +161,18 @@ def split_sections(body):
         title, _, rest = p.partition("\n"); out.append((title.strip(), rest))
     return out
 
+def card_body(text):
+    """카드 몸 — 끝의 구분선(`---`)과 빈 줄을 뗀다. 절 사이 표시가 STD-001 1.3 경계(다음 같은 레벨 이상 헤딩까지)
+    때문에 그 절 마지막 항목 블록에 들어온 것이라, 두면 카드 바닥에 빈 가로줄이 남는다. 가운데 `---`는 그대로 (STD-002 1장, #159)"""
+    lines = text.split("\n")
+    while lines and lines[-1].strip() in ("", "---"): lines.pop()
+    return "\n".join(lines)
+
 def split_items(body, pat):
     """본문을 원본 순서대로 가른다 → [("text", md) | ("item", (id, title, level, text))].
     항목 블록은 헤딩 다음 줄부터 같은 레벨 이상 다음 헤딩 직전까지. 항목 밖 문장(절 머리·소절 제목·
-    소절 머리)도 "text"로 남는다 — 버리면 유저용 탭에서 조용히 사라진다 (STD-002 V-PRD, #120)"""
+    소절 머리)도 "text"로 남는다 — 버리면 유저용 탭에서 조용히 사라진다 (STD-002 V-PRD, #120).
+    항목 텍스트는 card_body를 거친다 — 끝의 절 구분선은 카드에 그리지 않는다 (#159)"""
     lines = body.split("\n"); out = []; buf = []; i = 0
     while i < len(lines):
         h = re.match(r"^(#{1,6}) (\S+)(?: (.*))?$", lines[i])
@@ -175,7 +183,7 @@ def split_items(body, pat):
                 h2 = re.match(r"^(#{1,6}) ", lines[j])
                 if h2 and len(h2.group(1)) <= lvl: break
                 j += 1
-            out.append(("item", (h.group(2), h.group(3) or "", lvl, "\n".join(lines[i + 1:j])))); i = j
+            out.append(("item", (h.group(2), h.group(3) or "", lvl, card_body("\n".join(lines[i + 1:j]))))); i = j
         else: buf.append(lines[i]); i += 1
     if buf: out.append(("text", "\n".join(buf)))
     return out
@@ -253,9 +261,10 @@ def item_cards(did, text, pat, label, dmap):
 
 def etc_block(lines, did, common=""):
     """「그 밖」 — 뷰가 조각으로 가르고 남은 줄을 항목 카드 끝에 원본 순서로 (STD-002 1장, #152).
-    구분선·빈 줄뿐이면 그리지 않는다 — 문장이 아니라 절 사이 표시다(절 구분선 `---`이 마지막 항목 블록에 들어온다)"""
-    if all(l.strip() in ("", "---") for l in lines): return ""
-    return f'<div class="etc"><div class="etc-t">그 밖</div>{render_blocks(chr(10).join(lines), did, common=common)}</div>'
+    끝의 구분선·빈 줄은 떼고(card_body, #159), 남는 것이 없으면 그리지 않는다 — 문장이 아니라 절 사이 표시다"""
+    body = card_body("\n".join(lines))
+    if not body: return ""
+    return f'<div class="etc"><div class="etc-t">그 밖</div>{render_blocks(body, did, common=common)}</div>'
 
 # ───────────────────────── V-PRD ─────────────────────────
 def v_prd(doc):
@@ -864,7 +873,7 @@ def v_api(doc):
                     merged = yaml.safe_dump(base, allow_unicode=True, sort_keys=False, width=120)
                 except Exception as e: merged = f"# 합치기 실패: {e}"
                 out.append(f'<h2>{esc(title)}</h2>' + render_blocks(re.split(r"```", text)[0], did) +
-                           f'<details class="ep"><summary>공통 스키마 (components) 펼치기</summary>{render_blocks(text, did)}</details>'
+                           f'<details class="ep"><summary>공통 스키마 (components) 펼치기</summary>{render_blocks(card_body(text), did)}</details>'
                            f'<h3>OpenAPI 전체 — 뷰가 조각 {len(ops)}개를 합쳤다</h3><p class="soft">원본은 엔드포인트마다 조각. 이건 뷰가 만든 것(V-API). 그대로 저장하면 Swagger에 넣을 수 있다.</p><details class="ep"><summary>openapi.yaml 펼치기</summary><pre class="code"><code>{esc(merged)}</code></pre></details>')
                 continue
             out.append(f"<h2>{esc(title)}</h2>" + render_blocks(text, did))
@@ -999,6 +1008,16 @@ G1 본문 문장. 근거: [[T-PRD-001#R1]]
 
 #### G2 제목뿐인 목표
 
+#### G3 구분선 든 목표
+
+G3 앞 문단.
+
+---
+
+G3 뒤 문단.
+
+---
+
 ## 2. 비목표
 
 없음.
@@ -1016,6 +1035,8 @@ G1 본문 문장. 근거: [[T-PRD-001#R1]]
 R1 설명.
 
 - [ ] 인수기준 하나
+
+---
 
 ### 3.2 비워 둔 소절
 
@@ -1049,13 +1070,16 @@ C1 설명 문장.
 
 C2 뒤 문단.
 
+---
+
 ## 2. 구성도
 
 없음.
 """
 
 def _selftest():
-    """V-PRD·V-INFRA가 원본 문장을 버리지 않는지 (#120). 앱 포트(views.ts)는 대조하지 않는다(#153).
+    """V-PRD·V-INFRA가 원본 문장을 버리지 않는지 (#120), 카드 끝 구분선을 그리지 않는지 (#159).
+    앱 포트(views.ts)는 대조하지 않는다(#153).
 
     사용: view_build.py --selftest
     """
@@ -1065,6 +1089,7 @@ def _selftest():
     try: p, i = v_prd(ALL["T-PRD-001"]), v_infra(ALL["T-INFRA-001"])
     finally: ALL.clear(); ALL.update(saved)
     c2 = i.find('id="item-C2"')
+    g3 = p[p.find('id="item-G3"'):]; g3 = g3[:g3.find("</article>")]
     cases = [
         ("목표 절 머리", "목표 절 머리 문장" in p),
         ("G 본문", "G1 본문 문장" in p),
@@ -1078,6 +1103,10 @@ def _selftest():
         ("C 본문·출처 줄", "C1 설명 문장" in i and "출처: " in i and 'class="card" id="item-C1"' in i),
         ("마지막 제약 뒤 문단은 그 카드 안", 0 <= c2 < i.find("C2 뒤 문단") < i.find("</article>", c2)),
         ("목표·제약을 표로 모으지 않음", 'class="reassembled"' not in p + i),
+        ("카드 끝 구분선은 안 그림(G·R·C, #159)", not re.search(r'<hr>\s*(</article>|<ul class="ac">)', p + i)),
+        ("본문 가운데 구분선은 그대로", 0 <= g3.find("G3 앞 문단") < g3.find("<hr>") < g3.find("G3 뒤 문단")),
+        ("그 밖도 끝 구분선을 뗀다", "<hr>" not in etc_block(["그 밖 문장.", "", "---"], "T-PRD-001")
+         and "그 밖 문장." in etc_block(["그 밖 문장.", "", "---"], "T-PRD-001") and etc_block(["", "---", ""], "T-PRD-001") == ""),
     ]
     bad = [name for name, ok in cases if not ok]
     for name in bad:
