@@ -304,7 +304,8 @@ export const vApi: ViewFn = ({ title: t, body, ctx }) => {
         out.push(
           h2(title) +
             renderBlocks(text.split('```')[0], ctx) +
-            `<details class="ep"><summary>공통 스키마 (components) 펼치기</summary>${renderBlocks(cardBody(text), ctx)}</details><p class="soft">OpenAPI 전체 합치기(조각 ${n}개)는 정적 뷰(view_build.py)에서. React 탭은 조각 그대로.</p>`,
+            // OpenAPI 합치기는 정적 뷰만(STD-002 V-API, #153) — 같은 칸(div.oa-merge)에 한 줄. 대조 검사기가 그 속만 뺀다
+            `<details class="ep"><summary>공통 스키마 (components) 펼치기</summary>${renderBlocks(cardBody(text), ctx)}</details><div class="oa-merge"><p class="soft">OpenAPI 전체 합치기(조각 ${n}개)는 정적 뷰(view_build.py)에서. React 탭은 조각 그대로.</p></div>`,
         )
         continue
       }

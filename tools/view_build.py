@@ -1345,7 +1345,8 @@ def v_api(doc):
                 except Exception as e: merged = f"# 합치기 실패: {e}"
                 out.append(f'<h2>{esc(title)}</h2>' + render_blocks(re.split(r"```", text)[0], did) +
                            f'<details class="ep"><summary>공통 스키마 (components) 펼치기</summary>{render_blocks(card_body(text), did)}</details>'
-                           f'<h3>OpenAPI 전체 — 뷰가 조각 {len(ops)}개를 합쳤다</h3><p class="soft">원본은 엔드포인트마다 조각. 이건 뷰가 만든 것(V-API). 그대로 저장하면 Swagger에 넣을 수 있다.</p><details class="ep"><summary>openapi.yaml 펼치기</summary><pre class="code"><code>{esc(merged)}</code></pre></details>')
+                           # OpenAPI 합치기는 정적 뷰만 — 앱은 같은 칸(div.oa-merge)에 한 줄. 대조 검사기가 그 속만 뺀다 (STD-002 V-API, #153)
+                           f'<div class="oa-merge"><h3>OpenAPI 전체 — 뷰가 조각 {len(ops)}개를 합쳤다</h3><p class="soft">원본은 엔드포인트마다 조각. 이건 뷰가 만든 것(V-API). 그대로 저장하면 Swagger에 넣을 수 있다.</p><details class="ep"><summary>openapi.yaml 펼치기</summary><pre class="code"><code>{esc(merged)}</code></pre></details></div>')
                 continue
             out.append(f"<h2>{esc(title)}</h2>" + render_blocks(text, did))
         return "\n".join(out)
