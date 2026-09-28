@@ -1050,7 +1050,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `tools/check_view_html.py` 신설 — 앱 뷰 모듈을 rolldown(`frontend/node_modules`)으로 임시 파일 하나로 묶어 Node로 같은 입력(문서·색인·하위 참조·제목·배치 기준 경로)을 그리고, 두 HTML을 파싱해 태그·속성·글자로 비교한다(엔티티·태그 사이 공백·style·script는 안 본다, srcdoc 속도 같은 규칙, `div.oa-merge` 속은 뺀다). 싱크독 문서 + 셀프테스트 시험 문서, `--specs`로 다른 저장소. 종료 코드 0 같음 · 1 다름 · 2 준비 안 됨. 앱 `view/index.ts`의 타입 분기(`pick`)를 내보내 검사기가 같은 분기를 쓴다. 남은 차이를 고친다 — 정적 `data-item` · CODE 패턴 `[A-Z]+\d*`(서버 `spec/service.py`·`tools/validate.py`·앱 `types.ts`·정적 `ITEM_PAT`) · V-RFQ 요구 목록을 항목 블록에서 · V-UI 첫 절 앞과 감싸는 칸을 앱도 · 참조 링크 이중 이스케이프(둘 다) · OpenAPI 칸 `div.oa-merge`(둘 다) · 검사기가 찾는 나머지 |
 | 테스트 | 검사기가 싱크독 문서와 시험 문서에서 차이 0 · 여덟 저장소(`--specs`, KB 제외)도 0 · 서버 테스트: 두 글자 CODE 카드가 항목 · pytest · 검사기 전부 · 셀프테스트 · 배포 뒤 SYNC-CODE-001의 AA~가 목차·참조 패널에 나온다 |
 | 선행 | AO |
-| 완료 | — |
+| 완료 | 2026-09-28 · 브랜치 `card/AP-view-html` · spec 3 + code 6 · 테스트 259(두 글자 CODE 카드 사례 추가) · `ruff` · `validate` 0/0 · `check_code` 113/113 · `check_ui` 12/12 · `check_dom` 10·10·10 · `check_tokens` 91/0 · `check_view_css` 일곱 쌍 · `check_templates` 16/16 · `open_items --check` · `wf_build --selftest` · `view_build --selftest` 일곱 묶음 · **`check_view_html` 싱크독 문서 25 + 시험 문서 8 = 33/33 같음, 여덟 저장소(`--specs`, 컨테이너에서 읽기만, KB 제외) 114/114 같음** — 처음 돌렸을 때 33 중 13만 같았다 · 검사기 자체: 비교 규칙 열두 사례(다른 글자·엔티티·`<br/>`·속성 순서·속성 값·태그 사이 공백·`<pre>` 공백·style·script·srcdoc 이스케이프·srcdoc 글자·`oa-merge` 속과 뒤) · 정적 한쪽을 일부러 바꾸면 그 카드를 쓰는 여덟 문서를 잡고 종료 코드 1 · 번들러가 없으면 2 · 고친 차이: 정적 `data-item`·`data-ref`(아홉 자리) · V-RFQ 요구를 항목 블록에서(정적이 「RFQ:」를 미사용 요구에 넣고 내용 칸 인라인 코드를 뺐다) · 배치 도구 줄 버튼 `btn sm` · CODE 패턴 `[A-Z]+\d*`(서버·validate·앱·정적) · 앱 V-UI를 정적 모양으로(첫 절 앞·`.uiview`·`.prose`, 절 머리 id) · 참조 링크 이중 이스케이프(CCR-API-001의 `&`가 `&amp;`로 보였다) · OpenAPI 칸 `div.oa-merge` · 배포 뒤 운영: SYNC-UI-002가 `.uiview` 안 산문 둘·묶음 하나·배치 12로 전과 같은 모양(h1 숨김) · CCR-API-001 링크 라벨이 `&` 그대로 · SYNC-API-001 OpenAPI 칸 한 줄 · CODE-001 AA~는 이 완료란 커밋을 새 서버가 읽으며 항목이 된다(카드 PR 머지 커밋은 배포 전 옛 서버가 읽었다) · **명세에 없어서 정한 것**: 검사기 이름·종료 코드 0·1·2 · OpenAPI 예외는 같은 표지(`div.oa-merge`)로 — 문구로 알아보지 않는다 · V-UI는 앱이 정적(참조 구현)을 따른다 · 배치 버튼은 정적에 `btn sm`을 더한다(앱 모양 유지, 정적에는 `.btn` 스타일이 없다) · 링크 이중 이스케이프는 둘 다 고친다 · 언제 돌리나 — AGENTS.md 「뷰 코드를 고치면 돌린다」, DEV-14에는 넣지 않았다 |
 
 **왜 카드인가.** 규약(STD-002 1장·4장)이 「같은 HTML」을 요구하는데 지키는 장치가 없어 #120 같은 일이 조용히 났다. 검사기를 들이면서 지금 갈라진 곳을 전부 맞춘다 — 검사기는 차이 0인 상태로 들어온다(사용자 결정).
 
@@ -1127,6 +1127,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AM | `card/AM-uc-view` | `452c2ae` | #176 | 2026-09-23 |
 | AN | `card/AN-ms-view` | `22c1031` | #186 | 2026-09-28 |
 | AO | `card/AO-seq-view` | `3b6eef3` | #188 | 2026-09-28 |
+| AP | `card/AP-view-html` | `c2f5578` | #191 | 2026-09-28 |
 | (#119) | `fix/119-single-render` | — | #119 | 2026-09-23 |
 | (#126) | `fix/126-view-build-specs` | — | #126 | 2026-09-23 |
 | (#133) | `fix/133-tokens-by-chapter` | — | #133 | 2026-09-23 |
