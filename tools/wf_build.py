@@ -123,8 +123,8 @@ def frame_html(layout, common, base):
     return (
         '<div class="wfbox"><div class="wfbar"><span class="wfdim mono"></span>'
         '<span class="grow"></span>'
-        '<button type="button" class="wfframe-fit" hidden>원래 크기</button>'
-        '<button type="button" class="wffull">전체보기</button></div>'
+        '<button type="button" class="wfframe-fit btn sm" hidden>원래 크기</button>'
+        '<button type="button" class="wffull btn sm">전체보기</button></div>'
         f'<div class="wfframe"><iframe class="wfframe-if" sandbox="{SANDBOX}" '
         f'srcdoc="{html.escape(doc, quote=True)}"></iframe></div></div>'
     )
