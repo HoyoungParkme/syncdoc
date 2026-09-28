@@ -20,6 +20,9 @@
 여섯째 쌍(카드 AN): MS 뷰 CSS — `frontend/src/view/ms.ts msCss` ↔ `tools/view_build.py MS_CSS`.
 정적 뷰가 옛 `ms_build.py`로 따로 그리다 앱과 같은 HTML로 맞췄다(#153).
 
+일곱째 쌍(카드 AO): SEQ 뷰 CSS — `frontend/src/view/seq.ts seqCss` ↔ `tools/view_build.py SEQ_CSS`.
+정적 뷰가 옛 `seq_build.py`로 따로 그리다 앱과 같은 HTML로 맞췄다(#153).
+
 사용: python3 tools/check_view_css.py
 """
 
@@ -48,6 +51,9 @@ PY_UC = re.compile(r'^UC_CSS = r"""(.*?)"""', re.S | re.M)
 MS_TS = os.path.join(ROOT, "frontend", "src", "view", "ms.ts")
 TS_MS = re.compile(r"export const msCss = `(.*?)`", re.S)
 PY_MS = re.compile(r'^MS_CSS = r"""(.*?)"""', re.S | re.M)
+SEQ_TS = os.path.join(ROOT, "frontend", "src", "view", "seq.ts")
+TS_SEQ = re.compile(r"export const seqCss = `(.*?)`", re.S)
+PY_SEQ = re.compile(r'^SEQ_CSS = r"""(.*?)"""', re.S | re.M)
 
 
 def strip_header(text: str) -> str:
@@ -107,6 +113,10 @@ def main() -> int:
     tm, pm = TS_MS.search(mts), PY_MS.search(open(BUILDER, encoding="utf-8").read())
     ok &= _pair("MS 뷰 CSS", tm.group(1) if tm else None, pm.group(1) if pm else None,
                 "frontend/src/view/ms.ts msCss", "tools/view_build.py MS_CSS")
+    sts = open(SEQ_TS, encoding="utf-8").read() if os.path.exists(SEQ_TS) else ""
+    ts_, ps_ = TS_SEQ.search(sts), PY_SEQ.search(open(BUILDER, encoding="utf-8").read())
+    ok &= _pair("SEQ 뷰 CSS", ts_.group(1) if ts_ else None, ps_.group(1) if ps_ else None,
+                "frontend/src/view/seq.ts seqCss", "tools/view_build.py SEQ_CSS")
     return 0 if ok else 1
 
 

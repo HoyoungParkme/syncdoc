@@ -163,6 +163,10 @@ def split_sections(body):
         title, _, rest = p.partition("\n"); out.append((title.strip(), rest))
     return out
 
+def sec_name(title):
+    """절 제목의 번호를 뗀다 — `3. 미결사항` → `미결사항` (md.ts secName)"""
+    return re.sub(r"^\d+\.\s*", "", title)
+
 def card_body(text):
     """카드 몸 — 끝의 구분선(`---`)과 빈 줄을 뗀다. 절 사이 표시가 STD-001 1.3 경계(다음 같은 레벨 이상 헤딩까지)
     때문에 그 절 마지막 항목 블록에 들어온 것이라, 두면 카드 바닥에 빈 가로줄이 남는다. 가운데 `---`는 그대로 (STD-002 1장, #159)"""
@@ -760,26 +764,7 @@ def v_infra(doc):
         out.append(f"<h2>{esc(title)}</h2>" + render_blocks(text, did, r"C\d+"))
     return "\n".join(out)
 
-# ───────────────────────── 기존 생성기 흡수 (와이어프레임·시퀀스·MINISPEC) ─────────────────────────
-def absorb(script, src, tmp):
-    """기존 빌더를 돌려 결과 HTML에서 style·본문·script를 뽑아 공통 틀에 넣는다."""
-    import subprocess
-    subprocess.run(["python3", os.path.join(os.path.dirname(__file__), script), src, tmp], capture_output=True)
-    h = open(tmp, encoding="utf-8").read()
-    style = "".join(re.findall(r"<style>(.*?)</style>", h, re.S))
-    # 본문: <div class="layout"> 또는 <div class="stabs"> 부터 <footer> 전까지
-    m = re.search(r'(<div class="(?:stabs|layout)"[\s\S]*?)<footer>', h)
-    body = m.group(1) if m else ""
-    scripts = "".join(re.findall(r'<script(?: id="DATA" type="application/json")?>(?!window\.__mermaidReady)(.*?)</script>', h, re.S))
-    data = re.search(r'<script id="DATA" type="application/json">(.*?)</script>', h, re.S)
-    js = re.findall(r'<script>\n?((?!window\.__mermaidReady)[\s\S]*?)</script>', h)
-    js = [x for x in js if "JSON.parse" in x]
-    out = f'<style>{style}</style>{body}'
-    if data: out += f'<script id="DATA" type="application/json">{data.group(1)}</script>'
-    for x in js: out += f"<script>{x}</script>"
-    os.remove(tmp)
-    return out
-
+# ───────────────────────── V-UI ─────────────────────────
 def v_ui(doc):
     """V-UI — 화면 문서는 하나여도 둘이어도 같은 렌더러(카드 X). 규칙은 wf_build.py에."""
     import wf_build as wf
@@ -788,8 +773,282 @@ def v_ui(doc):
     ui = wf.render_ui(blocks, sid, wf.common_block(doc["body"]), wf.base_for(sid))
     return f'<style>{wf.WF_CSS}</style><div class="uiview">{ui}<script>{wf.WF_JS}</script></div>'
 
+# ───────────────────────── V-SEQ ─────────────────────────
+SEQ_HEAD = re.compile(r"^(SEQ-[0-9]+|SEQ-C[0-9]+)(?:\s+(.*))?$")
+SEQ_MENTION = re.compile(r"(?a:\b)(SEQ-C?[0-9]+)(?a:\b)")  # JS \b는 ASCII 경계 — 「SEQ-13에서」도 언급이다
+SEQ_P = re.compile(r"^(?:participant|actor)\s+(\w+)(?:\s+as\s+(.+))?$")
+SEQ_MSG = re.compile(r"^(\w+)\s*(-->>|->>|-->|->|--x|-x|--\)|-\))\s*(\w+)\s*:\s*(.*)$")
+SEQ_CTX = re.compile(r"^(alt|opt|loop|rect|par|critical|break)(?a:\b)\s*(.*)$")
+SEQ_ELSE = re.compile(r"^(?:else|and|option)(?a:\b)\s*(.*)$")
+# 좌 목록의 의미 묶음 — 원본 대응표 순서가 아니라 뷰 규약이 정한 그룹 (STD-002 V-SEQ). 문서에 없는 id는 건너뛰고,
+# 여기 없는 시퀀스는 「기타」로 모은다 (seq.ts GROUPS)
+SEQ_GROUPS = (
+    ("저장 파이프라인", ("SEQ-1", "SEQ-2", "SEQ-5", "SEQ-7", "SEQ-19")),
+    ("판단·처리", ("SEQ-3", "SEQ-6", "SEQ-17", "SEQ-18")),
+    ("조회", ("SEQ-9", "SEQ-10", "SEQ-11", "SEQ-12", "SEQ-13", "SEQ-14", "SEQ-15")),
+    ("프로젝트·계정·운영", ("SEQ-4", "SEQ-8", "SEQ-16", "SEQ-20", "SEQ-21")),
+    ("공통 형태", ("SEQ-C1", "SEQ-C2")),
+)
+
+def seq_parse_tables(text):
+    """본문 안 표 전부 → 셀 배열(구분선 행 제외) (seq.ts parseTables)"""
+    out, cur = [], None
+    for l in text.split("\n"):
+        if l.startswith("|"):
+            cells = [c.strip() for c in re.sub(r"^\||\|$", "", l).split("|")]
+            if all(re.fullmatch(r"[-: ]*", c) for c in cells): continue
+            if cur is None: cur = []; out.append(cur)
+            cur.append(cells)
+        else: cur = None
+    return out
+
+def seq_life_map(text):
+    """생명선 표 → {약어: 정보}. 헤더에 「약어」가 있는 첫 표. 약어 칸은 `RP·RD·RR`처럼 여럿일 수 있다 (seq.ts lifeMap)"""
+    tbl = next((t for t in seq_parse_tables(text) if len(t) > 1 and len(t[0]) >= 5 and "약어" in t[0]), None)
+    life = {}
+    if not tbl: return life
+    ab_col = tbl[0].index("약어")
+    for row in tbl[1:]:
+        cells = row + [""] * (5 - len(row))
+        rest = [c for i, c in enumerate(cells) if i != ab_col and i != 0]
+        info = {"name": cells[0], "what": rest[0] if rest else "", "kind": rest[1] if len(rest) > 1 else "", "where": rest[2] if len(rest) > 2 else ""}
+        for ab in re.split(r"[·,]\s*", cells[ab_col]):
+            if ab.strip(): life[ab.strip()] = info
+    return life
+
+def seq_parse_mermaid(mer):
+    """participant 목록과 단계(화살표) 목록. alt/opt/loop 문맥도 붙인다 — rect는 뺀다 (seq.ts parseMermaid)"""
+    parts, steps, ctx = [], [], []
+    for line in mer.split("\n"):
+        t = line.strip()
+        m = SEQ_P.match(t)
+        if m:
+            parts.append({"ab": m.group(1), "label": re.sub(r"<br\s*/?>", " ", m.group(2) if m.group(2) is not None else m.group(1))}); continue
+        m = SEQ_CTX.match(t)
+        if m: ctx.append((m.group(1), m.group(2))); continue
+        m = SEQ_ELSE.match(t)
+        if m and ctx: ctx[-1] = (ctx[-1][0], m.group(1)); continue
+        if t == "end" and ctx: ctx.pop(); continue
+        m = SEQ_MSG.match(t)
+        if m:
+            steps.append({"from": m.group(1), "arrow": m.group(2), "to": m.group(3), "msg": m.group(4),
+                          "ctx": " › ".join(f"{k} {v}".strip() for k, v in ctx if k != "rect")})
+    return parts, steps
+
+def seq_build(sid, title, text, life):
+    """시퀀스 절 하나 → 머리 글 · mermaid · 뒤 글 · 이 그림의 생명선 · 단계 (seq.ts buildSeq)"""
+    f = re.search(r"```mermaid\n([\s\S]*?)\n```", text)
+    mer = f.group(1) if f else ""
+    parts, steps = seq_parse_mermaid(mer)
+    labels = {p["ab"]: p["label"] for p in parts}
+    none = {"name": "", "what": "", "kind": "", "where": ""}
+    rows = [{"ab": p["ab"], "label": p["label"], **(life.get(p["ab"]) or life.get(p["label"].split(" ")[0]) or none)} for p in parts]
+    return {"kind": "seq", "id": sid, "title": title, "lead": text[:f.start()] if f else text, "mermaid": mer,
+            "after": text[f.end():] if f else "", "life": rows,
+            "steps": [{**st, "fromL": labels.get(st["from"], st["from"]), "toL": labels.get(st["to"], st["to"]), "ret": st["arrow"].startswith("--")} for st in steps]}
+
+def seq_jumpify(h, ids, did):
+    """같은 문서 참조([[#SEQ-N]])에 data-jump를 달고, 본문 글의 SEQ-N 언급을 점프 링크로 — 태그·링크 안은 건드리지 않는다 (seq.ts jumpify)"""
+    h = re.sub(r'data-ref="([^"#]+)#(SEQ-C?[0-9]+)"', lambda m: m.group(0) + (f' data-jump="{m.group(2)}"' if m.group(1) == did and m.group(2) in ids else ""), h)
+    out, in_a = [], 0
+    for piece in re.split(r"(<[^>]+>)", h):
+        if piece.startswith("<"):
+            if re.match(r"<a[\s>]", piece, re.I): in_a += 1
+            elif re.match(r"</a>", piece, re.I): in_a = max(0, in_a - 1)
+            out.append(piece)
+        elif in_a: out.append(piece)
+        else: out.append(SEQ_MENTION.sub(lambda m: f'<a class="jump" data-jump="{m.group(1)}">{m.group(0)}</a>' if m.group(1) in ids else m.group(0), piece))
+    return "".join(out)
+
+def seq_el_id(s):
+    return f'item-{s["id"]}' if s["kind"] == "seq" else f'sec-{s["id"]}'
+
+def seq_inner(s, did, J):
+    """시퀀스 칸 몸 — 머리 글 · 생명선 표 · 그림/단계 · 읽을 때 볼 것 (seq.ts seqInner)"""
+    h = f'<div class="lead">{J(render_blocks(s["lead"], did))}</div>'
+    if s["life"]:
+        rows = "".join(f'<tr><td class="mono">{esc(l["ab"])}</td><td><b>{esc(l["label"])}</b></td><td>{inline(l["what"], did)}</td>'
+                       f'<td class="kind">{esc(l["kind"])}</td><td class="soft">{inline(l["where"], did)}</td></tr>' for l in s["life"])
+        h += (f'<h3>생명선 — 이 그림에 나오는 것</h3><table class="life"><thead><tr><th>약어</th><th>이름</th><th>실체</th><th>종류</th><th>정의</th></tr></thead>'
+              f'<tbody>{rows}</tbody></table>')
+    if s["mermaid"]:
+        last, rows = None, ""
+        for i, st in enumerate(s["steps"]):
+            if st["ctx"] != last: rows += f'<tr class="ctx"><td colspan="3">{esc(st["ctx"]) if st["ctx"] else "기본 흐름"}</td></tr>'
+            last = st["ctx"]
+            arr = '<span class="arr ret">⇢</span>' if st["ret"] else '<span class="arr">→</span>'
+            rows += (f'<tr class="{"ret" if st["ret"] else ""}" data-step="{i + 1}"><td class="no">{i + 1}</td>'
+                     f'<td class="who">{esc(st["fromL"])} {arr} {esc(st["toL"])}</td><td>{esc(st["msg"])}</td></tr>')
+        h += ('<h3>흐름</h3><div class="split"><div class="dia-wrap"><div class="zoom"><button type="button" data-z="-">－</button>'
+              '<button type="button" data-z="0">100%</button><button type="button" data-z="+">＋</button></div>'
+              f'<div class="dia mer"><pre class="mermaid">{esc(s["mermaid"])}</pre></div></div><div class="steps"><table><thead><tr><th>#</th>'
+              f'<th>누가 → 누구</th><th>무엇</th></tr></thead><tbody>{rows}</tbody></table><div class="soft hint">→ 호출 · ⇢ 반환. 회색 줄은 분기(alt)·'
+              '조건(opt)·반복(loop) 안이라는 뜻. 번호는 그림의 번호와 같다.</div></div></div>')
+    if s["after"].strip():
+        # **읽을 때 볼 것** 문단(또는 「— …」 한 줄)을 소제목으로
+        after = re.sub(r"<p><strong>읽을 때 볼 것</strong></p>", "<h3>읽을 때 볼 것</h3>", J(render_blocks(s["after"], did)), count=1)
+        after = re.sub(r"<p><strong>읽을 때 볼 것</strong>\s*(?:—|–|-)?\s*", "<h3>읽을 때 볼 것</h3><p>", after, count=1)
+        h += f'<div class="after">{after}</div>'
+    return h
+
 def v_seq(doc):
-    return absorb("seq_build.py", doc["path"], "/tmp/_seq.html")
+    """V-SEQ — 좌 의미 묶음 · 시퀀스마다 접힌 칸(하나만 연다) · 생명선 표 · 그림/단계 · 읽을 때 볼 것 (STD-002 V-SEQ, 카드 AO).
+    frontend seq.ts vSeq와 한 쌍. 전에는 옛 seq_build.py가 데이터와 스크립트로 절 하나만 갈아 끼워 앱과 모양이 달랐고,
+    「이 문서가 다루는 것」 절이 없는 INS 문서에서 죽었다 (#153)"""
+    did = doc["fm"]["doc_id"]; body = doc["body"]
+    life = seq_life_map(body)
+    pre, post, seqs = [], [], []
+    for title, text in split_sections(body):
+        m = SEQ_HEAD.match(title)
+        if m: seqs.append(seq_build(m.group(1), (m.group(2) or "").strip(), trim_rule(text), life))
+        else: (post if seqs else pre).append((title, trim_rule(text)))
+    ids = {s["id"] for s in seqs}
+    J = lambda h: seq_jumpify(h, ids, did)
+    secs = []
+    if pre: secs.append({"kind": "text", "id": "overview", "title": "개요 · 대응표" if len(pre) > 1 else sec_name(pre[0][0]), "parts": pre})
+    secs += seqs
+    for i, (t, x) in enumerate(post):
+        name = sec_name(t)
+        sid = "feedback" if name.startswith("되먹일") else "pending" if name.startswith("미결") else f"tail{i + 1}"
+        secs.append({"kind": "text", "id": sid, "title": name, "parts": [(t, x)]})
+    by_id = {s["id"]: s for s in secs}
+    groups, used = [], set()  # 좌 목록: 개요 → 의미 묶음 → 기타 → 정리
+    if "overview" in by_id: groups.append(("개요", [by_id["overview"]]))
+    for g, gids in SEQ_GROUPS:
+        lst = [by_id[x] for x in gids if x in by_id]
+        used |= {x for x in gids if x in by_id}
+        if lst: groups.append((g, lst))
+    rest = [s for s in seqs if s["id"] not in used]
+    if rest: groups.append(("기타", rest))
+    tails = [s for s in secs if s["kind"] == "text" and s["id"] != "overview"]
+    if tails: groups.append(("정리", tails))
+    nav = "".join(f'<div class="grp">{esc(g)}</div>' + "".join(
+        f'<a href="#{seq_el_id(s)}" data-id="{esc(s["id"])}"><span class="k">{esc(s["id"])}</span>{inline(s["title"], did)}</a>' if s["kind"] == "seq"
+        else f'<a href="#{seq_el_id(s)}" data-id="{esc(s["id"])}">{esc(s["title"])}</a>' for s in lst) for g, lst in groups)
+    main = []
+    for i, s in enumerate(secs):
+        op = " open" if i == 0 else ""
+        if s["kind"] == "seq":
+            main.append(f'<details class="seq-sec seq-item" id="{seq_el_id(s)}" data-id="{esc(s["id"])}" data-item="{esc(s["id"])}"{op}><summary><h2>'
+                        f'<span class="k">{esc(s["id"])}</span>{inline(s["title"], did)}</h2></summary><div class="seq-body">{seq_inner(s, did, J)}</div></details>')
+        else:
+            inner = "".join((f"<h3>{esc(sec_name(t))}</h3>" if k else "") + J(render_blocks(x, did)) for k, (t, x) in enumerate(s["parts"]))
+            main.append(f'<details class="seq-sec" id="{seq_el_id(s)}" data-id="{esc(s["id"])}"{op}><summary><h2>{esc(s["title"])}</h2></summary>'
+                        f'<div class="seq-body">{inner}</div></details>')
+    return (f'<style>{SEQ_CSS}</style><div class="seqv"><nav class="seq-nav">{nav}</nav><main class="seq-main">{chr(10).join(main)}</main>'
+            f'<script>{SEQ_JS}</script></div>')
+
+# seq.ts seqCss와 바이트 단위로 같다 — check_view_css 일곱째 쌍 (카드 AO)
+SEQ_CSS = r"""
+.seqv{--ink:#1E2A30;--soft:#5C6B73;--faint:#8A969C;--rule:#C9CFCB;--hair:#E1E5E1;--panel:#F8F9F7;display:grid;grid-template-columns:250px minmax(0,1fr);border:1.5px solid var(--ink);background:#fff;min-height:60vh;font-size:14px;line-height:1.6;color:var(--ink)}
+.seqv .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.seqv .soft{color:var(--soft)}
+.seqv .seq-nav{border-right:1.5px solid var(--ink);background:var(--panel);overflow-y:auto;max-height:88vh;position:sticky;top:0;align-self:start}
+.seqv .seq-nav a{display:block;padding:8px 14px;font-size:13px;color:var(--ink);text-decoration:none;border-left:3px solid transparent;line-height:1.35;cursor:pointer}
+.seqv .seq-nav a:hover{background:#EAEEEA}
+.seqv .seq-nav a.sel{border-left-color:var(--ink);background:#fff;font-weight:600}
+.seqv .seq-nav a .k{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--faint);margin-right:6px}
+.seqv .seq-nav .grp{padding:12px 14px 4px;font-size:11px;font-weight:700;color:var(--soft)}
+.seqv .seq-main{padding:8px 30px 30px;min-width:0;overflow-x:auto}
+.seqv details.seq-sec{border-bottom:1px solid var(--hair)}
+.seqv details.seq-sec>summary{list-style:none;cursor:pointer;padding:10px 0;display:flex;align-items:baseline;gap:8px}
+.seqv details.seq-sec>summary::-webkit-details-marker{display:none}
+.seqv details.seq-sec>summary::before{content:"▸";color:var(--faint);font-size:12px;flex:none}
+.seqv details.seq-sec[open]>summary::before{content:"▾"}
+.seqv details.seq-sec>summary h2{margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em;border:none;padding:0}
+.seqv details.seq-sec[open]>summary h2{font-size:22px;font-weight:700}
+.seqv details.seq-sec>summary h2 .k{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--faint);margin-right:8px;font-weight:500}
+.seqv .seq-body{padding:4px 0 26px}
+.seqv .seq-body h3{font-size:15px;margin:26px 0 10px;padding-bottom:6px;border-bottom:1.5px solid var(--ink)}
+.seqv .seq-body h4{font-size:13.5px;margin:20px 0 8px;color:var(--soft)}
+.seqv .lead{color:var(--soft);margin-bottom:14px}
+.seqv .lead p{margin:0 0 6px}
+.seqv .dia{border:1px solid var(--rule);background:#fff;padding:14px;margin:12px 0 20px;overflow:auto}
+.seqv .dia svg{display:block;max-width:none}
+.seqv .dia pre.mermaid{margin:0;font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;background:none}
+.seqv .dia pre.mermaid[data-processed]{white-space:normal}
+.seqv .zoom{display:flex;gap:6px;justify-content:flex-end;margin-bottom:-6px;position:relative;z-index:1}
+.seqv .zoom button{font:inherit;font-size:12px;padding:3px 9px;border:1px solid var(--rule);background:var(--panel);cursor:pointer}
+.seqv .split{display:grid;grid-template-columns:minmax(520px,1.4fr) minmax(360px,1fr);gap:16px;align-items:start}
+.seqv .dia-wrap{min-width:0}
+.seqv .steps{position:sticky;top:12px;max-height:82vh;overflow-y:auto}
+.seqv .steps table{font-size:12.5px;margin:0}
+.seqv .steps td.no{font-family:ui-monospace,Menlo,monospace;color:var(--faint);width:1%;white-space:nowrap}
+.seqv .steps td.who{white-space:nowrap;font-weight:600}
+.seqv .steps .arr{color:var(--soft);font-weight:400;margin:0 3px}
+.seqv .steps .arr.ret{color:#1a5fb4}
+.seqv .steps tr.ret td{color:var(--soft)}
+.seqv .steps tr.ctx td{background:#EEF0EC;color:var(--soft);font-size:11.5px;font-weight:600;padding:5px 9px}
+.seqv .steps .hint{font-size:12px;margin-top:6px}
+.seqv table{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0 14px;background:#fff}
+.seqv th{text-align:left;font-weight:600;color:var(--soft);padding:7px 9px;border-bottom:1.5px solid var(--ink);background:var(--panel);white-space:nowrap}
+.seqv td{padding:7px 9px;border-bottom:1px solid var(--hair);vertical-align:top}
+.seqv table.life td.kind{white-space:nowrap;color:var(--soft)}
+.seqv .after h4,.seqv .after p{margin-top:8px}
+.seqv a.jump{color:#1a5fb4;cursor:pointer;border-bottom:1px dashed #1a5fb4;font-family:ui-monospace,Menlo,monospace;font-size:.92em;text-decoration:none}
+.seqv a.ref[data-jump]{cursor:pointer}
+@media (max-width:1200px){.seqv .split{grid-template-columns:1fr}.seqv .steps{position:static;max-height:none}}
+@media (max-width:900px){.seqv{grid-template-columns:1fr}.seqv .seq-nav{position:static;max-height:220px;border-right:none;border-bottom:1.5px solid var(--ink)}}
+"""
+
+# seq.ts vSeq onMount를 옮긴 것 — 접힌 칸은 하나만 연다 · 좌 목록·점프·해시로 그 칸을 연다 · 그림 확대 (카드 AO)
+SEQ_JS = r"""
+(function(){
+  const root=document.currentScript.parentElement;
+  const secEls=Array.from(root.querySelectorAll('details.seq-sec'));
+  const secById=new Map(secEls.map(d=>[d.dataset.id??'',d]));
+  const links=Array.from(root.querySelectorAll('.seq-nav a[data-id]'));
+  const mark=id=>{for(const a of links)a.classList.toggle('sel',a.dataset.id===id);};
+  const select=(id,scroll)=>{
+    const d=secById.get(id);
+    if(!d)return;
+    for(const o of secEls)if(o!==d&&o.open)o.open=false;
+    if(!d.open)d.open=true;
+    mark(id);
+    if(scroll)d.scrollIntoView({block:'start'});
+  };
+  const zoom=btn=>{
+    const box=btn.closest('.dia-wrap')?.querySelector('.dia');
+    const svg=box?.querySelector('svg');
+    if(!box||!svg)return;
+    const prev=Number(box.dataset.scale??'1')||1;
+    const z=btn.dataset.z;
+    const next=z==='+'?prev*1.2:z==='-'?prev/1.2:1;
+    const base=svg.getBoundingClientRect().height/prev;
+    box.dataset.scale=String(next);
+    svg.style.transform='scale('+next+')';
+    svg.style.transformOrigin='0 0';
+    box.style.height=next===1?'':(base*next+40)+'px';
+  };
+  root.addEventListener('click',e=>{
+    const t=e.target;
+    if(!(t instanceof Element))return;
+    const navA=t.closest('.seq-nav a[data-id]');
+    if(navA&&root.contains(navA)){e.preventDefault();select(navA.dataset.id??'',true);return;}
+    const jump=t.closest('[data-jump]');
+    if(jump&&root.contains(jump)&&secById.has(jump.dataset.jump??'')){e.preventDefault();select(jump.dataset.jump??'',true);return;}
+    const zb=t.closest('.zoom button[data-z]');
+    if(zb&&root.contains(zb))zoom(zb);
+  });
+  // toggle은 버블링하지 않는다 — capture로 받는다. summary를 눌러 열었으면 나머지를 닫고 목록 표시
+  root.addEventListener('toggle',e=>{
+    const d=e.target;
+    if(!(d instanceof HTMLDetailsElement)||!d.classList.contains('seq-sec')||!d.open)return;
+    for(const o of secEls)if(o!==d&&o.open)o.open=false;
+    mark(d.dataset.id??'');
+  },true);
+  const fromHash=()=>{
+    let h='';
+    try{h=decodeURIComponent(location.hash.slice(1));}catch(_){h=location.hash.slice(1);}
+    const id=h.replace(/^(?:item-|sec-)/,'');
+    if(!id||!secById.has(id))return false;
+    select(id,true);
+    return true;
+  };
+  window.addEventListener('hashchange',fromHash);
+  if(!fromHash()){const first=secEls.find(d=>d.open)??secEls[0];if(first)mark(first.dataset.id??'');}
+})();
+"""
 
 # ───────────────────────── V-MS ─────────────────────────
 MS_PARTS = ("시그니처", "근거", "입력", "처리", "출력", "예외", "호출하는 것", "테스트 관점")
@@ -797,8 +1056,8 @@ MS_PART = re.compile(r"^\*\*(" + "|".join(MS_PARTS) + r")\*\*[ ：:]*(.*)$")
 MS_LEFT = ("입력", "처리")
 MS_RIGHT = ("출력", "예외", "호출하는 것", "테스트 관점")
 
-def ms_trim_rule(s):
-    """끝의 `---` 한 줄을 뗀다 (ms.ts trimRule)"""
+def trim_rule(s):
+    """끝의 `---` 한 줄을 뗀다 — 절 나누기용이라 그리지 않는다 (ms.ts·seq.ts trimRule)"""
     return re.sub(r"\n---\s*\Z", "", s)
 
 def ms_parse_parts(text):
@@ -828,7 +1087,7 @@ def ms_parse_fns(text):
     out = []
     for iid, title, _, body in item_blocks(text, ITEM_PAT["MS"]):
         dot = iid.index(".")
-        parts, lead = ms_parse_parts(ms_trim_rule(body.rstrip()))
+        parts, lead = ms_parse_parts(trim_rule(body.rstrip()))
         sig, sig_rest = ms_split_sig(parts.get("시그니처", ""))
         out.append({"id": iid, "mod": iid[:dot], "name": iid[dot + 1:], "title": title, "sig": sig, "sig_rest": sig_rest,
                     "parts": parts, "lead": lead, "brief": len(parts) <= 4})
@@ -880,11 +1139,11 @@ def v_ms(doc):
     전에는 옛 ms_build.py가 데이터와 스크립트로 카드를 한 장씩 갈아 끼워 앱과 모양이 달랐고, INS 문서에서 죽었다 (#153)"""
     did = doc["fm"]["doc_id"]; secs = []; list_at = -1
     for i, (title, text0) in enumerate(split_sections(doc["body"])):
-        text = ms_trim_rule(text0); name = re.sub(r"^\d+\.\s*", "", title)
+        text = trim_rule(text0); name = re.sub(r"^\d+\.\s*", "", title)
         fns = ms_parse_fns(text)
         if fns:
             lead = re.split(r"^#### ", text, flags=re.M)[0]
-            secs.append({"kind": "fn", "id": f"s{i}", "title": title, "lead": ms_trim_rule(lead), "fns": fns})
+            secs.append({"kind": "fn", "id": f"s{i}", "title": title, "lead": trim_rule(lead), "fns": fns})
         elif name.startswith("함수 목록"):
             list_at = len(secs); ls = text.split("\n")
             k = next((j for j, l in enumerate(ls) if l.startswith("|")), -1)
@@ -1843,6 +2102,91 @@ def _selftest_ms():
     print("V-MS: 통과" if not bad else f"V-MS: {len(bad)} 실패")
     return 0 if not bad else 1
 
+_SELF_SEQ = """---
+doc_id: T-SEQ-001
+type: SEQ
+title: 시험 시퀀스
+status: draft
+upstream: []
+---
+
+# 시험 시퀀스
+
+## 0. 이 문서가 다루는 것
+
+머리 문장. 자세한 것은 SEQ-1에서 본다.
+
+## 1. 생명선
+
+| 이름 | 약어 | 실체 | 종류 | 정의 |
+|---|---|---|---|---|
+| 사람 | A | 사용자 | 액터 | 밖 |
+| 서비스 | S·SV | 서비스 객체 | 클래스 | 안 |
+
+## SEQ-1 저장한다
+
+앞 문장.
+
+```mermaid
+sequenceDiagram
+    actor A as 사람
+    participant S as 서비스
+    A->>S: save(body)
+    alt 충돌
+        S-->>A: 409
+    else 성공
+        S-->>A: 200
+    end
+```
+
+**읽을 때 볼 것** — 되돌리지 않는다. [[#SEQ-30]] 참고
+
+---
+
+## SEQ-30 묶음 밖
+
+뒤 문장 SEQ-1과 같다.
+
+## 되먹일 것
+
+되먹일 문장.
+
+## 미결사항
+
+없음.
+"""
+
+def _selftest_seq():
+    """V-SEQ가 원본 문장을 버리지 않고 앱(seq.ts)과 같은 모양인지 — 카드 AO. 앱과의 HTML 대조는 check_view_html(카드 AP)"""
+    saved = dict(ALL)
+    d = parse_doc(_SELF_SEQ, "T-SEQ-001.md"); ALL[d["fm"]["doc_id"]] = d
+    try: h = v_seq(d)
+    finally: ALL.clear(); ALL.update(saved)
+    sec = {m.group(1): m.group(0) for m in re.finditer(r'<details class="seq-sec[^"]*" id="([^"]+)".*?</details>', h, re.S)}
+    s1 = sec.get("item-SEQ-1", "")
+    keep = ["머리 문장.", "앞 문장.", "되돌리지 않는다.", "뒤 문장", "되먹일 문장.", "없음."]
+    cases = [
+        ("원본 문장을 버리지 않음", all(k in h for k in keep)),
+        ("첫 시퀀스 앞 절은 개요 칸 하나로", set(sec) == {"sec-overview", "item-SEQ-1", "item-SEQ-30", "sec-feedback", "sec-pending"}
+         and "<h2>개요 · 대응표</h2>" in h and "<h3>생명선</h3>" in sec.get("sec-overview", "")),
+        ("생명선 표는 그 시퀀스 것만", '<table class="life">' in s1 and "<b>사람</b>" in s1 and "<b>서비스</b>" in s1 and "서비스 객체" in s1
+         and '<table class="life">' not in sec.get("item-SEQ-30", "")),
+        ("단계 · 반환 · 분기 문맥", all(f'<tr class="ctx"><td colspan="3">{c}</td></tr>' in s1 for c in ("기본 흐름", "alt 충돌", "alt 성공"))
+         and s1.count('<tr class="ret"') == 2 and '사람 <span class="arr">→</span> 서비스' in s1 and '서비스 <span class="arr ret">⇢</span> 사람' in s1),
+        ("읽을 때 볼 것은 소제목", '<div class="after"><h3>읽을 때 볼 것</h3><p>' in s1),
+        ("같은 문서 점프", 'data-ref="T-SEQ-001#SEQ-30" data-jump="SEQ-30"' in s1),
+        ("한글이 붙은 언급도 점프", '<a class="jump" data-jump="SEQ-1">SEQ-1</a>에서' in h and '<a class="jump" data-jump="SEQ-1">SEQ-1</a>과' in h),
+        ("묶음 · 기타 · 정리", '<div class="grp">저장 파이프라인</div><a href="#item-SEQ-1"' in h and '<div class="grp">기타</div><a href="#item-SEQ-30"' in h
+         and '<div class="grp">정리</div>' in h),
+        ("첫 칸만 열림", h.count(" open>") == 1 and 'id="sec-overview" data-id="overview" open>' in h),
+        ("CSS·스크립트가 실려 있다", "<style>" in h and ".seqv{" in h and "document.currentScript" in h),
+    ]
+    bad = [name for name, ok in cases if not ok]
+    for name in bad:
+        print("✗ ", name)
+    print("V-SEQ: 통과" if not bad else f"V-SEQ: {len(bad)} 실패")
+    return 0 if not bad else 1
+
 def _selftest_root():
     """다른 저장소의 docs/specs를 색인하는지 (#126). 임시 폴더에 문서 둘 — 전역은 끝나면 되돌린다"""
     global SRC_DIR, OUT_DIR, CODE
@@ -1879,7 +2223,7 @@ def _selftest_root():
 def main(argv):
     """[--specs <저장소>/docs/specs] (--all | <원본.md>…) · --selftest"""
     if argv == ["--selftest"]:
-        return _selftest() | _selftest_scn() | _selftest_ui() | _selftest_uc() | _selftest_ms() | _selftest_root()
+        return _selftest() | _selftest_scn() | _selftest_ui() | _selftest_uc() | _selftest_ms() | _selftest_seq() | _selftest_root()
     specs = None
     if "--specs" in argv:
         i = argv.index("--specs")
