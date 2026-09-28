@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-002
 type: STD
 title: 뷰 규약 — 사람용 뷰 타입별 렌더링
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-UI-002]
 ---
 
@@ -222,7 +222,14 @@ a{cursor:default}
 
 ### V-MS
 
-함수 항목마다 카드. 시그니처 코드 + 처리 단계 번호 목록 + 예외 표. 함수 목록 절을 **서비스별로 묶어 표로 재조립**.
+| 부분 | 뷰 |
+|---|---|
+| 좌 | 목록 — 절, 그리고 함수 절의 함수를 모듈(서비스)별로. 부분이 넷 이하인 함수(간략형)는 흐리게 |
+| 함수 목록 | 원본 `함수 목록` 절의 머리 문장 + **모듈별 표로 재조립**(함수 · 한 줄 · 시그니처 첫 줄 · 상세도). 그 절이 없으면 첫 함수 절 앞에 만든다 |
+| 함수 카드 | 함수 항목마다 — 머리 `모듈.함수 — 제목`(간략형 표시) · 첫 부분 앞 글 · 시그니처 코드 · 근거 · 두 단(입력·처리 / 출력·예외·호출하는 것·테스트 관점). **전부 펼쳐 둔다** — 좌 목록·표 행·같은 문서 참조(`[[#X]]`)가 그 카드로 스크롤한다 |
+| 나머지 절 | 원본 순서 그대로 |
+
+정적 뷰와 앱이 같은 HTML이다(카드 AN). 전에는 정적이 옛 빌더(`ms_build.py` — 데이터와 스크립트로 카드를 한 장씩 갈아 끼웠다)라 모양이 달랐고, 다른 저장소 문서(INS)에서 죽었다(#153).
 
 ### V-CODE
 
@@ -257,7 +264,7 @@ a{cursor:default}
 
 ## 4. 구현
 
-`_tools/view_build.py` 하나가 전부 만든다. frontmatter `type`을 보고 `V-*` 함수로 본문을 그리고, `shell()`이 공통 틀을 씌운다. 타입마다 함수 하나. 출력은 `view_{doc_id}.html` — 파일 하나에 CSS·스크립트 내장. 이 스크립트가 React 유저용 탭의 **참조 구현**이다 — React는 이 HTML과 같게 그려야 한다. 배치의 srcdoc 조립·`FRAME_CSS`·`sandbox`도 같다 — `tools/check_view_css.py`가 **다섯 쌍**을 대조한다: 뷰 CSS(`styles.view.css`↔`view_build.py CSS`) · `FRAME_CSS` · `SANDBOX` · **화면 뷰 CSS**(`view/wireframe.ts wireframeCss`↔`wf_build.py WF_SCREEN_CSS`, 카드 AC) · **유스케이스 뷰 CSS**(`view/uc.ts ucCss`↔`view_build.py UC_CSS`, 카드 AM — 전에는 정적 뷰가 옛 `build.py`의 CSS를 따로 썼다). 넷째 쌍에는 탭·배치 틀·도구 줄·요소 표의 값이 산다 — 지금까지 우연히 같았을 뿐이라 한쪽만 고쳐도 조용히 갈라졌다. 정적 뷰 전용 스타일(페이지 껍데기·산문)은 `WF_PAGE_CSS`로 갈라 두었다.
+`_tools/view_build.py` 하나가 전부 만든다. frontmatter `type`을 보고 `V-*` 함수로 본문을 그리고, `shell()`이 공통 틀을 씌운다. 타입마다 함수 하나. 출력은 `view_{doc_id}.html` — 파일 하나에 CSS·스크립트 내장. 이 스크립트가 React 유저용 탭의 **참조 구현**이다 — React는 이 HTML과 같게 그려야 한다. 배치의 srcdoc 조립·`FRAME_CSS`·`sandbox`도 같다 — `tools/check_view_css.py`가 **여섯 쌍**을 대조한다: 뷰 CSS(`styles.view.css`↔`view_build.py CSS`) · `FRAME_CSS` · `SANDBOX` · **화면 뷰 CSS**(`view/wireframe.ts wireframeCss`↔`wf_build.py WF_SCREEN_CSS`, 카드 AC) · **유스케이스 뷰 CSS**(`view/uc.ts ucCss`↔`view_build.py UC_CSS`, 카드 AM — 전에는 정적 뷰가 옛 `build.py`의 CSS를 따로 썼다) · **MS 뷰 CSS**(`view/ms.ts msCss`↔`view_build.py MS_CSS`, 카드 AN). 넷째 쌍에는 탭·배치 틀·도구 줄·요소 표의 값이 산다 — 지금까지 우연히 같았을 뿐이라 한쪽만 고쳐도 조용히 갈라졌다. 정적 뷰 전용 스타일(페이지 껍데기·산문)은 `WF_PAGE_CSS`로 갈라 두었다.
 
 확정된 것: 공통 틀과 12타입 전부. `view_build.py --all`이 문서 25개 + `index.html`을 만든다. 스콥을 줄여 **재배치·재조립·그림 렌더·참조 링크·추적표**까지로 했다 — 아래 6장 참조. 나머지 타입은 하나씩 만들어 보고 확정한다.
 
