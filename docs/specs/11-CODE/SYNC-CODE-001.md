@@ -1022,7 +1022,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `view_build.py`에 `ms.ts`를 옮긴다 — `ms_parse_parts`·`ms_split_sig`·`ms_parse_fns`·`ms_sig_line`·`ms_jumpify`·`ms_list_table`·`ms_card`·`v_ms`(이름·구조를 ms.ts와 맞춤). `MS_JS`는 ms.ts `onMount`(좌 목록·목록 표 행·`[[#X]]` 점프·해시)를 옮긴 것. `MS_CSS`↔`msCss`를 `check_view_css` 여섯째 쌍. 정적 `inline()`이 앱처럼 `data-ref`를 붙인다 — 같은 문서 점프(`data-jump`)가 그 속성에서 나온다(AP 일부를 먼저). 옛 `tools/ms_build.py`와 `absorb`의 MS 경로 삭제 |
 | 테스트 | `view_build --selftest`에 V-MS 시험 문서(원본 문장을 버리지 않음 · 간략형 · 목록 표 재조립 · 함수 목록 절 없을 때 만듦 · 시그니처 펜스·한 줄 · `[[#X]]` 점프 · 미결 절) · 싱크독 MS 여덟과 다른 저장소 MS(INS 포함)가 정적에서 죽지 않고 일회성으로 묶은 앱과 같은 HTML(파싱 비교, `data-item`은 AP까지 빼고) · 정적 뷰를 브라우저로 |
 | 선행 | AM |
-| 완료 | — |
+| 완료 | 2026-09-28 · 브랜치 `card/AN-ms-view` · spec 2 + code 2 · 테스트 258(백엔드 변경 없음) · `validate` 0/0 · `check_code` 113/113 · `check_ui` 12/12 · `check_dom` 10·10·10 · `check_tokens` 91/0 · **`check_view_css` 여섯 쌍**(MS 뷰 CSS 신설) · `check_templates` 16/16 · `open_items --check` · `wf_build --selftest` · **`view_build --selftest` V-MS 열 건**(원본 문장 · 카드 전부 펼침 · 목록 표 재조립 · 간략형 · 시그니처 펜스·한 줄 · 두 단 · 같은 문서 점프 · 미결 절 · 함수 목록 절이 없으면 만듦 · CSS·스크립트) · MS 문서 37개(싱크독 여덟 + 여덟 저장소, INS 포함 — 컨테이너에서 읽기만)가 일회성으로 묶은 앱과 **파싱 비교로 같은 HTML**(`data-item`·`data-ref`까지) — 전에는 정적이 INS-MS-001에서 `IndexError`로 죽었다 · 정적 뷰를 브라우저로(잠깐 띄운 http.server): SYNC-MS-008 카드 14 · 좌 목록 17 · 좌 목록·목록 표 행·같은 문서 점프 링크(12)·해시 진입이 모두 그 카드로 가서 강조 · 앱 화면은 바뀌지 않는다(ms.ts 머리 주석만) · **되먹임**: 정적 `inline()`의 `data-ref`를 AP에서 AN으로 당겼다 — 점프가 그 속성에 기댄다 |
 
 **왜 카드인가.** 정적 V-MS는 규약의 참조 구현인데 앱과 다른 모양을 그렸고(#153), 다른 저장소 문서에서 죽었다. 옛 빌더를 고치는 대신 앱의 모양으로 한 벌로 맞춘다(사용자 결정) — AM의 UC와 같은 방식.
 
@@ -1097,6 +1097,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AK | `card/AK-scn-view` | `243cfa6` | #168 | 2026-09-23 |
 | AL | `card/AL-ui-view` | `04f2a36` | #174 | 2026-09-23 |
 | AM | `card/AM-uc-view` | `452c2ae` | #176 | 2026-09-23 |
+| AN | `card/AN-ms-view` | `22c1031` | #186 | 2026-09-28 |
 | (#119) | `fix/119-single-render` | — | #119 | 2026-09-23 |
 | (#126) | `fix/126-view-build-specs` | — | #126 | 2026-09-23 |
 | (#133) | `fix/133-tokens-by-chapter` | — | #133 | 2026-09-23 |
