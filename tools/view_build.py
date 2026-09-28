@@ -75,7 +75,9 @@ def inline(s, self_id):
         label = r if d != self_id else ("#" + it)
         href = view_href(d) + (f"#item-{it}" if it else "")
         cls = "ref" if exists else "ref missing"
-        return f'<a class="{cls}" href="{href}">{esc(label)}</a>'
+        # data-ref는 앱과 같다 — 같은 문서 점프(V-MS data-jump)가 여기서 나온다 (STD-002 1장, 카드 AN)
+        data = d + ("#" + it if it else "")
+        return f'<a class="{cls}" href="{href}" data-ref="{data}">{esc(label)}</a>'
     s = re.sub(r"\[\[([^\]]+)\]\]", ref, s)
     s = re.sub(r"(?<![\w/])(https?://[^\s<]+)", r'<a href="\1">\1</a>', s)
     s = re.sub(r"\x00(\d+)\x00", lambda m: f"<code>{codes[int(m.group(1))]}</code>", s)
@@ -789,8 +791,213 @@ def v_ui(doc):
 def v_seq(doc):
     return absorb("seq_build.py", doc["path"], "/tmp/_seq.html")
 
+# ───────────────────────── V-MS ─────────────────────────
+MS_PARTS = ("시그니처", "근거", "입력", "처리", "출력", "예외", "호출하는 것", "테스트 관점")
+MS_PART = re.compile(r"^\*\*(" + "|".join(MS_PARTS) + r")\*\*[ ：:]*(.*)$")
+MS_LEFT = ("입력", "처리")
+MS_RIGHT = ("출력", "예외", "호출하는 것", "테스트 관점")
+
+def ms_trim_rule(s):
+    """끝의 `---` 한 줄을 뗀다 (ms.ts trimRule)"""
+    return re.sub(r"\n---\s*\Z", "", s)
+
+def ms_parse_parts(text):
+    """**부분** 줄로 자른다. `근거: …` 한 줄짜리도 근거 부분으로 → (부분 → 원문 MD, 첫 부분 앞 글) (ms.ts parseParts)"""
+    parts, lead, cur = {}, [], None
+    for l in text.split("\n"):
+        m = MS_PART.match(l)
+        if m:
+            cur = m.group(1); parts[cur] = m.group(2); continue
+        g = re.match(r"^근거[:：]\s*(.+)$", l)
+        if g and "근거" not in parts:
+            parts["근거"] = g.group(1); continue
+        if cur is None: lead.append(l)
+        else: parts[cur] += "\n" + l
+    return {k: v.strip() for k, v in parts.items()}, "\n".join(lead).strip()
+
+def ms_split_sig(sig):
+    """시그니처 부분 → (코드, 나머지). ```python 펜스 또는 `한 줄` (ms.ts splitSig)"""
+    f = re.search(r"```[A-Za-z0-9_]*\n([\s\S]*?)\n?```", sig)
+    if f: return f.group(1).strip(), (sig[:f.start()] + sig[f.end():]).strip()
+    t = re.search(r"`([^`]+)`", sig)
+    if t and sig.strip().startswith("`"): return t.group(1).strip(), (sig[:t.start()] + sig[t.end():]).strip()
+    return sig.strip(), ""
+
+def ms_parse_fns(text):
+    """함수 항목 → 함수 목록 (ms.ts parseFns). 부분이 넷 이하면 간략형"""
+    out = []
+    for iid, title, _, body in item_blocks(text, ITEM_PAT["MS"]):
+        dot = iid.index(".")
+        parts, lead = ms_parse_parts(ms_trim_rule(body.rstrip()))
+        sig, sig_rest = ms_split_sig(parts.get("시그니처", ""))
+        out.append({"id": iid, "mod": iid[:dot], "name": iid[dot + 1:], "title": title, "sig": sig, "sig_rest": sig_rest,
+                    "parts": parts, "lead": lead, "brief": len(parts) <= 4})
+    return out
+
+def ms_sig_line(f):
+    """목록 표의 시그니처 칸 — 첫 줄, def 떼고 90자 (ms.ts sigLine)"""
+    return re.sub(r"^(async )?def ", "", f["sig"].split("\n")[0])[:90]
+
+def ms_jumpify(h, ids, did):
+    """같은 문서 참조([[#Class.method]])에 data-jump (ms.ts jumpify)"""
+    def add(m):
+        return m.group(0) + (f' data-jump="{esc(m.group(2))}"' if m.group(1) == did and m.group(2) in ids else "")
+    return re.sub(r'data-ref="([^"#]+)#([^"]+)"', add, h)
+
+def ms_mods(fns):
+    """모듈 이름 — 처음 나온 순서 (ms.ts mods)"""
+    return list(dict.fromkeys(f["mod"] for f in fns))
+
+def ms_list_table(fns):
+    """함수 목록을 모듈별 표로 재조립 (ms.ts listTable)"""
+    out = ""
+    for m in ms_mods(fns):
+        rows = "".join(f'<tr data-id="{esc(f["id"])}"><td><a href="#item-{esc(f["id"])}" data-jump="{esc(f["id"])}">{esc(f["name"])}</a></td>'
+                       f'<td>{esc(f["title"])}</td><td><code>{esc(ms_sig_line(f))}</code></td><td>{"간략" if f["brief"] else "전체"}</td></tr>'
+                       for f in fns if f["mod"] == m)
+        out += (f'<h3 class="ms-mod">{esc(m)}</h3><table class="list"><thead><tr><th>함수</th><th>한 줄</th><th>시그니처</th><th>상세도</th></tr></thead>'
+                f'<tbody>{rows}</tbody></table>')
+    return out
+
+def ms_card(f, did, J):
+    """함수 카드 — 머리 · 첫 부분 앞 글 · 시그니처 · 근거 · 두 단(입력·처리 / 출력·예외·호출하는 것·테스트 관점) (ms.ts card)"""
+    def R(k):
+        v = f["parts"].get(k)
+        return "" if v is None else f"<h5>{k}</h5>{J(render_blocks(v, did))}"
+    sig = ""
+    if "시그니처" in f["parts"]:
+        sig = f'<h5>시그니처</h5><pre class="code" data-lang="python"><code>{esc(f["sig"])}</code></pre>' + (J(render_blocks(f["sig_rest"], did)) if f["sig_rest"] else "")
+    left, right = "".join(R(k) for k in MS_LEFT), "".join(R(k) for k in MS_RIGHT)
+    two = f'<div class="two"><div>{left}</div><div>{right}</div></div>' if left or right else ""
+    lead = f'<div class="lead">{J(render_blocks(f["lead"], did))}</div>' if f["lead"] else ""
+    tag = '<span class="brief-tag">간략형</span>' if f["brief"] else ""
+    return (f'<article class="ms-card{" brief" if f["brief"] else ""}" id="item-{esc(f["id"])}" data-item="{esc(f["id"])}">'
+            f'<h4 class="ms-h"><span class="mod">{esc(f["mod"])}.</span>{esc(f["name"])}<span class="t"> — {inline(f["title"], did)}</span>{tag}</h4>'
+            f'{lead}{sig}{R("근거")}{two}</article>')
+
 def v_ms(doc):
-    return absorb("ms_build.py", doc["path"], "/tmp/_ms.html")
+    """V-MS — 좌 목록 · 모듈별 목록 표 · 함수 카드 전부 펼침 (STD-002 V-MS, 카드 AN). frontend ms.ts vMs와 한 쌍.
+    전에는 옛 ms_build.py가 데이터와 스크립트로 카드를 한 장씩 갈아 끼워 앱과 모양이 달랐고, INS 문서에서 죽었다 (#153)"""
+    did = doc["fm"]["doc_id"]; secs = []; list_at = -1
+    for i, (title, text0) in enumerate(split_sections(doc["body"])):
+        text = ms_trim_rule(text0); name = re.sub(r"^\d+\.\s*", "", title)
+        fns = ms_parse_fns(text)
+        if fns:
+            lead = re.split(r"^#### ", text, flags=re.M)[0]
+            secs.append({"kind": "fn", "id": f"s{i}", "title": title, "lead": ms_trim_rule(lead), "fns": fns})
+        elif name.startswith("함수 목록"):
+            list_at = len(secs); ls = text.split("\n")
+            k = next((j for j, l in enumerate(ls) if l.startswith("|")), -1)
+            secs.append({"kind": "list", "id": "list", "title": title, "lead": "\n".join(ls if k < 0 else ls[:k])})
+        else:
+            secs.append({"kind": "text", "id": "pending" if name.startswith("미결") else f"s{i}", "title": title, "text": text})
+    fns = [f for s in secs if s["kind"] == "fn" for f in s["fns"]]
+    if list_at < 0 and fns:  # 함수 목록 절이 없으면 첫 함수 절 앞에 만든다
+        secs.insert(next(j for j, s in enumerate(secs) if s["kind"] == "fn"), {"kind": "list", "id": "list", "title": "함수 목록", "lead": ""})
+    ids = {f["id"] for f in fns}
+    J = lambda h: ms_jumpify(h, ids, did)
+    nav, main = [], []
+    for s in secs:  # 좌 목록: 절 → (함수 목록) → 모듈별 함수 → 나머지 절
+        if s["kind"] == "fn":
+            for m in ms_mods(s["fns"]):
+                nav.append(f'<div class="grp">{esc(m)}</div>')
+                nav += [f'<a href="#item-{esc(f["id"])}" data-id="{esc(f["id"])}" class="{"brief" if f["brief"] else ""}"><span class="k">{esc(f["name"])}</span>'
+                        f'<span class="t">{esc(f["title"])}</span></a>' for f in s["fns"] if f["mod"] == m]
+        else:
+            name = re.sub(r"^\d+\.\s*", "", s["title"])
+            nav.append(f'<a href="#ms-{esc(s["id"])}" data-id="{esc(s["id"])}"><span class="k">{esc(name)}</span></a>')
+    for s in secs:
+        head = f'<section class="ms-sec" id="ms-{esc(s["id"])}" data-id="{esc(s["id"])}"><h2>{esc(s["title"])}</h2>'
+        if s["kind"] == "list":
+            main.append(head + (J(render_blocks(s["lead"], did)) if s["lead"].strip() else "") + ms_list_table(fns) + "</section>")
+        elif s["kind"] == "fn":
+            cards = "".join(f'<h3 class="ms-mod">{esc(m)}</h3>' + "".join(ms_card(f, did, J) for f in s["fns"] if f["mod"] == m) for m in ms_mods(s["fns"]))
+            main.append(head + (J(render_blocks(s["lead"], did)) if s["lead"].strip() else "") + cards + "</section>")
+        else:
+            main.append(head + J(render_blocks(s["text"], did)) + "</section>")
+    return (f'<style>{MS_CSS}</style><div class="msv"><nav class="ms-nav">{"".join(nav)}</nav><main class="ms-main">{chr(10).join(main)}</main>'
+            f'<script>{MS_JS}</script></div>')
+
+# ms.ts msCss와 바이트 단위로 같다 — check_view_css 여섯째 쌍 (카드 AN)
+MS_CSS = r"""
+.msv{--ink:#1E2A30;--soft:#5C6B73;--faint:#8A969C;--rule:#C9CFCB;--hair:#E1E5E1;--panel:#F8F9F7;display:grid;grid-template-columns:270px minmax(0,1fr);border:1.5px solid var(--ink);background:#fff;min-height:60vh;font-size:14px;line-height:1.6;color:var(--ink)}
+.msv .ms-nav{border-right:1.5px solid var(--ink);background:var(--panel);overflow-y:auto;max-height:88vh;position:sticky;top:0;align-self:start}
+.msv .ms-nav .grp{padding:12px 14px 4px;font-size:11px;font-weight:700;color:var(--soft)}
+.msv .ms-nav a{display:block;padding:7px 14px;font-size:13px;color:var(--ink);text-decoration:none;border-left:3px solid transparent;line-height:1.35;cursor:pointer}
+.msv .ms-nav a:hover{background:#EAEEEA}
+.msv .ms-nav a.sel{border-left-color:var(--ink);background:#fff;font-weight:600}
+.msv .ms-nav a .k{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--ink)}
+.msv .ms-nav a .t{color:var(--soft);font-size:12px;margin-left:6px}
+.msv .ms-nav a.brief .k{color:var(--soft)}
+.msv .ms-main{padding:8px 30px 30px;min-width:0;overflow-x:auto}
+.msv .ms-sec{padding:12px 0 8px;border-bottom:1px solid var(--hair)}
+.msv .ms-sec>h2{margin:0 0 8px;font-size:22px;font-weight:700;letter-spacing:-.02em;border:none;padding:0}
+.msv h3.ms-mod{font-size:13px;margin:22px 0 8px;padding-bottom:6px;border-bottom:1.5px solid var(--ink);color:var(--soft);letter-spacing:.02em}
+.msv .ms-card{padding:14px 0 18px;border-top:1px solid var(--hair);scroll-margin-top:12px;transition:background .6s}
+.msv .ms-card.hit{background:#FFF7D6}
+.msv .ms-card h4.ms-h{margin:0 0 4px;font-size:18px;font-weight:700;letter-spacing:-.02em}
+.msv .ms-card h4.ms-h .mod{color:var(--faint);font-weight:500;font-size:14px}
+.msv .ms-card h4.ms-h .t{color:var(--soft);font-weight:500;font-size:14px}
+.msv .ms-card h5{font-size:12.5px;margin:16px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--ink);color:var(--ink)}
+.msv .ms-card .lead{color:var(--soft)}
+.msv .brief-tag{display:inline-block;font-size:11px;padding:1px 8px;border:1px solid var(--rule);background:var(--panel);color:var(--soft);margin-left:8px;vertical-align:middle;font-weight:500}
+.msv pre.code{background:#1E2A30;color:#E8ECE8;padding:12px 14px;font:12.5px/1.55 ui-monospace,Menlo,monospace;overflow-x:auto;margin:6px 0 12px;border-radius:2px;white-space:pre-wrap}
+.msv pre.code code{background:none;color:inherit;padding:0;font-size:inherit}
+.msv table{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0 14px;background:#fff}
+.msv th{text-align:left;font-weight:600;color:var(--soft);padding:7px 9px;border-bottom:1.5px solid var(--ink);background:var(--panel)}
+.msv td{padding:7px 9px;border-bottom:1px solid var(--hair);vertical-align:top}
+.msv table.list td:first-child{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;white-space:nowrap}
+.msv table.list td:first-child a{color:inherit;text-decoration:none}
+.msv table.list tr{cursor:pointer}
+.msv table.list tr:hover td{background:#F2F4F1}
+.msv ol,.msv ul{margin:4px 0 12px;padding-left:22px}
+.msv li{margin:4px 0}
+.msv .two{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.msv a.ref[data-jump],.msv [data-jump]{cursor:pointer}
+@media (max-width:1000px){.msv{grid-template-columns:1fr}.msv .ms-nav{position:static;max-height:220px;border-right:none;border-bottom:1.5px solid var(--ink)}.msv .two{grid-template-columns:1fr}}
+"""
+
+# ms.ts vMs onMount를 옮긴 것 — 좌 목록·목록 표 행·같은 문서 참조(data-jump)·해시로 그 카드에 간다 (카드 AN)
+MS_JS = r"""
+(function(){
+  const root=document.currentScript.parentElement;
+  const targets=new Map();
+  for(const el of root.querySelectorAll('.ms-main [data-item], .ms-main .ms-sec[data-id]'))targets.set(el.dataset.item??el.dataset.id??'',el);
+  const links=Array.from(root.querySelectorAll('.ms-nav a[data-id]'));
+  let timer;
+  const select=id=>{
+    const el=targets.get(id);
+    if(!el)return false;
+    for(const a of links)a.classList.toggle('sel',a.dataset.id===id);
+    el.scrollIntoView({block:'start'});
+    if(el.classList.contains('ms-card')){
+      root.querySelectorAll('.ms-card.hit').forEach(c=>c.classList.remove('hit'));
+      el.classList.add('hit');
+      clearTimeout(timer);
+      timer=setTimeout(()=>el.classList.remove('hit'),1500);
+    }
+    return true;
+  };
+  root.addEventListener('click',e=>{
+    const t=e.target;
+    if(!(t instanceof Element))return;
+    const navA=t.closest('.ms-nav a[data-id]');
+    if(navA&&root.contains(navA)){if(select(navA.dataset.id||''))e.preventDefault();return;}
+    const jump=t.closest('[data-jump]');
+    if(jump&&root.contains(jump)){if(select(jump.dataset.jump||''))e.preventDefault();return;}
+    const row=t.closest('table.list tr[data-id]');
+    if(row&&root.contains(row))select(row.dataset.id||'');
+  });
+  const fromHash=()=>{
+    let h='';
+    try{h=decodeURIComponent(location.hash.slice(1));}catch(_){h=location.hash.slice(1);}
+    const id=h.replace(/^(?:item-|ms-)/,'');
+    if(id)select(id);
+  };
+  window.addEventListener('hashchange',fromHash);
+  fromHash();
+})();
+"""
 
 # ───────────────────────── V-DOM ─────────────────────────
 def v_dom(doc):
@@ -1359,7 +1566,7 @@ def _selftest_ui():
         ("메타·머리 설명", "<b>경로</b>" in s3 and '<div class="s-desc"><p>머리 설명 문장.</p></div>' in s3),
         ("요소 표는 문서 머리·칸 그대로", "<th>보여주는 것</th>" in s3 and "<th>종류</th>" not in s3 and "칸 모자란 행" in s3 and 'class="kind"' not in s3),
         ("규칙 이어진 줄·밑 목록·칩", "이어 쓴 둘째 줄" in rules and "규칙 밑 목록</li></ul>" in rules and 'data-ref="2"' in rules),
-        ("시나리오 머리 뒤는 유스케이스 자리", '<span class="uc">— <a class="ref" href="view_T-UI-001.html#item-UI-1">#UI-1</a></span>' in s3),
+        ("시나리오 머리 뒤는 유스케이스 자리", '<span class="uc">— <a class="ref" href="view_T-UI-001.html#item-UI-1" data-ref="T-UI-001#UI-1">#UI-1</a></span>' in s3),
         ("시나리오 단계 둘째 줄", "첫 단계 (<span" in s3 and "단계 둘째 줄" in s3),
         ("그 밖은 원본 순서", all(x >= 0 for x in at) and at == sorted(at)),
         ("둘째 html은 공통 틀과 함께", len(frames) == 1 and ".box{border:1px solid red}" in html.unescape(frames[0]) and "둘째 배치" in html.unescape(frames[0])),
@@ -1533,6 +1740,109 @@ upstream: [TX-PRD-001]
 | 1 | 상자 | 영역 | 근거 [[TX-PRD-001#G1]] | — |
 """
 
+_SELF_MS = """---
+doc_id: T-MS-001
+type: MS
+title: 시험 MINISPEC
+status: draft
+upstream: []
+---
+
+# 시험 MINISPEC
+
+## 0. 이 문서가 다루는 것
+
+머리 문장.
+
+## 1. 함수 목록
+
+목록 머리 문장.
+
+| 함수 | 한 줄 |
+|---|---|
+| [[#Foo.bar]] | 표 칸 |
+
+## 2. 함수
+
+함수 절 머리 문장.
+
+#### Foo.bar 막대를 만든다
+
+앞 글 문장.
+
+**시그니처**
+```python
+def bar(x: int) -> int
+```
+시그니처 뒤 문장.
+
+근거: [[#Foo.baz]] · 바깥 근거
+
+**입력** `x` 입력 문장
+
+**처리**
+1. 첫 단계
+2. 둘째 단계
+
+**출력** 출력 문장
+
+**예외** 예외 문장
+
+**호출하는 것** [[#Qux.run]]
+
+**테스트 관점** 시험 문장
+
+---
+
+#### Foo.baz 간략 함수
+
+**시그니처** `async def baz() -> None`
+
+**처리** 한 줄 처리
+
+---
+
+#### Qux.run 다른 모듈
+
+**처리** 돈다
+
+## 3. 미결사항
+
+없음.
+"""
+
+def _selftest_ms():
+    """V-MS가 원본 문장을 버리지 않고 앱(ms.ts)과 같은 모양인지 — 카드 AN. 앱과의 HTML 대조는 check_view_html(카드 AP)"""
+    saved = dict(ALL)
+    d = parse_doc(_SELF_MS, "T-MS-001.md"); ALL[d["fm"]["doc_id"]] = d
+    nolist = parse_doc(_SELF_MS.replace("## 1. 함수 목록\n\n목록 머리 문장.\n\n| 함수 | 한 줄 |\n|---|---|\n| [[#Foo.bar]] | 표 칸 |\n\n", ""), "T-MS-001.md")
+    try: h, h2 = v_ms(d), v_ms(nolist)
+    finally: ALL.clear(); ALL.update(saved)
+    card = {m.group(1): m.group(0) for m in re.finditer(r'<article class="ms-card[^"]*" id="item-([^"]+)".*?</article>', h, re.S)}
+    lst = h[h.find('id="ms-list"'):]; lst = lst[:lst.find("</section>")]
+    keep = ["머리 문장.", "목록 머리 문장.", "함수 절 머리 문장.", "앞 글 문장.", "시그니처 뒤 문장.", "바깥 근거", "입력 문장", "첫 단계", "둘째 단계",
+            "출력 문장", "예외 문장", "시험 문장", "한 줄 처리", "돈다", "없음."]
+    cases = [
+        ("원본 문장을 버리지 않음", all(k in h for k in keep)),
+        ("카드는 전부 펼침", h.count('<article class="ms-card') == 3 and set(card) == {"Foo.bar", "Foo.baz", "Qux.run"}),
+        ("목록 표는 모듈별로 다시 — 원본 표 대신", '<h3 class="ms-mod">Foo</h3><table class="list">' in lst and '<h3 class="ms-mod">Qux</h3>' in lst
+         and "표 칸" not in h and 'data-jump="Foo.baz">baz</a>' in lst),
+        ("간략형은 부분 넷 이하", 'class="ms-card brief" id="item-Foo.baz"' in h and "간략형" in card.get("Foo.baz", "")
+         and 'class="ms-card" id="item-Foo.bar"' in h and '<td>간략</td>' in lst and '<td>전체</td>' in lst),
+        ("시그니처 펜스·한 줄", "<code>def bar(x: int) -&gt; int</code>" in card.get("Foo.bar", "") and "<code>async def baz() -&gt; None</code>" in h
+         and "<code>baz() -&gt; None</code>" in lst),
+        ("두 단", '<div class="two"><div><h5>입력</h5>' in card.get("Foo.bar", "") and "<h5>테스트 관점</h5>" in card.get("Foo.bar", "")),
+        ("같은 문서 점프", 'data-ref="T-MS-001#Foo.baz" data-jump="Foo.baz"' in card.get("Foo.bar", "")),
+        ("미결 절", 'id="ms-pending"' in h),
+        ("함수 목록 절이 없으면 첫 함수 절 앞에 만든다", 0 <= h2.find('id="ms-list"') < h2.find('<h3 class="ms-mod">Foo</h3><article')),
+        ("CSS·스크립트가 실려 있다", "<style>" in h and ".msv{" in h and "<script>" in h and "document.currentScript" in h),
+    ]
+    bad = [name for name, ok in cases if not ok]
+    for name in bad:
+        print("✗ ", name)
+    print("V-MS: 통과" if not bad else f"V-MS: {len(bad)} 실패")
+    return 0 if not bad else 1
+
 def _selftest_root():
     """다른 저장소의 docs/specs를 색인하는지 (#126). 임시 폴더에 문서 둘 — 전역은 끝나면 되돌린다"""
     global SRC_DIR, OUT_DIR, CODE
@@ -1569,7 +1879,7 @@ def _selftest_root():
 def main(argv):
     """[--specs <저장소>/docs/specs] (--all | <원본.md>…) · --selftest"""
     if argv == ["--selftest"]:
-        return _selftest() | _selftest_scn() | _selftest_ui() | _selftest_uc() | _selftest_root()
+        return _selftest() | _selftest_scn() | _selftest_ui() | _selftest_uc() | _selftest_ms() | _selftest_root()
     specs = None
     if "--specs" in argv:
         i = argv.index("--specs")

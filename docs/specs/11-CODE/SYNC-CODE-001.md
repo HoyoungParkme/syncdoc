@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1011,6 +1011,20 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 **왜 카드인가.** 규약(STD-002 V-UC)이 좌 목록·우 상세와 고정 12행·두 대응표를 정했다 — 규약대로 버리고 있었다(AK·AL과 같은 기준). 정적 뷰가 옛 데이터를 그리던 것은 규약 밖 버그지만 같은 함수라 같이 고친다(사용자 결정).
 
 **왜 아무도 못 봤나.** 싱크독 자기 UC는 위젯이 읽는 모양(긴 행 이름·`**기본 흐름**`·`- **2a. …**`)으로 쓰였고, 정적 뷰는 싱크독 것을 옛 데이터로 그려도 거의 같아 보였다. 앱의 항목 밖 글(0장·절 머리)은 처음부터 그리지 않아 없는 줄 몰랐다.
+
+---
+
+#### AN 정적 MS 뷰를 앱과 같은 HTML로
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-STD-002]] 1장·V-MS·4장 · #153 · 사용자 결정 2026-09-27(정적 MS·SEQ도 앱과 같은 HTML로, 카드 셋 AN·AO·AP) |
+| 구현 | `view_build.py`에 `ms.ts`를 옮긴다 — `ms_parse_parts`·`ms_split_sig`·`ms_parse_fns`·`ms_sig_line`·`ms_jumpify`·`ms_list_table`·`ms_card`·`v_ms`(이름·구조를 ms.ts와 맞춤). `MS_JS`는 ms.ts `onMount`(좌 목록·목록 표 행·`[[#X]]` 점프·해시)를 옮긴 것. `MS_CSS`↔`msCss`를 `check_view_css` 여섯째 쌍. 정적 `inline()`이 앱처럼 `data-ref`를 붙인다 — 같은 문서 점프(`data-jump`)가 그 속성에서 나온다(AP 일부를 먼저). 옛 `tools/ms_build.py`와 `absorb`의 MS 경로 삭제 |
+| 테스트 | `view_build --selftest`에 V-MS 시험 문서(원본 문장을 버리지 않음 · 간략형 · 목록 표 재조립 · 함수 목록 절 없을 때 만듦 · 시그니처 펜스·한 줄 · `[[#X]]` 점프 · 미결 절) · 싱크독 MS 여덟과 다른 저장소 MS(INS 포함)가 정적에서 죽지 않고 일회성으로 묶은 앱과 같은 HTML(파싱 비교, `data-item`은 AP까지 빼고) · 정적 뷰를 브라우저로 |
+| 선행 | AM |
+| 완료 | — |
+
+**왜 카드인가.** 정적 V-MS는 규약의 참조 구현인데 앱과 다른 모양을 그렸고(#153), 다른 저장소 문서에서 죽었다. 옛 빌더를 고치는 대신 앱의 모양으로 한 벌로 맞춘다(사용자 결정) — AM의 UC와 같은 방식.
 
 ---
 

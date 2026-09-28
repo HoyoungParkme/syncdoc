@@ -17,6 +17,9 @@
 다섯째 쌍(카드 AM): 유스케이스 뷰 CSS — `frontend/src/view/uc.ts ucCss` ↔ `tools/view_build.py UC_CSS`.
 정적 뷰가 옛 `build.py`의 CSS를 따로 쓰다 되살리며 한 벌로 맞췄다.
 
+여섯째 쌍(카드 AN): MS 뷰 CSS — `frontend/src/view/ms.ts msCss` ↔ `tools/view_build.py MS_CSS`.
+정적 뷰가 옛 `ms_build.py`로 따로 그리다 앱과 같은 HTML로 맞췄다(#153).
+
 사용: python3 tools/check_view_css.py
 """
 
@@ -42,6 +45,9 @@ PY_SCREEN = re.compile(r'WF_SCREEN_CSS = r"""(.*?)"""', re.S)
 UC_TS = os.path.join(ROOT, "frontend", "src", "view", "uc.ts")
 TS_UC = re.compile(r"export const ucCss = `(.*?)`", re.S)
 PY_UC = re.compile(r'^UC_CSS = r"""(.*?)"""', re.S | re.M)
+MS_TS = os.path.join(ROOT, "frontend", "src", "view", "ms.ts")
+TS_MS = re.compile(r"export const msCss = `(.*?)`", re.S)
+PY_MS = re.compile(r'^MS_CSS = r"""(.*?)"""', re.S | re.M)
 
 
 def strip_header(text: str) -> str:
@@ -97,6 +103,10 @@ def main() -> int:
     tu, pu = TS_UC.search(uts), PY_UC.search(open(BUILDER, encoding="utf-8").read())
     ok &= _pair("유스케이스 뷰 CSS", tu.group(1) if tu else None, pu.group(1) if pu else None,
                 "frontend/src/view/uc.ts ucCss", "tools/view_build.py UC_CSS")
+    mts = open(MS_TS, encoding="utf-8").read() if os.path.exists(MS_TS) else ""
+    tm, pm = TS_MS.search(mts), PY_MS.search(open(BUILDER, encoding="utf-8").read())
+    ok &= _pair("MS 뷰 CSS", tm.group(1) if tm else None, pm.group(1) if pm else None,
+                "frontend/src/view/ms.ts msCss", "tools/view_build.py MS_CSS")
     return 0 if ok else 1
 
 
