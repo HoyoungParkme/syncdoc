@@ -1028,6 +1028,20 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 ---
 
+#### AO 정적 SEQ 뷰를 앱과 같은 HTML로
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-STD-002]] 1장·V-SEQ·4장 · #153 · 사용자 결정 2026-09-27(정적 MS·SEQ도 앱과 같은 HTML로, 카드 셋 AN·AO·AP) |
+| 구현 | `view_build.py`에 `seq.ts`를 옮긴다 — `seq_parse_tables`·`seq_life_map`·`seq_parse_mermaid`·`seq_build`·`seq_jumpify`·`seq_inner`·`v_seq`(이름·구조를 seq.ts와 맞춤, 좌 의미 묶음 `SEQ_GROUPS`). JS 정규식의 ASCII 단어 경계(`\b`)는 `(?a:\b)`로 옮긴다 — 「SEQ-13에서」처럼 한글이 붙은 언급도 점프가 된다. `SEQ_JS`는 seq.ts `onMount`(접힌 칸 하나만 열기·좌 목록·점프·확대·해시)를 옮긴 것. `SEQ_CSS`↔`seqCss`를 `check_view_css` 일곱째 쌍. `trim_rule`을 MS와 같이 쓴다. 옛 `tools/seq_build.py`와 `absorb` 삭제 |
+| 테스트 | `view_build --selftest`에 V-SEQ 시험 문서(원본 문장을 버리지 않음 · 개요 칸 하나로 · 생명선 표는 그 시퀀스 것만 · 단계 목록·반환·분기 문맥 · 읽을 때 볼 것 소제목 · 같은 문서 점프와 한글이 붙은 언급 · 묶음 밖 시퀀스는 「기타」 · 정리 · 첫 칸만 열림) · 싱크독 SEQ와 다른 저장소 SEQ(INS 포함)가 정적에서 죽지 않고 일회성으로 묶은 앱과 같은 HTML(파싱 비교, `data-*`까지) · 정적 뷰를 브라우저로 |
+| 선행 | AN |
+| 완료 | — |
+
+**왜 카드인가.** AN과 같다 — 정적 V-SEQ는 규약의 참조 구현인데 앱과 다른 모양을 그렸고, 「이 문서가 다루는 것」 절이 없는 문서에서 죽었다(#153).
+
+---
+
 ## 2. 통합 테스트 시나리오
 
 시나리오 S1~S7을 그대로 E2E 테스트로. 각 슬라이스의 `테스트` 행에 나눠 들어가 있다. 전부 통과하면 PRD 성공지표 측정을 시작한다.
