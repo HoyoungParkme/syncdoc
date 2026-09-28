@@ -1,9 +1,9 @@
-/** tools/seq_build.py 포트 — V-SEQ (STD-002 2장 V-SEQ).
+/** V-SEQ (STD-002 2장 V-SEQ) — tools/view_build.py v_seq와 한 쌍. 정적 뷰도 같은 HTML이다(카드 AO).
  *  좌: 시퀀스 목록을 의미 묶음(저장 파이프라인·판단·조회·운영·공통)으로. 본문 위: 원본 `생명선` 절에서 이 시퀀스에
  *  나오는 것만 고른 생명선 표. 가운데: 좌 mermaid(<pre class="mermaid"> — 렌더는 페이지가 한다, 확대 버튼) / 우 단계 목록
  *  (mermaid 화살표에서 자동 추출, alt·opt·loop 문맥은 회색 줄). 아래: 읽을 때 볼 것.
- *  파이썬은 절 하나만 main.innerHTML로 갈아끼웠다. 여기서는 절마다 <details>를 두고 하나만 연다(아코디언) — 시퀀스 상세가
- *  항상 DOM에 있어 페이지가 #item-SEQ-N으로 스크롤할 수 있다. [[#SEQ-N]]과 본문의 SEQ-N 언급은 페이지 안 점프. */
+ *  절마다 <details>를 두고 하나만 연다(아코디언) — 시퀀스 상세가 항상 DOM에 있어 페이지가 #item-SEQ-N으로 스크롤할 수 있다.
+ *  [[#SEQ-N]]과 본문의 SEQ-N 언급은 페이지 안 점프. 전에는 정적 뷰가 옛 seq_build.py로 절 하나만 갈아 끼웠다(#153). */
 import { esc, inline, renderBlocks, secName, splitSections, type RenderCtx } from './md'
 import type { ViewFn } from './types'
 
@@ -113,7 +113,7 @@ const MSG_RE = new RegExp(`^(${ID})\\s*(-->>|->>|-->|->|--x|-x|--\\)|-\\))\\s*($
 const CTX_RE = /^(alt|opt|loop|rect|par|critical|break)\b\s*(.*)$/
 const ELSE_RE = /^(?:else|and|option)\b\s*(.*)$/
 
-/** participant 목록과 단계(화살표) 목록. alt/opt/loop 문맥도 붙인다 (seq_build.parse_mermaid) */
+/** participant 목록과 단계(화살표) 목록. alt/opt/loop 문맥도 붙인다 (view_build.seq_parse_mermaid) */
 function parseMermaid(mer: string): { parts: Participant[]; steps: Omit<Step, 'fromL' | 'toL' | 'ret'>[] } {
   const parts: Participant[] = []
   const steps: Omit<Step, 'fromL' | 'toL' | 'ret'>[] = []
@@ -231,7 +231,7 @@ function seqInner(s: SeqSec, ctx: RenderCtx, J: (h: string) => string): string {
     h += `<h3>흐름</h3><div class="split"><div class="dia-wrap"><div class="zoom"><button type="button" data-z="-">－</button><button type="button" data-z="0">100%</button><button type="button" data-z="+">＋</button></div><div class="dia mer"><pre class="mermaid">${esc(s.mermaid)}</pre></div></div><div class="steps"><table><thead><tr><th>#</th><th>누가 → 누구</th><th>무엇</th></tr></thead><tbody>${stepRows}</tbody></table><div class="soft hint">→ 호출 · ⇢ 반환. 회색 줄은 분기(alt)·조건(opt)·반복(loop) 안이라는 뜻. 번호는 그림의 번호와 같다.</div></div></div>`
   }
   if (s.after.trim()) {
-    // **읽을 때 볼 것** 문단(또는 "— …" 한 줄)을 소제목으로 승격 (seq_build의 replace)
+    // **읽을 때 볼 것** 문단(또는 "— …" 한 줄)을 소제목으로 승격 (view_build.seq_inner)
     const after = J(renderBlocks(s.after, ctx))
       .replace(/<p><strong>읽을 때 볼 것<\/strong><\/p>/, '<h3>읽을 때 볼 것</h3>')
       .replace(/<p><strong>읽을 때 볼 것<\/strong>\s*(?:—|–|-)?\s*/, '<h3>읽을 때 볼 것</h3><p>')
@@ -396,7 +396,7 @@ export const vSeq: ViewFn = ({ body, ctx }) => {
   return { html, onMount }
 }
 
-/** seq_build.py TPL의 <style> 중 .layout 이하 — .seqv 아래로 범위 한정 */
+/** .seqv 아래로 범위 한정. view_build.py SEQ_CSS와 바이트 단위로 같다 — check_view_css 일곱째 쌍 (카드 AO) */
 export const seqCss = `
 .seqv{--ink:#1E2A30;--soft:#5C6B73;--faint:#8A969C;--rule:#C9CFCB;--hair:#E1E5E1;--panel:#F8F9F7;display:grid;grid-template-columns:250px minmax(0,1fr);border:1.5px solid var(--ink);background:#fff;min-height:60vh;font-size:14px;line-height:1.6;color:var(--ink)}
 .seqv .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
