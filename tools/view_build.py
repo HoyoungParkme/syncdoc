@@ -954,7 +954,7 @@ SEQ_CSS = r"""
 .seqv .seq-nav a.sel{border-left-color:var(--ink);background:#fff;font-weight:600}
 .seqv .seq-nav a .k{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--faint);margin-right:6px}
 .seqv .seq-nav .grp{padding:12px 14px 4px;font-size:11px;font-weight:700;color:var(--soft)}
-.seqv .seq-main{padding:8px 30px 30px;min-width:0;overflow-x:auto}
+.seqv .seq-main{padding:8px 30px 30px;min-width:0;overflow-x:auto;container:seqmain/inline-size}
 .seqv details.seq-sec{border-bottom:1px solid var(--hair)}
 .seqv details.seq-sec>summary{list-style:none;cursor:pointer;padding:10px 0;display:flex;align-items:baseline;gap:8px}
 .seqv details.seq-sec>summary::-webkit-details-marker{display:none}
@@ -992,7 +992,7 @@ SEQ_CSS = r"""
 .seqv .after h4,.seqv .after p{margin-top:8px}
 .seqv a.jump{color:#1a5fb4;cursor:pointer;border-bottom:1px dashed #1a5fb4;font-family:ui-monospace,Menlo,monospace;font-size:.92em;text-decoration:none}
 .seqv a.ref[data-jump]{cursor:pointer}
-@media (max-width:1200px){.seqv .split{grid-template-columns:1fr}.seqv .steps{position:static;max-height:none}}
+@container seqmain (max-width:895px){.seqv .split{grid-template-columns:1fr}.seqv .steps{position:static;max-height:none}}
 @media (max-width:900px){.seqv{grid-template-columns:1fr}.seqv .seq-nav{position:static;max-height:220px;border-right:none;border-bottom:1.5px solid var(--ink)}}
 """
 
