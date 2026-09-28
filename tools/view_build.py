@@ -70,14 +70,16 @@ def inline(s, self_id):
     s = re.sub(r"`([^`]+)`", keep, s)   # 코드 스팬은 참조·강조 처리에서 제외 (STD-001 1.4)
     s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s)
     def ref(m):
-        r = m.group(1); d, _, it = r.partition("#"); d = d or self_id
+        # s는 이미 이스케이프했다 — 잡은 조각을 원래 글자로 돌려 찾고, 내보낼 때 한 번만 이스케이프한다.
+        # 전에는 라벨을 두 번 이스케이프해 `&`가 든 ID가 `&amp;`로 보였다 (#153)
+        r = html.unescape(m.group(1)); d, _, it = r.partition("#"); d = d or self_id
         exists = d in ALL and (not it or it in ALL[d]["items"])
         label = r if d != self_id else ("#" + it)
         href = view_href(d) + (f"#item-{it}" if it else "")
         cls = "ref" if exists else "ref missing"
         # data-ref는 앱과 같다 — 같은 문서 점프(V-MS data-jump)가 여기서 나온다 (STD-002 1장, 카드 AN)
         data = d + ("#" + it if it else "")
-        return f'<a class="{cls}" href="{href}" data-ref="{data}">{esc(label)}</a>'
+        return f'<a class="{cls}" href="{esc(href)}" data-ref="{esc(data)}">{esc(label)}</a>'
     s = re.sub(r"\[\[([^\]]+)\]\]", ref, s)
     s = re.sub(r"(?<![\w/])(https?://[^\s<]+)", r'<a href="\1">\1</a>', s)
     s = re.sub(r"\x00(\d+)\x00", lambda m: f"<code>{codes[int(m.group(1))]}</code>", s)

@@ -30,6 +30,9 @@ const NUL = '\uE000' // 코드 스팬 자리표시 (사용자 영역 문자)
 export const esc = (s: string | null | undefined): string =>
   (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
+/** esc의 반대 — esc를 거친 글자를 원래대로 (inline이 잡은 참조 조각) */
+const unesc = (s: string): string => s.replace(/&quot;/g, '"').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&')
+
 export function splitRef(r: string): [string, string] {
   const i = r.indexOf('#')
   return i < 0 ? [r, ''] : [r.slice(0, i), r.slice(i + 1)]
@@ -44,14 +47,17 @@ export function inline(s: string, ctx: RenderCtx): string {
     return `${NUL}${codes.length - 1}${NUL}`
   })
   s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  s = s.replace(/\[\[([^\]]+)\]\]/g, (_m, r: string) => {
+  s = s.replace(/\[\[([^\]]+)\]\]/g, (_m, r0: string) => {
+    // s는 이미 esc를 거쳤다 — 잡은 조각을 원래 글자로 돌려 찾고, 내보낼 때 한 번만 이스케이프한다.
+    // 전에는 href·data-ref·라벨을 두 번 이스케이프해 `&`가 든 ID가 `&amp;`로 보였다 (#153)
+    const r = unesc(r0)
     const [d0, it] = splitRef(r)
     const d = d0 || ctx.selfId
     const ok = ctx.exists(d, it || undefined)
     const label = d !== ctx.selfId ? r : '#' + it
     const href = ctx.href(d, it || undefined)
-    const data = `${esc(d)}${it ? '#' + esc(it) : ''}`
-    return `<a class="${ok ? 'ref' : 'ref missing'}" href="${esc(href)}" data-ref="${data}">${esc(label)}</a>`
+    const data = `${d}${it ? '#' + it : ''}`
+    return `<a class="${ok ? 'ref' : 'ref missing'}" href="${esc(href)}" data-ref="${esc(data)}">${esc(label)}</a>`
   })
   s = s.replace(/(?<![\w/])(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>')
   s = s.replace(new RegExp(`${NUL}(\\d+)${NUL}`, 'g'), (_m, i: string) => `<code>${codes[Number(i)]}</code>`)
