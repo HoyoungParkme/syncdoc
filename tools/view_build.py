@@ -1376,7 +1376,8 @@ def v_plain(doc, pat):
 VIEWS = {"PRD": v_prd, "RFQ": v_rfq, "SCN": v_scn, "UC": v_uc, "INFRA": v_infra, "DOM": v_dom, "UI": v_ui, "API": v_api, "SEQ": v_seq, "MS": v_ms, "STD": v_std}
 ITEM_PAT = {"RFQ": r"Q\d+", "PRD": r"G\d+|R\d+|N\d+", "SCN": r"P\d+|S\d+", "UC": r"UC-[AHGS]\d+", "INFRA": r"C\d+",
             "DOM": r"[A-Za-z][A-Za-z0-9_]+", "UI": r"UI-\d+", "API": r"(GET|POST|PUT|PATCH|DELETE)/\S+|[a-z][a-z_]+",
-            "SEQ": r"SEQ-\d+|SEQ-C\d+", "MS": r"[A-Za-z_]+\.[a-z_]+", "STD": r"[A-Z]+-\d+|V-[A-Z]+"}
+            "SEQ": r"SEQ-\d+|SEQ-C\d+", "MS": r"[A-Za-z_]+\.[a-z_]+", "STD": r"[A-Z]+-\d+|V-[A-Z]+",
+            "CODE": r"[A-Z]+\d*"}  # CODE가 없어 모든 헤딩이 항목이 됐다 (STD-001 2.11, #153)
 
 CSS = r"""
 :root{--paper:#EDEFEC;--panel:#F8F9F7;--card:#fff;--ink:#1E2A30;--soft:#5C6B73;--faint:#8A969C;--rule:#C9CFCB;--hair:#E1E5E1;--hi:#FFF1B8;--blue:#1a5fb4}

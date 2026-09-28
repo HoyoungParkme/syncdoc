@@ -124,6 +124,16 @@ def test_item_blocks_boundaries_and_code_block_skip(db_session: Session) -> None
     assert last.item_id == "N1" and last.end_line == len(tail.split("\n"))
 
 
+def test_item_blocks_code_two_letter_cards(db_session: Session) -> None:
+    """CODE 카드는 Z 다음 AA·AB…로 잇는다 — 두 글자도 항목이다 (STD-001 2.11, #153)."""
+    body = (
+        "---\ndoc_id: EXMP-CODE-001\ntype: CODE\ntitle: 계획\nstatus: draft\n---\n# 구현 계획\n"
+        "## 1. 슬라이스\n#### A 기반\n#### B12 묶음 안 순서\n#### Z 한 글자 끝\n#### AB 두 글자\n"
+    )
+    got = [b.item_id for b in SpecService(db_session).item_blocks(body, DocType.CODE)]
+    assert got == ["A", "B12", "Z", "AB"]
+
+
 def test_item_blocks_matches_validate_py_on_all_specs(db_session: Session) -> None:
     """_tools/validate.py와 같은 결과 — 27개 명세의 항목 ID 목록."""
     import importlib.util
