@@ -1,8 +1,8 @@
-/** tools/ms_build.py 포트 — V-MS (STD-002 2장 V-MS).
+/** V-MS (STD-002 2장 V-MS) — tools/view_build.py v_ms와 한 쌍. 정적 뷰도 같은 HTML이다(카드 AN).
  *  함수 목록 절을 모듈(서비스)별 표로 재조립하고, 함수 항목(#### Class.method 제목)마다 카드 — 시그니처 코드 블록 · 근거 ·
  *  입력/처리(번호 목록) | 출력/예외/호출하는 것/테스트 관점 두 단. 부분이 4개 이하면 "간략형".
- *  파이썬은 카드 하나만 main.innerHTML로 보여줬다. 여기서는 카드를 전부 펼쳐 두고(가벼우니) 좌 목록·목록 표 행·[[#X]]가
- *  id="item-Class.method"로 스크롤한다. */
+ *  카드를 전부 펼쳐 두고(가벼우니) 좌 목록·목록 표 행·[[#X]]가 id="item-Class.method"로 스크롤한다.
+ *  전에는 정적 뷰가 옛 ms_build.py로 카드 하나만 main.innerHTML로 갈아 끼웠다(#153). */
 import { esc, inline, renderBlocks, secName, splitSections, itemBlocks, type RenderCtx } from './md'
 import { ITEM_PAT, type ViewFn } from './types'
 
@@ -51,7 +51,7 @@ type Sec = TextSec | FnSec | ListSec
 const stripFm = (s: string): string => s.replace(/^---\n[\s\S]*?\n---\n/, '')
 const trimRule = (s: string): string => s.replace(/\n---\s*$/, '')
 
-/** **부분** 줄로 자른다. `근거: …` 한 줄짜리도 근거 부분으로 (ms_build의 parts) */
+/** **부분** 줄로 자른다. `근거: …` 한 줄짜리도 근거 부분으로 (view_build.ms_parse_parts) */
 function parseParts(text: string): { parts: Map<PartName, string>; lead: string } {
   const parts = new Map<PartName, string>()
   const lead: string[] = []
@@ -270,7 +270,7 @@ export const vMs: ViewFn = ({ body, ctx }) => {
   return { html, onMount }
 }
 
-/** ms_build.py TPL의 <style> 중 .layout 이하 — .msv 아래로 범위 한정 */
+/** .msv 아래로 범위 한정. view_build.py MS_CSS와 바이트 단위로 같다 — check_view_css 여섯째 쌍 (카드 AN) */
 export const msCss = `
 .msv{--ink:#1E2A30;--soft:#5C6B73;--faint:#8A969C;--rule:#C9CFCB;--hair:#E1E5E1;--panel:#F8F9F7;display:grid;grid-template-columns:270px minmax(0,1fr);border:1.5px solid var(--ink);background:#fff;min-height:60vh;font-size:14px;line-height:1.6;color:var(--ink)}
 .msv .ms-nav{border-right:1.5px solid var(--ink);background:var(--panel);overflow-y:auto;max-height:88vh;position:sticky;top:0;align-self:start}
