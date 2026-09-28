@@ -1036,7 +1036,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `view_build.py`에 `seq.ts`를 옮긴다 — `seq_parse_tables`·`seq_life_map`·`seq_parse_mermaid`·`seq_build`·`seq_jumpify`·`seq_inner`·`v_seq`(이름·구조를 seq.ts와 맞춤, 좌 의미 묶음 `SEQ_GROUPS`). JS 정규식의 ASCII 단어 경계(`\b`)는 `(?a:\b)`로 옮긴다 — 「SEQ-13에서」처럼 한글이 붙은 언급도 점프가 된다. `SEQ_JS`는 seq.ts `onMount`(접힌 칸 하나만 열기·좌 목록·점프·확대·해시)를 옮긴 것. `SEQ_CSS`↔`seqCss`를 `check_view_css` 일곱째 쌍. `trim_rule`을 MS와 같이 쓴다. 옛 `tools/seq_build.py`와 `absorb` 삭제 |
 | 테스트 | `view_build --selftest`에 V-SEQ 시험 문서(원본 문장을 버리지 않음 · 개요 칸 하나로 · 생명선 표는 그 시퀀스 것만 · 단계 목록·반환·분기 문맥 · 읽을 때 볼 것 소제목 · 같은 문서 점프와 한글이 붙은 언급 · 묶음 밖 시퀀스는 「기타」 · 정리 · 첫 칸만 열림) · 싱크독 SEQ와 다른 저장소 SEQ(INS 포함)가 정적에서 죽지 않고 일회성으로 묶은 앱과 같은 HTML(파싱 비교, `data-*`까지) · 정적 뷰를 브라우저로 |
 | 선행 | AN |
-| 완료 | — |
+| 완료 | 2026-09-28 · 브랜치 `card/AO-seq-view` · spec 2 + code 1 · 테스트 258(백엔드 변경 없음) · `validate` 0/0 · `check_code` 113/113 · `check_ui` 12/12 · `check_dom` 10·10·10 · `check_tokens` 91/0 · **`check_view_css` 일곱 쌍**(SEQ 뷰 CSS 신설) · `check_templates` 16/16 · `open_items --check` · `wf_build --selftest` · **`view_build --selftest` V-SEQ 열 건**(원본 문장 · 개요 칸 하나로 · 그 시퀀스 생명선만 · 단계·반환·분기 문맥 · 읽을 때 볼 것 소제목 · 같은 문서 점프 · 한글이 붙은 언급 · 묶음·기타·정리 · 첫 칸만 열림 · CSS·스크립트) — 한글이 붙은 언급 사례는 유니코드 `\b`로 바꾸면 실패한다(확인) · SEQ 문서 일곱(싱크독 + HB·INS·JSD·QBOT·TBL·VA — 컨테이너에서 읽기만)이 일회성으로 묶은 앱과 **파싱 비교로 같은 HTML**(`data-*`까지), MS 37도 그대로 — 전에는 정적이 INS-SEQ-001에서 죽었다 · 옛 `absorb`(옛 빌더를 subprocess로 돌려 `/tmp`에 쓰던 것)도 지웠다 · 정적 뷰를 브라우저로(잠깐 띄운 http.server): SYNC-SEQ-001 칸 26 · 처음엔 개요만 열림 · 좌 목록·summary·해시가 그 칸만 연다 · mermaid 그림 · 확대 1.2 · 앱 화면은 바뀌지 않는다(seq.ts 머리 주석만) · **되먹임**: 그림/단계 두 단이 좁은 본문에서 가로로 넘친다 — 앱도 같다(본문 587px에 내용 926px), 미디어 쿼리가 창 폭 기준이라서 → #189 |
 
 **왜 카드인가.** AN과 같다 — 정적 V-SEQ는 규약의 참조 구현인데 앱과 다른 모양을 그렸고, 「이 문서가 다루는 것」 절이 없는 문서에서 죽었다(#153).
 
@@ -1112,6 +1112,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AL | `card/AL-ui-view` | `04f2a36` | #174 | 2026-09-23 |
 | AM | `card/AM-uc-view` | `452c2ae` | #176 | 2026-09-23 |
 | AN | `card/AN-ms-view` | `22c1031` | #186 | 2026-09-28 |
+| AO | `card/AO-seq-view` | `3b6eef3` | #188 | 2026-09-28 |
 | (#119) | `fix/119-single-render` | — | #119 | 2026-09-23 |
 | (#126) | `fix/126-view-build-specs` | — | #126 | 2026-09-23 |
 | (#133) | `fix/133-tokens-by-chapter` | — | #133 | 2026-09-23 |
