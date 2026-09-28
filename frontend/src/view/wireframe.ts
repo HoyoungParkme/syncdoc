@@ -8,8 +8,8 @@
  *  「공통 틀」 절의 첫 html 블록은 이 문서 모든 화면 앞에 함께 들어간다.
  *  wf_build.py는 DATA json + script로 런타임에 그렸지만 여기서는 HTML을 정적으로 만들고 onMount가 탭·연동만 붙인다. */
 import { commonBlock, frameHtml, hiIn, mountFrames, remeasure, safeLayout, splitCommon, type CommonParts } from './frame'
-import { cardBody, esc, etcBlock, h2, inline, leadRest, renderBlocks, type ItemBlock, type RenderCtx } from './md'
-import { ITEM_PAT, type ViewFn } from './types'
+import { cardBody, esc, etcBlock, inline, leadRest, renderBlocks, type ItemBlock, type RenderCtx } from './md'
+import type { ViewFn } from './types'
 import { itemCard } from './views'
 
 export interface WfScenario {
@@ -303,27 +303,6 @@ function screenHtml(s: WfScreen, i: number, ctx: RenderCtx, common: CommonParts)
   return `<section class="screen" id="item-${esc(s.id)}" data-item="${esc(s.id)}" data-i="${i}"${i === 0 ? '' : ' style="display:none"'}><div class="s-head"><b>${esc(s.id)} ${esc(s.name)}</b>${meta}</div>${desc}<div class="wfstack">${inner}</div></section>`
 }
 
-/** `## 절` 단위 → [제목, 본문]. md.splitSections와 같되 코드 펜스 안 `## `은 절이 아니다 —
- *  와이어프레임 html 예시에 마크다운 제목이 들어 있어(TBL·SYNC-UI-002) 거기서 갈리면 펜스 짝이 어긋난다 */
-function sections(body: string): [string, string][] {
-  const out: [string, string][] = []
-  let title: string | null = null
-  let buf: string[] = []
-  let inFence = false
-  for (const l of body.split('\n')) {
-    if (/^\s*```/.test(l)) inFence = !inFence
-    if (!inFence && l.startsWith('## ')) {
-      if (title !== null) out.push([title, buf.join('\n')])
-      title = l.slice(3).trim()
-      buf = []
-      continue
-    }
-    if (title !== null) buf.push(l)
-  }
-  if (title !== null) out.push([title, buf.join('\n')])
-  return out
-}
-
 /** wf_build._design_cards — 배치가 없는 화면은 화면마다 카드: 머리 ID·이름·하위 문서 N, 몸은 블록 전부, 바닥 「이 화면을 근거로 삼은
  *  문서」. 전에는 표 한 행에 첫 줄만 실려 나머지가 사라졌다 (STD-002 V-UI, #152). 종류·유스케이스는 머리로 뽑지 않는다 */
 const designCards = (screens: WfScreen[], ctx: RenderCtx): string =>
@@ -342,25 +321,6 @@ function renderRun(blocks: ItemBlock[], ctx: RenderCtx, common: CommonParts): st
     out.push(`<div class="stabs" role="tablist">${tabs}</div><div class="screens">${wired.map((s, i) => screenHtml(s, i, ctx, common)).join('')}</div>`)
   }
   return `<div class="wfgroup">${out.join('')}</div>`
-}
-
-/** 절 본문 → 산문은 그대로, 화면 항목 묶음은 카드·탭으로. 항목이 절 자체(`## UI-N`)인 경우는 vUi가 모은다 */
-function renderSection(text: string, ctx: RenderCtx, common: CommonParts): string {
-  const out: string[] = []
-  let run: ItemBlock[] = []
-  const flush = () => {
-    if (run.length) out.push(renderRun(run, ctx, common))
-    run = []
-  }
-  for (const seg of segments(text)) {
-    if (seg.kind === 'item') run.push(seg.block)
-    else {
-      flush()
-      out.push(renderBlocks(seg.text, ctx, ITEM_PAT.UI))
-    }
-  }
-  flush()
-  return out.join('\n')
 }
 
 // ───────────────────────── 동작 (wf_build.py script) ─────────────────────────
@@ -447,25 +407,25 @@ export function mountWireframe(root: HTMLElement): () => void {
 
 /** V-UI 렌더러 하나. `## UI-N` 절이 이어지면 한 묶음, 다른 절은 제목 + 안의 화면 항목을 자리에서 표·탭으로 */
 export const vUi: ViewFn = ({ body, ctx }) => {
-  const out: string[] = []
   // 「공통 틀」 절의 첫 html 블록 — 스타일·링크는 head, 마크업은 body 앞. 모든 화면 iframe에 함께 들어간다
   const common = splitCommon(commonBlock(body))
+  // wf_build.render_ui와 같은 모양 — 문서 순서대로 화면 사이 글은 .prose, 이어진 화면 항목은 묶음 하나(renderRun). 전체를
+  // .uiview로 감싼다. 전에는 ## 절마다 머리를 따로 그려 첫 절 앞(h1·구분선)을 버리고 절 머리에 id가 없었다 (#153)
+  const out: string[] = []
   let run: ItemBlock[] = []
   const flush = () => {
     if (run.length) out.push(renderRun(run, ctx, common))
     run = []
   }
-  for (const [title, text] of sections(body)) {
-    const m = /^(UI-\d+)(?:\s+(.*))?$/.exec(title)
-    if (m) {
-      run.push({ id: m[1], title: m[2] ?? '', level: 2, text })
-      continue
+  for (const seg of segments(body)) {
+    if (seg.kind === 'item') run.push(seg.block)
+    else {
+      flush()
+      out.push(`<div class="prose">${renderBlocks(seg.text, ctx)}</div>`)
     }
-    flush()
-    out.push(h2(title) + renderSection(text, ctx, common))
   }
   flush()
-  return { html: out.join('\n'), onMount: mountWireframe }
+  return { html: `<div class="uiview">${out.join('\n')}</div>`, onMount: mountWireframe }
 }
 
 // ───────────────────────── CSS (wf_build.py <style>) ─────────────────────────

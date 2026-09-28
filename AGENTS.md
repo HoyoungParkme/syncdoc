@@ -53,6 +53,7 @@ syncdoc/            저장소 = 프로젝트
 - `python tools/check_code.py` — MINISPEC↔코드 시그니처 대조 (DEV-14 첫째·둘째)
 - `python tools/check_ui.py` — 와이어프레임 요소 번호↔React `data-el` 대조 (DEV-17)
 - `python tools/check_view_css.py` — 뷰 CSS가 `view_build.py`와 바이트 단위로 같은지 (STD-002)
+- `python tools/check_view_html.py` — 정적 뷰와 앱 유저용 탭이 같은 HTML인지 (STD-002 1장·4장). 앱 뷰를 rolldown으로 묶어 Node로 돌리므로 `frontend/node_modules`가 있어야 한다. 싱크독 문서와 셀프테스트 시험 문서, `--specs <저장소>/docs/specs`로 다른 저장소. 뷰 코드(`tools/view_build.py`·`wf_build.py`·`frontend/src/view`)를 고치면 돌린다
 - `python tools/check_dom.py` — DOM 세 문서(도메인·클래스·데이터)의 이름 일치 (STD-001 4장 `dom.name`)
 - `python tools/check_tokens.py` — 디자인 토큰이 UI-001 3장과 같은 값인지 (DEV-17)
 - `python tools/check_templates.py` — 템플릿이 타입·서브타입의 필수 절을 다 갖췄는지. 템플릿대로 쓰면 미완성이 안 나야 한다 (STD-001 1.1)

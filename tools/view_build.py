@@ -70,14 +70,16 @@ def inline(s, self_id):
     s = re.sub(r"`([^`]+)`", keep, s)   # 코드 스팬은 참조·강조 처리에서 제외 (STD-001 1.4)
     s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s)
     def ref(m):
-        r = m.group(1); d, _, it = r.partition("#"); d = d or self_id
+        # s는 이미 이스케이프했다 — 잡은 조각을 원래 글자로 돌려 찾고, 내보낼 때 한 번만 이스케이프한다.
+        # 전에는 라벨을 두 번 이스케이프해 `&`가 든 ID가 `&amp;`로 보였다 (#153)
+        r = html.unescape(m.group(1)); d, _, it = r.partition("#"); d = d or self_id
         exists = d in ALL and (not it or it in ALL[d]["items"])
         label = r if d != self_id else ("#" + it)
         href = view_href(d) + (f"#item-{it}" if it else "")
         cls = "ref" if exists else "ref missing"
         # data-ref는 앱과 같다 — 같은 문서 점프(V-MS data-jump)가 여기서 나온다 (STD-002 1장, 카드 AN)
         data = d + ("#" + it if it else "")
-        return f'<a class="{cls}" href="{href}" data-ref="{data}">{esc(label)}</a>'
+        return f'<a class="{cls}" href="{esc(href)}" data-ref="{esc(data)}">{esc(label)}</a>'
     s = re.sub(r"\[\[([^\]]+)\]\]", ref, s)
     s = re.sub(r"(?<![\w/])(https?://[^\s<]+)", r'<a href="\1">\1</a>', s)
     s = re.sub(r"\x00(\d+)\x00", lambda m: f"<code>{codes[int(m.group(1))]}</code>", s)
@@ -112,7 +114,7 @@ def render_blocks(text, self_id, item_pat=None, common=""):
             is_item = item_pat and re.fullmatch(item_pat, tok) and not re.match(r"^\d", tok)
             if is_item:
                 title = text_[len(tok):].strip()
-                out.append(f'<h{lvl} class="item" id="item-{esc(tok)}"><span class="iid">{esc(tok)}</span>{inline(title, self_id)}</h{lvl}>')
+                out.append(f'<h{lvl} class="item" id="item-{esc(tok)}" data-item="{esc(tok)}"><span class="iid">{esc(tok)}</span>{inline(title, self_id)}</h{lvl}>')
             else:
                 out.append(f'<h{lvl} id="sec-{esc(re.sub(r"[^\w]", "", text_))}">{inline(text_, self_id)}</h{lvl}>')
             i += 1; continue
@@ -253,10 +255,10 @@ document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{{const g=b.dat
 # ───────────────────────── 항목 카드 (V-PRD 목표·요구사항, V-INFRA 제약) ─────────
 def item_card(did, iid, title, inner, down, label, pills=""):
     """머리 ID 뱃지·제목·필·`하위 문서 N` · 몸 · 바닥 "{label}: 문서들". 하위가 없으면 필·바닥을 안 그린다"""
-    card = f'<article class="card" id="item-{iid}"><div class="card-h"><span class="iid">{iid}</span><b>{inline(title, did)}</b>{pills}'
+    card = f'<article class="card" id="item-{iid}" data-item="{esc(iid)}"><div class="card-h"><span class="iid">{iid}</span><b>{inline(title, did)}</b>{pills}'
     if down: card += f'<span class="pill soft">하위 문서 {len(down)}</span>'  # 근거로 삼은 다른 문서 수 = 바닥 줄 (#160)
     card += "</div>" + inner
-    if down: card += f'<div class="down">{label}: ' + " · ".join(f'<a class="ref" href="{view_href(d)}">{d}</a>' for d in down) + "</div>"
+    if down: card += f'<div class="down">{label}: ' + " · ".join(f'<a class="ref" href="{view_href(d)}" data-ref="{d}">{d}</a>' for d in down) + "</div>"
     return card + "</article>"
 
 def item_cards(did, text, pat, label, dmap):
@@ -299,7 +301,7 @@ def v_prd(doc):
     # 추적표 (원본에 없음. 참조 테이블에서)
     downs = downstream_of(did)
     if downs:
-        rows = "".join(f'<tr><td><a class="ref" href="{view_href(d)}">{d}</a></td><td>{esc(ALL[d]["fm"]["title"])}</td><td>{esc(", ".join(sorted(v)))}</td></tr>' for d, v in sorted(downs.items()))
+        rows = "".join(f'<tr><td><a class="ref" href="{view_href(d)}" data-ref="{d}">{d}</a></td><td>{esc(ALL[d]["fm"]["title"])}</td><td>{esc(", ".join(sorted(v)))}</td></tr>' for d, v in sorted(downs.items()))
         out.append(f'<h2>추적표 — 이 문서를 근거로 삼은 문서</h2><p class="soft">원본에 없다. 다른 문서의 참조에서 계산했다.</p><table class="trace"><thead><tr><th>문서</th><th>제목</th><th>참조한 항목</th></tr></thead><tbody>{rows}</tbody></table>')
     return "\n".join(out)
 
@@ -314,10 +316,13 @@ def v_rfq(doc):
         by_q = {}
         for d, v in downs.items():
             for it in v: by_q.setdefault(it, set()).add(d)
-        rows = "".join(f'<tr><td class="iid">{esc(q)}</td><td>{inline(doc["items"].get(q, ""), did)}</td><td>{" · ".join(f"<a class=\"ref\" href=\"{view_href(d)}\">{d}</a>" for d in sorted(ds))}</td></tr>' for q, ds in sorted(by_q.items(), key=lambda x: (x[0]=="(문서)", x[0])))
+        # 요구와 그 제목은 항목 블록(Q\d+)에서 — parse_doc의 items는 글자로 시작하는 헤딩 전부라 「RFQ:」까지 요구로 셌고,
+        # 제목에서 인라인 코드를 뗐다 (#153)
+        titles = {x[0]: x[1] for x in item_blocks(doc["body"], r"Q\d+")}
+        rows = "".join(f'<tr><td class="iid">{esc(q)}</td><td>{inline(titles.get(q, ""), did)}</td><td>{" · ".join(f"<a class=\"ref\" href=\"{view_href(d)}\" data-ref=\"{d}\">{d}</a>" for d in sorted(ds))}</td></tr>' for q, ds in sorted(by_q.items(), key=lambda x: (x[0]=="(문서)", x[0])))
         out.append(f'<h2>추적표 — 요구가 어디로 갔나</h2><p class="soft">원본에 없다. 다른 문서의 참조에서 계산했다. 어느 요구도 근거로 안 쓰였다면 그 요구는 구현 계획이 없는 것이다.</p><table class="trace"><thead><tr><th>요구</th><th>내용</th><th>근거로 삼은 문서</th></tr></thead><tbody>{rows}</tbody></table>')
-        unused = [q for q in doc["items"] if q not in by_q]
-        if unused: out.append(f'<p class="warn">근거로 쓰이지 않은 요구: {", ".join(unused)}</p>')
+        unused = [q for q in titles if q not in by_q]
+        if unused: out.append(f'<p class="warn">근거로 쓰이지 않은 요구: {esc(", ".join(unused))}</p>')
     return "\n".join(out)
 
 # ───────────────────────── V-SCN ─────────────────────────
@@ -365,7 +370,7 @@ def scn_card(did, sid, title, text):
     head, steps, variants, tail, etc = scn_parts(text)
     lis = "".join(f"<li>{step_html(s, did)}</li>" for s in steps)
     vars_ = "".join(variant_html(v, did) for v in variants)
-    return (f'<article class="scard" id="item-{sid}"><div class="card-h"><span class="iid">{sid}</span><b>{inline(title, did)}</b><span class="pill soft">{len(steps)}단계</span></div>'
+    return (f'<article class="scard" id="item-{sid}" data-item="{esc(sid)}"><div class="card-h"><span class="iid">{sid}</span><b>{inline(title, did)}</b><span class="pill soft">{len(steps)}단계</span></div>'
             f'{render_blocks(chr(10).join(head), did)}<ol class="steps">{lis}</ol>{vars_}{render_blocks(chr(10).join(tail), did)}{etc_block(etc, did)}</article>')
 
 def v_scn(doc):
@@ -379,7 +384,7 @@ def v_scn(doc):
             body = grid = ""  # 이어진 P 카드끼리 한 그리드
             for k, x in split_items(text, r"P\d+"):
                 if k == "item":
-                    grid += f'<article class="pcard" id="item-{x[0]}"><div class="card-h"><span class="iid">{x[0]}</span><b>{inline(x[1], did)}</b></div>{render_blocks(x[3], did)}</article>'
+                    grid += f'<article class="pcard" id="item-{x[0]}" data-item="{esc(x[0])}"><div class="card-h"><span class="iid">{x[0]}</span><b>{inline(x[1], did)}</b></div>{render_blocks(x[3], did)}</article>'
                     continue
                 if grid: body += f'<div class="pgrid">{grid}</div>'; grid = ""
                 body += render_blocks(x, did)
@@ -508,7 +513,7 @@ def _map_text(h, fn):
     return "".join(out)
 
 def _uc_a(uid, did, cls, text):
-    return f'<a class="{cls}" href="{view_href(did)}#item-{uid}">{esc(text)}</a>'
+    return f'<a class="{cls}" href="{view_href(did)}#item-{uid}" data-ref="{did}#{uid}">{esc(text)}</a>'
 
 def uc_jumps(h, ids, did):
     """글자 속 맨몸 `UC-xx`(`#` 뒤 제외)를 그 카드로 가는 링크로. 있는 유스케이스만 (STD-002 V-UC)"""
@@ -1269,7 +1274,7 @@ def v_dom(doc):
                 lead = re.split(r"^#### ", text, flags=re.M)[0]
                 cards = ""
                 for cid, ct, _, cb in item_blocks(text, r"[A-Z][A-Za-z]+"):
-                    cards += f'<article class="pcard" id="item-{cid}"><div class="card-h"><span class="iid">{cid}</span><b>{inline(ct, did)}</b></div>{render_blocks(cb, did)}</article>'
+                    cards += f'<article class="pcard" id="item-{cid}" data-item="{esc(cid)}"><div class="card-h"><span class="iid">{cid}</span><b>{inline(ct, did)}</b></div>{render_blocks(cb, did)}</article>'
                 out.append(f'<h2>{esc(title)}</h2>{render_blocks(lead, did)}<div class="pgrid dom">{cards}</div>'); continue
             out.append(f"<h2>{esc(title)}</h2>" + render_blocks(text, did, r"[A-Z][A-Za-z]+"))
         return "\n".join(out)
@@ -1295,7 +1300,7 @@ def v_dom(doc):
                     # 각 클래스 항목: 헤딩 + 관계·테이블 링크 (조각 다이어그램은 합쳤으니 생략)
                     for cid, ct, _, cb in item_blocks(gb, r"[A-Z][A-Za-z]+"):
                         rest = re.sub(r"```mermaid\n.*?\n```\n?", "", cb, flags=re.S)
-                        out.append(f'<div class="card" id="item-{cid}"><div class="card-h"><span class="iid">{cid}</span><b>{inline(ct, did)}</b></div>{render_blocks(rest, did)}</div>')
+                        out.append(f'<div class="card" id="item-{cid}" data-item="{esc(cid)}"><div class="card-h"><span class="iid">{cid}</span><b>{inline(ct, did)}</b></div>{render_blocks(rest, did)}</div>')
                 continue
             out.append(f"<h2>{esc(title)}</h2>" + render_blocks(text, did, r"[A-Z][A-Za-z]+"))
         return "\n".join(out)
@@ -1323,7 +1328,7 @@ def v_api(doc):
                         rows += f'<tr><td><span class="meth m-{meth.lower()}">{meth}</span></td><td class="mono"><a href="#item-{esc(eid)}">{esc(path)}</a></td><td>{inline(et, did)}</td><td class="small">{inline(meta, did)}</td></tr>'
                         y = re.search(r"```yaml\n(.*?)\n```", eb, re.S)
                         if y: ops.append(y.group(1))
-                        details += f'<details class="ep" id="item-{esc(eid)}"><summary><span class="meth m-{meth.lower()}">{meth}</span> <span class="mono">{esc(path)}</span> — {inline(et, did)}</summary>{render_blocks(eb, did)}</details>'
+                        details += f'<details class="ep" id="item-{esc(eid)}" data-item="{esc(eid)}"><summary><span class="meth m-{meth.lower()}">{meth}</span> <span class="mono">{esc(path)}</span> — {inline(et, did)}</summary>{render_blocks(eb, did)}</details>'
                 out.append(f'<table class="reassembled eps"><thead><tr><th></th><th>경로</th><th>요약</th><th>화면 · 유스케이스 · 서비스</th></tr></thead><tbody>{rows}</tbody></table><h3>엔드포인트 상세</h3>{details}')
                 continue
             if name.startswith("스키마"):
@@ -1340,7 +1345,8 @@ def v_api(doc):
                 except Exception as e: merged = f"# 합치기 실패: {e}"
                 out.append(f'<h2>{esc(title)}</h2>' + render_blocks(re.split(r"```", text)[0], did) +
                            f'<details class="ep"><summary>공통 스키마 (components) 펼치기</summary>{render_blocks(card_body(text), did)}</details>'
-                           f'<h3>OpenAPI 전체 — 뷰가 조각 {len(ops)}개를 합쳤다</h3><p class="soft">원본은 엔드포인트마다 조각. 이건 뷰가 만든 것(V-API). 그대로 저장하면 Swagger에 넣을 수 있다.</p><details class="ep"><summary>openapi.yaml 펼치기</summary><pre class="code"><code>{esc(merged)}</code></pre></details>')
+                           # OpenAPI 합치기는 정적 뷰만 — 앱은 같은 칸(div.oa-merge)에 한 줄. 대조 검사기가 그 속만 뺀다 (STD-002 V-API, #153)
+                           f'<div class="oa-merge"><h3>OpenAPI 전체 — 뷰가 조각 {len(ops)}개를 합쳤다</h3><p class="soft">원본은 엔드포인트마다 조각. 이건 뷰가 만든 것(V-API). 그대로 저장하면 Swagger에 넣을 수 있다.</p><details class="ep"><summary>openapi.yaml 펼치기</summary><pre class="code"><code>{esc(merged)}</code></pre></details></div>')
                 continue
             out.append(f"<h2>{esc(title)}</h2>" + render_blocks(text, did))
         return "\n".join(out)
@@ -1359,7 +1365,7 @@ def v_api(doc):
                         schema_tbl = f'<p class="desc">{esc(d["description"])}</p><table class="schema"><thead><tr><th>인자</th><th>타입</th><th>필수</th><th>설명</th></tr></thead><tbody>' + "".join(f'<tr><td class="mono">{esc(k)}</td><td class="mono">{esc(v.get("type","") + ("["+v["items"]["type"]+"]" if v.get("type")=="array" and "items" in v else "") + (" "+"|".join(v["enum"]) if "enum" in v else ""))}</td><td>{"○" if k in req else ""}</td><td>{esc(v.get("description",""))}</td></tr>' for k, v in props.items()) + "</tbody></table>"
                     except Exception: schema_tbl = ""
                 rest = re.sub(r"```json\n\{\s*\"name\".*?\n```\n?", "", tb, count=1, flags=re.S)
-                out.append(f'<article class="card" id="item-{tid}"><div class="card-h"><span class="iid">{tid}</span><b>{inline(tt, did)}</b></div>{schema_tbl}{render_blocks(rest, did)}</article>')
+                out.append(f'<article class="card" id="item-{tid}" data-item="{esc(tid)}"><div class="card-h"><span class="iid">{tid}</span><b>{inline(tt, did)}</b></div>{schema_tbl}{render_blocks(rest, did)}</article>')
             continue
         out.append(f"<h2>{esc(title)}</h2>" + render_blocks(text, did, r"[a-z][a-z_]+"))
     return "\n".join(out)
@@ -1373,7 +1379,8 @@ def v_plain(doc, pat):
 VIEWS = {"PRD": v_prd, "RFQ": v_rfq, "SCN": v_scn, "UC": v_uc, "INFRA": v_infra, "DOM": v_dom, "UI": v_ui, "API": v_api, "SEQ": v_seq, "MS": v_ms, "STD": v_std}
 ITEM_PAT = {"RFQ": r"Q\d+", "PRD": r"G\d+|R\d+|N\d+", "SCN": r"P\d+|S\d+", "UC": r"UC-[AHGS]\d+", "INFRA": r"C\d+",
             "DOM": r"[A-Za-z][A-Za-z0-9_]+", "UI": r"UI-\d+", "API": r"(GET|POST|PUT|PATCH|DELETE)/\S+|[a-z][a-z_]+",
-            "SEQ": r"SEQ-\d+|SEQ-C\d+", "MS": r"[A-Za-z_]+\.[a-z_]+", "STD": r"[A-Z]+-\d+|V-[A-Z]+"}
+            "SEQ": r"SEQ-\d+|SEQ-C\d+", "MS": r"[A-Za-z_]+\.[a-z_]+", "STD": r"[A-Z]+-\d+|V-[A-Z]+",
+            "CODE": r"[A-Z]+\d*"}  # CODE가 없어 모든 헤딩이 항목이 됐다 (STD-001 2.11, #153)
 
 CSS = r"""
 :root{--paper:#EDEFEC;--panel:#F8F9F7;--card:#fff;--ink:#1E2A30;--soft:#5C6B73;--faint:#8A969C;--rule:#C9CFCB;--hair:#E1E5E1;--hi:#FFF1B8;--blue:#1a5fb4}
@@ -1657,7 +1664,7 @@ def _selftest_scn():
     d = parse_doc(_SELF_SCN, "T-SCN-001.md"); ALL[d["fm"]["doc_id"]] = d
     try: h = v_scn(d)
     finally: ALL.clear(); ALL.update(saved)
-    card = {m.group(1): m.group(0) for m in re.finditer(r'<article class="scard" id="item-(S\d+)">.*?</article>', h, re.S)}
+    card = {m.group(1): m.group(0) for m in re.finditer(r'<article class="scard" id="item-(S\d+)"[^>]*>.*?</article>', h, re.S)}
     s1, s2, s3 = card.get("S1", ""), card.get("S2", ""), card.get("S3", "")
     steps = s1[s1.find('<ol class="steps">'):s1.find("</ol>")]
     many = s1[s1.find("<summary>변형 — 여러 줄</summary>"):]
@@ -1809,7 +1816,7 @@ def _selftest_ui():
         d = parse_doc(raw, name); ALL[d["fm"]["doc_id"]] = d
     try: h = v_ui(ALL["T-UI-001"])
     finally: ALL.clear(); ALL.update(saved)
-    card = {m.group(1): m.group(0) for m in re.finditer(r'<article class="card" id="item-(UI-\d+)">.*?</article>', h, re.S)}
+    card = {m.group(1): m.group(0) for m in re.finditer(r'<article class="card" id="item-(UI-\d+)"[^>]*>.*?</article>', h, re.S)}
     scr = {m.group(1): m.group(0) for m in re.finditer(r'<section class="screen" id="item-(UI-\d+)".*?</section>', h, re.S)}
     c1, c2, s3, s4 = card.get("UI-1", ""), card.get("UI-2", ""), scr.get("UI-3", ""), scr.get("UI-4", "")
     etc = s3[s3.find('class="etc"'):] if 'class="etc"' in s3 else ""
@@ -1930,7 +1937,7 @@ def _selftest_uc():
     d = parse_doc(_SELF_UC, "T-UC-001.md"); ALL[d["fm"]["doc_id"]] = d
     try: h = v_uc(d)
     finally: ALL.clear(); ALL.update(saved)
-    card = {m.group(1): m.group(0) for m in re.finditer(r'<article class="card" id="item-(UC-[AHGS]\d+)">.*?</article>', h, re.S)}
+    card = {m.group(1): m.group(0) for m in re.finditer(r'<article class="card" id="item-(UC-[AHGS]\d+)"[^>]*>.*?</article>', h, re.S)}
     h1, h2_, s1 = card.get("UC-H1", ""), card.get("UC-H2", ""), card.get("UC-S1", "")
     rows = re.findall(r"<tr(?: class=\"rel\")?><th>(.*?)</th>", h1)
     rel = re.findall(r'<tr class="rel"><th>(.*?)</th>', h1)
@@ -1951,7 +1958,7 @@ def _selftest_uc():
         ("조각은 문서 순서", all(x >= 0 for x in at) and at == sorted(at)),
         ("그 밖 — 표 뒤 문단·모르는 굵은 머리", h1.find('class="etc"') < h1.find("표 뒤 문단") and "왜 있나." in h1[h1.find('class="etc"'):]),
         ("표 없는 항목은 본문 그대로(그 밖 머리 없이)", "선행" in h2_ and "표 없는 흐름 단계" in h2_ and 'class="etc"' not in h2_),
-        ("맨몸 UC-S1은 그 카드로", '<a class="jump" href="view_T-UC-001.html#item-UC-S1">UC-S1</a>' in h1),
+        ("맨몸 UC-S1은 그 카드로", '<a class="jump" href="view_T-UC-001.html#item-UC-S1" data-ref="T-UC-001#UC-S1">UC-S1</a>' in h1),
         ("칩은 「유스케이스」 열만", '>H1</a>' in matrix and '>S1</a>' in matrix and "<td>S1 시나리오</td>" in matrix and "<td>S1 글자</td>" in matrix),
         ("구분선뿐인 카드는 그 밖 없음", 'class="etc"' not in s1 and "<hr>" not in s1),
         ("옛 싱크독 데이터가 안 나온다", "UC-A1" not in h and data["labels"]["human"] == "운영자"),

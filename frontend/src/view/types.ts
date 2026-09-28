@@ -13,7 +13,7 @@ export const ITEM_PAT: Record<string, RegExp> = {
   SEQ: /SEQ-\d+|SEQ-C\d+/,
   MS: /[A-Za-z_]+\.[a-z_]+/,
   STD: /[A-Z]+-\d+|V-[A-Z]+/,
-  CODE: /[A-C]\d*/,
+  CODE: /[A-Z]+\d*/, // Z 다음은 AA·AB… — 서버·규약과 같다 (STD-001 2.11, #153)
 }
 
 export interface ViewInput {

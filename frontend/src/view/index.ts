@@ -14,7 +14,8 @@ const DIR: Record<string, string> = {
   RFQ: '01-RFQ', PRD: '02-PRD', SCN: '03-SCN', UC: '04-UC', INFRA: '05-INFRA', DOM: '06-DOM', UI: '07-UI', API: '08-API', SEQ: '09-SEQ', MS: '10-MS', CODE: '11-CODE', STD: 'STD',
 }
 
-function pick(type: string): ViewFn {
+/** 문서 타입 → 렌더러. tools/check_view_html.py도 이 분기로 그린다 — 앱과 같은 분기여야 대조가 뜻이 있다 (카드 AP) */
+export function pick(type: string): ViewFn {
   switch (type) {
     case 'PRD':
       return vPrd
