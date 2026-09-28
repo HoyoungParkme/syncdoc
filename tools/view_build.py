@@ -75,7 +75,9 @@ def inline(s, self_id):
         label = r if d != self_id else ("#" + it)
         href = view_href(d) + (f"#item-{it}" if it else "")
         cls = "ref" if exists else "ref missing"
-        return f'<a class="{cls}" href="{href}">{esc(label)}</a>'
+        # data-ref는 앱과 같다 — 같은 문서 점프(V-MS data-jump)가 여기서 나온다 (STD-002 1장, 카드 AN)
+        data = d + ("#" + it if it else "")
+        return f'<a class="{cls}" href="{href}" data-ref="{data}">{esc(label)}</a>'
     s = re.sub(r"\[\[([^\]]+)\]\]", ref, s)
     s = re.sub(r"(?<![\w/])(https?://[^\s<]+)", r'<a href="\1">\1</a>', s)
     s = re.sub(r"\x00(\d+)\x00", lambda m: f"<code>{codes[int(m.group(1))]}</code>", s)
@@ -1359,7 +1361,7 @@ def _selftest_ui():
         ("메타·머리 설명", "<b>경로</b>" in s3 and '<div class="s-desc"><p>머리 설명 문장.</p></div>' in s3),
         ("요소 표는 문서 머리·칸 그대로", "<th>보여주는 것</th>" in s3 and "<th>종류</th>" not in s3 and "칸 모자란 행" in s3 and 'class="kind"' not in s3),
         ("규칙 이어진 줄·밑 목록·칩", "이어 쓴 둘째 줄" in rules and "규칙 밑 목록</li></ul>" in rules and 'data-ref="2"' in rules),
-        ("시나리오 머리 뒤는 유스케이스 자리", '<span class="uc">— <a class="ref" href="view_T-UI-001.html#item-UI-1">#UI-1</a></span>' in s3),
+        ("시나리오 머리 뒤는 유스케이스 자리", '<span class="uc">— <a class="ref" href="view_T-UI-001.html#item-UI-1" data-ref="T-UI-001#UI-1">#UI-1</a></span>' in s3),
         ("시나리오 단계 둘째 줄", "첫 단계 (<span" in s3 and "단계 둘째 줄" in s3),
         ("그 밖은 원본 순서", all(x >= 0 for x in at) and at == sorted(at)),
         ("둘째 html은 공통 틀과 함께", len(frames) == 1 and ".box{border:1px solid red}" in html.unescape(frames[0]) and "둘째 배치" in html.unescape(frames[0])),
