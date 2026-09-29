@@ -572,6 +572,39 @@ function linkifyIds(text: string): string {
     .join('')
 }
 
+/** mindmap 정규화 — 모델이 라벨을 따옴표·괄호로 감싸는 버릇(`id[("이름 (최우선)")]`)이 mermaid mindmap 문법 오류를 낸다.
+ *  모양은 살리고(원·네모·둥근·육각) 라벨의 따옴표·괄호·대괄호만 벗긴다. 다른 그림은 손대지 않는다 (UI-002 8.7, 카드 AS) */
+function normalizeMindmap(src: string): string {
+  const lines = src.split('\n')
+  if (!/^\s*mindmap\s*$/.test(lines[0] ?? '')) return src
+  const clean = (label: string) =>
+    label
+      .replace(/^["'\s]+|["'\s]+$/g, '')
+      .replace(/["'[\]{}()]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  const shapes: [RegExp, (id: string, l: string) => string][] = [
+    [/^([^\s[({]*)\(\((.*)\)\)$/, (id, l) => `${id}((${l}))`],
+    [/^([^\s[({]*)\{\{(.*)\}\}$/, (id, l) => `${id}{{${l}}}`],
+    [/^([^\s[({]*)\[\((.*)\)\]$/, (id, l) => `${id}[${l}]`],
+    [/^([^\s[({]*)\[(.*)\]$/, (id, l) => `${id}[${l}]`],
+    [/^([^\s[({]*)\((.*)\)$/, (id, l) => `${id}(${l})`],
+  ]
+  return lines
+    .map((line, i) => {
+      if (i === 0) return line
+      const m = /^(\s*)(.*?)\s*$/.exec(line)
+      if (!m || !m[2]) return line
+      const [, indent, body] = m
+      for (const [re, emit] of shapes) {
+        const s = re.exec(body)
+        if (s) return indent + emit(s[1], clean(s[2]) || s[1] || '·')
+      }
+      return indent + clean(body)
+    })
+    .join('\n')
+}
+
 /** 답 본문 — React가 자식을 소유하지 않는다. innerHTML은 html이 바뀔 때만 넣는다.
  *  dangerouslySetInnerHTML로 두면 다시 그릴 때 innerHTML을 되돌려 mermaid가 그린 svg가 지워졌다(카드 AS) */
 function AnswerBody({ html, onClick }: { html: string; onClick: (ev: React.MouseEvent) => void }) {
@@ -718,6 +751,10 @@ function AskPanel({
     el.scrollTop = el.scrollHeight
     const nodes = el.querySelectorAll<HTMLElement>('.a pre.mermaid:not([data-processed])')
     if (!nodes.length) return
+    for (const n of nodes) {
+      const fixed = normalizeMindmap(n.textContent ?? '')
+      if (fixed !== n.textContent) n.textContent = fixed
+    }
     mermaid.initialize({ startOnLoad: false, theme: 'neutral' })
     mermaid
       .run({ nodes })
