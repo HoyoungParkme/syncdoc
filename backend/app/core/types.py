@@ -652,3 +652,54 @@ class AskRead:
 
 
 AskEvent = AskStart | AskNote | AskRead | AskAnswer
+
+
+# ── 대화 묶음 (SYNC-DOM-002 2.8·2.9, 카드 AQ·AR) ──
+
+
+@dataclass(frozen=True)
+class AttachmentMeta:
+    """SYNC-DOM-002 2.8 — 첨부 메타. 바이트·추출 글자는 안 실린다.
+    turn_id가 None이면 아직 안 보낸 것."""
+
+    id: int
+    name: str
+    mime: str
+    size: int
+    turn_id: int | None
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class TurnView:
+    """SYNC-DOM-002 2.8 — 턴 하나. progress·context_item_ids는 화면 8.9가 다시 그릴 재료."""
+
+    id: int
+    seq: int
+    question: str
+    answer: str | None
+    progress: list[dict]
+    context_item_ids: list[str]
+    error: str | None
+    attachments: list[AttachmentMeta]
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class ConversationBrief:
+    """SYNC-DOM-002 2.8 — 대화 목록 한 줄."""
+
+    id: int
+    title: str
+    turn_count: int
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class ConversationView(ConversationBrief):
+    """SYNC-DOM-002 2.8 — 대화 하나. pending은 올려 두고 아직 안 보낸 첨부(화면 8.14).
+    project_code는 내부용 — ask_item이 「이 문서의 프로젝트 대화인가」를 본다. API로 안 나간다."""
+
+    turns: list[TurnView]
+    pending: list[AttachmentMeta]
+    project_code: str = ""
