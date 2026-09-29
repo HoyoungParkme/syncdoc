@@ -61,6 +61,33 @@ def spec_items(specs: str, code: str) -> dict[str, tuple[str, bool, str, str] | 
     return out
 
 
+def _params(a: ast.arguments) -> list[str]:
+    """시그니처의 인자를 명세 표기 그대로 — 위치 전용(`/`)·`*args`·키워드 전용(`*`)·`**kwargs`까지.
+
+    `args.args`만 보면 `*` 뒤 인자가 빠져 명세와 코드가 글자 그대로 같아도 불일치가 난다 (#196).
+    """
+
+    def one(arg: ast.arg, default: ast.expr | None) -> str:
+        s = f"{arg.arg}:{ast.unparse(arg.annotation) if arg.annotation else '?'}"
+        return s + (f"={ast.unparse(default)}" if default is not None else "")
+
+    skip = ("self", "cls")
+    ponly = [x for x in a.posonlyargs if x.arg not in skip]
+    pos = ponly + [x for x in a.args if x.arg not in skip]
+    defaults = [None] * (len(pos) - len(a.defaults)) + list(a.defaults)
+    out = [one(x, d) for x, d in zip(pos, defaults, strict=True)]
+    if ponly:
+        out.insert(len(ponly), "/")
+    if a.vararg:
+        out.append("*" + one(a.vararg, None))
+    elif a.kwonlyargs:
+        out.append("*")
+    out += [one(x, d) for x, d in zip(a.kwonlyargs, a.kw_defaults, strict=True)]
+    if a.kwarg:
+        out.append("**" + one(a.kwarg, None))
+    return out
+
+
 def code_items(backend: str, code: str) -> tuple[dict[str, tuple[str, bool, str, str]], int]:
     """({docstring 항목ID: (파일, async, params, ret)}, 훑은 파일 수)
 
@@ -78,13 +105,7 @@ def code_items(backend: str, code: str) -> tuple[dict[str, tuple[str, bool, str,
             first = doc.split("\n", 1)[0].strip()
             if "#" not in first or not first.startswith(f"{code}-MS-"):
                 continue
-            args = [a for a in node.args.args if a.arg not in ("self", "cls")]
-            defaults = [None] * (len(args) - len(node.args.defaults)) + list(node.args.defaults)
-            params = ",".join(
-                f"{a.arg}:{ast.unparse(a.annotation) if a.annotation else '?'}"
-                + (f"={ast.unparse(d)}" if d is not None else "")
-                for a, d in zip(args, defaults, strict=True)
-            )
+            params = ",".join(_params(node.args))
             ret = ast.unparse(node.returns) if node.returns else "?"
             out[first.split("#", 1)[1]] = (
                 rel,
