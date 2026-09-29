@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -217,18 +217,25 @@ sequenceDiagram
         end
         H-->>GH: 202
         H->>P: process_commit(repo, head_hash) (비동기)
+        P->>P: 저장소 읽기 락 획득
     else 폴링 (1b) / 켜질 때 (1a)
+        P->>P: 저장소 읽기 락 획득
         P->>G: fetch(repo)
         G-->>P: remote_head
         opt remote_head != last_processed_commit
-            P->>P: process_commit(repo, remote_head)
+            P->>P: process_commit(repo, remote_head, locked=True)
         end
     end
 
+    Note over P: 웹훅·폴링·read_pending이 같은 읽기 락으로 한 줄로 선다 (#194)
+    P->>DB: last_processed_commit 다시 읽기
+    P->>G: fetch · rev_list_count(last..head)
+    alt 0 — 이미 처리했거나 옛 head
+        P-->>P: [] (처리 지점을 뒤로 돌리지 않는다)
+    end
     P->>G: changed_files(last_processed_commit..head, "docs/specs/")
     G-->>P: [(path, commit_hash, author_login)]
-    P->>P: repo lock 획득
-    loop 변경 파일마다 (3c)
+    loop 변경 파일마다 (3c) — 파일마다 쓰기 락(save_pipeline 안)
         P->>G: read(path @ commit_hash)
         G-->>P: body
         P->>P: save_pipeline(entry=github, doc_id, body, expected_version=None, author=github(login), commit_hash)
@@ -244,12 +251,13 @@ sequenceDiagram
         Note over P: 이후 mark_missing · extract · resolve_missing은 SEQ-1과 같음
     end
     P->>DB: Repository.last_processed_commit = head
-    P->>P: repo lock 해제
+    P->>P: 저장소 읽기 락 해제
 ```
 
 **읽을 때 볼 것**
 - `author`는 커밋 작성자 GitHub 로그인으로 User를 찾는다. 등록 안 된 사람이면? → 되먹일 것
 - 밀린 커밋이 여럿이면 `changed_files`가 범위 전체를 한 번에 준다. 커밋마다 돌지 않고 **최종 상태**만 저장한다. 중간 버전은 git에만 있다 → 되먹일 것
+- **처리 전체가 저장소 읽기 락 안이다.** 전에는 웹훅·폴링이 락 없이 불렀다. 앱이 처리 도중 민 자동 강등 커밋의 웹훅이 두 번째 실행을 띄워, 같은 커밋을 강등 전 본문으로 한 번 더 저장했다(DB=approved · 저장소=draft, #194). 파일마다 잡는 쓰기 락과는 다른 락이다
 
 ---
 
