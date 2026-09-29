@@ -1141,6 +1141,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | (#189) | `fix/189-seq-split` | — | #189 | 2026-09-29 |
 | (#194) | `fix/194-serial-commits` | — | #194 | 2026-09-29 |
 | (#197) | `fix/197-readorder-stale-draft` | — | #197 | 2026-09-29 |
+| (#198) | `fix/198-refs-stale-selection` | — | #198 | 2026-09-29 |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 | X | `card/X-ui-doc` | `7a4e821`~ | #103 | 2026-09-21 |
