@@ -738,16 +738,33 @@ a.arow:hover{background:var(--bg-subtle)}
 .qa .q{align-self:flex-end;max-width:92%;padding:var(--space-5) var(--space-9);border-radius:var(--radius-chip);
   background:var(--bg-sunken);color:var(--ink-body);font-size:var(--text-ui);white-space:pre-wrap}
 .qa .a{padding:var(--space-5) var(--space-9);border:1px solid var(--border);border-radius:var(--radius-chip);
-  background:var(--bg-card);color:var(--ink-prose);font-size:var(--text-ui);line-height:1.6;white-space:pre-wrap}
-.qa .a.wait{color:var(--ink-faint);border-style:dashed}
-.qa .a.fail{color:var(--danger);background:var(--danger-bg);border-color:var(--danger-bg)}
-.qa .qsrc{font-size:var(--text-caption);color:var(--ink-faint);font-family:var(--font-mono)}
-/* 8.9 진행 줄 — 모델이 읽기 전에 쓰는 한 줄(note)과 읽은 대상(read)이 차례로. 답이 오면 작고 흐리게 남는다 */
-.qa .qprog{display:flex;flex-direction:column;gap:var(--space-3);padding:var(--space-4) var(--space-9);border-left:2px solid var(--border);
-  font-size:var(--text-meta);color:var(--ink-muted)}
-.qa .qprog .read{font-family:var(--font-mono);color:var(--ink-faint)}
-.qa .qprog.done{font-size:var(--text-caption);color:var(--ink-faint)}
+  background:var(--bg-card);color:var(--ink-prose);font-size:var(--text-ui);line-height:1.6}
+/* 답은 가벼운 마크다운(renderBlocks) — 문단·목록·굵게·인라인 코드·참조 링크 (#206) */
+.qa .a p{margin:0 0 var(--space-5)}
+.qa .a p:last-child,.qa .a ul:last-child,.qa .a ol:last-child{margin-bottom:0}
+.qa .a ul,.qa .a ol{margin:0 0 var(--space-5) var(--space-11);padding:0}
+.qa .a li{margin:var(--space-2) 0}
+.qa .a code{font-family:var(--font-mono);font-size:var(--text-meta);background:var(--bg-sunken);padding:0 var(--space-2);border-radius:var(--radius-chip)}
+.qa .a a.ref{color:var(--ink-body);font-family:var(--font-mono);font-size:var(--text-meta)}
+.qa .a.wait{color:var(--ink-faint);border-style:dashed;white-space:pre-wrap}
+.qa .a.fail{color:var(--danger);background:var(--danger-bg);border-color:var(--danger-bg);white-space:pre-wrap}
+.qa .qsrc{font-size:var(--text-caption);color:var(--ink-faint);font-family:var(--font-mono);margin-top:var(--space-4)}
 .qa .qsrc a{color:var(--ink-muted)}
+/* 8.9 진행 묶음 — 읽는 동안은 스피너(공통 1.8)와 가장 최근 줄만, 답이 오면 「n단계 읽음 · 본 것 k」로 접힌다 (#206) */
+.qa .qprog{padding:var(--space-4) var(--space-9);border-left:2px solid var(--border);font-size:var(--text-meta);color:var(--ink-muted)}
+.qa .qprog>summary{display:flex;align-items:center;gap:var(--space-5);cursor:pointer;list-style:none}
+.qa .qprog>summary::-webkit-details-marker{display:none}
+.qa .qprog>summary .now{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qa .qprog>summary .n{margin-left:auto;font-size:var(--text-caption);color:var(--ink-faint);white-space:nowrap}
+.qa .qprog>summary .n::after{content:" ▸"}
+.qa .qprog[open]>summary .n::after{content:" ▾"}
+.qa .qprog .lines{display:flex;flex-direction:column;gap:var(--space-3);margin-top:var(--space-4)}
+.qa .qprog .read{font-family:var(--font-mono);color:var(--ink-faint)}
+/* 공통 1.8 진행 표시 — UI-001 3.4의 예외 하나. 답이 오면 즉시 사라진다 */
+.qa .spin{flex:none;width:14px;height:14px;border-radius:50%;border:2px solid var(--border);border-top-color:var(--ink-body);
+  animation:syncdoc-spin .8s linear infinite}
+@keyframes syncdoc-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.qa .spin{animation:none}}
 .pbody textarea[data-el="8.6"]{width:100%;box-sizing:border-box;min-height:64px;resize:vertical;padding:var(--space-6) var(--space-9);
   border:1px solid var(--border);border-radius:var(--radius-chip);background:var(--bg-card);color:var(--ink-body);
   font:inherit;font-size:var(--text-ui)}

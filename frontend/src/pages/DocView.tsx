@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { api, ApiError, incompleteOf, warnText, type AskAnswer, type AskNote, type AskRead, type AskTurn, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
+import { api, ApiError, docPath, incompleteOf, warnText, type AskAnswer, type AskNote, type AskRead, type AskTurn, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { attachDiagramButtons, DiagramFull, type FullDiagram, type WfFullDetail } from '../components/DiagramFull'
 import { esc, renderBlocks, splitRef } from '../view/md'
@@ -562,8 +562,18 @@ function titleOf(body: string): string {
 }
 
 
-/** 8.5 맥락 줄 · 8.6 질문 입력 · 8.7 대화(.qa · 본 것 .qsrc) · 8.9 진행 줄 — UC-H19, 카드 Y.
- *  POST /api/docs/{docId}/ask(SSE): note·read가 진행 줄에 차례로, answer가 답, error가 실패.
+/** 답 속 맨 `문서ID#항목ID`를 `[[…]]`로 — 모델은 대개 꺾쇠 없이 맨 ID로 답한다(#206). 코드 스팬과 이미 꺾쇠인 것은 둔다 */
+const BARE_ID = /(?<![\w[#`-])([A-Z]+-[A-Z]+-\d{3}(?:#[^\s,.;:)\]`]+)?)(?![\w\]])/g
+function linkifyIds(text: string): string {
+  return text
+    .split(/(`[^`]*`|\[\[[^\]]*\]\])/)
+    .map((part, i) => (i % 2 ? part : part.replace(BARE_ID, '[[$1]]')))
+    .join('')
+}
+
+/** 8.5 맥락 줄 · 8.6 질문 입력 · 8.7 대화(.qa) · 8.9 진행 묶음(접힘 · 본 것 .qsrc) — UC-H19, 카드 Y, #206.
+ *  POST /api/docs/{docId}/ask(SSE): note·read가 진행 묶음에 차례로(읽는 동안은 스피너와 마지막 줄만), answer가 답, error가 실패.
+ *  답은 가벼운 마크다운(renderBlocks)이고 참조는 7.2와 같은 링크다.
  *  항목은 힌트(item_id) — 안 골라도 문서 전체로 묻는다. 대화는 Shell이 프로젝트 단위로 든다 */
 function AskPanel({
   ask,
@@ -579,8 +589,19 @@ function AskPanel({
   goItem: (id: string) => void
 }) {
   const { turns, setTurns } = ask
+  const nav = useNavigate()
   const [question, setQuestion] = useState('')
   const [pending, setPending] = useState(false)
+  // 답 속 참조(7.2와 같음): 이 문서 안 항목이면 스크롤·선택, 남의 문서·문서 자체면 그 문서로. 링크 존재 검사는 안 한다
+  const plainCtx = { selfId: docId, href: (d: string, it?: string) => docPath(d, it), exists: () => true }
+  const onAnswerClick = (ev: React.MouseEvent) => {
+    const a = (ev.target as HTMLElement).closest<HTMLAnchorElement>('a[data-ref]')
+    if (!a) return
+    ev.preventDefault()
+    const [d, it] = splitRef(a.dataset.ref ?? '')
+    if (d === docId && it) goItem(it)
+    else nav(docPath(d, it || undefined))
+  }
   const abortRef = useRef<AbortController | null>(null)
   // 언마운트(문서·프로젝트 이동, 탭 전환)면 스트림을 끊는다 — 답은 오던 자리에 안 남는다
   useEffect(() => () => abortRef.current?.abort(), [])
@@ -667,41 +688,55 @@ function AskPanel({
         )}
       </div>
       <div className="qa" data-el="8.7">
-        {turns.map((t, i) => (
-          <div key={i} className="turn">
-            <div className="q">{t.q}</div>
-            {t.prog.length > 0 && (
-              <div className={'qprog' + (t.a !== undefined || t.err ? ' done' : '')} data-el="8.9">
-                {t.prog.map((pg, k) => (
-                  <div key={k} className={pg.kind}>
-                    {pg.kind === 'read' ? '읽음 · ' : ''}
-                    {pg.text}
-                  </div>
-                ))}
-              </div>
-            )}
-            {t.a !== undefined ? (
-              <>
-                <div className="a">{t.a}</div>
-                {t.src && t.src.length > 0 && (
-                  <div className="qsrc">
-                    본 것:{' '}
-                    {t.src.map((id, k) => (
-                      <span key={id}>
-                        {k > 0 && ' · '}
-                        {srcLink(id)}
-                      </span>
+        {turns.map((t, i) => {
+          const done = t.a !== undefined || t.err !== undefined
+          const last = t.prog[t.prog.length - 1]
+          const reads = t.src?.length ?? 0
+          return (
+            <div key={i} className="turn">
+              <div className="q">{t.q}</div>
+              {/* 8.9 — 읽는 동안은 스피너(공통 1.8)와 가장 최근 줄만, 답이 오면 「n단계 읽음 · 본 것 k」로 접힌다 */}
+              {(t.prog.length > 0 || !done) && (
+                <details className="qprog" data-el="8.9">
+                  <summary>
+                    {!done && <span className="spin" aria-label="읽는 중" />}
+                    <span className="now">
+                      {done ? `${t.prog.length}단계 읽음${reads ? ` · 본 것 ${reads}` : ''}` : last ? last.text : '답을 기다리는 중…'}
+                    </span>
+                    {!done && t.prog.length > 0 && <span className="n">{t.prog.length}단계</span>}
+                    {done && <span className="n" />}
+                  </summary>
+                  <div className="lines">
+                    {t.prog.map((pg, k) => (
+                      <div key={k} className={pg.kind}>
+                        {pg.kind === 'read' ? '읽음 · ' : ''}
+                        {pg.text}
+                      </div>
                     ))}
                   </div>
-                )}
-              </>
-            ) : t.err ? (
-              <div className="a fail">답을 못 받았습니다 — {t.err}</div>
-            ) : (
-              <div className="a wait">{t.prog.length ? '읽는 중…' : '답을 기다리는 중…'}</div>
-            )}
-          </div>
-        ))}
+                  {reads > 0 && (
+                    <div className="qsrc">
+                      본 것:{' '}
+                      {t.src!.map((id, k) => (
+                        <span key={id}>
+                          {k > 0 && ' · '}
+                          {srcLink(id)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </details>
+              )}
+              {t.a !== undefined ? (
+                <div className="a" onClick={onAnswerClick} dangerouslySetInnerHTML={{ __html: renderBlocks(linkifyIds(t.a), plainCtx) }} />
+              ) : t.err ? (
+                <div className="a fail">답을 못 받았습니다 — {t.err}</div>
+              ) : (
+                <div className="a wait">{t.prog.length ? '읽는 중…' : '답을 기다리는 중…'}</div>
+              )}
+            </div>
+          )
+        })}
       </div>
       <textarea
         data-el="8.6"
