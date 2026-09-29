@@ -1176,7 +1176,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AP | `card/AP-view-html` | `c2f5578` | #191 | 2026-09-28 |
 | AQ | `card/AQ-conversations` | `54d07f7` | #210 | 2026-09-29 |
 | AR | `card/AR-attachments` | `d71453b` | #212 | 2026-09-29 |
-| AS | `card/AS-answer-diagram` | `20370d8` · `cfe0fa6` · `c3dd207` | #214 · #215 · #217 | 2026-09-29 |
+| AS | `card/AS-answer-diagram` | `20370d8` · `cfe0fa6` · `c3dd207` · `65615b7` · `0d30b88` | #214 · #215 · #217 · #219 · #220 | 2026-09-29 |
 | (#119) | `fix/119-single-render` | — | #119 | 2026-09-23 |
 | (#126) | `fix/126-view-build-specs` | — | #126 | 2026-09-23 |
 | (#133) | `fix/133-tokens-by-chapter` | — | #133 | 2026-09-23 |
