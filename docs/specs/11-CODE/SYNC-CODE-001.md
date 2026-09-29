@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1085,6 +1085,20 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 완료 | 2026-09-29 · 브랜치 `card/AR-attachments` · code 4 + test 1 · 테스트 279 · `ruff` · `validate` 0/0 · `check_code` 127/127 · `check_ui` 12/12 · 배포 뒤 헤드 크롬: 「+」·드롭·붙여넣기 셋 다 칩 · 받지 않는 종류 토스트 · 캡처+PDF를 붙여 물으면 진행 줄 「첨부 회의록.pdf를 읽는다」·본 것 `첨부:회의록.pdf`·답에 PDF 문장과 캡처 내용 · 새로고침 뒤 보낸 칩(썸네일) 유지 · 대화 지우기로 첨부까지 |
 
 **왜 카드인가.** 파일이 붙는 순간 서버·모델·화면 셋이 함께 바뀐다 — 업로드 API, 도구 여섯째와 vision 파트, 드롭·붙여넣기·업로드 세 길. 대화(AQ)가 먼저 있어야 붙일 자리가 있다.
+
+---
+
+#### AS 질문 탭의 답에 그림 — 마인드맵·그래프
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R11]] · [[SYNC-UI-002#UI-5]] 8.7 · [[SYNC-UI-002]] 공통 1.7 · [[SYNC-MS-008#queries.ask_item]] 지시문 · 사용자 요청 2026-09-29 |
+| 구현 | `queries._ASK_SYSTEM`에 그림 문단(mermaid — flowchart·mindmap·classDiagram·sequenceDiagram, 읽은 항목만) · `AskPanel`이 답의 `pre.mermaid`에 `mermaid.run`을 돌리고 `attachDiagramButtons`로 전체보기(공통 1.7)를 붙인다 · 저장된 답도 다시 열면 그려진다 |
+| 테스트 | 지시문에 mermaid 안내가 있다 · 헤드 크롬: 「R1의 근거와 파생을 마인드맵으로」 → mindmap svg · 전체보기 층 · 새로고침 뒤에도 그림 · flowchart 한 번 더 |
+| 선행 | AR |
+| 완료 | — |
+
+**왜 카드인가.** 렌더러는 이미 mermaid 코드블록을 `pre.mermaid`로 만드는데 패널에서 돌리지 않았고, 지시문이 그림을 허락하지 않았다 — 지시문 한 문단과 패널 한 효과지만 화면 규칙(8.7·공통 1.7)이 바뀌므로 카드다.
 
 ---
 

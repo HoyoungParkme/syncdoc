@@ -544,6 +544,7 @@ async def test_ask_item_start_context_has_titles_and_item_names_but_no_body(
     events = await _collect(queries.ask_item("EXMP-PRD-001", "G1", _conv(scoped), "왜?", [], owner(scoped)))
     assert events == [AskStart("EXMP-PRD-001", "G1"), AskAnswer("답", [])]
     assert "먼저 보고 있는 항목을 get_item으로 읽는다" in seen[0][0]  # #110
+    assert "mermaid 코드블록" in seen[0][0] and "mindmap" in seen[0][0]  # 카드 AS — 그림으로 답한다
     system, messages, choice = seen[0]
     assert "[문서] EXMP-PRD-001 제품 · 상태 draft · v1" in system
     assert "[이 문서의 항목]\nG1 목표\nR1 기능" in system

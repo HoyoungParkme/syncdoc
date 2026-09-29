@@ -392,6 +392,7 @@ export function DocView() {
                       itemId={selected}
                       displayName={doc.items.find((i) => i.item_id === selected)?.display_name ?? ''}
                       goItem={goItem}
+                      openFull={setFull}
                     />
                   ) : (
                     <>
@@ -582,12 +583,14 @@ function AskPanel({
   itemId,
   displayName,
   goItem,
+  openFull,
 }: {
   ask: AskChat
   docId: string
   itemId: string | null
   displayName: string
   goItem: (id: string) => void
+  openFull: (d: FullDiagram) => void
 }) {
   const { code, convId, setConvId } = ask
   const nav = useNavigate()
@@ -674,11 +677,23 @@ function AskPanel({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convId])
-  // 새 턴·답이 오면 가운데 층을 끝으로
+  // 새 턴·답이 오면 가운데 층을 끝으로. 답 속 ```mermaid는 그림으로(본문 7.3과 같은 렌더러) + 전체보기 (카드 AS)
   useEffect(() => {
     const el = qaRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [turns])
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+    const nodes = el.querySelectorAll<HTMLElement>('.a pre.mermaid:not([data-processed])')
+    if (!nodes.length) return
+    mermaid.initialize({ startOnLoad: false, theme: 'neutral' })
+    mermaid
+      .run({ nodes })
+      .catch(() => undefined) // 문법 오류면 코드가 남는다
+      .then(() => {
+        if (qaRef.current !== el) return
+        attachDiagramButtons(el, openFull)
+        el.scrollTop = el.scrollHeight
+      })
+  }, [turns, openFull])
 
   const patchLast = (f: (t: AskTurnView) => AskTurnView) =>
     setTurns((ts) => ts.map((t, i) => (i === ts.length - 1 ? f(t) : t)))
