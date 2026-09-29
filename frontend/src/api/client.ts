@@ -319,14 +319,42 @@ export interface SaveResult {
 }
 /** UI-5 8.4~8.9 · POST /api/docs/{docId}/ask (SYNC-API-001 3.4, SSE). 대화는 서버에 저장되지 않는다 —
  *  클라이언트가 프로젝트 단위로 들고 있다가 요청마다 history로 통째로 보낸다. 항목은 힌트(item_id?)다. */
-export interface AskTurn {
-  role: 'user' | 'assistant'
-  text: string
-}
+/** POST /api/docs/{docId}/ask — 앞 대화는 서버가 대화(conversation_id)에서 만든다 (카드 AQ) */
 export interface AskRequest {
   question: string
-  history: AskTurn[]
+  conversation_id: number
   item_id?: string
+  attachment_ids?: number[]
+}
+// ── SYNC-API-001 3.5 대화·첨부 (카드 AQ·AR) ──
+export interface AttachmentMeta {
+  id: number
+  name: string
+  mime: string
+  size: number
+  turn_id: number | null
+  created_at: string
+}
+export interface Turn {
+  id: number
+  seq: number
+  question: string
+  answer: string | null
+  progress: { kind: 'note' | 'read'; text: string }[]
+  context_item_ids: string[]
+  error: string | null
+  attachments: AttachmentMeta[]
+  created_at: string
+}
+export interface ConversationBrief {
+  id: number
+  title: string
+  turn_count: number
+  updated_at: string
+}
+export interface Conversation extends ConversationBrief {
+  turns: Turn[]
+  pending: AttachmentMeta[]
 }
 /** 스트림 이벤트 — start · note · read · answer · error(problem) */
 export interface AskStart {

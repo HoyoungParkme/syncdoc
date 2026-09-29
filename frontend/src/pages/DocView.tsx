@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { api, ApiError, docPath, incompleteOf, warnText, type AskAnswer, type AskNote, type AskRead, type AskTurn, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
+import { ago, api, ApiError, docPath, incompleteOf, warnText, type AskAnswer, type AskNote, type AskRead, type Conversation, type ConversationBrief, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { attachDiagramButtons, DiagramFull, type FullDiagram, type WfFullDetail } from '../components/DiagramFull'
 import { esc, renderBlocks, splitRef } from '../view/md'
@@ -383,7 +383,7 @@ export function DocView() {
                     </span>
                   )}
                 </div>
-                <div className="pbody">
+                <div className={panel === 'ask' ? 'pbody ask' : 'pbody'}>
                   {panel === 'ask' ? (
                     // 대화는 Shell이 프로젝트 단위로 든다 — 문서·항목을 옮겨도 남고, 프로젝트가 바뀌면 새 대화
                     <AskPanel
@@ -571,10 +571,11 @@ function linkifyIds(text: string): string {
     .join('')
 }
 
-/** 8.5 맥락 줄 · 8.6 질문 입력 · 8.7 대화(.qa) · 8.9 진행 묶음(접힘 · 본 것 .qsrc) — UC-H19, 카드 Y, #206.
+/** 8.5 맥락 줄 · 8.11 대화 고르기 · 8.12 새 대화 · 8.13 지우기 · 8.7 대화(.qa) · 8.9 진행 묶음 · 8.6 입력 — UC-H19, 카드 Y·AQ, #206.
+ *  세 층 — 위 고정(8.5·대화 줄) · 가운데 스크롤(8.7) · 아래 고정(8.6). 답이 길어도 입력이 밀리지 않는다.
+ *  대화는 서버에 있다(카드 AQ): 프로젝트의 목록에서 고르고, 없으면 첫 질문에 만든다. URL ?conv={id}.
  *  POST /api/docs/{docId}/ask(SSE): note·read가 진행 묶음에 차례로(읽는 동안은 스피너와 마지막 줄만), answer가 답, error가 실패.
- *  답은 가벼운 마크다운(renderBlocks)이고 참조는 7.2와 같은 링크다.
- *  항목은 힌트(item_id) — 안 골라도 문서 전체로 묻는다. 대화는 Shell이 프로젝트 단위로 든다 */
+ *  답은 가벼운 마크다운(renderBlocks)이고 참조는 7.2와 같은 링크다. 항목은 힌트(item_id) — 안 골라도 문서 전체로 묻는다 */
 function AskPanel({
   ask,
   docId,
@@ -588,10 +589,15 @@ function AskPanel({
   displayName: string
   goItem: (id: string) => void
 }) {
-  const { turns, setTurns } = ask
+  const { code, convId, setConvId } = ask
   const nav = useNavigate()
+  const [sp, setSp] = useSearchParams()
+  const [convs, setConvs] = useState<ConversationBrief[]>([])
+  const [turns, setTurns] = useState<AskTurnView[]>([])
+  const [listOpen, setListOpen] = useState(false)
   const [question, setQuestion] = useState('')
   const [pending, setPending] = useState(false)
+  const qaRef = useRef<HTMLDivElement>(null)
   // 답 속 참조(7.2와 같음): 이 문서 안 항목이면 스크롤·선택, 남의 문서·문서 자체면 그 문서로. 링크 존재 검사는 안 한다
   const plainCtx = { selfId: docId, href: (d: string, it?: string) => docPath(d, it), exists: () => true }
   const onAnswerClick = (ev: React.MouseEvent) => {
@@ -603,62 +609,149 @@ function AskPanel({
     else nav(docPath(d, it || undefined))
   }
   const abortRef = useRef<AbortController | null>(null)
-  // 언마운트(문서·프로젝트 이동, 탭 전환)면 스트림을 끊는다 — 답은 오던 자리에 안 남는다
+  // 언마운트(문서·프로젝트 이동, 탭 전환)면 스트림을 끊는다 — 턴은 서버가 실패로 닫는다
   useEffect(() => () => abortRef.current?.abort(), [])
+
+  const loadList = useCallback(
+    () => api.get<ConversationBrief[]>(`/api/projects/${code}/conversations`).then(setConvs).catch(() => setConvs([])),
+    [code],
+  )
+  // 목록 — 처음과 대화가 바뀔 때. URL ?conv가 있으면 그것을, 없고 고른 것도 없으면 가장 최근 대화를 연다
+  useEffect(() => {
+    const fromUrl = Number(sp.get('conv'))
+    if (fromUrl && fromUrl !== convId) setConvId(fromUrl)
+    void loadList().then(() => undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code])
+  useEffect(() => {
+    if (convId === null && convs.length && !sp.get('conv')) setConvId(convs[0].id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convs])
+  // 고른 대화의 턴 — 서버에서. 저장된 진행 줄은 접힌 채 다시 그려진다
+  useEffect(() => {
+    if (convId === null) {
+      setTurns([])
+      return
+    }
+    let live = true
+    api
+      .get<Conversation>(`/api/conversations/${convId}`)
+      .then((c) => {
+        if (!live) return
+        setTurns(
+          c.turns.map((t) => ({
+            q: t.question,
+            prog: t.progress,
+            a: t.answer ?? undefined,
+            src: t.context_item_ids,
+            err: t.error ?? undefined,
+          })),
+        )
+      })
+      .catch(() => live && setConvId(null)) // 지워졌거나 남의 것 — 새 대화로
+    setSp(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('conv', String(convId))
+        return next
+      },
+      { replace: true },
+    )
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convId])
+  // 새 턴·답이 오면 가운데 층을 끝으로
+  useEffect(() => {
+    const el = qaRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [turns])
 
   const patchLast = (f: (t: AskTurnView) => AskTurnView) =>
     setTurns((ts) => ts.map((t, i) => (i === ts.length - 1 ? f(t) : t)))
 
+  const newConversation = () => {
+    setListOpen(false)
+    setConvId(null)
+    setTurns([])
+    setSp(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('conv')
+        return next
+      },
+      { replace: true },
+    )
+  }
+  const removeConversation = async (c: ConversationBrief) => {
+    if (!window.confirm(`「${c.title}」 대화를 지울까요? 질문·답·첨부가 함께 사라집니다.`)) return
+    await api.del(`/api/conversations/${c.id}`)
+    const rest = convs.filter((x) => x.id !== c.id)
+    setConvs(rest)
+    if (c.id === convId) {
+      if (rest.length) setConvId(rest[0].id)
+      else newConversation()
+    }
+  }
+
   const send = async () => {
     const q = question.trim()
     if (!q || pending) return
-    // history = 지금까지의 질문·답 전부(실패한 턴은 빼고). 서버가 LLM_MAX_TURNS에서 자른다
-    const history: AskTurn[] = turns
-      .filter((t) => t.a !== undefined)
-      .flatMap((t) => [
-        { role: 'user' as const, text: t.q },
-        { role: 'assistant' as const, text: t.a as string },
-      ])
     setQuestion('')
     setPending(true)
-    setTurns((ts) => [...ts, { q, prog: [] }])
-    const ac = new AbortController()
-    abortRef.current = ac
     try {
-      await api.stream(
-        `/api/docs/${docId}/ask`,
-        { question: q, history, item_id: itemId ?? undefined },
-        (name, data) => {
-          if (name === 'note') {
-            const d = data as AskNote
-            patchLast((t) => ({ ...t, prog: [...t.prog, { kind: 'note', text: d.text }] }))
-          } else if (name === 'read') {
-            const d = data as AskRead
-            patchLast((t) => ({ ...t, prog: [...t.prog, { kind: 'read', text: d.target ? `${d.tool} ${d.target}` : d.tool }] }))
-          } else if (name === 'answer') {
-            const d = data as AskAnswer
-            patchLast((t) => ({ ...t, a: d.answer, src: d.context_item_ids }))
-          } else if (name === 'error') {
-            const d = data as Problem
-            patchLast((t) => ({ ...t, err: String(d.reason ?? d.detail ?? d.title) }))
-          }
-        },
-        ac.signal,
-      )
-      // 스트림이 answer도 error도 없이 닫혔다
-      patchLast((t) => (t.a === undefined && t.err === undefined ? { ...t, err: '답 없이 끊겼습니다' } : t))
+      // 대화가 아직 없으면 첫 질문에 만든다 (8.12는 빈 대화를 미리 만들지 않는다)
+      let id = convId
+      if (id === null) {
+        const made = await api.post<ConversationBrief>(`/api/projects/${code}/conversations`, {})
+        id = made.id
+        setConvId(id)
+      }
+      setTurns((ts) => [...ts, { q, prog: [] }])
+      const ac = new AbortController()
+      abortRef.current = ac
+      try {
+        await api.stream(
+          `/api/docs/${docId}/ask`,
+          { question: q, conversation_id: id, item_id: itemId ?? undefined },
+          (name, data) => {
+            if (name === 'note') {
+              const d = data as AskNote
+              patchLast((t) => ({ ...t, prog: [...t.prog, { kind: 'note', text: d.text }] }))
+            } else if (name === 'read') {
+              const d = data as AskRead
+              patchLast((t) => ({ ...t, prog: [...t.prog, { kind: 'read', text: d.target ? `${d.tool} ${d.target}` : d.tool }] }))
+            } else if (name === 'answer') {
+              const d = data as AskAnswer
+              patchLast((t) => ({ ...t, a: d.answer, src: d.context_item_ids }))
+            } else if (name === 'error') {
+              const d = data as Problem
+              patchLast((t) => ({ ...t, err: String(d.reason ?? d.detail ?? d.title) }))
+            }
+          },
+          ac.signal,
+        )
+        // 스트림이 answer도 error도 없이 닫혔다
+        patchLast((t) => (t.a === undefined && t.err === undefined ? { ...t, err: '답 없이 끊겼습니다' } : t))
+      } catch (e) {
+        if (ac.signal.aborted) return
+        const reason = e instanceof ApiError ? String(e.problem.reason ?? e.message) : String(e)
+        patchLast((t) => ({ ...t, err: reason }))
+      } finally {
+        if (abortRef.current === ac) abortRef.current = null
+      }
+      void loadList() // 제목(첫 질문)·턴 수·시각이 바뀌었다
     } catch (e) {
-      if (ac.signal.aborted) return
-      const reason = e instanceof ApiError ? String(e.problem.reason ?? e.message) : String(e)
-      patchLast((t) => ({ ...t, err: reason }))
+      toast(e instanceof ApiError ? e.message : String(e))
     } finally {
-      if (abortRef.current === ac) abortRef.current = null
       setPending(false)
     }
   }
 
   const srcLink = (id: string) => {
-    // 본 것의 ID → 7.2와 같음. 이 문서 안 항목이면 스크롤·선택, 남의 문서·문서 자체면 링크
+    // 본 것의 ID → 7.2와 같음. 이 문서 안 항목이면 스크롤·선택, 남의 문서·문서 자체면 링크. 첨부는 글자만
+    if (id.startsWith('첨부:')) return <span key={id}>{id}</span>
     const [d, it] = id.includes('#') ? [id.split('#')[0], id.split('#')[1]] : [id, '']
     if (d === docId && it) {
       return (
@@ -673,21 +766,58 @@ function AskPanel({
       </Link>
     )
   }
+  const current = convs.find((c) => c.id === convId)
 
   return (
     <>
-      <div className="lbl" data-el="8.5">
-        {itemId ? (
-          <>
-            <b className="mono">{itemId}</b> {displayName} · 이 항목을 보며 묻습니다
-          </>
-        ) : (
-          <>
-            문서 전체 · <b className="mono">{docId}</b>에 대해 묻습니다
-          </>
+      <div className="asktop">
+        <div className="lbl" data-el="8.5">
+          {itemId ? (
+            <>
+              <b className="mono">{itemId}</b> {displayName} · 이 항목을 보며 묻습니다
+            </>
+          ) : (
+            <>
+              문서 전체 · <b className="mono">{docId}</b>에 대해 묻습니다
+            </>
+          )}
+        </div>
+        {/* 8.11 대화 고르기 · 8.12 새 대화 — 프로젝트의 대화 목록, 최근순 */}
+        <div className="convrow">
+          <button type="button" className="conv" data-el="8.11" onClick={() => setListOpen((o) => !o)} title={current?.title}>
+            대화 {listOpen ? '▾' : '▸'} {current ? current.title : convId === null ? '새 대화' : '…'}
+          </button>
+          <button type="button" className="btn sm" data-el="8.12" onClick={newConversation} disabled={convId === null && turns.length === 0}>
+            새 대화
+          </button>
+        </div>
+        {listOpen && (
+          <div className="convlist">
+            {convs.length === 0 && <div className="row lbl">아직 대화가 없습니다 — 아래에 물으면 생깁니다</div>}
+            {convs.map((c, i) => (
+              <div key={c.id} className={'row' + (c.id === convId ? ' on' : '')}>
+                <span
+                  className="title"
+                  onClick={() => {
+                    setConvId(c.id)
+                    setListOpen(false)
+                  }}
+                >
+                  {c.title}
+                </span>
+                <span className="cap">
+                  {c.turn_count}턴 · {ago(c.updated_at)}
+                </span>
+                {/* 8.13 — 확인 뒤 첨부까지 지운다. 번호는 첫 행에 */}
+                <button type="button" className="btn sm danger" data-el={i === 0 ? '8.13' : undefined} onClick={() => void removeConversation(c)}>
+                  지우기
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
-      <div className="qa" data-el="8.7">
+      <div className="qa" data-el="8.7" ref={qaRef}>
         {turns.map((t, i) => {
           const done = t.a !== undefined || t.err !== undefined
           const last = t.prog[t.prog.length - 1]
@@ -738,19 +868,22 @@ function AskPanel({
           )
         })}
       </div>
-      <textarea
-        data-el="8.6"
-        value={question}
-        disabled={pending}
-        placeholder={itemId ? '이 항목을 보며 묻습니다 — Enter로 보냅니다' : '이 문서에 대해 묻습니다 — Enter로 보냅니다'}
-        onChange={(e) => setQuestion(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            void send()
-          }
-        }}
-      />
+      {/* 아래 고정 — 8.6 입력. 첨부 칩(8.14)·「+」(8.15)는 카드 AR */}
+      <div className="askbottom">
+        <textarea
+          data-el="8.6"
+          value={question}
+          disabled={pending}
+          placeholder={itemId ? '이 항목을 보며 묻습니다 — Enter로 보냅니다' : '이 문서에 대해 묻습니다 — Enter로 보냅니다'}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              void send()
+            }
+          }}
+        />
+      </div>
     </>
   )
 }
