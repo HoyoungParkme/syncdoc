@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core import queries
+from app.core.conversation.service import ConversationService
 from app.core.errors import LlmUnavailable
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
@@ -169,11 +170,10 @@ def test_ask_endpoint_streams_start_note_read_answer(
         return steps.pop(0)
 
     monkeypatch.setattr(queries.llm, "step", step)
-    body = {
-        "question": "이게 뭐야?",
-        "history": [{"role": "user", "text": "앞"}, {"role": "assistant", "text": "답"}],
-        "item_id": "G1",
-    }
+    conv = client.post("/api/projects/EXMP/conversations", json={}).json()["id"]
+    svc = ConversationService(scoped)  # 앞 대화는 서버가 대화에서 만든다 (카드 AQ)
+    svc.finish_turn(svc.add_turn(conv, "앞", []).id, "답", [], [])
+    body = {"question": "이게 뭐야?", "conversation_id": conv, "item_id": "G1"}
     r = client.post("/api/docs/EXMP-PRD-001/ask", json=body)
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")
     assert r.headers["cache-control"] == "no-cache" and r.headers["x-accel-buffering"] == "no"
@@ -188,7 +188,7 @@ def test_ask_endpoint_streams_start_note_read_answer(
 
     # 항목 없이도 묻는다 — 문서 단위 시작
     steps.append(LlmStep("문서 전체 답", [], LlmUsage()))
-    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "이 문서가 뭐야?"})
+    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "이 문서가 뭐야?", "conversation_id": conv})
     assert _sse(r.text)[0] == ("start", {"doc_id": "EXMP-PRD-001", "item_id": None})
 
     # 루프 중 모델 실패 → 200 스트림 안 error 이벤트(problem+json 그대로)
@@ -196,7 +196,7 @@ def test_ask_endpoint_streams_start_note_read_answer(
         raise LlmUnavailable("HTTP 429")
 
     monkeypatch.setattr(queries.llm, "step", down)
-    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "?"})
+    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "?", "conversation_id": conv})
     assert r.status_code == 200
     ev = _sse(r.text)
     assert ev[0][0] == "start" and ev[1][0] == "error"
@@ -204,18 +204,18 @@ def test_ask_endpoint_streams_start_note_read_answer(
 
     # 키 없음 → 스트림 전 503 (상태 코드)
     monkeypatch.setattr(settings, "LLM_API_KEY", "")
-    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "?"})
+    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "?", "conversation_id": conv})
     assert r.status_code == 503 and r.json()["type"] == "urn:syncdoc:llm-not-configured"
     # 없는 항목 힌트 → 스트림 전 404
     monkeypatch.setattr(settings, "LLM_API_KEY", "sk-test")
-    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "?", "item_id": "G9"})
+    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "?", "conversation_id": conv, "item_id": "G9"})
     assert r.status_code == 404 and r.json()["resource"] == "item"
     # 남의 문서 → 404 (R12)
     login(client, scoped, "minjun")
-    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "?"})
+    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "?", "conversation_id": conv})
     assert r.status_code == 404 and r.json()["resource"] == "project"
     # 옛 경로는 없다
     login(client, scoped, "hoyoung")
     assert client.post(
-        "/api/docs/EXMP-PRD-001/items/G1/ask", json={"question": "?"}
+        "/api/docs/EXMP-PRD-001/items/G1/ask", json={"question": "?", "conversation_id": conv}
     ).status_code in (404, 405)

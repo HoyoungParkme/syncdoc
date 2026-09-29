@@ -1,6 +1,6 @@
 """SYNC-CODE-001#A·V 테스트 — 마이그레이션 up/down.
 
-테이블 10개(0011이 협업 테이블 셋을 지웠다) · 인덱스(DOM-003 3장) · downgrade 후 빈 스키마.
+테이블 13개(0011이 협업 테이블 셋을 지웠고 0014가 대화 셋을 더했다) · 인덱스(DOM-003 3장) · downgrade 후 빈 스키마.
 """
 
 import re
@@ -23,6 +23,9 @@ TABLES = {
     "users",
     "access_tokens",
     "commit_emails",
+    "conversations",  # 0014 — 대화·턴·첨부 (카드 AQ·AR)
+    "turns",
+    "attachments",
 }
 PARTIAL_INDEXES = {
     "ix_documents_has_convention_error",
@@ -44,7 +47,7 @@ def _reset_schema() -> None:
     engine.dispose()
 
 
-def test_upgrade_creates_10_tables_and_indexes(alembic_cfg: Config) -> None:
+def test_upgrade_creates_13_tables_and_indexes(alembic_cfg: Config) -> None:
     _reset_schema()
     command.upgrade(alembic_cfg, "head")
     engine = create_engine(settings.DATABASE_URL)
