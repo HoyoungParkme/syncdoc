@@ -74,13 +74,14 @@ export function ProjectInit({ onClose, onDone }: { onClose: () => void; onDone: 
           <input type="checkbox" data-el="2.6" checked={createRepo} onChange={(e) => setCreateRepo(e.target.checked)} />{' '}
           저장소가 없으면 새로 만든다 <span className="lbl">(공개로 만들어집니다)</span>
         </label>
-        {/* 등록하면 저장소에 무엇이 생기는지. 기존 명세가 발견되면(빈 저장소가 아니면) 감춘다 */}
+        {/* 등록하면 저장소에 무엇이 생기는지. 기존 명세가 발견되면(빈 저장소가 아니면) 감춘다.
+            배치(UI-002 UI-3 2.5)와 같은 글 — 빈 단계 디렉터리와 README뿐, 템플릿 사본은 안 넣는다(카드 AB, #199) */}
         {existing === null && (
           <div className="willcommit" data-el="2.5">
             <b>커밋될 것</b>
-            <div className="mono">docs/specs/_templates/ · 12개</div>
-            <div className="mono">docs/specs/{'{01-RFQ, 02-PRD, … , 11-CODE}'}/</div>
+            <div className="mono">docs/specs/{'{01-RFQ, 02-PRD, … , 11-CODE}'}/ · STD/</div>
             <div className="mono">docs/specs/assets/</div>
+            <div className="mono">docs/specs/README.md — 규약 링크</div>
           </div>
         )}
         {banner && (
