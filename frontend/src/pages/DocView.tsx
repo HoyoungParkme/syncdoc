@@ -146,9 +146,17 @@ export function DocView() {
   }, [view, tab, doc, nav, setPanel])
 
   useEffect(() => {
-    if (!selected) return
-    api.get<ItemReferences>(`/api/docs/${docId}/items/${selected.replace(/\//g, '~')}/references`).then(setRefs).catch(() => setRefs(null))
-  }, [selected, docId])
+    // 지금 문서의 항목일 때만 — 문서가 바뀐 첫 커밋엔 doc이 옛 문서라 옛 선택으로 새 문서에 묻지 않는다 (#198)
+    if (!selected || !doc || doc.doc_id !== docId || !doc.items.some((i) => i.item_id === selected)) return
+    let live = true // 늦게 온 응답(특히 404의 null)이 새 선택의 참조를 덮지 않게
+    api
+      .get<ItemReferences>(`/api/docs/${docId}/items/${selected.replace(/\//g, '~')}/references`)
+      .then((r) => live && setRefs(r))
+      .catch(() => live && setRefs(null))
+    return () => {
+      live = false
+    }
+  }, [selected, docId, doc])
 
   /** 3 상태 토글 — 갈 곳이 하나라 고를 것이 없다(UC-H8). 완료로 올릴 때 서버가 `status-blocked`로 거절하면
    *  토스트에 이유 — 배너(4·4a)가 이미 말하는 값이다. 다이얼로그 없음 */
