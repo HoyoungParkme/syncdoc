@@ -152,11 +152,13 @@ class AskTurn(BaseModel):
 
 
 class AskRequest(BaseModel):
-    """POST /api/docs/{docId}/ask — 대화는 클라이언트가 통째로 보낸다. item_id는 힌트다."""
+    """POST /api/docs/{docId}/ask — 어느 대화에 쌓을지(conversation_id). 앞 대화는 서버가 대화에서
+    만든다(카드 AQ). item_id는 힌트, attachment_ids는 이 질문에 붙일 안 보낸 첨부(카드 AR)."""
 
     question: str
-    history: list[AskTurn] = []
+    conversation_id: int
     item_id: str | None = None
+    attachment_ids: list[int] = []
 
 
 class AskStart(Base):

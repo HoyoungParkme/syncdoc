@@ -21,7 +21,8 @@ from app import db
 from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import AccountService
-from app.core.errors import ItemDeleted, LlmNotConfigured, LlmUnavailable, NotFound
+from app.core.conversation.service import ConversationService
+from app.core.errors import ItemDeleted, LlmNotConfigured, LlmUnavailable, NotFound, Problem
 from app.core.project.models import Project
 from app.core.project.service import ProjectService
 from app.core.reference.service import ReferenceService
@@ -34,6 +35,7 @@ from app.core.types import (
     AskNote,
     AskRead,
     AskStart,
+    AttachmentMeta,
     AuthorRef,
     BrokenRefSummary,
     ChainItem,
@@ -504,7 +506,8 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 [문서] {doc_id} {title} · 상태 {status} · v{version_no}
 [이 문서의 항목]
 {items}
-{viewing}"""
+{viewing}
+{attachments}"""
 
 _ASK_WRAP_UP = "도구 호출 상한(또는 시간 상한)에 닿았다. 지금까지 읽은 것으로 답하라. 못 읽은 것이 있으면 무엇을 못 읽었는지 말한다."
 
@@ -571,7 +574,9 @@ def _ref_json(r: ItemRef) -> dict[str, Any]:
     return {"id": f"{r.doc_id}#{r.item_id}", "name": r.display_name}
 
 
-async def ask_tool(name: str, args: dict, code: str, user: User) -> ToolResult:
+async def ask_tool(
+    name: str, args: dict, code: str, user: User, conversation_id: int
+) -> ToolResult:
     """SYNC-MS-008#queries.ask_tool
 
     도구 하나 실행. 없음·삭제·다른 프로젝트·인자 빠짐은 예외가 아니라 {"error": …} 텍스트다 —
@@ -671,7 +676,9 @@ async def ask_tool(name: str, args: dict, code: str, user: User) -> ToolResult:
         return _err("삭제된 항목", doc_id=doc_id, item_id=item_id)
 
 
-def _start_context(spec: SpecService, doc_id: str, item_id: str | None) -> tuple[str, Document]:
+def _start_context(
+    spec: SpecService, doc_id: str, item_id: str | None, attachments: str = ""
+) -> tuple[str, Document]:
     """시작 맥락 — 제목·상태·버전·항목 ID·이름. 본문은 안 실는다(사용자 결정 3)."""
     d = spec.get_document(doc_id)
     refs = spec.describe_documents([d.id])
@@ -691,66 +698,105 @@ def _start_context(spec: SpecService, doc_id: str, item_id: str | None) -> tuple
         version_no=d.current_version_no,
         items=items,
         viewing=viewing,
+        attachments=attachments,
     ), d
 
 
 async def ask_item(
-    doc_id: str, item_id: str | None, question: str, history: list[dict], user: User
+    doc_id: str,
+    item_id: str | None,
+    conversation_id: int,
+    question: str,
+    attachment_ids: list[int],
+    user: User,
 ) -> AsyncIterator[AskEvent]:
     """SYNC-MS-008#queries.ask_item
 
     ReAct 루프. DOM-002 3.2 — queries가 어댑터를 직접 부르는 것은 llm 하나뿐이고, 도구 실행은
-    여기 있는 조회(ask_tool)로 닫힌다. DB에 아무것도 쓰지 않는다. 첫 이벤트(start) 전의 오류는
-    예외(상태 코드), 뒤의 오류는 라우터가 error 이벤트로 낸다.
+    여기 있는 조회(ask_tool)로 닫힌다. 쓰는 것은 대화 표뿐이다(카드 AQ) — 질문을 받자마자 턴을
+    만들고 답이나 실패로 닫는다. 첫 이벤트(start) 전의 오류는 예외(상태 코드), 뒤의 오류는
+    라우터가 error 이벤트로 낸다.
     """
     if not settings.LLM_API_KEY:
         raise LlmNotConfigured()  # 네트워크를 타기 전에 막는다 (MS-008 0)
-    history = history[-settings.LLM_MAX_TURNS :] if settings.LLM_MAX_TURNS > 0 else []
     code = doc_id.split("-")[0]
     with db.session_scope() as s:
         ProjectService(s).get_owned(code, user)
-        system, _ = _start_context(SpecService(s), doc_id, item_id)
+        convs = ConversationService(s)
+        view = convs.get(conversation_id, user)  # 내 것이 아니면 not-found(conversation)
+        if view.project_code != code:
+            raise NotFound("conversation", conversation_id)
+        history = convs.history(conversation_id, settings.LLM_MAX_TURNS)
+        turn = convs.add_turn(conversation_id, question, attachment_ids)
+        turn_id = turn.id
+        metas = [m for t in view.turns for m in t.attachments] + view.pending
+        try:
+            system, _ = _start_context(SpecService(s), doc_id, item_id, _attachment_lines(metas))
+        except NotFound:
+            convs.finish_turn(turn_id, None, [], [], error="not-found")
+            raise
+        s.commit()  # 턴은 스트림과 무관하게 남는다 — 답이 안 와도 실패로 닫힌다
     yield AskStart(doc_id=doc_id, item_id=item_id)
     t0 = time.monotonic()
     calls = 0
     reads: list[str] = []
+    progress: list[dict] = []
     prompt_tokens = completion_tokens = 0
     log: list[dict] = [{"role": m["role"], "text": m["text"]} for m in history]
     log.append({"role": "user", "text": question})
     answer: str | None = None
-    while True:
-        step = await llm.step(system, log, _ASK_TOOLS)
-        prompt_tokens += step.usage.prompt_tokens
-        completion_tokens += step.usage.completion_tokens
-        if not step.tool_calls:
-            answer = step.text or ""
-            break
-        if step.text:
-            yield AskNote(step.text)
-        log.append({"role": "assistant", "text": step.text or "", "tool_calls": step.tool_calls})
-        for call in step.tool_calls:
-            reason = str(call.arguments.get("reason") or "").strip()
-            if reason:
-                yield AskNote(reason)
-            r = await ask_tool(call.name, call.arguments, code, user)
-            yield AskRead(call.name, r.target)
-            if r.target and r.target not in reads:
-                reads.append(r.target)
-            log.append({"role": "tool", "tool_call_id": call.id, "text": r.text})
-            calls += 1
-        if calls >= _ASK_MAX_CALLS or time.monotonic() - t0 >= _ASK_TIME_LIMIT:
-            log.append({"role": "user", "text": _ASK_WRAP_UP})
-            last = await llm.step(system, log, _ASK_TOOLS, tool_choice="none")
-            prompt_tokens += last.usage.prompt_tokens
-            completion_tokens += last.usage.completion_tokens
-            if not last.text:
-                raise LlmUnavailable("상한 뒤에도 답이 없다")
-            answer = last.text
-            break
+    try:
+        while True:
+            step = await llm.step(system, log, _ASK_TOOLS)
+            prompt_tokens += step.usage.prompt_tokens
+            completion_tokens += step.usage.completion_tokens
+            if not step.tool_calls:
+                answer = step.text or ""
+                break
+            if step.text:
+                progress.append({"kind": "note", "text": step.text})
+                yield AskNote(step.text)
+            log.append({"role": "assistant", "text": step.text or "", "tool_calls": step.tool_calls})
+            for call in step.tool_calls:
+                reason = str(call.arguments.get("reason") or "").strip()
+                if reason:
+                    progress.append({"kind": "note", "text": reason})
+                    yield AskNote(reason)
+                r = await ask_tool(call.name, call.arguments, code, user, conversation_id)
+                progress.append(
+                    {"kind": "read", "text": f"{call.name} {r.target}" if r.target else call.name}
+                )
+                yield AskRead(call.name, r.target)
+                if r.target and r.target not in reads:
+                    reads.append(r.target)
+                log.append({"role": "tool", "tool_call_id": call.id, "text": r.text})
+                calls += 1
+            if calls >= _ASK_MAX_CALLS or time.monotonic() - t0 >= _ASK_TIME_LIMIT:
+                log.append({"role": "user", "text": _ASK_WRAP_UP})
+                last = await llm.step(system, log, _ASK_TOOLS, tool_choice="none")
+                prompt_tokens += last.usage.prompt_tokens
+                completion_tokens += last.usage.completion_tokens
+                if not last.text:
+                    raise LlmUnavailable("상한 뒤에도 답이 없다")
+                answer = last.text
+                break
+    except BaseException as e:
+        # 실패도 턴으로 닫는다 — 다음 질문의 history에 안 실린다 (MS-010 finish_turn)
+        reason = getattr(e, "extra", {}).get("reason") if isinstance(e, Problem) else None
+        with db.session_scope() as s:
+            ConversationService(s).finish_turn(
+                turn_id, None, progress, reads, error=str(reason or type(e).__name__)[:300]
+            )
+            s.commit()
+        raise
+    with db.session_scope() as s:
+        ConversationService(s).finish_turn(turn_id, answer, progress, reads)
+        s.commit()
     _log.info(
-        "ask doc=%s item=%s user=%s calls=%d prompt=%d completion=%d elapsed=%.1fs",
+        "ask doc=%s item=%s conv=%s user=%s calls=%d prompt=%d completion=%d elapsed=%.1fs",
         doc_id,
         item_id,
+        conversation_id,
         user.id,
         calls,
         prompt_tokens,
@@ -758,3 +804,14 @@ async def ask_item(
         time.monotonic() - t0,
     )
     yield AskAnswer(answer=answer, context_item_ids=reads)
+
+
+def _attachment_lines(metas: list[AttachmentMeta]) -> str:
+    """시작 맥락의 [첨부] 줄 — 이름·종류·크기만. 글자·PDF는 read_attachment로, 이미지는 그 질문에 보인다."""
+    if not metas:
+        return ""
+    lines = ["[첨부]"]
+    for m in metas:
+        kind = "이미지 — 붙인 질문에 보인다" if m.mime.startswith("image/") else "read_attachment로 읽는다"
+        lines.append(f"{m.id} {m.name} ({m.mime}, {m.size}B) — {kind}")
+    return "\n".join(lines)

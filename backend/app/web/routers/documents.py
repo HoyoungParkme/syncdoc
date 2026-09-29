@@ -153,10 +153,11 @@ async def ask(doc_id: str, req: AskRequest, user: User = Depends(current_user)) 
 
     보고 있는 문서가 시작 맥락이고 항목은 힌트다(UC-H19). 모델이 도구로 같은 프로젝트를 읽는
     동안 note·read 이벤트를 흘리고 answer로 끝난다(SSE). 첫 이벤트(start) 전의 오류는 상태 코드,
-    뒤의 오류는 error 이벤트. 아무것도 저장하지 않는다.
+    뒤의 오류는 error 이벤트. 질문·답은 대화(conversation_id)에 남는다 — 명세 표는 안 쓴다.
     """
-    history = [{"role": t.role, "text": t.text} for t in req.history]
-    gen = queries.ask_item(doc_id, req.item_id, req.question, history, user)
+    gen = queries.ask_item(
+        doc_id, req.item_id, req.conversation_id, req.question, req.attachment_ids, user
+    )
     first = await anext(gen)  # 여기서 나는 Problem은 problem_handler가 상태 코드로 낸다
 
     async def body():
