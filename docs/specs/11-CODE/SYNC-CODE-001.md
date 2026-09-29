@@ -1096,7 +1096,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `queries._ASK_SYSTEM`에 그림 문단(mermaid — flowchart·mindmap·classDiagram·sequenceDiagram, 읽은 항목만) · `AskPanel`이 답의 `pre.mermaid`에 `mermaid.run`을 돌리고 `attachDiagramButtons`로 전체보기(공통 1.7)를 붙인다 · 저장된 답도 다시 열면 그려진다 |
 | 테스트 | 지시문에 mermaid 안내가 있다 · 헤드 크롬: 「R1의 근거와 파생을 마인드맵으로」 → mindmap svg · 전체보기 층 · 새로고침 뒤에도 그림 · flowchart 한 번 더 |
 | 선행 | AR |
-| 완료 | — |
+| 완료 | 2026-09-29 · 브랜치 `card/AS-answer-diagram` · spec 3 + code 2(+ #215 경합 고침) · 테스트 279 · `validate` 0/0 · `check_ui` 12/12 · `check_code` 127/127 · 배포 뒤 헤드 크롬: 「R1의 근거와 파생을 마인드맵으로」 → mindmap svg + 전체보기 층 · flowchart 한 번 더 · 새 대화에서도 · 새로고침 뒤에도 그림 |
 
 **왜 카드인가.** 렌더러는 이미 mermaid 코드블록을 `pre.mermaid`로 만드는데 패널에서 돌리지 않았고, 지시문이 그림을 허락하지 않았다 — 지시문 한 문단과 패널 한 효과지만 화면 규칙(8.7·공통 1.7)이 바뀌므로 카드다.
 
@@ -1176,6 +1176,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AP | `card/AP-view-html` | `c2f5578` | #191 | 2026-09-28 |
 | AQ | `card/AQ-conversations` | `54d07f7` | #210 | 2026-09-29 |
 | AR | `card/AR-attachments` | `d71453b` | #212 | 2026-09-29 |
+| AS | `card/AS-answer-diagram` | `20370d8` · `cfe0fa6` | #214 · #215 | 2026-09-29 |
 | (#119) | `fix/119-single-render` | — | #119 | 2026-09-23 |
 | (#126) | `fix/126-view-build-specs` | — | #126 | 2026-09-23 |
 | (#133) | `fix/133-tokens-by-chapter` | — | #133 | 2026-09-23 |
