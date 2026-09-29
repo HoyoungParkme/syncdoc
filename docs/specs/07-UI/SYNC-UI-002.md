@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -95,6 +95,15 @@ upstream: [SYNC-UI-001]
 - 닫는 길 셋 — 닫기 버튼 · `Esc` · 그림 바깥 클릭
 - **SEQ의 자기 확대 바(－/100%/＋)는 그대로 둔다.** 그건 본문 안에서 조금 키우는 것이고, 전체보기는 화면을 통째로 쓰는 것이다
 - 쓰는 곳: UI-5 유저용 본문(7.3 → 7.5·7.6) · UI-9 본문(4)의 그림. UI-8 그래프는 자기 전체보기(2.5)가 있다
+
+### 1.8 진행 표시
+
+서버가 답을 만드는 동안 **기다리는 중**임을 보이는 기호 — 14px 원호가 도는 스피너와 그 오른쪽에 지금 하는 일 한 줄. [[SYNC-UI-001]] 3.4 「애니메이션을 두지 않는다」의 예외 하나다: 전환 효과가 아니라 상태다.
+
+- **답·결과가 오면 즉시 사라진다.** 남는 것은 결과뿐이다 — 스피너가 멈춘 채 남지 않는다
+- 오른쪽 한 줄은 **가장 최근 것으로 갈아든다.** 줄이 쌓이지 않는다. 지나간 줄을 보려면 그 자리의 펼침(UI-5 8.9)으로
+- 0.8초에 한 바퀴, 잉크색 원호 하나. `prefers-reduced-motion`이면 돌지 않고 정지 원호로 둔다
+- 쓰는 곳: UI-5 질문 탭 진행 묶음(8.9). 다른 대기(UI-14 재구축 등)는 아직 안 쓴다 — 쓰게 되면 여기에 더한다
 
 ## 공통 틀
 
@@ -258,10 +267,19 @@ textarea.in{height:auto;min-height:64px;padding:8px 10px;resize:none;line-height
   /* 질문 탭 */
   .qa{display:flex;flex-direction:column;gap:8px;margin:8px 0}
   .qa .q{align-self:flex-end;max-width:92%;padding:5px 9px;border-radius:5px;background:var(--sub2);font-size:13.5px}
-  .qa .prog{display:flex;flex-direction:column;gap:2px;padding:3px 9px;border-left:2px solid var(--line);font-size:12.5px;color:var(--dim)}
+  .qa .prog{padding:3px 9px;border-left:2px solid var(--line);font-size:12.5px;color:var(--dim)}
+  .qa .prog summary{display:flex;align-items:center;gap:6px;cursor:pointer;list-style:none}
+  .qa .prog summary .n{margin-left:auto;font-size:11.5px;white-space:nowrap}
+  .qa .prog summary .n::after{content:" ▸"}
+  .qa .prog[open] summary .n::after{content:" ▾"}
+  .qa .prog .lines{display:flex;flex-direction:column;gap:2px;margin-top:4px}
   .qa .prog .r{font-family:var(--mono);font-size:11.5px}
+  .qa .spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--ink);flex:none;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
   .qa .a{padding:6px 9px;border:1px solid var(--line);border-radius:5px;background:#fff;font-size:13.5px;line-height:1.55}
-  .qa .src{font:12px var(--mono);color:var(--dim)}
+  .qa .a p{margin:0 0 6px}.qa .a p:last-child{margin:0}.qa .a ul{margin:0 0 6px 18px;padding:0}
+  .qa .a.wait{color:var(--dim);border-style:dashed}
+  .qa .src{font:12px var(--mono);color:var(--dim);margin-top:4px}
   /* 원본 탭 */
   .editor{display:grid;grid-template-columns:32px 1fr;border:1px solid var(--line);border-radius:6px;background:#fff;overflow:hidden}
   .gutter{background:var(--sub2);color:var(--dim);font:12px/1.65 var(--mono);text-align:right;padding:10px 6px}
@@ -388,21 +406,45 @@ status: draft
   </div>
 </div>
 
-<div class="var">질문 탭 — 패널 본문이 참조에서 질문으로 바뀐다. 진행 줄은 답이 오기 전엔 또렷이, 온 뒤엔 흐리게</div>
+<div class="var">질문 탭, 읽는 동안 — 진행 묶음(8.9)은 스피너(공통 1.8)와 지금 줄 하나. 「n단계 ▸」를 펼치면 지금까지 전부</div>
 <div class="sd h" style="width:250px;min-height:0">
-  <aside class="side" style="min-height:480px">
+  <aside class="side" style="min-height:300px">
     <div class="ptabs"><span data-el="8.1">참조</span><span class="on">질문</span></div>
     <div class="cap" data-el="8.5"><span class="idb">R1</span> 에이전트용 원본과 사람용 뷰 · 이 항목을 보며 묻습니다</div>
+    <div class="qa">
+      <div class="q">원본과 뷰를 왜 나눴나요?</div>
+      <details class="prog">
+        <summary><span class="spin"></span><span>근거 Q1을 읽는다 — 상위가 무엇을 요구했는지</span><span class="n">2단계</span></summary>
+        <div class="lines">
+          <div>R1 본문을 읽는다 — 왜 나눴는지가 거기 적혀 있을 것이다</div>
+          <div class="r">읽음 · SYNC-PRD-001#R1</div>
+          <div>근거 Q1을 읽는다 — 상위가 무엇을 요구했는지</div>
+        </div>
+      </details>
+      <div class="a wait">읽는 중…</div>
+    </div>
+    <textarea class="in" placeholder="이 문서에 대해 묻습니다"></textarea>
+  </aside>
+</div>
+
+<div class="var">질문 탭, 답이 온 뒤 — 8.9는 「n단계 읽음 · 본 것 k ▸」 한 줄로 접힌다. 펼치면 과정과 본 것. 답은 가벼운 마크다운이고 참조는 링크다</div>
+<div class="sd h" style="width:250px;min-height:0">
+  <aside class="side" style="min-height:420px">
+    <div class="ptabs"><span>참조</span><span class="on">질문</span></div>
+    <div class="cap"><span class="idb">R1</span> 에이전트용 원본과 사람용 뷰 · 이 항목을 보며 묻습니다</div>
     <div class="qa" data-el="8.7">
       <div class="q">원본과 뷰를 왜 나눴나요?</div>
-      <div class="prog" data-el="8.9">
-        <div>R1 본문을 읽는다 — 왜 나눴는지가 거기 적혀 있을 것이다</div>
-        <div class="r">읽음 · SYNC-PRD-001#R1</div>
-        <div>근거 Q1을 읽는다 — 상위가 무엇을 요구했는지</div>
-        <div class="r">읽음 · SYNC-RFQ-001#Q1</div>
-      </div>
-      <div class="a">에이전트가 읽을 것을 전제로 규약이 있는 MD를 원본으로 두고, 사람용은 거기서 파생 생성합니다. 근거는 <span class="m bd">SYNC-RFQ-001#Q1</span>이고 이 항목의 상위입니다.</div>
-      <div class="src">본 것: SYNC-PRD-001#R1 · SYNC-RFQ-001#Q1</div>
+      <details class="prog" data-el="8.9" open>
+        <summary><span>4단계 읽음 · 본 것 2</span><span class="n"></span></summary>
+        <div class="lines">
+          <div>R1 본문을 읽는다 — 왜 나눴는지가 거기 적혀 있을 것이다</div>
+          <div class="r">읽음 · SYNC-PRD-001#R1</div>
+          <div>근거 Q1을 읽는다 — 상위가 무엇을 요구했는지</div>
+          <div class="r">읽음 · SYNC-RFQ-001#Q1</div>
+        </div>
+        <div class="src">본 것: <span class="m bd">SYNC-PRD-001#R1</span> · <span class="m bd">SYNC-RFQ-001#Q1</span></div>
+      </details>
+      <div class="a"><p>에이전트가 읽을 것을 전제로 <b>규약이 있는 MD를 원본</b>으로 두고, 사람용은 거기서 파생 생성합니다.</p><ul><li>근거는 <span class="m bd">SYNC-RFQ-001#Q1</span> — 이 항목의 상위</li><li>원본은 읽기·복사만(10.1)</li></ul></div>
     </div>
     <textarea class="in" data-el="8.6" placeholder="이 문서에 대해 묻습니다"></textarea>
   </aside>
@@ -490,8 +532,8 @@ status: draft
 | 8.4 | 질문 탭 | 탭 | 읽다가 묻는다(UC-H19). 모델이 같은 프로젝트를 관계도로 따라 읽는다. **모델 키가 없으면 이 탭이 없다** — `GET /api/me`의 `llm_enabled`로 안다 | 패널을 질문으로 |
 | 8.5 | 맥락 줄 | 텍스트 | 지금 무엇을 보며 묻는지. 항목이 있으면 「`X 이름` · 이 항목을 보며 묻습니다」, 없으면 「문서 전체 · `{doc_id}`에 대해 묻습니다」. 항목은 힌트다 | — |
 | 8.6 | 질문 입력 | 입력 | **항상 활성**(휴지통 문서 제외). 보내는 동안만 비활성. 보내면 8.7에 쌓인다 | — |
-| 8.7 | 대화 | 목록 | 질문·진행 줄(8.9)·답이 차례로. **서버에 저장되지 않는다** — 대화는 프로젝트 단위로 브라우저에만 있다. 답 아래 「본 것」 = 모델이 실제로 읽은 대상, 부른 순서 | 대상 ID → 7.2와 같음(다른 문서면 그 문서로) |
-| 8.9 | 진행 줄 | 목록 | 답이 오기 전에 모델이 읽기 전마다 쓰는 한 줄(`note`)과 읽은 대상(`read`)이 **실시간으로 차례로** 쌓인다. 답이 오면 작고 흐리게 남는다 — 무엇을 보고 답했는지의 과정 | — |
+| 8.7 | 대화 | 목록 | 질문·진행 묶음(8.9)·답이 차례로. **서버에 저장되지 않는다** — 대화는 프로젝트 단위로 브라우저에만 있다. 답은 **가벼운 마크다운**(문단·목록·굵게·인라인 코드)으로 그리고, 답 속 `[[…]]`와 맨 `문서ID#항목ID`는 7.2와 같은 링크다(#206) | 답 속 참조 → 7.2와 같음(다른 문서면 그 문서로) |
+| 8.9 | 진행 묶음 | 접힌 묶음 | **읽는 동안** — 스피너(공통 1.8) + 모델이 읽기 전에 쓰는 **가장 최근 한 줄**(`note`). 새 줄이 오면 갈아든다. 오른쪽 「n단계 ▸」를 누르면 지금까지의 `note`·`read` 전부. **답이 온 뒤** — 스피너가 사라지고 「n단계 읽음 · 본 것 k ▸」 한 줄로 접힌다. 펼치면 진행 줄 전부와 그 아래 「본 것」 = 모델이 실제로 읽은 대상, 부른 순서. 줄은 SSE로 **실시간** 한 줄씩 온다 | 누르면 펼침/접힘 · 본 것 → 7.2와 같음 |
 | 9 | 단계 이동 | 버튼 2개 | 이전·다음 단계 문서 ID. 없으면 비활성 | 그 문서의 UI-5 |
 | 10 | 원본 본문 | 영역 | 원본 MD 그대로. 줄 번호. 3단 틀은 유저용과 같고 본문 열만 바뀐다 | — |
 | 10.1 | MD 텍스트 | 읽기 전용 텍스트 | 저장소의 파일 내용 그대로 | 선택·복사만. 편집 불가 |
@@ -528,7 +570,7 @@ status: draft
 - 참조 링크(7.2)가 미존재 참조면 회색 + 경고 아이콘, 클릭해도 이동 없음
 - **질문 탭(8.4)은 기본 탭이 아니다.** 처음 열면 여전히 참조 탭이고, 7.1이 참조 탭으로 가는 기존 전환도 그대로다. 질문 탭은 사람이 직접 누를 때만 열린다. URL은 `?panel=ask`
 - **항목은 힌트다.** 고르지 않아도 문서 전체로 묻는다(8.5 「문서 전체」). 골랐으면 「지금 보는 항목」으로 실려 모델이 거기서 시작한다. 어느 쪽이든 모델은 같은 프로젝트를 도구로 따라 읽는다
-- **진행 줄(8.9)은 실시간이다.** 응답이 SSE라 도구를 부를 때마다 한 줄씩 온다 — 한꺼번에 몰려 오면 잘못된 것이다. 답이 오기 전엔 또렷이, 온 뒤엔 흐리게
+- **진행 묶음(8.9)은 실시간이다.** 응답이 SSE라 도구를 부를 때마다 한 줄씩 온다 — 한꺼번에 몰려 오면 잘못된 것이다. 읽는 동안은 스피너와 지금 줄 하나만 보이고, 답이 오면 「n단계 읽음 · 본 것 k」 한 줄로 접힌다 — 과정은 남기되 답을 가리지 않는다. 전에는 여섯 줄이 답 위에 다 쌓여 답보다 과정이 먼저 읽혔다(#206)
 - **모델 키가 없으면 탭 자체가 없다**(인프라 5.3). 참조 탭만 남고 나머지 화면은 그대로다. 꺼진 기능을 회색으로 남겨 두지 않는다 — 켤 방법이 사람에게 없다
 - **대화는 프로젝트 단위이고 서버에 저장되지 않는다.** 같은 프로젝트 안에서 문서·항목을 옮겨도 남고(8.5만 바뀐다), 다른 프로젝트로 가면 새 대화다. 새로고침하면 사라진다. 남기는 길을 화면에 두지 않는다 — 답을 명세에 옮기는 것은 사람과 그 사람의 에이전트가 한다([[SYNC-PRD-001]] 2장 「전달」의 경계)
 - 답이 길어도 **패널 안에서만 스크롤한다**. 3단 규칙 그대로
@@ -560,8 +602,8 @@ status: draft
 **S-5 읽다가 막혀서 묻는다** — UC-H19
 1. 질문 탭(8.4)을 누른다. 항목을 골랐으면 맥락 줄(8.5)에 그 ID와 제목이, 안 골랐으면 「문서 전체」가 떠 있다 — 어느 쪽이든 묻는다
 2. 입력(8.6)에 「이 요구사항의 근거가 뭐라고 했어?」라고 묻는다
-3. 진행 줄(8.9)이 흐른다 — 「R1 본문을 읽는다」 「읽음 · SYNC-PRD-001#R1」 「근거 Q1을 읽는다」 「읽음 · SYNC-RFQ-001#Q1」. 도구를 부를 때마다 한 줄씩
-4. 답(8.7)이 뜨고 진행 줄은 흐려진다. 아래 「본 것」에 읽은 대상이 순서대로 보인다. 누르면 그 항목으로 간다
+3. 진행 묶음(8.9)의 스피너 옆 줄이 「R1 본문을 읽는다」 → 「근거 Q1을 읽는다」로 갈아들고 「2단계 ▸」가 는다. 펼치면 지금까지의 줄 전부 — 「R1 본문을 읽는다」 「읽음 · SYNC-PRD-001#R1」 「근거 Q1을 읽는다」. 도구를 부를 때마다 한 줄씩
+4. 답(8.7)이 마크다운으로 뜨고 8.9는 「4단계 읽음 · 본 것 2 ▸」로 접힌다. 펼치면 읽은 대상이 순서대로 보이고 누르면 그 항목으로 간다. 답 속 `SYNC-RFQ-001#Q1`도 링크다
 5. 이어 물으면 앞 대화가 함께 간다. 같은 프로젝트의 다른 문서로 옮겨도 대화는 그대로다
 6. 다른 프로젝트로 가면 새 대화다. 남길 값이 있었으면 에이전트에게 말해 명세를 고치게 한다
 
