@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -881,8 +881,9 @@ purge_document(doc_id, author) -> DeleteResult
     완전 삭제. 휴지통 안에서만. 들어오는 참조가 0이어야. spec.delete_document
     UC-H7. 옛 버전 본문 → save_pipeline(entry=web_revert). already-current 검사.
 
-process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
-    webhook·폴링·기동 시 따라잡기가 부른다.
+process_commit(repo: Repository, head_hash: str, locked: bool = False) -> list[SaveResult]
+    webhook·폴링·기동 시 따라잡기가 부른다. 전체가 저장소 읽기 락 안 — 셋이 한 줄로 선다(#194).
+    locked=True는 이미 그 락을 쥔 read_pending·catch_up. 락 안에서 last_processed를 다시 읽고 옛 head면 [].
     git.changed_files(last_processed..head, "docs/specs/") → 파일마다 save_pipeline(entry=github, commit_hash=...)
     author = account.user_by_login(커밋 작성자)
     밀린 커밋 여럿이면 최종 상태만 저장. 중간 버전은 git에만 (인프라 7장)
