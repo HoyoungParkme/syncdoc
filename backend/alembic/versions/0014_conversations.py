@@ -1,7 +1,8 @@
 """0014_conversations — conversations · turns · attachments (카드 AQ·AR).
 
 SYNC-DOM-003#conversations · #turns · #attachments · SYNC-PRD-001#R11 (2026-09-29 보관 결정).
-세 표를 한 리비전에 만든다 — 첨부 행은 AR가 채우지만 표는 대화와 같이 있어야 대화 조회가 한 모양이다.
+세 표를 한 리비전에 만든다 — 첨부 행은 AR가 채우지만 표는 대화와 같이 있어야 대화 조회가
+한 모양이다.
 명세 표를 가리키지 않고 projects·users만 FK. 프로젝트·대화가 지워지면 cascade.
 
 Revision ID: 0014
