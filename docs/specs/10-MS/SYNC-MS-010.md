@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-010
 type: MS
 title: MINISPEC — ConversationService — 대화·턴·첨부
-status: draft
+status: approved
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001, SYNC-STD-001]
 ---
 
