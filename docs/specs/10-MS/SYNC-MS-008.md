@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -57,21 +57,21 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### queries.ask_item 문서를 읽다가 묻는다 — 모델이 관계도를 따라 읽는다
 
-**시그니처** `async def ask_item(doc_id: str, item_id: str | None, question: str, history: list[dict], user: User) -> AsyncIterator[AskEvent]`
+**시그니처** `async def ask_item(doc_id: str, item_id: str | None, conversation_id: int, question: str, attachment_ids: list[int], user: User) -> AsyncIterator[AskEvent]`
 
-근거: [[SYNC-PRD-001#R11]] · [[SYNC-UC-001#UC-H19]] · [[SYNC-SEQ-001#SEQ-24]] · [[SYNC-INFRA-001]] 5.3 · 사용자 결정 2026-09-22(카드 Y — [[SYNC-CODE-001#Y]])
+근거: [[SYNC-PRD-001#R11]] · [[SYNC-UC-001#UC-H19]] · [[SYNC-SEQ-001#SEQ-24]] · [[SYNC-INFRA-001]] 5.3 · 사용자 결정 2026-09-22(카드 Y — [[SYNC-CODE-001#Y]]) · 사용자 결정 2026-09-29(대화·첨부 보관 — [[SYNC-CODE-001#AQ]]·[[SYNC-CODE-001#AR]])
 
-**입력** `doc_id` 지금 열린 문서 — 시작 맥락 · `item_id` 보고 있는 항목. 힌트일 뿐이라 `None`이면 문서 전체로 시작한다 · `question` 사람이 쓴 질문 · `history` 앞선 대화 `[{role: user|assistant, text}]`. 클라이언트가 들고 있다가 통째로 보낸 것. 앞 턴의 도구 호출·읽은 본문은 여기 없다
+**입력** `doc_id` 지금 열린 문서 — 시작 맥락 · `item_id` 보고 있는 항목. 힌트일 뿐이라 `None`이면 문서 전체로 시작한다 · `conversation_id` 쌓을 대화. 앞 대화는 여기서 읽는다 — 클라이언트가 보내지 않는다 · `question` 사람이 쓴 질문 · `attachment_ids` 이 대화에 올려 두고 아직 안 보낸 첨부. 이 질문의 턴에 붙는다
 
-**처리** — ReAct 루프. 모델이 읽기 도구를 스스로 부르고, 진행이 이벤트로 흘러 나간다
-0. `if not settings.LLM_API_KEY → ! LlmNotConfigured`(네트워크 전) · `ProjectService.get_owned(doc_id.split("-")[0], user)` — 남의 것이면 `! not-found {resource: project}` · `history`를 뒤에서부터 `settings.LLM_MAX_TURNS`턴만 남긴다
-1. 세션 하나에서 `doc = SpecService.get_document(doc_id)` + `describe_documents([doc.id])`(제목) → 시작 맥락: 제목·상태·버전 + 이 문서의 **모든 항목 `ID 이름`** + `item_id`가 있으면 `[지금 보는 항목] {item_id} {display_name}` · `item_id`가 이 문서에 없으면 `! not-found {resource: item}` · **본문은 싣지 않는다** — 필요한 본문은 모델이 도구로 읽는다
-2. `yield AskStart(doc_id, item_id)` — 이 앞의 예외는 HTTP 상태로, 이 뒤는 `error` 이벤트로 나간다([[SYNC-API-001]] 1장)
-3. `t0 = monotonic()` · `calls = 0` · `reads: list[str] = []` · 대화록 = `history` + `{role: user, text: question}`
+**처리** — ReAct 루프. 모델이 읽기 도구를 스스로 부르고, 진행이 이벤트로 흘러 나간다. 쓰는 것은 대화 표뿐이다
+0. `if not settings.LLM_API_KEY → ! LlmNotConfigured`(네트워크 전) · `ProjectService.get_owned(doc_id.split("-")[0], user)` — 남의 것이면 `! not-found {resource: project}` · [[SYNC-MS-010#ConversationService.get]]`(conversation_id, user)` — 내 것이 아니거나 그 프로젝트가 아니면 `! not-found {resource: conversation}`
+1. 세션 하나에서 `history = ConversationService.history(conversation_id, settings.LLM_MAX_TURNS)` · `turn = ConversationService.add_turn(conversation_id, question, attachment_ids)` · `images = ConversationService.pending_images(turn.id)` · `doc = SpecService.get_document(doc_id)` + `describe_documents([doc.id])`(제목) → 시작 맥락: 제목·상태·버전 + 이 문서의 **모든 항목 `ID 이름`** + `item_id`가 있으면 `[지금 보는 항목] {item_id} {display_name}` + 이 대화의 첨부가 있으면 `[첨부] {id} {name} ({종류}, {크기})` 줄들(글자·PDF는 「read_attachment로 읽을 수 있다」, 이미지는 「이 질문에 보인다」) · `item_id`가 이 문서에 없으면 `! not-found {resource: item}`(턴은 `error`로 닫는다) · **본문은 싣지 않는다** — 필요한 본문은 모델이 도구로 읽는다
+2. `yield AskStart(doc_id, item_id)` — 이 앞의 예외는 HTTP 상태로, 이 뒤는 `error` 이벤트로 나간다([[SYNC-API-001]] 1장). 이 뒤의 예외는 **`finish_turn(turn.id, error=…)`로 턴을 닫은 뒤** 던진다
+3. `t0 = monotonic()` · `calls = 0` · `reads: list[str] = []` · `progress: list[dict] = []`(yield하는 note·read를 그대로 모은다) · 대화록 = `history` + `{role: user, text: question, images}`
 4. `step = llm.step(system, 대화록, _ASK_TOOLS)` ([[SYNC-MS-009#llm.step]]) · usage 누적 · `if not step.tool_calls → answer = step.text → 7`
-5. `if step.text → yield AskNote(step.text)` · 도구 호출마다: `yield AskNote(args["reason"])` → `r = ask_tool(name, args, code, user)` → `yield AskRead(name, r.target)` · `r.target`이 있고 `reads`에 없으면 `reads.append` · 대화록에 `{role: assistant, text: step.text, tool_calls}`와 `{role: tool, tool_call_id, text: r.text}` 추가 · `calls += 1`(호출마다)
+5. `if step.text → yield AskNote(step.text)` · 도구 호출마다: `yield AskNote(args["reason"])` → `r = ask_tool(name, args, code, user, conversation_id)` → `yield AskRead(name, r.target)` · `r.target`이 있고 `reads`에 없으면 `reads.append` · 대화록에 `{role: assistant, text: step.text, tool_calls}`와 `{role: tool, tool_call_id, text: r.text}` 추가 · `calls += 1`(호출마다)
 6. `if calls >= _ASK_MAX_CALLS or monotonic() - t0 >= _ASK_TIME_LIMIT` → 대화록에 마무리 문장(아래)을 `user`로 추가 → `llm.step(system, 대화록, _ASK_TOOLS, tool_choice="none")` **한 번** → `step.text`가 비면 `! LlmUnavailable("상한 뒤에도 답이 없다")` → `answer = step.text` → 7 · 아니면 4로
-7. `log.info("ask doc=%s item=%s user=%s calls=%d prompt=%d completion=%d elapsed=%.1fs", …)` — 한 줄, 본문·질문·답은 안 남긴다(DEV-6) · `yield AskAnswer(answer, context_item_ids=reads)`
+7. `ConversationService.finish_turn(turn.id, answer, progress, reads)` — 세션 하나에서. 대화 `title`이 「새 대화」면 `question[:40]`으로, `updated_at` 갱신 · `log.info("ask doc=%s item=%s conv=%s user=%s calls=%d prompt=%d completion=%d elapsed=%.1fs", …)` — 한 줄, 본문·질문·답은 로그에 안 남긴다(DEV-6) · `yield AskAnswer(answer, context_item_ids=reads)`
 
 **상수** `_ASK_MAX_CALLS = 8` · `_ASK_TIME_LIMIT = 120.0`(초). 설정값이 아니라 코드 상수다 — 회수 경로는 키를 비우는 것 하나로 둔다([[SYNC-INFRA-001]] 5.3). 시간은 **호출 사이**에서만 본다 — 한 호출의 60초 타임아웃이 더해져 최악 180초(마무리 호출 포함)
 
@@ -133,13 +133,13 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 
 #### queries.ask_tool 모델이 부른 읽기 도구 하나를 실행한다
 
-**시그니처** `async def ask_tool(name: str, args: dict, code: str, user: User) -> ToolResult`
+**시그니처** `async def ask_tool(name: str, args: dict, code: str, user: User, conversation_id: int) -> ToolResult`
 
-근거: [[SYNC-PRD-001#R11]] · [[SYNC-UC-001#UC-H19]] · [[SYNC-API-002]] 3장(같은 이름·같은 모양)
+근거: [[SYNC-PRD-001#R11]] · [[SYNC-UC-001#UC-H19]] · [[SYNC-API-002]] 3장(같은 이름·같은 모양) · [[SYNC-INFRA-001]] 5.3 첨부
 
-**입력** `name` 도구 이름 · `args` 모델이 준 인자 · `code` 지금 열린 문서의 프로젝트 · `user` 묻는 사람
+**입력** `name` 도구 이름 · `args` 모델이 준 인자 · `code` 지금 열린 문서의 프로젝트 · `user` 묻는 사람 · `conversation_id` 이 대화 — `read_attachment`가 이 대화의 첨부만 읽게
 
-**도구 다섯** — 전부 읽기. 쓰기 도구는 어떤 경우에도 없다([[SYNC-PRD-001]] 2장 비목표). 모든 도구에 필수 인자 `reason: str`(무엇을 왜 읽는지 한 줄 — 진행 줄이 된다. 모델이 `tool_calls`와 함께 본문을 비우는 일이 잦아 인자로 못 박는다)
+**도구 여섯** — 전부 읽기. 쓰기 도구는 어떤 경우에도 없다([[SYNC-PRD-001]] 2장 비목표). 모든 도구에 필수 인자 `reason: str`(무엇을 왜 읽는지 한 줄 — 진행 줄이 된다. 모델이 `tool_calls`와 함께 본문을 비우는 일이 잦아 인자로 못 박는다)
 
 | 도구 | 인자 | 부르는 것 | 돌려주는 JSON | target |
 |---|---|---|---|---|
@@ -148,9 +148,10 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 | `item_chain` | `doc_id, item_id, reason` | [[#queries.item_chain]] | `{item, rows: [{stage, doc_type, items: [{id, name, role, status}]}]}` — **빈 단계도 그대로**(어느 단계가 안 쓰였는지의 근거) | `DOC#ITEM` |
 | `list_documents` | `reason` | [[#queries.document_list]] + [[SYNC-MS-002#SpecService.describe_documents]](제목) | `[{doc_id, stage, doc_type, title, status, version_no}]` | 없음 |
 | `get_document` | `doc_id, reason` | [[SYNC-MS-002#SpecService.get_document]] + 제목 | `{doc_id, title, status, version_no, items: [{item_id, display_name}], body}` 전문 | `DOC` |
+| `read_attachment` | `attachment_id, reason` | [[SYNC-MS-010#ConversationService.attachment_text]] | `{attachment_id, name, mime, text}` — 글자 파일은 본문 그대로, PDF는 뽑은 글자. 이 대화의 첨부가 아니거나 이미지면 `{"error": "없음"}`(이미지엔 `hint`: 「이미지는 붙인 질문에 이미 보였다」) | `첨부:{name}` |
 
 **처리**
-1. `name`이 다섯 밖 → `ToolResult(None, {"error": "없는 도구"})` · 필수 인자가 빠짐 → `{"error": "인자 X가 없다"}`
+1. `name`이 여섯 밖 → `ToolResult(None, {"error": "없는 도구"})` · 필수 인자가 빠짐 → `{"error": "인자 X가 없다"}`
 2. `args["doc_id"]`가 있고 `doc_id.split("-")[0] != code` → `{"error": "없음", "doc_id": …}` — 소유한 다른 프로젝트여도 같다. 이 대화는 같은 프로젝트 안이다
 3. 세션을 열고 `ProjectService.get_owned(code, user)` → 위 표의 함수 → JSON 조립 → 세션 닫기
 4. `NotFound`·`ItemDeleted`는 **던지지 않고** `{"error": "없음", …}` 텍스트로 — 모델이 되짚는다. `NotFound`에는 `hint`를 붙인다: 「이 문서에 그 항목이 없다. 다른 문서의 항목일 수 있다 — 보고 있는 항목을 get_item으로 읽어 본문의 참조 링크(문서ID#항목ID)에서 문서 ID를 확인하거나, get_references로 실제 위치를 찾아라」 — 모델이 항목 ID만으로 지금 문서를 짚었다가 포기하던 것을 막는다(#110). 그 밖의 예외는 전파(`error` 이벤트)
@@ -158,7 +159,7 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 
 **결과 형식** JSON 문자열. MCP 도구([[SYNC-API-002]])와 같은 모양이라 에이전트가 이미 보는 것과 같고, 마크다운 본문을 안에 그대로 담아도 경계가 안 흐트러진다. 크기 상한 없음(사용자 결정) — 큰 문서 전문이 맥락을 넘기면 모델이 400을 주고 `llm-unavailable`로 접힌다
 
-**`_ASK_TOOLS`** — `ToolSpec` 다섯. `description`은 [[SYNC-API-002]] 3장의 도구 설명 문장을 가져다 쓴다. `parameters`는 JSON Schema `{type: object, properties: {doc_id: {type: string}, item_id: {type: string}, reason: {type: string}}, required: [...]}` — 도구마다 위 표의 인자가 `required`
+**`_ASK_TOOLS`** — `ToolSpec` 여섯. `description`은 [[SYNC-API-002]] 3장의 도구 설명 문장을 가져다 쓴다(`read_attachment`는 MCP에 없다 — 「이 대화에 붙인 글자·PDF 첨부의 글자를 읽는다. 시작 맥락의 [첨부] 줄에 있는 id로」). `parameters`는 JSON Schema `{type: object, properties: {doc_id: {type: string}, item_id: {type: string}, attachment_id: {type: integer}, reason: {type: string}}, required: [...]}` — 도구마다 위 표의 인자가 `required`
 
 **출력** `ToolResult(target, text)` — `target`은 「본 것」에 실을 `DOC#ITEM`·`DOC`, 목록 도구는 `None`
 
@@ -166,7 +167,7 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 
 **테스트 관점(추가, #110)** 없는 항목의 「없음」에 `hint`가 있다 · 지시문에 「먼저 보고 있는 항목을 get_item으로 읽는다」가 있다
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_item]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.describe_documents]] · [[#queries.item_references_view]] [[#queries.item_chain]] [[#queries.document_list]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_item]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.describe_documents]] · [[#queries.item_references_view]] [[#queries.item_chain]] [[#queries.document_list]] · [[SYNC-MS-010#ConversationService.attachment_text]]
 
 **호출되는 것** [[#queries.ask_item]] 5단계
 
