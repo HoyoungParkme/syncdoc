@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-007
 type: MS
 title: MINISPEC — pipeline — 쓰기 조율
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -159,12 +159,12 @@ async def read_pending(code: str, user: User) -> int
 
 **처리**
 1. `ProjectService.get_owned(code, user)` — 남의 것이면 `! not-found {resource: project}`. **쓰기 경로의 소유 검사를 겸한다**
-1a. **읽기 락**(`_read_lock(code)`, 쓰기 락과 다른 것)을 잡는다 — 두 요청이 같은 작업 사본에 동시에 `git fetch`를 걸면 git이 인덱스 잠금으로 죽는다. 락 안에서 `last_processed_commit`을 **다시 읽는다**: 앞서 기다린 요청이 이미 따라잡아 놨을 수 있다
+1a. **저장소 읽기 락**(`read_lock(code)`, 쓰기 락과 다른 것)을 잡는다 — 두 요청이 같은 작업 사본에 동시에 `git fetch`를 걸면 git이 잠금으로 죽는다. 웹훅·폴링의 커밋 처리도 같은 락이다([[#pipeline.process_commit]] 0, #194). 락 안에서 `last_processed_commit`을 **다시 읽는다**: 앞서 기다린 요청이 이미 따라잡아 놨을 수 있다
 1b. **쓰기 락과 따로인 이유** — 4단계의 `process_commit`이 파일마다 쓰기 락을 잡는다. 같은 락이면 교착한다
 2. `head = git.fetch(repo.workdir)`
 3. if `head == repo.last_processed_commit` → **`fetched_at`을 지금으로 적고** `→ 0`. 방금 확인했다는 사실 자체가 화면이 보여줄 값이다(카드 AF) — 안 적으면 1초 전에 확인한 저장소가 5분 전으로 보인다. `behind_by`도 0으로 둔다(방금 재서 같았다)
 3a. `last_processed_commit`이 **비어 있어도 `→ 0`.** 그 값이 비는 것은 등록 중뿐이고([[SYNC-MS-001#ProjectService.init_project]]가 첫 커밋 해시를, `import_existing`은 재구축이 head를 적는다) 그 둘은 자기가 저장소를 읽는다
-4. `results = process_commit(repo, head)` → `→ len(results)`
+4. `results = process_commit(repo, head, locked=True)` — 이미 1a의 락을 쥐었다 → `→ len(results)`
 
 **왜 이것이 먼저인가 (#137).** 저장소에 쓰는 일은 전부 「덮어쓰기」다. 아직 읽지 않은 커밋이 있는 채로 쓰면 그 내용이 사라지는데, `git.commit_push`가 `reset --hard origin/main` 뒤에 본문을 덮으므로 push가 거부되지도 않아 **조용히** 사라진다. 읽기를 먼저 하면 덮을 것이 없다.
 
@@ -310,21 +310,22 @@ async def read_pending(code: str, user: User) -> int
 
 **시그니처**
 ```python
-async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
+async def process_commit(repo: Repository, head_hash: str, locked: bool = False) -> list[SaveResult]
 ```
 
 근거: [[SYNC-SEQ-001#SEQ-2]] · [[SYNC-UC-001#UC-G1]]
 
-**입력** `repo` 등록된 저장소. `head_hash` 처리할 끝 커밋 (webhook의 `after` 또는 `origin/main`)
+**입력** `repo` 등록된 저장소. `head_hash` 처리할 끝 커밋 (webhook의 `after` 또는 `origin/main`). `locked` 부른 쪽이 이미 저장소 읽기 락을 쥐었나 — [[#pipeline.read_pending]]·[[#scheduler.catch_up]]은 `True`, 웹훅은 `False`
 
 **처리**
 
-1. `repo.last_processed_commit == head_hash`면 `→ []`
-2. `git.fetch(repo.workdir)` (public)
+0. if not `locked` → **저장소 읽기 락 `read_lock(code)`을 잡는다.** 웹훅·폴링·read_pending이 한 줄로 선다 — 셋이 저마다 부르면 같은 head를 두 실행이 동시에 처리해, 둘째가 첫째의 저장 전에 3a를 보고 강등 전 본문으로 한 번 더 저장했다(DB=approved · 저장소=draft, #194). 파일마다 잡는 쓰기 락(4단계, `save_pipeline` 안)과는 다른 락이라 교착하지 않는다
+1. 락 안에서 `last = DB의 repositories.last_processed_commit`을 **다시 읽는다** — 앞서 기다린 실행이 이미 따라잡아 놨을 수 있다. if `last == head_hash` → `[]`
+2. `git.fetch(repo.workdir)` (public) · if `last` and `git.rev_list_count(f"{last}..{head_hash}") == 0` → `[]` — head가 이미 처리한 커밋이거나 그 조상이다(늦게 온 웹훅). **처리 지점을 뒤로 돌리지 않는다** — 돌리면 다음 실행이 같은 범위를 또 읽는다
 3. `files = git.changed_files(repo, f"{last}..{head}", path="docs/specs/")`. 각각 `(path, last_commit_hash_of_file, author_login, author_email, message)`. `_templates/`·`assets/`는 제외
 3a. **앱 자신이 만든 커밋은 거른다** — `commit_hash`가 이미 `versions.commit_hash`나 `status_changes.commit_hash`에 있으면 건너뛴다. 없으면 앱이 push한 커밋을 폴링이 github 경로로 다시 저장해 같은 커밋의 버전이 하나 더 생긴다
 3b. 남은 파일을 **문서 타입의 단계 순**으로 정렬(RFQ→…→CODE→STD). 경로순이면 하위가 먼저 저장돼 상위 참조가 미존재로 남는다
-4. 파일마다 (락은 `save_pipeline` 안에서):
+4. 파일마다 (쓰기 락은 `save_pipeline` 안에서 — 0단계의 읽기 락은 처리 전체를 감싼다):
    - `body = git.read(repo, path, head_hash)`
    - `doc_id` = **파일명**(github 경로는 `issue_doc_id`를 쓰지 않는다 — 커밋이 진실). `path_type` = 디렉터리명에서 번호를 뗀 것(`06-DOM` → `DOM`, STD-001 1.1). if `path_type != frontmatter.type` → `frontmatter.doc_id` 위반으로 처리(저장은 됨)
    - github 진입은 **항목 삭제 확인을 건너뛴다** — 물어볼 상대가 없고 커밋이 진실이다. 사라진 항목은 `is_deleted` + `mark_missing`으로 통보
@@ -351,6 +352,8 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]
 - 커밋 이메일이 등록된 사람: 자리표시를 안 만들고 그 사람으로 붙는다. `author.unknown` 없음
 - 파일명 ≠ frontmatter: 규약 오류로 저장됨
 - 한 파일 실패: 나머지 처리됨, `last_processed_commit` 안 바뀜
+- **같은 head를 둘이 동시에 처리해도** 버전 하나, 자동 강등이 유지되고 저장소와 DB 상태가 같다(#194)
+- **이미 처리한 커밋이나 그 조상**을 head로 받으면 `[]`이고 `last_processed_commit`은 그대로다(#194)
 
 ---
 
@@ -412,10 +415,10 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 
 근거: [[SYNC-INFRA-001]] 7장 · [[SYNC-UC-001#UC-G1]] 1a·1b · [[SYNC-MS-001#ProjectService.repo_status]]
 
-**처리** — 저장소마다
+**처리** — 저장소마다, **저장소 읽기 락 `read_lock(code)` 안에서**(웹훅·read_pending과 한 줄, [[#pipeline.process_commit]] 0, #194). `last_processed_commit`도 락 안에서 다시 읽는다
 1. `head = git.fetch(workdir)`
 2. `DB: repositories update behind_by = git.rev_list_count(f"{last_processed_commit}..{head}"), fetched_at = now, fetch_error = null` — **화면이 읽는 값을 여기서 적는다.** `last_processed_commit`이 없으면 `behind_by=None`
-3. if `head != repository.last_processed_commit` → [[#pipeline.process_commit]]
+3. if `head != repository.last_processed_commit` → [[#pipeline.process_commit]]`(repo, head, locked=True)`
 4. `→ 처리 결과 목록`
 
 **예외** **저장소 하나가 실패해도 다음 저장소를 계속한다.** 그 저장소의 `behind_by`는 건드리지
@@ -430,7 +433,7 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 
 **호출하는 것** `ProjectService.list_projects` · `git.fetch` `rev_list_count` · [[#pipeline.process_commit]]
 
-**테스트 관점** 원격이 앞서 있으면 `process_commit`이 불림 · 같으면 안 불리고 `fetched_at`만 갱신 · 저장소 둘 중 앞엣것이 실패해도 뒤엣것이 처리됨 · `behind_by`가 DB에 남아 `repo_status`가 그걸 읽음 · **실패한 저장소의 `fetch_error`에 사유가 남고, 다음 성공이 그것을 비운다**
+**테스트 관점** 원격이 앞서 있으면 `process_commit`이 불림 · 같으면 안 불리고 `fetched_at`만 갱신 · 웹훅 처리와 겹쳐도 fetch가 동시에 돌지 않는다(읽기 락) · 저장소 둘 중 앞엣것이 실패해도 뒤엣것이 처리됨 · `behind_by`가 DB에 남아 `repo_status`가 그걸 읽음 · **실패한 저장소의 `fetch_error`에 사유가 남고, 다음 성공이 그것을 비운다**
 
 ---
 

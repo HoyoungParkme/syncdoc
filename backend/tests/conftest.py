@@ -113,6 +113,18 @@ def scoped(db_session: Session, monkeypatch: pytest.MonkeyPatch) -> Session:
     return db_session
 
 
+@pytest.fixture(autouse=True)
+def _fresh_repo_locks():
+    """저장소 락(pipeline의 asyncio.Lock)은 모듈 전역인데 이벤트 루프는 테스트마다 새로 생긴다.
+    앞 테스트가 경합으로 락을 자기 루프에 묶어 두면, 다음 테스트가 경합할 때 RuntimeError가 나고
+    락이 잡힌 채 남아 뒤 테스트가 멈춘다 — 테스트마다 비운다 (#194, 운영은 루프가 하나다)."""
+    from app.core import pipeline
+
+    pipeline._locks.clear()
+    pipeline._read_locks.clear()
+    yield
+
+
 # ── git 임시 저장소 픽스처 (infra·project 테스트 공유) ──
 import subprocess  # noqa: E402
 from pathlib import Path  # noqa: E402

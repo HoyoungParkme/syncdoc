@@ -32,31 +32,35 @@ async def catch_up() -> list[SaveResult]:
     """
     with db.session_scope() as s:
         repos = [
-            (
-                p.repository.id,
-                p.repository.workdir_path,
-                p.repository.remote_url,
-                p.repository.last_processed_commit,
-            )
+            (p.code, p.repository.id, p.repository.workdir_path, p.repository.remote_url)
             for p in ProjectService(s).list_projects()
         ]
     out: list[SaveResult] = []
-    for repo_id, workdir, remote_url, last in repos:
+    for code, repo_id, workdir, remote_url in repos:
         try:
-            head = await git.fetch(Path(workdir))
-            behind = await git.rev_list_count(Path(workdir), f"{last}..{head}") if last else None
-            with db.session_scope() as s:
-                s.execute(
-                    update(Repository)
-                    .where(Repository.id == repo_id)
-                    # 성공한 주기가 옛 사유를 지운다 — 낡은 오류가 화면에 남으면 안 된다
-                    .values(behind_by=behind, fetched_at=now_utc(), fetch_error=None)
-                )
-                s.commit()
-            if head != last:
+            # 웹훅·read_pending과 같은 저장소 읽기 락 — fetch와 처리가 겹치지 않는다. 처리 지점도
+            # 락 안에서 읽는다: 기다리는 사이 웹훅이 따라잡아 놨을 수 있다 (MS-007 catch_up, #194)
+            async with pipeline.read_lock(code):
                 with db.session_scope() as s:
-                    repo = s.get(Repository, repo_id)
-                    out.extend(await pipeline.process_commit(repo, head))
+                    row = s.get(Repository, repo_id)
+                    assert row is not None
+                    last = row.last_processed_commit
+                head = await git.fetch(Path(workdir))
+                behind = (
+                    await git.rev_list_count(Path(workdir), f"{last}..{head}") if last else None
+                )
+                with db.session_scope() as s:
+                    s.execute(
+                        update(Repository)
+                        .where(Repository.id == repo_id)
+                        # 성공한 주기가 옛 사유를 지운다 — 낡은 오류가 화면에 남으면 안 된다
+                        .values(behind_by=behind, fetched_at=now_utc(), fetch_error=None)
+                    )
+                    s.commit()
+                if head != last:
+                    with db.session_scope() as s:
+                        repo = s.get(Repository, repo_id)
+                        out.extend(await pipeline.process_commit(repo, head, locked=True))
         except Exception as e:  # noqa: BLE001 — 저장소 하나가 죽어도 다음 저장소를 계속한다
             # 실패한 저장소의 behind_by는 건드리지 않는다. 낡은 값이 남지만
             # fetched_at이 언제 기준인지 말해 준다.
