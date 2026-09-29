@@ -572,6 +572,20 @@ function linkifyIds(text: string): string {
     .join('')
 }
 
+/** 답 본문 — React가 자식을 소유하지 않는다. innerHTML은 html이 바뀔 때만 넣는다.
+ *  dangerouslySetInnerHTML로 두면 다시 그릴 때 innerHTML을 되돌려 mermaid가 그린 svg가 지워졌다(카드 AS) */
+function AnswerBody({ html, onClick }: { html: string; onClick: (ev: React.MouseEvent) => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (el && el.dataset.html !== html) {
+      el.innerHTML = html
+      el.dataset.html = html
+    }
+  }, [html])
+  return <div className="a" ref={ref} onClick={onClick} />
+}
+
 /** 8.5 맥락 줄 · 8.11 대화 고르기 · 8.12 새 대화 · 8.13 지우기 · 8.7 대화(.qa) · 8.9 진행 묶음 · 8.6 입력 — UC-H19, 카드 Y·AQ, #206.
  *  세 층 — 위 고정(8.5·대화 줄) · 가운데 스크롤(8.7) · 아래 고정(8.6). 답이 길어도 입력이 밀리지 않는다.
  *  대화는 서버에 있다(카드 AQ): 프로젝트의 목록에서 고르고, 없으면 첫 질문에 만든다. URL ?conv={id}.
@@ -997,7 +1011,7 @@ function AskPanel({
                 </details>
               )}
               {t.a !== undefined ? (
-                <div className="a" onClick={onAnswerClick} dangerouslySetInnerHTML={{ __html: answerHtml(t.a) }} />
+                <AnswerBody html={answerHtml(t.a)} onClick={onAnswerClick} />
               ) : t.err ? (
                 <div className="a fail">답을 못 받았습니다 — {t.err}</div>
               ) : (
