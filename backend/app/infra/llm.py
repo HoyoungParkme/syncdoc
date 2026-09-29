@@ -8,6 +8,7 @@ OpenAI 호환 Chat Completions 하나(INFRA 5.3). 한 번 호출 + 도구 호출
 
 from __future__ import annotations
 
+import base64
 import json
 from typing import Any
 
@@ -25,6 +26,14 @@ def _wire(m: dict) -> dict[str, Any]:
     if m["role"] == "tool":
         return {"role": "tool", "tool_call_id": m["tool_call_id"], "content": m["text"]}
     out: dict[str, Any] = {"role": m["role"], "content": m.get("text") or None}
+    if m["role"] == "user" and m.get("images"):
+        # 이 턴에 붙인 이미지 — content 파트 배열(vision). 뒤 턴에는 안 실린다 (MS-009, 카드 AR)
+        parts: list[dict[str, Any]] = [{"type": "text", "text": m.get("text") or ""}]
+        for mime, data in m["images"]:
+            b64 = base64.b64encode(data).decode("ascii")
+            parts.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
+        out["content"] = parts
+        return out
     if m.get("tool_calls"):
         out["tool_calls"] = [
             {

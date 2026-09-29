@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { ago, api, ApiError, docPath, incompleteOf, warnText, type AskAnswer, type AskNote, type AskRead, type Conversation, type ConversationBrief, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
+import { ago, api, ApiError, docPath, incompleteOf, warnText, type AskAnswer, type AskNote, type AskRead, type AttachmentMeta, type Conversation, type ConversationBrief, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { attachDiagramButtons, DiagramFull, type FullDiagram, type WfFullDetail } from '../components/DiagramFull'
 import { esc, renderBlocks, splitRef } from '../view/md'
@@ -597,6 +597,10 @@ function AskPanel({
   const [listOpen, setListOpen] = useState(false)
   const [question, setQuestion] = useState('')
   const [pending, setPending] = useState(false)
+  // 8.14 아직 안 보낸 첨부(turn_id 없음) · 8.16 드래그가 패널 위에 있나 (카드 AR)
+  const [files, setFiles] = useState<AttachmentMeta[]>([])
+  const [dragging, setDragging] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
   const qaRef = useRef<HTMLDivElement>(null)
   // 답 속 참조(7.2와 같음): 이 문서 안 항목이면 스크롤·선택, 남의 문서·문서 자체면 그 문서로. 링크 존재 검사는 안 한다
   const plainCtx = { selfId: docId, href: (d: string, it?: string) => docPath(d, it), exists: () => true }
@@ -631,6 +635,7 @@ function AskPanel({
   useEffect(() => {
     if (convId === null) {
       setTurns([])
+      setFiles([])
       return
     }
     let live = true
@@ -645,8 +650,10 @@ function AskPanel({
             a: t.answer ?? undefined,
             src: t.context_item_ids,
             err: t.error ?? undefined,
+            att: t.attachments,
           })),
         )
+        setFiles(c.pending)
       })
       .catch(() => live && setConvId(null)) // 지워졌거나 남의 것 — 새 대화로
     setSp(
@@ -695,26 +702,83 @@ function AskPanel({
     }
   }
 
+  // 대화가 아직 없으면 만든다 — 첫 질문이나 첫 첨부에. 8.12는 빈 대화를 미리 만들지 않는다
+  const ensureConv = async (): Promise<number> => {
+    if (convId !== null) return convId
+    const made = await api.post<ConversationBrief>(`/api/projects/${code}/conversations`, {})
+    setConvId(made.id)
+    return made.id
+  }
+  // 8.15 「+」 · 8.16 드롭 · 8.6 붙여넣기 — 셋 다 여기로. 종류·상한은 화면이 먼저 막고 서버가 다시 판정한다
+  const ACCEPT = /\.(png|jpe?g|webp|gif|md|txt|csv|json|ya?ml|pdf)$/i
+  const addFiles = async (list: FileList | File[]) => {
+    const picked = Array.from(list)
+    if (!picked.length) return
+    let n = files.length
+    for (const f of picked) {
+      if (!ACCEPT.test(f.name)) {
+        toast(`받지 않는 종류: ${f.name}`)
+        continue
+      }
+      const limit = /\.(png|jpe?g|webp|gif)$/i.test(f.name) ? 10 * 1024 * 1024 : 1024 * 1024
+      if (f.size > limit) {
+        toast(`너무 큽니다(${limit >= 10 * 1024 * 1024 ? '10MB' : '1MB'}): ${f.name}`)
+        continue
+      }
+      if (n >= 8) {
+        toast('한 질문에 8개까지 붙일 수 있습니다')
+        break
+      }
+      try {
+        const id = await ensureConv()
+        const meta = await api.upload<AttachmentMeta>(`/api/conversations/${id}/attachments`, f)
+        setFiles((fs) => [...fs, meta])
+        n += 1
+      } catch (e) {
+        toast(e instanceof ApiError ? e.message : String(e))
+      }
+    }
+  }
+  const removeFile = async (m: AttachmentMeta) => {
+    try {
+      await api.del(`/api/attachments/${m.id}`)
+      setFiles((fs) => fs.filter((x) => x.id !== m.id))
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : String(e))
+    }
+  }
+  const fmtSize = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1024))}KB`)
+  const chip = (m: AttachmentMeta, onRemove?: () => void) => (
+    <span key={m.id} className="chip" title={m.name}>
+      {m.mime.startsWith('image/') ? <img className="th" src={`/api/attachments/${m.id}`} alt="" /> : null}
+      <a href={`/api/attachments/${m.id}`} target="_blank" rel="noreferrer">
+        {m.name}
+      </a>{' '}
+      · {fmtSize(m.size)}
+      {onRemove && (
+        <b className="x" onClick={onRemove} title="빼기">
+          ✕
+        </b>
+      )}
+    </span>
+  )
+
   const send = async () => {
     const q = question.trim()
     if (!q || pending) return
     setQuestion('')
     setPending(true)
     try {
-      // 대화가 아직 없으면 첫 질문에 만든다 (8.12는 빈 대화를 미리 만들지 않는다)
-      let id = convId
-      if (id === null) {
-        const made = await api.post<ConversationBrief>(`/api/projects/${code}/conversations`, {})
-        id = made.id
-        setConvId(id)
-      }
-      setTurns((ts) => [...ts, { q, prog: [] }])
+      const id = await ensureConv()
+      const sent = files
+      setFiles([])
+      setTurns((ts) => [...ts, { q, prog: [], att: sent }])
       const ac = new AbortController()
       abortRef.current = ac
       try {
         await api.stream(
           `/api/docs/${docId}/ask`,
-          { question: q, conversation_id: id, item_id: itemId ?? undefined },
+          { question: q, conversation_id: id, item_id: itemId ?? undefined, attachment_ids: sent.map((m) => m.id) },
           (name, data) => {
             if (name === 'note') {
               const d = data as AskNote
@@ -769,7 +833,25 @@ function AskPanel({
   const current = convs.find((c) => c.id === convId)
 
   return (
-    <>
+    <div
+      className="askpane"
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes('Files')) {
+          e.preventDefault()
+          setDragging(true)
+        }
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false)
+      }}
+      onDrop={(e) => {
+        e.preventDefault()
+        setDragging(false)
+        void addFiles(e.dataTransfer.files)
+      }}
+    >
+      {/* 8.16 — 파일을 끌어 패널 위에 오면 */}
+      {dragging && <div className="droplayer" data-el="8.16">여기 놓으면 질문에 붙습니다</div>}
       <div className="asktop">
         <div className="lbl" data-el="8.5">
           {itemId ? (
@@ -824,7 +906,10 @@ function AskPanel({
           const reads = t.src?.length ?? 0
           return (
             <div key={i} className="turn">
-              <div className="q">{t.q}</div>
+              <div className="q">
+                {t.q}
+                {t.att && t.att.length > 0 && <div className="chips sent">{t.att.map((m) => chip(m))}</div>}
+              </div>
               {/* 8.9 — 읽는 동안은 스피너(공통 1.8)와 가장 최근 줄만, 답이 오면 「n단계 읽음 · 본 것 k」로 접힌다 */}
               {(t.prog.length > 0 || !done) && (
                 <details className="qprog" data-el="8.9">
@@ -868,22 +953,45 @@ function AskPanel({
           )
         })}
       </div>
-      {/* 아래 고정 — 8.6 입력. 첨부 칩(8.14)·「+」(8.15)는 카드 AR */}
+      {/* 아래 고정 — 8.14 첨부 칩 · 8.15 「+」 · 8.6 입력(붙여넣기도 8.14로) */}
       <div className="askbottom">
-        <textarea
-          data-el="8.6"
-          value={question}
-          disabled={pending}
-          placeholder={itemId ? '이 항목을 보며 묻습니다 — Enter로 보냅니다' : '이 문서에 대해 묻습니다 — Enter로 보냅니다'}
-          onChange={(e) => setQuestion(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              void send()
-            }
-          }}
-        />
+        {files.length > 0 && <div className="chips" data-el="8.14">{files.map((m) => chip(m, () => void removeFile(m)))}</div>}
+        <div className="inrow">
+          <button type="button" className="btn sm" data-el="8.15" title="파일 붙이기" disabled={pending} onClick={() => fileRef.current?.click()}>
+            +
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            accept=".png,.jpg,.jpeg,.webp,.gif,.md,.txt,.csv,.json,.yaml,.yml,.pdf"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              if (e.target.files) void addFiles(e.target.files)
+              e.target.value = ''
+            }}
+          />
+          <textarea
+            data-el="8.6"
+            value={question}
+            disabled={pending}
+            placeholder={itemId ? '이 항목을 보며 묻습니다 — Enter로 보냅니다' : '이 문서에 대해 묻습니다 — Enter로 보냅니다'}
+            onChange={(e) => setQuestion(e.target.value)}
+            onPaste={(e) => {
+              if (e.clipboardData.files.length) {
+                e.preventDefault()
+                void addFiles(e.clipboardData.files)
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                void send()
+              }
+            }}
+          />
+        </div>
       </div>
-    </>
+    </div>
   )
 }

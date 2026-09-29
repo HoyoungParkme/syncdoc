@@ -559,6 +559,12 @@ _ASK_TOOLS: list[ToolSpec] = [
         "문서 원본 MD 전체와 상태·버전·항목 목록을 돌려준다. 크다 — 문서 전체를 훑어야 할 때만 쓴다. 본문 안 [[문서ID#항목ID]]는 다른 항목 참조이며 get_item으로 따라갈 수 있다.",
         {"doc_id": _DOC},
     ),
+    # MCP에 없는 여섯째 — 이 대화에 붙인 글자·PDF 첨부 (INFRA 5.3 첨부, 카드 AR)
+    _tool(
+        "read_attachment",
+        "이 대화에 붙인 글자·PDF 첨부의 글자를 읽는다. 시작 맥락의 [첨부] 줄에 있는 id로 부른다. 이미지는 붙인 질문에 이미 보였으므로 이 도구로 읽을 수 없다.",
+        {"attachment_id": {"type": "integer", "description": "[첨부] 줄의 첨부 id"}},
+    ),
 ]
 
 
@@ -656,6 +662,17 @@ async def ask_tool(
                 for d in docs
             ]
             return ToolResult(None, json.dumps(data, ensure_ascii=False))
+        if name == "read_attachment":
+            # 여섯째 — 이 대화의 글자·PDF 첨부. 이미지·남의 첨부는 「없음」 (MS-010 attachment_text)
+            att_id = int(args.get("attachment_id") or 0)
+            with db.session_scope() as s:
+                svc = ConversationService(s)
+                text_ = svc.attachment_text(conversation_id, att_id)
+                a = svc.repo.attachment(att_id) if text_ is not None else None
+            if text_ is None or a is None:
+                return _err("없음", attachment_id=att_id, hint="이미지는 붙인 질문에 이미 보였다")
+            data = {"attachment_id": att_id, "name": a.name, "mime": a.mime, "text": text_}
+            return ToolResult(f"첨부:{a.name}", json.dumps(data, ensure_ascii=False))
         # get_document
         d = await document_view(doc_id, user)
         with db.session_scope() as s:
@@ -729,6 +746,7 @@ async def ask_item(
         history = convs.history(conversation_id, settings.LLM_MAX_TURNS)
         turn = convs.add_turn(conversation_id, question, attachment_ids)
         turn_id = turn.id
+        images = convs.pending_images(turn_id)  # 이 턴의 이미지 — 메시지 파트로 (카드 AR)
         metas = [m for t in view.turns for m in t.attachments] + view.pending
         try:
             system, _ = _start_context(SpecService(s), doc_id, item_id, _attachment_lines(metas))
@@ -743,7 +761,7 @@ async def ask_item(
     progress: list[dict] = []
     prompt_tokens = completion_tokens = 0
     log: list[dict] = [{"role": m["role"], "text": m["text"]} for m in history]
-    log.append({"role": "user", "text": question})
+    log.append({"role": "user", "text": question, **({"images": images} if images else {})})
     answer: str | None = None
     try:
         while True:

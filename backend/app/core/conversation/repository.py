@@ -83,6 +83,36 @@ class ConversationRepository:
         )
         return list(self.session.scalars(stmt))
 
+    def attachment(self, att_id: int) -> Attachment | None:
+        return self.session.get(Attachment, att_id)
+
+    def pending_count(self, conv_id: int) -> int:
+        return int(
+            self.session.scalar(
+                select(func.count(Attachment.id)).where(
+                    Attachment.conversation_id == conv_id, Attachment.turn_id.is_(None)
+                )
+            )
+            or 0
+        )
+
+    def add_attachment(self, a: Attachment) -> Attachment:
+        self.session.add(a)
+        self.session.flush()
+        return a
+
+    def delete_attachment(self, att_id: int) -> None:
+        self.session.execute(delete(Attachment).where(Attachment.id == att_id))
+
+    def images_of_turn(self, turn_id: int) -> list[Attachment]:
+        return list(
+            self.session.scalars(
+                select(Attachment)
+                .where(Attachment.turn_id == turn_id, Attachment.mime.like("image/%"))
+                .order_by(Attachment.id)
+            )
+        )
+
     def attach_pending(self, conv_id: int, turn_id: int, ids: list[int]) -> None:
         """아직 안 보낸(turn_id null) 이 대화의 첨부만 턴에 붙인다. 남의 것·보낸 것은 건너뛴다."""
         if not ids:

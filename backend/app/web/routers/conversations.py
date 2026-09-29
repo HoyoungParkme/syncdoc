@@ -6,14 +6,21 @@ SYNC-API-001 3.5 · SEQ-24 · UI-5 8.11~8.13. ConversationService만 본다(DOM-
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.account.models import User
 from app.core.conversation.service import ConversationService
 from app.db import get_session
 from app.web import auth
-from app.web.schemas.conversations import Conversation, ConversationBrief, CreateConversation
+from app.web.schemas.conversations import (
+    AttachmentMeta,
+    Conversation,
+    ConversationBrief,
+    CreateConversation,
+)
 
 router = APIRouter(prefix="/api", tags=["conversations"])
 
@@ -46,6 +53,50 @@ async def get_conversation(
 ) -> Conversation:
     """SYNC-API-001#GET/api/conversations/{id} — 턴 전부 + 첨부 메타 (UI-5 8.7)"""
     return Conversation.model_validate(ConversationService(session).get(id, user))
+
+
+@router.post(
+    "/conversations/{id}/attachments", response_model=AttachmentMeta, status_code=201
+)
+async def upload_attachment(
+    id: int,
+    file: UploadFile,
+    user: User = Depends(auth.current_user),
+    session: Session = Depends(get_session),
+) -> AttachmentMeta:
+    """SYNC-API-001#POST/api/conversations/{id}/attachments — 아직 안 보낸 첨부 (UI-5 8.14~8.16)"""
+    data = await file.read()
+    a = ConversationService(session).add_attachment(
+        id, user, file.filename or "file", file.content_type or "", data
+    )
+    session.commit()
+    return AttachmentMeta.model_validate(a)
+
+
+@router.get("/attachments/{id}")
+async def get_attachment(
+    id: int, user: User = Depends(auth.current_user), session: Session = Depends(get_session)
+) -> Response:
+    """SYNC-API-001#GET/api/attachments/{id} — 파일 그대로. 썸네일·미리보기·다운로드"""
+    name, mime, data = ConversationService(session).attachment_bytes(id, user)
+    return Response(
+        content=data,
+        media_type=mime,
+        headers={
+            "Content-Disposition": f"inline; filename*=UTF-8''{quote(name)}",
+            "Cache-Control": "private, max-age=3600",  # 바이트는 안 바뀐다
+        },
+    )
+
+
+@router.delete("/attachments/{id}", status_code=204)
+async def delete_attachment(
+    id: int, user: User = Depends(auth.current_user), session: Session = Depends(get_session)
+) -> Response:
+    """SYNC-API-001#GET/api/attachments/{id} delete — 아직 안 보낸 첨부를 뺀다 (UI-5 8.14 ✕)"""
+    ConversationService(session).remove_attachment(id, user)
+    session.commit()
+    return Response(status_code=204)
 
 
 @router.delete("/conversations/{id}", status_code=204)

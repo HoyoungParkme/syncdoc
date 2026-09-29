@@ -3,7 +3,7 @@
  *  UI-1만 예외. 프로젝트 전환 경로는 로고 하나다 — 목록 화면 자체가 고르는 화면이라 선택기가 겹친다. */
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useCallback, useEffect, useState } from 'react'
-import { api, ApiError, type ProjectSummary, type Me } from '../api/client'
+import { api, ApiError, type AttachmentMeta, type ProjectSummary, type Me } from '../api/client'
 
 /** 질문 탭의 한 턴 — 질문, 진행 줄(8.9), 답, 본 것, 실패. 서버의 Turn을 화면 상태로 편 것 */
 export interface AskTurnView {
@@ -12,6 +12,7 @@ export interface AskTurnView {
   a?: string
   src?: string[]
   err?: string
+  att?: AttachmentMeta[] // 이 질문에 붙인 첨부 — 말풍선 아래 칩 (카드 AR)
 }
 /** 프로젝트 안에서 고른 대화(카드 AQ) — 문서·항목을 옮겨도 그대로다. 턴은 서버에 있어 DocView가 읽는다 */
 export interface AskChat {
