@@ -267,6 +267,50 @@ class EmailTaken(Problem):
         super().__init__(f"{email}은 다른 사람이 이미 등록했다", email=email)
 
 
+class AttachmentType(Problem):
+    """SYNC-API-001 2장 — 받지 않는 파일 종류 (UC-H19 1b, 카드 AR)."""
+
+    type = "urn:syncdoc:attachment-type"
+    status = 415
+    title = "attachment-type"
+
+    def __init__(self, mime: str) -> None:
+        super().__init__(f"받지 않는 종류: {mime}", mime=mime)
+
+
+class AttachmentTooLarge(Problem):
+    """SYNC-API-001 2장 — 상한 초과. 이미지 10MB, 글자·PDF 1MB (UC-H19 1b)."""
+
+    type = "urn:syncdoc:attachment-too-large"
+    status = 413
+    title = "attachment-too-large"
+
+    def __init__(self, limit: int, size: int) -> None:
+        super().__init__(f"너무 큽니다: {size}B > {limit}B", limit=limit, size=size)
+
+
+class AttachmentLimit(Problem):
+    """SYNC-API-001 2장 — 아직 안 보낸 첨부가 이미 8개 (UC-H19 1b)."""
+
+    type = "urn:syncdoc:attachment-limit"
+    status = 409
+    title = "attachment-limit"
+
+    def __init__(self, limit: int) -> None:
+        super().__init__(f"한 질문에 {limit}개까지", limit=limit)
+
+
+class AttachmentSent(Problem):
+    """SYNC-API-001 3.5 — 이미 보낸 첨부는 턴의 일부라 못 뺀다."""
+
+    type = "urn:syncdoc:attachment-sent"
+    status = 409
+    title = "attachment-sent"
+
+    def __init__(self, attachment_id: int) -> None:
+        super().__init__("이미 보낸 첨부는 뺄 수 없다", attachment_id=attachment_id)
+
+
 class LlmNotConfigured(Problem):
     """SYNC-API-001 2장 — 모델 키가 없다. 읽는 중 질의가 꺼져 있다 (UC-H19 2a)."""
 

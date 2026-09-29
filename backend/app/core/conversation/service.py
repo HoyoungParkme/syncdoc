@@ -13,13 +13,55 @@ from app.core.account.models import User
 from app.core.clock import now_utc
 from app.core.conversation.models import Attachment, Conversation, Turn
 from app.core.conversation.repository import ConversationRepository
-from app.core.errors import NotFound
+from app.core.errors import (
+    AttachmentLimit,
+    AttachmentSent,
+    AttachmentTooLarge,
+    AttachmentType,
+    NotFound,
+)
 from app.core.project.models import Project
 from app.core.project.service import ProjectService
 from app.core.types import AttachmentMeta, ConversationBrief, ConversationView, TurnView
 
 NEW_TITLE = "새 대화"
 TITLE_LEN = 40
+# 첨부 종류 — 확장자로 정한다(INFRA 5.3 첨부 · MS-010 add_attachment 2). 이 밖은 415
+MIME_OF = {
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "webp": "image/webp",
+    "gif": "image/gif",
+    "md": "text/markdown",
+    "txt": "text/plain",
+    "csv": "text/csv",
+    "json": "application/json",
+    "yaml": "application/yaml",
+    "yml": "application/yaml",
+    "pdf": "application/pdf",
+}
+IMAGE_LIMIT = 10 * 1024 * 1024
+TEXT_LIMIT = 1024 * 1024
+PENDING_LIMIT = 8
+
+
+def _extract_text(mime: str, data: bytes) -> str | None:
+    """글자 파일은 그대로, PDF는 pypdf로 쪽마다. 이미지는 None.
+    뽑히는 글자가 없으면 빈 문자열(스캔본)."""
+    if mime.startswith("image/"):
+        return None
+    if mime == "application/pdf":
+        try:
+            from io import BytesIO
+
+            from pypdf import PdfReader
+
+            pages = [p.extract_text() or "" for p in PdfReader(BytesIO(data)).pages]
+            return "\n\n".join(p for p in pages if p.strip())
+        except Exception:  # noqa: BLE001 — 깨진 PDF도 「글자 없음」으로 모델에 간다
+            return ""
+    return data.decode("utf-8", errors="replace")
 
 
 def _meta(a: Attachment) -> AttachmentMeta:
@@ -158,6 +200,84 @@ class ConversationService:
             conv.updated_at = now_utc()
         self.session.flush()
         return turn
+
+    # ── 첨부 (카드 AR) ──
+    def add_attachment(
+        self, conv_id: int, user: User, name: str, mime: str, data: bytes
+    ) -> Attachment:
+        """SYNC-MS-010#ConversationService.add_attachment
+
+        종류·상한이 여기서 막힌다. 글자·PDF는 올릴 때 한 번 글자를 뽑아 둔다.
+        """
+        conv, _ = self._owned(conv_id, user)
+        ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+        want = MIME_OF.get(ext)
+        base = (mime or "").split(";", 1)[0].strip().lower()
+        # 클라이언트 mime이 비었거나 octet-stream이면 확장자로 정한다. 표와 어긋나면 거절
+        if want is None or (base and base != "application/octet-stream" and base != want):
+            raise AttachmentType(base or ext or "?")
+        limit = IMAGE_LIMIT if want.startswith("image/") else TEXT_LIMIT
+        if len(data) > limit:
+            raise AttachmentTooLarge(limit, len(data))
+        if self.repo.pending_count(conv.id) >= PENDING_LIMIT:
+            raise AttachmentLimit(PENDING_LIMIT)
+        return self.repo.add_attachment(
+            Attachment(
+                conversation_id=conv.id,
+                turn_id=None,
+                user_id=user.id,
+                name=name[:200],
+                mime=want,
+                size=len(data),
+                bytes=data,
+                text_cache=_extract_text(want, data),
+                created_at=now_utc(),
+            )
+        )
+
+    def _owned_attachment(self, att_id: int, user: User) -> Attachment:
+        a = self.repo.attachment(att_id)
+        if a is None:
+            raise NotFound("attachment", att_id)
+        try:
+            self._owned(a.conversation_id, user)
+        except NotFound:
+            raise NotFound("attachment", att_id) from None
+        return a
+
+    def remove_attachment(self, att_id: int, user: User) -> None:
+        """SYNC-MS-010#ConversationService.remove_attachment
+
+        아직 안 보낸 것만. 보낸 첨부는 턴의 일부다.
+        """
+        a = self._owned_attachment(att_id, user)
+        if a.turn_id is not None:
+            raise AttachmentSent(att_id)
+        self.repo.delete_attachment(a.id)
+
+    def attachment_meta(self, att_id: int, user: User) -> AttachmentMeta:
+        """SYNC-MS-010#ConversationService.attachment_meta"""
+        return _meta(self._owned_attachment(att_id, user))
+
+    def attachment_bytes(self, att_id: int, user: User) -> tuple[str, str, bytes]:
+        """SYNC-MS-010#ConversationService.attachment_bytes"""
+        a = self._owned_attachment(att_id, user)
+        return a.name, a.mime, bytes(a.bytes)
+
+    def attachment_text(self, conv_id: int, att_id: int) -> str | None:
+        """SYNC-MS-010#ConversationService.attachment_text
+
+        이 대화의 첨부만. 이미지는 None — 붙인 질문에 이미 보였다.
+        소유 판정은 ask_item이 대화 단위로 했다.
+        """
+        a = self.repo.attachment(att_id)
+        if a is None or a.conversation_id != conv_id or a.mime.startswith("image/"):
+            return None
+        return a.text_cache or ""
+
+    def pending_images(self, turn_id: int) -> list[tuple[str, bytes]]:
+        """SYNC-MS-010#ConversationService.pending_images"""
+        return [(a.mime, bytes(a.bytes)) for a in self.repo.images_of_turn(turn_id)]
 
     def history(self, conv_id: int, limit: int) -> list[dict]:
         """SYNC-MS-010#ConversationService.history
