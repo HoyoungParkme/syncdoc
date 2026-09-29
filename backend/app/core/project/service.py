@@ -231,6 +231,11 @@ class ProjectService:
         async with _lock(code):
             project = self.get_owned(code, user)
             workdir = Path(project.repository.workdir_path)
+            # 대화·턴·첨부를 먼저(MS-001 2). 순환 임포트를 피해 여기서 부른다 —
+            # conversation이 project를 본다
+            from app.core.conversation.service import ConversationService
+
+            ConversationService(self.session).delete_by_project(project.id)
             self.repo.delete_all_of(project.id)
             self.session.flush()
             shutil.rmtree(workdir, ignore_errors=True)

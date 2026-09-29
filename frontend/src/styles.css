@@ -410,6 +410,25 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .ptabs span{flex:1;text-align:center;padding:var(--space-9) 0;cursor:pointer;color:var(--ink-faint);font-size:var(--text-meta)}
 .ptabs span.on{font-weight:var(--w-semibold);color:var(--ink-body);background:var(--bg-card)}
 .body3 .pbody{flex:1;overflow:auto;min-height:0;padding:var(--space-12)}
+/* 질문 탭 세 층 (카드 AQ) — 위 고정(8.5·대화 줄) · 가운데 스크롤(8.7) · 아래 고정(8.6). 3단 규칙의 패널판 */
+.body3 .pbody.ask{display:flex;flex-direction:column;overflow:hidden}
+.pbody.ask .asktop{flex:none}
+.pbody.ask .qa{flex:1;overflow:auto;min-height:0;margin:var(--space-6) 0}
+.pbody.ask .askbottom{flex:none;padding-top:var(--space-6);border-top:1px solid var(--border)}
+/* 8.11 대화 고르기 · 8.12 새 대화 · 8.13 지우기 */
+.convrow{display:flex;align-items:center;gap:var(--space-5);margin:var(--space-6) 0}
+.convrow .conv{flex:1;min-width:0;text-align:left;padding:var(--space-4) var(--space-8);border:1px solid var(--border);
+  border-radius:var(--radius-control);background:var(--bg-card);color:var(--ink-body);font:inherit;font-size:var(--text-meta);
+  cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.convlist{border:1px solid var(--border);border-radius:var(--radius-control);background:var(--bg-card);margin:0 0 var(--space-6);
+  max-height:220px;overflow:auto}
+.convlist .row{display:flex;align-items:center;gap:var(--space-6);padding:var(--space-5) var(--space-8);border-bottom:1px solid var(--border);
+  font-size:var(--text-meta)}
+.convlist .row:last-child{border-bottom:none}
+.convlist .row.on{background:var(--bg-subtle)}
+.convlist .row .title{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.convlist .row .cap{color:var(--ink-faint);font-size:var(--text-caption);white-space:nowrap}
+.convlist .row.lbl{color:var(--ink-faint);margin:0}
 /* 8.1 참조 카드 — ID 줄과 제목 줄. 가리키는 곳이 없으면 점선·흐리게 */
 .pbody .lbl{margin:var(--space-11) 0 var(--space-5)}
 .pbody .lbl:first-child{margin-top:0}

@@ -27,7 +27,7 @@ from app.mcp.auth import BearerAuth
 from app.mcp.tools import server as mcp_server
 from app.web import auth
 from app.web.auth import SessionMiddleware
-from app.web.routers import account, admin, documents, hooks, projects, references
+from app.web.routers import account, admin, conversations, documents, hooks, projects, references
 
 log = logging.getLogger(__name__)
 
@@ -89,6 +89,7 @@ for r in (
     projects.router,
     documents.router,
     references.router,
+    conversations.router,
     admin.router,
     hooks.router,
 ):
