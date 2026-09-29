@@ -639,6 +639,7 @@ function AskPanel({
       return
     }
     let live = true
+    setFiles([]) // 다른 대화의 칩을 비운다. 이 대화에 올린 것은 아래 합침으로 돌아온다
     api
       .get<Conversation>(`/api/conversations/${convId}`)
       .then((c) => {
@@ -653,7 +654,11 @@ function AskPanel({
             att: t.attachments,
           })),
         )
-        setFiles(c.pending)
+        // 서버의 안 보낸 첨부와 합친다 — 대화를 막 만들며 올리는 중이면 로컬 칩이 먼저 있을 수 있다
+        setFiles((fs) => {
+          const have = new Set(fs.map((x) => x.id))
+          return [...fs, ...c.pending.filter((p) => !have.has(p.id))]
+        })
       })
       .catch(() => live && setConvId(null)) // 지워졌거나 남의 것 — 새 대화로
     setSp(
@@ -702,10 +707,16 @@ function AskPanel({
     }
   }
 
-  // 대화가 아직 없으면 만든다 — 첫 질문이나 첫 첨부에. 8.12는 빈 대화를 미리 만들지 않는다
+  // 대화가 아직 없으면 만든다 — 첫 질문이나 첫 첨부에. 8.12는 빈 대화를 미리 만들지 않는다.
+  // ref로 즉시 기억한다 — 파일 여럿을 잇달아 올릴 때 state가 아직 null이라 대화가 둘 생기던 것
+  const convRef = useRef<number | null>(convId)
+  useEffect(() => {
+    convRef.current = convId
+  }, [convId])
   const ensureConv = async (): Promise<number> => {
-    if (convId !== null) return convId
+    if (convRef.current !== null) return convRef.current
     const made = await api.post<ConversationBrief>(`/api/projects/${code}/conversations`, {})
+    convRef.current = made.id
     setConvId(made.id)
     return made.id
   }
@@ -715,6 +726,13 @@ function AskPanel({
     const picked = Array.from(list)
     if (!picked.length) return
     let n = files.length
+    let id: number
+    try {
+      id = await ensureConv() // 한 묶음에 대화 하나
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : String(e))
+      return
+    }
     for (const f of picked) {
       if (!ACCEPT.test(f.name)) {
         toast(`받지 않는 종류: ${f.name}`)
@@ -730,9 +748,8 @@ function AskPanel({
         break
       }
       try {
-        const id = await ensureConv()
         const meta = await api.upload<AttachmentMeta>(`/api/conversations/${id}/attachments`, f)
-        setFiles((fs) => [...fs, meta])
+        setFiles((fs) => (fs.some((x) => x.id === meta.id) ? fs : [...fs, meta]))
         n += 1
       } catch (e) {
         toast(e instanceof ApiError ? e.message : String(e))
