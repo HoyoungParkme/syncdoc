@@ -21,7 +21,10 @@ export function ReadOrder() {
   // 레일 왼쪽에 프로젝트 이름이 필요하다. 문서 목록만으로는 이름을 알 수 없다
   const [projName, setProjName] = useState('')
   const [full, setFull] = useState<FullDiagram | null>(null)
-  const [showDraft, setShowDraft] = useState(false)
+  // 초안 보기(3.1)를 누른 **단계 번호**. 불리언을 효과로 되돌리면 단계가 바뀐 첫 렌더에 옛 값으로
+  // fetch가 나가 앞 단계 초안이 다음 단계 밑에 남는다 (#197). 단계마다 다시 누른다 (UI-9 S-2)
+  const [draftStage, setDraftStage] = useState<number | null>(null)
+  const showDraft = draftStage === stage
   const [bodies, setBodies] = useState<Document[]>([])
   const mainRef = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -35,14 +38,16 @@ export function ReadOrder() {
   const shown = approved.length ? approved : showDraft ? inStage : []
   const key = shown.map((d) => d.doc_id).join(',')
   useEffect(() => {
-    setShowDraft(false)
-  }, [stage])
-  useEffect(() => {
     if (!key) {
       setBodies([])
       return
     }
-    Promise.all(key.split(',').map((id) => api.get<Document>(`/api/docs/${id}`))).then(setBodies)
+    // 단계를 빨리 넘기면 앞 단계 응답이 늦게 온다 — 지금 key의 응답만 받는다 (#197)
+    let live = true
+    Promise.all(key.split(',').map((id) => api.get<Document>(`/api/docs/${id}`))).then((b) => live && setBodies(b))
+    return () => {
+      live = false
+    }
   }, [key])
   useEffect(() => {
     const root = mainRef.current
@@ -135,7 +140,7 @@ export function ReadOrder() {
           <div className="banner warn" data-el="3">
             이 단계에 완료된 문서가 없습니다. {inStage.map((d) => `${d.doc_id}은(는) ${STATUS_KO[d.status]}`).join(', ')}입니다.{' '}
             {!showDraft && (
-              <span className="btn sm" data-el="3.1" onClick={() => setShowDraft(true)}>
+              <span className="btn sm" data-el="3.1" onClick={() => setDraftStage(stage)}>
                 초안 보기
               </span>
             )}
