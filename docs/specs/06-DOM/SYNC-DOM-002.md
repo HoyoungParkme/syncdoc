@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -70,11 +70,12 @@ app/
 ├── config.py               환경 변수, 비밀키
 ├── db.py                   세션, 엔진
 │
-├── core/                   도메인 묶음 4개. 서로 ID로만 참조
+├── core/                   도메인 묶음 5개. 서로 ID로만 참조
 │   ├── project/            프로젝트, 저장소
 │   ├── spec/               문서, 항목, 버전, 상태변경
 │   ├── reference/          참조
 │   ├── account/            사용자, 액세스토큰
+│   ├── conversation/       대화, 턴, 첨부 — 읽는 중 질의의 보관 (2026-09-29, 카드 AQ·AR)
 │   │
 │   ├── types.py            2.7 열거형 · 2.8 DTO. 묶음 전부가 쓰므로 묶음 밖
 │   ├── clock.py            저장하는 시각. **프로세스 안에서 절대 뒤로 안 간다** (STD-004 DEV-18). 묶음 전부가 쓴다
@@ -428,10 +429,89 @@ classDiagram
 | `AskRead` | `tool: str` · `target: str \| None` | ask_item → `read` 이벤트. 도구 실행이 끝났다 |
 | `AskAnswer` | `answer: str` · `context_item_ids: list~str~` | ask_item → `answer` 이벤트. `context_item_ids`는 **모델이 실제로 읽은 대상**(부른 순서) — 화면이 「본 것」으로 보여준다. **저장하지 않는다**([[SYNC-INFRA-001]] 6장) |
 | `AskEvent` | `= AskStart \| AskNote \| AskRead \| AskAnswer` | ask_item이 차례로 yield하는 것. 라우터가 SSE로 흘린다 |
+| `AttachmentMeta` | `id` · `name` · `mime` · `size` · `turn_id: int \| None` · `created_at` | ConversationService → API `AttachmentMeta`. **바이트·추출 글자는 안 실린다** |
+| `TurnView` | `id` · `seq` · `question` · `answer: str \| None` · `progress: list[{kind, text}]` · `context_item_ids: list~str~` · `error: str \| None` · `attachments: list~AttachmentMeta~` · `created_at` | ConversationService.get → API `Conversation.turns` |
+| `ConversationBrief` | `id` · `title` · `turn_count` · `updated_at` | ConversationService.list → API 목록 |
+| `ConversationView` | `ConversationBrief` + `turns: list~TurnView~` + `pending: list~AttachmentMeta~`(아직 안 보낸 첨부) | ConversationService.get → API `Conversation` |
 
 타입은 여기 한 곳에만 정의한다.
 
-엔티티는 2.1~2.6, 열거형은 2.7.
+엔티티는 2.1~2.6과 2.9, 열거형은 2.7.
+
+### 2.9 대화
+
+2026-09-29에 들어온 묶음([[SYNC-PRD-001#R11]] 보관 결정, 카드 AQ·AR). 2.7·2.8 뒤에 두는 것은 번호를 안 바꾸기 위해서다 — MS 아홉 문서가 「2.8 DTO」를 가리킨다.
+
+#### Conversation 대화
+
+테이블: [[SYNC-DOM-003#conversations]] · 도메인: [[SYNC-DOM-001#Conversation]]
+
+```mermaid
+classDiagram
+    class Conversation {
+        +int id
+        +int project_id
+        +int user_id
+        +str title
+        +datetime created_at
+        +datetime updated_at
+    }
+```
+
+관계
+- `Conversation` * — 1 `Project` (ID만. 프로젝트 해제와 함께 cascade)
+- `Conversation` * — 1 `User`
+- `Conversation` 1 — * `Turn` · 1 — * `Attachment`
+
+#### Turn 턴
+
+테이블: [[SYNC-DOM-003#turns]] · 도메인: [[SYNC-DOM-001#Turn]]
+
+```mermaid
+classDiagram
+    class Turn {
+        +int id
+        +int conversation_id
+        +int seq
+        +str question
+        +str answer
+        +list progress
+        +list context_item_ids
+        +str error
+        +datetime created_at
+    }
+```
+
+관계
+- `Turn` * — 1 `Conversation`
+- `Turn` 1 — * `Attachment` (보낸 턴에 붙는다)
+
+**`progress`·`context_item_ids`는 화면이 다시 그릴 재료다.** 답만 남기면 「무엇을 읽었나」(UC-H19 성공 보장)를 다시 열었을 때 잃는다. `error`가 있는 턴은 다음 질문의 history에 안 실린다 — 실패한 답을 모델이 앞 대화로 보게 하지 않는다.
+
+#### Attachment 첨부
+
+테이블: [[SYNC-DOM-003#attachments]] · 도메인: [[SYNC-DOM-001#Attachment]]
+
+```mermaid
+classDiagram
+    class Attachment {
+        +int id
+        +int conversation_id
+        +int turn_id
+        +int user_id
+        +str name
+        +str mime
+        +int size
+        +bytes bytes
+        +str text_cache
+        +datetime created_at
+    }
+```
+
+관계
+- `Attachment` * — 1 `Conversation` · * — 0..1 `Turn`
+
+**`turn_id`가 없으면 아직 안 보낸 것이다.** 올리는 순간 대화에 속하고, 질문을 보낼 때 그 턴에 붙는다. 보내기 전에 빼면 행을 지운다. **바이트를 여기 둔다**(`bytea`) — 새 저장 서비스를 두지 않는다는 [[SYNC-INFRA-001]] 3장 결정. `text_cache`는 올릴 때 한 번 뽑는다 — 모델이 읽을 때마다 PDF를 다시 파싱하지 않는다.
 
 ---
 
@@ -453,6 +533,7 @@ flowchart LR
         rr[routers/references.py]
         ra[routers/account.py]
         rad[routers/admin.py]
+        rc[routers/conversations.py]
         hk[hooks.py]
     end
     subgraph mcp["mcp/ (Boundary)"]
@@ -463,6 +544,7 @@ flowchart LR
         SS[SpecService]
         RS[ReferenceService]
         AS[AccountService]
+        CS[ConversationService]
         PL[pipeline.py]
     end
     rp --> PS
@@ -471,11 +553,14 @@ flowchart LR
     ra --> AS
     rad --> PS
     rad --> PL
+    rc --> CS
     hk --> PL
     mt --> PS
     mt --> SS
     mt --> RS
 ```
+
+`routers/conversations.py`는 대화 목록·조회·삭제와 첨부 업로드·조회·삭제 — 묶음 하나(`ConversationService`)만 본다. 질문(`ask`)은 `routers/documents.py`에 그대로 있고 `queries.ask_item`이 대화를 읽고 쓴다(3.2).
 
 라우터 하나가 묶음 하나를 본다. `admin.py`만 예외로 프로젝트와 파이프라인 둘을 부른다 — 재구축([[SYNC-UC-001#UC-S6]])이 운영 성격이라 어느 묶음에도 안 들어간다. **예외 둘 더** — 라우터가 응답에 사람 이름을 붙이려고 `AccountService.users_by_ids`를 부르는 건 허용(이력). `documents.py`가 상태 변경·되돌리기를 `pipeline`으로 넘기는 것도 허용 — 둘은 조율이라 `pipeline`에 있다. `mcp/tools.py`는 account를 부르지 않는다 — 인증은 `mcp/auth.py`의 몫이다.
 
@@ -491,10 +576,13 @@ flowchart TB
     SS[SpecService]
     RS[ReferenceService]
     AS[AccountService]
+    CS[ConversationService]
     GIT[infra/git.py]
     GH[infra/github.py]
     LLM[infra/llm.py]
 
+    QR -.->|get · add_turn · finish_turn · attachment_text · attachment_bytes| CS
+    PS -.->|delete_by_project| CS
     PL -.->|get_document · validate · detect_deleted_items · create · save · apply_frontmatter| SS
     PL -.->|commit_push · read · changed_files| GIT
     PL -.->|extract · mark_missing · resolve_missing · downstream · clear| RS
@@ -511,6 +599,8 @@ flowchart TB
 ```
 
 **규칙** — 서비스끼리 직접 부르지 않는다. 묶음을 넘는 호출은 전부 `pipeline`(쓰기)이나 `queries`(읽기)를 거친다. v1에는 `TrackingService → ReferenceService·SpecService` 둘이 예외였으나 추적 묶음과 함께 사라졌다. 서비스가 `pipeline`을 부르는 건 `ProjectService.rebuild_index`뿐이다. 4장에서 각 노드를 확대한다.
+
+**`queries.ask_item`이 쓰는 유일한 자리다 — 대화 표만.** 읽는 중 질의가 대화를 보관하면서(2026-09-29) `queries`가 `ConversationService.add_turn`·`finish_turn`을 부른다. 명세 표는 여전히 안 쓴다 — `pipeline`을 거치지 않는 이유가 그대로다(쓰는 것이 명세가 아니다). `ProjectService.delete_project`가 `delete_by_project`를 불러 프로젝트 해제 때 대화를 함께 지운다.
 
 **`queries`가 어댑터를 직접 부르는 것은 `llm` 하나뿐이다.** 읽는 중 질의([[SYNC-PRD-001#R11]])는 쓰지 않고 읽기만 하므로 `pipeline`을 거칠 이유가 없고, 맥락을 조립하는 데 필요한 것이 이미 전부 `queries`에 있다. 새 묶음을 만들지 않는 이유는 5장에 적는다.
 
@@ -916,9 +1006,10 @@ diff_with_impact(doc_id, from, to, user) -> Diff    SEQ-15  diff → resolve_ite
 project_items(code, kind, user) -> list             SEQ-18  kind별로 list_by_project(has_convention_error) | 미완성 | 끊어진 참조(is_missing)
 item_chain(doc_id, item_id, user) -> ItemChain      —       전이적 폐포 (UI-15)
 downstream_view(doc_id, user) -> DownstreamView     —       이 문서를 참조하는 것. 추적표·하위 참조 수 (V-PRD)
-ask_item(doc_id, item_id?, question, history, user) -> AsyncIterator[AskEvent]
-                                                    SEQ-24  시작 맥락(제목·항목 목록) → llm.step ↔ ask_tool 루프(8번·120초) → AskAnswer
-ask_tool(name, args, code, user) -> ToolResult     SEQ-24  도구 하나 실행 — get_item · get_references · item_chain · list_documents · get_document. 같은 프로젝트·소유 검사
+ask_item(doc_id, item_id?, conversation_id, question, attachment_ids, user) -> AsyncIterator[AskEvent]
+                                                    SEQ-24  대화에서 history·첨부 목록 → 시작 맥락(제목·항목 목록·첨부 목록) → add_turn → llm.step ↔ ask_tool 루프(8번·120초) → finish_turn → AskAnswer
+ask_tool(name, args, code, user, conversation_id) -> ToolResult
+                                                    SEQ-24  도구 하나 실행 — get_item · get_references · item_chain · list_documents · get_document · read_attachment. 같은 프로젝트·소유 검사
 ```
 
 **규칙** — **모든 함수가 `user: User`를 명시 인자로 받고 첫 줄에서 `ProjectService.get_owned`(목록은 `list_owned`)를 지난다.** `doc_id`로 들어오는 것은 `doc_id.split("-")[0]`이 코드다. 소유가 아니면 본문·항목·참조를 읽기 전에 not-found로 끝난다. `queries`는 쓰지 않는다. 읽고 조합만 한다. 건수는 `document_ids`로 묶어 한 번에 묻는다(N+1 금지). 단계 11칸 계산(가장 낮은 상태·gate_warning)은 `project_summary` 안에 있다 — `ProjectService`가 아니라.
@@ -945,12 +1036,88 @@ github.exchange_code(code) -> str
 github.get_user(token) -> GithubUser
 
 llm.step(system, messages, tools, tool_choice="auto") -> LlmStep
-                                               모델 호출 한 번. 답 텍스트이거나 도구 호출 목록이거나 둘 다. usage 포함
+                                               모델 호출 한 번. 답 텍스트이거나 도구 호출 목록이거나 둘 다. usage 포함.
+                                               user 항목에 images(mime·bytes)가 있으면 content 파트 배열로 옮긴다 (첨부, 카드 AR)
 ```
 
 **규칙** — `git.commit_push`만 `AccountService.github_token_for`를 부른다(3.2). 토큰은 push URL에만 쓰고 `.git/config`에 남기지 않는다.
 
 `llm`은 키를 `config`에서 읽는다. 키가 비면 부르기 전에 `llm-not-configured`로 막고, 외부가 실패하면 `llm-unavailable`로 접는다 — 사용량 초과도 여기 들어간다([[SYNC-INFRA-001]] 5.3). **어댑터는 한 번 호출만 안다.** 도구 선언(`tools`)과 `tool_choice`를 와이어 형식(`{type: function, function: {name, description, parameters}}`)으로 옮겨 싣고, 응답의 `tool_calls`를 `ToolCall`로 파싱해 돌려준다. `arguments`가 JSON이 아니면 `llm-unavailable`. 루프는 어댑터에 없다 — `queries.ask_item`이 돈다.
+
+### 4.10 conversation
+
+#### ConversationService
+
+```mermaid
+classDiagram
+    class ConversationService {
+        «service»
+        +list(code: str, user: User) list~ConversationBrief~
+        +create(code: str, user: User, title: str?) Conversation
+        +get(conv_id: int, user: User) ConversationView
+        +delete(conv_id: int, user: User) None
+        +delete_by_project(project_id: int) None
+        +add_turn(conv_id: int, question: str, attachment_ids: list~int~) Turn
+        +finish_turn(turn_id: int, answer: str?, progress: list, context_item_ids: list~str~, error: str?) Turn
+        +history(conv_id: int, limit: int) list~dict~
+        +add_attachment(conv_id: int, user: User, name: str, mime: str, data: bytes) Attachment
+        +remove_attachment(att_id: int, user: User) None
+        +attachment_meta(att_id: int, user: User) AttachmentMeta
+        +attachment_bytes(att_id: int, user: User) tuple
+        +attachment_text(conv_id: int, att_id: int) str?
+        +pending_images(turn_id: int) list~tuple~
+    }
+    class Conversation {
+        +int id
+        +int project_id
+        +int user_id
+        +str title
+        +datetime created_at
+        +datetime updated_at
+    }
+    class Turn {
+        +int id
+        +int conversation_id
+        +int seq
+        +str question
+        +str answer
+        +list progress
+        +list context_item_ids
+        +str error
+    }
+    class Attachment {
+        +int id
+        +int conversation_id
+        +int turn_id
+        +str name
+        +str mime
+        +int size
+        +bytes bytes
+        +str text_cache
+    }
+    ConversationService --> Conversation
+    ConversationService --> Turn
+    ConversationService --> Attachment
+```
+
+| 메서드 | 부르는 곳 | 근거 |
+|---|---|---|
+| `list` · `create` · `get` · `delete` | routers/conversations — `/api/projects/{code}/conversations` · `/api/conversations/{id}` | UI-5 8.11~8.13 · UC-H19 |
+| `delete_by_project` | [[SYNC-MS-001#ProjectService.delete_project]] | UC-H17. 프로젝트 해제와 함께 |
+| `add_turn` · `finish_turn` · `history` | `queries.ask_item` | SEQ-24. 질문을 받자마자 턴을 만들고, 답이나 실패로 닫는다 |
+| `add_attachment` · `remove_attachment` · `attachment_meta` · `attachment_bytes` | routers/conversations — 업로드·미리보기·빼기 | UI-5 8.14~8.16 |
+| `attachment_text` · `pending_images` | `queries.ask_tool`(`read_attachment`) · `queries.ask_item`(이 턴의 이미지) | INFRA 5.3 첨부 |
+
+**규칙이 사는 곳**
+- `create`·`get`·`delete`·`list`: 첫 줄에서 `ProjectService.get_owned(code, user)`. 대화 ID로 들어오면 대화의 프로젝트로 판정 — 남의 대화는 `not-found {resource: "conversation"}`
+- `add_attachment`: **종류·상한이 여기서 막힌다** — mime이 받는 열 가지 밖이면 `attachment-type`(415), 이미지 10MB·나머지 1MB 초과면 `attachment-too-large`(413), 아직 안 보낸 첨부가 8개면 `attachment-limit`(409). 글자 파일은 UTF-8로 읽어 `text_cache`, PDF는 `pypdf`로 쪽마다 글자를 이어 붙인다(뽑히는 글자가 없으면 빈 문자열 — 스캔본은 「글자 없음」으로 모델에 간다)
+- `add_turn`: `seq = 마지막+1`, `attachment_ids`의 첨부(이 대화·`turn_id` null인 것만)에 `turn_id`를 채운다. 첫 턴이면 `title = question[:40]`. `updated_at` 갱신
+- `finish_turn`: 답이거나 `error` 하나. `progress`·`context_item_ids` 그대로 저장
+- `history(conv_id, limit)`: `error`가 없는 턴만, 뒤에서 `limit`턴 — `[{role: user, text: question}, {role: assistant, text: answer}]`
+- `attachment_text`: 그 대화의 첨부가 아니면 None(모델에 「없음」). 이미지면 None — 이미지는 도구로 못 읽는다
+- `delete`·`delete_by_project`: cascade에 맡긴다(DOM-003 규칙). 바이트를 따로 지울 곳이 없다 — 저장 서비스를 안 둔 이유
+
+---
 
 ## 5. 판단이 필요한 지점
 
