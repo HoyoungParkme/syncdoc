@@ -607,6 +607,18 @@ function AskPanel({
   const qaRef = useRef<HTMLDivElement>(null)
   // 답 속 참조(7.2와 같음): 이 문서 안 항목이면 스크롤·선택, 남의 문서·문서 자체면 그 문서로. 링크 존재 검사는 안 한다
   const plainCtx = { selfId: docId, href: (d: string, it?: string) => docPath(d, it), exists: () => true }
+  // 답 HTML은 턴마다 한 번만 만든다 — 렌더러 출력이 호출마다 달라(id 번호) 다시 만들면 React가 innerHTML을 되돌려
+  // mermaid가 그린 svg가 지워진다(카드 AS)
+  const htmlCache = useRef(new Map<string, string>())
+  const answerHtml = (a: string) => {
+    const key = docId + '\u0000' + a
+    let h = htmlCache.current.get(key)
+    if (h === undefined) {
+      h = renderBlocks(linkifyIds(a), plainCtx)
+      htmlCache.current.set(key, h)
+    }
+    return h
+  }
   const onAnswerClick = (ev: React.MouseEvent) => {
     const a = (ev.target as HTMLElement).closest<HTMLAnchorElement>('a[data-ref]')
     if (!a) return
@@ -985,7 +997,7 @@ function AskPanel({
                 </details>
               )}
               {t.a !== undefined ? (
-                <div className="a" onClick={onAnswerClick} dangerouslySetInnerHTML={{ __html: renderBlocks(linkifyIds(t.a), plainCtx) }} />
+                <div className="a" onClick={onAnswerClick} dangerouslySetInnerHTML={{ __html: answerHtml(t.a) }} />
               ) : t.err ? (
                 <div className="a fail">답을 못 받았습니다 — {t.err}</div>
               ) : (
