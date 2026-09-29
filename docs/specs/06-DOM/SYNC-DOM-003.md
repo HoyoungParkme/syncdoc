@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-003
 type: DOM
 title: ERD·DD — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-001]
 ---
 
@@ -42,6 +42,11 @@ erDiagram
     users ||--o{ access_tokens : owns
     users ||--o{ commit_emails : owns
     users ||--o{ projects : owns
+    projects ||--o{ conversations : keeps
+    users ||--o{ conversations : owns
+    conversations ||--o{ turns : ordered
+    conversations ||--o{ attachments : holds
+    turns |o--o{ attachments : attached
 
     projects {
         int id PK
@@ -139,6 +144,37 @@ erDiagram
         timestamptz expires_at
         timestamptz revoked_at
     }
+    conversations {
+        int id PK
+        int project_id FK
+        int user_id FK
+        varchar title
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    turns {
+        int id PK
+        int conversation_id FK
+        int seq
+        text question
+        text answer
+        jsonb progress
+        jsonb context_item_ids
+        varchar error
+        timestamptz created_at
+    }
+    attachments {
+        int id PK
+        int conversation_id FK
+        int turn_id FK
+        int user_id FK
+        varchar name
+        varchar mime
+        int size
+        bytea bytes
+        text text_cache
+        timestamptz created_at
+    }
 ```
 
 **설계 규칙**
@@ -146,6 +182,7 @@ erDiagram
 - 시각은 전부 `timestamptz`
 - 열거형은 DB enum이 아니라 `varchar` + 앱 검증. 값 추가 시 마이그레이션을 피하기 위해서
 - 삭제 컬럼은 `items`에만 있다. 문서·버전은 삭제하지 않는다 — 문서는 `documents.trashed_at`으로 **휴지통**에 넣는다(행은 남는다). **행까지 지우는 것**은 휴지통 안에서 다른 문서가 가리키지 않을 때만([[SYNC-MS-002#SpecService.delete_document]]) — 그 문서에 딸린 상태변경은 같이 지운다
+- **대화 세 표(`conversations`·`turns`·`attachments`)는 명세 표와 선이 없다.** `projects`·`users`를 FK로 가리킬 뿐 `documents`·`items`를 가리키지 않는다 — 문서 ID는 턴의 글자 속에만 있다. 재구축이 건드리지 않고, 프로젝트 행이 지워지면(`ProjectService.delete_project`) `ON DELETE CASCADE`로 함께 사라진다. 대화를 지우면 턴·첨부도 같은 cascade. 리비전 `0014_conversations`(대화·턴)와 `0015_attachments`(첨부) — 카드 AQ·AR
 - **재구축(UC-S6)은 `versions`·`references`만 지운다.** `documents`·`items`는 지우지 않는다 — 항목 ID 재사용 금지의 근거(`items.is_deleted`)와 휴지통 상태(`documents.trashed_at`)가 거기 산다. `items`는 upsert
 - 상태 변경은 `versions` 행을 만들지 않는다. `status_changes.commit_hash`가 그 커밋을 가리킨다
 - `references`의 `to_item_id`와 `to_document_id`는 CHECK로 하나만 채워지게 한다. `is_missing=true`면 둘 다 null
@@ -284,6 +321,46 @@ erDiagram
 | expires_at | timestamptz | null 허용 | 만료 시각. **v1은 항상 null**(인프라 9장 — 만료 없음). 컬럼과 검증 분기는 정책이 바뀔 때를 위해 남겨 둔다 | |
 | revoked_at | timestamptz | null 허용 | 폐기 시각. null이면 유효 | |
 | last_used_at | timestamptz | null 허용 | 이 토큰으로 마지막에 들어온 시각. null이면 한 번도 안 씀. 만료가 없으므로 안 쓰는 토큰을 찾는 단서가 이것뿐이다(UI-13 3.5) | |
+
+### conversations
+
+클래스: [[SYNC-DOM-002#Conversation]]
+
+| 컬럼 | 타입 | 제약 | 의미 | 예시 |
+|---|---|---|---|---|
+| project_id | int | FK not null, ON DELETE CASCADE | 어느 프로젝트의 대화인가. 프로젝트 해제와 함께 사라진다 | |
+| user_id | int | FK not null | 소유자. `projects.owner_user_id`와 같은 사람이지만 따로 둔다 — 소유 검사는 프로젝트로, 이 컬럼은 「누가 물었나」 | |
+| title | varchar(80) | not null | 첫 질문의 앞 40자. 빈 대화면 `새 대화` | `이 요구사항의 근거가 뭐라고 했어?` |
+| updated_at | timestamptz | not null | 마지막 턴이 끝난 시각. 목록 정렬 기준 | |
+
+### turns
+
+클래스: [[SYNC-DOM-002#Turn]]
+
+| 컬럼 | 타입 | 제약 | 의미 | 예시 |
+|---|---|---|---|---|
+| conversation_id | int | FK not null, ON DELETE CASCADE | | |
+| seq | int | not null, UK(conversation_id, seq) | 대화 안 순번 1부터 | `3` |
+| question | text | not null | 사람이 쓴 질문 | |
+| answer | text | null 허용 | 모델의 답. 실패한 턴은 null | |
+| progress | jsonb | not null, default `[]` | 진행 줄 `[{kind: note\|read, text}]` — 화면 8.9가 다시 그린다 | |
+| context_item_ids | jsonb | not null, default `[]` | 실제로 읽은 것(`DOC#ITEM`·`DOC`·`첨부:이름`), 부른 순서 | |
+| error | varchar(300) | null 허용 | 답을 못 받은 이유. 있으면 다음 질문의 history에 안 실린다 | `llm-unavailable` |
+
+### attachments
+
+클래스: [[SYNC-DOM-002#Attachment]]
+
+| 컬럼 | 타입 | 제약 | 의미 | 예시 |
+|---|---|---|---|---|
+| conversation_id | int | FK not null, ON DELETE CASCADE | 어느 대화에 붙였나 | |
+| turn_id | int | FK null 허용, ON DELETE CASCADE | 보낸 턴. **null이면 아직 안 보낸 것**(입력 칸에 올려 둔 상태) — 대화를 지우면 같이 사라진다 | |
+| user_id | int | FK not null | 올린 사람 | |
+| name | varchar(200) | not null | 원래 파일 이름 | `회의록.pdf` |
+| mime | varchar(80) | not null | 종류. 받는 것만 — `image/png` `image/jpeg` `image/webp` `image/gif` `text/markdown` `text/plain` `text/csv` `application/json` `application/yaml` `application/pdf` | `application/pdf` |
+| size | int | not null | 바이트 수. 이미지 ≤10MB, 나머지 ≤1MB — 서비스가 막는다 | `348211` |
+| bytes | bytea | not null | 파일 그대로. 이미지는 모델에 data URL로 실리고 사람에겐 미리보기로 | |
+| text_cache | text | null 허용 | 글자 파일은 본문 그대로, PDF는 `pypdf`로 뽑은 글자. 이미지는 null. 모델이 `read_attachment`로 읽는 것 | |
 
 ---
 

@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -280,6 +280,23 @@ textarea.in{height:auto;min-height:64px;padding:8px 10px;resize:none;line-height
   .qa .a p{margin:0 0 6px}.qa .a p:last-child{margin:0}.qa .a ul{margin:0 0 6px 18px;padding:0}
   .qa .a.wait{color:var(--dim);border-style:dashed}
   .qa .src{font:12px var(--mono);color:var(--dim);margin-top:4px}
+  /* 질문 탭 세 층 — 위 고정 · 가운데 스크롤 · 아래 고정 (카드 AQ·AR) */
+  .side.chat{display:flex;flex-direction:column}
+  .side.chat .qa{flex:1;overflow:auto;min-height:0}
+  .convrow{display:flex;align-items:center;gap:6px;margin:6px 0;font-size:12.5px}
+  .convrow .conv{flex:1;padding:4px 8px;border:1px solid var(--line);border-radius:5px;background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .convlist{border:1px solid var(--line);border-radius:6px;background:#fff;margin:4px 0}
+  .convlist .row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--line);font-size:12.5px}
+  .convlist .row:last-child{border-bottom:0}
+  .convlist .row>span:first-child{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chips{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 4px}
+  .chips.sent{margin:6px 0 0}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:2px 7px;border:1px solid var(--line);border-radius:12px;background:#fff;font:11.5px var(--mono)}
+  .chip .th{width:20px;height:20px;border-radius:3px;background:var(--sub2)}
+  .chip .x{margin-left:2px;color:var(--dim);cursor:pointer}
+  .inrow{display:flex;align-items:flex-end;gap:6px}
+  .inrow .in{flex:1}
+  .droplayer{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.85);border:2px dashed var(--ink);border-radius:8px;font-size:13.5px;font-weight:600}
   /* 원본 탭 */
   .editor{display:grid;grid-template-columns:32px 1fr;border:1px solid var(--line);border-radius:6px;background:#fff;overflow:hidden}
   .gutter{background:var(--sub2);color:var(--dim);font:12px/1.65 var(--mono);text-align:right;padding:10px 6px}
@@ -427,13 +444,14 @@ status: draft
   </aside>
 </div>
 
-<div class="var">질문 탭, 답이 온 뒤 — 8.9는 「n단계 읽음 · 본 것 k ▸」 한 줄로 접힌다. 펼치면 과정과 본 것. 답은 가벼운 마크다운이고 참조는 링크다</div>
+<div class="var">질문 탭, 답이 온 뒤 — 세 층(위 고정 · 가운데 스크롤 · 아래 고정). 8.9는 「n단계 읽음 · 본 것 k ▸」 한 줄로 접힌다. 답은 가벼운 마크다운이고 참조는 링크다. 첨부 칩(8.14)은 입력 바로 위</div>
 <div class="sd h" style="width:250px;min-height:0">
-  <aside class="side" style="min-height:420px">
+  <aside class="side chat" style="min-height:520px">
     <div class="ptabs"><span>참조</span><span class="on">질문</span></div>
     <div class="cap"><span class="idb">R1</span> 에이전트용 원본과 사람용 뷰 · 이 항목을 보며 묻습니다</div>
+    <div class="convrow"><span class="conv" data-el="8.11">대화 ▾ 원본과 뷰를 왜 나눴나요?</span><span class="b sm" data-el="8.12">새 대화</span></div>
     <div class="qa" data-el="8.7">
-      <div class="q">원본과 뷰를 왜 나눴나요?</div>
+      <div class="q">원본과 뷰를 왜 나눴나요?<div class="chips sent"><span class="chip"><span class="th"></span>capture.png · 212KB</span></div></div>
       <details class="prog" data-el="8.9" open>
         <summary><span>4단계 읽음 · 본 것 2</span><span class="n"></span></summary>
         <div class="lines">
@@ -446,7 +464,22 @@ status: draft
       </details>
       <div class="a"><p>에이전트가 읽을 것을 전제로 <b>규약이 있는 MD를 원본</b>으로 두고, 사람용은 거기서 파생 생성합니다.</p><ul><li>근거는 <span class="m bd">SYNC-RFQ-001#Q1</span> — 이 항목의 상위</li><li>원본은 읽기·복사만(10.1)</li></ul></div>
     </div>
-    <textarea class="in" data-el="8.6" placeholder="이 문서에 대해 묻습니다"></textarea>
+    <div class="chips" data-el="8.14"><span class="chip">회의록.pdf · 340KB <b class="x">✕</b></span></div>
+    <div class="inrow"><span class="b sm" data-el="8.15">+</span><textarea class="in" data-el="8.6" placeholder="이 문서에 대해 묻습니다"></textarea></div>
+  </aside>
+</div>
+
+<div class="var">대화 고르기(8.11)를 펼친 것 — 최근순, 행마다 지우기(8.13). 파일을 끌어 패널 위에 오면 드롭 안내 층(8.16)</div>
+<div class="sd h" style="width:250px;min-height:0">
+  <aside class="side chat" style="min-height:300px;position:relative">
+    <div class="ptabs"><span>참조</span><span class="on">질문</span></div>
+    <div class="cap"><span class="idb">R1</span> 에이전트용 원본과 사람용 뷰 · 이 항목을 보며 묻습니다</div>
+    <div class="convrow"><span class="conv">대화 ▾ 원본과 뷰를 왜 나눴나요?</span><span class="b sm">새 대화</span></div>
+    <div class="convlist">
+      <div class="row"><span>원본과 뷰를 왜 나눴나요?</span><span class="cap">3턴 · 방금</span><span class="b sm danger" data-el="8.13">지우기</span></div>
+      <div class="row"><span>R12 소유가 왜 필요해?</span><span class="cap">1턴 · 어제</span><span class="b sm danger">지우기</span></div>
+    </div>
+    <div class="droplayer" data-el="8.16">여기 놓으면 질문에 붙습니다</div>
   </aside>
 </div>
 
@@ -531,9 +564,15 @@ status: draft
 | 8.10 | 문서 전체를 참조 | 접힌 묶음 | 이 문서 **전체**를 가리킨 참조(`[[문서 ID]]`·frontmatter `upstream`) N건. 접혀 있고 누르면 펼친다. 항목을 고르기 전에도 있다. 재료는 `GET …/downstream`의 `(문서)` — 다른 문서에서 건 것만. 0이면 없다 | 펼침 · 참조 클릭 → 7.2와 같음 |
 | 8.4 | 질문 탭 | 탭 | 읽다가 묻는다(UC-H19). 모델이 같은 프로젝트를 관계도로 따라 읽는다. **모델 키가 없으면 이 탭이 없다** — `GET /api/me`의 `llm_enabled`로 안다 | 패널을 질문으로 |
 | 8.5 | 맥락 줄 | 텍스트 | 지금 무엇을 보며 묻는지. 항목이 있으면 「`X 이름` · 이 항목을 보며 묻습니다」, 없으면 「문서 전체 · `{doc_id}`에 대해 묻습니다」. 항목은 힌트다 | — |
-| 8.6 | 질문 입력 | 입력 | **항상 활성**(휴지통 문서 제외). 보내는 동안만 비활성. 보내면 8.7에 쌓인다 | — |
-| 8.7 | 대화 | 목록 | 질문·진행 묶음(8.9)·답이 차례로. **서버에 저장되지 않는다** — 대화는 프로젝트 단위로 브라우저에만 있다. 답은 **가벼운 마크다운**(문단·목록·굵게·인라인 코드)으로 그리고, 답 속 `[[…]]`와 맨 `문서ID#항목ID`는 7.2와 같은 링크다(#206) | 답 속 참조 → 7.2와 같음(다른 문서면 그 문서로) |
-| 8.9 | 진행 묶음 | 접힌 묶음 | **읽는 동안** — 스피너(공통 1.8) + 모델이 읽기 전에 쓰는 **가장 최근 한 줄**(`note`). 새 줄이 오면 갈아든다. 오른쪽 「n단계 ▸」를 누르면 지금까지의 `note`·`read` 전부. **답이 온 뒤** — 스피너가 사라지고 「n단계 읽음 · 본 것 k ▸」 한 줄로 접힌다. 펼치면 진행 줄 전부와 그 아래 「본 것」 = 모델이 실제로 읽은 대상, 부른 순서. 줄은 SSE로 **실시간** 한 줄씩 온다 | 누르면 펼침/접힘 · 본 것 → 7.2와 같음 |
+| 8.6 | 질문 입력 | 입력 | **패널 맨 아래 고정.** 항상 활성(휴지통 문서 제외). 보내는 동안만 비활성. 보내면 8.7에 쌓인다. 클립보드에 이미지·파일이 있으면 붙여넣기가 8.14로 간다 | Enter → 보냄 · 붙여넣기 → 8.14 |
+| 8.7 | 대화 | 목록 | 질문(붙인 첨부 칩 포함)·진행 묶음(8.9)·답이 차례로. **가운데 층만 스크롤한다.** 대화는 서버에 저장되어(카드 AQ) 새로고침·다른 기기에서도 8.11로 골라 이어 간다. 답은 **가벼운 마크다운**(문단·목록·굵게·인라인 코드)으로 그리고, 답 속 `[[…]]`와 맨 `문서ID#항목ID`는 7.2와 같은 링크다(#206) | 답 속 참조 → 7.2와 같음(다른 문서면 그 문서로) · 첨부 칩 → 미리보기(이미지)/다운로드 |
+| 8.11 | 대화 고르기 | 드롭다운 | 맥락 줄(8.5) 아래 한 줄 「대화 ▾ 제목」. 펼치면 이 프로젝트의 대화 목록 — 제목·턴 수·마지막 시각, 최근순. URL `?conv={id}` | 고르면 8.7이 그 대화로 · 행의 8.13 |
+| 8.12 | 새 대화 | 버튼 | 8.11 오른쪽 | 빈 대화를 만들고 8.7을 비운다 |
+| 8.13 | 대화 지우기 | 버튼 | 8.11 목록 행마다. `위험` 색 | 확인(1.1) 뒤 `DELETE /api/conversations/{id}` — 첨부도 함께. 지금 보던 대화면 목록 첫 것으로 |
+| 8.14 | 첨부 칩 | 칩 | 입력(8.6) 바로 위 한 줄. 이름·크기·✕. 이미지는 32px 썸네일. 아직 안 보낸 것(`turn_id` 없음). 한 질문에 8개 — 넘으면 토스트 | ✕ → `DELETE /api/attachments/{id}` |
+| 8.15 | 첨부 추가 | 버튼 | 입력 왼쪽 「+」. 파일 고르기 창 — 받는 종류만(이미지·md/txt/csv/json/yaml·pdf). 드롭(8.16)·붙여넣기(8.6)와 같은 곳(8.14)으로 간다 | 고르면 업로드 → 8.14 |
+| 8.16 | 드롭 안내 층 | 층 | 파일을 끌어 **패널 위**에 오면 반투명 층 「여기 놓으면 질문에 붙습니다」. 놓으면 업로드. 받지 않는 종류·상한 초과는 토스트 「받지 않는 종류」·「너무 큽니다(10MB/1MB)」 | 놓음 → 8.14 |
+| 8.9 | 진행 묶음 | 접힌 묶음 | **읽는 동안** — 스피너(공통 1.8) + 모델이 읽기 전에 쓰는 **가장 최근 한 줄**(`note`). 새 줄이 오면 갈아든다. 오른쪽 「n단계 ▸」를 누르면 지금까지의 `note`·`read` 전부. **답이 온 뒤** — 스피너가 사라지고 「n단계 읽음 · 본 것 k ▸」 한 줄로 접힌다. 펼치면 진행 줄 전부와 그 아래 「본 것」 = 모델이 실제로 읽은 대상, 부른 순서(`첨부:이름`도). 줄은 SSE로 **실시간** 한 줄씩 온다. 저장된 대화를 다시 열면 턴의 `progress`로 접힌 채 그려진다 | 누르면 펼침/접힘 · 본 것 → 7.2와 같음 |
 | 9 | 단계 이동 | 버튼 2개 | 이전·다음 단계 문서 ID. 없으면 비활성 | 그 문서의 UI-5 |
 | 10 | 원본 본문 | 영역 | 원본 MD 그대로. 줄 번호. 3단 틀은 유저용과 같고 본문 열만 바뀐다 | — |
 | 10.1 | MD 텍스트 | 읽기 전용 텍스트 | 저장소의 파일 내용 그대로 | 선택·복사만. 편집 불가 |
@@ -572,7 +611,11 @@ status: draft
 - **항목은 힌트다.** 고르지 않아도 문서 전체로 묻는다(8.5 「문서 전체」). 골랐으면 「지금 보는 항목」으로 실려 모델이 거기서 시작한다. 어느 쪽이든 모델은 같은 프로젝트를 도구로 따라 읽는다
 - **진행 묶음(8.9)은 실시간이다.** 응답이 SSE라 도구를 부를 때마다 한 줄씩 온다 — 한꺼번에 몰려 오면 잘못된 것이다. 읽는 동안은 스피너와 지금 줄 하나만 보이고, 답이 오면 「n단계 읽음 · 본 것 k」 한 줄로 접힌다 — 과정은 남기되 답을 가리지 않는다. 전에는 여섯 줄이 답 위에 다 쌓여 답보다 과정이 먼저 읽혔다(#206)
 - **모델 키가 없으면 탭 자체가 없다**(인프라 5.3). 참조 탭만 남고 나머지 화면은 그대로다. 꺼진 기능을 회색으로 남겨 두지 않는다 — 켤 방법이 사람에게 없다
-- **대화는 프로젝트 단위이고 서버에 저장되지 않는다.** 같은 프로젝트 안에서 문서·항목을 옮겨도 남고(8.5만 바뀐다), 다른 프로젝트로 가면 새 대화다. 새로고침하면 사라진다. 남기는 길을 화면에 두지 않는다 — 답을 명세에 옮기는 것은 사람과 그 사람의 에이전트가 한다([[SYNC-PRD-001]] 2장 「전달」의 경계)
+- **대화는 프로젝트 단위이고 서버에 저장된다**(카드 AQ, 2026-09-29). 프로젝트마다 대화 목록(8.11)이 있고, 같은 프로젝트 안에서 문서·항목을 옮겨도 고른 대화가 그대로다(8.5만 바뀐다). 새로고침·다른 기기에서도 목록에서 골라 이어 간다. 다른 프로젝트로 가면 그 프로젝트의 목록이다. 답을 명세에 옮기는 것은 여전히 사람과 그 사람의 에이전트가 한다([[SYNC-PRD-001]] 2장 「전달」의 경계) — 대화는 메모지 명세가 아니다
+- **질문 탭은 세 층이다.** 위 고정(8.5 맥락 줄 · 8.11/8.12 대화 줄) · 가운데 스크롤(8.7) · 아래 고정(8.14 첨부 칩 · 8.15 「+」 · 8.6 입력). 답이 길어도 입력이 화면 밖으로 밀리지 않는다 — 3단 규칙(가운데 열만 스크롤)의 패널판이다
+- **첨부는 세 길로 붙는다** — 「+」(8.15) · 패널 어디에나 드롭(8.16) · 입력에 붙여넣기(8.6). 셋 다 같은 업로드(`POST /api/conversations/{id}/attachments`)를 거쳐 8.14에 칩이 생긴다. 대화가 아직 없으면 먼저 하나 만든다. 보내면 칩이 질문 말풍선 아래로 옮겨 가 그 턴에 붙는다
+- **첨부는 보낸 턴에만 실린다.** 이미지는 그 질문에서 모델이 그대로 보고, 뒤 질문에는 다시 안 실린다 — 다시 보게 하려면 다시 붙인다. 글자·PDF는 대화의 첨부로 남아 모델이 도구로 필요할 때 읽는다(진행 줄 「첨부 회의록.pdf를 읽는다」, 본 것 `첨부:회의록.pdf`)
+- **종류와 상한은 붙이는 순간 막는다.** 이미지(png·jpg·webp·gif) 10MB · 글자(md·txt·csv·json·yaml)·PDF 1MB · 한 질문 8개. 화면이 먼저 토스트로 막고 서버도 같은 판정(413·415·409)이다
 - 답이 길어도 **패널 안에서만 스크롤한다**. 3단 규칙 그대로
 - **휴지통에 있는 문서(4b)에는 질문 탭이 없다.** 파일이 저장소에서 지워진 상태라 물을 본문이 없다 — 3이 없는 것과 같은 이유다
 - **상태 토글(3)은 저장소를 먼저 읽는다.** 방금 GitHub에 들어온 변경을 싱크독이 아직 못 읽었을 수 있다. 그 상태로 상태만 바꾸면 그 변경이 되돌아간다 — 실제로 한 번 그랬다(#137). 그래서 누르면 밀린 커밋을 먼저 읽고, 커밋할 본문도 저장소에서 읽어 `status:` 줄만 바꾼다([[SYNC-STD-004#DEV-19]])
@@ -605,7 +648,14 @@ status: draft
 3. 진행 묶음(8.9)의 스피너 옆 줄이 「R1 본문을 읽는다」 → 「근거 Q1을 읽는다」로 갈아들고 「2단계 ▸」가 는다. 펼치면 지금까지의 줄 전부 — 「R1 본문을 읽는다」 「읽음 · SYNC-PRD-001#R1」 「근거 Q1을 읽는다」. 도구를 부를 때마다 한 줄씩
 4. 답(8.7)이 마크다운으로 뜨고 8.9는 「4단계 읽음 · 본 것 2 ▸」로 접힌다. 펼치면 읽은 대상이 순서대로 보이고 누르면 그 항목으로 간다. 답 속 `SYNC-RFQ-001#Q1`도 링크다
 5. 이어 물으면 앞 대화가 함께 간다. 같은 프로젝트의 다른 문서로 옮겨도 대화는 그대로다
-6. 다른 프로젝트로 가면 새 대화다. 남길 값이 있었으면 에이전트에게 말해 명세를 고치게 한다
+6. 다른 프로젝트로 가면 그 프로젝트의 대화 목록이다. 남길 값이 있었으면 에이전트에게 말해 명세를 고치게 한다
+
+**S-6 캡처를 붙여 묻고 다음 날 이어 간다** — UC-H19, [[SYNC-SCN-001#S8]]
+1. 질문 탭에서 캡처를 입력(8.6)에 붙여넣는다. 입력 위에 썸네일 칩(8.14)이 생긴다. 「이 캡처의 요소 번호가 배치와 맞아?」 → Enter
+2. 칩이 질문 말풍선 아래로 옮겨 가고, 진행 묶음(8.9)이 돌다가 답이 온다. 모델이 캡처를 보고 답한 것이 본문에 보인다
+3. 회의록 PDF를 패널에 끌어다 놓는다 — 드롭 안내 층(8.16)이 떴다 사라지고 칩이 생긴다. 「이 자료의 요구가 PRD에 있어?」 → 진행 줄에 「첨부 회의록.pdf를 읽는다」, 본 것에 `첨부:회의록.pdf`
+4. 다음 날 다른 컴퓨터에서 같은 문서를 연다. 대화 고르기(8.11)를 펼쳐 어제 대화를 고른다 — 질문·답·칩이 그대로다. 이어서 묻는다
+5. 다 쓴 대화는 8.11 목록의 지우기(8.13)로 — 확인 뒤 첨부까지 사라진다
 
 ---
 

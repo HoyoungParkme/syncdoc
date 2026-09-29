@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-009
 type: MS
 title: MINISPEC — infra — git·github 어댑터
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -51,7 +51,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-INFRA-001]] 5.3 · [[SYNC-PRD-001#R11]] · [[SYNC-MS-008#queries.ask_item]]
 
-**입력** `system` 지시문 · `messages` 우리 키로 쌓인 대화록 — `{role: user|assistant, text}` · `{role: assistant, text, tool_calls: [ToolCall]}` · `{role: tool, tool_call_id, text}` · `tools` 모델이 부를 수 있는 도구 명세(`ToolSpec`) · `tool_choice` `"auto"`(모델이 고른다) 또는 `"none"`(도구 없이 답만 — 마무리 호출). 맥락 조립·자르기·루프는 전부 부르는 쪽([[SYNC-MS-008#queries.ask_item]])의 일이다. 여기서는 더하거나 자르지 않는다
+**입력** `system` 지시문 · `messages` 우리 키로 쌓인 대화록 — `{role: user|assistant, text}` · `{role: user, text, images: [(mime, bytes)]}`(이 턴에 붙인 이미지, 카드 AR) · `{role: assistant, text, tool_calls: [ToolCall]}` · `{role: tool, tool_call_id, text}` · `tools` 모델이 부를 수 있는 도구 명세(`ToolSpec`) · `tool_choice` `"auto"`(모델이 고른다) 또는 `"none"`(도구 없이 답만 — 마무리 호출). 맥락 조립·자르기·루프는 전부 부르는 쪽([[SYNC-MS-008#queries.ask_item]])의 일이다. 여기서는 더하거나 자르지 않는다
 
 **처리**
 1. `if not settings.LLM_API_KEY → ! LlmNotConfigured` — 네트워크 전
@@ -65,6 +65,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | 대화록 항목 | 보내는 것 |
 |---|---|
 | `{role: user\|assistant, text}` | `{role, content: text}` |
+| `{role: user, text, images}` | `{role: "user", content: [{type: "text", text}, {type: "image_url", image_url: {url: "data:{mime};base64,{b64}"}}, …]}` — 이미지가 비면 위 줄과 같다 |
 | `{role: assistant, text, tool_calls}` | `{role: "assistant", content: text or null, tool_calls: [{id, type: "function", function: {name, arguments: json.dumps(arguments)}}]}` |
 | `{role: tool, tool_call_id, text}` | `{role: "tool", tool_call_id, content: text}` |
 

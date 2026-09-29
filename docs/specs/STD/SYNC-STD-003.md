@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-003
 type: STD
 title: 명세 체인 지도 — 싱크독 첫 프로젝트의 실제 구조
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-STD-002]
 ---
 
@@ -467,6 +467,9 @@ flowchart BT
 
 **SYNC-SEQ-001**
 - [ ] SEQ-12 항목 블록 경계 — 문서 타입별 헤더 형식. 템플릿 규약과 함께
+
+**SYNC-MS-010**
+- [ ] 첨부 바이트가 DB를 무겁게 하면(수백 MB) 바이트 자리만 객체 저장소로 — 테이블·시그니처는 그대로([[SYNC-INFRA-001]] 3장)
 
 ---
 

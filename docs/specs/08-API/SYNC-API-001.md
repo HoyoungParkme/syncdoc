@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -31,7 +31,8 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 - **스트리밍은 `POST /api/docs/{docId}/ask` 하나다**(SSE, `text/event-stream`). 첫 이벤트(`start`) 전에 난 오류는 지금처럼 HTTP 상태 코드로, 뒤에 난 오류는 `error` 이벤트로 온다. 규칙 한 줄 — **첫 이벤트 전은 상태 코드, 뒤는 이벤트**
 
-**웹이 쓰지 않는 것** — 본문 생성·수정 엔드포인트는 없다. 본문 쓰기는 MCP와 GitHub push뿐이다(PRD R9). 웹의 쓰기는 상태 토글·되돌리기·휴지통·토큰·재구축까지다.
+**웹이 쓰지 않는 것** — 본문 생성·수정 엔드포인트는 없다. 본문 쓰기는 MCP와 GitHub push뿐이다(PRD R9). 웹의 쓰기는 상태 토글·되돌리기·휴지통·토큰·재구축, 그리고 **대화·첨부**(3.5 — 명세가 아니라 읽는 사람의 메모, [[SYNC-PRD-001]] 2장)까지다.
+- **업로드는 `POST /api/conversations/{id}/attachments` 하나다**(multipart/form-data). 나머지 요청 본문은 전부 JSON이다
 
 ---
 
@@ -72,6 +73,9 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:email-taken` | 409 | 남이 이미 등록한 커밋 이메일 | `email` | UI-13 2.6 |
 | `urn:syncdoc:not-implemented` | 501 | 카드 스텁 — 아직 구현 안 된 경로 (`import_existing` 등). 슬라이스 진행 중에만 존재 | `card` | [[SYNC-STD-004#DEV-12]] |
 | `urn:syncdoc:llm-not-configured` | 503 | 모델 키가 없다 — 읽는 중 질의가 꺼져 있다 | — | [[SYNC-UC-001#UC-H19]] 2a |
+| `urn:syncdoc:attachment-type` | 415 | 받지 않는 파일 종류 | `mime` | [[SYNC-UC-001#UC-H19]] 1b |
+| `urn:syncdoc:attachment-too-large` | 413 | 상한 초과 — 이미지 10MB, 글자·PDF 1MB | `limit`(바이트) · `size` | [[SYNC-UC-001#UC-H19]] 1b |
+| `urn:syncdoc:attachment-limit` | 409 | 아직 안 보낸 첨부가 이미 8개 | `limit` | [[SYNC-UC-001#UC-H19]] 1b |
 | `urn:syncdoc:llm-unavailable` | 424 | 모델 호출 실패. **사용량 초과도 여기 접힌다.** 스트림 중이면 `error` 이벤트로 온다(1장) | `reason` | [[SYNC-UC-001#UC-H19]] 4a |
 | `about:blank` | 그 코드 | 위 어느 것도 아닌 **프레임워크 HTTP 오류**. `title`은 상태 문구(RFC 9457) | — | — |
 | `urn:syncdoc:internal` | 500 | **예상 못 한 오류.** 위 어느 것도 아닌 예외가 라우터에서 샜다 | — | — |
@@ -777,7 +781,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 **문서가 시작점이고 항목은 힌트다.** `item_id`를 주면 「지금 보는 항목」으로 맥락에 한 줄 실릴 뿐, 없어도 묻는다. 모델은 같은 프로젝트의 문서·항목·참조를 읽기 도구로 스스로 읽고([[SYNC-INFRA-001]] 5.3), 무엇을 왜 읽는지가 이벤트로 차례로 온다. 도구 호출은 8번, 전체 120초까지 — 넘으면 그때까지 읽은 것으로 답한다.
 
-**아무것도 저장하지 않는다.** 대화는 클라이언트가 들고 있다가 요청마다 `history`로 통째로 보낸다. 서버는 `LLM_MAX_TURNS`턴까지만 받는다. 키가 없으면 `llm-not-configured`이고 화면은 탭 자체를 감춘다(`GET /api/me`의 `llm_enabled`).
+**대화에 저장한다**(카드 AQ, 2026-09-29). 요청은 `conversation_id`로 어느 대화인지 말하고, 앞 대화(`history`)는 서버가 그 대화의 턴에서 `LLM_MAX_TURNS`턴까지 만든다 — 클라이언트가 보내지 않는다. 질문을 받자마자 턴이 생기고 `answer`·`error` 뒤에 닫힌다(실패한 턴은 뒤 질문에 안 실린다). `attachment_ids`는 그 대화에 올려 두고 아직 안 보낸 첨부(3.5)를 이 질문에 붙인다 — 이미지는 이 질문의 메시지에 그대로, 글자·PDF는 모델이 `read_attachment`로 읽는다. 키가 없으면 `llm-not-configured`이고 화면은 탭 자체를 감춘다(`GET /api/me`의 `llm_enabled`).
 
 **응답은 SSE다.** `200 text/event-stream`, 헤더 `Cache-Control: no-cache` · `X-Accel-Buffering: no`. 프레임은 `event: {이름}\ndata: {JSON}\n\n`. 이벤트 다섯:
 
@@ -785,7 +789,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 |---|---|---|
 | `start` | `AskStart {doc_id, item_id}` | 시작 맥락 조립 직후, 첫 모델 호출 전. **이 앞의 오류(404·503·401)는 HTTP 상태 코드** |
 | `note` | `AskNote {text}` | 모델이 읽기 전에 쓴 한 줄(도구 인자 `reason`). 도구마다 하나 |
-| `read` | `AskRead {tool, target}` | 도구 실행이 끝났다. `target`은 `DOC#ITEM`·`DOC`, 목록이면 null |
+| `read` | `AskRead {tool, target}` | 도구 실행이 끝났다. `target`은 `DOC#ITEM`·`DOC`·`첨부:이름`, 목록이면 null |
 | `answer` | `AskAnswer {answer, context_item_ids}` | 마지막. 스트림 종료 |
 | `error` | problem+json 본문 그대로 `{type, title, status, detail, reason?}` | 루프 중 실패(`llm-unavailable` 등). 스트림 종료 |
 
@@ -813,9 +817,147 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
               - $ref: '#/components/schemas/AskRead'
               - $ref: '#/components/schemas/AskAnswer'
       '404':
-        description: 문서 없음 · 소유하지 않은 프로젝트 · item_id가 이 문서에 없음
+        description: 문서 없음 · 소유하지 않은 프로젝트 · item_id가 이 문서에 없음 · conversation_id가 내 것이 아니거나 다른 프로젝트
       '503':
         description: llm-not-configured
+```
+
+### 3.5 대화·첨부
+
+읽는 중 질의의 보관([[SYNC-PRD-001#R11]], 2026-09-29). 화면 [[SYNC-UI-001#UI-5]] 8.11~8.16 · 유스케이스 [[SYNC-UC-001#UC-H19]] · 서비스 [[SYNC-MS-010]]. 전부 소유자만 — 남의 대화·첨부는 `not-found {resource: "conversation"}`·`{resource: "attachment"}`.
+
+#### GET/api/projects/{code}/conversations 대화 목록
+
+```yaml
+/api/projects/{code}/conversations:
+  get:
+    summary: 이 프로젝트의 내 대화, 최근순 (UI-5 8.11)
+    parameters:
+    - $ref: '#/components/parameters/code'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/ConversationBrief'
+      '404':
+        $ref: '#/components/responses/NotFound'
+  post:
+    summary: 새 대화 (UI-5 8.12)
+    parameters:
+    - $ref: '#/components/parameters/code'
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              title:
+                type: string
+                description: 비우면 「새 대화」. 첫 질문이 오면 그 앞 40자로 바뀐다
+    responses:
+      '201':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationBrief'
+```
+
+#### GET/api/conversations/{id} 대화 하나
+
+```yaml
+/api/conversations/{id}:
+  get:
+    summary: 턴 전부 + 첨부 메타 (UI-5 8.7). 바이트·추출 글자는 안 실린다
+    parameters:
+    - $ref: '#/components/parameters/conversationId'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Conversation'
+      '404':
+        $ref: '#/components/responses/NotFound'
+  delete:
+    summary: 대화 지우기 — 턴·첨부까지 (UI-5 8.13)
+    parameters:
+    - $ref: '#/components/parameters/conversationId'
+    responses:
+      '204':
+        description: 지웠다
+      '404':
+        $ref: '#/components/responses/NotFound'
+```
+
+#### POST/api/conversations/{id}/attachments 첨부 올리기
+
+```yaml
+/api/conversations/{id}/attachments:
+  post:
+    summary: 파일 하나를 이 대화에 올린다 — 아직 안 보낸 첨부 (UI-5 8.14~8.16)
+    parameters:
+    - $ref: '#/components/parameters/conversationId'
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [file]
+            properties:
+              file:
+                type: string
+                format: binary
+                description: >
+                  받는 종류 — image/png image/jpeg image/webp image/gif(≤10MB) ·
+                  text/markdown text/plain text/csv application/json application/yaml application/pdf(≤1MB).
+                  종류는 확장자와 Content-Type 둘 다로 본다
+    responses:
+      '201':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttachmentMeta'
+      '409':
+        description: attachment-limit — 아직 안 보낸 첨부가 8개
+      '413':
+        description: attachment-too-large
+      '415':
+        description: attachment-type
+```
+
+#### GET/api/attachments/{id} 첨부 바이트
+
+```yaml
+/api/attachments/{id}:
+  get:
+    summary: 파일 그대로 — 썸네일·미리보기·다운로드 (UI-5 8.7·8.14)
+    parameters:
+    - $ref: '#/components/parameters/attachmentId'
+    responses:
+      '200':
+        description: Content-Type은 저장된 mime. Content-Disposition inline; filename은 원래 이름
+        headers:
+          Cache-Control:
+            schema:
+              type: string
+            description: "private, max-age=3600 — 바이트는 안 바뀐다"
+      '404':
+        $ref: '#/components/responses/NotFound'
+  delete:
+    summary: 아직 안 보낸 첨부를 뺀다 (UI-5 8.14 ✕). 보낸 첨부는 턴에 붙어 있어 못 뺀다
+    parameters:
+    - $ref: '#/components/parameters/attachmentId'
+    responses:
+      '204':
+        description: 뺐다
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        description: 이미 보낸 첨부 — `urn:syncdoc:attachment-sent`
 ```
 
 ### 3.7 계정·토큰
@@ -1103,6 +1245,20 @@ components:
       schema:
         type: string
         example: SYNC-PRD-001
+    conversationId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+      description: 대화 id. 내 것이 아니면 not-found {resource: "conversation"}
+    attachmentId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+      description: 첨부 id. 내 것이 아니면 not-found {resource: "attachment"}
     itemId:
       in: path
       name: itemId
@@ -1694,20 +1850,99 @@ components:
         item_id:
           type: string
           description: 지금 보고 있는 항목. 힌트일 뿐이라 없어도 된다. 이 문서에 없는 ID면 404
-        history:
+        conversation_id:
+          type: integer
+          description: 어느 대화에 쌓을지. 앞 대화는 서버가 이 대화의 턴에서 만든다(실패한 턴 제외, LLM_MAX_TURNS턴). 내 것이 아니거나 다른 프로젝트면 404
+        attachment_ids:
           type: array
-          description: 앞선 대화. 클라이언트가 들고 있다가 통째로 보낸다 — 앞 턴에서 모델이 읽은 본문은 안 실리므로 필요하면 다시 읽는다
+          items:
+            type: integer
+          description: 이 대화에 올려 두고 아직 안 보낸 첨부. 이 질문의 턴에 붙는다. 이미지는 메시지에 그대로, 글자·PDF는 read_attachment로
+    ConversationBrief:
+      type: object
+      required: [id, title, turn_count, updated_at]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        turn_count:
+          type: integer
+        updated_at:
+          type: string
+          format: date-time
+    Conversation:
+      allOf:
+      - $ref: '#/components/schemas/ConversationBrief'
+      - type: object
+        required: [turns, pending]
+        properties:
+          turns:
+            type: array
+            items:
+              $ref: '#/components/schemas/Turn'
+          pending:
+            type: array
+            description: 올려 두고 아직 안 보낸 첨부 — 화면 8.14
+            items:
+              $ref: '#/components/schemas/AttachmentMeta'
+    Turn:
+      type: object
+      required: [id, seq, question, progress, context_item_ids, attachments, created_at]
+      properties:
+        id:
+          type: integer
+        seq:
+          type: integer
+        question:
+          type: string
+        answer:
+          type: string
+          nullable: true
+        progress:
+          type: array
+          description: 진행 줄 — 화면 8.9가 접힌 채 다시 그린다
           items:
             type: object
-            required:
-            - role
-            - text
             properties:
-              role:
+              kind:
                 type: string
-                enum: [user, assistant]
+                enum: [note, read]
               text:
                 type: string
+        context_item_ids:
+          type: array
+          items:
+            type: string
+        error:
+          type: string
+          nullable: true
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttachmentMeta'
+        created_at:
+          type: string
+          format: date-time
+    AttachmentMeta:
+      type: object
+      required: [id, name, mime, size, created_at]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        mime:
+          type: string
+        size:
+          type: integer
+        turn_id:
+          type: integer
+          nullable: true
+          description: null이면 아직 안 보낸 것
+        created_at:
+          type: string
+          format: date-time
     AskStart:
       type: object
       description: 첫 이벤트. 이 앞의 오류는 HTTP 상태 코드로 온다
@@ -1735,11 +1970,11 @@ components:
       properties:
         tool:
           type: string
-          enum: [get_item, get_references, item_chain, list_documents, get_document]
+          enum: [get_item, get_references, item_chain, list_documents, get_document, read_attachment]
         target:
           type: string
           nullable: true
-          description: DOC#ITEM 또는 DOC. list_documents는 대상이 없어 null
+          description: DOC#ITEM 또는 DOC, 첨부면 「첨부:이름」. list_documents는 대상이 없어 null
     AskAnswer:
       type: object
       required:

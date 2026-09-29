@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -987,46 +987,62 @@ sequenceDiagram
 
 ## SEQ-24 읽다가 항목에 대해 묻는다
 
-[[SYNC-UC-001#UC-H19]] 기본 흐름 1~4. `POST /api/docs/{docId}/ask` — 응답은 SSE(`text/event-stream`). **쓰지 않는다 — `pipeline`을 거치지 않는 유일한 외부 호출이다.** 모델이 도구로 같은 프로젝트를 읽는 ReAct 루프다(사용자 결정 2026-09-22).
+[[SYNC-UC-001#UC-H19]] 기본 흐름 1~4. `POST /api/docs/{docId}/ask` — 응답은 SSE(`text/event-stream`). **명세는 쓰지 않는다 — `pipeline`을 거치지 않는 유일한 외부 호출이다.** 모델이 도구로 같은 프로젝트를 읽는 ReAct 루프다(사용자 결정 2026-09-22). 질문·답·첨부는 **대화 표에 남는다**(2026-09-29, 카드 AQ·AR) — 명세 표가 아니라 `pipeline` 밖이다.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor U as 사람
+    participant RC as routers/conversations
     participant RD as routers/documents
     participant Q as queries
+    participant C as ConversationService
     participant S as SpecService
     participant R as ReferenceService
     participant LLM as infra/llm
     participant DB
 
-    U->>RD: POST /api/docs/{id}/ask {question, history, item_id?}
-    RD->>Q: ask_item(doc_id, item_id, question, history, user)
-    Q->>Q: 키 없으면 llm-not-configured (2a) · get_owned · history를 LLM_MAX_TURNS턴으로 자른다
+    U->>RC: POST /api/conversations/{id}/attachments (multipart) — 드롭·붙여넣기·「+」
+    RC->>C: add_attachment(conv_id, user, name, mime, bytes)
+    C->>C: 종류·상한 검사 (415·413·409) · 글자·PDF면 text_cache 추출
+    C->>DB: attachments (turn_id null)
+    RC-->>U: 201 AttachmentMeta — 칩(8.14)
+    U->>RD: POST /api/docs/{id}/ask {conversation_id, question, item_id?, attachment_ids}
+    RD->>Q: ask_item(doc_id, item_id, conversation_id, question, attachment_ids, user)
+    Q->>Q: 키 없으면 llm-not-configured (2a) · get_owned
+    Q->>C: get(conversation_id, user) · history(conv_id, LLM_MAX_TURNS) · add_turn(question, attachment_ids)
+    C->>DB: conversations · turns · attachments(turn_id 채움)
+    C-->>Q: 앞 대화 · 첨부 목록 · 이 턴의 이미지
     Q->>S: get_document(doc_id) — 제목·상태·버전·항목 ID·이름 (본문은 안 싣는다)
     S->>DB: documents · items
-    S-->>Q: 시작 맥락
+    S-->>Q: 시작 맥락 (+ 첨부 이름·종류·크기 한 줄)
     Q-->>RD: start {doc_id, item_id}
     RD-->>U: 200 text/event-stream — 이 앞의 오류는 상태 코드, 뒤는 error 이벤트
     loop 도구 8번 · 전체 120초 안
-        Q->>LLM: step(system, 대화록, tools)
+        Q->>LLM: step(system, 대화록, tools) — 이 턴의 user 항목에 images (vision)
         LLM-->>Q: tool_calls 또는 답 문자열 — 실패하면 llm-unavailable → error 이벤트 (4a)
         Q-->>U: note {reason} — 무엇을 왜 읽는지
-        Q->>Q: ask_tool(name, args, code, user)
+        Q->>Q: ask_tool(name, args, code, user, conversation_id)
         Q->>S: get_item · get_document · list
         Q->>R: upstream · downstream · 사슬
+        Q->>C: attachment_text(conv_id, att_id) — read_attachment
         S-->>Q: 본문·목록 (없으면 「없음」 텍스트, 예외 아님 — 3c)
         R-->>Q: 참조 (문서는 제목·상태, 끊어진 건 「아직 없음」)
+        C-->>Q: 첨부 글자 (이미지·남의 첨부면 「없음」)
         Q-->>U: read {tool, target}
     end
     Q->>LLM: 상한에 닿으면 마무리 호출 한 번 (tool_choice none) — 읽은 것으로 답하라 (3b)
-    Q->>Q: usage 로그 한 줄 (DB에는 아무것도 없다)
+    Q->>C: finish_turn(turn_id, answer | error, progress, context_item_ids)
+    C->>DB: turns · conversations.updated_at
+    Q->>Q: usage 로그 한 줄 (본문은 로그에 없다)
     Q-->>U: answer {answer, context_item_ids} — 읽은 대상, 부른 순서
 ```
 
 **읽을 때 볼 것**
-- **DB에 쓰지 않는다.** 대화는 클라이언트가 들고 요청마다 `history`로 온다. 서버에 상태가 없으므로 같은 질문을 두 번 보내면 두 번 나간다
-- `queries`가 어댑터를 직접 부르는 유일한 자리다([[SYNC-DOM-002]] 3.2). 도구 실행도 `queries`가 이미 가진 조회로 닫힌다 — 쓰기가 없어 `pipeline`을 거칠 이유가 없다
+- **명세 표에는 쓰지 않는다.** 쓰는 것은 대화 세 표뿐이고 `ConversationService`가 닫는다. 턴은 질문을 받자마자 생기고(`add_turn`) 답이나 실패로 닫힌다(`finish_turn`) — 스트림이 끊겨도 턴은 실패로 남아 다음 질문에 안 실린다
+- 앞 대화는 서버가 대화에서 만든다. 같은 질문을 두 번 보내면 턴이 둘 생긴다
+- 첨부는 업로드(별도 요청)와 질문(`attachment_ids`)이 나뉜다 — 드롭·붙여넣기 순간 올라가 칩이 되고, 보낼 때 턴에 붙는다. 이미지는 이 턴의 `user` 항목에 `images`로 실려 `llm.step`이 파트 배열로 옮긴다([[SYNC-MS-009#llm.step]]); 뒤 턴에는 다시 안 실린다. 글자·PDF는 `read_attachment`로
+- `queries`가 어댑터를 직접 부르는 유일한 자리다([[SYNC-DOM-002]] 3.2). 도구 실행도 `queries`가 이미 가진 조회로 닫힌다 — 명세 쓰기가 없어 `pipeline`을 거칠 이유가 없다
 - **모델이 고른 것만 읽는다.** 시작 맥락에는 본문이 없다. 상한은 호출 수(8)와 시간(120초)이지 글자가 아니다([[SYNC-INFRA-001]] 5.3)
 - **첫 이벤트(`start`) 전의 오류는 HTTP 상태 코드**(404·503)이고, 뒤의 오류는 `error` 이벤트다. 라우터가 제너레이터를 한 번 당겨 `start`를 받은 뒤에야 스트림을 연다
 - 항목은 힌트다. 없어도 문서 전체로 묻는다(1a). 항목 ID가 문서에 없으면 `start` 전에 `not-found`

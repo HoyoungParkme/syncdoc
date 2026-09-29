@@ -2,8 +2,8 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
-upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
+status: draft
+upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
 # 구현 계획
@@ -1053,6 +1053,38 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 완료 | 2026-09-28 · 브랜치 `card/AP-view-html` · spec 3 + code 6 · 테스트 259(두 글자 CODE 카드 사례 추가) · `ruff` · `validate` 0/0 · `check_code` 113/113 · `check_ui` 12/12 · `check_dom` 10·10·10 · `check_tokens` 91/0 · `check_view_css` 일곱 쌍 · `check_templates` 16/16 · `open_items --check` · `wf_build --selftest` · `view_build --selftest` 일곱 묶음 · **`check_view_html` 싱크독 문서 25 + 시험 문서 8 = 33/33 같음, 여덟 저장소(`--specs`, 컨테이너에서 읽기만, KB 제외) 114/114 같음** — 처음 돌렸을 때 33 중 13만 같았다 · 검사기 자체: 비교 규칙 열두 사례(다른 글자·엔티티·`<br/>`·속성 순서·속성 값·태그 사이 공백·`<pre>` 공백·style·script·srcdoc 이스케이프·srcdoc 글자·`oa-merge` 속과 뒤) · 정적 한쪽을 일부러 바꾸면 그 카드를 쓰는 여덟 문서를 잡고 종료 코드 1 · 번들러가 없으면 2 · 고친 차이: 정적 `data-item`·`data-ref`(아홉 자리) · V-RFQ 요구를 항목 블록에서(정적이 「RFQ:」를 미사용 요구에 넣고 내용 칸 인라인 코드를 뺐다) · 배치 도구 줄 버튼 `btn sm` · CODE 패턴 `[A-Z]+\d*`(서버·validate·앱·정적) · 앱 V-UI를 정적 모양으로(첫 절 앞·`.uiview`·`.prose`, 절 머리 id) · 참조 링크 이중 이스케이프(CCR-API-001의 `&`가 `&amp;`로 보였다) · OpenAPI 칸 `div.oa-merge` · 배포 뒤 운영: SYNC-UI-002가 `.uiview` 안 산문 둘·묶음 하나·배치 12로 전과 같은 모양(h1 숨김) · CCR-API-001 링크 라벨이 `&` 그대로 · SYNC-API-001 OpenAPI 칸 한 줄 · CODE-001 AA~는 이 완료란 커밋을 새 서버가 읽으며 항목이 된다(카드 PR 머지 커밋은 배포 전 옛 서버가 읽었다) · **명세에 없어서 정한 것**: 검사기 이름·종료 코드 0·1·2 · OpenAPI 예외는 같은 표지(`div.oa-merge`)로 — 문구로 알아보지 않는다 · V-UI는 앱이 정적(참조 구현)을 따른다 · 배치 버튼은 정적에 `btn sm`을 더한다(앱 모양 유지, 정적에는 `.btn` 스타일이 없다) · 링크 이중 이스케이프는 둘 다 고친다 · 언제 돌리나 — AGENTS.md 「뷰 코드를 고치면 돌린다」, DEV-14에는 넣지 않았다 |
 
 **왜 카드인가.** 규약(STD-002 1장·4장)이 「같은 HTML」을 요구하는데 지키는 장치가 없어 #120 같은 일이 조용히 났다. 검사기를 들이면서 지금 갈라진 곳을 전부 맞춘다 — 검사기는 차이 0인 상태로 들어온다(사용자 결정).
+
+---
+
+#### AQ 대화를 서버에 보관한다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R11]](2026-09-29 보관 결정) · [[SYNC-SCN-001#S8]] · [[SYNC-UC-001#UC-H19]] · [[SYNC-INFRA-001]] 5.3·6장 · [[SYNC-DOM-001#Conversation]] · [[SYNC-DOM-002]] 2.9·3.2·4.10 · [[SYNC-DOM-003#conversations]] · [[SYNC-SEQ-001#SEQ-24]] |
+| 구현 함수 | **conversation** [[SYNC-MS-010#ConversationService.list]] · [[SYNC-MS-010#ConversationService.create]] · [[SYNC-MS-010#ConversationService.get]] · [[SYNC-MS-010#ConversationService.delete]] · [[SYNC-MS-010#ConversationService.delete_by_project]] · [[SYNC-MS-010#ConversationService.add_turn]] · [[SYNC-MS-010#ConversationService.finish_turn]] · [[SYNC-MS-010#ConversationService.history]] · **queries** [[SYNC-MS-008#queries.ask_item]](대화에서 history, add_turn·finish_turn) · **project** [[SYNC-MS-001#ProjectService.delete_project]] 2 · alembic `0014_conversations`(conversations·turns, cascade) |
+| API | [[SYNC-API-001#GET/api/projects/{code}/conversations]] get·post · [[SYNC-API-001#GET/api/conversations/{id}]] get·delete · [[SYNC-API-001#POST/api/docs/{docId}/ask]]의 `conversation_id`(history 제거) |
+| 화면 | [[SYNC-UI-002#UI-5]] 질문 탭 세 층(위 고정 · 8.7 스크롤 · 8.6 하단 고정) · 8.11 대화 고르기 · 8.12 새 대화 · 8.13 지우기 · `?conv={id}` · 저장된 턴의 8.9를 접힌 채 다시 그림 |
+| 테스트 | MS-010 여덟 함수의 테스트 관점 · `ask`가 턴을 남기고 실패 턴은 history에 안 실린다 · 프로젝트 해제가 대화를 지운다 · **E2E** S8 1·2·4(첨부 없이) · 헤드 크롬: 새 대화 → 질문 → 새로고침·다른 탭에서 같은 대화 · 지우기 |
+| 선행 | AP |
+| 완료 | — |
+
+**왜 카드인가.** PRD의 경계를 다시 그은 뒤 처음 만드는 묶음이다 — 개념 셋·표 셋·서비스 하나·API 넷·화면 세 층이 한 덩어리로 들어와야 「대화가 남는다」가 성립한다. 첨부(AR)는 이 위에 얹는다.
+
+---
+
+#### AR 질문에 파일을 붙인다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R11]] 첨부 항목 · [[SYNC-SCN-001#S8]] · [[SYNC-UC-001#UC-H19]] 1b·3 · [[SYNC-INFRA-001]] 3장(pypdf·python-multipart)·5.3 첨부 · [[SYNC-DOM-001#Attachment]] · [[SYNC-DOM-003#attachments]] · [[SYNC-UI-002]] 공통 1.8·UI-5 8.14~8.16 |
+| 구현 함수 | **conversation** [[SYNC-MS-010#ConversationService.add_attachment]] · [[SYNC-MS-010#ConversationService.remove_attachment]] · [[SYNC-MS-010#ConversationService.attachment_meta]] · [[SYNC-MS-010#ConversationService.attachment_bytes]] · [[SYNC-MS-010#ConversationService.attachment_text]] · [[SYNC-MS-010#ConversationService.pending_images]] · **queries** [[SYNC-MS-008#queries.ask_item]](첨부 목록 한 줄·이미지) · [[SYNC-MS-008#queries.ask_tool]] `read_attachment` · **infra** [[SYNC-MS-009#llm.step]] `images` 파트 · alembic `0015_attachments` · 의존성 `python-multipart`·`pypdf` |
+| API | [[SYNC-API-001#POST/api/conversations/{id}/attachments]] · [[SYNC-API-001#GET/api/attachments/{id}]] get·delete · `ask`의 `attachment_ids` · 에러 `attachment-type`·`attachment-too-large`·`attachment-limit`·`attachment-sent` |
+| 화면 | [[SYNC-UI-002#UI-5]] 8.14 칩(썸네일·✕) · 8.15 「+」 · 8.16 드롭 층 · 8.6 붙여넣기 · 질문 말풍선 아래 보낸 칩 · 본 것의 `첨부:이름` |
+| 테스트 | MS-010 여섯 함수의 테스트 관점(열 종류·상한·PDF 픽스처) · `ask`가 이미지를 그 턴의 `user` 항목에만 싣는다(가짜 `llm.step`으로 메시지 검사) · `read_attachment`가 글자를 주고 이미지·남의 첨부엔 「없음」 · **E2E** S8 전부 · 헤드 크롬: 붙여넣기·드롭·「+」 셋 다 칩이 되고, 종류 밖·상한 초과는 토스트, 답에 캡처 내용이 반영됨 |
+| 선행 | AQ |
+| 완료 | — |
+
+**왜 카드인가.** 파일이 붙는 순간 서버·모델·화면 셋이 함께 바뀐다 — 업로드 API, 도구 여섯째와 vision 파트, 드롭·붙여넣기·업로드 세 길. 대화(AQ)가 먼저 있어야 붙일 자리가 있다.
 
 ---
 
