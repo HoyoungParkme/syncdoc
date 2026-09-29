@@ -871,6 +871,78 @@ async def test_github_edit_of_approved_doc_pushes_the_demotion(scoped: Session, 
     assert svc.get_document("EXMP-RFQ-001").current_version_no == d.current_version_no
 
 
+async def _approve_rfq_then_edit_outside(scoped: Session, proj) -> str:
+    """승인된 RFQ를 남이 저장소에서 고쳐 push한다 — 새 head를 돌려준다 (#58·#194 공통 준비)."""
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    repo = _repo_row(proj)
+    repo.last_processed_commit = g(remote, "rev-parse", "main")
+    scoped.flush()
+    await create(proj, DocType.RFQ, RFQ)
+    d0 = SpecService(scoped).get_document("EXMP-RFQ-001")
+    await pipeline.save_pipeline(
+        Entry.web_status,
+        "EXMP-RFQ-001",
+        None,
+        re.sub(r"^status: .*$", f"status: {DocStatus.approved}", d0.body, count=1, flags=re.M),
+        d0.current_version_no,
+        None,
+        proj["author"],
+        "status(EXMP-RFQ-001): draft → approved",
+        reason=None,
+    )
+    repo.last_processed_commit = g(remote, "rev-parse", "main")
+    scoped.flush()
+    g(other, "pull", "-q", "--rebase")
+    body = (other / RFQ_FILE).read_text(encoding="utf-8")
+    return write_commit_push(
+        other, RFQ_FILE, body + "\n<!-- 밖에서 한 줄 -->\n", "spec(EXMP-RFQ-001): 밖에서 한 줄"
+    )
+
+
+async def test_same_head_processed_twice_at_once_keeps_the_demotion(scoped: Session, proj) -> None:
+    """#194 — 웹훅·폴링이 같은 head를 동시에 처리하면, 둘째가 「이미 저장한 커밋인가」를 첫째가
+    저장하기 전에 보고 쓰기 락을 기다렸다가 강등 전 본문(approved)으로 한 번 더 저장했다.
+    DB=approved · 저장소=draft로 갈리고 같은 커밋의 버전이 둘 생겼다. 이제 저장소마다 한 줄이다."""
+    remote = proj["repos"]["remote"]
+    repo = _repo_row(proj)
+    head = await _approve_rfq_then_edit_outside(scoped, proj)
+
+    r1, r2 = await asyncio.gather(
+        pipeline.process_commit(repo, head), pipeline.process_commit(repo, head)
+    )
+
+    assert len(r1) + len(r2) == 1  # 한 실행만 저장한다
+    d = SpecService(scoped).get_document("EXMP-RFQ-001")
+    in_repo = g(remote, "show", f"main:{RFQ_FILE}")
+    assert d.status == DocStatus.draft and "status: draft" in in_repo, (
+        f"갈렸다 — DB={d.status}, 저장소 draft={'status: draft' in in_repo}"
+    )
+    same = scoped.execute(
+        text("SELECT count(*) FROM versions WHERE commit_hash = :h"), {"h": head}
+    ).scalar()
+    assert same == 1
+
+
+async def test_process_commit_with_an_older_head_does_not_go_back(scoped: Session, proj) -> None:
+    """#194 — 이미 처리한 커밋이나 그 조상을 head로 받으면 아무것도 안 하고 처리 지점도 그대로다.
+    늦게 온 웹훅이 처리 지점을 뒤로 돌리면 다음 실행이 같은 범위를 또 읽는다."""
+    remote = proj["repos"]["remote"]
+    repo = _repo_row(proj)
+    head = await _approve_rfq_then_edit_outside(scoped, proj)
+    await pipeline.process_commit(repo, head)
+    now = g(remote, "rev-parse", "main")  # 강등 커밋까지 나아갔을 수 있다
+    await pipeline.process_commit(repo, now)
+    last = scoped.execute(
+        text("SELECT last_processed_commit FROM repositories WHERE id = :i"), {"i": repo.id}
+    ).scalar()
+
+    assert await pipeline.process_commit(repo, head) == []  # 옛 head
+    again = scoped.execute(
+        text("SELECT last_processed_commit FROM repositories WHERE id = :i"), {"i": repo.id}
+    ).scalar()
+    assert again == last
+
+
 async def test_github_author_lowering_status_themselves_is_not_overridden(
     scoped: Session, proj
 ) -> None:

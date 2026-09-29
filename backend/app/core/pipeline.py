@@ -63,12 +63,14 @@ def _lock(code: str) -> asyncio.Lock:
     return _locks.setdefault(code, asyncio.Lock())
 
 
-# 읽기 전용 락 — read_pending이 같은 작업 사본에 동시에 git fetch를 걸지 않게. 쓰기 락(_lock)과
-# 따로인 이유: read_pending 안의 process_commit이 _lock을 잡는다. 같은 락이면 교착한다
+# 저장소 읽기 락 — fetch와 커밋 처리(process_commit)를 저장소마다 한 줄로 세운다. 웹훅·폴링·
+# read_pending 셋이 같은 락이다 — 저마다 부르면 같은 head를 둘이 동시에 처리했다 (#194).
+# 쓰기 락(_lock)과 따로인 이유: process_commit이 파일마다 save_pipeline에서 _lock을 잡는다.
+# 같은 락이면 교착한다. 폴링(scheduler)이 같은 락을 쓰므로 공개 이름이다
 _read_locks: dict[str, asyncio.Lock] = {}
 
 
-def _read_lock(code: str) -> asyncio.Lock:
+def read_lock(code: str) -> asyncio.Lock:
     return _read_locks.setdefault(code, asyncio.Lock())
 
 
@@ -86,7 +88,7 @@ async def read_pending(code: str, user: User) -> int:
     with db.session_scope() as s:
         repo = ProjectService(s).get_owned(code, user).repository  # 쓰기 경로의 소유 검사를 겸한다
         repo_id, workdir = repo.id, Path(repo.workdir_path)
-    async with _read_lock(code):
+    async with read_lock(code):
         # 락 안에서 다시 읽는다 — 앞서 기다린 요청이 이미 따라잡아 놨을 수 있다
         with db.session_scope() as s:
             row = s.get(Repository, repo_id)
@@ -108,7 +110,7 @@ async def read_pending(code: str, user: User) -> int:
         with db.session_scope() as s:
             row = s.get(Repository, repo_id)
             assert row is not None
-            return len(await process_commit(row, head))
+            return len(await process_commit(row, head, locked=True))  # 이미 읽기 락 안이다
 
 
 async def save_pipeline(
@@ -554,13 +556,40 @@ def _inbound_names(spec: SpecService, inbound: list) -> list[str]:
     )
 
 
-async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]:
-    """SYNC-MS-007#pipeline.process_commit"""
-    if repo.last_processed_commit == head_hash:
+async def process_commit(
+    repo: Repository, head_hash: str, locked: bool = False
+) -> list[SaveResult]:
+    """SYNC-MS-007#pipeline.process_commit
+
+    전체가 저장소 읽기 락 안이다 — 웹훅·폴링·read_pending이 한 줄로 선다. 전에는 웹훅·폴링이
+    락 없이 불러 같은 head를 둘이 동시에 처리했고, 둘째가 첫째의 저장 전에 3a를 보고 강등 전
+    본문으로 한 번 더 저장해 DB=approved · 저장소=draft로 갈렸다 (#194).
+    locked=True는 이미 그 락을 쥔 부른 쪽이다.
+    """
+    with db.session_scope() as s:
+        code = next(p.code for p in ProjectService(s).list_projects() if p.id == repo.project_id)
+    if locked:
+        return await _process_commit(repo, head_hash, code)
+    async with read_lock(code):
+        return await _process_commit(repo, head_hash, code)
+
+
+async def _process_commit(repo: Repository, head_hash: str, code: str) -> list[SaveResult]:
+    """process_commit 1~6 — 저장소 읽기 락 안에서."""
+    # 1. 처리 지점은 락 안에서 다시 읽는다 — 앞서 기다린 실행이 이미 따라잡아 놨을 수 있다
+    with db.session_scope() as s:
+        row = s.get(Repository, repo.id)
+        assert row is not None
+        last = row.last_processed_commit
+    if last == head_hash:
         return []
     workdir = Path(repo.workdir_path)
     await git.fetch(workdir)
-    rng = f"{repo.last_processed_commit}..{head_hash}" if repo.last_processed_commit else head_hash
+    # 2. 이미 처리한 커밋이거나 그 조상이면(늦게 온 웹훅) 아무것도 안 한다 — 처리 지점을 뒤로
+    # 돌리면 다음 실행이 같은 범위를 또 읽는다
+    if last and await git.rev_list_count(workdir, f"{last}..{head_hash}") == 0:
+        return []
+    rng = f"{last}..{head_hash}" if last else head_hash
     files = await git.changed_files(workdir, rng, "docs/specs/")
     # 같은 커밋의 상·하위 문서는 11단계 순서로 — 하위가 먼저 저장되면 참조가 미존재로 남는다 (보고)
     files.sort(
@@ -569,8 +598,6 @@ async def process_commit(repo: Repository, head_hash: str) -> list[SaveResult]:
             f.path,
         )
     )
-    with db.session_scope() as s:
-        code = next(p.code for p in ProjectService(s).list_projects() if p.id == repo.project_id)
     results: list[SaveResult] = []
     failed: list[str] = []
     for f in files:
