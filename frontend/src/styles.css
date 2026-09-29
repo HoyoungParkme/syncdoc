@@ -412,7 +412,23 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .body3 .pbody{flex:1;overflow:auto;min-height:0;padding:var(--space-12)}
 /* 질문 탭 세 층 (카드 AQ) — 위 고정(8.5·대화 줄) · 가운데 스크롤(8.7) · 아래 고정(8.6). 3단 규칙의 패널판 */
 .body3 .pbody.ask{display:flex;flex-direction:column;overflow:hidden}
+.pbody.ask .askpane{display:flex;flex-direction:column;flex:1;min-height:0;position:relative}
 .pbody.ask .asktop{flex:none}
+/* 8.14 첨부 칩 · 8.15 「+」 · 8.16 드롭 안내 층 (카드 AR) */
+.chips{display:flex;flex-wrap:wrap;gap:var(--space-4);margin:var(--space-4) 0}
+.chips.sent{margin:var(--space-5) 0 0}
+.chip{display:inline-flex;align-items:center;gap:var(--space-4);max-width:100%;padding:var(--space-2) var(--space-6);
+  border:1px solid var(--border);border-radius:12px;background:var(--bg-card);font-family:var(--font-mono);font-size:var(--text-caption);color:var(--ink-muted)}
+.chip a{color:var(--ink-body);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.chip .th{width:20px;height:20px;border-radius:3px;object-fit:cover;background:var(--bg-sunken)}
+.chip .x{margin-left:var(--space-2);cursor:pointer;color:var(--ink-faint)}
+.chip .x:hover{color:var(--danger)}
+.inrow{display:flex;align-items:flex-end;gap:var(--space-5)}
+.inrow .btn{flex:none;height:32px;width:32px;padding:0;font-size:18px;line-height:1}
+.inrow textarea{flex:1;min-width:0}
+.droplayer{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.85);border:2px dashed var(--ink-body);border-radius:var(--radius-control);
+  font-size:var(--text-ui);font-weight:var(--w-semibold);color:var(--ink-body);pointer-events:none}
 .pbody.ask .qa{flex:1;overflow:auto;min-height:0;margin:var(--space-6) 0}
 .pbody.ask .askbottom{flex:none;padding-top:var(--space-6);border-top:1px solid var(--border)}
 /* 8.11 대화 고르기 · 8.12 새 대화 · 8.13 지우기 */

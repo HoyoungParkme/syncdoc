@@ -106,11 +106,22 @@ async function stream(
   if (buf.trim()) frame(buf)
 }
 
+/** 업로드 하나 — POST /api/conversations/{id}/attachments (multipart). 유일한 non-JSON 요청 (카드 AR) */
+async function upload<T>(url: string, file: File): Promise<T> {
+  const fd = new FormData()
+  fd.append('file', file, file.name)
+  const r = await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' })
+  const text = await r.text()
+  if (!r.ok) throw new ApiError(problemOf(r, text))
+  return JSON.parse(text) as T
+}
+
 export const api = {
   get: <T>(url: string) => call<T>('GET', url),
   post: <T>(url: string, body?: unknown) => call<T>('POST', url, body),
   del: <T>(url: string) => call<T>('DELETE', url),
   stream,
+  upload,
 }
 
 // ── SYNC-API-001 4장 스키마 ──
