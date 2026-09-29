@@ -1084,16 +1084,19 @@ classDiagram
         +list progress
         +list context_item_ids
         +str error
+        +datetime created_at
     }
     class Attachment {
         +int id
         +int conversation_id
         +int turn_id
+        +int user_id
         +str name
         +str mime
         +int size
         +bytes bytes
         +str text_cache
+        +datetime created_at
     }
     ConversationService --> Conversation
     ConversationService --> Turn
