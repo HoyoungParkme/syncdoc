@@ -641,6 +641,21 @@ function AskPanel({
       setFiles([])
       return
     }
+    const syncUrl = () =>
+      setSp(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.set('conv', String(convId))
+          return next
+        },
+        { replace: true },
+      )
+    if (createdHere.current === convId) {
+      // 첫 질문·첫 첨부로 막 만든 대화 — 서버엔 아직 아무것도 없고 로컬이 진실이다
+      createdHere.current = null
+      syncUrl()
+      return
+    }
     let live = true
     setFiles([]) // 다른 대화의 칩을 비운다. 이 대화에 올린 것은 아래 합침으로 돌아온다
     api
@@ -664,14 +679,7 @@ function AskPanel({
         })
       })
       .catch(() => live && setConvId(null)) // 지워졌거나 남의 것 — 새 대화로
-    setSp(
-      (prev) => {
-        const next = new URLSearchParams(prev)
-        next.set('conv', String(convId))
-        return next
-      },
-      { replace: true },
-    )
+    syncUrl()
     return () => {
       live = false
     }
@@ -725,6 +733,7 @@ function AskPanel({
   // 대화가 아직 없으면 만든다 — 첫 질문이나 첫 첨부에. 8.12는 빈 대화를 미리 만들지 않는다.
   // ref로 즉시 기억한다 — 파일 여럿을 잇달아 올릴 때 state가 아직 null이라 대화가 둘 생기던 것
   const convRef = useRef<number | null>(convId)
+  const createdHere = useRef<number | null>(null) // 여기서 막 만든 대화 — 서버에서 다시 읽지 않는다(빈 것을 읽어 로컬 턴을 지우던 경합)
   useEffect(() => {
     convRef.current = convId
   }, [convId])
@@ -732,6 +741,7 @@ function AskPanel({
     if (convRef.current !== null) return convRef.current
     const made = await api.post<ConversationBrief>(`/api/projects/${code}/conversations`, {})
     convRef.current = made.id
+    createdHere.current = made.id
     setConvId(made.id)
     return made.id
   }
