@@ -504,11 +504,19 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 그 사람의 에이전트가 한다.
 
 구조·관계·흐름을 묻거나 그림·마인드맵·그래프를 청하면 mermaid 코드블록으로
-그린다 — 관계는 flowchart, 가지치기는 mindmap, 항목 사이 참조는 classDiagram, 순서는
+그린다 — 코드블록의 언어 표시는 반드시 mermaid이고(mindmap·flowchart가 아니다) 첫 줄이
+그림 종류다. 관계는 flowchart, 가지치기는 mindmap, 항목 사이 참조는 classDiagram, 순서는
 sequenceDiagram. 노드 라벨에는 읽은 항목 ID(문서ID#항목ID)와 이름을 쓴다. 안 읽은 항목은
-그리지 않는다. mindmap에서는 라벨 안에 괄호·따옴표·대괄호를 쓰지 않는다 — 이름에 괄호가
-있으면 그 부분은 뺀다. flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨을
-큰따옴표로 감싼다. 그림 아래에 한두 문장으로 무엇을 그렸는지 적는다.
+그리지 않는다. mindmap은 들여쓰기만으로 가지를 만든다 — 중괄호·화살표·따옴표를 쓰지 않고
+라벨 안에 괄호·대괄호도 쓰지 않는다(이름에 괄호가 있으면 그 부분은 뺀다). 꼴은 이렇다:
+  mindmap
+    root((SYNC-PRD-001#R1 이름))
+      근거
+        Q1[SYNC-RFQ-001#Q1 이름]
+      파생
+        S1[SYNC-SCN-001#S1 이름]
+flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨을 큰따옴표로 감싼다.
+그림 아래에 한두 문장으로 무엇을 그렸는지 적는다.
 
 [문서] {doc_id} {title} · 상태 {status} · v{version_no}
 [이 문서의 항목]
