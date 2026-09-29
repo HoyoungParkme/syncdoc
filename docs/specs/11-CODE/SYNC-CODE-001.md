@@ -1143,6 +1143,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | (#197) | `fix/197-readorder-stale-draft` | — | #197 | 2026-09-29 |
 | (#198) | `fix/198-refs-stale-selection` | — | #198 | 2026-09-29 |
 | (#199) | `fix/199-willcommit-text` | — | #199 | 2026-09-29 |
+| (#200) | `fix/200-small-ui4-ui13` | — | #200 | 2026-09-29 |
 | V | `card/V-solo` | `9019be1`~`a3eba3f` | #98 | 2026-09-21 |
 | W | `card/W-owner` | `79a10bb`~`8ad75f9` | #102 | 2026-09-21 |
 | X | `card/X-ui-doc` | `7a4e821`~ | #103 | 2026-09-21 |

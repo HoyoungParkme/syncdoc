@@ -253,7 +253,8 @@ export function ProjectDetail() {
         <aside className="panel" data-el="5">
           <div className="pbody">
             <h4>최근 변경</h4>
-            {recent.length === 0 && <p className="lbl">아직 변경이 없습니다.</p>}
+            {/* 상세가 오기 전엔 빈 메시지도 안 그린다 — 「없습니다」는 상세가 온 뒤의 말이다 (#200) */}
+            {d && recent.length === 0 && <p className="lbl">아직 변경이 없습니다.</p>}
             {recent.map((v) => (
               <div className="rc" key={v.commit_hash + (v.version_no ?? 's')} onClick={() => nav(`/p/${code}/d/${v.doc_id}`)}>
                 <div>

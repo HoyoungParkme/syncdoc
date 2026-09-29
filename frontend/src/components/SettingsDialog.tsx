@@ -1,6 +1,6 @@
 /** UI-13 설정 — SYNC-UI-002#UI-13. 어느 화면 위에서든 뜨는 다이얼로그. 닫으면 보던 화면 그대로.
  *  1 다이얼로그 · 2 내 계정(2.1 로그인 ID, 2.2 로그아웃, 2.3 커밋 이메일 행, 2.4 삭제, 2.5 입력, 2.6 추가)
- *  3 MCP 토큰(3.1 행, 3.2 폐기, 3.3 이름, 3.4 발급, 3.5 마지막 사용)
+ *  3 MCP 토큰(3.1 행, 3.2 폐기, 3.3 이름, 3.4 발급 열기, 3.5 마지막 사용, 3.6 발급)
  *  4 토큰 원문 상자(4.1 원문, 4.2 복사) · 5 관리 카드(5.1 열기) · 6 관리 영역(UI-14) · 7 닫기(✕) · 8 클라이언트 설정(8.1 스니펫) · 9 닫기 */
 import { useEffect, useState } from 'react'
 import { ago, api, ApiError, type AccessToken, type CommitEmail, type User } from '../api/client'
@@ -99,7 +99,7 @@ export function SettingsDialog({ user, onClose }: { user: User; onClose: () => v
                   autoFocus
                   onChange={(e) => setLabel(e.target.value)}
                 />
-                <button className="btn sm solid" type="button" disabled={!label.trim()} onClick={issue}>
+                <button className="btn sm solid" type="button" data-el="3.6" disabled={!label.trim()} onClick={issue}>
                   발급
                 </button>
               </div>
