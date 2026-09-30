@@ -1,6 +1,7 @@
 /** UI-8 참조 그래프 — SYNC-UI-002#UI-8. 열은 11단계 고정, 노드는 항목.
  *  1 헤더(1.1 통계) · 2 툴바(2.1 전체, 2.2 완료만, 2.4 포커스 라벨, 2.5 전체보기)
  *  3 캔버스(3.1 노드, 3.2 참조 간선, 3.3 되돌아오는 간선, 3.4 미존재 참조, 3.5 고립 노드) · 4 범례
+ *  2.6 코드 호출 — MINISPEC 열에 실제 호출(3.6 같음 · 3.7 코드만 · 3.8 명세만)을 겹친다 (카드 AY)
  *
  *  배치는 브라우저가 한다 — 서버는 노드·간선 목록만 준다(MS-008 graph_view 8).
  *  라이브러리를 안 쓴다: 열이 고정이고 간선 넷이 저마다 다른 길로 가야 해서
@@ -9,7 +10,7 @@ import { ProjName } from '../components/ui'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { api, STAGE_TYPES, type Graph as GraphData, type GraphScope } from '../api/client'
+import { api, STAGE_TYPES, type CodeCalls, type Graph as GraphData, type GraphScope } from '../api/client'
 import { ItemChain } from '../components/ItemChain'
 
 /** 열 간격과 노드 폭이 다르다 — 그 차(32px)가 간선이 지나는 거터다 */
@@ -30,6 +31,8 @@ export function Graph() {
   const { code = '' } = useParams()
   const [sp, setSp] = useSearchParams()
   const scope = (sp.get('scope') ?? 'all') as GraphScope
+  const codeOn = sp.get('code') === '1' // 2.6 — URL ?code=1
+  const [calls, setCalls] = useState<CodeCalls | null>(null)
   const [g, setG] = useState<GraphData | null>(null)
   const [focus, setFocus] = useState<string | null>(null)
   const [full, setFull] = useState(false)
@@ -37,6 +40,22 @@ export function Graph() {
   useEffect(() => {
     api.get<GraphData>(`/api/projects/${code}/graph?scope=${scope}`).then(setG)
   }, [code, scope])
+  // 코드 호출은 켤 때만 받는다 — 대조는 서버가 부를 때 계산한다
+  useEffect(() => {
+    if (!codeOn) return
+    let alive = true
+    api.get<CodeCalls>(`/api/projects/${code}/code-calls`).then((c) => alive && setCalls(c))
+    return () => {
+      alive = false
+    }
+  }, [code, codeOn])
+  // 범위·코드 호출은 서로를 지우지 않는다
+  const setParam = (k: 'scope' | 'code', v: string | null) => {
+    const next = new URLSearchParams(sp)
+    if (v === null) next.delete(k)
+    else next.set(k, v)
+    setSp(next)
+  }
 
   const layout = useMemo(() => (g ? place(g) : null), [g])
   // 직접 이웃만. 전이적으로 따라가는 건 UI-15가 한다
@@ -63,17 +82,20 @@ export function Graph() {
       <div className="gbar" data-el="2">
         <span className="lbl">범위</span>
         {/* 범위는 잘라내는 게 아니라 골라낸다 — 열 11개는 늘 그대로다 */}
-        <span className={`btn sm${scope === 'all' ? ' on' : ''}`} data-el="2.1" onClick={() => setSp({})}>
+        <span className={`btn sm${scope === 'all' ? ' on' : ''}`} data-el="2.1" onClick={() => setParam('scope', null)}>
           전체
         </span>
-        <span className={`btn sm${scope === 'approved' ? ' on' : ''}`} data-el="2.2" onClick={() => setSp({ scope: 'approved' })}>
+        <span className={`btn sm${scope === 'approved' ? ' on' : ''}`} data-el="2.2" onClick={() => setParam('scope', 'approved')}>
           완료만
         </span>
         <span className="sep" />
         <span className="lbl" data-el="2.4">
-          {focusLabel}
+          {codeOn && calls && !calls.graph ? '코드 그래프 없음 — 코드를 push하면 만들어집니다' : focusLabel}
         </span>
         <span className="grow" />
+        <span className={`btn sm${codeOn ? ' on' : ''}`} data-el="2.6" onClick={() => setParam('code', codeOn ? null : '1')}>
+          코드 호출
+        </span>
         <span className="btn sm" data-el="2.5" onClick={() => setFull((f) => !f)}>
           {full ? '전체보기 끄기' : '전체보기'}
         </span>
@@ -86,7 +108,7 @@ export function Graph() {
                 {i + 1} {t}
               </div>
             ))}
-            <Edges layout={layout} g={g!} near={near} />
+            <Edges layout={layout} g={g!} near={near} calls={codeOn ? (calls?.edges ?? []) : []} />
             {layout.nodes.map((n) => (
               <div
                 key={n.id}
@@ -128,6 +150,28 @@ export function Graph() {
           미존재 참조
         </span>
         <span>◌ 고립 (참조 없음)</span>
+        {codeOn && (
+          <>
+            <span>
+              <svg className="sw" viewBox="0 0 22 8">
+                <path className="e cg same" d="M1 4 H21" />
+              </svg>{' '}
+              호출 — 명세와 같음
+            </span>
+            <span className="cgl">
+              <svg className="sw" viewBox="0 0 22 8">
+                <path className="e cg code" d="M1 4 H21" />
+              </svg>{' '}
+              호출 — 코드만
+            </span>
+            <span className="gone">
+              <svg className="sw" viewBox="0 0 22 8">
+                <path className="e cg spec" d="M1 4 H21" />
+              </svg>{' '}
+              호출 — 명세만
+            </span>
+          </>
+        )}
         <span className="grow" />
         <span>노드에 마우스를 올리면 그 항목의 참조만 남는다 · 클릭 → 11단계 흐름</span>
       </div>
@@ -224,7 +268,17 @@ type Layout = ReturnType<typeof place>
 
 /** 간선 넷. 상위가 왼쪽이면 곡선, 같은 열이면 왼쪽으로 나갔다 돌아오고,
  *  오른쪽이면(되돌아오는 참조) 행 아래 전용 레인으로 우회하고, 대상이 없으면 짧게 뻗다 끊긴다. */
-function Edges({ layout, g, near }: { layout: Layout; g: GraphData; near: { all: Set<string> } | null }) {
+function Edges({
+  layout,
+  g,
+  near,
+  calls,
+}: {
+  layout: Layout
+  g: GraphData
+  near: { all: Set<string> } | null
+  calls: CodeCalls['edges']
+}) {
   // 와이어프레임처럼 종류마다 한 번씩만 요소 번호를 붙인다 (DEV-17 반복 행 규칙)
   const seen = { e: false, back: false, gone: false }
   const paths: React.ReactNode[] = []
@@ -268,6 +322,30 @@ function Edges({ layout, g, near }: { layout: Layout; g: GraphData; near: { all:
       paths.push(<path key={i} className={cls('back')} data-el={first('back') ? '3.3' : undefined} d={d} />)
     }
   })
+  // 2.6 코드 호출 — MINISPEC 항목끼리, 열 **오른쪽으로** 나갔다 돌아온다(참조 간선은 왼쪽).
+  // 종류마다 거터 안 다른 거리로 돌아 셋이 한 줄로 겹치지 않는다 (카드 AY)
+  const kinds = { same: ['same', 8], code_only: ['code', 14], spec_only: ['spec', 20] } as const
+  const firstCode = { same: false, code_only: false, spec_only: false }
+  calls.forEach((c, i) => {
+    const f = layout.pos.get(c.from)
+    const t = layout.pos.get(c.to)
+    if (!f || !t) return // 범위 밖
+    const [cls, gap] = kinds[c.status]
+    const x = colX(f.col) + NODE_W
+    const fy = rowY(f.row) + NODE_H / 2 + (c.status === 'code_only' ? 3 : c.status === 'spec_only' ? -3 : 0)
+    const ty = rowY(t.row) + NODE_H / 2
+    const tx = colX(t.col) + NODE_W
+    const lit = !near || (near.all.has(c.from) && near.all.has(c.to))
+    const tag = !firstCode[c.status] && ((firstCode[c.status] = true), true)
+    paths.push(
+      <path
+        key={`c${i}`}
+        className={`e cg ${cls}${lit ? '' : ' dim'}`}
+        data-el={tag ? (c.status === 'same' ? '3.6' : c.status === 'code_only' ? '3.7' : '3.8') : undefined}
+        d={`M${x} ${fy} H${x + gap} V${ty} H${tx}`}
+      />,
+    )
+  })
   return (
     <svg className="edges" width={layout.w} height={layout.h}>
       {/* 화살촉이 없으면 어느 쪽이 상위인지 그림만 보고는 못 읽는다 */}
@@ -280,6 +358,9 @@ function Edges({ layout, g, near }: { layout: Layout; g: GraphData; near: { all:
         </marker>
         <marker id="ahr" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
           <path d="M0,0 L6,3 L0,6 z" fill="var(--ref-backlink)" />
+        </marker>
+        <marker id="ahc" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 z" fill="var(--graph-edge)" />
         </marker>
       </defs>
       {paths}

@@ -13,6 +13,7 @@ import json
 import logging
 import time
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -21,6 +22,9 @@ from app import db
 from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import AccountService
+from app.core.codegraph import graph as codegraph
+from app.core.codegraph.models import CodeGraph
+from app.core.codegraph.service import CodeGraphService
 from app.core.conversation.service import ConversationService
 from app.core.errors import ItemDeleted, LlmNotConfigured, LlmUnavailable, NotFound, Problem
 from app.core.project.models import Project
@@ -39,10 +43,20 @@ from app.core.types import (
     AttachmentMeta,
     AuthorRef,
     BrokenRefSummary,
+    CallDiff,
     ChainItem,
     ChainRow,
+    CodeBrief,
+    CodeCallEdge,
+    CodeCalls,
+    CodeFunction,
+    CodeGraphInfo,
+    CodeRef,
+    CodeText,
+    CodeView,
     Diff,
     DocStatus,
+    DocType,
     Document,
     DocumentSummary,
     DownstreamDoc,
@@ -803,7 +817,9 @@ async def ask_item(
             if step.text:
                 progress.append({"kind": "note", "text": step.text})
                 yield AskNote(step.text)
-            log.append({"role": "assistant", "text": step.text or "", "tool_calls": step.tool_calls})
+            log.append(
+                {"role": "assistant", "text": step.text or "", "tool_calls": step.tool_calls}
+            )
             for call in step.tool_calls:
                 reason = str(call.arguments.get("reason") or "").strip()
                 if reason:
@@ -866,6 +882,164 @@ def _attachment_lines(metas: list[AttachmentMeta]) -> str:
         return ""
     lines = ["[첨부]"]
     for m in metas:
-        kind = "이미지 — 붙인 질문에 보인다" if m.mime.startswith("image/") else "read_attachment로 읽는다"
+        kind = (
+            "이미지 — 붙인 질문에 보인다"
+            if m.mime.startswith("image/")
+            else "read_attachment로 읽는다"
+        )
         lines.append(f"{m.id} {m.name} ({m.mime}, {m.size}B) — {kind}")
     return "\n".join(lines)
+
+
+# ── 코드 그래프 (카드 AY) — 대조는 부를 때 계산한다. 그래프는 code_graphs, 「호출하는 것」은 명세
+
+
+def _graph_info(row: CodeGraph) -> CodeGraphInfo:
+    return CodeGraphInfo(row.commit_hash, row.source, row.built_at, row.error, row.function_count)
+
+
+def _ms_items(s: Session, project_id: int) -> list[tuple[str, str]]:
+    """프로젝트의 MINISPEC 항목마다 (문서ID#항목ID, 블록) — spec_calls의 재료."""
+    spec = SpecService(s)
+    out: list[tuple[str, str]] = []
+    for d in spec.list_by_project(project_id, stage=STAGE_OF["MS"]):
+        doc = spec.get_document(d.doc_id)
+        for b in spec.item_blocks(doc.body, DocType(doc.doc_type)):
+            out.append((f"{doc.doc_id}#{b.item_id}", b.text))
+    return out
+
+
+def _diffs(s: Session, project_id: int, graph: dict) -> dict[str, CallDiff]:
+    spec = codegraph.spec_calls(_ms_items(s, project_id))
+    return {d.ms_id: d for d in codegraph.compare(graph, spec)}
+
+
+def _code_ref(ms_id: str, diffs: dict, fns: dict, status: str | None = None) -> CodeRef:
+    d = diffs.get(ms_id)
+    f = fns.get(d.function) if d and d.function else None
+    if f is None:
+        return CodeRef(ms_id, None, None, None, status)
+    return CodeRef(ms_id, f["qual"], f["file"], f["line"], status)
+
+
+def _code_brief(d: CallDiff, fns: dict) -> CodeBrief:
+    f = fns.get(d.function) if d.function else None
+    return CodeBrief(
+        d.ms_id,
+        f["qual"] if f else None,
+        f["file"] if f else None,
+        f["line"] if f else None,
+        len(d.same),
+        len(d.code_only),
+        len(d.spec_only),
+    )
+
+
+async def code_view(doc_id: str, item_id: str | None, user: User) -> CodeView:
+    """SYNC-MS-008#queries.code_view
+
+    MINISPEC 항목이면 그 함수의 부르는 것(코드만·명세만·같음 순)·불리는 곳, 다른 항목이면 하위
+    체인의 MINISPEC 함수, MINISPEC 문서 단위면 그 문서 함수 전부. 그래프가 없으면 graph None.
+    """
+    with db.session_scope() as s:
+        project = ProjectService(s).get_owned(doc_id.split("-")[0], user)
+        spec = SpecService(s)
+        doc = spec.get_document(doc_id)
+        if item_id is not None:
+            spec.resolve_item(doc_id, item_id)
+        is_ms = doc.doc_type == DocType.MS
+        row = CodeGraphService(s).get(project.id)
+        if row is None:
+            return CodeView(None, doc_id, item_id, is_ms, False, None, [])
+        info, graph = _graph_info(row), row.graph
+        diffs = _diffs(s, project.id, graph)
+        order = [b.item_id for b in spec.item_blocks(doc.body, DocType(doc.doc_type))]
+    fns = {f["key"]: f for f in graph.get("functions", [])}
+    function: CodeFunction | None = None
+    missing = False
+    functions: list[CodeBrief] = []
+    if is_ms and item_id is not None:
+        ms_id = f"{doc_id}#{item_id}"
+        d = diffs.get(ms_id)
+        if d is None or d.function is None or d.function not in fns:
+            missing = True
+        else:
+            f = fns[d.function]
+            calls = [
+                *(_code_ref(x, diffs, fns, "code_only") for x in d.code_only),
+                *(_code_ref(x, diffs, fns, "spec_only") for x in d.spec_only),
+                *(_code_ref(x, diffs, fns, "same") for x in d.same),
+            ]
+            callers = [
+                _code_ref(o.ms_id, diffs, fns)
+                for o in diffs.values()
+                if ms_id in o.same or ms_id in o.code_only
+            ]
+            function = CodeFunction(
+                ms_id, f["qual"], f["file"], f["line"], f.get("end"), calls, callers
+            )
+    elif item_id is not None:
+        chain = await item_chain(doc_id, item_id, user)
+        ids = [
+            f"{ci.ref.doc_id}#{ci.ref.item_id}"
+            for r in chain.rows
+            if r.doc_type == "MS"
+            for ci in r.items
+            if ci.role == "downstream" and ci.ref.item_id
+        ]
+        functions = [_code_brief(diffs[i], fns) for i in ids if i in diffs]
+    elif is_ms:
+        functions = [
+            _code_brief(diffs[f"{doc_id}#{i}"], fns) for i in order if f"{doc_id}#{i}" in diffs
+        ]
+    return CodeView(info, doc_id, item_id, is_ms, missing, function, functions)
+
+
+async def code_calls(code: str, user: User) -> CodeCalls:
+    """SYNC-MS-008#queries.code_calls
+
+    MINISPEC 항목 사이의 호출 선 — 같음·코드만·명세만(UI-8 2.6).
+    """
+    with db.session_scope() as s:
+        project = ProjectService(s).get_owned(code, user)
+        row = CodeGraphService(s).get(project.id)
+        if row is None:
+            return CodeCalls(None, [])
+        info = _graph_info(row)
+        diffs = _diffs(s, project.id, row.graph)
+    edges = [
+        CodeCallEdge(d.ms_id, x, status)
+        for d in diffs.values()
+        for status, xs in (("same", d.same), ("code_only", d.code_only), ("spec_only", d.spec_only))
+        for x in xs
+    ]
+    return CodeCalls(info, edges)
+
+
+def _next_start(functions: list[dict], f: dict) -> int | None:
+    """같은 파일에서 이 함수 다음 함수의 앞 줄 — 끝 줄을 모르는(파이썬 밖) 함수의 끝."""
+    later = [g["line"] for g in functions if g["file"] == f["file"] and g["line"] > f["line"]]
+    return min(later) - 1 if later else None
+
+
+async def code_source(doc_id: str, item_id: str, user: User) -> CodeText:
+    """SYNC-MS-008#queries.code_source
+
+    코드 보기(8.21). 그래프 커밋의 저장소에서 읽는다 — 읽기는 CodeGraphService.read 한곳.
+    """
+    with db.session_scope() as s:
+        project = ProjectService(s).get_owned(doc_id.split("-")[0], user)
+        SpecService(s).resolve_item(doc_id, item_id)
+        svc = CodeGraphService(s)
+        row = svc.get(project.id)
+        if row is None:
+            raise NotFound("code_graph", project.code)
+        ms_id = f"{doc_id}#{item_id}"
+        d = codegraph.compare(row.graph, {ms_id: set()})[0]
+        fns = row.graph.get("functions", [])
+        f = next((x for x in fns if x["key"] == d.function), None)
+        if f is None:
+            raise NotFound("function", ms_id)
+        end = f.get("end") or _next_start(fns, f) or f["line"] + 59
+        workdir = Path(project.repository.workdir_path)
+        return await svc.read(project.id, workdir, f["file"], f["line"], end)

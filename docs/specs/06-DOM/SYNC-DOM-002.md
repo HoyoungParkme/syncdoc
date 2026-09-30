@@ -435,6 +435,13 @@ classDiagram
 | `TurnView` | `id` · `seq` · `question` · `answer: str \| None` · `progress: list[{kind, text}]` · `context_item_ids: list~str~` · `error: str \| None` · `attachments: list~AttachmentMeta~` · `created_at` | ConversationService.get → API `Conversation.turns` |
 | `ConversationBrief` | `id` · `title` · `turn_count` · `updated_at` | ConversationService.list → API 목록 |
 | `CallDiff` | `ms_id: str` · `function: str \| None`(`파일:줄`, 코드에 없으면 None) · `same` · `code_only` · `spec_only: list~str~`(항목 ID) | codegraph.compare → check_calls · queries(카드 AY). 명세의 「호출하는 것」과 실제 호출의 갈래 |
+| `CodeGraphInfo` | `commit_hash: str \| None` · `source: str \| None` · `built_at` · `error: str \| None` · `function_count: int` | queries → API. 그래프 행의 머리(몸통 없이) |
+| `CodeRef` | `ms_id: str` · `qual: str \| None` · `file: str \| None` · `line: int \| None` · `status: str \| None` | 부르는 것(`same`·`code_only`·`spec_only`)·불리는 곳(None) 한 줄 |
+| `CodeBrief` | `ms_id` · `qual` · `file` · `line` · `same: int` · `code_only: int` · `spec_only: int` | 함수 목록 한 줄 |
+| `CodeFunction` | `ms_id` · `qual` · `file` · `line` · `end: int \| None` · `calls: list~CodeRef~` · `callers: list~CodeRef~` | MINISPEC 항목의 함수 |
+| `CodeView` | `graph: CodeGraphInfo \| None` · `doc_id` · `item_id: str \| None` · `is_ms: bool` · `missing: bool` · `function: CodeFunction \| None` · `functions: list~CodeBrief~` | queries.code_view → API `CodeView`(UI-5 코드 탭) |
+| `CodeText` | `path` · `start` · `end` · `commit_hash` · `text` · `truncated: bool` | CodeGraphService.read → API `CodeText` · 질문 탭 `read_code`(카드 AZ) |
+| `CodeCallEdge` · `CodeCalls` | `from_: str` · `to: str` · `status: str` / `graph: CodeGraphInfo \| None` · `edges: list~CodeCallEdge~` | queries.code_calls → API `CodeCalls`(UI-8 코드 호출) |
 | `ConversationView` | `ConversationBrief` + `turns: list~TurnView~` + `pending: list~AttachmentMeta~`(아직 안 보낸 첨부) | ConversationService.get → API `Conversation` |
 
 타입은 여기 한 곳에만 정의한다.
@@ -564,6 +571,7 @@ flowchart LR
         ra[routers/account.py]
         rad[routers/admin.py]
         rc[routers/conversations.py]
+        rcg[routers/code.py]
         hk[hooks.py]
     end
     subgraph mcp["mcp/ (Boundary)"]
@@ -576,6 +584,7 @@ flowchart LR
         AS[AccountService]
         CS[ConversationService]
         PL[pipeline.py]
+        QRB[queries.py]
     end
     rp --> PS
     rd --> SS
@@ -584,13 +593,14 @@ flowchart LR
     rad --> PS
     rad --> PL
     rc --> CS
+    rcg --> QRB
     hk --> PL
     mt --> PS
     mt --> SS
     mt --> RS
 ```
 
-`routers/conversations.py`는 대화 목록·조회·삭제와 첨부 업로드·조회·삭제 — 묶음 하나(`ConversationService`)만 본다. 질문(`ask`)은 `routers/documents.py`에 그대로 있고 `queries.ask_item`이 대화를 읽고 쓴다(3.2).
+`routers/code.py`는 코드 탭·관계도 코드 호출의 네 조회(카드 AY) — `queries`만 본다. 대조는 여러 묶음(명세·코드 그래프)을 모아야 해서 서비스가 아니라 `queries`다. `routers/conversations.py`는 대화 목록·조회·삭제와 첨부 업로드·조회·삭제 — 묶음 하나(`ConversationService`)만 본다. 질문(`ask`)은 `routers/documents.py`에 그대로 있고 `queries.ask_item`이 대화를 읽고 쓴다(3.2).
 
 라우터 하나가 묶음 하나를 본다. `admin.py`만 예외로 프로젝트와 파이프라인 둘을 부른다 — 재구축([[SYNC-UC-001#UC-S6]])이 운영 성격이라 어느 묶음에도 안 들어간다. **예외 둘 더** — 라우터가 응답에 사람 이름을 붙이려고 `AccountService.users_by_ids`를 부르는 건 허용(이력). `documents.py`가 상태 변경·되돌리기를 `pipeline`으로 넘기는 것도 허용 — 둘은 조율이라 `pipeline`에 있다. `mcp/tools.py`는 account를 부르지 않는다 — 인증은 `mcp/auth.py`의 몫이다.
 
@@ -634,6 +644,9 @@ flowchart TB
     PL -.->|archive · changed_paths| GIT
     PS -.->|delete_by_project| CGS
     CG -.->|extract| GFY
+    QR -.->|get · read| CGS
+    QR -.->|spec_calls · compare| CG
+    CGS -.->|read| GIT
 ```
 
 **규칙** — 서비스끼리 직접 부르지 않는다. 묶음을 넘는 호출은 전부 `pipeline`(쓰기)이나 `queries`(읽기)를 거친다. v1에는 `TrackingService → ReferenceService·SpecService` 둘이 예외였으나 추적 묶음과 함께 사라졌다. 서비스가 `pipeline`을 부르는 건 `ProjectService.rebuild_index`뿐이다. 4장에서 각 노드를 확대한다.
@@ -1046,6 +1059,9 @@ diff_with_impact(doc_id, from, to, user) -> Diff    SEQ-15  diff → resolve_ite
 project_items(code, kind, user) -> list             SEQ-18  kind별로 list_by_project(has_convention_error) | 미완성 | 끊어진 참조(is_missing)
 item_chain(doc_id, item_id, user) -> ItemChain      —       전이적 폐포 (UI-15)
 downstream_view(doc_id, user) -> DownstreamView     —       이 문서를 참조하는 것. 추적표·하위 참조 수 (V-PRD)
+code_view(doc_id, item_id?, user) -> CodeView      SEQ-27  code_graphs 행 + MS 항목의 「호출하는 것」 → compare → 함수·부르는 것·불리는 곳 | 하위 체인의 함수
+code_calls(code, user) -> CodeCalls                SEQ-27  compare → MINISPEC 사이 호출 선 (UI-8 코드 호출)
+code_source(doc_id, item_id, user) -> CodeText     SEQ-27  함수의 파일·줄 → CodeGraphService.read (그래프 커밋의 저장소에서)
 ask_item(doc_id, item_id?, conversation_id, question, attachment_ids, user) -> AsyncIterator[AskEvent]
                                                     SEQ-24  대화에서 history·첨부 목록 → 시작 맥락(제목·항목 목록·첨부 목록) → add_turn → llm.step ↔ ask_tool 루프(8번·120초) → finish_turn → AskAnswer
 ask_tool(name, args, code, user, conversation_id) -> ToolResult
@@ -1178,6 +1194,7 @@ classDiagram
         +save(project_id: int, commit_hash: str, source: str, graph: dict) CodeGraph
         +fail(project_id: int, commit_hash: str, reason: str) CodeGraph
         +delete_by_project(project_id: int) None
+        +read(project_id: int, workdir: Path, path: str, start: int, end: int?) CodeText
     }
     class graph_py {
         «module»
@@ -1207,6 +1224,7 @@ classDiagram
 | `spec_calls` · `compare` | `tools/check_calls.py` · `queries`(카드 AY·AZ) | UC-H20 · DEV-14 |
 | `get` · `save` · `fail` | `pipeline.build_code_graph` · `process_commit`(그래프가 없나) | UC-S8 |
 | `delete_by_project` | [[SYNC-MS-001#ProjectService.delete_project]] | UC-H17 |
+| `read` | `queries.code_source`(코드 탭 8.21) · `queries.ask_tool`(`read_code`, 카드 AZ) | UC-H20 · 커밋된 파일만, 비밀 꼴 거부, 300줄 — 한곳에 둔다 |
 
 **규칙이 사는 곳**
 - `graph.py`는 순수하다 — DB·세션을 모른다. 검사기가 같은 결과를 내야 하기 때문

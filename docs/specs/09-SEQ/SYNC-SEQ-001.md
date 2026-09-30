@@ -90,6 +90,8 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | MCP restore_document | [[#SEQ-23]] | ○ |
 | MCP 모든 도구의 인증 | [[#SEQ-C2]] | |
 | (커밋 처리·재구축 뒤) 코드 그래프 | [[#SEQ-26]] | ○ |
+| GET /api/docs/{docId}/code · …/items/{itemId}/code · …/items/{itemId}/code/source | [[#SEQ-27]] | ○ |
+| GET /api/projects/{code}/code-calls | [[#SEQ-27]] | ○ |
 
 묶음을 넘는 것이 대응표 31행 중 22행이다(입구 여럿을 한 행에 묶은 것이 있다). v1.0에서 안 그린 조회 중 절반 이상이 묶음을 넘었다.
 
@@ -1132,6 +1134,51 @@ sequenceDiagram
 - **쓰기 락 밖이다.** 추출에 수 초가 걸려도 명세 저장과 따라잡기를 막지 않는다. 대신 같은 프로젝트의 만들기가 겹치지 않게 하나씩 돌리고, 밀리면 가장 최근 커밋 하나만 더 만든다
 - **작업 사본에서 돌지 않는다.** `git archive`로 그 커밋을 풀어 쓴다 — 작업 사본을 더럽히지 않고, 빌드 산출물이 섞이지 않는다
 - 대조 결과는 저장하지 않는다. 명세의 「호출하는 것」은 읽을 때 명세에서 가져오므로, 명세만 고친 커밋은 다시 만들 필요가 없다
+
+---
+
+## SEQ-27 코드 탭에서 항목의 코드를 대조한다
+
+[[SYNC-UC-001#UC-H20]]. UI-5 8.17~8.22 · UI-8 2.6. **대조는 부를 때 계산한다** — 그래프(코드 쪽)는 SEQ-26이 만들어 두고, 「호출하는 것」은 명세에서 읽는다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사람
+    participant RC as routers/code
+    participant Q as queries
+    participant PS as ProjectService
+    participant S as SpecService
+    participant CS as CodeGraphService
+    participant CG as codegraph/graph.py
+    participant G as infra/git
+
+    U->>RC: GET /api/docs/{doc}/items/{item}/code — 코드 탭(8.17)
+    RC->>Q: code_view(doc, item, user)
+    Q->>PS: get_owned — 남의 것이면 not-found
+    Q->>S: get_document · resolve_item
+    Q->>CS: get(project_id) — 없으면 graph null (1a)
+    Q->>S: list_by_project(MINISPEC) · get_document · item_blocks — 「호출하는 것」 줄
+    Q->>CG: spec_calls(items) → compare(graph, spec)
+    alt MINISPEC 항목
+        Q-->>RC: CodeView {function: 부르는 것(코드만·명세만·같음) · 불리는 곳}
+    else 다른 항목
+        Q->>Q: item_chain(doc, item) — 하위 폐포의 MINISPEC 항목
+        Q-->>RC: CodeView {functions: 항목마다 어긋남 수}
+    end
+    U->>RC: GET …/items/{item}/code/source — 코드 보기(8.21)를 펼칠 때
+    RC->>Q: code_source(doc, item, user)
+    Q->>CG: compare(graph, {항목}) — 그 항목의 함수 자리
+    Q->>CS: read(project_id, workdir, 파일, 시작, 끝)
+    CS->>G: read(workdir, 파일, 그래프 커밋) — 커밋된 파일만, 비밀 꼴 거부
+    Q-->>U: CodeText (300줄까지)
+    U->>RC: GET /api/projects/{code}/code-calls — 관계도 코드 호출(2.6)
+    RC->>Q: code_calls(code, user) → compare → 선(같음·코드만·명세만)
+```
+
+**읽을 때 볼 것**
+- 대조 결과는 어디에도 저장하지 않는다. 명세만 고친 커밋은 그래프를 다시 만들지 않아도 다음 조회부터 바뀐다
+- 코드 본문은 그래프를 만든 커밋에서 읽는다 — 작업 사본이 앞서 있어도 그래프와 본문이 같은 시점이다
 
 ---
 

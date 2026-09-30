@@ -388,6 +388,62 @@ export interface AskAnswer {
   context_item_ids: string[]
 }
 
+/** 코드 그래프 (SYNC-API-001 3.6, 카드 AY) — 대조는 서버가 부를 때 계산한다 */
+export interface CodeGraphInfo {
+  commit_hash: string | null
+  source: 'repo' | 'server' | null
+  built_at: string
+  error: string | null
+  function_count: number
+}
+export type CallStatus = 'same' | 'code_only' | 'spec_only'
+export interface CodeRef {
+  ms_id: string
+  qual: string | null
+  file: string | null
+  line: number | null
+  status: CallStatus | null
+}
+export interface CodeBrief {
+  ms_id: string
+  qual: string | null
+  file: string | null
+  line: number | null
+  same: number
+  code_only: number
+  spec_only: number
+}
+export interface CodeFunction {
+  ms_id: string
+  qual: string
+  file: string
+  line: number
+  end: number | null
+  calls: CodeRef[]
+  callers: CodeRef[]
+}
+export interface CodeView {
+  graph: CodeGraphInfo | null
+  doc_id: string
+  item_id: string | null
+  is_ms: boolean
+  missing: boolean
+  function: CodeFunction | null
+  functions: CodeBrief[]
+}
+export interface CodeText {
+  path: string
+  start: number
+  end: number
+  commit_hash: string
+  text: string
+  truncated: boolean
+}
+export interface CodeCalls {
+  graph: CodeGraphInfo | null
+  edges: { from: string; to: string; status: CallStatus }[]
+}
+
 export interface DownstreamView {
   by_item: Record<string, ItemRef[]>
   by_document: { doc_id: string; title: string; items: string[] }[]

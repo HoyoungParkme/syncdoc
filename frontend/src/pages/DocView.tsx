@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { ago, api, ApiError, docPath, incompleteOf, warnText, type AskAnswer, type AskDelta, type AskNote, type AskRead, type AttachmentMeta, type Conversation, type ConversationBrief, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
+import { ago, api, ApiError, docPath, incompleteOf, warnText, type AskAnswer, type AskDelta, type AskNote, type AskRead, type AttachmentMeta, type CodeText, type CodeView, type Conversation, type ConversationBrief, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { attachDiagramButtons, DiagramFull, type FullDiagram, type WfFullDetail } from '../components/DiagramFull'
 import { esc, renderBlocks, splitRef } from '../view/md'
@@ -31,17 +31,18 @@ export function DocView() {
   const [delOpen, setDelOpen] = useState(false) // 13
   useEscape(delOpen ? () => setDelOpen(false) : null) // 1.1 — 바깥 클릭과 같다 (#117)
   const [delInfo, setDelInfo] = useState<Record<string, unknown> | null>(null) // 13.2 — 서버 답(needs-confirm)으로만 채운다
-  // 8 패널 탭 — 기본은 참조. 질문 탭(8.4)은 사람이 누를 때만, URL은 ?panel=ask. 키가 없으면 탭 자체가 없다
+  // 8 패널 탭 — 기본은 참조. 질문 탭(8.4)은 사람이 누를 때만, URL은 ?panel=ask. 키가 없으면 탭 자체가 없다.
+  // 코드 탭(8.17)은 ?panel=code — 모든 문서에 있다(카드 AY)
   const { user, ask } = useOutletContext<{ user: Me; ask: AskChat }>()
   const askOn = user.llm_enabled
-  const panelParam = sp.get('panel') === 'ask' ? 'ask' : 'refs'
+  const panelParam = sp.get('panel') === 'ask' ? 'ask' : sp.get('panel') === 'code' ? 'code' : 'refs'
   const setPanel = useCallback(
-    (p: 'refs' | 'ask') =>
+    (p: 'refs' | 'ask' | 'code') =>
       // 함수형 갱신 — 본문 클릭 핸들러(effect 안 클로저)에서 불러도 낡은 sp를 안 쓴다
       setSp(
         (prev) => {
           const next = new URLSearchParams(prev)
-          if (p === 'ask') next.set('panel', 'ask')
+          if (p === 'ask' || p === 'code') next.set('panel', p)
           else next.delete('panel')
           return next
         },
@@ -130,7 +131,17 @@ export function DocView() {
       const item = t.closest<HTMLElement>('[data-item]')
       if (item && item.dataset.item) {
         setSelected(item.dataset.item)
-        setPanel('refs') // 7.1 클릭은 참조 탭으로 — 질문 탭은 사람이 직접 누를 때만
+        // 7.1 클릭은 참조 탭으로 — 질문 탭은 사람이 직접 누를 때만. 코드 탭은 그대로 두고 그 항목의
+        // 코드로 바뀐다 — 함수를 차례로 대조해 가는 자리라서 (UI-5 규칙, 카드 AY)
+        setSp(
+          (prev) => {
+            if (prev.get('panel') === 'code') return prev
+            const next = new URLSearchParams(prev)
+            next.delete('panel')
+            return next
+          },
+          { replace: true },
+        )
       }
     }
     root.addEventListener('click', onClick)
@@ -144,7 +155,7 @@ export function DocView() {
       root.removeEventListener('wf:full', onWfFull)
       if (typeof cleanup === 'function') cleanup()
     }
-  }, [view, tab, doc, nav, setPanel])
+  }, [view, tab, doc, nav, setSp])
 
   useEffect(() => {
     // 지금 문서의 항목일 때만 — 문서가 바뀐 첫 커밋엔 doc이 옛 문서라 옛 선택으로 새 문서에 묻지 않는다 (#198)
@@ -217,9 +228,11 @@ export function DocView() {
   }
 
   const askTab = askOn && !doc.trashed_at // 키 없음·휴지통 문서(4b)면 탭이 없다
-  const panel = askTab && panelParam === 'ask' ? 'ask' : 'refs'
+  const codeTab = !doc.trashed_at // 코드 탭은 모든 문서에 — 휴지통 문서(4b)만 없다 (카드 AY)
+  const panel = askTab && panelParam === 'ask' ? 'ask' : codeTab && panelParam === 'code' ? 'code' : 'refs'
   // 탭을 바꾸면 그 탭의 폭으로 — 참조 탭 250, 질문 탭 420 (UI-5 규칙, 카드 AT)
-  const [sideW, addSideW] = panel === 'ask' ? [askW, addAskW] : [panelW, addPanelW]
+  // 코드 탭은 질문 탭과 같은 넓은 폭을 같이 기억한다 — 본문을 읽는 자리라서 (8.17)
+  const [sideW, addSideW] = panel === 'refs' ? [panelW, addPanelW] : [askW, addAskW]
 
   return (
     // 폭 변수를 화면 전체가 쥔다 — 원본 탭도 같은 값으로 사이드바 자리를 비워 둬야
@@ -386,9 +399,21 @@ export function DocView() {
                       질문
                     </span>
                   )}
+                  {codeTab && (
+                    <span className={panel === 'code' ? 'on' : ''} data-el="8.17" onClick={() => setPanel('code')}>
+                      코드
+                    </span>
+                  )}
                 </div>
-                <div className={panel === 'ask' ? 'pbody ask' : 'pbody'}>
-                  {panel === 'ask' ? (
+                <div className={panel === 'ask' ? 'pbody ask' : panel === 'code' ? 'pbody code' : 'pbody'}>
+                  {panel === 'code' ? (
+                    <CodePanel
+                      docId={docId}
+                      itemId={selected}
+                      displayName={doc.items.find((i) => i.item_id === selected)?.display_name ?? ''}
+                      goItem={goItem}
+                    />
+                  ) : panel === 'ask' ? (
                     // 대화는 Shell이 프로젝트 단위로 든다 — 문서·항목을 옮겨도 남고, 프로젝트가 바뀌면 새 대화
                     <AskPanel
                       ask={ask}
@@ -607,6 +632,173 @@ function normalizeMindmap(src: string): string {
       return indent + clean(body)
     })
     .join('\n')
+}
+
+/** 8.17~8.22 코드 탭 — 코드 그래프로 이 항목을 명세와 대조한다(UC-H20, 카드 AY).
+ *  대조는 서버가 부를 때 계산한다 — 명세의 「호출하는 것」만 고쳐도 다시 열면 바뀐다 */
+const STATUS: Record<string, { mark: string; cls: string; tag: string }> = {
+  same: { mark: '✓', cls: 'same', tag: '' },
+  code_only: { mark: '▲', cls: 'code', tag: '코드만' },
+  spec_only: { mark: '◌', cls: 'spec', tag: '명세만' },
+}
+
+function CodePanel({
+  docId,
+  itemId,
+  displayName,
+  goItem,
+}: {
+  docId: string
+  itemId: string | null
+  displayName: string
+  goItem: (id: string) => void
+}) {
+  const nav = useNavigate()
+  const [view, setView] = useState<CodeView | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [src, setSrc] = useState<CodeText | null>(null)
+  const [srcErr, setSrcErr] = useState<string | null>(null)
+  const enc = (id: string) => id.replace(/\//g, '~')
+  useEffect(() => {
+    let alive = true
+    setView(null)
+    setErr(null)
+    setSrc(null)
+    setSrcErr(null)
+    const url = itemId ? `/api/docs/${docId}/items/${enc(itemId)}/code` : `/api/docs/${docId}/code`
+    api
+      .get<CodeView>(url)
+      .then((v) => alive && setView(v))
+      .catch((e) => alive && setErr(e instanceof ApiError ? e.message : String(e)))
+    return () => {
+      alive = false
+    }
+  }, [docId, itemId])
+  // 8.19·8.20·8.22 — 그 항목으로. 같은 문서면 스크롤·선택, 다른 문서면 코드 탭을 연 채로
+  const go = (msId: string) => {
+    const [d, it] = msId.split('#')
+    if (d === docId) goItem(it)
+    else nav(`/p/${d.split('-')[0]}/d/${d}?panel=code#item-${it}`)
+  }
+  const loadSrc = () => {
+    if (src || srcErr || !itemId) return
+    api
+      .get<CodeText>(`/api/docs/${docId}/items/${enc(itemId)}/code/source`)
+      .then(setSrc)
+      .catch((e) => setSrcErr(e instanceof ApiError ? e.message : String(e)))
+  }
+  const short = (msId: string) => msId.split('-').slice(1).join('-')
+  if (err) return <div className="pempty">{err}</div>
+  if (!view) return <div className="lbl">불러오는 중…</div>
+  const g = view.graph
+  if (!g) return <div className="pempty">코드 그래프가 없습니다 — 코드를 push하면 만들어집니다.</div>
+  const meta = (
+    <div className="fmeta">
+      그래프 {g.commit_hash ? g.commit_hash.slice(0, 7) : '—'} · {g.source === 'repo' ? '저장소' : '서버'} · {ago(g.built_at)}
+    </div>
+  )
+  const gerr = g.error ? <div className="gerr">마지막 만들기 실패 — {g.error}</div> : null
+  if (view.is_ms && itemId) {
+    const f = view.function
+    if (!f) {
+      return (
+        <div className="cg">
+          <div className="fhead" data-el="8.18">
+            {itemId}
+            {meta}
+          </div>
+          {gerr}
+          <div className="pempty">코드에 없음 — 이 항목의 함수를 코드에서 못 찾았습니다.</div>
+        </div>
+      )
+    }
+    const off = f.calls.filter((c) => c.status !== 'same')
+    return (
+      <div className="cg">
+        <div className="fhead" data-el="8.18">
+          {f.qual}
+          <div className="fmeta">
+            {f.file}:{f.line}
+          </div>
+          {meta}
+        </div>
+        {gerr}
+        <div className="k">
+          부르는 것 {f.calls.length}
+          {off.length > 0 && ` · 코드만 ${off.filter((c) => c.status === 'code_only').length} · 명세만 ${off.filter((c) => c.status === 'spec_only').length}`}
+        </div>
+        {f.calls.length === 0 && <div className="lbl">없음</div>}
+        {f.calls.map((c, i) => {
+          const st = STATUS[c.status ?? 'same']
+          return (
+            <div key={c.ms_id} className={`crow ${st.cls}`} data-el={i === 0 ? '8.19' : undefined} onClick={() => go(c.ms_id)} title={c.ms_id}>
+              <span className="st">{st.mark}</span>
+              <span className="nm">{c.qual ?? c.ms_id.split('#')[1]}</span>
+              {st.tag && <span className="tag">{st.tag}</span>}
+            </div>
+          )
+        })}
+        <div className="k">불리는 곳 {f.callers.length}</div>
+        {f.callers.length === 0 && <div className="lbl">없음</div>}
+        {f.callers.map((c, i) => (
+          <div key={c.ms_id} className="crow" data-el={i === 0 ? '8.20' : undefined} onClick={() => go(c.ms_id)} title={c.ms_id}>
+            <span className="nm">{c.qual ?? c.ms_id.split('#')[1]}</span>
+          </div>
+        ))}
+        <details className="csrc" data-el="8.21" onToggle={(e) => e.currentTarget.open && loadSrc()}>
+          <summary>
+            코드 보기 L{f.line}
+            {f.end ? `–L${f.end}` : ''}
+          </summary>
+          {srcErr ? (
+            <div className="lbl">{srcErr}</div>
+          ) : !src ? (
+            <div className="lbl">불러오는 중…</div>
+          ) : (
+            <pre>
+              {src.text.split('\n').map((ln, i) => (
+                <div key={i}>
+                  <span className="ln">{src.start + i}</span>
+                  {ln}
+                </div>
+              ))}
+              {src.truncated && <div className="lbl">… 300줄에서 잘랐습니다</div>}
+            </pre>
+          )}
+        </details>
+      </div>
+    )
+  }
+  if (!itemId && !view.is_ms) {
+    return <div className="pempty">항목을 고르세요. 그 항목에서 이어지는 MINISPEC 함수의 대조를 모아 보입니다.</div>
+  }
+  return (
+    <div className="cg">
+      <div className="cap">
+        {itemId ? (
+          <>
+            <b className="mono">{itemId}</b> {displayName} · 하위 체인의 함수 {view.functions.length}
+          </>
+        ) : (
+          <>이 문서의 함수 {view.functions.length}</>
+        )}
+      </div>
+      {gerr}
+      {view.functions.length === 0 && <div className="lbl">이어지는 MINISPEC 함수가 없습니다.</div>}
+      {view.functions.map((b, i) => (
+        <div key={b.ms_id} className="crow" data-el={i === 0 ? '8.22' : undefined} onClick={() => go(b.ms_id)} title={b.qual ?? b.ms_id}>
+          <span className="nm mono">{short(b.ms_id)}</span>
+          {b.code_only || b.spec_only ? (
+            <span className="cnt warn">
+              {b.code_only ? `▲${b.code_only}` : ''} {b.spec_only ? `◌${b.spec_only}` : ''}
+            </span>
+          ) : (
+            <span className="cnt">{b.qual ? `✓ ${b.same}` : '코드에 없음'}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 /** 답 본문 — React가 자식을 소유하지 않는다. innerHTML은 html이 바뀔 때만 넣는다.
