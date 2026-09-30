@@ -125,6 +125,25 @@ def _fresh_repo_locks():
     yield
 
 
+@pytest.fixture(autouse=True)
+def code_graph_calls(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
+    """코드 그래프 만들기(카드 AX)는 백그라운드에서 graphify를 돌린다 — 테스트에서는 걸기만 적는다.
+
+    process_commit·rebuild를 부르는 테스트가 수십 개라 전부 추출이 돌면 느리고 루프를 넘어 새어
+    나간다. 걸렸는지는 이 목록으로 보고, 만들기 자체는 build_code_graph를 직접 불러 시험한다.
+    진짜 schedule_code_graph는 테스트 모듈이 임포트할 때 쥐어 둔 것을 쓴다.
+    """
+    from app.core import pipeline
+
+    calls: list[tuple[str, str]] = []
+    pipeline._graph_tasks.clear()
+    pipeline._graph_next.clear()
+    monkeypatch.setattr(
+        pipeline, "schedule_code_graph", lambda code, commit: calls.append((code, commit))
+    )
+    return calls
+
+
 # ── git 임시 저장소 픽스처 (infra·project 테스트 공유) ──
 import subprocess  # noqa: E402
 from pathlib import Path  # noqa: E402

@@ -59,6 +59,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 4. `u.github_token_encrypted = encrypt(token, SECRET_KEY)` (Fernet) · `DB: update`
 5. `→ u`. 라우터가 세션을 만든다 — 테이블 없이 **서명 쿠키** `syncdoc_session`에 `github_login`만. 요청마다 `user_by_login`으로 User를 얻는다(인프라 5장)
 
+**호출하는 것** [[SYNC-MS-009#github.exchange_code]] · [[SYNC-MS-009#github.get_user]]
+
 **테스트 관점** 첫 로그인 → 행 생성 · 로그인 ID 바꾼 뒤 → 같은 행, `login` 갱신 · 자리표시가 있던 사람 → 그 행에 `github_user_id`·토큰 채워짐 (별도 행 안 생김)
 
 ---
@@ -179,7 +181,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **자리표시를 만드는 곳은 여기 하나다.** `process_commit`과 `rebuild`가 각자 만들면 판정이 두 경로에서 어긋난다 — 실제로 어긋나 있었다(#34).
 
-**호출하는 것** `pipeline.process_commit` 4단계 · `pipeline.rebuild` 5단계
+**호출하는 것** [[#AccountService.create_placeholder]]
+
+**호출되는 것** `pipeline.process_commit` 4단계 · `pipeline.rebuild` 5단계
 
 **테스트 관점** 등록된 이메일 → 그 사용자(login이 달라도) · 미등록 이메일 + noreply login → login으로 찾은 사용자 · 둘 다 없음 → 자리표시 · 대소문자가 달라도 같은 이메일로 찾는다 · `email`이 빈 문자열이면 2번부터
 

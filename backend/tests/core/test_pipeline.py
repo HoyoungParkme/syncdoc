@@ -1333,3 +1333,118 @@ async def test_human_paths_hide_someone_elses_project_but_github_path_does_not(
     )
     await scheduler.catch_up()
     assert SpecService(scoped).get_document("EXMP-PRD-001").commit_hash == head
+
+
+# ── 코드 그래프 (카드 AX · MS-007 5a·10 · schedule_code_graph · build_code_graph) ──
+# 수집 때 쥔 진짜 — autouse 픽스처가 테스트 중에 바꾼다
+REAL_SCHEDULE = pipeline.schedule_code_graph
+CODE = '''from spec import SpecService
+
+
+def save(s):
+    """EXMP-MS-007#pipeline.save"""
+    return SpecService(s).get("x")
+'''
+SVC = '''class SpecService:
+    def get(self, key):
+        """EXMP-MS-002#SpecService.get"""
+        return key
+'''
+
+
+async def test_process_commit_schedules_code_graph_when_code_changes(
+    scoped: Session, proj, code_graph_calls
+) -> None:
+    from app.core.codegraph.service import CodeGraphService
+
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    repo = _repo_row(proj)
+    repo.last_processed_commit = g(remote, "rev-parse", "main")
+    scoped.flush()
+    # 그래프가 아직 없으면 명세만 바꾼 커밋에서도 건다
+    h1 = write_commit_push(other, RFQ_FILE, RFQ, "spec: RFQ")
+    await pipeline.process_commit(repo, h1)
+    assert code_graph_calls == [("EXMP", h1)]
+    # 그래프가 있으면 명세만 바꾼 커밋은 건너뛴다 (UC-S8 1a)
+    CodeGraphService(scoped).save(proj["project"].id, h1, "server", {"functions": [], "calls": []})
+    h2 = write_commit_push(other, PRD_FILE, PRD_BODY, "spec: PRD")
+    await pipeline.process_commit(repo, h2)
+    assert code_graph_calls == [("EXMP", h1)]
+    # 코드 파일이 바뀌면 건다
+    h3 = write_commit_push(other, "backend/app/pipe.py", CODE, "code: pipe")
+    await pipeline.process_commit(repo, h3)
+    assert code_graph_calls == [("EXMP", h1), ("EXMP", h3)]
+
+
+async def test_rebuild_schedules_code_graph(scoped: Session, proj, code_graph_calls) -> None:
+    head = g(proj["repos"]["remote"], "rev-parse", "main")
+    await pipeline.rebuild("EXMP")
+    assert code_graph_calls == [("EXMP", head)]  # 재구축은 늘 다시 만든다
+
+
+async def test_build_code_graph_from_archive(scoped: Session, proj, monkeypatch) -> None:
+    from app.core.codegraph import graph as cg
+    from app.core.codegraph.service import CodeGraphService
+    from app.core.errors import CodeGraphFailed
+
+    other, work = proj["repos"]["other"], proj["repos"]["work"]
+    write_commit_push(other, "backend/app/spec.py", SVC, "code: spec")
+    head = write_commit_push(other, "backend/app/pipe.py", CODE, "code: pipe")
+    g(work, "fetch", "-q", "origin")  # 운영에서는 process_commit이 먼저 fetch한다
+    await pipeline.build_code_graph("EXMP", head)
+    row = CodeGraphService(scoped).get(proj["project"].id)
+    assert (row.commit_hash, row.source, row.error) == (head, "server", None)
+    quals = {f["qual"]: f for f in row.graph["functions"]}
+    assert quals["pipe.save"]["ms"] == "EXMP-MS-007#pipeline.save"
+    save, get = quals["pipe.save"]["key"], quals["SpecService.get"]["key"]
+    assert [save, get, "enrich"] in row.graph["calls"]  # 즉석 생성 호출을 보강이 잡았다
+    assert not (work / "graphify-out").exists()  # 작업 사본을 더럽히지 않는다
+    # 추출이 실패하면 옛 그래프가 남고 이유만 (UC-S8 2a)
+    old = row.graph
+
+    async def boom(_):
+        raise CodeGraphFailed("시간 초과")
+
+    monkeypatch.setattr(cg, "load", boom)
+    head2 = write_commit_push(other, "backend/app/c.py", "x = 1\n", "code: c")
+    g(work, "fetch", "-q", "origin")
+    await pipeline.build_code_graph("EXMP", head2)
+    row = CodeGraphService(scoped).get(proj["project"].id)
+    assert row.graph == old and row.commit_hash == head
+    assert row.error == f"{head2[:7]}: 시간 초과"
+
+
+async def test_build_code_graph_uses_committed_graph_json(scoped: Session, proj) -> None:
+    import json
+
+    from app.core.codegraph.service import CodeGraphService
+
+    other, work = proj["repos"]["other"], proj["repos"]["work"]
+    raw = {"nodes": [{"id": "f", "label": "f()", "_callable": True, "source_file": "a.py",
+                      "source_location": "L1"}], "links": []}  # fmt: skip
+    head = write_commit_push(other, "graphify-out/graph.json", json.dumps(raw), "graphify")
+    g(work, "fetch", "-q", "origin")
+    await pipeline.build_code_graph("EXMP", head)
+    row = CodeGraphService(scoped).get(proj["project"].id)
+    assert row.source == "repo" and [f["qual"] for f in row.graph["functions"]] == ["a.f"]
+
+
+async def test_schedule_code_graph_runs_latest_once_after_current(monkeypatch) -> None:
+    built: list[str] = []
+    gate = asyncio.Event()
+
+    async def fake_build(code: str, commit: str) -> None:
+        built.append(commit)
+        if commit == "c1":
+            await gate.wait()
+
+    monkeypatch.setattr(pipeline, "build_code_graph", fake_build)
+    REAL_SCHEDULE("EXMP", "c1")
+    await asyncio.sleep(0)  # c1이 돌기 시작한다
+    REAL_SCHEDULE("EXMP", "c2")
+    REAL_SCHEDULE("EXMP", "c3")  # 돌고 있는 동안 둘 — 마지막 것만 남는다
+    REAL_SCHEDULE("OTHR", "o1")  # 다른 프로젝트는 따로
+    gate.set()
+    await asyncio.gather(*pipeline._graph_tasks.values())
+    assert built.count("c1") == 1 and "c2" not in built and built.count("c3") == 1
+    assert built.index("c3") > built.index("c1") and "o1" in built

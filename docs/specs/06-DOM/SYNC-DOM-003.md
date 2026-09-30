@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-003
 type: DOM
 title: ERD·DD — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-001]
 ---
 
@@ -47,6 +47,7 @@ erDiagram
     conversations ||--o{ turns : ordered
     conversations ||--o{ attachments : holds
     turns |o--o{ attachments : attached
+    projects ||--o| code_graphs : graphed
 
     projects {
         int id PK
@@ -175,6 +176,16 @@ erDiagram
         text text_cache
         timestamptz created_at
     }
+    code_graphs {
+        int project_id PK,FK
+        varchar commit_hash
+        varchar source
+        jsonb graph
+        int function_count
+        int call_count
+        timestamptz built_at
+        varchar error
+    }
 ```
 
 **설계 규칙**
@@ -183,6 +194,7 @@ erDiagram
 - 열거형은 DB enum이 아니라 `varchar` + 앱 검증. 값 추가 시 마이그레이션을 피하기 위해서
 - 삭제 컬럼은 `items`에만 있다. 문서·버전은 삭제하지 않는다 — 문서는 `documents.trashed_at`으로 **휴지통**에 넣는다(행은 남는다). **행까지 지우는 것**은 휴지통 안에서 다른 문서가 가리키지 않을 때만([[SYNC-MS-002#SpecService.delete_document]]) — 그 문서에 딸린 상태변경은 같이 지운다
 - **대화 세 표(`conversations`·`turns`·`attachments`)는 명세 표와 선이 없다.** `projects`·`users`를 FK로 가리킬 뿐 `documents`·`items`를 가리키지 않는다 — 문서 ID는 턴의 글자 속에만 있다. 재구축이 건드리지 않고, 프로젝트 행이 지워지면(`ProjectService.delete_project`) `ON DELETE CASCADE`로 함께 사라진다. 대화를 지우면 턴·첨부도 같은 cascade. 리비전 `0014_conversations`가 세 표를 한 번에 만든다(카드 AQ) — 첨부 행은 AR가 채우지만 표는 대화와 같이 있어야 대화 조회가 한 모양이다
+- **`code_graphs`는 명세 표와 선이 없다**(카드 AX). `projects`만 가리키고 PK가 곧 `project_id`라 프로젝트마다 한 행이다. 항목 ID는 `graph` 안의 글자다. 재구축이 지우지 않는다 — 재구축 뒤 새로 만들어 바꿔 끼운다([[SYNC-UC-001#UC-S8]])
 - **재구축(UC-S6)은 `versions`·`references`만 지운다.** `documents`·`items`는 지우지 않는다 — 항목 ID 재사용 금지의 근거(`items.is_deleted`)와 휴지통 상태(`documents.trashed_at`)가 거기 산다. `items`는 upsert
 - 상태 변경은 `versions` 행을 만들지 않는다. `status_changes.commit_hash`가 그 커밋을 가리킨다
 - `references`의 `to_item_id`와 `to_document_id`는 CHECK로 하나만 채워지게 한다. `is_missing=true`면 둘 다 null
@@ -364,6 +376,21 @@ erDiagram
 
 ---
 
+### code_graphs
+
+클래스: [[SYNC-DOM-002#CodeGraph]]
+
+| 컬럼 | 타입 | 제약 | 의미 | 예시 |
+|---|---|---|---|---|
+| project_id | int | PK, FK not null, ON DELETE CASCADE | 어느 프로젝트의 그래프인가. 프로젝트마다 하나 | |
+| commit_hash | varchar(40) | null | 이 그래프를 만든 커밋. 첫 빌드부터 실패했으면 null | `2e243f4…` |
+| source | varchar(10) | null | `repo`(저장소에 커밋된 graphify 결과) · `server`(서버가 추출). 앱 검증 | `server` |
+| graph | jsonb | not null | 줄인 모양 `{functions, calls}`([[SYNC-MS-011]] 0장). 코드 본문 없음 | |
+| function_count | int | not null, default 0 | 함수 수. 관리·로그용 | `1471` |
+| call_count | int | not null, default 0 | 호출 선 수 | `2192` |
+| built_at | timestamptz | not null | 마지막으로 성공하거나 실패한 시각 | |
+| error | varchar(300) | null | 마지막 빌드가 실패한 이유(`커밋7자: 이유`). 성공하면 비운다 | `2e243f4: 시간 초과` |
+
 ## 3. 인덱스와 정규화
 
 [[SYNC-STD-004#DEV-8]] — 인덱스는 여기 적힌 것만. FK와 unique는 전부 인덱스(생략). 아래는 조회 패턴에서 온 추가 인덱스.
@@ -384,6 +411,7 @@ erDiagram
 | conversations | `(project_id, user_id)` · `(user_id)` | 프로젝트의 내 대화 목록 · FK 컬럼(DEV-8) |
 | turns | `(conversation_id, seq)` unique | 순번 유일 + 대화의 턴 차례 |
 | attachments | `(conversation_id)` · `(turn_id)` · `(user_id)` | 대화의 첨부 메타 · 턴의 이미지 · FK 컬럼(DEV-8) |
+| code_graphs | PK `(project_id)` — 이미 | 프로젝트의 그래프 하나. 다른 조회가 없다 |
 
 **정규화** — 전 테이블 3NF. 의도적 비정규화 하나([[SYNC-STD-004#DEV-9]]): `documents.current_body`(조회 캐시, `versions.body`와 같음 — **읽기 전용 캐시다**, DEV-19). `versions.body` 전체 저장은 비정규화가 아니라 git 사본이다.
 

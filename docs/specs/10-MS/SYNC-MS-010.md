@@ -77,6 +77,8 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001, SYNC-STD-001]
 2. `DB: insert conversations(project_id, user_id, title=title or "새 대화", created_at=updated_at=clock.now())`
 3. `→ Conversation`
 
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]]
+
 **테스트 관점** 제목이 비면 「새 대화」 · `updated_at == created_at` · 남의 프로젝트 → `not-found`
 
 ---

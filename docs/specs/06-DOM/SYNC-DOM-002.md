@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -54,7 +54,7 @@ syncdoc/                        저장소 = 프로젝트
 │                               (md.ts·views.ts·uc/wireframe/seq/ms.ts)
 │
 ├── docs/specs/                 명세 원본 (STD-001 1.1). 양쪽이 같이 본다
-├── tools/                      validate.py · check_code.py · check_ui.py · view_build.py · dev_preview.py
+├── tools/                      validate.py · check_code.py · check_calls.py · check_ui.py · view_build.py · dev_preview.py
 ├── scripts/                    tunnel.sh — Quick Tunnel 기동 (INFRA 5장)
 ├── Dockerfile · docker-compose.yml   배치 (INFRA 8장). 프런트를 빌드해 백엔드 이미지에 담는 2단계
 ├── .env.example               필요한 환경 변수의 이름만. 값은 비운다. `.env`는 커밋하지 않는다
@@ -76,6 +76,7 @@ app/
 │   ├── reference/          참조
 │   ├── account/            사용자, 액세스토큰
 │   ├── conversation/       대화, 턴, 첨부 — 읽는 중 질의의 보관 (2026-09-29, 카드 AQ·AR)
+│   ├── codegraph/          코드 그래프 — graph.py(순수: 추출·줄이기·보강·대조) · service.py(한 행 읽고 쓰기) (2026-09-30, 카드 AX)
 │   │
 │   ├── types.py            2.7 열거형 · 2.8 DTO. 묶음 전부가 쓰므로 묶음 밖
 │   ├── clock.py            저장하는 시각. **프로세스 안에서 절대 뒤로 안 간다** (STD-004 DEV-18). 묶음 전부가 쓴다
@@ -429,15 +430,16 @@ classDiagram
 | `AskRead` | `tool: str` · `target: str \| None` | ask_item → `read` 이벤트. 도구 실행이 끝났다 |
 | `AskDelta` | `text: str` | ask_item → `delta` 이벤트. 모델이 지금 쓰는 글자 조각 — 뒤에 `note`면 메모였고 `answer`면 답이다. 저장되지 않는다(카드 AW) |
 | `AskAnswer` | `answer: str` · `context_item_ids: list~str~` | ask_item → `answer` 이벤트. `context_item_ids`는 **모델이 실제로 읽은 대상**(부른 순서) — 화면이 「본 것」으로 보여준다. **저장하지 않는다**([[SYNC-INFRA-001]] 6장) |
-| `AskEvent` | `= AskStart \| AskNote \| AskRead \| AskAnswer` | ask_item이 차례로 yield하는 것. 라우터가 SSE로 흘린다 |
+| `AskEvent` | `= AskStart \| AskDelta \| AskNote \| AskRead \| AskAnswer` | ask_item이 차례로 yield하는 것. 라우터가 SSE로 흘린다 |
 | `AttachmentMeta` | `id` · `name` · `mime` · `size` · `turn_id: int \| None` · `created_at` | ConversationService → API `AttachmentMeta`. **바이트·추출 글자는 안 실린다** |
 | `TurnView` | `id` · `seq` · `question` · `answer: str \| None` · `progress: list[{kind, text}]` · `context_item_ids: list~str~` · `error: str \| None` · `attachments: list~AttachmentMeta~` · `created_at` | ConversationService.get → API `Conversation.turns` |
 | `ConversationBrief` | `id` · `title` · `turn_count` · `updated_at` | ConversationService.list → API 목록 |
+| `CallDiff` | `ms_id: str` · `function: str \| None`(`파일:줄`, 코드에 없으면 None) · `same` · `code_only` · `spec_only: list~str~`(항목 ID) | codegraph.compare → check_calls · queries(카드 AY). 명세의 「호출하는 것」과 실제 호출의 갈래 |
 | `ConversationView` | `ConversationBrief` + `turns: list~TurnView~` + `pending: list~AttachmentMeta~`(아직 안 보낸 첨부) | ConversationService.get → API `Conversation` |
 
 타입은 여기 한 곳에만 정의한다.
 
-엔티티는 2.1~2.6과 2.9, 열거형은 2.7.
+엔티티는 2.1~2.6과 2.9·2.10, 열거형은 2.7.
 
 ### 2.9 대화
 
@@ -516,6 +518,33 @@ classDiagram
 
 ---
 
+### 2.10 코드 그래프
+
+2026-09-30에 들어온 묶음([[SYNC-PRD-001#R13]], 카드 AX). 2.9 뒤에 둔다 — 번호를 안 바꾸기 위해서다.
+
+#### CodeGraph 코드 그래프
+
+테이블: [[SYNC-DOM-003#code_graphs]] · 도메인: [[SYNC-DOM-001#CodeGraph]]
+
+```mermaid
+classDiagram
+    class CodeGraph {
+        +int project_id
+        +str commit_hash
+        +str source
+        +dict graph
+        +int function_count
+        +int call_count
+        +datetime built_at
+        +str error
+    }
+```
+
+관계
+- `CodeGraph` 0..1 — 1 `Project` (ID만. PK가 곧 `project_id` — 프로젝트마다 하나. 해제와 함께 cascade)
+
+**`graph`는 줄인 모양이다** — `{functions: [{key, name, qual, file, line, end, ms}], calls: [[from, to, via]]}`([[SYNC-MS-011]] 0장). import·포함 관계·문서 노드는 버린다. **코드 본문과 대조 결과는 없다** — 본문은 저장소에서, 대조는 읽을 때.
+
 ---
 
 ## 3. 의존 관계 (v2)
@@ -578,9 +607,12 @@ flowchart TB
     RS[ReferenceService]
     AS[AccountService]
     CS[ConversationService]
+    CGS[CodeGraphService]
+    CG["codegraph/graph.py<br/>추출·줄이기·보강·대조"]
     GIT[infra/git.py]
     GH[infra/github.py]
     LLM[infra/llm.py]
+    GFY[infra/graphify.py]
 
     QR -.->|get · add_turn · finish_turn · attachment_text · attachment_bytes| CS
     PS -.->|delete_by_project| CS
@@ -597,11 +629,18 @@ flowchart TB
     GIT -.->|github_token_for| AS
     AS -.->|oauth| GH
     QR -.->|step| LLM
+    PL -.->|save · fail · get| CGS
+    PL -.->|load · reduce · enrich · touches_code| CG
+    PL -.->|archive · changed_paths| GIT
+    PS -.->|delete_by_project| CGS
+    CG -.->|extract| GFY
 ```
 
 **규칙** — 서비스끼리 직접 부르지 않는다. 묶음을 넘는 호출은 전부 `pipeline`(쓰기)이나 `queries`(읽기)를 거친다. v1에는 `TrackingService → ReferenceService·SpecService` 둘이 예외였으나 추적 묶음과 함께 사라졌다. 서비스가 `pipeline`을 부르는 건 `ProjectService.rebuild_index`뿐이다. 4장에서 각 노드를 확대한다.
 
 **`queries.ask_item`이 쓰는 유일한 자리다 — 대화 표만.** 읽는 중 질의가 대화를 보관하면서(2026-09-29) `queries`가 `ConversationService.add_turn`·`finish_turn`을 부른다. 명세 표는 여전히 안 쓴다 — `pipeline`을 거치지 않는 이유가 그대로다(쓰는 것이 명세가 아니다). `ProjectService.delete_project`가 `delete_by_project`를 불러 프로젝트 해제 때 대화를 함께 지운다.
+
+**`codegraph`는 명세 묶음을 모른다.** 항목 ID는 그래프 안의 글자이고, 명세의 「호출하는 것」은 부르는 쪽(검사기·`queries`)이 명세에서 읽어 `spec_calls`에 넘긴다. `graph.py`는 DB도 모른다 — 검사기가 DB 없이 서버와 같은 함수로 대조한다(카드 AX). 그래프 만들기는 쓰기 조율이라 `pipeline`이 한다([[SYNC-MS-007#pipeline.build_code_graph]]).
 
 **`queries`가 어댑터를 직접 부르는 것은 `llm` 하나뿐이다.** 읽는 중 질의([[SYNC-PRD-001#R11]])는 쓰지 않고 읽기만 하므로 `pipeline`을 거칠 이유가 없고, 맥락을 조립하는 데 필요한 것이 이미 전부 `queries`에 있다. 새 묶음을 만들지 않는 이유는 5장에 적는다.
 
@@ -1031,11 +1070,17 @@ git.log(workdir, path) -> list[Commit]
 git.rev_list_count(workdir, range) -> int
 git.exists(workdir, path) -> bool
 git.init_specs(workdir) -> dict[str, str]
+git.archive(workdir, commit, dest) -> None      그 커밋의 파일을 dest에 푼다 (코드 그래프, 카드 AX)
+git.changed_paths(workdir, range) -> list[str]  범위에서 바뀐 경로 전부 (명세 밖 포함)
+
+graphify.extract(src_dir) -> dict               graphify CLI로 코드만 추출. 환경변수를 비운 채, 모델 없음
 
 github.verify_signature(body, header) -> bool
 github.exchange_code(code) -> str
 github.get_user(token) -> GithubUser
 
+llm.step_stream(system, messages, tools, tool_choice="auto") -> AsyncIterator[str | LlmStep]
+                                               글자 조각을 오는 대로, 끝에 LlmStep 하나 (카드 AW)
 llm.step(system, messages, tools, tool_choice="auto") -> LlmStep
                                                모델 호출 한 번. 답 텍스트이거나 도구 호출 목록이거나 둘 다. usage 포함.
                                                user 항목에 images(mime·bytes)가 있으면 content 파트 배열로 옮긴다 (첨부, 카드 AR)
@@ -1120,6 +1165,54 @@ classDiagram
 - `history(conv_id, limit)`: `error`가 없는 턴만, 뒤에서 `limit`턴 — `[{role: user, text: question}, {role: assistant, text: answer}]`
 - `attachment_text`: 그 대화의 첨부가 아니면 None(모델에 「없음」). 이미지면 None — 이미지는 도구로 못 읽는다
 - `delete`·`delete_by_project`: cascade에 맡긴다(DOM-003 규칙). 바이트를 따로 지울 곳이 없다 — 저장 서비스를 안 둔 이유
+
+### 4.11 codegraph
+
+#### CodeGraphService
+
+```mermaid
+classDiagram
+    class CodeGraphService {
+        «service»
+        +get(project_id: int) CodeGraph?
+        +save(project_id: int, commit_hash: str, source: str, graph: dict) CodeGraph
+        +fail(project_id: int, commit_hash: str, reason: str) CodeGraph
+        +delete_by_project(project_id: int) None
+    }
+    class graph_py {
+        «module»
+        +touches_code(paths: list~str~) bool
+        +load(src_dir: Path) tuple
+        +reduce(raw: dict) dict
+        +enrich(src_dir: Path, graph: dict) dict
+        +spec_calls(items: list~tuple~) dict
+        +compare(graph: dict, spec: dict) list~CallDiff~
+    }
+    class CodeGraph {
+        +int project_id
+        +str commit_hash
+        +str source
+        +dict graph
+        +int function_count
+        +int call_count
+        +datetime built_at
+        +str error
+    }
+    CodeGraphService --> CodeGraph
+```
+
+| 메서드 | 부르는 곳 | 근거 |
+|---|---|---|
+| `touches_code` · `load` · `reduce` · `enrich` | [[SYNC-MS-007#pipeline.build_code_graph]] · `process_commit` · `tools/check_calls.py` | UC-S8 |
+| `spec_calls` · `compare` | `tools/check_calls.py` · `queries`(카드 AY·AZ) | UC-H20 · DEV-14 |
+| `get` · `save` · `fail` | `pipeline.build_code_graph` · `process_commit`(그래프가 없나) | UC-S8 |
+| `delete_by_project` | [[SYNC-MS-001#ProjectService.delete_project]] | UC-H17 |
+
+**규칙이 사는 곳**
+- `graph.py`는 순수하다 — DB·세션을 모른다. 검사기가 같은 결과를 내야 하기 때문
+- `save`: 한 행을 통째로 바꿔 끼운다. 반쯤 바뀐 그래프를 읽는 일이 없다
+- `fail`: 옛 그래프를 건드리지 않는다
+- 시그니처·처리는 [[SYNC-MS-011]]
 
 ---
 

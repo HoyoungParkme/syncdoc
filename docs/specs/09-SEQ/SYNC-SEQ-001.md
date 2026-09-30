@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -89,6 +89,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | MCP delete_document | [[#SEQ-22]] | ○ |
 | MCP restore_document | [[#SEQ-23]] | ○ |
 | MCP 모든 도구의 인증 | [[#SEQ-C2]] | |
+| (커밋 처리·재구축 뒤) 코드 그래프 | [[#SEQ-26]] | ○ |
 
 묶음을 넘는 것이 대응표 31행 중 22행이다(입구 여럿을 한 행에 묶은 것이 있다). v1.0에서 안 그린 조회 중 절반 이상이 묶음을 넘었다.
 
@@ -1086,6 +1087,51 @@ sequenceDiagram
 - **새 흐름을 만들지 않았다.** 본체는 카드 AD가 만든 `read_pending` 그대로다 — 소유 검사·읽기 락·`process_commit`이 이미 그 안에 있다. 이 시퀀스는 그것을 사람이 부를 수 있게 문 하나를 낸 것이다
 - 읽을 것이 없어도 **`fetched_at`은 새로 적는다.** 「지금 확인했다」가 이 동작의 절반이다 — 화면이 그 시각을 보여주므로(UI-14 2.4) 사람은 「최신」이 언제 기준인지 알게 된다
 - 통지(SEQ-2)가 걸려 있으면 이 버튼을 누를 일이 거의 없다. 통지를 못 건 저장소와 통지가 유실된 경우를 위한 길이다
+
+---
+
+## SEQ-26 코드 그래프를 만든다
+
+[[SYNC-UC-001#UC-S8]]. 입구가 없다 — 커밋 처리(SEQ-2·SEQ-25)와 재구축(SEQ-21)이 끝난 뒤 `pipeline`이 걸어 두고, 저장소 락 밖에서 돈다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant P as pipeline
+    participant G as infra/git
+    participant CG as codegraph/graph.py
+    participant GF as infra/graphify
+    participant CS as CodeGraphService
+    participant DB
+
+    P->>G: changed_paths(workdir, last..head) — process_commit 5a
+    P->>CG: touches_code(paths)
+    P->>CS: get(project_id) — 그래프가 아직 없나
+    alt 코드가 바뀌었거나 그래프가 없다
+        P->>P: schedule_code_graph(code, head) — 돌고 있으면 「다음」만 적는다
+        P->>G: archive(workdir, head, 임시 폴더)
+        P->>CG: load(임시 폴더)
+        alt 저장소에 graphify-out/graph.json이 있다
+            CG-->>P: ("repo", 그 파일)
+        else 없다
+            CG->>GF: extract(임시 폴더) — 환경변수를 비우고, 모델 없이
+            GF-->>CG: graph.json 원형
+            CG-->>P: ("server", 원형)
+        end
+        P->>CG: reduce(원형) → enrich(임시 폴더, 그래프) — 함수·호출 선만, 파이썬 보강
+        P->>CS: save(project_id, head, source, graph)
+        CS->>DB: code_graphs 한 행 교체 · error 비움
+        P->>P: 로그 한 줄 · 임시 폴더 삭제 · 「다음」이 있으면 한 번 더
+    else 명세만 바뀌었다
+        P->>P: 건너뛴다 — 대조는 읽을 때 계산한다
+    end
+    Note over P,CS: 2~4 어디서 실패하든 CS.fail(project_id, head, 이유) — 옛 그래프는 그대로
+```
+
+**읽을 때 볼 것**
+- **쓰기 락 밖이다.** 추출에 수 초가 걸려도 명세 저장과 따라잡기를 막지 않는다. 대신 같은 프로젝트의 만들기가 겹치지 않게 하나씩 돌리고, 밀리면 가장 최근 커밋 하나만 더 만든다
+- **작업 사본에서 돌지 않는다.** `git archive`로 그 커밋을 풀어 쓴다 — 작업 사본을 더럽히지 않고, 빌드 산출물이 섞이지 않는다
+- 대조 결과는 저장하지 않는다. 명세의 「호출하는 것」은 읽을 때 명세에서 가져오므로, 명세만 고친 커밋은 다시 만들 필요가 없다
 
 ---
 

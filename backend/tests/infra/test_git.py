@@ -507,3 +507,29 @@ async def test_commit_push_delete_removes_file_and_noops_when_absent(
     assert SEED not in git(repos["remote"], "ls-tree", "-r", "--name-only", "main")
     # 이미 없는 파일 → 커밋이 안 생긴다
     assert await g.commit_push(repos["work"], "noop", _author(), delete=[SEED]) == h
+
+
+# ── archive · changed_paths (카드 AX) ──
+async def test_archive_extracts_committed_files_only(
+    repos: dict[str, Path], tmp_path: Path
+) -> None:
+    other = repos["other"]
+    first = write_commit_push(other, "backend/app/a.py", "def a():\n    return 1\n", "code")
+    write_commit_push(other, "backend/app/a.py", "def a():\n    return 2\n", "code 2")
+    (repos["work"] / "untracked.py").write_text("x = 1\n", encoding="utf-8")
+    git(repos["work"], "fetch", "-q", "origin")
+    dest = tmp_path / "src"
+    await g.archive(repos["work"], first, dest)
+    assert (dest / "backend/app/a.py").read_text(encoding="utf-8") == "def a():\n    return 1\n"
+    assert (dest / SEED).exists() and not (dest / "untracked.py").exists()
+    assert not (dest / ".src.tar").exists()  # 풀고 나면 tar는 지운다
+
+
+async def test_changed_paths_lists_everything_in_range(repos: dict[str, Path]) -> None:
+    other = repos["other"]
+    base = git(other, "rev-parse", "HEAD")
+    write_commit_push(other, "backend/app/b.py", "x = 1\n", "code")
+    head = write_commit_push(other, "docs/specs/02-PRD/X-PRD-001.md", "# x\n", "spec")
+    git(repos["work"], "fetch", "-q", "origin")
+    paths = await g.changed_paths(repos["work"], f"{base}..{head}")
+    assert sorted(paths) == ["backend/app/b.py", "docs/specs/02-PRD/X-PRD-001.md"]

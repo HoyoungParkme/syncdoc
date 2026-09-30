@@ -11,6 +11,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import tempfile
+import time
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -19,8 +21,11 @@ from app import db
 from app.core.account.models import User
 from app.core.account.service import AccountService
 from app.core.clock import now_utc
+from app.core.codegraph import graph as codegraph
+from app.core.codegraph.service import CodeGraphService
 from app.core.errors import (
     AlreadyCurrent,
+    CodeGraphFailed,
     ConventionViolation,
     DocumentDeletionNeedsConfirm,
     DocumentHasHistory,
@@ -615,7 +620,80 @@ async def _process_commit(repo: Repository, head_hash: str, code: str) -> list[S
             row.behind_by, row.fetched_at = 0, now_utc()
             s.commit()
         repo.last_processed_commit = head_hash
+        # 5a. 코드 그래프 — 코드가 바뀌었거나 아직 없으면 (UC-S8). 명세만 바뀐 커밋은 건너뛴다
+        paths = await git.changed_paths(workdir, rng) if last else []
+        with db.session_scope() as s:
+            has_graph = CodeGraphService(s).get(repo.project_id) is not None
+        if codegraph.touches_code(paths) or not has_graph:
+            schedule_code_graph(code, head_hash)
     return results
+
+
+_graph_tasks: dict[str, asyncio.Task] = {}
+_graph_next: dict[str, str] = {}
+
+
+def schedule_code_graph(code: str, commit: str) -> None:
+    """SYNC-MS-007#pipeline.schedule_code_graph
+
+    저장소 락 밖에서 돈다 — 추출에 수 초가 걸려도 명세 처리와 쓰기를 막지 않는다. 프로젝트마다
+    하나씩: 돌고 있으면 「다음」만 적고, 끝난 뒤 가장 최근 커밋으로 한 번 더(UC-S8 2b).
+    """
+    task = _graph_tasks.get(code)
+    if task is not None and not task.done():
+        _graph_next[code] = commit
+        return
+
+    async def run(first: str) -> None:
+        nxt: str | None = first
+        while nxt:
+            await build_code_graph(code, nxt)
+            nxt = _graph_next.pop(code, None)
+
+    _graph_tasks[code] = asyncio.create_task(run(commit))
+
+
+async def build_code_graph(code: str, commit: str) -> None:
+    """SYNC-MS-007#pipeline.build_code_graph
+
+    그 커밋을 임시 폴더에 풀어(작업 사본을 안 건드린다) 저장소의 graph.json이나 graphify로
+    그래프를 얻고, 줄이고 보강해 한 행을 바꿔 끼운다. 배치라 실패는 삼키고 행에 남긴다.
+    """
+    with db.session_scope() as s:
+        try:
+            project = ProjectService(s).get(code)
+        except NotFound:
+            return  # 그새 해제됐다
+        pid, workdir = project.id, Path(project.repository.workdir_path)
+    t0 = time.monotonic()
+    try:
+        with tempfile.TemporaryDirectory(prefix="syncdoc-graph-") as tmp:
+            src = Path(tmp)
+            await git.archive(workdir, commit, src)
+            source, raw = await codegraph.load(src)
+            graph = codegraph.enrich(src, codegraph.reduce(raw))
+        with db.session_scope() as s:
+            CodeGraphService(s).save(pid, commit, source, graph)
+            s.commit()
+    except Exception as e:  # noqa: BLE001 — 배치다. 옛 그래프를 두고 이유만 남긴다 (UC-S8 2a)
+        reason = e.reason if isinstance(e, CodeGraphFailed) else f"{type(e).__name__}: {e}"
+        try:
+            with db.session_scope() as s:
+                CodeGraphService(s).fail(pid, commit, reason)
+                s.commit()
+        except Exception:  # noqa: BLE001 — 그새 프로젝트가 사라졌으면 남길 곳도 없다
+            pass
+        log.warning("code graph code=%s commit=%s 실패: %s", code, commit[:7], reason)
+        return
+    log.info(
+        "code graph code=%s commit=%s source=%s functions=%d calls=%d elapsed=%.1fs",
+        code,
+        commit[:7],
+        source,
+        len(graph["functions"]),
+        len(graph["calls"]),
+        time.monotonic() - t0,
+    )
 
 
 def _dir_type(path: str) -> str:
@@ -793,4 +871,5 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
         s.rollback()
         log.warning("rebuild %s 실패: %s", code, e)
         raise RebuildFailed(str(e)) from e
+    schedule_code_graph(code, head)  # 10. 재구축은 늘 다시 만든다 (UC-S8)
     return result

@@ -659,6 +659,21 @@ class AskRead:
     target: str | None
 
 
+@dataclass(frozen=True)
+class CallDiff:
+    """SYNC-DOM-002 2.8 — codegraph.compare의 한 줄. 명세 「호출하는 것」과 실제 호출의 갈래.
+
+    function은 `파일:줄`, 코드에 그 항목의 함수가 없으면 None(존재는 check_code가 본다).
+    나머지 셋은 항목 ID 목록, 정렬(카드 AX).
+    """
+
+    ms_id: str
+    function: str | None
+    same: list[str]
+    code_only: list[str]
+    spec_only: list[str]
+
+
 AskEvent = AskStart | AskDelta | AskNote | AskRead | AskAnswer
 
 

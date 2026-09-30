@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-003
 type: STD
 title: 명세 체인 지도 — 싱크독 첫 프로젝트의 실제 구조
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-STD-002]
 ---
 
@@ -465,7 +465,8 @@ flowchart BT
 문서 전부의 미결사항 절에서 **열려 있는 것만** 모았다. 이 목록은 `tools/open_items.py`가 만든다 — 손으로 고치지 않는다. 원본을 고치고 다시 생성한다.
 닫힌 미결은 각 문서에 결정과 함께 남아 있다.
 
-_열린 미결이 없다. 각 문서의 미결사항 절에 결정과 함께 닫혀 있다._
+**SYNC-MS-011**
+- [ ] 파이썬 밖(TS·Go…)의 보강 — 지금은 graphify 결과 그대로. 싱크독 코드는 MINISPEC 함수가 전부 파이썬이라 급하지 않다
 
 ## 6. 미결사항
 

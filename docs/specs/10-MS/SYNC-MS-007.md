@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-007
 type: MS
 title: MINISPEC — pipeline — 쓰기 조율
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/pipeline.py`의 함수 8개와 `scheduler.py`의 주기 함수 2개. 클래스 명세 [[SYNC-DOM-002]] 4.7의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/pipeline.py`의 함수 10개와 `scheduler.py`의 주기 함수 2개. 클래스 명세 [[SYNC-DOM-002]] 4.7의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -29,6 +29,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#pipeline.revert]] | 되돌리기 |
 | [[#pipeline.process_commit]] | GitHub 커밋 처리 |
 | [[#pipeline.rebuild]] | 인덱스 재구축 |
+| [[#pipeline.schedule_code_graph]] | 코드 그래프 만들기를 걸어 둔다 |
+| [[#pipeline.build_code_graph]] | 코드 그래프를 만든다 |
 | [[#pipeline.trash_document]] | 휴지통에 넣기 |
 | [[#pipeline.restore_document]] | 휴지통에서 되살리기 |
 | [[#pipeline.purge_document]] | 완전 삭제 |
@@ -126,7 +128,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 | push 실패 | `push-failed` | 7 |
 | 8~10a 중 DB 오류 | 트랜잭션 롤백. 커밋은 이미 원격에 있으므로 `repository.last_processed_commit`을 갱신하지 않아 폴링이 다시 처리한다 | 8 |
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `ProjectService.get`(github) · [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.issue_doc_id]] [[SYNC-MS-002#SpecService.apply_frontmatter]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.detect_deleted_items]] [[SYNC-MS-002#SpecService.create]] [[SYNC-MS-002#SpecService.save]] · `ReferenceService.downstream` · [[SYNC-MS-003#ReferenceService.mark_missing]] · `ReferenceService.extract` · `ReferenceService.resolve_missing` · `git.commit_push`
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `ProjectService.get`(github) · [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.issue_doc_id]] [[SYNC-MS-002#SpecService.apply_frontmatter]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.detect_deleted_items]] [[SYNC-MS-002#SpecService.create]] [[SYNC-MS-002#SpecService.save]] · `ReferenceService.downstream` · [[SYNC-MS-003#ReferenceService.mark_missing]] · `ReferenceService.extract` · `ReferenceService.resolve_missing` · `git.commit_push` · [[SYNC-MS-002#SpecService.apply_status]] · [[SYNC-MS-002#SpecService.describe_items]] · [[SYNC-MS-002#SpecService.item_pks]] · [[SYNC-MS-002#SpecService.precondition]] · [[#pipeline.read_pending]]
 
 **테스트 관점**
 - 정상 수정: 새 버전 번호 +1, 커밋 존재, 참조 갱신
@@ -176,6 +178,8 @@ async def read_pending(code: str, user: User) -> int
 
 **예외** `not-found`(1) · `git.fetch` 실패는 그대로 올린다 — 저장소에 닿지 못하면 쓰지도 못한다
 
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[#pipeline.process_commit]] · [[SYNC-MS-009#git.fetch]]
+
 **테스트 관점** 같은 프로젝트에 동시에 둘이 써도 `fetch`가 겹치지 않는다(읽기 락) · 밀린 것이 없으면 0이고 커밋이 안 생긴다 · **밀린 것이 없어도 `fetched_at`이 갱신된다** · 밖에서 push한 뒤 부르면 그 문서가 DB에 들어오고 `last_processed_commit`이 head가 된다 · 두 번 불러도 두 번째는 0(멱등) · 남의 프로젝트 → `not-found` · **`github` 경로에서는 불리지 않는다**(재귀 방지)
 
 ---
@@ -207,7 +211,7 @@ async def read_pending(code: str, user: User) -> int
 
 **예외** `not-found`(0) · `status-blocked` · `document-trashed` · 파이프라인의 `version-conflict`·`push-failed` 전파
 
-**호출하는 것** [[SYNC-MS-007#pipeline.read_pending]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-007#pipeline.save_pipeline]] [[SYNC-MS-003#ReferenceService.upstream_of_document]] · `git.read`
+**호출하는 것** [[SYNC-MS-007#pipeline.read_pending]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-007#pipeline.save_pipeline]] [[SYNC-MS-003#ReferenceService.upstream_of_document]] · `git.read` · [[SYNC-MS-001#ProjectService.get_owned]]
 
 **테스트 관점** **저장소를 앞세워 놓고 토글 → 그 커밋의 내용이 살아 있고 상태 커밋의 diff가 한 줄 추가·한 줄 삭제(#137)** · 규약 오류 문서를 `approved`로 → blocked · **미존재 참조가 있는 문서를 `approved`로 → blocked이고 `warnings`에 `ref.missing:`이 있다** · 같은 문서를 `draft`로 → 됨 · **상대 문서가 들어와 `resolve_missing`이 풀면 그 문서를 다시 저장하지 않아도 완료된다**(읽을 때 계산한다는 증거) · 정상 완료 → frontmatter `status: approved` 커밋 존재, Version 없음, StatusChange에 commit_hash · 같은 상태로 다시 → 커밋 없음 · `reason` 없이 불러도 된다 · 휴지통 문서 → `document-trashed` · **남의 프로젝트 문서 → `not-found`(project), 상태 그대로**
 
@@ -233,7 +237,7 @@ async def read_pending(code: str, user: User) -> int
 
 **예외** `not-found`(0·1) · `document-trashed`(1) · `document-deletion-needs-confirm`(3) · `push-failed`(4)
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-003#ReferenceService.inbound_of_document]] [[SYNC-MS-009#git.commit_push]] [[SYNC-MS-002#SpecService.trash]] [[SYNC-MS-003#ReferenceService.mark_missing]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-003#ReferenceService.inbound_of_document]] [[SYNC-MS-009#git.commit_push]] [[SYNC-MS-002#SpecService.trash]] [[SYNC-MS-003#ReferenceService.mark_missing]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-002#SpecService.describe_items]] · [[#pipeline.read_pending]]
 
 **테스트 관점** 남이 가리키는 문서도 confirm이면 들어간다 — `broken_refs`가 그 수이고 그 참조들이 `is_missing` · 원격에서 파일 사라짐, 커밋 메시지 `spec(…): 휴지통` · 행·버전 남음, `trashed_at` 있음, 목록에서 빠짐 · 두 번 넣으면 `document-trashed` · 그 뒤 폴링이 `D`를 건너뛰고 `last_processed_commit`이 나아감 · 휴지통 문서에 `update_document`·상태 변경 → `document-trashed`
 
@@ -256,7 +260,7 @@ async def read_pending(code: str, user: User) -> int
 
 **예외** `not-found`(0·1) · `document-not-trashed`(1) · 파이프라인의 `convention-violation`(3a)·`push-failed`
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.trash_commit]] [[SYNC-MS-009#git.read]] [[#pipeline.save_pipeline]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.trash_commit]] [[SYNC-MS-009#git.read]] [[#pipeline.save_pipeline]] · [[#pipeline.read_pending]]
 
 **테스트 관점** 넣기 → 되살리기 → 본문이 지우기 직전과 같고 버전 +1 · `trashed_at` null · 항목 `is_deleted` 풀림 · 하위에서 이 문서 항목을 가리키던 미존재 참조가 다시 이어진다 · 목록에 다시 나옴 · 휴지통에 없는 문서 → `document-not-trashed`
 
@@ -275,7 +279,7 @@ async def read_pending(code: str, user: User) -> int
 3. **트랜잭션** — `spec.delete_document(document)` · 커밋. 파일은 이미 저장소에 없다(휴지통 커밋) — push 없음
 4. `→ None`
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-003#ReferenceService.inbound_of_document]] [[SYNC-MS-002#SpecService.delete_document]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-003#ReferenceService.inbound_of_document]] [[SYNC-MS-002#SpecService.delete_document]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-002#SpecService.describe_items]]
 
 **테스트 관점** **남의 프로젝트 → `not-found`, 행 그대로** · 휴지통 아닌 문서 → `document-not-trashed` · 남이 아직 가리킴 → `document-has-history`에 `inbound_refs` · 다 걷어낸 뒤 → 행 다섯 종류(documents·items·versions·status_changes·references) 0 · 남이 이 문서를 미존재로 가리키는 것은 막지 않는다 · 번호 재발급
 
@@ -299,7 +303,7 @@ async def read_pending(code: str, user: User) -> int
 
 **예외** `not-found`, `already-current`, 파이프라인의 `convention-violation`(4a)·`item-deletion-needs-confirm`·`push-failed`
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-007#pipeline.save_pipeline]]
+**호출하는 것** [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-007#pipeline.save_pipeline]] · [[SYNC-MS-002#SpecService.version_body]] · [[#pipeline.read_pending]]
 
 **테스트 관점** 남의 프로젝트 → `not-found`, 버전 그대로 · v7에서 v6으로 → v8 생성, v7 남음 · 옛 본문이 현 규약 위반 → 거부 · 옛 본문에 없는 항목이 지금 있음 → 삭제 확인 요구 → confirm 후 그 항목을 가리키던 참조가 미존재
 
@@ -336,13 +340,14 @@ async def process_commit(repo: Repository, head_hash: str, locked: bool = False)
    - if `status == D` (파일 삭제) → **문서 행이 없거나 `trashed_at`이 있으면 건너뛴다** — 앱이 [[#pipeline.trash_document]]·[[#pipeline.purge_document]]로 만든 삭제 커밋이거나 등록 전에 사라진 파일이다. `mark_deleted`로 가면 `not-found`가 나서 그 커밋이 영영 「처리 실패」로 남고 `last_processed_commit`이 안 나아간다 · else → `deleted = spec.mark_deleted(document, commit_hash, author)` (`status=draft`, `file.deleted` 오류, 전 항목 `is_deleted`) · `reference.mark_missing(deleted)` · 문서 행은 남는다 · 다음 파일로
    - else → `save_pipeline(entry=github, doc_id, None, body, None, author, message=원 커밋 메시지, changed_items=None, commit_hash=file_commit_hash)` → 결과 모음
 5. `repo.last_processed_commit = head_hash`, `synced_at = now`
+5a. **코드 그래프**([[SYNC-UC-001#UC-S8]]) — `paths = git.changed_paths(repo.workdir, f"{last}..{head_hash}")`(`last`가 없으면 생략) · if [[SYNC-MS-011#codegraph.touches_code]]`(paths)` or [[SYNC-MS-011#CodeGraphService.get]]`(project_id)`가 None → [[#pipeline.schedule_code_graph]]`(code, head_hash)`. 명세만 바뀐 커밋은 그래프가 있으면 건너뛴다(UC-S8 1a)
 6. `→ results`
 
 **출력** 파일마다 `SaveResult`
 
 **예외** 파일 하나 실패해도 다음 파일 계속. 실패 목록을 로그. `last_processed_commit`은 **전부 성공했을 때만** 갱신 — 아니면 다음 폴링이 다시 시도
 
-**호출하는 것** [[#pipeline.save_pipeline]] · [[SYNC-MS-002#SpecService.mark_deleted]] [[SYNC-MS-003#ReferenceService.mark_missing]] · `git.fetch` `git.changed_files` `git.read` · `AccountService.user_for_commit`
+**호출하는 것** [[#pipeline.save_pipeline]] · [[#pipeline.schedule_code_graph]] · [[SYNC-MS-011#codegraph.touches_code]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.mark_deleted]] [[SYNC-MS-003#ReferenceService.mark_missing]] · `git.fetch` `git.changed_files` `git.changed_paths` `git.read` · `AccountService.user_for_commit` · [[SYNC-MS-001#ProjectService.list_projects]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.list_versions]] · [[SYNC-MS-002#SpecService.mark_convention_error]] · [[SYNC-MS-002#SpecService.validate]] · [[SYNC-MS-009#git.rev_list_count]]
 
 **테스트 관점**
 - 커밋 하나에 파일 둘: 결과 둘, 각각 새 버전
@@ -354,6 +359,7 @@ async def process_commit(repo: Repository, head_hash: str, locked: bool = False)
 - 한 파일 실패: 나머지 처리됨, `last_processed_commit` 안 바뀜
 - **같은 head를 둘이 동시에 처리해도** 버전 하나, 자동 강등이 유지되고 저장소와 DB 상태가 같다(#194)
 - **이미 처리한 커밋이나 그 조상**을 head로 받으면 `[]`이고 `last_processed_commit`은 그대로다(#194)
+- 코드 파일이 바뀐 커밋 → 그래프 만들기가 걸린다 · 명세만 바뀐 커밋 → 그래프가 있으면 안 걸린다, 없으면 걸린다(카드 AX)
 
 ---
 
@@ -388,13 +394,14 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 7a~7b. 없음 — 전파결정·플래그를 새 버전에 다시 잇던 자리. 카드 V에서 걷어냈다
 8. `repo.last_processed_commit = HEAD`
 9. **커밋.** 락 해제
+10. [[#pipeline.schedule_code_graph]]`(code, HEAD)` — 재구축은 늘 다시 만든다(UC-S8)
 10. `→ RebuildResult(docs, items, references, versions, convention_errors)`
 
 **출력** [[SYNC-API-001]] `RebuildResult`
 
 **예외** 어느 단계든 실패하면 트랜잭션 롤백. DB는 재구축 전 상태로. `! rebuild-failed {reason}`
 
-**호출하는 것** [[SYNC-MS-002#SpecService.clear_index]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.save]] [[SYNC-MS-002#SpecService.mark_convention_error]] · `ReferenceService.clear` `ReferenceService.extract` `ReferenceService.resolve_missing` · `AccountService.user_for_commit` · `git.*`
+**호출하는 것** [[#pipeline.schedule_code_graph]] · [[SYNC-MS-002#SpecService.clear_index]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.save]] [[SYNC-MS-002#SpecService.mark_convention_error]] · `ReferenceService.clear` `ReferenceService.extract` `ReferenceService.resolve_missing` · `AccountService.user_for_commit` · `git.*` · [[SYNC-MS-001#ProjectService.get]] · [[SYNC-MS-002#SpecService.apply_status]] · [[SYNC-MS-002#SpecService.create]] · [[SYNC-MS-002#SpecService.detect_deleted_items]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.item_pks]] · [[SYNC-MS-009#git.checkout]] · [[SYNC-MS-009#git.fetch]] · [[SYNC-MS-009#git.list]] · [[SYNC-MS-009#git.log]] · [[SYNC-MS-009#git.read]]
 
 **테스트 관점**
 - DB 비운 뒤 재구축: 문서·항목·참조·버전 수가 저장소와 일치
@@ -406,6 +413,46 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 - 커밋 이메일을 등록하고 재구축: 버전 작성자가 그 사람으로 바뀌고 `author.unknown`이 사라진다
 - `status(` 커밋: Version 안 늘고 StatusChange 생김
 - 중간 실패: DB가 재구축 전과 같음
+- 재구축 뒤 코드 그래프 만들기가 걸린다(카드 AX)
+
+---
+
+#### pipeline.schedule_code_graph 코드 그래프 만들기를 걸어 둔다
+
+**시그니처** `def schedule_code_graph(code: str, commit: str) -> None`
+
+근거: [[SYNC-UC-001#UC-S8]] 확장 2b · 사용자 결정 2026-09-30
+
+**처리**
+1. if 이 프로젝트의 만들기가 이미 돌고 있다 → `다음[code] = commit`으로 적어 두고 끝 — 사이의 커밋은 덮인다
+2. else → `asyncio.create_task`로 돌린다: `build_code_graph(code, commit)` → 끝나면 `다음[code]`가 있으면 꺼내 한 번 더, 없으면 끝
+3. **저장소 락 밖이다.** 부른 쪽(`process_commit`·`rebuild`)은 기다리지 않는다 — 추출에 수 초가 걸려도 명세 처리와 쓰기가 막히지 않는다
+
+**호출하는 것** [[#pipeline.build_code_graph]]
+
+**테스트 관점** 돌고 있을 때 두 번 걸면 끝난 뒤 **마지막 커밋으로 한 번만** 더 돈다 · 프로젝트가 다르면 따로 돈다
+
+---
+
+#### pipeline.build_code_graph 코드 그래프를 만든다
+
+**시그니처** `async def build_code_graph(code: str, commit: str) -> None`
+
+근거: [[SYNC-UC-001#UC-S8]] · [[SYNC-SEQ-001#SEQ-26]] · 사용자 결정 2026-09-30(보관은 DB에 줄인 모양, 임시 폴더에서)
+
+**처리**
+1. 세션 하나에서 `project = ProjectService.get(code)` — 배치라 소유를 안 본다(`process_commit`과 같다) · `workdir = project.repository.workdir_path`
+2. 임시 폴더를 만들고 [[SYNC-MS-009#git.archive]]`(workdir, commit, tmp)`
+3. `source, raw = `[[SYNC-MS-011#codegraph.load]]`(tmp)` · `graph = `[[SYNC-MS-011#codegraph.enrich]]`(tmp, `[[SYNC-MS-011#codegraph.reduce]]`(raw))` — 모델 없음
+4. 세션 하나에서 [[SYNC-MS-011#CodeGraphService.save]]`(project.id, commit, source, graph)` · 커밋
+5. `log.info("code graph code=%s commit=%s source=%s functions=%d calls=%d elapsed=%.1fs", …)` — 한 줄
+6. 임시 폴더를 지운다(실패해도)
+
+**예외** 2~4 어디서든 실패하면 **삼키고** [[SYNC-MS-011#CodeGraphService.fail]]`(project.id, commit, 이유)` · `log.warning` 한 줄 — 배치라 받을 사람이 없고, 옛 그래프는 남는다. 프로젝트가 없으면(그새 해제) 조용히 끝
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get]] · [[SYNC-MS-009#git.archive]] · [[SYNC-MS-011#codegraph.load]] · [[SYNC-MS-011#codegraph.reduce]] · [[SYNC-MS-011#codegraph.enrich]] · [[SYNC-MS-011#CodeGraphService.save]] · [[SYNC-MS-011#CodeGraphService.fail]]
+
+**테스트 관점** 로컬 bare origin에 파이썬 파일을 커밋 → 행 하나, `commit_hash`가 그 커밋, `source=server`, 함수가 있다 · 저장소에 `graphify-out/graph.json`을 커밋해 두면 `source=repo` · 추출이 실패하면 옛 그래프가 남고 `error` · 작업 사본에 `graphify-out/`이 생기지 않는다
 
 ---
 
@@ -431,7 +478,7 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 같은 오류로 실패했는데 관리 화면에는 아무 표시가 없었다(#46). 이 값은 [[SYNC-MS-001#ProjectService.repo_status]]가
 `RepoStatus.error`로 올려 UI-14 2.3에 뜬다. **성공한 주기가 지우므로 낡은 오류가 남지 않는다.**
 
-**호출하는 것** `ProjectService.list_projects` · `git.fetch` `rev_list_count` · [[#pipeline.process_commit]]
+**호출하는 것** `ProjectService.list_projects` · [[SYNC-MS-009#git.fetch]] [[SYNC-MS-009#git.rev_list_count]] · [[#pipeline.process_commit]]
 
 **테스트 관점** 원격이 앞서 있으면 `process_commit`이 불림 · 같으면 안 불리고 `fetched_at`만 갱신 · 웹훅 처리와 겹쳐도 fetch가 동시에 돌지 않는다(읽기 락) · 저장소 둘 중 앞엣것이 실패해도 뒤엣것이 처리됨 · `behind_by`가 DB에 남아 `repo_status`가 그걸 읽음 · **실패한 저장소의 `fetch_error`에 사유가 남고, 다음 성공이 그것을 비운다**
 
