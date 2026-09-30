@@ -388,6 +388,9 @@ export function DocView() {
         <Handle el="8.3" onDrag={(dx) => addSideW(-dx)} />
         <aside className="panel" data-el="8">
           {(() => {
+            // 코드 탭은 지금 문서의 항목일 때만 그 항목으로 묻는다 — 문서가 바뀐 첫 커밋엔 선택이 옛 문서
+            // 것이라 새 문서에 옛 항목을 물어 404가 난다(참조 패널의 #198과 같은 자리, 카드 AY)
+            const codeItem = selected && doc.doc_id === docId && doc.items.some((i) => i.item_id === selected) ? selected : null
             return (
               <>
                 <div className="ptabs">
@@ -409,8 +412,8 @@ export function DocView() {
                   {panel === 'code' ? (
                     <CodePanel
                       docId={docId}
-                      itemId={selected}
-                      displayName={doc.items.find((i) => i.item_id === selected)?.display_name ?? ''}
+                      itemId={codeItem}
+                      displayName={doc.items.find((i) => i.item_id === codeItem)?.display_name ?? ''}
                       goItem={goItem}
                     />
                   ) : panel === 'ask' ? (
