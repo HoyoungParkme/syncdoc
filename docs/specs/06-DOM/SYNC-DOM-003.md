@@ -127,6 +127,7 @@ erDiagram
         int id PK
         varchar github_login UK
         bigint github_user_id UK
+        varchar kind
         varchar display_name
         bytea github_token_encrypted
         timestamptz created_at
@@ -201,6 +202,7 @@ erDiagram
 - `references`의 `to_item_id`와 `to_document_id`는 CHECK로 하나만 채워지게 한다. `is_missing=true`면 둘 다 null
 - **끊어진 참조는 별도 표가 아니다.** 대상 항목이 삭제되면 그것을 가리키던 참조의 `to_*`를 비우고 `is_missing=true`로 되돌린다([[SYNC-MS-003#ReferenceService.mark_missing]]). `raw_target`이 남아 있어 상대가 돌아오면 `resolve_missing`이 다시 잇는다. v1의 `flags`·`propagation_decisions`·`comments`는 v2에서 뺐다([[SYNC-DOM-001]] 3.3) — 리비전 0011이 세 표를 지운다. `downgrade`는 0001·0007·0008의 정의를 복원하지만 데이터는 돌아오지 않는다. 옛 행은 각 저장소의 `backup/tracking.json`과 태그 `v1-collab`의 `import_tracking`으로만 되살릴 수 있다
 - **`repositories.hook_id`·`hook_error`는 리비전 `0013_add_repo_hook`이 둘 다 nullable로 더한다**(카드 AF). 기본값 없이 비운 채 시작한다 — 「아직 안 걸어 본 것」이 맞는 초기 상태다. `downgrade`는 두 컬럼을 지운다
+- **`users.kind`는 리비전 `0017_add_users_kind`가 기본 `github`로 더하고, `github_user_id`가 빈 행을 `placeholder`로 채운다**(카드 BC). 그때까지 자리표시를 `github_user_id IS NULL`로 가렸으므로 그 판정을 그대로 옮긴 것이다. `downgrade`는 컬럼을 지운다 — 로컬 사용자 행은 다시 자리표시처럼 보인다
 - **`repositories.storage`는 리비전 `0016_add_repositories_storage`가 `server_default 'github'`로 더한다**(카드 BA). 그때까지의 저장소는 전부 GitHub라 기본값이 곧 백필이다. `downgrade`는 컬럼을 지운다 — 서버 저장 행이 있으면 그 행의 `remote_url`이 서버 안 경로라 뜻이 어긋나므로, 내리기 전에 서버 저장 프로젝트를 해제해야 한다
 - **소유는 `projects.owner_user_id` 한 컬럼이다.** 별도 권한 표가 없다. 리비전 `0012_add_projects_owner`가 nullable로 더하고 `repositories.registered_by_user_id`(없으면 `min(users.id)`)로 채운 뒤 not null·FK로 조인다(0004 선례). `downgrade`는 컬럼을 지운다
 
@@ -313,6 +315,7 @@ erDiagram
 |---|---|---|---|---|
 | github_login | varchar(50) | UK | GitHub 아이디. **자리표시 User에서는 아이디가 아닐 수 있다** — 커밋 이메일이 noreply가 아니면 `%an`(사람 이름)이 대체값으로 들어간다([[SYNC-DOM-002]] 5장 결정 3) | `hoyoung-park` |
 | github_user_id | bigint | UK | GitHub 숫자 ID. 아이디 변경에 대비 | |
+| kind | varchar(12) | not null, 기본 `github` | 사용자 종류 — `github` · `local`(폐쇄망판 로컬 사용자) · `placeholder`(커밋으로만 알려진 사람). **자리표시 판정은 이 칸이다**(카드 BC) | `local` |
 | github_token_encrypted | bytea | null 허용 | OAuth 토큰. 앱 비밀키로 암호화. push에 사용. **null이면 미등록** — GitHub 직접 push로만 알려진 사람(자리표시). 로그인하면 채워진다 | |
 
 ### commit_emails
