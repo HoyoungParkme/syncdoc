@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import tarfile
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
@@ -400,3 +401,29 @@ async def init_specs(workdir: Path) -> dict[str, str]:
     files["docs/specs/assets/.gitkeep"] = ""
     files[README_PATH] = _readme()
     return files
+
+
+async def archive(workdir: Path, commit: str, dest: Path) -> None:
+    """SYNC-MS-009#git.archive
+
+    커밋된 파일만 dest에 푼다. 작업 사본을 건드리지 않고 .gitignore된 산출물이 섞이지 않는다
+    (코드 그래프, INFRA 4.3). filter="data"는 dest 밖으로 새는 경로·링크를 막는다.
+    """
+    dest.mkdir(parents=True, exist_ok=True)
+    tar = dest / ".src.tar"
+    await _run(workdir, "archive", "--format=tar", "-o", str(tar), commit)
+    try:
+        with tarfile.open(tar) as t:
+            t.extractall(dest, filter="data")
+    finally:
+        tar.unlink(missing_ok=True)
+
+
+async def changed_paths(workdir: Path, range: str) -> list[str]:
+    """SYNC-MS-009#git.changed_paths
+
+    범위에서 바뀐 경로 전부 — changed_files와 달리 명세 밖도 거르지 않는다. 코드가
+    바뀌었는지(process_commit 5a)만 보려는 것이다.
+    """
+    out = await _run(workdir, "diff", "--name-only", range)
+    return [line for line in out.splitlines() if line.strip()]
