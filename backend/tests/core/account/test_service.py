@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import AccountService, _fernet
 from app.core.errors import EmailTaken, NotFound, Unauthorized
@@ -125,6 +126,7 @@ def test_create_placeholder_inserts_unregistered_user(db_session: Session) -> No
         None,
         None,
     )
+    assert p.kind == "placeholder"  # 자리표시 판정은 이 칸 (카드 BC)
     with pytest.raises(Unauthorized):
         AccountService.github_token_for(p)
 
@@ -144,6 +146,7 @@ async def test_login_github_first_login_creates_user(db_session: Session, mock_g
         "code", "state", "http://testserver/auth/github/callback"
     )
     assert (u.github_user_id, u.github_login, u.display_name) == (42, "hoyoung", "박호영")
+    assert u.kind == "github"
     assert AccountService.github_token_for(u) == "gho_hoyoung"
     assert u.github_token_encrypted != b"gho_hoyoung"
     assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 1
@@ -169,6 +172,7 @@ async def test_login_github_fills_placeholder_row(db_session: Session, mock_gith
     mock_github(github_ok(42, "hoyoung", "박호영"))
     u = await svc.login_github("code", "state", "http://testserver/auth/github/callback")
     assert u.id == ghost.id and u.github_user_id == 42 and u.display_name == "박호영"
+    assert u.kind == "github"  # 자리표시가 계정이 됐다
     assert AccountService.github_token_for(u) == "gho_hoyoung"
     assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 1
 
@@ -211,6 +215,61 @@ def test_user_for_commit_falls_back_to_login(db_session: Session) -> None:
 def test_user_for_commit_creates_placeholder_when_neither_matches(db_session: Session) -> None:
     found = AccountService(db_session).user_for_commit("nobody@example.com", "Hoyoung Park")
     assert found.github_user_id is None and found.github_login == "Hoyoung Park"
+
+
+def test_user_for_commit_in_closed_edition_is_always_the_local_user(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """폐쇄망판 — 어떤 이메일·login이든 로컬 사용자, 자리표시를 만들지 않는다 (PRD R15)."""
+    monkeypatch.setattr(settings, "EDITION", "closed")
+    svc = AccountService(db_session)
+    me = svc.ensure_local_user("local", "박호영")
+    other = make_user(db_session, login="hoyoung")
+    svc.add_commit_email(other, "me@example.com")
+    assert svc.user_for_commit("me@example.com", "hoyoung").id == me.id
+    assert svc.user_for_commit("x@y.z", "Somebody Else").id == me.id
+    kinds = db_session.execute(text("SELECT kind FROM users ORDER BY id")).scalars().all()
+    assert kinds == ["local", "github"]
+
+
+# ── ensure_local_user · local_user (카드 BC) ──
+def test_ensure_local_user_makes_one_row_and_follows_settings(db_session: Session) -> None:
+    svc = AccountService(db_session)
+    first = svc.ensure_local_user("local", "local")
+    again = svc.ensure_local_user("local", "local")
+    renamed = svc.ensure_local_user("me", "박호영")
+    assert first.id == again.id == renamed.id and first.kind == "local"
+    assert (renamed.github_login, renamed.display_name) == ("me", "박호영")
+    assert renamed.github_user_id is None and renamed.github_token_encrypted is None
+    assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 1
+
+
+@pytest.mark.parametrize("token", ["gho_x", None])
+def test_ensure_local_user_refuses_a_login_someone_else_has(
+    db_session: Session, token: str | None
+) -> None:
+    """GitHub 계정·자리표시와 같은 아이디면 켜지지 않는다 — 남의 이력과 토큰을 물려받지 않게."""
+    taken = make_user(db_session, login="hoyoung", token=token)
+    svc = AccountService(db_session)
+    with pytest.raises(RuntimeError, match="LOCAL_LOGIN"):
+        svc.ensure_local_user("hoyoung", "박호영")
+    mine = svc.ensure_local_user("local", "local")
+    with pytest.raises(RuntimeError):
+        svc.ensure_local_user("hoyoung", "박호영")  # 이름을 바꿔도 겹치면 같다
+    db_session.refresh(taken)
+    db_session.refresh(mine)
+    assert (taken.kind, mine.github_login) == ("github", "local")
+
+
+def test_local_user_returns_the_row_or_makes_it_from_settings(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "LOCAL_LOGIN", "solo")
+    monkeypatch.setattr(settings, "LOCAL_NAME", "")
+    svc = AccountService(db_session)
+    made = svc.local_user()  # 없으면 설정대로 — 이름이 비면 아이디
+    assert (made.kind, made.github_login, made.display_name) == ("local", "solo", "solo")
+    assert svc.local_user().id == made.id
 
 
 def test_user_for_commit_is_case_insensitive(db_session: Session) -> None:

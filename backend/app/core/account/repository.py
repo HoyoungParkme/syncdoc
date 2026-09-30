@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.account.models import AccessToken, CommitEmail, User
+from app.core.types import UserKind
 
 
 class AccountRepository:
@@ -28,8 +29,13 @@ class AccountRepository:
 
     def placeholder_by_login(self, login: str) -> User | None:
         return self.session.scalar(
-            select(User).where(User.github_login == login, User.github_user_id.is_(None))
+            select(User).where(User.github_login == login, User.kind == UserKind.placeholder)
         )
+
+    def local_user(self) -> User | None:
+        """폐쇄망판 로컬 사용자 — 하나뿐이다 (PRD R15). 혹시 둘이면 먼저 만든 것."""
+        stmt = select(User).where(User.kind == UserKind.local).order_by(User.id).limit(1)
+        return self.session.scalar(stmt)
 
     def add_user(self, user: User) -> User:
         self.session.add(user)
