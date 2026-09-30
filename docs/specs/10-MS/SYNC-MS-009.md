@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-009
 type: MS
 title: MINISPEC — infra — git·github 어댑터
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`infra/git.py · infra/github.py · infra/llm.py`의 함수 16개. 클래스 명세 [[SYNC-DOM-002]] 4.9의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`infra/git.py · infra/github.py · infra/llm.py · infra/graphify.py`의 함수 20개. 클래스 명세 [[SYNC-DOM-002]] 4.9의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -35,11 +35,15 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#git.rev_list_count]] | 밀린 커밋 수 |
 | [[#git.exists]] | 경로 존재 |
 | [[#git.init_specs]] | 11단계 디렉터리·템플릿 |
+| [[#git.archive]] | 커밋의 파일을 폴더에 푼다 |
+| [[#git.changed_paths]] | 범위에서 바뀐 경로 전부 |
 | [[#github.verify_signature]] | webhook 서명 |
 | [[#github.exchange_code]] | OAuth code → token |
 | [[#github.get_user]] | token → 사용자 정보 |
 | [[#github.create_repo]] | 공개 저장소 만들기 |
 | [[#llm.step]] | 모델 한 번 호출 + 도구 호출 파싱 |
+| [[#llm.step_stream]] | 스트림으로 한 번 호출 — 글자 조각과 끝의 LlmStep |
+| [[#graphify.extract]] | graphify로 코드만 추출 |
 
 ---
 
@@ -268,6 +272,32 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ---
 
+#### git.archive 커밋의 파일을 폴더에 푼다
+
+**시그니처** `async def archive(workdir: Path, commit: str, dest: Path) -> None`
+
+근거: [[SYNC-UC-001#UC-S8]] 기본 흐름 2 · [[SYNC-INFRA-001]] 4.3
+
+**처리** `git archive --format=tar -o {dest}/.src.tar {commit}` → `tarfile`로 `dest`에 푼다(`filter="data"` — 경로 밖으로 새는 항목을 막는다) → tar 파일을 지운다. **작업 사본을 건드리지 않는다** — 커밋된 파일만, `.gitignore`된 산출물은 없다
+
+**예외** 커밋이 없거나 git 실패 → `! GitError`
+
+**테스트 관점** 커밋 시점의 파일만 풀린다(그 뒤에 바꾼 것은 없다) · 작업 사본의 추적 안 하는 파일은 안 나온다
+
+---
+
+#### git.changed_paths 범위에서 바뀐 경로 전부
+
+**시그니처** `async def changed_paths(workdir: Path, range: str) -> list[str]`
+
+근거: [[SYNC-MS-007#pipeline.process_commit]] 5a
+
+**처리** `git diff --name-only {range}` → 경로 목록. `changed_files`와 달리 **명세 밖도 전부**다 — 코드가 바뀌었는지 보려는 것이라 거르지 않는다
+
+**테스트 관점** 코드와 명세를 같이 바꾼 범위 → 둘 다 나온다
+
+---
+
 #### git.sync_readme 저장소 README를 지금 판으로
 
 **시그니처**
@@ -366,6 +396,31 @@ async def create_hook(token: str, owner: str, name: str, url: str, secret: str) 
 **예외** `! unauthorized {reason}` — 토큰에 `admin:repo_hook`이 없거나(403·404) GitHub이 거절. **사유를 그대로 싣되 비밀번호는 절대 싣지 않는다**
 
 **테스트 관점** 없을 때 만든다 · **이미 같은 주소면 안 만들고 그 id** · 권한 없으면 `unauthorized` · 보낸 본문에 `events: ["push"]`가 있다 · 예외 메시지에 비밀번호가 없다
+
+---
+
+
+---
+
+#### graphify.extract graphify로 코드만 추출
+
+**시그니처** `async def extract(src_dir: Path) -> dict`
+
+근거: [[SYNC-UC-001#UC-S8]] 기본 흐름 2 · [[SYNC-INFRA-001]] 3장·4.3 · 사용자 결정 2026-09-30
+
+**처리**
+1. `sys.executable -m graphify update {src_dir} --no-cluster` — 코드 파일만 tree-sitter로 읽는다(모델 없음). `.gitignore`와 `.graphifyignore`는 graphify가 따른다
+2. **환경변수를 비운다** — `PATH`·`LANG`만 넘기고 `HOME`은 `src_dir`로. 모델 키가 graphify에 닿지 않는다
+3. 타임아웃 코드 상수 `_TIMEOUT = 120`초
+4. `→ json.load(src_dir/graphify-out/graph.json)`
+
+**예외** 종료 코드가 0이 아니면 `! CodeGraphFailed(stderr 마지막 줄)` · 타임아웃 → `! CodeGraphFailed("시간 초과")` · 결과 파일이 없거나 JSON이 아님 → `! CodeGraphFailed("graph.json 없음")`
+
+**호출하는 것** 없음. 바깥만 만진다
+
+**호출되는 것** [[SYNC-MS-011#codegraph.load]]
+
+**테스트 관점** 파이썬 파일 둘(한쪽이 다른 쪽을 부른다) → 함수 노드와 `calls` 선이 있다 · 넘기는 환경에 `LLM_API_KEY`가 없다 · 존재하지 않는 폴더 → `CodeGraphFailed`
 
 ---
 
