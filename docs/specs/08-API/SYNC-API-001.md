@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -783,13 +783,14 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 **대화에 저장한다**(카드 AQ, 2026-09-29). 요청은 `conversation_id`로 어느 대화인지 말하고, 앞 대화(`history`)는 서버가 그 대화의 턴에서 `LLM_MAX_TURNS`턴까지 만든다 — 클라이언트가 보내지 않는다. 질문을 받자마자 턴이 생기고 `answer`·`error` 뒤에 닫힌다(실패한 턴은 뒤 질문에 안 실린다). `attachment_ids`는 그 대화에 올려 두고 아직 안 보낸 첨부(3.5)를 이 질문에 붙인다 — 이미지는 이 질문의 메시지에 그대로, 글자·PDF는 모델이 `read_attachment`로 읽는다. 키가 없으면 `llm-not-configured`이고 화면은 탭 자체를 감춘다(`GET /api/me`의 `llm_enabled`).
 
-**응답은 SSE다.** `200 text/event-stream`, 헤더 `Cache-Control: no-cache` · `X-Accel-Buffering: no`. 프레임은 `event: {이름}\ndata: {JSON}\n\n`. 이벤트 다섯:
+**응답은 SSE다.** `200 text/event-stream`, 헤더 `Cache-Control: no-cache` · `X-Accel-Buffering: no`. 프레임은 `event: {이름}\ndata: {JSON}\n\n`. 이벤트 여섯:
 
 | 이벤트 | data | 언제 |
 |---|---|---|
 | `start` | `AskStart {doc_id, item_id}` | 시작 맥락 조립 직후, 첫 모델 호출 전. **이 앞의 오류(404·503·401)는 HTTP 상태 코드** |
 | `note` | `AskNote {text}` | 모델이 읽기 전에 쓴 한 줄(도구 인자 `reason`). 도구마다 하나 |
 | `read` | `AskRead {tool, target}` | 도구 실행이 끝났다. `target`은 `DOC#ITEM`·`DOC`·`첨부:이름`, 목록이면 null |
+| `delta` | `AskDelta {text}` | 모델이 지금 쓰는 글자 조각 — 받는 대로 바로. **진실이 아니다**: 그 호출이 도구로 끝나면 `note`가, 답으로 끝나면 `answer`가 전체 글을 다시 준다(카드 AW) |
 | `answer` | `AskAnswer {answer, context_item_ids}` | 마지막. 스트림 종료 |
 | `error` | problem+json 본문 그대로 `{type, title, status, detail, reason?}` | 루프 중 실패(`llm-unavailable` 등). 스트림 종료 |
 
@@ -807,7 +808,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
             $ref: '#/components/schemas/AskRequest'
     responses:
       '200':
-        description: 이벤트 스트림. start → (note·read)* → answer | error
+        description: 이벤트 스트림. start → (delta·note·read)* → answer | error
         content:
           text/event-stream:
             schema:
@@ -815,6 +816,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
               - $ref: '#/components/schemas/AskStart'
               - $ref: '#/components/schemas/AskNote'
               - $ref: '#/components/schemas/AskRead'
+              - $ref: '#/components/schemas/AskDelta'
               - $ref: '#/components/schemas/AskAnswer'
       '404':
         description: 문서 없음 · 소유하지 않은 프로젝트 · item_id가 이 문서에 없음 · conversation_id가 내 것이 아니거나 다른 프로젝트
@@ -1955,6 +1957,14 @@ components:
           type: string
           nullable: true
     AskNote:
+      type: object
+      description: 모델이 읽기 전에 쓴 한 줄 — 무엇을 왜 읽는지. 화면 8.9
+      required:
+      - text
+      properties:
+        text:
+          type: string
+    AskDelta:
       type: object
       description: 모델이 읽기 전에 쓴 한 줄 — 무엇을 왜 읽는지. 화면 8.9
       required:
