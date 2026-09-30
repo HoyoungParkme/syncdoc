@@ -163,7 +163,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 3. 파일 쓰기 (`path` 또는 `files`). 상위 디렉터리 없으면 생성 · `delete`면 `git rm -q --ignore-unmatch {paths}`
    - **경로 가드**(카드 BB) — 쓰거나 지울 경로마다 `(workdir / p).resolve()`가 작업 사본 안이고 `.git` 조각이 없어야 한다. 아니면 쓴 것 없이 `! push-failed {reason: 작업 사본 밖 경로}`. push로 심은 심볼릭 링크를 따라 밖에 쓰거나 `.git/hooks`에 써서 서버가 코드를 돌리게 되는 것을 막는다
 4. `git add {paths}` · if `git diff --cached --quiet` (변경 없음) → `→ 현재 HEAD` (커밋 안 만듦. 같은 내용 재저장 · 이미 없는 파일 삭제)
-5. `git -c user.name={display_name} -c user.email={login}@users.noreply.github.com commit -m {message}`
+5. `git -c user.name={display_name} -c user.email={email} commit -m {message}` — `email`은 `{login}@users.noreply.github.com`. **로컬 사용자(`kind == local`, 폐쇄망판)면 `{login}@syncdoc.local`** — GitHub 계정이 아니므로 GitHub 주소를 지어내지 않는다([[SYNC-PRD-001#R15]])
 6. `git push {url with token} HEAD:main` — 기본 브랜치는 `main` 고정(결정). 다른 브랜치 저장소는 v1에서 지원 안 함
    - if 거부(non-fast-forward, UC-S7 2a) → `git fetch` · `git rebase origin/main` · if rebase 충돌 → `git rebase --abort`, `git reset --hard origin/main`, `! push-failed {reason: conflict}` · else → push 재시도. **`PUSH_RETRIES`회까지**(기본 3)
    - if 다 쓰고도 실패 → `git reset --hard origin/main`, `! push-failed {reason: stderr}`
@@ -185,7 +185,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** [[SYNC-MS-006#AccountService.github_token_for]]
 
-**테스트 관점** **작업 사본 밖을 가리키는 심볼릭 링크를 지나는 경로·`.git/` 경로 → `push-failed`, 아무것도 안 쓴다** · **서버 안 경로 원격 + 토큰 없는 사람 → push 성공**(토큰을 안 구한다) · **https 원격 + 토큰 없는 사람 → `push-failed 미등록`** · 커밋이 하나도 없는 원격 → 이 커밋이 첫 커밋 · 정상 → 원격에 커밋, 반환 해시 = 원격 HEAD · 같은 내용 → 커밋 안 생김, HEAD 반환 · 원격이 앞서 있음(다른 파일) → rebase 후 성공 · 연달아 두 번 앞서도 성공(재시도 2회) · 원격이 같은 파일 수정 → conflict, 작업 사본 원상 · 토큰이 config에 안 남음 · **git 로케일이 영어가 아니어도 거부를 거부로 판정**
+**테스트 관점** **작업 사본 밖을 가리키는 심볼릭 링크를 지나는 경로·`.git/` 경로 → `push-failed`, 아무것도 안 쓴다** · **서버 안 경로 원격 + 토큰 없는 사람 → push 성공**(토큰을 안 구한다) · **https 원격 + 토큰 없는 사람 → `push-failed 미등록`** · 로컬 사용자 → 커밋 이메일 `{login}@syncdoc.local` · 커밋이 하나도 없는 원격 → 이 커밋이 첫 커밋 · 정상 → 원격에 커밋, 반환 해시 = 원격 HEAD · 같은 내용 → 커밋 안 생김, HEAD 반환 · 원격이 앞서 있음(다른 파일) → rebase 후 성공 · 연달아 두 번 앞서도 성공(재시도 2회) · 원격이 같은 파일 수정 → conflict, 작업 사본 원상 · 토큰이 config에 안 남음 · **git 로케일이 영어가 아니어도 거부를 거부로 판정**
 
 ---
 
@@ -271,9 +271,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-UC-001#UC-A1]] 4 · [[SYNC-STD-001]] 1.1
 
-**처리** 반환할 `files` dict 구성 — `docs/specs/{NN-TYPE}/.gitkeep` 12개(11단계는 `01-RFQ`…`11-CODE`, 단계 밖 `STD`는 번호 없이 — STD-001 1.1), `docs/specs/assets/.gitkeep`, `docs/specs/README.md` — **모두 14개**. **템플릿·규약 사본은 넣지 않는다**(카드 AB, #113·#129) — 한 번 복사된 사본은 규약이 바뀌어도 갱신되지 않아 여덟 저장소가 낡은 안내를 들고 있었다. 대신 README가 `SPECS_URL`로 싱크독 저장소의 규약·템플릿을 가리키고, 에이전트는 [[SYNC-API-002#get_template]]으로 내장 원본을 받는다. `docs/specs/README.md`(규약 링크 + 11단계 순서표. **DOM 행에 셋의 순서** — 도메인 모델은 여기서, 클래스 명세·ERD는 API 뒤에([[SYNC-STD-001]] 2.6) — 와 **작업 단위 한 줄** — 문서 하나마다 멈춘다(STD-001 1.8) — 가 들어간다. 에이전트가 저장소에서 처음 읽는 글이라 여기 없으면 규약이 없는 것과 같다. **규약 본문은 링크다** — 첫 문단이 `SPECS_URL`로 SYNC-STD-001·STD-004·`_templates/`를 가리킨다). `→ files` — 실제 쓰기·커밋은 `commit_push(files=…)`
+**처리** 반환할 `files` dict 구성 — `docs/specs/{NN-TYPE}/.gitkeep` 12개(11단계는 `01-RFQ`…`11-CODE`, 단계 밖 `STD`는 번호 없이 — STD-001 1.1), `docs/specs/assets/.gitkeep`, `docs/specs/README.md` — **모두 14개**. **템플릿·규약 사본은 넣지 않는다**(카드 AB, #113·#129) — 한 번 복사된 사본은 규약이 바뀌어도 갱신되지 않아 여덟 저장소가 낡은 안내를 들고 있었다. 대신 README가 `settings.specs_url`로 싱크독 저장소의 규약·템플릿을 가리키고(**폐쇄망판에서 `SPECS_URL`이 기본값 그대로면 `{PUBLIC_BASE_URL}/specs`** — 이미지 안 사본, [[SYNC-API-001#GET/specs/{path}]]), 에이전트는 [[SYNC-API-002#get_template]]으로 내장 원본을 받는다. `docs/specs/README.md`(규약 링크 + 11단계 순서표. **DOM 행에 셋의 순서** — 도메인 모델은 여기서, 클래스 명세·ERD는 API 뒤에([[SYNC-STD-001]] 2.6) — 와 **작업 단위 한 줄** — 문서 하나마다 멈춘다(STD-001 1.8) — 가 들어간다. 에이전트가 저장소에서 처음 읽는 글이라 여기 없으면 규약이 없는 것과 같다. **규약 본문은 링크다** — 첫 문단이 `SPECS_URL`로 SYNC-STD-001·STD-004·`_templates/`를 가리킨다). `→ files` — 실제 쓰기·커밋은 `commit_push(files=…)`
 
-**테스트 관점** 파일 14개 · `.gitkeep` 디렉터리가 11단계 + `STD` + `assets` · `_templates/`가 **없다** · README에 `SPECS_URL` 링크와 11단계 표·작업 단위 한 줄·DOM 셋 순서가 있다
+**테스트 관점** 파일 14개 · `.gitkeep` 디렉터리가 11단계 + `STD` + `assets` · `_templates/`가 **없다** · README에 `SPECS_URL` 링크와 11단계 표·작업 단위 한 줄·DOM 셋 순서가 있다 · 폐쇄망판 → 링크가 `{PUBLIC_BASE_URL}/specs/STD/SYNC-STD-001.md`, `SPECS_URL`을 주면 그것
 
 ---
 
