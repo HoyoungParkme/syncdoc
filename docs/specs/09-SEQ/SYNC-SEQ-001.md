@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -1019,7 +1019,8 @@ sequenceDiagram
     Q-->>RD: start {doc_id, item_id}
     RD-->>U: 200 text/event-stream — 이 앞의 오류는 상태 코드, 뒤는 error 이벤트
     loop 도구 8번 · 전체 120초 안
-        Q->>LLM: step(system, 대화록, tools) — 이 턴의 user 항목에 images (vision)
+        Q->>LLM: step_stream(system, 대화록, tools) — 이 턴의 user 항목에 images (vision)
+        Q-->>U: delta {text} — 모델이 쓰는 글자 조각을 바로 (카드 AW). 답인지 메모인지는 뒤 이벤트가 정한다
         LLM-->>Q: tool_calls 또는 답 문자열 — 실패하면 llm-unavailable → error 이벤트 (4a)
         Q-->>U: note {reason} — 무엇을 왜 읽는지
         Q->>Q: ask_tool(name, args, code, user, conversation_id)
