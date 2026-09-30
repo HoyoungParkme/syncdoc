@@ -1261,6 +1261,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AU | `card/AU-answer-text` | `ed661fa` | #224 | 2026-09-30 |
 | AV | `card/AV-keep-all` | `b966ebb` | #228 | 2026-09-30 |
 | AW | `card/AW-stream` | `2e243f4` | #230 | 2026-09-30 |
+| AX | `card/AX-code-graph` | `171df7c` | #232 | 2026-09-30 |
 | (#119) | `fix/119-single-render` | — | #119 | 2026-09-23 |
 | (#126) | `fix/126-view-build-specs` | — | #126 | 2026-09-23 |
 | (#133) | `fix/133-tokens-by-chapter` | — | #133 | 2026-09-23 |
