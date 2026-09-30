@@ -27,23 +27,23 @@ upstream: [SYNC-PRD-001, SYNC-UC-001]
 
 #### C1 명세 원본은 각 프로젝트 코드 저장소의 `docs/specs/`에 산다
 
-출처: [[SYNC-PRD-001#R5]]
+출처: [[SYNC-PRD-001#R5]] · [[SYNC-PRD-001#R14]] — 저장소는 프로젝트마다 GitHub 저장소 또는 서버 저장소(싱크독 서버 안의 git)
 
 #### C2 저장소가 단일 진실 원천이다. DB는 색인이며 재구축 가능해야 한다
 
 출처: [[SYNC-PRD-001#N3]]
 
-#### C3 입구가 둘이다 — 사람은 웹, 에이전트는 MCP. 본문 쓰기는 MCP와 GitHub push뿐이고 웹은 읽기·상태·되돌리기·휴지통
+#### C3 입구가 둘이다 — 사람은 웹, 에이전트는 MCP. 본문 쓰기는 MCP와 저장소 push뿐이고 웹은 읽기·상태·되돌리기·휴지통
 
 출처: [[SYNC-PRD-001#R9]], USECASE 액터
 
-#### C4 저장 경로(MCP·GitHub push, 그리고 웹의 되돌리기·상태 변경)가 **같은 파이프라인**을 거쳐야 한다
+#### C4 저장 경로(MCP·저장소 push, 그리고 웹의 되돌리기·상태 변경)가 **같은 파이프라인**을 거쳐야 한다
 
 출처: UC-S1·S2
 
 #### C5 플랫폼이 꺼져 있어도 팀원이 저장소에서 명세를 읽고 쓸 수 있어야 한다. 싱크독이 관여하지 않는 경로이므로 유스케이스가 아니라 제약이며, R1(frontmatter에 상태)·R5(MD를 git에)로 충족된다
 
-출처: [[SYNC-PRD-001#N3]], [[SYNC-SCN-001#S7]]
+출처: [[SYNC-PRD-001#N3]], [[SYNC-SCN-001#S7]]. GitHub 프로젝트의 제약이다 — 서버 저장소([[SYNC-PRD-001#R14]])는 싱크독 서버 안에 있어 플랫폼과 함께 돈다. 서버 저장의 대비책은 사람의 clone과 볼륨 백업(6장)이다
 
 #### C6 한 사람이 자기 프로젝트를 쓴다. 사용자는 몇 명이어도 각자다
 
@@ -81,8 +81,10 @@ graph TB
         end
         PG[("PostgreSQL<br/>메타데이터")]
         FS["작업 사본<br/>clone된 저장소"]
+        OR[("서버 저장소<br/>bare git · origins 볼륨")]
         CORE --> PG
         CORE --> FS
+        FS <-->|commit · push · fetch| OR
     end
 
     BR -->|HTTPS| CF
@@ -99,6 +101,7 @@ graph TB
 - **Cloudflare Tunnel** — 노트북이 공개 IP 없이 고정 주소를 갖게 한다. 브라우저·에이전트·GitHub webhook이 모두 이 주소로 들어온다. 노트북에서 밖으로 나가는 연결만 쓰므로 방화벽 설정이 필요 없다.
 - **FastAPI 단일 앱** — 입구는 둘이지만 앱은 하나다. 이유는 4.1 참조.
 - **작업 사본** — 등록된 저장소를 노트북에 clone해 둔 것. 저장 시 여기에 쓰고 커밋해 push한다.
+- **서버 저장소** — GitHub 대신 서버 저장을 고른 프로젝트의 원격([[SYNC-PRD-001#R14]]). 노트북(서버) 안의 bare git이고, 작업 사본은 GitHub 저장소와 똑같이 이것을 clone해 쓴다. 그래서 파이프라인·재구축·코드 그래프가 저장 방식을 가리지 않는다.
 - **점선** — 플랫폼을 거치지 않고 에이전트가 저장소를 직접 읽는 경로. C5의 보장.
 
 ---
@@ -110,7 +113,7 @@ graph TB
 | 백엔드 | Python 3.12 / FastAPI | 요청자 주력 언어. MCP 파이썬 SDK 사용 가능 |
 | 프론트엔드 | React + Vite + TS (SPA, `frontend/`). 유저용 탭 렌더링은 **`tools/view_build.py`를 TS로 옮긴 것**(`md.ts`·`views.ts`·타입별 모듈) — `react-markdown`은 쓰지 않는다(뷰 규약과 바이트 단위로 같아야 해서). `mermaid`(다이어그램) · `react-flow`(UI-8 그래프. **dagre는 안 쓴다** — UI-8 규칙이 열을 11단계로 고정해 배치가 결정적이다) · diff는 직접 | 빌드 결과는 `syncdoc/web/static/`으로, FastAPI가 `/{path:path}` 폴백으로 서빙. 별도 호스팅 없음 |
 | 메타데이터 DB | PostgreSQL | 아래 참고 |
-| Git 조작 | GitPython 또는 `git` CLI 호출 | 작업 사본에서 clone·commit·push |
+| Git 조작 | GitPython 또는 `git` CLI 호출 | 작업 사본에서 clone·commit·push. 서버 저장소는 `git init --bare`로 만든다 — git이 이미지에 들어 있어 폐쇄망에도 따로 설치할 것이 없다 |
 | 다이어그램 | mermaid.js (브라우저 렌더링). 서버 생성물 없음 | PRD R10 |
 | 외부 노출 | Cloudflare Tunnel | C7을 우회하는 유일한 현실적 방법 |
 | 인증 | GitHub OAuth (웹) / 개인 토큰 (MCP) | 5장 |
@@ -207,7 +210,7 @@ sequenceDiagram
 
 저장소마다 노트북에 clone본을 하나 둔다. 모든 git 조작은 여기서 일어난다.
 
-- 프로젝트 등록(UC-A1) 시 clone
+- 프로젝트 등록(UC-A1) 시 clone. 서버 저장이면 서버 저장소(`ORIGINS_DIR/{코드}.git`)를 먼저 만들고 그것을 clone한다
 - 저장 시 쓰기 → commit → push
 - push 거부 시 fetch + rebase 후 재시도 (UC-S7 확장 `2a`)
 - 커밋 메시지는 규격을 따른다. 본문 변경 `spec(문서ID): 요약`, 상태 변경만 `status(문서ID): 이전 → 새상태`. 상태만 바꿔도 커밋이 생기며 접두어로 걸러 볼 수 있다. 둘째 줄부터 이유 — 변경 이력 절을 원본에 두지 않기 때문(STD-001 1.7)
@@ -246,6 +249,8 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 - **`PUBLIC_BASE_URL`의 쓰임**: 앱이 `redirect_uri`를 만들 때 쓴다. 요청 Host가 이 값의 host와 같으면 이 값을, 아니면 요청에서 만든다(`auth.callback_url`). 터널 뒤에서는 프록시가 https를 http로 보이게 하므로 요청만으로는 스킴을 못 믿는다. 비어 있으면 요청에서만 만든다
 - **502·504는 앞단이 덮는다**: Cloudflare는 원본이 보낸 502·504를 자기 오류 페이지로 바꾼다 — Named·Quick 둘 다, 무료 플랜에는 끄는 설정이 없다. 그러면 problem+json의 `reason`이 사람에게 닿지 않으므로 앱은 두 코드를 쓰지 않고, 앱 밖(GitHub·모델) 실패는 424로 보낸다([[SYNC-API-001]] 2장, #76). 500·503은 원본 본문이 통과한다
 - Quick → Named로 바꾸는 날: `.env`에 `TUNNEL_TOKEN`·`PUBLIC_BASE_URL` 넣고 `scripts/tunnel.sh` → OAuth 콜백을 고정 주소로 한 번 고침 → 팀원·에이전트의 MCP 등록을 고정 주소로. 그 뒤로는 재부팅 때 `scripts/tunnel.sh`만
+
+**서버 저장소에는 토큰이 없다.** 원격이 서버 안의 경로라 GitHub 토큰을 쓰지 않는다 — `git.commit_push`는 원격이 `https://`일 때만 토큰을 구한다. 그래서 서버 저장 프로젝트는 GitHub 토큰 없이 등록·저장·되돌리기가 된다([[SYNC-PRD-001#R14]]).
 
 **저장소는 public**: v1은 public 저장소만 다룬다 — `git.fetch`가 토큰 없이 돌기 때문. private 지원은 v2(MS-009 미결 — 그때 OAuth 범위도 `repo`로 넓혀야 한다). `clone`·`push`는 각자의 토큰을 쓰므로 public이어도 쓰기에는 권한이 필요하다. **소유와 저장소 권한은 다른 축이다** — 싱크독은 소유로 보이는 것을 가르고, GitHub는 push에서 저장소 권한을 가른다.
 
@@ -305,6 +310,8 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 | `DIFF_CONTEXT_LINES` | 3 | diff에서 앞뒤로 함께 보여줄 줄 수 |
 | `PUSH_RETRIES` | 3 | push 거부 시 rebase 후 재시도 횟수 |
 | `REPOS_DIR` | `/var/syncdoc/repos` | 작업 사본이 사는 곳 |
+| `ORIGINS_DIR` | `/var/syncdoc/origins` | 서버 저장소가 사는 곳(`{코드}.git`)과 보관 폴더(`_archive/`). **원본이므로 볼륨으로 남기고 백업한다**(6장) |
+| `STORAGE_MODES` | `github,server` | 이 서버에서 켠 저장 방식. 쉼표로 둘 중 하나 이상. 켜지 않은 방식으로는 프로젝트를 만들 수 없다([[SYNC-PRD-001#R14]]) |
 | `SPECS_URL` | `https://github.com/HoyoungParkme/syncdoc/blob/main/docs/specs` | 새 저장소 README가 규약·템플릿을 가리키는 주소. 싱크독 저장소를 옮기면 바꾼다 (카드 AB) |
 | `LLM_API_KEY` | **빈 값** | 모델 키. 비면 읽는 중 질의가 꺼진다 (5.3) |
 | `LLM_API_URL` | `https://api.openai.com/v1/chat/completions` | OpenAI 호환 Chat Completions 주소. 호환 서버면 바꾼다 (5.3) |
@@ -351,8 +358,12 @@ C2에 따라 **저장소가 원본이고 DB는 색인**이다. 어느 쪽에 무
 | 참조 관계 | DB (본문에서 추출) | 본문에서 재추출 가능 |
 | 프로젝트 등록 | DB | 재등록 필요 |
 | 발급 토큰 | DB | 재발급 필요 |
+| 서버 저장소([[SYNC-PRD-001#R14]]) | `ORIGINS_DIR/{코드}.git` — 서버 저장 프로젝트의 명세·첨부·이력 원본 | 손실 없음. 대신 **볼륨을 잃으면 원본을 잃는다** — 백업 대상 |
+| 보관된 서버 저장소 | `ORIGINS_DIR/_archive/{코드}-{UTC 시각}.git` — 해제한 서버 저장 프로젝트 | 손실 없음. 같은 코드로 가져오면 되살린다(UC-A1 3b) |
 | 코드 그래프([[SYNC-PRD-001#R13]]) | DB `code_graphs` — 프로젝트마다 한 행, 함수·호출 선·항목 ID. **코드 본문은 없다**(저장소에서 읽는다) | 코드에서 다시 만든다 — 다음 코드 커밋이나 재구축(UC-S8) |
 | 대화·첨부([[SYNC-PRD-001#R11]]) | **DB에만**(대화·턴·첨부 표. 첨부 바이트도 `bytea`) | **잃는다.** 읽는 사람의 메모라 원본이 없다 — 남길 값은 명세에 옮겼어야 한다. 재구축(UC-S6)은 이 표들을 건드리지 않는다 |
+
+**서버 저장이면 볼륨이 원본이다.** GitHub 프로젝트는 GitHub가 원본을 들고 있지만, 서버 저장 프로젝트는 `ORIGINS_DIR`(볼륨 `origins`)이 유일한 원본이다. 그 볼륨과 DB 덤프를 함께 백업한다 — DB만 백업하면 명세를 잃고, 볼륨만 백업하면 대화·첨부를 잃는다.
 
 **복구 불가 항목은 대화·첨부뿐이다.** 원본에 없는 것 중 프로젝트 등록과 발급 토큰은 다시 만들면 되고, 대화·첨부는 메모라 잃어도 명세는 그대로다(2026-09-29 사용자 결정 — 보관은 편의이지 원본이 아니다). DB 백업(8장)이 유일한 보호다. 끊어진 참조도 본문에서 재추출된다 — `is_missing`은 저장된 사실이 아니라 대상이 있는지를 본 결과다. v1에는 플래그·전파결정·댓글이 있어 세 표를 자연키 JSON으로 저장소 `backup/tracking.json`에 하루 한 번 커밋했다(옛 6.1). 셋을 빼면서([[SYNC-DOM-001]] 3.3) 백업도 함께 사라졌다. 그 파일은 각 저장소에 그대로 두고 지우지 않는다 — 파이프라인이 보는 경로(`docs/specs/`) 밖이라 아무것도 오해하지 않고, 옛 기록을 태그 `v1-collab`의 코드로 되살릴 유일한 사본이다.
 
@@ -373,6 +384,8 @@ C7 때문에 원래는 webhook을 받을 수 없었으나, Cloudflare Tunnel로 
 
 **코드가 바뀐 커밋이면 코드 그래프를 다시 만든다**([[SYNC-UC-001#UC-S8]]). 명세 처리가 끝난 뒤 저장소 락 **밖에서**, 프로젝트마다 하나씩 — 만드는 동안 또 들어오면 끝난 뒤 최신 커밋으로 한 번 더. 그래프가 아직 없으면 명세만 바뀐 커밋에서도 만든다.
 
+**서버 저장소에는 통지가 없다.** 원격이 서버 안이라 밖에서 바뀌지 않는다 — 바뀌는 길은 싱크독 자신의 커밋과 서버 저장소의 git 입구([[SYNC-PRD-001#R14]])뿐이다. 폴링은 서버 저장소에도 그대로 돈다(서버 안 fetch라 가볍다). 통지 걸기(카드 AF)는 서버 저장소에서 할 것이 없다.
+
 **밀린 커밋이 여럿이면 최종 상태만 저장한다.** `last_processed_commit..HEAD` 범위의 변경 파일을 한 번에 읽어 파일마다 버전 하나. 중간 커밋은 git에만 남는다. 커밋마다 버전을 복원하는 건 재구축(UC-S6)뿐이다.
 
 ---
@@ -381,8 +394,8 @@ C7 때문에 원래는 webhook을 받을 수 없었으나, Cloudflare Tunnel로 
 
 ```
 docker compose up
-├── app   FastAPI + React 빌드 결과   :8000
-└── db    PostgreSQL                  :5432
+├── app   FastAPI + React 빌드 결과   :8000   볼륨 repos(작업 사본) · origins(서버 저장소)
+└── db    PostgreSQL                  :5432   볼륨 pgdata
 ```
 
 Cloudflare Tunnel은 노트북에서 별도로 실행하며 `:8000`을 공개 주소에 연결한다.
