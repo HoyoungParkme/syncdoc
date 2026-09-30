@@ -562,3 +562,68 @@ async def test_changed_paths_lists_everything_in_range(repos: dict[str, Path]) -
     git(repos["work"], "fetch", "-q", "origin")
     paths = await g.changed_paths(repos["work"], f"{base}..{head}")
     assert sorted(paths) == ["backend/app/b.py", "docs/specs/02-PRD/X-PRD-001.md"]
+
+
+# ── http_backend (카드 BB) ──
+async def _empty_body():
+    return
+    yield b""  # 비동기 생성기로 만든다
+
+
+async def test_http_backend_advertises_upload_and_receive_pack(tmp_path: Path) -> None:
+    """info/refs 광고 — 읽기는 그냥, 쓰기는 REMOTE_USER가 있어야 한다(없으면 http-backend가 403)."""
+    await g.init_bare(tmp_path / "ABC.git")
+    for service, user in (("git-upload-pack", ""), ("git-receive-pack", "hoyoung")):
+        env = {
+            "REQUEST_METHOD": "GET",
+            "PATH_INFO": "/ABC.git/info/refs",
+            "QUERY_STRING": f"service={service}",
+        }
+        if user:
+            env["REMOTE_USER"] = user
+        r = await g.http_backend(tmp_path, env, _empty_body())
+        body = b"".join([c async for c in r.body])
+        assert r.status == 200, (service, r.status, body[:200])
+        assert (
+            "Content-Type",
+            f"application/x-{service}-advertisement",
+        ) in r.headers
+        assert f"# service={service}".encode() in body
+    # REMOTE_USER 없이 쓰기 광고 → 403
+    env = {
+        "REQUEST_METHOD": "GET",
+        "PATH_INFO": "/ABC.git/info/refs",
+        "QUERY_STRING": "service=git-receive-pack",
+    }
+    r = await g.http_backend(tmp_path, env, _empty_body())
+    _ = [c async for c in r.body]
+    assert r.status == 403
+
+
+# ── commit_push 쓰기 경로 가드 (카드 BB) ──
+async def test_commit_push_refuses_paths_outside_the_working_copy(
+    repos: dict[str, Path], tmp_path: Path
+) -> None:
+    """push로 심은 심볼릭 링크를 따라 밖에 쓰거나 .git 안에 쓰는 것을 거부한다 — 아무것도 안 쓴다."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (repos["other"] / "escape").symlink_to(outside)
+    git(repos["other"], "add", "escape")
+    git(repos["other"], "commit", "-q", "-m", "링크")
+    git(repos["other"], "push", "-q", "origin", "HEAD:main")
+    head = git(repos["remote"], "rev-parse", "main")
+    for bad in ("escape/evil.txt", ".git/hooks/pre-commit", "a/../../x.txt"):
+        with pytest.raises(PushFailed) as ei:
+            await g.commit_push(repos["work"], "m", _author(), files={bad: "x"})
+        assert "작업 사본 밖" in ei.value.extra["reason"], bad
+    assert list(outside.iterdir()) == []
+    assert not (repos["work"] / ".git" / "hooks" / "pre-commit").exists()
+    assert git(repos["remote"], "rev-parse", "main") == head
+
+
+async def test_commit_push_file_over_folder_is_push_failed(repos: dict[str, Path]) -> None:
+    """파일 자리에 폴더가 있으면 쓰기 실패 — push-failed로, 작업 사본은 원격 그대로."""
+    with pytest.raises(PushFailed) as ei:
+        await g.commit_push(repos["work"], "m", _author(), files={"docs/specs": "x"})
+    assert "쓰기 실패" in ei.value.extra["reason"]
+    assert git(repos["work"], "status", "--porcelain") == ""
