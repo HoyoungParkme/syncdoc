@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-010
 type: MS
 title: MINISPEC — ConversationService — 대화·턴·첨부
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001, SYNC-STD-001]
 ---
 
@@ -267,4 +267,4 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001, SYNC-STD-001]
 
 ## 3. 미결사항
 
-- [ ] 첨부 바이트가 DB를 무겁게 하면(수백 MB) 바이트 자리만 객체 저장소로 — 테이블·시그니처는 그대로([[SYNC-INFRA-001]] 3장)
+- [x] 첨부 바이트가 DB를 무겁게 하면(수백 MB) 바이트 자리만 객체 저장소로 — 테이블·시그니처는 그대로([[SYNC-INFRA-001]] 3장) — 결정(2026-09-30): 지금은 bytea. **프로젝트의 첨부 합이 1GB를 넘으면** 그때 새 카드로 바이트 자리만 객체 저장소로 옮긴다. 표·시그니처는 그대로
