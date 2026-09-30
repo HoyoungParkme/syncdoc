@@ -6,6 +6,7 @@ import asyncio
 import re
 import shutil
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -15,12 +16,14 @@ from app.core.account.models import User
 from app.core.account.service import AccountService
 from app.core.errors import (
     ExistingSpecs,
+    InvalidRequest,
     NotFound,
     ProjectCodeConflict,
     ProjectCodeInvalid,
     PushFailed,
     RepoCreateFailed,
     RepositoryAlreadyRegistered,
+    StorageUnavailable,
     Unauthorized,
 )
 from app.core.project.models import Project, Repository
@@ -32,6 +35,7 @@ from app.core.types import (
     HookStatus,
     RebuildResult,
     RepoStatus,
+    Storage,
     SyncResult,
 )
 from app.infra import git, github
@@ -65,6 +69,36 @@ def _split_remote(remote_url: str) -> tuple[str, str]:
     return parts[-2], parts[-1]
 
 
+def _archive_dir() -> Path:
+    return settings.ORIGINS_DIR / "_archive"
+
+
+def _archives(code: str) -> list[Path]:
+    """그 코드의 보관본 — 이름(UTC 시각) 순이라 끝이 가장 최근이다 (MS-001 3s)."""
+    d = _archive_dir()
+    return sorted(d.glob(f"{code}-*.git")) if d.exists() else []
+
+
+def _archive_path(code: str) -> Path:
+    """보관할 자리 `_archive/{code}-{UTC %Y%m%d%H%M%S}.git`. 같은 초에 둘이면 뒤에 번호를 붙인다."""
+    d = _archive_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
+    path, n = d / f"{code}-{stamp}.git", 1
+    while path.exists():
+        path, n = d / f"{code}-{stamp}-{n}.git", n + 1
+    return path
+
+
+def _archived_at(path: Path, code: str) -> str:
+    """보관본 이름의 시각 → ISO 문자열(UTC). 읽을 수 없으면 이름 그대로."""
+    stamp = path.name[len(code) + 1 : len(code) + 15]
+    try:
+        return datetime.strptime(stamp, "%Y%m%d%H%M%S").replace(tzinfo=UTC).isoformat()
+    except ValueError:
+        return path.name
+
+
 class ProjectService:
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -72,66 +106,104 @@ class ProjectService:
 
     async def init_project(
         self,
-        remote_url: str,
+        remote_url: str | None,
         code: str,
         name: str,
         user: User,
         import_existing: bool = False,
         create_repo: bool = False,
+        storage: Storage = Storage.github,
     ) -> Project:
         """SYNC-MS-001#ProjectService.init_project"""
         async with _lock(code):  # 0. 같은 코드 동시 초기화 (UC-A1 2c)
-            return await self._init(remote_url, code, name, user, import_existing, create_repo)
+            return await self._init(
+                remote_url, code, name, user, import_existing, create_repo, Storage(storage)
+            )
 
     async def _init(
         self,
-        remote_url: str,
+        remote_url: str | None,
         code: str,
         name: str,
         user: User,
         import_existing: bool,
         create_repo: bool = False,
+        storage: Storage = Storage.github,
     ) -> Project:
+        # 0a·0b — 저장 방식 (UC-A1 1a·1b, PRD R14). 켠 방식만, GitHub이면 주소가 있어야 한다
+        if storage.value not in settings.storage_modes:
+            raise StorageUnavailable(storage.value, settings.storage_modes)
+        if storage == Storage.github and not remote_url:
+            raise InvalidRequest(
+                [{"loc": "remote_url", "msg": "GitHub 저장은 저장소 주소가 필요하다"}]
+            )
         if not re.fullmatch(r"[A-Z]{1,4}", code):
             raise ProjectCodeInvalid("^[A-Z]{1,4}$")
         if self.repo.exists(code):
             raise ProjectCodeConflict(code)
-        # 2a — 한 저장소를 두 프로젝트가 쓰면 문서 ID가 겹쳐 이력을 덮어쓴다 (UC-A1 2d)
-        owner = self.repo.by_remote_url(remote_url)
-        if owner is not None:
-            raise RepositoryAlreadyRegistered(owner.code)
         workdir = settings.REPOS_DIR / code
-        shutil.rmtree(workdir, ignore_errors=True)
-        token = AccountService.github_token_for(user)
-        # 3b — 없으면 만든다. **기본값이 거짓인 이유**: 참이면 주소 오타가 조용히 새
-        # 저장소를 만든다. 지금은 clone이 실패해 push-failed가 나서 오타를 알아챈다 (카드 F)
-        if create_repo:
-            owner_name, repo_name = _split_remote(remote_url)
-            await github.create_repo(token, owner_name, repo_name)
+        origin: Path | None = None
+        restored: Path | None = None  # 되살린 보관본의 원래 자리 — 실패하면 돌려놓는다
+        token: str | None = None
+        if storage == Storage.server:
+            shutil.rmtree(workdir, ignore_errors=True)
+            # 3s — 서버 안 원본. GitHub 토큰을 구하지 않는다 (카드 BA)
+            origin, restored = await self._server_origin(code, import_existing)
+            remote_url = str(origin)
+        else:
+            assert remote_url is not None  # 0b
+            # 2a — 한 저장소를 두 프로젝트가 쓰면 문서 ID가 겹쳐 이력을 덮어쓴다 (UC-A1 2d)
+            owner = self.repo.by_remote_url(remote_url)
+            if owner is not None:
+                raise RepositoryAlreadyRegistered(owner.code)
+            shutil.rmtree(workdir, ignore_errors=True)
+            token = AccountService.github_token_for(user)
+            # 3b — 없으면 만든다. **기본값이 거짓인 이유**: 참이면 주소 오타가 조용히 새
+            # 저장소를 만든다. 지금은 clone이 실패해 push-failed가 나서 오타를 알아챈다 (카드 F)
+            if create_repo:
+                owner_name, repo_name = _split_remote(remote_url)
+                await github.create_repo(token, owner_name, repo_name)
+
+        def undo_origin() -> None:
+            """서버 저장의 되돌림 — 새로 만든 원본은 지우고, 되살린 것은 보관으로 돌려놓는다."""
+            if origin is None:
+                return
+            if restored is not None:
+                origin.rename(restored)
+            else:
+                shutil.rmtree(origin, ignore_errors=True)
+
         try:
             await git.clone(remote_url, workdir, token)
         except GitError as e:
             shutil.rmtree(workdir, ignore_errors=True)
+            undo_origin()
             raise PushFailed(f"clone: {e.stderr.strip()}") from e
         has = await git.exists(workdir, "docs/specs")
         if has and not import_existing:
             n = len(await git.list(workdir, "docs/specs/*/*.md"))
             shutil.rmtree(workdir, ignore_errors=True)
+            undo_origin()
             raise ExistingSpecs(n)
         savepoint = self.session.begin_nested()
         project = Project(code=code, name=name, owner_user_id=user.id)  # 등록한 사람이 소유자
         self.repo.add(project)
         repository = Repository(
             project_id=project.id,
+            storage=storage.value,
             remote_url=remote_url,
             workdir_path=str(workdir),
             registered_by_user_id=user.id,
         )
         self.repo.add(repository)
-        if has and import_existing:  # 3a2 — 기존 명세를 재구축으로 가져온다. 락·트랜잭션은 그쪽
+        if has and import_existing:  # 3a2·3b2 — 기존 명세를 재구축으로 가져온다. 락·트랜잭션은 그쪽
             from app.core import pipeline  # 서비스가 pipeline을 부르는 유일한 곳(DOM-002 3.2)
 
-            await pipeline.rebuild(code, session=self.session)
+            try:
+                await pipeline.rebuild(code, session=self.session)
+            except BaseException:
+                undo_origin()
+                raise
             return self.repo.by_code(code)
         files = await git.init_specs(workdir)
         author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.mcp)
@@ -142,10 +214,34 @@ class ProjectService:
         except PushFailed:
             savepoint.rollback()
             shutil.rmtree(workdir, ignore_errors=True)
+            undo_origin()
             raise
         repository.last_processed_commit = commit_hash
         self.session.flush()
         return self.repo.by_code(code)
+
+    async def _server_origin(self, code: str, import_existing: bool) -> tuple[Path, Path | None]:
+        """init_project 3s — 서버 저장소를 준비한다. (원본, 되살린 보관본의 원래 자리 | None).
+
+        원본을 잃는 길을 두지 않는다 — 등록되지 않은 채 남은 원본(지난 실패, 사람이 넣은 것)도
+        지우지 않고 보관으로 옮겨 보관본으로 다룬다.
+        """
+        origin = settings.ORIGINS_DIR / f"{code}.git"
+        if origin.exists():
+            origin.rename(_archive_path(code))
+        archives = _archives(code)
+        if archives:
+            latest = archives[-1]
+            if not import_existing:  # 3b — 되살릴지 묻는다
+                try:
+                    n = len(await git.list(latest, "docs/specs/*/*.md"))
+                except GitError:  # 커밋이 하나도 없는 원본
+                    n = 0
+                raise ExistingSpecs(n, archived_at=_archived_at(latest, code))
+            latest.rename(origin)  # 3b2 — 가장 최근 것을 되살린다
+            return origin, latest
+        await git.init_bare(origin)
+        return origin, None
 
     def list_projects(self) -> list[Project]:
         """SYNC-MS-001#ProjectService.list_projects
@@ -209,7 +305,8 @@ class ProjectService:
             RepoStatus(
                 p.code,
                 p.name,
-                p.repository.remote_url,
+                Storage(p.repository.storage),
+                public_remote(p.repository),  # 서버 저장이면 None — 서버 안 경로는 안 낸다
                 p.repository.last_processed_commit,
                 p.repository.synced_at,
                 p.repository.behind_by,
@@ -238,14 +335,24 @@ class ProjectService:
 
             ConversationService(self.session).delete_by_project(project.id)
             CodeGraphService(self.session).delete_by_project(project.id)  # 2a. 코드 그래프
+            server = project.repository.storage == Storage.server
+            origin = Path(project.repository.remote_url)
             self.repo.delete_all_of(project.id)
             self.session.flush()
             shutil.rmtree(workdir, ignore_errors=True)
+            # 4a. 서버 저장이면 원본을 지우지 않고 보관 폴더로 — 같은 코드로 가져오면 되살아난다
+            # (UC-H17, 카드 BA). 부르는 쪽 커밋이 뒤에 실패하면 운영자가 되돌린다(INFRA 6장)
+            if server and origin.exists():
+                origin.rename(_archive_path(code))
 
     async def ensure_hook(self, code: str, user: User) -> HookStatus:
         """SYNC-MS-001#ProjectService.ensure_hook"""
         project = self.get_owned(code, user)  # 남의 것이면 not-found
         repo = project.repository
+        if repo.storage == Storage.server:
+            # 1a. 원본이 서버 안이라 밖에서 바뀌지 않는다 — 서버 경로를 GitHub 주소로 쪼개
+            # API를 부르는 일도 막는다 (INFRA 7장, 카드 BA)
+            return HookStatus("none", "서버 저장소는 통지가 없다", created=False)
         url, secret = settings.PUBLIC_BASE_URL.rstrip("/"), settings.WEBHOOK_SECRET
         if not url or not secret:
             # 받는 쪽이 빈 비밀번호를 전부 거부한다 — 걸어 봐야 안 통하므로 걸지 않는다
@@ -292,7 +399,20 @@ class ProjectService:
 
 
 def _hook_state(repo: Repository) -> str:
-    """push 통지 상태 — ok · none · error (카드 AF). 둘 다 비면 아직 안 걸어 본 것이다."""
+    """push 통지 상태 — ok · none · error (카드 AF). 둘 다 비면 아직 안 걸어 본 것이다.
+
+    서버 저장소는 늘 none — 걸 통지가 없다 (INFRA 7장, 카드 BA).
+    """
+    if repo.storage == Storage.server:
+        return "none"
     if repo.hook_id:
         return "ok"
     return "error" if repo.hook_error else "none"
+
+
+def public_remote(repo: Repository) -> str | None:
+    """밖으로 내보낼 저장소 주소 — GitHub 주소, 서버 저장이면 None(서버 안 경로는 안 낸다).
+
+    요약·상세(queries)와 관리 표(repo_status)가 같은 규칙을 쓴다.
+    """
+    return None if repo.storage == Storage.server else repo.remote_url

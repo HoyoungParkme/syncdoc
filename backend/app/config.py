@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: str = ""
     WEBHOOK_SECRET: str = ""
     REPOS_DIR: Path = Path("/var/syncdoc/repos")
+    # 서버 저장소와 보관 폴더(_archive/). 원본이라 볼륨으로 남기고 백업한다 (INFRA 5.2·6장)
+    ORIGINS_DIR: Path = Path("/var/syncdoc/origins")
+    # 이 서버에서 켠 저장 방식. 쉼표로 github·server 중 하나 이상 (PRD R14, INFRA 5.2)
+    STORAGE_MODES: str = "github,server"
     # 새 저장소 README가 규약·템플릿을 가리키는 주소 (INFRA 5.2, 카드 AB). 저장소를 옮기면 바꾼다
     SPECS_URL: str = "https://github.com/HoyoungParkme/syncdoc/blob/main/docs/specs"
     PUBLIC_BASE_URL: str = ""  # 공개 주소 — Named 고정 호스트 또는 Quick (INFRA 5장). 비면 로컬만
@@ -32,6 +36,15 @@ class Settings(BaseSettings):
     LLM_API_URL: str = "https://api.openai.com/v1/chat/completions"  # OpenAI 호환 Chat Completions
     LLM_MODEL: str = "gpt-4o"
     LLM_MAX_TURNS: int = 10  # 한 대화에서 서버가 받는 최대 턴 수
+
+    @property
+    def storage_modes(self) -> list[str]:
+        """켠 저장 방식 — 적힌 순서대로, 모르는 값과 겹친 값은 뺀다. 비면 github 하나(예전 동작)."""
+        out: list[str] = []
+        for m in (x.strip().lower() for x in self.STORAGE_MODES.split(",")):
+            if m in ("github", "server") and m not in out:
+                out.append(m)
+        return out or ["github"]
 
     @property
     def session_secret(self) -> str:

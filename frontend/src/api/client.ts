@@ -133,9 +133,12 @@ export interface UserRef {
 export interface User extends UserRef {
   created_at: string
 }
-/** GET /api/me — llm_enabled가 거짓이면 UI-5 질문 탭(8.4)이 없다 */
+/** 저장 방식 — PRD R14 (카드 BA). server는 싱크독 서버 안의 git 저장소 */
+export type Storage = 'github' | 'server'
+/** GET /api/me — llm_enabled가 거짓이면 UI-5 질문 탭(8.4)이 없다. storage_modes는 이 서버가 켠 저장 방식(UI-3 2.7) */
 export interface Me extends User {
   llm_enabled: boolean
+  storage_modes: Storage[]
 }
 export interface Author {
   kind: 'human' | 'agent'
@@ -177,7 +180,9 @@ export interface TrashResult {
 export interface ProjectSummary {
   code: string
   name: string
-  remote_url: string
+  storage: Storage
+  /** GitHub 주소. 서버 저장이면 null — 서버 안 경로는 안 보인다 */
+  remote_url: string | null
   stages: StageSummary[]
   std_docs: DocumentSummary[]
   counts: Record<string, number>
@@ -292,7 +297,9 @@ export interface RepoStatus {
   code: string
   /** UI-14 표가 「[코드] 이름」으로 적는다 (UI-002 1.6) */
   name: string
-  remote_url: string
+  storage: Storage
+  /** 서버 저장이면 null */
+  remote_url: string | null
   last_processed_commit: string | null
   synced_at: string | null
   behind_by: number | null

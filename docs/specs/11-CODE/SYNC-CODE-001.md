@@ -1180,6 +1180,36 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 선행 | AY |
 | 완료 | — |
 
+#### BA 서버 저장 — 프로젝트마다 GitHub 또는 서버 저장소
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-RFQ-001#Q7]] · [[SYNC-PRD-001#R14]] · [[SYNC-SCN-001#S10]] · [[SYNC-UC-001#UC-A1]] · [[SYNC-UC-001#UC-H17]] · [[SYNC-SEQ-001#SEQ-28]] · [[SYNC-MS-001#ProjectService.init_project]] · [[SYNC-MS-001#ProjectService.delete_project]] · [[SYNC-MS-009#git.init_bare]] · 사용자 결정 2026-09-30(코드 하나에 판은 설정으로, 저장 방식은 프로젝트를 만들 때 — 둘 다 켜졌으면 에이전트가 사람에게 먼저 묻는다, 서버 저장은 서버 안 bare git, 해제하면 보관 폴더) |
+| 구현 | 설정 `STORAGE_MODES`·`ORIGINS_DIR` · 리비전 `0016_add_repositories_storage` · `Storage` · `git.init_bare` · `commit_push`는 https 원격일 때만 토큰 · `init_project` 3s(보관본 되살리기·이름 없이 남은 원본은 보관) · `delete_project` 보관 · `ensure_hook`·`repo_status` · 요약·상세에 `storage`(서버 저장이면 주소 없음) · `POST /api/projects` `storage` · `/api/me` `storage_modes` · MCP `init_project` 설명 끝 문장 · UI-3 2.7 · UI-4·UI-14 서버 저장 표시 · compose 볼륨 `origins` |
+| 테스트 | MS-001·MS-008·MS-009 테스트 관점 · 마이그레이션 표 · 운영: MCP로 서버 저장 프로젝트를 만들어 명세 저장·이력·되돌리기·상태·해제(보관)·되살리기, GitHub 프로젝트 회귀 |
+| 선행 | AZ |
+| 완료 | — |
+
+#### BB 코드 받기 — 서버 저장소의 git push · MCP 코드 올리기
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R14]] · [[SYNC-PRD-001#R13]] · 사용자 결정 2026-09-30(서버가 git push를 받는다 — 개인 토큰 · git 없는 PC는 MCP로 바뀐 파일과 지운 경로, 한 번 5MB·파일 500개, 명세 경로·비밀 꼴 거절, UTF-8 글자만) |
+| 구현 | `/git/{코드}.git/…`(git http-backend, Basic 비밀번호 자리에 개인 토큰, 소유자만, main만 처리) · MCP `upload_code` · 쓰기 경로 가드(작업 사본 밖·`.git` 거절) · 이력 표시 「git push」 · UI-4 push 방법. 명세는 이 카드를 시작할 때 쓴다 |
+| 테스트 | 실제 git 클라이언트로 clone·push · `upload_code` 상한·거절 · 운영: https push → 코드 탭, `upload_code` → 코드 탭 |
+| 선행 | BA |
+| 완료 | — |
+
+#### BC 폐쇄망판 — 로그인 없는 한 사람 판 · 글꼴 · 반입물
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-RFQ-001#Q7]] · [[SYNC-PRD-001#R14]] · 사용자 결정 2026-09-30(폐쇄망판은 요청자 혼자 쓰고 로그인이 없다, 저장은 서버만, 반입물은 이미지 tar + compose + 설치 안내) |
+| 구현 | `EDITION=closed` — 로컬 사용자 하나, GitHub 로그인·webhook 경로 없음 · `users.kind`(자리표시 판정을 칸으로) · Host·Origin 가드 · 127.0.0.1 compose · 글꼴을 앱이 담는다 · 배치 iframe의 바깥 글꼴 링크(폐쇄망판) · README 규약 링크를 서버 안 사본으로 · 반입물 스크립트와 설치 안내. 명세(PRD 폐쇄망판 요구사항 포함)는 이 카드를 시작할 때 쓴다 |
+| 테스트 | 인터넷 없는 네트워크에서 반입물 E2E(바깥 요청 0) · 인터넷판 회귀 |
+| 선행 | BB |
+| 완료 | — |
+
 ---
 
 ## 2. 통합 테스트 시나리오

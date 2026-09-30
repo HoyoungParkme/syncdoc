@@ -36,6 +36,8 @@ class Repository(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), unique=True)
+    # 저장 방식 github · server (PRD R14, 카드 BA). 서버 저장이면 remote_url은 서버 안 원본 경로
+    storage: Mapped[str] = mapped_column(String(8), default="github", server_default="github")
     remote_url: Mapped[str] = mapped_column(String(300))
     workdir_path: Mapped[str] = mapped_column(String(300))
     last_processed_commit: Mapped[str | None] = mapped_column(String(40))

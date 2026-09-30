@@ -8,8 +8,10 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://syncdoc:${POSTGRES_PASSWORD:-syncdoc}@db:5432/syncdoc
       REPOS_DIR: /var/syncdoc/repos
+      ORIGINS_DIR: /var/syncdoc/origins
     volumes:
       - repos:/var/syncdoc/repos
+      - origins:/var/syncdoc/origins  # 서버 저장소 — 원본이다. 백업한다 (INFRA 6장)
     depends_on:
       db:
         condition: service_healthy
@@ -31,3 +33,4 @@ services:
 volumes:
   pgdata:
   repos:
+  origins:

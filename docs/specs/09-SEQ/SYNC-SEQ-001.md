@@ -61,7 +61,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | POST /auth/logout | [[#SEQ-C1]] | |
 | POST /hooks/github | [[#SEQ-2]] | ○ |
 | GET /api/projects | [[#SEQ-9]] | ○ |
-| POST /api/projects · MCP init_project | [[#SEQ-4]] | ○ |
+| POST /api/projects · MCP init_project | [[#SEQ-4]] (GitHub 저장) · [[#SEQ-28]] (서버 저장) | ○ |
 | GET /api/projects/{code} | [[#SEQ-9]] | ○ |
 | GET /api/projects/{code}/docs · MCP list_documents | [[#SEQ-10]] | ○ |
 | GET /api/projects/{code}/flags | [[#SEQ-18]] | ○ |
@@ -267,7 +267,7 @@ sequenceDiagram
 
 ## SEQ-4 프로젝트를 초기화한다
 
-[[SYNC-UC-001#UC-A1]] 기본 흐름 1~6, 확장 2a·2b·3a·4a. 웹(UI-3)이든 MCP(`init_project`)든 같다.
+[[SYNC-UC-001#UC-A1]] 기본 흐름 1~6, 확장 2a·2b·3a·4a. 웹(UI-3)이든 MCP(`init_project`)든 같다. GitHub 저장의 흐름이다 — 서버 저장은 [[#SEQ-28]].
 
 ```mermaid
 sequenceDiagram
@@ -1181,6 +1181,61 @@ sequenceDiagram
 **읽을 때 볼 것**
 - 대조 결과는 어디에도 저장하지 않는다. 명세만 고친 커밋은 그래프를 다시 만들지 않아도 다음 조회부터 바뀐다
 - 코드 본문은 그래프를 만든 커밋에서 읽는다 — 작업 사본이 앞서 있어도 그래프와 본문이 같은 시점이다
+
+---
+
+## SEQ-28 서버 저장 프로젝트를 만든다
+
+[[SYNC-UC-001#UC-A1]] 기본 흐름 1~6(서버 저장), 확장 1a·3b. 웹(UI-3 2.7)이든 MCP(`init_project` storage=server)든 같다. GitHub 저장은 [[#SEQ-4]].
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사람 또는 에이전트
+    participant B as routers/projects 또는 mcp/tools
+    participant PS as ProjectService
+    participant G as infra/git
+    participant P as pipeline
+    participant DB
+
+    U->>B: init(storage=server, code, name, import_existing)
+    B->>PS: init_project(None, code, name, user, import_existing, storage=server)
+    PS->>PS: storage가 STORAGE_MODES에 있나
+    alt 켜지 않은 방식 (1a)
+        PS-->>B: storage-unavailable {storage, enabled}
+    end
+    PS->>PS: code 형식 · 중복 (2a·2b — SEQ-4와 같다)
+    PS->>PS: 보관본 찾기 ORIGINS_DIR/_archive/{code}-*.git
+    alt 보관본 있음 (3b)
+        alt import_existing=false
+            PS->>G: 가장 최근 보관본의 문서 수
+            PS-->>B: existing-specs {doc_count, archived_at}
+        else import_existing=true (3b2)
+            PS->>PS: 가장 최근 보관본을 ORIGINS_DIR/{code}.git으로 옮긴다
+            PS->>G: clone(원본, workdir) — 토큰 없음
+            PS->>DB: Project · Repository(storage=server)
+            PS->>P: rebuild(code)
+            P-->>PS: RebuildResult
+        end
+    else 없음 (기본 흐름 3)
+        PS->>G: init_bare(ORIGINS_DIR/{code}.git) — main, 앞당김·삭제 거부
+        PS->>G: clone(원본, workdir) — 토큰 없음
+        PS->>DB: Project · Repository(storage=server)
+        PS->>G: init_specs · commit_push("chore: init syncdoc") — 원격이 서버 안이라 토큰을 안 구한다
+        alt push 실패 (4a)
+            PS->>G: 작업 사본 · 새 원본 삭제
+            PS-->>B: push-failed
+        end
+        PS->>DB: Repository.last_processed_commit = hash
+    end
+    PS-->>B: Project
+    B-->>U: ProjectSummary (storage=server, remote_url 없음)
+```
+
+**읽을 때 볼 것**
+- 통지(webhook)를 걸지 않는다 — 서버 저장소는 밖에서 바뀌지 않는다([[SYNC-INFRA-001]] 7장)
+- 새로 만든 원본은 등록이 실패하면 지운다. 되살린 보관본은 실패하면 보관 폴더로 돌려놓는다 — 원본을 잃지 않는다
+- 해제([[SYNC-UC-001#UC-H17]])는 거꾸로 원본을 보관 폴더로 옮긴다([[SYNC-MS-001#ProjectService.delete_project]])
 
 ---
 

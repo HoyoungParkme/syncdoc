@@ -223,13 +223,14 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
    - `counts.broken_ref = sum(per_doc.values())` — 위에서 뜬 것을 다시 쓴다
    - `counts.convention_errors = sum(d.has_convention_error for d in docs)` · `counts.incomplete = sum(bool(d.incomplete_warnings))`
    - `updated_at = max(d.updated_at)`
+   - `storage = repository.storage` · `remote_url = repository.remote_url if storage == github else None` — 서버 저장소의 서버 안 경로는 밖으로 안 낸다([[SYNC-PRD-001#R14]])
 3. `→` 정렬 `updated_at desc`
 
 **출력** `ProjectSummary[]`. `stages`는 항상 11개. `counts`는 세 칸 — `broken_ref`·`convention_errors`·`incomplete`
 
 **호출하는 것** [[SYNC-MS-001#ProjectService.list_owned]] · `SpecService.list_by_project` · [[SYNC-MS-003#ReferenceService.count_missing_by_document]]
 
-**테스트 관점** 문서 없는 프로젝트 → 11칸 전부 null · 승인 2 + 초안 1인 단계 → `draft` · 3단계가 초안인데 4단계에 문서 → 4단계 `gate_warning=True` · STD 문서는 11칸에 안 세고 `std_docs`에 · 한 단계에 미존재 참조 있는 문서 둘 → 그 단계 `broken_count`가 둘의 합 · `counts.broken_ref`가 전 단계 합과 같다 · **두 사람이 각자 등록 → 각자 자기 것만** · 등록한 적 없는 사람 → 빈 목록
+**테스트 관점** 문서 없는 프로젝트 → 11칸 전부 null · 승인 2 + 초안 1인 단계 → `draft` · 3단계가 초안인데 4단계에 문서 → 4단계 `gate_warning=True` · STD 문서는 11칸에 안 세고 `std_docs`에 · 한 단계에 미존재 참조 있는 문서 둘 → 그 단계 `broken_count`가 둘의 합 · `counts.broken_ref`가 전 단계 합과 같다 · **두 사람이 각자 등록 → 각자 자기 것만** · 등록한 적 없는 사람 → 빈 목록 · **서버 저장 프로젝트 → `storage=server`, `remote_url=None`**
 
 ---
 
@@ -245,7 +246,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 3. `docs = document_list(code, user)` (문서별 건수 포함)
 4. `recent = SpecService.recent_changes(project_id, 10)`
 5. `repo = project.repository` — `last_processed_commit`·`behind_by`를 **DB에서 그대로 읽는다.** `git fetch`를 돌리지 않는다(UI-4 요소 7)
-6. `→ ProjectDetail(summary, remote_url, docs, recent_changes=recent, last_processed_commit, behind_by)`
+6. `→ ProjectDetail(summary, remote_url, docs, recent_changes=recent, last_processed_commit, behind_by)` — `storage`·`remote_url`은 요약(2)의 것 그대로. 서버 저장이면 `remote_url=None`
 
 **호출하는 것** [[#queries.project_summary]] [[#queries.document_list]] · `SpecService.recent_changes` · [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-006#AccountService.users_by_ids]]
 

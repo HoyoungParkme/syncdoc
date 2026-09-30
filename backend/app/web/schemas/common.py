@@ -30,6 +30,8 @@ class Me(User):
     """SYNC-API-001 Me — 내 계정. llm_enabled가 거짓이면 UI-5 질문 탭이 없다."""
 
     llm_enabled: bool = False
+    # 이 서버가 켠 저장 방식 — UI-3이 고를 것을 정한다 (PRD R14, 카드 BA)
+    storage_modes: list[str] = []
 
 
 class Author(Base):

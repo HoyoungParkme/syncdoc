@@ -65,9 +65,13 @@ def _with_token(remote_url: str, token: str) -> str:
     return remote_url
 
 
-async def clone(remote_url: str, workdir: Path, token: str) -> None:
-    """SYNC-MS-009#git.clone"""
-    await _run(None, "clone", _with_token(remote_url, token), str(workdir))
+async def clone(remote_url: str, workdir: Path, token: str | None) -> None:
+    """SYNC-MS-009#git.clone
+
+    토큰은 https 원격에만 붙는다. 서버 저장소(서버 안 경로, 카드 BA)는 token=None으로 그대로.
+    """
+    url = _with_token(remote_url, token) if token else remote_url
+    await _run(None, "clone", url, str(workdir))
     await _run(workdir, "remote", "set-url", "origin", remote_url)
 
 
@@ -121,10 +125,14 @@ async def commit_push(
         if path is None or content is None:
             raise ValueError("path+content · files · delete 중 하나는 있어야 한다")
         files = {path: content}
-    try:
-        token = AccountService.github_token_for(author.user)
-    except Unauthorized as e:
-        raise PushFailed("미등록") from e
+    # 1. 토큰은 https 원격일 때만 — 서버 저장소(서버 안 경로)는 GitHub 토큰 없이 push한다 (카드 BA)
+    origin = (await _run(workdir, "remote", "get-url", "origin")).strip()
+    token: str | None = None
+    if origin.startswith("https://"):
+        try:
+            token = AccountService.github_token_for(author.user)
+        except Unauthorized as e:
+            raise PushFailed("미등록") from e
     await _run(workdir, "fetch", "origin")
     # 빈 저장소에는 되돌아갈 곳이 없다. 이 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3)
     onto_remote = await _has_remote_head(workdir)
@@ -152,7 +160,7 @@ async def commit_push(
         f"user.email={user.github_login}@users.noreply.github.com",
     )
     await _run(workdir, *ident, "commit", "-q", "-m", message)
-    url = _with_token((await _run(workdir, "remote", "get-url", "origin")).strip(), token)
+    url = _with_token(origin, token) if token else origin
     # 거부(non-fast-forward)면 rebase 후 다시 민다. PUSH_RETRIES회까지 (MS-009 6단계)
     for attempt in range(settings.PUSH_RETRIES + 1):
         rc, out, err = await _exec(workdir, "push", "--porcelain", url, "HEAD:main")
@@ -401,6 +409,19 @@ async def init_specs(workdir: Path) -> dict[str, str]:
     files["docs/specs/assets/.gitkeep"] = ""
     files[README_PATH] = _readme()
     return files
+
+
+async def init_bare(path: Path) -> None:
+    """SYNC-MS-009#git.init_bare
+
+    서버 저장소를 만든다(카드 BA). 기본 브랜치 이름을 서버 설정에 맡기지 않고 main으로 —
+    다른 이름이면 HEAD:main push가 새 가지를 만들어 처리 지점이 어긋난다. 이력을 뒤로 돌리거나
+    가지를 지우는 push와 깨진 객체는 받지 않는다 — 버전 표가 커밋에 기댄다.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    await _run(None, "init", "-q", "--bare", "--initial-branch=main", str(path))
+    for key in ("receive.denyNonFastForwards", "receive.denyDeletes", "receive.fsckObjects"):
+        await _run(path, "config", key, "true")
 
 
 async def archive(workdir: Path, commit: str, dest: Path) -> None:

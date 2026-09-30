@@ -392,3 +392,166 @@ async def test_sync_now_reads_pending_and_touches_fetched_at(scoped: Session, re
     assert r2.docs == 0 and r2.fetched_at is not None and r2.fetched_at >= before
     with pytest.raises(NotFound):
         await ps.sync_now("EXMP", make_user(scoped, login="stranger"))
+
+
+# ── 서버 저장 (카드 BA, PRD R14) ──
+SRV_RFQ = "---\ndoc_id: SRV-RFQ-001\ntype: RFQ\ntitle: 요구\nstatus: draft\n---\n# RFQ\n## 1. 배경\n#### Q1 첫 요구\n내용\n"
+
+
+async def test_init_server_storage_makes_bare_origin_and_skeleton_without_github_token(
+    db_session: Session, repos_dir, origins_dir: Path
+) -> None:
+    """MS-001 3s — 서버 안 bare 원본, 골격 커밋. GitHub 토큰이 없는 사람도 된다(토큰을 안 구한다)."""
+    from app.core.types import Storage
+
+    user = make_user(db_session, login="local", token=None)
+    project = await ProjectService(db_session).init_project(
+        None, "SRV", "서버 저장", user, storage=Storage.server
+    )
+    origin = origins_dir / "SRV.git"
+    assert project.repository.storage == "server"
+    assert project.repository.remote_url == str(origin)
+    assert g(origin, "symbolic-ref", "HEAD") == "refs/heads/main"
+    assert g(origin, "config", "receive.denyNonFastForwards") == "true"
+    assert g(origin, "log", "-1", "--format=%s", "main") == "chore(SRV): init syncdoc"
+    assert "docs/specs/README.md" in g(origin, "ls-tree", "-r", "--name-only", "main")
+    assert project.repository.last_processed_commit == g(origin, "rev-parse", "main")
+
+
+async def test_init_rejects_storage_the_server_did_not_turn_on(
+    db_session: Session, repos_dir, origins_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """UC-A1 1a — 켜지 않은 방식이면 아무것도 만들지 않는다."""
+    from app.core.errors import StorageUnavailable
+    from app.core.types import Storage
+
+    monkeypatch.setattr(settings, "STORAGE_MODES", "github")
+    user = make_user(db_session, login="u")
+    with pytest.raises(StorageUnavailable) as ei:
+        await ProjectService(db_session).init_project(None, "SRV", "x", user, storage=Storage.server)
+    assert ei.value.extra == {"storage": "server", "enabled": ["github"]}
+    assert not (origins_dir / "SRV.git").exists()
+    assert not ProjectService(db_session).repo.exists("SRV")
+
+
+async def test_github_storage_without_remote_url_is_invalid_request(
+    db_session: Session, repos_dir
+) -> None:
+    """UC-A1 1b."""
+    from app.core.errors import InvalidRequest
+
+    user = make_user(db_session, login="u")
+    with pytest.raises(InvalidRequest) as ei:
+        await ProjectService(db_session).init_project(None, "GH", "x", user)
+    assert ei.value.extra["errors"][0]["loc"] == "remote_url"
+
+
+async def test_release_archives_server_origin_then_import_restores_documents(
+    db_session: Session, repos_dir, origins_dir: Path, tmp_path: Path
+) -> None:
+    """UC-H17 — 해제하면 보관 폴더로. UC-A1 3b — 가져오기 없이는 알리기만, 가져오면 되살린다."""
+    from app.core.errors import ExistingSpecs
+    from app.core.spec.service import SpecService
+    from app.core.types import Storage
+
+    user = make_user(db_session, login="local", token=None)
+    svc = ProjectService(db_session)
+    await svc.init_project(None, "SRV", "서버", user, storage=Storage.server)
+    origin = origins_dir / "SRV.git"
+    clone = tmp_path / "c"
+    g(tmp_path, "clone", "-q", str(origin), str(clone))
+    write_commit_push(clone, "docs/specs/01-RFQ/SRV-RFQ-001.md", SRV_RFQ, "spec(SRV-RFQ-001): 초안")
+
+    await svc.delete_project("SRV", user)
+    archived = list((origins_dir / "_archive").glob("SRV-*.git"))
+    assert not origin.exists() and len(archived) == 1
+    assert not (repos_dir / "SRV").exists()
+
+    with pytest.raises(ExistingSpecs) as ei:
+        await svc.init_project(None, "SRV", "서버", user, storage=Storage.server)
+    assert ei.value.extra["doc_count"] == 1
+    assert ei.value.extra["archived_at"].startswith("20")
+    assert not origin.exists() and archived[0].exists()  # 아무것도 안 바뀐다
+
+    project = await svc.init_project(
+        None, "SRV", "서버", user, import_existing=True, storage=Storage.server
+    )
+    assert origin.exists() and not archived[0].exists()
+    assert project.repository.last_processed_commit == g(origin, "rev-parse", "main")
+    assert SpecService(db_session).get_document("SRV-RFQ-001").doc_id == "SRV-RFQ-001"
+
+
+async def test_unregistered_leftover_origin_is_archived_not_deleted(
+    db_session: Session, repos_dir, origins_dir: Path
+) -> None:
+    """3s — 이름 없이 남은 원본(지난 실패·사람이 넣은 것)은 지우지 않고 보관으로 옮겨 묻는다."""
+    from app.core.errors import ExistingSpecs
+    from app.core.types import Storage
+
+    leftover = origins_dir / "OLD.git"
+    g(origins_dir, "init", "-q", "--bare", "-b", "main", str(leftover))
+    user = make_user(db_session, login="u")
+    with pytest.raises(ExistingSpecs) as ei:
+        await ProjectService(db_session).init_project(None, "OLD", "x", user, storage=Storage.server)
+    assert ei.value.extra["doc_count"] == 0  # 커밋이 없는 원본
+    assert not leftover.exists()
+    assert len(list((origins_dir / "_archive").glob("OLD-*.git"))) == 1
+
+
+async def test_failed_server_registration_keeps_no_new_origin_and_returns_restored_one(
+    db_session: Session,
+    repos_dir,
+    origins_dir: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """서버 저장의 되돌림 — 새 원본은 지우고, 되살린 보관본은 보관 폴더로 돌려놓는다."""
+    from app.core import pipeline
+    from app.core.errors import PushFailed
+    from app.core.types import Storage
+    from app.infra import git as git_mod
+
+    user = make_user(db_session, login="u", token=None)
+    svc = ProjectService(db_session)
+
+    async def fail_push(*a, **k):
+        raise PushFailed("boom")
+
+    monkeypatch.setattr(git_mod, "commit_push", fail_push)
+    with pytest.raises(PushFailed):
+        await svc.init_project(None, "NEW", "x", user, storage=Storage.server)
+    assert not (origins_dir / "NEW.git").exists()
+    assert not svc.repo.exists("NEW")
+
+    # 보관본을 되살리다 재구축이 실패하면 보관본은 제자리로 — 원본을 잃지 않는다
+    archive = origins_dir / "_archive" / "ARC-20260101000000.git"
+    g(origins_dir, "init", "-q", "--bare", "-b", "main", str(archive))
+    seed = tmp_path / "seed"
+    g(tmp_path, "clone", "-q", str(archive), str(seed))
+    g(seed, "checkout", "-q", "-b", "main")
+    write_commit_push(seed, "docs/specs/01-RFQ/ARC-RFQ-001.md", SRV_RFQ, "seed")
+
+    async def fail_rebuild(*a, **k):
+        raise RuntimeError("rebuild")
+
+    monkeypatch.setattr(pipeline, "rebuild", fail_rebuild)
+    with pytest.raises(RuntimeError):
+        await svc.init_project(None, "ARC", "x", user, import_existing=True, storage=Storage.server)
+    assert archive.exists() and not (origins_dir / "ARC.git").exists()
+
+
+async def test_ensure_hook_and_repo_status_on_server_storage(
+    db_session: Session, repos_dir, mock_github, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ensure_hook 1a — 서버 저장은 none이고 GitHub을 안 부른다. repo_status는 주소를 안 낸다."""
+    from app.core.types import Storage
+
+    monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "https://syncdoc.example.com")
+    calls = mock_github(lambda req: httpx.Response(500))
+    user = make_user(db_session, login="u", token=None)
+    svc = ProjectService(db_session)
+    await svc.init_project(None, "SRV", "x", user, storage=Storage.server)
+    r = await svc.ensure_hook("SRV", user)
+    assert r.hook == "none" and r.created is False and calls == []
+    [row] = await svc.repo_status(user)
+    assert row.storage == Storage.server and row.remote_url is None and row.hook == "none"

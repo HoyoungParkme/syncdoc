@@ -208,6 +208,9 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .initdlg .form{max-width:none;border:1px solid var(--border);border-radius:var(--radius-panel-card);
   padding:var(--space-4) var(--space-16) var(--space-16)}
 .form{max-width:640px}
+/* 2.7 저장 방식 — 라디오 둘을 한 줄로. 라벨은 폼 머리(굵게·블록)가 아니라 보기다 (카드 BA) */
+.form .seg{display:flex;gap:var(--space-18)}
+.form .seg label{display:flex;align-items:center;gap:var(--space-6);margin:0;font-weight:var(--w-regular);font-size:var(--text-meta)}
 .form label{display:block;margin:var(--space-14) 0 var(--space-4);font-weight:var(--w-semibold);font-size:var(--text-meta)}
 .inp{font:inherit;font-size:var(--text-meta);padding:var(--space-6) var(--space-8);
   border:1px solid var(--border-strong);border-radius:var(--radius-control);background:var(--bg-card)}

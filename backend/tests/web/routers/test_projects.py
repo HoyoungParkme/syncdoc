@@ -69,19 +69,25 @@ def test_init_project_web_path(
     g(seed, "add", "README.md")
     g(seed, "commit", "-q", "-m", "init")
     g(seed, "push", "-q", "origin", "HEAD:main")
-    r = client.post("/api/projects", json={"remote_url": str(bare), "code": "NEW", "name": "새"})
+    gh = {"storage": "github"}
+    r = client.post(
+        "/api/projects", json={**gh, "remote_url": str(bare), "code": "NEW", "name": "새"}
+    )
     assert r.status_code == 201 and r.json()["code"] == "NEW"
     assert all(s["status"] is None and s["doc_count"] == 0 for s in r.json()["stages"])
     assert (
         client.post(
-            "/api/projects", json={"remote_url": str(bare), "code": "new", "name": "x"}
+            "/api/projects", json={**gh, "remote_url": str(bare), "code": "new", "name": "x"}
         ).status_code
         == 422
     )
-    r = client.post("/api/projects", json={"remote_url": str(bare), "code": "NEW", "name": "x"})
+    r = client.post(
+        "/api/projects", json={**gh, "remote_url": str(bare), "code": "NEW", "name": "x"}
+    )
     assert r.status_code == 409 and r.json()["type"] == "urn:syncdoc:project-code-conflict"
     r = client.post(
-        "/api/projects", json={"remote_url": str(repos["remote"]), "code": "EXST", "name": "x"}
+        "/api/projects",
+        json={**gh, "remote_url": str(repos["remote"]), "code": "EXST", "name": "x"},
     )
     assert (
         r.status_code == 409
@@ -91,6 +97,7 @@ def test_init_project_web_path(
     r = client.post(
         "/api/projects",
         json={
+            **gh,
             "remote_url": str(repos["remote"]),
             "code": "EXST",
             "name": "x",
@@ -104,6 +111,37 @@ def test_init_project_web_path(
     assert (
         prd["doc_count"] == 1 and r.json()["counts"]["convention_errors"] == 1
     )  # 시드 PRD는 frontmatter 미완
+
+
+def test_init_project_server_storage_and_storage_rules(
+    client: TestClient, scoped: Session, tmp_path, monkeypatch
+) -> None:
+    """카드 BA — storage 필수, 켠 방식만, 서버 저장은 주소를 안 낸다. /api/me가 켠 방식을 준다."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "REPOS_DIR", tmp_path / "repos")
+    login(client, scoped)
+    assert client.get("/api/me").json()["storage_modes"] == ["github", "server"]
+    # storage가 없으면 입력 검증
+    r = client.post("/api/projects", json={"code": "SRV", "name": "x"})
+    assert r.status_code == 422 and r.json()["type"] == "urn:syncdoc:invalid-request"
+    # GitHub인데 주소가 없다
+    r = client.post("/api/projects", json={"storage": "github", "code": "SRV", "name": "x"})
+    assert r.status_code == 422 and r.json()["errors"][0]["loc"] == "remote_url"
+    # 서버 저장 — 주소 없이 만들어지고 응답에도 주소가 없다
+    r = client.post("/api/projects", json={"storage": "server", "code": "SRV", "name": "서버"})
+    assert r.status_code == 201
+    assert r.json()["storage"] == "server" and r.json()["remote_url"] is None
+    detail = client.get("/api/projects/SRV").json()
+    assert detail["storage"] == "server" and detail["remote_url"] is None
+    [row] = client.get("/api/admin/repos").json()
+    assert row["storage"] == "server" and row["remote_url"] is None and row["hook"] == "none"
+    # 켜지 않은 방식
+    monkeypatch.setattr(settings, "STORAGE_MODES", "github")
+    assert client.get("/api/me").json()["storage_modes"] == ["github"]
+    r = client.post("/api/projects", json={"storage": "server", "code": "SRVB", "name": "x"})
+    assert r.status_code == 422 and r.json()["type"] == "urn:syncdoc:storage-unavailable"
+    assert r.json()["enabled"] == ["github"]
 
 
 def test_other_owner_project_is_invisible(client: TestClient, scoped: Session) -> None:

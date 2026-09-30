@@ -12,12 +12,13 @@ import re
 from contextvars import ContextVar
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from mcp.server.mcpserver import MCPServer
 from mcp.types import CallToolResult, TextContent
 
 from app import db
+from app.config import settings
 from app.core import pipeline, queries
 from app.core.account.models import User
 from app.core.errors import NotFound, Problem, Unauthorized
@@ -33,11 +34,31 @@ from app.core.types import (
     Entry,
     ItemView,
     ProjectSummary,
+    Storage,
 )
 from app.infra import git
 
+
+def storage_sentence(modes: list[str]) -> str:
+    """init_project 설명 끝 문장 — 이 서버가 켠 저장 방식으로 정한다 (API-002 init_project, 카드 BA).
+
+    둘 다 켰으면 에이전트가 사람에게 먼저 묻게 하고, 하나면 그것으로 부르게 한다. 요청자가 말한
+    「처음 연결해 쓸 때 GitHub로 쓸지 폐쇄망에서 쓸지 확인하는 절차」가 이것이다(RFQ Q7).
+    """
+    if "github" in modes and "server" in modes:
+        return (
+            "이 서버는 GitHub 저장과 서버 저장을 둘 다 쓴다. "
+            "부르기 전에 사람에게 어느 쪽으로 할지 묻고 그 답을 storage에 넣는다."
+        )
+    only = modes[0] if modes else "github"
+    label = "서버 저장" if only == "server" else "GitHub 저장"
+    return f'이 서버는 {label}만 쓴다. storage="{only}"로 부른다. 묻지 않는다.'
+
+
 server = MCPServer(
-    "syncdoc", instructions="싱크독 명세 도구. 쓰기 전에 get_template, 수정 전에 get_document."
+    "syncdoc",
+    instructions="싱크독 명세 도구. 쓰기 전에 get_template, 수정 전에 get_document. "
+    "프로젝트를 만들 때 저장 방식을 고른다 — " + storage_sentence(settings.storage_modes),
 )
 current_user_id: ContextVar[int | None] = ContextVar("syncdoc_mcp_user_id", default=None)
 _APP_SPECS = Path(__file__).resolve().parents[3] / "docs" / "specs"  # backend/app/mcp → 저장소 루트
@@ -113,7 +134,8 @@ def _project_json(p: ProjectSummary) -> dict:
     return {
         "code": p.code,
         "name": p.name,
-        "remote_url": p.remote_url,
+        "storage": str(p.storage),
+        "remote_url": p.remote_url,  # 서버 저장이면 None (카드 BA)
         "stages": [_plain(s) for s in p.stages],
         "std_docs": [_summary_json(d) for d in p.std_docs],
         "counts": p.counts,
@@ -121,22 +143,35 @@ def _project_json(p: ProjectSummary) -> dict:
     }
 
 
-@server.tool(
-    description="GitHub 저장소를 싱크독 프로젝트로 등록한다. docs/specs/ 아래 11단계 디렉터리와 템플릿을 만들어 "
-    "커밋한다. 새 프로젝트를 시작할 때 한 번만 부른다. 이미 등록된 저장소면 project-code-conflict, 저장소에 "
-    "docs/specs/가 이미 있으면 existing-specs 에러가 나며 import_existing=true로 다시 부르면 기존 명세를 가져와 등록한다. "
-    "저장소가 아직 없으면 create_repo=true로 부른다 — 공개 저장소를 만들어 주고 이어서 등록까지 한다. "
-    "사람이 저장소를 만들어 달라고 했을 때만 이 인자를 붙인다."
-)
+def init_description(modes: list[str]) -> str:
+    """init_project 도구 설명 — 고정 문장 + 저장 방식 문장 (API-002 init_project)."""
+    return (
+        "싱크독 프로젝트를 만든다. 저장 방식(storage)을 고른다 — github: GitHub 저장소를 등록한다, "
+        "server: 싱크독 서버 안에 저장소를 만든다(GitHub 없이). docs/specs/ 아래 11단계 디렉터리와 "
+        "README를 커밋한다. 새 프로젝트를 시작할 때 한 번만 부른다. 같은 코드가 있으면 "
+        "project-code-conflict, 저장소에 docs/specs/가 이미 있거나 서버 저장인데 같은 코드의 보관된 "
+        "저장소가 있으면 existing-specs 에러가 나며 import_existing=true로 다시 부르면 기존 명세를 "
+        "가져와(보관본은 되살려) 등록한다. GitHub 저장소가 아직 없으면 create_repo=true로 부른다 — "
+        "공개 저장소를 만들어 주고 이어서 등록까지 한다. 사람이 저장소를 만들어 달라고 했을 때만 이 "
+        "인자를 붙인다. remote_url은 storage=github일 때만, 그때는 필수다. " + storage_sentence(modes)
+    )
+
+
+@server.tool(description=init_description(settings.storage_modes))
 async def init_project(
-    remote_url: str, code: str, name: str, import_existing: bool = False, create_repo: bool = False
+    storage: Literal["github", "server"],
+    code: str,
+    name: str,
+    remote_url: str | None = None,
+    import_existing: bool = False,
+    create_repo: bool = False,
 ) -> CallToolResult:
     """SYNC-API-002#init_project"""
     try:
         with db.session_scope() as s:
             user = _user(s)
             await ProjectService(s).init_project(
-                remote_url, code, name, user, import_existing, create_repo
+                remote_url, code, name, user, import_existing, create_repo, Storage(storage)
             )
             s.commit()
         summary = next(p for p in await queries.project_summary(user) if p.code == code)

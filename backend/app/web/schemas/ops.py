@@ -47,7 +47,8 @@ class Graph(Base):
 class RepoStatus(Base):
     code: str
     name: str
-    remote_url: str
+    storage: str  # github · server (카드 BA)
+    remote_url: str | None  # 서버 저장이면 None
     last_processed_commit: str | None
     synced_at: datetime | None
     behind_by: int | None

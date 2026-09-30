@@ -55,9 +55,16 @@ async def logout(request: Request) -> Response:
 
 @router.get("/api/me", response_model=Me)
 async def me(user: User = Depends(auth.current_user)) -> Me:
-    """SYNC-API-001#GET/api/me — llm_enabled는 서버에 키가 있는가(인프라 5.3)"""
+    """SYNC-API-001#GET/api/me — llm_enabled는 서버에 키가 있는가(인프라 5.3).
+
+    storage_modes는 이 서버가 켠 저장 방식 — UI-3이 고를 것을 정한다 (PRD R14, 카드 BA).
+    """
     base = UserSchema.model_validate(user).model_dump()
-    return Me(**base, llm_enabled=bool(settings.LLM_API_KEY))
+    return Me(
+        **base,
+        llm_enabled=bool(settings.LLM_API_KEY),
+        storage_modes=settings.storage_modes,
+    )
 
 
 @router.get("/api/me/emails", response_model=list[CommitEmail])
