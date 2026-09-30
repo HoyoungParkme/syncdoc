@@ -186,7 +186,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **자리표시를 만드는 곳은 여기 하나다.** `process_commit`과 `rebuild`가 각자 만들면 판정이 두 경로에서 어긋난다 — 실제로 어긋나 있었다(#34).
 
-**호출하는 것** [[#AccountService.create_placeholder]]
+**호출하는 것** [[#AccountService.create_placeholder]] · [[#AccountService.local_user]](폐쇄망판)
 
 **호출되는 것** `pipeline.process_commit` 4단계 · `pipeline.rebuild` 5단계
 
@@ -223,6 +223,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 근거: [[SYNC-PRD-001#R15]] · [[SYNC-SEQ-001#SEQ-C3]]
 
 **처리** `u = DB: users where kind=local` · if `u` → `→ u` · else → `→ ensure_local_user(settings.LOCAL_LOGIN, settings.local_name)` — 켜질 때 만들었으니 보통은 있다. DB를 바꿔 끼운 경우의 안전망
+
+**호출하는 것** [[#AccountService.ensure_local_user]](없을 때)
 
 **호출되는 것** `web/auth.current_user`(폐쇄망판 — 모든 웹 요청) · [[#AccountService.user_for_commit]](폐쇄망판)
 
