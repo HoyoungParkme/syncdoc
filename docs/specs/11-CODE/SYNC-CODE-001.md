@@ -1120,7 +1120,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `md.ts renderBlocks`·`view_build.render_blocks` 번호 목록 — 들여 쓴 `- `는 `<li>` 안 `<ul>`, 빈 줄 하나 뒤 번호는 같은 목록 · `.qa .a` 테두리·바탕·안쪽 여백 제거(`wait`·`fail`에만) · `_ASK_SYSTEM` 답 양식 문단 |
 | 테스트 | 지시문에 「답은 짧게 쓴다」 · `check_view_html` TS↔파이썬 같음 · `view_build --all` 전후 diff로 합쳐진 목록이 뜻과 맞는지 · 헤드 크롬: 같은 질문에 번호 1·2, 하위 목록 들여쓰기, 답에 테두리 없음, 이름 반복 없음 |
 | 선행 | AT |
-| 완료 | — |
+| 완료 | 2026-09-30 · 브랜치 `card/AU-answer-text` · spec 5 + code 3 · 테스트 279 · `ruff` · `validate` 0/0 · `check_ui` 12/12 · `check_view_html` 34/34 · `--selftest` · 배포 뒤 헤드 크롬(1440×900): 같은 질문에 번호 목록 1~7 이어짐 · ID 뒤 이름 한 번 · 굵은 소제목 · 답 테두리 0px·바탕 없음, 질문 말풍선·기다림 점선 그대로 · MS-007 유저용 뷰 `0.` 단계 0부터(`start` 0 ×7, 하위 목록 5) · 콘솔 오류 0 |
 
 **왜 카드인가.** 렌더러는 유저용 뷰 전체가 쓰고 정적 뷰와 대조 검사가 있어 TS·파이썬을 같이 고쳐야 한다(STD-002 1장 규칙이 는다). 답 상자와 지시문은 각각 UI-5·MS-008 규칙이다.
 
@@ -1202,6 +1202,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AR | `card/AR-attachments` | `d71453b` | #212 | 2026-09-29 |
 | AS | `card/AS-answer-diagram` | `20370d8` · `cfe0fa6` · `c3dd207` · `65615b7` · `0d30b88` | #214 · #215 · #217 · #219 · #220 | 2026-09-29 |
 | AT | `card/AT-ask-width` | `ee4a86c` | #222 | 2026-09-30 |
+| AU | `card/AU-answer-text` | `ed661fa` | #224 | 2026-09-30 |
 | (#119) | `fix/119-single-render` | — | #119 | 2026-09-23 |
 | (#126) | `fix/126-view-build-specs` | — | #126 | 2026-09-23 |
 | (#133) | `fix/133-tokens-by-chapter` | — | #133 | 2026-09-23 |
