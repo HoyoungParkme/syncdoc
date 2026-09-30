@@ -193,6 +193,25 @@ class Commit:
 
 
 @dataclass(frozen=True)
+class UploadResult:
+    """SYNC-DOM-002 2.8 — upload_code의 결과 (카드 BB). 같은 내용이면 changed=False."""
+
+    commit: str
+    changed: bool
+    files: int
+    deleted: int
+
+
+@dataclass
+class CgiResponse:
+    """SYNC-DOM-002 2.8 — git.http_backend → routers/git. 본문을 다 넘긴 뒤 만든다(INFRA 7장)."""
+
+    status: int
+    headers: list[tuple[str, str]]
+    body: Any  # AsyncIterator[bytes] — 남은 stdout. 다 읽으면 프로세스를 기다린다
+
+
+@dataclass(frozen=True)
 class GithubUser:
     id: int
     login: str

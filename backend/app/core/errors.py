@@ -212,6 +212,39 @@ class ExistingSpecs(Problem):
             )
 
 
+class StorageMismatch(Problem):
+    """UC-A10 1a — 서버 저장에만 되는 일(코드 올리기)을 GitHub 저장 프로젝트에 (카드 BB)."""
+
+    type = "urn:syncdoc:storage-mismatch"
+    status = 409
+    title = "storage-mismatch"
+
+    def __init__(self, storage: str) -> None:
+        super().__init__(f"{storage} 저장 프로젝트다 — 코드는 GitHub에 push한다", storage=storage)
+
+
+class UploadTooLarge(Problem):
+    """UC-A10 2a — 코드 올리기 한도(UTF-8 합 5MiB · 파일+지운 경로 500개). 나눠 보낸다."""
+
+    type = "urn:syncdoc:upload-too-large"
+    status = 413
+    title = "upload-too-large"
+
+    def __init__(self, limit: dict[str, int], size: int, count: int) -> None:
+        super().__init__("한도를 넘는다 — 나눠 보낸다", limit=limit, size=size, count=count)
+
+
+class UploadPathRefused(Problem):
+    """UC-A10 2b — 올릴 수 없는 경로. 하나라도 있으면 아무것도 올리지 않는다."""
+
+    type = "urn:syncdoc:upload-path-refused"
+    status = 422
+    title = "upload-path-refused"
+
+    def __init__(self, paths: list[dict[str, str]]) -> None:
+        super().__init__(f"올릴 수 없는 경로 {len(paths)}개", paths=paths)
+
+
 class StorageUnavailable(Problem):
     """UC-A1 1a — 이 서버에서 켜지 않은 저장 방식이다(설정 STORAGE_MODES, PRD R14)."""
 

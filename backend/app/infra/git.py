@@ -7,15 +7,17 @@ core는 이것을 통해서만 저장소를 만진다. 실패는 GitError(cmd, s
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import tarfile
+from collections.abc import AsyncIterator
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from app.config import settings
 from app.core.account.service import AccountService
 from app.core.errors import PushFailed, Unauthorized
-from app.core.types import Author, ChangedFile, Commit, spec_dir
+from app.core.types import Author, CgiResponse, ChangedFile, Commit, spec_dir
 
 range_ = range  # changed_files의 인자 이름 range(MS-009 시그니처)가 내장을 가린다
 _TOKEN_IN_URL = re.compile(r"(x-access-token:)[^@]+@")
@@ -139,10 +141,20 @@ async def commit_push(
     if onto_remote:
         await _run(workdir, "reset", "--hard", "origin/main")
     to_write = files or {}
-    for p, c in to_write.items():
-        f = workdir / p
-        f.parent.mkdir(parents=True, exist_ok=True)
-        f.write_text(c, encoding="utf-8")
+    # 3. 경로 가드 (카드 BB) — reset 뒤라야 push로 심은 심볼릭 링크까지 본다. 작업 사본 밖으로
+    # 나가거나 .git 안에 쓰면(훅 심기) 거부한다. 아무것도 쓰기 전에 본다
+    for p in [*to_write, *(delete or [])]:
+        if not _inside(workdir, p):
+            raise PushFailed(f"작업 사본 밖 경로: {p}")
+    try:
+        for p, c in to_write.items():
+            f = workdir / p
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(c, encoding="utf-8")
+    except OSError as e:  # 파일 자리에 폴더가 있거나 그 반대 — 쓴 것을 되돌린다
+        await _undo(workdir, onto_remote)
+        await _exec(workdir, "clean", "-fdq")
+        raise PushFailed(f"쓰기 실패: {e.filename or ''} {e.strerror or e}") from e
     if to_write:
         await _run(workdir, "add", "--", *to_write)
     if (
@@ -183,6 +195,15 @@ async def commit_push(
             raise PushFailed("conflict") from e
         # 재시도 사이에 기다리지 않는다 — 락을 쥔 채 자면 같은 프로젝트의 저장이 전부 막힌다
     return (await _run(workdir, "rev-parse", "HEAD")).strip()
+
+
+def _inside(workdir: Path, rel: str) -> bool:
+    """쓰거나 지울 경로가 작업 사본 안이고 .git 조각이 없나 (MS-009 commit_push 3, 카드 BB)."""
+    if not rel or ".git" in PurePosixPath(rel).parts:
+        return False
+    root = workdir.resolve()
+    target = (workdir / rel).resolve()
+    return target == root or root in target.parents
 
 
 async def read(workdir: Path, path: str, ref: str = "HEAD") -> str:
@@ -422,6 +443,99 @@ async def init_bare(path: Path) -> None:
     await _run(None, "init", "-q", "--bare", "--initial-branch=main", str(path))
     for key in ("receive.denyNonFastForwards", "receive.denyDeletes", "receive.fsckObjects"):
         await _run(path, "config", key, "true")
+
+
+async def http_backend(
+    root: Path, env: dict[str, str], body: AsyncIterator[bytes]
+) -> CgiResponse:
+    """SYNC-MS-009#git.http_backend
+
+    서버 저장소의 git 입구(카드 BB) — 이미지 안 git의 http-backend를 CGI로 돌린다. 앱의
+    환경(비밀)은 넘기지 않는다. **본문을 다 넘길 때까지 응답을 시작하지 않는다** — http-backend는
+    push 결과 머리를 본문을 다 읽기 전에 내놓는데, 그때 응답을 시작하면 큰 push(chunked)의 본문이
+    중간에 끊겼다(시험판 실측). 넘기는 동안 나오는 출력은 모아 둔다 — 안 읽으면 파이프가 찬다.
+    """
+    proc = await asyncio.create_subprocess_exec(
+        "git",
+        "http-backend",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env={
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "GIT_PROJECT_ROOT": str(root),
+            "GIT_HTTP_EXPORT_ALL": "1",
+            "GIT_HTTP_MAX_REQUEST_BUFFER": "100M",
+            **env,
+        },
+    )
+    assert proc.stdin and proc.stdout and proc.stderr
+    stdin, stdout, stderr = proc.stdin, proc.stdout, proc.stderr
+
+    async def feed() -> None:
+        try:
+            async for chunk in body:
+                if chunk:
+                    stdin.write(chunk)
+                    await stdin.drain()
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # 자식이 먼저 끝났다(거절 등) — 그 답은 stdout에 있다
+        finally:
+            stdin.close()
+
+    async def drain_err() -> None:
+        while await stderr.read(65536):
+            pass  # 비우기만 — 안 읽으면 자식이 막힌다
+
+    feeder = asyncio.create_task(feed())
+    err_task = asyncio.create_task(drain_err())
+    pending: list[bytes] = []
+    # 2~3. 본문을 넘기는 동안 stdout을 모은다
+    while not feeder.done():
+        reader = asyncio.ensure_future(stdout.read(65536))
+        done, _ = await asyncio.wait({reader, feeder}, return_when=asyncio.FIRST_COMPLETED)
+        if reader not in done:
+            chunk = await reader  # feeder가 먼저 끝났다 — 읽던 것은 마저 받는다
+            if chunk:
+                pending.append(chunk)
+            break
+        chunk = reader.result()
+        if not chunk:
+            break
+        pending.append(chunk)
+    await feeder
+    # 4. CGI 머리
+    buf = b"".join(pending)
+    while b"\r\n\r\n" not in buf:
+        chunk = await stdout.read(65536)
+        if not chunk:
+            break
+        buf += chunk
+    head, _, rest = buf.partition(b"\r\n\r\n")
+    status, headers = 200, []
+    for line in head.decode("latin-1").split("\r\n"):
+        name, _, value = line.partition(":")
+        if not name.strip():
+            continue
+        if name.strip().lower() == "status":
+            status = int(value.strip().split()[0])
+        else:
+            headers.append((name.strip(), value.strip()))
+
+    async def stream() -> AsyncIterator[bytes]:
+        try:
+            if rest:
+                yield rest
+            while chunk := await stdout.read(65536):
+                yield chunk
+            await err_task
+            await proc.wait()
+        finally:
+            if proc.returncode is None:  # 클라이언트가 끊겼다
+                proc.kill()
+                await proc.wait()
+
+    return CgiResponse(status, headers, stream())
 
 
 async def archive(workdir: Path, commit: str, dest: Path) -> None:
