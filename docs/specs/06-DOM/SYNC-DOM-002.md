@@ -88,7 +88,7 @@ app/
 ├── scheduler.py            폴링([[SYNC-MS-007#scheduler.catch_up]]). POLL_INTERVAL_SECONDS(기본 300, 테스트 0)
 │
 ├── web/                    REST API. core를 호출만 한다
-│   ├── routers/
+│   ├── routers/            git.py는 서버 저장소의 git 입구(카드 BB) — /git/{코드}.git
 │   ├── schemas/            요청·응답 형태
 │   ├── auth.py             GitHub OAuth·세션
 │   └── static/             React 빌드 결과 (gitignore). /{path:path} SPA 폴백은 라우트 맨 끝
@@ -402,7 +402,7 @@ classDiagram
 
 | 타입 | 필드 | 쓰는 곳 |
 |---|---|---|
-| `Entry` | 열거 `mcp` · `web_revert` · `web_status` · `github` | pipeline |
+| `Entry` | 열거 `mcp` · `web_revert` · `web_status` · `github` — **`github`는 「저장소로 들어온 커밋」**(GitHub push, 서버 저장소 git push, 재구축). 서버 저장소도 같은 값이다 — 판정 17곳이 같은 뜻이라 늘리지 않는다(카드 BB). 화면은 저장 방식으로 「GitHub push」/「git push」를 가른다 | pipeline |
 | `Author` | `kind: AuthorKind` · `user: User` · `instructed_by: User \| None` · `via: Entry` | pipeline · save · Version 기록. `versions.via`에 `mcp`·`web`·`github`로 접어 저장 |
 | `AuthorRef` | `kind: AuthorKind` · `user_id: int` · `instructed_by_id: int \| None` · `via: str` | SpecService가 돌려주는 작성 주체 — **id만**. `UserRef`로 채우는 건 `queries`가 `AccountService.users_by_ids`로 |
 | `Violation` | `line: int` · `rule: str` · `message: str` | validate |
@@ -424,6 +424,8 @@ classDiagram
 | `ChangedFile` | `path: str` · `status: A\|M\|D` · `commit_hash: str` · `author_login: str` · `message: str` · `author_email: str` | git.changed_files → process_commit. **`author_login`과 `author_email`을 둘 다 싣는다** — login은 `%an` 대체값일 수 있어 신원의 근거가 못 된다([[SYNC-MS-009#git.changed_files]]) |
 | `Commit` | `hash: str` · `login: str` · `date: datetime` · `message: str` · `email: str` · `path: str` | git.log → rebuild. `ChangedFile`과 같은 이유로 이메일을 함께 싣는다. `path`는 **그 커밋 시점의 경로** — `--follow`가 이름 바뀌기 전 커밋까지 주므로 지금 경로로는 본문을 못 읽는다([[SYNC-MS-009#git.log]]) |
 | `GithubUser` | `id: int` · `login: str` · `name: str` | github.get_user → login_github |
+| `UploadResult` | `commit: str` · `changed: bool` · `files: int` · `deleted: int` | pipeline.upload_code → MCP `upload_code`(카드 BB). 내용이 같으면 `changed=False`, 커밋은 그대로 |
+| `CgiResponse` | `status: int` · `headers: list[(str, str)]` · `body: AsyncIterator[bytes]` | git.http_backend → routers/git. 본문을 다 넘긴 뒤에 만들어진다(인프라 7장) |
 | `ToolSpec` | `name: str` · `description: str` · `parameters: dict`(JSON Schema) | queries 상수 `_ASK_TOOLS` → llm.step. 읽기 도구 다섯의 선언 |
 | `ToolCall` | `id: str` · `name: str` · `arguments: dict` | llm.step → queries.ask_item. 모델이 부르겠다고 한 도구 하나 |
 | `LlmUsage` | `prompt_tokens: int` · `completion_tokens: int`(없으면 0) | llm.step → ask_item이 누적해 로그 한 줄. DB에 안 쓴다 |
@@ -576,6 +578,7 @@ flowchart LR
         rad[routers/admin.py]
         rc[routers/conversations.py]
         rcg[routers/code.py]
+        rg[routers/git.py]
         hk[hooks.py]
     end
     subgraph mcp["mcp/ (Boundary)"]
@@ -598,6 +601,8 @@ flowchart LR
     rad --> PL
     rc --> CS
     rcg --> QRB
+    rg --> PS
+    rg --> PL
     hk --> PL
     mt --> PS
     mt --> SS
@@ -605,7 +610,7 @@ flowchart LR
     mt --> QRB
 ```
 
-`routers/code.py`는 코드 탭·관계도 코드 호출의 네 조회(카드 AY) — `queries`만 본다. 대조는 여러 묶음(명세·코드 그래프)을 모아야 해서 서비스가 아니라 `queries`다. `routers/conversations.py`는 대화 목록·조회·삭제와 첨부 업로드·조회·삭제 — 묶음 하나(`ConversationService`)만 본다. 질문(`ask`)은 `routers/documents.py`에 그대로 있고 `queries.ask_item`이 대화를 읽고 쓴다(3.2).
+`routers/git.py`는 서버 저장소의 git 입구(카드 BB) — 토큰으로 사람을 정하고(`AccountService.authenticate_token`, 인증은 입구의 몫이라 허용) `ProjectService.server_origin`으로 소유·저장 방식을 본 뒤 `git.http_backend`를 흘리고, push를 받으면 `pipeline.read_pending`으로 넘긴다 — `hooks.py`와 같은 자리다. `routers/code.py`는 코드 탭·관계도 코드 호출의 네 조회(카드 AY) — `queries`만 본다. 대조는 여러 묶음(명세·코드 그래프)을 모아야 해서 서비스가 아니라 `queries`다. `routers/conversations.py`는 대화 목록·조회·삭제와 첨부 업로드·조회·삭제 — 묶음 하나(`ConversationService`)만 본다. 질문(`ask`)은 `routers/documents.py`에 그대로 있고 `queries.ask_item`이 대화를 읽고 쓴다(3.2).
 
 라우터 하나가 묶음 하나를 본다. `admin.py`만 예외로 프로젝트와 파이프라인 둘을 부른다 — 재구축([[SYNC-UC-001#UC-S6]])이 운영 성격이라 어느 묶음에도 안 들어간다. **예외 둘 더** — 라우터가 응답에 사람 이름을 붙이려고 `AccountService.users_by_ids`를 부르는 건 허용(이력). `documents.py`가 상태 변경·되돌리기를 `pipeline`으로 넘기는 것도 허용 — 둘은 조율이라 `pipeline`에 있다. `mcp/tools.py`는 account를 부르지 않는다 — 인증은 `mcp/auth.py`의 몫이다.
 
@@ -687,6 +692,7 @@ classDiagram
         +rebuild_index(code: str, user: User) RebuildResult
         +delete_project(code: str, user: User) None
         +asset_path(code: str, path: str, user: User) Path
+        +server_origin(code: str, user: User) Path
     }
     class Project {
         +int id
@@ -725,6 +731,7 @@ classDiagram
 | `rebuild_index` | [[SYNC-API-001#POST/api/admin/repos/{code}/rebuild]] | [[SYNC-UC-001#UC-S6]] | not-found |
 | `delete_project` | [[SYNC-API-001#DELETE/api/projects/{code}]] | [[SYNC-UC-001#UC-H17]] | not-found |
 | `asset_path` | [[SYNC-API-001#GET/api/projects/{code}/files/{path}]] (사람 경로, `get_owned`) | [[SYNC-PRD-001#R5]] | not-found (project·file) |
+| `server_origin` | routers/git — [[SYNC-API-001#GET/git/{code}.git/info/refs]] 외 둘 | [[SYNC-UC-001#UC-H21]] | not-found (남의 것·GitHub 저장도 같은 답) |
 
 **규칙이 사는 곳**
 - **소유 게이트는 `get_owned` 하나다.** `project.owner_user_id != user.id`면 `NotFound("project", code)` — 있다는 사실이 새지 않는다(있는데 못 본다가 아니라 없다). 사람이 부르는 경로(웹·MCP)는 전부 `get_owned`·`list_owned`를 지나고, 사람이 없는 경로(폴링·웹훅·GitHub 커밋 처리)만 `get`·`list_projects`를 쓴다. `get(code, user: User | None)`처럼 인자를 선택으로 두지 않는다 — `None`이 「필터 없음」이라는 합법 값이 되면 빠뜨린 자리가 조용히 전체 열람이 된다
@@ -1040,6 +1047,12 @@ process_commit(repo: Repository, head_hash: str, locked: bool = False) -> list[S
     밀린 커밋 여럿이면 최종 상태만 저장. 중간 버전은 git에만 (인프라 7장)
     끝나면 repositories.last_processed_commit = head
 
+upload_code(code: str, files: dict[str, str], delete: list[str], message: str, author: Author) -> UploadResult
+    [[SYNC-UC-001#UC-A10]]. MCP upload_code가 부른다(카드 BB). get_owned · 서버 저장만(storage-mismatch)
+    한도(UTF-8 합 5MB · 파일+지운 경로 500개, upload-too-large)와 경로(상대 · .git 조각 없음 · docs/specs/ 밖 ·
+    비밀 꼴 아님, upload-path-refused — 하나라도 걸리면 아무것도 안 올림)를 락 밖에서 본다
+    read_pending(DEV-19) → 쓰기 락 안에서 git.commit_push(files, delete) → read_pending(처리 지점 전진·코드 그래프)
+
 rebuild(code: str, session: Session | None = None) -> RebuildResult
     [[SYNC-UC-001#UC-S6]]. 폴링·관리 화면이 부른다 — 관리 화면 쪽은 ProjectService.rebuild_index(code, user)가 get_owned를 먼저 지난다. 한 트랜잭션:
     reference.clear · spec.clear_index(versions만 삭제. documents·items는 유지 — 항목 ID 이력과 휴지통 상태가 거기 산다)
@@ -1095,6 +1108,8 @@ git.rev_list_count(workdir, range) -> int
 git.exists(workdir, path) -> bool
 git.init_specs(workdir) -> dict[str, str]
 git.init_bare(path) -> None                    서버 저장소를 만든다 — main, 앞당김·삭제 거부 (카드 BA)
+git.http_backend(root, env, body) -> CgiResponse
+                                               git http-backend를 CGI로. 본문을 다 넘긴 뒤 응답 머리를 준다 (카드 BB)
 git.archive(workdir, commit, dest) -> None      그 커밋의 파일을 dest에 푼다 (코드 그래프, 카드 AX)
 git.changed_paths(workdir, range) -> list[str]  범위에서 바뀐 경로 전부 (명세 밖 포함)
 
@@ -1111,7 +1126,7 @@ llm.step(system, messages, tools, tool_choice="auto") -> LlmStep
                                                user 항목에 images(mime·bytes)가 있으면 content 파트 배열로 옮긴다 (첨부, 카드 AR)
 ```
 
-**규칙** — `git.commit_push`만 `AccountService.github_token_for`를 부른다(3.2). **원격이 `https://`일 때만** 부른다 — 서버 저장소(서버 안 경로)는 토큰 없이 push한다(카드 BA). 토큰은 push URL에만 쓰고 `.git/config`에 남기지 않는다.
+**규칙** — `git.commit_push`만 `AccountService.github_token_for`를 부른다(3.2). **원격이 `https://`일 때만** 부른다 — 서버 저장소(서버 안 경로)는 토큰 없이 push한다(카드 BA). 토큰은 push URL에만 쓰고 `.git/config`에 남기지 않는다. **쓰는 경로는 작업 사본 안이어야 한다**(카드 BB) — push로 심은 심볼릭 링크를 따라 밖에 쓰거나 `.git/` 안에 쓰는 것을 거부한다.
 
 `llm`은 키를 `config`에서 읽는다. 키가 비면 부르기 전에 `llm-not-configured`로 막고, 외부가 실패하면 `llm-unavailable`로 접는다 — 사용량 초과도 여기 들어간다([[SYNC-INFRA-001]] 5.3). **어댑터는 한 번 호출만 안다.** 도구 선언(`tools`)과 `tool_choice`를 와이어 형식(`{type: function, function: {name, description, parameters}}`)으로 옮겨 싣고, 응답의 `tool_calls`를 `ToolCall`로 파싱해 돌려준다. `arguments`가 JSON이 아니면 `llm-unavailable`. 루프는 어댑터에 없다 — `queries.ask_item`이 돈다.
 

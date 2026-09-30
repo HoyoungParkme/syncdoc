@@ -35,6 +35,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#ProjectService.delete_project]] | 등록 해제·작업 사본 회수 |
 | [[#ProjectService.rebuild_index]] | 재구축 위임 |
 | [[#ProjectService.asset_path]] | 첨부 파일 경로 — 사람 경로 |
+| [[#ProjectService.server_origin]] | 서버 저장소 원본 경로 — git 입구 |
 
 ---
 
@@ -275,6 +276,30 @@ async def sync_now(code: str, user: User) -> SyncResult
 **호출되는 것** [[SYNC-API-001#GET/api/projects/{code}/files/{path}]] 라우터
 
 **테스트 관점** 소유자·있는 파일 → `Path`가 `base` 안 · 남의 프로젝트 → `not-found`이고 확장 필드가 `get_owned`의 것과 같다(`resource: project`) · `../../etc/passwd` → `not-found`(file) · `base` 밖을 가리키는 심볼릭 링크 → `not-found` · `01-RFQ/X-RFQ-001.md` → `not-found`(허용 밖 확장자) · 없는 파일 → `not-found`
+
+---
+
+#### ProjectService.server_origin 서버 저장소 원본 경로
+
+**시그니처** `def server_origin(code: str, user: User) -> Path`
+
+근거: [[SYNC-UC-001#UC-H21]] · [[SYNC-SEQ-001#SEQ-29]] · [[SYNC-API-001#GET/git/{code}.git/info/refs]] · [[SYNC-PRD-001#R14]]
+
+**처리**
+1. `project = get_owned(code, user)` — 남의 프로젝트는 `! not-found {resource: project, id: code}`
+2. if `project.repository.storage != server` → `! not-found {resource: project, id: code}` — **GitHub 저장 프로젝트도 없는 것과 같은 답이다.** git 입구는 서버 저장소에만 있다
+3. `origin = Path(project.repository.remote_url)` · if 없으면 → `! not-found {resource: project, id: code}`
+4. `→ origin`
+
+**출력** `Path` — `ORIGINS_DIR/{코드}.git`. 라우터가 `git.http_backend`에 `GIT_PROJECT_ROOT`와 `PATH_INFO`로 넘긴다
+
+**예외** `not-found`(project) — 남의 것·GitHub 저장·원본 없음이 같은 모양이다. 존재가 새지 않는다
+
+**호출하는 것** [[#ProjectService.get_owned]]
+
+**호출되는 것** routers/git(서버 저장소 git 입구 셋)
+
+**테스트 관점** 소유자·서버 저장 → 원본 경로 · 남의 서버 저장 프로젝트 → `not-found`(project) · 내 GitHub 저장 프로젝트 → 같은 `not-found` · 원본 폴더가 사라졌으면 `not-found`
 
 ---
 

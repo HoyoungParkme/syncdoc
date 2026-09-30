@@ -345,6 +345,19 @@ class ProjectService:
             if server and origin.exists():
                 origin.rename(_archive_path(code))
 
+    def server_origin(self, code: str, user: User) -> Path:
+        """SYNC-MS-001#ProjectService.server_origin
+
+        git 입구(카드 BB)가 흘릴 서버 안 원본. 남의 것·GitHub 저장·원본 없음은 같은 not-found —
+        git 입구는 서버 저장소에만 있고, 존재가 새지 않는다.
+        """
+        project = self.get_owned(code, user)
+        repo = project.repository
+        origin = Path(repo.remote_url)
+        if repo.storage != Storage.server or not origin.is_dir():
+            raise NotFound("project", code)
+        return origin
+
     async def ensure_hook(self, code: str, user: User) -> HookStatus:
         """SYNC-MS-001#ProjectService.ensure_hook"""
         project = self.get_owned(code, user)  # 남의 것이면 not-found

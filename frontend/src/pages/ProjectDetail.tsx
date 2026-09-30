@@ -5,7 +5,7 @@
  *  8 휴지통 묶음(8.1 행 · 8.2 되살리기 · 8.3 완전 삭제 · 8.4 확인) — 0건이면 묶음 자체가 없다 */
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import { StatusPill, ProjName, Tooltip, useEscape } from '../components/ui'
+import { StatusPill, ProjName, Tooltip, toast, useEscape } from '../components/ui'
 import { ago, api, ApiError, authorLabel, docPath, refKey, STAGE_NAMES, STATUS_KO, warnText, type BrokenRefSummary, type DocumentSummary, type ProjectDetail as Detail, type ProjectSummary } from '../api/client'
 
 
@@ -140,9 +140,12 @@ export function ProjectDetail() {
               {sum.remote_url.replace(/^https?:\/\//, '').replace(/\.git$/, '')}
             </a>
           ) : (
-            <span className="repo" data-el="1.3">
-              서버 저장소
-            </span>
+            <>
+              <span className="repo" data-el="1.3">
+                서버 저장소
+              </span>
+              <PushHowto code={sum.code} />
+            </>
           )}
         </div>
         <span className="grow" />
@@ -393,4 +396,28 @@ function listItem(kind: string, it: unknown) {
 function lowest(ds: DocumentSummary[]): string {
   const order: Record<string, number> = { draft: 0, approved: 1 }
   return ds.map((d) => d.status).sort((a, b) => order[a] - order[b])[0] ?? 'draft'
+}
+
+/** 1.4 push 방법 — 서버 저장 프로젝트에만(카드 BB, UC-H21). 원격을 더하는 줄과 push 줄, 비밀번호 칸에 개인 토큰.
+ *  주소는 이 서버의 `/git/{코드}.git` — 화면을 연 주소 그대로라 터널 뒤에서도 맞다 */
+function PushHowto({ code }: { code: string }) {
+  const lines = [`git remote add syncdoc ${window.location.origin}/git/${code}.git`, 'git push syncdoc main']
+  return (
+    <div className="pushhow" data-el="1.4">
+      <span className="lbl">push 방법</span>
+      {lines.map((l) => (
+        <code key={l}>{l}</code>
+      ))}
+      <span className="lbl">비밀번호 칸에 개인 토큰(설정)</span>
+      <span
+        className="btn sm"
+        onClick={() => {
+          void navigator.clipboard.writeText(lines.join('\n'))
+          toast('두 줄을 복사했습니다')
+        }}
+      >
+        복사
+      </span>
+    </div>
+  )
 }

@@ -9,11 +9,12 @@ B1 save_pipeline · B2 web_status·change_status · B4 revert·process_commit·r
 from __future__ import annotations
 
 import asyncio
+import fnmatch
 import logging
 import re
 import tempfile
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from sqlalchemy.orm import Session
 
@@ -22,6 +23,7 @@ from app.core.account.models import User
 from app.core.account.service import AccountService
 from app.core.clock import now_utc
 from app.core.codegraph import graph as codegraph
+from app.core.codegraph.service import DENY as CODE_DENY
 from app.core.codegraph.service import CodeGraphService
 from app.core.errors import (
     AlreadyCurrent,
@@ -36,6 +38,9 @@ from app.core.errors import (
     PreconditionUnmet,
     RebuildFailed,
     StatusBlocked,
+    StorageMismatch,
+    UploadPathRefused,
+    UploadTooLarge,
     VersionConflict,
 )
 from app.core.markdown import parse_frontmatter
@@ -53,7 +58,9 @@ from app.core.types import (
     Entry,
     RebuildResult,
     SaveResult,
+    Storage,
     TrashResult,
+    UploadResult,
     Violation,
     spec_dir,
     type_of_dir,
@@ -527,6 +534,63 @@ async def restore_document(doc_id: str, author: Author) -> SaveResult:
         )
         # 5. 없음 — 되살아난 항목을 가리키던 미존재 참조는 save_pipeline 10a가 이미 이었다
     return r
+
+
+_UPLOAD_BYTES = 5 * 1024 * 1024  # 한 번에 UTF-8 합 (사용자 결정 2026-09-30)
+_UPLOAD_COUNT = 500  # 파일 + 지운 경로
+
+
+def _refusal(path: str) -> str | None:
+    """upload_code 3 — 올릴 수 없는 경로의 이유. 올려도 되면 None (MS-007, UC-A10 2b)."""
+    if not path.strip():
+        return "빈 경로"
+    if "\\" in path:
+        return "역슬래시 — / 로 쓴다"
+    rel = PurePosixPath(path)
+    if rel.is_absolute():
+        return "절대 경로"
+    if ".." in rel.parts:
+        return "상위 경로(..)"
+    if ".git" in rel.parts:
+        return ".git"
+    if rel.parts[:2] == ("docs", "specs"):
+        return "명세 경로 — create_document·update_document로 쓴다"
+    if any(fnmatch.fnmatch(rel.name.lower(), pat) for pat in CODE_DENY):
+        return "비밀 꼴"
+    return None
+
+
+async def upload_code(
+    code: str, files: dict[str, str], delete: list[str], message: str, author: Author
+) -> UploadResult:
+    """SYNC-MS-007#pipeline.upload_code
+
+    git이 없는 PC의 코드를 서버 저장소에 커밋 하나로 넣는다(카드 BB, UC-A10). 명세 경로는 받지
+    않아 버전이 생기지 않는다 — 처리는 처리 지점을 옮기고 코드 그래프만 건다.
+    """
+    with db.session_scope() as s:
+        project = ProjectService(s).get_owned(code, author.user)
+        storage, workdir = project.repository.storage, Path(project.repository.workdir_path)
+    if storage != Storage.server:  # 1
+        raise StorageMismatch(storage)
+    size = sum(len(c.encode("utf-8")) for c in files.values())  # 2 — 락 밖
+    count = len(files) + len(delete)
+    if size > _UPLOAD_BYTES or count > _UPLOAD_COUNT:
+        raise UploadTooLarge({"bytes": _UPLOAD_BYTES, "count": _UPLOAD_COUNT}, size, count)
+    refused = [{"path": p, "reason": r} for p in [*files, *delete] if (r := _refusal(p))]  # 3
+    refused += [
+        {"path": p, "reason": "글자가 아니다(이진)"}
+        for p, c in files.items()
+        if "\x00" in c and not _refusal(p)
+    ]
+    if refused:
+        raise UploadPathRefused(refused)
+    await read_pending(code, author.user)  # 4 — 쓰기 전에 읽는다 (DEV-19)
+    async with _lock(code):  # 5
+        before = await git.fetch(workdir)
+        commit = await git.commit_push(workdir, message, author, files=files, delete=delete)
+    await read_pending(code, author.user)  # 6 — 처리 지점·코드 그래프
+    return UploadResult(commit, commit != before, len(files), len(delete))
 
 
 async def purge_document(doc_id: str, author: Author) -> None:
