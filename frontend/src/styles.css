@@ -619,6 +619,12 @@ a.arow:hover{background:var(--bg-subtle)}
 .edges .e.back{stroke:var(--ref-backlink);stroke-width:1.4;stroke-dasharray:5 3;marker-end:url(#ahr)}
 .edges .e.gone{stroke:var(--danger);stroke-width:1.6;stroke-dasharray:3 3;marker-end:url(#ahb)}
 .edges .e.dim{opacity:.1}
+/* UI-8 2.6 코드 호출 — 3.6 같음(옅게) · 3.7 코드만(호박) · 3.8 명세만(빨간 점선) (카드 AY) */
+.edges .e.cg{stroke-width:1.3;marker-end:url(#ahc)}
+.edges .e.cg.same{stroke:var(--border-strong)}
+.edges .e.cg.code{stroke:var(--caution-ink)}
+.edges .e.cg.spec{stroke:var(--danger);stroke-dasharray:3 3}
+.glegend .cgl{color:var(--caution-ink)}
 /* 그래프 범례는 카드 안 푸터 바다. UI-2 범례(배경 없는 텍스트 줄)와 이름을 갈라놓는다 */
 .glegend{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-4) var(--space-14);
   padding:var(--space-8) var(--space-14);border-top:1px solid var(--divider);
@@ -814,3 +820,28 @@ a.arow:hover{background:var(--bg-subtle)}
 
 /* 배치 iframe(.wfbox·.wfbar·.wfframe)의 규칙은 view/wireframe.ts wireframeCss에 있다 (카드 AC).
    정적 뷰(wf_build.py WF_SCREEN_CSS)와 바이트 단위로 같아야 해서 한 곳에 모았다 — check_view_css 넷째 쌍 */
+
+/* UI-5 8.17~8.22 코드 탭 — ✓ 같음 · ▲ 코드만 · ◌ 명세만 (카드 AY) */
+.pbody.code .cg{display:flex;flex-direction:column;gap:2px}
+.pbody.code .fhead{font:var(--w-semibold) var(--text-meta) var(--font-mono);color:var(--ink-body);margin-bottom:var(--space-4)}
+.pbody.code .fmeta{font:var(--text-caption) var(--font-mono);color:var(--ink-faint);font-weight:400;margin-top:var(--space-2)}
+.pbody.code .gerr{font-size:var(--text-caption);color:var(--danger);margin:var(--space-2) 0 var(--space-4)}
+.pbody.code .k{font-size:var(--text-caption);color:var(--ink-faint);margin:var(--space-9) 0 var(--space-3)}
+.pbody.code .cap{font-size:var(--text-meta);color:var(--ink-muted);margin-bottom:var(--space-5)}
+.pbody.code .crow{display:flex;align-items:center;gap:var(--space-5);padding:var(--space-3) var(--space-5);border-radius:var(--radius-chip);
+  font:var(--text-caption) var(--font-mono);color:var(--ink-body);cursor:pointer;min-width:0}
+.pbody.code .crow:hover{background:var(--bg-sunken)}
+.pbody.code .crow .st{width:12px;text-align:center;flex:none}
+.pbody.code .crow .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pbody.code .crow .tag,.pbody.code .crow .cnt{margin-left:auto;flex:none;font-family:var(--font-sans);color:var(--ink-faint)}
+.pbody.code .crow.same .st{color:var(--ink-faint)}
+.pbody.code .crow.code{background:var(--caution-bg)}
+.pbody.code .crow.code .st,.pbody.code .crow.code .tag{color:var(--caution-ink)}
+.pbody.code .crow.spec{background:var(--danger-bg)}
+.pbody.code .crow.spec .st,.pbody.code .crow.spec .tag{color:var(--danger)}
+.pbody.code .crow .cnt.warn{color:var(--caution-ink)}
+.pbody.code details.csrc{margin-top:var(--space-9);border-top:1px solid var(--border);padding-top:var(--space-5);font-size:var(--text-meta)}
+.pbody.code details.csrc summary{cursor:pointer;color:var(--ink-muted)}
+.pbody.code details.csrc pre{margin:var(--space-5) 0 0;padding:var(--space-5);background:var(--bg-sunken);border-radius:var(--radius-chip);
+  font:var(--text-caption)/1.5 var(--font-mono);white-space:pre;overflow:auto;max-height:420px}
+.pbody.code details.csrc .ln{display:inline-block;width:3.2em;margin-right:var(--space-5);text-align:right;color:var(--ink-faint);user-select:none}
