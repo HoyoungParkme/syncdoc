@@ -83,7 +83,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호환 서버 대안** — `tool_choice: "none"`을 받지 않는 OpenAI 호환 서버가 있다. 그때는 마무리 호출을 `tools=[]`(도구·`tool_choice` 둘 다 없이)로 보내면 같은 뜻이다. 기본은 `"none"`이고, 안 받는 서버가 확인되면 이 줄을 근거로 바꾼다
 
-**호출하는 것** 없음. 바깥만 만진다
+**호출하는 것** [[#llm.step_stream]] — 요청·파싱은 그것이 하고 여기는 끝의 `LlmStep`만 모은다
 
 **호출되는 것** 테스트·단발 호출. `ask_item`은 [[#llm.step_stream]]을 돈다(카드 AW)
 
@@ -179,6 +179,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **재시도로 건지는 것은 좁다.** 진입할 때 원격 최신에 맞추므로 거부는 `fetch`와 `push` 사이의 짧은
 틈에 외부 push가 끼어들 때만 난다. 한 번으로도 대부분 건지고, 셋은 여럿이 같은 저장소를 만질 때의
 대비다. **rebase 충돌은 몇 번을 해도 안 풀린다** — 에이전트가 현재 본문을 다시 읽어 합쳐야 한다.
+
+**호출하는 것** [[SYNC-MS-006#AccountService.github_token_for]]
 
 **테스트 관점** 커밋이 하나도 없는 원격 → 이 커밋이 첫 커밋 · 정상 → 원격에 커밋, 반환 해시 = 원격 HEAD · 같은 내용 → 커밋 안 생김, HEAD 반환 · 원격이 앞서 있음(다른 파일) → rebase 후 성공 · 연달아 두 번 앞서도 성공(재시도 2회) · 원격이 같은 파일 수정 → conflict, 작업 사본 원상 · 토큰이 config에 안 남음 · **git 로케일이 영어가 아니어도 거부를 거부로 판정**
 
@@ -318,6 +320,8 @@ async def sync_readme(workdir: Path, author: Author, code: str) -> str | None
 **출력** 커밋 해시 또는 `None`(이미 같음)
 
 **예외** `PushFailed` — 부르는 쪽이 그대로 올린다([[SYNC-MS-001#ProjectService.rebuild_index]] 2)
+
+**호출하는 것** [[#git.commit_push]] · [[#git.read]]
 
 **테스트 관점** 낡은 README → 커밋 하나, 파일 내용이 새 판 · 같은 README → `None`이고 HEAD 그대로 · README가 아예 없는 저장소 → 만든다 · 커밋 메시지에 프로젝트 코드
 
