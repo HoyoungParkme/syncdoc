@@ -174,6 +174,12 @@ class AskNote(Base):
     text: str
 
 
+class AskDelta(Base):
+    """SYNC-API-001 delta 이벤트 — 모델이 지금 쓰는 글자 조각. 진실이 아니다(카드 AW)."""
+
+    text: str
+
+
 class AskRead(Base):
     """SYNC-API-001 read 이벤트 — 도구 실행이 끝났다."""
 

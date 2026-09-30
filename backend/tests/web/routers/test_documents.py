@@ -161,15 +161,20 @@ def test_ask_endpoint_streams_start_note_read_answer(
             ],
             LlmUsage(),
         ),
+        "G1은 ",
         LlmStep("G1은 Q1을 근거로 한다", [], LlmUsage()),
     ]
     seen: list[list[dict]] = []
 
-    async def step(system, messages, tools, tool_choice="auto"):
+    async def step_stream(system, messages, tools, tool_choice="auto"):
         seen.append(list(messages))
-        return steps.pop(0)
+        while True:
+            part = steps.pop(0)
+            yield part
+            if isinstance(part, LlmStep):
+                return
 
-    monkeypatch.setattr(queries.llm, "step", step)
+    monkeypatch.setattr(queries.llm, "step_stream", step_stream)
     conv = client.post("/api/projects/EXMP/conversations", json={}).json()["id"]
     svc = ConversationService(scoped)  # 앞 대화는 서버가 대화에서 만든다 (카드 AQ)
     svc.finish_turn(svc.add_turn(conv, "앞", []).id, "답", [], [])
@@ -181,6 +186,7 @@ def test_ask_endpoint_streams_start_note_read_answer(
         ("start", {"doc_id": "EXMP-PRD-001", "item_id": "G1"}),
         ("note", {"text": "G1을 읽는다"}),
         ("read", {"tool": "get_item", "target": "EXMP-PRD-001#G1"}),
+        ("delta", {"text": "G1은 "}),  # 카드 AW — 글자 조각, answer가 전체를 다시 준다
         ("answer", {"answer": "G1은 Q1을 근거로 한다", "context_item_ids": ["EXMP-PRD-001#G1"]}),
     ]
     assert seen[0][-1] == {"role": "user", "text": "이게 뭐야?"} and len(seen[0]) == 3
@@ -194,8 +200,9 @@ def test_ask_endpoint_streams_start_note_read_answer(
     # 루프 중 모델 실패 → 200 스트림 안 error 이벤트(problem+json 그대로)
     async def down(system, messages, tools, tool_choice="auto"):
         raise LlmUnavailable("HTTP 429")
+        yield  # 비동기 제너레이터 — 첫 조각을 당길 때 던진다 (카드 AW)
 
-    monkeypatch.setattr(queries.llm, "step", down)
+    monkeypatch.setattr(queries.llm, "step_stream", down)
     r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "?", "conversation_id": conv})
     assert r.status_code == 200
     ev = _sse(r.text)
