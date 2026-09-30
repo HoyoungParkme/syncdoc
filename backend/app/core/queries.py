@@ -29,7 +29,7 @@ from app.core.codegraph.service import CodeGraphService
 from app.core.conversation.service import ConversationService
 from app.core.errors import ItemDeleted, LlmNotConfigured, LlmUnavailable, NotFound, Problem
 from app.core.project.models import Project
-from app.core.project.service import ProjectService
+from app.core.project.service import ProjectService, public_remote
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
 from app.core.types import (
@@ -75,6 +75,7 @@ from app.core.types import (
     ProjectSummary,
     RefEdge,
     StageSummary,
+    Storage,
     ToolResult,
     ToolSpec,
     UserRef,
@@ -108,7 +109,8 @@ def _summarize(
     return ProjectSummary(
         code=project.code,
         name=project.name,
-        remote_url=project.repository.remote_url,
+        storage=Storage(project.repository.storage),
+        remote_url=public_remote(project.repository),  # 서버 저장이면 None (카드 BA)
         stages=stages,
         std_docs=[d for d in docs if d.doc_type == "STD"],
         counts=counts,
