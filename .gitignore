@@ -11,3 +11,5 @@ frontend/node_modules/
 # 화면 확인 스크린샷은 저장소에 안 넣는다 — PR 본문에 붙인다 (DEV-14)
 /*.png
 
+# 폐쇄망 반입물 — scripts/release_closed.sh 결과 (INFRA 8.1)
+/dist/
