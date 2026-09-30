@@ -1194,8 +1194,8 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 | 항목 | 내용 |
 |---|---|
-| 근거 | [[SYNC-PRD-001#R14]] · [[SYNC-PRD-001#R13]] · 사용자 결정 2026-09-30(서버가 git push를 받는다 — 개인 토큰 · git 없는 PC는 MCP로 바뀐 파일과 지운 경로, 한 번 5MB·파일 500개, 명세 경로·비밀 꼴 거절, UTF-8 글자만) |
-| 구현 | `/git/{코드}.git/…`(git http-backend, Basic 비밀번호 자리에 개인 토큰, 소유자만, main만 처리) · MCP `upload_code` · 쓰기 경로 가드(작업 사본 밖·`.git` 거절) · 이력 표시 「git push」 · UI-4 push 방법. 명세는 이 카드를 시작할 때 쓴다 |
+| 근거 | [[SYNC-PRD-001#R14]] · [[SYNC-PRD-001#R13]] · [[SYNC-SCN-001#S10]] · [[SYNC-UC-001#UC-H21]] · [[SYNC-UC-001#UC-A10]] · [[SYNC-SEQ-001#SEQ-29]] · [[SYNC-SEQ-001#SEQ-30]] · [[SYNC-MS-001#ProjectService.server_origin]] · [[SYNC-MS-007#pipeline.upload_code]] · [[SYNC-MS-009#git.http_backend]] · 사용자 결정 2026-09-30(서버가 git push를 받는다 — 개인 토큰 · git 없는 PC는 MCP로 바뀐 파일과 지운 경로, 한 번 5MB·파일 500개, 명세 경로·비밀 꼴 거절, UTF-8 글자만) |
+| 구현 | `routers/git.py` — `/git/{코드}.git/`의 `info/refs`·`git-upload-pack`·`git-receive-pack`(git http-backend, Basic 비밀번호 칸에 개인 토큰, 소유자·서버 저장만, 본문을 다 넘긴 뒤 응답, push면 응답 뒤 read_pending) · `ProjectService.server_origin` · `pipeline.upload_code` + MCP `upload_code` · `git.http_backend` · `commit_push` 쓰기 경로 가드 · 오류 셋 · 이력 표시 「git push」 · UI-4 1.4 push 방법 |
 | 테스트 | 실제 git 클라이언트로 clone·push · `upload_code` 상한·거절 · 운영: https push → 코드 탭, `upload_code` → 코드 탭 |
 | 선행 | BA |
 | 완료 | — |
