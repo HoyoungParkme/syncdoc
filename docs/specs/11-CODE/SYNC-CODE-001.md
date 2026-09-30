@@ -1132,7 +1132,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | 앱 `styles.css` `body`와 정적 뷰 셸 CSS(`view_build.py` → `styles.view.css` 같은 바이트)에 `word-break:keep-all;overflow-wrap:anywhere` · 와이어프레임 iframe 안은 제외 |
 | 테스트 | `check_view_css` 뷰 CSS 쌍 같음 · 헤드 크롬: PRD-001 R1 카드 「이 MD가 원본」 한 덩어리 · 정적 뷰 같은 문단 · 질문 탭 답의 한글이 글자 중간에서 안 꺾이고 긴 ID는 칸 안에서 꺾임 |
 | 선행 | AU |
-| 완료 | — |
+| 완료 | 2026-09-30 · 브랜치 `card/AV-keep-all` · spec 3 + code 1 · `validate` 0/0 · `check_view_css` 7쌍 같음 · `check_tokens` 91/0 · 배포 뒤 헤드 크롬: `body`·`.qa .a` 모두 keep-all/anywhere · PRD-001 R1 카드 「이 MD가」 한 덩어리 · 채팅 답 문장이 어절에서 꺾임 · 정적 뷰 셸 CSS에 같은 선언 |
 
 **왜 카드인가.** 렌더러는 문단 줄을 공백으로 잇고 있어 하드 줄바꿈은 없다 — 원인은 CSS 기본값(한글은 아무 글자 사이나 꺾인다)이고, 디자인 토큰 문서(UI-001 3.2)에 규칙이 는다.
 
@@ -1215,6 +1215,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AS | `card/AS-answer-diagram` | `20370d8` · `cfe0fa6` · `c3dd207` · `65615b7` · `0d30b88` | #214 · #215 · #217 · #219 · #220 | 2026-09-29 |
 | AT | `card/AT-ask-width` | `ee4a86c` | #222 | 2026-09-30 |
 | AU | `card/AU-answer-text` | `ed661fa` | #224 | 2026-09-30 |
+| AV | `card/AV-keep-all` | `b966ebb` | #228 | 2026-09-30 |
 | (#119) | `fix/119-single-render` | — | #119 | 2026-09-23 |
 | (#126) | `fix/126-view-build-specs` | — | #126 | 2026-09-23 |
 | (#133) | `fix/133-tokens-by-chapter` | — | #133 | 2026-09-23 |
