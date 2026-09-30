@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-001
 type: UI
 title: 화면 설계 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UC-001, SYNC-DOM-002]
 ---
 
@@ -162,6 +162,8 @@ upstream: [SYNC-UC-001, SYNC-DOM-002]
 | 고정폭 작게 | 11.5~12px / 400~500 |
 
 한글 UI라 Pretendard를 고른다. 고정폭을 따로 두는 이유는 ID가 세로로 정렬돼야 훑기 좋기 때문이다.
+
+**줄바꿈은 어절 단위** — `word-break: keep-all`. 넘치는 긴 토큰(ID·URL·코드)은 `overflow-wrap: anywhere`로 칸 안에서 꺾는다. 한글이 글자 중간에서 꺾이면(「이 MD/가 원본」) 읽는 리듬이 끊긴다. 앱 화면·유저용 뷰·정적 뷰·채팅 답 모두 같다(카드 AV).
 
 ### 3.3 간격·모서리·그림자
 
