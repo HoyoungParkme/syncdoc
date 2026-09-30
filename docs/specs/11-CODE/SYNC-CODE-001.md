@@ -1292,8 +1292,13 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AV | `card/AV-keep-all` | `b966ebb` | #228 | 2026-09-30 |
 | AW | `card/AW-stream` | `2e243f4` | #230 | 2026-09-30 |
 | AX | `card/AX-code-graph` | `171df7c` | #232 | 2026-09-30 |
-| AY | `card/AY-code-tab` | `e5381de` | #235 | 2026-09-30 |
+| AY | `card/AY-code-tab` · `card/AY-code-stale-selection` · `card/AY-graph-focus` | `e5381de` · `73909f0` · `c6ec895` | #235 · #238 · #240 | 2026-09-30 |
 | AZ | `card/AZ-code-tools` | `b39c6f1` | #236 | 2026-09-30 |
+| (도구) | `chore/dev-preview-v2` | `9b7dadd` | #239 | 2026-09-30 |
+| BA | `card/BA-server-storage` | `c07a703` | #241 | 2026-09-30 |
+| BB | `card/BB-code-receive` | `5f6ba73` | #243 | 2026-09-30 |
+| BC | `card/BC-closed-edition` | `2434dc9` | #244 | 2026-09-30 |
+| (#242) | `fix/242-hook-on-init` | `a076246` | #245 | 2026-09-30 |
 | (#119) | `fix/119-single-render` | — | #119 | 2026-09-23 |
 | (#126) | `fix/126-view-build-specs` | — | #126 | 2026-09-23 |
 | (#133) | `fix/133-tokens-by-chapter` | — | #133 | 2026-09-23 |
