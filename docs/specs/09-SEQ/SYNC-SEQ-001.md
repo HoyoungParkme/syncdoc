@@ -321,7 +321,6 @@ sequenceDiagram
         end
     else 없음 (기본 흐름 4)
         PS->>G: mkdir 11단계 · README.md(규약 링크 — 사본 없음, 카드 AB)
-        PS->>GH: create_hook(push 통지) — 실패해도 등록은 계속 (UC-A1 4a, 카드 AF)
         PS->>G: commit_push("chore: init syncdoc", author)
         alt push 실패 (4a)
             G-->>PS: PushFailed
@@ -329,6 +328,7 @@ sequenceDiagram
             PS-->>B: push-failed
         end
         PS->>DB: Project · Repository(last_processed_commit=hash)
+        PS->>GH: create_hook(push 통지) — 등록이 끝난 뒤. 실패해도 등록은 계속, 사유는 hook_error (UC-A1 4a, 카드 AF)
     end
     PS-->>B: ProjectSummary (11단계 미작성 또는 재구축 결과)
     B-->>U: 결과

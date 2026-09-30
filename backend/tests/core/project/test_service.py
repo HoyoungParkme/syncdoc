@@ -114,6 +114,78 @@ async def test_init_project_accepts_repository_with_no_commits_at_all(
     assert "docs/specs/README.md" in g(bare, "ls-tree", "-r", "--name-only", "main")
 
 
+# ── init_project 9a — 등록 때 push 통지 (#242) ──
+@pytest.fixture
+def hook_env(monkeypatch: pytest.MonkeyPatch) -> str:
+    monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "https://syncdoc.example")
+    monkeypatch.setattr(settings, "WEBHOOK_SECRET", "s3cret")
+    return "https://syncdoc.example/hooks/github"
+
+
+def _empty_bare(repos_dir: Path, name: str) -> Path:
+    bare = repos_dir.parent / f"{name}.git"
+    g(repos_dir.parent, "init", "-q", "--bare", "-b", "main", str(bare))
+    return bare
+
+
+async def test_init_github_registers_the_push_hook_after_the_skeleton(
+    db_session: Session, repos_dir, mock_github, hook_env: str
+) -> None:
+    """9a — GitHub 저장 새 등록은 골격 커밋 뒤 통지를 건다. 전에는 관리 화면 버튼으로만 걸렸다."""
+    import json
+
+    user = make_user(db_session, login="hoyoung")
+    bare = _empty_bare(repos_dir, "hooked")
+    calls = mock_github(
+        lambda req: httpx.Response(200, json=[])
+        if req.method == "GET"
+        else httpx.Response(201, json={"id": 77})
+    )
+    project = await ProjectService(db_session).init_project(str(bare), "HOOK", "통지", user)
+    repo = project.repository
+    assert (repo.hook_id, repo.hook_error) == (77, None)
+    assert repo.last_processed_commit == g(bare, "rev-parse", "main")  # 등록은 그대로
+    post = next(c for c in calls if c.method == "POST")
+    assert post.url.path == f"/repos/{repos_dir.parent.name}/hooked/hooks"  # 주소에서 뜬 소유자·이름
+    assert json.loads(post.content)["config"]["url"] == hook_env
+
+
+@pytest.mark.parametrize("failure", ["refused", "offline"])
+async def test_init_github_hook_failure_keeps_the_registration(
+    db_session: Session, repos_dir, mock_github, hook_env: str, failure: str
+) -> None:
+    """4a — 통지를 못 걸어도 등록은 된다. 사유는 hook_error — GitHub 거절이든 연결 끊김이든."""
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if failure == "offline":
+            raise httpx.ConnectError("연결 끊김", request=req)
+        return httpx.Response(403, json={"message": "Forbidden"})
+
+    user = make_user(db_session, login="hoyoung")
+    bare = _empty_bare(repos_dir, f"hook-{failure}")
+    mock_github(handler)
+    project = await ProjectService(db_session).init_project(str(bare), "HOOF", "실패", user)
+    repo = project.repository
+    assert repo.hook_id is None and repo.hook_error
+    assert repo.last_processed_commit == g(bare, "rev-parse", "main")
+    assert ProjectService(db_session).get("HOOF").code == "HOOF"
+
+
+async def test_init_import_and_server_storage_do_not_call_github_for_a_hook(
+    db_session: Session, repos_dir, repos: dict, mock_github, hook_env: str
+) -> None:
+    """가져오기(8)와 서버 저장은 9a를 부르지 않는다 — 가져오기는 그림 그대로, 서버 저장은 통지가 없다."""
+    from app.core.types import Storage
+
+    user = make_user(db_session, login="hoyoung")
+    calls = mock_github(lambda req: httpx.Response(500))
+    await ProjectService(db_session).init_project(
+        str(repos["remote"]), "IMPT", "가져오기", user, import_existing=True
+    )
+    await ProjectService(db_session).init_project(None, "SRVH", "서버", user, storage=Storage.server)
+    assert calls == []
+
+
 async def test_create_repo_false_leaves_missing_repo_alone(
     db_session: Session, repos_dir, repos: dict, monkeypatch
 ) -> None:

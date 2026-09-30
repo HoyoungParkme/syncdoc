@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import shutil
 from dataclasses import replace
@@ -40,6 +41,8 @@ from app.core.types import (
 )
 from app.infra import git, github
 from app.infra.git import GitError
+
+log = logging.getLogger(__name__)
 
 # 첨부로 주는 확장자 — 이 밖은 없는 것과 같다 (API-001 GET …/files/{path})
 _ASSET_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "svg", "css", "woff", "woff2", "ttf"}
@@ -218,7 +221,22 @@ class ProjectService:
             raise
         repository.last_processed_commit = commit_hash
         self.session.flush()
+        if storage == Storage.github:
+            await self._hook_on_init(code, user, repository)
         return self.repo.by_code(code)
+
+    async def _hook_on_init(self, code: str, user: User, repository: Repository) -> None:
+        """init_project 9a — push 통지를 건다(#242). 무엇이 실패해도 등록을 깨지 않는다.
+
+        ensure_hook은 GitHub가 거절한 것만 상태로 돌려준다. 연결 끊김 같은 예외도 여기서 삼키고
+        사유를 hook_error에 남긴다 — 화면(UI-14)이 말하고, 사람이 「통지 걸기」로 다시 건다.
+        """
+        try:
+            await self.ensure_hook(code, user)
+        except Exception as e:  # noqa: BLE001 — 통지는 빠르게 하려는 수단이다. 주기 확인이 메운다
+            log.warning("등록 때 통지를 못 걸었다 code=%s: %s", code, e)
+            repository.hook_error = f"통지를 못 걸었다: {e}"[:300]
+            self.session.flush()
 
     async def _server_origin(self, code: str, import_existing: bool) -> tuple[Path, Path | None]:
         """init_project 3s — 서버 저장소를 준비한다. (원본, 되살린 보관본의 원래 자리 | None).
