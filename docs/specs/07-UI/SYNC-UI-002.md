@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -297,6 +297,20 @@ textarea.in{height:auto;min-height:64px;padding:8px 10px;resize:none;line-height
   .inrow{display:flex;align-items:flex-end;gap:6px}
   .inrow .in{flex:1}
   .droplayer{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.85);border:2px dashed var(--ink);border-radius:8px;font-size:13.5px;font-weight:600}
+  /* 코드 탭 (카드 AY) — ✓ 같음 · ▲ 코드만 · ◌ 명세만 */
+  .cg .fhead{font:600 13px var(--mono);color:var(--ink)}
+  .cg .fmeta{font:11.5px var(--mono);color:var(--dim);margin:2px 0 6px;font-weight:400}
+  .cg .gerr{font-size:12px;color:var(--warn);margin:0 0 6px}
+  .cg .crow{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;font:12px var(--mono);color:var(--ink2)}
+  .cg .crow .st{width:12px;text-align:center;flex:none}
+  .cg .crow .tag{margin-left:auto;font:11px var(--sans);color:var(--dim)}
+  .cg .crow.code{background:#fdf6e3}.cg .crow.code .st,.cg .crow.code .tag{color:var(--back)}
+  .cg .crow.spec{background:#fdf0ef}.cg .crow.spec .st,.cg .crow.spec .tag{color:var(--warn)}
+  .cg .crow.same .st{color:var(--dim)}
+  .cg .crow .cnt{margin-left:auto;font-size:11px;color:var(--dim)}
+  .cg .crow .cnt.warn{color:var(--back)}
+  .cg details.src{margin-top:10px;border-top:1px solid var(--line);padding-top:6px;font-size:12.5px}
+  .cg details.src pre{margin:6px 0 0;padding:8px;background:var(--sub);border-radius:5px;font:11.5px/1.5 var(--mono);white-space:pre;overflow:auto;max-height:160px}
   /* 원본 탭 */
   .editor{display:grid;grid-template-columns:32px 1fr;border:1px solid var(--line);border-radius:6px;background:#fff;overflow:hidden}
   .gutter{background:var(--sub2);color:var(--dim);font:12px/1.65 var(--mono);text-align:right;padding:10px 6px}
@@ -376,7 +390,7 @@ textarea.in{height:auto;min-height:64px;padding:8px 10px;resize:none;line-height
 
     <div class="hd" data-el="8.3"></div>
     <aside class="side" data-el="8">
-      <div class="ptabs"><span class="on" data-el="8.1">참조</span><span data-el="8.4">질문</span></div>
+      <div class="ptabs"><span class="on" data-el="8.1">참조</span><span data-el="8.4">질문</span><span data-el="8.17">코드</span></div>
       <div class="k">선택</div>
       <div class="sel"><span class="idb">R1</span>에이전트용 원본과 사람용 뷰</div>
       <div class="k">상위 참조 (근거)</div>
@@ -419,14 +433,14 @@ status: draft
       </div>
     </div>
     <div class="hd"></div>
-    <aside class="side"><div class="ptabs"><span class="on">참조</span><span>질문</span></div><div class="k">선택</div><div class="cap">항목을 선택하세요</div></aside>
+    <aside class="side"><div class="ptabs"><span class="on">참조</span><span>질문</span><span>코드</span></div><div class="k">선택</div><div class="cap">항목을 선택하세요</div></aside>
   </div>
 </div>
 
 <div class="var">질문 탭, 읽는 동안 — 진행 묶음(8.9)은 스피너(공통 1.8)와 지금 줄 하나. 「n단계 ▸」를 펼치면 지금까지 전부</div>
 <div class="sd h" style="width:420px;min-height:0">
   <aside class="side" style="min-height:300px">
-    <div class="ptabs"><span data-el="8.1">참조</span><span class="on">질문</span></div>
+    <div class="ptabs"><span data-el="8.1">참조</span><span class="on">질문</span><span>코드</span></div>
     <div class="cap" data-el="8.5"><span class="idb">R1</span> 에이전트용 원본과 사람용 뷰 · 이 항목을 보며 묻습니다</div>
     <div class="qa">
       <div class="q">원본과 뷰를 왜 나눴나요?</div>
@@ -447,7 +461,7 @@ status: draft
 <div class="var">질문 탭, 답이 온 뒤 — 세 층(위 고정 · 가운데 스크롤 · 아래 고정). 8.9는 「n단계 읽음 · 본 것 k ▸」 한 줄로 접힌다. 답은 상자 없이 맨글, 가벼운 마크다운이고 참조는 링크다. 첨부 칩(8.14)은 입력 바로 위</div>
 <div class="sd h" style="width:420px;min-height:0">
   <aside class="side chat" style="min-height:520px">
-    <div class="ptabs"><span>참조</span><span class="on">질문</span></div>
+    <div class="ptabs"><span>참조</span><span class="on">질문</span><span>코드</span></div>
     <div class="cap"><span class="idb">R1</span> 에이전트용 원본과 사람용 뷰 · 이 항목을 보며 묻습니다</div>
     <div class="convrow"><span class="conv" data-el="8.11">대화 ▾ 원본과 뷰를 왜 나눴나요?</span><span class="b sm" data-el="8.12">새 대화</span></div>
     <div class="qa" data-el="8.7">
@@ -469,10 +483,43 @@ status: draft
   </aside>
 </div>
 
+<div class="var">코드 탭 — MINISPEC 항목을 골랐을 때(카드 AY). 함수 머리(8.18) · 부르는 것(8.19)은 줄마다 ✓ 같음 · ▲ 코드만 · ◌ 명세만, 어긋난 줄이 위 · 불리는 곳(8.20) · 코드 보기(8.21)를 펼치면 본문. 폭은 질문 탭과 같다</div>
+<div class="sd h" style="width:420px;min-height:0">
+  <aside class="side cg" style="min-height:430px">
+    <div class="ptabs"><span>참조</span><span>질문</span><span class="on">코드</span></div>
+    <div class="fhead" data-el="8.18">pipeline.save_pipeline<div class="fmeta">backend/app/core/pipeline.py:121 · 그래프 066971e · 서버 · 3분 전</div></div>
+    <div class="k">부르는 것 7 · 코드만 1 · 명세만 1</div>
+    <div class="crow code" data-el="8.19"><span class="st">▲</span>git.commit_push<span class="tag">코드만</span></div>
+    <div class="crow spec"><span class="st">◌</span>ReferenceService.mark_missing<span class="tag">명세만</span></div>
+    <div class="crow same"><span class="st">✓</span>SpecService.validate</div>
+    <div class="crow same"><span class="st">✓</span>SpecService.save</div>
+    <div class="k">불리는 곳 3</div>
+    <div class="crow" data-el="8.20">pipeline.revert</div>
+    <div class="crow">pipeline.process_commit</div>
+    <details class="src" data-el="8.21" open><summary>코드 보기 L121–L214</summary><pre>async def save_pipeline(entry, doc_id, doc_type, body, …):
+    """SYNC-MS-007#pipeline.save_pipeline"""
+    await read_pending(code, author.user)
+    …
+    commit_hash = await git.commit_push(…)</pre></details>
+  </aside>
+</div>
+
+<div class="var">코드 탭 — MINISPEC가 아닌 항목(PRD R1). 하위 체인(UI-15와 같은 폐포)에서 이어지는 MINISPEC 함수(8.22)를 어긋남 수와 함께. 누르면 그 항목으로 가고 탭은 그대로. 그래프가 없으면 「코드 그래프가 없습니다 — 코드를 push하면 만들어집니다」</div>
+<div class="sd h" style="width:420px;min-height:0">
+  <aside class="side cg" style="min-height:230px">
+    <div class="ptabs"><span>참조</span><span>질문</span><span class="on">코드</span></div>
+    <div class="cap"><span class="idb">R1</span> 에이전트용 원본과 사람용 뷰 · 하위 체인의 함수 4</div>
+    <div class="crow" data-el="8.22"><span class="m">MS-007#pipeline.save_pipeline</span><span class="cnt warn">▲1 ◌1</span></div>
+    <div class="crow"><span class="m">MS-002#SpecService.save</span><span class="cnt">✓ 6</span></div>
+    <div class="crow"><span class="m">MS-002#SpecService.validate</span><span class="cnt">✓ 2</span></div>
+    <div class="crow"><span class="m">MS-008#queries.document_view</span><span class="cnt">✓ 4</span></div>
+  </aside>
+</div>
+
 <div class="var">대화 고르기(8.11)를 펼친 것 — 최근순, 행마다 지우기(8.13). 파일을 끌어 패널 위에 오면 드롭 안내 층(8.16)</div>
 <div class="sd h" style="width:420px;min-height:0">
   <aside class="side chat" style="min-height:300px;position:relative">
-    <div class="ptabs"><span>참조</span><span class="on">질문</span></div>
+    <div class="ptabs"><span>참조</span><span class="on">질문</span><span>코드</span></div>
     <div class="cap"><span class="idb">R1</span> 에이전트용 원본과 사람용 뷰 · 이 항목을 보며 묻습니다</div>
     <div class="convrow"><span class="conv">대화 ▾ 원본과 뷰를 왜 나눴나요?</span><span class="b sm">새 대화</span></div>
     <div class="convlist">
@@ -572,6 +619,12 @@ status: draft
 | 8.14 | 첨부 칩 | 칩 | 입력(8.6) 바로 위 한 줄. 이름·크기·✕. 이미지는 32px 썸네일. 아직 안 보낸 것(`turn_id` 없음). 한 질문에 8개 — 넘으면 토스트 | ✕ → `DELETE /api/attachments/{id}` |
 | 8.15 | 첨부 추가 | 버튼 | 입력 왼쪽 「+」. 파일 고르기 창 — 받는 종류만(이미지·md/txt/csv/json/yaml·pdf). 드롭(8.16)·붙여넣기(8.6)와 같은 곳(8.14)으로 간다 | 고르면 업로드 → 8.14 |
 | 8.16 | 드롭 안내 층 | 층 | 파일을 끌어 **패널 위**에 오면 반투명 층 「여기 놓으면 질문에 붙습니다」. 놓으면 업로드. 받지 않는 종류·상한 초과는 토스트 「받지 않는 종류」·「너무 큽니다(10MB/1MB)」 | 놓음 → 8.14 |
+| 8.17 | 코드 탭 | 탭 | 이 항목의 코드를 명세와 대조한다([[SYNC-UC-001#UC-H20]]). **모든 문서에 있다**(휴지통 문서 4b에는 없다). 폭은 질문 탭과 같은 넓은 폭이고 같이 기억한다. URL `?panel=code` | 패널을 코드로 |
+| 8.18 | 함수 머리 | 영역 | MINISPEC 항목의 함수 — 이름(`Class.fn`) · `파일:줄` · 그래프를 만든 커밋·출처(`서버`·`저장소`)·시각. 마지막 만들기가 실패했으면 그 커밋과 이유 한 줄(UC-H20 2a). 함수가 없으면 「코드에 없음」(2b) | — |
+| 8.19 | 부르는 것 | 목록 | 명세의 「호출하는 것」과 실제 호출을 합친 목록 — 줄마다 ✓ 같음 · ▲ 코드만(명세에 빠진 호출) · ◌ 명세만(코드에 없는 호출). 어긋난 줄이 위, 같음이 아래. 위 제목 줄에 개수 | 그 항목으로(7.2와 같음, 코드 탭 그대로) |
+| 8.20 | 불리는 곳 | 목록 | 이 함수를 부르는 MINISPEC 항목 — 비공개 도우미를 건너 닿는 것까지 | 그 항목으로 |
+| 8.21 | 코드 보기 | 접힌 묶음 | 「코드 보기 L시작–L끝」. 펼칠 때 그래프를 만든 커밋의 저장소에서 그 함수 본문을 읽어 줄 번호와 함께 보인다. 300줄까지(넘으면 「잘림」) | — |
+| 8.22 | 함수 목록 | 목록 | MINISPEC가 아닌 항목이면 하위 체인의 MINISPEC 함수, MINISPEC 문서에서 항목을 안 골랐으면 그 문서의 함수 전부 — 줄마다 항목 ID와 어긋남 수(▲ 코드만 · ◌ 명세만, 없으면 ✓ 같음 수) | 그 항목으로(코드 탭 그대로) |
 | 8.9 | 진행 묶음 | 접힌 묶음 | **읽는 동안** — 스피너(공통 1.8) + 모델이 읽기 전에 쓰는 **가장 최근 한 줄**(`note`). 새 줄이 오면 갈아든다. 오른쪽 「n단계 ▸」를 누르면 지금까지의 `note`·`read` 전부. **답이 온 뒤**(`answer` 이벤트 — 글이 흐르는 동안은 아직 아니다, 카드 AW) — 스피너가 사라지고 「n단계 읽음 · 본 것 k ▸」 한 줄로 접힌다. 펼치면 진행 줄 전부와 그 아래 「본 것」 = 모델이 실제로 읽은 대상, 부른 순서(`첨부:이름`도). 줄은 SSE로 **실시간** 한 줄씩 온다. 저장된 대화를 다시 열면 턴의 `progress`로 접힌 채 그려진다 | 누르면 펼침/접힘 · 본 것 → 7.2와 같음 |
 | 9 | 단계 이동 | 버튼 2개 | 이전·다음 단계 문서 ID. 없으면 비활성 | 그 문서의 UI-5 |
 | 10 | 원본 본문 | 영역 | 원본 MD 그대로. 줄 번호. 3단 틀은 유저용과 같고 본문 열만 바뀐다 | — |
@@ -621,6 +674,7 @@ status: draft
 - **상태 토글(3)은 저장소를 먼저 읽는다.** 방금 GitHub에 들어온 변경을 싱크독이 아직 못 읽었을 수 있다. 그 상태로 상태만 바꾸면 그 변경이 되돌아간다 — 실제로 한 번 그랬다(#137). 그래서 누르면 밀린 커밋을 먼저 읽고, 커밋할 본문도 저장소에서 읽어 `status:` 줄만 바꾼다([[SYNC-STD-004#DEV-19]])
 - **화면(UI) 문서의 배치(7.7)는 본문 폭을 다 쓴다.** 요소 표·규칙·시나리오를 옆에 세우지 않고 아래에 쌓는다 — 옆에 세우면 배치가 본문의 절반(≈730px)만 받아 권장 폭 1280이 늘 60%로 줄어 보였다(#134, 카드 AC). 참조 패널(8)을 접지 않는다. 좁은 창에서는 줄어 보이고, 1:1로 볼 길은 7.9와 7.10 둘이다
 - **배치 도구 줄(7.8)은 배치 위에 있다.** 배치 오른쪽 위에 버튼을 겹쳐 놓으면 그 자리의 그림(대개 상단 바의 버튼들)을 가린다(#130)
+- **코드 탭(8.17)은 열 때마다 대조한다**(카드 AY). 그래프(코드 쪽)는 서버가 코드 커밋마다 만들어 두고([[SYNC-UC-001#UC-S8]]), 명세의 「호출하는 것」은 열 때 읽는다 — 명세만 고치면 다시 만들지 않아도 바로 바뀐다. 그래프가 없으면 「코드 그래프가 없습니다 — 코드를 push하면 만들어집니다」, MINISPEC가 아닌 문서에서 항목을 안 골랐으면 「항목을 고르세요」
 - 다이어그램(7.3)은 편집·내려받기가 없다. 고치려면 원본의 코드블록을 에이전트에게 고치게 한다. **크게 보는 길은 전체보기(7.5)뿐이다** — 본문 폭(`--doc-w`)을 다 써도 시퀀스 스물몇 줄은 못 읽는다(공통 1.7)
 
 ### 시나리오
@@ -658,6 +712,13 @@ status: draft
 4. 다음 날 다른 컴퓨터에서 같은 문서를 연다. 대화 고르기(8.11)를 펼쳐 어제 대화를 고른다 — 질문·답·칩이 그대로다. 이어서 묻는다
 5. 다 쓴 대화는 8.11 목록의 지우기(8.13)로 — 확인 뒤 첨부까지 사라진다
 
+
+**S-7 구현이 명세대로인지 본다** — UC-H20, [[SYNC-SCN-001#S9]]
+1. MINISPEC 문서 SYNC-MS-007에서 `pipeline.save_pipeline`을 고르고 코드 탭(8.17)을 누른다. 패널이 넓어지고 함수 머리(8.18)에 파일·줄과 그래프 커밋이 뜬다
+2. 부르는 것(8.19) 맨 위에 ▲ 코드만 한 줄 — 명세에 빠진 호출이다. 누르면 그 항목으로 가고 탭은 코드 그대로다
+3. 코드 보기(8.21)를 펼쳐 본문에서 그 호출을 찾는다
+4. PRD 문서로 가서 R1을 고르면 함수 목록(8.22)에 R1에서 이어지는 MINISPEC 함수들이 어긋남 수와 함께 뜬다
+5. 관계도(UI-8)에서 「코드 호출」(2.6)을 켜면 같은 대조가 MINISPEC 열의 선으로 보인다
 ---
 
 ## UI-4 프로젝트 상세
@@ -1473,6 +1534,12 @@ status: draft
   .edges .e{fill:none;stroke:var(--edge);stroke-width:1.2;marker-end:url(#ah)}
   .edges .e.back{stroke:var(--back);stroke-width:1.4;stroke-dasharray:5 3;marker-end:url(#ahr)}
   .edges .e.gone{stroke:var(--warn);stroke-width:1.6;stroke-dasharray:3 3;marker-end:url(#ahb)}
+  /* 코드 호출(2.6, 카드 AY) — MINISPEC 열 오른쪽으로 나갔다 돌아온다. 참조 간선(왼쪽)과 안 겹친다 */
+  .edges .e.cg{stroke-width:1.3;marker-end:url(#ahc)}
+  .edges .e.cg.same{stroke:#b9b5ad}
+  .edges .e.cg.code{stroke:var(--back)}
+  .edges .e.cg.spec{stroke:var(--warn);stroke-dasharray:3 3}
+  .glegend .cgl{color:var(--back)}
   .glegend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;padding:8px 14px;border-top:1px solid var(--hair);background:var(--sub);font-size:12.5px;color:var(--ink3)}
   .glegend span{display:inline-flex;align-items:center;gap:5px}
   .glegend .back{color:var(--back)}
@@ -1502,6 +1569,7 @@ status: draft
         <span class="vsep"></span>
         <span class="lbl" data-el="2.4">PRD-001#R1 — 상위 1 · 하위 4</span>
         <span class="sp"></span>
+        <span class="b sm on" data-el="2.6">코드 호출</span>
         <span class="b sm" data-el="2.5">전체보기</span>
       </div>
 
@@ -1514,6 +1582,7 @@ status: draft
               <marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#8f8b83"/></marker>
               <marker id="ahr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#b8860b"/></marker>
               <marker id="ahb" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#b8342a"/></marker>
+              <marker id="ahc" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#8f8b83"/></marker>
             </defs>
             <path class="e" d="M168,61 C156,61 150,61 138,61"/>
             <path class="e" data-el="3.2" d="M468,61 C400,61 360,61 288,61"/>
@@ -1527,6 +1596,9 @@ status: draft
             <path class="e" d="M1518,141 C1506,141 1500,141 1488,141"/>
             <path class="e back" data-el="3.3" d="M886,101 L906,101 Q914,101 914,109 L914,228 Q914,236 922,236 L1052,236 Q1060,236 1060,228 L1060,109 Q1060,101 1068,101"/>
             <path class="e gone" data-el="3.4" d="M168,101 L146,101"/>
+            <path class="e cg same" data-el="3.6" d="M1486,141 L1500,141 L1500,181 L1486,181"/>
+            <path class="e cg code" data-el="3.7" d="M1486,146 L1508,146 L1508,221 L1486,221"/>
+            <path class="e cg spec" data-el="3.8" d="M1486,181 L1500,181 L1500,221 L1486,221"/>
           </svg>
 
           <div class="node" style="left:18px;top:48px">RFQ-001#Q1</div>
@@ -1543,6 +1615,8 @@ status: draft
           <div class="node" style="left:1068px;top:88px">API-002#get_document</div>
           <div class="node" style="left:1218px;top:88px">SEQ-001#SEQ-1</div>
           <div class="node" style="left:1368px;top:128px">MS-002#SpecService.save</div>
+          <div class="node" style="left:1368px;top:168px">MS-002#SpecService.validate</div>
+          <div class="node" style="left:1368px;top:208px">MS-009#git.commit_push</div>
           <div class="node" style="left:1518px;top:128px">CODE-001#V</div>
         </div>
       </div>
@@ -1553,6 +1627,9 @@ status: draft
         <span class="back"><svg><path class="back" d="M0,4 L22,4"/></svg>되돌아오는 참조</span>
         <span class="gone"><svg><path class="gone" d="M0,4 L22,4"/></svg>미존재 참조</span>
         <span>◌ 고립 (참조 없음)</span>
+        <span><svg><path class="cg same" d="M0,4 L22,4" style="stroke:#b9b5ad"/></svg>호출 — 명세와 같음</span>
+        <span class="cgl"><svg><path d="M0,4 L22,4" style="stroke:var(--back)"/></svg>호출 — 코드만</span>
+        <span class="gone"><svg><path class="gone" d="M0,4 L22,4"/></svg>호출 — 명세만</span>
         <span class="sp"></span>
         <span>노드에 마우스를 올리면 그 항목의 참조만 남는다 · 클릭 → 11단계 흐름</span>
       </div>
@@ -1572,12 +1649,16 @@ status: draft
 | 2.2 | 완료만 | 버튼 | **문서 상태가 `완료`인 문서의 항목**만. 확정된 뼈대만 본다 | 범위를 완료만으로(UC-H4 2b) |
 | 2.4 | 포커스 라벨 | 텍스트 | 노드에 올리기 전에는 안내. 올리면 `문서#항목 — 상위 n · 하위 m` | — |
 | 2.5 | 전체보기 | 버튼 | | 상단 바까지 숨기고 화면 전체를 캔버스로. 다시 누르면 복귀 |
+| 2.6 | 코드 호출 | 버튼 | 켜면 MINISPEC 열 안에 실제 호출 선(3.6~3.8)을 겹치고 범례에 셋이 는다. 코드 그래프가 없으면 포커스 라벨 자리에 「코드 그래프 없음」. URL `?code=1`(카드 AY) | 겹침 켜기·끄기 |
 | 3 | 캔버스 | 영역 | 열 = 11단계, 노드 = 항목. 안에서 스크롤 | — |
 | 3.1 | 노드 | 노드 | 항목 ID. 라벨이 넘치면 말줄임 | UI-15 11단계 흐름 |
 | 3.2 | 참조 간선 | 선 | 하위 → 상위. 상위가 왼쪽 열이면 곡선, 같은 열이면 왼쪽으로 나갔다 돌아오는 꺾은선 | — |
 | 3.3 | 되돌아오는 간선 | 선 | 상위가 **오른쪽 열**일 때. 체인을 거슬러 올라가는 참조라 눈에 띄어야 한다 | — |
 | 3.4 | 미존재 참조 | 선 | 대상 항목이 **정말로 없을 때**. 노드 왼쪽으로 짧게 뻗다 끊긴다 | — |
 | 3.5 | 고립 노드 | 노드 | 상위도 하위도 없는 항목. 점선 테두리와 `◌`(UC-H4 2a) | 3.1과 같음 |
+| 3.6 | 호출 — 같음 | 선 | 명세 「호출하는 것」에도 있는 실제 호출. 옅은 회색. 부르는 쪽 → 불리는 쪽, **열 오른쪽으로** 나갔다 돌아온다 | — |
+| 3.7 | 호출 — 코드만 | 선 | 명세에 빠진 실제 호출. 호박색 | — |
+| 3.8 | 호출 — 명세만 | 선 | 코드에 없는 명세 호출. 빨간 점선 | — |
 | 4 | 범례 | 텍스트 | 기호 설명. 선 견본을 실제 선으로 그린다. 선 종류를 말하는 두 항목은 라벨도 그 색. 조작 안내는 오른쪽 끝 | — |
 
 ### 규칙
@@ -1590,6 +1671,7 @@ status: draft
 - **치수는 고정이다.** 열 간격 150px · 노드 폭 118px · 노드 높이 26px · 행 간격 40px · 캔버스 여백 18px. 열 간격과 노드 폭의 차 32px가 간선이 지나는 거터다 — 노드가 열 폭을 다 쓰면 선이 노드를 밟는다
 - 간선에는 화살촉을 단다. 방향(하위 → 상위)이 그림만으로 읽혀야 한다. 되돌아오는 간선(3.3)의 모서리 반지름은 8px
 - 배치 계산은 브라우저가 한다. 서버는 노드·간선 목록만 준다([[SYNC-MS-008#queries.graph_view]])
+- **코드 호출(2.6)은 MINISPEC 항목끼리만 잇는다**(카드 AY). 도우미 함수는 노드로 그리지 않는다 — 건너 닿은 호출로 접는다([[SYNC-MS-011#codegraph.compare]]). 참조 간선이 왼쪽으로 도니 코드 호출은 **오른쪽으로** 돌아 둘이 안 겹친다. 대조는 열 때 계산한다([[SYNC-MS-008#queries.code_calls]])
 
 ### 시나리오
 
@@ -1612,6 +1694,11 @@ status: draft
 1. 캔버스가 답답하다. 전체보기(2.5)를 누른다
 2. 상단 바까지 사라지고 화면 전체가 캔버스가 된다
 3. 다시 누르면 돌아온다
+
+**S-5 코드 호출을 겹쳐 본다** — UC-H20
+1. `코드 호출`(2.6)을 누른다. MINISPEC 열 오른쪽으로 호출 선이 겹친다
+2. 호박색(3.7) 선을 따라가 명세에 빠진 호출을 찾고, 빨간 점선(3.8)으로 코드에 없는 명세 호출을 찾는다
+3. 노드를 눌러 UI-15로, 또는 문서 뷰의 코드 탭(UI-5 8.17)으로 가서 본문을 본다
 
 ---
 
