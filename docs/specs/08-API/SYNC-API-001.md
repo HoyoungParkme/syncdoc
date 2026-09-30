@@ -63,6 +63,9 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:invalid-request` | 422 | 요청 본문·쿼리·경로 값이 정의(아래 3장 스키마)에 안 맞다 — 입력 검증. `detail`은 첫 오류 한 줄(`body.to — …`) | `errors: [{loc, msg}]` — `loc`은 `body.to`처럼 점으로 이은 위치 | — |
 | `urn:syncdoc:existing-specs` | 409 | `docs/specs/` 이미 있음. 서버 저장이면 같은 코드의 **보관된 저장소**가 있음 | `doc_count` · `archived_at`(보관본일 때만, 가장 최근 것을 보관한 때) | [[SYNC-UC-001#UC-A1]] 3a, 3b |
 | `urn:syncdoc:storage-unavailable` | 422 | 이 서버에서 켜지 않은 저장 방식으로 프로젝트를 만들려 함 | `storage` · `enabled: [켜진 방식…]` | [[SYNC-UC-001#UC-A1]] 1a |
+| `urn:syncdoc:storage-mismatch` | 409 | 서버 저장 프로젝트에만 되는 일을 GitHub 저장 프로젝트에 — 코드 올리기 | `storage` | [[SYNC-UC-001#UC-A10]] 1a |
+| `urn:syncdoc:upload-too-large` | 413 | 코드 올리기 한도 초과 — UTF-8 합 5MB 또는 파일+지운 경로 500개. 나눠 보낸다 | `limit` · `size` · `count` | [[SYNC-UC-001#UC-A10]] 2a |
+| `urn:syncdoc:upload-path-refused` | 422 | 올릴 수 없는 경로 — 절대 경로·`..`·`.git` 조각·명세 경로(`docs/specs/`)·비밀 꼴·글자가 아닌 내용·폴더와 겹침. **하나라도 있으면 아무것도 안 올린다** | `paths: [{path, reason}]` | [[SYNC-UC-001#UC-A10]] 2b |
 | `urn:syncdoc:repo-create-failed` | 424 | `create_repo`로 저장소를 못 만듦 — 이름 규칙·권한·다른 소유자 점유 | `reason` | [[SYNC-CODE-001#F]] |
 | `urn:syncdoc:push-failed` | 424 | 저장소 push 실패(GitHub이 거절했거나 닿지 않음). 서버 저장소는 서버 안이라 거의 없다 | `reason` | [[SYNC-UC-001#UC-A1]] 4a, [[SYNC-UC-001#UC-S7]] 2b |
 | `urn:syncdoc:already-current` | 422 | 현재 버전으로 되돌리기 | — | [[SYNC-UC-001#UC-H7]] |
@@ -1305,6 +1308,83 @@ MINISPEC 항목인데 코드에 함수가 없으면 `function: null`·`missing: 
 
 ---
 
+### 3.9 git 저장소 (서버 저장소)
+
+서버 저장 프로젝트([[SYNC-PRD-001#R14]])의 git 입구. git 스마트 HTTP 그대로다 — 앱이 이미지 안의 `git http-backend`를 CGI로 돌린다([[SYNC-MS-009#git.http_backend]]). 응답 본문은 git 프로토콜이라 JSON이 아니다(오류만 problem+json). **인증은 HTTP Basic, 비밀번호 칸에 개인 토큰**(MCP와 같은 토큰, UI-13) — 아이디 칸은 보지 않는다. 토큰이 없거나 틀리면 `401`과 `WWW-Authenticate: Basic realm="SyncDoc"`라 git이 다시 묻는다. 토큰 주인이 소유자가 아니거나 GitHub 저장 프로젝트면 없는 것과 같은 `404`다. 받는 가지는 `main`이고 되감기·삭제 push는 저장소가 거절한다([[SYNC-UC-001#UC-H21]]).
+
+#### GET/git/{code}.git/info/refs 참조 광고 — clone·fetch·push의 첫 요청
+
+유스케이스 [[SYNC-UC-001#UC-H21]] · 서비스 [[SYNC-MS-001#ProjectService.server_origin]] · [[SYNC-MS-009#git.http_backend]]
+
+```yaml
+/git/{code}.git/info/refs:
+  get:
+    summary: git 스마트 HTTP 참조 광고. service로 읽기(git-upload-pack)와 쓰기(git-receive-pack)를 가른다
+    parameters:
+    - $ref: '#/components/parameters/code'
+    - name: service
+      in: query
+      required: true
+      schema:
+        type: string
+        enum: [git-upload-pack, git-receive-pack]
+    responses:
+      '200':
+        description: git 프로토콜 — application/x-git-{service}-advertisement
+      '401':
+        description: 토큰 없음·틀림. WWW-Authenticate Basic
+      '404':
+        $ref: '#/components/responses/Problem'
+```
+
+#### POST/git/{code}.git/git-upload-pack 읽기 — clone·fetch
+
+유스케이스 [[SYNC-UC-001#UC-H21]] · 서비스 [[SYNC-MS-009#git.http_backend]]
+
+```yaml
+/git/{code}.git/git-upload-pack:
+  post:
+    summary: git 스마트 HTTP 읽기. 요청 본문이 gzip이면 그대로 넘긴다(git http-backend가 푼다)
+    parameters:
+    - $ref: '#/components/parameters/code'
+    requestBody:
+      content:
+        application/x-git-upload-pack-request: {}
+    responses:
+      '200':
+        description: git 프로토콜 — application/x-git-upload-pack-result
+      '401':
+        description: 토큰 없음·틀림
+      '404':
+        $ref: '#/components/responses/Problem'
+```
+
+#### POST/git/{code}.git/git-receive-pack 쓰기 — push
+
+유스케이스 [[SYNC-UC-001#UC-H21]] · 서비스 [[SYNC-MS-009#git.http_backend]] · [[SYNC-MS-007#pipeline.read_pending]]
+
+```yaml
+/git/{code}.git/git-receive-pack:
+  post:
+    summary: >
+      git 스마트 HTTP 쓰기. 본문을 다 받은 뒤에 응답을 시작한다(인프라 7장). 응답을 다 보낸 뒤
+      밀린 커밋을 곧바로 읽는다 — 명세 파일은 버전이 되고 코드가 바뀌었으면 코드 그래프를 다시 만든다
+    parameters:
+    - $ref: '#/components/parameters/code'
+    requestBody:
+      content:
+        application/x-git-receive-pack-request: {}
+    responses:
+      '200':
+        description: git 프로토콜 — application/x-git-receive-pack-result. 거절한 ref는 여기 적힌다
+      '401':
+        description: 토큰 없음·틀림
+      '404':
+        $ref: '#/components/responses/Problem'
+```
+
+---
+
 ## 4. 스키마
 
 엔드포인트 조각이 참조하는 `components`. 항목이 아니다.
@@ -1461,7 +1541,9 @@ components:
           - mcp
           - web
           - github
-          description: 어느 경로로 저장됐나
+          description: >
+            어느 경로로 저장됐나. github는 저장소로 들어온 커밋 — GitHub push와 서버 저장소의
+            git push 둘 다다(카드 BB). 화면은 프로젝트의 storage로 「GitHub push」/「git push」를 적는다
     StageSummary:
       type: object
       properties:
