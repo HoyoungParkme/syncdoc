@@ -53,6 +53,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **처리** `project = ProjectService.get_owned(code, user)` (남의 것 → `not-found`) · `SpecService.list_trashed(project_id)` · 작성자 이름은 `users_by_ids`로(`trashed_by`). 건수는 안 센다 — 휴지통 목록에는 수치가 없다 · `→ docs`
 
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.list_trashed]] · [[SYNC-MS-006#AccountService.users_by_ids]]
+
 ---
 
 #### queries.ask_item 문서를 읽다가 묻는다 — 모델이 관계도를 따라 읽는다
@@ -144,7 +146,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 
 **예외** 남의 프로젝트·없는 `item_id` → `not-found`(`AskStart` 전이라 HTTP 상태) · 키 없음 → `llm-not-configured`(전) · 모델 실패·마무리 뒤에도 답 없음 → `llm-unavailable`(`AskStart` 뒤라 `error` 이벤트) · 도구 안의 「없음」은 예외가 아니라 결과다([[#queries.ask_tool]])
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-009#llm.step_stream]] · [[#queries.ask_tool]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-009#llm.step_stream]] · [[#queries.ask_tool]] · [[SYNC-MS-010#ConversationService.add_turn]] · [[SYNC-MS-010#ConversationService.finish_turn]] · [[SYNC-MS-010#ConversationService.get]] · [[SYNC-MS-010#ConversationService.history]] · [[SYNC-MS-010#ConversationService.pending_images]]
 
 **테스트 관점** 가짜 `llm.step`에 대본을 주어 돈다 · 지시문에 mermaid 그림 안내가 있다(카드 AS) · 지시문에 답 양식(「답은 짧게」)이 있다(카드 AU) · 대본이 `str` 조각을 주면 `delta`가 `note`/`answer` 앞에 그 순서로 나오고 `progress`에는 안 들어간다(카드 AW) · 대본 [도구 2번 → 답] → 이벤트 순서가 `start·note·read·note·read·answer`이고 `context_item_ids`가 read 순서·중복 접힘 · 대본이 도구만 9번 → 8번째 뒤 마무리 호출이 `tool_choice="none"`이고 그 뒤 호출이 없다 · `monotonic`을 패치해 120초 → 같은 마무리 · 마무리도 답이 비면 `llm-unavailable` · 시작 맥락에 항목 ID·이름은 있고 **본문은 없다** · `item_id=None`이면 「지금 보는 항목」 줄이 없다 · 없는 `item_id` → `not-found`가 `start` 전 · **DB에 아무것도 안 쓴다**(호출 전후 행 수가 같다) · `history`가 상한을 넘으면 뒤에서부터 잘린다 · usage 로그 한 줄에 calls·tokens·elapsed가 있고 본문이 없다 · 키가 비면 `SpecService`를 부르기도 전에 막힌다 · **MINISPEC이 빈 프로젝트**에서 물으면 `item_chain`의 빈 단계로 「아직 안 쓰였다」고 답할 재료를 받는다
 
@@ -186,7 +188,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 
 **테스트 관점(추가, #110)** 없는 항목의 「없음」에 `hint`가 있다 · 지시문에 「먼저 보고 있는 항목을 get_item으로 읽는다」가 있다
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_item]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.describe_documents]] · [[#queries.item_references_view]] [[#queries.item_chain]] [[#queries.document_list]] · [[SYNC-MS-010#ConversationService.attachment_text]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.describe_documents]] · [[#queries.item_references_view]] [[#queries.item_chain]] [[#queries.document_list]] · [[SYNC-MS-010#ConversationService.attachment_text]] · [[#queries.document_view]] · [[#queries.item_view]]
 
 **호출되는 것** [[#queries.ask_item]] 5단계
 
@@ -236,7 +238,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 5. `repo = project.repository` — `last_processed_commit`·`behind_by`를 **DB에서 그대로 읽는다.** `git fetch`를 돌리지 않는다(UI-4 요소 7)
 6. `→ ProjectDetail(summary, remote_url, docs, recent_changes=recent, last_processed_commit, behind_by)`
 
-**호출하는 것** [[#queries.project_summary]] [[#queries.document_list]] · `SpecService.recent_changes`
+**호출하는 것** [[#queries.project_summary]] [[#queries.document_list]] · `SpecService.recent_changes` · [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-006#AccountService.users_by_ids]]
 
 **테스트 관점** 남의 프로젝트 → `not-found`(문서 없음과 같은 모양) · 폴링이 `behind_by=2`를 적어 두면 응답도 2 · 아직 한 번도 못 받아봤으면 `behind_by=null` · 이 함수가 `git.fetch`를 부르지 않는다
 
@@ -255,7 +257,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 4. 문서마다 `counts = {broken_ref ← missing[id]}`, 없으면 0
 5. `→ docs`. MCP `list_documents`는 이걸 `stages`로 다시 묶는다(단계마다 `docs[]`)
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.list_by_project` · [[SYNC-MS-003#ReferenceService.count_missing_by_document]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.list_by_project` · [[SYNC-MS-003#ReferenceService.count_missing_by_document]] · [[SYNC-MS-006#AccountService.users_by_ids]]
 
 **테스트 관점** 남의 프로젝트 → `not-found` · 문서 30개 → DB 쿼리 2번(문서·참조) · 미존재 참조 없는 문서 → `broken_ref=0`
 
@@ -289,6 +291,8 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 
 **처리** `ProjectService.get_owned(doc_id.split("-")[0], user)` (남의 것 → `not-found`) · `v = SpecService.get_item(doc_id, item_id)` (없음·삭제 예외 전파) · `→ v`. 소유 검사 말고는 `SpecService`를 그대로 넘기는 자리다 — 라우터·MCP가 `queries`만 보게 하는 대칭 때문에 둔다
 
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_item]]
+
 ---
 
 #### queries.item_references_view 상위·하위 참조 + 표시 이름
@@ -305,7 +309,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 4. `RefEdge` → `ItemRef`: 상위는 `to_item_pk`가 있으면 `names[pk]` · `to_document_id`만 있으면 `ItemRef(doc_id, item_id=None, display_name=문서 제목)` · `is_missing`이면 `ItemRef(raw_target만, is_missing=True)`. 하위는 `from_item_pk`가 있으면 `names[pk]` · 없으면(항목 밖) **출발 문서** `ItemRef(doc_id, item_id=None, display_name=문서 제목)` — 전에는 건너뛰어 패널이 「고립 항목」이라 했다(#160). 항목·문서 id 공간이 겹치므로 따로 · `raw_target`은 둘 다 싣는다
 5. `→ ItemReferences(doc_id, item_id, upstream, downstream)`
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.resolve_item` `SpecService.describe_items` `SpecService.describe_documents` · `ReferenceService.upstream` `downstream`
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.resolve_item` `SpecService.describe_items` `SpecService.describe_documents` · `ReferenceService.upstream` `ReferenceService.downstream`
 
 **테스트 관점** 남의 프로젝트 → `not-found` · 미존재 참조 → `upstream`에 `is_missing=True, raw_target` · 문서 전체를 가리킨 참조 → `upstream`에 `item_id=None` · 항목 밖(절 본문·표)에서 이 항목을 건 참조 → `downstream`에 출발 문서(`item_id=None`, 문서 제목) · 이 문서 전체를 가리킨 참조(`[[문서]]`)는 어느 항목의 `downstream`에도 없다(#160) · 고립 항목 → 둘 다 빈 목록
 
@@ -327,7 +331,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 7. 노드 `id = f"{doc_id}#{item_id}"` (문서 노드는 `doc_id`만) · 노드에 `stage`(1~11)
 8. `→ Graph(nodes, edges, project_name=project.name)`. **좌표 없음** — 열 안 순서 정렬은 브라우저가 한다(UI-002 UI-8 규칙). `project_name`은 브레드크럼용(UI-8 요소 1)
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.list_items_by_project` · `ReferenceService.references_among`
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.list_items_by_project` · `ReferenceService.references_among` · [[SYNC-MS-002#SpecService.list_by_project]]
 
 **테스트 관점** `all` → 항목 수 = 노드 수(문서 노드 포함) · `approved` → 완료 문서의 항목만, 그 밖으로 나가는 간선은 없음 · 참조 없는 항목 → `isolated=True` · **범위 밖 대상 간선이 미존재 참조로 새지 않는다**
 
@@ -349,7 +353,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 6. 11단계로 나눠 담는다. **항목이 없는 단계도 빈 배열로 남긴다** — 체인이 어디서 끊겼는지가 이 화면의 목적이다
 7. `→ ItemChain(item, upstream_count, downstream_count, rows[11])`
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.resolve_item` `describe_items` · `ReferenceService.upstream` `downstream`
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.resolve_item` `SpecService.describe_items` `SpecService.get_document` · `ReferenceService.upstream` `ReferenceService.downstream`
 
 **테스트 관점** 남의 프로젝트 → `not-found` · 직접 참조만 있는 항목 → 상위 1·하위 0 · 3단계 건너 이어진 항목이 폐포에 들어옴 · 사이클이 있어도 안 멈춰 있음 · 항목 없는 단계도 행이 옴(길이 항상 11) · 되돌아오는 참조의 상위가 `upstream`으로 적힘
 
@@ -369,7 +373,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 4. hunk마다 `downstream_count = counts.get(pk, 0)` · 새로 생긴 항목(pk 없음)은 0
 5. `→ d`
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.diff` `resolve_items` · `ReferenceService.count_downstream`
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.diff` `SpecService.resolve_items` `SpecService.describe_items` · `ReferenceService.count_downstream`
 
 ---
 
@@ -386,7 +390,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 4. if `kind == incomplete` → `list_by_project` 중 `incomplete_warnings` 있는 것
 5. else → `! ValueError` — 라우터가 `kind`를 enum으로 검증해 422를 내므로 여기까지 오지 않는다. 방어용
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-003#ReferenceService.missing_in_project]] · `SpecService.describe_items` `describe_documents` `list_by_project`
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-003#ReferenceService.missing_in_project]] · `SpecService.describe_items` `SpecService.describe_documents` `SpecService.list_by_project`
 
 **테스트 관점** `broken_ref` → 미존재 참조마다 한 행, 출발 항목 이름이 있다 · 항목 밖 참조 → `item_id=None` · 상대가 들어오면 그 행이 사라진다 · 모르는 kind → `ValueError`
 
@@ -406,7 +410,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 4. `by_item = {item_id: [ItemRef…]}` (문서 단위는 키 `"(문서)"`) · `by_document = [{doc_id, title, items: [이 문서 항목 ID들]}]` 문서 단계순
 5. `→ DownstreamView(by_item, by_document)`
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.get_document` `item_pks` `describe_items` `describe_documents` · `ReferenceService.references_among`
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.get_document` `SpecService.item_pks` `SpecService.describe_items` `SpecService.describe_documents` · `ReferenceService.references_among`
 
 ---
 
