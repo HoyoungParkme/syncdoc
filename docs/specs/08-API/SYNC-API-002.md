@@ -20,6 +20,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 - 전송: MCP streamable HTTP. 엔드포인트 `POST /mcp`
 - 인증: `Authorization: Bearer {토큰}`. 토큰은 사람이 웹 설정(UI-13)에서 발급한다. 요청은 발급자 계정으로 기록된다
+- **저장 방식은 프로젝트마다다**([[SYNC-PRD-001#R14]]). 서버가 켠 방식은 연결할 때 받는 서버 안내(instructions)와 `init_project` 설명 끝 문장에 있다. 둘 다 켜진 서버에서는 `init_project`를 부르기 전에 **사람에게 먼저 묻는다** — GitHub 저장소로 할지, 서버에 저장할지. 하나만 켜진 서버는 그것으로 부르고 묻지 않는다
 - **발급자가 소유한 프로젝트만 열린다**([[SYNC-PRD-001#R12]]). 남의 프로젝트 코드나 문서 ID를 주면 `not-found {resource: "project"}` — 없는 것과 같다. `init_project`로 등록한 사람이 그 프로젝트의 소유자다
 - 에러: 도구 결과의 `isError: true` + 본문에 [[SYNC-API-001]]과 **같은 problem+json**. 에이전트가 `type`으로 분기한다
 - 모든 조회 결과에 문서 상태와 버전이 담긴다(PRD R9). 에이전트는 이걸로 확정 명세와 초안을 구분한다
@@ -52,16 +53,17 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ```json
 {
   "name": "init_project",
-  "description": "GitHub 저장소를 싱크독 프로젝트로 등록한다. docs/specs/ 아래 11단계 디렉터리와 템플릿을 만들어 커밋한다. 새 프로젝트를 시작할 때 한 번만 부른다. 이미 등록된 저장소면 project-code-conflict, 저장소에 docs/specs/가 이미 있으면 existing-specs 에러가 나며 import_existing=true로 다시 부르면 기존 명세를 가져와 등록한다. **저장소가 아직 없으면 create_repo=true로 부른다** — 공개 저장소를 만들어 주고 이어서 등록까지 한다. 사람이 저장소를 만들어 달라고 했을 때만 이 인자를 붙인다.",
+  "description": "싱크독 프로젝트를 만든다. 저장 방식(storage)을 고른다 — github: GitHub 저장소를 등록한다, server: 싱크독 서버 안에 저장소를 만든다(GitHub 없이). docs/specs/ 아래 11단계 디렉터리와 README를 커밋한다. 새 프로젝트를 시작할 때 한 번만 부른다. 같은 코드가 있으면 project-code-conflict, 저장소에 docs/specs/가 이미 있거나 서버 저장인데 같은 코드의 보관된 저장소가 있으면 existing-specs 에러가 나며 import_existing=true로 다시 부르면 기존 명세를 가져와(보관본은 되살려) 등록한다. **GitHub 저장소가 아직 없으면 create_repo=true로 부른다** — 공개 저장소를 만들어 주고 이어서 등록까지 한다. 사람이 저장소를 만들어 달라고 했을 때만 이 인자를 붙인다. {이 서버의 저장 방식 문장}",
   "inputSchema": {
     "type": "object",
-    "required": ["remote_url", "code", "name"],
+    "required": ["storage", "code", "name"],
     "properties": {
-      "remote_url": { "type": "string", "format": "uri", "description": "GitHub 저장소 주소" },
+      "storage": { "type": "string", "enum": ["github", "server"], "description": "저장 방식. 기본값이 없다 — 이 서버가 켠 방식만 된다" },
+      "remote_url": { "type": "string", "format": "uri", "description": "GitHub 저장소 주소. storage=github일 때만, 그때는 필수" },
       "code": { "type": "string", "pattern": "^[A-Z]{1,4}$", "description": "프로젝트 코드. 영문 대문자 4자 이내. 문서 ID 앞부분이 된다" },
       "name": { "type": "string", "maxLength": 100, "description": "표시 이름" },
-      "import_existing": { "type": "boolean", "default": false, "description": "docs/specs/가 이미 있을 때 덮어쓰지 않고 가져와 등록" },
-      "create_repo": { "type": "boolean", "default": false, "description": "저장소가 없으면 공개로 만든다. 이미 있으면 만들지 않는다" }
+      "import_existing": { "type": "boolean", "default": false, "description": "docs/specs/가 이미 있을 때 덮어쓰지 않고 가져와 등록. 서버 저장이면 같은 코드의 보관된 저장소를 되살린다" },
+      "create_repo": { "type": "boolean", "default": false, "description": "GitHub 저장소가 없으면 공개로 만든다. 이미 있으면 만들지 않는다. storage=github일 때만" }
     }
   }
 }
@@ -69,10 +71,14 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 **결과**
 ```json
-{ "code": "SYNC", "name": "싱크독", "remote_url": "...", "stages": [ { "stage": 1, "doc_type": "RFQ", "status": null, "doc_count": 0 }, "..." ] }
+{ "code": "SYNC", "name": "싱크독", "storage": "github", "remote_url": "...", "stages": [ { "stage": 1, "doc_type": "RFQ", "status": null, "doc_count": 0 }, "..." ] }
 ```
 
-**에러**: `project-code-conflict`(2a), `project-code-invalid`(2b), `existing-specs`(3a, 확장 필드 `doc_count`), `push-failed`(4a). 등록한 토큰의 발급자가 소유자가 된다(1장)
+**`{이 서버의 저장 방식 문장}`** — 설명 끝 문장은 서버가 켠 저장 방식(`STORAGE_MODES`)으로 정해진다. 둘 다면 「이 서버는 GitHub 저장과 서버 저장을 둘 다 쓴다. **부르기 전에 사람에게 어느 쪽으로 할지 묻고** 그 답을 storage에 넣는다」, 하나면 「이 서버는 {그 방식}만 쓴다. storage={그 값}으로 부른다. 묻지 않는다」. 요청자가 말한 「처음 연결해 쓸 때 GitHub로 쓸지 폐쇄망에서 쓸지 확인하는 절차」가 이것이다([[SYNC-RFQ-001#Q7]]). 도구 목록은 연결할 때 받으므로 설정을 바꾸면 에이전트가 다시 연결해야 새 문장을 본다
+
+**결과의 `remote_url`**: 서버 저장이면 `null` — 서버 안 경로는 내보내지 않는다
+
+**에러**: `storage-unavailable`(1a — 켜지 않은 방식, 확장 필드 `enabled`), `invalid-request`(1b — GitHub인데 주소 없음), `project-code-conflict`(2a), `project-code-invalid`(2b), `existing-specs`(3a·3b, 확장 필드 `doc_count`, 보관본이면 `archived_at`), `push-failed`(4a). 등록한 토큰의 발급자가 소유자가 된다(1장)
 
 ---
 
