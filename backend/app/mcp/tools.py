@@ -237,6 +237,20 @@ async def get_item(doc_id: str, item_id: str) -> CallToolResult:
 
 
 @server.tool(
+    description="항목의 코드를 명세와 대조한 결과를 돌려준다. MINISPEC 항목이면 그 함수의 파일·줄, 부르는 것(명세 「호출하는 것」과 같음·코드만·명세만)과 불리는 곳을, 다른 항목이면 하위 체인에서 이어지는 MINISPEC 함수와 어긋남 수를. 서버의 코드 그래프(graphify)로 계산한다 — 구현이 명세대로인지 볼 때 부른다."
+)
+async def get_code_graph(doc_id: str, item_id: str | None = None) -> CallToolResult:
+    """SYNC-API-002#get_code_graph"""
+    try:
+        with db.session_scope() as s:
+            user = _user(s)
+        v = await queries.code_view(doc_id, item_id.replace("~", "/") if item_id else None, user)
+    except Problem as p:
+        return _problem(p)
+    return _ok(v)
+
+
+@server.tool(
     description="항목의 상위 참조(이 항목이 근거로 삼은 것)와 하위 참조(이 항목을 근거로 삼은 것)를 나눠 돌려준다. "
     "이 항목이 왜 있는지, 바꾸면 어디에 영향이 가는지 알아야 할 때 부른다. 목록만 주고 본문은 펼치지 않는다. "
     "필요한 항목만 get_item으로 다시 요청한다. 빈 목록이면 고립 항목이다."
@@ -350,7 +364,9 @@ async def get_template(
         return _problem(p)
     # 서브타입을 주면 그것의 항목 패턴·필수 절·항목 블록이 온다. 안 주면 필수 절이 비고 고를 수 있는
     # 것이 subtypes에 온다 — 전에는 서브타입을 받을 자리가 없어 DOM의 필수 절이 늘 빈 배열이었다 (#114)
-    pats, secs = SUBTYPES[(doc_type, subtype)] if subtype else (TYPES[doc_type][0], TYPES[doc_type][1])
+    pats, secs = (
+        SUBTYPES[(doc_type, subtype)] if subtype else (TYPES[doc_type][0], TYPES[doc_type][1])
+    )
     out: dict[str, object] = {
         "doc_type": doc_type,
         "common_rules": _section(std, "1."),

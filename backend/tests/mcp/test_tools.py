@@ -48,7 +48,9 @@ async def test_tools_listed_with_descriptions() -> None:
         "update_document",
         "delete_document",
         "restore_document",
+        "get_code_graph",  # 카드 AZ
     }
+    assert "호출하는 것" in names["get_code_graph"] and "graphify" in names["get_code_graph"]
     assert "document-deletion-needs-confirm" in names["delete_document"]
     assert (
         "휴지통" in names["delete_document"] and "document-not-trashed" in names["restore_document"]
@@ -295,3 +297,20 @@ async def test_other_owner_project_is_not_found(scoped: Session, as_user) -> Non
     # 소유자에게는 그대로
     err, _ = await call("get_document", doc_id="EXMP-PRD-001")
     assert not err
+
+
+async def test_get_code_graph(scoped: Session, as_user) -> None:
+    """SYNC-API-002 get_code_graph — 코드 탭과 같은 대조(카드 AZ)."""
+    from app.core.codegraph.service import CodeGraphService
+    from tests.core.codegraph.test_queries import GRAPH, MS
+
+    p = _seed(scoped, as_user)
+    SpecService(scoped).create(p.id, "EXMP-MS-001", DocType.MS, MS, "h2", as_user, "spec: 테스트")
+    err, v = await call("get_code_graph", doc_id="EXMP-MS-001", item_id="svc.save")
+    assert not err and v["graph"] is None  # 아직 그래프가 없다
+    CodeGraphService(scoped).save(p.id, "c" * 40, "server", GRAPH)
+    err, v = await call("get_code_graph", doc_id="EXMP-MS-001", item_id="svc.save")
+    assert not err and v["function"]["qual"] == "svc.save"
+    assert [c["status"] for c in v["function"]["calls"]] == ["code_only", "spec_only", "same"]
+    err, v = await call("get_code_graph", doc_id="NOPE-MS-001")
+    assert err and v["type"] == "urn:syncdoc:not-found"
