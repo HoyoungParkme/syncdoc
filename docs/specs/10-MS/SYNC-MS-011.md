@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/codegraph/graph.py`(순수 함수 6개)와 `core/codegraph/service.py`(`CodeGraphService` 4개). 클래스 명세 [[SYNC-DOM-002]] 4.11의 시그니처를 함수 내부까지 내린 것.
+`core/codegraph/graph.py`(순수 함수 6개)와 `core/codegraph/service.py`(`CodeGraphService` 5개). 클래스 명세 [[SYNC-DOM-002]] 4.11의 시그니처를 함수 내부까지 내린 것.
 
 명세↔코드 대조([[SYNC-PRD-001#R13]])를 맡는다 — 2026-09-30 사용자 결정으로 graphify가 뽑은 호출 그래프에 싱크독의 보강을 더해, MINISPEC의 「호출하는 것」과 실제 호출을 가른다. **명세 묶음과 선이 없다**: 항목 ID는 그래프 안의 글자이고, 「호출하는 것」은 부르는 쪽(검사기 `check_calls`, 화면·챗봇은 카드 AY·AZ의 `queries`)이 명세에서 읽어 넘긴다.
 
@@ -43,6 +43,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 | [[#CodeGraphService.save]] | 새 그래프로 바꿔 끼운다 |
 | [[#CodeGraphService.fail]] | 실패 이유만 남긴다 — 옛 그래프는 그대로 |
 | [[#CodeGraphService.delete_by_project]] | 프로젝트 해제와 함께 |
+| [[#CodeGraphService.read]] | 그래프 커밋의 파일을 줄 범위로 — 비밀 꼴 거부, 300줄 |
 
 ---
 
@@ -195,6 +196,25 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 **처리** `DB: code_graphs where project_id` 삭제 — [[SYNC-MS-001#ProjectService.delete_project]]가 명세 표보다 먼저 같은 트랜잭션에서 부른다
 
 **테스트 관점** 해제 뒤 행 0
+
+---
+
+#### CodeGraphService.read 그래프 커밋의 파일을 줄 범위로
+
+**시그니처** `async def read(project_id: int, workdir: Path, path: str, start: int, end: int | None) -> CodeText`
+
+근거: [[SYNC-UC-001#UC-H20]] 기본 흐름 3 · 사용자 결정 2026-09-30(코드 본문은 DB에 두지 않고 그래프 커밋의 저장소에서 · 커밋된 파일만 · 비밀 꼴 거부 · 300줄) — 코드 탭(카드 AY)과 질문 탭 `read_code`(카드 AZ)가 같이 쓴다
+
+**처리**
+1. `row = get(project_id)` · if None 또는 `row.commit_hash` None → `! not-found {resource: code_graph}`
+2. `path`를 저장소 안 상대 경로로 — 절대 경로·`..`는 `! not-found {resource: file}` · 파일 이름이 `DENY`(`.env*` · `*.pem` · `*.key` · `id_rsa*` · `*.p12` · `*secret*`)에 걸리면 **같은** `! not-found {resource: file}` — 있는지가 새지 않게
+3. `text = `[[SYNC-MS-009#git.read]]`(workdir, path, row.commit_hash)` — **그래프 커밋의 커밋된 파일만**. 작업 사본·`.gitignore`된 파일은 못 본다 · 없으면 `! not-found {resource: file}`
+4. `start = max(1, start)` · `end = min(줄 수, end or 줄 수)` · 300줄을 넘으면 `end = start + 299`, `truncated = True`
+5. `→ CodeText(path, start, end, row.commit_hash, 그 줄들, truncated)`
+
+**호출하는 것** [[#CodeGraphService.get]] · [[SYNC-MS-009#git.read]]
+
+**테스트 관점** 그래프 커밋의 내용이다(뒤에 바뀐 것이 아니다) · 300줄에서 자르고 `truncated` · `.env`·`id_rsa`·`secrets.yaml`·`../x`·절대 경로 → `not-found` · 그래프 없음 → `not-found`
 
 ---
 
