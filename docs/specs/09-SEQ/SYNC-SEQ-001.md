@@ -20,7 +20,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 
 **두 종류로 나눈다.**
 - **고유 흐름** SEQ-1·2·4·5·7~15·18~24 — 분기가 있거나 묶음을 넘는 것. 각자 그림
-- **공통 형태** SEQ-C1·C2 — 정말로 `입구 → 서비스 하나 → DB → 반환`인 것. 그림 하나에 표로 어느 입구가 따르는지. **그려서 확인한 뒤에** 넣었다
+- **공통 형태** SEQ-C1·C2·C3 — 정말로 `입구 → 서비스 하나 → DB → 반환`인 것과 모든 요청 앞에 붙는 인증. 그림 하나에 표로 어느 입구가 따르는지. **그려서 확인한 뒤에** 넣었다
 
 **표기** — `alt` 분기, `opt` 조건부, `loop` 반복. 실선 호출, 점선 반환. `DB`는 어느 묶음이든 자기 테이블. 트랜잭션은 `rect`. `Q`는 `core/queries.py` — 읽기 집계 조합자(되먹일 것 #12).
 
@@ -56,10 +56,12 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 
 | 입구 | 시퀀스 | 묶음 넘음 |
 |---|---|---|
-| GET /auth/github | [[#SEQ-C1]] | |
-| GET /auth/github/callback | [[#SEQ-8]] | |
-| POST /auth/logout | [[#SEQ-C1]] | |
-| POST /hooks/github | [[#SEQ-2]] | ○ |
+| GET /auth/github (인터넷판) | [[#SEQ-C1]] | |
+| GET /auth/github/callback (인터넷판) | [[#SEQ-8]] | |
+| POST /auth/logout (인터넷판) | [[#SEQ-C1]] | |
+| POST /hooks/github (인터넷판) | [[#SEQ-2]] | ○ |
+| 폐쇄망판 모든 웹 요청의 가드·사용자 | [[#SEQ-C3]] | |
+| GET /specs/{path} | [[#SEQ-C1]] | |
 | GET /api/projects | [[#SEQ-9]] | ○ |
 | POST /api/projects · MCP init_project | [[#SEQ-4]] (GitHub 저장) · [[#SEQ-28]] (서버 저장) | ○ |
 | GET /api/projects/{code} | [[#SEQ-9]] | ○ |
@@ -96,7 +98,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | GET·POST /git/{code}.git/* (서버 저장소 git 입구) | [[#SEQ-29]] | ○ |
 | MCP upload_code | [[#SEQ-30]] | ○ |
 
-묶음을 넘는 것이 대응표 31행 중 22행이다(입구 여럿을 한 행에 묶은 것이 있다). v1.0에서 안 그린 조회 중 절반 이상이 묶음을 넘었다.
+묶음을 넘는 것이 대응표 41행 중 29행이다(입구 여럿을 한 행에 묶은 것이 있다). v1.0에서 안 그린 조회 중 절반 이상이 묶음을 넘었다.
 
 ---
 
@@ -416,7 +418,7 @@ sequenceDiagram
 
 ## SEQ-8 GitHub로 로그인한다
 
-인프라 5장. UI-1.
+인프라 5장. UI-1. **인터넷판만** — 폐쇄망판은 로그인이 없고 모든 웹 요청이 [[#SEQ-C3]]로 로컬 사용자가 된다.
 
 ```mermaid
 sequenceDiagram
@@ -1347,7 +1349,8 @@ sequenceDiagram
 | GET /auth/github | (라우터만) | state 생성, 302 |
 | POST /auth/logout | (라우터만) | 세션 삭제 |
 | GET /api/docs/{docId}/versions | SpecService.list_versions | `versions ∪ status_changes` 시각순 — 한 서비스 안이지만 두 테이블 |
-| GET /api/me | (세션 User) | |
+| GET /api/me | (세션 User — 폐쇄망판은 로컬 사용자, [[#SEQ-C3]]) | `edition`·`storage_modes`는 설정 |
+| GET /specs/{path} | (라우터만) | 이미지 안 `STD/`·`_templates/`만. 파일은 글자, 폴더는 목록. 공개 |
 | GET /api/me/tokens | AccountService.list_tokens | 폐기된 것 포함 |
 | POST /api/me/tokens | AccountService.issue_token | raw 생성 → sha256 저장 → raw는 응답에만 |
 | DELETE /api/me/tokens/{id} | AccountService.revoke_token | 본인 것만. 아니면 404 |
@@ -1386,6 +1389,38 @@ sequenceDiagram
 ```
 
 **읽을 때 볼 것** — 토큰 원문은 요청 헤더에만 있고 서버 어디에도 안 남는다. 로그에도 남기지 않는다 → MINISPEC.
+
+---
+
+## SEQ-C3 공통 형태 — 폐쇄망판 웹 요청
+
+폐쇄망판([[SYNC-PRD-001#R15]])의 모든 웹 요청 앞에 붙는다. 인터넷판의 세션 확인 자리다. 로그인이 없으니 **누가** 부르는지가 아니라 **어디서** 부르는지를 본다([[SYNC-INFRA-001]] 5장).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사람
+    participant W as web 가드
+    participant B as 라우터
+    participant AS as AccountService
+    participant DB
+
+    U->>W: 요청 (Host, Origin)
+    alt Host가 허용 목록 밖
+        W-->>U: 403 forbidden-origin {host}
+    end
+    alt 쓰기 요청(POST·PUT·PATCH·DELETE)인데 Origin이 있고 이 서버가 아니다 — /mcp·/git은 보지 않는다
+        W-->>U: 403 forbidden-origin {origin}
+    end
+    W->>B: 요청
+    B->>AS: local_user()
+    AS->>DB: users where kind=local
+    AS-->>B: User
+    B->>B: 그 입구의 흐름 (SEQ-xx) — 이 사람으로
+    B-->>U: 응답
+```
+
+**읽을 때 볼 것** — 허용 목록은 `127.0.0.1`·`localhost`·`[::1]`과 `PUBLIC_BASE_URL`의 host다(포트는 보지 않는다). 127.0.0.1에만 열어도 가드가 필요하다 — 다른 사이트가 제 이름을 127.0.0.1로 풀리게 바꿔(DNS rebinding) 내 브라우저로 부르면 Host가 그 이름이라 여기서 막힌다. Origin 확인은 다른 사이트의 폼·fetch가 보내는 쓰기(CSRF)를 막는다 — 본문 없는 POST(되돌리기·재구축)는 미리 묻는 요청(preflight)도 없다. MCP·git은 토큰이 사람을 정하므로([[#SEQ-C2]]·[[#SEQ-29]]) Host만 본다.
 
 ---
 
