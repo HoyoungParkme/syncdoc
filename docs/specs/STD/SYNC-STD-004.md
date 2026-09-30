@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-004
 type: STD
 title: 개발 규약 — 코드 파트 표준
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -224,13 +224,14 @@ C  통합·배포       외부 연결 · 첫 사용
 |---|---|
 | 카드의 구현 함수가 전부 있다 | `docstring` 항목 ID 대조. MINISPEC에 있는데 코드에 없거나 그 반대면 미완 |
 | 시그니처가 MINISPEC과 같다 | 검사기가 타입 힌트와 대조 |
+| 호출이 MINISPEC과 같다 | `check_calls.py` — 명세의 「호출하는 것」과 코드 호출 그래프(graphify + 보강)의 어긋남 0. `uv run --project backend python tools/check_calls.py`(카드 AX) |
 | 테스트 통과 | 단위(테스트 관점) + E2E(시나리오) 전부. **전용 테스트 DB에서만** — 아래 |
 | 린트·포맷 통과 | `ruff check` · `ruff format --check` |
 | 명세 통과 | `validate.py` 위반 0 (코드가 명세를 고쳤으면) |
 | CODE 문서 기록 | 슬라이스 카드 완료란에 커밋 해시·PR·날짜(KST) |
 | **화면 확인** (화면이 있는 카드만) | 에이전트가 `tsc`·`build`·API 테스트까지 하고, **사람이 브라우저에서 와이어프레임 요소 번호대로 눌러 본다.** 스크린샷을 PR에. 에이전트는 눈이 없다 — 이 조건만 사람 몫 |
 
-여섯(화면 카드는 일곱) 다 되어야 다음 카드. 하나라도 빠지면 그 슬라이스는 미완이고 다음 슬라이스의 `선행` 조건이 안 된다.
+일곱(화면 카드는 여덟) 다 되어야 다음 카드. 하나라도 빠지면 그 슬라이스는 미완이고 다음 슬라이스의 `선행` 조건이 안 된다.
 
 **테스트는 전용 DB에서만 돈다.** 이름에 `test`가 없는 DB를 가리키면 시작하지 않는다 — 스키마를 만드는 픽스처가 개발·운영 DB에 닿으면 그 데이터가 사라진다. 다른 DB를 쓰려면 `SYNCDOC_TEST_DATABASE_URL`로 말한다. 환경 변수를 `setdefault`로 두면 셸에 떠 있는 값이 이긴다 — 그래서 덮어쓴다.
 
