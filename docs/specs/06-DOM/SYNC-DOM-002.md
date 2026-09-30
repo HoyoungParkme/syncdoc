@@ -90,7 +90,7 @@ app/
 ├── web/                    REST API. core를 호출만 한다
 │   ├── routers/            git.py는 서버 저장소의 git 입구(카드 BB) — /git/{코드}.git
 │   ├── schemas/            요청·응답 형태
-│   ├── auth.py             GitHub OAuth·세션
+│   ├── auth.py             GitHub OAuth·세션. 폐쇄망판은 세션 없이 로컬 사용자(카드 BC)
 │   └── static/             React 빌드 결과 (gitignore). /{path:path} SPA 폴백은 라우트 맨 끝
 │
 ├── mcp/                    MCP 도구. core를 호출만 한다
@@ -335,6 +335,7 @@ classDiagram
         +int id
         +str github_login
         +int github_user_id
+        +UserKind kind
         +str display_name
         +bytes github_token_encrypted
         +datetime created_at
@@ -345,6 +346,8 @@ classDiagram
 - `User` 1 — * `AccessToken`
 - `User` 1 — * `CommitEmail`
 - `User` 1 — * `Project` (소유. 자리표시 User는 소유할 수 없다 — 5장 결정 3)
+
+`kind`는 사용자의 종류다 — `github`(OAuth로 들어온 계정) · `local`(폐쇄망판의 로컬 사용자 하나, [[SYNC-PRD-001#R15]]) · `placeholder`(커밋으로만 알려진 사람). **자리표시 판정은 이 칸이다** — 예전의 「`github_user_id`가 비었다」는 GitHub ID가 없는 로컬 사용자를 자리표시로 잘못 잡는다(카드 BC). 폐쇄망판에서 `github_login` 칸은 로컬 사용자의 아이디(`LOCAL_LOGIN`)를 든다 — 이름을 바꾸지 않는다(칸의 뜻은 `kind`가 가른다).
 
 #### CommitEmail 커밋이메일
 
@@ -393,6 +396,7 @@ classDiagram
 | DocType | RFQ, PRD, SCN, UC, INFRA, DOM, UI, API, SEQ, MS, CODE, STD | Document. STD는 단계 밖 |
 | DocStatus | draft, approved | Document, StatusChange. 라벨은 「초안」「완료」 |
 | AuthorKind | human, agent | Version |
+| UserKind | github, local, placeholder | User. 자리표시 판정 · 폐쇄망판 로컬 사용자(카드 BC) |
 | Storage | github, server | Repository. 라벨 「GitHub 저장소」「서버 저장소」([[SYNC-PRD-001#R14]]). 서버가 켠 것은 설정 `STORAGE_MODES`([[SYNC-INFRA-001]] 5.2) |
 
 ---
@@ -929,6 +933,8 @@ classDiagram
         +users_by_ids(ids: list~int~) dict
         +create_placeholder(login: str) User
         +user_for_commit(email: str, login: str) User
+        +ensure_local_user(login: str, display_name: str) User
+        +local_user() User
         +commit_emails(user: User) list~CommitEmail~
         +add_commit_email(user: User, email: str) CommitEmail
         +remove_commit_email(user: User, email_id: int) None
@@ -937,6 +943,7 @@ classDiagram
         +int id
         +str github_login
         +int github_user_id
+        +UserKind kind
         +str display_name
         +bytes github_token_encrypted
         +datetime created_at
@@ -969,13 +976,15 @@ classDiagram
 | `authenticate_token` | MCP 모든 요청 (SEQ-C2) | 인프라 5 |
 | `github_token_for` | infra/git | 인프라 5. 복호화 |
 | `user_by_login` · `create_placeholder` | `AccountService.user_for_commit` · web/auth | login으로 찾기·자리표시 만들기. **파이프라인이 직접 부르지 않는다** — `user_for_commit`을 거친다 |
-| `user_for_commit` | pipeline.process_commit · pipeline.rebuild | [[SYNC-UC-001#UC-G1]]. 커밋 작성자 → User. **이메일 먼저**, 없으면 login, 없으면 자리표시 생성 |
+| `user_for_commit` | pipeline.process_commit · pipeline.rebuild | [[SYNC-UC-001#UC-G1]]. 커밋 작성자 → User. **이메일 먼저**, 없으면 login, 없으면 자리표시 생성. **폐쇄망판은 늘 로컬 사용자** — 혼자 쓴다 |
+| `ensure_local_user` · `local_user` | main(켜질 때) · web/auth.current_user(폐쇄망판) | [[SYNC-PRD-001#R15]]. 로컬 사용자를 두고, 로그인 없이 그 사람으로 본다 |
 | `commit_emails` · `add_commit_email` · `remove_commit_email` | /api/me/emails | UI-13 2.3~2.6 |
 
 **규칙이 사는 곳**
 - `issue_token`: 원문은 반환에만. 저장은 SHA-256 해시
 - `login_github`: `github_user_id`로 upsert(로그인 ID 변경 대응). OAuth 토큰은 앱 비밀키로 암호화
 - `authenticate_token`: `revoked_at`이 있거나 `expires_at`이 지났으면 None
+- `ensure_local_user`: `kind=local` 행 하나 — 없으면 만들고 있으면 아이디·이름을 설정대로 고친다. 같은 아이디의 다른 종류 사용자가 있으면 그 행을 쓰지 않고 거부한다
 - `user_for_commit`: **이메일 → login → 자리표시** 순. 자리표시를 만드는 곳이 여기 하나뿐이어야 판정이 두 경로에서 어긋나지 않는다(5장 결정 3)
 - `add_commit_email`: `strip().lower()`로 정규화. 남이 이미 가진 이메일이면 거부, 내가 이미 가졌으면 그 행을 돌려준다(멱등)
 
