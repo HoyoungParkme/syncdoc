@@ -467,7 +467,7 @@ frontend/
 | `item.padding` | 번호에 앞자리 0 |
 | `item.pattern` | 첫 토큰이 ID처럼 보이는데(`^[A-Z]+-?\d`) 타입 패턴에 안 맞음 — 오타 방지 |
 | `ref.format` | `[[ ]]` 안이 `문서ID` · `문서ID#항목ID` · `#항목ID`(같은 문서) 형식 아님. 항목ID는 `\S+` |
-| `author.unknown` | GitHub 경로 커밋 작성자가 미등록 (자리표시 User). 저장은 되고 완료만 막힌다 |
+| `author.unknown` | 저장소로 직접 들어온 커밋(GitHub push · 서버 저장소 git push)의 작성자가 미등록 (자리표시 User). 저장은 되고 완료만 막힌다. 폐쇄망판에는 없다 — 모든 커밋이 로컬 사용자다([[SYNC-PRD-001#R15]]) |
 | `file.deleted` | GitHub 경로에서 명세 파일이 삭제됨. 문서는 남기고 `draft`로 내리며 항목 전부 `is_deleted`. 파일을 되살리면 풀린다 |
 
 **위반이 아닌 것**: mermaid 문법 오류, 미존재 참조, 필수 절 누락, 빈 항목 블록, 번호 없는 절 헤딩(4장 `section.unnumbered` 경고까지다 — 저장은 된다).
