@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1135,6 +1135,18 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 완료 | 2026-09-30 · 브랜치 `card/AV-keep-all` · spec 3 + code 1 · `validate` 0/0 · `check_view_css` 7쌍 같음 · `check_tokens` 91/0 · 배포 뒤 헤드 크롬: `body`·`.qa .a` 모두 keep-all/anywhere · PRD-001 R1 카드 「이 MD가」 한 덩어리 · 채팅 답 문장이 어절에서 꺾임 · 정적 뷰 셸 CSS에 같은 선언 |
 
 **왜 카드인가.** 렌더러는 문단 줄을 공백으로 잇고 있어 하드 줄바꿈은 없다 — 원인은 CSS 기본값(한글은 아무 글자 사이나 꺾인다)이고, 디자인 토큰 문서(UI-001 3.2)에 규칙이 는다.
+
+#### AW 답 스트리밍 — delta 이벤트
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-MS-009#llm.step_stream]] · [[SYNC-MS-008#queries.ask_item]] 4·6단계 · [[SYNC-API-001]] ask `delta` · [[SYNC-DOM-002]] 2.8 `AskDelta` · [[SYNC-SEQ-001#SEQ-24]] · [[SYNC-UI-002#UI-5]] 8.7·8.9 · 공통 1.8 · 사용자 요청 2026-09-30 「답이 한 번에 나오지 말고 스트리밍으로」 · 사용자 결정: 스피너는 `answer`까지, 흐르는 동안 마크다운을 그때그때, 그림은 끝난 뒤 |
+| 구현 | `llm.step_stream`(SSE 읽기·tool_calls 조각 조립·Content-Type으로 단발 대체) + `llm.step`은 모아서 · `AskDelta` DTO·스키마·`delta` 프레임 · `ask_item`이 조각을 `AskDelta`로 · `AskPanel`이 `live` 버퍼를 그때그때 마크다운으로(`note`·`read`에서 비움, `answer`에서 본문으로), mermaid는 `a`가 있는 턴만, rAF로 묶어 그린다 |
+| 테스트 | MS-009·MS-008 테스트 관점 · 라우터 프레임에 `delta` · 헤드 크롬: 스피너가 도는 채로 글이 늘어남(길이 폴링) · `answer` 뒤 접힘·본문 같음 · 마인드맵은 흐르는 동안 코드, 끝나면 그림 · 새로고침 뒤 저장된 답 그대로 |
+| 선행 | AV |
+| 완료 | — |
+
+**왜 카드인가.** 어댑터(MS-009)·이벤트(API·DOM)·루프(MS-008)·화면(UI-5) 넷이 같이 바뀐다. 핵심 결정 하나 — `delta`는 진실이 아니고 `note`/`answer`가 전체 글을 다시 준다 — 로 저장·재열기 경로를 그대로 둔다.
 
 ---
 
