@@ -109,6 +109,8 @@ upstream: [SYNC-UI-001]
 
 이 절의 첫 html 블록은 뷰가 **이 문서 모든 화면의 iframe 앞에** 넣는다([[SYNC-STD-001]] 2.7). 마크업은 없고 `<link>`(글꼴)와 `<style>`뿐이다 — 상단 바는 셸 안 화면 배치가 각자 품는다(0장). 카드 AA에서 12화면을 디자인 도구로 다시 그리며 카드 Z의 클래스 사전을 이 디자인 체계 하나로 바꿨다: 토큰(CSS 변수, 값은 UI-001 3장) · 아트보드 `.sd` · 상단 바 `.top` · 문서 바 `.docbar` · 버튼 `.b`(채움 `solid` · 위험 `danger` · 작게 `sm`) · 상태 필 `.pill` · 항목 ID 뱃지 `.idb` · 점 `.dot` · 배너 `.ban` · 입력 `.in` · 카드 `.card` · 다이얼로그 `.ov`+`.dlg`(머리 `.dh` · 본문 `.db` · 발 `.df`) · 탭 `.tabs` · 3단 틀 `.body3` · 히트맵 칸 `.cell` · diff 줄 `.dl` · 코드 상자 `.snip` · 단계 칩 `.stp`. 화면에만 있는 것은 그 화면의 `<style>`에 둔다.
 
+**글꼴 `<link>` 둘은 CDN 주소 그대로 둔다** — 정적 뷰와 인터넷판 앱이 그렇게 그린다. **폐쇄망판 앱**([[SYNC-PRD-001#R15]])은 iframe에 넣을 때 이 둘을 앱이 담은 글꼴(`/fonts/…`, [[SYNC-UI-001]] 3.2)로 바꾸고, 그 밖에 바깥 주소(`http:`·`https:`·`//`)를 부르는 `<link>`·`<script>`는 뺀다 — 닿지 않는 주소를 기다리느라 화면이 늦게 뜬다. 화면 배치가 제 글꼴을 CDN에서 부르면 폐쇄망판에서는 대체 글꼴로 보인다([[SYNC-STD-002]] V-UI). 상단 바의 로그아웃은 인터넷판만이다([[SYNC-UI-001]] 4장).
+
 ```html
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -1375,6 +1377,7 @@ status: draft
 ### 규칙
 
 - 유일하게 공통 틀(상단 바)이 없는 화면
+- **인터넷판만 있다.** 폐쇄망판은 로그인이 없어 이 화면이 없다 — `/login`으로 와도 UI-2로 보낸다([[SYNC-UI-001#UI-1]])
 - **이 화면은 서버에서 아무것도 안 읽는다.** v1.2에 11단계 색 띠를 뒀다가 뺐다 — 아래 참고
 - **카드에 담지 않는다.** 앱 배경 위에 로고·설명·버튼만 놓고 화면 세로 가운데에 둔다. 흰 판을 깔면 배경과 카드가 한 겹 더 갈리면서 로그인 폼이 '입력할 것이 많은 화면'처럼 보인다 — 여기서 할 일은 버튼 하나다
 - **버튼은 콘텐츠 폭을 채우는 검정 채움이다.** 이 화면에서 유일한 동작이므로 유일한 강조여야 한다. 테두리만 있는 버튼으로 두면 배경과 대비가 없어 어디를 눌러야 할지 눈이 먼저 못 찾는다
@@ -1963,6 +1966,23 @@ status: draft
     </div>
   </div>
 </div>
+
+<div class="var">폐쇄망판 — 내 계정이 한 줄뿐이다. 로그아웃·커밋 이메일이 없고 상단 바에도 로그아웃이 없다(카드 BC)</div>
+<div class="sd h" style="min-height:190px">
+  <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb on">설정</span></div>
+  <div class="ov" style="padding-top:24px">
+    <div class="dlg set">
+      <div class="db">
+        <section class="card" data-el="2">
+          <div class="ch">내 계정</div>
+          <div class="cb">
+            <div class="row"><b data-el="2.1">local</b><span class="cap">로그인 없음 · 이 PC · 박호영</span></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
 ```
 
 ### 요소
@@ -1971,9 +1991,9 @@ status: draft
 |---|---|---|---|---|
 | 1 | 다이얼로그 | 다이얼로그 | 어느 화면 위에서든 뜬다. 닫으면 보던 화면 그대로 | — |
 | 2 | 내 계정 | 카드 | GitHub 로그인 ID(2.1), 표시 이름, 커밋 이메일 목록(2.3) | — |
-| 2.1 | 로그인 ID | 텍스트 | GitHub 계정 | — |
-| 2.2 | 로그아웃 | 버튼 | | 세션 종료 → UI-1 |
-| 2.3 | 커밋 이메일 행 | 행 | 등록된 이메일 하나. 고정폭. 하나도 없으면 행이 없다 | — |
+| 2.1 | 로그인 ID | 텍스트 | GitHub 계정. 폐쇄망판은 로컬 사용자의 아이디(`LOCAL_LOGIN`) 옆에 「로그인 없음 · 이 PC · {이름}」 | — |
+| 2.2 | 로그아웃 | 버튼 | 인터넷판만 | 세션 종료 → UI-1 |
+| 2.3 | 커밋 이메일 행 | 행 | 등록된 이메일 하나. 고정폭. 하나도 없으면 행이 없다. 2.3~2.6은 인터넷판만 | — |
 | 2.4 | 삭제 | 버튼 | | 확인 후 삭제 |
 | 2.5 | 이메일 입력 | 입력 | git 커밋에 쓰는 이메일 | — |
 | 2.6 | 추가 | 버튼 | 2.5가 비어 있으면 비활성 | 등록하고 목록에 더한다. 남이 이미 등록했으면 그 자리에 오류 |
@@ -2014,6 +2034,7 @@ status: draft
 - **순서를 뒤집으면 화면이 잠긴다.** 이메일 없이 재구축하면 그 사람이 마지막으로 만진 문서 전부에 `author.unknown` 규약 오류가 붙고, 규약 오류가 있는 문서는 상태 변경 버튼이 통째로 비활성이다(UI-5 규칙)
 - **이메일 하나는 사람 하나다.** 남이 이미 등록한 이메일은 거부된다(409 `email-taken`). 먼저 등록한 쪽이 임자다. 사칭을 완전히 막지는 못하지만 권한은 안 준다 — push는 여전히 그 사람의 OAuth 토큰이 있어야 한다
 - **삭제(2.4)는 확인을 받는다.** 다음 재구축에서 그 이메일로 들어온 커밋이 자리표시로 돌아간다
+- **폐쇄망판([[SYNC-PRD-001#R15]])의 내 계정은 한 줄이다** — 로컬 사용자의 아이디(2.1)와 「로그인 없음 · 이 PC · {이름}」. 로그아웃(2.2)이 없다 — 로그인이 없다. 커밋 이메일(2.3~2.6)도 없다 — 혼자 쓰는 판은 저장소의 모든 커밋을 그 사람 것으로 보므로 이을 것이 없다([[SYNC-MS-006#AccountService.user_for_commit]]). 그래서 S-3도 일어나지 않는다
 - **행에 토큰 접두어를 두지 않는다.** 서버는 해시만 저장하므로 접두어를 남기려면 컬럼을 따로 만들어야 하는데, 이름(label)이 이미 어느 토큰인지 말한다. 컬럼 하나를 더 두고 기존 토큰은 빈칸으로 남기는 값을 치를 만큼은 아니다(#20)
 
 ### 시나리오
@@ -2376,7 +2397,7 @@ status: draft
           <div class="gr"><span class="no"></span><span></span><span></span><span>어디서</span></div>
           <div class="gr" data-el="2.1"><span class="no">1</span><span class="nm">저장소를 등록한다</span><span class="tx">명세 원본은 저장소의 docs/specs/에 둔다. 프로젝트 하나가 저장소 하나다.</span><span class="where">프로젝트 목록</span></div>
           <div class="gr"><span class="no">2</span><span class="nm">에이전트를 붙인다</span><span class="tx">설정에서 MCP 토큰을 발급해 Claude Code·Codex·Gemini에 넣는다. 클라이언트는 상관없다.</span><span class="where">설정</span></div>
-          <div class="gr"><span class="no">3</span><span class="nm">에이전트와 대화하며 명세를 쓴다</span><span class="tx">명세 본문이 들어오는 길은 MCP와 GitHub push 둘뿐이다. 웹에는 편집 화면이 없다. <b>커밋·PR에 에이전트 표시(Co-Authored-By 등)를 남기지 않는다.</b></span><span class="where">에이전트</span></div>
+          <div class="gr"><span class="no">3</span><span class="nm">에이전트와 대화하며 명세를 쓴다</span><span class="tx">명세 본문이 들어오는 길은 MCP와 저장소 push 둘뿐이다. 웹에는 편집 화면이 없다. <b>커밋·PR에 에이전트 표시(Co-Authored-By 등)를 남기지 않는다.</b></span><span class="where">에이전트</span></div>
           <div class="gr"><span class="no">4</span><span class="nm">웹에서 읽고 완료로 올린다</span><span class="tx">유저용 탭으로 읽고, 참조를 따라가고, 막히면 그 자리에서 묻고, 다 됐으면 완료로 올린다. 완료 문서를 고치면 초안으로 돌아온다.</span><span class="where">문서 뷰</span></div>
           <div class="gr"><span class="no">5</span><span class="nm">끊어진 것을 잡는다</span><span class="tx">상위 항목이 사라지면 그것을 가리키던 참조가 끊어진 참조로 뜬다. 알림은 없다 — 프로젝트 상세의 수치가 알림이다.</span><span class="where">프로젝트 상세</span></div>
           <div class="gr"><span class="no">6</span><span class="nm">수정은 다시 에이전트에게</span><span class="tx">어긋남이 보이면 화면 밖에서 에이전트에게 고치게 하고 돌아와 확인한다.</span><span class="where">에이전트</span></div>
@@ -2453,7 +2474,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 
 - 이 화면은 **읽기 전용이고 상태가 없다.** 어디서 열든 같은 내용이고, 닫으면 원래 화면 그대로다
 - 항목 ID 형식은 [[SYNC-STD-001]] 2장의 타입별 패턴을 사람 말로 옮긴 것이다. 규약이 바뀌면 여기도 바뀐다
-- **새 저장소에는 규약·템플릿 사본이 없다.** `docs/specs/README.md`의 링크가 싱크독 저장소를 가리키고, MCP `get_template`이 내장 원본을 준다([[SYNC-STD-001]] 1.1, 카드 AB)
+- **새 저장소에는 규약·템플릿 사본이 없다.** `docs/specs/README.md`의 링크가 싱크독 저장소(폐쇄망판은 이 서버의 `/specs` — [[SYNC-API-001#GET/specs/{path}]])를 가리키고, MCP `get_template`이 내장 원본을 준다([[SYNC-STD-001]] 1.1, 카드 AB)
 - **화면 단계의 안내는 「디자인 도구 산출물을 그대로」다.** 회색 상자 뼈대를 가르치지 않는다 — 에이전트가 가진 디자인 도구로 만든 자기 완결 html을 그대로 넣는다([[SYNC-STD-001]] 2.7, 카드 Z)
 - **사용 순서 3행에 커밋 표시 규약을 적는다.** GitHub에 올리는 커밋·PR에 에이전트 표시(Co-Authored-By·세션 링크·Generated with)를 남기지 않는다 — 작성자는 사람의 계정이다([[SYNC-STD-001]] 1장)
 - **"순서는 강제가 아니다"를 빼지 않는다.** 11단계를 보면 차례로 다 채워야 하는 것처럼 읽힌다. 실제로는 건너뛴 단계를 표시만 하고 막지 않는다([[SYNC-UC-001#UC-H14]] 1b)
