@@ -43,6 +43,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 | `restore_document` | [[SYNC-UC-001#UC-A8]] | pipeline.restore_document | ○ |
 | `get_template` | (STD-001 전달) | — 내장 템플릿 · 저장소 `STD/` 읽기 | |
 | `get_code_graph` | [[SYNC-UC-001#UC-A9]] | queries.code_view (코드 그래프, 카드 AZ) | |
+| `upload_code` | [[SYNC-UC-001#UC-A10]] | pipeline.upload_code (서버 저장소에 코드, 카드 BB) | ○ |
 
 ---
 
@@ -418,6 +419,45 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 ---
 
+### upload_code
+
+```json
+{
+  "name": "upload_code",
+  "description": "서버 저장 프로젝트의 서버 저장소에 코드를 올린다 — git이 없는 PC에서 코드 대조를 보려고 부른다. 바뀐 파일(경로와 UTF-8 글자 전체)과 지운 경로를 보내면 커밋 하나로 만들고 코드 그래프를 다시 만든다. git이 있으면 git push가 낫다. 명세 파일(docs/specs/)은 받지 않는다 — 명세는 create_document·update_document로. 한 번에 UTF-8 합 5MB, 파일과 지운 경로 합 500개까지 — 넘으면 upload-too-large, 나눠 보낸다. 절대 경로·..·.git·비밀 꼴(.env·*.pem·*.key 등)·이진 파일은 upload-path-refused이고 그때는 아무것도 올라가지 않는다. GitHub 저장 프로젝트면 storage-mismatch — GitHub에 push한다.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["project_code", "files", "message"],
+    "properties": {
+      "project_code": { "type": "string" },
+      "files": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["path", "content"],
+          "properties": {
+            "path": { "type": "string", "description": "저장소 뿌리에서의 상대 경로. 예: backend/app/main.py" },
+            "content": { "type": "string", "description": "파일 전체(UTF-8 글자)" }
+          }
+        }
+      },
+      "delete": { "type": "array", "items": { "type": "string" }, "default": [], "description": "지울 경로" },
+      "message": { "type": "string", "description": "커밋 메시지" }
+    }
+  }
+}
+```
+
+**결과**
+```json
+{ "commit": "3f9c…", "changed": true, "files": 2, "deleted": 1 }
+```
+내용이 저장소와 같으면 `changed: false`이고 커밋을 만들지 않는다. 코드 그래프는 서버가 곧 다시 만든다 — `get_code_graph`로 본다
+
+**에러**: `storage-mismatch`(1a) · `upload-too-large`(2a, 확장 필드 `limit`·`size`·`count`) · `upload-path-refused`(2b, `paths[{path, reason}]`) · `push-failed` · `not-found`(남의 프로젝트)
+
+---
+
 ## 4. 에이전트 순서
 
 도구 설명에 흩어진 것을 한 번에 적는다. 이 절이 에이전트의 시스템 프롬프트나 스킬 파일에 들어갈 내용이다.
@@ -456,6 +496,12 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
   - 상태를 바꾸려 하지 않는다    → 도구가 없다. 사람이 웹에서
   - get_references 결과를 전부 get_item으로 펼치지 않는다 → 필요한 것만
   - 한 대화에서 한 단계의 문서 여럿을 연달아 만들지 않는다 → 문서 하나가 단위다 (STD-001 1.8)
+
+코드를 서버 저장소에 둘 때 (서버 저장 프로젝트)
+  1. git이 있으면 git push를 권한다 — 프로젝트 화면의 push 방법(UI-4 1.4), 비밀번호 칸에 개인 토큰
+  2. git이 없으면 upload_code로 바뀐 파일과 지운 경로만. 명세 파일은 섞지 않는다
+     - upload-too-large → 나눠 보낸다
+     - upload-path-refused → 거절된 경로를 빼고 다시 (하나라도 있으면 아무것도 안 올라갔다)
 
 지울 때 (잘못 만든 문서)
   1. delete_document(doc_id)
