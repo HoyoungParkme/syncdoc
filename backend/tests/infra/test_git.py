@@ -76,6 +76,14 @@ async def test_commit_push_creates_commit_on_remote(repos: dict[str, Path]) -> N
     assert git(repos["work"], "log", "-1", "--format=%s") == "spec(SYNC-PRD-001): v2"
 
 
+async def test_commit_push_local_user_email_is_not_github(repos: dict[str, Path]) -> None:
+    """폐쇄망판 로컬 사용자는 GitHub 계정이 아니다 — {login}@syncdoc.local (MS-009 5단계, 카드 BC)."""
+    author = _author(token=None)
+    author.user.github_login, author.user.kind = "local", "local"
+    await g.commit_push(repos["work"], "m", author, path=SEED, content="v2")
+    assert git(repos["work"], "log", "-1", "--format=%ae") == "local@syncdoc.local"
+
+
 async def test_commit_push_same_content_makes_no_commit(repos: dict[str, Path]) -> None:
     head = git(repos["remote"], "rev-parse", "main")
     body = (repos["work"] / SEED).read_text(encoding="utf-8")
@@ -417,6 +425,16 @@ async def test_init_specs_returns_14_files_without_template_copies(
     assert h == git(repos["remote"], "rev-parse", "main")
     assert await g.exists(repos["work"], "docs/specs/STD/.gitkeep")
     assert await g.exists(repos["work"], "docs/specs/_templates/PRD.md") is False
+
+
+def test_readme_links_this_server_in_closed_edition(monkeypatch: pytest.MonkeyPatch) -> None:
+    """폐쇄망판에서 SPECS_URL이 기본값이면 이 서버의 /specs(이미지 안 사본), 주면 그것 (INFRA 8.1)."""
+    monkeypatch.setattr(settings, "EDITION", "closed")
+    monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "http://127.0.0.1:8000/")
+    assert "(http://127.0.0.1:8000/specs/STD/SYNC-STD-001.md)" in g._readme()
+    assert "(http://127.0.0.1:8000/specs/_templates)" in g._readme()
+    monkeypatch.setattr(settings, "SPECS_URL", "http://intra.example/specs")
+    assert "(http://intra.example/specs/STD/SYNC-STD-004.md)" in g._readme()
 
 
 # ── sync_readme ──
