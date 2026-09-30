@@ -389,3 +389,15 @@ class Internal(Problem):
 
     def __init__(self) -> None:
         super().__init__("서버에서 처리하지 못한 오류입니다. 로그를 확인하세요.")
+
+
+class CodeGraphFailed(Exception):
+    """코드 그래프를 못 만들었다 — SYNC-MS-011·MS-009 graphify.extract. problem 타입이 아니다.
+
+    그래프 만들기는 사람이 기다리지 않는 배치라(UC-S8) HTTP로 나가지 않는다. 받는 곳은
+    pipeline.build_code_graph 하나이고, 이유를 code_graphs.error에 남긴다.
+    """
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)

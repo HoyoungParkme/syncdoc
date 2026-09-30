@@ -16,6 +16,7 @@ dependencies = [
     "pydantic-settings>=2.4",
     "pypdf>=6.19.0",
     "python-multipart>=0.0.32",
+    "graphifyy>=0.9.72",  # 코드 호출 그래프 — tree-sitter, 모델 없음 (INFRA 3장, 카드 AX)
 ]
 
 [dependency-groups]
