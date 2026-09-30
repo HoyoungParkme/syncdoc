@@ -1156,7 +1156,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `core/codegraph/{models,repository,graph,service}.py` · 리비전 `0015_code_graphs` · `infra/graphify.py` · `git.archive`·`changed_paths` · `pipeline.schedule_code_graph`·`build_code_graph`(락 밖, 프로젝트마다 하나) · `process_commit` 5a · `rebuild` 10 · `delete_project` 2a · `tools/check_calls.py` · 백엔드 의존성 `graphifyy` · MS-001~010 「호출하는 것」을 검사기 결과대로 |
 | 테스트 | MS-011·MS-009·MS-007 테스트 관점 · 마이그레이션 표 14 · `check_calls` 0 · 운영: SYNC push 뒤 코드 그래프 로그 한 줄(함수 1,4xx) · 명세만 바꾼 push는 다시 안 만든다 |
 | 선행 | AW |
-| 완료 | — |
+| 완료 | 2026-09-30 · 브랜치 `card/AX-code-graph` · spec 23 + code 6 + tools 1 · 테스트 306 · `ruff` · `validate` 0/0 · `check_code` 143/143 · **`check_calls` 코드만 0 · 명세만 0**(같음 215) · `check_dom` 14·14·14 · `check_ui` 12/12 · 운영: 4장 행 push(`066971e`)에서 SYNC 첫 코드 그래프 — 서버 추출 · 함수 874 · 호출 선 1,286 · 10.3초(로컬 `check_calls`와 같은 수) · 드러난 것: graphify 추측 선(INFERRED)이 테스트 함수로 잘못 잇는다 → 추측 선·테스트 코드 제외, 클래스 메서드 안 모듈 호출을 놓친다 → 보강이 가져온 모듈·함수·넘기는 메서드 참조까지 |
 
 **왜 카드인가.** 요구사항(R13)·유스케이스·도메인 묶음·표·완료 조건(DEV-14)이 함께 는다. 검사기가 생기는 순간 기존 MINISPEC의 「호출하는 것」 빈칸(함수 33개 안팎)이 드러나므로 이 카드에서 0으로 닫는다.
 
