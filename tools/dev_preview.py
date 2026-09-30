@@ -1,17 +1,20 @@
 """화면 확인용 미리보기 서버 (DEV-14 일곱째 조건 — 사람이 브라우저에서 눌러 본다).
 
-GitHub OAuth 없이 본다: 개발 DB(syncdoc_dev, 테스트 컨테이너)를 새로 만들고 이 저장소의 docs/specs를
-파이프라인으로 올린 뒤 S4 상태(끊어진 참조·규약 오류)를 심는다.
+GitHub OAuth 없이 본다: 개발 DB(syncdoc_dev, 테스트 컨테이너)를 새로 만들고, 이 저장소의 작업 트리를
+로컬 bare 원격에 커밋 하나로 올려 **재구축**한다 — 저장소를 등록할 때와 같은 길이라 문서·항목·참조와
+코드 그래프(코드 탭·관계도 코드 호출)가 다 생긴다. 그 뒤 GitHub에서 직접 고친 것처럼 커밋을 더 push해
+S4 상태(버전 이력·끊어진 참조)를, SQL로 규약 오류를 심는다.
 로그인은 /__dev/login/{login} (hoyoung · minjun). 앱 코드는 건드리지 않는다 — 라우트는 여기서 붙인다.
 
-    uv run python tools/dev_preview.py            # 시드 + 서버 (http://localhost:8000/__dev/login/hoyoung)
-    uv run python tools/dev_preview.py --serve    # 시드 없이 서버만
+    uv run --project backend python tools/dev_preview.py            # 시드 + 서버 (http://localhost:8000/__dev/login/hoyoung)
+    uv run --project backend python tools/dev_preview.py --serve    # 시드 없이 서버만
 """
 
 from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -31,29 +34,24 @@ from sqlalchemy.orm import Session  # noqa: E402
 from app import db  # noqa: E402
 from app.core import pipeline  # noqa: E402
 from app.core.account.service import AccountService  # noqa: E402
-from app.core.errors import Problem  # noqa: E402
 from app.core.project.models import Project, Repository  # noqa: E402
 from app.core.reference.service import ReferenceService  # noqa: E402
 from app.core.spec.service import SpecService  # noqa: E402
-from app.core.types import (  # noqa: E402
-    Author,
-    AuthorKind,
-    DocType,
-    Entry,
-    spec_dir,
-)
+from app.core.types import DocType, spec_dir  # noqa: E402
 from app.main import app  # noqa: E402
 from app.web import auth  # noqa: E402
 
-ORDER = ["RFQ", "PRD", "SCN", "UC", "INFRA", "DOM", "UI", "API", "SEQ", "MS", "CODE", "STD"]
+# 커밋 신원 — noreply 메일의 앞부분이 login이라 그 계정으로 잡힌다 (AccountService.user_for_commit)
+HOYOUNG = ("박호영", "hoyoung@users.noreply.github.com")
+MINJUN = ("김민준", "minjun@users.noreply.github.com")
 
 
 def sh(*args: str, cwd: Path | None = None) -> str:
     return subprocess.run(args, cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
 
 
-def git(cwd: Path, *args: str) -> str:
-    return sh("git", "-c", "user.name=seed", "-c", "user.email=seed@example.com", *args, cwd=cwd)
+def git(cwd: Path, *args: str, who: tuple[str, str] = HOYOUNG) -> str:
+    return sh("git", "-c", f"user.name={who[0]}", "-c", f"user.email={who[1]}", *args, cwd=cwd)
 
 
 def fresh_db() -> None:
@@ -80,31 +78,51 @@ def fresh_db() -> None:
     command.upgrade(cfg, "head")
 
 
-def fresh_repo() -> tuple[Path, Path]:
-    import shutil
+def copy_tree(dest: Path) -> None:
+    """작업 트리를 복사한다 — 추적 파일과 무시되지 않는 새 파일(check_calls와 같다). 커밋 전 명세·코드도
+    미리 본다. 무시되는 파일(.env·node_modules·빌드 결과)은 안 간다."""
+    files = subprocess.run(
+        ["git", "-C", str(ROOT), "ls-files", "-z", "-co", "--exclude-standard"],
+        check=True,
+        capture_output=True,
+    ).stdout.split(b"\0")
+    for f in files:
+        if not f:
+            continue
+        rel = f.decode()
+        src = ROOT / rel
+        if not src.is_file():
+            continue  # 지웠지만 아직 커밋 안 한 파일
+        target = dest / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, target)
 
+
+def fresh_repo() -> tuple[Path, Path, Path]:
+    """bare 원격과 클론 둘 — seed(시드가 GitHub 사용자처럼 커밋해 push한다) · work(싱크독의 작업 사본).
+    첫 커밋은 이 저장소의 작업 트리 그대로 — 명세로 문서를, 코드로 코드 그래프를 만든다."""
     shutil.rmtree(PREVIEW, ignore_errors=True)
     PREVIEW.mkdir(parents=True)
     remote, seed, work = PREVIEW / "remote.git", PREVIEW / "seed", PREVIEW / "work"
     git(PREVIEW, "init", "-q", "--bare", "-b", "main", str(remote))
     git(PREVIEW, "clone", "-q", str(remote), str(seed))
     git(seed, "checkout", "-q", "-b", "main")
-    (seed / "README.md").write_text("# 싱크독 미리보기\n", encoding="utf-8")
-    git(seed, "add", "README.md")
-    git(seed, "commit", "-q", "-m", "chore(SYNC): init")
+    copy_tree(seed)
+    git(seed, "add", "-A")
+    git(seed, "commit", "-q", "-m", "chore(SYNC): 지금 작업 트리 그대로")
     git(seed, "push", "-q", "origin", "HEAD:main")
     git(PREVIEW, "clone", "-q", str(remote), str(work))
-    return remote, work
+    return remote, seed, work
 
 
-def agent(user) -> Author:
-    return Author(kind=AuthorKind.agent, user=user, instructed_by=user, via=Entry.mcp)
-
-
-async def save(author: Author, doc_id: str, body: str, expected: int, message: str, **kw):
-    return await pipeline.save_pipeline(
-        Entry.mcp, doc_id, None, body, expected, None, author, message, **kw
-    )
+def push(seed: Path, rel: str, body: str, message: str, who: tuple[str, str]) -> None:
+    """GitHub에서 직접 고친 것처럼 — 시드 클론에서 파일 하나를 바꿔 커밋하고 push한다.
+    먼저 당긴다: 싱크독이 그새 커밋했을 수 있다(README 판·상태 강등)."""
+    git(seed, "pull", "-q", "--rebase", "origin", "main", who=who)
+    (seed / rel).write_text(body, encoding="utf-8")
+    git(seed, "add", rel, who=who)
+    git(seed, "commit", "-q", "-m", message, who=who)
+    git(seed, "push", "-q", "origin", "HEAD:main", who=who)
 
 
 def with_downstream(s: Session, doc_id: str, exclude: set[str] = frozenset()) -> tuple[str, int]:
@@ -141,15 +159,16 @@ async def seed() -> None:
     from tests.core.account.test_service import make_user
 
     fresh_db()
-    remote, work = fresh_repo()
+    remote, seed_dir, work = fresh_repo()
     with db.SessionLocal() as s:
-        # 사용자를 먼저 만든다 — Repository.registered_by_user_id가 hoyoung을 참조한다
+        # 사용자를 먼저 만든다 — Project.owner_user_id·Repository.registered_by_user_id가 호영을 참조한다
         hoyoung = make_user(s, login="hoyoung")
         hoyoung.display_name = "박호영"
+        # 민준은 남이다 — 호영의 프로젝트가 안 보인다(1인 도구). 이력에 커밋 작성자로만 나온다
         minjun = make_user(s, login="minjun")
         minjun.display_name = "김민준"
         s.flush()
-        p = Project(code="SYNC", name="싱크독")
+        p = Project(code="SYNC", name="싱크독", owner_user_id=hoyoung.id)
         s.add(p)
         s.flush()
         s.add(
@@ -161,60 +180,37 @@ async def seed() -> None:
             )
         )
         s.commit()
-        h, m = agent(hoyoung), agent(minjun)
-        hid = hoyoung.id
 
-    # 1. 이 저장소의 명세를 단계 순서대로 올린다 (호영의 에이전트)
-    for typ in ORDER:
-        for f in sorted((ROOT / "docs/specs" / spec_dir(typ)).glob("SYNC-*.md")):
-            try:
-                r = await pipeline.save_pipeline(
-                    Entry.mcp,
-                    None,
-                    DocType(typ),
-                    f.read_text(encoding="utf-8"),
-                    None,
-                    "SYNC",
-                    h,
-                    f"spec({f.stem}): 초안",
-                    changed_items=[],
-                )
-                print(f"  {r.doc_id} v{r.version_no} 경고 {len(r.warnings)}")
-            except Problem as e:
-                print(f"  {f.stem} 실패: {e.to_dict()}")
-
+    # 1. 등록처럼 재구축으로 읽는다 — 문서·항목·참조, 그리고 코드 그래프
+    r = await pipeline.rebuild("SYNC")
+    print(
+        f"  재구축 — 문서 {r.docs} · 항목 {r.items} · 참조 {r.references}"
+        f" · 규약 오류 {len(r.convention_errors)}"
+    )
+    # 재구축이 백그라운드로 건 코드 그래프를 기다린다 — 안 기다리면 이 루프가 끝날 때 취소된다
+    task = pipeline._graph_tasks.get("SYNC")
+    if task is not None:
+        await task
     with db.SessionLocal() as s:
-        # 단계 순으로 올려 STD 참조가 미존재로 남는다 — 재구축 7단계처럼 한 번 해제
-        ReferenceService(s).resolve_missing(1)
-        s.commit()
-        spec = SpecService(s)
+        row = s.execute(
+            text("SELECT function_count, call_count, error FROM code_graphs")
+        ).first()
+        print(f"  코드 그래프 — {tuple(row) if row else '없음'}")
         q_edit, _ = with_downstream(s, "SYNC-RFQ-001")
         q_del, _ = with_downstream(s, "SYNC-RFQ-001", {q_edit})
-        rfq_no = spec.get_document("SYNC-RFQ-001").current_version_no
-        body_rfq = edited(s, "SYNC-RFQ-001", q_edit)
-    # 2. 민준의 에이전트가 RFQ 항목 수정 — v2에서는 아무것도 붙지 않는다(전파 없음). 버전만 는다
-    await save(
-        m,
-        "SYNC-RFQ-001",
-        body_rfq,
-        rfq_no,
-        f"spec(SYNC-RFQ-001): {q_edit} 보강",
-        changed_items=[q_edit],
-    )
+        body = edited(s, "SYNC-RFQ-001", q_edit)
+    rel = f"docs/specs/{spec_dir('RFQ')}/SYNC-RFQ-001.md"
+
+    # 2. 민준이 GitHub에서 RFQ 항목을 고쳐 push — 버전이 하나 는다(전파 없음)
+    push(seed_dir, rel, body, f"spec(SYNC-RFQ-001): {q_edit} 보강", MINJUN)
+    await pipeline.read_pending("SYNC", hoyoung)
     print(f"  RFQ {q_edit} 수정 → 버전 하나")
-    # 3. 민준의 에이전트가 RFQ 항목 삭제(확인) → 하위 참조가 미존재로 (끊어진 참조)
+    # 3. 민준이 하위 참조가 있는 항목을 지워 push — 하위 참조가 끊어진다
     with db.SessionLocal() as s:
-        rfq = SpecService(s).get_document("SYNC-RFQ-001")
-        body_del = without(s, "SYNC-RFQ-001", q_del)
-    await save(
-        m,
-        "SYNC-RFQ-001",
-        body_del,
-        rfq.current_version_no,
-        f"spec(SYNC-RFQ-001): {q_del} 삭제",
-        changed_items=[],
-        confirm_item_deletion=True,
-    )
+        body = without(s, "SYNC-RFQ-001", q_del)
+    push(seed_dir, rel, body, f"spec(SYNC-RFQ-001): {q_del} 삭제", MINJUN)
+    await pipeline.read_pending("SYNC", hoyoung)
+    print(f"  RFQ {q_del} 삭제 → 끊어진 참조")
     # 4. 규약 오류
     with db.SessionLocal() as s:
         s.execute(
@@ -223,7 +219,7 @@ async def seed() -> None:
             )
         )
         s.commit()
-    print("시드 완료 — hoyoung id", hid)
+    print("시드 완료 — hoyoung id", hoyoung.id)
 
 
 @app.get("/__dev/login/{login}")
@@ -236,6 +232,7 @@ def _dev_login(login: str, request: Request, session: Session = Depends(db.get_s
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(line_buffering=True)  # 파일로 돌려도 시드 진행이 바로 보이게 — 서버가 안 끝난다
     if "--serve" not in sys.argv:
         asyncio.run(seed())
     import uvicorn
