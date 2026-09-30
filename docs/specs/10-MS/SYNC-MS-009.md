@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`infra/git.py · infra/github.py · infra/llm.py · infra/graphify.py`의 함수 20개. 클래스 명세 [[SYNC-DOM-002]] 4.9의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`infra/git.py · infra/github.py · infra/llm.py · infra/graphify.py`의 함수 23개. 클래스 명세 [[SYNC-DOM-002]] 4.9의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -35,6 +35,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#git.rev_list_count]] | 밀린 커밋 수 |
 | [[#git.exists]] | 경로 존재 |
 | [[#git.init_specs]] | 11단계 디렉터리·템플릿 |
+| [[#git.init_bare]] | 서버 저장소 만들기 |
 | [[#git.archive]] | 커밋의 파일을 폴더에 푼다 |
 | [[#git.changed_paths]] | 범위에서 바뀐 경로 전부 |
 | [[#github.verify_signature]] | webhook 서명 |
@@ -120,9 +121,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### git.clone clone
 
-**시그니처** `async def clone(remote_url: str, workdir: Path, token: str) -> None`
+**시그니처** `async def clone(remote_url: str, workdir: Path, token: str | None) -> None`
 
-**처리** `git clone {url with token} {workdir}` — **전체 이력** clone. `--depth`를 쓰지 않는다 — 재구축(`pipeline.rebuild`)이 `git log`로 파일 이력 전체를 읽기 때문. URL은 `https://x-access-token:{token}@github.com/org/repo.git`. 완료 후 `git remote set-url origin {token 없는 url}` — 토큰이 `.git/config`에 남지 않게. push 때마다 토큰을 다시 붙인다
+**처리** `git clone {url with token} {workdir}` — **전체 이력** clone. 토큰은 `https://` 원격에만 붙는다 — 서버 저장소(서버 안 경로, [[SYNC-PRD-001#R14]])는 `token=None`으로 그대로 clone한다. `--depth`를 쓰지 않는다 — 재구축(`pipeline.rebuild`)이 `git log`로 파일 이력 전체를 읽기 때문. URL은 `https://x-access-token:{token}@github.com/org/repo.git`. 완료 후 `git remote set-url origin {token 없는 url}` — 토큰이 `.git/config`에 남지 않게. push 때마다 토큰을 다시 붙인다
 
 ---
 
@@ -155,7 +156,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **입력** `path`+`content` 하나 또는 `files` 여럿(초기화용) 또는 `delete` 경로 목록(문서를 휴지통에, [[SYNC-MS-007#pipeline.trash_document]]) — 셋 중 하나는 있어야 한다. `author.user` — 커밋 작성자
 
 **처리**
-1. `token = AccountService.github_token_for(author.user)` · if 실패 → `! push-failed {reason: 미등록}`
+1. `url = git remote get-url origin` · if `url`이 `https://`로 시작 → `token = AccountService.github_token_for(author.user)` · if 실패 → `! push-failed {reason: 미등록}`. **아니면(서버 저장소 — 서버 안 경로) 토큰을 구하지 않는다**([[SYNC-PRD-001#R14]]) — GitHub 토큰이 없는 사람도 서버 저장 프로젝트에는 쓴다
 2. `git fetch origin` · `git reset --hard origin/main` — 작업 사본을 원격 최신으로 (락 안이라 안전)
    - **원격에 커밋이 하나도 없으면 `origin/main`이 없다.** 되돌아갈 곳이 없으므로 reset을 건너뛴다. 이 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3, #6)
 3. 파일 쓰기 (`path` 또는 `files`). 상위 디렉터리 없으면 생성 · `delete`면 `git rm -q --ignore-unmatch {paths}`
@@ -182,7 +183,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** [[SYNC-MS-006#AccountService.github_token_for]]
 
-**테스트 관점** 커밋이 하나도 없는 원격 → 이 커밋이 첫 커밋 · 정상 → 원격에 커밋, 반환 해시 = 원격 HEAD · 같은 내용 → 커밋 안 생김, HEAD 반환 · 원격이 앞서 있음(다른 파일) → rebase 후 성공 · 연달아 두 번 앞서도 성공(재시도 2회) · 원격이 같은 파일 수정 → conflict, 작업 사본 원상 · 토큰이 config에 안 남음 · **git 로케일이 영어가 아니어도 거부를 거부로 판정**
+**테스트 관점** **서버 안 경로 원격 + 토큰 없는 사람 → push 성공**(토큰을 안 구한다) · **https 원격 + 토큰 없는 사람 → `push-failed 미등록`** · 커밋이 하나도 없는 원격 → 이 커밋이 첫 커밋 · 정상 → 원격에 커밋, 반환 해시 = 원격 HEAD · 같은 내용 → 커밋 안 생김, HEAD 반환 · 원격이 앞서 있음(다른 파일) → rebase 후 성공 · 연달아 두 번 앞서도 성공(재시도 2회) · 원격이 같은 파일 수정 → conflict, 작업 사본 원상 · 토큰이 config에 안 남음 · **git 로케일이 영어가 아니어도 거부를 거부로 판정**
 
 ---
 
@@ -271,6 +272,25 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **처리** 반환할 `files` dict 구성 — `docs/specs/{NN-TYPE}/.gitkeep` 12개(11단계는 `01-RFQ`…`11-CODE`, 단계 밖 `STD`는 번호 없이 — STD-001 1.1), `docs/specs/assets/.gitkeep`, `docs/specs/README.md` — **모두 14개**. **템플릿·규약 사본은 넣지 않는다**(카드 AB, #113·#129) — 한 번 복사된 사본은 규약이 바뀌어도 갱신되지 않아 여덟 저장소가 낡은 안내를 들고 있었다. 대신 README가 `SPECS_URL`로 싱크독 저장소의 규약·템플릿을 가리키고, 에이전트는 [[SYNC-API-002#get_template]]으로 내장 원본을 받는다. `docs/specs/README.md`(규약 링크 + 11단계 순서표. **DOM 행에 셋의 순서** — 도메인 모델은 여기서, 클래스 명세·ERD는 API 뒤에([[SYNC-STD-001]] 2.6) — 와 **작업 단위 한 줄** — 문서 하나마다 멈춘다(STD-001 1.8) — 가 들어간다. 에이전트가 저장소에서 처음 읽는 글이라 여기 없으면 규약이 없는 것과 같다. **규약 본문은 링크다** — 첫 문단이 `SPECS_URL`로 SYNC-STD-001·STD-004·`_templates/`를 가리킨다). `→ files` — 실제 쓰기·커밋은 `commit_push(files=…)`
 
 **테스트 관점** 파일 14개 · `.gitkeep` 디렉터리가 11단계 + `STD` + `assets` · `_templates/`가 **없다** · README에 `SPECS_URL` 링크와 11단계 표·작업 단위 한 줄·DOM 셋 순서가 있다
+
+---
+
+#### git.init_bare 서버 저장소 만들기
+
+**시그니처** `async def init_bare(path: Path) -> None`
+
+근거: [[SYNC-SEQ-001#SEQ-28]] · [[SYNC-PRD-001#R14]] · [[SYNC-INFRA-001]] 3장
+
+**처리**
+1. 상위 디렉터리가 없으면 만든다
+2. `git init --bare --initial-branch=main {path}` — 기본 브랜치 이름을 서버 설정(`init.defaultBranch`)에 맡기지 않는다. 다른 이름이 되면 `HEAD:main` push가 새 가지를 만들어 처리 지점이 어긋난다
+3. `git -C {path} config receive.denyNonFastForwards true` · `receive.denyDeletes true` · `receive.fsckObjects true` — 이력을 뒤로 돌리거나 가지를 지우는 push와 깨진 객체를 거부한다. 버전 표가 커밋에 기대기 때문이다
+
+**출력** 없음. 이미 있는지는 부르는 쪽이 먼저 본다([[SYNC-MS-001#ProjectService.init_project]] 3s)
+
+**호출하는 것** —
+
+**테스트 관점** 만든 저장소의 HEAD가 `refs/heads/main` · config 세 줄 · 그것을 clone해 `commit_push`하면 토큰 없이 들어간다
 
 ---
 
