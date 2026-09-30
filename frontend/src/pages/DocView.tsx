@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { ago, api, ApiError, docPath, incompleteOf, warnText, type AskAnswer, type AskNote, type AskRead, type AttachmentMeta, type Conversation, type ConversationBrief, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
+import { ago, api, ApiError, docPath, incompleteOf, warnText, type AskAnswer, type AskDelta, type AskNote, type AskRead, type AttachmentMeta, type Conversation, type ConversationBrief, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { attachDiagramButtons, DiagramFull, type FullDiagram, type WfFullDetail } from '../components/DiagramFull'
 import { esc, renderBlocks, splitRef } from '../view/md'
@@ -611,7 +611,7 @@ function normalizeMindmap(src: string): string {
 
 /** 답 본문 — React가 자식을 소유하지 않는다. innerHTML은 html이 바뀔 때만 넣는다.
  *  dangerouslySetInnerHTML로 두면 다시 그릴 때 innerHTML을 되돌려 mermaid가 그린 svg가 지워졌다(카드 AS) */
-function AnswerBody({ html, onClick }: { html: string; onClick: (ev: React.MouseEvent) => void }) {
+function AnswerBody({ html, onClick, live }: { html: string; onClick: (ev: React.MouseEvent) => void; live?: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = ref.current
@@ -620,7 +620,8 @@ function AnswerBody({ html, onClick }: { html: string; onClick: (ev: React.Mouse
       el.dataset.html = html
     }
   }, [html])
-  return <div className="a" ref={ref} onClick={onClick} />
+  // data-live — 흘러 들어오는 중. mermaid는 그리지 않는다(미완성 코드에 오류 그림이 뜬다) (8.7, 카드 AW)
+  return <div className="a" ref={ref} onClick={onClick} data-live={live ? '' : undefined} />
 }
 
 /** 8.5 맥락 줄 · 8.11 대화 고르기 · 8.12 새 대화 · 8.13 지우기 · 8.7 대화(.qa) · 8.9 진행 묶음 · 8.6 입력 — UC-H19, 카드 Y·AQ, #206.
@@ -753,7 +754,7 @@ function AskPanel({
     const el = qaRef.current
     if (!el) return
     el.scrollTop = el.scrollHeight
-    const nodes = el.querySelectorAll<HTMLElement>('.a pre.mermaid:not([data-processed])')
+    const nodes = el.querySelectorAll<HTMLElement>('.a:not([data-live]) pre.mermaid:not([data-processed])')
     if (!nodes.length) return
     for (const n of nodes) {
       const fixed = normalizeMindmap(n.textContent ?? '')
@@ -772,6 +773,19 @@ function AskPanel({
 
   const patchLast = (f: (t: AskTurnView) => AskTurnView) =>
     setTurns((ts) => ts.map((t, i) => (i === ts.length - 1 ? f(t) : t)))
+  // delta 누적 버퍼 — 조각마다 setState하지 않고 프레임에 한 번 그린다 (카드 AW)
+  const liveBuf = useRef('')
+  const liveRaf = useRef<number | null>(null)
+  const flushLive = () => {
+    liveRaf.current = null
+    const text = liveBuf.current
+    patchLast((t) => (t.a === undefined && t.err === undefined ? { ...t, live: text } : t))
+  }
+  const clearLive = () => {
+    liveBuf.current = ''
+    if (liveRaf.current !== null) cancelAnimationFrame(liveRaf.current)
+    liveRaf.current = null
+  }
 
   const newConversation = () => {
     setListOpen(false)
@@ -881,6 +895,7 @@ function AskPanel({
       const id = await ensureConv()
       const sent = files
       setFiles([])
+      clearLive()
       setTurns((ts) => [...ts, { q, prog: [], att: sent }])
       const ac = new AbortController()
       abortRef.current = ac
@@ -889,15 +904,22 @@ function AskPanel({
           `/api/docs/${docId}/ask`,
           { question: q, conversation_id: id, item_id: itemId ?? undefined, attachment_ids: sent.map((m) => m.id) },
           (name, data) => {
-            if (name === 'note') {
+            if (name === 'delta') {
+              // 모델이 지금 쓰는 글자 — 답인지 메모인지는 뒤 이벤트가 정한다. note가 오면 버린다 (8.7)
+              liveBuf.current += (data as AskDelta).text
+              if (liveRaf.current === null) liveRaf.current = requestAnimationFrame(flushLive)
+            } else if (name === 'note') {
               const d = data as AskNote
-              patchLast((t) => ({ ...t, prog: [...t.prog, { kind: 'note', text: d.text }] }))
+              clearLive()
+              patchLast((t) => ({ ...t, live: undefined, prog: [...t.prog, { kind: 'note', text: d.text }] }))
             } else if (name === 'read') {
               const d = data as AskRead
-              patchLast((t) => ({ ...t, prog: [...t.prog, { kind: 'read', text: d.target ? `${d.tool} ${d.target}` : d.tool }] }))
+              clearLive()
+              patchLast((t) => ({ ...t, live: undefined, prog: [...t.prog, { kind: 'read', text: d.target ? `${d.tool} ${d.target}` : d.tool }] }))
             } else if (name === 'answer') {
               const d = data as AskAnswer
-              patchLast((t) => ({ ...t, a: d.answer, src: d.context_item_ids }))
+              clearLive()
+              patchLast((t) => ({ ...t, live: undefined, a: d.answer, src: d.context_item_ids }))
             } else if (name === 'error') {
               const d = data as Problem
               patchLast((t) => ({ ...t, err: String(d.reason ?? d.detail ?? d.title) }))
@@ -1053,6 +1075,9 @@ function AskPanel({
               )}
               {t.a !== undefined ? (
                 <AnswerBody html={answerHtml(t.a)} onClick={onAnswerClick} />
+              ) : t.live ? (
+                // 흘러 들어오는 중 — 마크다운을 그때그때, 캐시 없이(svg가 없어 잃을 것이 없다). 스피너(8.9)는 answer까지 남는다
+                <AnswerBody html={renderBlocks(linkifyIds(t.live), plainCtx)} onClick={onAnswerClick} live />
               ) : t.err ? (
                 <div className="a fail">답을 못 받았습니다 — {t.err}</div>
               ) : (
