@@ -38,6 +38,14 @@ class AuthorKind(StrEnum):
     agent = "agent"
 
 
+class UserKind(StrEnum):
+    """사용자 종류 — SYNC-DOM-002 2.7. 자리표시 판정은 이 칸이다 (카드 BC)."""
+
+    github = "github"  # OAuth로 들어온 계정
+    local = "local"  # 폐쇄망판의 로컬 사용자 하나 (PRD R15)
+    placeholder = "placeholder"  # 커밋으로만 알려진 사람
+
+
 class Storage(StrEnum):
     """저장 방식 — SYNC-DOM-002 2.7, PRD R14. 프로젝트를 만들 때 정하고 바뀌지 않는다."""
 

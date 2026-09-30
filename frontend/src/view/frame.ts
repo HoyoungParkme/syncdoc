@@ -101,6 +101,28 @@ export function isStyleOnly(html: string): boolean {
 
 const attr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
 
+/** 앱이 담은 글꼴 주소 — vite.config.ts appFonts가 빌드 때 넣는다. 검사기(check_view_html)의 묶음에는 없다 */
+declare const __FONT_CSS__: { sans: string; mono: string } | undefined
+const FONT_CSS = typeof __FONT_CSS__ === 'undefined' ? null : __FONT_CSS__
+const EXTERNAL = /^\s*(?:https?:)?\/\//i
+
+/** 폐쇄망판 앱만 — 배치의 바깥 주소를 바꾸거나 뺀다 (SYNC-STD-002 V-UI 「바깥 주소」, 카드 BC).
+ *  알려진 글꼴 링크(Pretendard · Google Fonts의 IBM Plex Mono)는 앱이 담은 글꼴로 — **절대 경로**다(`<base>`가 문서
+ *  폴더라 상대 경로면 첨부 경로로 간다). 그 밖에 바깥 주소를 부르는 `<link>`와 `<style>` 안 `@import`는 뺀다 —
+ *  닿지 않는 주소를 기다리느라 화면이 늦게 뜬다. `<script>`는 safeLayout이 이미 지웠다 */
+export function localizeFonts(html: string): string {
+  return html
+    .replace(/<link\b[^>]*>/gi, (tag) => {
+      const href = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(tag)
+      const url = href ? (href[1] ?? href[2] ?? href[3] ?? '') : ''
+      if (!EXTERNAL.test(url)) return tag
+      if (FONT_CSS && /pretendard/i.test(url)) return `<link rel="stylesheet" href="${FONT_CSS.sans}">`
+      if (FONT_CSS && /fonts\.googleapis\.com/i.test(url) && /IBM\+Plex\+Mono/i.test(url)) return `<link rel="stylesheet" href="${FONT_CSS.mono}">`
+      return ''
+    })
+    .replace(/@import\s+(?:url\(\s*)?["']?\s*(?:https?:)?\/\/[^;]*;?/gi, '')
+}
+
 /** 화면 밖 html 블록(wfbox)의 이름 — 문서 순서로 이 블록 앞에 있는 마지막 헤딩 (DiagramFull과 같은 규칙) */
 function headingBefore(box: Element | null | undefined): string {
   if (!box) return ''
@@ -117,16 +139,17 @@ function headingBefore(box: Element | null | undefined): string {
   return ''
 }
 
-/** srcdoc 문서 한 벌. wf_build.frame_html과 같은 구조 */
-export function frameDoc(layout: string, common: CommonParts, base: string): string {
+/** srcdoc 문서 한 벌. wf_build.frame_html과 같은 구조. `local`은 폐쇄망판 앱만 준다(localizeFonts) */
+export function frameDoc(layout: string, common: CommonParts, base: string, local = false): string {
+  const fix = local ? localizeFonts : (x: string) => x
   // FRAME_CSS가 공통 틀·배치의 <style>보다 **앞**이다 — 문서가 정한 것이 이긴다 (#132)
-  return `<!doctype html><html><head><meta charset="utf-8"><base href="${attr(base)}"><style>${FRAME_CSS}</style>${common.head}</head><body>${common.body}${layout}</body></html>`
+  return `<!doctype html><html><head><meta charset="utf-8"><base href="${attr(base)}"><style>${FRAME_CSS}</style>${fix(common.head)}</head><body>${fix(common.body + layout)}</body></html>`
 }
 
 /** iframe 하나 = 배치 하나 + 위에 도구 줄. 부모(mountFrames)가 높이·축소·도구 줄을 잡는다.
  *  버튼은 마크업에 정적으로 둔다 — 정적 뷰와 DOM이 같아야 하고(DEV-17) 요소 번호를 붙일 수 있다 */
-export function frameHtml(layout: string, common: CommonParts, base: string): string {
-  return `<div class="wfbox"><div class="wfbar"><span class="wfdim mono"></span><span class="grow"></span><button type="button" class="wfframe-fit btn sm" hidden>원래 크기</button><button type="button" class="wffull btn sm">전체보기</button></div><div class="wfframe"><iframe class="wfframe-if" sandbox="${SANDBOX}" srcdoc="${attr(frameDoc(layout, common, base))}"></iframe></div></div>`
+export function frameHtml(layout: string, common: CommonParts, base: string, local = false): string {
+  return `<div class="wfbox"><div class="wfbar"><span class="wfdim mono"></span><span class="grow"></span><button type="button" class="wfframe-fit btn sm" hidden>원래 크기</button><button type="button" class="wffull btn sm">전체보기</button></div><div class="wfframe"><iframe class="wfframe-if" sandbox="${SANDBOX}" srcdoc="${attr(frameDoc(layout, common, base, local))}"></iframe></div></div>`
 }
 
 // ───────────────────────── 동작 (부모 쪽) ─────────────────────────

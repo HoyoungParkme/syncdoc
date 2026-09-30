@@ -212,6 +212,21 @@ class ExistingSpecs(Problem):
             )
 
 
+class ForbiddenOrigin(Problem):
+    """SEQ-C3 — 폐쇄망판에서 Host가 허용 목록 밖이거나 쓰기 요청의 Origin이 다른 곳 (카드 BC).
+
+    로그인이 없는 웹을 다른 이름(DNS rebinding)·다른 사이트(CSRF)가 부르는 것을 막는다.
+    확장 필드는 걸린 쪽 하나 — `host` 또는 `origin`.
+    """
+
+    type = "urn:syncdoc:forbidden-origin"
+    status = 403
+    title = "forbidden-origin"
+
+    def __init__(self, **which: str) -> None:
+        super().__init__("폐쇄망판은 이 PC(또는 PUBLIC_BASE_URL)에서만 쓴다", **which)
+
+
 class StorageMismatch(Problem):
     """UC-A10 1a — 서버 저장에만 되는 일(코드 올리기)을 GitHub 저장 프로젝트에 (카드 BB)."""
 

@@ -32,6 +32,8 @@ class Me(User):
     llm_enabled: bool = False
     # 이 서버가 켠 저장 방식 — UI-3이 고를 것을 정한다 (PRD R14, 카드 BA)
     storage_modes: list[str] = []
+    # 판 — closed면 로그아웃·커밋 이메일이 없다 (PRD R15, 카드 BC)
+    edition: str = "internet"
 
 
 class Author(Base):

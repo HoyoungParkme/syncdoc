@@ -17,7 +17,7 @@ from pathlib import Path, PurePosixPath
 from app.config import settings
 from app.core.account.service import AccountService
 from app.core.errors import PushFailed, Unauthorized
-from app.core.types import Author, CgiResponse, ChangedFile, Commit, spec_dir
+from app.core.types import Author, CgiResponse, ChangedFile, Commit, UserKind, spec_dir
 
 range_ = range  # changed_files의 인자 이름 range(MS-009 시그니처)가 내장을 가린다
 _TOKEN_IN_URL = re.compile(r"(x-access-token:)[^@]+@")
@@ -165,11 +165,13 @@ async def commit_push(
     if unchanged == 0:
         return (await _run(workdir, "rev-parse", "HEAD")).strip()
     user = author.user
+    # 로컬 사용자(폐쇄망판)는 GitHub 계정이 아니다 — GitHub 주소를 지어내지 않는다 (MS-009 5단계)
+    domain = "syncdoc.local" if user.kind == UserKind.local else "users.noreply.github.com"
     ident = (
         "-c",
         f"user.name={user.display_name}",
         "-c",
-        f"user.email={user.github_login}@users.noreply.github.com",
+        f"user.email={user.github_login}@{domain}",
     )
     await _run(workdir, *ident, "commit", "-q", "-m", message)
     url = _with_token(origin, token) if token else origin
@@ -360,7 +362,7 @@ def _readme() -> str:
     **규약 본문 사본을 두지 않는다** — 링크로 가리킨다(카드 AB, #113·#129). 복사한 사본은
     규약이 바뀌어도 갱신되지 않아 저장소 여덟이 낡은 안내를 들고 있었다.
     """
-    u = settings.SPECS_URL.rstrip("/")
+    u = settings.specs_url.rstrip("/")  # 폐쇄망판은 이 서버의 /specs (INFRA 8.1)
     return f"""# docs/specs — 명세 원본
 
 싱크독 명세 체인 11단계 + STD. 쓰는 법은 아래 셋이다.

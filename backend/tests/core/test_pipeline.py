@@ -7,7 +7,9 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core import pipeline
+from app.core.account.service import AccountService
 from app.core.errors import (
     AlreadyCurrent,
     ConventionViolation,
@@ -472,6 +474,29 @@ async def test_process_commit_two_files_one_commit_and_catch_up(scoped: Session,
         text("SELECT github_user_id, display_name FROM users WHERE github_login='seed'")
     ).one()
     assert seed == (None, "seed")
+
+
+async def test_process_commit_in_closed_edition_is_the_local_user(
+    scoped: Session, proj, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """폐쇄망판 — 누가 커밋했든 로컬 사용자로 붙는다. 자리표시·author.unknown 없음 (카드 BC)."""
+    monkeypatch.setattr(settings, "EDITION", "closed")
+    me = AccountService(scoped).ensure_local_user("local", "박호영")
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    repo = _repo_row(proj)
+    repo.last_processed_commit = g(remote, "rev-parse", "main")
+    scoped.flush()
+    (other / RFQ_FILE).parent.mkdir(parents=True, exist_ok=True)
+    (other / RFQ_FILE).write_text(RFQ, encoding="utf-8")
+    g(other, "add", "-A")
+    g(other, "commit", "-q", "--author=Somebody <somebody@example.com>", "-m", "spec: RFQ")
+    g(other, "push", "-q", "origin", "HEAD:main")
+    await pipeline.process_commit(repo, g(remote, "rev-parse", "main"))
+    d = SpecService(scoped).get_document("EXMP-RFQ-001")
+    assert d.last_author.user_id == me.id
+    assert "author.unknown" not in (d.convention_error_detail or "")
+    placeholders = "SELECT count(*) FROM users WHERE kind = 'placeholder'"
+    assert scoped.execute(text(placeholders)).scalar() == 0
 
 
 async def test_process_commit_mismatched_filename_deleted_file_and_partial_failure(

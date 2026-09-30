@@ -15,7 +15,7 @@ from app.core.account.models import AccessToken, CommitEmail, User
 from app.core.account.repository import AccountRepository
 from app.core.clock import now_utc
 from app.core.errors import EmailTaken, NotFound, Unauthorized
-from app.core.types import IssuedToken, UserRef
+from app.core.types import IssuedToken, UserKind, UserRef
 from app.infra import github
 
 
@@ -53,9 +53,15 @@ class AccountService:
             u.github_login, u.display_name = info.login, info.name
         elif (u := self.repo.placeholder_by_login(info.login)) is not None:
             u.github_user_id, u.display_name = info.id, info.name
+            u.kind = UserKind.github  # 미등록 push 사람이 로그인했다
         else:
             u = self.repo.add_user(
-                User(github_login=info.login, github_user_id=info.id, display_name=info.name)
+                User(
+                    github_login=info.login,
+                    github_user_id=info.id,
+                    kind=UserKind.github,
+                    display_name=info.name,
+                )
             )
         u.github_token_encrypted = _fernet().encrypt(token.encode())
         self.session.flush()
@@ -114,6 +120,7 @@ class AccountService:
                     User(
                         github_login=login,
                         github_user_id=None,
+                        kind=UserKind.placeholder,
                         display_name=login,
                         github_token_encrypted=None,
                     )
@@ -132,10 +139,47 @@ class AccountService:
 
         자리표시를 만드는 곳은 여기 하나다. process_commit과 rebuild가 각자
         만들면 판정이 두 경로에서 어긋난다 — 실제로 어긋나 있었다(#34).
+
+        폐쇄망판은 늘 로컬 사용자다 — 혼자 쓰는 판이라 저장소의 모든 커밋이 그 사람 것이다(PRD R15).
         """
+        if settings.closed:
+            return self.local_user()
         if email and (u := self.repo.user_by_email(email.strip().lower())) is not None:
             return u
         return self.repo.user_by_login(login) or self.create_placeholder(login)
+
+    def ensure_local_user(self, login: str, display_name: str) -> User:
+        """SYNC-MS-006#AccountService.ensure_local_user
+
+        폐쇄망판이 켜질 때 부른다. kind=local 행 하나 — 없으면 만들고 있으면 아이디·이름을 설정대로.
+        같은 아이디의 다른 사용자가 있으면 켜지지 않는다 — 그 행을 로컬 사용자로 바꾸면 남의 이력과
+        토큰을 물려받는다.
+        """
+        u = self.repo.local_user()
+        other = self.repo.user_by_login(login)
+        if other is not None and (u is None or other.id != u.id):
+            raise RuntimeError(f"LOCAL_LOGIN {login}은 이미 다른 사용자다 — 다른 아이디로")
+        if u is not None:
+            u.github_login, u.display_name = login, display_name
+            self.session.flush()
+            return u
+        return self.repo.add_user(
+            User(
+                github_login=login,
+                github_user_id=None,
+                kind=UserKind.local,
+                display_name=display_name,
+                github_token_encrypted=None,
+            )
+        )
+
+    def local_user(self) -> User:
+        """SYNC-MS-006#AccountService.local_user
+
+        켜질 때 만들었으니 보통은 있다. 없으면(DB를 바꿔 끼운 경우) 설정대로 만든다.
+        """
+        u = self.repo.local_user()
+        return u or self.ensure_local_user(settings.LOCAL_LOGIN, settings.local_name)
 
     def commit_emails(self, user: User) -> list[CommitEmail]:
         """SYNC-MS-006#AccountService.commit_emails"""

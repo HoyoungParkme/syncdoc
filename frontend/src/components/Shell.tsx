@@ -1,4 +1,4 @@
-/** 공통 틀 — SYNC-UI-001 4장. 상단 바: 싱크독 · 사용 방법 · 설정 · 로그아웃.
+/** 공통 틀 — SYNC-UI-001 4장. 상단 바: 싱크독 · 사용 방법 · 설정 · 로그아웃(인터넷판만 — 폐쇄망판은 로그인이 없다).
  *  사용 방법(UI-16)과 설정(UI-13)은 경로가 없는 다이얼로그다 — 닫으면 보던 화면 그대로.
  *  UI-1만 예외. 프로젝트 전환 경로는 로고 하나다 — 목록 화면 자체가 고르는 화면이라 선택기가 겹친다. */
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -64,9 +64,11 @@ export function Shell() {
         <button className="nav" type="button" onClick={() => setSettings(true)}>
           설정
         </button>
-        <button className="nav out" type="button" onClick={logout}>
-          로그아웃
-        </button>
+        {user.edition !== 'closed' && (
+          <button className="nav out" type="button" onClick={logout}>
+            로그아웃
+          </button>
+        )}
       </div>
       <main className="screen">
         <Outlet context={{ user, projects, ask }} />

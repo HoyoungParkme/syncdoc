@@ -2,6 +2,9 @@
 
 세션 = 서명 쿠키 `syncdoc_session`(SYNC-API-001 4장 securitySchemes). 세션 테이블은 없다(ERD 13개).
 세션에는 github_login만 둔다 — 사용자 조회는 AccountService.user_by_login(MS-006).
+
+폐쇄망판(PRD R15)은 세션이 없다 — 모든 웹 요청이 로컬 사용자이고, 대신 어디서 부르는지를 본다
+(`ClosedEditionGuard`, SEQ-C3).
 """
 
 from __future__ import annotations
@@ -10,15 +13,18 @@ from datetime import datetime
 from urllib.parse import urlencode, urlsplit
 
 from fastapi import Depends, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 from itsdangerous import TimestampSigner
 from itsdangerous.exc import SignatureExpired
 from sqlalchemy.orm import Session
+from starlette.datastructures import Headers
 from starlette.middleware.sessions import SessionMiddleware as _StarletteSessionMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import AccountService
-from app.core.errors import Unauthorized
+from app.core.errors import ForbiddenOrigin, NotFound, Problem, Unauthorized
 from app.db import get_session
 
 SESSION_COOKIE = "syncdoc_session"
@@ -110,9 +116,92 @@ def logout(request: Request) -> None:
 
 
 def current_user(request: Request, session: Session = Depends(get_session)) -> User:
-    """라우터 의존성. 세션 없거나 사용자 없으면 401 unauthorized(API-001 1장)."""
+    """라우터 의존성. 세션 없거나 사용자 없으면 401 unauthorized(API-001 1장).
+
+    폐쇄망판은 세션 없이 로컬 사용자다(SEQ-C3). 켜질 때 만들었으니 보통은 읽기만 하고,
+    없어서 방금 만들었으면 남도록 커밋한다.
+    """
+    if settings.closed:
+        user = AccountService(session).local_user()
+        session.commit()
+        return user
     login_ = request.session.get("login")
     user = AccountService(session).user_by_login(login_) if login_ else None
     if user is None:
         raise Unauthorized("세션 없음")
     return user
+
+
+# ───────────────────────── 폐쇄망판 가드 (SEQ-C3) ─────────────────────────
+
+_LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+_UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
+_TOKEN_PATHS = ("/mcp", "/git/")  # 토큰이 사람을 정한다 — Origin을 보지 않는다 (SEQ-C2·29)
+_GITHUB_PATHS = ("/auth/github", "/hooks/github")  # 폐쇄망판에는 없다 (API-001 1장)
+
+
+def _hostname(netloc: str) -> str:
+    """Host 헤더·주소의 netloc → 이름만(포트 없이, 소문자). `[::1]:8000` → `::1`."""
+    try:
+        return (urlsplit(f"//{netloc.strip()}").hostname or "").lower()
+    except ValueError:  # 대괄호가 짝이 안 맞는 따위 — 허용 목록에 없는 것과 같다
+        return ""
+
+
+def _public_netloc() -> str:
+    return urlsplit(settings.PUBLIC_BASE_URL.strip()).netloc.lower()
+
+
+def allowed_host(host: str) -> bool:
+    """허용 목록 — 127.0.0.1·localhost·[::1]과 PUBLIC_BASE_URL의 host (INFRA 5장)."""
+    name = _hostname(host)
+    return bool(name) and (name in _LOCAL_HOSTS or name == _hostname(_public_netloc()))
+
+
+def same_origin(origin: str, host: str) -> bool:
+    """Origin이 이 서버인가 — 요청 Host와 같은 곳이거나 PUBLIC_BASE_URL."""
+    netloc = urlsplit(origin.strip()).netloc.lower()
+    return bool(netloc) and netloc in {host.strip().lower(), _public_netloc()}
+
+
+class ClosedEditionGuard:
+    """폐쇄망판 웹 요청 가드 — SYNC-SEQ-001#SEQ-C3 (카드 BC).
+
+    로그인이 없으니 누가가 아니라 어디서 부르는지를 본다. Host가 허용 목록 밖이면(DNS rebinding)
+    403, 쓰기 요청의 Origin이 다른 곳이면(CSRF — 본문 없는 POST는 미리 묻는 요청도 없다) 403,
+    GitHub 로그인·통지 경로는 404, 로그인 화면(UI-1)은 목록(UI-2)으로 보낸다(UI-001 2장).
+    인터넷판에서는 그대로 지나간다. 순수 ASGI라 스트리밍 응답과 응답 뒤 작업(git push 처리)을
+    건드리지 않는다.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or not settings.closed:
+            await self.app(scope, receive, send)
+            return
+        headers = Headers(scope=scope)
+        host, path = headers.get("host", ""), scope.get("path", "")
+        refusal: Problem | None = None
+        if not allowed_host(host):
+            refusal = ForbiddenOrigin(host=host)
+        elif (
+            scope.get("method", "GET") in _UNSAFE
+            and (origin := headers.get("origin")) is not None
+            and not path.startswith(_TOKEN_PATHS)
+            and not same_origin(origin, host)
+        ):
+            refusal = ForbiddenOrigin(origin=origin)
+        elif path.startswith(_GITHUB_PATHS):
+            refusal = NotFound("path", path)
+        elif path == "/login":
+            await RedirectResponse("/", status_code=302)(scope, receive, send)
+            return
+        if refusal is None:
+            await self.app(scope, receive, send)
+            return
+        response = JSONResponse(
+            refusal.to_dict(), status_code=refusal.status, media_type="application/problem+json"
+        )
+        await response(scope, receive, send)

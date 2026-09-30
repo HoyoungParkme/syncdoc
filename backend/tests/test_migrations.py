@@ -70,6 +70,9 @@ def test_upgrade_creates_13_tables_and_indexes(alembic_cfg: Config) -> None:
     # 0016 — repositories.storage not null, 기본 github (카드 BA)
     storage = next(c for c in insp.get_columns("repositories") if c["name"] == "storage")
     assert storage["nullable"] is False and "github" in str(storage["default"])
+    # 0017 — users.kind not null, 기본 github (카드 BC)
+    kind = next(c for c in insp.get_columns("users") if c["name"] == "kind")
+    assert kind["nullable"] is False and "github" in str(kind["default"])
     assert via["nullable"] is False and via["default"] is None
     # FK 컬럼 전부 인덱스(DEV-8): 각 FK의 첫 컬럼이 어떤 인덱스의 선두 컬럼이다
     for table in TABLES:
@@ -97,6 +100,12 @@ def test_downgrade_removes_everything(alembic_cfg: Config) -> None:
                 " (1, 'a', 'a'), (2, 'b', 'b')"
             )
         )
+        conn.execute(
+            text(
+                "INSERT INTO users (id, github_login, github_user_id, display_name)"
+                " VALUES (3, 'c', 7, 'c')"
+            )
+        )
         conn.execute(text("INSERT INTO projects (id, code, name) VALUES (1, 'X', 'x')"))
         conn.execute(
             text(
@@ -111,6 +120,9 @@ def test_downgrade_removes_everything(alembic_cfg: Config) -> None:
         assert conn.execute(text("SELECT owner_user_id FROM projects WHERE id=1")).scalar() == 2
         # 0016 백필 — 그때까지의 저장소는 전부 GitHub (카드 BA)
         assert conn.execute(text("SELECT storage FROM repositories")).scalar() == "github"
+        # 0017 백필 — GitHub ID가 빈 행이 자리표시였다 (카드 BC)
+        kinds = dict(conn.execute(text("SELECT id, kind FROM users")).all())
+        assert kinds == {1: "placeholder", 2: "placeholder", 3: "github"}
         conn.execute(text("DELETE FROM repositories; DELETE FROM projects; DELETE FROM users"))
     engine.dispose()
     # 0011 왕복 — downgrade가 협업 테이블 셋을 0001·0007·0008 모양 그대로 되살린다 (DEV-7)

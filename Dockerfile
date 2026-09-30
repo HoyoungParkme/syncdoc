@@ -9,7 +9,8 @@ RUN npm run build
 
 FROM python:3.12-slim
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# uv는 판을 고정한다 — 같은 판 번호의 폐쇄망 반입물을 다시 만들어도 같은 도구로 짓게 (INFRA 8.1, 카드 BC)
+COPY --from=ghcr.io/astral-sh/uv:0.11.8 /uv /usr/local/bin/uv
 WORKDIR /srv/backend
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project

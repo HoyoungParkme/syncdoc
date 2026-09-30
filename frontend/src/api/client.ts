@@ -135,10 +135,14 @@ export interface User extends UserRef {
 }
 /** 저장 방식 — PRD R14 (카드 BA). server는 싱크독 서버 안의 git 저장소 */
 export type Storage = 'github' | 'server'
-/** GET /api/me — llm_enabled가 거짓이면 UI-5 질문 탭(8.4)이 없다. storage_modes는 이 서버가 켠 저장 방식(UI-3 2.7) */
+/** 판 — PRD R15 (카드 BC). closed는 로그인이 없는 한 사람 판이다 */
+export type Edition = 'internet' | 'closed'
+/** GET /api/me — llm_enabled가 거짓이면 UI-5 질문 탭(8.4)이 없다. storage_modes는 이 서버가 켠 저장 방식(UI-3 2.7).
+ *  edition이 closed면 로그아웃·커밋 이메일이 없고(UI-001 4장·UI-13) 배치 iframe이 앱이 담은 글꼴을 쓴다(STD-002 V-UI) */
 export interface Me extends User {
   llm_enabled: boolean
   storage_modes: Storage[]
+  edition?: Edition
 }
 export interface Author {
   kind: 'human' | 'agent'

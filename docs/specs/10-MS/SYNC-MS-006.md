@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/account/service.py`의 함수 13개. 클래스 명세 [[SYNC-DOM-002]] 4.6의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/account/service.py`의 함수 15개. 클래스 명세 [[SYNC-DOM-002]] 4.6의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -34,6 +34,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#AccountService.users_by_ids]] | 여러 사용자 표시 정보 |
 | [[#AccountService.create_placeholder]] | 미등록 자리표시 |
 | [[#AccountService.user_for_commit]] | 커밋 작성자 → User |
+| [[#AccountService.ensure_local_user]] | 로컬 사용자를 둔다 (폐쇄망판) |
+| [[#AccountService.local_user]] | 로컬 사용자 (폐쇄망판) |
 | [[#AccountService.commit_emails]] | 내 커밋 이메일 |
 | [[#AccountService.add_commit_email]] | 커밋 이메일 등록 |
 | [[#AccountService.remove_commit_email]] | 커밋 이메일 삭제 |
@@ -55,13 +57,15 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. `info = github.get_user(token)` → `{id, login, name}`
 3. `u = DB: users where github_user_id=info.id`
    - if 있음 → `login`·`display_name` 갱신 (로그인 ID 변경 대응)
-   - else → `u = DB: users where github_login=info.login and github_user_id is null` (자리표시) · if 있음 → `github_user_id` 채움 (미등록 push 사람이 로그인) · else → insert
+   - else → `u = DB: users where github_login=info.login and kind=placeholder` (자리표시) · if 있음 → `github_user_id` 채우고 `kind=github` (미등록 push 사람이 로그인) · else → insert `kind=github`
 4. `u.github_token_encrypted = encrypt(token, SECRET_KEY)` (Fernet) · `DB: update`
 5. `→ u`. 라우터가 세션을 만든다 — 테이블 없이 **서명 쿠키** `syncdoc_session`에 `github_login`만. 요청마다 `user_by_login`으로 User를 얻는다(인프라 5장)
 
 **호출하는 것** [[SYNC-MS-009#github.exchange_code]] · [[SYNC-MS-009#github.get_user]]
 
-**테스트 관점** 첫 로그인 → 행 생성 · 로그인 ID 바꾼 뒤 → 같은 행, `login` 갱신 · 자리표시가 있던 사람 → 그 행에 `github_user_id`·토큰 채워짐 (별도 행 안 생김)
+**테스트 관점** 첫 로그인 → 행 생성, `kind=github` · 로그인 ID 바꾼 뒤 → 같은 행, `login` 갱신 · 자리표시가 있던 사람 → 그 행에 `github_user_id`·토큰 채워지고 `kind=github` (별도 행 안 생김)
+
+폐쇄망판에는 부르는 곳이 없다 — `/auth/github*`가 없다([[SYNC-API-001]] 1장)
 
 ---
 
@@ -158,7 +162,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-SEQ-001#SEQ-2]] · 결정: 미등록 push는 자리표시 User + `author.unknown`
 
-**처리** `DB: users insert (github_login=login, github_user_id=None, display_name=login, github_token_encrypted=None)` → User. `github_login` unique이므로 동시 호출은 한쪽이 기존 행을 받는다
+**처리** `DB: users insert (github_login=login, github_user_id=None, kind=placeholder, display_name=login, github_token_encrypted=None)` → User. `github_login` unique이므로 동시 호출은 한쪽이 기존 행을 받는다
 
 **`login`이 GitHub 아이디가 아닐 수 있다.** 커밋 이메일이 noreply가 아니면 `git._login_of`가 `%an`(사람 이름)을 대신 준다. 공백이 든 문자열이 `github_login`에 앉는다 — 그래도 만든다. 판정을 여기서 하면 push를 건너뛰게 되고 원본·DB가 어긋난다([[SYNC-DOM-002]] 5장 결정 3)
 
@@ -173,6 +177,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **입력** `email` git 커밋의 `%ae` 원본 · `login` `git._login_of`가 준 값([[SYNC-MS-009#git.changed_files]])
 
 **처리**
+0. if `settings.EDITION == closed` → `→ local_user()` — 혼자 쓰는 판이라 저장소의 모든 커밋이 그 사람 것이다([[SYNC-PRD-001#R15]]). 커밋 이메일을 등록할 화면도 없다(UI-13)
 1. if `email` → `u = DB: commit_emails where email=email.strip().lower() join users` · if `u` → `→ u`
 2. `u = user_by_login(login)` · if `u` → `→ u`
 3. `→ create_placeholder(login)`
@@ -181,11 +186,49 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **자리표시를 만드는 곳은 여기 하나다.** `process_commit`과 `rebuild`가 각자 만들면 판정이 두 경로에서 어긋난다 — 실제로 어긋나 있었다(#34).
 
-**호출하는 것** [[#AccountService.create_placeholder]]
+**호출하는 것** [[#AccountService.create_placeholder]] · [[#AccountService.local_user]](폐쇄망판)
 
 **호출되는 것** `pipeline.process_commit` 4단계 · `pipeline.rebuild` 5단계
 
-**테스트 관점** 등록된 이메일 → 그 사용자(login이 달라도) · 미등록 이메일 + noreply login → login으로 찾은 사용자 · 둘 다 없음 → 자리표시 · 대소문자가 달라도 같은 이메일로 찾는다 · `email`이 빈 문자열이면 2번부터
+**테스트 관점** 등록된 이메일 → 그 사용자(login이 달라도) · 미등록 이메일 + noreply login → login으로 찾은 사용자 · 둘 다 없음 → 자리표시 · 대소문자가 달라도 같은 이메일로 찾는다 · `email`이 빈 문자열이면 2번부터 · 폐쇄망판 → 어떤 이메일·login이든 로컬 사용자, 자리표시를 만들지 않는다
+
+---
+
+#### AccountService.ensure_local_user 로컬 사용자를 둔다
+
+**시그니처** `ensure_local_user(login: str, display_name: str) -> User`
+
+근거: [[SYNC-PRD-001#R15]] · [[SYNC-INFRA-001]] 5장·5.2(`LOCAL_LOGIN`·`LOCAL_NAME`)
+
+**입력** 설정의 아이디와 표시 이름. 폐쇄망판 `main`이 켜질 때 부른다
+
+**처리**
+1. `u = DB: users where kind=local` (하나뿐이다)
+2. if `u` → `github_login`·`display_name`을 입력대로 고친다 — 설정을 바꾸고 다시 켜면 이름이 따라온다 · `→ u`
+3. `other = DB: users where github_login=login` · if `other` → `! RuntimeError`(「LOCAL_LOGIN {login}은 이미 다른 사용자다 — 다른 아이디로」). 켜질 때라 서버가 뜨지 않고 이 문장이 로그에 남는다. 그 행을 로컬 사용자로 바꾸면 남의 이력과 토큰을 물려받는다
+4. `DB: users insert (github_login=login, github_user_id=None, kind=local, display_name=display_name, github_token_encrypted=None)` → `→ u`
+
+**2에서 아이디가 바뀌면** 그 아이디가 남의 것인지 3처럼 먼저 본다 — 겹치면 같은 `RuntimeError`
+
+**호출되는 것** `main` 켜질 때(폐쇄망판) · [[#AccountService.local_user]](없을 때)
+
+**테스트 관점** 처음 → `kind=local` 행 하나 · 두 번 불러도 행 하나 · 이름을 바꿔 부르면 같은 행의 이름이 바뀐다 · 같은 아이디의 GitHub 사용자·자리표시가 있으면 RuntimeError, 행은 그대로
+
+---
+
+#### AccountService.local_user 로컬 사용자
+
+**시그니처** `local_user() -> User`
+
+근거: [[SYNC-PRD-001#R15]] · [[SYNC-SEQ-001#SEQ-C3]]
+
+**처리** `u = DB: users where kind=local` · if `u` → `→ u` · else → `→ ensure_local_user(settings.LOCAL_LOGIN, settings.local_name)` — 켜질 때 만들었으니 보통은 있다. DB를 바꿔 끼운 경우의 안전망
+
+**호출하는 것** [[#AccountService.ensure_local_user]](없을 때)
+
+**호출되는 것** `web/auth.current_user`(폐쇄망판 — 모든 웹 요청) · [[#AccountService.user_for_commit]](폐쇄망판)
+
+**테스트 관점** 있으면 그 행 · 없으면 설정대로 만든다
 
 ---
 

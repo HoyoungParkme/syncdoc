@@ -9,6 +9,8 @@ lerna-debug.log*
 
 node_modules
 dist
+# 글꼴 — vite.config.ts appFonts가 npm 패키지에서 옮긴다 (카드 BC)
+public/fonts
 dist-ssr
 *.local
 

@@ -22,6 +22,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ## 1. 규칙
 
 - 인증은 세션 쿠키. GitHub OAuth로 로그인하면 서버가 세션을 만든다. 미인증이면 401
+- **폐쇄망판**([[SYNC-PRD-001#R15]])은 로그인이 없다 — 세션 없이 모든 요청이 로컬 사용자다. 대신 요청 Host가 허용 목록 밖이거나 쓰기 요청의 Origin이 다른 곳이면 `forbidden-origin` 403([[SYNC-INFRA-001]] 5장). `/auth/github*`·`/hooks/github`는 없다(404). MCP·git은 인터넷판처럼 토큰
 - 에러는 RFC 9457 `application/problem+json`. `type`은 `urn:syncdoc:{종류}`. 종류별 확장 필드는 2장
 - 모든 시각은 ISO 8601 UTC
 - 문서 ID(`SYNC-PRD-001`)는 프로젝트 코드를 포함해 전역 유일하므로 `/api/docs/{docId}`로 바로 접근한다
@@ -31,7 +32,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 - **스트리밍은 `POST /api/docs/{docId}/ask` 하나다**(SSE, `text/event-stream`). 첫 이벤트(`start`) 전에 난 오류는 지금처럼 HTTP 상태 코드로, 뒤에 난 오류는 `error` 이벤트로 온다. 규칙 한 줄 — **첫 이벤트 전은 상태 코드, 뒤는 이벤트**
 
-**웹이 쓰지 않는 것** — 본문 생성·수정 엔드포인트는 없다. 본문 쓰기는 MCP와 GitHub push뿐이다(PRD R9). 웹의 쓰기는 상태 토글·되돌리기·휴지통·토큰·재구축, 그리고 **대화·첨부**(3.5 — 명세가 아니라 읽는 사람의 메모, [[SYNC-PRD-001]] 2장)까지다.
+**웹이 쓰지 않는 것** — 본문 생성·수정 엔드포인트는 없다. 본문 쓰기는 MCP와 저장소 push뿐이다(PRD R9). 웹의 쓰기는 상태 토글·되돌리기·휴지통·토큰·재구축, 그리고 **대화·첨부**(3.5 — 명세가 아니라 읽는 사람의 메모, [[SYNC-PRD-001]] 2장)까지다.
 - **업로드는 `POST /api/conversations/{id}/attachments` 하나다**(multipart/form-data). 나머지 요청 본문은 전부 JSON이다
 
 ---
@@ -63,6 +64,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:invalid-request` | 422 | 요청 본문·쿼리·경로 값이 정의(아래 3장 스키마)에 안 맞다 — 입력 검증. `detail`은 첫 오류 한 줄(`body.to — …`) | `errors: [{loc, msg}]` — `loc`은 `body.to`처럼 점으로 이은 위치 | — |
 | `urn:syncdoc:existing-specs` | 409 | `docs/specs/` 이미 있음. 서버 저장이면 같은 코드의 **보관된 저장소**가 있음 | `doc_count` · `archived_at`(보관본일 때만, 가장 최근 것을 보관한 때) | [[SYNC-UC-001#UC-A1]] 3a, 3b |
 | `urn:syncdoc:storage-unavailable` | 422 | 이 서버에서 켜지 않은 저장 방식으로 프로젝트를 만들려 함 | `storage` · `enabled: [켜진 방식…]` | [[SYNC-UC-001#UC-A1]] 1a |
+| `urn:syncdoc:forbidden-origin` | 403 | 폐쇄망판에서 요청 Host가 허용 목록 밖이거나, 쓰기 요청의 Origin이 이 서버가 아니다 — 로그인이 없는 웹을 다른 이름·다른 사이트가 부르는 것을 막는다 | `host` 또는 `origin` | [[SYNC-PRD-001#R15]] |
 | `urn:syncdoc:storage-mismatch` | 409 | 서버 저장 프로젝트에만 되는 일을 GitHub 저장 프로젝트에 — 코드 올리기 | `storage` | [[SYNC-UC-001#UC-A10]] 1a |
 | `urn:syncdoc:upload-too-large` | 413 | 코드 올리기 한도 초과 — UTF-8 합 5MB 또는 파일+지운 경로 500개. 나눠 보낸다 | `limit` · `size` · `count` | [[SYNC-UC-001#UC-A10]] 2a |
 | `urn:syncdoc:upload-path-refused` | 422 | 올릴 수 없는 경로 — 절대 경로·`..`·`.git` 조각·명세 경로(`docs/specs/`)·비밀 꼴·글자가 아닌 내용·폴더와 겹침. **하나라도 있으면 아무것도 안 올린다** | `paths: [{path, reason}]` | [[SYNC-UC-001#UC-A10]] 2b |
@@ -1385,6 +1387,34 @@ MINISPEC 항목인데 코드에 함수가 없으면 `function: null`·`missing: 
 
 ---
 
+### 3.10 규약 사본 (폐쇄망판)
+
+#### GET/specs/{path} 이미지 안의 규약·템플릿 사본
+
+유스케이스 [[SYNC-UC-001#UC-A1]](README의 규약 링크) · [[SYNC-PRD-001#R15]]
+
+```yaml
+/specs/{path}:
+  get:
+    summary: >
+      이미지에 담긴 docs/specs/STD·_templates를 글자로 준다. 폐쇄망판 README의 규약 링크가 여기를
+      가리킨다(SPECS_URL 기본값, 인프라 8.1). 공개 — 싱크독 자신의 규약이라 비밀이 없다. 폴더면
+      파일 목록. STD·_templates 밖이나 ..는 404
+    parameters:
+    - name: path
+      in: path
+      required: true
+      schema:
+        type: string
+    responses:
+      '200':
+        description: text/plain(파일) 또는 text/html(폴더 목록)
+      '404':
+        $ref: '#/components/responses/Problem'
+```
+
+---
+
 ## 4. 스키마
 
 엔드포인트 조각이 참조하는 `components`. 항목이 아니다.
@@ -1524,6 +1554,10 @@ components:
               type: string
               enum: [github, server]
             description: 이 서버가 켠 저장 방식(설정 STORAGE_MODES). UI-3이 고를 것을 정한다 ([[SYNC-PRD-001#R14]])
+          edition:
+            type: string
+            enum: [internet, closed]
+            description: 판(설정 EDITION). closed면 로그아웃·커밋 이메일이 없다 ([[SYNC-PRD-001#R15]])
     Author:
       type: object
       description: 버전의 작성 주체. 에이전트면 instructed_by가 있다

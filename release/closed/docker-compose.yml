@@ -1,0 +1,46 @@
+# 싱크독 폐쇄망판 — SYNC-INFRA-001 8.1 (카드 BC). 반입한 이미지를 불러 쓰기만 한다(build 없음).
+# 설치·업데이트·백업은 INSTALL.md. 값은 같은 폴더의 .env(.env.example을 복사해 채운다).
+#
+# 이름을 고정한다 — 새 판을 다른 폴더에 풀어도 같은 볼륨(데이터)을 쓴다.
+name: syncdoc-closed
+
+services:
+  app:
+    image: syncdoc-app:${SYNCDOC_VERSION:?.env에 SYNCDOC_VERSION을 둔다}
+    # 로그인이 없으니 기본은 이 PC 안에서만 연다(127.0.0.1). 같은 망에 열려면 INSTALL.md 7
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file: .env
+    environment:
+      EDITION: closed
+      SECRET_KEY: ${SECRET_KEY:?.env에 SECRET_KEY를 채운다}
+      DATABASE_URL: postgresql+psycopg://syncdoc:${POSTGRES_PASSWORD:?.env에 POSTGRES_PASSWORD를 채운다}@db:5432/syncdoc
+      REPOS_DIR: /var/syncdoc/repos
+      ORIGINS_DIR: /var/syncdoc/origins
+    volumes:
+      - repos:/var/syncdoc/repos
+      - origins:/var/syncdoc/origins # 서버 저장소 — 명세와 코드의 원본이다. 백업한다 (INSTALL.md 6)
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+  db:
+    image: postgres:16-alpine
+    # 포트를 열지 않는다 — 앱만 안에서 쓴다
+    environment:
+      POSTGRES_USER: syncdoc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: syncdoc
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U syncdoc"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  repos:
+  origins:

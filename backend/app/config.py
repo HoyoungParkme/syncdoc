@@ -36,10 +36,40 @@ class Settings(BaseSettings):
     LLM_API_URL: str = "https://api.openai.com/v1/chat/completions"  # OpenAI 호환 Chat Completions
     LLM_MODEL: str = "gpt-4o"
     LLM_MAX_TURNS: int = 10  # 한 대화에서 서버가 받는 최대 턴 수
+    # 판 — internet 또는 closed (PRD R15, INFRA 8.1). closed면 로그인 없이 로컬 사용자 하나
+    EDITION: str = "internet"
+    LOCAL_LOGIN: str = "local"  # 폐쇄망판 로컬 사용자의 아이디 — 커밋 작성자 {아이디}@syncdoc.local
+    LOCAL_NAME: str = ""  # 폐쇄망판 로컬 사용자의 표시 이름. 비면 LOCAL_LOGIN
+
+    @property
+    def closed(self) -> bool:
+        """폐쇄망판인가 (PRD R15). 모르는 값은 인터넷판 — 로그인을 끄는 쪽이 명시여야 한다."""
+        return self.EDITION.strip().lower() == "closed"
+
+    @property
+    def edition(self) -> str:
+        return "closed" if self.closed else "internet"
+
+    @property
+    def local_name(self) -> str:
+        return self.LOCAL_NAME.strip() or self.LOCAL_LOGIN
+
+    @property
+    def specs_url(self) -> str:
+        """README 규약 링크의 뿌리 (INFRA 5.2·8.1). 폐쇄망판에서 기본값이면 이 서버의 /specs."""
+        default = type(self).model_fields["SPECS_URL"].default
+        if self.closed and self.SPECS_URL == default:
+            return f"{self.PUBLIC_BASE_URL.strip().rstrip('/') or 'http://127.0.0.1:8000'}/specs"
+        return self.SPECS_URL
 
     @property
     def storage_modes(self) -> list[str]:
-        """켠 저장 방식 — 적힌 순서대로, 모르는 값과 겹친 값은 뺀다. 비면 github 하나(예전 동작)."""
+        """켠 저장 방식 — 적힌 순서대로, 모르는 값과 겹친 값은 뺀다. 비면 github 하나(예전 동작).
+
+        폐쇄망판은 서버 하나다 — GitHub에 닿지 못한다 (PRD R15).
+        """
+        if self.closed:
+            return ["server"]
         out: list[str] = []
         for m in (x.strip().lower() for x in self.STORAGE_MODES.split(",")):
             if m in ("github", "server") and m not in out:

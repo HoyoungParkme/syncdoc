@@ -20,13 +20,14 @@ from starlette.convertors import Convertor, register_url_convertor
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.routing import Match
 
-from app import scheduler
+from app import db, scheduler
 from app.config import settings
+from app.core.account.service import AccountService
 from app.core.errors import HttpError, Internal, InvalidRequest, MethodNotAllowed, NotFound, Problem
 from app.mcp.auth import BearerAuth
 from app.mcp.tools import server as mcp_server
 from app.web import auth
-from app.web.auth import SessionMiddleware
+from app.web.auth import ClosedEditionGuard, SessionMiddleware
 from app.web.routers import (
     account,
     admin,
@@ -36,6 +37,7 @@ from app.web.routers import (
     hooks,
     projects,
     references,
+    specs,
 )
 from app.web.routers import git as git_router
 
@@ -75,6 +77,10 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
     for r in spa_routes:
         routes.remove(r)
         routes.append(r)
+    if settings.closed:  # 폐쇄망판 — 로컬 사용자를 둔다. 남의 아이디면 여기서 멈춘다 (MS-006)
+        with db.session_scope() as s:
+            AccountService(s).ensure_local_user(settings.LOCAL_LOGIN, settings.local_name)
+            s.commit()
     async with mcp_server.session_manager.run():
         tasks: list[asyncio.Task] = []
         if settings.POLL_INTERVAL_SECONDS > 0:  # INFRA 7장 — 기동 시 따라잡기(1a) + 폴링(1b)
@@ -94,6 +100,8 @@ app.add_middleware(
     session_cookie=auth.SESSION_COOKIE,
     same_site="lax",
 )
+# 폐쇄망판 가드 — 맨 바깥(나중에 더한 것이 바깥). 인터넷판에서는 그대로 지나간다 (SEQ-C3, 카드 BC)
+app.add_middleware(ClosedEditionGuard)
 app.include_router(account.router)
 for r in (
     projects.router,
@@ -104,6 +112,7 @@ for r in (
     admin.router,
     hooks.router,
     git_router.router,  # 서버 저장소 git 입구 (카드 BB)
+    specs.router,  # 이미지 안 규약·템플릿 사본 (카드 BC)
 ):
     app.include_router(r)
 
@@ -187,6 +196,7 @@ _BUNDLE = "public, max-age=31536000, immutable"  # 이름에 해시 — 내용�
 _PLAIN = "no-cache"
 _SHELL = "no-cache"  # 화면 틀 — 매번 새 판인지 묻는다. 같으면 304
 _ASSETS = "assets/"  # Vite 기본 assetsDir. 빌드 설정을 바꾸면 여기도 바꾼다
+_FONTS = "fonts/"  # 앱이 담은 글꼴 — 경로에 판 번호가 있어 번들처럼 1년 (INFRA 3장·4.1, 카드 BC)
 
 
 def _file(request: Request, target: Path, cache: str) -> Response:
@@ -221,14 +231,14 @@ def _not_modified_since(since: str | None, resp: Response) -> bool:
 
 
 class _SpaPath(Convertor):
-    """화면 틀 대체 라우트의 경로 — API 앞머리(`/api`·`/auth`·`/hooks`·`/mcp`·`/git`)는 받지 않는다.
+    """화면 틀 대체 라우트의 경로 — API 앞머리(api·auth·hooks·mcp·git·specs)는 받지 않는다.
 
     받으면 `/api/없는경로`에 화면 틀(HTML, 200)이 나가고, POST는 이 GET 라우트와 경로만 맞아
     405가 났다. 여기서 빼면 그 경로는 어느 라우트와도 안 맞아 메서드와 무관하게
     404 problem+json이다 (SYNC-INFRA-001 4.1, #158).
     """
 
-    regex = r"(?!(?:api|auth|hooks|mcp|git)(?:/|$)).*"
+    regex = r"(?!(?:api|auth|hooks|mcp|git|specs)(?:/|$)).*"
 
     def convert(self, value: str) -> str:
         return value
@@ -247,7 +257,7 @@ async def spa(path: str, request: Request) -> Response:
         raise Problem("React 빌드 결과가 없다 — frontend/에서 npm run build")
     target = STATIC / path
     found = bool(path) and target.is_file() and target.resolve().is_relative_to(STATIC)
-    if path.startswith(_ASSETS):
+    if path.startswith((_ASSETS, _FONTS)):
         if found:
             return _file(request, target, _BUNDLE)
         # 번들 폴더에 없는 파일을 화면 틀로 떨어뜨리지 않는다 — 떨어뜨리면 배포 전에 열린 탭이

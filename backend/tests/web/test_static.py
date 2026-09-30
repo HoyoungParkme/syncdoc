@@ -20,6 +20,8 @@ def built(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (tmp_path / "assets" / "index-Ab12Cd34.js").write_text("export {}", encoding="utf-8")
     (tmp_path / "howto").mkdir()
     (tmp_path / "howto" / "term-add.png").write_bytes(b"\x89PNG")
+    (tmp_path / "fonts" / "pretendard-1.3.9").mkdir(parents=True)
+    (tmp_path / "fonts" / "pretendard-1.3.9" / "p.woff2").write_bytes(b"wOF2")
     monkeypatch.setattr(main, "STATIC", tmp_path)
     return tmp_path
 
@@ -36,6 +38,15 @@ def test_hashed_bundle_is_immutable(client: TestClient, built: Path) -> None:
     r = client.get("/assets/index-Ab12Cd34.js")
     assert r.status_code == 200
     assert r.headers["cache-control"] == "public, max-age=31536000, immutable"
+
+
+def test_fonts_are_immutable_and_missing_ones_404(client: TestClient, built: Path) -> None:
+    """앱이 담은 글꼴 — 경로에 판 번호가 있어 번들처럼 1년. 없는 글꼴은 화면 틀이 아니라 404 (카드 BC)."""
+    r = client.get("/fonts/pretendard-1.3.9/p.woff2")
+    assert r.status_code == 200 and r.content == b"wOF2"
+    assert r.headers["cache-control"] == "public, max-age=31536000, immutable"
+    gone = client.get("/fonts/pretendard-1.3.8/p.woff2")
+    assert gone.status_code == 404 and gone.headers["cache-control"] == "no-store"
 
 
 def test_missing_bundle_is_404_not_the_shell(client: TestClient, built: Path) -> None:
