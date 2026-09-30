@@ -1144,7 +1144,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `llm.step_stream`(SSE 읽기·tool_calls 조각 조립·Content-Type으로 단발 대체) + `llm.step`은 모아서 · `AskDelta` DTO·스키마·`delta` 프레임 · `ask_item`이 조각을 `AskDelta`로 · `AskPanel`이 `live` 버퍼를 그때그때 마크다운으로(`note`·`read`에서 비움, `answer`에서 본문으로), mermaid는 `a`가 있는 턴만, rAF로 묶어 그린다 |
 | 테스트 | MS-009·MS-008 테스트 관점 · 라우터 프레임에 `delta` · 헤드 크롬: 스피너가 도는 채로 글이 늘어남(길이 폴링) · `answer` 뒤 접힘·본문 같음 · 마인드맵은 흐르는 동안 코드, 끝나면 그림 · 새로고침 뒤 저장된 답 그대로 |
 | 선행 | AV |
-| 완료 | — |
+| 완료 | 2026-09-30 · 브랜치 `card/AW-stream` · spec 7 + code 3 · 테스트 283 · `ruff` · `validate` 0/0 · `check_code` 128/128 · `check_dom` · `check_ui` 12/12 · 배포 뒤 헤드 크롬(1440×900): 스피너가 도는 채로 흐르는 글이 10→178→425자(0.4초 표본 8개 전부 스피너 켜짐) → `answer` 뒤 494자·스피너 꺼짐·「4단계 읽음 · 본 것 1」 · 마인드맵은 흐르는 동안 `pre.mermaid` 코드(svg 없음), 끝난 뒤 mindmap svg 13노드 + 전체보기 · 새로고침 뒤 두 턴·svg 1·live 0 · 콘솔 오류 0 |
 
 **왜 카드인가.** 어댑터(MS-009)·이벤트(API·DOM)·루프(MS-008)·화면(UI-5) 넷이 같이 바뀐다. 핵심 결정 하나 — `delta`는 진실이 아니고 `note`/`answer`가 전체 글을 다시 준다 — 로 저장·재열기 경로를 그대로 둔다.
 
@@ -1228,6 +1228,7 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AT | `card/AT-ask-width` | `ee4a86c` | #222 | 2026-09-30 |
 | AU | `card/AU-answer-text` | `ed661fa` | #224 | 2026-09-30 |
 | AV | `card/AV-keep-all` | `b966ebb` | #228 | 2026-09-30 |
+| AW | `card/AW-stream` | `2e243f4` | #230 | 2026-09-30 |
 | (#119) | `fix/119-single-render` | — | #119 | 2026-09-23 |
 | (#126) | `fix/126-view-build-specs` | — | #126 | 2026-09-23 |
 | (#133) | `fix/133-tokens-by-chapter` | — | #133 | 2026-09-23 |
