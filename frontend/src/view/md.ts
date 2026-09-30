@@ -162,13 +162,30 @@ export function renderBlocks(text: string, ctx: RenderCtx, itemPat?: RegExp): st
       continue
     }
     if (/^\d+\. /.test(l)) {
+      // 번호 목록 — 들여 쓴 `- `는 그 항목의 하위 목록, 빈 줄 하나 뒤의 번호는 같은 목록 (STD-002 1장, 카드 AU)
       const items: string[] = []
-      while (i < lines.length && (/^\d+[a-z]?\. /.test(lines[i]) || lines[i].startsWith('   '))) {
-        if (/^\d+[a-z]?\. /.test(lines[i])) items.push(inline(lines[i].replace(/^\d+[a-z]?\. /, ''), ctx))
-        else if (items.length) items[items.length - 1] += '<br>' + inline(lines[i].trim(), ctx)
+      let sub: string[] = []
+      const flush = () => {
+        if (sub.length && items.length) items[items.length - 1] += '<ul>' + sub.map((t) => `<li>${t}</li>`).join('') + '</ul>'
+        sub = []
+      }
+      while (i < lines.length) {
+        const cur = lines[i]
+        if (/^\d+[a-z]?\. /.test(cur)) {
+          flush()
+          items.push(inline(cur.replace(/^\d+[a-z]?\. /, ''), ctx))
+        } else if (/^\s+- /.test(cur) && items.length) sub.push(inline(cur.replace(/^\s+- /, ''), ctx))
+        else if (cur.startsWith('   ')) {
+          flush()
+          if (items.length) items[items.length - 1] += '<br>' + inline(cur.trim(), ctx)
+        } else if (cur.trim() === '' && i + 1 < lines.length && /^\d+[a-z]?\. /.test(lines[i + 1])) {
+          /* 빈 줄 하나 — 같은 목록이 이어진다 */
+        } else break
         i++
       }
-      out.push('<ol>' + items.map((x) => `<li>${x}</li>`).join('') + '</ol>')
+      flush()
+      const first = l.match(/^\d+/)![0] // 첫 번호가 1이 아니면 그 번호부터(`0.` 준비 단계) — 원본 번호 그대로
+      out.push((first === '1' ? '<ol>' : `<ol start="${first}">`) + items.map((x) => `<li>${x}</li>`).join('') + '</ol>')
       continue
     }
     if (l.startsWith('> ')) {
