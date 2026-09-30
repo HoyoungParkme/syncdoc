@@ -31,6 +31,7 @@ from app.core.types import (
     STAGE_OF,
     ApiAuthor,
     AskAnswer,
+    AskDelta,
     AskEvent,
     AskNote,
     AskRead,
@@ -54,6 +55,7 @@ from app.core.types import (
     ItemRef,
     ItemReferences,
     ItemView,
+    LlmStep,
     ProjectDetail,
     ProjectSummary,
     RefEdge,
@@ -784,7 +786,15 @@ async def ask_item(
     answer: str | None = None
     try:
         while True:
-            step = await llm.step(system, log, _ASK_TOOLS)
+            # 글자 조각은 바로 AskDelta로 — 답인지 메모인지는 뒤 이벤트가 정한다 (MS-008 4단계, 카드 AW)
+            step: LlmStep | None = None
+            async for part in llm.step_stream(system, log, _ASK_TOOLS):
+                if isinstance(part, str):
+                    yield AskDelta(part)
+                else:
+                    step = part
+            if step is None:
+                raise LlmUnavailable("응답 형식이 다르다")
             prompt_tokens += step.usage.prompt_tokens
             completion_tokens += step.usage.completion_tokens
             if not step.tool_calls:
@@ -810,7 +820,14 @@ async def ask_item(
                 calls += 1
             if calls >= _ASK_MAX_CALLS or time.monotonic() - t0 >= _ASK_TIME_LIMIT:
                 log.append({"role": "user", "text": _ASK_WRAP_UP})
-                last = await llm.step(system, log, _ASK_TOOLS, tool_choice="none")
+                last: LlmStep | None = None
+                async for part in llm.step_stream(system, log, _ASK_TOOLS, tool_choice="none"):
+                    if isinstance(part, str):
+                        yield AskDelta(part)
+                    else:
+                        last = part
+                if last is None:
+                    raise LlmUnavailable("응답 형식이 다르다")
                 prompt_tokens += last.usage.prompt_tokens
                 completion_tokens += last.usage.completion_tokens
                 if not last.text:

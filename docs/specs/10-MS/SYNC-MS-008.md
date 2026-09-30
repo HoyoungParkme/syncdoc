@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -68,9 +68,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 1. 세션 하나에서 `history = ConversationService.history(conversation_id, settings.LLM_MAX_TURNS)` · `turn = ConversationService.add_turn(conversation_id, question, attachment_ids)` · `images = ConversationService.pending_images(turn.id)` · `doc = SpecService.get_document(doc_id)` + `describe_documents([doc.id])`(제목) → 시작 맥락: 제목·상태·버전 + 이 문서의 **모든 항목 `ID 이름`** + `item_id`가 있으면 `[지금 보는 항목] {item_id} {display_name}` + 이 대화의 첨부가 있으면 `[첨부] {id} {name} ({종류}, {크기})` 줄들(글자·PDF는 「read_attachment로 읽을 수 있다」, 이미지는 「이 질문에 보인다」) · `item_id`가 이 문서에 없으면 `! not-found {resource: item}`(턴은 `error`로 닫는다) · **본문은 싣지 않는다** — 필요한 본문은 모델이 도구로 읽는다
 2. `yield AskStart(doc_id, item_id)` — 이 앞의 예외는 HTTP 상태로, 이 뒤는 `error` 이벤트로 나간다([[SYNC-API-001]] 1장). 이 뒤의 예외는 **`finish_turn(turn.id, error=…)`로 턴을 닫은 뒤** 던진다
 3. `t0 = monotonic()` · `calls = 0` · `reads: list[str] = []` · `progress: list[dict] = []`(yield하는 note·read를 그대로 모은다) · 대화록 = `history` + `{role: user, text: question, images}`
-4. `step = llm.step(system, 대화록, _ASK_TOOLS)` ([[SYNC-MS-009#llm.step]]) · usage 누적 · `if not step.tool_calls → answer = step.text → 7`
+4. [[SYNC-MS-009#llm.step_stream]]`(system, 대화록, _ASK_TOOLS)`을 돈다 — `str` 조각이면 `yield AskDelta(text)`(모델이 지금 쓰는 글자, `progress`에 안 넣는다), `LlmStep`이면 `step`(카드 AW) · usage 누적 · `if not step.tool_calls → answer = step.text → 7`
 5. `if step.text → yield AskNote(step.text)` · 도구 호출마다: `yield AskNote(args["reason"])` → `r = ask_tool(name, args, code, user, conversation_id)` → `yield AskRead(name, r.target)` · `r.target`이 있고 `reads`에 없으면 `reads.append` · 대화록에 `{role: assistant, text: step.text, tool_calls}`와 `{role: tool, tool_call_id, text: r.text}` 추가 · `calls += 1`(호출마다)
-6. `if calls >= _ASK_MAX_CALLS or monotonic() - t0 >= _ASK_TIME_LIMIT` → 대화록에 마무리 문장(아래)을 `user`로 추가 → `llm.step(system, 대화록, _ASK_TOOLS, tool_choice="none")` **한 번** → `step.text`가 비면 `! LlmUnavailable("상한 뒤에도 답이 없다")` → `answer = step.text` → 7 · 아니면 4로
+6. `if calls >= _ASK_MAX_CALLS or monotonic() - t0 >= _ASK_TIME_LIMIT` → 대화록에 마무리 문장(아래)을 `user`로 추가 → `llm.step_stream(system, 대화록, _ASK_TOOLS, tool_choice="none")` **한 번**(조각은 4단계처럼 `AskDelta`로) → `step.text`가 비면 `! LlmUnavailable("상한 뒤에도 답이 없다")` → `answer = step.text` → 7 · 아니면 4로
 7. `ConversationService.finish_turn(turn.id, answer, progress, reads)` — 세션 하나에서. 대화 `title`이 「새 대화」면 `question[:40]`으로, `updated_at` 갱신 · `log.info("ask doc=%s item=%s conv=%s user=%s calls=%d prompt=%d completion=%d elapsed=%.1fs", …)` — 한 줄, 본문·질문·답은 로그에 안 남긴다(DEV-6) · `yield AskAnswer(answer, context_item_ids=reads)`
 
 **상수** `_ASK_MAX_CALLS = 8` · `_ASK_TIME_LIMIT = 120.0`(초). 설정값이 아니라 코드 상수다 — 회수 경로는 키를 비우는 것 하나로 둔다([[SYNC-INFRA-001]] 5.3). 시간은 **호출 사이**에서만 본다 — 한 호출의 60초 타임아웃이 더해져 최악 180초(마무리 호출 포함)
@@ -140,13 +140,13 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 도구 호출 상한(또는 시간 상한)에 닿았다. 지금까지 읽은 것으로 답하라. 못 읽은 것이 있으면 무엇을 못 읽었는지 말한다.
 ```
 
-**출력** `AskEvent`의 비동기 흐름 — `AskStart` 하나 → `AskNote`·`AskRead` 0개 이상 → `AskAnswer` 하나. `context_item_ids`는 모델이 **실제로 읽은 대상**(`DOC#ITEM`·`DOC`)을 부른 순서로, 중복 없이
+**출력** `AskEvent`의 비동기 흐름 — `AskStart` 하나 → `AskDelta`·`AskNote`·`AskRead` 0개 이상 → `AskAnswer` 하나. `AskDelta`는 모델이 지금 쓰는 글자 조각이고 **답인지 메모인지는 뒤 이벤트가 정한다** — 그 호출이 도구로 끝나면 `AskNote`(전체 글)가, 답으로 끝나면 `AskAnswer`(전체 본문)가 다시 온다. 조각은 저장하지 않는다(카드 AW). `context_item_ids`는 모델이 **실제로 읽은 대상**(`DOC#ITEM`·`DOC`)을 부른 순서로, 중복 없이
 
 **예외** 남의 프로젝트·없는 `item_id` → `not-found`(`AskStart` 전이라 HTTP 상태) · 키 없음 → `llm-not-configured`(전) · 모델 실패·마무리 뒤에도 답 없음 → `llm-unavailable`(`AskStart` 뒤라 `error` 이벤트) · 도구 안의 「없음」은 예외가 아니라 결과다([[#queries.ask_tool]])
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-009#llm.step]] · [[#queries.ask_tool]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-009#llm.step_stream]] · [[#queries.ask_tool]]
 
-**테스트 관점** 가짜 `llm.step`에 대본을 주어 돈다 · 지시문에 mermaid 그림 안내가 있다(카드 AS) · 지시문에 답 양식(「답은 짧게」)이 있다(카드 AU) · 대본 [도구 2번 → 답] → 이벤트 순서가 `start·note·read·note·read·answer`이고 `context_item_ids`가 read 순서·중복 접힘 · 대본이 도구만 9번 → 8번째 뒤 마무리 호출이 `tool_choice="none"`이고 그 뒤 호출이 없다 · `monotonic`을 패치해 120초 → 같은 마무리 · 마무리도 답이 비면 `llm-unavailable` · 시작 맥락에 항목 ID·이름은 있고 **본문은 없다** · `item_id=None`이면 「지금 보는 항목」 줄이 없다 · 없는 `item_id` → `not-found`가 `start` 전 · **DB에 아무것도 안 쓴다**(호출 전후 행 수가 같다) · `history`가 상한을 넘으면 뒤에서부터 잘린다 · usage 로그 한 줄에 calls·tokens·elapsed가 있고 본문이 없다 · 키가 비면 `SpecService`를 부르기도 전에 막힌다 · **MINISPEC이 빈 프로젝트**에서 물으면 `item_chain`의 빈 단계로 「아직 안 쓰였다」고 답할 재료를 받는다
+**테스트 관점** 가짜 `llm.step`에 대본을 주어 돈다 · 지시문에 mermaid 그림 안내가 있다(카드 AS) · 지시문에 답 양식(「답은 짧게」)이 있다(카드 AU) · 대본이 `str` 조각을 주면 `delta`가 `note`/`answer` 앞에 그 순서로 나오고 `progress`에는 안 들어간다(카드 AW) · 대본 [도구 2번 → 답] → 이벤트 순서가 `start·note·read·note·read·answer`이고 `context_item_ids`가 read 순서·중복 접힘 · 대본이 도구만 9번 → 8번째 뒤 마무리 호출이 `tool_choice="none"`이고 그 뒤 호출이 없다 · `monotonic`을 패치해 120초 → 같은 마무리 · 마무리도 답이 비면 `llm-unavailable` · 시작 맥락에 항목 ID·이름은 있고 **본문은 없다** · `item_id=None`이면 「지금 보는 항목」 줄이 없다 · 없는 `item_id` → `not-found`가 `start` 전 · **DB에 아무것도 안 쓴다**(호출 전후 행 수가 같다) · `history`가 상한을 넘으면 뒤에서부터 잘린다 · usage 로그 한 줄에 calls·tokens·elapsed가 있고 본문이 없다 · 키가 비면 `SpecService`를 부르기도 전에 막힌다 · **MINISPEC이 빈 프로젝트**에서 물으면 `item_chain`의 빈 단계로 「아직 안 쓰였다」고 답할 재료를 받는다
 
 ---
 

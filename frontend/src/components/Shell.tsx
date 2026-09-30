@@ -10,6 +10,7 @@ export interface AskTurnView {
   q: string
   prog: { kind: 'note' | 'read'; text: string }[]
   a?: string
+  live?: string // 흘러 들어오는 글(delta 누적) — a가 오면 버린다 (카드 AW)
   src?: string[]
   err?: string
   att?: AttachmentMeta[] // 이 질문에 붙인 첨부 — 말풍선 아래 칩 (카드 AR)

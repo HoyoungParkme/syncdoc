@@ -15,6 +15,7 @@ from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
 from app.core.types import (
     AskAnswer,
+    AskDelta,
     AskNote,
     AskRead,
     AskStart,
@@ -509,17 +510,22 @@ def script(monkeypatch):
     """llm.step을 대본으로. install([LlmStep, …]) → 받은 (system, messages, tool_choice) 기록."""
     seen: list[tuple[str, list[dict], str]] = []
 
-    def install(steps: list[LlmStep]):
+    def install(steps: list[LlmStep | str]):
+        """항목이 str이면 글자 조각(delta), LlmStep이면 그 호출의 끝 (카드 AW)."""
         it = iter(steps)
 
-        async def step(system, messages, tools, tool_choice="auto"):
+        async def step_stream(system, messages, tools, tool_choice="auto"):
             seen.append((system, list(messages), tool_choice))
-            try:
-                return next(it)
-            except StopIteration:
-                raise AssertionError("대본이 끝났는데 또 불렀다") from None
+            while True:
+                try:
+                    part = next(it)
+                except StopIteration:
+                    raise AssertionError("대본이 끝났는데 또 불렀다") from None
+                yield part
+                if isinstance(part, LlmStep):
+                    return
 
-        monkeypatch.setattr(queries.llm, "step", step)
+        monkeypatch.setattr(queries.llm, "step_stream", step_stream)
         return seen
 
     monkeypatch.setattr(settings, "LLM_API_KEY", "sk-test")
@@ -553,6 +559,40 @@ async def test_ask_item_start_context_has_titles_and_item_names_but_no_body(
     assert "근거 [[EXMP-RFQ-001#Q1]]" not in system  # 본문은 안 실린다 — 도구로 읽는다
     assert messages == [{"role": "user", "text": "왜?"}] and choice == "auto"
     assert _rows(scoped) == before
+
+
+async def test_ask_item_streams_delta_before_note_and_answer(scoped: Session, script) -> None:
+    """카드 AW — 대본의 str 조각은 delta로 그 순서에 나오고, progress에는 안 들어간다."""
+    _seed_refs(scoped)
+    script(
+        [
+            "G1을 ",
+            "읽는다",
+            _step(
+                "G1을 읽는다",
+                [_call("get_item", doc_id="EXMP-PRD-001", item_id="G1", reason="G1을 읽는다")],
+            ),
+            "G1은 ",
+            "Q1 근거",
+            _step("G1은 Q1 근거"),
+        ]
+    )
+    events = await _collect(
+        queries.ask_item("EXMP-PRD-001", "G1", _conv(scoped), "왜?", [], owner(scoped))
+    )
+    assert events == [
+        AskStart("EXMP-PRD-001", "G1"),
+        AskDelta("G1을 "),
+        AskDelta("읽는다"),
+        AskNote("G1을 읽는다"),  # 호출이 도구로 끝났다 — 흐르던 글은 메모였다
+        AskNote("G1을 읽는다"),  # 도구 인자 reason
+        AskRead("get_item", "EXMP-PRD-001#G1"),
+        AskDelta("G1은 "),
+        AskDelta("Q1 근거"),
+        AskAnswer("G1은 Q1 근거", ["EXMP-PRD-001#G1"]),
+    ]
+    progress = scoped.execute(text("SELECT progress FROM turns ORDER BY id DESC LIMIT 1")).scalar()
+    assert [p["kind"] for p in progress] == ["note", "note", "read"]  # delta는 없다
 
 
 async def test_ask_item_without_item_has_no_viewing_line(scoped: Session, script) -> None:

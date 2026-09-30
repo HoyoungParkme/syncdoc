@@ -367,7 +367,7 @@ export interface Conversation extends ConversationBrief {
   turns: Turn[]
   pending: AttachmentMeta[]
 }
-/** 스트림 이벤트 — start · note · read · answer · error(problem) */
+/** 스트림 이벤트 — start · delta · note · read · answer · error(problem) */
 export interface AskStart {
   doc_id: string
   item_id: string | null
@@ -378,6 +378,10 @@ export interface AskNote {
 export interface AskRead {
   tool: string
   target: string | null
+}
+/** 모델이 지금 쓰는 글자 조각 — 진실이 아니다. note면 메모였고 answer가 전체를 다시 준다 (카드 AW) */
+export interface AskDelta {
+  text: string
 }
 export interface AskAnswer {
   answer: string

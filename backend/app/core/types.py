@@ -644,6 +644,14 @@ class AskNote:
 
 
 @dataclass(frozen=True)
+class AskDelta:
+    """SYNC-DOM-002 2.8 — 모델이 지금 쓰는 글자 조각(delta 이벤트). 뒤에 note면 메모였고 answer면
+    답이다. 저장되지 않는다(카드 AW)."""
+
+    text: str
+
+
+@dataclass(frozen=True)
 class AskRead:
     """SYNC-DOM-002 2.8 — 도구 실행이 끝났다. target은 읽은 대상 ID."""
 
@@ -651,7 +659,7 @@ class AskRead:
     target: str | None
 
 
-AskEvent = AskStart | AskNote | AskRead | AskAnswer
+AskEvent = AskStart | AskDelta | AskNote | AskRead | AskAnswer
 
 
 # ── 대화 묶음 (SYNC-DOM-002 2.8·2.9, 카드 AQ·AR) ──
