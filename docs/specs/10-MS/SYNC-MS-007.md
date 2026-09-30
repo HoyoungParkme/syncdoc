@@ -34,6 +34,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#pipeline.trash_document]] | 휴지통에 넣기 |
 | [[#pipeline.restore_document]] | 휴지통에서 되살리기 |
 | [[#pipeline.purge_document]] | 완전 삭제 |
+| [[#pipeline.upload_code]] | 서버 저장소에 코드 올리기 |
 | [[#scheduler.catch_up]] | 밀린 커밋 따라잡기 |
 | [[#scheduler.poll_loop]] | 주기 폴링 |
 
@@ -282,6 +283,32 @@ async def read_pending(code: str, user: User) -> int
 **호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-003#ReferenceService.inbound_of_document]] [[SYNC-MS-002#SpecService.delete_document]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-002#SpecService.describe_items]]
 
 **테스트 관점** **남의 프로젝트 → `not-found`, 행 그대로** · 휴지통 아닌 문서 → `document-not-trashed` · 남이 아직 가리킴 → `document-has-history`에 `inbound_refs` · 다 걷어낸 뒤 → 행 다섯 종류(documents·items·versions·status_changes·references) 0 · 남이 이 문서를 미존재로 가리키는 것은 막지 않는다 · 번호 재발급
+
+---
+
+#### pipeline.upload_code 서버 저장소에 코드 올리기
+
+**시그니처** `async def upload_code(code: str, files: dict[str, str], delete: list[str], message: str, author: Author) -> UploadResult`
+
+근거: [[SYNC-SEQ-001#SEQ-30]] · [[SYNC-UC-001#UC-A10]] · [[SYNC-API-002#upload_code]] · [[SYNC-PRD-001#R14]]
+
+**처리**
+0. `project = ProjectService.get_owned(code, author.user)` — 남의 것이면 `! not-found {resource: project}`
+1. if `project.repository.storage != server` → `! storage-mismatch {storage: github}` (1a) — GitHub 프로젝트는 GitHub에 push한다
+2. **한도** — `size = UTF-8 바이트 합`, `count = len(files) + len(delete)` · if `size > 5MiB` 또는 `count > 500` → `! upload-too-large {limit, size, count}` (2a). 락 밖에서 본다
+3. **경로** — `files`와 `delete`의 경로마다 거절 사유를 모은다: 빈 경로·절대 경로·`\`·`..` 조각·`.git` 조각 · `docs/specs/`로 시작 — 명세는 문서 도구로 · 비밀 꼴(`CodeGraphService.DENY` — `.env*` `*.pem` `*.key` `id_rsa*` `*.p12` `*secret*`) · 글자에 NUL이 있음(이진). 하나라도 있으면 `! upload-path-refused {paths: [{path, reason}]}` (2b) — **아무것도 커밋하지 않는다**
+4. `read_pending(code, author.user)` — 쓰기 전에 밀린 커밋을 먼저 읽는다(DEV-19). 락 밖(그쪽이 락을 잡는다)
+5. 저장소 쓰기 락 안에서 `before = git.fetch(workdir)`(원격 main) · `commit = git.commit_push(workdir, message, author, files=files, delete=delete)` — 파일이 폴더와 겹치면 git이 실패해 `push-failed`. 쓰기 경로 가드도 여기서 돈다([[SYNC-MS-009#git.commit_push]])
+6. `read_pending(code, author.user)` — 처리 지점을 이 커밋으로 옮기고, 코드가 바뀌었으면 코드 그래프를 건다([[#pipeline.process_commit]] 5a). 명세 경로가 없으므로 버전은 생기지 않는다
+7. `→ UploadResult(commit, changed=commit != before, files=len(files), deleted=len(delete))`
+
+**예외** `not-found` · `storage-mismatch` · `upload-too-large` · `upload-path-refused` · `push-failed`
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[#pipeline.read_pending]] · [[SYNC-MS-009#git.fetch]] · [[SYNC-MS-009#git.commit_push]]
+
+**호출되는 것** MCP `upload_code`
+
+**테스트 관점** 파일 둘 + 지운 경로 하나 → 커밋 하나, 작성자가 토큰 주인, 처리 지점 = 그 커밋, 코드 그래프가 걸린다 · 같은 내용 → `changed=false`, 커밋 없음 · 5MiB+1바이트·501개 → `upload-too-large` · 거절 경로 여덟(절대·`..`·`.git`·`docs/specs/`·`.env`·`*.pem`·`\`·이진) → `upload-path-refused`에 전부, 원본 그대로 · GitHub 저장 프로젝트 → `storage-mismatch` · 먼저 push된 명세 커밋이 올린 뒤에도 살아 있다(DEV-19)
 
 ---
 
