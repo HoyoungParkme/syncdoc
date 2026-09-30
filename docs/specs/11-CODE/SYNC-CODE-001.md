@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1147,6 +1147,38 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 완료 | 2026-09-30 · 브랜치 `card/AW-stream` · spec 7 + code 3 · 테스트 283 · `ruff` · `validate` 0/0 · `check_code` 128/128 · `check_dom` · `check_ui` 12/12 · 배포 뒤 헤드 크롬(1440×900): 스피너가 도는 채로 흐르는 글이 10→178→425자(0.4초 표본 8개 전부 스피너 켜짐) → `answer` 뒤 494자·스피너 꺼짐·「4단계 읽음 · 본 것 1」 · 마인드맵은 흐르는 동안 `pre.mermaid` 코드(svg 없음), 끝난 뒤 mindmap svg 13노드 + 전체보기 · 새로고침 뒤 두 턴·svg 1·live 0 · 콘솔 오류 0 |
 
 **왜 카드인가.** 어댑터(MS-009)·이벤트(API·DOM)·루프(MS-008)·화면(UI-5) 넷이 같이 바뀐다. 핵심 결정 하나 — `delta`는 진실이 아니고 `note`/`answer`가 전체 글을 다시 준다 — 로 저장·재열기 경로를 그대로 둔다.
+
+#### AX 코드 그래프 — 만들기·보관·보강·검사기, 명세 호출 어긋남 0
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-RFQ-001#Q7]] · [[SYNC-PRD-001#R13]] · [[SYNC-SCN-001#S9]] · [[SYNC-UC-001#UC-S8]] · [[SYNC-SEQ-001#SEQ-26]] · [[SYNC-MS-011]] · [[SYNC-MS-007#pipeline.build_code_graph]] · [[SYNC-MS-007#pipeline.schedule_code_graph]] · [[SYNC-MS-009#graphify.extract]] · [[SYNC-MS-009#git.archive]] · [[SYNC-MS-009#git.changed_paths]] · [[SYNC-STD-001]] 2.10 · [[SYNC-STD-004#DEV-14]] · 사용자 결정 2026-09-30(저장소 graph.json 먼저, DB에 줄인 모양, ID 먼저 없으면 이름, 보강, 「호출하는 것」 줄만, 어긋남 0) |
+| 구현 | `core/codegraph/{models,repository,graph,service}.py` · 리비전 `0015_code_graphs` · `infra/graphify.py` · `git.archive`·`changed_paths` · `pipeline.schedule_code_graph`·`build_code_graph`(락 밖, 프로젝트마다 하나) · `process_commit` 5a · `rebuild` 10 · `delete_project` 2a · `tools/check_calls.py` · 백엔드 의존성 `graphifyy` · MS-001~010 「호출하는 것」을 검사기 결과대로 |
+| 테스트 | MS-011·MS-009·MS-007 테스트 관점 · 마이그레이션 표 14 · `check_calls` 0 · 운영: SYNC push 뒤 코드 그래프 로그 한 줄(함수 1,4xx) · 명세만 바꾼 push는 다시 안 만든다 |
+| 선행 | AW |
+| 완료 | — |
+
+**왜 카드인가.** 요구사항(R13)·유스케이스·도메인 묶음·표·완료 조건(DEV-14)이 함께 는다. 검사기가 생기는 순간 기존 MINISPEC의 「호출하는 것」 빈칸(함수 33개 안팎)이 드러나므로 이 카드에서 0으로 닫는다.
+
+#### AY 웹 코드 탭 + 관계도 코드 층
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R13]] · [[SYNC-UC-001#UC-H20]] · 사용자 결정 2026-09-30(모든 문서에 「코드」 탭 — MS 항목은 그 함수, 다른 항목은 하위 체인의 MS 함수 전부 · 목록 + 코드 펼침 · 관계도는 토글로 MS 열에 실제 호출을 겹친다) |
+| 구현 | UI-5 8.17~8.22 · UI-8 2.6·3.6~3.8 · API 셋(코드 보기·코드 호출·코드 본문) · `queries.code_view`·`code_calls`·`code_source` · `CodePanel` · `Graph` 토글 |
+| 테스트 | 헤드 크롬: SYNC-MS-007 `save_pipeline` 코드 탭(✓·▲·◌, 코드 펼침) · PRD R1의 코드 탭(하위 체인 함수) · 관계도 토글 선 셋 |
+| 선행 | AX |
+| 완료 | — |
+
+#### AZ 질문 탭·MCP 코드 도구
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R13]] · [[SYNC-PRD-001#R11]] · [[SYNC-PRD-001#R9]] · 사용자 결정 2026-09-30(`code_graph` + `read_code` — 파일 경로·줄 범위도, 300줄, 그래프 커밋의 커밋된 파일만, 비밀 꼴 거부 · MCP `get_code_graph`) |
+| 구현 | `ask_tool`에 도구 둘(여덟) · 지시문 한 줄 · 읽은 대상 `코드:` · MCP `get_code_graph` |
+| 테스트 | 질문 「save_pipeline이 명세대로 구현됐어?」 → 진행 줄에 코드 도구, 답에 코드 근거 · `.env` 읽기 거부 · MCP 호출 |
+| 선행 | AY |
+| 완료 | — |
 
 ---
 
