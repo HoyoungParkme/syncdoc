@@ -16,6 +16,7 @@ from typing import Any, Literal
 
 from mcp.server.mcpserver import MCPServer
 from mcp.types import CallToolResult, TextContent
+from pydantic import BaseModel
 
 from app import db
 from app.config import settings
@@ -269,6 +270,36 @@ async def get_item(doc_id: str, item_id: str) -> CallToolResult:
             "body": v.body,
         }
     )
+
+
+class CodeFile(BaseModel):
+    """upload_code의 파일 하나 — 저장소 뿌리에서의 상대 경로와 UTF-8 글자 전체."""
+
+    path: str
+    content: str
+
+
+@server.tool(
+    description="서버 저장 프로젝트의 서버 저장소에 코드를 올린다 — git이 없는 PC에서 코드 대조를 보려고 "
+    "부른다. 바뀐 파일(경로와 UTF-8 글자 전체)과 지운 경로를 보내면 커밋 하나로 만들고 코드 그래프를 다시 "
+    "만든다. git이 있으면 git push가 낫다. 명세 파일(docs/specs/)은 받지 않는다 — 명세는 create_document·"
+    "update_document로. 한 번에 UTF-8 합 5MB, 파일과 지운 경로 합 500개까지 — 넘으면 upload-too-large, "
+    "나눠 보낸다. 절대 경로·..·.git·비밀 꼴(.env·*.pem·*.key 등)·이진 파일은 upload-path-refused이고 "
+    "그때는 아무것도 올라가지 않는다. GitHub 저장 프로젝트면 storage-mismatch — GitHub에 push한다."
+)
+async def upload_code(
+    project_code: str, files: list[CodeFile], message: str, delete: list[str] | None = None
+) -> CallToolResult:
+    """SYNC-API-002#upload_code"""
+    try:
+        with db.session_scope() as s:
+            author = _agent_author(s)
+        r = await pipeline.upload_code(
+            project_code, {f.path: f.content for f in files}, list(delete or []), message, author
+        )
+        return _ok(r)
+    except Problem as p:
+        return _problem(p)
 
 
 @server.tool(

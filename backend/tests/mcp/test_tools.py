@@ -49,7 +49,9 @@ async def test_tools_listed_with_descriptions() -> None:
         "delete_document",
         "restore_document",
         "get_code_graph",  # 카드 AZ
+        "upload_code",  # 카드 BB
     }
+    assert "docs/specs/" in names["upload_code"] and "upload-too-large" in names["upload_code"]
     assert "호출하는 것" in names["get_code_graph"] and "graphify" in names["get_code_graph"]
     assert "document-deletion-needs-confirm" in names["delete_document"]
     assert (
@@ -350,3 +352,28 @@ async def test_get_code_graph(scoped: Session, as_user) -> None:
     assert [c["status"] for c in v["function"]["calls"]] == ["code_only", "spec_only", "same"]
     err, v = await call("get_code_graph", doc_id="NOPE-MS-001")
     assert err and v["type"] == "urn:syncdoc:not-found"
+
+
+async def test_upload_code_tool_puts_code_in_a_server_project(
+    scoped: Session, as_user, tmp_path, monkeypatch
+) -> None:
+    """카드 BB — 서버 저장 프로젝트에 코드를 커밋 하나로. GitHub 저장 프로젝트는 storage-mismatch."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "REPOS_DIR", tmp_path / "repos")
+    err, _ = await call("init_project", storage="server", code="UPT", name="올리기")
+    assert not err
+    err, r = await call(
+        "upload_code",
+        project_code="UPT",
+        files=[{"path": "app/x.py", "content": "X = 1\n"}],
+        message="code: x",
+    )
+    assert not err and r["changed"] and r["files"] == 1 and r["deleted"] == 0
+    err, p = await call(
+        "upload_code",
+        project_code="UPT",
+        files=[{"path": "docs/specs/01-RFQ/UPT-RFQ-001.md", "content": "x"}],
+        message="m",
+    )
+    assert err and p["type"] == "urn:syncdoc:upload-path-refused"
