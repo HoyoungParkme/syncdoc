@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-007
 type: MS
 title: MINISPEC — pipeline — 쓰기 조율
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/pipeline.py`의 함수 8개와 `scheduler.py`의 주기 함수 2개. 클래스 명세 [[SYNC-DOM-002]] 4.7의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/pipeline.py`의 함수 10개와 `scheduler.py`의 주기 함수 2개. 클래스 명세 [[SYNC-DOM-002]] 4.7의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -29,6 +29,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#pipeline.revert]] | 되돌리기 |
 | [[#pipeline.process_commit]] | GitHub 커밋 처리 |
 | [[#pipeline.rebuild]] | 인덱스 재구축 |
+| [[#pipeline.schedule_code_graph]] | 코드 그래프 만들기를 걸어 둔다 |
+| [[#pipeline.build_code_graph]] | 코드 그래프를 만든다 |
 | [[#pipeline.trash_document]] | 휴지통에 넣기 |
 | [[#pipeline.restore_document]] | 휴지통에서 되살리기 |
 | [[#pipeline.purge_document]] | 완전 삭제 |
@@ -336,13 +338,14 @@ async def process_commit(repo: Repository, head_hash: str, locked: bool = False)
    - if `status == D` (파일 삭제) → **문서 행이 없거나 `trashed_at`이 있으면 건너뛴다** — 앱이 [[#pipeline.trash_document]]·[[#pipeline.purge_document]]로 만든 삭제 커밋이거나 등록 전에 사라진 파일이다. `mark_deleted`로 가면 `not-found`가 나서 그 커밋이 영영 「처리 실패」로 남고 `last_processed_commit`이 안 나아간다 · else → `deleted = spec.mark_deleted(document, commit_hash, author)` (`status=draft`, `file.deleted` 오류, 전 항목 `is_deleted`) · `reference.mark_missing(deleted)` · 문서 행은 남는다 · 다음 파일로
    - else → `save_pipeline(entry=github, doc_id, None, body, None, author, message=원 커밋 메시지, changed_items=None, commit_hash=file_commit_hash)` → 결과 모음
 5. `repo.last_processed_commit = head_hash`, `synced_at = now`
+5a. **코드 그래프**([[SYNC-UC-001#UC-S8]]) — `paths = git.changed_paths(repo.workdir, f"{last}..{head_hash}")`(`last`가 없으면 생략) · if [[SYNC-MS-011#codegraph.touches_code]]`(paths)` or [[SYNC-MS-011#CodeGraphService.get]]`(project_id)`가 None → [[#pipeline.schedule_code_graph]]`(code, head_hash)`. 명세만 바뀐 커밋은 그래프가 있으면 건너뛴다(UC-S8 1a)
 6. `→ results`
 
 **출력** 파일마다 `SaveResult`
 
 **예외** 파일 하나 실패해도 다음 파일 계속. 실패 목록을 로그. `last_processed_commit`은 **전부 성공했을 때만** 갱신 — 아니면 다음 폴링이 다시 시도
 
-**호출하는 것** [[#pipeline.save_pipeline]] · [[SYNC-MS-002#SpecService.mark_deleted]] [[SYNC-MS-003#ReferenceService.mark_missing]] · `git.fetch` `git.changed_files` `git.read` · `AccountService.user_for_commit`
+**호출하는 것** [[#pipeline.save_pipeline]] · [[#pipeline.schedule_code_graph]] · [[SYNC-MS-011#codegraph.touches_code]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.mark_deleted]] [[SYNC-MS-003#ReferenceService.mark_missing]] · `git.fetch` `git.changed_files` `git.changed_paths` `git.read` · `AccountService.user_for_commit`
 
 **테스트 관점**
 - 커밋 하나에 파일 둘: 결과 둘, 각각 새 버전
@@ -354,6 +357,7 @@ async def process_commit(repo: Repository, head_hash: str, locked: bool = False)
 - 한 파일 실패: 나머지 처리됨, `last_processed_commit` 안 바뀜
 - **같은 head를 둘이 동시에 처리해도** 버전 하나, 자동 강등이 유지되고 저장소와 DB 상태가 같다(#194)
 - **이미 처리한 커밋이나 그 조상**을 head로 받으면 `[]`이고 `last_processed_commit`은 그대로다(#194)
+- 코드 파일이 바뀐 커밋 → 그래프 만들기가 걸린다 · 명세만 바뀐 커밋 → 그래프가 있으면 안 걸린다, 없으면 걸린다(카드 AX)
 
 ---
 
@@ -388,13 +392,14 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 7a~7b. 없음 — 전파결정·플래그를 새 버전에 다시 잇던 자리. 카드 V에서 걷어냈다
 8. `repo.last_processed_commit = HEAD`
 9. **커밋.** 락 해제
+10. [[#pipeline.schedule_code_graph]]`(code, HEAD)` — 재구축은 늘 다시 만든다(UC-S8)
 10. `→ RebuildResult(docs, items, references, versions, convention_errors)`
 
 **출력** [[SYNC-API-001]] `RebuildResult`
 
 **예외** 어느 단계든 실패하면 트랜잭션 롤백. DB는 재구축 전 상태로. `! rebuild-failed {reason}`
 
-**호출하는 것** [[SYNC-MS-002#SpecService.clear_index]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.save]] [[SYNC-MS-002#SpecService.mark_convention_error]] · `ReferenceService.clear` `ReferenceService.extract` `ReferenceService.resolve_missing` · `AccountService.user_for_commit` · `git.*`
+**호출하는 것** [[#pipeline.schedule_code_graph]] · [[SYNC-MS-002#SpecService.clear_index]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.save]] [[SYNC-MS-002#SpecService.mark_convention_error]] · `ReferenceService.clear` `ReferenceService.extract` `ReferenceService.resolve_missing` · `AccountService.user_for_commit` · `git.*`
 
 **테스트 관점**
 - DB 비운 뒤 재구축: 문서·항목·참조·버전 수가 저장소와 일치
@@ -406,6 +411,44 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 - 커밋 이메일을 등록하고 재구축: 버전 작성자가 그 사람으로 바뀌고 `author.unknown`이 사라진다
 - `status(` 커밋: Version 안 늘고 StatusChange 생김
 - 중간 실패: DB가 재구축 전과 같음
+- 재구축 뒤 코드 그래프 만들기가 걸린다(카드 AX)
+
+---
+
+#### pipeline.schedule_code_graph 코드 그래프 만들기를 걸어 둔다
+
+**시그니처** `def schedule_code_graph(code: str, commit: str) -> None`
+
+근거: [[SYNC-UC-001#UC-S8]] 확장 2b · 사용자 결정 2026-09-30
+
+**처리**
+1. if 이 프로젝트의 만들기가 이미 돌고 있다 → `다음[code] = commit`으로 적어 두고 끝 — 사이의 커밋은 덮인다
+2. else → `asyncio.create_task`로 돌린다: `build_code_graph(code, commit)` → 끝나면 `다음[code]`가 있으면 꺼내 한 번 더, 없으면 끝
+3. **저장소 락 밖이다.** 부른 쪽(`process_commit`·`rebuild`)은 기다리지 않는다 — 추출에 수 초가 걸려도 명세 처리와 쓰기가 막히지 않는다
+
+**테스트 관점** 돌고 있을 때 두 번 걸면 끝난 뒤 **마지막 커밋으로 한 번만** 더 돈다 · 프로젝트가 다르면 따로 돈다
+
+---
+
+#### pipeline.build_code_graph 코드 그래프를 만든다
+
+**시그니처** `async def build_code_graph(code: str, commit: str) -> None`
+
+근거: [[SYNC-UC-001#UC-S8]] · [[SYNC-SEQ-001#SEQ-26]] · 사용자 결정 2026-09-30(보관은 DB에 줄인 모양, 임시 폴더에서)
+
+**처리**
+1. 세션 하나에서 `project = ProjectService.get(code)` — 배치라 소유를 안 본다(`process_commit`과 같다) · `workdir = project.repository.workdir_path`
+2. 임시 폴더를 만들고 [[SYNC-MS-009#git.archive]]`(workdir, commit, tmp)`
+3. `source, raw = `[[SYNC-MS-011#codegraph.load]]`(tmp)` · `graph = `[[SYNC-MS-011#codegraph.enrich]]`(tmp, `[[SYNC-MS-011#codegraph.reduce]]`(raw))` — 모델 없음
+4. 세션 하나에서 [[SYNC-MS-011#CodeGraphService.save]]`(project.id, commit, source, graph)` · 커밋
+5. `log.info("code graph code=%s commit=%s source=%s functions=%d calls=%d elapsed=%.1fs", …)` — 한 줄
+6. 임시 폴더를 지운다(실패해도)
+
+**예외** 2~4 어디서든 실패하면 **삼키고** [[SYNC-MS-011#CodeGraphService.fail]]`(project.id, commit, 이유)` · `log.warning` 한 줄 — 배치라 받을 사람이 없고, 옛 그래프는 남는다. 프로젝트가 없으면(그새 해제) 조용히 끝
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get]] · [[SYNC-MS-009#git.archive]] · [[SYNC-MS-011#codegraph.load]] · [[SYNC-MS-011#codegraph.reduce]] · [[SYNC-MS-011#codegraph.enrich]] · [[SYNC-MS-011#CodeGraphService.save]] · [[SYNC-MS-011#CodeGraphService.fail]]
+
+**테스트 관점** 로컬 bare origin에 파이썬 파일을 커밋 → 행 하나, `commit_hash`가 그 커밋, `source=server`, 함수가 있다 · 저장소에 `graphify-out/graph.json`을 커밋해 두면 `source=repo` · 추출이 실패하면 옛 그래프가 남고 `error` · 작업 사본에 `graphify-out/`이 생기지 않는다
 
 ---
 
