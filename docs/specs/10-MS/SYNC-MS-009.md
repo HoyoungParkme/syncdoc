@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-009
 type: MS
 title: MINISPEC — infra — git·github 어댑터
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -56,9 +56,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **처리**
 1. `if not settings.LLM_API_KEY → ! LlmNotConfigured` — 네트워크 전
 2. 대화록을 와이어 형식으로 옮긴다 — 아래 표
-3. `httpx`로 `POST settings.LLM_API_URL`(OpenAI 호환 Chat Completions), `Authorization: Bearer {LLM_API_KEY}`, 본문 `{model: settings.LLM_MODEL, messages: [{role: "system", content: system}, …], tools: [{type: "function", function: {name, description, parameters}}], tool_choice}` — `tools`가 비면 `tools`·`tool_choice`를 아예 싣지 않는다 · 타임아웃 코드 상수 60초 · 스트리밍하지 않는다
+3. `httpx`로 `POST settings.LLM_API_URL`(OpenAI 호환 Chat Completions), `Authorization: Bearer {LLM_API_KEY}`, 본문 `{model: settings.LLM_MODEL, messages: [{role: "system", content: system}, …], tools: [{type: "function", function: {name, description, parameters}}], tool_choice}` — `tools`가 비면 `tools`·`tool_choice`를 아예 싣지 않는다 · 타임아웃 코드 상수 60초 · **`stream: true`·`stream_options: {include_usage: true}`로 스트리밍한다**(카드 AW)
 4. 응답 `choices[0].message` — `content`(없으면 `None`) · `tool_calls[]`마다 `ToolCall(id, function.name, json.loads(function.arguments))` · `usage`가 있으면 `LlmUsage(prompt_tokens, completion_tokens)`, 없으면 둘 다 0
 5. `→ LlmStep(text=content, tool_calls, usage)`
+
+구현은 [[#llm.step_stream]]을 끝까지 돌려 마지막 `LlmStep`을 돌려주는 것이다 — 요청·파싱 규칙은 같고 조각을 모을 뿐이다(카드 AW)
 
 **와이어 변환** — 우리 키 → OpenAI 호환
 
@@ -79,9 +81,36 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** 없음. 바깥만 만진다
 
-**호출되는 것** [[SYNC-MS-008#queries.ask_item]] 4·6단계
+**호출되는 것** 테스트·단발 호출. `ask_item`은 [[#llm.step_stream]]을 돈다(카드 AW)
 
 **테스트 관점** 키가 비면 부르기 전에 막는다(네트워크를 타지 않는다) · `tools`·`tool_choice`가 요청 본문에 그대로 실린다 · `tools`가 비면 두 키가 없다 · `tool_calls` 응답 → `ToolCall`의 `arguments`가 dict · `content`만 온 응답 → `text`, `tool_calls` 빈 목록 · `arguments`가 JSON이 아니면 `llm-unavailable` · `usage`가 없으면 0 · 외부가 429·400을 줘도 `llm-unavailable` · 외부가 느려도 예외로 끝나지 앱이 멈추지 않는다 · 대화록의 tool 항목이 `tool_call_id`와 함께 실린다 · `system`과 대화록을 그대로 싣는다(여기서 맥락을 더하거나 자르지 않는다)
+
+---
+
+#### llm.step_stream 스트림으로 한 번 호출 — 글자 조각과 끝의 LlmStep
+
+**시그니처** `async def step_stream(system: str, messages: list[dict], tools: list[ToolSpec], tool_choice: str = "auto") -> AsyncIterator[str | LlmStep]`
+
+근거: [[SYNC-INFRA-001]] 5.3 · [[SYNC-PRD-001#R11]] · [[SYNC-MS-008#queries.ask_item]] · 사용자 결정 2026-09-30(답은 흘러 나온다 — [[SYNC-CODE-001#AW]])
+
+**입력** [[#llm.step]]과 같다
+
+**처리**
+1. `if not settings.LLM_API_KEY → ! LlmNotConfigured` — 네트워크 전
+2. 본문은 [[#llm.step]] 3단계와 같고 `stream: true`·`stream_options: {include_usage: true}`를 더한다 · `httpx` `client.stream("POST", …)`
+3. 응답 `Content-Type`이 `text/event-stream`이 **아니면**(스트림을 무시하는 호환 서버) 본문을 JSON 하나로 읽어 [[#llm.step]] 4단계대로 `LlmStep` 하나를 `yield`하고 끝
+4. 줄마다 `data: ` 뒤를 JSON으로 — `[DONE]`이면 끝. `choices[].delta.content` 조각은 모으면서 **그대로 `str`로 `yield`** · `delta.tool_calls[]`는 `index`로 자리를 잡아 `id`·`function.name`을 채우고 `function.arguments` 조각을 이어 붙인다 · `usage`가 실린 청크(마지막)에서 `LlmUsage`
+5. 끝나면 `ToolCall(id, name, json.loads(arguments or "{}"))`로 만들고 `→ yield LlmStep(text=모은 글 or None, tool_calls, usage)` — 글자 조각을 냈어도 `text`는 전체다
+
+**출력** `str` 조각 0개 이상 → `LlmStep` 하나. 조각은 화면용이고 `LlmStep`이 진실이다
+
+**예외** [[#llm.step]]과 같다 — 키 없음 `llm-not-configured` · 비2xx·`httpx.HTTPError`·타임아웃·JSON 아님·`arguments` 비JSON → `llm-unavailable`
+
+**호출하는 것** 없음. 바깥만 만진다
+
+**호출되는 것** [[SYNC-MS-008#queries.ask_item]] 4·6단계 · [[#llm.step]]
+
+**테스트 관점** 본문에 `stream: true`·`stream_options`가 실린다 · SSE 본문(content 조각 셋 → tool_calls 조각 둘 → usage 청크 → `[DONE]`)을 MockTransport로 주면 조각이 순서대로 나오고 마지막 `LlmStep`의 `text`가 이어 붙인 전체, `tool_calls`의 `arguments`가 dict, `usage`가 마지막 청크 값이다 · `Content-Type: application/json`이면 단발로 읽어 `LlmStep`만 나온다 · 키가 비면 네트워크를 타지 않는다
 
 ---
 
