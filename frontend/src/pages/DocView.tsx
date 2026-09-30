@@ -1138,7 +1138,7 @@ function AskPanel({
 
   const srcLink = (id: string) => {
     // 본 것의 ID → 7.2와 같음. 이 문서 안 항목이면 스크롤·선택, 남의 문서·문서 자체면 링크. 첨부는 글자만
-    if (id.startsWith('첨부:')) return <span key={id}>{id}</span>
+    if (id.startsWith('첨부:') || id.startsWith('코드:')) return <span key={id}>{id}</span> // 첨부·코드는 글자만 (카드 AZ)
     const [d, it] = id.includes('#') ? [id.split('#')[0], id.split('#')[1]] : [id, '']
     if (d === docId && it) {
       return (

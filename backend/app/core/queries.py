@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -538,6 +539,10 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 문서ID#항목ID 이름 한 번이고 그 이름을 풀어 다시 쓰지 않는다. 번호 목록은 1·2·3으로 이어서
 쓴다.
 
+구현을 물으면(「명세대로 구현됐어?」 「이 함수가 실제로 뭘 부르나」) code_graph로 그 항목의
+대조(같음·코드만·명세만)를 먼저 보고, 필요하면 read_code로 함수 본문을 읽는다. 코드 근거는
+파일:줄로 댄다. 코드 그래프가 없다고 하면 그렇다고 말하고 지어내지 않는다.
+
 [문서] {doc_id} {title} · 상태 {status} · v{version_no}
 [이 문서의 항목]
 {items}
@@ -599,6 +604,23 @@ _ASK_TOOLS: list[ToolSpec] = [
         "read_attachment",
         "이 대화에 붙인 글자·PDF 첨부의 글자를 읽는다. 시작 맥락의 [첨부] 줄에 있는 id로 부른다. 이미지는 붙인 질문에 이미 보였으므로 이 도구로 읽을 수 없다.",
         {"attachment_id": {"type": "integer", "description": "[첨부] 줄의 첨부 id"}},
+    ),
+    # 일곱째 — 코드 대조. 설명은 SYNC-API-002 get_code_graph 원문 (카드 AZ)
+    _tool(
+        "code_graph",
+        "항목의 코드를 명세와 대조한 결과를 돌려준다. MINISPEC 항목이면 그 함수의 파일·줄, 부르는 것(명세 「호출하는 것」과 같음·코드만·명세만)과 불리는 곳을, 다른 항목이면 하위 체인에서 이어지는 MINISPEC 함수와 어긋남 수를. 서버의 코드 그래프(graphify)로 계산한다 — 구현이 명세대로인지 볼 때 부른다.",
+        {"doc_id": _DOC, "item_id": _ITEM},
+    ),
+    # 여덟째 — 코드 본문. MCP에는 없다 — 에이전트는 저장소를 가지고 있다 (카드 AZ)
+    _tool(
+        "read_code",
+        "그래프를 만든 커밋의 코드를 읽는다. target은 MINISPEC 항목 ID(문서ID#항목ID) · 함수 이름(Class.fn) · 파일 경로(path 또는 path:시작-끝). 300줄까지, 줄마다 번호가 붙는다. 키·인증서 같은 비밀 파일은 읽을 수 없다.",
+        {
+            "target": {
+                "type": "string",
+                "description": "문서ID#항목ID · Class.fn · 경로 · 경로:시작-끝",
+            }
+        },
     ),
 ]
 
@@ -708,6 +730,35 @@ async def ask_tool(
                 return _err("없음", attachment_id=att_id, hint="이미지는 붙인 질문에 이미 보였다")
             data = {"attachment_id": att_id, "name": a.name, "mime": a.mime, "text": text_}
             return ToolResult(f"첨부:{a.name}", json.dumps(data, ensure_ascii=False))
+        if name == "code_graph":
+            # 일곱째 — 코드 탭과 같은 대조 (카드 AZ)
+            v = await code_view(doc_id, item_id, user)
+            if v.graph is None:
+                return _err("코드 그래프 없음", hint="코드를 push하면 서버가 만든다")
+            return ToolResult(
+                f"코드:{doc_id}#{item_id}", json.dumps(_code_view_json(v), ensure_ascii=False)
+            )
+        if name == "read_code":
+            # 여덟째 — 그래프 커밋의 코드. 비밀 꼴·저장소 밖·모르는 이름은 「없음」 (카드 AZ)
+            target = str(args.get("target", "")).strip()
+            try:
+                t = await _read_code(code, target, user)
+            except NotFound:
+                return _err("없음", target=target, hint=_READ_CODE_HINT)
+            if t is None:
+                return _err("코드 그래프 없음", hint="코드를 push하면 서버가 만든다")
+            numbered = "\n".join(f"{t.start + i}: {ln}" for i, ln in enumerate(t.text.split("\n")))
+            data = {
+                "path": t.path,
+                "start": t.start,
+                "end": t.end,
+                "commit": t.commit_hash[:7],
+                "truncated": t.truncated,
+                "text": numbered,
+            }
+            return ToolResult(
+                f"코드:{t.path}:{t.start}-{t.end}", json.dumps(data, ensure_ascii=False)
+            )
         # get_document
         d = await document_view(doc_id, user)
         with db.session_scope() as s:
@@ -1043,3 +1094,80 @@ async def code_source(doc_id: str, item_id: str, user: User) -> CodeText:
         end = f.get("end") or _next_start(fns, f) or f["line"] + 59
         workdir = Path(project.repository.workdir_path)
         return await svc.read(project.id, workdir, f["file"], f["line"], end)
+
+
+_READ_CODE_HINT = "code_graph로 함수 위치(파일:줄)를 먼저 보거나 경로를 확인하라. 키·인증서 같은 비밀 파일은 읽을 수 없다"
+
+
+def _code_view_json(v: CodeView) -> dict[str, Any]:
+    """code_graph 도구의 JSON — 코드 탭과 같은 대조를 짧은 키로."""
+    g = v.graph
+    out: dict[str, Any] = {
+        "graph": {"commit": (g.commit_hash or "")[:7], "source": g.source, "error": g.error}
+        if g
+        else None,
+        "item": f"{v.doc_id}#{v.item_id}" if v.item_id else v.doc_id,
+        "is_ms": v.is_ms,
+        "missing": v.missing,
+    }
+    if v.function:
+        f = v.function
+        out["function"] = {
+            "qual": f.qual,
+            "file": f.file,
+            "line": f.line,
+            "end": f.end,
+            "calls": [
+                {"id": c.ms_id, "status": c.status, "qual": c.qual, "file": c.file, "line": c.line}
+                for c in f.calls
+            ],
+            "callers": [
+                {"id": c.ms_id, "qual": c.qual, "file": c.file, "line": c.line} for c in f.callers
+            ],
+        }
+    out["functions"] = [
+        {
+            "id": b.ms_id,
+            "qual": b.qual,
+            "file": b.file,
+            "line": b.line,
+            "same": b.same,
+            "code_only": b.code_only,
+            "spec_only": b.spec_only,
+        }
+        for b in v.functions
+    ]
+    return out
+
+
+async def _read_code(code: str, target: str, user: User) -> CodeText | None:
+    """read_code의 target → 파일·줄 범위 → CodeGraphService.read. 그래프가 없으면 None.
+
+    항목 ID(`문서#항목`)는 대조와 같은 규칙으로 함수를 찾고, 함수 이름은 그래프의 qual로, 나머지는
+    경로(`경로` 또는 `경로:시작-끝`). 못 찾으면 NotFound — 부르는 쪽이 「없음」으로 접는다.
+    """
+    with db.session_scope() as s:
+        project = ProjectService(s).get_owned(code, user)
+        svc = CodeGraphService(s)
+        row = svc.get(project.id)
+        if row is None:
+            return None
+        fns = row.graph.get("functions", [])
+        f: dict | None = None
+        path, start, end = target, 1, None
+        if "#" in target:
+            d = codegraph.compare(row.graph, {target: set()})[0]
+            f = next((x for x in fns if x["key"] == d.function), None)
+            if f is None:
+                raise NotFound("function", target)
+        else:
+            same = [x for x in fns if x["qual"] == target]
+            if len(same) == 1:
+                f = same[0]
+            elif m := re.fullmatch(r"(.+?):(\d+)-(\d+)", target):
+                path, start, end = m.group(1), int(m.group(2)), int(m.group(3))
+        if f is not None:
+            path, start = f["file"], f["line"]
+            end = f.get("end") or _next_start(fns, f) or start + 59
+        workdir = Path(project.repository.workdir_path)
+        return await svc.read(project.id, workdir, path, start, end)

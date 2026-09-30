@@ -2,7 +2,7 @@
 doc_id: SYNC-API-002
 type: API
 title: API 명세 MCP — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ---
 
@@ -41,6 +41,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 | `delete_document` | [[SYNC-UC-001#UC-A7]] | pipeline.trash_document | ○ |
 | `restore_document` | [[SYNC-UC-001#UC-A8]] | pipeline.restore_document | ○ |
 | `get_template` | (STD-001 전달) | — 내장 템플릿 · 저장소 `STD/` 읽기 | |
+| `get_code_graph` | [[SYNC-UC-001#UC-A9]] | queries.code_view (코드 그래프, 카드 AZ) | |
 
 ---
 
@@ -383,6 +384,31 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 **결과** — `SaveResult` (되살린 버전, `next_step` 포함)
 
 **에러**: `not-found`(문서 없음 · 남의 프로젝트는 `resource: project`) · `document-not-trashed`([[SYNC-UC-001#UC-A8]] 1a) · `convention-violation`(3a) · `push-failed`
+
+---
+
+### get_code_graph
+
+```json
+{
+  "name": "get_code_graph",
+  "description": "항목의 코드를 명세와 대조한 결과를 돌려준다. MINISPEC 항목이면 그 함수의 파일·줄, 부르는 것(명세 「호출하는 것」과 같음·코드만·명세만)과 불리는 곳을, 다른 항목이면 하위 체인에서 이어지는 MINISPEC 함수와 어긋남 수를. 서버의 코드 그래프(graphify)로 계산한다 — 구현이 명세대로인지 볼 때 부른다.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["doc_id"],
+    "properties": {
+      "doc_id": { "type": "string" },
+      "item_id": { "type": "string", "description": "없으면 문서 단위 — MINISPEC 문서면 그 문서 함수 전부" }
+    }
+  }
+}
+```
+
+**결과** [[SYNC-API-001]] 4장 `CodeView`와 같은 키 — `graph`(그래프 커밋·출처·실패 이유, 없으면 null) · `is_ms` · `missing` · `function`(`qual`·`file`·`line`·`end`·`calls[{ms_id, qual, file, line, status}]`·`callers[…]`) · `functions[{ms_id, qual, file, line, same, code_only, spec_only}]`. 대조는 부를 때 계산한다 — 명세만 고쳐도 바로 바뀐다
+
+**에러**: `not-found`(문서·항목 없음 · 남의 프로젝트는 `resource: project`)
+
+코드 본문은 MCP로 주지 않는다 — 에이전트는 저장소를 가지고 있고, 로컬 검사기 `check_calls`로 같은 대조를 돌린다([[SYNC-STD-004#DEV-14]]).
 
 ---
 

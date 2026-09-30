@@ -598,6 +598,7 @@ flowchart LR
     mt --> PS
     mt --> SS
     mt --> RS
+    mt --> QRB
 ```
 
 `routers/code.py`는 코드 탭·관계도 코드 호출의 네 조회(카드 AY) — `queries`만 본다. 대조는 여러 묶음(명세·코드 그래프)을 모아야 해서 서비스가 아니라 `queries`다. `routers/conversations.py`는 대화 목록·조회·삭제와 첨부 업로드·조회·삭제 — 묶음 하나(`ConversationService`)만 본다. 질문(`ask`)은 `routers/documents.py`에 그대로 있고 `queries.ask_item`이 대화를 읽고 쓴다(3.2).
@@ -1065,7 +1066,7 @@ code_source(doc_id, item_id, user) -> CodeText     SEQ-27  함수의 파일·줄
 ask_item(doc_id, item_id?, conversation_id, question, attachment_ids, user) -> AsyncIterator[AskEvent]
                                                     SEQ-24  대화에서 history·첨부 목록 → 시작 맥락(제목·항목 목록·첨부 목록) → add_turn → llm.step ↔ ask_tool 루프(8번·120초) → finish_turn → AskAnswer
 ask_tool(name, args, code, user, conversation_id) -> ToolResult
-                                                    SEQ-24  도구 하나 실행 — get_item · get_references · item_chain · list_documents · get_document · read_attachment. 같은 프로젝트·소유 검사
+                                                    SEQ-24  도구 하나 실행 — get_item · get_references · item_chain · list_documents · get_document · read_attachment · code_graph · read_code(카드 AZ). 같은 프로젝트·소유 검사
 ```
 
 **규칙** — **모든 함수가 `user: User`를 명시 인자로 받고 첫 줄에서 `ProjectService.get_owned`(목록은 `list_owned`)를 지난다.** `doc_id`로 들어오는 것은 `doc_id.split("-")[0]`이 코드다. 소유가 아니면 본문·항목·참조를 읽기 전에 not-found로 끝난다. `queries`는 쓰지 않는다. 읽고 조합만 한다. 건수는 `document_ids`로 묶어 한 번에 묻는다(N+1 금지). 단계 11칸 계산(가장 낮은 상태·gate_warning)은 `project_summary` 안에 있다 — `ProjectService`가 아니라.
