@@ -67,7 +67,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **`create_repo`의 기본값이 거짓인 이유.** 참으로 두면 주소에 오타를 내도 조용히 새 저장소가 생긴다. 지금은 그럴 때 clone이 실패해 `push-failed`가 나므로 오타를 알아챌 수 있다. 에이전트가 이 인자를 붙이려면 사람의 지시가 있어야 한다
 
-**호출하는 것** `AccountService.github_token_for` · [[SYNC-MS-009#github.create_repo]] · `git.clone` `exists` `list` `init_specs` `commit_push` · [[SYNC-MS-007#pipeline.rebuild]]
+**호출하는 것** `AccountService.github_token_for` · [[SYNC-MS-009#github.create_repo]] · [[SYNC-MS-009#git.clone]] [[SYNC-MS-009#git.exists]] [[SYNC-MS-009#git.list]] [[SYNC-MS-009#git.init_specs]] [[SYNC-MS-009#git.commit_push]] · [[SYNC-MS-007#pipeline.rebuild]]
 
 **테스트 관점** **통지 걸기가 실패해도 프로젝트는 등록된다**(hook_error에 사유) · 빈 저장소 → `docs/specs/` 생김, 커밋 하나, 11칸 null · **`owner_user_id`가 등록한 사람** · `docs/specs/` 있는 저장소 → `existing-specs`, workdir 없음, DB 행 없음 · `import_existing=true` → 재구축 결과 · clone 권한 없음 → `push-failed`, 아무것도 안 남음 · **없는 저장소 + `create_repo=false` → `push-failed`**(지금 동작) · **없는 저장소 + `true` → 공개 저장소가 생기고 골격 커밋까지** · **이미 있는 저장소 + `true` → 만들지 않고 그대로 쓴다** · 만든 뒤 등록이 실패해도 **저장소는 남는다**
 
@@ -114,6 +114,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **왜 `get(code, user)`가 아니라 함수를 하나 더 두나.** `user: User | None`으로 만들면 `None`이 「필터 없음」이라는 합법 값이 되어 **빠뜨린 자리가 조용히 전체 열람**이 된다. 함수가 둘이면 호출 자리마다 「시스템 경로인가 사람 경로인가」가 코드에 읽히고, `check_code`가 시그니처를 대조한다
 
 **호출되는 것** [[SYNC-MS-007#pipeline.save_pipeline]](github가 아닌 입구) · [[SYNC-MS-007#pipeline.change_status]] · `trash_document` `restore_document` `purge_document` `revert` · [[SYNC-MS-008]]의 사람용 조회 전부 · [[#ProjectService.delete_project]] · [[#ProjectService.rebuild_index]]
+
+**호출하는 것** [[#ProjectService.get]]
 
 **테스트 관점** 소유자 → `Project` · 다른 사람 → `not-found`이고 확장 필드가 `get`의 없음과 **같다**(`resource: project`) · 없는 코드 → 같은 `not-found`
 
@@ -187,6 +189,8 @@ async def ensure_hook(code: str, user: User) -> HookStatus
 
 **예외** `not-found`(1). 3의 실패는 **예외로 올리지 않고 상태로 돌려준다** — 사람이 화면에서 사유를 읽고 다시 누르면 된다
 
+**호출하는 것** [[#ProjectService.get_owned]] · [[SYNC-MS-006#AccountService.github_token_for]] · [[SYNC-MS-009#github.create_hook]]
+
 **테스트 관점** 주소·비밀번호가 비면 `none`이고 GitHub을 안 부른다 · 권한 없으면 `error`이고 `hook_error`가 남는다 · 성공하면 `ok`·`hook_id` 저장 · **두 번째 호출은 `created=False`** · 남의 프로젝트 → `not-found`
 
 ---
@@ -208,6 +212,8 @@ async def sync_now(code: str, user: User) -> SyncResult
 
 **예외** `not-found`(read_pending 1단계) · `git.fetch` 실패는 그대로 올린다(UC-G2 2b)
 
+**호출하는 것** [[#ProjectService.get_owned]] · [[SYNC-MS-007#pipeline.read_pending]]
+
 **테스트 관점** 밀린 것을 읽고 수를 돌려준다 · 읽을 것이 없으면 0이고 **`fetched_at`이 갱신된다** · 남의 프로젝트 → `not-found`
 
 ---
@@ -221,6 +227,8 @@ async def sync_now(code: str, user: User) -> SyncResult
 2. `hash = git.sync_readme(repo.workdir, Author(human, user, None, web_status), code)` — README가 낡았으면 새 판으로 커밋·push([[SYNC-MS-009#git.sync_readme]], 카드 AB). **인덱스보다 먼저**: 그 커밋이 3의 `fetch` head에 들어가 밀림이 0으로 끝난다. `PushFailed`는 그대로 올린다 — 저장소에 쓰는 일이 실패했으면 인덱스는 건드리지 않는다(UC-S6 1a)
 3. `pipeline.rebuild(code)` — 서비스가 pipeline을 부르는 유일한 곳(클래스 3.2)
 4. `→ RebuildResult(…, readme_updated=hash is not None)`
+
+**호출하는 것** [[#ProjectService.get_owned]] · [[SYNC-MS-007#pipeline.rebuild]] · [[SYNC-MS-009#git.sync_readme]]
 
 **테스트 관점** 남의 프로젝트 → `not-found`, 재구축 안 돎 · 낡은 README면 커밋이 하나 생기고 `readme_updated=true`, 이어서 재구축하면 밀림 0 · 같은 README면 커밋 없고 `false` · README push 실패면 인덱스가 그대로
 
