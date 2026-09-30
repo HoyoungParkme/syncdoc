@@ -674,6 +674,96 @@ class CallDiff:
     spec_only: list[str]
 
 
+@dataclass(frozen=True)
+class CodeGraphInfo:
+    """SYNC-DOM-002 2.8 — 코드 그래프 행의 머리. 몸통(graph)은 싣지 않는다(카드 AY)."""
+
+    commit_hash: str | None
+    source: str | None
+    built_at: datetime
+    error: str | None
+    function_count: int
+
+
+@dataclass(frozen=True)
+class CodeRef:
+    """SYNC-DOM-002 2.8 — 부르는 것(status 있음)·불리는 곳(status None) 한 줄."""
+
+    ms_id: str
+    qual: str | None
+    file: str | None
+    line: int | None
+    status: str | None = None
+
+
+@dataclass(frozen=True)
+class CodeBrief:
+    """SYNC-DOM-002 2.8 — 함수 목록 한 줄(UI-5 8.22)."""
+
+    ms_id: str
+    qual: str | None
+    file: str | None
+    line: int | None
+    same: int
+    code_only: int
+    spec_only: int
+
+
+@dataclass(frozen=True)
+class CodeFunction:
+    """SYNC-DOM-002 2.8 — MINISPEC 항목의 함수. calls는 어긋난 줄(코드만·명세만)이 위."""
+
+    ms_id: str
+    qual: str
+    file: str
+    line: int
+    end: int | None
+    calls: list[CodeRef]
+    callers: list[CodeRef]
+
+
+@dataclass(frozen=True)
+class CodeView:
+    """SYNC-DOM-002 2.8 — queries.code_view → API CodeView(UI-5 코드 탭)."""
+
+    graph: CodeGraphInfo | None
+    doc_id: str
+    item_id: str | None
+    is_ms: bool
+    missing: bool
+    function: CodeFunction | None
+    functions: list[CodeBrief]
+
+
+@dataclass(frozen=True)
+class CodeText:
+    """SYNC-DOM-002 2.8 — CodeGraphService.read → 코드 보기(8.21)·read_code(카드 AZ)."""
+
+    path: str
+    start: int
+    end: int
+    commit_hash: str
+    text: str
+    truncated: bool
+
+
+@dataclass(frozen=True)
+class CodeCallEdge:
+    """SYNC-DOM-002 2.8 — 관계도 코드 호출 선 하나(MINISPEC 항목끼리)."""
+
+    from_: str
+    to: str
+    status: str
+
+
+@dataclass(frozen=True)
+class CodeCalls:
+    """SYNC-DOM-002 2.8 — queries.code_calls → API CodeCalls(UI-8 2.6)."""
+
+    graph: CodeGraphInfo | None
+    edges: list[CodeCallEdge]
+
+
 AskEvent = AskStart | AskDelta | AskNote | AskRead | AskAnswer
 
 
