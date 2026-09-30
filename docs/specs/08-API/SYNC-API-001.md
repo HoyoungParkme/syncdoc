@@ -61,9 +61,10 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:project-code-conflict` | 409 | 코드 중복 | `code` | [[SYNC-UC-001#UC-A1]] 2a |
 | `urn:syncdoc:project-code-invalid` | 422 | 코드 형식 | `rule` | [[SYNC-UC-001#UC-A1]] 2b |
 | `urn:syncdoc:invalid-request` | 422 | 요청 본문·쿼리·경로 값이 정의(아래 3장 스키마)에 안 맞다 — 입력 검증. `detail`은 첫 오류 한 줄(`body.to — …`) | `errors: [{loc, msg}]` — `loc`은 `body.to`처럼 점으로 이은 위치 | — |
-| `urn:syncdoc:existing-specs` | 409 | `docs/specs/` 이미 있음 | `doc_count` | [[SYNC-UC-001#UC-A1]] 3a |
+| `urn:syncdoc:existing-specs` | 409 | `docs/specs/` 이미 있음. 서버 저장이면 같은 코드의 **보관된 저장소**가 있음 | `doc_count` · `archived_at`(보관본일 때만, 가장 최근 것을 보관한 때) | [[SYNC-UC-001#UC-A1]] 3a, 3b |
+| `urn:syncdoc:storage-unavailable` | 422 | 이 서버에서 켜지 않은 저장 방식으로 프로젝트를 만들려 함 | `storage` · `enabled: [켜진 방식…]` | [[SYNC-UC-001#UC-A1]] 1a |
 | `urn:syncdoc:repo-create-failed` | 424 | `create_repo`로 저장소를 못 만듦 — 이름 규칙·권한·다른 소유자 점유 | `reason` | [[SYNC-CODE-001#F]] |
-| `urn:syncdoc:push-failed` | 424 | GitHub push 실패 | `reason` | [[SYNC-UC-001#UC-A1]] 4a, [[SYNC-UC-001#UC-S7]] 2b |
+| `urn:syncdoc:push-failed` | 424 | 저장소 push 실패(GitHub이 거절했거나 닿지 않음). 서버 저장소는 서버 안이라 거의 없다 | `reason` | [[SYNC-UC-001#UC-A1]] 4a, [[SYNC-UC-001#UC-S7]] 2b |
 | `urn:syncdoc:already-current` | 422 | 현재 버전으로 되돌리기 | — | [[SYNC-UC-001#UC-H7]] |
 | `urn:syncdoc:document-has-history` | 409 | 휴지통의 문서를 완전 삭제하려는데 아직 다른 문서가 가리킴 | `inbound_refs: [문서ID#항목ID…]` | [[SYNC-UC-001#UC-H18]] 7 |
 | `urn:syncdoc:document-trashed` | 409 | 휴지통에 있는 문서를 저장·상태 변경·다시 휴지통에 넣으려 함 | `trashed_at` | [[SYNC-UC-001#UC-A7]] 1a |
@@ -225,13 +226,20 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
           schema:
             type: object
             required:
-            - remote_url
+            - storage
             - code
             - name
             properties:
+              storage:
+                type: string
+                enum: [github, server]
+                description: >
+                  저장 방식 ([[SYNC-PRD-001#R14]]). 서버가 켠 것만 된다(`GET /api/me`의 `storage_modes`) —
+                  아니면 storage-unavailable. 화면은 켠 것이 하나면 고르게 하지 않고 그것을 보낸다
               remote_url:
                 type: string
                 format: uri
+                description: GitHub 저장소 주소. **storage가 github일 때만, 그때는 필수**(없으면 invalid-request). server면 무시한다
               code:
                 type: string
                 pattern: ^[A-Z]{1,4}$
@@ -241,11 +249,11 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
               import_existing:
                 type: boolean
                 default: false
-                description: "docs/specs/가 이미 있을 때 true로 재요청하면 가져와서 등록 ([[SYNC-UC-001#UC-A1]] 3a2)"
+                description: "docs/specs/가 이미 있을 때 true로 재요청하면 가져와서 등록 ([[SYNC-UC-001#UC-A1]] 3a2). 서버 저장이면 같은 코드의 보관된 저장소를 되살린다(3b2)"
               create_repo:
                 type: boolean
                 default: false
-                description: "저장소가 없으면 공개 저장소로 만든다. 이미 있으면 만들지 않는다 ([[SYNC-CODE-001#F]])"
+                description: "저장소가 없으면 공개 저장소로 만든다. 이미 있으면 만들지 않는다 ([[SYNC-CODE-001#F]]). GitHub 저장만"
     responses:
       '201':
         content:
@@ -282,7 +290,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 #### DELETE/api/projects/{code} 프로젝트 등록 해제
 
-화면 [[SYNC-UI-002#UI-14]] 7(해제) · 유스케이스 [[SYNC-UC-001#UC-H17]] · 서비스 [[SYNC-MS-001#ProjectService.delete_project]] · GitHub 저장소는 손대지 않는다
+화면 [[SYNC-UI-002#UI-14]] 7(해제) · 유스케이스 [[SYNC-UC-001#UC-H17]] · 서비스 [[SYNC-MS-001#ProjectService.delete_project]] · GitHub 저장소는 손대지 않는다 · 서버 저장소는 보관 폴더로 옮긴다
 
 ```yaml
 /api/projects/{code}:
@@ -299,6 +307,8 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 **저장소는 건드리지 않는다.** 지우는 것은 싱크독 쪽 등록과 색인, 그리고 노트북의 작업 사본이다.
 `docs/specs/`는 원격에 그대로 남고, 다시 등록하면 `import_existing`으로 돌아온다.
+서버 저장소는 지우지 않고 보관 폴더(`ORIGINS_DIR/_archive/`)로 옮긴다 — 같은 코드로
+`import_existing`이면 되살아난다([[SYNC-UC-001#UC-A1]] 3b).
 
 **돌아오지 않는 것이 있다.** 상태 변경 이력은 원본에 없는 정보라 등록을 지우면 사라진다(인프라 6장).
 상태 자체는 frontmatter에 있어 돌아온다.
@@ -1428,6 +1438,12 @@ components:
           llm_enabled:
             type: boolean
             description: 서버에 LLM_API_KEY가 있는가. 로그인 때 이미 부르는 응답이라 요청이 늘지 않는다
+          storage_modes:
+            type: array
+            items:
+              type: string
+              enum: [github, server]
+            description: 이 서버가 켠 저장 방식(설정 STORAGE_MODES). UI-3이 고를 것을 정한다 ([[SYNC-PRD-001#R14]])
     Author:
       type: object
       description: 버전의 작성 주체. 에이전트면 instructed_by가 있다
@@ -1470,6 +1486,10 @@ components:
           type: string
         name:
           type: string
+        storage:
+          type: string
+          enum: [github, server]
+          description: 저장 방식 ([[SYNC-PRD-001#R14]])
         stages:
           type: array
           items:
@@ -1502,6 +1522,8 @@ components:
         properties:
           remote_url:
             type: string
+            nullable: true
+            description: GitHub 저장소 주소. 서버 저장이면 null — 서버 안 경로는 내보내지 않는다
           docs:
             type: array
             items:
@@ -1849,8 +1871,13 @@ components:
           type: string
         name:
           type: string   # UI-14 표가 「[코드] 이름」(UI-002 1.6)으로 적는다
+        storage:
+          type: string
+          enum: [github, server]
         remote_url:
           type: string
+          nullable: true
+          description: GitHub 저장소 주소. 서버 저장이면 null
         last_processed_commit:
           type: string
           nullable: true
@@ -1874,7 +1901,7 @@ components:
           enum: [ok, none, error]
           description: >
             push 통지가 걸려 있나 (카드 AF). ok면 반영이 몇 초, none이면 주기 확인(최대 5분)에만
-            기댄다. error면 hook_error에 사유
+            기댄다. error면 hook_error에 사유. 서버 저장은 늘 none — 걸 통지가 없다(인프라 7장)
         hook_error:
           type: string
           nullable: true
