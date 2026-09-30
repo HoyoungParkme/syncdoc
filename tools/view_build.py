@@ -139,12 +139,25 @@ def render_blocks(text, self_id, item_pat=None, common=""):
                 ind = len(lines[i]) - len(lines[i].lstrip()); items.append((ind, inline(re.sub(r"^\s*- ", "", lines[i]), self_id))); i += 1
             out.append("<ul>" + "".join(f'<li style="margin-left:{ind//2*14}px">{t}</li>' for ind, t in items) + "</ul>"); continue
         if re.match(r"^\d+\. ", l):
-            items = []
-            while i < len(lines) and (re.match(r"^\d+[a-z]?\. ", lines[i]) or lines[i].startswith("   ")):
-                if re.match(r"^\d+[a-z]?\. ", lines[i]): items.append(inline(re.sub(r"^\d+[a-z]?\. ", "", lines[i]), self_id))
-                elif items: items[-1] += "<br>" + inline(lines[i].strip(), self_id)
+            # 번호 목록 — 들여 쓴 `- `는 그 항목의 하위 목록, 빈 줄 하나 뒤의 번호는 같은 목록 (STD-002 1장, 카드 AU)
+            items = []; sub = []
+            def flush():
+                nonlocal sub
+                if sub and items: items[-1] += "<ul>" + "".join(f"<li>{t}</li>" for t in sub) + "</ul>"
+                sub = []
+            while i < len(lines):
+                cur = lines[i]
+                if re.match(r"^\d+[a-z]?\. ", cur): flush(); items.append(inline(re.sub(r"^\d+[a-z]?\. ", "", cur), self_id))
+                elif re.match(r"^\s+- ", cur) and items: sub.append(inline(re.sub(r"^\s+- ", "", cur), self_id))
+                elif cur.startswith("   "):
+                    flush()
+                    if items: items[-1] += "<br>" + inline(cur.strip(), self_id)
+                elif cur.strip() == "" and i + 1 < len(lines) and re.match(r"^\d+[a-z]?\. ", lines[i + 1]): pass  # 빈 줄 하나 — 같은 목록
+                else: break
                 i += 1
-            out.append("<ol>" + "".join(f"<li>{x}</li>" for x in items) + "</ol>"); continue
+            flush()
+            first = re.match(r"^\d+", l).group(0)  # 첫 번호가 1이 아니면 그 번호부터(`0.` 준비 단계) — 원본 번호 그대로
+            out.append(("<ol>" if first == "1" else f'<ol start="{first}">') + "".join(f"<li>{x}</li>" for x in items) + "</ol>"); continue
         if l.startswith("> "):
             q = []
             while i < len(lines) and lines[i].startswith("> "): q.append(inline(lines[i][2:], self_id)); i += 1

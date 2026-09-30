@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -276,7 +276,7 @@ textarea.in{height:auto;min-height:64px;padding:8px 10px;resize:none;line-height
   .qa .prog .r{font-family:var(--mono);font-size:11.5px}
   .qa .spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--ink);flex:none;animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
-  .qa .a{padding:6px 9px;border:1px solid var(--line);border-radius:5px;background:#fff;font-size:13.5px;line-height:1.55}
+  .qa .a{padding:0 2px;font-size:13.5px;line-height:1.55}
   .qa .a p{margin:0 0 6px}.qa .a p:last-child{margin:0}.qa .a ul{margin:0 0 6px 18px;padding:0}
   .qa .a.wait{color:var(--dim);border-style:dashed}
   .qa .src{font:12px var(--mono);color:var(--dim);margin-top:4px}
@@ -444,7 +444,7 @@ status: draft
   </aside>
 </div>
 
-<div class="var">질문 탭, 답이 온 뒤 — 세 층(위 고정 · 가운데 스크롤 · 아래 고정). 8.9는 「n단계 읽음 · 본 것 k ▸」 한 줄로 접힌다. 답은 가벼운 마크다운이고 참조는 링크다. 첨부 칩(8.14)은 입력 바로 위</div>
+<div class="var">질문 탭, 답이 온 뒤 — 세 층(위 고정 · 가운데 스크롤 · 아래 고정). 8.9는 「n단계 읽음 · 본 것 k ▸」 한 줄로 접힌다. 답은 상자 없이 맨글, 가벼운 마크다운이고 참조는 링크다. 첨부 칩(8.14)은 입력 바로 위</div>
 <div class="sd h" style="width:420px;min-height:0">
   <aside class="side chat" style="min-height:520px">
     <div class="ptabs"><span>참조</span><span class="on">질문</span></div>
@@ -565,7 +565,7 @@ status: draft
 | 8.4 | 질문 탭 | 탭 | 읽다가 묻는다(UC-H19). 모델이 같은 프로젝트를 관계도로 따라 읽는다. **모델 키가 없으면 이 탭이 없다** — `GET /api/me`의 `llm_enabled`로 안다 | 패널을 질문으로 |
 | 8.5 | 맥락 줄 | 텍스트 | 지금 무엇을 보며 묻는지. 항목이 있으면 「`X 이름` · 이 항목을 보며 묻습니다」, 없으면 「문서 전체 · `{doc_id}`에 대해 묻습니다」. 항목은 힌트다 | — |
 | 8.6 | 질문 입력 | 입력 | **패널 맨 아래 고정.** 항상 활성(휴지통 문서 제외). 보내는 동안만 비활성. 보내면 8.7에 쌓인다. 클립보드에 이미지·파일이 있으면 붙여넣기가 8.14로 간다 | Enter → 보냄 · 붙여넣기 → 8.14 |
-| 8.7 | 대화 | 목록 | 질문(붙인 첨부 칩 포함)·진행 묶음(8.9)·답이 차례로. **가운데 층만 스크롤한다.** 대화는 서버에 저장되어(카드 AQ) 새로고침·다른 기기에서도 8.11로 골라 이어 간다. 답은 **가벼운 마크다운**(문단·목록·굵게·인라인 코드)으로 그리고, 답 속 `[[…]]`와 맨 `문서ID#항목ID`는 7.2와 같은 링크다(#206) — 참조 ID는 **한 덩어리로 줄바꿈하지 않고**, 지금 문서 안 항목은 `#ID`로 줄여 보인다(카드 AT). 답 속 mermaid 코드블록은 **그림으로 그린다**(본문 7.3과 같은 렌더러 — 마인드맵·flowchart·클래스·시퀀스) — 오른쪽 위 전체보기(공통 1.7). mindmap은 그리기 전에 **라벨의 따옴표·괄호·대괄호를 벗긴다**(모양은 그대로) — 모델이 `id[("이름 (최우선)")]`처럼 써서 문법 오류가 잦다. 그래도 문법 오류면 코드가 남는다. 저장된 답도 다시 열면 그려진다(카드 AS) | 답 속 참조 → 7.2와 같음(다른 문서면 그 문서로) · 첨부 칩 → 미리보기(이미지)/다운로드 · 그림 전체보기 → 7.6 |
+| 8.7 | 대화 | 목록 | 질문(붙인 첨부 칩 포함)·진행 묶음(8.9)·답이 차례로. **가운데 층만 스크롤한다.** 대화는 서버에 저장되어(카드 AQ) 새로고침·다른 기기에서도 8.11로 골라 이어 간다. 답은 **상자 없이 맨글**로 패널 폭을 다 쓴다 — 질문만 오른쪽 말풍선이라 누가 말했는지는 자리와 바탕으로 갈린다. 기다림·실패는 지금처럼 테두리·색(카드 AU). 답은 **가벼운 마크다운**(문단·목록·굵게·인라인 코드)으로 그리고, 답 속 `[[…]]`와 맨 `문서ID#항목ID`는 7.2와 같은 링크다(#206) — 참조 ID는 **한 덩어리로 줄바꿈하지 않고**, 지금 문서 안 항목은 `#ID`로 줄여 보인다(카드 AT). 답 속 mermaid 코드블록은 **그림으로 그린다**(본문 7.3과 같은 렌더러 — 마인드맵·flowchart·클래스·시퀀스) — 오른쪽 위 전체보기(공통 1.7). mindmap은 그리기 전에 **라벨의 따옴표·괄호·대괄호를 벗긴다**(모양은 그대로) — 모델이 `id[("이름 (최우선)")]`처럼 써서 문법 오류가 잦다. 그래도 문법 오류면 코드가 남는다. 저장된 답도 다시 열면 그려진다(카드 AS) | 답 속 참조 → 7.2와 같음(다른 문서면 그 문서로) · 첨부 칩 → 미리보기(이미지)/다운로드 · 그림 전체보기 → 7.6 |
 | 8.11 | 대화 고르기 | 드롭다운 | 맥락 줄(8.5) 아래 한 줄 「대화 ▾ 제목」. 펼치면 이 프로젝트의 대화 목록 — 제목·턴 수·마지막 시각, 최근순. URL `?conv={id}` | 고르면 8.7이 그 대화로 · 행의 8.13 |
 | 8.12 | 새 대화 | 버튼 | 8.11 오른쪽 | 빈 대화를 만들고 8.7을 비운다 |
 | 8.13 | 대화 지우기 | 버튼 | 8.11 목록 행마다. `위험` 색 | 확인(1.1) 뒤 `DELETE /api/conversations/{id}` — 첨부도 함께. 지금 보던 대화면 목록 첫 것으로 |
