@@ -181,6 +181,7 @@ classDiagram
         +int id
         +int project_id
         +int registered_by_user_id
+        +Storage storage
         +str remote_url
         +str workdir_path
         +str last_processed_commit
@@ -195,6 +196,8 @@ classDiagram
 
 관계
 - `Repository` 1 — 1 `Project`
+
+`storage`는 **저장 방식**이다 — `github` 또는 `server`([[SYNC-PRD-001#R14]]). 만들 때 정하고 바뀌지 않는다. 서버 저장이면 `remote_url`은 서버 안 원본의 경로(`ORIGINS_DIR/{코드}.git`)라 밖으로 내보내지 않는다 — 입구는 `storage`를 보고 저장소 주소를 감춘다. 작업 사본·처리 지점·재구축은 저장 방식을 가리지 않는다. `hook_id`·`hook_error`는 GitHub 저장만 쓴다.
 
 `hook_id`·`hook_error`는 **push 통지를 걸었는지**를 들고 있다(카드 AF). 걸었으면 GitHub이 준 훅
 번호, 못 걸었으면 사유. 둘 다 비면 아직 안 걸어 본 것이다. 화면이 이 셋을 「걸림 / 안 걸림 /
@@ -390,6 +393,7 @@ classDiagram
 | DocType | RFQ, PRD, SCN, UC, INFRA, DOM, UI, API, SEQ, MS, CODE, STD | Document. STD는 단계 밖 |
 | DocStatus | draft, approved | Document, StatusChange. 라벨은 「초안」「완료」 |
 | AuthorKind | human, agent | Version |
+| Storage | github, server | Repository. 라벨 「GitHub 저장소」「서버 저장소」([[SYNC-PRD-001#R14]]). 서버가 켠 것은 설정 `STORAGE_MODES`([[SYNC-INFRA-001]] 5.2) |
 
 ---
 ### 2.8 응답·내부 타입 (DTO)
@@ -674,7 +678,7 @@ flowchart TB
 classDiagram
     class ProjectService {
         «service»
-        +init_project(remote_url: str, code: str, name: str, user: User, import_existing: bool = False) Project
+        +init_project(remote_url: str?, code: str, name: str, user: User, import_existing: bool = False, create_repo: bool = False, storage: Storage = Storage.github) Project
         +list_projects() list~Project~
         +list_owned(user: User) list~Project~
         +get(code: str) Project
@@ -695,6 +699,7 @@ classDiagram
         +int id
         +int project_id
         +int registered_by_user_id
+        +Storage storage
         +str remote_url
         +str workdir_path
         +str last_processed_commit
@@ -711,7 +716,7 @@ classDiagram
 
 | 메서드 | 부르는 곳 | 유스케이스 | 던지는 에러 |
 |---|---|---|---|
-| `init_project` | [[SYNC-API-001#POST/api/projects]] · MCP [[SYNC-API-002#init_project]] | [[SYNC-UC-001#UC-A1]] | project-code-conflict, project-code-invalid, existing-specs, push-failed |
+| `init_project` | [[SYNC-API-001#POST/api/projects]] · MCP [[SYNC-API-002#init_project]] | [[SYNC-UC-001#UC-A1]] | storage-unavailable, invalid-request, project-code-conflict, project-code-invalid, existing-specs, push-failed |
 | `list_projects` | scheduler · hooks (사람이 없는 경로) | [[SYNC-UC-001#UC-G1]] | |
 | `list_owned` | queries.project_summary · repo_status | [[SYNC-UC-001#UC-H14]] | |
 | `get` | pipeline(github 경로) · scheduler · hooks | — | not-found |
@@ -724,6 +729,8 @@ classDiagram
 **규칙이 사는 곳**
 - **소유 게이트는 `get_owned` 하나다.** `project.owner_user_id != user.id`면 `NotFound("project", code)` — 있다는 사실이 새지 않는다(있는데 못 본다가 아니라 없다). 사람이 부르는 경로(웹·MCP)는 전부 `get_owned`·`list_owned`를 지나고, 사람이 없는 경로(폴링·웹훅·GitHub 커밋 처리)만 `get`·`list_projects`를 쓴다. `get(code, user: User | None)`처럼 인자를 선택으로 두지 않는다 — `None`이 「필터 없음」이라는 합법 값이 되면 빠뜨린 자리가 조용히 전체 열람이 된다
 - `init_project`: `owner_user_id = user.id`. 코드는 `^[A-Z]{1,4}$`. `docs/specs/`가 이미 있으면 덮어쓰지 않고 `import_existing`으로 분기([[SYNC-UC-001#UC-A1]] 3a). `existing-specs`로 거부할 때 clone한 작업 사본을 지운다(SEQ-4)
+- `init_project`의 저장 방식: `STORAGE_MODES`에 없으면 `storage-unavailable`, GitHub인데 주소가 없으면 `invalid-request`. 서버 저장이면 `git.init_bare`로 `ORIGINS_DIR/{코드}.git`을 만들고 그것을 clone한다 — **토큰을 쓰지 않는다.** 같은 코드의 보관본(`ORIGINS_DIR/_archive/{코드}-*.git`)이 있으면 새로 만들지 않는다: `import_existing`이면 가장 최근 것을 되살리고, 아니면 `existing-specs`에 보관한 때를 싣는다([[SYNC-UC-001#UC-A1]] 3b)
+- `delete_project`: 서버 저장이면 원본을 지우지 않고 보관 폴더로 옮긴다([[SYNC-UC-001#UC-H17]])
 - `repo_status`: 저장소마다 `git.fetch` + `rev_list_count`로 `behind_by`. 캐시할지는 미결
 - **`documents` 테이블을 모른다.** 단계 요약·건수는 `queries.project_summary`가 `SpecService.list_by_project`와 `ReferenceService.count_missing_by_document`로 만든다(되먹임 #13)
 
@@ -1079,7 +1086,7 @@ ask_tool(name, args, code, user, conversation_id) -> ToolResult
 git.clone(remote_url, workdir, token) -> None
 git.fetch(workdir, token=None) -> str          origin/main 해시. v1은 public이라 토큰 없이
 git.checkout(workdir, ref) -> None
-git.commit_push(workdir, message, author, path=None, content=None, files=None) -> str
+git.commit_push(workdir, message, author, path=None, content=None, files=None, delete=None) -> str
 git.read(workdir, path, ref="HEAD") -> str
 git.changed_files(workdir, range, prefix) -> list[ChangedFile]
 git.list(workdir, glob, ref="HEAD") -> list[str]
@@ -1087,6 +1094,7 @@ git.log(workdir, path) -> list[Commit]
 git.rev_list_count(workdir, range) -> int
 git.exists(workdir, path) -> bool
 git.init_specs(workdir) -> dict[str, str]
+git.init_bare(path) -> None                    서버 저장소를 만든다 — main, 앞당김·삭제 거부 (카드 BA)
 git.archive(workdir, commit, dest) -> None      그 커밋의 파일을 dest에 푼다 (코드 그래프, 카드 AX)
 git.changed_paths(workdir, range) -> list[str]  범위에서 바뀐 경로 전부 (명세 밖 포함)
 
@@ -1103,7 +1111,7 @@ llm.step(system, messages, tools, tool_choice="auto") -> LlmStep
                                                user 항목에 images(mime·bytes)가 있으면 content 파트 배열로 옮긴다 (첨부, 카드 AR)
 ```
 
-**규칙** — `git.commit_push`만 `AccountService.github_token_for`를 부른다(3.2). 토큰은 push URL에만 쓰고 `.git/config`에 남기지 않는다.
+**규칙** — `git.commit_push`만 `AccountService.github_token_for`를 부른다(3.2). **원격이 `https://`일 때만** 부른다 — 서버 저장소(서버 안 경로)는 토큰 없이 push한다(카드 BA). 토큰은 push URL에만 쓰고 `.git/config`에 남기지 않는다.
 
 `llm`은 키를 `config`에서 읽는다. 키가 비면 부르기 전에 `llm-not-configured`로 막고, 외부가 실패하면 `llm-unavailable`로 접는다 — 사용량 초과도 여기 들어간다([[SYNC-INFRA-001]] 5.3). **어댑터는 한 번 호출만 안다.** 도구 선언(`tools`)과 `tool_choice`를 와이어 형식(`{type: function, function: {name, description, parameters}}`)으로 옮겨 싣고, 응답의 `tool_calls`를 `ToolCall`로 파싱해 돌려준다. `arguments`가 JSON이 아니면 `llm-unavailable`. 루프는 어댑터에 없다 — `queries.ask_item`이 돈다.
 
@@ -1249,7 +1257,7 @@ classDiagram
 2. **`github_login`** — 커밋 이메일이 GitHub noreply(`{id}+{login}@users.noreply.github.com`)면 앞부분이 곧 로그인 ID다
 3. **자리표시 생성** — `github_login`만 있는 User(`github_user_id`·`github_token_encrypted` null)
 
-**자리표시는 프로젝트를 소유할 수 없다.** 소유는 등록 시점에 정해지고(결정 6), 등록에는 토큰이 필요하며(`init_project`의 clone·push), 자리표시에는 토큰이 없다. 그래서 `projects.owner_user_id`에 자리표시가 앉는 길이 없다.
+**자리표시는 프로젝트를 소유할 수 없다.** 소유는 등록 시점에 정해지고(결정 6), 등록은 로그인한 사람(웹 세션이나 거기서 발급한 토큰)만 한다. 자리표시는 로그인한 적이 없다. 그래서 `projects.owner_user_id`에 자리표시가 앉는 길이 없다 — 토큰이 필요 없는 서버 저장(카드 BA)에서도 같다.
 
 **자리표시의 `github_login`은 GitHub 로그인이 아닐 수 있다.** noreply가 아닌 커밋에서는 `%an`(사람 이름)이 대체값으로 들어간다 — 공백이 든 문자열이 컬럼에 앉는다. 그래서 그 사람이 나중에 OAuth 로그인해도 login 대조로는 합쳐지지 않는다. **합치는 경로는 본인이 UI-13에서 커밋 이메일을 등록하고 인덱스를 재구축하는 것이다.** 앞으로의 커밋은 GitHub 설정에서 메일 비공개를 켜 noreply로 나가게 하면 2번에서 바로 잡힌다([[SYNC-INFRA-001]] 5장).
 
@@ -1263,7 +1271,7 @@ classDiagram
 
 **5. 끊어진 참조를 어디에 두나 — 결정: `references.is_missing`을 되돌린다.** v1은 상위 항목이 삭제되면 `broken_ref` 플래그를 세웠다. 추적 묶음을 빼면서 갈 곳이 없어졌는데, 참조 표에 이미 「대상이 없다」를 뜻하는 자리가 있다. 삭제된 대상을 아직 안 쓰인 대상과 같이 다루면 새 표·새 개념 없이 미완성 배너(UI-5 4a)·`get_references`·항목 표시가 전부 그대로 쓰인다. 상대가 되살아나면 `resolve_missing`이 잇는다 — 이미 있던 경로다. 「언제 끊어졌나」는 잃는다. 혼자 쓰는 도구에서 그 시각을 물을 사람이 없다.
 
-**6. 소유를 어디에 두나 — 결정: `projects.owner_user_id`. `repositories.registered_by_user_id`를 겸용하지 않는다.** 둘은 다른 사건이다. `registered_by_user_id`는 **push 토큰의 주인**이다 — GitHub 경로 자동 강등 커밋(`pipeline.process_commit`)을 미는 사람이고, 앞으로 private 저장소를 지원하면 fetch 토큰의 주인이다. 소유자는 **누구에게 보이나**다. 지금은 둘 다 등록한 사람이라 값이 같지만, 한 칸에 두면 나중에 토큰 주인을 바꾸는 일과 소유를 바꾸는 일이 갈라지지 않는다. 접근 단위도 프로젝트(`code`)다 — 모든 입구가 `code`로 들어오고 락도 `code` 단위라, 소유를 `repositories`에 두면 판정마다 조인이 붙는다. 프로젝트와 저장소가 1:1이라 어디에 두든 동작은 같으니 순수하게 뜻의 문제고, 뜻은 `projects`다. 리비전 `0012_add_projects_owner`가 컬럼을 더하고 등록자로 채운다([[SYNC-DOM-003#projects]]). 초대·공유·역할은 만들지 않는다 — 실측으로 여덟 프로젝트에 교차 작성이 한 건도 없었고, 필요해지면 `project_members` 표 하나와 `get_owned` 조건 한 줄이면 된다.
+**6. 소유를 어디에 두나 — 결정: `projects.owner_user_id`. `repositories.registered_by_user_id`를 겸용하지 않는다.** 둘은 다른 사건이다. `registered_by_user_id`는 **push 토큰의 주인**이다 — GitHub 경로 자동 강등 커밋(`pipeline.process_commit`)을 미는 사람이고, 앞으로 private 저장소를 지원하면 fetch 토큰의 주인이다. 서버 저장소는 토큰이 없어 등록한 사람을 적을 뿐이다(그 커밋의 작성자). 소유자는 **누구에게 보이나**다. 지금은 둘 다 등록한 사람이라 값이 같지만, 한 칸에 두면 나중에 토큰 주인을 바꾸는 일과 소유를 바꾸는 일이 갈라지지 않는다. 접근 단위도 프로젝트(`code`)다 — 모든 입구가 `code`로 들어오고 락도 `code` 단위라, 소유를 `repositories`에 두면 판정마다 조인이 붙는다. 프로젝트와 저장소가 1:1이라 어디에 두든 동작은 같으니 순수하게 뜻의 문제고, 뜻은 `projects`다. 리비전 `0012_add_projects_owner`가 컬럼을 더하고 등록자로 채운다([[SYNC-DOM-003#projects]]). 초대·공유·역할은 만들지 않는다 — 실측으로 여덟 프로젝트에 교차 작성이 한 건도 없었고, 필요해지면 `project_members` 표 하나와 `get_owned` 조건 한 줄이면 된다.
 
 ---
 
