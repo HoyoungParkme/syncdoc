@@ -57,6 +57,10 @@ upstream: [SYNC-PRD-001, SYNC-UC-001]
 
 출처: RFQ
 
+#### C10 폐쇄망판은 인터넷 없이 돈다 — 실행 중 바깥 요청이 없고, 반입은 이미지 묶음 하나다. 로그인이 없고 한 사람이 쓴다
+
+출처: [[SYNC-PRD-001#R15]] · [[SYNC-PRD-001#N4]]. 코드는 하나이고 설정 `EDITION=closed`가 판을 가른다(8.1)
+
 ---
 
 ## 2. 구성도
@@ -115,6 +119,7 @@ graph TB
 | 메타데이터 DB | PostgreSQL | 아래 참고 |
 | Git 조작 | GitPython 또는 `git` CLI 호출 | 작업 사본에서 clone·commit·push. 서버 저장소는 `git init --bare`로 만든다 — git이 이미지에 들어 있어 폐쇄망에도 따로 설치할 것이 없다 |
 | 다이어그램 | mermaid.js (브라우저 렌더링). 서버 생성물 없음 | PRD R10 |
+| 글꼴 | Pretendard·IBM Plex Mono를 **앱이 담는다**(npm 패키지를 빌드 때 `/fonts/{패키지}-{판}/`로 복사) | CDN을 부르지 않는다 — 폐쇄망판([[#C10]])이 바깥 없이 돌고, 인터넷판도 같은 파일을 쓴다. 판 번호가 경로에 있어 1년 immutable |
 | 외부 노출 | Cloudflare Tunnel | C7을 우회하는 유일한 현실적 방법 |
 | 인증 | GitHub OAuth (웹) / 개인 토큰 (MCP) | 5장 |
 | 모델 호출 | 외부 모델 API. `infra/llm.py` 어댑터 하나 | 읽는 중 질의([[SYNC-PRD-001#R11]])에만. 5.3 |
@@ -151,6 +156,8 @@ FastAPI 단일 앱
 | `/auth/*` | GitHub OAuth 콜백 |
 | `/hooks/github` | GitHub webhook 수신 |
 | `/git/{코드}.git/*` | 서버 저장소의 git 입구 — clone·push(개인 토큰). `info/refs`·`git-upload-pack`·`git-receive-pack` 셋만 |
+| `/fonts/*` | 앱이 담은 글꼴(판 번호가 든 경로). 화면 틀과 폐쇄망판의 배치 iframe이 쓴다 |
+| `/specs/*` | 이미지 안의 규약·템플릿 사본(`STD/`·`_templates/`)을 글자로. 폐쇄망판 README의 규약 링크가 가리킨다 |
 | `/` 및 정적 | React 빌드 결과 |
 
 **API 앞머리는 화면 틀로 떨어지지 않는다(#158).** `/api`·`/auth`·`/hooks`·`/mcp`·`/git` 아래 없는 경로는 메서드와 무관하게 404 problem+json(`not-found`, [[SYNC-API-001]] 2장)이다. 화면 틀 대체 라우트가 이 앞머리를 받지 않는다 — 전에는 `GET /api/없는경로`에 화면 틀(HTML, 200)이 나가 오타 난 호출이 성공처럼 보였고, `POST`는 대체 라우트 때문에 405가 났다.
@@ -232,6 +239,7 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 | 액터 | 방식 | 확인하는 것 |
 |---|---|---|
 | 사람 (웹) | GitHub OAuth | GitHub 계정으로 들어오고, 자기가 등록한 프로젝트만 본다 |
+| 사람 (웹, 폐쇄망판) | **로그인 없음** — 켜질 때 둔 로컬 사용자 하나([[#C10]]) | 요청 Host가 허용 목록(`127.0.0.1`·`localhost`·`[::1]`·`PUBLIC_BASE_URL`의 host)인가 — 이름을 바꿔 들어오는 DNS rebinding을 막는다. 쓰기 요청(POST·PUT·PATCH·DELETE)의 Origin이 있으면 같은 곳인가 — 다른 사이트가 보내는 요청을 막는다. 둘 다 `forbidden-origin` 403. MCP·git은 토큰이라 Origin을 보지 않는다 |
 | 에이전트 (MCP) | 개인 액세스 토큰 | 사람이 웹에서 발급한 토큰인가. 토큰은 발급한 사람에 묶이고, 발급자가 소유한 프로젝트만 연다 |
 | GitHub (webhook) | 서명 검증 | webhook secret으로 요청이 GitHub에서 왔는지 |
 | 사람의 git (서버 저장소) | HTTP Basic — **비밀번호 칸에 개인 토큰**(MCP와 같은 토큰) | 토큰의 주인이 그 프로젝트의 소유자인가, 서버 저장 프로젝트인가. 아이디 칸은 보지 않는다 — 토큰이 사람을 정한다. 틀리면 401과 `WWW-Authenticate`로 git이 다시 묻게, 남의 것·GitHub 저장은 404 |
@@ -315,11 +323,14 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 | `REPOS_DIR` | `/var/syncdoc/repos` | 작업 사본이 사는 곳 |
 | `ORIGINS_DIR` | `/var/syncdoc/origins` | 서버 저장소가 사는 곳(`{코드}.git`)과 보관 폴더(`_archive/`). **원본이므로 볼륨으로 남기고 백업한다**(6장) |
 | `STORAGE_MODES` | `github,server` | 이 서버에서 켠 저장 방식. 쉼표로 둘 중 하나 이상. 켜지 않은 방식으로는 프로젝트를 만들 수 없다([[SYNC-PRD-001#R14]]) |
-| `SPECS_URL` | `https://github.com/HoyoungParkme/syncdoc/blob/main/docs/specs` | 새 저장소 README가 규약·템플릿을 가리키는 주소. 싱크독 저장소를 옮기면 바꾼다 (카드 AB) |
+| `SPECS_URL` | `https://github.com/HoyoungParkme/syncdoc/blob/main/docs/specs` | 새 저장소 README가 규약·템플릿을 가리키는 주소. 싱크독 저장소를 옮기면 바꾼다 (카드 AB). **폐쇄망판에서 기본값 그대로면** `{PUBLIC_BASE_URL}/specs` — 이미지 안 사본(8.1) |
 | `LLM_API_KEY` | **빈 값** | 모델 키. 비면 읽는 중 질의가 꺼진다 (5.3) |
 | `LLM_API_URL` | `https://api.openai.com/v1/chat/completions` | OpenAI 호환 Chat Completions 주소. 호환 서버면 바꾼다 (5.3) |
 | `LLM_MODEL` | `gpt-4o` | 쓸 모델 이름 (5.3). mini는 항목 본문에 있는 것도 「모른다」고 내 첫날 바꿨다 |
 | `LLM_MAX_TURNS` | 10 | 한 대화에서 서버가 받는 최대 턴 수 (5.3) |
+| `EDITION` | `internet` | 판 — `internet` 또는 `closed`(8.1). closed면 로그인이 없고(로컬 사용자), 저장 방식은 서버만, GitHub 로그인·통지 경로가 없다 |
+| `LOCAL_LOGIN` | `local` | 폐쇄망판 로컬 사용자의 아이디 — 커밋 작성자(`{아이디}@syncdoc.local`)에 쓰인다 |
+| `LOCAL_NAME` | `LOCAL_LOGIN`과 같게 | 폐쇄망판 로컬 사용자의 표시 이름 — 이력·설정에 보인다 |
 
 `TUNNEL_TOKEN`은 앱이 읽지 않는다. `scripts/tunnel.sh`가 쓰는 값이라 `.env`에만 있다 (8장).
 
@@ -331,7 +342,7 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 |---|---|
 | 어디에 | **OpenAI 호환 Chat Completions**(`LLM_API_URL`). 회사를 고정하지 않는다 — 같은 모양의 API를 내는 서버(OpenAI·로컬 모델 등)면 주소만 바꾼다. 요청은 `POST {LLM_API_URL}`, `Authorization: Bearer`, 본문 `{model, messages, tools, tool_choice}`(function calling), 답은 `choices[0].message`의 `content` 또는 `tool_calls`. 호환 서버가 `tool_choice: none`을 못 받으면 마무리 호출을 `tools` 없이 보낸다 |
 | 키 | **서버에 하나**(`LLM_API_KEY`). 사람마다 넣지 않는다 — 혼자 쓰는 도구고([[#C6]]), 사람마다 키를 두면 `users`에 컬럼이 늘고 5.1 재암호화가 하나 더 생긴다 |
-| 켜고 끄기 | 키가 비면 **기능이 꺼진다.** 화면에서 탭이 사라지고 나머지는 그대로 돈다. **기본이 빈 값이므로 켜는 쪽이 선택이다** |
+| 켜고 끄기 | 키가 비면 **기능이 꺼진다.** 화면에서 탭이 사라지고 나머지는 그대로 돈다. **기본이 빈 값이므로 켜는 쪽이 선택이다.** 키를 받지 않는 사내 모델 서버(폐쇄망판)면 키 칸에 아무 글자나 넣는다 |
 | 도구 | 읽기 여덟 — 항목 본문 · 참조(상위·하위 1홉, 문서 참조는 제목·상태, 끊어진 건 「아직 없음」) · 사슬(전이) · 문서 목록 · 문서 전문 · **첨부 글자**(이 대화에 붙인 글자·PDF 파일의 추출 텍스트) · **코드 대조**(코드 그래프) · **코드 본문**(그래프 커밋의 커밋된 파일, 비밀 꼴 제외, 300줄 — 카드 AZ). **전부 읽기**이고 소유 검사를 지나며 **같은 프로젝트 안**만이다. 쓰는 도구는 어떤 경우에도 없다 |
 | 첨부 | 사람이 질문에 붙인 파일. 이미지(png·jpg·webp·gif ≤10MB)는 **그 질문의 사용자 메시지에 그대로**(data URL, vision) 실리고 뒤 턴에는 다시 안 실린다. 글자 파일(md·txt·csv·json·yaml)·PDF(≤1MB)는 업로드 때 글자를 뽑아 두고 모델이 도구로 필요할 때 읽는다 — 맥락에 미리 싣지 않는 원칙 그대로. 한 질문에 8개. 종류·상한 밖은 업로드에서 거절(413·415) |
 | 나가는 것 | 시작 맥락(문서 제목·상태·버전 + 그 문서의 항목 ID·이름 + 이 대화의 첨부 이름·종류·크기. 본문 없음) + 이 질문의 이미지 + 모델이 도구로 읽는 같은 프로젝트의 문서·항목·참조·첨부 글자·**코드 본문**(같은 프로젝트 저장소의 커밋된 파일만, `.env`·키·인증서 같은 비밀 꼴은 거부). 프로젝트 밖은 안 나간다 |
@@ -406,6 +417,25 @@ docker compose up
 Cloudflare Tunnel은 노트북에서 별도로 실행하며 `:8000`을 공개 주소에 연결한다.
 
 **이미지에 담기는 것** — 백엔드 코드, React 빌드 결과, 그리고 `docs/specs/`의 `_templates/`와 `STD/` 사본. [[SYNC-API-002#get_template]]이 템플릿은 **늘** 이 사본으로 주고(사용자 저장소에는 사본이 없다, 카드 AB), 규약은 그 프로젝트 저장소에 `STD/`가 있으면 그것을 먼저 준다. 둘 중 하나라도 이미지에서 빠지면 배포본에서만 조용히 실패한다.
+
+### 8.1 폐쇄망판
+
+같은 이미지를 설정 `EDITION=closed`로 띄운다([[#C10]]). 반입물은 스크립트(`scripts/release_closed.sh {판}`)가 인터넷 쪽에서 만든다.
+
+```
+syncdoc-closed-{판}/
+├── images.tar.gz        docker save — 앱(syncdoc-app:{판})과 postgres:16-alpine
+├── docker-compose.yml   이미지를 불러 쓰기만(build 없음) · EDITION=closed · 포트는 127.0.0.1만 · DB 포트 안 엶
+├── .env.example         SECRET_KEY · POSTGRES_PASSWORD · LOCAL_NAME · PUBLIC_BASE_URL · LLM_*(사내 주소)
+├── INSTALL.md           설치 · 토큰과 에이전트 · git 원격 · 업데이트 · 백업
+└── SHA256SUMS
+```
+
+- **설치** — `docker load -i images.tar.gz` → `.env` 채우기 → `docker compose up -d`. 스키마는 앱이 켜질 때 올린다
+- **업데이트** — 새 묶음을 `docker load` 하고 `SYNCDOC_VERSION`을 바꿔 `docker compose up -d`. 볼륨(`pgdata`·`repos`·`origins`)은 그대로
+- **백업** — `pg_dump`와 볼륨 `origins`(서버 저장소 — 원본이다, 6장)를 함께. `repos`는 작업 사본이라 다시 clone된다
+- **같은 망에 열 때** — compose 포트를 바꾸고 `PUBLIC_BASE_URL`을 그 주소로 둔다(Host 허용 목록, 5장). 로그인이 없으니 그 망의 누구나 쓰게 된다 — 설치 안내가 경고한다
+- **README 규약 링크** — 폐쇄망판은 `{PUBLIC_BASE_URL}/specs`(이미지 안 사본)를 가리킨다. `SPECS_URL`을 주면 그것을 쓴다
 
 **운영상 전제**
 - 노트북이 꺼지면 웹과 MCP가 모두 멈춘다. 이 구조의 근본 한계이며 C5(저장소 직접 읽기)가 대비책이다.
