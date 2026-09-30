@@ -218,7 +218,7 @@ class ProjectService:
                 hook=_hook_state(p.repository),
                 hook_error=p.repository.hook_error,
             )
-            for p in self.repo.owned_by(user.id)
+            for p in self.list_owned(user)  # 처리 — list_owned (check_calls, 카드 AX)
         ]
 
     async def delete_project(self, code: str, user: User) -> None:
