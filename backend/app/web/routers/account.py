@@ -58,12 +58,14 @@ async def me(user: User = Depends(auth.current_user)) -> Me:
     """SYNC-API-001#GET/api/me — llm_enabled는 서버에 키가 있는가(인프라 5.3).
 
     storage_modes는 이 서버가 켠 저장 방식 — UI-3이 고를 것을 정한다 (PRD R14, 카드 BA).
+    edition은 판 — closed면 화면이 로그아웃·커밋 이메일을 숨긴다 (PRD R15, 카드 BC).
     """
     base = UserSchema.model_validate(user).model_dump()
     return Me(
         **base,
         llm_enabled=bool(settings.LLM_API_KEY),
         storage_modes=settings.storage_modes,
+        edition=settings.edition,
     )
 
 
