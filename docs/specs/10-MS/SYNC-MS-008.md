@@ -40,6 +40,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#queries.downstream_view]] | 이 문서를 참조하는 것 (추적표) |
 | [[#queries.ask_item]] | 문서를 읽다가 묻는다 — 모델이 관계도를 따라 읽는다 |
 | [[#queries.ask_tool]] | 모델이 부른 읽기 도구 하나를 실행한다 |
+| [[#queries.code_view]] | 코드 탭 — 항목의 코드 대조 |
+| [[#queries.code_calls]] | 관계도 코드 호출 — MINISPEC 사이 호출 선 |
+| [[#queries.code_source]] | 코드 보기 — 함수 본문 |
 
 ---
 
@@ -411,6 +414,66 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 5. `→ DownstreamView(by_item, by_document)`
 
 **호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.get_document` `SpecService.item_pks` `SpecService.describe_items` `SpecService.describe_documents` · `ReferenceService.references_among`
+
+---
+
+
+#### queries.code_view 코드 탭 — 항목의 코드 대조
+
+**시그니처** `async def code_view(doc_id: str, item_id: str | None, user: User) -> CodeView`
+
+근거: [[SYNC-UC-001#UC-H20]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/code]] · [[SYNC-API-001#GET/api/docs/{docId}/code]] · [[SYNC-SEQ-001#SEQ-27]] · 사용자 결정 2026-09-30(모든 문서에 코드 탭, 다른 항목은 하위 체인)
+
+**처리**
+0. `project = ProjectService.get_owned(doc_id.split("-")[0], user)` — 남의 것이면 `! not-found` · `doc = SpecService.get_document(doc_id)` · if `item_id` → `SpecService.resolve_item(doc_id, item_id)`(없으면 `! not-found`)
+1. `row = CodeGraphService.get(project.id)` · if None → `CodeView(graph=None, …, functions=[])` (UC-H20 1a)
+2. `items` = 프로젝트의 MINISPEC 문서마다(`SpecService.list_by_project(stage=MS)`) `SpecService.get_document` → `SpecService.item_blocks(본문)` → `(문서ID#항목ID, 블록)` · `spec = codegraph.spec_calls(items)` · `diffs = codegraph.compare(row.graph, spec)`
+3. if MINISPEC 문서이고 `item_id` → 그 항목의 diff로 `CodeFunction` — `calls`: 코드만 → 명세만 → 같음 순, 줄마다 `CodeRef`(상대 항목의 함수가 있으면 qual·파일·줄) · `callers`: 다른 항목의 diff에서 이 항목이 같음·코드만에 든 것 · 함수가 없으면 `function=None, missing=True`(2b)
+4. if MINISPEC가 아닌 문서이고 `item_id` → `chain = `[[#queries.item_chain]]`(doc_id, item_id, user)` · 하위(`downstream`)이면서 MINISPEC 단계인 항목 → `functions = [CodeBrief]`(어긋남 수)
+5. if MINISPEC 문서이고 `item_id` 없음 → 그 문서 항목 전부의 `CodeBrief`(블록 순서)
+6. `→ CodeView(graph=머리(row), doc_id, item_id, is_ms, missing, function, functions)`
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.resolve_item]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-011#codegraph.spec_calls]] · [[SYNC-MS-011#codegraph.compare]] · [[#queries.item_chain]]
+
+**테스트 관점** 그래프 없음 → `graph` None · MINISPEC 항목 → `calls`가 코드만·명세만·같음 순이고 `callers`가 있다 · 코드에 없는 MINISPEC 항목 → `missing` · PRD 항목 → 하위 체인의 MINISPEC 함수와 어긋남 수 · MINISPEC 문서 단위 → 그 문서 함수 전부 · 남의 프로젝트 → `not-found` · 명세의 「호출하는 것」만 바꾸면 그래프를 안 바꿔도 결과가 바뀐다
+
+---
+
+#### queries.code_calls 관계도 코드 호출
+
+**시그니처** `async def code_calls(code: str, user: User) -> CodeCalls`
+
+근거: [[SYNC-UC-001#UC-H20]] · [[SYNC-API-001#GET/api/projects/{code}/code-calls]] · UI-8 2.6
+
+**처리**
+0. `project = ProjectService.get_owned(code, user)`
+1. `row = CodeGraphService.get(project.id)` · if None → `CodeCalls(graph=None, edges=[])`
+2. `code_view` 2단계와 같이 `spec`·`diffs`
+3. `edges` = diff마다 같음·코드만·명세만 각각 `CodeCallEdge(from_=diff.ms_id, to=상대, status)` — MINISPEC 항목끼리만
+4. `→ CodeCalls(graph=머리(row), edges)`
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-011#codegraph.spec_calls]] · [[SYNC-MS-011#codegraph.compare]]
+
+**테스트 관점** 선이 셋으로 갈린다 · 그래프 없음 → 빈 선 · 남의 프로젝트 → `not-found`
+
+---
+
+#### queries.code_source 코드 보기
+
+**시그니처** `async def code_source(doc_id: str, item_id: str, user: User) -> CodeText`
+
+근거: [[SYNC-UC-001#UC-H20]] 기본 흐름 3 · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/code/source]] · UI-5 8.21
+
+**처리**
+0. `project = ProjectService.get_owned(…)` · `SpecService.resolve_item(doc_id, item_id)`
+1. `row = CodeGraphService.get(project.id)` · if None → `! not-found {resource: code_graph}`
+2. `d = codegraph.compare(row.graph, {항목: ∅})[0]` — 그 항목의 함수 자리(docstring ID 먼저, 없으면 이름) · if `d.function` None → `! not-found {resource: function}`
+3. `start = 함수.line` · `end = 함수.end` — 없으면(파이썬 밖) 같은 파일 다음 함수 앞 줄, 그것도 없으면 `start + 59`
+4. `→ `[[SYNC-MS-011#CodeGraphService.read]]`(project.id, workdir, 함수.file, start, end)`
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.resolve_item]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#CodeGraphService.read]]
+
+**테스트 관점** 함수 본문이 그래프 커밋의 것 · 파이썬 함수는 끝 줄까지 · 그래프 없음·함수 없음 → `not-found`
 
 ---
 
