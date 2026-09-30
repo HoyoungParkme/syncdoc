@@ -13,7 +13,7 @@ import { extraCss, renderView } from '../view'
 import { attachDiagramButtons, DiagramFull, type FullDiagram, type WfFullDetail } from '../components/DiagramFull'
 import { esc, renderBlocks, splitRef } from '../view/md'
 import { ItemIdBadge, StatusPill, ProjName, toast, useEscape } from '../components/ui'
-import { Handle, PANEL, readStore, TOC, useWidth, writeStore } from '../components/panes'
+import { ASK, Handle, PANEL, readStore, TOC, useWidth, writeStore } from '../components/panes'
 import type { AskChat, AskTurnView } from '../components/Shell'
 
 
@@ -53,6 +53,7 @@ export function DocView() {
   // 규칙: 사이드바 폭과 원문/렌더링 선택은 사람마다 기억한다. 화면을 옮겨도 유지된다
   const [tocW, addTocW] = useWidth(TOC)
   const [panelW, addPanelW] = useWidth(PANEL)
+  const [askW, addAskW] = useWidth(ASK) // 질문 탭은 폭을 따로 기억한다 (8.3, 카드 AT)
   const [rawMode, setRawMode] = useState<'text' | 'rendered'>(() => (readStore('syncdoc.ui5.raw') === 'rendered' ? 'rendered' : 'text'))
   const pickRaw = (m: 'text' | 'rendered') => {
     setRawMode(m)
@@ -215,10 +216,15 @@ export function DocView() {
     setSelected(id)
   }
 
+  const askTab = askOn && !doc.trashed_at // 키 없음·휴지통 문서(4b)면 탭이 없다
+  const panel = askTab && panelParam === 'ask' ? 'ask' : 'refs'
+  // 탭을 바꾸면 그 탭의 폭으로 — 참조 탭 250, 질문 탭 420 (UI-5 규칙, 카드 AT)
+  const [sideW, addSideW] = panel === 'ask' ? [askW, addAskW] : [panelW, addPanelW]
+
   return (
     // 폭 변수를 화면 전체가 쥔다 — 원본 탭도 같은 값으로 사이드바 자리를 비워 둬야
     // 탭을 오갈 때 본문이 좌우로 안 흔들린다 (UI-5 규칙)
-    <div className="docscreen" style={{ '--toc-w': `${tocW}px`, '--panel-w': `${panelW}px` } as React.CSSProperties}>
+    <div className="docscreen" style={{ '--toc-w': `${tocW}px`, '--panel-w': `${sideW}px` } as React.CSSProperties}>
       {full && <DiagramFull d={full} el="7.6" onClose={() => setFull(null)} />}
       {/* 브레드크럼 — 어디서 들어왔든 지금 자리를 말하고, 앞 두 조각으로 되짚어 올라간다 */}
       <div className="docbar" data-el="1">
@@ -366,11 +372,9 @@ export function DocView() {
           </div>
         </div>
 
-        <Handle el="8.3" onDrag={(dx) => addPanelW(-dx)} />
+        <Handle el="8.3" onDrag={(dx) => addSideW(-dx)} />
         <aside className="panel" data-el="8">
           {(() => {
-            const askTab = askOn && !doc.trashed_at // 키 없음·휴지통 문서(4b)면 탭이 없다
-            const panel = askTab && panelParam === 'ask' ? 'ask' : 'refs'
             return (
               <>
                 <div className="ptabs">
