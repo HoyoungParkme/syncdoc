@@ -59,6 +59,7 @@ erDiagram
     repositories {
         int id PK
         int project_id FK,UK
+        varchar storage
         varchar remote_url
         varchar workdir_path
         varchar last_processed_commit
@@ -200,6 +201,7 @@ erDiagram
 - `references`의 `to_item_id`와 `to_document_id`는 CHECK로 하나만 채워지게 한다. `is_missing=true`면 둘 다 null
 - **끊어진 참조는 별도 표가 아니다.** 대상 항목이 삭제되면 그것을 가리키던 참조의 `to_*`를 비우고 `is_missing=true`로 되돌린다([[SYNC-MS-003#ReferenceService.mark_missing]]). `raw_target`이 남아 있어 상대가 돌아오면 `resolve_missing`이 다시 잇는다. v1의 `flags`·`propagation_decisions`·`comments`는 v2에서 뺐다([[SYNC-DOM-001]] 3.3) — 리비전 0011이 세 표를 지운다. `downgrade`는 0001·0007·0008의 정의를 복원하지만 데이터는 돌아오지 않는다. 옛 행은 각 저장소의 `backup/tracking.json`과 태그 `v1-collab`의 `import_tracking`으로만 되살릴 수 있다
 - **`repositories.hook_id`·`hook_error`는 리비전 `0013_add_repo_hook`이 둘 다 nullable로 더한다**(카드 AF). 기본값 없이 비운 채 시작한다 — 「아직 안 걸어 본 것」이 맞는 초기 상태다. `downgrade`는 두 컬럼을 지운다
+- **`repositories.storage`는 리비전 `0016_add_repositories_storage`가 `server_default 'github'`로 더한다**(카드 BA). 그때까지의 저장소는 전부 GitHub라 기본값이 곧 백필이다. `downgrade`는 컬럼을 지운다 — 서버 저장 행이 있으면 그 행의 `remote_url`이 서버 안 경로라 뜻이 어긋나므로, 내리기 전에 서버 저장 프로젝트를 해제해야 한다
 - **소유는 `projects.owner_user_id` 한 컬럼이다.** 별도 권한 표가 없다. 리비전 `0012_add_projects_owner`가 nullable로 더하고 `repositories.registered_by_user_id`(없으면 `min(users.id)`)로 채운 뒤 not null·FK로 조인다(0004 선례). `downgrade`는 컬럼을 지운다
 
 ---
@@ -224,10 +226,11 @@ erDiagram
 
 | 컬럼 | 타입 | 제약 | 의미 | 예시 |
 |---|---|---|---|---|
-| remote_url | varchar(300) | not null | GitHub 저장소 주소 | `https://github.com/dfocus/syncdoc` |
+| storage | varchar(8) | not null, 기본 `github` | **저장 방식** — `github` 또는 `server`([[SYNC-PRD-001#R14]]). 만들 때 정하고 바뀌지 않는다 | `server` |
+| remote_url | varchar(300) | not null | 원격. GitHub 저장이면 GitHub 저장소 주소, 서버 저장이면 **서버 안 원본의 경로**(`ORIGINS_DIR/{코드}.git`) — 이 경로는 입구가 밖으로 내보내지 않는다 | `https://github.com/dfocus/syncdoc` · `/var/syncdoc/origins/ABC.git` |
 | workdir_path | varchar(300) | not null | 노트북의 작업 사본 경로 | `/var/syncdoc/repos/SYNC` |
 | last_processed_commit | varchar(40) | null 허용 | 파이프라인이 마지막으로 처리한 커밋. 밀린 커밋 따라잡기 기준 | `a1b2c3…` |
-| registered_by_user_id | int | FK not null | **push 토큰의 주인.** GitHub 경로 자동 강등 커밋을 이 사람 토큰으로 민다. private 저장소를 지원할 때 fetch에 쓸 토큰의 주인이기도 하다. 소유자가 아니다 — 소유는 `projects.owner_user_id` — 폴링·재구축은 요청한 사람이 없거나 다른 사람일 수 있다. **v1은 public만 쓰므로 fetch에 토큰이 필요 없다**(MS-009 미결) | |
+| registered_by_user_id | int | FK not null | **push 토큰의 주인**(서버 저장은 토큰이 없어 등록한 사람을 적을 뿐). GitHub 경로 자동 강등 커밋을 이 사람 토큰으로 민다. private 저장소를 지원할 때 fetch에 쓸 토큰의 주인이기도 하다. 소유자가 아니다 — 소유는 `projects.owner_user_id` — 폴링·재구축은 요청한 사람이 없거나 다른 사람일 수 있다. **v1은 public만 쓰므로 fetch에 토큰이 필요 없다**(MS-009 미결) | |
 | synced_at | timestamptz | null 허용 | 마지막으로 원격을 받아온 시각. 폴링이 갱신 | |
 | behind_by | int | null 허용 | 원격이 앞선 커밋 수. 0이면 최신, null이면 아직 못 받아봄 | `0` |
 | fetched_at | timestamptz | null 허용 | `behind_by`를 잰 시각. 화면이 "언제 기준인지" 보여준다 | |
