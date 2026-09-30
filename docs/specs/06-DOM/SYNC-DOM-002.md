@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -427,6 +427,7 @@ classDiagram
 | `AskStart` | `doc_id: str` · `item_id: str \| None` | ask_item → 라우터 `start` 이벤트. 이 앞의 오류는 HTTP 상태, 뒤는 `error` 이벤트 |
 | `AskNote` | `text: str` | ask_item → `note` 이벤트. 모델이 읽기 전에 쓴 한 줄(도구 인자 `reason`) |
 | `AskRead` | `tool: str` · `target: str \| None` | ask_item → `read` 이벤트. 도구 실행이 끝났다 |
+| `AskDelta` | `text: str` | ask_item → `delta` 이벤트. 모델이 지금 쓰는 글자 조각 — 뒤에 `note`면 메모였고 `answer`면 답이다. 저장되지 않는다(카드 AW) |
 | `AskAnswer` | `answer: str` · `context_item_ids: list~str~` | ask_item → `answer` 이벤트. `context_item_ids`는 **모델이 실제로 읽은 대상**(부른 순서) — 화면이 「본 것」으로 보여준다. **저장하지 않는다**([[SYNC-INFRA-001]] 6장) |
 | `AskEvent` | `= AskStart \| AskNote \| AskRead \| AskAnswer` | ask_item이 차례로 yield하는 것. 라우터가 SSE로 흘린다 |
 | `AttachmentMeta` | `id` · `name` · `mime` · `size` · `turn_id: int \| None` · `created_at` | ConversationService → API `AttachmentMeta`. **바이트·추출 글자는 안 실린다** |
