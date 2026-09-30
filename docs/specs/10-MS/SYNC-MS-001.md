@@ -42,34 +42,45 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### ProjectService.init_project 프로젝트 초기화
 
-**시그니처** `async def init_project(remote_url: str, code: str, name: str, user: User, import_existing: bool = False, create_repo: bool = False) -> Project`
+**시그니처** `async def init_project(remote_url: str | None, code: str, name: str, user: User, import_existing: bool = False, create_repo: bool = False, storage: Storage = Storage.github) -> Project`
 
-근거: [[SYNC-SEQ-001#SEQ-4]] · [[SYNC-UC-001#UC-A1]] · [[SYNC-API-001#POST/api/projects]] · [[SYNC-API-002#init_project]] · [[SYNC-PRD-001#R12]]
+근거: [[SYNC-SEQ-001#SEQ-4]] · [[SYNC-SEQ-001#SEQ-28]] · [[SYNC-UC-001#UC-A1]] · [[SYNC-API-001#POST/api/projects]] · [[SYNC-API-002#init_project]] · [[SYNC-PRD-001#R12]] · [[SYNC-PRD-001#R14]]
 
 **처리**
 0. **코드 단위 락**을 잡는다(`asyncio.Lock`, code별). 같은 코드로 동시에 두 번 들어오면 서로의 작업 사본을 지운다(UC-A1 2c)
+0a. if `storage not in settings.storage_modes` → `! storage-unavailable {storage, enabled}` (UC-A1 1a)
+0b. if `storage == github and not remote_url` → `! invalid-request [{loc: remote_url, msg: GitHub 저장은 저장소 주소가 필요하다}]` (1b)
 1. if `not re.fullmatch(r"[A-Z]{1,4}", code)` → `! project-code-invalid {rule}` (2b)
 2. if `DB: projects where code` → `! project-code-conflict {code}` (2a)
-2a. if `DB: repositories where remote_url 정규화 일치` → `! repository-already-registered {code: 그 프로젝트}` (UC-A1 2d). 정규화는 소문자 + 끝 `/`·`.git` 제거 — `web/routers/hooks.py`가 webhook 저장소를 찾을 때와 같은 규칙
+2a. (GitHub 저장) if `DB: repositories where remote_url 정규화 일치` → `! repository-already-registered {code: 그 프로젝트}` (UC-A1 2d). 정규화는 소문자 + 끝 `/`·`.git` 제거 — `web/routers/hooks.py`가 webhook 저장소를 찾을 때와 같은 규칙
 3. `workdir = config.REPOS_DIR / code` · if 이미 있음 → 지운다 (이전 실패 잔재)
-3a. `token = AccountService.github_token_for(user)`
-3b. if `create_repo` → `github.create_repo(token, owner, name)` — `owner`·`name`은 `remote_url`에서 뜬다. **이미 있으면 만들지 않고 넘어간다**([[SYNC-MS-009#github.create_repo]]). if 실패 → workdir 삭제, `! repo-create-failed {reason}`
-4. `git.clone(remote_url, workdir, token)` · if 실패 → workdir 삭제, `! push-failed {reason: clone}`
+3s. **서버 저장이면** `origin = ORIGINS_DIR / f"{code}.git"` · `token = None` — GitHub 토큰을 구하지 않는다([[SYNC-PRD-001#R14]])
+   - if `origin`이 이미 있다(등록되지 않은 원본 — 지난 실패나 사람이 넣은 것) → **지우지 않고** 보관 폴더로 옮긴다. 아래 보관본으로 다룬다
+   - `archives = ORIGINS_DIR/_archive/{code}-*.git`을 이름(시각) 순으로
+   - if `archives and not import_existing` → `n = len(git.list(archives[-1], "docs/specs/*/*.md"))` · `! existing-specs {doc_count: n, archived_at: 이름의 시각}` (3b)
+   - if `archives and import_existing` → 가장 최근 것을 `origin`으로 옮긴다(되살림, 3b2)
+   - else → `git.init_bare(origin)`(새로 만듦)
+   - `remote_url = str(origin)` — DB에만 두고 입구는 내보내지 않는다
+3a. (GitHub 저장) `token = AccountService.github_token_for(user)`
+3b. (GitHub 저장) if `create_repo` → `github.create_repo(token, owner, name)` — `owner`·`name`은 `remote_url`에서 뜬다. **이미 있으면 만들지 않고 넘어간다**([[SYNC-MS-009#github.create_repo]]). if 실패 → workdir 삭제, `! repo-create-failed {reason}`
+4. `git.clone(remote_url, workdir, token)` · if 실패 → workdir 삭제, 서버 저장이면 되돌림(아래), `! push-failed {reason: clone}`
 5. `has = git.exists(workdir, "docs/specs")` — 커밋이 하나도 없는 빈 저장소는 `false`다([[SYNC-MS-009#git.exists]]). 9단계가 만드는 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3)
 6. if `has and not import_existing` → `n = len(git.list(workdir, "docs/specs/*/*.md"))`, workdir 삭제, `! existing-specs {doc_count: n}` (3a)
-7. **트랜잭션**: `DB: projects insert (code, name, owner_user_id=user.id)` — **등록하는 사람이 소유자다**([[SYNC-PRD-001#R12]]). 바뀌지 않고 나뉘지 않는다 · `DB: repositories insert (project_id, remote_url, workdir_path, last_processed_commit=None, registered_by_user_id=user.id)` — push 토큰의 주인. 지금은 소유자와 같은 사람이지만 뜻이 다르다(DOM-003 `repositories`)
+7. **트랜잭션**: `DB: projects insert (code, name, owner_user_id=user.id)` — **등록하는 사람이 소유자다**([[SYNC-PRD-001#R12]]). 바뀌지 않고 나뉘지 않는다 · `DB: repositories insert (project_id, storage, remote_url, workdir_path, last_processed_commit=None, registered_by_user_id=user.id)` — push 토큰의 주인(서버 저장은 등록한 사람을 적을 뿐). 지금은 소유자와 같은 사람이지만 뜻이 다르다(DOM-003 `repositories`)
 8. if `has and import_existing` → `pipeline.rebuild(code)` (3a2. 락·트랜잭션은 그쪽) · `last_processed_commit`은 rebuild가 채움
-9. else → `files = git.init_specs(workdir)` (11단계 + `STD/` 디렉터리, `_templates/` 12개, `assets/`) · `hash = git.commit_push(workdir, message=f"chore({code}): init syncdoc", author=Author(human, user, None, web), files=files)` · if 실패 → 7단계 롤백, workdir 삭제, `! push-failed` (4a) · `DB: repositories update last_processed_commit=hash`
-9a. `ensure_hook(code, user)` — push 통지를 건다([[#ProjectService.ensure_hook]], UC-A1 4). **실패해도 등록을 깨지 않는다**(4a) — 통지는 빠르게 하려는 수단이고, 못 걸어도 주기 확인(UC-G1 1b)이 메운다. 사유는 `repositories.hook_error`에 남아 화면이 말한다
+9. else → `files = git.init_specs(workdir)` (11단계 + `STD/` 디렉터리, `_templates/` 12개, `assets/`) · `hash = git.commit_push(workdir, message=f"chore({code}): init syncdoc", author=Author(human, user, None, web), files=files)` · if 실패 → 7단계 롤백, workdir 삭제, 서버 저장이면 되돌림, `! push-failed` (4a) · `DB: repositories update last_processed_commit=hash`
+9a. (GitHub 저장) `ensure_hook(code, user)` — push 통지를 건다([[#ProjectService.ensure_hook]], UC-A1 4). **실패해도 등록을 깨지 않는다**(4a) — 통지는 빠르게 하려는 수단이고, 못 걸어도 주기 확인(UC-G1 1b)이 메운다. 사유는 `repositories.hook_error`에 남아 화면이 말한다
 10. `→ Project`. **`ProjectSummary`는 입구(MCP 도구·라우터)가 `queries.project_summary()`로 만든다** — 서비스가 `queries`를 부르면 순환이다(클래스 3.2에 PS→QR 없음). 신규면 11칸 null
+
+**서버 저장의 되돌림** — 등록이 실패하면 새로 만든 원본은 지우고, 되살린 보관본은 보관 폴더로 돌려놓는다. **원본을 잃는 길을 두지 않는다** — 이름 없이 남은 원본도 지우지 않고 보관으로 옮겼다(3s).
 
 **저장소를 만든 뒤 실패하면 저장소는 남는다.** 7~9단계가 실패하면 DB와 작업 사본은 지금처럼 되돌리되 **GitHub 저장소는 지우지 않는다.** 앱이 남의 저장소를 지우는 권한을 쓰는 것이 위험하고, 되돌리는 사이 사람이 넣은 것까지 사라진다. 사용자가 직접 지우거나 `import_existing`으로 다시 등록하면 된다 — 오류 메시지에 그 사실을 적는다
 
 **`create_repo`의 기본값이 거짓인 이유.** 참으로 두면 주소에 오타를 내도 조용히 새 저장소가 생긴다. 지금은 그럴 때 clone이 실패해 `push-failed`가 나므로 오타를 알아챌 수 있다. 에이전트가 이 인자를 붙이려면 사람의 지시가 있어야 한다
 
-**호출하는 것** `AccountService.github_token_for` · [[SYNC-MS-009#github.create_repo]] · [[SYNC-MS-009#git.clone]] [[SYNC-MS-009#git.exists]] [[SYNC-MS-009#git.list]] [[SYNC-MS-009#git.init_specs]] [[SYNC-MS-009#git.commit_push]] · [[SYNC-MS-007#pipeline.rebuild]]
+**호출하는 것** `AccountService.github_token_for` · [[SYNC-MS-009#github.create_repo]] · [[SYNC-MS-009#git.clone]] [[SYNC-MS-009#git.exists]] [[SYNC-MS-009#git.list]] [[SYNC-MS-009#git.init_specs]] [[SYNC-MS-009#git.commit_push]] [[SYNC-MS-009#git.init_bare]] · [[SYNC-MS-007#pipeline.rebuild]]
 
-**테스트 관점** **통지 걸기가 실패해도 프로젝트는 등록된다**(hook_error에 사유) · 빈 저장소 → `docs/specs/` 생김, 커밋 하나, 11칸 null · **`owner_user_id`가 등록한 사람** · `docs/specs/` 있는 저장소 → `existing-specs`, workdir 없음, DB 행 없음 · `import_existing=true` → 재구축 결과 · clone 권한 없음 → `push-failed`, 아무것도 안 남음 · **없는 저장소 + `create_repo=false` → `push-failed`**(지금 동작) · **없는 저장소 + `true` → 공개 저장소가 생기고 골격 커밋까지** · **이미 있는 저장소 + `true` → 만들지 않고 그대로 쓴다** · 만든 뒤 등록이 실패해도 **저장소는 남는다**
+**테스트 관점** **서버 저장 → `ORIGINS_DIR/{code}.git`이 생기고(HEAD main) 골격 커밋 하나, GitHub을 안 부르고 토큰 없는 사람도 된다** · 켜지 않은 방식 → `storage-unavailable`, 아무것도 안 생김 · GitHub인데 주소 없음 → `invalid-request` · **보관본 있음 + 가져오기 아님 → `existing-specs`(`archived_at`), 아무것도 안 바뀜** · 가져오기 → 되살리고 재구축 버전 · 보관본 둘 → 가장 최근 것 · 서버 저장 등록 실패 → 새 원본은 지워지고 되살린 것은 보관으로 돌아간다 · 이름 없이 남은 원본 → 보관으로 옮기고 `existing-specs` · **통지 걸기가 실패해도 프로젝트는 등록된다**(hook_error에 사유) · 빈 저장소 → `docs/specs/` 생김, 커밋 하나, 11칸 null · **`owner_user_id`가 등록한 사람** · `docs/specs/` 있는 저장소 → `existing-specs`, workdir 없음, DB 행 없음 · `import_existing=true` → 재구축 결과 · clone 권한 없음 → `push-failed`, 아무것도 안 남음 · **없는 저장소 + `create_repo=false` → `push-failed`**(지금 동작) · **없는 저장소 + `true` → 공개 저장소가 생기고 골격 커밋까지** · **이미 있는 저장소 + `true` → 만들지 않고 그대로 쓴다** · 만든 뒤 등록이 실패해도 **저장소는 남는다**
 
 ---
 
@@ -127,7 +138,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 근거: [[SYNC-SEQ-001#SEQ-20]] · UI-14 표 2 · [[SYNC-PRD-001#R12]]
 
-**처리** `projects = list_owned(user)` — **내가 소유한 저장소만.** v1은 전부를 줬고 그것이 관리 화면에서 남의 저장소 주소가 보이던 자리다(#91). **원격을 안 탄다. `git.fetch`를 부르지 않는다.** 저장소마다 `→ RepoStatus(code, name, remote_url, last_processed_commit, synced_at, behind_by, fetched_at, error, hook, hook_error)` — `hook`은 `hook_id`·`hook_error`로 정하는 셋(`ok`/`none`/`error`, 카드 AF) — `name`은 UI-14 표가 「[코드] 이름」으로 적기 위해서다(UI-002 1.6).
+**처리** `projects = list_owned(user)` — **내가 소유한 저장소만.** v1은 전부를 줬고 그것이 관리 화면에서 남의 저장소 주소가 보이던 자리다(#91). **원격을 안 탄다. `git.fetch`를 부르지 않는다.** 저장소마다 `→ RepoStatus(code, name, storage, remote_url, last_processed_commit, synced_at, behind_by, fetched_at, error, hook, hook_error)` — `hook`은 `hook_id`·`hook_error`로 정하는 셋(`ok`/`none`/`error`, 카드 AF). **서버 저장이면 `remote_url=None`(서버 안 경로를 안 낸다)이고 `hook=none`** — `name`은 UI-14 표가 「[코드] 이름」으로 적기 위해서다(UI-002 1.6).
 
 `error`는 **폴링이 적어 둔 `repositories.fetch_error`**다([[SYNC-MS-007#scheduler.catch_up]]). v1에는 백업 읽기 실패도 이 칸에 모았는데, 백업이 사라지면서(카드 V) 폴링 오류만 남았다.
 
@@ -140,7 +151,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** [[#ProjectService.list_owned]]
 
-**테스트 관점** 폴링이 적어 둔 `fetch_error`가 `error`로 나온다 · 이 함수가 `git.fetch`를 부르지 않는다 · 폴링이 적어 둔 값을 그대로 돌려준다 · 등록 직후에는 `behind_by=None` · 작업 사본이 없어도 다른 저장소는 그대로 나온다 · **남의 저장소는 목록에 없다**
+**테스트 관점** **서버 저장 → `storage=server`, `remote_url=None`, `hook=none`** · 폴링이 적어 둔 `fetch_error`가 `error`로 나온다 · 이 함수가 `git.fetch`를 부르지 않는다 · 폴링이 적어 둔 값을 그대로 돌려준다 · 등록 직후에는 `behind_by=None` · 작업 사본이 없어도 다른 저장소는 그대로 나온다 · **남의 저장소는 목록에 없다**
 
 ---
 
@@ -156,17 +167,19 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2a. [[SYNC-MS-011#CodeGraphService.delete_by_project]]`(project.id)` — 코드 그래프(카드 AX). 같은 자리
 3. `DB: 이 프로젝트의 references · items · versions · status_changes · documents · repositories · projects` 순서로 삭제. 외래키를 물고 있으므로 자식부터
 4. `shutil.rmtree(workdir, ignore_errors=True)` — 작업 사본 회수
+4a. 서버 저장이면 원본(`repository.remote_url`)을 `ORIGINS_DIR/_archive/{code}-{UTC %Y%m%d%H%M%S}.git`으로 옮긴다 — **지우지 않는다**([[SYNC-UC-001#UC-H17]]). DB를 지운 뒤(flush), 작업 사본 삭제와 같은 자리다. 부르는 쪽의 커밋이 그 뒤에 실패하면 행이 남은 채 원본이 보관 폴더에 가 있으니 운영자가 되돌린다 — 드물다([[SYNC-INFRA-001]] 6장)
 5. `→ None`
 
-**저장소는 건드리지 않는다.** `docs/specs/`는 원격에 그대로 남는다. 다시 등록하면
-`import_existing=true`로 문서·항목·참조가 돌아온다.
+**GitHub 저장소는 건드리지 않는다.** `docs/specs/`는 원격에 그대로 남는다. 다시 등록하면
+`import_existing=true`로 문서·항목·참조가 돌아온다. 서버 저장소는 보관 폴더에 남고 같은 코드로
+가져오면 되살아난다([[#ProjectService.init_project]] 3s).
 
 **돌아오지 않는 것이 있다.** 상태 변경 이력(`status_changes`)은 원본에 없는 정보다(인프라 6장). 그래서 이 함수는 **되돌릴 수 없는 동작**이고, 부르는 쪽이
 사람에게 확인을 받아야 한다.
 
 **호출하는 것** [[#ProjectService.get_owned]] · [[SYNC-MS-010#ConversationService.delete_by_project]] · [[SYNC-MS-011#CodeGraphService.delete_by_project]]
 
-**테스트 관점** 삭제 후 `get` → not-found · 그 프로젝트의 대화·첨부·코드 그래프 행이 0 · 작업 사본 디렉터리가 사라짐 · 같은 저장소를 다시 등록할 수 있음(중복 등록 검사에 안 걸림) · 다른 프로젝트의 문서는 그대로 · **남의 프로젝트 → `not-found`, 아무것도 안 지워짐**
+**테스트 관점** 삭제 후 `get` → not-found · 그 프로젝트의 대화·첨부·코드 그래프 행이 0 · 작업 사본 디렉터리가 사라짐 · **서버 저장 → 원본이 `_archive/{code}-{시각}.git`으로 옮겨지고 `ORIGINS_DIR/{code}.git`은 없다** · 같은 저장소를 다시 등록할 수 있음(중복 등록 검사에 안 걸림) · 다른 프로젝트의 문서는 그대로 · **남의 프로젝트 → `not-found`, 아무것도 안 지워짐**
 
 ---
 
@@ -181,6 +194,7 @@ async def ensure_hook(code: str, user: User) -> HookStatus
 
 **처리**
 1. `get_owned(code, user)` — 남의 것이면 `! not-found {resource: project}`
+1a. 서버 저장이면 → `HookStatus("none", "서버 저장소는 통지가 없다", created=False)`. GitHub을 부르지 않는다 — 원본이 서버 안이라 밖에서 바뀌지 않는다([[SYNC-INFRA-001]] 7장). 서버 안 경로를 GitHub 주소로 쪼개 API를 부르는 일을 막는다
 2. `PUBLIC_BASE_URL`이나 `WEBHOOK_SECRET`이 비면 → `HookStatus("none", "공개 주소나 비밀번호가 없어 걸지 못한다", created=False)`. **걸지 않는다** — 받는 쪽이 빈 비밀번호를 전부 거부하므로 걸어 봐야 안 통한다
 3. `hook_id = github.create_hook(token, owner, name, f"{PUBLIC_BASE_URL}/hooks/github", WEBHOOK_SECRET)` · `Unauthorized`면 `repo.hook_error = 사유`, `→ HookStatus("error", 사유, False)`
 4. `repo.hook_id = hook_id` · `repo.hook_error = None` · `→ HookStatus("ok", None, created=이번에 만들었나)`
@@ -191,7 +205,7 @@ async def ensure_hook(code: str, user: User) -> HookStatus
 
 **호출하는 것** [[#ProjectService.get_owned]] · [[SYNC-MS-006#AccountService.github_token_for]] · [[SYNC-MS-009#github.create_hook]]
 
-**테스트 관점** 주소·비밀번호가 비면 `none`이고 GitHub을 안 부른다 · 권한 없으면 `error`이고 `hook_error`가 남는다 · 성공하면 `ok`·`hook_id` 저장 · **두 번째 호출은 `created=False`** · 남의 프로젝트 → `not-found`
+**테스트 관점** **서버 저장 → `none`이고 GitHub을 안 부른다** · 주소·비밀번호가 비면 `none`이고 GitHub을 안 부른다 · 권한 없으면 `error`이고 `hook_error`가 남는다 · 성공하면 `ok`·`hook_id` 저장 · **두 번째 호출은 `created=False`** · 남의 프로젝트 → `not-found`
 
 ---
 
