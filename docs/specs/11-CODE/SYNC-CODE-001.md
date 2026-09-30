@@ -1165,7 +1165,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-PRD-001#R13]] · [[SYNC-UC-001#UC-H20]] · 사용자 결정 2026-09-30(모든 문서에 「코드」 탭 — MS 항목은 그 함수, 다른 항목은 하위 체인의 MS 함수 전부 · 목록 + 코드 펼침 · 관계도는 토글로 MS 열에 실제 호출을 겹친다) |
-| 구현 | UI-5 8.17~8.22 · UI-8 2.6·3.6~3.8 · API 셋(코드 보기·코드 호출·코드 본문) · `queries.code_view`·`code_calls`·`code_source` · `CodePanel` · `Graph` 토글 |
+| 구현 | UI-5 8.17~8.22 · UI-8 2.6·3.6~3.8 · API 넷(문서 코드·항목 코드·코드 본문·코드 호출) · `queries.code_view`·`code_calls`·`code_source` · `CodeGraphService.read`(비밀 꼴 거부·300줄 — AZ의 `read_code`도 같이) · `CodePanel`(DocView 안) · `Graph` 토글 `?code=1` |
 | 테스트 | 헤드 크롬: SYNC-MS-007 `save_pipeline` 코드 탭(✓·▲·◌, 코드 펼침) · PRD R1의 코드 탭(하위 체인 함수) · 관계도 토글 선 셋 |
 | 선행 | AX |
 | 완료 | — |
@@ -1262,6 +1262,8 @@ MINISPEC이 낸 미결 셋. 카드에 들어가기 전에 정해야 한다.
 | AV | `card/AV-keep-all` | `b966ebb` | #228 | 2026-09-30 |
 | AW | `card/AW-stream` | `2e243f4` | #230 | 2026-09-30 |
 | AX | `card/AX-code-graph` | `171df7c` | #232 | 2026-09-30 |
+| AY | `card/AY-code-tab` | `e5381de` | #235 | 2026-09-30 |
+| AZ | `card/AZ-code-tools` | `b39c6f1` | #236 | 2026-09-30 |
 | (#119) | `fix/119-single-render` | — | #119 | 2026-09-23 |
 | (#126) | `fix/126-view-build-specs` | — | #126 | 2026-09-23 |
 | (#133) | `fix/133-tokens-by-chapter` | — | #133 | 2026-09-23 |
