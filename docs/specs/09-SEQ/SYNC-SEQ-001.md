@@ -93,6 +93,8 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | GET /api/docs/{docId}/code · …/items/{itemId}/code · …/items/{itemId}/code/source | [[#SEQ-27]] | ○ |
 | GET /api/projects/{code}/code-calls | [[#SEQ-27]] | ○ |
 | MCP get_code_graph | [[#SEQ-27]] | ○ |
+| GET·POST /git/{code}.git/* (서버 저장소 git 입구) | [[#SEQ-29]] | ○ |
+| MCP upload_code | [[#SEQ-30]] | ○ |
 
 묶음을 넘는 것이 대응표 31행 중 22행이다(입구 여럿을 한 행에 묶은 것이 있다). v1.0에서 안 그린 조회 중 절반 이상이 묶음을 넘었다.
 
@@ -1236,6 +1238,84 @@ sequenceDiagram
 - 통지(webhook)를 걸지 않는다 — 서버 저장소는 밖에서 바뀌지 않는다([[SYNC-INFRA-001]] 7장)
 - 새로 만든 원본은 등록이 실패하면 지운다. 되살린 보관본은 실패하면 보관 폴더로 돌려놓는다 — 원본을 잃지 않는다
 - 해제([[SYNC-UC-001#UC-H17]])는 거꾸로 원본을 보관 폴더로 옮긴다([[SYNC-MS-001#ProjectService.delete_project]])
+
+---
+
+## SEQ-29 서버 저장소가 git push를 받는다
+
+[[SYNC-UC-001#UC-H21]] 기본 흐름 1~4, 확장 2a·2b·3a·3b. clone·fetch(`git-upload-pack`)도 같은 입구다 — 처리(8~9)만 없다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사람의 git
+    participant R as routers/git
+    participant AS as AccountService
+    participant PS as ProjectService
+    participant G as infra/git
+    participant P as pipeline
+
+    U->>R: GET info/refs?service=git-receive-pack (Basic — 비밀번호 칸에 개인 토큰)
+    R->>AS: authenticate_token(비밀번호 칸)
+    alt 토큰 없음·틀림 (2a)
+        R-->>U: 401 WWW-Authenticate Basic — git이 다시 묻는다
+    end
+    R->>PS: server_origin(code, user)
+    alt 남의 것·GitHub 저장·없음 (2b)
+        PS-->>R: not-found
+        R-->>U: 404
+    end
+    R->>G: http_backend(ORIGINS_DIR, env, 본문) — 참조 광고
+    G-->>U: 200 advertisement
+    U->>R: POST git-receive-pack (팩)
+    R->>G: http_backend — 본문을 다 넘긴 뒤 응답 머리
+    Note over G: 되감기·삭제는 저장소 config가 거절 (3b)
+    G-->>U: 200 receive-pack 결과
+    R->>P: 응답 뒤 read_pending(code, user) — main만 따라간다 (3a)
+    P->>P: process_commit — 명세 파일은 버전, 코드가 바뀌었으면 schedule_code_graph
+```
+
+**읽을 때 볼 것**
+- 인증은 매 요청이다 — git은 요청마다 같은 Basic을 보낸다. 세션을 만들지 않는다
+- 처리는 응답을 다 보낸 뒤다. 읽기가 실패하거나 연결이 끊겨도 폴링이 메운다([[SYNC-INFRA-001]] 7장)
+
+---
+
+## SEQ-30 에이전트가 코드를 올린다
+
+[[SYNC-UC-001#UC-A10]] 기본 흐름 1~5, 확장 1a·2a·2b·3a.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor A as 에이전트
+    participant M as mcp/tools
+    participant P as pipeline
+    participant PS as ProjectService
+    participant G as infra/git
+
+    A->>M: upload_code(project_code, files, delete, message)
+    M->>P: upload_code(code, files, delete, message, author)
+    P->>PS: get_owned(code, user)
+    alt GitHub 저장 (1a)
+        P-->>M: storage-mismatch
+    end
+    P->>P: 한도(UTF-8 합 5MB · 500개) · 경로 검사 — 락 밖
+    alt 넘음 (2a) · 거절 경로 (2b)
+        P-->>M: upload-too-large · upload-path-refused (아무것도 안 올림)
+    end
+    P->>P: read_pending — 먼저 읽는다 (DEV-19)
+    P->>G: 쓰기 락 안에서 commit_push(files, delete) — 경로 가드
+    alt 내용이 같다 (3a)
+        G-->>P: 지금 HEAD (커밋 없음)
+    end
+    P->>P: read_pending — 처리 지점 전진, 코드면 schedule_code_graph
+    P-->>M: UploadResult(commit, changed, files, deleted)
+    M-->>A: 결과
+```
+
+**읽을 때 볼 것**
+- 명세 경로는 받지 않으므로 이 커밋이 버전을 만들지 않는다 — 처리는 처리 지점을 옮기고 코드 그래프만 건다
 
 ---
 
