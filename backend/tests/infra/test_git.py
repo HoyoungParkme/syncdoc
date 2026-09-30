@@ -1,5 +1,6 @@
 """SYNC-MS-009 테스트 관점 — git 어댑터. 임시 저장소로."""
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -179,9 +180,37 @@ async def test_commit_push_leaves_no_token_in_config(repos: dict[str, Path]) -> 
 
 
 async def test_commit_push_unregistered_user_is_push_failed(repos: dict[str, Path]) -> None:
+    """https 원격(GitHub)은 토큰이 있어야 민다 — 없으면 원격에 닿기 전에 미등록."""
+    git(repos["work"], "remote", "set-url", "origin", "https://example.invalid/o/r.git")
     with pytest.raises(PushFailed) as ei:
         await g.commit_push(repos["work"], "m", _author(token=None), path=SEED, content="v2")
     assert ei.value.extra["reason"] == "미등록"
+
+
+async def test_commit_push_to_server_path_needs_no_token(repos: dict[str, Path]) -> None:
+    """서버 저장소(서버 안 경로)는 토큰을 구하지 않는다 — 토큰 없는 사람도 민다 (카드 BA)."""
+    h = await g.commit_push(repos["work"], "m", _author(token=None), path=SEED, content="v2")
+    assert h == git(repos["remote"], "rev-parse", "main")
+
+
+# ── init_bare (카드 BA) ──
+async def test_init_bare_is_main_and_refuses_rewrites(tmp_path: Path) -> None:
+    origin = tmp_path / "o" / "X.git"  # 상위 폴더가 없어도 만든다
+    await g.init_bare(origin)
+    assert git(origin, "symbolic-ref", "HEAD") == "refs/heads/main"
+    for key in ("receive.denyNonFastForwards", "receive.denyDeletes", "receive.fsckObjects"):
+        assert git(origin, "config", key) == "true"
+    # 그것을 clone해 첫 커밋을 밀고, 되감은 push는 거부된다
+    work = tmp_path / "w"
+    git(tmp_path, "clone", "-q", str(origin), str(work))
+    git(work, "checkout", "-q", "-b", "main")
+    first = write_commit_push(work, "a.txt", "1", "one")
+    write_commit_push(work, "a.txt", "2", "two")
+    git(work, "reset", "-q", "--hard", first)
+    rewind = subprocess.run(
+        ["git", "push", "-q", "--force", "origin", "HEAD:main"], cwd=work, capture_output=True
+    )
+    assert rewind.returncode != 0
 
 
 # ── read ──
