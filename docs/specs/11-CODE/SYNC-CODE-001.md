@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1099,6 +1099,18 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 완료 | 2026-09-29 · 브랜치 `card/AS-answer-diagram` · spec 3 + code 2(+ #215 경합·#217 AnswerBody 고침) · 테스트 279 · `validate` 0/0 · `check_ui` 12/12 · `check_code` 127/127 · 배포 뒤 헤드 크롬: 「R1의 근거와 파생을 마인드맵으로」 → mindmap svg + 전체보기 층 · flowchart 한 번 더 · 새 대화에서도 · 새로고침 뒤에도 그림 |
 
 **왜 카드인가.** 렌더러는 이미 mermaid 코드블록을 `pre.mermaid`로 만드는데 패널에서 돌리지 않았고, 지시문이 그림을 허락하지 않았다 — 지시문 한 문단과 패널 한 효과지만 화면 규칙(8.7·공통 1.7)이 바뀌므로 카드다.
+
+#### AT 질문 탭의 가시성 — 탭별 패널 폭 · 참조 ID 한 덩어리
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UI-002#UI-5]] 8.3 · 8.7 · 규칙(사이드바 폭) · S-5 · 사용자 요청 2026-09-30 「글의 가시성을 높일 방법」 |
+| 구현 | `panes.ASK`(기본 420 · 300~720, 키 `syncdoc.ui5.panel.ask`) · `DocView`가 탭에 따라 `--panel-w`와 손잡이 8.3을 참조 폭/질문 폭으로 바꾼다 · `.qa .a a.ref`·`.qsrc a`는 `white-space:nowrap` |
+| 테스트 | 헤드 크롬(1440×900): 참조 탭 250 → 질문 탭 420 · 손잡이로 300 미만·720 초과 불가 · 새로고침·다른 문서에서도 420 · 참조 탭으로 돌아오면 250 · 답 속 `SYNC-UC-001#UC-A6`가 한 줄 · 같은 답 높이 1,240 → 700 안팎 |
+| 선행 | AS |
+| 완료 | — |
+
+**왜 카드인가.** 실측으로 원인이 폭이었다 — 참조 탭 기준 250px(글 칸 225px)에서 871자 답이 1,240px 세로 띠(한 줄 15자). 글자·색·행간은 본문과 같아 손대지 않는다. 화면 규칙(8.3 범위·기본 폭)이 바뀌므로 카드다. 같은 문서 안 ID를 `#ID`로 줄이는 것은 렌더러가 이미 하고 있어 명세에만 적었다.
 
 ---
 
