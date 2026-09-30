@@ -61,6 +61,7 @@ from app.core.types import (
     Storage,
     TrashResult,
     UploadResult,
+    UserKind,
     Violation,
     spec_dir,
     type_of_dir,
@@ -773,7 +774,7 @@ async def _process_file(workdir: Path, code: str, f, head_hash: str) -> list[Sav
         user = account.user_for_commit(f.author_email, f.author_login)
         # 「자리표시인가」로 판정한다. 「방금 만들었나」로 하면 같은 사람의 둘째
         # 문서부터 이미 행이 있어 오류가 안 붙는다 (SYNC-DOM-002 5장 결정 3, #34)
-        unknown = user.github_user_id is None
+        unknown = user.kind == UserKind.placeholder  # GitHub ID가 빈 로컬 사용자는 아니다(카드 BC)
         s.commit()
         author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.github)
         if f.status == "D":
@@ -901,7 +902,7 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
                     result.versions += 1
                     # 마지막 본문 커밋의 작성자로 판정한다 — UI-5 배너가 last_author와
                     # 함께 보여주는 값이고 _process_file도 방금 저장한 버전으로 본다
-                    last_unknown, last_login = user.github_user_id is None, c.login
+                    last_unknown, last_login = user.kind == UserKind.placeholder, c.login
                 document = spec.get_document(doc_id)
             if document is None:
                 continue
