@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -124,6 +124,10 @@ sequenceDiagram. 노드 라벨에는 읽은 항목 ID(문서ID#항목ID)와 이�
 flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨을 큰따옴표로 감싼다.
 그림 아래에 한두 문장으로 무엇을 그렸는지 적는다.
 
+답은 짧게 쓴다 — 문장은 한 뜻에 하나, 소제목은 굵은 한 줄, 목록은 한 줄씩. 항목을 댈 때는
+문서ID#항목ID 이름 한 번이고 그 이름을 풀어 다시 쓰지 않는다. 번호 목록은 1·2·3으로 이어서
+쓴다.
+
 [문서] {doc_id} {title} · 상태 {status} · v{version_no}
 [이 문서의 항목]
 {items}
@@ -142,7 +146,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 
 **호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-009#llm.step]] · [[#queries.ask_tool]]
 
-**테스트 관점** 가짜 `llm.step`에 대본을 주어 돈다 · 지시문에 mermaid 그림 안내가 있다(카드 AS) · 대본 [도구 2번 → 답] → 이벤트 순서가 `start·note·read·note·read·answer`이고 `context_item_ids`가 read 순서·중복 접힘 · 대본이 도구만 9번 → 8번째 뒤 마무리 호출이 `tool_choice="none"`이고 그 뒤 호출이 없다 · `monotonic`을 패치해 120초 → 같은 마무리 · 마무리도 답이 비면 `llm-unavailable` · 시작 맥락에 항목 ID·이름은 있고 **본문은 없다** · `item_id=None`이면 「지금 보는 항목」 줄이 없다 · 없는 `item_id` → `not-found`가 `start` 전 · **DB에 아무것도 안 쓴다**(호출 전후 행 수가 같다) · `history`가 상한을 넘으면 뒤에서부터 잘린다 · usage 로그 한 줄에 calls·tokens·elapsed가 있고 본문이 없다 · 키가 비면 `SpecService`를 부르기도 전에 막힌다 · **MINISPEC이 빈 프로젝트**에서 물으면 `item_chain`의 빈 단계로 「아직 안 쓰였다」고 답할 재료를 받는다
+**테스트 관점** 가짜 `llm.step`에 대본을 주어 돈다 · 지시문에 mermaid 그림 안내가 있다(카드 AS) · 지시문에 답 양식(「답은 짧게」)이 있다(카드 AU) · 대본 [도구 2번 → 답] → 이벤트 순서가 `start·note·read·note·read·answer`이고 `context_item_ids`가 read 순서·중복 접힘 · 대본이 도구만 9번 → 8번째 뒤 마무리 호출이 `tool_choice="none"`이고 그 뒤 호출이 없다 · `monotonic`을 패치해 120초 → 같은 마무리 · 마무리도 답이 비면 `llm-unavailable` · 시작 맥락에 항목 ID·이름은 있고 **본문은 없다** · `item_id=None`이면 「지금 보는 항목」 줄이 없다 · 없는 `item_id` → `not-found`가 `start` 전 · **DB에 아무것도 안 쓴다**(호출 전후 행 수가 같다) · `history`가 상한을 넘으면 뒤에서부터 잘린다 · usage 로그 한 줄에 calls·tokens·elapsed가 있고 본문이 없다 · 키가 비면 `SpecService`를 부르기도 전에 막힌다 · **MINISPEC이 빈 프로젝트**에서 물으면 `item_chain`의 빈 단계로 「아직 안 쓰였다」고 답할 재료를 받는다
 
 ---
 
