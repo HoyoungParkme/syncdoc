@@ -24,6 +24,8 @@ const PAD = 18
 const LANE_GAP = 12
 /** 되돌아오는 간선이 꺾이는 모서리 반지름 */
 const R = 8
+/** 코드 호출을 끈 때의 빈 목록 — 렌더마다 새 배열이면 포커스 계산(useMemo)이 매번 다시 돈다 */
+const NO_CALLS: CodeCalls['edges'] = []
 
 type Placed = { id: string; col: number; row: number; label: string; title: string; iso: boolean; docId: string; itemId: string | null }
 
@@ -58,7 +60,10 @@ export function Graph() {
   }
 
   const layout = useMemo(() => (g ? place(g) : null), [g])
-  // 직접 이웃만. 전이적으로 따라가는 건 UI-15가 한다
+  // 직접 이웃만. 전이적으로 따라가는 건 UI-15가 한다.
+  // 코드 호출(2.6)을 켰으면 그 노드가 부르는·그 노드를 부르는 함수도 남긴다 — 명세에 빠진 호출(3.7)은
+  // 참조가 없는 호출이라 참조 이웃만 남기면 가장 봐야 할 선이 흐려진다 (UI-002 UI-8 규칙, 카드 AY 보정)
+  const codeEdges = codeOn && calls ? calls.edges : NO_CALLS
   const near = useMemo(() => {
     if (!g || !focus) return null
     const up = new Set<string>()
@@ -67,8 +72,13 @@ export function Graph() {
       if (e.from === focus && e.to) up.add(e.to)
       if (e.to === focus) down.add(e.from)
     }
-    return { up, down, all: new Set([focus, ...up, ...down]) }
-  }, [g, focus])
+    const code = new Set<string>()
+    for (const c of codeEdges) {
+      if (c.from === focus) code.add(c.to)
+      if (c.to === focus) code.add(c.from)
+    }
+    return { focus, up, down, code, all: new Set([focus, ...up, ...down]) }
+  }, [g, focus, codeEdges])
 
   const stats = g
     ? `${code} · 문서 ${new Set(g.nodes.map((n) => n.doc_id)).size} · 항목 ${g.nodes.filter((n) => n.item_id).length} · 참조 ${g.edges.length}`
@@ -108,11 +118,11 @@ export function Graph() {
                 {i + 1} {t}
               </div>
             ))}
-            <Edges layout={layout} g={g!} near={near} calls={codeOn ? (calls?.edges ?? []) : []} />
+            <Edges layout={layout} g={g!} near={near} calls={codeEdges} />
             {layout.nodes.map((n) => (
               <div
                 key={n.id}
-                className={`node${n.iso ? ' iso' : ''}${near && !near.all.has(n.id) ? ' dim' : ''}`}
+                className={`node${n.iso ? ' iso' : ''}${near && !near.all.has(n.id) && !near.code.has(n.id) ? ' dim' : ''}`}
                 data-el={n.iso ? '3.5' : '3.1'}
                 style={{ left: colX(n.col), top: rowY(n.row), width: NODE_W, height: NODE_H }}
                 onMouseEnter={() => setFocus(n.id)}
@@ -276,7 +286,7 @@ function Edges({
 }: {
   layout: Layout
   g: GraphData
-  near: { all: Set<string> } | null
+  near: { all: Set<string>; focus: string } | null
   calls: CodeCalls['edges']
 }) {
   // 와이어프레임처럼 종류마다 한 번씩만 요소 번호를 붙인다 (DEV-17 반복 행 규칙)
@@ -335,7 +345,8 @@ function Edges({
     const fy = rowY(f.row) + NODE_H / 2 + (c.status === 'code_only' ? 3 : c.status === 'spec_only' ? -3 : 0)
     const ty = rowY(t.row) + NODE_H / 2
     const tx = colX(t.col) + NODE_W
-    const lit = !near || (near.all.has(c.from) && near.all.has(c.to))
+    // 포커스한 함수의 호출 선만 — 참조 이웃인지와 상관없이 (UI-8 규칙, 카드 AY 보정)
+    const lit = !near || c.from === near.focus || c.to === near.focus
     const tag = !firstCode[c.status] && ((firstCode[c.status] = true), true)
     paths.push(
       <path
