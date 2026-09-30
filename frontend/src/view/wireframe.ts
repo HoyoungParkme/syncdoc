@@ -298,7 +298,7 @@ function screenHtml(s: WfScreen, i: number, ctx: RenderCtx, common: CommonParts)
   }
   // 조각에 안 맞는 줄은 아래 판 끝 「그 밖」 — 둘째 html 블록은 공통 틀과 함께 (STD-002 V-UI, #152)
   right.push(etcBlock(s.etc, { ...ctx, common }))
-  let inner = frameHtml(s.layout ?? '', common, ctx.assetBase ?? '')
+  let inner = frameHtml(s.layout ?? '', common, ctx.assetBase ?? '', ctx.localFonts)
   if (right.join('')) inner += `<div class="rsecs">${right.join('')}</div>`
   return `<section class="screen" id="item-${esc(s.id)}" data-item="${esc(s.id)}" data-i="${i}"${i === 0 ? '' : ' style="display:none"'}><div class="s-head"><b>${esc(s.id)} ${esc(s.name)}</b>${meta}</div>${desc}<div class="wfstack">${inner}</div></section>`
 }

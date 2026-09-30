@@ -49,7 +49,7 @@ export function pick(type: string): ViewFn {
 /** frontmatter를 떼고(정적 뷰도 본문만) 타입별 렌더러로. 참조 링크는 /p/{code}/d/{doc}#item-X.
  *  downstream(GET /api/docs/{id}/downstream)이 있으면 하위 수·근거 문서·추적표를 계산한다.
  *  미존재 참조(doc.missing_refs, document_view 4a)는 회색 ?(class missing)로 그린다. */
-export function renderView(doc: Document, code: string, downstream?: DownstreamView | null): ViewOutput {
+export function renderView(doc: Document, code: string, downstream?: DownstreamView | null, opts: { localFonts?: boolean } = {}): ViewOutput {
   const m = /^---\n([\s\S]*?)\n---\n/.exec(doc.body)
   const fm: Record<string, string> = {}
   for (const line of (m ? m[1] : '').split('\n')) {
@@ -66,6 +66,7 @@ export function renderView(doc: Document, code: string, downstream?: DownstreamV
     downstream: downstream ? Object.fromEntries(downstream.by_document.map((x) => [x.doc_id, x.items])) : undefined,
     titles: downstream ? Object.fromEntries(downstream.by_document.map((x) => [x.doc_id, x.title])) : undefined,
     assetBase: `/api/projects/${doc.doc_id.split('-')[0] || code}/files/${DIR[doc.doc_type] ?? doc.doc_type}/`,
+    localFonts: opts.localFonts, // 폐쇄망판 앱만 (STD-002 V-UI, 카드 BC)
   }
   const out = pick(doc.doc_type)({ type: doc.doc_type, title: fm.title ?? '', body, ctx })
   // 타입별 onMount 뒤에 html 블록 iframe(wfbox)도 산다 — 이미 산 것(V-UI)은 mountFrames가 건너뛴다. 정리도 둘 다

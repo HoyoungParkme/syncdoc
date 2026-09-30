@@ -3,9 +3,9 @@
  *  4 본문(4.1 위치) · 5 이동(5.1 이전, 5.2 다음, 5.3 이 문서 열기) */
 import { ProjName } from '../components/ui'
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { api, docPath, STAGE_TYPES, STATUS_KO, type Document, type DocumentSummary, type ProjectDetail } from '../api/client'
+import { api, docPath, STAGE_TYPES, STATUS_KO, type Document, type DocumentSummary, type Me, type ProjectDetail } from '../api/client'
 import { extraCss, renderView } from '../view'
 import { attachDiagramButtons, DiagramFull, type FullDiagram, type WfFullDetail } from '../components/DiagramFull'
 import { esc, splitRef } from '../view/md'
@@ -14,6 +14,8 @@ const ORDER: Record<string, number> = { draft: 0, approved: 1 }
 
 export function ReadOrder() {
   const { code = '' } = useParams()
+  // 폐쇄망판 — 배치 iframe이 바깥 글꼴 대신 앱이 담은 글꼴 (STD-002 V-UI, 카드 BC)
+  const localFonts = useOutletContext<{ user: Me }>().user.edition === 'closed'
   const [sp, setSp] = useSearchParams()
   const nav = useNavigate()
   const stage = Number(sp.get('stage') ?? '1')
@@ -53,7 +55,7 @@ export function ReadOrder() {
     const root = mainRef.current
     if (!root) return
     // 문서마다 머리(킥커·제목·리드)를 얹는다. 킥커가 위치(4.1)다
-    const views = bodies.map((d) => renderView(d, code))
+    const views = bodies.map((d) => renderView(d, code, null, { localFonts }))
     root.innerHTML = bodies
       .map((d, i) => {
         const v = views[i]
@@ -90,7 +92,7 @@ export function ReadOrder() {
       root.removeEventListener('wf:full', onWfFull)
       for (const c of cleanups) if (typeof c === 'function') c()
     }
-  }, [bodies, code, nav, stage])
+  }, [bodies, code, nav, stage, localFonts])
   const hasDocs = (s: number) => docs.some((d) => d.stage === s)
   /** 그 단계 문서들 중 가장 낮은 상태. 완료 2 + 초안 1이면 초안 (UC-H14 1a와 같은 기준) */
   const stageStatus = (s: number) =>

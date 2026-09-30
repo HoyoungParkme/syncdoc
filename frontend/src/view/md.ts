@@ -23,6 +23,9 @@ export interface RenderCtx {
   assetBase?: string
   /** 그 문서 공통 틀 — 화면 「그 밖」의 둘째 html 블록만 받는다(STD-002 V-UI, #152). 나머지 html 블록은 공통 틀 없이 */
   common?: CommonParts
+  /** 참이면 배치 iframe의 바깥 글꼴 링크를 앱이 담은 글꼴로 바꾸고 그 밖의 바깥 주소는 뺀다(frame.localizeFonts).
+   *  **폐쇄망판 앱만 준다** — 정적 뷰와 검사기(check_view_html)는 주지 않아 원문 그대로다 (STD-002 V-UI, 카드 BC) */
+  localFonts?: boolean
 }
 
 const NUL = '\uE000' // 코드 스팬 자리표시 (사용자 영역 문자)
@@ -92,7 +95,7 @@ export function renderBlocks(text: string, ctx: RenderCtx, itemPat?: RegExp): st
       if (lang === 'mermaid') out.push(`<div class="mer"><pre class="mermaid">${esc(src)}</pre></div>`)
       // html 블록은 iframe으로 격리해 그린다(STD-002 1장). 스타일·링크뿐인 블록(공통 틀)은 그릴 것이 없으니 코드로
       // frameHtml이 이미 .wfbox다 — 한 겹 더 싸면 정적 뷰와 다르고 여백이 두 번 붙었다 (#152)
-      else if (lang === 'html' && !isStyleOnly(safeLayout(src))) out.push(frameHtml(safeLayout(src), ctx.common ?? NO_COMMON, ctx.assetBase ?? ''))
+      else if (lang === 'html' && !isStyleOnly(safeLayout(src))) out.push(frameHtml(safeLayout(src), ctx.common ?? NO_COMMON, ctx.assetBase ?? '', ctx.localFonts))
       else if (lang === 'html') out.push(`<pre class="code" data-lang="html"><code>${esc(src)}</code></pre>`)
       else out.push(`<pre class="code" data-lang="${esc(lang)}"><code>${esc(src)}</code></pre>`)
       i = j + 1

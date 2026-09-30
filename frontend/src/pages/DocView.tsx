@@ -83,7 +83,8 @@ export function DocView() {
     load()
   }, [load])
 
-  const view = useMemo(() => (doc ? renderView(doc, code, downstream) : null), [doc, code, downstream])
+  const localFonts = user.edition === 'closed' // 폐쇄망판 — 배치 iframe이 바깥 글꼴 대신 앱이 담은 글꼴 (STD-002 V-UI)
+  const view = useMemo(() => (doc ? renderView(doc, code, downstream, { localFonts }) : null), [doc, code, downstream, localFonts])
 
   // 유저용 본문: innerHTML → onMount → mermaid → 항목 클릭·참조 링크·해시 스크롤
   useEffect(() => {
