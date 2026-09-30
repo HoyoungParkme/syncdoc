@@ -38,6 +38,13 @@ class AuthorKind(StrEnum):
     agent = "agent"
 
 
+class Storage(StrEnum):
+    """저장 방식 — SYNC-DOM-002 2.7, PRD R14. 프로젝트를 만들 때 정하고 바뀌지 않는다."""
+
+    github = "github"
+    server = "server"  # 싱크독 서버 안의 bare git (카드 BA)
+
+
 class Entry(StrEnum):
     mcp = "mcp"
     web_revert = "web_revert"
@@ -87,7 +94,8 @@ class ProjectSummary:
 
     code: str
     name: str
-    remote_url: str
+    storage: Storage
+    remote_url: str | None  # 서버 저장이면 None — 서버 안 경로는 밖으로 안 낸다 (카드 BA)
     stages: list[StageSummary]
     std_docs: list[DocumentSummary]
     counts: dict[str, int]
@@ -114,7 +122,8 @@ class RepoStatus:
 
     code: str
     name: str  # UI-14 표가 「[코드] 이름」으로 적는다 (UI-002 1.6)
-    remote_url: str
+    storage: Storage
+    remote_url: str | None  # 서버 저장이면 None (카드 BA)
     last_processed_commit: str | None
     synced_at: datetime | None
     behind_by: int | None

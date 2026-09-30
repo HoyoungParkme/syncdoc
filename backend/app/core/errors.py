@@ -194,12 +194,35 @@ class ProjectCodeInvalid(Problem):
 
 
 class ExistingSpecs(Problem):
+    """UC-A1 3a — 저장소에 docs/specs/가 있다. 3b — 서버 저장인데 같은 코드의 보관본이 있다.
+
+    보관본이면 archived_at(가장 최근 것을 보관한 때)을 싣는다 — 화면이 「보관된 저장소」로 뜬다.
+    """
+
     type = "urn:syncdoc:existing-specs"
     status = 409
     title = "existing-specs"
 
-    def __init__(self, doc_count: int) -> None:
-        super().__init__("docs/specs/가 이미 있음", doc_count=doc_count)
+    def __init__(self, doc_count: int, archived_at: str | None = None) -> None:
+        if archived_at is None:
+            super().__init__("docs/specs/가 이미 있음", doc_count=doc_count)
+        else:
+            super().__init__(
+                "보관된 서버 저장소가 있음", doc_count=doc_count, archived_at=archived_at
+            )
+
+
+class StorageUnavailable(Problem):
+    """UC-A1 1a — 이 서버에서 켜지 않은 저장 방식이다(설정 STORAGE_MODES, PRD R14)."""
+
+    type = "urn:syncdoc:storage-unavailable"
+    status = 422
+    title = "storage-unavailable"
+
+    def __init__(self, storage: str, enabled: list[str]) -> None:
+        super().__init__(
+            f"이 서버에서 켜지 않은 저장 방식 {storage}", storage=storage, enabled=enabled
+        )
 
 
 class NotImplementedYet(Problem):

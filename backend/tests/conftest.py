@@ -126,6 +126,16 @@ def _fresh_repo_locks():
 
 
 @pytest.fixture(autouse=True)
+def origins_dir(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch):
+    """서버 저장소(카드 BA)는 테스트마다 임시 폴더에 — 기본값 /var/syncdoc/origins에 닿지 않게."""
+    from app.config import settings
+
+    d = tmp_path_factory.mktemp("origins")
+    monkeypatch.setattr(settings, "ORIGINS_DIR", d)
+    return d
+
+
+@pytest.fixture(autouse=True)
 def code_graph_calls(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
     """코드 그래프 만들기(카드 AX)는 백그라운드에서 graphify를 돌린다 — 테스트에서는 걸기만 적는다.
 
