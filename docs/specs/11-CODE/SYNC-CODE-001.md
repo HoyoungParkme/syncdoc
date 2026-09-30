@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1123,6 +1123,18 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 완료 | 2026-09-30 · 브랜치 `card/AU-answer-text` · spec 5 + code 3 · 테스트 279 · `ruff` · `validate` 0/0 · `check_ui` 12/12 · `check_view_html` 34/34 · `--selftest` · 배포 뒤 헤드 크롬(1440×900): 같은 질문에 번호 목록 1~7 이어짐 · ID 뒤 이름 한 번 · 굵은 소제목 · 답 테두리 0px·바탕 없음, 질문 말풍선·기다림 점선 그대로 · MS-007 유저용 뷰 `0.` 단계 0부터(`start` 0 ×7, 하위 목록 5) · 콘솔 오류 0 |
 
 **왜 카드인가.** 렌더러는 유저용 뷰 전체가 쓰고 정적 뷰와 대조 검사가 있어 TS·파이썬을 같이 고쳐야 한다(STD-002 1장 규칙이 는다). 답 상자와 지시문은 각각 UI-5·MS-008 규칙이다.
+
+#### AV 어절 단위 줄바꿈 — 본문·뷰·채팅
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UI-001]] 3.2 줄바꿈 · [[SYNC-STD-002]] 1장 공통 렌더링 · 사용자 피드백 2026-09-30 「가시성이 떨어지는 이유가 줄바꿈인 듯」 |
+| 구현 | 앱 `styles.css` `body`와 정적 뷰 셸 CSS(`view_build.py` → `styles.view.css` 같은 바이트)에 `word-break:keep-all;overflow-wrap:anywhere` · 와이어프레임 iframe 안은 제외 |
+| 테스트 | `check_view_css` 뷰 CSS 쌍 같음 · 헤드 크롬: PRD-001 R1 카드 「이 MD가 원본」 한 덩어리 · 정적 뷰 같은 문단 · 질문 탭 답의 한글이 글자 중간에서 안 꺾이고 긴 ID는 칸 안에서 꺾임 |
+| 선행 | AU |
+| 완료 | — |
+
+**왜 카드인가.** 렌더러는 문단 줄을 공백으로 잇고 있어 하드 줄바꿈은 없다 — 원인은 CSS 기본값(한글은 아무 글자 사이나 꺾인다)이고, 디자인 토큰 문서(UI-001 3.2)에 규칙이 는다.
 
 ---
 
