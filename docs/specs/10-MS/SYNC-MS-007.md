@@ -362,7 +362,7 @@ async def process_commit(repo: Repository, head_hash: str, locked: bool = False)
    - github 진입은 **항목 삭제 확인을 건너뛴다** — 물어볼 상대가 없고 커밋이 진실이다. 사라진 항목은 `is_deleted` + `mark_missing`으로 통보
    - 파일명·디렉터리·미등록 작성자 위반은 저장 뒤 `spec.mark_convention_error`로 덧붙인다
    - `user = account.user_for_commit(author_email, author_login)` — **이메일 → login → 자리표시** 순([[SYNC-MS-006#AccountService.user_for_commit]])
-   - if `user.github_user_id is None` → 위반에 `author.unknown: {author_login}` 추가. **판정은 「자리표시인가」이지 「방금 만들었나」가 아니다** — 후자로 하면 같은 사람의 둘째 문서부터 이미 행이 있어 오류가 안 붙는다(#34)
+   - if `user.kind == placeholder` → 위반에 `author.unknown: {author_login}` 추가. **판정은 「자리표시인가」이지 「방금 만들었나」가 아니다** — 후자로 하면 같은 사람의 둘째 문서부터 이미 행이 있어 오류가 안 붙는다(#34)
    - `author = Author(kind=human, user, instructed_by=None, via=github)`
    - if `status == D` (파일 삭제) → **문서 행이 없거나 `trashed_at`이 있으면 건너뛴다** — 앱이 [[#pipeline.trash_document]]·[[#pipeline.purge_document]]로 만든 삭제 커밋이거나 등록 전에 사라진 파일이다. `mark_deleted`로 가면 `not-found`가 나서 그 커밋이 영영 「처리 실패」로 남고 `last_processed_commit`이 안 나아간다 · else → `deleted = spec.mark_deleted(document, commit_hash, author)` (`status=draft`, `file.deleted` 오류, 전 항목 `is_deleted`) · `reference.mark_missing(deleted)` · 문서 행은 남는다 · 다음 파일로
    - else → `save_pipeline(entry=github, doc_id, None, body, None, author, message=원 커밋 메시지, changed_items=None, commit_hash=file_commit_hash)` → 결과 모음
@@ -382,6 +382,7 @@ async def process_commit(repo: Repository, head_hash: str, locked: bool = False)
 - 미등록 작성자: 자리표시 User 생성, 문서에 `author.unknown`
 - **같은 미등록 작성자가 문서 둘을 커밋: 둘 다 `author.unknown`** (자리표시는 하나만 생긴다)
 - 커밋 이메일이 등록된 사람: 자리표시를 안 만들고 그 사람으로 붙는다. `author.unknown` 없음
+- 폐쇄망판: 누가 커밋했든 로컬 사용자로 붙는다. 자리표시·`author.unknown` 없음([[SYNC-PRD-001#R15]])
 - 파일명 ≠ frontmatter: 규약 오류로 저장됨
 - 한 파일 실패: 나머지 처리됨, `last_processed_commit` 안 바뀜
 - **같은 head를 둘이 동시에 처리해도** 버전 하나, 자동 강등이 유지되고 저장소와 DB 상태가 같다(#194)
@@ -415,7 +416,7 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
      - if `message.startswith("status(")` → `spec.apply_status(…, commit_hash=hash)`만 (StatusChange 복원)
      - else if 이 문서의 첫 커밋 → `spec.create(...)` · else → `spec.save(document, body, hash, author, message, deleted=spec.detect_deleted_items(document, body), validate_result, rebuild=True)` — `version_no`는 남은 버전 수 + 1, `items` upsert. 커밋마다 삭제 항목도 반영한다
    - 마지막 커밋 본문으로 `reference.extract`, `spec.mark_convention_error(document_id, violations + extra, warnings)`. 삭제된 항목을 가리키는 참조는 `extract` 4단계가 `is_deleted=false`만 찾으므로 **저절로 미존재**가 된다 — `mark_missing`을 따로 부르지 않는다
-   - **`extra`에 작성자 위반을 얹는다** — 마지막 **본문** 커밋(`status(`가 아닌 것)의 작성자가 `github_user_id is None`이면 `author.unknown: {login}`. `mark_convention_error`는 항상 전량 교체라 여기서 안 얹으면 그 오류가 사라진다. 그래서 실물 인덱스에 규약 오류가 0건이었다(#34)
+   - **`extra`에 작성자 위반을 얹는다** — 마지막 **본문** 커밋(`status(`가 아닌 것)의 작성자가 자리표시(`kind == placeholder`)면 `author.unknown: {login}`. `mark_convention_error`는 항상 전량 교체라 여기서 안 얹으면 그 오류가 사라진다. 그래서 실물 인덱스에 규약 오류가 0건이었다(#34)
    - **마지막 본문 커밋을 기준으로 삼는 이유** — 문서의 `author.unknown`은 UI-5 배너가 `last_author`와 함께 보여주는 값이고 `process_commit`도 방금 저장한 버전의 작성자로 판정한다. 옛 커밋이 미등록이었어도 최신 커밋이 등록자면 문서는 깨끗하다
 7. `reference.resolve_missing(project_id)` — 파일 순서 때문에 미존재였던 참조 해제
 7a~7b. 없음 — 전파결정·플래그를 새 버전에 다시 잇던 자리. 카드 V에서 걷어냈다
