@@ -772,8 +772,8 @@ a.arow:hover{background:var(--bg-subtle)}
 .qa .turn{display:flex;flex-direction:column;gap:var(--space-4)}
 .qa .q{align-self:flex-end;max-width:92%;padding:var(--space-5) var(--space-9);border-radius:var(--radius-chip);
   background:var(--bg-sunken);color:var(--ink-body);font-size:var(--text-ui);white-space:pre-wrap}
-.qa .a{padding:var(--space-5) var(--space-9);border:1px solid var(--border);border-radius:var(--radius-chip);
-  background:var(--bg-card);color:var(--ink-prose);font-size:var(--text-ui);line-height:1.6}
+/* 답은 상자 없이 맨글 — 질문만 말풍선. 기다림·실패는 상태라 테두리·색을 둔다 (8.7, 카드 AU) */
+.qa .a{padding:0 var(--space-2);color:var(--ink-prose);font-size:var(--text-ui);line-height:1.6}
 /* 답은 가벼운 마크다운(renderBlocks) — 문단·목록·굵게·인라인 코드·참조 링크 (#206) */
 .qa .a p{margin:0 0 var(--space-5)}
 .qa .a p:last-child,.qa .a ul:last-child,.qa .a ol:last-child{margin-bottom:0}
@@ -785,8 +785,9 @@ a.arow:hover{background:var(--bg-subtle)}
 .qa .a .mer{position:relative;margin:var(--space-6) 0;overflow:auto}
 .qa .a .mer svg{max-width:100%;height:auto}
 .qa .a .mer pre.mermaid{margin:0;white-space:pre-wrap;font-size:var(--text-caption)}
-.qa .a.wait{color:var(--ink-faint);border-style:dashed;white-space:pre-wrap}
-.qa .a.fail{color:var(--danger);background:var(--danger-bg);border-color:var(--danger-bg);white-space:pre-wrap}
+.qa .a.wait,.qa .a.fail{padding:var(--space-5) var(--space-9);border:1px solid var(--border);border-radius:var(--radius-chip);white-space:pre-wrap}
+.qa .a.wait{color:var(--ink-faint);border-style:dashed}
+.qa .a.fail{color:var(--danger);background:var(--danger-bg);border-color:var(--danger-bg)}
 .qa .qsrc{font-size:var(--text-caption);color:var(--ink-faint);font-family:var(--font-mono);margin-top:var(--space-4)}
 .qa .qsrc a{color:var(--ink-muted);white-space:nowrap}
 /* 8.9 진행 묶음 — 읽는 동안은 스피너(공통 1.8)와 가장 최근 줄만, 답이 오면 「n단계 읽음 · 본 것 k」로 접힌다 (#206) */
