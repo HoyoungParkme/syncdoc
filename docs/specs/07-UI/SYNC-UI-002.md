@@ -739,6 +739,8 @@ status: draft
   .phead .nm{display:flex;align-items:baseline;gap:6px}
   .phead .nm .m{font-size:16px;font-weight:600}
   .phead .repo{display:block;margin-top:4px;font-family:var(--mono);font-size:12.5px;color:var(--ink3);border-bottom:1px dashed var(--line2);width:fit-content}
+  .push{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:8px;font-size:12.5px}
+  .push code{font-family:var(--mono);font-size:12px;background:var(--sub2);padding:2px 6px;border-radius:3px}
   /* 요약 수치 — 세 칸. 0이면 흐리게, 1 이상이면 경고색 숫자에 경고 테두리 */
   .stats{display:flex;gap:8px}
   .stat{display:inline-flex;align-items:baseline;gap:7px;padding:7px 12px;background:#fff;border:1px solid var(--line);border-radius:6px;font-size:13px;color:var(--ink3)}
@@ -872,6 +874,19 @@ status: draft
     </div>
   </div>
 </div>
+
+<div class="var">서버 저장 프로젝트의 머리 — 저장소 줄이 글자이고 push 방법(1.4)이 붙는다(카드 BB)</div>
+<div class="sd h" style="min-height:120px">
+  <div class="pg">
+    <div class="phead">
+      <div>
+        <div class="nm h1"><span class="m">[ABC]</span><span>서버 저장 예시</span></div>
+        <span class="repo">서버 저장소</span>
+        <div class="push" data-el="1.4"><span class="lbl">push 방법</span><code>git remote add syncdoc https://syncdoc.example.com/git/ABC.git</code><code>git push syncdoc main</code><span class="lbl">비밀번호 칸에 개인 토큰(설정)</span><span class="b sm">복사</span></div>
+      </div>
+    </div>
+  </div>
+</div>
 ```
 
 
@@ -883,6 +898,7 @@ status: draft
 | 1.1 | 코드 | 텍스트 | 프로젝트 코드 | — |
 | 1.2 | 이름 | 텍스트 | 프로젝트 이름 | — |
 | 1.3 | 저장소 주소 | 링크 | GitHub 주소. 서버 저장이면 「서버 저장소」 글자(링크 없음 — 서버 안 경로는 안 보인다) | GitHub이면 새 탭으로 GitHub |
+| 1.4 | push 방법 | 텍스트 | **서버 저장일 때만.** 원격을 더하는 줄 `git remote add syncdoc {이 서버}/git/{코드}.git`과 `git push syncdoc main` 두 줄. 비밀번호 칸에 개인 토큰(UI-13)이라는 안내 | 복사 — 두 줄을 클립보드로 |
 | 2.1 | 참조 그래프 | 버튼 | | UI-8로 |
 | 2.2 | 순서대로 읽기 | 버튼 | | UI-9로 |
 | 3 | 요약 수치 | 영역 | 프로젝트 전체의 끊어진 참조·규약 오류·미완성 건수. 0이면 흐리게 | — |
@@ -909,6 +925,7 @@ status: draft
 
 ### 규칙
 
+- **서버 저장 프로젝트는 머리에 push 방법(1.4)이 붙는다**(카드 BB). git이 있는 사람이 코드를 서버 저장소에 두는 길이다([[SYNC-UC-001#UC-H21]]) — 주소는 이 서버의 `/git/{코드}.git`, 비밀번호 칸에 개인 토큰. GitHub 프로젝트에는 없다(GitHub에 push한다). git이 없는 PC는 에이전트의 코드 올리기([[SYNC-UC-001#UC-A10]])
 - **휴지통(8)은 단계 표의 일부가 아니다.** 단계 칸(4.1)·미니 히트맵·요약 수치(3)·최근 변경(5)·그래프·순서 읽기는 휴지통 문서를 세지 않는다. 휴지통에 있는 동안 그 문서는 프로젝트에 없는 것이다 — 행만 남아 되돌릴 수 있을 뿐
 - 완전 삭제는 되살리기보다 한 단계 깊다 — 확인(8.4)이 한 번 더 있고, 남이 가리키는 동안은 서버가 막는다
 - 단계 상태 색: `완료` 초록 / `초안` 회색 / `미작성` 빈칸. UI-2와 같은 기준
@@ -946,6 +963,11 @@ status: draft
 1. 최근 변경(5)을 본다. 에이전트가 쓴 것과 사람이 쓴 것이 구분된다
 2. `status: 초안 → 완료` 같은 상태 전환도 줄로 보인다
 3. 문서를 누르면 UI-5로 간다
+
+**S-4 서버 저장 프로젝트에 코드를 둔다** — UC-H21
+1. 서버 저장 프로젝트라 저장소 줄(1.3)이 「서버 저장소」이고 push 방법(1.4)이 보인다
+2. 복사를 눌러 두 줄을 자기 저장소에서 실행한다. 비밀번호를 물으면 설정(UI-13)에서 발급한 개인 토큰을 넣는다
+3. 잠시 뒤 마지막 처리 커밋(7.1)이 push한 커밋으로 바뀌고, 문서 뷰의 코드 탭(UI-5 8.17)에 대조가 뜬다
 
 ---
 
@@ -1104,7 +1126,7 @@ status: draft
 |---|---|---|---|---|
 | 1 | 문서 바 | 영역 | UI-5와 같음. 이력 탭 활성 | 유저용·원본 → UI-5 |
 | 2 | 버전 목록 | 목록 | **좌측 사이드바의 카드 목록.** 최신이 위. 버전 번호, 시각, 작성 주체, 커밋 메시지(UC-H6 기본 흐름 2). `status` 커밋도 카드로 |
-| 2.1 | 버전 카드 | 카드 | 번호, `A`/`B` 뱃지(고른 두 개), 시각, 작성(사람/에이전트+지시자/GitHub push), 변경 요약, 되돌리기 | 고르면 diff 대상. 두 개까지 |
+| 2.1 | 버전 카드 | 카드 | 번호, `A`/`B` 뱃지(고른 두 개), 시각, 작성(사람/에이전트+지시자/GitHub push — 서버 저장 프로젝트면 「git push」, 카드 BB), 변경 요약, 되돌리기 | 고르면 diff 대상. 두 개까지 |
 | 7 | 이 변경이 닿는 곳 | 패널 | 우측. 바뀐 항목마다 하위 참조 건수 카드. 이 변경이 저장 전에 어디까지 번지는지 | 항목 클릭 → 3.3과 같음 |
 | 2.3 | A·B 뱃지 | 뱃지 | 고른 두 버전 중 어느 쪽이 이전(`A`)이고 어느 쪽이 현재(`B`)인지 | — |
 | 2.2 | 되돌리기 | 버튼 | 현재 버전과 `status` 행 제외한 행마다 | 되돌리기 확인(4) 열림(UC-H7 기본 흐름 1~2) |
