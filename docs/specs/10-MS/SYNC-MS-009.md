@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`infra/git.py · infra/github.py · infra/llm.py · infra/graphify.py`의 함수 23개. 클래스 명세 [[SYNC-DOM-002]] 4.9의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`infra/git.py · infra/github.py · infra/llm.py · infra/graphify.py`의 함수 24개. 클래스 명세 [[SYNC-DOM-002]] 4.9의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -36,6 +36,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#git.exists]] | 경로 존재 |
 | [[#git.init_specs]] | 11단계 디렉터리·템플릿 |
 | [[#git.init_bare]] | 서버 저장소 만들기 |
+| [[#git.http_backend]] | 서버 저장소 git 입구 — git http-backend를 CGI로 |
 | [[#git.archive]] | 커밋의 파일을 폴더에 푼다 |
 | [[#git.changed_paths]] | 범위에서 바뀐 경로 전부 |
 | [[#github.verify_signature]] | webhook 서명 |
@@ -160,6 +161,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. `git fetch origin` · `git reset --hard origin/main` — 작업 사본을 원격 최신으로 (락 안이라 안전)
    - **원격에 커밋이 하나도 없으면 `origin/main`이 없다.** 되돌아갈 곳이 없으므로 reset을 건너뛴다. 이 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3, #6)
 3. 파일 쓰기 (`path` 또는 `files`). 상위 디렉터리 없으면 생성 · `delete`면 `git rm -q --ignore-unmatch {paths}`
+   - **경로 가드**(카드 BB) — 쓰거나 지울 경로마다 `(workdir / p).resolve()`가 작업 사본 안이고 `.git` 조각이 없어야 한다. 아니면 쓴 것 없이 `! push-failed {reason: 작업 사본 밖 경로}`. push로 심은 심볼릭 링크를 따라 밖에 쓰거나 `.git/hooks`에 써서 서버가 코드를 돌리게 되는 것을 막는다
 4. `git add {paths}` · if `git diff --cached --quiet` (변경 없음) → `→ 현재 HEAD` (커밋 안 만듦. 같은 내용 재저장 · 이미 없는 파일 삭제)
 5. `git -c user.name={display_name} -c user.email={login}@users.noreply.github.com commit -m {message}`
 6. `git push {url with token} HEAD:main` — 기본 브랜치는 `main` 고정(결정). 다른 브랜치 저장소는 v1에서 지원 안 함
@@ -183,7 +185,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** [[SYNC-MS-006#AccountService.github_token_for]]
 
-**테스트 관점** **서버 안 경로 원격 + 토큰 없는 사람 → push 성공**(토큰을 안 구한다) · **https 원격 + 토큰 없는 사람 → `push-failed 미등록`** · 커밋이 하나도 없는 원격 → 이 커밋이 첫 커밋 · 정상 → 원격에 커밋, 반환 해시 = 원격 HEAD · 같은 내용 → 커밋 안 생김, HEAD 반환 · 원격이 앞서 있음(다른 파일) → rebase 후 성공 · 연달아 두 번 앞서도 성공(재시도 2회) · 원격이 같은 파일 수정 → conflict, 작업 사본 원상 · 토큰이 config에 안 남음 · **git 로케일이 영어가 아니어도 거부를 거부로 판정**
+**테스트 관점** **작업 사본 밖을 가리키는 심볼릭 링크를 지나는 경로·`.git/` 경로 → `push-failed`, 아무것도 안 쓴다** · **서버 안 경로 원격 + 토큰 없는 사람 → push 성공**(토큰을 안 구한다) · **https 원격 + 토큰 없는 사람 → `push-failed 미등록`** · 커밋이 하나도 없는 원격 → 이 커밋이 첫 커밋 · 정상 → 원격에 커밋, 반환 해시 = 원격 HEAD · 같은 내용 → 커밋 안 생김, HEAD 반환 · 원격이 앞서 있음(다른 파일) → rebase 후 성공 · 연달아 두 번 앞서도 성공(재시도 2회) · 원격이 같은 파일 수정 → conflict, 작업 사본 원상 · 토큰이 config에 안 남음 · **git 로케일이 영어가 아니어도 거부를 거부로 판정**
 
 ---
 
@@ -291,6 +293,31 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **호출하는 것** —
 
 **테스트 관점** 만든 저장소의 HEAD가 `refs/heads/main` · config 세 줄 · 그것을 clone해 `commit_push`하면 토큰 없이 들어간다
+
+---
+
+#### git.http_backend 서버 저장소 git 입구
+
+**시그니처** `async def http_backend(root: Path, env: dict[str, str], body: AsyncIterator[bytes]) -> CgiResponse`
+
+근거: [[SYNC-SEQ-001#SEQ-29]] · [[SYNC-API-001#POST/git/{code}.git/git-receive-pack]] · [[SYNC-INFRA-001]] 7장
+
+**입력** `root` — `ORIGINS_DIR`(`GIT_PROJECT_ROOT`). `env` — 라우터가 요청에서 만든 CGI 변수: `REQUEST_METHOD` · `PATH_INFO`(`/{코드}.git/{나머지}`) · `QUERY_STRING` · `CONTENT_TYPE` · `CONTENT_LENGTH`(**요청에 있을 때만** — chunked면 넣지 않아야 본문을 끝까지 읽는다) · `HTTP_CONTENT_ENCODING`(gzip이면 그대로 — 풀지 않는다) · `HTTP_GIT_PROTOCOL` · `REMOTE_USER`(비면 receive-pack이 403) · `REMOTE_ADDR`. `body` — 요청 본문 스트림
+
+**처리**
+1. `git http-backend`를 띄운다. 환경은 `PATH`·`GIT_PROJECT_ROOT`·`GIT_HTTP_EXPORT_ALL=1`·`GIT_HTTP_MAX_REQUEST_BUFFER=100M`과 `env`뿐 — 앱의 환경(비밀)을 넘기지 않는다
+2. `body`를 stdin으로 흘리는 일과 stdout을 읽는 일을 **동시에** 한다 — 차례로 하면 파이프가 차서 멈춘다. stderr도 따로 비운다
+3. **본문을 다 넘길 때까지 응답을 시작하지 않는다.** 그동안 나온 stdout은 모아 둔다. `git http-backend`는 push 결과 머리를 본문을 다 읽기 전에 내놓는데, 그때 응답을 시작하면 큰 push(chunked)의 본문이 중간에 끊겼다(시험판 실측 — 360KB에서 끊겨 「early EOF」)
+4. 본문이 끝나면 stdin을 닫고, 모은 것에서 CGI 머리를 `\r\n\r\n`까지 읽는다. `Status:` 줄이 있으면 그 코드, 없으면 200. `Status:`는 헤더로 내보내지 않는다
+5. `→ CgiResponse(status, headers, body=남은 stdout 스트림)` — 스트림이 끝나면 프로세스를 기다리고, 도중에 끊기면 프로세스를 죽인다
+
+**출력** [[SYNC-DOM-002]] 2.8 `CgiResponse`
+
+**예외** 없음 — git의 거절(되감기·인증 없음 등)은 git 프로토콜 응답 안에 있다
+
+**호출하는 것** —
+
+**테스트 관점** `info/refs?service=git-upload-pack`·`git-receive-pack` 광고가 200과 알맞은 Content-Type · `REMOTE_USER`가 있으면 receive-pack 광고가 된다 · 실제 git 클라이언트로 clone·push(3MB chunked 포함)가 된다 · 되감기 push는 git이 거절 문구로 받는다
 
 ---
 
