@@ -10,7 +10,7 @@ from app.core import queries
 from app.core.account.models import User
 from app.core.project.service import ProjectService
 from app.core.types import DocumentSummary as DocumentSummaryDto
-from app.core.types import GraphScope
+from app.core.types import GraphScope, Storage
 from app.db import get_session
 from app.web.auth import current_user
 from app.web.schemas.common import BrokenRefSummary
@@ -33,7 +33,13 @@ async def init_project(
 ) -> ProjectSummary:
     """SYNC-API-001#POST/api/projects"""
     await ProjectService(session).init_project(
-        req.remote_url, req.code, req.name, user, req.import_existing, req.create_repo
+        req.remote_url,
+        req.code,
+        req.name,
+        user,
+        req.import_existing,
+        req.create_repo,
+        Storage(req.storage),
     )
     session.commit()
     summary = next(p for p in await queries.project_summary(user) if p.code == req.code)

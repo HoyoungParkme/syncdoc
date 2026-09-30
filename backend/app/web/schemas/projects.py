@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -25,7 +26,8 @@ class StageSummary(Base):
 class ProjectSummary(Base):
     code: str
     name: str
-    remote_url: str
+    storage: Literal["github", "server"]  # 저장 방식 (PRD R14, 카드 BA)
+    remote_url: str | None  # 서버 저장이면 None — 서버 안 경로는 안 낸다
     stages: list[StageSummary]
     std_docs: list[DocumentSummary]
     counts: dict[str, int]
@@ -40,6 +42,7 @@ class ProjectSummary(Base):
         return {
             "code": p.code,
             "name": p.name,
+            "storage": str(p.storage),
             "remote_url": p.remote_url,
             "stages": [StageSummary.model_validate(s) for s in p.stages],
             "std_docs": [DocumentSummary.of(d) for d in p.std_docs],
@@ -88,7 +91,9 @@ class ProjectDetail(ProjectSummary):
 
 
 class InitProject(BaseModel):
-    remote_url: str
+    # 저장 방식 — 켠 것만 된다(storage-unavailable). GitHub이면 remote_url 필수 (카드 BA)
+    storage: Literal["github", "server"]
+    remote_url: str | None = None
     code: str = Field(pattern=r"^[A-Z]{1,4}$")
     name: str = Field(max_length=100)
     import_existing: bool = False

@@ -32,7 +32,9 @@ async def test_s1_agent_builds_specs_over_mcp(
     g(seed, "push", "-q", "origin", "HEAD:main")
 
     # 1. "이 저장소로 싱크독 시작해줘" → 11단계 디렉터리·템플릿 커밋
-    err, r = await call("init_project", remote_url=str(bare), code="EXMP", name="예시")
+    err, r = await call(
+        "init_project", storage="github", remote_url=str(bare), code="EXMP", name="예시"
+    )
     assert not err and all(s["status"] is None for s in r["stages"])
     assert g(bare, "log", "-1", "--format=%s", "main") == "chore(EXMP): init syncdoc"
 

@@ -236,21 +236,57 @@ async def test_init_project_tool(scoped: Session, as_user, repos, tmp_path, monk
     g(seed, "add", "README.md")
     g(seed, "commit", "-q", "-m", "init")
     g(seed, "push", "-q", "origin", "HEAD:main")
-    err, r = await call("init_project", remote_url=str(bare), code="NEW", name="새")
+    gh = {"storage": "github"}
+    err, r = await call("init_project", **gh, remote_url=str(bare), code="NEW", name="새")
     assert not err and r["code"] == "NEW" and len(r["stages"]) == 11
+    assert r["storage"] == "github" and r["remote_url"] == str(bare)
     assert all(s["status"] is None and s["doc_count"] == 0 for s in r["stages"])
     # 규약·템플릿 사본은 안 넣는다 — README가 링크로 가리킨다 (카드 AB)
     tree = g(bare, "ls-tree", "-r", "--name-only", "main")
     assert "docs/specs/README.md" in tree and "_templates" not in tree
-    err, p = await call("init_project", remote_url=str(bare), code="NEW", name="새")
+    err, p = await call("init_project", **gh, remote_url=str(bare), code="NEW", name="새")
     assert err and p["type"] == "urn:syncdoc:project-code-conflict"
-    err, p = await call("init_project", remote_url=str(repos["remote"]), code="EXST", name="n")
+    err, p = await call(
+        "init_project", **gh, remote_url=str(repos["remote"]), code="EXST", name="n"
+    )
     assert err and p["type"] == "urn:syncdoc:existing-specs" and p["doc_count"] == 1
     err, p = await call(
-        "init_project", remote_url=str(repos["remote"]), code="EXST", name="n", import_existing=True
+        "init_project",
+        **gh,
+        remote_url=str(repos["remote"]),
+        code="EXST",
+        name="n",
+        import_existing=True,
     )
     assert not err and p["code"] == "EXST"
     assert next(s for s in p["stages"] if s["doc_type"] == "PRD")["doc_count"] == 1
+
+
+async def test_init_project_server_storage_and_storage_is_required(
+    scoped: Session, as_user, tmp_path, monkeypatch
+) -> None:
+    """카드 BA — storage는 기본값이 없다. 서버 저장은 주소 없이 만들고 결과에도 주소가 없다."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "REPOS_DIR", tmp_path / "repos")
+    async with Client(tools.server) as c:  # storage 없음 → 도구 인자 검증에서 막힌다(JSON 아님)
+        missing = await c.call_tool("init_project", {"code": "SRV", "name": "서버"})
+    assert missing.is_error and "storage" in missing.content[0].text
+    err, r = await call("init_project", storage="server", code="SRV", name="서버")
+    assert not err and r["storage"] == "server" and r["remote_url"] is None
+    monkeypatch.setattr(settings, "STORAGE_MODES", "github")
+    err, p = await call("init_project", storage="server", code="SRVB", name="x")
+    assert err and p["type"] == "urn:syncdoc:storage-unavailable" and p["enabled"] == ["github"]
+
+
+def test_init_description_asks_first_only_when_both_modes_are_on() -> None:
+    """API-002 init_project — 설명 끝 문장이 서버가 켠 방식으로 정해진다(RFQ Q7의 확인 절차)."""
+    both = tools.init_description(["github", "server"])
+    assert "사람에게 어느 쪽으로 할지 묻고" in both
+    only = tools.init_description(["server"])
+    assert "서버 저장만 쓴다" in only and 'storage="server"' in only and "묻지 않는다" in only
+    assert "GitHub 저장만" in tools.storage_sentence(["github"])
+    assert "저장 방식을 고른다" in (tools.server.instructions or "")
 
 
 async def test_get_references_splits_upstream_downstream(scoped: Session, as_user) -> None:
