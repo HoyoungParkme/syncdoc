@@ -29,8 +29,8 @@ syncdoc/            저장소 = 프로젝트
 3. MINISPEC 순서대로 구현. 함수 하나 = 커밋 하나. docstring 첫 줄 = MINISPEC 항목 ID (DEV-3)
 4. MINISPEC "테스트 관점"을 테스트로. 통과할 때까지
 5. 카드의 E2E (시나리오 흐름 그대로)
-6. 완료 조건(DEV-14) 여섯 확인 → CODE-001 카드 완료란에 커밋·날짜 기록 → 다음 카드
-   화면이 있는 카드는 일곱째 — 사람이 브라우저에서 data-el 대로 눌러 본다 (DEV-17)
+6. 완료 조건(DEV-14) 일곱 확인 → CODE-001 카드 완료란에 커밋·날짜 기록 → 다음 카드
+   화면이 있는 카드는 여덟째 — 사람이 브라우저에서 data-el 대로 눌러 본다 (DEV-17)
 ```
 
 ## 막혔을 때
@@ -51,6 +51,7 @@ syncdoc/            저장소 = 프로젝트
 
 - `python tools/validate.py` — 명세 규약 검사 (STD-001 3·4장). 위반 0·경고 0이어야 한다
 - `python tools/check_code.py` — MINISPEC↔코드 시그니처 대조 (DEV-14 첫째·둘째)
+- `uv run --project backend python tools/check_calls.py` — MINISPEC 「호출하는 것」↔코드 호출 그래프(graphify + 보강) 대조 (DEV-14 셋째). 서버의 코드 그래프와 같은 함수로 센다
 - `python tools/check_ui.py` — 와이어프레임 요소 번호↔React `data-el` 대조 (DEV-17)
 - `python tools/check_view_css.py` — 뷰 CSS가 `view_build.py`와 바이트 단위로 같은지 (STD-002)
 - `python tools/check_view_html.py` — 정적 뷰와 앱 유저용 탭이 같은 HTML인지 (STD-002 1장·4장). 앱 뷰를 rolldown으로 묶어 Node로 돌리므로 `frontend/node_modules`가 있어야 한다. 싱크독 문서와 셀프테스트 시험 문서, `--specs <저장소>/docs/specs`로 다른 저장소. 뷰 코드(`tools/view_build.py`·`wf_build.py`·`frontend/src/view`)를 고치면 돌린다
