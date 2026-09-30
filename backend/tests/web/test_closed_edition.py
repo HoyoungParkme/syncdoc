@@ -80,6 +80,12 @@ def test_github_login_and_hook_paths_do_not_exist(closed: TestClient) -> None:
         assert r.status_code == 404 and r.json()["type"] == "urn:syncdoc:not-found", path
 
 
+def test_login_screen_sends_to_the_list(closed: TestClient) -> None:
+    """UI-1은 인터넷판만 — 폐쇄망판은 `/login`으로 와도 UI-2로 (UI-001 2장)."""
+    r = closed.get("/login?next=/p/X", follow_redirects=False)
+    assert r.status_code == 302 and r.headers["location"] == "/"
+
+
 def test_internet_edition_is_untouched(client: TestClient) -> None:
     """인터넷판 — 가드가 그대로 지나간다. 로그인 없으면 401, GitHub 로그인 경로가 있다."""
     assert client.get("/api/me", headers={"host": "evil.example"}).status_code == 401

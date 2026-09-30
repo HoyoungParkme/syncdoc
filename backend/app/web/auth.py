@@ -13,7 +13,7 @@ from datetime import datetime
 from urllib.parse import urlencode, urlsplit
 
 from fastapi import Depends, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from itsdangerous import TimestampSigner
 from itsdangerous.exc import SignatureExpired
 from sqlalchemy.orm import Session
@@ -169,8 +169,9 @@ class ClosedEditionGuard:
 
     로그인이 없으니 누가가 아니라 어디서 부르는지를 본다. Host가 허용 목록 밖이면(DNS rebinding)
     403, 쓰기 요청의 Origin이 다른 곳이면(CSRF — 본문 없는 POST는 미리 묻는 요청도 없다) 403,
-    GitHub 로그인·통지 경로는 404. 인터넷판에서는 그대로 지나간다. 순수 ASGI라 스트리밍 응답과
-    응답 뒤 작업(git push 처리)을 건드리지 않는다.
+    GitHub 로그인·통지 경로는 404, 로그인 화면(UI-1)은 목록(UI-2)으로 보낸다(UI-001 2장).
+    인터넷판에서는 그대로 지나간다. 순수 ASGI라 스트리밍 응답과 응답 뒤 작업(git push 처리)을
+    건드리지 않는다.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -194,6 +195,9 @@ class ClosedEditionGuard:
             refusal = ForbiddenOrigin(origin=origin)
         elif path.startswith(_GITHUB_PATHS):
             refusal = NotFound("path", path)
+        elif path == "/login":
+            await RedirectResponse("/", status_code=302)(scope, receive, send)
+            return
         if refusal is None:
             await self.app(scope, receive, send)
             return

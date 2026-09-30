@@ -3,13 +3,15 @@
  *  3 MCP 토큰(3.1 행, 3.2 폐기, 3.3 이름, 3.4 발급 열기, 3.5 마지막 사용, 3.6 발급)
  *  4 토큰 원문 상자(4.1 원문, 4.2 복사) · 5 관리 카드(5.1 열기) · 6 관리 영역(UI-14) · 7 닫기(✕) · 8 클라이언트 설정(8.1 스니펫) · 9 닫기 */
 import { useEffect, useState } from 'react'
-import { ago, api, ApiError, type AccessToken, type CommitEmail, type User } from '../api/client'
+import { ago, api, ApiError, type AccessToken, type CommitEmail, type Me } from '../api/client'
 import { Admin } from '../pages/Admin'
 import { useEscape } from './ui'
 
 const day = (iso: string) => iso.slice(0, 10)
 
-export function SettingsDialog({ user, onClose }: { user: User; onClose: () => void }) {
+export function SettingsDialog({ user, onClose }: { user: Me; onClose: () => void }) {
+  // 폐쇄망판 — 로그인이 없고 모든 커밋이 로컬 사용자라 로그아웃·커밋 이메일이 없다 (UI-13 규칙, 카드 BC)
+  const closed = user.edition === 'closed'
   useEscape(onClose) // 1.1 — 재구축 확인(UI-14 4)이 위에 떠 있으면 그것이 먼저 닫힌다
   const [tokens, setTokens] = useState<AccessToken[]>([])
   const [label, setLabel] = useState('')
@@ -25,8 +27,8 @@ export function SettingsDialog({ user, onClose }: { user: User; onClose: () => v
   const loadEmails = () => api.get<CommitEmail[]>('/api/me/emails').then(setEmails)
   useEffect(() => {
     load()
-    loadEmails()
-  }, [])
+    if (!closed) loadEmails()
+  }, [closed])
   async function issue() {
     const t = await api.post<AccessToken>('/api/me/tokens', { label })
     setIssued(t)
@@ -163,6 +165,16 @@ export function SettingsDialog({ user, onClose }: { user: User; onClose: () => v
             )}
           </section>
 
+          {closed ? (
+            <section className="card" data-el="2">
+              <div className="cardh">
+                <b>내 계정</b>
+              </div>
+              <div className="row">
+                <span data-el="2.1">{user.github_login}</span> <span className="lbl">로그인 없음 · 이 PC · {user.display_name}</span>
+              </div>
+            </section>
+          ) : (
           <section className="card" data-el="2">
             <div className="cardh">
               <b>내 계정</b>
@@ -200,6 +212,7 @@ export function SettingsDialog({ user, onClose }: { user: User; onClose: () => v
             </div>
             {emailError && <p className="lbl warn">{emailError}</p>}
           </section>
+          )}
         </div>
 
         <div className="dfoot">
