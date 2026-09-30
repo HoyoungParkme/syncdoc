@@ -26,6 +26,7 @@ TABLES = {
     "conversations",  # 0014 — 대화·턴·첨부 (카드 AQ·AR)
     "turns",
     "attachments",
+    "code_graphs",  # 0015 — 코드 그래프 (카드 AX)
 }
 PARTIAL_INDEXES = {
     "ix_documents_has_convention_error",
