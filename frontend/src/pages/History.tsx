@@ -5,8 +5,8 @@
  *
  *  UI-5와 같은 3단 틀이다 — 탭으로 오갈 때 틀이 바뀌면 같은 문서를 보고 있다는 감각이 끊긴다. */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ago, api, ApiError, docPath, josa, type Diff, type Document, type ItemReferences, type Version } from '../api/client'
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { ago, api, ApiError, docPath, josa, type Diff, type Document, type ItemReferences, type ProjectSummary, type Version } from '../api/client'
 import { DiffBox } from '../components/DiffBox'
 import { StatusPill, ProjName, useEscape } from '../components/ui'
 import { Handle, PANEL, TOC, useWidth } from '../components/panes'
@@ -17,6 +17,9 @@ const keyOf = (v: Version) => `${v.commit_hash}:${v.version_no ?? 's'}`
 
 export function History() {
   const { code: proj = '', docId = '' } = useParams()
+  // 저장 방식 — 서버 저장이면 작성 표시가 「git push」 (UI-7 2.1, 카드 BB)
+  const { projects } = useOutletContext<{ projects: ProjectSummary[] }>()
+  const serverStored = projects.find((x) => x.code === proj)?.storage === 'server'
   const nav = useNavigate()
   // 규칙: 사이드바 폭은 UI-5와 같다. 같은 키를 읽어 화면을 옮겨도 유지된다 (UI-7 규칙, #36)
   const [tocW, addTocW] = useWidth(TOC)
@@ -160,7 +163,8 @@ export function History() {
                   <span className="lbl">
                     {v.author?.kind === 'agent' ? '에이전트' : (v.author?.user?.display_name ?? '')}
                     {v.author?.kind === 'agent' && ` · 지시 ${v.author.instructed_by?.display_name ?? ''}`}
-                    {v.author?.via === 'github' && ' · GitHub push'}
+                    {/* github = 저장소로 들어온 커밋 — 서버 저장 프로젝트면 서버 저장소 git push다 (UI-7 2.1, 카드 BB) */}
+                    {v.author?.via === 'github' && (serverStored ? ' · git push' : ' · GitHub push')}
                   </span>
                   <span className="grow" />
                   {/* status 커밋은 본문이 같고, 현재 버전은 되돌릴 것이 없다 */}
