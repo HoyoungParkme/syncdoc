@@ -101,9 +101,10 @@ export function Admin() {
                 <td>
                   <ProjName code={r.code} name={r.name} />
                 </td>
-                <td className="lbl">{r.remote_url.replace(/^https?:\/\/(www\.)?github\.com\//, '').replace(/\.git$/, '')}</td>
+                {/* 서버 저장이면 글자만 — 서버 안 경로는 안 보인다 (UI-14 2.1, 카드 BA) */}
+                <td className="lbl">{r.remote_url ? r.remote_url.replace(/^https?:\/\/(www\.)?github\.com\//, '').replace(/\.git$/, '') : '서버 저장소'}</td>
                 <td>
-                  <a className="mono" data-el={i === 0 ? '2.2' : undefined} href={r.remote_url.startsWith('http') && r.last_processed_commit ? `${r.remote_url.replace(/\.git$/, '')}/commit/${r.last_processed_commit}` : undefined} target="_blank" rel="noreferrer">
+                  <a className="mono" data-el={i === 0 ? '2.2' : undefined} href={r.remote_url?.startsWith('http') && r.last_processed_commit ? `${r.remote_url.replace(/\.git$/, '')}/commit/${r.last_processed_commit}` : undefined} target="_blank" rel="noreferrer">
                     {r.last_processed_commit?.slice(0, 7) ?? '—'}
                   </a>{' '}
                   {r.synced_at && <span className="lbl">{ago(r.synced_at)}</span>}
@@ -118,7 +119,10 @@ export function Admin() {
                   )}
                 </td>
                 <td data-el={i === 0 ? '2.5' : undefined}>
-                  {r.hook === 'ok' ? (
+                  {r.storage === 'server' ? (
+                    // 걸 통지가 없다 — 원본이 서버 안이라 밖에서 바뀌지 않는다 (INFRA 7장)
+                    <span className="lbl">—</span>
+                  ) : r.hook === 'ok' ? (
                     <span className="lbl">걸림</span>
                   ) : (
                     <>
@@ -173,7 +177,16 @@ export function Admin() {
                     이 프로젝트의 등록과 작업 사본을 지웁니다. 목록에서 사라집니다.
                     {/* 4.3 — 무엇이 남는지. 저장소 밖에 사는 데이터가 없어 잃는 것도 없다 (UI-14 규칙) */}
                     <div className="banner warn" data-el="4.3">
-                      <b>GitHub 저장소는 그대로 남습니다</b> — 명세 원본은 거기 있습니다. 다시 등록하면 문서와 이력이 git에서 복원됩니다.
+                      {repos.find((x) => x.code === confirm)?.storage === 'server' ? (
+                        // 서버 저장 — 원본을 지우지 않고 보관 폴더로 옮긴다 (UC-H17, 카드 BA)
+                        <>
+                          <b>서버 저장소는 보관 폴더로 옮겨집니다</b> — 같은 코드로 「기존 명세 가져오기」를 하면 문서와 이력이 되살아납니다.
+                        </>
+                      ) : (
+                        <>
+                          <b>GitHub 저장소는 그대로 남습니다</b> — 명세 원본은 거기 있습니다. 다시 등록하면 문서와 이력이 git에서 복원됩니다.
+                        </>
+                      )}
                     </div>
                   </>
                 )}

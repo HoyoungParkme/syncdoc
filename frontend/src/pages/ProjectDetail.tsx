@@ -134,9 +134,16 @@ export function ProjectDetail() {
           <div>
             <ProjName code={sum.code} name={sum.name} elCode="1.1" elName="1.2" />
           </div>
-          <a className="repo mono" data-el="1.3" href={sum.remote_url} target="_blank" rel="noreferrer">
-            {sum.remote_url.replace(/^https?:\/\//, '').replace(/\.git$/, '')}
-          </a>
+          {/* 1.3 — 서버 저장이면 글자만. 서버 안 경로는 안 보인다(UI-002 UI-4, 카드 BA) */}
+          {sum.remote_url ? (
+            <a className="repo mono" data-el="1.3" href={sum.remote_url} target="_blank" rel="noreferrer">
+              {sum.remote_url.replace(/^https?:\/\//, '').replace(/\.git$/, '')}
+            </a>
+          ) : (
+            <span className="repo" data-el="1.3">
+              서버 저장소
+            </span>
+          )}
         </div>
         <span className="grow" />
         <Link className="btn" data-el="2.1" to={`/p/${code}/graph`}>
@@ -272,7 +279,7 @@ export function ProjectDetail() {
               // 재구축 같은 조작은 여기 없고 UI-14에 있다
               <div className="sync lbl" data-el="7">
                 마지막 처리 커밋{' '}
-                {d.last_processed_commit ? (
+                {d.last_processed_commit && sum.remote_url ? (
                   <a
                     className="mono"
                     data-el="7.1"
@@ -282,6 +289,11 @@ export function ProjectDetail() {
                   >
                     {d.last_processed_commit.slice(0, 7)}
                   </a>
+                ) : d.last_processed_commit ? (
+                  // 서버 저장 — 커밋을 열 곳이 없어 글자만
+                  <span className="mono" data-el="7.1">
+                    {d.last_processed_commit.slice(0, 7)}
+                  </span>
                 ) : (
                   <span className="mono" data-el="7.1">
                     —

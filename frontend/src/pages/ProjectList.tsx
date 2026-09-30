@@ -4,7 +4,7 @@
  *  표가 아니라 격자다 — 칸이 열 폭을 꽉 채워야 색이 띠로 읽힌다. */
 import { useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
-import { ago, STAGE_TYPES, type ProjectSummary } from '../api/client'
+import { ago, STAGE_TYPES, type Me, type ProjectSummary } from '../api/client'
 import { ProjectInit } from './ProjectInit'
 import { ProjName, Tooltip } from '../components/ui'
 
@@ -19,7 +19,7 @@ const breakdown = (counts: Record<string, number>) =>
   KINDS.filter(([k]) => counts[k]).map(([k, ko]) => `${ko} ${counts[k]}`)
 
 export function ProjectList() {
-  const { projects } = useOutletContext<{ projects: ProjectSummary[] }>()
+  const { projects, user } = useOutletContext<{ projects: ProjectSummary[]; user: Me }>()
   const nav = useNavigate()
   const [init, setInit] = useState(false)
   return (
@@ -103,7 +103,9 @@ export function ProjectList() {
         </div>
       )}
       {/* 성공하면 목록에 새 행이 보여야 한다. 목록은 셸이 들고 있으므로 다시 읽는다 */}
-      {init && <ProjectInit onClose={() => setInit(false)} onDone={() => window.location.assign('/')} />}
+      {init && (
+        <ProjectInit onClose={() => setInit(false)} onDone={() => window.location.assign('/')} storageModes={user.storage_modes ?? ['github']} />
+      )}
     </div>
   )
 }
