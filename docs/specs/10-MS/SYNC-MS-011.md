@@ -156,7 +156,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 #### CodeGraphService.get 프로젝트의 그래프 행
 
-**시그니처** `def get(self, project_id: int) -> CodeGraph | None`
+**시그니처** `def get(project_id: int) -> CodeGraph | None`
 
 **처리** `DB: code_graphs where project_id` → 행 또는 None. 소유 검사는 부르는 쪽(`queries`, 카드 AY)이 프로젝트를 열 때 이미 했다
 
@@ -166,7 +166,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 #### CodeGraphService.save 새 그래프로 바꿔 끼운다
 
-**시그니처** `def save(self, project_id: int, commit_hash: str, source: str, graph: dict) -> CodeGraph`
+**시그니처** `def save(project_id: int, commit_hash: str, source: str, graph: dict) -> CodeGraph`
 
 근거: [[SYNC-UC-001#UC-S8]] 기본 흐름 4 · 사용자 결정 2026-09-30 — 프로젝트마다 최신 하나
 
@@ -178,7 +178,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 #### CodeGraphService.fail 실패 이유만 남긴다
 
-**시그니처** `def fail(self, project_id: int, commit_hash: str, reason: str) -> CodeGraph`
+**시그니처** `def fail(project_id: int, commit_hash: str, reason: str) -> CodeGraph`
 
 근거: [[SYNC-UC-001#UC-S8]] 확장 2a
 
@@ -190,7 +190,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 #### CodeGraphService.delete_by_project 프로젝트 해제와 함께
 
-**시그니처** `def delete_by_project(self, project_id: int) -> None`
+**시그니처** `def delete_by_project(project_id: int) -> None`
 
 **처리** `DB: code_graphs where project_id` 삭제 — [[SYNC-MS-001#ProjectService.delete_project]]가 명세 표보다 먼저 같은 트랜잭션에서 부른다
 
