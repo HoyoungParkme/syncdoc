@@ -1,6 +1,6 @@
 /* 앱 틀 — SYNC-UI-002 배치 뼈대의 클래스. 값은 SYNC-UI-001 3장 디자인 토큰.
    **styles.view.css 뒤에 로드돼야 한다** — 두 파일이 클래스를 여럿 공유하고
-   앱이 이기는 근거가 로드 순서뿐이다 (.tabs .st .warn .grp .mono .on .done .ref .missing).
+   앱이 이기는 근거가 로드 순서뿐이다 (.tabs .st .grp .mono .on .done .ref .missing).
    앱 틀 한 곳에만 쓰는 규칙은 그 틀 안으로 좁힌다 — `.steps` 하나로 두었더니 뷰 안 같은 이름
    (시나리오 단계·시퀀스 단계 표)까지 가로로 눕혔다 (#169).
    순서가 뒤집히면 먼저 드러나는 곳: UI-5 문서 바 탭 · UI-9 미확정 배너 · V-API 엔드포인트 행. */
@@ -200,7 +200,8 @@ body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)
 .legend i.sw{width:11px;height:11px;border:1px solid transparent;border-radius:2px;background:var(--status-draft)}
 .legend i.sw.ok{background:var(--status-approved)}
 .legend i.sw.na{background:var(--bg-card);border-color:var(--border)}
-.warn{color:var(--danger);border:none;padding:0;background:none;font-size:inherit}
+/* UI-2 2.3·범례에만 — 전역 `.warn`이면 뷰 안 V-RFQ 경고 상자(p.warn)의 테두리·배경까지 지운다 (#226, #169와 같은 종류) */
+.hrow .warn,.legend .warn{color:var(--danger);border:none;padding:0;background:none;font-size:inherit}
 /* UI-3 프로젝트 초기화 · UI-13 설정 — 둘 다 다이얼로그다 */
 /* 입력을 한 상자로 묶는다. 머리·폼·발 세 층으로 읽혀야 어디까지가 채울 곳인지 보인다 */
 .initdlg .form{max-width:none;border:1px solid var(--border);border-radius:var(--radius-panel-card);
