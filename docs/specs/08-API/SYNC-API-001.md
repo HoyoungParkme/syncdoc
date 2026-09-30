@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -960,6 +960,88 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
         $ref: '#/components/responses/NotFound'
       '409':
         description: 이미 보낸 첨부 — `urn:syncdoc:attachment-sent`
+```
+
+### 3.6 코드 그래프
+
+명세↔코드 대조([[SYNC-PRD-001#R13]], 카드 AY). 화면 [[SYNC-UI-001#UI-5]] 코드 탭 · [[SYNC-UI-001#UI-8]] 코드 호출 · 유스케이스 [[SYNC-UC-001#UC-H20]] · 서비스 [[SYNC-MS-008#queries.code_view]] · [[SYNC-MS-008#queries.code_calls]] · [[SYNC-MS-008#queries.code_source]]. 전부 소유자만 — 남의 프로젝트는 `not-found`. **대조는 저장하지 않고 부를 때마다 계산한다** — 그래프(코드 쪽)는 `code_graphs`에서, 「호출하는 것」은 명세에서.
+
+#### GET/api/docs/{docId}/code 문서의 함수 대조
+
+```yaml
+/api/docs/{docId}/code:
+  get:
+    summary: "문서 단위 코드 탭 — MINISPEC 문서면 그 문서 함수 전부의 어긋남 요약 (UI-5 8.22)"
+    parameters:
+    - $ref: '#/components/parameters/docId'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeView'
+      '404':
+        $ref: '#/components/responses/NotFound'
+```
+
+MINISPEC가 아닌 문서는 `functions`가 비어 온다 — 화면이 「항목을 고르세요」라고 말한다. 그래프가 없으면 `graph: null`.
+
+#### GET/api/docs/{docId}/items/{itemId}/code 항목의 코드 대조
+
+```yaml
+/api/docs/{docId}/items/{itemId}/code:
+  get:
+    summary: "코드 탭 — MINISPEC 항목이면 그 함수(부르는 것·불리는 곳), 아니면 하위 체인의 MINISPEC 함수 (UI-5 8.18~8.22)"
+    parameters:
+    - $ref: '#/components/parameters/docId'
+    - $ref: '#/components/parameters/itemId'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeView'
+      '404':
+        $ref: '#/components/responses/NotFound'
+```
+
+MINISPEC 항목인데 코드에 함수가 없으면 `function: null`·`missing: true`(UC-H20 2b). MINISPEC가 아닌 항목은 [[#GET/api/docs/{docId}/items/{itemId}/chain]]과 같은 하위 폐포의 MINISPEC 항목을 `functions`로.
+
+#### GET/api/docs/{docId}/items/{itemId}/code/source 함수 본문
+
+```yaml
+/api/docs/{docId}/items/{itemId}/code/source:
+  get:
+    summary: "코드 보기(UI-5 8.21) — 그래프를 만든 커밋의 저장소에서 그 함수 본문. 300줄까지"
+    parameters:
+    - $ref: '#/components/parameters/docId'
+    - $ref: '#/components/parameters/itemId'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeText'
+      '404':
+        description: 문서·항목 없음 · 소유하지 않은 프로젝트 · 그래프 없음(`resource: code_graph`) · 코드에 그 함수 없음(`resource: function`) · 그 커밋에 파일 없음(`resource: file`)
+```
+
+#### GET/api/projects/{code}/code-calls MINISPEC 사이의 호출
+
+```yaml
+/api/projects/{code}/code-calls:
+  get:
+    summary: "관계도의 코드 호출(UI-8 2.6) — MINISPEC 항목 사이의 호출 선, 같음·코드만·명세만"
+    parameters:
+    - $ref: '#/components/parameters/code'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeCalls'
+      '404':
+        $ref: '#/components/responses/NotFound'
 ```
 
 ### 3.7 계정·토큰
@@ -1998,6 +2080,76 @@ components:
           description: 모델이 실제로 읽은 대상, 부른 순서(중복은 접는다). 화면이 「본 것」으로 보여준다. list_documents는 대상이 없어 안 실린다
           items:
             type: string
+    CodeGraphInfo:
+      type: object
+      description: 코드 그래프 한 행의 머리(카드 AX). 그래프 몸통은 싣지 않는다
+      properties:
+        commit_hash: {type: string, nullable: true, description: 그래프를 만든 커밋. 첫 빌드부터 실패했으면 null}
+        source: {type: string, nullable: true, enum: [repo, server]}
+        built_at: {type: string, format: date-time}
+        error: {type: string, nullable: true, description: 마지막 만들기가 실패한 이유(커밋7자 + 이유)}
+        function_count: {type: integer}
+    CodeRef:
+      type: object
+      description: 부르는 것·불리는 곳 한 줄(UI-5 8.19·8.20)
+      properties:
+        ms_id: {type: string, description: "DOC#ITEM"}
+        qual: {type: string, nullable: true, description: "코드의 이름 Class.fn — 코드에 없으면 null"}
+        file: {type: string, nullable: true}
+        line: {type: integer, nullable: true}
+        status: {type: string, nullable: true, enum: [same, code_only, spec_only], description: 부르는 것에만. 불리는 곳은 null}
+    CodeBrief:
+      type: object
+      description: 함수 목록 한 줄(UI-5 8.22)
+      properties:
+        ms_id: {type: string}
+        qual: {type: string, nullable: true}
+        file: {type: string, nullable: true}
+        line: {type: integer, nullable: true}
+        same: {type: integer}
+        code_only: {type: integer}
+        spec_only: {type: integer}
+    CodeFunction:
+      type: object
+      properties:
+        ms_id: {type: string}
+        qual: {type: string}
+        file: {type: string}
+        line: {type: integer}
+        end: {type: integer, nullable: true}
+        calls: {type: array, items: {$ref: '#/components/schemas/CodeRef'}, description: 어긋난 줄(코드만·명세만)이 위}
+        callers: {type: array, items: {$ref: '#/components/schemas/CodeRef'}}
+    CodeView:
+      type: object
+      properties:
+        graph: {nullable: true, allOf: [{$ref: '#/components/schemas/CodeGraphInfo'}], description: 그래프가 없으면 null}
+        doc_id: {type: string}
+        item_id: {type: string, nullable: true}
+        is_ms: {type: boolean, description: MINISPEC 문서인가}
+        missing: {type: boolean, description: MINISPEC 항목인데 코드에 함수가 없다}
+        function: {nullable: true, allOf: [{$ref: '#/components/schemas/CodeFunction'}]}
+        functions: {type: array, items: {$ref: '#/components/schemas/CodeBrief'}}
+    CodeText:
+      type: object
+      properties:
+        path: {type: string}
+        start: {type: integer}
+        end: {type: integer}
+        commit_hash: {type: string}
+        text: {type: string}
+        truncated: {type: boolean, description: 300줄에서 잘랐다}
+    CodeCalls:
+      type: object
+      properties:
+        graph: {nullable: true, allOf: [{$ref: '#/components/schemas/CodeGraphInfo'}]}
+        edges:
+          type: array
+          items:
+            type: object
+            properties:
+              from: {type: string, description: "부르는 MINISPEC 항목 DOC#ITEM"}
+              to: {type: string}
+              status: {type: string, enum: [same, code_only, spec_only]}
 ```
 
 ---
