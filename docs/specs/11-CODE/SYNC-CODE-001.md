@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1111,6 +1111,18 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 완료 | 2026-09-30 · 브랜치 `card/AT-ask-width` · spec 2 + code 1 · `validate` 0/0 · `check_ui` 12/12 · `check_view_html` 34/34 · 배포 뒤 헤드 크롬(1440×900): 참조 250 → 질문 420 · 손잡이 상한 720·하한 300 · 새로고침·다른 문서 420 · 참조로 돌아오면 250 · 참조 링크 8개 중 갈라진 것 0 · 같은 답 높이 1,240 → 680 |
 
 **왜 카드인가.** 실측으로 원인이 폭이었다 — 참조 탭 기준 250px(글 칸 225px)에서 871자 답이 1,240px 세로 띠(한 줄 15자). 글자·색·행간은 본문과 같아 손대지 않는다. 화면 규칙(8.3 범위·기본 폭)이 바뀌므로 카드다. 같은 문서 안 ID를 `#ID`로 줄이는 것은 렌더러가 이미 하고 있어 명세에만 적었다.
+
+#### AU 질문 탭의 글 — 중첩 목록·번호 이어가기 · 답은 맨글 · 지시문 답 양식
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-STD-002]] 1장 번호 목록 · [[SYNC-UI-002#UI-5]] 8.7 · [[SYNC-MS-008#queries.ask_item]] 지시문 · 사용자 결정 2026-09-30(카드 AT에서 남긴 후보 셋 전부) |
+| 구현 | `md.ts renderBlocks`·`view_build.render_blocks` 번호 목록 — 들여 쓴 `- `는 `<li>` 안 `<ul>`, 빈 줄 하나 뒤 번호는 같은 목록 · `.qa .a` 테두리·바탕·안쪽 여백 제거(`wait`·`fail`에만) · `_ASK_SYSTEM` 답 양식 문단 |
+| 테스트 | 지시문에 「답은 짧게 쓴다」 · `check_view_html` TS↔파이썬 같음 · `view_build --all` 전후 diff로 합쳐진 목록이 뜻과 맞는지 · 헤드 크롬: 같은 질문에 번호 1·2, 하위 목록 들여쓰기, 답에 테두리 없음, 이름 반복 없음 |
+| 선행 | AT |
+| 완료 | — |
+
+**왜 카드인가.** 렌더러는 유저용 뷰 전체가 쓰고 정적 뷰와 대조 검사가 있어 TS·파이썬을 같이 고쳐야 한다(STD-002 1장 규칙이 는다). 답 상자와 지시문은 각각 UI-5·MS-008 규칙이다.
 
 ---
 
