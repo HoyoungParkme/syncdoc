@@ -1204,9 +1204,9 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 | 항목 | 내용 |
 |---|---|
-| 근거 | [[SYNC-RFQ-001#Q7]] · [[SYNC-PRD-001#R14]] · 사용자 결정 2026-09-30(폐쇄망판은 요청자 혼자 쓰고 로그인이 없다, 저장은 서버만, 반입물은 이미지 tar + compose + 설치 안내) |
-| 구현 | `EDITION=closed` — 로컬 사용자 하나, GitHub 로그인·webhook 경로 없음 · `users.kind`(자리표시 판정을 칸으로) · Host·Origin 가드 · 127.0.0.1 compose · 글꼴을 앱이 담는다 · 배치 iframe의 바깥 글꼴 링크(폐쇄망판) · README 규약 링크를 서버 안 사본으로 · 반입물 스크립트와 설치 안내. 명세(PRD 폐쇄망판 요구사항 포함)는 이 카드를 시작할 때 쓴다 |
-| 테스트 | 인터넷 없는 네트워크에서 반입물 E2E(바깥 요청 0) · 인터넷판 회귀 |
+| 근거 | [[SYNC-RFQ-001#Q7]] · [[SYNC-PRD-001#R15]] · [[SYNC-PRD-001#N4]] · [[SYNC-SCN-001#S11]] · [[SYNC-INFRA-001#C10]] · [[SYNC-SEQ-001#SEQ-C3]] · [[SYNC-MS-006#AccountService.ensure_local_user]] · [[SYNC-MS-006#AccountService.local_user]] · [[SYNC-MS-006#AccountService.user_for_commit]] · [[SYNC-API-001#GET/specs/{path}]] · [[SYNC-STD-002]] V-UI · 사용자 결정 2026-09-30(폐쇄망판은 요청자 혼자 쓰고 로그인이 없다, 저장은 서버만, 반입물은 이미지 tar + compose + 설치 안내) |
+| 구현 | 설정 `EDITION`·`LOCAL_LOGIN`·`LOCAL_NAME`, 폐쇄망판이면 저장 방식은 서버만·README 규약 링크는 `{PUBLIC_BASE_URL}/specs` · 리비전 `0017_add_users_kind`(자리표시 판정을 칸으로) · `AccountService.ensure_local_user`·`local_user` · `user_for_commit` 폐쇄망판 · 로컬 사용자 커밋 이메일 · `web/auth` 세션 없이 로컬 사용자 · Host·Origin 가드(`forbidden-origin`) · GitHub 로그인·통지 경로 없음 · `GET /specs/{path}` · `/api/me` `edition` · 글꼴을 앱이 담는다(`/fonts`, 두 판) · 배치 iframe의 바깥 글꼴 링크(폐쇄망판) · 로그아웃·커밋 이메일 숨김 · 반입물(`release/closed/` · `scripts/release_closed.sh`) |
+| 테스트 | MS-006·MS-007·MS-009 테스트 관점 · 폐쇄망 설정으로 세션 없이 API · 가드 403 · GitHub 경로 404 · 인터넷 없는 네트워크에서 반입물 E2E(바깥 요청 0 — MCP 연결·서버 저장 프로젝트·명세·git push·`upload_code`·코드 탭) · 인터넷판 회귀 |
 | 선행 | BB |
 | 완료 | — |
 
