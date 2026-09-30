@@ -780,7 +780,7 @@ a.arow:hover{background:var(--bg-subtle)}
 .qa .a ul,.qa .a ol{margin:0 0 var(--space-5) var(--space-11);padding:0}
 .qa .a li{margin:var(--space-2) 0}
 .qa .a code{font-family:var(--font-mono);font-size:var(--text-meta);background:var(--bg-sunken);padding:0 var(--space-2);border-radius:var(--radius-chip)}
-.qa .a a.ref{color:var(--ink-body);font-family:var(--font-mono);font-size:var(--text-meta)}
+.qa .a a.ref{color:var(--ink-body);font-family:var(--font-mono);font-size:var(--text-meta);white-space:nowrap} /* ID는 한 덩어리 (8.7, 카드 AT) */
 /* 답 속 mermaid 그림(카드 AS) — 패널 폭에 맞추고 전체보기 버튼 자리를 둔다 */
 .qa .a .mer{position:relative;margin:var(--space-6) 0;overflow:auto}
 .qa .a .mer svg{max-width:100%;height:auto}
@@ -788,7 +788,7 @@ a.arow:hover{background:var(--bg-subtle)}
 .qa .a.wait{color:var(--ink-faint);border-style:dashed;white-space:pre-wrap}
 .qa .a.fail{color:var(--danger);background:var(--danger-bg);border-color:var(--danger-bg);white-space:pre-wrap}
 .qa .qsrc{font-size:var(--text-caption);color:var(--ink-faint);font-family:var(--font-mono);margin-top:var(--space-4)}
-.qa .qsrc a{color:var(--ink-muted)}
+.qa .qsrc a{color:var(--ink-muted);white-space:nowrap}
 /* 8.9 진행 묶음 — 읽는 동안은 스피너(공통 1.8)와 가장 최근 줄만, 답이 오면 「n단계 읽음 · 본 것 k」로 접힌다 (#206) */
 .qa .qprog{padding:var(--space-4) var(--space-9);border-left:2px solid var(--border);font-size:var(--text-meta);color:var(--ink-muted)}
 .qa .qprog>summary{display:flex;align-items:center;gap:var(--space-5);cursor:pointer;list-style:none}

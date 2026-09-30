@@ -20,9 +20,11 @@ export function writeStore(key: string, v: string): void {
   }
 }
 
-/** 좌 140~400 · 우 180~460 (UI-5 요소 6.2·8.3) */
+/** 좌 140~400 · 우 참조 탭 180~460 · 우 질문 탭 300~720 (UI-5 요소 6.2·8.3).
+ *  질문 탭은 따로 기억한다 — 참조 탭 폭(250)으로는 답이 한 줄 15자짜리 세로 띠가 된다(카드 AT) */
 export const TOC = { key: 'syncdoc.ui5.toc', init: 186, min: 140, max: 400 }
 export const PANEL = { key: 'syncdoc.ui5.panel', init: 250, min: 180, max: 460 }
+export const ASK = { key: 'syncdoc.ui5.panel.ask', init: 420, min: 300, max: 720 }
 
 /** 손잡이가 끄는 폭. 저장해 둔 값이 명세 범위 밖일 수 있어 잘라 넣는다.
  *  **더하기는 반드시 함수형으로.** mousemove 리스너는 mousedown 때 한 번 만들어지므로
