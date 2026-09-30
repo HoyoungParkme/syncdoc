@@ -555,3 +555,24 @@ async def test_ensure_hook_and_repo_status_on_server_storage(
     assert r.hook == "none" and r.created is False and calls == []
     [row] = await svc.repo_status(user)
     assert row.storage == Storage.server and row.remote_url is None and row.hook == "none"
+
+
+async def test_server_origin_only_for_the_owner_of_a_server_project(
+    db_session: Session, repos_dir, origins_dir: Path, repos: dict
+) -> None:
+    """MS-001 server_origin — 남의 것·GitHub 저장·원본 없음이 같은 not-found (카드 BB)."""
+    from app.core.types import Storage
+
+    me = make_user(db_session, login="me", token=None)
+    other = make_user(db_session, login="other", token=None)
+    svc = ProjectService(db_session)
+    await svc.init_project(None, "SRV", "서버", me, storage=Storage.server)
+    assert svc.server_origin("SRV", me) == origins_dir / "SRV.git"
+    for code, user in (("SRV", other), ("NOPE", me)):
+        with pytest.raises(NotFound) as ei:
+            svc.server_origin(code, user)
+        assert ei.value.extra == {"resource": "project", "id": code}
+    gh = make_user(db_session, login="gh")
+    await svc.init_project(str(repos["remote"]), "GH", "깃허브", gh, import_existing=True)
+    with pytest.raises(NotFound):
+        svc.server_origin("GH", gh)  # GitHub 저장에는 git 입구가 없다

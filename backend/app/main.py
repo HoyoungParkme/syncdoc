@@ -37,6 +37,7 @@ from app.web.routers import (
     projects,
     references,
 )
+from app.web.routers import git as git_router
 
 log = logging.getLogger(__name__)
 
@@ -102,6 +103,7 @@ for r in (
     code.router,
     admin.router,
     hooks.router,
+    git_router.router,  # 서버 저장소 git 입구 (카드 BB)
 ):
     app.include_router(r)
 
@@ -219,14 +221,14 @@ def _not_modified_since(since: str | None, resp: Response) -> bool:
 
 
 class _SpaPath(Convertor):
-    """화면 틀 대체 라우트의 경로 — API 앞머리(`/api`·`/auth`·`/hooks`·`/mcp`)는 받지 않는다.
+    """화면 틀 대체 라우트의 경로 — API 앞머리(`/api`·`/auth`·`/hooks`·`/mcp`·`/git`)는 받지 않는다.
 
     받으면 `/api/없는경로`에 화면 틀(HTML, 200)이 나가고, POST는 이 GET 라우트와 경로만 맞아
     405가 났다. 여기서 빼면 그 경로는 어느 라우트와도 안 맞아 메서드와 무관하게
     404 problem+json이다 (SYNC-INFRA-001 4.1, #158).
     """
 
-    regex = r"(?!(?:api|auth|hooks|mcp)(?:/|$)).*"
+    regex = r"(?!(?:api|auth|hooks|mcp|git)(?:/|$)).*"
 
     def convert(self, value: str) -> str:
         return value
