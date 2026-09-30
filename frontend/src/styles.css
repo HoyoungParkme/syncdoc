@@ -75,7 +75,8 @@
 
 /* 앱 바탕만 덮는다. styles.view.css의 body{}는 그대로 두고 나중 규칙으로 이긴다 —
    뷰 본문(.body/.wrap)은 자기 배경·글자색을 다시 선언하므로 여기 영향이 안 새어 든다 */
-body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans)}
+/* 줄바꿈은 어절 단위, 긴 토큰만 칸 안에서 꺾는다 (UI-001 3.2, 카드 AV) */
+body{background:var(--bg-app);color:var(--ink-body);font-family:var(--font-sans);word-break:keep-all;overflow-wrap:anywhere}
 
 /* UI-001 4.1 — 페이지 전체는 스크롤하지 않는다. 각 화면이 자기 안에서 스크롤한다.
    안 지키면 탭을 오갈 때 스크롤바가 생겼다 없어지며 가운데 정렬 본문이 좌우로 흔들린다 */
