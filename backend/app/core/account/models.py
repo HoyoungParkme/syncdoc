@@ -18,6 +18,9 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     github_login: Mapped[str] = mapped_column(String(50), unique=True)
     github_user_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
+    # github · local · placeholder (UserKind). 자리표시 판정은 이 칸 — github_user_id가 빈
+    # 로컬 사용자(폐쇄망판)를 자리표시로 잘못 잡지 않게 (카드 BC)
+    kind: Mapped[str] = mapped_column(String(12), default="github", server_default="github")
     display_name: Mapped[str] = mapped_column(String(100))
     github_token_encrypted: Mapped[bytes | None] = mapped_column(LargeBinary)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
