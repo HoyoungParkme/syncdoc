@@ -133,6 +133,10 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 문서ID#항목ID 이름 한 번이고 그 이름을 풀어 다시 쓰지 않는다. 번호 목록은 1·2·3으로 이어서
 쓴다.
 
+구현을 물으면(「명세대로 구현됐어?」 「이 함수가 실제로 뭘 부르나」) code_graph로 그 항목의
+대조(같음·코드만·명세만)를 먼저 보고, 필요하면 read_code로 함수 본문을 읽는다. 코드 근거는
+파일:줄로 댄다. 코드 그래프가 없다고 하면 그렇다고 말하고 지어내지 않는다.
+
 [문서] {doc_id} {title} · 상태 {status} · v{version_no}
 [이 문서의 항목]
 {items}
@@ -151,7 +155,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 
 **호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-009#llm.step_stream]] · [[#queries.ask_tool]] · [[SYNC-MS-010#ConversationService.add_turn]] · [[SYNC-MS-010#ConversationService.finish_turn]] · [[SYNC-MS-010#ConversationService.get]] · [[SYNC-MS-010#ConversationService.history]] · [[SYNC-MS-010#ConversationService.pending_images]]
 
-**테스트 관점** 가짜 `llm.step`에 대본을 주어 돈다 · 지시문에 mermaid 그림 안내가 있다(카드 AS) · 지시문에 답 양식(「답은 짧게」)이 있다(카드 AU) · 대본이 `str` 조각을 주면 `delta`가 `note`/`answer` 앞에 그 순서로 나오고 `progress`에는 안 들어간다(카드 AW) · 대본 [도구 2번 → 답] → 이벤트 순서가 `start·note·read·note·read·answer`이고 `context_item_ids`가 read 순서·중복 접힘 · 대본이 도구만 9번 → 8번째 뒤 마무리 호출이 `tool_choice="none"`이고 그 뒤 호출이 없다 · `monotonic`을 패치해 120초 → 같은 마무리 · 마무리도 답이 비면 `llm-unavailable` · 시작 맥락에 항목 ID·이름은 있고 **본문은 없다** · `item_id=None`이면 「지금 보는 항목」 줄이 없다 · 없는 `item_id` → `not-found`가 `start` 전 · **DB에 아무것도 안 쓴다**(호출 전후 행 수가 같다) · `history`가 상한을 넘으면 뒤에서부터 잘린다 · usage 로그 한 줄에 calls·tokens·elapsed가 있고 본문이 없다 · 키가 비면 `SpecService`를 부르기도 전에 막힌다 · **MINISPEC이 빈 프로젝트**에서 물으면 `item_chain`의 빈 단계로 「아직 안 쓰였다」고 답할 재료를 받는다
+**테스트 관점** 가짜 `llm.step`에 대본을 주어 돈다 · 지시문에 mermaid 그림 안내가 있다(카드 AS) · 지시문에 답 양식(「답은 짧게」)이 있다(카드 AU) · 지시문에 code_graph·read_code 안내가 있다(카드 AZ) · 대본이 `str` 조각을 주면 `delta`가 `note`/`answer` 앞에 그 순서로 나오고 `progress`에는 안 들어간다(카드 AW) · 대본 [도구 2번 → 답] → 이벤트 순서가 `start·note·read·note·read·answer`이고 `context_item_ids`가 read 순서·중복 접힘 · 대본이 도구만 9번 → 8번째 뒤 마무리 호출이 `tool_choice="none"`이고 그 뒤 호출이 없다 · `monotonic`을 패치해 120초 → 같은 마무리 · 마무리도 답이 비면 `llm-unavailable` · 시작 맥락에 항목 ID·이름은 있고 **본문은 없다** · `item_id=None`이면 「지금 보는 항목」 줄이 없다 · 없는 `item_id` → `not-found`가 `start` 전 · **DB에 아무것도 안 쓴다**(호출 전후 행 수가 같다) · `history`가 상한을 넘으면 뒤에서부터 잘린다 · usage 로그 한 줄에 calls·tokens·elapsed가 있고 본문이 없다 · 키가 비면 `SpecService`를 부르기도 전에 막힌다 · **MINISPEC이 빈 프로젝트**에서 물으면 `item_chain`의 빈 단계로 「아직 안 쓰였다」고 답할 재료를 받는다
 
 ---
 
@@ -163,7 +167,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 
 **입력** `name` 도구 이름 · `args` 모델이 준 인자 · `code` 지금 열린 문서의 프로젝트 · `user` 묻는 사람 · `conversation_id` 이 대화 — `read_attachment`가 이 대화의 첨부만 읽게
 
-**도구 여섯** — 전부 읽기. 쓰기 도구는 어떤 경우에도 없다([[SYNC-PRD-001]] 2장 비목표). 모든 도구에 필수 인자 `reason: str`(무엇을 왜 읽는지 한 줄 — 진행 줄이 된다. 모델이 `tool_calls`와 함께 본문을 비우는 일이 잦아 인자로 못 박는다)
+**도구 여덟** — 전부 읽기. 쓰기 도구는 어떤 경우에도 없다([[SYNC-PRD-001]] 2장 비목표). 모든 도구에 필수 인자 `reason: str`(무엇을 왜 읽는지 한 줄 — 진행 줄이 된다. 모델이 `tool_calls`와 함께 본문을 비우는 일이 잦아 인자로 못 박는다)
 
 | 도구 | 인자 | 부르는 것 | 돌려주는 JSON | target |
 |---|---|---|---|---|
@@ -173,6 +177,8 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 | `list_documents` | `reason` | [[#queries.document_list]] + [[SYNC-MS-002#SpecService.describe_documents]](제목) | `[{doc_id, stage, doc_type, title, status, version_no}]` | 없음 |
 | `get_document` | `doc_id, reason` | [[SYNC-MS-002#SpecService.get_document]] + 제목 | `{doc_id, title, status, version_no, items: [{item_id, display_name}], body}` 전문 | `DOC` |
 | `read_attachment` | `attachment_id, reason` | [[SYNC-MS-010#ConversationService.attachment_text]] | `{attachment_id, name, mime, text}` — 글자 파일은 본문 그대로, PDF는 뽑은 글자. 이 대화의 첨부가 아니거나 이미지면 `{"error": "없음"}`(이미지엔 `hint`: 「이미지는 붙인 질문에 이미 보였다」) | `첨부:{name}` |
+| `code_graph` | `doc_id, item_id, reason` | [[#queries.code_view]] | `{graph: {commit, source, error}, item, is_ms, missing, function: {qual, file, line, end, calls: [{id, status, qual, file, line}], callers: [{id, qual, file, line}]}, functions: [{id, qual, file, line, same, code_only, spec_only}]}` — [[SYNC-API-002#get_code_graph]]과 같은 뜻. 그래프가 없으면 `{"error": "코드 그래프 없음"}`(카드 AZ) | `코드:DOC#ITEM` |
+| `read_code` | `target, reason` — `target`은 MINISPEC 항목 ID(`문서#항목`) · 함수 이름(`Class.fn`) · 파일 경로(`path` 또는 `path:시작-끝`) | [[SYNC-MS-011#CodeGraphService.read]] — 항목 ID는 [[SYNC-MS-011#codegraph.compare]]로 함수 자리를, 함수 이름은 그래프의 `qual`로 찾는다 | `{path, start, end, commit, truncated, text}` — `text`는 줄마다 `번호: 내용`. 300줄까지 · 비밀 꼴·저장소 밖·없는 파일·모르는 함수는 `{"error": "없음", hint}`(카드 AZ) | `코드:path:시작-끝` |
 
 **처리**
 1. `name`이 여섯 밖 → `ToolResult(None, {"error": "없는 도구"})` · 필수 인자가 빠짐 → `{"error": "인자 X가 없다"}`
@@ -183,7 +189,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 
 **결과 형식** JSON 문자열. MCP 도구([[SYNC-API-002]])와 같은 모양이라 에이전트가 이미 보는 것과 같고, 마크다운 본문을 안에 그대로 담아도 경계가 안 흐트러진다. 크기 상한 없음(사용자 결정) — 큰 문서 전문이 맥락을 넘기면 모델이 400을 주고 `llm-unavailable`로 접힌다
 
-**`_ASK_TOOLS`** — `ToolSpec` 여섯. `description`은 [[SYNC-API-002]] 3장의 도구 설명 문장을 가져다 쓴다(`read_attachment`는 MCP에 없다 — 「이 대화에 붙인 글자·PDF 첨부의 글자를 읽는다. 시작 맥락의 [첨부] 줄에 있는 id로」). `parameters`는 JSON Schema `{type: object, properties: {doc_id: {type: string}, item_id: {type: string}, attachment_id: {type: integer}, reason: {type: string}}, required: [...]}` — 도구마다 위 표의 인자가 `required`
+**`_ASK_TOOLS`** — `ToolSpec` 여덟. `description`은 [[SYNC-API-002]] 3장의 도구 설명 문장을 가져다 쓴다(`read_attachment`는 MCP에 없다 — 「이 대화에 붙인 글자·PDF 첨부의 글자를 읽는다. 시작 맥락의 [첨부] 줄에 있는 id로」. `code_graph`는 `get_code_graph`의 문장이고, `read_code`도 MCP에 없다 — 「그래프를 만든 커밋의 코드를 읽는다. target은 MINISPEC 항목 ID(문서ID#항목ID) · 함수 이름(Class.fn) · 파일 경로(path 또는 path:시작-끝). 300줄까지, 줄마다 번호가 붙는다. 키·인증서 같은 비밀 파일은 읽을 수 없다.」). `parameters`는 JSON Schema `{type: object, properties: {doc_id: {type: string}, item_id: {type: string}, attachment_id: {type: integer}, reason: {type: string}}, required: [...]}` — 도구마다 위 표의 인자가 `required`
 
 **출력** `ToolResult(target, text)` — `target`은 「본 것」에 실을 `DOC#ITEM`·`DOC`, 목록 도구는 `None`
 
@@ -191,11 +197,11 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 
 **테스트 관점(추가, #110)** 없는 항목의 「없음」에 `hint`가 있다 · 지시문에 「먼저 보고 있는 항목을 get_item으로 읽는다」가 있다
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.describe_documents]] · [[#queries.item_references_view]] [[#queries.item_chain]] [[#queries.document_list]] · [[SYNC-MS-010#ConversationService.attachment_text]] · [[#queries.document_view]] · [[#queries.item_view]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.describe_documents]] · [[#queries.item_references_view]] [[#queries.item_chain]] [[#queries.document_list]] · [[#queries.code_view]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#CodeGraphService.read]] · [[SYNC-MS-010#ConversationService.attachment_text]] · [[#queries.document_view]] · [[#queries.item_view]]
 
 **호출되는 것** [[#queries.ask_item]] 5단계
 
-**테스트 관점** 다섯 도구 각각 돌려주는 JSON의 키 집합 · 다른 프로젝트 문서 ID(소유해도) → `없음` 텍스트, 예외 아님 · 남의 프로젝트 → `not-found` 전파 · 끊어진 참조 → `note: "아직 없음"` · `item_chain` 빈 단계 행 유지 · `list_documents`에 제목이 있다 · `reason` 빠짐 → `인자 reason이 없다` · 없는 도구 이름 → `없는 도구` · **DB에 아무것도 안 쓴다**
+**테스트 관점** `code_graph` — 그래프가 없으면 error, 있으면 function·calls(카드 AZ) · `read_code` 세 꼴(항목 ID·함수 이름·`경로:시작-끝`)이 같은 줄을 읽고 줄 번호가 붙는다 · `read_code(".env")` → 없음 · 다섯 도구 각각 돌려주는 JSON의 키 집합 · 다른 프로젝트 문서 ID(소유해도) → `없음` 텍스트, 예외 아님 · 남의 프로젝트 → `not-found` 전파 · 끊어진 참조 → `note: "아직 없음"` · `item_chain` 빈 단계 행 유지 · `list_documents`에 제목이 있다 · `reason` 빠짐 → `인자 reason이 없다` · 없는 도구 이름 → `없는 도구` · **DB에 아무것도 안 쓴다**
 
 ---
 #### queries.project_summary 프로젝트 목록 + 단계 11칸 + 건수
