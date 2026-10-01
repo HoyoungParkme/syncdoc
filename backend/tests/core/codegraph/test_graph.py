@@ -105,6 +105,7 @@ def test_communities_groups_by_file_labels_by_hub_and_is_deterministic() -> None
     comms = graph["communities"]
     assert [c["size"] for c in comms] == [3, 2]  # 함수 수 내림차순 · 테스트·문서만 든 군집은 없다
     assert {c["id"] for c in comms} == {by["g1"], by["f1"]}
+    assert by["g1"] == 0  # 노드가 가장 많은 군집(fb·g1·g2·t1)이 0 (#253)
     assert all(c["label"] and not c["label"].endswith("()") for c in comms)
     again = cg.communities(RAW2, cg.reduce(RAW2))
     assert [f["community"] for f in again["functions"]] == [
