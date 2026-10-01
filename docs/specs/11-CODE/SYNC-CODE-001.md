@@ -1280,7 +1280,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `queries._ask_loop`(ask_item의 루프를 뗀 것) · `queries.ask_code` · `AskStart.key` · 라우터 `POST /projects/{code}/code/ask`(SSE 포장은 `web/sse.py`로 떼어 두 라우터가 쓴다) · `AskPanel`을 `context` prop으로 일반화해 export(UI-5는 그대로) · `CodeGraph.tsx` 패널 탭 4.9(`?panel=ask`)·질문 탭 7·맥락 줄 7.1 · `styles.css` |
 | 테스트 | MS-008 테스트 관점(ask_code — 시작 맥락에 문서 목록·그래프 머리·함수 블록, key 없음=그래프 전체, 그래프 없음, 없는 key 404, 남의 것 404, 키 없음 503) · 라우터 SSE start에 key · ask_item 회귀 · `check_ui` UI-17 +3 · 헤드리스: 탭 전환·맥락 줄·`?panel=ask` · 운영: 함수를 고르고 묻기 → read_code·get_item 읽음·답 |
 | 선행 | BH |
-| 완료 | — |
+| 완료 | 2026-10-01 · 브랜치 `card/BI-code-ask`(f324221 #270) · spec 10 + code 5 · 테스트 388 · `ruff`·`tsc`·`oxlint` · `validate` 0/0 · `check_code` 157/157 · `check_calls` 0/0 · `check_ui` 14/14(UI-17 30, UI-5 59) · `check_view_html` 35/35 · 헤드리스(가짜 키, 콘솔 0): 탭 4.9 → `?panel=ask` → 「그래프 전체」 → 함수 고름 → 「queries.code_nodes · 이 함수를 보며」 → 보내기 → `POST /code/ask`에 `key` → error 표시 → 함수 탭 · UI-5 8.5 회귀 · 운영(컨테이너 안에서 `ask_code` 직접 호출, 실제 모델): `queries.code_nodes`를 두고 「명세대로 구현됐어?」 → `code_graph` 읽음 1회, 3.3초, 「명세대로… backend/app/core/queries.py:1235–1269」 — 대화 35에 남음 · 화면은 사람이 직접(DEV-17) |
 
 ---
 
