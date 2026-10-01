@@ -389,8 +389,10 @@ export interface Conversation extends ConversationBrief {
 }
 /** 스트림 이벤트 — start · delta · note · read · answer · error(problem) */
 export interface AskStart {
-  doc_id: string
+  doc_id: string | null
   item_id: string | null
+  /** 코드 그래프에서 물으면 함수 `파일:줄` (카드 BI) */
+  key?: string | null
 }
 export interface AskNote {
   text: string

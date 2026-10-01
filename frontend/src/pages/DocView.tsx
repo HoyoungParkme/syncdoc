@@ -425,12 +425,11 @@ export function DocView() {
                     // 대화는 Shell이 프로젝트 단위로 든다 — 문서·항목을 옮겨도 남고, 프로젝트가 바뀌면 새 대화
                     <AskPanel
                       ask={ask}
-                      docId={docId}
-                      itemId={selected}
-                      displayName={doc.items.find((i) => i.item_id === selected)?.display_name ?? ''}
+                      elContext="8.5"
+                      context={{ kind: 'doc', docId, itemId: selected, displayName: doc.items.find((i) => i.item_id === selected)?.display_name ?? '' }}
                       goItem={goItem}
                       openFull={setFull}
-                    />
+                      />
                   ) : (
                     <>
                       {!selected ? (
@@ -826,22 +825,27 @@ function AnswerBody({ html, onClick, live }: { html: string; onClick: (ev: React
  *  대화는 서버에 있다(카드 AQ): 프로젝트의 목록에서 고르고, 없으면 첫 질문에 만든다. URL ?conv={id}.
  *  POST /api/docs/{docId}/ask(SSE): note·read가 진행 묶음에 차례로(읽는 동안은 스피너와 마지막 줄만), answer가 답, error가 실패.
  *  답은 가벼운 마크다운(renderBlocks)이고 참조는 7.2와 같은 링크다. 항목은 힌트(item_id) — 안 골라도 문서 전체로 묻는다 */
-function AskPanel({
+/** 질문 탭의 맥락 — 문서(UI-5 8.5)이거나 코드 그래프의 함수(UI-17 7.1, 카드 BI). 보내는 입구와 맥락 줄만 다르다 */
+export type AskContext = { kind: 'doc'; docId: string; itemId: string | null; displayName: string } | { kind: 'code'; key: string | null; label: string }
+
+export function AskPanel({
   ask,
-  docId,
-  itemId,
-  displayName,
+  context,
   goItem,
   openFull,
+  elContext = '8.5',
 }: {
   ask: AskChat
-  docId: string
-  itemId: string | null
-  displayName: string
-  goItem: (id: string) => void
-  openFull: (d: FullDiagram) => void
+  context: AskContext
+  goItem?: (id: string) => void
+  openFull?: (d: FullDiagram) => void
+  /** 맥락 줄의 요소 번호 — UI-5는 8.5, UI-17은 7.1 */
+  elContext?: string
 }) {
   const { code, convId, setConvId } = ask
+  const docId = context.kind === 'doc' ? context.docId : ''
+  const itemId = context.kind === 'doc' ? context.itemId : null
+  const displayName = context.kind === 'doc' ? context.displayName : ''
   const nav = useNavigate()
   const [sp, setSp] = useSearchParams()
   const [convs, setConvs] = useState<ConversationBrief[]>([])
@@ -873,7 +877,7 @@ function AskPanel({
     if (!a) return
     ev.preventDefault()
     const [d, it] = splitRef(a.dataset.ref ?? '')
-    if (d === docId && it) goItem(it)
+    if (d === docId && it && goItem) goItem(it)
     else nav(docPath(d, it || undefined))
   }
   const abortRef = useRef<AbortController | null>(null)
@@ -963,7 +967,7 @@ function AskPanel({
       .catch(() => undefined) // 문법 오류면 코드가 남는다
       .then(() => {
         if (qaRef.current !== el) return
-        attachDiagramButtons(el, openFull)
+        attachDiagramButtons(el, openFull ?? (() => undefined))
         el.scrollTop = el.scrollHeight
       })
   }, [turns, openFull])
@@ -1098,8 +1102,10 @@ function AskPanel({
       abortRef.current = ac
       try {
         await api.stream(
-          `/api/docs/${docId}/ask`,
-          { question: q, conversation_id: id, item_id: itemId ?? undefined, attachment_ids: sent.map((m) => m.id) },
+          context.kind === 'doc' ? `/api/docs/${docId}/ask` : `/api/projects/${code}/code/ask`,
+          context.kind === 'doc'
+            ? { question: q, conversation_id: id, item_id: itemId ?? undefined, attachment_ids: sent.map((m) => m.id) }
+            : { question: q, conversation_id: id, key: context.key ?? undefined, attachment_ids: sent.map((m) => m.id) },
           (name, data) => {
             if (name === 'delta') {
               // 모델이 지금 쓰는 글자 — 답인지 메모인지는 뒤 이벤트가 정한다. note가 오면 버린다 (8.7)
@@ -1145,7 +1151,7 @@ function AskPanel({
     // 본 것의 ID → 7.2와 같음. 이 문서 안 항목이면 스크롤·선택, 남의 문서·문서 자체면 링크. 첨부는 글자만
     if (id.startsWith('첨부:') || id.startsWith('코드:')) return <span key={id}>{id}</span> // 첨부·코드는 글자만 (카드 AZ)
     const [d, it] = id.includes('#') ? [id.split('#')[0], id.split('#')[1]] : [id, '']
-    if (d === docId && it) {
+    if (d === docId && it && goItem) {
       return (
         <a key={id} href={`#item-${it}`} onClick={(e) => { e.preventDefault(); goItem(it) }}>
           {it}
@@ -1181,8 +1187,16 @@ function AskPanel({
       {/* 8.16 — 파일을 끌어 패널 위에 오면 */}
       {dragging && <div className="droplayer" data-el="8.16">여기 놓으면 질문에 붙습니다</div>}
       <div className="asktop">
-        <div className="lbl" data-el="8.5">
-          {itemId ? (
+        <div className="lbl" data-el={elContext}>
+          {context.kind === 'code' ? (
+            context.key ? (
+              <>
+                <b className="mono">{context.label}</b> · 이 함수를 보며 묻습니다
+              </>
+            ) : (
+              <>그래프 전체 · 이 프로젝트의 코드에 대해 묻습니다</>
+            )
+          ) : itemId ? (
             <>
               <b className="mono">{itemId}</b> {displayName} · 이 항목을 보며 묻습니다
             </>
@@ -1306,7 +1320,7 @@ function AskPanel({
             data-el="8.6"
             value={question}
             disabled={pending}
-            placeholder={itemId ? '이 항목을 보며 묻습니다 — Enter로 보냅니다' : '이 문서에 대해 묻습니다 — Enter로 보냅니다'}
+            placeholder={context.kind === 'code' ? (context.key ? '이 함수를 보며 묻습니다 — Enter로 보냅니다' : '이 프로젝트의 코드에 대해 묻습니다 — Enter로 보냅니다') : itemId ? '이 항목을 보며 묻습니다 — Enter로 보냅니다' : '이 문서에 대해 묻습니다 — Enter로 보냅니다'}
             onChange={(e) => setQuestion(e.target.value)}
             onPaste={(e) => {
               if (e.clipboardData.files.length) {
