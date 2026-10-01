@@ -454,6 +454,28 @@ export interface CodeCalls {
   graph: CodeGraphInfo | null
   edges: { from: string; to: string; status: CallStatus }[]
 }
+/** GET /api/projects/{code}/code-graph — UI-17 코드 그래프(카드 BD). 배치는 브라우저가 한다 */
+export interface CodeCommunity {
+  id: number
+  label: string
+  size: number
+}
+export interface CodeNode {
+  key: string
+  name: string
+  qual: string
+  file: string
+  line: number
+  community: number | null
+  ms: string | null
+  status: CallStatus | null
+}
+export interface CodeNodes {
+  graph: CodeGraphInfo | null
+  communities: CodeCommunity[]
+  functions: CodeNode[]
+  calls: [string, string][]
+}
 
 export interface DownstreamView {
   by_item: Record<string, ItemRef[]>
