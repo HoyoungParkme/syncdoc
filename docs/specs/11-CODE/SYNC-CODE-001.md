@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1209,6 +1209,18 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | MS-006·MS-007·MS-009 테스트 관점 · 폐쇄망 설정으로 세션 없이 API · 가드 403 · GitHub 경로 404 · 인터넷 없는 네트워크에서 반입물 E2E(바깥 요청 0 — MCP 연결·서버 저장 프로젝트·명세·git push·`upload_code`·코드 탭) · 인터넷판 회귀 |
 | 선행 | BB |
 | 완료 | 2026-10-01 · 브랜치 `card/BC-closed-edition`(2434dc9 #244) · spec 16 + code 8 · 테스트 372 · `check_view_html` 35/35 · 운영(인터넷판 회귀): 0017 올라감(github 3·placeholder 1) · 로그아웃·커밋 이메일 그대로 · `/auth/github` 302 · 글꼴 `/fonts/pretendard-1.3.9`·`ibm-plex-mono-5.3.0` 1년 immutable, Pretendard·Plex 로드, CDN 요청 0 · `/specs/STD/SYNC-STD-001.md` 200 · 로컬 반입 시험(`scripts/release_closed.sh 2026.09.30-rc1` → `docker load`, 앱·DB를 `internal: true` 망에, 프록시 하나): 브라우저 바깥 요청 0 · 로그인 없이 목록 · 내 계정 「로그인 없음 · 이 PC」 · MCP 안내 「서버 저장만」·github는 `storage-unavailable` · git clone·push·`upload_code` · 커밋 작성자 `local@syncdoc.local` · README 링크 `/specs` 200 · 배치 iframe CDN 글꼴 링크 → `/fonts`, `@import`·preconnect 제거 · `/login` → `/` · 다른 Host·Origin 403 · GitHub 경로 404 |
+
+---
+
+#### BD 코드 그래프 노드 보기 — 커뮤니티로 접은 함수 전체 그림
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R13]] · [[SYNC-SCN-001#S9]] · [[SYNC-UC-001#UC-H20]] 기본 흐름 5·5a·5b · [[SYNC-SEQ-001#SEQ-31]] · [[SYNC-MS-011#codegraph.communities]] · [[SYNC-MS-007#pipeline.build_code_graph]] · [[SYNC-MS-008#queries.code_nodes]] · [[SYNC-API-001#GET/api/projects/{code}/code-graph]] · [[SYNC-UI-002#UI-17]] · UI-4 2.3 · UI-5 8.23 · [[SYNC-INFRA-001]] 3장(d3-force) · 사용자 결정 2026-10-01(「graphify의 강점은 노드를 보여주는 것」 — 새 화면 UI-17, 함수·커뮤니티 노드만, 처음은 접힘, 만들 때 서버가 graphify cluster, d3-force + canvas, CDN 없음, 커뮤니티 팔레트 12색은 색 원칙의 예외) |
+| 구현 | `codegraph.communities` · `build_code_graph` 3단계 · `queries.code_nodes` · 라우터·스키마 `CodeNodes` · `types.py` DTO 셋 · `pages/CodeGraph.tsx`(힘 배치·canvas·포커스 겹층 3.1~3.4·검색·패널·범례) · 경로 `/p/:code/code-graph` · `ProjectDetail` 2.3 · `CodePanel` 8.23 · `client.ts` 타입 · `styles.css`(커뮤니티 팔레트 토큰) · 의존성 `d3-force`·`@types/d3-force` |
+| 테스트 | MS-011·MS-007·MS-008 테스트 관점 · 라우터 `/code-graph` 200/404 · `check_ui` UI-17·UI-4·UI-5 · `check_tokens` 팔레트 12 · 헤드 크롬: SYNC 그래프 접힘 → 커뮤니티 펼침 → 검색 `save_pipeline` → 겹층 ▲ → 코드 탭으로 → 8.23으로 돌아옴 · 옛 그래프(커뮤니티 없음) 안내 · 폐쇄망판 바깥 요청 0 |
+| 선행 | BC |
+| 완료 | — |
 
 ---
 
