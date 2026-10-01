@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -1080,6 +1080,38 @@ MINISPEC 항목인데 코드에 함수가 없으면 `function: null`·`missing: 
 ```
 
 그래프가 없으면 `graph: null`에 빈 목록(UC-H20 1a). 커뮤니티를 모르는 옛 그래프면 `communities: []`이고 함수의 `community`가 null(5a) — 화면이 전부 펼쳐 보인다. `status`는 `compare` 결과로 코드만이 하나라도 있으면 `code_only`, 아니면 명세만이 있으면 `spec_only`, 아니면 `same`; 항목 없는 함수는 `ms`·`status`가 null. `calls`는 `[부르는 key, 불리는 key]`쌍이고 `via`는 싣지 않는다. 응답은 수백 KB다 — 화면이 열 때 한 번 받고 배치는 브라우저가 한다.
+
+#### GET/api/projects/{code}/code/source 함수 본문 — 파일·줄로
+
+화면 [[SYNC-UI-001#UI-17]] 4.6 · 유스케이스 [[SYNC-UC-001#UC-H20]] 기본 흐름 5, 확장 5c · 서비스 [[SYNC-MS-008#queries.code_text]]
+
+```yaml
+/api/projects/{code}/code/source:
+  get:
+    summary: "코드 그래프의 코드(UI-17 4.6) — 그래프에 있는 함수를 파일·시작 줄로 짚어 그 본문. MINISPEC 항목이 없어도 된다. 300줄까지"
+    parameters:
+    - $ref: '#/components/parameters/code'
+    - name: file
+      in: query
+      required: true
+      schema: {type: string}
+      description: 그래프의 `functions[].file` 그대로 — 저장소 안 상대 경로
+    - name: line
+      in: query
+      required: true
+      schema: {type: integer}
+      description: 그 함수의 시작 줄(`functions[].line`). 그래프 커밋 기준이라 어긋나지 않는다
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeText'
+      '404':
+        description: 소유하지 않은 프로젝트 · 그래프 없음(`resource: code_graph`) · 그래프에 그 자리의 함수 없음(`resource: function`) · 그 커밋에 파일 없음·비밀 꼴(`resource: file`)
+```
+
+`…/items/{itemId}/code/source`와 읽는 곳이 같다([[SYNC-MS-011#CodeGraphService.read]]) — 입구만 항목이 아니라 자리다. 끝 줄 규칙도 같다(`end`가 없으면 같은 파일 다음 함수 앞 줄, 그것도 없으면 60줄). 그래프 옆에 코드를 두기로 한 2026-10-01 결정(카드 BF).
 
 ### 3.7 계정·토큰
 

@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -1102,6 +1102,7 @@ code_view(doc_id, item_id?, user) -> CodeView      SEQ-27  code_graphs 행 + MS 
 code_calls(code, user) -> CodeCalls                SEQ-27  compare → MINISPEC 사이 호출 선 (UI-8 코드 호출)
 code_nodes(code, user) -> CodeNodes                SEQ-31  code_graphs 행의 함수 전부 + 커뮤니티 + compare로 항목·상태 (UI-17 코드 그래프)
 code_source(doc_id, item_id, user) -> CodeText     SEQ-27  함수의 파일·줄 → CodeGraphService.read (그래프 커밋의 저장소에서)
+code_text(code, file, line, user) -> CodeText      SEQ-31  그래프의 함수를 파일·줄로 짚어 CodeGraphService.read (UI-17 코드 4.6, 카드 BF)
 ask_item(doc_id, item_id?, conversation_id, question, attachment_ids, user) -> AsyncIterator[AskEvent]
                                                     SEQ-24  대화에서 history·첨부 목록 → 시작 맥락(제목·항목 목록·첨부 목록) → add_turn → llm.step ↔ ask_tool 루프(8번·120초) → finish_turn → AskAnswer
 ask_tool(name, args, code, user, conversation_id) -> ToolResult

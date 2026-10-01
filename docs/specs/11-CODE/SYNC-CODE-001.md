@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1233,6 +1233,18 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | MS-007·MS-002 테스트 관점 · 도구 목록에 `change_status` · MCP로 approved → `status(…)` 커밋 하나 · 버전 그대로 · `status_changes.via=mcp` · 이력 행 `agent`·지시자=발급자 · 규약 오류·미완성·끊어진 참조면 `status-blocked`(웹과 같은 본문) · 휴지통이면 `document-trashed` · 남의 문서 `not-found` · 멱등 · `update_document`로 `status:`를 바꾸면 여전히 `frontmatter.status_change` · 웹 토글은 `via=web` · 운영: MCP 클라이언트로 올리고 UI-7에서 「에이전트 · 지시」 확인 |
 | 선행 | BD |
 | 완료 | 2026-10-01 · 브랜치 `card/BE-mcp-change-status`(12114d2 #251) · spec 12 + code 4 · 테스트 382 · `ruff` · `validate` 0/0 · `check_code` 155/155 · `check_calls` 0/0 · 화면 변경 없음 · 운영: 0018 올라감(`status_changes.via`) · 도구 목록 13개에 `change_status` · MCP로 SYNC-PRD-001 draft → approved(77bb9c3 — `status:` 한 줄 diff, 커밋 본문에 사유) · `/api/docs/SYNC-PRD-001/versions` 맨 위 행 `kind=agent · via=mcp · instructed_by=Hoyoung Park` · UI-7 2.1에 「에이전트 · 지시 Hoyoung Park」 · 이 카드가 초안으로 내린 문서 11건의 재승인도 MCP `change_status`로(사람이 시킨 쪽) · status-blocked·멱등·휴지통·남의 문서는 E2E |
+
+---
+
+#### BF 코드 그래프 옆에 코드 — 파일 트리와 함수 본문
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R13]] · [[SYNC-SCN-001#S9]] · [[SYNC-UC-001#UC-H20]] 기본 흐름 5·5c · [[SYNC-SEQ-001#SEQ-31]] · [[SYNC-MS-008#queries.code_text]] · [[SYNC-API-001#GET/api/projects/{code}/code/source]] · [[SYNC-UI-002#UI-17]] 4.6·6 · [[SYNC-UI-001]] 7장 9 · 사용자 피드백 2026-10-01 「코드랑 그래프를 같이 보여줘야 알아본다」 |
+| 구현 | `queries.code_text` · 라우터 `GET /projects/{code}/code/source` · `pages/CodeGraph.tsx` 3열(왼쪽 파일 트리 6·캔버스·패널 480) — 트리는 `functions[].file`로 브라우저가 디렉터리 › 파일 › 함수, 패널 4.6 코드는 고를 때 읽고 커뮤니티는 허브 함수 · 코드 그리기는 UI-5 8.21과 한 조각(`codeSrc.tsx`) · `styles.css` |
+| 테스트 | MS-008 테스트 관점 · 라우터 200/404/422 · `check_ui` UI-17 요소 +5 · 헤드 크롬: 트리 펼침 → 함수 → 커뮤니티 펼침·가운데·코드 → 파일 행 → 그 파일만 밝음 → 커뮤니티 원 → 허브 코드 → MINISPEC 함수는 4.4 그대로 → 트리 접기 → `?focus=` 진입 시 트리 경로 펼침 · 운영: SYNC 그래프에서 `queries.code_nodes` 코드가 패널에 |
+| 선행 | BE |
+| 완료 | — |
 
 ---
 
