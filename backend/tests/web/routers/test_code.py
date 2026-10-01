@@ -45,3 +45,36 @@ def test_code_endpoints(client: TestClient, scoped: Session, monkeypatch) -> Non
     assert client.get("/api/projects/EXMP/code-graph").status_code == 404
     r = client.get("/api/projects/EXMP/code/source", params={"file": "a.py", "line": 1})
     assert r.status_code == 404
+
+
+def test_code_ask_endpoint_streams_with_key(client: TestClient, scoped: Session, monkeypatch) -> None:
+    """POST /api/projects/{code}/code/ask (카드 BI) — start에 key, 뒤는 /api/docs/{docId}/ask와 같다."""
+    from app.config import settings
+    from app.core import queries
+    from app.core.types import LlmStep, LlmUsage
+    from tests.web.routers.test_documents import _sse
+
+    _seed(scoped)
+    login(client, scoped, "hoyoung")
+    r = client.post("/api/projects/EXMP/conversations", json={})
+    conv = r.json()["id"]
+    body = {"question": "이게 뭐야?", "conversation_id": conv, "key": "a.py:1"}
+    assert client.post("/api/projects/EXMP/code/ask", json=body).status_code == 503  # 키 없음
+    monkeypatch.setattr(settings, "LLM_API_KEY", "sk-test")
+    steps: list = [LlmStep("저장 함수다", [], LlmUsage())]
+
+    async def step_stream(system, messages, tools, tool_choice="auto"):
+        assert "[보는 함수] svc.save" in system
+        yield steps.pop(0)
+
+    monkeypatch.setattr(queries.llm, "step_stream", step_stream)
+    r = client.post("/api/projects/EXMP/code/ask", json=body)
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")
+    assert _sse(r.text) == [
+        ("start", {"doc_id": None, "item_id": None, "key": "a.py:1"}),
+        ("answer", {"answer": "저장 함수다", "context_item_ids": []}),
+    ]
+    miss = client.post("/api/projects/EXMP/code/ask", json={**body, "key": "a.py:2"})
+    assert miss.status_code == 404 and miss.json()["resource"] == "function"
+    login(client, scoped, "minjun")
+    assert client.post("/api/projects/EXMP/code/ask", json=body).status_code == 404
