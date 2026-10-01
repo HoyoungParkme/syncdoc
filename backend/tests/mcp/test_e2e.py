@@ -79,6 +79,29 @@ async def test_s1_agent_builds_specs_over_mcp(
         "via": "mcp",
     }
 
+    # 에이전트가 상태를 바꾼다 (카드 BE) — 「완료로 올려」. 웹 토글과 같은 길, 커밋 하나, 버전 그대로
+    err, p = await call("change_status", doc_id="EXMP-PRD-001", to="approved", reason="다 썼다")
+    assert not err and (p["doc_id"], p["status"], p["version_no"]) == (
+        "EXMP-PRD-001",
+        "approved",
+        1,
+    )
+    assert g(bare, "log", "-1", "--format=%s%n%b", "main").split("\n")[:2] == [
+        "status(EXMP-PRD-001): draft → approved",
+        "다 썼다",
+    ]
+    assert scoped.execute(
+        text("SELECT via, reason FROM status_changes WHERE commit_hash IS NOT NULL")
+    ).one() == ("mcp", "다 썼다")
+    # 멱등 — 이미 approved면 커밋이 늘지 않는다
+    n_commits = g(bare, "rev-list", "--count", "main")
+    err, p = await call("change_status", doc_id="EXMP-PRD-001", to="approved")
+    assert not err and p["status"] == "approved"
+    assert g(bare, "rev-list", "--count", "main") == n_commits
+    # 본문을 고치려면 그냥 update_document — 저절로 초안으로. 먼저 내릴 필요 없다 (API-002 4장)
+    err, p = await call("change_status", doc_id="EXMP-PRD-001", to="draft", reason="더 고친다")
+    assert not err and p["status"] == "draft" and p["version_no"] == 1
+
     # 수정 — 정상
     body2 = PRD_BODY.replace("한 줄로.", "한 줄로 정리.")
     err, r2 = await call(
@@ -154,9 +177,11 @@ async def test_s1_agent_builds_specs_over_mcp(
 
     # 저장소에 커밋이 있고 참조가 추출됨
     subjects = g(bare, "log", "--format=%s", "main").split("\n")
-    assert subjects[:5] == [
+    assert subjects[:7] == [
         "spec(EXMP-RFQ-001): Q1 삭제",
         "spec(EXMP-PRD-001): G1 다듬기",
+        "status(EXMP-PRD-001): approved → draft",
+        "status(EXMP-PRD-001): draft → approved",
         "spec(PRD): 목표·요구",
         "spec(RFQ): 첫 요구",
         "chore(EXMP): init syncdoc",
@@ -181,6 +206,11 @@ async def test_s1_agent_builds_specs_over_mcp(
         "RFQ": 1,
         "PRD": 1,
     }
+
+    # 끊어진 참조가 있으면 에이전트도 못 올린다 — 웹과 같은 조건 (UC-H8 1a, 카드 BE)
+    err, p = await call("change_status", doc_id="EXMP-PRD-001", to="approved")
+    assert err and p["type"] == "urn:syncdoc:status-blocked"
+    assert "ref.missing: EXMP-RFQ-001#Q1" in p["warnings"]
 
     # DOM 셋의 순서 (STD-001 2.6) — API 없이 클래스 명세 → precondition-unmet. 커밋도 DB도 없다
     dom = "---\ndoc_id: \ntype: DOM\ntitle: {t}\nstatus: draft\n---\n# DOM\n#### Document 문서\n속성\n"

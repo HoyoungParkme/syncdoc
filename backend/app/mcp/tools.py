@@ -30,6 +30,7 @@ from app.core.types import (
     STAGE_OF,
     Author,
     AuthorKind,
+    DocStatus,
     Document,
     DocumentSummary,
     Entry,
@@ -154,7 +155,8 @@ def init_description(modes: list[str]) -> str:
         "저장소가 있으면 existing-specs 에러가 나며 import_existing=true로 다시 부르면 기존 명세를 "
         "가져와(보관본은 되살려) 등록한다. GitHub 저장소가 아직 없으면 create_repo=true로 부른다 — "
         "공개 저장소를 만들어 주고 이어서 등록까지 한다. 사람이 저장소를 만들어 달라고 했을 때만 이 "
-        "인자를 붙인다. remote_url은 storage=github일 때만, 그때는 필수다. " + storage_sentence(modes)
+        "인자를 붙인다. remote_url은 storage=github일 때만, 그때는 필수다. "
+        + storage_sentence(modes)
     )
 
 
@@ -559,3 +561,23 @@ async def restore_document(doc_id: str) -> CallToolResult:
     except Problem as p:
         return _problem(p)
     return _ok(r.to_dict())
+
+
+@server.tool(
+    description="문서 상태를 바꾼다 — draft ⇄ approved. 사람이 「완료로 올려」라고 했을 때, 또는 쓰던 문서를 다 썼다고 스스로 판단했을 때 부른다. approved로 올릴 때 규약 오류·미완성·끊어진 참조가 하나라도 있으면 status-blocked — 목록을 고치고 다시 부르거나 사람에게 전한다. draft로 내리는 것은 막지 않는다. 본문의 status: 줄을 update_document로 바꾸면 frontmatter.status_change 위반이다 — 상태는 이 도구로만. 이력에 에이전트가 바꾼 것으로 남는다."
+)
+async def change_status(
+    doc_id: str, to: Literal["draft", "approved"], reason: str | None = None
+) -> CallToolResult:
+    """SYNC-API-002#change_status
+
+    웹 토글과 같은 pipeline.change_status — 조건이 갈리지 않는다. 다른 점은 author뿐 (카드 BE).
+    """
+    try:
+        with db.session_scope() as s:
+            author = _agent_author(s)
+        await pipeline.change_status(doc_id, DocStatus(to), author, reason)
+        d = await queries.document_view(doc_id, author.user)
+    except Problem as p:
+        return _problem(p)
+    return _ok(_summary_json(d))
