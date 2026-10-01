@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-011
 type: MS
 title: MINISPEC — codegraph — 코드 호출 그래프와 명세 대조
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 ---
 
@@ -132,7 +132,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 **처리**
 1. `G = graphify.paths.load_node_link_graph(raw)` · if 노드 0 → 모든 함수 `community = None`, `communities = []` → 6
-2. `C = networkx.community.louvain_communities(G 무향, resolution=1.0, seed=42)` — **graphify `cluster`가 아니다**(#253, 근거). Louvain은 노드·선 순서에 민감하므로 노드와 양 끝을 정렬한 선으로 그래프를 다시 만들어 넣어 결정적으로. 군집은 크기 내림차순(같으면 정렬한 노드 튜플)으로 번호를 매긴다 — `0`이 가장 큰 군집 · `labels = graphify.cluster.label_communities_by_hub(G, C의 멤버를 코드 노드만 남긴 것)` — 라벨은 graphify의 허브 이름이되 **허브 후보는 코드 노드만**(`source_file`이 있는 파일·클래스·함수). 문서·절 노드는 군집에는 들되 라벨에서 뺀다 — 문서 허브가 라벨이 되면 「SEQUENCE: 싱크독」·「2. 함수」 같은 이름이 나온다(#255). 차수는 전체 `G`로 잰다. **예외는 삼키고** 1의 빈 결과 + `log.warning` — 군집이 안 돼도 그래프는 남는다
+2. `C = networkx.community.louvain_communities(G 무향, resolution=1.0, seed=42)` — **graphify `cluster`가 아니다**(#253, 근거). Louvain은 노드·선 순서에 민감하므로 노드와 양 끝을 정렬한 선으로 그래프를 다시 만들어 넣어 결정적으로. 군집은 크기 내림차순(같으면 정렬한 노드 튜플)으로 번호를 매긴다 — `0`이 가장 큰 군집 · `labels = graphify.cluster.label_communities_by_hub(G, C의 멤버를 코드 노드만 남긴 것)` — 라벨은 graphify의 허브 이름이되 **허브 후보는 코드 노드만**(graphify `file_type == code` — 파일·클래스·함수. 문서 제목·절 노드도 `source_file`을 가지므로 그걸로는 못 가른다). 문서·절 노드는 군집에는 들되 라벨에서 뺀다 — 문서 허브가 라벨이 되면 「SEQUENCE: 싱크독」·「2. 함수」 같은 이름이 나온다(#255). 차수는 전체 `G`로 잰다. **예외는 삼키고** 1의 빈 결과 + `log.warning` — 군집이 안 돼도 그래프는 남는다
 3. 노드 → 커뮤니티 사상에서 **key → 커뮤니티**(`key`는 `reduce`와 같은 규칙 — `source_file` + `source_location`의 `L` 뒤 숫자)와 **파일 → 커뮤니티**(그 파일 노드들의 다수 커뮤니티, 동률이면 작은 번호)
 4. 함수마다 `community` = key의 것 · 없으면(enrich가 더한 정의) 파일의 것 · 그것도 없으면 None
 5. `communities = [{id, label: labels[id](끝 "()" 뗌), size: 든 함수 수}]` — 함수가 0인 군집(테스트·문서 노드만 든 것)은 뺀다. `size` 내림차순, 같으면 `id`
