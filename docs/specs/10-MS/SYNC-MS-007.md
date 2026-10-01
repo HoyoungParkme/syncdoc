@@ -111,6 +111,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 10. `reference.extract(document_id, version.id, body, item_pks=spec.item_pks(document_id), upstream_doc_ids=frontmatter upstream)`
 10a. `reference.resolve_missing(project_id, target_doc_id=doc_id)` — 이 문서(또는 항목)를 기다리던 미존재 참조를 푼다. 하위가 먼저 저장된 경우가 재구축까지 안 기다려도 되게(UC-S2 2a2)
 10b~13. 없음 — 끊어진 참조 해제·전파 감지·상위 불일치·댓글 재배치가 있던 자리. 카드 V에서 걷어냈다. 되살아난 참조는 10a가 이미 잇는다
+13a. **처리 지점**(`entry != github`, `web_status` 포함) — `made = 1`(6a가 커밋을 하나 더 밀었으면 2) · if `repo.last_processed_commit`이 있고 `git.rev_list_count(repo.workdir, f"{last_processed_commit}..{commit_hash}") == made` → `repo.last_processed_commit = commit_hash`, `synced_at = now`. **앱이 민 커밋은 이 저장이 곧 처리다** — 통지가 없는 서버 저장소에서 처리 지점이 폴링(5분)까지 늦게 보이지 않게(2026-10-01 사용자 결정). 수가 안 맞으면(0단계 뒤에 밖에서 push가 끼었다) 그대로 둔다 — 폴링·통지가 그것까지 읽는다. GitHub 프로젝트도 같이 옮긴다 — 뒤따르는 통지는 [[#pipeline.process_commit]] 1에서 `[]`
 14. **커밋.** 락 해제
 15. `→ SaveResult(doc_id, version_no, commit_hash, status, warnings, next_step)` — `deleted`가 있었으면 `warnings`에 `ref.broken: {n}`(9단계의 `broken`)을 섞는다. 에이전트가 「무엇이 끊어졌나」를 응답에서 본다 — `next_step`은 `entry == mcp`면 `f"{doc_id} v{version_no} 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)"`, 아니면 `None`. 규약을 에이전트가 잊어도 응답이 매번 다시 말한다([[SYNC-STD-001]] 1.8)
 
@@ -127,9 +128,9 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 | 버전 불일치 | `version-conflict` | 5 |
 | 삭제 항목에 하위 참조, 미확인 | `item-deletion-needs-confirm` | 6 |
 | push 실패 | `push-failed` | 7 |
-| 8~10a 중 DB 오류 | 트랜잭션 롤백. 커밋은 이미 원격에 있으므로 `repository.last_processed_commit`을 갱신하지 않아 폴링이 다시 처리한다 | 8 |
+| 8~13a 중 DB 오류 | 트랜잭션 롤백. 커밋은 이미 원격에 있고 `repository.last_processed_commit`도 같이 되돌아가 폴링이 다시 처리한다 | 8 |
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `ProjectService.get`(github) · [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.issue_doc_id]] [[SYNC-MS-002#SpecService.apply_frontmatter]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.detect_deleted_items]] [[SYNC-MS-002#SpecService.create]] [[SYNC-MS-002#SpecService.save]] · `ReferenceService.downstream` · [[SYNC-MS-003#ReferenceService.mark_missing]] · `ReferenceService.extract` · `ReferenceService.resolve_missing` · `git.commit_push` · [[SYNC-MS-002#SpecService.apply_status]] · [[SYNC-MS-002#SpecService.describe_items]] · [[SYNC-MS-002#SpecService.item_pks]] · [[SYNC-MS-002#SpecService.precondition]] · [[#pipeline.read_pending]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `ProjectService.get`(github) · [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.issue_doc_id]] [[SYNC-MS-002#SpecService.apply_frontmatter]] [[SYNC-MS-002#SpecService.validate]] [[SYNC-MS-002#SpecService.detect_deleted_items]] [[SYNC-MS-002#SpecService.create]] [[SYNC-MS-002#SpecService.save]] · `ReferenceService.downstream` · [[SYNC-MS-003#ReferenceService.mark_missing]] · `ReferenceService.extract` · `ReferenceService.resolve_missing` · `git.commit_push` · [[SYNC-MS-002#SpecService.apply_status]] · [[SYNC-MS-002#SpecService.describe_items]] · [[SYNC-MS-002#SpecService.item_pks]] · [[SYNC-MS-002#SpecService.precondition]] · [[#pipeline.read_pending]] · [[SYNC-MS-009#git.rev_list_count]]
 
 **테스트 관점**
 - 정상 수정: 새 버전 번호 +1, 커밋 존재, 참조 갱신
@@ -146,6 +147,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 - `web_status`: Version 없음, StatusChange에 commit_hash
 - 동시 저장 둘: 락 때문에 직렬화. 둘째가 version-conflict
 - 8단계 이후 DB 오류: 트랜잭션 롤백, `last_processed_commit` 그대로
+- 저장 뒤 `last_processed_commit`이 그 커밋이다(13a). 자동 강등으로 둘을 밀어도 같다 · 처리 지점이 그 사이 밖의 커밋만큼 뒤에 있으면(수가 안 맞음) 그대로다
 
 ---
 
@@ -233,14 +235,14 @@ async def read_pending(code: str, user: User) -> int
 2. 끊어질 것 — `inbound = reference.inbound_of_document(id)`(이름으로). **막지 않는다** — 보여준다
 3. if `not confirm` → `! document-deletion-needs-confirm {doc_id, title, version_count, inbound_refs}`. 웹은 여기 안 온다
 4. `commit_hash = git.commit_push(repo.workdir, f"spec({doc_id}): 휴지통", author, delete=[STD-001 1.1 경로])` · 실패 → `! push-failed`. **여기까지 DB 쓰기 없음**
-5. **트랜잭션** — `pks = spec.trash(document, commit_hash, author)` · `broken = reference.mark_missing(pks)` · 커밋 · 락 해제
+5. **트랜잭션** — `pks = spec.trash(document, commit_hash, author)` · `broken = reference.mark_missing(pks)` · 처리 지점([[#pipeline.save_pipeline]] 13a와 같은 규칙, `made = 1`) · 커밋 · 락 해제
 6. `→ TrashResult(doc_id, commit_hash, broken, next_step=f"{doc_id} 휴지통에 넣음 — 끊어진 참조 {broken}. 사람에게 알리고 멈춘다")`
 
 **예외** `not-found`(0·1) · `document-trashed`(1) · `document-deletion-needs-confirm`(3) · `push-failed`(4)
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-003#ReferenceService.inbound_of_document]] [[SYNC-MS-009#git.commit_push]] [[SYNC-MS-002#SpecService.trash]] [[SYNC-MS-003#ReferenceService.mark_missing]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-002#SpecService.describe_items]] · [[#pipeline.read_pending]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-003#ReferenceService.inbound_of_document]] [[SYNC-MS-009#git.commit_push]] [[SYNC-MS-002#SpecService.trash]] [[SYNC-MS-003#ReferenceService.mark_missing]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-002#SpecService.describe_items]] · [[#pipeline.read_pending]] · [[SYNC-MS-009#git.rev_list_count]]
 
-**테스트 관점** 남이 가리키는 문서도 confirm이면 들어간다 — `broken_refs`가 그 수이고 그 참조들이 `is_missing` · 원격에서 파일 사라짐, 커밋 메시지 `spec(…): 휴지통` · 행·버전 남음, `trashed_at` 있음, 목록에서 빠짐 · 두 번 넣으면 `document-trashed` · 그 뒤 폴링이 `D`를 건너뛰고 `last_processed_commit`이 나아감 · 휴지통 문서에 `update_document`·상태 변경 → `document-trashed`
+**테스트 관점** 남이 가리키는 문서도 confirm이면 들어간다 — `broken_refs`가 그 수이고 그 참조들이 `is_missing` · 원격에서 파일 사라짐, 커밋 메시지 `spec(…): 휴지통` · 행·버전 남음, `trashed_at` 있음, 목록에서 빠짐 · 두 번 넣으면 `document-trashed` · 넣은 뒤 `last_processed_commit`이 그 커밋(5) — 폴링이 돌아도 `D`를 다시 처리하지 않는다 · 휴지통 문서에 `update_document`·상태 변경 → `document-trashed`
 
 ---
 
