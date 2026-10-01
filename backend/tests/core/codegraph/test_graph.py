@@ -76,7 +76,8 @@ RAW2 = {
          "source_location": "L9"},
         {"id": "t1", "label": "test_x()", "_callable": True, "source_file": "tests/test_x.py",
          "source_location": "L3"},
-        {"id": "d1", "label": "노트", "file_type": "document"},
+        {"id": "d1", "label": "노트", "file_type": "document", "node_kind": "heading",
+         "source_file": "docs/n.md", "source_location": "L3"},  # 문서도 source_file이 있다
     ],
     "links": [
         {"source": "fa", "target": "f1", "relation": "contains"},
