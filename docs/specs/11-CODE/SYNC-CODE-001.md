@@ -1244,7 +1244,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `queries.code_text` · 라우터 `GET /projects/{code}/code/source` · `pages/CodeGraph.tsx` 3열(왼쪽 파일 트리 6·캔버스·패널 480) — 트리는 `functions[].file`로 브라우저가 디렉터리 › 파일 › 함수, 패널 4.6 코드는 고를 때 읽고 커뮤니티는 허브 함수 · 코드 그리기는 UI-5 8.21과 한 조각(`codeSrc.tsx`) · `styles.css` |
 | 테스트 | MS-008 테스트 관점 · 라우터 200/404/422 · `check_ui` UI-17 요소 +5 · 헤드 크롬: 트리 펼침 → 함수 → 커뮤니티 펼침·가운데·코드 → 파일 행 → 그 파일만 밝음 → 커뮤니티 원 → 허브 코드 → MINISPEC 함수는 4.4 그대로 → 트리 접기 → `?focus=` 진입 시 트리 경로 펼침 · 운영: SYNC 그래프에서 `queries.code_nodes` 코드가 패널에 |
 | 선행 | BE |
-| 완료 | — |
+| 완료 | 2026-10-01 · 브랜치 `card/BF-code-beside-graph`(7e0864a #258) · spec 11 + code 4 · 테스트 383 · `ruff`·`tsc`·`oxlint` · `validate` 0/0 · `check_code` 156/156 · `check_calls` 0/0 · `check_ui` 13/13(UI-17 요소 25) · `check_tokens` 103/0 · `check_view_html` 35/35 · 로컬 미리보기: `?focus` 진입 시 트리 경로 펼침·코드 L378–L442 → 트리에서 항목 없는 `_set_status` → 코드 L90–L94(4.4 없음) → 커뮤니티 칩 → 허브 `pipeline._rebuild` 코드 → 파일 행 → 그 파일만 밝음 → 접기 → 툴바 「트리」 · 운영: `GET /api/projects/SYNC/code/source`로 `queries.code_nodes` L1075–L1109(그래프 7e0864a) · 화면에서 트리 펼침 확인 · 아무것도 안 고른 상태에서 캔버스가 비던 TDZ는 #260(258481d #261)으로 바로 고침 |
 
 ---
 
