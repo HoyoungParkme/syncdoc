@@ -756,7 +756,8 @@ async def build_code_graph(code: str, commit: str) -> None:
             src = Path(tmp)
             await git.archive(workdir, commit, src)
             source, raw = await codegraph.load(src)
-            graph = codegraph.enrich(src, codegraph.reduce(raw))
+            # 커뮤니티는 enrich 뒤에 — 보강이 더한 함수도 받는다 (MS-007 3, 카드 BD)
+            graph = codegraph.communities(raw, codegraph.enrich(src, codegraph.reduce(raw)))
         with db.session_scope() as s:
             CodeGraphService(s).save(pid, commit, source, graph)
             s.commit()
@@ -771,12 +772,13 @@ async def build_code_graph(code: str, commit: str) -> None:
         log.warning("code graph code=%s commit=%s 실패: %s", code, commit[:7], reason)
         return
     log.info(
-        "code graph code=%s commit=%s source=%s functions=%d calls=%d elapsed=%.1fs",
+        "code graph code=%s commit=%s source=%s functions=%d calls=%d communities=%d elapsed=%.1fs",
         code,
         commit[:7],
         source,
         len(graph["functions"]),
         len(graph["calls"]),
+        len(graph.get("communities", [])),
         time.monotonic() - t0,
     )
 

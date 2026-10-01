@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends
 from app.core import queries
 from app.core.account.models import User
 from app.web.auth import current_user
-from app.web.schemas.code import CodeCalls, CodeText, CodeView
+from app.web.schemas.code import CodeCalls, CodeNodes, CodeText, CodeView
 
 router = APIRouter(prefix="/api", tags=["code"])
 
@@ -41,3 +41,9 @@ async def item_code_source(
 async def code_calls(code: str, user: User = Depends(current_user)) -> CodeCalls:
     """SYNC-API-001#GET/api/projects/{code}/code-calls — 관계도 코드 호출 (UI-8 2.6)"""
     return CodeCalls.model_validate(await queries.code_calls(code, user))
+
+
+@router.get("/projects/{code}/code-graph", response_model=CodeNodes)
+async def code_nodes(code: str, user: User = Depends(current_user)) -> CodeNodes:
+    """SYNC-API-001#GET/api/projects/{code}/code-graph — 코드 그래프 노드 전부 (UI-17)"""
+    return CodeNodes.model_validate(await queries.code_nodes(code, user))

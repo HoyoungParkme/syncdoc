@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-011
 type: MS
 title: MINISPEC — codegraph — 코드 호출 그래프와 명세 대조
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 ---
 
@@ -24,8 +24,9 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 | 키 | 모양 | 뜻 |
 |---|---|---|
-| `functions` | `[{key, name, qual, file, line, end, ms}]` | 저장소 안에 정의된 함수·메서드. `key`는 `파일:줄`. `qual`은 `Class.fn` 또는 `모듈.fn`. `end`는 끝 줄(모르면 null). `ms`는 docstring 첫 줄의 항목 ID(없으면 null) |
+| `functions` | `[{key, name, qual, file, line, end, ms, community}]` | 저장소 안에 정의된 함수·메서드. `key`는 `파일:줄`. `qual`은 `Class.fn` 또는 `모듈.fn`. `end`는 끝 줄(모르면 null). `ms`는 docstring 첫 줄의 항목 ID(없으면 null). `community`는 든 커뮤니티 번호(없으면 null — 카드 BD) |
 | `calls` | `[[from_key, to_key, via]]` | 호출 선. `via`는 `graphify`(graphify가 찾은 것) 또는 `enrich`(싱크독이 보강한 것) |
+| `communities` | `[{id, label, size}]` | 함수가 하나라도 든 커뮤니티(카드 BD). `id`는 graphify `cluster`의 번호(0이 가장 큼), `label`은 허브 노드 이름, `size`는 든 함수 수. **2026-10-01 이전 그래프에는 없다** — 읽는 쪽이 빈 것으로 본다 |
 
 ---
 
@@ -37,6 +38,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 | [[#codegraph.load]] | 저장소의 graph.json이 있으면 그것, 없으면 graphify로 추출 |
 | [[#codegraph.reduce]] | 함수·호출 선만 남긴다 |
 | [[#codegraph.enrich]] | 파이썬 코드로 타입을 풀어 호출을 보강한다 |
+| [[#codegraph.communities]] | 함수를 graphify 군집으로 묶는다 |
 | [[#codegraph.spec_calls]] | 명세의 「호출하는 것」을 항목 ID 집합으로 |
 | [[#codegraph.compare]] | 명세 호출과 코드 호출을 같음·코드만·명세만으로 |
 | [[#CodeGraphService.get]] | 프로젝트의 그래프 행 |
@@ -94,7 +96,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 2. `qual` — 메서드면 `method` 선으로 매단 클래스 노드의 이름을 붙여 `Class.fn`, 아니면 `모듈.fn`. 모듈 이름은 파일 이름에서 확장자를 뗀 것이고, 그것이 `service`·`__init__`·`index`면 **그 폴더 이름** — `core/codegraph/service.py`의 함수는 `codegraph.x`
 3. `ms` — `rationale_for` 선으로 붙은 docstring 노드의 라벨이 `^[A-Z][A-Z0-9]*-MS-\d+#[\w.]+`로 시작하면 그 ID. 아니면 null
 4. `calls` = `calls`·`indirect_call` 선 중 양 끝이 1의 함수인 것 → `[from_key, to_key, "graphify"]`. 같은 쌍은 하나로
-5. import·포함·문서 링크·docstring·개념 노드와 군집은 버린다 — 쓰는 곳이 없다
+5. import·포함·문서 링크·docstring·개념 노드는 버린다. 군집은 [[#codegraph.communities]]가 raw 그래프에서 따로 계산해 붙인다(카드 BD) — 여기서는 `community`를 두지 않는다
 6. `→ {"functions": [...], "calls": [...]}` (`end`는 null로 둔다 — 파이썬은 `enrich`가 채운다)
 
 **테스트 관점** 클래스 노드·import 선이 빠진다 · 메서드는 `Class.fn`, `service.py`의 함수는 폴더 이름 · docstring ID가 `ms`로 · 같은 호출 둘 → 하나
@@ -117,6 +119,30 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 5. `→ graph` (같은 객체에 더해 돌려준다)
 
 **테스트 관점** 다섯 꼴이 각각 선을 만든다 — 주석·대입·튜플 대입·즉석 생성·`self` · 모르는 클래스는 안 만든다 · graphify가 이미 잡은 선은 겹치지 않는다 · 데코레이터 달린 함수도 맞춘다 · docstring ID가 `ms`로
+
+---
+
+#### codegraph.communities 함수를 graphify 군집으로 묶는다
+
+**시그니처** `def communities(raw: dict, graph: dict) -> dict`
+
+근거: [[SYNC-UC-001#UC-S8]] 기본 흐름 3 · UI-17 · 사용자 결정 2026-10-01(그래프를 만들 때 서버가 군집한다 — raw 그래프에는 파일·클래스·호출 선이 다 들어 함수가 제 파일·클래스와 같이 묶인다 · Louvain seed 42, 모델·네트워크 없음 · 한 번)
+
+**입력** `raw` — `load`가 준 원형 · `graph` — `enrich`까지 끝난 그래프(같은 객체에 더해 돌려준다)
+
+**처리**
+1. `G = graphify.paths.load_node_link_graph(raw)` · if 노드 0 → 모든 함수 `community = None`, `communities = []` → 6
+2. `C = graphify.cluster.cluster(G)` · `labels = graphify.cluster.label_communities_by_hub(G, C)` — graspologic이 없으면 networkx Louvain(seed 42)이라 결정적. **예외는 삼키고** 1의 빈 결과 + `log.warning` — 군집이 안 돼도 그래프는 남는다
+3. 노드 → 커뮤니티 사상에서 **key → 커뮤니티**(`key`는 `reduce`와 같은 규칙 — `source_file` + `source_location`의 `L` 뒤 숫자)와 **파일 → 커뮤니티**(그 파일 노드들의 다수 커뮤니티, 동률이면 작은 번호)
+4. 함수마다 `community` = key의 것 · 없으면(enrich가 더한 정의) 파일의 것 · 그것도 없으면 None
+5. `communities = [{id, label: labels[id](끝 "()" 뗌), size: 든 함수 수}]` — 함수가 0인 군집(테스트·문서 노드만 든 것)은 뺀다. `size` 내림차순, 같으면 `id`
+6. `→ graph`
+
+**호출하는 것** 없음 (graphify 라이브러리 — MINISPEC 밖)
+
+**호출되는 것** [[SYNC-MS-007#pipeline.build_code_graph]] 3 — `enrich` 뒤. 검사기(`check_calls`)는 부르지 않는다 — 대조에 군집이 필요 없다
+
+**테스트 관점** contains·method 선으로 이어진 파일 둘 → 함수가 파일별로 갈린다 · 라벨이 허브 이름이고 `()`가 없다 · `size` = 함수 수이고 함수 없는 군집은 없다 · enrich가 더한 함수는 파일로 받는다 · 같은 raw 두 번 → 같은 결과 · 노드 없는 raw → 빈 목록·None
 
 ---
 

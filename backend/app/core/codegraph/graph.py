@@ -3,14 +3,17 @@
 DB를 모른다. 서버(pipeline.build_code_graph)와 검사기(tools/check_calls.py)가 같은 함수를 불러
 같은 결과를 낸다 — 사람·모델·에이전트·검사기가 한 대조를 본다([[SYNC-PRD-001#R13]]).
 
-그래프 모양 `{functions: [{key, name, qual, file, line, end, ms}], calls: [[from, to, via]]}` —
-key는 `파일:줄`, via는 `graphify`(graphify가 찾은 선) 또는 `enrich`(싱크독이 보강한 선).
+그래프 모양 `{functions: [{key, name, qual, file, line, end, ms, community}],
+calls: [[from, to, via]], communities: [{id, label, size}]}` — key는 `파일:줄`, via는
+`graphify`(graphify가 찾은 선) 또는 `enrich`(싱크독이 보강한 선), community는 graphify 군집
+번호(카드 BD — 2026-10-01 이전 그래프에는 없다).
 """
 
 from __future__ import annotations
 
 import ast
 import json
+import logging
 import re
 from collections import defaultdict
 from pathlib import Path, PurePosixPath
@@ -18,6 +21,8 @@ from pathlib import Path, PurePosixPath
 from app.core.errors import CodeGraphFailed
 from app.core.types import CallDiff
 from app.infra import graphify
+
+log = logging.getLogger(__name__)
 
 # graphify가 읽는 코드 파일 — 이것이 바뀐 커밋만 그래프를 다시 만든다 (UC-S8 1a)
 CODE_EXTS = frozenset(
@@ -75,6 +80,18 @@ def _module(file: str) -> str:
     return p.parent.name if p.stem in _PKG_STEMS and p.parent.name else p.stem
 
 
+def _node_key(n: dict) -> tuple[str, int] | None:
+    """raw 노드의 (파일, 줄) — `source_file` + `source_location`의 `L` 뒤 숫자. 없으면 None.
+
+    reduce의 함수 key 규칙이다. communities도 같은 규칙으로 노드와 함수를 잇는다.
+    """
+    file = n.get("source_file")
+    loc = str(n.get("source_location") or "")
+    if not file or not loc.startswith("L") or not loc[1:].isdigit():
+        return None
+    return file, int(loc[1:])
+
+
 def reduce(raw: dict) -> dict:
     """SYNC-MS-011#codegraph.reduce
 
@@ -98,11 +115,10 @@ def reduce(raw: dict) -> dict:
     for nid, n in nodes.items():
         if not n.get("_callable") or n.get("_callable_class"):
             continue
-        file = n.get("source_file")
-        loc = str(n.get("source_location") or "")
-        if not file or not loc.startswith("L") or not loc[1:].isdigit() or _is_test(file):
+        fl = _node_key(n)
+        if fl is None or _is_test(fl[0]):
             continue
-        line = int(loc[1:])
+        file, line = fl
         key = f"{file}:{line}"
         key_of[nid] = key
         if key in keys:
@@ -355,6 +371,52 @@ def _short_names(ids: set[str]) -> dict[str, str]:
     for n in dup:
         names.pop(n, None)
     return names
+
+
+def communities(raw: dict, graph: dict) -> dict:
+    """SYNC-MS-011#codegraph.communities
+
+    raw 그래프(파일·클래스·호출 선이 다 든 것)를 graphify로 군집해 함수마다 커뮤니티 번호를 붙이고
+    `communities`를 더한다. enrich 뒤에 — 보강이 더한 함수는 파일의 커뮤니티를 받는다. 모델·네트워크
+    없이 결정적(Louvain seed 42). 군집이 실패해도 그래프는 남는다 — 빈 결과와 경고 한 줄.
+    """
+    functions: list[dict] = graph["functions"]
+    by_key: dict[str, int] = {}
+    file_votes: dict[str, dict[int, int]] = defaultdict(lambda: defaultdict(int))
+    labels: dict[int, str] = {}
+    nodes = {n["id"]: n for n in raw.get("nodes", []) if "id" in n}
+    if nodes:
+        try:
+            from graphify.cluster import cluster, label_communities_by_hub
+            from graphify.paths import load_node_link_graph
+
+            g = load_node_link_graph(raw)
+            found = cluster(g)
+            named = label_communities_by_hub(g, found)
+            labels = {cid: _clean(str(lab)) for cid, lab in named.items()}
+            for cid, members in found.items():
+                for nid in members:
+                    n = nodes.get(nid)
+                    fl = _node_key(n) if n else None
+                    if fl is None:
+                        continue
+                    by_key[f"{fl[0]}:{fl[1]}"] = cid
+                    file_votes[fl[0]][cid] += 1
+        except Exception as e:  # noqa: BLE001 — 군집은 덤이다. 그래프 만들기를 깨지 않는다
+            log.warning("code graph 군집 실패 — 커뮤니티 없이 둔다: %s", e)
+            by_key, file_votes, labels = {}, defaultdict(lambda: defaultdict(int)), {}
+    by_file = {f: min(v.items(), key=lambda kv: (-kv[1], kv[0]))[0] for f, v in file_votes.items()}
+    sizes: dict[int, int] = defaultdict(int)
+    for f in functions:
+        cid = by_key.get(f["key"], by_file.get(f["file"]))
+        f["community"] = cid
+        if cid is not None:
+            sizes[cid] += 1
+    graph["communities"] = [
+        {"id": cid, "label": labels.get(cid, str(cid)), "size": size}
+        for cid, size in sorted(sizes.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
+    return graph
 
 
 def spec_calls(items: list[tuple[str, str]]) -> dict[str, set[str]]:

@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -489,7 +489,7 @@ status: draft
 <div class="sd h" style="width:420px;min-height:0">
   <aside class="side cg" style="min-height:430px">
     <div class="ptabs"><span>참조</span><span>질문</span><span class="on">코드</span></div>
-    <div class="fhead" data-el="8.18">pipeline.save_pipeline<div class="fmeta">backend/app/core/pipeline.py:121 · 그래프 066971e · 서버 · 3분 전</div></div>
+    <div class="fhead" data-el="8.18">pipeline.save_pipeline<div class="fmeta">backend/app/core/pipeline.py:121 · 그래프 066971e · 서버 · 3분 전 · <span class="ref" data-el="8.23">그래프에서 보기</span></div></div>
     <div class="k">부르는 것 7 · 코드만 1 · 명세만 1</div>
     <div class="crow code" data-el="8.19"><span class="st">▲</span>git.commit_push<span class="tag">코드만</span></div>
     <div class="crow spec"><span class="st">◌</span>ReferenceService.mark_missing<span class="tag">명세만</span></div>
@@ -627,6 +627,7 @@ status: draft
 | 8.20 | 불리는 곳 | 목록 | 이 함수를 부르는 MINISPEC 항목 — 비공개 도우미를 건너 닿는 것까지 | 그 항목으로 |
 | 8.21 | 코드 보기 | 접힌 묶음 | 「코드 보기 L시작–L끝」. 펼칠 때 그래프를 만든 커밋의 저장소에서 그 함수 본문을 읽어 줄 번호와 함께 보인다. 300줄까지(넘으면 「잘림」) | — |
 | 8.22 | 함수 목록 | 목록 | MINISPEC가 아닌 항목이면 하위 체인의 MINISPEC 함수, MINISPEC 문서에서 항목을 안 골랐으면 그 문서의 함수 전부 — 줄마다 항목 ID와 어긋남 수(▲ 코드만 · ◌ 명세만, 없으면 ✓ 같음 수) | 그 항목으로(코드 탭 그대로) |
+| 8.23 | 그래프에서 보기 | 링크 | 함수 머리(8.18) 안. 함수가 코드에 있을 때만 | UI-17을 이 함수에 포커스해 연다 — `/p/{코드}/code-graph?focus={파일:줄}` |
 | 8.9 | 진행 묶음 | 접힌 묶음 | **읽는 동안** — 스피너(공통 1.8) + 모델이 읽기 전에 쓰는 **가장 최근 한 줄**(`note`). 새 줄이 오면 갈아든다. 오른쪽 「n단계 ▸」를 누르면 지금까지의 `note`·`read` 전부. **답이 온 뒤**(`answer` 이벤트 — 글이 흐르는 동안은 아직 아니다, 카드 AW) — 스피너가 사라지고 「n단계 읽음 · 본 것 k ▸」 한 줄로 접힌다. 펼치면 진행 줄 전부와 그 아래 「본 것」 = 모델이 실제로 읽은 대상, 부른 순서(`첨부:이름`·코드를 읽었으면 `코드:…`도, 카드 AZ). 줄은 SSE로 **실시간** 한 줄씩 온다. 저장된 대화를 다시 열면 턴의 `progress`로 접힌 채 그려진다 | 누르면 펼침/접힘 · 본 것 → 7.2와 같음 |
 | 9 | 단계 이동 | 버튼 2개 | 이전·다음 단계 문서 ID. 없으면 비활성 | 그 문서의 UI-5 |
 | 10 | 원본 본문 | 영역 | 원본 MD 그대로. 줄 번호. 3단 틀은 유저용과 같고 본문 열만 바뀐다 | — |
@@ -793,6 +794,7 @@ status: draft
       </div>
       <span class="sp"></span>
       <span class="b" data-el="2.1">참조 그래프</span>
+      <span class="b" data-el="2.3">코드 그래프</span>
       <span class="b" data-el="2.2">순서대로 읽기</span>
     </div>
 
@@ -903,6 +905,7 @@ status: draft
 | 1.4 | push 방법 | 텍스트 | **서버 저장일 때만.** 원격을 더하는 줄 `git remote add syncdoc {이 서버}/git/{코드}.git`과 `git push syncdoc main` 두 줄. 비밀번호 칸에 개인 토큰(UI-13)이라는 안내 | 복사 — 두 줄을 클립보드로 |
 | 2.1 | 참조 그래프 | 버튼 | | UI-8로 |
 | 2.2 | 순서대로 읽기 | 버튼 | | UI-9로 |
+| 2.3 | 코드 그래프 | 버튼 | 참조 그래프와 순서대로 읽기 사이 | UI-17로 |
 | 3 | 요약 수치 | 영역 | 프로젝트 전체의 끊어진 참조·규약 오류·미완성 건수. 0이면 흐리게 | — |
 | 3.2 | 끊어진 참조 | 수치 | 가리키는 곳이 없는 참조(`references.is_missing`) 수. 항목이 삭제됐거나 아직 안 쓰였다 | 목록 다이얼로그(6). UC-H14 기본 흐름 4 |
 | 3.4 | 규약 오류 | 수치 | has_convention_error 문서 수 | 목록 다이얼로그(6) |
@@ -2507,6 +2510,211 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 1. 그 컴퓨터의 브라우저로 로그인하고 `사용 방법`을 연다
 2. 붙이는 법 표(6)를 따라 토큰을 발급하고 명령(6.2)을 복사해 터미널에 붙인다 — 주소가 이미 채워져 있다
 3. Claude Code를 새로 켜고 `/mcp`로 확인한다
+
+---
+
+## UI-17 코드 그래프
+
+| 항목 | 내용 |
+|---|---|
+| 화면 설계 | [[SYNC-UI-001#UI-17]] |
+| 경로 | `/p/{프로젝트코드}/code-graph` · `?focus={파일:줄}`이면 그 함수를 골라 가운데로 |
+| 진입 | UI-4 코드 그래프 버튼(2.3) · UI-5 코드 탭 함수 머리의 「그래프에서 보기」(8.23) |
+| 유스케이스 | [[SYNC-UC-001#UC-H20]] 기본 흐름 5, 확장 5a·5b |
+
+### 배치
+
+```html
+<style>
+  .pg{padding:22px 26px 26px;display:flex;flex-direction:column;gap:14px;flex:1}
+  .phead{display:flex;align-items:flex-end;gap:10px}
+  .crumbs{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink3);margin-bottom:3px}
+  .crumbs .sep{color:var(--mute);font-size:12px}
+  .gcard{flex:1;display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .gbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--sub);font-size:13px}
+  .gbar .in{width:220px;height:28px;font-size:13px}
+  .cgbody{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 280px;min-height:0}
+  /* 캔버스 — 힘 배치 그림. 접힌 커뮤니티는 큰 원(크기 = 함수 수), 펼친 커뮤니티는 작은 원들. 선 굵기 = 호출 수 */
+  .cgcanvas{position:relative;overflow:hidden;background:#fff;min-height:560px}
+  .cgcanvas svg{position:absolute;inset:0;width:100%;height:100%}
+  .cgcanvas .lk{stroke:#8f8b83;stroke-opacity:.35;fill:none}
+  .cgcanvas .c{fill-opacity:.85}
+  .cgcanvas text{font:600 11px var(--mono);fill:#fff;text-anchor:middle;pointer-events:none}
+  .cgcanvas .ms{stroke:#2f7d5b;stroke-width:2.5;fill-opacity:.9}
+  .cgcanvas .ms.code{stroke:#8a6410}
+  .cgcanvas .ms.spec{stroke:#b8342a}
+  /* 포커스 겹층 — 올리거나 고른 노드 하나와 그 선만 DOM으로 다시 그린다(요소 번호가 붙는 자리) */
+  .cgo{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .cgo line{stroke:#17181c;stroke-width:2.2;stroke-opacity:.9}
+  .cgn{position:absolute;transform:translate(-50%,-100%);padding:5px 9px;border-radius:6px;background:#17181c;color:#fff;font:600 11.5px var(--mono);white-space:nowrap;box-shadow:0 3px 10px rgba(23,24,28,.25)}
+  .cgn .sub{display:block;font:400 11px var(--sans);color:rgba(255,255,255,.75)}
+  .cgn .mark{display:inline-block;margin-left:5px;color:#f0c969}
+  .cgn.c{background:#3b6ea5}
+  .cgside{border-left:1px solid var(--line);background:var(--sub);padding:14px 16px;overflow:auto;font-size:13px}
+  .cgside .k{font:600 12px var(--sans);color:var(--ink3);margin:12px 0 6px}
+  .cgside .nm{font:600 13.5px var(--mono);color:var(--ink);word-break:break-all}
+  .cgside .meta{font:12px var(--mono);color:var(--dim);margin-top:3px}
+  .cgside .chip{display:inline-flex;align-items:center;gap:5px;margin-top:6px;padding:2px 8px;border-radius:999px;background:#fff;border:1px solid var(--line2);font-size:12px}
+  .cgside .chip i{width:9px;height:9px;border-radius:50%;background:#3b6ea5}
+  .cgside .crow{display:flex;align-items:center;gap:6px;padding:4px 0;font:12.5px var(--mono);border-bottom:1px solid var(--hair)}
+  .cgside .st{width:14px;text-align:center}
+  .cgside .st.code{color:var(--back)} .cgside .st.spec{color:var(--warn)} .cgside .st.same{color:var(--ok)}
+  .cgside .lnk{display:inline-block;margin-top:12px;color:var(--ink);text-decoration:underline;font-size:13px}
+  .glegend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;padding:8px 14px;border-top:1px solid var(--hair);background:var(--sub);font-size:12.5px;color:var(--ink3)}
+  .glegend .row{display:inline-flex;align-items:center;gap:5px}
+  .glegend .row i{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .glegend .row input{margin:0}
+  .glegend .row.off{opacity:.45}
+</style>
+<div class="sd">
+  <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb">설정</span><span class="tb">로그아웃</span></div>
+  <div class="pg">
+    <div class="phead" data-el="1">
+      <div>
+        <div class="crumbs"><span><span class="m bd">[SYNC]</span> 싱크독</span><span class="sep">›</span><span>코드 그래프</span></div>
+        <span class="h1">코드 그래프</span>
+      </div>
+      <span class="sp"></span>
+      <span class="lbl" data-el="1.1">함수 1,266 · 호출 2,192 · 커뮤니티 23 · 그래프 a076246 · 서버 · 3분 전</span>
+    </div>
+
+    <div class="gcard">
+      <div class="gbar" data-el="2">
+        <span data-el="2.1"><input class="in" placeholder="함수 이름 · 파일" value="save_pipeline"></span>
+        <span class="b sm" data-el="2.2">전부 펼치기</span>
+        <span class="vsep"></span>
+        <span class="lbl" data-el="2.3">커뮤니티를 누르면 펼쳐집니다 · 함수를 누르면 옆에 보입니다</span>
+        <span class="sp"></span>
+      </div>
+
+      <div class="cgbody">
+        <div class="cgcanvas" data-el="3">
+          <!-- 그림은 canvas가 그린다 — 여기서는 모양만. 접힌 커뮤니티(큰 원)와 펼친 커뮤니티 하나(작은 원들), 선 굵기 = 호출 수 -->
+          <svg viewBox="0 0 900 560">
+            <line class="lk" x1="190" y1="150" x2="420" y2="300" stroke-width="5"/>
+            <line class="lk" x1="190" y1="150" x2="640" y2="130" stroke-width="2"/>
+            <line class="lk" x1="640" y1="130" x2="420" y2="300" stroke-width="3"/>
+            <line class="lk" x1="150" y1="400" x2="420" y2="300" stroke-width="1.5"/>
+            <line class="lk" x1="720" y1="420" x2="420" y2="300" stroke-width="4"/>
+            <line class="lk" x1="720" y1="420" x2="640" y2="130" stroke-width="1"/>
+            <line class="lk" x1="420" y1="300" x2="470" y2="250" stroke-width="1"/>
+            <line class="lk" x1="470" y1="250" x2="520" y2="300" stroke-width="1"/>
+            <line class="lk" x1="420" y1="300" x2="400" y2="360" stroke-width="1"/>
+            <line class="lk" x1="470" y1="250" x2="400" y2="360" stroke-width="1"/>
+            <circle class="c" cx="190" cy="150" r="34" fill="#3b6ea5"/><text x="190" y="154">routers</text>
+            <circle class="c" cx="640" cy="130" r="28" fill="#c2663a"/><text x="640" y="134">SpecService</text>
+            <circle class="c" cx="150" cy="400" r="22" fill="#5b8c3e"/><text x="150" y="404">infra/git</text>
+            <circle class="c" cx="720" cy="420" r="30" fill="#8a5bb5"/><text x="720" y="424">queries</text>
+            <!-- 펼친 커뮤니티 pipeline — 함수 노드들. 고리는 MINISPEC 함수(색 = 대조 상태) -->
+            <circle class="ms" cx="470" cy="250" r="7" fill="#c9a227"/>
+            <circle class="ms code" cx="420" cy="300" r="7" fill="#c9a227"/>
+            <circle cx="520" cy="300" r="5" fill="#c9a227"/>
+            <circle cx="400" cy="360" r="5" fill="#c9a227"/>
+            <circle cx="455" cy="330" r="5" fill="#c9a227"/>
+            <circle class="ms spec" cx="500" cy="210" r="7" fill="#c9a227"/>
+          </svg>
+          <!-- 포커스 겹층: 고른 함수 노드와 그 선만 DOM으로 — 여기에 번호가 붙는다 -->
+          <svg class="cgo" data-el="3.3" viewBox="0 0 900 560"><line x1="420" y1="300" x2="470" y2="250"/><line x1="420" y1="300" x2="400" y2="360"/><line x1="420" y1="300" x2="190" y2="150"/></svg>
+          <div class="cgn c" data-el="3.1" style="left:190px;top:106px">routers<span class="sub">함수 118 · 펼치기</span></div>
+          <div class="cgn f" data-el="3.2" style="left:420px;top:288px">pipeline.save_pipeline<span class="mark" data-el="3.4">▲</span><span class="sub">backend/app/core/pipeline.py:121</span></div>
+        </div>
+
+        <aside class="cgside" data-el="4">
+          <div data-el="4.1">
+            <div class="nm">pipeline.save_pipeline</div>
+            <div class="meta">backend/app/core/pipeline.py:121</div>
+            <span class="chip" data-el="4.5"><i></i>pipeline · 함수 118 · 접기</span>
+          </div>
+          <div class="k">부르는 것 9</div>
+          <div class="crow" data-el="4.2"><span class="st code">▲</span>git.commit_push</div>
+          <div class="crow"><span class="st spec">◌</span>ReferenceService.mark_missing</div>
+          <div class="crow"><span class="st same">✓</span>SpecService.validate</div>
+          <div class="crow"><span class="st same">✓</span>SpecService.save</div>
+          <div class="crow"><span class="st"></span>pipeline._run</div>
+          <div class="k">불리는 곳 3</div>
+          <div class="crow" data-el="4.3">pipeline.revert</div>
+          <div class="crow">pipeline.change_status</div>
+          <div class="crow">routers.documents.update</div>
+          <a class="lnk" data-el="4.4">코드 탭으로 → MS-007#pipeline.save_pipeline</a>
+        </aside>
+      </div>
+
+      <div class="glegend" data-el="5">
+        <span class="row" data-el="5.1"><input type="checkbox" checked><i style="background:#3b6ea5"></i>routers · 118</span>
+        <span class="row"><input type="checkbox" checked><i style="background:#c2663a"></i>SpecService · 96</span>
+        <span class="row"><input type="checkbox" checked><i style="background:#c9a227"></i>pipeline · 71</span>
+        <span class="row"><input type="checkbox" checked><i style="background:#8a5bb5"></i>queries · 64</span>
+        <span class="row off"><input type="checkbox"><i style="background:#5b8c3e"></i>infra/git · 40</span>
+        <span class="sp"></span>
+        <span data-el="5.2">큰 원 = 커뮤니티(크기 = 함수 수) · 선 굵기 = 호출 수 · 고리 = MINISPEC 함수 — ✓ 같음 · ▲ 코드만 · ◌ 명세만</span>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+### 요소
+
+| # | 이름 | 종류 | 보여주는 것 | 누르면 |
+|---|---|---|---|---|
+| 1 | 헤더 | 영역 | 브레드크럼(`[코드] 이름 › 코드 그래프`)과 제목 | — |
+| 1.1 | 통계 | 텍스트 | 함수 수 · 호출 수 · 커뮤니티 수 · 그래프를 만든 커밋·출처·시각. 마지막 만들기가 실패했으면 그 커밋과 이유 한 줄(UC-H20 2a) | — |
+| 2 | 툴바 | 영역 | 검색·펼치기·상태 | — |
+| 2.1 | 검색 | 입력 | 함수 이름·`Class.fn`·파일 경로의 부분 일치. 맞는 첫 함수의 커뮤니티를 펼치고 그 함수를 골라 가운데로 | — |
+| 2.2 | 전부 펼치기 | 버튼 | 접힌 것이 하나라도 있으면 「전부 펼치기」, 다 펼쳐졌으면 「전부 접기」 | 토글 |
+| 2.3 | 상태 라벨 | 텍스트 | 평소엔 조작 안내. 검색이 없으면 「없음」(5b). 커뮤니티 없는 옛 그래프면 「커뮤니티 없음 — 다음 코드 push에 생깁니다」(5a). 그래프가 없으면 「코드 그래프 없음 — 코드를 push하면 만들어집니다」(1a) | — |
+| 3 | 캔버스 | 영역 | 힘 배치 그림. 접힌 커뮤니티는 큰 원(반지름이 함수 수의 제곱근), 펼친 커뮤니티는 함수 작은 원들, 선 굵기는 호출 수. 빈 곳을 끌면 이동, 휠로 확대·축소, 노드를 끌면 그 노드가 따라온다 | — |
+| 3.1 | 커뮤니티 노드 (겹층) | 노드 | 올리거나 고른 **접힌 커뮤니티** — 라벨·함수 수·「펼치기」. 캔버스 위 DOM | 펼친다 |
+| 3.2 | 함수 노드 (겹층) | 노드 | 올리거나 고른 **함수** — `Class.fn`·`파일:줄`. 캔버스 위 DOM | 옆 패널(4)에 그 함수. 다시 누르면 선택 해제 |
+| 3.3 | 호출 선 (겹층) | 선 | 고른 노드에 닿는 선만 진하게 DOM으로 다시 그린다. 나머지 선·노드는 흐려진다 | — |
+| 3.4 | 대조 표시 | 뱃지 | MINISPEC 항목이 있는 함수 — 노드에 고리, 겹층에 ✓(같음)·▲(코드만)·◌(명세만). 색은 상태 색(완료·주의·경고) | — |
+| 4 | 옆 패널 | 영역 | 고른 노드의 자세한 것. 아무것도 안 골랐으면 「노드를 고르면 여기에 보입니다」 | — |
+| 4.1 | 이름·자리 | 텍스트 | 함수면 `Class.fn`·`파일:줄`과 커뮤니티 칩(4.5). 커뮤니티면 라벨·함수 수 | — |
+| 4.2 | 부르는 것 | 목록 | 이 함수가 부르는 함수. MINISPEC 항목이 있는 줄은 ✓·▲·◌가 붙는다(코드 탭 8.19와 같은 뜻). 커뮤니티를 골랐으면 든 함수 상위 20(호출 많은 순) | 그 함수를 골라 가운데로 |
+| 4.3 | 불리는 곳 | 목록 | 이 함수를 부르는 함수 | 그 함수를 골라 가운데로 |
+| 4.4 | 코드 탭으로 | 링크 | MINISPEC 항목이 있는 함수에만. `문서#항목` | UI-5 코드 탭 — `/p/{코드}/d/{문서}?panel=code#item-{항목}` |
+| 4.5 | 커뮤니티 칩 | 버튼 | 함수가 든 커뮤니티의 색·라벨·함수 수 | 그 커뮤니티를 접는다 |
+| 5 | 범례 | 영역 | 커뮤니티 목록과 표시 설명 | — |
+| 5.1 | 커뮤니티 행 | 행 | 색 견본 · 라벨 · 함수 수 · 체크박스. 라벨이 파일 경로 꼴이면 파일 이름만 보이고 전체는 툴팁 | 체크를 끄면 그 커뮤니티의 노드·선을 숨긴다 |
+| 5.2 | 표시 설명 | 텍스트 | 큰 원·선 굵기·고리·세 기호의 뜻 | — |
+
+### 규칙
+
+- **처음은 전부 접혀 있다.** 함수 1,000개를 한 번에 그리면 읽을 수 없다 — 커뮤니티 스물 몇 개와 그 사이 호출 수가 먼저 보이고, 누른 것만 펼쳐진다. 펼친 커뮤니티의 새 노드는 그 커뮤니티 자리에서 시작해 요동이 작다
+- **커뮤니티는 서버가 그래프를 만들 때 계산한다**([[SYNC-MS-011#codegraph.communities]], 사용자 결정 2026-10-01) — graphify의 군집(Louvain, 모델 없음)과 허브 이름 라벨. 화면은 계산하지 않는다. 라벨이 허브의 파일 경로면(`backend/app/core/pipeline.py`) 파일 이름만 보이고 전체는 툴팁
+- **색은 커뮤니티 팔레트 12색**([[SYNC-UI-001]] 3.1, 7장 8)을 커뮤니티 번호 순으로 돌려 쓴다. 13번째부터 반복 — 범례(5.1)의 라벨이 가른다. 상태 색은 대조 표시(3.4)에만
+- **MINISPEC 함수는 고리를 두른다.** 상태 색은 코드 탭과 같다 — 같음은 완료 색, 코드만은 주의 색, 명세만은 경고 색. 어느 것도 아닌 함수(도우미·항목 없음)는 고리가 없다
+- **호버·선택은 UI-8과 같은 문법이다** — 그 노드의 이웃(선으로 닿는 노드)만 남기고 나머지를 흐린다. 선택한 노드와 그 선은 캔버스 위 DOM 겹층(3.1~3.4)으로 다시 그린다 — 글자가 선명하고, 요소 번호가 붙을 자리가 생긴다. **캔버스 안 그림에는 번호가 없다** — 검사기는 DOM만 본다([[SYNC-STD-004#DEV-17]])
+- 커뮤니티 노드 반지름은 `8 + 2.2·√함수수`, 함수 노드는 MINISPEC 함수 6 · 그 밖 4. 선 굵기는 `0.6 + log₂(호출 수)` — 접힌 커뮤니티 사이는 그 안 함수들의 호출을 합친 수, 펼치면 함수 단위
+- **검색(2.1)은 이름·`Class.fn`·파일의 부분 일치**다. 맞는 첫 함수의 커뮤니티를 펼치고 그 함수를 골라 가운데로 옮긴다. 없으면 2.3에 「없음」(5b) — 그림은 그대로. `?focus=파일:줄`로 들어온 것도 같은 길이다(8.23)
+- **배치는 브라우저가 한다**(`d3-force` 힘 배치, [[SYNC-INFRA-001]] 3장). 서버는 노드·선·커뮤니티만 준다([[SYNC-MS-008#queries.code_nodes]]). 틱 300쯤에서 멈추고 끌면 다시 돈다. 그리기는 `<canvas>` — 1,300개 노드도 부드럽다. 바깥 요청이 없다 — 폐쇄망판에서도 같다
+- 그래프가 없으면(1a) 캔버스가 비고 2.3이 말한다. 커뮤니티가 없는 옛 그래프면(5a) 함수를 묶지 않고 전부 펼쳐 보이고 2.3이 말한다 — 다음 코드 push가 채운다
+- 접힌 커뮤니티를 고르면 패널(4)에 라벨·함수 수와 든 함수 상위 20(호출 많은 순)이 보이고, 함수를 누르면 펼쳐지며 그 함수가 골라진다
+
+### 시나리오
+
+**S-1 접힌 채 훑고 펼친다** — UC-H20 기본 흐름 5
+1. UI-4에서 코드 그래프(2.3)를 연다. 커뮤니티 스물 몇 개가 큰 원으로, 사이 선 굵기가 호출 수다
+2. 가장 굵은 선이 닿는 `pipeline` 원(3.1)을 누른다. 함수 71개가 작은 원으로 펼쳐지고 그 자리에서 퍼진다
+3. 고리가 둘린 노드에 마우스를 올린다 — 겹층(3.2)에 이름과 `파일:줄`, ▲(3.4)가 보이고 그 선(3.3)만 진하다
+
+**S-2 코드 탭에서 와서 그 함수를 본다** — UI-5 8.23
+1. 코드 탭에서 `pipeline.save_pipeline`의 「그래프에서 보기」(8.23)를 누른다
+2. 그 함수의 커뮤니티가 펼쳐진 채 노드가 가운데에 골라져 있고(3.2), 옆 패널(4)에 부르는 것·불리는 곳
+3. 「코드 탭으로」(4.4)를 누르면 원래 자리로 돌아온다
+
+**S-3 이름으로 찾아 코드 탭으로** — UC-H20 기본 흐름 5
+1. 검색(2.1)에 `commit_push`를 친다. `infra/git` 커뮤니티가 펼쳐지고 `git.commit_push`가 가운데에 골라진다
+2. 패널의 불리는 곳(4.3)에서 `pipeline.save_pipeline`을 누른다 — 선택이 옮겨 가고 가운데로 온다
+3. 「코드 탭으로」(4.4)로 UI-5 코드 탭에 간다
+
+**S-4 옛 그래프** — UC-H20 확장 5a
+1. 커뮤니티를 모르는 그래프의 프로젝트에서 연다. 함수가 전부 펼쳐져 있고 상태 라벨(2.3)이 「커뮤니티 없음 — 다음 코드 push에 생깁니다」
+2. 코드를 push하면 다음에 열 때 커뮤니티로 접혀 있다
+
+**S-5 커뮤니티를 숨겨 본다**
+1. 범례(5.1)에서 `infra/git`의 체크를 끈다. 그 커뮤니티의 노드와 선이 사라진다
+2. 다시 켜면 돌아온다. 「전부 접기」(2.2)로 처음 모양이 된다
 
 ---
 

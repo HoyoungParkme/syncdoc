@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-003
 type: DOM
 title: ERD·DD — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-001]
 ---
 
@@ -391,7 +391,7 @@ erDiagram
 | project_id | int | PK, FK not null, ON DELETE CASCADE | 어느 프로젝트의 그래프인가. 프로젝트마다 하나 | |
 | commit_hash | varchar(40) | null | 이 그래프를 만든 커밋. 첫 빌드부터 실패했으면 null | `2e243f4…` |
 | source | varchar(10) | null | `repo`(저장소에 커밋된 graphify 결과) · `server`(서버가 추출). 앱 검증 | `server` |
-| graph | jsonb | not null | 줄인 모양 `{functions, calls}`([[SYNC-MS-011]] 0장). 코드 본문 없음 | |
+| graph | jsonb | not null | 줄인 모양 `{functions, calls, communities}`([[SYNC-MS-011]] 0장). 함수마다 `community`(없으면 null). **2026-10-01 이전에 만든 행에는 `communities`가 없다** — 읽는 쪽이 빈 것으로 보고, 다음 코드 push가 채운다(마이그레이션 없음 — JSONB 안 키다, 카드 BD). 코드 본문 없음 | |
 | function_count | int | not null, default 0 | 함수 수. 관리·로그용 | `1471` |
 | call_count | int | not null, default 0 | 호출 선 수 | `2192` |
 | built_at | timestamptz | not null | 마지막으로 성공하거나 실패한 시각 | |

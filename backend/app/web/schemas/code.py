@@ -74,3 +74,27 @@ class CodeCallEdge(Base):
 class CodeCalls(Base):
     graph: CodeGraphInfo | None
     edges: list[CodeCallEdge]
+
+
+class CodeCommunity(Base):
+    id: int
+    label: str
+    size: int
+
+
+class CodeNode(Base):
+    key: str
+    name: str
+    qual: str
+    file: str
+    line: int
+    community: int | None
+    ms: str | None
+    status: str | None
+
+
+class CodeNodes(Base):
+    graph: CodeGraphInfo | None
+    communities: list[CodeCommunity]
+    functions: list[CodeNode]
+    calls: list[list[str]]

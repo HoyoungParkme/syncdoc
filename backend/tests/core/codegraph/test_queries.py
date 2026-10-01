@@ -11,6 +11,7 @@ from app.core.errors import NotFound
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
 from app.core.types import DocType
+from tests.core.account.test_service import make_user
 from tests.core.reference.test_service import PRD, RFQ
 from tests.core.spec.test_service import author, make_project, owner
 
@@ -144,6 +145,34 @@ async def test_code_calls_three_kinds(scoped: Session) -> None:
         ("svc.write", "svc.save", "code_only"),
     }
     assert calls.graph.function_count == 4
+
+
+async def test_code_nodes_lists_everything_with_status_and_communities(scoped: Session) -> None:
+    graph = {
+        "functions": [dict(f, community=0 if f["file"] == "a.py" else None) for f in GRAPH["functions"]],
+        "calls": GRAPH["calls"],
+        "communities": [{"id": 0, "label": "svc", "size": 4}],
+    }
+    _seed(scoped, graph)
+    nodes = await queries.code_nodes("EXMP", owner(scoped))
+    assert nodes.graph.function_count == 4 and [c.label for c in nodes.communities] == ["svc"]
+    by = {f.qual: f for f in nodes.functions}
+    # 코드만이 하나라도 있으면 code_only > 명세만 > 같음 · 도우미는 항목 없음
+    assert (by["svc.save"].ms, by["svc.save"].status) == ("EXMP-MS-001#svc.save", "code_only")
+    assert (by["svc.write"].ms, by["svc.write"].status) == ("EXMP-MS-001#svc.write", "code_only")
+    assert by["svc.check"].status == "same" and by["svc._help"].ms is None
+    assert all(f.community == 0 for f in nodes.functions)
+    assert nodes.calls == [[a, b] for a, b, _ in GRAPH["calls"]]  # via는 싣지 않는다
+
+
+async def test_code_nodes_old_graph_no_graph_and_not_owned(scoped: Session) -> None:
+    _seed(scoped)  # GRAPH 그대로 — 커뮤니티를 모르는 옛 그래프
+    nodes = await queries.code_nodes("EXMP", owner(scoped))
+    assert nodes.communities == [] and all(f.community is None for f in nodes.functions)
+    with pytest.raises(NotFound):
+        await queries.code_nodes("EXMP", make_user(scoped, login="stranger"))
+    scoped.execute(text("DELETE FROM code_graphs"))
+    assert (await queries.code_nodes("EXMP", owner(scoped))).graph is None
 
 
 async def test_code_source_reads_function_range_from_graph_commit(

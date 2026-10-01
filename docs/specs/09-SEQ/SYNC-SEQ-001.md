@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 
 유스케이스 흐름을 **객체 수준**으로 내린다. 누가 누굴 어떤 순서로 부르고, 어디서 갈라지는지. 생명선은 클래스 명세 4장의 서비스와 인프라 4.1의 구성 요소다.
 
-**1장 대응표의 입구 전부(REST 33 엔드포인트 + MCP 도구)를 다룬다.** v1.0에서는 "단순 조회는 안 그린다"고 했으나, 그려보니 단순해 보이던 조회가 묶음을 넘는 호출을 숨기고 있었다(`get_document`의 미존재 참조, 프로젝트 목록의 건수). 시퀀스는 그런 걸 잡으려고 그리는 것이므로 빠뜨리면 안 된다.
+**1장 대응표의 입구 전부(REST 34 엔드포인트 + MCP 도구)를 다룬다.** v1.0에서는 "단순 조회는 안 그린다"고 했으나, 그려보니 단순해 보이던 조회가 묶음을 넘는 호출을 숨기고 있었다(`get_document`의 미존재 참조, 프로젝트 목록의 건수). 시퀀스는 그런 걸 잡으려고 그리는 것이므로 빠뜨리면 안 된다.
 
 **v2에서 협업 장치를 걷어냈다.** 전파·플래그·댓글·내 할 일·백업의 시퀀스(SEQ-3·6·16·17)는 은퇴했고 번호는 비워 둔다. 남은 것 중 그 장치를 부르던 단계는 지웠다.
 
@@ -97,6 +97,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | MCP get_code_graph | [[#SEQ-27]] | ○ |
 | GET·POST /git/{code}.git/* (서버 저장소 git 입구) | [[#SEQ-29]] | ○ |
 | MCP upload_code | [[#SEQ-30]] | ○ |
+| GET /api/projects/{code}/code-graph | [[#SEQ-31]] | ○ |
 
 묶음을 넘는 것이 대응표 41행 중 29행이다(입구 여럿을 한 행에 묶은 것이 있다). v1.0에서 안 그린 조회 중 절반 이상이 묶음을 넘었다.
 
@@ -1128,6 +1129,7 @@ sequenceDiagram
             CG-->>P: ("server", 원형)
         end
         P->>CG: reduce(원형) → enrich(임시 폴더, 그래프) — 함수·호출 선만, 파이썬 보강
+        P->>CG: communities(원형, 그래프) — graphify 군집, 함수마다 커뮤니티 (카드 BD)
         P->>CS: save(project_id, head, source, graph)
         CS->>DB: code_graphs 한 행 교체 · error 비움
         P->>P: 로그 한 줄 · 임시 폴더 삭제 · 「다음」이 있으면 한 번 더
@@ -1319,6 +1321,44 @@ sequenceDiagram
 
 **읽을 때 볼 것**
 - 명세 경로는 받지 않으므로 이 커밋이 버전을 만들지 않는다 — 처리는 처리 지점을 옮기고 코드 그래프만 건다
+
+---
+
+## SEQ-31 코드 그래프 노드를 본다
+
+[[SYNC-UC-001#UC-H20]] 기본 흐름 5. UI-17. 함수 전부·호출 선·커뮤니티를 한 번에 받고, 배치는 브라우저가 한다. 커뮤니티는 SEQ-26이 만들 때 붙였다 — 읽을 때 계산하지 않는다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사람
+    participant RC as routers/code
+    participant Q as queries
+    participant PS as ProjectService
+    participant CS as CodeGraphService
+    participant S as SpecService
+    participant CG as codegraph/graph.py
+
+    U->>RC: GET /api/projects/{code}/code-graph — UI-4 2.3 · UI-5 8.23
+    RC->>Q: code_nodes(code, user)
+    Q->>PS: get_owned — 남의 것이면 not-found
+    Q->>CS: get(project_id)
+    alt 그래프 없음 (1a)
+        Q-->>RC: CodeNodes {graph: null, 빈 목록}
+    end
+    Q->>S: list_by_project(MINISPEC) · get_document · item_blocks — 「호출하는 것」 줄
+    Q->>CG: spec_calls(items) → compare(graph, spec) — 함수 key → 항목·상태
+    Q-->>RC: CodeNodes {communities, functions(community·ms·status), calls}
+    RC-->>U: 응답 (수백 KB, 한 번)
+    U->>U: 브라우저가 커뮤니티로 접어 d3-force로 배치하고 canvas에 그린다
+    opt 「코드 탭으로」(4.4)
+        U->>RC: UI-5 코드 탭 — SEQ-27
+    end
+```
+
+**읽을 때 볼 것**
+- 대조 상태는 SEQ-27과 같은 `compare`다 — 코드 탭과 그림이 같은 판정을 보인다
+- 옛 그래프(커뮤니티 없음)는 `communities`가 비고 함수의 `community`가 null — 화면이 전부 펼쳐 보이고 다음 코드 push가 채운다(5a)
 
 ---
 

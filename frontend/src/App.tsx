@@ -1,6 +1,7 @@
 /** 화면 흐름 — SYNC-UI-001 4장. 경로는 SYNC-UI-002 각 화면의 `경로`. */
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Shell } from './components/Shell'
+import { CodeGraph } from './pages/CodeGraph'
 import { DocView } from './pages/DocView'
 import { Graph } from './pages/Graph'
 import { History } from './pages/History'
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/p/:code/d/:docId" element={<DocView />} />
           <Route path="/p/:code/d/:docId/history" element={<History />} />
           <Route path="/p/:code/graph" element={<Graph />} />
+          <Route path="/p/:code/code-graph" element={<CodeGraph />} />
           <Route path="/p/:code/read" element={<ReadOrder />} />
         </Route>
       </Routes>

@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -42,6 +42,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#queries.ask_tool]] | 모델이 부른 읽기 도구 하나를 실행한다 |
 | [[#queries.code_view]] | 코드 탭 — 항목의 코드 대조 |
 | [[#queries.code_calls]] | 관계도 코드 호출 — MINISPEC 사이 호출 선 |
+| [[#queries.code_nodes]] | 코드 그래프 노드 — 함수 전부·커뮤니티·대조 상태 (UI-17) |
 | [[#queries.code_source]] | 코드 보기 — 함수 본문 |
 
 ---
@@ -462,6 +463,26 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 **호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-011#codegraph.spec_calls]] · [[SYNC-MS-011#codegraph.compare]]
 
 **테스트 관점** 선이 셋으로 갈린다 · 그래프 없음 → 빈 선 · 남의 프로젝트 → `not-found`
+
+---
+
+#### queries.code_nodes 코드 그래프 노드 — 함수 전부·커뮤니티·대조 상태
+
+**시그니처** `async def code_nodes(code: str, user: User) -> CodeNodes`
+
+근거: [[SYNC-UC-001#UC-H20]] 기본 흐름 5 · [[SYNC-API-001#GET/api/projects/{code}/code-graph]] · [[SYNC-SEQ-001#SEQ-31]] · UI-17 · 사용자 결정 2026-10-01(함수·커뮤니티 노드, 처음은 접힘)
+
+**처리**
+0. `project = ProjectService.get_owned(code, user)`
+1. `row = CodeGraphService.get(project.id)` · if None → `CodeNodes(graph=None, communities=[], functions=[], calls=[])`
+2. `code_view` 2단계와 같이 `spec`·`diffs` — `by_key = {d.function: d for d in diffs if d.function}`
+3. 함수마다 `CodeNode(key, name, qual, file, line, community=f.get("community"), ms, status)` — `d = by_key.get(key)` · 없으면 `ms`·`status` None · `status` = if `d.code_only` → `code_only` · elif `d.spec_only` → `spec_only` · else `same`
+4. `communities = [CodeCommunity(id, label, size) for c in row.graph.get("communities", [])]` — 옛 그래프는 빈 목록 · `calls = [[a, b] for a, b, _ in row.graph["calls"]]`
+5. `→ CodeNodes(graph=머리(row), communities, functions, calls)`
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-011#codegraph.spec_calls]] · [[SYNC-MS-011#codegraph.compare]]
+
+**테스트 관점** 항목 있는 함수에 `ms`·`status`(코드만 > 명세만 > 같음) · 도우미는 `ms` None · 커뮤니티 목록과 함수의 `community`가 그래프 그대로 · 옛 그래프(`communities` 없음) → 빈 목록, `community` None · 그래프 없음 → `graph` None · 남의 프로젝트 → `not-found`
 
 ---
 

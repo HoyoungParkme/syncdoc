@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-007
 type: MS
 title: MINISPEC — pipeline — 쓰기 조율
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -473,16 +473,16 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 **처리**
 1. 세션 하나에서 `project = ProjectService.get(code)` — 배치라 소유를 안 본다(`process_commit`과 같다) · `workdir = project.repository.workdir_path`
 2. 임시 폴더를 만들고 [[SYNC-MS-009#git.archive]]`(workdir, commit, tmp)`
-3. `source, raw = `[[SYNC-MS-011#codegraph.load]]`(tmp)` · `graph = `[[SYNC-MS-011#codegraph.enrich]]`(tmp, `[[SYNC-MS-011#codegraph.reduce]]`(raw))` — 모델 없음
+3. `source, raw = `[[SYNC-MS-011#codegraph.load]]`(tmp)` · `graph = `[[SYNC-MS-011#codegraph.communities]]`(raw, `[[SYNC-MS-011#codegraph.enrich]]`(tmp, `[[SYNC-MS-011#codegraph.reduce]]`(raw)))` — 모델 없음. 커뮤니티는 enrich 뒤에 — 보강이 더한 함수도 받는다(카드 BD)
 4. 세션 하나에서 [[SYNC-MS-011#CodeGraphService.save]]`(project.id, commit, source, graph)` · 커밋
-5. `log.info("code graph code=%s commit=%s source=%s functions=%d calls=%d elapsed=%.1fs", …)` — 한 줄
+5. `log.info("code graph code=%s commit=%s source=%s functions=%d calls=%d communities=%d elapsed=%.1fs", …)` — 한 줄
 6. 임시 폴더를 지운다(실패해도)
 
 **예외** 2~4 어디서든 실패하면 **삼키고** [[SYNC-MS-011#CodeGraphService.fail]]`(project.id, commit, 이유)` · `log.warning` 한 줄 — 배치라 받을 사람이 없고, 옛 그래프는 남는다. 프로젝트가 없으면(그새 해제) 조용히 끝
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get]] · [[SYNC-MS-009#git.archive]] · [[SYNC-MS-011#codegraph.load]] · [[SYNC-MS-011#codegraph.reduce]] · [[SYNC-MS-011#codegraph.enrich]] · [[SYNC-MS-011#CodeGraphService.save]] · [[SYNC-MS-011#CodeGraphService.fail]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get]] · [[SYNC-MS-009#git.archive]] · [[SYNC-MS-011#codegraph.load]] · [[SYNC-MS-011#codegraph.reduce]] · [[SYNC-MS-011#codegraph.enrich]] · [[SYNC-MS-011#codegraph.communities]] · [[SYNC-MS-011#CodeGraphService.save]] · [[SYNC-MS-011#CodeGraphService.fail]]
 
-**테스트 관점** 로컬 bare origin에 파이썬 파일을 커밋 → 행 하나, `commit_hash`가 그 커밋, `source=server`, 함수가 있다 · 저장소에 `graphify-out/graph.json`을 커밋해 두면 `source=repo` · 추출이 실패하면 옛 그래프가 남고 `error` · 작업 사본에 `graphify-out/`이 생기지 않는다
+**테스트 관점** 로컬 bare origin에 파이썬 파일을 커밋 → 행 하나, `commit_hash`가 그 커밋, `source=server`, 함수가 있다 · 저장소에 `graphify-out/graph.json`을 커밋해 두면 `source=repo` · 추출이 실패하면 옛 그래프가 남고 `error` · 작업 사본에 `graphify-out/`이 생기지 않는다 · 함수마다 `community`가 있고 `communities`가 비어 있지 않다(카드 BD)
 
 ---
 

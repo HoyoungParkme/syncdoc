@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -452,6 +452,9 @@ classDiagram
 | `CodeView` | `graph: CodeGraphInfo \| None` · `doc_id` · `item_id: str \| None` · `is_ms: bool` · `missing: bool` · `function: CodeFunction \| None` · `functions: list~CodeBrief~` | queries.code_view → API `CodeView`(UI-5 코드 탭) |
 | `CodeText` | `path` · `start` · `end` · `commit_hash` · `text` · `truncated: bool` | CodeGraphService.read → API `CodeText` · 질문 탭 `read_code`(카드 AZ) |
 | `CodeCallEdge` · `CodeCalls` | `from_: str` · `to: str` · `status: str` / `graph: CodeGraphInfo \| None` · `edges: list~CodeCallEdge~` | queries.code_calls → API `CodeCalls`(UI-8 코드 호출) |
+| `CodeCommunity` | `id: int` · `label: str` · `size: int` | 코드 그래프의 커뮤니티 하나(카드 BD). `size`는 든 함수 수 |
+| `CodeNode` | `key` · `name` · `qual` · `file` · `line` · `community: int \| None` · `ms: str \| None` · `status: str \| None` | 코드 그래프 노드 하나. `status`는 항목이 있을 때 `compare`로 — `code_only` > `spec_only` > `same` |
+| `CodeNodes` | `graph: CodeGraphInfo \| None` · `communities: list~CodeCommunity~` · `functions: list~CodeNode~` · `calls: list~list~str~~` | queries.code_nodes → API `CodeNodes`(UI-17 코드 그래프) |
 | `ConversationView` | `ConversationBrief` + `turns: list~TurnView~` + `pending: list~AttachmentMeta~`(아직 안 보낸 첨부) | ConversationService.get → API `Conversation` |
 
 타입은 여기 한 곳에만 정의한다.
@@ -560,7 +563,7 @@ classDiagram
 관계
 - `CodeGraph` 0..1 — 1 `Project` (ID만. PK가 곧 `project_id` — 프로젝트마다 하나. 해제와 함께 cascade)
 
-**`graph`는 줄인 모양이다** — `{functions: [{key, name, qual, file, line, end, ms}], calls: [[from, to, via]]}`([[SYNC-MS-011]] 0장). import·포함 관계·문서 노드는 버린다. **코드 본문과 대조 결과는 없다** — 본문은 저장소에서, 대조는 읽을 때.
+**`graph`는 줄인 모양이다** — `{functions: [{key, name, qual, file, line, end, ms, community}], calls: [[from, to, via]], communities: [{id, label, size}]}`([[SYNC-MS-011]] 0장). import·포함 관계·문서 노드는 버리되, 그것으로 계산한 **커뮤니티**는 함수마다 번호로 남긴다(카드 BD). **코드 본문과 대조 결과는 없다** — 본문은 저장소에서, 대조는 읽을 때.
 
 ---
 
@@ -1091,6 +1094,7 @@ item_chain(doc_id, item_id, user) -> ItemChain      —       전이적 폐포 (
 downstream_view(doc_id, user) -> DownstreamView     —       이 문서를 참조하는 것. 추적표·하위 참조 수 (V-PRD)
 code_view(doc_id, item_id?, user) -> CodeView      SEQ-27  code_graphs 행 + MS 항목의 「호출하는 것」 → compare → 함수·부르는 것·불리는 곳 | 하위 체인의 함수
 code_calls(code, user) -> CodeCalls                SEQ-27  compare → MINISPEC 사이 호출 선 (UI-8 코드 호출)
+code_nodes(code, user) -> CodeNodes                SEQ-31  code_graphs 행의 함수 전부 + 커뮤니티 + compare로 항목·상태 (UI-17 코드 그래프)
 code_source(doc_id, item_id, user) -> CodeText     SEQ-27  함수의 파일·줄 → CodeGraphService.read (그래프 커밋의 저장소에서)
 ask_item(doc_id, item_id?, conversation_id, question, attachment_ids, user) -> AsyncIterator[AskEvent]
                                                     SEQ-24  대화에서 history·첨부 목록 → 시작 맥락(제목·항목 목록·첨부 목록) → add_turn → llm.step ↔ ask_tool 루프(8번·120초) → finish_turn → AskAnswer
@@ -1235,6 +1239,7 @@ classDiagram
         +load(src_dir: Path) tuple
         +reduce(raw: dict) dict
         +enrich(src_dir: Path, graph: dict) dict
+        +communities(raw: dict, graph: dict) dict
         +spec_calls(items: list~tuple~) dict
         +compare(graph: dict, spec: dict) list~CallDiff~
     }
@@ -1254,6 +1259,7 @@ classDiagram
 | 메서드 | 부르는 곳 | 근거 |
 |---|---|---|
 | `touches_code` · `load` · `reduce` · `enrich` | [[SYNC-MS-007#pipeline.build_code_graph]] · `process_commit` · `tools/check_calls.py` | UC-S8 |
+| `communities` | `pipeline.build_code_graph`(enrich 뒤) | UC-S8 3 · UI-17 · 사용자 결정 2026-10-01 — raw 그래프를 graphify로 군집해 함수마다 커뮤니티를 붙인다. 검사기는 안 부른다 |
 | `spec_calls` · `compare` | `tools/check_calls.py` · `queries`(카드 AY·AZ) | UC-H20 · DEV-14 |
 | `get` · `save` · `fail` | `pipeline.build_code_graph` · `process_commit`(그래프가 없나) | UC-S8 |
 | `delete_by_project` | [[SYNC-MS-001#ProjectService.delete_project]] | UC-H17 |

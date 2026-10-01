@@ -19,9 +19,13 @@ def test_code_endpoints(client: TestClient, scoped: Session) -> None:
     assert len(doc["functions"]) == 4 and doc["graph"]["source"] == "server"
     calls = client.get("/api/projects/EXMP/code-calls").json()
     assert {"from", "to", "status"} <= set(calls["edges"][0])  # from 별칭
+    nodes = client.get("/api/projects/EXMP/code-graph").json()  # UI-17 (카드 BD)
+    assert set(nodes) == {"graph", "communities", "functions", "calls"} and len(nodes["functions"]) == 4
+    assert nodes["functions"][0]["status"] == "code_only" and nodes["communities"] == []
     miss = client.get("/api/docs/EXMP-MS-001/items/svc.gone/code/source")
     assert miss.status_code == 404 and miss.json()["resource"] == "function"
     # 남의 프로젝트
     login(client, scoped, "minjun")
     assert client.get("/api/docs/EXMP-MS-001/items/svc.save/code").status_code == 404
     assert client.get("/api/projects/EXMP/code-calls").status_code == 404
+    assert client.get("/api/projects/EXMP/code-graph").status_code == 404

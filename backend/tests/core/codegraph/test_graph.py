@@ -61,6 +61,63 @@ def test_reduce_keeps_functions_and_calls_only() -> None:
     assert g["calls"] == [["app/core/pipeline.py:30", "app/core/pipeline.py:50", "graphify"]]
 
 
+# ── communities ──
+RAW2 = {
+    "nodes": [
+        {"id": "fa", "label": "a.py", "source_file": "app/a.py", "source_location": "L1"},
+        {"id": "f1", "label": "f1()", "_callable": True, "source_file": "app/a.py",
+         "source_location": "L2"},
+        {"id": "f2", "label": "f2()", "_callable": True, "source_file": "app/a.py",
+         "source_location": "L5"},
+        {"id": "fb", "label": "b.py", "source_file": "app/b.py", "source_location": "L1"},
+        {"id": "g1", "label": "g1()", "_callable": True, "source_file": "app/b.py",
+         "source_location": "L2"},
+        {"id": "g2", "label": "g2()", "_callable": True, "source_file": "app/b.py",
+         "source_location": "L9"},
+        {"id": "t1", "label": "test_x()", "_callable": True, "source_file": "tests/test_x.py",
+         "source_location": "L3"},
+        {"id": "d1", "label": "노트", "file_type": "document"},
+    ],
+    "links": [
+        {"source": "fa", "target": "f1", "relation": "contains"},
+        {"source": "fa", "target": "f2", "relation": "contains"},
+        {"source": "f1", "target": "f2", "relation": "calls"},
+        {"source": "fb", "target": "g1", "relation": "contains"},
+        {"source": "fb", "target": "g2", "relation": "contains"},
+        {"source": "g1", "target": "g2", "relation": "calls"},
+        {"source": "g1", "target": "g2", "relation": "calls"},
+        {"source": "t1", "target": "g1", "relation": "calls"},
+    ],
+}  # fmt: skip
+
+
+def test_communities_groups_by_file_labels_by_hub_and_is_deterministic() -> None:
+    graph = cg.reduce(RAW2)
+    graph["functions"].append(  # enrich가 더한 정의 — 파일로 커뮤니티를 받는다
+        {"key": "app/b.py:30", "name": "g3", "qual": "b.g3", "file": "app/b.py", "line": 30,
+         "end": None, "ms": None}  # fmt: skip
+    )
+    out = cg.communities(RAW2, graph)
+    assert out is graph
+    by = {f["name"]: f["community"] for f in graph["functions"]}
+    assert by["f1"] == by["f2"] and by["g1"] == by["g2"] == by["g3"] and by["f1"] != by["g1"]
+    assert all(c is not None for c in by.values())
+    comms = graph["communities"]
+    assert [c["size"] for c in comms] == [3, 2]  # 함수 수 내림차순 · 테스트·문서만 든 군집은 없다
+    assert {c["id"] for c in comms} == {by["g1"], by["f1"]}
+    assert all(c["label"] and not c["label"].endswith("()") for c in comms)
+    again = cg.communities(RAW2, cg.reduce(RAW2))
+    assert [f["community"] for f in again["functions"]] == [
+        f["community"] for f in graph["functions"] if f["name"] != "g3"
+    ]
+
+
+def test_communities_without_nodes_leaves_none_and_empty() -> None:
+    graph = cg.reduce(RAW)
+    out = cg.communities({"nodes": [], "links": []}, graph)
+    assert out["communities"] == [] and all(f["community"] is None for f in out["functions"])
+
+
 # ── enrich ──
 SVC = '''
 class SpecService:
