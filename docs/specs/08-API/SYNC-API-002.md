@@ -2,7 +2,7 @@
 doc_id: SYNC-API-002
 type: API
 title: API 명세 MCP — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ---
 
@@ -12,7 +12,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-에이전트(Claude Code · Codex · Gemini 등)가 싱크독에 붙을 때 쓰는 MCP 도구 8개. 유스케이스 [[SYNC-UC-001#UC-A1]]~A6에 대응하고, 쓰기는 create/update 둘로 나눈다. `get_template`은 [[SYNC-STD-001]] 규약을 에이전트에게 전달하는 통로다.
+에이전트(Claude Code · Codex · Gemini 등)가 싱크독에 붙을 때 쓰는 MCP 도구 13개. 유스케이스 [[SYNC-UC-001#UC-A1]]~A6에 대응하고, 쓰기는 create/update 둘로 나눈다. `get_template`은 [[SYNC-STD-001]] 규약을 에이전트에게 전달하는 통로다.
 
 **이 문서의 독자는 에이전트다.** 각 도구의 `description`이 에이전트가 도구를 고를 때 읽는 문장이므로, 언제 쓰고 언제 쓰지 않는지를 거기에 담는다.
 
@@ -24,7 +24,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 - **발급자가 소유한 프로젝트만 열린다**([[SYNC-PRD-001#R12]]). 남의 프로젝트 코드나 문서 ID를 주면 `not-found {resource: "project"}` — 없는 것과 같다. `init_project`로 등록한 사람이 그 프로젝트의 소유자다
 - 에러: 도구 결과의 `isError: true` + 본문에 [[SYNC-API-001]]과 **같은 problem+json**. 에이전트가 `type`으로 분기한다
 - 모든 조회 결과에 문서 상태와 버전이 담긴다(PRD R9). 에이전트는 이걸로 확정 명세와 초안을 구분한다
-- 상태 변경은 MCP에 **없다**. 초안인지 완료인지는 사람의 판단이라 웹에서만 한다([[SYNC-UC-001#UC-H8]] 주 액터 사람)
+- 상태 변경은 `change_status` 하나로만 한다([[SYNC-UC-001#UC-H8]], 카드 BE). 사람이 시켰을 때, 또는 에이전트가 다 썼다고 판단했을 때. 완료로 올리는 조건은 웹 토글과 같다. `update_document` 본문의 `status:` 줄로 바꾸면 위반이다
 - 쓰기의 단위는 **문서 하나**다([[SYNC-STD-001]] 1.8). `create_document`·`update_document`의 결과에 `next_step`이 실린다 — 에이전트는 그것을 사람에게 그대로 전하고 멈춘다. DOM 셋의 순서(STD-001 2.6)만은 서버가 `precondition-unmet`으로 막는다
 
 ## 2. 도구 이름
@@ -41,6 +41,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 | `update_document` | [[SYNC-UC-001#UC-A6]] (수정) | SpecService.save | ○ |
 | `delete_document` | [[SYNC-UC-001#UC-A7]] | pipeline.trash_document | ○ |
 | `restore_document` | [[SYNC-UC-001#UC-A8]] | pipeline.restore_document | ○ |
+| `change_status` | [[SYNC-UC-001#UC-H8]] | pipeline.change_status (웹 토글과 같은 함수, 카드 BE) | ○ |
 | `get_template` | (STD-001 전달) | — 내장 템플릿 · 저장소 `STD/` 읽기 | |
 | `get_code_graph` | [[SYNC-UC-001#UC-A9]] | queries.code_view (코드 그래프, 카드 AZ) | |
 | `upload_code` | [[SYNC-UC-001#UC-A10]] | pipeline.upload_code (서버 저장소에 코드, 카드 BB) | ○ |
@@ -394,6 +395,32 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 ---
 
+### change_status
+
+```json
+{
+  "name": "change_status",
+  "description": "문서 상태를 바꾼다 — draft ⇄ approved. 사람이 「완료로 올려」라고 했을 때, 또는 쓰던 문서를 다 썼다고 스스로 판단했을 때 부른다. approved로 올릴 때 규약 오류·미완성·끊어진 참조가 하나라도 있으면 status-blocked — 목록을 고치고 다시 부르거나 사람에게 전한다. draft로 내리는 것은 막지 않는다. 본문의 status: 줄을 update_document로 바꾸면 frontmatter.status_change 위반이다 — 상태는 이 도구로만. 이력에 에이전트가 바꾼 것으로 남는다.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["doc_id", "to"],
+    "properties": {
+      "doc_id": { "type": "string" },
+      "to": { "type": "string", "enum": ["draft", "approved"] },
+      "reason": { "type": "string", "description": "왜 바꾸는지 한 줄. 이력(UI-7)에 남는다" }
+    }
+  }
+}
+```
+
+**결과** — 문서 요약. `list_documents`의 문서 한 행과 같은 모양(`doc_id`·`status`·`version_no`·`last_author`…). 이미 그 상태면 아무것도 안 하고 그대로(멱등). 상태 커밋 `status({doc_id}): {from} → {to}` 하나가 저장소에 생기고, 버전은 늘지 않는다([[SYNC-SEQ-001#SEQ-5]])
+
+**에러**: `not-found`(문서 없음 · 남의 프로젝트는 `resource: project`) · `status-blocked {convention_error_detail, warnings}`([[SYNC-UC-001#UC-H8]] 1a — `warnings`에 `section.missing: …`·`ref.missing: …`) · `document-trashed` · `push-failed`
+
+웹 토글([[SYNC-API-001#POST/api/docs/{docId}/status]])과 같은 함수([[SYNC-MS-007#pipeline.change_status]])를 부른다 — 조건이 갈리지 않는다. 다른 점은 이력의 작성 주체뿐: 에이전트 · 지시 {토큰 발급자}(카드 BE)
+
+---
+
 ### get_code_graph
 
 ```json
@@ -493,7 +520,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
   - update_document에 doc_id 오타 → not-found. 새 문서가 생기지 않는다
   - 남의 프로젝트 코드·문서 ID → not-found(project). 토큰 발급자가 소유한 프로젝트만 열린다 — list_documents로 코드를 다시 확인한다
   - expected_version 없이 update  → 스키마에서 거부
-  - 상태를 바꾸려 하지 않는다    → 도구가 없다. 사람이 웹에서
+  - update_document 본문으로 status:를 바꾸지 않는다 → frontmatter.status_change 위반. change_status로
   - get_references 결과를 전부 get_item으로 펼치지 않는다 → 필요한 것만
   - 한 대화에서 한 단계의 문서 여럿을 연달아 만들지 않는다 → 문서 하나가 단위다 (STD-001 1.8)
 
@@ -502,6 +529,13 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
   2. git이 없으면 upload_code로 바뀐 파일과 지운 경로만. 명세 파일은 섞지 않는다
      - upload-too-large → 나눠 보낸다
      - upload-path-refused → 거절된 경로를 빼고 다시 (하나라도 있으면 아무것도 안 올라갔다)
+
+상태를 바꿀 때
+  1. 사람이 「완료로 올려」라고 했거나, 쓰던 문서를 다 썼다고 판단하면 change_status(doc_id, "approved", reason)
+     reason = 왜 올리는지 한 줄 ("R1~R12 다 채움, 사람이 읽고 확인")
+     - status-blocked → warnings(section.missing·ref.missing)와 convention_error_detail을 고치고 다시. 못 고치는 것(상위 문서가 아직 없어 끊어진 참조)은 사람에게 전한다
+  2. 완료 문서를 고쳐야 하면 그냥 update_document — 저절로 초안으로 내려간다. 먼저 draft로 내릴 필요 없다
+  3. 올린 뒤에도 멈춘다 — 사람이 웹에서 읽는 순서는 그대로다 (STD-001 1.8)
 
 지울 때 (잘못 만든 문서)
   1. delete_document(doc_id)
