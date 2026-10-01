@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -44,6 +44,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#queries.code_calls]] | 관계도 코드 호출 — MINISPEC 사이 호출 선 |
 | [[#queries.code_nodes]] | 코드 그래프 노드 — 함수 전부·커뮤니티·대조 상태 (UI-17) |
 | [[#queries.code_source]] | 코드 보기 — 함수 본문 |
+| [[#queries.code_text]] | 코드 그래프의 코드 — 파일·줄로 함수 본문 (UI-17 4.6, 카드 BF) |
 
 ---
 
@@ -502,6 +503,25 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 **호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.resolve_item]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#CodeGraphService.read]]
 
 **테스트 관점** 함수 본문이 그래프 커밋의 것 · 파이썬 함수는 끝 줄까지 · 그래프 없음·함수 없음 → `not-found`
+
+---
+
+#### queries.code_text 코드 그래프의 코드 — 파일·줄로
+
+**시그니처** `async def code_text(code: str, file: str, line: int, user: User) -> CodeText`
+
+근거: [[SYNC-UC-001#UC-H20]] 기본 흐름 5, 확장 5c · [[SYNC-API-001#GET/api/projects/{code}/code/source]] · UI-17 4.6 · 사용자 결정 2026-10-01(그래프 옆에 코드 — 항목 없는 함수도 그 자리에서 읽는다, 카드 BF)
+
+**처리**
+0. `project = ProjectService.get_owned(code, user)`
+1. `row = CodeGraphService.get(project.id)` · if None → `! not-found {resource: code_graph}`
+2. `f = row.graph.functions 중 file == file and line == line` · 없으면 → `! not-found {resource: function}` — 자리는 그래프 커밋 기준이라 화면이 준 값이 그대로 맞는다
+3. `start = f.line` · `end = f.end` — 없으면 같은 파일 다음 함수 앞 줄, 그것도 없으면 `start + 59`([[#queries.code_source]] 3과 같은 규칙, 같은 도우미)
+4. `→ `[[SYNC-MS-011#CodeGraphService.read]]`(project.id, workdir, f.file, start, end)` — 비밀 꼴·그 커밋에 없는 파일은 `read`가 `not-found {resource: file}`
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-011#CodeGraphService.read]]
+
+**테스트 관점** 그래프의 함수를 파일·줄로 → 본문이 그래프 커밋의 것, 파이썬 함수는 끝 줄까지 · `end` 없는 함수는 다음 함수 앞 줄까지 · 없는 자리·그래프 없음·남의 것 → `not-found`
 
 ---
 
