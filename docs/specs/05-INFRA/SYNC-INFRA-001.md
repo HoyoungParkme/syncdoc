@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -115,7 +115,7 @@ graph TB
 | 층 | 선택 | 이유 |
 |---|---|---|
 | 백엔드 | Python 3.12 / FastAPI | 요청자 주력 언어. MCP 파이썬 SDK 사용 가능 |
-| 프론트엔드 | React + Vite + TS (SPA, `frontend/`). 유저용 탭 렌더링은 **`tools/view_build.py`를 TS로 옮긴 것**(`md.ts`·`views.ts`·타입별 모듈) — `react-markdown`은 쓰지 않는다(뷰 규약과 바이트 단위로 같아야 해서). `mermaid`(다이어그램) · `react-flow`(UI-8 그래프. **dagre는 안 쓴다** — UI-8 규칙이 열을 11단계로 고정해 배치가 결정적이다) · diff는 직접 | 빌드 결과는 `syncdoc/web/static/`으로, FastAPI가 `/{path:path}` 폴백으로 서빙. 별도 호스팅 없음 |
+| 프론트엔드 | React + Vite + TS (SPA, `frontend/`). 유저용 탭 렌더링은 **`tools/view_build.py`를 TS로 옮긴 것**(`md.ts`·`views.ts`·타입별 모듈) — `react-markdown`은 쓰지 않는다(뷰 규약과 바이트 단위로 같아야 해서). `mermaid`(다이어그램) · UI-8 참조 그래프는 **라이브러리 없이 직접 SVG**(열이 11단계로 고정이라 배치가 결정적) · `d3-force`(UI-17 코드 그래프의 힘 배치만. 그리기는 `<canvas>`, 끌기·줌·이동은 직접. npm으로 번들에 담아 CDN 없음 — [[#C10]]) · diff는 직접 | 빌드 결과는 `syncdoc/web/static/`으로, FastAPI가 `/{path:path}` 폴백으로 서빙. 별도 호스팅 없음 |
 | 메타데이터 DB | PostgreSQL | 아래 참고 |
 | Git 조작 | GitPython 또는 `git` CLI 호출 | 작업 사본에서 clone·commit·push. 서버 저장소는 `git init --bare`로 만든다 — git이 이미지에 들어 있어 폐쇄망에도 따로 설치할 것이 없다 |
 | 다이어그램 | mermaid.js (브라우저 렌더링). 서버 생성물 없음 | PRD R10 |
@@ -124,7 +124,7 @@ graph TB
 | 인증 | GitHub OAuth (웹) / 개인 토큰 (MCP) | 5장 |
 | 모델 호출 | 외부 모델 API. `infra/llm.py` 어댑터 하나 | 읽는 중 질의([[SYNC-PRD-001#R11]])에만. 5.3 |
 | 첨부 | `python-multipart`(업로드 파싱) · `pypdf`(PDF 글자 추출). 바이트는 PostgreSQL `bytea` | 질문에 붙이는 파일(5.3). 새 저장 서비스를 두지 않는다 — 10MB×수십 개 규모라 DB로 충분하고, 커지면 바이트 자리만 객체 저장소로 옮긴다 |
-| 코드 그래프 | graphify(`graphifyy` — tree-sitter 문법 26종, 모델 없음) + 싱크독의 파이썬 AST 보강 | 명세↔코드 대조([[SYNC-PRD-001#R13]]). 결과는 DB `code_graphs`에 줄인 모양으로(6장). 이미지가 170MB쯤 커진다 |
+| 코드 그래프 | graphify(`graphifyy` — tree-sitter 문법 26종, 모델 없음) + 싱크독의 파이썬 AST 보강 + graphify `cluster`(Louvain, seed 42, 모델 없음)를 서버 프로세스 안에서 — 함수의 커뮤니티(UI-17). 싱크독 저장소 1초쯤, graspologic이 없어 networkx 경로 | 명세↔코드 대조([[SYNC-PRD-001#R13]]). 결과는 DB `code_graphs`에 줄인 모양으로(6장). 이미지가 170MB쯤 커진다 |
 | git 입구 | `git http-backend`(이미지 안 git을 CGI로) | 서버 저장소의 clone·push([[SYNC-PRD-001#R14]]). 따로 Git 서버를 두지 않고 앱 경로 하나로 받는다 |
 | 실행 | Docker Compose (app + db) | 명령 하나로 켜고 끈다 |
 
