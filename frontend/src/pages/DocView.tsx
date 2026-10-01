@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
 import { ago, api, ApiError, docPath, incompleteOf, warnText, type AskAnswer, type AskDelta, type AskNote, type AskRead, type AttachmentMeta, type CodeText, type CodeView, type Conversation, type ConversationBrief, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
+import { CodeLines } from './codeSrc'
 import { extraCss, renderView } from '../view'
 import { attachDiagramButtons, DiagramFull, type FullDiagram, type WfFullDetail } from '../components/DiagramFull'
 import { esc, renderBlocks, splitRef } from '../view/md'
@@ -763,15 +764,7 @@ function CodePanel({
           ) : !src ? (
             <div className="lbl">불러오는 중…</div>
           ) : (
-            <pre>
-              {src.text.split('\n').map((ln, i) => (
-                <div key={i}>
-                  <span className="ln">{src.start + i}</span>
-                  {ln}
-                </div>
-              ))}
-              {src.truncated && <div className="lbl">… 300줄에서 잘랐습니다</div>}
-            </pre>
+            <CodeLines src={src} />
           )}
         </details>
       </div>
