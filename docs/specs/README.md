@@ -27,7 +27,7 @@
 | — | `STD` | 작성 규약·뷰 규약·개발 규약 (단계 밖 — 싱크독 저장소에 있다) |
 
 - 경로 `docs/specs/{NN-TYPE}/{doc_id}.md` · 문서 ID `{프로젝트코드}-{TYPE}-{NNN}`
-- 상태(`status`)는 frontmatter가 진실. 변경은 싱크독 웹에서만
+- 상태(`status`)는 frontmatter가 진실. 변경은 싱크독 웹 토글이나 MCP `change_status`로만 — 본문 수정으로 바꾸지 않는다
 - 첨부는 `assets/` — 문서에서는 문서 폴더 기준 상대 경로(`../assets/x.png`)
 - 화면(UI) 배치는 디자인 도구 산출물(스타일까지 든 자기 완결 html)을 그대로 넣는다(규약 2.7)
 - 커밋·PR에 에이전트 표시(Co-Authored-By 등)를 남기지 않는다. 작성자는 사람의 계정이다

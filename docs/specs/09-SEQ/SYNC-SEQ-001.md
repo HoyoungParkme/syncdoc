@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -90,6 +90,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | MCP update_document | [[#SEQ-1]] | ○ |
 | MCP delete_document | [[#SEQ-22]] | ○ |
 | MCP restore_document | [[#SEQ-23]] | ○ |
+| MCP change_status | [[#SEQ-5]] | ○ |
 | MCP 모든 도구의 인증 | [[#SEQ-C2]] | |
 | (커밋 처리·재구축 뒤) 코드 그래프 | [[#SEQ-26]] | ○ |
 | GET /api/docs/{docId}/code · …/items/{itemId}/code · …/items/{itemId}/code/source | [[#SEQ-27]] | ○ |
@@ -344,20 +345,27 @@ sequenceDiagram
 
 ## SEQ-5 문서 상태를 바꾼다
 
-[[SYNC-UC-001#UC-H8]] 기본 흐름 1~3, 확장 1a. UI-5 요소 3. 초안 ⇄ 완료 토글.
+[[SYNC-UC-001#UC-H8]] 기본 흐름 1~3, 확장 1a. UI-5 요소 3 · MCP `change_status`(카드 BE). 초안 ⇄ 완료 토글. 입구가 둘이고 그 뒤는 하나다.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor U as 사람
+    actor A as 에이전트
     participant RD as routers/documents
+    participant MT as mcp/tools
     participant S as SpecService
     participant P as pipeline
     participant G as infra/git
     participant DB
 
-    U->>RD: POST /api/docs/{id}/status {to, reason?}
-    RD->>P: change_status(doc_id, to, user, reason)
+    alt 웹 토글
+        U->>RD: POST /api/docs/{id}/status {to, reason?}
+        RD->>P: change_status(doc_id, to, Author(human, user, None, web_status), reason)
+    else MCP change_status — 사람이 시켰거나 에이전트가 다 썼다고 판단 (카드 BE)
+        A->>MT: change_status(doc_id, to, reason?)
+        MT->>P: change_status(doc_id, to, _agent_author(kind=agent, 지시자=발급자, via=mcp), reason)
+    end
     P->>G: read_pending — fetch · 밀렸으면 process_commit (UC-H8 1d, #137)
     P->>S: get_document(doc_id)
     alt to=approved and (has_convention_error or incomplete_warnings or 미존재 참조) (1a)
@@ -365,16 +373,18 @@ sequenceDiagram
     end
     P->>G: read(경로, origin/main) — 원본이 진실 (DOM-001)
     P->>P: 그 본문의 frontmatter.status 줄만 교체 → new_body
-    P->>P: save_pipeline(entry=web_status, doc_id, new_body, expected_version=current, author=human, reason) — 같은 세션
+    P->>P: save_pipeline(entry=web_status, doc_id, new_body, expected_version=current, author, reason) — 같은 세션
     Note over P: 상태 줄 하나만 바뀐다 — 본문은 저장소에서 읽은 그대로<br/>· validate (frontmatter만)<br/>· 버전 검사<br/>· push (message: "status(doc_id): from → to")<br/>· Version 생성 안 함 · extract 안 함
     P->>G: commit_push(…, "status(SYNC-PRD-001): draft → approved")
     G-->>P: commit_hash
     rect rgb(240,244,240)
         P->>DB: Document.status=to · current_body=new_body
-        P->>DB: StatusChange(from, to, user, reason, commit_hash)
+        P->>DB: StatusChange(from, to, author.user, via=author.via 접음, reason, commit_hash)
     end
     P-->>RD: DocumentSummary
     RD-->>U: 상태 뱃지 갱신
+    P-->>MT: DocumentSummary
+    MT-->>A: 문서 요약 (status·version_no·last_author)
 ```
 
 **읽을 때 볼 것**
@@ -382,6 +392,7 @@ sequenceDiagram
 - 완료로 올리는 조건은 셋뿐이다 — 규약 오류·미완성·미존재 참조가 없을 것. 셋 다 한 문서만 보고 판정된다. 상위 대조·댓글 확인은 v2에서 사라졌다
 - **쓰기 전에 읽는다 (#137).** 저장소에 아직 안 읽은 커밋이 있으면 먼저 읽어 반영하고(1단계), 커밋할 본문도 `origin/main`에서 읽는다. 예전에는 DB의 `current_body`로 본문을 만들어 커밋해서, 밀린 커밋의 내용이 통째로 되돌아갔다 — `git.commit_push`가 `reset --hard` 뒤에 덮어쓰므로 push가 거부되지도 않아 조용히 사라졌다. 저장소에 쓰는 다른 일(SEQ-7·SEQ-22·SEQ-23·SEQ-1)도 같은 읽기가 앞선다
 - 상태 변경은 **Version을 만들지 않는다.** `StatusChange`가 커밋 해시를 갖는다. UI-7 이력에서 `status` 행은 `StatusChange`에서, `spec` 행은 `Version`에서 와서 시각순으로 합친다
+- **입구가 둘, 조건은 하나(카드 BE).** 에이전트의 `change_status`도 같은 `pipeline.change_status`를 부른다 — 1a의 막는 조건·밀린 커밋 읽기·상태 커밋이 전부 같다. 다른 것은 `author`뿐이고, 그것이 `StatusChange.via`(`web`/`mcp`)로 남아 이력이 「에이전트 · 지시 {사람}」을 그린다. `entry=web_status`는 입구 이름이 아니라 「상태 줄만 바꾸는 모양」이다
 
 ---
 

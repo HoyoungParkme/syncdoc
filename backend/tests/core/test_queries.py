@@ -27,7 +27,7 @@ from app.core.types import (
     ToolCall,
 )
 from tests.core.reference.test_service import PRD, RFQ, UPSTREAM
-from tests.core.spec.test_service import author, make_project, owner
+from tests.core.spec.test_service import author, make_project, owner, web
 
 
 def _mk(svc, pid, did, typ, status="draft", title="x", a=None):
@@ -95,7 +95,9 @@ async def test_project_detail_docs_and_recent_changes_with_names(scoped: Session
     svc.create(p.id, "EXMP-RFQ-001", DocType.RFQ, RFQ, "h0", a, "spec(EXMP-RFQ-001): 초안")
     svc.create(p.id, "EXMP-PRD-001", DocType.PRD, PRD, "h1", a, "spec(EXMP-PRD-001): 초안")
     d = svc.get_document("EXMP-PRD-001")
-    svc.apply_status(d, d.body.replace("status: draft", "status: approved"), "c1", a.user, None)
+    svc.apply_status(
+        d, d.body.replace("status: draft", "status: approved"), "c1", web(a.user), None
+    )
     pd = await queries.project_detail("EXMP", owner(scoped))
     assert (pd.code, pd.remote_url, [x.doc_id for x in pd.docs]) == (
         "EXMP",
@@ -346,7 +348,9 @@ async def test_graph_view_full_stage_scope_and_isolated(scoped: Session) -> None
     assert g_ok.nodes == [] and g_ok.edges == []
     # 범위 밖을 가리키는 간선은 그리지 않는다 — 미존재 참조와 다르다 (MS-008 5단계).
     # PRD만 완료로 올리면 G1→Q1(RFQ, 범위 밖)은 안 그리고 R1→Q9(미존재)만 남는다
-    svc.apply_status(d, d.body.replace("status: draft", "status: approved"), "c1", a_prd.user, None)
+    svc.apply_status(
+        d, d.body.replace("status: draft", "status: approved"), "c1", web(a_prd.user), None
+    )
     g_ok = await queries.graph_view("EXMP", owner(scoped), GraphScope.approved)
     ok_ids = {n.id for n in g_ok.nodes}
     assert ok_ids == {"EXMP-PRD-001", "EXMP-PRD-001#G1", "EXMP-PRD-001#R1"}

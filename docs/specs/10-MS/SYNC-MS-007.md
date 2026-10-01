@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-007
 type: MS
 title: MINISPEC — pipeline — 쓰기 조율
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -105,7 +105,7 @@ async def save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | No
 7. if `entry != github` → `commit_hash = git.commit_push(repo.workdir, message, author, path=STD-001 1.1 경로, content=body)` — **본문은 부른 쪽이 정한다.** 상태 토글은 저장소에서 읽은 것(change_status 4), 되돌리기는 옛 버전, MCP는 에이전트가 준 것이다. 0단계가 밀린 것을 먼저 읽었으므로 여기서 덮을 남의 커밋이 없다 · if 실패 → `! push-failed {reason}`, 락 해제. **여기까지 DB 쓰기 없음**
 8. **트랜잭션 시작**
    - if 생성 → `version = spec.create(project_id, doc_id, doc_type, body, commit_hash, author, message, validate_result=4단계 결과)`
-   - if `entry == web_status` → `spec.apply_status(document, body, commit_hash, author.user, reason)` (Document.status·current_body 갱신 + StatusChange). **Version 없음.** 9~10a 건너뛰고 14로
+   - if `entry == web_status` → `spec.apply_status(document, body, commit_hash, author, reason)` (Document.status·current_body 갱신 + StatusChange). **Version 없음.** 9~10a 건너뛰고 14로
    - else → `version = spec.save(document, body, commit_hash, author, message, deleted, validate_result=4단계 결과, status_commit_hash=6a가 민 해시)` — **모든 경로.** 경고(`incomplete_warnings`)는 mcp 저장에도 남아야 완료 전환을 막는다. 위반은 github 경로에서만 저장까지 온다
 9. `broken = reference.mark_missing(deleted)` — 사라진 항목을 가리키던 참조가 **그 자리에서** 미존재가 된다([[SYNC-MS-003#ReferenceService.mark_missing]]). 플래그를 세우지 않는다 — 참조 행이 스스로 끊어졌다고 말하고, UI-5 4a 배너·UI-4 3.2가 그것을 보여준다
 10. `reference.extract(document_id, version.id, body, item_pks=spec.item_pks(document_id), upstream_doc_ids=frontmatter upstream)`
@@ -189,14 +189,14 @@ async def read_pending(code: str, user: User) -> int
 
 #### pipeline.change_status 초안 ⇄ 완료 토글
 
-**시그니처** `async def change_status(doc_id: str, to: DocStatus, user: User, reason: str | None = None) -> DocumentSummary`
+**시그니처** `async def change_status(doc_id: str, to: DocStatus, author: Author, reason: str | None = None) -> DocumentSummary`
 
-근거: [[SYNC-SEQ-001#SEQ-5]] · [[SYNC-UC-001#UC-H8]] · [[SYNC-API-001#POST/api/docs/{docId}/status]] · **조율이라 pipeline에 있다** — 검사·frontmatter·push·상태 기록을 잇는다. SpecService는 DB만
+근거: [[SYNC-SEQ-001#SEQ-5]] · [[SYNC-UC-001#UC-H8]] · [[SYNC-API-001#POST/api/docs/{docId}/status]] · [[SYNC-API-002#change_status]](카드 BE) · **조율이라 pipeline에 있다** — 검사·frontmatter·push·상태 기록을 잇는다. SpecService는 DB만
 
-**입력** `doc_id`, 목표 상태 `to`(`draft` | `approved`), 누른 사람, 사유(선택 — 웹 토글은 안 보낸다)
+**입력** `doc_id`, 목표 상태 `to`(`draft` | `approved`), `author` — 웹 토글은 `Author(human, user, None, web_status)`, MCP `change_status`는 `_agent_author`(kind=agent, 지시자=발급자, via=mcp), 사유(선택 — 웹 토글은 안 보낸다. 에이전트는 왜 올리는지 한 줄)
 
 **처리**
-0. `read_pending(code, user)` — **밀린 커밋을 먼저 읽는다**([[#pipeline.read_pending]], UC-H8 1d). 소유 검사도 여기서 끝난다. 문서를 읽기 전에, 락 밖에서
+0. `read_pending(code, author.user)` — **밀린 커밋을 먼저 읽는다**([[#pipeline.read_pending]], UC-H8 1d). 소유 검사도 여기서 끝난다. 문서를 읽기 전에, 락 밖에서
 1. `document = get_document(doc_id)` · `trashed_at`이면 `! document-trashed`
 2. `missing = 중복 접은 [e.raw_target for e in ReferenceService.upstream_of_document(document.id, include_missing=True) if e.is_missing]`
 2a. if `to == approved and (document.has_convention_error or document.incomplete_warnings or missing)` → `! status-blocked {convention_error_detail, warnings: incomplete_warnings + [f"ref.missing: {t}" for t in missing]}` (UC-H8 1a). `draft`로 내리는 것은 막지 않는다. **혼자 써도 이 검사는 남는다** — 완료는 「규약에 맞고 참조가 다 이어진 문서」라는 뜻이고, 그 뜻이 없으면 UI-5 4a 배너가 「알아두세요」로 약해진다
@@ -207,7 +207,7 @@ async def read_pending(code: str, user: User) -> int
 4. `body = git.read(repo.workdir, STD-001 1.1 경로, "origin/main")` → `new_body` = 그 본문의 frontmatter `status:` 줄만 교체. **원본이 진실이다**([[SYNC-DOM-001#StatusChange]]) — `current_body`는 조회 캐시라 쓰기 출처로 쓰지 않는다. 0단계가 방금 `fetch`했으므로 `origin/main`이 최신이다
 4a. 저장소에서 못 읽으면(`GitError` — 파일이 아직 없다) `current_body`로 떨어지고 경고 로그 한 줄. 이때 커밋은 파일을 만드는 복구가 된다
 4b. **왜 저장소에서 읽나 (#137).** `current_body`로 만든 본문을 커밋하면, 아직 읽지 않은 커밋이 있을 때 그 내용이 통째로 되돌아간다. `git.commit_push`가 `reset --hard origin/main` 뒤에 본문을 덮어쓰므로 push가 거부되지도 않아 조용히 사라진다. 실제로 카드 AA 완료란이 그렇게 날아갔다
-5. `save_pipeline(entry=web_status, doc_id, None, new_body, expected_version=current_version_no, project_code=None, author=Author(human, user, None, web), message=f"status({doc_id}): {from} → {to}\n\n{reason or ''}", reason=reason)` — **같은 세션**. `save_pipeline`이 세션을 인자로 받거나(있으면 재사용) 없으면 연다. push 후 `spec.apply_status(…, reason)`
+5. `save_pipeline(entry=web_status, doc_id, None, new_body, expected_version=current_version_no, project_code=None, author=author, message=f"status({doc_id}): {from} → {to}\n\n{reason or ''}", reason=reason)` — **같은 세션**. `entry=web_status`는 입구가 아니라 「상태 줄만 바꾸는 모양」이다 — 에이전트가 불러도 이 분기. 누가 바꿨나는 `author`가 `StatusChange.via`로 남긴다(카드 BE). `save_pipeline`이 세션을 인자로 받거나(있으면 재사용) 없으면 연다. push 후 `spec.apply_status(…, reason)`
 6. `→ DocumentSummary`
 
 **출력** 바뀐 문서 요약
@@ -216,7 +216,7 @@ async def read_pending(code: str, user: User) -> int
 
 **호출하는 것** [[SYNC-MS-007#pipeline.read_pending]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-007#pipeline.save_pipeline]] [[SYNC-MS-003#ReferenceService.upstream_of_document]] · `git.read` · [[SYNC-MS-001#ProjectService.get_owned]]
 
-**테스트 관점** **저장소를 앞세워 놓고 토글 → 그 커밋의 내용이 살아 있고 상태 커밋의 diff가 한 줄 추가·한 줄 삭제(#137)** · 규약 오류 문서를 `approved`로 → blocked · **미존재 참조가 있는 문서를 `approved`로 → blocked이고 `warnings`에 `ref.missing:`이 있다** · 같은 문서를 `draft`로 → 됨 · **상대 문서가 들어와 `resolve_missing`이 풀면 그 문서를 다시 저장하지 않아도 완료된다**(읽을 때 계산한다는 증거) · 정상 완료 → frontmatter `status: approved` 커밋 존재, Version 없음, StatusChange에 commit_hash · 같은 상태로 다시 → 커밋 없음 · `reason` 없이 불러도 된다 · 휴지통 문서 → `document-trashed` · **남의 프로젝트 문서 → `not-found`(project), 상태 그대로**
+**테스트 관점** **저장소를 앞세워 놓고 토글 → 그 커밋의 내용이 살아 있고 상태 커밋의 diff가 한 줄 추가·한 줄 삭제(#137)** · 규약 오류 문서를 `approved`로 → blocked · **미존재 참조가 있는 문서를 `approved`로 → blocked이고 `warnings`에 `ref.missing:`이 있다** · 같은 문서를 `draft`로 → 됨 · **상대 문서가 들어와 `resolve_missing`이 풀면 그 문서를 다시 저장하지 않아도 완료된다**(읽을 때 계산한다는 증거) · 정상 완료 → frontmatter `status: approved` 커밋 존재, Version 없음, StatusChange에 commit_hash · 같은 상태로 다시 → 커밋 없음 · `reason` 없이 불러도 된다 · 휴지통 문서 → `document-trashed` · **남의 프로젝트 문서 → `not-found`(project), 상태 그대로** · **에이전트 author(via=mcp)로 토글 → StatusChange.via=mcp, 이력 행이 `agent`·지시자=발급자 · 막는 조건은 사람과 같다(카드 BE)**
 
 ---
 

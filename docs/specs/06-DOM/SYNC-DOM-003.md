@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-003
 type: DOM
 title: ERD·DD — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-001]
 ---
 
@@ -290,6 +290,7 @@ erDiagram
 |---|---|---|---|---|
 | from_status | varchar(10) | DocStatus, null 허용 | 이전 상태. 문서 생성 시 첫 행은 null | `draft` |
 | to_status | varchar(10) | DocStatus not null | 바뀐 상태 | `approved` |
+| via | varchar(8) | not null, 기본 `web` | 어느 길로 바뀌었나 — `web`(토글) / `mcp`(에이전트 `change_status`, 카드 BE) / `github`(저장소로 들어온 `status(...)` 커밋 · 재구축). `versions.via`와 같은 값. `mcp`면 이력이 「에이전트 · 지시 {changed_by}」로 보인다. 자동 강등·휴지통·파일 삭제 행은 그 커밋이 들어온 길 | `mcp` |
 | reason | text | null 허용 | 강등 사유 등. 완료 문서 수정으로 자동 강등되면 시스템이 채운다. 휴지통은 `휴지통`으로 적어 되살리기가 그 행의 커밋을 찾는다 | `본문 수정으로 자동 강등` |
 | commit_hash | varchar(40) | null 허용 | 상태 변경으로 생긴 `status(...)` 커밋. 자동 강등(본문 커밋에 딸림)이면 null. 이력 화면이 `versions`와 합쳐 보여준다 | |
 

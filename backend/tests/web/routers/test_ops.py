@@ -16,6 +16,7 @@ from app.infra.git import README_PATH
 from tests.conftest import git as g
 from tests.conftest import write_commit_push
 from tests.core.reference.test_service import RFQ
+from tests.core.spec.test_service import web
 from tests.core.test_pipeline import PRD_BODY, PRD_FILE, RFQ_FILE, create, update
 from tests.core.test_queries import _b3
 from tests.web.conftest import login
@@ -37,7 +38,7 @@ def test_graph_versions_downstream_via_api(client: TestClient, scoped: Session) 
     assert client.get("/api/projects/EXMP/graph", params={"scope": "nope"}).status_code == 422
     d2 = svc.get_document("EXMP-PRD-001")
     svc.apply_status(
-        d2, d2.body.replace("status: draft", "status: approved"), "c1", a_prd.user, None
+        d2, d2.body.replace("status: draft", "status: approved"), "c1", web(a_prd.user), None
     )
     vs = client.get("/api/docs/EXMP-PRD-001/versions").json()
     assert [

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.spec.service import SpecService
 from app.core.types import DocType
 from tests.conftest import git as g
-from tests.core.spec.test_service import PRD, author, make_project
+from tests.core.spec.test_service import PRD, author, make_project, web
 from tests.web.conftest import login
 
 
@@ -38,7 +38,7 @@ def test_list_and_docs(client: TestClient, scoped: Session) -> None:
     # 상세 (UI-4): 요약 + 문서 목록 + 최근 변경
     d = SpecService(scoped).get_document("EXMP-PRD-001")
     SpecService(scoped).apply_status(
-        d, d.body.replace("status: draft", "status: approved"), "c1", a.user, None
+        d, d.body.replace("status: draft", "status: approved"), "c1", web(a.user), None
     )
     det = client.get("/api/projects/EXMP").json()
     assert det["code"] == "EXMP" and [x["doc_id"] for x in det["docs"]] == ["EXMP-PRD-001"]

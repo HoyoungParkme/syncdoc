@@ -50,7 +50,11 @@ async def test_tools_listed_with_descriptions() -> None:
         "restore_document",
         "get_code_graph",  # 카드 AZ
         "upload_code",  # 카드 BB
+        "change_status",  # 카드 BE
     }
+    assert (
+        "status-blocked" in names["change_status"] and "update_document" in names["change_status"]
+    )
     assert "docs/specs/" in names["upload_code"] and "upload-too-large" in names["upload_code"]
     assert "호출하는 것" in names["get_code_graph"] and "graphify" in names["get_code_graph"]
     assert "document-deletion-needs-confirm" in names["delete_document"]

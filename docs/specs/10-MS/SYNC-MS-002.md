@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-002
 type: MS
 title: MINISPEC — SpecService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -229,7 +229,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 3. `blocks = item_blocks(body, doc_type)`. 블록마다 `DB: items where document_id and item_id` · if 있음 → `display_name` 갱신, **`is_deleted=false, deleted_at=null`로 되돌림**(본문에 다시 나타났으므로 복구) · else → insert
 4. `deleted_item_pks`마다 `DB: items set is_deleted=true, deleted_at=now`
 5. if `author.via == github` → `new_status = fm.status` (원본이 진실) · else → `new_status = document.status`. **단 `fm.status`가 `draft`·`approved` 밖이면 `new_status = document.status`** — 값이 틀린 frontmatter는 `validate`가 이미 `frontmatter.status` 위반으로 남겼다(규약 오류 배너). DB에는 둘 밖의 값이 들어오지 않는다. 옛 값 `review`가 남은 저장소가 그 경우다(#99)
-6. if `document.status == approved and body != document.current_body and new_status == approved` → `new_status = draft`, `DB: status_changes insert (from=approved, to=draft, changed_by=author.user, reason="본문 수정으로 자동 강등", commit_hash=status_commit_hash)` (UC-A6 6a). **완료 문서를 고치면 초안으로 돌아간다** — 혼자 써도 「고쳤으니 다시 봐야 한다」는 신호는 필요하다
+6. if `document.status == approved and body != document.current_body and new_status == approved` → `new_status = draft`, `DB: status_changes insert (from=approved, to=draft, changed_by=author.user, via=author.via 접음, reason="본문 수정으로 자동 강등", commit_hash=status_commit_hash)` (UC-A6 6a). **완료 문서를 고치면 초안으로 돌아간다** — 혼자 써도 「고쳤으니 다시 봐야 한다」는 신호는 필요하다
    - **`new_status == approved`를 함께 보는 것은 github 경로 때문이다.** 5단계에서 작성자가 frontmatter로 스스로 `draft`를 적었으면 그게 원본의 진실이다. 이미 초안이라 강등할 것이 없고, 덮으면 StatusChange가 거짓으로 하나 는다
    - **이 강등은 저장소에도 반영돼야 한다**([[SYNC-STD-001]] 1.2 「`status`가 진실」). mcp·web_revert 경로는 [[SYNC-MS-007#pipeline.save_pipeline]] 6a가 **push 전에** 본문을 고쳐 한 커밋으로 끝낸다. **github 경로는 커밋이 이미 저장소에 있어 그럴 수 없다** — 같은 6a가 `status(…)` 커밋을 하나 더 밀고, 그 해시가 `status_commit_hash`로 여기 온다 (#58)
 7. `DB: documents update (current_body, current_version_no=new_no, status=new_status)` · if `validate_result` → `has_convention_error = bool(violations)`, `convention_error_detail = violations를 "rule: message" 줄로 (없으면 null)`, `incomplete_warnings = warnings JSON (없으면 null)` · else → 오류·경고 컬럼 그대로 · **`trashed_at·trashed_by_user_id = null`** — 어느 입구든 저장되면 휴지통에서 나온다(UC-A8 4, GitHub로 파일을 되살려도 같다)
@@ -247,16 +247,16 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### SpecService.apply_status 상태 변경 적용
 
-**시그니처** `apply_status(document: Document, new_body: str, commit_hash: str | None, user: User, reason: str | None, to: DocStatus | None = None) -> None`
+**시그니처** `apply_status(document: Document, new_body: str, commit_hash: str | None, author: Author, reason: str | None, to: DocStatus | None = None) -> None`
 
 근거: [[SYNC-SEQ-001#SEQ-5]] · `pipeline.save_pipeline` 8단계 `web_status` 분기(`reason`은 `pipeline.change_status`가 인자로 넘긴다 — 커밋 메시지를 다시 파싱하지 않는다) · `pipeline.rebuild`의 status 커밋 복원
 
 **처리** — 호출자의 트랜잭션 안. Version을 만들지 않는다
 1. `to = to or new_body의 frontmatter status`
-2. `DB: status_changes insert (document_id, from=document.status, to, changed_by=user, reason, commit_hash, changed_at=now)`
+2. `DB: status_changes insert (document_id, from=document.status, to, changed_by=author.user, via=author.via를 mcp|web|github로 접음, reason, commit_hash, changed_at=now)` — `via`가 누가 바꿨나다(카드 BE). 웹 토글 `web`, 에이전트 `mcp`, 재구축·저장소로 들어온 `status(...)` 커밋 `github`
 3. `DB: documents update (status=to, current_body=new_body)`
 
-**테스트 관점** Version 수 그대로 · StatusChange에 commit_hash 있음 · `current_body`의 frontmatter만 바뀜
+**테스트 관점** Version 수 그대로 · StatusChange에 commit_hash 있음 · `current_body`의 frontmatter만 바뀜 · 에이전트 author → `via=mcp`, 웹 → `web`
 
 ---
 
@@ -268,7 +268,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **처리** — 호출자의 트랜잭션 안
 1. `DB: items where document_id and is_deleted=false` → 전부 `is_deleted=true, deleted_at=now` · pk 목록 기억
-2. `DB: status_changes insert (from=document.status, to=draft, changed_by=author.user, reason="파일 삭제됨", commit_hash)`
+2. `DB: status_changes insert (from=document.status, to=draft, changed_by=author.user, via=author.via 접음, reason="파일 삭제됨", commit_hash)`
 3. `DB: documents update status=draft, has_convention_error=true, convention_error_detail="file.deleted: {commit_hash}"`
 4. `→` 삭제된 항목 pk 목록 (호출자가 `ReferenceService.mark_missing`)
 
@@ -294,12 +294,12 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **처리**
 1. `DB: versions where document_id` → `Version(version_no, commit_hash, message=versions.message, author=AuthorRef, created_at)` (DTO)
-2. `DB: status_changes where document_id and commit_hash is not null` → `Version(version_no=None, commit_hash, message="status(...): from → to", author=AuthorRef(kind=human, user_id=changed_by_user_id, instructed_by_id=None, via="web"), created_at=changed_at)`
+2. `DB: status_changes where document_id and commit_hash is not null` → `Version(version_no=None, commit_hash, message="status(...): from → to", author, created_at=changed_at)`. `author`는 행의 `via`로 접는다(카드 BE) — `mcp`면 `AuthorRef(kind=agent, user_id=changed_by_user_id, instructed_by_id=changed_by_user_id, via="mcp")`(발급자가 곧 지시자), 아니면 `AuthorRef(kind=human, user_id=changed_by_user_id, instructed_by_id=None, via)`. 이력 화면이 버전 행과 같은 규칙으로 「에이전트 · 지시 {사람}」·「git push」를 그린다
 3. 둘을 `created_at` 내림차순으로 합쳐 `→`
 
 **출력** `Version[]` (DTO, API 스키마 + `doc_id`). status 행은 `version_no: null`. `author`는 `AuthorRef` — 이름은 호출한 입구(라우터 또는 `queries`)가 `users_by_ids`로 채워 API `author`로 내보낸다
 
-**테스트 관점** 버전 3 + 상태변경 2 → 5행 시각순 · 자동 강등 StatusChange(commit_hash null)는 안 나옴 — 본문 커밋 행에 딸린 것
+**테스트 관점** 버전 3 + 상태변경 2 → 5행 시각순 · 자동 강등 StatusChange(commit_hash null)는 안 나옴 — 본문 커밋 행에 딸린 것 · `via=mcp` 행은 `agent`·지시자=바꾼 사람
 
 ---
 
@@ -528,7 +528,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **처리** — 호출자의 트랜잭션 안. `mark_deleted`와 같되 규약 오류가 아니라 휴지통이다
 1. `DB: items where document_id and is_deleted=false` → 전부 `is_deleted=true, deleted_at=now` · pk 목록
-2. `DB: status_changes insert (from=document.status, to=draft, changed_by=author.user, reason="휴지통", commit_hash)` — 이 커밋 해시가 되살릴 때 「직전 내용」을 찾는 열쇠다
+2. `DB: status_changes insert (from=document.status, to=draft, changed_by=author.user, via=author.via 접음, reason="휴지통", commit_hash)` — 이 커밋 해시가 되살릴 때 「직전 내용」을 찾는 열쇠다
 3. `DB: documents update status=draft, trashed_at=now, trashed_by_user_id=author.user.id` · `has_convention_error`는 건드리지 않는다
 4. `→` pk 목록 (호출자가 `ReferenceService.mark_missing`)
 

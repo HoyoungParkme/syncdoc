@@ -12,7 +12,6 @@ import re
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.core.account.models import User
 from app.core.clock import now_utc
 from app.core.errors import (
     ConventionViolation,
@@ -402,6 +401,12 @@ class SpecService:
             via=v.via,
         )
 
+    def _status_author(self, c: StatusChange) -> AuthorRef:
+        """상태 변경 행 → AuthorRef. via=mcp면 에이전트가 바꾼 것 — 발급자가 곧 지시자 (카드 BE)."""
+        if c.via == "mcp":
+            return AuthorRef("agent", c.changed_by_user_id, c.changed_by_user_id, "mcp")
+        return AuthorRef("human", c.changed_by_user_id, None, c.via)
+
     def get_item(self, doc_id: str, item_id: str) -> ItemView:
         """SYNC-MS-002#SpecService.get_item"""
         document = self.get_document(doc_id)
@@ -489,6 +494,7 @@ class SpecService:
                     from_status=DocStatus.approved,
                     to_status=DocStatus.draft,
                     changed_by_user_id=author.user.id,
+                    via=fold_via(author.via),
                     reason="본문 수정으로 자동 강등",
                     # mcp·되돌리기는 본문 커밋 하나에 담기므로 None. github는 강등을
                     # 저장소에 반영한 status 커밋이 따로 있다 (MS-007 save_pipeline 6a)
@@ -626,7 +632,7 @@ class SpecService:
         document: Document,
         new_body: str,
         commit_hash: str | None,
-        user: User,
+        author: Author,
         reason: str | None,
         to: DocStatus | None = None,
     ) -> None:
@@ -639,7 +645,8 @@ class SpecService:
                 document_id=row.id,
                 from_status=row.status,
                 to_status=str(to),
-                changed_by_user_id=user.id,
+                changed_by_user_id=author.user.id,
+                via=fold_via(author.via),
                 reason=reason,
                 commit_hash=commit_hash,
                 changed_at=now_utc(),
@@ -670,7 +677,7 @@ class SpecService:
                 version_no=None,
                 commit_hash=c.commit_hash,  # type: ignore[arg-type]
                 message=f"status({doc_id}): {c.from_status} → {c.to_status}",
-                author=AuthorRef("human", c.changed_by_user_id, None, "web"),
+                author=self._status_author(c),
                 created_at=c.changed_at,
             )
             for c in self.repo.status_changes_with_commit(row.id)
@@ -699,6 +706,7 @@ class SpecService:
                 from_status=row.status,
                 to_status=DocStatus.draft,
                 changed_by_user_id=author.user.id,
+                via=fold_via(author.via),
                 reason="휴지통",
                 commit_hash=commit_hash,
                 changed_at=now_utc(),
@@ -743,6 +751,7 @@ class SpecService:
                 from_status=row.status,
                 to_status=DocStatus.draft,
                 changed_by_user_id=author.user.id,
+                via=fold_via(author.via),
                 reason="파일 삭제됨",
                 commit_hash=commit_hash,
                 changed_at=now_utc(),
@@ -836,7 +845,7 @@ class SpecService:
                 version_no=None,
                 commit_hash=c.commit_hash,  # type: ignore[arg-type]
                 message=f"status({doc_id}): {c.from_status} → {c.to_status}",
-                author=AuthorRef("human", c.changed_by_user_id, None, "web"),
+                author=self._status_author(c),
                 created_at=c.changed_at,
             )
             for c, doc_id in self.repo.recent_status_changes(project_id, n)

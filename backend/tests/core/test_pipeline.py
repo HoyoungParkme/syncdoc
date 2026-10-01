@@ -26,7 +26,7 @@ from tests.conftest import git as g
 from tests.conftest import write_commit_push
 from tests.core.account.test_service import make_user
 from tests.core.reference.test_service import RFQ
-from tests.core.spec.test_service import PRD
+from tests.core.spec.test_service import PRD, web
 
 PRD_BODY = PRD.replace("EXMP-RFQ-001#Q2", "EXMP-RFQ-001#Q1")
 
@@ -239,7 +239,7 @@ async def test_write_paths_do_not_revert_unread_commits(scoped: Session, proj) -
     # 밖에서 한 줄 더한 뒤(앱은 아직 안 읽었다) 상태 토글
     ahead = PRD_BODY.replace("한 줄로.", "한 줄로. 밖에서 더한 문장.")
     write_commit_push(other, PRD_FILE, ahead, "spec(EXMP-PRD-001): 밖에서 수정")
-    d = await pipeline.change_status("EXMP-PRD-001", "approved", user, None)
+    d = await pipeline.change_status("EXMP-PRD-001", "approved", web(user), None)
 
     pushed = g(remote, "show", f"main:{PRD_FILE}")
     assert "밖에서 더한 문장." in pushed  # 밀린 커밋의 내용이 살아 있다
@@ -284,7 +284,7 @@ async def test_app_commits_advance_the_processing_point(
     r2 = await create(proj)
     assert repo.last_processed_commit == r2.commit_hash
     # web_status도 같다 · 완료 상태에서 고치면 자동 강등 커밋이 하나 더 — 둘 다 넘어간다 (6a)
-    await pipeline.change_status("EXMP-PRD-001", "approved", proj["user"], None)
+    await pipeline.change_status("EXMP-PRD-001", "approved", web(proj["user"]), None)
     assert repo.last_processed_commit == g(remote, "rev-parse", "main")
     approved = PRD_BODY.replace("status: draft", "status: approved")  # mcp는 지금 상태를 보낸다
     r3 = await update(proj, "EXMP-PRD-001", approved.replace("한 줄로.", "두 줄로."), 1)
@@ -345,7 +345,7 @@ async def test_change_status_commits_frontmatter_no_version(scoped: Session, pro
     svc = SpecService(scoped)
     user = proj["user"]
     # 완료로 — 상위 대조 없이, 다이얼로그 없이
-    d = await pipeline.change_status("EXMP-PRD-001", "approved", user, "다 썼다")
+    d = await pipeline.change_status("EXMP-PRD-001", "approved", web(user), "다 썼다")
     assert d.status == "approved" and d.current_version_no == 1
     assert (
         g(proj["repos"]["remote"], "log", "-1", "--format=%s", "main")
@@ -366,17 +366,17 @@ async def test_change_status_commits_frontmatter_no_version(scoped: Session, pro
     assert "status: approved" in svc.get_document("EXMP-PRD-001").body
     # 같은 상태로 다시 → 커밋 없음 (멱등)
     head = g(proj["repos"]["remote"], "rev-parse", "main")
-    await pipeline.change_status("EXMP-PRD-001", "approved", user, None)
+    await pipeline.change_status("EXMP-PRD-001", "approved", web(user), None)
     assert g(proj["repos"]["remote"], "rev-parse", "main") == head
     # 초안으로 되돌리기 — 사유 없이. 막는 검사가 없다
-    d2 = await pipeline.change_status("EXMP-PRD-001", "draft", user)
+    d2 = await pipeline.change_status("EXMP-PRD-001", "draft", web(user))
     assert d2.status == "draft" and "status: draft" in svc.get_document("EXMP-PRD-001").body
     # 미완성 경고가 있는 문서는 approved 불가 — 생성 직후부터 경고가 남는다 (MS-002 create 1단계)
     scn = await create(proj, DocType.SCN, "# 시나리오\n\n## 배경\n\n아직 항목이 없다.\n")
     assert "item.none" in scn.warnings
     assert "item.none" in svc.get_document(scn.doc_id).incomplete_warnings
     with pytest.raises(StatusBlocked) as ei:
-        await pipeline.change_status(scn.doc_id, "approved", user, None)
+        await pipeline.change_status(scn.doc_id, "approved", web(user), None)
     assert "item.none" in ei.value.extra["warnings"]
     # mcp 수정 저장에도 남는다 (MS-007 8단계, 모든 경로)
     body = svc.get_document(scn.doc_id).body + "\n한 줄 더.\n"
@@ -384,8 +384,30 @@ async def test_change_status_commits_frontmatter_no_version(scoped: Session, pro
     assert "item.none" in r3.warnings
     assert "item.none" in svc.get_document(scn.doc_id).incomplete_warnings
     with pytest.raises(StatusBlocked):
-        await pipeline.change_status(scn.doc_id, "approved", user, None)
+        await pipeline.change_status(scn.doc_id, "approved", web(user), None)
     assert r.doc_id == "EXMP-PRD-001"
+
+
+async def test_agent_change_status_is_recorded_as_agent(scoped: Session, proj) -> None:
+    """카드 BE — MCP change_status는 같은 함수를 author만 다르게 부른다. StatusChange.via=mcp."""
+    await create(proj, DocType.RFQ, RFQ)
+    await create(proj)
+    d = await pipeline.change_status("EXMP-PRD-001", "approved", proj["author"], "다 썼다고 판단")
+    assert d.status == "approved" and d.current_version_no == 1
+    assert (
+        g(proj["repos"]["remote"], "log", "-1", "--format=%s", "main")
+        == "status(EXMP-PRD-001): draft → approved"
+    )
+    assert scoped.execute(
+        text("SELECT via, reason FROM status_changes WHERE commit_hash IS NOT NULL")
+    ).one() == ("mcp", "다 썼다고 판단")
+    top = SpecService(scoped).list_versions("EXMP-PRD-001")[0]
+    u = proj["user"].id
+    assert (top.version_no, top.author.kind, top.author.via) == (None, "agent", "mcp")
+    assert (top.author.user_id, top.author.instructed_by_id) == (u, u)
+    # 사람이 웹에서 내리면 그 행은 web
+    await pipeline.change_status("EXMP-PRD-001", "draft", web(proj["user"]))
+    assert SpecService(scoped).list_versions("EXMP-PRD-001")[0].author.via == "web"
 
 
 async def test_convention_error_document_cannot_be_completed(scoped: Session, proj) -> None:
@@ -401,7 +423,7 @@ async def test_convention_error_document_cannot_be_completed(scoped: Session, pr
         )
     )
     with pytest.raises(StatusBlocked) as ei:
-        await pipeline.change_status("EXMP-PRD-001", "approved", proj["user"], None)
+        await pipeline.change_status("EXMP-PRD-001", "approved", web(proj["user"]), None)
     assert ei.value.extra["convention_error_detail"] == "author.unknown: x"
     assert SpecService(scoped).get_document("EXMP-PRD-001").status == "draft"
 
@@ -1099,7 +1121,7 @@ async def test_process_commit_skips_commits_the_app_pushed_itself(scoped: Sessio
     scoped.flush()
     await create(proj, DocType.RFQ, RFQ)
     r = await create(proj)
-    await pipeline.change_status("EXMP-PRD-001", "approved", proj["user"], "완료")
+    await pipeline.change_status("EXMP-PRD-001", "approved", web(proj["user"]), "완료")
     head = g(remote, "rev-parse", "main")
     assert await pipeline.process_commit(repo, head) == []
     d = SpecService(scoped).get_document("EXMP-PRD-001")
@@ -1217,15 +1239,15 @@ async def test_missing_ref_blocks_approve_and_clears_when_target_arrives(
     assert svc.get_document("EXMP-PRD-001").incomplete_warnings == []  # 컬럼에는 안 들어간다
     assert "EXMP-RFQ-001#Q1" in (await queries.document_view("EXMP-PRD-001", user)).missing_refs
     with pytest.raises(StatusBlocked) as ei:
-        await pipeline.change_status("EXMP-PRD-001", "approved", user, None)
+        await pipeline.change_status("EXMP-PRD-001", "approved", web(user), None)
     assert "ref.missing: EXMP-RFQ-001#Q1" in ei.value.extra["warnings"]
     # 초안은 막히지 않는다 — 저장은 됐고 완료만 막힌다
-    await pipeline.change_status("EXMP-PRD-001", "draft", user, None)
+    await pipeline.change_status("EXMP-PRD-001", "draft", web(user), None)
     assert svc.get_document("EXMP-PRD-001").status == "draft"
     # 상대 문서가 들어오면 resolve_missing이 풀고, PRD를 다시 저장하지 않아도 완료된다
     await create(proj, DocType.RFQ, RFQ)
     assert (await queries.document_view("EXMP-PRD-001", user)).missing_refs == []
-    await pipeline.change_status("EXMP-PRD-001", "approved", user, None)
+    await pipeline.change_status("EXMP-PRD-001", "approved", web(user), None)
     assert svc.get_document("EXMP-PRD-001").status == "approved"
 
 
@@ -1288,7 +1310,7 @@ async def test_trash_restore_purge_document(scoped: Session, proj) -> None:
     with pytest.raises(DocumentTrashed):
         await update(proj, "EXMP-RFQ-001", RFQ, 1, changed_items=[])
     with pytest.raises(DocumentTrashed):
-        await pipeline.change_status("EXMP-RFQ-001", DocStatus.approved, proj["user"], None)
+        await pipeline.change_status("EXMP-RFQ-001", DocStatus.approved, web(proj["user"]), None)
     # 폴링은 휴지통 커밋의 D를 건너뛰고 나아간다
     repo = _repo_row(proj)
     repo.last_processed_commit = before
@@ -1380,7 +1402,7 @@ async def test_human_paths_hide_someone_elses_project_but_github_path_does_not(
         )
     assert ei.value.extra == {"resource": "project", "id": "EXMP"}
     for coro in (
-        pipeline.change_status("EXMP-PRD-001", "approved", stranger, None),
+        pipeline.change_status("EXMP-PRD-001", "approved", web(stranger), None),
         pipeline.revert("EXMP-PRD-001", 1, stranger),
         pipeline.trash_document("EXMP-PRD-001", s_author, confirm=True),
         pipeline.restore_document("EXMP-PRD-001", s_author),
