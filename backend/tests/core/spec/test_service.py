@@ -49,6 +49,11 @@ def author(session: Session, login: str = "hoyoung", kind: AuthorKind = AuthorKi
     )
 
 
+def web(user) -> Author:
+    """웹 토글 — Author(human, user, None, web_status). 상태 변경 테스트가 쓴다 (카드 BE)."""
+    return Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.web_status)
+
+
 _ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..")
 SPECS = sorted(
     p for p in glob.glob(os.path.join(_ROOT, "docs/specs/*/*.md")) if "/_templates/" not in p
@@ -694,19 +699,19 @@ def test_last_author_neighbors_resolve_item(db_session: Session) -> None:
 def test_apply_status_records_change_without_version(db_session: Session) -> None:
     svc, a, d = _seed(db_session)
     new_body = PRD.replace("status: draft", "status: approved")
-    svc.apply_status(d, new_body, "c0ffee", a.user, "다 썼다")
+    svc.apply_status(d, new_body, "c0ffee", web(a.user), "다 썼다")
     d2 = svc.get_document("EXMP-PRD-001")
     assert d2.status == "approved" and d2.body == new_body and d2.current_version_no == 1
     assert db_session.execute(text("SELECT count(*) FROM versions")).scalar() == 1
     row = db_session.execute(
-        text("SELECT from_status, to_status, reason, commit_hash FROM status_changes")
+        text("SELECT from_status, to_status, reason, commit_hash, via FROM status_changes")
     ).one()
-    assert row == ("draft", "approved", "다 썼다", "c0ffee")
+    assert row == ("draft", "approved", "다 썼다", "c0ffee", "web")
     svc.apply_status(
         d2,
         new_body.replace("status: approved", "status: draft"),
         None,
-        a.user,
+        web(a.user),
         None,
         to="draft",
     )
@@ -755,8 +760,12 @@ def test_recent_changes_merges_versions_and_status_commits_desc(db_session: Sess
     svc, a, d = _seed(db_session)
     v2 = svc.save(d, d.body + "\n", "h2", a, "spec(EXMP-PRD-001): 한 줄 추가\n\n이유", [])
     d2 = svc.get_document("EXMP-PRD-001")
-    svc.apply_status(d2, d2.body.replace("status: draft", "status: approved"), "c1", a.user, "완료")
-    svc.apply_status(d2, d2.body, None, a.user, "commit 없는 자동 강등은 안 나온다", to="draft")
+    svc.apply_status(
+        d2, d2.body.replace("status: draft", "status: approved"), "c1", web(a.user), "완료"
+    )
+    svc.apply_status(
+        d2, d2.body, None, web(a.user), "commit 없는 자동 강등은 안 나온다", to="draft"
+    )
     pid = _project_id(db_session, "EXMP")
     got = svc.recent_changes(pid, 10)
     assert [(r.doc_id, r.version_no, r.commit_hash) for r in got] == [
@@ -840,7 +849,7 @@ def test_list_versions_merges_status_commits_and_skips_auto_demotion(db_session:
     )  # 승인 문서 수정 → 자동 강등(commit_hash null)
     d2 = svc.get_document("EXMP-PRD-001")
     # 강등된 draft → approved
-    svc.apply_status(d2, d2.body, "c1", a.user, "다시 완료", to="approved")
+    svc.apply_status(d2, d2.body, "c1", web(a.user), "다시 완료", to="approved")
     d3 = svc.get_document("EXMP-PRD-001")
     svc.save(d3, d3.body + "\n", "h3", a, "spec: v3", [])
     got = svc.list_versions("EXMP-PRD-001")
@@ -855,6 +864,16 @@ def test_list_versions_merges_status_commits_and_skips_auto_demotion(db_session:
         got[1].author.kind == "human"
         and got[0].author.kind == "agent"
         and got[0].doc_id == "EXMP-PRD-001"
+    )
+    assert got[1].author.via == "web" and got[1].author.instructed_by_id is None
+    # 에이전트가 MCP change_status로 바꾼 행 — via=mcp, 발급자가 곧 지시자 (카드 BE)
+    svc.apply_status(svc.get_document("EXMP-PRD-001"), d3.body, "c2", a, "에이전트가", to="draft")
+    top = svc.list_versions("EXMP-PRD-001")[0]
+    assert (top.commit_hash, top.author.kind, top.author.via) == ("c2", "agent", "mcp")
+    assert top.author.user_id == a.user.id and top.author.instructed_by_id == a.user.id
+    assert (
+        db_session.execute(text("SELECT via FROM status_changes WHERE commit_hash='c2'")).scalar()
+        == "mcp"
     )
     with pytest.raises(NotFound):
         svc.list_versions("EXMP-PRD-404")
