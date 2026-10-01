@@ -113,6 +113,8 @@ class StatusChange(Base):
     from_status: Mapped[str | None] = mapped_column(String(10))
     to_status: Mapped[str] = mapped_column(String(10))
     changed_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    # 어느 길로 바뀌었나 — web·mcp·github. versions.via와 같은 값 (카드 BE)
+    via: Mapped[str] = mapped_column(String(8), default="web", server_default="web")
     reason: Mapped[str | None] = mapped_column(Text)
     commit_hash: Mapped[str | None] = mapped_column(String(40))
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
