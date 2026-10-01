@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -1090,7 +1090,7 @@ project_detail(code, user) -> ProjectDetail         SEQ-9   + recent_changes
 document_list(code, user, stage?, status?) -> list  SEQ-10  list_by_project
 trash_list(code, user) -> list                      —       휴지통 목록
 document_view(doc_id, user) -> Document             SEQ-11  get_owned → get_document → neighbors (본문을 읽기 전에 소유를 본다)
-item_view(doc_id, item_id, user) -> ItemView        SEQ-12  get_item
+item_view(doc_id, item_id, user) -> ItemView        SEQ-12  get_item · 웹 GET …/items/{itemId} (UI-18 항목 미리보기, 카드 BH)
 item_references_view(doc_id, item_id, user) -> ItemReferences
                                                     SEQ-13  resolve_item → upstream · downstream → describe_items · describe_documents
 graph_view(code, user, scope?) -> Graph             SEQ-14  list_items_by_project → references_among → isolated 계산 (좌표 없음)
