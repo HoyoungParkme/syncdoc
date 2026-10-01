@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-001
 type: STD
 title: 명세 작성 규약
-status: approved
+status: draft
 upstream: [SYNC-PRD-001]
 ---
 
@@ -59,7 +59,7 @@ docs/specs/
 | `status` | ○ | `draft` / `approved` — 초안·완료 | 생성 시 `draft`. 이후 사람이 웹에서. 완료 문서를 고치면 `draft`로 내려간다 |
 | `upstream` | | 문서 ID 배열. 이 문서가 근거로 삼은 문서 | 에이전트 |
 
-`status`가 진실이다. DB의 `documents.status`는 이 값의 사본이다. 웹에서 상태를 바꾸면 이 줄이 고쳐지고 커밋된다. **MCP로 이 값을 바꿔 보내면 위반이다** — 상태 변경은 사람이 웹에서만 한다(UC-H8). GitHub에 직접 push한 경우는 원본이 진실이므로 그대로 받는다.
+`status`가 진실이다. DB의 `documents.status`는 이 값의 사본이다. 상태를 바꾸면 이 줄이 고쳐지고 커밋된다. **`update_document` 본문으로 이 값을 바꿔 보내면 위반이다** — 상태 변경은 전용 길로만 한다. 사람은 웹 토글, 에이전트는 MCP `change_status`(UC-H8, 카드 BE). 둘 다 이 줄 하나만 고치는 `status(...)` 커밋을 만든다. GitHub에 직접 push한 경우는 원본이 진실이므로 그대로 받는다.
 
 `downstream`(누가 나를 참조하나)은 frontmatter에 없다. 시스템이 참조 테이블에서 계산해 뷰에 보여준다. 여기 두면 하위 문서가 생길 때마다 상위 문서에 커밋이 생겨 변경 감지가 연쇄로 돈다.
 
@@ -459,7 +459,7 @@ frontend/
 | `frontmatter.status` | `status`가 둘 중 하나(`draft`·`approved`) 아님 |
 | `frontmatter.doc_id` | 형식 `^[A-Z]{1,4}-[A-Z]+-\d{3}$` 아님, 또는 파일명과 다름, 또는 `type`과 다름 |
 | `frontmatter.ref` | `upstream`에 문서 ID 형식 아닌 것 |
-| `frontmatter.status_change` | MCP 경로 저장에서 `status`가 현재 DB 값과 다름. 상태 변경은 웹(UC-H8)에서만. GitHub 경로는 검사 안 함 |
+| `frontmatter.status_change` | MCP `update_document` 저장에서 `status`가 현재 DB 값과 다름. 상태 변경은 전용 길(웹 토글 · MCP `change_status`, UC-H8)로만. GitHub 경로는 검사 안 함 |
 | `frontmatter.title.subtype` | 서브타입이 있는 타입(DOM·UI·API)의 `title`에 키워드가 없음 — DOM 「도메인」「클래스」「ERD」(2.6) · UI 「화면 설계」「와이어프레임」(2.7 — 둘 중 어느 것이든 규약은 같고, 검사기가 문서를 찾는 열쇠다) · API 「REST」「MCP」(2.8). 제목으로 서브타입을 가르므로 없으면 항목 패턴도 필수 절도 정하지 못한다 |
 | `item.punct` | 항목 ID 뒤에 `.`·`:` |
 | `item.duplicate` | 같은 항목 ID가 둘 |
