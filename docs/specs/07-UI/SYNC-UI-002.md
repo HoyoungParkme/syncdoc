@@ -2681,7 +2681,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
             <div class="k">명세</div>
             <div class="it"><span class="idb">MS-007#pipeline.save_pipeline</span> 저장 파이프라인</div>
             <div class="sk">근거</div>
-            <div class="sr" data-el="4.7.1"><span class="idb">SEQ-1</span> 에이전트가 문서를 고친다</div>
+            <div class="sr" data-el="4.8"><span class="idb">SEQ-1</span> 에이전트가 문서를 고친다</div>
             <div class="sr"><span class="idb">UC-A6</span> 문서를 쓴다</div>
             <div class="sr"><span class="idb">API-002#update_document</span> update_document</div>
             <div class="sk">이것을 가리킴</div>
@@ -2738,7 +2738,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 | 4.4 | 코드 탭으로 | 링크 | MINISPEC 항목이 있는 함수에만. `문서#항목` | UI-5 코드 탭 — `/p/{코드}/d/{문서}?panel=code#item-{항목}` |
 | 4.5 | 커뮤니티 칩 | 버튼 | 함수가 든 커뮤니티의 색·라벨·함수 수 | 그 커뮤니티를 접는다 |
 | 4.7 | 명세 | 영역 | 고른 함수가 어느 명세의 무엇인가. MINISPEC 함수면 항목 뱃지·이름, 「근거」(그 항목이 건 상위 참조 — SEQ·UC·API·DOM…)와 「이것을 가리킴」(이 항목을 가리키는 하위 참조 — CODE 카드 등). `…/items/{항목}/references`(참조 탭 8.1과 같은 자료). 항목이 없는 함수면 「항목 없음」과 **가까운 항목** — 부르는 것·불리는 곳 중 항목 있는 함수의 항목, 호출 많은 순 6개. 커뮤니티를 골랐으면 허브 함수(4.6과 같은 함수) 기준. 상위·하위 각 8줄, 넘치면 「… n개 더 — 코드 탭에서」 | — |
-| 4.7.1 | 참조 줄 | 행 | 항목 ID 뱃지와 이름. 가리키는 곳이 없는 참조는 회색에 경고 | 그 문서의 그 항목으로(`/p/{코드}/d/{문서}#item-{항목}`) |
+| 4.8 | 참조 줄 | 행 | 항목 ID 뱃지와 이름. 가리키는 곳이 없는 참조는 회색에 경고 | 그 문서의 그 항목으로(`/p/{코드}/d/{문서}#item-{항목}`) |
 | 4.6 | 코드 | 영역 | 고른 함수의 본문 — 「코드 L시작–L끝」과 그래프 커밋, 줄 번호가 붙은 본문(UI-5 8.21과 같은 모양·같은 읽기, 300줄 상한). 고르는 순간 읽는다. 커뮤니티를 골랐으면 허브 함수(라벨이 함수면 그것, 아니면 4.2의 첫 함수)의 본문. 못 읽으면(5c) 「코드를 읽을 수 없습니다 — {이유}」 한 줄 | — |
 | 5 | 범례 | 영역 | 커뮤니티 목록과 표시 설명 | — |
 | 5.1 | 커뮤니티 행 | 행 | 색 견본 · 라벨 · 함수 수 · 체크박스. 라벨이 파일 경로 꼴이면 파일 이름만 보이고 전체는 툴팁 | 체크를 끄면 그 커뮤니티의 노드·선을 숨긴다 |
@@ -2802,7 +2802,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 
 **S-7 명세 연관을 따라간다** — UC-H20 기본 흐름 5 (카드 BG)
 1. `save_pipeline`을 고른다. 코드(4.6) 아래 명세(4.7)에 `MS-007#pipeline.save_pipeline`과 「근거」 SEQ-1·UC-A6·API-002#update_document, 「이것을 가리킴」 CODE-001#B1
-2. 근거 줄 `SEQ-1`(4.7.1)을 누른다 — SEQ 문서의 그 항목으로 간다. 뒤로 돌아오면 선택이 그대로다
+2. 근거 줄 `SEQ-1`(4.8)을 누른다 — SEQ 문서의 그 항목으로 간다. 뒤로 돌아오면 선택이 그대로다
 3. 고리 없는 `_advance_processed`를 고른다 — 「항목 없음 · 가까운 항목」에 `MS-007#pipeline.save_pipeline`(이 함수를 부르는 것)
 4. 접힌 커뮤니티 원을 누른다 — 허브 함수 기준으로 4.6과 4.7이 같이 바뀐다
 
