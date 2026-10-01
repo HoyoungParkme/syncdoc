@@ -1268,7 +1268,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | 라우터 `GET /docs/{doc_id}/items/{item_id}`(`routers/references.py`, `queries.item_view` 그대로) · `web/schemas` `ItemView` · `components/ItemPeek.tsx`(UI-18 — 스택·블록 렌더 `renderBlocks`·링크 가로채기·이동·새 창·Esc) · `CodeGraph.tsx` 4.8 줄과 `DocView.tsx` 참조 카드가 팝업을 연다 · `client.ts` · `styles.css` |
 | 테스트 | 라우터 200(블록만)·404(+available_items)·410(삭제됨)·남의 것 404 · `check_ui` 화면 14(UI-18 요소 10) · 헤드리스 크롬(콘솔 0): UI-17 명세 줄 → 팝업 블록 → 블록 안 참조 → 팝업 교체 → 뒤로 → 이동 → UI-5 그 항목 → 새 창 URL → 문서 전체 참조 → 문서 머리 변형 → UI-5 참조 탭 카드 → 같은 팝업 → Esc·바깥 클릭 |
 | 선행 | BG |
-| 완료 | — |
+| 완료 | 2026-10-01 · 브랜치 `card/BH-item-peek`(5f69d79 #266) · spec 10 + code 3 · 테스트 384 · `ruff`·`tsc`·`oxlint` · `validate` 0/0 · `check_ui` 14/14(UI-18 요소 10) · `check_code` 156/156 · `check_calls` 0/0 · `check_view_html` 35/35 · 헤드리스 크롬(WSLg 고장, 콘솔 0): UI-17 근거 줄 SEQ-1 → 팝업(SEQ-001#SEQ-1 · 초안 · v1, 블록) → 블록 안 UC-A6 → 팝업 교체·「뒤로」 → 새 창 URL(팝업 유지) → Esc(선택 그대로) → 이동 `/p/SYNC/d/SYNC-SEQ-001#item-SEQ-1` · UI-5 참조 카드 → 같은 팝업 · 문서 전체 카드 → 문서 머리(API 명세 MCP — 싱크독 · 8단계 · 항목 13) · 운영: 배포 번들에 UI-18 문구, `GET /api/docs/SYNC-SEQ-001/items/SEQ-1` 입구 응답 — 화면은 사람이 직접(DEV-17) |
 
 ---
 
