@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -827,7 +827,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 | 이벤트 | data | 언제 |
 |---|---|---|
-| `start` | `AskStart {doc_id, item_id}` | 시작 맥락 조립 직후, 첫 모델 호출 전. **이 앞의 오류(404·503·401)는 HTTP 상태 코드** |
+| `start` | `AskStart {doc_id, item_id, key?}` — 코드 그래프에서 묻으면 `doc_id`·`item_id`가 null이고 `key`가 함수(카드 BI) | 시작 맥락 조립 직후, 첫 모델 호출 전. **이 앞의 오류(404·503·401)는 HTTP 상태 코드** |
 | `note` | `AskNote {text}` | 모델이 읽기 전에 쓴 한 줄(도구 인자 `reason`). 도구마다 하나 |
 | `read` | `AskRead {tool, target}` | 도구 실행이 끝났다. `target`은 `DOC#ITEM`·`DOC`·`첨부:이름`, 목록이면 null |
 | `delta` | `AskDelta {text}` | 모델이 지금 쓰는 글자 조각 — 받는 대로 바로. **진실이 아니다**: 그 호출이 도구로 끝나면 `note`가, 답으로 끝나면 `answer`가 전체 글을 다시 준다(카드 AW) |
@@ -1137,6 +1137,44 @@ MINISPEC 항목인데 코드에 함수가 없으면 `function: null`·`missing: 
 ```
 
 `…/items/{itemId}/code/source`와 읽는 곳이 같다([[SYNC-MS-011#CodeGraphService.read]]) — 입구만 항목이 아니라 자리다. 끝 줄 규칙도 같다(`end`가 없으면 같은 파일 다음 함수 앞 줄, 그것도 없으면 60줄). 그래프 옆에 코드를 두기로 한 2026-10-01 결정(카드 BF).
+
+#### POST/api/projects/{code}/code/ask 코드 그래프에서 묻는다 — SSE
+
+화면 [[SYNC-UI-001#UI-17]] 7 · 유스케이스 [[SYNC-UC-001#UC-H19]] 기본 흐름 1~2(코드 그래프) · 서비스 [[SYNC-MS-008#queries.ask_code]]
+
+**고른 함수가 시작 맥락이고, 없어도 묻는다.** `key`(그래프의 `functions[].key`, `파일:줄`)를 주면 그 함수(이름·파일:줄·항목·대조 상태·부르는 것·불리는 곳)가 맥락에 실리고, 없으면 그래프 전체다. 본문은 안 싣는다 — 모델이 `read_code`로 읽는다. 대화·첨부·응답 스트림은 [[#POST/api/docs/{docId}/ask]]와 같다 — `start`만 `{doc_id: null, item_id: null, key}`.
+
+```yaml
+/api/projects/{code}/code/ask:
+  post:
+    summary: "코드 그래프에서 묻는다 ([[SYNC-UC-001#UC-H19]], 카드 BI) — SSE. 루프·도구·이벤트는 /api/docs/{docId}/ask와 같다"
+    parameters:
+    - $ref: '#/components/parameters/code'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AskCodeRequest'
+    responses:
+      '200':
+        description: 이벤트 스트림. start → (delta·note·read)* → answer | error
+        content:
+          text/event-stream:
+            schema:
+              oneOf:
+              - $ref: '#/components/schemas/AskStart'
+              - $ref: '#/components/schemas/AskNote'
+              - $ref: '#/components/schemas/AskRead'
+              - $ref: '#/components/schemas/AskDelta'
+              - $ref: '#/components/schemas/AskAnswer'
+      '404':
+        description: 소유하지 않은 프로젝트 · 대화가 내 것이 아님(`resource: conversation`) · `key`가 그래프에 없음(`resource: function`)
+      '503':
+        description: 모델 키 없음(`llm-not-configured`)
+```
+
+코드 그래프가 없는 프로젝트에서도 200이다 — 시작 맥락에 「코드 그래프 없음」이 들고 모델이 그렇다고 말한다(2b).
 
 ### 3.7 계정·토큰
 
@@ -2156,6 +2194,17 @@ components:
                 type: string
               detail:
                 type: string
+    AskCodeRequest:
+      type: object
+      description: POST /api/projects/{code}/code/ask (카드 BI). AskRequest에서 item_id가 key로
+      required:
+      - question
+      - conversation_id
+      properties:
+        question: {type: string}
+        key: {type: string, nullable: true, description: 고른 함수 `파일:줄`. 없으면 그래프 전체}
+        conversation_id: {type: integer}
+        attachment_ids: {type: array, items: {type: integer}}
     AskRequest:
       type: object
       required:
@@ -2261,12 +2310,15 @@ components:
           format: date-time
     AskStart:
       type: object
-      description: 첫 이벤트. 이 앞의 오류는 HTTP 상태 코드로 온다
-      required:
-      - doc_id
+      description: 첫 이벤트. 이 앞의 오류는 HTTP 상태 코드로 온다. 코드 그래프에서 묻으면 doc_id·item_id 대신 key
       properties:
+        key:
+          type: string
+          nullable: true
+          description: 코드 그래프에서 고른 함수 `파일:줄`(카드 BI). 문서에서 물으면 없다
         doc_id:
           type: string
+          nullable: true
         item_id:
           type: string
           nullable: true
