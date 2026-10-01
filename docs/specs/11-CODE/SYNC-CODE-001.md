@@ -1232,7 +1232,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | 리비전 `0018_add_status_changes_via`(기본 `web`) · `StatusChange.via` 모델 · `SpecService.apply_status(…, author)`와 `save`·`mark_deleted`·`trash`의 insert에 `via` · `list_versions`·`recent_changes`의 status 행 AuthorRef를 `via`로 접기 · `pipeline.change_status(doc_id, to, author, reason)` · `routers/documents.change_status`는 `Author(human, user, None, web_status)` · MCP 도구 `change_status(doc_id, to, reason?)`(`_agent_author`) · `rebuild`의 status 커밋 복원은 `via=github` · 화면은 바뀌지 않는다 — UI-7 2.1이 버전 행과 같은 규칙으로 이미 그린다 |
 | 테스트 | MS-007·MS-002 테스트 관점 · 도구 목록에 `change_status` · MCP로 approved → `status(…)` 커밋 하나 · 버전 그대로 · `status_changes.via=mcp` · 이력 행 `agent`·지시자=발급자 · 규약 오류·미완성·끊어진 참조면 `status-blocked`(웹과 같은 본문) · 휴지통이면 `document-trashed` · 남의 문서 `not-found` · 멱등 · `update_document`로 `status:`를 바꾸면 여전히 `frontmatter.status_change` · 웹 토글은 `via=web` · 운영: MCP 클라이언트로 올리고 UI-7에서 「에이전트 · 지시」 확인 |
 | 선행 | BD |
-| 완료 | — |
+| 완료 | 2026-10-01 · 브랜치 `card/BE-mcp-change-status`(12114d2 #251) · spec 12 + code 4 · 테스트 382 · `ruff` · `validate` 0/0 · `check_code` 155/155 · `check_calls` 0/0 · 화면 변경 없음 · 운영: 0018 올라감(`status_changes.via`) · 도구 목록 13개에 `change_status` · MCP로 SYNC-PRD-001 draft → approved(77bb9c3 — `status:` 한 줄 diff, 커밋 본문에 사유) · `/api/docs/SYNC-PRD-001/versions` 맨 위 행 `kind=agent · via=mcp · instructed_by=Hoyoung Park` · UI-7 2.1에 「에이전트 · 지시 Hoyoung Park」 · 이 카드가 초안으로 내린 문서 11건의 재승인도 MCP `change_status`로(사람이 시킨 쪽) · status-blocked·멱등·휴지통·남의 문서는 E2E |
 
 ---
 
