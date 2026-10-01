@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 
 유스케이스 흐름을 **객체 수준**으로 내린다. 누가 누굴 어떤 순서로 부르고, 어디서 갈라지는지. 생명선은 클래스 명세 4장의 서비스와 인프라 4.1의 구성 요소다.
 
-**1장 대응표의 입구 전부(REST 36 엔드포인트 + MCP 도구)를 다룬다.** v1.0에서는 "단순 조회는 안 그린다"고 했으나, 그려보니 단순해 보이던 조회가 묶음을 넘는 호출을 숨기고 있었다(`get_document`의 미존재 참조, 프로젝트 목록의 건수). 시퀀스는 그런 걸 잡으려고 그리는 것이므로 빠뜨리면 안 된다.
+**1장 대응표의 입구 전부(REST 37 엔드포인트 + MCP 도구)를 다룬다.** v1.0에서는 "단순 조회는 안 그린다"고 했으나, 그려보니 단순해 보이던 조회가 묶음을 넘는 호출을 숨기고 있었다(`get_document`의 미존재 참조, 프로젝트 목록의 건수). 시퀀스는 그런 걸 잡으려고 그리는 것이므로 빠뜨리면 안 된다.
 
 **v2에서 협업 장치를 걷어냈다.** 전파·플래그·댓글·내 할 일·백업의 시퀀스(SEQ-3·6·16·17)는 은퇴했고 번호는 비워 둔다. 남은 것 중 그 장치를 부르던 단계는 지웠다.
 
@@ -86,6 +86,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | POST /api/admin/repos/{code}/sync | [[#SEQ-25]] | ○ |
 | POST /api/admin/repos/{code}/hook | [[#SEQ-4]] | |
 | POST /api/docs/{docId}/ask | [[#SEQ-24]] | ○ |
+| POST /api/projects/{code}/code/ask | [[#SEQ-32]] | ○ |
 | MCP create_document | [[#SEQ-19]] | ○ |
 | MCP update_document | [[#SEQ-1]] | ○ |
 | MCP delete_document | [[#SEQ-22]] | ○ |
@@ -1483,6 +1484,42 @@ sequenceDiagram
 ```
 
 **읽을 때 볼 것** — 허용 목록은 `127.0.0.1`·`localhost`·`[::1]`과 `PUBLIC_BASE_URL`의 host다(포트는 보지 않는다). 127.0.0.1에만 열어도 가드가 필요하다 — 다른 사이트가 제 이름을 127.0.0.1로 풀리게 바꿔(DNS rebinding) 내 브라우저로 부르면 Host가 그 이름이라 여기서 막힌다. Origin 확인은 다른 사이트의 폼·fetch가 보내는 쓰기(CSRF)를 막는다 — 본문 없는 POST(되돌리기·재구축)는 미리 묻는 요청(preflight)도 없다. MCP·git은 토큰이 사람을 정하므로([[#SEQ-C2]]·[[#SEQ-29]]) Host만 본다.
+
+---
+
+## SEQ-32 코드 그래프에서 묻는다
+
+[[SYNC-UC-001#UC-H19]] 기본 흐름 1~2(코드 그래프), 확장 1b·2b. `POST /api/projects/{code}/code/ask` — SSE. **루프는 SEQ-24와 같다** — 입구와 시작 맥락만 다르고, 도구 여덟·상한·대화 저장·이벤트 여섯은 그대로다(카드 BI).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사람
+    participant RCG as routers/code
+    participant Q as queries
+    participant C as ConversationService
+    participant CS as CodeGraphService
+    participant S as SpecService
+    participant LLM as infra/llm
+
+    U->>RCG: POST /api/projects/{code}/code/ask {conversation_id, question, key?, attachment_ids} — UI-17 질문 탭(7)
+    RCG->>Q: ask_code(code, key, conversation_id, question, attachment_ids, user)
+    Q->>Q: 키 없으면 llm-not-configured · get_owned
+    Q->>C: get · history · add_turn (SEQ-24와 같다)
+    Q->>CS: get(project_id) — 없으면 「코드 그래프 없음」 한 줄 (2b)
+    Q->>S: list_by_project + describe_documents — 문서 목록(ID·제목·상태, 본문 없음)
+    Q->>Q: key로 함수 → compare로 항목·대조 상태, 부르는 것·불리는 곳(각 20까지) → 시작 맥락. key가 그래프에 없으면 not-found function
+    Q-->>RCG: start {doc_id: null, item_id: null, key}
+    RCG-->>U: 200 text/event-stream
+    loop SEQ-24의 루프 그대로 — _ask_loop
+        Q->>LLM: step_stream(system, 대화록, tools)
+        Q-->>U: delta · note · read … answer | error
+    end
+```
+
+**읽을 때 볼 것**
+- 입구가 둘(문서·코드 그래프)이고 그 뒤는 하나다 — `_ask_loop`. 대화는 프로젝트 것이라 문서에서 묻다 그래프로 와도 이어진다
+- 시작 맥락에 함수 본문을 싣지 않는다 — 문서 본문을 안 싣는 것과 같은 원칙(사용자 결정 3). 모델이 `read_code`로 읽는다
 
 ---
 
