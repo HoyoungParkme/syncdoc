@@ -722,7 +722,11 @@ function CodePanel({
         <div className="fhead" data-el="8.18">
           {f.qual}
           <div className="fmeta">
-            {f.file}:{f.line}
+            {f.file}:{f.line} ·{' '}
+            {/* 8.23 — UI-17을 이 함수에 포커스해 연다 (카드 BD) */}
+            <Link className="lnk" data-el="8.23" to={`/p/${docId.split('-')[0]}/code-graph?focus=${encodeURIComponent(`${f.file}:${f.line}`)}`}>
+              그래프에서 보기
+            </Link>
           </div>
           {meta}
         </div>

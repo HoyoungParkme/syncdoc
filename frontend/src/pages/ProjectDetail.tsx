@@ -152,6 +152,9 @@ export function ProjectDetail() {
         <Link className="btn" data-el="2.1" to={`/p/${code}/graph`}>
           참조 그래프
         </Link>
+        <Link className="btn" data-el="2.3" to={`/p/${code}/code-graph`}>
+          코드 그래프
+        </Link>
         <Link className="btn" data-el="2.2" to={`/p/${code}/read`}>
           순서대로 읽기
         </Link>
