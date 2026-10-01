@@ -82,7 +82,7 @@ export function ItemPeek({ code, target, onClose }: { code: string; target: Peek
   return (
     <>
       <div className="backdrop" onClick={onClose} />
-      <div className="dialog mid peek" data-el="1" onClick={(e) => e.stopPropagation()}>
+      <div className="dialog wide peek" data-el="1" onClick={(e) => e.stopPropagation()}>
         <div className="dhead">
           {stack.length > 1 && (
             <span className="bk" data-el="1.1" onClick={() => setStack((s) => s.slice(0, -1))}>

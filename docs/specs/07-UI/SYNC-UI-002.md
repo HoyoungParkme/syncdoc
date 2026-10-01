@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -2823,7 +2823,10 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 <style>
   .pg{padding:22px 26px;display:flex;flex-direction:column;gap:14px;flex:1}
   .ghost{flex:1;border:1px solid var(--line);border-radius:8px;background:#fff}
-  .dlg.peek{width:640px}
+  .dlg.peek{width:900px}
+  .db .body{overflow-x:auto}
+  .db .body table{width:max-content;max-width:none}
+  .db .body td,.db .body th{min-width:9em;max-width:28em}
   .dh .idb{display:inline-block;padding:0 6px;border-radius:4px;background:#fbefd2;font:600 12.5px var(--mono)}
   .dh .doc{font:400 12.5px var(--sans);color:var(--ink3);display:flex;align-items:center;gap:6px}
   .dh .pill{display:inline-block;padding:0 7px;border-radius:999px;font:600 11px var(--sans);background:var(--ok);color:#fff}
@@ -2900,7 +2903,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 
 | # | 이름 | 종류 | 보여주는 것 | 누르면 |
 |---|---|---|---|---|
-| 1 | 다이얼로그 | 다이얼로그 | UI-5 또는 UI-17 위에 뜬다. 폭 640. 본문(2)만 스크롤, 최대 70vh | — |
+| 1 | 다이얼로그 | 다이얼로그 | UI-5 또는 UI-17 위에 뜬다. 폭 900(공통 `wide`). 본문(2)만 스크롤, 최대 70vh. 표가 넘치면 본문 안에서 가로 스크롤 | — |
 | 1.1 | 뒤로 | 버튼 | 블록 안 참조(2.1)를 따라왔을 때만. 스택 깊이만큼 되짚는다 | 바로 전 항목으로 |
 | 1.2 | 항목 ID | 뱃지 | `문서#항목`(프로젝트 코드 접두는 뺀다). 문서 전체 참조면 문서 ID | — |
 | 1.3 | 문서 | 텍스트 | 문서 ID · 상태 필 · 버전 — 항목 응답(`ItemView`)에 든 것만. 제목은 본문을 받아야 알 수 있어 안 보인다(문서 전체 변형 3에는 있다) | — |
@@ -2918,7 +2921,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 - **블록 안 참조(2.1)는 팝업 안에서 이어 본다.** 스택에 쌓고 「뒤로」(1.1)로 되짚는다. 받은 블록은 스택을 내려갈 때 다시 받지 않는다. 열려 있는 동안 같은 항목을 또 누르면 아무 일도 없다
 - 문서 전체 참조(항목 없음)는 문서 머리(3)만 — `GET /api/docs/{docId}`의 제목·상태·항목 수. 삭제된 항목(410)은 본문에 「삭제된 항목 — {deleted_at}」 한 줄과 「이동」만. 가리키는 곳 없는 참조는 애초에 팝업을 안 연다(UC-H3 2b)
 - 닫는 길은 공통 1.1 — ✕ · Esc · 바깥 클릭. 「이동」도 닫는다. 「새 창」은 안 닫는다
-- 폭 640 — 항목 블록은 본문 한 단 폭이면 충분하고, 뒤의 화면이 보여야 어디서 열었는지 안다
+- **폭 900, 표는 제 폭대로**(#268) — 처음엔 640으로 뒀는데 MINISPEC 함수 카드처럼 표가 든 블록이 열마다 글자 단위로 꺾여 읽을 수 없었다. 표는 `width:max-content`로 제 폭을 갖고(열은 9~28em), 넘치면 본문(2) 안에서 가로 스크롤한다. 뒤의 화면은 양옆으로 조금 보이면 된다
 
 ### 시나리오
 
