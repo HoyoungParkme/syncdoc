@@ -398,8 +398,8 @@ def communities(raw: dict, graph: dict) -> dict:
     raw 그래프(파일·클래스·호출 선이 다 든 것)를 networkx Louvain으로 군집해 함수마다 커뮤니티
     번호를 붙이고 `communities`를 더한다. enrich 뒤에 — 보강이 더한 함수는 파일의 커뮤니티를
     받는다. 모델·네트워크 없이 결정적(seed 42). graphify `cluster`는 안 쓴다 — 응집도 재쪼개기가
-    싱크독을 100개 넘는 군집으로 터뜨린다(#253). 라벨만 graphify의 허브 라벨. 군집이 실패해도
-    그래프는 남는다.
+    싱크독을 100개 넘는 군집으로 터뜨린다(#253). 라벨만 graphify의 허브 라벨 — 후보는 코드
+    노드만(#255). 군집이 실패해도 그래프는 남는다.
     """
     functions: list[dict] = graph["functions"]
     by_key: dict[str, int] = {}
@@ -413,7 +413,13 @@ def communities(raw: dict, graph: dict) -> dict:
 
             g = load_node_link_graph(raw)
             found = _louvain(g)
-            named = label_communities_by_hub(g, found)
+            # 라벨 허브는 코드 노드만 — 문서·절 노드가 허브면 「SEQUENCE: 싱크독」 같은
+            # 이름이 된다 (#255)
+            code_only = {
+                cid: [n for n in members if nodes.get(n, {}).get("source_file")]
+                for cid, members in found.items()
+            }
+            named = label_communities_by_hub(g, code_only)
             labels = {cid: _clean(str(lab)) for cid, lab in named.items()}
             for cid, members in found.items():
                 for nid in members:

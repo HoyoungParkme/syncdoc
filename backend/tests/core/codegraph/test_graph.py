@@ -87,6 +87,11 @@ RAW2 = {
         {"source": "g1", "target": "g2", "relation": "calls"},
         {"source": "g1", "target": "g2", "relation": "calls"},
         {"source": "t1", "target": "g1", "relation": "calls"},
+        # 문서 노드가 b.py 군집의 차수 최고 — 그래도 라벨은 코드 노드 이름 (#255)
+        {"source": "d1", "target": "fb", "relation": "references"},
+        {"source": "d1", "target": "g1", "relation": "references"},
+        {"source": "d1", "target": "g2", "relation": "references"},
+        {"source": "d1", "target": "t1", "relation": "references"},
     ],
 }  # fmt: skip
 
@@ -107,6 +112,7 @@ def test_communities_groups_by_file_labels_by_hub_and_is_deterministic() -> None
     assert {c["id"] for c in comms} == {by["g1"], by["f1"]}
     assert by["g1"] == 0  # 노드가 가장 많은 군집(fb·g1·g2·t1)이 0 (#253)
     assert all(c["label"] and not c["label"].endswith("()") for c in comms)
+    assert "노트" not in [c["label"] for c in comms]  # 문서 허브는 라벨이 못 된다 (#255)
     again = cg.communities(RAW2, cg.reduce(RAW2))
     assert [f["community"] for f in again["functions"]] == [
         f["community"] for f in graph["functions"] if f["name"] != "g3"
