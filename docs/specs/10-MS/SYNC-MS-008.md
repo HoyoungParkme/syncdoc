@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -300,6 +300,8 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 #### queries.item_view 항목 블록
 
 **시그니처** `async def item_view(doc_id: str, item_id: str, user: User) -> ItemView`
+
+근거: [[SYNC-SEQ-001#SEQ-12]] · [[SYNC-API-002#get_item]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}]](UI-18 항목 미리보기, 카드 BH — 웹 입구가 같은 함수를 쓴다)
 
 **처리** `ProjectService.get_owned(doc_id.split("-")[0], user)` (남의 것 → `not-found`) · `v = SpecService.get_item(doc_id, item_id)` (없음·삭제 예외 전파) · `→ v`. 소유 검사 말고는 `SpecService`를 그대로 넘기는 자리다 — 라우터·MCP가 `queries`만 보게 하는 대칭 때문에 둔다
 
