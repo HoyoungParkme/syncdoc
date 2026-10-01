@@ -270,6 +270,45 @@ async def test_read_pending_is_idempotent_and_skips_github_path(scoped: Session,
         await pipeline.read_pending("EXMP", make_user(scoped, login="stranger"))
 
 
+async def test_app_commits_advance_the_processing_point(
+    scoped: Session, proj, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """13a — 앱이 민 커밋은 그 저장이 곧 처리다(2026-10-01 결정). 서버 저장소는 통지가 없어
+    이것이 없으면 폴링(5분)까지 처리 지점이 뒤에 있는 것처럼 보였다."""
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    repo = proj["project"].repository
+    repo.last_processed_commit = g(remote, "rev-parse", "main")
+    scoped.flush()
+    r = await create(proj, DocType.RFQ, RFQ)
+    assert repo.last_processed_commit == r.commit_hash  # mcp 저장
+    r2 = await create(proj)
+    assert repo.last_processed_commit == r2.commit_hash
+    # web_status도 같다 · 완료 상태에서 고치면 자동 강등 커밋이 하나 더 — 둘 다 넘어간다 (6a)
+    await pipeline.change_status("EXMP-PRD-001", "approved", proj["user"], None)
+    assert repo.last_processed_commit == g(remote, "rev-parse", "main")
+    approved = PRD_BODY.replace("status: draft", "status: approved")  # mcp는 지금 상태를 보낸다
+    r3 = await update(proj, "EXMP-PRD-001", approved.replace("한 줄로.", "두 줄로."), 1)
+    assert repo.last_processed_commit == r3.commit_hash == g(remote, "rev-parse", "main")
+    # 읽기(0)와 push(7) 사이 틈에 밖의 커밋이 끼면 수가 안 맞는다 — 옮기지 않고 폴링에 맡긴다
+    from app.core import pipeline as pl
+
+    real = pl.git.commit_push
+
+    async def push_with_intruder(workdir, *args, **kw):
+        g(other, "pull", "-q", "--rebase", "origin", "main")
+        write_commit_push(other, RFQ_FILE, RFQ + "\n끼어든 줄.\n", "spec(EXMP-RFQ-001): 밖에서")
+        return await real(workdir, *args, **kw)
+
+    monkeypatch.setattr(pl.git, "commit_push", push_with_intruder)
+    r4 = await update(proj, "EXMP-PRD-001", PRD_BODY.replace("한 줄로.", "셋."), 2)
+    monkeypatch.setattr(pl.git, "commit_push", real)
+    assert repo.last_processed_commit == r3.commit_hash and r4.commit_hash != r3.commit_hash
+    # 휴지통도 같은 규칙 — 먼저 읽어 끼어든 것까지 따라잡고, 휴지통 커밋으로 옮긴다
+    t = await pipeline.trash_document("EXMP-PRD-001", proj["author"], confirm=True)
+    assert repo.last_processed_commit == t.commit_hash == g(remote, "rev-parse", "main")
+    assert PRD_FILE not in remote_files(proj["repos"])
+
+
 async def test_revert_and_trash_do_not_revert_unread_commits(scoped: Session, proj) -> None:
     """되돌리기·휴지통도 쓰기 전에 읽는다 (DEV-19, #137)."""
     other, remote = proj["repos"]["other"], proj["repos"]["remote"]

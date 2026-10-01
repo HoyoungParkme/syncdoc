@@ -184,6 +184,7 @@ sequenceDiagram
         R->>DB: Reference 갱신 (사라진 것 삭제, 미존재 표시)
         P->>R: resolve_missing(document_id, item_pks)
         R->>DB: 이 문서·항목을 raw_target으로 기다리던 참조를 잇는다
+        P->>DB: repositories.last_processed_commit = commit_hash (13a — 앱이 민 커밋은 곧 처리된 것. 그 사이 밖의 커밋이 끼었으면 그대로)
     end
     P->>P: repo lock 해제
     P-->>T: SaveResult {version_no, commit_hash, status, next_step}

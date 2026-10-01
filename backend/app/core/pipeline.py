@@ -321,6 +321,7 @@ async def _run(
     if entry == Entry.web_status:
         assert document is not None
         spec.apply_status(document, body, commit_hash, author.user, reason)
+        await _advance_processed(repo, commit_hash, 1)  # 13a
         s.commit()
         return SaveResult(
             doc_id,
@@ -358,6 +359,9 @@ async def _run(
     warnings = [str(w) for w in vr.warnings]
     if deleted:
         warnings.append(f"ref.broken: {broken}")
+    # 13a. 처리 지점 — 앱이 민 커밋은 이 저장이 곧 처리다 (6a가 하나 더 밀었으면 둘)
+    if entry != Entry.github:
+        await _advance_processed(repo, commit_hash, 2 if status_commit_hash else 1)
     # 14. 커밋
     s.commit()
     status = spec.get_document(doc_id).status
@@ -464,6 +468,21 @@ async def revert(
         )
 
 
+async def _advance_processed(repo: Repository, commit_hash: str, made: int) -> None:
+    """save_pipeline 13a · trash_document 5 — 앱이 민 커밋은 그 저장이 곧 처리다.
+
+    통지가 없는 서버 저장소에서 처리 지점이 폴링(5분)까지 늦게 보이지 않게(2026-10-01 결정).
+    처리 지점부터 이 커밋까지가 방금 민 수와 같을 때만 옮긴다 — 그 사이 밖에서 push가 끼었으면
+    (read_pending 뒤의 짧은 틈) 그대로 두어 폴링·통지가 그것까지 읽는다. 커밋은 부른 쪽이 한다.
+    """
+    last = repo.last_processed_commit
+    if not last:
+        return
+    behind = await git.rev_list_count(Path(repo.workdir_path), f"{last}..{commit_hash}")
+    if behind == made:
+        repo.last_processed_commit, repo.synced_at = commit_hash, now_utc()
+
+
 async def trash_document(doc_id: str, author: Author, confirm: bool) -> TrashResult:
     """SYNC-MS-007#pipeline.trash_document"""
     code = doc_id.split("-")[0]
@@ -493,6 +512,7 @@ async def trash_document(doc_id: str, author: Author, confirm: bool) -> TrashRes
             # 5. 트랜잭션 — 항목 삭제됨 + 휴지통 표시 + 그것을 가리키던 참조는 미존재로
             pks = spec.trash(document, commit_hash, author)
             broken = refs.mark_missing(pks)
+            await _advance_processed(repo, commit_hash, 1)  # save_pipeline 13a와 같은 규칙
             s.commit()
     return TrashResult(
         doc_id,
