@@ -82,6 +82,18 @@ class Document(DocumentSummary):
         )
 
 
+class ItemView(Base):
+    """GET /api/docs/{docId}/items/{itemId} — 항목 블록 하나 (UI-18 항목 미리보기, 카드 BH).
+    MCP get_item과 같은 queries.item_view."""
+
+    doc_id: str
+    item_id: str
+    display_name: str | None
+    body: str
+    doc_status: str
+    doc_version_no: int
+
+
 class ItemReferences(Base):
     doc_id: str
     item_id: str

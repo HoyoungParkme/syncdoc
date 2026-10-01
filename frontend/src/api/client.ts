@@ -239,6 +239,15 @@ export interface BrokenRefSummary {
   source: ItemRef
   raw_target: string
 }
+/** GET /api/docs/{docId}/items/{itemId} — 항목 블록 하나 (UI-18 항목 미리보기, 카드 BH) */
+export interface ItemView {
+  doc_id: string
+  item_id: string
+  display_name: string | null
+  body: string
+  doc_status: string
+  doc_version_no: number
+}
 export interface ItemReferences {
   doc_id: string
   item_id: string

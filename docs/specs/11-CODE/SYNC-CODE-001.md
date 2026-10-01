@@ -1260,6 +1260,18 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 ---
 
+#### BH 항목 미리보기 팝업 (UI-18) — 참조를 누르면 그 항목 블록만
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R2]] · [[SYNC-UC-001#UC-H3]] 기본 흐름 3·3a·3b · [[SYNC-SEQ-001#SEQ-12]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}]] · [[SYNC-MS-008#queries.item_view]] · [[SYNC-UI-002#UI-18]] · [[SYNC-UI-001]] 7장 10 · 사용자 제안 2026-10-01 「누르면 팝업으로 해당 부분만, 상단에 이동·새 창」 |
+| 구현 | 라우터 `GET /docs/{doc_id}/items/{item_id}`(`routers/references.py`, `queries.item_view` 그대로) · `web/schemas` `ItemView` · `components/ItemPeek.tsx`(UI-18 — 스택·블록 렌더 `renderBlocks`·링크 가로채기·이동·새 창·Esc) · `CodeGraph.tsx` 4.8 줄과 `DocView.tsx` 참조 카드가 팝업을 연다 · `client.ts` · `styles.css` |
+| 테스트 | 라우터 200(블록만)·404(+available_items)·410(삭제됨)·남의 것 404 · `check_ui` 화면 14(UI-18 요소 10) · 헤드리스 크롬(콘솔 0): UI-17 명세 줄 → 팝업 블록 → 블록 안 참조 → 팝업 교체 → 뒤로 → 이동 → UI-5 그 항목 → 새 창 URL → 문서 전체 참조 → 문서 머리 변형 → UI-5 참조 탭 카드 → 같은 팝업 → Esc·바깥 클릭 |
+| 선행 | BG |
+| 완료 | — |
+
+---
+
 ## 2. 통합 테스트 시나리오
 
 시나리오 S1~S7을 그대로 E2E 테스트로. 각 슬라이스의 `테스트` 행에 나눠 들어가 있다. 전부 통과하면 PRD 성공지표 측정을 시작한다.

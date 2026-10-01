@@ -47,7 +47,7 @@ upstream: [SYNC-UI-001]
 - **확인 버튼의 라벨이 상태를 말한다.** `휴지통에 넣기` / `삭제하고 되돌리기`처럼, 누르면 무슨 일이 생기는지 버튼에 적는다
 - 다이얼로그 위에 다이얼로그가 뜰 수 있다 — UI-13 위의 재구축 확인이 그렇다
 
-지금 쓰는 곳: UI-3 초기화 · UI-3 기존 명세 발견 · UI-4 목록 · UI-5 휴지통 확인 · UI-7 되돌리기 · UI-7 삭제 확인 · UI-13 설정 · UI-14 재구축 확인 · UI-15 11단계 흐름 · UI-16 사용 방법.
+지금 쓰는 곳: UI-18 항목 미리보기 · UI-3 초기화 · UI-3 기존 명세 발견 · UI-4 목록 · UI-5 휴지통 확인 · UI-7 되돌리기 · UI-7 삭제 확인 · UI-13 설정 · UI-14 재구축 확인 · UI-15 11단계 흐름 · UI-16 사용 방법.
 
 ### 1.2 툴팁
 
@@ -609,7 +609,7 @@ status: draft
 | 7.10 | 배치 전체보기 | 버튼 | 배치마다. 좁은 창에서도 1:1로 보는 길 | 전체보기 층(7.6) |
 | 8 | 오른쪽 패널 | 영역 | 참조 탭(8.1) / 질문 탭(8.4). 유저용 탭에서만 | — |
 | 8.3 | 패널 경계 | 손잡이 | 우측 폭을 끈다. **참조 탭 180~460px · 질문 탭 300~720px** — 탭마다 따로 기억한다 | — |
-| 8.1 | 참조 탭 | 패널 | 선택 항목의 상위 참조·하위 참조. 가리키는 곳이 없는 참조는 회색 카드에 경고 아이콘(UC-H2 2c). **하위는 이 항목을 가리키는 참조 하나하나** — 항목 밖(절 본문·표)에서 건 것은 출발 문서 카드(`문서 ID` · 「항목 밖 · 문서 제목」). 이 문서 전체를 가리킨 참조는 항목의 하위가 아니라 8.10에 있다. 하위가 없으면 「없음」, 상위도 없으면 「없음 — 고립 항목」(관계도 UI-8 3.5와 같은 정의) | 참조 클릭 → 7.2와 같음 |
+| 8.1 | 참조 탭 | 패널 | 선택 항목의 상위 참조·하위 참조. 가리키는 곳이 없는 참조는 회색 카드에 경고 아이콘(UC-H2 2c). **하위는 이 항목을 가리키는 참조 하나하나** — 항목 밖(절 본문·표)에서 건 것은 출발 문서 카드(`문서 ID` · 「항목 밖 · 문서 제목」). 이 문서 전체를 가리킨 참조는 항목의 하위가 아니라 8.10에 있다. 하위가 없으면 「없음」, 상위도 없으면 「없음 — 고립 항목」(관계도 UI-8 3.5와 같은 정의) | 카드를 누르면 항목 미리보기 팝업(UI-18, 카드 BH) — 그 항목 블록만. 문서 전체 카드는 문서 머리만. 가리키는 곳 없는 카드는 안 열린다. 문서로 가기는 팝업의 「이동」 |
 | 8.10 | 문서 전체를 참조 | 접힌 묶음 | 이 문서 **전체**를 가리킨 참조(`[[문서 ID]]`·frontmatter `upstream`) N건. 접혀 있고 누르면 펼친다. 항목을 고르기 전에도 있다. 재료는 `GET …/downstream`의 `(문서)` — 다른 문서에서 건 것만. 0이면 없다 | 펼침 · 참조 클릭 → 7.2와 같음 |
 | 8.4 | 질문 탭 | 탭 | 읽다가 묻는다(UC-H19). 모델이 같은 프로젝트를 관계도로 따라 읽는다. **모델 키가 없으면 이 탭이 없다** — `GET /api/me`의 `llm_enabled`로 안다 | 패널을 질문으로 |
 | 8.5 | 맥락 줄 | 텍스트 | 지금 무엇을 보며 묻는지. 항목이 있으면 「`X 이름` · 이 항목을 보며 묻습니다」, 없으면 「문서 전체 · `{doc_id}`에 대해 묻습니다」. 항목은 힌트다 | — |
@@ -2738,7 +2738,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 | 4.4 | 코드 탭으로 | 링크 | MINISPEC 항목이 있는 함수에만. `문서#항목` | UI-5 코드 탭 — `/p/{코드}/d/{문서}?panel=code#item-{항목}` |
 | 4.5 | 커뮤니티 칩 | 버튼 | 함수가 든 커뮤니티의 색·라벨·함수 수 | 그 커뮤니티를 접는다 |
 | 4.7 | 명세 | 영역 | 고른 함수가 어느 명세의 무엇인가. MINISPEC 함수면 항목 뱃지·이름, 「근거」(그 항목이 건 상위 참조 — SEQ·UC·API·DOM…)와 「이것을 가리킴」(이 항목을 가리키는 하위 참조 — CODE 카드 등). `…/items/{항목}/references`(참조 탭 8.1과 같은 자료). 항목이 없는 함수면 「항목 없음」과 **가까운 항목** — 부르는 것·불리는 곳 중 항목 있는 함수의 항목, 호출 많은 순 6개. 커뮤니티를 골랐으면 허브 함수(4.6과 같은 함수) 기준. 상위·하위 각 8줄, 넘치면 「… n개 더 — 코드 탭에서」 | — |
-| 4.8 | 참조 줄 | 행 | 항목 ID 뱃지와 이름. 가리키는 곳이 없는 참조는 회색에 경고 | 그 문서의 그 항목으로(`/p/{코드}/d/{문서}#item-{항목}`) |
+| 4.8 | 참조 줄 | 행 | 항목 ID 뱃지와 이름. 가리키는 곳이 없는 참조는 회색에 경고 | 항목 미리보기 팝업(UI-18, 카드 BH) — 그 항목 블록만. 문서로 가기는 팝업의 「이동」. 가리키는 곳 없는 줄은 안 열린다 |
 | 4.6 | 코드 | 영역 | 고른 함수의 본문 — 「코드 L시작–L끝」과 그래프 커밋, 줄 번호가 붙은 본문(UI-5 8.21과 같은 모양·같은 읽기, 300줄 상한). 고르는 순간 읽는다. 커뮤니티를 골랐으면 허브 함수(라벨이 함수면 그것, 아니면 4.2의 첫 함수)의 본문. 못 읽으면(5c) 「코드를 읽을 수 없습니다 — {이유}」 한 줄 | — |
 | 5 | 범례 | 영역 | 커뮤니티 목록과 표시 설명 | — |
 | 5.1 | 커뮤니티 행 | 행 | 색 견본 · 라벨 · 함수 수 · 체크박스. 라벨이 파일 경로 꼴이면 파일 이름만 보이고 전체는 툴팁 | 체크를 끄면 그 커뮤니티의 노드·선을 숨긴다 |
@@ -2805,6 +2805,140 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 2. 근거 줄 `SEQ-1`(4.8)을 누른다 — SEQ 문서의 그 항목으로 간다. 뒤로 돌아오면 선택이 그대로다
 3. 고리 없는 `_advance_processed`를 고른다 — 「항목 없음 · 가까운 항목」에 `MS-007#pipeline.save_pipeline`(이 함수를 부르는 것)
 4. 접힌 커뮤니티 원을 누른다 — 허브 함수 기준으로 4.6과 4.7이 같이 바뀐다
+
+---
+
+## UI-18 항목 미리보기
+
+| 항목 | 내용 |
+|---|---|
+| 화면 설계 | [[SYNC-UI-001#UI-18]] |
+| 경로 | UI-5·UI-17 위의 다이얼로그. 별도 경로 없음 |
+| 진입 | UI-5 참조 탭 카드(8.1) · UI-17 명세 줄(4.8) · 이 팝업 안 블록의 참조 링크(2.1) |
+| 유스케이스 | [[SYNC-UC-001#UC-H3]] 기본 흐름 3, 확장 3a·3b |
+
+### 배치
+
+```html
+<style>
+  .pg{padding:22px 26px;display:flex;flex-direction:column;gap:14px;flex:1}
+  .ghost{flex:1;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .dlg.peek{width:640px}
+  .dh .idb{display:inline-block;padding:0 6px;border-radius:4px;background:#fbefd2;font:600 12.5px var(--mono)}
+  .dh .doc{font:400 12.5px var(--sans);color:var(--ink3);display:flex;align-items:center;gap:6px}
+  .dh .pill{display:inline-block;padding:0 7px;border-radius:999px;font:600 11px var(--sans);background:var(--ok);color:#fff}
+  .dh .bk{font:400 13px var(--sans);color:var(--ink3);cursor:pointer}
+  .db{max-height:70vh}
+  .db .body h4{margin:0 0 8px;font-size:15px}
+  .db .body p{margin:0 0 8px;line-height:1.65;font-size:13.5px}
+  .db .body a.ref{color:var(--ink);text-decoration:none;border-bottom:1px dotted var(--ink3)}
+  .db .body pre{background:var(--sub2);padding:8px;border-radius:6px;font:12px/1.5 var(--mono)}
+  .dochead{padding:4px 0}
+  .dochead .t{font:600 15px var(--sans)}
+  .dochead .m{font:12.5px var(--mono);color:var(--dim);margin-top:4px}
+</style>
+<div class="sd">
+  <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb">설정</span><span class="tb">로그아웃</span></div>
+  <div class="pg"><div style="display:flex;align-items:flex-end;gap:10px"><span class="h1">코드 그래프</span><span class="sp"></span><span class="lbl">함수 967 · 호출 1,448 · 커뮤니티 19</span></div><div class="ghost"></div></div>
+
+  <div class="ov" style="padding-top:44px">
+    <div class="dlg peek" data-el="1">
+      <div class="dh">
+        <span class="bk" data-el="1.1">‹ 뒤로</span>
+        <span class="idb" data-el="1.2">SEQ-001#SEQ-1</span>
+        <span class="doc" data-el="1.3">SEQ-001 <span class="pill">완료</span> v35</span>
+        <span class="sp"></span>
+        <span class="b" data-el="1.5">새 창</span>
+        <span class="b solid" data-el="1.4">이동</span>
+        <span class="x" data-el="1.6">✕</span>
+      </div>
+      <div class="db" data-el="2">
+        <div class="body">
+          <h4>SEQ-1 에이전트가 문서를 수정한다</h4>
+          <p><a class="ref" data-el="2.1">UC-001#UC-A6</a> 기본 흐름 1~6, 확장 3a·4a. MCP <code>update_document</code>.</p>
+          <pre>sequenceDiagram
+    autonumber
+    actor A as 에이전트
+    participant T as mcp/tools
+    …</pre>
+          <p><b>읽을 때 볼 것</b> — 저장은 push가 먼저고 DB가 뒤다. push가 실패하면 DB에 아무것도 남지 않는다.</p>
+        </div>
+      </div>
+      <div class="df">
+        <span class="lbl">그림은 「이동」해서 본다 · Esc로 닫힘</span>
+        <span class="sp"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="var">변형 — 문서 전체 참조(3a): 문서 머리만</div>
+<div class="sd h">
+  <div class="ov" style="padding-top:44px">
+    <div class="dlg peek" data-el="1">
+      <div class="dh">
+        <span class="idb" data-el="1.2">API-002</span>
+        <span class="doc" data-el="1.3">API-002 <span class="pill">완료</span> v21</span>
+        <span class="sp"></span>
+        <span class="b" data-el="1.5">새 창</span>
+        <span class="b solid" data-el="1.4">이동</span>
+        <span class="x" data-el="1.6">✕</span>
+      </div>
+      <div class="db" data-el="2">
+        <div class="dochead" data-el="3">
+          <div class="t">API 명세 MCP — 싱크독</div>
+          <div class="m">8단계 API · 완료 · 항목 13 · 문서 전체를 가리키는 참조라 본문은 열지 않는다</div>
+        </div>
+      </div>
+      <div class="df"><span class="lbl">문서를 보려면 「이동」</span><span class="sp"></span></div>
+    </div>
+  </div>
+</div>
+```
+
+### 요소
+
+| # | 이름 | 종류 | 보여주는 것 | 누르면 |
+|---|---|---|---|---|
+| 1 | 다이얼로그 | 다이얼로그 | UI-5 또는 UI-17 위에 뜬다. 폭 640. 본문(2)만 스크롤, 최대 70vh | — |
+| 1.1 | 뒤로 | 버튼 | 블록 안 참조(2.1)를 따라왔을 때만. 스택 깊이만큼 되짚는다 | 바로 전 항목으로 |
+| 1.2 | 항목 ID | 뱃지 | `문서#항목`(프로젝트 코드 접두는 뺀다). 문서 전체 참조면 문서 ID | — |
+| 1.3 | 문서 | 텍스트 | 문서 ID · 상태 필 · 버전 — 항목 응답(`ItemView`)에 든 것만. 제목은 본문을 받아야 알 수 있어 안 보인다(문서 전체 변형 3에는 있다) | — |
+| 1.4 | 이동 | 버튼 | | 그 문서의 UI-5, 그 항목 자리(`/p/{코드}/d/{문서}#item-{항목}`). 팝업은 닫힌다 |
+| 1.5 | 새 창 | 버튼 | | 같은 주소를 새 탭으로. 팝업은 그대로 |
+| 1.6 | 닫기(✕) | 버튼 | | 닫힘 |
+| 2 | 본문 | 영역 | 그 항목 블록을 유저용 탭(UI-5 7)과 같은 렌더로. 헤더부터 다음 항목 헤더 전까지 | — |
+| 2.1 | 참조 링크 | 링크 | 블록 안 `[[…]]`. 유저용 탭과 같은 점선 밑줄 | 팝업이 그 항목으로 바뀐다(스택에 쌓인다). 없는 참조는 안 열린다 |
+| 3 | 문서 머리 | 영역 | 문서 전체 참조(3a)일 때 본문 대신 — 제목 · 단계 · 상태 · 항목 수 · 「본문은 열지 않는다」 한 줄 | — |
+
+### 규칙
+
+- **보던 화면을 떠나지 않는다.** 참조를 누른 자리(UI-17의 선택·UI-5의 선택 항목)는 팝업 뒤에 그대로 있고, 닫으면 그대로 돌아온다. 팝업은 URL이 없다 — 브라우저 히스토리를 건드리지 않는다
+- **블록은 서버가 자른다**([[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}]] — MCP `get_item`과 같은 `queries.item_view`). 화면은 `body`를 유저용 렌더(`renderBlocks`)로 그린다 — 유저용 탭과 다른 글자를 보이면 안 된다. 그림(mermaid)은 그리지 않고 코드로 둔다 — 발의 안내가 「이동」을 가리킨다
+- **블록 안 참조(2.1)는 팝업 안에서 이어 본다.** 스택에 쌓고 「뒤로」(1.1)로 되짚는다. 받은 블록은 스택을 내려갈 때 다시 받지 않는다. 열려 있는 동안 같은 항목을 또 누르면 아무 일도 없다
+- 문서 전체 참조(항목 없음)는 문서 머리(3)만 — `GET /api/docs/{docId}`의 제목·상태·항목 수. 삭제된 항목(410)은 본문에 「삭제된 항목 — {deleted_at}」 한 줄과 「이동」만. 가리키는 곳 없는 참조는 애초에 팝업을 안 연다(UC-H3 2b)
+- 닫는 길은 공통 1.1 — ✕ · Esc · 바깥 클릭. 「이동」도 닫는다. 「새 창」은 안 닫는다
+- 폭 640 — 항목 블록은 본문 한 단 폭이면 충분하고, 뒤의 화면이 보여야 어디서 열었는지 안다
+
+### 시나리오
+
+**S-1 코드 그래프에서 근거를 들여다본다** — UC-H3 기본 흐름 3 (카드 BH)
+1. UI-17에서 `save_pipeline`을 고르고 명세(4.7)의 근거 줄 `SEQ-1`(4.8)을 누른다
+2. 팝업(1)에 `SEQ-001#SEQ-1` 뱃지(1.2), 「SEQ-001 · 완료 · v35」(1.3), 본문(2)에 SEQ-1 블록. 뒤의 그래프는 선택이 그대로다
+3. Esc로 닫는다 — 그래프에 `save_pipeline`이 아직 골라져 있다
+
+**S-2 블록 안 참조를 따라간다 — 뒤로**
+1. S-1의 팝업에서 본문의 `UC-001#UC-A6`(2.1)을 누른다. 팝업이 UC-A6 블록으로 바뀌고 머리에 「‹ 뒤로」(1.1)가 생긴다
+2. 「뒤로」를 누른다 — SEQ-1로 돌아온다(다시 받지 않는다)
+
+**S-3 문서로 간다 · 새 창으로 연다**
+1. 「이동」(1.4)을 누른다 — SEQ 문서 UI-5가 SEQ-1 자리에서 열리고 팝업은 닫힌다. 브라우저 뒤로 가기는 UI-17이다
+2. 대신 「새 창」(1.5)을 누르면 같은 자리가 새 탭에 열리고 팝업은 그대로다
+
+**S-4 참조 탭에서 · 문서 전체 · 삭제됨** — UC-H3 3a·3b
+1. UI-5 참조 탭(8.1)에서 상위 참조 카드를 누른다 — 같은 팝업이 뜬다
+2. 문서 전체를 가리키는 카드를 누르면 본문 자리에 문서 머리(3)만 — 제목·단계·상태·항목 수
+3. 삭제된 항목이면 「삭제된 항목 — 2026-09-30」과 「이동」만. 가리키는 곳 없는 카드는 눌러도 아무 일도 없다
 
 ---
 

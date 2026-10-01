@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { ago, api, ApiError, type CodeNode, type CodeNodes, type CodeText, type ItemRef, type ItemReferences, type ProjectSummary } from '../api/client'
 import { CodeLines } from './codeSrc'
+import { ItemPeek, type PeekTarget } from '../components/ItemPeek'
 
 type Sel = { kind: 'c'; id: number } | { kind: 'f'; key: string }
 interface GNode extends SimulationNodeDatum {
@@ -71,6 +72,7 @@ export function CodeGraph() {
   const [src, setSrc] = useState<{ key: string; text?: CodeText; error?: string } | null>(null)
   const srcSeq = useRef(0)
   const [refs, setRefs] = useState<{ key: string; data?: ItemReferences; error?: string } | null>(null) // 4.7 명세 (카드 BG)
+  const [peek, setPeek] = useState<PeekTarget | null>(null) // UI-18 항목 미리보기 (카드 BH)
   const refSeq = useRef(0)
   const [, bump] = useState(0) // 틱마다 겹층 자리를 다시 — canvas는 rAF가 직접 그린다
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -640,10 +642,10 @@ export function CodeGraph() {
         <ItemIdBadge>{r.raw_target.split('-').slice(1).join('-')}</ItemIdBadge> 가리키는 곳 없음
       </div>
     ) : (
-      <Link className="sr" key={`${r.doc_id}#${r.item_id}`} data-el={first ? '4.8' : undefined} to={`/p/${r.doc_id?.split('-')[0]}/d/${r.doc_id}${r.item_id ? '#item-' + r.item_id : ''}`}>
+      <div className="sr" key={`${r.doc_id}#${r.item_id}`} data-el={first ? '4.8' : undefined} onClick={() => setPeek({ doc_id: r.doc_id!, item_id: r.item_id })} title="항목 미리보기 (UI-18)">
         <ItemIdBadge>{`${r.doc_id}${r.item_id ? '#' + r.item_id : ''}`.split('-').slice(1).join('-')}</ItemIdBadge>
         <span className="nm2">{r.item_id ? r.display_name : `(문서 전체) ${r.display_name ?? ''}`}</span>
-      </Link>
+      </div>
     )
   const specBlock = (f: CodeNode) => {
     const LIMIT = 8
@@ -658,10 +660,10 @@ export function CodeGraph() {
           {items.map((x, i) => {
             const m = msParts(x.ms!)
             return (
-              <Link className="sr" key={x.ms} data-el={i === 0 ? '4.8' : undefined} to={m.to} title={x.ms!}>
+              <div className="sr" key={x.ms} data-el={i === 0 ? '4.8' : undefined} onClick={() => setPeek({ doc_id: m.doc, item_id: m.item })} title={`${x.ms!} — 항목 미리보기 (UI-18)`}>
                 <ItemIdBadge>{m.short}</ItemIdBadge>
                 <span className="nm2">{x.qual}</span>
-              </Link>
+              </div>
             )
           })}
         </div>
@@ -872,6 +874,7 @@ export function CodeGraph() {
           <span data-el="5.2">큰 원 = 커뮤니티(크기 = 함수 수) · 선 굵기 = 호출 수 · 고리 = MINISPEC 함수 — ✓ 같음 · ▲ 코드만 · ◌ 명세만</span>
         </div>
       </div>
+      {peek && <ItemPeek code={code} target={peek} onClose={() => setPeek(null)} />}
     </div>
   )
 }

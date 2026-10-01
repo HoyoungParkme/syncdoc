@@ -916,3 +916,11 @@ a.arow:hover{background:var(--bg-subtle)}
 .cglegend .row input{margin:0}
 .cglegend .row.off{opacity:.45}
 .cglegend .grow{flex:1}
+
+/* UI-18 항목 미리보기 (카드 BH) — 공통 다이얼로그 위에 블록 하나. 본문은 유저용 뷰와 같은 .body 스타일 */
+.dialog.peek .dhead{gap:var(--space-8)}
+.dialog.peek .dhead .bk{font-weight:var(--w-regular);font-size:var(--text-meta);color:var(--ink-muted);cursor:pointer}
+.dialog.peek .dhead .doc{display:flex;align-items:center;gap:var(--space-6);font-weight:var(--w-regular);font-size:var(--text-meta);color:var(--ink-muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dialog.peek .dbody{max-height:70vh;overflow:auto;padding:var(--space-14) var(--space-18)}
+.dialog.peek .dochead .t{font-weight:var(--w-semibold);font-size:var(--text-ui)}
+.dialog.peek .dochead .m{font-family:var(--font-mono);font-size:var(--text-mono-sm);color:var(--ink-faint);margin-top:var(--space-4)}

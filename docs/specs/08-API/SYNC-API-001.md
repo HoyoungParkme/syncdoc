@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -532,6 +532,31 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
       '410':
         $ref: '#/components/responses/Problem'
 ```
+
+#### GET/api/docs/{docId}/items/{itemId} 항목 블록
+
+화면 [[SYNC-UI-001#UI-18]] · 유스케이스 [[SYNC-UC-001#UC-H3]] 기본 흐름 3 · 서비스 [[SYNC-MS-008#queries.item_view]] — MCP `get_item`과 같은 함수
+
+```yaml
+/api/docs/{docId}/items/{itemId}:
+  get:
+    summary: "항목 블록 하나 (UI-18 항목 미리보기) — 헤더부터 다음 항목 헤더 전까지. 화면이 유저용으로 그린다"
+    parameters:
+    - $ref: '#/components/parameters/docId'
+    - $ref: '#/components/parameters/itemId'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemView'
+      '404':
+        description: 문서 없음 · 소유하지 않은 프로젝트 · 항목 없음(`available_items`가 실린다)
+      '410':
+        description: 삭제된 항목(`item-deleted`, `deleted_at`)
+```
+
+참조 줄(UI-17 4.8)·참조 카드(UI-5 8.1)를 누르면 이 응답의 `body`를 팝업에 그린다 — 보던 화면을 떠나지 않는다(카드 BH). `itemId`의 `/`는 `~`로.
 
 #### GET/api/docs/{docId}/downstream 이 문서를 참조하는 것
 
@@ -1804,6 +1829,16 @@ components:
           type: string
         is_missing:
           type: boolean
+    ItemView:
+      type: object
+      description: 항목 블록 하나 (UI-18 · MCP get_item과 같은 모양)
+      properties:
+        doc_id: {type: string}
+        item_id: {type: string}
+        display_name: {type: string, nullable: true}
+        body: {type: string, description: 항목 헤더부터 다음 항목 헤더 전까지의 원본}
+        doc_status: {type: string}
+        doc_version_no: {type: integer}
     ItemReferences:
       type: object
       properties:

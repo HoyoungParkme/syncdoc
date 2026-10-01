@@ -10,6 +10,7 @@ import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 
 import mermaid from 'mermaid'
 import { ago, api, ApiError, docPath, incompleteOf, warnText, type AskAnswer, type AskDelta, type AskNote, type AskRead, type AttachmentMeta, type CodeText, type CodeView, type Conversation, type ConversationBrief, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
 import { CodeLines } from './codeSrc'
+import { ItemPeek, type PeekTarget } from '../components/ItemPeek'
 import { extraCss, renderView } from '../view'
 import { attachDiagramButtons, DiagramFull, type FullDiagram, type WfFullDetail } from '../components/DiagramFull'
 import { esc, renderBlocks, splitRef } from '../view/md'
@@ -28,6 +29,7 @@ export function DocView() {
   const [full, setFull] = useState<FullDiagram | null>(null) // 7.6
   const [selected, setSelected] = useState<string | null>(null)
   const [refs, setRefs] = useState<ItemReferences | null>(null)
+  const [peek, setPeek] = useState<PeekTarget | null>(null) // UI-18 항목 미리보기 (카드 BH)
   const [downstream, setDownstream] = useState<DownstreamView | null>(null)
   const [delOpen, setDelOpen] = useState(false) // 13
   useEscape(delOpen ? () => setDelOpen(false) : null) // 1.1 — 바깥 클릭과 같다 (#117)
@@ -241,6 +243,7 @@ export function DocView() {
     // 탭을 오갈 때 본문이 좌우로 안 흔들린다 (UI-5 규칙)
     <div className="docscreen" style={{ '--toc-w': `${tocW}px`, '--panel-w': `${sideW}px` } as React.CSSProperties}>
       {full && <DiagramFull d={full} el="7.6" onClose={() => setFull(null)} />}
+      {peek && <ItemPeek code={code} target={peek} onClose={() => setPeek(null)} />}
       {/* 브레드크럼 — 어디서 들어왔든 지금 자리를 말하고, 앞 두 조각으로 되짚어 올라간다 */}
       <div className="docbar" data-el="1">
         <Link className="crumb" to={`/p/${code}`}>
@@ -437,11 +440,11 @@ export function DocView() {
                           항목 헤더를 누르면 그 항목의 상위·하위 참조가 여기 옵니다.
                         </div>
                       ) : refs ? (
-                        <Refs refs={refs} />
+                        <Refs refs={refs} onPeek={setPeek} />
                       ) : (
                         <div className="lbl">선택: #{selected}</div>
                       )}
-                      <DocRefs refs={downstream?.by_item['(문서)'] ?? []} />
+                      <DocRefs refs={downstream?.by_item['(문서)'] ?? []} onPeek={setPeek} />
                     </>
                   )}
                 </div>
@@ -534,7 +537,7 @@ function tocOf(doc: Document): { id: string; text: string; depth: number }[] {
 /** 참조 카드 한 장 — 문서 ID(#항목 ID)와 이름. 가리키는 곳이 없으면 점선·흐리게.
  *  항목이 없으면(item_id null) 문서다 — 상위에서는 문서 전체를 가리킨 것(`(문서 전체)`), 하위·8.10에서는 항목 밖
  *  (절 본문·표·frontmatter)에서 건 참조의 출발 문서(`항목 밖 · 제목`, #160) */
-function RefCard({ r, from }: { r: ItemRef; from?: boolean }) {
+function RefCard({ r, from, onPeek }: { r: ItemRef; from?: boolean; onPeek: (t: PeekTarget) => void }) {
   if (r.is_missing)
     return (
       <div className="rcard missing">
@@ -542,21 +545,22 @@ function RefCard({ r, from }: { r: ItemRef; from?: boolean }) {
         <div className="lbl">항목이 삭제됐거나 아직 안 쓰였다</div>
       </div>
     )
+  // 누르면 항목 미리보기(UI-18, 카드 BH) — 문서로 가기는 팝업의 「이동」
   return (
-    <Link className="rcard" to={`/p/${r.doc_id?.split('-')[0]}/d/${r.doc_id}${r.item_id ? '#item-' + r.item_id : ''}`}>
+    <div className="rcard" onClick={() => onPeek({ doc_id: r.doc_id!, item_id: r.item_id })} title="항목 미리보기">
       <b className="mono">
         {r.doc_id}
         {r.item_id ? '#' + r.item_id : ''}
       </b>
       <div className="lbl">{r.item_id ? r.display_name : from ? `항목 밖 · ${r.display_name ?? ''}` : '(문서 전체)'}</div>
-    </Link>
+    </div>
   )
 }
 
 /** 8.1 참조 — 선택 항목의 상위(근거)·하위(파생). 각 줄은 카드다.
  *  하위는 이 항목을 가리키는 참조 하나하나 — 카드·관계도와 같은 것을 센다. 문서 전체를 가리킨 참조는 8.10에 (#160).
  *  「고립 항목」은 상위도 하위도 없을 때만 — 관계도(UI-8 3.5)와 같은 정의 */
-function Refs({ refs }: { refs: ItemReferences }) {
+function Refs({ refs, onPeek }: { refs: ItemReferences; onPeek: (t: PeekTarget) => void }) {
   const isolated = !refs.upstream.length && !refs.downstream.length
   return (
     <>
@@ -565,10 +569,10 @@ function Refs({ refs }: { refs: ItemReferences }) {
         <ItemIdBadge>{refs.item_id}</ItemIdBadge>
       </div>
       <div className="lbl">상위 참조 (근거)</div>
-      {refs.upstream.length ? refs.upstream.map((r, i) => <RefCard key={i} r={r} />) : <div className="pempty">없음</div>}
+      {refs.upstream.length ? refs.upstream.map((r, i) => <RefCard key={i} r={r} onPeek={onPeek} />) : <div className="pempty">없음</div>}
       <div className="lbl">하위 참조 (파생) {refs.downstream.length || ''}</div>
       {refs.downstream.length ? (
-        refs.downstream.map((r, i) => <RefCard key={i} r={r} from />)
+        refs.downstream.map((r, i) => <RefCard key={i} r={r} from onPeek={onPeek} />)
       ) : (
         <div className="pempty">{isolated ? '없음 — 고립 항목' : '없음'}</div>
       )}
@@ -578,13 +582,13 @@ function Refs({ refs }: { refs: ItemReferences }) {
 
 /** 8.10 문서 전체를 참조 — 이 문서 **전체**를 가리킨 참조(`GET …/downstream`의 `(문서)`, 다른 문서에서 건 것만).
  *  항목의 하위가 아니라 따로 접어 둔다. 항목을 고르기 전에도 있다. 0이면 없다 (#160) */
-function DocRefs({ refs }: { refs: ItemRef[] }) {
+function DocRefs({ refs, onPeek }: { refs: ItemRef[]; onPeek: (t: PeekTarget) => void }) {
   if (!refs.length) return null
   return (
     <details className="docrefs" data-el="8.10">
       <summary className="lbl">문서 전체를 참조 {refs.length}</summary>
       {refs.map((r, i) => (
-        <RefCard key={i} r={r} from />
+        <RefCard key={i} r={r} from onPeek={onPeek} />
       ))}
     </details>
   )
