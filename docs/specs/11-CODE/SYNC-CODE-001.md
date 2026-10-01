@@ -1220,7 +1220,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `codegraph.communities` · `build_code_graph` 3단계 · `queries.code_nodes` · 라우터·스키마 `CodeNodes` · `types.py` DTO 셋 · `pages/CodeGraph.tsx`(힘 배치·canvas·포커스 겹층 3.1~3.4·검색·패널·범례) · 경로 `/p/:code/code-graph` · `ProjectDetail` 2.3 · `CodePanel` 8.23 · `client.ts` 타입 · `styles.css`(커뮤니티 팔레트 토큰) · 의존성 `d3-force`·`@types/d3-force` |
 | 테스트 | MS-011·MS-007·MS-008 테스트 관점 · 라우터 `/code-graph` 200/404 · `check_ui` UI-17·UI-4·UI-5 · `check_tokens` 팔레트 12 · 헤드 크롬: SYNC 그래프 접힘 → 커뮤니티 펼침 → 검색 `save_pipeline` → 겹층 ▲ → 코드 탭으로 → 8.23으로 돌아옴 · 옛 그래프(커뮤니티 없음) 안내 · 폐쇄망판 바깥 요청 0 |
 | 선행 | BC |
-| 완료 | — |
+| 완료 | 2026-10-01 · 브랜치 `card/BD-code-graph-nodes`(2359b75 #249) · spec 16 + code 7 · 테스트 381 · `ruff`·`tsc`·`oxlint` · `validate` 0/0 · `check_code` 155/155 · `check_calls` 0/0 · `check_ui` 13/13(UI-17 요소 20) · `check_tokens` 103/0 · `check_view_html` 35/35 · 로컬 미리보기: 접힘(처음 맞춤)·범례 끄기·전부 펼치기(958 노드)·휠·끌기·검색 없음·검색 → 겹층 3.2·3.4·선 → 패널 → 4.4 코드 탭 → 8.23 → `?focus` 복귀, 콘솔 오류 0 · 운영(배포 뒤 재구축): SYNC 그래프 3659864 함수 958 · 호출 1,423 · **커뮤니티 127(8.2초)** · UI-4 2.3 → UI-17 통계·범례 127 · `save_pipeline` 검색 → ✓ 겹층·선 7·부르는 것 4·불리는 곳 6 → 코드 탭 → 8.23 → 복귀 · 바깥 요청은 Cloudflare 분석 하나뿐 · 되먹임: 싱크독은 군집 127개(싱글턴 다수)라 범례가 길다 — `resolution` 조정 후보 |
 
 ---
 
