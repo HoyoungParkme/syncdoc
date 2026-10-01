@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.core import queries
 from app.core.account.models import User
@@ -47,3 +47,14 @@ async def code_calls(code: str, user: User = Depends(current_user)) -> CodeCalls
 async def code_nodes(code: str, user: User = Depends(current_user)) -> CodeNodes:
     """SYNC-API-001#GET/api/projects/{code}/code-graph — 코드 그래프 노드 전부 (UI-17)"""
     return CodeNodes.model_validate(await queries.code_nodes(code, user))
+
+
+@router.get("/projects/{code}/code/source", response_model=CodeText)
+async def code_text(
+    code: str,
+    file: str = Query(min_length=1),
+    line: int = Query(ge=1),
+    user: User = Depends(current_user),
+) -> CodeText:
+    """SYNC-API-001#GET/api/projects/{code}/code/source — 코드 그래프의 코드 (UI-17 4.6, 카드 BF)"""
+    return CodeText.model_validate(await queries.code_text(code, file, line, user))
