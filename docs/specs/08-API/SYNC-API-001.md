@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -1058,6 +1058,28 @@ MINISPEC 항목인데 코드에 함수가 없으면 `function: null`·`missing: 
       '404':
         $ref: '#/components/responses/NotFound'
 ```
+
+#### GET/api/projects/{code}/code-graph 코드 그래프 노드 전부
+
+화면 [[SYNC-UI-001#UI-17]] · 유스케이스 [[SYNC-UC-001#UC-H20]] 기본 흐름 5 · 서비스 [[SYNC-MS-008#queries.code_nodes]]
+
+```yaml
+/api/projects/{code}/code-graph:
+  get:
+    summary: "코드 그래프(UI-17) — 프로젝트 함수 전부 · 호출 선 · 커뮤니티. MINISPEC 항목이 있는 함수는 대조 상태"
+    parameters:
+    - $ref: '#/components/parameters/code'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeNodes'
+      '404':
+        $ref: '#/components/responses/NotFound'
+```
+
+그래프가 없으면 `graph: null`에 빈 목록(UC-H20 1a). 커뮤니티를 모르는 옛 그래프면 `communities: []`이고 함수의 `community`가 null(5a) — 화면이 전부 펼쳐 보인다. `status`는 `compare` 결과로 코드만이 하나라도 있으면 `code_only`, 아니면 명세만이 있으면 `spec_only`, 아니면 `same`; 항목 없는 함수는 `ms`·`status`가 null. `calls`는 `[부르는 key, 불리는 key]`쌍이고 `via`는 싣지 않는다. 응답은 수백 KB다 — 화면이 열 때 한 번 받고 배치는 브라우저가 한다.
 
 ### 3.7 계정·토큰
 
@@ -2293,6 +2315,39 @@ components:
               from: {type: string, description: "부르는 MINISPEC 항목 DOC#ITEM"}
               to: {type: string}
               status: {type: string, enum: [same, code_only, spec_only]}
+    CodeNodes:
+      type: object
+      description: 코드 그래프 노드 전부(UI-17, 카드 BD). 배치는 브라우저가 한다
+      properties:
+        graph: {nullable: true, allOf: [{$ref: '#/components/schemas/CodeGraphInfo'}]}
+        communities:
+          type: array
+          description: 함수가 하나라도 든 커뮤니티. 옛 그래프면 빈 목록
+          items:
+            type: object
+            properties:
+              id: {type: integer}
+              label: {type: string, description: 허브 노드 이름}
+              size: {type: integer, description: 든 함수 수}
+        functions:
+          type: array
+          items:
+            type: object
+            properties:
+              key: {type: string, description: "파일:줄"}
+              name: {type: string}
+              qual: {type: string, description: "Class.fn 또는 모듈.fn"}
+              file: {type: string}
+              line: {type: integer}
+              community: {type: integer, nullable: true}
+              ms: {type: string, nullable: true, description: "MINISPEC 항목 DOC#ITEM"}
+              status: {type: string, nullable: true, enum: [same, code_only, spec_only]}
+        calls:
+          type: array
+          description: "[부르는 key, 불리는 key]"
+          items:
+            type: array
+            items: {type: string}
 ```
 
 ---
