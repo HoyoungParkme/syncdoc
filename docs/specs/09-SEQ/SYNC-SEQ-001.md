@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 
 유스케이스 흐름을 **객체 수준**으로 내린다. 누가 누굴 어떤 순서로 부르고, 어디서 갈라지는지. 생명선은 클래스 명세 4장의 서비스와 인프라 4.1의 구성 요소다.
 
-**1장 대응표의 입구 전부(REST 35 엔드포인트 + MCP 도구)를 다룬다.** v1.0에서는 "단순 조회는 안 그린다"고 했으나, 그려보니 단순해 보이던 조회가 묶음을 넘는 호출을 숨기고 있었다(`get_document`의 미존재 참조, 프로젝트 목록의 건수). 시퀀스는 그런 걸 잡으려고 그리는 것이므로 빠뜨리면 안 된다.
+**1장 대응표의 입구 전부(REST 36 엔드포인트 + MCP 도구)를 다룬다.** v1.0에서는 "단순 조회는 안 그린다"고 했으나, 그려보니 단순해 보이던 조회가 묶음을 넘는 호출을 숨기고 있었다(`get_document`의 미존재 참조, 프로젝트 목록의 건수). 시퀀스는 그런 걸 잡으려고 그리는 것이므로 빠뜨리면 안 된다.
 
 **v2에서 협업 장치를 걷어냈다.** 전파·플래그·댓글·내 할 일·백업의 시퀀스(SEQ-3·6·16·17)는 은퇴했고 번호는 비워 둔다. 남은 것 중 그 장치를 부르던 단계는 지웠다.
 
@@ -69,7 +69,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | GET /api/projects/{code}/flags | [[#SEQ-18]] | ○ |
 | GET /api/projects/{code}/graph | [[#SEQ-14]] | ○ |
 | GET /api/docs/{docId} · MCP get_document | [[#SEQ-11]] | ○ |
-| MCP get_item | [[#SEQ-12]] | ○ |
+| MCP get_item · GET /api/docs/{docId}/items/{itemId} | [[#SEQ-12]] | ○ |
 | GET …/items/{itemId}/references · MCP get_references | [[#SEQ-13]] | ○ |
 | POST /api/docs/{docId}/status | [[#SEQ-5]] | ○ |
 | GET /api/docs/{docId}/versions | [[#SEQ-C1]] | |
@@ -584,7 +584,7 @@ sequenceDiagram
 
 ## SEQ-12 항목을 본다
 
-[[SYNC-UC-001#UC-A3]]. MCP `get_item`.
+[[SYNC-UC-001#UC-A3]]. MCP `get_item` · REST `GET /api/docs/{docId}/items/{itemId}`(UI-18 항목 미리보기, [[SYNC-UC-001#UC-H3]] 3, 카드 BH) — 입구만 다르고 `queries.item_view`부터는 같다.
 
 ```mermaid
 sequenceDiagram
@@ -611,6 +611,7 @@ sequenceDiagram
     S-->>Q: ItemView (body 블록, doc_status, doc_version_no)
     Q-->>T: ItemView
     T-->>A: JSON
+    Note over T,Q: 웹은 routers/references가 같은 item_view를 부른다 — UI-18이 블록을 유저용으로 그린다 (카드 BH)
 ```
 
 **읽을 때 볼 것** — "항목 블록"의 경계를 어떻게 자르나가 MINISPEC 과제. 문서 타입마다 헤더 형식이 다르다(클래스 미결 `display_name`과 같은 문제).
