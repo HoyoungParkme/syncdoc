@@ -1462,6 +1462,7 @@ async def test_build_code_graph_from_archive(scoped: Session, proj, monkeypatch)
     assert quals["pipe.save"]["ms"] == "EXMP-MS-007#pipeline.save"
     save, get = quals["pipe.save"]["key"], quals["SpecService.get"]["key"]
     assert [save, get, "enrich"] in row.graph["calls"]  # 즉석 생성 호출을 보강이 잡았다
+    assert row.graph["communities"] and all("community" in f for f in row.graph["functions"])
     assert not (work / "graphify-out").exists()  # 작업 사본을 더럽히지 않는다
     # 추출이 실패하면 옛 그래프가 남고 이유만 (UC-S8 2a)
     old = row.graph
