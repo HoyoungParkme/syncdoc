@@ -5,27 +5,19 @@
 
 from __future__ import annotations
 
-import json
-
 from fastapi import APIRouter, Depends, Query, Response
-from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core import pipeline, queries
 from app.core.account.models import User
 from app.core.account.service import AccountService
-from app.core.errors import Problem
 from app.core.spec.service import SpecService
-from app.core.types import ApiAuthor, AskEvent, Author, AuthorKind, DocStatus, Entry
+from app.core.types import ApiAuthor, Author, AuthorKind, DocStatus, Entry
 from app.db import get_session
+from app.web import sse
 from app.web.auth import current_user
 from app.web.schemas.documents import (
-    AskAnswer,
-    AskDelta,
-    AskNote,
-    AskRead,
     AskRequest,
-    AskStart,
     ChangeStatus,
     Diff,
     Document,
@@ -133,23 +125,6 @@ async def revert(doc_id: str, req: Revert, user: User = Depends(current_user)) -
     return SaveResult.model_validate(r)
 
 
-def _frame(name: str, data: dict) -> str:
-    return f"event: {name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
-
-
-def _event(ev: AskEvent) -> str:
-    """queries의 이벤트 DTO → SSE 프레임. 이름은 API-001 3.4 표 그대로."""
-    if isinstance(ev, queries.AskStart):
-        return _frame("start", AskStart.model_validate(ev).model_dump())
-    if isinstance(ev, queries.AskDelta):
-        return _frame("delta", AskDelta.model_validate(ev).model_dump())
-    if isinstance(ev, queries.AskNote):
-        return _frame("note", AskNote.model_validate(ev).model_dump())
-    if isinstance(ev, queries.AskRead):
-        return _frame("read", AskRead.model_validate(ev).model_dump())
-    return _frame("answer", AskAnswer.model_validate(ev).model_dump())
-
-
 @router.post("/{doc_id}/ask")
 async def ask(doc_id: str, req: AskRequest, user: User = Depends(current_user)) -> Response:
     """SYNC-API-001#POST/api/docs/{docId}/ask
@@ -162,18 +137,4 @@ async def ask(doc_id: str, req: AskRequest, user: User = Depends(current_user)) 
     gen = queries.ask_item(
         doc_id, req.item_id, req.conversation_id, req.question, req.attachment_ids, user
     )
-    first = await anext(gen)  # 여기서 나는 Problem은 problem_handler가 상태 코드로 낸다
-
-    async def body():
-        yield _event(first)
-        try:
-            async for ev in gen:
-                yield _event(ev)
-        except Problem as p:
-            yield _frame("error", p.to_dict())
-
-    return StreamingResponse(
-        body(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    return await sse.stream(gen)  # SSE 포장은 web/sse — code.ask_code와 같다 (카드 BI)

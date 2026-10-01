@@ -163,6 +163,16 @@ class AskTurn(BaseModel):
     text: str
 
 
+class AskCodeRequest(BaseModel):
+    """POST /api/projects/{code}/code/ask (카드 BI) — AskRequest에서 item_id가 key(함수
+    `파일:줄`)로. key가 없으면 그래프 전체를 두고 묻는다."""
+
+    question: str
+    conversation_id: int
+    key: str | None = None
+    attachment_ids: list[int] = []
+
+
 class AskRequest(BaseModel):
     """POST /api/docs/{docId}/ask — 어느 대화에 쌓을지(conversation_id). 앞 대화는 서버가 대화에서
     만든다(카드 AQ). item_id는 힌트, attachment_ids는 이 질문에 붙일 안 보낸 첨부(카드 AR)."""
@@ -174,10 +184,12 @@ class AskRequest(BaseModel):
 
 
 class AskStart(Base):
-    """SYNC-API-001 start 이벤트. 이 앞의 오류는 상태 코드, 뒤는 error 이벤트."""
+    """SYNC-API-001 start 이벤트. 이 앞의 오류는 상태 코드, 뒤는 error 이벤트.
+    코드 그래프에서 물으면 doc_id·item_id가 null이고 key가 함수 (카드 BI)."""
 
-    doc_id: str
+    doc_id: str | None
     item_id: str | None
+    key: str | None = None
 
 
 class AskNote(Base):
