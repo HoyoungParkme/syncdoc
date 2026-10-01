@@ -922,5 +922,9 @@ a.arow:hover{background:var(--bg-subtle)}
 .dialog.peek .dhead .bk{font-weight:var(--w-regular);font-size:var(--text-meta);color:var(--ink-muted);cursor:pointer}
 .dialog.peek .dhead .doc{display:flex;align-items:center;gap:var(--space-6);font-weight:var(--w-regular);font-size:var(--text-meta);color:var(--ink-muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dialog.peek .dbody{max-height:70vh;overflow:auto;padding:var(--space-14) var(--space-18)}
+/* 표가 든 블록(MINISPEC 함수 카드)은 제 폭대로 — 열이 글자 단위로 꺾이지 않게. 넘치면 본문 안에서 가로 스크롤 (#268) */
+.dialog.peek .dbody .body{overflow-x:auto}
+.dialog.peek .dbody .body table{width:max-content;max-width:none}
+.dialog.peek .dbody .body td,.dialog.peek .dbody .body th{min-width:9em;max-width:28em}
 .dialog.peek .dochead .t{font-weight:var(--w-semibold);font-size:var(--text-ui)}
 .dialog.peek .dochead .m{font-family:var(--font-mono);font-size:var(--text-mono-sm);color:var(--ink-faint);margin-top:var(--space-4)}
