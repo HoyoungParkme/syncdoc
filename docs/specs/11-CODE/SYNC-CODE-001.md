@@ -1168,7 +1168,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | UI-5 8.17~8.22 · UI-8 2.6·3.6~3.8 · API 넷(문서 코드·항목 코드·코드 본문·코드 호출) · `queries.code_view`·`code_calls`·`code_source` · `CodeGraphService.read`(비밀 꼴 거부·300줄 — AZ의 `read_code`도 같이) · `CodePanel`(DocView 안) · `Graph` 토글 `?code=1` |
 | 테스트 | 헤드 크롬: SYNC-MS-007 `save_pipeline` 코드 탭(✓·▲·◌, 코드 펼침) · PRD R1의 코드 탭(하위 체인 함수) · 관계도 토글 선 셋 |
 | 선행 | AX |
-| 완료 | — |
+| 완료 | 2026-10-01 · 브랜치 `card/AY-code-tab`(e5381de #235) + 보정 `card/AY-code-stale-selection`(73909f0 #238 — 문서를 옮길 때 옛 항목으로 묻지 않는다) · `card/AY-graph-focus`(c6ec895 #240 — 포커스가 그 함수의 호출 선을 켠다) · 운영 헤드 크롬: SYNC-MS-001 코드 탭 — 이 문서의 함수 12 전부 ✓, init_project 카드 「그래프 a076246 · 서버」 부르는 것 10 ✓ · 불리는 곳 0 · 코드 보기 L110–L124 · 코드 탭을 연 채 DOM-002로 이동해도 4xx 0 · 관계도 코드 호출 선 251, init_project에 마우스 → 선 10 켜짐·241 흐림·끝 노드 25 남음 |
 
 #### AZ 질문 탭·MCP 코드 도구
 
@@ -1178,7 +1178,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `ask_tool`에 도구 둘(여덟) · 지시문 한 줄 · 읽은 대상 `코드:` · MCP `get_code_graph` |
 | 테스트 | 질문 「save_pipeline이 명세대로 구현됐어?」 → 진행 줄에 코드 도구, 답에 코드 근거 · `.env` 읽기 거부 · MCP 호출 |
 | 선행 | AY |
-| 완료 | — |
+| 완료 | 2026-10-01 · 브랜치 `card/AZ-code-tools`(b39c6f1 #236) · 운영 헤드 크롬: SYNC-MS-001 질문 탭 「init_project가 실제로 부르는 함수를 코드 그래프와 본문으로 확인」 → `code_graph` · `read_code`(service.py:110-124) 두 도구, 본 것 2, 6초, 답 「명세 호출 목록과 코드 일치」 · 운영 MCP `get_code_graph`(SRVP-RFQ-001 Q1 → 그래프 4c3a8b9 함수 3) |
 
 #### BA 서버 저장 — 프로젝트마다 GitHub 또는 서버 저장소
 
@@ -1188,7 +1188,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | 설정 `STORAGE_MODES`·`ORIGINS_DIR` · 리비전 `0016_add_repositories_storage` · `Storage` · `git.init_bare` · `commit_push`는 https 원격일 때만 토큰 · `init_project` 3s(보관본 되살리기·이름 없이 남은 원본은 보관) · `delete_project` 보관 · `ensure_hook`·`repo_status` · 요약·상세에 `storage`(서버 저장이면 주소 없음) · `POST /api/projects` `storage` · `/api/me` `storage_modes` · MCP `init_project` 설명 끝 문장 · UI-3 2.7 · UI-4·UI-14 서버 저장 표시 · compose 볼륨 `origins` |
 | 테스트 | MS-001·MS-008·MS-009 테스트 관점 · 마이그레이션 표 · 운영: MCP로 서버 저장 프로젝트를 만들어 명세 저장·이력·되돌리기·상태·해제(보관)·되살리기, GitHub 프로젝트 회귀 |
 | 선행 | AZ |
-| 완료 | — |
+| 완료 | 2026-10-01 · 브랜치 `card/BA-server-storage`(c07a703 #241) · spec 17 + code 6 · 테스트 329 · `check_code` 148/148 · `check_calls` 0/0 · 운영: 0016 올라감 · UI-3 라디오 기본값 없음·고르기 전 초기화 비활성·서버면 주소·「없으면 만든다」 숨김 · MCP `init_project(storage=server)` SRVP(주소 null) → 서버 안 저장소에 골격·v1·v2 커밋(`receive.denyNonFastForwards`·`denyDeletes`·`fsckObjects`), 토큰 없이 · 운영 MCP 안내 「둘 다 쓴다 — 먼저 묻는다」 · UI-4 「서버 저장소」 · 되돌리기 v3→v4 · 상태 토글 완료↔초안 커밋 · UI-14 해제 → `_archive/SRVP-20261001003239.git` · UI-3 같은 코드 → 「보관된 저장소 … 문서 1개」 → 가져와서 등록 → v4 복원 · 끝나고 해제·보관 폴더 삭제 |
 
 #### BB 코드 받기 — 서버 저장소의 git push · MCP 코드 올리기
 
@@ -1198,7 +1198,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `routers/git.py` — `/git/{코드}.git/`의 `info/refs`·`git-upload-pack`·`git-receive-pack`(git http-backend, Basic 비밀번호 칸에 개인 토큰, 소유자·서버 저장만, 본문을 다 넘긴 뒤 응답, push면 응답 뒤 read_pending) · `ProjectService.server_origin` · `pipeline.upload_code` + MCP `upload_code` · `git.http_backend` · `commit_push` 쓰기 경로 가드 · 오류 셋 · 이력 표시 「git push」 · UI-4 1.4 push 방법 |
 | 테스트 | 실제 git 클라이언트로 clone·push · `upload_code` 상한·거절 · 운영: https push → 코드 탭, `upload_code` → 코드 탭 |
 | 선행 | BA |
-| 완료 | — |
+| 완료 | 2026-10-01 · 브랜치 `card/BB-code-receive`(5f6ba73 #243) · spec 11 + code 4 · 테스트 343 · 운영: https `git push`(비밀번호 칸 토큰, Cloudflare 경유) 8448c6d → 처리 지점·코드 그래프, UI-7 「Hoyoung Park · git push」, UI-4 push 방법에 `https://syncdoc.dpdns.org/git/SRVP.git` · MCP `upload_code` 4c3a8b9 → `get_code_graph` 함수 3 · git 입구 토큰 없으면 401 + `WWW-Authenticate: Basic`, 옛 프로토콜 404 |
 
 #### BC 폐쇄망판 — 로그인 없는 한 사람 판 · 글꼴 · 반입물
 
@@ -1208,7 +1208,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | 설정 `EDITION`·`LOCAL_LOGIN`·`LOCAL_NAME`, 폐쇄망판이면 저장 방식은 서버만·README 규약 링크는 `{PUBLIC_BASE_URL}/specs` · 리비전 `0017_add_users_kind`(자리표시 판정을 칸으로) · `AccountService.ensure_local_user`·`local_user` · `user_for_commit` 폐쇄망판 · 로컬 사용자 커밋 이메일 · `web/auth` 세션 없이 로컬 사용자 · Host·Origin 가드(`forbidden-origin`) · GitHub 로그인·통지 경로 없음 · `GET /specs/{path}` · `/api/me` `edition` · 글꼴을 앱이 담는다(`/fonts`, 두 판) · 배치 iframe의 바깥 글꼴 링크(폐쇄망판) · 로그아웃·커밋 이메일 숨김 · 반입물(`release/closed/` · `scripts/release_closed.sh`) |
 | 테스트 | MS-006·MS-007·MS-009 테스트 관점 · 폐쇄망 설정으로 세션 없이 API · 가드 403 · GitHub 경로 404 · 인터넷 없는 네트워크에서 반입물 E2E(바깥 요청 0 — MCP 연결·서버 저장 프로젝트·명세·git push·`upload_code`·코드 탭) · 인터넷판 회귀 |
 | 선행 | BB |
-| 완료 | — |
+| 완료 | 2026-10-01 · 브랜치 `card/BC-closed-edition`(2434dc9 #244) · spec 16 + code 8 · 테스트 372 · `check_view_html` 35/35 · 운영(인터넷판 회귀): 0017 올라감(github 3·placeholder 1) · 로그아웃·커밋 이메일 그대로 · `/auth/github` 302 · 글꼴 `/fonts/pretendard-1.3.9`·`ibm-plex-mono-5.3.0` 1년 immutable, Pretendard·Plex 로드, CDN 요청 0 · `/specs/STD/SYNC-STD-001.md` 200 · 로컬 반입 시험(`scripts/release_closed.sh 2026.09.30-rc1` → `docker load`, 앱·DB를 `internal: true` 망에, 프록시 하나): 브라우저 바깥 요청 0 · 로그인 없이 목록 · 내 계정 「로그인 없음 · 이 PC」 · MCP 안내 「서버 저장만」·github는 `storage-unavailable` · git clone·push·`upload_code` · 커밋 작성자 `local@syncdoc.local` · README 링크 `/specs` 200 · 배치 iframe CDN 글꼴 링크 → `/fonts`, `@import`·preconnect 제거 · `/login` → `/` · 다른 Host·Origin 403 · GitHub 경로 404 |
 
 ---
 
