@@ -2846,7 +2846,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
       <div class="dh">
         <span class="bk" data-el="1.1">‹ 뒤로</span>
         <span class="idb" data-el="1.2">SEQ-001#SEQ-1</span>
-        <span class="doc" data-el="1.3">시퀀스 — 싱크독 <span class="pill">완료</span> v35</span>
+        <span class="doc" data-el="1.3">SEQ-001 <span class="pill">완료</span> v35</span>
         <span class="sp"></span>
         <span class="b" data-el="1.5">새 창</span>
         <span class="b solid" data-el="1.4">이동</span>
@@ -2881,7 +2881,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
     <div class="dlg peek" data-el="1">
       <div class="dh">
         <span class="idb" data-el="1.2">API-002</span>
-        <span class="doc" data-el="1.3">API 명세 MCP — 싱크독 <span class="pill">완료</span> v21</span>
+        <span class="doc" data-el="1.3">API-002 <span class="pill">완료</span> v21</span>
         <span class="sp"></span>
         <span class="b" data-el="1.5">새 창</span>
         <span class="b solid" data-el="1.4">이동</span>
@@ -2906,7 +2906,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 | 1 | 다이얼로그 | 다이얼로그 | UI-5 또는 UI-17 위에 뜬다. 폭 640. 본문(2)만 스크롤, 최대 70vh | — |
 | 1.1 | 뒤로 | 버튼 | 블록 안 참조(2.1)를 따라왔을 때만. 스택 깊이만큼 되짚는다 | 바로 전 항목으로 |
 | 1.2 | 항목 ID | 뱃지 | `문서#항목`(프로젝트 코드 접두는 뺀다). 문서 전체 참조면 문서 ID | — |
-| 1.3 | 문서 | 텍스트 | 문서 제목 · 상태 필 · 버전 | — |
+| 1.3 | 문서 | 텍스트 | 문서 ID · 상태 필 · 버전 — 항목 응답(`ItemView`)에 든 것만. 제목은 본문을 받아야 알 수 있어 안 보인다(문서 전체 변형 3에는 있다) | — |
 | 1.4 | 이동 | 버튼 | | 그 문서의 UI-5, 그 항목 자리(`/p/{코드}/d/{문서}#item-{항목}`). 팝업은 닫힌다 |
 | 1.5 | 새 창 | 버튼 | | 같은 주소를 새 탭으로. 팝업은 그대로 |
 | 1.6 | 닫기(✕) | 버튼 | | 닫힘 |
@@ -2927,7 +2927,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 
 **S-1 코드 그래프에서 근거를 들여다본다** — UC-H3 기본 흐름 3 (카드 BH)
 1. UI-17에서 `save_pipeline`을 고르고 명세(4.7)의 근거 줄 `SEQ-1`(4.8)을 누른다
-2. 팝업(1)에 `SEQ-001#SEQ-1` 뱃지(1.2), 「시퀀스 — 싱크독 · 완료 · v35」(1.3), 본문(2)에 SEQ-1 블록. 뒤의 그래프는 선택이 그대로다
+2. 팝업(1)에 `SEQ-001#SEQ-1` 뱃지(1.2), 「SEQ-001 · 완료 · v35」(1.3), 본문(2)에 SEQ-1 블록. 뒤의 그래프는 선택이 그대로다
 3. Esc로 닫는다 — 그래프에 `save_pipeline`이 아직 골라져 있다
 
 **S-2 블록 안 참조를 따라간다 — 뒤로**
