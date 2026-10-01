@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -420,7 +420,7 @@ Cloudflare Tunnel은 노트북에서 별도로 실행하며 `:8000`을 공개 �
 
 ### 8.1 폐쇄망판
 
-같은 이미지를 설정 `EDITION=closed`로 띄운다([[#C10]]). 반입물은 스크립트(`scripts/release_closed.sh {판}`)가 인터넷 쪽에서 만든다.
+같은 이미지를 설정 `EDITION=closed`로 띄운다([[#C10]]). 반입물은 스크립트(`scripts/release_closed.sh {판}`)가 인터넷 쪽에서 만든다. **DB 이미지는 그 PC에 있는 `postgres:16-alpine`을 그대로 담는다** — 없을 때만 받는다. 만들 때마다 받으면 로컬 태그가 새 다이제스트로 옮겨가 같은 PC의 운영 db가 다음 `compose up`에 다시 만들어진다(#262).
 
 ```
 syncdoc-closed-{판}/
