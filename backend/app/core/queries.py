@@ -50,8 +50,11 @@ from app.core.types import (
     CodeBrief,
     CodeCallEdge,
     CodeCalls,
+    CodeCommunity,
     CodeFunction,
     CodeGraphInfo,
+    CodeNode,
+    CodeNodes,
     CodeRef,
     CodeText,
     CodeView,
@@ -1067,6 +1070,43 @@ async def code_calls(code: str, user: User) -> CodeCalls:
         for x in xs
     ]
     return CodeCalls(info, edges)
+
+
+async def code_nodes(code: str, user: User) -> CodeNodes:
+    """SYNC-MS-008#queries.code_nodes
+
+    함수 전부·호출 선·커뮤니티(UI-17). 항목이 있는 함수의 상태는 코드 탭과 같은 compare로.
+    """
+    with db.session_scope() as s:
+        project = ProjectService(s).get_owned(code, user)
+        row = CodeGraphService(s).get(project.id)
+        if row is None:
+            return CodeNodes(None, [], [], [])
+        info = _graph_info(row)
+        diffs = _diffs(s, project.id, row.graph)
+    by_key = {d.function: d for d in diffs.values() if d.function}
+    functions = []
+    for f in row.graph["functions"]:
+        d = by_key.get(f["key"])
+        status = None
+        if d is not None:
+            status = "code_only" if d.code_only else "spec_only" if d.spec_only else "same"
+        functions.append(
+            CodeNode(
+                f["key"],
+                f["name"],
+                f["qual"],
+                f["file"],
+                f["line"],
+                f.get("community"),
+                d.ms_id if d else None,
+                status,
+            )
+        )
+    communities = [
+        CodeCommunity(c["id"], c["label"], c["size"]) for c in row.graph.get("communities", [])
+    ]
+    return CodeNodes(info, communities, functions, [[a, b] for a, b, *_ in row.graph["calls"]])
 
 
 def _next_start(functions: list[dict], f: dict) -> int | None:

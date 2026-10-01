@@ -800,6 +800,42 @@ class CodeCalls:
     edges: list[CodeCallEdge]
 
 
+@dataclass(frozen=True)
+class CodeCommunity:
+    """SYNC-DOM-002 2.8 — 코드 그래프의 커뮤니티 하나(카드 BD). size는 든 함수 수."""
+
+    id: int
+    label: str
+    size: int
+
+
+@dataclass(frozen=True)
+class CodeNode:
+    """SYNC-DOM-002 2.8 — 코드 그래프 노드 하나. status는 항목이 있을 때 compare로.
+
+    코드만 > 명세만 > 같음(카드 BD).
+    """
+
+    key: str
+    name: str
+    qual: str
+    file: str
+    line: int
+    community: int | None
+    ms: str | None
+    status: str | None
+
+
+@dataclass(frozen=True)
+class CodeNodes:
+    """SYNC-DOM-002 2.8 — queries.code_nodes → API CodeNodes(UI-17 코드 그래프)."""
+
+    graph: CodeGraphInfo | None
+    communities: list[CodeCommunity]
+    functions: list[CodeNode]
+    calls: list[list[str]]
+
+
 AskEvent = AskStart | AskDelta | AskNote | AskRead | AskAnswer
 
 
