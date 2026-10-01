@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1221,6 +1221,18 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | MS-011·MS-007·MS-008 테스트 관점 · 라우터 `/code-graph` 200/404 · `check_ui` UI-17·UI-4·UI-5 · `check_tokens` 팔레트 12 · 헤드 크롬: SYNC 그래프 접힘 → 커뮤니티 펼침 → 검색 `save_pipeline` → 겹층 ▲ → 코드 탭으로 → 8.23으로 돌아옴 · 옛 그래프(커뮤니티 없음) 안내 · 폐쇄망판 바깥 요청 0 |
 | 선행 | BC |
 | 완료 | 2026-10-01 · 브랜치 `card/BD-code-graph-nodes`(2359b75 #249) · spec 16 + code 7 · 테스트 381 · `ruff`·`tsc`·`oxlint` · `validate` 0/0 · `check_code` 155/155 · `check_calls` 0/0 · `check_ui` 13/13(UI-17 요소 20) · `check_tokens` 103/0 · `check_view_html` 35/35 · 로컬 미리보기: 접힘(처음 맞춤)·범례 끄기·전부 펼치기(958 노드)·휠·끌기·검색 없음·검색 → 겹층 3.2·3.4·선 → 패널 → 4.4 코드 탭 → 8.23 → `?focus` 복귀, 콘솔 오류 0 · 운영(배포 뒤 재구축): SYNC 그래프 3659864 함수 958 · 호출 1,423 · **커뮤니티 127(8.2초)** · UI-4 2.3 → UI-17 통계·범례 127 · `save_pipeline` 검색 → ✓ 겹층·선 7·부르는 것 4·불리는 곳 6 → 코드 탭 → 8.23 → 복귀 · 바깥 요청은 Cloudflare 분석 하나뿐 · 되먹임: 싱크독은 군집 127개(싱글턴 다수)라 범례가 길다 — `resolution` 조정 후보 |
+
+---
+
+#### BE 에이전트의 상태 변경 — MCP `change_status`
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R6]] · [[SYNC-UC-001#UC-H8]] · [[SYNC-SEQ-001#SEQ-5]] · [[SYNC-API-002#change_status]] · [[SYNC-MS-007#pipeline.change_status]] · [[SYNC-MS-002#SpecService.apply_status]] · [[SYNC-MS-002#SpecService.list_versions]] · [[SYNC-DOM-002#StatusChange]] · [[SYNC-DOM-003#status_changes]] · [[SYNC-STD-001]] 1.2·4장 `frontmatter.status_change` · [[SYNC-UI-002#UI-7]] 2.1 |
+| 구현 | 리비전 `0018_add_status_changes_via`(기본 `web`) · `StatusChange.via` 모델 · `SpecService.apply_status(…, author)`와 `save`·`mark_deleted`·`trash`의 insert에 `via` · `list_versions`·`recent_changes`의 status 행 AuthorRef를 `via`로 접기 · `pipeline.change_status(doc_id, to, author, reason)` · `routers/documents.change_status`는 `Author(human, user, None, web_status)` · MCP 도구 `change_status(doc_id, to, reason?)`(`_agent_author`) · `rebuild`의 status 커밋 복원은 `via=github` · 화면은 바뀌지 않는다 — UI-7 2.1이 버전 행과 같은 규칙으로 이미 그린다 |
+| 테스트 | MS-007·MS-002 테스트 관점 · 도구 목록에 `change_status` · MCP로 approved → `status(…)` 커밋 하나 · 버전 그대로 · `status_changes.via=mcp` · 이력 행 `agent`·지시자=발급자 · 규약 오류·미완성·끊어진 참조면 `status-blocked`(웹과 같은 본문) · 휴지통이면 `document-trashed` · 남의 문서 `not-found` · 멱등 · `update_document`로 `status:`를 바꾸면 여전히 `frontmatter.status_change` · 웹 토글은 `via=web` · 운영: MCP 클라이언트로 올리고 UI-7에서 「에이전트 · 지시」 확인 |
+| 선행 | BD |
+| 완료 | — |
 
 ---
 
