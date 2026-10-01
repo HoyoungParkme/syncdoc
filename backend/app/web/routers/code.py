@@ -9,8 +9,10 @@ from fastapi import APIRouter, Depends, Query
 
 from app.core import queries
 from app.core.account.models import User
+from app.web import sse
 from app.web.auth import current_user
 from app.web.schemas.code import CodeCalls, CodeNodes, CodeText, CodeView
+from app.web.schemas.documents import AskCodeRequest
 
 router = APIRouter(prefix="/api", tags=["code"])
 
@@ -58,3 +60,15 @@ async def code_text(
 ) -> CodeText:
     """SYNC-API-001#GET/api/projects/{code}/code/source — 코드 그래프의 코드 (UI-17 4.6, 카드 BF)"""
     return CodeText.model_validate(await queries.code_text(code, file, line, user))
+
+
+@router.post("/projects/{code}/code/ask")
+async def ask_code(code: str, req: AskCodeRequest, user: User = Depends(current_user)):
+    """SYNC-API-001#POST/api/projects/{code}/code/ask — 코드 그래프에서 묻는다 (UI-17 7, 카드 BI)
+
+    고른 함수(key)가 시작 맥락이고 없어도 묻는다. SSE 이벤트·대화는 /api/docs/{docId}/ask와 같다.
+    """
+    gen = queries.ask_code(
+        code, req.key, req.conversation_id, req.question, req.attachment_ids, user
+    )
+    return await sse.stream(gen)

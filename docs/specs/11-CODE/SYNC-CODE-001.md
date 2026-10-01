@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1269,6 +1269,18 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | 라우터 200(블록만)·404(+available_items)·410(삭제됨)·남의 것 404 · `check_ui` 화면 14(UI-18 요소 10) · 헤드리스 크롬(콘솔 0): UI-17 명세 줄 → 팝업 블록 → 블록 안 참조 → 팝업 교체 → 뒤로 → 이동 → UI-5 그 항목 → 새 창 URL → 문서 전체 참조 → 문서 머리 변형 → UI-5 참조 탭 카드 → 같은 팝업 → Esc·바깥 클릭 |
 | 선행 | BG |
 | 완료 | 2026-10-01 · 브랜치 `card/BH-item-peek`(5f69d79 #266) · spec 10 + code 3 · 테스트 384 · `ruff`·`tsc`·`oxlint` · `validate` 0/0 · `check_ui` 14/14(UI-18 요소 10) · `check_code` 156/156 · `check_calls` 0/0 · `check_view_html` 35/35 · 헤드리스 크롬(WSLg 고장, 콘솔 0): UI-17 근거 줄 SEQ-1 → 팝업(SEQ-001#SEQ-1 · 초안 · v1, 블록) → 블록 안 UC-A6 → 팝업 교체·「뒤로」 → 새 창 URL(팝업 유지) → Esc(선택 그대로) → 이동 `/p/SYNC/d/SYNC-SEQ-001#item-SEQ-1` · UI-5 참조 카드 → 같은 팝업 · 문서 전체 카드 → 문서 머리(API 명세 MCP — 싱크독 · 8단계 · 항목 13) · 운영: 배포 번들에 UI-18 문구, `GET /api/docs/SYNC-SEQ-001/items/SEQ-1` 입구 응답 — 화면은 사람이 직접(DEV-17) |
+
+---
+
+#### BI 코드 그래프에서 묻는다 — UI-17 질문 탭
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R11]] · [[SYNC-UC-001#UC-H19]] 기본 흐름 1~2(코드 그래프)·1b·2b · [[SYNC-SEQ-001#SEQ-32]] · [[SYNC-MS-008#queries.ask_code]] · [[SYNC-API-001#POST/api/projects/{code}/code/ask]] · [[SYNC-UI-002#UI-17]] 4.9·7·7.1 · [[SYNC-UI-001]] 7장 11 · 사용자 요청 2026-10-01 「코드 그래프 쪽에도 챗봇이 붙어야 돼」 |
+| 구현 | `queries._ask_loop`(ask_item의 루프를 뗀 것) · `queries.ask_code` · `AskStart.key` · 라우터 `POST /projects/{code}/code/ask`(SSE 포장은 `web/sse.py`로 떼어 두 라우터가 쓴다) · `AskPanel`을 `context` prop으로 일반화해 export(UI-5는 그대로) · `CodeGraph.tsx` 패널 탭 4.9(`?panel=ask`)·질문 탭 7·맥락 줄 7.1 · `styles.css` |
+| 테스트 | MS-008 테스트 관점(ask_code — 시작 맥락에 문서 목록·그래프 머리·함수 블록, key 없음=그래프 전체, 그래프 없음, 없는 key 404, 남의 것 404, 키 없음 503) · 라우터 SSE start에 key · ask_item 회귀 · `check_ui` UI-17 +3 · 헤드리스: 탭 전환·맥락 줄·`?panel=ask` · 운영: 함수를 고르고 묻기 → read_code·get_item 읽음·답 |
+| 선행 | BH |
+| 완료 | — |
 
 ---
 

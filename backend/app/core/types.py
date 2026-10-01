@@ -666,10 +666,13 @@ class ToolResult:
 
 @dataclass(frozen=True)
 class AskStart:
-    """SYNC-DOM-002 2.8 — 스트림의 첫 이벤트. 이 앞의 오류는 상태 코드, 뒤는 error 이벤트."""
+    """SYNC-DOM-002 2.8 — 스트림의 첫 이벤트. 이 앞의 오류는 상태 코드, 뒤는 error 이벤트.
 
-    doc_id: str
+    코드 그래프에서 물으면(ask_code, 카드 BI) doc_id·item_id 대신 key(함수 `파일:줄`)."""
+
+    doc_id: str | None
     item_id: str | None
+    key: str | None = None
 
 
 @dataclass(frozen=True)

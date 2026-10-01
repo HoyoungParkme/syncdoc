@@ -817,3 +817,63 @@ async def test_ask_tool_errors_are_text_not_exceptions(scoped: Session) -> None:
         await queries.ask_tool(
             "list_documents", {"reason": "r"}, "EXMP", owner(scoped, "minjun"), 0
         )
+
+
+# ── ask_code — 코드 그래프에서 묻는다 (카드 BI) ──
+def _seed_graph(scoped: Session):
+    """ask_code용 — 문서(RFQ·PRD·MS)와 코드 그래프 한 행. codegraph 테스트의 GRAPH와 같은 모양."""
+    from tests.core.codegraph.test_queries import _seed as seed_graph
+
+    return seed_graph(scoped)
+
+
+async def test_ask_code_start_context_has_docs_graph_and_function_block(
+    scoped: Session, script
+) -> None:
+    """MS-008 ask_code 1~3 — 문서 목록·그래프 머리·보는 함수(항목·대조·부르는 것·불리는 곳). 본문은 없다."""
+    _seed_graph(scoped)
+    seen = script([_step("답")])
+    events = await _collect(
+        queries.ask_code("EXMP", "a.py:1", _conv(scoped), "명세대로야?", [], owner(scoped))
+    )
+    assert events == [AskStart(None, None, "a.py:1"), AskAnswer("답", [])]
+    system, messages, _ = seen[0]
+    assert "당신은 코드 그래프를 보는 사람 옆에서" in system and "read_code로 본문을 읽고" in system
+    assert "[코드 그래프] 커밋 ccccccc · 함수 4 · 호출 4" in system
+    assert "[문서 목록]\n" in system and "EXMP-MS-001 예시 MINISPEC · draft" in system
+    assert "[보는 함수] svc.save · a.py:1–4 · 항목 EXMP-MS-001#svc.save (code_only)" in system
+    assert "[부르는 것 2]" in system and "svc._help · a.py:13 · 항목 없음" in system
+    assert "[불리는 곳 1]" in system and "svc.write · a.py:9 · 항목 EXMP-MS-001#svc.write" in system
+    assert "def " not in system  # 본문은 안 싣는다 — 모델이 read_code로 읽는다
+    assert "mermaid 코드블록" in system and "답은 짧게 쓴다" in system  # 공통 지시는 그대로
+    assert messages == [{"role": "user", "text": "명세대로야?"}]
+
+
+async def test_ask_code_without_key_is_whole_graph_and_without_graph_still_asks(
+    scoped: Session, script
+) -> None:
+    _seed_graph(scoped)
+    seen = script([_step("답1"), _step("답2")])
+    ev = await _collect(queries.ask_code("EXMP", None, _conv(scoped), "git은?", [], owner(scoped)))
+    assert ev[0] == AskStart(None, None, None) and "[보는 것] 그래프 전체" in seen[0][0]
+    # 그래프가 없어도 묻는다 (UC-H19 2b)
+    scoped.execute(text("DELETE FROM code_graphs"))
+    ev = await _collect(queries.ask_code("EXMP", None, _conv(scoped), "?", [], owner(scoped)))
+    assert ev[-1] == AskAnswer("답2", []) and "[코드 그래프] 없음" in seen[1][0]
+
+
+async def test_ask_code_unknown_key_and_stranger_and_no_api_key(
+    scoped: Session, script, monkeypatch
+) -> None:
+    _seed_graph(scoped)
+    script([_step("답")])
+    conv = _conv(scoped)
+    with pytest.raises(NotFound) as ei:  # 그래프에 없는 자리 — 스트림 전
+        await _collect(queries.ask_code("EXMP", "a.py:2", conv, "?", [], owner(scoped)))
+    assert ei.value.extra["resource"] == "function"
+    assert ConversationService(scoped).get(conv, owner(scoped)).turns[-1].error == "not-found"
+    with pytest.raises(NotFound):  # 남의 프로젝트
+        await _collect(queries.ask_code("EXMP", None, conv, "?", [], owner(scoped, "minjun")))
+    monkeypatch.setattr(settings, "LLM_API_KEY", "")
+    with pytest.raises(LlmNotConfigured):
+        await _collect(queries.ask_code("EXMP", None, conv, "?", [], owner(scoped)))

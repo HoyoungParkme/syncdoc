@@ -5,6 +5,7 @@
  *  4 옆 패널(4.1 이름·자리, 4.2 부르는 것, 4.3 불리는 곳, 4.4 코드 탭으로, 4.5 커뮤니티 칩, 4.6 코드) · 5 범례(5.1 커뮤니티 행, 5.2 설명)
  *  6 파일 트리(6.1 폴더·파일 행, 6.2 함수 행, 6.3 접기) — 카드 BF. 그래프 옆에 코드: 함수를 고르면 4.6에 본문이 바로,
  *    커뮤니티면 허브 함수의 본문. 트리는 functions[].file로 브라우저가 만든다 — 요청이 없다
+ *  카드 BI — 패널 탭 4.9(함수 | 질문, ?panel=ask) · 7 질문 탭(UI-5 질문 탭과 같은 AskPanel, 맥락은 고른 함수) · 7.1 맥락 줄
  *  카드 BG — 트리는 폴더 한 단씩, 폴더·파일을 고르면 그 아래 함수 노드를 펼쳐 보인다(트리 포커스). 4.7 명세 —
  *    항목·근거(상위 참조)·하위 참조(…/references, 참조 탭과 같은 자료), 항목 없으면 가까운 항목
  *
@@ -14,7 +15,9 @@ import { ItemIdBadge, ProjName } from '../components/ui'
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type Simulation, type SimulationLinkDatum, type SimulationNodeDatum } from 'd3-force'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
-import { ago, api, ApiError, type CodeNode, type CodeNodes, type CodeText, type ItemRef, type ItemReferences, type ProjectSummary } from '../api/client'
+import { ago, api, ApiError, type CodeNode, type CodeNodes, type CodeText, type ItemRef, type ItemReferences, type Me, type ProjectSummary } from '../api/client'
+import { AskPanel } from './DocView'
+import type { AskChat } from '../components/Shell'
 import { CodeLines } from './codeSrc'
 import { ItemPeek, type PeekTarget } from '../components/ItemPeek'
 
@@ -54,8 +57,21 @@ const msParts = (ms: string) => {
 
 export function CodeGraph() {
   const { code = '' } = useParams()
-  const { projects } = useOutletContext<{ projects: ProjectSummary[] }>()
-  const [sp] = useSearchParams()
+  const { user, projects, ask } = useOutletContext<{ user: Me; projects: ProjectSummary[]; ask: AskChat }>()
+  const [sp, setSp] = useSearchParams()
+  // 4.9 패널 탭 — 질문 탭은 ?panel=ask (UI-5 8.4와 같은 키). 모델 키가 없으면 탭 줄이 없다 (카드 BI)
+  const askTab = !!user?.llm_enabled
+  const panelTab: 'fn' | 'ask' = askTab && sp.get('panel') === 'ask' ? 'ask' : 'fn'
+  const setPanelTab = (tab: 'fn' | 'ask') =>
+    setSp(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (tab === 'ask') next.set('panel', 'ask')
+        else next.delete('panel')
+        return next
+      },
+      { replace: true },
+    )
   const [data, setData] = useState<CodeNodes | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set())
@@ -813,8 +829,23 @@ export function CodeGraph() {
               </>
             )}
           </div>
-          <aside className="cgside" data-el="4">
-            {selFn ? (
+          <aside className={`cgside${panelTab === 'ask' ? ' ask' : ''}`} data-el="4">
+            {askTab && (
+              <div className="ptabs" data-el="4.9">
+                <span className={panelTab === 'fn' ? 'on' : ''} onClick={() => setPanelTab('fn')}>
+                  함수
+                </span>
+                <span className={panelTab === 'ask' ? 'on' : ''} onClick={() => setPanelTab('ask')}>
+                  질문
+                </span>
+              </div>
+            )}
+            {panelTab === 'ask' ? (
+              // 7 질문 탭 — UI-5 질문 탭과 같은 패널. 맥락(7.1)은 고른 함수(커뮤니티면 허브 함수), 없으면 그래프 전체
+              <div className="pbody ask" data-el="7">
+                <AskPanel ask={ask} elContext="7.1" context={{ kind: 'code', key: codeTarget?.key ?? null, label: codeTarget?.qual ?? '' }} />
+              </div>
+            ) : selFn ? (
               <>
                 <div data-el="4.1">
                   <div className="nm">{selFn.qual}</div>

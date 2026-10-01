@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -2520,7 +2520,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 | 화면 설계 | [[SYNC-UI-001#UI-17]] |
 | 경로 | `/p/{프로젝트코드}/code-graph` · `?focus={파일:줄}`이면 그 함수를 골라 가운데로 |
 | 진입 | UI-4 코드 그래프 버튼(2.3) · UI-5 코드 탭 함수 머리의 「그래프에서 보기」(8.23) |
-| 유스케이스 | [[SYNC-UC-001#UC-H20]] 기본 흐름 5, 확장 5a·5b·5c |
+| 유스케이스 | [[SYNC-UC-001#UC-H20]] 기본 흐름 5, 확장 5a·5b·5c · [[SYNC-UC-001#UC-H19]] 기본 흐름 1~2(코드 그래프)·1b(질문 탭, 카드 BI) |
 
 ### 배치
 
@@ -2562,6 +2562,10 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
   .cgn .mark{display:inline-block;margin-left:5px;color:#f0c969}
   .cgn.c{background:#3b6ea5}
   .cgside{border-left:1px solid var(--line);background:var(--sub);padding:14px 16px;overflow:auto;font-size:13px}
+  /* 패널 탭(4.9) — UI-5의 참조|질문|코드 탭과 같은 문법. 모델 키가 없으면 「질문」이 없다 */
+  .cgside .ptabs{display:flex;gap:14px;margin:-4px 0 10px;font:600 12.5px var(--sans);color:var(--dim)}
+  .cgside .ptabs span{padding-bottom:4px;cursor:pointer}
+  .cgside .ptabs span.on{color:var(--ink);border-bottom:2px solid var(--ink)}
   .cgside .k{font:600 12px var(--sans);color:var(--ink3);margin:12px 0 6px}
   .cgside .nm{font:600 13.5px var(--mono);color:var(--ink);word-break:break-all}
   .cgside .meta{font:12px var(--mono);color:var(--dim);margin-top:3px}
@@ -2661,6 +2665,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
         </div>
 
         <aside class="cgside" data-el="4">
+          <div class="ptabs" data-el="4.9"><span class="on">함수</span><span>질문</span></div>
           <div data-el="4.1">
             <div class="nm">pipeline.save_pipeline</div>
             <div class="meta">backend/app/core/pipeline.py:121</div>
@@ -2714,6 +2719,26 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
     </div>
   </div>
 </div>
+
+<div class="var">변형 — 질문 탭(4.9 「질문」): UI-5 질문 탭과 같은 패널, 맥락 줄(7.1)만 함수. 모델 키가 있을 때만</div>
+<div class="sd h" style="min-height:520px">
+  <div class="pg">
+    <div class="gcard" style="flex-direction:row;min-height:480px">
+      <div class="ghost" style="border:none;border-radius:0"></div>
+      <aside class="cgside" data-el="7" style="width:480px;display:flex;flex-direction:column">
+        <div class="ptabs"><span>함수</span><span class="on">질문</span></div>
+        <div class="lbl" data-el="7.1"><b style="font-family:var(--mono)">pipeline.save_pipeline</b> · 이 함수를 보며 묻습니다</div>
+        <div style="display:flex;gap:8px;margin:6px 0"><span class="b sm">대화 ▸ save_pipeline이 명세대로야?</span><span class="b sm">새 대화</span></div>
+        <div style="flex:1;overflow:auto;font-size:13px;line-height:1.6">
+          <p style="margin:6px 0;padding:8px 10px;background:#fff;border:1px solid var(--line);border-radius:6px">save_pipeline이 명세대로 구현됐어?</p>
+          <p style="margin:6px 0;font-size:12px;color:var(--dim)">3단계 읽음 · 본 것 2 ▸</p>
+          <p style="margin:6px 0"><b>대조</b> — <span class="m">MS-007#pipeline.save_pipeline</span>의 「호출하는 것」 아홉 중 여덟이 같고 <span class="m">git.commit_push</span>는 코드에만 있다(▲). 본문 L129–L176에서 7단계 push가 명세 7과 같다.</p>
+        </div>
+        <div style="display:flex;gap:6px;align-items:flex-end;margin-top:8px"><span class="b sm">+</span><textarea style="flex:1;height:52px;font:13px var(--sans);border:1px solid var(--line2);border-radius:6px;padding:6px 8px" placeholder="이 함수를 보며 묻습니다 — Enter로 보냅니다"></textarea></div>
+      </aside>
+    </div>
+  </div>
+</div>
 ```
 
 ### 요소
@@ -2738,11 +2763,14 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 | 4.4 | 코드 탭으로 | 링크 | MINISPEC 항목이 있는 함수에만. `문서#항목` | UI-5 코드 탭 — `/p/{코드}/d/{문서}?panel=code#item-{항목}` |
 | 4.5 | 커뮤니티 칩 | 버튼 | 함수가 든 커뮤니티의 색·라벨·함수 수 | 그 커뮤니티를 접는다 |
 | 4.7 | 명세 | 영역 | 고른 함수가 어느 명세의 무엇인가. MINISPEC 함수면 항목 뱃지·이름, 「근거」(그 항목이 건 상위 참조 — SEQ·UC·API·DOM…)와 「이것을 가리킴」(이 항목을 가리키는 하위 참조 — CODE 카드 등). `…/items/{항목}/references`(참조 탭 8.1과 같은 자료). 항목이 없는 함수면 「항목 없음」과 **가까운 항목** — 부르는 것·불리는 곳 중 항목 있는 함수의 항목, 호출 많은 순 6개. 커뮤니티를 골랐으면 허브 함수(4.6과 같은 함수) 기준. 상위·하위 각 8줄, 넘치면 「… n개 더 — 코드 탭에서」 | — |
+| 4.9 | 패널 탭 | 탭 | 「함수」(4.1~4.8) · 「질문」(7). 모델 키가 없으면(`GET /api/me`의 `llm_enabled`) 「질문」이 없고 탭 줄도 없다. URL `?panel=ask`가 질문 탭 | 전환 |
 | 4.8 | 참조 줄 | 행 | 항목 ID 뱃지와 이름. 가리키는 곳이 없는 참조는 회색에 경고 | 항목 미리보기 팝업(UI-18, 카드 BH) — 그 항목 블록만. 문서로 가기는 팝업의 「이동」. 가리키는 곳 없는 줄은 안 열린다 |
 | 4.6 | 코드 | 영역 | 고른 함수의 본문 — 「코드 L시작–L끝」과 그래프 커밋, 줄 번호가 붙은 본문(UI-5 8.21과 같은 모양·같은 읽기, 300줄 상한). 고르는 순간 읽는다. 커뮤니티를 골랐으면 허브 함수(라벨이 함수면 그것, 아니면 4.2의 첫 함수)의 본문. 못 읽으면(5c) 「코드를 읽을 수 없습니다 — {이유}」 한 줄 | — |
 | 5 | 범례 | 영역 | 커뮤니티 목록과 표시 설명 | — |
 | 5.1 | 커뮤니티 행 | 행 | 색 견본 · 라벨 · 함수 수 · 체크박스. 라벨이 파일 경로 꼴이면 파일 이름만 보이고 전체는 툴팁 | 체크를 끄면 그 커뮤니티의 노드·선을 숨긴다 |
 | 5.2 | 표시 설명 | 텍스트 | 큰 원·선 굵기·고리·세 기호의 뜻 | — |
+| 7 | 질문 탭 | 패널 | 옆 패널(4)의 「질문」. **UI-5 질문 탭(8.5~8.16)과 같은 컴포넌트** — 대화 고르기·새 대화·첨부·진행 묶음·답·입력이 그대로이고 번호도 그 번호다. 다른 것은 맥락 줄(7.1)과 보내는 입구(`POST /api/projects/{code}/code/ask`)뿐 | — |
+| 7.1 | 맥락 줄 | 텍스트 | 「`pipeline.save_pipeline` · 이 함수를 보며 묻습니다」 — 함수를 고르면 그 함수(선택이 바뀌면 바로 따라간다), 커뮤니티를 골랐으면 허브 함수, 아무것도 안 골랐으면 「그래프 전체 · 이 프로젝트의 코드에 대해 묻습니다」 | — |
 | 6 | 파일 트리 | 영역 | 캔버스 왼쪽 240px. 함수가 있는 파일만, 경로순. 폴더(한 단씩) › 파일 › 함수. 처음엔 폴더가 접혀 있고 고른 함수의 조상 폴더만 펼쳐진다 | — |
 | 6.1 | 폴더·파일 행 | 행 | `▸`/`▾`와 이름. **폴더는 한 단씩 전부** — `backend › app › core › pipeline.py`, 자식 하나뿐인 폴더도 묶지 않는다(진짜 폴더처럼). 들여쓰기 14px/단 | `▸`는 펼침·접힘. **이름을 누르면 트리 포커스** — 그 아래 함수 전부의 커뮤니티가 펼쳐지고(숨긴 것은 되살림) 그 노드들만 밝으며 화면이 그 노드들에 맞춰진다. 폴더도 파일도 같다. 같은 행을 다시 누르면 푼다 |
 | 6.2 | 함수 행 | 행 | 이름. MINISPEC 함수는 상태 색 고리(✓·▲·◌와 같은 뜻), 그 밖은 흐린 고리 | 그 함수를 골라 가운데로(2.1과 같은 길) — 패널(4)에 코드 |
@@ -2764,6 +2792,9 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 - **커뮤니티를 고르면 허브 함수의 코드를 미리 보인다** — 라벨과 이름(`Class.fn` 또는 `fn`)이 같은 함수가 그 커뮤니티에 있으면 그것, 없으면(라벨이 파일·클래스·모듈) 든 함수 목록(4.2)의 첫 함수. 운영 싱크독은 17개 중 둘만 함수 라벨이다
 - **파일 트리(6)는 브라우저가 만든다** — `code_nodes`의 `functions[].file`을 `/`로 쪼개 폴더 한 단씩 › 파일 › 함수(줄 순). 함수가 없는 파일·폴더는 없다. 접힌 폴더 안은 그리지 않는다(함수 1,000개여도 DOM이 가볍다). `?focus=`·검색·노드 클릭으로 함수가 골라지면 조상 폴더가 전부 펼쳐지고 행이 밝아진다
 - **트리 포커스(6.1)는 그림을 끌고 온다**(카드 BG) — 폴더·파일 이름을 누르면 그 아래 함수 전부: 커뮤니티를 펼치고(숨긴 것은 범례에서 되살림), 그 노드들만 밝고 나머지는 흐리며(3.3과 같은 문법), 화면을 그 노드들의 상자에 맞춘다(처음 전체 맞춤과 같은 계산). 트리와 그림이 따로 놀면 안 된다 — 트리에서 고른 것은 그림에 반드시 보인다
+- **질문 탭(7)은 UI-5 질문 탭을 그대로 쓴다**(카드 BI) — 같은 컴포넌트에 맥락만 고른 함수(`key`)로 준다. 보내는 곳은 `POST /api/projects/{code}/code/ask`, 대화·첨부·진행·답은 UI-5와 같은 표·같은 이벤트. 대화는 프로젝트 것이라 UI-5에서 고른 대화가 여기서도 그대로다(`?conv=`)
+- **질문의 맥락은 고른 함수다** — 그래프에서 다른 함수를 고르면 맥락 줄(7.1)이 바로 바뀌고 다음 질문부터 그 함수를 두고 묻는다. 앞 질문은 대화에 그대로다. 함수 본문은 안 보낸다 — 모델이 `read_code`로 읽는다(사용자 결정 3과 같은 원칙)
+- 모델 키가 없으면 탭 줄(4.9) 자체가 없다 — UI-5 8.4와 같다. 그래프가 없는 프로젝트에서도 묻는다(UC-H19 2b)
 - **명세 연관(4.7)은 참조 탭과 같은 자료다**(카드 BG) — 함수를 고를 때 그 항목의 `…/references`를 한 번 읽는다(코드와 같은 때, 늦은 답은 버린다). 항목이 없으면 요청 없이 부르는 것·불리는 곳의 항목으로 「가까운 항목」(한 단, 호출 많은 순 6개). 줄을 누르면 그 문서의 그 항목으로 간다
 - 트리를 접으면(6.3) 열이 0이 되고 캔버스가 넓어진다. 1280px 화면에서 트리 240 + 패널 480이면 캔버스가 560 — 좁으면 접는다. 모바일 폭(≤720)에서는 기본 접힘
 
@@ -2805,6 +2836,13 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 2. 근거 줄 `SEQ-1`(4.8)을 누른다 — SEQ 문서의 그 항목으로 간다. 뒤로 돌아오면 선택이 그대로다
 3. 고리 없는 `_advance_processed`를 고른다 — 「항목 없음 · 가까운 항목」에 `MS-007#pipeline.save_pipeline`(이 함수를 부르는 것)
 4. 접힌 커뮤니티 원을 누른다 — 허브 함수 기준으로 4.6과 4.7이 같이 바뀐다
+
+**S-8 함수를 두고 묻는다** — UC-H19 기본 흐름 1~2(코드 그래프), 카드 BI
+1. `save_pipeline`을 고르고 패널 탭(4.9)에서 「질문」을 누른다. 맥락 줄(7.1)이 「`pipeline.save_pipeline` · 이 함수를 보며 묻습니다」. URL에 `?panel=ask`
+2. 「이 함수가 명세대로 구현됐어?」를 보낸다 — 진행 묶음(8.9)에 「code_graph … · read_code …」가 흐르고 답에 대조와 파일:줄 근거가 온다. 답 속 `MS-007#pipeline.save_pipeline`을 누르면 그 문서로
+3. 그래프에서 `_advance_processed`를 고른다 — 맥락 줄이 바뀐다. 「이건 뭐 하는 함수야?」 → 모델이 `read_code`로 본문을 읽고 답한다. 앞 질문은 대화에 그대로
+4. 아무것도 안 고른 채(빈 곳 클릭) 「이 프로젝트에서 git은 어디서 쓰여?」 — 맥락 줄 「그래프 전체」, 모델이 `code_graph`·`read_code`로 찾는다
+5. UI-5 문서 뷰로 가서 질문 탭을 열면 같은 대화가 이어져 있다(`?conv=`)
 
 ---
 

@@ -845,7 +845,39 @@ async def ask_item(
             convs.finish_turn(turn_id, None, [], [], error="not-found")
             raise
         s.commit()  # 턴은 스트림과 무관하게 남는다 — 답이 안 와도 실패로 닫힌다
-    yield AskStart(doc_id=doc_id, item_id=item_id)
+    async for ev in _ask_loop(
+        system,
+        code,
+        conversation_id,
+        turn_id,
+        history,
+        question,
+        images,
+        user,
+        AskStart(doc_id=doc_id, item_id=item_id),
+        f"doc={doc_id} item={item_id}",
+    ):
+        yield ev
+
+
+async def _ask_loop(
+    system: str,
+    code: str,
+    conversation_id: int,
+    turn_id: int,
+    history: list[dict],
+    question: str,
+    images: list,
+    user: User,
+    start: AskStart,
+    where: str,
+) -> AsyncIterator[AskEvent]:
+    """ReAct 루프 — MS-008 ask_item 1~7. ask_item·ask_code가 같이 쓴다(카드 BI).
+
+    입구마다 다른 것은 0단계의 검사와 시작 맥락(system)뿐이다. 턴(turn_id)은 호출자가 이미
+    만들어 커밋했다 — 여기서는 답이나 실패로 닫는다.
+    """
+    yield start
     t0 = time.monotonic()
     calls = 0
     reads: list[str] = []
@@ -919,9 +951,8 @@ async def ask_item(
         ConversationService(s).finish_turn(turn_id, answer, progress, reads)
         s.commit()
     _log.info(
-        "ask doc=%s item=%s conv=%s user=%s calls=%d prompt=%d completion=%d elapsed=%.1fs",
-        doc_id,
-        item_id,
+        "ask %s conv=%s user=%s calls=%d prompt=%d completion=%d elapsed=%.1fs",
+        where,
         conversation_id,
         user.id,
         calls,
@@ -930,6 +961,135 @@ async def ask_item(
         time.monotonic() - t0,
     )
     yield AskAnswer(answer=answer, context_item_ids=reads)
+
+
+_ASK_CODE_SYSTEM = (
+    _ASK_SYSTEM.split("[문서] {doc_id}")[0].replace(
+        """당신은 명세를 읽는 사람 옆에서 그 자리를 설명한다. 문서 하나가 열려 있고, 당신은 도구로
+같은 프로젝트의 다른 문서와 항목을 읽을 수 있다. 읽기만 한다 — 쓰는 도구는 없다.""",
+        """당신은 코드 그래프를 보는 사람 옆에서 그 함수를 설명한다. 프로젝트의 코드 그래프(함수·호출)와
+명세 문서들이 있고, 당신은 도구로 함수 본문과 명세 항목을 읽을 수 있다. 읽기만 한다.
+
+함수 자체를 묻는 질문(뭐 하는 함수야·왜 이렇게 했어)은 read_code로 본문을 읽고 답한다.
+명세와 맞는지 물으면 항목이 있으면 code_graph로 대조(같음·코드만·명세만)를 보고 get_item으로
+그 항목을 읽어 견준다. 항목이 없는 함수면 부르는 것·불리는 곳의 항목을 따라간다 — 그 함수가
+어느 명세의 어느 자리를 받치는지 거기서 보인다. 코드 근거는 파일:줄로, 명세 근거는
+문서ID#항목ID로 댄다. 코드 그래프가 없다고 적혀 있으면 그렇다고 말하고 지어내지 않는다.""",
+    )
+    + """{graph_line}
+[문서 목록]
+{docs}
+{viewing}
+{attachments}"""
+)
+_ASK_CODE_NEIGHBORS = 20  # 부르는 것·불리는 곳 각각 시작 맥락에 싣는 상한
+
+
+def _code_context(s: Session, project, key: str | None, attachments: str) -> str:
+    """ask_code의 시작 맥락 — 문서 목록·그래프 머리·고른 함수 블록. 본문은 안 싣는다 (MS-008 ask_code 1~3)."""
+    spec = SpecService(s)
+    docs_rows = spec.list_by_project(project.id)
+    titles = spec.describe_documents([d.id for d in docs_rows])
+    docs = (
+        "\n".join(
+            f"{d.doc_id} {titles[d.id].title if d.id in titles else ''} · {d.status}".rstrip()
+            for d in docs_rows
+        )
+        or "(없음)"
+    )
+    row = CodeGraphService(s).get(project.id)
+    if row is None:
+        graph_line = "[코드 그래프] 없음 — 코드를 push하면 만들어진다"
+        viewing = "[보는 것] 그래프 전체" if key is None else ""
+        if key is not None:
+            raise NotFound("function", key)
+        return _ASK_CODE_SYSTEM.format(
+            graph_line=graph_line, docs=docs, viewing=viewing, attachments=attachments
+        )
+    g = row.graph
+    fns = g.get("functions", [])
+    graph_line = f"[코드 그래프] 커밋 {(row.commit_hash or '')[:7]} · 함수 {len(fns)} · 호출 {len(g.get('calls', []))}"
+    if key is None:
+        viewing = "[보는 것] 그래프 전체"
+    else:
+        by_key = {f["key"]: f for f in fns}
+        f = by_key.get(key)
+        if f is None:
+            raise NotFound("function", key)
+        diffs = _diffs(s, project.id, g)
+        ms_of = {d.function: d for d in diffs.values() if d.function}
+
+        def item_of(k: str) -> str:
+            d = ms_of.get(k)
+            if d is None:
+                return "항목 없음"
+            st = "code_only" if d.code_only else "spec_only" if d.spec_only else "same"
+            return f"항목 {d.ms_id} ({st})"
+
+        def line_of(k: str) -> str:
+            x = by_key[k]
+            return f"{x['qual']} · {x['file']}:{x['line']} · {item_of(k)}"
+
+        calls = [b for a, b, *_ in g.get("calls", []) if a == key and b in by_key]
+        callers = [a for a, b, *_ in g.get("calls", []) if b == key and a in by_key]
+        end = f"–{f['end']}" if f.get("end") else ""
+        lines = [f"[보는 함수] {f['qual']} · {f['file']}:{f['line']}{end} · {item_of(key)}"]
+        for title, ks in (("부르는 것", calls), ("불리는 곳", callers)):
+            lines.append(f"[{title} {len(ks)}]")
+            lines.extend(line_of(k) for k in ks[:_ASK_CODE_NEIGHBORS])
+            if len(ks) > _ASK_CODE_NEIGHBORS:
+                lines.append(f"… {len(ks) - _ASK_CODE_NEIGHBORS}개 더")
+        viewing = "\n".join(lines)
+    return _ASK_CODE_SYSTEM.format(
+        graph_line=graph_line, docs=docs, viewing=viewing, attachments=attachments
+    )
+
+
+async def ask_code(
+    code: str,
+    key: str | None,
+    conversation_id: int,
+    question: str,
+    attachment_ids: list[int],
+    user: User,
+) -> AsyncIterator[AskEvent]:
+    """SYNC-MS-008#queries.ask_code
+
+    코드 그래프에서 묻는다(UI-17 질문 탭, 카드 BI). 고른 함수(key)가 시작 맥락이고 없어도 묻는다 —
+    그래프 전체. 루프는 ask_item과 같은 _ask_loop.
+    """
+    if not settings.LLM_API_KEY:
+        raise LlmNotConfigured()
+    with db.session_scope() as s:
+        project = ProjectService(s).get_owned(code, user)
+        convs = ConversationService(s)
+        view = convs.get(conversation_id, user)
+        if view.project_code != code:
+            raise NotFound("conversation", conversation_id)
+        history = convs.history(conversation_id, settings.LLM_MAX_TURNS)
+        turn = convs.add_turn(conversation_id, question, attachment_ids)
+        turn_id = turn.id
+        images = convs.pending_images(turn_id)
+        metas = [m for t in view.turns for m in t.attachments] + view.pending
+        try:
+            system = _code_context(s, project, key, _attachment_lines(metas))
+        except NotFound:
+            convs.finish_turn(turn_id, None, [], [], error="not-found")
+            raise
+        s.commit()
+    async for ev in _ask_loop(
+        system,
+        code,
+        conversation_id,
+        turn_id,
+        history,
+        question,
+        images,
+        user,
+        AskStart(doc_id=None, item_id=None, key=key),
+        f"code={code} key={key}",
+    ):
+        yield ev
 
 
 def _attachment_lines(metas: list[AttachmentMeta]) -> str:

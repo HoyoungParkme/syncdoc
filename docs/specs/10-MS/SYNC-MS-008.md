@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -81,6 +81,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 7. `ConversationService.finish_turn(turn.id, answer, progress, reads)` — 세션 하나에서. 대화 `title`이 「새 대화」면 `question[:40]`으로, `updated_at` 갱신 · `log.info("ask doc=%s item=%s conv=%s user=%s calls=%d prompt=%d completion=%d elapsed=%.1fs", …)` — 한 줄, 본문·질문·답은 로그에 안 남긴다(DEV-6) · `yield AskAnswer(answer, context_item_ids=reads)`
 
 **상수** `_ASK_MAX_CALLS = 8` · `_ASK_TIME_LIMIT = 120.0`(초). 설정값이 아니라 코드 상수다 — 회수 경로는 키를 비우는 것 하나로 둔다([[SYNC-INFRA-001]] 5.3). 시간은 **호출 사이**에서만 본다 — 한 호출의 60초 타임아웃이 더해져 최악 180초(마무리 호출 포함)
+
+**루프는 비공개 도우미 `_ask_loop(system, code, conversation_id, question, attachment_ids, user, start)`에 있다**(카드 BI) — 1~7이 그것이고, [[#queries.ask_code]]가 같이 쓴다. 입구마다 다른 것은 0단계의 검사와 시작 맥락뿐이다
 
 **대화록 항목** — 우리 키로 쌓고 와이어 형식은 어댑터가 옮긴다([[SYNC-MS-009#llm.step]]): `{role: user|assistant, text}` · `{role: assistant, text, tool_calls: [ToolCall]}` · `{role: tool, tool_call_id, text}`
 
@@ -206,6 +208,46 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 **테스트 관점** `code_graph` — 그래프가 없으면 error, 있으면 function·calls(카드 AZ) · `read_code` 세 꼴(항목 ID·함수 이름·`경로:시작-끝`)이 같은 줄을 읽고 줄 번호가 붙는다 · `read_code(".env")` → 없음 · 다섯 도구 각각 돌려주는 JSON의 키 집합 · 다른 프로젝트 문서 ID(소유해도) → `없음` 텍스트, 예외 아님 · 남의 프로젝트 → `not-found` 전파 · 끊어진 참조 → `note: "아직 없음"` · `item_chain` 빈 단계 행 유지 · `list_documents`에 제목이 있다 · `reason` 빠짐 → `인자 reason이 없다` · 없는 도구 이름 → `없는 도구` · **DB에 아무것도 안 쓴다**
 
 ---
+#### queries.ask_code 코드 그래프에서 묻는다 — 고른 함수가 시작 맥락
+
+**시그니처** `async def ask_code(code: str, key: str | None, conversation_id: int, question: str, attachment_ids: list[int], user: User) -> AsyncIterator[AskEvent]`
+
+근거: [[SYNC-PRD-001#R11]] · [[SYNC-UC-001#UC-H19]] 기본 흐름 1~2(코드 그래프)·1b·2b · [[SYNC-SEQ-001#SEQ-32]] · [[SYNC-API-001#POST/api/projects/{code}/code/ask]] · UI-17 질문 탭(7) · 사용자 요청 2026-10-01(카드 BI)
+
+**입력** `code` 프로젝트 · `key` 고른 함수(`파일:줄`, `functions[].key`). `None`이면 그래프 전체 · 나머지는 [[#queries.ask_item]]과 같다
+
+**처리** — [[#queries.ask_item]]과 같은 루프(`_ask_loop`). 다른 것은 0단계와 시작 맥락뿐
+0. `if not settings.LLM_API_KEY → ! LlmNotConfigured` · `project = ProjectService.get_owned(code, user)` · 대화 검사·`history`·`add_turn`·첨부 목록은 `ask_item` 1과 같다
+1. `row = CodeGraphService.get(project.id)` — 없으면 `graph_line = "코드 그래프 없음 — 코드를 push하면 만들어진다"`(2b), 있으면 `[코드 그래프] 커밋 {7자} · 함수 N · 호출 M`
+2. `docs = SpecService.list_by_project(project.id)` + `describe_documents` → `[문서 목록]` 줄마다 `ID 제목 · 상태`(본문 없음 — 사용자 결정 3)
+3. `key`가 있으면: `f = functions 중 key` · 없으면 `! not-found {resource: function}` · `d = codegraph.compare(graph, spec_calls)` 중 이 함수 → `[보는 함수] {qual} · {file}:{line}–{end} · 항목 {ms} ({status})` 또는 `항목 없음` · `[부르는 것 n]`·`[불리는 곳 n]` 줄마다 `qual · file:line · 항목`(각 20까지, 넘으면 `… k개 더`). `key`가 없으면 `[보는 것] 그래프 전체`
+4. `system = _ASK_CODE_SYSTEM.format(graph_line, docs, viewing, attachments)` → `yield from _ask_loop(system, code, …, AskStart(doc_id=None, item_id=None, key=key))` — 이벤트 여섯·상한·`finish_turn`·로그 전부 같다. 로그는 `ask code=%s key=%s …`
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-010#ConversationService.get]] [[SYNC-MS-010#ConversationService.history]] [[SYNC-MS-010#ConversationService.add_turn]] [[SYNC-MS-010#ConversationService.pending_images]] [[SYNC-MS-010#ConversationService.finish_turn]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] [[SYNC-MS-002#SpecService.describe_documents]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.item_blocks]](대조용 MINISPEC 항목 — `ask_item`·`code_nodes`와 같은 `_diffs`) · [[SYNC-MS-011#codegraph.spec_calls]] [[SYNC-MS-011#codegraph.compare]] · [[#queries.ask_tool]] · [[SYNC-MS-009#llm.step_stream]]
+
+**지시문 원문** — 코드 `_ASK_CODE_SYSTEM`. 앞부분(읽기만 한다·reason·상한·모른다·그림·답 양식)은 `_ASK_SYSTEM`과 같고, 자리 설명과 코드 규칙만 다르다
+
+```
+당신은 코드 그래프를 보는 사람 옆에서 그 함수를 설명한다. 프로젝트의 코드 그래프(함수·호출)와
+명세 문서들이 있고, 당신은 도구로 함수 본문과 명세 항목을 읽을 수 있다. 읽기만 한다.
+
+함수 자체를 묻는 질문(뭐 하는 함수야·왜 이렇게 했어)은 read_code로 본문을 읽고 답한다.
+명세와 맞는지 물으면 항목이 있으면 code_graph로 대조(같음·코드만·명세만)를 보고 get_item으로
+그 항목을 읽어 견준다. 항목이 없는 함수면 부르는 것·불리는 곳의 항목을 따라간다 — 그 함수가
+어느 명세의 어느 자리를 받치는지 거기서 보인다. 코드 근거는 파일:줄로, 명세 근거는
+문서ID#항목ID로 댄다. 코드 그래프가 없다고 적혀 있으면 그렇다고 말하고 지어내지 않는다.
+
+{graph_line}
+[문서 목록]
+{docs}
+{viewing}
+{attachments}
+```
+
+**테스트 관점** 시작 맥락에 `[문서 목록]`·`[코드 그래프] 커밋`·`[보는 함수] svc.save · a.py:1–4 · 항목 EXMP-MS-001#svc.save (code_only)`·부르는 것·불리는 곳이 있고 본문은 없다 · `key=None` → `[보는 것] 그래프 전체` · 그래프 없음 → `코드 그래프 없음` 줄, 그래도 답 · 없는 `key` → `not-found function`(스트림 전) · 남의 프로젝트 `not-found` · 키 없음 `llm-not-configured` · `AskStart(None, None, key)` · 턴이 대화에 남는다
+
+---
+
 #### queries.project_summary 프로젝트 목록 + 단계 11칸 + 건수
 
 **시그니처** `async def project_summary(user: User) -> list[ProjectSummary]`

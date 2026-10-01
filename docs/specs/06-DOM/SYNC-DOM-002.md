@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -438,7 +438,7 @@ classDiagram
 | `LlmUsage` | `prompt_tokens: int` · `completion_tokens: int`(없으면 0) | llm.step → ask_item이 누적해 로그 한 줄. DB에 안 쓴다 |
 | `LlmStep` | `text: str \| None` · `tool_calls: list~ToolCall~` · `usage: LlmUsage` | llm.step → ask_item. 한 번 호출의 결과 — 답이거나 도구 호출이거나 둘 다 |
 | `ToolResult` | `target: str \| None`(`DOC#ITEM`·`DOC`. 목록은 None) · `text: str`(모델에 줄 JSON) | queries.ask_tool → ask_item |
-| `AskStart` | `doc_id: str` · `item_id: str \| None` | ask_item → 라우터 `start` 이벤트. 이 앞의 오류는 HTTP 상태, 뒤는 `error` 이벤트 |
+| `AskStart` | `doc_id: str \| None` · `item_id: str \| None` · `key: str \| None`(코드 그래프에서 묻을 때 함수 `파일:줄`, 카드 BI) | ask_item·ask_code → 라우터 `start` 이벤트. 이 앞의 오류는 HTTP 상태, 뒤는 `error` 이벤트 |
 | `AskNote` | `text: str` | ask_item → `note` 이벤트. 모델이 읽기 전에 쓴 한 줄(도구 인자 `reason`) |
 | `AskRead` | `tool: str` · `target: str \| None` | ask_item → `read` 이벤트. 도구 실행이 끝났다 |
 | `AskDelta` | `text: str` | ask_item → `delta` 이벤트. 모델이 지금 쓰는 글자 조각 — 뒤에 `note`면 메모였고 `answer`면 답이다. 저장되지 않는다(카드 AW) |
@@ -1103,6 +1103,8 @@ code_calls(code, user) -> CodeCalls                SEQ-27  compare → MINISPEC 
 code_nodes(code, user) -> CodeNodes                SEQ-31  code_graphs 행의 함수 전부 + 커뮤니티 + compare로 항목·상태 (UI-17 코드 그래프)
 code_source(doc_id, item_id, user) -> CodeText     SEQ-27  함수의 파일·줄 → CodeGraphService.read (그래프 커밋의 저장소에서)
 code_text(code, file, line, user) -> CodeText      SEQ-31  그래프의 함수를 파일·줄로 짚어 CodeGraphService.read (UI-17 코드 4.6, 카드 BF)
+ask_code(code, key?, conversation_id, question, attachment_ids, user) -> AsyncIterator[AskEvent]
+                                                    SEQ-32  코드 그래프에서 묻는다 — 문서 목록·그래프 머리·고른 함수 블록이 시작 맥락, 루프는 ask_item과 같은 _ask_loop (UI-17 질문 탭, 카드 BI)
 ask_item(doc_id, item_id?, conversation_id, question, attachment_ids, user) -> AsyncIterator[AskEvent]
                                                     SEQ-24  대화에서 history·첨부 목록 → 시작 맥락(제목·항목 목록·첨부 목록) → add_turn → llm.step ↔ ask_tool 루프(8번·120초) → finish_turn → AskAnswer
 ask_tool(name, args, code, user, conversation_id) -> ToolResult
