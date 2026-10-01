@@ -23,7 +23,9 @@ mkdir -p "$out"
 
 # 인터넷판과 같은 Dockerfile — 판은 설정(EDITION=closed)이 가른다
 docker build -t "syncdoc-app:${ver}" "$root"
-docker pull postgres:16-alpine
+# DB 이미지는 이 PC에 있는 것을 그대로 담는다 — 없을 때만 받는다. 매번 받으면 로컬 태그가 새 다이제스트로
+# 옮겨가 같은 PC의 운영 db가 다음 compose up에 다시 만들어진다 (#262, INFRA 8.1)
+docker image inspect postgres:16-alpine >/dev/null 2>&1 || docker pull postgres:16-alpine
 docker save "syncdoc-app:${ver}" postgres:16-alpine | gzip > "${out}/images.tar.gz"
 
 cp "${root}/release/closed/docker-compose.yml" "${root}/release/closed/INSTALL.md" "$out/"
