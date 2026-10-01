@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -292,6 +292,7 @@ classDiagram
         +DocStatus from_status
         +DocStatus to_status
         +int changed_by_user_id
+        +str via
         +str reason
         +str commit_hash
         +datetime changed_at
@@ -300,6 +301,8 @@ classDiagram
 
 관계
 - `StatusChange` * — 1 `Document`
+
+`via`는 `versions.via`와 같은 값(`web` · `mcp` · `github`) — 어느 길로 바뀌었나. `mcp`면 에이전트가 바꾼 것이고 지시한 사람은 `changed_by`(토큰 발급자)다. 이력이 `AuthorRef`로 접을 때 `mcp` → `kind=agent, instructed_by=changed_by`(카드 BE)
 
 ### 2.3 참조
 
@@ -763,7 +766,7 @@ classDiagram
         +detect_deleted_items(document: Document, body: str) list~int~
         +create(project_id: int, doc_id: str, doc_type: DocType, body: str, commit_hash: str, author: Author, message: str, validate_result: ValidateResult?) VersionRow
         +save(document: Document, body: str, commit_hash: str, author: Author, message: str, deleted_item_pks: list~int~, validate_result: ValidateResult?, rebuild: bool) VersionRow
-        +apply_status(document: Document, new_body: str, commit_hash: str?, user: User, reason: str?, to: DocStatus?) None
+        +apply_status(document: Document, new_body: str, commit_hash: str?, author: Author, reason: str?, to: DocStatus?) None
         +list_versions(doc_id: str) list~Version~
         +diff(doc_id: str, from_no: int, to_no: int) Diff
         +list_by_project(project_id: int, stage: int?, status: DocStatus?, has_convention_error: bool?) list~DocumentSummary~
@@ -831,6 +834,7 @@ classDiagram
         +DocStatus from_status
         +DocStatus to_status
         +int changed_by_user_id
+        +str via
         +str reason
         +str commit_hash
         +datetime changed_at
@@ -1033,9 +1037,11 @@ save_pipeline(entry: Entry, doc_id: str | None, doc_type: DocType | None,
     entry=web_status: 1 → 2(frontmatter만) → 3 → 5(message "status(...)") → 6은 Document.status + StatusChange(commit_hash)만.
                       Version·extract·detect_impact 없음.
 
-change_status(doc_id, to, user, reason=None) -> DocumentSummary
-    UC-H8. 토글 하나. approved로 올릴 때만 검사(status-blocked — 규약 오류·미완성·끊어진 참조)
-    → frontmatter status 교체 → save_pipeline(entry=web_status, reason). 세션 하나 — 자기가 열고 save_pipeline에 넘긴다.
+change_status(doc_id, to, author, reason=None) -> DocumentSummary
+    UC-H8. 토글 하나. 웹 토글은 Author(human, user, None, web_status), MCP change_status는 _agent_author(카드 BE)
+    approved로 올릴 때만 검사(status-blocked — 규약 오류·미완성·끊어진 참조). 입구와 무관하게 같은 조건
+    → frontmatter status 교체 → save_pipeline(entry=web_status, author, reason). 세션 하나 — 자기가 열고 save_pipeline에 넘긴다.
+    entry=web_status는 입구가 아니라 「상태 줄만 바꾸는 파이프라인 모양」이다 — MCP도 이 분기. 누가 바꿨나는 author.via로 StatusChange.via에
 
 revert(doc_id, to_version, user, confirm_item_deletion=False) -> SaveResult
 
