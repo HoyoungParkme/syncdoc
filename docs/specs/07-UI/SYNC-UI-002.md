@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -2520,7 +2520,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 | 화면 설계 | [[SYNC-UI-001#UI-17]] |
 | 경로 | `/p/{프로젝트코드}/code-graph` · `?focus={파일:줄}`이면 그 함수를 골라 가운데로 |
 | 진입 | UI-4 코드 그래프 버튼(2.3) · UI-5 코드 탭 함수 머리의 「그래프에서 보기」(8.23) |
-| 유스케이스 | [[SYNC-UC-001#UC-H20]] 기본 흐름 5, 확장 5a·5b |
+| 유스케이스 | [[SYNC-UC-001#UC-H20]] 기본 흐름 5, 확장 5a·5b·5c |
 
 ### 배치
 
@@ -2533,7 +2533,18 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
   .gcard{flex:1;display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .gbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--sub);font-size:13px}
   .gbar .in{width:220px;height:28px;font-size:13px}
-  .cgbody{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 280px;min-height:0}
+  .cgbody{flex:1;display:grid;grid-template-columns:240px minmax(0,1fr) 480px;min-height:0}
+  /* 파일 트리(6) — 디렉터리 › 파일 › 함수. 접으면 열이 0이 되고 캔버스가 넓어진다 */
+  .cgtree{border-right:1px solid var(--line);background:var(--sub);overflow:auto;font:12.5px var(--mono);padding:8px 0}
+  .cgtree .th{display:flex;align-items:center;padding:2px 10px 6px;font:600 12px var(--sans);color:var(--ink3)}
+  .cgtree .th .b{margin-left:auto}
+  .cgtree .tr{display:flex;align-items:center;gap:5px;padding:2px 10px;white-space:nowrap;cursor:pointer}
+  .cgtree .tr.d{color:var(--ink2)} .cgtree .tr.f{color:var(--ink3)} .cgtree .tr.fn{color:var(--ink)}
+  .cgtree .tr.on{background:#fff;font-weight:600}
+  .cgtree .tr.dim{opacity:.45}
+  .cgtree .tw{width:10px;color:var(--mute);text-align:center}
+  .cgtree .ring{width:8px;height:8px;border-radius:50%;border:2px solid var(--ok);flex:none}
+  .cgtree .ring.code{border-color:var(--back)} .cgtree .ring.spec{border-color:var(--warn)} .cgtree .ring.none{border-color:var(--line2)}
   /* 캔버스 — 힘 배치 그림. 접힌 커뮤니티는 큰 원(크기 = 함수 수), 펼친 커뮤니티는 작은 원들. 선 굵기 = 호출 수 */
   .cgcanvas{position:relative;overflow:hidden;background:#fff;min-height:560px}
   .cgcanvas svg{position:absolute;inset:0;width:100%;height:100%}
@@ -2560,6 +2571,11 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
   .cgside .st{width:14px;text-align:center}
   .cgside .st.code{color:var(--back)} .cgside .st.spec{color:var(--warn)} .cgside .st.same{color:var(--ok)}
   .cgside .lnk{display:inline-block;margin-top:12px;color:var(--ink);text-decoration:underline;font-size:13px}
+  /* 코드(4.6) — UI-5 8.21과 같은 모양. 패널 높이의 절반쯤을 쓰고 안에서 스크롤 */
+  .cgside .csrc{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+  .cgside .csrc .ch{display:flex;gap:8px;font:600 12px var(--sans);color:var(--ink3)}
+  .cgside .csrc pre{margin:6px 0 0;padding:8px;max-height:300px;overflow:auto;background:var(--sub2);border-radius:6px;font:12px/1.55 var(--mono);color:var(--ink2)}
+  .cgside .csrc .ln{display:inline-block;width:3.2em;margin-right:8px;text-align:right;color:var(--mute);user-select:none}
   .glegend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;padding:8px 14px;border-top:1px solid var(--hair);background:var(--sub);font-size:12.5px;color:var(--ink3)}
   .glegend .row{display:inline-flex;align-items:center;gap:5px}
   .glegend .row i{width:10px;height:10px;border-radius:50%;display:inline-block}
@@ -2588,6 +2604,20 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
       </div>
 
       <div class="cgbody">
+        <aside class="cgtree" data-el="6">
+          <div class="th">파일<span class="b sm" data-el="6.3">접기</span></div>
+          <div class="tr d" data-el="6.1"><span class="tw">▾</span>backend/app/core</div>
+          <div class="tr f on" style="padding-left:22px"><span class="tw">▾</span>pipeline.py</div>
+          <div class="tr fn" data-el="6.2" style="padding-left:36px"><span class="ring code"></span>save_pipeline</div>
+          <div class="tr fn" style="padding-left:36px"><span class="ring none"></span>_advance_processed</div>
+          <div class="tr fn" style="padding-left:36px"><span class="ring"></span>change_status</div>
+          <div class="tr fn" style="padding-left:36px"><span class="ring"></span>revert</div>
+          <div class="tr f" style="padding-left:22px"><span class="tw">▸</span>queries.py</div>
+          <div class="tr f" style="padding-left:22px"><span class="tw">▸</span>codegraph/graph.py</div>
+          <div class="tr d dim"><span class="tw">▸</span>backend/app/web</div>
+          <div class="tr d dim"><span class="tw">▸</span>frontend/src/pages</div>
+          <div class="tr d dim"><span class="tw">▸</span>tools</div>
+        </aside>
         <div class="cgcanvas" data-el="3">
           <!-- 그림은 canvas가 그린다 — 여기서는 모양만. 접힌 커뮤니티(큰 원)와 펼친 커뮤니티 하나(작은 원들), 선 굵기 = 호출 수 -->
           <svg viewBox="0 0 900 560">
@@ -2624,6 +2654,17 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
             <div class="nm">pipeline.save_pipeline</div>
             <div class="meta">backend/app/core/pipeline.py:121</div>
             <span class="chip" data-el="4.5"><i></i>pipeline · 함수 118 · 접기</span>
+          </div>
+          <div class="csrc" data-el="4.6">
+            <div class="ch">코드 L121–L214<span class="lbl">a076246</span></div>
+            <pre><span class="ln">121</span>async def save_pipeline(
+<span class="ln">122</span>    entry: Entry,
+<span class="ln">123</span>    doc_id: str | None,
+<span class="ln">124</span>    ...
+<span class="ln">135</span>) -&gt; SaveResult:
+<span class="ln">136</span>    """SYNC-MS-007#pipeline.save_pipeline"""
+<span class="ln">137</span>    async with _lock(repo):
+<span class="ln">138</span>        document = spec.get_document(doc_id)</pre>
           </div>
           <div class="k">부르는 것 9</div>
           <div class="crow" data-el="4.2"><span class="st code">▲</span>git.commit_push</div>
@@ -2674,9 +2715,14 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 | 4.3 | 불리는 곳 | 목록 | 이 함수를 부르는 함수 | 그 함수를 골라 가운데로 |
 | 4.4 | 코드 탭으로 | 링크 | MINISPEC 항목이 있는 함수에만. `문서#항목` | UI-5 코드 탭 — `/p/{코드}/d/{문서}?panel=code#item-{항목}` |
 | 4.5 | 커뮤니티 칩 | 버튼 | 함수가 든 커뮤니티의 색·라벨·함수 수 | 그 커뮤니티를 접는다 |
+| 4.6 | 코드 | 영역 | 고른 함수의 본문 — 「코드 L시작–L끝」과 그래프 커밋, 줄 번호가 붙은 본문(UI-5 8.21과 같은 모양·같은 읽기, 300줄 상한). 고르는 순간 읽는다. 커뮤니티를 골랐으면 허브 함수(라벨이 함수면 그것, 아니면 4.2의 첫 함수)의 본문. 못 읽으면(5c) 「코드를 읽을 수 없습니다 — {이유}」 한 줄 | — |
 | 5 | 범례 | 영역 | 커뮤니티 목록과 표시 설명 | — |
 | 5.1 | 커뮤니티 행 | 행 | 색 견본 · 라벨 · 함수 수 · 체크박스. 라벨이 파일 경로 꼴이면 파일 이름만 보이고 전체는 툴팁 | 체크를 끄면 그 커뮤니티의 노드·선을 숨긴다 |
 | 5.2 | 표시 설명 | 텍스트 | 큰 원·선 굵기·고리·세 기호의 뜻 | — |
+| 6 | 파일 트리 | 영역 | 캔버스 왼쪽 240px. 함수가 있는 파일만, 경로순. 디렉터리 › 파일 › 함수 세 단. 처음엔 디렉터리가 접혀 있고 고른 함수의 경로만 펼쳐진다 | — |
+| 6.1 | 디렉터리·파일 행 | 행 | `▸`/`▾`와 이름. 디렉터리는 두 번째 단까지(`backend/app/core`), 파일은 그 아래 | 펼침·접힘. **파일 행을 누르면** 그 파일의 함수만 남기고 캔버스의 나머지를 흐린다(3.3과 같은 문법). 다시 누르면 푼다 |
+| 6.2 | 함수 행 | 행 | 이름. MINISPEC 함수는 상태 색 고리(✓·▲·◌와 같은 뜻), 그 밖은 흐린 고리 | 그 함수를 골라 가운데로(2.1과 같은 길) — 패널(4)에 코드 |
+| 6.3 | 접기 | 버튼 | 트리 머리 오른쪽 | 트리 열이 사라지고 캔버스가 넓어진다. 툴바에 「트리」가 생겨 다시 연다 |
 
 ### 규칙
 
@@ -2690,6 +2736,10 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 - **배치는 브라우저가 한다**(`d3-force` 힘 배치, [[SYNC-INFRA-001]] 3장). 서버는 노드·선·커뮤니티만 준다([[SYNC-MS-008#queries.code_nodes]]). 틱 300쯤에서 멈추고 끌면 다시 돈다. 그리기는 `<canvas>` — 1,300개 노드도 부드럽다. 바깥 요청이 없다 — 폐쇄망판에서도 같다
 - 그래프가 없으면(1a) 캔버스가 비고 2.3이 말한다. 커뮤니티가 없는 옛 그래프면(5a) 함수를 묶지 않고 전부 펼쳐 보이고 2.3이 말한다 — 다음 코드 push가 채운다
 - 접힌 커뮤니티를 고르면 패널(4)에 라벨·함수 수와 든 함수 상위 20(호출 많은 순)이 보이고, 함수를 누르면 펼쳐지며 그 함수가 골라진다
+- **코드는 고를 때 읽는다**(4.6, 카드 BF) — 호버로는 안 읽는다. 함수를 고르면 `GET /api/projects/{code}/code/source?file&line` 한 번([[SYNC-MS-008#queries.code_text]]), 앞 요청이 남아 있으면 끊는다. 코드 탭 8.21과 같은 읽기·상한이라 두 화면이 같은 본문을 보인다. 못 읽으면(5c) 코드 자리에만 이유 한 줄 — 부르는 것·불리는 곳은 그대로
+- **커뮤니티를 고르면 허브 함수의 코드를 미리 보인다** — 라벨과 이름(`Class.fn` 또는 `fn`)이 같은 함수가 그 커뮤니티에 있으면 그것, 없으면(라벨이 파일·클래스·모듈) 든 함수 목록(4.2)의 첫 함수. 운영 싱크독은 17개 중 둘만 함수 라벨이다
+- **파일 트리(6)는 브라우저가 만든다** — `code_nodes`의 `functions[].file`로 디렉터리(두 단) › 파일 › 함수(줄 순). 함수가 없는 파일·디렉터리는 없다. 접힌 디렉터리 안은 그리지 않는다(함수 1,000개여도 DOM이 가볍다). `?focus=`·검색·노드 클릭으로 함수가 골라지면 그 경로가 펼쳐지고 행이 밝아진다
+- 트리를 접으면(6.3) 열이 0이 되고 캔버스가 넓어진다. 1280px 화면에서 트리 240 + 패널 480이면 캔버스가 560 — 좁으면 접는다. 모바일 폭(≤720)에서는 기본 접힘
 
 ### 시나리오
 
@@ -2700,12 +2750,12 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 
 **S-2 코드 탭에서 와서 그 함수를 본다** — UI-5 8.23
 1. 코드 탭에서 `pipeline.save_pipeline`의 「그래프에서 보기」(8.23)를 누른다
-2. 그 함수의 커뮤니티가 펼쳐진 채 노드가 가운데에 골라져 있고(3.2), 옆 패널(4)에 부르는 것·불리는 곳
+2. 그 함수의 커뮤니티가 펼쳐진 채 노드가 가운데에 골라져 있고(3.2), 옆 패널(4)에 코드(4.6)와 부르는 것·불리는 곳. 왼쪽 트리(6)는 `backend/app/core › pipeline.py`가 펼쳐져 그 함수 행(6.2)이 밝다
 3. 「코드 탭으로」(4.4)를 누르면 원래 자리로 돌아온다
 
 **S-3 이름으로 찾아 코드 탭으로** — UC-H20 기본 흐름 5
 1. 검색(2.1)에 `commit_push`를 친다. `infra/git` 커뮤니티가 펼쳐지고 `git.commit_push`가 가운데에 골라진다
-2. 패널의 불리는 곳(4.3)에서 `pipeline.save_pipeline`을 누른다 — 선택이 옮겨 가고 가운데로 온다
+2. 패널의 불리는 곳(4.3)에서 `pipeline.save_pipeline`을 누른다 — 선택이 옮겨 가고 가운데로 오며 코드(4.6)가 그 함수로 바뀐다
 3. 「코드 탭으로」(4.4)로 UI-5 코드 탭에 간다
 
 **S-4 옛 그래프** — UC-H20 확장 5a
@@ -2715,6 +2765,14 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 **S-5 커뮤니티를 숨겨 본다**
 1. 범례(5.1)에서 `infra/git`의 체크를 끈다. 그 커뮤니티의 노드와 선이 사라진다
 2. 다시 켜면 돌아온다. 「전부 접기」(2.2)로 처음 모양이 된다
+
+**S-6 트리로 찾아 코드를 읽는다** — UC-H20 기본 흐름 5, 확장 5c (카드 BF)
+1. 트리(6)에서 `backend/app/core`(6.1)를 펼치고 `pipeline.py`를 펼친다. 함수 행(6.2)들이 줄 순으로 — `save_pipeline`에 ▲색 고리
+2. `_advance_processed`(6.2)를 누른다. 고리 없는 함수인데도 커뮤니티가 펼쳐지고 노드가 가운데로 오며, 패널에 코드(4.6)가 「코드 L63–L71 · a076246」로 바로 펼쳐진다. 「코드 탭으로」(4.4)는 없다 — 항목이 없다
+3. 파일 행 `pipeline.py`(6.1)를 누른다 — 캔버스에서 그 파일 함수들만 밝고 나머지는 흐리다. 다시 누르면 푼다
+4. 접힌 커뮤니티 `SpecService` 원을 누른다 — 패널에 든 함수 목록과 함께 첫 함수 `SpecService.save`의 코드가 미리 보인다
+5. 비밀 꼴 파일의 함수를 고른다(5c) — 코드 자리에 「코드를 읽을 수 없습니다 — 그 커밋에 파일이 없거나 비밀 꼴」, 부르는 것·불리는 곳은 그대로
+6. 「접기」(6.3)로 트리를 닫는다 — 캔버스가 넓어지고 툴바에 「트리」가 생긴다
 
 ---
 
