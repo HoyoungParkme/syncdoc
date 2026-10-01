@@ -27,6 +27,9 @@
   --ref-backlink:#b8860b;                /* UI-8 전용 — 되돌아오는 참조 */
   --graph-edge:#8f8b83;                  /* UI-8 전용 */
   --overlay:rgba(23,24,28,.42);
+  /* UI-17 전용 — 코드 그래프 커뮤니티 팔레트 12 (3.1 색 원칙의 예외, 7장 8). 13번째부터 되돌아 쓴다 */
+  --cg-1:#3b6ea5; --cg-2:#c2663a; --cg-3:#5b8c3e; --cg-4:#8a5bb5; --cg-5:#c9a227; --cg-6:#3a9a9a;
+  --cg-7:#b8507a; --cg-8:#6b6b3a; --cg-9:#7d5a3c; --cg-10:#5a62c4; --cg-11:#2f6f8f; --cg-12:#8aa83a;
 
   /* 3.2 타이포 */
   --font-sans:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;
@@ -853,3 +856,38 @@ a.arow:hover{background:var(--bg-subtle)}
 .pbody.code details.csrc pre{margin:var(--space-5) 0 0;padding:var(--space-5);background:var(--bg-sunken);border-radius:var(--radius-chip);
   font:var(--text-caption)/1.5 var(--font-mono);white-space:pre;overflow:auto;max-height:420px}
 .pbody.code details.csrc .ln{display:inline-block;width:3.2em;margin-right:var(--space-5);text-align:right;color:var(--ink-faint);user-select:none}
+
+/* UI-17 코드 그래프 (카드 BD) — 힘 배치는 canvas가 그리고, 올리거나 고른 노드 하나와 그 선만 DOM 겹층(3.1~3.4) */
+.cgpage{max-width:calc(1420px + var(--space-22) * 2);padding:var(--space-22)}
+.cgbody{display:grid;grid-template-columns:minmax(0,1fr) 280px;min-height:0}
+.gcard .cgcanvas{position:relative;overflow:hidden;height:calc(100vh - var(--topbar-h) - 250px);background:var(--bg-card);touch-action:none;cursor:grab}
+.gcard .cgcanvas.drag{cursor:grabbing}
+.gcard .cgcanvas canvas{display:block;width:100%;height:100%}
+.cgo{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.cgo line{stroke:var(--ink-body);stroke-width:2.2;stroke-opacity:.9}
+.cgn{position:absolute;transform:translate(-50%,calc(-100% - 10px));pointer-events:none;padding:var(--space-5) var(--space-9);
+  border-radius:var(--radius-control);background:var(--ink-body);color:#fff;font-family:var(--font-mono);font-size:11.5px;
+  font-weight:var(--w-semibold);white-space:nowrap;box-shadow:var(--shadow-node-focus);z-index:2}
+.cgn .sub{display:block;font-family:var(--font-sans);font-weight:var(--w-regular);font-size:11px;color:rgba(255,255,255,.75)}
+.cgn .mark{display:inline-block;margin-left:var(--space-5)}
+.cgn .mark.code{color:var(--cg-5)} .cgn .mark.spec{color:#f0a89e} .cgn .mark.same{color:#9fd8b4}
+.cgside{border-left:1px solid var(--border);background:var(--bg-subtle);padding:var(--space-14) var(--space-16);overflow:auto;font-size:var(--text-meta)}
+.cgside .k{font-weight:var(--w-semibold);font-size:var(--text-mono-sm);color:var(--ink-muted);margin:var(--space-12) 0 var(--space-6)}
+.cgside .nm{font-family:var(--font-mono);font-weight:var(--w-semibold);font-size:13.5px;word-break:break-all}
+.cgside .meta{font-family:var(--font-mono);font-size:var(--text-mono-sm);color:var(--ink-faint);margin-top:var(--space-3);word-break:break-all}
+.cgside .chip{display:inline-flex;align-items:center;gap:var(--space-5);margin-top:var(--space-6);padding:var(--space-2) var(--space-8);
+  border-radius:999px;background:var(--bg-card);border:1px solid var(--border-strong);font-size:var(--text-mono-sm);cursor:pointer}
+.cgside .chip i,.cglegend .row i{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+.cgside .crow{display:flex;align-items:center;gap:var(--space-6);padding:var(--space-4) 0;font-family:var(--font-mono);font-size:var(--text-mono-id);
+  border-bottom:1px solid var(--divider);cursor:pointer;word-break:break-all}
+.cgside .crow:hover{color:var(--ink-body);background:var(--bg-card)}
+.cgside .st{width:14px;text-align:center;flex:none}
+.cgside .st.code{color:var(--caution-ink)} .cgside .st.spec{color:var(--danger)} .cgside .st.same{color:var(--status-approved)}
+.cgside .lnk{display:inline-block;margin-top:var(--space-12);color:var(--ink-body)}
+.cgside .empty{color:var(--ink-faint)}
+.cglegend{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-4) var(--space-14);padding:var(--space-8) var(--space-14);max-height:84px;overflow:auto;
+  border-top:1px solid var(--divider);background:var(--bg-subtle);font-size:var(--text-caption);color:var(--ink-muted)}
+.cglegend .row{display:inline-flex;align-items:center;gap:var(--space-5);cursor:pointer;white-space:nowrap}
+.cglegend .row input{margin:0}
+.cglegend .row.off{opacity:.45}
+.cglegend .grow{flex:1}
