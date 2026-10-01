@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -1368,6 +1368,7 @@ sequenceDiagram
         RC->>Q: code_text(code, file, line, user)
         Q->>CS: get(project_id) → functions에서 file·line → read(workdir, file, start, end) — 그래프 커밋의 저장소
         Q-->>RC: CodeText (300줄까지 · 못 읽으면 not-found file)
+        U->>RC: GET /api/docs/{doc}/items/{item}/references — 함수에 항목이 있을 때, SEQ-13과 같다 (패널 4.7 명세, 카드 BG)
     end
     opt 「코드 탭으로」(4.4)
         U->>RC: UI-5 코드 탭 — SEQ-27
@@ -1377,7 +1378,7 @@ sequenceDiagram
 **읽을 때 볼 것**
 - 대조 상태는 SEQ-27과 같은 `compare`다 — 코드 탭과 그림이 같은 판정을 보인다
 - 옛 그래프(커뮤니티 없음)는 `communities`가 비고 함수의 `community`가 null — 화면이 전부 펼쳐 보이고 다음 코드 push가 채운다(5a)
-- **코드는 고를 때 읽는다**(카드 BF) — 함수 하나를 고를 때마다 `code/source` 한 번. 코드 탭 8.21과 같은 `CodeGraphService.read`라 둘이 같은 본문을 보인다. 파일 트리(6)는 `code_nodes`의 `functions[].file`로 브라우저가 만든다 — 요청이 없다
+- **코드는 고를 때 읽는다**(카드 BF) — 함수 하나를 고를 때마다 `code/source` 한 번. 코드 탭 8.21과 같은 `CodeGraphService.read`라 둘이 같은 본문을 보인다. 파일 트리(6)는 `code_nodes`의 `functions[].file`로 브라우저가 만든다 — 요청이 없다. 항목 없는 함수의 「가까운 항목」도 `calls`와 `functions[].ms`로 브라우저가 센다(카드 BG)
 
 ---
 
