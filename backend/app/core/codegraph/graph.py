@@ -373,12 +373,33 @@ def _short_names(ids: set[str]) -> dict[str, str]:
     return names
 
 
+def _louvain(g, resolution: float = 1.0) -> dict[int, list[str]]:
+    """Louvain 군집(seed 42) — MS-011 communities 2. graphify cluster의 재쪼개기 없이 (#253).
+
+    Louvain은 노드·선 순서에 민감하다 — 노드와 양 끝을 정렬한 선으로 다시 만들어 넣는다.
+    번호는 크기 내림차순(같으면 정렬한 노드 튜플) — 0이 가장 큰 군집.
+    """
+    import networkx as nx
+
+    u = nx.Graph()
+    u.add_nodes_from(sorted(g.nodes(), key=str))
+    u.add_edges_from(sorted(tuple(sorted((str(a), str(b)))) for a, b in g.edges()))
+    if u.number_of_edges() == 0:
+        comms = [{n} for n in u.nodes()]
+    else:
+        comms = nx.community.louvain_communities(u, resolution=resolution, seed=42)
+    ordered = sorted(comms, key=lambda c: (-len(c), tuple(sorted(c))))
+    return {i: sorted(c) for i, c in enumerate(ordered)}
+
+
 def communities(raw: dict, graph: dict) -> dict:
     """SYNC-MS-011#codegraph.communities
 
-    raw 그래프(파일·클래스·호출 선이 다 든 것)를 graphify로 군집해 함수마다 커뮤니티 번호를 붙이고
-    `communities`를 더한다. enrich 뒤에 — 보강이 더한 함수는 파일의 커뮤니티를 받는다. 모델·네트워크
-    없이 결정적(Louvain seed 42). 군집이 실패해도 그래프는 남는다 — 빈 결과와 경고 한 줄.
+    raw 그래프(파일·클래스·호출 선이 다 든 것)를 networkx Louvain으로 군집해 함수마다 커뮤니티
+    번호를 붙이고 `communities`를 더한다. enrich 뒤에 — 보강이 더한 함수는 파일의 커뮤니티를
+    받는다. 모델·네트워크 없이 결정적(seed 42). graphify `cluster`는 안 쓴다 — 응집도 재쪼개기가
+    싱크독을 100개 넘는 군집으로 터뜨린다(#253). 라벨만 graphify의 허브 라벨. 군집이 실패해도
+    그래프는 남는다.
     """
     functions: list[dict] = graph["functions"]
     by_key: dict[str, int] = {}
@@ -387,11 +408,11 @@ def communities(raw: dict, graph: dict) -> dict:
     nodes = {n["id"]: n for n in raw.get("nodes", []) if "id" in n}
     if nodes:
         try:
-            from graphify.cluster import cluster, label_communities_by_hub
+            from graphify.cluster import label_communities_by_hub
             from graphify.paths import load_node_link_graph
 
             g = load_node_link_graph(raw)
-            found = cluster(g)
+            found = _louvain(g)
             named = label_communities_by_hub(g, found)
             labels = {cid: _clean(str(lab)) for cid, lab in named.items()}
             for cid, members in found.items():

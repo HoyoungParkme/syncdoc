@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -124,7 +124,7 @@ graph TB
 | 인증 | GitHub OAuth (웹) / 개인 토큰 (MCP) | 5장 |
 | 모델 호출 | 외부 모델 API. `infra/llm.py` 어댑터 하나 | 읽는 중 질의([[SYNC-PRD-001#R11]])에만. 5.3 |
 | 첨부 | `python-multipart`(업로드 파싱) · `pypdf`(PDF 글자 추출). 바이트는 PostgreSQL `bytea` | 질문에 붙이는 파일(5.3). 새 저장 서비스를 두지 않는다 — 10MB×수십 개 규모라 DB로 충분하고, 커지면 바이트 자리만 객체 저장소로 옮긴다 |
-| 코드 그래프 | graphify(`graphifyy` — tree-sitter 문법 26종, 모델 없음) + 싱크독의 파이썬 AST 보강 + graphify `cluster`(Louvain, seed 42, 모델 없음)를 서버 프로세스 안에서 — 함수의 커뮤니티(UI-17). 싱크독 저장소 1초쯤, graspologic이 없어 networkx 경로 | 명세↔코드 대조([[SYNC-PRD-001#R13]]). 결과는 DB `code_graphs`에 줄인 모양으로(6장). 이미지가 170MB쯤 커진다 |
+| 코드 그래프 | graphify(`graphifyy` — tree-sitter 문법 26종, 모델 없음) + 싱크독의 파이썬 AST 보강 + networkx Louvain(`louvain_communities`, resolution 1.0, seed 42, 모델 없음)과 graphify의 허브 라벨을 서버 프로세스 안에서 — 함수의 커뮤니티(UI-17). graphify `cluster`는 안 쓴다 — 응집도 재쪼개기가 커뮤니티를 100개 넘게 만든다(#253). 싱크독 저장소 1초쯤 | 명세↔코드 대조([[SYNC-PRD-001#R13]]). 결과는 DB `code_graphs`에 줄인 모양으로(6장). 이미지가 170MB쯤 커진다 |
 | git 입구 | `git http-backend`(이미지 안 git을 CGI로) | 서버 저장소의 clone·push([[SYNC-PRD-001#R14]]). 따로 Git 서버를 두지 않고 앱 경로 하나로 받는다 |
 | 실행 | Docker Compose (app + db) | 명령 하나로 켜고 끈다 |
 

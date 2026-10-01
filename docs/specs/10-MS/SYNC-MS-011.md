@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-011
 type: MS
 title: MINISPEC — codegraph — 코드 호출 그래프와 명세 대조
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 ---
 
@@ -122,17 +122,17 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 ---
 
-#### codegraph.communities 함수를 graphify 군집으로 묶는다
+#### codegraph.communities 함수를 Louvain 군집으로 묶는다
 
 **시그니처** `def communities(raw: dict, graph: dict) -> dict`
 
-근거: [[SYNC-UC-001#UC-S8]] 기본 흐름 3 · UI-17 · 사용자 결정 2026-10-01(그래프를 만들 때 서버가 군집한다 — raw 그래프에는 파일·클래스·호출 선이 다 들어 함수가 제 파일·클래스와 같이 묶인다 · Louvain seed 42, 모델·네트워크 없음 · 한 번)
+근거: [[SYNC-UC-001#UC-S8]] 기본 흐름 3 · UI-17 · 사용자 결정 2026-10-01(그래프를 만들 때 서버가 군집한다 — raw 그래프에는 파일·클래스·호출 선이 다 들어 함수가 제 파일·클래스와 같이 묶인다 · Louvain seed 42, 모델·네트워크 없음 · 한 번) · **#253 — graphify `cluster`를 쓰지 않는다.** 그것은 Louvain 뒤에 50노드 이상·응집도 0.05 미만 군집을 다시 쪼개는 2차 패스가 있어 싱크독(노드 4,197)이 111~131개로 터진다(resolution 0.1~1.0 모두). networkx Louvain만 돌리면 resolution 1.0에서 19개 — SCN S9의 「스물 몇 개」가 그대로 나온다. 사용자 결정 2026-10-01: Louvain 직접, resolution 1.0
 
 **입력** `raw` — `load`가 준 원형 · `graph` — `enrich`까지 끝난 그래프(같은 객체에 더해 돌려준다)
 
 **처리**
 1. `G = graphify.paths.load_node_link_graph(raw)` · if 노드 0 → 모든 함수 `community = None`, `communities = []` → 6
-2. `C = graphify.cluster.cluster(G)` · `labels = graphify.cluster.label_communities_by_hub(G, C)` — graspologic이 없으면 networkx Louvain(seed 42)이라 결정적. **예외는 삼키고** 1의 빈 결과 + `log.warning` — 군집이 안 돼도 그래프는 남는다
+2. `C = networkx.community.louvain_communities(G 무향, resolution=1.0, seed=42)` — **graphify `cluster`가 아니다**(#253, 근거). Louvain은 노드·선 순서에 민감하므로 노드와 양 끝을 정렬한 선으로 그래프를 다시 만들어 넣어 결정적으로. 군집은 크기 내림차순(같으면 정렬한 노드 튜플)으로 번호를 매긴다 — `0`이 가장 큰 군집 · `labels = graphify.cluster.label_communities_by_hub(G, C)` — 라벨은 graphify 그대로(허브 이름). **예외는 삼키고** 1의 빈 결과 + `log.warning` — 군집이 안 돼도 그래프는 남는다
 3. 노드 → 커뮤니티 사상에서 **key → 커뮤니티**(`key`는 `reduce`와 같은 규칙 — `source_file` + `source_location`의 `L` 뒤 숫자)와 **파일 → 커뮤니티**(그 파일 노드들의 다수 커뮤니티, 동률이면 작은 번호)
 4. 함수마다 `community` = key의 것 · 없으면(enrich가 더한 정의) 파일의 것 · 그것도 없으면 None
 5. `communities = [{id, label: labels[id](끝 "()" 뗌), size: 든 함수 수}]` — 함수가 0인 군집(테스트·문서 노드만 든 것)은 뺀다. `size` 내림차순, 같으면 `id`
@@ -142,7 +142,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 **호출되는 것** [[SYNC-MS-007#pipeline.build_code_graph]] 3 — `enrich` 뒤. 검사기(`check_calls`)는 부르지 않는다 — 대조에 군집이 필요 없다
 
-**테스트 관점** contains·method 선으로 이어진 파일 둘 → 함수가 파일별로 갈린다 · 라벨이 허브 이름이고 `()`가 없다 · `size` = 함수 수이고 함수 없는 군집은 없다 · enrich가 더한 함수는 파일로 받는다 · 같은 raw 두 번 → 같은 결과 · 노드 없는 raw → 빈 목록·None
+**테스트 관점** contains·method 선으로 이어진 파일 둘 → 함수가 파일별로 갈린다 · 라벨이 허브 이름이고 `()`가 없다 · `size` = 함수 수이고 함수 없는 군집은 없다 · enrich가 더한 함수는 파일로 받는다 · 같은 raw 두 번 → 같은 결과 · 노드 없는 raw → 빈 목록·None · 노드가 가장 많은 군집이 `0`(#253)
 
 ---
 
