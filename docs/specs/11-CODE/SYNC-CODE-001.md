@@ -1256,7 +1256,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | 백엔드 없음 · `pages/CodeGraph.tsx` — 트리를 폴더 한 단씩 재귀(`TreeDir`), 폴더·파일 행 = 트리 포커스(그 아래 함수의 커뮤니티 펼침·그 노드만 밝게·`fitTo`), 패널 4.7 명세(항목 뱃지·근거·하위 참조는 `…/references`, 항목 없으면 가까운 항목) · `styles.css` |
 | 테스트 | 프런트 `tsc`·`build`·`lint` · `check_ui` UI-17 요소 +2 · 헤드 크롬(포커스 없는 첫 화면부터, 콘솔 0): 폴더 한 단씩 → 폴더 클릭 → 커뮤니티 펼침·밝음·맞춤 → 파일 클릭 → 함수 클릭 → 코드 + 명세(항목·근거·하위) → 근거 줄 → 문서로 → 항목 없는 함수 → 가까운 항목 → 커뮤니티 원 → 허브 기준 · 운영 같은 흐름 |
 | 선행 | BF |
-| 완료 | — |
+| 완료 | 2026-10-01 · 브랜치 `card/BG-tree-depth-spec-links`(0b14c02 #264) · spec 8 + code 1 · 백엔드 변경 없음(pytest 383 회귀) · `tsc`·`build`·`oxlint` · `validate` 0/0 · `check_ui` 13/13(UI-17 요소 27 — 4.7.1은 검사기가 두 단까지라 4.8로) · `check_tokens` · `check_view_html` 35/35 · 헤드리스 크롬(WSLg 고장, 포커스 없는 첫 화면부터, 콘솔 오류 0): backend › app › core 한 단씩 → 폴더 포커스(커뮤니티 펼침·그 노드만·화면 맞춤) → pipeline.py → save_pipeline → 코드 L129–L176 + 명세(MS-007#pipeline.save_pipeline · 근거 22 · SEQ-1 링크) → _advance_processed → 「항목 없음 · 가까운 항목」(trash_document·rev_list_count) → 커뮤니티 허브 → ?focus 진입 시 조상 폴더 전부 · 운영: 배포 번들에 4.7 문구 포함, references 입구 응답 — 화면은 사람이 직접(DEV-17) |
 
 ---
 
