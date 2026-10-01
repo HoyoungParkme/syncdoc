@@ -226,3 +226,22 @@ def test_ask_endpoint_streams_start_note_read_answer(
     assert client.post(
         "/api/docs/EXMP-PRD-001/items/G1/ask", json={"question": "?", "conversation_id": conv}
     ).status_code in (404, 405)
+
+
+def test_item_view_endpoint_returns_block_only(client: TestClient, scoped: Session) -> None:
+    """API-001 GET /api/docs/{docId}/items/{itemId} — UI-18 항목 미리보기 (카드 BH)."""
+    _seed(scoped)
+    login(client, scoped, "hoyoung")
+    r = client.get("/api/docs/EXMP-PRD-001/items/R1")
+    assert r.status_code == 200
+    v = r.json()
+    assert (v["doc_id"], v["item_id"], v["doc_status"]) == ("EXMP-PRD-001", "R1", "draft")
+    assert v["doc_version_no"] == 1
+    assert v["body"].startswith("#### R1") and "#### N1" not in v["body"]  # 블록만
+    miss = client.get("/api/docs/EXMP-PRD-001/items/R9")
+    assert miss.status_code == 404 and miss.json()["available_items"] == ["G1", "R1"]
+    scoped.execute(text("UPDATE items SET is_deleted=true, deleted_at=now() WHERE item_id='R1'"))
+    gone = client.get("/api/docs/EXMP-PRD-001/items/R1")
+    assert gone.status_code == 410 and gone.json()["type"] == "urn:syncdoc:item-deleted"
+    login(client, scoped, "minjun")
+    assert client.get("/api/docs/EXMP-PRD-001/items/G1").status_code == 404
