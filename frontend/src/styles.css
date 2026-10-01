@@ -872,6 +872,13 @@ a.arow:hover{background:var(--bg-subtle)}
 .cgtree .tw{width:10px;color:var(--ink-faint);text-align:center;flex:none}
 .cgtree .ring{width:8px;height:8px;border-radius:50%;border:2px solid var(--border-strong);flex:none}
 .cgtree .ring.same{border-color:var(--status-approved)} .cgtree .ring.code{border-color:var(--caution-ink)} .cgtree .ring.spec{border-color:var(--danger)}
+/* 4.7 명세 — 항목 뱃지와 참조 줄. 참조 탭(8.1)과 같은 자료 (카드 BG) */
+.cgside .spec .it{margin-bottom:var(--space-4)}
+.cgside .spec .sk{font-weight:var(--w-semibold);font-size:11px;color:var(--ink-faint);margin:var(--space-6) 0 var(--space-2)}
+.cgside .spec .sr{display:flex;align-items:center;gap:var(--space-6);padding:var(--space-2) 0;color:var(--ink-body);text-decoration:none;cursor:pointer}
+.cgside .spec .sr:hover .nm2{text-decoration:underline}
+.cgside .spec .sr .nm2{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cgside .spec .sr.missing{color:var(--ink-disabled)}
 .gcard .cgcanvas{position:relative;overflow:hidden;height:calc(100vh - var(--topbar-h) - 250px);background:var(--bg-card);touch-action:none;cursor:grab}
 .gcard .cgcanvas.drag{cursor:grabbing}
 .gcard .cgcanvas canvas{display:block;width:100%;height:100%}

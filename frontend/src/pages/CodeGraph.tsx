@@ -3,16 +3,18 @@
  *  3 캔버스 — 그림은 canvas가 그린다. 올리거나 고른 노드 하나와 그 선만 DOM 겹층으로 다시 그린다:
  *    3.1 커뮤니티 노드 · 3.2 함수 노드 · 3.3 호출 선 · 3.4 대조 표시
  *  4 옆 패널(4.1 이름·자리, 4.2 부르는 것, 4.3 불리는 곳, 4.4 코드 탭으로, 4.5 커뮤니티 칩, 4.6 코드) · 5 범례(5.1 커뮤니티 행, 5.2 설명)
- *  6 파일 트리(6.1 디렉터리·파일 행, 6.2 함수 행, 6.3 접기) — 카드 BF. 그래프 옆에 코드: 함수를 고르면 4.6에 본문이 바로,
+ *  6 파일 트리(6.1 폴더·파일 행, 6.2 함수 행, 6.3 접기) — 카드 BF. 그래프 옆에 코드: 함수를 고르면 4.6에 본문이 바로,
  *    커뮤니티면 허브 함수의 본문. 트리는 functions[].file로 브라우저가 만든다 — 요청이 없다
+ *  카드 BG — 트리는 폴더 한 단씩, 폴더·파일을 고르면 그 아래 함수 노드를 펼쳐 보인다(트리 포커스). 4.7 명세 —
+ *    항목·근거(상위 참조)·하위 참조(…/references, 참조 탭과 같은 자료), 항목 없으면 가까운 항목
  *
  *  배치는 브라우저가 한다 — 서버는 노드·선·커뮤니티만 준다(MS-008 code_nodes). 커뮤니티는 서버가 그래프를
  *  만들 때 계산한 것(MS-011 communities). d3-force는 번들 안에 있어 바깥 요청이 없다 — 폐쇄망판도 같다. */
-import { ProjName } from '../components/ui'
+import { ItemIdBadge, ProjName } from '../components/ui'
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type Simulation, type SimulationLinkDatum, type SimulationNodeDatum } from 'd3-force'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
-import { ago, api, ApiError, type CodeNode, type CodeNodes, type CodeText, type ProjectSummary } from '../api/client'
+import { ago, api, ApiError, type CodeNode, type CodeNodes, type CodeText, type ItemRef, type ItemReferences, type ProjectSummary } from '../api/client'
 import { CodeLines } from './codeSrc'
 
 type Sel = { kind: 'c'; id: number } | { kind: 'f'; key: string }
@@ -36,6 +38,18 @@ const STATUS_CLS: Record<string, string> = { same: 'same', code_only: 'code', sp
 const short = (label: string) => (label.includes('/') ? label.slice(label.lastIndexOf('/') + 1) : label)
 const cNodeId = (cid: number) => `c:${cid}`
 const fNodeId = (key: string) => `f:${key}`
+/** 6 트리 한 단 — 폴더(한 단씩)와 그 안 파일. 접힌 폴더 안은 그리지 않는다 */
+interface TDir {
+  name: string
+  path: string
+  dirs: TDir[]
+  files: { file: string; fns: CodeNode[] }[]
+}
+/** 항목 ID `SYNC-MS-007#pipeline.save_pipeline` → 문서·항목·화면 링크 */
+const msParts = (ms: string) => {
+  const [doc, item] = ms.split('#')
+  return { doc, item, short: ms.split('-').slice(1).join('-'), to: `/p/${doc.split('-')[0]}/d/${doc}#item-${item}` }
+}
 
 export function CodeGraph() {
   const { code = '' } = useParams()
@@ -53,9 +67,11 @@ export function CodeGraph() {
   // 6 파일 트리 · 4.6 코드 (카드 BF)
   const [treeOpen, setTreeOpen] = useState(() => typeof window === 'undefined' || window.innerWidth > 720)
   const [openDirs, setOpenDirs] = useState<Set<string>>(() => new Set())
-  const [fileFocus, setFileFocus] = useState<string | null>(null)
+  const [treeFocus, setTreeFocus] = useState<{ path: string; keys: Set<string>; cids: Set<number> } | null>(null)
   const [src, setSrc] = useState<{ key: string; text?: CodeText; error?: string } | null>(null)
   const srcSeq = useRef(0)
+  const [refs, setRefs] = useState<{ key: string; data?: ItemReferences; error?: string } | null>(null) // 4.7 명세 (카드 BG)
+  const refSeq = useRef(0)
   const [, bump] = useState(0) // 틱마다 겹층 자리를 다시 — canvas는 rAF가 직접 그린다
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
@@ -65,7 +81,7 @@ export function CodeGraph() {
   const view = useRef({ x: 0, y: 0, k: 1 })
   const dirty = useRef(true)
   const focusRef = useRef<Sel | null>(null)
-  const fileFocusRef = useRef<{ file: string; cids: Set<number> } | null>(null)
+  const treeFocusRef = useRef<{ keys: Set<string>; cids: Set<number> } | null>(null)
   const fitted = useRef(false) // 처음 안정될 때 한 번 전체가 보이게 맞춘다
   const colors = useRef<{ cg: string[]; ok: string; code: string; spec: string; edge: string; ink: string }>({ cg: [], ok: '', code: '', spec: '', edge: '', ink: '' })
 
@@ -102,21 +118,36 @@ export function CodeGraph() {
     return d
   }, [data])
 
-  /** 6 파일 트리 — 디렉터리(파일의 폴더 경로) › 파일 › 함수(줄 순). 함수가 있는 파일만, 경로순 */
+  /** 6 파일 트리 — 폴더 한 단씩 › 파일 › 함수(줄 순). 함수가 있는 파일만, 이름순. 자식 하나뿐인 폴더도 묶지 않는다 (카드 BG) */
   const tree = useMemo(() => {
-    const dirs = new Map<string, Map<string, CodeNode[]>>()
-    for (const f of data?.functions ?? []) {
-      const i = f.file.lastIndexOf('/')
-      const dir = i < 0 ? '.' : f.file.slice(0, i)
-      const files = dirs.get(dir) ?? new Map<string, CodeNode[]>()
-      files.set(f.file, [...(files.get(f.file) ?? []), f])
-      dirs.set(dir, files)
+    const root: TDir = { name: '', path: '', dirs: [], files: [] }
+    const byFile = new Map<string, CodeNode[]>()
+    for (const f of data?.functions ?? []) byFile.set(f.file, [...(byFile.get(f.file) ?? []), f])
+    for (const [file, fns] of byFile) {
+      const parts = file.split('/')
+      let d = root
+      for (const seg of parts.slice(0, -1)) {
+        let next = d.dirs.find((x) => x.name === seg)
+        if (!next) {
+          next = { name: seg, path: d.path ? `${d.path}/${seg}` : seg, dirs: [], files: [] }
+          d.dirs.push(next)
+        }
+        d = next
+      }
+      d.files.push({ file, fns: fns.sort((a, b) => a.line - b.line) })
     }
-    return [...dirs]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([dir, files]) => ({ dir, files: [...files].sort(([a], [b]) => a.localeCompare(b)).map(([file, fns]) => ({ file, fns: fns.sort((a, b) => a.line - b.line) })) }))
+    const sortDir = (d: TDir) => {
+      d.dirs.sort((a, b) => a.name.localeCompare(b.name)).forEach(sortDir)
+      d.files.sort((a, b) => a.file.localeCompare(b.file))
+    }
+    sortDir(root)
+    return root
   }, [data])
-  const dirOf = (file: string) => (file.includes('/') ? file.slice(0, file.lastIndexOf('/')) : '.')
+  /** 파일의 조상 폴더 전부 + 파일 — pick·?focus가 트리를 연다 */
+  const ancestors = (file: string) => {
+    const parts = file.split('/')
+    return parts.map((_, i) => parts.slice(0, i + 1).join('/'))
+  }
 
   /** 표시 그래프 — 접힌 커뮤니티는 큰 원 하나, 펼친 커뮤니티는 함수들. 선은 양 끝을 표시 노드로 접어 센다 */
   const shown = useMemo(() => {
@@ -259,9 +290,9 @@ export function CodeGraph() {
       }
       ctx.strokeStyle = col.edge
       ctx.lineCap = 'round'
-      // 파일 행(6.1) 포커스 — 선과 노드 둘 다 보므로 루프 앞에서 읽는다 (#260)
-      const ff = fileFocusRef.current
-      const litNode = (n: GNode) => (ff === null ? true : n.kind === 'f' ? n.fn!.file === ff.file : ff.cids.has(n.cid!))
+      // 트리 포커스(6.1) — 선과 노드 둘 다 보므로 루프 앞에서 읽는다 (#260)
+      const ff = treeFocusRef.current
+      const litNode = (n: GNode) => (ff === null ? true : n.kind === 'f' ? ff.keys.has(n.fn!.key) : ff.cids.has(n.cid!))
       for (const l of linksRef.current) {
         const s = l.source as GNode
         const t = l.target as GNode
@@ -274,8 +305,8 @@ export function CodeGraph() {
         ctx.stroke()
       }
       for (const n of nodesRef.current) {
-        // 포커스 노드가 있으면 그 이웃만, 없고 파일 행(6.1)을 골랐으면 그 파일의 함수(와 그 함수가 든 커뮤니티)만 밝다
-        const dim = fid !== null ? !near.has(n.id) : ff !== null && (n.kind === 'f' ? n.fn!.file !== ff.file : !ff.cids.has(n.cid!))
+        // 포커스 노드가 있으면 그 이웃만, 없고 트리(6.1)에서 골랐으면 그 아래 함수(와 그 함수가 든 커뮤니티)만 밝다
+        const dim = fid !== null ? !near.has(n.id) : !litNode(n)
         ctx.globalAlpha = dim ? 0.15 : n.kind === 'c' ? 0.85 : 0.9
         ctx.fillStyle = n.cid === null ? col.edge : col.cg[n.cid % PALETTE]
         ctx.beginPath()
@@ -311,10 +342,10 @@ export function CodeGraph() {
     dirty.current = true
   }, [focus])
   useEffect(() => {
-    fileFocusRef.current = fileFocus && data ? { file: fileFocus, cids: new Set(data.functions.filter((f) => f.file === fileFocus && f.community !== null).map((f) => f.community!)) } : null
+    treeFocusRef.current = treeFocus ? { keys: treeFocus.keys, cids: treeFocus.cids } : null
     dirty.current = true
     bump((t) => t + 1)
-  }, [fileFocus, data])
+  }, [treeFocus])
 
   // 좌표 — 화면 → 세계
   const toWorld = (sx: number, sy: number) => {
@@ -325,10 +356,10 @@ export function CodeGraph() {
     const [wx, wy] = toWorld(sx, sy)
     return simRef.current?.find(wx, wy, 24 / view.current.k)
   }
-  /** 전체가 보이게 — 노드 상자에 맞춰 줌·이동 (처음 한 번) */
-  const fitAll = () => {
+  /** 노드들이 보이게 — 그 상자에 맞춰 줌·이동. 처음 한 번은 전부, 트리 포커스는 그 노드들 */
+  const fitNodes = (ns: GNode[]) => {
     const box = boxRef.current
-    const ns = nodesRef.current.filter((n) => n.x !== undefined)
+    ns = ns.filter((n) => n.x !== undefined)
     if (!box || !ns.length) return
     const xs = ns.map((n) => n.x!)
     const ys = ns.map((n) => n.y!)
@@ -338,7 +369,9 @@ export function CodeGraph() {
     const k = Math.min(1.5, box.clientWidth / bw, box.clientHeight / bh)
     view.current = { x: box.clientWidth / 2 - ((Math.min(...xs) + Math.max(...xs)) / 2) * k, y: box.clientHeight / 2 - ((Math.min(...ys) + Math.max(...ys)) / 2) * k, k }
     dirty.current = true
+    bump((t) => t + 1)
   }
+  const fitAll = () => fitNodes(nodesRef.current)
   const centerOn = useCallback((n: GNode) => {
     const box = boxRef.current
     if (!box || n.x === undefined || n.y === undefined) return
@@ -360,7 +393,7 @@ export function CodeGraph() {
         })
       }
       setSel({ kind: 'f', key: f.key })
-      setOpenDirs((s) => new Set(s).add(dirOf(f.file)).add(f.file)) // 트리(6)의 그 경로를 펼친다
+      setOpenDirs((s) => new Set([...s, ...ancestors(f.file)])) // 트리(6)의 조상 폴더 전부와 파일을 연다
       // 노드는 다음 틱에 생긴다 — 자리가 잡힌 뒤 가운데로
       window.setTimeout(() => {
         const n = nodesRef.current.find((m) => m.id === fNodeId(f.key))
@@ -510,7 +543,22 @@ export function CodeGraph() {
       .catch((e) => seq === srcSeq.current && setSrc({ key: codeKey, error: e instanceof ApiError ? e.message : String(e) }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codeKey, code])
-  // 6.1 디렉터리·파일 행 — 펼침·접힘. 파일은 캔버스 흐림(fileFocus)도 토글
+  // 4.7 명세 — 항목이 있으면 그 항목의 참조를 한 번 (참조 탭 8.1과 같은 자료). 늦은 답은 버린다
+  useEffect(() => {
+    if (!codeKey || !codeTarget?.ms) {
+      setRefs(null)
+      return
+    }
+    const seq = ++refSeq.current
+    const { doc, item } = msParts(codeTarget.ms)
+    setRefs({ key: codeKey })
+    api
+      .get<ItemReferences>(`/api/docs/${doc}/items/${item.replace(/\//g, '~')}/references`)
+      .then((d) => seq === refSeq.current && setRefs({ key: codeKey, data: d }))
+      .catch((e) => seq === refSeq.current && setRefs({ key: codeKey, error: e instanceof ApiError ? e.message : String(e) }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codeKey])
+  // 6.1 폴더·파일 행 — ▸는 펼침·접힘, 이름은 트리 포커스(그 아래 함수의 커뮤니티를 펼치고 그 노드만 밝게, 화면을 맞춘다)
   const toggleDir = (key: string) =>
     setOpenDirs((s) => {
       const n = new Set(s)
@@ -518,6 +566,134 @@ export function CodeGraph() {
       else n.add(key)
       return n
     })
+  const focusTree = (path: string, isFile: boolean) => {
+    if (treeFocus?.path === path) {
+      setTreeFocus(null)
+      return
+    }
+    const fns = (data?.functions ?? []).filter((f) => (isFile ? f.file === path : f.file.startsWith(path + '/')))
+    const keys = new Set(fns.map((f) => f.key))
+    const cids = new Set(fns.filter((f) => f.community !== null).map((f) => f.community!))
+    setTreeFocus({ path, keys, cids })
+    setOpenDirs((s) => new Set(s).add(path))
+    if (grouped && cids.size) {
+      setExpanded((s) => new Set([...s, ...cids]))
+      setHidden((s) => {
+        const n = new Set(s)
+        cids.forEach((c) => n.delete(c))
+        return n
+      })
+    }
+    // 노드는 다음 틱에 생긴다 — 자리가 잡힌 뒤 그 노드들에 맞춘다
+    window.setTimeout(() => fitNodes(nodesRef.current.filter((n) => n.kind === 'f' && keys.has(n.fn!.key))), 120)
+  }
+  /** 6 트리 한 단 그리기 — 접힌 폴더 안은 그리지 않는다. data-el은 첫 폴더 행(6.1)·첫 함수 행(6.2)에만 */
+  const marks = { dir: false, fn: false }
+  const renderDir = (d: TDir, depth: number): React.ReactNode => (
+    <div key={d.path || '/'}>
+      {d.dirs.map((c) => {
+        const first = !marks.dir
+        marks.dir = true
+        const open = openDirs.has(c.path)
+        return (
+          <div key={c.path}>
+            <div className={`tr d${treeFocus?.path === c.path ? ' on' : ''}`} style={{ paddingLeft: 10 + 14 * depth }} data-el={first ? '6.1' : undefined} title={c.path} onClick={() => focusTree(c.path, false)}>
+              <span className="tw" onClick={(e) => (e.stopPropagation(), toggleDir(c.path))}>
+                {open ? '▾' : '▸'}
+              </span>
+              {c.name}
+            </div>
+            {open && renderDir(c, depth + 1)}
+          </div>
+        )
+      })}
+      {d.files.map(({ file, fns }) => {
+        const open = openDirs.has(file)
+        return (
+          <div key={file}>
+            <div className={`tr f${treeFocus?.path === file ? ' on' : ''}`} style={{ paddingLeft: 10 + 14 * depth }} title={file} onClick={() => focusTree(file, true)}>
+              <span className="tw" onClick={(e) => (e.stopPropagation(), toggleDir(file))}>
+                {open ? '▾' : '▸'}
+              </span>
+              {short(file)}
+            </div>
+            {open &&
+              fns.map((f) => {
+                const first = !marks.fn
+                marks.fn = true
+                return (
+                  <div className={`tr fn${selFn?.key === f.key ? ' on' : ''}`} key={f.key} style={{ paddingLeft: 10 + 14 * (depth + 1) }} data-el={first ? '6.2' : undefined} onClick={() => pick(f)} title={`${f.qual} · ${f.file}:${f.line}`}>
+                    <span className={`ring${f.status ? ` ${STATUS_CLS[f.status]}` : ''}`} />
+                    {f.name}
+                  </div>
+                )
+              })}
+          </div>
+        )
+      })}
+    </div>
+  )
+  /** 4.7 명세 — 항목 뱃지 · 근거(상위) · 이것을 가리킴(하위). 항목 없으면 가까운 항목 */
+  const refRow = (r: ItemRef, first = false) =>
+    r.is_missing ? (
+      <div className="sr missing" key={r.raw_target} data-el={first ? '4.8' : undefined} title="가리키는 곳 없음 — 항목이 삭제됐거나 아직 안 쓰였다">
+        <ItemIdBadge>{r.raw_target.split('-').slice(1).join('-')}</ItemIdBadge> 가리키는 곳 없음
+      </div>
+    ) : (
+      <Link className="sr" key={`${r.doc_id}#${r.item_id}`} data-el={first ? '4.8' : undefined} to={`/p/${r.doc_id?.split('-')[0]}/d/${r.doc_id}${r.item_id ? '#item-' + r.item_id : ''}`}>
+        <ItemIdBadge>{`${r.doc_id}${r.item_id ? '#' + r.item_id : ''}`.split('-').slice(1).join('-')}</ItemIdBadge>
+        <span className="nm2">{r.item_id ? r.display_name : `(문서 전체) ${r.display_name ?? ''}`}</span>
+      </Link>
+    )
+  const specBlock = (f: CodeNode) => {
+    const LIMIT = 8
+    if (!f.ms) {
+      const near = [...callsOf(f.key), ...callersOf(f.key)].filter((x) => x.ms)
+      const seen = new Set<string>()
+      const items = near.filter((x) => (seen.has(x.ms!) ? false : (seen.add(x.ms!), true))).sort((a, b) => (degree.get(b.key) ?? 0) - (degree.get(a.key) ?? 0)).slice(0, 6)
+      return (
+        <div className="spec" data-el="4.7">
+          <div className="k">명세</div>
+          <div className="it lbl">항목 없음{items.length ? ' · 가까운 항목' : ''}</div>
+          {items.map((x, i) => {
+            const m = msParts(x.ms!)
+            return (
+              <Link className="sr" key={x.ms} data-el={i === 0 ? '4.8' : undefined} to={m.to} title={x.ms!}>
+                <ItemIdBadge>{m.short}</ItemIdBadge>
+                <span className="nm2">{x.qual}</span>
+              </Link>
+            )
+          })}
+        </div>
+      )
+    }
+    const m = msParts(f.ms)
+    const d = refs?.data
+    const up = d?.upstream ?? []
+    const down = d?.downstream ?? []
+    return (
+      <div className="spec" data-el="4.7">
+        <div className="k">명세</div>
+        <div className="it">
+          <ItemIdBadge>{m.short}</ItemIdBadge>
+        </div>
+        {refs?.error ? (
+          <div className="lbl">참조를 읽을 수 없습니다 — {refs.error}</div>
+        ) : !d ? (
+          <div className="lbl">불러오는 중…</div>
+        ) : (
+          <>
+            <div className="sk">근거 {up.length || ''}</div>
+            {up.length ? up.slice(0, LIMIT).map((r, i) => refRow(r, i === 0)) : <div className="lbl">없음</div>}
+            {up.length > LIMIT && <div className="lbl">… {up.length - LIMIT}개 더 — 코드 탭에서</div>}
+            <div className="sk">이것을 가리킴 {down.length || ''}</div>
+            {down.length ? down.slice(0, LIMIT).map((r) => refRow(r)) : <div className="lbl">없음</div>}
+            {down.length > LIMIT && <div className="lbl">… {down.length - LIMIT}개 더 — 코드 탭에서</div>}
+          </>
+        )}
+      </div>
+    )
+  }
   const codeBlock = (f: CodeNode) => (
     <div className="csrc" data-el="4.6">
       <div className="ch">
@@ -598,32 +774,7 @@ export function CodeGraph() {
                   접기
                 </span>
               </div>
-              {tree.map(({ dir, files }, di) => (
-                <div key={dir}>
-                  <div className={`tr d${openDirs.has(dir) ? ' on' : ''}`} data-el={di === 0 ? '6.1' : undefined} onClick={() => toggleDir(dir)} title={dir}>
-                    <span className="tw">{openDirs.has(dir) ? '▾' : '▸'}</span>
-                    {dir}
-                  </div>
-                  {openDirs.has(dir) &&
-                    files.map(({ file, fns }) => (
-                      <div key={file}>
-                        <div className={`tr f${fileFocus === file ? ' on' : ''}`} style={{ paddingLeft: 22 }} title={file} onClick={() => setFileFocus((cur) => (cur === file ? null : file))}>
-                          <span className="tw" onClick={(e) => (e.stopPropagation(), toggleDir(file))}>
-                            {openDirs.has(file) ? '▾' : '▸'}
-                          </span>
-                          {short(file)}
-                        </div>
-                        {openDirs.has(file) &&
-                          fns.map((f, fi) => (
-                            <div className={`tr fn${selFn?.key === f.key ? ' on' : ''}`} key={f.key} style={{ paddingLeft: 36 }} data-el={di === 0 && fi === 0 ? '6.2' : undefined} onClick={() => pick(f)} title={`${f.qual} · ${f.file}:${f.line}`}>
-                              <span className={`ring${f.status ? ` ${STATUS_CLS[f.status]}` : ''}`} />
-                              {f.name}
-                            </div>
-                          ))}
-                      </div>
-                    ))}
-                </div>
-              ))}
+              {renderDir(tree, 0)}
             </aside>
           )}
           <div className={`cgcanvas${dragging ? ' drag' : ''}`} data-el="3" ref={boxRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onWheel={onWheel}>
@@ -676,6 +827,7 @@ export function CodeGraph() {
                   )}
                 </div>
                 {codeBlock(selFn)}
+                {specBlock(selFn)}
                 <div className="k">부르는 것 {callsOf(selFn.key).length}</div>
                 <div data-el="4.2">{callsOf(selFn.key).map(row)}</div>
                 <div className="k">불리는 곳 {callersOf(selFn.key).length}</div>
@@ -699,6 +851,7 @@ export function CodeGraph() {
                   </span>
                 </div>
                 {codeTarget && codeBlock(codeTarget)}
+                {codeTarget && specBlock(codeTarget)}
                 <div className="k">든 함수 — 호출 많은 순 {Math.min(20, members.length)}</div>
                 <div data-el="4.2">{members.map(row)}</div>
               </>

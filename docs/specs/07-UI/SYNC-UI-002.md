@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -2571,6 +2571,11 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
   .cgside .st{width:14px;text-align:center}
   .cgside .st.code{color:var(--back)} .cgside .st.spec{color:var(--warn)} .cgside .st.same{color:var(--ok)}
   .cgside .lnk{display:inline-block;margin-top:12px;color:var(--ink);text-decoration:underline;font-size:13px}
+  /* 명세(4.7) — 항목 뱃지와 참조 줄. 참조 탭(UI-5 8.1)과 같은 자료 (카드 BG) */
+  .cgside .spec .it{font:12.5px var(--sans);color:var(--ink);margin-bottom:4px}
+  .cgside .spec .sk{font:600 11px var(--sans);color:var(--dim);margin:6px 0 2px}
+  .cgside .spec .sr{display:flex;align-items:center;gap:6px;padding:2px 0;font:12px var(--sans);color:var(--ink2);cursor:pointer}
+  .cgside .spec .idb{display:inline-block;padding:0 5px;border-radius:4px;background:#fbefd2;color:var(--ink);font:600 11px var(--mono)}
   /* 코드(4.6) — UI-5 8.21과 같은 모양. 패널 높이의 절반쯤을 쓰고 안에서 스크롤 */
   .cgside .csrc{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
   .cgside .csrc .ch{display:flex;gap:8px;font:600 12px var(--sans);color:var(--ink3)}
@@ -2606,16 +2611,22 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
       <div class="cgbody">
         <aside class="cgtree" data-el="6">
           <div class="th">파일<span class="b sm" data-el="6.3">접기</span></div>
-          <div class="tr d" data-el="6.1"><span class="tw">▾</span>backend/app/core</div>
-          <div class="tr f on" style="padding-left:22px"><span class="tw">▾</span>pipeline.py</div>
-          <div class="tr fn" data-el="6.2" style="padding-left:36px"><span class="ring code"></span>save_pipeline</div>
-          <div class="tr fn" style="padding-left:36px"><span class="ring none"></span>_advance_processed</div>
-          <div class="tr fn" style="padding-left:36px"><span class="ring"></span>change_status</div>
-          <div class="tr fn" style="padding-left:36px"><span class="ring"></span>revert</div>
-          <div class="tr f" style="padding-left:22px"><span class="tw">▸</span>queries.py</div>
-          <div class="tr f" style="padding-left:22px"><span class="tw">▸</span>codegraph/graph.py</div>
-          <div class="tr d dim"><span class="tw">▸</span>backend/app/web</div>
-          <div class="tr d dim"><span class="tw">▸</span>frontend/src/pages</div>
+          <!-- 폴더 한 단씩 — backend › app › core › pipeline.py › 함수. 들여쓰기 14px/단 (카드 BG) -->
+          <div class="tr d" data-el="6.1"><span class="tw">▾</span>backend</div>
+          <div class="tr d" style="padding-left:24px"><span class="tw">▸</span>alembic</div>
+          <div class="tr d" style="padding-left:24px"><span class="tw">▾</span>app</div>
+          <div class="tr d" style="padding-left:38px"><span class="tw">▸</span>account</div>
+          <div class="tr d on" style="padding-left:38px"><span class="tw">▾</span>core</div>
+          <div class="tr d" style="padding-left:52px"><span class="tw">▸</span>codegraph</div>
+          <div class="tr d" style="padding-left:52px"><span class="tw">▸</span>spec</div>
+          <div class="tr f on" style="padding-left:52px"><span class="tw">▾</span>pipeline.py</div>
+          <div class="tr fn" data-el="6.2" style="padding-left:66px"><span class="ring code"></span>save_pipeline</div>
+          <div class="tr fn" style="padding-left:66px"><span class="ring none"></span>_advance_processed</div>
+          <div class="tr fn" style="padding-left:66px"><span class="ring"></span>change_status</div>
+          <div class="tr fn" style="padding-left:66px"><span class="ring"></span>revert</div>
+          <div class="tr f" style="padding-left:52px"><span class="tw">▸</span>queries.py</div>
+          <div class="tr d dim" style="padding-left:38px"><span class="tw">▸</span>web</div>
+          <div class="tr d dim"><span class="tw">▸</span>frontend</div>
           <div class="tr d dim"><span class="tw">▸</span>tools</div>
         </aside>
         <div class="cgcanvas" data-el="3">
@@ -2666,6 +2677,17 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 <span class="ln">137</span>    async with _lock(repo):
 <span class="ln">138</span>        document = spec.get_document(doc_id)</pre>
           </div>
+          <div class="spec" data-el="4.7">
+            <div class="k">명세</div>
+            <div class="it"><span class="idb">MS-007#pipeline.save_pipeline</span> 저장 파이프라인</div>
+            <div class="sk">근거</div>
+            <div class="sr" data-el="4.8"><span class="idb">SEQ-1</span> 에이전트가 문서를 고친다</div>
+            <div class="sr"><span class="idb">UC-A6</span> 문서를 쓴다</div>
+            <div class="sr"><span class="idb">API-002#update_document</span> update_document</div>
+            <div class="sk">이것을 가리킴</div>
+            <div class="sr"><span class="idb">CODE-001#B1</span> 쓰기 파이프라인</div>
+            <div class="sr"><span class="idb">MS-007#pipeline.revert</span> 되돌리기</div>
+          </div>
           <div class="k">부르는 것 9</div>
           <div class="crow" data-el="4.2"><span class="st code">▲</span>git.commit_push</div>
           <div class="crow"><span class="st spec">◌</span>ReferenceService.mark_missing</div>
@@ -2715,12 +2737,14 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 | 4.3 | 불리는 곳 | 목록 | 이 함수를 부르는 함수 | 그 함수를 골라 가운데로 |
 | 4.4 | 코드 탭으로 | 링크 | MINISPEC 항목이 있는 함수에만. `문서#항목` | UI-5 코드 탭 — `/p/{코드}/d/{문서}?panel=code#item-{항목}` |
 | 4.5 | 커뮤니티 칩 | 버튼 | 함수가 든 커뮤니티의 색·라벨·함수 수 | 그 커뮤니티를 접는다 |
+| 4.7 | 명세 | 영역 | 고른 함수가 어느 명세의 무엇인가. MINISPEC 함수면 항목 뱃지·이름, 「근거」(그 항목이 건 상위 참조 — SEQ·UC·API·DOM…)와 「이것을 가리킴」(이 항목을 가리키는 하위 참조 — CODE 카드 등). `…/items/{항목}/references`(참조 탭 8.1과 같은 자료). 항목이 없는 함수면 「항목 없음」과 **가까운 항목** — 부르는 것·불리는 곳 중 항목 있는 함수의 항목, 호출 많은 순 6개. 커뮤니티를 골랐으면 허브 함수(4.6과 같은 함수) 기준. 상위·하위 각 8줄, 넘치면 「… n개 더 — 코드 탭에서」 | — |
+| 4.8 | 참조 줄 | 행 | 항목 ID 뱃지와 이름. 가리키는 곳이 없는 참조는 회색에 경고 | 그 문서의 그 항목으로(`/p/{코드}/d/{문서}#item-{항목}`) |
 | 4.6 | 코드 | 영역 | 고른 함수의 본문 — 「코드 L시작–L끝」과 그래프 커밋, 줄 번호가 붙은 본문(UI-5 8.21과 같은 모양·같은 읽기, 300줄 상한). 고르는 순간 읽는다. 커뮤니티를 골랐으면 허브 함수(라벨이 함수면 그것, 아니면 4.2의 첫 함수)의 본문. 못 읽으면(5c) 「코드를 읽을 수 없습니다 — {이유}」 한 줄 | — |
 | 5 | 범례 | 영역 | 커뮤니티 목록과 표시 설명 | — |
 | 5.1 | 커뮤니티 행 | 행 | 색 견본 · 라벨 · 함수 수 · 체크박스. 라벨이 파일 경로 꼴이면 파일 이름만 보이고 전체는 툴팁 | 체크를 끄면 그 커뮤니티의 노드·선을 숨긴다 |
 | 5.2 | 표시 설명 | 텍스트 | 큰 원·선 굵기·고리·세 기호의 뜻 | — |
-| 6 | 파일 트리 | 영역 | 캔버스 왼쪽 240px. 함수가 있는 파일만, 경로순. 디렉터리 › 파일 › 함수 세 단. 처음엔 디렉터리가 접혀 있고 고른 함수의 경로만 펼쳐진다 | — |
-| 6.1 | 디렉터리·파일 행 | 행 | `▸`/`▾`와 이름. 디렉터리는 파일의 폴더 경로 그대로 한 단(`backend/app/core`), 파일은 그 아래 | 펼침·접힘. **파일 행을 누르면** 그 파일의 함수만 남기고 캔버스의 나머지를 흐린다(3.3과 같은 문법). 다시 누르면 푼다 |
+| 6 | 파일 트리 | 영역 | 캔버스 왼쪽 240px. 함수가 있는 파일만, 경로순. 폴더(한 단씩) › 파일 › 함수. 처음엔 폴더가 접혀 있고 고른 함수의 조상 폴더만 펼쳐진다 | — |
+| 6.1 | 폴더·파일 행 | 행 | `▸`/`▾`와 이름. **폴더는 한 단씩 전부** — `backend › app › core › pipeline.py`, 자식 하나뿐인 폴더도 묶지 않는다(진짜 폴더처럼). 들여쓰기 14px/단 | `▸`는 펼침·접힘. **이름을 누르면 트리 포커스** — 그 아래 함수 전부의 커뮤니티가 펼쳐지고(숨긴 것은 되살림) 그 노드들만 밝으며 화면이 그 노드들에 맞춰진다. 폴더도 파일도 같다. 같은 행을 다시 누르면 푼다 |
 | 6.2 | 함수 행 | 행 | 이름. MINISPEC 함수는 상태 색 고리(✓·▲·◌와 같은 뜻), 그 밖은 흐린 고리 | 그 함수를 골라 가운데로(2.1과 같은 길) — 패널(4)에 코드 |
 | 6.3 | 접기 | 버튼 | 트리 머리 오른쪽 | 트리 열이 사라지고 캔버스가 넓어진다. 툴바에 「트리」가 생겨 다시 연다 |
 
@@ -2738,7 +2762,9 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 - 접힌 커뮤니티를 고르면 패널(4)에 라벨·함수 수와 든 함수 상위 20(호출 많은 순)이 보이고, 함수를 누르면 펼쳐지며 그 함수가 골라진다
 - **코드는 고를 때 읽는다**(4.6, 카드 BF) — 호버로는 안 읽는다. 함수를 고르면 `GET /api/projects/{code}/code/source?file&line` 한 번([[SYNC-MS-008#queries.code_text]]), 앞 요청이 남아 있으면 끊는다. 코드 탭 8.21과 같은 읽기·상한이라 두 화면이 같은 본문을 보인다. 못 읽으면(5c) 코드 자리에만 이유 한 줄 — 부르는 것·불리는 곳은 그대로
 - **커뮤니티를 고르면 허브 함수의 코드를 미리 보인다** — 라벨과 이름(`Class.fn` 또는 `fn`)이 같은 함수가 그 커뮤니티에 있으면 그것, 없으면(라벨이 파일·클래스·모듈) 든 함수 목록(4.2)의 첫 함수. 운영 싱크독은 17개 중 둘만 함수 라벨이다
-- **파일 트리(6)는 브라우저가 만든다** — `code_nodes`의 `functions[].file`로 디렉터리(파일의 폴더 경로 그대로) › 파일 › 함수(줄 순). 함수가 없는 파일·디렉터리는 없다. 접힌 디렉터리 안은 그리지 않는다(함수 1,000개여도 DOM이 가볍다). `?focus=`·검색·노드 클릭으로 함수가 골라지면 그 경로가 펼쳐지고 행이 밝아진다
+- **파일 트리(6)는 브라우저가 만든다** — `code_nodes`의 `functions[].file`을 `/`로 쪼개 폴더 한 단씩 › 파일 › 함수(줄 순). 함수가 없는 파일·폴더는 없다. 접힌 폴더 안은 그리지 않는다(함수 1,000개여도 DOM이 가볍다). `?focus=`·검색·노드 클릭으로 함수가 골라지면 조상 폴더가 전부 펼쳐지고 행이 밝아진다
+- **트리 포커스(6.1)는 그림을 끌고 온다**(카드 BG) — 폴더·파일 이름을 누르면 그 아래 함수 전부: 커뮤니티를 펼치고(숨긴 것은 범례에서 되살림), 그 노드들만 밝고 나머지는 흐리며(3.3과 같은 문법), 화면을 그 노드들의 상자에 맞춘다(처음 전체 맞춤과 같은 계산). 트리와 그림이 따로 놀면 안 된다 — 트리에서 고른 것은 그림에 반드시 보인다
+- **명세 연관(4.7)은 참조 탭과 같은 자료다**(카드 BG) — 함수를 고를 때 그 항목의 `…/references`를 한 번 읽는다(코드와 같은 때, 늦은 답은 버린다). 항목이 없으면 요청 없이 부르는 것·불리는 곳의 항목으로 「가까운 항목」(한 단, 호출 많은 순 6개). 줄을 누르면 그 문서의 그 항목으로 간다
 - 트리를 접으면(6.3) 열이 0이 되고 캔버스가 넓어진다. 1280px 화면에서 트리 240 + 패널 480이면 캔버스가 560 — 좁으면 접는다. 모바일 폭(≤720)에서는 기본 접힘
 
 ### 시나리오
@@ -2767,12 +2793,18 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 2. 다시 켜면 돌아온다. 「전부 접기」(2.2)로 처음 모양이 된다
 
 **S-6 트리로 찾아 코드를 읽는다** — UC-H20 기본 흐름 5, 확장 5c (카드 BF)
-1. 트리(6)에서 `backend/app/core`(6.1)를 펼치고 `pipeline.py`를 펼친다. 함수 행(6.2)들이 줄 순으로 — `save_pipeline`에 ▲색 고리
+1. 트리(6)에서 `backend`(6.1) › `app` › `core`를 한 단씩 펼치고 `pipeline.py`를 펼친다. 함수 행(6.2)들이 줄 순으로 — `save_pipeline`에 ▲색 고리
 2. `_advance_processed`(6.2)를 누른다. 고리 없는 함수인데도 커뮤니티가 펼쳐지고 노드가 가운데로 오며, 패널에 코드(4.6)가 「코드 L63–L71 · a076246」로 바로 펼쳐진다. 「코드 탭으로」(4.4)는 없다 — 항목이 없다
-3. 파일 행 `pipeline.py`(6.1)를 누른다 — 캔버스에서 그 파일 함수들만 밝고 나머지는 흐리다. 다시 누르면 푼다
+3. 파일 행 `pipeline.py`(6.1)를 누른다 — 그 파일 함수들의 커뮤니티가 펼쳐져 노드가 드러나고 그것들만 밝으며 화면이 거기에 맞춰진다. `core` 폴더 행을 누르면 그 아래 파일 전부가 같다. 다시 누르면 푼다
 4. 접힌 커뮤니티 `SpecService` 원을 누른다 — 패널에 든 함수 목록과 함께 첫 함수 `SpecService.save`의 코드가 미리 보인다
 5. 비밀 꼴 파일의 함수를 고른다(5c) — 코드 자리에 「코드를 읽을 수 없습니다 — 그 커밋에 파일이 없거나 비밀 꼴」, 부르는 것·불리는 곳은 그대로
 6. 「접기」(6.3)로 트리를 닫는다 — 캔버스가 넓어지고 툴바에 「트리」가 생긴다
+
+**S-7 명세 연관을 따라간다** — UC-H20 기본 흐름 5 (카드 BG)
+1. `save_pipeline`을 고른다. 코드(4.6) 아래 명세(4.7)에 `MS-007#pipeline.save_pipeline`과 「근거」 SEQ-1·UC-A6·API-002#update_document, 「이것을 가리킴」 CODE-001#B1
+2. 근거 줄 `SEQ-1`(4.8)을 누른다 — SEQ 문서의 그 항목으로 간다. 뒤로 돌아오면 선택이 그대로다
+3. 고리 없는 `_advance_processed`를 고른다 — 「항목 없음 · 가까운 항목」에 `MS-007#pipeline.save_pipeline`(이 함수를 부르는 것)
+4. 접힌 커뮤니티 원을 누른다 — 허브 함수 기준으로 4.6과 4.7이 같이 바뀐다
 
 ---
 
