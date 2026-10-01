@@ -2871,11 +2871,8 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
     </div>
   </div>
 </div>
-```
 
 <div class="var">변형 — 문서 전체 참조(3a): 문서 머리만</div>
-
-```html
 <div class="sd h">
   <div class="ov" style="padding-top:44px">
     <div class="dlg peek" data-el="1">
