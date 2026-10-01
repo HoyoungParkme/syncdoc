@@ -83,7 +83,7 @@ async def change_status(
 
     토글. 완료로 올릴 때 규약 오류·미완성·끊어진 참조가 있으면 status-blocked (UC-H8 1a).
     """
-    d = await pipeline.change_status(doc_id, DocStatus(req.to), user, req.reason)
+    d = await pipeline.change_status(doc_id, DocStatus(req.to), _human(user), req.reason)
     return DocumentSummary.of(await queries.document_view(d.doc_id, user))
 
 

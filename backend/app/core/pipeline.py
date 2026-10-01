@@ -320,7 +320,7 @@ async def _run(
     # 8. 트랜잭션
     if entry == Entry.web_status:
         assert document is not None
-        spec.apply_status(document, body, commit_hash, author.user, reason)
+        spec.apply_status(document, body, commit_hash, author, reason)
         await _advance_processed(repo, commit_hash, 1)  # 13a
         s.commit()
         return SaveResult(
@@ -378,15 +378,19 @@ async def _run(
 async def change_status(
     doc_id: str,
     to: DocStatus,
-    user: User,
+    author: Author,
     reason: str | None = None,
 ) -> DocumentSummary:
-    """SYNC-MS-007#pipeline.change_status"""
+    """SYNC-MS-007#pipeline.change_status
+
+    웹 토글은 Author(human, user, None, web_status), MCP change_status는 _agent_author (카드 BE).
+    조건은 입구와 무관하게 같고, 누가 바꿨나는 author가 StatusChange.via로 남긴다.
+    """
     code = doc_id.split("-")[0]
     # 0. 밀린 커밋을 먼저 읽는다 — 소유 검사도 여기서. 락·세션 밖 (MS-007 change_status 0)
-    await read_pending(code, user)
+    await read_pending(code, author.user)
     with db.session_scope() as s:
-        repo = ProjectService(s).get_owned(code, user).repository
+        repo = ProjectService(s).get_owned(code, author.user).repository
         spec = SpecService(s)
         document = spec.get_document(doc_id)
         if document.trashed_at is not None:
@@ -423,7 +427,6 @@ async def change_status(
             log.warning("change_status %s: origin/main에 %s가 없다 — DB 본문으로", doc_id, path)
             src = document.body
         new_body = _set_status(src, to)
-        author = Author(kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.web_status)
         await save_pipeline(
             Entry.web_status,
             doc_id,
@@ -909,7 +912,7 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
                     kind=AuthorKind.human, user=user, instructed_by=None, via=Entry.github
                 )
                 if c.message.startswith("status(") and document is not None:
-                    spec.apply_status(document, body, c.hash, user, None)
+                    spec.apply_status(document, body, c.hash, author, None)
                 else:
                     vr = spec.validate(body, doc_type, Entry.github, None)
                     if document is None:
