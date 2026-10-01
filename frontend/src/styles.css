@@ -892,6 +892,12 @@ a.arow:hover{background:var(--bg-subtle)}
 .cgn .mark.code{color:var(--cg-5)} .cgn .mark.spec{color:#f0a89e} .cgn .mark.same{color:#9fd8b4}
 .cgside{border-left:1px solid var(--border);background:var(--bg-subtle);padding:var(--space-14) var(--space-16);overflow:auto;font-size:var(--text-meta)}
 .cgside .k{font-weight:var(--w-semibold);font-size:var(--text-mono-sm);color:var(--ink-muted);margin:var(--space-12) 0 var(--space-6)}
+/* 4.9 패널 탭 — UI-5의 참조|질문|코드 탭과 같은 문법. 질문 탭(7)은 UI-5 질문 탭(.pbody.ask)을 그대로 (카드 BI) */
+.cgside .ptabs{display:flex;gap:var(--space-14);margin:-4px 0 var(--space-10);font-weight:var(--w-semibold);font-size:var(--text-mono-sm);color:var(--ink-muted)}
+.cgside .ptabs span{padding-bottom:var(--space-4);cursor:pointer}
+.cgside .ptabs span.on{color:var(--ink-body);border-bottom:2px solid var(--ink-body)}
+.cgside.ask{display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
+.cgside.ask .pbody.ask{flex:1;min-height:0;display:flex;flex-direction:column;padding:0}
 .cgside .nm{font-family:var(--font-mono);font-weight:var(--w-semibold);font-size:13.5px;word-break:break-all}
 .cgside .meta{font-family:var(--font-mono);font-size:var(--text-mono-sm);color:var(--ink-faint);margin-top:var(--space-3);word-break:break-all}
 .cgside .chip{display:inline-flex;align-items:center;gap:var(--space-5);margin-top:var(--space-6);padding:var(--space-2) var(--space-8);
