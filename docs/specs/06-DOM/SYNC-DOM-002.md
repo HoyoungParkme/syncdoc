@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -1265,7 +1265,7 @@ classDiagram
 | 메서드 | 부르는 곳 | 근거 |
 |---|---|---|
 | `touches_code` · `load` · `reduce` · `enrich` | [[SYNC-MS-007#pipeline.build_code_graph]] · `process_commit` · `tools/check_calls.py` | UC-S8 |
-| `communities` | `pipeline.build_code_graph`(enrich 뒤) | UC-S8 3 · UI-17 · 사용자 결정 2026-10-01 — raw 그래프를 graphify로 군집해 함수마다 커뮤니티를 붙인다. 검사기는 안 부른다 |
+| `communities` | `pipeline.build_code_graph`(enrich 뒤) | UC-S8 3 · UI-17 · 사용자 결정 2026-10-01 — raw 그래프를 networkx Louvain(seed 42)으로 군집하고 graphify 허브 라벨을 붙여 함수마다 커뮤니티를 적는다(#253). 검사기는 안 부른다 |
 | `spec_calls` · `compare` | `tools/check_calls.py` · `queries`(카드 AY·AZ) | UC-H20 · DEV-14 |
 | `get` · `save` · `fail` | `pipeline.build_code_graph` · `process_commit`(그래프가 없나) | UC-S8 |
 | `delete_by_project` | [[SYNC-MS-001#ProjectService.delete_project]] | UC-H17 |
