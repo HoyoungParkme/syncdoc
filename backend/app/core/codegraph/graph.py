@@ -413,10 +413,10 @@ def communities(raw: dict, graph: dict) -> dict:
 
             g = load_node_link_graph(raw)
             found = _louvain(g)
-            # 라벨 허브는 코드 노드만 — 문서·절 노드가 허브면 「SEQUENCE: 싱크독」 같은
-            # 이름이 된다 (#255)
+            # 라벨 허브는 코드 노드만(file_type == code) — 문서·절 노드도 source_file을
+            # 가지며, 허브가 되면 「SEQUENCE: 싱크독」 같은 이름이 된다 (#255)
             code_only = {
-                cid: [n for n in members if nodes.get(n, {}).get("source_file")]
+                cid: [n for n in members if nodes.get(n, {}).get("file_type", "code") == "code"]
                 for cid, members in found.items()
             }
             named = label_communities_by_hub(g, code_only)
