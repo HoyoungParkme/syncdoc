@@ -259,6 +259,8 @@ export function CodeGraph() {
       }
       ctx.strokeStyle = col.edge
       ctx.lineCap = 'round'
+      // 파일 행(6.1) 포커스 — 선과 노드 둘 다 보므로 루프 앞에서 읽는다 (#260)
+      const ff = fileFocusRef.current
       const litNode = (n: GNode) => (ff === null ? true : n.kind === 'f' ? n.fn!.file === ff.file : ff.cids.has(n.cid!))
       for (const l of linksRef.current) {
         const s = l.source as GNode
@@ -271,7 +273,6 @@ export function CodeGraph() {
         ctx.lineTo(t.x!, t.y!)
         ctx.stroke()
       }
-      const ff = fileFocusRef.current
       for (const n of nodesRef.current) {
         // 포커스 노드가 있으면 그 이웃만, 없고 파일 행(6.1)을 골랐으면 그 파일의 함수(와 그 함수가 든 커뮤니티)만 밝다
         const dim = fid !== null ? !near.has(n.id) : ff !== null && (n.kind === 'f' ? n.fn!.file !== ff.file : !ff.cids.has(n.cid!))
