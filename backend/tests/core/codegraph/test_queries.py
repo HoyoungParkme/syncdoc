@@ -191,3 +191,34 @@ async def test_code_source_reads_function_range_from_graph_commit(
     assert seen == [("a.py", "c" * 40)]  # 그래프 커밋에서
     with pytest.raises(NotFound):  # 코드에 없는 함수
         await queries.code_source("EXMP-MS-001", "svc.gone", owner(scoped))
+
+
+async def test_code_text_reads_any_function_by_file_and_line(scoped: Session, monkeypatch) -> None:
+    """MS-008 code_text — 항목 없는 함수도 파일·줄로 (카드 BF)."""
+    _seed(scoped)
+    seen = []
+
+    async def fake_read(workdir, path, ref="HEAD"):
+        seen.append((path, ref))
+        return "\n".join(f"line {i}" for i in range(1, 21))
+
+    monkeypatch.setattr(cg_service.git, "read", fake_read)
+    t = await queries.code_text("EXMP", "a.py", 13, owner(scoped))  # svc._help — 항목 없음
+    assert (t.path, t.start, t.end, t.text) == ("a.py", 13, 15, "line 13\nline 14\nline 15")
+    assert seen == [("a.py", "c" * 40)]  # 그래프 커밋에서
+    # end 없는 함수는 같은 파일 다음 함수 앞 줄까지, 마지막이면 +59 (code_source와 같은 규칙)
+    g = {**GRAPH, "functions": [dict(f, end=None) for f in GRAPH["functions"]]}
+    CodeGraphService(scoped).save(_project_id(scoped), "d" * 40, "server", g)
+    t = await queries.code_text("EXMP", "a.py", 1, owner(scoped))
+    assert (t.start, t.end) == (1, 4)
+    t = await queries.code_text("EXMP", "a.py", 13, owner(scoped))
+    assert (t.start, t.end) == (13, 20)  # 파일이 20줄이라 read가 자른다
+    with pytest.raises(NotFound) as ei:  # 그 자리에 함수 없음
+        await queries.code_text("EXMP", "a.py", 2, owner(scoped))
+    assert ei.value.extra["resource"] == "function"
+    with pytest.raises(NotFound):  # 남의 것
+        await queries.code_text("EXMP", "a.py", 1, make_user(scoped, "minjun"))
+
+
+def _project_id(scoped: Session) -> int:
+    return scoped.execute(text("SELECT id FROM projects WHERE code='EXMP'")).scalar_one()

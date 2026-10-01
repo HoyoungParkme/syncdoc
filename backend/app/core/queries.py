@@ -1138,6 +1138,27 @@ async def code_source(doc_id: str, item_id: str, user: User) -> CodeText:
         return await svc.read(project.id, workdir, f["file"], f["line"], end)
 
 
+async def code_text(code: str, file: str, line: int, user: User) -> CodeText:
+    """SYNC-MS-008#queries.code_text
+
+    코드 그래프의 코드(UI-17 4.6, 카드 BF). 그래프의 함수를 파일·시작 줄로 짚는다 — 항목이 없어도
+    읽는다. 읽기는 code_source와 같은 CodeGraphService.read 한곳이라 코드 탭과 같은 본문이다.
+    """
+    with db.session_scope() as s:
+        project = ProjectService(s).get_owned(code, user)
+        svc = CodeGraphService(s)
+        row = svc.get(project.id)
+        if row is None:
+            raise NotFound("code_graph", project.code)
+        fns = row.graph.get("functions", [])
+        f = next((x for x in fns if x["file"] == file and x["line"] == line), None)
+        if f is None:
+            raise NotFound("function", f"{file}:{line}")
+        end = f.get("end") or _next_start(fns, f) or f["line"] + 59
+        workdir = Path(project.repository.workdir_path)
+        return await svc.read(project.id, workdir, f["file"], f["line"], end)
+
+
 _READ_CODE_HINT = "code_graph로 함수 위치(파일:줄)를 먼저 보거나 경로를 확인하라. 키·인증서 같은 비밀 파일은 읽을 수 없다"
 
 
