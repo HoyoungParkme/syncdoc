@@ -1292,7 +1292,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `graph.py` — 항목 ID 정규식을 어느 문서든으로, `reduce`·`enrich`가 `item`(+`-MS-`면 `ms`)을 쓰고, `enrich` 2a가 `.ts/.tsx/.js/.jsx` 파일 첫 주석의 화면 ID를 그 파일 함수에 준다. `compare`·`check_calls`는 `ms` 그대로 · `CodeNode.item`(types·schema·client) · `queries.code_nodes` `item=f.get("item") or ms` · `CodeGraph.tsx` 4.7·가까운 항목을 `item`으로, 머리 뱃지 → UI-18 |
 | 테스트 | MS-011 테스트 관점(reduce — API ID는 `item`만·설명 잘림 · enrich — tsx 첫 주석 → 파일 함수 전부, 함수 docstring 우선, 화면 ID 없는 파일 null) · MS-008(code_nodes — API 항목 함수 `item`만, 옛 그래프 `item`=`ms`) · `check_calls` 0/0 그대로 · 헤드리스: 라우터 함수 → API 뱃지·근거 → 뱃지 클릭 → 팝업 · `CodeGraph` → `UI-002#UI-17` · 리포지토리 함수 → 「항목 없음」 · 운영: SYNC 재구축 뒤 `item` 있는 함수 수 |
 | 선행 | BI |
-| 완료 | — |
+| 완료 | 2026-10-02 · 브랜치 `card/BJ-item-beyond-ms`(c84ece1 #272) · spec 10 + code 3 · 테스트 389 · `ruff`·`tsc`·`oxlint` · `validate` 0/0 · `check_code` 157/157 · `check_calls` 0/0(982 함수 · `ms` 판정 그대로) · `check_ui` 14/14 · 헤드리스(dev_preview 재구축, 콘솔 0): 함수 982 중 `item` 287(MINISPEC 157 + API·UI 130, `item`과 `ms`가 어긋난 함수 0) · `code.code_nodes` → 4.7에 `API-001#GET/api/projects/{code}/code-graph`·근거 3(UI-17·UC-H20·MS-008)·하위 3, 4.4 없음 · 뱃지 클릭 → UI-18 팝업(이동·새 창·Esc) · `CodeGraph.CodeGraph` → `UI-002#UI-17`·근거 9 · `SpecRepository.__init__` → 「항목 없음」 · `save_pipeline` 회귀(뱃지·4.4) · 운영: 머지 커밋의 그래프가 옛 컨테이너로 먼저 만들어져 `item` 0 → 배포 뒤 컨테이너 안에서 `build_code_graph("SYNC", c84ece1)` 다시 → `item` 287 · 공개 번들에 미리보기 뱃지 · 화면은 사람이 직접(DEV-17) |
 
 ---
 
