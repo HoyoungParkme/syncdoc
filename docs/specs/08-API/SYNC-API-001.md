@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -1045,7 +1045,7 @@ MINISPEC가 아닌 문서는 `functions`가 비어 온다 — 화면이 「항�
         $ref: '#/components/responses/NotFound'
 ```
 
-MINISPEC 항목인데 코드에 함수가 없으면 `function: null`·`missing: true`(UC-H20 2b). MINISPEC가 아닌 항목은 [[#GET/api/docs/{docId}/items/{itemId}/chain]]과 같은 하위 폐포의 MINISPEC 항목을 `functions`로.
+MINISPEC 항목인데 코드에 함수가 없으면 `function: null`·`missing: true`(UC-H20 2b). MINISPEC가 아닌 항목은 [[#GET/api/docs/{docId}/items/{itemId}/chain]]과 같은 하위 폐포의 MINISPEC 항목을 `functions`로. 그 항목의 함수가 코드에 있으면(API 항목의 라우터, 화면 항목의 컴포넌트 — docstring·파일 주석의 항목 ID, 카드 BK) `function`도 — `calls`·`callers`는 항목 있는 함수까지, `status`는 null(대조 없음). `…/code/source`도 같은 함수를 읽는다. 옛 그래프(`item` 없음)면 `function: null`.
 
 #### GET/api/docs/{docId}/items/{itemId}/code/source 함수 본문
 
@@ -2377,7 +2377,7 @@ components:
       type: object
       description: 부르는 것·불리는 곳 한 줄(UI-5 8.19·8.20)
       properties:
-        ms_id: {type: string, description: "DOC#ITEM"}
+        ms_id: {type: string, description: "DOC#ITEM — 항목 ID. MINISPEC이 아닌 항목의 함수(카드 BK)에서는 이웃의 item"}
         qual: {type: string, nullable: true, description: "코드의 이름 Class.fn — 코드에 없으면 null"}
         file: {type: string, nullable: true}
         line: {type: integer, nullable: true}
@@ -2395,8 +2395,9 @@ components:
         spec_only: {type: integer}
     CodeFunction:
       type: object
+      description: 항목의 함수. MINISPEC이면 대조, API·UI 항목이면 item으로 찾은 함수와 항목 있는 이웃(status null, 카드 BK)
       properties:
-        ms_id: {type: string}
+        ms_id: {type: string, description: "항목 ID"}
         qual: {type: string}
         file: {type: string}
         line: {type: integer}

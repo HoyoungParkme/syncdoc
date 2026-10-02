@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -449,9 +449,9 @@ classDiagram
 | `ConversationBrief` | `id` · `title` · `turn_count` · `updated_at` | ConversationService.list → API 목록 |
 | `CallDiff` | `ms_id: str` · `function: str \| None`(`파일:줄`, 코드에 없으면 None) · `same` · `code_only` · `spec_only: list~str~`(항목 ID) | codegraph.compare → check_calls · queries(카드 AY). 명세의 「호출하는 것」과 실제 호출의 갈래 |
 | `CodeGraphInfo` | `commit_hash: str \| None` · `source: str \| None` · `built_at` · `error: str \| None` · `function_count: int` | queries → API. 그래프 행의 머리(몸통 없이) |
-| `CodeRef` | `ms_id: str` · `qual: str \| None` · `file: str \| None` · `line: int \| None` · `status: str \| None` | 부르는 것(`same`·`code_only`·`spec_only`)·불리는 곳(None) 한 줄 |
+| `CodeRef` | `ms_id: str` · `qual: str \| None` · `file: str \| None` · `line: int \| None` · `status: str \| None` | 부르는 것(`same`·`code_only`·`spec_only`)·불리는 곳(None) 한 줄. `ms_id`는 항목 ID — MINISPEC이 아닌 항목(API·UI)의 함수에서는 그 항목이고 `status`는 None(카드 BK) |
 | `CodeBrief` | `ms_id` · `qual` · `file` · `line` · `same: int` · `code_only: int` · `spec_only: int` | 함수 목록 한 줄 |
-| `CodeFunction` | `ms_id` · `qual` · `file` · `line` · `end: int \| None` · `calls: list~CodeRef~` · `callers: list~CodeRef~` | MINISPEC 항목의 함수 |
+| `CodeFunction` | `ms_id` · `qual` · `file` · `line` · `end: int \| None` · `calls: list~CodeRef~` · `callers: list~CodeRef~` | 항목의 함수 — MINISPEC이면 대조, API·UI 항목이면 `item`으로 찾은 함수와 항목 있는 이웃(카드 BK). `ms_id`는 그 항목 ID |
 | `CodeView` | `graph: CodeGraphInfo \| None` · `doc_id` · `item_id: str \| None` · `is_ms: bool` · `missing: bool` · `function: CodeFunction \| None` · `functions: list~CodeBrief~` | queries.code_view → API `CodeView`(UI-5 코드 탭) |
 | `CodeText` | `path` · `start` · `end` · `commit_hash` · `text` · `truncated: bool` | CodeGraphService.read → API `CodeText` · 질문 탭 `read_code`(카드 AZ) |
 | `CodeCallEdge` · `CodeCalls` | `from_: str` · `to: str` · `status: str` / `graph: CodeGraphInfo \| None` · `edges: list~CodeCallEdge~` | queries.code_calls → API `CodeCalls`(UI-8 코드 호출) |
@@ -1098,7 +1098,7 @@ diff_with_impact(doc_id, from, to, user) -> Diff    SEQ-15  diff → resolve_ite
 project_items(code, kind, user) -> list             SEQ-18  kind별로 list_by_project(has_convention_error) | 미완성 | 끊어진 참조(is_missing)
 item_chain(doc_id, item_id, user) -> ItemChain      —       전이적 폐포 (UI-15)
 downstream_view(doc_id, user) -> DownstreamView     —       이 문서를 참조하는 것. 추적표·하위 참조 수 (V-PRD)
-code_view(doc_id, item_id?, user) -> CodeView      SEQ-27  code_graphs 행 + MS 항목의 「호출하는 것」 → compare → 함수·부르는 것·불리는 곳 | 하위 체인의 함수
+code_view(doc_id, item_id?, user) -> CodeView      SEQ-27  code_graphs 행 + MS 항목의 「호출하는 것」 → compare → 함수·부르는 것·불리는 곳 | API·UI 항목은 item_function·item_neighbors(대조 없음) | 하위 체인의 함수
 code_calls(code, user) -> CodeCalls                SEQ-27  compare → MINISPEC 사이 호출 선 (UI-8 코드 호출)
 code_nodes(code, user) -> CodeNodes                SEQ-31  code_graphs 행의 함수 전부 + 커뮤니티 + compare로 항목·상태 (UI-17 코드 그래프)
 code_source(doc_id, item_id, user) -> CodeText     SEQ-27  함수의 파일·줄 → CodeGraphService.read (그래프 커밋의 저장소에서)
@@ -1251,6 +1251,8 @@ classDiagram
         +communities(raw: dict, graph: dict) dict
         +spec_calls(items: list~tuple~) dict
         +compare(graph: dict, spec: dict) list~CallDiff~
+        +item_function(graph: dict, item_id: str) dict?
+        +item_neighbors(graph: dict, key: str) tuple
     }
     class CodeGraph {
         +int project_id
@@ -1270,6 +1272,7 @@ classDiagram
 | `touches_code` · `load` · `reduce` · `enrich` | [[SYNC-MS-007#pipeline.build_code_graph]] · `process_commit` · `tools/check_calls.py` | UC-S8 |
 | `communities` | `pipeline.build_code_graph`(enrich 뒤) | UC-S8 3 · UI-17 · 사용자 결정 2026-10-01 — raw 그래프를 networkx Louvain(seed 42)으로 군집하고 graphify 허브 라벨을 붙여 함수마다 커뮤니티를 적는다(#253). 검사기는 안 부른다 |
 | `spec_calls` · `compare` | `tools/check_calls.py` · `queries`(카드 AY·AZ) | UC-H20 · DEV-14 |
+| `item_function` · `item_neighbors` | `queries.code_view` · `code_source` · `ask_tool`(`read_code`) | UC-H20 2 — API·UI 항목의 함수(카드 BK). 검사기는 안 부른다 |
 | `get` · `save` · `fail` | `pipeline.build_code_graph` · `process_commit`(그래프가 없나) | UC-S8 |
 | `delete_by_project` | [[SYNC-MS-001#ProjectService.delete_project]] | UC-H17 |
 | `read` | `queries.code_source`(코드 탭 8.21) · `queries.ask_tool`(`read_code`, 카드 AZ) | UC-H20 · 커밋된 파일만, 비밀 꼴 거부, 300줄 — 한곳에 둔다 |

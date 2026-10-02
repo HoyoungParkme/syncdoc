@@ -61,6 +61,51 @@ GRAPH = {
 }
 
 
+API = """---
+doc_id: EXMP-API-001
+type: API
+title: 예시 API
+status: draft
+upstream: [EXMP-PRD-001]
+---
+# API
+
+## 3. 엔드포인트
+
+#### GET/api/code 코드 탭
+근거 [[EXMP-PRD-001#R1]]
+"""
+UI = """---
+doc_id: EXMP-UI-002
+type: UI
+title: 예시 화면
+status: draft
+upstream: [EXMP-PRD-001]
+---
+# 와이어프레임
+
+## 1. 화면
+
+#### UI-1 로그인
+근거 [[EXMP-PRD-001#R1]]
+"""
+# item 있는 그래프(카드 BK) — GRAPH + 라우터(a.py:17, API 항목) + 화면 파일(함수 둘, 같은 UI 항목)
+GRAPH_ITEMS = {
+    "functions": [dict(f, item=f["ms"]) for f in GRAPH["functions"]]
+    + [
+        dict(_fn("a.py:17", "routers.get_code", None, 20), item="EXMP-API-001#GET/api/code"),
+        dict(_fn("Page.tsx:3", "Page.helper", None), item="EXMP-UI-002#UI-1"),
+        dict(_fn("Page.tsx:10", "Page.Page", None), item="EXMP-UI-002#UI-1"),
+    ],
+    "calls": GRAPH["calls"]
+    + [
+        ["a.py:17", "a.py:1", "graphify"],  # 라우터 → svc.save
+        ["Page.tsx:10", "Page.tsx:3", "graphify"],  # 컴포넌트 → 같은 항목의 도우미
+        ["Page.tsx:3", "a.py:17", "graphify"],  # 도우미 → 라우터
+    ],
+}  # fmt: skip
+
+
 def _seed(scoped: Session, graph: dict | None = GRAPH):
     svc, ref = SpecService(scoped), ReferenceService(scoped)
     p = make_project(scoped)
@@ -72,6 +117,15 @@ def _seed(scoped: Session, graph: dict | None = GRAPH):
     ref.extract(d.id, v.id, d.body, {i.item_id: i.pk for i in d.items}, ["EXMP-PRD-001"])
     if graph is not None:
         CodeGraphService(scoped).save(p.id, "c" * 40, "server", graph)
+    return p
+
+
+def _seed_items(scoped: Session, graph: dict | None = GRAPH_ITEMS):
+    """_seed + API·UI 문서 — API·UI 항목의 함수(카드 BK)."""
+    p = _seed(scoped, graph)
+    svc, a = SpecService(scoped), author(scoped)
+    svc.create(p.id, "EXMP-API-001", DocType.API, API, "h3", a, "spec: 테스트")
+    svc.create(p.id, "EXMP-UI-002", DocType.UI, UI, "h4", a, "spec: 테스트")
     return p
 
 
@@ -113,6 +167,30 @@ async def test_code_view_non_ms_item_lists_downstream_chain_functions(scoped: Se
     assert [b.ms_id for b in v.functions] == ["EXMP-MS-001#svc.save"]  # R1을 근거로 삼는 함수
     none = await queries.code_view("EXMP-PRD-001", None, owner(scoped))
     assert none.functions == []  # 항목을 안 골랐으면 화면이 「항목을 고르세요」
+
+
+async def test_code_view_api_and_ui_items_show_their_function_without_compare(scoped: Session) -> None:
+    """MS-008 code_view 3a — API·UI 항목도 그 항목의 함수, 이웃은 항목 있는 함수까지, status None (카드 BK)."""
+    _seed_items(scoped)
+    v = await queries.code_view("EXMP-API-001", "GET/api/code", owner(scoped))
+    assert not v.is_ms and not v.missing
+    f = v.function
+    assert (f.ms_id, f.qual, f.file, f.line, f.end) == ("EXMP-API-001#GET/api/code", "routers.get_code", "a.py", 17, 20)
+    assert [(c.ms_id, c.qual, c.status) for c in f.calls] == [("EXMP-MS-001#svc.save", "svc.save", None)]
+    assert [(c.ms_id, c.qual) for c in f.callers] == [("EXMP-UI-002#UI-1", "Page.helper")]
+    assert v.functions == []  # 하위 체인은 그대로 — API 항목을 근거로 삼은 MINISPEC이 없다
+    u = await queries.code_view("EXMP-UI-002", "UI-1", owner(scoped))
+    assert u.function.qual == "Page.Page" and u.function.line == 10  # 파일 이름과 같은 컴포넌트
+    assert [c.ms_id for c in u.function.calls] == ["EXMP-API-001#GET/api/code"]  # 같은 항목의 helper를 건너
+    ms = await queries.code_view("EXMP-MS-001", "svc.save", owner(scoped))  # MINISPEC 회귀 — 대조 그대로
+    assert [c.status for c in ms.function.calls] == ["code_only", "spec_only", "same"]
+    assert [c.ms_id for c in ms.function.callers] == ["EXMP-MS-001#svc.write"]
+
+
+async def test_code_view_api_item_on_old_graph_has_no_function(scoped: Session) -> None:
+    _seed_items(scoped, GRAPH)  # item 없는 옛 그래프
+    v = await queries.code_view("EXMP-API-001", "GET/api/code", owner(scoped))
+    assert v.function is None and not v.missing and v.functions == []
 
 
 async def test_code_view_without_graph_and_not_owned(scoped: Session) -> None:
@@ -198,6 +276,18 @@ async def test_code_source_reads_function_range_from_graph_commit(
     assert seen == [("a.py", "c" * 40)]  # 그래프 커밋에서
     with pytest.raises(NotFound):  # 코드에 없는 함수
         await queries.code_source("EXMP-MS-001", "svc.gone", owner(scoped))
+
+
+async def test_code_source_reads_api_item_function_by_item(scoped: Session, monkeypatch) -> None:
+    """MS-008 code_source 2 — compare로 못 찾으면 item으로 (카드 BK)."""
+    _seed_items(scoped)
+
+    async def fake_read(workdir, path, ref="HEAD"):
+        return "\n".join(f"line {i}" for i in range(1, 21))
+
+    monkeypatch.setattr(cg_service.git, "read", fake_read)
+    t = await queries.code_source("EXMP-API-001", "GET/api/code", owner(scoped))
+    assert (t.path, t.start, t.end) == ("a.py", 17, 20)
 
 
 async def test_code_text_reads_any_function_by_file_and_line(scoped: Session, monkeypatch) -> None:

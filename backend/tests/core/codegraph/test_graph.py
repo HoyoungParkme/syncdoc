@@ -324,6 +324,67 @@ def test_compare_walks_helpers_and_splits_three_ways() -> None:
     assert diffs["X#S.gone"] == CallDiff("X#S.gone", None, [], [], [])  # 코드에 없음
 
 
+# ── item_function · item_neighbors (카드 BK) ──
+def _gi(funcs: list[tuple[str, str, str | None]], calls: list[tuple[str, str]]) -> dict:
+    """(key=파일:줄, qual, item) — 이름은 qual의 끝, ms는 item이 MS일 때."""
+    out = []
+    for k, q, it in funcs:
+        file, line = k.split(":")
+        out.append({"key": k, "name": q.split(".")[-1], "qual": q, "file": file, "line": int(line),
+                    "end": None, "item": it, "ms": it if it and "-MS-" in it else None})  # fmt: skip
+    return {"functions": out, "calls": [[a, b, "graphify"] for a, b in calls]}
+
+
+SCREEN = _gi(
+    [
+        ("pages/Page.tsx:3", "Page.helper", "X-UI-002#UI-1"),  # 같은 항목의 도우미
+        ("pages/Page.tsx:10", "Page.Page", "X-UI-002#UI-1"),  # 파일 이름과 같은 컴포넌트
+        ("pages/panes.tsx:2", "panes.Left", "X-UI-002#UI-1"),  # 같은 항목, 다른 파일
+        ("r.py:1", "code.get_code", "X-API-001#GET/api/code"),  # 라우터
+        ("q.py:1", "queries.view", "X-MS-008#queries.view"),
+        ("q.py:9", "queries._help", None),  # 도우미
+        ("q.py:20", "SpecService.get", "X-MS-002#SpecService.get"),
+        ("q.py:30", "queries.deep", "X-MS-008#queries.deep"),  # get 너머 — 안 간다
+    ],
+    [
+        ("pages/Page.tsx:10", "pages/Page.tsx:3"),
+        ("pages/Page.tsx:3", "r.py:1"),
+        ("pages/panes.tsx:2", "r.py:1"),
+        ("r.py:1", "q.py:1"),
+        ("q.py:1", "q.py:9"),
+        ("q.py:9", "q.py:20"),
+        ("q.py:20", "q.py:30"),
+        ("q.py:9", "r.py:1"),  # 사이클
+    ],
+)
+
+
+def test_item_function_prefers_file_stem_then_first() -> None:
+    assert cg.item_function(SCREEN, "X-UI-002#UI-1")["qual"] == "Page.Page"  # 파일 이름과 같은 것
+    assert cg.item_function(SCREEN, "X-API-001#GET/api/code")["key"] == "r.py:1"
+    no_stem = {"functions": [f for f in SCREEN["functions"] if f["qual"] != "Page.Page"], "calls": []}
+    assert cg.item_function(no_stem, "X-UI-002#UI-1")["qual"] == "Page.helper"  # (파일, 줄) 순 첫 함수
+    assert cg.item_function(SCREEN, "X-UI-002#UI-9") is None
+    assert cg.item_function(cg.reduce(RAW), "EXMP-MS-007#pipeline.save_pipeline")["name"] == "save_pipeline"
+    old = {"functions": [{k: v for k, v in f.items() if k != "item"} for f in SCREEN["functions"]], "calls": []}
+    assert cg.item_function(old, "X-API-001#GET/api/code") is None  # item 없는 옛 그래프
+
+
+def test_item_neighbors_skips_helpers_and_same_item_both_ways() -> None:
+    fwd, back = cg.item_neighbors(SCREEN, "r.py:1")
+    assert fwd == ["q.py:1"]  # 라우터 → queries.view (항목 있는 함수에서 멈춘다)
+    # UI-1 둘(helper·panes.Left)은 하나로 접힌다(먼저 닿은 것) · 사이클(_help → 라우터)로 queries.view도 — 항목 ID 순
+    assert back == ["q.py:1", "pages/Page.tsx:3"]
+    fwd, back = cg.item_neighbors(SCREEN, "pages/Page.tsx:10")
+    assert fwd == ["r.py:1"] and back == []  # 같은 항목의 helper를 건너 라우터까지
+    fwd, back = cg.item_neighbors(SCREEN, "q.py:1")
+    assert fwd == ["r.py:1", "q.py:20"]  # 도우미(_help)를 건너 get · 사이클로 라우터 — deep은 get 너머. 항목 ID 순
+    assert back == ["r.py:1"]
+    assert cg.item_neighbors(SCREEN, "없음:1") == ([], [])
+    old = {"functions": [{**f, "item": None} for f in SCREEN["functions"]], "calls": SCREEN["calls"]}
+    assert cg.item_neighbors(old, "r.py:1") == ([], [])  # item 없는 옛 그래프
+
+
 # ── load ──
 async def test_load_prefers_committed_graph_json(tmp_path: Path, monkeypatch) -> None:
     (tmp_path / "graphify-out").mkdir()
