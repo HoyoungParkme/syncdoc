@@ -107,8 +107,15 @@ RAW2 = {
 def test_communities_groups_by_file_labels_by_hub_and_is_deterministic() -> None:
     graph = cg.reduce(RAW2)
     graph["functions"].append(  # enrich가 더한 정의 — 파일로 커뮤니티를 받는다
-        {"key": "app/b.py:30", "name": "g3", "qual": "b.g3", "file": "app/b.py", "line": 30,
-         "end": None, "ms": None}  # fmt: skip
+        {
+            "key": "app/b.py:30",
+            "name": "g3",
+            "qual": "b.g3",
+            "file": "app/b.py",
+            "line": 30,
+            "end": None,
+            "ms": None,
+        }  # fmt: skip
     )
     out = cg.communities(RAW2, graph)
     assert out is graph
@@ -207,7 +214,10 @@ def test_enrich_resolves_five_forms_and_fixes_names(tmp_path: Path) -> None:
     assert by["pipe.by_assign"]["ms"] == "EXMP-MS-007#pipeline.by_assign"
     assert by["pipe.by_assign"]["item"] == by["pipe.by_assign"]["ms"]
     # API docstring은 item만 — 대조(ms) 대상이 아니다 (카드 BJ)
-    assert (by["pipe.by_tuple"]["item"], by["pipe.by_tuple"]["ms"]) == ("EXMP-API-001#POST/api/x/{id}", None)
+    assert (by["pipe.by_tuple"]["item"], by["pipe.by_tuple"]["ms"]) == (
+        "EXMP-API-001#POST/api/x/{id}",
+        None,
+    )
     assert by["pipe.by_inline"]["item"] is None
     assert by["SpecService.get_document"]["end"] == 8  # 끝 줄을 AST로
     assert "pipe.decorated" in by  # graphify가 놓친 정의는 더한다 (데코레이터가 있어도)
@@ -456,11 +466,22 @@ SCREEN = _gi(
 def test_item_function_prefers_file_stem_then_first() -> None:
     assert cg.item_function(SCREEN, "X-UI-002#UI-1")["qual"] == "Page.Page"  # 파일 이름과 같은 것
     assert cg.item_function(SCREEN, "X-API-001#GET/api/code")["key"] == "r.py:1"
-    no_stem = {"functions": [f for f in SCREEN["functions"] if f["qual"] != "Page.Page"], "calls": []}
-    assert cg.item_function(no_stem, "X-UI-002#UI-1")["qual"] == "Page.helper"  # (파일, 줄) 순 첫 함수
+    no_stem = {
+        "functions": [f for f in SCREEN["functions"] if f["qual"] != "Page.Page"],
+        "calls": [],
+    }
+    assert (
+        cg.item_function(no_stem, "X-UI-002#UI-1")["qual"] == "Page.helper"
+    )  # (파일, 줄) 순 첫 함수
     assert cg.item_function(SCREEN, "X-UI-002#UI-9") is None
-    assert cg.item_function(cg.reduce(RAW), "EXMP-MS-007#pipeline.save_pipeline")["name"] == "save_pipeline"
-    old = {"functions": [{k: v for k, v in f.items() if k != "item"} for f in SCREEN["functions"]], "calls": []}
+    assert (
+        cg.item_function(cg.reduce(RAW), "EXMP-MS-007#pipeline.save_pipeline")["name"]
+        == "save_pipeline"
+    )
+    old = {
+        "functions": [{k: v for k, v in f.items() if k != "item"} for f in SCREEN["functions"]],
+        "calls": [],
+    }
     assert cg.item_function(old, "X-API-001#GET/api/code") is None  # item 없는 옛 그래프
 
 
@@ -472,11 +493,140 @@ def test_item_neighbors_skips_helpers_and_same_item_both_ways() -> None:
     fwd, back = cg.item_neighbors(SCREEN, "pages/Page.tsx:10")
     assert fwd == ["r.py:1"] and back == []  # 같은 항목의 helper를 건너 라우터까지
     fwd, back = cg.item_neighbors(SCREEN, "q.py:1")
-    assert fwd == ["r.py:1", "q.py:20"]  # 도우미(_help)를 건너 get · 사이클로 라우터 — deep은 get 너머. 항목 ID 순
+    assert fwd == [
+        "r.py:1",
+        "q.py:20",
+    ]  # 도우미(_help)를 건너 get · 사이클로 라우터 — deep은 get 너머. 항목 ID 순
     assert back == ["r.py:1"]
     assert cg.item_neighbors(SCREEN, "없음:1") == ([], [])
-    old = {"functions": [{**f, "item": None} for f in SCREEN["functions"]], "calls": SCREEN["calls"]}
+    old = {
+        "functions": [{**f, "item": None} for f in SCREEN["functions"]],
+        "calls": SCREEN["calls"],
+    }
     assert cg.item_neighbors(old, "r.py:1") == ([], [])  # item 없는 옛 그래프
+
+
+# ── layer_table · layers (MS-011, 카드 BM) ──
+CLASS_DOC = """---
+doc_id: X-DOM-002
+type: DOM
+title: 클래스 명세 — X
+status: draft
+---
+## 0. 이 문서가 다루는 것
+
+| 경로 | 층 | 명세 |
+|---|---|---|
+| `a/*.py` | 다른 절 | [[X-STD-001]] |
+
+## 1. 폴더 구조
+
+```
+| 경로 | 층 | 명세 |
+| `fenced/*.py` | 코드블록 | [[X-STD-001]] |
+```
+
+| 이름 | 뜻 |
+|---|---|
+| `x` | 머리가 다른 표 |
+
+**층**
+
+| 경로 | 층 | 명세 |
+|---|---|---|
+| `app/core/*/repository.py` | 리포지토리 | [[X-DOM-002]] 4장 · [[X-DOM-003]] |
+| `app/alembic/**` · `app/db.py` | 마이그레이션·설정 | [[X-STD-004#DEV-7]] · 글자만 |
+| `tools/special.py` | 특별 도구 | [[X-STD-002]] |
+| `tools/*.py` | 도구 | [[X-STD-004#DEV-14]] |
+| `gone/**` | 지운 폴더 | [[X-DOM-003]] |
+
+## 2. 엔티티
+"""
+
+
+def test_layer_table_reads_only_the_folder_section_table() -> None:
+    rows = cg.layer_table(CLASS_DOC)
+    assert [r["name"] for r in rows] == [
+        "리포지토리",
+        "마이그레이션·설정",
+        "특별 도구",
+        "도구",
+        "지운 폴더",
+    ]
+    assert rows[1]["patterns"] == ["app/alembic/**", "app/db.py"]  # 꼴 여럿
+    assert rows[0]["specs"] == [
+        {"ref": "X-DOM-002", "note": "4장"},
+        {"ref": "X-DOM-003", "note": ""},
+    ]
+    assert rows[1]["specs"][1] == {"ref": None, "note": "글자만"}  # 링크 없는 조각
+    assert CLASS_DOC.split("\n")[rows[0]["line"] - 1].startswith("| `app/core/*/repository.py`")
+    assert cg.layer_table(CLASS_DOC.replace("## 1. 폴더 구조", "## 1. 구조")) == []  # 절이 없으면
+    assert (
+        cg.layer_table("## 폴더 구조\n| 경로 | 층 | 명세 |\n|-|-|-|\n| `x/*` | 층 | |\n")[0]["name"]
+        == "층"
+    )  # 번호 없는 절도
+
+
+def test_layers_item_first_then_helper_then_first_row() -> None:
+    rows = cg.layer_table(CLASS_DOC)
+
+    def fn(key: str, item: str | None = None, ms: str | None = None) -> dict:
+        file, line = key.rsplit(":", 1)
+        return {"key": key, "name": "f", "qual": "m.f", "file": file, "line": int(line),
+                "end": None, "item": item, "ms": ms}  # fmt: skip
+
+    g = {
+        "functions": [
+            fn("app/core/spec/repository.py:3"),
+            fn("app/core/spec/service.py:5", item="X-MS-002#SpecService.save"),
+            fn("app/core/spec/service.py:9"),  # 같은 파일에 항목 → 도우미
+            fn("app/core/spec/sub/repository.py:1"),  # `*`는 한 단만 — 안 맞는다
+            fn("app/alembic/versions/0001.py:2"),  # `**`는 여러 단
+            fn("tools/special.py:1"),  # 위 줄이 이긴다
+            fn("tools/check.py:1"),
+            fn("tools/old.py:4", ms="X-MS-009#old.run"),  # 옛 그래프 — ms만 있어도 항목
+        ],
+        "calls": [],
+    }
+    layer_of, unmatched = cg.layers(g, rows)
+    assert layer_of["app/core/spec/repository.py:3"]["name"] == "리포지토리"
+    assert layer_of["app/core/spec/repository.py:3"]["specs"][0] == {
+        "ref": "X-DOM-002",
+        "note": "4장",
+    }
+    assert "app/core/spec/service.py:5" not in layer_of  # 항목이 먼저
+    assert layer_of["app/core/spec/service.py:9"] == {"name": "도우미", "specs": []}
+    assert "app/core/spec/sub/repository.py:1" not in layer_of  # 층 없음
+    assert layer_of["app/alembic/versions/0001.py:2"]["name"] == "마이그레이션·설정"
+    assert layer_of["tools/special.py:1"]["name"] == "특별 도구"
+    assert layer_of["tools/check.py:1"]["name"] == "도구"
+    assert "tools/old.py:4" not in layer_of
+    assert [r["name"] for r in unmatched] == ["지운 폴더"]  # 어느 함수에도 안 맞는 줄
+    only_helpers, _ = cg.layers(g, [])
+    assert set(only_helpers) == {"app/core/spec/service.py:9"}  # 표가 없으면 도우미만
+
+
+def test_enrich_resolves_self_attribute_set_in_init(tmp_path: Path) -> None:
+    """MS-011 enrich 4·5 — `__init__`의 self.repo = Repo(…) 뒤 self.repo.get(…) → Repo.get (카드 BM)."""
+    (tmp_path / "repo.py").write_text(
+        "class Repo:\n    def __init__(self, s):\n        self.s = s\n\n"
+        "    def get(self, k):\n        return k\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "svc.py").write_text(
+        "from repo import Repo\n\n\nclass Svc:\n    def __init__(self, s):\n"
+        "        self.repo = Repo(s)\n        self.other: Repo = make()\n        self.n = 3\n\n"
+        "    def run(self, k):\n        return self.repo.get(k)\n\n"
+        "    def run2(self, k):\n        return self.other.get(k) + self.n.bit_length()\n",
+        encoding="utf-8",
+    )
+    g = {"functions": [_fn("repo.py", 5, "get"), _fn("svc.py", 10, "run"), _fn("svc.py", 13, "run2")],
+         "calls": []}  # fmt: skip
+    cg.enrich(tmp_path, g)
+    k = {f["qual"]: f["key"] for f in g["functions"]}
+    enriched = {(a, b) for a, b, via in g["calls"] if via == "enrich"}
+    assert (k["Svc.run"], k["Repo.get"]) in enriched  # 대입한 속성
+    assert (k["Svc.run2"], k["Repo.get"]) in enriched  # 주석 단 속성
 
 
 # ── load ──
