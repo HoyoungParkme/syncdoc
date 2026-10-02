@@ -673,10 +673,31 @@ export function CodeGraph() {
       const near = [...callsOf(f.key), ...callersOf(f.key)].filter((x) => itemOf(x))
       const seen = new Set<string>()
       const items = near.filter((x) => (seen.has(itemOf(x)!) ? false : (seen.add(itemOf(x)!), true))).sort((a, b) => (degree.get(b.key) ?? 0) - (degree.get(a.key) ?? 0)).slice(0, 6)
+      // 층(카드 BM) — 클래스 명세 「폴더 구조」 절 층 표의 줄, 같은 파일에 항목 있으면 도우미
+      const ly = f.layer
       return (
         <div className="spec" data-el="4.7">
           <div className="k">명세</div>
-          <div className="it lbl">항목 없음{items.length ? ' · 가까운 항목' : ''}</div>
+          {ly ? (
+            <div className="it layer">
+              <span className="lbl">층</span> <b>{ly.name}</b>
+              {ly.name === '도우미' && <span className="lbl"> · 같은 파일의 항목을 받친다</span>}
+              {ly.specs.map((x, i) =>
+                x.ref ? (
+                  <span key={i} className="peekable" onClick={() => setPeek({ doc_id: x.ref!.split('#')[0], item_id: x.ref!.split('#')[1] ?? null })} title={`${x.ref} — 미리보기 (UI-18)`}>
+                    {' '}
+                    <ItemIdBadge>{x.ref.split('-').slice(1).join('-')}</ItemIdBadge>
+                    {x.note && <span className="lbl"> {x.note}</span>}
+                  </span>
+                ) : (
+                  <span key={i} className="lbl"> {x.note}</span>
+                ),
+              )}
+            </div>
+          ) : (
+            <div className="it lbl">항목 없음</div>
+          )}
+          {items.length > 0 && <div className="sk">가까운 항목</div>}
           {items.map((x, i) => {
             const m = msParts(itemOf(x)!)
             return (
