@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -251,7 +251,7 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 - 커밋 작성자 — 각자의 계정으로 커밋이 남는다. 한 계정으로 몰지 않는다
 - 저장소 접근 — 각자의 토큰으로 push한다
 
-**공개 경로 — Named Tunnel (고정 주소)**: Cloudflare에 올린 도메인 아래 호스트 하나(`PUBLIC_BASE_URL`)를 Zero Trust → Tunnels에서 만든 터널에 잇고, 노트북에서 `cloudflared tunnel run --token $TUNNEL_TOKEN`으로 붙인다. **재부팅해도 주소가 같다** — OAuth 콜백·MCP 등록·에이전트 설정을 한 번만 한다. `.env`에 `TUNNEL_TOKEN`(터널 토큰 — 대시보드가 준다. 비밀이므로 채팅·커밋에 안 적는다)과 `PUBLIC_BASE_URL`(고정 호스트)을 둔다. `scripts/tunnel.sh`가 `TUNNEL_TOKEN`이 있으면 이 모드로 뜬다.
+**공개 경로 — Named Tunnel (고정 주소)**: Cloudflare에 올린 도메인 아래 호스트 하나(`PUBLIC_BASE_URL`)를 Zero Trust → Tunnels에서 만든 터널에 잇고, 노트북에서 `cloudflared tunnel run`으로 붙인다. **재부팅해도 주소가 같다** — OAuth 콜백·MCP 등록·에이전트 설정을 한 번만 한다. `.env`에 `TUNNEL_TOKEN`(터널 토큰 — 대시보드가 준다. 비밀이므로 채팅·커밋에 안 적는다)과 `PUBLIC_BASE_URL`(고정 호스트)을 둔다. `scripts/tunnel.sh`가 `TUNNEL_TOKEN`이 있으면 이 모드로 뜬다. **터널은 compose 서비스 `tunnel`이다**(#284) — 스크립트가 git에 안 올리는 `docker-compose.override.yml`을 만들어 공식 `cloudflare/cloudflared` 이미지를 app과 **네트워크를 같이 쓰게**(`network_mode: service:app`) 띄운다. 대시보드의 대상 `http://localhost:8000`이 곧 app이라 대시보드를 안 고친다. 토큰은 그 파일에 적지 않고 compose가 `.env`에서 `${TUNNEL_TOKEN}`을 채운다. app·db·tunnel 모두 `restart: unless-stopped`라 Docker가 뜨면 같이 뜬다 — 전에는 호스트 `nohup cloudflared`라 재부팅을 못 넘겨 공개 주소가 530이었다(2026-10-02)
 
 **대안 — Quick Tunnel (도메인 없음)**: `TUNNEL_TOKEN`이 비어 있으면 `cloudflared tunnel --url http://localhost:8000`으로 `https://xxx.trycloudflare.com` 임시 주소를 받는다. 공짜지만 **켤 때마다 주소가 바뀐다** — 스크립트가 `PUBLIC_BASE_URL`을 새 주소로 덮어쓰고, 사람이 OAuth 콜백·MCP 등록을 다시 한다.
 
@@ -259,7 +259,7 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 - **OAuth 앱**: 앱 하나에 로컬용(`http://localhost:8000/auth/github/callback`)과 공개용 콜백을 **둘 다 등록해 두면** 양쪽에서 로그인된다 — 앱이 `redirect_uri`를 보내기 때문이다(SEQ-8). Named Tunnel이면 한 번, Quick Tunnel이면 켤 때마다 공개용 콜백을 고친다(3분)
 - **`PUBLIC_BASE_URL`의 쓰임**: 앱이 `redirect_uri`를 만들 때 쓴다. 요청 Host가 이 값의 host와 같으면 이 값을, 아니면 요청에서 만든다(`auth.callback_url`). 터널 뒤에서는 프록시가 https를 http로 보이게 하므로 요청만으로는 스킴을 못 믿는다. 비어 있으면 요청에서만 만든다
 - **502·504는 앞단이 덮는다**: Cloudflare는 원본이 보낸 502·504를 자기 오류 페이지로 바꾼다 — Named·Quick 둘 다, 무료 플랜에는 끄는 설정이 없다. 그러면 problem+json의 `reason`이 사람에게 닿지 않으므로 앱은 두 코드를 쓰지 않고, 앱 밖(GitHub·모델) 실패는 424로 보낸다([[SYNC-API-001]] 2장, #76). 500·503은 원본 본문이 통과한다
-- Quick → Named로 바꾸는 날: `.env`에 `TUNNEL_TOKEN`·`PUBLIC_BASE_URL` 넣고 `scripts/tunnel.sh` → OAuth 콜백을 고정 주소로 한 번 고침 → 팀원·에이전트의 MCP 등록을 고정 주소로. 그 뒤로는 재부팅 때 `scripts/tunnel.sh`만
+- Quick → Named로 바꾸는 날: `.env`에 `TUNNEL_TOKEN`·`PUBLIC_BASE_URL` 넣고 `scripts/tunnel.sh` → OAuth 콜백을 고정 주소로 한 번 고침 → 팀원·에이전트의 MCP 등록을 고정 주소로. 그 뒤로는 재부팅해도 할 일이 없다(8장 「재부팅 뒤」)
 
 **서버 저장소에는 토큰이 없다.** 원격이 서버 안의 경로라 GitHub 토큰을 쓰지 않는다 — `git.commit_push`는 원격이 `https://`일 때만 토큰을 구한다. 그래서 서버 저장 프로젝트는 GitHub 토큰 없이 등록·저장·되돌리기가 된다([[SYNC-PRD-001#R14]]).
 
@@ -332,7 +332,7 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 | `LOCAL_LOGIN` | `local` | 폐쇄망판 로컬 사용자의 아이디 — 커밋 작성자(`{아이디}@syncdoc.local`)에 쓰인다 |
 | `LOCAL_NAME` | `LOCAL_LOGIN`과 같게 | 폐쇄망판 로컬 사용자의 표시 이름 — 이력·설정에 보인다 |
 
-`TUNNEL_TOKEN`은 앱이 읽지 않는다. `scripts/tunnel.sh`가 쓰는 값이라 `.env`에만 있다 (8장).
+`TUNNEL_TOKEN`은 앱이 읽지 않는다. compose가 터널 서비스에 넘기는 값이고 `scripts/tunnel.sh`가 있는지만 본다 — `.env`에만 있다 (5장·8장, #284).
 
 ### 5.3 모델 호출
 
@@ -412,9 +412,17 @@ C7 때문에 원래는 webhook을 받을 수 없었으나, Cloudflare Tunnel로 
 docker compose up
 ├── app   FastAPI + React 빌드 결과   :8000   볼륨 repos(작업 사본) · origins(서버 저장소)
 └── db    PostgreSQL                  :5432   볼륨 pgdata
+(tunnel  cloudflared — app과 네트워크를 같이 쓴다. TUNNEL_TOKEN이 있을 때 scripts/tunnel.sh가 override로 더한다)
 ```
 
-Cloudflare Tunnel은 노트북에서 별도로 실행하며 `:8000`을 공개 주소에 연결한다.
+Cloudflare Named Tunnel은 compose 서비스 `tunnel`로 돌며 `:8000`을 공개 주소에 연결한다(5장). 토큰이 없는 Quick Tunnel만 호스트에서 따로 띄운다.
+
+**재부팅 뒤**(#284) — Docker Desktop이 Windows 로그인 때 뜨면 app·db·tunnel이 `restart: unless-stopped`로 같이 뜬다. 할 일은 확인뿐이다.
+- `docker compose ps` — app·db(healthy)·tunnel이 `Up`
+- 공개 주소 `{PUBLIC_BASE_URL}/health`가 `{"status":"ok"}`
+- 테스트 DB 컨테이너(`syncdoc-test-pg`, 5434)도 재시작 정책을 걸어 두었다 — 꺼져 있으면 `docker start syncdoc-test-pg`
+- 안 떴으면 `scripts/tunnel.sh` 한 번 — 앱·터널을 다시 올린다
+- **app만 골라 다시 만들지 않는다**(`docker compose up -d app`) — tunnel은 app의 네트워크에 붙어 있어 옛 app과 함께 끊긴다. 배포는 늘 전부(`docker compose up -d --build`) — compose가 tunnel도 다시 만든다
 
 **이미지에 담기는 것** — 백엔드 코드, React 빌드 결과, 그리고 `docs/specs/`의 `_templates/`와 `STD/` 사본. [[SYNC-API-002#get_template]]이 템플릿은 **늘** 이 사본으로 주고(사용자 저장소에는 사본이 없다, 카드 AB), 규약은 그 프로젝트 저장소에 `STD/`가 있으면 그것을 먼저 준다. 둘 중 하나라도 이미지에서 빠지면 배포본에서만 조용히 실패한다.
 
