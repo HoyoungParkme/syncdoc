@@ -1340,7 +1340,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `CodeGraph.tsx` — 폭 판정(1280) · 툴바 「질문」 2.4 · 오른쪽 끝 질문 열 7(`AskPanel` 그대로, 손잡이 7.2) · 좁으면 4.9 탭 그대로 · 열림은 브라우저 기억 + `?panel=ask` · 폭은 UI-5 질문 탭과 같은 기억(`panes.ASK`) · `styles.css` |
 | 테스트 | `check_ui` UI-17 +2 · `tsc`·`oxlint`·`build` · 헤드리스: 1440에서 2.4 → 7 열림·코드 4.6 같이 보임·7.1 맥락·`?panel=ask`·손잡이 폭이 UI-5와 같음·새로고침 유지·닫힘, 1200에서 4.9 탭 · UI-5 질문 탭 회귀 |
 | 선행 | BM |
-| 완료 | — |
+| 완료 | 2026-10-02 · 브랜치 `card/BN-code-ask-column`(a62249b #280) · spec 7 + code 1 · 백엔드 변경 없음 · `tsc`·`oxlint`·`build` · `validate` 0/0 · `check_ui` 14/14(UI-17 요소 32) · `check_tokens` 0 · 헤드리스(가짜 키, 콘솔 0): 폭 1440 — 처음엔 닫힘 · 2.4 「질문 ▸」 → 오른쪽 끝 질문 열 420 · 옆 패널 코드 4.6 「코드 L129–L176」이 같이 보임 · 7.1 「pipeline.save_pipeline · 이 함수를 보며 묻습니다」 → 다른 함수를 고르면 따라감 · `?panel=ask` · 7.2로 520 → UI-5 질문 탭도 520 · 새로고침 뒤 열림 유지 · 다시 누르면 닫히고 `?panel` 빠짐 · 질문 입력 y≈747(화면 안 — 줄 높이를 그림 높이로 묶음). 폭 1200 — 4.9 탭, 2.4 없음, 「질문」이면 옆 패널 자리에 질문 · 운영: 공개 번들에 `syncdoc.ui17.ask`·`min-width: 1280px`·「질문 ◂」 · 화면은 사람이 직접(DEV-17) |
 
 ---
 
