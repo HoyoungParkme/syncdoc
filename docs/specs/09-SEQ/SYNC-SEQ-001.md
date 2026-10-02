@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -1505,7 +1505,7 @@ sequenceDiagram
     participant S as SpecService
     participant LLM as infra/llm
 
-    U->>RCG: POST /api/projects/{code}/code/ask {conversation_id, question, key?, attachment_ids} — UI-17 질문 탭(7)
+    U->>RCG: POST /api/projects/{code}/code/ask {conversation_id, question, key?, attachment_ids} — UI-17 질문 열(7, 좁은 화면은 탭)
     RCG->>Q: ask_code(code, key, conversation_id, question, attachment_ids, user)
     Q->>Q: 키 없으면 llm-not-configured · get_owned
     Q->>C: get · history · add_turn (SEQ-24와 같다)
