@@ -251,6 +251,9 @@ title: 클래스 명세 — X
 status: draft
 ---
 ## 1. 폴더 구조
+| 경로 | 층 | 명세 |
+|---|---|---|
+| `app/*/crud.py` | DB 접근 | [[X-DOM-003]] |
 ## 2. 엔티티
 #### Foo 푸
 ```mermaid
@@ -273,6 +276,34 @@ classDiagram
 """
     r = SpecService(db_session).validate(body, DocType.DOM, Entry.github)
     assert r.violations == [] and [str(w) for w in r.warnings] == ["entity.mismatch: Foo"]
+
+
+def test_validate_layer_table_warning(db_session: Session) -> None:
+    """STD-001 2.6·4장 — 클래스 명세 「폴더 구조」 절에 층 표가 없으면 layer.table (카드 BM)."""
+    svc = SpecService(db_session)
+    head = "---\ndoc_id: X-DOM-002\ntype: DOM\ntitle: {t}\nstatus: draft\n---\n"
+    rest = "## 2. 엔티티\n#### Foo 푸\n## 3. 의존 관계\n## 4. 설계 클래스\n## 5. 미결사항\n"
+    table = "| 경로 | 층 | 명세 |\n|---|---|---|\n| `app/*/crud.py` | DB 접근 | [[X-DOM-003]] |\n"
+
+    def warns(t: str, folder: str) -> list[str]:
+        r = svc.validate(head.format(t=t) + folder + rest, DocType.DOM, Entry.github)
+        assert r.violations == []
+        return [w.rule for w in r.warnings]
+
+    assert warns("클래스 명세 — X", "## 1. 폴더 구조\n" + table) == []
+    assert warns("클래스 명세 — X", "## 1. 폴더 구조\n트리만\n") == ["layer.table"]
+    # 코드블록 안 표·머리가 다른 표·다른 절의 표는 층 표가 아니다
+    fenced = "## 1. 폴더 구조\n```\n" + table + "```\n"
+    assert warns("클래스 명세 — X", fenced) == ["layer.table"]
+    other = "## 1. 폴더 구조\n" + table.replace("| 명세 |", "| 문서 |", 1)
+    assert warns("클래스 명세 — X", other) == ["layer.table"]
+    late = "## 1. 폴더 구조\n트리\n## 1.5 부록\n" + table
+    assert "layer.table" in warns("클래스 명세 — X", late)
+    # 도메인 모델·ERD는 안 본다 — 클래스 명세만
+    dom = svc.validate(
+        head.format(t="도메인 모델 — X") + "#### Foo 푸\n", DocType.DOM, Entry.github
+    )
+    assert "layer.table" not in [w.rule for w in dom.warnings]
 
 
 def test_validate_constraint_source_warning(db_session: Session) -> None:

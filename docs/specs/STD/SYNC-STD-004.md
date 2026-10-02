@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-004
 type: STD
 title: 개발 규약 — 코드 파트 표준
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -226,7 +226,7 @@ C  통합·배포       외부 연결 · 첫 사용
 |---|---|
 | 카드의 구현 함수가 전부 있다 | `docstring` 항목 ID 대조. MINISPEC에 있는데 코드에 없거나 그 반대면 미완 |
 | 시그니처가 MINISPEC과 같다 | 검사기가 타입 힌트와 대조 |
-| 호출이 MINISPEC과 같다 | `check_calls.py` — 명세의 「호출하는 것」과 코드 호출 그래프(graphify + 보강)의 어긋남 0. `uv run --project backend python tools/check_calls.py`(카드 AX) |
+| 호출이 MINISPEC과 같다 | `check_calls.py` — 명세의 「호출하는 것」과 코드 호출 그래프(graphify + 보강)의 어긋남 0. `uv run --project backend python tools/check_calls.py`(카드 AX). **층 없음 0 · 안 맞는 줄 0**도 — 클래스 명세 층 표가 항목 없는 함수를 다 덮고, 표의 줄이 다 코드에 맞는다(카드 BM) |
 | 테스트 통과 | 단위(테스트 관점) + E2E(시나리오) 전부. **전용 테스트 DB에서만** — 아래 |
 | 린트·포맷 통과 | `ruff check` · `ruff format --check` |
 | 명세 통과 | `validate.py` 위반 0 (코드가 명세를 고쳤으면) |

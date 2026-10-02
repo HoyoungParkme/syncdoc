@@ -213,6 +213,31 @@ def _bind(target: ast.expr, value: ast.expr, env: dict[str, str], classes: dict)
             env[t.id] = v.func.id
 
 
+def _self_attrs(init: ast.FunctionDef | ast.AsyncFunctionDef) -> dict[str, str]:
+    """`__init__`의 `self.x = Cls(…)` · `self.x: Cls = …` → 속성 → 클래스 이름(enrich 4, 카드 BM).
+
+    클래스가 그래프에 있는지는 부를 때(_resolve) 본다 — 다른 파일의 클래스를 아직 안 읽었을 수 있다.
+    """
+    out: dict[str, str] = {}
+    for node in ast.walk(init):
+        target, cls_name = None, None
+        if isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target = node.targets[0]
+            v = node.value
+            if isinstance(v, ast.Call) and isinstance(v.func, ast.Name):
+                cls_name = v.func.id
+        elif isinstance(node, ast.AnnAssign):
+            target, cls_name = node.target, _ann_name(node.annotation)
+        if (
+            cls_name
+            and isinstance(target, ast.Attribute)
+            and isinstance(target.value, ast.Name)
+            and target.value.id == "self"
+        ):
+            out[target.attr] = cls_name
+    return out
+
+
 class _Ctx:
     """보강에 쓰는 이름표 — 클래스의 메서드, 파일의 맨 위 함수, 점 이름 → 파일."""
 
@@ -220,6 +245,8 @@ class _Ctx:
         self.classes: dict[str, dict[str, str]] = defaultdict(dict)  # 클래스 → 메서드 → key
         self.module_funcs: dict[str, dict[str, str]] = defaultdict(dict)  # 파일 → 함수 → key
         self.modules: dict[str, str] = {}  # 점 이름 꼬리(`app.infra.git`·`git`) → 파일
+        # 클래스 → `__init__`의 `self.x = Cls(…)` 속성 → 클래스 이름 (enrich 4, 카드 BM)
+        self.attrs: dict[str, dict[str, str]] = defaultdict(dict)
 
     def index_modules(self, files: list[str]) -> None:
         dup: set[str] = set()
@@ -314,6 +341,14 @@ def _resolve(
                 c = env[base.id]
             elif isinstance(base, ast.Name) and base.id == "self" and cls:
                 c = cls
+            elif (
+                isinstance(base, ast.Attribute)
+                and isinstance(base.value, ast.Name)
+                and base.value.id == "self"
+                and cls
+                and base.attr in ctx.attrs.get(cls, {})
+            ):
+                c = ctx.attrs[cls][base.attr]  # self.repo.get — __init__에서 담은 속성 (카드 BM)
             if c and attr in classes.get(c, {}):
                 out.add(classes[c][attr])
             elif isinstance(base, ast.Name) and base.id in mods:
@@ -642,6 +677,8 @@ def enrich(src_dir: Path, graph: dict) -> dict:
                     f["ms"] = m
             if cls:
                 ctx.classes[cls][fn.name] = f["key"]
+                if fn.name == "__init__":
+                    ctx.attrs[cls].update(_self_attrs(fn))
             else:
                 ctx.module_funcs[file][fn.name] = f["key"]
             found.append((file, f, cls, fn))
@@ -871,3 +908,99 @@ def item_neighbors(graph: dict, key: str) -> tuple[list[str], list[str]]:
         return [found[i] for i in sorted(found)]
 
     return walk(fwd), walk(back)
+
+
+# ── 층 (MS-011 layer_table·layers, 카드 BM) — 클래스 명세 「폴더 구조」 절의 층 표 ──
+_LAYER_HEAD = ["경로", "층", "명세"]
+_HELPER = "도우미"
+
+
+def _cells(line: str) -> list[str]:
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def layer_table(body: str) -> list[dict]:
+    """SYNC-MS-011#codegraph.layer_table
+
+    클래스 명세 「폴더 구조」 절에서 머리가 경로·층·명세인 첫 표 → 줄마다
+    {patterns, name, specs: [{ref, note}], line}. 표 순서가 우선순위다. 코드블록 안은 표가 아니다.
+    """
+    rows: list[dict] = []
+    in_sec = in_fence = in_table = False
+    for i, line in enumerate(body.split("\n"), start=1):
+        if line.startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        if line.startswith("## "):
+            if in_table:
+                break
+            in_sec = re.sub(r"^[\d.]+\s*", "", line[3:].strip()).startswith("폴더 구조")
+            continue
+        if not in_sec:
+            continue
+        if not in_table:
+            if line.lstrip().startswith("|") and _cells(line) == _LAYER_HEAD:
+                in_table = True
+            continue
+        if not line.lstrip().startswith("|"):
+            break  # 표가 끝났다
+        cells = _cells(line)
+        if len(cells) < 3 or set(cells[0]) <= {"-", ":", " "}:
+            continue  # 구분 줄
+        patterns = [p for part in cells[0].split(" · ") for p in re.findall(r"`([^`]+)`", part)]
+        if not patterns:
+            continue
+        specs = []
+        for part in cells[2].split(" · "):
+            m = _REF.search(part)
+            note = _REF.sub("", part).strip()
+            if m or note:
+                specs.append({"ref": m.group(1).strip() if m else None, "note": note})
+        rows.append({"patterns": patterns, "name": cells[1], "specs": specs, "line": i})
+    return rows
+
+
+def _glob(pattern: str) -> re.Pattern[str]:
+    """경로 꼴 → 정규식. `**`는 여러 단, `*`는 한 단(`/` 빼고). 경로 전체가 맞아야 한다."""
+    out: list[str] = []
+    i = 0
+    while i < len(pattern):
+        if pattern.startswith("**", i):
+            out.append(".*")
+            i += 2
+        elif pattern[i] == "*":
+            out.append("[^/]*")
+            i += 1
+        else:
+            out.append(re.escape(pattern[i]))
+            i += 1
+    return re.compile("".join(out) + r"\Z")
+
+
+def layers(graph: dict, rows: list[dict]) -> tuple[dict[str, dict], list[dict]]:
+    """SYNC-MS-011#codegraph.layers
+
+    항목 없는 함수마다 층 — 같은 파일에 항목 있는 함수가 있으면 「도우미」, 아니면 표 위에서부터
+    첫 일치 줄. 항목이 있는 함수에는 붙이지 않는다. 모든 함수와 대조해 하나도 안 맞는 줄도 돌려준다.
+    """
+    funcs = graph.get("functions", [])
+    compiled = [[_glob(p) for p in r["patterns"]] for r in rows]
+    has_item = {f["file"] for f in funcs if f.get("item") or f.get("ms")}
+    used = [False] * len(rows)
+    out: dict[str, dict] = {}
+    for f in funcs:
+        hit = None
+        for i, pats in enumerate(compiled):
+            if any(p.match(f["file"]) for p in pats):
+                used[i] = True
+                if hit is None:
+                    hit = i
+        if f.get("item") or f.get("ms"):
+            continue  # 항목이 먼저
+        if f["file"] in has_item:
+            out[f["key"]] = {"name": _HELPER, "specs": []}
+        elif hit is not None:
+            out[f["key"]] = {"name": rows[hit]["name"], "specs": list(rows[hit]["specs"])}
+    return out, [r for r, u in zip(rows, used, strict=True) if not u]

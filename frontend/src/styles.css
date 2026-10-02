@@ -875,6 +875,9 @@ a.arow:hover{background:var(--bg-subtle)}
 /* 4.7 명세 — 항목 뱃지와 참조 줄. 참조 탭(8.1)과 같은 자료 (카드 BG) */
 .cgside .spec .it{margin-bottom:var(--space-4)}
 .cgside .spec .it.peekable{cursor:pointer}
+.cgside .spec .it.layer{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}
+.cgside .spec .it.layer .peekable{cursor:pointer}
+.cgside .spec .it.layer .peekable:hover .idb{text-decoration:underline}
 .cgside .spec .it.peekable:hover .idb{text-decoration:underline}
 .cgside .spec .sk{font-weight:var(--w-semibold);font-size:11px;color:var(--ink-faint);margin:var(--space-6) 0 var(--space-2)}
 .cgside .spec .sr{display:flex;align-items:center;gap:var(--space-6);padding:var(--space-2) 0;color:var(--ink-body);text-decoration:none;cursor:pointer}

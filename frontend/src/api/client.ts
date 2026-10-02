@@ -471,6 +471,11 @@ export interface CodeCommunity {
   label: string
   size: number
 }
+/** 항목 없는 함수의 층 — 클래스 명세 「폴더 구조」 절 층 표의 줄, 또는 도우미(카드 BM) */
+export interface CodeLayer {
+  name: string
+  specs: { ref: string | null; note: string }[]
+}
 export interface CodeNode {
   key: string
   name: string
@@ -483,6 +488,7 @@ export interface CodeNode {
   /** 그중 MINISPEC 항목 — 대조·고리·코드 탭은 이것으로 */
   ms: string | null
   status: CallStatus | null
+  layer?: CodeLayer | null
 }
 export interface CodeNodes {
   graph: CodeGraphInfo | null
@@ -524,6 +530,7 @@ const WARN_KO: Record<string, (m: string) => string> = {
   'constraint.source': (m) => `출처 없는 제약: ${m}`,
   'section.unnumbered': (m) => `번호 없는 절 제목: ${m}`,
   'dom.name': (m) => `DOM 세 문서의 이름이 어긋남: ${m}`,
+  'layer.table': () => '층 표 없음 — 「폴더 구조」 절에 경로·층·명세 표를 적는다',
 }
 /** `"section.missing: 시나리오"` → `"필수 절 없음: 시나리오"`.
  *  표에 없는 규칙은 문자열 그대로 — 규약을 늘렸는데 문구를 안 채운 것이 눈에 띄어야 한다 */

@@ -28,6 +28,7 @@ from app.core.codegraph.models import CodeGraph
 from app.core.codegraph.service import CodeGraphService
 from app.core.conversation.service import ConversationService
 from app.core.errors import ItemDeleted, LlmNotConfigured, LlmUnavailable, NotFound, Problem
+from app.core.markdown import parse_frontmatter
 from app.core.project.models import Project
 from app.core.project.service import ProjectService, public_remote
 from app.core.reference.service import ReferenceService
@@ -53,6 +54,8 @@ from app.core.types import (
     CodeCommunity,
     CodeFunction,
     CodeGraphInfo,
+    CodeLayer,
+    CodeLayerSpec,
     CodeNode,
     CodeNodes,
     CodeRef,
@@ -1019,12 +1022,16 @@ def _code_context(s: Session, project, key: str | None, attachments: str) -> str
             raise NotFound("function", key)
         diffs = _diffs(s, project.id, g)
         ms_of = {d.function: d for d in diffs.values() if d.function}
+        layer_of = _layers(s, project.id, g)
 
         def item_of(k: str) -> str:
             d = ms_of.get(k)
-            if d is None:  # 대조 없는 함수 — API·UI 항목이면 그 항목만 (카드 BK)
+            # 대조 없는 함수 — API·UI 항목이면 그 항목만(카드 BK), 그것도 없으면 층(카드 BM)
+            if d is None:
                 it = by_key[k].get("item")
-                return f"항목 {it}" if it else "항목 없음"
+                if it:
+                    return f"항목 {it}"
+                return _layer_line(layer_of[k]) if k in layer_of else "항목 없음"
             st = "code_only" if d.code_only else "spec_only" if d.spec_only else "same"
             return f"항목 {d.ms_id} ({st})"
 
@@ -1130,6 +1137,32 @@ def _ms_items(s: Session, project_id: int) -> list[tuple[str, str]]:
 def _diffs(s: Session, project_id: int, graph: dict) -> dict[str, CallDiff]:
     spec = codegraph.spec_calls(_ms_items(s, project_id))
     return {d.ms_id: d for d in codegraph.compare(graph, spec)}
+
+
+def _layers(s: Session, project_id: int, graph: dict) -> dict[str, CodeLayer]:
+    """항목 없는 함수 key → 층 (MS-008 code_nodes 2a, 카드 BM).
+
+    프로젝트 DOM 문서 중 제목에 「클래스」가 든 첫 것의 층 표 — 없으면 표 없이(도우미만).
+    표는 볼 때 읽는다 — 「호출하는 것」처럼 명세만 고쳐도 바로 바뀐다.
+    """
+    spec = SpecService(s)
+    rows: list[dict] = []
+    for d in spec.list_by_project(project_id, stage=STAGE_OF["DOM"]):
+        body = spec.get_document(d.doc_id).body
+        if "클래스" in parse_frontmatter(body)[0].get("title", ""):
+            rows = codegraph.layer_table(body)
+            break
+    layer_of, _ = codegraph.layers(graph, rows)
+    return {
+        k: CodeLayer(v["name"], [CodeLayerSpec(x["ref"], x["note"]) for x in v["specs"]])
+        for k, v in layer_of.items()
+    }
+
+
+def _layer_line(layer: CodeLayer) -> str:
+    """질문 맥락의 층 표기 — `층 리포지토리 · SYNC-DOM-002 4장 · SYNC-DOM-003`."""
+    parts = [f"{x.ref or ''} {x.note}".strip() for x in layer.specs]
+    return " · ".join([f"층 {layer.name}", *[p for p in parts if p]])
 
 
 def _code_ref(ms_id: str, diffs: dict, fns: dict, status: str | None = None) -> CodeRef:
@@ -1266,6 +1299,7 @@ async def code_nodes(code: str, user: User) -> CodeNodes:
             return CodeNodes(None, [], [], [])
         info = _graph_info(row)
         diffs = _diffs(s, project.id, row.graph)
+        layer_of = _layers(s, project.id, row.graph)  # 2a — 항목 없는 함수의 층 (카드 BM)
     by_key = {d.function: d for d in diffs.values() if d.function}
     functions = []
     for f in row.graph["functions"]:
@@ -1285,6 +1319,7 @@ async def code_nodes(code: str, user: User) -> CodeNodes:
                 f.get("item") or ms,  # 옛 그래프(2026-10-02 이전)는 item이 없다 — ms로
                 ms,
                 status,
+                layer_of.get(f["key"]),
             )
         )
     communities = [

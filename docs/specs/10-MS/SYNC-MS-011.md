@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-011
 type: MS
 title: MINISPEC — codegraph — 코드 호출 그래프와 명세 대조
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/codegraph/graph.py`(순수 함수 9개)와 `core/codegraph/service.py`(`CodeGraphService` 5개). 클래스 명세 [[SYNC-DOM-002]] 4.11의 시그니처를 함수 내부까지 내린 것.
+`core/codegraph/graph.py`(순수 함수 11개)와 `core/codegraph/service.py`(`CodeGraphService` 5개). 클래스 명세 [[SYNC-DOM-002]] 4.11의 시그니처를 함수 내부까지 내린 것.
 
 명세↔코드 대조([[SYNC-PRD-001#R13]])를 맡는다 — 2026-09-30 사용자 결정으로 graphify가 뽑은 호출 그래프에 싱크독의 보강을 더해, MINISPEC의 「호출하는 것」과 실제 호출을 가른다. **명세 묶음과 선이 없다**: 항목 ID는 그래프 안의 글자이고, 「호출하는 것」은 부르는 쪽(검사기 `check_calls`, 화면·챗봇은 카드 AY·AZ의 `queries`)이 명세에서 읽어 넘긴다.
 
@@ -43,6 +43,8 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 | [[#codegraph.compare]] | 명세 호출과 코드 호출을 같음·코드만·명세만으로 |
 | [[#codegraph.item_function]] | 항목 ID → 그 항목의 함수(화면 항목은 파일 이름과 같은 컴포넌트) |
 | [[#codegraph.item_neighbors]] | 함수의 부르는 것·불리는 곳을 항목 있는 함수까지 — 도우미·같은 항목은 건너 |
+| [[#codegraph.layer_table]] | 클래스 명세 「폴더 구조」 절의 층 표를 읽는다 |
+| [[#codegraph.layers]] | 항목 없는 함수마다 층 — 도우미 규칙, 표의 첫 일치 줄. 안 맞는 줄도 |
 | [[#CodeGraphService.get]] | 프로젝트의 그래프 행 |
 | [[#CodeGraphService.save]] | 새 그래프로 바꿔 끼운다 |
 | [[#CodeGraphService.fail]] | 실패 이유만 남긴다 — 옛 그래프는 그대로 |
@@ -121,11 +123,11 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 2c. 그래프에 있는데 `end`가 없는 TS/JS 함수(graphify가 넣은 중첩 함수 — 컴포넌트 안 핸들러)는 파일의 함수 노드(function·arrow·method) 중 같은 줄에서 시작하는 것의 끝 줄로 채운다
 2d. 맨 위 정의의 몸통에서 호출 `f(…)` · `o.m(…)` · JSX `<Comp …>` → 같은 파일의 맨 위 이름, 또는 **상대 import**(`./x`·`../api/client` — 확장자 `.ts .tsx .js .jsx .mjs`나 폴더의 `index.*`로 파일을 찾는다. 별칭 `a as b`·default import도)한 파일의 맨 위 이름이 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다. 패키지 import(`react`)·경로 별칭은 풀지 않는다
 3. 화면 코드 — 파일마다 **첫 주석**(맨 위 `/** … */` 또는 `//` 묶음)에서 `[A-Z][A-Z0-9]*-UI-\d{3}#UI-\d+`를 찾아, 그 파일 함수 중 `item`이 없는 것 전부에 준다(`ms`는 건드리지 않는다). 화면 하나 = 파일 하나(DEV-17)라 파일 단위로 잇는다. 첫 주석에 화면 ID가 없는 파일(공용 부품·뷰 렌더러)은 그대로 null. 2026-10-02 사용자 결정, 카드 BJ
-4. 함수 몸통에서 **타입을 아는 변수**를 모은다 — 인자 주석 `x: Cls` · `x = Cls(…)` · `a, b = A(…), B(…)`. `Cls`는 이 그래프 안에 정의된 클래스 이름일 때만
-5. 호출 `x.m(…)`(4의 변수) · `Cls(…).m(…)` · `self.m(…)`(메서드 안) → `Cls.m`이 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다
+4. 함수 몸통에서 **타입을 아는 변수**를 모은다 — 인자 주석 `x: Cls` · `x = Cls(…)` · `a, b = A(…), B(…)`. `Cls`는 이 그래프 안에 정의된 클래스 이름일 때만. 그리고 **타입을 아는 속성** — 클래스 `__init__`의 `self.x = Cls(…)`(또는 `self.x: Cls = …`)는 그 클래스 메서드 전부에서 `self.x`의 타입이다(카드 BM — 서비스가 리포지토리를 `self.repo`로 들고 부르는 134곳이 그래프에 없어 리포지토리 93개 중 89개가 외톨이였다)
+5. 호출 `x.m(…)`(4의 변수) · `Cls(…).m(…)` · `self.m(…)`(메서드 안) · `self.x.m(…)`(4의 속성) → `Cls.m`이 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다
 6. `→ graph` (같은 객체에 더해 돌려준다)
 
-**테스트 관점** 다섯 꼴이 각각 선을 만든다 — 주석·대입·튜플 대입·즉석 생성·`self` · 모르는 클래스는 안 만든다 · graphify가 이미 잡은 선은 겹치지 않는다 · 데코레이터 달린 함수도 맞춘다 · MINISPEC docstring ID가 `item`·`ms`로, API docstring ID는 `item`만 · `.tsx` 첫 주석의 화면 ID가 그 파일 함수 전부의 `item`으로(`ms`는 null), 화면 ID 없는 파일은 null · TS/JS — 맨 위 함수의 끝 줄·qual(function·const 화살표·class 메서드·객체 리터럴 메서드와 화살표) · graphify가 놓친 맨 위 정의를 더하고 화면 ID도 받는다 · 중첩 함수는 끝 줄만, 지우지 않는다 · 같은 파일·상대 import(별칭·default·`index`)·JSX·`o.m` 호출이 `enrich` 선으로 · 패키지 import는 안 잇는다 · 깨진 파일은 건너뛴다
+**테스트 관점** 다섯 꼴이 각각 선을 만든다 — 주석·대입·튜플 대입·즉석 생성·`self` · `__init__`의 `self.repo = Repo(…)` 뒤 다른 메서드의 `self.repo.get(…)` → `Repo.get` · 모르는 클래스는 안 만든다 · graphify가 이미 잡은 선은 겹치지 않는다 · 데코레이터 달린 함수도 맞춘다 · MINISPEC docstring ID가 `item`·`ms`로, API docstring ID는 `item`만 · `.tsx` 첫 주석의 화면 ID가 그 파일 함수 전부의 `item`으로(`ms`는 null), 화면 ID 없는 파일은 null · TS/JS — 맨 위 함수의 끝 줄·qual(function·const 화살표·class 메서드·객체 리터럴 메서드와 화살표) · graphify가 놓친 맨 위 정의를 더하고 화면 ID도 받는다 · 중첩 함수는 끝 줄만, 지우지 않는다 · 같은 파일·상대 import(별칭·default·`index`)·JSX·`o.m` 호출이 `enrich` 선으로 · 패키지 import는 안 잇는다 · 깨진 파일은 건너뛴다
 
 ---
 
@@ -218,6 +220,43 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 5. `→ (부르는 것 key 목록, 불리는 곳 key 목록)`
 
 **테스트 관점** 도우미를 건너 닿는다 · 같은 항목의 함수는 건너 그 너머까지 · 항목 있는 함수 너머는 안 간다 · 역방향도 같다 · 사이클에서 멈춘다 · 같은 항목 둘은 하나로 · `ms`만 있는 옛 그래프는 빈 목록
+
+---
+
+#### codegraph.layer_table 클래스 명세의 층 표를 읽는다
+
+**시그니처** `def layer_table(body: str) -> list[dict]`
+
+근거: [[SYNC-STD-001]] 2.6 층 표 · 사용자 결정 2026-10-02(층 표는 클래스 명세 「폴더 구조」 절에 필수 · 명세 칸은 `[[…]]` 링크 · 카드 BM)
+
+**입력** `body` — DOM 클래스 명세 원본 전체
+
+**처리**
+1. 「폴더 구조」 절만 본다 — `## ` 헤딩 글자가 번호를 떼고 `폴더 구조`로 시작하는 절부터 다음 `## `까지. 코드블록 안 줄은 표가 아니다
+2. 머리 칸이 차례로 `경로`·`층`·`명세`인 첫 표 · 없으면 `→ []`
+3. 몸 줄마다 `{patterns, name, specs, line}` — `patterns` = 경로 칸의 백틱 안 꼴들(` · `로 나열) · `name` = 층 칸 글자 · `specs` = 명세 칸을 ` · `로 나눈 조각마다 `{ref: 첫 [[…]] 안 또는 None, note: 링크를 뺀 나머지 글자}` · `line` = 본문 줄 번호. 꼴이 하나도 없는 줄은 버린다
+4. `→ 줄 목록` — 표 순서 그대로(순서가 우선순위)
+
+**테스트 관점** 번호 붙은 절·안 붙은 절 · 코드블록 안 표는 안 읽는다 · 머리가 다른 표는 건너뛴다 · 다른 절의 표는 안 읽는다 · 꼴 여럿·조각 여럿 · 링크 없는 조각은 `ref` None · 표 없음 → 빈 목록
+
+---
+
+#### codegraph.layers 항목 없는 함수마다 층
+
+**시그니처** `def layers(graph: dict, rows: list[dict]) -> tuple[dict[str, dict], list[dict]]`
+
+근거: [[SYNC-STD-001]] 2.6 판정 순서 · [[SYNC-UC-001#UC-H20]] 기본 흐름 5 · 사용자 결정 2026-10-02(도우미는 규칙으로 · 위에서부터 첫 줄 · 층 없는 함수와 안 맞는 줄은 검사가 잡는다, 카드 BM)
+
+**입력** `graph` — 그래프 모양 그대로 · `rows` — [[#codegraph.layer_table]]
+
+**처리**
+1. 꼴 → 정규식: `**` → 여러 단, `*` → 한 단(`/` 빼고), 나머지 글자는 그대로 — 경로 전체가 맞아야 한다
+2. `has_item` = 항목(`item`, 옛 그래프는 `ms`)이 있는 함수가 하나라도 든 파일들
+3. 함수마다 — 항목이 있으면 층을 안 붙인다(항목이 먼저) · `file in has_item`이면 `{name: "도우미", specs: []}` · 아니면 표 위에서부터 첫 일치 줄의 `{name, specs}` · 아무 줄에도 안 맞으면 붙이지 않는다
+4. 줄마다 **모든 함수**(항목 있는 것도)와 대조해 하나도 안 맞는 줄을 모은다
+5. `→ (항목 없는 함수 key → {name, specs}, 안 맞는 줄 목록)` — 층이 없는 함수는 dict에 없다
+
+**테스트 관점** 항목 있는 함수는 층이 없다 · 같은 파일에 항목 있으면 도우미(표보다 먼저) · 첫 일치가 이긴다 · `*`는 한 단만, `**`는 여러 단 · 안 맞는 줄 · 표가 비면 도우미만 · 옛 그래프(`item` 없음)는 `ms`로
 
 ---
 

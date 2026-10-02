@@ -31,6 +31,16 @@ upstream: []
 └── …
 ```
 
+<!-- 층 표 — 함수 단위 명세(MINISPEC·API·UI)가 없는 코드가 어느 층이고 그 층을 무슨 문서가 정하는지(STD-001 2.6). 코드 그래프가 읽는다. 위에서부터 첫 줄이 이긴다 — 좁은 경로를 위에. 같은 파일에 항목 있는 함수가 있는 도우미는 적지 않는다 -->
+
+**층**
+
+| 경로 | 층 | 명세 |
+|---|---|---|
+| `backend/app/domains/*/crud.py` | DB 접근 | [[XXXX-DOM-002]] 4장 · [[XXXX-DOM-003]] |
+| `backend/app/domains/*/schemas.py` | 요청·응답 모델 | [[XXXX-API-001]] |
+| `backend/alembic/**` | 마이그레이션 | [[XXXX-DOM-003]] |
+
 ## 2. 엔티티
 
 ```mermaid

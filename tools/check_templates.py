@@ -13,6 +13,7 @@ DOM 템플릿이 도메인 모델 골격만 든 채로 오래 살아남았고, �
   3. 필수 절이 다 있는가 — validate와 같은 대조(번호를 떼고 앞부분 일치)
   4. 항목 예시가 하나라도 항목 패턴에 맞는가 — 안 맞으면 그대로 쓴 문서가 「항목이 하나도 없음」
      (CODE·STD는 항목 없는 문서가 정상이라 빼는 것도 validate와 같다)
+  5. DOM 클래스 템플릿의 「폴더 구조」 절에 층 표가 있는가 — 없으면 그대로 쓴 문서가 layer.table (카드 BM)
 
 본 것의 수를 함께 낸다(STD-004 DEV-17) — 0이면 실패다.
 
@@ -26,7 +27,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from validate import SUBTYPES, TYPES, strip_code  # noqa: E402 — 같은 폴더의 규약 원형
+from validate import SUBTYPES, TYPES, has_layer_table, strip_code  # noqa: E402 — 같은 폴더의 규약 원형
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 TEMPLATES = os.path.join(ROOT, "docs", "specs", "_templates")
@@ -112,6 +113,9 @@ def main() -> int:
             problems.append(f"필수 절 없음: {' · '.join(missing)}")
         if not items and typ not in NO_ITEMS_OK:
             problems.append("항목 예시가 항목 패턴에 안 맞는다 — 그대로 쓰면 「항목이 하나도 없음」")
+        # DOM 클래스 명세 — 「폴더 구조」 절의 층 표 (STD-001 2.6, 카드 BM)
+        if typ == "DOM" and sub == "클래스" and not has_layer_table(body):
+            problems.append("「폴더 구조」 절에 층 표(경로·층·명세)가 없다 — 그대로 쓰면 layer.table 미완성")
         if problems:
             bad += 1
             print(f"✗  {name:14} {rel}")

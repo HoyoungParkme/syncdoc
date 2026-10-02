@@ -49,6 +49,21 @@ def strip_code(text):
         out.append("" if inblk else re.sub(r"`[^`]*`", lambda m: " " * len(m.group(0)), l))
     return "\n".join(out)
 
+def has_layer_table(text):
+    """DOM 클래스 명세의 「폴더 구조」 절에 머리가 경로·층·명세인 표가 있나 (STD-001 2.6, 카드 BM).
+
+    text는 코드를 비운 본문(strip_code) — 코드블록 안 표는 표가 아니다. check_templates도 부른다.
+    """
+    in_sec = False
+    for l in text.split("\n"):
+        if l.startswith("## "):
+            in_sec = re.sub(r"^[\d.]+\s*", "", l[3:].strip()).startswith("폴더 구조")
+        elif in_sec and l.lstrip().startswith("|"):
+            if [c.strip() for c in l.strip().strip("|").split("|")] == ["경로", "층", "명세"]:
+                return True
+    return False
+
+
 def _type_of_dir(name):
     """디렉터리 이름 → 타입. `06-DOM` → `DOM` (SYNC-STD-001 1.1). STD는 번호가 없다."""
     return name.split("-", 1)[1] if name[:2].isdigit() and "-" in name else name
@@ -130,6 +145,9 @@ def validate(path, deleted_ids=()):
             W.append(("section.missing", s))
     if not items and typ not in ("CODE", "STD"):
         W.append(("item.none", ""))
+    # DOM 클래스 명세 — 「폴더 구조」 절의 층 표 (STD-001 2.6·4장, 카드 BM)
+    if typ == "DOM" and "클래스" in title and not has_layer_table(body):
+        W.append(("layer.table", ""))
     # INFRA 제약 — 줄 머리 「출처:」 (STD-001 2.5·4장, #120). body는 코드를 비운 것
     if typ == "INFRA" and item_re:
         cur, lvl, found = None, 0, False

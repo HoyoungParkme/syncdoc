@@ -237,9 +237,11 @@ class SpecService:
                 W.append(Warning("section.missing", s))
         if not items and doc_type not in ("CODE", "STD"):
             W.append(Warning("item.none", ""))
-        # 6. DOM 클래스 명세 — 2장·4장 엔티티 속성 대조
+        # 6. DOM 클래스 명세 — 2장·4장 엔티티 속성 대조 · 「폴더 구조」 절의 층 표(카드 BM)
         if doc_type == "DOM" and "클래스" in (fm.get("title") or ""):
             W.extend(_entity_mismatch(body))
+            if not _has_layer_table(lines):
+                W.append(Warning("layer.table", ""))
         # 7. INFRA 제약 — 줄 머리 「출처:」 (STD-001 2.5·4장, #120). 마스킹한 줄이라 코드블록 안은
         # 안 센다. 링크가 아니어도 통과하고, 문단 끝 「근거:」는 출처가 아니다
         if doc_type == "INFRA":
@@ -928,6 +930,22 @@ def _apply_validate(row: DocumentRow, vr: ValidateResult) -> None:
 
 
 _CLASS = re.compile(r"class (\w+) \{(.*?)\}", re.S)
+
+
+def _has_layer_table(lines: list[str]) -> bool:
+    """「폴더 구조」 절에 머리가 경로·층·명세인 표가 있나 (STD-001 2.6, 카드 BM).
+
+    lines는 코드를 비운 줄(masked_lines) — 코드블록 안 표는 표가 아니다. 찾는 규칙은
+    codegraph.layer_table 1~2와 같다(spec 묶음이 codegraph를 부르지 않게 따로 둔다).
+    """
+    in_sec = False
+    for line in lines:
+        if line.startswith("## "):
+            in_sec = re.sub(r"^[\d.]+\s*", "", line[3:].strip()).startswith("폴더 구조")
+        elif in_sec and line.lstrip().startswith("|"):
+            if [c.strip() for c in line.strip().strip("|").split("|")] == ["경로", "층", "명세"]:
+                return True
+    return False
 
 
 def _entity_mismatch(body: str) -> list[Warning]:

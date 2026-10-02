@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -1362,7 +1362,9 @@ sequenceDiagram
     end
     Q->>S: list_by_project(MINISPEC) · get_document · item_blocks — 「호출하는 것」 줄
     Q->>CG: spec_calls(items) → compare(graph, spec) — 함수 key → 항목·상태
-    Q-->>RC: CodeNodes {communities, functions(community·ms·status), calls}
+    Q->>S: list_by_project(DOM) · get_document — 클래스 명세 「폴더 구조」 절 (카드 BM)
+    Q->>CG: layer_table(body) → layers(graph, rows) — 항목 없는 함수 key → 층
+    Q-->>RC: CodeNodes {communities, functions(community·item·ms·status·layer), calls}
     RC-->>U: 응답 (수백 KB, 한 번)
     U->>U: 브라우저가 커뮤니티로 접어 d3-force로 배치하고 canvas에 그린다
     opt 함수를 고르면 — 패널 4.6 코드 (카드 BF)
@@ -1379,6 +1381,7 @@ sequenceDiagram
 
 **읽을 때 볼 것**
 - 대조 상태는 SEQ-27과 같은 `compare`다 — 코드 탭과 그림이 같은 판정을 보인다
+- **층은 볼 때 명세에서 읽는다**(카드 BM) — 「호출하는 것」처럼 클래스 명세의 층 표만 고쳐도 다음 요청부터 바뀐다. 그래프에 저장하지 않는다
 - 옛 그래프(커뮤니티 없음)는 `communities`가 비고 함수의 `community`가 null — 화면이 전부 펼쳐 보이고 다음 코드 push가 채운다(5a)
 - **코드는 고를 때 읽는다**(카드 BF) — 함수 하나를 고를 때마다 `code/source` 한 번. 코드 탭 8.21과 같은 `CodeGraphService.read`라 둘이 같은 본문을 보인다. 파일 트리(6)는 `code_nodes`의 `functions[].file`로 브라우저가 만든다 — 요청이 없다. 항목 없는 함수의 「가까운 항목」도 `calls`와 `functions[].ms`로 브라우저가 센다(카드 BG)
 

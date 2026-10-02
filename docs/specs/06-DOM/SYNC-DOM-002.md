@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -143,6 +143,27 @@ frontend/
 **기본형과 다른 점, 그리고 왜.** [[SYNC-STD-001]] 1.9의 프런트 기본형에 `view/`는 없다. 원본 탭 렌더링은 화면도 아니고 서버 호출도 아닌 **순수 변환**이라 `pages`·`components`·`api` 어디에도 맞지 않는다 — 백엔드의 `shared/`에 해당하는 자리다. `tools/view_build.py`를 TS로 옮긴 것이라 파이썬 쪽과 짝이 맞아야 해서 파일 이름까지 같이 간다. 나머지는 기본형 그대로다.
 
 **빌드 결과는 백엔드 이미지로 간다** — `frontend` 빌드 산출물이 `backend/app/web/static`에 들어가고 거기서 서빙된다(INFRA 8장). 그래서 컨테이너가 하나다.
+
+**층** — 함수 단위 명세(MINISPEC 카드·API 엔드포인트·UI 화면)가 없는 코드가 어느 층이고 그 층을 무슨 문서가 정하는지([[SYNC-STD-001]] 2.6, 카드 BM). 코드 그래프가 읽어 UI-17 4.7에 보인다. 위에서부터 첫 줄이 이긴다. 같은 파일에 항목 있는 함수가 있는 도우미(서비스·`pipeline`·`queries`·`graph.py`·라우터·`infra`의 비공개 함수)는 규칙으로 가르니 적지 않는다
+
+| 경로 | 층 | 명세 |
+|---|---|---|
+| `backend/alembic/**` | 마이그레이션 | [[SYNC-STD-004#DEV-7]] · [[SYNC-DOM-003]] |
+| `backend/app/main.py` · `backend/app/config.py` · `backend/app/db.py` | 앱 조립·설정 | [[SYNC-INFRA-001]] 2장·5.2 |
+| `backend/app/core/*/repository.py` | 리포지토리 | [[SYNC-DOM-002]] 4장 · [[SYNC-DOM-003]] |
+| `backend/app/core/types.py` | 열거형·DTO | [[SYNC-DOM-002]] 2.7·2.8 |
+| `backend/app/core/errors.py` | 에러 | [[SYNC-STD-004#DEV-5]] · [[SYNC-API-001]] 2장 |
+| `backend/app/core/clock.py` | 시각 | [[SYNC-STD-004#DEV-18]] |
+| `backend/app/core/markdown.py` | 명세 파싱 | [[SYNC-STD-001]] 1장·3장 |
+| `backend/app/web/auth.py` · `backend/app/mcp/auth.py` | 인증 | [[SYNC-INFRA-001]] 5장 |
+| `backend/app/web/schemas/*` | 웹 스키마 | [[SYNC-API-001]] 4장 |
+| `backend/app/web/sse.py` | 질문 스트림 | [[SYNC-API-001]] 3.4·3.6 |
+| `frontend/src/view/**` | 뷰 렌더러 | [[SYNC-STD-002]] |
+| `frontend/src/api/*` | API 클라이언트 | [[SYNC-API-001]] |
+| `frontend/src/main.tsx` · `frontend/src/App.tsx` · `frontend/src/components/*` · `frontend/src/pages/*` | 화면 공용 부품 | [[SYNC-UI-001]] · [[SYNC-UI-002]] |
+| `frontend/vite.config.ts` | 빌드 설정 | [[SYNC-INFRA-001]] 8장 |
+| `tools/view_build.py` · `tools/wf_build.py` · `tools/check_view_*.py` | 뷰 생성·검사 | [[SYNC-STD-002]] |
+| `tools/*.py` | 검사기·개발 도구 | [[SYNC-STD-004#DEV-14]] · [[SYNC-STD-001]] |
 
 ---
 
@@ -456,7 +477,9 @@ classDiagram
 | `CodeText` | `path` · `start` · `end` · `commit_hash` · `text` · `truncated: bool` | CodeGraphService.read → API `CodeText` · 질문 탭 `read_code`(카드 AZ) |
 | `CodeCallEdge` · `CodeCalls` | `from_: str` · `to: str` · `status: str` / `graph: CodeGraphInfo \| None` · `edges: list~CodeCallEdge~` | queries.code_calls → API `CodeCalls`(UI-8 코드 호출) |
 | `CodeCommunity` | `id: int` · `label: str` · `size: int` | 코드 그래프의 커뮤니티 하나(카드 BD). `size`는 든 함수 수 |
-| `CodeNode` | `key` · `name` · `qual` · `file` · `line` · `community: int \| None` · `item: str \| None` · `ms: str \| None` · `status: str \| None` | 코드 그래프 노드 하나. `item`은 속한 명세 항목(어느 문서든 — 카드 BJ), `ms`는 그중 MINISPEC 항목. `status`는 `ms`가 있을 때 `compare`로 — `code_only` > `spec_only` > `same` |
+| `CodeLayerSpec` | `ref: str \| None` · `note: str` | 층 표 명세 칸의 조각 하나 — `[[…]]` 안(없으면 None)과 뒤 글자(카드 BM) |
+| `CodeLayer` | `name: str` · `specs: list~CodeLayerSpec~` | 항목 없는 함수의 층. 도우미는 `name="도우미"`, `specs=[]` |
+| `CodeNode` | `key` · `name` · `qual` · `file` · `line` · `community: int \| None` · `item: str \| None` · `ms: str \| None` · `status: str \| None` · `layer: CodeLayer \| None` | 코드 그래프 노드 하나. `item`은 속한 명세 항목(어느 문서든 — 카드 BJ), `ms`는 그중 MINISPEC 항목. `status`는 `ms`가 있을 때 `compare`로 — `code_only` > `spec_only` > `same`. `layer`는 항목이 없을 때 클래스 명세 층 표로(카드 BM) |
 | `CodeNodes` | `graph: CodeGraphInfo \| None` · `communities: list~CodeCommunity~` · `functions: list~CodeNode~` · `calls: list~list~str~~` | queries.code_nodes → API `CodeNodes`(UI-17 코드 그래프) |
 | `ConversationView` | `ConversationBrief` + `turns: list~TurnView~` + `pending: list~AttachmentMeta~`(아직 안 보낸 첨부) | ConversationService.get → API `Conversation` |
 
@@ -1253,6 +1276,8 @@ classDiagram
         +compare(graph: dict, spec: dict) list~CallDiff~
         +item_function(graph: dict, item_id: str) dict?
         +item_neighbors(graph: dict, key: str) tuple
+        +layer_table(body: str) list
+        +layers(graph: dict, rows: list) tuple
     }
     class CodeGraph {
         +int project_id
@@ -1272,6 +1297,7 @@ classDiagram
 | `touches_code` · `load` · `reduce` · `enrich` | [[SYNC-MS-007#pipeline.build_code_graph]] · `process_commit` · `tools/check_calls.py` | UC-S8 |
 | `communities` | `pipeline.build_code_graph`(enrich 뒤) | UC-S8 3 · UI-17 · 사용자 결정 2026-10-01 — raw 그래프를 networkx Louvain(seed 42)으로 군집하고 graphify 허브 라벨을 붙여 함수마다 커뮤니티를 적는다(#253). 검사기는 안 부른다 |
 | `spec_calls` · `compare` | `tools/check_calls.py` · `queries`(카드 AY·AZ) | UC-H20 · DEV-14 |
+| `layer_table` · `layers` | `queries.code_nodes` · `queries.ask_code` · `tools/check_calls.py` | UC-H20 5 · STD-001 2.6 층 표 — 항목 없는 함수의 층, 층 없는 함수·안 맞는 줄 검사(카드 BM) |
 | `item_function` · `item_neighbors` | `queries.code_view` · `code_source` · `ask_tool`(`read_code`) | UC-H20 2 — API·UI 항목의 함수(카드 BK). 검사기는 안 부른다 |
 | `get` · `save` · `fail` | `pipeline.build_code_graph` · `process_commit`(그래프가 없나) | UC-S8 |
 | `delete_by_project` | [[SYNC-MS-001#ProjectService.delete_project]] | UC-H17 |

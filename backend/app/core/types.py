@@ -813,6 +813,22 @@ class CodeCommunity:
 
 
 @dataclass(frozen=True)
+class CodeLayerSpec:
+    """SYNC-DOM-002 2.8 — 층 표 명세 칸의 조각. ref는 `[[…]]` 안(없으면 None), note는 뒤 글자."""
+
+    ref: str | None
+    note: str
+
+
+@dataclass(frozen=True)
+class CodeLayer:
+    """SYNC-DOM-002 2.8 — 항목 없는 함수의 층(카드 BM). 도우미는 name="도우미", specs=[]."""
+
+    name: str
+    specs: list[CodeLayerSpec]
+
+
+@dataclass(frozen=True)
 class CodeNode:
     """SYNC-DOM-002 2.8 — 코드 그래프 노드 하나. status는 MINISPEC 항목(ms)이 있을 때 compare로.
 
@@ -828,6 +844,7 @@ class CodeNode:
     item: str | None
     ms: str | None
     status: str | None
+    layer: CodeLayer | None = None
 
 
 @dataclass(frozen=True)

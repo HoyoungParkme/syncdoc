@@ -10,7 +10,7 @@ from app.core.codegraph.service import CodeGraphService
 from app.core.errors import NotFound
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
-from app.core.types import DocType
+from app.core.types import CodeLayer, CodeLayerSpec, DocType
 from tests.core.account.test_service import make_user
 from tests.core.reference.test_service import PRD, RFQ
 from tests.core.spec.test_service import author, make_project, owner
@@ -41,8 +41,15 @@ upstream: [EXMP-PRD-001]
 
 def _fn(key: str, qual: str, ms: str | None, end: int | None = None) -> dict:
     file, line = key.split(":")
-    return {"key": key, "name": qual.split(".")[-1], "qual": qual, "file": file,
-            "line": int(line), "end": end, "ms": ms}  # fmt: skip  — 옛 그래프 꼴(item 없음)
+    return {
+        "key": key,
+        "name": qual.split(".")[-1],
+        "qual": qual,
+        "file": file,
+        "line": int(line),
+        "end": end,
+        "ms": ms,
+    }  # fmt: skip  — 옛 그래프 꼴(item 없음)
 
 
 GRAPH = {
@@ -120,6 +127,30 @@ def _seed(scoped: Session, graph: dict | None = GRAPH):
     return p
 
 
+CLS = """---
+doc_id: EXMP-DOM-002
+type: DOM
+title: 클래스 명세 — 예시
+status: draft
+upstream: [EXMP-PRD-001]
+---
+# 클래스 명세
+
+## 1. 폴더 구조
+
+**층**
+
+| 경로 | 층 | 명세 |
+|---|---|---|
+| `b.py` | 리포지토리 | [[EXMP-PRD-001]] 4장 |
+"""
+# 층(카드 BM) — 항목 있는 함수가 하나도 없는 파일의 함수 하나
+GRAPH_LAYERS = dict(
+    GRAPH_ITEMS,
+    functions=[*GRAPH_ITEMS["functions"], dict(_fn("b.py:1", "repo.get", None, 3), item=None)],
+)
+
+
 def _seed_items(scoped: Session, graph: dict | None = GRAPH_ITEMS):
     """_seed + API·UI 문서 — API·UI 항목의 함수(카드 BK)."""
     p = _seed(scoped, graph)
@@ -169,20 +200,34 @@ async def test_code_view_non_ms_item_lists_downstream_chain_functions(scoped: Se
     assert none.functions == []  # 항목을 안 골랐으면 화면이 「항목을 고르세요」
 
 
-async def test_code_view_api_and_ui_items_show_their_function_without_compare(scoped: Session) -> None:
+async def test_code_view_api_and_ui_items_show_their_function_without_compare(
+    scoped: Session,
+) -> None:
     """MS-008 code_view 3a — API·UI 항목도 그 항목의 함수, 이웃은 항목 있는 함수까지, status None (카드 BK)."""
     _seed_items(scoped)
     v = await queries.code_view("EXMP-API-001", "GET/api/code", owner(scoped))
     assert not v.is_ms and not v.missing
     f = v.function
-    assert (f.ms_id, f.qual, f.file, f.line, f.end) == ("EXMP-API-001#GET/api/code", "routers.get_code", "a.py", 17, 20)
-    assert [(c.ms_id, c.qual, c.status) for c in f.calls] == [("EXMP-MS-001#svc.save", "svc.save", None)]
+    assert (f.ms_id, f.qual, f.file, f.line, f.end) == (
+        "EXMP-API-001#GET/api/code",
+        "routers.get_code",
+        "a.py",
+        17,
+        20,
+    )
+    assert [(c.ms_id, c.qual, c.status) for c in f.calls] == [
+        ("EXMP-MS-001#svc.save", "svc.save", None)
+    ]
     assert [(c.ms_id, c.qual) for c in f.callers] == [("EXMP-UI-002#UI-1", "Page.helper")]
     assert v.functions == []  # 하위 체인은 그대로 — API 항목을 근거로 삼은 MINISPEC이 없다
     u = await queries.code_view("EXMP-UI-002", "UI-1", owner(scoped))
     assert u.function.qual == "Page.Page" and u.function.line == 10  # 파일 이름과 같은 컴포넌트
-    assert [c.ms_id for c in u.function.calls] == ["EXMP-API-001#GET/api/code"]  # 같은 항목의 helper를 건너
-    ms = await queries.code_view("EXMP-MS-001", "svc.save", owner(scoped))  # MINISPEC 회귀 — 대조 그대로
+    assert [c.ms_id for c in u.function.calls] == [
+        "EXMP-API-001#GET/api/code"
+    ]  # 같은 항목의 helper를 건너
+    ms = await queries.code_view(
+        "EXMP-MS-001", "svc.save", owner(scoped)
+    )  # MINISPEC 회귀 — 대조 그대로
     assert [c.status for c in ms.function.calls] == ["code_only", "spec_only", "same"]
     assert [c.ms_id for c in ms.function.callers] == ["EXMP-MS-001#svc.write"]
 
@@ -241,12 +286,31 @@ async def test_code_nodes_lists_everything_with_status_and_communities(scoped: S
     assert (by["svc.save"].ms, by["svc.save"].status) == ("EXMP-MS-001#svc.save", "code_only")
     assert by["svc.save"].item == "EXMP-MS-001#svc.save"
     assert (by["svc.write"].ms, by["svc.write"].status) == ("EXMP-MS-001#svc.write", "code_only")
-    assert by["svc.check"].status == "same" and by["svc._help"].ms is None and by["svc._help"].item is None
+    assert (
+        by["svc.check"].status == "same"
+        and by["svc._help"].ms is None
+        and by["svc._help"].item is None
+    )
     # API 항목 함수 — item만, 대조는 없다 (카드 BJ)
     r = by["routers.get_code"]
     assert (r.item, r.ms, r.status) == ("EXMP-API-001#GET/api/code", None, None)
     assert all(f.community == (0 if f.file == "a.py" else None) for f in nodes.functions)
     assert nodes.calls == [[a, b] for a, b, _ in GRAPH["calls"]]  # via는 싣지 않는다
+
+
+async def test_code_nodes_layers_from_class_spec_table(scoped: Session) -> None:
+    """MS-008 code_nodes 2a — 항목 없는 함수에 클래스 명세 층 표의 층, 같은 파일에 항목 있으면 도우미 (카드 BM)."""
+    p = _seed_items(scoped, GRAPH_LAYERS)
+    nodes = await queries.code_nodes("EXMP", owner(scoped))
+    by = {f.qual: f for f in nodes.functions}
+    assert by["svc._help"].layer == CodeLayer("도우미", [])  # 클래스 명세가 없어도 도우미는 규칙
+    assert by["repo.get"].layer is None  # 표가 없으면 층 없음
+    SpecService(scoped).create(p.id, "EXMP-DOM-002", DocType.DOM, CLS, "h5", author(scoped), "spec")
+    nodes = await queries.code_nodes("EXMP", owner(scoped))
+    by = {f.qual: f for f in nodes.functions}
+    assert by["repo.get"].layer == CodeLayer("리포지토리", [CodeLayerSpec("EXMP-PRD-001", "4장")])
+    assert by["svc.save"].layer is None and by["routers.get_code"].layer is None  # 항목이 먼저
+    assert by["svc._help"].layer == CodeLayer("도우미", [])
 
 
 async def test_code_nodes_old_graph_no_graph_and_not_owned(scoped: Session) -> None:
