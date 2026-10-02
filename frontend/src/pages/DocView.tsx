@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
-import { ago, api, ApiError, docPath, incompleteOf, warnText, type AskAnswer, type AskDelta, type AskNote, type AskRead, type AttachmentMeta, type CodeText, type CodeView, type Conversation, type ConversationBrief, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
+import { ago, api, ApiError, docPath, incompleteOf, warnText, type AskAnswer, type AskDelta, type AskNote, type AskRead, type AttachmentMeta, type CodeFunction, type CodeText, type CodeView, type Conversation, type ConversationBrief, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
 import { CodeLines } from './codeSrc'
 import { ItemPeek, type PeekTarget } from '../components/ItemPeek'
 import { extraCss, renderView } from '../view'
@@ -706,23 +706,24 @@ function CodePanel({
     </div>
   )
   const gerr = g.error ? <div className="gerr">마지막 만들기 실패 — {g.error}</div> : null
-  if (view.is_ms && itemId) {
-    const f = view.function
-    if (!f) {
-      return (
-        <div className="cg">
-          <div className="fhead" data-el="8.18">
-            {itemId}
-            {meta}
-          </div>
-          {gerr}
-          <div className="pempty">코드에 없음 — 이 항목의 함수를 코드에서 못 찾았습니다.</div>
-        </div>
-      )
-    }
-    const off = f.calls.filter((c) => c.status !== 'same')
+  if (view.is_ms && itemId && !view.function) {
     return (
       <div className="cg">
+        <div className="fhead" data-el="8.18">
+          {itemId}
+          {meta}
+        </div>
+        {gerr}
+        <div className="pempty">코드에 없음 — 이 항목의 함수를 코드에서 못 찾았습니다.</div>
+      </div>
+    )
+  }
+  // 함수 블록(8.18~8.21·8.23) — MINISPEC 항목은 대조, API·화면 항목은 그 항목의 함수를 대조 없이(status null, 카드 BK)
+  const fnBlock = (f: CodeFunction) => {
+    const off = f.calls.filter((c) => c.status && c.status !== 'same')
+    const matched = f.calls.some((c) => c.status)
+    return (
+      <>
         <div className="fhead" data-el="8.18">
           {f.qual}
           <div className="fmeta">
@@ -738,15 +739,16 @@ function CodePanel({
         <div className="k">
           부르는 것 {f.calls.length}
           {off.length > 0 && ` · 코드만 ${off.filter((c) => c.status === 'code_only').length} · 명세만 ${off.filter((c) => c.status === 'spec_only').length}`}
+          {!matched && f.calls.length > 0 && ' · 대조 없음'}
         </div>
         {f.calls.length === 0 && <div className="lbl">없음</div>}
         {f.calls.map((c, i) => {
-          const st = STATUS[c.status ?? 'same']
+          const st = c.status ? STATUS[c.status] : null
           return (
-            <div key={c.ms_id} className={`crow ${st.cls}`} data-el={i === 0 ? '8.19' : undefined} onClick={() => go(c.ms_id)} title={c.ms_id}>
-              <span className="st">{st.mark}</span>
+            <div key={c.ms_id} className={`crow ${st?.cls ?? ''}`} data-el={i === 0 ? '8.19' : undefined} onClick={() => go(c.ms_id)} title={c.ms_id}>
+              {st && <span className="st">{st.mark}</span>}
               <span className="nm">{c.qual ?? c.ms_id.split('#')[1]}</span>
-              {st.tag && <span className="tag">{st.tag}</span>}
+              {st?.tag && <span className="tag">{st.tag}</span>}
             </div>
           )
         })}
@@ -770,14 +772,18 @@ function CodePanel({
             <CodeLines src={src} />
           )}
         </details>
-      </div>
+      </>
     )
+  }
+  if (view.is_ms && itemId && view.function) {
+    return <div className="cg">{fnBlock(view.function)}</div>
   }
   if (!itemId && !view.is_ms) {
     return <div className="pempty">항목을 고르세요. 그 항목에서 이어지는 MINISPEC 함수의 대조를 모아 보입니다.</div>
   }
   return (
     <div className="cg">
+      {view.function && fnBlock(view.function)}
       <div className="cap">
         {itemId ? (
           <>
@@ -787,7 +793,7 @@ function CodePanel({
           <>이 문서의 함수 {view.functions.length}</>
         )}
       </div>
-      {gerr}
+      {!view.function && gerr}
       {view.functions.length === 0 && <div className="lbl">이어지는 MINISPEC 함수가 없습니다.</div>}
       {view.functions.map((b, i) => (
         <div key={b.ms_id} className="crow" data-el={i === 0 ? '8.22' : undefined} onClick={() => go(b.ms_id)} title={b.qual ?? b.ms_id}>
