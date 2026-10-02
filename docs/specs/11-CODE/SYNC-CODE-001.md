@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1341,6 +1341,18 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | `check_ui` UI-17 +2 · `tsc`·`oxlint`·`build` · 헤드리스: 1440에서 2.4 → 7 열림·코드 4.6 같이 보임·7.1 맥락·`?panel=ask`·손잡이 폭이 UI-5와 같음·새로고침 유지·닫힘, 1200에서 4.9 탭 · UI-5 질문 탭 회귀 |
 | 선행 | BM |
 | 완료 | 2026-10-02 · 브랜치 `card/BN-code-ask-column`(a62249b #280) · spec 7 + code 1 · 백엔드 변경 없음 · `tsc`·`oxlint`·`build` · `validate` 0/0 · `check_ui` 14/14(UI-17 요소 32) · `check_tokens` 0 · 헤드리스(가짜 키, 콘솔 0): 폭 1440 — 처음엔 닫힘 · 2.4 「질문 ▸」 → 오른쪽 끝 질문 열 420 · 옆 패널 코드 4.6 「코드 L129–L176」이 같이 보임 · 7.1 「pipeline.save_pipeline · 이 함수를 보며 묻습니다」 → 다른 함수를 고르면 따라감 · `?panel=ask` · 7.2로 520 → UI-5 질문 탭도 520 · 새로고침 뒤 열림 유지 · 다시 누르면 닫히고 `?panel` 빠짐 · 질문 입력 y≈747(화면 안 — 줄 높이를 그림 높이로 묶음). 폭 1200 — 4.9 탭, 2.4 없음, 「질문」이면 옆 패널 자리에 질문 · 운영: 공개 번들에 `syncdoc.ui17.ask`·`min-width: 1280px`·「질문 ◂」 · 화면은 사람이 직접(DEV-17) |
+
+---
+
+#### BO 코드 그래프를 UI-5 틀로 — 화면 전체, 사이드바 탭 코드·명세·질문
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UI-002#UI-17]] 1·2·4·4.9·4.10·5·6·6.4·7·규칙·S-7 1·S-8 1·S-9 · [[SYNC-UI-001]] 7장 15·11 다시 덧붙임 · 사용자 요청 2026-10-02 「코드 그래프 부분도 화면 넓이가 사진처럼 좌우를 다 쓰고 채팅도 저렇게 오른쪽 사이드바에 넣었으면」(UI-5 사진) · 사용자 결정 2026-10-02(사이드바 폭 = UI-5 질문·코드 탭과 같은 기억 · 트리는 UI-5 목차처럼 손잡이 · 범례는 그림 아래 · 시안 둘(클로드 디자인) 중 B 「코드 \| 명세 \| 질문」) |
+| 구현 | `CodeGraph.tsx` — 바깥 틀을 UI-5의 `docscreen`·`docbar`·3단 격자로(트리 폭 `useWidth` 새 기억 + 손잡이 6.4, 사이드바 `useWidth(ASK)` + 손잡이 4.10), 사이드바 탭 4.9(코드·명세·질문 — `?panel=spec\|ask` + 브라우저 기억), 툴바 2.4·오른쪽 끝 질문 열·폭 1280 판정 삭제 · `components/panes.tsx`(트리 폭) · `styles.css`(`.gcard`·`.cgbody`·`.cgask` 정리) |
+| 테스트 | `check_ui` UI-17 · `tsc`·`oxlint`·`build` · `check_tokens` · 운영 헤드 브라우저 1440·1200: S-9 1~4 · S-8 1(질문 탭·맥락 줄·`?panel=ask`) · S-7 1(명세 탭) · 트리 접기·다시 열기 · 범례 체크 · 질문 입력이 화면 안 |
+| 선행 | BN |
+| 완료 | — |
 
 ---
 
