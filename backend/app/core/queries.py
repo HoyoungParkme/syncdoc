@@ -622,11 +622,11 @@ _ASK_TOOLS: list[ToolSpec] = [
     # 여덟째 — 코드 본문. MCP에는 없다 — 에이전트는 저장소를 가지고 있다 (카드 AZ)
     _tool(
         "read_code",
-        "그래프를 만든 커밋의 코드를 읽는다. target은 항목 ID(문서ID#항목ID — MINISPEC·API·UI 어느 문서든) · 함수 이름(Class.fn) · 파일 경로(path 또는 path:시작-끝). 300줄까지, 줄마다 번호가 붙는다. 키·인증서 같은 비밀 파일은 읽을 수 없다.",
+        "그래프를 만든 커밋의 코드를 읽는다. target은 항목 ID(문서ID#항목ID — MINISPEC·API·UI 어느 문서든) · 함수 이름(Class.fn, 하나뿐이면 이름만도) · 파일 경로(path · path:줄 — 그 줄의 함수 · path:시작-끝). 300줄까지, 줄마다 번호가 붙는다. 키·인증서 같은 비밀 파일은 읽을 수 없다.",
         {
             "target": {
                 "type": "string",
-                "description": "문서ID#항목ID · Class.fn · 경로 · 경로:시작-끝",
+                "description": "문서ID#항목ID · Class.fn · 이름 · 경로 · 경로:줄 · 경로:시작-끝",
             }
         },
     ),
@@ -751,8 +751,10 @@ async def ask_tool(
             target = str(args.get("target", "")).strip()
             try:
                 t = await _read_code(code, target, user)
-            except NotFound:
-                return _err("없음", target=target, hint=_READ_CODE_HINT)
+            except NotFound as e:
+                # 이름이 여럿이면 후보를 싣는다 — 모델이 앞의 file:줄로 다시 부른다 (#286)
+                more = {"candidates": e.extra["candidates"]} if "candidates" in e.extra else {}
+                return _err("없음", target=target, hint=_READ_CODE_HINT, **more)
             if t is None:
                 return _err("코드 그래프 없음", hint="코드를 push하면 서버가 만든다")
             numbered = "\n".join(f"{t.start + i}: {ln}" for i, ln in enumerate(t.text.split("\n")))
@@ -1041,7 +1043,7 @@ def _code_context(s: Session, project, key: str | None, attachments: str) -> str
 
         calls = [b for a, b, *_ in g.get("calls", []) if a == key and b in by_key]
         callers = [a for a, b, *_ in g.get("calls", []) if b == key and a in by_key]
-        end = f"–{f['end']}" if f.get("end") else ""
+        end = f"-{f['end']}" if f.get("end") else ""  # read_code가 받는 꼴 그대로 (#286)
         lines = [f"[보는 함수] {f['qual']} · {f['file']}:{f['line']}{end} · {item_of(key)}"]
         for title, ks in (("부르는 것", calls), ("불리는 곳", callers)):
             lines.append(f"[{title} {len(ks)}]")
@@ -1334,6 +1336,19 @@ def _next_start(functions: list[dict], f: dict) -> int | None:
     return min(later) - 1 if later else None
 
 
+def _function_at(functions: list[dict], path: str, line: int) -> dict | None:
+    """`경로:줄`의 함수 — 그 줄에서 시작하는 함수, 아니면 그 줄을 품은 함수. 함수 밖이면 None (#286).
+
+    끝 줄을 모르면 다음 함수 앞 줄까지(_next_start), 그것도 없으면 파일 끝까지로 본다.
+    """
+    here = [g for g in functions if g["file"] == path and g["line"] <= line]
+    for g in sorted(here, key=lambda g: g["line"], reverse=True):
+        last = g.get("end") or _next_start(functions, g)
+        if last is None or line <= last:
+            return g
+    return None
+
+
 async def code_source(doc_id: str, item_id: str, user: User) -> CodeText:
     """SYNC-MS-008#queries.code_source
 
@@ -1380,7 +1395,12 @@ async def code_text(code: str, file: str, line: int, user: User) -> CodeText:
         return await svc.read(project.id, workdir, f["file"], f["line"], end)
 
 
-_READ_CODE_HINT = "code_graph로 함수 위치(파일:줄)를 먼저 보거나 경로를 확인하라. 키·인증서 같은 비밀 파일은 읽을 수 없다"
+_READ_CODE_HINT = (
+    "target은 항목 ID(문서ID#항목ID) · 함수 이름(Class.fn, 하나뿐이면 이름만) · 파일:줄 · "
+    "파일:시작-끝. 위치를 모르면 code_graph로 함수 위치(파일:줄)를 먼저 보라. "
+    "키·인증서 같은 비밀 파일은 읽을 수 없다"
+)
+_READ_CANDIDATES = 10  # 이름이 여럿일 때 「없음」에 싣는 후보 상한 (#286)
 
 
 def _code_view_json(v: CodeView) -> dict[str, Any]:
@@ -1427,8 +1447,10 @@ def _code_view_json(v: CodeView) -> dict[str, Any]:
 async def _read_code(code: str, target: str, user: User) -> CodeText | None:
     """read_code의 target → 파일·줄 범위 → CodeGraphService.read. 그래프가 없으면 None.
 
-    항목 ID(`문서#항목`)는 대조와 같은 규칙으로 함수를 찾고, 함수 이름은 그래프의 qual로, 나머지는
-    경로(`경로` 또는 `경로:시작-끝`). 못 찾으면 NotFound — 부르는 쪽이 「없음」으로 접는다.
+    항목 ID(`문서#항목`)는 대조와 같은 규칙으로 함수를 찾고, 함수 이름은 그래프의 qual로 — 안 맞으면
+    하나뿐인 맨 이름(`name`)으로, 나머지는 경로(`경로` · `경로:줄` — 그 줄의 함수 · `경로:시작-끝`,
+    `–`도). 시작 맥락·code_graph가 보인 꼴을 그대로 받는다(#286). 못 찾으면 NotFound — 부르는 쪽이
+    「없음」으로 접는다. 이름이 여럿이면 NotFound에 candidates(`file:줄 qual`)를 싣는다.
     """
     with db.session_scope() as s:
         project = ProjectService(s).get_owned(code, user)
@@ -1448,10 +1470,18 @@ async def _read_code(code: str, target: str, user: User) -> CodeText | None:
                 raise NotFound("function", target)
         else:
             same = [x for x in fns if x["qual"] == target]
-            if len(same) == 1:
+            if not same and not re.search(r"[/:]", target):  # 맨 이름 — qual이 안 맞을 때만
+                same = [x for x in fns if x["name"] == target]
+            if len(same) > 1:
+                cands = [f"{x['file']}:{x['line']} {x['qual']}" for x in same[:_READ_CANDIDATES]]
+                raise NotFound("function", target, candidates=cands)
+            if same:
                 f = same[0]
-            elif m := re.fullmatch(r"(.+?):(\d+)-(\d+)", target):
+            elif m := re.fullmatch(r"(.+?):(\d+)[-–](\d+)", target):
                 path, start, end = m.group(1), int(m.group(2)), int(m.group(3))
+            elif m := re.fullmatch(r"(.+?):(\d+)", target):
+                path, start = m.group(1), int(m.group(2))
+                f = _function_at(fns, path, start)  # 함수 밖 줄이면 None — 그 줄부터 읽는다
         if f is not None:
             path, start = f["file"], f["line"]
             end = f.get("end") or _next_start(fns, f) or start + 59
