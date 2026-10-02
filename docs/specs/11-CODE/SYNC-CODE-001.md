@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1317,6 +1317,18 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | MS-011 enrich 테스트 관점(TS/JS) · 「다른 언어는 손대지 않는다」 테스트를 TS 동작에 맞게 · `check_calls` 0/0 그대로 · 헤드리스: UI-17 `CodeGraph` 코드가 끝까지(300줄 잘림) · UI-5 `UI-002#UI-17` 코드 보기 · 운영: 재구축 뒤 TS 끝 줄 null 0 |
 | 선행 | BK |
 | 완료 | 2026-10-02 · 브랜치 `card/BL-ts-enrich`(7b57705 #276) · spec 6 + code 2 · 테스트 397 · `ruff` · `validate` 0/0 · `open_items` 최신(열린 미결 0) · `check_code` 159/159 · `check_calls` 0/0(함수 986 → 1002) · `check_ui` 14/14 · 작업 트리 실측: TS 함수 201 → 206(`api.get`·`api.post`·`api.del`·`uc.ucParts`·`uc.ucNode`), TS 끝 줄 null 201 → 0, `CodeGraph` L58–915, TS에서 나가는 enrich 선 39 · 헤드리스(dev_preview 재구축, 콘솔 0): UI-17 `CodeGraph` 코드 「L58–L357」(300줄 상한까지) · 트리에 `api.get/post/del` · UI-5 `UI-002#UI-17` 코드 보기 「L58–L915」 · 운영: 머지 커밋 그래프가 옛 컨테이너로 먼저 만들어져 TS 끝 줄 null 201 → 배포 뒤 컨테이너 안 `build_code_graph("SYNC", 7b57705)` → 함수 1002, TS 206, 끝 줄 null 0, enrich 선 39, 커뮤니티 19 · `code_source(UI-002#UI-17)` L58–357 잘림 · `read_code("api.get")` client.ts:120 · 화면은 사람이 직접(DEV-17) |
+
+---
+
+#### BM 층 표 — 항목 없는 함수도 그 층의 명세로
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R13]] · [[SYNC-UC-001#UC-H20]] 기본 흐름 5 · [[SYNC-STD-001]] 1.9·2.6·4장 `layer.table` · [[SYNC-DOM-002]] 1장 층 표 · [[SYNC-MS-011#codegraph.layer_table]] · [[SYNC-MS-011#codegraph.layers]] · [[SYNC-MS-011#codegraph.enrich]] 4·5(`self.x` 속성) · [[SYNC-MS-002#SpecService.validate]] 6 · [[SYNC-MS-008#queries.code_nodes]] 2a·3 · [[SYNC-MS-008#queries.ask_code]] 3 · [[SYNC-API-001#GET/api/projects/{code}/code-graph]] `layer` · [[SYNC-SEQ-001#SEQ-31]] · [[SYNC-UI-002#UI-17]] 4.7·S-7 7~8 · [[SYNC-UI-001]] 7장 14 · [[SYNC-STD-004#DEV-14]] · 사용자 질문 2026-10-02 「713개를 층을 명세서에 기입하는건 안되나?」 · 사용자 결정 2026-10-02(클래스 명세 「폴더 구조」 절·필수 · 도우미는 규칙 · check_calls 층 없음 0·안 맞는 줄 0 · 4.7 + 질문 맥락 · 층 + 명세 뱃지 + 가까운 항목 · 위에서부터 첫 줄 · 링크 · `self.repo` 선도 이 카드에) |
+| 구현 | `graph.py` `layer_table`·`layers`·`_Ctx`/`_resolve`의 `self.x` 속성 타입 · `spec/service.py`·`tools/validate.py` `layer.table` · `types.py`·`schemas/code.py`·`client.ts` `CodeLayer` · `queries` `_layer_rows`·`code_nodes`·`_code_context` · `check_calls` 층 검사 · `check_templates` 층 표 · `CodeGraph.tsx` 4.7 층 줄 · DOM-002 1장 층 표 · 템플릿 |
+| 테스트 | MS-011 테스트 관점(layer_table·layers·enrich `self.repo`) · MS-002(layer.table) · MS-008(code_nodes layer·도우미, ask_code 맥락 층) · `compare`·`check_calls` 회귀 + 층 없음 0·안 맞는 줄 0 · 헤드리스: UI-17 리포지토리 함수 → 층·뱃지·가까운 항목, 도우미, 뱃지 → UI-18 · 운영: 재구축 뒤 층 없는 함수 0, 질문 맥락, 실제 모델 ask_code |
+| 선행 | BL |
+| 완료 | — |
 
 ---
 
