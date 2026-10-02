@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1329,6 +1329,18 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | MS-011 테스트 관점(layer_table·layers·enrich `self.repo`) · MS-002(layer.table) · MS-008(code_nodes layer·도우미, ask_code 맥락 층) · `compare`·`check_calls` 회귀 + 층 없음 0·안 맞는 줄 0 · 헤드리스: UI-17 리포지토리 함수 → 층·뱃지·가까운 항목, 도우미, 뱃지 → UI-18 · 운영: 재구축 뒤 층 없는 함수 0, 질문 맥락, 실제 모델 ask_code |
 | 선행 | BL |
 | 완료 | 2026-10-02 · 브랜치 `card/BM-layers`(6fa3605 #278) · spec 14 + code 5 · 테스트 403 · `ruff`·`tsc`·`oxlint` · `validate` 0/0 · `check_templates` 모자람 0 · `check_code` 일치 · `check_calls` 코드만 0·명세만 0·**층 없음 0·안 맞는 줄 0**(함수 1011, 호출 선 1546 → 1691 — `self.repo` 선) · `check_ui` 14/14 · 헤드리스(dev_preview 재구축, 콘솔 0): 항목도 층도 없는 함수 0 · `AccountRepository.user_by_id` → 「층 리포지토리 · DOM-002 4장 · DOM-003」·가까운 항목 `MS-006#AccountService.authenticate_token` · 뱃지 → DOM-002 문서 머리(UI-18) · `pipeline._advance_processed` → 도우미 · `tools/check_ui.py` → 검사기·개발 도구 · MS 회귀 · DOM-002 미완성 없음 · 운영(배포 뒤 컨테이너 안 `build_code_graph("SYNC", 6fa3605)`): 함수 1011 중 항목 291·층 720·둘 다 없음 0, 도우미 150 · `_code_context` 「층 리포지토리 · SYNC-DOM-002 4장 · SYNC-DOM-003」 · 실제 모델 `ask_code`(새 대화 36, 2.3초, 도구 없이): 「리포지토리 층, 명세는 DOM-002 4장과 DOM-003, AccountService.authenticate_token이 쓴다」 · 화면은 사람이 직접(DEV-17) |
+
+---
+
+#### BN 코드 그래프의 질문을 오른쪽 끝 열로 — 코드와 질문을 같이 본다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R11]] · [[SYNC-UC-001#UC-H19]] 기본 흐름 1 · [[SYNC-SEQ-001#SEQ-32]] · [[SYNC-UI-002#UI-17]] 2.4·4.9·7·7.2·규칙·S-8 · [[SYNC-UI-001]] 7장 11 덧붙임 · 사용자 요청 2026-10-02 「코드창에서 쓰는 챗봇도 아직 추가가 안되었어」 · 사용자 결정 2026-10-02(코드 그래프의 코드 옆 · 다른 곳처럼 오른쪽 끝 열 · 버튼으로 연다 · 1280 미만은 탭) |
+| 구현 | `CodeGraph.tsx` — 폭 판정(1280) · 툴바 「질문」 2.4 · 오른쪽 끝 질문 열 7(`AskPanel` 그대로, 손잡이 7.2) · 좁으면 4.9 탭 그대로 · 열림은 브라우저 기억 + `?panel=ask` · 폭은 UI-5 질문 탭과 같은 기억(`panes.ASK`) · `styles.css` |
+| 테스트 | `check_ui` UI-17 +2 · `tsc`·`oxlint`·`build` · 헤드리스: 1440에서 2.4 → 7 열림·코드 4.6 같이 보임·7.1 맥락·`?panel=ask`·손잡이 폭이 UI-5와 같음·새로고침 유지·닫힘, 1200에서 4.9 탭 · UI-5 질문 탭 회귀 |
+| 선행 | BM |
+| 완료 | — |
 
 ---
 

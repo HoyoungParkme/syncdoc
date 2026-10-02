@@ -6,6 +6,8 @@
  *  6 파일 트리(6.1 폴더·파일 행, 6.2 함수 행, 6.3 접기) — 카드 BF. 그래프 옆에 코드: 함수를 고르면 4.6에 본문이 바로,
  *    커뮤니티면 허브 함수의 본문. 트리는 functions[].file로 브라우저가 만든다 — 요청이 없다
  *  카드 BI — 패널 탭 4.9(함수 | 질문, ?panel=ask) · 7 질문 탭(UI-5 질문 탭과 같은 AskPanel, 맥락은 고른 함수) · 7.1 맥락 줄
+ *  카드 BN — 폭 1280 이상이면 질문은 오른쪽 끝 열(7): 툴바 2.4 「질문」으로 열고 닫고, 7.2 손잡이로 폭(UI-5 질문 탭과 같은 기억).
+ *    옆 패널(코드·명세)은 그대로 — 코드를 보면서 묻는다. 1280 미만은 4.9 탭 그대로
  *  카드 BG — 트리는 폴더 한 단씩, 폴더·파일을 고르면 그 아래 함수 노드를 펼쳐 보인다(트리 포커스). 4.7 명세 —
  *    항목·근거(상위 참조)·하위 참조(…/references, 참조 탭과 같은 자료), 항목 없으면 가까운 항목
  *
@@ -17,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { ago, api, ApiError, type CodeNode, type CodeNodes, type CodeText, type ItemRef, type ItemReferences, type Me, type ProjectSummary } from '../api/client'
 import { AskPanel } from './DocView'
+import { ASK, Handle, readStore, useWidth, writeStore } from '../components/panes'
 import type { AskChat } from '../components/Shell'
 import { CodeLines } from './codeSrc'
 import { ItemPeek, type PeekTarget } from '../components/ItemPeek'
@@ -50,6 +53,10 @@ interface TDir {
   files: { file: string; fns: CodeNode[] }[]
 }
 /** 항목 ID `SYNC-MS-007#pipeline.save_pipeline` → 문서·항목·화면 링크 */
+// 폭 1280 이상이면 질문은 오른쪽 끝 열 — 질문 열을 열어 두었는지는 넓은 화면에서만 기억한다 (카드 BN)
+const WIDE = '(min-width: 1280px)'
+const ASK_OPEN = 'syncdoc.ui17.ask'
+
 const msParts = (ms: string) => {
   const [doc, item] = ms.split('#')
   return { doc, item, short: ms.split('-').slice(1).join('-'), to: `/p/${doc.split('-')[0]}/d/${doc}#item-${item}` }
@@ -59,10 +66,21 @@ export function CodeGraph() {
   const { code = '' } = useParams()
   const { user, projects, ask } = useOutletContext<{ user: Me; projects: ProjectSummary[]; ask: AskChat }>()
   const [sp, setSp] = useSearchParams()
-  // 4.9 패널 탭 — 질문 탭은 ?panel=ask (UI-5 8.4와 같은 키). 모델 키가 없으면 탭 줄이 없다 (카드 BI)
+  // 질문 — ?panel=ask (UI-5 8.4와 같은 키). 모델 키가 없으면 질문 자체가 없다 (카드 BI)
   const askTab = !!user?.llm_enabled
   const panelTab: 'fn' | 'ask' = askTab && sp.get('panel') === 'ask' ? 'ask' : 'fn'
-  const setPanelTab = (tab: 'fn' | 'ask') =>
+  // 폭 1280 이상이면 질문은 오른쪽 끝 열(7) — 툴바 2.4로 연다. 좁으면 옆 패널의 4.9 탭 (카드 BN)
+  const [wide, setWide] = useState(() => typeof window === 'undefined' || window.matchMedia(WIDE).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(WIDE)
+    const on = () => setWide(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  const [askW, addAskW] = useWidth(ASK) // 7.2 — UI-5 질문 탭(8.3)과 같은 폭 기억
+  const askColumn = wide && panelTab === 'ask'
+  const setPanelTab = (tab: 'fn' | 'ask') => {
+    if (wide) writeStore(ASK_OPEN, tab === 'ask' ? '1' : '0') // 열림은 넓은 화면에서만 기억한다
     setSp(
       (prev) => {
         const next = new URLSearchParams(prev)
@@ -72,6 +90,15 @@ export function CodeGraph() {
       },
       { replace: true },
     )
+  }
+  // 처음 열 때 — 넓은 화면에서 질문 열을 열어 두었으면 다시 연다(딥 링크 ?panel=ask가 없을 때)
+  const restored = useRef(false)
+  useEffect(() => {
+    if (restored.current || !askTab) return
+    restored.current = true
+    if (wide && sp.get('panel') !== 'ask' && readStore(ASK_OPEN) === '1') setPanelTab('ask')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askTab])
   const [data, setData] = useState<CodeNodes | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set())
@@ -807,8 +834,13 @@ export function CodeGraph() {
             {status}
           </span>
           <span className="grow" />
+          {askTab && wide && (
+            <span className={`btn sm${askColumn ? ' on' : ''}`} data-el="2.4" onClick={() => setPanelTab(askColumn ? 'fn' : 'ask')} title="코드를 보면서 묻는다 — 오른쪽 끝 질문 열 (카드 BN)">
+              {askColumn ? '질문 ◂' : '질문 ▸'}
+            </span>
+          )}
         </div>
-        <div className={`cgbody${treeOpen ? '' : ' notree'}`}>
+        <div className={`cgbody${treeOpen ? '' : ' notree'}${askColumn ? ' ask' : ''}`} style={{ '--ask-w': `${askW}px` } as React.CSSProperties}>
           {treeOpen && (
             <aside className="cgtree" data-el="6">
               <div className="th">
@@ -854,8 +886,8 @@ export function CodeGraph() {
               </>
             )}
           </div>
-          <aside className={`cgside${panelTab === 'ask' ? ' ask' : ''}`} data-el="4">
-            {askTab && (
+          <aside className={`cgside${panelTab === 'ask' && !wide ? ' ask' : ''}`} data-el="4">
+            {askTab && !wide && (
               <div className="ptabs" data-el="4.9">
                 <span className={panelTab === 'fn' ? 'on' : ''} onClick={() => setPanelTab('fn')}>
                   함수
@@ -865,8 +897,8 @@ export function CodeGraph() {
                 </span>
               </div>
             )}
-            {panelTab === 'ask' ? (
-              // 7 질문 탭 — UI-5 질문 탭과 같은 패널. 맥락(7.1)은 고른 함수(커뮤니티면 허브 함수), 없으면 그래프 전체
+            {panelTab === 'ask' && !wide ? (
+              // 7 질문 탭(좁은 화면) — UI-5 질문 탭과 같은 패널. 맥락(7.1)은 고른 함수(커뮤니티면 허브 함수), 없으면 그래프 전체
               <div className="pbody ask" data-el="7">
                 <AskPanel ask={ask} elContext="7.1" context={{ kind: 'code', key: codeTarget?.key ?? null, label: codeTarget?.qual ?? '' }} />
               </div>
@@ -917,6 +949,18 @@ export function CodeGraph() {
               <div className="empty">노드를 고르면 여기에 보입니다 — 함수는 코드와 부르는 것·불리는 곳, 커뮤니티는 허브 함수의 코드와 든 함수.</div>
             )}
           </aside>
+          {askColumn && (
+            <>
+              {/* 7.2 — 질문 열 왼쪽 손잡이. 끄는 쪽이 왼쪽이면 넓어진다 (UI-5 8.3과 같다) */}
+              <Handle el="7.2" onDrag={(dx) => addAskW(-dx)} />
+              {/* 7 질문 열(넓은 화면) — 옆 패널(코드·명세)을 그대로 둔 채 묻는다 (카드 BN) */}
+              <aside className="cgask" data-el="7">
+                <div className="pbody ask">
+                  <AskPanel ask={ask} elContext="7.1" context={{ kind: 'code', key: codeTarget?.key ?? null, label: codeTarget?.qual ?? '' }} />
+                </div>
+              </aside>
+            </>
+          )}
         </div>
         <div className="cglegend" data-el="5">
           {(data?.communities ?? []).map((c, i) => (
