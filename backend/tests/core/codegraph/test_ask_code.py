@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core import queries
 from app.core.codegraph import service as cg_service
 from app.infra.git import GitError
-from tests.core.codegraph.test_queries import _seed, _seed_items
+from tests.core.codegraph.test_queries import GRAPH, _fn, _seed, _seed_items
 from tests.core.spec.test_service import owner
 
 FILE = "\n".join(f"line {i}" for i in range(1, 21))
@@ -78,18 +78,60 @@ async def test_read_code_three_forms_numbered_and_denied(scoped: Session, monkey
         assert tb is None and db["error"] == "없음" and "code_graph" in db["hint"], bad
 
 
+async def test_read_code_takes_what_the_context_shows(scoped: Session, monkeypatch) -> None:
+    """#286 — 맥락·code_graph가 보인 꼴(file:줄·en dash 범위·맨 이름)도 같은 줄을 읽는다."""
+    _seed(scoped)
+    _fake_git(monkeypatch)
+    u = owner(scoped)
+
+    async def read(target: str) -> tuple[str | None, dict]:
+        r = await queries.ask_tool("read_code", {"target": target, "reason": "본문"}, "EXMP", u, 0)
+        return r.target, json.loads(r.text)
+
+    want = await read("EXMP-MS-001#svc.check")  # a.py 5–8
+    for same in ("a.py:5", "a.py:6", "check", "a.py:5–8"):  # 시작 줄·안쪽 줄·맨 이름·en dash
+        assert await read(same) == want, same
+    t, d = await read("a.py:17")  # 함수 밖 줄 — 그 줄부터 파일 끝까지
+    assert t == "코드:a.py:17-20" and d["text"].split("\n")[0] == "17: line 17"
+
+
+async def test_read_code_ambiguous_name_gives_candidates(scoped: Session, monkeypatch) -> None:
+    """#286 — 이름이 여럿이면 「없음」에 후보(`file:줄 qual`)를 싣는다."""
+    _seed(
+        scoped,
+        graph=dict(GRAPH, functions=[*GRAPH["functions"], _fn("b.py:1", "other.check", None, 3)]),
+    )
+    _fake_git(monkeypatch)
+    r = await queries.ask_tool(
+        "read_code", {"target": "check", "reason": "본문"}, "EXMP", owner(scoped), 0
+    )
+    d = json.loads(r.text)
+    assert r.target is None and d["error"] == "없음" and "code_graph" in d["hint"]
+    assert d["candidates"] == ["a.py:5 svc.check", "b.py:1 other.check"]
+
+
 async def test_code_graph_and_read_code_take_api_item(scoped: Session, monkeypatch) -> None:
     """카드 BK — API 항목의 함수를 code_graph가 대조 없이 보이고, read_code가 항목 ID로 읽는다."""
     _seed_items(scoped)
     seen = _fake_git(monkeypatch)
     u = owner(scoped)
     r = await queries.ask_tool(
-        "code_graph", {"doc_id": "EXMP-API-001", "item_id": "GET/api/code", "reason": "라우터"}, "EXMP", u, 0
+        "code_graph",
+        {"doc_id": "EXMP-API-001", "item_id": "GET/api/code", "reason": "라우터"},
+        "EXMP",
+        u,
+        0,
     )
     data = json.loads(r.text)
     assert data["is_ms"] is False and data["function"]["qual"] == "routers.get_code"
     assert data["function"]["calls"] == [
-        {"id": "EXMP-MS-001#svc.save", "status": None, "qual": "svc.save", "file": "a.py", "line": 1}
+        {
+            "id": "EXMP-MS-001#svc.save",
+            "status": None,
+            "qual": "svc.save",
+            "file": "a.py",
+            "line": 1,
+        }
     ]
     r2 = await queries.ask_tool(
         "read_code", {"target": "EXMP-API-001#GET/api/code", "reason": "본문"}, "EXMP", u, 0

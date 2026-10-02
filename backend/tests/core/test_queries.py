@@ -841,7 +841,7 @@ async def test_ask_code_start_context_has_docs_graph_and_function_block(
     assert "당신은 코드 그래프를 보는 사람 옆에서" in system and "read_code로 본문을 읽고" in system
     assert "[코드 그래프] 커밋 ccccccc · 함수 4 · 호출 4" in system
     assert "[문서 목록]\n" in system and "EXMP-MS-001 예시 MINISPEC · draft" in system
-    assert "[보는 함수] svc.save · a.py:1–4 · 항목 EXMP-MS-001#svc.save (code_only)" in system
+    assert "[보는 함수] svc.save · a.py:1-4 · 항목 EXMP-MS-001#svc.save (code_only)" in system
     assert "[부르는 것 2]" in system and "svc._help · a.py:13 · 층 도우미" in system  # 카드 BM
     assert "[불리는 곳 1]" in system and "svc.write · a.py:9 · 항목 EXMP-MS-001#svc.write" in system
     assert "def " not in system  # 본문은 안 싣는다 — 모델이 read_code로 읽는다
@@ -857,7 +857,7 @@ async def test_ask_code_context_shows_api_item_without_status(scoped: Session, s
     seen = script([_step("답")])
     await _collect(queries.ask_code("EXMP", "a.py:17", _conv(scoped), "뭐야?", [], owner(scoped)))
     system = seen[0][0]
-    assert "[보는 함수] routers.get_code · a.py:17–20 · 항목 EXMP-API-001#GET/api/code" in system
+    assert "[보는 함수] routers.get_code · a.py:17-20 · 항목 EXMP-API-001#GET/api/code" in system
     assert (
         "svc.save · a.py:1 · 항목 EXMP-MS-001#svc.save (code_only)" in system
     )  # 대조 있는 이웃은 상태
@@ -875,7 +875,7 @@ async def test_ask_code_context_shows_layer_for_function_without_item(
     SpecService(scoped).create(p.id, "EXMP-DOM-002", DocType.DOM, CLS, "h5", author(scoped), "spec")
     seen = script([_step("답"), _step("답")])
     await _collect(queries.ask_code("EXMP", "b.py:1", _conv(scoped), "뭐야?", [], owner(scoped)))
-    assert "[보는 함수] repo.get · b.py:1–3 · 층 리포지토리 · EXMP-PRD-001 4장" in seen[0][0]
+    assert "[보는 함수] repo.get · b.py:1-3 · 층 리포지토리 · EXMP-PRD-001 4장" in seen[0][0]
     await _collect(queries.ask_code("EXMP", "a.py:1", _conv(scoped), "뭐야?", [], owner(scoped)))
     assert "svc._help · a.py:13 · 층 도우미" in seen[1][0]
 
