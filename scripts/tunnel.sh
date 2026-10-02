@@ -2,8 +2,10 @@
 # 켤 때마다 하는 일 — SYNC-INFRA-001 5장 공개 경로.
 #
 #   1) docker compose up -d --build   앱·DB 기동 (마이그레이션은 컨테이너가 돌린다)
-#   2) 터널 — .env 의 TUNNEL_TOKEN 이 있으면 Named Tunnel (고정 주소 PUBLIC_BASE_URL),
-#              없으면 Quick Tunnel (cloudflared tunnel --url … → https://xxx.trycloudflare.com)
+#   2) 터널 — .env 의 TUNNEL_TOKEN 이 있으면 Named Tunnel (고정 주소 PUBLIC_BASE_URL).
+#              터널은 compose 서비스 — docker-compose.override.yml(git에 안 올림)을 만들어 두면
+#              그 뒤로는 Docker가 뜰 때 app·db와 같이 뜬다. 재부팅해도 할 일이 없다 (#284)
+#              없으면 Quick Tunnel (호스트 cloudflared tunnel --url … → https://xxx.trycloudflare.com)
 #   3) Quick 이면 새 주소를 .env 의 PUBLIC_BASE_URL 에 넣고 app 재시작. Named 는 안 건드린다
 #   4) Quick 이면 OAuth 앱 callback URL 을 사람이 브라우저에서 고친다 (아래 순서를 출력한다)
 #
@@ -15,20 +17,54 @@ cd "$(dirname "$0")/.."
 LOG=/tmp/syncdoc-cloudflared.log
 PIDF=/tmp/syncdoc-cloudflared.pid
 
+OVR=docker-compose.override.yml
+
 stop() {
-  [ -f "$PIDF" ] && kill "$(cat "$PIDF")" 2>/dev/null && echo "터널 종료" || echo "돌고 있는 터널 없음"
+  # 예전(호스트 nohup) 터널과 compose 터널 서비스 둘 다
+  [ -f "$PIDF" ] && kill "$(cat "$PIDF")" 2>/dev/null && echo "호스트 터널 종료" || echo "돌고 있는 호스트 터널 없음"
   rm -f "$PIDF"
+  [ -f "$OVR" ] && docker compose stop tunnel >/dev/null 2>&1 && echo "터널 컨테이너 멈춤" || true
 }
 [ "${1:-}" = "--stop" ] && { stop; exit 0; }
 
-export PATH="$HOME/.local/bin:$PATH"   # sudo 없이 넣은 cloudflared
-command -v cloudflared >/dev/null || {
-  echo "cloudflared 가 없습니다. 설치(권한 불필요):" >&2
-  echo "  mkdir -p ~/.local/bin" >&2
-  echo "  curl -sL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o ~/.local/bin/cloudflared" >&2
-  echo "  chmod 755 ~/.local/bin/cloudflared" >&2
-  exit 1
-}
+# .env 에서 두 값만 읽는다 — source 하면 다른 값이 셸에 퍼진다
+TUNNEL_TOKEN=$(sed -n 's/^TUNNEL_TOKEN=//p' .env | tail -1)
+PUBLIC_BASE_URL=$(sed -n 's/^PUBLIC_BASE_URL=//p' .env | tail -1)
+
+# 호스트 cloudflared는 Quick Tunnel만 쓴다 — Named는 컨테이너 이미지가 있다
+if [ -z "$TUNNEL_TOKEN" ]; then
+  export PATH="$HOME/.local/bin:$PATH"   # sudo 없이 넣은 cloudflared
+  command -v cloudflared >/dev/null || {
+    echo "cloudflared 가 없습니다. 설치(권한 불필요):" >&2
+    echo "  mkdir -p ~/.local/bin" >&2
+    echo "  curl -sL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o ~/.local/bin/cloudflared" >&2
+    echo "  chmod 755 ~/.local/bin/cloudflared" >&2
+    exit 1
+  }
+fi
+
+# 예전 호스트 터널은 끈다 — 터널은 이제 compose 서비스다 (#284)
+[ -f "$PIDF" ] && kill "$(cat "$PIDF")" 2>/dev/null || true
+rm -f "$PIDF"
+if [ -n "$TUNNEL_TOKEN" ]; then
+  [ -n "$PUBLIC_BASE_URL" ] || { echo "TUNNEL_TOKEN 이 있으면 PUBLIC_BASE_URL(고정 호스트)도 .env 에 있어야 합니다" >&2; exit 1; }
+  # 토큰은 파일에 안 적는다 — compose가 .env 에서 ${TUNNEL_TOKEN} 을 채운다.
+  # app과 네트워크를 같이 쓴다 — 대시보드의 대상 http://localhost:8000 이 곧 app 이다
+  cat > "$OVR" <<'YML'
+# scripts/tunnel.sh가 만든다 — .env 에 TUNNEL_TOKEN 이 있을 때만 (INFRA-001 5장, #284). git에 안 올린다
+services:
+  tunnel:
+    image: cloudflare/cloudflared:2026.8.3
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    network_mode: "service:app"
+    depends_on: [app]
+    restart: unless-stopped
+YML
+else
+  rm -f "$OVR"   # 토큰이 없으면 터널 서비스도 없다 — Quick Tunnel은 아래에서 호스트로
+fi
 
 echo "[1/4] docker compose up"  # 빌드 컨텍스트는 저장소 루트 (backend·frontend·docs)
 docker compose up -d --build
@@ -38,25 +74,18 @@ for _ in $(seq 1 60); do
 done
 curl -sf http://localhost:8000/health >/dev/null || { echo "앱이 뜨지 않았습니다: docker compose logs app" >&2; exit 1; }
 
-# .env 에서 두 값만 읽는다 — source 하면 다른 값이 셸에 퍼진다
-TUNNEL_TOKEN=$(sed -n 's/^TUNNEL_TOKEN=//p' .env | tail -1)
-PUBLIC_BASE_URL=$(sed -n 's/^PUBLIC_BASE_URL=//p' .env | tail -1)
-
-stop >/dev/null 2>&1 || true
 : > "$LOG"
 if [ -n "$TUNNEL_TOKEN" ]; then
   # Named Tunnel — 주소는 Cloudflare 대시보드에서 호스트를 이 터널에 이어 둔 것. 재부팅해도 같다
-  [ -n "$PUBLIC_BASE_URL" ] || { echo "TUNNEL_TOKEN 이 있으면 PUBLIC_BASE_URL(고정 호스트)도 .env 에 있어야 합니다" >&2; exit 1; }
-  echo "[2/4] cloudflared named tunnel → $PUBLIC_BASE_URL"
-  nohup cloudflared tunnel --no-autoupdate run --token "$TUNNEL_TOKEN" >"$LOG" 2>&1 &
-  echo $! > "$PIDF"
+  echo "[2/4] cloudflared named tunnel(컨테이너) → $PUBLIC_BASE_URL"
   for _ in $(seq 1 60); do
-    grep -q "Registered tunnel connection" "$LOG" && break
+    docker compose logs tunnel 2>/dev/null | grep -q "Registered tunnel connection" && break
     sleep 1
   done
-  grep -q "Registered tunnel connection" "$LOG" || { echo "터널이 안 붙었습니다. 로그: $LOG" >&2; stop; exit 1; }
+  docker compose logs tunnel 2>/dev/null | grep -q "Registered tunnel connection" \
+    || { echo "터널이 안 붙었습니다: docker compose logs tunnel" >&2; exit 1; }
   echo "[3/4] .env 그대로 (고정 주소)"
-  echo "[4/4] 할 일 없음 — OAuth 콜백·MCP 등록은 처음 한 번만"
+  echo "[4/4] 할 일 없음 — OAuth 콜백·MCP 등록은 처음 한 번만. 재부팅해도 터널이 저절로 뜬다"
   echo
   echo "  공개 주소: $PUBLIC_BASE_URL   (health: $(curl -s -m 10 "$PUBLIC_BASE_URL/health" || echo '아직 응답 없음 — 몇 초 뒤 다시'))"
   echo "  터널 종료: scripts/tunnel.sh --stop"
