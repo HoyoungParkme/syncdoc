@@ -1316,7 +1316,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `graph.py` `_enrich_ts`와 도우미(tree-sitter-typescript로 맨 위 정의·함수 노드 끝 줄·상대 import·호출) — `enrich`가 파이썬 단계 뒤, 화면 ID 앞에 부른다 · `pyproject.toml`에 `tree-sitter`·`tree-sitter-typescript` 직접 의존(graphifyy가 이미 끄는 것) |
 | 테스트 | MS-011 enrich 테스트 관점(TS/JS) · 「다른 언어는 손대지 않는다」 테스트를 TS 동작에 맞게 · `check_calls` 0/0 그대로 · 헤드리스: UI-17 `CodeGraph` 코드가 끝까지(300줄 잘림) · UI-5 `UI-002#UI-17` 코드 보기 · 운영: 재구축 뒤 TS 끝 줄 null 0 |
 | 선행 | BK |
-| 완료 | — |
+| 완료 | 2026-10-02 · 브랜치 `card/BL-ts-enrich`(7b57705 #276) · spec 6 + code 2 · 테스트 397 · `ruff` · `validate` 0/0 · `open_items` 최신(열린 미결 0) · `check_code` 159/159 · `check_calls` 0/0(함수 986 → 1002) · `check_ui` 14/14 · 작업 트리 실측: TS 함수 201 → 206(`api.get`·`api.post`·`api.del`·`uc.ucParts`·`uc.ucNode`), TS 끝 줄 null 201 → 0, `CodeGraph` L58–915, TS에서 나가는 enrich 선 39 · 헤드리스(dev_preview 재구축, 콘솔 0): UI-17 `CodeGraph` 코드 「L58–L357」(300줄 상한까지) · 트리에 `api.get/post/del` · UI-5 `UI-002#UI-17` 코드 보기 「L58–L915」 · 운영: 머지 커밋 그래프가 옛 컨테이너로 먼저 만들어져 TS 끝 줄 null 201 → 배포 뒤 컨테이너 안 `build_code_graph("SYNC", 7b57705)` → 함수 1002, TS 206, 끝 줄 null 0, enrich 선 39, 커뮤니티 19 · `code_source(UI-002#UI-17)` L58–357 잘림 · `read_code("api.get")` client.ts:120 · 화면은 사람이 직접(DEV-17) |
 
 ---
 
