@@ -89,6 +89,7 @@ class CodeNode(Base):
     file: str
     line: int
     community: int | None
+    item: str | None
     ms: str | None
     status: str | None
 

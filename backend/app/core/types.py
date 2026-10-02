@@ -814,9 +814,9 @@ class CodeCommunity:
 
 @dataclass(frozen=True)
 class CodeNode:
-    """SYNC-DOM-002 2.8 — 코드 그래프 노드 하나. status는 항목이 있을 때 compare로.
+    """SYNC-DOM-002 2.8 — 코드 그래프 노드 하나. status는 MINISPEC 항목(ms)이 있을 때 compare로.
 
-    코드만 > 명세만 > 같음(카드 BD).
+    코드만 > 명세만 > 같음(카드 BD). item은 속한 명세 항목 — 어느 문서든(카드 BJ).
     """
 
     key: str
@@ -825,6 +825,7 @@ class CodeNode:
     file: str
     line: int
     community: int | None
+    item: str | None
     ms: str | None
     status: str | None
 

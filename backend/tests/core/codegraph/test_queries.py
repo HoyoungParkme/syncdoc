@@ -42,7 +42,7 @@ upstream: [EXMP-PRD-001]
 def _fn(key: str, qual: str, ms: str | None, end: int | None = None) -> dict:
     file, line = key.split(":")
     return {"key": key, "name": qual.split(".")[-1], "qual": qual, "file": file,
-            "line": int(line), "end": end, "ms": ms}  # fmt: skip
+            "line": int(line), "end": end, "ms": ms}  # fmt: skip  — 옛 그래프 꼴(item 없음)
 
 
 GRAPH = {
@@ -149,26 +149,33 @@ async def test_code_calls_three_kinds(scoped: Session) -> None:
 
 async def test_code_nodes_lists_everything_with_status_and_communities(scoped: Session) -> None:
     graph = {
-        "functions": [dict(f, community=0 if f["file"] == "a.py" else None) for f in GRAPH["functions"]],
+        "functions": [dict(f, item=f["ms"], community=0 if f["file"] == "a.py" else None)
+                      for f in GRAPH["functions"]]
+        + [dict(_fn("r.py:1", "routers.get_code", None, 3), item="EXMP-API-001#GET/api/code")],
         "calls": GRAPH["calls"],
         "communities": [{"id": 0, "label": "svc", "size": 4}],
-    }
+    }  # fmt: skip
     _seed(scoped, graph)
     nodes = await queries.code_nodes("EXMP", owner(scoped))
-    assert nodes.graph.function_count == 4 and [c.label for c in nodes.communities] == ["svc"]
+    assert nodes.graph.function_count == 5 and [c.label for c in nodes.communities] == ["svc"]
     by = {f.qual: f for f in nodes.functions}
     # 코드만이 하나라도 있으면 code_only > 명세만 > 같음 · 도우미는 항목 없음
     assert (by["svc.save"].ms, by["svc.save"].status) == ("EXMP-MS-001#svc.save", "code_only")
+    assert by["svc.save"].item == "EXMP-MS-001#svc.save"
     assert (by["svc.write"].ms, by["svc.write"].status) == ("EXMP-MS-001#svc.write", "code_only")
-    assert by["svc.check"].status == "same" and by["svc._help"].ms is None
-    assert all(f.community == 0 for f in nodes.functions)
+    assert by["svc.check"].status == "same" and by["svc._help"].ms is None and by["svc._help"].item is None
+    # API 항목 함수 — item만, 대조는 없다 (카드 BJ)
+    r = by["routers.get_code"]
+    assert (r.item, r.ms, r.status) == ("EXMP-API-001#GET/api/code", None, None)
+    assert all(f.community == (0 if f.file == "a.py" else None) for f in nodes.functions)
     assert nodes.calls == [[a, b] for a, b, _ in GRAPH["calls"]]  # via는 싣지 않는다
 
 
 async def test_code_nodes_old_graph_no_graph_and_not_owned(scoped: Session) -> None:
-    _seed(scoped)  # GRAPH 그대로 — 커뮤니티를 모르는 옛 그래프
+    _seed(scoped)  # GRAPH 그대로 — 커뮤니티·item을 모르는 옛 그래프
     nodes = await queries.code_nodes("EXMP", owner(scoped))
     assert nodes.communities == [] and all(f.community is None for f in nodes.functions)
+    assert all(f.item == f.ms for f in nodes.functions)  # item이 없으면 ms로 (카드 BJ)
     with pytest.raises(NotFound):
         await queries.code_nodes("EXMP", make_user(scoped, login="stranger"))
     scoped.execute(text("DELETE FROM code_graphs"))
