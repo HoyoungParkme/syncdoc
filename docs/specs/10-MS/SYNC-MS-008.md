@@ -80,13 +80,13 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 4. [[SYNC-MS-009#llm.step_stream]]`(system, 대화록, _ASK_TOOLS)`을 돈다 — `str` 조각이면 `yield AskDelta(text)`(모델이 지금 쓰는 글자, `progress`에 안 넣는다), `LlmStep`이면 `step`(카드 AW) · usage 누적 · `if not step.tool_calls → answer = step.text → 7`
 5. `if step.text → yield AskNote(step.text)` · 도구 호출마다: `yield AskNote(args["reason"])` → `r = ask_tool(name, args, code, user, conversation_id)` → `yield AskRead(name, r.target)` · `r.target`이 있고 `reads`에 없으면 `reads.append` · 대화록에 `{role: assistant, text: step.text, tool_calls}`와 `{role: tool, tool_call_id, text: r.text}` 추가 · `calls += 1`(호출마다)
 6. `if calls >= _ASK_MAX_CALLS or monotonic() - t0 >= _ASK_TIME_LIMIT` → 대화록에 마무리 문장(아래)을 `user`로 추가 → `llm.step_stream(system, 대화록, _ASK_TOOLS, tool_choice="none")` **한 번**(조각은 4단계처럼 `AskDelta`로) → `step.text`가 비면 `! LlmUnavailable("상한 뒤에도 답이 없다")` → `answer = step.text` → 7 · 아니면 4로
-7. `ConversationService.finish_turn(turn.id, answer, progress, reads)` — 세션 하나에서. 대화 `title`이 「새 대화」면 `question[:40]`으로, `updated_at` 갱신 · `log.info("ask doc=%s item=%s conv=%s user=%s calls=%d prompt=%d completion=%d elapsed=%.1fs", …)` — 한 줄, 본문·질문·답은 로그에 안 남긴다(DEV-6) · `linked, missing = _answer_links(project, answer)` → `yield AskAnswer(linked, context_item_ids=reads, missing_refs=missing)` — 저장(`finish_turn`)은 모델이 쓴 원문이고 내보낼 때만 링크로 바꾼다(#290)
+7. `ConversationService.finish_turn(turn.id, answer, progress, reads)` — 세션 하나에서. 대화 `title`이 「새 대화」면 `question[:40]`으로, `updated_at` 갱신 · `log.info("ask doc=%s item=%s conv=%s user=%s calls=%d prompt=%d completion=%d elapsed=%.1fs", …)` — 한 줄, 본문·질문·답은 로그에 안 남긴다(DEV-6) · `linked, missing = _answer_links(answer, _ref_index(s, project.id))` → `yield AskAnswer(linked, context_item_ids=reads, missing_refs=missing)` — 저장(`finish_turn`)은 모델이 쓴 원문이고 내보낼 때만 링크로 바꾼다(#290)
 
 **상수** `_ASK_MAX_CALLS = 8` · `_ASK_TIME_LIMIT = 120.0`(초). 설정값이 아니라 코드 상수다 — 회수 경로는 키를 비우는 것 하나로 둔다([[SYNC-INFRA-001]] 5.3). 시간은 **호출 사이**에서만 본다 — 한 호출의 60초 타임아웃이 더해져 최악 180초(마무리 호출 포함)
 
 **루프는 비공개 도우미 `_ask_loop(system, code, conversation_id, question, attachment_ids, user, start)`에 있다**(카드 BI) — 1~7이 그것이고, [[#queries.ask_code]]가 같이 쓴다. 입구마다 다른 것은 0단계의 검사와 시작 맥락뿐이다
 
-**답 속 참조 링크 — 비공개 도우미 `_answer_links(project, text) -> (글, missing_refs)`**(#290, 사용자 결정 2026-10-02 「실제 항목과 맞춘다 · 서버가 내보낼 때」). 프로젝트의 문서·항목은 [[SYNC-MS-002#SpecService.list_items_by_project]] 한 번(휴지통 문서 포함 — UI-5가 연다)
+**답 속 참조 링크 — 비공개 도우미 `_answer_links(text, index) -> (글, missing_refs)`**(#290, 사용자 결정 2026-10-02 「실제 항목과 맞춘다 · 서버가 내보낼 때」). `index`는 `_ref_index(s, project_id)` — 문서 ID → 항목 ID들(긴 것부터), [[SYNC-MS-002#SpecService.list_items_by_project]] 한 번(휴지통 문서 포함 — UI-5가 연다)
 1. 코드블록·인라인 코드·이미 있는 `[[…]]` 안은 바꾸지 않는다
 2. 맨 `{문서ID}`(문서 ID 꼴 `[A-Z]{1,4}-[A-Z]+-\d{3}` — `markdown.DOC_ID`와 같다) 뒤에 `#`이 오면 — 그 문서 항목 중 뒤 글자가 그것으로 시작하고 바로 뒤가 영문·숫자·`_`가 아닌 **가장 긴 항목 ID** → `[[문서#항목]]`, 뒤 글자(조사 등)는 그대로. 맞는 항목이 없으면 영문·숫자·`_ . / { } ~ -`까지(끝 `.`은 뺀다)를 ID로 `[[…]]`. 예: `SYNC-MS-007#pipeline.save_pipeline대로` → `[[SYNC-MS-007#pipeline.save_pipeline]]대로` · R1·R13이 있으면 `#R13은` → R13
 3. `#` 없는 맨 문서 ID → `[[문서]]`
@@ -270,7 +270,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 **처리**
 1. 세션 하나에서 `v = ConversationService.get(conv_id, user)` — 내 것이 아니면 `! not-found {resource: conversation}`(그대로 전파)
 2. `project = ProjectService.get_owned(v.project_code, user)`
-3. 답이 있는 턴마다 `_answer_links(project, answer)`([[#queries.ask_item]]과 같은 규칙, 문서·항목 목록은 한 번만 읽는다) → `TurnView(answer=바꾼 글, missing_refs=…)`. 답이 없는 턴(실패)은 그대로 `missing_refs=[]`
+3. `index = _ref_index(s, project.id)` 한 번 → 답이 있는 턴마다 `_answer_links(answer, index)`([[#queries.ask_item]]과 같은 규칙) → `TurnView(answer=바꾼 글, missing_refs=…)`. 답이 없는 턴(실패)은 그대로 `missing_refs=[]`
 
 **출력** `ConversationView` — 턴의 `answer`는 링크로 바꾼 글, `missing_refs`는 그 턴의 없는 참조. DB의 글은 안 바뀐다
 
