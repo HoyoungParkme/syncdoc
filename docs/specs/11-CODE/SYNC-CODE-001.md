@@ -1352,7 +1352,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `CodeGraph.tsx` — 바깥 틀을 UI-5의 `docscreen`·`docbar`·3단 격자로(트리 폭 `useWidth` 새 기억 + 손잡이 6.4, 사이드바 `useWidth(ASK)` + 손잡이 4.10), 사이드바 탭 4.9(코드·명세·질문 — `?panel=spec\|ask` + 브라우저 기억), 툴바 2.4·오른쪽 끝 질문 열·폭 1280 판정 삭제 · `components/panes.tsx`(트리 폭) · `styles.css`(`.gcard`·`.cgbody`·`.cgask` 정리) |
 | 테스트 | `check_ui` UI-17 · `tsc`·`oxlint`·`build` · `check_tokens` · 운영 헤드 브라우저 1440·1200: S-9 1~4 · S-8 1(질문 탭·맥락 줄·`?panel=ask`) · S-7 1(명세 탭) · 트리 접기·다시 열기 · 범례 체크 · 질문 입력이 화면 안 |
 | 선행 | BN |
-| 완료 | — |
+| 완료 | 2026-10-02 · 브랜치 `card/BO-code-graph-full-width`(c8ca5d4 #292) + `card/BO-toolbar-nowrap`(8d64a1b #293) · spec 3 + code 2 · 백엔드 변경 없음 · `tsc`·`oxlint`·`build` · `validate` 0/0 · `check_ui` UI-17 32/32 · `check_tokens` 0 · 시안 둘(클로드 디자인 캔버스) 중 B · 운영 헤드 브라우저 1440×900: 머리 줄이 화면 폭 1440 · 트리 240 \| 그림 778 \| 사이드바 420, 페이지 스크롤 없음 · 코드·명세(`?panel=spec`)·질문(`?panel=ask`) 탭, 탭을 바꿔도 그림 폭 그대로 · 명세 탭에서 다른 함수를 골라도 명세 탭 · 6.4로 240→300·4.10으로 420→520이 새로고침 뒤 그대로, UI-5 질문 탭도 520 · 마지막 탭 복원 · 트리 접기 → 그림 1019, 「트리」로 다시 · 「전부 펼치기」가 한 줄(#293 — 가운데 778에서 두 줄로 꺾였다) · 손잡이를 그림 위로(z-index — `position:relative` 그림이 6.4의 누름 자리를 덮었다) · 실제 모델(대화 40) 「이 함수는 무엇을 부르고 누가 불러?」 → 부르는 것 4·불리는 곳 6을 파일:줄로 · 화면은 사람이 직접(DEV-17) |
 
 ---
 
