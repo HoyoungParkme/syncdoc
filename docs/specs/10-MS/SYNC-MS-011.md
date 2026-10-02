@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-011
 type: MS
 title: MINISPEC — codegraph — 코드 호출 그래프와 명세 대조
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 ---
 
@@ -24,7 +24,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 | 키 | 모양 | 뜻 |
 |---|---|---|
-| `functions` | `[{key, name, qual, file, line, end, item, ms, community}]` | 저장소 안에 정의된 함수·메서드. `key`는 `파일:줄`. `qual`은 `Class.fn` 또는 `모듈.fn`. `end`는 끝 줄(모르면 null). `item`은 이 함수가 속한 명세 항목 ID — docstring 첫 줄의 항목 ID(어느 문서든 — MINISPEC·API·UI…), 화면 코드(`.ts/.tsx/.js/.jsx`)는 파일 첫 주석의 화면 ID(없으면 null — 카드 BJ). `ms`는 그중 MINISPEC 항목일 때 같은 값(아니면 null) — 대조는 `ms`로만. `community`는 든 커뮤니티 번호(없으면 null — 카드 BD). **`item`은 2026-10-02 이전 그래프에 없다** — 읽는 쪽이 `ms`로 본다 |
+| `functions` | `[{key, name, qual, file, line, end, item, ms, community}]` | 저장소 안에 정의된 함수·메서드. `key`는 `파일:줄`. `qual`은 `Class.fn` 또는 `모듈.fn`. `end`는 끝 줄(파이썬·TS/JS는 `enrich`가 채운다, 다른 언어는 null). `item`은 이 함수가 속한 명세 항목 ID — docstring 첫 줄의 항목 ID(어느 문서든 — MINISPEC·API·UI…), 화면 코드(`.ts/.tsx/.js/.jsx`)는 파일 첫 주석의 화면 ID(없으면 null — 카드 BJ). `ms`는 그중 MINISPEC 항목일 때 같은 값(아니면 null) — 대조는 `ms`로만. `community`는 든 커뮤니티 번호(없으면 null — 카드 BD). **`item`은 2026-10-02 이전 그래프에 없다** — 읽는 쪽이 `ms`로 본다 |
 | `calls` | `[[from_key, to_key, via]]` | 호출 선. `via`는 `graphify`(graphify가 찾은 것) 또는 `enrich`(싱크독이 보강한 것) |
 | `communities` | `[{id, label, size}]` | 함수가 하나라도 든 커뮤니티(카드 BD). `id`는 graphify `cluster`의 번호(0이 가장 큼), `label`은 허브 노드 이름, `size`는 든 함수 수. **2026-10-01 이전 그래프에는 없다** — 읽는 쪽이 빈 것으로 본다 |
 
@@ -105,23 +105,27 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 ---
 
-#### codegraph.enrich 파이썬 코드로 호출을 보강한다
+#### codegraph.enrich 파이썬·TS/JS 코드로 그래프를 보강한다
 
 **시그니처** `def enrich(src_dir: Path, graph: dict) -> dict`
 
-근거: 사용자 결정 2026-09-30 — graphify는 변수의 타입을 추론하지 않아 `spec = SpecService(s); spec.get_document()`를 못 잡는다(실측: 명세만 58건 중 대부분). 싱크독이 보강해 푼다
+근거: 사용자 결정 2026-09-30 — graphify는 변수의 타입을 추론하지 않아 `spec = SpecService(s); spec.get_document()`를 못 잡는다(실측: 명세만 58건 중 대부분). 싱크독이 보강해 푼다 · 사용자 결정 2026-10-02(카드 BL) — graphify는 TS/JS 함수의 끝 줄을 하나도 안 준다(실측: 싱크독 프런트 201개 전부 null — `CodeGraph` 컴포넌트가 코드 보기에서 L58–L117로 잘렸다)와 객체 리터럴의 화살표 메서드(`api.get`)를 놓친다. 끝 줄 + 빠진 맨 위 함수 + 호출을 채운다. 중첩 함수는 맨 위만(파이썬과 같이) — graphify가 이미 넣은 중첩 함수는 지우지 않고 끝 줄만
 
 **입력** `graph` — `reduce`의 결과. `src_dir` — 같은 커밋의 파일
 
-**처리** — `graph.functions` 중 `.py` 파일(1·2·4·5)과 화면 코드 `.ts/.tsx/.js/.jsx`(3)만. 다른 언어는 손대지 않는다
+**처리** — `graph.functions` 중 `.py` 파일(1·2·4·5)과 `.ts/.tsx/.js/.jsx/.mjs` 파일(2a~2d·3)만. 다른 언어(Go 등)는 손대지 않는다. 보강은 **더하기만** 한다 — graphify가 준 함수·선을 지우지 않는다
 1. 파일마다 `ast.parse`. 함수 정의를 `(파일, def 줄)`과 `(파일, 첫 데코레이터 줄)` 둘로 찾아 그래프의 함수에 맞춘다(graphify가 어느 줄을 머리로 삼든 맞는다). 못 맞춘 정의는 새 함수로 더한다
 2. 맞춘 함수마다 `end` = `end_lineno` · `qual` = AST로 본 `Class.fn`/`모듈.fn`(2단계 규칙과 같다) · docstring 첫 줄이 항목 ID(`reduce` 3의 정규식)면 `item`을 그것으로, `-MS-` 문서면 `ms`도(AST가 진실)
+2a. TS/JS — 파일마다 tree-sitter(`tree-sitter-typescript` — graphify가 이미 쓰는 문법. `.tsx`·`.jsx`는 TSX, 나머지는 TypeScript 문법)로 읽는다. **맨 위 정의**: `[export [default]] function f` · `const f = (…) => …` / `function` · `class C { m() }` → `C.m` · `const o = { m() {}, k: () => … }` → `o.m`·`o.k`. 머리 줄은 선언문의 첫 줄과 함수 노드의 첫 줄 둘로 그래프의 함수에 맞추고, 못 맞춘 정의는 새 함수로 더한다(`item`·`ms` null)
+2b. 맞춘·더한 맨 위 함수마다 `end` = 선언문 끝 줄 · `qual` = `C.m`/`o.m` 또는 `모듈.f`(2단계의 모듈 규칙)
+2c. 그래프에 있는데 `end`가 없는 TS/JS 함수(graphify가 넣은 중첩 함수 — 컴포넌트 안 핸들러)는 파일의 함수 노드(function·arrow·method) 중 같은 줄에서 시작하는 것의 끝 줄로 채운다
+2d. 맨 위 정의의 몸통에서 호출 `f(…)` · `o.m(…)` · JSX `<Comp …>` → 같은 파일의 맨 위 이름, 또는 **상대 import**(`./x`·`../api/client` — 확장자 `.ts .tsx .js .jsx .mjs`나 폴더의 `index.*`로 파일을 찾는다. 별칭 `a as b`·default import도)한 파일의 맨 위 이름이 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다. 패키지 import(`react`)·경로 별칭은 풀지 않는다
 3. 화면 코드 — 파일마다 **첫 주석**(맨 위 `/** … */` 또는 `//` 묶음)에서 `[A-Z][A-Z0-9]*-UI-\d{3}#UI-\d+`를 찾아, 그 파일 함수 중 `item`이 없는 것 전부에 준다(`ms`는 건드리지 않는다). 화면 하나 = 파일 하나(DEV-17)라 파일 단위로 잇는다. 첫 주석에 화면 ID가 없는 파일(공용 부품·뷰 렌더러)은 그대로 null. 2026-10-02 사용자 결정, 카드 BJ
 4. 함수 몸통에서 **타입을 아는 변수**를 모은다 — 인자 주석 `x: Cls` · `x = Cls(…)` · `a, b = A(…), B(…)`. `Cls`는 이 그래프 안에 정의된 클래스 이름일 때만
 5. 호출 `x.m(…)`(4의 변수) · `Cls(…).m(…)` · `self.m(…)`(메서드 안) → `Cls.m`이 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다
 6. `→ graph` (같은 객체에 더해 돌려준다)
 
-**테스트 관점** 다섯 꼴이 각각 선을 만든다 — 주석·대입·튜플 대입·즉석 생성·`self` · 모르는 클래스는 안 만든다 · graphify가 이미 잡은 선은 겹치지 않는다 · 데코레이터 달린 함수도 맞춘다 · MINISPEC docstring ID가 `item`·`ms`로, API docstring ID는 `item`만 · `.tsx` 첫 주석의 화면 ID가 그 파일 함수 전부의 `item`으로(`ms`는 null), 화면 ID 없는 파일은 null
+**테스트 관점** 다섯 꼴이 각각 선을 만든다 — 주석·대입·튜플 대입·즉석 생성·`self` · 모르는 클래스는 안 만든다 · graphify가 이미 잡은 선은 겹치지 않는다 · 데코레이터 달린 함수도 맞춘다 · MINISPEC docstring ID가 `item`·`ms`로, API docstring ID는 `item`만 · `.tsx` 첫 주석의 화면 ID가 그 파일 함수 전부의 `item`으로(`ms`는 null), 화면 ID 없는 파일은 null · TS/JS — 맨 위 함수의 끝 줄·qual(function·const 화살표·class 메서드·객체 리터럴 메서드와 화살표) · graphify가 놓친 맨 위 정의를 더하고 화면 ID도 받는다 · 중첩 함수는 끝 줄만, 지우지 않는다 · 같은 파일·상대 import(별칭·default·`index`)·JSX·`o.m` 호출이 `enrich` 선으로 · 패키지 import는 안 잇는다 · 깨진 파일은 건너뛴다
 
 ---
 
@@ -282,4 +286,4 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 ## 3. 미결사항
 
-- [ ] 파이썬 밖(TS·Go…)의 보강 — 지금은 graphify 결과 그대로. 싱크독 코드는 MINISPEC 함수가 전부 파이썬이라 급하지 않다
+- [x] 파이썬 밖(TS·Go…)의 보강 — 지금은 graphify 결과 그대로. 싱크독 코드는 MINISPEC 함수가 전부 파이썬이라 급하지 않다 — **결정(2026-10-02, 카드 BL): TS/JS는 tree-sitter로 끝 줄·빠진 맨 위 함수·호출을 채운다**([[#codegraph.enrich]] 2a~2d). 끝 줄이 없어 화면 컴포넌트의 코드 보기가 잘리는 것이 실제 문제였다. Go 등 다른 언어는 graphify 그대로 — 그 언어의 프로젝트가 생기면 같은 꼴로 더한다

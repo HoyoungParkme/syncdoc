@@ -17,6 +17,8 @@ dependencies = [
     "pypdf>=6.19.0",
     "python-multipart>=0.0.32",
     "graphifyy>=0.9.72",  # 코드 호출 그래프 — tree-sitter, 모델 없음 (INFRA 3장, 카드 AX)
+    "tree-sitter>=0.25.2",  # TS/JS 보강 — graphifyy가 이미 끄는 것을 직접 (MS-011 enrich 2a, 카드 BL)
+    "tree-sitter-typescript>=0.23.2",
 ]
 
 [dependency-groups]

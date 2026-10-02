@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1305,6 +1305,18 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | MS-011 테스트 관점 둘 · MS-008(code_view API·UI 항목·옛 그래프, code_source API 항목, ask_code 맥락 `항목 {item}`, read_code 항목 ID·code_graph API 항목) · `compare`·`check_calls` 회귀 · `check_ui` UI-5 그대로 · 헤드리스: UI-5 API 항목 코드 탭(함수 머리·부르는 것·코드 보기·하위 체인), UI 항목, MS 회귀 · 운영: 컨테이너 안 `code_view`·`_code_context`·`_read_code` + 실제 모델 `ask_code`(라우터 함수) + MCP `get_code_graph` |
 | 선행 | BJ |
 | 완료 | 2026-10-02 · 브랜치 `card/BK-item-everywhere`(fbcfb4e #274) · spec 9 + code 4 · 테스트 396 · `ruff`·`tsc`·`oxlint` · `validate` 0/0 · `check_code` 159/159 · `check_calls` 0/0(986 함수) · `check_ui` 14/14 · 헤드리스(dev_preview 재구축, 콘솔 0): `SYNC-API-001#GET/api/projects/{code}/code-graph` 코드 탭 → 함수 머리 `code.code_nodes` L49–51·「부르는 것 1 · 대조 없음」 `queries.code_nodes`(✓▲◌ 없음)·코드 보기 본문·하위 체인 1 · `UI-002#UI-17` → `CodeGraph.CodeGraph`(부르는 것 UI-18·UI-5) · MS-007 `save_pipeline` 회귀 ✓ · 운영(컨테이너 안, 머지 커밋 그래프 `item` 289): `_code_context` 「항목 SYNC-API-001#GET/…」 · `code_view(API)` 함수·이웃·하위 체인 · `code_view(UI-17)` `CodeGraph` · `_read_code(항목 ID)` L49–51 · 실제 모델 `ask_code`(라우터 함수, 대화 35) 7.0초 — `get_references`로 그 API 항목을 읽고 근거 UI-17·UC-H20·MS-008을 답함 · MCP `get_code_graph`(API 항목) 임시 토큰으로 확인 · 화면은 사람이 직접(DEV-17) |
+
+---
+
+#### BL TS/JS 보강 — 끝 줄·빠진 함수·호출 (MS-011 미결)
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R13]] · [[SYNC-UC-001#UC-S8]] 기본 흐름 3 · [[SYNC-MS-011#codegraph.enrich]] 2a~2d · [[SYNC-MS-011]] 3장 미결 · [[SYNC-INFRA-001]] 3장 · 사용자 결정 2026-10-02(끝 줄 + 빠진 함수 + 호출 · 중첩 함수는 맨 위만, graphify가 넣은 것은 끝 줄만) · 실측: 프런트 함수 201개 끝 줄 전부 null |
+| 구현 | `graph.py` `_enrich_ts`와 도우미(tree-sitter-typescript로 맨 위 정의·함수 노드 끝 줄·상대 import·호출) — `enrich`가 파이썬 단계 뒤, 화면 ID 앞에 부른다 · `pyproject.toml`에 `tree-sitter`·`tree-sitter-typescript` 직접 의존(graphifyy가 이미 끄는 것) |
+| 테스트 | MS-011 enrich 테스트 관점(TS/JS) · 「다른 언어는 손대지 않는다」 테스트를 TS 동작에 맞게 · `check_calls` 0/0 그대로 · 헤드리스: UI-17 `CodeGraph` 코드가 끝까지(300줄 잘림) · UI-5 `UI-002#UI-17` 코드 보기 · 운영: 재구축 뒤 TS 끝 줄 null 0 |
+| 선행 | BK |
+| 완료 | — |
 
 ---
 

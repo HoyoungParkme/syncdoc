@@ -226,12 +226,106 @@ def test_enrich_resolves_five_forms_and_fixes_names(tmp_path: Path) -> None:
 
 
 def test_enrich_skips_other_languages_and_broken_files(tmp_path: Path) -> None:
-    (tmp_path / "a.ts").write_text("export function f() {}", encoding="utf-8")
+    (tmp_path / "a.go").write_text("package a\nfunc F() {}\n", encoding="utf-8")
     (tmp_path / "bad.py").write_text("def (:\n", encoding="utf-8")
-    g = {"functions": [_fn("a.ts", 1, "f"), _fn("bad.py", 1, "x")], "calls": []}
+    g = {"functions": [_fn("a.go", 2, "F"), _fn("bad.py", 1, "x")], "calls": []}
     cg.enrich(tmp_path, g)
-    assert [f["qual"] for f in g["functions"]] == ["", ""]  # 손대지 않는다
+    assert [f["qual"] for f in g["functions"]] == ["", ""]  # Go·깨진 파이썬은 손대지 않는다
+    assert [f["end"] for f in g["functions"]] == [None, None]
     assert [f["item"] for f in g["functions"]] == [None, None]  # 화면 ID 없는 파일은 그대로
+
+
+# ── enrich — TS/JS (MS-011 enrich 2a~2d, 카드 BL) ──
+PAGE_TSX = """/** UI-1 화면 — X-UI-002#UI-1 */
+import { useState } from 'react'
+import { api as client, helper } from '../lib/api'
+import Badge from '../lib/Badge'
+import * as md from '../lib/md'
+
+const short = (s: string) =>
+  s.slice(1)
+
+export function Page() {
+  const [v, setV] = useState(0)
+  const onClick = () => {
+    client.get('/x')
+    helper(short('ab'))
+  }
+  return <div onClick={onClick}><Badge />{md.render('x')}</div>
+}
+
+export default function Main() {
+  return <Page />
+}
+
+class Store {
+  load() {
+    return short('a')
+  }
+}
+"""
+API_TS = """export const api = {
+  get: <T,>(url: string) => fetch(url) as T,
+  post(url: string) {
+    return fetch(url)
+  },
+}
+
+export function helper(x: string) {
+  return x
+}
+"""
+BADGE_TSX = "export default function Badge() {\n  return <span />\n}\n"
+MD_TS = "export function render(s: string): string {\n  return s\n}\n"
+
+
+def _ts_src(tmp_path: Path) -> Path:
+    for rel, body in (("pages/Page.tsx", PAGE_TSX), ("lib/api.ts", API_TS),
+                      ("lib/Badge.tsx", BADGE_TSX), ("lib/md/index.ts", MD_TS)):  # fmt: skip
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text(body, encoding="utf-8")
+    (tmp_path / "lib" / "broken.ts").write_bytes(b"\xff\xfe(((")
+    return tmp_path
+
+
+def test_enrich_ts_ends_quals_missing_defs_nested_and_calls(tmp_path: Path) -> None:
+    src = _ts_src(tmp_path)
+    # graphify가 잡은 것처럼 — 맨 위 몇 개(끝 줄 없음)와 중첩 핸들러 하나, 선 하나. api.get/post는 놓쳤다
+    g = {
+        "functions": [
+            _fn("pages/Page.tsx", 7, "short"), _fn("pages/Page.tsx", 10, "Page"),
+            _fn("pages/Page.tsx", 12, "onClick"),  # 중첩 — 끝 줄만 채운다
+            _fn("pages/Page.tsx", 19, "Main"), _fn("lib/api.ts", 8, "helper"),
+            _fn("lib/Badge.tsx", 1, "Badge"), _fn("lib/md/index.ts", 1, "render"),
+            _fn("lib/broken.ts", 1, "x"),
+        ],
+        "calls": [["pages/Page.tsx:19", "pages/Page.tsx:10", "graphify"]],
+    }  # fmt: skip
+    cg.enrich(src, g)
+    by = {f["key"]: f for f in g["functions"]}
+    # 2b — 맨 위 함수의 끝 줄·qual (const 화살표는 선언문 끝, index.ts는 폴더 이름)
+    assert (by["pages/Page.tsx:7"]["end"], by["pages/Page.tsx:7"]["qual"]) == (8, "Page.short")
+    assert (by["pages/Page.tsx:10"]["end"], by["pages/Page.tsx:19"]["end"]) == (17, 21)
+    assert by["lib/md/index.ts:1"]["qual"] == "md.render"
+    # 2a — 놓친 정의를 더한다: 객체 리터럴의 화살표·메서드, 클래스 메서드
+    assert by["lib/api.ts:2"]["qual"] == "api.get" and by["lib/api.ts:3"]["qual"] == "api.post"
+    assert by["lib/api.ts:3"]["end"] == 5
+    assert by["pages/Page.tsx:24"]["qual"] == "Store.load" and by["pages/Page.tsx:24"]["end"] == 26
+    # 2c — 중첩 함수는 지우지 않고 끝 줄만
+    assert by["pages/Page.tsx:12"]["end"] == 15 and by["pages/Page.tsx:12"]["qual"] == ""
+    # 깨진 파일은 건너뛴다
+    assert by["lib/broken.ts:1"]["end"] is None
+    # 3 — 더한 TS 함수도 파일 첫 주석의 화면 ID를 받는다
+    assert by["pages/Page.tsx:24"]["item"] == "X-UI-002#UI-1" and by["lib/api.ts:2"]["item"] is None
+    # 2d — 호출: 같은 파일 · 별칭 import의 객체 메서드 · named import · default import(JSX) ·
+    # 이름공간 import · 클래스 메서드에서 같은 파일. 패키지(useState)는 안 잇는다
+    enriched = {(a, b) for a, b, via in g["calls"] if via == "enrich"}
+    page = "pages/Page.tsx:10"
+    assert {(page, "pages/Page.tsx:7"), (page, "lib/api.ts:2"), (page, "lib/api.ts:8"),
+            (page, "lib/Badge.tsx:1"), (page, "lib/md/index.ts:1"),
+            ("pages/Page.tsx:24", "pages/Page.tsx:7")} <= enriched  # fmt: skip
+    assert ("pages/Page.tsx:19", "pages/Page.tsx:10") not in enriched  # graphify 선과 안 겹친다
+    assert all(not b.startswith("react") for _, b in enriched)
 
 
 def test_enrich_gives_screen_id_of_file_head_comment_to_all_its_functions(tmp_path: Path) -> None:
