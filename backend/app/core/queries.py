@@ -613,13 +613,13 @@ _ASK_TOOLS: list[ToolSpec] = [
     # 일곱째 — 코드 대조. 설명은 SYNC-API-002 get_code_graph 원문 (카드 AZ)
     _tool(
         "code_graph",
-        "항목의 코드를 명세와 대조한 결과를 돌려준다. MINISPEC 항목이면 그 함수의 파일·줄, 부르는 것(명세 「호출하는 것」과 같음·코드만·명세만)과 불리는 곳을, 다른 항목이면 하위 체인에서 이어지는 MINISPEC 함수와 어긋남 수를. 서버의 코드 그래프(graphify)로 계산한다 — 구현이 명세대로인지 볼 때 부른다.",
+        "항목의 코드를 명세와 대조한 결과를 돌려준다. MINISPEC 항목이면 그 함수의 파일·줄, 부르는 것(명세 「호출하는 것」과 같음·코드만·명세만)과 불리는 곳을, 다른 항목이면 하위 체인에서 이어지는 MINISPEC 함수와 어긋남 수를. API·화면 항목처럼 그 항목의 함수가 코드에 있으면(docstring·파일 주석의 항목 ID) 그 함수와 항목 있는 이웃도 — 대조 없이(status null). 서버의 코드 그래프(graphify)로 계산한다 — 구현이 명세대로인지 볼 때 부른다.",
         {"doc_id": _DOC, "item_id": _ITEM},
     ),
     # 여덟째 — 코드 본문. MCP에는 없다 — 에이전트는 저장소를 가지고 있다 (카드 AZ)
     _tool(
         "read_code",
-        "그래프를 만든 커밋의 코드를 읽는다. target은 MINISPEC 항목 ID(문서ID#항목ID) · 함수 이름(Class.fn) · 파일 경로(path 또는 path:시작-끝). 300줄까지, 줄마다 번호가 붙는다. 키·인증서 같은 비밀 파일은 읽을 수 없다.",
+        "그래프를 만든 커밋의 코드를 읽는다. target은 항목 ID(문서ID#항목ID — MINISPEC·API·UI 어느 문서든) · 함수 이름(Class.fn) · 파일 경로(path 또는 path:시작-끝). 300줄까지, 줄마다 번호가 붙는다. 키·인증서 같은 비밀 파일은 읽을 수 없다.",
         {
             "target": {
                 "type": "string",
@@ -973,7 +973,8 @@ _ASK_CODE_SYSTEM = (
 함수 자체를 묻는 질문(뭐 하는 함수야·왜 이렇게 했어)은 read_code로 본문을 읽고 답한다.
 명세와 맞는지 물으면 항목이 있으면 code_graph로 대조(같음·코드만·명세만)를 보고 get_item으로
 그 항목을 읽어 견준다. 항목이 없는 함수면 부르는 것·불리는 곳의 항목을 따라간다 — 그 함수가
-어느 명세의 어느 자리를 받치는지 거기서 보인다. 코드 근거는 파일:줄로, 명세 근거는
+어느 명세의 어느 자리를 받치는지 거기서 보인다. API·UI 항목인 함수는 대조가 없다 — get_item으로
+그 항목을 읽고 code_graph로 하위 MINISPEC 함수를 본다. 코드 근거는 파일:줄로, 명세 근거는
 문서ID#항목ID로 댄다. 코드 그래프가 없다고 적혀 있으면 그렇다고 말하고 지어내지 않는다.""",
     )
     + """{graph_line}
@@ -1021,8 +1022,9 @@ def _code_context(s: Session, project, key: str | None, attachments: str) -> str
 
         def item_of(k: str) -> str:
             d = ms_of.get(k)
-            if d is None:
-                return "항목 없음"
+            if d is None:  # 대조 없는 함수 — API·UI 항목이면 그 항목만 (카드 BK)
+                it = by_key[k].get("item")
+                return f"항목 {it}" if it else "항목 없음"
             st = "code_only" if d.code_only else "spec_only" if d.spec_only else "same"
             return f"항목 {d.ms_id} ({st})"
 
@@ -1138,6 +1140,11 @@ def _code_ref(ms_id: str, diffs: dict, fns: dict, status: str | None = None) -> 
     return CodeRef(ms_id, f["qual"], f["file"], f["line"], status)
 
 
+def _item_ref(f: dict) -> CodeRef:
+    """item_neighbors의 함수 → 대조 없는 CodeRef(항목 ID는 그 함수의 item, status None) (카드 BK)."""
+    return CodeRef(f["item"], f["qual"], f["file"], f["line"])
+
+
 def _code_brief(d: CallDiff, fns: dict) -> CodeBrief:
     f = fns.get(d.function) if d.function else None
     return CodeBrief(
@@ -1194,7 +1201,22 @@ async def code_view(doc_id: str, item_id: str | None, user: User) -> CodeView:
             function = CodeFunction(
                 ms_id, f["qual"], f["file"], f["line"], f.get("end"), calls, callers
             )
-    elif item_id is not None:
+    if function is None and item_id is not None:
+        # 3a — API·UI 항목의 함수: item으로 찾고 항목 있는 이웃까지, 대조 없음 (카드 BK)
+        f = codegraph.item_function(graph, f"{doc_id}#{item_id}")
+        if f is not None:
+            missing = False
+            fwd, back = codegraph.item_neighbors(graph, f["key"])
+            function = CodeFunction(
+                f"{doc_id}#{item_id}",
+                f["qual"],
+                f["file"],
+                f["line"],
+                f.get("end"),
+                [_item_ref(fns[k]) for k in fwd],
+                [_item_ref(fns[k]) for k in back],
+            )
+    if item_id is not None and not is_ms:
         chain = await item_chain(doc_id, item_id, user)
         ids = [
             f"{ci.ref.doc_id}#{ci.ref.item_id}"
@@ -1293,6 +1315,8 @@ async def code_source(doc_id: str, item_id: str, user: User) -> CodeText:
         d = codegraph.compare(row.graph, {ms_id: set()})[0]
         fns = row.graph.get("functions", [])
         f = next((x for x in fns if x["key"] == d.function), None)
+        if f is None:  # API·UI 항목 — item으로 (카드 BK)
+            f = codegraph.item_function(row.graph, ms_id)
         if f is None:
             raise NotFound("function", ms_id)
         end = f.get("end") or _next_start(fns, f) or f["line"] + 59
@@ -1383,6 +1407,8 @@ async def _read_code(code: str, target: str, user: User) -> CodeText | None:
         if "#" in target:
             d = codegraph.compare(row.graph, {target: set()})[0]
             f = next((x for x in fns if x["key"] == d.function), None)
+            if f is None:  # API·UI 항목 — item으로 (카드 BK)
+                f = codegraph.item_function(row.graph, target)
             if f is None:
                 raise NotFound("function", target)
         else:

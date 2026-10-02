@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core import queries
 from app.core.codegraph import service as cg_service
 from app.infra.git import GitError
-from tests.core.codegraph.test_queries import _seed
+from tests.core.codegraph.test_queries import _seed, _seed_items
 from tests.core.spec.test_service import owner
 
 FILE = "\n".join(f"line {i}" for i in range(1, 21))
@@ -76,3 +76,24 @@ async def test_read_code_three_forms_numbered_and_denied(scoped: Session, monkey
     for bad in (".env", "없는.py", "EXMP-MS-001#svc.gone"):
         tb, db = await read(bad)
         assert tb is None and db["error"] == "없음" and "code_graph" in db["hint"], bad
+
+
+async def test_code_graph_and_read_code_take_api_item(scoped: Session, monkeypatch) -> None:
+    """카드 BK — API 항목의 함수를 code_graph가 대조 없이 보이고, read_code가 항목 ID로 읽는다."""
+    _seed_items(scoped)
+    seen = _fake_git(monkeypatch)
+    u = owner(scoped)
+    r = await queries.ask_tool(
+        "code_graph", {"doc_id": "EXMP-API-001", "item_id": "GET/api/code", "reason": "라우터"}, "EXMP", u, 0
+    )
+    data = json.loads(r.text)
+    assert data["is_ms"] is False and data["function"]["qual"] == "routers.get_code"
+    assert data["function"]["calls"] == [
+        {"id": "EXMP-MS-001#svc.save", "status": None, "qual": "svc.save", "file": "a.py", "line": 1}
+    ]
+    r2 = await queries.ask_tool(
+        "read_code", {"target": "EXMP-API-001#GET/api/code", "reason": "본문"}, "EXMP", u, 0
+    )
+    d2 = json.loads(r2.text)
+    assert r2.target == "코드:a.py:17-20" and d2["text"].startswith("17: line 17\n18: line 18")
+    assert seen == [("a.py", "c" * 40)]
