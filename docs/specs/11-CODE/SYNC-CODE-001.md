@@ -1304,7 +1304,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `codegraph.item_function`·`item_neighbors`(graph.py — `compare`는 그대로) · `queries.code_view` 3a · `code_source` · `_read_code` · `_code_context`(항목 줄) · `_ASK_CODE_SYSTEM`·`_ASK_TOOLS` 문장 · `mcp/tools.py` `get_code_graph` 설명 · `DocView.tsx` CodePanel(함수 블록 조건 `view.function`, status null 줄은 표시 없음, 아래 8.22) |
 | 테스트 | MS-011 테스트 관점 둘 · MS-008(code_view API·UI 항목·옛 그래프, code_source API 항목, ask_code 맥락 `항목 {item}`, read_code 항목 ID·code_graph API 항목) · `compare`·`check_calls` 회귀 · `check_ui` UI-5 그대로 · 헤드리스: UI-5 API 항목 코드 탭(함수 머리·부르는 것·코드 보기·하위 체인), UI 항목, MS 회귀 · 운영: 컨테이너 안 `code_view`·`_code_context`·`_read_code` + 실제 모델 `ask_code`(라우터 함수) + MCP `get_code_graph` |
 | 선행 | BJ |
-| 완료 | — |
+| 완료 | 2026-10-02 · 브랜치 `card/BK-item-everywhere`(fbcfb4e #274) · spec 9 + code 4 · 테스트 396 · `ruff`·`tsc`·`oxlint` · `validate` 0/0 · `check_code` 159/159 · `check_calls` 0/0(986 함수) · `check_ui` 14/14 · 헤드리스(dev_preview 재구축, 콘솔 0): `SYNC-API-001#GET/api/projects/{code}/code-graph` 코드 탭 → 함수 머리 `code.code_nodes` L49–51·「부르는 것 1 · 대조 없음」 `queries.code_nodes`(✓▲◌ 없음)·코드 보기 본문·하위 체인 1 · `UI-002#UI-17` → `CodeGraph.CodeGraph`(부르는 것 UI-18·UI-5) · MS-007 `save_pipeline` 회귀 ✓ · 운영(컨테이너 안, 머지 커밋 그래프 `item` 289): `_code_context` 「항목 SYNC-API-001#GET/…」 · `code_view(API)` 함수·이웃·하위 체인 · `code_view(UI-17)` `CodeGraph` · `_read_code(항목 ID)` L49–51 · 실제 모델 `ask_code`(라우터 함수, 대화 35) 7.0초 — `get_references`로 그 API 항목을 읽고 근거 UI-17·UC-H20·MS-008을 답함 · MCP `get_code_graph`(API 항목) 임시 토큰으로 확인 · 화면은 사람이 직접(DEV-17) |
 
 ---
 
