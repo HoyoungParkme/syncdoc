@@ -2,12 +2,13 @@
  *  1 헤더(1.1 통계) · 2 툴바(2.1 검색, 2.2 전부 펼치기/접기, 2.3 상태 라벨)
  *  3 캔버스 — 그림은 canvas가 그린다. 올리거나 고른 노드 하나와 그 선만 DOM 겹층으로 다시 그린다:
  *    3.1 커뮤니티 노드 · 3.2 함수 노드 · 3.3 호출 선 · 3.4 대조 표시
- *  4 옆 패널(4.1 이름·자리, 4.2 부르는 것, 4.3 불리는 곳, 4.4 코드 탭으로, 4.5 커뮤니티 칩, 4.6 코드) · 5 범례(5.1 커뮤니티 행, 5.2 설명)
+ *  4 사이드바(4.1 이름·자리, 4.2 부르는 것, 4.3 불리는 곳, 4.4 코드 탭으로, 4.5 커뮤니티 칩, 4.6 코드) · 5 범례(5.1 커뮤니티 행, 5.2 설명)
  *  6 파일 트리(6.1 폴더·파일 행, 6.2 함수 행, 6.3 접기) — 카드 BF. 그래프 옆에 코드: 함수를 고르면 4.6에 본문이 바로,
  *    커뮤니티면 허브 함수의 본문. 트리는 functions[].file로 브라우저가 만든다 — 요청이 없다
- *  카드 BI — 패널 탭 4.9(함수 | 질문, ?panel=ask) · 7 질문 탭(UI-5 질문 탭과 같은 AskPanel, 맥락은 고른 함수) · 7.1 맥락 줄
- *  카드 BN — 폭 1280 이상이면 질문은 오른쪽 끝 열(7): 툴바 2.4 「질문」으로 열고 닫고, 7.2 손잡이로 폭(UI-5 질문 탭과 같은 기억).
- *    옆 패널(코드·명세)은 그대로 — 코드를 보면서 묻는다. 1280 미만은 4.9 탭 그대로
+ *  카드 BI — 7 질문(UI-5 질문 탭과 같은 AskPanel, 맥락은 고른 함수) · 7.1 맥락 줄
+ *  카드 BO — UI-5와 같은 틀: 머리 줄(1) · 3단(트리 6 | 가운데 툴바 2·그림 3·범례 5 | 사이드바 4). 트리 폭 6.4·사이드바 폭 4.10
+ *    손잡이(사이드바는 UI-5 질문·코드 탭과 같은 기억), 사이드바 탭 4.9 코드 | 명세 | 질문(?panel=spec|ask, 마지막 탭 기억).
+ *    카드 BN의 오른쪽 끝 질문 열·툴바 2.4·폭 1280 판정은 없앴다
  *  카드 BG — 트리는 폴더 한 단씩, 폴더·파일을 고르면 그 아래 함수 노드를 펼쳐 보인다(트리 포커스). 4.7 명세 —
  *    항목·근거(상위 참조)·하위 참조(…/references, 참조 탭과 같은 자료), 항목 없으면 가까운 항목
  *
@@ -19,7 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { ago, api, ApiError, type CodeNode, type CodeNodes, type CodeText, type ItemRef, type ItemReferences, type Me, type ProjectSummary } from '../api/client'
 import { AskPanel } from './DocView'
-import { ASK, Handle, readStore, useWidth, writeStore } from '../components/panes'
+import { ASK, CG_TREE, Handle, readStore, useWidth, writeStore } from '../components/panes'
 import type { AskChat } from '../components/Shell'
 import { CodeLines } from './codeSrc'
 import { ItemPeek, type PeekTarget } from '../components/ItemPeek'
@@ -53,9 +54,9 @@ interface TDir {
   files: { file: string; fns: CodeNode[] }[]
 }
 /** 항목 ID `SYNC-MS-007#pipeline.save_pipeline` → 문서·항목·화면 링크 */
-// 폭 1280 이상이면 질문은 오른쪽 끝 열 — 질문 열을 열어 두었는지는 넓은 화면에서만 기억한다 (카드 BN)
-const WIDE = '(min-width: 1280px)'
-const ASK_OPEN = 'syncdoc.ui17.ask'
+// 4.9 사이드바 탭 — 마지막 탭을 기억해 다시 열면 그 탭이다 (카드 BO)
+const PANEL_TAB = 'syncdoc.ui17.panel'
+type Tab = 'code' | 'spec' | 'ask'
 
 const msParts = (ms: string) => {
   const [doc, item] = ms.split('#')
@@ -66,39 +67,34 @@ export function CodeGraph() {
   const { code = '' } = useParams()
   const { user, projects, ask } = useOutletContext<{ user: Me; projects: ProjectSummary[]; ask: AskChat }>()
   const [sp, setSp] = useSearchParams()
-  // 질문 — ?panel=ask (UI-5 8.4와 같은 키). 모델 키가 없으면 질문 자체가 없다 (카드 BI)
+  // 4.9 사이드바 탭 — 코드 | 명세 | 질문(카드 BO). ?panel=spec|ask, 코드는 없음(UI-5 8.4와 같은 키).
+  // 모델 키가 없으면 질문 탭 자체가 없다 (카드 BI)
   const askTab = !!user?.llm_enabled
-  const panelTab: 'fn' | 'ask' = askTab && sp.get('panel') === 'ask' ? 'ask' : 'fn'
-  // 폭 1280 이상이면 질문은 오른쪽 끝 열(7) — 툴바 2.4로 연다. 좁으면 옆 패널의 4.9 탭 (카드 BN)
-  const [wide, setWide] = useState(() => typeof window === 'undefined' || window.matchMedia(WIDE).matches)
-  useEffect(() => {
-    const mq = window.matchMedia(WIDE)
-    const on = () => setWide(mq.matches)
-    mq.addEventListener('change', on)
-    return () => mq.removeEventListener('change', on)
-  }, [])
-  const [askW, addAskW] = useWidth(ASK) // 7.2 — UI-5 질문 탭(8.3)과 같은 폭 기억
-  const askColumn = wide && panelTab === 'ask'
-  const setPanelTab = (tab: 'fn' | 'ask') => {
-    if (wide) writeStore(ASK_OPEN, tab === 'ask' ? '1' : '0') // 열림은 넓은 화면에서만 기억한다
+  const panelParam = sp.get('panel')
+  const tab: Tab = panelParam === 'spec' ? 'spec' : askTab && panelParam === 'ask' ? 'ask' : 'code'
+  const [treeW, addTreeW] = useWidth(CG_TREE) // 6.4 — 트리 폭 기억 (UI-5 목차와 같은 문법)
+  const [sideW, addSideW] = useWidth(ASK) // 4.10 — UI-5 질문·코드 탭(8.3)과 같은 폭 기억. 탭을 바꿔도 한 폭
+  const setTab = (next: Tab) => {
+    writeStore(PANEL_TAB, next)
     setSp(
       (prev) => {
-        const next = new URLSearchParams(prev)
-        if (tab === 'ask') next.set('panel', 'ask')
-        else next.delete('panel')
-        return next
+        const p = new URLSearchParams(prev)
+        if (next === 'code') p.delete('panel')
+        else p.set('panel', next)
+        return p
       },
       { replace: true },
     )
   }
-  // 처음 열 때 — 넓은 화면에서 질문 열을 열어 두었으면 다시 연다(딥 링크 ?panel=ask가 없을 때)
+  // 처음 열 때 — ?panel이 없으면 마지막 탭으로(질문은 모델 키가 있을 때만)
   const restored = useRef(false)
   useEffect(() => {
-    if (restored.current || !askTab) return
+    if (restored.current || !user) return
     restored.current = true
-    if (wide && sp.get('panel') !== 'ask' && readStore(ASK_OPEN) === '1') setPanelTab('ask')
+    const last = readStore(PANEL_TAB)
+    if (!sp.get('panel') && (last === 'spec' || (last === 'ask' && askTab))) setTab(last)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [askTab])
+  }, [user])
   const [data, setData] = useState<CodeNodes | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set())
@@ -391,6 +387,17 @@ export function CodeGraph() {
     dirty.current = true
     bump((t) => t + 1)
   }, [treeFocus])
+  // 열 폭이 바뀌면(손잡이 4.10·6.4, 트리 접기) 그림 상자가 바뀐다 — 다시 그리고 겹층 자리도 다시 (카드 BO)
+  useEffect(() => {
+    const box = boxRef.current
+    if (!box || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      dirty.current = true
+      bump((t) => t + 1)
+    })
+    ro.observe(box)
+    return () => ro.disconnect()
+  }, [])
 
   // 좌표 — 화면 → 세계
   const toWorld = (sx: number, sy: number) => {
@@ -801,50 +808,84 @@ export function CodeGraph() {
     </div>
   )
 
-  return (
-    <div className="page cgpage">
-      <div className="phead" data-el="1">
-        <div>
-          <div className="crumbs">
-            <Link to={`/p/${code}`}>
-              <ProjName code={code} name={projName} />
-            </Link>
-            <span className="sep">›</span>
-            <span>코드 그래프</span>
-          </div>
-          <b>코드 그래프</b>
+  const empty = <div className="empty">노드를 고르면 여기에 보입니다 — 함수는 코드와 부르는 것·불리는 곳, 커뮤니티는 허브 함수의 코드와 든 함수.</div>
+  const ctx = { kind: 'code' as const, key: codeTarget?.key ?? null, label: codeTarget?.qual ?? '' }
+  // 4.9 「코드」 — 이름·커뮤니티 칩·코드·부르는 것·불리는 곳·코드 탭으로
+  const codeTab = selFn ? (
+    <>
+      <div data-el="4.1">
+        <div className="nm">{selFn.qual}</div>
+        <div className="meta">
+          {selFn.file}:{selFn.line}
         </div>
+        {selFn.community !== null && commOf.has(selFn.community) && (
+          <span className="chip" data-el="4.5" onClick={() => collapse(selFn.community!)} title={commOf.get(selFn.community)!.label}>
+            <i style={{ background: `var(--cg-${(selFn.community % PALETTE) + 1})` }} />
+            {short(commOf.get(selFn.community)!.label)} · 함수 {commOf.get(selFn.community)!.size} · 접기
+          </span>
+        )}
+      </div>
+      {codeBlock(selFn)}
+      <div className="k">부르는 것 {callsOf(selFn.key).length}</div>
+      <div data-el="4.2">{callsOf(selFn.key).map(row)}</div>
+      <div className="k">불리는 곳 {callersOf(selFn.key).length}</div>
+      <div data-el="4.3">{callersOf(selFn.key).map(row)}</div>
+      {selFn.ms && (
+        <Link className="lnk" data-el="4.4" to={`/p/${selFn.ms.split('-')[0]}/d/${selFn.ms.split('#')[0]}?panel=code#item-${selFn.ms.split('#')[1]}`}>
+          코드 탭으로 → {selFn.ms.split('-').slice(1).join('-')}
+        </Link>
+      )}
+    </>
+  ) : selComm ? (
+    <>
+      <div data-el="4.1">
+        <div className="nm" title={selComm.label}>
+          {short(selComm.label)}
+        </div>
+        <div className="meta">커뮤니티 · 함수 {selComm.size}</div>
+        <span className="chip" data-el="4.5" onClick={() => (expanded.has(selComm.id) ? collapse(selComm.id) : setExpanded((s) => new Set(s).add(selComm.id)))}>
+          <i style={{ background: `var(--cg-${(selComm.id % PALETTE) + 1})` }} />
+          {expanded.has(selComm.id) ? '접기' : '펼치기'}
+        </span>
+      </div>
+      {codeTarget && codeBlock(codeTarget)}
+      <div className="k">든 함수 — 호출 많은 순 {Math.min(20, members.length)}</div>
+      <div data-el="4.2">{members.map(row)}</div>
+    </>
+  ) : (
+    empty
+  )
+  // 4.9 「명세」 — 고른 함수(커뮤니티면 허브 함수)가 어느 명세의 무엇인가(4.7)
+  const specTab = codeTarget ? (
+    <>
+      <div className="nm">{codeTarget.qual}</div>
+      <div className="meta">
+        {codeTarget.file}:{codeTarget.line}
+        {selComm ? ` · ${short(selComm.label)}의 허브` : ''}
+      </div>
+      {specBlock(codeTarget)}
+    </>
+  ) : (
+    empty
+  )
+
+  return (
+    // 카드 BO — UI-5와 같은 틀(.docscreen·.docbar·3단). 폭 변수를 화면이 쥔다 — 트리 6.4, 사이드바 4.10
+    <div className="docscreen cgscreen" style={{ '--tree-w': `${treeW}px`, '--panel-w': `${sideW}px` } as React.CSSProperties}>
+      <div className="docbar" data-el="1">
+        <Link className="crumb" to={`/p/${code}`}>
+          <ProjName code={code} name={projName} />
+        </Link>
+        <span className="sep">›</span>
+        <b>코드 그래프</b>
         <span className="grow" />
         <span className="lbl" data-el="1.1">
           {stats}
         </span>
       </div>
-      <div className="gcard">
-        <div className="gbar" data-el="2">
-          <span data-el="2.1">
-            <input className="inp" placeholder="함수 이름 · 파일" value={q} onChange={(e) => setQ(e.target.value)} />
-          </span>
-          <span className="btn sm" data-el="2.2" onClick={toggleAll}>
-            {allOpen ? '전부 접기' : '전부 펼치기'}
-          </span>
-          {!treeOpen && (
-            <span className="btn sm" onClick={() => setTreeOpen(true)}>
-              트리
-            </span>
-          )}
-          <span className="sep" />
-          <span className="lbl" data-el="2.3">
-            {status}
-          </span>
-          <span className="grow" />
-          {askTab && wide && (
-            <span className={`btn sm${askColumn ? ' on' : ''}`} data-el="2.4" onClick={() => setPanelTab(askColumn ? 'fn' : 'ask')} title="코드를 보면서 묻는다 — 오른쪽 끝 질문 열 (카드 BN)">
-              {askColumn ? '질문 ◂' : '질문 ▸'}
-            </span>
-          )}
-        </div>
-        <div className={`cgbody${treeOpen ? '' : ' notree'}${askColumn ? ' ask' : ''}`} style={{ '--ask-w': `${askW}px` } as React.CSSProperties}>
-          {treeOpen && (
+      <div className={`cg3${treeOpen ? '' : ' notree'}`}>
+        {treeOpen && (
+          <>
             <aside className="cgtree" data-el="6">
               <div className="th">
                 파일
@@ -854,7 +895,28 @@ export function CodeGraph() {
               </div>
               {renderDir(tree, 0)}
             </aside>
-          )}
+            {/* 6.4 — 트리 오른쪽 손잡이. 오른쪽으로 끌면 넓어진다 (UI-5 목차 6.2와 같다) */}
+            <Handle el="6.4" onDrag={(dx) => addTreeW(dx)} />
+          </>
+        )}
+        <div className="cgmid">
+          <div className="gbar" data-el="2">
+            <span data-el="2.1">
+              <input className="inp" placeholder="함수 이름 · 파일" value={q} onChange={(e) => setQ(e.target.value)} />
+            </span>
+            <span className="btn sm" data-el="2.2" onClick={toggleAll}>
+              {allOpen ? '전부 접기' : '전부 펼치기'}
+            </span>
+            {!treeOpen && (
+              <span className="btn sm" onClick={() => setTreeOpen(true)}>
+                트리
+              </span>
+            )}
+            <span className="sep" />
+            <span className="lbl" data-el="2.3">
+              {status}
+            </span>
+          </div>
           <div className={`cgcanvas${dragging ? ' drag' : ''}`} data-el="3" ref={boxRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onWheel={onWheel}>
             <canvas ref={canvasRef} />
             {focusNode && (
@@ -889,93 +951,43 @@ export function CodeGraph() {
               </>
             )}
           </div>
-          <aside className={`cgside${panelTab === 'ask' && !wide ? ' ask' : ''}`} data-el="4">
-            {askTab && !wide && (
-              <div className="ptabs" data-el="4.9">
-                <span className={panelTab === 'fn' ? 'on' : ''} onClick={() => setPanelTab('fn')}>
-                  함수
-                </span>
-                <span className={panelTab === 'ask' ? 'on' : ''} onClick={() => setPanelTab('ask')}>
-                  질문
-                </span>
-              </div>
+          <div className="cglegend" data-el="5">
+            {(data?.communities ?? []).map((c, i) => (
+              <label className={`row${hidden.has(c.id) ? ' off' : ''}`} key={c.id} data-el={i === 0 ? '5.1' : undefined} title={c.label}>
+                <input type="checkbox" checked={!hidden.has(c.id)} onChange={() => toggleHidden(c.id)} />
+                <i style={{ background: `var(--cg-${(c.id % PALETTE) + 1})` }} />
+                {short(c.label)} · {c.size}
+              </label>
+            ))}
+            <span className="grow" />
+            <span data-el="5.2">큰 원 = 커뮤니티(크기 = 함수 수) · 선 굵기 = 호출 수 · 고리 = MINISPEC 함수 — ✓ 같음 · ▲ 코드만 · ◌ 명세만</span>
+          </div>
+        </div>
+        {/* 4.10 — 사이드바 왼쪽 손잡이. 왼쪽으로 끌면 넓어진다 (UI-5 8.3과 같은 기억) */}
+        <Handle el="4.10" onDrag={(dx) => addSideW(-dx)} />
+        <aside className="panel cgside" data-el="4">
+          <div className="ptabs" data-el="4.9">
+            <span className={tab === 'code' ? 'on' : ''} onClick={() => setTab('code')}>
+              코드
+            </span>
+            <span className={tab === 'spec' ? 'on' : ''} onClick={() => setTab('spec')}>
+              명세
+            </span>
+            {askTab && (
+              <span className={tab === 'ask' ? 'on' : ''} onClick={() => setTab('ask')}>
+                질문
+              </span>
             )}
-            {panelTab === 'ask' && !wide ? (
-              // 7 질문 탭(좁은 화면) — UI-5 질문 탭과 같은 패널. 맥락(7.1)은 고른 함수(커뮤니티면 허브 함수), 없으면 그래프 전체
-              <div className="pbody ask" data-el="7">
-                <AskPanel ask={ask} elContext="7.1" context={{ kind: 'code', key: codeTarget?.key ?? null, label: codeTarget?.qual ?? '' }} />
-              </div>
-            ) : selFn ? (
-              <>
-                <div data-el="4.1">
-                  <div className="nm">{selFn.qual}</div>
-                  <div className="meta">
-                    {selFn.file}:{selFn.line}
-                  </div>
-                  {selFn.community !== null && commOf.has(selFn.community) && (
-                    <span className="chip" data-el="4.5" onClick={() => collapse(selFn.community!)} title={commOf.get(selFn.community)!.label}>
-                      <i style={{ background: `var(--cg-${(selFn.community % PALETTE) + 1})` }} />
-                      {short(commOf.get(selFn.community)!.label)} · 함수 {commOf.get(selFn.community)!.size} · 접기
-                    </span>
-                  )}
-                </div>
-                {codeBlock(selFn)}
-                {specBlock(selFn)}
-                <div className="k">부르는 것 {callsOf(selFn.key).length}</div>
-                <div data-el="4.2">{callsOf(selFn.key).map(row)}</div>
-                <div className="k">불리는 곳 {callersOf(selFn.key).length}</div>
-                <div data-el="4.3">{callersOf(selFn.key).map(row)}</div>
-                {selFn.ms && (
-                  <Link className="lnk" data-el="4.4" to={`/p/${selFn.ms.split('-')[0]}/d/${selFn.ms.split('#')[0]}?panel=code#item-${selFn.ms.split('#')[1]}`}>
-                    코드 탭으로 → {selFn.ms.split('-').slice(1).join('-')}
-                  </Link>
-                )}
-              </>
-            ) : selComm ? (
-              <>
-                <div data-el="4.1">
-                  <div className="nm" title={selComm.label}>
-                    {short(selComm.label)}
-                  </div>
-                  <div className="meta">커뮤니티 · 함수 {selComm.size}</div>
-                  <span className="chip" data-el="4.5" onClick={() => (expanded.has(selComm.id) ? collapse(selComm.id) : setExpanded((s) => new Set(s).add(selComm.id)))}>
-                    <i style={{ background: `var(--cg-${(selComm.id % PALETTE) + 1})` }} />
-                    {expanded.has(selComm.id) ? '접기' : '펼치기'}
-                  </span>
-                </div>
-                {codeTarget && codeBlock(codeTarget)}
-                {codeTarget && specBlock(codeTarget)}
-                <div className="k">든 함수 — 호출 많은 순 {Math.min(20, members.length)}</div>
-                <div data-el="4.2">{members.map(row)}</div>
-              </>
-            ) : (
-              <div className="empty">노드를 고르면 여기에 보입니다 — 함수는 코드와 부르는 것·불리는 곳, 커뮤니티는 허브 함수의 코드와 든 함수.</div>
-            )}
-          </aside>
-          {askColumn && (
-            <>
-              {/* 7.2 — 질문 열 왼쪽 손잡이. 끄는 쪽이 왼쪽이면 넓어진다 (UI-5 8.3과 같다) */}
-              <Handle el="7.2" onDrag={(dx) => addAskW(-dx)} />
-              {/* 7 질문 열(넓은 화면) — 옆 패널(코드·명세)을 그대로 둔 채 묻는다 (카드 BN) */}
-              <aside className="cgask" data-el="7">
-                <div className="pbody ask">
-                  <AskPanel ask={ask} elContext="7.1" context={{ kind: 'code', key: codeTarget?.key ?? null, label: codeTarget?.qual ?? '' }} />
-                </div>
-              </aside>
-            </>
+          </div>
+          {tab === 'ask' ? (
+            // 7 질문 — UI-5 질문 탭과 같은 패널. 맥락(7.1)은 고른 함수(커뮤니티면 허브 함수), 없으면 그래프 전체
+            <div className="pbody ask" data-el="7">
+              <AskPanel ask={ask} elContext="7.1" context={ctx} />
+            </div>
+          ) : (
+            <div className="pbody">{tab === 'spec' ? specTab : codeTab}</div>
           )}
-        </div>
-        <div className="cglegend" data-el="5">
-          {(data?.communities ?? []).map((c, i) => (
-            <label className={`row${hidden.has(c.id) ? ' off' : ''}`} key={c.id} data-el={i === 0 ? '5.1' : undefined} title={c.label}>
-              <input type="checkbox" checked={!hidden.has(c.id)} onChange={() => toggleHidden(c.id)} />
-              <i style={{ background: `var(--cg-${(c.id % PALETTE) + 1})` }} />
-              {short(c.label)} · {c.size}
-            </label>
-          ))}
-          <span className="grow" />
-          <span data-el="5.2">큰 원 = 커뮤니티(크기 = 함수 수) · 선 굵기 = 호출 수 · 고리 = MINISPEC 함수 — ✓ 같음 · ▲ 코드만 · ◌ 명세만</span>
-        </div>
+        </aside>
       </div>
       {peek && <ItemPeek code={code} target={peek} onClose={() => setPeek(null)} />}
     </div>

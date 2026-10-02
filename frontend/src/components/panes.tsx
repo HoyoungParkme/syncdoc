@@ -25,6 +25,8 @@ export function writeStore(key: string, v: string): void {
 export const TOC = { key: 'syncdoc.ui5.toc', init: 186, min: 140, max: 400 }
 export const PANEL = { key: 'syncdoc.ui5.panel', init: 250, min: 180, max: 460 }
 export const ASK = { key: 'syncdoc.ui5.panel.ask', init: 420, min: 300, max: 720 }
+/** UI-17 파일 트리 160~400 (요소 6.4, 카드 BO). 사이드바는 ASK를 같이 쓴다(4.10) — 두 화면이 같은 폭으로 열린다 */
+export const CG_TREE = { key: 'syncdoc.ui17.tree', init: 240, min: 160, max: 400 }
 
 /** 손잡이가 끄는 폭. 저장해 둔 값이 명세 범위 밖일 수 있어 잘라 넣는다.
  *  **더하기는 반드시 함수형으로.** mousemove 리스너는 mousedown 때 한 번 만들어지므로
