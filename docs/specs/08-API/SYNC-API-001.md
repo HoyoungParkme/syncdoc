@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -831,7 +831,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `note` | `AskNote {text}` | 모델이 읽기 전에 쓴 한 줄(도구 인자 `reason`). 도구마다 하나 |
 | `read` | `AskRead {tool, target}` | 도구 실행이 끝났다. `target`은 `DOC#ITEM`·`DOC`·`첨부:이름`, 목록이면 null |
 | `delta` | `AskDelta {text}` | 모델이 지금 쓰는 글자 조각 — 받는 대로 바로. **진실이 아니다**: 그 호출이 도구로 끝나면 `note`가, 답으로 끝나면 `answer`가 전체 글을 다시 준다(카드 AW) |
-| `answer` | `AskAnswer {answer, context_item_ids}` | 마지막. 스트림 종료 |
+| `answer` | `AskAnswer {answer, context_item_ids, missing_refs}` — `answer`는 맨 `문서ID#항목ID`를 서버가 실제 항목과 맞춰 `[[…]]`로 바꾼 글, `missing_refs`는 그 글의 없는 참조(#290). `delta`는 바꾸지 않은 글자다 | 마지막. 스트림 종료 |
 | `error` | problem+json 본문 그대로 `{type, title, status, detail, reason?}` | 루프 중 실패(`llm-unavailable` 등). 스트림 종료 |
 
 ```yaml
@@ -913,6 +913,9 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 /api/conversations/{id}:
   get:
     summary: 턴 전부 + 첨부 메타 (UI-5 8.7). 바이트·추출 글자는 안 실린다
+    description: >
+      queries.conversation_view. 턴의 답은 저장된 원문의 맨 문서ID#항목ID를 실제 항목과 맞춰
+      [[…]]로 바꾼 글이고 missing_refs가 그 턴의 없는 참조다(#290) — 답 이벤트와 같은 규칙
     parameters:
     - $ref: '#/components/parameters/conversationId'
     responses:
@@ -2253,7 +2256,7 @@ components:
               $ref: '#/components/schemas/AttachmentMeta'
     Turn:
       type: object
-      required: [id, seq, question, progress, context_item_ids, attachments, created_at]
+      required: [id, seq, question, progress, context_item_ids, attachments, created_at, missing_refs]
       properties:
         id:
           type: integer
@@ -2289,6 +2292,11 @@ components:
         created_at:
           type: string
           format: date-time
+        missing_refs:
+          type: array
+          description: 답 속 참조 중 가리키는 곳이 없는 것(#290) — 화면이 끊어진 참조 모양으로 그린다. 답이 없으면 빈 목록
+          items:
+            type: string
     AttachmentMeta:
       type: object
       required: [id, name, mime, size, created_at]
@@ -2356,12 +2364,18 @@ components:
       required:
       - answer
       - context_item_ids
+      - missing_refs
       properties:
         answer:
           type: string
         context_item_ids:
           type: array
           description: 모델이 실제로 읽은 대상, 부른 순서(중복은 접는다). 화면이 「본 것」으로 보여준다. list_documents는 대상이 없어 안 실린다
+          items:
+            type: string
+        missing_refs:
+          type: array
+          description: answer 속 참조 중 가리키는 곳이 없는 것(#290) — 화면이 끊어진 참조 모양으로 그린다
           items:
             type: string
     CodeGraphInfo:
