@@ -14,6 +14,7 @@ export interface AskTurnView {
   src?: string[]
   err?: string
   att?: AttachmentMeta[] // 이 질문에 붙인 첨부 — 말풍선 아래 칩 (카드 AR)
+  missing?: string[] // 답 속 없는 참조 — 끊어진 참조 모양 (#290)
 }
 /** 프로젝트 안에서 고른 대화(카드 AQ) — 문서·항목을 옮겨도 그대로다. 턴은 서버에 있어 DocView가 읽는다 */
 export interface AskChat {

@@ -376,6 +376,8 @@ export interface Turn {
   error: string | null
   attachments: AttachmentMeta[]
   created_at: string
+  /** 답 속 참조 중 가리키는 곳이 없는 것 — 답은 서버가 [[…]]로 맞춰 보낸다 (#290) */
+  missing_refs: string[]
 }
 export interface ConversationBrief {
   id: number
@@ -408,6 +410,8 @@ export interface AskDelta {
 export interface AskAnswer {
   answer: string
   context_item_ids: string[]
+  /** 답 속 참조 중 가리키는 곳이 없는 것 (#290) */
+  missing_refs: string[]
 }
 
 /** 코드 그래프 (SYNC-API-001 3.6, 카드 AY) — 대조는 서버가 부를 때 계산한다 */

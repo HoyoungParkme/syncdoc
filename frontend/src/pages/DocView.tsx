@@ -600,14 +600,6 @@ function titleOf(body: string): string {
 }
 
 
-/** 답 속 맨 `문서ID#항목ID`를 `[[…]]`로 — 모델은 대개 꺾쇠 없이 맨 ID로 답한다(#206). 코드 스팬과 이미 꺾쇠인 것은 둔다 */
-const BARE_ID = /(?<![\w[#`-])([A-Z]+-[A-Z]+-\d{3}(?:#[^\s,.;:)\]`]+)?)(?![\w\]])/g
-function linkifyIds(text: string): string {
-  return text
-    .split(/(`[^`]*`|\[\[[^\]]*\]\])/)
-    .map((part, i) => (i % 2 ? part : part.replace(BARE_ID, '[[$1]]')))
-    .join('')
-}
 
 /** mindmap 정규화 — 모델이 라벨을 따옴표·괄호로 감싸는 버릇(`id[("이름 (최우선)")]`)이 mermaid mindmap 문법 오류를 낸다.
  *  모양은 살리고(원·네모·둥근·육각) 라벨의 따옴표·괄호·대괄호만 벗긴다. 다른 그림은 손대지 않는다 (UI-002 8.7, 카드 AS) */
@@ -864,16 +856,18 @@ export function AskPanel({
   const [dragging, setDragging] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const qaRef = useRef<HTMLDivElement>(null)
-  // 답 속 참조(7.2와 같음): 이 문서 안 항목이면 스크롤·선택, 남의 문서·문서 자체면 그 문서로. 링크 존재 검사는 안 한다
+  // 답 속 참조(7.2와 같음): 이 문서 안 항목이면 스크롤·선택, 남의 문서·문서 자체면 그 문서로.
+  // 맨 ID는 서버가 실제 항목과 맞춰 [[…]]로 보내고, 없는 것은 그 턴의 missing_refs다 (#290)
   const plainCtx = { selfId: docId, href: (d: string, it?: string) => docPath(d, it), exists: () => true }
   // 답 HTML은 턴마다 한 번만 만든다 — 렌더러 출력이 호출마다 달라(id 번호) 다시 만들면 React가 innerHTML을 되돌려
   // mermaid가 그린 svg가 지워진다(카드 AS)
   const htmlCache = useRef(new Map<string, string>())
-  const answerHtml = (a: string) => {
-    const key = docId + '\u0000' + a
+  const answerHtml = (a: string, missing: string[] = []) => {
+    const key = docId + '\u0000' + a + '\u0000' + missing.join('\u0000')
     let h = htmlCache.current.get(key)
     if (h === undefined) {
-      h = renderBlocks(linkifyIds(a), plainCtx)
+      const gone = new Set(missing)
+      h = renderBlocks(a, { ...plainCtx, exists: (d: string, it?: string) => !gone.has(it ? `${d}#${it}` : d) })
       htmlCache.current.set(key, h)
     }
     return h
@@ -882,6 +876,7 @@ export function AskPanel({
     const a = (ev.target as HTMLElement).closest<HTMLAnchorElement>('a[data-ref]')
     if (!a) return
     ev.preventDefault()
+    if (a.classList.contains('missing')) return // 가리키는 곳이 없다 — 본문 7.2처럼 안 간다 (#290)
     const [d, it] = splitRef(a.dataset.ref ?? '')
     if (d === docId && it && goItem) goItem(it)
     else nav(docPath(d, it || undefined))
@@ -941,6 +936,7 @@ export function AskPanel({
             src: t.context_item_ids,
             err: t.error ?? undefined,
             att: t.attachments,
+            missing: t.missing_refs,
           })),
         )
         // 서버의 안 보낸 첨부와 합친다 — 대화를 막 만들며 올리는 중이면 로컬 칩이 먼저 있을 수 있다
@@ -1128,7 +1124,7 @@ export function AskPanel({
             } else if (name === 'answer') {
               const d = data as AskAnswer
               clearLive()
-              patchLast((t) => ({ ...t, live: undefined, a: d.answer, src: d.context_item_ids }))
+              patchLast((t) => ({ ...t, live: undefined, a: d.answer, src: d.context_item_ids, missing: d.missing_refs }))
             } else if (name === 'error') {
               const d = data as Problem
               patchLast((t) => ({ ...t, err: String(d.reason ?? d.detail ?? d.title) }))
@@ -1291,10 +1287,11 @@ export function AskPanel({
                 </details>
               )}
               {t.a !== undefined ? (
-                <AnswerBody html={answerHtml(t.a)} onClick={onAnswerClick} />
+                <AnswerBody html={answerHtml(t.a, t.missing)} onClick={onAnswerClick} />
               ) : t.live ? (
-                // 흘러 들어오는 중 — 마크다운을 그때그때, 캐시 없이(svg가 없어 잃을 것이 없다). 스피너(8.9)는 answer까지 남는다
-                <AnswerBody html={renderBlocks(linkifyIds(t.live), plainCtx)} onClick={onAnswerClick} live />
+                // 흘러 들어오는 중 — 마크다운을 그때그때, 캐시 없이(svg가 없어 잃을 것이 없다). 스피너(8.9)는 answer까지 남는다.
+                // 맨 ID는 글자로 두고 answer가 오면 서버가 맞춘 링크로 바뀐다 (#290)
+                <AnswerBody html={renderBlocks(t.live, plainCtx)} onClick={onAnswerClick} live />
               ) : t.err ? (
                 <div className="a fail">답을 못 받았습니다 — {t.err}</div>
               ) : (

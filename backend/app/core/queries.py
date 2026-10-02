@@ -14,6 +14,7 @@ import logging
 import re
 import time
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -61,6 +62,7 @@ from app.core.types import (
     CodeRef,
     CodeText,
     CodeView,
+    ConversationView,
     Diff,
     DocStatus,
     DocType,
@@ -523,7 +525,7 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 쓰였는지 짚어 준다 — item_chain의 빈 단계나 「아직 없음」 참조가 그 근거다.
 지어내지 않는다.
 
-답에 근거를 댈 때는 읽은 항목 ID(문서ID#항목ID)를 그대로 쓴다. 없는 ID를 만들지 않는다.
+답에 근거를 댈 때는 읽은 항목 ID를 [[문서ID#항목ID]]로 그대로 쓴다. 없는 ID를 만들지 않는다.
 
 명세를 고치라고 하지 않는다. 당신은 읽기를 돕는 자리이고, 본문을 쓰는 것은 사람과
 그 사람의 에이전트가 한다.
@@ -544,7 +546,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 그림 아래에 한두 문장으로 무엇을 그렸는지 적는다.
 
 답은 짧게 쓴다 — 문장은 한 뜻에 하나, 소제목은 굵은 한 줄, 목록은 한 줄씩. 항목을 댈 때는
-문서ID#항목ID 이름 한 번이고 그 이름을 풀어 다시 쓰지 않는다. 번호 목록은 1·2·3으로 이어서
+[[문서ID#항목ID]] 이름 한 번이고 그 이름을 풀어 다시 쓰지 않는다. 번호 목록은 1·2·3으로 이어서
 쓴다.
 
 구현을 물으면(「명세대로 구현됐어?」 「이 함수가 실제로 뭘 부르나」) code_graph로 그 항목의
@@ -865,6 +867,74 @@ async def ask_item(
         yield ev
 
 
+# 답 속 참조(#290) — 맨 문서 ID(markdown.DOC_ID와 같은 꼴)와, 맞는 항목이 없을 때 항목 ID로 볼 꼴
+_ANS_DOC = re.compile(r"(?<![A-Za-z0-9_#/\[-])([A-Z]{1,4}-[A-Z]+-\d{3})(?![A-Za-z0-9_])")
+_ANS_TAIL = re.compile(r"[A-Za-z0-9_./{}~-]+")
+_ANS_KEEP = re.compile(
+    r"(```.*?```|`[^`\n]*`|\[\[[^\]]*\]\])", re.S
+)  # 코드·이미 있는 링크는 그대로
+
+
+def _ref_index(s: Session, project_id: int) -> dict[str, list[str]]:
+    """문서 ID → 항목 ID들(긴 것부터). 답 속 참조를 맞출 재료 — list_items_by_project 한 번 (#290)."""
+    out: dict[str, list[str]] = {}
+    for b in SpecService(s).list_items_by_project(project_id):
+        items = out.setdefault(b.doc_id, [])
+        if b.item_id:
+            items.append(b.item_id)
+    for items in out.values():
+        items.sort(key=len, reverse=True)
+    return out
+
+
+def _answer_links(text: str, index: dict[str, list[str]]) -> tuple[str, list[str]]:
+    """답 속 맨 `문서ID#항목ID` → `[[…]]`(그 문서의 가장 긴 실제 항목까지), 없는 참조 목록 (#290).
+
+    MS-008 ask_item의 「답 속 참조 링크」 1~4. 코드블록·인라인 코드·이미 있는 `[[…]]` 안은 바꾸지 않고,
+    모델이 쓴 `[[…]]`도 없는 것이면 missing에 싣는다. `[[#항목]]`(문서 없는 꼴)은 보지 않는다.
+    """
+
+    def link(part: str) -> str:
+        res: list[str] = []
+        pos = 0
+        for m in _ANS_DOC.finditer(part):
+            if m.start() < pos:  # 앞 항목 ID가 먹은 자리
+                continue
+            doc, end = m.group(1), m.end()
+            ref = doc
+            if part.startswith("#", end):
+                rest = part[end + 1 :]
+                it = next(
+                    (
+                        x
+                        for x in index.get(doc, [])
+                        if rest.startswith(x)
+                        and not (len(rest) > len(x) and re.match(r"[A-Za-z0-9_]", rest[len(x)]))
+                    ),
+                    None,
+                )
+                if it is None:  # 맞는 항목이 없다 — 영문·숫자 규칙으로 자르고 없는 참조가 된다
+                    tail = _ANS_TAIL.match(rest)
+                    it = tail.group(0).rstrip(".") if tail else ""
+                if it:
+                    ref, end = f"{doc}#{it}", end + 1 + len(it)
+            res.append(part[pos : m.start()] + f"[[{ref}]]")
+            pos = end
+        return "".join(res) + part[pos:]
+
+    pieces = _ANS_KEEP.split(text)
+    out = "".join(p if i % 2 else link(p) for i, p in enumerate(pieces))
+    missing: list[str] = []
+    for i, p in enumerate(_ANS_KEEP.split(out)):
+        if not (i % 2 and p.startswith("[[")):
+            continue
+        raw = p[2:-2]
+        doc, _, it = raw.partition("#")
+        if doc and (doc not in index or (it and it not in index[doc])) and raw not in missing:
+            missing.append(raw)
+    return out, missing
+
+
 async def _ask_loop(
     system: str,
     code: str,
@@ -953,8 +1023,11 @@ async def _ask_loop(
             s.commit()
         raise
     with db.session_scope() as s:
-        ConversationService(s).finish_turn(turn_id, answer, progress, reads)
+        ConversationService(s).finish_turn(turn_id, answer, progress, reads)  # 저장은 원문
         s.commit()
+        # 내보낼 때만 답 속 참조를 실제 항목과 맞춘 링크로 (#290)
+        project = ProjectService(s).get_owned(code, user)
+        linked, missing = _answer_links(answer, _ref_index(s, project.id))
     _log.info(
         "ask %s conv=%s user=%s calls=%d prompt=%d completion=%d elapsed=%.1fs",
         where,
@@ -965,7 +1038,7 @@ async def _ask_loop(
         completion_tokens,
         time.monotonic() - t0,
     )
-    yield AskAnswer(answer=answer, context_item_ids=reads)
+    yield AskAnswer(answer=linked, context_item_ids=reads, missing_refs=missing)
 
 
 _ASK_CODE_SYSTEM = (
@@ -980,7 +1053,7 @@ _ASK_CODE_SYSTEM = (
 그 항목을 읽어 견준다. 항목이 없는 함수면 부르는 것·불리는 곳의 항목을 따라간다 — 그 함수가
 어느 명세의 어느 자리를 받치는지 거기서 보인다. API·UI 항목인 함수는 대조가 없다 — get_item으로
 그 항목을 읽고 code_graph로 하위 MINISPEC 함수를 본다. 코드 근거는 파일:줄로, 명세 근거는
-문서ID#항목ID로 댄다. 코드 그래프가 없다고 적혀 있으면 그렇다고 말하고 지어내지 않는다.""",
+[[문서ID#항목ID]]로 댄다. 코드 그래프가 없다고 적혀 있으면 그렇다고 말하고 지어내지 않는다.""",
     )
     + """{graph_line}
 [문서 목록]
@@ -1101,6 +1174,26 @@ async def ask_code(
         f"code={code} key={key}",
     ):
         yield ev
+
+
+async def conversation_view(conv_id: int, user: User) -> ConversationView:
+    """SYNC-MS-008#queries.conversation_view
+
+    저장된 답은 원문이다 — 내보낼 때 답 속 맨 ID를 실제 항목과 맞춘 링크로 바꾸고 없는 참조를 싣는다
+    (답 이벤트와 같은 규칙, #290). 문서·항목 목록은 한 번만 읽는다.
+    """
+    with db.session_scope() as s:
+        v = ConversationService(s).get(conv_id, user)
+        project = ProjectService(s).get_owned(v.project_code, user)
+        index = _ref_index(s, project.id)
+    turns = []
+    for t in v.turns:
+        if t.answer is None:
+            turns.append(t)
+            continue
+        linked, missing = _answer_links(t.answer, index)
+        turns.append(replace(t, answer=linked, missing_refs=missing))
+    return replace(v, turns=turns)
 
 
 def _attachment_lines(metas: list[AttachmentMeta]) -> str:

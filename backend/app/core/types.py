@@ -615,10 +615,12 @@ class AskAnswer:
     """SYNC-DOM-002 2.8 — queries.ask_item → API AskAnswer. 저장되지 않는다.
 
     context_item_ids는 모델이 실제로 읽은 대상(항목·문서 ID), 부른 순서(카드 Y).
+    answer는 맨 ID를 실제 항목과 맞춘 [[…]] 글, missing_refs는 그 글의 없는 참조(#290).
     """
 
     answer: str
     context_item_ids: list[str]
+    missing_refs: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -889,6 +891,7 @@ class TurnView:
     error: str | None
     attachments: list[AttachmentMeta]
     created_at: datetime
+    missing_refs: list[str] = field(default_factory=list)  # 답 속 없는 참조 (#290)
 
 
 @dataclass(frozen=True)

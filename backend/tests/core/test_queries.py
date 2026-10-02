@@ -908,3 +908,69 @@ async def test_ask_code_unknown_key_and_stranger_and_no_api_key(
     monkeypatch.setattr(settings, "LLM_API_KEY", "")
     with pytest.raises(LlmNotConfigured):
         await _collect(queries.ask_code("EXMP", None, conv, "?", [], owner(scoped)))
+
+
+def test_answer_links_matches_longest_real_item() -> None:
+    """#290 — 맨 ID는 그 문서의 가장 긴 실제 항목까지 [[…]], 없는 것은 missing (MS-008 ask_item)."""
+    index = {
+        "EXMP-MS-001": ["svc.save_all", "svc.save"],
+        "EXMP-PRD-001": ["R13", "R1"],
+        "EXMP-UC-001": [],
+    }
+    text = (
+        "EXMP-MS-001#svc.save대로 · EXMP-PRD-001#R13은 · EXMP-PRD-001#R1, "
+        "`EXMP-PRD-001#R1` · [[EXMP-PRD-001#R1]] · EXMP-UC-001 · EXMP-PRD-001#R9. "
+        "[[EXMP-PRD-001#R77]] · EXMP-ZZ-009#x.y · https://h/p/EXMP/d/EXMP-PRD-001#item-R1\n"
+        "```\nEXMP-PRD-001#R1\n```"
+    )
+    out, missing = queries._answer_links(text, index)
+    assert out == (
+        "[[EXMP-MS-001#svc.save]]대로 · [[EXMP-PRD-001#R13]]은 · [[EXMP-PRD-001#R1]], "
+        "`EXMP-PRD-001#R1` · [[EXMP-PRD-001#R1]] · [[EXMP-UC-001]] · [[EXMP-PRD-001#R9]]. "
+        "[[EXMP-PRD-001#R77]] · [[EXMP-ZZ-009#x.y]] · https://h/p/EXMP/d/EXMP-PRD-001#item-R1\n"
+        "```\nEXMP-PRD-001#R1\n```"
+    )
+    assert missing == ["EXMP-PRD-001#R9", "EXMP-PRD-001#R77", "EXMP-ZZ-009#x.y"]
+    # 바로 뒤가 영문·숫자면 짧은 항목으로 잡지 않는다 — R1만 있는데 R13
+    out2, missing2 = queries._answer_links("EXMP-PRD-001#R13", {"EXMP-PRD-001": ["R1"]})
+    assert out2 == "[[EXMP-PRD-001#R13]]" and missing2 == ["EXMP-PRD-001#R13"]
+
+
+async def test_ask_item_answer_links_refs_but_stores_raw(scoped: Session, script) -> None:
+    """#290 — answer 이벤트는 링크로 바꾼 글과 없는 참조, 저장된 턴은 원문. 지시문은 [[…]]로 쓰라고."""
+    _seed_refs(scoped)
+    raw = "EXMP-PRD-001#G1은 EXMP-RFQ-001#Q1에서 왔다. EXMP-PRD-001#G9는 없다"
+    seen = script([_step(raw)])
+    events = await _collect(
+        queries.ask_item("EXMP-PRD-001", "G1", _conv(scoped), "왜?", [], owner(scoped))
+    )
+    assert events[-1] == AskAnswer(
+        "[[EXMP-PRD-001#G1]]은 [[EXMP-RFQ-001#Q1]]에서 왔다. [[EXMP-PRD-001#G9]]는 없다",
+        [],
+        ["EXMP-PRD-001#G9"],
+    )
+    stored = scoped.execute(text("SELECT answer FROM turns ORDER BY id DESC LIMIT 1")).scalar()
+    assert stored == raw
+    assert "[[문서ID#항목ID]]" in seen[0][0]
+
+
+async def test_conversation_view_links_answers_and_lists_missing(scoped: Session, script) -> None:
+    """#290 — 다시 열 때도 같은 규칙. 답이 없는 턴은 그대로, 남의 대화는 not-found."""
+    _seed_refs(scoped)
+    script([_step("EXMP-PRD-001#R1 · EXMP-PRD-001#R9")])
+    conv = _conv(scoped)
+    await _collect(queries.ask_item("EXMP-PRD-001", None, conv, "뭐야?", [], owner(scoped)))
+    convs = ConversationService(scoped)
+    failed = convs.add_turn(conv, "실패할 질문", [])
+    convs.finish_turn(failed.id, None, [], [], error="llm-unavailable")
+    v = await queries.conversation_view(conv, owner(scoped))
+    ok, bad = v.turns[-2], v.turns[-1]
+    assert ok.answer == "[[EXMP-PRD-001#R1]] · [[EXMP-PRD-001#R9]]"
+    assert ok.missing_refs == ["EXMP-PRD-001#R9"]
+    assert bad.answer is None and bad.missing_refs == []
+    stored = scoped.execute(
+        text("SELECT answer FROM turns WHERE conversation_id = :c AND seq = 1"), {"c": conv}
+    ).scalar()
+    assert stored == "EXMP-PRD-001#R1 · EXMP-PRD-001#R9"
+    with pytest.raises(NotFound):
+        await queries.conversation_view(conv, owner(scoped, "someone-else"))

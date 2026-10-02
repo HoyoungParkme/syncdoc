@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -1061,12 +1061,14 @@ sequenceDiagram
     Q->>C: finish_turn(turn_id, answer | error, progress, context_item_ids)
     C->>DB: turns · conversations.updated_at
     Q->>Q: usage 로그 한 줄 (본문은 로그에 없다)
-    Q-->>U: answer {answer, context_item_ids} — 읽은 대상, 부른 순서
+    Q->>S: list_items_by_project — 답 속 맨 문서ID#항목ID를 실제 항목과 맞춘다 (_answer_links, #290)
+    Q-->>U: answer {answer, context_item_ids, missing_refs} — [[…]]로 바꾼 답, 읽은 대상, 없는 참조
 ```
 
 **읽을 때 볼 것**
 - **명세 표에는 쓰지 않는다.** 쓰는 것은 대화 세 표뿐이고 `ConversationService`가 닫는다. 턴은 질문을 받자마자 생기고(`add_turn`) 답이나 실패로 닫힌다(`finish_turn`) — 스트림이 끊겨도 턴은 실패로 남아 다음 질문에 안 실린다
 - 앞 대화는 서버가 대화에서 만든다. 같은 질문을 두 번 보내면 턴이 둘 생긴다
+- **답은 원문으로 저장하고 내보낼 때 링크로 바꾼다**(#290) — 맨 `문서ID#항목ID`를 그 문서의 가장 긴 실제 항목까지 `[[…]]`로, 없는 것은 `missing_refs`. 대화를 다시 열 때(`GET /api/conversations/{id}` → [[SYNC-MS-008#queries.conversation_view]])도 같은 규칙이라 나중에 항목이 생기면 그때부터 링크가 산다
 - 첨부는 업로드(별도 요청)와 질문(`attachment_ids`)이 나뉜다 — 드롭·붙여넣기 순간 올라가 칩이 되고, 보낼 때 턴에 붙는다. 이미지는 이 턴의 `user` 항목에 `images`로 실려 `llm.step`이 파트 배열로 옮긴다([[SYNC-MS-009#llm.step]]); 뒤 턴에는 다시 안 실린다. 글자·PDF는 `read_attachment`로
 - `queries`가 어댑터를 직접 부르는 유일한 자리다([[SYNC-DOM-002]] 3.2). 도구 실행도 `queries`가 이미 가진 조회로 닫힌다 — 명세 쓰기가 없어 `pipeline`을 거칠 이유가 없다
 - **모델이 고른 것만 읽는다.** 시작 맥락에는 본문이 없다. 상한은 호출 수(8)와 시간(120초)이지 글자가 아니다([[SYNC-INFRA-001]] 5.3)

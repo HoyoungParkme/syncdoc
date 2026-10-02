@@ -216,3 +216,4 @@ class AskAnswer(Base):
 
     answer: str
     context_item_ids: list[str]
+    missing_refs: list[str] = []  # 답 속 없는 참조 (#290)

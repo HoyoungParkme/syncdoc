@@ -187,14 +187,23 @@ def test_ask_endpoint_streams_start_note_read_answer(
         ("note", {"text": "G1을 읽는다"}),
         ("read", {"tool": "get_item", "target": "EXMP-PRD-001#G1"}),
         ("delta", {"text": "G1은 "}),  # 카드 AW — 글자 조각, answer가 전체를 다시 준다
-        ("answer", {"answer": "G1은 Q1을 근거로 한다", "context_item_ids": ["EXMP-PRD-001#G1"]}),
+        (
+            "answer",
+            {
+                "answer": "G1은 Q1을 근거로 한다",
+                "context_item_ids": ["EXMP-PRD-001#G1"],
+                "missing_refs": [],  # 답 속 없는 참조 (#290)
+            },
+        ),
     ]
     assert seen[0][-1] == {"role": "user", "text": "이게 뭐야?"} and len(seen[0]) == 3
     assert scoped.execute(text("SELECT count(*) FROM versions")).scalar() == 2  # 아무것도 안 쓴다
 
     # 항목 없이도 묻는다 — 문서 단위 시작
     steps.append(LlmStep("문서 전체 답", [], LlmUsage()))
-    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "이 문서가 뭐야?", "conversation_id": conv})
+    r = client.post(
+        "/api/docs/EXMP-PRD-001/ask", json={"question": "이 문서가 뭐야?", "conversation_id": conv}
+    )
     assert _sse(r.text)[0] == ("start", {"doc_id": "EXMP-PRD-001", "item_id": None, "key": None})
 
     # 루프 중 모델 실패 → 200 스트림 안 error 이벤트(problem+json 그대로)
@@ -215,7 +224,10 @@ def test_ask_endpoint_streams_start_note_read_answer(
     assert r.status_code == 503 and r.json()["type"] == "urn:syncdoc:llm-not-configured"
     # 없는 항목 힌트 → 스트림 전 404
     monkeypatch.setattr(settings, "LLM_API_KEY", "sk-test")
-    r = client.post("/api/docs/EXMP-PRD-001/ask", json={"question": "?", "conversation_id": conv, "item_id": "G9"})
+    r = client.post(
+        "/api/docs/EXMP-PRD-001/ask",
+        json={"question": "?", "conversation_id": conv, "item_id": "G9"},
+    )
     assert r.status_code == 404 and r.json()["resource"] == "item"
     # 남의 문서 → 404 (R12)
     login(client, scoped, "minjun")

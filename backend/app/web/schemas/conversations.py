@@ -34,6 +34,7 @@ class Turn(Base):
     error: str | None
     attachments: list[AttachmentMeta]
     created_at: datetime
+    missing_refs: list[str] = []  # 답 속 없는 참조 (#290)
 
 
 class ConversationBrief(Base):
