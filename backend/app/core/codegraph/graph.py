@@ -169,7 +169,16 @@ def reduce(raw: dict) -> dict:
         if a and b and a != b and (a, b) not in seen:
             seen.add((a, b))
             calls.append([a, b, "graphify"])
-    return {"functions": functions, "calls": calls}
+    # graphify가 읽은 코드 파일 — 함수가 없어도 파일 노드가 있다. enrich가 쓰고 지운다 (#282)
+    files = sorted(
+        {
+            str(n["source_file"])
+            for n in nodes.values()
+            if n.get("file_type") == "code" and n.get("source_file")
+            and not _is_test(str(n["source_file"]))
+        }
+    )  # fmt: skip
+    return {"functions": functions, "calls": calls, "files": files}
 
 
 def _defs(tree: ast.Module):
@@ -572,7 +581,9 @@ def _enrich_ts(src_dir: Path, graph: dict) -> None:
     """
     funcs: list[dict] = graph["functions"]
     by_loc = {(f["file"], f["line"]): f for f in funcs}
-    files = sorted({f["file"] for f in funcs if f["file"].endswith(_TS_EXTS)})
+    # 함수가 있는 파일 + graphify가 읽은 파일 — 객체 리터럴뿐인 파일도 읽는다 (#282)
+    seen_files = [x for x in graph.pop("files", []) if x.endswith(_TS_EXTS)]
+    files = sorted({f["file"] for f in funcs if f["file"].endswith(_TS_EXTS)} | set(seen_files))
     fileset = set(files)
     parsed: dict[str, tuple] = {}  # file → (root, src, defs, default)
     names: dict[str, dict[str, str]] = {}  # file → 맨 위 이름(f · o.m) → key
