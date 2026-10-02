@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-011
 type: MS
 title: MINISPEC — codegraph — 코드 호출 그래프와 명세 대조
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 ---
 
@@ -101,7 +101,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 3. `item` — `rationale_for` 선으로 붙은 docstring 노드의 라벨이 `^[A-Z][A-Z0-9]*-[A-Z]+-\d+#\S+`로 시작하면 그 ID(공백 앞까지 — `SYNC-API-001#GET/api/docs/{docId} — 설명`에서 ` — ` 앞). 아니면 null. `ms` — `item`이 `-MS-` 문서의 항목이면 같은 값, 아니면 null(카드 BJ — 전에는 MINISPEC ID만 읽었다)
 4. `calls` = `calls`·`indirect_call` 선 중 양 끝이 1의 함수인 것 → `[from_key, to_key, "graphify"]`. 같은 쌍은 하나로
 5. import·포함·문서 링크·docstring·개념 노드는 버린다. 군집은 [[#codegraph.communities]]가 raw 그래프에서 따로 계산해 붙인다(카드 BD) — 여기서는 `community`를 두지 않는다
-6. `→ {"functions": [...], "calls": [...]}` (`end`는 null로 둔다 — 파이썬은 `enrich`가 채운다)
+6. `→ {"functions": [...], "calls": [...], "files": [...]}` (`end`는 null로 둔다 — 파이썬은 `enrich`가 채운다). `files`는 graphify가 읽은 코드 파일 — `file_type == code`인 노드의 `source_file`, 테스트 파일 빼고 정렬. 함수가 하나도 없는 파일도 든다. `enrich`가 쓰고 지우므로 저장 모양(0장)에는 없다(#282)
 
 **테스트 관점** 클래스 노드·import 선이 빠진다 · 메서드는 `Class.fn`, `service.py`의 함수는 폴더 이름 · MINISPEC docstring ID가 `item`·`ms` 둘 다로 · API docstring ID(`#` 뒤에 `/`·`{}`)는 `item`에만, 설명은 잘린다 · 같은 호출 둘 → 하나
 
@@ -115,7 +115,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 **입력** `graph` — `reduce`의 결과. `src_dir` — 같은 커밋의 파일
 
-**처리** — `graph.functions` 중 `.py` 파일(1·2·4·5)과 `.ts/.tsx/.js/.jsx/.mjs` 파일(2a~2d·3)만. 다른 언어(Go 등)는 손대지 않는다. 보강은 **더하기만** 한다 — graphify가 준 함수·선을 지우지 않는다
+**처리** — `graph.functions` 중 `.py` 파일(1·2·4·5)과 `.ts/.tsx/.js/.jsx/.mjs` 파일(2a~2d·3)만. TS/JS는 `graph.functions`의 파일에 더해 `reduce`가 준 `files`의 TS/JS도 읽는다 — graphify가 객체 리터럴 안 화살표만 든 파일(`export const api = { get: () => … }`)을 함수 0개로 놓쳐도 그 파일을 다시 읽는다(#282, 2026-10-02 사용자 결정 「graphify가 읽은 파일 전부」). `files`는 다 쓴 뒤 그래프에서 지운다. 다른 언어(Go 등)는 손대지 않는다. 보강은 **더하기만** 한다 — graphify가 준 함수·선을 지우지 않는다
 1. 파일마다 `ast.parse`. 함수 정의를 `(파일, def 줄)`과 `(파일, 첫 데코레이터 줄)` 둘로 찾아 그래프의 함수에 맞춘다(graphify가 어느 줄을 머리로 삼든 맞는다). 못 맞춘 정의는 새 함수로 더한다
 2. 맞춘 함수마다 `end` = `end_lineno` · `qual` = AST로 본 `Class.fn`/`모듈.fn`(2단계 규칙과 같다) · docstring 첫 줄이 항목 ID(`reduce` 3의 정규식)면 `item`을 그것으로, `-MS-` 문서면 `ms`도(AST가 진실)
 2a. TS/JS — 파일마다 tree-sitter(`tree-sitter-typescript` — graphify가 이미 쓰는 문법. `.tsx`·`.jsx`는 TSX, 나머지는 TypeScript 문법)로 읽는다. **맨 위 정의**: `[export [default]] function f` · `const f = (…) => …` / `function` · `class C { m() }` → `C.m` · `const o = { m() {}, k: () => … }` → `o.m`·`o.k`. 머리 줄은 선언문의 첫 줄과 함수 노드의 첫 줄 둘로 그래프의 함수에 맞추고, 못 맞춘 정의는 새 함수로 더한다(`item`·`ms` null)
@@ -127,7 +127,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 5. 호출 `x.m(…)`(4의 변수) · `Cls(…).m(…)` · `self.m(…)`(메서드 안) · `self.x.m(…)`(4의 속성) → `Cls.m`이 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다
 6. `→ graph` (같은 객체에 더해 돌려준다)
 
-**테스트 관점** 다섯 꼴이 각각 선을 만든다 — 주석·대입·튜플 대입·즉석 생성·`self` · `__init__`의 `self.repo = Repo(…)` 뒤 다른 메서드의 `self.repo.get(…)` → `Repo.get` · 모르는 클래스는 안 만든다 · graphify가 이미 잡은 선은 겹치지 않는다 · 데코레이터 달린 함수도 맞춘다 · MINISPEC docstring ID가 `item`·`ms`로, API docstring ID는 `item`만 · `.tsx` 첫 주석의 화면 ID가 그 파일 함수 전부의 `item`으로(`ms`는 null), 화면 ID 없는 파일은 null · TS/JS — 맨 위 함수의 끝 줄·qual(function·const 화살표·class 메서드·객체 리터럴 메서드와 화살표) · graphify가 놓친 맨 위 정의를 더하고 화면 ID도 받는다 · 중첩 함수는 끝 줄만, 지우지 않는다 · 같은 파일·상대 import(별칭·default·`index`)·JSX·`o.m` 호출이 `enrich` 선으로 · 패키지 import는 안 잇는다 · 깨진 파일은 건너뛴다
+**테스트 관점** 다섯 꼴이 각각 선을 만든다 — 주석·대입·튜플 대입·즉석 생성·`self` · `__init__`의 `self.repo = Repo(…)` 뒤 다른 메서드의 `self.repo.get(…)` → `Repo.get` · 모르는 클래스는 안 만든다 · graphify가 이미 잡은 선은 겹치지 않는다 · 데코레이터 달린 함수도 맞춘다 · MINISPEC docstring ID가 `item`·`ms`로, API docstring ID는 `item`만 · `.tsx` 첫 주석의 화면 ID가 그 파일 함수 전부의 `item`으로(`ms`는 null), 화면 ID 없는 파일은 null · TS/JS — 맨 위 함수의 끝 줄·qual(function·const 화살표·class 메서드·객체 리터럴 메서드와 화살표) · graphify가 놓친 맨 위 정의를 더하고 화면 ID도 받는다 · 중첩 함수는 끝 줄만, 지우지 않는다 · graphify가 함수 0개로 본 TS 파일도 `files`로 읽어 `api.get`과 그 선을 더하고, 결과에 `files`가 남지 않는다(#282) · 같은 파일·상대 import(별칭·default·`index`)·JSX·`o.m` 호출이 `enrich` 선으로 · 패키지 import는 안 잇는다 · 깨진 파일은 건너뛴다
 
 ---
 
