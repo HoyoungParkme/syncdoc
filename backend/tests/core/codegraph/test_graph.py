@@ -35,10 +35,12 @@ RAW = {
         {"id": "f_cg", "label": "load()", "_callable": True,
          "source_file": "app/core/codegraph/service.py", "source_location": "L5"},
         {"id": "r1", "label": "EXMP-MS-007#pipeline.save_pipeline 설명", "file_type": "rationale"},
+        {"id": "r2", "label": "EXMP-API-001#GET/api/docs/{docId}/code — 코드 탭", "file_type": "rationale"},
     ],
     "links": [
         {"source": "c_svc", "target": "m_get", "relation": "method"},
         {"source": "r1", "target": "f_save", "relation": "rationale_for"},
+        {"source": "r2", "target": "f_help", "relation": "rationale_for"},
         {"source": "f_save", "target": "f_help", "relation": "calls"},
         {"source": "f_save", "target": "f_help", "relation": "indirect_call"},
         {"source": "f_help", "target": "c_svc", "relation": "calls"},
@@ -56,6 +58,11 @@ def test_reduce_keeps_functions_and_calls_only() -> None:
     assert by["save_pipeline"]["qual"] == "pipeline.save_pipeline"
     assert by["load"]["qual"] == "codegraph.load"  # service.py는 폴더 이름
     assert by["save_pipeline"]["ms"] == "EXMP-MS-007#pipeline.save_pipeline"
+    assert by["save_pipeline"]["item"] == by["save_pipeline"]["ms"]  # MINISPEC ID는 item·ms 둘 다
+    # API ID는 item에만 — `#` 뒤의 `/`·`{}`를 품고 ` — 설명`은 잘린다 (카드 BJ)
+    assert by["_run"]["item"] == "EXMP-API-001#GET/api/docs/{docId}/code"
+    assert by["_run"]["ms"] is None
+    assert by["load"]["item"] is None and by["load"]["ms"] is None
     assert by["save_pipeline"]["key"] == "app/core/pipeline.py:30" and by["_run"]["line"] == 50
     # 같은 호출 둘은 하나, 자기 호출·클래스로 가는 선·포함 선은 없다
     assert g["calls"] == [["app/core/pipeline.py:30", "app/core/pipeline.py:50", "graphify"]]
@@ -155,6 +162,7 @@ def by_assign(s):
 
 
 def by_tuple(s):
+    """EXMP-API-001#POST/api/x/{id} — 라우터 (카드 BJ)"""
     spec, refs = SpecService(s), ReferenceService()
     return refs.upstream(1)
 
@@ -183,7 +191,7 @@ def _src(tmp_path: Path) -> Path:
 
 def _fn(file: str, line: int, name: str) -> dict:
     return {"key": f"{file}:{line}", "name": name, "qual": "", "file": file, "line": line,
-            "end": None, "ms": None}  # fmt: skip
+            "end": None, "item": None, "ms": None}  # fmt: skip
 
 
 def test_enrich_resolves_five_forms_and_fixes_names(tmp_path: Path) -> None:
@@ -197,6 +205,10 @@ def test_enrich_resolves_five_forms_and_fixes_names(tmp_path: Path) -> None:
     by = {f["qual"]: f for f in g["functions"]}
     assert by["SpecService.get_document"]["ms"] == "EXMP-MS-002#SpecService.get_document"
     assert by["pipe.by_assign"]["ms"] == "EXMP-MS-007#pipeline.by_assign"
+    assert by["pipe.by_assign"]["item"] == by["pipe.by_assign"]["ms"]
+    # API docstring은 item만 — 대조(ms) 대상이 아니다 (카드 BJ)
+    assert (by["pipe.by_tuple"]["item"], by["pipe.by_tuple"]["ms"]) == ("EXMP-API-001#POST/api/x/{id}", None)
+    assert by["pipe.by_inline"]["item"] is None
     assert by["SpecService.get_document"]["end"] == 8  # 끝 줄을 AST로
     assert "pipe.decorated" in by  # graphify가 놓친 정의는 더한다 (데코레이터가 있어도)
     k = {q: f["key"] for q, f in by.items()}
@@ -219,6 +231,35 @@ def test_enrich_skips_other_languages_and_broken_files(tmp_path: Path) -> None:
     g = {"functions": [_fn("a.ts", 1, "f"), _fn("bad.py", 1, "x")], "calls": []}
     cg.enrich(tmp_path, g)
     assert [f["qual"] for f in g["functions"]] == ["", ""]  # 손대지 않는다
+    assert [f["item"] for f in g["functions"]] == [None, None]  # 화면 ID 없는 파일은 그대로
+
+
+def test_enrich_gives_screen_id_of_file_head_comment_to_all_its_functions(tmp_path: Path) -> None:
+    """MS-011 enrich 3 — 화면 코드는 파일 첫 주석의 화면 ID를 그 파일 함수 전부에 (카드 BJ)."""
+    (tmp_path / "pages").mkdir()
+    (tmp_path / "pages" / "CodeGraph.tsx").write_text(
+        "/** UI-17 코드 그래프 — EXMP-UI-002#UI-17 (카드 BD).\n *  1 헤더 */\n"
+        "import x from 'y'\nconst a = () => 1\nexport function CodeGraph() {}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "pages" / "ui.tsx").write_text(
+        "// 공용 부품 — 화면 ID 없음 (DEV-17 밖)\nexport function Badge() {}\n", encoding="utf-8"
+    )
+    (tmp_path / "pages" / "late.ts").write_text(
+        "import z from 'z'\n// EXMP-UI-002#UI-5 는 첫 주석이 아니다\nexport function f() {}\n",
+        encoding="utf-8",
+    )
+    own = dict(_fn("pages/CodeGraph.tsx", 4, "a"), item="EXMP-API-001#GET/x")  # 함수 ID가 우선
+    g = {
+        "functions": [own, _fn("pages/CodeGraph.tsx", 5, "CodeGraph"), _fn("pages/ui.tsx", 2, "Badge"),
+                      _fn("pages/late.ts", 3, "f")],
+        "calls": [],
+    }  # fmt: skip
+    cg.enrich(tmp_path, g)
+    by = {f["name"]: f for f in g["functions"]}
+    assert by["CodeGraph"]["item"] == "EXMP-UI-002#UI-17" and by["CodeGraph"]["ms"] is None
+    assert by["a"]["item"] == "EXMP-API-001#GET/x"  # 이미 있는 item은 안 덮는다
+    assert by["Badge"]["item"] is None and by["f"]["item"] is None
 
 
 # ── spec_calls ──

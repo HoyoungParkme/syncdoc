@@ -3,10 +3,12 @@
 DB를 모른다. 서버(pipeline.build_code_graph)와 검사기(tools/check_calls.py)가 같은 함수를 불러
 같은 결과를 낸다 — 사람·모델·에이전트·검사기가 한 대조를 본다([[SYNC-PRD-001#R13]]).
 
-그래프 모양 `{functions: [{key, name, qual, file, line, end, ms, community}],
+그래프 모양 `{functions: [{key, name, qual, file, line, end, item, ms, community}],
 calls: [[from, to, via]], communities: [{id, label, size}]}` — key는 `파일:줄`, via는
 `graphify`(graphify가 찾은 선) 또는 `enrich`(싱크독이 보강한 선), community는 graphify 군집
-번호(카드 BD — 2026-10-01 이전 그래프에는 없다).
+번호(카드 BD — 2026-10-01 이전 그래프에는 없다). item은 속한 명세 항목(어느 문서든 — 라우터는
+API 항목, 화면 코드는 파일 첫 주석의 화면 ID. 카드 BJ — 2026-10-02 이전 그래프에는 없다), ms는
+그중 MINISPEC 항목일 때 같은 값 — 대조(compare)는 ms로만.
 """
 
 from __future__ import annotations
@@ -29,7 +31,13 @@ CODE_EXTS = frozenset(
     ".py .ts .tsx .js .jsx .mjs .go .rs .java .kt .scala .rb .php .cs .c .h .cpp .hpp"
     " .swift .lua .ex .exs .jl .sh .sql .vue .svelte".split()
 )
-_MS_ID = re.compile(r"^([A-Z][A-Z0-9]*-MS-\d+#[\w.]+)")
+# docstring 첫 줄의 항목 ID — 어느 문서든(MS-011 reduce 3). `#` 뒤는 공백 앞까지라
+# `SYNC-API-001#GET/api/docs/{docId} — 설명`에서 설명이 잘린다 (카드 BJ)
+_ITEM_ID = re.compile(r"^([A-Z][A-Z0-9]*-[A-Z]+-\d+#\S+)")
+_MS_DOC = re.compile(r"^[A-Z][A-Z0-9]*-MS-\d+#")
+# 화면 코드 파일 첫 주석의 화면 ID — 그 파일 함수 전부의 item (MS-011 enrich 3)
+_SCREEN_ID = re.compile(r"[A-Z][A-Z0-9]*-UI-\d{3}#UI-\d+")
+_SCREEN_EXTS = (".ts", ".tsx", ".js", ".jsx")
 # 모듈 이름 대신 폴더 이름을 쓰는 파일 — core/codegraph/service.py의 함수는 codegraph.x
 _PKG_STEMS = frozenset({"service", "__init__", "index"})
 _REF = re.compile(r"\[\[([^\]]+)\]\]")
@@ -92,6 +100,15 @@ def _node_key(n: dict) -> tuple[str, int] | None:
     return file, int(loc[1:])
 
 
+def _item_of(first_line: str) -> tuple[str | None, str | None]:
+    """docstring 첫 줄 → (item, ms). item은 어느 문서의 항목 ID든, ms는 MINISPEC일 때 같은 값."""
+    m = _ITEM_ID.match(first_line.strip())
+    if not m:
+        return None, None
+    item = m.group(1)
+    return item, item if _MS_DOC.match(item) else None
+
+
 def reduce(raw: dict) -> dict:
     """SYNC-MS-011#codegraph.reduce
 
@@ -100,15 +117,18 @@ def reduce(raw: dict) -> dict:
     nodes = {n["id"]: n for n in raw.get("nodes", [])}
     links = raw.get("links") or raw.get("edges") or []
     owner: dict[str, str] = {}  # 메서드 노드 → 클래스 이름 (method 선은 클래스 → 메서드)
-    ms: dict[str, str] = {}  # 함수 노드 → docstring 첫 줄의 항목 ID
+    item: dict[str, str] = {}  # 함수 노드 → docstring 첫 줄의 항목 ID (어느 문서든)
+    ms: dict[str, str] = {}  # 그중 MINISPEC 항목
     for e in links:
         rel = e.get("relation")
         if rel == "method" and e.get("source") in nodes:
             owner[e["target"]] = _clean(nodes[e["source"]].get("label", ""))
         elif rel == "rationale_for" and e.get("source") in nodes:
-            m = _MS_ID.match(str(nodes[e["source"]].get("label", "")).strip())
+            it, m = _item_of(str(nodes[e["source"]].get("label", "")))
+            if it:
+                item[e["target"]] = it
             if m:
-                ms[e["target"]] = m.group(1)
+                ms[e["target"]] = m
     key_of: dict[str, str] = {}
     functions: list[dict] = []
     keys: set[str] = set()
@@ -134,6 +154,7 @@ def reduce(raw: dict) -> dict:
                 "file": file,
                 "line": line,
                 "end": None,
+                "item": item.get(nid),
                 "ms": ms.get(nid),
             }
         )
@@ -305,11 +326,38 @@ def _resolve(
     return out
 
 
+_HEAD_COMMENT = re.compile(r"^\s*(/\*[\s\S]*?\*/|(?://[^\n]*\n?)+)")
+
+
+def _screen_items(src_dir: Path, funcs: list[dict]) -> None:
+    """MS-011 enrich 3 — 화면 코드 파일 첫 주석의 화면 ID를 그 파일 함수 중 item 없는 것 전부에.
+
+    화면 하나 = 파일 하나(DEV-17)라 파일 단위로 잇는다. ms는 건드리지 않는다 — 대조 대상이 아니다.
+    """
+    by_file: dict[str, list[dict]] = defaultdict(list)
+    for f in funcs:
+        if f["file"].endswith(_SCREEN_EXTS):
+            by_file[f["file"]].append(f)
+    for file, fs in by_file.items():
+        try:
+            head = (src_dir / file).read_text(encoding="utf-8", errors="replace")[:4000]
+        except OSError:
+            continue
+        c = _HEAD_COMMENT.match(head)
+        m = _SCREEN_ID.search(c.group(0)) if c else None
+        if not m:
+            continue
+        for f in fs:
+            if not f.get("item"):
+                f["item"] = m.group(0)
+
+
 def enrich(src_dir: Path, graph: dict) -> dict:
     """SYNC-MS-011#codegraph.enrich
 
     파이썬 파일을 AST로 다시 읽어 끝 줄·이름·항목 ID를 바로잡고, graphify가 놓친 호출을 더한다 —
-    변수에 담은 객체의 메서드, 가져온 모듈·함수, 인자로 넘기는 메서드. 다른 언어는 손대지 않는다.
+    변수에 담은 객체의 메서드, 가져온 모듈·함수, 인자로 넘기는 메서드. 화면 코드는 파일 첫 주석의
+    화면 ID만 item으로 잇는다(카드 BJ). 다른 언어는 손대지 않는다.
     """
     funcs: list[dict] = graph["functions"]
     by_loc = {(f["file"], f["line"]): f for f in funcs}
@@ -329,21 +377,23 @@ def enrich(src_dir: Path, graph: dict) -> dict:
             f = next((by_loc[(file, ln)] for ln in heads if (file, ln) in by_loc), None)
             if f is None:  # graphify가 놓친 정의 — 더한다
                 f = {"key": f"{file}:{fn.lineno}", "name": fn.name, "qual": "", "file": file,
-                     "line": fn.lineno, "end": None, "ms": None}  # fmt: skip
+                     "line": fn.lineno, "end": None, "item": None, "ms": None}  # fmt: skip
                 funcs.append(f)
                 by_loc[(file, fn.lineno)] = f
             f["end"] = fn.end_lineno
             f["qual"] = f"{cls}.{fn.name}" if cls else f"{_module(file)}.{fn.name}"
             doc = ast.get_docstring(fn)
             if doc:
-                m = _MS_ID.match(doc.strip().splitlines()[0].strip())
-                if m:
-                    f["ms"] = m.group(1)
+                it, m = _item_of(doc.strip().splitlines()[0])
+                if it:
+                    f["item"] = it
+                    f["ms"] = m
             if cls:
                 ctx.classes[cls][fn.name] = f["key"]
             else:
                 ctx.module_funcs[file][fn.name] = f["key"]
             found.append((file, f, cls, fn))
+    _screen_items(src_dir, funcs)
     file_imports = {file: _imports(tree.body, file, ctx) for file, tree in trees.items()}
     have = {(c[0], c[1]) for c in graph["calls"]}
     for file, f, cls, fn in found:
