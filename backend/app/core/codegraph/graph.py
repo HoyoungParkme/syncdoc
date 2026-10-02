@@ -326,6 +326,257 @@ def _resolve(
     return out
 
 
+# ── TS/JS 보강 (MS-011 enrich 2a~2d, 카드 BL) — graphify가 이미 쓰는 tree-sitter-typescript ──
+_TS_EXTS = (".ts", ".tsx", ".js", ".jsx", ".mjs")
+_TS_FN_NODES = frozenset({"function_declaration", "arrow_function", "function_expression",
+                          "method_definition", "generator_function_declaration"})  # fmt: skip
+_TS_LANGS: dict[str, object] = {}
+
+
+def _ts_parse(file: str, src: bytes):
+    """파일 → tree-sitter 뿌리. `.tsx`·`.jsx`는 TSX 문법, 나머지는 TypeScript(JS의 상위집합)."""
+    import tree_sitter as ts
+    import tree_sitter_typescript as tst
+
+    kind = "tsx" if file.endswith((".tsx", ".jsx")) else "ts"
+    if kind not in _TS_LANGS:
+        _TS_LANGS[kind] = ts.Language(
+            tst.language_tsx() if kind == "tsx" else tst.language_typescript()
+        )
+    return ts.Parser(_TS_LANGS[kind]).parse(src).root_node
+
+
+def _ts_text(n, src: bytes) -> str:
+    return src[n.start_byte : n.end_byte].decode("utf-8", errors="replace")
+
+
+def _ts_defs(root, src: bytes) -> tuple[list[tuple], str | None]:
+    """맨 위 정의 — [(소속 | None, 이름, 머리 줄들, 끝 줄, 몸통 노드)]와 default export 이름.
+
+    `function f` · `const f = () =>` · `class C { m() }` · `const o = { m() {}, k: () => }`.
+    머리 줄은 선언문 첫 줄과 함수 노드 첫 줄 둘 — graphify가 어느 쪽을 머리로 삼든 맞는다.
+    """
+    out: list[tuple] = []
+    default: str | None = None
+
+    def head(stmt, node) -> list[int]:
+        return sorted({stmt.start_point[0] + 1, node.start_point[0] + 1})
+
+    def visit(node, stmt) -> None:
+        nonlocal default
+        t = node.type
+        if t == "export_statement":
+            is_default = any(c.type == "default" for c in node.children)
+            for c in node.children:
+                before = len(out)
+                visit(c, node)
+                if is_default and len(out) > before and out[before][0] is None:
+                    default = out[before][1]
+        elif t in ("function_declaration", "generator_function_declaration"):
+            name = node.child_by_field_name("name")
+            if name is not None:
+                out.append(
+                    (None, _ts_text(name, src), head(stmt, node), stmt.end_point[0] + 1, node)
+                )
+        elif t in ("lexical_declaration", "variable_declaration"):
+            for d in node.children:
+                if d.type != "variable_declarator":
+                    continue
+                name, val = d.child_by_field_name("name"), d.child_by_field_name("value")
+                if name is None or val is None or name.type != "identifier":
+                    continue
+                nm = _ts_text(name, src)
+                if val.type in ("arrow_function", "function_expression"):
+                    out.append((None, nm, head(stmt, val), stmt.end_point[0] + 1, val))
+                elif val.type == "object":
+                    for p in val.children:
+                        if p.type == "method_definition":
+                            k, body = p.child_by_field_name("name"), p
+                        elif p.type == "pair":
+                            k, body = p.child_by_field_name("key"), p.child_by_field_name("value")
+                            if body is None or body.type not in (
+                                "arrow_function",
+                                "function_expression",
+                            ):
+                                continue
+                        else:
+                            continue
+                        key = _ts_text(k, src).strip("'\"")
+                        if key.isidentifier():
+                            out.append((nm, key, [p.start_point[0] + 1], p.end_point[0] + 1, body))
+        elif t == "class_declaration":
+            name, body = node.child_by_field_name("name"), node.child_by_field_name("body")
+            if name is None or body is None:
+                return
+            cname = _ts_text(name, src)
+            for m in body.children:
+                if m.type == "method_definition":
+                    mn = m.child_by_field_name("name")
+                    out.append(
+                        (cname, _ts_text(mn, src), [m.start_point[0] + 1], m.end_point[0] + 1, m)
+                    )
+
+    for c in root.children:
+        visit(c, c)
+    return out, default
+
+
+def _ts_ends(root) -> dict[int, int]:
+    """파일의 함수 노드 전부(중첩 포함) — 시작 줄 → 끝 줄. 같은 줄이면 가장 바깥(먼저 만난 것)."""
+    out: dict[int, int] = {}
+    stack = [root]
+    while stack:
+        n = stack.pop()
+        if n.type in _TS_FN_NODES:
+            out.setdefault(n.start_point[0] + 1, n.end_point[0] + 1)
+        stack.extend(reversed(n.children))
+    return out
+
+
+def _ts_resolve_path(file: str, spec: str, files: set[str]) -> str | None:
+    """상대 import → 그래프의 파일. `./x` → x.ts|x.tsx|… 또는 x/index.*. 패키지·별칭은 None."""
+    import posixpath
+
+    if not spec.startswith("."):
+        return None
+    base = posixpath.normpath(posixpath.join(posixpath.dirname(file), spec))
+    if base in files:
+        return base
+    stem = base.rsplit(".", 1)[0] if base.endswith((".js", ".jsx", ".mjs")) else base
+    for cand in (stem, f"{stem}/index"):
+        for ext in _TS_EXTS:
+            if f"{cand}{ext}" in files:
+                return f"{cand}{ext}"
+    return None
+
+
+def _ts_imports(root, src: bytes, file: str, files: set[str]) -> dict[str, tuple[str, str | None]]:
+    """import → 지역 이름 → (파일, 원래 이름). default는 "default", `* as ns`는 None(이름공간)."""
+    out: dict[str, tuple[str, str | None]] = {}
+    for c in root.children:
+        if c.type != "import_statement":
+            continue
+        s = c.child_by_field_name("source") or next(
+            (x for x in c.children if x.type == "string"), None
+        )
+        target = _ts_resolve_path(file, _ts_text(s, src).strip("'\""), files) if s else None
+        if target is None:
+            continue
+        for clause in (x for x in c.children if x.type == "import_clause"):
+            for x in clause.children:
+                if x.type == "identifier":
+                    out[_ts_text(x, src)] = (target, "default")
+                elif x.type == "namespace_import":
+                    ns = next((y for y in x.children if y.type == "identifier"), None)
+                    if ns is not None:
+                        out[_ts_text(ns, src)] = (target, None)
+                elif x.type == "named_imports":
+                    for sp in (y for y in x.children if y.type == "import_specifier"):
+                        name, alias = (
+                            sp.child_by_field_name("name"),
+                            sp.child_by_field_name("alias"),
+                        )
+                        out[_ts_text(alias or name, src)] = (target, _ts_text(name, src))
+    return out
+
+
+def _ts_calls(node, src: bytes) -> set[tuple[str, str | None]]:
+    """몸통의 호출 — `f(…)` → (f, None) · `o.m(…)` → (o, m) · JSX `<Comp>` → (Comp, None)."""
+    out: set[tuple[str, str | None]] = set()
+    stack = [node]
+    while stack:
+        n = stack.pop()
+        if n.type == "call_expression":
+            fn = n.child_by_field_name("function")
+            if fn is not None and fn.type == "identifier":
+                out.add((_ts_text(fn, src), None))
+            elif fn is not None and fn.type == "member_expression":
+                obj, prop = fn.child_by_field_name("object"), fn.child_by_field_name("property")
+                if obj is not None and prop is not None and obj.type == "identifier":
+                    out.add((_ts_text(obj, src), _ts_text(prop, src)))
+        elif n.type in ("jsx_opening_element", "jsx_self_closing_element"):
+            nm = n.child_by_field_name("name")
+            if nm is not None and nm.type == "identifier":
+                out.add((_ts_text(nm, src), None))
+        stack.extend(n.children)
+    return out
+
+
+def _ts_target(
+    a: str,
+    b: str | None,
+    local: dict[str, str],
+    imports: dict[str, tuple[str, str | None]],
+    names: dict[str, dict[str, str]],
+    defaults: dict[str, str | None],
+) -> str | None:
+    """호출 (a, b) → 그래프 key. 같은 파일의 맨 위 이름이 먼저, 아니면 상대 import한 파일의 이름."""
+    if b is None:
+        if a in local:
+            return local[a]
+        if a not in imports:
+            return None
+        tf, orig = imports[a]
+        if orig == "default":
+            orig = defaults.get(tf)
+        return names.get(tf, {}).get(orig) if orig else None
+    if f"{a}.{b}" in local:
+        return local[f"{a}.{b}"]
+    if a not in imports:
+        return None
+    tf, orig = imports[a]
+    if orig is None:  # import * as ns — ns.f
+        return names.get(tf, {}).get(b)
+    return names.get(tf, {}).get(f"{orig}.{b}")
+
+
+def _enrich_ts(src_dir: Path, graph: dict) -> None:
+    """MS-011 enrich 2a~2d — TS/JS 맨 위 정의의 끝 줄·qual, 빠진 정의, 중첩 함수 끝 줄, 호출 선.
+
+    보강은 더하기만 — graphify의 함수·선을 지우지 않는다. 깨진 파일은 건너뛴다.
+    """
+    funcs: list[dict] = graph["functions"]
+    by_loc = {(f["file"], f["line"]): f for f in funcs}
+    files = sorted({f["file"] for f in funcs if f["file"].endswith(_TS_EXTS)})
+    fileset = set(files)
+    parsed: dict[str, tuple] = {}  # file → (root, src, defs, default)
+    names: dict[str, dict[str, str]] = {}  # file → 맨 위 이름(f · o.m) → key
+    for file in files:
+        try:
+            src = (src_dir / file).read_bytes()
+            root = _ts_parse(file, src)
+        except (OSError, ValueError):
+            continue
+        defs, default = _ts_defs(root, src)
+        parsed[file] = (root, src, defs, default)
+        names[file] = {}
+        for owner, name, heads, end, _node in defs:
+            f = next((by_loc[(file, ln)] for ln in heads if (file, ln) in by_loc), None)
+            if f is None:  # graphify가 놓친 정의 — 더한다 (2a)
+                f = {"key": f"{file}:{heads[0]}", "name": name, "qual": "", "file": file,
+                     "line": heads[0], "end": None, "item": None, "ms": None}  # fmt: skip
+                funcs.append(f)
+                by_loc[(file, heads[0])] = f
+            f["end"] = end  # 2b
+            f["qual"] = f"{owner}.{name}" if owner else f"{_module(file)}.{name}"
+            names[file][f"{owner}.{name}" if owner else name] = f["key"]
+        ends = _ts_ends(root)
+        for f in funcs:  # 2c — graphify가 넣은 중첩 함수
+            if f["file"] == file and not f.get("end") and f["line"] in ends:
+                f["end"] = ends[f["line"]]
+    defaults = {file: v[3] for file, v in parsed.items()}
+    have = {(c[0], c[1]) for c in graph["calls"]}
+    for file, (root, src, defs, _default) in parsed.items():
+        imports = _ts_imports(root, src, file, fileset)
+        for owner, name, _heads, _end, node in defs:  # 2d
+            src_key = names[file][f"{owner}.{name}" if owner else name]
+            for a, b in sorted(_ts_calls(node, src), key=lambda x: (x[0], x[1] or "")):
+                dst = _ts_target(a, b, names[file], imports, names, defaults)
+                if dst and dst != src_key and (src_key, dst) not in have:
+                    have.add((src_key, dst))
+                    graph["calls"].append([src_key, dst, "enrich"])
+
+
 _HEAD_COMMENT = re.compile(r"^\s*(/\*[\s\S]*?\*/|(?://[^\n]*\n?)+)")
 
 
@@ -356,8 +607,9 @@ def enrich(src_dir: Path, graph: dict) -> dict:
     """SYNC-MS-011#codegraph.enrich
 
     파이썬 파일을 AST로 다시 읽어 끝 줄·이름·항목 ID를 바로잡고, graphify가 놓친 호출을 더한다 —
-    변수에 담은 객체의 메서드, 가져온 모듈·함수, 인자로 넘기는 메서드. 화면 코드는 파일 첫 주석의
-    화면 ID만 item으로 잇는다(카드 BJ). 다른 언어는 손대지 않는다.
+    변수에 담은 객체의 메서드, 가져온 모듈·함수, 인자로 넘기는 메서드. TS/JS는 tree-sitter로 끝 줄·
+    빠진 맨 위 함수·호출을 채운다(카드 BL). 화면 코드는 파일 첫 주석의 화면 ID를 item으로 잇는다
+    (카드 BJ). 다른 언어는 손대지 않는다.
     """
     funcs: list[dict] = graph["functions"]
     by_loc = {(f["file"], f["line"]): f for f in funcs}
@@ -393,6 +645,7 @@ def enrich(src_dir: Path, graph: dict) -> dict:
             else:
                 ctx.module_funcs[file][fn.name] = f["key"]
             found.append((file, f, cls, fn))
+    _enrich_ts(src_dir, graph)  # 2a~2d — 화면 ID(3) 앞에: 더한 TS 함수도 화면 ID를 받는다
     _screen_items(src_dir, funcs)
     file_imports = {file: _imports(tree.body, file, ctx) for file, tree in trees.items()}
     have = {(c[0], c[1]) for c in graph["calls"]}
