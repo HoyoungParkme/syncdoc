@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -1104,7 +1104,7 @@ MINISPEC 항목인데 코드에 함수가 없으면 `function: null`·`missing: 
         $ref: '#/components/responses/NotFound'
 ```
 
-그래프가 없으면 `graph: null`에 빈 목록(UC-H20 1a). 커뮤니티를 모르는 옛 그래프면 `communities: []`이고 함수의 `community`가 null(5a) — 화면이 전부 펼쳐 보인다. `status`는 `compare` 결과로 코드만이 하나라도 있으면 `code_only`, 아니면 명세만이 있으면 `spec_only`, 아니면 `same`; MINISPEC 항목 없는 함수는 `ms`·`status`가 null. `item`은 그 함수가 속한 명세 항목 — MINISPEC이면 `ms`와 같고, 라우터·MCP 도구는 API 항목, 화면 코드는 파일의 화면 ID(카드 BJ). 옛 그래프(2026-10-02 이전)면 `ms`와 같다. `calls`는 `[부르는 key, 불리는 key]`쌍이고 `via`는 싣지 않는다. 응답은 수백 KB다 — 화면이 열 때 한 번 받고 배치는 브라우저가 한다.
+그래프가 없으면 `graph: null`에 빈 목록(UC-H20 1a). 커뮤니티를 모르는 옛 그래프면 `communities: []`이고 함수의 `community`가 null(5a) — 화면이 전부 펼쳐 보인다. `status`는 `compare` 결과로 코드만이 하나라도 있으면 `code_only`, 아니면 명세만이 있으면 `spec_only`, 아니면 `same`; MINISPEC 항목 없는 함수는 `ms`·`status`가 null. `item`은 그 함수가 속한 명세 항목 — MINISPEC이면 `ms`와 같고, 라우터·MCP 도구는 API 항목, 화면 코드는 파일의 화면 ID(카드 BJ). 옛 그래프(2026-10-02 이전)면 `ms`와 같다. `layer`는 항목이 없는 함수의 층 — 볼 때 클래스 명세의 층 표를 읽어 붙인다(그래프에 저장하지 않는다, 카드 BM). 클래스 명세나 표가 없으면 도우미만 붙는다. `calls`는 `[부르는 key, 불리는 key]`쌍이고 `via`는 싣지 않는다. 응답은 수백 KB다 — 화면이 열 때 한 번 받고 배치는 브라우저가 한다.
 
 #### GET/api/projects/{code}/code/source 함수 본문 — 파일·줄로
 
@@ -2463,6 +2463,20 @@ components:
               item: {type: string, nullable: true, description: "속한 명세 항목 DOC#ITEM — MINISPEC·API·UI 어느 문서든 (카드 BJ)"}
               ms: {type: string, nullable: true, description: "MINISPEC 항목 DOC#ITEM — item 중 MS 문서의 것"}
               status: {type: string, nullable: true, enum: [same, code_only, spec_only]}
+              layer:
+                type: object
+                nullable: true
+                description: "항목이 없는 함수의 층 — 클래스 명세 「폴더 구조」 절 층 표의 첫 일치 줄, 같은 파일에 항목 있는 함수가 있으면 도우미 (카드 BM)"
+                properties:
+                  name: {type: string, description: "층 이름. 도우미는 \"도우미\""}
+                  specs:
+                    type: array
+                    description: 명세 칸의 조각들. 도우미는 빈 목록
+                    items:
+                      type: object
+                      properties:
+                        ref: {type: string, nullable: true, description: "[[…]] 안 — DOC 또는 DOC#ITEM"}
+                        note: {type: string, description: 링크 뒤 글자(「4장」)}
         calls:
           type: array
           description: "[부르는 key, 불리는 key]"
