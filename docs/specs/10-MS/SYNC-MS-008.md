@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -181,8 +181,8 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 | `list_documents` | `reason` | [[#queries.document_list]] + [[SYNC-MS-002#SpecService.describe_documents]](제목) | `[{doc_id, stage, doc_type, title, status, version_no}]` | 없음 |
 | `get_document` | `doc_id, reason` | [[SYNC-MS-002#SpecService.get_document]] + 제목 | `{doc_id, title, status, version_no, items: [{item_id, display_name}], body}` 전문 | `DOC` |
 | `read_attachment` | `attachment_id, reason` | [[SYNC-MS-010#ConversationService.attachment_text]] | `{attachment_id, name, mime, text}` — 글자 파일은 본문 그대로, PDF는 뽑은 글자. 이 대화의 첨부가 아니거나 이미지면 `{"error": "없음"}`(이미지엔 `hint`: 「이미지는 붙인 질문에 이미 보였다」) | `첨부:{name}` |
-| `code_graph` | `doc_id, item_id, reason` | [[#queries.code_view]] | `{graph: {commit, source, error}, item, is_ms, missing, function: {qual, file, line, end, calls: [{id, status, qual, file, line}], callers: [{id, qual, file, line}]}, functions: [{id, qual, file, line, same, code_only, spec_only}]}` — [[SYNC-API-002#get_code_graph]]과 같은 뜻. 그래프가 없으면 `{"error": "코드 그래프 없음"}`(카드 AZ) | `코드:DOC#ITEM` |
-| `read_code` | `target, reason` — `target`은 MINISPEC 항목 ID(`문서#항목`) · 함수 이름(`Class.fn`) · 파일 경로(`path` 또는 `path:시작-끝`) | [[SYNC-MS-011#CodeGraphService.read]] — 항목 ID는 [[SYNC-MS-011#codegraph.compare]]로 함수 자리를, 함수 이름은 그래프의 `qual`로 찾는다 | `{path, start, end, commit, truncated, text}` — `text`는 줄마다 `번호: 내용`. 300줄까지 · 비밀 꼴·저장소 밖·없는 파일·모르는 함수는 `{"error": "없음", hint}`(카드 AZ) | `코드:path:시작-끝` |
+| `code_graph` | `doc_id, item_id, reason` | [[#queries.code_view]] | `{graph: {commit, source, error}, item, is_ms, missing, function: {qual, file, line, end, calls: [{id, status, qual, file, line}], callers: [{id, qual, file, line}]}, functions: [{id, qual, file, line, same, code_only, spec_only}]}` — [[SYNC-API-002#get_code_graph]]과 같은 뜻. API·UI 항목이면 `function`이 그 항목의 함수이고 `status`가 null(대조 없음, 카드 BK). 그래프가 없으면 `{"error": "코드 그래프 없음"}`(카드 AZ) | `코드:DOC#ITEM` |
+| `read_code` | `target, reason` — `target`은 항목 ID(`문서#항목` — MINISPEC·API·UI 어느 문서든) · 함수 이름(`Class.fn`) · 파일 경로(`path` 또는 `path:시작-끝`) | [[SYNC-MS-011#CodeGraphService.read]] — 항목 ID는 [[SYNC-MS-011#codegraph.compare]]로 함수 자리를, 없으면 [[SYNC-MS-011#codegraph.item_function]](API·UI 항목, 카드 BK), 함수 이름은 그래프의 `qual`로 찾는다 | `{path, start, end, commit, truncated, text}` — `text`는 줄마다 `번호: 내용`. 300줄까지 · 비밀 꼴·저장소 밖·없는 파일·모르는 함수는 `{"error": "없음", hint}`(카드 AZ) | `코드:path:시작-끝` |
 
 **처리**
 1. `name`이 여섯 밖 → `ToolResult(None, {"error": "없는 도구"})` · 필수 인자가 빠짐 → `{"error": "인자 X가 없다"}`
@@ -193,7 +193,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 
 **결과 형식** JSON 문자열. MCP 도구([[SYNC-API-002]])와 같은 모양이라 에이전트가 이미 보는 것과 같고, 마크다운 본문을 안에 그대로 담아도 경계가 안 흐트러진다. 크기 상한 없음(사용자 결정) — 큰 문서 전문이 맥락을 넘기면 모델이 400을 주고 `llm-unavailable`로 접힌다
 
-**`_ASK_TOOLS`** — `ToolSpec` 여덟. `description`은 [[SYNC-API-002]] 3장의 도구 설명 문장을 가져다 쓴다(`read_attachment`는 MCP에 없다 — 「이 대화에 붙인 글자·PDF 첨부의 글자를 읽는다. 시작 맥락의 [첨부] 줄에 있는 id로」. `code_graph`는 `get_code_graph`의 문장이고, `read_code`도 MCP에 없다 — 「그래프를 만든 커밋의 코드를 읽는다. target은 MINISPEC 항목 ID(문서ID#항목ID) · 함수 이름(Class.fn) · 파일 경로(path 또는 path:시작-끝). 300줄까지, 줄마다 번호가 붙는다. 키·인증서 같은 비밀 파일은 읽을 수 없다.」). `parameters`는 JSON Schema `{type: object, properties: {doc_id: {type: string}, item_id: {type: string}, attachment_id: {type: integer}, reason: {type: string}}, required: [...]}` — 도구마다 위 표의 인자가 `required`
+**`_ASK_TOOLS`** — `ToolSpec` 여덟. `description`은 [[SYNC-API-002]] 3장의 도구 설명 문장을 가져다 쓴다(`read_attachment`는 MCP에 없다 — 「이 대화에 붙인 글자·PDF 첨부의 글자를 읽는다. 시작 맥락의 [첨부] 줄에 있는 id로」. `code_graph`는 `get_code_graph`의 문장이고, `read_code`도 MCP에 없다 — 「그래프를 만든 커밋의 코드를 읽는다. target은 항목 ID(문서ID#항목ID — MINISPEC·API·UI 어느 문서든) · 함수 이름(Class.fn) · 파일 경로(path 또는 path:시작-끝). 300줄까지, 줄마다 번호가 붙는다. 키·인증서 같은 비밀 파일은 읽을 수 없다.」). `parameters`는 JSON Schema `{type: object, properties: {doc_id: {type: string}, item_id: {type: string}, attachment_id: {type: integer}, reason: {type: string}}, required: [...]}` — 도구마다 위 표의 인자가 `required`
 
 **출력** `ToolResult(target, text)` — `target`은 「본 것」에 실을 `DOC#ITEM`·`DOC`, 목록 도구는 `None`
 
@@ -201,7 +201,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 
 **테스트 관점(추가, #110)** 없는 항목의 「없음」에 `hint`가 있다 · 지시문에 「먼저 보고 있는 항목을 get_item으로 읽는다」가 있다
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.describe_documents]] · [[#queries.item_references_view]] [[#queries.item_chain]] [[#queries.document_list]] · [[#queries.code_view]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#CodeGraphService.read]] · [[SYNC-MS-010#ConversationService.attachment_text]] · [[#queries.document_view]] · [[#queries.item_view]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.describe_documents]] · [[#queries.item_references_view]] [[#queries.item_chain]] [[#queries.document_list]] · [[#queries.code_view]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#codegraph.item_function]] · [[SYNC-MS-011#CodeGraphService.read]] · [[SYNC-MS-010#ConversationService.attachment_text]] · [[#queries.document_view]] · [[#queries.item_view]]
 
 **호출되는 것** [[#queries.ask_item]] 5단계
 
@@ -220,7 +220,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 0. `if not settings.LLM_API_KEY → ! LlmNotConfigured` · `project = ProjectService.get_owned(code, user)` · 대화 검사·`history`·`add_turn`·첨부 목록은 `ask_item` 1과 같다
 1. `row = CodeGraphService.get(project.id)` — 없으면 `graph_line = "코드 그래프 없음 — 코드를 push하면 만들어진다"`(2b), 있으면 `[코드 그래프] 커밋 {7자} · 함수 N · 호출 M`
 2. `docs = SpecService.list_by_project(project.id)` + `describe_documents` → `[문서 목록]` 줄마다 `ID 제목 · 상태`(본문 없음 — 사용자 결정 3)
-3. `key`가 있으면: `f = functions 중 key` · 없으면 `! not-found {resource: function}` · `d = codegraph.compare(graph, spec_calls)` 중 이 함수 → `[보는 함수] {qual} · {file}:{line}–{end} · 항목 {ms} ({status})` 또는 `항목 없음` · `[부르는 것 n]`·`[불리는 곳 n]` 줄마다 `qual · file:line · 항목`(각 20까지, 넘으면 `… k개 더`). `key`가 없으면 `[보는 것] 그래프 전체`
+3. `key`가 있으면: `f = functions 중 key` · 없으면 `! not-found {resource: function}` · `d = codegraph.compare(graph, spec_calls)` 중 이 함수 → `[보는 함수] {qual} · {file}:{line}–{end} · 항목 {ms} ({status})` · 대조가 없고 `f.item`이 있으면 `항목 {item}`(API·UI 항목 — 카드 BK) · 둘 다 없으면 `항목 없음` · `[부르는 것 n]`·`[불리는 곳 n]` 줄마다 `qual · file:line · 항목`(같은 규칙, 각 20까지, 넘으면 `… k개 더`). `key`가 없으면 `[보는 것] 그래프 전체`
 4. `system = _ASK_CODE_SYSTEM.format(graph_line, docs, viewing, attachments)` → `yield from _ask_loop(system, code, …, AskStart(doc_id=None, item_id=None, key=key))` — 이벤트 여섯·상한·`finish_turn`·로그 전부 같다. 로그는 `ask code=%s key=%s …`
 
 **호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-010#ConversationService.get]] [[SYNC-MS-010#ConversationService.history]] [[SYNC-MS-010#ConversationService.add_turn]] [[SYNC-MS-010#ConversationService.pending_images]] [[SYNC-MS-010#ConversationService.finish_turn]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] [[SYNC-MS-002#SpecService.describe_documents]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.item_blocks]](대조용 MINISPEC 항목 — `ask_item`·`code_nodes`와 같은 `_diffs`) · [[SYNC-MS-011#codegraph.spec_calls]] [[SYNC-MS-011#codegraph.compare]] · [[#queries.ask_tool]] · [[SYNC-MS-009#llm.step_stream]]
@@ -234,7 +234,8 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 함수 자체를 묻는 질문(뭐 하는 함수야·왜 이렇게 했어)은 read_code로 본문을 읽고 답한다.
 명세와 맞는지 물으면 항목이 있으면 code_graph로 대조(같음·코드만·명세만)를 보고 get_item으로
 그 항목을 읽어 견준다. 항목이 없는 함수면 부르는 것·불리는 곳의 항목을 따라간다 — 그 함수가
-어느 명세의 어느 자리를 받치는지 거기서 보인다. 코드 근거는 파일:줄로, 명세 근거는
+어느 명세의 어느 자리를 받치는지 거기서 보인다. API·UI 항목인 함수는 대조가 없다 — get_item으로
+그 항목을 읽고 code_graph로 하위 MINISPEC 함수를 본다. 코드 근거는 파일:줄로, 명세 근거는
 문서ID#항목ID로 댄다. 코드 그래프가 없다고 적혀 있으면 그렇다고 말하고 지어내지 않는다.
 
 {graph_line}
@@ -482,13 +483,14 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 1. `row = CodeGraphService.get(project.id)` · if None → `CodeView(graph=None, …, functions=[])` (UC-H20 1a)
 2. `items` = 프로젝트의 MINISPEC 문서마다(`SpecService.list_by_project(stage=MS)`) `SpecService.get_document` → `SpecService.item_blocks(본문)` → `(문서ID#항목ID, 블록)` · `spec = codegraph.spec_calls(items)` · `diffs = codegraph.compare(row.graph, spec)`
 3. if MINISPEC 문서이고 `item_id` → 그 항목의 diff로 `CodeFunction` — `calls`: 코드만 → 명세만 → 같음 순, 줄마다 `CodeRef`(상대 항목의 함수가 있으면 qual·파일·줄) · `callers`: 다른 항목의 diff에서 이 항목이 같음·코드만에 든 것 · 함수가 없으면 `function=None, missing=True`(2b)
+3a. 3이 함수를 못 찾았고 `item_id`가 있으면 `f = `[[SYNC-MS-011#codegraph.item_function]]`(graph, 문서ID#항목ID)` — 있으면 `function = CodeFunction(항목ID, qual, file, line, end, calls, callers)`, `calls`·`callers`는 [[SYNC-MS-011#codegraph.item_neighbors]]의 함수를 `CodeRef(그 함수의 item, qual, file, line, status=None)`로 — **대조 없음**(API·UI 항목, 카드 BK). 4의 하위 체인 목록은 그대로 더한다. MINISPEC 항목이 3a로 찾아지면 `missing=False`
 4. if MINISPEC가 아닌 문서이고 `item_id` → `chain = `[[#queries.item_chain]]`(doc_id, item_id, user)` · 하위(`downstream`)이면서 MINISPEC 단계인 항목 → `functions = [CodeBrief]`(어긋남 수)
 5. if MINISPEC 문서이고 `item_id` 없음 → 그 문서 항목 전부의 `CodeBrief`(블록 순서)
 6. `→ CodeView(graph=머리(row), doc_id, item_id, is_ms, missing, function, functions)`
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.resolve_item]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-011#codegraph.spec_calls]] · [[SYNC-MS-011#codegraph.compare]] · [[#queries.item_chain]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.resolve_item]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-011#codegraph.spec_calls]] · [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#codegraph.item_function]] · [[SYNC-MS-011#codegraph.item_neighbors]] · [[#queries.item_chain]]
 
-**테스트 관점** 그래프 없음 → `graph` None · MINISPEC 항목 → `calls`가 코드만·명세만·같음 순이고 `callers`가 있다 · 코드에 없는 MINISPEC 항목 → `missing` · PRD 항목 → 하위 체인의 MINISPEC 함수와 어긋남 수 · MINISPEC 문서 단위 → 그 문서 함수 전부 · 남의 프로젝트 → `not-found` · 명세의 「호출하는 것」만 바꾸면 그래프를 안 바꿔도 결과가 바뀐다
+**테스트 관점** 그래프 없음 → `graph` None · MINISPEC 항목 → `calls`가 코드만·명세만·같음 순이고 `callers`가 있다 · 코드에 없는 MINISPEC 항목 → `missing` · PRD 항목 → 하위 체인의 MINISPEC 함수와 어긋남 수 · API 항목 → 그 라우터 함수와 `status` None인 부르는 것, 하위 체인 목록도 · UI 항목 → 파일 이름과 같은 컴포넌트 · 옛 그래프(`item` 없음)의 API 항목 → `function` None · MINISPEC 문서 단위 → 그 문서 함수 전부 · 남의 프로젝트 → `not-found` · 명세의 「호출하는 것」만 바꾸면 그래프를 안 바꿔도 결과가 바뀐다
 
 ---
 
@@ -540,13 +542,13 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 **처리**
 0. `project = ProjectService.get_owned(…)` · `SpecService.resolve_item(doc_id, item_id)`
 1. `row = CodeGraphService.get(project.id)` · if None → `! not-found {resource: code_graph}`
-2. `d = codegraph.compare(row.graph, {항목: ∅})[0]` — 그 항목의 함수 자리(docstring ID 먼저, 없으면 이름) · if `d.function` None → `! not-found {resource: function}`
+2. `d = codegraph.compare(row.graph, {항목: ∅})[0]` — 그 항목의 함수 자리(docstring ID 먼저, 없으면 이름) · `d.function`이 None이면 [[SYNC-MS-011#codegraph.item_function]](API·UI 항목, 카드 BK) · 그것도 없으면 `! not-found {resource: function}`
 3. `start = 함수.line` · `end = 함수.end` — 없으면(파이썬 밖) 같은 파일 다음 함수 앞 줄, 그것도 없으면 `start + 59`
 4. `→ `[[SYNC-MS-011#CodeGraphService.read]]`(project.id, workdir, 함수.file, start, end)`
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.resolve_item]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#CodeGraphService.read]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.resolve_item]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#codegraph.item_function]] · [[SYNC-MS-011#CodeGraphService.read]]
 
-**테스트 관점** 함수 본문이 그래프 커밋의 것 · 파이썬 함수는 끝 줄까지 · 그래프 없음·함수 없음 → `not-found`
+**테스트 관점** 함수 본문이 그래프 커밋의 것 · 파이썬 함수는 끝 줄까지 · API 항목은 `item`으로 찾은 함수의 본문(카드 BK) · 그래프 없음·함수 없음 → `not-found`
 
 ---
 
