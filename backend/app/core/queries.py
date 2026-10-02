@@ -1251,6 +1251,7 @@ async def code_nodes(code: str, user: User) -> CodeNodes:
         status = None
         if d is not None:
             status = "code_only" if d.code_only else "spec_only" if d.spec_only else "same"
+        ms = d.ms_id if d else None
         functions.append(
             CodeNode(
                 f["key"],
@@ -1259,7 +1260,8 @@ async def code_nodes(code: str, user: User) -> CodeNodes:
                 f["file"],
                 f["line"],
                 f.get("community"),
-                d.ms_id if d else None,
+                f.get("item") or ms,  # 옛 그래프(2026-10-02 이전)는 item이 없다 — ms로
+                ms,
                 status,
             )
         )

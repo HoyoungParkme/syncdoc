@@ -561,14 +561,15 @@ export function CodeGraph() {
       .catch((e) => seq === srcSeq.current && setSrc({ key: codeKey, error: e instanceof ApiError ? e.message : String(e) }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codeKey, code])
-  // 4.7 명세 — 항목이 있으면 그 항목의 참조를 한 번 (참조 탭 8.1과 같은 자료). 늦은 답은 버린다
+  // 4.7 명세 — 항목(item — MINISPEC만이 아니다, 카드 BJ)이 있으면 그 항목의 참조를 한 번 (참조 탭 8.1과 같은 자료). 늦은 답은 버린다
   useEffect(() => {
-    if (!codeKey || !codeTarget?.ms) {
+    const it = codeTarget?.item ?? codeTarget?.ms
+    if (!codeKey || !it) {
       setRefs(null)
       return
     }
     const seq = ++refSeq.current
-    const { doc, item } = msParts(codeTarget.ms)
+    const { doc, item } = msParts(it)
     setRefs({ key: codeKey })
     api
       .get<ItemReferences>(`/api/docs/${doc}/items/${item.replace(/\//g, '~')}/references`)
@@ -663,20 +664,23 @@ export function CodeGraph() {
         <span className="nm2">{r.item_id ? r.display_name : `(문서 전체) ${r.display_name ?? ''}`}</span>
       </div>
     )
+  // 속한 항목 — MINISPEC만이 아니다(라우터는 API 항목, 화면은 UI-N). 옛 그래프는 item이 없어 ms (카드 BJ)
+  const itemOf = (f: CodeNode) => f.item ?? f.ms
   const specBlock = (f: CodeNode) => {
     const LIMIT = 8
-    if (!f.ms) {
-      const near = [...callsOf(f.key), ...callersOf(f.key)].filter((x) => x.ms)
+    const it = itemOf(f)
+    if (!it) {
+      const near = [...callsOf(f.key), ...callersOf(f.key)].filter((x) => itemOf(x))
       const seen = new Set<string>()
-      const items = near.filter((x) => (seen.has(x.ms!) ? false : (seen.add(x.ms!), true))).sort((a, b) => (degree.get(b.key) ?? 0) - (degree.get(a.key) ?? 0)).slice(0, 6)
+      const items = near.filter((x) => (seen.has(itemOf(x)!) ? false : (seen.add(itemOf(x)!), true))).sort((a, b) => (degree.get(b.key) ?? 0) - (degree.get(a.key) ?? 0)).slice(0, 6)
       return (
         <div className="spec" data-el="4.7">
           <div className="k">명세</div>
           <div className="it lbl">항목 없음{items.length ? ' · 가까운 항목' : ''}</div>
           {items.map((x, i) => {
-            const m = msParts(x.ms!)
+            const m = msParts(itemOf(x)!)
             return (
-              <div className="sr" key={x.ms} data-el={i === 0 ? '4.8' : undefined} onClick={() => setPeek({ doc_id: m.doc, item_id: m.item })} title={`${x.ms!} — 항목 미리보기 (UI-18)`}>
+              <div className="sr" key={itemOf(x)} data-el={i === 0 ? '4.8' : undefined} onClick={() => setPeek({ doc_id: m.doc, item_id: m.item })} title={`${itemOf(x)!} — 항목 미리보기 (UI-18)`}>
                 <ItemIdBadge>{m.short}</ItemIdBadge>
                 <span className="nm2">{x.qual}</span>
               </div>
@@ -685,14 +689,14 @@ export function CodeGraph() {
         </div>
       )
     }
-    const m = msParts(f.ms)
+    const m = msParts(it)
     const d = refs?.data
     const up = d?.upstream ?? []
     const down = d?.downstream ?? []
     return (
       <div className="spec" data-el="4.7">
         <div className="k">명세</div>
-        <div className="it">
+        <div className="it peekable" onClick={() => setPeek({ doc_id: m.doc, item_id: m.item })} title={`${it} — 항목 미리보기 (UI-18)`}>
           <ItemIdBadge>{m.short}</ItemIdBadge>
         </div>
         {refs?.error ? (

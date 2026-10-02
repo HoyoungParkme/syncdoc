@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -521,13 +521,13 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 0. `project = ProjectService.get_owned(code, user)`
 1. `row = CodeGraphService.get(project.id)` · if None → `CodeNodes(graph=None, communities=[], functions=[], calls=[])`
 2. `code_view` 2단계와 같이 `spec`·`diffs` — `by_key = {d.function: d for d in diffs if d.function}`
-3. 함수마다 `CodeNode(key, name, qual, file, line, community=f.get("community"), ms, status)` — `d = by_key.get(key)` · 없으면 `ms`·`status` None · `status` = if `d.code_only` → `code_only` · elif `d.spec_only` → `spec_only` · else `same`
+3. 함수마다 `CodeNode(key, name, qual, file, line, community=f.get("community"), item=f.get("item") or ms, ms, status)` — `d = by_key.get(key)` · 없으면 `ms`·`status` None · `status` = if `d.code_only` → `code_only` · elif `d.spec_only` → `spec_only` · else `same`. `item`은 그래프의 `item`(API·UI 항목도, 카드 BJ) — 옛 그래프(`item` 없음)는 `ms`
 4. `communities = [CodeCommunity(id, label, size) for c in row.graph.get("communities", [])]` — 옛 그래프는 빈 목록 · `calls = [[a, b] for a, b, _ in row.graph["calls"]]`
 5. `→ CodeNodes(graph=머리(row), communities, functions, calls)`
 
 **호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-011#codegraph.spec_calls]] · [[SYNC-MS-011#codegraph.compare]]
 
-**테스트 관점** 항목 있는 함수에 `ms`·`status`(코드만 > 명세만 > 같음) · 도우미는 `ms` None · 커뮤니티 목록과 함수의 `community`가 그래프 그대로 · 옛 그래프(`communities` 없음) → 빈 목록, `community` None · 그래프 없음 → `graph` None · 남의 프로젝트 → `not-found`
+**테스트 관점** 항목 있는 함수에 `ms`·`status`(코드만 > 명세만 > 같음) · 도우미는 `ms` None · API 항목 함수는 `item`만 있고 `ms`·`status` None · 커뮤니티 목록과 함수의 `community`가 그래프 그대로 · 옛 그래프(`communities`·`item` 없음) → 빈 목록, `community` None, `item`은 `ms` · 그래프 없음 → `graph` None · 남의 프로젝트 → `not-found`
 
 ---
 

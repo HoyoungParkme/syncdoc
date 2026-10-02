@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1281,6 +1281,18 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | MS-008 테스트 관점(ask_code — 시작 맥락에 문서 목록·그래프 머리·함수 블록, key 없음=그래프 전체, 그래프 없음, 없는 key 404, 남의 것 404, 키 없음 503) · 라우터 SSE start에 key · ask_item 회귀 · `check_ui` UI-17 +3 · 헤드리스: 탭 전환·맥락 줄·`?panel=ask` · 운영: 함수를 고르고 묻기 → read_code·get_item 읽음·답 |
 | 선행 | BH |
 | 완료 | 2026-10-01 · 브랜치 `card/BI-code-ask`(f324221 #270) · spec 10 + code 5 · 테스트 388 · `ruff`·`tsc`·`oxlint` · `validate` 0/0 · `check_code` 157/157 · `check_calls` 0/0 · `check_ui` 14/14(UI-17 30, UI-5 59) · `check_view_html` 35/35 · 헤드리스(가짜 키, 콘솔 0): 탭 4.9 → `?panel=ask` → 「그래프 전체」 → 함수 고름 → 「queries.code_nodes · 이 함수를 보며」 → 보내기 → `POST /code/ask`에 `key` → error 표시 → 함수 탭 · UI-5 8.5 회귀 · 운영(컨테이너 안에서 `ask_code` 직접 호출, 실제 모델): `queries.code_nodes`를 두고 「명세대로 구현됐어?」 → `code_graph` 읽음 1회, 3.3초, 「명세대로… backend/app/core/queries.py:1235–1269」 — 대화 35에 남음 · 화면은 사람이 직접(DEV-17) |
+
+---
+
+#### BJ 코드 그래프의 항목을 MINISPEC 밖으로 — API·UI 항목
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R13]] 마지막 인수기준 · [[SYNC-UC-001#UC-H20]] 기본 흐름 5 · [[SYNC-MS-011#codegraph.reduce]] 3 · [[SYNC-MS-011#codegraph.enrich]] 2·3 · [[SYNC-MS-008#queries.code_nodes]] 3 · [[SYNC-API-001#GET/api/projects/{code}/code-graph]] `item` · [[SYNC-UI-002#UI-17]] 4.7·S-7 5~6 · [[SYNC-UI-001]] 7장 12 · [[SYNC-STD-004#DEV-3]] · 사용자 질문 2026-10-01 「명세가 없는 것들은 뭐야?」 · 사용자 결정 2026-10-02(파일 첫 주석의 화면 ID를 그 파일 함수 전부에 · 뱃지는 미리보기) |
+| 구현 | `graph.py` — 항목 ID 정규식을 어느 문서든으로, `reduce`·`enrich`가 `item`(+`-MS-`면 `ms`)을 쓰고, `enrich` 2a가 `.ts/.tsx/.js/.jsx` 파일 첫 주석의 화면 ID를 그 파일 함수에 준다. `compare`·`check_calls`는 `ms` 그대로 · `CodeNode.item`(types·schema·client) · `queries.code_nodes` `item=f.get("item") or ms` · `CodeGraph.tsx` 4.7·가까운 항목을 `item`으로, 머리 뱃지 → UI-18 |
+| 테스트 | MS-011 테스트 관점(reduce — API ID는 `item`만·설명 잘림 · enrich — tsx 첫 주석 → 파일 함수 전부, 함수 docstring 우선, 화면 ID 없는 파일 null) · MS-008(code_nodes — API 항목 함수 `item`만, 옛 그래프 `item`=`ms`) · `check_calls` 0/0 그대로 · 헤드리스: 라우터 함수 → API 뱃지·근거 → 뱃지 클릭 → 팝업 · `CodeGraph` → `UI-002#UI-17` · 리포지토리 함수 → 「항목 없음」 · 운영: SYNC 재구축 뒤 `item` 있는 함수 수 |
+| 선행 | BI |
+| 완료 | — |
 
 ---
 

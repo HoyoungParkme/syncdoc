@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-004
 type: STD
 title: 개발 규약 — 코드 파트 표준
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -46,6 +46,8 @@ async def save_pipeline(...):
 ```
 
 코드에서 명세로 돌아가는 유일한 고리. 검사기가 이걸로 MINISPEC↔코드 일치를 대조한다(4장).
+
+MINISPEC 밖의 층도 같은 꼴이다 — 라우터는 `"""SYNC-API-001#GET/api/docs/{docId}/code — 설명"""`, MCP 도구는 `"""SYNC-API-002#get_item"""`(ID 뒤 ` — 설명`은 자유). 화면 컴포넌트는 파일 첫 주석의 화면 ID(DEV-17). 코드 그래프가 이 ID를 함수의 「속한 항목」으로 읽어 명세 연관(UI-17 4.7)을 보인다(카드 BJ) — 대조(4장)는 MINISPEC ID에만.
 
 `_`로 시작하는 비공개 헬퍼는 MINISPEC이 없어도 된다 — 단 **그 모듈 밖에서 부르지 않는다.** 밖에서 부르게 되면 MINISPEC 항목으로 올린다.
 

@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-011
 type: MS
 title: MINISPEC — codegraph — 코드 호출 그래프와 명세 대조
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 ---
 
@@ -24,7 +24,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 | 키 | 모양 | 뜻 |
 |---|---|---|
-| `functions` | `[{key, name, qual, file, line, end, ms, community}]` | 저장소 안에 정의된 함수·메서드. `key`는 `파일:줄`. `qual`은 `Class.fn` 또는 `모듈.fn`. `end`는 끝 줄(모르면 null). `ms`는 docstring 첫 줄의 항목 ID(없으면 null). `community`는 든 커뮤니티 번호(없으면 null — 카드 BD) |
+| `functions` | `[{key, name, qual, file, line, end, item, ms, community}]` | 저장소 안에 정의된 함수·메서드. `key`는 `파일:줄`. `qual`은 `Class.fn` 또는 `모듈.fn`. `end`는 끝 줄(모르면 null). `item`은 이 함수가 속한 명세 항목 ID — docstring 첫 줄의 항목 ID(어느 문서든 — MINISPEC·API·UI…), 화면 코드(`.ts/.tsx/.js/.jsx`)는 파일 첫 주석의 화면 ID(없으면 null — 카드 BJ). `ms`는 그중 MINISPEC 항목일 때 같은 값(아니면 null) — 대조는 `ms`로만. `community`는 든 커뮤니티 번호(없으면 null — 카드 BD). **`item`은 2026-10-02 이전 그래프에 없다** — 읽는 쪽이 `ms`로 본다 |
 | `calls` | `[[from_key, to_key, via]]` | 호출 선. `via`는 `graphify`(graphify가 찾은 것) 또는 `enrich`(싱크독이 보강한 것) |
 | `communities` | `[{id, label, size}]` | 함수가 하나라도 든 커뮤니티(카드 BD). `id`는 graphify `cluster`의 번호(0이 가장 큼), `label`은 허브 노드 이름, `size`는 든 함수 수. **2026-10-01 이전 그래프에는 없다** — 읽는 쪽이 빈 것으로 본다 |
 
@@ -94,12 +94,12 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 **처리**
 1. 함수 = `_callable`이 참이고 `_callable_class`가 아닌 노드. `file` = `source_file`, `line` = `source_location`의 `L` 뒤 숫자, `key` = `f"{file}:{line}"`, `name` = `label`에서 앞 `.`과 뒤 `()`를 뗀 것
 2. `qual` — 메서드면 `method` 선으로 매단 클래스 노드의 이름을 붙여 `Class.fn`, 아니면 `모듈.fn`. 모듈 이름은 파일 이름에서 확장자를 뗀 것이고, 그것이 `service`·`__init__`·`index`면 **그 폴더 이름** — `core/codegraph/service.py`의 함수는 `codegraph.x`
-3. `ms` — `rationale_for` 선으로 붙은 docstring 노드의 라벨이 `^[A-Z][A-Z0-9]*-MS-\d+#[\w.]+`로 시작하면 그 ID. 아니면 null
+3. `item` — `rationale_for` 선으로 붙은 docstring 노드의 라벨이 `^[A-Z][A-Z0-9]*-[A-Z]+-\d+#\S+`로 시작하면 그 ID(공백 앞까지 — `SYNC-API-001#GET/api/docs/{docId} — 설명`에서 ` — ` 앞). 아니면 null. `ms` — `item`이 `-MS-` 문서의 항목이면 같은 값, 아니면 null(카드 BJ — 전에는 MINISPEC ID만 읽었다)
 4. `calls` = `calls`·`indirect_call` 선 중 양 끝이 1의 함수인 것 → `[from_key, to_key, "graphify"]`. 같은 쌍은 하나로
 5. import·포함·문서 링크·docstring·개념 노드는 버린다. 군집은 [[#codegraph.communities]]가 raw 그래프에서 따로 계산해 붙인다(카드 BD) — 여기서는 `community`를 두지 않는다
 6. `→ {"functions": [...], "calls": [...]}` (`end`는 null로 둔다 — 파이썬은 `enrich`가 채운다)
 
-**테스트 관점** 클래스 노드·import 선이 빠진다 · 메서드는 `Class.fn`, `service.py`의 함수는 폴더 이름 · docstring ID가 `ms`로 · 같은 호출 둘 → 하나
+**테스트 관점** 클래스 노드·import 선이 빠진다 · 메서드는 `Class.fn`, `service.py`의 함수는 폴더 이름 · MINISPEC docstring ID가 `item`·`ms` 둘 다로 · API docstring ID(`#` 뒤에 `/`·`{}`)는 `item`에만, 설명은 잘린다 · 같은 호출 둘 → 하나
 
 ---
 
@@ -111,14 +111,15 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 **입력** `graph` — `reduce`의 결과. `src_dir` — 같은 커밋의 파일
 
-**처리** — `graph.functions` 중 `.py` 파일만. 다른 언어는 손대지 않는다
+**처리** — `graph.functions` 중 `.py` 파일(1·2·4·5)과 화면 코드 `.ts/.tsx/.js/.jsx`(3)만. 다른 언어는 손대지 않는다
 1. 파일마다 `ast.parse`. 함수 정의를 `(파일, def 줄)`과 `(파일, 첫 데코레이터 줄)` 둘로 찾아 그래프의 함수에 맞춘다(graphify가 어느 줄을 머리로 삼든 맞는다). 못 맞춘 정의는 새 함수로 더한다
-2. 맞춘 함수마다 `end` = `end_lineno` · `qual` = AST로 본 `Class.fn`/`모듈.fn`(2단계 규칙과 같다) · docstring 첫 줄이 항목 ID면 `ms`를 그것으로(AST가 진실)
-3. 함수 몸통에서 **타입을 아는 변수**를 모은다 — 인자 주석 `x: Cls` · `x = Cls(…)` · `a, b = A(…), B(…)`. `Cls`는 이 그래프 안에 정의된 클래스 이름일 때만
-4. 호출 `x.m(…)`(3의 변수) · `Cls(…).m(…)` · `self.m(…)`(메서드 안) → `Cls.m`이 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다
-5. `→ graph` (같은 객체에 더해 돌려준다)
+2. 맞춘 함수마다 `end` = `end_lineno` · `qual` = AST로 본 `Class.fn`/`모듈.fn`(2단계 규칙과 같다) · docstring 첫 줄이 항목 ID(`reduce` 3의 정규식)면 `item`을 그것으로, `-MS-` 문서면 `ms`도(AST가 진실)
+3. 화면 코드 — 파일마다 **첫 주석**(맨 위 `/** … */` 또는 `//` 묶음)에서 `[A-Z][A-Z0-9]*-UI-\d{3}#UI-\d+`를 찾아, 그 파일 함수 중 `item`이 없는 것 전부에 준다(`ms`는 건드리지 않는다). 화면 하나 = 파일 하나(DEV-17)라 파일 단위로 잇는다. 첫 주석에 화면 ID가 없는 파일(공용 부품·뷰 렌더러)은 그대로 null. 2026-10-02 사용자 결정, 카드 BJ
+4. 함수 몸통에서 **타입을 아는 변수**를 모은다 — 인자 주석 `x: Cls` · `x = Cls(…)` · `a, b = A(…), B(…)`. `Cls`는 이 그래프 안에 정의된 클래스 이름일 때만
+5. 호출 `x.m(…)`(4의 변수) · `Cls(…).m(…)` · `self.m(…)`(메서드 안) → `Cls.m`이 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다
+6. `→ graph` (같은 객체에 더해 돌려준다)
 
-**테스트 관점** 다섯 꼴이 각각 선을 만든다 — 주석·대입·튜플 대입·즉석 생성·`self` · 모르는 클래스는 안 만든다 · graphify가 이미 잡은 선은 겹치지 않는다 · 데코레이터 달린 함수도 맞춘다 · docstring ID가 `ms`로
+**테스트 관점** 다섯 꼴이 각각 선을 만든다 — 주석·대입·튜플 대입·즉석 생성·`self` · 모르는 클래스는 안 만든다 · graphify가 이미 잡은 선은 겹치지 않는다 · 데코레이터 달린 함수도 맞춘다 · MINISPEC docstring ID가 `item`·`ms`로, API docstring ID는 `item`만 · `.tsx` 첫 주석의 화면 ID가 그 파일 함수 전부의 `item`으로(`ms`는 null), 화면 ID 없는 파일은 null
 
 ---
 

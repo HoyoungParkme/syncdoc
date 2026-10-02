@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -456,7 +456,7 @@ classDiagram
 | `CodeText` | `path` · `start` · `end` · `commit_hash` · `text` · `truncated: bool` | CodeGraphService.read → API `CodeText` · 질문 탭 `read_code`(카드 AZ) |
 | `CodeCallEdge` · `CodeCalls` | `from_: str` · `to: str` · `status: str` / `graph: CodeGraphInfo \| None` · `edges: list~CodeCallEdge~` | queries.code_calls → API `CodeCalls`(UI-8 코드 호출) |
 | `CodeCommunity` | `id: int` · `label: str` · `size: int` | 코드 그래프의 커뮤니티 하나(카드 BD). `size`는 든 함수 수 |
-| `CodeNode` | `key` · `name` · `qual` · `file` · `line` · `community: int \| None` · `ms: str \| None` · `status: str \| None` | 코드 그래프 노드 하나. `status`는 항목이 있을 때 `compare`로 — `code_only` > `spec_only` > `same` |
+| `CodeNode` | `key` · `name` · `qual` · `file` · `line` · `community: int \| None` · `item: str \| None` · `ms: str \| None` · `status: str \| None` | 코드 그래프 노드 하나. `item`은 속한 명세 항목(어느 문서든 — 카드 BJ), `ms`는 그중 MINISPEC 항목. `status`는 `ms`가 있을 때 `compare`로 — `code_only` > `spec_only` > `same` |
 | `CodeNodes` | `graph: CodeGraphInfo \| None` · `communities: list~CodeCommunity~` · `functions: list~CodeNode~` · `calls: list~list~str~~` | queries.code_nodes → API `CodeNodes`(UI-17 코드 그래프) |
 | `ConversationView` | `ConversationBrief` + `turns: list~TurnView~` + `pending: list~AttachmentMeta~`(아직 안 보낸 첨부) | ConversationService.get → API `Conversation` |
 
@@ -566,7 +566,7 @@ classDiagram
 관계
 - `CodeGraph` 0..1 — 1 `Project` (ID만. PK가 곧 `project_id` — 프로젝트마다 하나. 해제와 함께 cascade)
 
-**`graph`는 줄인 모양이다** — `{functions: [{key, name, qual, file, line, end, ms, community}], calls: [[from, to, via]], communities: [{id, label, size}]}`([[SYNC-MS-011]] 0장). import·포함 관계·문서 노드는 버리되, 그것으로 계산한 **커뮤니티**는 함수마다 번호로 남긴다(카드 BD). **코드 본문과 대조 결과는 없다** — 본문은 저장소에서, 대조는 읽을 때.
+**`graph`는 줄인 모양이다** — `{functions: [{key, name, qual, file, line, end, item, ms, community}], calls: [[from, to, via]], communities: [{id, label, size}]}`([[SYNC-MS-011]] 0장). import·포함 관계·문서 노드는 버리되, 그것으로 계산한 **커뮤니티**는 함수마다 번호로 남긴다(카드 BD). **코드 본문과 대조 결과는 없다** — 본문은 저장소에서, 대조는 읽을 때.
 
 ---
 
