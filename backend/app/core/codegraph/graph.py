@@ -568,3 +568,53 @@ def compare(graph: dict, spec: dict[str, set[str]]) -> list[CallDiff]:
             CallDiff(mid, key, sorted(want & code), sorted(code - want), sorted(want - code))
         )
     return out
+
+
+def item_function(graph: dict, item_id: str) -> dict | None:
+    """SYNC-MS-011#codegraph.item_function
+
+    항목 ID → 그 항목의 함수. 화면 항목은 파일 함수 전부가 같은 item이라 파일 이름과 같은
+    함수(`CodeGraph.tsx`의 `CodeGraph`)로 좁히고, 없으면 (파일, 줄) 순 첫 함수(카드 BK).
+    """
+    cands = [f for f in graph.get("functions", []) if f.get("item") == item_id]
+    if not cands:
+        return None
+    named = [f for f in cands if f["name"] == PurePosixPath(f["file"]).stem]
+    return min(named or cands, key=lambda f: (f["file"], f["line"]))
+
+
+def item_neighbors(graph: dict, key: str) -> tuple[list[str], list[str]]:
+    """SYNC-MS-011#codegraph.item_neighbors
+
+    함수의 부르는 것·불리는 곳을 항목(item) 있는 함수까지 — 항목 없는 도우미와 **같은 항목**의
+    함수는 건너 계속, 다른 항목에 닿으면 멈춘다(compare 3과 같은 걷기, 양방향). 항목 ID로 접어
+    항목 ID 순(카드 BK).
+    """
+    by_key = {f["key"]: f for f in graph.get("functions", [])}
+    start = by_key.get(key)
+    if start is None:
+        return [], []
+    own = start.get("item")
+    fwd: dict[str, list[str]] = defaultdict(list)
+    back: dict[str, list[str]] = defaultdict(list)
+    for a, b, *_ in graph.get("calls", []):
+        fwd[a].append(b)
+        back[b].append(a)
+
+    def walk(adj: dict[str, list[str]]) -> list[str]:
+        found: dict[str, str] = {}  # 항목 ID → 먼저 닿은 함수 key
+        seen = {key}
+        stack = [key]
+        while stack:
+            for v in adj.get(stack.pop(), ()):
+                if v in seen or v not in by_key:
+                    continue
+                seen.add(v)
+                it = by_key[v].get("item")
+                if it and it != own:
+                    found.setdefault(it, v)  # 다른 항목 — 여기서 멈춘다
+                else:
+                    stack.append(v)  # 도우미·같은 항목 — 건너 계속
+        return [found[i] for i in sorted(found)]
+
+    return walk(fwd), walk(back)
