@@ -50,6 +50,26 @@ RAW = {
 }  # fmt: skip
 
 
+def test_reduce_lists_code_files_without_functions_too() -> None:
+    """#282 — 함수 없는 코드 파일도 files에(테스트 파일은 뺀다). enrich가 쓰고 지운다."""
+    raw = {
+        "nodes": [
+            *RAW["nodes"],
+            {"id": "f_api", "label": "api.ts", "file_type": "code", "source_file": "web/api.ts"},
+            {
+                "id": "f_t",
+                "label": "test_x.py",
+                "file_type": "code",
+                "source_file": "tests/test_x.py",
+            },
+            {"id": "d_doc", "label": "notes", "file_type": "document", "source_file": "notes.md"},
+        ],
+        "links": RAW["links"],
+    }
+    files = cg.reduce(raw)["files"]
+    assert "web/api.ts" in files and "tests/test_x.py" not in files and "notes.md" not in files
+
+
 def test_reduce_keeps_functions_and_calls_only() -> None:
     g = cg.reduce(RAW)
     by = {f["name"]: f for f in g["functions"]}
@@ -296,6 +316,21 @@ def _ts_src(tmp_path: Path) -> Path:
         (tmp_path / rel).write_text(body, encoding="utf-8")
     (tmp_path / "lib" / "broken.ts").write_bytes(b"\xff\xfe(((")
     return tmp_path
+
+
+def test_enrich_ts_reads_files_graphify_saw_without_functions(tmp_path: Path) -> None:
+    """#282 — graphify가 함수를 0개 찾은 api.ts도 files로 읽어 api.get·api.post와 선을 더한다."""
+    src = _ts_src(tmp_path)
+    g = {
+        "functions": [_fn("pages/Page.tsx", 10, "Page")],
+        "calls": [],
+        "files": ["lib/api.ts", "pages/Page.tsx", "README.md"],
+    }
+    cg.enrich(src, g)
+    by = {f["key"]: f for f in g["functions"]}
+    assert by["lib/api.ts:2"]["qual"] == "api.get" and by["lib/api.ts:3"]["qual"] == "api.post"
+    assert ["pages/Page.tsx:10", "lib/api.ts:2", "enrich"] in g["calls"]
+    assert "files" not in g  # 저장 모양에는 없다
 
 
 def test_enrich_ts_ends_quals_missing_defs_nested_and_calls(tmp_path: Path) -> None:
