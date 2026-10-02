@@ -15,6 +15,10 @@ graphify를 돌린다 — 저장소에 `graphify-out/`을 남기지 않는다. �
 
 종료 코드 1 = 코드만·명세만이 하나라도 있다(필터 범위 안에서). 「코드에 없음」은 셈에 안 든다 —
 함수가 있는지는 check_code가 본다.
+
+층(카드 BM) — 클래스 명세 「폴더 구조」 절의 층 표로 항목 없는 함수마다 층을 매긴다(서버와 같은
+codegraph.layers). 어느 층에도 안 걸리는 함수(「층 없음」)와 어느 함수에도 안 맞는 표 줄(「안 맞는
+줄」)도 0이어야 통과다(STD-004 DEV-14). `--doc`으로 좁혀도 층은 그래프 전체를 본다.
 """
 
 from __future__ import annotations
@@ -119,12 +123,27 @@ def main() -> int:
                 print("  명세만:", " · ".join(x.split("#", 1)[1] for x in d.spec_only))
             if args.verbose and d.same:
                 print("  같음:  ", " · ".join(x.split("#", 1)[1] for x in d.same))
+    # 층 — 클래스 명세의 층 표 (카드 BM)
+    cls_doc = proj.by_title(args.specs, "DOM", "클래스")
+    rows = codegraph.layer_table(open(cls_doc, encoding="utf-8").read()) if cls_doc else []
+    if not rows:
+        print(f"층 표 없음 — {os.path.basename(cls_doc) if cls_doc else 'DOM 클래스 명세'}의 「폴더 구조」 절")
+    layer_of, unmatched = codegraph.layers(graph, rows)
+    no_layer = [
+        f
+        for f in graph["functions"]
+        if not (f.get("item") or f.get("ms")) and f["key"] not in layer_of
+    ]
+    for f in sorted(no_layer, key=lambda f: f["key"]):
+        print(f"층 없음  {f['key']}  {f['qual']}")
+    for r in unmatched:
+        print(f"안 맞는 줄  {os.path.basename(cls_doc or '')}:{r['line']}  {' · '.join(r['patterns'])}")
     print(
         f"합계: {code} · 그래프 {source} 함수 {len(graph['functions'])} 호출 선 {len(graph['calls'])}"
         f" · 항목 {len(diffs)} · 같음 {same} · 코드만 {code_only} · 명세만 {spec_only}"
-        f" · 코드에 없음 {missing}"
+        f" · 코드에 없음 {missing} · 층 없음 {len(no_layer)} · 안 맞는 줄 {len(unmatched)}"
     )
-    return 1 if code_only or spec_only else 0
+    return 1 if code_only or spec_only or no_layer or unmatched else 0
 
 
 if __name__ == "__main__":
