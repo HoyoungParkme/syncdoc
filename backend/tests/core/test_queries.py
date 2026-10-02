@@ -842,7 +842,7 @@ async def test_ask_code_start_context_has_docs_graph_and_function_block(
     assert "[코드 그래프] 커밋 ccccccc · 함수 4 · 호출 4" in system
     assert "[문서 목록]\n" in system and "EXMP-MS-001 예시 MINISPEC · draft" in system
     assert "[보는 함수] svc.save · a.py:1–4 · 항목 EXMP-MS-001#svc.save (code_only)" in system
-    assert "[부르는 것 2]" in system and "svc._help · a.py:13 · 항목 없음" in system
+    assert "[부르는 것 2]" in system and "svc._help · a.py:13 · 층 도우미" in system  # 카드 BM
     assert "[불리는 곳 1]" in system and "svc.write · a.py:9 · 항목 EXMP-MS-001#svc.write" in system
     assert "def " not in system  # 본문은 안 싣는다 — 모델이 read_code로 읽는다
     assert "mermaid 코드블록" in system and "답은 짧게 쓴다" in system  # 공통 지시는 그대로
@@ -858,9 +858,26 @@ async def test_ask_code_context_shows_api_item_without_status(scoped: Session, s
     await _collect(queries.ask_code("EXMP", "a.py:17", _conv(scoped), "뭐야?", [], owner(scoped)))
     system = seen[0][0]
     assert "[보는 함수] routers.get_code · a.py:17–20 · 항목 EXMP-API-001#GET/api/code" in system
-    assert "svc.save · a.py:1 · 항목 EXMP-MS-001#svc.save (code_only)" in system  # 대조 있는 이웃은 상태
+    assert (
+        "svc.save · a.py:1 · 항목 EXMP-MS-001#svc.save (code_only)" in system
+    )  # 대조 있는 이웃은 상태
     assert "Page.helper · Page.tsx:3 · 항목 EXMP-UI-002#UI-1" in system  # 화면 항목
     assert "API·UI 항목인 함수는 대조가 없다" in system
+
+
+async def test_ask_code_context_shows_layer_for_function_without_item(
+    scoped: Session, script
+) -> None:
+    """MS-008 ask_code 3 — 항목도 대조도 없으면 층 줄 (카드 BM)."""
+    from tests.core.codegraph.test_queries import CLS, GRAPH_LAYERS, _seed_items
+
+    p = _seed_items(scoped, GRAPH_LAYERS)
+    SpecService(scoped).create(p.id, "EXMP-DOM-002", DocType.DOM, CLS, "h5", author(scoped), "spec")
+    seen = script([_step("답"), _step("답")])
+    await _collect(queries.ask_code("EXMP", "b.py:1", _conv(scoped), "뭐야?", [], owner(scoped)))
+    assert "[보는 함수] repo.get · b.py:1–3 · 층 리포지토리 · EXMP-PRD-001 4장" in seen[0][0]
+    await _collect(queries.ask_code("EXMP", "a.py:1", _conv(scoped), "뭐야?", [], owner(scoped)))
+    assert "svc._help · a.py:13 · 층 도우미" in seen[1][0]
 
 
 async def test_ask_code_without_key_is_whole_graph_and_without_graph_still_asks(

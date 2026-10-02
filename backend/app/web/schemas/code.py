@@ -82,6 +82,16 @@ class CodeCommunity(Base):
     size: int
 
 
+class CodeLayerSpec(Base):
+    ref: str | None
+    note: str
+
+
+class CodeLayer(Base):
+    name: str
+    specs: list[CodeLayerSpec]
+
+
 class CodeNode(Base):
     key: str
     name: str
@@ -92,6 +102,7 @@ class CodeNode(Base):
     item: str | None
     ms: str | None
     status: str | None
+    layer: CodeLayer | None = None
 
 
 class CodeNodes(Base):
