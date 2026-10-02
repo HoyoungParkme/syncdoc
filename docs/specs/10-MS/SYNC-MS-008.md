@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -220,10 +220,10 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 0. `if not settings.LLM_API_KEY → ! LlmNotConfigured` · `project = ProjectService.get_owned(code, user)` · 대화 검사·`history`·`add_turn`·첨부 목록은 `ask_item` 1과 같다
 1. `row = CodeGraphService.get(project.id)` — 없으면 `graph_line = "코드 그래프 없음 — 코드를 push하면 만들어진다"`(2b), 있으면 `[코드 그래프] 커밋 {7자} · 함수 N · 호출 M`
 2. `docs = SpecService.list_by_project(project.id)` + `describe_documents` → `[문서 목록]` 줄마다 `ID 제목 · 상태`(본문 없음 — 사용자 결정 3)
-3. `key`가 있으면: `f = functions 중 key` · 없으면 `! not-found {resource: function}` · `d = codegraph.compare(graph, spec_calls)` 중 이 함수 → `[보는 함수] {qual} · {file}:{line}–{end} · 항목 {ms} ({status})` · 대조가 없고 `f.item`이 있으면 `항목 {item}`(API·UI 항목 — 카드 BK) · 둘 다 없으면 `항목 없음` · `[부르는 것 n]`·`[불리는 곳 n]` 줄마다 `qual · file:line · 항목`(같은 규칙, 각 20까지, 넘으면 `… k개 더`). `key`가 없으면 `[보는 것] 그래프 전체`
+3. `key`가 있으면: `f = functions 중 key` · 없으면 `! not-found {resource: function}` · `d = codegraph.compare(graph, spec_calls)` 중 이 함수 → `[보는 함수] {qual} · {file}:{line}–{end} · 항목 {ms} ({status})` · 대조가 없고 `f.item`이 있으면 `항목 {item}`(API·UI 항목 — 카드 BK) · 둘 다 없고 층이 있으면 `층 {이름} · {명세 조각들}`(2a와 같은 `layers`, 도우미는 `층 도우미`, 카드 BM) · 그것도 없으면 `항목 없음` · `[부르는 것 n]`·`[불리는 곳 n]` 줄마다 `qual · file:line · 항목`(같은 규칙, 각 20까지, 넘으면 `… k개 더`). `key`가 없으면 `[보는 것] 그래프 전체`
 4. `system = _ASK_CODE_SYSTEM.format(graph_line, docs, viewing, attachments)` → `yield from _ask_loop(system, code, …, AskStart(doc_id=None, item_id=None, key=key))` — 이벤트 여섯·상한·`finish_turn`·로그 전부 같다. 로그는 `ask code=%s key=%s …`
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-010#ConversationService.get]] [[SYNC-MS-010#ConversationService.history]] [[SYNC-MS-010#ConversationService.add_turn]] [[SYNC-MS-010#ConversationService.pending_images]] [[SYNC-MS-010#ConversationService.finish_turn]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] [[SYNC-MS-002#SpecService.describe_documents]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.item_blocks]](대조용 MINISPEC 항목 — `ask_item`·`code_nodes`와 같은 `_diffs`) · [[SYNC-MS-011#codegraph.spec_calls]] [[SYNC-MS-011#codegraph.compare]] · [[#queries.ask_tool]] · [[SYNC-MS-009#llm.step_stream]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-010#ConversationService.get]] [[SYNC-MS-010#ConversationService.history]] [[SYNC-MS-010#ConversationService.add_turn]] [[SYNC-MS-010#ConversationService.pending_images]] [[SYNC-MS-010#ConversationService.finish_turn]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] [[SYNC-MS-002#SpecService.describe_documents]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.item_blocks]](대조용 MINISPEC 항목 — `ask_item`·`code_nodes`와 같은 `_diffs`) · [[SYNC-MS-011#codegraph.spec_calls]] [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#codegraph.layer_table]] [[SYNC-MS-011#codegraph.layers]] · [[#queries.ask_tool]] · [[SYNC-MS-009#llm.step_stream]]
 
 **지시문 원문** — 코드 `_ASK_CODE_SYSTEM`. 앞부분(읽기만 한다·reason·상한·모른다·그림·답 양식)은 `_ASK_SYSTEM`과 같고, 자리 설명과 코드 규칙만 다르다
 
@@ -245,7 +245,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 {attachments}
 ```
 
-**테스트 관점** 시작 맥락에 `[문서 목록]`·`[코드 그래프] 커밋`·`[보는 함수] svc.save · a.py:1–4 · 항목 EXMP-MS-001#svc.save (code_only)`·부르는 것·불리는 곳이 있고 본문은 없다 · `key=None` → `[보는 것] 그래프 전체` · 그래프 없음 → `코드 그래프 없음` 줄, 그래도 답 · 없는 `key` → `not-found function`(스트림 전) · 남의 프로젝트 `not-found` · 키 없음 `llm-not-configured` · `AskStart(None, None, key)` · 턴이 대화에 남는다
+**테스트 관점** 시작 맥락에 `[문서 목록]`·`[코드 그래프] 커밋`·`[보는 함수] svc.save · a.py:1–4 · 항목 EXMP-MS-001#svc.save (code_only)`·부르는 것·불리는 곳이 있고 본문은 없다 · 항목 없는 함수 줄에 `층 리포지토리 · …`, 같은 파일에 항목 있으면 `층 도우미`(카드 BM) · `key=None` → `[보는 것] 그래프 전체` · 그래프 없음 → `코드 그래프 없음` 줄, 그래도 답 · 없는 `key` → `not-found function`(스트림 전) · 남의 프로젝트 `not-found` · 키 없음 `llm-not-configured` · `AskStart(None, None, key)` · 턴이 대화에 남는다
 
 ---
 
@@ -523,13 +523,14 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 0. `project = ProjectService.get_owned(code, user)`
 1. `row = CodeGraphService.get(project.id)` · if None → `CodeNodes(graph=None, communities=[], functions=[], calls=[])`
 2. `code_view` 2단계와 같이 `spec`·`diffs` — `by_key = {d.function: d for d in diffs if d.function}`
-3. 함수마다 `CodeNode(key, name, qual, file, line, community=f.get("community"), item=f.get("item") or ms, ms, status)` — `d = by_key.get(key)` · 없으면 `ms`·`status` None · `status` = if `d.code_only` → `code_only` · elif `d.spec_only` → `spec_only` · else `same`. `item`은 그래프의 `item`(API·UI 항목도, 카드 BJ) — 옛 그래프(`item` 없음)는 `ms`
+2a. 층(카드 BM) — 프로젝트 DOM 문서 중 제목에 「클래스」가 든 첫 것(`SpecService.list_by_project(stage=DOM)` → `SpecService.get_document`)의 본문으로 `rows = `[[SYNC-MS-011#codegraph.layer_table]] · 없으면 `[]` · `layer_of, _ = `[[SYNC-MS-011#codegraph.layers]]`(row.graph, rows)`
+3. 함수마다 `CodeNode(key, name, qual, file, line, community=f.get("community"), item=f.get("item") or ms, ms, status, layer=layer_of.get(key))` — `d = by_key.get(key)` · 없으면 `ms`·`status` None · `status` = if `d.code_only` → `code_only` · elif `d.spec_only` → `spec_only` · else `same`. `item`은 그래프의 `item`(API·UI 항목도, 카드 BJ) — 옛 그래프(`item` 없음)는 `ms`
 4. `communities = [CodeCommunity(id, label, size) for c in row.graph.get("communities", [])]` — 옛 그래프는 빈 목록 · `calls = [[a, b] for a, b, _ in row.graph["calls"]]`
 5. `→ CodeNodes(graph=머리(row), communities, functions, calls)`
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-011#codegraph.spec_calls]] · [[SYNC-MS-011#codegraph.compare]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-011#codegraph.spec_calls]] · [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#codegraph.layer_table]] · [[SYNC-MS-011#codegraph.layers]]
 
-**테스트 관점** 항목 있는 함수에 `ms`·`status`(코드만 > 명세만 > 같음) · 도우미는 `ms` None · API 항목 함수는 `item`만 있고 `ms`·`status` None · 커뮤니티 목록과 함수의 `community`가 그래프 그대로 · 옛 그래프(`communities`·`item` 없음) → 빈 목록, `community` None, `item`은 `ms` · 그래프 없음 → `graph` None · 남의 프로젝트 → `not-found`
+**테스트 관점** 항목 있는 함수에 `ms`·`status`(코드만 > 명세만 > 같음) · 도우미는 `ms` None · 항목 없는 함수에 층 표의 `layer`, 같은 파일에 항목 있으면 `도우미`, 항목 있는 함수는 `layer` None · 클래스 명세가 없는 프로젝트 → 도우미만 · API 항목 함수는 `item`만 있고 `ms`·`status` None · 커뮤니티 목록과 함수의 `community`가 그래프 그대로 · 옛 그래프(`communities`·`item` 없음) → 빈 목록, `community` None, `item`은 `ms` · 그래프 없음 → `graph` None · 남의 프로젝트 → `not-found`
 
 ---
 
