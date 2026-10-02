@@ -459,7 +459,10 @@ export function CodeGraph() {
     else setNotFound(true)
   }, [data, sp, byKey, pick])
 
-  // 2.1 검색 — 이름·Class.fn·파일 부분 일치. 맞는 첫 함수로
+  // 2.1 검색 — 이름·Class.fn·파일 부분 일치. 맞는 첫 함수로.
+  // 검색어가 바뀔 때만 돈다 — pick은 펼칠 때마다 새로 생기므로 ref로 (패널·트리 선택을 되돌리지 않게, #288)
+  const pickRef = useRef(pick)
+  pickRef.current = pick
   useEffect(() => {
     if (!data) return
     const t = window.setTimeout(() => {
@@ -470,10 +473,10 @@ export function CodeGraph() {
       }
       const hit = data.functions.find((f) => f.qual.toLowerCase().includes(needle) || f.name.toLowerCase().includes(needle) || f.file.toLowerCase().includes(needle))
       setNotFound(!hit)
-      if (hit) pick(hit)
+      if (hit) pickRef.current(hit)
     }, 300)
     return () => window.clearTimeout(t)
-  }, [q, data, pick])
+  }, [q, data])
 
   // 포인터 — 노드를 끌면 그 노드, 빈 곳을 끌면 이동, 휠은 커서 기준 줌, 클릭은 펼치기·선택
   const drag = useRef<{ node: GNode | null; sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null)
