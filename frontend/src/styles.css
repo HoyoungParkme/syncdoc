@@ -591,6 +591,7 @@ a.arow:hover{background:var(--bg-subtle)}
 .gbar .btn.on{background:var(--ink-body);color:#fff;border-color:var(--ink-body)}
 .gbar .sep{width:1px;height:16px;background:var(--border-strong);margin:0 var(--space-4)}
 .gbar .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gbar .btn{white-space:nowrap;flex:none} /* 가운데 열이 좁아도 버튼 글자는 한 줄 — 줄어드는 것은 안내 글(2.3) (카드 BO) */
 /* 3 캔버스 — 안에서 스크롤한다. 전체보기면 남은 높이를 다 쓴다 */
 /* **`.gcard` 안으로 묶는다.** 맨 이름 `.canvas`로 두면 UC 유저용 뷰의 패키지 그림 상자
    (`.v-uc .canvas`)까지 이 높이를 물려받아, 1178px짜리 그림이 660px 상자 안에서 또 스크롤됐다.
