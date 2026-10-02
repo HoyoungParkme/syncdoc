@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -463,10 +463,10 @@ classDiagram
 | `AskNote` | `text: str` | ask_item → `note` 이벤트. 모델이 읽기 전에 쓴 한 줄(도구 인자 `reason`) |
 | `AskRead` | `tool: str` · `target: str \| None` | ask_item → `read` 이벤트. 도구 실행이 끝났다 |
 | `AskDelta` | `text: str` | ask_item → `delta` 이벤트. 모델이 지금 쓰는 글자 조각 — 뒤에 `note`면 메모였고 `answer`면 답이다. 저장되지 않는다(카드 AW) |
-| `AskAnswer` | `answer: str` · `context_item_ids: list~str~` | ask_item → `answer` 이벤트. `context_item_ids`는 **모델이 실제로 읽은 대상**(부른 순서) — 화면이 「본 것」으로 보여준다. **저장하지 않는다**([[SYNC-INFRA-001]] 6장) |
+| `AskAnswer` | `answer: str` · `context_item_ids: list~str~` · `missing_refs: list~str~` | ask_item → `answer` 이벤트. `context_item_ids`는 **모델이 실제로 읽은 대상**(부른 순서) — 화면이 「본 것」으로 보여준다. `answer`는 맨 ID를 실제 항목과 맞춰 `[[…]]`로 바꾼 글, `missing_refs`는 그 글의 없는 참조(#290 — 화면은 끊어진 참조 모양). **저장하지 않는다**([[SYNC-INFRA-001]] 6장) |
 | `AskEvent` | `= AskStart \| AskDelta \| AskNote \| AskRead \| AskAnswer` | ask_item이 차례로 yield하는 것. 라우터가 SSE로 흘린다 |
 | `AttachmentMeta` | `id` · `name` · `mime` · `size` · `turn_id: int \| None` · `created_at` | ConversationService → API `AttachmentMeta`. **바이트·추출 글자는 안 실린다** |
-| `TurnView` | `id` · `seq` · `question` · `answer: str \| None` · `progress: list[{kind, text}]` · `context_item_ids: list~str~` · `error: str \| None` · `attachments: list~AttachmentMeta~` · `created_at` | ConversationService.get → API `Conversation.turns` |
+| `TurnView` | `id` · `seq` · `question` · `answer: str \| None` · `progress: list[{kind, text}]` · `context_item_ids: list~str~` · `error: str \| None` · `attachments: list~AttachmentMeta~` · `created_at` · `missing_refs: list~str~`(기본 빈 목록) | ConversationService.get(답은 원문) → queries.conversation_view(답을 링크로, `missing_refs`, #290) → API `Conversation.turns` |
 | `ConversationBrief` | `id` · `title` · `turn_count` · `updated_at` | ConversationService.list → API 목록 |
 | `CallDiff` | `ms_id: str` · `function: str \| None`(`파일:줄`, 코드에 없으면 None) · `same` · `code_only` · `spec_only: list~str~`(항목 ID) | codegraph.compare → check_calls · queries(카드 AY). 명세의 「호출하는 것」과 실제 호출의 갈래 |
 | `CodeGraphInfo` | `commit_hash: str \| None` · `source: str \| None` · `built_at` · `error: str \| None` · `function_count: int` | queries → API. 그래프 행의 머리(몸통 없이) |
@@ -481,7 +481,7 @@ classDiagram
 | `CodeLayer` | `name: str` · `specs: list~CodeLayerSpec~` | 항목 없는 함수의 층. 도우미는 `name="도우미"`, `specs=[]` |
 | `CodeNode` | `key` · `name` · `qual` · `file` · `line` · `community: int \| None` · `item: str \| None` · `ms: str \| None` · `status: str \| None` · `layer: CodeLayer \| None` | 코드 그래프 노드 하나. `item`은 속한 명세 항목(어느 문서든 — 카드 BJ), `ms`는 그중 MINISPEC 항목. `status`는 `ms`가 있을 때 `compare`로 — `code_only` > `spec_only` > `same`. `layer`는 항목이 없을 때 클래스 명세 층 표로(카드 BM) |
 | `CodeNodes` | `graph: CodeGraphInfo \| None` · `communities: list~CodeCommunity~` · `functions: list~CodeNode~` · `calls: list~list~str~~` | queries.code_nodes → API `CodeNodes`(UI-17 코드 그래프) |
-| `ConversationView` | `ConversationBrief` + `turns: list~TurnView~` + `pending: list~AttachmentMeta~`(아직 안 보낸 첨부) | ConversationService.get → API `Conversation` |
+| `ConversationView` | `ConversationBrief` + `turns: list~TurnView~` + `pending: list~AttachmentMeta~`(아직 안 보낸 첨부) | ConversationService.get → queries.conversation_view → API `Conversation` |
 
 타입은 여기 한 곳에만 정의한다.
 
@@ -1129,7 +1129,9 @@ code_text(code, file, line, user) -> CodeText      SEQ-31  그래프의 함수�
 ask_code(code, key?, conversation_id, question, attachment_ids, user) -> AsyncIterator[AskEvent]
                                                     SEQ-32  코드 그래프에서 묻는다 — 문서 목록·그래프 머리·고른 함수 블록이 시작 맥락, 루프는 ask_item과 같은 _ask_loop (UI-17 질문 탭, 카드 BI)
 ask_item(doc_id, item_id?, conversation_id, question, attachment_ids, user) -> AsyncIterator[AskEvent]
-                                                    SEQ-24  대화에서 history·첨부 목록 → 시작 맥락(제목·항목 목록·첨부 목록) → add_turn → llm.step ↔ ask_tool 루프(8번·120초) → finish_turn → AskAnswer
+                                                    SEQ-24  대화에서 history·첨부 목록 → 시작 맥락(제목·항목 목록·첨부 목록) → add_turn → llm.step ↔ ask_tool 루프(8번·120초) → finish_turn(원문) → list_items_by_project로 답 속 맨 ID를 링크로(#290) → AskAnswer
+conversation_view(conv_id, user) -> ConversationView
+                                                    —       ConversationService.get → 턴마다 답 속 맨 ID를 실제 항목과 맞춘 링크로 + missing_refs (UI-5 8.7, #290)
 ask_tool(name, args, code, user, conversation_id) -> ToolResult
                                                     SEQ-24  도구 하나 실행 — get_item · get_references · item_chain · list_documents · get_document · read_attachment · code_graph · read_code(카드 AZ). 같은 프로젝트·소유 검사
 ```
