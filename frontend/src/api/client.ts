@@ -478,6 +478,9 @@ export interface CodeNode {
   file: string
   line: number
   community: number | null
+  /** 속한 명세 항목 — 어느 문서든(API·UI도). 카드 BJ */
+  item: string | null
+  /** 그중 MINISPEC 항목 — 대조·고리·코드 탭은 이것으로 */
   ms: string | null
   status: CallStatus | null
 }
