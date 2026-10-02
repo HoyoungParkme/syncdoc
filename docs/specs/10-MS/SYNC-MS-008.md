@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -40,6 +40,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#queries.downstream_view]] | 이 문서를 참조하는 것 (추적표) |
 | [[#queries.ask_item]] | 문서를 읽다가 묻는다 — 모델이 관계도를 따라 읽는다 |
 | [[#queries.ask_tool]] | 모델이 부른 읽기 도구 하나를 실행한다 |
+| [[#queries.ask_code]] | 코드 그래프에서 묻는다 — 고른 함수가 시작 맥락 |
+| [[#queries.conversation_view]] | 대화 하나 — 답 속 참조를 실제 항목과 맞춘 링크로 (#290) |
 | [[#queries.code_view]] | 코드 탭 — 항목의 코드 대조 |
 | [[#queries.code_calls]] | 관계도 코드 호출 — MINISPEC 사이 호출 선 |
 | [[#queries.code_nodes]] | 코드 그래프 노드 — 함수 전부·커뮤니티·대조 상태 (UI-17) |
@@ -78,11 +80,19 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 4. [[SYNC-MS-009#llm.step_stream]]`(system, 대화록, _ASK_TOOLS)`을 돈다 — `str` 조각이면 `yield AskDelta(text)`(모델이 지금 쓰는 글자, `progress`에 안 넣는다), `LlmStep`이면 `step`(카드 AW) · usage 누적 · `if not step.tool_calls → answer = step.text → 7`
 5. `if step.text → yield AskNote(step.text)` · 도구 호출마다: `yield AskNote(args["reason"])` → `r = ask_tool(name, args, code, user, conversation_id)` → `yield AskRead(name, r.target)` · `r.target`이 있고 `reads`에 없으면 `reads.append` · 대화록에 `{role: assistant, text: step.text, tool_calls}`와 `{role: tool, tool_call_id, text: r.text}` 추가 · `calls += 1`(호출마다)
 6. `if calls >= _ASK_MAX_CALLS or monotonic() - t0 >= _ASK_TIME_LIMIT` → 대화록에 마무리 문장(아래)을 `user`로 추가 → `llm.step_stream(system, 대화록, _ASK_TOOLS, tool_choice="none")` **한 번**(조각은 4단계처럼 `AskDelta`로) → `step.text`가 비면 `! LlmUnavailable("상한 뒤에도 답이 없다")` → `answer = step.text` → 7 · 아니면 4로
-7. `ConversationService.finish_turn(turn.id, answer, progress, reads)` — 세션 하나에서. 대화 `title`이 「새 대화」면 `question[:40]`으로, `updated_at` 갱신 · `log.info("ask doc=%s item=%s conv=%s user=%s calls=%d prompt=%d completion=%d elapsed=%.1fs", …)` — 한 줄, 본문·질문·답은 로그에 안 남긴다(DEV-6) · `yield AskAnswer(answer, context_item_ids=reads)`
+7. `ConversationService.finish_turn(turn.id, answer, progress, reads)` — 세션 하나에서. 대화 `title`이 「새 대화」면 `question[:40]`으로, `updated_at` 갱신 · `log.info("ask doc=%s item=%s conv=%s user=%s calls=%d prompt=%d completion=%d elapsed=%.1fs", …)` — 한 줄, 본문·질문·답은 로그에 안 남긴다(DEV-6) · `linked, missing = _answer_links(project, answer)` → `yield AskAnswer(linked, context_item_ids=reads, missing_refs=missing)` — 저장(`finish_turn`)은 모델이 쓴 원문이고 내보낼 때만 링크로 바꾼다(#290)
 
 **상수** `_ASK_MAX_CALLS = 8` · `_ASK_TIME_LIMIT = 120.0`(초). 설정값이 아니라 코드 상수다 — 회수 경로는 키를 비우는 것 하나로 둔다([[SYNC-INFRA-001]] 5.3). 시간은 **호출 사이**에서만 본다 — 한 호출의 60초 타임아웃이 더해져 최악 180초(마무리 호출 포함)
 
 **루프는 비공개 도우미 `_ask_loop(system, code, conversation_id, question, attachment_ids, user, start)`에 있다**(카드 BI) — 1~7이 그것이고, [[#queries.ask_code]]가 같이 쓴다. 입구마다 다른 것은 0단계의 검사와 시작 맥락뿐이다
+
+**답 속 참조 링크 — 비공개 도우미 `_answer_links(project, text) -> (글, missing_refs)`**(#290, 사용자 결정 2026-10-02 「실제 항목과 맞춘다 · 서버가 내보낼 때」). 프로젝트의 문서·항목은 [[SYNC-MS-002#SpecService.list_items_by_project]] 한 번(휴지통 문서 포함 — UI-5가 연다)
+1. 코드블록·인라인 코드·이미 있는 `[[…]]` 안은 바꾸지 않는다
+2. 맨 `{문서ID}`(문서 ID 꼴 `[A-Z]{1,4}-[A-Z]+-\d{3}` — `markdown.DOC_ID`와 같다) 뒤에 `#`이 오면 — 그 문서 항목 중 뒤 글자가 그것으로 시작하고 바로 뒤가 영문·숫자·`_`가 아닌 **가장 긴 항목 ID** → `[[문서#항목]]`, 뒤 글자(조사 등)는 그대로. 맞는 항목이 없으면 영문·숫자·`_ . / { } ~ -`까지(끝 `.`은 뺀다)를 ID로 `[[…]]`. 예: `SYNC-MS-007#pipeline.save_pipeline대로` → `[[SYNC-MS-007#pipeline.save_pipeline]]대로` · R1·R13이 있으면 `#R13은` → R13
+3. `#` 없는 맨 문서 ID → `[[문서]]`
+4. 결과 글의 `[[문서]]`·`[[문서#항목]]`(모델이 쓴 것 포함) 중 없는 것 → `missing_refs`(나온 순서, 중복 없이). `[[#항목]]`(문서 없는 꼴)은 보지 않는다. 화면은 이것을 본문 7.2처럼 끊어진 참조 모양으로 그린다([[SYNC-UI-002#UI-5]] 8.7)
+
+대화를 다시 열 때도 같은 규칙이다([[#queries.conversation_view]]). 저장은 원문이라 나중에 항목이 생기면 그때부터 링크가 산다
 
 **대화록 항목** — 우리 키로 쌓고 와이어 형식은 어댑터가 옮긴다([[SYNC-MS-009#llm.step]]): `{role: user|assistant, text}` · `{role: assistant, text, tool_calls: [ToolCall]}` · `{role: tool, tool_call_id, text}`
 
@@ -113,7 +123,7 @@ item_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽�
 쓰였는지 짚어 준다 — item_chain의 빈 단계나 「아직 없음」 참조가 그 근거다.
 지어내지 않는다.
 
-답에 근거를 댈 때는 읽은 항목 ID(문서ID#항목ID)를 그대로 쓴다. 없는 ID를 만들지 않는다.
+답에 근거를 댈 때는 읽은 항목 ID를 [[문서ID#항목ID]]로 그대로 쓴다. 없는 ID를 만들지 않는다.
 
 명세를 고치라고 하지 않는다. 당신은 읽기를 돕는 자리이고, 본문을 쓰는 것은 사람과
 그 사람의 에이전트가 한다.
@@ -134,7 +144,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 그림 아래에 한두 문장으로 무엇을 그렸는지 적는다.
 
 답은 짧게 쓴다 — 문장은 한 뜻에 하나, 소제목은 굵은 한 줄, 목록은 한 줄씩. 항목을 댈 때는
-문서ID#항목ID 이름 한 번이고 그 이름을 풀어 다시 쓰지 않는다. 번호 목록은 1·2·3으로 이어서
+[[문서ID#항목ID]] 이름 한 번이고 그 이름을 풀어 다시 쓰지 않는다. 번호 목록은 1·2·3으로 이어서
 쓴다.
 
 구현을 물으면(「명세대로 구현됐어?」 「이 함수가 실제로 뭘 부르나」) code_graph로 그 항목의
@@ -153,13 +163,13 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 도구 호출 상한(또는 시간 상한)에 닿았다. 지금까지 읽은 것으로 답하라. 못 읽은 것이 있으면 무엇을 못 읽었는지 말한다.
 ```
 
-**출력** `AskEvent`의 비동기 흐름 — `AskStart` 하나 → `AskDelta`·`AskNote`·`AskRead` 0개 이상 → `AskAnswer` 하나. `AskDelta`는 모델이 지금 쓰는 글자 조각이고 **답인지 메모인지는 뒤 이벤트가 정한다** — 그 호출이 도구로 끝나면 `AskNote`(전체 글)가, 답으로 끝나면 `AskAnswer`(전체 본문)가 다시 온다. 조각은 저장하지 않는다(카드 AW). `context_item_ids`는 모델이 **실제로 읽은 대상**(`DOC#ITEM`·`DOC`)을 부른 순서로, 중복 없이
+**출력** `AskEvent`의 비동기 흐름 — `AskStart` 하나 → `AskDelta`·`AskNote`·`AskRead` 0개 이상 → `AskAnswer` 하나. `AskDelta`는 모델이 지금 쓰는 글자 조각이고 **답인지 메모인지는 뒤 이벤트가 정한다** — 그 호출이 도구로 끝나면 `AskNote`(전체 글)가, 답으로 끝나면 `AskAnswer`(전체 본문)가 다시 온다. 조각은 저장하지 않는다(카드 AW). `context_item_ids`는 모델이 **실제로 읽은 대상**(`DOC#ITEM`·`DOC`)을 부른 순서로, 중복 없이 · `AskAnswer.answer`는 맨 ID를 `[[…]]`로 바꾼 글, `missing_refs`는 그 글의 없는 참조(#290)
 
 **예외** 남의 프로젝트·없는 `item_id` → `not-found`(`AskStart` 전이라 HTTP 상태) · 키 없음 → `llm-not-configured`(전) · 모델 실패·마무리 뒤에도 답 없음 → `llm-unavailable`(`AskStart` 뒤라 `error` 이벤트) · 도구 안의 「없음」은 예외가 아니라 결과다([[#queries.ask_tool]])
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-009#llm.step_stream]] · [[#queries.ask_tool]] · [[SYNC-MS-010#ConversationService.add_turn]] · [[SYNC-MS-010#ConversationService.finish_turn]] · [[SYNC-MS-010#ConversationService.get]] · [[SYNC-MS-010#ConversationService.history]] · [[SYNC-MS-010#ConversationService.pending_images]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.describe_documents]] · [[SYNC-MS-002#SpecService.list_items_by_project]](`_answer_links`, #290) · [[SYNC-MS-009#llm.step_stream]] · [[#queries.ask_tool]] · [[SYNC-MS-010#ConversationService.add_turn]] · [[SYNC-MS-010#ConversationService.finish_turn]] · [[SYNC-MS-010#ConversationService.get]] · [[SYNC-MS-010#ConversationService.history]] · [[SYNC-MS-010#ConversationService.pending_images]]
 
-**테스트 관점** 가짜 `llm.step`에 대본을 주어 돈다 · 지시문에 mermaid 그림 안내가 있다(카드 AS) · 지시문에 답 양식(「답은 짧게」)이 있다(카드 AU) · 지시문에 code_graph·read_code 안내가 있다(카드 AZ) · 대본이 `str` 조각을 주면 `delta`가 `note`/`answer` 앞에 그 순서로 나오고 `progress`에는 안 들어간다(카드 AW) · 대본 [도구 2번 → 답] → 이벤트 순서가 `start·note·read·note·read·answer`이고 `context_item_ids`가 read 순서·중복 접힘 · 대본이 도구만 9번 → 8번째 뒤 마무리 호출이 `tool_choice="none"`이고 그 뒤 호출이 없다 · `monotonic`을 패치해 120초 → 같은 마무리 · 마무리도 답이 비면 `llm-unavailable` · 시작 맥락에 항목 ID·이름은 있고 **본문은 없다** · `item_id=None`이면 「지금 보는 항목」 줄이 없다 · 없는 `item_id` → `not-found`가 `start` 전 · **DB에 아무것도 안 쓴다**(호출 전후 행 수가 같다) · `history`가 상한을 넘으면 뒤에서부터 잘린다 · usage 로그 한 줄에 calls·tokens·elapsed가 있고 본문이 없다 · 키가 비면 `SpecService`를 부르기도 전에 막힌다 · **MINISPEC이 빈 프로젝트**에서 물으면 `item_chain`의 빈 단계로 「아직 안 쓰였다」고 답할 재료를 받는다
+**테스트 관점** 가짜 `llm.step`에 대본을 주어 돈다 · 지시문에 mermaid 그림 안내가 있다(카드 AS) · 지시문에 답 양식(「답은 짧게」)이 있다(카드 AU) · 지시문에 code_graph·read_code 안내가 있다(카드 AZ) · 대본이 `str` 조각을 주면 `delta`가 `note`/`answer` 앞에 그 순서로 나오고 `progress`에는 안 들어간다(카드 AW) · 대본 [도구 2번 → 답] → 이벤트 순서가 `start·note·read·note·read·answer`이고 `context_item_ids`가 read 순서·중복 접힘 · 대본이 도구만 9번 → 8번째 뒤 마무리 호출이 `tool_choice="none"`이고 그 뒤 호출이 없다 · `monotonic`을 패치해 120초 → 같은 마무리 · 마무리도 답이 비면 `llm-unavailable` · 시작 맥락에 항목 ID·이름은 있고 **본문은 없다** · `item_id=None`이면 「지금 보는 항목」 줄이 없다 · 없는 `item_id` → `not-found`가 `start` 전 · **DB에 아무것도 안 쓴다**(호출 전후 행 수가 같다) · `history`가 상한을 넘으면 뒤에서부터 잘린다 · usage 로그 한 줄에 calls·tokens·elapsed가 있고 본문이 없다 · 키가 비면 `SpecService`를 부르기도 전에 막힌다 · **MINISPEC이 빈 프로젝트**에서 물으면 `item_chain`의 빈 단계로 「아직 안 쓰였다」고 답할 재료를 받는다 · **답 속 참조(#290)** — `answer` 이벤트의 글은 맨 ID가 가장 긴 실제 항목까지 `[[…]]`(조사는 그대로, R1·R13이면 R13) · 코드 스팬과 이미 `[[…]]`인 것은 그대로 · 없는 항목·없는 문서(맨 ID든 모델이 쓴 `[[…]]`든)는 `missing_refs` · 저장된 턴의 답은 원문 · 지시문에 `[[문서ID#항목ID]]`가 있다
 
 ---
 
@@ -223,7 +233,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 3. `key`가 있으면: `f = functions 중 key` · 없으면 `! not-found {resource: function}` · `d = codegraph.compare(graph, spec_calls)` 중 이 함수 → `[보는 함수] {qual} · {file}:{line}-{end} · 항목 {ms} ({status})`(줄 범위는 read_code가 받는 꼴 그대로 하이픈 — 모델은 본 꼴을 보낸다, #286) · 대조가 없고 `f.item`이 있으면 `항목 {item}`(API·UI 항목 — 카드 BK) · 둘 다 없고 층이 있으면 `층 {이름} · {명세 조각들}`(2a와 같은 `layers`, 도우미는 `층 도우미`, 카드 BM) · 그것도 없으면 `항목 없음` · `[부르는 것 n]`·`[불리는 곳 n]` 줄마다 `qual · file:line · 항목`(같은 규칙, 각 20까지, 넘으면 `… k개 더`). `key`가 없으면 `[보는 것] 그래프 전체`
 4. `system = _ASK_CODE_SYSTEM.format(graph_line, docs, viewing, attachments)` → `yield from _ask_loop(system, code, …, AskStart(doc_id=None, item_id=None, key=key))` — 이벤트 여섯·상한·`finish_turn`·로그 전부 같다. 로그는 `ask code=%s key=%s …`
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-010#ConversationService.get]] [[SYNC-MS-010#ConversationService.history]] [[SYNC-MS-010#ConversationService.add_turn]] [[SYNC-MS-010#ConversationService.pending_images]] [[SYNC-MS-010#ConversationService.finish_turn]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] [[SYNC-MS-002#SpecService.describe_documents]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.item_blocks]](대조용 MINISPEC 항목 — `ask_item`·`code_nodes`와 같은 `_diffs`) · [[SYNC-MS-011#codegraph.spec_calls]] [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#codegraph.layer_table]] [[SYNC-MS-011#codegraph.layers]] · [[#queries.ask_tool]] · [[SYNC-MS-009#llm.step_stream]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-010#ConversationService.get]] [[SYNC-MS-010#ConversationService.history]] [[SYNC-MS-010#ConversationService.add_turn]] [[SYNC-MS-010#ConversationService.pending_images]] [[SYNC-MS-010#ConversationService.finish_turn]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] [[SYNC-MS-002#SpecService.describe_documents]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.list_items_by_project]](`_answer_links`, #290) [[SYNC-MS-002#SpecService.item_blocks]](대조용 MINISPEC 항목 — `ask_item`·`code_nodes`와 같은 `_diffs`) · [[SYNC-MS-011#codegraph.spec_calls]] [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#codegraph.layer_table]] [[SYNC-MS-011#codegraph.layers]] · [[#queries.ask_tool]] · [[SYNC-MS-009#llm.step_stream]]
 
 **지시문 원문** — 코드 `_ASK_CODE_SYSTEM`. 앞부분(읽기만 한다·reason·상한·모른다·그림·답 양식)은 `_ASK_SYSTEM`과 같고, 자리 설명과 코드 규칙만 다르다
 
@@ -236,7 +246,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 그 항목을 읽어 견준다. 항목이 없는 함수면 부르는 것·불리는 곳의 항목을 따라간다 — 그 함수가
 어느 명세의 어느 자리를 받치는지 거기서 보인다. API·UI 항목인 함수는 대조가 없다 — get_item으로
 그 항목을 읽고 code_graph로 하위 MINISPEC 함수를 본다. 코드 근거는 파일:줄로, 명세 근거는
-문서ID#항목ID로 댄다. 코드 그래프가 없다고 적혀 있으면 그렇다고 말하고 지어내지 않는다.
+[[문서ID#항목ID]]로 댄다. 코드 그래프가 없다고 적혀 있으면 그렇다고 말하고 지어내지 않는다.
 
 {graph_line}
 [문서 목록]
@@ -246,6 +256,31 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 ```
 
 **테스트 관점** 시작 맥락에 `[문서 목록]`·`[코드 그래프] 커밋`·`[보는 함수] svc.save · a.py:1-4 · 항목 EXMP-MS-001#svc.save (code_only)`·부르는 것·불리는 곳이 있고 본문은 없다 · 항목 없는 함수 줄에 `층 리포지토리 · …`, 같은 파일에 항목 있으면 `층 도우미`(카드 BM) · `key=None` → `[보는 것] 그래프 전체` · 그래프 없음 → `코드 그래프 없음` 줄, 그래도 답 · 없는 `key` → `not-found function`(스트림 전) · 남의 프로젝트 `not-found` · 키 없음 `llm-not-configured` · `AskStart(None, None, key)` · 턴이 대화에 남는다
+
+---
+
+#### queries.conversation_view 대화 하나 — 답 속 참조를 실제 항목과 맞춘 링크로
+
+**시그니처** `async def conversation_view(conv_id: int, user: User) -> ConversationView`
+
+근거: [[SYNC-UC-001#UC-H19]] · [[SYNC-API-001#GET/api/conversations/{id}]] · UI-5 8.7·8.11 · 사용자 결정 2026-10-02(#290 — 답 속 맨 ID는 서버가 내보낼 때 실제 항목과 맞춘다, 저장은 원문)
+
+**입력** `conv_id` 대화 · `user`
+
+**처리**
+1. 세션 하나에서 `v = ConversationService.get(conv_id, user)` — 내 것이 아니면 `! not-found {resource: conversation}`(그대로 전파)
+2. `project = ProjectService.get_owned(v.project_code, user)`
+3. 답이 있는 턴마다 `_answer_links(project, answer)`([[#queries.ask_item]]과 같은 규칙, 문서·항목 목록은 한 번만 읽는다) → `TurnView(answer=바꾼 글, missing_refs=…)`. 답이 없는 턴(실패)은 그대로 `missing_refs=[]`
+
+**출력** `ConversationView` — 턴의 `answer`는 링크로 바꾼 글, `missing_refs`는 그 턴의 없는 참조. DB의 글은 안 바뀐다
+
+**예외** 남의 대화 → `not-found`
+
+**호출하는 것** [[SYNC-MS-010#ConversationService.get]] · [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-002#SpecService.list_items_by_project]]
+
+**호출되는 것** `GET /api/conversations/{id}` 라우터
+
+**테스트 관점** 지난 턴의 맨 ID가 링크된 글로 오고 없는 참조가 `missing_refs` · DB의 답은 원문 그대로 · 답이 없는 턴은 `missing_refs`가 빈 목록 · 남의 대화 `not-found`
 
 ---
 
