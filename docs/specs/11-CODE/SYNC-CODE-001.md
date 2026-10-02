@@ -1328,7 +1328,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `graph.py` `layer_table`·`layers`·`_Ctx`/`_resolve`의 `self.x` 속성 타입 · `spec/service.py`·`tools/validate.py` `layer.table` · `types.py`·`schemas/code.py`·`client.ts` `CodeLayer` · `queries` `_layer_rows`·`code_nodes`·`_code_context` · `check_calls` 층 검사 · `check_templates` 층 표 · `CodeGraph.tsx` 4.7 층 줄 · DOM-002 1장 층 표 · 템플릿 |
 | 테스트 | MS-011 테스트 관점(layer_table·layers·enrich `self.repo`) · MS-002(layer.table) · MS-008(code_nodes layer·도우미, ask_code 맥락 층) · `compare`·`check_calls` 회귀 + 층 없음 0·안 맞는 줄 0 · 헤드리스: UI-17 리포지토리 함수 → 층·뱃지·가까운 항목, 도우미, 뱃지 → UI-18 · 운영: 재구축 뒤 층 없는 함수 0, 질문 맥락, 실제 모델 ask_code |
 | 선행 | BL |
-| 완료 | — |
+| 완료 | 2026-10-02 · 브랜치 `card/BM-layers`(6fa3605 #278) · spec 14 + code 5 · 테스트 403 · `ruff`·`tsc`·`oxlint` · `validate` 0/0 · `check_templates` 모자람 0 · `check_code` 일치 · `check_calls` 코드만 0·명세만 0·**층 없음 0·안 맞는 줄 0**(함수 1011, 호출 선 1546 → 1691 — `self.repo` 선) · `check_ui` 14/14 · 헤드리스(dev_preview 재구축, 콘솔 0): 항목도 층도 없는 함수 0 · `AccountRepository.user_by_id` → 「층 리포지토리 · DOM-002 4장 · DOM-003」·가까운 항목 `MS-006#AccountService.authenticate_token` · 뱃지 → DOM-002 문서 머리(UI-18) · `pipeline._advance_processed` → 도우미 · `tools/check_ui.py` → 검사기·개발 도구 · MS 회귀 · DOM-002 미완성 없음 · 운영(배포 뒤 컨테이너 안 `build_code_graph("SYNC", 6fa3605)`): 함수 1011 중 항목 291·층 720·둘 다 없음 0, 도우미 150 · `_code_context` 「층 리포지토리 · SYNC-DOM-002 4장 · SYNC-DOM-003」 · 실제 모델 `ask_code`(새 대화 36, 2.3초, 도구 없이): 「리포지토리 층, 명세는 DOM-002 4장과 DOM-003, AccountService.authenticate_token이 쓴다」 · 화면은 사람이 직접(DEV-17) |
 
 ---
 
