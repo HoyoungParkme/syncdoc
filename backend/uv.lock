@@ -1342,6 +1342,8 @@ dependencies = [
     { name = "pypdf" },
     { name = "python-multipart" },
     { name = "sqlalchemy" },
+    { name = "tree-sitter" },
+    { name = "tree-sitter-typescript" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1366,6 +1368,8 @@ requires-dist = [
     { name = "pypdf", specifier = ">=6.19.0" },
     { name = "python-multipart", specifier = ">=0.0.32" },
     { name = "sqlalchemy", specifier = ">=2.0" },
+    { name = "tree-sitter", specifier = ">=0.25.2" },
+    { name = "tree-sitter-typescript", specifier = ">=0.23.2" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
 ]
 
