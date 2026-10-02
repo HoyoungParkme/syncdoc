@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-011
 type: MS
 title: MINISPEC — codegraph — 코드 호출 그래프와 명세 대조
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/codegraph/graph.py`(순수 함수 6개)와 `core/codegraph/service.py`(`CodeGraphService` 5개). 클래스 명세 [[SYNC-DOM-002]] 4.11의 시그니처를 함수 내부까지 내린 것.
+`core/codegraph/graph.py`(순수 함수 9개)와 `core/codegraph/service.py`(`CodeGraphService` 5개). 클래스 명세 [[SYNC-DOM-002]] 4.11의 시그니처를 함수 내부까지 내린 것.
 
 명세↔코드 대조([[SYNC-PRD-001#R13]])를 맡는다 — 2026-09-30 사용자 결정으로 graphify가 뽑은 호출 그래프에 싱크독의 보강을 더해, MINISPEC의 「호출하는 것」과 실제 호출을 가른다. **명세 묶음과 선이 없다**: 항목 ID는 그래프 안의 글자이고, 「호출하는 것」은 부르는 쪽(검사기 `check_calls`, 화면·챗봇은 카드 AY·AZ의 `queries`)이 명세에서 읽어 넘긴다.
 
@@ -41,6 +41,8 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 | [[#codegraph.communities]] | 함수를 graphify 군집으로 묶는다 |
 | [[#codegraph.spec_calls]] | 명세의 「호출하는 것」을 항목 ID 집합으로 |
 | [[#codegraph.compare]] | 명세 호출과 코드 호출을 같음·코드만·명세만으로 |
+| [[#codegraph.item_function]] | 항목 ID → 그 항목의 함수(화면 항목은 파일 이름과 같은 컴포넌트) |
+| [[#codegraph.item_neighbors]] | 함수의 부르는 것·불리는 곳을 항목 있는 함수까지 — 도우미·같은 항목은 건너 |
 | [[#CodeGraphService.get]] | 프로젝트의 그래프 행 |
 | [[#CodeGraphService.save]] | 새 그래프로 바꿔 끼운다 |
 | [[#CodeGraphService.fail]] | 실패 이유만 남긴다 — 옛 그래프는 그대로 |
@@ -179,6 +181,39 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 5. `→ [CallDiff]` 항목 ID 순
 
 **테스트 관점** 도우미를 건너 닿은 호출이 코드 호출에 든다 · 항목이 있는 함수 너머는 안 간다 · 사이클에서 멈춘다 · docstring 없는 함수가 이름으로 이어진다 · 함수 없는 항목은 `function=None`
+
+---
+
+#### codegraph.item_function 항목 ID로 그 항목의 함수
+
+**시그니처** `def item_function(graph: dict, item_id: str) -> dict | None`
+
+근거: [[SYNC-UC-001#UC-H20]] 기본 흐름 2 · 사용자 결정 2026-10-02(화면 항목은 파일 이름과 같은 컴포넌트 하나, 카드 BK)
+
+**처리**
+1. `cands = [f for f in graph.functions if f.item == item_id]` · 없으면 `→ None`(옛 그래프·항목 없음)
+2. 이름이 파일 이름(확장자 뗀 것)과 같은 함수가 있으면 그것 — `CodeGraph.tsx`의 `CodeGraph`. 화면 항목은 파일 함수 전부가 같은 `item`이라 여기서 하나로 좁힌다
+3. 없으면 `(file, line)` 순으로 첫 함수
+4. `→ 함수 dict`
+
+**테스트 관점** 파일 이름과 같은 함수가 먼저 · 없으면 첫 함수 · 두 파일이 같은 항목이면 이름 맞는 파일 · `item` 없는 그래프 → None
+
+---
+
+#### codegraph.item_neighbors 항목 있는 함수까지의 부르는 것·불리는 곳
+
+**시그니처** `def item_neighbors(graph: dict, key: str) -> tuple[list[str], list[str]]`
+
+근거: [[SYNC-UC-001#UC-H20]] 기본 흐름 2 · 사용자 결정 2026-10-02(항목 있는 함수만, `item` 기준, 카드 BK)
+
+**처리** — [[#codegraph.compare]] 3과 같은 걷기를 `item`으로, 양방향
+1. `start = functions 중 key` · `own = start.item`(없으면 None)
+2. 정방향: `calls`를 따라가며 `item`이 없거나 **`own`과 같은** 함수(도우미·같은 항목의 다른 함수)는 건너 계속, 다른 `item`이 있는 함수에 닿으면 멈춘다. 방문 표시로 사이클을 멈춘다. 자기 자신은 뺀다
+3. 역방향: `calls`를 거꾸로 같은 규칙
+4. 닿은 함수를 항목 ID로 접는다(한 항목 = 먼저 닿은 함수 하나) · 항목 ID 순
+5. `→ (부르는 것 key 목록, 불리는 곳 key 목록)`
+
+**테스트 관점** 도우미를 건너 닿는다 · 같은 항목의 함수는 건너 그 너머까지 · 항목 있는 함수 너머는 안 간다 · 역방향도 같다 · 사이클에서 멈춘다 · 같은 항목 둘은 하나로 · `ms`만 있는 옛 그래프는 빈 목록
 
 ---
 
