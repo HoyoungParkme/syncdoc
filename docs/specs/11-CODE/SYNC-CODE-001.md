@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1293,6 +1293,18 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | MS-011 테스트 관점(reduce — API ID는 `item`만·설명 잘림 · enrich — tsx 첫 주석 → 파일 함수 전부, 함수 docstring 우선, 화면 ID 없는 파일 null) · MS-008(code_nodes — API 항목 함수 `item`만, 옛 그래프 `item`=`ms`) · `check_calls` 0/0 그대로 · 헤드리스: 라우터 함수 → API 뱃지·근거 → 뱃지 클릭 → 팝업 · `CodeGraph` → `UI-002#UI-17` · 리포지토리 함수 → 「항목 없음」 · 운영: SYNC 재구축 뒤 `item` 있는 함수 수 |
 | 선행 | BI |
 | 완료 | 2026-10-02 · 브랜치 `card/BJ-item-beyond-ms`(c84ece1 #272) · spec 10 + code 3 · 테스트 389 · `ruff`·`tsc`·`oxlint` · `validate` 0/0 · `check_code` 157/157 · `check_calls` 0/0(982 함수 · `ms` 판정 그대로) · `check_ui` 14/14 · 헤드리스(dev_preview 재구축, 콘솔 0): 함수 982 중 `item` 287(MINISPEC 157 + API·UI 130, `item`과 `ms`가 어긋난 함수 0) · `code.code_nodes` → 4.7에 `API-001#GET/api/projects/{code}/code-graph`·근거 3(UI-17·UC-H20·MS-008)·하위 3, 4.4 없음 · 뱃지 클릭 → UI-18 팝업(이동·새 창·Esc) · `CodeGraph.CodeGraph` → `UI-002#UI-17`·근거 9 · `SpecRepository.__init__` → 「항목 없음」 · `save_pipeline` 회귀(뱃지·4.4) · 운영: 머지 커밋의 그래프가 옛 컨테이너로 먼저 만들어져 `item` 0 → 배포 뒤 컨테이너 안에서 `build_code_graph("SYNC", c84ece1)` 다시 → `item` 287 · 공개 번들에 미리보기 뱃지 · 화면은 사람이 직접(DEV-17) |
+
+---
+
+#### BK 질문 탭·코드 탭·MCP에도 항목 — API·UI 항목의 함수
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UC-001#UC-H20]] 기본 흐름 2 · [[SYNC-MS-011#codegraph.item_function]] · [[SYNC-MS-011#codegraph.item_neighbors]] · [[SYNC-MS-008#queries.code_view]] 3a · [[SYNC-MS-008#queries.code_source]] 2 · [[SYNC-MS-008#queries.ask_code]] 3 · [[SYNC-MS-008#queries.ask_tool]] `code_graph`·`read_code` · [[SYNC-API-002#get_code_graph]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/code]] · [[SYNC-UI-002#UI-5]] 8.18·8.19·8.22 · [[SYNC-UI-001]] 7장 13 · 사용자 결정 2026-10-02(맥락 + 코드 탭·MCP까지 · 이웃은 항목 있는 함수만 item 기준 · 화면 항목은 파일 이름과 같은 컴포넌트 하나) |
+| 구현 | `codegraph.item_function`·`item_neighbors`(graph.py — `compare`는 그대로) · `queries.code_view` 3a · `code_source` · `_read_code` · `_code_context`(항목 줄) · `_ASK_CODE_SYSTEM`·`_ASK_TOOLS` 문장 · `mcp/tools.py` `get_code_graph` 설명 · `DocView.tsx` CodePanel(함수 블록 조건 `view.function`, status null 줄은 표시 없음, 아래 8.22) |
+| 테스트 | MS-011 테스트 관점 둘 · MS-008(code_view API·UI 항목·옛 그래프, code_source API 항목, ask_code 맥락 `항목 {item}`, read_code 항목 ID·code_graph API 항목) · `compare`·`check_calls` 회귀 · `check_ui` UI-5 그대로 · 헤드리스: UI-5 API 항목 코드 탭(함수 머리·부르는 것·코드 보기·하위 체인), UI 항목, MS 회귀 · 운영: 컨테이너 안 `code_view`·`_code_context`·`_read_code` + 실제 모델 `ask_code`(라우터 함수) + MCP `get_code_graph` |
+| 선행 | BJ |
+| 완료 | — |
 
 ---
 
