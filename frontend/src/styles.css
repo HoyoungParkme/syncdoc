@@ -800,6 +800,7 @@ a.arow:hover{background:var(--bg-subtle)}
 .qa .a li{margin:var(--space-2) 0}
 .qa .a code{font-family:var(--font-mono);font-size:var(--text-meta);background:var(--bg-sunken);padding:0 var(--space-2);border-radius:var(--radius-chip)}
 .qa .a a.ref{color:var(--ink-body);font-family:var(--font-mono);font-size:var(--text-meta);white-space:nowrap} /* ID는 한 덩어리 (8.7, 카드 AT) */
+.qa .a a.ref.missing{color:var(--ink-disabled);cursor:default} /* 가리키는 곳 없는 참조 — 본문 7.2처럼 회색 「?」(뒤 글자는 styles.view.css), 안 간다 (#290) */
 /* 답 속 mermaid 그림(카드 AS) — 패널 폭에 맞추고 전체보기 버튼 자리를 둔다 */
 .qa .a .mer{position:relative;margin:var(--space-6) 0;overflow:auto}
 .qa .a .mer svg{max-width:100%;height:auto}

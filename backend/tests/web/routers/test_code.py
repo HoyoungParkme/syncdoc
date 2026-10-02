@@ -20,7 +20,10 @@ def test_code_endpoints(client: TestClient, scoped: Session, monkeypatch) -> Non
     calls = client.get("/api/projects/EXMP/code-calls").json()
     assert {"from", "to", "status"} <= set(calls["edges"][0])  # from 별칭
     nodes = client.get("/api/projects/EXMP/code-graph").json()  # UI-17 (카드 BD)
-    assert set(nodes) == {"graph", "communities", "functions", "calls"} and len(nodes["functions"]) == 4
+    assert (
+        set(nodes) == {"graph", "communities", "functions", "calls"}
+        and len(nodes["functions"]) == 4
+    )
     assert nodes["functions"][0]["status"] == "code_only" and nodes["communities"] == []
     miss = client.get("/api/docs/EXMP-MS-001/items/svc.gone/code/source")
     assert miss.status_code == 404 and miss.json()["resource"] == "function"
@@ -47,7 +50,9 @@ def test_code_endpoints(client: TestClient, scoped: Session, monkeypatch) -> Non
     assert r.status_code == 404
 
 
-def test_code_ask_endpoint_streams_with_key(client: TestClient, scoped: Session, monkeypatch) -> None:
+def test_code_ask_endpoint_streams_with_key(
+    client: TestClient, scoped: Session, monkeypatch
+) -> None:
     """POST /api/projects/{code}/code/ask (카드 BI) — start에 key, 뒤는 /api/docs/{docId}/ask와 같다."""
     from app.config import settings
     from app.core import queries
@@ -72,7 +77,7 @@ def test_code_ask_endpoint_streams_with_key(client: TestClient, scoped: Session,
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")
     assert _sse(r.text) == [
         ("start", {"doc_id": None, "item_id": None, "key": "a.py:1"}),
-        ("answer", {"answer": "저장 함수다", "context_item_ids": []}),
+        ("answer", {"answer": "저장 함수다", "context_item_ids": [], "missing_refs": []}),
     ]
     miss = client.post("/api/projects/EXMP/code/ask", json={**body, "key": "a.py:2"})
     assert miss.status_code == 404 and miss.json()["resource"] == "function"

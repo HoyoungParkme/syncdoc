@@ -1,6 +1,7 @@
 """routers/conversations — /api/projects/{code}/conversations · /api/conversations/{id}.
 
 SYNC-API-001 3.5 · SEQ-24 · UI-5 8.11~8.13. ConversationService만 본다(DOM-002 3.1).
+대화 하나 읽기는 queries.conversation_view — 답 속 참조를 링크로 바꿔 준다(#290).
 질문(ask)은 routers/documents에 그대로 있고 queries.ask_item이 대화를 읽고 쓴다.
 """
 
@@ -11,6 +12,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, Response, UploadFile
 from sqlalchemy.orm import Session
 
+from app.core import queries
 from app.core.account.models import User
 from app.core.conversation.service import ConversationService
 from app.db import get_session
@@ -48,16 +50,12 @@ async def create_conversation(
 
 
 @router.get("/conversations/{id}", response_model=Conversation)
-async def get_conversation(
-    id: int, user: User = Depends(auth.current_user), session: Session = Depends(get_session)
-) -> Conversation:
-    """SYNC-API-001#GET/api/conversations/{id} — 턴 전부 + 첨부 메타 (UI-5 8.7)"""
-    return Conversation.model_validate(ConversationService(session).get(id, user))
+async def get_conversation(id: int, user: User = Depends(auth.current_user)) -> Conversation:
+    """SYNC-API-001#GET/api/conversations/{id} — 턴 전부 + 첨부 메타 (UI-5 8.7, #290)"""
+    return Conversation.model_validate(await queries.conversation_view(id, user))
 
 
-@router.post(
-    "/conversations/{id}/attachments", response_model=AttachmentMeta, status_code=201
-)
+@router.post("/conversations/{id}/attachments", response_model=AttachmentMeta, status_code=201)
 async def upload_attachment(
     id: int,
     file: UploadFile,
