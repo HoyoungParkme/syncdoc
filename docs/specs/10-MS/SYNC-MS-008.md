@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -148,8 +148,8 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 쓴다.
 
 구현을 물으면(「명세대로 구현됐어?」 「이 함수가 실제로 뭘 부르나」) code_graph로 그 항목의
-대조(같음·코드만·명세만)를 먼저 보고, 필요하면 read_code로 함수 본문을 읽는다. 코드 근거는
-파일:줄로 댄다. 코드 그래프가 없다고 하면 그렇다고 말하고 지어내지 않는다.
+대조(같음·코드만·명세만)를 먼저 보고, 필요하면 read_code로 함수 본문을 읽는다. 함수를 이름으로
+찾거나 어디서 쓰이는지 물으면 find_code로 찾는다. 코드 근거는 파일:줄로 댄다. 코드 그래프가 없다고 하면 그렇다고 말하고 지어내지 않는다.
 
 [문서] {doc_id} {title} · 상태 {status} · v{version_no}
 [이 문서의 항목]
@@ -193,6 +193,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 | `read_attachment` | `attachment_id, reason` | [[SYNC-MS-010#ConversationService.attachment_text]] | `{attachment_id, name, mime, text}` — 글자 파일은 본문 그대로, PDF는 뽑은 글자. 이 대화의 첨부가 아니거나 이미지면 `{"error": "없음"}`(이미지엔 `hint`: 「이미지는 붙인 질문에 이미 보였다」) | `첨부:{name}` |
 | `code_graph` | `doc_id, item_id, reason` | [[#queries.code_view]] | `{graph: {commit, source, error}, item, is_ms, missing, function: {qual, file, line, end, calls: [{id, status, qual, file, line}], callers: [{id, qual, file, line}]}, functions: [{id, qual, file, line, same, code_only, spec_only}]}` — [[SYNC-API-002#get_code_graph]]과 같은 뜻. API·UI 항목이면 `function`이 그 항목의 함수이고 `status`가 null(대조 없음, 카드 BK). 그래프가 없으면 `{"error": "코드 그래프 없음"}`(카드 AZ) | `코드:DOC#ITEM` |
 | `read_code` | `target, reason` — `target`은 항목 ID(`문서#항목` — MINISPEC·API·UI 어느 문서든) · 함수 이름(`Class.fn`, 그래프에 하나뿐이면 맨 이름 `fn`도) · 파일 경로(`path` · `path:줄` · `path:시작-끝`, `–`도). 시작 맥락·code_graph가 보인 꼴을 그대로 받는다(#286) | [[SYNC-MS-011#CodeGraphService.read]] — 항목 ID는 [[SYNC-MS-011#codegraph.compare]]로 함수 자리를, 없으면 [[SYNC-MS-011#codegraph.item_function]](API·UI 항목, 카드 BK), 함수 이름은 그래프의 `qual`로, 안 맞으면 `name`이 하나뿐일 때 그것으로 찾는다. `path:줄`은 그 줄에서 시작하는 함수, 아니면 그 줄을 품은 함수(끝 줄이 없으면 다음 함수 앞 줄까지), 함수 밖 줄이면 그 줄부터 | `{path, start, end, commit, truncated, text}` — `text`는 줄마다 `번호: 내용`. 300줄까지 · 비밀 꼴·저장소 밖·없는 파일·모르는 함수는 `{"error": "없음", hint}`(카드 AZ) — `hint`는 받는 꼴 넷과 「위치를 모르면 code_graph」. 이름(qual·맨 이름)이 여럿이면 `candidates`(`file:줄 qual`, 10까지 — 앞의 `file:줄`을 그대로 다시 넣는다) | `코드:path:시작-끝` |
+| `find_code` | `query, reason` — 함수 이름·`Class.fn`·파일 경로의 일부(#302) | [[SYNC-MS-011#CodeGraphService.get]] — 그래프 함수 중 이름·qual·파일이 `query`를 품은 것(대소문자 무시, UI-17 검색 2.1과 같은 규칙). 이름·qual이 `query`와 똑같은 것이 먼저, 나머지는 파일·줄 순. 불리는 곳은 그래프 호출 선에서. 항목은 함수의 `item`, 없으면 층(`_layers`, [[#queries.ask_code]] 3과 같은 줄) | `{query, total, functions: [{qual, file, line, item \| layer, callers: [{qual, file, line}], more_callers}], more}` — 함수 30·불리는 곳 10까지, 넘친 수는 `more`·`more_callers`. 맞는 것이 없으면 `functions: []`와 hint(「더 짧은 이름이나 파일 이름으로」). 그래프가 없으면 `{"error": "코드 그래프 없음"}` | `코드검색:{query}` |
 
 **처리**
 1. `name`이 여섯 밖 → `ToolResult(None, {"error": "없는 도구"})` · 필수 인자가 빠짐 → `{"error": "인자 X가 없다"}`
@@ -203,7 +204,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 
 **결과 형식** JSON 문자열. MCP 도구([[SYNC-API-002]])와 같은 모양이라 에이전트가 이미 보는 것과 같고, 마크다운 본문을 안에 그대로 담아도 경계가 안 흐트러진다. 크기 상한 없음(사용자 결정) — 큰 문서 전문이 맥락을 넘기면 모델이 400을 주고 `llm-unavailable`로 접힌다
 
-**`_ASK_TOOLS`** — `ToolSpec` 여덟. `description`은 [[SYNC-API-002]] 3장의 도구 설명 문장을 가져다 쓴다(`read_attachment`는 MCP에 없다 — 「이 대화에 붙인 글자·PDF 첨부의 글자를 읽는다. 시작 맥락의 [첨부] 줄에 있는 id로」. `code_graph`는 `get_code_graph`의 문장이고, `read_code`도 MCP에 없다 — 「그래프를 만든 커밋의 코드를 읽는다. target은 항목 ID(문서ID#항목ID — MINISPEC·API·UI 어느 문서든) · 함수 이름(Class.fn, 하나뿐이면 이름만도) · 파일 경로(path · path:줄 — 그 줄의 함수 · path:시작-끝). 300줄까지, 줄마다 번호가 붙는다. 키·인증서 같은 비밀 파일은 읽을 수 없다.」). `parameters`는 JSON Schema `{type: object, properties: {doc_id: {type: string}, item_id: {type: string}, attachment_id: {type: integer}, reason: {type: string}}, required: [...]}` — 도구마다 위 표의 인자가 `required`
+**`_ASK_TOOLS`** — `ToolSpec` 아홉. `description`은 [[SYNC-API-002]] 3장의 도구 설명 문장을 가져다 쓴다(`read_attachment`는 MCP에 없다 — 「이 대화에 붙인 글자·PDF 첨부의 글자를 읽는다. 시작 맥락의 [첨부] 줄에 있는 id로」. `code_graph`는 `get_code_graph`의 문장이고, `read_code`도 MCP에 없다 — 「그래프를 만든 커밋의 코드를 읽는다. target은 항목 ID(문서ID#항목ID — MINISPEC·API·UI 어느 문서든) · 함수 이름(Class.fn, 하나뿐이면 이름만도) · 파일 경로(path · path:줄 — 그 줄의 함수 · path:시작-끝). 300줄까지, 줄마다 번호가 붙는다. 키·인증서 같은 비밀 파일은 읽을 수 없다.」. `find_code`도 MCP에 없다(에이전트는 저장소를 grep한다, #302) — 「코드 그래프에서 함수를 이름으로 찾는다. query는 함수 이름·Class.fn·파일 경로의 일부. 맞는 함수마다 파일:줄·항목(없으면 층)·불리는 곳을 준다 — 함수 30·불리는 곳 10까지. 어디서 쓰이는지 볼 때 부른다.」). `parameters`는 JSON Schema `{type: object, properties: {doc_id: {type: string}, item_id: {type: string}, attachment_id: {type: integer}, reason: {type: string}}, required: [...]}` — 도구마다 위 표의 인자가 `required`
 
 **출력** `ToolResult(target, text)` — `target`은 「본 것」에 실을 `DOC#ITEM`·`DOC`, 목록 도구는 `None`
 
@@ -211,11 +212,11 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 
 **테스트 관점(추가, #110)** 없는 항목의 「없음」에 `hint`가 있다 · 지시문에 「먼저 보고 있는 항목을 get_item으로 읽는다」가 있다
 
-**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.describe_documents]] · [[#queries.item_references_view]] [[#queries.item_chain]] [[#queries.document_list]] · [[#queries.code_view]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#codegraph.item_function]] · [[SYNC-MS-011#CodeGraphService.read]] · [[SYNC-MS-010#ConversationService.attachment_text]] · [[#queries.document_view]] · [[#queries.item_view]]
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] [[SYNC-MS-002#SpecService.get_document]] [[SYNC-MS-002#SpecService.describe_documents]] · [[#queries.item_references_view]] [[#queries.item_chain]] [[#queries.document_list]] · [[#queries.code_view]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#codegraph.item_function]] · [[SYNC-MS-011#CodeGraphService.read]] · [[SYNC-MS-002#SpecService.list_by_project]] [[SYNC-MS-011#codegraph.layer_table]] [[SYNC-MS-011#codegraph.layers]](`find_code`의 층, #302) · [[SYNC-MS-010#ConversationService.attachment_text]] · [[#queries.document_view]] · [[#queries.item_view]]
 
 **호출되는 것** [[#queries.ask_item]] 5단계
 
-**테스트 관점** `code_graph` — 그래프가 없으면 error, 있으면 function·calls(카드 AZ) · `read_code` 여러 꼴 — 항목 ID·함수 이름·하나뿐인 맨 이름·`경로:줄`(시작 줄·안쪽 줄)·`경로:시작-끝`(`–`도)이 같은 줄을 읽고 줄 번호가 붙는다 · 함수 밖 `경로:줄`은 그 줄부터 · 이름(qual·맨 이름)이 여럿이면 `없음`에 `candidates`(#286) · `read_code(".env")` → 없음 · 다섯 도구 각각 돌려주는 JSON의 키 집합 · 다른 프로젝트 문서 ID(소유해도) → `없음` 텍스트, 예외 아님 · 남의 프로젝트 → `not-found` 전파 · 끊어진 참조 → `note: "아직 없음"` · `item_chain` 빈 단계 행 유지 · `list_documents`에 제목이 있다 · `reason` 빠짐 → `인자 reason이 없다` · 없는 도구 이름 → `없는 도구` · **DB에 아무것도 안 쓴다**
+**테스트 관점** `find_code`(#302) — 이름 일부로 함수와 불리는 곳 · 똑같은 이름이 먼저 · 30·10을 넘으면 자르고 `more`·`more_callers` · 항목 없는 함수는 층 · 맞는 것이 없으면 빈 목록과 hint · 그래프 없으면 error · 지시문에 find_code · `code_graph` — 그래프가 없으면 error, 있으면 function·calls(카드 AZ) · `read_code` 여러 꼴 — 항목 ID·함수 이름·하나뿐인 맨 이름·`경로:줄`(시작 줄·안쪽 줄)·`경로:시작-끝`(`–`도)이 같은 줄을 읽고 줄 번호가 붙는다 · 함수 밖 `경로:줄`은 그 줄부터 · 이름(qual·맨 이름)이 여럿이면 `없음`에 `candidates`(#286) · `read_code(".env")` → 없음 · 다섯 도구 각각 돌려주는 JSON의 키 집합 · 다른 프로젝트 문서 ID(소유해도) → `없음` 텍스트, 예외 아님 · 남의 프로젝트 → `not-found` 전파 · 끊어진 참조 → `note: "아직 없음"` · `item_chain` 빈 단계 행 유지 · `list_documents`에 제목이 있다 · `reason` 빠짐 → `인자 reason이 없다` · 없는 도구 이름 → `없는 도구` · **DB에 아무것도 안 쓴다**
 
 ---
 #### queries.ask_code 코드 그래프에서 묻는다 — 고른 함수가 시작 맥락
@@ -242,6 +243,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 명세 문서들이 있고, 당신은 도구로 함수 본문과 명세 항목을 읽을 수 있다. 읽기만 한다.
 
 함수 자체를 묻는 질문(뭐 하는 함수야·왜 이렇게 했어)은 read_code로 본문을 읽고 답한다.
+어디서 쓰이는지·어떤 함수가 있는지 물으면 find_code로 이름을 찾아 불리는 곳을 따라간다.
 명세와 맞는지 물으면 항목이 있으면 code_graph로 대조(같음·코드만·명세만)를 보고 get_item으로
 그 항목을 읽어 견준다. 항목이 없는 함수면 부르는 것·불리는 곳의 항목을 따라간다 — 그 함수가
 어느 명세의 어느 자리를 받치는지 거기서 보인다. API·UI 항목인 함수는 대조가 없다 — get_item으로
