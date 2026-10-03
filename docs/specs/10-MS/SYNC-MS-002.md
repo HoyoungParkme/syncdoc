@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-002
 type: MS
 title: MINISPEC — SpecService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/spec/service.py`의 함수 34개. 클래스 명세 [[SYNC-DOM-002]] 4.2의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/spec/service.py`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-002]] 4.2의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -52,6 +52,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#SpecService.mark_convention_error]] | 오류·경고 표시 |
 | [[#SpecService.issue_doc_id]] | 문서 ID 발급 |
 | [[#SpecService.precondition]] | DOM 선행조건 |
+| [[#SpecService.status_change_count]] | 상태 변경 수 |
 | [[#SpecService.trash]] | 휴지통에 넣기 |
 | [[#SpecService.trash_commit]] | 휴지통 커밋 해시 |
 | [[#SpecService.list_trashed]] | 휴지통 목록 |
