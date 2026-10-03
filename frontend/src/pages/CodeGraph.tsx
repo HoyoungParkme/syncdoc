@@ -277,10 +277,12 @@ export function CodeGraph() {
             fitted.current = true
             fitAll()
           }
-          if (frameRef.current) {
-            applyFrameRef.current()
-            if (settled) frameRef.current = null // 거의 멈췄다 — 마지막으로 맞추고 그친다
-          }
+          if (frameRef.current) applyFrameRef.current()
+        })
+        // 배치가 정말 멈췄다(alpha < alphaMin) — 마지막으로 맞추고 그친다. 0.08에서 그치면 남은 움직임에 25px쯤 밀렸다 (#295)
+        .on('end', () => {
+          if (frameRef.current) applyFrameRef.current()
+          frameRef.current = null
         })
     simRef.current = sim
     sim.nodes(nodes)
@@ -447,7 +449,8 @@ export function CodeGraph() {
     frameRef.current = f
     window.setTimeout(() => {
       applyFrame()
-      if ((simRef.current?.alpha() ?? 0) < 0.08 && frameRef.current === f) frameRef.current = null
+      const sim = simRef.current
+      if ((!sim || sim.alpha() < sim.alphaMin()) && frameRef.current === f) frameRef.current = null
     }, 60)
   }
   const centerOn = useCallback((n: GNode) => {
