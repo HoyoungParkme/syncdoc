@@ -88,6 +88,33 @@ def test_reduce_keeps_functions_and_calls_only() -> None:
     assert g["calls"] == [["app/core/pipeline.py:30", "app/core/pipeline.py:50", "graphify"]]
 
 
+def test_reduce_drops_test_files() -> None:
+    """MS-011 reduce 1 — 테스트 파일의 노드는 함수가 아니다. `test`가 들어도 꼴이 아니면 남는다."""
+    files = {
+        "tests/x.py": True,
+        "app/test/y.py": True,
+        "web/src/__tests__/b.ts": True,
+        "app/test_a.py": True,
+        "app/a_test.py": True,
+        "web/a.test.tsx": True,
+        "web/a.spec.ts": True,
+        "conftest.py": True,
+        "app/sub/conftest.py": True,
+        "app/testing.py": False,
+        "app/contest.py": False,
+        "web/spec.ts": False,
+    }
+    raw = {
+        "nodes": [
+            {"id": f, "label": "f()", "_callable": True, "source_file": f, "source_location": "L1"}
+            for f in files
+        ],
+        "links": [],
+    }
+    kept = {f["file"] for f in cg.reduce(raw)["functions"]}
+    assert kept == {f for f, is_test in files.items() if not is_test}
+
+
 # ── communities ──
 RAW2 = {
     "nodes": [
@@ -145,13 +172,61 @@ def test_communities_groups_by_file_labels_by_hub_and_is_deterministic() -> None
     comms = graph["communities"]
     assert [c["size"] for c in comms] == [3, 2]  # 함수 수 내림차순 · 테스트·문서만 든 군집은 없다
     assert {c["id"] for c in comms} == {by["g1"], by["f1"]}
-    assert by["g1"] == 0  # 노드가 가장 많은 군집(fb·g1·g2·t1)이 0 (#253)
+    assert by["g1"] == 0  # 노드가 가장 많은 군집(fb·g1·g2·d1)이 0 (#253) — t1은 안 든다(#306)
     assert all(c["label"] and not c["label"].endswith("()") for c in comms)
     assert "노트" not in [c["label"] for c in comms]  # 문서 허브는 라벨이 못 된다 (#255)
     again = cg.communities(RAW2, cg.reduce(RAW2))
     assert [f["community"] for f in again["functions"]] == [
         f["community"] for f in graph["functions"] if f["name"] != "g3"
     ]
+
+
+# 테스트 여덟이 c.py의 두 함수를 넷씩 나눠 부른다 — 테스트까지 묶으면 h1·h2가 두 커뮤니티로 갈리고
+# 하나의 라벨이 test_c.py였다 (#306)
+RAW3 = {
+    "nodes": [
+        {"id": "fa", "label": "a.py", "source_file": "app/a.py", "source_location": "L1"},
+        {"id": "f1", "label": "f1()", "_callable": True, "source_file": "app/a.py",
+         "source_location": "L2"},
+        {"id": "f2", "label": "f2()", "_callable": True, "source_file": "app/a.py",
+         "source_location": "L5"},
+        {"id": "fc", "label": "c.py", "source_file": "app/c.py", "source_location": "L1"},
+        {"id": "h1", "label": "h1()", "_callable": True, "source_file": "app/c.py",
+         "source_location": "L2"},
+        {"id": "h2", "label": "h2()", "_callable": True, "source_file": "app/c.py",
+         "source_location": "L9"},
+        {"id": "ft", "label": "test_c.py", "source_file": "tests/test_c.py",
+         "source_location": "L1"},
+        *[{"id": f"t{i}", "label": f"test_{i}()", "_callable": True,
+           "source_file": "tests/test_c.py", "source_location": f"L{10 * i}"} for i in range(1, 9)],
+    ],
+    "links": [
+        {"source": "fa", "target": "f1", "relation": "contains"},
+        {"source": "fa", "target": "f2", "relation": "contains"},
+        {"source": "f1", "target": "f2", "relation": "calls"},
+        {"source": "fc", "target": "h1", "relation": "contains"},
+        {"source": "fc", "target": "h2", "relation": "contains"},
+        {"source": "f2", "target": "h1", "relation": "calls"},
+        *[{"source": "ft", "target": f"t{i}", "relation": "contains"} for i in range(1, 9)],
+        *[{"source": f"t{i}", "target": "h1" if i <= 4 else "h2", "relation": "calls"}
+          for i in range(1, 9)],
+    ],
+}  # fmt: skip
+
+
+def test_communities_leave_tests_out() -> None:
+    """#306 — 테스트 노드·선은 군집에 안 든다. 같은 파일의 함수가 한 커뮤니티, 라벨은 테스트가 아니다."""
+    out = cg.communities(RAW3, cg.reduce(RAW3))
+    by = {f["name"]: f["community"] for f in out["functions"]}
+    assert by["h1"] == by["h2"] and by["f1"] == by["f2"] and by["h1"] != by["f1"]
+    assert not any(c["label"].startswith("test_") for c in out["communities"])
+    tests = {n["id"] for n in RAW3["nodes"] if n["source_file"].startswith("tests/")}
+    bare = {
+        "nodes": [n for n in RAW3["nodes"] if n["id"] not in tests],
+        "links": [e for e in RAW3["links"] if not {e["source"], e["target"]} & tests],
+    }
+    same = cg.communities(bare, cg.reduce(bare))  # 테스트 노드를 뺀 raw와 같은 결과
+    assert same["communities"] == out["communities"] and same["functions"] == out["functions"]
 
 
 def test_communities_without_nodes_leaves_none_and_empty() -> None:
