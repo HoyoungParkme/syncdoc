@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -2876,7 +2876,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 1. `save_pipeline`을 고르고 사이드바 「질문」 탭(4.9)을 누른다(카드 BO). 맥락 줄(7.1)이 「`pipeline.save_pipeline` · 이 함수를 보며 묻습니다」. URL에 `?panel=ask`. 「코드」 탭으로 돌아가면 코드(4.6)가 그대로다
 2. 「이 함수가 명세대로 구현됐어?」를 보낸다 — 진행 묶음(8.9)에 「code_graph … · read_code …」가 흐르고 답에 대조와 파일:줄 근거가 온다. 답 속 `MS-007#pipeline.save_pipeline`을 누르면 그 문서로
 3. 그래프에서 `_advance_processed`를 고른다 — 맥락 줄이 바뀐다. 「이건 뭐 하는 함수야?」 → 모델이 `read_code`로 본문을 읽고 답한다. 앞 질문은 대화에 그대로
-4. 아무것도 안 고른 채(빈 곳 클릭) 「이 프로젝트에서 git은 어디서 쓰여?」 — 맥락 줄 「그래프 전체」, 모델이 `code_graph`·`read_code`로 찾는다
+4. 아무것도 안 고른 채(빈 곳 클릭) 「이 프로젝트에서 git은 어디서 쓰여?」 — 맥락 줄 「그래프 전체」, 모델이 `find_code`로 git 함수와 불리는 곳을 찾고 필요하면 `read_code`로 읽는다(#302)
 5. UI-5 문서 뷰로 가서 질문 탭을 열면 같은 대화가 이어져 있다(`?conv=`)
 
 **S-9 화면을 다 쓰고 폭을 맞춘다** — 카드 BO
