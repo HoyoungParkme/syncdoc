@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-009
 type: MS
 title: MINISPEC — infra — git·github 어댑터
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`infra/git.py · infra/github.py · infra/llm.py · infra/graphify.py`의 함수 24개. 클래스 명세 [[SYNC-DOM-002]] 4.9의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`infra/git.py · infra/github.py · infra/llm.py · infra/graphify.py`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-002]] 4.9의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -39,10 +39,12 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#git.http_backend]] | 서버 저장소 git 입구 — git http-backend를 CGI로 |
 | [[#git.archive]] | 커밋의 파일을 폴더에 푼다 |
 | [[#git.changed_paths]] | 범위에서 바뀐 경로 전부 |
+| [[#git.sync_readme]] | 저장소 README를 지금 판으로 |
 | [[#github.verify_signature]] | webhook 서명 |
 | [[#github.exchange_code]] | OAuth code → token |
 | [[#github.get_user]] | token → 사용자 정보 |
 | [[#github.create_repo]] | 공개 저장소 만들기 |
+| [[#github.create_hook]] | push 통지 걸기 |
 | [[#llm.step]] | 모델 한 번 호출 + 도구 호출 파싱 |
 | [[#llm.step_stream]] | 스트림으로 한 번 호출 — 글자 조각과 끝의 LlmStep |
 | [[#graphify.extract]] | graphify로 코드만 추출 |
