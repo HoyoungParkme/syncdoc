@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-011
 type: MS
 title: MINISPEC — codegraph — 코드 호출 그래프와 명세 대조
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/codegraph/graph.py`(순수 함수 11개)와 `core/codegraph/service.py`(`CodeGraphService` 5개). 클래스 명세 [[SYNC-DOM-002]] 4.11의 시그니처를 함수 내부까지 내린 것.
+`core/codegraph/graph.py`(순수 함수)와 `core/codegraph/service.py`(`CodeGraphService`) — 목록은 1장. 클래스 명세 [[SYNC-DOM-002]] 4.11의 시그니처를 함수 내부까지 내린 것.
 
 명세↔코드 대조([[SYNC-PRD-001#R13]])를 맡는다 — 2026-09-30 사용자 결정으로 graphify가 뽑은 호출 그래프에 싱크독의 보강을 더해, MINISPEC의 「호출하는 것」과 실제 호출을 가른다. **명세 묶음과 선이 없다**: 항목 ID는 그래프 안의 글자이고, 「호출하는 것」은 부르는 쪽(검사기 `check_calls`, 화면·챗봇은 카드 AY·AZ의 `queries`)이 명세에서 읽어 넘긴다.
 
