@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-006
 type: MS
 title: MINISPEC — AccountService
-status: draft
+status: approved
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
