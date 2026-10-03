@@ -330,6 +330,9 @@ export function CodeGraph() {
       const col = colors.current
       const fid = focusRef.current ? (focusRef.current.kind === 'c' ? cNodeId(focusRef.current.id) : fNodeId(focusRef.current.key)) : null
       const near = new Set<string>()
+      // 고른 커뮤니티가 펼쳐져 노드가 없으면 그 커뮤니티의 함수들이 밝다 (#298)
+      const openComm = focusRef.current?.kind === 'c' && !nodesRef.current.some((n) => n.id === fid) ? focusRef.current.id : null
+      if (openComm !== null) for (const n of nodesRef.current) if (n.kind === 'f' && n.cid === openComm) near.add(n.id)
       if (fid) {
         near.add(fid)
         for (const l of linksRef.current) {
@@ -561,7 +564,13 @@ export function CodeGraph() {
       d.node.fy = null
       simRef.current?.alphaTarget(0)
       if (!d.moved) {
-        if (d.node.kind === 'c') setExpanded((s) => new Set(s).add(d.node!.cid!))
+        if (d.node.kind === 'c') {
+          // 펼치면서 고른다 — 사이드바에 커뮤니티, 화면은 그 노드들에 따라간다 (#298)
+          const cid = d.node.cid!
+          setExpanded((s) => new Set(s).add(cid))
+          setSel({ kind: 'c', id: cid })
+          follow({ kind: 'fit', keys: new Set((data?.functions ?? []).filter((f) => f.community === cid).map((f) => f.key)) })
+        }
         else setSel((cur) => (cur?.kind === 'f' && cur.key === d.node!.fn!.key ? null : { kind: 'f', key: d.node!.fn!.key }))
       }
     } else if (!d.moved) setSel(null)
