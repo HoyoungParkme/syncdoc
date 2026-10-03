@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-001
 type: MS
 title: MINISPEC — ProjectService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/project/service.py`의 함수 9개. 클래스 명세 [[SYNC-DOM-002]] 4.1의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/project/service.py`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-002]] 4.1의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -33,6 +33,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#ProjectService.get_owned]] | 코드 → 내 프로젝트 — 사람 경로 |
 | [[#ProjectService.repo_status]] | 동기화 상태 |
 | [[#ProjectService.delete_project]] | 등록 해제·작업 사본 회수 |
+| [[#ProjectService.ensure_hook]] | push 통지를 건다 |
+| [[#ProjectService.sync_now]] | 지금 가져오기 |
 | [[#ProjectService.rebuild_index]] | 재구축 위임 |
 | [[#ProjectService.asset_path]] | 첨부 파일 경로 — 사람 경로 |
 | [[#ProjectService.server_origin]] | 서버 저장소 원본 경로 — git 입구 |
