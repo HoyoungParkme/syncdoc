@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-010
 type: MS
 title: MINISPEC — ConversationService — 대화·턴·첨부
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/conversation/service.py`의 함수 14개. 클래스 명세 [[SYNC-DOM-002]] 4.10의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/conversation/service.py`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-002]] 4.10의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 읽는 중 질의([[SYNC-PRD-001#R11]])의 **보관**을 맡는다 — 2026-09-29 사용자 결정으로 대화·첨부를 서버에 두기로 했다. 명세 묶음과 선이 없다: 문서·항목 표를 읽지도 쓰지도 않고, 프로젝트·사용자를 ID로만 가리킨다([[SYNC-DOM-001]] 4장 「대화」 묶음). 재구축(UC-S6)이 건드리지 않는다.
 
