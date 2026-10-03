@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -1133,7 +1133,7 @@ ask_item(doc_id, item_id?, conversation_id, question, attachment_ids, user) -> A
 conversation_view(conv_id, user) -> ConversationView
                                                     —       ConversationService.get → 턴마다 답 속 맨 ID를 실제 항목과 맞춘 링크로 + missing_refs (UI-5 8.7, #290)
 ask_tool(name, args, code, user, conversation_id) -> ToolResult
-                                                    SEQ-24  도구 하나 실행 — get_item · get_references · item_chain · list_documents · get_document · read_attachment · code_graph · read_code(카드 AZ). 같은 프로젝트·소유 검사
+                                                    SEQ-24  도구 하나 실행 — get_item · get_references · item_chain · list_documents · get_document · read_attachment · code_graph · read_code(카드 AZ) · find_code(#302). 같은 프로젝트·소유 검사
 ```
 
 **규칙** — **모든 함수가 `user: User`를 명시 인자로 받고 첫 줄에서 `ProjectService.get_owned`(목록은 `list_owned`)를 지난다.** `doc_id`로 들어오는 것은 `doc_id.split("-")[0]`이 코드다. 소유가 아니면 본문·항목·참조를 읽기 전에 not-found로 끝난다. `queries`는 쓰지 않는다. 읽고 조합만 한다. 건수는 `document_ids`로 묶어 한 번에 묻는다(N+1 금지). 단계 11칸 계산(가장 낮은 상태·gate_warning)은 `project_summary` 안에 있다 — `ProjectService`가 아니라.

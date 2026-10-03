@@ -139,3 +139,61 @@ async def test_code_graph_and_read_code_take_api_item(scoped: Session, monkeypat
     d2 = json.loads(r2.text)
     assert r2.target == "코드:a.py:17-20" and d2["text"].startswith("17: line 17\n18: line 18")
     assert seen == [("a.py", "c" * 40)]
+
+
+async def _find(scoped: Session, query: str) -> tuple[str | None, dict]:
+    r = await queries.ask_tool(
+        "find_code", {"query": query, "reason": "찾기"}, "EXMP", owner(scoped), 0
+    )
+    return r.target, json.loads(r.text)
+
+
+async def test_find_code_names_and_callers(scoped: Session, monkeypatch) -> None:
+    """#302 — 이름 일부로 함수와 불리는 곳. 똑같은 이름이 먼저, 나머지는 파일·줄 순. 항목을 싣는다."""
+    _seed_items(scoped)
+    t, d = await _find(scoped, "check")
+    assert t == "코드검색:check" and d["total"] == 1 and d["more"] == 0
+    f = d["functions"][0]
+    assert (f["qual"], f["file"], f["line"], f["item"]) == (
+        "svc.check",
+        "a.py",
+        5,
+        "EXMP-MS-001#svc.check",
+    )
+    assert (
+        f["callers"] == [{"qual": "svc._help", "file": "a.py", "line": 13}]
+        and f["more_callers"] == 0
+    )
+    _, d2 = await _find(scoped, "svc.")
+    assert [x["qual"] for x in d2["functions"]] == [
+        "svc.save",
+        "svc.check",
+        "svc.write",
+        "svc._help",
+    ]
+    _, d3 = await _find(scoped, "write")
+    assert d3["functions"][0]["qual"] == "svc.write"
+    monkeypatch.setattr(queries, "_FIND_FUNCTIONS", 2)
+    monkeypatch.setattr(queries, "_FIND_CALLERS", 0)
+    _, d4 = await _find(scoped, "a.py")
+    assert len(d4["functions"]) == 2 and d4["total"] >= 4 and d4["more"] == d4["total"] - 2
+    assert all(x["callers"] == [] for x in d4["functions"])
+    assert d4["functions"][0]["more_callers"] >= 1  # svc.save ← svc.write … — 상한 0이라 전부 넘친 수
+
+
+async def test_find_code_exact_name_first_none_and_no_graph(scoped: Session) -> None:
+    """#302 — 똑같은 이름이 먼저 · 맞는 것 없음은 빈 목록과 hint · 그래프 없음은 error."""
+    _seed(
+        scoped,
+        graph=dict(GRAPH, functions=[*GRAPH["functions"], _fn("0.py:1", "x.save_all", None, 3)]),
+    )
+    _, d = await _find(scoped, "save")
+    assert [x["qual"] for x in d["functions"]] == ["svc.save", "x.save_all"]
+    _, none = await _find(scoped, "zzz")
+    assert none["functions"] == [] and none["total"] == 0 and "더 짧은" in none["hint"]
+
+
+async def test_find_code_without_graph(scoped: Session) -> None:
+    _seed(scoped, graph=None)
+    t, d = await _find(scoped, "svc")
+    assert t is None and d["error"] == "코드 그래프 없음"

@@ -550,8 +550,9 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 쓴다.
 
 구현을 물으면(「명세대로 구현됐어?」 「이 함수가 실제로 뭘 부르나」) code_graph로 그 항목의
-대조(같음·코드만·명세만)를 먼저 보고, 필요하면 read_code로 함수 본문을 읽는다. 코드 근거는
-파일:줄로 댄다. 코드 그래프가 없다고 하면 그렇다고 말하고 지어내지 않는다.
+대조(같음·코드만·명세만)를 먼저 보고, 필요하면 read_code로 함수 본문을 읽는다. 함수를 이름으로
+찾거나 어디서 쓰이는지 물으면 find_code로 찾는다. 코드 근거는 파일:줄로 댄다. 코드 그래프가
+없다고 하면 그렇다고 말하고 지어내지 않는다.
 
 [문서] {doc_id} {title} · 상태 {status} · v{version_no}
 [이 문서의 항목]
@@ -631,6 +632,12 @@ _ASK_TOOLS: list[ToolSpec] = [
                 "description": "문서ID#항목ID · Class.fn · 이름 · 경로 · 경로:줄 · 경로:시작-끝",
             }
         },
+    ),
+    # 아홉째 — 이름으로 찾기. MCP에는 없다 — 에이전트는 저장소를 grep한다 (#302)
+    _tool(
+        "find_code",
+        "코드 그래프에서 함수를 이름으로 찾는다. query는 함수 이름·Class.fn·파일 경로의 일부. 맞는 함수마다 파일:줄·항목(없으면 층)·불리는 곳을 준다 — 함수 30·불리는 곳 10까지. 어디서 쓰이는지 볼 때 부른다.",
+        {"query": {"type": "string", "description": "함수 이름·Class.fn·파일 경로의 일부"}},
     ),
 ]
 
@@ -748,6 +755,13 @@ async def ask_tool(
             return ToolResult(
                 f"코드:{doc_id}#{item_id}", json.dumps(_code_view_json(v), ensure_ascii=False)
             )
+        if name == "find_code":
+            # 아홉째 — 이름 일부로 함수와 불리는 곳 (#302)
+            query = str(args.get("query", "")).strip()
+            found = _find_code(code, query, user)
+            if found is None:
+                return _err("코드 그래프 없음", hint="코드를 push하면 서버가 만든다")
+            return ToolResult(f"코드검색:{query}", json.dumps(found, ensure_ascii=False))
         if name == "read_code":
             # 여덟째 — 그래프 커밋의 코드. 비밀 꼴·저장소 밖·모르는 이름은 「없음」 (카드 AZ)
             target = str(args.get("target", "")).strip()
@@ -1049,6 +1063,7 @@ _ASK_CODE_SYSTEM = (
 명세 문서들이 있고, 당신은 도구로 함수 본문과 명세 항목을 읽을 수 있다. 읽기만 한다.
 
 함수 자체를 묻는 질문(뭐 하는 함수야·왜 이렇게 했어)은 read_code로 본문을 읽고 답한다.
+어디서 쓰이는지·어떤 함수가 있는지 물으면 find_code로 이름을 찾아 불리는 곳을 따라간다.
 명세와 맞는지 물으면 항목이 있으면 code_graph로 대조(같음·코드만·명세만)를 보고 get_item으로
 그 항목을 읽어 견준다. 항목이 없는 함수면 부르는 것·불리는 곳의 항목을 따라간다 — 그 함수가
 어느 명세의 어느 자리를 받치는지 거기서 보인다. API·UI 항목인 함수는 대조가 없다 — get_item으로
@@ -1427,6 +1442,73 @@ def _next_start(functions: list[dict], f: dict) -> int | None:
     """같은 파일에서 이 함수 다음 함수의 앞 줄 — 끝 줄을 모르는(파이썬 밖) 함수의 끝."""
     later = [g["line"] for g in functions if g["file"] == f["file"] and g["line"] > f["line"]]
     return min(later) - 1 if later else None
+
+
+_FIND_FUNCTIONS, _FIND_CALLERS = 30, 10  # find_code 한 번에 싣는 상한 (#302, 사용자 결정)
+
+
+def _find_code(code: str, query: str, user: User) -> dict | None:
+    """find_code — 그래프 함수 중 이름·qual·파일이 query를 품은 것과 그 불리는 곳. 그래프가 없으면 None.
+
+    UI-17 검색(2.1)과 같은 부분 일치(대소문자 무시). 이름·qual이 똑같은 것이 먼저, 나머지는 파일·줄 순.
+    항목이 없는 함수는 층(`_layers`, 질문 맥락과 같은 줄)을 싣는다 (#302).
+    """
+    with db.session_scope() as s:
+        project = ProjectService(s).get_owned(code, user)
+        row = CodeGraphService(s).get(project.id)
+        if row is None:
+            return None
+        g = row.graph
+        fns = g.get("functions", [])
+        needle = query.lower()
+        hits = [
+            f
+            for f in fns
+            if needle
+            and (
+                needle in f["qual"].lower()
+                or needle in f["name"].lower()
+                or needle in f["file"].lower()
+            )
+        ]
+        hits.sort(
+            key=lambda f: (
+                needle not in (f["qual"].lower(), f["name"].lower()),
+                f["file"],
+                f["line"],
+            )
+        )
+        layer_of = _layers(s, project.id, g) if hits else {}
+    by_key = {f["key"]: f for f in fns}
+    callers: dict[str, list[str]] = {}
+    for a, b, *_ in g.get("calls", []):
+        if a in by_key:
+            cs = callers.setdefault(b, [])
+            if a not in cs:
+                cs.append(a)
+    out = []
+    for f in hits[:_FIND_FUNCTIONS]:
+        cs = callers.get(f["key"], [])
+        item = {"qual": f["qual"], "file": f["file"], "line": f["line"]}
+        if f.get("item"):
+            item["item"] = f["item"]
+        elif f["key"] in layer_of:
+            item["layer"] = _layer_line(layer_of[f["key"]])
+        item["callers"] = [
+            {"qual": by_key[k]["qual"], "file": by_key[k]["file"], "line": by_key[k]["line"]}
+            for k in cs[:_FIND_CALLERS]
+        ]
+        item["more_callers"] = max(0, len(cs) - _FIND_CALLERS)
+        out.append(item)
+    result: dict[str, Any] = {
+        "query": query,
+        "total": len(hits),
+        "functions": out,
+        "more": max(0, len(hits) - _FIND_FUNCTIONS),
+    }
+    if not hits:
+        result["hint"] = "맞는 함수가 없다 — 더 짧은 이름이나 파일 이름으로 다시 찾아라"
+    return result
 
 
 def _function_at(functions: list[dict], path: str, line: int) -> dict | None:

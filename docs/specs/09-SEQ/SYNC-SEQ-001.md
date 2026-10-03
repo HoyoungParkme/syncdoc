@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -1051,7 +1051,7 @@ sequenceDiagram
         Q->>S: get_item · get_document · list
         Q->>R: upstream · downstream · 사슬
         Q->>C: attachment_text(conv_id, att_id) — read_attachment
-        Q->>Q: code_graph → code_view · read_code → CodeGraphService.read — 코드 대조·본문 (카드 AZ)
+        Q->>Q: code_graph → code_view · read_code → CodeGraphService.read · find_code → 그래프 함수 이름 찾기·불리는 곳 — 코드 대조·본문·찾기 (카드 AZ, #302)
         S-->>Q: 본문·목록 (없으면 「없음」 텍스트, 예외 아님 — 3c)
         R-->>Q: 참조 (문서는 제목·상태, 끊어진 건 「아직 없음」)
         C-->>Q: 첨부 글자 (이미지·남의 첨부면 「없음」)
