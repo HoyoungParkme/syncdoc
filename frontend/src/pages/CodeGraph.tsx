@@ -124,6 +124,9 @@ export function CodeGraph() {
   const focusRef = useRef<Sel | null>(null)
   const treeFocusRef = useRef<{ keys: Set<string>; cids: Set<number> } | null>(null)
   const fitted = useRef(false) // 처음 안정될 때 한 번 전체가 보이게 맞춘다
+  // 펼친 뒤 따라갈 자리 — 배치가 멈출 때까지 틱마다 다시 맞춘다. 사용자가 끌거나 휠을 굴리면 그만 (#295)
+  const frameRef = useRef<{ kind: 'center'; key: string } | { kind: 'fit'; keys: Set<string> } | null>(null)
+  const applyFrameRef = useRef<() => void>(() => {}) // 배치 틱이 부른다 — 시뮬레이션은 한 번 만들어지므로 ref로
   const colors = useRef<{ cg: string[]; ok: string; code: string; spec: string; edge: string; ink: string }>({ cg: [], ok: '', code: '', spec: '', edge: '', ink: '' })
 
   useEffect(() => {
@@ -269,9 +272,14 @@ export function CodeGraph() {
         .on('tick', () => {
           dirty.current = true
           bump((t) => t + 1)
-          if (!fitted.current && (simRef.current?.alpha() ?? 1) < 0.08) {
+          const settled = (simRef.current?.alpha() ?? 1) < 0.08
+          if (!fitted.current && settled) {
             fitted.current = true
             fitAll()
+          }
+          if (frameRef.current) {
+            applyFrameRef.current()
+            if (settled) frameRef.current = null // 거의 멈췄다 — 마지막으로 맞추고 그친다
           }
         })
     simRef.current = sim
@@ -424,6 +432,24 @@ export function CodeGraph() {
     bump((t) => t + 1)
   }
   const fitAll = () => fitNodes(nodesRef.current)
+  /** 따라갈 자리에 맞춘다 — 노드가 아직 없으면 다음 틱에 (#295) */
+  const applyFrame = () => {
+    const f = frameRef.current
+    if (!f) return
+    if (f.kind === 'center') {
+      const n = nodesRef.current.find((m) => m.id === fNodeId(f.key))
+      if (n) centerOn(n)
+    } else fitNodes(nodesRef.current.filter((n) => n.kind === 'f' && f.keys.has(n.fn!.key)))
+  }
+  applyFrameRef.current = applyFrame
+  /** 따라가기를 세운다. 이미 펼쳐져 배치가 서 있으면 틱이 안 오니 한 번 맞추고 그친다 */
+  const follow = (f: { kind: 'center'; key: string } | { kind: 'fit'; keys: Set<string> }) => {
+    frameRef.current = f
+    window.setTimeout(() => {
+      applyFrame()
+      if ((simRef.current?.alpha() ?? 0) < 0.08 && frameRef.current === f) frameRef.current = null
+    }, 60)
+  }
   const centerOn = useCallback((n: GNode) => {
     const box = boxRef.current
     if (!box || n.x === undefined || n.y === undefined) return
@@ -446,13 +472,11 @@ export function CodeGraph() {
       }
       setSel({ kind: 'f', key: f.key })
       setOpenDirs((s) => new Set([...s, ...ancestors(f.file)])) // 트리(6)의 조상 폴더 전부와 파일을 연다
-      // 노드는 다음 틱에 생긴다 — 자리가 잡힌 뒤 가운데로
-      window.setTimeout(() => {
-        const n = nodesRef.current.find((m) => m.id === fNodeId(f.key))
-        if (n) centerOn(n)
-      }, 60)
+      // 노드는 다음 틱에 생기고 펼친 커뮤니티는 2~3초 더 퍼진다 — 멈출 때까지 가운데로 따라간다 (#295)
+      follow({ kind: 'center', key: f.key })
     },
-    [grouped, expanded, hidden, centerOn],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [grouped, expanded, hidden],
   )
 
   // ?focus=파일:줄 (8.23) — 한 번
@@ -492,6 +516,7 @@ export function CodeGraph() {
     const sx = e.clientX - rect.left
     const sy = e.clientY - rect.top
     const n = findNode(sx, sy)
+    frameRef.current = null // 사용자가 잡았다 — 따라가기를 그만 (#295)
     drag.current = { node: n ?? null, sx, sy, ox: view.current.x, oy: view.current.y, moved: false }
     if (n) {
       n.fx = n.x
@@ -539,6 +564,7 @@ export function CodeGraph() {
     } else if (!d.moved) setSel(null)
   }
   const onWheel = (e: React.WheelEvent) => {
+    frameRef.current = null // 사용자가 줌했다 — 따라가기를 그만 (#295)
     const rect = boxRef.current!.getBoundingClientRect()
     const sx = e.clientX - rect.left
     const sy = e.clientY - rect.top
@@ -640,8 +666,8 @@ export function CodeGraph() {
         return n
       })
     }
-    // 노드는 다음 틱에 생긴다 — 자리가 잡힌 뒤 그 노드들에 맞춘다
-    window.setTimeout(() => fitNodes(nodesRef.current.filter((n) => n.kind === 'f' && keys.has(n.fn!.key))), 120)
+    // 노드는 다음 틱에 생기고 퍼진다 — 멈출 때까지 그 노드들의 상자에 따라간다 (#295)
+    follow({ kind: 'fit', keys })
   }
   /** 6 트리 한 단 그리기 — 접힌 폴더 안은 그리지 않는다. data-el은 첫 폴더 행(6.1)·첫 함수 행(6.2)에만 */
   const marks = { dir: false, fn: false }
