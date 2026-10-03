@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-`core/queries.py`의 함수 14개. 클래스 명세 [[SYNC-DOM-002]] 4.8의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
+`core/queries.py`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-002]] 4.8의 시그니처를 함수 내부까지 내린 것. **MS 문서 하나 = 클래스 명세 4장 절 하나 = 코드 파일 하나** — 이 파일을 짤 때 이 문서를 본다.
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처·근거·입력·처리·출력·예외·호출하는 것·테스트 관점, 분기는 `if 조건 → 결과`, 간략형 허용. 내부 타입(`Author` `ItemBlock` `ValidateResult` …)은 [[SYNC-DOM-002]] 2.8.
 
@@ -18,7 +18,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 `queries`는 `pipeline`과 대칭이다. 서비스는 자기 테이블만 알고, `queries`가 pk·ID로 이어 붙여 응답 형태([[SYNC-API-001]] 4장)를 만든다. **절대 쓰지 않는다.**
 
-**사람용 조회는 전부 `user: User`를 받는다** — 여기 14개 전부가 그렇다. 첫 단계에서 [[SYNC-MS-001#ProjectService.get_owned]](목록은 `list_owned`)로 소유를 가르고, 남의 프로젝트는 문서·항목을 **읽기 전에** `not-found {resource: project}`로 끝난다([[SYNC-PRD-001#R12]]). 프로젝트 코드는 `code` 인자 또는 `doc_id.split("-")[0]`. **`user`의 자리는 마지막 필수 인자다** — 기본값이 있는 선택 인자(`stage`·`status`·`scope`) 앞. `user`는 필수라 기본값 뒤에 올 수 없고, 필수 인자 중 맨 뒤에 두면 열네 함수가 같은 모양이 된다. 라우터는 `Depends(current_user)`를, MCP는 `_user(session)`을 그 자리에 넣는다.
+**사람용 조회는 전부 `user: User`를 받는다** — 여기 전부가 그렇다. 첫 단계에서 [[SYNC-MS-001#ProjectService.get_owned]](목록은 `list_owned`)로 소유를 가르고, 남의 프로젝트는 문서·항목을 **읽기 전에** `not-found {resource: project}`로 끝난다([[SYNC-PRD-001#R12]]). 프로젝트 코드는 `code` 인자 또는 `doc_id.split("-")[0]`. **`user`의 자리는 마지막 필수 인자다** — 기본값이 있는 선택 인자(`stage`·`status`·`scope`) 앞. `user`는 필수라 기본값 뒤에 올 수 없고, 필수 인자 중 맨 뒤에 두면 열네 함수가 같은 모양이 된다. 라우터는 `Depends(current_user)`를, MCP는 `_user(session)`을 그 자리에 넣는다.
 
 ---
 
