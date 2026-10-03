@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-011
 type: MS
 title: MINISPEC — codegraph — 코드 호출 그래프와 명세 대조
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 ---
 
@@ -26,7 +26,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 |---|---|---|
 | `functions` | `[{key, name, qual, file, line, end, item, ms, community}]` | 저장소 안에 정의된 함수·메서드. `key`는 `파일:줄`. `qual`은 `Class.fn` 또는 `모듈.fn`. `end`는 끝 줄(파이썬·TS/JS는 `enrich`가 채운다, 다른 언어는 null). `item`은 이 함수가 속한 명세 항목 ID — docstring 첫 줄의 항목 ID(어느 문서든 — MINISPEC·API·UI…), 화면 코드(`.ts/.tsx/.js/.jsx`)는 파일 첫 주석의 화면 ID(없으면 null — 카드 BJ). `ms`는 그중 MINISPEC 항목일 때 같은 값(아니면 null) — 대조는 `ms`로만. `community`는 든 커뮤니티 번호(없으면 null — 카드 BD). **`item`은 2026-10-02 이전 그래프에 없다** — 읽는 쪽이 `ms`로 본다 |
 | `calls` | `[[from_key, to_key, via]]` | 호출 선. `via`는 `graphify`(graphify가 찾은 것) 또는 `enrich`(싱크독이 보강한 것) |
-| `communities` | `[{id, label, size}]` | 함수가 하나라도 든 커뮤니티(카드 BD). `id`는 graphify `cluster`의 번호(0이 가장 큼), `label`은 허브 노드 이름, `size`는 든 함수 수. **2026-10-01 이전 그래프에는 없다** — 읽는 쪽이 빈 것으로 본다 |
+| `communities` | `[{id, label, size}]` | 함수가 하나라도 든 커뮤니티(카드 BD). `id`는 Louvain 군집 번호(0이 가장 큼 — #253), `label`은 허브 노드 이름(테스트가 아닌 코드 노드 — #255·#306), `size`는 든 함수 수. **2026-10-01 이전 그래프에는 없다** — 읽는 쪽이 빈 것으로 본다 |
 
 ---
 
@@ -38,7 +38,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 | [[#codegraph.load]] | 저장소의 graph.json이 있으면 그것, 없으면 graphify로 추출 |
 | [[#codegraph.reduce]] | 함수·호출 선만 남긴다 |
 | [[#codegraph.enrich]] | 파이썬 코드로 타입을 풀어 호출을 보강한다 |
-| [[#codegraph.communities]] | 함수를 graphify 군집으로 묶는다 |
+| [[#codegraph.communities]] | 함수를 Louvain 군집으로 묶는다 |
 | [[#codegraph.spec_calls]] | 명세의 「호출하는 것」을 항목 ID 집합으로 |
 | [[#codegraph.compare]] | 명세 호출과 코드 호출을 같음·코드만·명세만으로 |
 | [[#codegraph.item_function]] | 항목 ID → 그 항목의 함수(화면 항목은 파일 이름과 같은 컴포넌트) |
@@ -96,14 +96,14 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 근거: 사용자 결정 2026-09-30 — DB에 줄인 모양으로(싱크독 저장소 4.6 MB → 454 KB)
 
 **처리**
-1. 함수 = `_callable`이 참이고 `_callable_class`가 아닌 노드. `file` = `source_file`, `line` = `source_location`의 `L` 뒤 숫자, `key` = `f"{file}:{line}"`, `name` = `label`에서 앞 `.`과 뒤 `()`를 뗀 것
+1. 함수 = `_callable`이 참이고 `_callable_class`가 아닌 노드. `file` = `source_file`, `line` = `source_location`의 `L` 뒤 숫자, `key` = `f"{file}:{line}"`, `name` = `label`에서 앞 `.`과 뒤 `()`를 뗀 것. **테스트 파일의 노드는 함수가 아니다** — 테스트는 구현이 아니라 대조에서 뺀다. 테스트 파일은 경로에 `tests/`·`test/`·`__tests__/` 단이 있거나, 이름이 `test_*.py`·`*_test.py`·`*.test.*`·`*.spec.*`(js·jsx·ts·tsx)·`conftest.py`인 것 — [[#codegraph.communities]]도 같은 판정
 2. `qual` — 메서드면 `method` 선으로 매단 클래스 노드의 이름을 붙여 `Class.fn`, 아니면 `모듈.fn`. 모듈 이름은 파일 이름에서 확장자를 뗀 것이고, 그것이 `service`·`__init__`·`index`면 **그 폴더 이름** — `core/codegraph/service.py`의 함수는 `codegraph.x`
 3. `item` — `rationale_for` 선으로 붙은 docstring 노드의 라벨이 `^[A-Z][A-Z0-9]*-[A-Z]+-\d+#\S+`로 시작하면 그 ID(공백 앞까지 — `SYNC-API-001#GET/api/docs/{docId} — 설명`에서 ` — ` 앞). 아니면 null. `ms` — `item`이 `-MS-` 문서의 항목이면 같은 값, 아니면 null(카드 BJ — 전에는 MINISPEC ID만 읽었다)
 4. `calls` = `calls`·`indirect_call` 선 중 양 끝이 1의 함수인 것 → `[from_key, to_key, "graphify"]`. 같은 쌍은 하나로
 5. import·포함·문서 링크·docstring·개념 노드는 버린다. 군집은 [[#codegraph.communities]]가 raw 그래프에서 따로 계산해 붙인다(카드 BD) — 여기서는 `community`를 두지 않는다
 6. `→ {"functions": [...], "calls": [...], "files": [...]}` (`end`는 null로 둔다 — 파이썬은 `enrich`가 채운다). `files`는 graphify가 읽은 코드 파일 — `file_type == code`인 노드의 `source_file`, 테스트 파일 빼고 정렬. 함수가 하나도 없는 파일도 든다. `enrich`가 쓰고 지우므로 저장 모양(0장)에는 없다(#282)
 
-**테스트 관점** 클래스 노드·import 선이 빠진다 · 메서드는 `Class.fn`, `service.py`의 함수는 폴더 이름 · MINISPEC docstring ID가 `item`·`ms` 둘 다로 · API docstring ID(`#` 뒤에 `/`·`{}`)는 `item`에만, 설명은 잘린다 · 같은 호출 둘 → 하나
+**테스트 관점** 클래스 노드·import 선이 빠진다 · 테스트 파일의 함수가 빠진다 · 메서드는 `Class.fn`, `service.py`의 함수는 폴더 이름 · MINISPEC docstring ID가 `item`·`ms` 둘 다로 · API docstring ID(`#` 뒤에 `/`·`{}`)는 `item`에만, 설명은 잘린다 · 같은 호출 둘 → 하나
 
 ---
 
@@ -135,23 +135,23 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 **시그니처** `def communities(raw: dict, graph: dict) -> dict`
 
-근거: [[SYNC-UC-001#UC-S8]] 기본 흐름 3 · UI-17 · 사용자 결정 2026-10-01(그래프를 만들 때 서버가 군집한다 — raw 그래프에는 파일·클래스·호출 선이 다 들어 함수가 제 파일·클래스와 같이 묶인다 · Louvain seed 42, 모델·네트워크 없음 · 한 번) · **#253 — graphify `cluster`를 쓰지 않는다.** 그것은 Louvain 뒤에 50노드 이상·응집도 0.05 미만 군집을 다시 쪼개는 2차 패스가 있어 싱크독(노드 4,197)이 111~131개로 터진다(resolution 0.1~1.0 모두). networkx Louvain만 돌리면 resolution 1.0에서 19개 — SCN S9의 「스물 몇 개」가 그대로 나온다. 사용자 결정 2026-10-01: Louvain 직접, resolution 1.0
+근거: [[SYNC-UC-001#UC-S8]] 기본 흐름 3 · UI-17 · 사용자 결정 2026-10-01(그래프를 만들 때 서버가 군집한다 — raw 그래프에는 파일·클래스·호출 선이 다 들어 함수가 제 파일·클래스와 같이 묶인다 · Louvain seed 42, 모델·네트워크 없음 · 한 번) · **#253 — graphify `cluster`를 쓰지 않는다.** 그것은 Louvain 뒤에 50노드 이상·응집도 0.05 미만 군집을 다시 쪼개는 2차 패스가 있어 싱크독(노드 4,197)이 111~131개로 터진다(resolution 0.1~1.0 모두). networkx Louvain만 돌리면 resolution 1.0에서 19개 — SCN S9의 「스물 몇 개」가 그대로 나온다. 사용자 결정 2026-10-01: Louvain 직접, resolution 1.0 · **#306 — 테스트는 군집에서 뺀다**(사용자 결정 2026-10-03). 테스트 노드·선이 군집에 들자, 테스트가 나눠 부르는 같은 파일의 함수가 둘로 갈리고 차수가 큰 테스트 파일이 라벨이 됐다 — 운영 CCR `test_pipeline.py`·VA `tests/conftest.py`·SYNC `test_tools.py`
 
 **입력** `raw` — `load`가 준 원형 · `graph` — `enrich`까지 끝난 그래프(같은 객체에 더해 돌려준다)
 
 **처리**
-1. `G = graphify.paths.load_node_link_graph(raw)` · if 노드 0 → 모든 함수 `community = None`, `communities = []` → 6
+1. `G = graphify.paths.load_node_link_graph(raw에서 테스트 노드와 그 선을 뺀 것)` — 테스트 노드는 `source_file`이 테스트 파일([[#codegraph.reduce]] 1과 같은 판정)인 노드. 묶음·라벨·차수가 구현 코드로만 정해진다(#306) · if 노드 0 → 모든 함수 `community = None`, `communities = []` → 6
 2. `C = networkx.community.louvain_communities(G 무향, resolution=1.0, seed=42)` — **graphify `cluster`가 아니다**(#253, 근거). Louvain은 노드·선 순서에 민감하므로 노드와 양 끝을 정렬한 선으로 그래프를 다시 만들어 넣어 결정적으로. 군집은 크기 내림차순(같으면 정렬한 노드 튜플)으로 번호를 매긴다 — `0`이 가장 큰 군집 · `labels = graphify.cluster.label_communities_by_hub(G, C의 멤버를 코드 노드만 남긴 것)` — 라벨은 graphify의 허브 이름이되 **허브 후보는 코드 노드만**(graphify `file_type == code` — 파일·클래스·함수. 문서 제목·절 노드도 `source_file`을 가지므로 그걸로는 못 가른다). 문서·절 노드는 군집에는 들되 라벨에서 뺀다 — 문서 허브가 라벨이 되면 「SEQUENCE: 싱크독」·「2. 함수」 같은 이름이 나온다(#255). 차수는 전체 `G`로 잰다. **예외는 삼키고** 1의 빈 결과 + `log.warning` — 군집이 안 돼도 그래프는 남는다
 3. 노드 → 커뮤니티 사상에서 **key → 커뮤니티**(`key`는 `reduce`와 같은 규칙 — `source_file` + `source_location`의 `L` 뒤 숫자)와 **파일 → 커뮤니티**(그 파일 노드들의 다수 커뮤니티, 동률이면 작은 번호)
 4. 함수마다 `community` = key의 것 · 없으면(enrich가 더한 정의) 파일의 것 · 그것도 없으면 None
-5. `communities = [{id, label: labels[id](끝 "()" 뗌), size: 든 함수 수}]` — 함수가 0인 군집(테스트·문서 노드만 든 것)은 뺀다. `size` 내림차순, 같으면 `id`
+5. `communities = [{id, label: labels[id](끝 "()" 뗌), size: 든 함수 수}]` — 함수가 0인 군집(문서 노드나 함수 없는 파일만 든 것)은 뺀다. `size` 내림차순, 같으면 `id`
 6. `→ graph`
 
 **호출하는 것** 없음 (graphify 라이브러리 — MINISPEC 밖)
 
 **호출되는 것** [[SYNC-MS-007#pipeline.build_code_graph]] 3 — `enrich` 뒤. 검사기(`check_calls`)는 부르지 않는다 — 대조에 군집이 필요 없다
 
-**테스트 관점** contains·method 선으로 이어진 파일 둘 → 함수가 파일별로 갈린다 · 라벨이 허브 이름이고 `()`가 없다 · `size` = 함수 수이고 함수 없는 군집은 없다 · enrich가 더한 함수는 파일로 받는다 · 같은 raw 두 번 → 같은 결과 · 노드 없는 raw → 빈 목록·None · 노드가 가장 많은 군집이 `0`(#253) · 문서 노드가 차수 최고여도 라벨은 코드 노드 이름(#255)
+**테스트 관점** contains·method 선으로 이어진 파일 둘 → 함수가 파일별로 갈린다 · 라벨이 허브 이름이고 `()`가 없다 · `size` = 함수 수이고 함수 없는 군집은 없다 · enrich가 더한 함수는 파일로 받는다 · 같은 raw 두 번 → 같은 결과 · 노드 없는 raw → 빈 목록·None · 노드가 가장 많은 군집이 `0`(#253) · 문서 노드가 차수 최고여도 라벨은 코드 노드 이름(#255) · 테스트가 나눠 부르는 같은 파일의 함수는 한 커뮤니티이고 차수 최고인 테스트 파일도 라벨이 못 된다 — 테스트 노드를 뺀 raw와 같은 결과(#306)
 
 ---
 
