@@ -489,12 +489,29 @@ export function CodeGraph() {
   const focused = useRef(false)
   useEffect(() => {
     const key = sp.get('focus')
-    if (!data || !key || focused.current) return
-    focused.current = true
+    if (!data || focused.current) return
+    focused.current = true // 처음 한 번 읽었다 — 그 뒤로는 고른 함수가 ?focus를 쓴다 (#300)
+    if (!key) return
     const f = byKey.get(key)
     if (f) pick(f)
     else setNotFound(true)
   }, [data, sp, byKey, pick])
+
+  // 고른 함수를 주소에 남긴다 — 뒤로 오면 위 ?focus 길로 다시 골라진다. 커뮤니티·없음이면 뺀다 (#300)
+  const selKey = sel?.kind === 'f' ? sel.key : null
+  useEffect(() => {
+    if (!data || !focused.current) return // 처음 ?focus를 읽기 전에는 지우지 않는다
+    setSp(
+      (prev) => {
+        if ((prev.get('focus') ?? null) === selKey) return prev
+        const next = new URLSearchParams(prev)
+        if (selKey) next.set('focus', selKey)
+        else next.delete('focus')
+        return next
+      },
+      { replace: true },
+    )
+  }, [selKey, data, setSp])
 
   // 2.1 검색 — 이름·Class.fn·파일 부분 일치. 맞는 첫 함수로.
   // 검색어가 바뀔 때만 돈다 — pick은 펼칠 때마다 새로 생기므로 ref로 (패널·트리 선택을 되돌리지 않게, #288)
