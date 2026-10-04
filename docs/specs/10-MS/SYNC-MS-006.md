@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-006
 type: MS
 title: MINISPEC — AccountService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -29,7 +29,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#AccountService.issue_token]] | 토큰 발급 |
 | [[#AccountService.revoke_token]] | 토큰 폐기 |
 | [[#AccountService.authenticate_token]] | MCP 인증 |
-| [[#AccountService.github_token_for]] | push용 토큰 복호화 |
+| [[#AccountService.github_token_for]] | push·fetch용 토큰 복호화 |
 | [[#AccountService.user_by_login]] | 로그인 → User |
 | [[#AccountService.users_by_ids]] | 여러 사용자 표시 정보 |
 | [[#AccountService.create_placeholder]] | 미등록 자리표시 |
@@ -122,11 +122,13 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ---
 
-#### AccountService.github_token_for push용 토큰 복호화
+#### AccountService.github_token_for push·fetch용 토큰 복호화
 
 **시그니처** `github_token_for(user: User) -> str`
 
 **처리** if `user.github_token_encrypted is None` → `! unauthorized {reason: 미등록 사용자. 로그인 필요}` · else → `decrypt(…)`. 자리표시 User는 push할 수 없다 — 그 사람 이름으로 커밋이 필요한 경로(웹 되돌리기·상태 변경)는 로그인한 뒤에야 가능
+
+**부르는 곳은 git 모듈 하나다**([[SYNC-DOM-002]] 4.9) — push는 작성자, fetch는 저장소를 등록한 사람의 토큰이다. 비공개 저장소를 읽으려고 fetch에도 쓴다(#310). fetch는 이 함수가 실패하면 토큰 없이 시도한다([[SYNC-MS-009#git.fetch]])
 
 **복호화 실패도 `unauthorized`다.** 비밀키를 바꾸면 기존에 저장된 토큰이 전부 풀리지 않는다.
 이때 나는 `InvalidToken`을 잡아 `! unauthorized {reason: 토큰을 풀 수 없다. 다시 로그인해야 한다}`로
