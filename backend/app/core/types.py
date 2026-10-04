@@ -201,6 +201,15 @@ class Commit:
 
 
 @dataclass(frozen=True)
+class MoveResult:
+    """SYNC-API-001 MoveResult — 서버 저장으로 옮긴 결과 (카드 BQ)."""
+
+    origin: str  # 서버 저장소 자리 ORIGINS_DIR/{code}.git
+    head: str  # 옮긴 뒤 origin/main
+    hook: HookStatus  # push 통지를 거뒀나
+
+
+@dataclass(frozen=True)
 class UploadResult:
     """SYNC-DOM-002 2.8 — upload_code의 결과 (카드 BB). 같은 내용이면 changed=False."""
 

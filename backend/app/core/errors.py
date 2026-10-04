@@ -248,8 +248,20 @@ class StorageMismatch(Problem):
     status = 409
     title = "storage-mismatch"
 
-    def __init__(self, storage: str) -> None:
-        super().__init__(f"{storage} 저장 프로젝트다 — 코드는 GitHub에 push한다", storage=storage)
+    def __init__(self, storage: str, detail: str | None = None) -> None:
+        detail = detail or f"{storage} 저장 프로젝트다 — 코드는 GitHub에 push한다"
+        super().__init__(detail, storage=storage)
+
+
+class OriginExists(Problem):
+    """UC-H22 2c — 서버 저장으로 옮기려는데 그 자리에 이미 무언가 있다 (카드 BQ). 지우지 않는다."""
+
+    type = "urn:syncdoc:origin-exists"
+    status = 409
+    title = "origin-exists"
+
+    def __init__(self, path: str) -> None:
+        super().__init__(f"서버 저장소 자리에 이미 무언가 있다: {path}", path=path)
 
 
 class UploadTooLarge(Problem):

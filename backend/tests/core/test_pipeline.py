@@ -2,7 +2,9 @@
 
 import asyncio
 import re
+import shutil
 
+import httpx
 import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -15,8 +17,10 @@ from app.core.errors import (
     ConventionViolation,
     ItemDeletionNeedsConfirm,
     NotFound,
+    OriginExists,
     PushFailed,
     RebuildFailed,
+    StorageMismatch,
     VersionConflict,
 )
 from app.core.project.models import Project, Repository
@@ -1535,3 +1539,80 @@ async def test_schedule_code_graph_runs_latest_once_after_current(monkeypatch) -
     await asyncio.gather(*pipeline._graph_tasks.values())
     assert built.count("c1") == 1 and "c2" not in built and built.count("c3") == 1
     assert built.index("c3") > built.index("c1") and "o1" in built
+
+
+# ── move_to_server (카드 BQ, UC-H22) ──
+async def test_move_to_server_keeps_history_and_switches_storage(
+    scoped: Session, proj, origins_dir, mock_github, tmp_path
+) -> None:
+    """가지·태그를 해시 그대로 옮기고 저장 방식·원격만 바뀐다. 버전은 그대로, 통지는 거둔다."""
+    await create(proj)  # PRD 버전 1 — 옛 원격(GitHub 흉내)에 커밋
+    remote, work = proj["repos"]["remote"], proj["repos"]["work"]
+    g(remote, "branch", "feat", "main")
+    g(remote, "tag", "v1", "main")
+    repo = _repo_row(proj)
+    repo.last_processed_commit = g(remote, "rev-parse", "main")
+    repo.hook_id = 77
+    scoped.flush()
+    versions = scoped.execute(text("SELECT count(*) FROM versions")).scalar()
+    calls = mock_github(lambda req: httpx.Response(204))
+    r = await pipeline.move_to_server("EXMP", proj["user"])
+    origin = origins_dir / "EXMP.git"
+    assert r.origin == str(origin) and r.head == g(remote, "rev-parse", "main")
+    for ref in ("main", "feat", "v1"):
+        assert g(origin, "rev-parse", ref) == g(remote, "rev-parse", ref)
+    assert r.hook.hook == "ok" and calls[-1].method == "DELETE"
+    assert (repo.storage, repo.remote_url, repo.hook_id) == ("server", str(origin), None)
+    assert g(work, "remote", "get-url", "origin") == str(origin)
+    assert scoped.execute(text("SELECT count(*) FROM versions")).scalar() == versions
+    # 그 뒤 들어온 커밋은 서버 저장소에서 읽는다 — git 입구 push와 같은 자리
+    pusher = tmp_path / "pusher"
+    g(tmp_path, "clone", "-q", str(origin), str(pusher))
+    write_commit_push(pusher, RFQ_FILE, RFQ, "spec: RFQ")
+    assert await pipeline.read_pending("EXMP", proj["user"]) == 1
+    assert g(remote, "rev-parse", "main") != g(origin, "rev-parse", "main")  # 옛 원격은 그대로
+
+
+async def test_move_to_server_refuses_and_rolls_back(
+    scoped: Session, proj, origins_dir, tmp_path
+) -> None:
+    """남의 것 · 자리에 무언가(안 건드림) · 처리 지점 없음 · 복제 실패 · 이미 서버 — 아무것도 안 바뀐다."""
+    repo, work = _repo_row(proj), proj["repos"]["work"]
+    remote = str(proj["repos"]["remote"])
+    with pytest.raises(NotFound):
+        await pipeline.move_to_server("EXMP", make_user(scoped, login="stranger"))
+    origin = origins_dir / "EXMP.git"
+    origin.mkdir()
+    (origin / "keep").write_text("사람이 둔 것", encoding="utf-8")
+    with pytest.raises(OriginExists):
+        await pipeline.move_to_server("EXMP", proj["user"])
+    assert (origin / "keep").read_text(encoding="utf-8") == "사람이 둔 것"
+    shutil.rmtree(origin)
+    repo.last_processed_commit = "0" * 40  # 복제본에 없는 처리 지점
+    scoped.flush()
+    with pytest.raises(PushFailed):
+        await pipeline.move_to_server("EXMP", proj["user"])
+    assert not origin.exists() and repo.storage == "github"
+    assert g(work, "remote", "get-url", "origin") == remote
+    repo.last_processed_commit, repo.remote_url = None, str(tmp_path / "missing.git")
+    scoped.flush()
+    with pytest.raises(PushFailed):  # 복제 실패
+        await pipeline.move_to_server("EXMP", proj["user"])
+    assert not origin.exists() and repo.storage == "github"
+    repo.remote_url, repo.storage = remote, "server"
+    scoped.flush()
+    with pytest.raises(StorageMismatch):
+        await pipeline.move_to_server("EXMP", proj["user"])
+
+
+async def test_move_to_server_goes_on_when_hook_cannot_be_removed(
+    scoped: Session, proj, origins_dir, mock_github
+) -> None:
+    """통지를 못 거둬도 옮긴다 — 결과에 error가 실린다(UC-H22 5a)."""
+    repo = _repo_row(proj)
+    repo.hook_id = 77
+    scoped.flush()
+    mock_github(lambda req: httpx.Response(403, json={"message": "Forbidden"}))
+    r = await pipeline.move_to_server("EXMP", proj["user"])
+    assert r.hook.hook == "error" and "403" in (r.hook.hook_error or "")
+    assert (repo.storage, repo.hook_id) == ("server", None)
