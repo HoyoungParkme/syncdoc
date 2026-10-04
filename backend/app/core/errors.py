@@ -227,6 +227,20 @@ class ForbiddenOrigin(Problem):
         super().__init__("폐쇄망판은 이 PC(또는 PUBLIC_BASE_URL)에서만 쓴다", **which)
 
 
+class LoginNotAllowed(Problem):
+    """SEQ-8 — 허용 목록(ALLOWED_LOGINS) 밖 GitHub 계정의 로그인 (카드 BP).
+
+    콜백 라우터가 302 /login?denied=1로 바꾸므로 브라우저는 이것을 JSON으로 보지 않는다.
+    """
+
+    type = "urn:syncdoc:login-not-allowed"
+    status = 403
+    title = "login-not-allowed"
+
+    def __init__(self, login: str) -> None:
+        super().__init__(f"허용되지 않은 계정이다: {login}", login=login)
+
+
 class StorageMismatch(Problem):
     """UC-A10 1a — 서버 저장에만 되는 일(코드 올리기)을 GitHub 저장 프로젝트에 (카드 BB)."""
 

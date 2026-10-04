@@ -14,7 +14,7 @@ from app.config import settings
 from app.core.account.models import AccessToken, CommitEmail, User
 from app.core.account.repository import AccountRepository
 from app.core.clock import now_utc
-from app.core.errors import EmailTaken, NotFound, Unauthorized
+from app.core.errors import EmailTaken, LoginNotAllowed, NotFound, Unauthorized
 from app.core.types import IssuedToken, UserKind, UserRef
 from app.infra import github
 
@@ -48,6 +48,8 @@ class AccountService:
         """SYNC-MS-006#AccountService.login_github"""
         token = await github.exchange_code(code, redirect_uri)
         info = await github.get_user(token)
+        if not settings.login_allowed(info.login):
+            raise LoginNotAllowed(info.login)  # 행도 토큰도 남기지 않는다 (카드 BP)
         u = self.repo.user_by_github_user_id(info.id)
         if u is not None:
             u.github_login, u.display_name = info.login, info.name

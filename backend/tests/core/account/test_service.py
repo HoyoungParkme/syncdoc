@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import AccountService, _fernet
-from app.core.errors import EmailTaken, NotFound, Unauthorized
+from app.core.errors import EmailTaken, LoginNotAllowed, NotFound, Unauthorized
 from tests.conftest import github_ok
 
 
@@ -186,6 +186,32 @@ async def test_login_github_bad_code_is_unauthorized(db_session: Session, mock_g
             "bad", "state", "http://testserver/auth/github/callback"
         )
     assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 0
+
+
+@pytest.mark.parametrize("login", ["stranger", "HOYOUNG-x"])
+async def test_login_github_outside_allowlist_leaves_nothing(
+    db_session: Session, mock_github, monkeypatch: pytest.MonkeyPatch, login: str
+) -> None:
+    """카드 BP — 허용 목록 밖이면 login-not-allowed. 행도 토큰도 남지 않는다."""
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "Hoyoung, hypark-df")
+    mock_github(github_ok(77, login, "남"))
+    with pytest.raises(LoginNotAllowed) as ei:
+        await AccountService(db_session).login_github("c", "s", "http://testserver/cb")
+    assert ei.value.extra["login"] == login and ei.value.status == 403
+    assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 0
+
+
+async def test_login_github_allowlist_ignores_case_and_empty_means_everyone(
+    db_session: Session, mock_github, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """카드 BP — 대소문자가 달라도 목록 안이면 된다 · 목록이 비면 누구나(예전 동작)."""
+    svc = AccountService(db_session)
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "Hoyoung,hypark-df")
+    mock_github(github_ok(42, "hoyoung", "박호영"))
+    assert (await svc.login_github("c", "s", "http://testserver/cb")).github_login == "hoyoung"
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "")
+    mock_github(github_ok(77, "anyone", "누구"))
+    assert (await svc.login_github("c", "s", "http://testserver/cb")).github_login == "anyone"
 
 
 # ── users_by_ids ──

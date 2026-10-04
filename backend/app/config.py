@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     SESSION_SECRET: str = ""  # 세션 쿠키 서명. 비면 SECRET_KEY를 쓴다 (INFRA 5.1)
     GITHUB_CLIENT_ID: str = ""
     GITHUB_CLIENT_SECRET: str = ""
+    # 로그인할 수 있는 GitHub 계정, 쉼표로(대소문자 무시). 비면 누구나 (INFRA 5장, 카드 BP)
+    ALLOWED_LOGINS: str = ""
     # 싱크독이 만드는 GitHub 저장소를 비공개로 (INFRA 5장, #310). 공개는 false로 명시할 때만
     GITHUB_REPO_PRIVATE: bool = True
     WEBHOOK_SECRET: str = ""
@@ -47,6 +49,13 @@ class Settings(BaseSettings):
     def closed(self) -> bool:
         """폐쇄망판인가 (PRD R15). 모르는 값은 인터넷판 — 로그인을 끄는 쪽이 명시여야 한다."""
         return self.EDITION.strip().lower() == "closed"
+
+    def login_allowed(self, login: str | None) -> bool:
+        """허용 목록 안인가 (카드 BP). 폐쇄망판은 로컬 사용자 하나라, 목록이 비면 누구나."""
+        allowed = {x.strip().lower() for x in self.ALLOWED_LOGINS.split(",") if x.strip()}
+        if self.closed or not allowed:
+            return True
+        return (login or "").lower() in allowed
 
     @property
     def edition(self) -> str:
