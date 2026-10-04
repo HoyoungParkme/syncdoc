@@ -247,3 +247,16 @@ async def test_hook_button_persists_hook_id_across_requests(
     assert client.get("/api/admin/repos").json()[0]["hook"] == "ok"
     second = client.post("/api/admin/repos/EXMP/hook").json()
     assert (second["hook"], second["created"]) == ("ok", False)
+
+
+async def test_move_to_server_route(client: TestClient, scoped: Session, proj, origins_dir) -> None:
+    """카드 BQ — 200이면 서버 저장, 다시 부르면 storage-mismatch(409), 없는 코드는 404."""
+    login(client, scoped)
+    r = client.post("/api/admin/repos/EXMP/move-to-server")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["origin"] == str(origins_dir / "EXMP.git") and len(body["head"]) == 40
+    assert body["hook"] == {"hook": "none", "hook_error": None, "created": False}
+    again = client.post("/api/admin/repos/EXMP/move-to-server")
+    assert again.status_code == 409 and again.json()["type"] == "urn:syncdoc:storage-mismatch"
+    assert client.post("/api/admin/repos/NOPE/move-to-server").status_code == 404
