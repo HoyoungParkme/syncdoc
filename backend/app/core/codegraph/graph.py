@@ -724,6 +724,18 @@ def _short_names(ids: set[str]) -> dict[str, str]:
     return names
 
 
+def _drop_tests(raw: dict) -> dict:
+    """raw에서 테스트 노드(`source_file`이 테스트 파일)와 그 선을 뺀 사본 — communities 1(#306).
+
+    테스트가 나눠 부르는 같은 파일의 함수가 갈리고, 차수 큰 테스트 파일이 라벨이 되던 것을 막는다.
+    """
+    nodes = [n for n in raw.get("nodes", []) if not _is_test(str(n.get("source_file") or ""))]
+    keep = {n.get("id") for n in nodes}
+    key = "links" if "links" in raw else "edges"
+    links = [e for e in raw.get(key) or [] if e.get("source") in keep and e.get("target") in keep]
+    return {**raw, "nodes": nodes, key: links}
+
+
 def _louvain(g, resolution: float = 1.0) -> dict[int, list[str]]:
     """Louvain 군집(seed 42) — MS-011 communities 2. graphify cluster의 재쪼개기 없이 (#253).
 
@@ -750,8 +762,10 @@ def communities(raw: dict, graph: dict) -> dict:
     번호를 붙이고 `communities`를 더한다. enrich 뒤에 — 보강이 더한 함수는 파일의 커뮤니티를
     받는다. 모델·네트워크 없이 결정적(seed 42). graphify `cluster`는 안 쓴다 — 응집도 재쪼개기가
     싱크독을 100개 넘는 군집으로 터뜨린다(#253). 라벨만 graphify의 허브 라벨 — 후보는 코드
-    노드만(#255). 군집이 실패해도 그래프는 남는다.
+    노드만(#255). 테스트 노드와 그 선은 빼고 묶는다 — 묶음·라벨·차수가 구현 코드로만(#306).
+    군집이 실패해도 그래프는 남는다.
     """
+    raw = _drop_tests(raw)
     functions: list[dict] = graph["functions"]
     by_key: dict[str, int] = {}
     file_votes: dict[str, dict[int, int]] = defaultdict(lambda: defaultdict(int))

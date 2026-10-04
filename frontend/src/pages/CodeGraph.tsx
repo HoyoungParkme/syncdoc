@@ -44,6 +44,13 @@ const STATUS_MARK: Record<string, string> = { same: '✓', code_only: '▲', spe
 const STATUS_CLS: Record<string, string> = { same: 'same', code_only: 'code', spec_only: 'spec' }
 /** 라벨이 파일 경로 꼴이면 파일 이름만 — 전체는 title로 (UI-17 규칙) */
 const short = (label: string) => (label.includes('/') ? label.slice(label.lastIndexOf('/') + 1) : label)
+/** 커뮤니티의 허브 함수(UI-17 규칙 「허브 함수」, #306) — 라벨과 같은 이름 → 라벨 클래스의 메서드 → 라벨 파일의 함수 → 첫 함수.
+ *  members는 호출 많은 순이라 단계마다 첫째가 호출 많은 것 */
+const hubOf = (label: string, members: CodeNode[]): CodeNode | undefined =>
+  members.find((f) => f.qual === label || f.name === label) ??
+  members.find((f) => f.qual.startsWith(`${label}.`)) ??
+  members.find((f) => f.file === label || f.file.endsWith(`/${label}`)) ??
+  members[0]
 const cNodeId = (cid: number) => `c:${cid}`
 const fNodeId = (key: string) => `f:${key}`
 /** 6 트리 한 단 — 폴더(한 단씩)와 그 안 파일. 접힌 폴더 안은 그리지 않는다 */
@@ -637,8 +644,8 @@ export function CodeGraph() {
   const callersOf = (key: string) => (data?.calls ?? []).filter(([, b]) => b === key).map(([a]) => byKey.get(a)).filter((f): f is CodeNode => !!f)
   const allMembers = selComm ? data!.functions.filter((f) => f.community === selComm.id).sort((a, b) => (degree.get(b.key) ?? 0) - (degree.get(a.key) ?? 0)) : []
   const members = allMembers.slice(0, 20)
-  // 4.6 코드 — 함수를 골랐으면 그 함수, 커뮤니티면 허브 함수(라벨과 이름이 같은 것, 없으면 호출 많은 첫 함수)
-  const codeTarget = selFn ?? (selComm ? (allMembers.find((f) => f.qual === selComm.label || f.name === selComm.label) ?? allMembers[0]) : undefined)
+  // 4.6 코드 — 함수를 골랐으면 그 함수, 커뮤니티면 허브 함수(hubOf — 라벨의 클래스 메서드·파일 함수 중 호출 많은 것, #306)
+  const codeTarget = selFn ?? (selComm ? hubOf(selComm.label, allMembers) : undefined)
   const codeKey = codeTarget?.key
   useEffect(() => {
     if (!codeKey || !codeTarget) {
