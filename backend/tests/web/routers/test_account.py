@@ -107,6 +107,23 @@ def test_session_survives_a_clock_that_went_backward(
     assert client.get("/__test/whoami").status_code == 401
 
 
+def test_session_outside_allowlist_is_401_and_cleared(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """카드 BP — 목록에서 뺀 사람의 세션은 401이고 세션을 비운다. 목록이 비면 그대로 된다."""
+    from app.config import settings
+
+    make_user(db_session, login="stranger")
+    assert client.get("/__test/login/stranger").status_code == 204
+    assert client.get("/__test/whoami").json() == {"login": "stranger"}
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "hoyoung")
+    r = client.get("/__test/whoami")
+    assert r.status_code == 401 and r.json()["detail"] == "허용되지 않은 계정"
+    assert client.cookies.get(auth.SESSION_COOKIE) is None
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "")
+    assert client.get("/__test/whoami").status_code == 401  # 세션을 비웠으니 다시 로그인해야
+
+
 def test_session_of_unknown_user_is_401(client: TestClient, db_session: Session) -> None:
     make_user(db_session, login="gone")
     client.get("/__test/login/gone")
