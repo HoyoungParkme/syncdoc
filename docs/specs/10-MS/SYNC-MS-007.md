@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-007
 type: MS
 title: MINISPEC — pipeline — 쓰기 조율
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -167,7 +167,7 @@ async def read_pending(code: str, user: User) -> int
 1. `ProjectService.get_owned(code, user)` — 남의 것이면 `! not-found {resource: project}`. **쓰기 경로의 소유 검사를 겸한다**
 1a. **저장소 읽기 락**(`read_lock(code)`, 쓰기 락과 다른 것)을 잡는다 — 두 요청이 같은 작업 사본에 동시에 `git fetch`를 걸면 git이 잠금으로 죽는다. 웹훅·폴링의 커밋 처리도 같은 락이다([[#pipeline.process_commit]] 0, #194). 락 안에서 `last_processed_commit`을 **다시 읽는다**: 앞서 기다린 요청이 이미 따라잡아 놨을 수 있다
 1b. **쓰기 락과 따로인 이유** — 4단계의 `process_commit`이 파일마다 쓰기 락을 잡는다. 같은 락이면 교착한다
-2. `head = git.fetch(repo.workdir)`
+2. `head = git.fetch(repo.workdir, 등록자)` — 등록자 = `users[repo.registered_by_user_id]`. 비공개 저장소도 그 사람 토큰으로 읽는다([[SYNC-MS-009#git.fetch]], #310)
 3. if `head == repo.last_processed_commit` → **`fetched_at`을 지금으로 적고** `→ 0`. 방금 확인했다는 사실 자체가 화면이 보여줄 값이다(카드 AF) — 안 적으면 1초 전에 확인한 저장소가 5분 전으로 보인다. `behind_by`도 0으로 둔다(방금 재서 같았다)
 3a. `last_processed_commit`이 **비어 있어도 `→ 0`.** 그 값이 비는 것은 등록 중뿐이고([[SYNC-MS-001#ProjectService.init_project]]가 첫 커밋 해시를, `import_existing`은 재구축이 head를 적는다) 그 둘은 자기가 저장소를 읽는다
 4. `results = process_commit(repo, head, locked=True)` — 이미 1a의 락을 쥐었다 → `→ len(results)`
@@ -355,7 +355,7 @@ async def process_commit(repo: Repository, head_hash: str, locked: bool = False)
 
 0. if not `locked` → **저장소 읽기 락 `read_lock(code)`을 잡는다.** 웹훅·폴링·read_pending이 한 줄로 선다 — 셋이 저마다 부르면 같은 head를 두 실행이 동시에 처리해, 둘째가 첫째의 저장 전에 3a를 보고 강등 전 본문으로 한 번 더 저장했다(DB=approved · 저장소=draft, #194). 파일마다 잡는 쓰기 락(4단계, `save_pipeline` 안)과는 다른 락이라 교착하지 않는다
 1. 락 안에서 `last = DB의 repositories.last_processed_commit`을 **다시 읽는다** — 앞서 기다린 실행이 이미 따라잡아 놨을 수 있다. if `last == head_hash` → `[]`
-2. `git.fetch(repo.workdir)` (public) · if `last` and `git.rev_list_count(f"{last}..{head_hash}") == 0` → `[]` — head가 이미 처리한 커밋이거나 그 조상이다(늦게 온 웹훅). **처리 지점을 뒤로 돌리지 않는다** — 돌리면 다음 실행이 같은 범위를 또 읽는다
+2. `git.fetch(repo.workdir, 등록자)`(등록한 사람의 토큰 — 비공개 저장소, #310) · if `last` and `git.rev_list_count(f"{last}..{head_hash}") == 0` → `[]` — head가 이미 처리한 커밋이거나 그 조상이다(늦게 온 웹훅). **처리 지점을 뒤로 돌리지 않는다** — 돌리면 다음 실행이 같은 범위를 또 읽는다
 3. `files = git.changed_files(repo, f"{last}..{head}", path="docs/specs/")`. 각각 `(path, last_commit_hash_of_file, author_login, author_email, message)`. `_templates/`·`assets/`는 제외
 3a. **앱 자신이 만든 커밋은 거른다** — `commit_hash`가 이미 `versions.commit_hash`나 `status_changes.commit_hash`에 있으면 건너뛴다. 없으면 앱이 push한 커밋을 폴링이 github 경로로 다시 저장해 같은 커밋의 버전이 하나 더 생긴다
 3b. 남은 파일을 **문서 타입의 단계 순**으로 정렬(RFQ→…→CODE→STD). 경로순이면 하위가 먼저 저장돼 상위 참조가 미존재로 남는다
@@ -408,7 +408,7 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 **처리**
 
 1. `project, repo = project.get(code)`. 락 획득 — `get`이다. 사람 경로는 [[SYNC-MS-001#ProjectService.rebuild_index]]가 `get_owned`로 이미 걸렀고, `init_project(import_existing)`는 등록하는 사람 자신이며 폴링에는 사람이 없다
-2. `git.fetch(repo.workdir)`, `git.checkout(repo.workdir, "origin/main")` · if fetch 실패 → `! rebuild-failed {reason}` (500으로 새지 않게)
+2. `git.fetch(repo.workdir, 등록자)`(등록한 사람의 토큰, #310), `git.checkout(repo.workdir, "origin/main")` · if fetch 실패 → `! rebuild-failed {reason}` (500으로 새지 않게)
 3. **트랜잭션 시작**
 4. `reference.clear(project_id)` · `spec.clear_index(project_id)` — `versions`와 커밋 있는 `status_changes` 삭제. `documents`·`items`는 유지(`status_changes` FK, 항목 pk 보존)
 4a. **`versions`를 가리키는 FK는 `references.extracted_version_id` 하나다**([[SYNC-MS-002#SpecService.clear_index]]) — 4단계가 먼저 지운다. 지우는 테이블에 걸린 FK를 안 세서 실물 재구축이 죽은 적이 있다(#38). 전파결정·플래그가 사라지면서 재연결 단계(옛 3a·7a·7b)도 사라졌다
@@ -494,7 +494,7 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 근거: [[SYNC-INFRA-001]] 7장 · [[SYNC-UC-001#UC-G1]] 1a·1b · [[SYNC-MS-001#ProjectService.repo_status]]
 
 **처리** — 저장소마다, **저장소 읽기 락 `read_lock(code)` 안에서**(웹훅·read_pending과 한 줄, [[#pipeline.process_commit]] 0, #194). `last_processed_commit`도 락 안에서 다시 읽는다
-1. `head = git.fetch(workdir)`
+1. `head = git.fetch(workdir, 등록자)` — 등록자 = `users[repo.registered_by_user_id]`, 락 안 세션에서 읽는다. 사람 없이 도는 폴링도 비공개 저장소를 그 사람 토큰으로 읽는다(#310)
 2. `DB: repositories update behind_by = git.rev_list_count(f"{last_processed_commit}..{head}"), fetched_at = now, fetch_error = null` — **화면이 읽는 값을 여기서 적는다.** `last_processed_commit`이 없으면 `behind_by=None`
 3. if `head != repository.last_processed_commit` → [[#pipeline.process_commit]]`(repo, head, locked=True)`
 4. `→ 처리 결과 목록`
