@@ -1,6 +1,6 @@
 """SYNC-MS-009 — infra/git.py. git CLI를 asyncio.create_subprocess_exec로 감싸는 얇은 층.
 
-core는 이것을 통해서만 저장소를 만진다. 실패는 GitError(cmd, stderr). 토큰은 push URL에만 쓰고
+core는 이것을 통해서만 저장소를 만진다. 실패는 GitError(cmd, stderr). 토큰은 push·fetch URL에만 쓰고
 .git/config·로그에 남기지 않는다(SYNC-INFRA-001 5장 · SYNC-STD-004#DEV-6).
 """
 
@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from app.config import settings
+from app.core.account.models import User
 from app.core.account.service import AccountService
 from app.core.errors import PushFailed, Unauthorized
 from app.core.types import Author, CgiResponse, ChangedFile, Commit, UserKind, spec_dir
@@ -77,7 +78,28 @@ async def clone(remote_url: str, workdir: Path, token: str | None) -> None:
     await _run(workdir, "remote", "set-url", "origin", remote_url)
 
 
-async def fetch(workdir: Path, token: str | None = None) -> str:
+async def _fetch_origin(workdir: Path, origin: str, token: str | None) -> None:
+    """원격 브랜치를 origin/*로 받는다. clone이 config에서 토큰을 지웠으니 있으면 URL에 붙인다."""
+    if token is None:
+        await _run(workdir, "fetch", "origin")
+    else:
+        url = _with_token(origin, token)
+        await _run(workdir, "fetch", url, "+refs/heads/*:refs/remotes/origin/*")
+
+
+async def _fetch_as(workdir: Path, user: User | None) -> None:
+    """https 원격이면 그 사람의 토큰으로 받아 온다 — 비공개 저장소 (#310)."""
+    origin = (await _run(workdir, "remote", "get-url", "origin")).strip()
+    token = None
+    if user is not None and origin.startswith("https://"):
+        try:
+            token = AccountService.github_token_for(user)
+        except Unauthorized:
+            pass  # 토큰 없이 시도한다 — 공개 저장소는 그래도 된다
+    await _fetch_origin(workdir, origin, token)
+
+
+async def fetch(workdir: Path, user: User | None = None) -> str:
     """SYNC-MS-009#git.fetch
 
     `origin/HEAD`가 아니라 `origin/main`을 본다. `origin/HEAD`는 상징 ref이고
@@ -86,11 +108,7 @@ async def fetch(workdir: Path, token: str | None = None) -> str:
     매번 실패하고, 그것을 부르는 폴링·재구축·복원이 통째로 죽는다 (#45).
     기본 브랜치는 main 고정이라(commit_push가 HEAD:main으로 민다) 상징 ref가 필요 없다.
     """
-    if token is None:  # v1은 public 저장소만 — 토큰 없이 된다
-        await _run(workdir, "fetch", "origin")
-    else:  # private(v2): clone이 config에서 토큰을 지웠으므로 URL에 다시 붙인다
-        url = _with_token((await _run(workdir, "remote", "get-url", "origin")).strip(), token)
-        await _run(workdir, "fetch", url, "+refs/heads/*:refs/remotes/origin/*")
+    await _fetch_as(workdir, user)  # 비공개 저장소는 그 사람(등록자) 토큰으로만 읽힌다 (#310)
     return (await _run(workdir, "rev-parse", "origin/main")).strip()
 
 
@@ -135,7 +153,7 @@ async def commit_push(
             token = AccountService.github_token_for(author.user)
         except Unauthorized as e:
             raise PushFailed("미등록") from e
-    await _run(workdir, "fetch", "origin")
+    await _fetch_origin(workdir, origin, token)  # push 토큰으로 — 비공개 저장소도 읽힌다 (#310)
     # 빈 저장소에는 되돌아갈 곳이 없다. 이 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3)
     onto_remote = await _has_remote_head(workdir)
     if onto_remote:
@@ -187,7 +205,7 @@ async def commit_push(
         if attempt == settings.PUSH_RETRIES:
             await _undo(workdir, onto_remote)
             raise PushFailed(err.strip() or out.strip())
-        await _run(workdir, "fetch", "origin")
+        await _fetch_origin(workdir, origin, token)
         try:
             await _run(workdir, *ident, "rebase", "origin/main")
         except GitError as e:
@@ -410,7 +428,7 @@ async def sync_readme(workdir: Path, author: Author, code: str) -> str | None:
     """
     want = _readme()
     # push는 토큰을 붙인 URL로 밀어 origin/main 추적 참조가 갱신되지 않는다 — 비교 전에 받아 온다
-    await _run(workdir, "fetch", "origin")
+    await _fetch_as(workdir, author.user)
     try:
         have = await read(workdir, README_PATH, "origin/main")
     except (GitError, OSError):

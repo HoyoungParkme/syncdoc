@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -263,7 +263,7 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 
 **서버 저장소에는 토큰이 없다.** 원격이 서버 안의 경로라 GitHub 토큰을 쓰지 않는다 — `git.commit_push`는 원격이 `https://`일 때만 토큰을 구한다. 그래서 서버 저장 프로젝트는 GitHub 토큰 없이 등록·저장·되돌리기가 된다([[SYNC-PRD-001#R14]]).
 
-**저장소는 public**: v1은 public 저장소만 다룬다 — `git.fetch`가 토큰 없이 돌기 때문. private 지원은 v2(MS-009 미결 — 그때 OAuth 범위도 `repo`로 넓혀야 한다). `clone`·`push`는 각자의 토큰을 쓰므로 public이어도 쓰기에는 권한이 필요하다. **소유와 저장소 권한은 다른 축이다** — 싱크독은 소유로 보이는 것을 가르고, GitHub는 push에서 저장소 권한을 가른다.
+**새 저장소는 비공개가 기본이다**(#310, 2026-10-04): 싱크독이 만드는 GitHub 저장소는 `GITHUB_REPO_PRIVATE`(기본 참)대로 비공개로 생긴다 — 공개는 그 값을 거짓으로 **명시할 때만**. 이미 있는 저장소의 공개 여부는 바꾸지 않는다(공개면 경고 로그만). 그래서 OAuth 범위는 `repo admin:repo_hook`이다 — 비공개 저장소를 만들고 읽으려면 `repo`가 필요하다(전에는 `public_repo`, v1은 공개 전용이었다). 범위를 넓히기 전에 받은 토큰은 다음 로그인까지 옛 범위다. **비공개 저장소의 fetch는 등록한 사람의 토큰으로**(`repositories.registered_by_user_id`) — 폴링·재구축도 사람 없이 돈다. 토큰을 못 구하면 토큰 없이 시도한다(공개 저장소는 그래도 된다). `clone`·`push`는 각자의 토큰을 쓰므로 공개여도 쓰기에는 권한이 필요하다. **소유와 저장소 권한은 다른 축이다** — 싱크독은 소유로 보이는 것을 가르고, GitHub는 push에서 저장소 권한을 가른다.
 
 **컨테이너 빌드**: Dockerfile은 두 단계다 — `node`로 `frontend/`를 빌드해 `syncdoc/web/static`에 넣고, `python`으로 앱을 담는다. 프런트 빌드 단계가 없으면 새 클론에서 화면이 빈 채로 뜬다.
 
@@ -315,6 +315,7 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 | `SESSION_SECRET` | 없으면 `SECRET_KEY` | 세션 쿠키 서명. 토큰 키와 나눈다 (5.1) |
 | `GITHUB_CLIENT_ID` | — | OAuth 앱 |
 | `GITHUB_CLIENT_SECRET` | — | OAuth 앱 |
+| `GITHUB_REPO_PRIVATE` | `true` | 싱크독이 만드는 GitHub 저장소를 비공개로(5장). **공개로 만들려면 `false`로 명시** — 이미 있는 저장소의 공개 여부는 바꾸지 않는다 |
 | `WEBHOOK_SECRET` | 없음 | push webhook 서명 검증 (7장). **비면 통지를 걸지도 받지도 않는다** |
 | `PUBLIC_BASE_URL` | 없음 | 공개 주소. 비면 로컬만 (8장). OAuth 콜백과 **webhook 주소**(7장) 둘에 쓴다 |
 | `POLL_INTERVAL_SECONDS` | 300 | 폴링 주기. 0 이하면 폴링을 켜지 않는다 |

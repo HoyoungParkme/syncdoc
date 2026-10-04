@@ -34,6 +34,8 @@ class Me(User):
     storage_modes: list[str] = []
     # 판 — closed면 로그아웃·커밋 이메일이 없다 (PRD R15, 카드 BC)
     edition: str = "internet"
+    # 싱크독이 만드는 GitHub 저장소가 비공개인가 — UI-3 2.6 문구 (INFRA 5장, #310)
+    repo_private: bool = True
 
 
 class Author(Base):

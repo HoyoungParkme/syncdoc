@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -1375,7 +1375,7 @@ status: draft
 |---|---|---|---|---|
 | 1 | 로그인 영역 | 영역 | 로고, 안내, 버튼. 상단 바 없음 | — |
 | 1.1 | 한 줄 설명 | 텍스트 | 이 도구가 무엇인지 | — |
-| 2 | GitHub로 로그인 | 버튼 | | GitHub OAuth 동의 화면으로. 공개 저장소 범위(`public_repo`)만 요청 |
+| 2 | GitHub로 로그인 | 버튼 | | GitHub OAuth 동의 화면으로. 범위 `repo admin:repo_hook` — 비공개 저장소를 만들고 읽는다([[SYNC-INFRA-001]] 5장, #310). 범위를 넓히기 전에 로그인한 사람은 다시 로그인해야 새 범위다 |
 | 3 | 복귀 안내 | 텍스트 | 원래 URL이 있었으면 그리로 간다는 안내 | — |
 
 ### 규칙
@@ -1459,7 +1459,7 @@ status: draft
           <label>이름</label>
           <input class="in" data-el="2.3" placeholder="에어데이터">
 
-          <label class="chk"><input type="checkbox" data-el="2.6"> 저장소가 없으면 새로 만든다 <span class="lbl">(공개로 만들어집니다)</span></label>
+          <label class="chk"><input type="checkbox" data-el="2.6"> 저장소가 없으면 새로 만든다 <span class="lbl">(비공개로 만들어집니다)</span></label>
 
           <div class="will" data-el="2.5">
             <b>커밋될 것</b>
@@ -1507,7 +1507,7 @@ status: draft
 | 2.1 | 저장소 주소 | 입력 | GitHub 저장소 URL. GitHub 저장일 때만 | — |
 | 2.2 | 프로젝트 코드 | 입력 | 영문 대문자 4자 이내 | — |
 | 2.3 | 이름 | 입력 | 표시 이름 | — |
-| 2.6 | 없으면 만든다 | 체크박스 | GitHub 저장일 때만. 끄면 지금과 같다 — 없는 저장소면 `push-failed`. 켜면 **공개 저장소**를 만들어 준다([[SYNC-CODE-001#F]]). **비공개 선택지는 없다** — v1의 폴링이 토큰 없이 돌아 비공개면 조용히 죽는다 | — |
+| 2.6 | 없으면 만든다 | 체크박스 | GitHub 저장일 때만. 끄면 지금과 같다 — 없는 저장소면 `push-failed`. 켜면 저장소를 만들어 준다([[SYNC-CODE-001#F]]) — **비공개가 기본**이다(서버 설정 `GITHUB_REPO_PRIVATE`, #310). 문구는 `GET /api/me`의 `repo_private`대로 「(비공개로 만들어집니다)」 또는 「(공개로 만들어집니다)」 — 서버가 공개로 바꿔 두었으면 그렇게 말한다. 이미 있는 저장소는 공개 여부를 바꾸지 않는다 | — |
 | 2.4 | 코드 오류 | 텍스트 | 초기화 시도 후 서버가 거부한 이유. 중복(UC-A1 2a) 또는 형식(2b). 시도 전엔 안 보임 | — |
 | 2.5 | 커밋될 것 | 영역 | 등록하면 저장소에 무엇이 생기는지 — 빈 단계 디렉터리와 README 하나다. **규약·템플릿 사본은 안 넣는다**(카드 AB). 빈 저장소가 아니면 안 보인다. 서버 저장이면 첫 줄이 「이 서버 안에 저장소를 새로 만든다」 | — |
 | 3.1 | 초기화 | 버튼 | | 서버에 요청. 결과에 따라 2.4 / 4 / 5 / UI-2 |

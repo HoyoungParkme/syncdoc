@@ -154,8 +154,8 @@ def init_description(modes: list[str]) -> str:
         "project-code-conflict, 저장소에 docs/specs/가 이미 있거나 서버 저장인데 같은 코드의 보관된 "
         "저장소가 있으면 existing-specs 에러가 나며 import_existing=true로 다시 부르면 기존 명세를 "
         "가져와(보관본은 되살려) 등록한다. GitHub 저장소가 아직 없으면 create_repo=true로 부른다 — "
-        "공개 저장소를 만들어 주고 이어서 등록까지 한다. 사람이 저장소를 만들어 달라고 했을 때만 이 "
-        "인자를 붙인다. remote_url은 storage=github일 때만, 그때는 필수다. "
+        "저장소를 만들어 주고(비공개가 기본 — 서버 설정) 이어서 등록까지 한다. 사람이 저장소를 만들어 "
+        "달라고 했을 때만 이 인자를 붙인다. remote_url은 storage=github일 때만, 그때는 필수다. "
         + storage_sentence(modes)
     )
 

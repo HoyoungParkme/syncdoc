@@ -101,13 +101,14 @@ async def read_pending(code: str, user: User) -> int:
     with db.session_scope() as s:
         repo = ProjectService(s).get_owned(code, user).repository  # 쓰기 경로의 소유 검사를 겸한다
         repo_id, workdir = repo.id, Path(repo.workdir_path)
+        registered = s.get(User, repo.registered_by_user_id)  # fetch 토큰의 주인 (#310)
     async with read_lock(code):
         # 락 안에서 다시 읽는다 — 앞서 기다린 요청이 이미 따라잡아 놨을 수 있다
         with db.session_scope() as s:
             row = s.get(Repository, repo_id)
             assert row is not None
             last = row.last_processed_commit
-        head = await git.fetch(workdir)
+        head = await git.fetch(workdir, registered)
         # last가 None인 것은 **등록 중**뿐이다 — init_project가 첫 커밋 해시를, import_existing은
         # rebuild가 head를 적는다. 그 둘은 자기가 저장소를 읽으므로 여기서 또 읽지 않는다
         if last is None or head == last:
@@ -674,10 +675,11 @@ async def _process_commit(repo: Repository, head_hash: str, code: str) -> list[S
         row = s.get(Repository, repo.id)
         assert row is not None
         last = row.last_processed_commit
+        registered = s.get(User, row.registered_by_user_id)  # fetch 토큰의 주인 (#310)
     if last == head_hash:
         return []
     workdir = Path(repo.workdir_path)
-    await git.fetch(workdir)
+    await git.fetch(workdir, registered)
     # 2. 이미 처리한 커밋이거나 그 조상이면(늦게 온 웹훅) 아무것도 안 한다 — 처리 지점을 뒤로
     # 돌리면 다음 실행이 같은 범위를 또 읽는다
     if last and await git.rev_list_count(workdir, f"{last}..{head_hash}") == 0:
@@ -880,7 +882,8 @@ async def _rebuild(s: Session, code: str) -> RebuildResult:
     spec, refs, account = SpecService(s), ReferenceService(s), AccountService(s)
     result = RebuildResult(0, 0, 0, 0)
     try:
-        head = await git.fetch(workdir)  # 2단계도 실패하면 rebuild-failed (MS-007 예외)
+        # 2단계도 실패하면 rebuild-failed (MS-007 예외). 등록한 사람 토큰으로 — 비공개 저장소 (#310)
+        head = await git.fetch(workdir, s.get(User, repo.registered_by_user_id))
         await git.checkout(workdir, "origin/main")
         # 4a. versions를 가리키는 FK는 references.extracted_version_id 하나 — 먼저 지운다.
         # 전파결정·플래그가 사라지면서 DEFERRED·재연결(옛 3a·7a·7b)도 사라졌다 (카드 V)

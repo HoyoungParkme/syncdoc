@@ -2,12 +2,13 @@
 
 import hashlib
 import hmac
+import json
 
 import httpx
 import pytest
 
 from app.config import settings
-from app.core.errors import Unauthorized
+from app.core.errors import RepoCreateFailed, Unauthorized
 from app.infra import github as gh
 
 
@@ -24,6 +25,61 @@ def test_verify_signature_rejects_everything_when_secret_is_empty(
     body = b'{"ref":"refs/heads/main"}'
     assert gh.verify_signature(body, _sig(body, "")) is False  # 올바른 계산값이어도
     assert gh.verify_signature(body, "") is False
+
+
+# ── create_repo (#310) ──
+CLONE = "https://github.com/o/r.git"
+
+
+def _no_repo_then_created(req: httpx.Request) -> httpx.Response:
+    if req.method == "GET":
+        return httpx.Response(404, json={"message": "Not Found"})
+    return httpx.Response(201, json={"clone_url": CLONE})
+
+
+async def test_create_repo_is_private_by_default(mock_github) -> None:
+    calls = mock_github(_no_repo_then_created)
+    assert await gh.create_repo("t", "o", "r") == CLONE
+    body = json.loads(calls[-1].content)
+    assert calls[-1].method == "POST" and body["private"] is True and body["auto_init"] is False
+
+
+async def test_create_repo_is_public_only_when_setting_is_false(
+    mock_github, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "GITHUB_REPO_PRIVATE", False)
+    calls = mock_github(_no_repo_then_created)
+    await gh.create_repo("t", "o", "r")
+    assert json.loads(calls[-1].content)["private"] is False
+
+
+@pytest.mark.parametrize("private", [False, True])
+async def test_create_repo_keeps_existing_repo_and_warns_if_public(
+    mock_github, caplog: pytest.LogCaptureFixture, private: bool
+) -> None:
+    """이미 있으면 만들지도 공개 여부를 바꾸지도 않는다 — 공개면 경고 로그만."""
+    calls = mock_github(
+        lambda req: httpx.Response(200, json={"clone_url": CLONE, "private": private})
+    )
+    with caplog.at_level("WARNING", logger="app.infra.github"):
+        assert await gh.create_repo("t", "o", "r") == CLONE
+    assert [c.method for c in calls] == ["GET"]
+    warned = any("o/r" in r.getMessage() and "공개" in r.getMessage() for r in caplog.records)
+    assert warned is (not private)
+
+
+async def test_create_repo_forbidden_asks_to_log_in_again(mock_github) -> None:
+    """옛 public_repo 토큰은 비공개 생성이 거절된다 — 다시 로그인을 말한다."""
+
+    def h(req: httpx.Request) -> httpx.Response:
+        if req.method == "GET":
+            return httpx.Response(404, json={"message": "Not Found"})
+        return httpx.Response(403, json={"message": "Forbidden"})
+
+    mock_github(h)
+    with pytest.raises(RepoCreateFailed) as ei:
+        await gh.create_repo("t", "o", "r")
+    assert "403" in str(ei.value) and "다시 로그인" in str(ei.value)
 
 
 # ── create_hook ──

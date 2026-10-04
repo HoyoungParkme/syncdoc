@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -1004,7 +1004,7 @@ classDiagram
 | `login_github` | [[SYNC-API-001#GET/auth/github/callback]] | 인프라 5, SEQ-8 |
 | `list_tokens` · `issue_token` · `revoke_token` | /api/me/tokens | UI-13 |
 | `authenticate_token` | MCP 모든 요청 (SEQ-C2) | 인프라 5 |
-| `github_token_for` | infra/git | 인프라 5. 복호화 |
+| `github_token_for` | infra/git | 인프라 5. 복호화 — push(작성자)·fetch(등록한 사람, 비공개 저장소 #310) |
 | `user_by_login` · `create_placeholder` | `AccountService.user_for_commit` · web/auth | login으로 찾기·자리표시 만들기. **파이프라인이 직접 부르지 않는다** — `user_for_commit`을 거친다 |
 | `user_for_commit` | pipeline.process_commit · pipeline.rebuild | [[SYNC-UC-001#UC-G1]]. 커밋 작성자 → User. **이메일 먼저**, 없으면 login, 없으면 자리표시 생성. **폐쇄망판은 늘 로컬 사용자** — 혼자 쓴다 |
 | `ensure_local_user` · `local_user` | main(켜질 때) · web/auth.current_user(폐쇄망판) | [[SYNC-PRD-001#R15]]. 로컬 사용자를 두고, 로그인 없이 그 사람으로 본다 |
@@ -1144,7 +1144,7 @@ ask_tool(name, args, code, user, conversation_id) -> ToolResult
 
 ```
 git.clone(remote_url, workdir, token) -> None
-git.fetch(workdir, token=None) -> str          origin/main 해시. v1은 public이라 토큰 없이
+git.fetch(workdir, user=None) -> str           origin/main 해시. https면 그 사람 토큰, 못 구하면 없이 (#310)
 git.checkout(workdir, ref) -> None
 git.commit_push(workdir, message, author, path=None, content=None, files=None, delete=None) -> str
 git.read(workdir, path, ref="HEAD") -> str
@@ -1173,7 +1173,7 @@ llm.step(system, messages, tools, tool_choice="auto") -> LlmStep
                                                user 항목에 images(mime·bytes)가 있으면 content 파트 배열로 옮긴다 (첨부, 카드 AR)
 ```
 
-**규칙** — `git.commit_push`만 `AccountService.github_token_for`를 부른다(3.2). **원격이 `https://`일 때만** 부른다 — 서버 저장소(서버 안 경로)는 토큰 없이 push한다(카드 BA). 토큰은 push URL에만 쓰고 `.git/config`에 남기지 않는다. **쓰는 경로는 작업 사본 안이어야 한다**(카드 BB) — push로 심은 심볼릭 링크를 따라 밖에 쓰거나 `.git/` 안에 쓰는 것을 거부한다.
+**규칙** — git 모듈(`commit_push`·`fetch`·`sync_readme`)만 `AccountService.github_token_for`를 부른다(3.2) — push는 작성자, fetch는 저장소를 등록한 사람의 토큰이다(비공개 저장소, #310). 부르는 쪽은 토큰이 아니라 사람을 넘긴다. fetch는 토큰을 못 구하면 토큰 없이 시도한다. **원격이 `https://`일 때만** 부른다 — 서버 저장소(서버 안 경로)는 토큰 없이 push한다(카드 BA). 토큰은 push URL에만 쓰고 `.git/config`에 남기지 않는다. **쓰는 경로는 작업 사본 안이어야 한다**(카드 BB) — push로 심은 심볼릭 링크를 따라 밖에 쓰거나 `.git/` 안에 쓰는 것을 거부한다.
 
 `llm`은 키를 `config`에서 읽는다. 키가 비면 부르기 전에 `llm-not-configured`로 막고, 외부가 실패하면 `llm-unavailable`로 접는다 — 사용량 초과도 여기 들어간다([[SYNC-INFRA-001]] 5.3). **어댑터는 한 번 호출만 안다.** 도구 선언(`tools`)과 `tool_choice`를 와이어 형식(`{type: function, function: {name, description, parameters}}`)으로 옮겨 싣고, 응답의 `tool_calls`를 `ToolCall`로 파싱해 돌려준다. `arguments`가 JSON이 아니면 `llm-unavailable`. 루프는 어댑터에 없다 — `queries.ask_item`이 돈다.
 

@@ -122,6 +122,7 @@ def test_init_project_server_storage_and_storage_rules(
     monkeypatch.setattr(settings, "REPOS_DIR", tmp_path / "repos")
     login(client, scoped)
     assert client.get("/api/me").json()["storage_modes"] == ["github", "server"]
+    assert client.get("/api/me").json()["repo_private"] is True  # 새 저장소는 비공개가 기본 (#310)
     # storage가 없으면 입력 검증
     r = client.post("/api/projects", json={"code": "SRV", "name": "x"})
     assert r.status_code == 422 and r.json()["type"] == "urn:syncdoc:invalid-request"

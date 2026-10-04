@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     SESSION_SECRET: str = ""  # 세션 쿠키 서명. 비면 SECRET_KEY를 쓴다 (INFRA 5.1)
     GITHUB_CLIENT_ID: str = ""
     GITHUB_CLIENT_SECRET: str = ""
+    # 싱크독이 만드는 GitHub 저장소를 비공개로 (INFRA 5장, #310). 공개는 false로 명시할 때만
+    GITHUB_REPO_PRIVATE: bool = True
     WEBHOOK_SECRET: str = ""
     REPOS_DIR: Path = Path("/var/syncdoc/repos")
     # 서버 저장소와 보관 폴더(_archive/). 원본이라 볼륨으로 남기고 백업한다 (INFRA 5.2·6장)
