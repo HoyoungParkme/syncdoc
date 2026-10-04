@@ -1363,7 +1363,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | 설정 `ALLOWED_LOGINS`(쉼표, 대소문자 무시)와 `settings.login_allowed` · [[SYNC-MS-006#AccountService.login_github]] — 목록 밖이면 아무것도 남기지 않고 `login-not-allowed` · [[SYNC-MS-006#AccountService.authenticate_token]] — 목록 밖 주인의 토큰은 None(MCP·git 입구) · `web/auth.current_user` — 목록 밖 세션은 비우고 401 · 콜백 라우터 — 거절이면 302 `/login?denied=1` · `pages/Login.tsx` 거절 안내(4) · `docker-compose.yml` 포트를 `127.0.0.1`로 · 폐쇄망판은 검사하지 않는다(로컬 사용자 하나) |
 | 테스트 | MS-006 테스트 관점 · 라우터: 목록 밖 콜백 → 302 `/login?denied=1`이고 사용자 행·토큰 없음 · 목록 밖 세션 → 401이고 세션 비움 · 목록 밖 주인의 토큰 → MCP 401 · 설정이 비면 누구나 · 대소문자 무시 · `check_ui` UI-1 · 운영: 허용 계정 로그인 그대로, 목록 밖 거절 |
 | 선행 | — |
-| 완료 | — |
+| 완료 | 2026-10-04 · 브랜치 `card/BP-login-allowlist`(21d635d #312) · spec 7 + code 7 · 테스트 430 · `ruff`·`tsc`·`oxlint`·`build` · `validate` 0/0 · `check_code` 162/162 · `check_calls` 0/0 · `check_ui` 14/14(UI-1 요소 5) · 운영: `.env`에 `ALLOWED_LOGINS=HoyoungParkme,hypark-df`(사용자가 넣음) 뒤 재생성 — 허용 HoyoungParkme·hypark-df, 거절 seonyoungyoo16·자리표시 · 기존 세션 그대로(`/api/me` 200) · 새 창 `/login?denied=1`에만 거절 안내(4) · 포트 `127.0.0.1:8000`·`127.0.0.1:5432`, 공개 주소 200(터널은 앱 안쪽) |
 ---
 
 ## 2. 통합 테스트 시나리오
