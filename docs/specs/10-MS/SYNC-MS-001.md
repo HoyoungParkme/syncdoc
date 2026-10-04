@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-001
 type: MS
 title: MINISPEC — ProjectService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -34,6 +34,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#ProjectService.repo_status]] | 동기화 상태 |
 | [[#ProjectService.delete_project]] | 등록 해제·작업 사본 회수 |
 | [[#ProjectService.ensure_hook]] | push 통지를 건다 |
+| [[#ProjectService.remove_hook]] | push 통지를 거둔다 |
 | [[#ProjectService.sync_now]] | 지금 가져오기 |
 | [[#ProjectService.rebuild_index]] | 재구축 위임 |
 | [[#ProjectService.asset_path]] | 첨부 파일 경로 — 사람 경로 |
@@ -209,6 +210,31 @@ async def ensure_hook(code: str, user: User) -> HookStatus
 **호출하는 것** [[#ProjectService.get_owned]] · [[SYNC-MS-006#AccountService.github_token_for]] · [[SYNC-MS-009#github.create_hook]]
 
 **테스트 관점** **서버 저장 → `none`이고 GitHub을 안 부른다** · 주소·비밀번호가 비면 `none`이고 GitHub을 안 부른다 · 권한 없으면 `error`이고 `hook_error`가 남는다 · 성공하면 `ok`·`hook_id` 저장 · **두 번째 호출은 `created=False`** · 남의 프로젝트 → `not-found`
+
+---
+
+#### ProjectService.remove_hook push 통지를 거둔다
+
+**시그니처**
+```python
+async def remove_hook(code: str, user: User) -> HookStatus
+```
+
+근거: [[SYNC-UC-001#UC-H22]] 5·5a · [[SYNC-MS-007#pipeline.move_to_server]] 8 · 카드 BQ — [[#ProjectService.ensure_hook]]의 반대
+
+**처리**
+1. `get_owned(code, user)` — 남의 것이면 `! not-found {resource: project}`
+2. if 서버 저장이거나 `repo.hook_id`가 없으면 → `HookStatus("none", None, created=False)`. GitHub을 부르지 않는다
+3. `github.delete_hook(token, owner, name, repo.hook_id)` — `owner`·`name`은 `remote_url`에서 뜬다 · `Unauthorized`면 → `HookStatus("error", 사유, created=False)`. `hook_id`는 그대로 둔다
+4. `repo.hook_id = None` · `repo.hook_error = None` · `→ HookStatus("ok", None, created=False)`
+
+**출력** [[SYNC-API-001]] `HookStatus` — `created`는 늘 거짓이다
+
+**예외** `not-found`(1). 3의 실패는 **예외로 올리지 않고 상태로 돌려준다** — 옮기기(UC-H22)는 통지를 못 거둬도 계속한다(5a)
+
+**호출하는 것** [[#ProjectService.get_owned]] · [[SYNC-MS-006#AccountService.github_token_for]] · [[SYNC-MS-009#github.delete_hook]]
+
+**테스트 관점** 통지가 없거나 서버 저장 → `none`이고 GitHub을 안 부른다 · 있으면 지우고 `ok`·`hook_id` 비움 · 권한 없으면 `error`이고 `hook_id` 그대로
 
 ---
 
