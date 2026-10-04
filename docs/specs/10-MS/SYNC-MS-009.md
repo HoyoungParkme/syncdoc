@@ -140,6 +140,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **토큰은 여기서 구한다**(#310) — 비공개 저장소는 토큰 없이 읽히지 않는다. `clone`이 `.git/config`에서 토큰을 지우므로 매번 URL에 붙인다. 부르는 쪽은 토큰이 아니라 **사람**을 넘긴다 — 폴링·웹훅·재구축은 저장소를 등록한 사람(`repositories.registered_by_user_id`). 토큰을 다루는 곳을 git 모듈 하나로 모은다([[SYNC-DOM-002]] 4.9 규칙). **토큰을 못 구하면(미등록·풀 수 없음) 토큰 없이 시도한다** — 공개 저장소는 그래도 되고, 비공개면 git이 실패해 그 사유가 `fetch_error`로 남는다(UI-14). 토큰이 든 URL은 `GitError`가 가린다
 
+**호출하는 것** [[SYNC-MS-006#AccountService.github_token_for]]
+
 **테스트 관점** https 원격 + 토큰 있는 사람 → 토큰 URL과 refspec으로 받는다 · 토큰을 못 구하는 사람 → `fetch origin` · 서버 저장소(서버 안 경로) → 사람이 있어도 토큰을 안 구한다
 
 ---
@@ -372,7 +374,7 @@ async def sync_readme(workdir: Path, author: Author, code: str) -> str | None
 
 **예외** `PushFailed` — 부르는 쪽이 그대로 올린다([[SYNC-MS-001#ProjectService.rebuild_index]] 2)
 
-**호출하는 것** [[#git.commit_push]] · [[#git.read]]
+**호출하는 것** [[#git.commit_push]] · [[#git.read]] · [[SYNC-MS-006#AccountService.github_token_for]](1의 fetch, #310)
 
 **테스트 관점** 낡은 README → 커밋 하나, 파일 내용이 새 판 · 같은 README → `None`이고 HEAD 그대로 · README가 아예 없는 저장소 → 만든다 · 커밋 메시지에 프로젝트 코드
 
