@@ -229,6 +229,75 @@ def test_communities_leave_tests_out() -> None:
     assert same["communities"] == out["communities"] and same["functions"] == out["functions"]
 
 
+# 메서드 없는 타입 클래스(User — 함수 넷이 타입으로 가리킴)와 의존성 파일(package.json — 의존성 다섯을
+# import)이 각 군집의 차수 최고 — 옛 라벨은 User·package.json이었다 (#308)
+RAW4 = {
+    "nodes": [
+        {"id": "fs", "label": "svc.py", "source_file": "app/svc.py", "source_location": "L1"},
+        *[{"id": f"s{i}", "label": f"f{i}()", "_callable": True, "source_file": "app/svc.py",
+           "source_location": f"L{10 * i}"} for i in range(1, 5)],
+        {"id": "fm", "label": "models.py", "source_file": "app/models.py", "source_location": "L1"},
+        {"id": "cu", "label": "User", "_callable": True, "_callable_class": True,
+         "source_file": "app/models.py", "source_location": "L5"},
+        {"id": "fp", "label": "package.json", "source_file": "web/package.json",
+         "source_location": "L1"},
+        *[{"id": f"k{i}", "label": f"dep{i}", "file_type": "concept",
+           "source_file": "web/package.json"} for i in range(1, 6)],
+        {"id": "fv", "label": "vite.config.ts", "source_file": "web/vite.config.ts",
+         "source_location": "L1"},
+        {"id": "pd", "label": "pkgDir()", "_callable": True, "source_file": "web/vite.config.ts",
+         "source_location": "L3"},
+    ],
+    "links": [
+        *[{"source": "fs", "target": f"s{i}", "relation": "contains"} for i in range(1, 5)],
+        {"source": "s1", "target": "s2", "relation": "calls"},
+        {"source": "fm", "target": "cu", "relation": "contains"},
+        *[{"source": f"s{i}", "target": "cu", "relation": "references"} for i in range(1, 5)],
+        *[{"source": "fp", "target": f"k{i}", "relation": "imports"} for i in range(1, 6)],
+        *[{"source": "fv", "target": f"k{i}", "relation": "imports"} for i in range(1, 4)],
+        {"source": "fv", "target": "pd", "relation": "contains"},
+    ],
+}  # fmt: skip
+
+
+def test_communities_label_owns_a_function() -> None:
+    """#308 — 라벨은 그 커뮤니티의 함수를 품은 노드. 메서드 없는 클래스·함수 없는 파일은 못 된다."""
+    out = cg.communities(RAW4, cg.reduce(RAW4))
+    by = {f["name"]: f["community"] for f in out["functions"]}
+    labels = {c["id"]: c["label"] for c in out["communities"]}
+    assert labels[by["f1"]] == "svc.py"  # User(차수 5)가 아니라 함수 넷이 든 파일
+    assert labels[by["pkgDir"]] == "vite.config.ts"  # package.json(차수 5)이 아니라 함수가 든 파일
+
+
+def test_communities_class_with_methods_labels_and_no_owner_falls_back() -> None:
+    """#308 — 메서드가 그 커뮤니티에 든 클래스는 라벨이 된다 · 후보가 없으면 코드 노드 중 허브."""
+    raw = {
+        "nodes": [
+            {"id": "fc", "label": "c.py", "source_file": "app/c.py", "source_location": "L1"},
+            {"id": "cc", "label": "Repo", "_callable": True, "_callable_class": True,
+             "source_file": "app/c.py", "source_location": "L3"},
+            *[{"id": f"m{i}", "label": f".m{i}()", "_callable": True, "source_file": "app/c.py",
+               "source_location": f"L{10 * i}"} for i in range(1, 4)],
+        ],
+        "links": [
+            {"source": "fc", "target": "cc", "relation": "contains"},
+            *[{"source": "cc", "target": f"m{i}", "relation": "method"} for i in range(1, 4)],
+            {"source": "m1", "target": "m2", "relation": "calls"},
+        ],
+    }  # fmt: skip
+    out = cg.communities(raw, cg.reduce(raw))
+    assert {f["qual"] for f in out["functions"]} == {"Repo.m1", "Repo.m2", "Repo.m3"}
+    labels = {c["id"]: c["label"] for c in out["communities"]}
+    by = {f["qual"]: f["community"] for f in out["functions"]}
+    assert labels[by["Repo.m3"]] == "Repo"  # 그 커뮤니티에 메서드가 든 클래스
+    # 메서드 없는 클래스 하나뿐 + 보강이 더한 같은 파일 함수 — 함수를 품은 노드가 없다
+    lone = {"nodes": [{"id": "cx", "label": "X", "_callable": True, "_callable_class": True,
+                       "source_file": "app/x.py", "source_location": "L1"}], "links": []}  # fmt: skip
+    graph = {"functions": [{"key": "app/x.py:5", "name": "f", "qual": "x.f", "file": "app/x.py",
+                            "line": 5, "end": None, "ms": None}], "calls": []}  # fmt: skip
+    assert [c["label"] for c in cg.communities(lone, graph)["communities"]] == ["X"]
+
+
 def test_communities_without_nodes_leaves_none_and_empty() -> None:
     graph = cg.reduce(RAW)
     out = cg.communities({"nodes": [], "links": []}, graph)

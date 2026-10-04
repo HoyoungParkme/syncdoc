@@ -755,37 +755,72 @@ def _louvain(g, resolution: float = 1.0) -> dict[int, list[str]]:
     return {i: sorted(c) for i, c in enumerate(ordered)}
 
 
+def _owns(n: dict, keys: set[str], files: set[str], owners: set[tuple[str, str]]) -> bool:
+    """노드가 그 커뮤니티의 함수를 품었나 — 함수 자신 · 메서드가 든 클래스 · 함수가 든 파일(#308).
+
+    keys는 그 커뮤니티 함수의 key, files는 그 파일, owners는 (파일, qual의 마지막 `.` 앞).
+    `source_file`이 없는 노드(바깥 이름)는 아무것도 품지 않는다.
+    """
+    file = str(n.get("source_file") or "")
+    if not file:
+        return False
+    if n.get("_callable_class"):
+        return (file, _clean(str(n.get("label", "")))) in owners
+    if n.get("_callable"):
+        fl = _node_key(n)
+        return fl is not None and f"{fl[0]}:{fl[1]}" in keys
+    return file in files
+
+
+def _hub_labels(
+    g, found: dict[int, list[str]], nodes: dict[str, dict], functions: list[dict]
+) -> dict[int, str]:
+    """communities 5 — graphify 허브 라벨. 후보는 그 커뮤니티의 함수를 품은 코드 노드(#308).
+
+    타입 표기·상속·import 선도 차수에 들어 메서드 없는 타입 클래스·의존성 파일이 허브가 되던 것을
+    막는다. 후보가 없으면 그 군집의 코드 노드 전부 — 문서·절 노드는 라벨이 못 된다(#255).
+    """
+    from graphify.cluster import label_communities_by_hub
+
+    mine: dict[int, list[dict]] = defaultdict(list)
+    for f in functions:
+        if f.get("community") is not None:
+            mine[f["community"]].append(f)
+    cands: dict[int, list[str]] = {}
+    for cid, members in found.items():
+        fs = mine.get(cid, [])
+        keys = {f["key"] for f in fs}
+        files = {f["file"] for f in fs}
+        quals = [(f["file"], f.get("qual") or "") for f in fs]
+        owners = {(file, q.rsplit(".", 1)[0]) for file, q in quals if "." in q}
+        code = [m for m in members if nodes.get(m, {}).get("file_type", "code") == "code"]
+        cands[cid] = [m for m in code if _owns(nodes.get(m, {}), keys, files, owners)] or code
+    return {cid: _clean(str(lab)) for cid, lab in label_communities_by_hub(g, cands).items()}
+
+
 def communities(raw: dict, graph: dict) -> dict:
     """SYNC-MS-011#codegraph.communities
 
     raw 그래프(파일·클래스·호출 선이 다 든 것)를 networkx Louvain으로 군집해 함수마다 커뮤니티
     번호를 붙이고 `communities`를 더한다. enrich 뒤에 — 보강이 더한 함수는 파일의 커뮤니티를
     받는다. 모델·네트워크 없이 결정적(seed 42). graphify `cluster`는 안 쓴다 — 응집도 재쪼개기가
-    싱크독을 100개 넘는 군집으로 터뜨린다(#253). 라벨만 graphify의 허브 라벨 — 후보는 코드
-    노드만(#255). 테스트 노드와 그 선은 빼고 묶는다 — 묶음·라벨·차수가 구현 코드로만(#306).
-    군집이 실패해도 그래프는 남는다.
+    싱크독을 100개 넘는 군집으로 터뜨린다(#253). 라벨만 graphify의 허브 라벨 — 후보는 그
+    커뮤니티의 함수를 품은 코드 노드(#255·#308). 테스트 노드와 그 선은 빼고 묶는다 — 묶음·라벨·
+    차수가 구현 코드로만(#306). 군집이 실패해도 그래프는 남는다.
     """
     raw = _drop_tests(raw)
     functions: list[dict] = graph["functions"]
     by_key: dict[str, int] = {}
     file_votes: dict[str, dict[int, int]] = defaultdict(lambda: defaultdict(int))
-    labels: dict[int, str] = {}
+    found: dict[int, list[str]] = {}
+    g = None
     nodes = {n["id"]: n for n in raw.get("nodes", []) if "id" in n}
     if nodes:
         try:
-            from graphify.cluster import label_communities_by_hub
             from graphify.paths import load_node_link_graph
 
             g = load_node_link_graph(raw)
             found = _louvain(g)
-            # 라벨 허브는 코드 노드만(file_type == code) — 문서·절 노드도 source_file을
-            # 가지며, 허브가 되면 「SEQUENCE: 싱크독」 같은 이름이 된다 (#255)
-            code_only = {
-                cid: [n for n in members if nodes.get(n, {}).get("file_type", "code") == "code"]
-                for cid, members in found.items()
-            }
-            named = label_communities_by_hub(g, code_only)
-            labels = {cid: _clean(str(lab)) for cid, lab in named.items()}
             for cid, members in found.items():
                 for nid in members:
                     n = nodes.get(nid)
@@ -796,7 +831,7 @@ def communities(raw: dict, graph: dict) -> dict:
                     file_votes[fl[0]][cid] += 1
         except Exception as e:  # noqa: BLE001 — 군집은 덤이다. 그래프 만들기를 깨지 않는다
             log.warning("code graph 군집 실패 — 커뮤니티 없이 둔다: %s", e)
-            by_key, file_votes, labels = {}, defaultdict(lambda: defaultdict(int)), {}
+            by_key, file_votes, found = {}, defaultdict(lambda: defaultdict(int)), {}
     by_file = {f: min(v.items(), key=lambda kv: (-kv[1], kv[0]))[0] for f, v in file_votes.items()}
     sizes: dict[int, int] = defaultdict(int)
     for f in functions:
@@ -804,6 +839,12 @@ def communities(raw: dict, graph: dict) -> dict:
         f["community"] = cid
         if cid is not None:
             sizes[cid] += 1
+    labels: dict[int, str] = {}
+    if found:
+        try:  # 라벨은 함수를 붙인 뒤에 — 후보가 그 커뮤니티의 함수를 품은 노드다 (#308)
+            labels = _hub_labels(g, found, nodes, functions)
+        except Exception as e:  # noqa: BLE001 — 라벨이 안 돼도 커뮤니티는 남는다(번호)
+            log.warning("code graph 라벨 실패 — 번호로 둔다: %s", e)
     graph["communities"] = [
         {"id": cid, "label": labels.get(cid, str(cid)), "size": size}
         for cid, size in sorted(sizes.items(), key=lambda kv: (-kv[1], kv[0]))
