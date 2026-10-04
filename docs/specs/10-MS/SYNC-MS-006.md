@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-006
 type: MS
 title: MINISPEC — AccountService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -55,6 +55,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **처리**
 1. `token = github.exchange_code(code, redirect_uri)` · if 실패 → `! unauthorized`
 2. `info = github.get_user(token)` → `{id, login, name}`
+2a. if `not settings.login_allowed(info.login)`(설정 `ALLOWED_LOGINS` — 쉼표, 대소문자 무시, 비면 누구나) → `! login-not-allowed {login}` — **사용자 행도 토큰도 남기지 않는다**(카드 BP, [[SYNC-SEQ-001#SEQ-8]]). 라우터가 302 `/login?denied=1`로 바꾼다
 3. `u = DB: users where github_user_id=info.id`
    - if 있음 → `login`·`display_name` 갱신 (로그인 ID 변경 대응)
    - else → `u = DB: users where github_login=info.login and kind=placeholder` (자리표시) · if 있음 → `github_user_id` 채우고 `kind=github` (미등록 push 사람이 로그인) · else → insert `kind=github`
@@ -63,7 +64,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** [[SYNC-MS-009#github.exchange_code]] · [[SYNC-MS-009#github.get_user]]
 
-**테스트 관점** 첫 로그인 → 행 생성, `kind=github` · 로그인 ID 바꾼 뒤 → 같은 행, `login` 갱신 · 자리표시가 있던 사람 → 그 행에 `github_user_id`·토큰 채워지고 `kind=github` (별도 행 안 생김)
+**테스트 관점** 첫 로그인 → 행 생성, `kind=github` · 로그인 ID 바꾼 뒤 → 같은 행, `login` 갱신 · 자리표시가 있던 사람 → 그 행에 `github_user_id`·토큰 채워지고 `kind=github` (별도 행 안 생김) · 허용 목록 밖 → `login-not-allowed`, 행·토큰 없음(이미 있던 사람의 토큰도 안 바뀜) · 대소문자가 달라도 목록 안이면 된다 · 목록이 비면 누구나
 
 폐쇄망판에는 부르는 곳이 없다 — `/auth/github*`가 없다([[SYNC-API-001]] 1장)
 
@@ -115,10 +116,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 1. `h = sha256(raw)`
 2. `t = DB: access_tokens where token_hash=h`
 3. if `t is None or t.revoked_at or (t.expires_at and t.expires_at < now)` → `→ None`
+3a. `u = DB: users where id=t.user_id` · if `u is None or not settings.login_allowed(u.github_login)` → `→ None` — **허용 목록에서 뺀 사람의 토큰은 바로 막힌다**(카드 BP — MCP·git 입구가 이 함수를 쓴다). 사용 흔적도 안 남긴다
 4. `DB: access_tokens update last_used_at=now` — 통과한 요청만. UI-13이 이 값을 보여준다
-5. `→ DB: users where id=t.user_id`
+5. `→ u`
 
-**테스트 관점** 폐기 후 → None · 오타 raw → None. 어느 경우든 **어느 쪽이 틀렸는지 알려주지 않는다** · 성공한 인증 뒤 `last_used_at`이 갱신됨 · 실패한 인증은 아무것도 안 건드림
+**테스트 관점** 폐기 후 → None · 오타 raw → None. 어느 경우든 **어느 쪽이 틀렸는지 알려주지 않는다** · 성공한 인증 뒤 `last_used_at`이 갱신됨 · 실패한 인증은 아무것도 안 건드림 · 주인이 허용 목록 밖 → None이고 `last_used_at` 그대로 · 폐쇄망판의 로컬 사용자 토큰은 목록과 상관없이 된다
 
 ---
 
