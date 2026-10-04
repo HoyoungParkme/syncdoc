@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-009
 type: MS
 title: MINISPEC — infra — git·github 어댑터
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -43,7 +43,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#github.verify_signature]] | webhook 서명 |
 | [[#github.exchange_code]] | OAuth code → token |
 | [[#github.get_user]] | token → 사용자 정보 |
-| [[#github.create_repo]] | 공개 저장소 만들기 |
+| [[#github.create_repo]] | 저장소 만들기 — 기본 비공개 |
 | [[#github.create_hook]] | push 통지 걸기 |
 | [[#llm.step]] | 모델 한 번 호출 + 도구 호출 파싱 |
 | [[#llm.step_stream]] | 스트림으로 한 번 호출 — 글자 조각과 끝의 LlmStep |
@@ -132,13 +132,15 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### git.fetch fetch
 
-**시그니처** `async def fetch(workdir: Path, token: str | None = None) -> str`
+**시그니처** `async def fetch(workdir: Path, user: User | None = None) -> str`
 
-**처리** if `token` → `git fetch {url with token} +refs/heads/*:refs/remotes/origin/*` · else → `git fetch origin` → `git rev-parse origin/main` · `→ 해시`. 작업 사본은 건드리지 않는다.
+**처리** `origin = git remote get-url origin` · if `origin`이 `https://`로 시작하고 `user`의 토큰을 구한다(`AccountService.github_token_for(user)`) → `git fetch {origin with token} +refs/heads/*:refs/remotes/origin/*` · else(서버 저장소·`user` 없음·토큰을 못 구함) → `git fetch origin` → `git rev-parse origin/main` · `→ 해시`. 작업 사본은 건드리지 않는다.
 
 **`origin/HEAD`가 아니라 `origin/main`을 본다.** `origin/HEAD`는 상징 ref이고 **`git clone`이 빈 저장소에서는 그것을 만들지 않는다**. 그런데 새 프로젝트를 시작하는 가장 흔한 방법이 빈 저장소다([[SYNC-UC-001#UC-A1]] 기본 흐름 3). 그 프로젝트는 폴링·재구축·복원·push 재시도가 전부 죽는데, 실패가 `fetch` 안에서 나므로 어디가 원인인지도 안 보인다(#45). 기본 브랜치는 `main` 고정이므로([[#git.commit_push]] 6단계) 상징 ref를 거칠 이유가 없다. `main`이 아닌 기본 브랜치는 v1에서 지원하지 않는다(8장 미결).
 
-**public 저장소는 토큰 없이 된다** — v1은 public만 쓴다. `clone`이 `.git/config`에서 토큰을 지우므로 private이면 매번 URL에 붙여야 하고, 그때 호출자가 `AccountService.github_token_for(repo.registered_by_user)`로 얻어 넘긴다. private 지원은 v2(8장 미결)
+**토큰은 여기서 구한다**(#310) — 비공개 저장소는 토큰 없이 읽히지 않는다. `clone`이 `.git/config`에서 토큰을 지우므로 매번 URL에 붙인다. 부르는 쪽은 토큰이 아니라 **사람**을 넘긴다 — 폴링·웹훅·재구축은 저장소를 등록한 사람(`repositories.registered_by_user_id`). 토큰을 다루는 곳을 git 모듈 하나로 모은다([[SYNC-DOM-002]] 4.9 규칙). **토큰을 못 구하면(미등록·풀 수 없음) 토큰 없이 시도한다** — 공개 저장소는 그래도 되고, 비공개면 git이 실패해 그 사유가 `fetch_error`로 남는다(UI-14). 토큰이 든 URL은 `GitError`가 가린다
+
+**테스트 관점** https 원격 + 토큰 있는 사람 → 토큰 URL과 refspec으로 받는다 · 토큰을 못 구하는 사람 → `fetch origin` · 서버 저장소(서버 안 경로) → 사람이 있어도 토큰을 안 구한다
 
 ---
 
@@ -160,14 +162,14 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **처리**
 1. `url = git remote get-url origin` · if `url`이 `https://`로 시작 → `token = AccountService.github_token_for(author.user)` · if 실패 → `! push-failed {reason: 미등록}`. **아니면(서버 저장소 — 서버 안 경로) 토큰을 구하지 않는다**([[SYNC-PRD-001#R14]]) — GitHub 토큰이 없는 사람도 서버 저장 프로젝트에는 쓴다
-2. `git fetch origin` · `git reset --hard origin/main` — 작업 사본을 원격 최신으로 (락 안이라 안전)
+2. fetch(1의 토큰이 있으면 URL에 붙여 — 비공개 저장소도 읽힌다, #310. 없으면 `git fetch origin`) · `git reset --hard origin/main` — 작업 사본을 원격 최신으로 (락 안이라 안전)
    - **원격에 커밋이 하나도 없으면 `origin/main`이 없다.** 되돌아갈 곳이 없으므로 reset을 건너뛴다. 이 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3, #6)
 3. 파일 쓰기 (`path` 또는 `files`). 상위 디렉터리 없으면 생성 · `delete`면 `git rm -q --ignore-unmatch {paths}`
    - **경로 가드**(카드 BB) — 쓰거나 지울 경로마다 `(workdir / p).resolve()`가 작업 사본 안이고 `.git` 조각이 없어야 한다. 아니면 쓴 것 없이 `! push-failed {reason: 작업 사본 밖 경로}`. push로 심은 심볼릭 링크를 따라 밖에 쓰거나 `.git/hooks`에 써서 서버가 코드를 돌리게 되는 것을 막는다
 4. `git add {paths}` · if `git diff --cached --quiet` (변경 없음) → `→ 현재 HEAD` (커밋 안 만듦. 같은 내용 재저장 · 이미 없는 파일 삭제)
 5. `git -c user.name={display_name} -c user.email={email} commit -m {message}` — `email`은 `{login}@users.noreply.github.com`. **로컬 사용자(`kind == local`, 폐쇄망판)면 `{login}@syncdoc.local`** — GitHub 계정이 아니므로 GitHub 주소를 지어내지 않는다([[SYNC-PRD-001#R15]])
 6. `git push {url with token} HEAD:main` — 기본 브랜치는 `main` 고정(결정). 다른 브랜치 저장소는 v1에서 지원 안 함
-   - if 거부(non-fast-forward, UC-S7 2a) → `git fetch` · `git rebase origin/main` · if rebase 충돌 → `git rebase --abort`, `git reset --hard origin/main`, `! push-failed {reason: conflict}` · else → push 재시도. **`PUSH_RETRIES`회까지**(기본 3)
+   - if 거부(non-fast-forward, UC-S7 2a) → fetch(2와 같이 토큰으로) · `git rebase origin/main` · if rebase 충돌 → `git rebase --abort`, `git reset --hard origin/main`, `! push-failed {reason: conflict}` · else → push 재시도. **`PUSH_RETRIES`회까지**(기본 3)
    - if 다 쓰고도 실패 → `git reset --hard origin/main`, `! push-failed {reason: stderr}`
    - **빈 저장소였으면 되돌릴 원격 커밋이 없다.** reset 대신 `git update-ref -d HEAD`로 방금 만든 로컬 커밋만 푼다
 7. `→ git rev-parse HEAD`
@@ -361,7 +363,7 @@ async def sync_readme(workdir: Path, author: Author, code: str) -> str | None
 **입력** 작업 사본, 커밋 주체(재구축을 누른 소유자), 프로젝트 코드(커밋 메시지용)
 
 **처리**
-1. `fetch origin` — push는 토큰을 붙인 URL로 밀어 `origin/main` 추적 참조가 갱신되지 않는다. 비교 전에 받아 온다
+1. fetch(`author.user`의 토큰 — [[#git.fetch]]와 같은 규칙, #310) — push는 토큰을 붙인 URL로 밀어 `origin/main` 추적 참조가 갱신되지 않는다. 비교 전에 받아 온다
 2. `git.read(workdir, "docs/specs/README.md", "origin/main")` — 없으면(`GitError`) 빈 문자열로 본다
 3. 지금 판(`init_specs`가 쓰는 것과 같은 글)과 같으면 `→ None`. 저장소에 아무것도 쓰지 않는다
 4. 다르면 `commit_push(workdir, f"chore({code}): README를 싱크독 규약 링크로", author, path="docs/specs/README.md", content=...)` → `→ commit_hash`
@@ -404,26 +406,30 @@ async def sync_readme(workdir: Path, author: Author, code: str) -> str | None
 
 ---
 
-#### github.create_repo 공개 저장소 만들기
+#### github.create_repo 저장소 만들기 — 기본 비공개
 
 **시그니처** `async def create_repo(token: str, owner: str, name: str) -> str`
 
-근거: [[SYNC-CODE-001#F]] · [[SYNC-UC-001#UC-A1]] 기본 흐름 3
+근거: [[SYNC-CODE-001#F]] · [[SYNC-UC-001#UC-A1]] 기본 흐름 3 · #310(사용자 결정 2026-10-04 — 새 저장소는 비공개가 기본, 공개는 설정으로 명시할 때만)
 
 **처리**
-1. `GET https://api.github.com/repos/{owner}/{name}` — 이미 있으면 **만들지 않고** 그 `clone_url`을 돌려준다
-2. 없으면 `POST https://api.github.com/user/repos` (Bearer) · `{name, private: false, auto_init: false}`
+1. `GET https://api.github.com/repos/{owner}/{name}` — 이미 있으면 **만들지 않고** 그 `clone_url`을 돌려준다. **공개 여부도 바꾸지 않는다** — if 그 저장소가 공개(`private`가 거짓) → `log.warning`만
+2. 없으면 `POST https://api.github.com/user/repos` (Bearer) · `{name, private: settings.GITHUB_REPO_PRIVATE, auto_init: false}` — 설정 기본은 참([[SYNC-INFRA-001]] 5.2)
 3. `→ clone_url`
 
 **출력** `https://github.com/{owner}/{name}.git`
 
-**예외** `! repo-create-failed {reason}` — 이름이 GitHub 규칙에 안 맞거나, 토큰 권한이 모자라거나, 같은 이름이 **다른 소유자 아래** 있어 접근이 안 될 때
+**예외** `! repo-create-failed {reason}` — 이름이 GitHub 규칙에 안 맞거나, 토큰 권한이 모자라거나, 같은 이름이 **다른 소유자 아래** 있어 접근이 안 될 때. if 403·404 → 사유 끝에 「비공개 저장소는 repo 권한이 필요하다 — 권한을 넓히기 전에 받은 토큰이면 다시 로그인」
 
-**항상 공개로 만든다.** v1은 공개 저장소만 지원한다 — [[#git.fetch]]가 토큰 없이 돌기 때문이다. 비공개로 만들면 등록은 되고 **폴링이 조용히 죽는다.** 선택지를 안 두어 그 함정을 없앤다(8장 미결이 풀리면 그때 인자를 연다)
+**비공개가 기본이다**(#310). 전에는 v1이 공개 저장소만 지원해(fetch가 토큰 없이 돌았다) 늘 공개로 만들었고, 그래서 명세가 실수로 공개됐다. 이제 [[#git.fetch]]가 등록자 토큰으로 읽으므로 비공개도 동기화된다. 공개는 `GITHUB_REPO_PRIVATE=false`로 서버가 명시할 때만 — 요청마다 고르는 인자는 두지 않는다. GitHub은 비공개 생성에 OAuth `repo` 범위를 요구한다([[SYNC-INFRA-001]] 5장) — 범위를 넓히기 전에 받은 토큰은 403·404로 거절되므로 예외 사유가 다시 로그인을 말한다
+
+**이미 있는 저장소의 공개 여부를 바꾸지 않는 이유.** 사람이 GitHub에서 정한 것이다 — 등록이 그것을 몰래 바꾸면 안 된다. 공개면 경고 로그로 남겨 사람이 알아채게 한다
 
 **`auto_init`을 쓰지 않는다.** 초기 커밋을 GitHub이 만들면 README가 생기고, 그러면 [[SYNC-MS-001#ProjectService.init_project]]의 "빈 저장소" 경로가 아니라 "내용 있는 저장소" 경로를 타 흐름이 갈린다. 골격 커밋이 그 저장소의 첫 커밋이어야 한다
 
 **이미 있으면 만들지 않는 이유.** 같은 인자로 두 번 불러도 결과가 같아야 한다 — 등록이 중간에 실패해 사람이 다시 부를 때 "이미 있다"로 막히면 손으로 지워야 한다
+
+**테스트 관점** 기본 설정 → POST 바디 `private: true` · 설정 거짓 → `private: false` · 이미 있는 공개 저장소 → POST 없이 그 `clone_url` + 경고 로그 · 이미 있는 비공개 저장소 → 경고 없음 · 403 → `repo-create-failed`에 다시 로그인 안내
 
 
 ---
@@ -479,5 +485,5 @@ async def create_hook(token: str, owner: str, name: str, url: str, secret: str) 
 
 ## 3. 미결사항
 
-- [x] **private 저장소 지원.** v1은 public 전용 — `fetch`가 토큰 없이 돈다. private이면 폴링·재구축·`repo_status`가 `registered_by_user_id`의 토큰으로 fetch해야 하고, 그 사람이 권한을 잃었을 때 UI-14에 표시하는 흐름이 필요하다. `clone`·`commit_push`는 이미 토큰을 쓴다 — 결정: v1은 public 전용(인프라 5장). private은 v2 — `git.fetch(workdir, token)`과 `registered_by_user_id`가 그 자리
+- [x] **private 저장소 지원.** v1은 public 전용 — `fetch`가 토큰 없이 돈다. private이면 폴링·재구축·`repo_status`가 `registered_by_user_id`의 토큰으로 fetch해야 하고, 그 사람이 권한을 잃었을 때 UI-14에 표시하는 흐름이 필요하다. `clone`·`commit_push`는 이미 토큰을 쓴다 — 결정: v1은 public 전용(인프라 5장). private은 v2 — `git.fetch(workdir, token)`과 `registered_by_user_id`가 그 자리. **→ 2026-10-04 v2로 열었다(#310)**: 새 저장소는 비공개가 기본(`GITHUB_REPO_PRIVATE`), OAuth `repo`, [[#git.fetch]]가 사람(등록자)을 받아 git 모듈 안에서 토큰을 구한다 — 못 구하면 토큰 없이. 권한을 잃으면 fetch 실패 사유가 `fetch_error`로 UI-14에 남는다(새 흐름 없이 기존 표시)
 - [x] `commit_push` 6단계 rebase 재시도 횟수 — 지금 1회. 락이 있으니 충돌은 외부 push와만 — 결정: **3회**(`PUSH_RETRIES` 설정, 기본 3). 거부는 `fetch`→`reset` 이후 push 사이의 짧은 틈에 외부 push가 끼어들 때만 나므로 한 번으로도 대부분 건지지만, 여럿이 같은 저장소를 만질 때를 대비한다. 재시도 사이에 기다리지 않는다 — 락을 쥔 채 자면 같은 프로젝트의 다른 저장이 전부 막힌다. **rebase 충돌은 재시도로 안 풀린다** — 되돌리고 `push-failed{reason: conflict}`, 에이전트가 현재 본문을 다시 읽어 합친다
