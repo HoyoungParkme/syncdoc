@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import AccountService
-from app.core.errors import Unauthorized
+from app.core.errors import LoginNotAllowed, Unauthorized
 from app.db import get_session
 from app.web import auth
 from app.web.schemas.account import AccessToken, AddEmail, CommitEmail, IssuedToken, IssueToken
@@ -36,11 +36,18 @@ async def github_start(
 async def github_callback(
     request: Request, code: str, state: str, session: Session = Depends(get_session)
 ) -> RedirectResponse:
-    """SYNC-API-001#GET/auth/github/callback — state 대조 · login_github · 세션 · 302 next."""
+    """SYNC-API-001#GET/auth/github/callback — state 대조 · login_github · 세션 · 302 next.
+
+    허용 목록 밖 계정이면 로그인 화면으로 돌려보내 거절 안내(UI-1 4)를 보인다 (카드 BP).
+    """
     if not state or state != request.session.get("oauth_state"):
         raise Unauthorized("state 불일치")
     next_path = request.session.get("oauth_next") or "/"
-    user = await AccountService(session).login_github(code, state, auth.callback_url(request))
+    try:
+        user = await AccountService(session).login_github(code, state, auth.callback_url(request))
+    except LoginNotAllowed:
+        auth.logout(request)  # OAuth 임시값도 비운다
+        return RedirectResponse("/login?denied=1", status_code=302)
     session.commit()  # 트랜잭션은 호출자(DEV-10)
     auth.login(request, user)
     return RedirectResponse(next_path, status_code=302)

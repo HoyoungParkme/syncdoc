@@ -156,6 +156,24 @@ def test_oauth_callback_without_next_goes_root(client: TestClient, mock_github) 
     assert r.status_code == 302 and r.headers["location"] == "/"
 
 
+def test_oauth_callback_outside_allowlist_goes_back_to_login_denied(
+    client: TestClient, db_session: Session, mock_github, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """카드 BP — 목록 밖 계정은 302 /login?denied=1. 사용자 행·세션이 남지 않는다."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "hoyoung")
+    mock_github(github_ok(77, "stranger", "남"))
+    r = client.get("/auth/github", follow_redirects=False)
+    state = parse_qs(urlparse(r.headers["location"]).query)["state"][0]
+    r = client.get(
+        "/auth/github/callback", params={"code": "c", "state": state}, follow_redirects=False
+    )
+    assert r.status_code == 302 and r.headers["location"] == "/login?denied=1"
+    assert client.cookies.get(auth.SESSION_COOKIE) is None  # OAuth 임시값까지 비운다
+    assert db_session.execute(sqlalchemy.text("SELECT count(*) FROM users")).scalar() == 0
+
+
 # ── /api/me · /api/me/tokens ──
 def test_me_and_tokens_issue_list_revoke(client: TestClient, db_session: Session) -> None:
     from tests.web.conftest import login
