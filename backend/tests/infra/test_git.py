@@ -225,6 +225,24 @@ async def test_commit_push_to_server_path_needs_no_token(repos: dict[str, Path])
     assert h == git(repos["remote"], "rev-parse", "main")
 
 
+# ── clone_bare · set_origin (카드 BQ) ──
+async def test_clone_bare_copies_branches_and_tags_without_remote(
+    repos: dict[str, Path], tmp_path: Path
+) -> None:
+    """가지·태그가 같은 해시로 옮겨지고, 원격(토큰 든 주소)·다른 HEAD는 남지 않는다."""
+    git(repos["remote"], "branch", "feat", "main")
+    git(repos["remote"], "tag", "v1", "main")
+    dest = tmp_path / "origins" / "EXMP.git"
+    await g.clone_bare(str(repos["remote"]), dest, "s3cr3t")
+    for ref in ("main", "feat", "v1"):
+        assert git(dest, "rev-parse", ref) == git(repos["remote"], "rev-parse", ref)
+    cfg = (dest / "config").read_text(encoding="utf-8")
+    assert "[remote" not in cfg and "s3cr3t" not in cfg
+    assert git(dest, "symbolic-ref", "HEAD") == "refs/heads/main"
+    for key in ("receive.denyNonFastForwards", "receive.denyDeletes", "receive.fsckObjects"):
+        assert git(dest, "config", key) == "true"
+
+
 # ── init_bare (카드 BA) ──
 async def test_init_bare_is_main_and_refuses_rewrites(tmp_path: Path) -> None:
     origin = tmp_path / "o" / "X.git"  # 상위 폴더가 없어도 만든다

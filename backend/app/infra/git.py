@@ -452,6 +452,10 @@ async def init_specs(workdir: Path) -> dict[str, str]:
     return files
 
 
+# 서버 저장소의 받기 규칙 — 이력을 뒤로 돌리거나 가지를 지우는 push와 깨진 객체를 받지 않는다
+_RECEIVE_RULES = ("receive.denyNonFastForwards", "receive.denyDeletes", "receive.fsckObjects")
+
+
 async def init_bare(path: Path) -> None:
     """SYNC-MS-009#git.init_bare
 
@@ -461,7 +465,22 @@ async def init_bare(path: Path) -> None:
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     await _run(None, "init", "-q", "--bare", "--initial-branch=main", str(path))
-    for key in ("receive.denyNonFastForwards", "receive.denyDeletes", "receive.fsckObjects"):
+    for key in _RECEIVE_RULES:
+        await _run(path, "config", key, "true")
+
+
+async def clone_bare(remote_url: str, path: Path, token: str | None) -> None:
+    """SYNC-MS-009#git.clone_bare
+
+    원격을 서버 저장소로 통째로 — 가지·태그를 커밋 해시 그대로 옮긴다(카드 BQ). 토큰이 든 주소를
+    남기지 않으려고 원격을 지운다 — 서버 저장소에는 원격이 없다. 규칙은 init_bare와 같다.
+    """
+    url = _with_token(remote_url, token) if token else remote_url
+    path.parent.mkdir(parents=True, exist_ok=True)
+    await _run(None, "clone", "-q", "--bare", url, str(path))
+    await _run(path, "remote", "remove", "origin")
+    await _run(path, "symbolic-ref", "HEAD", "refs/heads/main")
+    for key in _RECEIVE_RULES:
         await _run(path, "config", key, "true")
 
 
