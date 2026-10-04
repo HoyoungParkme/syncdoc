@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1354,6 +1354,16 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 선행 | BN |
 | 완료 | 2026-10-02 · 브랜치 `card/BO-code-graph-full-width`(c8ca5d4 #292) + `card/BO-toolbar-nowrap`(8d64a1b #293) · spec 3 + code 2 · 백엔드 변경 없음 · `tsc`·`oxlint`·`build` · `validate` 0/0 · `check_ui` UI-17 32/32 · `check_tokens` 0 · 시안 둘(클로드 디자인 캔버스) 중 B · 운영 헤드 브라우저 1440×900: 머리 줄이 화면 폭 1440 · 트리 240 \| 그림 778 \| 사이드바 420, 페이지 스크롤 없음 · 코드·명세(`?panel=spec`)·질문(`?panel=ask`) 탭, 탭을 바꿔도 그림 폭 그대로 · 명세 탭에서 다른 함수를 골라도 명세 탭 · 6.4로 240→300·4.10으로 420→520이 새로고침 뒤 그대로, UI-5 질문 탭도 520 · 마지막 탭 복원 · 트리 접기 → 그림 1019, 「트리」로 다시 · 「전부 펼치기」가 한 줄(#293 — 가운데 778에서 두 줄로 꺾였다) · 손잡이를 그림 위로(z-index — `position:relative` 그림이 6.4의 누름 자리를 덮었다) · 실제 모델(대화 40) 「이 함수는 무엇을 부르고 누가 불러?」 → 부르는 것 4·불리는 곳 6을 파일:줄로 · 화면은 사람이 직접(DEV-17) |
 
+
+#### BP 로그인 허용 계정 — 목록 밖은 로그인·세션·토큰·git 입구 모두 막고, 포트는 이 PC에만
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#N2]] · [[SYNC-INFRA-001]] 5장 · [[SYNC-SEQ-001#SEQ-8]] · [[SYNC-UI-002#UI-1]] · 사용자 결정 2026-10-04(내 노트북에서 혼자 쓴다 — 공개 주소는 계속 쓰되 ID로 막는다 · 허용 계정 HoyoungParkme·hypark-df · 목록 밖은 새 로그인·세션·MCP 토큰·git 입구 전부 막는다 · 설정이 비면 예전처럼 누구나 · 포트는 이 PC에만) |
+| 구현 | 설정 `ALLOWED_LOGINS`(쉼표, 대소문자 무시)와 `settings.login_allowed` · [[SYNC-MS-006#AccountService.login_github]] — 목록 밖이면 아무것도 남기지 않고 `login-not-allowed` · [[SYNC-MS-006#AccountService.authenticate_token]] — 목록 밖 주인의 토큰은 None(MCP·git 입구) · `web/auth.current_user` — 목록 밖 세션은 비우고 401 · 콜백 라우터 — 거절이면 302 `/login?denied=1` · `pages/Login.tsx` 거절 안내(4) · `docker-compose.yml` 포트를 `127.0.0.1`로 · 폐쇄망판은 검사하지 않는다(로컬 사용자 하나) |
+| 테스트 | MS-006 테스트 관점 · 라우터: 목록 밖 콜백 → 302 `/login?denied=1`이고 사용자 행·토큰 없음 · 목록 밖 세션 → 401이고 세션 비움 · 목록 밖 주인의 토큰 → MCP 401 · 설정이 비면 누구나 · 대소문자 무시 · `check_ui` UI-1 · 운영: 허용 계정 로그인 그대로, 목록 밖 거절 |
+| 선행 | — |
+| 완료 | — |
 ---
 
 ## 2. 통합 테스트 시나리오
