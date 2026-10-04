@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -85,6 +85,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | POST /api/admin/repos/{code}/rebuild | [[#SEQ-21]] | ○ |
 | POST /api/admin/repos/{code}/sync | [[#SEQ-25]] | ○ |
 | POST /api/admin/repos/{code}/hook | [[#SEQ-4]] | |
+| POST /api/admin/repos/{code}/move-to-server | [[#SEQ-33]] | ○ |
 | POST /api/docs/{docId}/ask | [[#SEQ-24]] | ○ |
 | POST /api/projects/{code}/code/ask | [[#SEQ-32]] | ○ |
 | MCP create_document | [[#SEQ-19]] | ○ |
@@ -1529,6 +1530,52 @@ sequenceDiagram
 **읽을 때 볼 것**
 - 입구가 둘(문서·코드 그래프)이고 그 뒤는 하나다 — `_ask_loop`. 대화는 프로젝트 것이라 문서에서 묻다 그래프로 와도 이어진다
 - 시작 맥락에 함수 본문을 싣지 않는다 — 문서 본문을 안 싣는 것과 같은 원칙(사용자 결정 3). 모델이 `read_code`로 읽는다
+
+---
+
+## SEQ-33 GitHub 저장 프로젝트를 서버 저장으로 옮긴다
+
+[[SYNC-UC-001#UC-H22]] 기본 흐름 1~7, 확장 2a~2c·4a·5a. `POST /api/admin/repos/{code}/move-to-server` — 화면이 없다(카드 BQ). **쓰기와 읽기를 함께 막고** 옮긴다 — 저장(`save_pipeline`)과 fetch(폴링·웹훅)가 끼어들면 옛 원격과 새 원격 사이에서 커밋이 샌다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사람(소유자)
+    participant RA as routers/admin
+    participant P as pipeline
+    participant PS as ProjectService
+    participant AS as AccountService
+    participant G as infra/git
+    participant GHI as infra/github
+    participant DB
+
+    U->>RA: POST /api/admin/repos/{code}/move-to-server
+    RA->>P: move_to_server(code, user)
+    P->>PS: get_owned(code, user) — 남의 것이면 not-found (2a)
+    alt 이미 서버 저장 (2b)
+        P-->>U: 409 storage-mismatch
+    end
+    P->>P: 자리 ORIGINS_DIR/{code}.git — 있으면 409 origin-exists (2c, 아무것도 안 지운다)
+    P->>AS: github_token_for(user)
+    P->>P: 읽기 락 → 쓰기 락
+    P->>G: fetch(workdir, user) — 작업 사본을 원격 최신으로
+    P->>G: clone_bare(remote_url, origin, token) — 가지·태그, 토큰은 남기지 않는다
+    P->>G: rev_list_count(origin, 처리 지점) — 복제본에 있나
+    alt 복제 실패 · 처리 지점 없음 (4a)
+        P->>P: origin 지움 → 424 push-failed
+    end
+    P->>PS: remove_hook(code, user)
+    PS->>GHI: delete_hook(token, owner, name, hook_id) — 실패는 상태로 (5a)
+    P->>G: set_origin(workdir, origin) · fetch(workdir)
+    P->>DB: repositories storage=server · remote_url=origin · hook 칸 비움
+    P-->>RA: MoveResult {origin, head, hook}
+    RA-->>U: 200
+```
+
+**읽을 때 볼 것**
+- **DB는 건드리지 않는다** — 버전·상태 이력·대화·코드 그래프가 커밋 해시에 기대는데, 복제가 해시를 그대로 옮기므로 그대로 맞는다. 저장소 행의 저장 방식·원격·통지 칸만 바뀐다
+- 락 순서는 읽기 → 쓰기 — `process_commit`(읽기 락)이 `save_pipeline`(쓰기 락)을 부르는 것과 같은 순서라 엇갈려 막히지 않는다
+- 옮긴 뒤로는 그 프로젝트가 서버 저장이다 — 쓰기는 서버 저장소로, 코드는 git 입구로 push한다([[#SEQ-29]]). GitHub 저장소 보관(비공개·archive)은 운영이 한다
 
 ---
 
