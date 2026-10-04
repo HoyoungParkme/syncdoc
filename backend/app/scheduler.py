@@ -15,6 +15,7 @@ from sqlalchemy import update
 
 from app import db
 from app.core import pipeline
+from app.core.account.models import User
 from app.core.clock import now_utc
 from app.core.project.models import Repository
 from app.core.project.service import ProjectService
@@ -45,7 +46,9 @@ async def catch_up() -> list[SaveResult]:
                     row = s.get(Repository, repo_id)
                     assert row is not None
                     last = row.last_processed_commit
-                head = await git.fetch(Path(workdir))
+                    # fetch 토큰의 주인 — 사람 없이 도는 폴링도 비공개 저장소를 읽는다 (#310)
+                    registered = s.get(User, row.registered_by_user_id)
+                head = await git.fetch(Path(workdir), registered)
                 behind = (
                     await git.rev_list_count(Path(workdir), f"{last}..{head}") if last else None
                 )

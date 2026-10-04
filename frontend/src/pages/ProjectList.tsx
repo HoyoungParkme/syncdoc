@@ -104,7 +104,7 @@ export function ProjectList() {
       )}
       {/* 성공하면 목록에 새 행이 보여야 한다. 목록은 셸이 들고 있으므로 다시 읽는다 */}
       {init && (
-        <ProjectInit onClose={() => setInit(false)} onDone={() => window.location.assign('/')} storageModes={user.storage_modes ?? ['github']} />
+        <ProjectInit onClose={() => setInit(false)} onDone={() => window.location.assign('/')} storageModes={user.storage_modes ?? ['github']} repoPrivate={user.repo_private ?? true} />
       )}
     </div>
   )

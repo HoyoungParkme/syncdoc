@@ -195,6 +195,30 @@ async def test_commit_push_unregistered_user_is_push_failed(repos: dict[str, Pat
     assert ei.value.extra["reason"] == "미등록"
 
 
+async def test_fetch_uses_the_users_token_on_https_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    """#310 — https 원격이면 그 사람 토큰으로 받는다(비공개 저장소). 못 구하면 토큰 없이, 서버
+    저장소(서버 안 경로)면 사람이 있어도 토큰을 붙이지 않는다."""
+    origin = {"url": "https://github.com/o/r.git"}
+    calls: list[tuple[str, ...]] = []
+
+    async def fake_run(workdir: Path | None, *args: str) -> str:
+        calls.append(args)
+        return f"{origin['url']}\n" if args[:2] == ("remote", "get-url") else "abc\n"
+
+    monkeypatch.setattr(g, "_run", fake_run)
+    wd = Path("/nowhere")
+    assert await g.fetch(wd, _author("gho_secret").user) == "abc"
+    with_token = "https://x-access-token:gho_secret@github.com/o/r.git"
+    assert ("fetch", with_token, "+refs/heads/*:refs/remotes/origin/*") in calls
+    calls.clear()
+    await g.fetch(wd, _author(token=None).user)  # 토큰을 못 구한다 — 토큰 없이 시도
+    assert ("fetch", "origin") in calls
+    calls.clear()
+    origin["url"] = "/var/syncdoc/origins/X.git"  # 서버 저장소
+    await g.fetch(wd, _author("gho_secret").user)
+    assert ("fetch", "origin") in calls and not any("gho_secret" in " ".join(c) for c in calls)
+
+
 async def test_commit_push_to_server_path_needs_no_token(repos: dict[str, Path]) -> None:
     """서버 저장소(서버 안 경로)는 토큰을 구하지 않는다 — 토큰 없는 사람도 민다 (카드 BA)."""
     h = await g.commit_push(repos["work"], "m", _author(token=None), path=SEED, content="v2")

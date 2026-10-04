@@ -1141,7 +1141,7 @@ async def test_save_resolves_missing_refs_waiting_for_this_document(scoped: Sess
 async def test_rebuild_fetch_failure_is_rebuild_failed(scoped: Session, proj, monkeypatch) -> None:
     from app.infra import git as gitmod
 
-    async def boom(workdir):
+    async def boom(workdir, user=None):  # fetch(workdir, 등록자) — #310
         raise gitmod.GitError(["git", "fetch"], "could not read Username")
 
     monkeypatch.setattr(gitmod, "fetch", boom)

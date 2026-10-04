@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 
 import httpx
 
 from app.config import settings
 from app.core.errors import RepoCreateFailed, Unauthorized
 from app.core.types import GithubUser
+
+log = logging.getLogger(__name__)
 
 _API = "https://api.github.com"
 _HDR = {"Accept": "application/vnd.github+json"}
@@ -60,8 +63,8 @@ async def get_user(token: str) -> GithubUser:
 async def create_repo(token: str, owner: str, name: str) -> str:
     """SYNC-MS-009#github.create_repo
 
-    **항상 공개로 만든다.** v1은 공개 저장소만 지원한다 — 폴링 fetch가 토큰 없이
-    돌기 때문이다(git.fetch). 비공개로 만들면 등록은 되고 폴링이 조용히 죽는다.
+    **비공개가 기본이다**(#310) — 공개는 서버가 GITHUB_REPO_PRIVATE=false로 명시할 때만.
+    이미 있는 저장소는 공개 여부를 바꾸지 않는다. 공개면 경고 로그만 남긴다.
 
     **auto_init을 쓰지 않는다.** GitHub이 초기 커밋을 만들면 README가 생겨
     "빈 저장소" 경로가 아니라 "내용 있는 저장소" 경로를 타 흐름이 갈린다.
@@ -72,11 +75,14 @@ async def create_repo(token: str, owner: str, name: str) -> str:
         # 이미 있으면 만들지 않는다 — 같은 인자로 두 번 불러도 결과가 같아야 한다
         r = await client.get(f"{_API}/repos/{owner}/{name}", headers=auth)
         if r.is_success:
-            return str(r.json()["clone_url"])
+            existing = r.json()
+            if not existing.get("private"):
+                log.warning("저장소 %s/%s가 이미 공개다 — 공개 여부는 바꾸지 않는다", owner, name)
+            return str(existing["clone_url"])
         r = await client.post(
             f"{_API}/user/repos",
             headers=auth,
-            json={"name": name, "private": False, "auto_init": False},
+            json={"name": name, "private": settings.GITHUB_REPO_PRIVATE, "auto_init": False},
         )
     if not r.is_success:
         detail = ""
@@ -88,6 +94,8 @@ async def create_repo(token: str, owner: str, name: str) -> str:
                 detail += " — " + "; ".join(e.get("message", str(e)) for e in errs)
         except Exception:  # noqa: BLE001 — 본문이 JSON이 아니어도 상태 코드는 알린다
             detail = r.text[:200]
+        if r.status_code in (403, 404):  # 권한을 넓히기 전(public_repo)에 받은 토큰이다
+            detail += " — 비공개 저장소는 repo 권한이 필요하다. 다시 로그인한다"
         raise RepoCreateFailed(f"{r.status_code} {detail}".strip())
     return str(r.json()["clone_url"])
 

@@ -143,6 +143,8 @@ export interface Me extends User {
   llm_enabled: boolean
   storage_modes: Storage[]
   edition?: Edition
+  /** 싱크독이 만드는 GitHub 저장소가 비공개인가(설정 GITHUB_REPO_PRIVATE) — UI-3 2.6 문구 (#310) */
+  repo_private?: boolean
 }
 export interface Author {
   kind: 'human' | 'agent'

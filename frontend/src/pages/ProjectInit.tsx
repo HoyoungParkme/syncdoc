@@ -10,11 +10,14 @@ export function ProjectInit({
   onClose,
   onDone,
   storageModes,
+  repoPrivate,
 }: {
   onClose: () => void
   onDone: () => void
   /** 이 서버가 켠 저장 방식(/api/me). 하나면 고를 것이 없다 */
   storageModes: Storage[]
+  /** 새 GitHub 저장소가 비공개인가(/api/me의 repo_private) — 2.6 문구 */
+  repoPrivate: boolean
 }) {
   // 2.7 저장 방식 — 둘 다 켰을 때만 고른다. **기본값이 없다** — 고를 때까지 초기화(3.1)가 꺼져 있다.
   // MCP가 사람에게 먼저 묻는 것과 같은 이유다(PRD R14, 카드 BA)
@@ -31,7 +34,7 @@ export function ProjectInit({
   useEscape(onClose)
   useEscape(existing !== null ? () => setExisting(null) : null)
   const [banner, setBanner] = useState('')
-  // 카드 F — 끄면 지금과 같다(없는 저장소면 push-failed). 켜면 공개 저장소를 만들어 준다.
+  // 카드 F — 끄면 지금과 같다(없는 저장소면 push-failed). 켜면 저장소를 만들어 준다 — 비공개가 기본(#310).
   // 기본값을 거짓으로 두는 이유는 주소 오타가 조용히 새 저장소를 만들지 않게 하려는 것
   const [createRepo, setCreateRepo] = useState(false)
 
@@ -116,7 +119,7 @@ export function ProjectInit({
         {!server && (
           <label className="chk">
             <input type="checkbox" data-el="2.6" checked={createRepo} onChange={(e) => setCreateRepo(e.target.checked)} />{' '}
-            저장소가 없으면 새로 만든다 <span className="lbl">(공개로 만들어집니다)</span>
+            저장소가 없으면 새로 만든다 <span className="lbl">({repoPrivate ? '비공개' : '공개'}로 만들어집니다)</span>
           </label>
         )}
         {/* 등록하면 저장소에 무엇이 생기는지. 기존 명세가 발견되면(빈 저장소가 아니면) 감춘다.

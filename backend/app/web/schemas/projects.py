@@ -97,5 +97,5 @@ class InitProject(BaseModel):
     code: str = Field(pattern=r"^[A-Z]{1,4}$")
     name: str = Field(max_length=100)
     import_existing: bool = False
-    # 저장소가 없으면 공개로 만든다. 이미 있으면 만들지 않는다 (카드 F)
+    # 저장소가 없으면 만든다 — 비공개가 기본(GITHUB_REPO_PRIVATE, #310). 있으면 안 만든다 (카드 F)
     create_repo: bool = False
