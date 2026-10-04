@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -459,6 +459,10 @@ sequenceDiagram
     GHI-->>AS: access_token
     AS->>GHI: get_user(access_token)
     GHI-->>AS: {id, login, name}
+    alt login이 허용 목록(ALLOWED_LOGINS) 밖 — 카드 BP
+        AS-->>RA: login-not-allowed (사용자·토큰을 남기지 않는다)
+        RA-->>U: 302 /login?denied=1
+    end
     AS->>DB: User upsert by github_user_id (login 바뀌었으면 갱신)
     AS->>AS: encrypt(access_token, 앱 비밀키)
     AS->>DB: users.github_token_encrypted
@@ -467,7 +471,7 @@ sequenceDiagram
     RA-->>U: 302 next 또는 /
 ```
 
-**읽을 때 볼 것** — `github_user_id`로 upsert한다. 로그인 ID를 바꾼 사람도 같은 User다(DD users). `redirect_uri`를 보내므로 OAuth 앱 하나에 콜백을 여럿(로컬·공개) 등록해도 요청한 주소로 돌아온다(인프라 5장).
+**읽을 때 볼 것** — 허용 목록은 GitHub이 알려 준 login으로 **upsert 전에** 본다 — 목록 밖 계정은 행도 토큰도 남지 않는다(카드 BP). 설정이 비면 누구나다. `github_user_id`로 upsert한다. 로그인 ID를 바꾼 사람도 같은 User다(DD users). `redirect_uri`를 보내므로 OAuth 앱 하나에 콜백을 여럿(로컬·공개) 등록해도 요청한 주소로 돌아온다(인프라 5장).
 
 ---
 
