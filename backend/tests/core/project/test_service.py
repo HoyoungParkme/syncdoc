@@ -452,6 +452,24 @@ async def test_ensure_hook_records_error_and_then_succeeds(
     assert (r3.hook, r3.created) == ("ok", False)
 
 
+async def test_remove_hook_none_ok_and_error(scoped: Session, repos: dict, mock_github) -> None:
+    """카드 BQ — 통지가 없으면 none(GitHub 안 부름) · 있으면 지우고 ok · 권한 없으면 error, hook_id 그대로."""
+    ps, user = _registered(scoped, repos)
+    calls = mock_github(lambda req: httpx.Response(204))
+    assert (await ps.remove_hook("EXMP", user)).hook == "none" and calls == []
+    repo = ps.get_owned("EXMP", user).repository
+    repo.hook_id = 77
+    mock_github(lambda req: httpx.Response(403, json={"message": "Forbidden"}))
+    r = await ps.remove_hook("EXMP", user)
+    assert r.hook == "error" and "403" in (r.hook_error or "") and repo.hook_id == 77
+    calls = mock_github(lambda req: httpx.Response(204))
+    r = await ps.remove_hook("EXMP", user)
+    assert (r.hook, r.hook_error, r.created) == ("ok", None, False) and repo.hook_id is None
+    assert (calls[-1].method, calls[-1].url.path) == ("DELETE", "/repos/o/r/hooks/77")
+    with pytest.raises(NotFound):
+        await ps.remove_hook("EXMP", make_user(scoped, login="stranger"))
+
+
 async def test_sync_now_reads_pending_and_touches_fetched_at(scoped: Session, repos: dict) -> None:
     ps, user = _registered(scoped, repos)
     g(repos["other"], "pull", "-q", "--rebase", "origin", "main")

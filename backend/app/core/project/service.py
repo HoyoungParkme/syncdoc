@@ -407,6 +407,25 @@ class ProjectService:
         self.session.flush()
         return HookStatus("ok", None, created=had != hook_id)
 
+    async def remove_hook(self, code: str, user: User) -> HookStatus:
+        """SYNC-MS-001#ProjectService.remove_hook
+
+        ensure_hook의 반대 — 서버 저장으로 옮길 때 GitHub의 push 통지를 거둔다(카드 BQ). 실패는
+        예외로 올리지 않고 상태로 돌려준다 — 옮기기는 통지를 못 거둬도 계속한다(UC-H22 5a).
+        """
+        repo = self.get_owned(code, user).repository
+        if repo.storage == Storage.server or repo.hook_id is None:
+            return HookStatus("none", None, created=False)
+        owner_name, repo_name = _split_remote(repo.remote_url)
+        try:
+            token = AccountService.github_token_for(user)
+            await github.delete_hook(token, owner_name, repo_name, repo.hook_id)
+        except Unauthorized as e:
+            return HookStatus("error", str(e)[:300], created=False)
+        repo.hook_id, repo.hook_error = None, None
+        self.session.flush()
+        return HookStatus("ok", None, created=False)
+
     async def sync_now(self, code: str, user: User) -> SyncResult:
         """SYNC-MS-001#ProjectService.sync_now"""
         from app.core import pipeline  # 서비스가 pipeline을 부르는 유일한 곳(DOM-002 3.2)
