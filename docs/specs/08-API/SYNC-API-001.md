@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -258,7 +258,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
               create_repo:
                 type: boolean
                 default: false
-                description: "저장소가 없으면 공개 저장소로 만든다. 이미 있으면 만들지 않는다 ([[SYNC-CODE-001#F]]). GitHub 저장만"
+                description: "저장소가 없으면 만든다 — 비공개가 기본(설정 GITHUB_REPO_PRIVATE, 공개는 서버가 거짓으로 명시할 때만, #310). 이미 있으면 만들지 않고 공개 여부도 바꾸지 않는다 ([[SYNC-CODE-001#F]]). GitHub 저장만"
     responses:
       '201':
         content:
@@ -1678,6 +1678,9 @@ components:
             type: string
             enum: [internet, closed]
             description: 판(설정 EDITION). closed면 로그아웃·커밋 이메일이 없다 ([[SYNC-PRD-001#R15]])
+          repo_private:
+            type: boolean
+            description: 싱크독이 만드는 GitHub 저장소가 비공개인가(설정 GITHUB_REPO_PRIVATE, 기본 참). UI-3 2.6이 「비공개로/공개로 만들어집니다」를 고른다 (#310)
     Author:
       type: object
       description: 버전의 작성 주체. 에이전트면 instructed_by가 있다
