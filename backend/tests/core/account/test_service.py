@@ -106,6 +106,23 @@ def test_authenticate_token_none_for_revoked_typo_or_expired(db_session: Session
     assert svc.authenticate_token(future.raw).id == u.id
 
 
+def test_authenticate_token_none_when_owner_left_allowlist(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """카드 BP — 주인이 허용 목록 밖이면 None이고 사용 흔적(last_used_at)도 안 남는다."""
+    svc = AccountService(db_session)
+    u = make_user(db_session, login="stranger")
+    issued = svc.issue_token(u, "x")
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "hoyoung")
+    assert svc.authenticate_token(issued.raw) is None
+    assert issued.token.last_used_at is None
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "Stranger")  # 대소문자 무시
+    assert svc.authenticate_token(issued.raw).id == u.id
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "hoyoung")
+    monkeypatch.setattr(settings, "EDITION", "closed")  # 폐쇄망판은 목록을 보지 않는다
+    assert svc.authenticate_token(issued.raw).id == u.id
+
+
 # ── user_by_login ──
 def test_user_by_login_returns_placeholder_too(db_session: Session) -> None:
     svc = AccountService(db_session)
