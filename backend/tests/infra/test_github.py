@@ -154,3 +154,18 @@ async def test_get_user_uses_bearer_and_falls_back_name_to_login(mock_github) ->
     mock_github(lambda r: httpx.Response(401, json={"message": "Bad credentials"}))
     with pytest.raises(Unauthorized):
         await gh.get_user("bad")
+
+
+# ── delete_hook (카드 BQ) ──
+@pytest.mark.parametrize("status", [204, 404])
+async def test_delete_hook_done_when_deleted_or_already_gone(mock_github, status: int) -> None:
+    calls = mock_github(lambda req: httpx.Response(status))
+    await gh.delete_hook("t", "o", "r", 77)
+    assert [(c.method, c.url.path) for c in calls] == [("DELETE", "/repos/o/r/hooks/77")]
+
+
+async def test_delete_hook_forbidden_is_unauthorized(mock_github) -> None:
+    mock_github(lambda req: httpx.Response(403, json={"message": "Forbidden"}))
+    with pytest.raises(Unauthorized) as ei:
+        await gh.delete_hook("t", "o", "r", 77)
+    assert "403" in str(ei.value)

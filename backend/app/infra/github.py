@@ -138,3 +138,20 @@ async def create_hook(token: str, owner: str, name: str, url: str, secret: str) 
             detail = r.text[:200]
         raise Unauthorized(f"{r.status_code} {detail}".strip())
     return int(r.json()["id"])
+
+
+async def delete_hook(token: str, owner: str, name: str, hook_id: int) -> None:
+    """SYNC-MS-009#github.delete_hook
+
+    push 통지를 지운다(카드 BQ). 이미 없으면(404) 그대로 끝 — 같은 인자로 두 번 불러도 결과가 같다.
+    """
+    auth = {"Authorization": f"Bearer {token}", **_HDR}
+    async with httpx.AsyncClient() as client:
+        r = await client.delete(f"{_API}/repos/{owner}/{name}/hooks/{hook_id}", headers=auth)
+    if r.status_code in (204, 404):
+        return
+    try:
+        detail = r.json().get("message", "")
+    except Exception:  # noqa: BLE001 — 본문이 JSON이 아니어도 상태 코드는 알린다
+        detail = r.text[:200]
+    raise Unauthorized(f"{r.status_code} {detail}".strip())
