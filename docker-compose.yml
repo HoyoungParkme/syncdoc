@@ -4,7 +4,7 @@ services:
     build: .
     restart: unless-stopped  # Docker Desktop이 뜨면 같이 뜬다 — 재부팅을 넘긴다 (#284)
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"  # 이 PC에만 — 바깥은 터널(app 네트워크 안쪽)로만 들어온다 (카드 BP)
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://syncdoc:${POSTGRES_PASSWORD:-syncdoc}@db:5432/syncdoc
@@ -24,7 +24,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-syncdoc}
       POSTGRES_DB: syncdoc
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"  # 이 PC에만 (카드 BP)
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
