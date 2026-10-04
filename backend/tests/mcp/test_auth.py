@@ -35,6 +35,21 @@ def test_mcp_requires_valid_bearer(client: TestClient, db_session: Session, scop
     assert client.get("/health").status_code == 200  # /mcp 밖은 인증 없음
 
 
+def test_mcp_token_of_user_outside_allowlist_is_401(
+    client: TestClient, db_session: Session, scoped, monkeypatch
+) -> None:
+    """카드 BP — 토큰 주인이 허용 목록 밖이면 MCP도 401. 목록에 넣으면 다시 된다."""
+    from app.config import settings
+
+    u = make_user(db_session, login="stranger")
+    live = AccountService(db_session).issue_token(u, "cc")
+    auth = {**HDR, "Authorization": f"Bearer {live.raw}"}
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "hoyoung")
+    assert client.post("/mcp", json=INIT, headers=auth).status_code == 401
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "hoyoung,stranger")
+    assert client.post("/mcp", json=INIT, headers=auth).status_code == 200
+
+
 def test_successful_call_commits_last_used_at(
     client: TestClient, db_session: Session, monkeypatch
 ) -> None:

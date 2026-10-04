@@ -14,7 +14,7 @@ from app.config import settings
 from app.core.account.models import AccessToken, CommitEmail, User
 from app.core.account.repository import AccountRepository
 from app.core.clock import now_utc
-from app.core.errors import EmailTaken, NotFound, Unauthorized
+from app.core.errors import EmailTaken, LoginNotAllowed, NotFound, Unauthorized
 from app.core.types import IssuedToken, UserKind, UserRef
 from app.infra import github
 
@@ -48,6 +48,8 @@ class AccountService:
         """SYNC-MS-006#AccountService.login_github"""
         token = await github.exchange_code(code, redirect_uri)
         info = await github.get_user(token)
+        if not settings.login_allowed(info.login):
+            raise LoginNotAllowed(info.login)  # 행도 토큰도 남기지 않는다 (카드 BP)
         u = self.repo.user_by_github_user_id(info.id)
         if u is not None:
             u.github_login, u.display_name = info.login, info.name
@@ -97,9 +99,12 @@ class AccountService:
         t = self.repo.token_by_hash(_sha256(raw))
         if t is None or t.revoked_at or (t.expires_at and t.expires_at < now_utc()):
             return None
+        u = self.repo.user_by_id(t.user_id)
+        if u is None or not settings.login_allowed(u.github_login):
+            return None  # 허용 목록에서 뺀 사람의 토큰은 바로 막힌다 — 흔적도 안 남긴다 (카드 BP)
         t.last_used_at = now_utc()  # 통과한 요청만. 만료가 없어 이게 유일한 사용 흔적
         self.session.flush()
-        return self.repo.user_by_id(t.user_id)
+        return u
 
     def user_by_login(self, login: str) -> User | None:
         """SYNC-MS-006#AccountService.user_by_login"""

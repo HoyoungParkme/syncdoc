@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import AccountService, _fernet
-from app.core.errors import EmailTaken, NotFound, Unauthorized
+from app.core.errors import EmailTaken, LoginNotAllowed, NotFound, Unauthorized
 from tests.conftest import github_ok
 
 
@@ -106,6 +106,23 @@ def test_authenticate_token_none_for_revoked_typo_or_expired(db_session: Session
     assert svc.authenticate_token(future.raw).id == u.id
 
 
+def test_authenticate_token_none_when_owner_left_allowlist(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """카드 BP — 주인이 허용 목록 밖이면 None이고 사용 흔적(last_used_at)도 안 남는다."""
+    svc = AccountService(db_session)
+    u = make_user(db_session, login="stranger")
+    issued = svc.issue_token(u, "x")
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "hoyoung")
+    assert svc.authenticate_token(issued.raw) is None
+    assert issued.token.last_used_at is None
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "Stranger")  # 대소문자 무시
+    assert svc.authenticate_token(issued.raw).id == u.id
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "hoyoung")
+    monkeypatch.setattr(settings, "EDITION", "closed")  # 폐쇄망판은 목록을 보지 않는다
+    assert svc.authenticate_token(issued.raw).id == u.id
+
+
 # ── user_by_login ──
 def test_user_by_login_returns_placeholder_too(db_session: Session) -> None:
     svc = AccountService(db_session)
@@ -186,6 +203,32 @@ async def test_login_github_bad_code_is_unauthorized(db_session: Session, mock_g
             "bad", "state", "http://testserver/auth/github/callback"
         )
     assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 0
+
+
+@pytest.mark.parametrize("login", ["stranger", "HOYOUNG-x"])
+async def test_login_github_outside_allowlist_leaves_nothing(
+    db_session: Session, mock_github, monkeypatch: pytest.MonkeyPatch, login: str
+) -> None:
+    """카드 BP — 허용 목록 밖이면 login-not-allowed. 행도 토큰도 남지 않는다."""
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "Hoyoung, hypark-df")
+    mock_github(github_ok(77, login, "남"))
+    with pytest.raises(LoginNotAllowed) as ei:
+        await AccountService(db_session).login_github("c", "s", "http://testserver/cb")
+    assert ei.value.extra["login"] == login and ei.value.status == 403
+    assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 0
+
+
+async def test_login_github_allowlist_ignores_case_and_empty_means_everyone(
+    db_session: Session, mock_github, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """카드 BP — 대소문자가 달라도 목록 안이면 된다 · 목록이 비면 누구나(예전 동작)."""
+    svc = AccountService(db_session)
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "Hoyoung,hypark-df")
+    mock_github(github_ok(42, "hoyoung", "박호영"))
+    assert (await svc.login_github("c", "s", "http://testserver/cb")).github_login == "hoyoung"
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "")
+    mock_github(github_ok(77, "anyone", "누구"))
+    assert (await svc.login_github("c", "s", "http://testserver/cb")).github_login == "anyone"
 
 
 # ── users_by_ids ──

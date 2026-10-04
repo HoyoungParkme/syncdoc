@@ -130,6 +130,9 @@ def current_user(request: Request, session: Session = Depends(get_session)) -> U
     user = AccountService(session).user_by_login(login_) if login_ else None
     if user is None:
         raise Unauthorized("세션 없음")
+    if not settings.login_allowed(user.github_login):
+        request.session.clear()  # 허용 목록에서 뺀 사람의 세션은 비운다 (카드 BP)
+        raise Unauthorized("허용되지 않은 계정")
     return user
 
 

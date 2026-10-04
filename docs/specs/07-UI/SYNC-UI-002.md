@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -1358,11 +1358,14 @@ status: draft
   .login .desc{margin:14px 0 26px;font-size:14.5px;line-height:1.7;color:var(--ink3)}
   .login .b{width:100%;height:42px;font-size:14.5px;font-weight:600}
   .login .cap{margin-top:14px}
+  .login .deny{margin:0 0 18px;font-size:13px;line-height:1.6;color:var(--danger)}
 </style>
 <div class="sd"><!-- 상단 바가 없는 유일한 화면. 카드 없이 앱 배경 위에 세로 가운데 -->
   <div class="login" data-el="1">
     <div class="logo">싱크독<span class="m">SyncDoc</span></div>
     <p class="desc" data-el="1.1">개발자가 PM 없이 11단계 명세 체인을 쓰고,<br>에이전트가 그 명세를 따르게 하는 플랫폼</p>
+    <!-- ?denied=1일 때만 (카드 BP) -->
+    <p class="deny" data-el="4">이 GitHub 계정은 이 싱크독에 들어올 수 없습니다.<br>다른 계정으로 들어오려면 GitHub에서 로그아웃한 뒤 다시 누르세요</p>
     <a class="b solid" data-el="2">GitHub로 로그인</a>
     <p class="cap" data-el="3">로그인 후 원래 가려던 화면으로 돌아갑니다</p>
   </div>
@@ -1377,6 +1380,7 @@ status: draft
 | 1.1 | 한 줄 설명 | 텍스트 | 이 도구가 무엇인지 | — |
 | 2 | GitHub로 로그인 | 버튼 | | GitHub OAuth 동의 화면으로. 범위 `repo admin:repo_hook` — 비공개 저장소를 만들고 읽는다([[SYNC-INFRA-001]] 5장, #310). 범위를 넓히기 전에 로그인한 사람은 다시 로그인해야 새 범위다 |
 | 3 | 복귀 안내 | 텍스트 | 원래 URL이 있었으면 그리로 간다는 안내 | — |
+| 4 | 거절 안내 | 텍스트 | 허용 목록 밖 계정으로 로그인해 돌아왔을 때만(`?denied=1`) — 「이 GitHub 계정은 이 싱크독에 들어올 수 없습니다」와 다른 계정으로 들어오는 법. 위험 색(카드 BP) | — |
 
 ### 규칙
 
@@ -1388,7 +1392,8 @@ status: draft
 - 복귀 안내(3)는 버튼보다 한 단계 낮은 캡션이다. 누를 것이 아니라 알림이다
 - OAuth 성공 → 원래 가려던 URL. 없으면 UI-2
 - OAuth 토큰은 앱 비밀키로 암호화해 저장한다(인프라 5장). 이 화면은 그 사실을 보여주지 않는다
-- 누구나 GitHub 계정이면 들어온다. 그런데 보이는 것은 자기가 등록한 프로젝트뿐이라([[SYNC-PRD-001#R12]]), 등록한 것이 없는 계정은 로그인은 되지만 UI-2가 빈 상태(3)다
+- **허용 목록 안 계정만 들어온다**(설정 `ALLOWED_LOGINS`, 카드 BP — 비면 GitHub 계정이면 누구나). 목록 밖이면 GitHub 동의 뒤 이 화면으로 돌아와 거절 안내(4)를 본다 — 계정은 만들어지지 않는다. GitHub이 같은 계정으로 바로 다시 들여보내므로, 다른 계정으로 들어오려면 GitHub에서 먼저 로그아웃해야 한다고 4가 말한다
+- 보이는 것은 자기가 등록한 프로젝트뿐이라([[SYNC-PRD-001#R12]]), 등록한 것이 없는 계정은 로그인은 되지만 UI-2가 빈 상태(3)다
 
 ### 시나리오
 
@@ -1401,6 +1406,11 @@ status: draft
 1. 예전에 저장해 둔 `…/d/SYNC-PRD-001` 링크를 열었는데 로그인이 안 되어 있다
 2. 이 화면으로 온다. 로그인한다
 3. 원래 링크의 UI-5로 간다
+
+**S-3 허용되지 않은 계정으로 로그인한다** — 카드 BP
+1. 허용 목록 밖 GitHub 계정으로 GitHub로 로그인(2)을 누르고 동의한다
+2. 이 화면으로 돌아와 거절 안내(4)가 보인다. 싱크독에 그 계정이 생기지 않는다
+3. GitHub에서 로그아웃하고 허용된 계정으로 다시 누르면 UI-2로 간다
 
 ---
 

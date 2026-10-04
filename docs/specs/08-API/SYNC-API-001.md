@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -22,6 +22,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ## 1. 규칙
 
 - 인증은 세션 쿠키. GitHub OAuth로 로그인하면 서버가 세션을 만든다. 미인증이면 401
+- **허용 목록**(설정 `ALLOWED_LOGINS`, 카드 BP) — 목록 밖 계정은 로그인이 거절되고(콜백이 302 `/login?denied=1`), 이미 있는 세션도 401이며 세션을 비운다. 개인 토큰(MCP·git 입구)도 주인이 목록 밖이면 401. 설정이 비면 누구나
 - **폐쇄망판**([[SYNC-PRD-001#R15]])은 로그인이 없다 — 세션 없이 모든 요청이 로컬 사용자다. 대신 요청 Host가 허용 목록 밖이거나 쓰기 요청의 Origin이 다른 곳이면 `forbidden-origin` 403([[SYNC-INFRA-001]] 5장). `/auth/github*`·`/hooks/github`는 없다(404). MCP·git은 인터넷판처럼 토큰
 - 에러는 RFC 9457 `application/problem+json`. `type`은 `urn:syncdoc:{종류}`. 종류별 확장 필드는 2장
 - 모든 시각은 ISO 8601 UTC
@@ -51,7 +52,8 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 | type | status | 언제 | 확장 필드 | 유스케이스 |
 |---|---|---|---|---|
-| `urn:syncdoc:unauthorized` | 401 | 세션 없음 | — | — |
+| `urn:syncdoc:unauthorized` | 401 | 세션 없음 · 세션 주인이 허용 목록 밖(카드 BP) | — | — |
+| `urn:syncdoc:login-not-allowed` | 403 | 허용 목록(`ALLOWED_LOGINS`) 밖 GitHub 계정의 로그인 — 콜백 라우터가 302 `/login?denied=1`로 바꾸므로 브라우저는 이것을 JSON으로 보지 않는다(카드 BP) | `login` | [[SYNC-SEQ-001#SEQ-8]] |
 | `urn:syncdoc:not-found` | 404 | 문서·항목·프로젝트·파일 없음. **API 경로**가 없을 때도 — `/api`·`/auth`·`/hooks`·`/mcp` 아래 없는 경로는 메서드와 무관하게 이것이다(`resource: "path"`, `id`는 요청 경로) | `resource`, `id` | [[SYNC-UC-001#UC-A2]] 1a |
 | `urn:syncdoc:method-not-allowed` | 405 | 경로는 있는데 그 메서드는 없다. 응답 헤더 `Allow`도 같은 값 | `allow: [메서드…]` — 그 경로의 라우트 전부 | — |
 | `urn:syncdoc:item-deleted` | 410 | 삭제된 항목 조회 | `deleted_at` | [[SYNC-UC-001#UC-A3]] 1a |
@@ -138,7 +140,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
         type: string
     responses:
       '302':
-        description: next 또는 / 로
+        description: next 또는 / 로. 허용 목록 밖 계정이면 /login?denied=1 로 — 사용자·토큰을 남기지 않는다(카드 BP)
 ```
 
 #### POST/auth/logout 세션 종료
