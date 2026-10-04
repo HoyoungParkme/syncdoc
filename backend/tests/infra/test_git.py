@@ -243,6 +243,19 @@ async def test_clone_bare_copies_branches_and_tags_without_remote(
         assert git(dest, "config", key) == "true"
 
 
+async def test_set_origin_then_fetch_reads_the_new_remote(
+    repos: dict[str, Path], tmp_path: Path
+) -> None:
+    """원격 주소만 바꾸고, 그 뒤 fetch가 새 원격의 main을 읽는다."""
+    dest = tmp_path / "origins" / "EXMP.git"
+    await g.clone_bare(str(repos["remote"]), dest, None)
+    write_commit_push(repos["other"], SEED, "v2", "밖에서")  # 옛 원격만 앞선다
+    await g.set_origin(repos["work"], str(dest))
+    assert git(repos["work"], "remote", "get-url", "origin") == str(dest)
+    assert await g.fetch(repos["work"]) == git(dest, "rev-parse", "main")
+    assert git(dest, "rev-parse", "main") != git(repos["remote"], "rev-parse", "main")
+
+
 # ── init_bare (카드 BA) ──
 async def test_init_bare_is_main_and_refuses_rewrites(tmp_path: Path) -> None:
     origin = tmp_path / "o" / "X.git"  # 상위 폴더가 없어도 만든다

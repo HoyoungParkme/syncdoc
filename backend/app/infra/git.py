@@ -112,6 +112,14 @@ async def fetch(workdir: Path, user: User | None = None) -> str:
     return (await _run(workdir, "rev-parse", "origin/main")).strip()
 
 
+async def set_origin(workdir: Path, url: str) -> None:
+    """SYNC-MS-009#git.set_origin
+
+    작업 사본의 원격만 바꾼다(카드 BQ) — 받아 오기는 fetch가 한다. 되돌릴 때도 이 함수 하나다.
+    """
+    await _run(workdir, "remote", "set-url", "origin", url)
+
+
 async def checkout(workdir: Path, ref: str) -> None:
     """SYNC-MS-009#git.checkout"""
     await _run(workdir, "checkout", "--force", ref)
