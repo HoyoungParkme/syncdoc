@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -67,7 +67,8 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:existing-specs` | 409 | `docs/specs/` 이미 있음. 서버 저장이면 같은 코드의 **보관된 저장소**가 있음 | `doc_count` · `archived_at`(보관본일 때만, 가장 최근 것을 보관한 때) | [[SYNC-UC-001#UC-A1]] 3a, 3b |
 | `urn:syncdoc:storage-unavailable` | 422 | 이 서버에서 켜지 않은 저장 방식으로 프로젝트를 만들려 함 | `storage` · `enabled: [켜진 방식…]` | [[SYNC-UC-001#UC-A1]] 1a |
 | `urn:syncdoc:forbidden-origin` | 403 | 폐쇄망판에서 요청 Host가 허용 목록 밖이거나, 쓰기 요청의 Origin이 이 서버가 아니다 — 로그인이 없는 웹을 다른 이름·다른 사이트가 부르는 것을 막는다 | `host` 또는 `origin` | [[SYNC-PRD-001#R15]] |
-| `urn:syncdoc:storage-mismatch` | 409 | 서버 저장 프로젝트에만 되는 일을 GitHub 저장 프로젝트에 — 코드 올리기 | `storage` | [[SYNC-UC-001#UC-A10]] 1a |
+| `urn:syncdoc:storage-mismatch` | 409 | 서버 저장 프로젝트에만 되는 일을 GitHub 저장 프로젝트에 — 코드 올리기. 또는 이미 서버 저장인 프로젝트를 서버 저장으로 옮기려 함(카드 BQ) | `storage` | [[SYNC-UC-001#UC-A10]] 1a, [[SYNC-UC-001#UC-H22]] 2b |
+| `urn:syncdoc:origin-exists` | 409 | 서버 저장으로 옮기려는데 그 코드의 서버 저장소 자리(`ORIGINS_DIR/{코드}.git`)에 이미 무언가 있다 — 지난 실패의 찌꺼기나 사람이 둔 것. 아무것도 지우지 않는다(카드 BQ) | `path` | [[SYNC-UC-001#UC-H22]] 2c |
 | `urn:syncdoc:upload-too-large` | 413 | 코드 올리기 한도 초과 — UTF-8 합 5MB 또는 파일+지운 경로 500개. 나눠 보낸다 | `limit` · `size` · `count` | [[SYNC-UC-001#UC-A10]] 2a |
 | `urn:syncdoc:upload-path-refused` | 422 | 올릴 수 없는 경로 — 절대 경로·`..`·`.git` 조각·명세 경로(`docs/specs/`)·비밀 꼴·글자가 아닌 내용·폴더와 겹침. **하나라도 있으면 아무것도 안 올린다** | `paths: [{path, reason}]` | [[SYNC-UC-001#UC-A10]] 2b |
 | `urn:syncdoc:repo-create-failed` | 424 | `create_repo`로 저장소를 못 만듦 — 이름 규칙·권한·다른 소유자 점유 | `reason` | [[SYNC-CODE-001#F]] |
@@ -1406,6 +1407,35 @@ MINISPEC 항목인데 코드에 함수가 없으면 `function: null`·`missing: 
         $ref: '#/components/responses/Problem'
 ```
 
+#### POST/api/admin/repos/{code}/move-to-server 서버 저장으로 옮긴다
+
+화면 — (관리 API만, 카드 BQ) · 유스케이스 [[SYNC-UC-001#UC-H22]] · 서비스 [[SYNC-MS-007#pipeline.move_to_server]]
+
+```yaml
+/api/admin/repos/{code}/move-to-server:
+  post:
+    summary: >
+      GitHub 저장 프로젝트를 서버 저장으로 옮긴다 ([[SYNC-UC-001#UC-H22]]). 저장소를 가지·태그·커밋 해시
+      그대로 서버 안에 복제하고 push 통지를 거둔 뒤 작업 사본의 원격과 저장 방식을 바꾼다. DB(버전·상태
+      이력·대화·코드 그래프)는 그대로다. 실패하면 아무것도 바뀌지 않는다. 소유자만. 화면이 없다.
+      409는 storage-mismatch(이미 서버 저장)·origin-exists(자리에 무언가 있다), 424는 push-failed(복제 실패·
+      처리 지점이 복제본에 없음)
+    parameters:
+    - $ref: '#/components/parameters/code'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveResult'
+      '404':
+        $ref: '#/components/responses/Problem'
+      '409':
+        $ref: '#/components/responses/Problem'
+      '424':
+        $ref: '#/components/responses/Problem'
+```
+
 ---
 
 #### POST/api/admin/repos/{code}/sync 지금 가져오기
@@ -2169,6 +2199,18 @@ components:
         created:
           type: boolean
           description: 이번에 새로 걸었나. 이미 있었으면 false
+    MoveResult:
+      type: object
+      description: 서버 저장으로 옮긴 결과 (카드 BQ)
+      properties:
+        origin:
+          type: string
+          description: 서버 저장소 자리(ORIGINS_DIR/{코드}.git)
+        head:
+          type: string
+          description: 옮긴 뒤 origin/main 커밋
+        hook:
+          $ref: '#/components/schemas/HookStatus'
     SyncResult:
       type: object
       properties:
