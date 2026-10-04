@@ -12,6 +12,7 @@ import asyncio
 import fnmatch
 import logging
 import re
+import shutil
 import tempfile
 import time
 from pathlib import Path, PurePosixPath
@@ -19,6 +20,7 @@ from pathlib import Path, PurePosixPath
 from sqlalchemy.orm import Session
 
 from app import db
+from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import AccountService
 from app.core.clock import now_utc
@@ -35,7 +37,9 @@ from app.core.errors import (
     DocumentTrashed,
     ItemDeletionNeedsConfirm,
     NotFound,
+    OriginExists,
     PreconditionUnmet,
+    PushFailed,
     RebuildFailed,
     StatusBlocked,
     StorageMismatch,
@@ -56,6 +60,7 @@ from app.core.types import (
     DocType,
     DocumentSummary,
     Entry,
+    MoveResult,
     RebuildResult,
     SaveResult,
     Storage,
@@ -616,6 +621,54 @@ async def upload_code(
         commit = await git.commit_push(workdir, message, author, files=files, delete=delete)
     await read_pending(code, author.user)  # 6 — 처리 지점·코드 그래프
     return UploadResult(commit, commit != before, len(files), len(delete))
+
+
+async def move_to_server(code: str, user: User) -> MoveResult:
+    """SYNC-MS-007#pipeline.move_to_server
+
+    GitHub 저장을 서버 저장으로 옮긴다(카드 BQ, UC-H22). 저장소는 가지·태그를 커밋 해시 그대로
+    복제하고 DB는 건드리지 않는다 — 버전·이력·대화·코드 그래프가 해시에 기댄다. 읽기·쓰기 락을
+    함께 잡아 저장과 fetch가 옛 원격과 새 원격 사이에 끼어들지 못하게 한다. 실패하면 되돌린다.
+    """
+    with db.session_scope() as s:
+        repo = ProjectService(s).get_owned(code, user).repository  # 0 — 남의 것이면 not-found
+        if repo.storage == Storage.server:
+            raise StorageMismatch(Storage.server.value, "이미 서버 저장이다")
+        repo_id, remote, workdir = repo.id, repo.remote_url, Path(repo.workdir_path)
+    origin = settings.ORIGINS_DIR / f"{code}.git"
+    if origin.exists():  # 2 — 지난 실패의 찌꺼기나 사람이 둔 것. 지우지 않는다
+        raise OriginExists(str(origin))
+    token = AccountService.github_token_for(user)  # 3 — 비공개 저장소도 복제한다
+    async with read_lock(code), _lock(code):  # 4 — 순서는 process_commit → save_pipeline과 같다
+        await git.fetch(workdir, user)  # 5
+        with db.session_scope() as s:
+            row = s.get(Repository, repo_id)
+            assert row is not None
+            last = row.last_processed_commit
+        try:
+            await git.clone_bare(remote, origin, token)  # 6
+            if last:  # 7 — 처리 지점이 복제본에 없으면 GitError
+                await git.rev_list_count(origin, last)
+        except git.GitError as e:
+            shutil.rmtree(origin, ignore_errors=True)  # 7a — 아무것도 바뀌지 않는다
+            raise PushFailed(f"clone: {e.stderr.strip()}") from e
+        with db.session_scope() as s:  # 8 — 실패는 상태로 받고 계속한다(5a)
+            hook = await ProjectService(s).remove_hook(code, user)
+            s.commit()
+        try:
+            await git.set_origin(workdir, str(origin))  # 9
+            head = await git.fetch(workdir)
+            with db.session_scope() as s:  # 10
+                row = s.get(Repository, repo_id)
+                assert row is not None
+                row.storage, row.remote_url = Storage.server.value, str(origin)
+                row.hook_id, row.hook_error = None, None
+                s.commit()
+        except Exception:
+            await git.set_origin(workdir, remote)  # 되돌린다 — 원격은 GitHub, 자리는 비운다
+            shutil.rmtree(origin, ignore_errors=True)
+            raise
+    return MoveResult(origin=str(origin), head=head, hook=hook)
 
 
 async def purge_document(doc_id: str, author: Author) -> None:

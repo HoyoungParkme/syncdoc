@@ -5,11 +5,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.core import pipeline
 from app.core.account.models import User
 from app.core.project.service import ProjectService
 from app.db import get_session
 from app.web.auth import current_user
-from app.web.schemas.ops import HookStatus, RebuildResult, RepoStatus, SyncResult
+from app.web.schemas.ops import HookStatus, MoveResult, RebuildResult, RepoStatus, SyncResult
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -46,3 +47,12 @@ async def sync(
 ) -> SyncResult:
     """SYNC-API-001#POST/api/admin/repos/{code}/sync"""
     return SyncResult.model_validate(await ProjectService(session).sync_now(code, user))
+
+
+@router.post("/repos/{code}/move-to-server", response_model=MoveResult)
+async def move_to_server(code: str, user: User = Depends(current_user)) -> MoveResult:
+    """SYNC-API-001#POST/api/admin/repos/{code}/move-to-server
+
+    GitHub 저장을 서버 저장으로 옮긴다(카드 BQ). 락·커밋·되돌리기는 pipeline이 한다.
+    """
+    return MoveResult.model_validate(await pipeline.move_to_server(code, user))

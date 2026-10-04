@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-007
 type: MS
 title: MINISPEC — pipeline — 쓰기 조율
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -36,6 +36,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#pipeline.restore_document]] | 휴지통에서 되살리기 |
 | [[#pipeline.purge_document]] | 완전 삭제 |
 | [[#pipeline.upload_code]] | 서버 저장소에 코드 올리기 |
+| [[#pipeline.move_to_server]] | GitHub 저장을 서버 저장으로 옮기기 |
 | [[#scheduler.catch_up]] | 밀린 커밋 따라잡기 |
 | [[#scheduler.poll_loop]] | 주기 폴링 |
 
@@ -484,6 +485,40 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 **호출하는 것** [[SYNC-MS-001#ProjectService.get]] · [[SYNC-MS-009#git.archive]] · [[SYNC-MS-011#codegraph.load]] · [[SYNC-MS-011#codegraph.reduce]] · [[SYNC-MS-011#codegraph.enrich]] · [[SYNC-MS-011#codegraph.communities]] · [[SYNC-MS-011#CodeGraphService.save]] · [[SYNC-MS-011#CodeGraphService.fail]]
 
 **테스트 관점** 로컬 bare origin에 파이썬 파일을 커밋 → 행 하나, `commit_hash`가 그 커밋, `source=server`, 함수가 있다 · 저장소에 `graphify-out/graph.json`을 커밋해 두면 `source=repo` · 추출이 실패하면 옛 그래프가 남고 `error` · 작업 사본에 `graphify-out/`이 생기지 않는다 · 함수마다 `community`가 있고 `communities`가 비어 있지 않다(카드 BD)
+
+---
+
+#### pipeline.move_to_server GitHub 저장을 서버 저장으로 옮기기
+
+**시그니처** `async def move_to_server(code: str, user: User) -> MoveResult`
+
+근거: [[SYNC-SEQ-001#SEQ-33]] · [[SYNC-UC-001#UC-H22]] · [[SYNC-API-001#POST/api/admin/repos/{code}/move-to-server]] · [[SYNC-PRD-001#R14]] · 카드 BQ(사용자 결정 2026-10-04 — DB는 그대로, 저장소는 커밋 해시까지 그대로, GitHub 웹훅은 거둔다)
+
+**처리**
+0. `project = ProjectService.get_owned(code, user)` — 남의 것이면 `! not-found {resource: project}` (2a)
+1. if `project.repository.storage == server` → `! storage-mismatch {storage: server}` 「이미 서버 저장이다」 (2b)
+2. `origin = ORIGINS_DIR/{code}.git` · if 있으면 → `! origin-exists {path}` — 지우지도 옮기지도 않는다 (2c)
+3. `token = AccountService.github_token_for(user)` — 없으면 `! unauthorized`. 비공개 저장소도 복제하려고 소유자 토큰으로
+4. **읽기 락 → 쓰기 락**(`read_lock(code)` 다음 `_lock(code)`) — fetch(폴링·웹훅)와 저장이 끼어들지 못한다. 순서는 `process_commit`이 `save_pipeline`을 부를 때와 같다
+5. `git.fetch(workdir, user)` — 작업 사본을 원격 최신으로
+6. `git.clone_bare(remote_url, origin, token)` — 가지·태그를 커밋 해시 그대로 · 실패하면 → 7a
+7. if `last_processed_commit`이 있으면 `git.rev_list_count(origin, last_processed_commit)` — 복제본에 없으면(GitError) → 7a
+   - 7a. `origin`을 지우고 `! push-failed {reason}` — 아무것도 바뀌지 않는다 (4a)
+8. `hook = ProjectService.remove_hook(code, user)` — 실패는 상태로 돌려받고 계속한다 (5a). GitHub 저장일 때 불러야 원격 주소로 소유자·이름을 안다
+9. `git.set_origin(workdir, origin)` · `head = git.fetch(workdir)` — 서버 저장소라 토큰이 필요 없다
+10. `DB: repositories update storage=server, remote_url=str(origin), hook_id=null, hook_error=null` · 커밋
+    - 9·10이 실패하면 → `git.set_origin(workdir, remote_url)`로 되돌리고 `origin`을 지운 뒤 다시 올린다
+11. `→ MoveResult(origin=str(origin), head, hook)`
+
+**출력** [[SYNC-API-001]] `MoveResult`
+
+**예외** `not-found`(0) · `storage-mismatch`(1) · `origin-exists`(2) · `unauthorized`(3) · `push-failed`(6·7)
+
+**DB는 건드리지 않는다.** 버전·상태 이력·대화·코드 그래프가 커밋 해시에 기대는데, 복제가 해시를 그대로 옮기므로 그대로 맞는다. 저장소 행의 저장 방식·원격·통지 칸만 바뀐다. GitHub 저장소 보관(비공개·archive)은 운영이 한다
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-006#AccountService.github_token_for]] · [[SYNC-MS-009#git.fetch]] [[SYNC-MS-009#git.clone_bare]] [[SYNC-MS-009#git.rev_list_count]] [[SYNC-MS-009#git.set_origin]] · [[SYNC-MS-001#ProjectService.remove_hook]]
+
+**테스트 관점** 옮긴 뒤 서버 저장소의 가지·태그가 원격과 같은 해시 · `storage=server`·`remote_url`이 서버 저장소·통지 칸이 빈다 · 작업 사본의 원격이 서버 저장소 · 문서·버전 수가 그대로 · 그 뒤 `read_pending`이 서버 저장소에서 읽는다 · 남의 것 → not-found · 이미 서버 → storage-mismatch · 자리에 무언가 있으면 origin-exists이고 그것을 안 건드린다 · 복제 실패 → push-failed, 자리·원격·DB 그대로 · 통지 거두기가 실패해도 옮긴다(결과에 error)
 
 ---
 

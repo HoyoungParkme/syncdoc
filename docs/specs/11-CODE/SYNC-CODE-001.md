@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1364,6 +1364,16 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | MS-006 테스트 관점 · 라우터: 목록 밖 콜백 → 302 `/login?denied=1`이고 사용자 행·토큰 없음 · 목록 밖 세션 → 401이고 세션 비움 · 목록 밖 주인의 토큰 → MCP 401 · 설정이 비면 누구나 · 대소문자 무시 · `check_ui` UI-1 · 운영: 허용 계정 로그인 그대로, 목록 밖 거절 |
 | 선행 | — |
 | 완료 | 2026-10-04 · 브랜치 `card/BP-login-allowlist`(21d635d #312) · spec 7 + code 7 · 테스트 430 · `ruff`·`tsc`·`oxlint`·`build` · `validate` 0/0 · `check_code` 162/162 · `check_calls` 0/0 · `check_ui` 14/14(UI-1 요소 5) · 운영: `.env`에 `ALLOWED_LOGINS=HoyoungParkme,hypark-df`(사용자가 넣음) 뒤 재생성 — 허용 HoyoungParkme·hypark-df, 거절 seonyoungyoo16·자리표시 · 기존 세션 그대로(`/api/me` 200) · 새 창 `/login?denied=1`에만 거절 안내(4) · 포트 `127.0.0.1:8000`·`127.0.0.1:5432`, 공개 주소 200(터널은 앱 안쪽) |
+
+#### BQ GitHub 저장 → 서버 저장으로 옮기기 — 이력·커밋 해시 그대로, 웹훅은 거둔다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UC-001#UC-H22]] · [[SYNC-SEQ-001#SEQ-33]] · [[SYNC-PRD-001#R14]] · 사용자 결정 2026-10-04(내 노트북에서 혼자 쓴다 — SYNC를 뺀 프로젝트는 GitHub를 빼고 이 서버의 저장소가 코드·명세 원본 · DB는 그대로 둔다(버전·상태 이력·대화) · 전환은 관리 API만, 화면 없음 · GitHub 웹훅은 거둔다 · GitHub 저장소는 운영에서 비공개로 보관) |
+| 구현 | [[SYNC-MS-007#pipeline.move_to_server]] · [[SYNC-MS-001#ProjectService.remove_hook]] · [[SYNC-MS-009#git.clone_bare]] · [[SYNC-MS-009#git.set_origin]] · [[SYNC-MS-009#github.delete_hook]] · 라우터 [[SYNC-API-001#POST/api/admin/repos/{code}/move-to-server]] · 새 오류 `origin-exists` · `storage-mismatch`에 「이미 서버 저장」 |
+| 테스트 | MS 테스트 관점 · 라우터 200·404·409 · 운영: 8개(CCR·HB·IMBC·INS·JSD·PAW·QBOT·VA)를 옮기고 HEAD·문서 수·버전 수·코드 그래프·fetch 오류 0을 옮기기 전과 대조 |
+| 선행 | BA(서버 저장) · BP |
+| 완료 | — |
 ---
 
 ## 2. 통합 테스트 시나리오

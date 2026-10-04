@@ -70,6 +70,14 @@ class HookStatus(Base):
     created: bool
 
 
+class MoveResult(Base):
+    """서버 저장으로 옮긴 결과 (카드 BQ)."""
+
+    origin: str
+    head: str
+    hook: HookStatus
+
+
 class SyncResult(Base):
     docs: int
     fetched_at: datetime | None

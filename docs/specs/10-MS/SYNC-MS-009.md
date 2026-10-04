@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-009
 type: MS
 title: MINISPEC — infra — git·github 어댑터
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -36,6 +36,8 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#git.exists]] | 경로 존재 |
 | [[#git.init_specs]] | 11단계 디렉터리·템플릿 |
 | [[#git.init_bare]] | 서버 저장소 만들기 |
+| [[#git.clone_bare]] | 원격을 서버 저장소로 통째로 복제 |
+| [[#git.set_origin]] | 작업 사본의 원격 바꾸기 |
 | [[#git.http_backend]] | 서버 저장소 git 입구 — git http-backend를 CGI로 |
 | [[#git.archive]] | 커밋의 파일을 폴더에 푼다 |
 | [[#git.changed_paths]] | 범위에서 바뀐 경로 전부 |
@@ -45,6 +47,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#github.get_user]] | token → 사용자 정보 |
 | [[#github.create_repo]] | 저장소 만들기 — 기본 비공개 |
 | [[#github.create_hook]] | push 통지 걸기 |
+| [[#github.delete_hook]] | push 통지 지우기 |
 | [[#llm.step]] | 모델 한 번 호출 + 도구 호출 파싱 |
 | [[#llm.step_stream]] | 스트림으로 한 번 호출 — 글자 조각과 끝의 LlmStep |
 | [[#graphify.extract]] | graphify로 코드만 추출 |
@@ -302,6 +305,40 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ---
 
+#### git.clone_bare 원격을 서버 저장소로 통째로 복제
+
+**시그니처** `async def clone_bare(remote_url: str, path: Path, token: str | None) -> None`
+
+근거: [[SYNC-SEQ-001#SEQ-33]] · [[SYNC-UC-001#UC-H22]] 4 · 카드 BQ
+
+**처리**
+1. 상위 디렉터리가 없으면 만든다
+2. `git clone --bare {url} {path}` — `url`은 `token`이 있고 https면 토큰을 붙인 것([[#git.clone]]과 같은 규칙). 가지·태그를 커밋 해시 그대로 옮긴다
+3. `git -C {path} remote remove origin` — **토큰이 든 주소를 남기지 않는다.** 서버 저장소에는 원격이 없다
+4. `git -C {path} symbolic-ref HEAD refs/heads/main` · [[#git.init_bare]]와 같은 receive 설정 셋 — 서버 저장소의 규칙이 같아진다
+
+**출력** 없음. 이미 있는지는 부르는 쪽이 먼저 본다([[SYNC-MS-007#pipeline.move_to_server]] 2). 실패는 `GitError`(토큰은 가린다)
+
+**호출하는 것** —
+
+**테스트 관점** 원격의 가지·태그가 같은 해시로 있다 · config에 원격·토큰이 없다 · HEAD가 `refs/heads/main` · receive 설정 셋
+
+---
+
+#### git.set_origin 작업 사본의 원격 바꾸기
+
+**시그니처** `async def set_origin(workdir: Path, url: str) -> None`
+
+근거: [[SYNC-SEQ-001#SEQ-33]] · [[SYNC-UC-001#UC-H22]] 6 · 카드 BQ
+
+**처리** `git remote set-url origin {url}` — 받아 오지는 않는다(부르는 쪽이 [[#git.fetch]]). 그래서 되돌릴 때도 같은 함수 하나다
+
+**호출하는 것** —
+
+**테스트 관점** 바꾼 뒤 `remote get-url origin`이 그 주소 · 그 뒤 fetch가 새 원격에서 받는다
+
+---
+
 #### git.http_backend 서버 저장소 git 입구
 
 **시그니처** `async def http_backend(root: Path, env: dict[str, str], body: AsyncIterator[bytes]) -> CgiResponse`
@@ -460,6 +497,17 @@ async def create_hook(token: str, owner: str, name: str, url: str, secret: str) 
 
 ---
 
+#### github.delete_hook push 통지 지우기
+
+**시그니처** `async def delete_hook(token: str, owner: str, name: str, hook_id: int) -> None`
+
+근거: [[SYNC-MS-001#ProjectService.remove_hook]] · [[SYNC-UC-001#UC-H22]] 5 · 카드 BQ
+
+**처리** `DELETE https://api.github.com/repos/{owner}/{name}/hooks/{hook_id}` (Bearer) · 204 → 끝 · **404 → 이미 없다, 끝**(같은 인자로 두 번 불러도 결과가 같다 — [[#github.create_hook]]과 같은 원칙) · 그 밖 → `! unauthorized {status message}`
+
+**호출하는 것** —
+
+**테스트 관점** 204 → 끝 · 404 → 끝 · 403 → unauthorized
 
 ---
 
