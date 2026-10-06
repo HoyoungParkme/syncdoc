@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -261,7 +261,10 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
               create_repo:
                 type: boolean
                 default: false
-                description: "저장소가 없으면 만든다 — 비공개가 기본(설정 GITHUB_REPO_PRIVATE, 공개는 서버가 거짓으로 명시할 때만, #310). 이미 있으면 만들지 않고 공개 여부도 바꾸지 않는다 ([[SYNC-CODE-001#F]]). GitHub 저장만"
+                description: "저장소가 없으면 만든다 — 공개 여부는 private로 고른다. 이미 있으면 만들지 않고 공개 여부도 바꾸지 않는다 ([[SYNC-CODE-001#F]]). GitHub 저장만"
+              private:
+                type: boolean
+                description: "create_repo로 새로 만들 저장소의 공개 여부. 참이면 비공개, 거짓이면 공개. **빼면 서버 기본값**(설정 GITHUB_REPO_PRIVATE, 기본 비공개) — 카드 BS. 이미 있는 저장소에는 아무 일도 하지 않는다"
     responses:
       '201':
         content:
