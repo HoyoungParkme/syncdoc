@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1403,6 +1403,16 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | MS 테스트 관점 · 라우터 200·404·409·422 · 운영: 8개(CCR·HB·IMBC·INS·JSD·PAW·QBOT·VA)를 GitHub 보관을 푼 뒤 옮기고 GitHub `main`·가지·태그가 서버 저장소와 같은 해시 · 문서 수·버전 수가 옮기기 전과 같음 · 웹훅 · fetch 오류 0 |
 | 선행 | BQ · BS |
 | 완료 | 2026-10-07 · 브랜치 `card/BT-move-to-github`(65729cc #324) · spec 11 + code 5 · 테스트 459 · `ruff` · `validate` 0/0 · `check_code` 171/171 · `check_calls` 0/0 · `check_dom` 0 · 운영: 8개를 GitHub 보관을 푼 뒤 관리 API로 옮김 — 각 `head`가 옮기기 전 처리 지점과 같음, GitHub 가지·태그가 서버 저장소와 해시까지 같음(HB 1 · IMBC 1 · INS 1 · JSD 2 · PAW 2 · QBOT 2 · VA 11 · CCR 14), 문서·버전 수 그대로, fetch 오류 0, 웹훅 8, 서버 저장소 8개는 `_archive/`로 · 공개 여부는 사용자 결정대로(HB · IMBC · VA · CCR 공개, INS · JSD · PAW · QBOT 비공개) · CCR은 노트북 이전 병합 넷을 되돌린 뒤(명세 13문서 승인된 옛 글로) 옮기고 Pages(workflow) 다시 켜 200 · daily 다시 켬 · INS deploy 워크플로 끔 · 노트북 작업 사본 셋(QBOT · VA · CCR) 원격을 GitHub로, git 입구 토큰 폐기 · 찾은 것: 재구축이 파일을 지운 커밋에서 실패(#325) |
+
+#### BU 릴리즈 둘의 이름 — 싱크독_깃허브 · 싱크독_로컬, 한 PC에서 나란히
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-RFQ-001#Q8]] · [[SYNC-PRD-001#R15]] · [[SYNC-INFRA-001]] 5.2·5.3·8.1 · [[SYNC-UI-001]] 4장 · [[SYNC-UI-002#UI-13]] 8.1 · [[SYNC-UI-002#UI-16]] 6.2~6.6 · [[SYNC-API-002]] 1장 · 사용자 결정 2026-10-06(릴리즈를 다르게 — 싱크독_깃허브 · 싱크독_로컬 · MCP 이름 `syncdoc_github`·`syncdoc_local` · `EDITION` 값은 그대로 · 한 PC에서 나란히) |
+| 구현 | 설정 `mcp_name`(MCP 서버 이름) · `LLM_API_URL` 기본값을 판마다(`llm_url`, 싱크독_로컬은 없음) · `llm_enabled`(키와 주소) — `/api/me`·[[SYNC-MS-009#llm.step]]·[[SYNC-MS-009#llm.step_stream]]·[[SYNC-MS-008#queries.ask_item]]·[[SYNC-MS-008#queries.ask_code]] · `Shell.tsx` 로고·탭 제목 · `SettingsDialog.tsx` 8.1 · `HowTo.tsx` 6.2 이름과 터미널 6.5·6.6 글자 상자(그림 `term-add.png`·`term-list.png` 지움) · `release/closed` → `release/local`(compose 이름 `syncdoc-local`, 포트 `127.0.0.1:8010`, MCP 이름 `syncdoc_local`) · `scripts/release_closed.sh` → `release_local.sh`(묶음 `syncdoc-local-{판}`) |
+| 테스트 | 설정: 판마다 `llm_url` 기본값 · `llm_enabled`는 키와 주소 · `mcp_name` · `/api/me`의 `llm_enabled` · MCP 서버 이름 · `check_ui` UI-13·UI-16 · `tsc`·`oxlint`·`build` · 운영: 상단 바·탭 제목이 싱크독_깃허브, MCP 서버 이름 `syncdoc_github` · 싱크독_로컬 묶음을 새로 만들어 반입 시험(포트 8010, 바깥 요청 0, MCP `syncdoc_local`) |
+| 선행 | — |
+| 완료 | — |
 
 ---
 
