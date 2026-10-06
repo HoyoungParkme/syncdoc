@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1383,7 +1383,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `scripts/backup.sh` — compose 밖에서 db·app 컨테이너로 `pg_dump -Fc`와 볼륨 `origins` tar를 묶어 `gpg --symmetric AES256`(암호 파일은 사람이 만든다) → `BACKUP_DIR` · 오늘 것이 있으면 건너뜀 · 최근 `BACKUP_KEEP`개만 · `--verify 파일`(풀어서 덤프 목록·저장소 목록) · crontab 매시 정각 |
 | 테스트 | 임시 암호·임시 폴더로 한 번 → 파일이 생기고 `--verify`가 덤프 목록·서버 저장소 8개를 보인다 · 같은 날 다시 → 건너뜀 · 15개면 14개만 남음 · 암호 파일이 없으면 이유를 남기고 끝 · 테스트 DB 컨테이너의 임시 DB로 복구해 프로젝트 수가 같다 |
 | 선행 | BQ |
-| 완료 | 2026-10-06 · 브랜치 `card/BR-backup` · spec 2 + code 1 · `validate` 0/0 · 시험(임시 암호·임시 폴더): 백업 49MB · `--verify` 덤프 표 15·서버 저장소 8개 · 같은 날 다시 → 건너뜀 · 15개 → 14개 · 암호 파일 없음 → 이유 남기고 끝(종료 3) · 테스트 DB 컨테이너의 임시 DB로 복구 — 프로젝트 10·버전 1818이 운영과 같음(임시 DB·풀어 둔 파일 삭제) · 운영: `~/.config/syncdoc/backup.env`(구글 드라이브 `내 드라이브/syncdoc-backup`) · crontab 매시 정각 · **첫 실제 백업은 사람이 암호 파일(`~/.config/syncdoc/backup.pass`)을 만든 뒤 첫 정각** |
+| 완료 | 2026-10-06 · 브랜치 `card/BR-backup` · spec 2 + code 1 · `validate` 0/0 · 시험(임시 암호·임시 폴더): 백업 49MB · `--verify` 덤프 표 15·서버 저장소 8개 · 같은 날 다시 → 건너뜀 · 15개 → 14개 · 암호 파일 없음 → 이유 남기고 끝(종료 3) · 테스트 DB 컨테이너의 임시 DB로 복구 — 프로젝트 10·버전 1818이 운영과 같음(임시 DB·풀어 둔 파일 삭제) · 운영: `~/.config/syncdoc/backup.env`(구글 드라이브 `내 드라이브/syncdoc-backup`) · crontab 매시 정각 · 암호 파일은 사람이 만들었고(대화 기록에 찍혀 첫 백업 전에 새로 바꿈 — 화면에 내지 않고 클립보드로) · **첫 실제 백업 2026-10-06 19:52** `syncdoc-20261006-195231.tar.gpg` 49MB → 구글 드라이브, `--verify` 덤프 표 15·서버 저장소 8개 |
 ---
 
 ## 2. 통합 테스트 시나리오
