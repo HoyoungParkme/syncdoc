@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-006
 type: MS
 title: MINISPEC — AccountService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -117,10 +117,10 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 2. `t = DB: access_tokens where token_hash=h`
 3. if `t is None or t.revoked_at or (t.expires_at and t.expires_at < now)` → `→ None`
 3a. `u = DB: users where id=t.user_id` · if `u is None or not settings.login_allowed(u.github_login)` → `→ None` — **허용 목록에서 뺀 사람의 토큰은 바로 막힌다**(카드 BP — MCP·git 입구가 이 함수를 쓴다). 사용 흔적도 안 남긴다
-4. `DB: access_tokens update last_used_at=now` — 통과한 요청만. UI-13이 이 값을 보여준다
+4. `DB: access_tokens update last_used_at=now` — 통과한 요청만. UI-13이 이 값을 보여준다. **flush만 한다 — 부르는 쪽(MCP 미들웨어·git 입구)이 응답 전에 곧바로 커밋한다.** 커밋하지 않으면 사용 흔적이 롤백되고(#49), 커밋을 응답 뒤로 미루면 토큰 행 잠금을 응답 내내 쥔다 — 같은 토큰의 다음 요청이 그 잠금을 이벤트 루프 위에서 기다려 앱 전체가 멈춘다(#318)
 5. `→ u`
 
-**테스트 관점** 폐기 후 → None · 오타 raw → None. 어느 경우든 **어느 쪽이 틀렸는지 알려주지 않는다** · 성공한 인증 뒤 `last_used_at`이 갱신됨 · 실패한 인증은 아무것도 안 건드림 · 주인이 허용 목록 밖 → None이고 `last_used_at` 그대로 · 폐쇄망판의 로컬 사용자 토큰은 목록과 상관없이 된다
+**테스트 관점** 폐기 후 → None · 오타 raw → None. 어느 경우든 **어느 쪽이 틀렸는지 알려주지 않는다** · 성공한 인증 뒤 `last_used_at`이 갱신됨 · 실패한 인증은 아무것도 안 건드림 · 주인이 허용 목록 밖 → None이고 `last_used_at` 그대로 · 폐쇄망판의 로컬 사용자 토큰은 목록과 상관없이 된다 · 부르는 쪽(MCP·git 입구) — 통과한 요청 뒤 `last_used_at`이 **커밋**돼 있고, 응답을 흘리는 동안 토큰 행이 잠겨 있지 않다
 
 ---
 
