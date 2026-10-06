@@ -1715,7 +1715,7 @@ components:
             description: 판(설정 EDITION). closed면 로그아웃·커밋 이메일이 없다 ([[SYNC-PRD-001#R15]])
           repo_private:
             type: boolean
-            description: 싱크독이 만드는 GitHub 저장소가 비공개인가(설정 GITHUB_REPO_PRIVATE, 기본 참). UI-3 2.6이 「비공개로/공개로 만들어집니다」를 고른다 (#310)
+            description: 공개 여부를 고르지 않고 만든 GitHub 저장소가 비공개인가(설정 GITHUB_REPO_PRIVATE, 기본 참). UI-3 공개 여부(2.8)의 처음 선택이 된다 (#310 · 카드 BS)
     Author:
       type: object
       description: 버전의 작성 주체. 에이전트면 instructed_by가 있다
