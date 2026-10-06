@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -1749,7 +1749,7 @@ components:
         properties:
           llm_enabled:
             type: boolean
-            description: 서버에 LLM_API_KEY가 있는가. 로그인 때 이미 부르는 응답이라 요청이 늘지 않는다
+            description: 서버에 모델 키와 주소가 있는가(LLM_API_KEY · LLM_API_URL — 싱크독_로컬은 주소 기본값이 없다, 카드 BU). 로그인 때 이미 부르는 응답이라 요청이 늘지 않는다
           storage_modes:
             type: array
             items:
@@ -1759,7 +1759,7 @@ components:
           edition:
             type: string
             enum: [internet, closed]
-            description: 판(설정 EDITION). closed면 로그아웃·커밋 이메일이 없다 ([[SYNC-PRD-001#R15]])
+            description: 판(설정 EDITION). internet은 싱크독_깃허브, closed는 싱크독_로컬 — 화면이 상단 바·탭 제목과 MCP 등록 이름을 이것으로 고른다(카드 BU). closed면 로그아웃·커밋 이메일이 없다 ([[SYNC-PRD-001#R15]])
           repo_private:
             type: boolean
             description: 공개 여부를 고르지 않고 만든 GitHub 저장소가 비공개인가(설정 GITHUB_REPO_PRIVATE, 기본 참). UI-3 공개 여부(2.8)의 처음 선택이 된다 (#310 · 카드 BS)
