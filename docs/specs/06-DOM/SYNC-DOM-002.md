@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -218,7 +218,7 @@ classDiagram
 관계
 - `Repository` 1 — 1 `Project`
 
-`storage`는 **저장 방식**이다 — `github` 또는 `server`([[SYNC-PRD-001#R14]]). 만들 때 정하고 바뀌지 않는다. 서버 저장이면 `remote_url`은 서버 안 원본의 경로(`ORIGINS_DIR/{코드}.git`)라 밖으로 내보내지 않는다 — 입구는 `storage`를 보고 저장소 주소를 감춘다. 작업 사본·처리 지점·재구축은 저장 방식을 가리지 않는다. `hook_id`·`hook_error`는 GitHub 저장만 쓴다.
+`storage`는 **저장 방식**이다 — `github` 또는 `server`([[SYNC-PRD-001#R14]]). 만들 때 정한다. 바뀌는 것은 관리 API로 옮길 때뿐이다 — 서버 저장으로([[SYNC-UC-001#UC-H22]], 카드 BQ)·GitHub 저장으로([[SYNC-UC-001#UC-H23]], 카드 BT). 서버 저장이면 `remote_url`은 서버 안 원본의 경로(`ORIGINS_DIR/{코드}.git`)라 밖으로 내보내지 않는다 — 입구는 `storage`를 보고 저장소 주소를 감춘다. 작업 사본·처리 지점·재구축은 저장 방식을 가리지 않는다. `hook_id`·`hook_error`는 GitHub 저장만 쓴다.
 
 `hook_id`·`hook_error`는 **push 통지를 걸었는지**를 들고 있다(카드 AF). 걸었으면 GitHub이 준 훅
 번호, 못 걸었으면 사유. 둘 다 비면 아직 안 걸어 본 것이다. 화면이 이 셋을 「걸림 / 안 걸림 /
@@ -453,7 +453,7 @@ classDiagram
 | `Commit` | `hash: str` · `login: str` · `date: datetime` · `message: str` · `email: str` · `path: str` | git.log → rebuild. `ChangedFile`과 같은 이유로 이메일을 함께 싣는다. `path`는 **그 커밋 시점의 경로** — `--follow`가 이름 바뀌기 전 커밋까지 주므로 지금 경로로는 본문을 못 읽는다([[SYNC-MS-009#git.log]]) |
 | `GithubUser` | `id: int` · `login: str` · `name: str` | github.get_user → login_github |
 | `UploadResult` | `commit: str` · `changed: bool` · `files: int` · `deleted: int` | pipeline.upload_code → MCP `upload_code`(카드 BB). 내용이 같으면 `changed=False`, 커밋은 그대로 |
-| `MoveResult` | `origin: str` · `head: str` · `hook: HookStatus` | pipeline.move_to_server → `POST /api/admin/repos/{code}/move-to-server`(카드 BQ). `origin`은 서버 저장소 자리, `head`는 옮긴 뒤 `origin/main` |
+| `MoveResult` | `origin: str` · `head: str` · `hook: HookStatus` | pipeline.move_to_server · move_to_github → `POST /api/admin/repos/{code}/move-to-server` · `move-to-github`(카드 BQ · BT). `origin`은 옮긴 뒤의 원격(서버 저장소 자리 또는 GitHub 주소), `head`는 옮긴 뒤 `origin/main`, `hook`은 통지를 거뒀나·걸었나 |
 | `CgiResponse` | `status: int` · `headers: list[(str, str)]` · `body: AsyncIterator[bytes]` | git.http_backend → routers/git. 본문을 다 넘긴 뒤에 만들어진다(인프라 7장) |
 | `ToolSpec` | `name: str` · `description: str` · `parameters: dict`(JSON Schema) | queries 상수 `_ASK_TOOLS` → llm.step. 읽기 도구 다섯의 선언 |
 | `ToolCall` | `id: str` · `name: str` · `arguments: dict` | llm.step → queries.ask_item. 모델이 부르겠다고 한 도구 하나 |
@@ -646,7 +646,7 @@ flowchart LR
 
 `routers/git.py`는 서버 저장소의 git 입구(카드 BB) — 토큰으로 사람을 정하고(`AccountService.authenticate_token`, 인증은 입구의 몫이라 허용) `ProjectService.server_origin`으로 소유·저장 방식을 본 뒤 `git.http_backend`를 흘리고, push를 받으면 `pipeline.read_pending`으로 넘긴다 — `hooks.py`와 같은 자리다. `routers/code.py`는 코드 탭·관계도 코드 호출의 네 조회(카드 AY) — `queries`만 본다. 대조는 여러 묶음(명세·코드 그래프)을 모아야 해서 서비스가 아니라 `queries`다. `routers/conversations.py`는 대화 목록·조회·삭제와 첨부 업로드·조회·삭제 — 묶음 하나(`ConversationService`)만 본다. 질문(`ask`)은 `routers/documents.py`에 그대로 있고 `queries.ask_item`이 대화를 읽고 쓴다(3.2).
 
-라우터 하나가 묶음 하나를 본다. `admin.py`만 예외로 프로젝트와 파이프라인 둘을 부른다 — 재구축([[SYNC-UC-001#UC-S6]])과 서버 저장으로 옮기기([[SYNC-UC-001#UC-H22]], 카드 BQ — 쓰기·읽기 락을 함께 잡아야 해서 `pipeline`)가 운영 성격이라 어느 묶음에도 안 들어간다. **예외 둘 더** — 라우터가 응답에 사람 이름을 붙이려고 `AccountService.users_by_ids`를 부르는 건 허용(이력). `documents.py`가 상태 변경·되돌리기를 `pipeline`으로 넘기는 것도 허용 — 둘은 조율이라 `pipeline`에 있다. `mcp/tools.py`는 account를 부르지 않는다 — 인증은 `mcp/auth.py`의 몫이다.
+라우터 하나가 묶음 하나를 본다. `admin.py`만 예외로 프로젝트와 파이프라인 둘을 부른다 — 재구축([[SYNC-UC-001#UC-S6]])과 서버 저장으로 옮기기·GitHub 저장으로 되돌리기([[SYNC-UC-001#UC-H22]] · [[SYNC-UC-001#UC-H23]], 카드 BQ · BT — 쓰기·읽기 락을 함께 잡아야 해서 `pipeline`)가 운영 성격이라 어느 묶음에도 안 들어간다. **예외 둘 더** — 라우터가 응답에 사람 이름을 붙이려고 `AccountService.users_by_ids`를 부르는 건 허용(이력). `documents.py`가 상태 변경·되돌리기를 `pipeline`으로 넘기는 것도 허용 — 둘은 조율이라 `pipeline`에 있다. `mcp/tools.py`는 account를 부르지 않는다 — 인증은 `mcp/auth.py`의 몫이다.
 
 ### 3.2 Control 사이의 의존 관계
 
@@ -673,7 +673,7 @@ flowchart TB
     PL -.->|get_document · validate · detect_deleted_items · create · save · apply_frontmatter| SS
     PL -.->|commit_push · read · changed_files| GIT
     PL -.->|extract · mark_missing · resolve_missing · downstream · clear| RS
-    PL -.->|get · get_owned · remove_hook| PS
+    PL -.->|get · get_owned · remove_hook · ensure_hook · archive_origin| PS
     QR -.->|list_by_project · describe_items · resolve_item · neighbors · diff · …| SS
     QR -.->|upstream · downstream · references_among · count_downstream| RS
     QR -.->|list_owned · get_owned| PS
@@ -685,8 +685,9 @@ flowchart TB
     QR -.->|step| LLM
     PL -.->|save · fail · get| CGS
     PL -.->|load · reduce · enrich · touches_code| CG
-    PL -.->|archive · changed_paths · clone_bare · set_origin| GIT
+    PL -.->|archive · changed_paths · clone_bare · set_origin · push_all| GIT
     PS -.->|create_hook · delete_hook| GH
+    PL -.->|repo_archived| GH
     PS -.->|delete_by_project| CGS
     CG -.->|extract| GFY
     QR -.->|get · read| CGS
@@ -729,6 +730,7 @@ classDiagram
         +remove_hook(code: str, user: User) HookStatus
         +asset_path(code: str, path: str, user: User) Path
         +server_origin(code: str, user: User) Path
+        +archive_origin(code: str) Path?
     }
     class Project {
         +int id
@@ -769,6 +771,7 @@ classDiagram
 | `remove_hook` | pipeline.move_to_server — GitHub 저장일 때 push 통지를 거둔다(카드 BQ). 실패는 상태로 | [[SYNC-UC-001#UC-H22]] | not-found |
 | `asset_path` | [[SYNC-API-001#GET/api/projects/{code}/files/{path}]] (사람 경로, `get_owned`) | [[SYNC-PRD-001#R5]] | not-found (project·file) |
 | `server_origin` | routers/git — [[SYNC-API-001#GET/git/{code}.git/info/refs]] 외 둘 | [[SYNC-UC-001#UC-H21]] | not-found (남의 것·GitHub 저장도 같은 답) |
+| `archive_origin` | pipeline.move_to_github — 되돌린 뒤 서버 저장소를 보관 폴더로(카드 BT). 지우지 않는다 | [[SYNC-UC-001#UC-H23]] | |
 
 **규칙이 사는 곳**
 - **소유 게이트는 `get_owned` 하나다.** `project.owner_user_id != user.id`면 `NotFound("project", code)` — 있다는 사실이 새지 않는다(있는데 못 본다가 아니라 없다). 사람이 부르는 경로(웹·MCP)는 전부 `get_owned`·`list_owned`를 지나고, 사람이 없는 경로(폴링·웹훅·GitHub 커밋 처리)만 `get`·`list_projects`를 쓴다. `get(code, user: User | None)`처럼 인자를 선택으로 두지 않는다 — `None`이 「필터 없음」이라는 합법 값이 되면 빠뜨린 자리가 조용히 전체 열람이 된다
@@ -1103,6 +1106,13 @@ move_to_server(code: str, user: User) -> MoveResult
     읽기 락 → 쓰기 락 안에서 fetch → git.clone_bare(가지·태그·커밋 해시 그대로) → 처리 지점 확인 → remove_hook →
     git.set_origin · fetch → repositories storage=server. DB(버전·이력·대화·코드 그래프)는 그대로. 실패하면 되돌린다
 
+move_to_github(code: str, user: User, remote_url: str) -> MoveResult
+    [[SYNC-UC-001#UC-H23]]. 관리 API가 부른다(카드 BT) — move_to_server의 반대. get_owned · 서버 저장만(storage-mismatch) ·
+    GitHub 저장을 켰어야(storage-unavailable) · 다른 프로젝트의 주소가 아니어야(repository-already-registered)
+    읽기 락 → 쓰기 락 안에서 github.repo_archived(닿지 않음 push-failed · 보관 중 repo-archived) → git.push_all(되감지 않고
+    한꺼번에) → git.set_origin · fetch → main 비교(다르면 원격을 되돌린다) → repositories storage=github → ensure_hook →
+    archive_origin. DB(버전·이력·대화·코드 그래프)는 그대로
+
 rebuild(code: str, session: Session | None = None) -> RebuildResult
     [[SYNC-UC-001#UC-S6]]. 폴링·관리 화면이 부른다 — 관리 화면 쪽은 ProjectService.rebuild_index(code, user)가 get_owned를 먼저 지난다. 한 트랜잭션:
     reference.clear · spec.clear_index(versions만 삭제. documents·items는 유지 — 항목 ID 이력과 휴지통 상태가 거기 산다)
@@ -1166,6 +1176,7 @@ git.init_specs(workdir) -> dict[str, str]
 git.init_bare(path) -> None                    서버 저장소를 만든다 — main, 앞당김·삭제 거부 (카드 BA)
 git.clone_bare(remote_url, path, token) -> None 원격을 서버 저장소로 통째로 — 원격·토큰은 안 남긴다 (카드 BQ)
 git.set_origin(workdir, url) -> None           작업 사본의 원격만 바꾼다 — 받아 오기는 fetch (카드 BQ)
+git.push_all(path, remote_url, token) -> str   서버 저장소의 가지·태그를 원격으로 — 되감지 않고 한꺼번에, 올린 main (카드 BT)
 git.http_backend(root, env, body) -> CgiResponse
                                                git http-backend를 CGI로. 본문을 다 넘긴 뒤 응답 머리를 준다 (카드 BB)
 git.archive(workdir, commit, dest) -> None      그 커밋의 파일을 dest에 푼다 (코드 그래프, 카드 AX)
@@ -1177,6 +1188,7 @@ github.verify_signature(body, header) -> bool
 github.exchange_code(code) -> str
 github.get_user(token) -> GithubUser
 github.delete_hook(token, owner, name, hook_id) -> None   push 통지를 지운다 — 없으면(404) 그대로 끝 (카드 BQ)
+github.repo_archived(token, owner, name) -> bool         저장소가 보관 중인가 — 닿지 않으면 unauthorized (카드 BT)
 
 llm.step_stream(system, messages, tools, tool_choice="auto") -> AsyncIterator[str | LlmStep]
                                                글자 조각을 오는 대로, 끝에 LlmStep 하나 (카드 AW)
