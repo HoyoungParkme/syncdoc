@@ -1402,7 +1402,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | [[SYNC-MS-007#pipeline.move_to_github]] · [[SYNC-MS-009#git.push_all]] · [[SYNC-MS-009#github.repo_archived]] · [[SYNC-MS-001#ProjectService.archive_origin]] · 라우터 [[SYNC-API-001#POST/api/admin/repos/{code}/move-to-github]] · 새 오류 `repo-archived` · `storage-mismatch`에 「이미 GitHub 저장」 · `Storage` 주석(옮길 때만 바뀐다) |
 | 테스트 | MS 테스트 관점 · 라우터 200·404·409·422 · 운영: 8개(CCR·HB·IMBC·INS·JSD·PAW·QBOT·VA)를 GitHub 보관을 푼 뒤 옮기고 GitHub `main`·가지·태그가 서버 저장소와 같은 해시 · 문서 수·버전 수가 옮기기 전과 같음 · 웹훅 · fetch 오류 0 |
 | 선행 | BQ · BS |
-| 완료 | — |
+| 완료 | 2026-10-07 · 브랜치 `card/BT-move-to-github`(65729cc #324) · spec 11 + code 5 · 테스트 459 · `ruff` · `validate` 0/0 · `check_code` 171/171 · `check_calls` 0/0 · `check_dom` 0 · 운영: 8개를 GitHub 보관을 푼 뒤 관리 API로 옮김 — 각 `head`가 옮기기 전 처리 지점과 같음, GitHub 가지·태그가 서버 저장소와 해시까지 같음(HB 1 · IMBC 1 · INS 1 · JSD 2 · PAW 2 · QBOT 2 · VA 11 · CCR 14), 문서·버전 수 그대로, fetch 오류 0, 웹훅 8, 서버 저장소 8개는 `_archive/`로 · 공개 여부는 사용자 결정대로(HB · IMBC · VA · CCR 공개, INS · JSD · PAW · QBOT 비공개) · CCR은 노트북 이전 병합 넷을 되돌린 뒤(명세 13문서 승인된 옛 글로) 옮기고 Pages(workflow) 다시 켜 200 · daily 다시 켬 · INS deploy 워크플로 끔 · 노트북 작업 사본 셋(QBOT · VA · CCR) 원격을 GitHub로, git 입구 토큰 폐기 · 찾은 것: 재구축이 파일을 지운 커밋에서 실패(#325) |
 
 ---
 
