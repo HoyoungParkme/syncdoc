@@ -71,7 +71,7 @@ class HookStatus(Base):
 
 
 class MoveResult(Base):
-    """서버 저장으로 옮긴 결과 (카드 BQ)."""
+    """저장 방식을 옮긴 결과 — 서버 저장으로(카드 BQ)·GitHub 저장으로(카드 BT)."""
 
     origin: str
     head: str
@@ -111,6 +111,11 @@ class TrashResult(Base):
 class Revert(BaseModel):
     to_version: int = Field(ge=1)
     confirm_item_deletion: bool = False
+
+
+class MoveToGithub(BaseModel):
+    # 되돌릴 GitHub 저장소 주소 — 보관이 풀려 있어야 한다 (카드 BT)
+    remote_url: str = Field(min_length=1)
 
 
 class DownstreamDoc(Base):
