@@ -47,7 +47,10 @@ class UserKind(StrEnum):
 
 
 class Storage(StrEnum):
-    """저장 방식 — SYNC-DOM-002 2.7, PRD R14. 프로젝트를 만들 때 정하고 바뀌지 않는다."""
+    """저장 방식 — SYNC-DOM-002 2.7, PRD R14. 만들 때 정한다.
+
+    바뀌는 것은 관리 API로 옮길 때뿐이다 — 서버 저장으로(카드 BQ)·GitHub 저장으로(카드 BT).
+    """
 
     github = "github"
     server = "server"  # 싱크독 서버 안의 bare git (카드 BA)
@@ -202,11 +205,11 @@ class Commit:
 
 @dataclass(frozen=True)
 class MoveResult:
-    """SYNC-API-001 MoveResult — 서버 저장으로 옮긴 결과 (카드 BQ)."""
+    """SYNC-API-001 MoveResult — 저장 방식을 옮긴 결과. 서버 저장으로(카드 BQ)·GitHub로(카드 BT)."""
 
-    origin: str  # 서버 저장소 자리 ORIGINS_DIR/{code}.git
+    origin: str  # 옮긴 뒤의 원격 — 서버 저장소 자리 ORIGINS_DIR/{code}.git 또는 GitHub 주소
     head: str  # 옮긴 뒤 origin/main
-    hook: HookStatus  # push 통지를 거뒀나
+    hook: HookStatus  # push 통지를 거뒀나(서버로)·걸었나(GitHub로)
 
 
 @dataclass(frozen=True)

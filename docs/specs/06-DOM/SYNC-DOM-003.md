@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-003
 type: DOM
 title: ERD·DD — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-001]
 ---
 
@@ -228,7 +228,7 @@ erDiagram
 
 | 컬럼 | 타입 | 제약 | 의미 | 예시 |
 |---|---|---|---|---|
-| storage | varchar(8) | not null, 기본 `github` | **저장 방식** — `github` 또는 `server`([[SYNC-PRD-001#R14]]). 만들 때 정하고 바뀌지 않는다 | `server` |
+| storage | varchar(8) | not null, 기본 `github` | **저장 방식** — `github` 또는 `server`([[SYNC-PRD-001#R14]]). 만들 때 정하고, 관리 API로 옮길 때만 바뀐다(카드 BQ · BT) | `server` |
 | remote_url | varchar(300) | not null | 원격. GitHub 저장이면 GitHub 저장소 주소, 서버 저장이면 **서버 안 원본의 경로**(`ORIGINS_DIR/{코드}.git`) — 이 경로는 입구가 밖으로 내보내지 않는다 | `https://github.com/example/syncdoc` · `/var/syncdoc/origins/ABC.git` |
 | workdir_path | varchar(300) | not null | 노트북의 작업 사본 경로 | `/var/syncdoc/repos/SYNC` |
 | last_processed_commit | varchar(40) | null 허용 | 파이프라인이 마지막으로 처리한 커밋. 밀린 커밋 따라잡기 기준 | `a1b2c3…` |

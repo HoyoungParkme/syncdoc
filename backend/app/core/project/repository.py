@@ -5,12 +5,30 @@ from __future__ import annotations
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.errors import RepoCreateFailed
 from app.core.project.models import Project, Repository
 
 
 def normalize_remote(url: str) -> str:
     """저장소 주소 비교용 — 소문자, 끝 `/`·`.git` 제거 (web/routers/hooks.py 와 같은 규칙)."""
     return url.strip().rstrip("/").lower().removesuffix(".git")  # 소문자 먼저 — .GIT 도 잡는다
+
+
+def split_remote(remote_url: str) -> tuple[str, str]:
+    """`https://github.com/owner/repo(.git)` → `(owner, repo)` (MS-001 3b · MS-007 되돌리기 5).
+
+    ssh 형태(`git@github.com:owner/repo.git`)도 받는다 — clone은 그것도 되므로
+    여기서만 막으면 경로가 갈린다.
+    """
+    s = remote_url.strip().rstrip("/")
+    if s.endswith(".git"):
+        s = s[: -len(".git")]
+    if ":" in s and "//" not in s:  # ssh
+        s = s.split(":", 1)[1]
+    parts = [x for x in s.split("/") if x]
+    if len(parts) < 2:
+        raise RepoCreateFailed(f"저장소 주소에서 소유자·이름을 못 읽었다: {remote_url}")
+    return parts[-2], parts[-1]
 
 
 class ProjectRepository:

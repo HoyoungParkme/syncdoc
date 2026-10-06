@@ -1,4 +1,4 @@
-"""routers/admin — SYNC-API-001 3.8 관리. repo_status·rebuild."""
+"""routers/admin — SYNC-API-001 3.8 관리. repo_status·rebuild·통지·옮기기."""
 
 from __future__ import annotations
 
@@ -10,7 +10,14 @@ from app.core.account.models import User
 from app.core.project.service import ProjectService
 from app.db import get_session
 from app.web.auth import current_user
-from app.web.schemas.ops import HookStatus, MoveResult, RebuildResult, RepoStatus, SyncResult
+from app.web.schemas.ops import (
+    HookStatus,
+    MoveResult,
+    MoveToGithub,
+    RebuildResult,
+    RepoStatus,
+    SyncResult,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -56,3 +63,14 @@ async def move_to_server(code: str, user: User = Depends(current_user)) -> MoveR
     GitHub 저장을 서버 저장으로 옮긴다(카드 BQ). 락·커밋·되돌리기는 pipeline이 한다.
     """
     return MoveResult.model_validate(await pipeline.move_to_server(code, user))
+
+
+@router.post("/repos/{code}/move-to-github", response_model=MoveResult)
+async def move_to_github(
+    code: str, req: MoveToGithub, user: User = Depends(current_user)
+) -> MoveResult:
+    """SYNC-API-001#POST/api/admin/repos/{code}/move-to-github
+
+    서버 저장을 GitHub 저장으로 되돌린다(카드 BT). 락·커밋·되돌리기는 pipeline이 한다.
+    """
+    return MoveResult.model_validate(await pipeline.move_to_github(code, user, req.remote_url))

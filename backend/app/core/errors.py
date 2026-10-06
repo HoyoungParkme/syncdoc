@@ -264,6 +264,20 @@ class OriginExists(Problem):
         super().__init__(f"서버 저장소 자리에 이미 무언가 있다: {path}", path=path)
 
 
+class RepoArchived(Problem):
+    """UC-H23 3b — GitHub로 되돌리려는 저장소가 보관 중이라 push할 수 없다 (카드 BT)."""
+
+    type = "urn:syncdoc:repo-archived"
+    status = 409
+    title = "repo-archived"
+
+    def __init__(self, remote_url: str) -> None:
+        super().__init__(
+            f"GitHub 저장소가 보관 중이다 — GitHub에서 보관을 풀고 다시: {remote_url}",
+            remote_url=remote_url,
+        )
+
+
 class UploadTooLarge(Problem):
     """UC-A10 2a — 코드 올리기 한도(UTF-8 합 5MiB · 파일+지운 경로 500개). 나눠 보낸다."""
 

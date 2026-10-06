@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -86,6 +86,7 @@ upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 | POST /api/admin/repos/{code}/sync | [[#SEQ-25]] | ○ |
 | POST /api/admin/repos/{code}/hook | [[#SEQ-4]] | |
 | POST /api/admin/repos/{code}/move-to-server | [[#SEQ-33]] | ○ |
+| POST /api/admin/repos/{code}/move-to-github | [[#SEQ-34]] | ○ |
 | POST /api/docs/{docId}/ask | [[#SEQ-24]] | ○ |
 | POST /api/projects/{code}/code/ask | [[#SEQ-32]] | ○ |
 | MCP create_document | [[#SEQ-19]] | ○ |
@@ -1580,6 +1581,61 @@ sequenceDiagram
 - **DB는 건드리지 않는다** — 버전·상태 이력·대화·코드 그래프가 커밋 해시에 기대는데, 복제가 해시를 그대로 옮기므로 그대로 맞는다. 저장소 행의 저장 방식·원격·통지 칸만 바뀐다
 - 락 순서는 읽기 → 쓰기 — `process_commit`(읽기 락)이 `save_pipeline`(쓰기 락)을 부르는 것과 같은 순서라 엇갈려 막히지 않는다
 - 옮긴 뒤로는 그 프로젝트가 서버 저장이다 — 쓰기는 서버 저장소로, 코드는 git 입구로 push한다([[#SEQ-29]]). GitHub 저장소 보관(비공개·archive)은 운영이 한다
+
+---
+
+## SEQ-34 서버 저장 프로젝트를 GitHub 저장으로 되돌린다
+
+[[SYNC-UC-001#UC-H23]] 기본 흐름 1~9, 확장 2a~2d·3a·3b·4a·5a·7a. `POST /api/admin/repos/{code}/move-to-github` — 화면이 없다(카드 BT). [[#SEQ-33]]의 반대다. **쓰기와 읽기를 함께 막고** 옮긴다 — 저장과 fetch가 옛 원격과 새 원격 사이에 끼어들지 못한다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사람(소유자)
+    participant RA as routers/admin
+    participant P as pipeline
+    participant PS as ProjectService
+    participant AS as AccountService
+    participant G as infra/git
+    participant GHI as infra/github
+    participant DB
+
+    U->>RA: POST /api/admin/repos/{code}/move-to-github {remote_url}
+    RA->>P: move_to_github(code, user, remote_url)
+    P->>PS: get_owned(code, user) — 남의 것이면 not-found (2a)
+    alt 이미 GitHub 저장 (2b) · GitHub 저장을 안 켬 (2c) · 다른 프로젝트가 쓰는 주소 (2d)
+        P-->>U: 409 storage-mismatch · 422 storage-unavailable · 409 repository-already-registered
+    end
+    P->>AS: github_token_for(user)
+    P->>P: 읽기 락 → 쓰기 락
+    P->>GHI: repo_archived(token, owner, name)
+    alt 닿지 않음 (3a)
+        P-->>U: 424 push-failed
+    else 보관 중 (3b)
+        P-->>U: 409 repo-archived
+    end
+    P->>G: push_all(origin, remote_url, token) — 가지·태그, 되감지 않고 한꺼번에(atomic)
+    alt 거절 (4a)
+        P-->>U: 424 push-failed — 아무것도 안 바뀜
+    end
+    P->>G: set_origin(workdir, remote_url) · fetch(workdir, user)
+    alt 받아 온 main ≠ 서버 저장소 main (5a)
+        P->>G: set_origin(workdir, origin) — 되돌림
+        P-->>U: 424 push-failed
+    end
+    P->>DB: repositories storage=github · remote_url · 커밋
+    P->>PS: ensure_hook(code, user)
+    PS->>GHI: create_hook(token, owner, name, url, secret) — 실패는 상태로 (7a)
+    P->>PS: archive_origin(code) — 서버 저장소를 _archive/로
+    P-->>RA: MoveResult {origin: remote_url, head, hook}
+    RA-->>U: 200
+```
+
+**읽을 때 볼 것**
+- **DB는 건드리지 않는다** — 버전·상태 이력·대화·코드 그래프가 기대는 커밋 해시가 push로 그대로 간다. 저장소 행의 저장 방식·원격만 바뀌고 통지 칸은 `ensure_hook`이 채운다
+- push는 **되감지 않고 한꺼번에**(`--atomic`)다 — GitHub 쪽이 갈라져 있으면 하나도 올라가지 않는다. 확인(5)이 실패해 되돌릴 때 GitHub에 올라간 가지·태그는 그대로 둔다 — 서버 저장소와 같은 커밋이라 다시 부르면 이어서 된다
+- 공개 여부는 바꾸지 않는다 — 사람이 GitHub에서 미리 정한다([[SYNC-UC-001#UC-A1]] 3과 같은 원칙)
+- git 입구([[#SEQ-29]])의 push는 이 락 밖이다 — 옮기는 동안 서버 저장소로 push하지 않는다. 옮긴 뒤로는 GitHub 저장이라 git 입구가 그 프로젝트를 not-found로 막는다
 
 ---
 

@@ -155,3 +155,21 @@ async def delete_hook(token: str, owner: str, name: str, hook_id: int) -> None:
     except Exception:  # noqa: BLE001 — 본문이 JSON이 아니어도 상태 코드는 알린다
         detail = r.text[:200]
     raise Unauthorized(f"{r.status_code} {detail}".strip())
+
+
+async def repo_archived(token: str, owner: str, name: str) -> bool:
+    """SYNC-MS-009#github.repo_archived
+
+    저장소가 보관 중인가(카드 BT) — 보관 중이면 push가 안 된다. 닿지 않으면(없음·권한 없음 —
+    GitHub은 권한 없는 비공개 저장소도 404로 답한다) unauthorized.
+    """
+    auth = {"Authorization": f"Bearer {token}", **_HDR}
+    async with httpx.AsyncClient() as client:
+        r = await client.get(f"{_API}/repos/{owner}/{name}", headers=auth)
+    if r.is_success:
+        return bool(r.json().get("archived"))
+    try:
+        detail = r.json().get("message", "")
+    except Exception:  # noqa: BLE001 — 본문이 JSON이 아니어도 상태 코드는 알린다
+        detail = r.text[:200]
+    raise Unauthorized(f"{r.status_code} {detail}".strip())

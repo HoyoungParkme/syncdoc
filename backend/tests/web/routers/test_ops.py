@@ -260,3 +260,33 @@ async def test_move_to_server_route(client: TestClient, scoped: Session, proj, o
     again = client.post("/api/admin/repos/EXMP/move-to-server")
     assert again.status_code == 409 and again.json()["type"] == "urn:syncdoc:storage-mismatch"
     assert client.post("/api/admin/repos/NOPE/move-to-server").status_code == 404
+
+
+async def test_move_to_github_route(
+    client: TestClient, scoped: Session, proj, origins_dir, mock_github
+) -> None:
+    """카드 BT — 서버 저장이면 200으로 GitHub 저장, 다시 부르면 storage-mismatch(409).
+
+    본문이 없으면 422, 보관 중이면 repo-archived(409), 없는 코드는 404.
+    """
+    import httpx
+
+    login(client, scoped)
+    remote = str(proj["repos"]["remote"])
+    assert client.post("/api/admin/repos/EXMP/move-to-server").status_code == 200
+    r = client.post("/api/admin/repos/EXMP/move-to-github", json={})
+    assert r.status_code == 422 and r.json()["type"] == "urn:syncdoc:invalid-request"
+    mock_github(lambda req: httpx.Response(200, json={"archived": True}))
+    r = client.post("/api/admin/repos/EXMP/move-to-github", json={"remote_url": remote})
+    assert r.status_code == 409 and r.json()["type"] == "urn:syncdoc:repo-archived"
+    assert r.json()["remote_url"] == remote
+    mock_github(lambda req: httpx.Response(200, json={"archived": False}))
+    r = client.post("/api/admin/repos/EXMP/move-to-github", json={"remote_url": remote})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["origin"] == remote and len(body["head"]) == 40
+    assert not (origins_dir / "EXMP.git").exists()
+    again = client.post("/api/admin/repos/EXMP/move-to-github", json={"remote_url": remote})
+    assert again.status_code == 409 and again.json()["type"] == "urn:syncdoc:storage-mismatch"
+    nope = client.post("/api/admin/repos/NOPE/move-to-github", json={"remote_url": remote})
+    assert nope.status_code == 404

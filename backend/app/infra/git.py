@@ -492,6 +492,28 @@ async def clone_bare(remote_url: str, path: Path, token: str | None) -> None:
         await _run(path, "config", key, "true")
 
 
+async def push_all(path: Path, remote_url: str, token: str | None) -> str:
+    """SYNC-MS-009#git.push_all
+
+    서버 저장소의 가지·태그를 원격으로 모두 올린다(카드 BT — clone_bare의 반대). `+`가 없어
+    되감지 않고, --atomic이라 하나라도 거절되면 아무 ref도 바뀌지 않는다. 토큰이 든 주소는 그
+    자리에서만 쓴다 — 원격으로 등록하지 않아 config에 남지 않는다. 올린 main을 돌려준다.
+    """
+    url = _with_token(remote_url, token) if token else remote_url
+    args = (
+        "push",
+        "--atomic",
+        "--porcelain",
+        url,
+        "refs/heads/*:refs/heads/*",
+        "refs/tags/*:refs/tags/*",
+    )
+    code, out, err = await _exec(path, *args)
+    if code != 0 or _rejected(out):
+        raise GitError(["git", *args], f"{err}{out}")
+    return (await _run(path, "rev-parse", "refs/heads/main")).strip()
+
+
 async def http_backend(
     root: Path, env: dict[str, str], body: AsyncIterator[bytes]
 ) -> CgiResponse:

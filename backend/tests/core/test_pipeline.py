@@ -20,7 +20,10 @@ from app.core.errors import (
     OriginExists,
     PushFailed,
     RebuildFailed,
+    RepoArchived,
+    RepositoryAlreadyRegistered,
     StorageMismatch,
+    StorageUnavailable,
     VersionConflict,
 )
 from app.core.project.models import Project, Repository
@@ -1616,3 +1619,146 @@ async def test_move_to_server_goes_on_when_hook_cannot_be_removed(
     r = await pipeline.move_to_server("EXMP", proj["user"])
     assert r.hook.hook == "error" and "403" in (r.hook.hook_error or "")
     assert (repo.storage, repo.hook_id) == ("server", None)
+
+
+# ── move_to_github (카드 BT, UC-H23) ──
+def _github_ok(req: httpx.Request) -> httpx.Response:
+    """GitHub 흉내 — 저장소는 보관 중이 아니고, 통지는 새로 건다."""
+    if req.url.path.endswith("/hooks") and req.method == "GET":
+        return httpx.Response(200, json=[])
+    if req.url.path.endswith("/hooks"):
+        return httpx.Response(201, json={"id": 88})
+    return httpx.Response(200, json={"archived": False})
+
+
+async def _on_server(proj, tmp_path) -> dict[str, str]:
+    """서버 저장으로 옮긴 뒤 서버 저장소에 커밋·가지·태그를 더한다 — 옛 원격(GitHub)보다 앞선다."""
+    _repo_row(proj).last_processed_commit = g(proj["repos"]["remote"], "rev-parse", "main")
+    await pipeline.move_to_server("EXMP", proj["user"])
+    origin = settings.ORIGINS_DIR / "EXMP.git"
+    pusher = tmp_path / "pusher"
+    g(tmp_path, "clone", "-q", str(origin), str(pusher))
+    write_commit_push(pusher, RFQ_FILE, RFQ, "spec: RFQ")
+    assert await pipeline.read_pending("EXMP", proj["user"]) == 1
+    g(origin, "branch", "feat", "main")
+    g(origin, "tag", "v1", "main")
+    return {ref: g(origin, "rev-parse", ref) for ref in ("main", "feat", "v1")}
+
+
+async def test_move_to_github_pushes_history_and_switches_back(
+    scoped: Session, proj, origins_dir, mock_github, tmp_path, monkeypatch
+) -> None:
+    """서버 저장소의 가지·태그가 GitHub에 같은 해시로. 저장 방식·원격만 바뀌고 버전은 그대로.
+
+    통지를 걸고, 서버 저장소는 지우지 않고 보관 폴더로 간다. 그 뒤 커밋은 GitHub에서 읽는다.
+    """
+    monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "https://syncdoc.example")
+    await create(proj)  # PRD 버전 1
+    want = await _on_server(proj, tmp_path)
+    remote, work = proj["repos"]["remote"], proj["repos"]["work"]
+    versions = scoped.execute(text("SELECT count(*) FROM versions")).scalar()
+    calls = mock_github(_github_ok)
+    r = await pipeline.move_to_github("EXMP", proj["user"], str(remote))
+    assert {ref: g(remote, "rev-parse", ref) for ref in want} == want
+    assert r.origin == str(remote) and r.head == want["main"]
+    assert r.hook.hook == "ok" and any(c.method == "POST" for c in calls)
+    repo = _repo_row(proj)
+    assert (repo.storage, repo.remote_url, repo.hook_id) == ("github", str(remote), 88)
+    assert g(work, "remote", "get-url", "origin") == str(remote)
+    assert scoped.execute(text("SELECT count(*) FROM versions")).scalar() == versions
+    assert not (origins_dir / "EXMP.git").exists()
+    assert len(list((origins_dir / "_archive").glob("EXMP-*.git"))) == 1
+    later = tmp_path / "later"
+    g(tmp_path, "clone", "-q", str(remote), str(later))
+    write_commit_push(later, RFQ_FILE, RFQ + "\n덧붙인 줄\n", "spec: RFQ 고침")
+    assert await pipeline.read_pending("EXMP", proj["user"]) == 1
+
+
+async def test_move_to_github_refuses_and_changes_nothing(
+    scoped: Session, proj, origins_dir, mock_github, tmp_path, monkeypatch
+) -> None:
+    """남의 것 · 이미 GitHub · GitHub 저장 꺼짐 · 다른 프로젝트의 주소 · 닿지 않음 · 보관 중 ·
+    갈라진 GitHub — 싱크독 쪽(저장 방식·원격·서버 저장소)은 그대로, GitHub의 가지도 안 바뀐다."""
+    remote, work = proj["repos"]["remote"], proj["repos"]["work"]
+    with pytest.raises(StorageMismatch):  # 아직 GitHub 저장
+        await pipeline.move_to_github("EXMP", proj["user"], str(remote))
+    await _on_server(proj, tmp_path)
+    origin = origins_dir / "EXMP.git"
+    repo = _repo_row(proj)
+
+    def unchanged() -> None:
+        assert (repo.storage, repo.remote_url) == ("server", str(origin)) and origin.exists()
+        assert g(work, "remote", "get-url", "origin") == str(origin)
+
+    with pytest.raises(NotFound):
+        await pipeline.move_to_github("EXMP", make_user(scoped, login="stranger"), str(remote))
+    monkeypatch.setattr(settings, "STORAGE_MODES", "server")
+    with pytest.raises(StorageUnavailable):
+        await pipeline.move_to_github("EXMP", proj["user"], str(remote))
+    monkeypatch.setattr(settings, "STORAGE_MODES", "github,server")
+    othr = Project(code="OTHR", name="남", owner_user_id=proj["user"].id)
+    scoped.add(othr)
+    scoped.flush()
+    scoped.add(
+        Repository(
+            project_id=othr.id,
+            remote_url=str(tmp_path / "taken.git"),
+            workdir_path=str(tmp_path / "w2"),
+            registered_by_user_id=proj["user"].id,
+        )
+    )
+    scoped.flush()
+    with pytest.raises(RepositoryAlreadyRegistered):
+        await pipeline.move_to_github("EXMP", proj["user"], str(tmp_path / "taken.git"))
+    mock_github(lambda req: httpx.Response(404, json={"message": "Not Found"}))
+    with pytest.raises(PushFailed):  # 닿지 않음
+        await pipeline.move_to_github("EXMP", proj["user"], str(remote))
+    mock_github(lambda req: httpx.Response(200, json={"archived": True}))
+    with pytest.raises(RepoArchived):
+        await pipeline.move_to_github("EXMP", proj["user"], str(remote))
+    unchanged()
+    mock_github(_github_ok)
+    write_commit_push(proj["repos"]["other"], PRD_FILE, "갈라짐", "GitHub에서만")
+    before = g(remote, "rev-parse", "main")
+    with pytest.raises(PushFailed):  # 갈라진 GitHub — 되감지 않는다
+        await pipeline.move_to_github("EXMP", proj["user"], str(remote))
+    assert g(remote, "rev-parse", "main") == before and g(remote, "tag", "--list") == ""
+    unchanged()
+
+
+async def test_move_to_github_restores_origin_when_main_differs(
+    scoped: Session, proj, origins_dir, mock_github, tmp_path, monkeypatch
+) -> None:
+    """받아 온 main이 서버 저장소의 것과 다르면 원격을 서버 저장소로 되돌린다(UC-H23 5a)."""
+    await _on_server(proj, tmp_path)
+    remote, work = proj["repos"]["remote"], proj["repos"]["work"]
+    origin = origins_dir / "EXMP.git"
+    mock_github(_github_ok)
+
+    async def other_main(workdir, user=None) -> str:
+        return "0" * 40
+
+    monkeypatch.setattr(pipeline.git, "fetch", other_main)
+    with pytest.raises(PushFailed) as ei:
+        await pipeline.move_to_github("EXMP", proj["user"], str(remote))
+    assert "main이 다르다" in str(ei.value)
+    assert g(work, "remote", "get-url", "origin") == str(origin)
+    assert _repo_row(proj).storage == "server" and origin.exists()
+
+
+async def test_move_to_github_goes_on_when_hook_cannot_be_set(
+    scoped: Session, proj, origins_dir, mock_github, tmp_path, monkeypatch
+) -> None:
+    """통지를 못 걸어도 옮긴다 — 결과에 error가 실린다(UC-H23 7a)."""
+    monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "https://syncdoc.example")
+    await _on_server(proj, tmp_path)
+
+    def no_hooks(req: httpx.Request) -> httpx.Response:
+        if req.url.path.endswith("/hooks"):
+            return httpx.Response(403, json={"message": "Forbidden"})
+        return httpx.Response(200, json={"archived": False})
+
+    mock_github(no_hooks)
+    r = await pipeline.move_to_github("EXMP", proj["user"], str(proj["repos"]["remote"]))
+    assert r.hook.hook == "error" and "403" in (r.hook.hook_error or "")
+    assert _repo_row(proj).storage == "github"

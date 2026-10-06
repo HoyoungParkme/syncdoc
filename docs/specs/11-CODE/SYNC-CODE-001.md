@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1393,6 +1393,16 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | MS 테스트 관점 · 라우터: `private`를 빼면 서버 기본값, `false`면 공개로 만든다 · MCP 도구가 `private`를 넘긴다 · `check_ui` UI-3 · 운영: 2.6을 켜면 2.8이 보이고 비공개가 골라져 있다 |
 | 선행 | — |
 | 완료 | 2026-10-07 · 브랜치 `card/BS-repo-visibility`(a0b46e5 #322) · spec 10 + code 5 · 테스트 447 · `ruff`·`tsc`·`oxlint`·`build` · `validate` 0/0 · `check_code` 167/167 · `check_calls` 0/0 · `check_dom` 0 · `check_ui` 14/14(UI-3 요소 17) · 운영: 전체 재생성 뒤 `create_repo(token, owner, name, private)` · MCP 설명에 「공개 여부는 private로 고르고, 빼면 비공개」 · 공개 번들에 2.8(비공개·공개) · 공개 주소 200 · 화면은 사람이 직접(DEV-17) |
+
+#### BT 서버 저장 → GitHub 저장으로 되돌리기 — 가지·태그를 해시 그대로 push, 서버 저장소는 보관
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UC-001#UC-H23]] · [[SYNC-SEQ-001#SEQ-34]] · [[SYNC-PRD-001#R14]] · 카드 BQ의 반대 · 사용자 결정 2026-10-06(공개로 올라가는 것은 상관없다 — 서버 저장으로 옮긴 8개를 보안 검토 뒤 GitHub로 되돌린다. 공개 여부는 프로젝트마다 GitHub에서 정한다 · 보안 이슈가 있는 일은 싱크독_로컬) |
+| 구현 | [[SYNC-MS-007#pipeline.move_to_github]] · [[SYNC-MS-009#git.push_all]] · [[SYNC-MS-009#github.repo_archived]] · [[SYNC-MS-001#ProjectService.archive_origin]] · 라우터 [[SYNC-API-001#POST/api/admin/repos/{code}/move-to-github]] · 새 오류 `repo-archived` · `storage-mismatch`에 「이미 GitHub 저장」 · `Storage` 주석(옮길 때만 바뀐다) |
+| 테스트 | MS 테스트 관점 · 라우터 200·404·409·422 · 운영: 8개(CCR·HB·IMBC·INS·JSD·PAW·QBOT·VA)를 GitHub 보관을 푼 뒤 옮기고 GitHub `main`·가지·태그가 서버 저장소와 같은 해시 · 문서 수·버전 수가 옮기기 전과 같음 · 웹훅 · fetch 오류 0 |
+| 선행 | BQ · BS |
+| 완료 | — |
 
 ---
 

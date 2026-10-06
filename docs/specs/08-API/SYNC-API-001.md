@@ -2,7 +2,7 @@
 doc_id: SYNC-API-001
 type: API
 title: API 명세 REST — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -65,20 +65,21 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:project-code-invalid` | 422 | 코드 형식 | `rule` | [[SYNC-UC-001#UC-A1]] 2b |
 | `urn:syncdoc:invalid-request` | 422 | 요청 본문·쿼리·경로 값이 정의(아래 3장 스키마)에 안 맞다 — 입력 검증. `detail`은 첫 오류 한 줄(`body.to — …`) | `errors: [{loc, msg}]` — `loc`은 `body.to`처럼 점으로 이은 위치 | — |
 | `urn:syncdoc:existing-specs` | 409 | `docs/specs/` 이미 있음. 서버 저장이면 같은 코드의 **보관된 저장소**가 있음 | `doc_count` · `archived_at`(보관본일 때만, 가장 최근 것을 보관한 때) | [[SYNC-UC-001#UC-A1]] 3a, 3b |
-| `urn:syncdoc:storage-unavailable` | 422 | 이 서버에서 켜지 않은 저장 방식으로 프로젝트를 만들려 함 | `storage` · `enabled: [켜진 방식…]` | [[SYNC-UC-001#UC-A1]] 1a |
+| `urn:syncdoc:storage-unavailable` | 422 | 이 서버에서 켜지 않은 저장 방식으로 프로젝트를 만들거나 옮기려 함 | `storage` · `enabled: [켜진 방식…]` | [[SYNC-UC-001#UC-A1]] 1a, [[SYNC-UC-001#UC-H23]] 2c |
 | `urn:syncdoc:forbidden-origin` | 403 | 폐쇄망판에서 요청 Host가 허용 목록 밖이거나, 쓰기 요청의 Origin이 이 서버가 아니다 — 로그인이 없는 웹을 다른 이름·다른 사이트가 부르는 것을 막는다 | `host` 또는 `origin` | [[SYNC-PRD-001#R15]] |
-| `urn:syncdoc:storage-mismatch` | 409 | 서버 저장 프로젝트에만 되는 일을 GitHub 저장 프로젝트에 — 코드 올리기. 또는 이미 서버 저장인 프로젝트를 서버 저장으로 옮기려 함(카드 BQ) | `storage` | [[SYNC-UC-001#UC-A10]] 1a, [[SYNC-UC-001#UC-H22]] 2b |
+| `urn:syncdoc:storage-mismatch` | 409 | 서버 저장 프로젝트에만 되는 일을 GitHub 저장 프로젝트에 — 코드 올리기. 또는 이미 서버 저장인 프로젝트를 서버 저장으로 옮기려 함(카드 BQ), 이미 GitHub 저장인 프로젝트를 GitHub로 되돌리려 함(카드 BT) | `storage` | [[SYNC-UC-001#UC-A10]] 1a, [[SYNC-UC-001#UC-H22]] 2b, [[SYNC-UC-001#UC-H23]] 2b |
 | `urn:syncdoc:origin-exists` | 409 | 서버 저장으로 옮기려는데 그 코드의 서버 저장소 자리(`ORIGINS_DIR/{코드}.git`)에 이미 무언가 있다 — 지난 실패의 찌꺼기나 사람이 둔 것. 아무것도 지우지 않는다(카드 BQ) | `path` | [[SYNC-UC-001#UC-H22]] 2c |
+| `urn:syncdoc:repo-archived` | 409 | GitHub로 되돌리려는 저장소가 보관(archive) 중이라 push할 수 없다 — GitHub에서 보관을 풀고 다시(카드 BT) | `remote_url` | [[SYNC-UC-001#UC-H23]] 3b |
 | `urn:syncdoc:upload-too-large` | 413 | 코드 올리기 한도 초과 — UTF-8 합 5MB 또는 파일+지운 경로 500개. 나눠 보낸다 | `limit` · `size` · `count` | [[SYNC-UC-001#UC-A10]] 2a |
 | `urn:syncdoc:upload-path-refused` | 422 | 올릴 수 없는 경로 — 절대 경로·`..`·`.git` 조각·명세 경로(`docs/specs/`)·비밀 꼴·글자가 아닌 내용·폴더와 겹침. **하나라도 있으면 아무것도 안 올린다** | `paths: [{path, reason}]` | [[SYNC-UC-001#UC-A10]] 2b |
 | `urn:syncdoc:repo-create-failed` | 424 | `create_repo`로 저장소를 못 만듦 — 이름 규칙·권한·다른 소유자 점유 | `reason` | [[SYNC-CODE-001#F]] |
-| `urn:syncdoc:push-failed` | 424 | 저장소 push 실패(GitHub이 거절했거나 닿지 않음). 서버 저장소는 서버 안이라 거의 없다 | `reason` | [[SYNC-UC-001#UC-A1]] 4a, [[SYNC-UC-001#UC-S7]] 2b |
+| `urn:syncdoc:push-failed` | 424 | 저장소 push 실패(GitHub이 거절했거나 닿지 않음). 서버 저장소는 서버 안이라 거의 없다 | `reason` | [[SYNC-UC-001#UC-A1]] 4a, [[SYNC-UC-001#UC-S7]] 2b, [[SYNC-UC-001#UC-H23]] 3a·4a·5a |
 | `urn:syncdoc:already-current` | 422 | 현재 버전으로 되돌리기 | — | [[SYNC-UC-001#UC-H7]] |
 | `urn:syncdoc:document-has-history` | 409 | 휴지통의 문서를 완전 삭제하려는데 아직 다른 문서가 가리킴 | `inbound_refs: [문서ID#항목ID…]` | [[SYNC-UC-001#UC-H18]] 7 |
 | `urn:syncdoc:document-trashed` | 409 | 휴지통에 있는 문서를 저장·상태 변경·다시 휴지통에 넣으려 함 | `trashed_at` | [[SYNC-UC-001#UC-A7]] 1a |
 | `urn:syncdoc:document-not-trashed` | 409 | 휴지통에 없는 문서를 되살리거나 완전 삭제하려 함 | — | [[SYNC-UC-001#UC-A8]] 1a |
 | `urn:syncdoc:rebuild-failed` | 500 | 재구축 중 실패, 롤백됨 | `reason` | [[SYNC-UC-001#UC-S6]] |
-| `urn:syncdoc:repository-already-registered` | 409 | 이미 등록된 저장소 | `code` (그 저장소를 쓰는 프로젝트) | [[SYNC-UC-001#UC-A1]] 2d |
+| `urn:syncdoc:repository-already-registered` | 409 | 이미 등록된 저장소 | `code` (그 저장소를 쓰는 프로젝트) | [[SYNC-UC-001#UC-A1]] 2d, [[SYNC-UC-001#UC-H23]] 2d |
 | `urn:syncdoc:email-taken` | 409 | 남이 이미 등록한 커밋 이메일 | `email` | UI-13 2.6 |
 | `urn:syncdoc:not-implemented` | 501 | 카드 스텁 — 아직 구현 안 된 경로 (`import_existing` 등). 슬라이스 진행 중에만 존재 | `card` | [[SYNC-STD-004#DEV-12]] |
 | `urn:syncdoc:llm-not-configured` | 503 | 모델 키가 없다 — 읽는 중 질의가 꺼져 있다 | — | [[SYNC-UC-001#UC-H19]] 2a |
@@ -1439,6 +1440,52 @@ MINISPEC 항목인데 코드에 함수가 없으면 `function: null`·`missing: 
         $ref: '#/components/responses/Problem'
 ```
 
+#### POST/api/admin/repos/{code}/move-to-github GitHub 저장으로 되돌린다
+
+화면 — (관리 API만, 카드 BT) · 유스케이스 [[SYNC-UC-001#UC-H23]] · 서비스 [[SYNC-MS-007#pipeline.move_to_github]]
+
+```yaml
+/api/admin/repos/{code}/move-to-github:
+  post:
+    summary: >
+      서버 저장 프로젝트를 GitHub 저장으로 되돌린다 ([[SYNC-UC-001#UC-H23]] — move-to-server의 반대). 서버
+      저장소의 가지·태그를 커밋 해시 그대로 GitHub 저장소에 push하고(되감지 않고 한꺼번에) 작업 사본의 원격과
+      저장 방식을 바꾼 뒤 push 통지를 건다. 서버 저장소는 보관 폴더로 옮긴다. DB(버전·상태 이력·대화·코드 그래프)는
+      그대로고 GitHub 저장소의 공개 여부는 바꾸지 않는다. 실패하면 싱크독 쪽은 아무것도 바뀌지 않는다. 소유자만.
+      화면이 없다. 409는 storage-mismatch(이미 GitHub 저장)·repository-already-registered(다른 프로젝트의 주소)·
+      repo-archived(GitHub 저장소가 보관 중), 422는 storage-unavailable(GitHub 저장을 안 켬), 424는
+      push-failed(닿지 않음·거절·받아 온 main이 다름)
+    parameters:
+    - $ref: '#/components/parameters/code'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - remote_url
+            properties:
+              remote_url:
+                type: string
+                format: uri
+                description: 되돌릴 GitHub 저장소 주소. 옮기기 전의 그 저장소 또는 새로 만든 빈 저장소 — 보관이 풀려 있어야 한다
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveResult'
+      '404':
+        $ref: '#/components/responses/Problem'
+      '409':
+        $ref: '#/components/responses/Problem'
+      '422':
+        $ref: '#/components/responses/Problem'
+      '424':
+        $ref: '#/components/responses/Problem'
+```
+
 ---
 
 #### POST/api/admin/repos/{code}/sync 지금 가져오기
@@ -2204,11 +2251,11 @@ components:
           description: 이번에 새로 걸었나. 이미 있었으면 false
     MoveResult:
       type: object
-      description: 서버 저장으로 옮긴 결과 (카드 BQ)
+      description: 저장 방식을 옮긴 결과 — 서버 저장으로(카드 BQ)·GitHub 저장으로(카드 BT)
       properties:
         origin:
           type: string
-          description: 서버 저장소 자리(ORIGINS_DIR/{코드}.git)
+          description: 옮긴 뒤의 원격 — 서버 저장소 자리(ORIGINS_DIR/{코드}.git) 또는 GitHub 저장소 주소
         head:
           type: string
           description: 옮긴 뒤 origin/main 커밋
