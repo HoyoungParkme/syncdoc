@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -385,6 +385,21 @@ C2에 따라 **저장소가 원본이고 DB는 색인**이다. 어느 쪽에 무
 
 **복구 불가 항목은 대화·첨부뿐이다.** 원본에 없는 것 중 프로젝트 등록과 발급 토큰은 다시 만들면 되고, 대화·첨부는 메모라 잃어도 명세는 그대로다(2026-09-29 사용자 결정 — 보관은 편의이지 원본이 아니다). DB 백업(8장)이 유일한 보호다. 끊어진 참조도 본문에서 재추출된다 — `is_missing`은 저장된 사실이 아니라 대상이 있는지를 본 결과다. v1에는 플래그·전파결정·댓글이 있어 세 표를 자연키 JSON으로 저장소 `backup/tracking.json`에 하루 한 번 커밋했다(옛 6.1). 셋을 빼면서([[SYNC-DOM-001]] 3.3) 백업도 함께 사라졌다. 그 파일은 각 저장소에 그대로 두고 지우지 않는다 — 파이프라인이 보는 경로(`docs/specs/`) 밖이라 아무것도 오해하지 않고, 옛 기록을 태그 `v1-collab`의 코드로 되살릴 유일한 사본이다.
 
+
+### 6.1 정기 백업 (카드 BR)
+
+**노트북이 유일한 사본이다** — 서버 저장 프로젝트는 GitHub에 원본이 없다(2026-10-04, 카드 BQ). 그래서 `scripts/backup.sh`가 하루 한 번 묶어 노트북 밖에 둔다.
+
+| 항목 | 값 |
+|---|---|
+| 담는 것 | DB 덤프(`pg_dump -Fc` — 등록·버전·상태 이력·대화·첨부·토큰 해시 전부)와 볼륨 `origins`(서버 저장소 원본·보관본). 작업 사본(`repos`)은 원본에서 다시 clone되니 뺀다. **`.env`는 담지 않는다** — 비밀 키는 따로 보관한다(없으면 저장된 GitHub 토큰을 못 풀어 다시 로그인) |
+| 암호화 | `gpg --symmetric --cipher-algo AES256`. 암호는 `~/.config/syncdoc/backup.pass`(권한 600) — **사람이 만들고 노트북 밖(비밀번호 관리자 등)에도 둔다. 잃으면 백업을 못 푼다** |
+| 자리 | `BACKUP_DIR` — 기본 구글 드라이브 `내 드라이브/syncdoc-backup`(`/mnt/g/…`). 동기화 폴더라 노트북을 잃어도 남고, 내용은 암호화돼 드라이브가 읽지 못한다 |
+| 주기·보관 | crontab 매시 정각에 부르고 오늘 것이 있으면 건너뛴다 — 하루 한 번, 꺼져 있던 날도 켜진 뒤 첫 정각에. 최근 `BACKUP_KEEP`(기본 14)개만 남긴다 |
+| 설정 | `~/.config/syncdoc/backup.env`(비밀 아님) — `BACKUP_DIR`·`BACKUP_KEEP`·`BACKUP_PASS_FILE` |
+| 기록 | `~/.local/state/syncdoc/backup.log` — 만든 것·건너뛴 이유(암호 파일 없음·드라이브 없음) |
+
+**복구** — ① `scripts/backup.sh --verify {파일}`로 풀리는지 본다 ② `gpg -d {파일} | tar -x` → `db.dump`·`origins.tar` ③ `docker compose exec -T db pg_restore --clean --if-exists -U syncdoc -d syncdoc < db.dump` ④ `docker compose cp`로 `origins.tar`를 앱 컨테이너 `/var/syncdoc/`에 풀고 ⑤ `docker compose up -d --build`. 작업 사본은 재구축(UC-S6)이나 다음 저장 때 다시 생긴다
 ---
 
 ## 7. 외부 변경 감지
