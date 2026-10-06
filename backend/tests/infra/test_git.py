@@ -256,6 +256,53 @@ async def test_set_origin_then_fetch_reads_the_new_remote(
     assert git(dest, "rev-parse", "main") != git(repos["remote"], "rev-parse", "main")
 
 
+# ── push_all (카드 BT) ──
+async def _server_with_branch(repos: dict[str, Path], tmp_path: Path) -> Path:
+    """서버 저장소 흉내 — 원격을 복제하고 가지·태그를 하나씩 더한다."""
+    src = tmp_path / "origins" / "EXMP.git"
+    await g.clone_bare(str(repos["remote"]), src, None)
+    git(src, "branch", "feat", "main")
+    git(src, "tag", "v1", "main")
+    return src
+
+
+async def test_push_all_copies_branches_and_tags(repos: dict[str, Path], tmp_path: Path) -> None:
+    """가지·태그가 같은 해시로 올라가고 올린 main을 돌려준다. 다시 불러도 그대로 끝."""
+    src = await _server_with_branch(repos, tmp_path)
+    dest = tmp_path / "github.git"
+    git(tmp_path, "init", "-q", "--bare", "-b", "main", str(dest))
+    assert await g.push_all(src, str(dest), None) == git(src, "rev-parse", "main")
+    for ref in ("main", "feat", "v1"):
+        assert git(dest, "rev-parse", ref) == git(src, "rev-parse", ref)
+    assert await g.push_all(src, str(dest), None) == git(src, "rev-parse", "main")
+    assert "[remote" not in (src / "config").read_text(encoding="utf-8")
+
+
+async def test_push_all_refuses_diverged_and_changes_nothing(
+    repos: dict[str, Path], tmp_path: Path
+) -> None:
+    """원격 main이 갈라졌으면 GitError — 한꺼번에(atomic)라 새 가지도 안 생긴다. 되감지 않는다."""
+    src = await _server_with_branch(repos, tmp_path)
+    pusher = tmp_path / "pusher"
+    git(tmp_path, "clone", "-q", str(src), str(pusher))
+    write_commit_push(pusher, SEED, "서버에서", "서버")  # 서버 저장소가 앞선다
+    write_commit_push(repos["other"], SEED, "GitHub에서", "갈라짐")  # 원격도 따로 앞선다
+    before = git(repos["remote"], "rev-parse", "main")
+    with pytest.raises(g.GitError):
+        await g.push_all(src, str(repos["remote"]), None)
+    assert git(repos["remote"], "rev-parse", "main") == before
+    assert git(repos["remote"], "branch", "--list", "feat") == ""
+
+
+async def test_push_all_hides_token(repos: dict[str, Path], tmp_path: Path) -> None:
+    """닿지 않는 https 원격 — 예외 메시지와 config에 토큰이 없다."""
+    src = await _server_with_branch(repos, tmp_path)
+    with pytest.raises(g.GitError) as ei:
+        await g.push_all(src, "https://127.0.0.1:9/o/r.git", "s3cr3t")
+    assert "s3cr3t" not in str(ei.value)
+    assert "s3cr3t" not in (src / "config").read_text(encoding="utf-8")
+
+
 # ── init_bare (카드 BA) ──
 async def test_init_bare_is_main_and_refuses_rewrites(tmp_path: Path) -> None:
     origin = tmp_path / "o" / "X.git"  # 상위 폴더가 없어도 만든다
