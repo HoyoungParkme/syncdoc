@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -73,7 +73,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **입력** `doc_id` 지금 열린 문서 — 시작 맥락 · `item_id` 보고 있는 항목. 힌트일 뿐이라 `None`이면 문서 전체로 시작한다 · `conversation_id` 쌓을 대화. 앞 대화는 여기서 읽는다 — 클라이언트가 보내지 않는다 · `question` 사람이 쓴 질문 · `attachment_ids` 이 대화에 올려 두고 아직 안 보낸 첨부. 이 질문의 턴에 붙는다
 
 **처리** — ReAct 루프. 모델이 읽기 도구를 스스로 부르고, 진행이 이벤트로 흘러 나간다. 쓰는 것은 대화 표뿐이다
-0. `if not settings.LLM_API_KEY → ! LlmNotConfigured`(네트워크 전) · `ProjectService.get_owned(doc_id.split("-")[0], user)` — 남의 것이면 `! not-found {resource: project}` · [[SYNC-MS-010#ConversationService.get]]`(conversation_id, user)` — 내 것이 아니거나 그 프로젝트가 아니면 `! not-found {resource: conversation}`
+0. `if not settings.llm_enabled → ! LlmNotConfigured`(네트워크 전 — 키와 주소, 카드 BU) · `ProjectService.get_owned(doc_id.split("-")[0], user)` — 남의 것이면 `! not-found {resource: project}` · [[SYNC-MS-010#ConversationService.get]]`(conversation_id, user)` — 내 것이 아니거나 그 프로젝트가 아니면 `! not-found {resource: conversation}`
 1. 세션 하나에서 `history = ConversationService.history(conversation_id, settings.LLM_MAX_TURNS)` · `turn = ConversationService.add_turn(conversation_id, question, attachment_ids)` · `images = ConversationService.pending_images(turn.id)` · `doc = SpecService.get_document(doc_id)` + `describe_documents([doc.id])`(제목) → 시작 맥락: 제목·상태·버전 + 이 문서의 **모든 항목 `ID 이름`** + `item_id`가 있으면 `[지금 보는 항목] {item_id} {display_name}` + 이 대화의 첨부가 있으면 `[첨부] {id} {name} ({종류}, {크기})` 줄들(글자·PDF는 「read_attachment로 읽을 수 있다」, 이미지는 「이 질문에 보인다」) · `item_id`가 이 문서에 없으면 `! not-found {resource: item}`(턴은 `error`로 닫는다) · **본문은 싣지 않는다** — 필요한 본문은 모델이 도구로 읽는다
 2. `yield AskStart(doc_id, item_id)` — 이 앞의 예외는 HTTP 상태로, 이 뒤는 `error` 이벤트로 나간다([[SYNC-API-001]] 1장). 이 뒤의 예외는 **`finish_turn(turn.id, error=…)`로 턴을 닫은 뒤** 던진다
 3. `t0 = monotonic()` · `calls = 0` · `reads: list[str] = []` · `progress: list[dict] = []`(yield하는 note·read를 그대로 모은다) · 대화록 = `history` + `{role: user, text: question, images}`
@@ -228,7 +228,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 **입력** `code` 프로젝트 · `key` 고른 함수(`파일:줄`, `functions[].key`). `None`이면 그래프 전체 · 나머지는 [[#queries.ask_item]]과 같다
 
 **처리** — [[#queries.ask_item]]과 같은 루프(`_ask_loop`). 다른 것은 0단계와 시작 맥락뿐
-0. `if not settings.LLM_API_KEY → ! LlmNotConfigured` · `project = ProjectService.get_owned(code, user)` · 대화 검사·`history`·`add_turn`·첨부 목록은 `ask_item` 1과 같다
+0. `if not settings.llm_enabled → ! LlmNotConfigured` · `project = ProjectService.get_owned(code, user)` · 대화 검사·`history`·`add_turn`·첨부 목록은 `ask_item` 1과 같다
 1. `row = CodeGraphService.get(project.id)` — 없으면 `graph_line = "코드 그래프 없음 — 코드를 push하면 만들어진다"`(2b), 있으면 `[코드 그래프] 커밋 {7자} · 함수 N · 호출 M`
 2. `docs = SpecService.list_by_project(project.id)` + `describe_documents` → `[문서 목록]` 줄마다 `ID 제목 · 상태`(본문 없음 — 사용자 결정 3)
 3. `key`가 있으면: `f = functions 중 key` · 없으면 `! not-found {resource: function}` · `d = codegraph.compare(graph, spec_calls)` 중 이 함수 → `[보는 함수] {qual} · {file}:{line}-{end} · 항목 {ms} ({status})`(줄 범위는 read_code가 받는 꼴 그대로 하이픈 — 모델은 본 꼴을 보낸다, #286) · 대조가 없고 `f.item`이 있으면 `항목 {item}`(API·UI 항목 — 카드 BK) · 둘 다 없고 층이 있으면 `층 {이름} · {명세 조각들}`(2a와 같은 `layers`, 도우미는 `층 도우미`, 카드 BM) · 그것도 없으면 `항목 없음` · `[부르는 것 n]`·`[불리는 곳 n]` 줄마다 `qual · file:line · 항목`(같은 규칙, 각 20까지, 넘으면 `… k개 더`). `key`가 없으면 `[보는 것] 그래프 전체`
