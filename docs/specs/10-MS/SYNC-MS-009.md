@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-009
 type: MS
 title: MINISPEC — infra — git·github 어댑터
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -445,22 +445,22 @@ async def sync_readme(workdir: Path, author: Author, code: str) -> str | None
 
 ---
 
-#### github.create_repo 저장소 만들기 — 기본 비공개
+#### github.create_repo 저장소 만들기 — 공개 여부는 부르는 쪽이 고른다
 
-**시그니처** `async def create_repo(token: str, owner: str, name: str) -> str`
+**시그니처** `async def create_repo(token: str, owner: str, name: str, private: bool) -> str`
 
-근거: [[SYNC-CODE-001#F]] · [[SYNC-UC-001#UC-A1]] 기본 흐름 3 · #310(사용자 결정 2026-10-04 — 새 저장소는 비공개가 기본, 공개는 설정으로 명시할 때만)
+근거: [[SYNC-CODE-001#F]] · [[SYNC-CODE-001#BS]] · [[SYNC-UC-001#UC-A1]] 기본 흐름 3 · #310(2026-10-04 — 비공개 지원) · 사용자 결정 2026-10-06(공개 여부는 만들 때 고르고, 고르지 않으면 비공개)
 
 **처리**
 1. `GET https://api.github.com/repos/{owner}/{name}` — 이미 있으면 **만들지 않고** 그 `clone_url`을 돌려준다. **공개 여부도 바꾸지 않는다** — if 그 저장소가 공개(`private`가 거짓) → `log.warning`만
-2. 없으면 `POST https://api.github.com/user/repos` (Bearer) · `{name, private: settings.GITHUB_REPO_PRIVATE, auto_init: false}` — 설정 기본은 참([[SYNC-INFRA-001]] 5.2)
+2. 없으면 `POST https://api.github.com/user/repos` (Bearer) · `{name, private, auto_init: false}` — `private`는 부르는 쪽이 정한다. 고르지 않았을 때의 기본(비공개)은 [[SYNC-MS-001#ProjectService.init_project]]가 채운다
 3. `→ clone_url`
 
 **출력** `https://github.com/{owner}/{name}.git`
 
 **예외** `! repo-create-failed {reason}` — 이름이 GitHub 규칙에 안 맞거나, 토큰 권한이 모자라거나, 같은 이름이 **다른 소유자 아래** 있어 접근이 안 될 때. if 403·404 → 사유 끝에 「비공개 저장소는 repo 권한이 필요하다 — 권한을 넓히기 전에 받은 토큰이면 다시 로그인」
 
-**비공개가 기본이다**(#310). 전에는 v1이 공개 저장소만 지원해(fetch가 토큰 없이 돌았다) 늘 공개로 만들었고, 그래서 명세가 실수로 공개됐다. 이제 [[#git.fetch]]가 등록자 토큰으로 읽으므로 비공개도 동기화된다. 공개는 `GITHUB_REPO_PRIVATE=false`로 서버가 명시할 때만 — 요청마다 고르는 인자는 두지 않는다. GitHub은 비공개 생성에 OAuth `repo` 범위를 요구한다([[SYNC-INFRA-001]] 5장) — 범위를 넓히기 전에 받은 토큰은 403·404로 거절되므로 예외 사유가 다시 로그인을 말한다
+**공개 여부는 만들 때 고른다 — 고르지 않으면 비공개다**(카드 BS). v1은 공개 저장소만 지원해(fetch가 토큰 없이 돌았다) 늘 공개로 만들었다. #310(2026-10-04)이 비공개를 지원하며 서버 설정 하나로 비공개를 기본으로 했다. 2026-10-06 사용자가 「private도 지원하고, 공개로 올라가는 것은 상관없게」로 다시 잡아 요청마다 고르게 했다 — 보안 이슈가 있는 일은 싱크독_로컬([[SYNC-PRD-001#R15]])이 맡는다. 이제 [[#git.fetch]]가 등록자 토큰으로 읽으므로 비공개도 동기화된다. GitHub은 비공개 생성에 OAuth `repo` 범위를 요구한다([[SYNC-INFRA-001]] 5장) — 범위를 넓히기 전에 받은 토큰은 403·404로 거절되므로 예외 사유가 다시 로그인을 말한다
 
 **이미 있는 저장소의 공개 여부를 바꾸지 않는 이유.** 사람이 GitHub에서 정한 것이다 — 등록이 그것을 몰래 바꾸면 안 된다. 공개면 경고 로그로 남겨 사람이 알아채게 한다
 
@@ -468,7 +468,7 @@ async def sync_readme(workdir: Path, author: Author, code: str) -> str | None
 
 **이미 있으면 만들지 않는 이유.** 같은 인자로 두 번 불러도 결과가 같아야 한다 — 등록이 중간에 실패해 사람이 다시 부를 때 "이미 있다"로 막히면 손으로 지워야 한다
 
-**테스트 관점** 기본 설정 → POST 바디 `private: true` · 설정 거짓 → `private: false` · 이미 있는 공개 저장소 → POST 없이 그 `clone_url` + 경고 로그 · 이미 있는 비공개 저장소 → 경고 없음 · 403 → `repo-create-failed`에 다시 로그인 안내
+**테스트 관점** `private=True` → POST 바디 `private: true` · `private=False` → `private: false` · 이미 있는 공개 저장소 → POST 없이 그 `clone_url` + 경고 로그 · 이미 있는 비공개 저장소 → 경고 없음 · 403 → `repo-create-failed`에 다시 로그인 안내
 
 
 ---
