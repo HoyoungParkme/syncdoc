@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-007
 type: MS
 title: MINISPEC — pipeline — 쓰기 조율
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -37,6 +37,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#pipeline.purge_document]] | 완전 삭제 |
 | [[#pipeline.upload_code]] | 서버 저장소에 코드 올리기 |
 | [[#pipeline.move_to_server]] | GitHub 저장을 서버 저장으로 옮기기 |
+| [[#pipeline.move_to_github]] | 서버 저장을 GitHub 저장으로 되돌리기 |
 | [[#scheduler.catch_up]] | 밀린 커밋 따라잡기 |
 | [[#scheduler.poll_loop]] | 주기 폴링 |
 
@@ -519,6 +520,44 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 **호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-006#AccountService.github_token_for]] · [[SYNC-MS-009#git.fetch]] [[SYNC-MS-009#git.clone_bare]] [[SYNC-MS-009#git.rev_list_count]] [[SYNC-MS-009#git.set_origin]] · [[SYNC-MS-001#ProjectService.remove_hook]]
 
 **테스트 관점** 옮긴 뒤 서버 저장소의 가지·태그가 원격과 같은 해시 · `storage=server`·`remote_url`이 서버 저장소·통지 칸이 빈다 · 작업 사본의 원격이 서버 저장소 · 문서·버전 수가 그대로 · 그 뒤 `read_pending`이 서버 저장소에서 읽는다 · 남의 것 → not-found · 이미 서버 → storage-mismatch · 자리에 무언가 있으면 origin-exists이고 그것을 안 건드린다 · 복제 실패 → push-failed, 자리·원격·DB 그대로 · 통지 거두기가 실패해도 옮긴다(결과에 error)
+
+---
+
+#### pipeline.move_to_github 서버 저장을 GitHub 저장으로 되돌리기
+
+**시그니처** `async def move_to_github(code: str, user: User, remote_url: str) -> MoveResult`
+
+근거: [[SYNC-SEQ-001#SEQ-34]] · [[SYNC-UC-001#UC-H23]] · [[SYNC-API-001#POST/api/admin/repos/{code}/move-to-github]] · [[SYNC-PRD-001#R14]] · 카드 BT(사용자 결정 2026-10-06 — 서버 저장으로 옮긴 프로젝트를 GitHub로 되돌린다. DB는 그대로, 커밋 해시도 그대로)
+
+**처리**
+0. `project = ProjectService.get_owned(code, user)` — 남의 것이면 `! not-found {resource: project}` (2a)
+1. if `project.repository.storage == github` → `! storage-mismatch {storage: github}` 「이미 GitHub 저장이다」 (2b)
+1a. if `"github" not in settings.storage_modes` → `! storage-unavailable {storage: github, enabled}` (2c)
+2. if 다른 프로젝트가 `remote_url`을 쓴다(정규화 일치 — [[SYNC-MS-001#ProjectService.init_project]] 2a와 같은 규칙) → `! repository-already-registered {code: 그 프로젝트}` (2d)
+3. `token = AccountService.github_token_for(user)` — 없으면 `! unauthorized`
+4. **읽기 락 → 쓰기 락**(`read_lock(code)` 다음 `_lock(code)`) — [[#pipeline.move_to_server]] 4와 같은 순서
+5. `owner, name = remote_url에서 뜬다` · `archived = github.repo_archived(token, owner, name)` — 닿지 않으면(`unauthorized`) → `! push-failed {reason: GitHub 저장소에 닿지 않는다 …}` (3a) · if `archived` → `! repo-archived {remote_url}` (3b)
+6. `origin = Path(remote_url 칸)`(서버 저장소) · `src = git.push_all(origin, remote_url, token)` — 가지·태그를 되감지 않고 한꺼번에. 거절되면(`GitError`) → `! push-failed {reason}` — 아무것도 바뀌지 않는다 (4a)
+7. `git.set_origin(workdir, remote_url)` · `head = git.fetch(workdir, user)` — if `head != src` → 7a
+   - 7a. `git.set_origin(workdir, str(origin))`로 되돌리고 `! push-failed {reason: main이 다르다}` (5a). fetch가 실패해도 같다
+8. `DB: repositories update storage=github, remote_url=remote_url, hook_id=null, hook_error=null` · 커밋 — 실패하면 7a처럼 원격을 되돌리고 다시 올린다
+9. `hook = ProjectService.ensure_hook(code, user)` — 실패는 상태로 받고 계속한다(7a). `ensure_hook`이 상태로 돌려주지 않는 실패(연결 끊김 따위)도 삼키고 사유를 `hook_error`에 적는다([[SYNC-MS-001#ProjectService.init_project]] 9a와 같다)
+10. `ProjectService.archive_origin(code)` — 서버 저장소를 보관 폴더로 옮긴다. 지우지 않는다
+11. `→ MoveResult(origin=remote_url, head, hook)`
+
+**출력** [[SYNC-API-001]] `MoveResult`
+
+**예외** `not-found`(0) · `storage-mismatch`(1) · `storage-unavailable`(1a) · `repository-already-registered`(2) · `unauthorized`(3) · `push-failed`(5·6·7) · `repo-archived`(5)
+
+**DB는 건드리지 않는다.** [[#pipeline.move_to_server]]와 같은 이유다 — push가 커밋 해시를 그대로 옮긴다. 저장소 행의 저장 방식·원격·통지 칸만 바뀐다. **공개 여부는 바꾸지 않는다** — 사람이 GitHub에서 미리 정한다(UC-A1 3과 같은 원칙). GitHub 저장소의 보관을 푸는 것도 운영이 한다
+
+**GitHub에 올라간 것은 되돌리지 않는다.** 7a에서 되돌릴 때 GitHub에 이미 올라간 가지·태그는 서버 저장소와 같은 커밋이다 — 그대로 두면 다시 불렀을 때 이어서 된다. 앱이 남의 저장소에서 지우는 권한을 쓰지 않는다([[SYNC-MS-001#ProjectService.init_project]]의 「저장소는 남는다」와 같다)
+
+**git 입구의 push는 이 락 밖이다.** 옮기는 동안 서버 저장소로 push하지 않는다(혼자 쓰는 운영 도구). 8 뒤로는 GitHub 저장이라 git 입구가 이 프로젝트를 not-found로 막는다([[SYNC-MS-001#ProjectService.server_origin]])
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-006#AccountService.github_token_for]] · [[SYNC-MS-009#github.repo_archived]] · [[SYNC-MS-009#git.push_all]] [[SYNC-MS-009#git.set_origin]] [[SYNC-MS-009#git.fetch]] · [[SYNC-MS-001#ProjectService.ensure_hook]] [[SYNC-MS-001#ProjectService.archive_origin]]
+
+**테스트 관점** 되돌린 뒤 GitHub(흉내 bare)의 가지·태그가 서버 저장소와 같은 해시 · `storage=github`·`remote_url`이 그 주소 · 작업 사본의 원격이 그 주소 · 문서·버전 수가 그대로 · 서버 저장소가 보관 폴더로 갔다 · 그 뒤 들어온 커밋은 GitHub에서 읽는다 · 남의 것 → not-found · 이미 GitHub → storage-mismatch · GitHub 저장을 안 켬 → storage-unavailable · 다른 프로젝트의 주소 → repository-already-registered · 보관 중 → repo-archived · 닿지 않음 → push-failed · **갈라진 GitHub → push-failed이고 GitHub의 가지가 하나도 안 바뀐다** · 모두 싱크독 쪽(저장 방식·원격·서버 저장소)은 그대로 · 통지를 못 걸어도 옮긴다(결과에 error)
 
 ---
 
