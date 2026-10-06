@@ -1373,7 +1373,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | [[SYNC-MS-007#pipeline.move_to_server]] · [[SYNC-MS-001#ProjectService.remove_hook]] · [[SYNC-MS-009#git.clone_bare]] · [[SYNC-MS-009#git.set_origin]] · [[SYNC-MS-009#github.delete_hook]] · 라우터 [[SYNC-API-001#POST/api/admin/repos/{code}/move-to-server]] · 새 오류 `origin-exists` · `storage-mismatch`에 「이미 서버 저장」 |
 | 테스트 | MS 테스트 관점 · 라우터 200·404·409 · 운영: 8개(CCR·HB·IMBC·INS·JSD·PAW·QBOT·VA)를 옮기고 HEAD·문서 수·버전 수·코드 그래프·fetch 오류 0을 옮기기 전과 대조 |
 | 선행 | BA(서버 저장) · BP |
-| 완료 | — |
+| 완료 | 2026-10-04 · 브랜치 `card/BQ-move-to-server`(9644619 #314) · spec 8 + code 6 · 테스트 440 · `ruff` · `validate` 0/0 · `check_code` 167/167 · `check_calls` 0/0 · `check_dom` 0 · 운영: 8개(CCR·HB·IMBC·INS·JSD·PAW·QBOT·VA)를 관리 API로 옮김 — 처리 지점·문서 수·버전 수·코드 그래프 커밋·함수 수가 옮기기 전과 같음, 가지·태그가 GitHub와 커밋 해시까지 같음(CCR 14 · VA 11 …), fetch 오류 0, GitHub 웹훅 0(7개 지움, PAW는 없었음) · 그 뒤 GitHub 비공개+보관: HB·IMBC·JSD·QBOT·VA |
 ---
 
 ## 2. 통합 테스트 시나리오
