@@ -117,7 +117,7 @@ async def step_stream(
     화면용이고 LlmStep이 진실이다. 스트림을 무시하는 호환 서버(Content-Type이 text/event-stream이
     아님)면 본문을 JSON 하나로 읽는다. 실패는 step과 같이 llm-unavailable로 접는다.
     """
-    if not settings.LLM_API_KEY:
+    if not settings.llm_enabled:  # 키와 주소 — 싱크독_로컬은 주소 기본값이 없다 (카드 BU)
         raise LlmNotConfigured()
     body = _body(system, messages, tools, tool_choice)
     body["stream"] = True
@@ -130,7 +130,7 @@ async def step_stream(
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             async with client.stream(
                 "POST",
-                settings.LLM_API_URL,
+                settings.llm_url,
                 json=body,
                 headers={"Authorization": f"Bearer {settings.LLM_API_KEY}"},
             ) as r:

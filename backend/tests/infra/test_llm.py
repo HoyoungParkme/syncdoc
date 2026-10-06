@@ -93,7 +93,7 @@ async def test_sends_tools_and_conversation_in_wire_shape(mock_llm) -> None:
     got = await llm.step("지시문", msgs, TOOLS)
     assert got.text == "답이다" and got.tool_calls == [] and got.usage.prompt_tokens == 0
     req = calls[0]
-    assert req.method == "POST" and str(req.url) == settings.LLM_API_URL
+    assert req.method == "POST" and str(req.url) == settings.llm_url
     assert req.headers["authorization"] == "Bearer sk-test"
     body = json.loads(req.content)
     assert body["model"] == "test-model" and body["tool_choice"] == "auto"
