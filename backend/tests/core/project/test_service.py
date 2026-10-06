@@ -693,3 +693,25 @@ async def test_server_origin_only_for_the_owner_of_a_server_project(
     await svc.init_project(str(repos["remote"]), "GH", "깃허브", gh, import_existing=True)
     with pytest.raises(NotFound):
         svc.server_origin("GH", gh)  # GitHub 저장에는 git 입구가 없다
+
+
+def test_archive_origin_moves_to_archive_without_name_clash(
+    db_session: Session, origins_dir: Path
+) -> None:
+    """MS-001 archive_origin — 보관 폴더로 옮기고 그 자리를 준다. 없으면 None (카드 BT).
+
+    같은 초에 둘을 보관해도 이름이 겹치지 않는다.
+    """
+    svc = ProjectService(db_session)
+    assert svc.archive_origin("ARC") is None
+    dests = []
+    for n in range(2):
+        origin = origins_dir / "ARC.git"
+        origin.mkdir()
+        (origin / "HEAD").write_text(f"ref: refs/heads/main {n}\n", encoding="utf-8")
+        dest = svc.archive_origin("ARC")
+        assert dest is not None and dest.parent == origins_dir / "_archive"
+        assert not origin.exists()
+        assert (dest / "HEAD").read_text(encoding="utf-8").endswith(f"{n}\n")
+        dests.append(dest)
+    assert dests[0] != dests[1] and all(d.name.startswith("ARC-") for d in dests)

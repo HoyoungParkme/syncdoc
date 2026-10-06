@@ -391,6 +391,20 @@ class ProjectService:
             raise NotFound("project", code)
         return origin
 
+    def archive_origin(self, code: str) -> Path | None:
+        """SYNC-MS-001#ProjectService.archive_origin
+
+        GitHub로 되돌린 뒤 서버 저장소를 보관 폴더로 옮긴다(카드 BT) — 지우지 않는다. 자리는
+        init_project 3s·delete_project 4a와 같아 같은 코드로 가져오면 되살아난다. 소유는 부르는
+        쪽이 이미 봤다. 원본이 없으면 None.
+        """
+        origin = settings.ORIGINS_DIR / f"{code}.git"
+        if not origin.exists():
+            return None
+        dest = _archive_path(code)
+        origin.rename(dest)
+        return dest
+
     async def ensure_hook(self, code: str, user: User) -> HookStatus:
         """SYNC-MS-001#ProjectService.ensure_hook"""
         project = self.get_owned(code, user)  # 남의 것이면 not-found
