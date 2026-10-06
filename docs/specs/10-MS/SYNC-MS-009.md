@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-009
 type: MS
 title: MINISPEC — infra — git·github 어댑터
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -38,6 +38,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#git.init_bare]] | 서버 저장소 만들기 |
 | [[#git.clone_bare]] | 원격을 서버 저장소로 통째로 복제 |
 | [[#git.set_origin]] | 작업 사본의 원격 바꾸기 |
+| [[#git.push_all]] | 서버 저장소의 가지·태그를 원격으로 모두 push |
 | [[#git.http_backend]] | 서버 저장소 git 입구 — git http-backend를 CGI로 |
 | [[#git.archive]] | 커밋의 파일을 폴더에 푼다 |
 | [[#git.changed_paths]] | 범위에서 바뀐 경로 전부 |
@@ -45,9 +46,10 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#github.verify_signature]] | webhook 서명 |
 | [[#github.exchange_code]] | OAuth code → token |
 | [[#github.get_user]] | token → 사용자 정보 |
-| [[#github.create_repo]] | 저장소 만들기 — 기본 비공개 |
+| [[#github.create_repo]] | 저장소 만들기 — 공개 여부는 부르는 쪽이 고른다 |
 | [[#github.create_hook]] | push 통지 걸기 |
 | [[#github.delete_hook]] | push 통지 지우기 |
+| [[#github.repo_archived]] | 저장소가 보관 중인가 |
 | [[#llm.step]] | 모델 한 번 호출 + 도구 호출 파싱 |
 | [[#llm.step_stream]] | 스트림으로 한 번 호출 — 글자 조각과 끝의 LlmStep |
 | [[#graphify.extract]] | graphify로 코드만 추출 |
@@ -339,6 +341,26 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 ---
 
+#### git.push_all 서버 저장소의 가지·태그를 원격으로 모두 push
+
+**시그니처** `async def push_all(path: Path, remote_url: str, token: str | None) -> str`
+
+근거: [[SYNC-SEQ-001#SEQ-34]] · [[SYNC-UC-001#UC-H23]] 4 · 카드 BT — [[#git.clone_bare]]의 반대
+
+**처리**
+1. `url` — `token`이 있고 https면 토큰을 붙인 것([[#git.clone]]과 같은 규칙). 원격으로 등록하지 않고 그 자리에서만 쓴다 — 토큰이 든 주소가 config에 남지 않는다
+2. `git -C {path} push --atomic --porcelain {url} refs/heads/*:refs/heads/* refs/tags/*:refs/tags/*` — **`+`가 없어 되감지 않는다.** 원격이 갈라져 있으면 거절되고, `--atomic`이라 하나라도 거절되면 아무 ref도 바뀌지 않는다
+3. if 실패 또는 거절된 ref(`--porcelain`의 `!`)가 있으면 → `GitError`(토큰은 가린다)
+4. `→ git -C {path} rev-parse refs/heads/main` — 올린 `main`
+
+**출력** 올린 `main`의 커밋 해시. 부르는 쪽이 받아 온 원격 `main`과 맞춰 본다([[SYNC-MS-007#pipeline.move_to_github]] 7)
+
+**호출하는 것** —
+
+**테스트 관점** 가지·태그가 원격에 같은 해시로 있다 · 원격에 이미 있는 같은 커밋이면 그대로 끝 · **원격이 갈라졌으면 GitError이고 원격의 가지가 하나도 안 바뀐다**(다른 가지가 앞서 있어도) · 예외 메시지와 config에 토큰이 없다
+
+---
+
 #### git.http_backend 서버 저장소 git 입구
 
 **시그니처** `async def http_backend(root: Path, env: dict[str, str], body: AsyncIterator[bytes]) -> CgiResponse`
@@ -508,6 +530,20 @@ async def create_hook(token: str, owner: str, name: str, url: str, secret: str) 
 **호출하는 것** —
 
 **테스트 관점** 204 → 끝 · 404 → 끝 · 403 → unauthorized
+
+---
+
+#### github.repo_archived 저장소가 보관 중인가
+
+**시그니처** `async def repo_archived(token: str, owner: str, name: str) -> bool`
+
+근거: [[SYNC-MS-007#pipeline.move_to_github]] 5 · [[SYNC-UC-001#UC-H23]] 3 · 카드 BT
+
+**처리** `GET https://api.github.com/repos/{owner}/{name}` (Bearer) · 200 → `archived` 값 · 그 밖(없음·권한 없음 — GitHub은 권한 없는 비공개 저장소도 404로 답한다) → `! unauthorized {status message}`
+
+**호출하는 것** —
+
+**테스트 관점** 보관 중 → 참 · 아님 → 거짓 · 404 → unauthorized
 
 ---
 
