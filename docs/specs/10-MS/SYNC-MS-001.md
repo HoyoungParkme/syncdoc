@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-001
 type: MS
 title: MINISPEC — ProjectService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -39,6 +39,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#ProjectService.rebuild_index]] | 재구축 위임 |
 | [[#ProjectService.asset_path]] | 첨부 파일 경로 — 사람 경로 |
 | [[#ProjectService.server_origin]] | 서버 저장소 원본 경로 — git 입구 |
+| [[#ProjectService.archive_origin]] | 서버 저장소를 보관 폴더로 |
 
 ---
 
@@ -194,7 +195,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 async def ensure_hook(code: str, user: User) -> HookStatus
 ```
 
-근거: [[SYNC-INFRA-001]] 7장 · [[SYNC-UC-001#UC-A1]] 4·4a · [[SYNC-API-001#POST/api/admin/repos/{code}/hook]] · #115
+근거: [[SYNC-INFRA-001]] 7장 · [[SYNC-UC-001#UC-A1]] 4·4a · [[SYNC-API-001#POST/api/admin/repos/{code}/hook]] · #115 · [[SYNC-UC-001#UC-H23]] 7(GitHub로 되돌릴 때 다시 건다 — [[SYNC-MS-007#pipeline.move_to_github]] 9, 카드 BT)
 
 **처리**
 1. `get_owned(code, user)` — 남의 것이면 `! not-found {resource: project}`
@@ -328,6 +329,27 @@ async def sync_now(code: str, user: User) -> SyncResult
 **호출되는 것** routers/git(서버 저장소 git 입구 셋)
 
 **테스트 관점** 소유자·서버 저장 → 원본 경로 · 남의 서버 저장 프로젝트 → `not-found`(project) · 내 GitHub 저장 프로젝트 → 같은 `not-found` · 원본 폴더가 사라졌으면 `not-found`
+
+---
+
+#### ProjectService.archive_origin 서버 저장소를 보관 폴더로
+
+**시그니처** `def archive_origin(code: str) -> Path | None`
+
+근거: [[SYNC-UC-001#UC-H23]] 8 · [[SYNC-MS-007#pipeline.move_to_github]] 10 · 카드 BT
+
+**처리**
+1. `origin = ORIGINS_DIR/{code}.git` · if 없으면 → `None`
+2. `dest = ORIGINS_DIR/_archive/{code}-{UTC %Y%m%d%H%M%S}.git` — 같은 초에 둘이면 뒤에 번호. [[#ProjectService.init_project]] 3s·[[#ProjectService.delete_project]] 4a가 쓰는 자리와 같다 — 같은 코드로 서버 저장 프로젝트를 다시 만들 때 「기존 명세 가져오기」로 되살아난다
+3. `origin.rename(dest)` · `→ dest`
+
+**출력** 보관한 자리. 원본이 없었으면 `None`
+
+**지우지 않는다.** 원본을 잃는 길을 두지 않는다([[#ProjectService.init_project]]의 「서버 저장의 되돌림」과 같다). 소유는 부르는 쪽이 이미 봤다(`pipeline.move_to_github` 0) — 사람이 없는 경로라 `user`를 받지 않는다
+
+**호출하는 것** —
+
+**테스트 관점** 있으면 보관 폴더로 옮기고 그 자리를 돌려준다 · 원본 자리가 빈다 · 없으면 `None` · 같은 초에 둘을 보관해도 이름이 겹치지 않는다
 
 ---
 
