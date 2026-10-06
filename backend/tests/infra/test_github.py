@@ -27,7 +27,7 @@ def test_verify_signature_rejects_everything_when_secret_is_empty(
     assert gh.verify_signature(body, "") is False
 
 
-# ── create_repo (#310) ──
+# ── create_repo (#310 · 카드 BS) ──
 CLONE = "https://github.com/o/r.git"
 
 
@@ -37,20 +37,16 @@ def _no_repo_then_created(req: httpx.Request) -> httpx.Response:
     return httpx.Response(201, json={"clone_url": CLONE})
 
 
-async def test_create_repo_is_private_by_default(mock_github) -> None:
-    calls = mock_github(_no_repo_then_created)
-    assert await gh.create_repo("t", "o", "r") == CLONE
-    body = json.loads(calls[-1].content)
-    assert calls[-1].method == "POST" and body["private"] is True and body["auto_init"] is False
-
-
-async def test_create_repo_is_public_only_when_setting_is_false(
-    mock_github, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("private", [True, False])
+async def test_create_repo_posts_the_callers_visibility(
+    mock_github, monkeypatch: pytest.MonkeyPatch, private: bool
 ) -> None:
-    monkeypatch.setattr(settings, "GITHUB_REPO_PRIVATE", False)
+    """공개 여부는 부르는 쪽이 고른 그대로 — 서버 설정을 보지 않는다(기본은 init_project가 채운다)."""
+    monkeypatch.setattr(settings, "GITHUB_REPO_PRIVATE", not private)
     calls = mock_github(_no_repo_then_created)
-    await gh.create_repo("t", "o", "r")
-    assert json.loads(calls[-1].content)["private"] is False
+    assert await gh.create_repo("t", "o", "r", private) == CLONE
+    body = json.loads(calls[-1].content)
+    assert calls[-1].method == "POST" and body["private"] is private and body["auto_init"] is False
 
 
 @pytest.mark.parametrize("private", [False, True])
@@ -62,7 +58,7 @@ async def test_create_repo_keeps_existing_repo_and_warns_if_public(
         lambda req: httpx.Response(200, json={"clone_url": CLONE, "private": private})
     )
     with caplog.at_level("WARNING", logger="app.infra.github"):
-        assert await gh.create_repo("t", "o", "r") == CLONE
+        assert await gh.create_repo("t", "o", "r", True) == CLONE
     assert [c.method for c in calls] == ["GET"]
     warned = any("o/r" in r.getMessage() and "공개" in r.getMessage() for r in caplog.records)
     assert warned is (not private)
@@ -78,7 +74,7 @@ async def test_create_repo_forbidden_asks_to_log_in_again(mock_github) -> None:
 
     mock_github(h)
     with pytest.raises(RepoCreateFailed) as ei:
-        await gh.create_repo("t", "o", "r")
+        await gh.create_repo("t", "o", "r", True)
     assert "403" in str(ei.value) and "다시 로그인" in str(ei.value)
 
 

@@ -60,11 +60,11 @@ async def get_user(token: str) -> GithubUser:
     return GithubUser(id=d["id"], login=d["login"], name=d.get("name") or d["login"])
 
 
-async def create_repo(token: str, owner: str, name: str) -> str:
+async def create_repo(token: str, owner: str, name: str, private: bool) -> str:
     """SYNC-MS-009#github.create_repo
 
-    **비공개가 기본이다**(#310) — 공개는 서버가 GITHUB_REPO_PRIVATE=false로 명시할 때만.
-    이미 있는 저장소는 공개 여부를 바꾸지 않는다. 공개면 경고 로그만 남긴다.
+    **공개 여부는 부르는 쪽이 고른다**(카드 BS) — 고르지 않았을 때의 기본(비공개)은
+    init_project가 채운다. 이미 있는 저장소는 공개 여부를 바꾸지 않는다. 공개면 경고 로그만 남긴다.
 
     **auto_init을 쓰지 않는다.** GitHub이 초기 커밋을 만들면 README가 생겨
     "빈 저장소" 경로가 아니라 "내용 있는 저장소" 경로를 타 흐름이 갈린다.
@@ -82,7 +82,7 @@ async def create_repo(token: str, owner: str, name: str) -> str:
         r = await client.post(
             f"{_API}/user/repos",
             headers=auth,
-            json={"name": name, "private": settings.GITHUB_REPO_PRIVATE, "auto_init": False},
+            json={"name": name, "private": private, "auto_init": False},
         )
     if not r.is_success:
         detail = ""
