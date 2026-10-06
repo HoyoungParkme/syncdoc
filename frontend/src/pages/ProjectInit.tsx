@@ -1,5 +1,6 @@
 /** UI-3 프로젝트 초기화 — SYNC-UI-002#UI-3. **UI-2 위의 다이얼로그**. UC-A1 사람 경로.
- *  1 헤더 · 2 입력 폼(2.7 저장 방식, 2.1 주소, 2.2 코드, 2.3 이름, 2.4 코드 오류, 2.5 커밋될 것)
+ *  1 헤더 · 2 입력 폼(2.7 저장 방식, 2.1 주소, 2.2 코드, 2.3 이름, 2.4 코드 오류, 2.5 커밋될 것,
+ *  2.6 없으면 만든다, 2.8 공개 여부)
  *  3.1 초기화 · 3.2 취소 · 3.3 닫기(✕) · 4 기존 명세 발견(4.1 가져와서 등록, 4.2 취소) · 5 push 실패
  *  화면은 검사하지 않는다 — 서버가 코드 형식·중복 → 저장소 접근 → docs/specs 존재 순으로 판정한다. */
 import { useState } from 'react'
@@ -16,7 +17,7 @@ export function ProjectInit({
   onDone: () => void
   /** 이 서버가 켠 저장 방식(/api/me). 하나면 고를 것이 없다 */
   storageModes: Storage[]
-  /** 새 GitHub 저장소가 비공개인가(/api/me의 repo_private) — 2.6 문구 */
+  /** 공개 여부를 고르지 않으면 새 GitHub 저장소가 비공개인가(/api/me의 repo_private) — 2.8의 처음 선택 */
   repoPrivate: boolean
 }) {
   // 2.7 저장 방식 — 둘 다 켰을 때만 고른다. **기본값이 없다** — 고를 때까지 초기화(3.1)가 꺼져 있다.
@@ -34,9 +35,11 @@ export function ProjectInit({
   useEscape(onClose)
   useEscape(existing !== null ? () => setExisting(null) : null)
   const [banner, setBanner] = useState('')
-  // 카드 F — 끄면 지금과 같다(없는 저장소면 push-failed). 켜면 저장소를 만들어 준다 — 비공개가 기본(#310).
+  // 카드 F — 끄면 지금과 같다(없는 저장소면 push-failed). 켜면 저장소를 만들어 준다.
   // 기본값을 거짓으로 두는 이유는 주소 오타가 조용히 새 저장소를 만들지 않게 하려는 것
   const [createRepo, setCreateRepo] = useState(false)
+  // 2.8 — 새로 만들 저장소의 공개 여부. 처음 선택은 서버 설정(기본 비공개)이라 고르지 않으면 실수로 공개되지 않는다 (카드 BS)
+  const [priv, setPriv] = useState(repoPrivate)
 
   async function submit(importExisting = false) {
     setCodeErr('')
@@ -49,6 +52,8 @@ export function ProjectInit({
         name,
         import_existing: importExisting,
         create_repo: server ? false : createRepo,
+        // 만들 때만 보낸다 — 빼면 서버 기본값이다 (카드 BS)
+        private: !server && createRepo ? priv : undefined,
       })
       onDone()
     } catch (e) {
@@ -119,8 +124,18 @@ export function ProjectInit({
         {!server && (
           <label className="chk">
             <input type="checkbox" data-el="2.6" checked={createRepo} onChange={(e) => setCreateRepo(e.target.checked)} />{' '}
-            저장소가 없으면 새로 만든다 <span className="lbl">({repoPrivate ? '비공개' : '공개'}로 만들어집니다)</span>
+            저장소가 없으면 새로 만든다
           </label>
+        )}
+        {!server && createRepo && (
+          <div className="seg" data-el="2.8">
+            <label className="chk">
+              <input type="radio" name="vis" checked={priv} onChange={() => setPriv(true)} /> 비공개
+            </label>
+            <label className="chk">
+              <input type="radio" name="vis" checked={!priv} onChange={() => setPriv(false)} /> 공개
+            </label>
+          </div>
         )}
         {/* 등록하면 저장소에 무엇이 생기는지. 기존 명세가 발견되면(빈 저장소가 아니면) 감춘다.
             배치(UI-002 UI-3 2.5)와 같은 글 — 빈 단계 디렉터리와 README뿐, 템플릿 사본은 안 넣는다(카드 AB, #199) */}

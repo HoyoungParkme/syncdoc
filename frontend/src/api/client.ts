@@ -143,7 +143,7 @@ export interface Me extends User {
   llm_enabled: boolean
   storage_modes: Storage[]
   edition?: Edition
-  /** 싱크독이 만드는 GitHub 저장소가 비공개인가(설정 GITHUB_REPO_PRIVATE) — UI-3 2.6 문구 (#310) */
+  /** 공개 여부를 고르지 않고 만든 GitHub 저장소가 비공개인가(설정 GITHUB_REPO_PRIVATE) — UI-3 2.8의 처음 선택 (#310 · 카드 BS) */
   repo_private?: boolean
 }
 export interface Author {
