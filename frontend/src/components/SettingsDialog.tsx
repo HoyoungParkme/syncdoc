@@ -3,7 +3,7 @@
  *  3 MCP 토큰(3.1 행, 3.2 폐기, 3.3 이름, 3.4 발급 열기, 3.5 마지막 사용, 3.6 발급)
  *  4 토큰 원문 상자(4.1 원문, 4.2 복사) · 5 관리 카드(5.1 열기) · 6 관리 영역(UI-14) · 7 닫기(✕) · 8 클라이언트 설정(8.1 스니펫) · 9 닫기 */
 import { useEffect, useState } from 'react'
-import { ago, api, ApiError, type AccessToken, type CommitEmail, type Me } from '../api/client'
+import { ago, api, ApiError, MCP_NAME, type AccessToken, type CommitEmail, type Me } from '../api/client'
 import { Admin } from '../pages/Admin'
 import { useEscape } from './ui'
 
@@ -61,9 +61,10 @@ export function SettingsDialog({ user, onClose }: { user: Me; onClose: () => voi
   const logout = () => {
     api.post('/auth/logout', {}).finally(() => (window.location.href = '/login'))
   }
+  // 서버 이름은 판 이름 — 서버가 알리는 이름과 같게 (UI-13 8.1, 카드 BU)
   const snippet = `{
   "mcpServers": {
-    "syncdoc": {
+    "${MCP_NAME[user.edition ?? 'internet']}": {
       "url": "${window.location.origin}/mcp",
       "headers": { "Authorization": "Bearer syncdoc_pat_…" }
     }

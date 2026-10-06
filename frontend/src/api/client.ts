@@ -137,6 +137,10 @@ export interface User extends UserRef {
 export type Storage = 'github' | 'server'
 /** 판 — PRD R15 (카드 BC). closed는 로그인이 없는 한 사람 판이다 */
 export type Edition = 'internet' | 'closed'
+/** 판 이름 — 상단 바·탭 제목(UI-001 4장). EDITION 값은 그대로 두고 이름만 바뀐다 (PRD R15, 카드 BU) */
+export const EDITION_NAME: Record<Edition, string> = { internet: '싱크독_깃허브', closed: '싱크독_로컬' }
+/** MCP 서버 이름 = 판 이름 — 등록 명령(UI-16 6.2)·클라이언트 설정(UI-13 8.1)이 서버가 알리는 이름과 같다 (API-002 1장) */
+export const MCP_NAME: Record<Edition, string> = { internet: 'syncdoc_github', closed: 'syncdoc_local' }
 /** GET /api/me — llm_enabled가 거짓이면 UI-5 질문 탭(8.4)이 없다. storage_modes는 이 서버가 켠 저장 방식(UI-3 2.7).
  *  edition이 closed면 로그아웃·커밋 이메일이 없고(UI-001 4장·UI-13) 배치 iframe이 앱이 담은 글꼴을 쓴다(STD-002 V-UI) */
 export interface Me extends User {
