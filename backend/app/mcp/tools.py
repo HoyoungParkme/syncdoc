@@ -58,7 +58,7 @@ def storage_sentence(modes: list[str]) -> str:
 
 
 server = MCPServer(
-    "syncdoc",
+    settings.mcp_name,  # 판 이름 — syncdoc_github · syncdoc_local (API-002 1장, 카드 BU)
     instructions="싱크독 명세 도구. 쓰기 전에 get_template, 수정 전에 get_document. "
     "프로젝트를 만들 때 저장 방식을 고른다 — " + storage_sentence(settings.storage_modes),
 )
