@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -59,7 +59,7 @@ upstream: [SYNC-PRD-001, SYNC-UC-001]
 
 #### C10 폐쇄망판은 인터넷 없이 돈다 — 실행 중 바깥 요청이 없고, 반입은 이미지 묶음 하나다. 로그인이 없고 한 사람이 쓴다
 
-출처: [[SYNC-PRD-001#R15]] · [[SYNC-PRD-001#N4]]. 코드는 하나이고 설정 `EDITION=closed`가 판을 가른다(8.1)
+출처: [[SYNC-PRD-001#R15]] · [[SYNC-PRD-001#N4]]. 코드는 하나이고 설정 `EDITION=closed`가 판을 가른다(8.1). 릴리즈 이름은 인터넷판이 **싱크독_깃허브**, 폐쇄망판이 **싱크독_로컬**이다(카드 BU)
 
 ---
 
@@ -329,10 +329,10 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 | `STORAGE_MODES` | `github,server` | 이 서버에서 켠 저장 방식. 쉼표로 둘 중 하나 이상. 켜지 않은 방식으로는 프로젝트를 만들 수 없다([[SYNC-PRD-001#R14]]) |
 | `SPECS_URL` | `https://github.com/HoyoungParkme/syncdoc/blob/main/docs/specs` | 새 저장소 README가 규약·템플릿을 가리키는 주소. 싱크독 저장소를 옮기면 바꾼다 (카드 AB). **폐쇄망판에서 기본값 그대로면** `{PUBLIC_BASE_URL}/specs` — 이미지 안 사본(8.1) |
 | `LLM_API_KEY` | **빈 값** | 모델 키. 비면 읽는 중 질의가 꺼진다 (5.3) |
-| `LLM_API_URL` | `https://api.openai.com/v1/chat/completions` | OpenAI 호환 Chat Completions 주소. 호환 서버면 바꾼다 (5.3) |
+| `LLM_API_URL` | 싱크독_깃허브 `https://api.openai.com/v1/chat/completions` · 싱크독_로컬 **없음** | OpenAI 호환 Chat Completions 주소. 호환 서버면 바꾼다. 싱크독_로컬은 기본 주소가 없다 — 사내 주소를 넣어야 질문 탭이 생긴다 (5.3, [[SYNC-PRD-001#R15]]) |
 | `LLM_MODEL` | `gpt-4o` | 쓸 모델 이름 (5.3). mini는 항목 본문에 있는 것도 「모른다」고 내 첫날 바꿨다 |
 | `LLM_MAX_TURNS` | 10 | 한 대화에서 서버가 받는 최대 턴 수 (5.3) |
-| `EDITION` | `internet` | 판 — `internet` 또는 `closed`(8.1). closed면 로그인이 없고(로컬 사용자), 저장 방식은 서버만, GitHub 로그인·통지 경로가 없다 |
+| `EDITION` | `internet` | 판 — `internet`(싱크독_깃허브) 또는 `closed`(싱크독_로컬, 8.1). closed면 로그인이 없고(로컬 사용자), 저장 방식은 서버만, GitHub 로그인·통지 경로가 없다. 화면 이름과 MCP 서버 이름(`syncdoc_github`·`syncdoc_local`)이 이 값을 따른다 |
 | `LOCAL_LOGIN` | `local` | 폐쇄망판 로컬 사용자의 아이디 — 커밋 작성자(`{아이디}@syncdoc.local`)에 쓰인다 |
 | `LOCAL_NAME` | `LOCAL_LOGIN`과 같게 | 폐쇄망판 로컬 사용자의 표시 이름 — 이력·설정에 보인다 |
 
@@ -346,7 +346,7 @@ C6이 요구하는 것은 권한 구분이 아니다. 여기서는 **누가 들�
 |---|---|
 | 어디에 | **OpenAI 호환 Chat Completions**(`LLM_API_URL`). 회사를 고정하지 않는다 — 같은 모양의 API를 내는 서버(OpenAI·로컬 모델 등)면 주소만 바꾼다. 요청은 `POST {LLM_API_URL}`, `Authorization: Bearer`, 본문 `{model, messages, tools, tool_choice}`(function calling), 답은 `choices[0].message`의 `content` 또는 `tool_calls`. 호환 서버가 `tool_choice: none`을 못 받으면 마무리 호출을 `tools` 없이 보낸다 |
 | 키 | **서버에 하나**(`LLM_API_KEY`). 사람마다 넣지 않는다 — 혼자 쓰는 도구고([[#C6]]), 사람마다 키를 두면 `users`에 컬럼이 늘고 5.1 재암호화가 하나 더 생긴다 |
-| 켜고 끄기 | 키가 비면 **기능이 꺼진다.** 화면에서 탭이 사라지고 나머지는 그대로 돈다. **기본이 빈 값이므로 켜는 쪽이 선택이다.** 키를 받지 않는 사내 모델 서버(폐쇄망판)면 키 칸에 아무 글자나 넣는다 |
+| 켜고 끄기 | 키나 주소가 비면 **기능이 꺼진다.** 화면에서 탭이 사라지고 나머지는 그대로 돈다. **키의 기본이 빈 값이므로 켜는 쪽이 선택이다.** 싱크독_로컬은 주소에도 기본값이 없다 — 넣지 않은 채 키만 넣어 바깥(OpenAI)으로 나가는 일이 없다([[SYNC-PRD-001#R15]]·[[SYNC-PRD-001#N4]]). 키를 받지 않는 사내 모델 서버면 키 칸에 아무 글자나 넣는다 |
 | 도구 | 읽기 여덟 — 항목 본문 · 참조(상위·하위 1홉, 문서 참조는 제목·상태, 끊어진 건 「아직 없음」) · 사슬(전이) · 문서 목록 · 문서 전문 · **첨부 글자**(이 대화에 붙인 글자·PDF 파일의 추출 텍스트) · **코드 대조**(코드 그래프) · **코드 본문**(그래프 커밋의 커밋된 파일, 비밀 꼴 제외, 300줄 — 카드 AZ). **전부 읽기**이고 소유 검사를 지나며 **같은 프로젝트 안**만이다. 쓰는 도구는 어떤 경우에도 없다 |
 | 첨부 | 사람이 질문에 붙인 파일. 이미지(png·jpg·webp·gif ≤10MB)는 **그 질문의 사용자 메시지에 그대로**(data URL, vision) 실리고 뒤 턴에는 다시 안 실린다. 글자 파일(md·txt·csv·json·yaml)·PDF(≤1MB)는 업로드 때 글자를 뽑아 두고 모델이 도구로 필요할 때 읽는다 — 맥락에 미리 싣지 않는 원칙 그대로. 한 질문에 8개. 종류·상한 밖은 업로드에서 거절(413·415) |
 | 나가는 것 | 시작 맥락(문서 제목·상태·버전 + 그 문서의 항목 ID·이름 + 이 대화의 첨부 이름·종류·크기. 본문 없음) + 이 질문의 이미지 + 모델이 도구로 읽는 같은 프로젝트의 문서·항목·참조·첨부 글자·**코드 본문**(같은 프로젝트 저장소의 커밋된 파일만, `.env`·키·인증서 같은 비밀 꼴은 거부). 프로젝트 밖은 안 나간다 |
@@ -445,16 +445,16 @@ Cloudflare Named Tunnel은 compose 서비스 `tunnel`로 돌며 `:8000`을 공�
 
 **이미지에 담기는 것** — 백엔드 코드, React 빌드 결과, 그리고 `docs/specs/`의 `_templates/`와 `STD/` 사본. [[SYNC-API-002#get_template]]이 템플릿은 **늘** 이 사본으로 주고(사용자 저장소에는 사본이 없다, 카드 AB), 규약은 그 프로젝트 저장소에 `STD/`가 있으면 그것을 먼저 준다. 둘 중 하나라도 이미지에서 빠지면 배포본에서만 조용히 실패한다.
 
-### 8.1 폐쇄망판
+### 8.1 싱크독_로컬 (폐쇄망판)
 
-같은 이미지를 설정 `EDITION=closed`로 띄운다([[#C10]]). 반입물은 스크립트(`scripts/release_closed.sh {판}`)가 인터넷 쪽에서 만든다. **DB 이미지는 그 PC에 있는 `postgres:16-alpine`을 그대로 담는다** — 없을 때만 받는다. 만들 때마다 받으면 로컬 태그가 새 다이제스트로 옮겨가 같은 PC의 운영 db가 다음 `compose up`에 다시 만들어진다(#262).
+같은 이미지를 설정 `EDITION=closed`로 띄운다([[#C10]]). 반입물은 스크립트(`scripts/release_local.sh {판}`)가 인터넷 쪽에서 `release/local/`의 compose·설치 안내·`.env.example`을 묶어 만든다. **DB 이미지는 그 PC에 있는 `postgres:16-alpine`을 그대로 담는다** — 없을 때만 받는다. 만들 때마다 받으면 로컬 태그가 새 다이제스트로 옮겨가 같은 PC의 운영 db가 다음 `compose up`에 다시 만들어진다(#262).
 
 ```
-syncdoc-closed-{판}/
+syncdoc-local-{판}/
 ├── images.tar.gz        docker save — 앱(syncdoc-app:{판})과 postgres:16-alpine
-├── docker-compose.yml   이미지를 불러 쓰기만(build 없음) · EDITION=closed · 포트는 127.0.0.1만 · DB 포트 안 엶
-├── .env.example         SECRET_KEY · POSTGRES_PASSWORD · LOCAL_NAME · PUBLIC_BASE_URL · LLM_*(사내 주소)
-├── INSTALL.md           설치 · 토큰과 에이전트 · git 원격 · 업데이트 · 백업
+├── docker-compose.yml   이미지를 불러 쓰기만(build 없음) · EDITION=closed · compose 이름 syncdoc-local · 포트 127.0.0.1:8010 · DB 포트 안 엶
+├── .env.example         SECRET_KEY · POSTGRES_PASSWORD · LOCAL_NAME · PUBLIC_BASE_URL(http://127.0.0.1:8010) · LLM_*(사내 주소)
+├── INSTALL.md           설치 · 토큰과 에이전트(MCP 이름 syncdoc_local) · git 원격 · 업데이트 · 백업
 └── SHA256SUMS
 ```
 
@@ -463,6 +463,7 @@ syncdoc-closed-{판}/
 - **백업** — `pg_dump`와 볼륨 `origins`(서버 저장소 — 원본이다, 6장)를 함께. `repos`는 작업 사본이라 다시 clone된다
 - **같은 망에 열 때** — compose 포트를 바꾸고 `PUBLIC_BASE_URL`을 그 주소로 둔다(Host 허용 목록, 5장). 로그인이 없으니 그 망의 누구나 쓰게 된다 — 설치 안내가 경고한다
 - **README 규약 링크** — 폐쇄망판은 `{PUBLIC_BASE_URL}/specs`(이미지 안 사본)를 가리킨다. `SPECS_URL`을 주면 그것을 쓴다
+- **싱크독_깃허브와 나란히** — compose 이름(`syncdoc-local`)이 달라 컨테이너·볼륨·네트워크가 겹치지 않고, 포트가 8010이라 같은 PC의 싱크독_깃허브(8000)와 같이 돈다. 에이전트에는 `syncdoc_local`로 붙인다 — 한 세션에서 `syncdoc_github`와 함께 쓸 수 있다(카드 BU)
 
 **운영상 전제**
 - 노트북이 꺼지면 웹과 MCP가 모두 멈춘다. 이 구조의 근본 한계이며 C5(저장소 직접 읽기)가 대비책이다.
