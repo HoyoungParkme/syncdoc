@@ -41,14 +41,20 @@ from app.core.errors import (
     PreconditionUnmet,
     PushFailed,
     RebuildFailed,
+    RepoArchived,
+    RepoCreateFailed,
+    RepositoryAlreadyRegistered,
     StatusBlocked,
     StorageMismatch,
+    StorageUnavailable,
+    Unauthorized,
     UploadPathRefused,
     UploadTooLarge,
     VersionConflict,
 )
 from app.core.markdown import parse_frontmatter
 from app.core.project.models import Repository
+from app.core.project.repository import split_remote
 from app.core.project.service import ProjectService
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
@@ -60,6 +66,7 @@ from app.core.types import (
     DocType,
     DocumentSummary,
     Entry,
+    HookStatus,
     MoveResult,
     RebuildResult,
     SaveResult,
@@ -71,7 +78,7 @@ from app.core.types import (
     spec_dir,
     type_of_dir,
 )
-from app.infra import git
+from app.infra import git, github
 
 log = logging.getLogger(__name__)
 _locks: dict[str, asyncio.Lock] = {}
@@ -669,6 +676,71 @@ async def move_to_server(code: str, user: User) -> MoveResult:
             shutil.rmtree(origin, ignore_errors=True)
             raise
     return MoveResult(origin=str(origin), head=head, hook=hook)
+
+
+async def move_to_github(code: str, user: User, remote_url: str) -> MoveResult:
+    """SYNC-MS-007#pipeline.move_to_github
+
+    서버 저장을 GitHub 저장으로 되돌린다(카드 BT, UC-H23) — move_to_server의 반대. 서버 저장소의
+    가지·태그를 커밋 해시 그대로 push하고(되감지 않고 한꺼번에) DB는 건드리지 않는다. 확인이
+    실패하면 작업 사본의 원격만 되돌린다 — GitHub에 올라간 것은 서버 저장소와 같은 커밋이라 그대로
+    둔다(다시 부르면 이어서 된다). 공개 여부는 바꾸지 않는다 — 사람이 GitHub에서 정한다.
+    """
+    with db.session_scope() as s:
+        svc = ProjectService(s)
+        repo = svc.get_owned(code, user).repository  # 0 — 남의 것이면 not-found
+        if repo.storage == Storage.github:  # 1
+            raise StorageMismatch(Storage.github.value, "이미 GitHub 저장이다")
+        if Storage.github.value not in settings.storage_modes:  # 1a — 싱크독_로컬
+            raise StorageUnavailable(Storage.github.value, settings.storage_modes)
+        # 2 — 한 저장소를 두 프로젝트가 쓰면 문서 ID가 겹친다 (UC-A1 2d와 같은 규칙)
+        other = svc.repo.by_remote_url(remote_url)
+        if other is not None and other.code != code:
+            raise RepositoryAlreadyRegistered(other.code)
+        repo_id, origin, workdir = repo.id, Path(repo.remote_url), Path(repo.workdir_path)
+    token = AccountService.github_token_for(user)  # 3
+    async with read_lock(code), _lock(code):  # 4 — 순서는 move_to_server와 같다
+        try:  # 5 — 닿는지, 보관 중인지
+            owner, name = split_remote(remote_url)
+            archived = await github.repo_archived(token, owner, name)
+        except (Unauthorized, RepoCreateFailed) as e:
+            raise PushFailed(f"GitHub 저장소에 닿지 않는다: {e}") from e
+        if archived:
+            raise RepoArchived(remote_url)
+        try:  # 6 — 거절되면 아무 ref도 안 바뀐다(--atomic)
+            src = await git.push_all(origin, remote_url, token)
+        except git.GitError as e:
+            raise PushFailed(f"push: {e.stderr.strip()}") from e
+        try:
+            await git.set_origin(workdir, remote_url)  # 7
+            head = await git.fetch(workdir, user)
+            if head != src:
+                raise PushFailed(f"main이 다르다 — GitHub {head[:7]} · 서버 저장소 {src[:7]}")
+            with db.session_scope() as s:  # 8
+                row = s.get(Repository, repo_id)
+                assert row is not None
+                row.storage, row.remote_url = Storage.github.value, remote_url
+                row.hook_id, row.hook_error = None, None
+                s.commit()
+        except Exception as e:
+            await git.set_origin(workdir, str(origin))  # 7a — 원격을 서버 저장소로 되돌린다
+            if isinstance(e, git.GitError):
+                raise PushFailed(f"fetch: {e.stderr.strip()}") from e
+            raise
+        with db.session_scope() as s:
+            svc = ProjectService(s)
+            try:  # 9 — 실패는 상태로 받고 계속한다(7a). 주기 확인이 메운다
+                hook = await svc.ensure_hook(code, user)
+            except Exception as e:  # noqa: BLE001 — 연결 끊김 따위도 옮기기를 깨지 않는다
+                log.warning("되돌릴 때 통지를 못 걸었다 code=%s: %s", code, e)
+                reason = f"통지를 못 걸었다: {e}"[:300]
+                row = s.get(Repository, repo_id)
+                assert row is not None
+                row.hook_error = reason
+                hook = HookStatus("error", reason, created=False)
+            s.commit()
+            svc.archive_origin(code)  # 10 — 지우지 않는다
+    return MoveResult(origin=remote_url, head=head, hook=hook)
 
 
 async def purge_document(doc_id: str, author: Author) -> None:

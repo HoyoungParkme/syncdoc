@@ -22,13 +22,12 @@ from app.core.errors import (
     ProjectCodeConflict,
     ProjectCodeInvalid,
     PushFailed,
-    RepoCreateFailed,
     RepositoryAlreadyRegistered,
     StorageUnavailable,
     Unauthorized,
 )
 from app.core.project.models import Project, Repository
-from app.core.project.repository import ProjectRepository
+from app.core.project.repository import ProjectRepository, split_remote
 from app.core.types import (
     Author,
     AuthorKind,
@@ -53,23 +52,6 @@ _locks: dict[str, asyncio.Lock] = {}
 def _lock(code: str) -> asyncio.Lock:
     """코드 단위 락 (MS-001 0단계 · UC-A1 2c) — 동시 초기화가 서로의 작업 사본을 지운다."""
     return _locks.setdefault(code, asyncio.Lock())
-
-
-def _split_remote(remote_url: str) -> tuple[str, str]:
-    """`https://github.com/owner/repo(.git)` → `(owner, repo)` (MS-001 3b).
-
-    ssh 형태(`git@github.com:owner/repo.git`)도 받는다 — clone은 그것도 되므로
-    여기서만 막으면 경로가 갈린다.
-    """
-    s = remote_url.strip().rstrip("/")
-    if s.endswith(".git"):
-        s = s[: -len(".git")]
-    if ":" in s and "//" not in s:  # ssh
-        s = s.split(":", 1)[1]
-    parts = [x for x in s.split("/") if x]
-    if len(parts) < 2:
-        raise RepoCreateFailed(f"저장소 주소에서 소유자·이름을 못 읽었다: {remote_url}")
-    return parts[-2], parts[-1]
 
 
 def _archive_dir() -> Path:
@@ -174,7 +156,7 @@ class ProjectService:
             # 저장소를 만든다. 지금은 clone이 실패해 push-failed가 나서 오타를 알아챈다 (카드 F)
             # 공개 여부는 요청이 고르고, 고르지 않으면 서버 기본값(비공개)이다 (카드 BS)
             if create_repo:
-                owner_name, repo_name = _split_remote(remote_url)
+                owner_name, repo_name = split_remote(remote_url)
                 await github.create_repo(
                     token,
                     owner_name,
@@ -418,7 +400,7 @@ class ProjectService:
             # 받는 쪽이 빈 비밀번호를 전부 거부한다 — 걸어 봐야 안 통하므로 걸지 않는다
             return HookStatus("none", "공개 주소나 비밀번호가 없어 걸지 못한다", created=False)
         had = repo.hook_id
-        owner_name, repo_name = _split_remote(repo.remote_url)
+        owner_name, repo_name = split_remote(repo.remote_url)
         try:
             hook_id = await github.create_hook(
                 AccountService.github_token_for(user),
@@ -445,7 +427,7 @@ class ProjectService:
         repo = self.get_owned(code, user).repository
         if repo.storage == Storage.server or repo.hook_id is None:
             return HookStatus("none", None, created=False)
-        owner_name, repo_name = _split_remote(repo.remote_url)
+        owner_name, repo_name = split_remote(repo.remote_url)
         try:
             token = AccountService.github_token_for(user)
             await github.delete_hook(token, owner_name, repo_name, repo.hook_id)
