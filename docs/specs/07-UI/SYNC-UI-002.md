@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -1955,7 +1955,7 @@ status: draft
             <p class="desc">Claude Code · Codex · Gemini CLI가 같은 엔드포인트를 씁니다.</p>
             <pre class="snip" data-el="8.1">{
   "mcpServers": {
-    "syncdoc": {
+    "syncdoc_github": {
       "url": "https://syncdoc.example.dev/mcp",
       "headers": { "Authorization": "Bearer syncdoc_pat_…" }
     }
@@ -2031,7 +2031,7 @@ status: draft
 | 6 | 관리 영역 | 영역 | UI-14. 펼쳤을 때만 | — |
 | 7 | 닫기(✕) | 버튼 | | 닫힘 |
 | 8 | 클라이언트 설정 | 카드 | 에이전트에 붙여넣을 MCP 설정 | — |
-| 8.1 | 설정 스니펫 | 텍스트 | 읽기 전용 JSON. 주소와 토큰 자리 | — |
+| 8.1 | 설정 스니펫 | 텍스트 | 읽기 전용 JSON. 주소와 토큰 자리. **서버 이름은 판 이름**이다 — `syncdoc_github`·`syncdoc_local`(카드 BU) | — |
 | 9 | 닫기 | 버튼 | | 닫힘 |
 
 ### 규칙
@@ -2427,19 +2427,19 @@ status: draft
           <div class="gr" data-el="6.1"><span class="no">1</span><span class="nm">토큰을 발급한다</span><span class="tx">설정 → MCP 토큰 → 발급. 이름을 적는다. 원문은 그때 한 번만 보이니 바로 복사한다.</span><span class="where">설정</span></div>
           <div class="gr"><span class="no">2</span><span class="nm">터미널에서 한 줄</span><span class="tx">아래 명령. <code>--scope user</code>면 어느 폴더에서 켜도 붙는다. Codex·Gemini CLI는 설정의 클라이언트 설정 JSON을 각자 설정 파일에 넣는다.</span><span class="where">터미널</span></div>
           <div class="gr"><span class="no">3</span><span class="nm">Claude Code를 새로 켠다</span><span class="tx">MCP 서버는 세션이 시작될 때 읽힌다. 켜져 있던 창에는 방금 넣은 서버가 안 보인다 — 나갔다가 다시 켠다.</span><span class="where">터미널</span></div>
-          <div class="gr"><span class="no">4</span><span class="nm">붙었는지 본다</span><span class="tx"><code>claude mcp list</code>에 <code>syncdoc … ✔ Connected</code>, 또는 세션 안에서 <code>/mcp</code>. claude.ai 커넥터 목록에는 안 나온다 — 이 컴퓨터 설정에만 있는 것이 정상이다.</span><span class="where">터미널</span></div>
+          <div class="gr"><span class="no">4</span><span class="nm">붙었는지 본다</span><span class="tx"><code>claude mcp list</code>에 <code>syncdoc_github … ✔ Connected</code>, 또는 세션 안에서 <code>/mcp</code>. claude.ai 커넥터 목록에는 안 나온다 — 이 컴퓨터 설정에만 있는 것이 정상이다.</span><span class="where">터미널</span></div>
         </div>
         <figure data-el="6.4"><div class="shot">그림 — 발급 직후, 토큰 원문이 한 번만 보이는 화면 (/howto/token-issued.png)</div><figcaption>1. 발급 직후. 원문은 이 화면에서 한 번만 보인다 (캡처에서는 가렸다)</figcaption></figure>
-        <pre class="snip" data-el="6.2">claude mcp add --transport http --scope user syncdoc \
+        <pre class="snip" data-el="6.2">claude mcp add --transport http --scope user syncdoc_github \
     https://syncdoc.example.dev/mcp \
     --header "Authorization: Bearer syncdoc_pat_…"</pre>
-        <figure data-el="6.5"><div class="shot term">$ claude mcp add --transport http --scope user syncdoc https://{싱크독 주소}/mcp --header "Authorization: Bearer [REDACTED]"
-Added HTTP MCP server syncdoc with URL: https://{싱크독 주소}/mcp to user config</div><figcaption>2. 붙이면 이렇게 답한다. 토큰은 [REDACTED]로 가려진다</figcaption></figure>
+        <figure data-el="6.5"><div class="shot term">$ claude mcp add --transport http --scope user syncdoc_github https://{싱크독 주소}/mcp --header "Authorization: Bearer [REDACTED]"
+Added HTTP MCP server syncdoc_github with URL: https://{싱크독 주소}/mcp to user config</div><figcaption>2. 붙이면 이렇게 답한다. 토큰은 [REDACTED]로 가려진다</figcaption></figure>
         <figure data-el="6.6"><div class="shot term">$ claude mcp list
 Checking MCP server health...
 
-syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>4. 새로 켠 뒤 <code>claude mcp list</code> — 이 줄이 보이면 붙은 것이다</figcaption></figure>
-        <p class="note" data-el="6.3">그 뒤로는 에이전트에게 「싱크독으로 프로젝트 하나 만들어 줘」라고 말하면 된다. 주소가 바뀌면 <code>claude mcp remove syncdoc</code> 후 다시 넣는다.</p>
+syncdoc_github: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>4. 새로 켠 뒤 <code>claude mcp list</code> — 이 줄이 보이면 붙은 것이다</figcaption></figure>
+        <p class="note" data-el="6.3">그 뒤로는 에이전트에게 「싱크독으로 프로젝트 하나 만들어 줘」라고 말하면 된다. 주소가 바뀌면 <code>claude mcp remove syncdoc_github</code> 후 다시 넣는다.</p>
 
         <h4 class="st">11단계가 뜻하는 것</h4>
         <div class="g stages" data-el="3"><!-- 머리 행 없음. 위 소제목이 그 일을 한다 -->
@@ -2483,11 +2483,11 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 | 5 | 닫기 | 버튼 | | 닫힘 |
 | 6 | 붙이는 법 표 | 표 | 토큰 → 명령 → 새 세션 → 확인. 2의 둘째 단계를 손 순서로 편 것 | — |
 | 6.1 | 붙이는 행 | 행 | 한 단계 | — |
-| 6.2 | 명령 | 코드 상자 | `claude mcp add …` 한 줄. **주소는 이 화면의 주소로 채워져 있다.** 토큰만 자리표시 | — |
+| 6.2 | 명령 | 코드 상자 | `claude mcp add …` 한 줄. **주소는 이 화면의 주소로 채워져 있다.** 토큰만 자리표시. 서버 이름은 판 이름(`syncdoc_github`·`syncdoc_local`, 카드 BU) | — |
 | 6.3 | 그 다음 | 텍스트 | 붙은 뒤 첫마디와, 주소가 바뀌었을 때 하는 일 | — |
 | 6.4 | 발급 순간 그림 | 그림 | 토큰 원문이 한 번만 보이는 화면. 원문은 가려져 있다 | — |
-| 6.5 | 터미널 그림 (add) | 그림 | `claude mcp add`가 답하는 모양. 주소는 자리표시 | — |
-| 6.6 | 터미널 그림 (list) | 그림 | `claude mcp list`의 `syncdoc … ✔ Connected` 한 줄 | — |
+| 6.5 | 터미널 (add) | 글자 상자 | `claude mcp add`가 답하는 모양. 주소는 자리표시, 서버 이름은 판 이름 | — |
+| 6.6 | 터미널 (list) | 글자 상자 | `claude mcp list`의 `{판의 서버 이름} … ✔ Connected` 한 줄 | — |
 
 ### 규칙
 
@@ -2506,7 +2506,7 @@ syncdoc: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figcaption>
 - 항목 ID는 고정폭 평문이다. 칩으로 그리면 표에 색 상자가 열한 줄 생겨 단계 이름보다 먼저 눈에 든다
 - 다이얼로그 폭은 `660px`
 - **명령(6.2)의 주소는 채워서 보여준다.** UI-13 클라이언트 설정(8.1)과 같은 원천 — 지금 열려 있는 화면의 origin — 을 쓴다. `{주소}`를 사람이 바꿔 넣게 두면 터널 주소를 옮겨 적다가 틀린다. 토큰은 발급 화면에서 한 번만 보이는 값이라 여기 채울 수 없고, 자리표시로 둔다
-- **그림(6.4~6.6)은 앱 밖 화면만이다.** 토큰이 한 번만 보이는 순간과 터미널 둘 — 앱 안에서 볼 수 없는 것이다. 앱 화면은 캡처로 넣지 않는다 — 한 클릭 거리고, 화면이 바뀌면 캡처가 낡는다. 터미널 그림의 주소는 `{싱크독 주소}` 자리표시다 — 실제 주소는 6.2가 채운다. 파일은 `frontend/public/howto/`, 경로 `/howto/*.png`
+- **그림·터미널(6.4~6.6)은 앱 밖 화면만이다.** 토큰이 한 번만 보이는 순간과 터미널 둘 — 앱 안에서 볼 수 없는 것이다. 앱 화면은 캡처로 넣지 않는다 — 한 클릭 거리고, 화면이 바뀌면 캡처가 낡는다. 그림은 발급 순간(6.4) 하나고 파일은 `frontend/public/howto/`, 경로 `/howto/*.png`. **터미널(6.5·6.6)은 글자 상자로 그린다** — 서버 이름이 판마다 달라(`syncdoc_github`·`syncdoc_local`) 캡처로 두면 한 판에서 틀린다(카드 BU). 주소는 `{싱크독 주소}` 자리표시다 — 실제 주소는 6.2가 채운다
 - **「새로 켠다」(6 셋째 행)를 빼지 않는다.** 실제로 붙이는 사람이 가장 먼저 걸리는 자리다 — 켜져 있던 세션에 서버가 안 보여서 잘못 넣은 줄 안다. 설명서가 앱 밖에 있으면 이 한 줄을 못 보고, 그래서 앱 안에 둔다
 
 ### 시나리오

@@ -86,6 +86,46 @@ def test_login_screen_sends_to_the_list(closed: TestClient) -> None:
     assert r.status_code == 302 and r.headers["location"] == "/"
 
 
+@pytest.mark.parametrize(
+    ("edition", "url", "key", "want_url", "enabled"),
+    [
+        ("internet", None, "k", "https://api.openai.com/v1/chat/completions", True),
+        ("closed", None, "k", "", False),  # 싱크독_로컬은 주소 기본값이 없다 — 키만으로 안 나간다
+        ("closed", "http://llm.local/v1/chat/completions", "k", "http://llm.local/v1/chat/completions", True),
+        ("internet", "", "k", "", False),  # 주소를 비워 두면 꺼진다
+        ("internet", None, "", "https://api.openai.com/v1/chat/completions", False),
+    ],
+)
+def test_llm_url_and_enabled_follow_the_edition(
+    monkeypatch: pytest.MonkeyPatch, edition, url, key, want_url, enabled
+) -> None:
+    """카드 BU — 모델 주소는 판의 기본값, 질문 탭은 키와 주소가 다 있어야 (INFRA 5.3, PRD R15)."""
+    monkeypatch.setattr(settings, "EDITION", edition)
+    monkeypatch.setattr(settings, "LLM_API_URL", url)
+    monkeypatch.setattr(settings, "LLM_API_KEY", key)
+    assert (settings.llm_url, settings.llm_enabled) == (want_url, enabled)
+
+
+def test_mcp_name_is_the_edition_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    """카드 BU — MCP 서버 이름은 판 이름. 서버는 켜질 때의 판으로 이름을 단다 (API-002 1장)."""
+    from app.mcp import tools
+
+    assert settings.mcp_name == "syncdoc_github" and tools.server.name == "syncdoc_github"
+    monkeypatch.setattr(settings, "EDITION", "closed")
+    assert settings.mcp_name == "syncdoc_local"
+
+
+def test_closed_me_has_no_question_tab_without_an_address(
+    closed: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """카드 BU — 싱크독_로컬에 키만 있고 주소가 없으면 질문 탭이 없다(PRD R15)."""
+    monkeypatch.setattr(settings, "LLM_API_KEY", "아무 글자")
+    monkeypatch.setattr(settings, "LLM_API_URL", None)
+    assert closed.get("/api/me").json()["llm_enabled"] is False
+    monkeypatch.setattr(settings, "LLM_API_URL", "http://llm.local/v1/chat/completions")
+    assert closed.get("/api/me").json()["llm_enabled"] is True
+
+
 def test_internet_edition_is_untouched(client: TestClient) -> None:
     """인터넷판 — 가드가 그대로 지나간다. 로그인 없으면 401, GitHub 로그인 경로가 있다."""
     assert client.get("/api/me", headers={"host": "evil.example"}).status_code == 401

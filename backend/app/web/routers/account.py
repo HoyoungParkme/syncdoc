@@ -62,16 +62,18 @@ async def logout(request: Request) -> Response:
 
 @router.get("/api/me", response_model=Me)
 async def me(user: User = Depends(auth.current_user)) -> Me:
-    """SYNC-API-001#GET/api/me — llm_enabled는 서버에 키가 있는가(인프라 5.3).
+    """SYNC-API-001#GET/api/me — llm_enabled는 서버에 키와 주소가 있는가(인프라 5.3, 카드 BU).
 
     storage_modes는 이 서버가 켠 저장 방식 — UI-3이 고를 것을 정한다 (PRD R14, 카드 BA).
-    edition은 판 — closed면 화면이 로그아웃·커밋 이메일을 숨긴다 (PRD R15, 카드 BC).
-    repo_private는 새 GitHub 저장소가 비공개인가 — UI-3 2.6 문구 (#310).
+    edition은 판 — 화면이 판 이름(싱크독_깃허브·싱크독_로컬)과 MCP 등록 이름을 고르고, closed면
+    로그아웃·커밋 이메일을 숨긴다 (PRD R15, 카드 BC·BU).
+    repo_private는 고르지 않고 만든 GitHub 저장소가 비공개인가 — UI-3 2.8의 처음 선택
+    (#310·카드 BS).
     """
     base = UserSchema.model_validate(user).model_dump()
     return Me(
         **base,
-        llm_enabled=bool(settings.LLM_API_KEY),
+        llm_enabled=settings.llm_enabled,
         storage_modes=settings.storage_modes,
         edition=settings.edition,
         repo_private=settings.GITHUB_REPO_PRIVATE,

@@ -846,7 +846,7 @@ async def ask_item(
     만들고 답이나 실패로 닫는다. 첫 이벤트(start) 전의 오류는 예외(상태 코드), 뒤의 오류는
     라우터가 error 이벤트로 낸다.
     """
-    if not settings.LLM_API_KEY:
+    if not settings.llm_enabled:
         raise LlmNotConfigured()  # 네트워크를 타기 전에 막는다 (MS-008 0)
     code = doc_id.split("-")[0]
     with db.session_scope() as s:
@@ -1157,7 +1157,7 @@ async def ask_code(
     코드 그래프에서 묻는다(UI-17 질문 탭, 카드 BI). 고른 함수(key)가 시작 맥락이고 없어도 묻는다 —
     그래프 전체. 루프는 ask_item과 같은 _ask_loop.
     """
-    if not settings.LLM_API_KEY:
+    if not settings.llm_enabled:
         raise LlmNotConfigured()
     with db.session_scope() as s:
         project = ProjectService(s).get_owned(code, user)

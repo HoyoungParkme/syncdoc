@@ -782,6 +782,9 @@ a.arow:hover{background:var(--bg-subtle)}
 /* UI-16 6.4~6.6 앱 밖 화면 그림. 앱 화면은 캡처로 넣지 않는다 — 바뀌면 낡는다 */
 .howto figure{margin:var(--space-12) 0 0}
 .howto figure img{display:block;width:100%;border:1px solid var(--border);border-radius:var(--radius-control)}
+/* 터미널 글자 상자 — 상단 바와 같은 잉크 바탕(UI-16 6.5·6.6, 카드 BU) */
+.howto figure .term{margin:0;padding:var(--space-10) var(--space-14);background:var(--ink-body);color:#fff;border-radius:var(--radius-control);
+  font-family:var(--font-mono);font-size:var(--text-mono-sm);line-height:1.6;white-space:pre;overflow-x:auto}
 .howto figcaption{margin-top:var(--space-5);font-size:var(--text-caption);color:var(--ink-faint);line-height:1.6}
 .howto figure+.snippet{margin-top:var(--space-12)}
 .howto .note{margin:0;padding:var(--space-10) var(--space-12);border-radius:var(--radius-control);

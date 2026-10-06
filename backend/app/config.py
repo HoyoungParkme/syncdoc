@@ -9,6 +9,9 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# 싱크독_깃허브의 모델 주소 기본값 — 싱크독_로컬은 기본값이 없다 (INFRA 5.2, 카드 BU)
+_OPENAI_CHAT = "https://api.openai.com/v1/chat/completions"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -35,9 +38,10 @@ class Settings(BaseSettings):
     POLL_INTERVAL_SECONDS: int = 300  # INFRA 7장 보조 경로. 0이면 폴링·기동 따라잡기 끔(테스트)
     DIFF_CONTEXT_LINES: int = 3  # diff에서 앞뒤로 함께 보여줄 줄 수 (INFRA 5.2)
     PUSH_RETRIES: int = 3  # push 거부 시 rebase 후 재시도 횟수 (INFRA 5.2)
-    # 읽는 중 질의 (INFRA 5.3). 키가 비면 기능이 꺼진다 — 켜는 쪽이 선택이다
+    # 읽는 중 질의 (INFRA 5.3). 키나 주소가 비면 기능이 꺼진다 — 켜는 쪽이 선택이다
     LLM_API_KEY: str = ""
-    LLM_API_URL: str = "https://api.openai.com/v1/chat/completions"  # OpenAI 호환 Chat Completions
+    # OpenAI 호환 Chat Completions. 안 주면 판의 기본값(llm_url) — 싱크독_로컬은 없다 (카드 BU)
+    LLM_API_URL: str | None = None
     LLM_MODEL: str = "gpt-4o"
     LLM_MAX_TURNS: int = 10  # 한 대화에서 서버가 받는 최대 턴 수
     # 판 — internet 또는 closed (PRD R15, INFRA 8.1). closed면 로그인 없이 로컬 사용자 하나
@@ -62,6 +66,24 @@ class Settings(BaseSettings):
         return "closed" if self.closed else "internet"
 
     @property
+    def mcp_name(self) -> str:
+        """MCP 서버 이름 = 판 이름 (API-002 1장, 카드 BU). 두 판을 한 에이전트에 붙여도 가른다."""
+        return "syncdoc_local" if self.closed else "syncdoc_github"
+
+    @property
+    def llm_url(self) -> str:
+        """모델 주소 (INFRA 5.2·5.3). 안 주면 싱크독_깃허브는 OpenAI, 싱크독_로컬은 없다 —
+        키만 넣고 주소를 빠뜨려 바깥으로 나가는 일이 없다 (PRD R15·N4, 카드 BU)."""
+        if self.LLM_API_URL is not None:
+            return self.LLM_API_URL.strip()
+        return "" if self.closed else _OPENAI_CHAT
+
+    @property
+    def llm_enabled(self) -> bool:
+        """읽는 중 질의가 켜졌나 — 키와 주소가 다 있어야 한다 (INFRA 5.3, 카드 BU)."""
+        return bool(self.LLM_API_KEY and self.llm_url)
+
+    @property
     def local_name(self) -> str:
         return self.LOCAL_NAME.strip() or self.LOCAL_LOGIN
 
@@ -70,7 +92,8 @@ class Settings(BaseSettings):
         """README 규약 링크의 뿌리 (INFRA 5.2·8.1). 폐쇄망판에서 기본값이면 이 서버의 /specs."""
         default = type(self).model_fields["SPECS_URL"].default
         if self.closed and self.SPECS_URL == default:
-            return f"{self.PUBLIC_BASE_URL.strip().rstrip('/') or 'http://127.0.0.1:8000'}/specs"
+            # 기본 자리는 싱크독_로컬 묶음의 포트 — 싱크독_깃허브(8000)와 나란히 돈다 (INFRA 8.1)
+            return f"{self.PUBLIC_BASE_URL.strip().rstrip('/') or 'http://127.0.0.1:8010'}/specs"
         return self.SPECS_URL
 
     @property

@@ -1,10 +1,11 @@
 /** UI-16 사용 방법 — SYNC-UI-002#UI-16. 상단 바에서 어느 화면 위로든 뜨는 안내 다이얼로그.
  *  1 다이얼로그 · 2 사용 순서(2.1 행) · 3 11단계 표(3.1 단계 행, 3.2 STD 행, 3.3 ID 문법, 3.4 주의, 3.5 문서 구성) · 4 ✕ · 5 닫기
  *  6 붙이는 법 표(6.1 행) · 6.2 명령 상자(주소 채움) · 6.3 그 다음 · 6.4 발급 순간 그림 · 6.5 터미널 add · 6.6 터미널 list
+ *  서버 이름은 판 이름(syncdoc_github · syncdoc_local)이라 터미널은 그림이 아니라 글자 상자다 (카드 BU)
  *  읽기 전용이고 상태가 없다 — 어디서 열든 같은 내용이고 닫으면 원래 화면 그대로다. */
 
 import type { ReactNode } from 'react'
-import { STAGE_NAMES } from '../api/client'
+import { MCP_NAME, STAGE_NAMES, type Edition } from '../api/client'
 import { useEscape } from './ui'
 
 /** 여섯 단계. 웹에 편집이 없다는 것을 3에서 말한다 — 처음 온 사람이 가장 자주 헤매는 지점이다 */
@@ -89,7 +90,7 @@ const STAGES: [string, string, string, string[], Docs][] = [
 
 /** 에이전트를 붙이는 손 순서 — 2의 둘째 단계를 편 것. 셋째 행을 빼지 않는다(UI-16 규칙):
  *  켜져 있던 세션에 서버가 안 보여서 잘못 넣은 줄 아는 것이, 붙이는 사람이 가장 먼저 걸리는 자리다 */
-const CONNECT: [string, ReactNode, string][] = [
+const connect = (name: string): [string, ReactNode, string][] => [
   ['토큰을 발급한다', '설정 → MCP 토큰 → 발급. 이름을 적는다. 원문은 그때 한 번만 보이니 바로 복사한다.', '설정'],
   [
     '터미널에서 한 줄',
@@ -103,18 +104,20 @@ const CONNECT: [string, ReactNode, string][] = [
   [
     '붙었는지 본다',
     <>
-      <code>claude mcp list</code>에 <code>syncdoc … ✔ Connected</code>, 또는 세션 안에서 <code>/mcp</code>. claude.ai 커넥터 목록에는 안
+      <code>claude mcp list</code>에 <code>{name} … ✔ Connected</code>, 또는 세션 안에서 <code>/mcp</code>. claude.ai 커넥터 목록에는 안
       나온다 — 이 컴퓨터 설정에만 있는 것이 정상이다.
     </>,
     '터미널',
   ],
 ]
 
-export function HowTo({ onClose }: { onClose: () => void }) {
+export function HowTo({ onClose, edition }: { onClose: () => void; edition?: Edition }) {
   useEscape(onClose) // 1.1 — 바깥 클릭과 같다 (#117)
+  // 서버 이름은 판 이름 — 서버가 알리는 이름과 같게 등록한다 (UI-16 6.2, 카드 BU)
+  const name = MCP_NAME[edition ?? 'internet']
   // 주소는 UI-13 클라이언트 설정(8.1)과 같은 원천 — 사람이 옮겨 적으면 터널 주소를 틀린다.
   // 토큰은 발급 화면에서 한 번만 보이고 서버도 다시 못 준다 — 자리표시
-  const cmd = `claude mcp add --transport http --scope user syncdoc \\
+  const cmd = `claude mcp add --transport http --scope user ${name} \\
     ${window.location.origin}/mcp \\
     --header "Authorization: Bearer syncdoc_pat_…"`
   return (
@@ -154,7 +157,7 @@ export function HowTo({ onClose }: { onClose: () => void }) {
           <h4 className="sectitle">에이전트를 붙이는 법</h4>
           <table className="grid" data-el="6">
             <tbody>
-              {CONNECT.map(([what, how, where], i) => (
+              {connect(name).map(([what, how, where], i) => (
                 <tr key={what} data-el={i === 0 ? '6.1' : undefined}>
                   <td className="no">{i + 1}</td>
                   <td>{what}</td>
@@ -172,18 +175,29 @@ export function HowTo({ onClose }: { onClose: () => void }) {
           <pre className="snippet" data-el="6.2">
             {cmd}
           </pre>
+          {/* 터미널은 글자 상자 — 서버 이름이 판마다 달라 그림이면 한 판에서 틀린다(UI-16 규칙). 주소는 자리표시 */}
           <figure data-el="6.5">
-            <img src="/howto/term-add.png" alt="터미널 — claude mcp add 실행 결과" />
+            <pre className="term">{`$ claude mcp add --transport http --scope user ${name} \\
+    https://{싱크독 주소}/mcp \\
+    --header "Authorization: Bearer syncdoc_pat_…"
+Added HTTP MCP server ${name} with URL: https://{싱크독 주소}/mcp to user config
+Headers: {
+  "Authorization": "[REDACTED]"
+}
+File modified: ~/.claude.json`}</pre>
             <figcaption>2. 붙이면 이렇게 답한다. 토큰은 [REDACTED]로 가려진다</figcaption>
           </figure>
           <figure data-el="6.6">
-            <img src="/howto/term-list.png" alt="터미널 — claude mcp list에 syncdoc Connected" />
+            <pre className="term">{`$ claude mcp list
+Checking MCP server health…
+
+${name}: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected`}</pre>
             <figcaption>
               4. 새로 켠 뒤 <code>claude mcp list</code> — 이 줄이 보이면 붙은 것이다
             </figcaption>
           </figure>
           <p className="note" data-el="6.3">
-            그 뒤로는 에이전트에게 「싱크독으로 프로젝트 하나 만들어 줘」라고 말하면 된다. 주소가 바뀌면 <code>claude mcp remove syncdoc</code> 후 다시
+            그 뒤로는 에이전트에게 「싱크독으로 프로젝트 하나 만들어 줘」라고 말하면 된다. 주소가 바뀌면 <code>claude mcp remove {name}</code> 후 다시
             넣는다.
           </p>
 

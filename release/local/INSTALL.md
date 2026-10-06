@@ -1,6 +1,6 @@
-# 싱크독 폐쇄망판 — 설치 안내
+# 싱크독_로컬 — 설치 안내
 
-인터넷이 없는 PC에서 혼자 쓰는 판이다. 로그인이 없고, 명세와 코드는 이 PC의 싱크독 서버 안 git 저장소에 쌓인다. GitHub에 닿지 않는다.
+싱크독_로컬(폐쇄망판)은 인터넷이 없는 PC에서 혼자 쓰는 판이다. 로그인이 없고, 명세와 코드는 이 PC의 싱크독 서버 안 git 저장소에 쌓인다. GitHub에 닿지 않는다.
 
 필요한 것: Docker(Compose 포함). 그 밖에 설치할 것은 없다 — git도 이미지 안에 있다.
 
@@ -29,7 +29,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-브라우저로 <http://127.0.0.1:8000>을 연다. 프로젝트 목록이 바로 뜬다 — 로그인 화면이 없다. 스키마는 앱이 켜질 때 스스로 올린다.
+브라우저로 <http://127.0.0.1:8010>을 연다(8010 — 같은 PC의 싱크독_깃허브가 8000을 쓴다). 프로젝트 목록이 바로 뜬다 — 로그인 화면이 없다. 스키마는 앱이 켜질 때 스스로 올린다.
 
 ## 2. 에이전트 붙이기 (MCP)
 
@@ -37,22 +37,22 @@ docker compose up -d
 2. 에이전트에 넣는다. Claude Code라면:
 
 ```
-claude mcp add --transport http --scope user syncdoc \
-  http://127.0.0.1:8000/mcp \
+claude mcp add --transport http --scope user syncdoc_local \
+  http://127.0.0.1:8010/mcp \
   --header "Authorization: Bearer {토큰}"
 ```
 
-3. 에이전트를 **새로 켠다** — 켜져 있던 세션에는 안 보인다
+3. 에이전트를 **새로 켠다** — 켜져 있던 세션에는 안 보인다. 이름은 `syncdoc_local`이다 — 싱크독_깃허브(`syncdoc_github`)와 한 세션에 같이 붙여도 갈린다
 4. 「싱크독으로 프로젝트 하나 만들어 줘」라고 말한다. 이 판은 저장 방식이 서버 하나라 묻지 않고 서버 저장소를 만든다
 
-상단 바 `사용 방법`에 같은 순서가 그림과 함께 있다.
+상단 바 `사용 방법`에 같은 순서가 있다.
 
 ## 3. 코드 대조 — git push
 
 프로젝트 화면 머리의 **push 방법**을 복사해 코드 저장소에서 돌린다.
 
 ```
-git remote add syncdoc http://127.0.0.1:8000/git/{코드}.git
+git remote add syncdoc http://127.0.0.1:8010/git/{코드}.git
 git push syncdoc main
 ```
 
@@ -62,7 +62,7 @@ git이 없는 PC라면 에이전트가 MCP `upload_code`로 올린다 — 한 �
 
 ## 4. 질문 탭 (선택)
 
-사내에 OpenAI 호환 모델 서버가 있으면 `.env`의 셋을 채우고 `docker compose up -d`로 다시 켠다.
+사내에 OpenAI 호환 모델 서버가 있으면 `.env`의 셋을 채우고 `docker compose up -d`로 다시 켠다. 주소에는 기본값이 없다 — 넣지 않으면 탭이 없고 바깥으로 나가지 않는다.
 
 ```
 LLM_API_URL=http://{사내 주소}/v1/chat/completions
@@ -70,7 +70,7 @@ LLM_MODEL={모델 이름}
 LLM_API_KEY={키}
 ```
 
-키가 필요 없는 서버면 `LLM_API_KEY`에 아무 값이나 넣는다 — 비어 있으면 탭이 꺼진다.
+키가 필요 없는 서버면 `LLM_API_KEY`에 아무 값이나 넣는다 — 주소나 키가 비어 있으면 탭이 꺼진다.
 
 ## 5. 업데이트
 
@@ -86,7 +86,9 @@ docker load -i images.tar.gz
 docker compose up -d
 ```
 
-데이터(볼륨 `syncdoc-closed_pgdata`·`_repos`·`_origins`)는 그대로다. 새 스키마는 켜질 때 올라간다.
+데이터(볼륨 `syncdoc-local_pgdata`·`_repos`·`_origins`)는 그대로다. 새 스키마는 켜질 때 올라간다.
+
+**옛 이름(`syncdoc-closed-…`) 묶음에서 올릴 때** — compose 이름이 `syncdoc-local`로 바뀌어 그대로 켜면 빈 볼륨을 새로 쓴다. 옛 데이터를 이으려면 `.env`에 `COMPOSE_PROJECT_NAME=syncdoc-closed`를 더한다. 포트도 8010으로 바뀌었으니 `PUBLIC_BASE_URL`을 `http://127.0.0.1:8010`으로 바꾸고 에이전트를 `syncdoc_local`로 다시 붙인다.
 
 ## 6. 백업
 
@@ -114,8 +116,8 @@ docker compose up -d
 
 **로그인이 없으니 그 망의 누구나 쓰게 된다.** 그래도 열려면:
 
-1. `docker-compose.yml`의 포트를 `"8000:8000"`으로 바꾼다
-2. `.env`의 `PUBLIC_BASE_URL`을 다른 PC가 부르는 주소로 바꾼다(예: `http://10.0.0.5:8000`) — 이 서버는 허용한 주소로 들어온 요청만 받는다
+1. `docker-compose.yml`의 포트를 `"8010:8000"`으로 바꾼다
+2. `.env`의 `PUBLIC_BASE_URL`을 다른 PC가 부르는 주소로 바꾼다(예: `http://10.0.0.5:8010`) — 이 서버는 허용한 주소로 들어온 요청만 받는다
 3. `docker compose up -d`
 
 ## 8. 막힐 때

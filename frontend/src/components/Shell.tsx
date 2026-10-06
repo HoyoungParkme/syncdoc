@@ -3,7 +3,7 @@
  *  UI-1만 예외. 프로젝트 전환 경로는 로고 하나다 — 목록 화면 자체가 고르는 화면이라 선택기가 겹친다. */
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useCallback, useEffect, useState } from 'react'
-import { api, ApiError, type AttachmentMeta, type ProjectSummary, type Me } from '../api/client'
+import { api, ApiError, EDITION_NAME, type AttachmentMeta, type ProjectSummary, type Me } from '../api/client'
 
 /** 질문 탭의 한 턴 — 질문, 진행 줄(8.9), 답, 본 것, 실패. 서버의 Turn을 화면 상태로 편 것 */
 export interface AskTurnView {
@@ -48,6 +48,11 @@ export function Shell() {
       })
     api.get<ProjectSummary[]>('/api/projects').then(setProjects).catch(() => undefined)
   }, [nav, loc.pathname, loc.search])
+  // 로고와 탭 제목은 판 이름 — 두 판을 나란히 열어도 탭으로 가른다 (UI-001 4장, 카드 BU)
+  const edition = EDITION_NAME[user?.edition ?? 'internet']
+  useEffect(() => {
+    if (user) document.title = edition
+  }, [user, edition])
   const logout = () => {
     api.post('/auth/logout', {}).finally(() => nav('/login'))
   }
@@ -56,7 +61,7 @@ export function Shell() {
     <div className="app">
       <div className="topbar">
         <strong>
-          <Link to="/">싱크독</Link>
+          <Link to="/">{edition}</Link>
         </strong>
         <span className="grow" />
         <button className="nav" type="button" onClick={() => setHowTo(true)}>
@@ -74,7 +79,7 @@ export function Shell() {
       <main className="screen">
         <Outlet context={{ user, projects, ask }} />
       </main>
-      {howTo && <HowTo onClose={() => setHowTo(false)} />}
+      {howTo && <HowTo onClose={() => setHowTo(false)} edition={user.edition} />}
       {settings && <SettingsDialog user={user} onClose={() => setSettings(false)} />}
       <ToastHost />
     </div>

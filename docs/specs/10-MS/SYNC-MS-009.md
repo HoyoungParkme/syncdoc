@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-009
 type: MS
 title: MINISPEC — infra — git·github 어댑터
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -67,9 +67,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **입력** `system` 지시문 · `messages` 우리 키로 쌓인 대화록 — `{role: user|assistant, text}` · `{role: user, text, images: [(mime, bytes)]}`(이 턴에 붙인 이미지, 카드 AR) · `{role: assistant, text, tool_calls: [ToolCall]}` · `{role: tool, tool_call_id, text}` · `tools` 모델이 부를 수 있는 도구 명세(`ToolSpec`) · `tool_choice` `"auto"`(모델이 고른다) 또는 `"none"`(도구 없이 답만 — 마무리 호출). 맥락 조립·자르기·루프는 전부 부르는 쪽([[SYNC-MS-008#queries.ask_item]])의 일이다. 여기서는 더하거나 자르지 않는다
 
 **처리**
-1. `if not settings.LLM_API_KEY → ! LlmNotConfigured` — 네트워크 전
+1. `if not settings.llm_enabled → ! LlmNotConfigured` — 네트워크 전. 키와 주소가 다 있어야 한다 — 싱크독_로컬은 주소 기본값이 없다([[SYNC-INFRA-001]] 5.3, 카드 BU)
 2. 대화록을 와이어 형식으로 옮긴다 — 아래 표
-3. `httpx`로 `POST settings.LLM_API_URL`(OpenAI 호환 Chat Completions), `Authorization: Bearer {LLM_API_KEY}`, 본문 `{model: settings.LLM_MODEL, messages: [{role: "system", content: system}, …], tools: [{type: "function", function: {name, description, parameters}}], tool_choice}` — `tools`가 비면 `tools`·`tool_choice`를 아예 싣지 않는다 · 타임아웃 코드 상수 60초 · **`stream: true`·`stream_options: {include_usage: true}`로 스트리밍한다**(카드 AW)
+3. `httpx`로 `POST settings.llm_url`(OpenAI 호환 Chat Completions — 설정 `LLM_API_URL`, 없으면 판의 기본값), `Authorization: Bearer {LLM_API_KEY}`, 본문 `{model: settings.LLM_MODEL, messages: [{role: "system", content: system}, …], tools: [{type: "function", function: {name, description, parameters}}], tool_choice}` — `tools`가 비면 `tools`·`tool_choice`를 아예 싣지 않는다 · 타임아웃 코드 상수 60초 · **`stream: true`·`stream_options: {include_usage: true}`로 스트리밍한다**(카드 AW)
 4. 응답 `choices[0].message` — `content`(없으면 `None`) · `tool_calls[]`마다 `ToolCall(id, function.name, json.loads(function.arguments))` · `usage`가 있으면 `LlmUsage(prompt_tokens, completion_tokens)`, 없으면 둘 다 0
 5. `→ LlmStep(text=content, tool_calls, usage)`
 
@@ -109,7 +109,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **입력** [[#llm.step]]과 같다
 
 **처리**
-1. `if not settings.LLM_API_KEY → ! LlmNotConfigured` — 네트워크 전
+1. `if not settings.llm_enabled → ! LlmNotConfigured` — 네트워크 전. 키와 주소가 다 있어야 한다 — 싱크독_로컬은 주소 기본값이 없다([[SYNC-INFRA-001]] 5.3, 카드 BU)
 2. 본문은 [[#llm.step]] 3단계와 같고 `stream: true`·`stream_options: {include_usage: true}`를 더한다 · `httpx` `client.stream("POST", …)`
 3. 응답 `Content-Type`이 `text/event-stream`이 **아니면**(스트림을 무시하는 호환 서버) 본문을 JSON 하나로 읽어 [[#llm.step]] 4단계대로 `LlmStep` 하나를 `yield`하고 끝
 4. 줄마다 `data: ` 뒤를 JSON으로 — `[DONE]`이면 끝. `choices[].delta.content` 조각은 모으면서 **그대로 `str`로 `yield`** · `delta.tool_calls[]`는 `index`로 자리를 잡아 `id`·`function.name`을 채우고 `function.arguments` 조각을 이어 붙인다 · `usage`가 실린 청크(마지막)에서 `LlmUsage`
