@@ -2,7 +2,7 @@
 doc_id: SYNC-SEQ-001
 type: SEQ
 title: SEQUENCE — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-API-001, SYNC-API-002, SYNC-UC-001]
 ---
 
@@ -1286,6 +1286,7 @@ sequenceDiagram
     alt 토큰 없음·틀림 (2a)
         R-->>U: 401 WWW-Authenticate Basic — git이 다시 묻는다
     end
+    R->>R: 커밋 — 사용 흔적(last_used_at)을 남기고 토큰 행 잠금을 곧바로 놓는다
     R->>PS: server_origin(code, user)
     alt 남의 것·GitHub 저장·없음 (2b)
         PS-->>R: not-found
@@ -1303,6 +1304,7 @@ sequenceDiagram
 
 **읽을 때 볼 것**
 - 인증은 매 요청이다 — git은 요청마다 같은 Basic을 보낸다. 세션을 만들지 않는다
+- 인증이 통과하면 **응답 전에 곧바로 커밋한다**(4) — 잠금을 쥔 채 응답을 흘리면 fetch가 곧바로 잇는 POST가 같은 토큰 행을 기다리며 이벤트 루프째 막혀 앱 전체가 멈춘다(#318). MCP도 같다([[#SEQ-C2]])
 - 처리는 응답을 다 보낸 뒤다. 읽기가 실패하거나 연결이 끊겨도 폴링이 메운다([[SYNC-INFRA-001]] 7장)
 
 ---
@@ -1456,7 +1458,9 @@ sequenceDiagram
         M-->>A: isError {type: unauthorized}
     end
     AS->>DB: users where id
+    AS->>DB: access_tokens update last_used_at (flush만)
     AS-->>M: User
+    M->>DB: 커밋 — 도구를 돌리기 전에 곧바로(#49·#318)
     M->>M: author = Author(kind=agent, user, instructed_by=user, via=mcp)
     M->>M: 도구 실행 (SEQ-xx)
 ```

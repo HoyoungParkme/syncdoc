@@ -41,7 +41,11 @@ _SERVICES = {"git-upload-pack", "git-receive-pack"}
 
 
 def _token_user(request: Request, session: Session) -> User | None:
-    """Basic의 비밀번호 칸이 개인 토큰이다. 아이디 칸은 보지 않는다 — 토큰이 사람을 정한다."""
+    """Basic의 비밀번호 칸이 개인 토큰이다. 아이디 칸은 보지 않는다 — 토큰이 사람을 정한다.
+
+    통과하면 곧바로 커밋한다(SEQ-29 4) — 사용 흔적이 남고 토큰 행 잠금을 놓는다. 쥔 채 응답을 흘리면
+    fetch가 곧바로 잇는 POST가 그 잠금을 이벤트 루프 위에서 기다려 앱 전체가 멈춘다(#318).
+    """
     header = request.headers.get("authorization", "")
     if not header[:6].lower() == "basic ":
         return None
@@ -50,7 +54,10 @@ def _token_user(request: Request, session: Session) -> User | None:
     except (binascii.Error, UnicodeDecodeError):
         return None
     _, _, token = decoded.partition(":")
-    return AccountService(session).authenticate_token(token) if token else None
+    user = AccountService(session).authenticate_token(token) if token else None
+    if user is not None:
+        session.commit()
+    return user
 
 
 def _challenge() -> Response:

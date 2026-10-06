@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 import uvicorn
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 from app import db
 from app.config import settings
@@ -24,6 +25,7 @@ from app.core.account.models import User
 from app.core.account.service import AccountService
 from app.core.project.service import ProjectService
 from app.core.types import Storage
+from app.infra import git as infra_git
 from tests.core.account.test_service import make_user
 
 CODE = "GITP"
@@ -180,3 +182,48 @@ async def test_clone_push_and_processing_over_http(live, tmp_path: Path) -> None
     assert r.returncode != 0 and ("404" in r.stderr or "not found" in r.stderr.lower())
     # 사용자의 전역 git 설정·자격 증명 저장소를 건드리지 않았다
     assert not (home / ".git-credentials").exists()
+
+
+async def test_auth_commits_before_streaming(
+    live, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#318 — 인증이 통과하면 응답 전에 곧바로 커밋한다(SEQ-29 4).
+
+    예전에는 `last_used_at`을 flush만 한 채 응답을 흘려 토큰 행 잠금을 응답 내내 쥐었다. fetch가 곧바로
+    잇는 POST가 그 잠금을 이벤트 루프 위에서 기다려 앱 전체가 멈췄다(실물). 세션이 닫힐 때 롤백돼
+    사용 흔적도 남지 않았다. 경합은 운이라 **잠금 자체를 본다** — 응답을 흘리는 자리에서 다른 연결이
+    토큰 행을 기다리지 않고 잠가 본다.
+    """
+    home = tmp_path / "home"
+    home.mkdir()
+    with db.SessionLocal() as s:
+        owner = s.get(User, live["owner_id"])
+        await ProjectService(s).init_project(None, CODE, "git 시험", owner, storage=Storage.server)
+        s.commit()
+    held: list[bool] = []
+    real = infra_git.http_backend
+
+    async def probe(*args, **kwargs):
+        with db.engine.connect() as c:
+            try:
+                c.execute(
+                    text("SELECT 1 FROM access_tokens WHERE user_id = :u FOR UPDATE NOWAIT"),
+                    {"u": live["owner_id"]},
+                )
+                held.append(False)
+            except OperationalError:
+                held.append(True)
+        return await real(*args, **kwargs)
+
+    monkeypatch.setattr(infra_git, "http_backend", probe)
+    url = f"http://x:{live['tok']}@127.0.0.1:{live['port']}/git/{CODE}.git"
+    r = _git(tmp_path, home, "clone", "-q", url, str(tmp_path / "work"))
+
+    assert r.returncode == 0, r.stderr
+    assert held and not any(held), "인증의 잠금을 쥔 채 응답을 흘린다"
+    with db.SessionLocal() as s:
+        used = s.execute(
+            text("SELECT last_used_at FROM access_tokens WHERE user_id = :u"),
+            {"u": live["owner_id"]},
+        ).scalar()
+    assert used is not None, "인증이 커밋하지 않으면 last_used_at이 롤백된다"
