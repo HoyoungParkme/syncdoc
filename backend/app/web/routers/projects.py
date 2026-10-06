@@ -40,6 +40,7 @@ async def init_project(
         req.import_existing,
         req.create_repo,
         Storage(req.storage),
+        req.private,
     )
     session.commit()
     summary = next(p for p in await queries.project_summary(user) if p.code == req.code)
