@@ -536,7 +536,7 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 2. if 다른 프로젝트가 `remote_url`을 쓴다(정규화 일치 — [[SYNC-MS-001#ProjectService.init_project]] 2a와 같은 규칙) → `! repository-already-registered {code: 그 프로젝트}` (2d)
 3. `token = AccountService.github_token_for(user)` — 없으면 `! unauthorized`
 4. **읽기 락 → 쓰기 락**(`read_lock(code)` 다음 `_lock(code)`) — [[#pipeline.move_to_server]] 4와 같은 순서
-5. `owner, name = remote_url에서 뜬다` · `archived = github.repo_archived(token, owner, name)` — 닿지 않으면(`unauthorized`) → `! push-failed {reason: GitHub 저장소에 닿지 않는다 …}` (3a) · if `archived` → `! repo-archived {remote_url}` (3b)
+5. `owner, name = remote_url에서 뜬다` · `archived = github.repo_archived(token, owner, name)` — 주소에서 소유자·이름을 못 읽거나 닿지 않으면(`unauthorized`) → `! push-failed {reason: GitHub 저장소에 닿지 않는다 …}` (3a) · if `archived` → `! repo-archived {remote_url}` (3b)
 6. `origin = Path(remote_url 칸)`(서버 저장소) · `src = git.push_all(origin, remote_url, token)` — 가지·태그를 되감지 않고 한꺼번에. 거절되면(`GitError`) → `! push-failed {reason}` — 아무것도 바뀌지 않는다 (4a)
 7. `git.set_origin(workdir, remote_url)` · `head = git.fetch(workdir, user)` — if `head != src` → 7a
    - 7a. `git.set_origin(workdir, str(origin))`로 되돌리고 `! push-failed {reason: main이 다르다}` (5a). fetch가 실패해도 같다
