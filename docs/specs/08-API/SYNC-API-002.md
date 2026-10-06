@@ -2,7 +2,7 @@
 doc_id: SYNC-API-002
 type: API
 title: API 명세 MCP — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ---
 
@@ -20,6 +20,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 - 전송: MCP streamable HTTP. 엔드포인트 `POST /mcp`
 - 인증: `Authorization: Bearer {토큰}`. 토큰은 사람이 웹 설정(UI-13)에서 발급한다. 요청은 발급자 계정으로 기록된다
+- **서버 이름은 판 이름이다** — 싱크독_깃허브는 `syncdoc_github`, 싱크독_로컬은 `syncdoc_local`([[SYNC-PRD-001#R15]], 카드 BU). 연결할 때 서버가 이 이름을 알리고, 사람이 등록하는 이름(UI-13 8.1 · UI-16 6.2)도 같다. 한 에이전트에 두 판을 같이 붙여도 도구가 어느 쪽 것인지 이름으로 가른다
 - **저장 방식은 프로젝트마다다**([[SYNC-PRD-001#R14]]). 서버가 켠 방식은 연결할 때 받는 서버 안내(instructions)와 `init_project` 설명 끝 문장에 있다. 둘 다 켜진 서버에서는 `init_project`를 부르기 전에 **사람에게 먼저 묻는다** — GitHub 저장소로 할지, 서버에 저장할지. 하나만 켜진 서버는 그것으로 부르고 묻지 않는다
 - **발급자가 소유한 프로젝트만 열린다**([[SYNC-PRD-001#R12]]). 남의 프로젝트 코드나 문서 ID를 주면 `not-found {resource: "project"}` — 없는 것과 같다. `init_project`로 등록한 사람이 그 프로젝트의 소유자다
 - 에러: 도구 결과의 `isError: true` + 본문에 [[SYNC-API-001]]과 **같은 problem+json**. 에이전트가 `type`으로 분기한다
