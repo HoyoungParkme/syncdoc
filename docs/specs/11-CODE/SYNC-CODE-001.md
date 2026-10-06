@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -91,7 +91,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 첫 사용 | 싱크독 저장소를 싱크독에 `init_project`(import_existing=true) → 문서·항목·참조가 인덱스되고 **validate 결과가 `tools/validate.py`와 일치** → 이 문서를 싱크독에서 승인 |
 | 테스트 | 노트북 밖에서 접속 · 팀원 로그인 · 팀원 토큰으로 MCP |
 | 선행 | B4 |
-| 완료 | (C-1 로컬 2026-09-09: `docker compose up --build`(Dockerfile 2단계) → 마이그레이션 0001~0004 → 실제 GitHub OAuth 로그인 → `HoyoungParkme/syncdoc` `import_existing=true` → 문서 27·항목 338·참조 963(미존재 0)·규약 오류 0 = `tools/validate.py`와 일치 → MCP 토큰으로 `get_document`·`get_references`. C-2 2026-09-09: Quick Tunnel `*.trycloudflare.com` → 노트북 밖에서 접속·로그인 확인, 세션 없으면 401 · 터널로 MCP(토큰 없이 401, 토큰으로 정상) · **폴링 확인**: PR #1 머지로 main 전진 → 5분 주기 폴링이 스스로 따라잡아(약 4분 40초) 바뀐 명세 10개에 v2 생성, 전부 `via=github`, `last_processed_commit`이 새 main과 일치 · OAuth는 앱 하나에 로컬·터널 콜백 둘 등록, `redirect_uri`로 각자 주소 복귀 · webhook 없음(주소 가변, 명세대로 폴링만) · **팀원 검증 2026-09-14** (`hypark-df`, 저장소 `bbs-spec` 협력자): GitHub OAuth로 팀원 로그인 → 새 사용자 생성(id=9) · UI-13에서 토큰 발급(「한 번만 보입니다」·복사·목록 표시 확인) · 그 토큰으로 MCP `get_document`·`update_document` → **커밋이 `hypark-df <hypark-df@users.noreply.github.com>`로 push되고 GitHub 계정까지 이어짐**, DB는 `kind=agent·작성자=hypark-df·via=mcp` · 주인이 상위 `BBS-PRD-001#R1`을 고쳐 전파하니 플래그 6건 중 **팀원이 마지막에 고친 문서의 2건만 팀원 「내 할 일」에 뜨고** 나머지 4건은 주인에게 감(담당자 = 대상 문서 최근 버전 작성자) · 팀원이 둘을 해제하니 0건 · 미결: 비공개 저장소 fetch 토큰(v2, MS-009 8장)) |
+| 완료 | (C-1 로컬 2026-09-09: `docker compose up --build`(Dockerfile 2단계) → 마이그레이션 0001~0004 → 실제 GitHub OAuth 로그인 → `HoyoungParkme/syncdoc` `import_existing=true` → 문서 27·항목 338·참조 963(미존재 0)·규약 오류 0 = `tools/validate.py`와 일치 → MCP 토큰으로 `get_document`·`get_references`. C-2 2026-09-09: Quick Tunnel `*.trycloudflare.com` → 노트북 밖에서 접속·로그인 확인, 세션 없으면 401 · 터널로 MCP(토큰 없이 401, 토큰으로 정상) · **폴링 확인**: PR #1 머지로 main 전진 → 5분 주기 폴링이 스스로 따라잡아(약 4분 40초) 바뀐 명세 10개에 v2 생성, 전부 `via=github`, `last_processed_commit`이 새 main과 일치 · OAuth는 앱 하나에 로컬·터널 콜백 둘 등록, `redirect_uri`로 각자 주소 복귀 · webhook 없음(주소 가변, 명세대로 폴링만) · **팀원 검증 2026-09-14** (두 번째 계정, 저장소 `bbs-spec` 협력자): GitHub OAuth로 팀원 로그인 → 새 사용자 생성(id=9) · UI-13에서 토큰 발급(「한 번만 보입니다」·복사·목록 표시 확인) · 그 토큰으로 MCP `get_document`·`update_document` → **커밋이 두 번째 계정의 noreply 메일로 push되고 GitHub 계정까지 이어짐**, DB는 `kind=agent·작성자=두 번째 계정·via=mcp` · 주인이 상위 `BBS-PRD-001#R1`을 고쳐 전파하니 플래그 6건 중 **팀원이 마지막에 고친 문서의 2건만 팀원 「내 할 일」에 뜨고** 나머지 4건은 주인에게 감(담당자 = 대상 문서 최근 버전 작성자) · 팀원이 둘을 해제하니 0건 · 미결: 비공개 저장소 fetch 토큰(v2, MS-009 8장)) |
 
 
 #### D1 토큰과 셸
@@ -268,11 +268,11 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 화면 | 코드를 `[SYNC]`처럼 대괄호 친 고정폭·굵게 + 이름. UI-14 표에는 이름이 없던 것을 붙인다 |
 | 테스트 | `check_ui.py` 15/15 그대로(요소 번호는 안 바뀐다) · 여덟 자리 전부 `[코드] 이름` — 한 곳만 다르면 어휘가 아니라 실수다 |
 | 선행 | H |
-| 완료 | 2026-09-14 · 브랜치 `card/I-code-name` · 커밋 `3af52a0`(spec) `6286968`(code) · PR #65 · `check_ui.py` 15/15 · `check_code.py` 132/132 · `validate.py` 위반 0·경고 0 · 백엔드 213 · ruff · `tsc`·`build` 통과 · **실물 확인**(터널, 새로 불러서): 여덟 자리 전부 — UI-2 `[SYNC] 싱크독` · UI-4 `[INS] 보험청구심사 어시스턴트` · UI-5 문서 바·킥커 · UI-7 · UI-8 · UI-9 `← [INS] …` · UI-14 네 행 · **걸린 것**: 관리 표 데이터(RepoStatus)에 이름이 없었다 — DTO·pydantic·프런트 타입·API-001·MS-001에 `name`을 더했다. 처음엔 배포 전 번들이 탭에 남아 옛 화면을 읽었다 — 새로 불러서 다시 봤다 |
+| 완료 | 2026-09-14 · 브랜치 `card/I-code-name` · 커밋 `3af52a0`(spec) `6286968`(code) · PR #65 · `check_ui.py` 15/15 · `check_code.py` 132/132 · `validate.py` 위반 0·경고 0 · 백엔드 213 · ruff · `tsc`·`build` 통과 · **실물 확인**(터널, 새로 불러서): 여덟 자리 전부 — UI-2 `[SYNC] 싱크독` · UI-4 `[INS] …` · UI-5 문서 바·킥커 · UI-7 · UI-8 · UI-9 `← [INS] …` · UI-14 네 행 · **걸린 것**: 관리 표 데이터(RepoStatus)에 이름이 없었다 — DTO·pydantic·프런트 타입·API-001·MS-001에 `name`을 더했다. 처음엔 배포 전 번들이 탭에 남아 옛 화면을 읽었다 — 새로 불러서 다시 봤다 |
 
 **왜 카드인가.** 여덟 화면의 표기가 한꺼번에 바뀌고 공통 조각이 하나 생긴다. 버그가 아니라 어휘 결정이다(DEV-15).
 
-**왜 지금인가.** 목록에서 `INS 보험청구심사 어시스턴트`를 보고 어디까지가 코드인지 한 번 읽어야 알았다. 문서 ID는 `INS-UC-001`처럼 코드가 접두로 딱 갈리는데 프로젝트 이름만 안 갈렸다. 사용자가 제안했고, 네 자리 전후를 그려 보고 정했다.
+**왜 지금인가.** 목록에서 `ABC 주문 관리 도우미`를 보고 어디까지가 코드인지 한 번 읽어야 알았다. 문서 ID는 `INS-UC-001`처럼 코드가 접두로 딱 갈리는데 프로젝트 이름만 안 갈렸다. 사용자가 제안했고, 네 자리 전후를 그려 보고 정했다.
 
 **정한 것 둘.**
 
@@ -457,7 +457,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 화면 | 없음 |
 | 테스트 | 손으로 — 토큰 넣고 `scripts/tunnel.sh` → 고정 주소로 `/health` · 재부팅 뒤 같은 주소 · `TUNNEL_TOKEN` 비우면 Quick으로 뜨고 `PUBLIC_BASE_URL`이 새 주소로 바뀜 |
 | 선행 | C |
-| 완료 | 2026-09-16 · 브랜치 `card/Q-named-tunnel` · 커밋 `12b39a5`(spec) `chore(Q)`(script) · PR #79 · #81(플래그 순서 — `--no-autoupdate`는 `run` 앞) · **실물**: 무료 도메인 `syncdoc.dpdns.org`(DigitalPlat FreeDomain, 만료 2027-09-16, 120일 전부터 무료 갱신) → Cloudflare 존(Free, NS owen·serena) → Zero Trust 터널 `syncdoc`(Healthy, 커넥터 `hoyoung` linux_amd64) → Published application route `syncdoc.dpdns.org → http://localhost:8000` → `.env` `TUNNEL_TOKEN`·`PUBLIC_BASE_URL` → `scripts/tunnel.sh` 「named tunnel → https://syncdoc.dpdns.org」 → `/health` ok · OAuth 콜백 고정 주소로 갱신, 고정 주소로 GitHub 로그인 통과 · MCP 등록(WSL·Windows) 고정 주소, `tools/list` 9개 · **걸린 것**: 경로를 만들기 전에 이름을 조회한 WSL DNS 중계기(10.255.255.254)가 「없음」을 캐시해 이 노트북에서만 한동안 못 찾음 — `/etc/hosts`로 우회. 순서는 「경로 저장 → 조회」 · 셋업 기록(캡처 9장): claude.ai/artifact/BetNPr14t6npa2H3vANcnX |
+| 완료 | 2026-09-16 · 브랜치 `card/Q-named-tunnel` · 커밋 `12b39a5`(spec) `chore(Q)`(script) · PR #79 · #81(플래그 순서 — `--no-autoupdate`는 `run` 앞) · **실물**: 무료 도메인(공개 주소) → Cloudflare 존 → Zero Trust 터널(Healthy) → Published application route `{공개 주소} → http://localhost:8000` → `.env` `TUNNEL_TOKEN`·`PUBLIC_BASE_URL` → `scripts/tunnel.sh` 「named tunnel → https://{공개 주소}」 → `/health` ok · OAuth 콜백 고정 주소로 갱신, 고정 주소로 GitHub 로그인 통과 · MCP 등록(WSL·Windows) 고정 주소, `tools/list` 9개 · **걸린 것**: 경로를 만들기 전에 이름을 조회한 WSL DNS 중계기(10.255.255.254)가 「없음」을 캐시해 이 노트북에서만 한동안 못 찾음 — `/etc/hosts`로 우회. 순서는 「경로 저장 → 조회」 · 셋업 기록(캡처 9장): claude.ai/artifact/BetNPr14t6npa2H3vANcnX |
 
 **왜 카드인가.** 인프라 문서의 결정이 바뀐다(INFRA 9장 미결 하나를 뒤집는다). 코드는 스크립트뿐이라 작지만 기록해야 한다.
 
@@ -896,7 +896,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `github.create_hook` 신설 — 등록할 때 앱이 push 통지를 걸고(실패해도 등록은 마친다), 이미 있는 저장소는 관리 화면 버튼으로. 받는 쪽은 `push`·`refs/heads/main`만, 비밀번호가 비면 전부 거부. `ProjectService.ensure_hook`·`sync_now`(본체는 `read_pending` 재사용) · `read_pending`이 밀린 게 없어도 `fetched_at`을 적는다 · 화면에 **확인 시각**·**통지 상태**·**지금 가져오기**·**통지 걸기** · OAuth 범위에 `admin:repo_hook` |
 | 테스트 | `create_hook` 멱등·권한 없으면 예외 · `verify_signature`가 빈 비밀번호에 항상 False · `ping`·작업 브랜치·삭제 push 무시 · `ensure_hook` 넷 · `sync_now` · `read_pending`이 밀린 게 없어도 `fetched_at` 갱신 |
 | 선행 | AD |
-| 완료 | 2026-09-22 · 브랜치 `card/AF-webhook` · spec 10 + code 1 + `fix(#145)` · 테스트 **230**(신설 7) · 리비전 `0013` · `validate` 0/0 · `check_code` 114/114 · `check_ui` 12/12 · `check_dom` 10·10·10 · `check_tokens` 91/0 · `check_view_css` 네 쌍 · 사람 확인(배포 뒤): **저장소 아홉 전부에 통지를 걸었다**(`gh api … /hooks`로 확인 — `https://syncdoc.dpdns.org/hooks/github` events=push) · 두 번째로 눌러도 훅이 안 늘고 `created=false` · 「지금 가져오기」가 0을 돌려주며 확인 시각을 갱신 · **기존 토큰이 옛 범위(`repo`)를 들고 있어 다시 로그인하지 않고도 걸렸다** — 새 범위는 앞으로 받을 토큰을 위한 것 · 되먹임 **#145**: `ensure_hook`이 `flush`만 하고 라우터가 커밋하지 않아 GitHub에는 훅이 생기는데 `hook_id`가 안 남았다. 같은 세션만 보던 테스트가 못 잡아 **다른 요청에서도 보이는지**를 고정했다 |
+| 완료 | 2026-09-22 · 브랜치 `card/AF-webhook` · spec 10 + code 1 + `fix(#145)` · 테스트 **230**(신설 7) · 리비전 `0013` · `validate` 0/0 · `check_code` 114/114 · `check_ui` 12/12 · `check_dom` 10·10·10 · `check_tokens` 91/0 · `check_view_css` 네 쌍 · 사람 확인(배포 뒤): **저장소 아홉 전부에 통지를 걸었다**(`gh api … /hooks`로 확인 — `https://{공개 주소}/hooks/github` events=push) · 두 번째로 눌러도 훅이 안 늘고 `created=false` · 「지금 가져오기」가 0을 돌려주며 확인 시각을 갱신 · **기존 토큰이 옛 범위(`repo`)를 들고 있어 다시 로그인하지 않고도 걸렸다** — 새 범위는 앞으로 받을 토큰을 위한 것 · 되먹임 **#145**: `ensure_hook`이 `flush`만 하고 라우터가 커밋하지 않아 GitHub에는 훅이 생기는데 `hook_id`가 안 남았다. 같은 세션만 보던 테스트가 못 잡아 **다른 요청에서도 보이는지**를 고정했다 |
 
 **왜 카드인가.** 명세가 **주 경로**라고 적어 둔 통지를 코드가 한 번도 등록하지 않았다. 실측으로 두 저장소 다 훅이 비어 있었고(`gh api … /hooks` → `[]`), 실제 경로는 5분 폴링 하나였다. INFRA 7장은 이유를 「Quick Tunnel 주소가 바뀌어 못 건다」로 적었는데 고정 주소는 카드 Q에서 이미 생겼다 — 전제가 사라진 채 숙제만 남아 있었다.
 
@@ -1198,7 +1198,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `routers/git.py` — `/git/{코드}.git/`의 `info/refs`·`git-upload-pack`·`git-receive-pack`(git http-backend, Basic 비밀번호 칸에 개인 토큰, 소유자·서버 저장만, 본문을 다 넘긴 뒤 응답, push면 응답 뒤 read_pending) · `ProjectService.server_origin` · `pipeline.upload_code` + MCP `upload_code` · `git.http_backend` · `commit_push` 쓰기 경로 가드 · 오류 셋 · 이력 표시 「git push」 · UI-4 1.4 push 방법 |
 | 테스트 | 실제 git 클라이언트로 clone·push · `upload_code` 상한·거절 · 운영: https push → 코드 탭, `upload_code` → 코드 탭 |
 | 선행 | BA |
-| 완료 | 2026-10-01 · 브랜치 `card/BB-code-receive`(5f6ba73 #243) · spec 11 + code 4 · 테스트 343 · 운영: https `git push`(비밀번호 칸 토큰, Cloudflare 경유) 8448c6d → 처리 지점·코드 그래프, UI-7 「Hoyoung Park · git push」, UI-4 push 방법에 `https://syncdoc.dpdns.org/git/SRVP.git` · MCP `upload_code` 4c3a8b9 → `get_code_graph` 함수 3 · git 입구 토큰 없으면 401 + `WWW-Authenticate: Basic`, 옛 프로토콜 404 |
+| 완료 | 2026-10-01 · 브랜치 `card/BB-code-receive`(5f6ba73 #243) · spec 11 + code 4 · 테스트 343 · 운영: https `git push`(비밀번호 칸 토큰, Cloudflare 경유) 8448c6d → 처리 지점·코드 그래프, UI-7 「Hoyoung Park · git push」, UI-4 push 방법에 `https://{공개 주소}/git/SRVP.git` · MCP `upload_code` 4c3a8b9 → `get_code_graph` 함수 3 · git 입구 토큰 없으면 401 + `WWW-Authenticate: Basic`, 옛 프로토콜 404 |
 
 #### BC 폐쇄망판 — 로그인 없는 한 사람 판 · 글꼴 · 반입물
 
@@ -1359,11 +1359,11 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 | 항목 | 내용 |
 |---|---|
-| 근거 | [[SYNC-PRD-001#N2]] · [[SYNC-INFRA-001]] 5장 · [[SYNC-SEQ-001#SEQ-8]] · [[SYNC-UI-002#UI-1]] · 사용자 결정 2026-10-04(내 노트북에서 혼자 쓴다 — 공개 주소는 계속 쓰되 ID로 막는다 · 허용 계정 HoyoungParkme·hypark-df · 목록 밖은 새 로그인·세션·MCP 토큰·git 입구 전부 막는다 · 설정이 비면 예전처럼 누구나 · 포트는 이 PC에만) |
+| 근거 | [[SYNC-PRD-001#N2]] · [[SYNC-INFRA-001]] 5장 · [[SYNC-SEQ-001#SEQ-8]] · [[SYNC-UI-002#UI-1]] · 사용자 결정 2026-10-04(내 노트북에서 혼자 쓴다 — 공개 주소는 계속 쓰되 ID로 막는다 · 허용 계정 둘(개인 · 두 번째 계정) · 목록 밖은 새 로그인·세션·MCP 토큰·git 입구 전부 막는다 · 설정이 비면 예전처럼 누구나 · 포트는 이 PC에만) |
 | 구현 | 설정 `ALLOWED_LOGINS`(쉼표, 대소문자 무시)와 `settings.login_allowed` · [[SYNC-MS-006#AccountService.login_github]] — 목록 밖이면 아무것도 남기지 않고 `login-not-allowed` · [[SYNC-MS-006#AccountService.authenticate_token]] — 목록 밖 주인의 토큰은 None(MCP·git 입구) · `web/auth.current_user` — 목록 밖 세션은 비우고 401 · 콜백 라우터 — 거절이면 302 `/login?denied=1` · `pages/Login.tsx` 거절 안내(4) · `docker-compose.yml` 포트를 `127.0.0.1`로 · 폐쇄망판은 검사하지 않는다(로컬 사용자 하나) |
 | 테스트 | MS-006 테스트 관점 · 라우터: 목록 밖 콜백 → 302 `/login?denied=1`이고 사용자 행·토큰 없음 · 목록 밖 세션 → 401이고 세션 비움 · 목록 밖 주인의 토큰 → MCP 401 · 설정이 비면 누구나 · 대소문자 무시 · `check_ui` UI-1 · 운영: 허용 계정 로그인 그대로, 목록 밖 거절 |
 | 선행 | — |
-| 완료 | 2026-10-04 · 브랜치 `card/BP-login-allowlist`(21d635d #312) · spec 7 + code 7 · 테스트 430 · `ruff`·`tsc`·`oxlint`·`build` · `validate` 0/0 · `check_code` 162/162 · `check_calls` 0/0 · `check_ui` 14/14(UI-1 요소 5) · 운영: `.env`에 `ALLOWED_LOGINS=HoyoungParkme,hypark-df`(사용자가 넣음) 뒤 재생성 — 허용 HoyoungParkme·hypark-df, 거절 seonyoungyoo16·자리표시 · 기존 세션 그대로(`/api/me` 200) · 새 창 `/login?denied=1`에만 거절 안내(4) · 포트 `127.0.0.1:8000`·`127.0.0.1:5432`, 공개 주소 200(터널은 앱 안쪽) |
+| 완료 | 2026-10-04 · 브랜치 `card/BP-login-allowlist`(21d635d #312) · spec 7 + code 7 · 테스트 430 · `ruff`·`tsc`·`oxlint`·`build` · `validate` 0/0 · `check_code` 162/162 · `check_calls` 0/0 · `check_ui` 14/14(UI-1 요소 5) · 운영: `.env`에 `ALLOWED_LOGINS`(계정 둘, 사용자가 넣음) 뒤 재생성 — 허용 계정 둘, 거절 다른 사용자·자리표시 · 기존 세션 그대로(`/api/me` 200) · 새 창 `/login?denied=1`에만 거절 안내(4) · 포트 `127.0.0.1:8000`·`127.0.0.1:5432`, 공개 주소 200(터널은 앱 안쪽) |
 
 #### BQ GitHub 저장 → 서버 저장으로 옮기기 — 이력·커밋 해시 그대로, 웹훅은 거둔다
 

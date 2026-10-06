@@ -84,7 +84,7 @@ def mock_github(monkeypatch: pytest.MonkeyPatch):
     return install
 
 
-def github_ok(user_id: int = 42, login: str = "hoyoung", name: str | None = "박호영"):
+def github_ok(user_id: int = 42, login: str = "hoyoung", name: str | None = "홍길동"):
     """exchange_code → gho_{login}, get_user → {id, login, name} 인 정상 GitHub 핸들러."""
     import httpx  # noqa: E402
 

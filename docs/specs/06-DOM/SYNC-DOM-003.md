@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-003
 type: DOM
 title: ERD·DD — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-001]
 ---
 
@@ -229,7 +229,7 @@ erDiagram
 | 컬럼 | 타입 | 제약 | 의미 | 예시 |
 |---|---|---|---|---|
 | storage | varchar(8) | not null, 기본 `github` | **저장 방식** — `github` 또는 `server`([[SYNC-PRD-001#R14]]). 만들 때 정하고 바뀌지 않는다 | `server` |
-| remote_url | varchar(300) | not null | 원격. GitHub 저장이면 GitHub 저장소 주소, 서버 저장이면 **서버 안 원본의 경로**(`ORIGINS_DIR/{코드}.git`) — 이 경로는 입구가 밖으로 내보내지 않는다 | `https://github.com/dfocus/syncdoc` · `/var/syncdoc/origins/ABC.git` |
+| remote_url | varchar(300) | not null | 원격. GitHub 저장이면 GitHub 저장소 주소, 서버 저장이면 **서버 안 원본의 경로**(`ORIGINS_DIR/{코드}.git`) — 이 경로는 입구가 밖으로 내보내지 않는다 | `https://github.com/example/syncdoc` · `/var/syncdoc/origins/ABC.git` |
 | workdir_path | varchar(300) | not null | 노트북의 작업 사본 경로 | `/var/syncdoc/repos/SYNC` |
 | last_processed_commit | varchar(40) | null 허용 | 파이프라인이 마지막으로 처리한 커밋. 밀린 커밋 따라잡기 기준 | `a1b2c3…` |
 | registered_by_user_id | int | FK not null | **push 토큰의 주인**(서버 저장은 토큰이 없어 등록한 사람을 적을 뿐). GitHub 경로 자동 강등 커밋을 이 사람 토큰으로 민다. **비공개 저장소 fetch에 쓸 토큰의 주인이기도 하다**(#310) — 폴링·웹훅·재구축이 이 사람 토큰으로 읽는다. 소유자가 아니다 — 소유는 `projects.owner_user_id` — 폴링·재구축은 요청한 사람이 없거나 다른 사람일 수 있다. 이 사람 토큰을 못 구하면 fetch는 토큰 없이 시도한다(공개 저장소는 그래도 된다, MS-009 `git.fetch`) | |

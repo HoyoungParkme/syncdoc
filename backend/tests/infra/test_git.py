@@ -59,7 +59,7 @@ def _author(token: str | None = "gho_secret") -> Author:
     u = User(
         github_login="hoyoung",
         github_user_id=1,
-        display_name="박호영",
+        display_name="홍길동",
         github_token_encrypted=None if token is None else _fernet().encrypt(token.encode()),
     )
     return Author(kind=AuthorKind.human, user=u, instructed_by=None, via=Entry.mcp)
@@ -71,7 +71,7 @@ async def test_commit_push_creates_commit_on_remote(repos: dict[str, Path]) -> N
     )
     assert h == git(repos["remote"], "rev-parse", "main")
     assert git(repos["work"], "log", "-1", "--format=%an <%ae>") == (
-        "박호영 <hoyoung@users.noreply.github.com>"
+        "홍길동 <hoyoung@users.noreply.github.com>"
     )
     assert git(repos["work"], "log", "-1", "--format=%s") == "spec(SYNC-PRD-001): v2"
 
@@ -313,8 +313,8 @@ async def test_changed_files_keeps_last_commit_per_file_and_skips_templates(
 
 
 async def test_changed_files_login_from_noreply_email(repos: dict[str, Path]) -> None:
-    assert g._login_of("박호영", "12345+hoyoung@users.noreply.github.com") == "hoyoung"
-    assert g._login_of("박호영", "hoyoung@users.noreply.github.com") == "hoyoung"
+    assert g._login_of("홍길동", "12345+hoyoung@users.noreply.github.com") == "hoyoung"
+    assert g._login_of("홍길동", "hoyoung@users.noreply.github.com") == "hoyoung"
     assert g._login_of("seed", "seed@example.com") == "seed"
 
 

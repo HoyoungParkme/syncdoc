@@ -158,11 +158,11 @@ def test_create_placeholder_twice_returns_same_row(db_session: Session) -> None:
 
 # ── login_github ──
 async def test_login_github_first_login_creates_user(db_session: Session, mock_github) -> None:
-    mock_github(github_ok(42, "hoyoung", "박호영"))
+    mock_github(github_ok(42, "hoyoung", "홍길동"))
     u = await AccountService(db_session).login_github(
         "code", "state", "http://testserver/auth/github/callback"
     )
-    assert (u.github_user_id, u.github_login, u.display_name) == (42, "hoyoung", "박호영")
+    assert (u.github_user_id, u.github_login, u.display_name) == (42, "hoyoung", "홍길동")
     assert u.kind == "github"
     assert AccountService.github_token_for(u) == "gho_hoyoung"
     assert u.github_token_encrypted != b"gho_hoyoung"
@@ -173,7 +173,7 @@ async def test_login_github_renamed_login_updates_same_row(
     db_session: Session, mock_github
 ) -> None:
     svc = AccountService(db_session)
-    mock_github(github_ok(42, "old-name", "박호영"))
+    mock_github(github_ok(42, "old-name", "홍길동"))
     first = await svc.login_github("c1", "s", "http://testserver/auth/github/callback")
     mock_github(github_ok(42, "new-name", "Hoyoung"))
     second = await svc.login_github("c2", "s", "http://testserver/auth/github/callback")
@@ -186,9 +186,9 @@ async def test_login_github_renamed_login_updates_same_row(
 async def test_login_github_fills_placeholder_row(db_session: Session, mock_github) -> None:
     svc = AccountService(db_session)
     ghost = svc.create_placeholder("hoyoung")
-    mock_github(github_ok(42, "hoyoung", "박호영"))
+    mock_github(github_ok(42, "hoyoung", "홍길동"))
     u = await svc.login_github("code", "state", "http://testserver/auth/github/callback")
-    assert u.id == ghost.id and u.github_user_id == 42 and u.display_name == "박호영"
+    assert u.id == ghost.id and u.github_user_id == 42 and u.display_name == "홍길동"
     assert u.kind == "github"  # 자리표시가 계정이 됐다
     assert AccountService.github_token_for(u) == "gho_hoyoung"
     assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 1
@@ -210,7 +210,7 @@ async def test_login_github_outside_allowlist_leaves_nothing(
     db_session: Session, mock_github, monkeypatch: pytest.MonkeyPatch, login: str
 ) -> None:
     """카드 BP — 허용 목록 밖이면 login-not-allowed. 행도 토큰도 남지 않는다."""
-    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "Hoyoung, hypark-df")
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "Hoyoung, second-acct")
     mock_github(github_ok(77, login, "남"))
     with pytest.raises(LoginNotAllowed) as ei:
         await AccountService(db_session).login_github("c", "s", "http://testserver/cb")
@@ -223,8 +223,8 @@ async def test_login_github_allowlist_ignores_case_and_empty_means_everyone(
 ) -> None:
     """카드 BP — 대소문자가 달라도 목록 안이면 된다 · 목록이 비면 누구나(예전 동작)."""
     svc = AccountService(db_session)
-    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "Hoyoung,hypark-df")
-    mock_github(github_ok(42, "hoyoung", "박호영"))
+    monkeypatch.setattr(settings, "ALLOWED_LOGINS", "Hoyoung,second-acct")
+    mock_github(github_ok(42, "hoyoung", "홍길동"))
     assert (await svc.login_github("c", "s", "http://testserver/cb")).github_login == "hoyoung"
     monkeypatch.setattr(settings, "ALLOWED_LOGINS", "")
     mock_github(github_ok(77, "anyone", "누구"))
@@ -266,7 +266,7 @@ def test_user_for_commit_in_closed_edition_is_always_the_local_user(
     """폐쇄망판 — 어떤 이메일·login이든 로컬 사용자, 자리표시를 만들지 않는다 (PRD R15)."""
     monkeypatch.setattr(settings, "EDITION", "closed")
     svc = AccountService(db_session)
-    me = svc.ensure_local_user("local", "박호영")
+    me = svc.ensure_local_user("local", "홍길동")
     other = make_user(db_session, login="hoyoung")
     svc.add_commit_email(other, "me@example.com")
     assert svc.user_for_commit("me@example.com", "hoyoung").id == me.id
@@ -280,9 +280,9 @@ def test_ensure_local_user_makes_one_row_and_follows_settings(db_session: Sessio
     svc = AccountService(db_session)
     first = svc.ensure_local_user("local", "local")
     again = svc.ensure_local_user("local", "local")
-    renamed = svc.ensure_local_user("me", "박호영")
+    renamed = svc.ensure_local_user("me", "홍길동")
     assert first.id == again.id == renamed.id and first.kind == "local"
-    assert (renamed.github_login, renamed.display_name) == ("me", "박호영")
+    assert (renamed.github_login, renamed.display_name) == ("me", "홍길동")
     assert renamed.github_user_id is None and renamed.github_token_encrypted is None
     assert db_session.execute(text("SELECT count(*) FROM users")).scalar() == 1
 
@@ -295,10 +295,10 @@ def test_ensure_local_user_refuses_a_login_someone_else_has(
     taken = make_user(db_session, login="hoyoung", token=token)
     svc = AccountService(db_session)
     with pytest.raises(RuntimeError, match="LOCAL_LOGIN"):
-        svc.ensure_local_user("hoyoung", "박호영")
+        svc.ensure_local_user("hoyoung", "홍길동")
     mine = svc.ensure_local_user("local", "local")
     with pytest.raises(RuntimeError):
-        svc.ensure_local_user("hoyoung", "박호영")  # 이름을 바꿔도 겹치면 같다
+        svc.ensure_local_user("hoyoung", "홍길동")  # 이름을 바꿔도 겹치면 같다
     db_session.refresh(taken)
     db_session.refresh(mine)
     assert (taken.kind, mine.github_login) == ("github", "local")

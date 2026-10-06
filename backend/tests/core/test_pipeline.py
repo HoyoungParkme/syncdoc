@@ -546,7 +546,7 @@ async def test_process_commit_in_closed_edition_is_the_local_user(
 ) -> None:
     """폐쇄망판 — 누가 커밋했든 로컬 사용자로 붙는다. 자리표시·author.unknown 없음 (카드 BC)."""
     monkeypatch.setattr(settings, "EDITION", "closed")
-    me = AccountService(scoped).ensure_local_user("local", "박호영")
+    me = AccountService(scoped).ensure_local_user("local", "홍길동")
     other, remote = proj["repos"]["other"], proj["repos"]["remote"]
     repo = _repo_row(proj)
     repo.last_processed_commit = g(remote, "rev-parse", "main")

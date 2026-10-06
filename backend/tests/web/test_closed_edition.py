@@ -23,14 +23,14 @@ def closed(scoped: Session, monkeypatch: pytest.MonkeyPatch):
     """
     monkeypatch.setattr(settings, "EDITION", "closed")
     monkeypatch.setattr(settings, "LOCAL_LOGIN", "local")
-    monkeypatch.setattr(settings, "LOCAL_NAME", "박호영")
+    monkeypatch.setattr(settings, "LOCAL_NAME", "홍길동")
     monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "http://testserver")
     yield from _client(scoped, raise_server_exceptions=False)
 
 
 def test_starts_with_one_local_user_and_needs_no_login(closed: TestClient, scoped: Session) -> None:
     rows = scoped.execute(text("SELECT github_login, display_name, kind FROM users")).all()
-    assert rows == [("local", "박호영", "local")]  # 켜질 때 만들었다 (MS-006 ensure_local_user)
+    assert rows == [("local", "홍길동", "local")]  # 켜질 때 만들었다 (MS-006 ensure_local_user)
     me = closed.get("/api/me")
     assert me.status_code == 200  # 세션 없이
     body = me.json()

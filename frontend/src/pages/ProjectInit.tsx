@@ -105,9 +105,9 @@ export function ProjectInit({
           </>
         )}
         <label>프로젝트 코드</label>
-        <input className="inp mono" data-el="2.2" value={code} onChange={(e) => setCode(e.target.value)} placeholder="AIRD" style={{ width: 140 }} />
+        <input className="inp mono" data-el="2.2" value={code} onChange={(e) => setCode(e.target.value)} placeholder="DEMO" style={{ width: 140 }} />
         <div className="lbl">
-          영문 대문자 4자 이내. 문서 ID 앞부분이 됩니다 — 예: <code>AIRD-PRD-001</code>
+          영문 대문자 4자 이내. 문서 ID 앞부분이 됩니다 — 예: <code>DEMO-PRD-001</code>
         </div>
         {codeErr && (
           <div className="ferr" data-el="2.4">
@@ -115,7 +115,7 @@ export function ProjectInit({
           </div>
         )}
         <label>이름</label>
-        <input className="inp wide" data-el="2.3" value={name} onChange={(e) => setName(e.target.value)} placeholder="에어데이터" />
+        <input className="inp wide" data-el="2.3" value={name} onChange={(e) => setName(e.target.value)} placeholder="데모 프로젝트" />
         {!server && (
           <label className="chk">
             <input type="checkbox" data-el="2.6" checked={createRepo} onChange={(e) => setCreateRepo(e.target.checked)} />{' '}

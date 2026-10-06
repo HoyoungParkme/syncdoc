@@ -42,7 +42,7 @@ from app.main import app  # noqa: E402
 from app.web import auth  # noqa: E402
 
 # 커밋 신원 — noreply 메일의 앞부분이 login이라 그 계정으로 잡힌다 (AccountService.user_for_commit)
-HOYOUNG = ("박호영", "hoyoung@users.noreply.github.com")
+HOYOUNG = ("홍길동", "hoyoung@users.noreply.github.com")
 MINJUN = ("김민준", "minjun@users.noreply.github.com")
 
 
@@ -163,7 +163,7 @@ async def seed() -> None:
     with db.SessionLocal() as s:
         # 사용자를 먼저 만든다 — Project.owner_user_id·Repository.registered_by_user_id가 호영을 참조한다
         hoyoung = make_user(s, login="hoyoung")
-        hoyoung.display_name = "박호영"
+        hoyoung.display_name = "홍길동"
         # 민준은 남이다 — 호영의 프로젝트가 안 보인다(1인 도구). 이력에 커밋 작성자로만 나온다
         minjun = make_user(s, login="minjun")
         minjun.display_name = "김민준"
