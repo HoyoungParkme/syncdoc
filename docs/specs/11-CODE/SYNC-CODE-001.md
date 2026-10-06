@@ -1392,7 +1392,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | [[SYNC-MS-009#github.create_repo]] `private` 인자(요청 본문에 그대로) · [[SYNC-MS-001#ProjectService.init_project]] `private`(None이면 `GITHUB_REPO_PRIVATE`) · [[SYNC-API-001#POST/api/projects]] `InitProject.private` · [[SYNC-API-002#init_project]] `private` · `pages/ProjectInit.tsx` 공개 여부 2.8(2.6을 켰을 때만, 처음 선택은 `/api/me`의 `repo_private`) |
 | 테스트 | MS 테스트 관점 · 라우터: `private`를 빼면 서버 기본값, `false`면 공개로 만든다 · MCP 도구가 `private`를 넘긴다 · `check_ui` UI-3 · 운영: 2.6을 켜면 2.8이 보이고 비공개가 골라져 있다 |
 | 선행 | — |
-| 완료 | — |
+| 완료 | 2026-10-07 · 브랜치 `card/BS-repo-visibility`(a0b46e5 #322) · spec 10 + code 5 · 테스트 447 · `ruff`·`tsc`·`oxlint`·`build` · `validate` 0/0 · `check_code` 167/167 · `check_calls` 0/0 · `check_dom` 0 · `check_ui` 14/14(UI-3 요소 17) · 운영: 전체 재생성 뒤 `create_repo(token, owner, name, private)` · MCP 설명에 「공개 여부는 private로 고르고, 빼면 비공개」 · 공개 번들에 2.8(비공개·공개) · 공개 주소 200 · 화면은 사람이 직접(DEV-17) |
 
 ---
 
