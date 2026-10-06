@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1374,6 +1374,16 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | MS 테스트 관점 · 라우터 200·404·409 · 운영: 8개(CCR·HB·IMBC·INS·JSD·PAW·QBOT·VA)를 옮기고 HEAD·문서 수·버전 수·코드 그래프·fetch 오류 0을 옮기기 전과 대조 |
 | 선행 | BA(서버 저장) · BP |
 | 완료 | 2026-10-04 · 브랜치 `card/BQ-move-to-server`(9644619 #314) · spec 8 + code 6 · 테스트 440 · `ruff` · `validate` 0/0 · `check_code` 167/167 · `check_calls` 0/0 · `check_dom` 0 · 운영: 8개(CCR·HB·IMBC·INS·JSD·PAW·QBOT·VA)를 관리 API로 옮김 — 처리 지점·문서 수·버전 수·코드 그래프 커밋·함수 수가 옮기기 전과 같음, 가지·태그가 GitHub와 커밋 해시까지 같음(CCR 14 · VA 11 …), fetch 오류 0, GitHub 웹훅 0(7개 지움, PAW는 없었음) · 그 뒤 GitHub 비공개+보관: HB·IMBC·JSD·QBOT·VA |
+
+#### BR 암호화 정기 백업 — DB 덤프와 서버 저장소를 하루 한 번, 구글 드라이브로
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-INFRA-001]] 6.1 · 카드 BQ 뒤 노트북이 유일한 사본(서버 저장) · 사용자 결정 2026-10-04(매일 · 최근 14개 · 암호화해서 구글 드라이브 폴더로 · 호스트 스크립트 + 예약 실행 · 폴더는 사용자가 연결) |
+| 구현 | `scripts/backup.sh` — compose 밖에서 db·app 컨테이너로 `pg_dump -Fc`와 볼륨 `origins` tar를 묶어 `gpg --symmetric AES256`(암호 파일은 사람이 만든다) → `BACKUP_DIR` · 오늘 것이 있으면 건너뜀 · 최근 `BACKUP_KEEP`개만 · `--verify 파일`(풀어서 덤프 목록·저장소 목록) · crontab 매시 정각 |
+| 테스트 | 임시 암호·임시 폴더로 한 번 → 파일이 생기고 `--verify`가 덤프 목록·서버 저장소 8개를 보인다 · 같은 날 다시 → 건너뜀 · 15개면 14개만 남음 · 암호 파일이 없으면 이유를 남기고 끝 · 테스트 DB 컨테이너의 임시 DB로 복구해 프로젝트 수가 같다 |
+| 선행 | BQ |
+| 완료 | — |
 ---
 
 ## 2. 통합 테스트 시나리오
