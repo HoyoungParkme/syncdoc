@@ -116,11 +116,19 @@ class ProjectService:
         import_existing: bool = False,
         create_repo: bool = False,
         storage: Storage = Storage.github,
+        private: bool | None = None,
     ) -> Project:
         """SYNC-MS-001#ProjectService.init_project"""
         async with _lock(code):  # 0. 같은 코드 동시 초기화 (UC-A1 2c)
             return await self._init(
-                remote_url, code, name, user, import_existing, create_repo, Storage(storage)
+                remote_url,
+                code,
+                name,
+                user,
+                import_existing,
+                create_repo,
+                Storage(storage),
+                private,
             )
 
     async def _init(
@@ -132,6 +140,7 @@ class ProjectService:
         import_existing: bool,
         create_repo: bool = False,
         storage: Storage = Storage.github,
+        private: bool | None = None,
     ) -> Project:
         # 0a·0b — 저장 방식 (UC-A1 1a·1b, PRD R14). 켠 방식만, GitHub이면 주소가 있어야 한다
         if storage.value not in settings.storage_modes:
@@ -163,9 +172,15 @@ class ProjectService:
             token = AccountService.github_token_for(user)
             # 3b — 없으면 만든다. **기본값이 거짓인 이유**: 참이면 주소 오타가 조용히 새
             # 저장소를 만든다. 지금은 clone이 실패해 push-failed가 나서 오타를 알아챈다 (카드 F)
+            # 공개 여부는 요청이 고르고, 고르지 않으면 서버 기본값(비공개)이다 (카드 BS)
             if create_repo:
                 owner_name, repo_name = _split_remote(remote_url)
-                await github.create_repo(token, owner_name, repo_name)
+                await github.create_repo(
+                    token,
+                    owner_name,
+                    repo_name,
+                    private if private is not None else settings.GITHUB_REPO_PRIVATE,
+                )
 
         def undo_origin() -> None:
             """서버 저장의 되돌림 — 새로 만든 원본은 지우고, 되살린 것은 보관으로 돌려놓는다."""

@@ -196,7 +196,7 @@ async def test_create_repo_false_leaves_missing_repo_alone(
 
     calls: list[tuple] = []
 
-    async def spy(token, owner, name):
+    async def spy(token, owner, name, private):
         calls.append((owner, name))
         return "x"
 
@@ -221,7 +221,7 @@ async def test_create_repo_true_creates_then_registers(
     bare = repos_dir.parent / "made.git"
     calls: list[tuple] = []
 
-    async def fake_create(token, owner, name):
+    async def fake_create(token, owner, name, private):
         calls.append((owner, name))
         g(repos_dir.parent, "init", "-q", "--bare", "-b", "main", str(bare))
         return str(bare)
@@ -248,7 +248,7 @@ async def test_create_repo_true_does_not_recreate_existing(
 
     made: list[tuple] = []
 
-    async def fake_create(token, owner, name):
+    async def fake_create(token, owner, name, private):
         made.append((owner, name))
         return str(repos["remote"])
 
@@ -262,6 +262,33 @@ async def test_create_repo_true_does_not_recreate_existing(
     # create_repo는 불리되(있으면 만들지 않는 판정은 그 안에서 한다) 등록이 정상 완료된다
     assert made, "create_repo는 호출된다"
     assert ProjectService(db_session).get("EXI").code == "EXI"
+
+
+@pytest.mark.parametrize(
+    ("private", "setting", "expected"),
+    [(None, True, True), (None, False, False), (False, True, False), (True, False, True)],
+)
+async def test_create_repo_visibility_is_the_requests_or_the_setting(
+    db_session: Session, repos_dir, repos: dict, monkeypatch, private, setting, expected
+) -> None:
+    """카드 BS — 공개 여부는 요청이 고르고, 고르지 않으면(None) 서버 기본값(GITHUB_REPO_PRIVATE)."""
+    from app.infra import github
+
+    seen: list[bool] = []
+
+    async def fake_create(token, owner, name, private):
+        seen.append(private)
+        return str(repos["remote"])
+
+    monkeypatch.setattr(github, "create_repo", fake_create)
+    monkeypatch.setattr(settings, "GITHUB_REPO_PRIVATE", setting)
+    user = make_user(db_session, login="hoyoung")
+
+    await ProjectService(db_session).init_project(
+        str(repos["remote"]), "VIS", "공개 여부", user, True, True, private=private
+    )
+
+    assert seen == [expected]
 
 
 async def test_empty_repo_project_can_fetch_afterwards(
