@@ -113,6 +113,39 @@ def test_init_project_web_path(
     )  # 시드 PRD는 frontmatter 미완
 
 
+def test_init_project_passes_visibility(
+    client: TestClient, scoped: Session, tmp_path, monkeypatch
+) -> None:
+    """카드 BS — private를 서비스까지 넘긴다. 빼면 서버 기본값(GITHUB_REPO_PRIVATE)."""
+    from app.config import settings
+    from app.infra import github
+
+    monkeypatch.setattr(settings, "REPOS_DIR", tmp_path / "repos")
+    seen: list[bool] = []
+
+    async def fake_create(token, owner, name, private):
+        seen.append(private)
+        g(tmp_path, "init", "-q", "--bare", "-b", "main", str(tmp_path / f"{name}.git"))
+        return str(tmp_path / f"{name}.git")
+
+    monkeypatch.setattr(github, "create_repo", fake_create)
+    login(client, scoped)
+    for code, extra in (("PUB", {"private": False}), ("DEF", {})):
+        r = client.post(
+            "/api/projects",
+            json={
+                "storage": "github",
+                "remote_url": str(tmp_path / f"{code.lower()}.git"),
+                "code": code,
+                "name": "x",
+                "create_repo": True,
+                **extra,
+            },
+        )
+        assert r.status_code == 201, r.json()
+    assert seen == [False, True]
+
+
 def test_init_project_server_storage_and_storage_rules(
     client: TestClient, scoped: Session, tmp_path, monkeypatch
 ) -> None:

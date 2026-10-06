@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-001
 type: MS
 title: MINISPEC — ProjectService
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -46,7 +46,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 #### ProjectService.init_project 프로젝트 초기화
 
-**시그니처** `async def init_project(remote_url: str | None, code: str, name: str, user: User, import_existing: bool = False, create_repo: bool = False, storage: Storage = Storage.github) -> Project`
+**시그니처** `async def init_project(remote_url: str | None, code: str, name: str, user: User, import_existing: bool = False, create_repo: bool = False, storage: Storage = Storage.github, private: bool | None = None) -> Project`
 
 근거: [[SYNC-SEQ-001#SEQ-4]] · [[SYNC-SEQ-001#SEQ-28]] · [[SYNC-UC-001#UC-A1]] · [[SYNC-API-001#POST/api/projects]] · [[SYNC-API-002#init_project]] · [[SYNC-PRD-001#R12]] · [[SYNC-PRD-001#R14]]
 
@@ -66,7 +66,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
    - else → `git.init_bare(origin)`(새로 만듦)
    - `remote_url = str(origin)` — DB에만 두고 입구는 내보내지 않는다
 3a. (GitHub 저장) `token = AccountService.github_token_for(user)`
-3b. (GitHub 저장) if `create_repo` → `github.create_repo(token, owner, name)` — `owner`·`name`은 `remote_url`에서 뜬다. **이미 있으면 만들지 않고 넘어간다**([[SYNC-MS-009#github.create_repo]]). if 실패 → workdir 삭제, `! repo-create-failed {reason}`
+3b. (GitHub 저장) if `create_repo` → `github.create_repo(token, owner, name, private if private is not None else settings.GITHUB_REPO_PRIVATE)` — `owner`·`name`은 `remote_url`에서 뜬다. **공개 여부는 요청이 고르고, 고르지 않으면 서버 기본값(비공개)**이다(카드 BS). **이미 있으면 만들지 않고 넘어간다** — 공개 여부도 그대로다([[SYNC-MS-009#github.create_repo]]). if 실패 → workdir 삭제, `! repo-create-failed {reason}`
 4. `git.clone(remote_url, workdir, token)` · if 실패 → workdir 삭제, 서버 저장이면 되돌림(아래), `! push-failed {reason: clone}`
 5. `has = git.exists(workdir, "docs/specs")` — 커밋이 하나도 없는 빈 저장소는 `false`다([[SYNC-MS-009#git.exists]]). 9단계가 만드는 커밋이 그 저장소의 첫 커밋이 된다 (UC-A1 기본 흐름 3)
 6. if `has and not import_existing` → `n = len(git.list(workdir, "docs/specs/*/*.md"))`, workdir 삭제, `! existing-specs {doc_count: n}` (3a)
@@ -84,7 +84,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** `AccountService.github_token_for` · [[SYNC-MS-009#github.create_repo]] · [[SYNC-MS-009#git.clone]] [[SYNC-MS-009#git.exists]] [[SYNC-MS-009#git.list]] [[SYNC-MS-009#git.init_specs]] [[SYNC-MS-009#git.commit_push]] [[SYNC-MS-009#git.init_bare]] · [[SYNC-MS-007#pipeline.rebuild]] · [[#ProjectService.ensure_hook]]
 
-**테스트 관점** **서버 저장 → `ORIGINS_DIR/{code}.git`이 생기고(HEAD main) 골격 커밋 하나, GitHub을 안 부르고 토큰 없는 사람도 된다** · 켜지 않은 방식 → `storage-unavailable`, 아무것도 안 생김 · GitHub인데 주소 없음 → `invalid-request` · **보관본 있음 + 가져오기 아님 → `existing-specs`(`archived_at`), 아무것도 안 바뀜** · 가져오기 → 되살리고 재구축 버전 · 보관본 둘 → 가장 최근 것 · 서버 저장 등록 실패 → 새 원본은 지워지고 되살린 것은 보관으로 돌아간다 · 이름 없이 남은 원본 → 보관으로 옮기고 `existing-specs` · **GitHub 저장 새 등록 → 통지가 걸린다(`hook_id`)**(#242) · **통지 걸기가 실패해도 프로젝트는 등록된다**(hook_error에 사유 — GitHub가 거절해도, 연결이 끊겨도) · 가져오기·서버 저장은 통지를 부르지 않는다 · 빈 저장소 → `docs/specs/` 생김, 커밋 하나, 11칸 null · **`owner_user_id`가 등록한 사람** · `docs/specs/` 있는 저장소 → `existing-specs`, workdir 없음, DB 행 없음 · `import_existing=true` → 재구축 결과 · clone 권한 없음 → `push-failed`, 아무것도 안 남음 · **없는 저장소 + `create_repo=false` → `push-failed`**(지금 동작) · **없는 저장소 + `true` → 공개 저장소가 생기고 골격 커밋까지** · **이미 있는 저장소 + `true` → 만들지 않고 그대로 쓴다** · 만든 뒤 등록이 실패해도 **저장소는 남는다**
+**테스트 관점** **서버 저장 → `ORIGINS_DIR/{code}.git`이 생기고(HEAD main) 골격 커밋 하나, GitHub을 안 부르고 토큰 없는 사람도 된다** · 켜지 않은 방식 → `storage-unavailable`, 아무것도 안 생김 · GitHub인데 주소 없음 → `invalid-request` · **보관본 있음 + 가져오기 아님 → `existing-specs`(`archived_at`), 아무것도 안 바뀜** · 가져오기 → 되살리고 재구축 버전 · 보관본 둘 → 가장 최근 것 · 서버 저장 등록 실패 → 새 원본은 지워지고 되살린 것은 보관으로 돌아간다 · 이름 없이 남은 원본 → 보관으로 옮기고 `existing-specs` · **GitHub 저장 새 등록 → 통지가 걸린다(`hook_id`)**(#242) · **통지 걸기가 실패해도 프로젝트는 등록된다**(hook_error에 사유 — GitHub가 거절해도, 연결이 끊겨도) · 가져오기·서버 저장은 통지를 부르지 않는다 · 빈 저장소 → `docs/specs/` 생김, 커밋 하나, 11칸 null · **`owner_user_id`가 등록한 사람** · `docs/specs/` 있는 저장소 → `existing-specs`, workdir 없음, DB 행 없음 · `import_existing=true` → 재구축 결과 · clone 권한 없음 → `push-failed`, 아무것도 안 남음 · **없는 저장소 + `create_repo=false` → `push-failed`**(지금 동작) · **없는 저장소 + `true` → 저장소가 생기고 골격 커밋까지** · `private=False` → 공개로, `private=True` → 비공개로 만든다 · **`private`를 빼면 설정값(기본 비공개)**(카드 BS) · **이미 있는 저장소 + `true` → 만들지 않고 그대로 쓴다** · 만든 뒤 등록이 실패해도 **저장소는 남는다**
 
 ---
 

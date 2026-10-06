@@ -268,6 +268,37 @@ async def test_init_project_tool(scoped: Session, as_user, repos, tmp_path, monk
     assert next(s for s in p["stages"] if s["doc_type"] == "PRD")["doc_count"] == 1
 
 
+async def test_init_project_tool_passes_visibility(
+    scoped: Session, as_user, tmp_path, monkeypatch
+) -> None:
+    """카드 BS — private를 넘긴다. 빼면 서버 기본값(GITHUB_REPO_PRIVATE)."""
+    from app.config import settings
+    from app.infra import github
+    from tests.conftest import git as g
+
+    monkeypatch.setattr(settings, "REPOS_DIR", tmp_path / "repos")
+    seen: list[bool] = []
+
+    async def fake_create(token, owner, name, private):
+        seen.append(private)
+        g(tmp_path, "init", "-q", "--bare", "-b", "main", str(tmp_path / f"{name}.git"))
+        return str(tmp_path / f"{name}.git")
+
+    monkeypatch.setattr(github, "create_repo", fake_create)
+    for code, extra in (("PUB", {"private": False}), ("DEF", {})):
+        err, r = await call(
+            "init_project",
+            storage="github",
+            remote_url=str(tmp_path / f"{code.lower()}.git"),
+            code=code,
+            name="x",
+            create_repo=True,
+            **extra,
+        )
+        assert not err, r
+    assert seen == [False, True]
+
+
 async def test_init_project_server_storage_and_storage_is_required(
     scoped: Session, as_user, tmp_path, monkeypatch
 ) -> None:
@@ -293,6 +324,7 @@ def test_init_description_asks_first_only_when_both_modes_are_on() -> None:
     assert "서버 저장만 쓴다" in only and 'storage="server"' in only and "묻지 않는다" in only
     assert "GitHub 저장만" in tools.storage_sentence(["github"])
     assert "저장 방식을 고른다" in (tools.server.instructions or "")
+    assert "공개 여부는 private로 고르고, 빼면 비공개" in both  # 카드 BS
 
 
 async def test_get_references_splits_upstream_downstream(scoped: Session, as_user) -> None:

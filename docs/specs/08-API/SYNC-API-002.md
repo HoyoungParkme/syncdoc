@@ -2,7 +2,7 @@
 doc_id: SYNC-API-002
 type: API
 title: API 명세 MCP — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ---
 
@@ -55,7 +55,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ```json
 {
   "name": "init_project",
-  "description": "싱크독 프로젝트를 만든다. 저장 방식(storage)을 고른다 — github: GitHub 저장소를 등록한다, server: 싱크독 서버 안에 저장소를 만든다(GitHub 없이). docs/specs/ 아래 11단계 디렉터리와 README를 커밋한다. 새 프로젝트를 시작할 때 한 번만 부른다. 같은 코드가 있으면 project-code-conflict, 저장소에 docs/specs/가 이미 있거나 서버 저장인데 같은 코드의 보관된 저장소가 있으면 existing-specs 에러가 나며 import_existing=true로 다시 부르면 기존 명세를 가져와(보관본은 되살려) 등록한다. **GitHub 저장소가 아직 없으면 create_repo=true로 부른다** — 저장소를 만들어 주고(비공개가 기본 — 서버 설정, #310) 이어서 등록까지 한다. 사람이 저장소를 만들어 달라고 했을 때만 이 인자를 붙인다. {이 서버의 저장 방식 문장}",
+  "description": "싱크독 프로젝트를 만든다. 저장 방식(storage)을 고른다 — github: GitHub 저장소를 등록한다, server: 싱크독 서버 안에 저장소를 만든다(GitHub 없이). docs/specs/ 아래 11단계 디렉터리와 README를 커밋한다. 새 프로젝트를 시작할 때 한 번만 부른다. 같은 코드가 있으면 project-code-conflict, 저장소에 docs/specs/가 이미 있거나 서버 저장인데 같은 코드의 보관된 저장소가 있으면 existing-specs 에러가 나며 import_existing=true로 다시 부르면 기존 명세를 가져와(보관본은 되살려) 등록한다. **GitHub 저장소가 아직 없으면 create_repo=true로 부른다** — 저장소를 만들어 주고(공개 여부는 private로 고르고, 빼면 비공개) 이어서 등록까지 한다. 사람이 저장소를 만들어 달라고 했을 때만 이 인자를 붙인다. {이 서버의 저장 방식 문장}",
   "inputSchema": {
     "type": "object",
     "required": ["storage", "code", "name"],
@@ -65,7 +65,8 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
       "code": { "type": "string", "pattern": "^[A-Z]{1,4}$", "description": "프로젝트 코드. 영문 대문자 4자 이내. 문서 ID 앞부분이 된다" },
       "name": { "type": "string", "maxLength": 100, "description": "표시 이름" },
       "import_existing": { "type": "boolean", "default": false, "description": "docs/specs/가 이미 있을 때 덮어쓰지 않고 가져와 등록. 서버 저장이면 같은 코드의 보관된 저장소를 되살린다" },
-      "create_repo": { "type": "boolean", "default": false, "description": "GitHub 저장소가 없으면 만든다 — 비공개가 기본(서버 설정 GITHUB_REPO_PRIVATE). 이미 있으면 만들지 않고 공개 여부도 바꾸지 않는다. storage=github일 때만" }
+      "create_repo": { "type": "boolean", "default": false, "description": "GitHub 저장소가 없으면 만든다 — 공개 여부는 private로 고른다. 이미 있으면 만들지 않고 공개 여부도 바꾸지 않는다. storage=github일 때만" },
+      "private": { "type": "boolean", "description": "create_repo로 새로 만들 저장소의 공개 여부. 참이면 비공개, 거짓이면 공개. 빼면 서버 기본값(비공개). 사람이 공개를 말했을 때만 false로 부른다" }
     }
   }
 }

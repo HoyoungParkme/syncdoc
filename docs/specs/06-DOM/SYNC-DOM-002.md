@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -718,7 +718,7 @@ flowchart TB
 classDiagram
     class ProjectService {
         «service»
-        +init_project(remote_url: str?, code: str, name: str, user: User, import_existing: bool = False, create_repo: bool = False, storage: Storage = Storage.github) Project
+        +init_project(remote_url: str?, code: str, name: str, user: User, import_existing: bool = False, create_repo: bool = False, storage: Storage = Storage.github, private: bool? = None) Project
         +list_projects() list~Project~
         +list_owned(user: User) list~Project~
         +get(code: str) Project

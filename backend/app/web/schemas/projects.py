@@ -97,5 +97,7 @@ class InitProject(BaseModel):
     code: str = Field(pattern=r"^[A-Z]{1,4}$")
     name: str = Field(max_length=100)
     import_existing: bool = False
-    # 저장소가 없으면 만든다 — 비공개가 기본(GITHUB_REPO_PRIVATE, #310). 있으면 안 만든다 (카드 F)
+    # 저장소가 없으면 만든다. 있으면 안 만들고 공개 여부도 그대로 둔다 (카드 F · #310)
     create_repo: bool = False
+    # 새로 만들 저장소의 공개 여부 — 빼면 서버 기본값(GITHUB_REPO_PRIVATE, 기본 비공개) (카드 BS)
+    private: bool | None = None
