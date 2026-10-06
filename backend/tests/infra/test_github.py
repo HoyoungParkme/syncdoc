@@ -165,3 +165,19 @@ async def test_delete_hook_forbidden_is_unauthorized(mock_github) -> None:
     with pytest.raises(Unauthorized) as ei:
         await gh.delete_hook("t", "o", "r", 77)
     assert "403" in str(ei.value)
+
+
+# ── repo_archived (카드 BT) ──
+@pytest.mark.parametrize("archived", [True, False])
+async def test_repo_archived_reads_the_flag(mock_github, archived: bool) -> None:
+    calls = mock_github(lambda req: httpx.Response(200, json={"archived": archived}))
+    assert await gh.repo_archived("t", "o", "r") is archived
+    assert [(c.method, c.url.path) for c in calls] == [("GET", "/repos/o/r")]
+
+
+async def test_repo_archived_unreachable_is_unauthorized(mock_github) -> None:
+    """없거나 권한이 없으면 — GitHub은 권한 없는 비공개 저장소도 404로 답한다."""
+    mock_github(lambda req: httpx.Response(404, json={"message": "Not Found"}))
+    with pytest.raises(Unauthorized) as ei:
+        await gh.repo_archived("t", "o", "r")
+    assert "404" in str(ei.value)
