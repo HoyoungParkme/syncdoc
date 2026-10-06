@@ -143,10 +143,10 @@ async def test_exchange_code_without_token_is_unauthorized(mock_github) -> None:
 # ── get_user ──
 async def test_get_user_uses_bearer_and_falls_back_name_to_login(mock_github) -> None:
     calls = mock_github(
-        lambda r: httpx.Response(200, json={"id": 42, "login": "hoyoung", "name": "박호영"})
+        lambda r: httpx.Response(200, json={"id": 42, "login": "hoyoung", "name": "홍길동"})
     )
     u = await gh.get_user("gho_abc")
-    assert (u.id, u.login, u.name) == (42, "hoyoung", "박호영")
+    assert (u.id, u.login, u.name) == (42, "hoyoung", "홍길동")
     assert calls[0].headers["authorization"] == "Bearer gho_abc"
     assert str(calls[0].url) == "https://api.github.com/user"
     mock_github(lambda r: httpx.Response(200, json={"id": 7, "login": "noname", "name": None}))

@@ -32,7 +32,7 @@ async def test_s2_owner_reads_completes_and_connects_mcp(
     await create(proj, DocType.PRD, PRD_BODY)
 
     # 1. 소유자 호영이 GitHub로 로그인한다 (SEQ-8). 같은 GitHub 계정이라 User 행이 합쳐진다
-    mock_github(github_ok(proj["user"].github_user_id, "hoyoung", "박호영"))
+    mock_github(github_ok(proj["user"].github_user_id, "hoyoung", "홍길동"))
     r = client.get(
         "/auth/github", params={"next": "/p/EXMP/d/EXMP-PRD-001"}, follow_redirects=False
     )
@@ -62,7 +62,7 @@ async def test_s2_owner_reads_completes_and_connects_mcp(
     assert r.status_code == 200 and r.json()["status"] == "approved"
     assert g(proj["repos"]["remote"], "log", "-1", "--format=%s%n%an", "main").split("\n") == [
         "status(EXMP-PRD-001): draft → approved",
-        "박호영",
+        "홍길동",
     ]
     # 5. 토글은 되돌아온다 — 완료 문서를 다시 초안으로
     assert (

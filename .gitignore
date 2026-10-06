@@ -4,7 +4,7 @@ __pycache__/
 .env
 .venv/
 node_modules/
-.claude/WORKLOG.md
+.claude/
 backend/app/web/static/
 frontend/node_modules/
 .playwright-mcp/

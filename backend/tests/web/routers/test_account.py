@@ -135,7 +135,7 @@ def test_session_of_unknown_user_is_401(client: TestClient, db_session: Session)
 def test_oauth_e2e_login_then_session_then_logout(
     client: TestClient, db_session: Session, mock_github
 ) -> None:
-    calls = mock_github(github_ok(42, "hoyoung", "박호영"))
+    calls = mock_github(github_ok(42, "hoyoung", "홍길동"))
     r = client.get("/auth/github", params={"next": "/p/SYNC"}, follow_redirects=False)
     state = parse_qs(urlparse(r.headers["location"]).query)["state"][0]
     r = client.get(
