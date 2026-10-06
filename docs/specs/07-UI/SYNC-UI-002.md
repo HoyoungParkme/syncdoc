@@ -2,7 +2,7 @@
 doc_id: SYNC-UI-002
 type: UI
 title: 와이어프레임 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UI-001]
 ---
 
@@ -81,7 +81,7 @@ upstream: [SYNC-UI-001]
 
 프로젝트는 어디서든 **`[코드] 이름`**으로 적는다 — `[SYNC] 싱크독`. 코드는 고정폭·굵게, **대괄호까지 고정폭**이고, 이름은 본문체다.
 
-- **대괄호가 있어야 코드가 문서 ID와 같은 어휘로 읽힌다.** `SYNC-PRD-001`의 접두가 `[SYNC]`다 — 목록에서 코드가 한 열처럼 훑히고, 이름이 코드의 일부인지 헷갈리지 않는다(`INS 보험청구심사 어시스턴트`는 어디까지가 코드인지 한 번 읽어야 안다)
+- **대괄호가 있어야 코드가 문서 ID와 같은 어휘로 읽힌다.** `SYNC-PRD-001`의 접두가 `[SYNC]`다 — 목록에서 코드가 한 열처럼 훑히고, 이름이 코드의 일부인지 헷갈리지 않는다(`ABC 주문 관리 도우미`는 어디까지가 코드인지 한 번 읽어야 안다)
 - **여덟 자리가 전부 이 하나를 쓴다** — UI-2 목록 행 · UI-4 상세 머리(1.1·1.2) · UI-5 문서 바 브레드크럼과 킥커 · UI-7 문서 바 · UI-8 브레드크럼 · UI-9 단계 레일 `← [코드] 이름` · UI-14 관리 표. 한 곳만 다르면 어휘가 아니라 실수로 보인다
 - 코드만 있고 이름이 없는 자리(결과 라벨의 `SYNC · 방금`)는 대괄호를 안 친다 — 대괄호는 이름과 붙을 때 코드를 가르는 표시다
 
@@ -365,7 +365,7 @@ textarea.in{height:auto;min-height:64px;padding:8px 10px;resize:none;line-height
         <div class="tabs" data-el="2">
           <span class="t on" data-el="2.1">유저용</span><span class="t" data-el="2.2">원본</span><span class="t" data-el="2.3">이력</span>
         </div>
-        <div class="ban err" data-el="4">규약 오류 — frontmatter.status 누락 <span class="cap" style="color:inherit;opacity:.8">커밋 a1b2c3 · 박호영</span></div>
+        <div class="ban err" data-el="4">규약 오류 — frontmatter.status 누락 <span class="cap" style="color:inherit;opacity:.8">커밋 a1b2c3 · 홍길동</span></div>
         <div class="ban note" data-el="4a">미완성 — 필수 절 「성공지표」 없음 · 가리키는 곳 없는 참조 1 · 완료 불가</div>
 
         <div class="dochead">
@@ -552,7 +552,7 @@ status: draft
     <span><span class="m bd">[SYNC]</span> 싱크독</span><span class="sep">›</span><span class="m">6 DOM</span><span class="sep">›</span><span class="m bd cur">SYNC-DOM-003</span><span class="pill">초안</span><span class="ver">v3</span>
   </div>
   <div style="padding:14px 26px;background:#fff">
-    <div class="ban note" data-el="4b">휴지통에 있는 문서입니다 — 2026-09-16 박호영 · 파일은 저장소에 없고 되살리면 돌아옵니다<span class="sp"></span><span class="b sm" data-el="4b.1">되살리기</span></div>
+    <div class="ban note" data-el="4b">휴지통에 있는 문서입니다 — 2026-09-16 홍길동 · 파일은 저장소에 없고 되살리면 돌아옵니다<span class="sp"></span><span class="b sm" data-el="4b.1">되살리기</span></div>
   </div>
 </div>
 
@@ -791,7 +791,7 @@ status: draft
     <div class="phead" data-el="1">
       <div>
         <div class="nm h1"><span class="m" data-el="1.1">[SYNC]</span><span data-el="1.2">싱크독</span></div>
-        <a class="repo" data-el="1.3">github.com/dfocus/syncdoc</a>
+        <a class="repo" data-el="1.3">github.com/example/syncdoc</a>
       </div>
       <span class="sp"></span>
       <span class="b" data-el="2.1">참조 그래프</span>
@@ -812,7 +812,7 @@ status: draft
         </div>
 
         <div class="stg" data-el="4.1"><span class="no">1</span><span class="nm">요구·인터뷰<span class="cd">RFQ</span></span><span class="pill ok">완료</span><span class="sp"></span><span class="n">문서 1개</span><span class="caret">▾</span></div>
-        <div class="doc" data-el="4.2"><span class="m">SYNC-RFQ-001</span><span class="dot ok"></span><span class="lbl">완료 · v3 · 2일 전 · 박호영</span></div>
+        <div class="doc" data-el="4.2"><span class="m">SYNC-RFQ-001</span><span class="dot ok"></span><span class="lbl">완료 · v3 · 2일 전 · 홍길동</span></div>
 
         <div class="stg"><span class="no">2</span><span class="nm">제품 요구<span class="cd">PRD</span></span><span class="pill ok">완료</span><span class="ids" data-el="4.5"><a>SYNC-PRD-001</a></span><span class="n">문서 1개</span><span class="caret">▸</span></div>
         <div class="stg"><span class="no">3</span><span class="nm">사용자 시나리오<span class="cd">SCN</span></span><span class="pill ok">완료</span><span class="ids"><a>SYNC-SCN-001</a></span><span class="n">문서 1개</span><span class="caret">▸</span></div>
@@ -821,8 +821,8 @@ status: draft
         <div class="stg"><span class="no">6</span><span class="nm">도메인·클래스·데이터<span class="cd">DOM</span></span><span class="pill ok">완료</span><span class="ids"><a>SYNC-DOM-001</a><a>SYNC-DOM-002</a><a>SYNC-DOM-003</a></span><span class="n">문서 3개</span><span class="caret">▸</span></div>
 
         <div class="stg"><span class="no">7</span><span class="nm">화면<span class="cd">UI</span></span><span class="pill">초안</span><span class="sp"></span><span class="n">문서 2개</span><span class="caret">▾</span></div>
-        <div class="doc"><span class="m">SYNC-UI-001</span><span class="dot ok"></span><span class="lbl">완료 · v5 · 어제 · 에이전트(박호영)</span></div>
-        <div class="doc"><span class="m">SYNC-UI-002</span><span class="dot"></span><span class="lbl">초안 · v2 · 3시간 전 · 에이전트(박호영)</span><span class="sp"></span><span class="mis">끊어진 참조 1</span></div>
+        <div class="doc"><span class="m">SYNC-UI-001</span><span class="dot ok"></span><span class="lbl">완료 · v5 · 어제 · 에이전트(홍길동)</span></div>
+        <div class="doc"><span class="m">SYNC-UI-002</span><span class="dot"></span><span class="lbl">초안 · v2 · 3시간 전 · 에이전트(홍길동)</span><span class="sp"></span><span class="mis">끊어진 참조 1</span></div>
 
         <div class="stg"><span class="no">8</span><span class="nm">인터페이스<span class="cd">API</span></span><span class="pill">초안</span><span class="ids"><a>SYNC-API-001</a><a>SYNC-API-002</a></span><span class="n">문서 2개</span><span class="caret">▸</span></div>
         <div class="stg"><span class="no">9</span><span class="nm">시퀀스<span class="cd">SEQ</span></span><span class="pill">초안</span><span class="ids"><a>SYNC-SEQ-001</a></span><span class="n">문서 1개</span><span class="caret">▸</span></div>
@@ -833,7 +833,7 @@ status: draft
 
         <!-- 휴지통. 0건이면 묶음 자체가 없다. 흐리게 -->
         <div class="stg dim" data-el="8"><span class="no">—</span><span class="nm">휴지통</span><span class="sp"></span><span class="n">1개</span><span class="caret">▾</span></div>
-        <div class="doc dim" data-el="8.1"><span class="m">SYNC-DOM-003</span><span class="lbl">ERD·DD — 싱크독</span><span class="lbl">v3 · 2026-09-16 박호영이 넣음</span><span class="sp"></span><span class="b sm" data-el="8.2">되살리기</span><span class="b sm danger" data-el="8.3">완전 삭제</span></div>
+        <div class="doc dim" data-el="8.1"><span class="m">SYNC-DOM-003</span><span class="lbl">ERD·DD — 싱크독</span><span class="lbl">v3 · 2026-09-16 홍길동이 넣음</span><span class="sp"></span><span class="b sm" data-el="8.2">되살리기</span><span class="b sm danger" data-el="8.3">완전 삭제</span></div>
       </div>
 
       <aside class="panel" data-el="5">
@@ -841,17 +841,17 @@ status: draft
         <div class="rc">
           <div class="l1"><span class="m bd">SYNC-SCN-001</span><span class="m cap">v4</span><span class="sp"></span><span class="cap">3시간 전</span></div>
           <div class="msg">spec: 페르소나 P2 툴 목록 갱신</div>
-          <div class="by">에이전트 · 지시 박호영</div>
+          <div class="by">에이전트 · 지시 홍길동</div>
         </div>
         <div class="rc">
           <div class="l1"><span class="m bd">SYNC-PRD-001</span><span class="m cap">status</span><span class="sp"></span><span class="cap">어제</span></div>
           <div class="msg">status: 초안 → 완료</div>
-          <div class="by">박호영</div>
+          <div class="by">홍길동</div>
         </div>
         <div class="rc">
           <div class="l1"><span class="m bd">SYNC-UI-002</span><span class="m cap">v2</span><span class="sp"></span><span class="cap">3시간 전</span></div>
           <div class="msg">spec(SYNC-UI-002): 12화면 디자인 도구로 다시 그림</div>
-          <div class="by">에이전트 · 지시 박호영</div>
+          <div class="by">에이전트 · 지시 홍길동</div>
         </div>
         <div class="sync" data-el="7">마지막 처리 커밋 <span class="m" data-el="7.1">eb30fd6</span><br>밀린 커밋 <b data-el="7.2">0</b> <span data-el="7.3">12초 전 확인</span></div>
       </aside>
@@ -1034,27 +1034,27 @@ status: draft
       <div class="vcard sel" data-el="2.1">
         <div class="l1"><span class="m">v7</span><span class="ab" data-el="2.3">B</span><span class="sp"></span><span class="cap">1일 전</span></div>
         <span class="msg">spec: R10 다이어그램 렌더링으로 변경</span>
-        <div class="by">에이전트 · 지시 박호영</div>
+        <div class="by">에이전트 · 지시 홍길동</div>
       </div>
       <div class="vcard">
         <div class="l1"><span class="m">status</span><span class="sp"></span><span class="cap">1일 전</span></div>
         <span class="msg">status: 초안 → 완료</span>
-        <div class="by">박호영</div>
+        <div class="by">홍길동</div>
       </div>
       <div class="vcard sel">
         <div class="l1"><span class="m">v6</span><span class="ab">A</span><span class="sp"></span><span class="cap">2일 전</span></div>
         <span class="msg">spec: 웹 편집 삭제</span>
-        <div class="by">에이전트 · 지시 박호영<span class="sp"></span><span class="b sm danger" data-el="2.2">되돌리기</span></div>
+        <div class="by">에이전트 · 지시 홍길동<span class="sp"></span><span class="b sm danger" data-el="2.2">되돌리기</span></div>
       </div>
       <div class="vcard">
         <div class="l1"><span class="m">v5</span><span class="sp"></span><span class="cap">3일 전</span></div>
         <span class="msg">spec: 요약 수치 세 칸으로</span>
-        <div class="by">에이전트 · 지시 박호영<span class="sp"></span><span class="b sm danger">되돌리기</span></div>
+        <div class="by">에이전트 · 지시 홍길동<span class="sp"></span><span class="b sm danger">되돌리기</span></div>
       </div>
       <div class="vcard">
         <div class="l1"><span class="m">v4</span><span class="sp"></span><span class="cap">5일 전</span></div>
         <span class="msg">spec: N3 휴지통</span>
-        <div class="by">GitHub push · 박호영<span class="sp"></span><span class="b sm danger">되돌리기</span></div>
+        <div class="by">GitHub push · 홍길동<span class="sp"></span><span class="b sm danger">되돌리기</span></div>
       </div>
       <p class="hint">두 개까지 고른다. 세 번째를 누르면 <b class="m">A</b>가 밀려난다.</p>
     </nav>
@@ -1255,21 +1255,21 @@ status: draft
       </div>
       <div class="hrow">
         <span></span>
-        <span class="pn"><span class="nm"><span class="m">[DBA]</span>데이터베이스 관리</span><span class="sub">6문서 · 어제</span></span>
+        <span class="pn"><span class="nm"><span class="m">[MEMO]</span>메모장</span><span class="sub">6문서 · 어제</span></span>
         <span class="cell ok">1</span><span class="cell ok">1</span><span class="cell dr">1</span><span class="cell dr">1</span>
         <span class="cell na"></span><span class="cell dr">2</span>
         <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
       </div>
       <div class="hrow">
         <span></span>
-        <span class="pn"><span class="nm"><span class="m">[RHYM]</span>리듬핏</span><span class="sub">1문서 · 3일 전</span></span>
+        <span class="pn"><span class="nm"><span class="m">[TODO]</span>할 일 관리</span><span class="sub">1문서 · 3일 전</span></span>
         <span class="cell dr">1</span>
         <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
         <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
       </div>
       <div class="hrow">
         <span></span>
-        <span class="pn"><span class="nm"><span class="m">[AIRD]</span>에어데이터</span><span class="sub">0문서 · 2주 전</span></span>
+        <span class="pn"><span class="nm"><span class="m">[DEMO]</span>데모</span><span class="sub">0문서 · 2주 전</span></span>
         <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
         <span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span><span class="cell na"></span>
       </div>
@@ -1462,12 +1462,12 @@ status: draft
           <div class="hint">싱크독이 이 저장소에 쓰기 권한이 있어야 합니다</div>
 
           <label>프로젝트 코드</label>
-          <input class="in m" data-el="2.2" placeholder="AIRD" style="width:140px">
-          <div class="hint">영문 대문자 4자 이내. 문서 ID 앞부분이 됩니다 — 예: <code>AIRD-PRD-001</code></div>
+          <input class="in m" data-el="2.2" placeholder="DEMO" style="width:140px">
+          <div class="hint">영문 대문자 4자 이내. 문서 ID 앞부분이 됩니다 — 예: <code>DEMO-PRD-001</code></div>
           <div class="err" data-el="2.4">이미 쓰이는 코드입니다</div>
 
           <label>이름</label>
-          <input class="in" data-el="2.3" placeholder="에어데이터">
+          <input class="in" data-el="2.3" placeholder="데모 프로젝트">
 
           <label class="chk"><input type="checkbox" data-el="2.6"> 저장소가 없으면 새로 만든다 <span class="lbl">(비공개로 만들어집니다)</span></label>
 
@@ -1823,7 +1823,7 @@ status: draft
         <p class="lead">누가 어떤 상황에서 싱크독을 쓰는지. 여기서 정한 시나리오가 유스케이스의 근거가 된다.</p>
         <h2>1. 페르소나</h2>
         <div class="item"><span class="idb">P1</span>혼자 만드는 개발자</div>
-        <p>박호영 — 싱크독을 만들었고 자기 프로젝트에도 쓴다. PM이 없고, 명세는 에이전트와 대화하며 쌓인다.</p>
+        <p>홍길동 — 싱크독을 만들었고 자기 프로젝트에도 쓴다. PM이 없고, 명세는 에이전트와 대화하며 쌓인다.</p>
         <h2>2. 시나리오</h2>
         <div class="item"><span class="idb">S1</span>대화하다가 명세가 쌓인다</div>
         <p>에이전트에게 요구를 말하면 <span class="ref">[[SYNC-PRD-001#R1]]</span>처럼 항목이 생기고, 웹에서 읽어 완료로 올린다.</p>
@@ -1970,7 +1970,7 @@ status: draft
         <section class="card" data-el="2">
           <div class="ch">내 계정</div>
           <div class="cb">
-            <div class="row"><b data-el="2.1">HoyoungParkme</b><span class="cap">GitHub · 박호영</span><span class="sp"></span><span class="b sm" data-el="2.2">로그아웃</span></div>
+            <div class="row"><b data-el="2.1">HoyoungParkme</b><span class="cap">GitHub · 홍길동</span><span class="sp"></span><span class="b sm" data-el="2.2">로그아웃</span></div>
             <p class="desc">커밋 이메일 — GitHub에서 바로 push한 커밋을 내 계정으로 잇습니다. 등록 뒤 관리에서 인덱스 재구축을 한 번 돌리세요.</p>
             <div class="row" data-el="2.3"><span class="m">hoyoung@example.com</span><span class="sp"></span><span class="b sm danger" data-el="2.4">삭제</span></div>
             <div class="row"><input class="in m" data-el="2.5" placeholder="you@example.com"><span class="b sm" data-el="2.6">추가</span></div>
@@ -1992,7 +1992,7 @@ status: draft
         <section class="card" data-el="2">
           <div class="ch">내 계정</div>
           <div class="cb">
-            <div class="row"><b data-el="2.1">local</b><span class="cap">로그인 없음 · 이 PC · 박호영</span></div>
+            <div class="row"><b data-el="2.1">local</b><span class="cap">로그인 없음 · 이 PC · 홍길동</span></div>
           </div>
         </section>
       </div>
@@ -2126,23 +2126,23 @@ status: draft
               <div class="vr hd"><span>프로젝트</span><span>저장소</span><span>마지막 처리 커밋</span><span>동기화</span><span>통지</span><span></span></div>
               <div class="vr" data-el="2.1">
                 <span><span class="m bd">[SYNC]</span> 싱크독</span>
-                <span class="repo m">dfocus/syncdoc</span>
+                <span class="repo m">example/syncdoc</span>
                 <span><span class="m" data-el="2.2">a1b2c3d</span> <span class="cap">1시간 전</span></span>
                 <span><span class="st ok" data-el="2.3">최신</span> <span class="cap" data-el="2.4">12초 전 확인</span></span>
                 <span class="cap" data-el="2.5">걸림</span>
                 <span class="acts"><span class="b sm" data-el="6">지금 가져오기</span><span class="b sm" data-el="3">인덱스 재구축</span><span class="b sm danger" data-el="7">해제</span></span>
               </div>
               <div class="vr">
-                <span><span class="m bd">[DBA]</span> 데이터베이스 관리</span>
-                <span class="repo m">dfocus/dba-ax</span>
+                <span><span class="m bd">[MEMO]</span> 메모장</span>
+                <span class="repo m">example/memo</span>
                 <span><span class="m">9e8f7a6</span> <span class="cap">3일 전</span></span>
                 <span><span class="st behind">밀림 2</span> <span class="cap">4분 전 확인</span></span>
                 <span class="cap"><span class="b sm" data-el="8">통지 걸기</span></span>
                 <span class="acts"><span class="b sm">인덱스 재구축</span><span class="b sm danger">해제</span></span>
               </div>
               <div class="vr">
-                <span><span class="m bd">[AIRD]</span> 에어데이터</span>
-                <span class="repo m">dfocus/airdata</span>
+                <span><span class="m bd">[DEMO]</span> 데모</span>
+                <span class="repo m">example/demo</span>
                 <span><span class="m">—</span></span>
                 <span><span class="st na">문서 없음</span></span>
                 <span class="acts"><span class="b sm">인덱스 재구축</span><span class="b sm danger">해제</span></span>
