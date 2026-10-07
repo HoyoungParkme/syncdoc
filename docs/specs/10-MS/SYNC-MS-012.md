@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-012
 type: MS
 title: MINISPEC — runtime — 켜기·끄기·설정·PostgreSQL·한 번만 실행 (Rust)
-status: draft
+status: approved
 upstream: [SYNC-DOM-004, SYNC-INFRA-001, SYNC-PRD-001, SYNC-SEQ-001, SYNC-STD-004]
 ---
 
