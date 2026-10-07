@@ -1,0 +1,20 @@
+[package]
+name = "syncdoc_core"
+description = "싱크독_로컬 도메인 묶음과 조율 (SYNC-DOM-004 crates/core)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+thiserror = { workspace = true }
+time = { workspace = true }
+
+[dev-dependencies]
+time = { workspace = true, features = ["macros"] }
+tokio = { workspace = true }
+
+[lints]
+workspace = true

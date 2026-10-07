@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-003
 type: STD
 title: 명세 체인 지도 — 싱크독 첫 프로젝트의 실제 구조
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-STD-002]
 ---
 
@@ -18,7 +18,7 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 
 ## 1. 체인과 문서
 
-11단계 + 단계 밖 STD. 문서 29개(이 문서 포함), 항목 566개, 문서 간·안 참조 2811개(2026-10-07, 코드블록 밖 `[[ ]]`).
+11단계 + 단계 밖 STD. 문서 31개(이 문서 포함), 항목 582개, 문서 간·안 참조 2946개(2026-10-07, 코드블록 밖 `[[ ]]`).
 
 | 단계 | 문서 ID | 제목 | 파일 | 항목 | 절 | 상위(frontmatter) |
 |---|---|---|---|---|---|---|
@@ -30,7 +30,7 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 | 6 | `SYNC-DOM-001` | 도메인 모델 — 싱크독 | `도메인모델_싱크독.md` | 10 | 7 | UC-001, INFRA-001 |
 | 6 | `SYNC-DOM-002` | 클래스 명세 — 싱크독 | `클래스명세_싱크독.md` | 14 | 8 | DOM-001, INFRA-001, API-001, API-002 |
 | 6 | `SYNC-DOM-003` | ERD·DD — 싱크독 | `ERD_DD_싱크독.md` | 10 | 6 | DOM-002, DOM-001 |
-| 6 | `SYNC-DOM-004` | 클래스 명세 — 싱크독_로컬 (Rust) | `06-DOM/SYNC-DOM-004.md` | 14 | 6 | DOM-001, DOM-002, DOM-003, INFRA-001, API-001, API-002, STD-001 |
+| 6 | `SYNC-DOM-004` | 클래스 명세 — 싱크독_로컬 (Rust) | `06-DOM/SYNC-DOM-004.md` | 15 | 6 | DOM-001, DOM-002, DOM-003, INFRA-001, API-001, API-002, STD-001 |
 | 7 | `SYNC-UI-001` | 화면 설계 — 싱크독 | `화면설계_싱크독.md` | 12 | 9 | UC-001, DOM-002 |
 | 7 | `SYNC-UI-002` | 와이어프레임 — 싱크독 | `와이어프레임_싱크독.md` | 12 | 16 | UI-001 |
 | 8 | `SYNC-API-001` | API 명세 REST — 싱크독 | `API_REST_싱크독.md` | 36 | 7 | UI-002, DOM-002, DOM-003 |
@@ -45,6 +45,8 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 | 10 | `SYNC-MS-009` | MINISPEC — infra — git·github 어댑터 | `MINISPEC_009_infra_싱크독.md` | 18 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
 | 10 | `SYNC-MS-010` | MINISPEC — ConversationService — 대화·턴·첨부 | `10-MS/SYNC-MS-010.md` | 14 | 4 | DOM-002, DOM-003, SEQ-001, API-001, STD-001 |
 | 10 | `SYNC-MS-011` | MINISPEC — codegraph — 코드 호출 그래프와 명세 대조 | `10-MS/SYNC-MS-011.md` | 16 | 4 | DOM-002, DOM-003, SEQ-001, STD-001 |
+| 10 | `SYNC-MS-012` | MINISPEC — runtime — 켜기·끄기·설정·PostgreSQL·한 번만 실행 (Rust) | `10-MS/SYNC-MS-012.md` | 13 | 4 | DOM-004, INFRA-001, PRD-001, SEQ-001, STD-004 |
+| 10 | `SYNC-MS-016` | MINISPEC — AccountService (Rust) | `10-MS/SYNC-MS-016.md` | 2 | 4 | DOM-004, MS-006, SEQ-001, API-001 |
 | 11 | `SYNC-CODE-001` | 구현 계획 — 슬라이스 카드와 커밋 기록 | `CODE_구현계획_싱크독.md` | 34 | 6 | STD-004, MS-001, MS-002, MS-003, MS-006, MS-007, MS-008, MS-009, API-001, API-002, UI-002, SCN-001 |
 | 11 | `SYNC-CODE-002` | 구현 계획 — 싱크독_로컬 (Rust) 슬라이스 카드와 커밋 기록 | `11-CODE/SYNC-CODE-002.md` | 1 | 5 | STD-004, DOM-004, PRD-001, INFRA-001, API-001, API-002, UI-002, SCN-001 |
 | — | `SYNC-STD-001` | 명세 작성 규약 | `STD_명세작성규약_싱크독.md` | 0 | 11 | PRD-001 |
@@ -250,6 +252,18 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 - 3. 미결사항
 
 **SYNC-MS-009** MINISPEC — infra — git·github 어댑터
+- 0. 이 문서가 다루는 것
+- 1. 함수 목록
+- 2. 함수
+- 3. 미결사항
+
+**SYNC-MS-012** MINISPEC — runtime — 켜기·끄기·설정·PostgreSQL·한 번만 실행 (Rust)
+- 0. 이 문서가 다루는 것
+- 1. 함수 목록
+- 2. 함수
+- 3. 미결사항
+
+**SYNC-MS-016** MINISPEC — AccountService (Rust)
 - 0. 이 문서가 다루는 것
 - 1. 함수 목록
 - 2. 함수

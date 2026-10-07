@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-004
 type: STD
 title: 개발 규약 — 코드 파트 표준
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -166,7 +166,8 @@ impl SpecService<'_> {
 - 리비전 메시지 = 바뀐 ERD 항목: `0002_add_flags_upstream_impact`
 - 열거형은 DB enum이 아니라 `varchar` + 앱 검증 (ERD 설계 규칙). 값 추가에 마이그레이션 없음
 - `downgrade`를 반드시 쓴다. 되돌릴 수 없는 리비전은 리뷰에서 막는다
-- **Rust 판도 원본은 Alembic 하나다.** `local/migrations/NNNN_*.sql`은 리비전마다 `alembic upgrade --sql`이 만든 것이고 손으로 고치지 않는다. Rust 판은 같은 `alembic_version` 표로 어디까지 올렸는지 알고, 자기가 모르는 새 리비전이 있는 DB면 켜지 않는다. 두 판의 스키마가 같은지는 검사로 본다
+- **Rust 판도 원본은 Alembic 하나다.** `local/migrations/NNNN_*.sql`은 리비전마다 `alembic upgrade --sql`이 만든 것이고 손으로 고치지 않는다 — 만드는 것은 `cargo xtask migrations`다. Rust 판은 같은 `alembic_version` 표로 어디까지 올렸는지 알고, 자기가 모르는 새 리비전이 있는 DB면 켜지 않는다. 파일은 제 `BEGIN`·`COMMIT`을 든 채 그대로 돈다(파일 하나 = 트랜잭션 하나 — DEV-10의 예외). 두 판의 스키마가 같은지는 `cargo xtask schema-check`로 본다
+- **Alembic 리비전을 더한 카드는 같은 카드에서 `cargo xtask migrations`로 SQL을 다시 만든다** — `cargo xtask migrations --check`(다시 만들어 바이트 비교)가 빠뜨린 것을 잡는다(카드 L1)
 
 #### DEV-8 인덱스는 ERD·DD 3장에 적힌 것만
 
@@ -234,6 +235,8 @@ C  통합·배포       외부 연결 · 첫 사용
 
 막히면 — 명세가 틀렸거나 모자란 것이다. 코드로 우회하지 않고 명세를 고친다. 고친 문서는 초안으로 내려가고, 다시 완료로 올릴 때 사람이 한 번 더 본다.
 
+**Rust 카드는 MINISPEC을 카드의 첫 커밋으로 쓴다**(2026-10-07, [[SYNC-INFRA-001#C11]]). 둘째 구현의 MINISPEC은 미리 다 써 두지 않는다 — 카드를 받을 때 그 카드 몫을 쓰고(2의 「MINISPEC」이 그것이다), 클래스 명세 [[SYNC-DOM-004]]의 절과 층 표도 같은 카드에서 맞춘다. 아직 없는 MINISPEC 항목을 구현 계획이 미리 가리키지 않는다.
+
 **작업 메모(WORKLOG 등)는 명세를 이기지 못한다.** 되먹임으로 명세가 갱신되면 메모의 "결정"이 낡는다. 다시 시작할 때 명세를 먼저 읽고 메모를 맞춘 뒤 일한다.
 
 ---
@@ -258,7 +261,7 @@ C  통합·배포       외부 연결 · 첫 사용
 
 **테스트는 전용 DB에서만 돈다.** 이름에 `test`가 없는 DB를 가리키면 시작하지 않는다 — 스키마를 만드는 픽스처가 개발·운영 DB에 닿으면 그 데이터가 사라진다. 다른 DB를 쓰려면 `SYNCDOC_TEST_DATABASE_URL`로 말한다. 환경 변수를 `setdefault`로 두면 셸에 떠 있는 값이 이긴다 — 그래서 덮어쓴다.
 
-**Rust 시험의 DB**는 같은 시험 컨테이너(5434)의 `syncdoc_local_test*`다 — 시험마다 DB 하나, 이름에 `test`가 있다. 앱의 데이터 자리(함께 담은 PostgreSQL)는 쓰지 않는다. 다른 DB는 `SYNCDOC_LOCAL_TEST_DATABASE_URL`.
+**Rust 시험의 DB**는 같은 시험 컨테이너(5434)의 `syncdoc_local_test*`다 — 시험마다 DB 하나, 이름에 `test`가 있다. 앱의 데이터 자리(함께 담은 PostgreSQL)는 쓰지 않는다. 다른 DB는 `SYNCDOC_LOCAL_TEST_DATABASE_URL`. **켜기·끄기 시험**([[SYNC-MS-012]]의 `pg.start`와 실행 파일 시험)만 함께 담은 PostgreSQL을 띄운다 — 시험마다 만든 임시 데이터 자리에서, 개발용 바이너리(`cargo xtask pg-fetch`)로. Rust 카드의 확인에는 `cargo xtask migrations --check`·`cargo xtask schema-check`도 든다(DEV-7).
 
 **한 DB에 pytest를 둘 이상 동시에 돌리지 않는다.** 서로의 트랜잭션에 걸려 매번 다른 테스트가 401·연결 오류로 죽는다. 실패하는 테스트가 돌 때마다 달라지면 이것부터 의심한다(#17).
 
