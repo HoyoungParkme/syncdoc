@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -54,6 +54,7 @@ syncdoc/                        저장소 = 프로젝트
 │                               (md.ts·views.ts·uc/wireframe/seq/ms.ts)
 │
 ├── local/                      Rust 판 — 싱크독_로컬 설치형. 구조는 DOM-004 1장 (카드 L1부터)
+├── contract/                   공용 계약 시험 — 두 판을 띄워 같은 시나리오(INFRA 9.8, 카드 L2). 앱을 import하지 않는다
 │
 ├── docs/specs/                 명세 원본 (STD-001 1.1). 양쪽이 같이 본다
 ├── tools/                      validate.py · check_code.py · check_calls.py · check_ui.py · view_build.py · dev_preview.py
@@ -168,6 +169,7 @@ frontend/
 | `frontend/vite.config.ts` | 빌드 설정 | [[SYNC-INFRA-001]] 8장 |
 | `tools/view_build.py` · `tools/wf_build.py` · `tools/check_view_*.py` | 뷰 생성·검사 | [[SYNC-STD-002]] |
 | `tools/*.py` | 검사기·개발 도구 | [[SYNC-STD-004#DEV-14]] · [[SYNC-STD-001]] |
+| `contract/**` | 계약 시험 | [[SYNC-INFRA-001]] 9.8 · [[SYNC-STD-004#DEV-14]] |
 
 ---
 
