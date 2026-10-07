@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-004
 type: DOM
 title: 클래스 명세 — 싱크독_로컬 (Rust)
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-INFRA-001, SYNC-API-00
 
 싱크독의 **둘째 구현**(Rust, `local/`)을 코드 구조로 옮긴다 — [[SYNC-INFRA-001#C11]] · [[SYNC-INFRA-001]] 9장. 파이썬 판의 클래스 명세 [[SYNC-DOM-002]]와 **같은 묶음·같은 서비스·같은 메서드 이름**이고, 이 문서는 다른 점만 적는다. 도메인 모델([[SYNC-DOM-001]])과 테이블([[SYNC-DOM-003]])은 두 구현이 함께 쓴다([[SYNC-STD-001]] 1.9·2.6).
 
-**뼈대다(2026-10-07).** 아직 코드가 없다. 폴더 구조의 트리, 엔티티의 Rust 타입, 묶음 ↔ MINISPEC ↔ 자리 표까지만 둔다. 층 표의 줄과 설계 클래스(그림·메서드 표)는 카드마다 그 카드의 MINISPEC과 함께 더한다 — MINISPEC은 카드의 첫 커밋이다([[SYNC-STD-004#DEV-13]]). 카드는 [[SYNC-CODE-002]].
+**카드마다 자란다.** 뼈대(2026-10-07)에 카드 L1이 켜기·끄기(4.1)와 로컬 사용자(4.5)를 더했다. 층 표의 줄과 설계 클래스(그림·메서드 표)는 카드마다 그 카드의 MINISPEC과 함께 더한다 — MINISPEC은 카드의 첫 커밋이다([[SYNC-STD-004#DEV-13]]). 카드는 [[SYNC-CODE-002]].
 
 ---
 
@@ -28,52 +28,98 @@ upstream: [SYNC-DOM-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-INFRA-001, SYNC-API-00
 
 ```
 local/                          싱크독_로컬 (Rust) — 실행 파일 하나 (INFRA 9.1)
-├── Cargo.toml · Cargo.lock     작업 공간 — crate 넷 + xtask
-├── rust-toolchain.toml         Rust 판 고정 (STD-001 1.9)
+├── Cargo.toml · Cargo.lock     작업 공간 — crate 넷 + xtask. 의존 판은 여기 한곳에
+├── rust-toolchain.toml         Rust 판 고정 — 1.99.0 (STD-001 1.9)
+├── .cargo/config.toml          `cargo xtask` 별칭 · 개발용 PostgreSQL 자리(SYNCDOC_LOCAL_PG_DIR)
 ├── crates/                     층마다 crate 하나. 의존은 app → server → core → codegraph 한 방향
-│   ├── app/                    실행 파일 — 켜기·끄기·설정·데이터 자리·PostgreSQL 자식 프로세스 ·
+│   ├── app/                    실행 파일 syncdoc-local — 켜기·끄기·설정·데이터 자리·PostgreSQL 자식 프로세스 ·
 │   │                           한 번만 실행·트레이·자동 시작·백업·주기 일
 │   ├── server/                 axum 한 서버 — REST·SSE·MCP(/mcp)·git 입구(/git) · 화면과 /specs(실행 파일에 담음)
-│   ├── core/                   도메인 묶음과 조율 — 파이썬 core/와 같은 묶음·같은 서비스 + infra
+│   ├── core/                   도메인 묶음과 조율 — 파이썬 core/와 같은 묶음·같은 서비스 + infra · 이전
 │   └── codegraph/              코드 그래프의 순수 부분 — 추출·줄이기·보강·대조·커뮤니티. DB 없음
-├── migrations/                 이전 SQL — 원본은 backend/alembic. `alembic upgrade --sql`로 만든 것 (STD-004 DEV-7)
-├── xtask/                      개발 도구 — 이전 SQL 만들기·스키마 같음 검사·속도 재기 (`cargo xtask …`)
-├── packaging/                  설치 파일 — NSIS(setup.exe)·.deb·AppImage 설정 · MinGit·PostgreSQL 받기
-└── target/                     빌드 결과 (gitignore)
+├── migrations/                 이전 SQL — 원본은 backend/alembic. `cargo xtask migrations`가 리비전마다
+│                               `alembic upgrade --sql`로 만든다. 손으로 고치지 않는다 (STD-004 DEV-7)
+├── xtask/                      개발 도구 — pg-fetch(개발용 PostgreSQL 바이너리) · migrations [--check] ·
+│                               schema-check(두 판의 스키마 같음) · test-db-clean · 속도 재기(L17)
+├── packaging/                  설치 파일 — NSIS(setup.exe)·.deb·AppImage 설정 · MinGit·PostgreSQL 받기 (L4)
+└── target/                     빌드 결과 (gitignore). target/pg/16.15.0 — pg-fetch가 받은 PostgreSQL
 ```
 
-crate마다 `src/`와 거울 `tests/`를 둔다. 단위 시험은 그 모듈의 `#[cfg(test)]`도 된다([[SYNC-STD-004]] 1장).
+**crate 이름** — 패키지 `syncdoc_app`(실행 파일 `syncdoc-local`) · `syncdoc_server` · `syncdoc_core` · `syncdoc_codegraph`. Rust 표준 `core`와 겹치지 않게 앞에 `syncdoc_`를 붙인다 — 이 문서의 `crates/core`는 `syncdoc_core`다.
+
+crate마다 `src/`와 거울 `tests/`를 둔다. 단위 시험은 그 모듈의 `#[cfg(test)]`도 된다([[SYNC-STD-004]] 1장). DB가 드는 시험은 시험 컨테이너(5434)에 시험마다 DB 하나를 만든다 — 공용 도우미는 `crates/core/tests/support/`.
+
+**app/ 안** — 켜기·끄기 (4.1)
+
+```
+crates/app/src/
+├── main.rs                     진입 — 인자를 읽어 runtime.run, 끝 코드
+├── lib.rs                      공개 모듈
+├── runtime.rs                  켠다·포트에 묶는다·끈다
+├── paths.rs                    데이터 자리 · PostgreSQL 바이너리 자리
+├── settings.rs                 settings.toml — INFRA 5.2와 같은 이름
+├── logs.rs                     logs/ — 날마다 한 파일, 최근 14개
+├── instance.rs                 한 번만 실행 — 잠금 · instance.json · 두 번째 실행
+└── pg.rs                       함께 담은 PostgreSQL — initdb · postgres --single · pg_ctl
+```
+
+**server/ 안** — 입구. 파이썬 `web/`에 해당한다
+
+```
+crates/server/src/
+├── lib.rs                      라우터 조립 · /health
+├── state.rs                    AppState — 연결 풀 · 로컬 사용자 설정 · 공개 주소
+└── web/
+    ├── guard.rs                Host·Origin 가드 (SEQ-C3) — 라우팅 바깥에서 모든 요청에
+    ├── auth.rs                 현재 사용자 — 로컬 사용자
+    ├── problem.rs              problem+json 응답 · 405 · 패닉
+    ├── static_files.rs         화면 빌드(rust-embed) · 캐시 규칙 · 304 (INFRA 4.1)
+    ├── schemas.rs              응답 형태 (API-001 4장)
+    └── routes/                 API-001 경로 — account(/api/me) · specs(/specs)
+```
 
 **core/ 안** — 묶음은 파이썬 `core/`와 같다.
 
 ```
-crates/core/src/
-├── lib.rs                      공개 모듈
-├── project/ · spec/ · reference/ · account/ · conversation/ · codegraph/
-│   ├── model.rs                행 = 도메인 객체. 속성은 DOM-003 그대로
-│   ├── repo.rs                 조회·저장. DB만 안다
-│   └── service.rs              규칙. 여기서만 모델을 만진다
-├── types.rs                    열거형·DTO (DOM-002 2.7·2.8)
-├── clock.rs                    저장 시각 — 프로세스 안에서 뒤로 안 간다 (STD-004 DEV-18)
-├── markdown.rs                 순수 — frontmatter·코드 마스킹·헤딩·참조·항목 블록
-├── errors.rs                   Problem 열거형 하나에 problem+json 종류 전부 (STD-004 DEV-5)
-├── pipeline.rs                 쓰기 조율 — 프로젝트마다 읽기·쓰기 락, 순서는 파이썬과 같다
-├── queries.rs                  읽기 조합
-└── infra/                      바깥 — git 자식 프로세스 · upload-pack·receive-pack · 모델 호출
+crates/core/
+├── build.rs                    local/migrations/*.sql을 실행 파일에 담는 목록을 만든다
+└── src/
+    ├── lib.rs                      공개 모듈
+    ├── project/ · spec/ · reference/ · account/ · conversation/ · codegraph/
+    │   ├── model.rs                행 = 도메인 객체(`…Row`). 속성은 DOM-003 그대로
+    │   ├── repo.rs                 조회·저장. DB만 안다
+    │   └── service.rs              규칙. 여기서만 모델을 만진다
+    ├── types.rs                    열거형·DTO (DOM-002 2.7·2.8)
+    ├── clock.rs                    저장 시각 — 프로세스 안에서 뒤로 안 간다 (STD-004 DEV-18)
+    ├── markdown.rs                 순수 — frontmatter·코드 마스킹·헤딩·참조·항목 블록
+    ├── errors.rs                   Problem 열거형 하나에 problem+json 종류 전부 (STD-004 DEV-5)
+    ├── migrate.rs                  이전 SQL을 올린다 (4.1) — 모든 crate의 시험도 이것으로 DB를 만든다
+    ├── pipeline.rs                 쓰기 조율 — 프로젝트마다 읽기·쓰기 락, 순서는 파이썬과 같다
+    ├── queries.rs                  읽기 조합
+    └── infra/                      바깥 — git 자식 프로세스 · upload-pack·receive-pack · 모델 호출
 ```
 
-`app`·`server`·`codegraph` 안의 파일은 그 카드가 적는다.
+지금(카드 L1) 있는 것은 `account`·`types.rs`·`errors.rs`·`migrate.rs`다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
 
-**층** — 함수 단위 명세(MINISPEC 카드·API 엔드포인트·UI 화면)가 없는 코드가 어느 층이고 그 층을 무슨 문서가 정하는지([[SYNC-STD-001]] 2.6). 코드 그래프가 읽는다. 위에서부터 첫 줄이 이긴다. **줄은 카드마다 더한다** — 코드가 없는 줄은 검사기(`check_calls`)가 「안 맞는 줄」로 잡는다.
+**층** — 함수 단위 명세(MINISPEC 카드·API 엔드포인트·UI 화면)가 없는 코드가 어느 층이고 그 층을 무슨 문서가 정하는지([[SYNC-STD-001]] 2.6). 코드 그래프가 읽는다. 위에서부터 첫 줄이 이긴다. **줄은 카드마다 더한다** — 코드가 없는 줄은 검사기(`check_calls`)가 「안 맞는 줄」로 잡는다. 함수가 없는 파일(구조체만 — `state.rs`·`schemas.rs`·`model.rs`)은 적지 않는다.
 
 | 경로 | 층 | 명세 |
 |---|---|---|
+| `local/crates/app/src/main.rs` | 실행 파일 진입 | [[SYNC-INFRA-001]] 9.1 · [[SYNC-MS-012]] |
+| `local/crates/server/src/lib.rs` | 서버 조립·`/health` | [[SYNC-INFRA-001]] 4.1·9.1 |
+| `local/crates/server/src/web/guard.rs` · `local/crates/server/src/web/auth.rs` | 인증 | [[SYNC-INFRA-001]] 5장·9.4 · [[SYNC-SEQ-001#SEQ-C3]] |
+| `local/crates/server/src/web/problem.rs` · `local/crates/core/src/errors.rs` | 에러 | [[SYNC-STD-004#DEV-5]] · [[SYNC-API-001]] 2장 |
+| `local/crates/server/src/web/static_files.rs` | 정적 파일 | [[SYNC-INFRA-001]] 4.1 |
+| `local/crates/core/src/types.rs` | 열거형·DTO | [[SYNC-DOM-002]] 2.7·2.8 |
+| `local/crates/core/src/*/repo.rs` | 리포지토리 | [[SYNC-DOM-004]] 4장 · [[SYNC-DOM-003]] |
+| `local/crates/*/build.rs` | 빌드 설정 | [[SYNC-STD-004#DEV-7]] · [[SYNC-INFRA-001]] 9.2 |
+| `local/xtask/**` | 개발 도구 | [[SYNC-STD-004#DEV-7]] · [[SYNC-STD-004#DEV-14]] |
 
 ---
 
 ## 2. 엔티티
 
-테이블과 속성은 [[SYNC-DOM-003]] 그대로다 — 두 구현이 같은 표를 쓴다(이전의 원본은 Alembic 하나, [[SYNC-STD-004#DEV-7]]). 여기는 Rust 타입과 자리만 적는다. 관계·규칙은 [[SYNC-DOM-002]] 2장 그대로다.
+테이블과 속성은 [[SYNC-DOM-003]] 그대로다 — 두 구현이 같은 표를 쓴다(이전의 원본은 Alembic 하나, [[SYNC-STD-004#DEV-7]]). 여기는 Rust 타입과 자리만 적는다 — DB 행 타입은 `…Row`다([[SYNC-STD-004#DEV-2]]). 관계·규칙은 [[SYNC-DOM-002]] 2장 그대로다.
 
 ### 2.1 프로젝트
 
@@ -81,13 +127,13 @@ crates/core/src/
 
 테이블: [[SYNC-DOM-003#projects]] · 도메인: [[SYNC-DOM-001#Project]]
 
-`core::project::Project` — [[SYNC-DOM-002#Project]]
+`syncdoc_core::project::ProjectRow` — [[SYNC-DOM-002#Project]]
 
 #### Repository 저장소
 
 테이블: [[SYNC-DOM-003#repositories]] · 도메인: [[SYNC-DOM-001#Repository]]
 
-`core::project::Repository` — [[SYNC-DOM-002#Repository]]
+`syncdoc_core::project::RepositoryRow` — [[SYNC-DOM-002#Repository]]
 
 ### 2.2 명세
 
@@ -95,25 +141,25 @@ crates/core/src/
 
 테이블: [[SYNC-DOM-003#documents]] · 도메인: [[SYNC-DOM-001#Document]]
 
-`core::spec::Document` — [[SYNC-DOM-002#Document]]
+`syncdoc_core::spec::DocumentRow` — [[SYNC-DOM-002#Document]]
 
 #### Item 항목
 
 테이블: [[SYNC-DOM-003#items]] · 도메인: [[SYNC-DOM-001#Item]]
 
-`core::spec::Item` — [[SYNC-DOM-002#Item]]
+`syncdoc_core::spec::ItemRow` — [[SYNC-DOM-002#Item]]
 
 #### Version 버전
 
 테이블: [[SYNC-DOM-003#versions]] · 도메인: [[SYNC-DOM-001#Version]]
 
-`core::spec::Version` — [[SYNC-DOM-002#Version]]
+`syncdoc_core::spec::VersionRow` — [[SYNC-DOM-002#Version]]
 
 #### StatusChange 상태변경
 
 테이블: [[SYNC-DOM-003#status_changes]] · 도메인: [[SYNC-DOM-001#StatusChange]]
 
-`core::spec::StatusChange` — [[SYNC-DOM-002#StatusChange]]
+`syncdoc_core::spec::StatusChangeRow` — [[SYNC-DOM-002#StatusChange]]
 
 ### 2.3 참조
 
@@ -121,7 +167,7 @@ crates/core/src/
 
 테이블: [[SYNC-DOM-003#references]] · 도메인: [[SYNC-DOM-001#Reference]]
 
-`core::reference::Reference` — [[SYNC-DOM-002#Reference]]
+`syncdoc_core::reference::ReferenceRow` — [[SYNC-DOM-002#Reference]]
 
 ### 2.4 계정
 
@@ -129,19 +175,19 @@ crates/core/src/
 
 테이블: [[SYNC-DOM-003#users]] · 도메인: [[SYNC-DOM-001#User]]
 
-`core::account::User` — [[SYNC-DOM-002#User]]. 싱크독_로컬에는 `kind=local` 사용자 하나와 커밋으로 알려진 자리표시만 있다([[SYNC-PRD-001#R15]])
+`syncdoc_core::account::UserRow` — [[SYNC-DOM-002#User]]. 싱크독_로컬에는 `kind=local` 사용자 하나뿐이다 — 커밋 작성자도 늘 그 사람이다([[SYNC-PRD-001#R15]] · [[SYNC-MS-006#AccountService.user_for_commit]] 0)
 
 #### CommitEmail 커밋이메일
 
 테이블: [[SYNC-DOM-003#commit_emails]] · 도메인: [[SYNC-DOM-001#CommitEmail]]
 
-`core::account::CommitEmail` — [[SYNC-DOM-002#CommitEmail]]
+`syncdoc_core::account::CommitEmailRow` — [[SYNC-DOM-002#CommitEmail]]
 
 #### AccessToken 액세스토큰
 
 테이블: [[SYNC-DOM-003#access_tokens]] · 도메인: [[SYNC-DOM-001#AccessToken]]
 
-`core::account::AccessToken` — [[SYNC-DOM-002#AccessToken]]
+`syncdoc_core::account::AccessTokenRow` — [[SYNC-DOM-002#AccessToken]]
 
 ### 2.5 대화
 
@@ -149,19 +195,19 @@ crates/core/src/
 
 테이블: [[SYNC-DOM-003#conversations]] · 도메인: [[SYNC-DOM-001#Conversation]]
 
-`core::conversation::Conversation` — [[SYNC-DOM-002#Conversation]]
+`syncdoc_core::conversation::ConversationRow` — [[SYNC-DOM-002#Conversation]]
 
 #### Turn 턴
 
 테이블: [[SYNC-DOM-003#turns]] · 도메인: [[SYNC-DOM-001#Turn]]
 
-`core::conversation::Turn` — [[SYNC-DOM-002#Turn]]
+`syncdoc_core::conversation::TurnRow` — [[SYNC-DOM-002#Turn]]
 
 #### Attachment 첨부
 
 테이블: [[SYNC-DOM-003#attachments]] · 도메인: [[SYNC-DOM-001#Attachment]]
 
-`core::conversation::Attachment` — [[SYNC-DOM-002#Attachment]]
+`syncdoc_core::conversation::AttachmentRow` — [[SYNC-DOM-002#Attachment]]
 
 ### 2.6 코드 그래프
 
@@ -169,11 +215,11 @@ crates/core/src/
 
 테이블: [[SYNC-DOM-003#code_graphs]] · 도메인: [[SYNC-DOM-001#CodeGraph]]
 
-`core::codegraph::CodeGraph` — [[SYNC-DOM-002#CodeGraph]]. 그래프를 만드는 순수 부분은 `codegraph` crate다
+`syncdoc_core::codegraph::CodeGraphRow` — [[SYNC-DOM-002#CodeGraph]]. 그래프를 만드는 순수 부분은 `codegraph` crate다
 
 ### 2.7 열거형·DTO
 
-[[SYNC-DOM-002]] 2.7·2.8 그대로 — `core::types`. 직렬화 이름(JSON 키·열거형 값)도 같다. 화면과 에이전트가 두 판을 가리지 않는다.
+[[SYNC-DOM-002]] 2.7·2.8 그대로 — `syncdoc_core::types`. 직렬화 이름(JSON 키·열거형 값)도 같다. 화면과 에이전트가 두 판을 가리지 않는다.
 
 ---
 
@@ -196,18 +242,72 @@ crates/core/src/
 
 | 절 | 묶음 | MINISPEC | 자리 | 파이썬 판 |
 |---|---|---|---|---|
-| 4.1 | runtime — 켜기·끄기·설정·PostgreSQL·한 번만 실행 | MS-012 | `crates/app` | `main.py` · `config.py` · `db.py` |
+| 4.1 | runtime — 켜기·끄기·설정·PostgreSQL·한 번만 실행 | [[SYNC-MS-012]] | `crates/app` · `crates/core/src/migrate.rs` | `main.py` · `config.py` · `db.py` |
 | 4.2 | project | MS-013 | `crates/core/src/project` | [[SYNC-MS-001]] |
 | 4.3 | spec · markdown | MS-014 | `crates/core/src/spec` · `markdown.rs` | [[SYNC-MS-002]] |
 | 4.4 | reference | MS-015 | `crates/core/src/reference` | [[SYNC-MS-003]] |
-| 4.5 | account | MS-016 | `crates/core/src/account` | [[SYNC-MS-006]] |
+| 4.5 | account | [[SYNC-MS-016]] | `crates/core/src/account` | [[SYNC-MS-006]] |
 | 4.6 | pipeline · scheduler | MS-017 | `crates/core/src/pipeline.rs` · `crates/app` | [[SYNC-MS-007]] |
 | 4.7 | queries | MS-018 | `crates/core/src/queries.rs` | [[SYNC-MS-008]] |
 | 4.8 | git · git_rpc | MS-019 | `crates/core/src/infra` · `crates/server`(git 입구) | [[SYNC-MS-009]] |
 | 4.9 | llm | MS-020 | `crates/core/src/infra` | [[SYNC-MS-009]] |
 | 4.10 | conversation | MS-021 | `crates/core/src/conversation` | [[SYNC-MS-010]] |
 | 4.11 | codegraph | MS-022 | `crates/codegraph` · `crates/core/src/codegraph` | [[SYNC-MS-011]] |
-| 4.12 | 데이터 자리 · 백업 | MS-023 | `crates/app` | — (Docker 판은 `scripts/backup.sh`, [[SYNC-CODE-001#BR]]) |
+| 4.12 | 데이터 자리 옮기기 · 백업 | MS-023 | `crates/app` | — (Docker 판은 `scripts/backup.sh`, [[SYNC-CODE-001#BR]]) |
+
+
+데이터 자리의 **기본값 찾기**는 4.1(MS-012 `paths.data_dir`)이고, 옮기기와 그 자리를 가리키는 파일은 4.12다.
+
+### 4.1 runtime — 켜기·끄기 (MS-012)
+
+클래스가 아니라 모듈 함수다 — 파이썬 판의 `main.py` lifespan·`config.py`·`db.py`와 Dockerfile의 `alembic upgrade head`가 하던 일을 한 프로세스가 한다.
+
+| 함수 | 하는 일 | 부르는 곳 |
+|---|---|---|
+| [[SYNC-MS-012#runtime.run]] | 켠다 — 끌 때까지 | `main` |
+| [[SYNC-MS-012#runtime.bind]] | 127.0.0.1의 8010, 못 쓰면 8011~8019 | `runtime.run` |
+| [[SYNC-MS-012#runtime.shutdown]] | 끈다 | `runtime.run` |
+| [[SYNC-MS-012#paths.data_dir]] · [[SYNC-MS-012#paths.pg_dir]] | 데이터 자리 · PostgreSQL 바이너리 자리 | `runtime.run` |
+| [[SYNC-MS-012#settings.load]] | `settings.toml` | `runtime.run` |
+| [[SYNC-MS-012#logs.init]] | 로그 | `runtime.run` |
+| [[SYNC-MS-012#instance.acquire]] · [[SYNC-MS-012#instance.publish]] · [[SYNC-MS-012#instance.open_running]] | 한 번만 실행 | `runtime.run` |
+| [[SYNC-MS-012#pg.start]] · [[SYNC-MS-012#pg.stop]] | 함께 담은 PostgreSQL | `runtime.run` · `runtime.shutdown` |
+| [[SYNC-MS-012#migrate.apply]] | 이전 SQL | `runtime.run` · 모든 crate의 DB 시험 |
+
+규칙
+- 켜는 순서는 [[SYNC-INFRA-001]] 9.1 그대로다 — 잠금 → 로그 → 설정 → PostgreSQL → 이전 → 로컬 사용자 → 포트 → 서빙. 끄는 순서는 거꾸로
+- PostgreSQL은 따로 프로세스 묶음으로 띄운다 — 터미널 신호가 먼저 닿지 않고, 멈추는 순서를 앱이 쥔다
+- 켜는 중 실패는 `Problem::Internal`의 로그 문장으로 돌려주고 `main`이 끝 코드 1로 끝난다
+
+### 4.5 account (MS-016)
+
+#### AccountService
+
+```mermaid
+classDiagram
+    class AccountService {
+        +db: PgConnection
+        +ensure_local_user(login, display_name) UserRow
+        +local_user(login, display_name) UserRow
+    }
+    class UserRow {
+        +i32 id
+        +String github_login
+        +Option~i64~ github_user_id
+        +String display_name
+        +Option~Vec~ github_token_encrypted
+        +OffsetDateTime created_at
+        +String kind
+    }
+    AccountService --> UserRow
+```
+
+| 메서드 | 부르는 곳 | 근거 | 던지는 에러 |
+|---|---|---|---|
+| [[SYNC-MS-016#AccountService.ensure_local_user]] | 켤 때 `runtime.run` | [[SYNC-MS-006#AccountService.ensure_local_user]] | `internal`(아이디가 남의 것) |
+| [[SYNC-MS-016#AccountService.local_user]] | 웹 입구의 현재 사용자(`web/auth`) — `GET /api/me` | [[SYNC-SEQ-001#SEQ-C3]] | — |
+
+규칙 — [[SYNC-DOM-002]] 4.6과 같다. 로컬 사용자는 `kind=local` 행 하나뿐이다. 서비스는 연결을 빌려 받고 트랜잭션은 부르는 쪽이 쥔다. 토큰(L3)·커밋 작성자(L11)는 그 카드가 더한다.
 
 ---
 
