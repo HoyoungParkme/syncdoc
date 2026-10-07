@@ -956,6 +956,50 @@ def test_enrich_resolves_self_attribute_set_in_init(tmp_path: Path) -> None:
 
 
 # ── load ──
+
+ACCOUNT_PY = """class AccountService:
+    @staticmethod
+    def token_for(user):
+        return user
+
+
+def push(user):
+    return AccountService.token_for(user)
+"""
+
+ACCOUNT_RS = """pub struct AccountService;
+
+impl AccountService {
+    pub fn local_user(&self) {}
+}
+"""
+
+
+def test_enrich_resolves_class_qualified_call(tmp_path: Path) -> None:
+    """`Cls.m(…)` — 클래스 이름으로 부르는 정적 메서드도 enrich 선으로 (#336)."""
+    (tmp_path / "account.py").write_text(ACCOUNT_PY, encoding="utf-8")
+    g = {
+        "functions": [_fn("account.py", 3, "token_for"), _fn("account.py", 7, "push")],
+        "calls": [],
+    }
+    cg.enrich(tmp_path, g)
+    k = {f["qual"]: f["key"] for f in g["functions"]}
+    assert [k["account.push"], k["AccountService.token_for"], "enrich"] in g["calls"]
+
+
+async def test_class_qualified_call_survives_same_name_rust_type(tmp_path: Path) -> None:
+    """Rust 판에 같은 이름의 타입이 있으면 graphify는 `Cls.m(…)`을 버린다 — 보강이 다시 잇는다 (#336)."""
+    (tmp_path / "account.py").write_text(ACCOUNT_PY, encoding="utf-8")
+    (tmp_path / "local/src").mkdir(parents=True)
+    (tmp_path / "local/src/account.rs").write_text(ACCOUNT_RS, encoding="utf-8")
+    _source, raw = await cg.load(tmp_path)
+    g = cg.enrich(tmp_path, cg.reduce(raw))
+    k = {(f["file"], f["qual"]): f["key"] for f in g["functions"]}
+    push, token = k[("account.py", "account.push")], k[("account.py", "AccountService.token_for")]
+    assert (push, token) in {(a, b) for a, b, _ in g["calls"]}
+    assert ("local/src/account.rs", "AccountService.local_user") in k  # Rust 쪽도 그대로
+
+
 async def test_load_prefers_committed_graph_json(tmp_path: Path, monkeypatch) -> None:
     (tmp_path / "graphify-out").mkdir()
     (tmp_path / "graphify-out" / "graph.json").write_text(json.dumps(RAW), encoding="utf-8")

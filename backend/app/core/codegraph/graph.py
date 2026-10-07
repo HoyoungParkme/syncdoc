@@ -312,8 +312,9 @@ def _resolve(
 ) -> set[str]:
     """함수 몸통의 호출과 넘기는 참조 → 그래프 안 함수의 key.
 
-    `x.m` · `Cls(…).m` · `self.m`(타입을 아는 객체의 메서드) · `mod.f`(가져온 모듈의 함수) ·
-    `f(…)`(가져온 함수). 호출이 아니라 인자로 넘겨도(`closure(pk, refs.upstream)`) 센다.
+    `x.m` · `Cls(…).m` · `Cls.m` · `self.m`(타입을 아는 객체의 메서드) ·
+    `mod.f`(가져온 모듈의 함수) · `f(…)`(가져온 함수). 호출이 아니라 인자로 넘겨도
+    (`closure(pk, refs.upstream)`) 센다.
     """
     classes = ctx.classes
     env: dict[str, str] = {}
@@ -348,6 +349,10 @@ def _resolve(
                 c = base.func.id
             elif isinstance(base, ast.Name) and base.id in env:
                 c = env[base.id]
+            elif isinstance(base, ast.Name) and base.id in classes:
+                # Cls.m — 클래스 이름으로. graphify는 같은 이름의 타입이 다른 언어에도 있으면
+                # (Rust 판의 AccountService) 모호하다며 버린다 — 파이썬 이름표로 잇는다 (#336)
+                c = base.id
             elif isinstance(base, ast.Name) and base.id == "self" and cls:
                 c = cls
             elif (
