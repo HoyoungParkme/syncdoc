@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -1298,7 +1298,7 @@ classDiagram
         +reduce(raw: dict) dict
         +enrich(src_dir: Path, graph: dict) dict
         +communities(raw: dict, graph: dict) dict
-        +spec_calls(items: list~tuple~) dict
+        +spec_calls(items: list~tuple~, impl_of: dict? = None) dict
         +compare(graph: dict, spec: dict) list~CallDiff~
         +item_function(graph: dict, item_id: str) dict?
         +item_neighbors(graph: dict, key: str) tuple
