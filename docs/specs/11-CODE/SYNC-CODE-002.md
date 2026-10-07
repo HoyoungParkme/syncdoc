@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-002
 type: CODE
 title: 구현 계획 — 싱크독_로컬 (Rust) 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 **MINISPEC은 카드의 첫 커밋으로 쓴다**([[SYNC-STD-004#DEV-13]]). 그래서 L1만 표가 있고 나머지는 하는 일과 선행만 있다 — 카드를 받을 때 그 카드의 표를 쓴다. 아직 없는 MINISPEC 항목을 미리 가리키지 않는다.
 
-**진행 상황**: 카드 17장(L1~L17). 완료 0(2026-10-07).
+**진행 상황**: 카드 17장(L1~L17). 완료 0(2026-10-07). L1은 계약 시험 없이 병합하고 완료란은 L2 뒤에 적는다(사용자 결정 2026-10-07).
 
 ---
 
@@ -24,11 +24,12 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 | 항목 | 내용 |
 |---|---|
-| 근거 | [[SYNC-PRD-001#R15]] · [[SYNC-INFRA-001#C10]] · [[SYNC-INFRA-001#C11]] · [[SYNC-INFRA-001]] 9.1~9.4 · [[SYNC-STD-004#DEV-7]] · [[SYNC-DOM-004]] 1장 · 사용자 결정 2026-10-07(PostgreSQL 16을 함께 담는다 · 데이터 자리 · 개발은 WSL) |
-| 구현 | MINISPEC(카드의 첫 커밋) — MS-012 runtime 전부와 MS-016 account의 로컬 사용자 몫 · `local/` 작업 공간(crate 넷 + xtask) · 설정(`settings.toml`) · 데이터 자리(기본값) · 한 번만 실행 · 함께 담은 PostgreSQL 16 띄우기·멈추기 · `local/migrations/`(`alembic upgrade --sql`로 만든 것) 올리기와 스키마 같음 검사(xtask) · 로컬 사용자 · `/health` · Host·Origin 가드 · problem+json · 화면 정적 파일(같은 React 빌드)·캐시 규칙·`/specs` · 끄기 순서. WSL에서 `--no-tray`로 돈다 |
-| API | [[SYNC-API-001#GET/api/me]] · `/health` |
+| 근거 | [[SYNC-PRD-001#R15]] · [[SYNC-INFRA-001#C10]] · [[SYNC-INFRA-001#C11]] · [[SYNC-INFRA-001]] 4.1·9.1~9.4 · [[SYNC-SEQ-001#SEQ-C3]] · [[SYNC-API-001]] 2장 · [[SYNC-STD-004#DEV-7]] · [[SYNC-DOM-004]] 1장·4.1·4.5 · 사용자 결정 2026-10-07(PostgreSQL 16을 함께 담는다 · 데이터 자리 · 개발은 WSL · 계약 시험은 L2 뒤 · 설정 파일은 INFRA 5.2 이름 · 같은 망 열기는 L16 · 로그는 날마다 14개 · PostgreSQL은 앱이 직접 띄우고 크기는 기본값) |
+| 구현 | [[SYNC-MS-012#runtime.run]] · [[SYNC-MS-012#runtime.bind]] · [[SYNC-MS-012#runtime.shutdown]] · [[SYNC-MS-012#paths.data_dir]] · [[SYNC-MS-012#paths.pg_dir]] · [[SYNC-MS-012#settings.load]] · [[SYNC-MS-012#logs.init]] · [[SYNC-MS-012#instance.acquire]] · [[SYNC-MS-012#instance.publish]] · [[SYNC-MS-012#instance.open_running]] · [[SYNC-MS-012#pg.start]] · [[SYNC-MS-012#pg.stop]] · [[SYNC-MS-012#migrate.apply]] · [[SYNC-MS-016#AccountService.ensure_local_user]] · [[SYNC-MS-016#AccountService.local_user]] · 층 코드 — `local/` 작업 공간(crate 넷 + xtask) · Host·Origin 가드 · problem+json · `/health` · 화면 정적 파일(같은 React 빌드)·캐시 규칙 · `local/migrations/`(`cargo xtask migrations`) · xtask `pg-fetch`·`migrations --check`·`schema-check`·`test-db-clean`. WSL에서 `--no-tray`로 돈다 |
+| API | [[SYNC-API-001#GET/api/me]] · [[SYNC-API-001#GET/specs/{path}]] · `/health` |
 | 화면 | 새로 만들지 않는다 — 같은 빌드를 담아 연다 |
-| 테스트 | MS 테스트 관점 · `cargo test`(시험 DB 5434 `syncdoc_local_test*`) · `cargo fmt --check` · `cargo clippy --all-targets -- -D warnings` · 스키마 같음 — Rust 판이 올린 표와 Alembic이 만든 표의 스키마 덤프가 같다 · 두 번째 실행은 떠 있는 것을 연다 · 다른 Host·Origin은 막힌다 · `/api/me`가 로컬 사용자 · 계약 시험(카드 L2의 틀)에서 `/health`·`/api/me`·가드가 두 판에 같다 |
+| 테스트 | MS 테스트 관점 · `cargo test`(시험 DB 5434 `syncdoc_local_test*`) · `cargo fmt --check` · `cargo clippy --all-targets -- -D warnings` · `cargo check --target x86_64-pc-windows-msvc` · `cargo xtask migrations --check` · `cargo xtask schema-check` — Rust 판이 올린 표와 Alembic이 만든 표의 스키마 덤프가 같다 · 실행 파일 시험 — 두 번째 실행은 떠 있는 것을 연다, 다른 Host·Origin은 막힌다, `/api/me`가 로컬 사용자, SIGINT로 끈다 · 계약 시험은 L2가 L1 몫을 넣는다 — L1 완료란은 그 뒤에(사용자 결정 2026-10-07) |
+| 스텁 | 없음 — 트레이(L4)·따라잡기와 주기 확인(L11)·백업(L16)은 그 카드가 켜기·끄기에 단계를 더한다 |
 | 선행 | [[SYNC-CODE-001#BV]] · [[SYNC-CODE-001#BW]] |
 | 완료 | — |
 
@@ -36,7 +37,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
-| L2 계약 시험 틀 | 저장소 루트 `contract/` — pytest·httpx·MCP 클라이언트·git CLI, 앱을 import하지 않는다 · 가짜 모델 서버 · 파이썬 판(Docker 싱크독_로컬)이 먼저 다 통과 | — (L1과 나란히) | M |
+| L2 계약 시험 틀 | 저장소 루트 `contract/` — pytest·httpx·MCP 클라이언트·git CLI, 앱을 import하지 않는다 · 가짜 모델 서버 · 파이썬 판(Docker 싱크독_로컬)이 먼저 다 통과 · L1 몫(`/health`·`/api/me`·가드·정적 파일·`/specs`)을 두 판에 돌리고 L1 완료란을 적는다 · 파이썬 판과 다른 프레임워크 동작(끝 슬래시 307·`/docs`·HEAD·Range·ETag 꼴·Host 없는 요청)을 같게 할지 정한다 | L1 | M |
 | L3 토큰·MCP | 토큰 발급·폐기·인증 · `/mcp`(rmcp, 이름 `syncdoc_local`) · 도구 13 선언(못 만든 것은 `not-implemented`) · `get_template` | L1 | M |
 | L4 설치형 껍데기 | 트레이·자동 시작·두 번째 실행 · NSIS(MinGit·PostgreSQL 포함)·.deb·AppImage · 릴리즈 워크플로 | L1 | L |
 | L5 명세 엔진 | frontmatter·규약 검증·항목·diff — 파이썬이 만든 정답과 맞춘다 | L1 | L |
@@ -50,7 +51,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | L13 커뮤니티·노드 | graphrs Louvain(seed 42) · 허브 라벨 · 노드 목록 | L12 | M |
 | L14 대화·질문 탭 | 대화·첨부(PDF) · 모델 스트리밍 · 질문 루프 · SSE | L8 · L12 | XL |
 | L15 번들 가져오기 | 파이썬 판 카드 BX(git 번들 가져오기)의 Rust 쪽 | L11 · BX | S |
-| L16 데이터 보호·「이 PC」 | 백업·되살리기·데이터 자리 옮기기 · UI-13 「이 PC」 묶음 | L4 · L11 | L |
+| L16 데이터 보호·「이 PC」 | 백업·되살리기·데이터 자리 옮기기 · UI-13 「이 PC」 묶음 · 같은 망 열기(`PUBLIC_BASE_URL`, 설정 파일만 — 사용자 결정 2026-10-07) | L4 · L11 | L |
 | L17 속도·출시 판정 | 두 판을 같은 PC에서 잰다 — [[SYNC-PRD-001#R15]] 속도 목표와 「파이썬 판보다 느린 항목 없음」 | L14~L16 | M |
 
 #325(재구축이 파일을 지운 커밋에서 실패)와 카드 BX는 파이썬 판에서 먼저 한다 — [[SYNC-CODE-001]].
