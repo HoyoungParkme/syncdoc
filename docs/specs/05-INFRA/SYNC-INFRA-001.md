@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -172,8 +172,8 @@ FastAPI 단일 앱
 | 무엇 | `Cache-Control` | 왜 |
 |---|---|---|
 | 화면 틀 `index.html`(`/`·화면 주소 전부) | `no-cache` | 매번 새 판인지 묻는다. 바뀌지 않았으면 304라 가볍다 — 배포하면 다음 요청에 새 번들을 가리킨다 |
-| 번들 `/assets/*`(이름에 해시) | `public, max-age=31536000, immutable` | 내용이 바뀌면 이름이 바뀌므로 낡을 수 없다 |
-| `/assets/`에 **없는** 파일 | `404` + `no-store` | 화면 틀로 떨어뜨리지 않는다 — 떨어뜨리면 옛 탭이 HTML을 스크립트로 읽다 깨지고, 그 HTML이 에지에 4시간 남았다 |
+| 번들 `/assets/*`(이름에 해시) · 글꼴 `/fonts/*`(판 번호가 든 경로, 3장) | `public, max-age=31536000, immutable` | 내용이 바뀌면 이름이 바뀌므로 낡을 수 없다 |
+| `/assets/`·`/fonts/`에 **없는** 파일 | `404` + `no-store` | 화면 틀로 떨어뜨리지 않는다 — 떨어뜨리면 옛 탭이 HTML을 스크립트로 읽다 깨지고, 그 HTML이 에지에 4시간 남았다 |
 | 그 밖의 파일(사용 방법 그림) | `no-cache` | 이름이 안 바뀌어 매번 새 판인지 묻는다. 1시간으로 두었더니 그림을 바꿔도 이미 본 사람은 옛 그림을 봤다 — 에지가 4시간으로 덮어 최대 4시간(#151) |
 
 **「매번 묻는다」는 서버가 304로 답해야 가볍다(#151).** 요청의 `If-None-Match`가 파일의 ETag와 같거나, ETag 없이 온 `If-Modified-Since`가 수정 시각보다 늦으면 본문 없이 `304`다. Cloudflare를 거친 화면 틀에는 ETag가 떨어져 브라우저가 수정 시각으로만 묻는다. 전에는 서버가 304를 한 번도 돌려주지 않았다 — 그림은 에지가 자기 사본으로 304를 줬지만 에지가 서버에 다시 물을 때마다 본문이 터널로 다시 왔고, 화면 틀은 늘 200이었다.
@@ -502,7 +502,7 @@ syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 |---|---|---|
 | 언어·서버 | Rust · tokio · axum | 속도와 설치형 실행 파일 하나([[SYNC-RFQ-001#Q8]] 3). SSE·multipart·정적 파일을 한 서버에서 |
 | MCP | rmcp(공식 Rust SDK, streamable HTTP) | [[SYNC-API-002]] 도구 13을 같은 이름·설명으로. 판이 자주 바뀌어 정확한 판으로 묶는다 |
-| 데이터베이스 | PostgreSQL 16을 함께 담는다(postgresql_embedded) · sqlx | 파이썬 판과 같은 표([[SYNC-DOM-003]]). 한 판의 덤프가 다른 판에 그대로 들어간다 |
+| 데이터베이스 | PostgreSQL 16을 함께 담는다 — 바이너리(theseus 16.15)를 설치 폴더에 두고 `initdb`·`postgres`·`pg_ctl`을 앱이 직접 부른다 · 역할·DB `syncdoc` · 연결 수·메모리는 기본값 · sqlx | 파이썬 판과 같은 표([[SYNC-DOM-003]]). 역할 이름까지 같아 한 판의 덤프가 다른 판에 그대로 들어간다. 시험용 라이브러리(postgresql_embedded)는 fsync를 끄고 멈출 때 데이터 폴더를 지워 쓰지 않는다 · 기본값이어도 쓰는 만큼만 메모리에 올라온다(사용자 결정 2026-10-07 — L17에서 잰다) |
 | 이전 | **Alembic이 유일한 원본**이다. `alembic upgrade --sql`로 만든 SQL을 `local/migrations/`에 두고 실행 파일에 담는다. 이전 기록은 같은 `alembic_version` 표 | 스키마가 두 구현으로 갈리지 않게. 두 판의 스키마가 같은지는 검사로 본다 |
 | git | 윈도는 MinGit을 함께 담는다(GPL 고지와 원본 안내를 설치 파일에). 리눅스는 시스템 git(.deb가 의존한다) | 순수 Rust git은 아직 push를 받지 못한다(2026-10, gitoxide·libgit2) |
 | 코드 그래프 | tree-sitter(파이썬·TS·JS·Rust 문법)로 함수·호출을 뽑고 graphrs Louvain(seed 42)으로 커뮤니티를 나눈다 | graphify는 파이썬 전용이다. 커뮤니티 모양은 파이썬 판과 조금 다를 수 있다 |
@@ -514,14 +514,16 @@ syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 
 ### 9.3 데이터 자리
 
-- **기본** — 윈도 `%LOCALAPPDATA%\SyncDoc Local`, 리눅스 `~/.local/share/syncdoc-local`. 안에 `pgdata/`(DB) · `origins/`(서버 저장소 — 원본, 6장) · `repos/`(작업 사본) · `settings.toml` · `logs/`
+- **기본** — 윈도 `%LOCALAPPDATA%\SyncDoc Local`, 리눅스 `~/.local/share/syncdoc-local`. 안에 `pgdata/`(DB) · `origins/`(서버 저장소 — 원본, 6장) · `repos/`(작업 사본) · `settings.toml` · `logs/` · `syncdoc-local.lock`(한 번만 실행) · `instance.json`(켜진 주소 — 두 번째 실행이 읽는다)
+- **`settings.toml`** — 키 이름은 5.2와 같다(`LOCAL_LOGIN`·`LOCAL_NAME`·`LLM_API_URL`·`LLM_API_KEY`·`LLM_MODEL`, 사용자 결정 2026-10-07). 첫 실행 때 기본값과 설명 주석이 든 파일을 만든다 — 「이 PC」 화면(L16)이 생기기 전까지는 이 파일을 고친다
+- **`logs/`** — 앱 `syncdoc-local.{날짜}.log`와 PostgreSQL `postgresql-{날짜}.log`, 날마다 한 파일·종류마다 최근 14개(사용자 결정 2026-10-07)
 - **프로그램과 데이터를 나눈다** — 실행 파일·PostgreSQL·MinGit은 설치 폴더에, 데이터는 데이터 자리에. 덮어 설치해도 데이터는 그대로다
 - **옮기기** — 설정 「이 PC」에서 고른 폴더로. 쓰기를 멈춘다 → PostgreSQL을 멈춘다 → DB·서버 저장소·설정을 복사하고 확인한다 → 자리를 가리키는 파일을 바꾼다 → 다시 켠다. 작업 사본은 복사하지 않고 다시 만든다. 옛 폴더는 사람이 지울 때까지 둔다
 
 ### 9.4 접근
 
 - 127.0.0.1에서만 연다. Host·Origin 가드와 개인 토큰은 5장의 폐쇄망판 규칙 그대로다. 로그인·세션 서명 키는 없다
-- 같은 망에 여는 것은 설정 파일에만 둔다([[SYNC-PRD-001#R15]]) — 열면 그 망의 누구나 쓴다
+- 같은 망에 여는 것은 설정 파일에만 둔다([[SYNC-PRD-001#R15]]) — 열면 그 망의 누구나 쓴다. 카드 L16이 넣는다 — 그 전까지 가드의 공개 주소는 `http://127.0.0.1:{실제 포트}`다(Docker 판 기본값과 같은 결과)
 - PostgreSQL은 127.0.0.1 임의 포트와 켤 때마다 바뀌는 암호로 띄운다 — 밖에서 닿지 않는다
 
 ### 9.5 설치·자동 시작·업데이트
