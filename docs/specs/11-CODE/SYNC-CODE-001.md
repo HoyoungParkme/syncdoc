@@ -1422,7 +1422,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | [[SYNC-MS-011#codegraph.enrich]] 2e~2h `_enrich_rs`(tree-sitter-rust 직접 의존) · [[SYNC-MS-011#codegraph.spec_calls]] `impl_of` — 이름표를 구현마다 · [[SYNC-MS-008#queries.code_view]]·[[SYNC-MS-008#queries.code_nodes]] — `impl_of`를 넘기고 클래스 명세 전부의 층 표를 쓴다 · `tools/check_calls.py` — `impl_of`, 모든 층 표, MS 항목이 있는데 함수가 0개인 구현은 실패 · `tools/proj.py` `all_by_title`·`class_doc_of` |
 | 테스트 | MS 테스트 관점 · Rust 조각(TS 보강 시험과 같은 꼴) · 두 구현에 같은 이름 · `check_calls` 0/0이고 파이썬 함수 수가 그대로 · 운영: 배포 뒤 SYNC 그래프의 함수·라벨이 그대로 |
 | 선행 | — |
-| 완료 | — |
+| 완료 | 2026-10-07 · 브랜치 `card/BV-rust-graph`(3d447a0 #331) · spec 5 + code 3 · 테스트 471 · `ruff` · `validate` 0/0 · `check_code` 171/171 · `check_calls` 0/0(못 읽은 구현 0, 함수 1067) · `check_dom` 0 · Rust 조각: 맨 위 fn·impl 메서드(제네릭·트레이트 impl)·`///` 첫 줄 항목(속성 건너)·`#[cfg(test)]` 없음·호출 일곱 꼴, graphify로 뽑은 그래프의 Rust 함수 전부에 커뮤니티(key = fn 줄) · 두 구현의 같은 이름이 제 구현으로 풀림(나누지 않으면 깨지는 시험) · 운영: 전체 재생성 뒤 컨테이너 안에서 SYNC 그래프를 머지 커밋으로 다시 만듦 — 함수 1041 → 1067(BV가 더한 26), 오류 없음, 커뮤니티 26 → 25(라벨 대부분 그대로) · 공개 주소 200 |
 
 ---
 
