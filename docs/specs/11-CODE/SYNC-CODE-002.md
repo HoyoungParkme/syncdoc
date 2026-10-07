@@ -31,7 +31,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 테스트 | MS 테스트 관점 · `cargo test`(시험 DB 5434 `syncdoc_local_test*`) · `cargo fmt --check` · `cargo clippy --all-targets -- -D warnings` · `cargo check --target x86_64-pc-windows-msvc` · `cargo xtask migrations --check` · `cargo xtask schema-check` — Rust 판이 올린 표와 Alembic이 만든 표의 스키마 덤프가 같다 · 실행 파일 시험 — 두 번째 실행은 떠 있는 것을 연다, 다른 Host·Origin은 막힌다, `/api/me`가 로컬 사용자, SIGINT로 끈다 · 계약 시험은 L2가 L1 몫을 넣는다 — L1 완료란은 그 뒤에(사용자 결정 2026-10-07) |
 | 스텁 | 없음 — 트레이(L4)·따라잡기와 주기 확인(L11)·백업(L16)은 그 카드가 켜기·끄기에 단계를 더한다 |
 | 선행 | [[SYNC-CODE-001#BV]] · [[SYNC-CODE-001#BW]] |
-| 완료 | — |
+| 완료 | 2026-10-07 · 브랜치 `card/L1-walking-skeleton`(a7cf251 #338) · `cargo test` 32 · clippy(리눅스·윈도) · 윈도 `cargo check` · `xtask migrations --check` · `schema-check` 같음 · `check_code` Rust 15/15 · `check_calls` 0/0 · 계약 시험(L2) Rust L1 몫 22/22 · 화면은 Playwright로 셸·`/api/me` 확인 · 되먹임: 그래프 `Cls.m` 해석(#336·#337) |
 
 #### L2 계약 시험 틀 — 두 판을 띄워 같은 시나리오를 돌린다
 
@@ -41,7 +41,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | 저장소 루트 `contract/` — pytest·httpx·mcp, 앱을 import하지 않는다 · `--target python\|rust\|both` · 파이썬 판은 작업 트리로 만든 이미지를 Docker(폐쇄망판 구성, 빈 볼륨·임시 포트), Rust 판은 `syncdoc-local`을 임시 데이터 자리로 띄우고 끝나면 지운다 · 시험마다 카드 표시 `@pytest.mark.card("L1")` — Rust 판은 이 문서에서 완료된 카드만 돈다 · 가짜 모델 서버(OpenAI 호환) |
 | 테스트 | 파이썬 판에서 전부 통과 · Rust 판에서 L1 몫 전부 통과(`/health`·`/api/me`·Host·Origin 가드·GitHub 경로·`/login`·API 앞머리 404·405·정적 파일 캐시와 304·`/specs`) · MCP 틀(L3 표시)은 파이썬만 |
 | 선행 | L1 |
-| 완료 | — |
+| 완료 | 2026-10-07 · 브랜치 `card/L2-contract`(47049c8 #339) · spec 6 + code 1 · `uv run pytest --target both --with-card L1` 46 통과·2 건너뜀(Rust L3) · 파이썬 판 24/24 · validate 0/0 · `check_calls` 층 없음 0·안 맞는 줄 0 · 되먹임: DOM-002 `contract/**` 층 줄을 거둠(그래프가 시험 파일을 뺀다) |
 
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
