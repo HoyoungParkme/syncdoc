@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1413,6 +1413,16 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | 설정: 판마다 `llm_url` 기본값 · `llm_enabled`는 키와 주소 · `mcp_name` · `/api/me`의 `llm_enabled` · MCP 서버 이름 · `check_ui` UI-13·UI-16 · `tsc`·`oxlint`·`build` · 운영: 상단 바·탭 제목이 싱크독_깃허브, MCP 서버 이름 `syncdoc_github` · 싱크독_로컬 묶음을 새로 만들어 반입 시험(포트 8010, 바깥 요청 0, MCP `syncdoc_local`) |
 | 선행 | — |
 | 완료 | 2026-10-07 · 브랜치 `card/BU-release-names`(4a2d5dc #327) + `card/BU-term-wrap`(b69c538 #328) · spec 10 + code 6 · 테스트 466 · `ruff`·`tsc`·`oxlint`·`build` · `validate` 0/0 · `check_code` 171/171 · `check_calls` 0/0 · `check_dom` 0 · `check_ui` 14/14(UI-13 25 · UI-16 18) · `check_tokens` 0 · 운영(싱크독_깃허브): 전체 재생성 뒤 MCP 서버 이름 `syncdoc_github` · 질문 탭 그대로(키 + 기본 주소) · 공개 번들에 판 이름 · 공개 주소 200 · 싱크독_로컬 묶음 `dist/syncdoc-local-2026.10.07-2.tar.gz`(272MB, sha256 af480eb2…) 반입 시험 — `sha256sum -c` OK · `docker load` · 바깥 없는 망(internal) + 관문 127.0.0.1:8010: 앱 안에서 1.1.1.1 · api.openai.com 막힘, 주소 없이 키만 있으면 `llm_enabled` 거짓 · MCP 서버 이름 `syncdoc_local` · 도구 13 · `init_project`(서버) · `upload_code` 2파일 → 코드 그래프 `calc.add`·`calc.total`·`util.twice`·`util.four`(파이썬·TS) · 헤드리스: 탭 제목 · 로고 싱크독_로컬, UI-16 6.2·6.5·6.6에 `syncdoc_local`과 8010 주소, 로그아웃 없음, 요청 37건 전부 127.0.0.1:8010 · 콘솔 오류 0 · 찾은 것: 터미널 상자 가로 스크롤(→ #328) · `2026.10.07` 시험 설치를 `-2`로 INSTALL 5 순서대로 올림 — 데이터 그대로 · 운영 `postgres:16-alpine` 태그 그대로 · 화면은 사람이 직접(DEV-17) |
+
+#### BV 코드 그래프가 Rust를 읽는다 — 두 구현의 같은 이름은 구현 안에서 푼다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-STD-001]] 2.10(구현이 둘이면) · [[SYNC-INFRA-001#C11]] · 사용자 결정 2026-10-07(명세 하나 구현 둘 · 코드 그래프 파이썬·TS·JS·Rust). SYNC를 올린 싱크독_깃허브의 UI-17과 `check_calls`는 같은 함수로 센다([[SYNC-STD-004#DEV-14]]) — graphify의 Rust 추출은 함수에 `_callable`이 없어 Rust 함수가 0개다. 그러면 Rust MS가 전부 「코드에 없음」으로 조용히 통과한다. 두 구현에 같은 이름의 항목이 생기면 짧은 이름 표가 그 이름을 지워 파이썬 쪽 백틱 「호출하는 것」 16줄도 사라진다 |
+| 구현 | [[SYNC-MS-011#codegraph.enrich]] 2e~2h `_enrich_rs`(tree-sitter-rust 직접 의존) · [[SYNC-MS-011#codegraph.spec_calls]] `impl_of` — 이름표를 구현마다 · [[SYNC-MS-008#queries.code_view]]·[[SYNC-MS-008#queries.code_nodes]] — `impl_of`를 넘기고 클래스 명세 전부의 층 표를 쓴다 · `tools/check_calls.py` — `impl_of`, 모든 층 표, MS 항목이 있는데 함수가 0개인 구현은 실패 · `tools/proj.py` `all_by_title`·`class_doc_of` |
+| 테스트 | MS 테스트 관점 · Rust 조각(TS 보강 시험과 같은 꼴) · 두 구현에 같은 이름 · `check_calls` 0/0이고 파이썬 함수 수가 그대로 · 운영: 배포 뒤 SYNC 그래프의 함수·라벨이 그대로 |
+| 선행 | — |
+| 완료 | — |
 
 ---
 
