@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-004
 type: STD
 title: 개발 규약 — 코드 파트 표준
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -252,7 +252,7 @@ C  통합·배포       외부 연결 · 첫 사용
 | 호출이 MINISPEC과 같다 | `check_calls.py` — 명세의 「호출하는 것」과 코드 호출 그래프(graphify + 보강)의 어긋남 0. `uv run --project backend python tools/check_calls.py`(카드 AX). **층 없음 0 · 안 맞는 줄 0**도 — 클래스 명세 층 표가 항목 없는 함수를 다 덮고, 표의 줄이 다 코드에 맞는다(카드 BM) |
 | 테스트 통과 | 단위(테스트 관점) + E2E(시나리오) 전부. **전용 테스트 DB에서만** — 아래 |
 | 린트·포맷 통과 | `ruff check` · `ruff format --check`. **Rust 카드**는 `cargo fmt --check` · `cargo clippy --all-targets -- -D warnings` |
-| 계약 시험 (Rust 카드) | 카드가 닫는 공용 계약 시험이 Rust 판에서 통과하고 파이썬 판에서도 그대로 통과한다 |
+| 계약 시험 (Rust 카드) | 카드가 닫는 공용 계약 시험이 Rust 판에서 통과하고 파이썬 판에서도 그대로 통과한다 — `cd contract && uv run pytest --target both --with-card L3`(그 카드). 시험마다 카드 표시, 계약 밖 목록은 [[SYNC-CODE-002]] 2장 |
 | 명세 통과 | `validate.py` 위반 0 (코드가 명세를 고쳤으면) |
 | CODE 문서 기록 | 슬라이스 카드 완료란에 커밋 해시·PR·날짜(KST) |
 | **화면 확인** (화면이 있는 카드만) | 에이전트가 `tsc`·`build`·API 테스트까지 하고, **사람이 브라우저에서 와이어프레임 요소 번호대로 눌러 본다.** 스크린샷을 PR에. 에이전트는 눈이 없다 — 이 조건만 사람 몫 |
