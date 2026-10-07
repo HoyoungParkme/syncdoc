@@ -4,19 +4,21 @@
 
 ## 처음 열었을 때
 
-1. `docs/specs/STD/SYNC-STD-004.md` — 개발 규약. 코드가 지켜야 할 규칙 17개(DEV-1~17)
+1. `docs/specs/STD/SYNC-STD-004.md` — 개발 규약. 코드가 지켜야 할 규칙 19개(DEV-1~19)
 2. `docs/specs/STD/SYNC-STD-001.md` — 명세 작성 규약. 명세를 고쳐야 할 때
-3. `docs/specs/11-CODE/SYNC-CODE-001.md` — 구현 계획. **여기서 카드 하나를 받는다**
+3. `docs/specs/11-CODE/SYNC-CODE-001.md` — 구현 계획(파이썬 판). **여기서 카드 하나를 받는다**. Rust 판(싱크독_로컬, `local/`)의 카드는 `SYNC-CODE-002`(L1…) — 구현이 둘이다(INFRA C11)
 
-## 폴더 구조 (DOM-002 1장)
+## 폴더 구조 (DOM-002 1장 · Rust 판은 DOM-004 1장)
 
 ```
 syncdoc/            저장소 = 프로젝트
 ├── backend/        파이썬. app/(임포트 패키지) · tests/ · alembic/ · pyproject.toml
-├── frontend/       React 소스 (Vite+TS). 빌드 → backend/app/web/static
+├── frontend/       React 소스 (Vite+TS). 빌드 → backend/app/web/static. 두 판이 같은 빌드를 담는다
+├── local/          Rust 판(싱크독_로컬 설치형). 구조는 DOM-004 1장 — 카드 L1부터
+├── release/local/  Docker 싱크독_로컬 묶음 재료(Rust 판이 나오기 전까지, INFRA 8.1)
 ├── docs/specs/     명세 원본. 디렉터리는 {NN-TYPE} — 번호가 읽는 순서 (STD-001 1.1)
 ├── tools/          validate.py · check_code.py · check_ui.py · view_build.py · dev_preview.py
-├── scripts/        tunnel.sh — Quick Tunnel 기동
+├── scripts/        tunnel.sh(터널) · backup.sh(정기 백업) · release_local.sh(Docker 싱크독_로컬 묶음)
 └── Dockerfile · docker-compose.yml
 ```
 
@@ -44,6 +46,7 @@ syncdoc/            저장소 = 프로젝트
 ## 도구
 
 파이썬은 `backend/`에서 돈다 — `cd backend && uv run pytest` · `uv run ruff check .` · `uv run alembic upgrade head`.
+Rust는 `local/`에서 돈다 — `cd local && cargo test` · `cargo fmt --check` · `cargo clippy --all-targets -- -D warnings`(카드 L1부터). 검사기(`check_code`·`check_calls`)는 두 구현을 다 읽는다(카드 BV·BW).
 검사기는 저장소 루트에서 돈다.
 
 **테스트는 전용 DB(5434 `syncdoc_test`)에서만 돈다.** 이름에 `test`가 없으면 시작하지 않는다. 다른 DB를 쓰려면 `SYNCDOC_TEST_DATABASE_URL`.

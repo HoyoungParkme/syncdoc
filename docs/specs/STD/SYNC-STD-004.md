@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-004
 type: STD
 title: 개발 규약 — 코드 파트 표준
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
 ---
 
@@ -15,6 +15,8 @@ upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
 세 가지를 정한다 — 코드가 지켜야 할 규칙(1·2장), 작업을 어떻게 자르나(3장), 언제 끝났다고 하나(4장). 프로젝트마다 다른 것(어느 슬라이스를 어떤 순서로)은 그 프로젝트의 CODE 문서([[SYNC-CODE-001]])에 둔다.
 
 **원칙** — 코드는 MINISPEC을 옮긴 것이다. MINISPEC에 없는 함수를 만들면 MINISPEC을 먼저 고친다. 명세 없는 코드는 싱크독이 막으려는 바로 그것이다.
+
+**구현이 둘이다**([[SYNC-INFRA-001#C11]], 2026-10-07) — 싱크독_깃허브는 파이썬 `backend/`, 싱크독_로컬은 Rust `local/`. 규칙은 둘에 같고, 언어마다 다른 것은 DEV마다 「Rust」 문단에 적는다. 슬라이스 순서는 구현마다 그 CODE 문서에 둔다 — 파이썬은 [[SYNC-CODE-001]], Rust는 CODE-002.
 
 ---
 
@@ -30,6 +32,8 @@ upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
 
 테스트는 거울 구조 — `tests/core/spec/test_service.py`가 `core/spec/service.py`를 검사한다.
 
+**Rust** — 폴더는 Rust 판의 클래스 명세(DOM-004) 1장 그대로다. 테스트는 crate 안의 거울(`tests/`)이나 그 모듈의 `#[cfg(test)]`에 둔다.
+
 #### DEV-2 이름은 명세의 이름
 
 클래스·메서드·테이블·컬럼 이름은 클래스 명세·ERD·DD·MINISPEC에 적힌 그대로. `SpecService.save`를 `save_document`로 바꾸지 않는다. 바꿔야 하면 명세부터.
@@ -37,6 +41,8 @@ upstream: [SYNC-STD-001, SYNC-DOM-002, SYNC-DOM-003]
 Python: 클래스 `PascalCase`, 함수·변수 `snake_case`, 상수 `UPPER`. 테이블·컬럼 `snake_case`. React: 컴포넌트 `PascalCase`, 파일명 = 컴포넌트명.
 
 **DTO와 ORM 이름이 같을 때** — DTO(API 응답·클래스 2.8)가 그 이름을 갖고, ORM 모델은 코드에서 `*Row`로 별칭한다: `Document`(DTO) / `DocumentRow`(ORM), `Version` / `VersionRow`. 서비스가 내부에서 돌려주는 건 Row, 입구로 나가는 건 DTO. MINISPEC 시그니처의 엔티티 이름은 Row다.
+
+**Rust** — 타입 `PascalCase`, 함수·모듈·변수 `snake_case`, 상수 `UPPER`. Row와 DTO는 파이썬과 같다 — `DocumentRow`(DB 행) / `Document`(API DTO).
 
 #### DEV-3 함수 docstring 첫 줄 = MINISPEC 항목 ID
 
@@ -51,13 +57,25 @@ MINISPEC 밖의 층도 같은 꼴이다 — 라우터는 `"""SYNC-API-001#GET/ap
 
 `_`로 시작하는 비공개 헬퍼는 MINISPEC이 없어도 된다 — 단 **그 모듈 밖에서 부르지 않는다.** 밖에서 부르게 되면 MINISPEC 항목으로 올린다.
 
+**Rust** — 문서 주석(`///`)의 첫 줄이 항목 ID다. 속성(`#[…]`)보다 앞에 둔다. 항목 ID는 점 꼴 그대로다(`impl SpecService`의 `save` = `SpecService.save`).
+
+```rust
+impl SpecService<'_> {
+    /// SYNC-MS-014#SpecService.save
+    pub async fn save(&mut self, …) -> Result<VersionRow, Problem> {
+```
+
+라우터·MCP 도구도 같은 꼴이다(`/// SYNC-API-001#GET/api/me`). `pub`이 아닌 함수가 비공개 도우미다 — 모듈 밖에서 부르게 되면 MINISPEC 항목으로 올린다.
+
 #### DEV-4 타입 힌트 필수, 형식은 도구가
 
-모든 함수 시그니처에 타입 힌트. MINISPEC 시그니처와 같아야 한다. `from __future__ import annotations`를 모든 모듈에 — `list[...]` 표기가 MINISPEC과 같게. 포맷은 `ruff format`, 린트는 `ruff check` — 손으로 맞추지 않는다. `tests/`는 E501 무시, 중간 커밋은 F401 무시, `mcp/tools.py`는 E501 무시(도구 description이 API 명세 원문이라 길다) — 전부 pyproject에 명시. React는 `prettier` + `eslint`.
+모든 함수 시그니처에 타입 힌트. MINISPEC 시그니처와 같아야 한다. **Rust**는 시그니처가 MINISPEC과 글자 그대로 같다 — 공개 범위·`async`·받는 쪽(`&self`·`&mut self`)·제네릭·반환. 포맷 `cargo fmt`, 린트 `cargo clippy --all-targets -- -D warnings`. `from __future__ import annotations`를 모든 모듈에 — `list[...]` 표기가 MINISPEC과 같게. 포맷은 `ruff format`, 린트는 `ruff check` — 손으로 맞추지 않는다. `tests/`는 E501 무시, 중간 커밋은 F401 무시, `mcp/tools.py`는 E501 무시(도구 description이 API 명세 원문이라 길다) — 전부 pyproject에 명시. React는 `prettier` + `eslint`.
 
 #### DEV-5 에러는 problem+json 타입 하나에 예외 클래스 하나
 
 `urn:syncdoc:version-conflict` ↔ `VersionConflict(Problem)`. API 명세 2장 에러 표와 1:1. 새 에러는 API 명세부터.
+
+**Rust**는 `Problem` 열거형 하나에 problem+json 종류마다 갈래 하나다. MINISPEC 함수는 `Result<_, Problem>`을 돌려준다.
 
 **상태 코드 502·504는 쓰지 않는다** — 앞단 Cloudflare가 자기 오류 페이지로 바꿔 problem+json이 사라진다. 앱 밖(GitHub·모델)이 실패한 것은 424다([[SYNC-API-001]] 2장, #76). `tests/core/test_errors.py`가 모든 에러 클래스를 훑어 막는다.
 
@@ -71,6 +89,7 @@ MINISPEC 밖의 층도 같은 꼴이다 — 라우터는 `"""SYNC-API-001#GET/ap
 - DB만 만지는 서비스 메서드는 `def` (SQLAlchemy sync 세션. 2~3명 규모)
 - **async 함수를 하나라도 부르면 그 함수도 `async def`** — `login_github`(github), `init_project`(git), `change_status`·`revert`(pipeline), `pipeline.*`, `queries.*`, 라우터·MCP 도구 전부
 - MINISPEC 시그니처에 `async def`가 명시된다. 없으면 sync. 코드가 이걸 어기면 명세가 틀린 것 — 명세부터
+- **Rust** — `async`는 MINISPEC 시그니처가 정한다. DB(sqlx)·git·HTTP는 async다. 오래 막는 일(파싱·Louvain·PDF·diff)은 `spawn_blocking`으로 넘긴다. MINISPEC 항목끼리는 구체 타입·모듈 경로로 부른다 — `dyn`·제네릭·매크로 인자로 부르면 코드 그래프가 따라가지 못한다
 
 #### DEV-19 저장소에 쓰기 전에 읽는다
 
@@ -147,6 +166,7 @@ MINISPEC 밖의 층도 같은 꼴이다 — 라우터는 `"""SYNC-API-001#GET/ap
 - 리비전 메시지 = 바뀐 ERD 항목: `0002_add_flags_upstream_impact`
 - 열거형은 DB enum이 아니라 `varchar` + 앱 검증 (ERD 설계 규칙). 값 추가에 마이그레이션 없음
 - `downgrade`를 반드시 쓴다. 되돌릴 수 없는 리비전은 리뷰에서 막는다
+- **Rust 판도 원본은 Alembic 하나다.** `local/migrations/NNNN_*.sql`은 리비전마다 `alembic upgrade --sql`이 만든 것이고 손으로 고치지 않는다. Rust 판은 같은 `alembic_version` 표로 어디까지 올렸는지 알고, 자기가 모르는 새 리비전이 있는 DB면 켜지 않는다. 두 판의 스키마가 같은지는 검사로 본다
 
 #### DEV-8 인덱스는 ERD·DD 3장에 적힌 것만
 
@@ -160,7 +180,7 @@ FK 전부, unique 제약 전부, 그리고 ERD·DD 3장 인덱스 표. 쿼리가
 
 `pipeline.save_pipeline` 6단계, `pipeline.rebuild` 3~9단계처럼 MINISPEC에 "한 트랜잭션"이라고 적힌 범위가 트랜잭션이다. 서비스 메서드는 트랜잭션도 세션도 열지 않는다 — 호출자의 것 안에서 돈다.
 
-**세션 소유자는 입구 층이다** — `pipeline`·`queries`·라우터·MCP 도구가 `db.session_scope()`로 열고 닫는다. 서비스 하나만 부르는 라우터(SEQ-C1)는 라우터가 연다. `init_project`처럼 서비스가 트랜잭션을 언급하면 그건 "이 범위를 한 트랜잭션으로 묶어라"는 호출자에게 하는 지시다.
+**세션 소유자는 입구 층이다** — `pipeline`·`queries`·라우터·MCP 도구가 `db.session_scope()`로 열고 닫는다(**Rust**는 연결을 쥐고 트랜잭션을 연다. 서비스는 `&mut PgConnection`을 받아 그 안에서만 돈다). 서비스 하나만 부르는 라우터(SEQ-C1)는 라우터가 연다. `init_project`처럼 서비스가 트랜잭션을 언급하면 그건 "이 범위를 한 트랜잭션으로 묶어라"는 호출자에게 하는 지시다.
 
 ---
 
@@ -228,20 +248,24 @@ C  통합·배포       외부 연결 · 첫 사용
 | 시그니처가 MINISPEC과 같다 | 검사기가 타입 힌트와 대조 |
 | 호출이 MINISPEC과 같다 | `check_calls.py` — 명세의 「호출하는 것」과 코드 호출 그래프(graphify + 보강)의 어긋남 0. `uv run --project backend python tools/check_calls.py`(카드 AX). **층 없음 0 · 안 맞는 줄 0**도 — 클래스 명세 층 표가 항목 없는 함수를 다 덮고, 표의 줄이 다 코드에 맞는다(카드 BM) |
 | 테스트 통과 | 단위(테스트 관점) + E2E(시나리오) 전부. **전용 테스트 DB에서만** — 아래 |
-| 린트·포맷 통과 | `ruff check` · `ruff format --check` |
+| 린트·포맷 통과 | `ruff check` · `ruff format --check`. **Rust 카드**는 `cargo fmt --check` · `cargo clippy --all-targets -- -D warnings` |
+| 계약 시험 (Rust 카드) | 카드가 닫는 공용 계약 시험이 Rust 판에서 통과하고 파이썬 판에서도 그대로 통과한다 |
 | 명세 통과 | `validate.py` 위반 0 (코드가 명세를 고쳤으면) |
 | CODE 문서 기록 | 슬라이스 카드 완료란에 커밋 해시·PR·날짜(KST) |
 | **화면 확인** (화면이 있는 카드만) | 에이전트가 `tsc`·`build`·API 테스트까지 하고, **사람이 브라우저에서 와이어프레임 요소 번호대로 눌러 본다.** 스크린샷을 PR에. 에이전트는 눈이 없다 — 이 조건만 사람 몫 |
 
-일곱(화면 카드는 여덟) 다 되어야 다음 카드. 하나라도 빠지면 그 슬라이스는 미완이고 다음 슬라이스의 `선행` 조건이 안 된다.
+일곱(화면 카드는 여덟, Rust 카드는 계약 시험까지) 다 되어야 다음 카드. 검사기(`check_code`·`check_calls`)는 두 구현에 같은 것이다 — 두 구현을 다 읽는다. Rust 카드의 테스트는 `cargo test`이고 기록은 CODE-002에 한다. 하나라도 빠지면 그 슬라이스는 미완이고 다음 슬라이스의 `선행` 조건이 안 된다.
 
 **테스트는 전용 DB에서만 돈다.** 이름에 `test`가 없는 DB를 가리키면 시작하지 않는다 — 스키마를 만드는 픽스처가 개발·운영 DB에 닿으면 그 데이터가 사라진다. 다른 DB를 쓰려면 `SYNCDOC_TEST_DATABASE_URL`로 말한다. 환경 변수를 `setdefault`로 두면 셸에 떠 있는 값이 이긴다 — 그래서 덮어쓴다.
+
+**Rust 시험의 DB**는 같은 시험 컨테이너(5434)의 `syncdoc_local_test*`다 — 시험마다 DB 하나, 이름에 `test`가 있다. 앱의 데이터 자리(함께 담은 PostgreSQL)는 쓰지 않는다. 다른 DB는 `SYNCDOC_LOCAL_TEST_DATABASE_URL`.
 
 **한 DB에 pytest를 둘 이상 동시에 돌리지 않는다.** 서로의 트랜잭션에 걸려 매번 다른 테스트가 401·연결 오류로 죽는다. 실패하는 테스트가 돌 때마다 달라지면 이것부터 의심한다(#17).
 
 #### DEV-15 커밋·PR
 
 - 커밋 메시지 규격: `code(슬라이스): 함수명 — 요약` 예: `code(R): pipeline.trash_document — 문서를 휴지통으로`. 명세 커밋(`spec(…)`)과 구분
+- Rust 카드는 `code(L1): SpecService.save — 요약`(항목 ID 그대로, 점 꼴), 가지는 `card/L1-…`. 기록은 CODE-002
 - 이미 끝난 슬라이스의 버그를 고칠 때는 `fix(#이슈번호): 요약`. 카드가 아니라 **이슈가 단위**다. 이슈에 무엇이 왜 틀렸는지와 어느 명세가 근거인지를 적고, 카드는 건드리지 않는다
 - PR = 슬라이스 하나. PR 설명 = 카드 내용 + 완료 조건 체크
 - 리뷰는 코드가 아니라 **카드 대조** — 구현 함수 목록과 코드가 맞는지, 테스트 관점이 테스트에 있는지

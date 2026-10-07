@@ -16,3 +16,6 @@ frontend/node_modules/
 
 # 터널 서비스 — scripts/tunnel.sh가 TUNNEL_TOKEN이 있을 때 만든다 (INFRA-001 5장, #284)
 /docker-compose.override.yml
+
+# Rust 판 빌드 결과 (STD-004 DEV-1, INFRA 9장)
+/local/target/

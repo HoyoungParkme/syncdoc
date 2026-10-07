@@ -5,3 +5,5 @@ frontend/node_modules
 backend/app/web/static
 backend/tests
 .playwright-mcp
+# Rust 판(싱크독_로컬 설치형) — 파이썬 판 이미지에 들지 않는다 (INFRA C11)
+local
