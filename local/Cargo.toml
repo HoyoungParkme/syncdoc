@@ -1,0 +1,47 @@
+# 싱크독_로컬 (Rust) 작업 공간 — SYNC-DOM-004 1장
+# 의존 판은 여기 한곳에 둔다. Cargo.lock은 커밋한다(실행 파일).
+
+[workspace]
+resolver = "3"
+members = ["crates/app", "crates/server", "crates/core", "crates/codegraph", "xtask"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+publish = false
+
+[workspace.dependencies]
+syncdoc_core = { path = "crates/core" }
+syncdoc_server = { path = "crates/server" }
+
+axum = "0.8.9"
+clap = { version = "4.6", features = ["derive"] }
+directories = "6.0"
+http-body-util = "0.1"
+httpdate = "1.0"
+percent-encoding = "2.3"
+rand = "0.10"
+rust-embed = { version = "8.12", features = ["interpolate-folder-path", "include-exclude"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+sha2 = "0.10"
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres", "derive", "time"] }
+tempfile = "3"
+thiserror = "2.0"
+time = "0.3"
+tokio = { version = "1.53", features = ["macros", "rt-multi-thread", "net", "process", "signal", "time", "fs", "io-util", "sync"] }
+toml = "1.1"
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.7", features = ["catch-panic"] }
+tracing = "0.1.44"
+tracing-appender = "0.2.5"
+tracing-subscriber = { version = "0.3", features = ["fmt", "registry"] }
+webbrowser = "1.2"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[profile.release]
+lto = "thin"
+strip = true

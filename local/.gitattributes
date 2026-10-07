@@ -1,0 +1,2 @@
+# 이전 SQL은 xtask가 만든 그대로 — 운영체제마다 줄 끝이 바뀌면 --check가 깨진다
+migrations/*.sql text eol=lf

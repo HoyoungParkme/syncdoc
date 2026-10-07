@@ -1,0 +1,8 @@
+# cargo xtask … — 개발 도구 (SYNC-DOM-004 1장 xtask)
+[alias]
+xtask = "run -q -p xtask --"
+
+# 개발·시험용 PostgreSQL 바이너리 자리 — `cargo xtask pg-fetch`가 받는다 (SYNC-MS-012#paths.pg_dir).
+# 설치판은 실행 파일 옆 postgresql/을 쓴다. 바깥에서 준 값이 있으면 그것이 이긴다
+[env]
+SYNCDOC_LOCAL_PG_DIR = { value = "target/pg/16.15.0", relative = true }

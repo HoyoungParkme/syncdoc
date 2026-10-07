@@ -1,0 +1,6 @@
+# Rust 판 고정 — SYNC-STD-001 1.9 · SYNC-DOM-004 1장
+[toolchain]
+channel = "1.99.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+targets = ["x86_64-pc-windows-msvc"]
