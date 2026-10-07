@@ -21,6 +21,8 @@ DD 표가 `id`·외래키·표준 시각을 싣기도 하고 빼기도 해서 �
       python3 tools/check_dom.py --all    맞는 것까지
       python3 tools/check_dom.py --specs <다른 저장소>/docs/specs
 
+구현이 둘이면 클래스 명세도 둘이다(STD-001 2.6) — 둘 다 읽고, 테이블은 명세마다 다 가리켜야 한다.
+
 프로젝트 코드는 명세에서 읽는다 — `SYNC-`를 박아 두지 않는다 (STD-004 4장, #57).
 """
 
@@ -115,43 +117,50 @@ def main() -> int:
     show_ok = a.all
     # **번호가 아니라 제목으로 찾는다** — 싱크독은 DOM-001이 도메인이지만 게시판
     # 프로젝트는 DOM-001이 ERD다. 번호로 찾으면 엉뚱한 문서를 읽고도 답을 낸다 (#57)
-    paths = {k: proj.by_title(a.specs, "DOM", k) for k in ("도메인", "클래스", "ERD")}
-    missing = [k for k, v in paths.items() if v is None]
+    paths = {k: proj.by_title(a.specs, "DOM", k) for k in ("도메인", "ERD")}
+    # 클래스 명세는 구현마다 하나다 — 도메인·데이터 명세는 함께 쓴다 (STD-001 2.6, 카드 BW)
+    classes = proj.all_by_title(a.specs, "DOM", "클래스")
+    missing = [k for k, v in paths.items() if v is None] + ([] if classes else ["클래스"])
     if missing:
         print(f"{code}: DOM 문서를 못 찾았다 — 제목에 {' · '.join(missing)}이(가) 없다")
         return 0
     domain = items_of(paths["도메인"])
     tables = items_of(paths["ERD"])
-    links = class_links(
-        paths["클래스"],
-        # 링크 대상 문서 번호는 안 본다 — 어느 문서의 항목인지는 뒤에서 집합으로 가른다
-        re.compile(r"(테이블|도메인):\s*\[\[[^\]#]+#([^\]]+)\]\]"),
-    )
+    # 링크 대상 문서 번호는 안 본다 — 어느 문서의 항목인지는 뒤에서 집합으로 가른다
+    link = re.compile(r"(테이블|도메인):\s*\[\[[^\]#]+#([^\]]+)\]\]")
     warnings: list[tuple[str, str]] = []
-
-    linked_tables = set()
     name = {k: os.path.basename(v)[:-3] for k, v in paths.items()}
-    for cls, refs in links.items():
-        table, concept = refs.get("테이블"), refs.get("도메인")
-        if table:
-            linked_tables.add(table)
-            if table not in tables:
-                warnings.append((cls, f"테이블 `{table}`이 {name['ERD']}에 없다"))
-            elif show_ok:
-                print(f"✓  {cls:24} 테이블 {table}")
-        if concept:
-            if concept not in domain:
-                warnings.append((cls, f"도메인 `{concept}`이 {name['도메인']}에 없다"))
-            elif show_ok:
-                print(f"✓  {cls:24} 도메인 {concept}")
+    seen: list[str] = []
 
-    for t in sorted(tables - linked_tables):
-        warnings.append(("—", f"테이블 `{t}`을 가리키는 클래스가 없다"))
+    for path in classes:
+        doc = os.path.basename(path)[:-3]
+        # 구현이 둘이면 어느 클래스 명세의 경고인지 붙인다 — 하나면 전과 같은 줄
+        tag = f" ({doc})" if len(classes) > 1 else ""
+        links = class_links(path, link)
+        seen.append(f"{len(links)}{tag}")
+        linked_tables = set()
+        for cls, refs in links.items():
+            table, concept = refs.get("테이블"), refs.get("도메인")
+            if table:
+                linked_tables.add(table)
+                if table not in tables:
+                    warnings.append((cls, f"테이블 `{table}`이 {name['ERD']}에 없다{tag}"))
+                elif show_ok:
+                    print(f"✓  {cls:24} 테이블 {table}{tag}")
+            if concept:
+                if concept not in domain:
+                    warnings.append((cls, f"도메인 `{concept}`이 {name['도메인']}에 없다{tag}"))
+                elif show_ok:
+                    print(f"✓  {cls:24} 도메인 {concept}{tag}")
+
+        # 테이블은 구현마다 다 가리켜야 한다 — 두 구현이 같은 표를 쓴다 (DOM-003 공유)
+        for t in sorted(tables - linked_tables):
+            warnings.append(("—", f"테이블 `{t}`을 가리키는 클래스가 없다{tag}"))
 
     for cls, msg in warnings:
         print(f"⚠  {cls:24} dom.name: {msg}")
     print(
-        f"\n합계: {code} · 클래스 {len(links)} · 테이블 {len(tables)}"
+        f"\n합계: {code} · 클래스 {' + '.join(seen)} · 테이블 {len(tables)}"
         f" · 개념 {len(domain)} · 경고 {len(warnings)}"
     )
     return 1 if warnings else 0

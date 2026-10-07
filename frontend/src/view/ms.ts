@@ -19,6 +19,8 @@ interface Fn {
   title: string
   /** 시그니처 코드(펜스·백틱 벗긴 것) */
   sig: string
+  /** 시그니처 언어 — 펜스 태그, 없으면 fn 꼴이면 rust·아니면 python (STD-002 V-MS) */
+  sigLang: string
   /** 시그니처 부분에서 코드를 뺀 나머지 원문 */
   sigRest: string
   /** 부분 이름 → 원문 MD */
@@ -76,26 +78,39 @@ function parseParts(text: string): { parts: Map<PartName, string>; lead: string 
   return { parts, lead: lead.join('\n').trim() }
 }
 
-/** 시그니처 부분 → [코드, 나머지]. ```python 펜스 또는 `한 줄` */
-function splitSig(sig: string): [string, string] {
-  const fence = /```\w*\n([\s\S]*?)\n?```/.exec(sig)
-  if (fence) return [fence[1].trim(), (sig.slice(0, fence.index) + sig.slice(fence.index + fence[0].length)).trim()]
+/** `fn` 꼴 — 앞에 pub·pub(crate)·const·async·unsafe·extern이 붙어도 (STD-002 V-MS, check_code RS_FN) */
+const RS_FN = /^(?:pub(?:\([^)]*\))?\s+)?(?:(?:const|async|unsafe)\s+)*(?:extern\s+(?:"[^"]*"\s+)?)?fn\s/
+/** 목록 칸에서 떼는 머리 — 파이썬 def·async def, Rust pub·async·fn */
+const SIG_HEAD = /^(?:pub(?:\([^)]*\))?\s+)?(?:(?:const|async|unsafe)\s+)*(?:extern\s+(?:"[^"]*"\s+)?)?(?:def|fn)\s+/
+const langOf = (code: string): string => (RS_FN.test(code) ? 'rust' : 'python')
+
+/** 시그니처 부분 → [코드, 나머지, 언어]. 펜스(언어는 태그) 또는 `한 줄` */
+function splitSig(sig: string): [string, string, string] {
+  const fence = /```(\w*)\n([\s\S]*?)\n?```/.exec(sig)
+  if (fence) {
+    const code = fence[2].trim()
+    return [code, (sig.slice(0, fence.index) + sig.slice(fence.index + fence[0].length)).trim(), fence[1] || langOf(code)]
+  }
   const tick = /`([^`]+)`/.exec(sig)
-  if (tick && sig.trim().startsWith('`')) return [tick[1].trim(), (sig.slice(0, tick.index) + sig.slice(tick.index + tick[0].length)).trim()]
-  return [sig.trim(), '']
+  if (tick && sig.trim().startsWith('`')) {
+    const code = tick[1].trim()
+    return [code, (sig.slice(0, tick.index) + sig.slice(tick.index + tick[0].length)).trim(), langOf(code)]
+  }
+  return [sig.trim(), '', langOf(sig.trim())]
 }
 
 function parseFns(text: string): Fn[] {
   return itemBlocks(text, ITEM_PAT.MS).map((b) => {
     const dot = b.id.indexOf('.')
     const { parts, lead } = parseParts(trimRule(b.text.trimEnd()))
-    const [sig, sigRest] = splitSig(parts.get('시그니처') ?? '')
+    const [sig, sigRest, sigLang] = splitSig(parts.get('시그니처') ?? '')
     return {
       id: b.id,
       mod: b.id.slice(0, dot),
       name: b.id.slice(dot + 1),
       title: b.title,
       sig,
+      sigLang,
       sigRest,
       parts,
       lead,
@@ -104,12 +119,8 @@ function parseFns(text: string): Fn[] {
   })
 }
 
-/** 목록 표의 시그니처 칸 — 첫 줄, def 떼고 90자 */
-const sigLine = (f: Fn): string =>
-  f.sig
-    .split('\n')[0]
-    .replace(/^(async )?def /, '')
-    .slice(0, 90)
+/** 목록 표의 시그니처 칸 — 첫 줄, 머리(def·fn과 그 앞 pub·async) 떼고 90자 */
+const sigLine = (f: Fn): string => f.sig.split('\n')[0].replace(SIG_HEAD, '').slice(0, 90)
 
 /** 같은 문서 참조([[#Class.method]])에 data-jump */
 function jumpify(html: string, ids: ReadonlySet<string>, selfId: string): string {
@@ -141,7 +152,7 @@ function card(f: Fn, ctx: RenderCtx, J: (h: string) => string): string {
     return v === undefined ? '' : `<h5>${k}</h5>${J(renderBlocks(v, ctx))}`
   }
   const sig = f.parts.has('시그니처')
-    ? `<h5>시그니처</h5><pre class="code" data-lang="python"><code>${esc(f.sig)}</code></pre>${f.sigRest ? J(renderBlocks(f.sigRest, ctx)) : ''}`
+    ? `<h5>시그니처</h5><pre class="code" data-lang="${esc(f.sigLang)}"><code>${esc(f.sig)}</code></pre>${f.sigRest ? J(renderBlocks(f.sigRest, ctx)) : ''}`
     : ''
   const left = LEFT.map(R).join('')
   const right = RIGHT.map(R).join('')

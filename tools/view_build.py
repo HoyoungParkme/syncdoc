@@ -1092,13 +1092,26 @@ def ms_parse_parts(text):
         else: parts[cur] += "\n" + l
     return {k: v.strip() for k, v in parts.items()}, "\n".join(lead).strip()
 
+# `fn` 꼴 — 앞에 pub·pub(crate)·const·async·unsafe·extern이 붙어도 (STD-002 V-MS, check_code RS_FN)
+MS_RS_FN = re.compile(r'^(?:pub(?:\([^)]*\))?\s+)?(?:(?:const|async|unsafe)\s+)*(?:extern\s+(?:"[^"]*"\s+)?)?fn\s')
+# 목록 칸에서 떼는 머리 — 파이썬 def·async def, Rust pub·async·fn
+MS_SIG_HEAD = re.compile(r'^(?:pub(?:\([^)]*\))?\s+)?(?:(?:const|async|unsafe)\s+)*(?:extern\s+(?:"[^"]*"\s+)?)?(?:def|fn)\s+')
+
+def ms_lang(code):
+    """태그 없는 시그니처의 언어 — fn 꼴이면 rust (ms.ts langOf)"""
+    return "rust" if MS_RS_FN.match(code) else "python"
+
 def ms_split_sig(sig):
-    """시그니처 부분 → (코드, 나머지). ```python 펜스 또는 `한 줄` (ms.ts splitSig)"""
-    f = re.search(r"```[A-Za-z0-9_]*\n([\s\S]*?)\n?```", sig)
-    if f: return f.group(1).strip(), (sig[:f.start()] + sig[f.end():]).strip()
+    """시그니처 부분 → (코드, 나머지, 언어). 펜스(언어는 태그) 또는 `한 줄` (ms.ts splitSig)"""
+    f = re.search(r"```([A-Za-z0-9_]*)\n([\s\S]*?)\n?```", sig)
+    if f:
+        code = f.group(2).strip()
+        return code, (sig[:f.start()] + sig[f.end():]).strip(), f.group(1) or ms_lang(code)
     t = re.search(r"`([^`]+)`", sig)
-    if t and sig.strip().startswith("`"): return t.group(1).strip(), (sig[:t.start()] + sig[t.end():]).strip()
-    return sig.strip(), ""
+    if t and sig.strip().startswith("`"):
+        code = t.group(1).strip()
+        return code, (sig[:t.start()] + sig[t.end():]).strip(), ms_lang(code)
+    return sig.strip(), "", ms_lang(sig.strip())
 
 def ms_parse_fns(text):
     """함수 항목 → 함수 목록 (ms.ts parseFns). 부분이 넷 이하면 간략형"""
@@ -1106,14 +1119,14 @@ def ms_parse_fns(text):
     for iid, title, _, body in item_blocks(text, ITEM_PAT["MS"]):
         dot = iid.index(".")
         parts, lead = ms_parse_parts(trim_rule(body.rstrip()))
-        sig, sig_rest = ms_split_sig(parts.get("시그니처", ""))
-        out.append({"id": iid, "mod": iid[:dot], "name": iid[dot + 1:], "title": title, "sig": sig, "sig_rest": sig_rest,
+        sig, sig_rest, sig_lang = ms_split_sig(parts.get("시그니처", ""))
+        out.append({"id": iid, "mod": iid[:dot], "name": iid[dot + 1:], "title": title, "sig": sig, "sig_lang": sig_lang, "sig_rest": sig_rest,
                     "parts": parts, "lead": lead, "brief": len(parts) <= 4})
     return out
 
 def ms_sig_line(f):
-    """목록 표의 시그니처 칸 — 첫 줄, def 떼고 90자 (ms.ts sigLine)"""
-    return re.sub(r"^(async )?def ", "", f["sig"].split("\n")[0])[:90]
+    """목록 표의 시그니처 칸 — 첫 줄, 머리(def·fn과 그 앞 pub·async) 떼고 90자 (ms.ts sigLine)"""
+    return MS_SIG_HEAD.sub("", f["sig"].split("\n")[0], count=1)[:90]
 
 def ms_jumpify(h, ids, did):
     """같은 문서 참조([[#Class.method]])에 data-jump (ms.ts jumpify)"""
@@ -1143,7 +1156,7 @@ def ms_card(f, did, J):
         return "" if v is None else f"<h5>{k}</h5>{J(render_blocks(v, did))}"
     sig = ""
     if "시그니처" in f["parts"]:
-        sig = f'<h5>시그니처</h5><pre class="code" data-lang="python"><code>{esc(f["sig"])}</code></pre>' + (J(render_blocks(f["sig_rest"], did)) if f["sig_rest"] else "")
+        sig = f'<h5>시그니처</h5><pre class="code" data-lang="{esc(f["sig_lang"])}"><code>{esc(f["sig"])}</code></pre>' + (J(render_blocks(f["sig_rest"], did)) if f["sig_rest"] else "")
     left, right = "".join(R(k) for k in MS_LEFT), "".join(R(k) for k in MS_RIGHT)
     two = f'<div class="two"><div>{left}</div><div>{right}</div></div>' if left or right else ""
     lead = f'<div class="lead">{J(render_blocks(f["lead"], did))}</div>' if f["lead"] else ""
@@ -2085,6 +2098,25 @@ def bar(x: int) -> int
 
 **처리** 돈다
 
+---
+
+#### Rs.save Rust 펜스
+
+**시그니처**
+```rust
+pub async fn save(&mut self, body: &str) -> Result<String, Problem>
+```
+
+**처리** Rust 저장 처리
+
+---
+
+#### Rs.run Rust 한 줄
+
+**시그니처** `fn run(x: u8) -> u8`
+
+**처리** Rust 한 줄 처리
+
 ## 3. 미결사항
 
 없음.
@@ -2100,16 +2132,20 @@ def _selftest_ms():
     card = {m.group(1): m.group(0) for m in re.finditer(r'<article class="ms-card[^"]*" id="item-([^"]+)".*?</article>', h, re.S)}
     lst = h[h.find('id="ms-list"'):]; lst = lst[:lst.find("</section>")]
     keep = ["머리 문장.", "목록 머리 문장.", "함수 절 머리 문장.", "앞 글 문장.", "시그니처 뒤 문장.", "바깥 근거", "입력 문장", "첫 단계", "둘째 단계",
-            "출력 문장", "예외 문장", "시험 문장", "한 줄 처리", "돈다", "없음."]
+            "출력 문장", "예외 문장", "시험 문장", "한 줄 처리", "돈다", "Rust 저장 처리", "Rust 한 줄 처리", "없음."]
     cases = [
         ("원본 문장을 버리지 않음", all(k in h for k in keep)),
-        ("카드는 전부 펼침", h.count('<article class="ms-card') == 3 and set(card) == {"Foo.bar", "Foo.baz", "Qux.run"}),
+        ("카드는 전부 펼침", h.count('<article class="ms-card') == 5 and set(card) == {"Foo.bar", "Foo.baz", "Qux.run", "Rs.save", "Rs.run"}),
         ("목록 표는 모듈별로 다시 — 원본 표 대신", '<h3 class="ms-mod">Foo</h3><table class="list">' in lst and '<h3 class="ms-mod">Qux</h3>' in lst
          and "표 칸" not in h and 'data-jump="Foo.baz">baz</a>' in lst),
         ("간략형은 부분 넷 이하", 'class="ms-card brief" id="item-Foo.baz"' in h and "간략형" in card.get("Foo.baz", "")
          and 'class="ms-card" id="item-Foo.bar"' in h and '<td>간략</td>' in lst and '<td>전체</td>' in lst),
         ("시그니처 펜스·한 줄", "<code>def bar(x: int) -&gt; int</code>" in card.get("Foo.bar", "") and "<code>async def baz() -&gt; None</code>" in h
          and "<code>baz() -&gt; None</code>" in lst),
+        ("시그니처 언어 — 펜스 태그, 없으면 fn 꼴", all('data-lang="rust"' in card.get(k, "") for k in ("Rs.save", "Rs.run"))
+         and all('data-lang="python"' in card.get(k, "") for k in ("Foo.bar", "Foo.baz"))),
+        ("목록 칸은 pub·async·fn 머리를 뗀다", "<code>save(&amp;mut self, body: &amp;str) -&gt; Result&lt;String, Problem&gt;</code>" in lst
+         and "<code>run(x: u8) -&gt; u8</code>" in lst and "<code>bar(x: int) -&gt; int</code>" in lst),
         ("두 단", '<div class="two"><div><h5>입력</h5>' in card.get("Foo.bar", "") and "<h5>테스트 관점</h5>" in card.get("Foo.bar", "")),
         ("같은 문서 점프", 'data-ref="T-MS-001#Foo.baz" data-jump="Foo.baz"' in card.get("Foo.bar", "")),
         ("미결 절", 'id="ms-pending"' in h),

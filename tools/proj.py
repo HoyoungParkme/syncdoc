@@ -56,14 +56,19 @@ def code_of(specs: str) -> str:
     return codes[0]
 
 
-def type_dir(specs: str, typ: str) -> str:
-    """`DOM` → `docs/specs/06-DOM`. 번호를 박지 않고 읽어서 찾는다 (STD-001 1.1)."""
+def type_dir(specs: str, typ: str, required: bool = True) -> str | None:
+    """`DOM` → `docs/specs/06-DOM`. 번호를 박지 않고 읽어서 찾는다 (STD-001 1.1).
+
+    없으면 멈춘다 — `required=False`면 None (그 타입 문서가 없는 저장소).
+    """
     hits = sorted(
         d
         for d in glob.glob(os.path.join(specs, "*"))
         if os.path.isdir(d) and re.fullmatch(rf"(\d\d-)?{typ}", os.path.basename(d))
     )
     if not hits:
+        if not required:
+            return None
         sys.exit(f"{typ} 디렉터리가 없다: {specs}")
     return hits[0]
 
@@ -96,13 +101,12 @@ def by_title(specs: str, typ: str, keyword: str) -> str | None:
 def all_by_title(specs: str, typ: str, keyword: str) -> list[str]:
     """제목에 그 말이 든 문서 전부 — 이름 순.
 
-    구현이 둘이면 클래스 명세도 둘이다(STD-001 2.6, 카드 BV).
+    구현이 둘이면 클래스 명세도 둘이다(STD-001 2.6, 카드 BV). 그 타입 디렉터리가 없으면 빈 목록.
     """
-    return [
-        p
-        for p in sorted(glob.glob(os.path.join(type_dir(specs, typ), "*.md")))
-        if keyword in title_of(p)
-    ]
+    d = type_dir(specs, typ, required=False)
+    if d is None:
+        return []
+    return [p for p in sorted(glob.glob(os.path.join(d, "*.md"))) if keyword in title_of(p)]
 
 
 def upstream_of(path: str) -> list[str]:
