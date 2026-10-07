@@ -2,7 +2,7 @@
 doc_id: SYNC-STD-003
 type: STD
 title: 명세 체인 지도 — 싱크독 첫 프로젝트의 실제 구조
-status: approved
+status: draft
 upstream: [SYNC-STD-001, SYNC-STD-002]
 ---
 
@@ -42,11 +42,15 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 | 10 | `SYNC-MS-007` | MINISPEC — pipeline — 쓰기 조율 | `MINISPEC_007_pipeline_싱크독.md` | 11 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
 | 10 | `SYNC-MS-008` | MINISPEC — queries — 읽기 조합 | `MINISPEC_008_queries_싱크독.md` | 14 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
 | 10 | `SYNC-MS-009` | MINISPEC — infra — git·github 어댑터 | `MINISPEC_009_infra_싱크독.md` | 18 | 4 | DOM-002, SEQ-001, API-001, API-002, STD-001 |
+| 10 | `SYNC-MS-010` | MINISPEC — ConversationService — 대화·턴·첨부 | `10-MS/SYNC-MS-010.md` | 14 | 4 | DOM-002, DOM-003, SEQ-001, API-001, STD-001 |
+| 10 | `SYNC-MS-011` | MINISPEC — codegraph — 코드 호출 그래프와 명세 대조 | `10-MS/SYNC-MS-011.md` | 16 | 4 | DOM-002, DOM-003, SEQ-001, STD-001 |
 | 11 | `SYNC-CODE-001` | 구현 계획 — 슬라이스 카드와 커밋 기록 | `CODE_구현계획_싱크독.md` | 34 | 6 | STD-004, MS-001, MS-002, MS-003, MS-006, MS-007, MS-008, MS-009, API-001, API-002, UI-002, SCN-001 |
 | — | `SYNC-STD-001` | 명세 작성 규약 | `STD_명세작성규약_싱크독.md` | 0 | 11 | PRD-001 |
 | — | `SYNC-STD-002` | 뷰 규약 — 사람용 뷰 타입별 렌더링 | `STD_뷰규약_싱크독.md` | 12 | 8 | STD-001, UI-002 |
 | — | `SYNC-STD-004` | 개발 규약 — 코드 파트 표준 | `STD_개발규약_싱크독.md` | 19 | 6 | STD-001, DOM-002, DOM-003 |
 **아직 없는 것**: 프로토타입(`SYNC-UI-004`, 선택 — `view_*.html` 25개가 대신함). 명세 파트 전부 + CODE 구현 계획까지 있다. 남은 건 코드 자체.
+
+**구현이 둘이다**(2026-10-07, [[SYNC-INFRA-001#C11]]) — 위 표의 클래스 명세 DOM-002, MINISPEC MS-001~011, 구현 계획 CODE-001은 **파이썬 판**(`backend/`, 싱크독_깃허브)의 것이다. **Rust 판**(`local/`, 싱크독_로컬)은 클래스 명세 DOM-004, MINISPEC MS-012부터, 구현 계획 CODE-002를 따로 둔다 — 검사기가 두 구현을 가르게 된 뒤(카드 BV·BW)에 생긴다. 나머지 문서는 두 판이 함께 쓴다. 파일 칸은 처음 만든 때의 이름이고 지금은 `{NN-TYPE}/{문서 ID}.md`다.
 
 **되돌아오는 문서**: `SYNC-DOM-002` 클래스 명세는 6단계에서 엔티티(v1)까지, API(8) 뒤 컨트롤(v2), SEQUENCE(9) 뒤 되먹임(v3). SEQ 승인 조건이 그 v3다. 지금 v3까지 반영됐다.
 
