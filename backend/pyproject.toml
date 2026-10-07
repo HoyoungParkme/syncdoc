@@ -19,6 +19,7 @@ dependencies = [
     "graphifyy>=0.9.72",  # 코드 호출 그래프 — tree-sitter, 모델 없음 (INFRA 3장, 카드 AX)
     "tree-sitter>=0.25.2",  # TS/JS 보강 — graphifyy가 이미 끄는 것을 직접 (MS-011 enrich 2a, 카드 BL)
     "tree-sitter-typescript>=0.23.2",
+    "tree-sitter-rust>=0.24.2",  # Rust 보강 — graphify의 Rust 추출은 함수를 주지 않는다 (MS-011 enrich 2e, 카드 BV)
 ]
 
 [dependency-groups]
