@@ -19,6 +19,10 @@ graphify를 돌린다 — 저장소에 `graphify-out/`을 남기지 않는다. �
 층(카드 BM) — 클래스 명세 「폴더 구조」 절의 층 표로 항목 없는 함수마다 층을 매긴다(서버와 같은
 codegraph.layers). 어느 층에도 안 걸리는 함수(「층 없음」)와 어느 함수에도 안 맞는 표 줄(「안 맞는
 줄」)도 0이어야 통과다(STD-004 DEV-14). `--doc`으로 좁혀도 층은 그래프 전체를 본다.
+
+구현이 둘이면(카드 BV, STD-001 2.10) — 「호출하는 것」의 이름은 MS 문서 upstream의 클래스 명세(구현)
+안에서 풀고, 층 표는 클래스 명세 전부를 읽는다. MINISPEC 항목이 있는데 그래프에 그 구현의 함수가
+하나도 없으면 실패다 — 그 언어를 못 읽어 조용히 「코드에 없음」이 된 것이다.
 """
 
 from __future__ import annotations
@@ -97,7 +101,8 @@ def main() -> int:
     if not items:
         print(f"합계: {code} · MINISPEC 없음 — 볼 것이 없다")
         return 0
-    spec = codegraph.spec_calls(items)
+    impl_of = proj.class_doc_of(args.specs)
+    spec = codegraph.spec_calls(items, impl_of)
     with tempfile.TemporaryDirectory(prefix="check-calls-") as tmp:
         src = Path(tmp)
         copy_tree(Path(args.root), src)
@@ -123,11 +128,26 @@ def main() -> int:
                 print("  명세만:", " · ".join(x.split("#", 1)[1] for x in d.spec_only))
             if args.verbose and d.same:
                 print("  같음:  ", " · ".join(x.split("#", 1)[1] for x in d.same))
-    # 층 — 클래스 명세의 층 표 (카드 BM)
-    cls_doc = proj.by_title(args.specs, "DOM", "클래스")
-    rows = codegraph.layer_table(open(cls_doc, encoding="utf-8").read()) if cls_doc else []
+    # 구현마다 — MINISPEC 항목이 있는데 그래프에 그 구현의 함수가 0개면 그 언어를 못 읽은 것
+    # (카드 BV)
+    blind: list[tuple[str, int]] = []
+    for impl in sorted(set(impl_of.values())):
+        docs = {d for d, i in impl_of.items() if i == impl}
+        n_items = sum(1 for i, _ in items if i.split("#", 1)[0] in docs)
+        n_funcs = sum(
+            1 for f in graph["functions"] if (f.get("ms") or "").split("#", 1)[0] in docs
+        )
+        if n_items and not n_funcs:
+            blind.append((impl, n_items))
+            print(f"구현 {impl}: MINISPEC 항목 {n_items}개인데 그래프에 그 함수가 하나도 없다")
+    # 층 — 클래스 명세 전부의 층 표 (카드 BM·BV)
+    cls_docs = proj.all_by_title(args.specs, "DOM", "클래스")
+    rows: list[dict] = []
+    for path in cls_docs:
+        for r in codegraph.layer_table(open(path, encoding="utf-8").read()):
+            rows.append({**r, "doc": os.path.basename(path)})
     if not rows:
-        print(f"층 표 없음 — {os.path.basename(cls_doc) if cls_doc else 'DOM 클래스 명세'}의 「폴더 구조」 절")
+        print("층 표 없음 — DOM 클래스 명세의 「폴더 구조」 절")
     layer_of, unmatched = codegraph.layers(graph, rows)
     no_layer = [
         f
@@ -137,13 +157,14 @@ def main() -> int:
     for f in sorted(no_layer, key=lambda f: f["key"]):
         print(f"층 없음  {f['key']}  {f['qual']}")
     for r in unmatched:
-        print(f"안 맞는 줄  {os.path.basename(cls_doc or '')}:{r['line']}  {' · '.join(r['patterns'])}")
+        print(f"안 맞는 줄  {r['doc']}:{r['line']}  {' · '.join(r['patterns'])}")
     print(
         f"합계: {code} · 그래프 {source} 함수 {len(graph['functions'])} 호출 선 {len(graph['calls'])}"
         f" · 항목 {len(diffs)} · 같음 {same} · 코드만 {code_only} · 명세만 {spec_only}"
         f" · 코드에 없음 {missing} · 층 없음 {len(no_layer)} · 안 맞는 줄 {len(unmatched)}"
+        f" · 못 읽은 구현 {len(blind)}"
     )
-    return 1 if code_only or spec_only or no_layer or unmatched else 0
+    return 1 if code_only or spec_only or no_layer or unmatched or blind else 0
 
 
 if __name__ == "__main__":
