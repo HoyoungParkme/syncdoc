@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-001
 type: CODE
 title: 구현 계획 — 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYNC-MS-007, SYNC-MS-008, SYNC-MS-009, SYNC-MS-010, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -1423,6 +1423,16 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 테스트 | MS 테스트 관점 · Rust 조각(TS 보강 시험과 같은 꼴) · 두 구현에 같은 이름 · `check_calls` 0/0이고 파이썬 함수 수가 그대로 · 운영: 배포 뒤 SYNC 그래프의 함수·라벨이 그대로 |
 | 선행 | — |
 | 완료 | 2026-10-07 · 브랜치 `card/BV-rust-graph`(3d447a0 #331) · spec 5 + code 3 · 테스트 471 · `ruff` · `validate` 0/0 · `check_code` 171/171 · `check_calls` 0/0(못 읽은 구현 0, 함수 1067) · `check_dom` 0 · Rust 조각: 맨 위 fn·impl 메서드(제네릭·트레이트 impl)·`///` 첫 줄 항목(속성 건너)·`#[cfg(test)]` 없음·호출 일곱 꼴, graphify로 뽑은 그래프의 Rust 함수 전부에 커뮤니티(key = fn 줄) · 두 구현의 같은 이름이 제 구현으로 풀림(나누지 않으면 깨지는 시험) · 운영: 전체 재생성 뒤 컨테이너 안에서 SYNC 그래프를 머지 커밋으로 다시 만듦 — 함수 1041 → 1067(BV가 더한 26), 오류 없음, 커뮤니티 26 → 25(라벨 대부분 그대로) · 공개 주소 200 |
+
+#### BW 검사기와 뷰가 두 구현을 가른다 — 키는 문서#항목, Rust 시그니처는 tree-sitter로
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-STD-001]] 2.10(시그니처는 그 구현의 언어로 · 못 읽는 시그니처는 위반 · 두 구현에 같은 이름) · [[SYNC-STD-004#DEV-3]] Rust 문단 · [[SYNC-STD-004#DEV-14]](검사기는 두 구현을 다 읽는다) · [[SYNC-STD-002]] V-MS · [[SYNC-INFRA-001#C11]] · 사용자 결정 2026-10-07(명세 하나 구현 둘). `check_code`는 항목을 짧은 이름으로 세서 두 구현의 같은 이름(`SpecService.save`)이 하나를 덮는다. 시그니처는 ```` ```python ```` 펜스만 읽어 Rust 시그니처는 「못 읽음」(`?`)으로 셈에 안 들고, 코드는 `.py`만 훑는다 — Rust MS가 생겨도 일치도 미완도 아닌 채 통과한다. 뷰는 시그니처를 모두 `python`이라 적는다 |
+| 구현 | `tools/check_code.py` — 키는 `문서#항목` 전체 · 같은 키가 둘(명세 안·코드 안)이거나 시그니처를 못 읽으면 실패(`?` 없앰) · 코드펜스 안의 `#` 줄은 항목이 아니다 · 시그니처 언어는 펜스 태그, 태그가 없으면 `fn` 꼴 · Rust는 `local/` 아래 `.rs`(`target/` 빼고)를 tree-sitter-rust로 — `///` 첫 줄 항목 ID(속성 건너, `#[cfg(test)]` 모듈 빼고), 머리(가시성·`async`·이름·제네릭·인자·반환·where)를 공백·끝 쉼표 없이 대조 · 명세와 코드의 언어가 다르면 실패 · 클래스 명세가 둘 이상이면 MS의 `upstream`에 클래스 명세가 꼭 하나 · 합계에 언어마다 `파이썬 171/171 · Rust 0/0` · `--selftest`(.py·.rs 조각) · Rust를 읽어야 하는데 tree-sitter가 없으면 종료 2 · `tools/check_dom.py` — 클래스 명세 전부를 읽고, 테이블을 안 가리킨 것은 문서마다 · 뷰 `tools/view_build.py`·`frontend/src/view/ms.ts` — 시그니처 언어로 `data-lang`, 목록 칸은 `pub`·`async`·`fn` 머리도 뗀다 |
+| 테스트 | `check_code --selftest`(일치·불일치·없음·명세 밖·못 읽음·같은 키 둘·언어 다름·두 구현의 같은 이름·rustfmt 여러 줄 머리·속성 뒤 `///`·테스트 모듈·펜스 안 `#`·구현 모름) · `view_build --selftest`(V-MS에 Rust 시그니처 둘 — `data-lang="rust"`, 목록 칸) · `check_view_html` · `check_code` 파이썬 171/171 · Rust 0/0 · `check_dom` 0, 클래스 명세 둘인 임시 사본에서도 · `tsc`·`oxlint`·`build` · 운영: 배포 뒤 MS 탭의 시그니처 그대로 |
+| 선행 | BV |
+| 완료 | — |
 
 ---
 
