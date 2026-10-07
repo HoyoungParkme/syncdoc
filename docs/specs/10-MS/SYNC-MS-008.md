@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-008
 type: MS
 title: MINISPEC — queries — 읽기 조합
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -518,7 +518,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 **처리**
 0. `project = ProjectService.get_owned(doc_id.split("-")[0], user)` — 남의 것이면 `! not-found` · `doc = SpecService.get_document(doc_id)` · if `item_id` → `SpecService.resolve_item(doc_id, item_id)`(없으면 `! not-found`)
 1. `row = CodeGraphService.get(project.id)` · if None → `CodeView(graph=None, …, functions=[])` (UC-H20 1a)
-2. `items` = 프로젝트의 MINISPEC 문서마다(`SpecService.list_by_project(stage=MS)`) `SpecService.get_document` → `SpecService.item_blocks(본문)` → `(문서ID#항목ID, 블록)` · `spec = codegraph.spec_calls(items)` · `diffs = codegraph.compare(row.graph, spec)`
+2. `items` = 프로젝트의 MINISPEC 문서마다(`SpecService.list_by_project(stage=MS)`) `SpecService.get_document` → `SpecService.item_blocks(본문)` → `(문서ID#항목ID, 블록)` · `impl_of` = MS 문서마다 frontmatter `upstream` 중 클래스 명세(제목에 「클래스」가 든 DOM 문서) — 구현이 둘이면 이름을 구현 안에서 푼다(카드 BV) · `spec = codegraph.spec_calls(items, impl_of)` · `diffs = codegraph.compare(row.graph, spec)`
 3. if MINISPEC 문서이고 `item_id` → 그 항목의 diff로 `CodeFunction` — `calls`: 코드만 → 명세만 → 같음 순, 줄마다 `CodeRef`(상대 항목의 함수가 있으면 qual·파일·줄) · `callers`: 다른 항목의 diff에서 이 항목이 같음·코드만에 든 것 · 함수가 없으면 `function=None, missing=True`(2b)
 3a. 3이 함수를 못 찾았고 `item_id`가 있으면 `f = `[[SYNC-MS-011#codegraph.item_function]]`(graph, 문서ID#항목ID)` — 있으면 `function = CodeFunction(항목ID, qual, file, line, end, calls, callers)`, `calls`·`callers`는 [[SYNC-MS-011#codegraph.item_neighbors]]의 함수를 `CodeRef(그 함수의 item, qual, file, line, status=None)`로 — **대조 없음**(API·UI 항목, 카드 BK). 4의 하위 체인 목록은 그대로 더한다. MINISPEC 항목이 3a로 찾아지면 `missing=False`
 4. if MINISPEC가 아닌 문서이고 `item_id` → `chain = `[[#queries.item_chain]]`(doc_id, item_id, user)` · 하위(`downstream`)이면서 MINISPEC 단계인 항목 → `functions = [CodeBrief]`(어긋남 수)
@@ -560,14 +560,14 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 0. `project = ProjectService.get_owned(code, user)`
 1. `row = CodeGraphService.get(project.id)` · if None → `CodeNodes(graph=None, communities=[], functions=[], calls=[])`
 2. `code_view` 2단계와 같이 `spec`·`diffs` — `by_key = {d.function: d for d in diffs if d.function}`
-2a. 층(카드 BM) — 프로젝트 DOM 문서 중 제목에 「클래스」가 든 첫 것(`SpecService.list_by_project(stage=DOM)` → `SpecService.get_document`)의 본문으로 `rows = `[[SYNC-MS-011#codegraph.layer_table]] · 없으면 `[]` · `layer_of, _ = `[[SYNC-MS-011#codegraph.layers]]`(row.graph, rows)`
+2a. 층(카드 BM) — 프로젝트 DOM 문서 중 제목에 「클래스」가 든 **것 전부**(`SpecService.list_by_project(stage=DOM)` → `SpecService.get_document`. 구현이 둘이면 클래스 명세도 둘 — 카드 BV)의 본문마다 표를 읽어 문서 순서대로 이어 붙인 `rows = `[[SYNC-MS-011#codegraph.layer_table]] · 없으면 `[]` · `layer_of, _ = `[[SYNC-MS-011#codegraph.layers]]`(row.graph, rows)`
 3. 함수마다 `CodeNode(key, name, qual, file, line, community=f.get("community"), item=f.get("item") or ms, ms, status, layer=layer_of.get(key))` — `d = by_key.get(key)` · 없으면 `ms`·`status` None · `status` = if `d.code_only` → `code_only` · elif `d.spec_only` → `spec_only` · else `same`. `item`은 그래프의 `item`(API·UI 항목도, 카드 BJ) — 옛 그래프(`item` 없음)는 `ms`
 4. `communities = [CodeCommunity(id, label, size) for c in row.graph.get("communities", [])]` — 옛 그래프는 빈 목록 · `calls = [[a, b] for a, b, _ in row.graph["calls"]]`
 5. `→ CodeNodes(graph=머리(row), communities, functions, calls)`
 
 **호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-011#codegraph.spec_calls]] · [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#codegraph.layer_table]] · [[SYNC-MS-011#codegraph.layers]]
 
-**테스트 관점** 항목 있는 함수에 `ms`·`status`(코드만 > 명세만 > 같음) · 도우미는 `ms` None · 항목 없는 함수에 층 표의 `layer`, 같은 파일에 항목 있으면 `도우미`, 항목 있는 함수는 `layer` None · 클래스 명세가 없는 프로젝트 → 도우미만 · API 항목 함수는 `item`만 있고 `ms`·`status` None · 커뮤니티 목록과 함수의 `community`가 그래프 그대로 · 옛 그래프(`communities`·`item` 없음) → 빈 목록, `community` None, `item`은 `ms` · 그래프 없음 → `graph` None · 남의 프로젝트 → `not-found`
+**테스트 관점** 항목 있는 함수에 `ms`·`status`(코드만 > 명세만 > 같음) · 도우미는 `ms` None · 항목 없는 함수에 층 표의 `layer`, 같은 파일에 항목 있으면 `도우미`, 항목 있는 함수는 `layer` None · 클래스 명세가 없는 프로젝트 → 도우미만 · 클래스 명세가 둘이면 두 층 표를 다 쓴다(카드 BV) · API 항목 함수는 `item`만 있고 `ms`·`status` None · 커뮤니티 목록과 함수의 `community`가 그래프 그대로 · 옛 그래프(`communities`·`item` 없음) → 빈 목록, `community` None, `item`은 `ms` · 그래프 없음 → `graph` None · 남의 프로젝트 → `not-found`
 
 ---
 

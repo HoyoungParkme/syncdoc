@@ -574,7 +574,7 @@ def _ts_target(
     return names.get(tf, {}).get(f"{orig}.{b}")
 
 
-def _enrich_ts(src_dir: Path, graph: dict) -> None:
+def _enrich_ts(src_dir: Path, graph: dict, seen_files: list[str]) -> None:
     """MS-011 enrich 2a~2d — TS/JS 맨 위 정의의 끝 줄·qual, 빠진 정의, 중첩 함수 끝 줄, 호출 선.
 
     보강은 더하기만 — graphify의 함수·선을 지우지 않는다. 깨진 파일은 건너뛴다.
@@ -582,7 +582,6 @@ def _enrich_ts(src_dir: Path, graph: dict) -> None:
     funcs: list[dict] = graph["functions"]
     by_loc = {(f["file"], f["line"]): f for f in funcs}
     # 함수가 있는 파일 + graphify가 읽은 파일 — 객체 리터럴뿐인 파일도 읽는다 (#282)
-    seen_files = [x for x in graph.pop("files", []) if x.endswith(_TS_EXTS)]
     files = sorted({f["file"] for f in funcs if f["file"].endswith(_TS_EXTS)} | set(seen_files))
     fileset = set(files)
     parsed: dict[str, tuple] = {}  # file → (root, src, defs, default)
@@ -623,6 +622,412 @@ def _enrich_ts(src_dir: Path, graph: dict) -> None:
                     graph["calls"].append([src_key, dst, "enrich"])
 
 
+# ── Rust 보강 (MS-011 enrich 2e~2h, 카드 BV) — graphify의 Rust 추출은 함수에 _callable이 없다 ──
+_RS_LANG: list[object] = []
+# 타입 이름을 벗길 감싸개 — `Arc<SpecService>`의 메서드는 SpecService의 것이다 (enrich 2g)
+_RS_WRAPPERS = frozenset({"Arc", "Box", "Rc", "Option", "RefCell", "Mutex", "RwLock", "Cow"})
+_RS_SELF = frozenset({"crate", "self", "super"})
+
+
+def _rs_parse(src: bytes):
+    import tree_sitter as ts
+    import tree_sitter_rust as tsr
+
+    if not _RS_LANG:
+        _RS_LANG.append(ts.Language(tsr.language()))
+    return ts.Parser(_RS_LANG[0]).parse(src).root_node
+
+
+def _rs_module(file: str) -> str:
+    """qual의 모듈 — 파일 이름. `mod.rs`는 폴더, `src/lib.rs`·`src/main.rs`는 crate 폴더 (2e)."""
+    p = PurePosixPath(file)
+    if p.stem == "mod" and p.parent.name:
+        return p.parent.name
+    if p.stem in ("lib", "main") and p.parent.name == "src" and p.parent.parent.name:
+        return p.parent.parent.name
+    return p.stem
+
+
+def _rs_mod_path(file: str) -> list[str]:
+    """모듈 경로 — 파일의 `src/` 아래. `a/b.rs`·`a/b/mod.rs` → [a, b] · `src/lib.rs` → [] (2g)."""
+    parts = list(PurePosixPath(file).with_suffix("").parts)
+    if "src" in parts:
+        parts = parts[len(parts) - parts[::-1].index("src") :]
+    if parts and parts[-1] == "mod":
+        parts = parts[:-1]
+    if parts in (["lib"], ["main"]):
+        parts = []
+    return parts
+
+
+def _rs_type(node, src: bytes) -> str | None:
+    """타입 노드 → 이름. `&T`·`&mut T`·`T<'a>`·`a::T`, 감싸개 `Arc<T>`·`Option<T>`는 벗긴다."""
+    while node is not None:
+        t = node.type
+        if t in ("reference_type", "pointer_type"):
+            node = node.child_by_field_name("type")
+        elif t == "generic_type":
+            name = _rs_type(node.child_by_field_name("type"), src)
+            if name not in _RS_WRAPPERS:
+                return name
+            args = node.child_by_field_name("type_arguments")
+            inner = [c for c in args.named_children if c.type != "lifetime"] if args else []
+            node = inner[0] if inner else None
+        elif t == "type_identifier":
+            return _ts_text(node, src)
+        elif t == "scoped_type_identifier":
+            nm = node.child_by_field_name("name")
+            return _ts_text(nm, src) if nm is not None else None
+        else:
+            return None
+    return None
+
+
+def _rs_path(node, src: bytes) -> list[str]:
+    """경로 `crate::a::b` → [crate, a, b]. `T::<U>::m`의 제네릭은 뗀다."""
+    if node is None:
+        return []
+    t = node.type
+    if t == "scoped_identifier":
+        name = node.child_by_field_name("name")
+        tail = [_ts_text(name, src)] if name is not None else []
+        return _rs_path(node.child_by_field_name("path"), src) + tail
+    if t in ("identifier", "type_identifier", "crate", "self", "super"):
+        return [_ts_text(node, src)]
+    if t == "generic_type":
+        return _rs_path(node.child_by_field_name("type"), src)
+    return []
+
+
+def _rs_uses(node, src: bytes, prefix: list[str]) -> list[tuple[str, list[str]]]:
+    """use 인자 → [(지역 이름, 경로)].
+
+    `a::{b, c as d}` · `a::b as e` · `a::{self}`, 그리고 `a::*`는 ("*", a).
+    """
+    if node is None:
+        return []
+    t = node.type
+    if t in ("identifier", "crate", "self", "super"):
+        seg = _ts_text(node, src)
+        if seg == "self" and prefix:
+            return [(prefix[-1], list(prefix))]
+        return [(seg, [*prefix, seg])]
+    if t == "scoped_identifier":
+        full = [*prefix, *_rs_path(node, src)]
+        return [(full[-1], full)] if full else []
+    if t == "use_as_clause":
+        alias = node.child_by_field_name("alias")
+        full = [*prefix, *_rs_path(node.child_by_field_name("path"), src)]
+        return [(_ts_text(alias, src), full)] if alias is not None and full else []
+    if t == "scoped_use_list":
+        base = [*prefix, *_rs_path(node.child_by_field_name("path"), src)]
+        return _rs_uses(node.child_by_field_name("list"), src, base)
+    if t == "use_list":
+        return [u for c in node.named_children for u in _rs_uses(c, src, prefix)]
+    if t == "use_wildcard":
+        inner = node.named_children[0] if node.named_children else None
+        return [("*", [*prefix, *_rs_path(inner, src)])]
+    return []
+
+
+def _rs_abs(segs: list[str], here: list[str]) -> list[str]:
+    """`crate::a` · `self::a` · `super::a` → `src/` 기준 모듈 경로."""
+    if not segs:
+        return segs
+    if segs[0] == "crate":
+        return segs[1:]
+    if segs[0] == "self":
+        return [*here, *segs[1:]]
+    n = 0
+    while n < len(segs) and segs[n] == "super":
+        n += 1
+    return [*here[: max(len(here) - n, 0)], *segs[n:]] if n else segs
+
+
+def _rs_doc(node, src: bytes) -> str | None:
+    """정의 바로 앞 `///` 묶음의 첫 줄 — 사이의 속성 `#[…]`은 건너뛴다 (2f)."""
+    first = None
+    p = node.prev_sibling
+    while p is not None and p.type in ("line_comment", "attribute_item"):
+        if p.type == "line_comment":
+            text = _ts_text(p, src)
+            if not text.startswith("///") or text.startswith("////"):
+                break  # 보통 주석에서 묶음이 끝난다
+            first = text[3:].strip()
+        p = p.prev_sibling
+    return first
+
+
+class _RsFile:
+    """Rust 파일 하나 — 맨 위 정의·구조체 필드·use (2e·2g).
+
+    인라인 `mod { }`(테스트 포함)는 안 본다.
+    """
+
+    def __init__(self, file: str, root, src: bytes) -> None:
+        self.file, self.root, self.src = file, root, src
+        self.here = _rs_mod_path(file)
+        # (타입 | None, 이름, fn 줄, 끝 줄, 정의 노드)
+        self.defs: list[tuple[str | None, str, int, int, object]] = []
+        self.fields: dict[str, dict[str, str]] = {}  # 구조체 → 필드 → 타입
+        self.uses: list[tuple[str, list[str]]] = []
+        for c in root.named_children:
+            if c.type == "function_item":
+                self._add(None, c)
+            elif c.type == "impl_item":
+                owner = _rs_type(c.child_by_field_name("type"), src)
+                body = c.child_by_field_name("body")
+                if owner and body is not None:
+                    for m in body.named_children:
+                        if m.type == "function_item":
+                            self._add(owner, m)
+            elif c.type == "struct_item":
+                name, body = c.child_by_field_name("name"), c.child_by_field_name("body")
+                if name is not None and body is not None and body.type == "field_declaration_list":
+                    out = self.fields.setdefault(_ts_text(name, src), {})
+                    for fd in body.named_children:
+                        if fd.type == "field_declaration":
+                            fname = fd.child_by_field_name("name")
+                            ftype = _rs_type(fd.child_by_field_name("type"), src)
+                            if fname is not None and ftype:
+                                out[_ts_text(fname, src)] = ftype
+            elif c.type == "use_declaration":
+                self.uses.extend(_rs_uses(c.child_by_field_name("argument"), src, []))
+
+    def _add(self, owner: str | None, fn) -> None:
+        name = fn.child_by_field_name("name")
+        if name is not None:
+            self.defs.append(
+                (owner, _ts_text(name, self.src), fn.start_point[0] + 1, fn.end_point[0] + 1, fn)
+            )
+
+
+class _RsCtx:
+    """Rust 이름표 (2g).
+
+    모듈 경로 꼬리 → 파일 · 파일 → 맨 위 fn · 타입 → 메서드 · 구조체 → 필드 타입.
+    """
+
+    def __init__(self, parsed: list[_RsFile]) -> None:
+        self.modules: dict[str, str] = {}
+        dup: set[str] = set()
+        for rf in parsed:
+            for i in range(len(rf.here)):
+                key = "::".join(rf.here[i:])
+                if key in self.modules and self.modules[key] != rf.file:
+                    dup.add(key)
+                self.modules[key] = rf.file
+        for d in dup:  # 두 파일에 겹치는 꼬리는 모호하다
+            self.modules.pop(d, None)
+        self.funcs: dict[str, dict[str, str]] = defaultdict(dict)  # 파일 → fn → key
+        self.methods: dict[str, dict[str, str]] = defaultdict(dict)  # 타입 → 메서드 → key
+        self.fields: dict[str, dict[str, str]] = {}
+        self.paths = {rf.file: rf.here for rf in parsed}
+        for rf in parsed:
+            self.fields.update(rf.fields)
+            for owner, name, line, _end, _node in rf.defs:
+                key = f"{rf.file}:{line}"
+                if owner:
+                    self.methods[owner][name] = key
+                else:
+                    self.funcs[rf.file][name] = key
+
+    def module(self, segs: list[str]) -> str | None:
+        """모듈 경로 → 파일. 앞에서부터 떼어 가며 가장 긴 꼬리로 찾는다(crate 이름도 떨어진다)."""
+        segs = [s for s in segs if s not in _RS_SELF]
+        for i in range(len(segs)):
+            f = self.modules.get("::".join(segs[i:]))
+            if f:
+                return f
+        return None
+
+    def types(self) -> set[str]:
+        return set(self.methods) | set(self.fields)
+
+
+def _rs_aliases(rf: _RsFile, ctx: _RsCtx) -> tuple[dict[str, tuple[str, str]], list[str]]:
+    """파일 맨 위 use → (지역 이름 → 뜻, `*` 모듈들).
+
+    뜻은 ("mod", 파일) · ("fn", key) · ("type", 타입).
+    """
+    out: dict[str, tuple[str, str]] = {}
+    globs: list[str] = []
+    types = ctx.types()
+    for alias, segs in rf.uses:
+        full = _rs_abs(segs, rf.here)
+        if alias == "*":
+            f = ctx.module(full)
+            if f:
+                globs.append(f)
+            continue
+        f = ctx.module(full) if full else None
+        if f:
+            out[alias] = ("mod", f)
+        elif len(full) >= 2 and (m := ctx.module(full[:-1])) and full[-1] in ctx.funcs.get(m, {}):
+            out[alias] = ("fn", ctx.funcs[m][full[-1]])
+        elif full and full[-1] in types:
+            out[alias] = ("type", full[-1])
+    return out, globs
+
+
+def _rs_walk(node):
+    stack = [node]
+    while stack:
+        n = stack.pop()
+        yield n
+        stack.extend(n.children)
+
+
+def _rs_resolve(
+    owner: str | None, fn, rf: _RsFile, ctx: _RsCtx, aliases: dict, globs: list[str]
+) -> set[str]:
+    """몸통의 호출과 넘기는 경로 → 그래프 안 함수의 key (2h)."""
+    src, types = rf.src, ctx.types()
+    env: dict[str, str] = {}
+
+    def type_of_alias(name: str) -> str:
+        a = aliases.get(name)
+        return a[1] if a and a[0] == "type" else name
+
+    params = fn.child_by_field_name("parameters")
+    for p in params.named_children if params is not None else []:
+        if p.type == "parameter":
+            pat, ty = p.child_by_field_name("pattern"), _rs_type(p.child_by_field_name("type"), src)
+            if pat is not None and pat.type == "identifier" and ty and type_of_alias(ty) in types:
+                env[_ts_text(pat, src)] = type_of_alias(ty)
+
+    def value_type(v) -> str | None:
+        while v is not None and v.type in ("try_expression", "await_expression"):
+            v = v.named_children[0] if v.named_children else None
+        if v is None:
+            return None
+        if v.type == "call_expression":
+            f = v.child_by_field_name("function")
+            segs = _rs_path(f, src) if f is not None and f.type == "scoped_identifier" else []
+            if len(segs) >= 2 and type_of_alias(segs[-2]) in types:
+                return type_of_alias(segs[-2])  # `T::new(…)` — 만든 것의 타입
+        elif v.type == "struct_expression":
+            name = v.child_by_field_name("name")
+            t = _rs_path(name, src)[-1:] if name is not None else []
+            if t and type_of_alias(t[0]) in types:
+                return type_of_alias(t[0])
+        return None
+
+    nodes = list(_rs_walk(fn))
+    for n in nodes:  # 대입을 먼저 다 모은다 — 걷는 순서와 상관없이
+        if n.type == "let_declaration":
+            pat = n.child_by_field_name("pattern")
+            if pat is None or pat.type != "identifier":
+                continue
+            ty = _rs_type(n.child_by_field_name("type"), src)
+            t = type_of_alias(ty) if ty else value_type(n.child_by_field_name("value"))
+            if t in types:
+                env[_ts_text(pat, src)] = t
+
+    def recv_type(v) -> str | None:
+        if v is None:
+            return None
+        if v.type == "self":
+            return owner
+        if v.type == "identifier":
+            return env.get(_ts_text(v, src))
+        if v.type == "field_expression":
+            base, fld = recv_type(v.child_by_field_name("value")), v.child_by_field_name("field")
+            if fld is None:
+                return None
+            return ctx.fields.get(base or "", {}).get(_ts_text(fld, src))
+        return value_type(v)
+
+    out: set[str] = set()
+    for n in nodes:
+        if n.type == "scoped_identifier":  # `T::m` · `Self::m` · `모듈::f` — 부르든 넘기든
+            segs = _rs_path(n, src)
+            if len(segs) < 2:
+                continue
+            head, name = segs[-2], segs[-1]
+            t = owner if head == "Self" else type_of_alias(head)
+            if t in ctx.methods and name in ctx.methods[t]:
+                out.add(ctx.methods[t][name])
+                continue
+            mods = segs[:-1]
+            a = aliases.get(mods[0])
+            if a and a[0] == "mod":
+                f = ctx.module([*ctx.paths.get(a[1], []), *mods[1:]]) if len(mods) > 1 else a[1]
+            else:
+                f = ctx.module(_rs_abs(mods, rf.here))
+            if f and name in ctx.funcs.get(f, {}):
+                out.add(ctx.funcs[f][name])
+        elif n.type == "call_expression":
+            f = n.child_by_field_name("function")
+            if f is not None and f.type == "generic_function":
+                f = f.child_by_field_name("function")
+            if f is None:
+                continue
+            if f.type == "identifier":  # `f(…)` — 같은 파일 · use한 함수 · `*` 모듈
+                name = _ts_text(f, src)
+                a = aliases.get(name)
+                if name in ctx.funcs.get(rf.file, {}):
+                    out.add(ctx.funcs[rf.file][name])
+                elif a and a[0] == "fn":
+                    out.add(a[1])
+                else:
+                    hits = [ctx.funcs[g][name] for g in globs if name in ctx.funcs.get(g, {})]
+                    if hits:
+                        out.add(hits[0])
+            elif f.type == "field_expression":  # `x.m(…)` — 타입을 아는 x
+                t = recv_type(f.child_by_field_name("value"))
+                m = f.child_by_field_name("field")
+                if t and m is not None and _ts_text(m, src) in ctx.methods.get(t, {}):
+                    out.add(ctx.methods[t][_ts_text(m, src)])
+    return out
+
+
+def _enrich_rs(src_dir: Path, graph: dict, seen_files: list[str]) -> None:
+    """MS-011 enrich 2e~2h — Rust 맨 위 fn·impl 메서드, `///` 첫 줄 항목, 호출 선.
+
+    graphify의 Rust 추출은 함수에 `_callable`을 달지 않아 reduce가 다 버린다 — 정의부터 여기서
+    채운다.
+    key는 `파일:fn 줄`로 graphify Rust 노드와 같아 커뮤니티가 붙는다. 깨진 파일은 건너뛴다.
+    """
+    funcs: list[dict] = graph["functions"]
+    by_loc = {(f["file"], f["line"]): f for f in funcs}
+    files = sorted({f["file"] for f in funcs if f["file"].endswith(".rs")} | set(seen_files))
+    parsed: list[_RsFile] = []
+    for file in files:
+        if _is_test(file):
+            continue
+        try:
+            src = (src_dir / file).read_bytes()
+            parsed.append(_RsFile(file, _rs_parse(src), src))
+        except (OSError, ValueError):
+            continue
+    ctx = _RsCtx(parsed)
+    for rf in parsed:
+        for owner, name, line, end, node in rf.defs:
+            f = by_loc.get((rf.file, line))
+            if f is None:
+                f = {"key": f"{rf.file}:{line}", "name": name, "qual": "", "file": rf.file,
+                     "line": line, "end": None, "item": None, "ms": None}  # fmt: skip
+                funcs.append(f)
+                by_loc[(rf.file, line)] = f
+            f["end"] = end
+            f["qual"] = f"{owner}.{name}" if owner else f"{_rs_module(rf.file)}.{name}"
+            doc = _rs_doc(node, rf.src)
+            if doc:
+                it, m = _item_of(doc)
+                if it:
+                    f["item"], f["ms"] = it, m
+    have = {(c[0], c[1]) for c in graph["calls"]}
+    for rf in parsed:
+        aliases, globs = _rs_aliases(rf, ctx)
+        for owner, _name, line, _end, node in rf.defs:
+            key = f"{rf.file}:{line}"
+            for dst in sorted(_rs_resolve(owner, node, rf, ctx, aliases, globs)):
+                if dst != key and (key, dst) not in have:
+                    have.add((key, dst))
+                    graph["calls"].append([key, dst, "enrich"])
+
+
 _HEAD_COMMENT = re.compile(r"^\s*(/\*[\s\S]*?\*/|(?://[^\n]*\n?)+)")
 
 
@@ -655,8 +1060,10 @@ def enrich(src_dir: Path, graph: dict) -> dict:
     파이썬 파일을 AST로 다시 읽어 끝 줄·이름·항목 ID를 바로잡고, graphify가 놓친 호출을 더한다 —
     변수에 담은 객체의 메서드, 가져온 모듈·함수, 인자로 넘기는 메서드. TS/JS는 tree-sitter로 끝 줄·
     빠진 맨 위 함수·호출을 채운다(카드 BL). 화면 코드는 파일 첫 주석의 화면 ID를 item으로 잇는다
-    (카드 BJ). 다른 언어는 손대지 않는다.
+    (카드 BJ). Rust는 graphify가 함수를 주지 않아 tree-sitter로 정의·항목 ID·호출을 다 채운다
+    (카드 BV). 다른 언어는 손대지 않는다.
     """
+    seen = graph.pop("files", [])  # graphify가 읽은 코드 파일 — 언어마다 나눠 쓰고 저장 모양엔 없다
     funcs: list[dict] = graph["functions"]
     by_loc = {(f["file"], f["line"]): f for f in funcs}
     ctx = _Ctx()
@@ -693,8 +1100,9 @@ def enrich(src_dir: Path, graph: dict) -> dict:
             else:
                 ctx.module_funcs[file][fn.name] = f["key"]
             found.append((file, f, cls, fn))
-    _enrich_ts(src_dir, graph)  # 2a~2d — 화면 ID(3) 앞에: 더한 TS 함수도 화면 ID를 받는다
+    _enrich_ts(src_dir, graph, [x for x in seen if x.endswith(_TS_EXTS)])  # 2a~2d — 화면 ID(3) 앞에
     _screen_items(src_dir, funcs)
+    _enrich_rs(src_dir, graph, [x for x in seen if x.endswith(".rs")])  # 2e~2h
     file_imports = {file: _imports(tree.body, file, ctx) for file, tree in trees.items()}
     have = {(c[0], c[1]) for c in graph["calls"]}
     for file, f, cls, fn in found:
@@ -852,15 +1260,27 @@ def communities(raw: dict, graph: dict) -> dict:
     return graph
 
 
-def spec_calls(items: list[tuple[str, str]]) -> dict[str, set[str]]:
+def spec_calls(
+    items: list[tuple[str, str]], impl_of: dict[str, str] | None = None
+) -> dict[str, set[str]]:
     """SYNC-MS-011#codegraph.spec_calls
 
-    항목마다 「호출하는 것」 줄의 `[[…]]`와 백틱 이름 중 MINISPEC 항목인 것만.
+    항목마다 「호출하는 것」 줄의 `[[…]]`와 백틱 이름 중 MINISPEC 항목인 것만. 백틱 이름은 그 항목의
+    구현(MS 문서 upstream의 클래스 명세 — impl_of) 안에서 푼다. 두 구현에 같은 이름이 있어도 서로
+    가리지 않는다(카드 BV). impl_of가 없으면 구현 하나다.
     """
     ids = {i for i, _ in items}
-    names = _short_names(ids)
+
+    def impl(i: str) -> str | None:
+        return impl_of.get(i.split("#", 1)[0]) if impl_of else None
+
+    groups: dict[str | None, set[str]] = defaultdict(set)
+    for i in ids:
+        groups[impl(i)].add(i)
+    names_of = {g: _short_names(members) for g, members in groups.items()}
     out: dict[str, set[str]] = {}
     for ms_id, body in items:
+        names = names_of[impl(ms_id)]
         doc = ms_id.split("#", 1)[0]
         found: set[str] = set()
         line = next((ln for ln in body.splitlines() if ln.startswith(_CALLS_LINE)), None)

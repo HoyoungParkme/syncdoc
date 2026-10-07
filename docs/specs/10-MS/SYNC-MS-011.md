@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-011
 type: MS
 title: MINISPEC — codegraph — 코드 호출 그래프와 명세 대조
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 ---
 
@@ -107,27 +107,31 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 ---
 
-#### codegraph.enrich 파이썬·TS/JS 코드로 그래프를 보강한다
+#### codegraph.enrich 파이썬·TS/JS·Rust 코드로 그래프를 보강한다
 
 **시그니처** `def enrich(src_dir: Path, graph: dict) -> dict`
 
-근거: 사용자 결정 2026-09-30 — graphify는 변수의 타입을 추론하지 않아 `spec = SpecService(s); spec.get_document()`를 못 잡는다(실측: 명세만 58건 중 대부분). 싱크독이 보강해 푼다 · 사용자 결정 2026-10-02(카드 BL) — graphify는 TS/JS 함수의 끝 줄을 하나도 안 준다(실측: 싱크독 프런트 201개 전부 null — `CodeGraph` 컴포넌트가 코드 보기에서 L58–L117로 잘렸다)와 객체 리터럴의 화살표 메서드(`api.get`)를 놓친다. 끝 줄 + 빠진 맨 위 함수 + 호출을 채운다. 중첩 함수는 맨 위만(파이썬과 같이) — graphify가 이미 넣은 중첩 함수는 지우지 않고 끝 줄만
+근거: 사용자 결정 2026-09-30 — graphify는 변수의 타입을 추론하지 않아 `spec = SpecService(s); spec.get_document()`를 못 잡는다(실측: 명세만 58건 중 대부분). 싱크독이 보강해 푼다 · 사용자 결정 2026-10-02(카드 BL) — graphify는 TS/JS 함수의 끝 줄을 하나도 안 준다(실측: 싱크독 프런트 201개 전부 null — `CodeGraph` 컴포넌트가 코드 보기에서 L58–L117로 잘렸다)와 객체 리터럴의 화살표 메서드(`api.get`)를 놓친다. 끝 줄 + 빠진 맨 위 함수 + 호출을 채운다. 중첩 함수는 맨 위만(파이썬과 같이) — graphify가 이미 넣은 중첩 함수는 지우지 않고 끝 줄만 · 사용자 결정 2026-10-07(카드 BV) — Rust 판(`local/`)이 같은 저장소에 산다([[SYNC-INFRA-001#C11]]). graphify의 Rust 추출은 함수에 `_callable`을 달지 않아 `reduce`가 Rust 함수를 다 버린다 — Rust는 보강이 정의·끝 줄·항목 ID·호출을 다 맡는다
 
 **입력** `graph` — `reduce`의 결과. `src_dir` — 같은 커밋의 파일
 
-**처리** — `graph.functions` 중 `.py` 파일(1·2·4·5)과 `.ts/.tsx/.js/.jsx/.mjs` 파일(2a~2d·3)만. TS/JS는 `graph.functions`의 파일에 더해 `reduce`가 준 `files`의 TS/JS도 읽는다 — graphify가 객체 리터럴 안 화살표만 든 파일(`export const api = { get: () => … }`)을 함수 0개로 놓쳐도 그 파일을 다시 읽는다(#282, 2026-10-02 사용자 결정 「graphify가 읽은 파일 전부」). `files`는 다 쓴 뒤 그래프에서 지운다. 다른 언어(Go 등)는 손대지 않는다. 보강은 **더하기만** 한다 — graphify가 준 함수·선을 지우지 않는다
+**처리** — `graph.functions` 중 `.py` 파일(1·2·4·5)과 `.ts/.tsx/.js/.jsx/.mjs` 파일(2a~2d·3), 그리고 `.rs` 파일(2e~2h)만. TS/JS와 Rust는 `graph.functions`의 파일에 더해 `reduce`가 준 `files`의 그 언어 파일도 읽는다 — graphify가 객체 리터럴 안 화살표만 든 파일(`export const api = { get: () => … }`)을 함수 0개로 놓쳐도 그 파일을 다시 읽는다(#282, 2026-10-02 사용자 결정 「graphify가 읽은 파일 전부」). `files`는 다 쓴 뒤 그래프에서 지운다. 다른 언어(Go 등)는 손대지 않는다. 보강은 **더하기만** 한다 — graphify가 준 함수·선을 지우지 않는다
 1. 파일마다 `ast.parse`. 함수 정의를 `(파일, def 줄)`과 `(파일, 첫 데코레이터 줄)` 둘로 찾아 그래프의 함수에 맞춘다(graphify가 어느 줄을 머리로 삼든 맞는다). 못 맞춘 정의는 새 함수로 더한다
 2. 맞춘 함수마다 `end` = `end_lineno` · `qual` = AST로 본 `Class.fn`/`모듈.fn`(2단계 규칙과 같다) · docstring 첫 줄이 항목 ID(`reduce` 3의 정규식)면 `item`을 그것으로, `-MS-` 문서면 `ms`도(AST가 진실)
 2a. TS/JS — 파일마다 tree-sitter(`tree-sitter-typescript` — graphify가 이미 쓰는 문법. `.tsx`·`.jsx`는 TSX, 나머지는 TypeScript 문법)로 읽는다. **맨 위 정의**: `[export [default]] function f` · `const f = (…) => …` / `function` · `class C { m() }` → `C.m` · `const o = { m() {}, k: () => … }` → `o.m`·`o.k`. 머리 줄은 선언문의 첫 줄과 함수 노드의 첫 줄 둘로 그래프의 함수에 맞추고, 못 맞춘 정의는 새 함수로 더한다(`item`·`ms` null)
 2b. 맞춘·더한 맨 위 함수마다 `end` = 선언문 끝 줄 · `qual` = `C.m`/`o.m` 또는 `모듈.f`(2단계의 모듈 규칙)
 2c. 그래프에 있는데 `end`가 없는 TS/JS 함수(graphify가 넣은 중첩 함수 — 컴포넌트 안 핸들러)는 파일의 함수 노드(function·arrow·method) 중 같은 줄에서 시작하는 것의 끝 줄로 채운다
 2d. 맨 위 정의의 몸통에서 호출 `f(…)` · `o.m(…)` · JSX `<Comp …>` → 같은 파일의 맨 위 이름, 또는 **상대 import**(`./x`·`../api/client` — 확장자 `.ts .tsx .js .jsx .mjs`나 폴더의 `index.*`로 파일을 찾는다. 별칭 `a as b`·default import도)한 파일의 맨 위 이름이 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다. 패키지 import(`react`)·경로 별칭은 풀지 않는다
+2e. Rust — 파일마다 tree-sitter(`tree-sitter-rust`)로 읽는다. **맨 위 정의**: 파일 맨 위 `fn f` → `모듈.f` · `impl T { fn m }`·`impl Tr for T { fn m }` → `T.m`(타입의 제네릭은 뗀다). `#[cfg(test)]` 모듈과 그 밖의 인라인 `mod { … }` 안은 읽지 않는다 — 테스트는 구현이 아니다(`reduce` 2의 테스트 파일과 같은 뜻). key는 `파일:fn 줄`(속성 줄이 아니라 `fn`이 든 줄 — graphify Rust 노드의 줄과 같아 커뮤니티가 붙는다) · `end` = 정의 끝 줄 · 모듈 = 파일 이름, `mod.rs`는 폴더 이름, `src/lib.rs`·`src/main.rs`는 crate 폴더 이름
+2f. 정의 바로 앞의 문서 주석(`///` — 사이의 속성 `#[…]`은 건너뛴다) 첫 줄이 항목 ID(`reduce` 3의 정규식)면 `item`, `-MS-` 문서면 `ms`도
+2g. 이름표 — 모듈 경로(파일의 `src/` 아래 경로. `crate::infra::git`은 `infra::git`·`git` 꼬리로 찾고, 두 파일에 겹치는 꼬리는 뺀다) → 파일 · 파일의 맨 위 `fn` · 타입의 메서드 · 구조체 필드의 타입(`&`·`Arc`·`Box`·`Rc`·`Option`을 벗긴 이름) · 파일 맨 위 `use`(별칭 `as`·묶음 `{a, b as c}`·`crate`·`self`·`super`)
+2h. 맨 위 정의의 몸통에서 `f(…)`(같은 파일이나 `use`한 함수) · `T::m`·`Self::m`·`모듈::f`(경로 — 부르든 값으로 넘기든) · `x.m(…)`(타입을 아는 `x` — 인자 `x: T`·`&T`·`&mut T`, `let x: T`, `let x = T::…(…)`·`T { … }`(`?`·`.await`를 벗겨), `self`, `self.필드`) → 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다. 트레이트 객체·제네릭 인자·매크로 안 호출은 풀지 않는다([[SYNC-STD-004#DEV-16]] Rust)
 3. 화면 코드 — 파일마다 **첫 주석**(맨 위 `/** … */` 또는 `//` 묶음)에서 `[A-Z][A-Z0-9]*-UI-\d{3}#UI-\d+`를 찾아, 그 파일 함수 중 `item`이 없는 것 전부에 준다(`ms`는 건드리지 않는다). 화면 하나 = 파일 하나(DEV-17)라 파일 단위로 잇는다. 첫 주석에 화면 ID가 없는 파일(공용 부품·뷰 렌더러)은 그대로 null. 2026-10-02 사용자 결정, 카드 BJ
 4. 함수 몸통에서 **타입을 아는 변수**를 모은다 — 인자 주석 `x: Cls` · `x = Cls(…)` · `a, b = A(…), B(…)`. `Cls`는 이 그래프 안에 정의된 클래스 이름일 때만. 그리고 **타입을 아는 속성** — 클래스 `__init__`의 `self.x = Cls(…)`(또는 `self.x: Cls = …`)는 그 클래스 메서드 전부에서 `self.x`의 타입이다(카드 BM — 서비스가 리포지토리를 `self.repo`로 들고 부르는 134곳이 그래프에 없어 리포지토리 93개 중 89개가 외톨이였다)
 5. 호출 `x.m(…)`(4의 변수) · `Cls(…).m(…)` · `self.m(…)`(메서드 안) · `self.x.m(…)`(4의 속성) → `Cls.m`이 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다
 6. `→ graph` (같은 객체에 더해 돌려준다)
 
-**테스트 관점** 다섯 꼴이 각각 선을 만든다 — 주석·대입·튜플 대입·즉석 생성·`self` · `__init__`의 `self.repo = Repo(…)` 뒤 다른 메서드의 `self.repo.get(…)` → `Repo.get` · 모르는 클래스는 안 만든다 · graphify가 이미 잡은 선은 겹치지 않는다 · 데코레이터 달린 함수도 맞춘다 · MINISPEC docstring ID가 `item`·`ms`로, API docstring ID는 `item`만 · `.tsx` 첫 주석의 화면 ID가 그 파일 함수 전부의 `item`으로(`ms`는 null), 화면 ID 없는 파일은 null · TS/JS — 맨 위 함수의 끝 줄·qual(function·const 화살표·class 메서드·객체 리터럴 메서드와 화살표) · graphify가 놓친 맨 위 정의를 더하고 화면 ID도 받는다 · 중첩 함수는 끝 줄만, 지우지 않는다 · graphify가 함수 0개로 본 TS 파일도 `files`로 읽어 `api.get`과 그 선을 더하고, 결과에 `files`가 남지 않는다(#282) · 같은 파일·상대 import(별칭·default·`index`)·JSX·`o.m` 호출이 `enrich` 선으로 · 패키지 import는 안 잇는다 · 깨진 파일은 건너뛴다
+**테스트 관점** 다섯 꼴이 각각 선을 만든다 — 주석·대입·튜플 대입·즉석 생성·`self` · `__init__`의 `self.repo = Repo(…)` 뒤 다른 메서드의 `self.repo.get(…)` → `Repo.get` · 모르는 클래스는 안 만든다 · graphify가 이미 잡은 선은 겹치지 않는다 · 데코레이터 달린 함수도 맞춘다 · MINISPEC docstring ID가 `item`·`ms`로, API docstring ID는 `item`만 · `.tsx` 첫 주석의 화면 ID가 그 파일 함수 전부의 `item`으로(`ms`는 null), 화면 ID 없는 파일은 null · TS/JS — 맨 위 함수의 끝 줄·qual(function·const 화살표·class 메서드·객체 리터럴 메서드와 화살표) · graphify가 놓친 맨 위 정의를 더하고 화면 ID도 받는다 · 중첩 함수는 끝 줄만, 지우지 않는다 · graphify가 함수 0개로 본 TS 파일도 `files`로 읽어 `api.get`과 그 선을 더하고, 결과에 `files`가 남지 않는다(#282) · 같은 파일·상대 import(별칭·default·`index`)·JSX·`o.m` 호출이 `enrich` 선으로 · 패키지 import는 안 잇는다 · 깨진 파일은 건너뛴다 · **Rust** — 맨 위 `fn`과 `impl` 메서드(제네릭 타입·트레이트 impl)의 qual·끝 줄, `///` 첫 줄의 항목(속성을 건너), key가 graphify Rust 노드의 줄과 같다 · `#[cfg(test)]` 모듈 안 함수는 없다 · `Self::m`·`self.m`·`self.필드.m`·`T::m`·`모듈::f`·`use` 별칭·`let x = T::new()` 뒤 `x.m` 호출이 `enrich` 선으로 · 모르는 타입은 잇지 않는다 · 결과에 `files`가 남지 않는다
 
 ---
 
@@ -158,19 +162,19 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 #### codegraph.spec_calls 명세의 「호출하는 것」
 
-**시그니처** `def spec_calls(items: list[tuple[str, str]]) -> dict[str, set[str]]`
+**시그니처** `def spec_calls(items: list[tuple[str, str]], impl_of: dict[str, str] | None = None) -> dict[str, set[str]]`
 
-근거: 사용자 결정 2026-09-30 — 명세의 호출은 「호출하는 것」 줄만 읽는다(처리 단계 글은 부르는 쪽까지 섞여 기준이 못 된다) · [[SYNC-STD-001]] 2.10
+근거: 사용자 결정 2026-09-30 — 명세의 호출은 「호출하는 것」 줄만 읽는다(처리 단계 글은 부르는 쪽까지 섞여 기준이 못 된다) · [[SYNC-STD-001]] 2.10 — 구현이 둘이면 이름은 같은 구현 안에서 푼다(카드 BV)
 
-**입력** `items` — MINISPEC 항목마다 `(항목 ID, 블록 본문)`. 프로젝트의 MS 문서 전부
+**입력** `items` — MINISPEC 항목마다 `(항목 ID, 블록 본문)`. 프로젝트의 MS 문서 전부 · `impl_of` — MS 문서 ID → 그 문서 `upstream`의 클래스 명세(어느 구현의 것인가). 없으면 구현 하나로 본다
 
 **처리**
-1. 이름표 = 항목 ID마다 `#` 뒤(`pipeline.save_pipeline`) → 항목 ID. 이름이 겹치면 그 이름은 이름표에서 뺀다(모호하다)
+1. 이름표 = **구현마다** 항목 ID의 `#` 뒤(`pipeline.save_pipeline`) → 항목 ID. 같은 구현 안에서 이름이 겹치면 그 이름은 뺀다(모호하다). 다른 구현의 같은 이름은 서로를 가리지 않는다
 2. 항목마다 본문에서 `**호출하는 것**`으로 시작하는 줄을 찾는다. 없으면 빈 집합
-3. 그 줄의 `[[문서#항목]]`(같은 문서 줄임 `[[#항목]]`은 그 항목의 문서로 푼다)과 백틱 이름(`` `git.fetch` ``, 괄호 앞까지)을 이름표·항목 ID 집합에 비춰 **MINISPEC 항목인 것만** 남긴다. 자기 자신은 뺀다
+3. 그 줄의 `[[문서#항목]]`(같은 문서 줄임 `[[#항목]]`은 그 항목의 문서로 푼다)과 백틱 이름(`` `git.fetch` ``, 괄호 앞까지)을 이름표·항목 ID 집합에 비춰 **MINISPEC 항목인 것만** 남긴다. 백틱 이름은 **그 항목의 구현** 이름표로 푼다. `[[문서#항목]]`이 다른 구현의 항목이면 코드가 부를 수 없으니 `compare`에서 「명세만」으로 남는다 — 검사기가 잡는다. 자기 자신은 뺀다
 4. `→ {항목 ID: 집합}` — 모든 항목이 키로 있다
 
-**테스트 관점** `[[#x]]`가 같은 문서로 풀린다 · 백틱 이름이 항목이면 들어가고 아니면(`exists` 같은 말) 빠진다 · 줄이 없는 항목은 빈 집합 · 겹치는 짧은 이름은 안 쓴다
+**테스트 관점** `[[#x]]`가 같은 문서로 풀린다 · 백틱 이름이 항목이면 들어가고 아니면(`exists` 같은 말) 빠진다 · 줄이 없는 항목은 빈 집합 · 겹치는 짧은 이름은 안 쓴다 · **두 구현에 같은 이름(`SpecService.save`)이 있어도 각 구현의 백틱 이름이 제 구현의 항목으로 풀린다** · `impl_of` 없이 부르면 구현 하나로 본다(지금과 같다)
 
 ---
 

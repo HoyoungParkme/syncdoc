@@ -93,6 +93,43 @@ def by_title(specs: str, typ: str, keyword: str) -> str | None:
     return None
 
 
+def all_by_title(specs: str, typ: str, keyword: str) -> list[str]:
+    """제목에 그 말이 든 문서 전부 — 이름 순.
+
+    구현이 둘이면 클래스 명세도 둘이다(STD-001 2.6, 카드 BV).
+    """
+    return [
+        p
+        for p in sorted(glob.glob(os.path.join(type_dir(specs, typ), "*.md")))
+        if keyword in title_of(p)
+    ]
+
+
+def upstream_of(path: str) -> list[str]:
+    """frontmatter의 upstream — 문서 ID 목록. 본문은 안 읽는다."""
+    head = open(path, encoding="utf-8").read().split("\n---", 1)[0]
+    m = re.search(r"^upstream:\s*\[(.*)\]\s*$", head, re.M)
+    return [x.strip() for x in m.group(1).split(",") if x.strip()] if m else []
+
+
+def class_doc_of(specs: str) -> dict[str, str]:
+    """MS 문서 ID → 그 문서 upstream의 클래스 명세 ID(어느 구현의 것인가, STD-001 2.10).
+
+    클래스 명세가 꼭 하나일 때만 적는다. 없거나 둘이면 빠진다 — 그 MS는 구현을 모른다.
+    """
+    classes = {os.path.basename(p)[:-3] for p in all_by_title(specs, "DOM", "클래스")}
+    out: dict[str, str] = {}
+    for path in doc_files(specs):
+        name = os.path.basename(path)[:-3]
+        m = DOC_ID.fullmatch(name)
+        if not m or m.group(2) != "MS":
+            continue
+        hits = [u for u in upstream_of(path) if u in classes]
+        if len(hits) == 1:
+            out[name] = hits[0]
+    return out
+
+
 def repo_of(specs: str) -> str:
     """`…/docs/specs` → 그 저장소의 뿌리. **코드 기본값은 명세와 같은 저장소다** —
     자기 저장소로 되돌아가면 남의 명세를 싱크독 코드와 대조하고도 그럴듯한 답을 낸다."""

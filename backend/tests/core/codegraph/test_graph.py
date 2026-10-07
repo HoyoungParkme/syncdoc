@@ -546,6 +546,137 @@ def test_enrich_gives_screen_id_of_file_head_comment_to_all_its_functions(tmp_pa
 
 
 # ── spec_calls ──
+# ── Rust 보강 (MS-011 enrich 2e~2h, 카드 BV) ──
+GIT_RS = """/// SYNC-MS-019#git.commit_push
+pub async fn commit_push(path: &str) -> Result<String, Problem> {
+    let out = run(path).await?;
+    Ok(out)
+}
+
+fn run(path: &str) -> std::io::Result<String> {
+    Ok(path.to_string())
+}
+"""
+
+SERVICE_RS = """use crate::infra::git;
+use crate::infra::git::commit_push as push;
+use super::repo::{Repo, Store as Shelf};
+
+pub struct SpecService<'c> {
+    repo: Arc<Repo<'c>>,
+}
+
+impl<'c> SpecService<'c> {
+    /// SYNC-MS-014#SpecService.save
+    /// 둘째 줄은 항목이 아니다
+    #[allow(dead_code)]
+    pub async fn save(&mut self, body: &str) -> Result<String, Problem> {
+        let h = git::commit_push(body).await?;
+        self.repo.insert(&h);
+        Self::helper(&h);
+        crate::infra::git::commit_push(&h);
+        let s = Shelf::open();
+        s.put(&h);
+        Ok(h)
+    }
+
+    fn helper(x: &str) {
+        push(x);
+    }
+}
+
+impl Display for SpecService<'_> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        self.unknown();
+        Ok(())
+    }
+}
+
+pub fn build(store: &Shelf) {
+    store.put("x");
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn t() {}
+}
+"""
+
+REPO_RS = """pub struct Repo<'c> { db: &'c str }
+
+impl Repo<'_> {
+    pub fn insert(&self, h: &str) {}
+}
+
+pub struct Store;
+
+impl Store {
+    pub fn open() -> Store { Store }
+    pub fn put(&self, x: &str) {}
+}
+"""
+
+
+def _rs_src(tmp_path: Path) -> Path:
+    for rel, body in (("app/src/infra/git.rs", GIT_RS), ("app/src/spec/service.rs", SERVICE_RS),
+                      ("app/src/spec/repo.rs", REPO_RS), ("app/src/lib.rs", "pub fn boot() {}\n")):  # fmt: skip
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text(body, encoding="utf-8")
+    (tmp_path / "app/src/broken.rs").write_bytes(b"\xff\xfe(((")
+    (tmp_path / "app/tests/it.rs").parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "app/tests/it.rs").write_text("fn it_works() {}\n", encoding="utf-8")
+    return tmp_path
+
+
+def test_enrich_rs_defs_items_and_calls(tmp_path: Path) -> None:
+    """graphify가 Rust 함수를 주지 않아도(reduce가 버린다) files의 .rs를 읽어 정의·항목·호출을 채운다."""
+    src = _rs_src(tmp_path)
+    files = ["app/src/infra/git.rs", "app/src/spec/service.rs", "app/src/spec/repo.rs",
+             "app/src/lib.rs", "app/src/broken.rs", "app/tests/it.rs"]  # fmt: skip
+    g = {"functions": [], "calls": [], "files": files}
+    cg.enrich(src, g)
+    by = {f["key"]: f for f in g["functions"]}
+    # 2e — 맨 위 fn·impl 메서드(제네릭 타입·트레이트 impl), key는 fn 줄, 끝 줄, qual
+    save = by["app/src/spec/service.rs:13"]
+    assert (save["qual"], save["end"]) == ("SpecService.save", 21)
+    assert by["app/src/spec/service.rs:23"]["qual"] == "SpecService.helper"
+    assert by["app/src/spec/service.rs:29"]["qual"] == "SpecService.fmt"  # impl Display for …
+    assert by["app/src/spec/service.rs:35"]["qual"] == "service.build"
+    assert by["app/src/infra/git.rs:2"]["qual"] == "git.commit_push"
+    assert by["app/src/lib.rs:1"]["qual"] == "app.boot"  # src/lib.rs는 crate 폴더 이름
+    # 2f — 첫 `///` 줄이 항목(속성은 건너뛴다), 둘째 줄은 아니다. 항목 없는 함수는 None
+    assert (save["item"], save["ms"]) == ("SYNC-MS-014#SpecService.save",) * 2
+    assert by["app/src/infra/git.rs:2"]["ms"] == "SYNC-MS-019#git.commit_push"
+    assert by["app/src/infra/git.rs:7"]["item"] is None
+    # 테스트 모듈·테스트 파일·깨진 파일은 없다
+    quals = {f["qual"] for f in g["functions"]}
+    assert "service.t" not in quals and "it.it_works" not in quals
+    assert all(not f["file"].endswith("broken.rs") for f in g["functions"])
+    # 2h — 호출: 같은 파일 fn · use 모듈 경로 · use 별칭 함수 · Self:: · self.필드(Arc 벗김) ·
+    # crate:: 전체 경로 · use 묶음 별칭 타입의 생성 뒤 메서드 · 인자 타입(&Shelf)
+    enriched = {(a, b) for a, b, via in g["calls"] if via == "enrich"}
+    git_push, run = "app/src/infra/git.rs:2", "app/src/infra/git.rs:7"
+    helper, build = "app/src/spec/service.rs:23", "app/src/spec/service.rs:35"
+    insert, put = "app/src/spec/repo.rs:4", "app/src/spec/repo.rs:11"
+    assert {(git_push, run), (save["key"], git_push), (save["key"], helper),
+            (save["key"], insert), (save["key"], put), (helper, git_push),
+            (build, put)} <= enriched  # fmt: skip
+    # 모르는 메서드(self.unknown)는 잇지 않는다
+    assert not any(a == "app/src/spec/service.rs:29" for a, _ in enriched)
+    assert "files" not in g
+
+
+async def test_enrich_rs_keys_match_graphify_nodes_so_communities_attach(tmp_path: Path) -> None:
+    """key의 줄이 graphify Rust 노드의 줄과 같다 — 커뮤니티가 Rust 함수에도 붙는다."""
+    src = _rs_src(tmp_path)
+    (src / "app/src/broken.rs").unlink()
+    _source, raw = await cg.load(src)
+    g = cg.communities(raw, cg.enrich(src, cg.reduce(raw)))
+    rust = [f for f in g["functions"] if f["file"].endswith(".rs")]
+    assert len(rust) >= 8 and all(f["community"] is not None for f in rust)
+
+
 def test_spec_calls_reads_only_the_calls_line() -> None:
     items = [
         ("X-MS-007#pipeline.save", "처리 `pipeline.other` 을 부른다\n"
@@ -567,6 +698,22 @@ def test_spec_calls_drops_ambiguous_short_names() -> None:
     items = [("A-MS-001#x.run", "**호출하는 것** `y.go`"), ("A-MS-002#y.go", ""),
              ("A-MS-003#y.go", "")]  # fmt: skip
     assert cg.spec_calls(items)["A-MS-001#x.run"] == set()  # 같은 이름 둘 — 모호하다
+
+
+def test_spec_calls_resolves_names_within_each_implementation() -> None:
+    """카드 BV — 두 구현에 같은 이름이 있어도 백틱 이름은 제 구현의 항목으로 풀린다."""
+    items = [
+        ("A-MS-001#pipeline.save", "**호출하는 것** `SpecService.save`"),  # 파이썬
+        ("A-MS-002#SpecService.save", ""),
+        ("A-MS-012#pipeline.save", "**호출하는 것** `SpecService.save`"),  # Rust
+        ("A-MS-014#SpecService.save", ""),
+    ]
+    impl_of = {"A-MS-001": "A-DOM-002", "A-MS-002": "A-DOM-002",
+               "A-MS-012": "A-DOM-004", "A-MS-014": "A-DOM-004"}  # fmt: skip
+    got = cg.spec_calls(items, impl_of)
+    assert got["A-MS-001#pipeline.save"] == {"A-MS-002#SpecService.save"}
+    assert got["A-MS-012#pipeline.save"] == {"A-MS-014#SpecService.save"}
+    assert cg.spec_calls(items)["A-MS-001#pipeline.save"] == set()  # impl_of 없이 — 한 구현, 모호
 
 
 # ── compare ──
