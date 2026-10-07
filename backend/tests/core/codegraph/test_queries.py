@@ -313,6 +313,62 @@ async def test_code_nodes_layers_from_class_spec_table(scoped: Session) -> None:
     assert by["svc._help"].layer == CodeLayer("도우미", [])
 
 
+CLS_RS = """---
+doc_id: EXMP-DOM-004
+type: DOM
+title: 클래스 명세 — 예시 Rust 판
+status: draft
+upstream: [EXMP-PRD-001]
+---
+# 클래스 명세
+
+## 1. 폴더 구조
+
+**층**
+
+| 경로 | 층 | 명세 |
+|---|---|---|
+| `local/**` | Rust 리포지토리 | [[EXMP-PRD-001]] 9장 |
+"""
+
+
+async def test_code_nodes_layers_from_every_class_spec(scoped: Session) -> None:
+    """카드 BV — 구현이 둘이면 클래스 명세도 둘. 두 층 표를 다 쓴다(MS-008 code_nodes 2a)."""
+    graph = dict(
+        GRAPH_LAYERS,
+        functions=[*GRAPH_LAYERS["functions"],
+                   dict(_fn("local/src/repo.rs:4", "Repo.insert", None, 4), item=None)],
+    )  # fmt: skip
+    p = _seed_items(scoped, graph)
+    svc, a = SpecService(scoped), author(scoped)
+    svc.create(p.id, "EXMP-DOM-002", DocType.DOM, CLS, "h5", a, "spec")
+    svc.create(p.id, "EXMP-DOM-004", DocType.DOM, CLS_RS, "h6", a, "spec")
+    by = {f.qual: f for f in (await queries.code_nodes("EXMP", owner(scoped))).functions}
+    assert by["repo.get"].layer == CodeLayer("리포지토리", [CodeLayerSpec("EXMP-PRD-001", "4장")])
+    assert by["Repo.insert"].layer == CodeLayer(
+        "Rust 리포지토리", [CodeLayerSpec("EXMP-PRD-001", "9장")]
+    )
+
+
+async def test_code_view_resolves_short_names_within_the_implementation(scoped: Session) -> None:
+    """카드 BV — Rust 판 MS에 같은 이름(svc.check)이 있어도 파이썬 MS의 백틱 이름은 제 구현으로 푼다."""
+    p = _seed(scoped)
+    svc, a = SpecService(scoped), author(scoped)
+    svc.create(p.id, "EXMP-DOM-002", DocType.DOM, CLS, "h5", a, "spec")
+    svc.create(p.id, "EXMP-DOM-004", DocType.DOM, CLS_RS, "h6", a, "spec")
+    d = svc.get_document("EXMP-MS-001")
+    body = d.body.replace("upstream: [EXMP-PRD-001]", "upstream: [EXMP-PRD-001, EXMP-DOM-002]")
+    body = body.replace("**호출하는 것** [[#svc.check]] · [[#svc.gone]]",
+                        "**호출하는 것** `svc.check` · [[#svc.gone]]")  # fmt: skip
+    svc.save(d, body, "h7", a, "spec", [])
+    rust_ms = MS.replace("EXMP-MS-001", "EXMP-MS-012").replace(
+        "upstream: [EXMP-PRD-001]", "upstream: [EXMP-PRD-001, EXMP-DOM-004]"
+    )
+    svc.create(p.id, "EXMP-MS-012", DocType.MS, rust_ms, "h8", a, "spec")
+    v = await queries.code_view("EXMP-MS-001", "svc.save", owner(scoped))
+    assert ("EXMP-MS-001#svc.check", "same") in [(c.ms_id, c.status) for c in v.function.calls]
+
+
 async def test_code_nodes_old_graph_no_graph_and_not_owned(scoped: Session) -> None:
     _seed(scoped)  # GRAPH 그대로 — 커뮤니티·item을 모르는 옛 그래프
     nodes = await queries.code_nodes("EXMP", owner(scoped))

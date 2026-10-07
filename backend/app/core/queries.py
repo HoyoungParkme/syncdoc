@@ -1244,24 +1244,50 @@ def _ms_items(s: Session, project_id: int) -> list[tuple[str, str]]:
     return out
 
 
+def _class_docs(s: Session, project_id: int) -> list[str]:
+    """프로젝트의 클래스 명세 — DOM 문서 중 제목에 「클래스」가 든 것 전부, 문서 순서.
+
+    구현이 둘이면 클래스 명세도 둘이다(STD-001 2.6, 카드 BV).
+    """
+    spec = SpecService(s)
+    return [
+        d.doc_id
+        for d in spec.list_by_project(project_id, stage=STAGE_OF["DOM"])
+        if "클래스" in parse_frontmatter(spec.get_document(d.doc_id).body)[0].get("title", "")
+    ]
+
+
+def _impl_of(s: Session, project_id: int) -> dict[str, str]:
+    """MS 문서 ID → 그 문서 upstream의 클래스 명세(어느 구현의 것인가) — MS-008 code_view 2.
+
+    클래스 명세가 꼭 하나일 때만 적는다(STD-001 2.10). spec_calls가 이름을 구현 안에서 푼다.
+    """
+    spec, classes = SpecService(s), set(_class_docs(s, project_id))
+    out: dict[str, str] = {}
+    for d in spec.list_by_project(project_id, stage=STAGE_OF["MS"]):
+        up = parse_frontmatter(spec.get_document(d.doc_id).body)[0].get("upstream", "")
+        hits = [x for x in re.findall(r"[\w-]+", str(up).strip("[]")) if x in classes]
+        if len(hits) == 1:
+            out[d.doc_id] = hits[0]
+    return out
+
+
 def _diffs(s: Session, project_id: int, graph: dict) -> dict[str, CallDiff]:
-    spec = codegraph.spec_calls(_ms_items(s, project_id))
+    spec = codegraph.spec_calls(_ms_items(s, project_id), _impl_of(s, project_id))
     return {d.ms_id: d for d in codegraph.compare(graph, spec)}
 
 
 def _layers(s: Session, project_id: int, graph: dict) -> dict[str, CodeLayer]:
     """항목 없는 함수 key → 층 (MS-008 code_nodes 2a, 카드 BM).
 
-    프로젝트 DOM 문서 중 제목에 「클래스」가 든 첫 것의 층 표 — 없으면 표 없이(도우미만).
-    표는 볼 때 읽는다 — 「호출하는 것」처럼 명세만 고쳐도 바로 바뀐다.
+    프로젝트 클래스 명세 전부의 층 표를 문서 순서대로 이어 붙인다 — 구현이 둘이면 클래스 명세도
+    둘이다(카드 BV). 없으면 표 없이(도우미만). 표는 볼 때 읽는다 — 「호출하는 것」처럼 명세만 고쳐도
+    바로 바뀐다.
     """
     spec = SpecService(s)
     rows: list[dict] = []
-    for d in spec.list_by_project(project_id, stage=STAGE_OF["DOM"]):
-        body = spec.get_document(d.doc_id).body
-        if "클래스" in parse_frontmatter(body)[0].get("title", ""):
-            rows = codegraph.layer_table(body)
-            break
+    for doc_id in _class_docs(s, project_id):
+        rows.extend(codegraph.layer_table(spec.get_document(doc_id).body))
     layer_of, _ = codegraph.layers(graph, rows)
     return {
         k: CodeLayer(v["name"], [CodeLayerSpec(x["ref"], x["note"]) for x in v["specs"]])
