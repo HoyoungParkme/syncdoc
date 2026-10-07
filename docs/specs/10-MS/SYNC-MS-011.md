@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-011
 type: MS
 title: MINISPEC — codegraph — 코드 호출 그래프와 명세 대조
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 ---
 
@@ -128,10 +128,10 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 2h. 맨 위 정의의 몸통에서 `f(…)`(같은 파일이나 `use`한 함수) · `T::m`·`Self::m`·`모듈::f`(경로 — 부르든 값으로 넘기든) · `x.m(…)`(타입을 아는 `x` — 인자 `x: T`·`&T`·`&mut T`, `let x: T`, `let x = T::…(…)`·`T { … }`(`?`·`.await`를 벗겨), `self`, `self.필드`) → 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다. 트레이트 객체·제네릭 인자·매크로 안 호출은 풀지 않는다([[SYNC-STD-004#DEV-16]] Rust)
 3. 화면 코드 — 파일마다 **첫 주석**(맨 위 `/** … */` 또는 `//` 묶음)에서 `[A-Z][A-Z0-9]*-UI-\d{3}#UI-\d+`를 찾아, 그 파일 함수 중 `item`이 없는 것 전부에 준다(`ms`는 건드리지 않는다). 화면 하나 = 파일 하나(DEV-17)라 파일 단위로 잇는다. 첫 주석에 화면 ID가 없는 파일(공용 부품·뷰 렌더러)은 그대로 null. 2026-10-02 사용자 결정, 카드 BJ
 4. 함수 몸통에서 **타입을 아는 변수**를 모은다 — 인자 주석 `x: Cls` · `x = Cls(…)` · `a, b = A(…), B(…)`. `Cls`는 이 그래프 안에 정의된 클래스 이름일 때만. 그리고 **타입을 아는 속성** — 클래스 `__init__`의 `self.x = Cls(…)`(또는 `self.x: Cls = …`)는 그 클래스 메서드 전부에서 `self.x`의 타입이다(카드 BM — 서비스가 리포지토리를 `self.repo`로 들고 부르는 134곳이 그래프에 없어 리포지토리 93개 중 89개가 외톨이였다)
-5. 호출 `x.m(…)`(4의 변수) · `Cls(…).m(…)` · `self.m(…)`(메서드 안) · `self.x.m(…)`(4의 속성) → `Cls.m`이 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다
+5. 호출 `x.m(…)`(4의 변수) · `Cls(…).m(…)` · `Cls.m(…)`(클래스 이름으로 — 정적·클래스 메서드) · `self.m(…)`(메서드 안) · `self.x.m(…)`(4의 속성) → `Cls.m`이 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다. `Cls`는 파이썬 파일에 정의된 클래스뿐이다(1의 이름표) — `Cls.m(…)`은 graphify도 잇지만, 같은 이름의 타입이 다른 언어에도 있으면(Rust 판의 `AccountService`, [[SYNC-INFRA-001#C11]]) 「모호하다」며 버린다. 두 구현은 같은 이름을 쓰므로(STD-001 2.10) 파이썬 이름표로 다시 잇는다(#336)
 6. `→ graph` (같은 객체에 더해 돌려준다)
 
-**테스트 관점** 다섯 꼴이 각각 선을 만든다 — 주석·대입·튜플 대입·즉석 생성·`self` · `__init__`의 `self.repo = Repo(…)` 뒤 다른 메서드의 `self.repo.get(…)` → `Repo.get` · 모르는 클래스는 안 만든다 · graphify가 이미 잡은 선은 겹치지 않는다 · 데코레이터 달린 함수도 맞춘다 · MINISPEC docstring ID가 `item`·`ms`로, API docstring ID는 `item`만 · `.tsx` 첫 주석의 화면 ID가 그 파일 함수 전부의 `item`으로(`ms`는 null), 화면 ID 없는 파일은 null · TS/JS — 맨 위 함수의 끝 줄·qual(function·const 화살표·class 메서드·객체 리터럴 메서드와 화살표) · graphify가 놓친 맨 위 정의를 더하고 화면 ID도 받는다 · 중첩 함수는 끝 줄만, 지우지 않는다 · graphify가 함수 0개로 본 TS 파일도 `files`로 읽어 `api.get`과 그 선을 더하고, 결과에 `files`가 남지 않는다(#282) · 같은 파일·상대 import(별칭·default·`index`)·JSX·`o.m` 호출이 `enrich` 선으로 · 패키지 import는 안 잇는다 · 깨진 파일은 건너뛴다 · **Rust** — 맨 위 `fn`과 `impl` 메서드(제네릭 타입·트레이트 impl)의 qual·끝 줄, `///` 첫 줄의 항목(속성을 건너), key가 graphify Rust 노드의 줄과 같다 · `#[cfg(test)]` 모듈 안 함수는 없다 · `Self::m`·`self.m`·`self.필드.m`·`T::m`·`모듈::f`·`use` 별칭·`let x = T::new()` 뒤 `x.m` 호출이 `enrich` 선으로 · 모르는 타입은 잇지 않는다 · 결과에 `files`가 남지 않는다
+**테스트 관점** 다섯 꼴이 각각 선을 만든다 — 주석·대입·튜플 대입·즉석 생성·`self` · `__init__`의 `self.repo = Repo(…)` 뒤 다른 메서드의 `self.repo.get(…)` → `Repo.get` · `Cls.m(…)` — 같은 이름의 Rust 타입이 있어 graphify가 버려도 파이썬 메서드로 잇는다(#336) · 모르는 클래스는 안 만든다 · graphify가 이미 잡은 선은 겹치지 않는다 · 데코레이터 달린 함수도 맞춘다 · MINISPEC docstring ID가 `item`·`ms`로, API docstring ID는 `item`만 · `.tsx` 첫 주석의 화면 ID가 그 파일 함수 전부의 `item`으로(`ms`는 null), 화면 ID 없는 파일은 null · TS/JS — 맨 위 함수의 끝 줄·qual(function·const 화살표·class 메서드·객체 리터럴 메서드와 화살표) · graphify가 놓친 맨 위 정의를 더하고 화면 ID도 받는다 · 중첩 함수는 끝 줄만, 지우지 않는다 · graphify가 함수 0개로 본 TS 파일도 `files`로 읽어 `api.get`과 그 선을 더하고, 결과에 `files`가 남지 않는다(#282) · 같은 파일·상대 import(별칭·default·`index`)·JSX·`o.m` 호출이 `enrich` 선으로 · 패키지 import는 안 잇는다 · 깨진 파일은 건너뛴다 · **Rust** — 맨 위 `fn`과 `impl` 메서드(제네릭 타입·트레이트 impl)의 qual·끝 줄, `///` 첫 줄의 항목(속성을 건너), key가 graphify Rust 노드의 줄과 같다 · `#[cfg(test)]` 모듈 안 함수는 없다 · `Self::m`·`self.m`·`self.필드.m`·`T::m`·`모듈::f`·`use` 별칭·`let x = T::new()` 뒤 `x.m` 호출이 `enrich` 선으로 · 모르는 타입은 잇지 않는다 · 결과에 `files`가 남지 않는다
 
 ---
 
