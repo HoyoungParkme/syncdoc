@@ -59,6 +59,7 @@ Rust는 `local/`에서 돈다 — `cd local && cargo test` · `cargo fmt --check
 - `python tools/validate.py` — 명세 규약 검사 (STD-001 3·4장). 위반 0·경고 0이어야 한다
 - `python tools/check_code.py` — MINISPEC↔코드 시그니처 대조 (DEV-14 첫째·둘째). 키는 `문서#항목`, 결과는 구현마다(`파이썬 171/171 · Rust 0/0`). Rust(`local/`)는 tree-sitter-rust로 읽으므로 Rust 코드나 Rust MINISPEC이 있으면 `uv run --project backend python tools/check_code.py`(없으면 종료 2). `--selftest`(카드 BW)
 - `uv run --project backend python tools/check_calls.py` — MINISPEC 「호출하는 것」↔코드 호출 그래프(graphify + 보강) 대조 (DEV-14 셋째). 서버의 코드 그래프와 같은 함수로 센다
+- `cd contract && uv run pytest --target both` — 공용 계약 시험(INFRA 9.8, 카드 L2). 파이썬 판(작업 트리 이미지·Docker)과 Rust 판(`syncdoc-local`)을 시험이 직접 띄우고 같은 시나리오를 돌린다. Rust 판은 CODE-002에서 완료된 카드만 — 끝내는 중인 카드는 `--with-card L3`. 계약 밖 목록은 CODE-002 2장
 - `python tools/check_ui.py` — 와이어프레임 요소 번호↔React `data-el` 대조 (DEV-17)
 - `python tools/check_view_css.py` — 뷰 CSS가 `view_build.py`와 바이트 단위로 같은지 (STD-002)
 - `python tools/check_view_html.py` — 정적 뷰와 앱 유저용 탭이 같은 HTML인지 (STD-002 1장·4장). 앱 뷰를 rolldown으로 묶어 Node로 돌리므로 `frontend/node_modules`가 있어야 한다. 싱크독 문서와 셀프테스트 시험 문서, `--specs <저장소>/docs/specs`로 다른 저장소. 뷰 코드(`tools/view_build.py`·`wf_build.py`·`frontend/src/view`)를 고치면 돌린다

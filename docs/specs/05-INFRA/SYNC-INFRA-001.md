@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -544,7 +544,7 @@ syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 
 ### 9.8 같은 기능과 속도
 
-- **같은 기능** — 공용 계약 시험(`contract/`) — 주소만 받는 HTTP·MCP·git 시나리오다. 파이썬 폐쇄망판(Docker)이 기준이고 Rust 판이 같은 결과를 내야 한다
+- **같은 기능** — 공용 계약 시험(`contract/`) — 주소만 받는 HTTP·MCP·git 시나리오다. 파이썬 폐쇄망판(Docker)이 기준이고 Rust 판이 같은 결과를 내야 한다. 시험이 두 판을 직접 띄운다 — 파이썬 판은 작업 트리로 만든 이미지(빈 볼륨·임시 포트), Rust 판은 임시 데이터 자리. **계약 밖**(API-001에 없는 프레임워크 동작, 2026-10-07): 끝 슬래시 리다이렉트(307) · `/docs`·`/redoc`·`/openapi.json` · GET 경로의 HEAD · Range(206) · ETag 값의 꼴 · Host 머리 없는 요청
 - **속도** — [[SYNC-PRD-001#R15]]의 수치를 같은 PC에서 두 판을 나란히 재어 본다 — 켜기(첫 실행·다시 켜기), 화면 조회, 문서 저장(git 포함), 싱크독 저장소의 코드 그래프, 켜 둔 메모리(PostgreSQL 포함)
 
 ---
