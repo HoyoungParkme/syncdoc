@@ -53,7 +53,7 @@ Rust는 `local/`에서 돈다 — `cd local && cargo test` · `cargo fmt --check
 **한 DB에 pytest를 둘 이상 동시에 돌리지 않는다.** 규칙과 이유는 [[SYNC-STD-004#DEV-14]].
 
 - `python tools/validate.py` — 명세 규약 검사 (STD-001 3·4장). 위반 0·경고 0이어야 한다
-- `python tools/check_code.py` — MINISPEC↔코드 시그니처 대조 (DEV-14 첫째·둘째)
+- `python tools/check_code.py` — MINISPEC↔코드 시그니처 대조 (DEV-14 첫째·둘째). 키는 `문서#항목`, 결과는 구현마다(`파이썬 171/171 · Rust 0/0`). Rust(`local/`)는 tree-sitter-rust로 읽으므로 Rust 코드나 Rust MINISPEC이 있으면 `uv run --project backend python tools/check_code.py`(없으면 종료 2). `--selftest`(카드 BW)
 - `uv run --project backend python tools/check_calls.py` — MINISPEC 「호출하는 것」↔코드 호출 그래프(graphify + 보강) 대조 (DEV-14 셋째). 서버의 코드 그래프와 같은 함수로 센다
 - `python tools/check_ui.py` — 와이어프레임 요소 번호↔React `data-el` 대조 (DEV-17)
 - `python tools/check_view_css.py` — 뷰 CSS가 `view_build.py`와 바이트 단위로 같은지 (STD-002)
