@@ -1,0 +1,33 @@
+# 계약 시험용 파이썬 폐쇄망판 — release/local/docker-compose.yml과 같은 구성(SYNC-INFRA-001 8.1).
+# 다른 점: 작업 트리로 만든 이미지(syncdoc-app:contract) · 볼륨 없음(끝나면 down -v) · 임시 포트.
+name: syncdoc-contract
+
+services:
+  app:
+    image: syncdoc-app:contract
+    ports:
+      - "127.0.0.1:${CONTRACT_PORT:?}:8000"
+    environment:
+      EDITION: closed
+      SECRET_KEY: contract-only
+      DATABASE_URL: postgresql+psycopg://syncdoc:contract@db:5432/syncdoc
+      PUBLIC_BASE_URL: http://127.0.0.1:${CONTRACT_PORT}
+      LOCAL_LOGIN: local
+      LLM_API_URL: ${CONTRACT_LLM_URL:-}
+      LLM_API_KEY: ${CONTRACT_LLM_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: syncdoc
+      POSTGRES_PASSWORD: contract
+      POSTGRES_DB: syncdoc
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U syncdoc"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
