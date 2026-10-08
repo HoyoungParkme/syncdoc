@@ -213,8 +213,7 @@ impl ProjectService<'_> {
             }
         };
         let remote = origin.to_string_lossy().into_owned();
-        let git = &self.repos.git;
-        if let Err(p) = git.clone(&remote, &workdir).await {
+        if let Err(p) = self.repos.git.clone(&remote, &workdir).await {
             let _ = fs::remove_dir_all(&workdir);
             undo_origin();
             return Err(match p {
@@ -224,9 +223,14 @@ impl ProjectService<'_> {
                 other => other,
             });
         }
-        let has = git.exists(&workdir, "docs/specs").await?;
+        let has = self.repos.git.exists(&workdir, "docs/specs").await?;
         if has && !import_existing {
-            let n = git.list(&workdir, "docs/specs/*/*.md", "HEAD").await?.len() as i64;
+            let n = self
+                .repos
+                .git
+                .list(&workdir, "docs/specs/*/*.md", "HEAD")
+                .await?
+                .len() as i64;
             let _ = fs::remove_dir_all(&workdir);
             undo_origin();
             return Err(Problem::ExistingSpecs {
@@ -256,7 +260,12 @@ impl ProjectService<'_> {
         }
         let files = Git::init_specs(&self.repos.specs_url);
         let message = format!("chore({code}): init syncdoc");
-        let hash = match git.commit_push(&workdir, &message, user, &files, &[]).await {
+        let hash = match self
+            .repos
+            .git
+            .commit_push(&workdir, &message, user, &files, &[])
+            .await
+        {
             Ok(h) => h,
             Err(p @ Problem::PushFailed { .. }) => {
                 tx.rollback().await?;
