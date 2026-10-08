@@ -78,6 +78,7 @@ pub async fn call(
         "get_template" => get_template(state, user, &typed).await,
         "list_documents" => list_documents(state, user, &typed).await,
         "get_document" => get_document(state, user, &typed).await,
+        "get_item" => get_item(state, user, &typed).await,
         _ => Err(Problem::NotImplemented {
             card: tool.card.to_string(),
         }),
@@ -196,6 +197,29 @@ async fn get_document(state: &AppState, user: &UserRow, a: &PyValue) -> Result<V
     out.insert("prev_doc_id".into(), Value::from(d.prev_doc_id));
     out.insert("next_doc_id".into(), Value::from(d.next_doc_id));
     Ok(Value::Object(out))
+}
+
+/// SYNC-API-002#get_item
+///
+/// `item_id`는 `~`를 `/`로 바꾼 것(서비스가 바꾼다)
+async fn get_item(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let mut c = state.pool.acquire().await?;
+    let v = queries::item_view(
+        &mut c,
+        &state.repos,
+        &arg_str(a, "doc_id"),
+        &arg_str(a, "item_id"),
+        user,
+    )
+    .await?;
+    Ok(json!({
+        "doc_id": v.doc_id,
+        "item_id": v.item_id,
+        "display_name": v.display_name,
+        "doc_status": v.doc_status,
+        "doc_version_no": v.doc_version_no,
+        "body": v.body,
+    }))
 }
 
 /// SYNC-API-002#get_template
