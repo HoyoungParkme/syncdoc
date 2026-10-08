@@ -1,6 +1,7 @@
 //! 열거형·DTO — SYNC-DOM-002 2.7·2.8 그대로 (Rust는 `syncdoc_core::types`).
 //! 직렬화 이름(JSON 키·열거형 값)도 파이썬 판과 같다.
 
+use indexmap::IndexMap;
 use serde::Serialize;
 use time::OffsetDateTime;
 
@@ -212,6 +213,92 @@ impl UserKind {
     }
 }
 
+/// 저장 방식 — `repositories.storage` (DOM-002 2.7 `Storage`). 싱크독_로컬은 서버 저장뿐이다
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Storage {
+    Github,
+    Server,
+}
+
+impl Storage {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Storage::Github => "github",
+            Storage::Server => "server",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Storage> {
+        [Storage::Github, Storage::Server]
+            .into_iter()
+            .find(|t| t.as_str() == s)
+    }
+}
+
+/// 단계 번호 — `RFQ` 1 … `CODE` 11. `STD`는 단계 밖 (DOM-002 `STAGE_OF`)
+pub const STAGES: [&str; 11] = [
+    "RFQ", "PRD", "SCN", "UC", "INFRA", "DOM", "UI", "API", "SEQ", "MS", "CODE",
+];
+
+/// 타입 → 단계 번호 — 없으면 None(`STD`·모르는 타입)
+pub fn stage_of(doc_type: &str) -> Option<i32> {
+    STAGES
+        .iter()
+        .position(|t| *t == doc_type)
+        .map(|i| i as i32 + 1)
+}
+
+/// 작성자 — id만(이름은 읽기 조합이 붙인다) (DOM-002 2.8 `AuthorRef`)
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct AuthorRef {
+    pub kind: String,
+    pub user_id: i32,
+    pub instructed_by_id: Option<i32>,
+    pub via: String,
+}
+
+/// 문서 요약 (API-001 `DocumentSummary`) — `counts`는 읽기 조합이 채운다
+#[derive(Clone, Debug, PartialEq)]
+pub struct DocumentSummary {
+    pub id: i32,
+    pub doc_id: String,
+    pub doc_type: String,
+    pub stage: Option<i32>,
+    pub status: String,
+    pub current_version_no: i32,
+    pub has_convention_error: bool,
+    pub incomplete_warnings: Vec<String>,
+    pub updated_at: OffsetDateTime,
+    pub last_author: Option<AuthorRef>,
+    pub counts: IndexMap<String, i64>,
+    pub trashed_at: Option<OffsetDateTime>,
+}
+
+/// 단계 한 칸 (API-001 `StageSummary`)
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct StageSummary {
+    pub stage: i32,
+    pub doc_type: String,
+    pub status: Option<String>,
+    pub doc_count: i64,
+    pub gate_warning: bool,
+    pub broken_count: i64,
+}
+
+/// 프로젝트 요약 (API-001 `ProjectSummary`) — 단계는 늘 11칸
+#[derive(Clone, Debug, PartialEq)]
+pub struct ProjectSummary {
+    pub code: String,
+    pub name: String,
+    pub storage: Storage,
+    pub remote_url: Option<String>,
+    pub stages: Vec<StageSummary>,
+    pub std_docs: Vec<DocumentSummary>,
+    pub counts: IndexMap<String, i64>,
+    pub updated_at: Option<OffsetDateTime>,
+}
+
 /// 토큰 발급 결과 — 원문(`raw`)은 이 값에만 있다 (SYNC-DOM-002 2.8 `IssuedToken`)
 #[derive(Clone, Debug)]
 pub struct IssuedToken {
@@ -238,6 +325,12 @@ pub fn iso_utc(t: OffsetDateTime) -> String {
         t.minute(),
         t.second()
     )
+}
+
+/// 파이썬 `datetime.isoformat()`(UTC) — 마이크로초가 0이면 뺀다, 끝은 `+00:00`. MCP 응답이 이 꼴이다
+pub fn py_isoformat(t: OffsetDateTime) -> String {
+    let z = iso_utc(t);
+    format!("{}+00:00", z.trim_end_matches('Z'))
 }
 
 #[cfg(test)]
