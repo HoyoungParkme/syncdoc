@@ -867,4 +867,53 @@ impl SpecService<'_> {
         }
         Ok(format!("{code}-{doc_type}-{:03}", max + 1))
     }
+
+    /// SYNC-MS-014#SpecService.precondition
+    ///
+    /// DOM 셋의 순서 — 클래스 명세 ← API 문서, ERD ← 클래스 명세. 존재만 본다(상태·승인은 신호, PRD R6)
+    pub async fn precondition(
+        &mut self,
+        project_id: i32,
+        doc_type: &str,
+        title: &str,
+    ) -> Result<Option<(String, Vec<String>)>, Problem> {
+        if doc_type != "DOM" {
+            return Ok(None);
+        }
+        let key = |t: Option<&str>| subtype_of("DOM", t).map(|i| SUBTYPES[i].1);
+        let sub = key(Some(title));
+        if !matches!(sub, Some("클래스" | "ERD")) {
+            return Ok(None); // 도메인 모델은 첫 문서다. 키워드 없음은 validate가 잡는다
+        }
+        let docs = repo::documents_of_project(&mut *self.db, project_id).await?;
+        let (ok, requires) = if sub == Some("클래스") {
+            (
+                docs.iter().any(|d| d.doc_type == "API"),
+                "API 문서(REST 또는 MCP) — 클래스의 메서드는 API가 정한다",
+            )
+        } else {
+            // 제목은 documents에 열이 없다 — 본문 frontmatter에서
+            (
+                docs.iter().any(|d| {
+                    d.doc_type == "DOM"
+                        && key(markdown::parse_frontmatter(&d.current_body)
+                            .0
+                            .get("title")
+                            .map(String::as_str))
+                            == Some("클래스")
+                }),
+                "DOM 클래스 명세 — 테이블은 엔티티 클래스에서 나온다",
+            )
+        };
+        if ok {
+            return Ok(None);
+        }
+        let mut have: Vec<String> = docs
+            .iter()
+            .filter(|d| d.doc_type == "DOM")
+            .map(|d| d.doc_id.clone())
+            .collect();
+        have.sort();
+        Ok(Some((requires.to_string(), have)))
+    }
 }
