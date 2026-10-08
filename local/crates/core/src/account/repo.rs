@@ -171,3 +171,14 @@ pub async fn user_by_id(db: &mut PgConnection, id: i32) -> Result<Option<UserRow
     .fetch_optional(db)
     .await
 }
+
+/// id 여럿으로 사용자 — 쿼리 한 번, 차례 없음
+pub async fn users_by_ids(db: &mut PgConnection, ids: &[i32]) -> Result<Vec<UserRow>, sqlx::Error> {
+    sqlx::query_as::<_, UserRow>(
+        "SELECT id, github_login, github_user_id, display_name, github_token_encrypted, \
+         created_at, kind FROM users WHERE id = ANY($1)",
+    )
+    .bind(ids)
+    .fetch_all(db)
+    .await
+}
