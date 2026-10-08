@@ -18,6 +18,8 @@ pub static REF: LazyLock<Regex> = LazyLock::new(|| compile(r"\[\[([^\]]+)\]\]"))
 pub static HEADING: LazyLock<Regex> = LazyLock::new(|| compile(r"^(#{1,6}) (\S+)(?: (.*))?$"));
 /// frontmatter — 본문 머리의 `---` 두 줄 사이 (파이썬 `re.S`)
 static FRONTMATTER: LazyLock<Regex> = LazyLock::new(|| compile(r"(?s)^---\n(.*?)\n---\n"));
+/// 인라인 코드
+static INLINE_CODE: LazyLock<Regex> = LazyLock::new(|| compile(r"`[^`]*`"));
 
 /// SYNC-MS-014#markdown.parse_frontmatter
 pub fn parse_frontmatter(body: &str) -> (IndexMap<String, String>, usize) {
@@ -30,4 +32,33 @@ pub fn parse_frontmatter(body: &str) -> (IndexMap<String, String>, usize) {
         fm.insert(strip(k).to_string(), strip(v).to_string());
     }
     (fm, m[0].matches('\n').count())
+}
+
+/// SYNC-MS-014#markdown.masked_lines
+pub fn masked_lines(body: &str) -> Vec<String> {
+    let (_, fm_lines) = parse_frontmatter(body);
+    let mut out = Vec::new();
+    let mut in_block = false;
+    for (i, line) in body.split('\n').enumerate() {
+        if i < fm_lines {
+            out.push(String::new());
+            continue;
+        }
+        if line.starts_with("```") {
+            in_block = !in_block;
+            out.push(String::new());
+            continue;
+        }
+        if in_block {
+            out.push(String::new());
+        } else {
+            // 같은 수(코드 포인트)의 공백 — 줄 안 자리를 지킨다
+            out.push(
+                INLINE_CODE
+                    .replace_all(line, |c: &regex::Captures| " ".repeat(c[0].chars().count()))
+                    .into_owned(),
+            );
+        }
+    }
+    out
 }
