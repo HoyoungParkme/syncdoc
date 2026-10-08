@@ -343,4 +343,148 @@ impl Git {
         let spec: OsString = format!("{git_ref}:{path}").into();
         self.run(Some(workdir), &[os("show"), &spec]).await
     }
+
+    /// 빈 원격이면 되돌아갈 커밋이 없어 로컬 커밋만 푼다 (파이썬 `_undo`)
+    async fn undo(&self, workdir: &Path, onto_remote: bool) -> Result<(), Problem> {
+        if onto_remote {
+            self.run(
+                Some(workdir),
+                &[os("reset"), os("--hard"), os("origin/main")],
+            )
+            .await?;
+        } else {
+            self.exec(Some(workdir), &[os("update-ref"), os("-d"), os("HEAD")])
+                .await?;
+        }
+        Ok(())
+    }
+
+    /// SYNC-MS-019#Git.commit_push
+    pub async fn commit_push(
+        &self,
+        workdir: &Path,
+        message: &str,
+        user: &UserRow,
+        files: &IndexMap<String, String>,
+        delete: &[String],
+    ) -> Result<String, Problem> {
+        let w = Some(workdir);
+        // 1. GitHub 원격이면 토큰이 있어야 한다 — 싱크독_로컬에는 없다(파이썬 판의 토큰 없는 사람)
+        let origin = strip(
+            &self
+                .run(w, &[os("remote"), os("get-url"), os("origin")])
+                .await?,
+        )
+        .to_string();
+        if origin.starts_with("https://") {
+            return Err(push_failed("미등록"));
+        }
+        self.run(w, &[os("fetch"), os("origin")]).await?;
+        // 빈 원격이면 이 커밋이 첫 커밋이다
+        let onto_remote = self
+            .exec(
+                w,
+                &[
+                    os("rev-parse"),
+                    os("--verify"),
+                    os("--quiet"),
+                    os("origin/main"),
+                ],
+            )
+            .await?
+            .code
+            == 0;
+        if onto_remote {
+            self.run(w, &[os("reset"), os("--hard"), os("origin/main")])
+                .await?;
+        }
+        // 3. 경로 가드 — reset 뒤에, 아무것도 쓰기 전에
+        for p in files.keys().chain(delete.iter()) {
+            if !inside(workdir, p) {
+                return Err(push_failed(format!("작업 사본 밖 경로: {p}")));
+            }
+        }
+        for (p, content) in files {
+            let f = workdir.join(p);
+            let written = f
+                .parent()
+                .map_or(Ok(()), fs::create_dir_all)
+                .and_then(|()| fs::write(&f, content.as_bytes()));
+            if let Err(e) = written {
+                self.undo(workdir, onto_remote).await?;
+                self.exec(w, &[os("clean"), os("-fdq")]).await?;
+                return Err(push_failed(format!(
+                    "쓰기 실패: {} {}",
+                    f.display(),
+                    strerror(&e)
+                )));
+            }
+        }
+        if !files.is_empty() {
+            let mut args = vec![os("add"), os("--")];
+            args.extend(files.keys().map(|k| os(k)));
+            self.run(w, &args).await?;
+        }
+        if !delete.is_empty() {
+            let mut args = vec![os("rm"), os("-q"), os("--ignore-unmatch"), os("--")];
+            args.extend(delete.iter().map(|k| os(k)));
+            self.run(w, &args).await?;
+        }
+        if self
+            .exec(w, &[os("diff"), os("--cached"), os("--quiet")])
+            .await?
+            .code
+            == 0
+        {
+            return Ok(strip(&self.run(w, &[os("rev-parse"), os("HEAD")]).await?).to_string());
+        }
+        // 로컬 사용자(폐쇄망판)는 GitHub 계정이 아니다 — GitHub 주소를 지어내지 않는다
+        let domain = if user.kind == UserKind::Local.as_str() {
+            "syncdoc.local"
+        } else {
+            "users.noreply.github.com"
+        };
+        let name: OsString = format!("user.name={}", user.display_name).into();
+        let email: OsString = format!("user.email={}@{domain}", user.github_login).into();
+        let mut commit = vec![os("-c"), &name, os("-c"), &email];
+        commit.extend([os("commit"), os("-q"), os("-m"), os(message)]);
+        self.run(w, &commit).await?;
+        // 거부(non-fast-forward)면 rebase 뒤 다시 민다 — 사이에 기다리지 않는다
+        for attempt in 0..=PUSH_RETRIES {
+            let o = self
+                .exec(
+                    w,
+                    &[os("push"), os("--porcelain"), os(&origin), os("HEAD:main")],
+                )
+                .await?;
+            if o.code == 0 {
+                break;
+            }
+            let rejected = py_splitlines(&o.stdout).iter().any(|l| l.starts_with('!'));
+            if !rejected || attempt == PUSH_RETRIES {
+                self.undo(workdir, onto_remote).await?;
+                let why = if strip(&o.stderr).is_empty() {
+                    strip(&o.stdout)
+                } else {
+                    strip(&o.stderr)
+                };
+                return Err(push_failed(why));
+            }
+            self.run(w, &[os("fetch"), os("origin")]).await?;
+            let mut rebase = vec![os("-c"), &name, os("-c"), &email];
+            rebase.extend([os("rebase"), os("origin/main")]);
+            match self.run(w, &rebase).await {
+                Ok(_) => {}
+                // 같은 줄을 남이 고쳤다 — 재시도로 안 풀린다. 에이전트가 다시 읽어 합쳐야 한다
+                Err(Problem::Git { .. }) => {
+                    self.exec(w, &[os("rebase"), os("--abort")]).await?;
+                    self.run(w, &[os("reset"), os("--hard"), os("origin/main")])
+                        .await?;
+                    return Err(push_failed("conflict"));
+                }
+                Err(other) => return Err(other),
+            }
+        }
+        Ok(strip(&self.run(w, &[os("rev-parse"), os("HEAD")]).await?).to_string())
+    }
 }
