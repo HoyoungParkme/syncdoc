@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-004
 type: DOM
 title: 클래스 명세 — 싱크독_로컬 (Rust)
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-INFRA-001, SYNC-API-00
 
 싱크독의 **둘째 구현**(Rust, `local/`)을 코드 구조로 옮긴다 — [[SYNC-INFRA-001#C11]] · [[SYNC-INFRA-001]] 9장. 파이썬 판의 클래스 명세 [[SYNC-DOM-002]]와 **같은 묶음·같은 서비스·같은 메서드 이름**이고, 이 문서는 다른 점만 적는다. 도메인 모델([[SYNC-DOM-001]])과 테이블([[SYNC-DOM-003]])은 두 구현이 함께 쓴다([[SYNC-STD-001]] 1.9·2.6).
 
-**카드마다 자란다.** 뼈대(2026-10-07)에 카드 L1이 켜기·끄기(4.1)와 로컬 사용자(4.5)를 더했다. 층 표의 줄과 설계 클래스(그림·메서드 표)는 카드마다 그 카드의 MINISPEC과 함께 더한다 — MINISPEC은 카드의 첫 커밋이다([[SYNC-STD-004#DEV-13]]). 카드는 [[SYNC-CODE-002]].
+**카드마다 자란다.** 뼈대(2026-10-07)에 카드 L1이 켜기·끄기(4.1)와 로컬 사용자(4.5)를, 카드 L3가 토큰(4.5)·MCP 입구·파이썬 호환 층(1장)을 더했다. 층 표의 줄과 설계 클래스(그림·메서드 표)는 카드마다 그 카드의 MINISPEC과 함께 더한다 — MINISPEC은 카드의 첫 커밋이다([[SYNC-STD-004#DEV-13]]). 카드는 [[SYNC-CODE-002]].
 
 ---
 
@@ -40,7 +40,7 @@ local/                          싱크독_로컬 (Rust) — 실행 파일 하나
 ├── migrations/                 이전 SQL — 원본은 backend/alembic. `cargo xtask migrations`가 리비전마다
 │                               `alembic upgrade --sql`로 만든다. 손으로 고치지 않는다 (STD-004 DEV-7)
 ├── xtask/                      개발 도구 — pg-fetch(개발용 PostgreSQL 바이너리) · migrations [--check] ·
-│                               schema-check(두 판의 스키마 같음) · test-db-clean · 속도 재기(L17)
+│                               schema-check(두 판의 스키마 같음) · test-db-clean · mcp-tools [--check](L3) · 속도 재기(L17)
 ├── packaging/                  설치 파일 — NSIS(setup.exe)·.deb·AppImage 설정 · MinGit·PostgreSQL 받기 (L4)
 └── target/                     빌드 결과 (gitignore). target/pg/16.15.0 — pg-fetch가 받은 PostgreSQL
 ```
@@ -69,14 +69,29 @@ crates/app/src/
 crates/server/src/
 ├── lib.rs                      라우터 조립 · /health
 ├── state.rs                    AppState — 연결 풀 · 로컬 사용자 설정 · 공개 주소
-└── web/
-    ├── guard.rs                Host·Origin 가드 (SEQ-C3) — 라우팅 바깥에서 모든 요청에
-    ├── auth.rs                 현재 사용자 — 로컬 사용자
-    ├── problem.rs              problem+json 응답 · 405 · 패닉
-    ├── static_files.rs         화면 빌드(rust-embed) · 캐시 규칙 · 304 (INFRA 4.1)
-    ├── schemas.rs              응답 형태 (API-001 4장)
-    └── routes/                 API-001 경로 — account(/api/me) · specs(/specs)
+├── web/
+│   ├── guard.rs                Host·Origin 가드 (SEQ-C3) — 라우팅 바깥에서 모든 요청에
+│   ├── auth.rs                 현재 사용자 — 로컬 사용자
+│   ├── problem.rs              problem+json 응답 · 405 · 패닉
+│   ├── static_files.rs         화면 빌드(rust-embed) · 캐시 규칙 · 304 (INFRA 4.1)
+│   ├── schemas.rs              응답 형태 (API-001 4장)
+│   └── routes/                 API-001 경로 — account(/api/me · /api/me/tokens) · specs(/specs)
+├── mcp/                        /mcp — 파이썬 mcp SDK의 핸드셰이크 경로를 옮긴 것 (API-002 1장, 카드 L3)
+│   ├── auth.rs                 Bearer → AccountService.authenticate_token, 통과하면 응답 전에 커밋 (SEQ-C2)
+│   ├── transport.rs            streamable HTTP, 세션 없음 — Accept·Content-Type·본문 읽기·SSE 쓰기
+│   ├── dispatch.rs             JSON-RPC 봉투 검증 · 메서드 표(판마다) · 요청·알림 나누기 · 오류 꼴
+│   ├── handlers.rs             initialize·ping·tools·resources·prompts — MCPServer와 같은 답
+│   ├── tools.rs                도구 13개 — 인자 검증 후 카드마다 처리기, 없으면 not-implemented
+│   └── declarations.json       도구 선언·안내문·서버 이름 — `cargo xtask mcp-tools`가 파이썬 판에서 만든다. 손으로 안 고친다
+└── compat/                     파이썬 호환 층 — 오류 문장·값 꼴을 파이썬 판과 바이트로 같게 (INFRA 9.8)
+    ├── pyvalue.rs              JSON → 파이썬 값(dict 순서·큰 정수·inf·nan) · repr
+    ├── pyjson.rs               파이썬 `json.loads` — FastAPI 본문·도구 인자 미리 읽기의 오류 위치
+    ├── pydantic.rs             검증 오류 줄·문장·`N validation errors for …` 꼴
+    ├── lax.rs                  pydantic lax 검증 — str·int·float·bool·dict·list·Literal·None
+    └── fastapi.rs              요청 본문·경로 값 → invalid-request(loc·msg)
 ```
+
+**옮긴 판** — `mcp/`와 `compat/`는 파이썬 판이 쓰는 꾸러미의 동작을 옮긴다(사용자 결정 2026-10-08 — 검증 문장까지 바이트로 같다, MCP는 핸드셰이크 경로 전부). 기준 판은 `backend/uv.lock`의 mcp 2.2.0 · pydantic 2.13.5(pydantic-core 2.46.5) · FastAPI 0.141.1 · starlette 1.6.0 · sse-starlette 3.4.11과 Python 3.12다. JSON 읽기는 pydantic-core와 같은 `jiter` crate를 같은 판으로 쓴다. 파이썬 쪽이 판을 올리면 계약 시험의 두 판 차이 시험이 어긋남을 잡는다 — 그때 이 층을 따라 고친다. 2026-07-28 새 프로토콜(`_streamable_http_modern`)은 카드 L18이다
 
 **core/ 안** — 묶음은 파이썬 `core/`와 같다.
 
@@ -99,7 +114,7 @@ crates/core/
     └── infra/                      바깥 — git 자식 프로세스 · upload-pack·receive-pack · 모델 호출
 ```
 
-지금(카드 L1) 있는 것은 `account`·`types.rs`·`errors.rs`·`migrate.rs`다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
+지금(카드 L3) 있는 것은 `account`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
 
 **층** — 함수 단위 명세(MINISPEC 카드·API 엔드포인트·UI 화면)가 없는 코드가 어느 층이고 그 층을 무슨 문서가 정하는지([[SYNC-STD-001]] 2.6). 코드 그래프가 읽는다. 위에서부터 첫 줄이 이긴다. **줄은 카드마다 더한다** — 코드가 없는 줄은 검사기(`check_calls`)가 「안 맞는 줄」로 잡는다. 함수가 없는 파일(구조체만 — `state.rs`·`schemas.rs`·`model.rs`)은 적지 않는다.
 
@@ -107,10 +122,13 @@ crates/core/
 |---|---|---|
 | `local/crates/app/src/main.rs` | 실행 파일 진입 | [[SYNC-INFRA-001]] 9.1 · [[SYNC-MS-012]] |
 | `local/crates/server/src/lib.rs` | 서버 조립·`/health` | [[SYNC-INFRA-001]] 4.1·9.1 |
-| `local/crates/server/src/web/guard.rs` · `local/crates/server/src/web/auth.rs` | 인증 | [[SYNC-INFRA-001]] 5장·9.4 · [[SYNC-SEQ-001#SEQ-C3]] |
+| `local/crates/server/src/web/guard.rs` · `local/crates/server/src/web/auth.rs` · `local/crates/server/src/mcp/auth.rs` | 인증 | [[SYNC-INFRA-001]] 5장·9.4 · [[SYNC-SEQ-001#SEQ-C2]] · [[SYNC-SEQ-001#SEQ-C3]] |
+| `local/crates/server/src/mcp/**` | MCP 입구 | [[SYNC-API-002]] 1장·2장 · [[SYNC-INFRA-001]] 9.8 |
+| `local/crates/server/src/compat/**` | 파이썬 호환 | [[SYNC-INFRA-001]] 9.8 · [[SYNC-DOM-004]] 1장 |
 | `local/crates/server/src/web/problem.rs` · `local/crates/core/src/errors.rs` | 에러 | [[SYNC-STD-004#DEV-5]] · [[SYNC-API-001]] 2장 |
 | `local/crates/server/src/web/static_files.rs` | 정적 파일 | [[SYNC-INFRA-001]] 4.1 |
 | `local/crates/core/src/types.rs` | 열거형·DTO | [[SYNC-DOM-002]] 2.7·2.8 |
+| `local/crates/core/src/clock.rs` | 시각 | [[SYNC-STD-004#DEV-18]] |
 | `local/crates/core/src/*/repo.rs` | 리포지토리 | [[SYNC-DOM-004]] 4장 · [[SYNC-DOM-003]] |
 | `local/crates/*/build.rs` | 빌드 설정 | [[SYNC-STD-004#DEV-7]] · [[SYNC-INFRA-001]] 9.2 |
 | `local/xtask/**` | 개발 도구 | [[SYNC-STD-004#DEV-7]] · [[SYNC-STD-004#DEV-14]] |
@@ -289,6 +307,10 @@ classDiagram
         +db: PgConnection
         +ensure_local_user(login, display_name) UserRow
         +local_user(login, display_name) UserRow
+        +list_tokens(user) Vec~AccessTokenRow~
+        +issue_token(user, label) IssuedToken
+        +revoke_token(user, token_id)
+        +authenticate_token(raw) Option~UserRow~
     }
     class UserRow {
         +i32 id
@@ -299,15 +321,35 @@ classDiagram
         +OffsetDateTime created_at
         +String kind
     }
+    class AccessTokenRow {
+        +i32 id
+        +i32 user_id
+        +String token_hash
+        +String label
+        +OffsetDateTime issued_at
+        +Option~OffsetDateTime~ expires_at
+        +Option~OffsetDateTime~ revoked_at
+        +Option~OffsetDateTime~ last_used_at
+    }
+    class IssuedToken {
+        +AccessTokenRow token
+        +String raw
+    }
     AccountService --> UserRow
+    AccountService --> AccessTokenRow
+    IssuedToken --> AccessTokenRow
 ```
 
 | 메서드 | 부르는 곳 | 근거 | 던지는 에러 |
 |---|---|---|---|
 | [[SYNC-MS-016#AccountService.ensure_local_user]] | 켤 때 `runtime.run` | [[SYNC-MS-006#AccountService.ensure_local_user]] | `internal`(아이디가 남의 것) |
-| [[SYNC-MS-016#AccountService.local_user]] | 웹 입구의 현재 사용자(`web/auth`) — `GET /api/me` | [[SYNC-SEQ-001#SEQ-C3]] | — |
+| [[SYNC-MS-016#AccountService.local_user]] | 웹 입구의 현재 사용자(`web/auth`) — 모든 웹 경로 | [[SYNC-SEQ-001#SEQ-C3]] | — |
+| [[SYNC-MS-016#AccountService.list_tokens]] | `GET /api/me/tokens` | [[SYNC-MS-006#AccountService.list_tokens]] | — |
+| [[SYNC-MS-016#AccountService.issue_token]] | `POST /api/me/tokens` | [[SYNC-MS-006#AccountService.issue_token]] | — |
+| [[SYNC-MS-016#AccountService.revoke_token]] | `DELETE /api/me/tokens/{id}` | [[SYNC-MS-006#AccountService.revoke_token]] | `not-found` |
+| [[SYNC-MS-016#AccountService.authenticate_token]] | MCP 입구(`mcp/auth`) | [[SYNC-SEQ-001#SEQ-C2]] | — |
 
-규칙 — [[SYNC-DOM-002]] 4.6과 같다. 로컬 사용자는 `kind=local` 행 하나뿐이다. 서비스는 연결을 빌려 받고 트랜잭션은 부르는 쪽이 쥔다. 토큰(L3)·커밋 작성자(L11)는 그 카드가 더한다.
+규칙 — [[SYNC-DOM-002]] 4.6과 같다. 로컬 사용자는 `kind=local` 행 하나뿐이다. 서비스는 연결을 빌려 받고 트랜잭션은 부르는 쪽이 쥔다. 토큰 원문은 발급 응답에만 있고 DB·로그에는 해시만 남는다. 커밋 작성자(L11)는 그 카드가 더한다.
 
 ---
 
