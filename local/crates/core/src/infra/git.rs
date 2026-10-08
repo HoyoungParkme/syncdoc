@@ -487,4 +487,79 @@ impl Git {
         }
         Ok(strip(&self.run(w, &[os("rev-parse"), os("HEAD")]).await?).to_string())
     }
+
+    /// SYNC-MS-019#Git.init_specs
+    pub fn init_specs(specs_url: &str) -> IndexMap<String, String> {
+        let mut files = IndexMap::new();
+        for t in SPEC_TYPES {
+            let dir = match stage_of(t) {
+                Some(n) => format!("{n:02}-{t}"),
+                None => t.to_string(),
+            };
+            files.insert(format!("docs/specs/{dir}/.gitkeep"), String::new());
+        }
+        files.insert("docs/specs/assets/.gitkeep".to_string(), String::new());
+        files.insert(
+            "docs/specs/README.md".to_string(),
+            README.replace("{SPECS_URL}", specs_url.trim_end_matches('/')),
+        );
+        files
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn isolates_user_git_config() {
+        let g = Git {
+            exe: "git".into(),
+            global_config: "/tmp/empty-gitconfig".into(),
+        };
+        let c = g.command(None, &[os("status")]);
+        let std = c.as_std();
+        let args: Vec<_> = std
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(&args[..10], ISOLATE.map(str::to_string).as_slice());
+        assert_eq!(args.last().map(String::as_str), Some("status"));
+        let envs: Vec<(String, Option<String>)> = std
+            .get_envs()
+            .map(|(k, v)| {
+                (
+                    k.to_string_lossy().into_owned(),
+                    v.map(|v| v.to_string_lossy().into_owned()),
+                )
+            })
+            .collect();
+        for (k, v) in [
+            ("GIT_CONFIG_NOSYSTEM", "1"),
+            ("GIT_CONFIG_GLOBAL", "/tmp/empty-gitconfig"),
+            ("GIT_TERMINAL_PROMPT", "0"),
+            ("LC_ALL", "C"),
+        ] {
+            assert!(envs.contains(&(k.to_string(), Some(v.to_string()))), "{k}");
+        }
+    }
+
+    #[test]
+    fn glob_like_pure_posix_path_match() {
+        assert!(path_match("docs/specs/02-PRD/x.md", "docs/specs/*/*.md"));
+        assert!(path_match("docs/specs/02-PRD/한글.md", "docs/specs/*/*.md"));
+        assert!(!path_match(
+            "docs/specs/02-PRD/sub/x.md",
+            "docs/specs/*/*.md"
+        ));
+        assert!(!path_match("docs/specs/README.md", "docs/specs/*/*.md"));
+        assert!(path_match("docs/specs/a/.md", "docs/specs/*/*.md"));
+        assert!(!path_match("docs/specs/a/x.mdx", "docs/specs/*/*.md"));
+    }
+
+    #[test]
+    fn strerror_drops_os_error_code() {
+        let e = std::io::Error::from_raw_os_error(21);
+        assert!(!strerror(&e).contains("os error"));
+    }
 }
