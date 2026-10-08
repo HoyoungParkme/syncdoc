@@ -63,11 +63,20 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | L1 |
 | 완료 | 2026-10-08 · 브랜치 `card/L4-installable`(98dcf88 #343) · spec 11 + code 10 · `cargo test` 62 · clippy(리눅스·윈도) · 윈도 `cargo check` · `check_code` Rust 21/21 · `check_calls` 안 맞는 줄 0 · 계약 `--target rust` 130 통과 · 워크플로 — 윈도 setup.exe를 조용히 깔아 켜고 `/health`·`/api/me`, 지운 뒤 데이터 자리가 남는다(러너는 관리자 — 권한을 내려놓고 다시 켜 프로세스 둘) · 리눅스 .deb·AppImage 켜기·끄기 · 태그 `local-v0.1.0` → GitHub Release(정식, setup.exe·.deb·AppImage) · 사람 확인(윈도 트레이·바로 가기·제거)은 따로 · 되먹임: 윈도 관리자 토큰에서 PostgreSQL이 거부 — MS-012 `privilege.drop_admin`(줄인 토큰 + 기본 DACL에 사용자)·DOM-004·INFRA 9.4, `pg_ctl start` 출력은 파이프가 아니라 파일로(윈도에서 서버가 파이프를 물려받는다) |
 
+#### L5 명세 엔진 — frontmatter·규약 검증·항목·diff가 파이썬 판과 바이트로 같다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-MS-002]] · [[SYNC-STD-001]] 1장·3장·4장 · [[SYNC-DOM-004]] 4.3 · [[SYNC-STD-004#DEV-7]] · [[SYNC-STD-004#DEV-16]] · 사용자 결정 2026-10-08(바이트까지·유니코드까지 · 파이썬 diff 버그는 파이썬을 먼저 고친다(#345) · 정답 파일 + 무작위 차이 시험 · 범위는 엔진 + DB 읽는 둘) |
+| 구현 | [[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-014#markdown.masked_lines]] · [[SYNC-MS-014#markdown.headings]] · [[SYNC-MS-014#markdown.cut_blocks]] · [[SYNC-MS-014#SpecService.item_blocks]] · [[SYNC-MS-014#SpecService.validate]] · [[SYNC-MS-014#SpecService.check]] · [[SYNC-MS-014#SpecService.apply_frontmatter]] · [[SYNC-MS-014#SpecService.diff]] · [[SYNC-MS-014#SpecService.diff_bodies]] · 층 코드 — `core/src/pycompat/`(유니코드 표 생성물·strip·repr — server/compat의 `printable.rs`를 내려 옮김·정규식 문자 클래스·difflib) · `spec/{model,repo}.rs` · `types.rs` 열거형·DTO · `Problem::ConventionViolation` · xtask `unicode-tables [--check]`·`spec-golden [--check]`·`spec-diff` |
+| 테스트 | `cargo test` — 정답 파일(`crates/core/tests/golden/spec.json`, 꼴 모음 약 150) 전부 같다 · 지금의 명세 전부 위반 0·경고 0 · 시험 DB로 `item.reused`·복구 예외·`web_revert`·diff의 판 조회·`not-found` · `cargo xtask spec-diff` — 지금의 명세·템플릿 + 명세마다 git 이력 다섯 판 diff + 씨앗 고정 무작위 2000 차이 0 · 계약 몫 없음(HTTP로 닿는 것은 L7부터) — `--target both` 그대로 통과 |
+| 선행 | L1 · #345 |
+| 완료 | — |
+
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
-| L5 명세 엔진 | frontmatter·규약 검증·항목·diff — 파이썬이 만든 정답과 맞춘다 | L1 | L |
 | L6 git·서버 저장 | git 어댑터 · 프로젝트 만들기·지우기(보관)·`init_project` · `get_template`(소유 프로젝트 · 저장소 `STD/`를 먼저, 사용자 결정 2026-10-08) | L3 · L5 | M |
 | L7 저장 파이프라인 | 저장 파이프라인·대기열 읽기·락 · MCP 읽기·쓰기 도구 | L6 | XL |
 | L8 웹 읽기 | 나머지 조회와 GET 경로(UI-2·4·5·7·8·9·15·18) | L7 | L |
@@ -106,6 +115,8 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 **돌리는 법** — `cd contract && uv run pytest --target both`(기본). 파이썬 판은 지금 작업 트리로 이미지를 만들어 띄우고, Rust 판은 `local/`을 빌드해 띄운다(`cargo xtask pg-fetch` 먼저). 시험마다 그 기능을 닫는 카드를 적는다(`@pytest.mark.card("L3")`) — 파이썬 판은 전부 돌고, Rust 판은 이 문서의 완료란이 찬 카드만 돈다(나머지는 건너뜀으로 센다). 카드를 끝내기 전 확인은 `--with-card L3`. **두 판 차이 시험**(카드 L3~)은 같은 무작위 사례(씨앗 고정)를 두 판에 보내 상태·머리·본문을 바이트로 비교한다 — 두 판이 다 떠 있을 때(`--target both`)만 돈다.
 
 **계약 밖** — API-001에 없는 프레임워크 동작은 두 판이 달라도 된다(사용자 결정 2026-10-07): 끝 슬래시 리다이렉트(307) · `/docs`·`/redoc`·`/openapi.json` · GET 경로의 HEAD · Range(206) · ETag 값의 꼴 · Host 머리 없는 요청 · 응답의 `date`·`server`·`connection` 머리와 본문을 나눠 보내는 꼴(chunked·content-length). 화면과 에이전트는 이것들을 쓰지 않는다. **MCP-Protocol-Version 머리가 핸드셰이크 판(2024-11-05~2025-11-25)이 아닌 요청**도 L18까지 계약 밖이다(사용자 결정 2026-10-08).
+
+**명세 엔진**(카드 L5)은 HTTP로 닿기 전이라 계약 시험 대신 정답 파일(`cargo test`)과 `cargo xtask spec-diff`(두 판에 같은 본문을 돌려 바이트 비교)로 맞춘다 — 엔진을 고치면 둘 다 돌린다.
 
 속도는 카드 L17이 잰다 — [[SYNC-PRD-001#R15]]의 수치를 같은 PC에서 두 판을 나란히(9.8).
 
