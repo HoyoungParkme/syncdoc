@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use syncdoc_core::errors::Problem;
 use syncdoc_core::project::service::ProjectService;
@@ -79,7 +79,7 @@ pub async fn init_project(
 pub async fn delete_project(
     State(state): State<AppState>,
     Path(code): Path<String>,
-) -> Result<StatusCode, ApiProblem> {
+) -> Result<Response, ApiProblem> {
     let mut tx = state.pool.begin().await.map_err(Problem::from)?;
     let user = current_user(&mut tx, &state).await?;
     ProjectService {
@@ -89,5 +89,10 @@ pub async fn delete_project(
     .delete_project(&code, &user)
     .await?;
     tx.commit().await.map_err(Problem::from)?;
-    Ok(StatusCode::NO_CONTENT)
+    // FastAPI `status_code=204`에 처리기가 None을 돌려주면 JSONResponse의 머리가 남는다 — 파이썬 판과 같게
+    Ok((
+        StatusCode::NO_CONTENT,
+        [(header::CONTENT_TYPE, "application/json")],
+    )
+        .into_response())
 }

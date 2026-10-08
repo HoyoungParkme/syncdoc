@@ -414,10 +414,10 @@ fn py_json_str(s: &str) -> String {
     serde_json::to_string(s).unwrap_or_default()
 }
 
-/// `CallToolResult(content=[TextContent(text)])`를 판의 꼴로 — 키는 알파벳 차례
+/// `CallToolResult(content=[TextContent(text)])`를 판의 꼴로 — 키는 알파벳 차례, `isError`는 거짓으로 실린다
 fn ok_result(text: &str) -> String {
     format!(
-        "{{\"content\":[{{\"text\":{},\"type\":\"text\"}}]}}",
+        "{{\"content\":[{{\"text\":{},\"type\":\"text\"}}],\"isError\":false}}",
         serde_json::to_string(text).unwrap_or_default()
     )
 }
