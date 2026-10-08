@@ -3,6 +3,7 @@
 SYNC-INFRA-001 9.8 · SYNC-CODE-002 2장. 사례 표(`test_l3_mcp.py`)가 갈림길마다 한 번씩이라면 이것은 그 사이를 메운다 —
 봉투·파라미터·도구 인자의 검증 문장(pydantic)과 JSON 읽기 오류까지. `--diff-count`·`--diff-seed`로 넓힌다.
 Rust 판이 `not-implemented`로 답한 도구 부르기는 그 도구의 카드 전까지 비교하지 않는다(센다).
+카드 L7부터 문서가 실제로 생긴다 — 커밋 해시와 시각(`+00:00`)은 판마다 달라 가린다.
 """
 
 from __future__ import annotations
@@ -263,6 +264,15 @@ def _small_id(seg: str) -> bool:
     return digits.isdigit() and int(digits) < 10**6
 
 
+HASH = re.compile(r"\b[0-9a-f]{40}\b")
+STAMP = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?\+00:00")
+
+
+def mask_saved(reply: dict) -> dict:
+    """저장한 문서의 커밋 해시와 시각 — 판마다 다르다(카드 L7)"""
+    return {**reply, "body": STAMP.sub("T", HASH.sub("H", reply["body"]))}
+
+
 def mask_tokens(body: str) -> str:
     """성공한 발급·목록의 값 — id·시각·원문은 판마다 다르다"""
     body = re.sub(r'"id":\d+', '"id":N', body)
@@ -297,12 +307,16 @@ def test_mcp_both_editions_answer_alike(both, request_count):
         hs = rand_headers(r, "{t}")
         if method == "GET":
             continue  # 끝나지 않는 SSE — 사례 표가 본다
-        a = request(
-            py.port, method, "/mcp", [(k, v.replace("{t}", tok_py)) for k, v in hs], body
-        ).contract()
-        b = request(
-            rs.port, method, "/mcp", [(k, v.replace("{t}", tok_rs)) for k, v in hs], body
-        ).contract()
+        a = mask_saved(
+            request(
+                py.port, method, "/mcp", [(k, v.replace("{t}", tok_py)) for k, v in hs], body
+            ).contract()
+        )
+        b = mask_saved(
+            request(
+                rs.port, method, "/mcp", [(k, v.replace("{t}", tok_rs)) for k, v in hs], body
+            ).contract()
+        )
         if "urn:syncdoc:not-implemented" in b["body"]:
             skipped += 1
             continue

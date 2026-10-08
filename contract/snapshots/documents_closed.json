@@ -1,0 +1,902 @@
+{
+ "create_empty_project": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"project None 없음\\\", \\\"resource\\\": \\\"project\\\", \\\"id\\\": \\\"None\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "create_no_project": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"project NOPE 없음\\\", \\\"resource\\\": \\\"project\\\", \\\"id\\\": \\\"NOPE\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "create_other_id": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:convention-violation\\\", \\\"title\\\": \\\"convention-violation\\\", \\\"status\\\": 422, \\\"detail\\\": \\\"규약 위반\\\", \\\"violations\\\": [{\\\"line\\\": 2, \\\"rule\\\": \\\"frontmatter.doc_id\\\", \\\"message\\\": \\\"발급 LDA-PRD-002와 다름: LDA-PRD-007\\\"}], \\\"warnings\\\": []}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "delete_r2_ask": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:item-deletion-needs-confirm\\\", \\\"title\\\": \\\"item-deletion-needs-confirm\\\", \\\"status\\\": 409, \\\"detail\\\": \\\"항목 삭제에 하위 참조가 있음\\\", \\\"deleted_items\\\": [{\\\"item_id\\\": \\\"R2\\\", \\\"downstream\\\": [{\\\"doc_id\\\": \\\"LDA-SCN-001\\\", \\\"item_id\\\": \\\"S1\\\", \\\"display_name\\\": \\\"첫 흐름\\\"}]}]}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "delete_r2_confirm": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-PRD-001\\\", \\\"version_no\\\": 4, \\\"commit_hash\\\": \\\"H\\\", \\\"status\\\": \\\"draft\\\", \\\"warnings\\\": [\\\"ref.broken: 1\\\"], \\\"next_step\\\": \\\"LDA-PRD-001 v4 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)\\\"}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "dom_class_unmet": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:precondition-unmet\\\", \\\"title\\\": \\\"precondition-unmet\\\", \\\"status\\\": 422, \\\"detail\\\": \\\"먼저 있어야 한다: API 문서(REST 또는 MCP) — 클래스의 메서드는 API가 정한다\\\", \\\"requires\\\": \\\"API 문서(REST 또는 MCP) — 클래스의 메서드는 API가 정한다\\\", \\\"have\\\": []}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "dom_no_subtype": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:convention-violation\\\", \\\"title\\\": \\\"convention-violation\\\", \\\"status\\\": 422, \\\"detail\\\": \\\"규약 위반\\\", \\\"violations\\\": [{\\\"line\\\": 2, \\\"rule\\\": \\\"frontmatter.title.subtype\\\", \\\"message\\\": \\\"DOM 제목에 「도메인」·「클래스」·「ERD」 중 하나가 있어야 한다\\\"}], \\\"warnings\\\": [{\\\"rule\\\": \\\"item.none\\\", \\\"message\\\": \\\"\\\"}]}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "get_empty": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"project  없음\\\", \\\"resource\\\": \\\"project\\\", \\\"id\\\": \\\"\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "get_missing_doc": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"document LDA-PRD-404 없음\\\", \\\"resource\\\": \\\"document\\\", \\\"id\\\": \\\"LDA-PRD-404\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "get_other_project": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"project NOPE 없음\\\", \\\"resource\\\": \\\"project\\\", \\\"id\\\": \\\"NOPE\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "get_prd": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-PRD-001\\\", \\\"doc_type\\\": \\\"PRD\\\", \\\"stage\\\": 2, \\\"status\\\": \\\"draft\\\", \\\"version_no\\\": 1, \\\"has_convention_error\\\": false, \\\"incomplete_warnings\\\": [], \\\"updated_at\\\": \\\"T\\\", \\\"last_author\\\": {\\\"kind\\\": \\\"agent\\\", \\\"user\\\": \\\"local\\\", \\\"instructed_by\\\": \\\"local\\\", \\\"via\\\": \\\"mcp\\\"}, \\\"counts\\\": {}, \\\"commit_hash\\\": \\\"H\\\", \\\"convention_error_detail\\\": null, \\\"body\\\": \\\"---\\\\ndoc_id: LDA-PRD-001\\\\ntype: PRD\\\\ntitle: 문서 시험\\\\nstatus: draft\\\\n---\\\\n# 문서 시험\\\\n\\\\n## 1. 목표\\\\n\\\\n#### G1 첫 목표\\\\n한 줄.\\\\n\\\\n## 2. 비목표\\\\n\\\\n## 3. 요구사항\\\\n\\\\n#### R1 첫 기능\\\\n설명. 근거 [[LDA-RFQ-001#Q1]]\\\\n\\\\n#### R2 둘째 기능\\\\n설명.\\\\n\\\\n## 4. 성공지표\\\\n\\\\n## 5. 미결사항\\\\n\\\", \\\"items\\\": [{\\\"item_id\\\": \\\"G1\\\", \\\"display_name\\\": \\\"첫 목표\\\", \\\"missing_refs\\\": []}, {\\\"item_id\\\": \\\"R1\\\", \\\"display_name\\\": \\\"첫 기능\\\", \\\"missing_refs\\\": [\\\"LDA-RFQ-001#Q1\\\"]}, {\\\"item_id\\\": \\\"R2\\\", \\\"display_name\\\": \\\"둘째 기능\\\", \\\"missing_refs\\\": []}], \\\"prev_doc_id\\\": null, \\\"next_doc_id\\\": \\\"LDA-SCN-001\\\"}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "get_scn": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-SCN-001\\\", \\\"doc_type\\\": \\\"SCN\\\", \\\"stage\\\": 3, \\\"status\\\": \\\"draft\\\", \\\"version_no\\\": 1, \\\"has_convention_error\\\": false, \\\"incomplete_warnings\\\": [], \\\"updated_at\\\": \\\"T\\\", \\\"last_author\\\": {\\\"kind\\\": \\\"agent\\\", \\\"user\\\": \\\"local\\\", \\\"instructed_by\\\": \\\"local\\\", \\\"via\\\": \\\"mcp\\\"}, \\\"counts\\\": {}, \\\"commit_hash\\\": \\\"H\\\", \\\"convention_error_detail\\\": null, \\\"body\\\": \\\"---\\\\ndoc_id: LDA-SCN-001\\\\ntype: SCN\\\\ntitle: 시나리오\\\\nstatus: draft\\\\nupstream: [LDA-PRD-001]\\\\n---\\\\n# 시나리오\\\\n\\\\n## 1. 페르소나\\\\n\\\\n#### P1 사람\\\\n누구.\\\\n\\\\n## 2. 시나리오\\\\n\\\\n#### S1 첫 흐름\\\\n근거: [[LDA-PRD-001#R2]] · [[LDA-UC-001#UC-A1]] · [[#P1]]\\\\n\\\\n## 3. 대응표\\\\n\\\\n표에서 [[LDA-PRD-001#R1]] · [[LDA-PRD-001]]\\\\n\\\", \\\"items\\\": [{\\\"item_id\\\": \\\"P1\\\", \\\"display_name\\\": \\\"사람\\\", \\\"missing_refs\\\": []}, {\\\"item_id\\\": \\\"S1\\\", \\\"display_name\\\": \\\"첫 흐름\\\", \\\"missing_refs\\\": [\\\"LDA-UC-001#UC-A1\\\"]}], \\\"prev_doc_id\\\": \\\"LDA-PRD-001\\\", \\\"next_doc_id\\\": null}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "get_scn_broken": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-SCN-001\\\", \\\"doc_type\\\": \\\"SCN\\\", \\\"stage\\\": 3, \\\"status\\\": \\\"draft\\\", \\\"version_no\\\": 1, \\\"has_convention_error\\\": false, \\\"incomplete_warnings\\\": [], \\\"updated_at\\\": \\\"T\\\", \\\"last_author\\\": {\\\"kind\\\": \\\"agent\\\", \\\"user\\\": \\\"local\\\", \\\"instructed_by\\\": \\\"local\\\", \\\"via\\\": \\\"mcp\\\"}, \\\"counts\\\": {}, \\\"commit_hash\\\": \\\"H\\\", \\\"convention_error_detail\\\": null, \\\"body\\\": \\\"---\\\\ndoc_id: LDA-SCN-001\\\\ntype: SCN\\\\ntitle: 시나리오\\\\nstatus: draft\\\\nupstream: [LDA-PRD-001]\\\\n---\\\\n# 시나리오\\\\n\\\\n## 1. 페르소나\\\\n\\\\n#### P1 사람\\\\n누구.\\\\n\\\\n## 2. 시나리오\\\\n\\\\n#### S1 첫 흐름\\\\n근거: [[LDA-PRD-001#R2]] · [[LDA-UC-001#UC-A1]] · [[#P1]]\\\\n\\\\n## 3. 대응표\\\\n\\\\n표에서 [[LDA-PRD-001#R1]] · [[LDA-PRD-001]]\\\\n\\\", \\\"items\\\": [{\\\"item_id\\\": \\\"P1\\\", \\\"display_name\\\": \\\"사람\\\", \\\"missing_refs\\\": []}, {\\\"item_id\\\": \\\"S1\\\", \\\"display_name\\\": \\\"첫 흐름\\\", \\\"missing_refs\\\": [\\\"LDA-PRD-001#R2\\\", \\\"LDA-UC-001#UC-A1\\\"]}], \\\"prev_doc_id\\\": \\\"LDA-PRD-001\\\", \\\"next_doc_id\\\": null}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "init": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"code\\\": \\\"LDA\\\", \\\"name\\\": \\\"문서 시험\\\", \\\"storage\\\": \\\"server\\\", \\\"remote_url\\\": null, \\\"stages\\\": [{\\\"stage\\\": 1, \\\"doc_type\\\": \\\"RFQ\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 2, \\\"doc_type\\\": \\\"PRD\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 3, \\\"doc_type\\\": \\\"SCN\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 4, \\\"doc_type\\\": \\\"UC\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 5, \\\"doc_type\\\": \\\"INFRA\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 6, \\\"doc_type\\\": \\\"DOM\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 7, \\\"doc_type\\\": \\\"UI\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 8, \\\"doc_type\\\": \\\"API\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 9, \\\"doc_type\\\": \\\"SEQ\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 10, \\\"doc_type\\\": \\\"MS\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 11, \\\"doc_type\\\": \\\"CODE\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}], \\\"std_docs\\\": [], \\\"counts\\\": {\\\"broken_ref\\\": 0, \\\"convention_errors\\\": 0, \\\"incomplete\\\": 0}, \\\"updated_at\\\": null}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "item_last": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-SCN-001\\\", \\\"item_id\\\": \\\"S1\\\", \\\"display_name\\\": \\\"첫 흐름\\\", \\\"doc_status\\\": \\\"draft\\\", \\\"doc_version_no\\\": 1, \\\"body\\\": \\\"#### S1 첫 흐름\\\\n근거: [[LDA-PRD-001#R2]] · [[LDA-UC-001#UC-A1]] · [[#P1]]\\\\n\\\"}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "item_missing": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"item LDA-PRD-001#R9 없음\\\", \\\"resource\\\": \\\"item\\\", \\\"id\\\": \\\"LDA-PRD-001#R9\\\", \\\"available_items\\\": [\\\"G1\\\", \\\"R1\\\", \\\"R2\\\"]}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "item_no_doc": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"document LDA-PRD-404 없음\\\", \\\"resource\\\": \\\"document\\\", \\\"id\\\": \\\"LDA-PRD-404\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "item_r1": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-PRD-001\\\", \\\"item_id\\\": \\\"R1\\\", \\\"display_name\\\": \\\"첫 기능\\\", \\\"doc_status\\\": \\\"draft\\\", \\\"doc_version_no\\\": 1, \\\"body\\\": \\\"#### R1 첫 기능\\\\n설명. 근거 [[LDA-RFQ-001#Q1]]\\\\n\\\"}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "item_r2_deleted": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:item-deleted\\\", \\\"title\\\": \\\"item-deleted\\\", \\\"status\\\": 410, \\\"detail\\\": \\\"삭제된 항목\\\", \\\"deleted_at\\\": \\\"T\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "item_tilde": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"item LDA-PRD-001#R/1 없음\\\", \\\"resource\\\": \\\"item\\\", \\\"id\\\": \\\"LDA-PRD-001#R/1\\\", \\\"available_items\\\": [\\\"G1\\\", \\\"R1\\\", \\\"R2\\\"]}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "list_after": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"project_code\\\": \\\"LDA\\\", \\\"stages\\\": [{\\\"stage\\\": 1, \\\"doc_type\\\": \\\"RFQ\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 2, \\\"doc_type\\\": \\\"PRD\\\", \\\"status\\\": \\\"draft\\\", \\\"doc_count\\\": 1, \\\"docs\\\": [{\\\"doc_id\\\": \\\"LDA-PRD-001\\\", \\\"doc_type\\\": \\\"PRD\\\", \\\"stage\\\": 2, \\\"status\\\": \\\"draft\\\", \\\"version_no\\\": 4, \\\"has_convention_error\\\": false, \\\"incomplete_warnings\\\": [], \\\"updated_at\\\": \\\"T\\\", \\\"last_author\\\": {\\\"kind\\\": \\\"agent\\\", \\\"user\\\": \\\"local\\\", \\\"instructed_by\\\": \\\"local\\\", \\\"via\\\": \\\"mcp\\\"}, \\\"counts\\\": {\\\"broken_ref\\\": 1}}]}, {\\\"stage\\\": 3, \\\"doc_type\\\": \\\"SCN\\\", \\\"status\\\": \\\"draft\\\", \\\"doc_count\\\": 1, \\\"docs\\\": [{\\\"doc_id\\\": \\\"LDA-SCN-001\\\", \\\"doc_type\\\": \\\"SCN\\\", \\\"stage\\\": 3, \\\"status\\\": \\\"draft\\\", \\\"version_no\\\": 1, \\\"has_convention_error\\\": false, \\\"incomplete_warnings\\\": [], \\\"updated_at\\\": \\\"T\\\", \\\"last_author\\\": {\\\"kind\\\": \\\"agent\\\", \\\"user\\\": \\\"local\\\", \\\"instructed_by\\\": \\\"local\\\", \\\"via\\\": \\\"mcp\\\"}, \\\"counts\\\": {\\\"broken_ref\\\": 1}}]}, {\\\"stage\\\": 4, \\\"doc_type\\\": \\\"UC\\\", \\\"status\\\": \\\"draft\\\", \\\"doc_count\\\": 1, \\\"docs\\\": [{\\\"doc_id\\\": \\\"LDA-UC-001\\\", \\\"doc_type\\\": \\\"UC\\\", \\\"stage\\\": 4, \\\"status\\\": \\\"draft\\\", \\\"version_no\\\": 1, \\\"has_convention_error\\\": false, \\\"incomplete_warnings\\\": [], \\\"updated_at\\\": \\\"T\\\", \\\"last_author\\\": {\\\"kind\\\": \\\"agent\\\", \\\"user\\\": \\\"local\\\", \\\"instructed_by\\\": \\\"local\\\", \\\"via\\\": \\\"mcp\\\"}, \\\"counts\\\": {\\\"broken_ref\\\": 0}}]}, {\\\"stage\\\": 5, \\\"doc_type\\\": \\\"INFRA\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 6, \\\"doc_type\\\": \\\"DOM\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 7, \\\"doc_type\\\": \\\"UI\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 8, \\\"doc_type\\\": \\\"API\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 9, \\\"doc_type\\\": \\\"SEQ\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 10, \\\"doc_type\\\": \\\"MS\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 11, \\\"doc_type\\\": \\\"CODE\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}]}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "list_all": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"project_code\\\": \\\"LDA\\\", \\\"stages\\\": [{\\\"stage\\\": 1, \\\"doc_type\\\": \\\"RFQ\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 2, \\\"doc_type\\\": \\\"PRD\\\", \\\"status\\\": \\\"draft\\\", \\\"doc_count\\\": 1, \\\"docs\\\": [{\\\"doc_id\\\": \\\"LDA-PRD-001\\\", \\\"doc_type\\\": \\\"PRD\\\", \\\"stage\\\": 2, \\\"status\\\": \\\"draft\\\", \\\"version_no\\\": 1, \\\"has_convention_error\\\": false, \\\"incomplete_warnings\\\": [], \\\"updated_at\\\": \\\"T\\\", \\\"last_author\\\": {\\\"kind\\\": \\\"agent\\\", \\\"user\\\": \\\"local\\\", \\\"instructed_by\\\": \\\"local\\\", \\\"via\\\": \\\"mcp\\\"}, \\\"counts\\\": {\\\"broken_ref\\\": 1}}]}, {\\\"stage\\\": 3, \\\"doc_type\\\": \\\"SCN\\\", \\\"status\\\": \\\"draft\\\", \\\"doc_count\\\": 1, \\\"docs\\\": [{\\\"doc_id\\\": \\\"LDA-SCN-001\\\", \\\"doc_type\\\": \\\"SCN\\\", \\\"stage\\\": 3, \\\"status\\\": \\\"draft\\\", \\\"version_no\\\": 1, \\\"has_convention_error\\\": false, \\\"incomplete_warnings\\\": [], \\\"updated_at\\\": \\\"T\\\", \\\"last_author\\\": {\\\"kind\\\": \\\"agent\\\", \\\"user\\\": \\\"local\\\", \\\"instructed_by\\\": \\\"local\\\", \\\"via\\\": \\\"mcp\\\"}, \\\"counts\\\": {\\\"broken_ref\\\": 1}}]}, {\\\"stage\\\": 4, \\\"doc_type\\\": \\\"UC\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 5, \\\"doc_type\\\": \\\"INFRA\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 6, \\\"doc_type\\\": \\\"DOM\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 7, \\\"doc_type\\\": \\\"UI\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 8, \\\"doc_type\\\": \\\"API\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 9, \\\"doc_type\\\": \\\"SEQ\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 10, \\\"doc_type\\\": \\\"MS\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 11, \\\"doc_type\\\": \\\"CODE\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}]}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "list_draft": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"project_code\\\": \\\"LDA\\\", \\\"stages\\\": [{\\\"stage\\\": 1, \\\"doc_type\\\": \\\"RFQ\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 2, \\\"doc_type\\\": \\\"PRD\\\", \\\"status\\\": \\\"draft\\\", \\\"doc_count\\\": 1, \\\"docs\\\": [{\\\"doc_id\\\": \\\"LDA-PRD-001\\\", \\\"doc_type\\\": \\\"PRD\\\", \\\"stage\\\": 2, \\\"status\\\": \\\"draft\\\", \\\"version_no\\\": 1, \\\"has_convention_error\\\": false, \\\"incomplete_warnings\\\": [], \\\"updated_at\\\": \\\"T\\\", \\\"last_author\\\": {\\\"kind\\\": \\\"agent\\\", \\\"user\\\": \\\"local\\\", \\\"instructed_by\\\": \\\"local\\\", \\\"via\\\": \\\"mcp\\\"}, \\\"counts\\\": {\\\"broken_ref\\\": 1}}]}, {\\\"stage\\\": 3, \\\"doc_type\\\": \\\"SCN\\\", \\\"status\\\": \\\"draft\\\", \\\"doc_count\\\": 1, \\\"docs\\\": [{\\\"doc_id\\\": \\\"LDA-SCN-001\\\", \\\"doc_type\\\": \\\"SCN\\\", \\\"stage\\\": 3, \\\"status\\\": \\\"draft\\\", \\\"version_no\\\": 1, \\\"has_convention_error\\\": false, \\\"incomplete_warnings\\\": [], \\\"updated_at\\\": \\\"T\\\", \\\"last_author\\\": {\\\"kind\\\": \\\"agent\\\", \\\"user\\\": \\\"local\\\", \\\"instructed_by\\\": \\\"local\\\", \\\"via\\\": \\\"mcp\\\"}, \\\"counts\\\": {\\\"broken_ref\\\": 1}}]}, {\\\"stage\\\": 4, \\\"doc_type\\\": \\\"UC\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 5, \\\"doc_type\\\": \\\"INFRA\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 6, \\\"doc_type\\\": \\\"DOM\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 7, \\\"doc_type\\\": \\\"UI\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 8, \\\"doc_type\\\": \\\"API\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 9, \\\"doc_type\\\": \\\"SEQ\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 10, \\\"doc_type\\\": \\\"MS\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 11, \\\"doc_type\\\": \\\"CODE\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}]}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "list_no_project": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"project NOPE 없음\\\", \\\"resource\\\": \\\"project\\\", \\\"id\\\": \\\"NOPE\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "list_stage0": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"project_code\\\": \\\"LDA\\\", \\\"stages\\\": []}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "list_stage2": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"project_code\\\": \\\"LDA\\\", \\\"stages\\\": [{\\\"stage\\\": 2, \\\"doc_type\\\": \\\"PRD\\\", \\\"status\\\": \\\"draft\\\", \\\"doc_count\\\": 1, \\\"docs\\\": [{\\\"doc_id\\\": \\\"LDA-PRD-001\\\", \\\"doc_type\\\": \\\"PRD\\\", \\\"stage\\\": 2, \\\"status\\\": \\\"draft\\\", \\\"version_no\\\": 1, \\\"has_convention_error\\\": false, \\\"incomplete_warnings\\\": [], \\\"updated_at\\\": \\\"T\\\", \\\"last_author\\\": {\\\"kind\\\": \\\"agent\\\", \\\"user\\\": \\\"local\\\", \\\"instructed_by\\\": \\\"local\\\", \\\"via\\\": \\\"mcp\\\"}, \\\"counts\\\": {\\\"broken_ref\\\": 1}}]}]}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "list_stage_huge": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"project_code\\\": \\\"LDA\\\", \\\"stages\\\": []}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "list_stage_str": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"project_code\\\": \\\"LDA\\\", \\\"stages\\\": [{\\\"stage\\\": 3, \\\"doc_type\\\": \\\"SCN\\\", \\\"status\\\": \\\"draft\\\", \\\"doc_count\\\": 1, \\\"docs\\\": [{\\\"doc_id\\\": \\\"LDA-SCN-001\\\", \\\"doc_type\\\": \\\"SCN\\\", \\\"stage\\\": 3, \\\"status\\\": \\\"draft\\\", \\\"version_no\\\": 1, \\\"has_convention_error\\\": false, \\\"incomplete_warnings\\\": [], \\\"updated_at\\\": \\\"T\\\", \\\"last_author\\\": {\\\"kind\\\": \\\"agent\\\", \\\"user\\\": \\\"local\\\", \\\"instructed_by\\\": \\\"local\\\", \\\"via\\\": \\\"mcp\\\"}, \\\"counts\\\": {\\\"broken_ref\\\": 1}}]}]}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "list_status_other": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"project_code\\\": \\\"LDA\\\", \\\"stages\\\": [{\\\"stage\\\": 1, \\\"doc_type\\\": \\\"RFQ\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 2, \\\"doc_type\\\": \\\"PRD\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 3, \\\"doc_type\\\": \\\"SCN\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 4, \\\"doc_type\\\": \\\"UC\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 5, \\\"doc_type\\\": \\\"INFRA\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 6, \\\"doc_type\\\": \\\"DOM\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 7, \\\"doc_type\\\": \\\"UI\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 8, \\\"doc_type\\\": \\\"API\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 9, \\\"doc_type\\\": \\\"SEQ\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 10, \\\"doc_type\\\": \\\"MS\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}, {\\\"stage\\\": 11, \\\"doc_type\\\": \\\"CODE\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"docs\\\": []}]}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "lower_type": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:convention-violation\\\", \\\"title\\\": \\\"convention-violation\\\", \\\"status\\\": 422, \\\"detail\\\": \\\"규약 위반\\\", \\\"violations\\\": [{\\\"line\\\": 2, \\\"rule\\\": \\\"frontmatter.type\\\", \\\"message\\\": \\\"type 'prd'\\\"}, {\\\"line\\\": 2, \\\"rule\\\": \\\"frontmatter.doc_id\\\", \\\"message\\\": \\\"형식 'LDA-prd-001'\\\"}], \\\"warnings\\\": [{\\\"rule\\\": \\\"item.none\\\", \\\"message\\\": \\\"\\\"}]}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "prd_create": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-PRD-001\\\", \\\"version_no\\\": 1, \\\"commit_hash\\\": \\\"H\\\", \\\"status\\\": \\\"draft\\\", \\\"warnings\\\": [], \\\"next_step\\\": \\\"LDA-PRD-001 v1 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)\\\"}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "prd_padding": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:convention-violation\\\", \\\"title\\\": \\\"convention-violation\\\", \\\"status\\\": 422, \\\"detail\\\": \\\"규약 위반\\\", \\\"violations\\\": [{\\\"line\\\": 21, \\\"rule\\\": \\\"item.padding\\\", \\\"message\\\": \\\"R02\\\"}], \\\"warnings\\\": []}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "refs_lonely": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-PRD-001\\\", \\\"item_id\\\": \\\"G1\\\", \\\"upstream\\\": [], \\\"downstream\\\": []}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "refs_missing": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"item LDA-PRD-001#R9 없음\\\", \\\"resource\\\": \\\"item\\\", \\\"id\\\": \\\"LDA-PRD-001#R9\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "refs_r1": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-PRD-001\\\", \\\"item_id\\\": \\\"R1\\\", \\\"upstream\\\": [{\\\"doc_id\\\": null, \\\"item_id\\\": null, \\\"display_name\\\": null, \\\"raw_target\\\": \\\"LDA-RFQ-001#Q1\\\", \\\"is_missing\\\": true}], \\\"downstream\\\": [{\\\"doc_id\\\": \\\"LDA-SCN-001\\\", \\\"item_id\\\": null, \\\"display_name\\\": \\\"시나리오\\\", \\\"raw_target\\\": \\\"LDA-PRD-001#R1\\\", \\\"is_missing\\\": false}]}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "refs_r2": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-PRD-001\\\", \\\"item_id\\\": \\\"R2\\\", \\\"upstream\\\": [], \\\"downstream\\\": [{\\\"doc_id\\\": \\\"LDA-SCN-001\\\", \\\"item_id\\\": \\\"S1\\\", \\\"display_name\\\": \\\"첫 흐름\\\", \\\"raw_target\\\": \\\"LDA-PRD-001#R2\\\", \\\"is_missing\\\": false}]}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "refs_r2_deleted": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:item-deleted\\\", \\\"title\\\": \\\"item-deleted\\\", \\\"status\\\": 410, \\\"detail\\\": \\\"삭제된 항목\\\", \\\"deleted_at\\\": \\\"T\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "refs_s1": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-SCN-001\\\", \\\"item_id\\\": \\\"S1\\\", \\\"upstream\\\": [{\\\"doc_id\\\": \\\"LDA-PRD-001\\\", \\\"item_id\\\": \\\"R2\\\", \\\"display_name\\\": \\\"둘째 기능\\\", \\\"raw_target\\\": \\\"LDA-PRD-001#R2\\\", \\\"is_missing\\\": false}, {\\\"doc_id\\\": null, \\\"item_id\\\": null, \\\"display_name\\\": null, \\\"raw_target\\\": \\\"LDA-UC-001#UC-A1\\\", \\\"is_missing\\\": true}, {\\\"doc_id\\\": \\\"LDA-SCN-001\\\", \\\"item_id\\\": \\\"P1\\\", \\\"display_name\\\": \\\"사람\\\", \\\"raw_target\\\": \\\"#P1\\\", \\\"is_missing\\\": false}], \\\"downstream\\\": []}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "refs_s1_after_uc": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-SCN-001\\\", \\\"item_id\\\": \\\"S1\\\", \\\"upstream\\\": [{\\\"doc_id\\\": null, \\\"item_id\\\": null, \\\"display_name\\\": null, \\\"raw_target\\\": \\\"LDA-PRD-001#R2\\\", \\\"is_missing\\\": true}, {\\\"doc_id\\\": \\\"LDA-UC-001\\\", \\\"item_id\\\": \\\"UC-A1\\\", \\\"display_name\\\": \\\"첫 일\\\", \\\"raw_target\\\": \\\"LDA-UC-001#UC-A1\\\", \\\"is_missing\\\": false}, {\\\"doc_id\\\": \\\"LDA-SCN-001\\\", \\\"item_id\\\": \\\"P1\\\", \\\"display_name\\\": \\\"사람\\\", \\\"raw_target\\\": \\\"#P1\\\", \\\"is_missing\\\": false}], \\\"downstream\\\": [{\\\"doc_id\\\": \\\"LDA-UC-001\\\", \\\"item_id\\\": \\\"UC-A1\\\", \\\"display_name\\\": \\\"첫 일\\\", \\\"raw_target\\\": \\\"LDA-SCN-001#S1\\\", \\\"is_missing\\\": false}]}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "reuse_r2": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:convention-violation\\\", \\\"title\\\": \\\"convention-violation\\\", \\\"status\\\": 422, \\\"detail\\\": \\\"규약 위반\\\", \\\"violations\\\": [{\\\"line\\\": 21, \\\"rule\\\": \\\"item.reused\\\", \\\"message\\\": \\\"R2 — 삭제된 항목 ID 재사용\\\"}], \\\"warnings\\\": []}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "scn_create": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-SCN-001\\\", \\\"version_no\\\": 1, \\\"commit_hash\\\": \\\"H\\\", \\\"status\\\": \\\"draft\\\", \\\"warnings\\\": [], \\\"next_step\\\": \\\"LDA-SCN-001 v1 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)\\\"}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "uc_create": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-UC-001\\\", \\\"version_no\\\": 1, \\\"commit_hash\\\": \\\"H\\\", \\\"status\\\": \\\"draft\\\", \\\"warnings\\\": [], \\\"next_step\\\": \\\"LDA-UC-001 v1 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)\\\"}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "unknown_type": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:convention-violation\\\", \\\"title\\\": \\\"convention-violation\\\", \\\"status\\\": 422, \\\"detail\\\": \\\"규약 위반\\\", \\\"violations\\\": [{\\\"line\\\": 2, \\\"rule\\\": \\\"frontmatter.type\\\", \\\"message\\\": \\\"type 'XYZ'\\\"}], \\\"warnings\\\": [{\\\"rule\\\": \\\"item.none\\\", \\\"message\\\": \\\"\\\"}]}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "update_empty_id": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"project None 없음\\\", \\\"resource\\\": \\\"project\\\", \\\"id\\\": \\\"None\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "update_empty_message": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"Error executing tool update_document\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "update_no_doc": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"document LDA-PRD-404 없음\\\", \\\"resource\\\": \\\"document\\\", \\\"id\\\": \\\"LDA-PRD-404\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "update_r1": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-PRD-001\\\", \\\"version_no\\\": 3, \\\"commit_hash\\\": \\\"H\\\", \\\"status\\\": \\\"draft\\\", \\\"warnings\\\": [], \\\"next_step\\\": \\\"LDA-PRD-001 v3 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)\\\"}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "update_same_body": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LDA-PRD-001\\\", \\\"version_no\\\": 2, \\\"commit_hash\\\": \\\"H\\\", \\\"status\\\": \\\"draft\\\", \\\"warnings\\\": [], \\\"next_step\\\": \\\"LDA-PRD-001 v2 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)\\\"}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "update_stale": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:version-conflict\\\", \\\"title\\\": \\\"version-conflict\\\", \\\"status\\\": 409, \\\"detail\\\": \\\"버전 불일치\\\", \\\"current_version\\\": 1, \\\"current_body\\\": \\\"---\\\\ndoc_id: LDA-PRD-001\\\\ntype: PRD\\\\ntitle: 문서 시험\\\\nstatus: draft\\\\n---\\\\n# 문서 시험\\\\n\\\\n## 1. 목표\\\\n\\\\n#### G1 첫 목표\\\\n한 줄.\\\\n\\\\n## 2. 비목표\\\\n\\\\n## 3. 요구사항\\\\n\\\\n#### R1 첫 기능\\\\n설명. 근거 [[LDA-RFQ-001#Q1]]\\\\n\\\\n#### R2 둘째 기능\\\\n설명.\\\\n\\\\n## 4. 성공지표\\\\n\\\\n## 5. 미결사항\\\\n\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "update_status_change": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:convention-violation\\\", \\\"title\\\": \\\"convention-violation\\\", \\\"status\\\": 422, \\\"detail\\\": \\\"규약 위반\\\", \\\"violations\\\": [{\\\"line\\\": 2, \\\"rule\\\": \\\"frontmatter.status_change\\\", \\\"message\\\": \\\"상태 변경은 웹에서만(UC-H8)\\\"}], \\\"warnings\\\": []}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ }
+}
