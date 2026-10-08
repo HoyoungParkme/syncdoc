@@ -2,7 +2,6 @@
 //! 오류 문장과 값 꼴을 바이트로 같게 한다 (SYNC-DOM-004 1장 compat · SYNC-INFRA-001 9.8).
 
 pub mod fastapi;
-pub mod printable;
 pub mod pydantic;
 pub mod pyjson;
 pub mod pyvalue;

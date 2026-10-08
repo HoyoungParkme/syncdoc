@@ -8,6 +8,7 @@
 //! - `test-db-clean` — 시험이 남긴 `syncdoc_local_test_*` DB를 지운다
 //! - `icon` — `packaging/icon.svg`에서 icon.ico·icon.png·tray.rgba를 만든다(카드 L4)
 //! - `mcp-tools [--check]` — 파이썬 판 MCP 서버에서 `crates/server/src/mcp/declarations.json`을 뽑는다(카드 L3)
+//! - `unicode-tables [--check]` — 파이썬 3.12의 문자 분류 표 `crates/core/src/pycompat/unicode.rs`를 뽑는다(카드 L5)
 
 mod icon;
 mod mcp_tools;
@@ -16,9 +17,11 @@ mod package;
 mod pg_fetch;
 mod schema;
 mod testdb;
+mod unicode_tables;
 
+use std::ffi::OsStr;
 use std::path::PathBuf;
-use std::process::ExitCode;
+use std::process::{Command, ExitCode};
 
 use clap::{Parser, Subcommand};
 
@@ -58,6 +61,11 @@ enum Cmd {
         #[arg(long)]
         check: bool,
     },
+    /// 파이썬 문자 분류 표를 뽑는다 (--check: 다시 뽑아 비교만)
+    UnicodeTables {
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 #[tokio::main]
@@ -70,6 +78,7 @@ async fn main() -> ExitCode {
         Cmd::TestDbClean => testdb::clean().await,
         Cmd::McpTools { check } => mcp_tools::run(check),
         Cmd::Icon => icon::run(),
+        Cmd::UnicodeTables { check } => unicode_tables::run(check),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -91,4 +100,25 @@ pub fn local_root() -> PathBuf {
 /// 저장소 뿌리 — `local/` 한 단계 위
 pub fn repo_root() -> PathBuf {
     local_root().parent().expect("저장소 뿌리").to_path_buf()
+}
+
+/// `uv run --project backend python xtask/py/{script} 인자…` → 표준 출력.
+/// 작업 자리는 `local/`이다 — `.env`가 없어 파이썬 판 설정이 운영 값을 읽지 않는다
+pub fn python(script: &str, args: &[&OsStr]) -> Result<Vec<u8>, String> {
+    let out = Command::new("uv")
+        .args(["run", "--quiet", "--project"])
+        .arg(repo_root().join("backend"))
+        .arg("python")
+        .arg(local_root().join("xtask").join("py").join(script))
+        .args(args)
+        .current_dir(local_root())
+        .output()
+        .map_err(|e| format!("uv를 못 돌렸다 — {e}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "{script} 실패 — {}",
+            String::from_utf8_lossy(&out.stderr)
+        ));
+    }
+    Ok(out.stdout)
 }
