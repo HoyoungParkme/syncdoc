@@ -271,6 +271,23 @@ impl ProjectService<'_> {
         self.get(code).await
     }
 
+    /// SYNC-MS-013#ProjectService.delete_project
+    pub async fn delete_project(&mut self, code: &str, user: &UserRow) -> Result<(), Problem> {
+        let lock = lock_of(code);
+        let _held = lock.lock().await;
+        let (project, repository) = self.get_owned(code, user).await?;
+        let workdir = PathBuf::from(&repository.workdir_path);
+        let origin = PathBuf::from(&repository.remote_url);
+        let server = repository.storage == Storage::Server.as_str();
+        repo::delete_all_of(&mut *self.db, project.id).await?;
+        let _ = fs::remove_dir_all(&workdir);
+        // 서버 저장이면 원본을 지우지 않고 보관한다 — 같은 코드로 가져오면 되살아난다(L11)
+        if server && origin.exists() {
+            fs::rename(&origin, self.archive_path(code)?)?;
+        }
+        Ok(())
+    }
+
     /// SYNC-MS-013#ProjectService.get
     pub async fn get(&mut self, code: &str) -> Result<(ProjectRow, RepositoryRow), Problem> {
         repo::by_code(&mut *self.db, code)
@@ -304,5 +321,43 @@ impl ProjectService<'_> {
         user: &UserRow,
     ) -> Result<Vec<(ProjectRow, RepositoryRow)>, Problem> {
         Ok(repo::owned_by(&mut *self.db, user.id).await?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn archive_order_and_time() {
+        let mut names = vec![
+            "ARC-20261008120000-10.git",
+            "ARC-20261008120000.git",
+            "ARC-junk.git",
+            "ARC-20261008120000-2.git",
+            "ARC-20261008115959.git",
+            "ARC-20261008120000-1.git",
+        ];
+        names.sort_by_key(|n| archive_key(n, "ARC"));
+        assert_eq!(
+            names,
+            [
+                "ARC-junk.git",
+                "ARC-20261008115959.git",
+                "ARC-20261008120000.git",
+                "ARC-20261008120000-1.git",
+                "ARC-20261008120000-2.git",
+                "ARC-20261008120000-10.git",
+            ]
+        );
+        assert_eq!(
+            archived_at(Path::new("/o/_archive/ARC-20261008123456-1.git"), "ARC"),
+            "2026-10-08T12:34:56+00:00"
+        );
+        assert_eq!(
+            archived_at(Path::new("ARC-junk.git"), "ARC"),
+            "ARC-junk.git"
+        );
+        assert!(valid_code("SYNC") && !valid_code("SYNCX") && !valid_code("sy") && !valid_code(""));
     }
 }
