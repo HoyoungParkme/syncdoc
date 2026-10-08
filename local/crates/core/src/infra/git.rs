@@ -517,6 +517,16 @@ impl Git {
         self.run(w, &[os("fetch"), os("origin")]).await?;
         Ok(strip(&self.run(w, &[os("rev-parse"), os("origin/main")]).await?).to_string())
     }
+
+    /// SYNC-MS-019#Git.rev_list_count
+    pub async fn rev_list_count(&self, workdir: &Path, range: &str) -> Result<i64, Problem> {
+        let out = self
+            .run(Some(workdir), &[os("rev-list"), os("--count"), os(range)])
+            .await?;
+        strip(&out).parse().map_err(|_| Problem::Internal {
+            log: format!("git rev-list --count {range}의 출력이 수가 아니다: {out}"),
+        })
+    }
 }
 
 #[cfg(test)]
