@@ -341,3 +341,47 @@ async fn clone_of_missing_remote_is_git_error() {
         .await;
     assert!(matches!(r, Err(Problem::Git { cmd, .. }) if cmd.starts_with("git clone ")));
 }
+
+#[tokio::test]
+async fn fetch_sees_outside_push_without_touching_workdir_and_counts_range() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, origin, work) = setup(tmp.path()).await;
+    // 빈 원격 — origin/main이 없다
+    assert!(matches!(g.fetch(&work).await, Err(Problem::Git { .. })));
+    let first = g
+        .commit_push(&work, "첫", &local_user(), &files(&[("a.md", "a")]), &[])
+        .await
+        .expect("첫 커밋");
+    assert_eq!(g.fetch(&work).await.expect("fetch"), first);
+    // 밖에서 민 커밋 → 그 해시, 작업 사본 HEAD는 그대로
+    let other = tmp.path().join("other");
+    sh(
+        tmp.path(),
+        &[
+            "clone",
+            "-q",
+            origin.to_str().expect("경로"),
+            other.to_str().expect("경로"),
+        ],
+    );
+    std::fs::write(other.join("b.md"), "b").expect("파일");
+    sh(&other, &["add", "b.md"]);
+    sh(&other, &["commit", "-q", "-m", "밖"]);
+    sh(&other, &["push", "-q", "origin", "HEAD:main"]);
+    let outside = sh(&other, &["rev-parse", "HEAD"]);
+    assert_eq!(g.fetch(&work).await.expect("fetch"), outside);
+    assert_eq!(sh(&work, &["rev-parse", "HEAD"]), first);
+    let range = format!("{first}..{outside}");
+    assert_eq!(g.rev_list_count(&work, &range).await.expect("수"), 1);
+    assert_eq!(
+        g.rev_list_count(&work, &format!("{first}..{first}"))
+            .await
+            .expect("수"),
+        0
+    );
+    assert!(matches!(
+        g.rev_list_count(&work, "0123456789abcdef0123456789abcdef01234567..HEAD")
+            .await,
+        Err(Problem::Git { .. })
+    ));
+}
