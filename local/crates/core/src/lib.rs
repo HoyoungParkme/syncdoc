@@ -7,6 +7,7 @@ pub mod errors;
 pub mod infra;
 pub mod markdown;
 pub mod migrate;
+pub mod project;
 pub mod pycompat;
 pub mod spec;
 pub mod types;
