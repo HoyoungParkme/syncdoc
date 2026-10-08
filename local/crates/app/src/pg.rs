@@ -163,8 +163,13 @@ async fn configure(bin: &Path, pgdata: &Path, pw: &str) -> Result<(), Problem> {
     checked(out, "postgres --single", Some(pw))
 }
 
-/// `pg_ctl start` — 따로 프로세스 묶음으로. 터미널 Ctrl+C가 먼저 닿지 않고 멈추는 순서를 앱이 쥔다
+/// `pg_ctl start` — 따로 프로세스 묶음으로. 터미널 Ctrl+C가 먼저 닿지 않고 멈추는 순서를 앱이 쥔다.
+/// 표준 출력·오류는 파이프가 아니라 `logs/pg_ctl.log`로 — 윈도의 `pg_ctl`은 핸들을 물려주며 서버를 띄워,
+/// 파이프로 받으면 서버가 끝날 때까지 읽기가 끝나지 않는다
 async fn ctl_start(bin: &Path, pgdata: &Path, logs: &Path, port: u16) -> Result<(), Problem> {
+    let out_path = logs.join("pg_ctl.log");
+    let out = fs::File::create(&out_path)?;
+    let err = out.try_clone()?;
     let mut cmd = Command::new(exe(bin, "pg_ctl"));
     cmd.arg("start")
         .arg("-D")
@@ -181,7 +186,21 @@ async fn ctl_start(bin: &Path, pgdata: &Path, logs: &Path, port: u16) -> Result<
     cmd.process_group(0);
     #[cfg(windows)]
     cmd.creation_flags(0x0000_0200); // CREATE_NEW_PROCESS_GROUP
-    checked(cmd.output().await, "pg_ctl start", None)
+    cmd.stdin(Stdio::null()).stdout(out).stderr(err);
+    let status = cmd.status().await.map_err(|e| Problem::Internal {
+        log: format!("pg_ctl start을 못 돌렸다 — {e}"),
+    })?;
+    if status.success() {
+        return Ok(());
+    }
+    let text = fs::read_to_string(&out_path).unwrap_or_default();
+    Err(Problem::Internal {
+        log: format!(
+            "pg_ctl start 실패({status}) — {} · {}",
+            tail(&text),
+            logs.join("postgresql-boot.log").display()
+        ),
+    })
 }
 
 async fn ctl_running(bin: &Path, pgdata: &Path) -> bool {
@@ -279,9 +298,13 @@ fn checked(out: std::io::Result<Output>, what: &str, secret: Option<&str>) -> Re
     if let Some(s) = secret {
         err = err.replace(s, "***");
     }
-    let tail: Vec<&str> = err.lines().rev().take(5).collect();
-    let tail: Vec<&str> = tail.into_iter().rev().collect();
     Err(Problem::Internal {
-        log: format!("{what} 실패({}) — {}", out.status, tail.join(" / ")),
+        log: format!("{what} 실패({}) — {}", out.status, tail(&err)),
     })
+}
+
+/// 마지막 다섯 줄을 한 줄로
+fn tail(text: &str) -> String {
+    let lines: Vec<&str> = text.lines().rev().take(5).collect();
+    lines.into_iter().rev().collect::<Vec<_>>().join(" / ")
 }
