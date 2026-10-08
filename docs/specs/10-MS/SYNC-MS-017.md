@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-017
 type: MS
 title: MINISPEC — pipeline — 쓰기 조율 (Rust)
-status: draft
+status: approved
 upstream: [SYNC-DOM-004, SYNC-MS-007, SYNC-MS-013, SYNC-MS-014, SYNC-MS-015, SYNC-SEQ-001, SYNC-STD-004]
 ---
 
