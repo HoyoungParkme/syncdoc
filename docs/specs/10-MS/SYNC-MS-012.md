@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-012
 type: MS
 title: MINISPEC — runtime — 켜기·끄기·설정·PostgreSQL·한 번만 실행 (Rust)
-status: approved
+status: draft
 upstream: [SYNC-DOM-004, SYNC-INFRA-001, SYNC-PRD-001, SYNC-SEQ-001, SYNC-STD-004]
 ---
 
@@ -10,13 +10,13 @@ upstream: [SYNC-DOM-004, SYNC-INFRA-001, SYNC-PRD-001, SYNC-SEQ-001, SYNC-STD-00
 
 ## 0. 이 문서가 다루는 것
 
-싱크독_로컬(Rust)의 켜기·끄기 — `crates/app`의 `runtime`·`paths`·`settings`·`logs`·`instance`·`pg`와 `crates/core/src/migrate.rs`(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.1. 파이썬 판에서는 `main.py`(lifespan)·`config.py`·`db.py`와 Dockerfile의 `alembic upgrade head`가 하던 일이다 — 설치형 프로그램 하나라 PostgreSQL을 띄우고 끄는 일까지 여기서 한다([[SYNC-INFRA-001]] 9.1).
+싱크독_로컬(Rust)의 켜기·끄기 — `crates/app`의 `runtime`·`tray`·`paths`·`settings`·`logs`·`instance`·`pg`와 `crates/core/src/migrate.rs`(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.1. 파이썬 판에서는 `main.py`(lifespan)·`config.py`·`db.py`와 Dockerfile의 `alembic upgrade head`가 하던 일이다 — 설치형 프로그램 하나라 PostgreSQL을 띄우고 끄는 일까지 여기서 한다([[SYNC-INFRA-001]] 9.1).
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처는 Rust(코드와 글자 그대로, [[SYNC-STD-004#DEV-4]]), 분기는 `if 조건 → 결과`. **표기** — `→` 반환·결과, `!` 예외(`Problem`), `·` 같은 단계 안 구분.
 
 **켜는 중 실패는 HTTP가 아니다.** 이 문서의 함수도 `Result<_, Problem>`을 돌려주지만([[SYNC-STD-004#DEV-5]]) 켜는 중에 난 것은 `Problem::Internal`의 로그 문장이 사람이 읽는 말이다 — `main`이 그 문장을 표준 오류와 로그에 남기고 끝 코드 1로 끝난다.
 
-**카드 L1 몫이다(2026-10-07).** 트레이(L4)·git 자식 프로세스(L6·L10)·쓰기 락 기다림(L7)·밀린 커밋 따라잡기와 주기 확인(L11)·하루 한 번 백업 확인과 데이터 자리 옮기기(L16)는 그 카드가 [[#runtime.run]]·[[#runtime.shutdown]]에 단계를 더한다.
+**카드 L1 몫이고(2026-10-07) 카드 L4가 트레이와 첫 켜기의 브라우저를 더했다(2026-10-08).** git 자식 프로세스(L6·L10)·쓰기 락 기다림(L7)·밀린 커밋 따라잡기와 주기 확인(L11)·하루 한 번 백업 확인과 데이터 자리 옮기기(L16)는 그 카드가 [[#runtime.run]]·[[#runtime.shutdown]]에 단계를 더한다.
 
 ---
 
@@ -27,6 +27,7 @@ upstream: [SYNC-DOM-004, SYNC-INFRA-001, SYNC-PRD-001, SYNC-SEQ-001, SYNC-STD-00
 | [[#runtime.run]] | 켠다 — 끌 때까지 |
 | [[#runtime.bind]] | 127.0.0.1의 포트에 묶는다 (8010, 못 쓰면 다음) |
 | [[#runtime.shutdown]] | 끈다 — 새 요청 끊기 → 기다림 → PostgreSQL 멈춤 |
+| [[#tray.run]] | 트레이 — 열기·끝내기, 끝날 때까지 |
 | [[#paths.data_dir]] | 기본 데이터 자리 |
 | [[#paths.pg_dir]] | PostgreSQL 바이너리 자리 |
 | [[#settings.load]] | `settings.toml`을 읽는다 (없으면 만든다) |
@@ -46,12 +47,12 @@ upstream: [SYNC-DOM-004, SYNC-INFRA-001, SYNC-PRD-001, SYNC-SEQ-001, SYNC-STD-00
 
 **시그니처**
 ```rust
-pub async fn run(args: Args) -> Result<(), Problem>
+pub async fn run(args: Args, tray: Option<TrayLink>) -> Result<(), Problem>
 ```
 
-근거: [[SYNC-INFRA-001]] 9.1 · [[SYNC-PRD-001#R15]]
+근거: [[SYNC-INFRA-001]] 9.1·9.5 · [[SYNC-PRD-001#R15]]
 
-**입력** `Args` — `--data-dir`(없으면 [[#paths.data_dir]]) · `--port`(기본 8010, 0이면 OS가 고른 포트 — 시험용) · `--no-tray`(L1은 트레이가 없어 받아 두기만 한다 — L4) · `--no-browser`(두 번째 실행이 브라우저를 열지 않는다 — 시험용)
+**입력** `Args` — `--data-dir`(없으면 [[#paths.data_dir]]) · `--port`(기본 8010, 0이면 OS가 고른 포트 — 시험용) · `--no-tray`(트레이 없이 — 개발·시험) · `--no-browser`(브라우저를 열지 않는다 — 시험용) · `--autostart`(로그인 때 자동 시작이 붙인다 — 트레이로만, 브라우저를 열지 않는다. 사용자 결정 2026-10-08). `tray` — [[#tray.run]]이 넘긴 짝: 켜진 주소를 보낼 곳과 「끝내기」를 받을 곳. `--no-tray`면 없다
 
 **처리**
 1. `data = args.data_dir` 또는 `paths.data_dir()` · `data`와 그 안 `logs/`·`origins/`·`repos/`를 만든다
@@ -61,8 +62,8 @@ pub async fn run(args: Args) -> Result<(), Problem>
 5. `pg = pg.start(paths.pg_dir(), data)`
 6. 연결 풀(sqlx 기본, 최대 10)을 연다 · 연결 하나로 `migrate.apply` · 트랜잭션을 열어 `AccountService { db }.ensure_local_user(settings.local_login, settings.local_name)` 후 커밋 — 5 뒤에서 실패하면 `pg.stop` 뒤 그 `Problem`
 7. `listener = runtime.bind(port, port + 9)`(0이면 `bind(0, 0)`) · 받은 포트가 `port`가 아니면 「{port}을 못 써 {실제}에 열었다 — 에이전트의 MCP 주소도 바뀐다」를 로그와 표준 출력에
-8. `instance.publish(data, 실제 포트)` · 서버를 조립한다(공개 주소 `http://127.0.0.1:{실제 포트}` — 같은 망 열기는 L16) · 「싱크독_로컬 — http://127.0.0.1:{실제 포트}/」를 표준 출력에
-9. 끄기 신호(Ctrl+C·SIGTERM)를 기다린다 → `runtime.shutdown(running)`
+8. `instance.publish(data, 실제 포트)` · 서버를 조립한다(공개 주소 `http://127.0.0.1:{실제 포트}` — 같은 망 열기는 L16) · 「싱크독_로컬 — http://127.0.0.1:{실제 포트}/」를 표준 출력에 · `tray`가 있으면 주소를 보낸다 · if `--autostart`도 `--no-browser`도 아니다 → 기본 브라우저로 연다(못 열면 로그만) — 바로 가기로 켠 사람은 화면을 바로 본다(사용자 결정 2026-10-08)
+9. 끄기 신호(Ctrl+C·SIGTERM) 또는 트레이의 「끝내기」를 기다린다 → `runtime.shutdown(running)`
 
 **출력** `Ok(())` — `main`이 끝 코드 0
 
@@ -70,7 +71,7 @@ pub async fn run(args: Args) -> Result<(), Problem>
 
 **호출하는 것** [[#paths.data_dir]] · [[#instance.acquire]] · [[#instance.open_running]] · [[#logs.init]] · [[#settings.load]] · [[#paths.pg_dir]] · [[#pg.start]] · [[#migrate.apply]] · [[SYNC-MS-016#AccountService.ensure_local_user]] · [[#runtime.bind]] · [[#instance.publish]] · [[#runtime.shutdown]] · [[#pg.stop]]
 
-**테스트 관점** 실행 파일 시험(임시 데이터 자리) — 켜면 `/health`·`/api/me`가 뜨고 `instance.json`이 생긴다 · 두 번째 실행은 주소를 찍고 끝 코드 0 · SIGINT로 10초 안에 끝나고 `postmaster.pid`·`instance.json`이 없다 · 다시 켜면 같은 데이터 · `LOCAL_LOGIN`이 남의 아이디면 끝 코드 1과 그 문장, PostgreSQL은 멈춰 있다 · 켜기 시간을 찍어 둔다(첫 실행·다시 켜기 — 판정은 L17)
+**테스트 관점** 실행 파일 시험(임시 데이터 자리) — 켜면 `/health`·`/api/me`가 뜨고 `instance.json`이 생긴다 · 트레이의 끝내기 신호로도 끝난다(끄는 순서는 같다) · `--autostart`·`--no-browser`면 브라우저를 열지 않는다 · 두 번째 실행은 주소를 찍고 끝 코드 0 · SIGINT로 10초 안에 끝나고 `postmaster.pid`·`instance.json`이 없다 · 다시 켜면 같은 데이터 · `LOCAL_LOGIN`이 남의 아이디면 끝 코드 1과 그 문장, PostgreSQL은 멈춰 있다 · 켜기 시간을 찍어 둔다(첫 실행·다시 켜기 — 판정은 L17)
 
 ---
 
@@ -118,6 +119,35 @@ pub async fn shutdown(running: Running) -> Result<(), Problem>
 **호출하는 것** [[#pg.stop]]
 
 **테스트 관점** 느린 요청이 있어도 10초 안에 끝난다 · 끝난 뒤 PostgreSQL이 없고 `instance.json`이 없다 · 잠금을 다시 잡을 수 있다 · PostgreSQL이 먼저 멈춰 있어도 `Ok`
+
+---
+
+#### tray.run 트레이 — 열기·끝내기
+
+**시그니처**
+```rust
+pub fn run(rt: &Runtime, args: Args) -> Result<(), Problem>
+```
+
+근거: [[SYNC-INFRA-001]] 9.1·9.2 · [[SYNC-PRD-001#R15]] · 사용자 결정 2026-10-08(메뉴는 열기·끝내기 — 「지금 백업」은 L16)
+
+**입력** `rt` — `main`이 만든 tokio 실행기 · `args` — `--no-tray`가 아닐 때 `main`이 넘긴다
+
+**처리**
+1. `TrayLink`(주소를 받을 곳·「끝내기」를 보낼 곳)를 만들고 `rt`에서 [[#runtime.run]]을 띄운다
+2. 주소를 기다린다 — 오기 전에 `runtime.run`이 끝나면(켜기 실패·두 번째 실행) 그 결과를 그대로 돌려준다
+3. 아이콘(실행 파일에 담은 32×32)과 메뉴 「열기」·「끝내기」로 트레이를 만든다. 툴팁 「싱크독_로컬 — {주소}」. 못 만들면(트레이를 받는 데스크톱이 없다) 로그만 남기고 트레이 없이 간다
+4. 메뉴를 받는다 — 「열기」·아이콘 두 번 누르기 → 기본 브라우저로 주소 · 「끝내기」 → `runtime.run`에 끝내기를 보낸다
+5. 윈도는 이 스레드에서 메시지 루프를 돈다(트레이가 그 스레드에 붙는다) — `runtime.run`이 끝나면 루프를 닫는다. 리눅스(StatusNotifierItem, D-Bus)는 `runtime.run`이 끝나기를 기다린다
+6. → `runtime.run`의 결과
+
+**예외** `runtime.run`의 `Problem` 그대로
+
+**호출하는 것** [[#runtime.run]]
+
+**호출되는 것** `main`(트레이가 있을 때)
+
+**테스트 관점** 「끝내기」 신호를 보내면 `runtime.run`이 끄는 순서대로 끝나고 이 함수가 그 결과를 돌려준다 · 켜기가 실패하면 트레이를 만들지 않고 그 `Problem` · 트레이를 못 만들어도 서버는 돈다
 
 ---
 
