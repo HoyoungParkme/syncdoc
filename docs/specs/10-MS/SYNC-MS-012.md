@@ -3,7 +3,7 @@ doc_id: SYNC-MS-012
 type: MS
 title: MINISPEC — runtime — 켜기·끄기·설정·PostgreSQL·한 번만 실행 (Rust)
 status: approved
-upstream: [SYNC-DOM-004, SYNC-INFRA-001, SYNC-PRD-001, SYNC-SEQ-001, SYNC-STD-004]
+upstream: [SYNC-DOM-004, SYNC-INFRA-001, SYNC-PRD-001, SYNC-SEQ-001, SYNC-STD-004, SYNC-MS-017]
 ---
 
 # MINISPEC — runtime (싱크독_로컬 Rust)
@@ -109,7 +109,7 @@ pub async fn shutdown(running: Running) -> Result<(), Problem>
 
 **처리**
 1. 서버에 끄기 신호 — 새 연결을 받지 않는다
-2. 진행 중 요청을 최대 10초 기다린다 · 넘으면 끊는다 — INFRA 9.1의 「쓰기 락이 풀리기를 기다린다」 자리(락은 L7부터)
+2. 진행 중 요청과 쓰기 락([[SYNC-MS-017#pipeline.wait_idle]])을 합쳐 최대 10초 기다린다 · 넘으면 끊는다 — INFRA 9.1의 「쓰기 락이 풀리기를 기다린다」. 요청이 끊겨도 저장은 따로 돌므로([[SYNC-MS-017#pipeline.save_pipeline]]) git과 DB 사이에 있는 저장까지(카드 L7)
 3. 연결 풀을 닫는다
 4. `pg.stop(pg)`
 5. `instance.json`을 지운다 · 잠금을 놓는다 — 4가 실패해도 한다
@@ -118,7 +118,7 @@ pub async fn shutdown(running: Running) -> Result<(), Problem>
 
 **예외** 4의 `Problem`은 5 뒤에 그대로
 
-**호출하는 것** [[#pg.stop]]
+**호출하는 것** [[SYNC-MS-017#pipeline.wait_idle]] · [[#pg.stop]]
 
 **테스트 관점** 느린 요청이 있어도 10초 안에 끝난다 · 끝난 뒤 PostgreSQL이 없고 `instance.json`이 없다 · 잠금을 다시 잡을 수 있다 · PostgreSQL이 먼저 멈춰 있어도 `Ok`
 
