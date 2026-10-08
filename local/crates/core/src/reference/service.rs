@@ -153,4 +153,19 @@ impl ReferenceService<'_> {
             .map(edge)
             .collect())
     }
+
+    /// SYNC-MS-015#ReferenceService.upstream_of_document
+    pub async fn upstream_of_document(
+        &mut self,
+        document_id: i32,
+        include_missing: bool,
+    ) -> Result<Vec<RefEdge>, Problem> {
+        Ok(
+            repo::from_document(&mut *self.db, document_id, include_missing)
+                .await?
+                .into_iter()
+                .map(edge)
+                .collect(),
+        )
+    }
 }
