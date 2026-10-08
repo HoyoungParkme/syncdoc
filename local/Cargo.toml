@@ -21,7 +21,7 @@ directories = "6.0"
 embed-resource = "3"
 futures-util = "0.3"
 http-body-util = "0.1"
-indexmap = "2.14"
+indexmap = { version = "2.14", features = ["serde"] }
 httpdate = "1.0"
 jiter = "=0.14.0"
 num-bigint = "0.4.6"
