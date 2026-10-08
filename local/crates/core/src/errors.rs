@@ -17,9 +17,9 @@ pub enum Problem {
         title: String,
         detail: Option<String>,
     },
-    /// `not-found` — 없는 자원·없는 경로
-    #[error("{resource} {id} 없음")]
-    NotFound { resource: String, id: String },
+    /// `not-found` — 없는 자원·없는 경로. `id`는 문자열이거나 정수다(파이썬 판이 받은 그대로)
+    #[error("{resource} {} 없음", id_text(.id))]
+    NotFound { resource: String, id: Value },
     /// `method-not-allowed` — 그 경로에 없는 메서드
     #[error("이 경로에 {method} 메서드는 없습니다")]
     MethodNotAllowed { method: String, allow: Vec<String> },
@@ -29,6 +29,9 @@ pub enum Problem {
         host: Option<String>,
         origin: Option<String>,
     },
+    /// `invalid-request` — 요청 본문·경로 값이 정의에 안 맞다. `(loc, msg)`들 (API-001 2장, 파이썬 `InvalidRequest`)
+    #[error("{}", invalid_detail(.errors))]
+    InvalidRequest { errors: Vec<(String, String)> },
     /// `internal` — 처리하지 못한 오류. `log`는 로그로만 간다 — 켤 때는 사람이 읽는 문장이다
     #[error("{log}")]
     Internal { log: String },
@@ -42,6 +45,7 @@ impl Problem {
             Problem::NotFound { .. } => Some("not-found"),
             Problem::MethodNotAllowed { .. } => Some("method-not-allowed"),
             Problem::ForbiddenOrigin { .. } => Some("forbidden-origin"),
+            Problem::InvalidRequest { .. } => Some("invalid-request"),
             Problem::Internal { .. } => Some("internal"),
         }
     }
@@ -52,6 +56,7 @@ impl Problem {
             Problem::NotFound { .. } => 404,
             Problem::MethodNotAllowed { .. } => 405,
             Problem::ForbiddenOrigin { .. } => 403,
+            Problem::InvalidRequest { .. } => 422,
             Problem::Internal { .. } => 500,
         }
     }
@@ -78,7 +83,7 @@ impl Problem {
         match self {
             Problem::NotFound { resource, id } => vec![
                 ("resource", Value::from(resource.as_str())),
-                ("id", Value::from(id.as_str())),
+                ("id", id.clone()),
             ],
             Problem::MethodNotAllowed { allow, .. } => vec![("allow", Value::from(allow.clone()))],
             Problem::ForbiddenOrigin { host, origin } => match (host, origin) {
@@ -86,8 +91,39 @@ impl Problem {
                 (None, Some(o)) => vec![("origin", Value::from(o.as_str()))],
                 (None, None) => vec![],
             },
+            Problem::InvalidRequest { errors } => vec![(
+                "errors",
+                Value::from(
+                    errors
+                        .iter()
+                        .map(|(loc, msg)| {
+                            let mut m = serde_json::Map::new();
+                            m.insert("loc".into(), Value::from(loc.as_str()));
+                            m.insert("msg".into(), Value::from(msg.as_str()));
+                            Value::Object(m)
+                        })
+                        .collect::<Vec<_>>(),
+                ),
+            )],
             Problem::Blank { .. } | Problem::Internal { .. } => vec![],
         }
+    }
+}
+
+/// 첫 오류 `{loc} — {msg}`, loc이 비면 msg (파이썬 `InvalidRequest.__init__`)
+fn invalid_detail(errors: &[(String, String)]) -> String {
+    match errors.first() {
+        Some((loc, msg)) if !loc.is_empty() => format!("{loc} — {msg}"),
+        Some((_, msg)) => msg.clone(),
+        None => "입력이 정의에 맞지 않습니다".to_string(),
+    }
+}
+
+/// 파이썬 `str(id)` — 문자열은 그대로, 수는 숫자
+fn id_text(id: &Value) -> String {
+    match id {
+        Value::String(s) => s.clone(),
+        other => other.to_string(),
     }
 }
 

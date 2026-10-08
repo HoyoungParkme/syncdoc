@@ -34,7 +34,7 @@ pub async fn fallback(method: Method, uri: Uri, headers: HeaderMap) -> Response 
     if API_PREFIXES.contains(&first) {
         return render(&Problem::NotFound {
             resource: "path".into(),
-            id: path,
+            id: path.into(),
         });
     }
     if method != Method::GET && method != Method::HEAD {
