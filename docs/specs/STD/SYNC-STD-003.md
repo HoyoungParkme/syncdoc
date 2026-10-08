@@ -50,6 +50,7 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 | 10 | `SYNC-MS-014` | MINISPEC — SpecService · markdown (Rust) | `10-MS/SYNC-MS-014.md` | 10 | 4 | DOM-004, MS-002, MS-003, STD-001, STD-004 |
 | 10 | `SYNC-MS-015` | MINISPEC — ReferenceService (Rust) | `10-MS/SYNC-MS-015.md` | 1 | 4 | DOM-004, MS-003, STD-004 |
 | 10 | `SYNC-MS-016` | MINISPEC — AccountService (Rust) | `10-MS/SYNC-MS-016.md` | 2 | 4 | DOM-004, MS-006, SEQ-001, API-001 |
+| 10 | `SYNC-MS-017` | MINISPEC — pipeline — 쓰기 조율 (Rust) | `10-MS/SYNC-MS-017.md` | 5 | 4 | DOM-004, MS-007, MS-013, MS-014, MS-015, SEQ-001, STD-004 |
 | 10 | `SYNC-MS-018` | MINISPEC — queries — 읽기 조합 (Rust) | `10-MS/SYNC-MS-018.md` | 1 | 4 | DOM-004, MS-008, API-001, API-002 |
 | 10 | `SYNC-MS-019` | MINISPEC — git 어댑터 (Rust) | `10-MS/SYNC-MS-019.md` | 7 | 4 | DOM-004, MS-009, INFRA-001, STD-004 |
 | 11 | `SYNC-CODE-001` | 구현 계획 — 슬라이스 카드와 커밋 기록 | `CODE_구현계획_싱크독.md` | 34 | 6 | STD-004, MS-001, MS-002, MS-003, MS-006, MS-007, MS-008, MS-009, API-001, API-002, UI-002, SCN-001 |
@@ -287,6 +288,12 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 - 3. 미결사항
 
 **SYNC-MS-016** MINISPEC — AccountService (Rust)
+- 0. 이 문서가 다루는 것
+- 1. 함수 목록
+- 2. 함수
+- 3. 미결사항
+
+**SYNC-MS-017** MINISPEC — pipeline — 쓰기 조율 (Rust)
 - 0. 이 문서가 다루는 것
 - 1. 함수 목록
 - 2. 함수
