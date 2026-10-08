@@ -77,8 +77,10 @@ jobs:
           }
           $me = Invoke-RestMethod http://127.0.0.1:8010/api/me
           if ($me.edition -ne 'closed') { throw "/api/me가 이상하다" }
+          # 러너는 관리자다 — 앱이 권한을 내려놓고 자신을 다시 켜서 둘이 돈다(기다리는 쪽과 서버)
+          Write-Output "syncdoc-local 프로세스 $(@(Get-Process syncdoc-local).Count)개"
           # 콘솔이 없어 Ctrl+C를 못 보낸다 — 프로세스를 끝내고 PostgreSQL은 pg_ctl로 멈춘다
-          Stop-Process $proc -Force
+          Get-Process syncdoc-local -ErrorAction SilentlyContinue | Stop-Process -Force
           & "$dir\postgresql\bin\pg_ctl.exe" stop -D "$env:LOCALAPPDATA\SyncDoc Local\pgdata" -m fast -w
           Start-Process "$dir\uninstall.exe" -ArgumentList '/S',"_?=$dir" -Wait
           Remove-Item "$dir\uninstall.exe" -ErrorAction SilentlyContinue
