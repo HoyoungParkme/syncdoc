@@ -10,6 +10,9 @@ type Locks = LazyLock<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>>;
 /// 쓰기 락 — 프로젝트 코드마다 하나, 프로세스 전역. 만들고 지우지 않는다(파이썬 `_locks`)
 static WRITE_LOCKS: Locks = LazyLock::new(|| Mutex::new(HashMap::new()));
 
+/// 읽기 락 — 쓰기 락과 따로인 지도. fetch와 커밋 처리를 저장소마다 한 줄로(#194)
+static READ_LOCKS: Locks = LazyLock::new(|| Mutex::new(HashMap::new()));
+
 fn lock_in(map: &Locks, code: &str) -> Arc<tokio::sync::Mutex<()>> {
     let mut m = map
         .lock()
@@ -22,4 +25,11 @@ fn lock_in(map: &Locks, code: &str) -> Arc<tokio::sync::Mutex<()>> {
 /// 저장을 한 줄로 세운다 — 들어온 차례로, 시간 제한 없이(파이썬 `asyncio.Lock`과 같다)
 pub fn write_lock(code: &str) -> Arc<tokio::sync::Mutex<()>> {
     lock_in(&WRITE_LOCKS, code)
+}
+
+/// SYNC-MS-017#pipeline.read_lock
+///
+/// 쓰기 락과 다른 락이다 — 커밋 처리가 파일마다 쓰기 락을 잡는다. 같은 락이면 교착한다
+pub fn read_lock(code: &str) -> Arc<tokio::sync::Mutex<()>> {
+    lock_in(&READ_LOCKS, code)
 }
