@@ -5,6 +5,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::LazyLock;
 
+use indexmap::IndexMap;
 use regex::Regex;
 use sqlx::PgConnection;
 
@@ -167,6 +168,8 @@ static ID_LIKE: LazyLock<Regex> = LazyLock::new(|| compile(r"^[A-Z]+-?\d+$"));
 static SECTION_NUM: LazyLock<Regex> = LazyLock::new(|| compile(r"^[\d.]+\s*"));
 /// 장 머리 `## N.` — `entity.mismatch`
 static CHAPTER: LazyLock<Regex> = LazyLock::new(|| compile(r"^## (\d+)\."));
+/// 첫 `# ` 헤딩 — 파이썬 `re.search(r"^# (.+)$", body, re.M)`
+static H1: LazyLock<Regex> = LazyLock::new(|| compile(r"(?m)^# (.+)$"));
 /// mermaid 클래스 — 파이썬 `class (\w+) \{(.*?)\}`(re.S)
 static CLASS: LazyLock<Regex> = LazyLock::new(|| compile(r"(?s)class (\w+) \{(.*?)\}"));
 
@@ -540,5 +543,60 @@ impl SpecService<'_> {
             violations: v,
             warnings: w,
         }
+    }
+
+    /// SYNC-MS-014#SpecService.apply_frontmatter
+    pub fn apply_frontmatter(
+        body: &str,
+        doc_id: &str,
+        doc_type: DocType,
+        status: DocStatus,
+    ) -> Result<String, Problem> {
+        let (fm, fm_lines) = markdown::parse_frontmatter(body);
+        if fm.is_empty() {
+            let title = H1
+                .captures(body)
+                .map_or_else(|| doc_id.to_string(), |c| strip(&c[1]).to_string());
+            return Ok(format!(
+                "---\ndoc_id: {doc_id}\ntype: {}\ntitle: {title}\nstatus: {}\n---\n{body}",
+                doc_type.as_str(),
+                status.as_str()
+            ));
+        }
+        if let Some(cur) = fm.get("doc_id")
+            && !cur.is_empty()
+            && cur != doc_id
+        {
+            return Err(Problem::ConventionViolation {
+                violations: vec![violation(
+                    2,
+                    "frontmatter.doc_id",
+                    &format!("발급 {doc_id}와 다름: {cur}"),
+                )],
+                warnings: Vec::new(),
+            });
+        }
+        // 덮어쓸 키 — 첫 줄만 바꾸고, 없는 키는 이 차례로 끝에 더한다
+        let mut forced: IndexMap<&str, &str> = IndexMap::from([
+            ("doc_id", doc_id),
+            ("type", doc_type.as_str()),
+            ("status", status.as_str()),
+        ]);
+        let lines: Vec<&str> = body.split('\n').collect();
+        let mut out: Vec<String> = vec!["---".to_string()];
+        for line in &lines[1..fm_lines - 1] {
+            match line.split_once(':') {
+                Some((k, _)) if forced.contains_key(strip(k)) => {
+                    let k = strip(k);
+                    let v = forced.shift_remove(k).unwrap_or_default();
+                    out.push(format!("{k}: {v}"));
+                }
+                _ => out.push((*line).to_string()),
+            }
+        }
+        out.extend(forced.iter().map(|(k, v)| format!("{k}: {v}")));
+        out.push("---".to_string());
+        out.extend(lines[fm_lines..].iter().map(|l| (*l).to_string()));
+        Ok(out.join("\n"))
     }
 }
