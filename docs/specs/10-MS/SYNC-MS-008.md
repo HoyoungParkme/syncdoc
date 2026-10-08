@@ -400,12 +400,12 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 1. `pk = SpecService.resolve_item(doc_id, item_id)` · 예외 전파 (`not-found` · `item-deleted`)
 2. `up = ReferenceService.upstream(pk)` · `down = ReferenceService.downstream(pk)` — 이 항목을 가리키는 참조 하나하나. 어디서 걸었든(항목 블록 안이든, 절 본문·표처럼 항목 밖이든) 다 든다. **문서 전체를 가리킨 참조는 항목의 하위가 아니다** — 전에는 그 문서 모든 항목 아래에 섞여 카드·관계도와 수가 달랐다(#160). 화면은 그것을 `GET …/downstream`의 `(문서)`로 따로 보인다([[SYNC-UI-002#UI-5]] 8.10)
 3. `need = {e.to_item_pk for e in up} ∪ {e.from_item_pk for e in down}` · `names = SpecService.describe_items(need)` — **한 번**. 문서 쪽(상위의 `to_document_id`·하위의 출발 항목 없는 `from_document_id`)은 `SpecService.describe_documents`로 따로
-4. `RefEdge` → `ItemRef`: 상위는 `to_item_pk`가 있으면 `names[pk]` · `to_document_id`만 있으면 `ItemRef(doc_id, item_id=None, display_name=문서 제목)` · `is_missing`이면 `ItemRef(raw_target만, is_missing=True)`. 하위는 `from_item_pk`가 있으면 `names[pk]` · 없으면(항목 밖) **출발 문서** `ItemRef(doc_id, item_id=None, display_name=문서 제목)` — 전에는 건너뛰어 패널이 「고립 항목」이라 했다(#160). 항목·문서 id 공간이 겹치므로 따로 · `raw_target`은 둘 다 싣는다
+4. `RefEdge` → `ItemRef`: 상위는 `to_item_pk`가 있으면 `names[pk]` · `to_document_id`만 있으면 `ItemRef(doc_id, item_id=None, display_name=문서 제목)` · `is_missing`이면 `ItemRef(raw_target만, is_missing=True)`. 하위는 `from_item_pk`가 있으면 `names[pk]` · 없으면(항목 밖) **출발 문서** `ItemRef(doc_id, item_id=None, display_name=문서 제목)` — 전에는 건너뛰어 패널이 「고립 항목」이라 했다(#160). 항목·문서 id 공간이 겹치므로 따로 · `raw_target`은 둘 다 싣는다 — **참조마다 새 `ItemRef`**다. `names`의 것을 고쳐 돌려주면 한 항목이 같은 대상을 두 꼴(`[[#R1]]`·`[[EXMP-PRD-001#R1]]`)로 가리킬 때 둘 다 마지막 `raw_target`이 된다(#353)
 5. `→ ItemReferences(doc_id, item_id, upstream, downstream)`
 
 **호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.resolve_item` `SpecService.describe_items` `SpecService.describe_documents` · `ReferenceService.upstream` `ReferenceService.downstream`
 
-**테스트 관점** 남의 프로젝트 → `not-found` · 미존재 참조 → `upstream`에 `is_missing=True, raw_target` · 문서 전체를 가리킨 참조 → `upstream`에 `item_id=None` · 항목 밖(절 본문·표)에서 이 항목을 건 참조 → `downstream`에 출발 문서(`item_id=None`, 문서 제목) · 이 문서 전체를 가리킨 참조(`[[문서]]`)는 어느 항목의 `downstream`에도 없다(#160) · 고립 항목 → 둘 다 빈 목록
+**테스트 관점** 남의 프로젝트 → `not-found` · 미존재 참조 → `upstream`에 `is_missing=True, raw_target` · 문서 전체를 가리킨 참조 → `upstream`에 `item_id=None` · 항목 밖(절 본문·표)에서 이 항목을 건 참조 → `downstream`에 출발 문서(`item_id=None`, 문서 제목) · 이 문서 전체를 가리킨 참조(`[[문서]]`)는 어느 항목의 `downstream`에도 없다(#160) · 고립 항목 → 둘 다 빈 목록 · 같은 대상을 두 꼴로 가리킨 참조 둘 → 각자의 `raw_target`, id 차례(#353)
 
 ---
 
