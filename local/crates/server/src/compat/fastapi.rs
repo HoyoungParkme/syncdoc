@@ -125,6 +125,23 @@ pub mod schemas {
         .expect("IssueToken 스키마")
     }
 
+    /// `InitProject` — 파이썬 판 `web/schemas/projects.py`의 core schema 그대로 (SYNC-API-001#POST/api/projects)
+    pub fn init_project() -> Validator {
+        Validator::new(
+            &json!({"type": "model", "cls": "InitProject", "schema": {"type": "model-fields", "fields": {
+                "storage": {"type": "model-field", "schema": {"type": "literal", "expected": ["github", "server"]}},
+                "remote_url": {"type": "model-field", "schema": {"type": "default", "schema": {"type": "nullable", "schema": {"type": "str"}}, "default": null}},
+                "code": {"type": "model-field", "schema": {"type": "str", "pattern": "^[A-Z]{1,4}$"}},
+                "name": {"type": "model-field", "schema": {"type": "str", "max_length": 100}},
+                "import_existing": {"type": "model-field", "schema": {"type": "default", "schema": {"type": "bool"}, "default": false}},
+                "create_repo": {"type": "model-field", "schema": {"type": "default", "schema": {"type": "bool"}, "default": false}},
+                "private": {"type": "model-field", "schema": {"type": "default", "schema": {"type": "nullable", "schema": {"type": "bool"}}, "default": null}}},
+                "model_name": "InitProject"}, "config": {"title": "InitProject"}}),
+            "InitProject",
+        )
+        .expect("InitProject 스키마")
+    }
+
     /// 경로의 `int` 값
     pub fn int() -> Validator {
         Validator::new(&json!({"type": "int"}), "int").expect("int 스키마")
