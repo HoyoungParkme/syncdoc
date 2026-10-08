@@ -77,6 +77,7 @@ pub async fn call(
         "init_project" => init_project(state, user, &typed).await,
         "get_template" => get_template(state, user, &typed).await,
         "list_documents" => list_documents(state, user, &typed).await,
+        "get_document" => get_document(state, user, &typed).await,
         _ => Err(Problem::NotImplemented {
             card: tool.card.to_string(),
         }),
@@ -162,6 +163,39 @@ async fn list_documents(state: &AppState, user: &UserRow, a: &PyValue) -> Result
         }));
     }
     Ok(json!({"project_code": project_code, "stages": stages}))
+}
+
+/// SYNC-API-002#get_document
+///
+/// 요약 + 해시·규약 오류 문장·본문·항목(각자의 미존재 참조)·이웃 — 파이썬 `get_document`의 꼴. `counts`는 비었다
+async fn get_document(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let mut c = state.pool.acquire().await?;
+    let d = queries::document_view(&mut c, &state.repos, &arg_str(a, "doc_id"), user).await?;
+    let mut out = summary_map(&d.summary);
+    out.insert("commit_hash".into(), Value::from(d.commit_hash));
+    out.insert(
+        "convention_error_detail".into(),
+        Value::from(d.convention_error_detail),
+    );
+    out.insert("body".into(), Value::from(d.body));
+    out.insert(
+        "items".into(),
+        Value::from(
+            d.items
+                .iter()
+                .map(|i| {
+                    json!({
+                        "item_id": i.item_id,
+                        "display_name": i.display_name,
+                        "missing_refs": i.missing_refs,
+                    })
+                })
+                .collect::<Vec<_>>(),
+        ),
+    );
+    out.insert("prev_doc_id".into(), Value::from(d.prev_doc_id));
+    out.insert("next_doc_id".into(), Value::from(d.next_doc_id));
+    Ok(Value::Object(out))
 }
 
 /// SYNC-API-002#get_template
@@ -357,7 +391,12 @@ fn author_json(d: &DocumentSummary) -> Value {
 
 /// 파이썬 `_summary_json` — 시각은 `isoformat()`(`+00:00`)
 fn summary_json(d: &DocumentSummary) -> Value {
-    json!({
+    Value::Object(summary_map(d))
+}
+
+/// `_summary_json`의 키들 — `get_document`가 뒤에 더 붙인다
+fn summary_map(d: &DocumentSummary) -> Map<String, Value> {
+    let Value::Object(m) = json!({
         "doc_id": d.doc_id,
         "doc_type": d.doc_type,
         "stage": d.stage,
@@ -368,7 +407,10 @@ fn summary_json(d: &DocumentSummary) -> Value {
         "updated_at": py_isoformat(d.updated_at),
         "last_author": author_json(d),
         "counts": d.counts,
-    })
+    }) else {
+        return Map::new();
+    };
+    m
 }
 
 fn arg<'a>(v: &'a PyValue, name: &str) -> Option<&'a PyValue> {
