@@ -25,12 +25,15 @@ mod win {
     use std::ptr::{null, null_mut};
 
     use windows_sys::Win32::Foundation::{
-        CloseHandle, HANDLE, HANDLE_FLAG_INHERIT, SetHandleInformation, WAIT_OBJECT_0,
+        CloseHandle, GENERIC_ALL, HANDLE, HANDLE_FLAG_INHERIT, SetHandleInformation, WAIT_OBJECT_0,
     };
     use windows_sys::Win32::Security::{
-        AllocateAndInitializeSid, CheckTokenMembership, CreateRestrictedToken,
-        DISABLE_MAX_PRIVILEGE, FreeSid, PSID, SECURITY_NT_AUTHORITY, SID_AND_ATTRIBUTES,
-        TOKEN_ALL_ACCESS,
+        ACCESS_ALLOWED_ACE, ACE_HEADER, ACL, ACL_REVISION, ACL_SIZE_INFORMATION,
+        AclSizeInformation, AddAccessAllowedAceEx, AddAce, AllocateAndInitializeSid,
+        CheckTokenMembership, CreateRestrictedToken, DISABLE_MAX_PRIVILEGE, FreeSid, GetAce,
+        GetAclInformation, GetLengthSid, GetTokenInformation, InitializeAcl, OBJECT_INHERIT_ACE,
+        PSID, SECURITY_NT_AUTHORITY, SID_AND_ATTRIBUTES, SetTokenInformation, TOKEN_ALL_ACCESS,
+        TOKEN_DEFAULT_DACL, TOKEN_INFORMATION_CLASS, TOKEN_USER, TokenDefaultDacl, TokenUser,
     };
     use windows_sys::Win32::System::Console::{
         GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, SetConsoleCtrlHandler,
@@ -140,6 +143,91 @@ mod win {
         Ok(false)
     }
 
+    /// 토큰 정보 — 구조체를 그대로 읽을 수 있게 8바이트 맞춤 버퍼로
+    fn token_info(token: HANDLE, class: TOKEN_INFORMATION_CLASS) -> io::Result<Vec<u64>> {
+        let mut size = 0u32;
+        // SAFETY: 크기만 묻는다 — 버퍼 없이 부르면 실패하고 size를 채운다
+        unsafe { GetTokenInformation(token, class, null_mut(), 0, &mut size) };
+        if size == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        let mut buf = vec![0u64; (size as usize).div_ceil(8)];
+        // SAFETY: buf는 size 바이트 이상
+        if unsafe { GetTokenInformation(token, class, buf.as_mut_ptr().cast(), size, &mut size) }
+            == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(buf)
+    }
+
+    /// 토큰의 기본 DACL에 지금 사용자를 더한다 — 관리자 토큰의 기본 DACL은 Administrators·SYSTEM뿐이라
+    /// 그 그룹을 거부 전용으로 바꾸면 자기가 만든 파이프·프로세스에도 닿지 못한다(PostgreSQL `AddUserToTokenDacl`)
+    fn add_user_to_dacl(token: HANDLE) -> io::Result<()> {
+        let dacl = token_info(token, TokenDefaultDacl)?;
+        let user = token_info(token, TokenUser)?;
+        // SAFETY: GetTokenInformation이 버퍼 첫머리에 TOKEN_DEFAULT_DACL·TOKEN_USER를 채웠다 — 가리키는 곳도 그 버퍼 안
+        let (old, sid) = unsafe {
+            (
+                (*dacl.as_ptr().cast::<TOKEN_DEFAULT_DACL>()).DefaultDacl,
+                (*user.as_ptr().cast::<TOKEN_USER>()).User.Sid,
+            )
+        };
+        if old.is_null() {
+            return Ok(()); // 기본 DACL이 없으면 막히는 것도 없다
+        }
+        let mut info = ACL_SIZE_INFORMATION::default();
+        // SAFETY: old는 살아 있는 ACL · info는 지역 변수
+        if unsafe {
+            GetAclInformation(
+                old,
+                (&mut info as *mut ACL_SIZE_INFORMATION).cast(),
+                size_of::<ACL_SIZE_INFORMATION>() as u32,
+                AclSizeInformation,
+            )
+        } == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        // 새 ACE = ACCESS_ALLOWED_ACE에서 SidStart 자리를 SID로 바꾼 크기
+        // SAFETY: sid는 user 버퍼 안의 SID
+        let size = info.AclBytesInUse + size_of::<ACCESS_ALLOWED_ACE>() as u32
+            - size_of::<u32>() as u32
+            + unsafe { GetLengthSid(sid) };
+        let mut buf = vec![0u64; (size as usize).div_ceil(8)];
+        let acl = buf.as_mut_ptr().cast::<ACL>();
+        // SAFETY: acl은 size 바이트 이상인 버퍼 · old의 ACE를 차례로 옮기고 사용자 ACE를 끝에 더한다
+        unsafe {
+            if InitializeAcl(acl, size, ACL_REVISION) == 0 {
+                return Err(io::Error::last_os_error());
+            }
+            for i in 0..info.AceCount {
+                let mut ace = null_mut();
+                if GetAce(old, i, &mut ace) == 0 {
+                    return Err(io::Error::last_os_error());
+                }
+                let len = (*ace.cast::<ACE_HEADER>()).AceSize as u32;
+                if AddAce(acl, ACL_REVISION, u32::MAX, ace, len) == 0 {
+                    return Err(io::Error::last_os_error());
+                }
+            }
+            if AddAccessAllowedAceEx(acl, ACL_REVISION, OBJECT_INHERIT_ACE, GENERIC_ALL, sid) == 0 {
+                return Err(io::Error::last_os_error());
+            }
+            let new = TOKEN_DEFAULT_DACL { DefaultDacl: acl };
+            if SetTokenInformation(
+                token,
+                TokenDefaultDacl,
+                (&new as *const TOKEN_DEFAULT_DACL).cast(),
+                size_of::<TOKEN_DEFAULT_DACL>() as u32,
+            ) == 0
+            {
+                return Err(io::Error::last_os_error());
+            }
+        }
+        Ok(())
+    }
+
     /// 콘솔의 Ctrl+C는 자식이 받아 끄는 순서를 탄다 — 이 프로세스는 기다리기만 한다
     unsafe extern "system" fn ignore_ctrl(_: u32) -> BOOL {
         1
@@ -182,6 +270,7 @@ mod win {
             return Err(io::Error::last_os_error());
         }
         let restricted = Owned(restricted);
+        add_user_to_dacl(restricted.0)?;
 
         // 명령줄은 CreateProcessW가 고쳐 쓸 수 있는 버퍼여야 한다
         // SAFETY: GetCommandLineW는 프로세스가 끝날 때까지 사는 NUL로 끝나는 문자열을 준다
