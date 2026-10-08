@@ -85,6 +85,7 @@ pub async fn call(
         "get_item" => get_item(state, user, &typed).await,
         "get_references" => get_references(state, user, &typed).await,
         "create_document" => create_document(state, user, &typed).await,
+        "update_document" => update_document(state, user, &typed).await,
         _ => Err(Problem::NotImplemented {
             card: tool.card.to_string(),
         }),
@@ -299,6 +300,36 @@ async fn create_document(state: &AppState, user: &UserRow, a: &PyValue) -> Resul
             author: agent_author(user),
             message: arg_str(a, "message"),
             confirm_item_deletion: false,
+        },
+    )
+    .await?;
+    Ok(save_json(&r))
+}
+
+/// SYNC-API-002#update_document
+///
+/// `changed_items`는 검증만 받고 쓰지 않는다(파이썬도 쓰지 않는다). `i64` 밖의 판 번호는 어느 판과도 다르다
+async fn update_document(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let expected = arg_int(a, "expected_version").map(|b| {
+        i64::try_from(&b).unwrap_or(if b.sign() == num_bigint::Sign::Minus {
+            i64::MIN
+        } else {
+            i64::MAX
+        })
+    });
+    let r = pipeline::save_pipeline(
+        &state.pool,
+        &state.repos,
+        SaveInput {
+            entry: Entry::Mcp,
+            doc_id: Some(arg_str(a, "doc_id")),
+            doc_type: None,
+            body: arg_str(a, "body"),
+            expected_version: expected,
+            project_code: None,
+            author: agent_author(user),
+            message: arg_str(a, "message"),
+            confirm_item_deletion: arg_bool(a, "confirm_item_deletion"),
         },
     )
     .await?;
