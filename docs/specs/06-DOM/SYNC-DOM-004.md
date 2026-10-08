@@ -53,7 +53,7 @@ crate마다 `src/`와 거울 `tests/`를 둔다. 단위 시험은 그 모듈의 
 
 ```
 crates/app/src/
-├── main.rs                     진입 — 인자를 읽어 runtime.run, 끝 코드
+├── main.rs                     진입 — 인자를 읽어 runtime.run, 끝 코드 · 일꾼 스레드 스택(파이썬 판의 1만 겹 JSON을 받으려고, L3)
 ├── lib.rs                      공개 모듈
 ├── runtime.rs                  켠다·포트에 묶는다·끈다
 ├── paths.rs                    데이터 자리 · PostgreSQL 바이너리 자리
@@ -84,11 +84,13 @@ crates/server/src/
 │   ├── tools.rs                도구 13개 — 인자 검증 후 카드마다 처리기, 없으면 not-implemented
 │   └── declarations.json       도구 선언·안내문·서버 이름 — `cargo xtask mcp-tools`가 파이썬 판에서 만든다. 손으로 안 고친다
 └── compat/                     파이썬 호환 층 — 오류 문장·값 꼴을 파이썬 판과 바이트로 같게 (INFRA 9.8)
-    ├── pyvalue.rs              JSON → 파이썬 값(dict 순서·큰 정수·inf·nan) · repr
-    ├── pyjson.rs               파이썬 `json.loads` — FastAPI 본문·도구 인자 미리 읽기의 오류 위치
-    ├── pydantic.rs             검증 오류 줄·문장·`N validation errors for …` 꼴
-    ├── lax.rs                  pydantic lax 검증 — str·int·float·bool·dict·list·Literal·None
-    └── fastapi.rs              요청 본문·경로 값 → invalid-request(loc·msg)
+    ├── pyvalue.rs              JSON → 파이썬 값(dict 순서·큰 정수·inf·nan·짝 없는 서로게이트) · repr
+    ├── pyjson.rs               파이썬 `json.loads`(`_json.c`) — FastAPI 본문·도구 인자 미리 읽기의 오류 위치·C 재귀 한도
+    ├── pydantic/               검증 — 파이썬 판이 내보낸 core schema를 읽어(schema) lax 규칙으로 검증하고(validate)
+    │                           같은 오류 줄·문장·`N validation errors for …` 꼴을 낸다(errors). smart union의 고르기까지
+    ├── printable.rs            파이썬 `str.isprintable()` 표(유니코드 15.0) — repr이 이스케이프할 글자. 생성물
+    ├── fastapi.rs              요청 본문(Content-Type·json.loads)·경로 값 → invalid-request(loc·msg) · 400
+    └── uvicorn.rs              요청 경로를 `unquote`로 풀어 라우팅한다(`/api/m%65` = `/api/me`)
 ```
 
 **옮긴 판** — `mcp/`와 `compat/`는 파이썬 판이 쓰는 꾸러미의 동작을 옮긴다(사용자 결정 2026-10-08 — 검증 문장까지 바이트로 같다, MCP는 핸드셰이크 경로 전부). 기준 판은 `backend/uv.lock`의 mcp 2.2.0 · pydantic 2.13.5(pydantic-core 2.46.5) · FastAPI 0.141.1 · starlette 1.6.0 · sse-starlette 3.4.11과 Python 3.12다. JSON 읽기는 pydantic-core와 같은 `jiter` crate를 같은 판으로 쓴다. 파이썬 쪽이 판을 올리면 계약 시험의 두 판 차이 시험이 어긋남을 잡는다 — 그때 이 층을 따라 고친다. 2026-07-28 새 프로토콜(`_streamable_http_modern`)은 카드 L18이다
@@ -116,7 +118,7 @@ crates/core/
 
 지금(카드 L3) 있는 것은 `account`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
 
-**층** — 함수 단위 명세(MINISPEC 카드·API 엔드포인트·UI 화면)가 없는 코드가 어느 층이고 그 층을 무슨 문서가 정하는지([[SYNC-STD-001]] 2.6). 코드 그래프가 읽는다. 위에서부터 첫 줄이 이긴다. **줄은 카드마다 더한다** — 코드가 없는 줄은 검사기(`check_calls`)가 「안 맞는 줄」로 잡는다. 함수가 없는 파일(구조체만 — `state.rs`·`schemas.rs`·`model.rs`)은 적지 않는다.
+**층** — 함수 단위 명세(MINISPEC 카드·API 엔드포인트·UI 화면)가 없는 코드가 어느 층이고 그 층을 무슨 문서가 정하는지([[SYNC-STD-001]] 2.6). 코드 그래프가 읽는다. 위에서부터 첫 줄이 이긴다. **줄은 카드마다 더한다** — 코드가 없는 줄은 검사기(`check_calls`)가 「안 맞는 줄」로 잡는다. 함수가 없는 파일(구조체만 — `state.rs`·`model.rs`)은 적지 않는다.
 
 | 경로 | 층 | 명세 |
 |---|---|---|
@@ -128,6 +130,7 @@ crates/core/
 | `local/crates/server/src/web/problem.rs` · `local/crates/core/src/errors.rs` | 에러 | [[SYNC-STD-004#DEV-5]] · [[SYNC-API-001]] 2장 |
 | `local/crates/server/src/web/static_files.rs` | 정적 파일 | [[SYNC-INFRA-001]] 4.1 |
 | `local/crates/core/src/types.rs` | 열거형·DTO | [[SYNC-DOM-002]] 2.7·2.8 |
+| `local/crates/server/src/web/schemas.rs` | 응답 형태 | [[SYNC-API-001]] 4장 |
 | `local/crates/core/src/clock.rs` | 시각 | [[SYNC-STD-004#DEV-18]] |
 | `local/crates/core/src/*/repo.rs` | 리포지토리 | [[SYNC-DOM-004]] 4장 · [[SYNC-DOM-003]] |
 | `local/crates/*/build.rs` | 빌드 설정 | [[SYNC-STD-004#DEV-7]] · [[SYNC-INFRA-001]] 9.2 |
