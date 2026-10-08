@@ -1,4 +1,4 @@
-//! 자리 — 데이터 자리와 PostgreSQL 바이너리 자리 (SYNC-INFRA-001 9.3)
+//! 자리 — 데이터 자리와 PostgreSQL 바이너리·git 실행 파일 자리 (SYNC-INFRA-001 9.2·9.3)
 
 use std::path::{Path, PathBuf};
 
@@ -33,6 +33,33 @@ pub fn pg_dir() -> Result<PathBuf, Problem> {
     checked(dir)
 }
 
+/// SYNC-MS-012#paths.git
+pub fn git() -> Result<PathBuf, Problem> {
+    let exe_dir = if cfg!(windows) {
+        std::env::current_exe()?.parent().map(Path::to_path_buf)
+    } else {
+        None
+    };
+    git_from(std::env::var_os("SYNCDOC_LOCAL_GIT"), exe_dir)
+}
+
+/// 환경 변수 → 윈도 설치 폴더의 MinGit → 시스템 git 차례. 자리를 준 것인데 파일이 없으면 `Problem`
+fn git_from(env: Option<std::ffi::OsString>, exe_dir: Option<PathBuf>) -> Result<PathBuf, Problem> {
+    let given = env
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        // 윈도는 설치 폴더의 MinGit — PATH를 고치지 않는다
+        .or_else(|| exe_dir.map(|d| d.join("mingit").join("cmd").join("git.exe")));
+    match given {
+        Some(p) if p.is_file() => Ok(p),
+        Some(p) => Err(Problem::Internal {
+            log: format!("git을 못 찾았다 — {}", p.display()),
+        }),
+        // 리눅스는 시스템 git — .deb가 의존한다
+        None => Ok(PathBuf::from("git")),
+    }
+}
+
 /// `bin/postgres`가 있는 자리만
 fn checked(dir: PathBuf) -> Result<PathBuf, Problem> {
     let postgres = exe(&dir.join("bin"), "postgres");
@@ -57,6 +84,21 @@ fn exe(bin: &Path, name: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn git_env_then_mingit_then_path() {
+        let tmp = tempfile::tempdir().expect("임시");
+        let f = tmp.path().join("git");
+        std::fs::write(&f, "").expect("파일");
+        assert_eq!(
+            git_from(Some(f.clone().into()), None).expect("환경 변수"),
+            f
+        );
+        let err = git_from(Some(tmp.path().join("no").into()), None).expect_err("없음");
+        assert!(err.to_string().contains("no"));
+        assert!(git_from(None, Some(tmp.path().to_path_buf())).is_err()); // MinGit이 없다
+        assert_eq!(git_from(None, None).expect("시스템"), PathBuf::from("git"));
+    }
 
     #[test]
     fn data_dir_ends_with_edition_name() {
