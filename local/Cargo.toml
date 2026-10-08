@@ -18,6 +18,7 @@ syncdoc_server = { path = "crates/server" }
 axum = "0.8.9"
 clap = { version = "4.6", features = ["derive"] }
 directories = "6.0"
+embed-resource = "3"
 futures-util = "0.3"
 http-body-util = "0.1"
 indexmap = "2.14"
@@ -27,6 +28,7 @@ num-bigint = "0.4.6"
 num-traits = "0.2"
 percent-encoding = "2.3"
 rand = "0.10"
+resvg = { version = "0.48", default-features = false, features = ["text"] }
 ryu = "1.0"
 rust-embed = { version = "8.12", features = ["interpolate-folder-path", "include-exclude"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -34,6 +36,7 @@ serde_json = { version = "1.0", features = ["preserve_order", "arbitrary_precisi
 sha2 = "0.10"
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres", "derive", "time"] }
 tempfile = "3"
+tao = "0.37"
 thiserror = "2.0"
 time = "0.3"
 tokio = { version = "1.53", features = ["macros", "rt-multi-thread", "net", "process", "signal", "time", "fs", "io-util", "sync"] }
@@ -41,6 +44,7 @@ toml = "1.1"
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.7", features = ["catch-panic"] }
 tracing = "0.1.44"
+tray-icon = { version = "0.26", default-features = false, features = ["ksni"] }
 tracing-appender = "0.2.5"
 tracing-subscriber = { version = "0.3", features = ["fmt", "registry"] }
 url = "=2.5.8"

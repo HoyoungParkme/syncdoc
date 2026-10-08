@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- 싱크독_로컬 아이콘 원본 (SYNC-DOM-004 1장 packaging) — 색은 UI-001 3장 토큰. `cargo xtask icon`이 icon.ico·icon.png·tray.rgba를 만든다 -->
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#17181c"/>
+  <path d="M68 40 h84 l44 44 v124 a12 12 0 0 1 -12 12 h-116 a12 12 0 0 1 -12 -12 v-156 a12 12 0 0 1 12 -12 z" fill="#ffffff"/>
+  <path d="M152 40 v32 a12 12 0 0 0 12 12 h32 z" fill="#cfccc4"/>
+  <rect x="80" y="100" width="80" height="13" rx="6.5" fill="#a8a49c"/>
+  <rect x="80" y="128" width="56" height="13" rx="6.5" fill="#a8a49c"/>
+  <circle cx="184" cy="184" r="54" fill="#2f7d5b" stroke="#17181c" stroke-width="10"/>
+  <path d="M159.6 175.1 A26 26 0 0 1 201.4 164.7" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round"/>
+  <path d="M208.8 171.4 L188.2 170.3 L205.6 151.0 Z" fill="#ffffff"/>
+  <path d="M208.4 192.9 A26 26 0 0 1 166.6 203.3" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round"/>
+  <path d="M159.2 196.6 L179.8 197.7 L162.4 217.0 Z" fill="#ffffff"/>
+</svg>
