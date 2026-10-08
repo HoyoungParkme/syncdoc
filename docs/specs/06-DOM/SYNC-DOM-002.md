@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -55,6 +55,7 @@ syncdoc/                        저장소 = 프로젝트
 │
 ├── local/                      Rust 판 — 싱크독_로컬 설치형. 구조는 DOM-004 1장 (카드 L1부터)
 ├── contract/                   공용 계약 시험 — 두 판을 띄워 같은 시나리오(INFRA 9.8, 카드 L2). 앱을 import하지 않는다
+├── .github/workflows/          local-release.yml — 싱크독_로컬 설치 파일(setup.exe·.deb·AppImage)을 만들고 깔아 보고, 태그 `local-v*`면 Release (INFRA 9.5, 카드 L4)
 │
 ├── docs/specs/                 명세 원본 (STD-001 1.1). 양쪽이 같이 본다
 ├── tools/                      validate.py · check_code.py · check_calls.py · check_ui.py · view_build.py · dev_preview.py
