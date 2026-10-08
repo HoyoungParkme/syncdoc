@@ -125,9 +125,9 @@ pub async fn revoke_token(&mut self, user: &UserRow, token_id: i64) -> Result<()
 
 **처리** `access_tokens where id=token_id and user_id=user.id` · if 없음 → `! NotFound("access_token", token_id)`(남의 토큰도 같은 답) · `update revoked_at=저장 시각`. 행은 남긴다
 
-**다른 점** 파이썬의 `int`는 크기가 없다 — `i64` 밖의 id는 웹 입구가 이 함수를 부르지 않고 같은 `not-found`를 낸다(그런 행은 없다). 이미 폐기한 토큰을 다시 폐기하면 `revoked_at`이 새 시각으로 바뀐다 — 파이썬 판과 같다
+**다른 점** 파이썬 판은 id를 `int4`로 DB에 넘긴다 — 그 범위(±2^31) 밖이면 DB가 거절해 500 `internal`이다. Rust도 `i32`로 못 바꾸면 `! Internal`(같은 응답). 파이썬의 `int`는 크기가 없어 `i64` 밖의 id도 오는데, 웹 입구가 이 함수를 부르지 않고 같은 `internal`을 낸다. 이미 폐기한 토큰을 다시 폐기하면 `revoked_at`이 새 시각으로 바뀐다 — 파이썬 판과 같다
 
-**테스트 관점** 폐기 뒤 행이 남고 `revoked_at`이 찬다 · 남의 토큰 → `not-found`이고 그 행은 그대로 · 없는 id → `not-found`
+**테스트 관점** 폐기 뒤 행이 남고 `revoked_at`이 찬다 · 남의 토큰 → `not-found`이고 그 행은 그대로 · 없는 id → `not-found` · `int4` 밖 → `internal`
 
 ---
 
