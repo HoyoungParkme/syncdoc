@@ -13,6 +13,15 @@ pub const VERSION: &str = "16.15.0";
 pub const LINUX: &str = "x86_64-unknown-linux-gnu";
 pub const WINDOWS: &str = "x86_64-pc-windows-msvc";
 
+/// 받은 압축 파일의 sha256 — GitHub 릴리즈의 digest로 고정한다(옆에 딸린 .sha256 파일은 대상마다 꼴이 다르다)
+fn sha256_of(target: &str) -> Result<&'static str, String> {
+    match target {
+        LINUX => Ok("77dd669eda3985ea8be26256f6af28d3c8414152ada713797555bb7423b4486a"),
+        WINDOWS => Ok("157bd7322f8c653f06b0373d1b2280e9cb238b6a6d3bd05541aeb8f33885a8ad"),
+        other => Err(format!("해시를 모르는 대상 {other}")),
+    }
+}
+
 /// `cargo xtask pg-fetch [--target T]` — 리눅스(기본)는 개발용 자리, 다른 대상은 `target/pg/{대상}/16.15.0`
 pub fn run(target: Option<String>) -> Result<(), String> {
     let target = target.unwrap_or_else(|| LINUX.to_string());
@@ -44,11 +53,8 @@ pub fn fetch(target: &str, dest: &std::path::Path) -> Result<(), String> {
     let dl = root.join("dl");
     fs::create_dir_all(&dl).map_err(|e| e.to_string())?;
     let archive = dl.join(&name);
-    let sums = dl.join(format!("{name}.sha256"));
     curl(&url, &archive)?;
-    curl(&format!("{url}.sha256"), &sums)?;
-    let want = fs::read_to_string(&sums).map_err(|e| e.to_string())?;
-    let want = want.split_whitespace().next().unwrap_or("").to_lowercase();
+    let want = sha256_of(target)?;
     let got: String = Sha256::digest(fs::read(&archive).map_err(|e| e.to_string())?)
         .iter()
         .map(|b| format!("{b:02x}"))
