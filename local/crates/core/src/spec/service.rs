@@ -18,9 +18,9 @@ use crate::pycompat::difflib::unified_diff;
 use crate::pycompat::re::compile;
 use crate::pycompat::repr::repr;
 use crate::types::{
-    AuthorRef, Diff, DiffLine, DiffOp, DocItem, DocStatus, DocType, Document, DocumentSummary,
-    Entry, Hunk, ItemBlock, ItemRef, ItemView, ValidateResult, Violation, Warning, py_isoformat,
-    stage_of,
+    AuthorRef, Diff, DiffLine, DiffOp, DocItem, DocRef, DocStatus, DocType, Document,
+    DocumentSummary, Entry, Hunk, ItemBlock, ItemRef, ItemView, ValidateResult, Violation, Warning,
+    py_isoformat, stage_of,
 };
 
 /// 이력 diff의 앞뒤 줄 수 — 파이썬 `DIFF_CONTEXT_LINES`
@@ -997,6 +997,37 @@ impl SpecService<'_> {
                     ..ItemRef::default()
                 };
                 (r.item.id, ref_)
+            })
+            .collect())
+    }
+
+    /// SYNC-MS-014#SpecService.describe_documents
+    pub async fn describe_documents(
+        &mut self,
+        document_ids: &[i32],
+    ) -> Result<HashMap<i32, DocRef>, Problem> {
+        if document_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        Ok(repo::documents_by_ids(&mut *self.db, document_ids)
+            .await?
+            .into_iter()
+            .map(|r| {
+                // 제목은 frontmatter에서, 비면 문서 ID (파이썬 `… or row.doc_id`)
+                let title = markdown::parse_frontmatter(&r.current_body)
+                    .0
+                    .get("title")
+                    .filter(|t| !t.is_empty())
+                    .cloned()
+                    .unwrap_or_else(|| r.doc_id.clone());
+                let d = DocRef {
+                    document_id: r.id,
+                    stage: stage_of(&r.doc_type),
+                    doc_id: r.doc_id,
+                    title,
+                    status: r.status,
+                };
+                (d.document_id, d)
             })
             .collect())
     }
