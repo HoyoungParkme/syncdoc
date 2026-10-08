@@ -262,9 +262,11 @@ def _to_ref(e: RefEdge, names: dict[int, ItemRef]) -> ItemRef:
     if e.is_missing:
         return ItemRef(None, None, None, raw_target=e.raw_target, is_missing=True)
     pk = e.to_item_pk if e.to_item_pk is not None else e.to_document_id
-    ref = names.get(pk) or ItemRef(None, None, None, raw_target=e.raw_target, is_missing=True)
-    ref.raw_target = e.raw_target
-    return ref
+    ref = names.get(pk)
+    if ref is None:
+        return ItemRef(None, None, None, raw_target=e.raw_target, is_missing=True)
+    # 참조마다 새 것 — names의 것을 고치면 같은 대상을 두 꼴로 가리킨 참조가 둘 다 마지막 것이 된다 (#353)
+    return replace(ref, raw_target=e.raw_target)
 
 
 async def item_references_view(doc_id: str, item_id: str, user: User) -> ItemReferences:
