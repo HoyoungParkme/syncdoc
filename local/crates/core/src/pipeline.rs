@@ -3,8 +3,17 @@
 //! 카드 L7 몫은 `mcp` 입구다. 웹(L9)·GitHub·밀린 커밋 처리(L11)는 그 카드가 갈래를 더한다.
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
+
+use sqlx::PgPool;
+
+use crate::account::model::UserRow;
+use crate::clock;
+use crate::errors::Problem;
+use crate::project::repo as project_repo;
+use crate::project::service::{ProjectService, ServerRepos};
 
 type Locks = LazyLock<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>>;
 
@@ -52,4 +61,44 @@ pub async fn wait_idle(limit: Duration) -> bool {
     })
     .await
     .is_ok()
+}
+
+/// SYNC-MS-017#pipeline.read_pending
+///
+/// 저장소에 쓰기 전에 밀린 커밋을 먼저 읽는다(DEV-19). **쓰기 락 밖에서 부른다**.
+/// 밀린 것이 있으면 카드 L11(커밋 처리)까지 저장하지 않는다(사용자 결정 2026-10-08)
+pub async fn read_pending(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+) -> Result<i64, Problem> {
+    let (_, repo) = {
+        let mut c = pool.acquire().await?;
+        // 쓰기 경로의 소유 검사를 겸한다
+        ProjectService { db: &mut c, repos }
+            .get_owned(code, user)
+            .await?
+    };
+    let lock = read_lock(code);
+    let _held = lock.lock().await;
+    // 락 안에서 다시 읽는다 — 앞서 기다린 요청이 이미 따라잡아 놨을 수 있다
+    let last = {
+        let mut c = pool.acquire().await?;
+        project_repo::last_processed_of(&mut c, repo.id)
+            .await?
+            .flatten()
+    };
+    let head = repos.git.fetch(Path::new(&repo.workdir_path)).await?;
+    // 처리 지점이 없는 것은 등록 중뿐이다 — 등록이 스스로 저장소를 읽는다
+    if last.as_deref().is_none_or(|l| l == head) {
+        if last.is_some() {
+            let mut c = pool.acquire().await?;
+            project_repo::set_fetched(&mut c, repo.id, clock::now()).await?;
+        }
+        return Ok(0);
+    }
+    Err(Problem::NotImplemented {
+        card: "L11".to_string(),
+    })
 }

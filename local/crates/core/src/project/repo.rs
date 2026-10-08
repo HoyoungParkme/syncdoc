@@ -1,6 +1,7 @@
 //! projects·repositories 조회·저장 — DB만 안다 (SYNC-DOM-004 4장 · SYNC-DOM-003)
 
 use sqlx::{AssertSqlSafe, PgConnection};
+use time::OffsetDateTime;
 
 use super::model::{ProjectRow, RepositoryRow};
 
@@ -129,5 +130,48 @@ pub async fn delete_all_of(db: &mut PgConnection, project_id: i32) -> Result<(),
     ] {
         sqlx::query(stmt).bind(project_id).execute(&mut *db).await?;
     }
+    Ok(())
+}
+
+/// 저장소의 처리 지점 — 행이 없으면 None
+pub async fn last_processed_of(
+    db: &mut PgConnection,
+    repository_id: i32,
+) -> Result<Option<Option<String>>, sqlx::Error> {
+    sqlx::query_scalar::<_, Option<String>>(
+        "SELECT last_processed_commit FROM repositories WHERE id = $1",
+    )
+    .bind(repository_id)
+    .fetch_optional(db)
+    .await
+}
+
+/// 방금 받아 와 밀린 것이 없다 — 화면이 보여줄 「확인한 시각」
+pub async fn set_fetched(
+    db: &mut PgConnection,
+    repository_id: i32,
+    at: OffsetDateTime,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE repositories SET behind_by = 0, fetched_at = $2 WHERE id = $1")
+        .bind(repository_id)
+        .bind(at)
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
+/// 처리 지점을 앞당긴다 — 앱이 민 커밋은 그 저장이 곧 처리다
+pub async fn advance_processed(
+    db: &mut PgConnection,
+    repository_id: i32,
+    commit: &str,
+    at: OffsetDateTime,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE repositories SET last_processed_commit = $2, synced_at = $3 WHERE id = $1")
+        .bind(repository_id)
+        .bind(commit)
+        .bind(at)
+        .execute(db)
+        .await?;
     Ok(())
 }
