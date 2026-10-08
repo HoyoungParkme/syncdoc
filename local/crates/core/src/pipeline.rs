@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
+use std::time::Duration;
 
 type Locks = LazyLock<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>>;
 
@@ -32,4 +33,23 @@ pub fn write_lock(code: &str) -> Arc<tokio::sync::Mutex<()>> {
 /// 쓰기 락과 다른 락이다 — 커밋 처리가 파일마다 쓰기 락을 잡는다. 같은 락이면 교착한다
 pub fn read_lock(code: &str) -> Arc<tokio::sync::Mutex<()>> {
     lock_in(&READ_LOCKS, code)
+}
+
+/// SYNC-MS-017#pipeline.wait_idle
+///
+/// 끌 때 — 지금까지 만든 쓰기 락을 차례로 잡아 본다. 다 잡으면 `true`, `limit`이 지나면 `false` (INFRA 9.1)
+pub async fn wait_idle(limit: Duration) -> bool {
+    let locks: Vec<_> = WRITE_LOCKS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .values()
+        .cloned()
+        .collect();
+    tokio::time::timeout(limit, async {
+        for l in locks {
+            drop(l.lock().await);
+        }
+    })
+    .await
+    .is_ok()
 }
