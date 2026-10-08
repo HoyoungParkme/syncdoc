@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 **MINISPEC은 카드의 첫 커밋으로 쓴다**([[SYNC-STD-004#DEV-13]]). 그래서 L1만 표가 있고 나머지는 하는 일과 선행만 있다 — 카드를 받을 때 그 카드의 표를 쓴다. 아직 없는 MINISPEC 항목을 미리 가리키지 않는다.
 
-**진행 상황**: 카드 18장(L1~L18). 완료 4(L1·L2 2026-10-07, L3·L4 2026-10-08). 첫 릴리즈 `local-v0.1.0`(L4). L1은 계약 시험 없이 병합하고 완료란은 L2 뒤에 적었다(사용자 결정 2026-10-07).
+**진행 상황**: 카드 18장(L1~L18). 완료 5(L1·L2 2026-10-07, L3·L4·L5 2026-10-08). 첫 릴리즈 `local-v0.1.0`(L4). L1은 계약 시험 없이 병합하고 완료란은 L2 뒤에 적었다(사용자 결정 2026-10-07).
 
 ---
 
@@ -71,7 +71,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | [[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-014#markdown.masked_lines]] · [[SYNC-MS-014#markdown.headings]] · [[SYNC-MS-014#markdown.cut_blocks]] · [[SYNC-MS-014#SpecService.item_blocks]] · [[SYNC-MS-014#SpecService.validate]] · [[SYNC-MS-014#SpecService.check]] · [[SYNC-MS-014#SpecService.apply_frontmatter]] · [[SYNC-MS-014#SpecService.diff]] · [[SYNC-MS-014#SpecService.diff_bodies]] · 층 코드 — `core/src/pycompat/`(유니코드 표 생성물·strip·repr — server/compat의 `printable.rs`를 내려 옮김·정규식 문자 클래스·difflib) · `spec/{model,repo}.rs` · `types.rs` 열거형·DTO · `Problem::ConventionViolation` · xtask `unicode-tables [--check]`·`spec-golden [--check]`·`spec-diff` |
 | 테스트 | `cargo test` — 정답 파일(`crates/core/tests/golden/spec.json`, 꼴 모음 약 150) 전부 같다 · 지금의 명세 전부 위반 0·경고 0 · 시험 DB로 `item.reused`·복구 예외·`web_revert`·diff의 판 조회·`not-found` · `cargo xtask spec-diff` — 지금의 명세·템플릿 + 명세마다 git 이력 다섯 판 diff + 씨앗 고정 무작위 2000 차이 0 · 계약 몫 없음(HTTP로 닿는 것은 L7부터) — `--target both` 그대로 통과 |
 | 선행 | L1 · #345 |
-| 완료 | — |
+| 완료 | 2026-10-08 · 브랜치 `card/L5-spec-engine`(18cab61 #347) · 선행 #345(#346 — 파이썬 판 diff가 `---` 줄 삭제·`++` 줄 추가를 빠뜨리던 것) · spec 6 + code 15 · `cargo test` 76(정답 파일 122 사례 같음 · 실제 명세·템플릿 위반 0·경고 0 · 시험 DB로 item.reused·복구 예외·diff 판 조회·not-found) · `cargo xtask spec-diff` 기본 4671 사례·씨앗 1·2·3·77(5000) 각 11421 사례 다른 것 0 · `unicode-tables`·`spec-golden`·`migrations`·`mcp-tools --check` · `schema-check` 같음 · clippy(리눅스·윈도) · 윈도 `cargo check` · 워크플로 녹색 · `check_code` Rust 31/31 · `check_calls` 코드만·명세만·안 맞는 줄 0 · 계약 `--target both` 263 통과·1 건너뜀(L5 몫 없음) · 되먹임: MS-014 `validate`의 호출하는 것에 `parse_frontmatter`(check_calls가 찾음), STD-001 `item.pattern` 꼴을 검사기와 같게, server/compat의 `printable.rs`를 core `pycompat`으로 |
 
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
