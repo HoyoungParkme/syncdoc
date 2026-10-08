@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -486,7 +486,7 @@ syncdoc-local-{판}/
 ```
 syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 ├── 웹 · REST · SSE · MCP(/mcp) · git 입구(/git)   axum 한 서버
-├── 트레이                                          열기 · 지금 백업 · 끝내기
+├── 트레이                                          열기 · 끝내기 (「지금 백업」은 L16이 더한다)
 ├── PostgreSQL 16   자식 프로세스 — 데이터 자리의 pgdata, 127.0.0.1 임의 포트 · 켤 때마다 바뀌는 암호
 └── git             자식 프로세스 — 윈도는 함께 담은 MinGit, 리눅스는 시스템 git
 ```
@@ -501,7 +501,7 @@ syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 | 층 | 선택 | 이유 |
 |---|---|---|
 | 언어·서버 | Rust · tokio · axum | 속도와 설치형 실행 파일 하나([[SYNC-RFQ-001#Q8]] 3). SSE·multipart·정적 파일을 한 서버에서 |
-| MCP | rmcp(공식 Rust SDK, streamable HTTP) | [[SYNC-API-002]] 도구 13을 같은 이름·설명으로. 판이 자주 바뀌어 정확한 판으로 묶는다 |
+| MCP | 파이썬 mcp SDK 2.2.0의 핸드셰이크 경로를 옮겼다(세션 없는 streamable HTTP) · 도구 선언은 파이썬 판에서 뽑는다(`cargo xtask mcp-tools`) | [[SYNC-API-002]] 도구 13을 같은 이름·설명·검증 문장으로 — 사용자 결정 2026-10-08(바이트까지 같다). rmcp는 SSE 꼴·검증 문장을 맞출 수 없어 쓰지 않는다 |
 | 데이터베이스 | PostgreSQL 16을 함께 담는다 — 바이너리(theseus 16.15)를 설치 폴더에 두고 `initdb`·`postgres`·`pg_ctl`을 앱이 직접 부른다 · 역할·DB `syncdoc` · 연결 수·메모리는 기본값 · sqlx | 파이썬 판과 같은 표([[SYNC-DOM-003]]). 역할 이름까지 같아 한 판의 덤프가 다른 판에 그대로 들어간다. 시험용 라이브러리(postgresql_embedded)는 fsync를 끄고 멈출 때 데이터 폴더를 지워 쓰지 않는다 · 기본값이어도 쓰는 만큼만 메모리에 올라온다(사용자 결정 2026-10-07 — L17에서 잰다) |
 | 이전 | **Alembic이 유일한 원본**이다. `alembic upgrade --sql`로 만든 SQL을 `local/migrations/`에 두고 실행 파일에 담는다. 이전 기록은 같은 `alembic_version` 표 | 스키마가 두 구현으로 갈리지 않게. 두 판의 스키마가 같은지는 검사로 본다 |
 | git | 윈도는 MinGit을 함께 담는다(GPL 고지와 원본 안내를 설치 파일에). 리눅스는 시스템 git(.deb가 의존한다) | 순수 Rust git은 아직 push를 받지 못한다(2026-10, gitoxide·libgit2) |
@@ -509,7 +509,7 @@ syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 | 모델 호출 | reqwest 스트리밍 — OpenAI 호환 Chat Completions | 5.3 그대로 |
 | 첨부 | PDF 글자는 pdf_oxide | 5.3 그대로 |
 | 화면 | 같은 React 빌드(`npm run build`)를 실행 파일에 담는다. `/specs`·템플릿 사본도 담는다 | 화면은 하나다([[#C11]]) |
-| 트레이·자동 시작 | tray-icon · 윈도 사용자 시작 프로그램(HKCU Run) · 리눅스 systemd 사용자 단위 | [[SYNC-PRD-001#R15]] |
+| 트레이·자동 시작 | tray-icon(윈도 메시지 루프 · 리눅스 StatusNotifierItem, GTK 없이) · 윈도 사용자 시작 프로그램(HKCU Run) · 리눅스 XDG autostart(`~/.config/autostart`) | [[SYNC-PRD-001#R15]]. 트레이는 데스크톱 세션이 있어야 뜬다 — 그래서 리눅스는 데스크톱 로그인 때 켜는 XDG autostart다(사용자 결정 2026-10-08) |
 | 설치 파일 | 윈도 NSIS setup.exe · 리눅스 .deb·AppImage. GitHub Actions의 윈도·리눅스 러너가 만든다. 서명은 없다 | Rust용 MSI 도구(WiX v3)는 지원이 끝났다 |
 
 ### 9.3 데이터 자리
@@ -525,13 +525,16 @@ syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 - 127.0.0.1에서만 연다. Host·Origin 가드와 개인 토큰은 5장의 폐쇄망판 규칙 그대로다. 로그인·세션 서명 키는 없다
 - 같은 망에 여는 것은 설정 파일에만 둔다([[SYNC-PRD-001#R15]]) — 열면 그 망의 누구나 쓴다. 카드 L16이 넣는다 — 그 전까지 가드의 공개 주소는 `http://127.0.0.1:{실제 포트}`다(Docker 판 기본값과 같은 결과)
 - PostgreSQL은 127.0.0.1 임의 포트와 켤 때마다 바뀌는 암호로 띄운다 — 밖에서 닿지 않는다
+- PostgreSQL은 관리자 권한으로 돌지 않는다 — 윈도에서 관리자 권한으로 켜지면(UAC를 끈 PC·「관리자 권한으로 실행」) 앱이 맨 처음 관리자 그룹을 뺀 토큰으로 자신을 다시 켠다. PostgreSQL의 `pg_ctl`과 같은 방법이다
 
 ### 9.5 설치·자동 시작·업데이트
 
-- **설치** — 사용자 범위(관리자 권한 없이). 바로 가기와 로그인 때 자동 시작(트레이로만, 브라우저는 안 연다)을 둔다. 첫 실행이 DB를 만든다
-- **자동 시작** — 설정 「이 PC」에서 끄고 켠다
+- **설치** — 사용자 범위(관리자 권한 없이). 윈도는 `%LOCALAPPDATA%\Programs\SyncDoc Local`에 깔고 시작 메뉴와 바탕화면 바로 가기를 둔다(바탕화면은 설치 화면에서 끌 수 있다, 기본 켬). 리눅스 .deb는 `/opt/syncdoc-local`과 프로그램 메뉴, AppImage는 파일 하나. 첫 실행이 DB를 만든다
+- **켜기** — 바로 가기로 켜면 브라우저로 화면을 연다. 자동 시작(`--autostart`)은 트레이로만 켜고 브라우저는 안 연다(사용자 결정 2026-10-08)
+- **자동 시작** — **기본 끔**. 윈도는 설치 화면의 체크박스(기본 해제)가 HKCU Run을 둔다. 리눅스는 설정 「이 PC」(L16)가 XDG autostart 파일을 둔다. 끄고 켜는 것도 「이 PC」(L16)
+- **설치 파일** — 윈도 `SyncDoc-Local-{판}-setup.exe`(NSIS) · 리눅스 `syncdoc-local_{판}_amd64.deb`·`SyncDoc-Local-{판}-x86_64.AppImage`, x86_64만. PostgreSQL(theseus 16.15)과 윈도 MinGit은 판을 고정해 해시를 보고 담는다. `.github/workflows/local-release.yml`이 만들고 깔아→켜→`/health`→지워 본 뒤, 태그 `local-v{판}`이면 GitHub Release에 올린다(사용자 결정 2026-10-08 — 0.1.0부터 정식)
 - **업데이트** — 새 설치 파일로 덮어 설치한다. 켜질 때 새 이전 SQL이 올라간다. 데이터가 프로그램보다 새 판의 스키마면 켜지 않고 알린다
-- **제거** — 프로그램만 지운다. 데이터 자리는 남긴다
+- **제거** — 프로그램·바로 가기·자동 시작만 지운다. 데이터 자리는 남긴다. 켜져 있으면 실행 파일이 잠겨 있다 — 트레이에서 끝낸 뒤 다시 하라고 알린다
 
 ### 9.6 백업·되살리기
 

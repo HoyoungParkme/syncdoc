@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=SyncDoc Local
+Name[ko]=싱크독_로컬
+Comment=Specs on this PC
+Comment[ko]=명세를 이 PC에서
+Exec=syncdoc-local
+Icon=syncdoc-local
+Terminal=false
+Categories=Development;
+StartupNotify=false

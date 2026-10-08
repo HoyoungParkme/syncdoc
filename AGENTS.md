@@ -50,6 +50,8 @@ Rust는 `local/`에서 돈다 — `cd local && cargo test` · `cargo fmt --check
 - 처음 한 번 — C 링커(`sudo apt install build-essential pkg-config`, 사람이) · rustup(판은 `local/rust-toolchain.toml`이 고른다) · `cargo xtask pg-fetch`(개발·시험용 PostgreSQL 16.15를 `local/target/pg/`에)
 - `cargo xtask migrations` — Alembic 리비전을 더했으면 `local/migrations/`를 다시 만든다. `--check`는 다시 만들어 비교만(DEV-7)
 - `cargo xtask mcp-tools` — 파이썬 MCP 도구의 설명·인자를 바꿨으면 Rust 판의 `declarations.json`을 다시 만든다. `--check`는 비교만(DEV-7)
+- `cargo xtask package linux|windows` — 설치 파일(.deb·AppImage / setup.exe). `cargo build --release -p syncdoc_app`(화면 빌드 `npm run build` 뒤) 다음에. 윈도는 NSIS가 있는 윈도에서 · `cargo xtask icon` — `packaging/icon.svg`를 고쳤으면 icon.ico·icon.png·tray.rgba를 다시 만든다
+- **릴리즈** — `local/Cargo.toml`의 version을 올리고 병합한 뒤 태그 `local-v{판}`을 민다. `.github/workflows/local-release.yml`이 윈도·리눅스에서 만들고 깔아 켜 본 뒤 GitHub Release에 올린다(INFRA 9.5)
 - `cargo xtask schema-check` — 시험 서버(5434)에 Alembic DB와 Rust DB를 만들어 스키마가 같은지 · `cargo xtask test-db-clean` — 시험이 남긴 `syncdoc_local_test_*` 지우기
 - `cargo run -p syncdoc_app -- --no-tray` — 싱크독_로컬을 띄운다(데이터는 `~/.local/share/syncdoc-local`, 다른 자리는 `--data-dir`). 윈도 브라우저로 http://127.0.0.1:8010
 검사기는 저장소 루트에서 돈다.

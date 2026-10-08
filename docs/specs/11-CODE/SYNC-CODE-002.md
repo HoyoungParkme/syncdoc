@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-002
 type: CODE
 title: 구현 계획 — 싱크독_로컬 (Rust) 슬라이스 카드와 커밋 기록
-status: approved
+status: draft
 upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
@@ -51,13 +51,22 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | `core/account` 토큰 넷([[SYNC-MS-016]]) · `server/web` 토큰 세 경로 · `server/mcp` — 인증(Bearer, 통과하면 응답 전에 커밋)·전송(streamable HTTP, 세션 없음)·분배·처리기·도구 선언(`declarations.json` — `cargo xtask mcp-tools`가 파이썬 판에서 만든다) · `server/compat` — 파이썬 호환 층(값·repr·파이썬 json·jiter·pydantic 오류 문장·lax 검증). 옮긴 판은 [[SYNC-DOM-004]] 1장. 못 만든 도구와 그것을 만드는 카드 — `init_project`·`get_template` L6 · `list_documents`·`get_document`·`get_item`·`get_references`·`create_document`·`update_document` L7 · `delete_document`·`restore_document`·`change_status` L9 · `upload_code` L10 · `get_code_graph` L12 |
 | 테스트 | `cargo test`(MS-016 테스트 관점 · 호환 층의 문장) · 계약 L3 — 토큰 세 경로의 모양과 값 · MCP 사례 표(인증·initialize·tools/list 바이트·SSE 꼴·Accept·Content-Type·봉투 오류·모르는 메서드·도구) · **두 판 차이 시험**(씨앗 고정 무작위 사례를 두 판에 보내 바이트로 비교, `--target both`) · 화면 UI-13 토큰 발급·폐기 |
 | 선행 | L1 |
-| 완료 | 2026-10-08 · 브랜치 `card/L3-token-mcp`(7276b48 #341) · spec 10 + code 9 · `cargo test`(core 토큰 7 · server MCP 4 · compat 18) · clippy(리눅스·윈도) · 윈도 `cargo check` · `xtask migrations --check`·`mcp-tools --check`·`schema-check` · 계약 `--target both --with-card L3` 263 통과·1 건너뜀(get_document L7) · 두 판 차이 시험 씨앗 1·2·3(2000)·77(10000) 전부 같음 · `check_code` Rust 19/19 · `check_calls` 0/0 · 화면 UI-13 토큰 발급·폐기는 Playwright로(사람 확인은 따로) · 되먹임: MS-016 `revoke_token` int4 밖은 internal(계약 시험이 찾음), DOM-002 층 표 `contract/**` 다시, 계약 밖에 `connection` 머리 |
+| 완료 | 2026-10-08 · 브랜치 `card/L3-token-mcp`(7276b48 #341) · spec 9 + code 9 · `cargo test`(core 토큰 7 · server MCP 4 · compat 18) · clippy(리눅스·윈도) · 윈도 `cargo check` · `xtask migrations --check`·`mcp-tools --check`·`schema-check` · 계약 `--target both --with-card L3` 263 통과·1 건너뜀(get_document L7) · 두 판 차이 시험 씨앗 1·2·3(2000)·77(10000) 전부 같음 · `check_code` Rust 19/19 · `check_calls` 0/0 · 화면 UI-13 토큰 발급·폐기는 Playwright로(사람 확인은 따로) · 되먹임: MS-016 `revoke_token` int4 밖은 internal(계약 시험이 찾음), DOM-002 층 표 `contract/**` 다시, 계약 밖에 `connection` 머리 |
+
+#### L4 설치형 껍데기 — 깔아 쓰는 프로그램이 된다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-INFRA-001]] 9.1·9.2·9.4·9.5 · [[SYNC-PRD-001#R15]] · [[SYNC-MS-012#tray.run]] · [[SYNC-MS-012#runtime.run]] · [[SYNC-MS-012#privilege.drop_admin]] · 사용자 결정 2026-10-08(트레이는 열기·끝내기 · 자동 시작 기본 끔, 리눅스는 XDG autostart(L16) · 바탕화면 바로 가기 기본 · 태그 → Release, 0.1.0 정식 · 아이콘은 새로 그린다 · x86_64, 바로 가기로 켜면 브라우저) |
+| 구현 | `crates/app` — `tray.rs`(tray-icon: 윈도 메시지 루프, 리눅스 StatusNotifierItem), `main.rs`(트레이가 메인 스레드), `privilege.rs`(윈도 관리자 권한 내려놓기 — PostgreSQL이 관리자 권한을 거부한다), `runtime.run`(`--autostart`·첫 켜기의 브라우저·트레이 끝내기) · `packaging/` — 아이콘 원본·NOTICE·NSIS·.desktop·AppRun · `xtask` — `package windows\|linux`(재료를 모아 setup.exe·.deb·AppImage), `icon`, `pg-fetch --target` · `.github/workflows/local-release.yml` |
+| 테스트 | `cargo test`(트레이 끝내기 → 끄는 순서, `--autostart`면 브라우저 안 엶) · 워크플로 — 윈도 setup.exe를 조용히 깔아 켜고(러너는 관리자 — 권한을 내려놓고 켠다) `/health`, 지운 뒤 데이터 자리가 남는지 · 리눅스 .deb·AppImage도 같이 · 계약(L1~L3) 그대로 · 사람 확인 — 윈도에서 깔아 트레이·바로 가기·제거 |
+| 선행 | L1 |
+| 완료 | — |
 
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
-| L4 설치형 껍데기 | 트레이·자동 시작·두 번째 실행 · NSIS(MinGit·PostgreSQL 포함)·.deb·AppImage · 릴리즈 워크플로 | L1 | L |
 | L5 명세 엔진 | frontmatter·규약 검증·항목·diff — 파이썬이 만든 정답과 맞춘다 | L1 | L |
 | L6 git·서버 저장 | git 어댑터 · 프로젝트 만들기·지우기(보관)·`init_project` · `get_template`(소유 프로젝트 · 저장소 `STD/`를 먼저, 사용자 결정 2026-10-08) | L3 · L5 | M |
 | L7 저장 파이프라인 | 저장 파이프라인·대기열 읽기·락 · MCP 읽기·쓰기 도구 | L6 | XL |

@@ -1,0 +1,170 @@
+# 싱크독_로컬 설치 파일 — 만들고, 깔아 켜 보고, 지운다. 태그 local-v{판}이면 GitHub Release에 올린다.
+# SYNC-INFRA-001 9.5 · SYNC-DOM-004 1장 packaging · SYNC-CODE-002 카드 L4 (사용자 결정 2026-10-08)
+name: local-release
+
+on:
+  push:
+    tags: ["local-v*"]
+  pull_request:
+    paths: ["local/**", "frontend/**", ".github/workflows/local-release.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: 화면 빌드
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Rust 릴리즈 빌드
+        working-directory: local
+        run: cargo build --release -p syncdoc_app
+      - name: 설치 파일
+        working-directory: local
+        run: |
+          $env:PATH = "C:\Program Files (x86)\NSIS;$env:PATH"
+          cargo xtask package windows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: local/target/package/windows/out/*.exe
+      - name: 깔아 켜 보고 지운다
+        run: |
+          $setup = (Get-ChildItem local/target/package/windows/out/*.exe).FullName
+          Start-Process $setup -ArgumentList '/S' -Wait
+          $dir = "$env:LOCALAPPDATA\Programs\SyncDoc Local"
+          $exe = "$dir\syncdoc-local.exe"
+          foreach ($p in @($exe, "$dir\postgresql\bin\postgres.exe", "$dir\mingit\cmd\git.exe", "$dir\NOTICE.txt", "$dir\uninstall.exe")) {
+            if (-not (Test-Path $p)) { throw "없다 — $p" }
+          }
+          $menu = [Environment]::GetFolderPath('Programs')
+          $desk = [Environment]::GetFolderPath('Desktop')
+          if (-not (Test-Path "$menu\싱크독_로컬.lnk")) { throw "시작 메뉴 바로 가기가 없다" }
+          if (-not (Test-Path "$desk\싱크독_로컬.lnk")) { throw "바탕화면 바로 가기가 없다(기본 켬)" }
+          $run = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -ErrorAction SilentlyContinue).'SyncDoc Local'
+          if ($run) { throw "자동 시작은 기본 끔이어야 한다" }
+          $proc = Start-Process $exe -ArgumentList '--no-tray','--no-browser','--port','8010' -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP\out.txt" -RedirectStandardError "$env:RUNNER_TEMP\err.txt"
+          $ok = $false
+          for ($i = 0; $i -lt 120; $i++) {
+            if ($proc.HasExited) { break }
+            try { if ((Invoke-WebRequest http://127.0.0.1:8010/health -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200) { $ok = $true; break } } catch {}
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $ok) {
+            Write-Output "끝났나: $($proc.HasExited) 끝 코드: $($proc.ExitCode)"
+            Get-Content "$env:RUNNER_TEMP\out.txt", "$env:RUNNER_TEMP\err.txt" -ErrorAction SilentlyContinue
+            Get-ChildItem -Recurse "$env:LOCALAPPDATA\SyncDoc Local" -ErrorAction SilentlyContinue | Select-Object -First 40 FullName
+            Get-Content "$env:LOCALAPPDATA\SyncDoc Local\logs\*" -ErrorAction SilentlyContinue
+            throw "/health가 안 뜬다"
+          }
+          $me = Invoke-RestMethod http://127.0.0.1:8010/api/me
+          if ($me.edition -ne 'closed') { throw "/api/me가 이상하다" }
+          # 러너는 관리자다 — 앱이 권한을 내려놓고 자신을 다시 켜서 둘이 돈다(기다리는 쪽과 서버)
+          Write-Output "syncdoc-local 프로세스 $(@(Get-Process syncdoc-local).Count)개"
+          # 콘솔이 없어 Ctrl+C를 못 보낸다 — 프로세스를 끝내고 PostgreSQL은 pg_ctl로 멈춘다
+          Get-Process syncdoc-local -ErrorAction SilentlyContinue | Stop-Process -Force
+          & "$dir\postgresql\bin\pg_ctl.exe" stop -D "$env:LOCALAPPDATA\SyncDoc Local\pgdata" -m fast -w
+          Start-Process "$dir\uninstall.exe" -ArgumentList '/S',"_?=$dir" -Wait
+          Remove-Item "$dir\uninstall.exe" -ErrorAction SilentlyContinue
+          if (Test-Path $exe) { throw "제거 뒤에도 실행 파일이 있다" }
+          if (Test-Path "$dir\postgresql") { throw "제거 뒤에도 postgresql이 있다" }
+          if (Test-Path "$menu\싱크독_로컬.lnk") { throw "제거 뒤에도 바로 가기가 있다" }
+          if (-not (Test-Path "$env:LOCALAPPDATA\SyncDoc Local\pgdata")) { throw "제거가 데이터 자리를 지웠다" }
+          Write-Output "윈도 설치 시험 통과"
+
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: 화면 빌드
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Rust 릴리즈 빌드
+        working-directory: local
+        run: cargo build --release -p syncdoc_app
+      - name: 설치 파일
+        working-directory: local
+        run: cargo xtask package linux
+      - name: .deb — 깔아 켜 보고 지운다
+        run: |
+          set -eu
+          sudo apt-get install -y ./local/target/package/linux/out/syncdoc-local_*_amd64.deb
+          test -x /opt/syncdoc-local/syncdoc-local
+          test -f /usr/share/applications/syncdoc-local.desktop
+          data=$(mktemp -d)
+          setsid sh -c 'echo $$ > "$1/pid"; exec syncdoc-local --data-dir "$1/d" --port 8010 --no-tray --no-browser' sh "$data" &
+          for i in $(seq 1 120); do curl -fsS http://127.0.0.1:8010/health && break; sleep 0.5; done
+          curl -fsS http://127.0.0.1:8010/api/me | grep -q '"edition":"closed"'
+          kill -INT -- "-$(cat "$data/pid")"
+          for i in $(seq 1 40); do [ ! -e "$data/d/instance.json" ] && break; sleep 0.5; done
+          test ! -e "$data/d/instance.json"
+          sudo apt-get remove -y syncdoc-local
+          test ! -e /opt/syncdoc-local/syncdoc-local
+          test -d "$data/d/pgdata"
+          echo ".deb 시험 통과"
+      - name: AppImage — 켜 보고 끈다
+        run: |
+          set -eu
+          app=$(ls local/target/package/linux/out/*.AppImage)
+          data=$(mktemp -d)
+          setsid sh -c 'echo $$ > "$2/pid"; exec "$1" --appimage-extract-and-run --data-dir "$2/d" --port 8011 --no-tray --no-browser' sh "$PWD/$app" "$data" &
+          for i in $(seq 1 120); do curl -fsS http://127.0.0.1:8011/health && break; sleep 0.5; done
+          kill -INT -- "-$(cat "$data/pid")"
+          for i in $(seq 1 40); do [ ! -e "$data/d/instance.json" ] && break; sleep 0.5; done
+          test ! -e "$data/d/instance.json"
+          echo "AppImage 시험 통과"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            local/target/package/linux/out/*.deb
+            local/target/package/linux/out/*.AppImage
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/local-v')
+    needs: [windows, linux]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: 태그와 판이 같은지
+        run: |
+          want=$(sed -n 's/^version = "\(.*\)"/\1/p' local/Cargo.toml | head -1)
+          test "${GITHUB_REF_NAME}" = "local-v${want}"
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ver="${GITHUB_REF_NAME#local-v}"
+          gh release create "$GITHUB_REF_NAME" dist/windows/*.exe dist/linux/*.deb dist/linux/*.AppImage \
+            --title "싱크독_로컬 ${ver}" \
+            --notes "싱크독_로컬 ${ver} — 윈도 setup.exe · 리눅스 .deb·AppImage (x86_64). 서명은 없다 — 윈도 SmartScreen이 물으면 「추가 정보 → 실행」. 데이터는 지워도 남는다(SYNC-INFRA-001 9.5)."

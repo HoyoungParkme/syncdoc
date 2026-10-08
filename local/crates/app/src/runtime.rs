@@ -19,6 +19,7 @@ use tracing_appender::non_blocking::WorkerGuard;
 
 use crate::pg::PgServer;
 use crate::settings::Settings;
+use crate::tray::TrayLink;
 use crate::{instance, logs, paths, pg, settings};
 
 /// 인자 — 개발·시험용이 섞여 있다
@@ -35,12 +36,15 @@ pub struct Args {
     /// 묶을 포트 — 못 쓰면 다음 9개까지, 0이면 아무 포트
     #[arg(long, default_value_t = 8010)]
     pub port: u16,
-    /// 트레이 없이 — 카드 L1은 트레이가 없어 받아 두기만 한다 (L4)
+    /// 트레이 없이 — 개발·시험
     #[arg(long)]
     pub no_tray: bool,
-    /// 이미 켜져 있을 때 브라우저를 열지 않는다
+    /// 브라우저를 열지 않는다 — 시험
     #[arg(long)]
     pub no_browser: bool,
+    /// 로그인 때 자동 시작 — 트레이로만, 브라우저를 열지 않는다 (INFRA 9.5)
+    #[arg(long)]
+    pub autostart: bool,
 }
 
 /// 켜진 것 — runtime.shutdown이 거꾸로 끈다
@@ -55,7 +59,7 @@ pub struct Running {
 }
 
 /// SYNC-MS-012#runtime.run
-pub async fn run(args: Args) -> Result<(), Problem> {
+pub async fn run(args: Args, tray: Option<TrayLink>) -> Result<(), Problem> {
     let data = match args.data_dir {
         Some(d) => d,
         None => paths::data_dir()?,
@@ -69,7 +73,7 @@ pub async fn run(args: Args) -> Result<(), Problem> {
         fs::create_dir_all(dir)?;
     }
     let Some(lock) = instance::acquire(&data)? else {
-        let url = instance::open_running(&data, !args.no_browser).await?;
+        let url = instance::open_running(&data, !args.no_browser && !args.autostart).await?;
         println!("싱크독_로컬이 이미 켜져 있다 — {url}");
         return Ok(());
     };
@@ -122,9 +126,23 @@ pub async fn run(args: Args) -> Result<(), Problem> {
             })
             .await
     });
-    tracing::info!("싱크독_로컬 — http://127.0.0.1:{port}/");
-    println!("싱크독_로컬 — http://127.0.0.1:{port}/");
-    wait_signal().await;
+    let url = format!("http://127.0.0.1:{port}/");
+    tracing::info!("싱크독_로컬 — {url}");
+    println!("싱크독_로컬 — {url}");
+    let quit = match tray {
+        Some(link) => {
+            let _ = link.url.send(url.clone());
+            Some(link.quit)
+        }
+        None => None,
+    };
+    if !args.autostart && !args.no_browser {
+        open_browser(url);
+    }
+    tokio::select! {
+        () = wait_signal() => {}
+        () = wait_quit(quit) => {}
+    }
     shutdown(Running {
         server: serving,
         stop,
@@ -199,6 +217,25 @@ pub async fn shutdown(running: Running) -> Result<(), Problem> {
 
 fn remove_instance(data_dir: &Path) {
     let _ = fs::remove_file(data_dir.join(instance::INSTANCE_FILE));
+}
+
+/// 바로 가기로 켠 사람에게 화면을 연다 — 못 열면 로그만(브라우저 없는 곳)
+fn open_browser(url: String) {
+    tokio::task::spawn_blocking(move || {
+        if let Err(e) = webbrowser::open(&url) {
+            tracing::warn!("브라우저를 못 열었다 — {url}: {e}");
+        }
+    });
+}
+
+/// 트레이의 「끝내기」 — 트레이가 없거나 만들지 못해 보낼 쪽이 사라졌으면 끝없이 기다린다
+async fn wait_quit(quit: Option<oneshot::Receiver<()>>) {
+    if let Some(rx) = quit
+        && rx.await.is_ok()
+    {
+        return;
+    }
+    std::future::pending().await
 }
 
 /// 끄기 신호 — Ctrl+C, 유닉스는 SIGTERM도

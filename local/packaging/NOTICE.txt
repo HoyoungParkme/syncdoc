@@ -1,0 +1,18 @@
+싱크독_로컬 (SyncDoc Local) — 함께 담은 것
+==========================================
+
+이 설치 파일에는 다음 프로그램이 함께 들어 있다. 각자의 라이선스를 따른다.
+
+PostgreSQL 16.15
+  라이선스: PostgreSQL License (https://www.postgresql.org/about/licence/)
+  바이너리: theseus-rs/postgresql-binaries 16.15.0
+            https://github.com/theseus-rs/postgresql-binaries/releases/tag/16.15.0
+  원본: https://www.postgresql.org/ftp/source/v16.15/
+
+MinGit 2.56.0.2 (윈도 설치 파일만)
+  라이선스: GNU General Public License v2 (mingit/LICENSE.txt)
+  바이너리와 원본: Git for Windows v2.56.0.windows.2
+            https://github.com/git-for-windows/git/releases/tag/v2.56.0.windows.2
+  GPL에 따라 원본을 위 주소에서 받을 수 있다.
+
+싱크독_로컬 자체의 원본: https://github.com/HoyoungParkme/syncdoc
