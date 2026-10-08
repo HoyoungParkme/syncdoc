@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 **MINISPEC은 카드의 첫 커밋으로 쓴다**([[SYNC-STD-004#DEV-13]]). 그래서 L1만 표가 있고 나머지는 하는 일과 선행만 있다 — 카드를 받을 때 그 카드의 표를 쓴다. 아직 없는 MINISPEC 항목을 미리 가리키지 않는다.
 
-**진행 상황**: 카드 18장(L1~L18). 완료 3(L1·L2 2026-10-07, L3 2026-10-08). L1은 계약 시험 없이 병합하고 완료란은 L2 뒤에 적었다(사용자 결정 2026-10-07).
+**진행 상황**: 카드 18장(L1~L18). 완료 4(L1·L2 2026-10-07, L3·L4 2026-10-08). 첫 릴리즈 `local-v0.1.0`(L4). L1은 계약 시험 없이 병합하고 완료란은 L2 뒤에 적었다(사용자 결정 2026-10-07).
 
 ---
 
@@ -61,7 +61,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | `crates/app` — `tray.rs`(tray-icon: 윈도 메시지 루프, 리눅스 StatusNotifierItem), `main.rs`(트레이가 메인 스레드), `privilege.rs`(윈도 관리자 권한 내려놓기 — PostgreSQL이 관리자 권한을 거부한다), `runtime.run`(`--autostart`·첫 켜기의 브라우저·트레이 끝내기) · `packaging/` — 아이콘 원본·NOTICE·NSIS·.desktop·AppRun · `xtask` — `package windows\|linux`(재료를 모아 setup.exe·.deb·AppImage), `icon`, `pg-fetch --target` · `.github/workflows/local-release.yml` |
 | 테스트 | `cargo test`(트레이 끝내기 → 끄는 순서, `--autostart`면 브라우저 안 엶) · 워크플로 — 윈도 setup.exe를 조용히 깔아 켜고(러너는 관리자 — 권한을 내려놓고 켠다) `/health`, 지운 뒤 데이터 자리가 남는지 · 리눅스 .deb·AppImage도 같이 · 계약(L1~L3) 그대로 · 사람 확인 — 윈도에서 깔아 트레이·바로 가기·제거 |
 | 선행 | L1 |
-| 완료 | — |
+| 완료 | 2026-10-08 · 브랜치 `card/L4-installable`(98dcf88 #343) · spec 11 + code 10 · `cargo test` 62 · clippy(리눅스·윈도) · 윈도 `cargo check` · `check_code` Rust 21/21 · `check_calls` 안 맞는 줄 0 · 계약 `--target rust` 130 통과 · 워크플로 — 윈도 setup.exe를 조용히 깔아 켜고 `/health`·`/api/me`, 지운 뒤 데이터 자리가 남는다(러너는 관리자 — 권한을 내려놓고 다시 켜 프로세스 둘) · 리눅스 .deb·AppImage 켜기·끄기 · 태그 `local-v0.1.0` → GitHub Release(정식, setup.exe·.deb·AppImage) · 사람 확인(윈도 트레이·바로 가기·제거)은 따로 · 되먹임: 윈도 관리자 토큰에서 PostgreSQL이 거부 — MS-012 `privilege.drop_admin`(줄인 토큰 + 기본 DACL에 사용자)·DOM-004·INFRA 9.4, `pg_ctl start` 출력은 파이프가 아니라 파일로(윈도에서 서버가 파이프를 물려받는다) |
 
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
