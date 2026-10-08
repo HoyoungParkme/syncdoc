@@ -10,13 +10,13 @@ upstream: [SYNC-DOM-004, SYNC-INFRA-001, SYNC-PRD-001, SYNC-SEQ-001, SYNC-STD-00
 
 ## 0. 이 문서가 다루는 것
 
-싱크독_로컬(Rust)의 켜기·끄기 — `crates/app`의 `runtime`·`tray`·`paths`·`settings`·`logs`·`instance`·`pg`와 `crates/core/src/migrate.rs`(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.1. 파이썬 판에서는 `main.py`(lifespan)·`config.py`·`db.py`와 Dockerfile의 `alembic upgrade head`가 하던 일이다 — 설치형 프로그램 하나라 PostgreSQL을 띄우고 끄는 일까지 여기서 한다([[SYNC-INFRA-001]] 9.1).
+싱크독_로컬(Rust)의 켜기·끄기 — `crates/app`의 `runtime`·`tray`·`privilege`·`paths`·`settings`·`logs`·`instance`·`pg`와 `crates/core/src/migrate.rs`(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.1. 파이썬 판에서는 `main.py`(lifespan)·`config.py`·`db.py`와 Dockerfile의 `alembic upgrade head`가 하던 일이다 — 설치형 프로그램 하나라 PostgreSQL을 띄우고 끄는 일까지 여기서 한다([[SYNC-INFRA-001]] 9.1).
 
 형식은 [[SYNC-STD-001]] 2.10 — 시그니처는 Rust(코드와 글자 그대로, [[SYNC-STD-004#DEV-4]]), 분기는 `if 조건 → 결과`. **표기** — `→` 반환·결과, `!` 예외(`Problem`), `·` 같은 단계 안 구분.
 
 **켜는 중 실패는 HTTP가 아니다.** 이 문서의 함수도 `Result<_, Problem>`을 돌려주지만([[SYNC-STD-004#DEV-5]]) 켜는 중에 난 것은 `Problem::Internal`의 로그 문장이 사람이 읽는 말이다 — `main`이 그 문장을 표준 오류와 로그에 남기고 끝 코드 1로 끝난다.
 
-**카드 L1 몫이고(2026-10-07) 카드 L4가 트레이와 첫 켜기의 브라우저를 더했다(2026-10-08).** git 자식 프로세스(L6·L10)·쓰기 락 기다림(L7)·밀린 커밋 따라잡기와 주기 확인(L11)·하루 한 번 백업 확인과 데이터 자리 옮기기(L16)는 그 카드가 [[#runtime.run]]·[[#runtime.shutdown]]에 단계를 더한다.
+**카드 L1 몫이고(2026-10-07) 카드 L4가 트레이와 첫 켜기의 브라우저, 윈도 관리자 권한 내려놓기를 더했다(2026-10-08).** git 자식 프로세스(L6·L10)·쓰기 락 기다림(L7)·밀린 커밋 따라잡기와 주기 확인(L11)·하루 한 번 백업 확인과 데이터 자리 옮기기(L16)는 그 카드가 [[#runtime.run]]·[[#runtime.shutdown]]에 단계를 더한다.
 
 ---
 
@@ -28,6 +28,7 @@ upstream: [SYNC-DOM-004, SYNC-INFRA-001, SYNC-PRD-001, SYNC-SEQ-001, SYNC-STD-00
 | [[#runtime.bind]] | 127.0.0.1의 포트에 묶는다 (8010, 못 쓰면 다음) |
 | [[#runtime.shutdown]] | 끈다 — 새 요청 끊기 → 기다림 → PostgreSQL 멈춤 |
 | [[#tray.run]] | 트레이 — 열기·끝내기, 끝날 때까지 |
+| [[#privilege.drop_admin]] | 윈도 관리자 권한을 내려놓고 다시 켠다 |
 | [[#paths.data_dir]] | 기본 데이터 자리 |
 | [[#paths.pg_dir]] | PostgreSQL 바이너리 자리 |
 | [[#settings.load]] | `settings.toml`을 읽는다 (없으면 만든다) |
@@ -148,6 +149,33 @@ pub fn run(rt: &Runtime, args: Args) -> Result<(), Problem>
 **호출되는 것** `main`(트레이가 있을 때)
 
 **테스트 관점** 「끝내기」 신호를 보내면 `runtime.run`이 끄는 순서대로 끝나고 이 함수가 그 결과를 돌려준다 · 켜기가 실패하면 트레이를 만들지 않고 그 `Problem` · 트레이를 못 만들어도 서버는 돈다
+
+---
+
+#### privilege.drop_admin 윈도 관리자 권한을 내려놓는다
+
+**시그니처**
+```rust
+pub fn drop_admin() -> Option<u32>
+```
+
+근거: [[SYNC-INFRA-001]] 9.4 — PostgreSQL은 관리자 권한으로 돌지 않는다(`postgres`가 거부한다). 관리자 권한 그대로 켜지는 때 — UAC를 끈 PC · 「관리자 권한으로 실행」 · GitHub의 윈도 러너
+
+**처리**
+1. 윈도가 아니면 → `None`
+2. if 환경 변수 `SYNCDOC_RESTRICTED`가 있다(이미 다시 켠 자식) → `None`
+3. if 지금 토큰에 Administrators·Power Users 그룹이 켜져 있지 않다 → `None` — UAC가 켜진 보통 계정은 여기서 끝난다
+4. 지금 토큰에서 두 그룹을 거부 전용으로 바꾸고 특권을 다 뺀 토큰을 만든다(`CreateRestrictedToken`, `DISABLE_MAX_PRIVILEGE`) — PostgreSQL이 `initdb`·`pg_ctl`에서 하는 것(`restricted_token.c`)과 같다
+5. `SYNCDOC_RESTRICTED=1`을 두고 그 토큰으로 같은 명령줄을 다시 켠다 — 표준 입력·출력·오류를 물려준다. 콘솔의 Ctrl+C는 자식이 받아 끄는 순서를 탄다 — 이 프로세스는 무시하고 기다린다
+6. 자식이 끝나기를 기다린다 → `Some(자식의 끝 코드)` — `main`이 그 코드로 끝난다
+
+**출력** `None` — 그대로 켠다 · `Some(code)` — 다시 켠 자식이 끝났다
+
+**예외** 없음 — 3~6이 실패하면 표준 오류에 남기고 `None`(그대로 켜면 PostgreSQL이 이유를 말한다)
+
+**호출되는 것** `main`(맨 처음, tokio를 만들기 전 — 환경 변수를 바꾸므로 스레드가 하나일 때)
+
+**테스트 관점** 윈도가 아니면 `None` · 관리자 계정(GitHub 윈도 러너)에서 설치 파일로 깔아 켜면 `/health`가 뜬다(워크플로) · 이 저장소의 `unsafe`는 이 함수의 Win32 호출뿐이다
 
 ---
 
@@ -295,7 +323,7 @@ pub async fn start(pg_dir: &Path, data_dir: &Path) -> Result<PgServer, Problem>
 3. if `pgdata/`가 없다(처음) → `initdb -D pgdata.init -U syncdoc -A scram-sha-256 --pwfile=… -E UTF8 --locale=C` — 암호 파일은 사용자만 읽고 바로 지운다 · `pgdata.init`을 `pgdata`로 이름 바꿈 — 반쯤 만든 것을 다음 실행이 완성본으로 읽지 않게. 역할 이름은 Docker 판과 같은 `syncdoc`이다 — 한 판의 덤프가 다른 판에 그대로 들어간다
 4. if `pgdata/postmaster.pid`가 있고 `pg_ctl status`가 돌고 있다 → `pg_ctl stop -m fast` — 지난번 비정상 종료로 남은 서버
 5. `postgres --single -D pgdata postgres`의 표준 입력으로 `ALTER ROLE syncdoc PASSWORD pw` · `ALTER SYSTEM SET` `listen_addresses='127.0.0.1'` · `timezone='UTC'` · `log_timezone='UTC'` · `logging_collector=on` · `log_directory='../logs'` · `log_filename='postgresql-%Y-%m-%d.log'` · 유닉스는 `unix_socket_directories=''` — 켤 때마다 암호가 바뀐다. 암호는 디스크·명령줄·로그에 남지 않는다
-6. `127.0.0.1:0`에 잠깐 묶어 빈 포트를 얻고 `pg_ctl start -D pgdata -w -t 60 -l logs/postgresql-boot.log -o "-p {포트}"` — 따로 프로세스 묶음으로 띄운다. 터미널의 Ctrl+C가 PostgreSQL에 바로 닿지 않게 하고, 멈추는 순서는 [[#runtime.shutdown]]이 쥔다 · 실패하면 다른 포트로 두 번 더
+6. `127.0.0.1:0`에 잠깐 묶어 빈 포트를 얻고 `pg_ctl start -D pgdata -w -t 60 -l logs/postgresql-boot.log -o "-p {포트}"` — 따로 프로세스 묶음으로 띄운다. `pg_ctl`의 표준 출력·오류는 `logs/pg_ctl.log`로 받는다 — 윈도의 `pg_ctl`은 핸들을 물려주며 서버를 띄워, 파이프로 받으면 서버가 끝날 때까지 기다린다. 터미널의 Ctrl+C가 PostgreSQL에 바로 닿지 않게 하고, 멈추는 순서는 [[#runtime.shutdown]]이 쥔다 · 실패하면 다른 포트로 두 번 더
 7. `syncdoc` 역할로 `postgres` DB에 붙어 `syncdoc` DB가 없으면 만든다
 
 **출력** `PgServer { options, port, pgdata, bin }` — `options`는 127.0.0.1·포트·`syncdoc`·`pw`·DB `syncdoc`. 놓이면(패닉 등) `pg_ctl stop`을 한 번 시도한다
