@@ -8,6 +8,8 @@ use std::sync::LazyLock;
 use regex::Regex;
 use sqlx::PgConnection;
 
+use super::repo;
+use crate::errors::Problem;
 use crate::markdown::{self, DOC_ID, HEADING, REF};
 use crate::pycompat::chars::{is_decimal, lstrip, strip};
 use crate::pycompat::re::compile;
@@ -287,6 +289,52 @@ impl SpecService<'_> {
             return Vec::new();
         };
         markdown::cut_blocks(body, |tok| re.is_match(tok))
+    }
+
+    /// SYNC-MS-014#SpecService.validate
+    pub async fn validate(
+        &mut self,
+        body: &str,
+        doc_type: DocType,
+        entry: Entry,
+        current_status: Option<DocStatus>,
+    ) -> Result<ValidateResult, Problem> {
+        let (fm, _) = markdown::parse_frontmatter(body);
+        let deleted = self
+            .deleted_item_ids(fm.get("doc_id").map(String::as_str))
+            .await?;
+        let body = body.to_string();
+        // 긴 본문 파싱은 일꾼 스레드를 막지 않게 (SYNC-STD-004#DEV-16)
+        tokio::task::spawn_blocking(move || {
+            SpecService::check(&body, doc_type, entry, current_status, &deleted)
+        })
+        .await
+        .map_err(|e| Problem::Internal {
+            log: format!("규약 검사: {e}"),
+        })
+    }
+
+    /// `item.reused`가 볼 삭제된 ID — 파일 삭제·휴지통으로 지워진 것을 되살리는 것은 복구라 빈 집합 (MS-002 validate 3)
+    async fn deleted_item_ids(&mut self, doc_id: Option<&str>) -> Result<HashSet<String>, Problem> {
+        let Some(doc_id) = doc_id.filter(|d| !d.is_empty()) else {
+            return Ok(HashSet::new());
+        };
+        let Some(doc) = repo::document_by_doc_id(&mut *self.db, doc_id).await? else {
+            return Ok(HashSet::new());
+        };
+        if doc
+            .convention_error_detail
+            .as_deref()
+            .unwrap_or("")
+            .starts_with("file.deleted:")
+            || doc.trashed_at.is_some()
+        {
+            return Ok(HashSet::new());
+        }
+        Ok(repo::deleted_item_ids(&mut *self.db, doc.id)
+            .await?
+            .into_iter()
+            .collect())
     }
 
     /// SYNC-MS-014#SpecService.check
