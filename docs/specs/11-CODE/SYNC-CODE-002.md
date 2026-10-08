@@ -96,7 +96,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 **돌리는 법** — `cd contract && uv run pytest --target both`(기본). 파이썬 판은 지금 작업 트리로 이미지를 만들어 띄우고, Rust 판은 `local/`을 빌드해 띄운다(`cargo xtask pg-fetch` 먼저). 시험마다 그 기능을 닫는 카드를 적는다(`@pytest.mark.card("L3")`) — 파이썬 판은 전부 돌고, Rust 판은 이 문서의 완료란이 찬 카드만 돈다(나머지는 건너뜀으로 센다). 카드를 끝내기 전 확인은 `--with-card L3`. **두 판 차이 시험**(카드 L3~)은 같은 무작위 사례(씨앗 고정)를 두 판에 보내 상태·머리·본문을 바이트로 비교한다 — 두 판이 다 떠 있을 때(`--target both`)만 돈다.
 
-**계약 밖** — API-001에 없는 프레임워크 동작은 두 판이 달라도 된다(사용자 결정 2026-10-07): 끝 슬래시 리다이렉트(307) · `/docs`·`/redoc`·`/openapi.json` · GET 경로의 HEAD · Range(206) · ETag 값의 꼴 · Host 머리 없는 요청 · 응답의 `date`·`server` 머리와 본문을 나눠 보내는 꼴(chunked·content-length). 화면과 에이전트는 이것들을 쓰지 않는다. **MCP-Protocol-Version 머리가 핸드셰이크 판(2024-11-05~2025-11-25)이 아닌 요청**도 L18까지 계약 밖이다(사용자 결정 2026-10-08).
+**계약 밖** — API-001에 없는 프레임워크 동작은 두 판이 달라도 된다(사용자 결정 2026-10-07): 끝 슬래시 리다이렉트(307) · `/docs`·`/redoc`·`/openapi.json` · GET 경로의 HEAD · Range(206) · ETag 값의 꼴 · Host 머리 없는 요청 · 응답의 `date`·`server`·`connection` 머리와 본문을 나눠 보내는 꼴(chunked·content-length). 화면과 에이전트는 이것들을 쓰지 않는다. **MCP-Protocol-Version 머리가 핸드셰이크 판(2024-11-05~2025-11-25)이 아닌 요청**도 L18까지 계약 밖이다(사용자 결정 2026-10-08).
 
 속도는 카드 L17이 잰다 — [[SYNC-PRD-001#R15]]의 수치를 같은 PC에서 두 판을 나란히(9.8).
 
