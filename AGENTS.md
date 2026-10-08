@@ -50,6 +50,9 @@ Rust는 `local/`에서 돈다 — `cd local && cargo test` · `cargo fmt --check
 - 처음 한 번 — C 링커(`sudo apt install build-essential pkg-config`, 사람이) · rustup(판은 `local/rust-toolchain.toml`이 고른다) · `cargo xtask pg-fetch`(개발·시험용 PostgreSQL 16.15를 `local/target/pg/`에)
 - `cargo xtask migrations` — Alembic 리비전을 더했으면 `local/migrations/`를 다시 만든다. `--check`는 다시 만들어 비교만(DEV-7)
 - `cargo xtask mcp-tools` — 파이썬 MCP 도구의 설명·인자를 바꿨으면 Rust 판의 `declarations.json`을 다시 만든다. `--check`는 비교만(DEV-7)
+- `cargo xtask unicode-tables` — 파이썬 3.12의 문자 분류 표(`core/src/pycompat/unicode.rs`)를 다시 뽑는다. `--check`는 비교만(DEV-7)
+- `cargo xtask spec-golden` — 명세 엔진 정답 파일(`core/tests/golden/spec.json`, 꼴 모음을 입력째 얼림)을 파이썬 판으로 다시 만든다. `--check`는 비교만. `cargo test`가 Rust 답과 비교한다(카드 L5)
+- `cargo xtask spec-diff [--seed S] [--count N]` — 지금의 명세·템플릿, git 이력 diff, 씨앗 고정 무작위 본문을 두 판의 명세 엔진에 돌려 바이트로 비교한다. 엔진(`markdown.rs`·`spec/`·`pycompat/`)이나 파이썬 판 엔진을 고치면 돌린다
 - `cargo xtask package linux|windows` — 설치 파일(.deb·AppImage / setup.exe). `cargo build --release -p syncdoc_app`(화면 빌드 `npm run build` 뒤) 다음에. 윈도는 NSIS가 있는 윈도에서 · `cargo xtask icon` — `packaging/icon.svg`를 고쳤으면 icon.ico·icon.png·tray.rgba를 다시 만든다
 - **릴리즈** — `local/Cargo.toml`의 version을 올리고 병합한 뒤 태그 `local-v{판}`을 민다. `.github/workflows/local-release.yml`이 윈도·리눅스에서 만들고 깔아 켜 본 뒤 GitHub Release에 올린다(INFRA 9.5)
 - `cargo xtask schema-check` — 시험 서버(5434)에 Alembic DB와 Rust DB를 만들어 스키마가 같은지 · `cargo xtask test-db-clean` — 시험이 남긴 `syncdoc_local_test_*` 지우기

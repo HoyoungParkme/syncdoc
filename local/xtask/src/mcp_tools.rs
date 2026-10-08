@@ -2,11 +2,9 @@
 //! 도구 13개의 선언·안내문·고정 결과의 바이트와 pydantic core schema를 `declarations.json` 하나에 담는다.
 //! 파이썬이 원본이다 — 이 파일을 손으로 고치지 않는다. 스크립트는 `xtask/py/export_mcp.py`.
 
+use crate::{local_root, python};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-
-use crate::{local_root, repo_root};
 
 fn dest() -> PathBuf {
     local_root()
@@ -38,21 +36,5 @@ pub fn run(check: bool) -> Result<(), String> {
 
 /// `uv run --project backend python xtask/py/export_mcp.py OUT` — 작업 자리는 `local/`(`.env`가 없다)
 fn generate(to: &Path) -> Result<(), String> {
-    let script = local_root().join("xtask").join("py").join("export_mcp.py");
-    let out = Command::new("uv")
-        .args(["run", "--quiet", "--project"])
-        .arg(repo_root().join("backend"))
-        .arg("python")
-        .arg(&script)
-        .arg(to)
-        .current_dir(local_root())
-        .output()
-        .map_err(|e| format!("uv를 못 돌렸다 — {e}"))?;
-    if !out.status.success() {
-        return Err(format!(
-            "export_mcp.py 실패 — {}",
-            String::from_utf8_lossy(&out.stderr)
-        ));
-    }
-    Ok(())
+    python("export_mcp.py", &[to.as_os_str()]).map(|_| ())
 }

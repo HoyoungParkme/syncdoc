@@ -4,6 +4,8 @@
 use serde_json::Value;
 use thiserror::Error;
 
+use crate::types::{Violation, Warning};
+
 /// `internal`의 본문 — 고정 문구. 예외 종류·메시지는 로그로만 (API-001 2장)
 pub const INTERNAL_DETAIL: &str = "서버에서 처리하지 못한 오류입니다. 로그를 확인하세요.";
 
@@ -32,6 +34,12 @@ pub enum Problem {
     /// `invalid-request` — 요청 본문·경로 값이 정의에 안 맞다. `(loc, msg)`들 (API-001 2장, 파이썬 `InvalidRequest`)
     #[error("{}", invalid_detail(.errors))]
     InvalidRequest { errors: Vec<(String, String)> },
+    /// `convention-violation` — 규약 위반(STD-001 3장). 본문 「규약 위반」, 위반·경고 목록 (파이썬 `ConventionViolation`)
+    #[error("규약 위반")]
+    ConventionViolation {
+        violations: Vec<Violation>,
+        warnings: Vec<Warning>,
+    },
     /// `internal` — 처리하지 못한 오류. `log`는 로그로만 간다 — 켤 때는 사람이 읽는 문장이다
     #[error("{log}")]
     Internal { log: String },
@@ -46,6 +54,7 @@ impl Problem {
             Problem::MethodNotAllowed { .. } => Some("method-not-allowed"),
             Problem::ForbiddenOrigin { .. } => Some("forbidden-origin"),
             Problem::InvalidRequest { .. } => Some("invalid-request"),
+            Problem::ConventionViolation { .. } => Some("convention-violation"),
             Problem::Internal { .. } => Some("internal"),
         }
     }
@@ -57,6 +66,7 @@ impl Problem {
             Problem::MethodNotAllowed { .. } => 405,
             Problem::ForbiddenOrigin { .. } => 403,
             Problem::InvalidRequest { .. } => 422,
+            Problem::ConventionViolation { .. } => 422,
             Problem::Internal { .. } => 500,
         }
     }
@@ -105,6 +115,40 @@ impl Problem {
                         .collect::<Vec<_>>(),
                 ),
             )],
+            Problem::ConventionViolation {
+                violations,
+                warnings,
+            } => vec![
+                (
+                    "violations",
+                    Value::from(
+                        violations
+                            .iter()
+                            .map(|v| {
+                                let mut m = serde_json::Map::new();
+                                m.insert("line".into(), Value::from(v.line));
+                                m.insert("rule".into(), Value::from(v.rule.as_str()));
+                                m.insert("message".into(), Value::from(v.message.as_str()));
+                                Value::Object(m)
+                            })
+                            .collect::<Vec<_>>(),
+                    ),
+                ),
+                (
+                    "warnings",
+                    Value::from(
+                        warnings
+                            .iter()
+                            .map(|w| {
+                                let mut m = serde_json::Map::new();
+                                m.insert("rule".into(), Value::from(w.rule.as_str()));
+                                m.insert("message".into(), Value::from(w.message.as_str()));
+                                Value::Object(m)
+                            })
+                            .collect::<Vec<_>>(),
+                    ),
+                ),
+            ],
             Problem::Blank { .. } | Problem::Internal { .. } => vec![],
         }
     }

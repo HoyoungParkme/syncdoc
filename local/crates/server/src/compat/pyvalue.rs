@@ -8,7 +8,7 @@ use indexmap::IndexMap;
 use jiter::JsonValue;
 use num_bigint::BigInt;
 
-use super::printable::is_printable;
+use syncdoc_core::pycompat::repr::repr_code_points;
 
 /// 파이썬 `str`. 짝 없는 서로게이트(파이썬 `json.loads`의 `"\ud800"`)가 있을 때만 `Wide`다 — 러스트 `String`에 못 담는다
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -50,43 +50,9 @@ impl PyStr {
         }
     }
 
-    /// 파이썬 `repr(s)`
+    /// 파이썬 `repr(s)` — 서로게이트까지 코드 포인트로 (`syncdoc_core::pycompat::repr`)
     pub fn repr(&self) -> String {
-        let cps = self.code_points();
-        let has_single = cps.contains(&u32::from('\''));
-        let has_double = cps.contains(&u32::from('"'));
-        let quote = if has_single && !has_double { '"' } else { '\'' };
-        let mut out = String::with_capacity(cps.len() + 2);
-        out.push(quote);
-        for cp in cps {
-            match cp {
-                c if c == u32::from(quote) || c == u32::from('\\') => {
-                    out.push('\\');
-                    out.push(char::from_u32(c).unwrap_or('?'));
-                }
-                0x09 => out.push_str("\\t"),
-                0x0A => out.push_str("\\n"),
-                0x0D => out.push_str("\\r"),
-                c if c < 0x20 || c == 0x7F => {
-                    let _ = write!(out, "\\x{c:02x}");
-                }
-                c if c < 0x7F => out.push(char::from_u32(c).unwrap_or('?')),
-                c if is_printable(c) && char::from_u32(c).is_some() => {
-                    out.push(char::from_u32(c).unwrap_or('?'));
-                }
-                c if c <= 0xFF => {
-                    let _ = write!(out, "\\x{c:02x}");
-                }
-                c if c <= 0xFFFF => {
-                    let _ = write!(out, "\\u{c:04x}");
-                }
-                c => {
-                    let _ = write!(out, "\\U{c:08x}");
-                }
-            }
-        }
-        out.push(quote);
-        out
+        repr_code_points(&self.code_points())
     }
 }
 

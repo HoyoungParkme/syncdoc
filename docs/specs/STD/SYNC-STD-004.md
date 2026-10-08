@@ -262,7 +262,7 @@ C  통합·배포       외부 연결 · 첫 사용
 
 **테스트는 전용 DB에서만 돈다.** 이름에 `test`가 없는 DB를 가리키면 시작하지 않는다 — 스키마를 만드는 픽스처가 개발·운영 DB에 닿으면 그 데이터가 사라진다. 다른 DB를 쓰려면 `SYNCDOC_TEST_DATABASE_URL`로 말한다. 환경 변수를 `setdefault`로 두면 셸에 떠 있는 값이 이긴다 — 그래서 덮어쓴다.
 
-**Rust 시험의 DB**는 같은 시험 컨테이너(5434)의 `syncdoc_local_test*`다 — 시험마다 DB 하나, 이름에 `test`가 있다. 앱의 데이터 자리(함께 담은 PostgreSQL)는 쓰지 않는다. 다른 DB는 `SYNCDOC_LOCAL_TEST_DATABASE_URL`. **켜기·끄기 시험**([[SYNC-MS-012]]의 `pg.start`와 실행 파일 시험)만 함께 담은 PostgreSQL을 띄운다 — 시험마다 만든 임시 데이터 자리에서, 개발용 바이너리(`cargo xtask pg-fetch`)로. Rust 카드의 확인에는 `cargo xtask migrations --check`·`cargo xtask schema-check`·`cargo xtask mcp-tools --check`도 든다(DEV-7).
+**Rust 시험의 DB**는 같은 시험 컨테이너(5434)의 `syncdoc_local_test*`다 — 시험마다 DB 하나, 이름에 `test`가 있다. 앱의 데이터 자리(함께 담은 PostgreSQL)는 쓰지 않는다. 다른 DB는 `SYNCDOC_LOCAL_TEST_DATABASE_URL`. **켜기·끄기 시험**([[SYNC-MS-012]]의 `pg.start`와 실행 파일 시험)만 함께 담은 PostgreSQL을 띄운다 — 시험마다 만든 임시 데이터 자리에서, 개발용 바이너리(`cargo xtask pg-fetch`)로. Rust 카드의 확인에는 `cargo xtask migrations --check`·`cargo xtask schema-check`·`cargo xtask mcp-tools --check`·`cargo xtask unicode-tables --check`·`cargo xtask spec-golden --check`도 든다(DEV-7). 명세 엔진을 고친 카드는 `cargo xtask spec-diff`(파이썬 판과의 차이 0)까지(카드 L5).
 
 **한 DB에 pytest를 둘 이상 동시에 돌리지 않는다.** 서로의 트랜잭션에 걸려 매번 다른 테스트가 401·연결 오류로 죽는다. 실패하는 테스트가 돌 때마다 달라지면 이것부터 의심한다(#17).
 

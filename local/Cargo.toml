@@ -28,6 +28,7 @@ num-bigint = "0.4.6"
 num-traits = "0.2"
 percent-encoding = "2.3"
 rand = "0.10"
+regex = "1.13"
 resvg = { version = "0.48", default-features = false, features = ["text"] }
 ryu = "1.0"
 rust-embed = { version = "8.12", features = ["interpolate-folder-path", "include-exclude"] }
