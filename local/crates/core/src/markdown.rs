@@ -9,6 +9,7 @@ use regex::Regex;
 
 use crate::pycompat::chars::strip;
 use crate::pycompat::re::compile;
+use crate::types::ItemBlock;
 
 /// 문서 ID 꼴 (STD-001 1.2)
 pub static DOC_ID: LazyLock<Regex> = LazyLock::new(|| compile(r"^[A-Z]{1,4}-[A-Z]+-\d{3}$"));
@@ -79,4 +80,30 @@ pub fn headings(body: &str) -> Vec<(usize, usize, String, String)> {
             })
         })
         .collect()
+}
+
+/// SYNC-MS-014#markdown.cut_blocks
+pub fn cut_blocks(body: &str, is_item: impl Fn(&str) -> bool) -> Vec<ItemBlock> {
+    let lines: Vec<&str> = body.split('\n').collect();
+    let heads = headings(body);
+    let mut blocks = Vec::new();
+    for (n, (i, level, tok, rest)) in heads.iter().enumerate() {
+        if !is_item(tok) {
+            continue;
+        }
+        // 블록 끝 = 레벨이 같거나 높은 다음 헤딩의 앞 줄, 없으면 본문 끝
+        let end = heads[n + 1..]
+            .iter()
+            .find(|(_, lvl, _, _)| lvl <= level)
+            .map_or(lines.len() - 1, |(j, _, _, _)| j - 1);
+        blocks.push(ItemBlock {
+            item_id: tok.clone(),
+            display_name: strip(rest).to_string(),
+            level: *level,
+            start_line: i + 1,
+            end_line: end + 1,
+            text: lines[*i..=end].join("\n"),
+        });
+    }
+    blocks
 }
