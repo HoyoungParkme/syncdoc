@@ -9,6 +9,7 @@ use indexmap::IndexMap;
 use regex::Regex;
 use sqlx::PgConnection;
 
+use super::model::{DocumentRow, VersionRow};
 use super::repo;
 use crate::errors::Problem;
 use crate::markdown::{self, DOC_ID, HEADING, REF};
@@ -17,8 +18,8 @@ use crate::pycompat::difflib::unified_diff;
 use crate::pycompat::re::compile;
 use crate::pycompat::repr::repr;
 use crate::types::{
-    AuthorRef, Diff, DiffLine, DiffOp, DocStatus, DocType, DocumentSummary, Entry, Hunk, ItemBlock,
-    ValidateResult, Violation, Warning, stage_of,
+    AuthorRef, Diff, DiffLine, DiffOp, DocItem, DocStatus, DocType, Document, DocumentSummary,
+    Entry, Hunk, ItemBlock, ValidateResult, Violation, Warning, stage_of,
 };
 
 /// 이력 diff의 앞뒤 줄 수 — 파이썬 `DIFF_CONTEXT_LINES`
@@ -303,6 +304,53 @@ fn normalized(text: &str) -> Vec<&str> {
         .map(strip)
         .filter(|l| !l.is_empty())
         .collect()
+}
+
+/// 판 행 → 작성자(id만) — 파이썬 `_author_of`
+fn author_of(v: &VersionRow) -> AuthorRef {
+    AuthorRef {
+        kind: v.author_kind.clone(),
+        user_id: v.author_user_id,
+        instructed_by_id: v.instructed_by_user_id,
+        via: v.via.clone(),
+    }
+}
+
+/// 문서 행 + 최근 판 → 요약 — 파이썬 `_summary_fields`. `incomplete_warnings`는 JSON 목록(없거나 비면 빈 것)
+fn summary_of(r: &DocumentRow, latest: Option<&VersionRow>) -> Result<DocumentSummary, Problem> {
+    let raw = r
+        .incomplete_warnings
+        .as_deref()
+        .filter(|w| !w.is_empty())
+        .unwrap_or("[]");
+    let warnings: Vec<String> = serde_json::from_str(raw).map_err(|e| Problem::Internal {
+        log: format!(
+            "{}의 incomplete_warnings가 JSON 목록이 아니다 — {e}",
+            r.doc_id
+        ),
+    })?;
+    Ok(DocumentSummary {
+        id: r.id,
+        doc_id: r.doc_id.clone(),
+        doc_type: r.doc_type.clone(),
+        stage: stage_of(&r.doc_type),
+        status: r.status.clone(),
+        current_version_no: r.current_version_no,
+        has_convention_error: r.has_convention_error,
+        incomplete_warnings: warnings,
+        updated_at: r.updated_at,
+        last_author: latest.map(author_of),
+        author: None,
+        counts: Default::default(),
+        trashed_at: r.trashed_at,
+    })
+}
+
+fn not_found(resource: &str, id: &str) -> Problem {
+    Problem::NotFound {
+        resource: resource.to_string(),
+        id: serde_json::Value::from(id),
+    }
 }
 
 /// 명세 서비스 — 연결을 빌려 받는다. 트랜잭션은 부르는 쪽이 쥔다 (SYNC-STD-004#DEV-10).
@@ -764,37 +812,38 @@ impl SpecService<'_> {
             (stage_of(&a.doc_type).unwrap_or(99), &a.doc_id)
                 .cmp(&(stage_of(&b.doc_type).unwrap_or(99), &b.doc_id))
         });
-        rows.into_iter()
-            .map(|r| {
-                let warnings: Vec<String> =
-                    serde_json::from_str(r.incomplete_warnings.as_deref().unwrap_or("[]"))
-                        .map_err(|e| Problem::Internal {
-                            log: format!(
-                                "{}의 incomplete_warnings가 JSON 목록이 아니다 — {e}",
-                                r.doc_id
-                            ),
-                        })?;
-                Ok(DocumentSummary {
-                    id: r.id,
-                    stage: stage_of(&r.doc_type),
-                    author: None,
-                    last_author: latest.get(&r.id).map(|v| AuthorRef {
-                        kind: v.author_kind.clone(),
-                        user_id: v.author_user_id,
-                        instructed_by_id: v.instructed_by_user_id,
-                        via: v.via.clone(),
-                    }),
-                    doc_id: r.doc_id,
-                    doc_type: r.doc_type,
-                    status: r.status,
-                    current_version_no: r.current_version_no,
-                    has_convention_error: r.has_convention_error,
-                    incomplete_warnings: warnings,
-                    updated_at: r.updated_at,
-                    counts: Default::default(),
-                    trashed_at: r.trashed_at,
-                })
-            })
+        rows.iter()
+            .map(|r| summary_of(r, latest.get(&r.id)))
             .collect()
+    }
+
+    /// SYNC-MS-014#SpecService.get_document
+    pub async fn get_document(&mut self, doc_id: &str) -> Result<Document, Problem> {
+        let Some(row) = repo::document_by_doc_id(&mut *self.db, doc_id).await? else {
+            return Err(not_found("document", doc_id));
+        };
+        let items = repo::items_of(&mut *self.db, row.id, false)
+            .await?
+            .into_iter()
+            .map(|i| DocItem {
+                pk: i.id,
+                item_id: i.item_id,
+                display_name: i.display_name,
+                missing_refs: Vec::new(),
+            })
+            .collect();
+        let latest = repo::latest_version(&mut *self.db, row.id).await?;
+        Ok(Document {
+            summary: summary_of(&row, latest.as_ref())?,
+            body: row.current_body,
+            commit_hash: latest.as_ref().map(|v| v.commit_hash.clone()),
+            current_version_id: latest.as_ref().map(|v| v.id),
+            missing_refs: Vec::new(),
+            convention_error_detail: row.convention_error_detail,
+            items,
+            prev_doc_id: None,
+            next_doc_id: None,
+            project_name: String::new(),
+        })
     }
 }
