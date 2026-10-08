@@ -12,8 +12,8 @@ use sqlx::postgres::PgPoolOptions;
 use syncdoc_core::account::service::AccountService;
 use syncdoc_core::errors::Problem;
 use syncdoc_core::infra::git::Git;
-use syncdoc_core::migrate;
 use syncdoc_core::project::service::ServerRepos;
+use syncdoc_core::{migrate, pipeline};
 use syncdoc_server::state::AppState;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
@@ -219,12 +219,15 @@ pub async fn shutdown(running: Running) -> Result<(), Problem> {
     } = running;
     let _ = stop.send(());
     let abort = server.abort_handle();
-    if tokio::time::timeout(Duration::from_secs(10), server)
-        .await
-        .is_err()
-    {
+    // 진행 중 요청과 쓰기 락을 합쳐 10초 — 요청이 끊겨도 저장은 따로 돌아 git과 DB 사이에 있을 수 있다 (INFRA 9.1)
+    let limit = Duration::from_secs(10);
+    let started = tokio::time::Instant::now();
+    if tokio::time::timeout(limit, server).await.is_err() {
         tracing::warn!("진행 중 요청을 10초 기다렸다 — 끊는다");
         abort.abort();
+    }
+    if !pipeline::wait_idle(limit.saturating_sub(started.elapsed())).await {
+        tracing::warn!("저장이 끝나기를 10초 기다렸다 — 끊는다");
     }
     pool.close().await;
     let stopped = pg::stop(db).await;
