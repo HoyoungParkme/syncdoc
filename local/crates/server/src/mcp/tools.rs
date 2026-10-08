@@ -1,21 +1,27 @@
 //! 도구 부르기 — mcp 2.2.0 `MCPServer._handle_call_tool`·`Tool.run`·`FuncMetadata.pre_parse_json`을 옮겼다.
 //! 인자 검증은 파이썬과 같은 문장을 낸다. 검증을 지난 도구는 그 카드가 처리기를 둔다 — 아직이면 `not-implemented`
-//! (SYNC-CODE-002 L3 표, 사용자 결정 2026-10-08). 카드 L6이 `init_project`·`get_template`를 열었다.
+//! (SYNC-CODE-002 L3 표, 사용자 결정 2026-10-08). 카드 L6이 `init_project`·`get_template`를, 카드 L7이
+//! 읽기 넷(`list_documents`·`get_document`·`get_item`·`get_references`)과 쓰기 둘(`create_document`·`update_document`)을 열었다.
 
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
+use num_bigint::BigInt;
 use regex::Regex;
 use serde_json::{Map, Value, json};
 use syncdoc_core::account::model::UserRow;
 use syncdoc_core::errors::Problem;
 use syncdoc_core::markdown::masked_lines;
+use syncdoc_core::pipeline::{self, SaveInput};
 use syncdoc_core::project::service::ProjectService;
 use syncdoc_core::pycompat::chars::strip;
 use syncdoc_core::pycompat::re::compile;
 use syncdoc_core::queries;
 use syncdoc_core::spec::{SUBTYPES, TYPES};
-use syncdoc_core::types::{DocumentSummary, ProjectSummary, Storage, py_isoformat};
+use syncdoc_core::types::{
+    Author, AuthorKind, DocumentSummary, Entry, ItemRef, ProjectSummary, STAGES, SaveResult,
+    Storage, py_isoformat,
+};
 
 use crate::compat::pydantic::{Failure, Opts};
 use crate::compat::pyjson::{self, Depth};
@@ -74,6 +80,12 @@ pub async fn call(
     let result = match name {
         "init_project" => init_project(state, user, &typed).await,
         "get_template" => get_template(state, user, &typed).await,
+        "list_documents" => list_documents(state, user, &typed).await,
+        "get_document" => get_document(state, user, &typed).await,
+        "get_item" => get_item(state, user, &typed).await,
+        "get_references" => get_references(state, user, &typed).await,
+        "create_document" => create_document(state, user, &typed).await,
+        "update_document" => update_document(state, user, &typed).await,
         _ => Err(Problem::NotImplemented {
             card: tool.card.to_string(),
         }),
@@ -111,6 +123,217 @@ async fn init_project(state: &AppState, user: &UserRow, a: &PyValue) -> Result<V
             log: format!("만든 프로젝트 {code}의 요약이 없다"),
         })?;
     Ok(project_json(&summary))
+}
+
+/// SYNC-API-002#list_documents
+///
+/// 11단계로 다시 묶는다(파이썬 `list_documents`) — `stage`가 1~11 밖이면 단계가 없다, `status`는 거르지 않고 비교만
+async fn list_documents(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let project_code = arg_str(a, "project_code");
+    let stage = arg_int(a, "stage").map(|b| {
+        i32::try_from(&b)
+            .ok()
+            .filter(|n| (1..=11).contains(n))
+            .unwrap_or(0)
+    });
+    let status = arg_opt_str(a, "status");
+    let mut c = state.pool.acquire().await?;
+    let docs = queries::document_list(
+        &mut c,
+        &state.repos,
+        &project_code,
+        user,
+        stage,
+        status.as_deref(),
+    )
+    .await?;
+    let mut stages = Vec::new();
+    for (i, doc_type) in STAGES.iter().enumerate() {
+        let n = i as i32 + 1;
+        if stage.is_some_and(|s| s != n) {
+            continue;
+        }
+        let mine: Vec<&DocumentSummary> = docs.iter().filter(|d| d.stage == Some(n)).collect();
+        // 가장 낮은 상태 — 초안이 하나라도 있으면 초안
+        let lowest = if mine.iter().any(|d| d.status == "draft") {
+            Some("draft")
+        } else if mine.is_empty() {
+            None
+        } else {
+            Some("approved")
+        };
+        stages.push(json!({
+            "stage": n,
+            "doc_type": doc_type,
+            "status": lowest,
+            "doc_count": mine.len(),
+            "docs": mine.iter().map(|d| summary_json(d)).collect::<Vec<_>>(),
+        }));
+    }
+    Ok(json!({"project_code": project_code, "stages": stages}))
+}
+
+/// SYNC-API-002#get_document
+///
+/// 요약 + 해시·규약 오류 문장·본문·항목(각자의 미존재 참조)·이웃 — 파이썬 `get_document`의 꼴. `counts`는 비었다
+async fn get_document(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let mut c = state.pool.acquire().await?;
+    let d = queries::document_view(&mut c, &state.repos, &arg_str(a, "doc_id"), user).await?;
+    let mut out = summary_map(&d.summary);
+    out.insert("commit_hash".into(), Value::from(d.commit_hash));
+    out.insert(
+        "convention_error_detail".into(),
+        Value::from(d.convention_error_detail),
+    );
+    out.insert("body".into(), Value::from(d.body));
+    out.insert(
+        "items".into(),
+        Value::from(
+            d.items
+                .iter()
+                .map(|i| {
+                    json!({
+                        "item_id": i.item_id,
+                        "display_name": i.display_name,
+                        "missing_refs": i.missing_refs,
+                    })
+                })
+                .collect::<Vec<_>>(),
+        ),
+    );
+    out.insert("prev_doc_id".into(), Value::from(d.prev_doc_id));
+    out.insert("next_doc_id".into(), Value::from(d.next_doc_id));
+    Ok(Value::Object(out))
+}
+
+/// SYNC-API-002#get_item
+///
+/// `item_id`는 `~`를 `/`로 바꾼 것(서비스가 바꾼다)
+async fn get_item(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let mut c = state.pool.acquire().await?;
+    let v = queries::item_view(
+        &mut c,
+        &state.repos,
+        &arg_str(a, "doc_id"),
+        &arg_str(a, "item_id"),
+        user,
+    )
+    .await?;
+    Ok(json!({
+        "doc_id": v.doc_id,
+        "item_id": v.item_id,
+        "display_name": v.display_name,
+        "doc_status": v.doc_status,
+        "doc_version_no": v.doc_version_no,
+        "body": v.body,
+    }))
+}
+
+/// SYNC-API-002#get_references
+async fn get_references(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let mut c = state.pool.acquire().await?;
+    let r = queries::item_references_view(
+        &mut c,
+        &state.repos,
+        &arg_str(a, "doc_id"),
+        &arg_str(a, "item_id"),
+        user,
+    )
+    .await?;
+    let refs = |xs: &[ItemRef]| -> Vec<Value> {
+        xs.iter()
+            .map(|x| {
+                json!({
+                    "doc_id": x.doc_id,
+                    "item_id": x.item_id,
+                    "display_name": x.display_name,
+                    "raw_target": x.raw_target,
+                    "is_missing": x.is_missing,
+                })
+            })
+            .collect()
+    };
+    Ok(json!({
+        "doc_id": r.doc_id,
+        "item_id": r.item_id,
+        "upstream": refs(&r.upstream),
+        "downstream": refs(&r.downstream),
+    }))
+}
+
+/// 토큰으로 들어온 요청은 발급자 계정 — `agent`·발급자·발급자·`mcp` (SEQ-C2, 파이썬 `_agent_author`)
+fn agent_author(user: &UserRow) -> Author {
+    Author {
+        kind: AuthorKind::Agent,
+        user: user.clone(),
+        instructed_by: Some(user.clone()),
+        via: Entry::Mcp,
+    }
+}
+
+/// 파이썬 `SaveResult.to_dict()`
+fn save_json(r: &SaveResult) -> Value {
+    json!({
+        "doc_id": r.doc_id,
+        "version_no": r.version_no,
+        "commit_hash": r.commit_hash,
+        "status": r.status,
+        "warnings": r.warnings,
+        "next_step": r.next_step,
+    })
+}
+
+/// SYNC-API-002#create_document
+///
+/// 타입은 거르지 않는다 — 모르는 타입도 파이썬처럼 문서 ID를 발급하고 규약 검사(`frontmatter.type`)에서 막힌다
+async fn create_document(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let r = pipeline::save_pipeline(
+        &state.pool,
+        &state.repos,
+        SaveInput {
+            entry: Entry::Mcp,
+            doc_id: None,
+            doc_type: Some(arg_str(a, "doc_type")),
+            body: arg_str(a, "body"),
+            expected_version: None,
+            project_code: Some(arg_str(a, "project_code")),
+            author: agent_author(user),
+            message: arg_str(a, "message"),
+            confirm_item_deletion: false,
+        },
+    )
+    .await?;
+    Ok(save_json(&r))
+}
+
+/// SYNC-API-002#update_document
+///
+/// `changed_items`는 검증만 받고 쓰지 않는다(파이썬도 쓰지 않는다). `i64` 밖의 판 번호는 어느 판과도 다르다
+async fn update_document(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let expected = arg_int(a, "expected_version").map(|b| {
+        i64::try_from(&b).unwrap_or(if b.sign() == num_bigint::Sign::Minus {
+            i64::MIN
+        } else {
+            i64::MAX
+        })
+    });
+    let r = pipeline::save_pipeline(
+        &state.pool,
+        &state.repos,
+        SaveInput {
+            entry: Entry::Mcp,
+            doc_id: Some(arg_str(a, "doc_id")),
+            doc_type: None,
+            body: arg_str(a, "body"),
+            expected_version: expected,
+            project_code: None,
+            author: agent_author(user),
+            message: arg_str(a, "message"),
+            confirm_item_deletion: arg_bool(a, "confirm_item_deletion"),
+        },
+    )
+    .await?;
+    Ok(save_json(&r))
 }
 
 /// SYNC-API-002#get_template
@@ -291,9 +514,27 @@ pub fn project_json(p: &ProjectSummary) -> Value {
     })
 }
 
-/// 파이썬 `_summary_json` — 이 경로의 문서 요약에는 이름 붙은 작성자가 없다(`last_author` 없음)
+/// 파이썬 `_author_json` — 사람은 로그인으로. 이름을 붙이지 않은 요약(프로젝트 요약의 `std_docs`)은 없음
+fn author_json(d: &DocumentSummary) -> Value {
+    match &d.author {
+        None => Value::Null,
+        Some(a) => json!({
+            "kind": a.kind,
+            "user": a.user.as_ref().map(|u| u.github_login.as_str()),
+            "instructed_by": a.instructed_by.as_ref().map(|u| u.github_login.as_str()),
+            "via": a.via,
+        }),
+    }
+}
+
+/// 파이썬 `_summary_json` — 시각은 `isoformat()`(`+00:00`)
 fn summary_json(d: &DocumentSummary) -> Value {
-    json!({
+    Value::Object(summary_map(d))
+}
+
+/// `_summary_json`의 키들 — `get_document`가 뒤에 더 붙인다
+fn summary_map(d: &DocumentSummary) -> Map<String, Value> {
+    let Value::Object(m) = json!({
         "doc_id": d.doc_id,
         "doc_type": d.doc_type,
         "stage": d.stage,
@@ -302,9 +543,12 @@ fn summary_json(d: &DocumentSummary) -> Value {
         "has_convention_error": d.has_convention_error,
         "incomplete_warnings": d.incomplete_warnings,
         "updated_at": py_isoformat(d.updated_at),
-        "last_author": Value::Null,
+        "last_author": author_json(d),
         "counts": d.counts,
-    })
+    }) else {
+        return Map::new();
+    };
+    m
 }
 
 fn arg<'a>(v: &'a PyValue, name: &str) -> Option<&'a PyValue> {
@@ -323,6 +567,14 @@ fn arg_opt_str(v: &PyValue, name: &str) -> Option<String> {
     match arg(v, name) {
         None | Some(PyValue::None) => None,
         Some(_) => Some(arg_str(v, name)),
+    }
+}
+
+/// 검증을 지난 정수 인자 — 없거나 None이면 없음
+fn arg_int(v: &PyValue, name: &str) -> Option<BigInt> {
+    match arg(v, name) {
+        Some(PyValue::Int(i)) => Some(i.clone()),
+        _ => None,
     }
 }
 
@@ -355,11 +607,13 @@ fn problem_text(v: &Value) -> String {
     py_dumps(v)
 }
 
-/// 처리기의 실패 — 문제(Problem)는 `_problem`의 JSON, git 실패 같은 예외는 MCP SDK의 「Error executing tool」 문장
+/// 처리기의 실패 — 문제(Problem)는 `_problem`의 JSON. git·DB 실패 같은 예외는 mcp 2.2.0 `Tool.run`의
+/// `UnexpectedToolError` — 「Error executing tool {name}」뿐, 예외의 글은 서버에 남는다(로그)
 fn tool_error(name: &str, p: &Problem) -> String {
     match p {
         Problem::Git { .. } | Problem::Internal { .. } => {
-            error_result(&format!("Error executing tool {name}: {p}"))
+            tracing::error!("도구 {name} 실패 — {p}");
+            error_result(&format!("Error executing tool {name}"))
         }
         _ => error_result(&problem_text(&Value::Object(problem_dict(p)))),
     }

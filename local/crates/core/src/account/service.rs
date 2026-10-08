@@ -1,5 +1,7 @@
 //! AccountService — SYNC-MS-016 (파이썬 판 SYNC-MS-006과 같은 이름·같은 처리)
 
+use std::collections::HashMap;
+
 use rand::RngExt;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -9,7 +11,7 @@ use super::model::{AccessTokenRow, UserRow};
 use super::repo;
 use crate::clock;
 use crate::errors::Problem;
-use crate::types::IssuedToken;
+use crate::types::{IssuedToken, UserRef};
 
 /// 사용자·토큰 서비스 — 연결을 빌려 받는다. 트랜잭션은 부르는 쪽이 쥔다 (SYNC-STD-004#DEV-10)
 pub struct AccountService<'c> {
@@ -107,6 +109,25 @@ impl AccountService<'_> {
         };
         repo::set_last_used(&mut *self.db, t.id, clock::now()).await?;
         Ok(Some(u))
+    }
+
+    /// SYNC-MS-016#AccountService.users_by_ids
+    pub async fn users_by_ids(&mut self, ids: &[i32]) -> Result<HashMap<i32, UserRef>, Problem> {
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        Ok(repo::users_by_ids(&mut *self.db, ids)
+            .await?
+            .into_iter()
+            .map(|u| {
+                let r = UserRef {
+                    id: u.id,
+                    github_login: u.github_login,
+                    display_name: u.display_name,
+                };
+                (r.id, r)
+            })
+            .collect())
     }
 }
 

@@ -9,7 +9,6 @@ use syncdoc_core::project::service::ServerRepos;
 use syncdoc_core::queries::project_summary;
 use syncdoc_core::reference::service::ReferenceService;
 use syncdoc_core::spec::SpecService;
-use syncdoc_core::types::DocStatus;
 
 fn repos() -> ServerRepos {
     ServerRepos {
@@ -187,7 +186,7 @@ async fn summary_stages_counts_order_and_ownership() {
     assert_eq!(docs[1].incomplete_warnings, ["section.missing: 목표"]);
     assert_eq!(docs[3].stage, None);
     let only = SpecService { db: &mut c }
-        .list_by_project(p, Some(2), Some(DocStatus::Approved), Some(true))
+        .list_by_project(p, Some(2), Some("approved"), Some(true))
         .await
         .expect("조건");
     assert_eq!(

@@ -9,7 +9,9 @@ use indexmap::IndexMap;
 use regex::Regex;
 use sqlx::PgConnection;
 
+use super::model::{DocumentRow, VersionRow};
 use super::repo;
+use crate::clock;
 use crate::errors::Problem;
 use crate::markdown::{self, DOC_ID, HEADING, REF};
 use crate::pycompat::chars::{is_decimal, lstrip, strip};
@@ -17,8 +19,9 @@ use crate::pycompat::difflib::unified_diff;
 use crate::pycompat::re::compile;
 use crate::pycompat::repr::repr;
 use crate::types::{
-    AuthorRef, Diff, DiffLine, DiffOp, DocStatus, DocType, DocumentSummary, Entry, Hunk, ItemBlock,
-    ValidateResult, Violation, Warning, stage_of,
+    Author, AuthorRef, Diff, DiffLine, DiffOp, DocItem, DocRef, DocStatus, DocType, Document,
+    DocumentSummary, Entry, Hunk, ItemBlock, ItemRef, ItemView, ValidateResult, Violation, Warning,
+    fold_via, py_isoformat, stage_of,
 };
 
 /// 이력 diff의 앞뒤 줄 수 — 파이썬 `DIFF_CONTEXT_LINES`
@@ -305,6 +308,105 @@ fn normalized(text: &str) -> Vec<&str> {
         .collect()
 }
 
+/// 판 행 → 작성자(id만) — 파이썬 `_author_of`
+fn author_of(v: &VersionRow) -> AuthorRef {
+    AuthorRef {
+        kind: v.author_kind.clone(),
+        user_id: v.author_user_id,
+        instructed_by_id: v.instructed_by_user_id,
+        via: v.via.clone(),
+    }
+}
+
+/// 문서 행 + 최근 판 → 요약 — 파이썬 `_summary_fields`. `incomplete_warnings`는 JSON 목록(없거나 비면 빈 것)
+fn summary_of(r: &DocumentRow, latest: Option<&VersionRow>) -> Result<DocumentSummary, Problem> {
+    let raw = r
+        .incomplete_warnings
+        .as_deref()
+        .filter(|w| !w.is_empty())
+        .unwrap_or("[]");
+    let warnings: Vec<String> = serde_json::from_str(raw).map_err(|e| Problem::Internal {
+        log: format!(
+            "{}의 incomplete_warnings가 JSON 목록이 아니다 — {e}",
+            r.doc_id
+        ),
+    })?;
+    Ok(DocumentSummary {
+        id: r.id,
+        doc_id: r.doc_id.clone(),
+        doc_type: r.doc_type.clone(),
+        stage: stage_of(&r.doc_type),
+        status: r.status.clone(),
+        current_version_no: r.current_version_no,
+        has_convention_error: r.has_convention_error,
+        incomplete_warnings: warnings,
+        updated_at: r.updated_at,
+        last_author: latest.map(author_of),
+        author: None,
+        counts: Default::default(),
+        trashed_at: r.trashed_at,
+    })
+}
+
+/// 타입 문자열로 항목 블록 — 모르는 타입이면 없다(파이썬 `patterns_for`가 패턴을 못 준다)
+fn blocks_of(body: &str, doc_type: &str, title: Option<&str>) -> Vec<ItemBlock> {
+    DocType::parse(doc_type).map_or_else(Vec::new, |t| SpecService::item_blocks(body, t, title))
+}
+
+/// 규약 결과 → documents의 오류·경고 열 — 파이썬 `_apply_validate`.
+/// 오류 문장은 `rule: message`를 줄마다, 경고는 `str(w)`들의 JSON 목록(`ensure_ascii` 없이, 비면 없음)
+fn convention_columns(vr: &ValidateResult) -> (bool, Option<String>, Option<String>) {
+    let detail = vr
+        .violations
+        .iter()
+        .map(|v| format!("{}: {}", v.rule, v.message))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let warnings = (!vr.warnings.is_empty()).then(|| {
+        let items: Vec<String> = vr
+            .warnings
+            .iter()
+            .map(|w| serde_json::to_string(&w.to_string()).unwrap_or_default())
+            .collect();
+        format!("[{}]", items.join(", "))
+    });
+    (
+        !vr.violations.is_empty(),
+        (!detail.is_empty()).then_some(detail),
+        warnings,
+    )
+}
+
+/// 새 판 행 — 시각은 저장 시각(SYNC-STD-004#DEV-18), `via`는 입구를 접은 것 (파이썬 `_new_version`)
+fn new_version<'a>(
+    document_id: i32,
+    version_no: i32,
+    commit_hash: &'a str,
+    body: &'a str,
+    author: &Author,
+    message: &'a str,
+) -> repo::NewVersion<'a> {
+    repo::NewVersion {
+        document_id,
+        version_no,
+        commit_hash,
+        body,
+        author_kind: author.kind.as_str(),
+        author_user_id: author.user.id,
+        instructed_by_user_id: author.instructed_by.as_ref().map(|u| u.id),
+        via: fold_via(author.via),
+        message,
+        created_at: clock::now(),
+    }
+}
+
+fn not_found(resource: &str, id: &str) -> Problem {
+    Problem::NotFound {
+        resource: resource.to_string(),
+        id: serde_json::Value::from(id),
+    }
+}
+
 /// 명세 서비스 — 연결을 빌려 받는다. 트랜잭션은 부르는 쪽이 쥔다 (SYNC-STD-004#DEV-10).
 /// DB가 필요 없는 함수는 연결 없이 부르는 연관 함수다
 pub struct SpecService<'c> {
@@ -333,7 +435,7 @@ impl SpecService<'_> {
     pub async fn validate(
         &mut self,
         body: &str,
-        doc_type: DocType,
+        doc_type: &str,
         entry: Entry,
         current_status: Option<DocStatus>,
     ) -> Result<ValidateResult, Problem> {
@@ -341,10 +443,10 @@ impl SpecService<'_> {
         let deleted = self
             .deleted_item_ids(fm.get("doc_id").map(String::as_str))
             .await?;
-        let body = body.to_string();
+        let (body, doc_type) = (body.to_string(), doc_type.to_string());
         // 긴 본문 파싱은 일꾼 스레드를 막지 않게 (SYNC-STD-004#DEV-16)
         tokio::task::spawn_blocking(move || {
-            SpecService::check(&body, doc_type, entry, current_status, &deleted)
+            SpecService::check(&body, &doc_type, entry, current_status, &deleted)
         })
         .await
         .map_err(|e| Problem::Internal {
@@ -376,14 +478,16 @@ impl SpecService<'_> {
     }
 
     /// SYNC-MS-014#SpecService.check
+    ///
+    /// 타입은 문자열 그대로 — 모르는 타입도 파이썬처럼 `frontmatter.type` 위반까지 간다
     pub fn check(
         body: &str,
-        doc_type: DocType,
+        doc_type: &str,
         entry: Entry,
         current_status: Option<DocStatus>,
         deleted: &HashSet<String>,
     ) -> ValidateResult {
-        let dt = doc_type.as_str();
+        let dt = doc_type;
         let mut v: Vec<Violation> = Vec::new();
         let mut w: Vec<Warning> = Vec::new();
         let (fm, _) = markdown::parse_frontmatter(body);
@@ -524,7 +628,7 @@ impl SpecService<'_> {
                 // 단어형 ID 타입에서만 — 절 제목이 항목으로 오인될 위험이 그쪽에만 있다. H1은 문서 제목
                 if h[1].len() > 1
                     && item_re.is_some()
-                    && matches!(doc_type, DocType::Dom | DocType::Ms | DocType::Api)
+                    && matches!(dt, "DOM" | "MS" | "API")
                     && !tok.starts_with(is_decimal)
                 {
                     let head: String = text.chars().take(40).collect();
@@ -553,19 +657,19 @@ impl SpecService<'_> {
                 w.push(warning("section.missing", s));
             }
         }
-        if items.is_empty() && !matches!(doc_type, DocType::Code | DocType::Std) {
+        if items.is_empty() && !matches!(dt, "CODE" | "STD") {
             w.push(warning("item.none", ""));
         }
         // 6. DOM 클래스 명세 — 2장·4장 엔티티 속성 대조 · 「폴더 구조」 절의 층 표(카드 BM)
-        if doc_type == DocType::Dom && title.unwrap_or("").contains("클래스") {
+        if dt == "DOM" && title.unwrap_or("").contains("클래스") {
             w.extend(entity_mismatch(body));
             if !has_layer_table(&lines) {
                 w.push(warning("layer.table", ""));
             }
         }
         // 7. INFRA 제약 — 줄 머리 「출처:」 (STD-001 2.5·4장, #120). 마스킹한 줄이라 코드블록 안은 안 센다
-        if doc_type == DocType::Infra {
-            for b in SpecService::item_blocks(body, doc_type, title) {
+        if dt == "INFRA" {
+            for b in SpecService::item_blocks(body, DocType::Infra, title) {
                 if !lines[b.start_line..b.end_line]
                     .iter()
                     .any(|x| x.starts_with("출처:"))
@@ -584,7 +688,7 @@ impl SpecService<'_> {
     pub fn apply_frontmatter(
         body: &str,
         doc_id: &str,
-        doc_type: DocType,
+        doc_type: &str,
         status: DocStatus,
     ) -> Result<String, Problem> {
         let (fm, fm_lines) = markdown::parse_frontmatter(body);
@@ -593,8 +697,7 @@ impl SpecService<'_> {
                 .captures(body)
                 .map_or_else(|| doc_id.to_string(), |c| strip(&c[1]).to_string());
             return Ok(format!(
-                "---\ndoc_id: {doc_id}\ntype: {}\ntitle: {title}\nstatus: {}\n---\n{body}",
-                doc_type.as_str(),
+                "---\ndoc_id: {doc_id}\ntype: {doc_type}\ntitle: {title}\nstatus: {}\n---\n{body}",
                 status.as_str()
             ));
         }
@@ -614,7 +717,7 @@ impl SpecService<'_> {
         // 덮어쓸 키 — 첫 줄만 바꾸고, 없는 키는 이 차례로 끝에 더한다
         let mut forced: IndexMap<&str, &str> = IndexMap::from([
             ("doc_id", doc_id),
-            ("type", doc_type.as_str()),
+            ("type", doc_type),
             ("status", status.as_str()),
         ]);
         let lines: Vec<&str> = body.split('\n').collect();
@@ -742,11 +845,13 @@ impl SpecService<'_> {
     }
 
     /// SYNC-MS-014#SpecService.list_by_project
+    ///
+    /// 상태는 문자열 그대로 비교한다 — MCP `list_documents`가 받은 값을 거르지 않는다(파이썬과 같다)
     pub async fn list_by_project(
         &mut self,
         project_id: i32,
         stage: Option<i32>,
-        status: Option<DocStatus>,
+        status: Option<&str>,
         has_convention_error: Option<bool>,
     ) -> Result<Vec<DocumentSummary>, Problem> {
         let mut rows: Vec<_> = repo::documents_of_project(&mut *self.db, project_id)
@@ -754,7 +859,7 @@ impl SpecService<'_> {
             .into_iter()
             .filter(|r| r.trashed_at.is_none())
             .filter(|r| stage.is_none() || stage_of(&r.doc_type) == stage)
-            .filter(|r| status.is_none_or(|s| r.status == s.as_str()))
+            .filter(|r| status.is_none_or(|s| r.status == s))
             .filter(|r| has_convention_error.is_none_or(|h| r.has_convention_error == h))
             .collect();
         let ids: Vec<i32> = rows.iter().map(|r| r.id).collect();
@@ -763,36 +868,399 @@ impl SpecService<'_> {
             (stage_of(&a.doc_type).unwrap_or(99), &a.doc_id)
                 .cmp(&(stage_of(&b.doc_type).unwrap_or(99), &b.doc_id))
         });
-        rows.into_iter()
-            .map(|r| {
-                let warnings: Vec<String> =
-                    serde_json::from_str(r.incomplete_warnings.as_deref().unwrap_or("[]"))
-                        .map_err(|e| Problem::Internal {
-                            log: format!(
-                                "{}의 incomplete_warnings가 JSON 목록이 아니다 — {e}",
-                                r.doc_id
-                            ),
-                        })?;
-                Ok(DocumentSummary {
-                    id: r.id,
-                    stage: stage_of(&r.doc_type),
-                    last_author: latest.get(&r.id).map(|v| AuthorRef {
-                        kind: v.author_kind.clone(),
-                        user_id: v.author_user_id,
-                        instructed_by_id: v.instructed_by_user_id,
-                        via: v.via.clone(),
-                    }),
-                    doc_id: r.doc_id,
-                    doc_type: r.doc_type,
-                    status: r.status,
-                    current_version_no: r.current_version_no,
-                    has_convention_error: r.has_convention_error,
-                    incomplete_warnings: warnings,
-                    updated_at: r.updated_at,
-                    counts: Default::default(),
-                    trashed_at: r.trashed_at,
-                })
-            })
+        rows.iter()
+            .map(|r| summary_of(r, latest.get(&r.id)))
             .collect()
+    }
+
+    /// SYNC-MS-014#SpecService.get_document
+    pub async fn get_document(&mut self, doc_id: &str) -> Result<Document, Problem> {
+        let Some(row) = repo::document_by_doc_id(&mut *self.db, doc_id).await? else {
+            return Err(not_found("document", doc_id));
+        };
+        let items = repo::items_of(&mut *self.db, row.id, false)
+            .await?
+            .into_iter()
+            .map(|i| DocItem {
+                pk: i.id,
+                item_id: i.item_id,
+                display_name: i.display_name,
+                missing_refs: Vec::new(),
+            })
+            .collect();
+        let latest = repo::latest_version(&mut *self.db, row.id).await?;
+        Ok(Document {
+            summary: summary_of(&row, latest.as_ref())?,
+            body: row.current_body,
+            commit_hash: latest.as_ref().map(|v| v.commit_hash.clone()),
+            current_version_id: latest.as_ref().map(|v| v.id),
+            missing_refs: Vec::new(),
+            convention_error_detail: row.convention_error_detail,
+            items,
+            prev_doc_id: None,
+            next_doc_id: None,
+            project_name: String::new(),
+        })
+    }
+
+    /// SYNC-MS-014#SpecService.issue_doc_id
+    pub async fn issue_doc_id(
+        &mut self,
+        project_id: i32,
+        code: &str,
+        doc_type: &str,
+    ) -> Result<String, Problem> {
+        let mut max = 0i64;
+        // 휴지통 것까지 센다 — 번호를 다시 쓰지 않는다. 끝 `-` 뒤 수(파이썬 `int(d.rsplit("-", 1)[1])`)
+        for d in repo::doc_ids_of_type(&mut *self.db, project_id, doc_type).await? {
+            let tail = d.rsplit_once('-').map_or(d.as_str(), |(_, t)| t);
+            let n: i64 = tail.parse().map_err(|_| Problem::Internal {
+                log: format!("문서 ID {d}의 번호를 못 읽는다"),
+            })?;
+            max = max.max(n);
+        }
+        Ok(format!("{code}-{doc_type}-{:03}", max + 1))
+    }
+
+    /// SYNC-MS-014#SpecService.precondition
+    ///
+    /// DOM 셋의 순서 — 클래스 명세 ← API 문서, ERD ← 클래스 명세. 존재만 본다(상태·승인은 신호, PRD R6)
+    pub async fn precondition(
+        &mut self,
+        project_id: i32,
+        doc_type: &str,
+        title: &str,
+    ) -> Result<Option<(String, Vec<String>)>, Problem> {
+        if doc_type != "DOM" {
+            return Ok(None);
+        }
+        let key = |t: Option<&str>| subtype_of("DOM", t).map(|i| SUBTYPES[i].1);
+        let sub = key(Some(title));
+        if !matches!(sub, Some("클래스" | "ERD")) {
+            return Ok(None); // 도메인 모델은 첫 문서다. 키워드 없음은 validate가 잡는다
+        }
+        let docs = repo::documents_of_project(&mut *self.db, project_id).await?;
+        let (ok, requires) = if sub == Some("클래스") {
+            (
+                docs.iter().any(|d| d.doc_type == "API"),
+                "API 문서(REST 또는 MCP) — 클래스의 메서드는 API가 정한다",
+            )
+        } else {
+            // 제목은 documents에 열이 없다 — 본문 frontmatter에서
+            (
+                docs.iter().any(|d| {
+                    d.doc_type == "DOM"
+                        && key(markdown::parse_frontmatter(&d.current_body)
+                            .0
+                            .get("title")
+                            .map(String::as_str))
+                            == Some("클래스")
+                }),
+                "DOM 클래스 명세 — 테이블은 엔티티 클래스에서 나온다",
+            )
+        };
+        if ok {
+            return Ok(None);
+        }
+        let mut have: Vec<String> = docs
+            .iter()
+            .filter(|d| d.doc_type == "DOM")
+            .map(|d| d.doc_id.clone())
+            .collect();
+        have.sort();
+        Ok(Some((requires.to_string(), have)))
+    }
+
+    /// SYNC-MS-014#SpecService.get_item
+    ///
+    /// `~`는 `/`로 — 경로에 `/`를 못 싣는 항목 ID(`GET/api/me`)를 MCP·웹이 그렇게 보낸다
+    pub async fn get_item(&mut self, doc_id: &str, item_id: &str) -> Result<ItemView, Problem> {
+        let document = self.get_document(doc_id).await?;
+        let item_id = item_id.replace('~', "/");
+        let Some(item) = repo::item_of(&mut *self.db, document.summary.id, &item_id).await? else {
+            return Err(Problem::NotFoundWithItems {
+                resource: "item".to_string(),
+                id: format!("{doc_id}#{item_id}"),
+                available_items: document.items.iter().map(|i| i.item_id.clone()).collect(),
+            });
+        };
+        if item.is_deleted {
+            return Err(Problem::ItemDeleted {
+                deleted_at: item.deleted_at.map(py_isoformat),
+            });
+        }
+        let block = blocks_of(&document.body, &document.summary.doc_type, None)
+            .into_iter()
+            .find(|b| b.item_id == item_id)
+            .ok_or_else(|| Problem::Internal {
+                log: format!("{doc_id}#{item_id} 행은 있는데 본문에 블록이 없다"),
+            })?;
+        Ok(ItemView {
+            pk: item.id,
+            doc_id: doc_id.to_string(),
+            item_id,
+            display_name: item.display_name,
+            body: block.text,
+            doc_status: document.summary.status,
+            doc_version_no: document.summary.current_version_no,
+        })
+    }
+
+    /// SYNC-MS-014#SpecService.detect_deleted_items
+    pub async fn detect_deleted_items(
+        &mut self,
+        document: &Document,
+        body: &str,
+    ) -> Result<Vec<i32>, Problem> {
+        let new_ids: HashSet<String> = blocks_of(body, &document.summary.doc_type, None)
+            .into_iter()
+            .map(|b| b.item_id)
+            .collect();
+        Ok(repo::items_of(&mut *self.db, document.summary.id, false)
+            .await?
+            .into_iter()
+            .filter(|i| !new_ids.contains(&i.item_id))
+            .map(|i| i.id)
+            .collect())
+    }
+
+    /// SYNC-MS-014#SpecService.describe_items
+    pub async fn describe_items(
+        &mut self,
+        item_pks: &[i32],
+    ) -> Result<HashMap<i32, ItemRef>, Problem> {
+        if item_pks.is_empty() {
+            return Ok(HashMap::new());
+        }
+        Ok(repo::items_with_doc_id(&mut *self.db, item_pks)
+            .await?
+            .into_iter()
+            .map(|r| {
+                let ref_ = ItemRef {
+                    doc_id: Some(r.doc_id),
+                    item_id: Some(r.item.item_id),
+                    display_name: r.item.display_name,
+                    is_deleted: r.item.is_deleted,
+                    deleted_at: r.item.deleted_at,
+                    ..ItemRef::default()
+                };
+                (r.item.id, ref_)
+            })
+            .collect())
+    }
+
+    /// SYNC-MS-014#SpecService.describe_documents
+    pub async fn describe_documents(
+        &mut self,
+        document_ids: &[i32],
+    ) -> Result<HashMap<i32, DocRef>, Problem> {
+        if document_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        Ok(repo::documents_by_ids(&mut *self.db, document_ids)
+            .await?
+            .into_iter()
+            .map(|r| {
+                // 제목은 frontmatter에서, 비면 문서 ID (파이썬 `… or row.doc_id`)
+                let title = markdown::parse_frontmatter(&r.current_body)
+                    .0
+                    .get("title")
+                    .filter(|t| !t.is_empty())
+                    .cloned()
+                    .unwrap_or_else(|| r.doc_id.clone());
+                let d = DocRef {
+                    document_id: r.id,
+                    stage: stage_of(&r.doc_type),
+                    doc_id: r.doc_id,
+                    title,
+                    status: r.status,
+                };
+                (d.document_id, d)
+            })
+            .collect())
+    }
+
+    /// SYNC-MS-014#SpecService.create
+    ///
+    /// 상태는 frontmatter가 `draft`·`approved`면 그것, 아니면 `draft`(둘 밖의 값은 DB에 들이지 않는다, #99)
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create(
+        &mut self,
+        project_id: i32,
+        doc_id: &str,
+        doc_type: &str,
+        body: &str,
+        commit_hash: &str,
+        author: &Author,
+        message: &str,
+        validate_result: &ValidateResult,
+    ) -> Result<VersionRow, Problem> {
+        let (fm, _) = markdown::parse_frontmatter(body);
+        let status = fm
+            .get("status")
+            .map(String::as_str)
+            .filter(|s| matches!(*s, "draft" | "approved"))
+            .unwrap_or("draft");
+        let (has_error, detail, warnings) = convention_columns(validate_result);
+        let id = repo::insert_document(
+            &mut *self.db,
+            &repo::NewDocument {
+                project_id,
+                doc_id,
+                doc_type,
+                status,
+                body,
+                has_convention_error: has_error,
+                convention_error_detail: detail.as_deref(),
+                incomplete_warnings: warnings.as_deref(),
+            },
+        )
+        .await?;
+        for b in blocks_of(body, doc_type, fm.get("title").map(String::as_str)) {
+            repo::insert_item(&mut *self.db, id, &b.item_id, &b.display_name).await?;
+        }
+        Ok(repo::insert_version(
+            &mut *self.db,
+            &new_version(id, 1, commit_hash, body, author, message),
+        )
+        .await?)
+    }
+
+    /// SYNC-MS-014#SpecService.save
+    ///
+    /// 파이썬 `save`의 `mcp` 갈래 — 재구축(`rebuild`)과 상태 커밋 해시(`github`)는 카드 L11
+    #[allow(clippy::too_many_arguments)]
+    pub async fn save(
+        &mut self,
+        document: &Document,
+        body: &str,
+        commit_hash: &str,
+        author: &Author,
+        message: &str,
+        deleted_item_pks: &[i32],
+        validate_result: &ValidateResult,
+    ) -> Result<VersionRow, Problem> {
+        let row = repo::document_by_id(&mut *self.db, document.summary.id)
+            .await?
+            .ok_or_else(|| Problem::Internal {
+                log: format!("저장할 문서 {}가 없다", document.summary.doc_id),
+            })?;
+        let new_no = row.current_version_no + 1;
+        let version = repo::insert_version(
+            &mut *self.db,
+            &new_version(row.id, new_no, commit_hash, body, author, message),
+        )
+        .await?;
+        let (fm, _) = markdown::parse_frontmatter(body);
+        for b in blocks_of(body, &row.doc_type, fm.get("title").map(String::as_str)) {
+            match repo::item_of(&mut *self.db, row.id, &b.item_id).await? {
+                // 본문에 다시 나타났으므로 되살린다 (MS-002 save 3, #15)
+                Some(item) => repo::restore_item(&mut *self.db, item.id, &b.display_name).await?,
+                None => {
+                    repo::insert_item(&mut *self.db, row.id, &b.item_id, &b.display_name).await?;
+                }
+            }
+        }
+        for pk in deleted_item_pks {
+            repo::mark_item_deleted(&mut *self.db, *pk, clock::now()).await?;
+        }
+        // github는 frontmatter가 진실이다. 둘 밖의 값이면 DB를 안 바꾼다 (#99)
+        let fm_status = fm
+            .get("status")
+            .map(String::as_str)
+            .filter(|s| matches!(*s, "draft" | "approved"));
+        let mut new_status = match (author.via, fm_status) {
+            (Entry::Github, Some(s)) => s,
+            _ => row.status.as_str(),
+        };
+        // 6. 자동 강등 — mcp·되돌리기는 이 자리에서 내린다(본문 커밋 하나에 담기므로 커밋 해시 없음) (#58)
+        if row.status == "approved" && body != row.current_body && new_status == "approved" {
+            new_status = "draft";
+            repo::insert_status_change(
+                &mut *self.db,
+                &repo::NewStatusChange {
+                    document_id: row.id,
+                    from_status: Some("approved"),
+                    to_status: "draft",
+                    changed_by_user_id: author.user.id,
+                    via: fold_via(author.via),
+                    reason: Some("본문 수정으로 자동 강등"),
+                    commit_hash: None,
+                    changed_at: clock::now(),
+                },
+            )
+            .await?;
+        }
+        let (has_error, detail, warnings) = convention_columns(validate_result);
+        // 7. 어느 입구든 저장되면 휴지통에서 나온다 (UC-A8 4)
+        repo::update_saved_document(
+            &mut *self.db,
+            &repo::SavedDocument {
+                id: row.id,
+                body,
+                version_no: new_no,
+                status: new_status,
+                has_convention_error: has_error,
+                convention_error_detail: detail.as_deref(),
+                incomplete_warnings: warnings.as_deref(),
+            },
+        )
+        .await?;
+        Ok(version)
+    }
+
+    /// SYNC-MS-014#SpecService.item_pks
+    pub async fn item_pks(&mut self, document_id: i32) -> Result<HashMap<String, i32>, Problem> {
+        Ok(repo::items_of(&mut *self.db, document_id, false)
+            .await?
+            .into_iter()
+            .map(|i| (i.item_id, i.id))
+            .collect())
+    }
+
+    /// SYNC-MS-014#SpecService.neighbors
+    ///
+    /// 바로 앞·뒤 단계 각각의 가장 작은 문서 ID — 휴지통 것은 빼고, 단계 밖(STD)이면 둘 다 없다
+    pub async fn neighbors(
+        &mut self,
+        doc_id: &str,
+    ) -> Result<(Option<String>, Option<String>), Problem> {
+        let Some(row) = repo::document_by_doc_id(&mut *self.db, doc_id).await? else {
+            return Err(not_found("document", doc_id));
+        };
+        let Some(stage) = stage_of(&row.doc_type) else {
+            return Ok((None, None));
+        };
+        let docs: Vec<DocumentRow> = repo::documents_of_project(&mut *self.db, row.project_id)
+            .await?
+            .into_iter()
+            .filter(|d| d.trashed_at.is_none())
+            .collect();
+        let first = |n: i32| {
+            docs.iter()
+                .filter(|d| stage_of(&d.doc_type) == Some(n))
+                .map(|d| d.doc_id.clone())
+                .min()
+        };
+        Ok((first(stage - 1), first(stage + 1)))
+    }
+
+    /// SYNC-MS-014#SpecService.resolve_item
+    ///
+    /// `~`는 바꾸지 않는다(파이썬과 같다). 없는 문서도 항목 `not-found`
+    pub async fn resolve_item(&mut self, doc_id: &str, item_id: &str) -> Result<i32, Problem> {
+        let item = match repo::document_by_doc_id(&mut *self.db, doc_id).await? {
+            Some(row) => repo::item_of(&mut *self.db, row.id, item_id).await?,
+            None => None,
+        };
+        let Some(item) = item else {
+            return Err(not_found("item", &format!("{doc_id}#{item_id}")));
+        };
+        if item.is_deleted {
+            return Err(Problem::ItemDeleted {
+                deleted_at: item.deleted_at.map(py_isoformat),
+            });
+        }
+        Ok(item.id)
     }
 }

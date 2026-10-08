@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-002, SYNC-MS-003, SYNC-STD-001, SYNC-STD-004]
 
 서비스는 연결을 빌려 받는다 — `SpecService<'c> { pub db: &'c mut PgConnection }`. DB가 필요 없는 함수는 연결 없이 부르는 연관 함수다(`SpecService::item_blocks(…)`). 트랜잭션은 부르는 쪽이 쥔다([[SYNC-STD-004#DEV-10]]).
 
-**카드 L5 몫은 엔진이다(2026-10-08)** — 마크다운 넷, 항목 블록, 규약 검증, frontmatter 채움, diff. **카드 L6이 문서 목록(`list_by_project`)을 더했다** — 프로젝트 요약이 쓴다. 나머지 SpecService(문서·버전 조회, 만들기·저장, 상태, 휴지통…)는 쓰는 카드(L7·L8·L9)가 이 문서에 더한다.
+**카드 L5 몫은 엔진이다(2026-10-08)** — 마크다운 넷, 항목 블록, 규약 검증, frontmatter 채움, diff. **카드 L6이 문서 목록(`list_by_project`)을, 카드 L7이 저장·조회(만들기·저장·문서·항목·이름·이웃·ID 발급·선행조건)를 더했다** — 저장 파이프라인([[SYNC-MS-017]])과 읽기 조합이 쓴다. **타입은 문자열이다(L7)** — 파이썬처럼 에이전트가 보낸 모르는 타입도 받아 `frontmatter.type` 위반까지 같은 답을 낸다(`check`·`validate`·`apply_frontmatter`, 상태 조건도 문자열 그대로 비교). 나머지 SpecService(문서·버전 조회, 만들기·저장, 상태, 휴지통…)는 쓰는 카드(L7·L8·L9)가 이 문서에 더한다.
 
 **파이썬 판과 바이트까지 같다**(사용자 결정 2026-10-08 — 유니코드까지). 파이썬 엔진은 YAML·마크다운 라이브러리 없이 정규식·`difflib`이고 메시지에 `repr`이 들어간다. 그래서
 - 문자 분류는 **파이썬 3.12(유니코드 15.0)의 표**를 쓴다 — 정규식의 `\s`·`\S`·`\d`·`\w`와 `str.strip()`. 표는 `crates/core/src/pycompat/`의 생성물이다(`cargo xtask unicode-tables`). Rust 표준의 `trim()`·`char::is_whitespace`·`regex`의 `\d`는 쓰지 않는다(`\x1c`~`\x1f`, 유니코드 판이 다르다)
@@ -43,6 +43,18 @@ upstream: [SYNC-DOM-004, SYNC-MS-002, SYNC-MS-003, SYNC-STD-001, SYNC-STD-004]
 | [[#SpecService.diff]] | 두 버전 diff — 본문을 DB에서 |
 | [[#SpecService.diff_bodies]] | 두 본문 diff — DB 없이 |
 | [[#SpecService.list_by_project]] | 프로젝트 문서 목록 |
+| [[#SpecService.issue_doc_id]] | 문서 ID 발급 |
+| [[#SpecService.precondition]] | DOM 선행조건 |
+| [[#SpecService.get_document]] | 문서 조회 |
+| [[#SpecService.get_item]] | 항목 블록 조회 |
+| [[#SpecService.detect_deleted_items]] | 사라진 항목 찾기 |
+| [[#SpecService.describe_items]] | 항목 pk → 표시 정보 |
+| [[#SpecService.describe_documents]] | 문서 pk → 표시 정보 |
+| [[#SpecService.create]] | 문서 행 생성 |
+| [[#SpecService.save]] | 버전·항목 저장 |
+| [[#SpecService.item_pks]] | 문서의 항목 pk 지도 |
+| [[#SpecService.neighbors]] | 앞뒤 단계 문서 |
+| [[#SpecService.resolve_item]] | doc_id·item_id → pk |
 
 ---
 
@@ -149,7 +161,7 @@ pub fn item_blocks(body: &str, doc_type: DocType, title: Option<&str>) -> Vec<It
 
 **시그니처**
 ```rust
-pub async fn validate(&mut self, body: &str, doc_type: DocType, entry: Entry, current_status: Option<DocStatus>) -> Result<ValidateResult, Problem>
+pub async fn validate(&mut self, body: &str, doc_type: &str, entry: Entry, current_status: Option<DocStatus>) -> Result<ValidateResult, Problem>
 ```
 
 근거: [[SYNC-MS-002#SpecService.validate]] · [[SYNC-STD-004#DEV-16]]
@@ -172,7 +184,7 @@ pub async fn validate(&mut self, body: &str, doc_type: DocType, entry: Entry, cu
 
 **시그니처**
 ```rust
-pub fn check(body: &str, doc_type: DocType, entry: Entry, current_status: Option<DocStatus>, deleted: &HashSet<String>) -> ValidateResult
+pub fn check(body: &str, doc_type: &str, entry: Entry, current_status: Option<DocStatus>, deleted: &HashSet<String>) -> ValidateResult
 ```
 
 근거: [[SYNC-MS-002#SpecService.validate]] 1~8 · [[SYNC-STD-001]] 3장·4장
@@ -195,7 +207,7 @@ pub fn check(body: &str, doc_type: DocType, entry: Entry, current_status: Option
 
 **시그니처**
 ```rust
-pub fn apply_frontmatter(body: &str, doc_id: &str, doc_type: DocType, status: DocStatus) -> Result<String, Problem>
+pub fn apply_frontmatter(body: &str, doc_id: &str, doc_type: &str, status: DocStatus) -> Result<String, Problem>
 ```
 
 근거: [[SYNC-MS-002#SpecService.apply_frontmatter]]
@@ -259,7 +271,7 @@ pub fn diff_bodies(from: &str, to: &str, doc_type: DocType, from_no: i32, to_no:
 
 **시그니처**
 ```rust
-pub async fn list_by_project(&mut self, project_id: i32, stage: Option<i32>, status: Option<DocStatus>, has_convention_error: Option<bool>) -> Result<Vec<DocumentSummary>, Problem>
+pub async fn list_by_project(&mut self, project_id: i32, stage: Option<i32>, status: Option<&str>, has_convention_error: Option<bool>) -> Result<Vec<DocumentSummary>, Problem>
 ```
 
 근거: [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-018#queries.project_summary]]
@@ -269,6 +281,200 @@ pub async fn list_by_project(&mut self, project_id: i32, stage: Option<i32>, sta
 **출력** `DocumentSummary` — `counts`는 비고 이름 붙은 작성자(`author`)는 없다 — `queries`가 채운다
 
 **테스트 관점** (시험 DB) 단계·`doc_id` 차례, `STD`는 맨 뒤 · 휴지통 문서는 안 나온다 · 작성자는 최근 버전의 것 · 버전이 없으면 작성자 없음 · `stage=6` → DOM만 · `status` 조건
+
+---
+
+#### SpecService.issue_doc_id 문서 ID 발급
+
+**시그니처**
+```rust
+pub async fn issue_doc_id(&mut self, project_id: i32, code: &str, doc_type: &str) -> Result<String, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.issue_doc_id]]
+
+**처리** `DB: documents where project_id and doc_type`(휴지통 것까지)의 `doc_id` 끝 `-` 뒤 수의 가장 큰 것(없으면 0) + 1 · `→ "{code}-{doc_type}-{n:03}"`
+
+**테스트 관점** 첫 문서 → `001` · 휴지통 문서도 센다 · 타입마다 따로
+
+---
+
+#### SpecService.precondition DOM 선행조건
+
+**시그니처**
+```rust
+pub async fn precondition(&mut self, project_id: i32, doc_type: &str, title: &str) -> Result<Option<(String, Vec<String>)>, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.precondition]] · [[SYNC-STD-001]] 2.6
+
+**처리** [[SYNC-MS-002#SpecService.precondition]]과 같다 — DOM이 아니면 없음 · 서브타입 「클래스」 → 프로젝트에 API 문서가 하나라도(휴지통 것까지) 있으면 없음, 아니면 `("API 문서(REST 또는 MCP) — 클래스의 메서드는 API가 정한다", DOM 문서 ID들 정렬)` · 「ERD」 → 제목에 「클래스」인 DOM 문서가 있으면 없음, 아니면 `("DOM 클래스 명세 — 테이블은 엔티티 클래스에서 나온다", …)` · 그 밖 → 없음
+
+**호출하는 것** [[#markdown.parse_frontmatter]](문서의 제목)
+
+**테스트 관점** API 없는 프로젝트의 「클래스 명세」 → 요구와 DOM 목록 · API 하나 있으면 없음 · 클래스 명세 없이 「ERD」 → 요구 · 「도메인 모델」·DOM 아닌 타입 → 없음
+
+---
+
+#### SpecService.get_document 문서 조회
+
+**시그니처**
+```rust
+pub async fn get_document(&mut self, doc_id: &str) -> Result<Document, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.get_document]]
+
+**처리** `DB: documents where doc_id` · 없으면 `! NotFound { resource: "document", id: doc_id }` · 항목은 지우지 않은 것을 id 차례로 · 최근 판의 해시·id·작성자 · `→ Document`(문서 요약 + 본문·해시·규약 오류 문장·항목) — 휴지통 문서도 돌려준다
+
+**테스트 관점** 항목은 id 차례·지운 것 없음 · 해시는 최근 판 · 없는 문서 → `not-found`
+
+---
+
+#### SpecService.get_item 항목 블록 조회
+
+**시그니처**
+```rust
+pub async fn get_item(&mut self, doc_id: &str, item_id: &str) -> Result<ItemView, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.get_item]] · [[SYNC-API-002#get_item]]
+
+**처리** [[SYNC-MS-002#SpecService.get_item]]과 같다 — `get_document` · `item_id`의 `~`를 `/`로 · `DB: items where document_id and item_id`(지운 것까지) · 없으면 `! NotFoundWithItems { resource: "item", id: "{doc_id}#{item_id}", available_items: 지우지 않은 항목 ID들 }` · 지웠으면 `! ItemDeleted { deleted_at }` · 본문의 그 항목 블록 · `→ ItemView`
+
+**호출하는 것** [[#SpecService.get_document]] · [[#SpecService.item_blocks]]
+
+**테스트 관점** 마지막 항목은 문서 끝까지 · 아래 레벨 소제목은 블록 안 · 없는 항목 → `available_items` · 지운 항목 → `item-deleted` · `GET~api~me` → `GET/api/me`
+
+---
+
+#### SpecService.detect_deleted_items 사라진 항목 찾기
+
+**시그니처**
+```rust
+pub async fn detect_deleted_items(&mut self, document: &Document, body: &str) -> Result<Vec<i32>, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.detect_deleted_items]]
+
+**처리** 새 본문의 항목 ID 집합(문서 타입, 제목은 본문 frontmatter) · `DB: items where document_id and not is_deleted`(id 차례) 가운데 집합에 없는 것의 pk
+
+**호출하는 것** [[#SpecService.item_blocks]]
+
+**테스트 관점** 항목 하나 지움 → pk 하나 · 제목만 바꿈·순서만 바꿈 → 빈 목록
+
+---
+
+#### SpecService.describe_items 항목 pk → 표시 정보
+
+**시그니처**
+```rust
+pub async fn describe_items(&mut self, item_pks: &[i32]) -> Result<HashMap<i32, ItemRef>, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.describe_items]]
+
+**처리** 빈 목록 → 빈 지도 · `DB: items join documents where id in pks` → `{pk: ItemRef { doc_id, item_id, display_name, is_deleted, deleted_at }}`
+
+**테스트 관점** 지운 항목도 `is_deleted`와 함께 · 없는 pk는 지도에 없다
+
+---
+
+#### SpecService.describe_documents 문서 pk → 표시 정보
+
+**시그니처**
+```rust
+pub async fn describe_documents(&mut self, document_ids: &[i32]) -> Result<HashMap<i32, DocRef>, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.describe_documents]]
+
+**처리** 빈 목록 → 빈 지도 · `DB: documents where id in ids` → `{id: DocRef { document_id, doc_id, title: frontmatter 제목(비면 doc_id), stage, status }}`
+
+**호출하는 것** [[#markdown.parse_frontmatter]]
+
+**테스트 관점** 제목 없는 문서 → doc_id
+
+---
+
+#### SpecService.create 문서 행 생성
+
+**시그니처**
+```rust
+pub async fn create(&mut self, project_id: i32, doc_id: &str, doc_type: &str, body: &str, commit_hash: &str, author: &Author, message: &str, validate_result: &ValidateResult) -> Result<VersionRow, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.create]]
+
+**처리** [[SYNC-MS-002#SpecService.create]]와 같다 — `documents insert`(상태는 frontmatter가 `draft`·`approved`면 그것, 아니면 `draft` · 판 1 · 규약 결과 — `has_convention_error`, `convention_error_detail = "rule: message"`를 줄마다, `incomplete_warnings = 경고 「rule: message」들의 JSON 목록`(ensure_ascii 없이, 비면 없음)) · 항목 블록마다 `items insert`(블록 차례) · `versions insert`(판 1 · `author_kind` · 작성자·지시자 · `via`는 입구를 접은 것 — `web_revert`·`web_status` → `web` · message · `created_at=now`)
+
+**호출하는 것** [[#SpecService.item_blocks]] · [[#markdown.parse_frontmatter]]
+
+**테스트 관점** 문서·항목·판 행 · 경고가 `incomplete_warnings`에 · `via=mcp`
+
+---
+
+#### SpecService.save 버전·항목 저장
+
+**시그니처**
+```rust
+pub async fn save(&mut self, document: &Document, body: &str, commit_hash: &str, author: &Author, message: &str, deleted_item_pks: &[i32], validate_result: &ValidateResult) -> Result<VersionRow, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.save]]
+
+**처리** [[SYNC-MS-002#SpecService.save]]의 `mcp` 갈래와 같다 — 판 = 현재 + 1 · `versions insert` · 항목 블록마다 있으면 이름을 고치고 **되살리고**(`is_deleted=false`·`deleted_at` 없음), 없으면 `insert` · `deleted_item_pks`는 `is_deleted=true`·`deleted_at=now` · 완료 문서이고 본문이 바뀌었으면 상태를 `draft`로 · `status_changes insert(approved → draft, 바꾼 사람, via, "본문 수정으로 자동 강등", 커밋 없음)` · 본문·판·상태·규약 결과 · 휴지통에서 나온다 · `updated_at=now`
+
+**다른 점** 재구축(`rebuild`)·상태 커밋 해시(`github` 입구)는 L11 — 받지 않는다
+
+**호출하는 것** [[#SpecService.item_blocks]] · [[#markdown.parse_frontmatter]]
+
+**테스트 관점** v2 · 지운 항목 표시 · 같은 ID가 다시 나타나면 되살림 · 완료 문서 → 초안·상태 변경 행 하나
+
+---
+
+#### SpecService.item_pks 문서의 항목 pk 지도
+
+**시그니처**
+```rust
+pub async fn item_pks(&mut self, document_id: i32) -> Result<HashMap<String, i32>, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.item_pks]]
+
+**처리** 지우지 않은 항목의 `{item_id: pk}`
+
+**테스트 관점** 지운 항목은 없다
+
+---
+
+#### SpecService.neighbors 앞뒤 단계 문서
+
+**시그니처**
+```rust
+pub async fn neighbors(&mut self, doc_id: &str) -> Result<(Option<String>, Option<String>), Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.neighbors]]
+
+**처리** 없는 문서 → `not-found` · 단계 없음(STD) → 둘 다 없음 · 휴지통이 아닌 같은 프로젝트 문서 가운데 앞 단계·뒤 단계 각각의 가장 작은 `doc_id`(바로 이웃 단계만)
+
+**테스트 관점** RFQ·PRD·SCN 하나씩 → PRD의 앞뒤 · 이웃 단계가 비면 없음
+
+---
+
+#### SpecService.resolve_item doc_id·item_id → pk
+
+**시그니처**
+```rust
+pub async fn resolve_item(&mut self, doc_id: &str, item_id: &str) -> Result<i32, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.resolve_item]]
+
+**처리** 문서·항목(지운 것까지)이 없으면 `! NotFound { resource: "item", id: "{doc_id}#{item_id}" }` · 지웠으면 `! ItemDeleted` · `→ pk`. `~`는 바꾸지 않는다(파이썬과 같다)
+
+**테스트 관점** 없는 문서도 `item` not-found · 지운 항목 → `item-deleted`
 
 ---
 

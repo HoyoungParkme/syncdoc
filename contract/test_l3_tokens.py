@@ -96,9 +96,10 @@ ERRORS = [
     ("revoke_i64_min", "DELETE", "/api/me/tokens/-9223372036854775808", [], b""),
     ("revoke_i64_under", "DELETE", "/api/me/tokens/-9223372036854775809", [], b""),
     ("tokens_put", "PUT", "/api/me/tokens", [JSON], b"{}"),
-    # 파이썬 json의 C 재귀 한도 — 이 경로에서 9986겹까지 읽는다(넘으면 400)
+    # 파이썬 json의 C 재귀 한도 — 이 경로에서 9986겹까지 읽는다(넘으면 400). 9987은 파이썬 판이 같은
+    # 프로세스에서도 읽기도 못 읽기도 한다(C 재귀 남은 수가 작업 스케줄에 따라 한 칸 흔들린다) — 넘음은 9988로 본다
     ("body_depth_ok", "POST", "/api/me/tokens", [JSON], b"[" * 9986 + b"]" * 9986),
-    ("body_depth_over", "POST", "/api/me/tokens", [JSON], b"[" * 9987 + b"]" * 9987),
+    ("body_depth_over", "POST", "/api/me/tokens", [JSON], b"[" * 9988 + b"]" * 9988),
     ("path_encoded", "GET", "/api/m%65/tokens%2Fx", [], b""),
 ]
 

@@ -78,8 +78,7 @@ fn every_spec_passes_check_with_no_warnings() {
     for path in specs {
         let body = std::fs::read_to_string(&path).expect("본문");
         let (fm, _) = markdown::parse_frontmatter(&body);
-        let dt = DocType::parse(&fm["type"]).expect("타입");
-        let r = SpecService::check(&body, dt, Entry::Github, None, &HashSet::new());
+        let r = SpecService::check(&body, &fm["type"], Entry::Github, None, &HashSet::new());
         assert!(
             r.violations.is_empty() && r.warnings.is_empty(),
             "{}: {r:?}",
@@ -105,13 +104,7 @@ fn every_template_filled_with_an_id_passes() {
         let body = std::fs::read_to_string(dir.join(&name))
             .expect("본문")
             .replacen("doc_id: \n", &format!("doc_id: XXXX-{typ}-001\n"), 1);
-        let r = SpecService::check(
-            &body,
-            DocType::parse(typ).expect("타입"),
-            Entry::Github,
-            None,
-            &HashSet::new(),
-        );
+        let r = SpecService::check(&body, typ, Entry::Github, None, &HashSet::new());
         assert!(
             r.violations.is_empty() && r.warnings.is_empty(),
             "{name}: {r:?}"
@@ -136,7 +129,7 @@ fn item_blocks_boundaries_like_ms_002() {
 fn check_variants_like_ms_002() {
     let none = HashSet::new();
     let rules = |body: &str, entry, cs, deleted: &HashSet<String>| -> Vec<String> {
-        SpecService::check(body, DocType::Prd, entry, cs, deleted)
+        SpecService::check(body, "PRD", entry, cs, deleted)
             .violations
             .into_iter()
             .map(|v| v.rule)
@@ -175,7 +168,7 @@ fn check_variants_like_ms_002() {
     assert!(rules(PRD, Entry::Github, Some(DocStatus::Approved), &none).is_empty());
     let w = SpecService::check(
         &PRD.replace("## 4. 성공지표\n", ""),
-        DocType::Prd,
+        "PRD",
         Entry::Github,
         None,
         &none,
@@ -185,23 +178,18 @@ fn check_variants_like_ms_002() {
 
 #[test]
 fn apply_frontmatter_like_ms_002() {
-    let got = SpecService::apply_frontmatter(
-        "# 제목\n본문\n",
-        "EXMP-PRD-002",
-        DocType::Prd,
-        DocStatus::Draft,
-    )
-    .expect("채움");
+    let got =
+        SpecService::apply_frontmatter("# 제목\n본문\n", "EXMP-PRD-002", "PRD", DocStatus::Draft)
+            .expect("채움");
     assert_eq!(
         got,
         "---\ndoc_id: EXMP-PRD-002\ntype: PRD\ntitle: 제목\nstatus: draft\n---\n# 제목\n본문\n"
     );
-    let err = SpecService::apply_frontmatter(PRD, "EXMP-PRD-009", DocType::Prd, DocStatus::Draft)
+    let err = SpecService::apply_frontmatter(PRD, "EXMP-PRD-009", "PRD", DocStatus::Draft)
         .expect_err("다른 doc_id");
     assert!(matches!(err, Problem::ConventionViolation { .. }));
-    let kept =
-        SpecService::apply_frontmatter(PRD, "EXMP-PRD-001", DocType::Prd, DocStatus::Approved)
-            .expect("같은 doc_id");
+    let kept = SpecService::apply_frontmatter(PRD, "EXMP-PRD-001", "PRD", DocStatus::Approved)
+        .expect("같은 doc_id");
     assert!(kept.contains("upstream: [EXMP-RFQ-001]") && kept.contains("status: approved"));
 }
 
@@ -300,7 +288,7 @@ async fn validate_reads_deleted_ids_and_skips_restored_documents() {
         let mut c = db.pool.acquire().await.expect("연결");
         seed(&mut c, detail, trashed).await;
         let r = SpecService { db: &mut c }
-            .validate(PRD, DocType::Prd, Entry::Mcp, None)
+            .validate(PRD, "PRD", Entry::Mcp, None)
             .await
             .expect("검증");
         let rules: Vec<&str> = r.violations.iter().map(|v| v.rule.as_str()).collect();
@@ -310,7 +298,7 @@ async fn validate_reads_deleted_ids_and_skips_restored_documents() {
             "{detail:?} {trashed}"
         );
         let r = SpecService { db: &mut c }
-            .validate(PRD, DocType::Prd, Entry::WebRevert, None)
+            .validate(PRD, "PRD", Entry::WebRevert, None)
             .await
             .expect("되돌리기");
         assert!(r.violations.is_empty());
@@ -319,7 +307,7 @@ async fn validate_reads_deleted_ids_and_skips_restored_documents() {
     let db = support::test_db().await;
     let mut c = db.pool.acquire().await.expect("연결");
     let r = SpecService { db: &mut c }
-        .validate(PRD, DocType::Prd, Entry::Mcp, None)
+        .validate(PRD, "PRD", Entry::Mcp, None)
         .await
         .expect("없는 문서");
     assert!(r.violations.is_empty());
@@ -368,4 +356,39 @@ async fn diff_reads_versions_and_reports_not_found_like_python() {
         }
         other => panic!("문서 없음이어야 한다: {other:?}"),
     }
+}
+
+#[test]
+fn unknown_type_goes_to_frontmatter_type_like_python() {
+    // 파이썬 판에 같은 본문을 돌려 받은 답 — 모르는 타입도 거르지 않고 위반까지 간다(카드 L7)
+    let b =
+        SpecService::apply_frontmatter("# 제목\n본문\n", "EXMP-XYZ-001", "XYZ", DocStatus::Draft)
+            .expect("채움");
+    assert_eq!(
+        b,
+        "---\ndoc_id: EXMP-XYZ-001\ntype: XYZ\ntitle: 제목\nstatus: draft\n---\n# 제목\n본문\n"
+    );
+    let r = SpecService::check(&b, "XYZ", Entry::Mcp, None, &HashSet::new());
+    assert_eq!(
+        r.violations
+            .iter()
+            .map(|v| (v.line, v.rule.as_str(), v.message.as_str()))
+            .collect::<Vec<_>>(),
+        [(2, "frontmatter.type", "type 'XYZ'")]
+    );
+    assert_eq!(r.warnings.len(), 1);
+    assert_eq!(r.warnings[0].to_string(), "item.none");
+    let b = SpecService::apply_frontmatter("본문", "EXMP-x y-001", "x y", DocStatus::Draft)
+        .expect("채움");
+    let r = SpecService::check(&b, "x y", Entry::Mcp, None, &HashSet::new());
+    assert_eq!(
+        r.violations
+            .iter()
+            .map(|v| (v.rule.as_str(), v.message.as_str()))
+            .collect::<Vec<_>>(),
+        [
+            ("frontmatter.type", "type 'x y'"),
+            ("frontmatter.doc_id", "형식 'EXMP-x y-001'")
+        ]
+    );
 }

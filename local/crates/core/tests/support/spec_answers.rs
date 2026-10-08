@@ -88,7 +88,7 @@ pub fn body_answer(case: &Value) -> Value {
         let cs = c["current_status"]
             .as_str()
             .map(|x| DocStatus::parse(x).expect("상태"));
-        let r = SpecService::check(body, dt, entry, cs, &deleted);
+        let r = SpecService::check(body, s(case, "doc_type"), entry, cs, &deleted);
         let mut m = c.as_object().cloned().unwrap_or_default();
         m.insert("result".into(), json!(r));
         checks.push(Value::Object(m));
@@ -100,7 +100,7 @@ pub fn body_answer(case: &Value) -> Value {
         match SpecService::apply_frontmatter(
             body,
             s(a, "doc_id"),
-            doc_type(s(a, "doc_type")),
+            s(a, "doc_type"),
             DocStatus::parse(s(a, "status")).expect("상태"),
         ) {
             Ok(b) => m.insert("ok".into(), Value::from(b)),

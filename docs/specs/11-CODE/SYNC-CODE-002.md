@@ -84,11 +84,21 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | L3 · L5 · #349 |
 | 완료 | 2026-10-08 · 브랜치 `card/L6-server-storage`(8654495 #351) · 선행 #349(#350 — 파이썬 판 보관본 정렬·`git.exists` 언어·quotepath) · spec 12 + code 25 · `cargo test` 98(git 어댑터는 임시 자리의 진짜 git — pre-push 훅으로 rebase·충돌까지 · 서비스·요약은 시험 DB) · 계약 `--target both --with-card L6` 344 통과·2 건너뜀(get_document L7 · 보관본 재구축 L11) · 두 판 차이 시험이 이제 `init_project`·`get_template`까지 — 씨앗 1·2·3 × 2000 다른 것 0 · 워크플로 녹색 — 윈도(MinGit, 권한을 내린 토큰)·리눅스(.deb, 시스템 git)에서 만들고 지우기 · clippy(리눅스·윈도) · 윈도 `cargo check` · xtask `--check` 넷·`schema-check` · `check_code` Rust 47/47 · `check_calls` 0 · 사람 확인(윈도에서 에이전트로 init_project → get_template)은 따로 · 되먹임: MS-018 `project_summary`가 `repos`를 받는다, MS-013 init_project의 호출하는 것에 `get`(check_calls), git은 `self.repos.git`으로 바로(지역 변수면 그래프가 놓친다), 도구 성공 결과의 `isError:false`·지우기 204의 `application/json`(계약 시험), `GET /api/projects`를 L6에서 함께(요약이 있어 L8 몫을 당김) |
 
+#### L7 저장 파이프라인 — 에이전트가 MCP로 명세를 쌓고 읽는다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-MS-007]] · [[SYNC-MS-002]] · [[SYNC-MS-003]] · [[SYNC-MS-008]] · [[SYNC-SEQ-001#SEQ-1]] · [[SYNC-UC-001#UC-A6]] · [[SYNC-SCN-001#S1]] · [[SYNC-SCN-001#S3]] · [[SYNC-SCN-001#S4]] · [[SYNC-INFRA-001]] 4.3·9.1 · [[SYNC-API-002#create_document]] · [[SYNC-API-002#update_document]] · [[SYNC-API-002#list_documents]] · [[SYNC-API-002#get_document]] · [[SYNC-API-002#get_item]] · [[SYNC-API-002#get_references]] · 사용자 결정 2026-10-08(밀린 커밋이 있으면 `not-implemented(L11)` · 파이썬 어긋남은 파이썬 먼저(#353)) |
+| 구현 | [[SYNC-MS-017#pipeline.write_lock]] · [[SYNC-MS-017#pipeline.read_lock]] · [[SYNC-MS-017#pipeline.wait_idle]] · [[SYNC-MS-017#pipeline.read_pending]] · [[SYNC-MS-017#pipeline.save_pipeline]] · [[SYNC-MS-014#SpecService.issue_doc_id]] · [[SYNC-MS-014#SpecService.precondition]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.get_item]] · [[SYNC-MS-014#SpecService.detect_deleted_items]] · [[SYNC-MS-014#SpecService.describe_items]] · [[SYNC-MS-014#SpecService.describe_documents]] · [[SYNC-MS-014#SpecService.create]] · [[SYNC-MS-014#SpecService.save]] · [[SYNC-MS-014#SpecService.item_pks]] · [[SYNC-MS-014#SpecService.neighbors]] · [[SYNC-MS-014#SpecService.resolve_item]] · [[SYNC-MS-015#ReferenceService.extract]] · [[SYNC-MS-015#ReferenceService.upstream]] · [[SYNC-MS-015#ReferenceService.downstream]] · [[SYNC-MS-015#ReferenceService.upstream_of_document]] · [[SYNC-MS-015#ReferenceService.resolve_missing]] · [[SYNC-MS-015#ReferenceService.mark_missing]] · [[SYNC-MS-016#AccountService.users_by_ids]] · [[SYNC-MS-018#queries.document_list]] · [[SYNC-MS-018#queries.document_view]] · [[SYNC-MS-018#queries.item_view]] · [[SYNC-MS-018#queries.item_references_view]] · [[SYNC-MS-019#Git.fetch]] · [[SYNC-MS-019#Git.rev_list_count]] · [[SYNC-MS-012#runtime.shutdown]](쓰기 락 기다림) · 층 코드 — `types.rs` 문서·항목·참조 DTO · `errors.rs` 저장 문제 다섯·`not-found`의 `available_items` · `spec`의 `check`·`validate`·`apply_frontmatter`가 타입을 문자열로 · server: 도구 여섯 |
+| API | [[SYNC-API-002#create_document]] · [[SYNC-API-002#update_document]] · [[SYNC-API-002#list_documents]] · [[SYNC-API-002#get_document]] · [[SYNC-API-002#get_item]] · [[SYNC-API-002#get_references]] |
+| 테스트 | `cargo test`(서비스·파이프라인은 시험 DB + 임시 자리의 진짜 git — 동시 저장 둘이면 둘째가 `version-conflict`, 부른 쪽을 버려도 저장이 끝까지) · 계약 L7 — 만들기(경고·`next_step`)·고치기 v2·`version-conflict`·규약 위반·하위 있는 항목 삭제 → 확인 → `ref.broken`·끊긴 참조 → 되살리면 이어짐·모르는 타입·DOM 선행조건·목록·문서·항목(`~`)·위아래 참조·`available_items` · 두 판 차이 시험이 여섯 도구까지(커밋 해시·`+00:00` 시각 가림) · `spec-golden --check`·`spec-diff` 그대로 |
+| 선행 | L6 · #353 |
+| 완료 | — |
+
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
-| L7 저장 파이프라인 | 저장 파이프라인·대기열 읽기·락 · MCP 읽기·쓰기 도구 | L6 | XL |
 | L8 웹 읽기 | 나머지 조회와 GET 경로(UI-2·4·5·7·8·9·15·18) | L7 | L |
 | L9 상태·되돌리기·휴지통 | 상태 바꾸기·되돌리기·휴지통·되살리기·영구 삭제 | L7 | M |
 | L10 git 입구·코드 올리기 | upload-pack·receive-pack(`main`) · `/git/*` · `upload_code` | L9 | L |

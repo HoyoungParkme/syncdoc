@@ -124,12 +124,12 @@ crates/core/
     │   └── difflib.rs              SequenceMatcher(autojunk) · get_grouped_opcodes · unified_diff
     ├── errors.rs                   Problem 열거형 하나에 problem+json 종류 전부 (STD-004 DEV-5)
     ├── migrate.rs                  이전 SQL을 올린다 (4.1) — 모든 crate의 시험도 이것으로 DB를 만든다
-    ├── pipeline.rs                 쓰기 조율 — 프로젝트마다 읽기·쓰기 락, 순서는 파이썬과 같다
+    ├── pipeline.rs                 쓰기 조율 — 프로젝트마다 읽기·쓰기 락, 순서는 파이썬과 같다 (L7 — 저장은 따로 띄운 작업에서)
     ├── queries.rs                  읽기 조합
     └── infra/                      바깥 — git 자식 프로세스(`git.rs`, L6 — 사용자 git 설정을 막는다) · upload-pack·receive-pack · 모델 호출
 ```
 
-지금(카드 L6) 있는 것은 `account`·`spec`·`project`·`reference`(미존재 참조 세기만)·`markdown.rs`·`pycompat/`·`queries.rs`(프로젝트 요약만)·`infra/git.rs`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. `spec/`의 정답 파일은 `crates/core/tests/golden/spec.json`(생성물, `cargo xtask spec-golden`)이다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
+지금(카드 L7) 있는 것은 `account`·`spec`·`project`·`reference`(뽑기·끊기·잇기·조회 셋·미존재 세기)·`markdown.rs`·`pycompat/`·`pipeline.rs`(MCP 저장)·`queries.rs`(프로젝트 요약·문서 목록·문서·항목·참조)·`infra/git.rs`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. `spec/`의 정답 파일은 `crates/core/tests/golden/spec.json`(생성물, `cargo xtask spec-golden`)이다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
 
 **층** — 함수 단위 명세(MINISPEC 카드·API 엔드포인트·UI 화면)가 없는 코드가 어느 층이고 그 층을 무슨 문서가 정하는지([[SYNC-STD-001]] 2.6). 코드 그래프가 읽는다. 위에서부터 첫 줄이 이긴다. **줄은 카드마다 더한다** — 코드가 없는 줄은 검사기(`check_calls`)가 「안 맞는 줄」로 잡는다. 함수가 없는 파일(구조체만 — `state.rs`·`model.rs`)은 적지 않는다.
 
@@ -281,7 +281,7 @@ crates/core/
 | 4.3 | spec · markdown | MS-014 | `crates/core/src/spec` · `markdown.rs` | [[SYNC-MS-002]] |
 | 4.4 | reference | MS-015 | `crates/core/src/reference` | [[SYNC-MS-003]] |
 | 4.5 | account | [[SYNC-MS-016]] | `crates/core/src/account` | [[SYNC-MS-006]] |
-| 4.6 | pipeline · scheduler | MS-017 | `crates/core/src/pipeline.rs` · `crates/app` | [[SYNC-MS-007]] |
+| 4.6 | pipeline · scheduler | [[SYNC-MS-017]] | `crates/core/src/pipeline.rs` · `crates/app` | [[SYNC-MS-007]] |
 | 4.7 | queries | MS-018 | `crates/core/src/queries.rs` | [[SYNC-MS-008]] |
 | 4.8 | git · git_rpc | MS-019 | `crates/core/src/infra` · `crates/server`(git 입구) | [[SYNC-MS-009]] |
 | 4.9 | llm | MS-020 | `crates/core/src/infra` | [[SYNC-MS-009]] |
@@ -364,6 +364,31 @@ classDiagram
         +apply_frontmatter(body, doc_id, doc_type, status) String
         +diff(doc_id, from_no, to_no, context) Diff
         +diff_bodies(from, to, doc_type, from_no, to_no, context) Diff
+        +list_by_project(project_id, stage, status, has_convention_error) Vec~DocumentSummary~
+        +issue_doc_id(project_id, code, doc_type) String
+        +precondition(project_id, doc_type, title) Option
+        +get_document(doc_id) Document
+        +get_item(doc_id, item_id) ItemView
+        +detect_deleted_items(document, body) Vec~i32~
+        +describe_items(item_pks) HashMap~i32, ItemRef~
+        +describe_documents(document_ids) HashMap~i32, DocRef~
+        +create(project_id, doc_id, doc_type, body, commit_hash, author, message, validate_result) VersionRow
+        +save(document, body, commit_hash, author, message, deleted_item_pks, validate_result) VersionRow
+        +item_pks(document_id) HashMap~String, i32~
+        +neighbors(doc_id) Option~String~
+        +resolve_item(doc_id, item_id) i32
+    }
+    class Document {
+        +i32 id
+        +String doc_id
+        +String doc_type
+        +DocStatus status
+        +i32 version_no
+        +String body
+        +Vec~DocItem~ items
+        +Option~String~ prev_doc_id
+        +Option~String~ next_doc_id
+        +Vec~String~ missing_refs
     }
     class ItemBlock {
         +String item_id
@@ -390,6 +415,7 @@ classDiagram
     SpecService --> ItemBlock
     SpecService --> ValidateResult
     SpecService --> Diff
+    SpecService --> Document
     Diff --> Hunk
 ```
 
@@ -401,19 +427,52 @@ classDiagram
 | [[SYNC-MS-014#SpecService.apply_frontmatter]] | 저장 파이프라인의 만들기(L7) | [[SYNC-MS-002#SpecService.apply_frontmatter]] | `convention-violation` |
 | [[SYNC-MS-014#SpecService.diff]] | 이력 diff(L8) | [[SYNC-MS-002#SpecService.diff]] | `not-found` |
 | [[SYNC-MS-014#SpecService.diff_bodies]] | `diff` · `cargo xtask spec-diff` | [[SYNC-MS-002#SpecService.diff]] | — |
-| [[SYNC-MS-014#SpecService.list_by_project]] | `queries.project_summary`(L6) | [[SYNC-MS-002#SpecService.list_by_project]] | — |
+| [[SYNC-MS-014#SpecService.list_by_project]] | `queries.project_summary`(L6) · `queries.document_list`(L7) | [[SYNC-MS-002#SpecService.list_by_project]] | — |
+| [[SYNC-MS-014#SpecService.issue_doc_id]] · [[SYNC-MS-014#SpecService.precondition]] · [[SYNC-MS-014#SpecService.create]] | 저장 파이프라인의 만들기 | [[SYNC-MS-002#SpecService.create]] | `precondition-unmet`(파이프라인이) |
+| [[SYNC-MS-014#SpecService.detect_deleted_items]] · [[SYNC-MS-014#SpecService.save]] · [[SYNC-MS-014#SpecService.item_pks]] | 저장 파이프라인의 고치기 | [[SYNC-MS-002#SpecService.save]] | — |
+| [[SYNC-MS-014#SpecService.get_document]] | 저장 파이프라인 · `queries.document_view` | [[SYNC-MS-002#SpecService.get_document]] | `not-found` |
+| [[SYNC-MS-014#SpecService.get_item]] · [[SYNC-MS-014#SpecService.resolve_item]] | `queries.item_view` · `queries.item_references_view` | [[SYNC-MS-002#SpecService.get_item]] | `not-found`(`available_items`) · `item-deleted` |
+| [[SYNC-MS-014#SpecService.describe_items]] · [[SYNC-MS-014#SpecService.describe_documents]] · [[SYNC-MS-014#SpecService.neighbors]] | 저장 파이프라인(삭제 확인) · `queries` | [[SYNC-MS-002#SpecService.describe_items]] | — |
 
 markdown 넷([[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-014#markdown.masked_lines]] · [[SYNC-MS-014#markdown.headings]] · [[SYNC-MS-014#markdown.cut_blocks]])은 함수다 — spec과 reference(L7)가 같이 쓴다.
 
-규칙 — [[SYNC-DOM-002]] 4.2와 같다. 항목 판정은 `item_blocks` 한 곳이다. **파이썬 판과 바이트까지 같다**(사용자 결정 2026-10-08) — 문자 분류·repr·정규식·difflib은 `pycompat/`가 파이썬 3.12와 같게 하고, 맞춤은 정답 파일(`cargo test`)과 `cargo xtask spec-diff`가 본다. 항목 패턴 표(`TYPES`·`SUBTYPES`)는 파이썬과 같은 문자열이다. 나머지 메서드(문서·버전 조회, 만들기·저장, 상태, 휴지통…)는 그 카드가 더한다.
+규칙 — [[SYNC-DOM-002]] 4.2와 같다. 항목 판정은 `item_blocks` 한 곳이다. **파이썬 판과 바이트까지 같다**(사용자 결정 2026-10-08) — 문자 분류·repr·정규식·difflib은 `pycompat/`가 파이썬 3.12와 같게 하고, 맞춤은 정답 파일(`cargo test`)과 `cargo xtask spec-diff`가 본다. 항목 패턴 표(`TYPES`·`SUBTYPES`)는 파이썬과 같은 문자열이다. 타입은 검사·저장 입구에서 문자열 그대로 받는다(모르는 타입도 `frontmatter.type` 위반까지 파이썬과 같게, L7). 나머지 메서드(버전 목록, 상태, 휴지통…)는 그 카드가 더한다.
 
 ### 4.4 reference (MS-015)
 
+#### ReferenceService
+
+```mermaid
+classDiagram
+    class ReferenceService {
+        +db: PgConnection
+        +extract(document_id, version_id, body, item_pks, upstream_doc_ids) ExtractResult
+        +upstream(item_pk) Vec~RefEdge~
+        +downstream(item_pk) Vec~RefEdge~
+        +upstream_of_document(document_id, include_missing) Vec~RefEdge~
+        +resolve_missing(project_id, target_doc_id) i64
+        +mark_missing(item_pks) i64
+        +count_missing_by_document(document_ids) HashMap~i32, i64~
+    }
+    class RefEdge {
+        +Option~i32~ from_item_pk
+        +Option~i32~ to_item_pk
+        +Option~i32~ to_document_id
+        +String raw_target
+        +bool is_missing
+        +i32 from_document_id
+    }
+    ReferenceService --> RefEdge
+```
+
 | 메서드 | 부르는 곳 | 근거 | 던지는 에러 |
 |---|---|---|---|
-| [[SYNC-MS-015#ReferenceService.count_missing_by_document]] | `queries.project_summary` | [[SYNC-MS-003#ReferenceService.count_missing_by_document]] | — |
+| [[SYNC-MS-015#ReferenceService.extract]] · [[SYNC-MS-015#ReferenceService.resolve_missing]] · [[SYNC-MS-015#ReferenceService.mark_missing]] | 저장 파이프라인 | [[SYNC-MS-003#ReferenceService.extract]] | — |
+| [[SYNC-MS-015#ReferenceService.upstream]] · [[SYNC-MS-015#ReferenceService.downstream]] | `queries.item_references_view` · 저장 파이프라인(삭제 확인) | [[SYNC-MS-003#ReferenceService.downstream]] | — |
+| [[SYNC-MS-015#ReferenceService.upstream_of_document]] | `queries.document_view` | [[SYNC-MS-003#ReferenceService.upstream_of_document]] | — |
+| [[SYNC-MS-015#ReferenceService.count_missing_by_document]] | `queries.project_summary` · `queries.document_list` | [[SYNC-MS-003#ReferenceService.count_missing_by_document]] | — |
 
-`ReferenceService { db }`. 참조 뽑기·풀기(L7)와 조회(L8)는 그 카드가 그림과 함께 더한다.
+규칙 — [[SYNC-DOM-002]] 4.3과 같다. 참조 행이 끊어짐을 스스로 말한다(`is_missing`·`raw_target`) — 따로 표가 없다. 조회 차례는 id다(#353). 나머지 조회(관계도·휴지통)는 L8·L9가 더한다.
 
 ### 4.5 account (MS-016)
 
@@ -429,6 +488,7 @@ classDiagram
         +issue_token(user, label) IssuedToken
         +revoke_token(user, token_id)
         +authenticate_token(raw) Option~UserRow~
+        +users_by_ids(ids) HashMap~i32, UserRef~
     }
     class UserRow {
         +i32 id
@@ -466,14 +526,64 @@ classDiagram
 | [[SYNC-MS-016#AccountService.issue_token]] | `POST /api/me/tokens` | [[SYNC-MS-006#AccountService.issue_token]] | — |
 | [[SYNC-MS-016#AccountService.revoke_token]] | `DELETE /api/me/tokens/{id}` | [[SYNC-MS-006#AccountService.revoke_token]] | `not-found` |
 | [[SYNC-MS-016#AccountService.authenticate_token]] | MCP 입구(`mcp/auth`) | [[SYNC-SEQ-001#SEQ-C2]] | — |
+| [[SYNC-MS-016#AccountService.users_by_ids]] | `queries.document_list` · `queries.document_view` | [[SYNC-MS-006#AccountService.users_by_ids]] | — |
 
 규칙 — [[SYNC-DOM-002]] 4.6과 같다. 로컬 사용자는 `kind=local` 행 하나뿐이다. 서비스는 연결을 빌려 받고 트랜잭션은 부르는 쪽이 쥔다. 토큰 원문은 발급 응답에만 있고 DB·로그에는 해시만 남는다. 커밋 작성자(L11)는 그 카드가 더한다.
+
+### 4.6 pipeline (MS-017)
+
+클래스가 아니라 모듈 함수다 — 파이썬 `core/pipeline.py`와 같다. 연결 풀을 받아 트랜잭션을 연다.
+
+```mermaid
+classDiagram
+    class pipeline {
+        +write_lock(code) Mutex
+        +read_lock(code) Mutex
+        +wait_idle(limit) bool
+        +read_pending(pool, repos, code, user) i64
+        +save_pipeline(pool, repos, input) SaveResult
+    }
+    class SaveInput {
+        +Entry entry
+        +Option~String~ doc_id
+        +String doc_type
+        +String body
+        +Option~i32~ expected_version
+        +Option~String~ project_code
+        +Author author
+        +String message
+        +bool confirm_item_deletion
+    }
+    class SaveResult {
+        +String doc_id
+        +i32 version_no
+        +String commit_hash
+        +DocStatus status
+        +Vec~String~ warnings
+        +String next_step
+    }
+    pipeline --> SaveInput
+    pipeline --> SaveResult
+```
+
+| 함수 | 부르는 곳 | 근거 | 던지는 에러 |
+|---|---|---|---|
+| [[SYNC-MS-017#pipeline.save_pipeline]] | MCP `create_document` · `update_document` | [[SYNC-MS-007#pipeline.save_pipeline]] | `not-found` · `document-trashed` · `precondition-unmet` · `convention-violation` · `version-conflict` · `item-deletion-needs-confirm` · `push-failed` · `not-implemented`(밀린 커밋, L11) · `internal`(git) |
+| [[SYNC-MS-017#pipeline.read_pending]] | `save_pipeline` | [[SYNC-MS-007#pipeline.read_pending]] | `not-found` · `not-implemented`(L11) · `internal`(git) |
+| [[SYNC-MS-017#pipeline.write_lock]] · [[SYNC-MS-017#pipeline.read_lock]] | `save_pipeline` · `read_pending` | [[SYNC-MS-007]] 락 | — |
+| [[SYNC-MS-017#pipeline.wait_idle]] | `runtime.shutdown` | [[SYNC-INFRA-001]] 9.1 | — |
+
+규칙 — [[SYNC-DOM-002]] 4.4와 같다. 프로젝트마다 쓰기 락 하나·읽기 락 하나, 프로세스 전역이고 시간 제한이 없다. 읽기 → 쓰기 차례(`read_pending`은 쓰기 락 밖). 검사가 다 끝난 뒤에야 git을 쓰고, git이 끝난 뒤에야 DB를 쓴다 — 실패하면 DB는 그대로다. 저장은 따로 띄운 작업에서 돌아 부른 요청이 끊겨도 끝까지 간다. 웹·GitHub 입구 갈래와 주기 일(scheduler)은 L9·L11이 더한다.
 
 ### 4.7 queries (MS-018)
 
 | 함수 | 부르는 곳 | 근거 | 던지는 에러 |
 |---|---|---|---|
 | [[SYNC-MS-018#queries.project_summary]] | `GET`·`POST /api/projects` · MCP `init_project` | [[SYNC-MS-008#queries.project_summary]] | — |
+| [[SYNC-MS-018#queries.document_list]] | MCP `list_documents` | [[SYNC-MS-008#queries.document_list]] | `not-found` |
+| [[SYNC-MS-018#queries.document_view]] | MCP `get_document` | [[SYNC-MS-008#queries.document_view]] | `not-found` |
+| [[SYNC-MS-018#queries.item_view]] | MCP `get_item` | [[SYNC-MS-008#queries.item_view]] | `not-found`(`available_items`) · `item-deleted` |
+| [[SYNC-MS-018#queries.item_references_view]] | MCP `get_references` | [[SYNC-MS-008#queries.item_references_view]] | `not-found` · `item-deleted` |
 
 모듈 함수다 — 연결을 첫 인자로 받는다. 나머지 조회는 L8이 더한다.
 
@@ -493,6 +603,8 @@ classDiagram
         +read(workdir, path, git_ref) String
         +commit_push(workdir, message, user, files, delete) String
         +init_specs(specs_url) IndexMap
+        +fetch(workdir) String
+        +rev_list_count(workdir, range) i64
     }
 ```
 
@@ -500,6 +612,7 @@ classDiagram
 |---|---|---|---|
 | [[SYNC-MS-019#Git.init_bare]] · [[SYNC-MS-019#Git.clone]] · [[SYNC-MS-019#Git.exists]] · [[SYNC-MS-019#Git.list]] · [[SYNC-MS-019#Git.init_specs]] · [[SYNC-MS-019#Git.commit_push]] | `ProjectService.init_project` | [[SYNC-MS-009]] | `push-failed` · `internal`(git 실패) |
 | [[SYNC-MS-019#Git.read]] | MCP `get_template`(저장소 규약 먼저) | [[SYNC-MS-009#git.read]] | `internal` |
+| [[SYNC-MS-019#Git.commit_push]] · [[SYNC-MS-019#Git.fetch]] · [[SYNC-MS-019#Git.rev_list_count]] | 저장 파이프라인 | [[SYNC-MS-009]] | `push-failed` · `internal` |
 
 규칙 — git CLI를 자식 프로세스로 부른다(윈도 MinGit · 리눅스 시스템 git). **사용자 git 설정을 막는다**(사용자 결정 2026-10-08) — 시스템·전역 설정 끔, 프롬프트·서명·autocrlf 끔, `LC_ALL=C`, `safe.directory=*`. 파이썬 판이 Docker 안에서 받는 깨끗한 환경과 같게 해 같은 명령이 같은 결과를 낸다. git 입구(upload-pack·receive-pack)는 L10이 더한다.
 
