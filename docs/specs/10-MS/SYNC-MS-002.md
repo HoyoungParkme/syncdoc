@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-002
 type: MS
 title: MINISPEC — SpecService
-status: draft
+status: approved
 upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 ---
 
