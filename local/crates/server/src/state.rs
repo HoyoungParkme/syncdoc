@@ -1,6 +1,9 @@
 //! AppState — 처리기가 함께 쓰는 것 (SYNC-DOM-004 1장 server)
 
+use std::sync::Arc;
+
 use sqlx::PgPool;
+use syncdoc_core::project::service::ServerRepos;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -13,4 +16,6 @@ pub struct AppState {
     pub llm_enabled: bool,
     /// 공개 주소의 host:port — 같은 망 열기(L16) 전에는 `127.0.0.1:{실제 포트}` (INFRA 9.4)
     pub public_netloc: String,
+    /// 서버 저장소 자리 — git·`origins/`·`repos/`·규약 주소 (SYNC-MS-013 0장, 카드 L6)
+    pub repos: Arc<ServerRepos>,
 }

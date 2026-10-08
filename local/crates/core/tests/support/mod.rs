@@ -95,3 +95,21 @@ impl Drop for TestDb {
         .join();
     }
 }
+
+/// 임시 자리의 서버 저장소 자리 — git은 PATH의 것, 전역 설정은 그 자리의 빈 파일 (SYNC-MS-013 0장)
+pub fn server_repos(root: &std::path::Path) -> syncdoc_core::project::service::ServerRepos {
+    for d in ["origins", "repos"] {
+        let _ = std::fs::create_dir_all(root.join(d));
+    }
+    let global = root.join("gitconfig");
+    let _ = std::fs::write(&global, "");
+    syncdoc_core::project::service::ServerRepos {
+        git: syncdoc_core::infra::git::Git {
+            exe: "git".into(),
+            global_config: global,
+        },
+        origins: root.join("origins"),
+        repos: root.join("repos"),
+        specs_url: "http://127.0.0.1:8010/specs".into(),
+    }
+}

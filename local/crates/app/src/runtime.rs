@@ -3,6 +3,7 @@
 
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 use clap::Parser;
@@ -10,7 +11,9 @@ use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use syncdoc_core::account::service::AccountService;
 use syncdoc_core::errors::Problem;
+use syncdoc_core::infra::git::Git;
 use syncdoc_core::migrate;
+use syncdoc_core::project::service::ServerRepos;
 use syncdoc_server::state::AppState;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
@@ -80,6 +83,12 @@ pub async fn run(args: Args, tray: Option<TrayLink>) -> Result<(), Problem> {
     let guard = logs::init(&data)?;
     let conf = settings::load(&data)?;
     let pg_dir = paths::pg_dir()?;
+    let git_exe = paths::git()?;
+    // git이 사용자 전역 설정 대신 읽는 빈 파일 (SYNC-MS-019 0장)
+    let global_config = data.join("gitconfig");
+    if !global_config.is_file() {
+        fs::write(&global_config, "")?;
+    }
     let server = pg::start(&pg_dir, &data).await?;
     let pool = match prepare(&server, &conf).await {
         Ok(pool) => pool,
@@ -111,12 +120,23 @@ pub async fn run(args: Args, tray: Option<TrayLink>) -> Result<(), Problem> {
         println!("{note}");
     }
     instance::publish(&data, port)?;
+    let root = std::path::absolute(&data)?;
+    let repos = ServerRepos {
+        git: Git {
+            exe: git_exe,
+            global_config: root.join("gitconfig"),
+        },
+        origins: root.join("origins"),
+        repos: root.join("repos"),
+        specs_url: format!("http://127.0.0.1:{port}/specs"),
+    };
     let app = syncdoc_server::app(AppState {
         pool: pool.clone(),
         local_login: conf.local_login.clone(),
         local_name: conf.local_name.clone(),
         llm_enabled: conf.llm_enabled,
         public_netloc: format!("127.0.0.1:{port}"),
+        repos: Arc::new(repos),
     });
     let (stop, stopped) = oneshot::channel::<()>();
     let serving = tokio::spawn(async move {

@@ -23,6 +23,9 @@ fn state(pool: PgPool) -> AppState {
         local_login: "local".into(),
         local_name: "로컬".into(),
         llm_enabled: false,
+        repos: std::sync::Arc::new(support::server_repos(
+            &std::env::temp_dir().join("syncdoc-server-test"),
+        )),
         public_netloc: format!("127.0.0.1:{PORT}"),
     }
 }
