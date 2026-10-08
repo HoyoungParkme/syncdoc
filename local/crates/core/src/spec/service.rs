@@ -13,9 +13,13 @@ use super::repo;
 use crate::errors::Problem;
 use crate::markdown::{self, DOC_ID, HEADING, REF};
 use crate::pycompat::chars::{is_decimal, lstrip, strip};
+use crate::pycompat::difflib::unified_diff;
 use crate::pycompat::re::compile;
 use crate::pycompat::repr::repr;
-use crate::types::{DocStatus, DocType, Entry, ItemBlock, ValidateResult, Violation, Warning};
+use crate::types::{
+    Diff, DiffLine, DiffOp, DocStatus, DocType, Entry, Hunk, ItemBlock, ValidateResult, Violation,
+    Warning,
+};
 
 /// 이력 diff의 앞뒤 줄 수 — 파이썬 `DIFF_CONTEXT_LINES`
 pub const DIFF_CONTEXT_LINES: usize = 3;
@@ -267,6 +271,37 @@ fn entity_mismatch(body: &str) -> Vec<Warning> {
         .into_iter()
         .filter(|n| a4.get(*n).is_some_and(|x| *x != a2[*n]))
         .map(|n| warning("entity.mismatch", n))
+        .collect()
+}
+
+/// 본문 → {항목 ID: 블록 글} — 항목 밖 글은 `None` 키 하나 (MS-002 diff 2). 같은 ID는 처음 자리에 마지막 글
+fn split_items(body: &str, doc_type: DocType) -> IndexMap<Option<String>, String> {
+    let blocks = SpecService::item_blocks(body, doc_type, None);
+    let lines: Vec<&str> = body.split('\n').collect();
+    let mut covered: HashSet<usize> = HashSet::new();
+    let mut out: IndexMap<Option<String>, String> = IndexMap::new();
+    for blk in blocks {
+        covered.extend(blk.start_line - 1..blk.end_line);
+        out.insert(Some(blk.item_id), blk.text);
+    }
+    let rest: Vec<&str> = lines
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !covered.contains(i))
+        .map(|(_, l)| *l)
+        .collect();
+    let rest = rest.join("\n");
+    if !strip(&rest).is_empty() {
+        out.insert(None, rest);
+    }
+    out
+}
+
+/// 파이썬 `[ln.strip() for ln in text.split("\n") if ln.strip()]` — 공백만 바뀐 것은 같다
+fn normalized(text: &str) -> Vec<&str> {
+    text.split('\n')
+        .map(strip)
+        .filter(|l| !l.is_empty())
         .collect()
 }
 
@@ -598,5 +633,74 @@ impl SpecService<'_> {
         out.push("---".to_string());
         out.extend(lines[fm_lines..].iter().map(|l| (*l).to_string()));
         Ok(out.join("\n"))
+    }
+
+    /// SYNC-MS-014#SpecService.diff_bodies
+    pub fn diff_bodies(
+        from: &str,
+        to: &str,
+        doc_type: DocType,
+        from_no: i32,
+        to_no: i32,
+        context: usize,
+    ) -> Diff {
+        let src = split_items(from, doc_type);
+        let dst = split_items(to, doc_type);
+        let mut order: Vec<Option<String>> = dst.keys().cloned().collect();
+        order.extend(src.keys().filter(|k| !dst.contains_key(*k)).cloned());
+        order.sort_by_key(|k| k.is_none()); // 항목 밖 글은 마지막 — 안정 정렬
+        let mut hunks = Vec::new();
+        for item_id in order {
+            let a = src.get(&item_id).map_or("", String::as_str);
+            let b = dst.get(&item_id).map_or("", String::as_str);
+            if normalized(a) == normalized(b) {
+                continue; // 공백만 바뀜 → hunk 없음
+            }
+            let lines = if a.is_empty() || b.is_empty() {
+                // 새로 생긴 항목은 전부 add, 사라진 항목은 전부 del
+                let (op, text) = if a.is_empty() {
+                    (DiffOp::Add, b)
+                } else {
+                    (DiffOp::Del, a)
+                };
+                text.trim_end_matches('\n')
+                    .split('\n')
+                    .map(|t| DiffLine {
+                        op,
+                        text: t.to_string(),
+                    })
+                    .collect()
+            } else {
+                let al: Vec<&str> = a.split('\n').collect();
+                let bl: Vec<&str> = b.split('\n').collect();
+                // 머리 두 줄(`--- `·`+++ `)과 `@@`만 버린다 (#345)
+                unified_diff(&al, &bl, context)
+                    .into_iter()
+                    .skip(2)
+                    .filter(|ln| !ln.starts_with("@@"))
+                    .map(|ln| {
+                        let op = match ln.as_bytes().first() {
+                            Some(b'+') => DiffOp::Add,
+                            Some(b'-') => DiffOp::Del,
+                            _ => DiffOp::Ctx,
+                        };
+                        DiffLine {
+                            op,
+                            text: ln[1..].to_string(),
+                        }
+                    })
+                    .collect()
+            };
+            hunks.push(Hunk {
+                item_id,
+                lines,
+                downstream_count: 0,
+            });
+        }
+        Diff {
+            from_version: from_no,
+            to_version: to_no,
+            hunks,
+        }
     }
 }
