@@ -635,6 +635,43 @@ impl SpecService<'_> {
         Ok(out.join("\n"))
     }
 
+    /// SYNC-MS-014#SpecService.diff
+    pub async fn diff(
+        &mut self,
+        doc_id: &str,
+        from_no: i32,
+        to_no: i32,
+        context: usize,
+    ) -> Result<Diff, Problem> {
+        let Some(row) = repo::document_by_doc_id(&mut *self.db, doc_id).await? else {
+            return Err(Problem::NotFound {
+                resource: "document".to_string(),
+                id: serde_json::Value::from(doc_id),
+            });
+        };
+        let bodies = repo::version_bodies(&mut *self.db, row.id, &[from_no, to_no]).await?;
+        for no in [from_no, to_no] {
+            if !bodies.contains_key(&no) {
+                return Err(Problem::NotFound {
+                    resource: "version".to_string(),
+                    id: serde_json::Value::from(format!("{doc_id} v{no}")),
+                });
+            }
+        }
+        let doc_type = DocType::parse(&row.doc_type).ok_or_else(|| Problem::Internal {
+            log: format!("문서 {doc_id}의 타입 {}을 모른다", row.doc_type),
+        })?;
+        let (a, b) = (bodies[&from_no].clone(), bodies[&to_no].clone());
+        // 긴 블록의 diff는 일꾼 스레드를 막지 않게 (SYNC-STD-004#DEV-16)
+        tokio::task::spawn_blocking(move || {
+            SpecService::diff_bodies(&a, &b, doc_type, from_no, to_no, context)
+        })
+        .await
+        .map_err(|e| Problem::Internal {
+            log: format!("diff: {e}"),
+        })
+    }
+
     /// SYNC-MS-014#SpecService.diff_bodies
     pub fn diff_bodies(
         from: &str,
