@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-008, SYNC-API-001, SYNC-API-002]
 
 **카드 L6 몫은 프로젝트 요약 하나다(2026-10-08)** — `init_project`·`POST /api/projects`가 돌려주고 `GET /api/projects`가 목록으로 낸다(사용자 결정 — 요약 전부, 문서가 있어도 맞게). 나머지 조회(L8)는 그 카드가 더한다.
 
-**다른 점(전체)** 파이썬은 함수마다 세션을 연다 — Rust는 부르는 쪽의 연결을 받는다(첫 인자 `db`).
+**다른 점(전체)** 파이썬은 함수마다 세션을 연다 — Rust는 부르는 쪽의 연결을 받는다(첫 인자 `db`). 프로젝트를 읽는 함수는 서버 저장소 자리(`repos` — [[SYNC-MS-013]] 0장)도 받는다 — `ProjectService`가 그 둘로 선다.
 
 ---
 
@@ -32,7 +32,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-008, SYNC-API-001, SYNC-API-002]
 
 **시그니처**
 ```rust
-pub async fn project_summary(db: &mut PgConnection, user: &UserRow) -> Result<Vec<ProjectSummary>, Problem>
+pub async fn project_summary(db: &mut PgConnection, repos: &ServerRepos, user: &UserRow) -> Result<Vec<ProjectSummary>, Problem>
 ```
 
 근거: [[SYNC-MS-008#queries.project_summary]] · [[SYNC-UC-001#UC-H14]] · [[SYNC-API-001#GET/api/projects]]
