@@ -41,7 +41,8 @@ local/                          싱크독_로컬 (Rust) — 실행 파일 하나
 │                               `alembic upgrade --sql`로 만든다. 손으로 고치지 않는다 (STD-004 DEV-7)
 ├── xtask/                      개발 도구 — pg-fetch(개발용 PostgreSQL 바이너리) · migrations [--check] ·
 │                               schema-check(두 판의 스키마 같음) · test-db-clean · mcp-tools [--check](L3) ·
-│                               package windows|linux · icon · pg-fetch --target(L4) · 속도 재기(L17)
+│                               package windows|linux · icon · pg-fetch --target(L4) · unicode-tables [--check] ·
+│                               spec-golden [--check] · spec-diff(L5) · 속도 재기(L17)
 ├── packaging/                  설치 파일 재료 (L4) — `cargo xtask package`가 실행 파일·PostgreSQL·MinGit과 함께 모은다
 │   ├── icon.svg                앱 아이콘 원본 — `cargo xtask icon`이 icon.ico·icon.png·tray.rgba(32×32 RGBA)를 만든다(생성물)
 │   ├── NOTICE.txt              함께 담은 것과 라이선스·원본 주소(PostgreSQL · MinGit GPL)
@@ -91,11 +92,10 @@ crates/server/src/
 │   ├── tools.rs                도구 13개 — 인자 검증 후 카드마다 처리기, 없으면 not-implemented
 │   └── declarations.json       도구 선언·안내문·서버 이름 — `cargo xtask mcp-tools`가 파이썬 판에서 만든다. 손으로 안 고친다
 └── compat/                     파이썬 호환 층 — 오류 문장·값 꼴을 파이썬 판과 바이트로 같게 (INFRA 9.8)
-    ├── pyvalue.rs              JSON → 파이썬 값(dict 순서·큰 정수·inf·nan·짝 없는 서로게이트) · repr
+    ├── pyvalue.rs              JSON → 파이썬 값(dict 순서·큰 정수·inf·nan·짝 없는 서로게이트) · repr(문자 표는 core `pycompat`)
     ├── pyjson.rs               파이썬 `json.loads`(`_json.c`) — FastAPI 본문·도구 인자 미리 읽기의 오류 위치·C 재귀 한도
     ├── pydantic/               검증 — 파이썬 판이 내보낸 core schema를 읽어(schema) lax 규칙으로 검증하고(validate)
     │                           같은 오류 줄·문장·`N validation errors for …` 꼴을 낸다(errors). smart union의 고르기까지
-    ├── printable.rs            파이썬 `str.isprintable()` 표(유니코드 15.0) — repr이 이스케이프할 글자. 생성물
     ├── fastapi.rs              요청 본문(Content-Type·json.loads)·경로 값 → invalid-request(loc·msg) · 400
     └── uvicorn.rs              요청 경로를 `unquote`로 풀어 라우팅한다(`/api/m%65` = `/api/me`)
 ```
@@ -116,6 +116,12 @@ crates/core/
     ├── types.rs                    열거형·DTO (DOM-002 2.7·2.8)
     ├── clock.rs                    저장 시각 — 프로세스 안에서 뒤로 안 간다 (STD-004 DEV-18)
     ├── markdown.rs                 순수 — frontmatter·코드 마스킹·헤딩·참조·항목 블록
+    ├── pycompat/                   파이썬 호환 — 문자 분류·repr·정규식·difflib을 파이썬 3.12와 같게 (L5)
+    │   ├── unicode.rs              생성물 — `re`의 \s·\d·\w와 str.isprintable 구간(유니코드 15.0). `cargo xtask unicode-tables`
+    │   ├── chars.rs                표 찾기 · 파이썬 strip
+    │   ├── repr.rs                 파이썬 str repr — server/compat도 이것을 쓴다
+    │   ├── re.rs                   파이썬 패턴 문자열의 \s·\S·\d·\w를 위 표로 바꿔 regex로 컴파일
+    │   └── difflib.rs              SequenceMatcher(autojunk) · get_grouped_opcodes · unified_diff
     ├── errors.rs                   Problem 열거형 하나에 problem+json 종류 전부 (STD-004 DEV-5)
     ├── migrate.rs                  이전 SQL을 올린다 (4.1) — 모든 crate의 시험도 이것으로 DB를 만든다
     ├── pipeline.rs                 쓰기 조율 — 프로젝트마다 읽기·쓰기 락, 순서는 파이썬과 같다
@@ -123,7 +129,7 @@ crates/core/
     └── infra/                      바깥 — git 자식 프로세스 · upload-pack·receive-pack · 모델 호출
 ```
 
-지금(카드 L3) 있는 것은 `account`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
+지금(카드 L5) 있는 것은 `account`·`spec`·`markdown.rs`·`pycompat/`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. `spec/`의 정답 파일은 `crates/core/tests/golden/spec.json`(생성물, `cargo xtask spec-golden`)이다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
 
 **층** — 함수 단위 명세(MINISPEC 카드·API 엔드포인트·UI 화면)가 없는 코드가 어느 층이고 그 층을 무슨 문서가 정하는지([[SYNC-STD-001]] 2.6). 코드 그래프가 읽는다. 위에서부터 첫 줄이 이긴다. **줄은 카드마다 더한다** — 코드가 없는 줄은 검사기(`check_calls`)가 「안 맞는 줄」로 잡는다. 함수가 없는 파일(구조체만 — `state.rs`·`model.rs`)은 적지 않는다.
 
@@ -133,7 +139,7 @@ crates/core/
 | `local/crates/server/src/lib.rs` | 서버 조립·`/health` | [[SYNC-INFRA-001]] 4.1·9.1 |
 | `local/crates/server/src/web/guard.rs` · `local/crates/server/src/web/auth.rs` · `local/crates/server/src/mcp/auth.rs` | 인증 | [[SYNC-INFRA-001]] 5장·9.4 · [[SYNC-SEQ-001#SEQ-C2]] · [[SYNC-SEQ-001#SEQ-C3]] |
 | `local/crates/server/src/mcp/**` | MCP 입구 | [[SYNC-API-002]] 1장·2장 · [[SYNC-INFRA-001]] 9.8 |
-| `local/crates/server/src/compat/**` | 파이썬 호환 | [[SYNC-INFRA-001]] 9.8 · [[SYNC-DOM-004]] 1장 |
+| `local/crates/server/src/compat/**` · `local/crates/core/src/pycompat/**` | 파이썬 호환 | [[SYNC-INFRA-001]] 9.8 · [[SYNC-DOM-004]] 1장 |
 | `local/crates/server/src/web/problem.rs` · `local/crates/core/src/errors.rs` | 에러 | [[SYNC-STD-004#DEV-5]] · [[SYNC-API-001]] 2장 |
 | `local/crates/server/src/web/static_files.rs` | 정적 파일 | [[SYNC-INFRA-001]] 4.1 |
 | `local/crates/core/src/types.rs` | 열거형·DTO | [[SYNC-DOM-002]] 2.7·2.8 |
@@ -310,6 +316,62 @@ crates/core/
 - 트레이가 있으면 메인 스레드는 트레이 차지다(윈도 메시지 루프) — 서버·PostgreSQL은 tokio 일꾼 스레드에서 돈다. 「끝내기」는 Ctrl+C와 같은 끄는 순서를 탄다(L4)
 - 켜는 중 실패는 `Problem::Internal`의 로그 문장으로 돌려주고 `main`이 끝 코드 1로 끝난다
 - 윈도에서 관리자 권한으로 켜졌으면 맨 처음 관리자 그룹을 뺀 토큰으로 자신을 다시 켠다 — PostgreSQL은 관리자 권한으로 돌지 않는다. `unsafe`는 이 모듈의 Win32 호출뿐이다(작업 공간 lint `unsafe_code = "deny"`, 이 모듈만 허용, L4)
+
+### 4.3 spec · markdown (MS-014)
+
+#### SpecService
+
+```mermaid
+classDiagram
+    class SpecService {
+        +db: PgConnection
+        +item_blocks(body, doc_type, title) Vec~ItemBlock~
+        +validate(body, doc_type, entry, current_status) ValidateResult
+        +check(body, doc_type, entry, current_status, deleted) ValidateResult
+        +apply_frontmatter(body, doc_id, doc_type, status) String
+        +diff(doc_id, from_no, to_no, context) Diff
+        +diff_bodies(from, to, doc_type, from_no, to_no, context) Diff
+    }
+    class ItemBlock {
+        +String item_id
+        +String display_name
+        +usize level
+        +usize start_line
+        +usize end_line
+        +String text
+    }
+    class ValidateResult {
+        +Vec~Violation~ violations
+        +Vec~Warning~ warnings
+    }
+    class Diff {
+        +i32 from_version
+        +i32 to_version
+        +Vec~Hunk~ hunks
+    }
+    class Hunk {
+        +Option~String~ item_id
+        +Vec~DiffLine~ lines
+        +i64 downstream_count
+    }
+    SpecService --> ItemBlock
+    SpecService --> ValidateResult
+    SpecService --> Diff
+    Diff --> Hunk
+```
+
+| 메서드 | 부르는 곳 | 근거 | 던지는 에러 |
+|---|---|---|---|
+| [[SYNC-MS-014#SpecService.item_blocks]] | `check`·`diff_bodies` · 저장(L7)·항목 조회(L8) | [[SYNC-MS-002#SpecService.item_blocks]] | — |
+| [[SYNC-MS-014#SpecService.validate]] | 저장 파이프라인(L7) | [[SYNC-MS-002#SpecService.validate]] | `internal`(DB) |
+| [[SYNC-MS-014#SpecService.check]] | `validate` · `cargo xtask spec-diff` | [[SYNC-MS-002#SpecService.validate]] | — |
+| [[SYNC-MS-014#SpecService.apply_frontmatter]] | 저장 파이프라인의 만들기(L7) | [[SYNC-MS-002#SpecService.apply_frontmatter]] | `convention-violation` |
+| [[SYNC-MS-014#SpecService.diff]] | 이력 diff(L8) | [[SYNC-MS-002#SpecService.diff]] | `not-found` |
+| [[SYNC-MS-014#SpecService.diff_bodies]] | `diff` · `cargo xtask spec-diff` | [[SYNC-MS-002#SpecService.diff]] | — |
+
+markdown 넷([[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-014#markdown.masked_lines]] · [[SYNC-MS-014#markdown.headings]] · [[SYNC-MS-014#markdown.cut_blocks]])은 함수다 — spec과 reference(L7)가 같이 쓴다.
+
+규칙 — [[SYNC-DOM-002]] 4.2와 같다. 항목 판정은 `item_blocks` 한 곳이다. **파이썬 판과 바이트까지 같다**(사용자 결정 2026-10-08) — 문자 분류·repr·정규식·difflib은 `pycompat/`가 파이썬 3.12와 같게 하고, 맞춤은 정답 파일(`cargo test`)과 `cargo xtask spec-diff`가 본다. 항목 패턴 표(`TYPES`·`SUBTYPES`)는 파이썬과 같은 문자열이다. 나머지 메서드(문서·버전 조회, 만들기·저장, 상태, 휴지통…)는 그 카드가 더한다.
 
 ### 4.5 account (MS-016)
 
