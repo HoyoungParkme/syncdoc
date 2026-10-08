@@ -46,6 +46,7 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 | 10 | `SYNC-MS-010` | MINISPEC — ConversationService — 대화·턴·첨부 | `10-MS/SYNC-MS-010.md` | 14 | 4 | DOM-002, DOM-003, SEQ-001, API-001, STD-001 |
 | 10 | `SYNC-MS-011` | MINISPEC — codegraph — 코드 호출 그래프와 명세 대조 | `10-MS/SYNC-MS-011.md` | 16 | 4 | DOM-002, DOM-003, SEQ-001, STD-001 |
 | 10 | `SYNC-MS-012` | MINISPEC — runtime — 켜기·끄기·설정·PostgreSQL·한 번만 실행 (Rust) | `10-MS/SYNC-MS-012.md` | 13 | 4 | DOM-004, INFRA-001, PRD-001, SEQ-001, STD-004 |
+| 10 | `SYNC-MS-014` | MINISPEC — SpecService · markdown (Rust) | `10-MS/SYNC-MS-014.md` | 10 | 4 | DOM-004, MS-002, MS-003, STD-001, STD-004 |
 | 10 | `SYNC-MS-016` | MINISPEC — AccountService (Rust) | `10-MS/SYNC-MS-016.md` | 2 | 4 | DOM-004, MS-006, SEQ-001, API-001 |
 | 11 | `SYNC-CODE-001` | 구현 계획 — 슬라이스 카드와 커밋 기록 | `CODE_구현계획_싱크독.md` | 34 | 6 | STD-004, MS-001, MS-002, MS-003, MS-006, MS-007, MS-008, MS-009, API-001, API-002, UI-002, SCN-001 |
 | 11 | `SYNC-CODE-002` | 구현 계획 — 싱크독_로컬 (Rust) 슬라이스 카드와 커밋 기록 | `11-CODE/SYNC-CODE-002.md` | 1 | 5 | STD-004, DOM-004, PRD-001, INFRA-001, API-001, API-002, UI-002, SCN-001 |
@@ -258,6 +259,12 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 - 3. 미결사항
 
 **SYNC-MS-012** MINISPEC — runtime — 켜기·끄기·설정·PostgreSQL·한 번만 실행 (Rust)
+- 0. 이 문서가 다루는 것
+- 1. 함수 목록
+- 2. 함수
+- 3. 미결사항
+
+**SYNC-MS-014** MINISPEC — SpecService · markdown (Rust)
 - 0. 이 문서가 다루는 것
 - 1. 함수 목록
 - 2. 함수
