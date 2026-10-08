@@ -307,4 +307,34 @@ impl Git {
             .await?;
         Ok(!strip(&out).is_empty())
     }
+
+    /// SYNC-MS-019#Git.list
+    pub async fn list(
+        &self,
+        workdir: &Path,
+        glob: &str,
+        git_ref: &str,
+    ) -> Result<Vec<String>, Problem> {
+        let out = self
+            .run(
+                Some(workdir),
+                &[
+                    os("ls-tree"),
+                    os("-r"),
+                    os("--name-only"),
+                    os(git_ref),
+                    os("--"),
+                    os("docs/specs"),
+                ],
+            )
+            .await?;
+        // 명세가 아닌 것은 뺀다 — 템플릿·첨부 (MS-009 list, #40)
+        Ok(py_splitlines(&out)
+            .into_iter()
+            .filter(|p| {
+                path_match(p, glob) && !p.split('/').any(|x| x == "_templates" || x == "assets")
+            })
+            .map(str::to_string)
+            .collect())
+    }
 }
