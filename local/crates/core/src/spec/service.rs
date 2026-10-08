@@ -1124,4 +1124,87 @@ impl SpecService<'_> {
         )
         .await?)
     }
+
+    /// SYNC-MS-014#SpecService.save
+    ///
+    /// 파이썬 `save`의 `mcp` 갈래 — 재구축(`rebuild`)과 상태 커밋 해시(`github`)는 카드 L11
+    #[allow(clippy::too_many_arguments)]
+    pub async fn save(
+        &mut self,
+        document: &Document,
+        body: &str,
+        commit_hash: &str,
+        author: &Author,
+        message: &str,
+        deleted_item_pks: &[i32],
+        validate_result: &ValidateResult,
+    ) -> Result<VersionRow, Problem> {
+        let row = repo::document_by_id(&mut *self.db, document.summary.id)
+            .await?
+            .ok_or_else(|| Problem::Internal {
+                log: format!("저장할 문서 {}가 없다", document.summary.doc_id),
+            })?;
+        let new_no = row.current_version_no + 1;
+        let version = repo::insert_version(
+            &mut *self.db,
+            &new_version(row.id, new_no, commit_hash, body, author, message),
+        )
+        .await?;
+        let (fm, _) = markdown::parse_frontmatter(body);
+        for b in blocks_of(body, &row.doc_type, fm.get("title").map(String::as_str)) {
+            match repo::item_of(&mut *self.db, row.id, &b.item_id).await? {
+                // 본문에 다시 나타났으므로 되살린다 (MS-002 save 3, #15)
+                Some(item) => repo::restore_item(&mut *self.db, item.id, &b.display_name).await?,
+                None => {
+                    repo::insert_item(&mut *self.db, row.id, &b.item_id, &b.display_name).await?;
+                }
+            }
+        }
+        for pk in deleted_item_pks {
+            repo::mark_item_deleted(&mut *self.db, *pk, clock::now()).await?;
+        }
+        // github는 frontmatter가 진실이다. 둘 밖의 값이면 DB를 안 바꾼다 (#99)
+        let fm_status = fm
+            .get("status")
+            .map(String::as_str)
+            .filter(|s| matches!(*s, "draft" | "approved"));
+        let mut new_status = match (author.via, fm_status) {
+            (Entry::Github, Some(s)) => s,
+            _ => row.status.as_str(),
+        };
+        // 6. 자동 강등 — mcp·되돌리기는 이 자리에서 내린다(본문 커밋 하나에 담기므로 커밋 해시 없음) (#58)
+        if row.status == "approved" && body != row.current_body && new_status == "approved" {
+            new_status = "draft";
+            repo::insert_status_change(
+                &mut *self.db,
+                &repo::NewStatusChange {
+                    document_id: row.id,
+                    from_status: Some("approved"),
+                    to_status: "draft",
+                    changed_by_user_id: author.user.id,
+                    via: fold_via(author.via),
+                    reason: Some("본문 수정으로 자동 강등"),
+                    commit_hash: None,
+                    changed_at: clock::now(),
+                },
+            )
+            .await?;
+        }
+        let (has_error, detail, warnings) = convention_columns(validate_result);
+        // 7. 어느 입구든 저장되면 휴지통에서 나온다 (UC-A8 4)
+        repo::update_saved_document(
+            &mut *self.db,
+            &repo::SavedDocument {
+                id: row.id,
+                body,
+                version_no: new_no,
+                status: new_status,
+                has_convention_error: has_error,
+                convention_error_detail: detail.as_deref(),
+                incomplete_warnings: warnings.as_deref(),
+            },
+        )
+        .await?;
+        Ok(version)
+    }
 }
