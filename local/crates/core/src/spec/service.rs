@@ -1096,10 +1096,11 @@ impl SpecService<'_> {
         validate_result: &ValidateResult,
     ) -> Result<VersionRow, Problem> {
         let (fm, _) = markdown::parse_frontmatter(body);
-        let status = match fm.get("status").map(String::as_str) {
-            Some(s @ ("draft" | "approved")) => s,
-            _ => "draft",
-        };
+        let status = fm
+            .get("status")
+            .map(String::as_str)
+            .filter(|s| matches!(*s, "draft" | "approved"))
+            .unwrap_or("draft");
         let (has_error, detail, warnings) = convention_columns(validate_result);
         let id = repo::insert_document(
             &mut *self.db,
