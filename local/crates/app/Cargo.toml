@@ -29,6 +29,7 @@ webbrowser = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 tao = { workspace = true }
+windows-sys = { workspace = true }
 
 [build-dependencies]
 embed-resource = { workspace = true }

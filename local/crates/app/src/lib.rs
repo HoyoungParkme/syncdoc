@@ -4,6 +4,7 @@ pub mod instance;
 pub mod logs;
 pub mod paths;
 pub mod pg;
+pub mod privilege;
 pub mod runtime;
 pub mod settings;
 pub mod tray;

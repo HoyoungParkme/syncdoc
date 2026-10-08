@@ -49,9 +49,11 @@ tracing-appender = "0.2.5"
 tracing-subscriber = { version = "0.3", features = ["fmt", "registry"] }
 url = "=2.5.8"
 webbrowser = "1.2"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Console", "Win32_System_Environment", "Win32_System_SystemServices", "Win32_System_Threading"] }
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+# unsafe는 crates/app/src/privilege.rs의 Win32 호출에서만 허용한다(SYNC-DOM-004 4.1)
+unsafe_code = "deny"
 
 [profile.release]
 lto = "thin"
