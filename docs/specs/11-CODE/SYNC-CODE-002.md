@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 **MINISPEC은 카드의 첫 커밋으로 쓴다**([[SYNC-STD-004#DEV-13]]). 그래서 L1만 표가 있고 나머지는 하는 일과 선행만 있다 — 카드를 받을 때 그 카드의 표를 쓴다. 아직 없는 MINISPEC 항목을 미리 가리키지 않는다.
 
-**진행 상황**: 카드 18장(L1~L18). 완료 5(L1·L2 2026-10-07, L3·L4·L5 2026-10-08). 첫 릴리즈 `local-v0.1.0`(L4). L1은 계약 시험 없이 병합하고 완료란은 L2 뒤에 적었다(사용자 결정 2026-10-07).
+**진행 상황**: 카드 18장(L1~L18). 완료 6(L1·L2 2026-10-07, L3~L6 2026-10-08). 첫 릴리즈 `local-v0.1.0`(L4). L1은 계약 시험 없이 병합하고 완료란은 L2 뒤에 적었다(사용자 결정 2026-10-07).
 
 ---
 
@@ -82,7 +82,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | API | [[SYNC-API-002#init_project]] · [[SYNC-API-002#get_template]] · [[SYNC-API-001#GET/api/projects]] · [[SYNC-API-001#POST/api/projects]] · [[SYNC-API-001#DELETE/api/projects/{code}]] |
 | 테스트 | `cargo test`(git 어댑터는 임시 자리의 진짜 git과 사용자 설정 흉내 · 서비스·요약은 시험 DB) · 계약 L6 — MCP 만들기·중복·나쁜 코드·github 저장·`get_template` 타입·서브타입·없는 것, REST 만들기·422·지우기 → 다시 만들기 `existing-specs` · 두 판 차이 시험이 두 도구를 바이트로(`archived_at` 가림) · 워크플로 — 윈도 MinGit으로 만들기·지우기 |
 | 선행 | L3 · L5 · #349 |
-| 완료 | — |
+| 완료 | 2026-10-08 · 브랜치 `card/L6-server-storage`(8654495 #351) · 선행 #349(#350 — 파이썬 판 보관본 정렬·`git.exists` 언어·quotepath) · spec 12 + code 25 · `cargo test` 98(git 어댑터는 임시 자리의 진짜 git — pre-push 훅으로 rebase·충돌까지 · 서비스·요약은 시험 DB) · 계약 `--target both --with-card L6` 344 통과·2 건너뜀(get_document L7 · 보관본 재구축 L11) · 두 판 차이 시험이 이제 `init_project`·`get_template`까지 — 씨앗 1·2·3 × 2000 다른 것 0 · 워크플로 녹색 — 윈도(MinGit, 권한을 내린 토큰)·리눅스(.deb, 시스템 git)에서 만들고 지우기 · clippy(리눅스·윈도) · 윈도 `cargo check` · xtask `--check` 넷·`schema-check` · `check_code` Rust 47/47 · `check_calls` 0 · 사람 확인(윈도에서 에이전트로 init_project → get_template)은 따로 · 되먹임: MS-018 `project_summary`가 `repos`를 받는다, MS-013 init_project의 호출하는 것에 `get`(check_calls), git은 `self.repos.git`으로 바로(지역 변수면 그래프가 놓친다), 도구 성공 결과의 `isError:false`·지우기 204의 `application/json`(계약 시험), `GET /api/projects`를 L6에서 함께(요약이 있어 L8 몫을 당김) |
 
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
