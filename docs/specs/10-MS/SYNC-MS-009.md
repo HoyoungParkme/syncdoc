@@ -16,7 +16,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **표기** — `→` 반환·결과, `!` 예외, `DB:` 테이블 접근, `git:` 저장소 접근, `·` 같은 단계 안 구분.
 
-`infra`는 서비스가 아니다. git 명령과 GitHub API를 감싸는 얇은 층이며, core는 이것을 통해서만 바깥을 만진다. 여기 MINISPEC은 "어떤 git 명령을 어떤 옵션으로"까지 적는다 — 그게 이 층의 전부라서. `git.*`는 전부 `asyncio.create_subprocess_exec`로 CLI를 부른다. 실패는 `GitError(cmd, stderr)`.
+`infra`는 서비스가 아니다. git 명령과 GitHub API를 감싸는 얇은 층이며, core는 이것을 통해서만 바깥을 만진다. 여기 MINISPEC은 "어떤 git 명령을 어떤 옵션으로"까지 적는다 — 그게 이 층의 전부라서. `git.*`는 전부 `asyncio.create_subprocess_exec`로 CLI를 부른다. 실패는 `GitError(cmd, stderr)`. **모든 git에 `-c core.quotepath=false`를 붙인다** — 기본값은 한글 경로를 `"docs/specs/02-PRD/\355…"`처럼 따옴표·8진수로 내어 경로 비교·glob이 빠뜨린다(#349).
 
 ---
 
@@ -238,7 +238,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **부르는 쪽 둘이 같은 것을 원한다.** `pipeline.rebuild` 5단계는 재구축할 명세 목록을, `ProjectService.init_project` 6단계는 이미 있는 명세 수를 센다. 둘 다 템플릿을 세면 안 된다 — 템플릿은 `Path(path).stem`이 `API`처럼 나와 "알 수 없는 디렉터리" 규약 오류로 잡히고, 재구축 결과 화면(UI-14 5.2)이 매번 없는 오류를 세어 보여준다(#40)
 
-**테스트 관점** 번호 붙은 디렉터리가 `*`에 걸린다 · `_templates/`·`assets/`가 안 나온다 · glob에 안 맞는 경로는 빠진다
+**테스트 관점** 번호 붙은 디렉터리가 `*`에 걸린다 · `_templates/`·`assets/`가 안 나온다 · glob에 안 맞는 경로는 빠진다 · **한글 이름 문서도 센다**(따옴표 없이, #349)
 
 ---
 
@@ -270,9 +270,11 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `async def exists(workdir: Path, path: str) -> bool`
 
-**처리** `git ls-tree HEAD -- {path}` 결과 유무. 작업 사본이 아니라 **커밋된 것** 기준
+**처리** `git rev-parse --verify --quiet HEAD^{commit}` · if 끝 코드 1(가리키는 커밋 없음) → `false` · if 다른 실패 → `GitError` · `git ls-tree HEAD -- {path}` 결과 유무. 작업 사본이 아니라 **커밋된 것** 기준
 
-**커밋이 하나도 없는 저장소는 `false`다.** `HEAD`가 가리키는 것이 없어 git이 실패하는데, 그것을 에러로 올리면 빈 저장소로 프로젝트를 시작하는 길이 막힌다 — 새 프로젝트를 시작하는 가장 흔한 방법이 그것이다. `HEAD` 없음만 `false`로 삼키고 다른 git 오류는 그대로 올린다
+**커밋이 하나도 없는 저장소는 `false`다.** `HEAD`가 가리키는 것이 없어 git이 실패하는데, 그것을 에러로 올리면 빈 저장소로 프로젝트를 시작하는 길이 막힌다 — 새 프로젝트를 시작하는 가장 흔한 방법이 그것이다. `HEAD` 없음만 `false`로 삼키고 다른 git 오류는 그대로 올린다. **`HEAD` 없음을 stderr 문구로 가리지 않는다** — git 로케일이 영어가 아니면 놓친다(#349). `rev-parse --verify --quiet`의 끝 코드로 본다
+
+**테스트 관점** 빈 저장소 → `false` · 커밋된 경로 → `true` · 저장소가 아닌 자리 → `GitError` · git 로케일이 영어가 아니어도 빈 저장소 → `false`
 
 ---
 
