@@ -61,7 +61,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 3. `workdir = config.REPOS_DIR / code` · if 이미 있음 → 지운다 (이전 실패 잔재)
 3s. **서버 저장이면** `origin = ORIGINS_DIR / f"{code}.git"` · `token = None` — GitHub 토큰을 구하지 않는다([[SYNC-PRD-001#R14]])
    - if `origin`이 이미 있다(등록되지 않은 원본 — 지난 실패나 사람이 넣은 것) → **지우지 않고** 보관 폴더로 옮긴다. 아래 보관본으로 다룬다
-   - `archives = ORIGINS_DIR/_archive/{code}-*.git`을 이름(시각) 순으로
+   - `archives = ORIGINS_DIR/_archive/{code}-*.git`을 (시각, 번호) 순으로 — 같은 초의 `{code}-{시각}-1.git`이 `{code}-{시각}.git`보다 뒤(새것)다. 이름 문자열 순이면 `-`가 `.`보다 앞이라 거꾸로 된다(#349)
    - if `archives and not import_existing` → `n = len(git.list(archives[-1], "docs/specs/*/*.md"))` · `! existing-specs {doc_count: n, archived_at: 이름의 시각}` (3b)
    - if `archives and import_existing` → 가장 최근 것을 `origin`으로 옮긴다(되살림, 3b2)
    - else → `git.init_bare(origin)`(새로 만듦)
@@ -73,7 +73,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 6. if `has and not import_existing` → `n = len(git.list(workdir, "docs/specs/*/*.md"))`, workdir 삭제, `! existing-specs {doc_count: n}` (3a)
 7. **트랜잭션**: `DB: projects insert (code, name, owner_user_id=user.id)` — **등록하는 사람이 소유자다**([[SYNC-PRD-001#R12]]). 바뀌지 않고 나뉘지 않는다 · `DB: repositories insert (project_id, storage, remote_url, workdir_path, last_processed_commit=None, registered_by_user_id=user.id)` — push 토큰의 주인(서버 저장은 등록한 사람을 적을 뿐). 지금은 소유자와 같은 사람이지만 뜻이 다르다(DOM-003 `repositories`)
 8. if `has and import_existing` → `pipeline.rebuild(code)` (3a2. 락·트랜잭션은 그쪽) · `last_processed_commit`은 rebuild가 채움
-9. else → `files = git.init_specs(workdir)` (11단계 + `STD/` 디렉터리, `_templates/` 12개, `assets/`) · `hash = git.commit_push(workdir, message=f"chore({code}): init syncdoc", author=Author(human, user, None, web), files=files)` · if 실패 → 7단계 롤백, workdir 삭제, 서버 저장이면 되돌림, `! push-failed` (4a) · `DB: repositories update last_processed_commit=hash`
+9. else → `files = git.init_specs(workdir)` (11단계 + `STD/` 디렉터리의 `.gitkeep`, `assets/`, `README.md` — 14파일, 템플릿·규약 사본은 넣지 않는다(카드 AB)) · `hash = git.commit_push(workdir, message=f"chore({code}): init syncdoc", author=Author(human, user, None, mcp), files=files)` · if 실패 → 7단계 롤백, workdir 삭제, 서버 저장이면 되돌림, `! push-failed` (4a) · `DB: repositories update last_processed_commit=hash`
 9a. (GitHub 저장) `ensure_hook(code, user)` — push 통지를 건다([[#ProjectService.ensure_hook]], UC-A1 4). **실패해도 등록을 깨지 않는다**(4a) — 통지는 빠르게 하려는 수단이고, 못 걸어도 주기 확인(UC-G1 1b)이 메운다. 사유는 `repositories.hook_error`에 남아 화면이 말한다. `ensure_hook`이 상태로 돌려주지 않는 실패(연결 끊김 따위)도 여기서 삼키고 그 사유를 `hook_error`에 적는다. 가져오기(8)와 서버 저장은 부르지 않는다
 10. `→ Project`. **`ProjectSummary`는 입구(MCP 도구·라우터)가 `queries.project_summary()`로 만든다** — 서비스가 `queries`를 부르면 순환이다(클래스 3.2에 PS→QR 없음). 신규면 11칸 null
 
@@ -85,7 +85,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** `AccountService.github_token_for` · [[SYNC-MS-009#github.create_repo]] · [[SYNC-MS-009#git.clone]] [[SYNC-MS-009#git.exists]] [[SYNC-MS-009#git.list]] [[SYNC-MS-009#git.init_specs]] [[SYNC-MS-009#git.commit_push]] [[SYNC-MS-009#git.init_bare]] · [[SYNC-MS-007#pipeline.rebuild]] · [[#ProjectService.ensure_hook]]
 
-**테스트 관점** **서버 저장 → `ORIGINS_DIR/{code}.git`이 생기고(HEAD main) 골격 커밋 하나, GitHub을 안 부르고 토큰 없는 사람도 된다** · 켜지 않은 방식 → `storage-unavailable`, 아무것도 안 생김 · GitHub인데 주소 없음 → `invalid-request` · **보관본 있음 + 가져오기 아님 → `existing-specs`(`archived_at`), 아무것도 안 바뀜** · 가져오기 → 되살리고 재구축 버전 · 보관본 둘 → 가장 최근 것 · 서버 저장 등록 실패 → 새 원본은 지워지고 되살린 것은 보관으로 돌아간다 · 이름 없이 남은 원본 → 보관으로 옮기고 `existing-specs` · **GitHub 저장 새 등록 → 통지가 걸린다(`hook_id`)**(#242) · **통지 걸기가 실패해도 프로젝트는 등록된다**(hook_error에 사유 — GitHub가 거절해도, 연결이 끊겨도) · 가져오기·서버 저장은 통지를 부르지 않는다 · 빈 저장소 → `docs/specs/` 생김, 커밋 하나, 11칸 null · **`owner_user_id`가 등록한 사람** · `docs/specs/` 있는 저장소 → `existing-specs`, workdir 없음, DB 행 없음 · `import_existing=true` → 재구축 결과 · clone 권한 없음 → `push-failed`, 아무것도 안 남음 · **없는 저장소 + `create_repo=false` → `push-failed`**(지금 동작) · **없는 저장소 + `true` → 저장소가 생기고 골격 커밋까지** · `private=False` → 공개로, `private=True` → 비공개로 만든다 · **`private`를 빼면 설정값(기본 비공개)**(카드 BS) · **이미 있는 저장소 + `true` → 만들지 않고 그대로 쓴다** · 만든 뒤 등록이 실패해도 **저장소는 남는다**
+**테스트 관점** **서버 저장 → `ORIGINS_DIR/{code}.git`이 생기고(HEAD main) 골격 커밋 하나, GitHub을 안 부르고 토큰 없는 사람도 된다** · 켜지 않은 방식 → `storage-unavailable`, 아무것도 안 생김 · GitHub인데 주소 없음 → `invalid-request` · **보관본 있음 + 가져오기 아님 → `existing-specs`(`archived_at`), 아무것도 안 바뀜** · 가져오기 → 되살리고 재구축 버전 · 보관본 둘 → 가장 최근 것 · **같은 초에 둘(`…-1.git`) → 번호가 큰 것이 가장 최근**(#349) · 서버 저장 등록 실패 → 새 원본은 지워지고 되살린 것은 보관으로 돌아간다 · 이름 없이 남은 원본 → 보관으로 옮기고 `existing-specs` · **GitHub 저장 새 등록 → 통지가 걸린다(`hook_id`)**(#242) · **통지 걸기가 실패해도 프로젝트는 등록된다**(hook_error에 사유 — GitHub가 거절해도, 연결이 끊겨도) · 가져오기·서버 저장은 통지를 부르지 않는다 · 빈 저장소 → `docs/specs/` 생김, 커밋 하나, 11칸 null · **`owner_user_id`가 등록한 사람** · `docs/specs/` 있는 저장소 → `existing-specs`, workdir 없음, DB 행 없음 · `import_existing=true` → 재구축 결과 · clone 권한 없음 → `push-failed`, 아무것도 안 남음 · **없는 저장소 + `create_repo=false` → `push-failed`**(지금 동작) · **없는 저장소 + `true` → 저장소가 생기고 골격 커밋까지** · `private=False` → 공개로, `private=True` → 비공개로 만든다 · **`private`를 빼면 설정값(기본 비공개)**(카드 BS) · **이미 있는 저장소 + `true` → 만들지 않고 그대로 쓴다** · 만든 뒤 등록이 실패해도 **저장소는 남는다**
 
 ---
 
