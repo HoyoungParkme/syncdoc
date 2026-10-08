@@ -776,6 +776,7 @@ impl SpecService<'_> {
                 Ok(DocumentSummary {
                     id: r.id,
                     stage: stage_of(&r.doc_type),
+                    author: None,
                     last_author: latest.get(&r.id).map(|v| AuthorRef {
                         kind: v.author_kind.clone(),
                         user_id: v.author_user_id,

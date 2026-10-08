@@ -1,11 +1,13 @@
 //! 열거형·DTO — SYNC-DOM-002 2.7·2.8 그대로 (Rust는 `syncdoc_core::types`).
 //! 직렬화 이름(JSON 키·열거형 값)도 파이썬 판과 같다.
 
+use std::fmt;
+
 use indexmap::IndexMap;
 use serde::Serialize;
 use time::OffsetDateTime;
 
-use crate::account::model::AccessTokenRow;
+use crate::account::model::{AccessTokenRow, UserRow};
 
 /// 문서 타입 — 11단계 코드와 `STD` (SYNC-STD-001 1.1)
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
@@ -145,6 +147,17 @@ pub struct Warning {
     pub message: String,
 }
 
+/// 파이썬 `str(Warning)` — `rule: message`, message가 비면 `rule`
+impl fmt::Display for Warning {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.message.is_empty() {
+            write!(f, "{}", self.rule)
+        } else {
+            write!(f, "{}: {}", self.rule, self.message)
+        }
+    }
+}
+
 /// 규약 검증 결과 — 위반이 비면 통과 (DOM-002 2.8 `ValidateResult`)
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct ValidateResult {
@@ -249,6 +262,48 @@ pub fn stage_of(doc_type: &str) -> Option<i32> {
         .map(|i| i as i32 + 1)
 }
 
+/// 작성 주체의 종류 (DOM-002 2.7 `AuthorKind`)
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AuthorKind {
+    Human,
+    Agent,
+}
+
+impl AuthorKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AuthorKind::Human => "human",
+            AuthorKind::Agent => "agent",
+        }
+    }
+}
+
+/// 쓰는 사람 (DOM-002 2.8 `Author`) — 에이전트는 `agent`·발급자·발급자·`mcp` (SEQ-C2)
+#[derive(Clone, Debug)]
+pub struct Author {
+    pub kind: AuthorKind,
+    pub user: UserRow,
+    pub instructed_by: Option<UserRow>,
+    pub via: Entry,
+}
+
+/// 입구 → `versions.via` — `web_revert`·`web_status`는 `web`으로 접는다 (파이썬 `fold_via`)
+pub fn fold_via(entry: Entry) -> &'static str {
+    match entry {
+        Entry::WebRevert | Entry::WebStatus => "web",
+        other => other.as_str(),
+    }
+}
+
+/// 타입 → 저장소 디렉터리 `{NN-TYPE}` — 단계 밖(`STD`)은 번호 없이 (파이썬 `spec_dir`, STD-001 1.1)
+pub fn spec_dir(doc_type: &str) -> String {
+    match stage_of(doc_type) {
+        Some(n) => format!("{n:02}-{doc_type}"),
+        None => doc_type.to_string(),
+    }
+}
+
 /// 작성자 — id만(이름은 읽기 조합이 붙인다) (DOM-002 2.8 `AuthorRef`)
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct AuthorRef {
@@ -258,7 +313,24 @@ pub struct AuthorRef {
     pub via: String,
 }
 
-/// 문서 요약 (API-001 `DocumentSummary`) — `counts`는 읽기 조합이 채운다
+/// 사용자 표시 정보 (API-001 `UserRef`)
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct UserRef {
+    pub id: i32,
+    pub github_login: String,
+    pub display_name: String,
+}
+
+/// 이름 붙은 작성자 (API-001 `Author`) — 읽기 조합이 `AuthorRef`를 `users_by_ids`로 채운 것
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ApiAuthor {
+    pub kind: String,
+    pub user: Option<UserRef>,
+    pub instructed_by: Option<UserRef>,
+    pub via: String,
+}
+
+/// 문서 요약 (API-001 `DocumentSummary`) — `counts`·`author`는 읽기 조합이 채운다
 #[derive(Clone, Debug, PartialEq)]
 pub struct DocumentSummary {
     pub id: i32,
@@ -271,8 +343,113 @@ pub struct DocumentSummary {
     pub incomplete_warnings: Vec<String>,
     pub updated_at: OffsetDateTime,
     pub last_author: Option<AuthorRef>,
+    pub author: Option<ApiAuthor>,
     pub counts: IndexMap<String, i64>,
     pub trashed_at: Option<OffsetDateTime>,
+}
+
+/// 문서의 항목 하나 (API-001 `Document.items[]`) — `missing_refs`는 읽기 조합이 채운다
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DocItem {
+    pub pk: i32,
+    pub item_id: String,
+    pub display_name: Option<String>,
+    pub missing_refs: Vec<String>,
+}
+
+/// 문서 (API-001 `Document`) — 요약 + 본문·해시·항목. 이웃·미존재 참조·프로젝트 이름은 `queries.document_view`가 붙인다
+#[derive(Clone, Debug, PartialEq)]
+pub struct Document {
+    pub summary: DocumentSummary,
+    pub body: String,
+    pub commit_hash: Option<String>,
+    pub current_version_id: Option<i32>,
+    pub missing_refs: Vec<String>,
+    pub convention_error_detail: Option<String>,
+    pub items: Vec<DocItem>,
+    pub prev_doc_id: Option<String>,
+    pub next_doc_id: Option<String>,
+    pub project_name: String,
+}
+
+/// 항목 블록 조회 (API-002 `get_item`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ItemView {
+    pub pk: i32,
+    pub doc_id: String,
+    pub item_id: String,
+    pub display_name: Option<String>,
+    pub body: String,
+    pub doc_status: String,
+    pub doc_version_no: i32,
+}
+
+/// 참조 대상 표시 (API-001 `ItemRef`) — 문서 전체 참조면 `item_id`가 없다. `is_deleted`·`deleted_at`은 안쪽 것
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ItemRef {
+    pub doc_id: Option<String>,
+    pub item_id: Option<String>,
+    pub display_name: Option<String>,
+    pub raw_target: String,
+    pub is_missing: bool,
+    pub is_deleted: bool,
+    pub deleted_at: Option<OffsetDateTime>,
+}
+
+/// 문서 pk → 표시 정보 (DOM-002 2.8 `DocRef`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DocRef {
+    pub document_id: i32,
+    pub doc_id: String,
+    pub title: String,
+    pub stage: Option<i32>,
+    pub status: String,
+}
+
+/// 항목의 상위·하위 참조 (API-002 `get_references`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ItemReferences {
+    pub doc_id: String,
+    pub item_id: String,
+    pub upstream: Vec<ItemRef>,
+    pub downstream: Vec<ItemRef>,
+}
+
+/// 참조 간선 — pk만 (DOM-002 2.8 `RefEdge`). 파이썬 `_edge`와 같은 꼴
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RefEdge {
+    pub from_item_pk: Option<i32>,
+    pub to_item_pk: Option<i32>,
+    pub to_document_id: Option<i32>,
+    pub raw_target: String,
+    pub is_missing: bool,
+    pub from_document_id: i32,
+}
+
+/// 참조 추출 결과 (DOM-002 2.8 `ExtractResult`)
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ExtractResult {
+    pub added: i64,
+    pub removed: i64,
+    pub missing: i64,
+}
+
+/// 저장 결과 (API-002 `create_document`·`update_document`) — `next_step`은 `mcp`만
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SaveResult {
+    pub doc_id: String,
+    pub version_no: i32,
+    pub commit_hash: String,
+    pub status: String,
+    pub warnings: Vec<String>,
+    pub next_step: Option<String>,
+}
+
+/// 하위 참조가 있는 지운 항목 — `item-deletion-needs-confirm`의 한 칸. 하위는 출발 항목의 이름으로
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DeletedItem {
+    pub item_id: String,
+    pub downstream: Vec<ItemRef>,
 }
 
 /// 단계 한 칸 (API-001 `StageSummary`)
@@ -337,6 +514,24 @@ pub fn py_isoformat(t: OffsetDateTime) -> String {
 mod tests {
     use super::*;
     use time::macros::datetime;
+
+    #[test]
+    fn warning_text_and_spec_dir_like_python() {
+        let w = |r: &str, m: &str| Warning {
+            rule: r.into(),
+            message: m.into(),
+        };
+        assert_eq!(
+            w("section.missing", "1. 목적").to_string(),
+            "section.missing: 1. 목적"
+        );
+        assert_eq!(w("item.none", "").to_string(), "item.none");
+        assert_eq!(spec_dir("DOM"), "06-DOM");
+        assert_eq!(spec_dir("CODE"), "11-CODE");
+        assert_eq!(spec_dir("STD"), "STD");
+        assert_eq!(fold_via(Entry::WebStatus), "web");
+        assert_eq!(fold_via(Entry::Mcp), "mcp");
+    }
 
     #[test]
     fn iso_utc_like_pydantic() {

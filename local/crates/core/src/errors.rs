@@ -4,7 +4,7 @@
 use serde_json::Value;
 use thiserror::Error;
 
-use crate::types::{Violation, Warning};
+use crate::types::{DeletedItem, Violation, Warning};
 
 /// `internal`의 본문 — 고정 문구. 예외 종류·메시지는 로그로만 (API-001 2장)
 pub const INTERNAL_DETAIL: &str = "서버에서 처리하지 못한 오류입니다. 로그를 확인하세요.";
@@ -22,6 +22,16 @@ pub enum Problem {
     /// `not-found` — 없는 자원·없는 경로. `id`는 문자열이거나 정수다(파이썬 판이 받은 그대로)
     #[error("{resource} {} 없음", id_text(.id))]
     NotFound { resource: String, id: Value },
+    /// `not-found` — 없는 항목. 그 문서의 지우지 않은 항목 ID를 함께 (파이썬 `NotFound(…, available_items=…)`)
+    #[error("{resource} {id} 없음")]
+    NotFoundWithItems {
+        resource: String,
+        id: String,
+        available_items: Vec<String>,
+    },
+    /// `item-deleted` — 지운 항목. 시각은 파이썬 `isoformat()`, 없으면 null
+    #[error("삭제된 항목")]
+    ItemDeleted { deleted_at: Option<String> },
     /// `method-not-allowed` — 그 경로에 없는 메서드
     #[error("이 경로에 {method} 메서드는 없습니다")]
     MethodNotAllowed { method: String, allow: Vec<String> },
@@ -40,6 +50,21 @@ pub enum Problem {
         violations: Vec<Violation>,
         warnings: Vec<Warning>,
     },
+    /// `version-conflict` — 기대한 판이 현재 판이 아니다. 현재 판과 본문을 함께
+    #[error("버전 불일치")]
+    VersionConflict {
+        current_version: i32,
+        current_body: String,
+    },
+    /// `item-deletion-needs-confirm` — 지우는 항목에 하위 참조가 있다. 하위는 이름으로 (#50)
+    #[error("항목 삭제에 하위 참조가 있음")]
+    ItemDeletionNeedsConfirm { deleted_items: Vec<DeletedItem> },
+    /// `precondition-unmet` — DOM 셋의 순서 (STD-001 2.6)
+    #[error("먼저 있어야 한다: {requires}")]
+    PreconditionUnmet { requires: String, have: Vec<String> },
+    /// `document-trashed` — 휴지통에 있는 문서. 시각은 파이썬 `isoformat()` (UC-A7 1a)
+    #[error("휴지통에 있는 문서")]
+    DocumentTrashed { trashed_at: String },
     /// `storage-unavailable` — 이 서버에서 켜지 않은 저장 방식 (UC-A1 1a)
     #[error("이 서버에서 켜지 않은 저장 방식 {storage}")]
     StorageUnavailable {
@@ -77,7 +102,12 @@ impl Problem {
     pub fn kind(&self) -> Option<&'static str> {
         match self {
             Problem::Blank { .. } => None,
-            Problem::NotFound { .. } => Some("not-found"),
+            Problem::NotFound { .. } | Problem::NotFoundWithItems { .. } => Some("not-found"),
+            Problem::ItemDeleted { .. } => Some("item-deleted"),
+            Problem::VersionConflict { .. } => Some("version-conflict"),
+            Problem::ItemDeletionNeedsConfirm { .. } => Some("item-deletion-needs-confirm"),
+            Problem::PreconditionUnmet { .. } => Some("precondition-unmet"),
+            Problem::DocumentTrashed { .. } => Some("document-trashed"),
             Problem::MethodNotAllowed { .. } => Some("method-not-allowed"),
             Problem::ForbiddenOrigin { .. } => Some("forbidden-origin"),
             Problem::InvalidRequest { .. } => Some("invalid-request"),
@@ -95,7 +125,12 @@ impl Problem {
     pub fn status(&self) -> u16 {
         match self {
             Problem::Blank { status, .. } => *status,
-            Problem::NotFound { .. } => 404,
+            Problem::NotFound { .. } | Problem::NotFoundWithItems { .. } => 404,
+            Problem::ItemDeleted { .. } => 410,
+            Problem::VersionConflict { .. }
+            | Problem::ItemDeletionNeedsConfirm { .. }
+            | Problem::DocumentTrashed { .. } => 409,
+            Problem::PreconditionUnmet { .. } => 422,
             Problem::MethodNotAllowed { .. } => 405,
             Problem::ForbiddenOrigin { .. } => 403,
             Problem::InvalidRequest { .. } => 422,
@@ -132,6 +167,69 @@ impl Problem {
                 ("resource", Value::from(resource.as_str())),
                 ("id", id.clone()),
             ],
+            Problem::NotFoundWithItems {
+                resource,
+                id,
+                available_items,
+            } => vec![
+                ("resource", Value::from(resource.as_str())),
+                ("id", Value::from(id.as_str())),
+                ("available_items", Value::from(available_items.clone())),
+            ],
+            Problem::ItemDeleted { deleted_at } => {
+                vec![("deleted_at", Value::from(deleted_at.clone()))]
+            }
+            Problem::VersionConflict {
+                current_version,
+                current_body,
+            } => vec![
+                ("current_version", Value::from(*current_version)),
+                ("current_body", Value::from(current_body.as_str())),
+            ],
+            Problem::ItemDeletionNeedsConfirm { deleted_items } => vec![(
+                "deleted_items",
+                Value::from(
+                    deleted_items
+                        .iter()
+                        .map(|d| {
+                            let mut m = serde_json::Map::new();
+                            m.insert("item_id".into(), Value::from(d.item_id.as_str()));
+                            m.insert(
+                                "downstream".into(),
+                                Value::from(
+                                    d.downstream
+                                        .iter()
+                                        .map(|r| {
+                                            let mut x = serde_json::Map::new();
+                                            x.insert(
+                                                "doc_id".into(),
+                                                Value::from(r.doc_id.clone()),
+                                            );
+                                            x.insert(
+                                                "item_id".into(),
+                                                Value::from(r.item_id.clone()),
+                                            );
+                                            x.insert(
+                                                "display_name".into(),
+                                                Value::from(r.display_name.clone()),
+                                            );
+                                            Value::Object(x)
+                                        })
+                                        .collect::<Vec<_>>(),
+                                ),
+                            );
+                            Value::Object(m)
+                        })
+                        .collect::<Vec<_>>(),
+                ),
+            )],
+            Problem::PreconditionUnmet { requires, have } => vec![
+                ("requires", Value::from(requires.as_str())),
+                ("have", Value::from(have.clone())),
+            ],
+            Problem::DocumentTrashed { trashed_at } => {
+                vec![("trashed_at", Value::from(trashed_at.as_str()))]
+            }
             Problem::MethodNotAllowed { allow, .. } => vec![("allow", Value::from(allow.clone()))],
             Problem::ForbiddenOrigin { host, origin } => match (host, origin) {
                 (Some(h), _) => vec![("host", Value::from(h.as_str()))],
