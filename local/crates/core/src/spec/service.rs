@@ -19,7 +19,7 @@ use crate::pycompat::re::compile;
 use crate::pycompat::repr::repr;
 use crate::types::{
     AuthorRef, Diff, DiffLine, DiffOp, DocItem, DocStatus, DocType, Document, DocumentSummary,
-    Entry, Hunk, ItemBlock, ValidateResult, Violation, Warning, stage_of,
+    Entry, Hunk, ItemBlock, ItemView, ValidateResult, Violation, Warning, py_isoformat, stage_of,
 };
 
 /// 이력 diff의 앞뒤 줄 수 — 파이썬 `DIFF_CONTEXT_LINES`
@@ -344,6 +344,11 @@ fn summary_of(r: &DocumentRow, latest: Option<&VersionRow>) -> Result<DocumentSu
         counts: Default::default(),
         trashed_at: r.trashed_at,
     })
+}
+
+/// 타입 문자열로 항목 블록 — 모르는 타입이면 없다(파이썬 `patterns_for`가 패턴을 못 준다)
+fn blocks_of(body: &str, doc_type: &str, title: Option<&str>) -> Vec<ItemBlock> {
+    DocType::parse(doc_type).map_or_else(Vec::new, |t| SpecService::item_blocks(body, t, title))
 }
 
 fn not_found(resource: &str, id: &str) -> Problem {
@@ -915,5 +920,40 @@ impl SpecService<'_> {
             .collect();
         have.sort();
         Ok(Some((requires.to_string(), have)))
+    }
+
+    /// SYNC-MS-014#SpecService.get_item
+    ///
+    /// `~`는 `/`로 — 경로에 `/`를 못 싣는 항목 ID(`GET/api/me`)를 MCP·웹이 그렇게 보낸다
+    pub async fn get_item(&mut self, doc_id: &str, item_id: &str) -> Result<ItemView, Problem> {
+        let document = self.get_document(doc_id).await?;
+        let item_id = item_id.replace('~', "/");
+        let Some(item) = repo::item_of(&mut *self.db, document.summary.id, &item_id).await? else {
+            return Err(Problem::NotFoundWithItems {
+                resource: "item".to_string(),
+                id: format!("{doc_id}#{item_id}"),
+                available_items: document.items.iter().map(|i| i.item_id.clone()).collect(),
+            });
+        };
+        if item.is_deleted {
+            return Err(Problem::ItemDeleted {
+                deleted_at: item.deleted_at.map(py_isoformat),
+            });
+        }
+        let block = blocks_of(&document.body, &document.summary.doc_type, None)
+            .into_iter()
+            .find(|b| b.item_id == item_id)
+            .ok_or_else(|| Problem::Internal {
+                log: format!("{doc_id}#{item_id} 행은 있는데 본문에 블록이 없다"),
+            })?;
+        Ok(ItemView {
+            pk: item.id,
+            doc_id: doc_id.to_string(),
+            item_id,
+            display_name: item.display_name,
+            body: block.text,
+            doc_status: document.summary.status,
+            doc_version_no: document.summary.current_version_no,
+        })
     }
 }
