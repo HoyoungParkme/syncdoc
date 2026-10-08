@@ -491,6 +491,28 @@ async def test_exists_is_committed_not_workdir(repos: dict[str, Path]) -> None:
     assert await g.exists(repos["work"], "docs/specs/04-UC/x.md") is False
 
 
+async def test_exists_empty_repo_false_in_any_locale_and_raises_outside_repo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """빈 저장소는 False — git이 영어로 말하지 않아도. 저장소가 아니면 GitError (#349)."""
+    empty = tmp_path / "empty"
+    subprocess.run(["git", "init", "-q", str(empty)], check=True)
+    monkeypatch.setenv("LANGUAGE", "ko")
+    monkeypatch.setenv("LC_ALL", "ko_KR.UTF-8")
+    assert await g.exists(empty, "docs/specs") is False
+    (tmp_path / "plain").mkdir()
+    with pytest.raises(g.GitError):
+        await g.exists(tmp_path / "plain", "docs/specs")
+
+
+async def test_list_keeps_korean_paths_unquoted(repos: dict[str, Path]) -> None:
+    """한글 이름 문서도 센다 — quotepath 기본값이면 따옴표·8진수로 나와 glob에 안 걸린다 (#349)."""
+    await g.commit_push(
+        repos["work"], "spec: 한글", _author(), files={"docs/specs/02-PRD/한글-문서.md": "x\n"}
+    )
+    assert "docs/specs/02-PRD/한글-문서.md" in await g.list(repos["work"], "docs/specs/*/*.md")
+
+
 # ── init_specs ──
 async def test_init_specs_returns_14_files_without_template_copies(
     repos: dict[str, Path],

@@ -137,16 +137,20 @@ async def test_init_github_registers_the_push_hook_after_the_skeleton(
     user = make_user(db_session, login="hoyoung")
     bare = _empty_bare(repos_dir, "hooked")
     calls = mock_github(
-        lambda req: httpx.Response(200, json=[])
-        if req.method == "GET"
-        else httpx.Response(201, json={"id": 77})
+        lambda req: (
+            httpx.Response(200, json=[])
+            if req.method == "GET"
+            else httpx.Response(201, json={"id": 77})
+        )
     )
     project = await ProjectService(db_session).init_project(str(bare), "HOOK", "통지", user)
     repo = project.repository
     assert (repo.hook_id, repo.hook_error) == (77, None)
     assert repo.last_processed_commit == g(bare, "rev-parse", "main")  # 등록은 그대로
     post = next(c for c in calls if c.method == "POST")
-    assert post.url.path == f"/repos/{repos_dir.parent.name}/hooked/hooks"  # 주소에서 뜬 소유자·이름
+    assert (
+        post.url.path == f"/repos/{repos_dir.parent.name}/hooked/hooks"
+    )  # 주소에서 뜬 소유자·이름
     assert json.loads(post.content)["config"]["url"] == hook_env
 
 
@@ -182,7 +186,9 @@ async def test_init_import_and_server_storage_do_not_call_github_for_a_hook(
     await ProjectService(db_session).init_project(
         str(repos["remote"]), "IMPT", "가져오기", user, import_existing=True
     )
-    await ProjectService(db_session).init_project(None, "SRVH", "서버", user, storage=Storage.server)
+    await ProjectService(db_session).init_project(
+        None, "SRVH", "서버", user, storage=Storage.server
+    )
     assert calls == []
 
 
@@ -466,9 +472,11 @@ async def test_ensure_hook_records_error_and_then_succeeds(
     assert (await ps.repo_status(user))[0].hook == "error"
 
     mock_github(
-        lambda req: httpx.Response(200, json=[])
-        if req.method == "GET"
-        else httpx.Response(201, json={"id": 9})
+        lambda req: (
+            httpx.Response(200, json=[])
+            if req.method == "GET"
+            else httpx.Response(201, json={"id": 9})
+        )
     )
     r2 = await ps.ensure_hook("EXMP", user)
     assert (r2.hook, r2.hook_error, r2.created) == ("ok", None, True)
@@ -545,7 +553,9 @@ async def test_init_rejects_storage_the_server_did_not_turn_on(
     monkeypatch.setattr(settings, "STORAGE_MODES", "github")
     user = make_user(db_session, login="u")
     with pytest.raises(StorageUnavailable) as ei:
-        await ProjectService(db_session).init_project(None, "SRV", "x", user, storage=Storage.server)
+        await ProjectService(db_session).init_project(
+            None, "SRV", "x", user, storage=Storage.server
+        )
     assert ei.value.extra == {"storage": "server", "enabled": ["github"]}
     assert not (origins_dir / "SRV.git").exists()
     assert not ProjectService(db_session).repo.exists("SRV")
@@ -609,7 +619,9 @@ async def test_unregistered_leftover_origin_is_archived_not_deleted(
     g(origins_dir, "init", "-q", "--bare", "-b", "main", str(leftover))
     user = make_user(db_session, login="u")
     with pytest.raises(ExistingSpecs) as ei:
-        await ProjectService(db_session).init_project(None, "OLD", "x", user, storage=Storage.server)
+        await ProjectService(db_session).init_project(
+            None, "OLD", "x", user, storage=Storage.server
+        )
     assert ei.value.extra["doc_count"] == 0  # 커밋이 없는 원본
     assert not leftover.exists()
     assert len(list((origins_dir / "_archive").glob("OLD-*.git"))) == 1
@@ -693,6 +705,29 @@ async def test_server_origin_only_for_the_owner_of_a_server_project(
     await svc.init_project(str(repos["remote"]), "GH", "깃허브", gh, import_existing=True)
     with pytest.raises(NotFound):
         svc.server_origin("GH", gh)  # GitHub 저장에는 git 입구가 없다
+
+
+def test_archives_same_second_newest_is_the_numbered_one(origins_dir: Path) -> None:
+    """MS-001 3s — 같은 초의 `…-1.git`은 `….git`보다 새것이다. 이름 문자열 순이면 거꾸로다 (#349)."""
+    from app.core.project.service import _archives
+
+    d = origins_dir / "_archive"
+    d.mkdir()
+    for name in [
+        "ARC-20261008120000.git",
+        "ARC-20261008120000-1.git",
+        "ARC-20261008115959.git",
+        "ARC-20261008120000-10.git",
+        "ARC-20261008120000-2.git",
+    ]:
+        (d / name).mkdir()
+    assert [p.name for p in _archives("ARC")] == [
+        "ARC-20261008115959.git",
+        "ARC-20261008120000.git",
+        "ARC-20261008120000-1.git",
+        "ARC-20261008120000-2.git",
+        "ARC-20261008120000-10.git",
+    ]
 
 
 def test_archive_origin_moves_to_archive_without_name_clash(
