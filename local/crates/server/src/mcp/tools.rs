@@ -17,7 +17,9 @@ use syncdoc_core::pycompat::chars::strip;
 use syncdoc_core::pycompat::re::compile;
 use syncdoc_core::queries;
 use syncdoc_core::spec::{SUBTYPES, TYPES};
-use syncdoc_core::types::{DocumentSummary, ProjectSummary, STAGES, Storage, py_isoformat};
+use syncdoc_core::types::{
+    DocumentSummary, ItemRef, ProjectSummary, STAGES, Storage, py_isoformat,
+};
 
 use crate::compat::pydantic::{Failure, Opts};
 use crate::compat::pyjson::{self, Depth};
@@ -79,6 +81,7 @@ pub async fn call(
         "list_documents" => list_documents(state, user, &typed).await,
         "get_document" => get_document(state, user, &typed).await,
         "get_item" => get_item(state, user, &typed).await,
+        "get_references" => get_references(state, user, &typed).await,
         _ => Err(Problem::NotImplemented {
             card: tool.card.to_string(),
         }),
@@ -219,6 +222,38 @@ async fn get_item(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value
         "doc_status": v.doc_status,
         "doc_version_no": v.doc_version_no,
         "body": v.body,
+    }))
+}
+
+/// SYNC-API-002#get_references
+async fn get_references(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let mut c = state.pool.acquire().await?;
+    let r = queries::item_references_view(
+        &mut c,
+        &state.repos,
+        &arg_str(a, "doc_id"),
+        &arg_str(a, "item_id"),
+        user,
+    )
+    .await?;
+    let refs = |xs: &[ItemRef]| -> Vec<Value> {
+        xs.iter()
+            .map(|x| {
+                json!({
+                    "doc_id": x.doc_id,
+                    "item_id": x.item_id,
+                    "display_name": x.display_name,
+                    "raw_target": x.raw_target,
+                    "is_missing": x.is_missing,
+                })
+            })
+            .collect()
+    };
+    Ok(json!({
+        "doc_id": r.doc_id,
+        "item_id": r.item_id,
+        "upstream": refs(&r.upstream),
+        "downstream": refs(&r.downstream),
     }))
 }
 
