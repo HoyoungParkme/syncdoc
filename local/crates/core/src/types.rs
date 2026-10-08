@@ -1,9 +1,198 @@
 //! 열거형·DTO — SYNC-DOM-002 2.7·2.8 그대로 (Rust는 `syncdoc_core::types`).
 //! 직렬화 이름(JSON 키·열거형 값)도 파이썬 판과 같다.
 
+use serde::Serialize;
 use time::OffsetDateTime;
 
 use crate::account::model::AccessTokenRow;
+
+/// 문서 타입 — 11단계 코드와 `STD` (SYNC-STD-001 1.1)
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+pub enum DocType {
+    #[serde(rename = "RFQ")]
+    Rfq,
+    #[serde(rename = "PRD")]
+    Prd,
+    #[serde(rename = "SCN")]
+    Scn,
+    #[serde(rename = "UC")]
+    Uc,
+    #[serde(rename = "INFRA")]
+    Infra,
+    #[serde(rename = "DOM")]
+    Dom,
+    #[serde(rename = "UI")]
+    Ui,
+    #[serde(rename = "API")]
+    Api,
+    #[serde(rename = "SEQ")]
+    Seq,
+    #[serde(rename = "MS")]
+    Ms,
+    #[serde(rename = "CODE")]
+    Code,
+    #[serde(rename = "STD")]
+    Std,
+}
+
+impl DocType {
+    pub const ALL: [DocType; 12] = [
+        DocType::Rfq,
+        DocType::Prd,
+        DocType::Scn,
+        DocType::Uc,
+        DocType::Infra,
+        DocType::Dom,
+        DocType::Ui,
+        DocType::Api,
+        DocType::Seq,
+        DocType::Ms,
+        DocType::Code,
+        DocType::Std,
+    ];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DocType::Rfq => "RFQ",
+            DocType::Prd => "PRD",
+            DocType::Scn => "SCN",
+            DocType::Uc => "UC",
+            DocType::Infra => "INFRA",
+            DocType::Dom => "DOM",
+            DocType::Ui => "UI",
+            DocType::Api => "API",
+            DocType::Seq => "SEQ",
+            DocType::Ms => "MS",
+            DocType::Code => "CODE",
+            DocType::Std => "STD",
+        }
+    }
+
+    /// 글자 → 타입 — 없는 이름이면 None
+    pub fn parse(s: &str) -> Option<DocType> {
+        DocType::ALL.into_iter().find(|t| t.as_str() == s)
+    }
+}
+
+/// 문서 상태 — 둘뿐이다 (DOM-002 2.7, 라벨 「완료」는 approved)
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DocStatus {
+    Draft,
+    Approved,
+}
+
+impl DocStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DocStatus::Draft => "draft",
+            DocStatus::Approved => "approved",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<DocStatus> {
+        [DocStatus::Draft, DocStatus::Approved]
+            .into_iter()
+            .find(|t| t.as_str() == s)
+    }
+}
+
+/// 저장이 들어온 입구 (DOM-002 2.7 `Entry`) — 규약 검증이 입구마다 다르다
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Entry {
+    Mcp,
+    WebRevert,
+    WebStatus,
+    Github,
+}
+
+impl Entry {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Entry::Mcp => "mcp",
+            Entry::WebRevert => "web_revert",
+            Entry::WebStatus => "web_status",
+            Entry::Github => "github",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Entry> {
+        [
+            Entry::Mcp,
+            Entry::WebRevert,
+            Entry::WebStatus,
+            Entry::Github,
+        ]
+        .into_iter()
+        .find(|t| t.as_str() == s)
+    }
+}
+
+/// 규약 위반 — 저장을 막는다 (DOM-002 2.8 `Violation`)
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Violation {
+    pub line: usize,
+    pub rule: String,
+    pub message: String,
+}
+
+/// 미완성 경고 — 저장은 된다 (DOM-002 2.8 `Warning`)
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Warning {
+    pub rule: String,
+    pub message: String,
+}
+
+/// 규약 검증 결과 — 위반이 비면 통과 (DOM-002 2.8 `ValidateResult`)
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct ValidateResult {
+    pub violations: Vec<Violation>,
+    pub warnings: Vec<Warning>,
+}
+
+/// 항목 블록 — 줄은 1부터, 끝 포함. `text`는 원본 줄 (DOM-002 2.8 `ItemBlock`)
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ItemBlock {
+    pub item_id: String,
+    pub display_name: String,
+    pub level: usize,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub text: String,
+}
+
+/// diff 줄의 종류
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DiffOp {
+    Add,
+    Del,
+    Ctx,
+}
+
+/// diff 줄 (DOM-002 2.8 `DiffLine`)
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct DiffLine {
+    pub op: DiffOp,
+    pub text: String,
+}
+
+/// 항목 하나의 바뀐 줄들 — `item_id`가 None이면 항목 밖 글. `downstream_count`는 읽기 조합이 채운다
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Hunk {
+    pub item_id: Option<String>,
+    pub lines: Vec<DiffLine>,
+    pub downstream_count: i64,
+}
+
+/// 두 버전 diff (API-001 `Diff`)
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Diff {
+    pub from_version: i32,
+    pub to_version: i32,
+    pub hunks: Vec<Hunk>,
+}
 
 /// 사용자 종류 — `users.kind`. DB enum이 아니라 varchar + 앱 검증 (SYNC-DOM-003)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
