@@ -161,7 +161,7 @@ pub async fn validate(&mut self, body: &str, doc_type: DocType, entry: Entry, cu
 
 **예외** DB 오류 → `! Internal` · 규약 위반은 결과로 돌려준다
 
-**호출하는 것** [[#SpecService.check]]
+**호출하는 것** [[#markdown.parse_frontmatter]](본문의 `doc_id`) · [[#SpecService.check]]
 
 **테스트 관점** (시험 DB) 삭제된 `R15`를 다시 쓰면 `item.reused` · 같은 본문을 `web_revert`로 → 통과 · 문서가 `file.deleted:`·휴지통이면 통과 · 없는 문서·빈 `doc_id`는 삭제 집합이 비었다
 
