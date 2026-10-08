@@ -219,7 +219,10 @@ def server(request: pytest.FixtureRequest, _servers: dict) -> Server:
 
 @pytest.fixture
 def both(request: pytest.FixtureRequest, _servers: dict) -> tuple[Server, Server]:
-    """두 판 차이 시험 — 둘 다 띄울 때(`--target both`)만, Rust는 카드가 끝났거나 --with-card일 때만"""
+    """두 판 차이 시험 — 둘 다 띄울 때(`--target both`)만.
+
+    Rust는 카드가 끝났거나 --with-card일 때만 돈다.
+    """
     if request.config.getoption("--target") != "both":
         pytest.skip("두 판 차이 시험은 --target both에서만")
     if not _rust_allowed(request):

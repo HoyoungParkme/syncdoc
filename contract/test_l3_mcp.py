@@ -11,9 +11,10 @@ import json
 
 import httpx
 import pytest
-from conftest import token_for
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
+
+from conftest import token_for
 from snapshots import check
 from wire import request
 
@@ -41,7 +42,11 @@ def note(method: str, params=None) -> bytes:
     return json.dumps(msg).encode()
 
 
-INIT = {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "c", "version": "0"}}
+INIT = {
+    "protocolVersion": "2025-06-18",
+    "capabilities": {},
+    "clientInfo": {"name": "c", "version": "0"},
+}
 
 # (이름, 메서드, 머리, 본문[, 카드]) — 카드가 L3가 아니면 그 도구를 만드는 카드까지 Rust는 건너뛴다
 CASES: list[tuple] = [
@@ -51,20 +56,40 @@ CASES: list[tuple] = [
     ("auth_lowercase", "POST", [("Authorization", f"bearer {TOKEN}"), ACCEPT, JSON], rpc("ping")),
     ("auth_padded", "POST", [("Authorization", f"Bearer  \t{TOKEN} "), ACCEPT, JSON], rpc("ping")),
     ("auth_last_wins", "POST", [("Authorization", "Bearer nope"), AUTH, ACCEPT, JSON], rpc("ping")),
-    ("auth_first_ok_last_bad", "POST", [AUTH, ("Authorization", "Bearer nope"), ACCEPT, JSON], rpc("ping")),
+    (
+        "auth_first_ok_last_bad",
+        "POST",
+        [AUTH, ("Authorization", "Bearer nope"), ACCEPT, JSON],
+        rpc("ping"),
+    ),
     ("auth_get", "GET", [ACCEPT], b""),
     ("method_put", "PUT", STD, rpc("ping")),
     # 전송 — Content-Type·Accept·본문
     ("ct_missing", "POST", [AUTH, ACCEPT], rpc("ping")),
     ("ct_text", "POST", [AUTH, ACCEPT, ("Content-Type", "text/plain")], rpc("ping")),
     ("ct_upper", "POST", [AUTH, ACCEPT, ("Content-Type", "APPLICATION/JSON")], rpc("ping")),
-    ("ct_charset", "POST", [AUTH, ACCEPT, ("Content-Type", "application/json; charset=utf-8")], rpc("ping")),
-    ("ct_list", "POST", [AUTH, ACCEPT, ("Content-Type", "application/json, text/plain")], rpc("ping")),
+    (
+        "ct_charset",
+        "POST",
+        [AUTH, ACCEPT, ("Content-Type", "application/json; charset=utf-8")],
+        rpc("ping"),
+    ),
+    (
+        "ct_list",
+        "POST",
+        [AUTH, ACCEPT, ("Content-Type", "application/json, text/plain")],
+        rpc("ping"),
+    ),
     ("ct_suffix", "POST", [AUTH, ACCEPT, ("Content-Type", "application/jsonx")], rpc("ping")),
     ("accept_json_only", "POST", [AUTH, ("Accept", "application/json"), JSON], rpc("ping")),
     ("accept_sse_only", "POST", [AUTH, ("Accept", "text/event-stream"), JSON], rpc("ping")),
     ("accept_star", "POST", [AUTH, ("Accept", "*/*"), JSON], rpc("ping")),
-    ("accept_wild_q", "POST", [AUTH, ("Accept", "application/*;q=0.9, text/* ; q=0.1"), JSON], rpc("ping")),
+    (
+        "accept_wild_q",
+        "POST",
+        [AUTH, ("Accept", "application/*;q=0.9, text/* ; q=0.1"), JSON],
+        rpc("ping"),
+    ),
     ("accept_missing", "POST", [AUTH, JSON], rpc("ping")),
     ("body_empty", "POST", STD, b""),
     ("body_broken", "POST", STD, b'{"jsonrpc":'),
@@ -75,7 +100,12 @@ CASES: list[tuple] = [
     ("body_too_big_declared", "POST", [*STD, ("Content-Length", str(5 * 1024 * 1024))], b"{}"),
     ("delete", "DELETE", [AUTH], b""),
     ("get_no_sse", "GET", [AUTH, ("Accept", "application/json")], b""),
-    ("get_last_event_id", "GET", [AUTH, ("Accept", "text/event-stream"), ("Last-Event-ID", "7")], b""),
+    (
+        "get_last_event_id",
+        "GET",
+        [AUTH, ("Accept", "text/event-stream"), ("Last-Event-ID", "7")],
+        b"",
+    ),
     # 봉투
     ("env_bad_version", "POST", STD, b'{"jsonrpc":"1.0","id":1,"method":"ping"}'),
     ("env_id_float", "POST", STD, b'{"jsonrpc":"2.0","id":1.5,"method":"ping"}'),
@@ -86,7 +116,12 @@ CASES: list[tuple] = [
     ("env_method_int", "POST", STD, b'{"jsonrpc":"2.0","id":1,"method":3}'),
     ("env_params_list", "POST", STD, b'{"jsonrpc":"2.0","id":1,"method":"ping","params":[1]}'),
     ("env_nothing", "POST", STD, b'{"a":1}'),
-    ("env_long_values", "POST", STD, json.dumps({"jsonrpc": "2" * 80, "id": [1] * 40, "method": "x" * 60}).encode()),
+    (
+        "env_long_values",
+        "POST",
+        STD,
+        json.dumps({"jsonrpc": "2" * 80, "id": [1] * 40, "method": "x" * 60}).encode(),
+    ),
     ("note_initialized", "POST", STD, note("notifications/initialized")),
     ("note_unknown", "POST", STD, note("notifications/whatever", {"a": 1})),
     ("msg_response", "POST", STD, b'{"jsonrpc":"2.0","id":1,"result":{}}'),
@@ -94,14 +129,24 @@ CASES: list[tuple] = [
     # 메서드
     ("initialize", "POST", STD, rpc("initialize", INIT)),
     ("initialize_2024", "POST", STD, rpc("initialize", {**INIT, "protocolVersion": "2024-11-05"})),
-    ("initialize_future", "POST", STD, rpc("initialize", {**INIT, "protocolVersion": "2030-01-01"})),
+    (
+        "initialize_future",
+        "POST",
+        STD,
+        rpc("initialize", {**INIT, "protocolVersion": "2030-01-01"}),
+    ),
     ("initialize_no_params", "POST", STD, rpc("initialize")),
     ("initialize_bad", "POST", STD, rpc("initialize", {"protocolVersion": 1})),
     ("ping", "POST", STD, rpc("ping")),
     ("ping_meta_bad", "POST", STD, rpc("ping", {"_meta": 5})),
     ("tools_list", "POST", STD, rpc("tools/list")),
     ("tools_list_2024", "POST", [*STD, ("MCP-Protocol-Version", "2024-11-05")], rpc("tools/list")),
-    ("tools_list_2025_11", "POST", [*STD, ("MCP-Protocol-Version", "2025-11-25")], rpc("tools/list")),
+    (
+        "tools_list_2025_11",
+        "POST",
+        [*STD, ("MCP-Protocol-Version", "2025-11-25")],
+        rpc("tools/list"),
+    ),
     ("tools_list_bad_cursor", "POST", STD, rpc("tools/list", {"cursor": 5})),
     ("resources_list", "POST", STD, rpc("resources/list")),
     ("resources_templates", "POST", STD, rpc("resources/templates/list")),
@@ -111,7 +156,15 @@ CASES: list[tuple] = [
     ("prompts_list", "POST", STD, rpc("prompts/list")),
     ("prompts_get", "POST", STD, rpc("prompts/get", {"name": "p"})),
     ("prompts_get_bad_args", "POST", STD, rpc("prompts/get", {"name": "p", "arguments": {"a": 1}})),
-    ("complete", "POST", STD, rpc("completion/complete", {"ref": {"type": "ref/prompt", "name": "x"}, "argument": {"name": "a", "value": "b"}})),
+    (
+        "complete",
+        "POST",
+        STD,
+        rpc(
+            "completion/complete",
+            {"ref": {"type": "ref/prompt", "name": "x"}, "argument": {"name": "a", "value": "b"}},
+        ),
+    ),
     ("complete_bad", "POST", STD, rpc("completion/complete", {})),
     ("set_level", "POST", STD, rpc("logging/setLevel", {"level": "info"})),
     ("discover", "POST", STD, rpc("server/discover")),
@@ -121,15 +174,104 @@ CASES: list[tuple] = [
     ("call_no_params", "POST", STD, rpc("tools/call")),
     ("call_unknown_tool", "POST", STD, rpc("tools/call", {"name": "nope", "arguments": {}})),
     ("call_missing_args", "POST", STD, rpc("tools/call", {"name": "get_document"})),
-    ("call_bad_types", "POST", STD, rpc("tools/call", {"name": "list_documents", "arguments": {"project_code": 1, "stage": "x", "status": [1]}})),
-    ("call_pre_parse", "POST", STD, rpc("tools/call", {"name": "update_document", "arguments": {"doc_id": "a", "body": "b", "expected_version": "3", "message": "m", "changed_items": '["x", 1]'}})),
-    ("call_upload_bad", "POST", STD, rpc("tools/call", {"name": "upload_code", "arguments": {"project_code": "X", "files": [{"path": 1}], "message": "m"}})),
-    ("call_literal_bad", "POST", STD, rpc("tools/call", {"name": "change_status", "arguments": {"doc_id": "a", "to": "done"}})),
-    ("call_init_bad", "POST", STD, rpc("tools/call", {"name": "init_project", "arguments": {"storage": "s3", "code": "X"}})),
+    (
+        "call_bad_types",
+        "POST",
+        STD,
+        rpc(
+            "tools/call",
+            {
+                "name": "list_documents",
+                "arguments": {"project_code": 1, "stage": "x", "status": [1]},
+            },
+        ),
+    ),
+    (
+        "call_pre_parse",
+        "POST",
+        STD,
+        rpc(
+            "tools/call",
+            {
+                "name": "update_document",
+                "arguments": {
+                    "doc_id": "a",
+                    "body": "b",
+                    "expected_version": "3",
+                    "message": "m",
+                    "changed_items": '["x", 1]',
+                },
+            },
+        ),
+    ),
+    (
+        "call_upload_bad",
+        "POST",
+        STD,
+        rpc(
+            "tools/call",
+            {
+                "name": "upload_code",
+                "arguments": {"project_code": "X", "files": [{"path": 1}], "message": "m"},
+            },
+        ),
+    ),
+    (
+        "call_literal_bad",
+        "POST",
+        STD,
+        rpc("tools/call", {"name": "change_status", "arguments": {"doc_id": "a", "to": "done"}}),
+    ),
+    (
+        "call_init_bad",
+        "POST",
+        STD,
+        rpc("tools/call", {"name": "init_project", "arguments": {"storage": "s3", "code": "X"}}),
+    ),
     # 도구 인자를 미리 읽는 파이썬 json의 C 재귀 한도 — 이 경로에서 9987겹까지
-    ("call_arg_depth_ok", "POST", STD, rpc("tools/call", {"name": "update_document", "arguments": {"doc_id": "a", "body": "b", "expected_version": 1, "message": "m", "changed_items": "[" * 9987 + "]" * 9987}})),
-    ("call_arg_depth_over", "POST", STD, rpc("tools/call", {"name": "update_document", "arguments": {"doc_id": "a", "body": "b", "expected_version": 1, "message": "m", "changed_items": "[" * 9988 + "]" * 9988}})),
-    ("call_get_document", "POST", STD, rpc("tools/call", {"name": "get_document", "arguments": {"doc_id": "X-PRD-001"}}), "L7"),
+    (
+        "call_arg_depth_ok",
+        "POST",
+        STD,
+        rpc(
+            "tools/call",
+            {
+                "name": "update_document",
+                "arguments": {
+                    "doc_id": "a",
+                    "body": "b",
+                    "expected_version": 1,
+                    "message": "m",
+                    "changed_items": "[" * 9987 + "]" * 9987,
+                },
+            },
+        ),
+    ),
+    (
+        "call_arg_depth_over",
+        "POST",
+        STD,
+        rpc(
+            "tools/call",
+            {
+                "name": "update_document",
+                "arguments": {
+                    "doc_id": "a",
+                    "body": "b",
+                    "expected_version": 1,
+                    "message": "m",
+                    "changed_items": "[" * 9988 + "]" * 9988,
+                },
+            },
+        ),
+    ),
+    (
+        "call_get_document",
+        "POST",
+        STD,
+        rpc("tools/call", {"name": "get_document", "arguments": {"doc_id": "X-PRD-001"}}),
+        "L7",
+    ),
 ]
 
 
@@ -147,11 +289,22 @@ def test_mcp_case(server, case):
 
 def test_get_stream_stays_open(server):
     """GET은 끝나지 않는 SSE — 보낼 것이 없어 15초마다 ping뿐이다. 머리만 보고 1초 뒤 끊는다"""
-    reply = request(server.port, "GET", "/mcp", [("Authorization", f"Bearer {token_for(server)}"), ACCEPT], read_for=1.0)
+    reply = request(
+        server.port,
+        "GET",
+        "/mcp",
+        [("Authorization", f"Bearer {token_for(server)}"), ACCEPT],
+        read_for=1.0,
+    )
     assert reply.timed_out
     got = reply.contract()
     assert (got["status"], got["body"]) == (200, "")
-    check("mcp_closed", "get_stream_headers", {"status": got["status"], "headers": got["headers"]}, server.target)
+    check(
+        "mcp_closed",
+        "get_stream_headers",
+        {"status": got["status"], "headers": got["headers"]},
+        server.target,
+    )
 
 
 async def test_real_client_connects(server):

@@ -1,7 +1,8 @@
 """날 HTTP — 머리를 보낸 그대로 보내고(같은 이름 둘·이상한 값까지) 받은 것을 그대로 읽는다.
 
-계약 비교는 상태 코드·계약 안의 머리·본문 바이트다. 계약 밖(SYNC-CODE-002 2장): `date`·`server` 머리,
-연결 머리(`connection`), 본문을 나눠 보내는 꼴(`transfer-encoding`·`content-length`).
+계약 비교는 상태 코드·계약 안의 머리·본문 바이트다.
+계약 밖(SYNC-CODE-002 2장): `date`·`server`·`connection` 머리,
+본문을 나눠 보내는 꼴(`transfer-encoding`·`content-length`).
 """
 
 from __future__ import annotations
@@ -85,7 +86,7 @@ def request(
             if not b:
                 break
             raw += b
-    except (TimeoutError, socket.timeout):
+    except TimeoutError:
         timed_out = True
     finally:
         s.close()

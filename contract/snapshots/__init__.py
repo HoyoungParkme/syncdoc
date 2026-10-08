@@ -1,6 +1,7 @@
 """스냅숏 — 파이썬 판의 답을 파일로 두고 두 판을 그것과 비교한다 (SYNC-CODE-002 2장).
 
-다시 뜨기: `uv run pytest --target python --update-snapshots`(또는 both — 파이썬 판이 먼저 돌아 새 값으로 Rust를 본다).
+다시 뜨기: `uv run pytest --target python --update-snapshots`
+(또는 both — 파이썬 판이 먼저 돌아 새 값으로 Rust를 본다).
 파일은 `snapshots/{이름}.json`, 키 = 사례 이름. 손으로 고치지 않는다.
 """
 

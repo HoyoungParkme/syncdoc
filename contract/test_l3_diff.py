@@ -13,6 +13,7 @@ import re
 import urllib.parse
 
 import pytest
+
 from conftest import token_for
 from wire import request
 
@@ -20,22 +21,102 @@ pytestmark = pytest.mark.card("L3")
 
 HANDSHAKE = ["2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25"]
 METHODS = [
-    "initialize", "ping", "tools/list", "tools/call", "resources/list", "resources/templates/list",
-    "resources/read", "resources/subscribe", "resources/unsubscribe", "prompts/list", "prompts/get",
-    "completion/complete", "logging/setLevel", "server/discover", "subscriptions/listen",
-    "notifications/initialized", "notifications/cancelled", "notifications/progress", "nope/x", "",
+    "initialize",
+    "ping",
+    "tools/list",
+    "tools/call",
+    "resources/list",
+    "resources/templates/list",
+    "resources/read",
+    "resources/subscribe",
+    "resources/unsubscribe",
+    "prompts/list",
+    "prompts/get",
+    "completion/complete",
+    "logging/setLevel",
+    "server/discover",
+    "subscriptions/listen",
+    "notifications/initialized",
+    "notifications/cancelled",
+    "notifications/progress",
+    "nope/x",
+    "",
 ]
 PARAM_KEYS = [
-    "protocolVersion", "capabilities", "clientInfo", "_meta", "name", "arguments", "uri", "cursor",
-    "level", "ref", "argument", "context", "task", "inputResponses", "requestState", "requestId",
-    "reason", "progressToken", "progress", "total", "message", "x",
+    "protocolVersion",
+    "capabilities",
+    "clientInfo",
+    "_meta",
+    "name",
+    "arguments",
+    "uri",
+    "cursor",
+    "level",
+    "ref",
+    "argument",
+    "context",
+    "task",
+    "inputResponses",
+    "requestState",
+    "requestId",
+    "reason",
+    "progressToken",
+    "progress",
+    "total",
+    "message",
+    "x",
 ]
 WORDS = [
-    "", "a", "2.0", "1", " 1 ", "1_000", "1.0", "1.5", "1e3", "-0", "+1", "0x10", "true", "yes", "off",
-    "null", "[1, 2]", '["x", 1]', '{"a": 1}', '[{"path": "a", "content": "b"}]', "한글 문장", "é \u0001",
-    'quo"te', "it's", "\\", "😀", "file:///x", "http://example.com/a b", "ref/prompt", "ref/resource",
-    "github", "server", "draft", "approved", "info", "debug", "SYNC", "X-PRD-001", "R1", "PRD", "DOM",
-    "클래스", "MCP", "NaN", "inf", "\t", "x" * 60, "1" * 30, "ping", "tools/call",
+    "",
+    "a",
+    "2.0",
+    "1",
+    " 1 ",
+    "1_000",
+    "1.0",
+    "1.5",
+    "1e3",
+    "-0",
+    "+1",
+    "0x10",
+    "true",
+    "yes",
+    "off",
+    "null",
+    "[1, 2]",
+    '["x", 1]',
+    '{"a": 1}',
+    '[{"path": "a", "content": "b"}]',
+    "한글 문장",
+    "é \u0001",
+    'quo"te',
+    "it's",
+    "\\",
+    "😀",
+    "file:///x",
+    "http://example.com/a b",
+    "ref/prompt",
+    "ref/resource",
+    "github",
+    "server",
+    "draft",
+    "approved",
+    "info",
+    "debug",
+    "SYNC",
+    "X-PRD-001",
+    "R1",
+    "PRD",
+    "DOM",
+    "클래스",
+    "MCP",
+    "NaN",
+    "inf",
+    "\t",
+    "x" * 60,
+    "1" * 30,
+    "ping",
+    "tools/call",
 ]
 
 
@@ -58,7 +139,9 @@ def rand_value(r: random.Random, depth: int = 0):
         return rand_scalar(r)
     if k < 0.8:
         return [rand_value(r, depth + 1) for _ in range(r.randint(0, 3))]
-    return {r.choice(PARAM_KEYS + WORDS[:8]): rand_value(r, depth + 1) for _ in range(r.randint(0, 4))}
+    return {
+        r.choice(PARAM_KEYS + WORDS[:8]): rand_value(r, depth + 1) for _ in range(r.randint(0, 4))
+    }
 
 
 def rand_params(r: random.Random, method: str, tools: dict):
@@ -106,7 +189,9 @@ def rand_arg(r: random.Random, sch: dict):
     if t == "boolean" or "boolean" in alts:
         return r.choice([True, False, "true", "no", 1, 0, 2, None])
     if t == "array" or "array" in alts:
-        return r.choice([[], ["a"], ["a", 1], [{"path": "a", "content": "b"}], [{"path": 1}], '["a"]', None])
+        return r.choice(
+            [[], ["a"], ["a", 1], [{"path": "a", "content": "b"}], [{"path": 1}], '["a"]', None]
+        )
     return rand_value(r)
 
 
@@ -133,7 +218,9 @@ def rand_body(r: random.Random, tools: dict) -> bytes:
         body = body[: r.randint(0, len(body))]
     elif k < 0.06:
         i = r.randint(0, len(body))
-        body = body[:i] + r.choice([b"x", b",", b"}", b'"', b"\\", b"\x01", b" ", b"NaN"]) + body[i:]
+        body = (
+            body[:i] + r.choice([b"x", b",", b"}", b'"', b"\\", b"\x01", b" ", b"NaN"]) + body[i:]
+        )
     elif k < 0.07:
         body = b"[" + body + b"]"
     return body
@@ -145,15 +232,35 @@ def rand_headers(r: random.Random, tok: str) -> list[tuple[str, str]]:
     if k < 0.9:
         hs.append(("Accept", "application/json, text/event-stream"))
     elif k < 0.95:
-        hs.append(("Accept", r.choice(["*/*", "application/json", "text/event-stream", "text/*, application/*"])))
+        hs.append(
+            (
+                "Accept",
+                r.choice(["*/*", "application/json", "text/event-stream", "text/*, application/*"]),
+            )
+        )
     k = r.random()
     if k < 0.94:
         hs.append(("Content-Type", "application/json"))
     elif k < 0.97:
-        hs.append(("Content-Type", r.choice(["application/json; charset=utf-8", "text/plain", "APPLICATION/JSON"])))
+        hs.append(
+            (
+                "Content-Type",
+                r.choice(["application/json; charset=utf-8", "text/plain", "APPLICATION/JSON"]),
+            )
+        )
     if r.random() < 0.15:
         hs.append(("MCP-Protocol-Version", r.choice(HANDSHAKE)))
     return hs
+
+
+def _small_id(seg: str) -> bool:
+    """pydantic lax int로 읽혀 있는 토큰 번호(작은 양수)가 될 수 있는 경로 값 — `1.0`·`+7`·`1_0`·` 3 `까지"""
+    text = urllib.parse.unquote(seg).strip()
+    m = re.fullmatch(r"\+?0*([\d_]+?)(\.0+)?", text)
+    if not m:
+        return False
+    digits = m.group(1).replace("_", "")
+    return digits.isdigit() and int(digits) < 10**6
 
 
 def mask_tokens(body: str) -> str:
@@ -165,8 +272,14 @@ def mask_tokens(body: str) -> str:
 
 def _tool_props(server) -> dict:
     tok = token_for(server)
-    hs = [("Authorization", f"Bearer {tok}"), ("Accept", "application/json, text/event-stream"), ("Content-Type", "application/json")]
-    reply = request(server.port, "POST", "/mcp", hs, b'{"jsonrpc":"2.0","id":1,"method":"tools/list"}')
+    hs = [
+        ("Authorization", f"Bearer {tok}"),
+        ("Accept", "application/json, text/event-stream"),
+        ("Content-Type", "application/json"),
+    ]
+    reply = request(
+        server.port, "POST", "/mcp", hs, b'{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+    )
     data = json.loads(reply.body.decode().split("data: ", 1)[1])
     return {t["name"]: t["inputSchema"].get("properties", {}) for t in data["result"]["tools"]}
 
@@ -184,22 +297,48 @@ def test_mcp_both_editions_answer_alike(both, request_count):
         hs = rand_headers(r, "{t}")
         if method == "GET":
             continue  # 끝나지 않는 SSE — 사례 표가 본다
-        a = request(py.port, method, "/mcp", [(k, v.replace("{t}", tok_py)) for k, v in hs], body).contract()
-        b = request(rs.port, method, "/mcp", [(k, v.replace("{t}", tok_rs)) for k, v in hs], body).contract()
+        a = request(
+            py.port, method, "/mcp", [(k, v.replace("{t}", tok_py)) for k, v in hs], body
+        ).contract()
+        b = request(
+            rs.port, method, "/mcp", [(k, v.replace("{t}", tok_rs)) for k, v in hs], body
+        ).contract()
         if "urn:syncdoc:not-implemented" in b["body"]:
             skipped += 1
             continue
         if a != b:
             diffs.append((i, hs, body, a, b))
     detail = "\n".join(
-        f"#{i} {hs[1:]} {body[:300]!r}\n  파이썬 {a}\n  Rust   {b}" for i, hs, body, a, b in diffs[:5]
+        f"#{i} {hs[1:]} {body[:300]!r}\n  파이썬 {a}\n  Rust   {b}"
+        for i, hs, body, a, b in diffs[:5]
     )
     assert not diffs, f"{len(diffs)}/{count}개가 다르다(건너뜀 {skipped}):\n{detail}"
 
 
 SEGMENTS = [
-    "abc", "1.5", "1.0", "+7", "-0", "1_0", "%201", "%E2%80%8B1", "%FF", "１", "1e3", "0x1f", "-5",
-    "2147483648", "-2147483649", "9" * 30, "%20", "nan", "true", "a%2Fb", "%2e%2e", "%25", "1%3F2",
+    "abc",
+    "1.5",
+    "1.0",
+    "+7",
+    "-0",
+    "1_0",
+    "%201",
+    "%E2%80%8B1",
+    "%FF",
+    "１",
+    "1e3",
+    "0x1f",
+    "-5",
+    "2147483648",
+    "-2147483649",
+    "9" * 30,
+    "%20",
+    "nan",
+    "true",
+    "a%2Fb",
+    "%2e%2e",
+    "%25",
+    "1%3F2",
 ]
 
 
@@ -217,15 +356,22 @@ def test_tokens_both_editions_answer_alike(both, request_count):
                 body = body[: r.randint(0, len(body))]
             elif k < 0.12:
                 body = b'{"label":"\\ud83d\\ude00\\ud800"}'
-            ct = r.choice(["application/json"] * 6 + ["text/plain", "application/x+json", "", "application/json; charset=latin-1"])
+            ct = r.choice(
+                ["application/json"] * 6
+                + ["text/plain", "application/x+json", "", "application/json; charset=latin-1"]
+            )
             hs = [("Content-Type", ct)] if ct else []
             a = request(py.port, "POST", "/api/me/tokens", hs, body).contract()
             b = request(rs.port, "POST", "/api/me/tokens", hs, body).contract()
             a["body"], b["body"] = mask_tokens(a["body"]), mask_tokens(b["body"])
         else:
-            seg = r.choice(SEGMENTS) if r.random() < 0.8 else urllib.parse.quote(str(rand_scalar(r)), safe="")
-            if seg.isdigit() and len(seg) < 7:
-                continue  # 있는 토큰일 수 있다 — 두 판의 번호가 다르다
+            seg = (
+                r.choice(SEGMENTS)
+                if r.random() < 0.8
+                else urllib.parse.quote(str(rand_scalar(r)), safe="")
+            )
+            if _small_id(seg):
+                continue  # 있는 토큰일 수 있다 — 두 판의 번호가 다르고, 다른 시험의 토큰을 폐기한다
             if not seg or urllib.parse.unquote(seg).endswith("/"):
                 continue  # 끝 슬래시는 307 리다이렉트 — 계약 밖
             a = request(py.port, "DELETE", f"/api/me/tokens/{seg}").contract()

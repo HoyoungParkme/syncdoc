@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 
 import pytest
+
 from snapshots import check
 from wire import request
 
@@ -29,7 +30,12 @@ def test_issue_list_revoke(server):
     assert list(t) == [*KEYS, "token"]
     assert re.fullmatch(r"syncdoc_pat_[A-Za-z0-9_-]{43}", t["token"])
     assert re.fullmatch(ISO, t["issued_at"])
-    assert (t["label"], t["expires_at"], t["revoked_at"], t["last_used_at"]) == ("노트북 · 집", None, None, None)
+    assert (t["label"], t["expires_at"], t["revoked_at"], t["last_used_at"]) == (
+        "노트북 · 집",
+        None,
+        None,
+        None,
+    )
     listed = server.client().get("/api/me/tokens")
     assert listed.status_code == 200 and listed.headers["content-type"] == "application/json"
     first = listed.json()[0]
@@ -43,7 +49,11 @@ def test_issue_list_revoke(server):
 
 def test_mcp_use_leaves_a_trace_and_revoked_token_is_refused(server):
     t = issue(server, "trace")
-    hs = [("Authorization", f"Bearer {t['token']}"), ("Accept", "application/json, text/event-stream"), JSON]
+    hs = [
+        ("Authorization", f"Bearer {t['token']}"),
+        ("Accept", "application/json, text/event-stream"),
+        JSON,
+    ]
     ping = b'{"jsonrpc":"2.0","id":1,"method":"ping"}'
     assert request(server.port, "POST", "/mcp", hs, ping).status == 200
     used = [x for x in server.client().get("/api/me/tokens").json() if x["id"] == t["id"]][0]
@@ -68,7 +78,13 @@ ERRORS = [
     ("body_broken", "POST", "/api/me/tokens", [JSON], b'{"label": "x",}'),
     ("body_not_utf8", "POST", "/api/me/tokens", [JSON], b"\xff"),
     ("body_no_content_type", "POST", "/api/me/tokens", [], b'{"label":"x"}'),
-    ("body_text_plain", "POST", "/api/me/tokens", [("Content-Type", "text/plain")], b'{"label":"x"}'),
+    (
+        "body_text_plain",
+        "POST",
+        "/api/me/tokens",
+        [("Content-Type", "text/plain")],
+        b'{"label":"x"}',
+    ),
     ("body_int_too_long", "POST", "/api/me/tokens", [JSON], b'{"label":' + b"1" * 4301 + b"}"),
     ("revoke_text", "DELETE", "/api/me/tokens/abc", [], b""),
     ("revoke_fraction", "DELETE", "/api/me/tokens/1.5", [], b""),
