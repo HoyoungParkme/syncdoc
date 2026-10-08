@@ -505,6 +505,18 @@ impl Git {
         );
         files
     }
+
+    /// SYNC-MS-019#Git.fetch
+    ///
+    /// `origin/HEAD`가 아니라 `origin/main` — 빈 저장소를 받은 사본에는 상징 ref가 없다(#45). 작업 사본은 건드리지 않는다
+    pub async fn fetch(&self, workdir: &Path) -> Result<String, Problem> {
+        let w = Some(workdir);
+        // 원격 주소를 읽는 첫 명령 — 파이썬 판처럼 부른다(토큰 갈래는 없다 — 서버 저장뿐)
+        self.run(w, &[os("remote"), os("get-url"), os("origin")])
+            .await?;
+        self.run(w, &[os("fetch"), os("origin")]).await?;
+        Ok(strip(&self.run(w, &[os("rev-parse"), os("origin/main")]).await?).to_string())
+    }
 }
 
 #[cfg(test)]
