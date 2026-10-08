@@ -58,10 +58,11 @@ crate마다 `src/`와 거울 `tests/`를 둔다. 단위 시험은 그 모듈의 
 
 ```
 crates/app/src/
-├── main.rs                     진입 — 인자를 읽어 runtime.run, 끝 코드 · 일꾼 스레드 스택(파이썬 판의 1만 겹 JSON을 받으려고, L3)
+├── main.rs                     진입 — 관리자 권한 내려놓기 → 인자를 읽어 runtime.run, 끝 코드 · 일꾼 스레드 스택(파이썬 판의 1만 겹 JSON을 받으려고, L3)
 ├── lib.rs                      공개 모듈
 ├── runtime.rs                  켠다·포트에 묶는다·끈다
 ├── tray.rs                     트레이 — 열기·끝내기 (윈도 메시지 루프 · 리눅스 StatusNotifierItem, L4)
+├── privilege.rs                윈도 관리자 권한 내려놓기 — 관리자 그룹을 뺀 토큰으로 다시 켠다 (L4 · 저장소의 unsafe는 여기뿐)
 ├── paths.rs                    데이터 자리 · PostgreSQL 바이너리 자리
 ├── settings.rs                 settings.toml — INFRA 5.2와 같은 이름
 ├── logs.rs                     logs/ — 날마다 한 파일, 최근 14개
@@ -295,6 +296,7 @@ crates/core/
 | [[SYNC-MS-012#runtime.bind]] | 127.0.0.1의 8010, 못 쓰면 8011~8019 | `runtime.run` |
 | [[SYNC-MS-012#runtime.shutdown]] | 끈다 | `runtime.run` |
 | [[SYNC-MS-012#tray.run]] | 트레이 — 열기·끝내기 | `main`(트레이가 있을 때) |
+| [[SYNC-MS-012#privilege.drop_admin]] | 윈도 관리자 권한을 내려놓고 다시 켠다 | `main`(맨 처음) |
 | [[SYNC-MS-012#paths.data_dir]] · [[SYNC-MS-012#paths.pg_dir]] | 데이터 자리 · PostgreSQL 바이너리 자리 | `runtime.run` |
 | [[SYNC-MS-012#settings.load]] | `settings.toml` | `runtime.run` |
 | [[SYNC-MS-012#logs.init]] | 로그 | `runtime.run` |
@@ -307,6 +309,7 @@ crates/core/
 - PostgreSQL은 따로 프로세스 묶음으로 띄운다 — 터미널 신호가 먼저 닿지 않고, 멈추는 순서를 앱이 쥔다
 - 트레이가 있으면 메인 스레드는 트레이 차지다(윈도 메시지 루프) — 서버·PostgreSQL은 tokio 일꾼 스레드에서 돈다. 「끝내기」는 Ctrl+C와 같은 끄는 순서를 탄다(L4)
 - 켜는 중 실패는 `Problem::Internal`의 로그 문장으로 돌려주고 `main`이 끝 코드 1로 끝난다
+- 윈도에서 관리자 권한으로 켜졌으면 맨 처음 관리자 그룹을 뺀 토큰으로 자신을 다시 켠다 — PostgreSQL은 관리자 권한으로 돌지 않는다. `unsafe`는 이 모듈의 Win32 호출뿐이다(작업 공간 lint `unsafe_code = "deny"`, 이 모듈만 허용, L4)
 
 ### 4.5 account (MS-016)
 
