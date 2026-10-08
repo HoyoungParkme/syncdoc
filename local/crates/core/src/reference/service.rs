@@ -144,4 +144,13 @@ impl ReferenceService<'_> {
             .map(edge)
             .collect())
     }
+
+    /// SYNC-MS-015#ReferenceService.downstream
+    pub async fn downstream(&mut self, item_pk: i32) -> Result<Vec<RefEdge>, Problem> {
+        Ok(repo::to_item(&mut *self.db, item_pk)
+            .await?
+            .into_iter()
+            .map(edge)
+            .collect())
+    }
 }
