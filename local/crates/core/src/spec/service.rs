@@ -11,6 +11,7 @@ use sqlx::PgConnection;
 
 use super::model::{DocumentRow, VersionRow};
 use super::repo;
+use crate::clock;
 use crate::errors::Problem;
 use crate::markdown::{self, DOC_ID, HEADING, REF};
 use crate::pycompat::chars::{is_decimal, lstrip, strip};
@@ -18,9 +19,9 @@ use crate::pycompat::difflib::unified_diff;
 use crate::pycompat::re::compile;
 use crate::pycompat::repr::repr;
 use crate::types::{
-    AuthorRef, Diff, DiffLine, DiffOp, DocItem, DocRef, DocStatus, DocType, Document,
+    Author, AuthorRef, Diff, DiffLine, DiffOp, DocItem, DocRef, DocStatus, DocType, Document,
     DocumentSummary, Entry, Hunk, ItemBlock, ItemRef, ItemView, ValidateResult, Violation, Warning,
-    py_isoformat, stage_of,
+    fold_via, py_isoformat, stage_of,
 };
 
 /// 이력 diff의 앞뒤 줄 수 — 파이썬 `DIFF_CONTEXT_LINES`
@@ -350,6 +351,53 @@ fn summary_of(r: &DocumentRow, latest: Option<&VersionRow>) -> Result<DocumentSu
 /// 타입 문자열로 항목 블록 — 모르는 타입이면 없다(파이썬 `patterns_for`가 패턴을 못 준다)
 fn blocks_of(body: &str, doc_type: &str, title: Option<&str>) -> Vec<ItemBlock> {
     DocType::parse(doc_type).map_or_else(Vec::new, |t| SpecService::item_blocks(body, t, title))
+}
+
+/// 규약 결과 → documents의 오류·경고 열 — 파이썬 `_apply_validate`.
+/// 오류 문장은 `rule: message`를 줄마다, 경고는 `str(w)`들의 JSON 목록(`ensure_ascii` 없이, 비면 없음)
+fn convention_columns(vr: &ValidateResult) -> (bool, Option<String>, Option<String>) {
+    let detail = vr
+        .violations
+        .iter()
+        .map(|v| format!("{}: {}", v.rule, v.message))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let warnings = (!vr.warnings.is_empty()).then(|| {
+        let items: Vec<String> = vr
+            .warnings
+            .iter()
+            .map(|w| serde_json::to_string(&w.to_string()).unwrap_or_default())
+            .collect();
+        format!("[{}]", items.join(", "))
+    });
+    (
+        !vr.violations.is_empty(),
+        (!detail.is_empty()).then_some(detail),
+        warnings,
+    )
+}
+
+/// 새 판 행 — 시각은 저장 시각(SYNC-STD-004#DEV-18), `via`는 입구를 접은 것 (파이썬 `_new_version`)
+fn new_version<'a>(
+    document_id: i32,
+    version_no: i32,
+    commit_hash: &'a str,
+    body: &'a str,
+    author: &Author,
+    message: &'a str,
+) -> repo::NewVersion<'a> {
+    repo::NewVersion {
+        document_id,
+        version_no,
+        commit_hash,
+        body,
+        author_kind: author.kind.as_str(),
+        author_user_id: author.user.id,
+        instructed_by_user_id: author.instructed_by.as_ref().map(|u| u.id),
+        via: fold_via(author.via),
+        message,
+        created_at: clock::now(),
+    }
 }
 
 fn not_found(resource: &str, id: &str) -> Problem {
@@ -1030,5 +1078,50 @@ impl SpecService<'_> {
                 (d.document_id, d)
             })
             .collect())
+    }
+
+    /// SYNC-MS-014#SpecService.create
+    ///
+    /// 상태는 frontmatter가 `draft`·`approved`면 그것, 아니면 `draft`(둘 밖의 값은 DB에 들이지 않는다, #99)
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create(
+        &mut self,
+        project_id: i32,
+        doc_id: &str,
+        doc_type: &str,
+        body: &str,
+        commit_hash: &str,
+        author: &Author,
+        message: &str,
+        validate_result: &ValidateResult,
+    ) -> Result<VersionRow, Problem> {
+        let (fm, _) = markdown::parse_frontmatter(body);
+        let status = match fm.get("status").map(String::as_str) {
+            Some(s @ ("draft" | "approved")) => s,
+            _ => "draft",
+        };
+        let (has_error, detail, warnings) = convention_columns(validate_result);
+        let id = repo::insert_document(
+            &mut *self.db,
+            &repo::NewDocument {
+                project_id,
+                doc_id,
+                doc_type,
+                status,
+                body,
+                has_convention_error: has_error,
+                convention_error_detail: detail.as_deref(),
+                incomplete_warnings: warnings.as_deref(),
+            },
+        )
+        .await?;
+        for b in blocks_of(body, doc_type, fm.get("title").map(String::as_str)) {
+            repo::insert_item(&mut *self.db, id, &b.item_id, &b.display_name).await?;
+        }
+        Ok(repo::insert_version(
+            &mut *self.db,
+            &new_version(id, 1, commit_hash, body, author, message),
+        )
+        .await?)
     }
 }
