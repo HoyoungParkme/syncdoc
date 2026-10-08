@@ -62,3 +62,21 @@ pub fn masked_lines(body: &str) -> Vec<String> {
     }
     out
 }
+
+/// SYNC-MS-014#markdown.headings
+pub fn headings(body: &str) -> Vec<(usize, usize, String, String)> {
+    masked_lines(body)
+        .iter()
+        .enumerate()
+        .filter_map(|(i, line)| {
+            HEADING.captures(line).map(|h| {
+                (
+                    i,
+                    h[1].len(),
+                    h[2].to_string(),
+                    h.get(3).map_or("", |m| m.as_str()).to_string(),
+                )
+            })
+        })
+        .collect()
+}
