@@ -93,7 +93,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | API | [[SYNC-API-002#create_document]] · [[SYNC-API-002#update_document]] · [[SYNC-API-002#list_documents]] · [[SYNC-API-002#get_document]] · [[SYNC-API-002#get_item]] · [[SYNC-API-002#get_references]] |
 | 테스트 | `cargo test`(서비스·파이프라인은 시험 DB + 임시 자리의 진짜 git — 동시 저장 둘이면 둘째가 `version-conflict`, 부른 쪽을 버려도 저장이 끝까지) · 계약 L7 — 만들기(경고·`next_step`)·고치기 v2·`version-conflict`·규약 위반·하위 있는 항목 삭제 → 확인 → `ref.broken`·끊긴 참조 → 되살리면 이어짐·모르는 타입·DOM 선행조건·목록·문서·항목(`~`)·위아래 참조·`available_items` · 두 판 차이 시험이 여섯 도구까지(커밋 해시·`+00:00` 시각 가림) · `spec-golden --check`·`spec-diff` 그대로 |
 | 선행 | L6 · #353 |
-| 완료 | — |
+| 완료 | 2026-10-08 · 브랜치 `card/L7-save-pipeline`(4a56078 #355) · 선행 #353(#354 — 파이썬 판 참조 조회 차례·`get_references`의 `raw_target` 덮어쓰기) · spec 14 + code 45 · `cargo test` 111(파이프라인 끝에서 끝 — 시험 DB + 진짜 git: 동시 저장 둘이면 둘째가 `version-conflict`, 부른 쪽을 버려도 저장이 끝까지, 밖의 커밋은 `not-implemented(L11)`, 쓰기 락 기다림) · 계약 `--target both --with-card L7` 447 통과·1 건너뜀(보관본 재구축 L11) — 스냅숏 `documents_closed` 51 사례가 파이썬 판과 바이트로 같다(해시·시각만 가림) · 문서 도구만 겨냥한 두 판 차이 시험(상태를 쌓으며 무작위 본문·참조·항목) 씨앗 1·2·3·77 × 1000 다른 것 0(씨앗 2 — 저장 165·삭제 확인 23·참조 조회 111) · L3 차이 시험 씨앗 1·2·3 × 2000 다른 것 0 · `spec-golden --check`·`spec-diff`(4692 사례) 다른 것 0 · xtask `--check` 넷·`schema-check` · clippy(리눅스·윈도) · 윈도 `cargo check` · 워크플로 녹색 · `check_code` Rust 77/77 · `check_calls` 0 · 되먹임: MCP 도구의 예상 밖 실패(git·DB)는 mcp 2.2.0처럼 「Error executing tool {name}」뿐(L6부터 글을 붙이고 있었다 — 빈 커밋 메시지 사례가 찾음), MS-017 테스트 관점 — 에이전트가 지운 ID를 다시 쓰면 `item.reused`(되살리기는 웹, L9), 「호출하는 것」 빠진 것(check_calls — MS-014 다섯·MS-015 extract·MS-017), L3 계약의 JSON 깊이 「넘음」을 9988로(파이썬 판이 같은 프로세스에서도 9987겹을 읽기도 못 읽기도 한다) |
 
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
