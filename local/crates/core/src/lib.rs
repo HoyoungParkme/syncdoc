@@ -4,6 +4,7 @@
 pub mod account;
 pub mod clock;
 pub mod errors;
+pub mod infra;
 pub mod markdown;
 pub mod migrate;
 pub mod pycompat;

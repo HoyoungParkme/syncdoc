@@ -19,6 +19,7 @@ time = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+tempfile = { workspace = true }
 time = { workspace = true, features = ["macros"] }
 tokio = { workspace = true }
 
