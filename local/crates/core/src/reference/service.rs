@@ -189,4 +189,14 @@ impl ReferenceService<'_> {
         }
         Ok(n)
     }
+
+    /// SYNC-MS-015#ReferenceService.mark_missing
+    ///
+    /// `raw_target`은 그대로 — 상대가 돌아오면 `resolve_missing`이 다시 잇는다
+    pub async fn mark_missing(&mut self, item_pks: &[i32]) -> Result<i64, Problem> {
+        if item_pks.is_empty() {
+            return Ok(0);
+        }
+        Ok(repo::mark_missing(&mut *self.db, item_pks).await? as i64)
+    }
 }
