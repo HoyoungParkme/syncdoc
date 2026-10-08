@@ -165,7 +165,7 @@ pub fn drop_admin() -> Option<u32>
 1. 윈도가 아니면 → `None`
 2. if 환경 변수 `SYNCDOC_RESTRICTED`가 있다(이미 다시 켠 자식) → `None`
 3. if 지금 토큰에 Administrators·Power Users 그룹이 켜져 있지 않다 → `None` — UAC가 켜진 보통 계정은 여기서 끝난다
-4. 지금 토큰에서 두 그룹을 거부 전용으로 바꾸고 특권을 다 뺀 토큰을 만든다(`CreateRestrictedToken`, `DISABLE_MAX_PRIVILEGE`) — PostgreSQL이 `initdb`·`pg_ctl`에서 하는 것(`restricted_token.c`)과 같다
+4. 지금 토큰에서 두 그룹을 거부 전용으로 바꾸고 특권을 다 뺀 토큰을 만든다(`CreateRestrictedToken`, `DISABLE_MAX_PRIVILEGE`) — PostgreSQL이 `initdb`·`pg_ctl`에서 하는 것(`restricted_token.c`)과 같다 · 그 토큰의 기본 DACL에 지금 사용자를 더한다 — 관리자 토큰의 기본 DACL은 Administrators·SYSTEM뿐이라, 그 그룹을 거부 전용으로 바꾸면 자기가 만든 파이프·프로세스에도 닿지 못한다(PostgreSQL `AddUserToTokenDacl`)
 5. `SYNCDOC_RESTRICTED=1`을 두고 그 토큰으로 같은 명령줄을 다시 켠다 — 표준 입력·출력·오류를 물려준다. 콘솔의 Ctrl+C는 자식이 받아 끄는 순서를 탄다 — 이 프로세스는 무시하고 기다린다
 6. 자식이 끝나기를 기다린다 → `Some(자식의 끝 코드)` — `main`이 그 코드로 끝난다
 
