@@ -1243,4 +1243,23 @@ impl SpecService<'_> {
         };
         Ok((first(stage - 1), first(stage + 1)))
     }
+
+    /// SYNC-MS-014#SpecService.resolve_item
+    ///
+    /// `~`는 바꾸지 않는다(파이썬과 같다). 없는 문서도 항목 `not-found`
+    pub async fn resolve_item(&mut self, doc_id: &str, item_id: &str) -> Result<i32, Problem> {
+        let item = match repo::document_by_doc_id(&mut *self.db, doc_id).await? {
+            Some(row) => repo::item_of(&mut *self.db, row.id, item_id).await?,
+            None => None,
+        };
+        let Some(item) = item else {
+            return Err(not_found("item", &format!("{doc_id}#{item_id}")));
+        };
+        if item.is_deleted {
+            return Err(Problem::ItemDeleted {
+                deleted_at: item.deleted_at.map(py_isoformat),
+            });
+        }
+        Ok(item.id)
+    }
 }
