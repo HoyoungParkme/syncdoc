@@ -337,4 +337,10 @@ impl Git {
             .map(str::to_string)
             .collect())
     }
+
+    /// SYNC-MS-019#Git.read
+    pub async fn read(&self, workdir: &Path, path: &str, git_ref: &str) -> Result<String, Problem> {
+        let spec: OsString = format!("{git_ref}:{path}").into();
+        self.run(Some(workdir), &[os("show"), &spec]).await
+    }
 }
