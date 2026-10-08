@@ -103,4 +103,21 @@ impl ProjectService<'_> {
                 id: serde_json::Value::from(code),
             })
     }
+
+    /// SYNC-MS-013#ProjectService.get_owned
+    pub async fn get_owned(
+        &mut self,
+        code: &str,
+        user: &UserRow,
+    ) -> Result<(ProjectRow, RepositoryRow), Problem> {
+        let (p, r) = self.get(code).await?;
+        if p.owner_user_id != user.id {
+            // 남의 것은 없는 것과 같은 답이다
+            return Err(Problem::NotFound {
+                resource: "project".to_string(),
+                id: serde_json::Value::from(code),
+            });
+        }
+        Ok((p, r))
+    }
 }
