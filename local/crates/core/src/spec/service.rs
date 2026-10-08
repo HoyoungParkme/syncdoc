@@ -19,7 +19,8 @@ use crate::pycompat::re::compile;
 use crate::pycompat::repr::repr;
 use crate::types::{
     AuthorRef, Diff, DiffLine, DiffOp, DocItem, DocStatus, DocType, Document, DocumentSummary,
-    Entry, Hunk, ItemBlock, ItemView, ValidateResult, Violation, Warning, py_isoformat, stage_of,
+    Entry, Hunk, ItemBlock, ItemRef, ItemView, ValidateResult, Violation, Warning, py_isoformat,
+    stage_of,
 };
 
 /// 이력 diff의 앞뒤 줄 수 — 파이썬 `DIFF_CONTEXT_LINES`
@@ -972,6 +973,31 @@ impl SpecService<'_> {
             .into_iter()
             .filter(|i| !new_ids.contains(&i.item_id))
             .map(|i| i.id)
+            .collect())
+    }
+
+    /// SYNC-MS-014#SpecService.describe_items
+    pub async fn describe_items(
+        &mut self,
+        item_pks: &[i32],
+    ) -> Result<HashMap<i32, ItemRef>, Problem> {
+        if item_pks.is_empty() {
+            return Ok(HashMap::new());
+        }
+        Ok(repo::items_with_doc_id(&mut *self.db, item_pks)
+            .await?
+            .into_iter()
+            .map(|r| {
+                let ref_ = ItemRef {
+                    doc_id: Some(r.doc_id),
+                    item_id: Some(r.item.item_id),
+                    display_name: r.item.display_name,
+                    is_deleted: r.item.is_deleted,
+                    deleted_at: r.item.deleted_at,
+                    ..ItemRef::default()
+                };
+                (r.item.id, ref_)
+            })
             .collect())
     }
 }
