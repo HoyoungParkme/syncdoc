@@ -333,7 +333,7 @@ impl SpecService<'_> {
     pub async fn validate(
         &mut self,
         body: &str,
-        doc_type: DocType,
+        doc_type: &str,
         entry: Entry,
         current_status: Option<DocStatus>,
     ) -> Result<ValidateResult, Problem> {
@@ -341,10 +341,10 @@ impl SpecService<'_> {
         let deleted = self
             .deleted_item_ids(fm.get("doc_id").map(String::as_str))
             .await?;
-        let body = body.to_string();
+        let (body, doc_type) = (body.to_string(), doc_type.to_string());
         // 긴 본문 파싱은 일꾼 스레드를 막지 않게 (SYNC-STD-004#DEV-16)
         tokio::task::spawn_blocking(move || {
-            SpecService::check(&body, doc_type, entry, current_status, &deleted)
+            SpecService::check(&body, &doc_type, entry, current_status, &deleted)
         })
         .await
         .map_err(|e| Problem::Internal {
@@ -376,14 +376,16 @@ impl SpecService<'_> {
     }
 
     /// SYNC-MS-014#SpecService.check
+    ///
+    /// 타입은 문자열 그대로 — 모르는 타입도 파이썬처럼 `frontmatter.type` 위반까지 간다
     pub fn check(
         body: &str,
-        doc_type: DocType,
+        doc_type: &str,
         entry: Entry,
         current_status: Option<DocStatus>,
         deleted: &HashSet<String>,
     ) -> ValidateResult {
-        let dt = doc_type.as_str();
+        let dt = doc_type;
         let mut v: Vec<Violation> = Vec::new();
         let mut w: Vec<Warning> = Vec::new();
         let (fm, _) = markdown::parse_frontmatter(body);
@@ -524,7 +526,7 @@ impl SpecService<'_> {
                 // 단어형 ID 타입에서만 — 절 제목이 항목으로 오인될 위험이 그쪽에만 있다. H1은 문서 제목
                 if h[1].len() > 1
                     && item_re.is_some()
-                    && matches!(doc_type, DocType::Dom | DocType::Ms | DocType::Api)
+                    && matches!(dt, "DOM" | "MS" | "API")
                     && !tok.starts_with(is_decimal)
                 {
                     let head: String = text.chars().take(40).collect();
@@ -553,19 +555,19 @@ impl SpecService<'_> {
                 w.push(warning("section.missing", s));
             }
         }
-        if items.is_empty() && !matches!(doc_type, DocType::Code | DocType::Std) {
+        if items.is_empty() && !matches!(dt, "CODE" | "STD") {
             w.push(warning("item.none", ""));
         }
         // 6. DOM 클래스 명세 — 2장·4장 엔티티 속성 대조 · 「폴더 구조」 절의 층 표(카드 BM)
-        if doc_type == DocType::Dom && title.unwrap_or("").contains("클래스") {
+        if dt == "DOM" && title.unwrap_or("").contains("클래스") {
             w.extend(entity_mismatch(body));
             if !has_layer_table(&lines) {
                 w.push(warning("layer.table", ""));
             }
         }
         // 7. INFRA 제약 — 줄 머리 「출처:」 (STD-001 2.5·4장, #120). 마스킹한 줄이라 코드블록 안은 안 센다
-        if doc_type == DocType::Infra {
-            for b in SpecService::item_blocks(body, doc_type, title) {
+        if dt == "INFRA" {
+            for b in SpecService::item_blocks(body, DocType::Infra, title) {
                 if !lines[b.start_line..b.end_line]
                     .iter()
                     .any(|x| x.starts_with("출처:"))
@@ -584,7 +586,7 @@ impl SpecService<'_> {
     pub fn apply_frontmatter(
         body: &str,
         doc_id: &str,
-        doc_type: DocType,
+        doc_type: &str,
         status: DocStatus,
     ) -> Result<String, Problem> {
         let (fm, fm_lines) = markdown::parse_frontmatter(body);
@@ -593,8 +595,7 @@ impl SpecService<'_> {
                 .captures(body)
                 .map_or_else(|| doc_id.to_string(), |c| strip(&c[1]).to_string());
             return Ok(format!(
-                "---\ndoc_id: {doc_id}\ntype: {}\ntitle: {title}\nstatus: {}\n---\n{body}",
-                doc_type.as_str(),
+                "---\ndoc_id: {doc_id}\ntype: {doc_type}\ntitle: {title}\nstatus: {}\n---\n{body}",
                 status.as_str()
             ));
         }
@@ -614,7 +615,7 @@ impl SpecService<'_> {
         // 덮어쓸 키 — 첫 줄만 바꾸고, 없는 키는 이 차례로 끝에 더한다
         let mut forced: IndexMap<&str, &str> = IndexMap::from([
             ("doc_id", doc_id),
-            ("type", doc_type.as_str()),
+            ("type", doc_type),
             ("status", status.as_str()),
         ]);
         let lines: Vec<&str> = body.split('\n').collect();
