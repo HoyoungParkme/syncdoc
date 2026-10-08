@@ -6,4 +6,5 @@ pub mod clock;
 pub mod errors;
 pub mod migrate;
 pub mod pycompat;
+pub mod spec;
 pub mod types;

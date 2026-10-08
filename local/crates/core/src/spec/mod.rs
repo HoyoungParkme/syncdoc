@@ -1,0 +1,6 @@
+//! spec — 문서·항목·버전과 명세 엔진 (SYNC-DOM-004 4.3 · SYNC-MS-014)
+
+pub mod model;
+pub mod repo;
+
+pub use model::{DocumentRow, ItemRow, VersionRow};
