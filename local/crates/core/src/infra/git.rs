@@ -267,4 +267,16 @@ impl Git {
         }
         Ok(())
     }
+
+    /// SYNC-MS-019#Git.clone
+    pub async fn clone(&self, remote: &str, workdir: &Path) -> Result<(), Problem> {
+        self.run(None, &[os("clone"), os(remote), workdir.as_os_str()])
+            .await?;
+        self.run(
+            Some(workdir),
+            &[os("remote"), os("set-url"), os("origin"), os(remote)],
+        )
+        .await?;
+        Ok(())
+    }
 }
