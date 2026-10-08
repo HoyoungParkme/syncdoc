@@ -1,15 +1,38 @@
 //! queries — 읽기 조합 (SYNC-MS-018 · SYNC-DOM-004 4.7). 파이썬 판 `core/queries.py`와 같은 이름·같은 처리.
-//! 여러 묶음의 서비스를 불러 응답 하나로 엮는다 — 쓰지 않는다. 지금(카드 L6)은 프로젝트 요약 하나다.
+//! 여러 묶음의 서비스를 불러 응답 하나로 엮는다 — 쓰지 않는다. 프로젝트 요약(L6)과 MCP 읽기 도구의 넷(L7).
 
 use indexmap::IndexMap;
 use sqlx::PgConnection;
 
 use crate::account::model::UserRow;
+use crate::account::service::AccountService;
 use crate::errors::Problem;
 use crate::project::service::{ProjectService, ServerRepos};
 use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
-use crate::types::{ProjectSummary, STAGES, StageSummary, Storage};
+use crate::types::{
+    ApiAuthor, AuthorRef, DocumentSummary, ProjectSummary, STAGES, StageSummary, Storage,
+};
+
+/// 작성자(id만) → 이름 붙은 작성자 — 파이썬 `_api_author`. 지시자는 id가 있을 때만
+async fn api_author(
+    db: &mut PgConnection,
+    r: Option<&AuthorRef>,
+) -> Result<Option<ApiAuthor>, Problem> {
+    let Some(r) = r else {
+        return Ok(None);
+    };
+    let ids: Vec<i32> = std::iter::once(r.user_id)
+        .chain(r.instructed_by_id)
+        .collect();
+    let names = AccountService { db }.users_by_ids(&ids).await?;
+    Ok(Some(ApiAuthor {
+        kind: r.kind.clone(),
+        user: names.get(&r.user_id).cloned(),
+        instructed_by: r.instructed_by_id.and_then(|i| names.get(&i).cloned()),
+        via: r.via.clone(),
+    }))
+}
 
 /// SYNC-MS-018#queries.project_summary
 pub async fn project_summary(
@@ -96,4 +119,37 @@ pub async fn project_summary(
         (b.updated_at.is_some(), b.updated_at).cmp(&(a.updated_at.is_some(), a.updated_at))
     });
     Ok(out)
+}
+
+/// SYNC-MS-018#queries.document_list
+pub async fn document_list(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+    stage: Option<i32>,
+    status: Option<&str>,
+) -> Result<Vec<DocumentSummary>, Problem> {
+    let (project, _) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code, user)
+    .await?;
+    let mut docs = SpecService { db: &mut *db }
+        .list_by_project(project.id, stage, status, None)
+        .await?;
+    let ids: Vec<i32> = docs.iter().map(|d| d.id).collect();
+    // 쿼리 한 번 (N+1 금지)
+    let missing = ReferenceService { db: &mut *db }
+        .count_missing_by_document(&ids)
+        .await?;
+    for d in &mut docs {
+        d.counts.insert(
+            "broken_ref".to_string(),
+            missing.get(&d.id).copied().unwrap_or(0),
+        );
+        d.author = api_author(&mut *db, d.last_author.as_ref()).await?;
+    }
+    Ok(docs)
 }
