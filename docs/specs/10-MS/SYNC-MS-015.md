@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-015
 type: MS
 title: MINISPEC — ReferenceService (Rust)
-status: draft
+status: approved
 upstream: [SYNC-DOM-004, SYNC-MS-003, SYNC-STD-004]
 ---
 
