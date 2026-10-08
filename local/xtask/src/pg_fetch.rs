@@ -1,5 +1,6 @@
-//! 개발·시험용 PostgreSQL 바이너리 — theseus-rs/postgresql-binaries 16.15.0 (SYNC-INFRA-001 9.2).
-//! 설치판은 설치 파일이 담는다(카드 L4). 받는 것은 개발 때 한 번이고, 실행 중에는 아무것도 받지 않는다(C10).
+//! PostgreSQL 바이너리 — theseus-rs/postgresql-binaries 16.15.0 (SYNC-INFRA-001 9.2).
+//! 개발·시험용은 `target/pg/16.15.0`(리눅스). 설치 파일 재료는 `package`가 대상마다 받아 담는다(카드 L4).
+//! 받는 것은 개발·빌드 때뿐이고, 실행 중에는 아무것도 받지 않는다(C10).
 
 use std::fs;
 use std::process::Command;
@@ -9,16 +10,34 @@ use sha2::{Digest, Sha256};
 use crate::local_root;
 
 pub const VERSION: &str = "16.15.0";
-const TARGET: &str = "x86_64-unknown-linux-gnu";
+pub const LINUX: &str = "x86_64-unknown-linux-gnu";
+pub const WINDOWS: &str = "x86_64-pc-windows-msvc";
 
-pub fn run() -> Result<(), String> {
+/// `cargo xtask pg-fetch [--target T]` — 리눅스(기본)는 개발용 자리, 다른 대상은 `target/pg/{대상}/16.15.0`
+pub fn run(target: Option<String>) -> Result<(), String> {
+    let target = target.unwrap_or_else(|| LINUX.to_string());
     let root = local_root().join("target").join("pg");
-    let dest = root.join(VERSION);
-    if dest.join("bin").join("postgres").is_file() {
+    let dest = if target == LINUX {
+        root.join(VERSION)
+    } else {
+        root.join(&target).join(VERSION)
+    };
+    fetch(&target, &dest)
+}
+
+/// 대상의 바이너리를 `dest`에 푼다 — 해시를 보고, 이미 있으면 그대로
+pub fn fetch(target: &str, dest: &std::path::Path) -> Result<(), String> {
+    let root = local_root().join("target").join("pg");
+    let postgres = if target.contains("windows") {
+        "postgres.exe"
+    } else {
+        "postgres"
+    };
+    if dest.join("bin").join(postgres).is_file() {
         println!("이미 있다 — {}", dest.display());
         return Ok(());
     }
-    let name = format!("postgresql-{VERSION}-{TARGET}.tar.gz");
+    let name = format!("postgresql-{VERSION}-{target}.tar.gz");
     let url = format!(
         "https://github.com/theseus-rs/postgresql-binaries/releases/download/{VERSION}/{name}"
     );
@@ -37,18 +56,22 @@ pub fn run() -> Result<(), String> {
     if got != want {
         return Err(format!("sha256이 다르다 — {name}"));
     }
-    fs::create_dir_all(&dest).map_err(|e| e.to_string())?;
+    fs::create_dir_all(dest).map_err(|e| e.to_string())?;
     let ok = Command::new("tar")
         .arg("-xzf")
         .arg(&archive)
         .arg("-C")
-        .arg(&dest)
+        .arg(dest)
         .arg("--strip-components=1")
         .status()
         .map_err(|e| e.to_string())?
         .success();
     if !ok {
         return Err("tar로 풀지 못했다".into());
+    }
+    if target.contains("windows") {
+        println!("받았다 — {}", dest.display());
+        return Ok(());
     }
     let ldd = Command::new("ldd")
         .arg(dest.join("bin").join("postgres"))
@@ -67,7 +90,7 @@ pub fn run() -> Result<(), String> {
     Ok(())
 }
 
-fn curl(url: &str, to: &std::path::Path) -> Result<(), String> {
+pub fn curl(url: &str, to: &std::path::Path) -> Result<(), String> {
     let ok = Command::new("curl")
         .args(["-fsSL", "--retry", "3", "-o"])
         .arg(to)

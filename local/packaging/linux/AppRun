@@ -1,0 +1,4 @@
+#!/bin/sh
+# AppImage 진입 — 함께 담은 PostgreSQL은 실행 파일 옆 postgresql/ (SYNC-MS-012 paths.pg_dir)
+HERE="$(dirname "$(readlink -f "$0")")"
+exec "$HERE/usr/bin/syncdoc-local" "$@"
