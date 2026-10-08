@@ -9,6 +9,8 @@
 //! - `icon` — `packaging/icon.svg`에서 icon.ico·icon.png·tray.rgba를 만든다(카드 L4)
 //! - `mcp-tools [--check]` — 파이썬 판 MCP 서버에서 `crates/server/src/mcp/declarations.json`을 뽑는다(카드 L3)
 //! - `unicode-tables [--check]` — 파이썬 3.12의 문자 분류 표 `crates/core/src/pycompat/unicode.rs`를 뽑는다(카드 L5)
+//! - `spec-golden [--check]` — 명세 엔진의 정답 파일 `crates/core/tests/golden/spec.json`을 파이썬 판으로 만든다(카드 L5)
+//! - `spec-diff [--seed S] [--count N]` — 지금의 명세·git 이력·무작위 본문을 두 판에 돌려 비교한다(카드 L5)
 
 mod icon;
 mod mcp_tools;
@@ -16,6 +18,8 @@ mod migrations;
 mod package;
 mod pg_fetch;
 mod schema;
+mod spec_diff;
+mod spec_golden;
 mod testdb;
 mod unicode_tables;
 
@@ -66,6 +70,18 @@ enum Cmd {
         #[arg(long)]
         check: bool,
     },
+    /// 명세 엔진의 정답 파일을 파이썬 판으로 만든다 (--check: 다시 만들어 비교만)
+    SpecGolden {
+        #[arg(long)]
+        check: bool,
+    },
+    /// 명세 엔진 차이 시험 — 두 판에 같은 본문을 돌려 비교한다
+    SpecDiff {
+        #[arg(long, default_value_t = 20261008)]
+        seed: u64,
+        #[arg(long, default_value_t = 2000)]
+        count: usize,
+    },
 }
 
 #[tokio::main]
@@ -79,6 +95,8 @@ async fn main() -> ExitCode {
         Cmd::McpTools { check } => mcp_tools::run(check),
         Cmd::Icon => icon::run(),
         Cmd::UnicodeTables { check } => unicode_tables::run(check),
+        Cmd::SpecGolden { check } => spec_golden::run(check),
+        Cmd::SpecDiff { seed, count } => spec_diff::run(seed, count),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

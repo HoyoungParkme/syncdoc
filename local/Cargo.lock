@@ -4565,6 +4565,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "resvg",
+ "serde_json",
  "sha2 0.10.9",
  "sqlx",
  "syncdoc_core",
