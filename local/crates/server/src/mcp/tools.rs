@@ -1,10 +1,27 @@
 //! 도구 부르기 — mcp 2.2.0 `MCPServer._handle_call_tool`·`Tool.run`·`FuncMetadata.pre_parse_json`을 옮겼다.
-//! 인자 검증은 파이썬과 같은 문장을 낸다. 검증을 지난 도구는 그 도구를 만들 카드 전까지 `not-implemented`다
-//! (SYNC-CODE-002 L3 표, 사용자 결정 2026-10-08).
+//! 인자 검증은 파이썬과 같은 문장을 낸다. 검증을 지난 도구는 그 카드가 처리기를 둔다 — 아직이면 `not-implemented`
+//! (SYNC-CODE-002 L3 표, 사용자 결정 2026-10-08). 카드 L6이 `init_project`·`get_template`를 열었다.
+
+use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
+
+use regex::Regex;
+use serde_json::{Map, Value, json};
+use syncdoc_core::account::model::UserRow;
+use syncdoc_core::errors::Problem;
+use syncdoc_core::markdown::masked_lines;
+use syncdoc_core::project::service::ProjectService;
+use syncdoc_core::pycompat::chars::strip;
+use syncdoc_core::pycompat::re::compile;
+use syncdoc_core::queries;
+use syncdoc_core::spec::{SUBTYPES, TYPES};
+use syncdoc_core::types::{DocumentSummary, ProjectSummary, Storage, py_isoformat};
 
 use crate::compat::pydantic::{Failure, Opts};
 use crate::compat::pyjson::{self, Depth};
-use crate::compat::pyvalue::{PyDict, PyValue};
+use crate::compat::pyvalue::{PyDict, PyStr, PyValue};
+use crate::state::AppState;
+use crate::web::routes::specs::builtin;
 
 use super::decl::decl;
 
@@ -12,7 +29,12 @@ use super::decl::decl;
 pub const ARG_JSON_DEPTH: Depth = Depth(9_987);
 
 /// `tools/call` 결과 JSON — 늘 `CallToolResult`(오류도 `isError`로)
-pub fn call(name: &str, arguments: Option<&PyValue>) -> String {
+pub async fn call(
+    state: &AppState,
+    user: Option<&UserRow>,
+    name: &str,
+    arguments: Option<&PyValue>,
+) -> String {
     let d = decl();
     let Some(tool) = d.tools.get(name) else {
         return error_result(&format!("Unknown tool: {name}"));
@@ -26,16 +48,339 @@ pub fn call(name: &str, arguments: Option<&PyValue>) -> String {
         |k| tool.keys.contains(k),
         |k| tool.str_fields.contains(k),
     );
-    match tool
+    let typed = match tool
         .validator
         .validate(&PyValue::Dict(parsed), Opts::default())
     {
-        Ok(_) => error_result(&not_implemented(tool.card)),
-        Err(Failure::Invalid(e)) => error_result(&format!(
-            "Error executing tool {name}: {}",
-            e.display(&d.url_prefix)
-        )),
-        Err(Failure::Exception(_)) => error_result(&format!("Error executing tool {name}")),
+        Ok(v) => v,
+        Err(Failure::Invalid(e)) => {
+            return error_result(&format!(
+                "Error executing tool {name}: {}",
+                e.display(&d.url_prefix)
+            ));
+        }
+        Err(Failure::Exception(_)) => return error_result(&format!("Error executing tool {name}")),
+    };
+    let Some(user) = user else {
+        // 파이썬 `_user` — 토큰 없이 닿지 않는다(인증이 먼저 막는다)
+        return error_result(&problem_text(&Value::Object(problem_dict(
+            &Problem::Blank {
+                status: 401,
+                title: "unauthorized".into(),
+                detail: Some("토큰 없음".into()),
+            },
+        ))));
+    };
+    let result = match name {
+        "init_project" => init_project(state, user, &typed).await,
+        "get_template" => get_template(state, user, &typed).await,
+        _ => Err(Problem::NotImplemented {
+            card: tool.card.to_string(),
+        }),
+    };
+    match result {
+        Ok(v) => ok_result(&py_dumps(&v)),
+        Err(p) => tool_error(name, &p),
+    }
+}
+
+/// SYNC-API-002#init_project
+async fn init_project(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let code = arg_str(a, "code");
+    let storage = Storage::parse(&arg_str(a, "storage")).unwrap_or(Storage::Github);
+    let mut tx = state.pool.begin().await?;
+    ProjectService {
+        db: &mut tx,
+        repos: &state.repos,
+    }
+    .init_project(
+        &code,
+        &arg_str(a, "name"),
+        user,
+        arg_bool(a, "import_existing"),
+        storage,
+    )
+    .await?;
+    tx.commit().await?;
+    let mut c = state.pool.acquire().await?;
+    let all = queries::project_summary(&mut c, &state.repos, user).await?;
+    let summary = all
+        .into_iter()
+        .find(|p| p.code == code)
+        .ok_or_else(|| Problem::Internal {
+            log: format!("만든 프로젝트 {code}의 요약이 없다"),
+        })?;
+    Ok(project_json(&summary))
+}
+
+/// SYNC-API-002#get_template
+async fn get_template(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let project_code = arg_str(a, "project_code");
+    let doc_type = arg_str(a, "doc_type");
+    let subtype = arg_opt_str(a, "subtype");
+    let Some((_, pats, secs)) = TYPES.iter().find(|(t, _, _)| *t == doc_type) else {
+        return Err(not_found("doc_type", &doc_type));
+    };
+    let subs: Vec<&str> = SUBTYPES
+        .iter()
+        .filter(|(t, _, _, _)| *t == doc_type)
+        .map(|(_, k, _, _)| *k)
+        .collect();
+    if let Some(s) = &subtype
+        && !subs.contains(&s.as_str())
+    {
+        return Err(not_found("subtype", s)); // doc_type이 틀렸을 때와 같은 답 (API-002)
+    }
+    // 소유한 프로젝트만 연다 — 남의 것은 없는 것과 같다
+    let mut tx = state.pool.begin().await?;
+    let (_, repository) = ProjectService {
+        db: &mut tx,
+        repos: &state.repos,
+    }
+    .get_owned(&project_code, user)
+    .await?;
+    tx.commit().await?;
+    let workdir = PathBuf::from(&repository.workdir_path);
+    // 템플릿은 내장이 먼저(#94) · 서브타입 뼈대가 없으면 타입 것
+    let mut name = match &subtype {
+        Some(s) => format!("{doc_type}-{s}"),
+        None => doc_type.clone(),
+    };
+    if subtype.is_some() && builtin(&format!("_templates/{name}.md")).is_none() {
+        name = doc_type.clone();
+    }
+    let template = read_spec_file(
+        state,
+        &workdir,
+        &format!("docs/specs/_templates/{name}.md"),
+        None,
+        true,
+    )
+    .await?;
+    // 규약은 저장소의 {코드}-STD-001이 먼저, 없으면 싱크독 것 (STD-001 2.12, 사용자 결정 2026-10-08)
+    let std = read_spec_file(
+        state,
+        &workdir,
+        &format!("docs/specs/STD/{project_code}-STD-001.md"),
+        Some("docs/specs/STD/SYNC-STD-001.md"),
+        false,
+    )
+    .await?;
+    let (pats, secs): (&[&str], &[&str]) = match &subtype {
+        Some(s) => SUBTYPES
+            .iter()
+            .find(|(t, k, _, _)| *t == doc_type && k == s)
+            .map(|(_, _, p, q)| (*p, *q))
+            .unwrap_or((pats, secs)),
+        None => (pats, secs),
+    };
+    let mut out = Map::new();
+    out.insert("doc_type".into(), Value::from(doc_type.as_str()));
+    out.insert("common_rules".into(), Value::from(section(&std, "1.")));
+    out.insert(
+        "type_rules".into(),
+        json!({
+            "item_patterns": pats,
+            "required_sections": secs,
+            "block_structure": block_structure(&std, &doc_type, subtype.as_deref()),
+        }),
+    );
+    out.insert("template".into(), Value::from(template));
+    out.insert("example".into(), Value::from(section(&std, "5.")));
+    match &subtype {
+        Some(s) => {
+            out.insert("subtype".into(), Value::from(s.as_str()));
+        }
+        None if !subs.is_empty() => {
+            out.insert("subtypes".into(), json!(subs));
+        }
+        None => {}
+    }
+    Ok(Value::Object(out))
+}
+
+/// 프로젝트 저장소의 파일, 없으면 앱에 내장된 사본 — 파이썬 `_read_spec_file`.
+/// `prefer_builtin`이면 내장이 먼저, 저장소는 내장에 없을 때만
+async fn read_spec_file(
+    state: &AppState,
+    workdir: &Path,
+    path: &str,
+    fallback: Option<&str>,
+    prefer_builtin: bool,
+) -> Result<String, Problem> {
+    let local = |p: &str| builtin(p.strip_prefix("docs/specs/").unwrap_or(p));
+    if prefer_builtin && let Some(t) = local(path) {
+        return Ok(t);
+    }
+    match state.repos.git.read(workdir, path, "HEAD").await {
+        Ok(t) => Ok(t),
+        // 작업 사본이 없거나(OSError) 파일이 없으면(GitError) 내장 사본
+        Err(Problem::Git { .. } | Problem::Internal { .. }) => [Some(path), fallback]
+            .into_iter()
+            .flatten()
+            .find_map(local)
+            .ok_or_else(|| not_found("file", path)),
+        Err(other) => Err(other),
+    }
+}
+
+/// `## N. 제목` 절 하나 — 다음 `## `까지. 코드블록 안 헤딩은 무시 (파이썬 `_section`)
+fn section(text: &str, prefix: &str) -> String {
+    let lines: Vec<&str> = text.split('\n').collect();
+    let masked = masked_lines(text);
+    let head = format!("## {prefix}");
+    let Some(start) = masked.iter().position(|m| m.starts_with(&head)) else {
+        return String::new();
+    };
+    let end = (start + 1..masked.len())
+        .find(|&i| masked[i].starts_with("## "))
+        .unwrap_or(lines.len());
+    strip(&lines[start..end].join("\n")).to_string()
+}
+
+static SUB_SECTION: LazyLock<Regex> = LazyLock::new(|| compile(r"(?m)^### 2\.\d+ "));
+static BOLD_HEAD: LazyLock<Regex> = LazyLock::new(|| compile(r"(?m)^\*\*([^*\n]+)\*\*\s*$"));
+static BLOCK_ROW: LazyLock<Regex> = LazyLock::new(|| compile(r"(?m)^\| 항목 블록 \| (.+?) \|$"));
+
+/// STD-001 2장 타입 표의 「항목 블록」 행 — 서브타입이면 그 굵은 머리 아래 표만 (파이썬 `_block_structure`)
+fn block_structure(std: &str, doc_type: &str, subtype: Option<&str>) -> String {
+    let sec = section(std, "2.");
+    for chunk in SUB_SECTION.split(&sec).skip(1) {
+        if !chunk.starts_with(doc_type) {
+            continue;
+        }
+        let mut chunk = chunk;
+        if let Some(sub) = subtype {
+            let heads: Vec<_> = BOLD_HEAD.captures_iter(chunk).collect();
+            for (i, h) in heads.iter().enumerate() {
+                if h[1].contains(sub) {
+                    let end = heads
+                        .get(i + 1)
+                        .map_or(chunk.len(), |n| n.get(0).map_or(chunk.len(), |m| m.start()));
+                    let from = h.get(0).map_or(0, |m| m.end());
+                    chunk = &chunk[from..end];
+                    break;
+                }
+            }
+        }
+        if let Some(m) = BLOCK_ROW.captures(chunk) {
+            return m[1].to_string();
+        }
+    }
+    String::new()
+}
+
+fn not_found(resource: &str, id: &str) -> Problem {
+    Problem::NotFound {
+        resource: resource.to_string(),
+        id: Value::from(id),
+    }
+}
+
+/// 파이썬 `_project_json` — 시각은 `isoformat()`(`+00:00`)
+pub fn project_json(p: &ProjectSummary) -> Value {
+    json!({
+        "code": p.code,
+        "name": p.name,
+        "storage": p.storage.as_str(),
+        "remote_url": p.remote_url,
+        "stages": p.stages,
+        "std_docs": p.std_docs.iter().map(summary_json).collect::<Vec<_>>(),
+        "counts": p.counts,
+        "updated_at": p.updated_at.map(py_isoformat),
+    })
+}
+
+/// 파이썬 `_summary_json` — 이 경로의 문서 요약에는 이름 붙은 작성자가 없다(`last_author` 없음)
+fn summary_json(d: &DocumentSummary) -> Value {
+    json!({
+        "doc_id": d.doc_id,
+        "doc_type": d.doc_type,
+        "stage": d.stage,
+        "status": d.status,
+        "version_no": d.current_version_no,
+        "has_convention_error": d.has_convention_error,
+        "incomplete_warnings": d.incomplete_warnings,
+        "updated_at": py_isoformat(d.updated_at),
+        "last_author": Value::Null,
+        "counts": d.counts,
+    })
+}
+
+fn arg<'a>(v: &'a PyValue, name: &str) -> Option<&'a PyValue> {
+    v.as_dict().and_then(|d| d.get(&PyStr::from(name)))
+}
+
+fn arg_str(v: &PyValue, name: &str) -> String {
+    match arg(v, name) {
+        Some(PyValue::Str(PyStr::Utf8(s))) => s.clone(),
+        Some(PyValue::Str(s)) => s.repr(),
+        _ => String::new(),
+    }
+}
+
+fn arg_opt_str(v: &PyValue, name: &str) -> Option<String> {
+    match arg(v, name) {
+        None | Some(PyValue::None) => None,
+        Some(_) => Some(arg_str(v, name)),
+    }
+}
+
+fn arg_bool(v: &PyValue, name: &str) -> bool {
+    matches!(arg(v, name), Some(PyValue::Bool(true)))
+}
+
+/// 파이썬 `Problem.to_dict()` — type·title·status·detail(비면 뺌)·확장 필드 차례
+fn problem_dict(p: &Problem) -> Map<String, Value> {
+    let mut m = Map::new();
+    m.insert(
+        "type".into(),
+        Value::from(match p.kind() {
+            Some(k) => format!("urn:syncdoc:{k}"),
+            None => "about:blank".to_string(),
+        }),
+    );
+    m.insert("title".into(), Value::from(p.title()));
+    m.insert("status".into(), Value::from(p.status()));
+    if let Some(d) = p.detail().filter(|d| !d.is_empty()) {
+        m.insert("detail".into(), Value::from(d));
+    }
+    for (k, v) in p.extras() {
+        m.insert(k.into(), v);
+    }
+    m
+}
+
+fn problem_text(v: &Value) -> String {
+    py_dumps(v)
+}
+
+/// 처리기의 실패 — 문제(Problem)는 `_problem`의 JSON, git 실패 같은 예외는 MCP SDK의 「Error executing tool」 문장
+fn tool_error(name: &str, p: &Problem) -> String {
+    match p {
+        Problem::Git { .. } | Problem::Internal { .. } => {
+            error_result(&format!("Error executing tool {name}: {p}"))
+        }
+        _ => error_result(&problem_text(&Value::Object(problem_dict(p)))),
+    }
+}
+
+/// 파이썬 `json.dumps(x, ensure_ascii=False)` — 기본 구분자 `, `·`: `, 키는 넣은 차례
+pub fn py_dumps(v: &Value) -> String {
+    match v {
+        Value::Object(m) => {
+            let items: Vec<String> = m
+                .iter()
+                .map(|(k, v)| format!("{}: {}", py_json_str(k), py_dumps(v)))
+                .collect();
+            format!("{{{}}}", items.join(", "))
+        }
+        Value::Array(a) => format!(
+            "[{}]",
+            a.iter().map(py_dumps).collect::<Vec<_>>().join(", ")
+        ),
+        Value::String(s) => py_json_str(s),
+        other => other.to_string(),
     }
 }
 
@@ -64,18 +409,17 @@ fn pre_parse_json(
     out
 }
 
-/// 파이썬 판 도구의 `_problem(NotImplementedYet(card))` — `json.dumps(…, ensure_ascii=False)`(기본 구분자)
-fn not_implemented(card: &str) -> String {
-    format!(
-        "{{\"type\": \"urn:syncdoc:not-implemented\", \"title\": \"not-implemented\", \"status\": 501, \"detail\": {}, \"card\": {}}}",
-        py_json_str(&format!("{card}: 아직 구현되지 않음")),
-        py_json_str(card)
-    )
-}
-
 /// 파이썬 `json.dumps(str, ensure_ascii=False)` — 제어 글자·따옴표·역슬래시만 이스케이프
 fn py_json_str(s: &str) -> String {
     serde_json::to_string(s).unwrap_or_default()
+}
+
+/// `CallToolResult(content=[TextContent(text)])`를 판의 꼴로 — 키는 알파벳 차례, `isError`는 거짓으로 실린다
+fn ok_result(text: &str) -> String {
+    format!(
+        "{{\"content\":[{{\"text\":{},\"type\":\"text\"}}],\"isError\":false}}",
+        serde_json::to_string(text).unwrap_or_default()
+    )
 }
 
 /// `CallToolResult(content=[TextContent(text)], is_error=True)`를 판의 꼴로 — 키는 알파벳 차례
@@ -91,18 +435,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn unknown_tool_like_python() {
+    fn dumps_like_python() {
+        let v = json!({"a": 1, "b": [true, null, "가\"\n"], "c": {}});
         assert_eq!(
-            call("nope", None),
-            r#"{"content":[{"text":"Unknown tool: nope","type":"text"}],"isError":true}"#
+            py_dumps(&v),
+            r#"{"a": 1, "b": [true, null, "가\"\n"], "c": {}}"#
         );
     }
 
     #[test]
-    fn valid_call_is_not_implemented_with_its_card() {
-        let mut a = PyDict::new();
-        a.insert("doc_id".into(), PyValue::str("X-PRD-001"));
-        let out = call("get_document", Some(&PyValue::Dict(a)));
-        assert!(out.contains(r#"\"card\": \"L7\""#), "{out}");
+    fn section_and_block_structure_follow_std_001() {
+        let std = builtin("STD/SYNC-STD-001.md").expect("내장 규약");
+        assert!(section(&std, "1.").starts_with("## 1."));
+        assert!(!block_structure(&std, "PRD", None).is_empty());
+        assert_ne!(
+            block_structure(&std, "DOM", Some("클래스")),
+            block_structure(&std, "DOM", Some("도메인"))
+        );
     }
 }

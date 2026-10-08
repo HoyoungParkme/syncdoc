@@ -2,8 +2,11 @@
 //! `shared/jsonrpc_dispatcher.py`(예외 → 오류)·`MCPServer` 처리기를 옮겼다 (SYNC-API-002 1장).
 //! 세션 없는 전송이라 요청마다 연결이 새로 나고 「태어날 때부터 준비됨」이다 — initialize 문지기가 없다.
 
+use syncdoc_core::account::model::UserRow;
+
 use crate::compat::pydantic::{Failure, Opts};
 use crate::compat::pyvalue::{PyDict, PyStr, PyValue};
+use crate::state::AppState;
 
 use super::decl::decl;
 use super::tools;
@@ -63,8 +66,14 @@ fn field<'a>(v: &'a PyValue, name: &str) -> Option<&'a PyValue> {
     v.as_dict().and_then(|d| d.get(&PyStr::from(name)))
 }
 
-/// `ServerRunner._on_request` — `version`은 요청 머리의 판(없으면 기본 판)
-pub fn dispatch(method: &str, params: Option<&PyValue>, version: &str) -> Outcome {
+/// `ServerRunner._on_request` — `version`은 요청 머리의 판(없으면 기본 판). `user`는 토큰 발급자
+pub async fn dispatch(
+    state: &AppState,
+    user: Option<&UserRow>,
+    method: &str,
+    params: Option<&PyValue>,
+    version: &str,
+) -> Outcome {
     let d = decl();
     // RequestStateBoundary — 미들웨어라 판 문지기·검증보다 먼저. 봉인 키가 프로세스마다 새것이라
     // 클라이언트가 보낸 requestState는 무엇이든 풀리지 않는다(mcp server/request_state.py)
@@ -145,7 +154,7 @@ pub fn dispatch(method: &str, params: Option<&PyValue>, version: &str) -> Outcom
         "tools/call" => {
             let name = field(&typed, "name").map(text).unwrap_or_default();
             let args = field(&typed, "arguments").filter(|a| !a.is_none());
-            Outcome::Ok(tools::call(&name, args))
+            Outcome::Ok(tools::call(state, user, &name, args).await)
         }
         _ => method_not_found(method),
     }

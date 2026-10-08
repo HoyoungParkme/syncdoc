@@ -17,6 +17,7 @@ use crate::state::AppState;
 use crate::web::guard::guard;
 use crate::web::problem::{method_not_allowed, panic_response};
 use crate::web::routes::account::{issue_token, list_tokens, me, revoke_token};
+use crate::web::routes::projects::{delete_project, init_project, list_projects};
 use crate::web::routes::specs::spec_copy;
 use crate::web::static_files::fallback;
 
@@ -27,6 +28,8 @@ pub fn app(state: AppState) -> Router {
         .route("/api/me", get(me))
         .route("/api/me/tokens", get(list_tokens).post(issue_token))
         .route("/api/me/tokens/{token_id}", delete(revoke_token))
+        .route("/api/projects", get(list_projects).post(init_project))
+        .route("/api/projects/{code}", delete(delete_project))
         .merge(mcp::router(state.clone()))
         .route("/specs/", get(spec_copy))
         .route("/specs/{*path}", get(spec_copy))

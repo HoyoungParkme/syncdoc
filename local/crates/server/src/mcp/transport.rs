@@ -5,14 +5,17 @@
 use std::time::Duration;
 
 use axum::body::{Body, Bytes};
-use axum::extract::Request;
+use axum::extract::{Request, State};
 use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use futures_util::stream;
 use jiter::JsonValue;
 
+use syncdoc_core::account::model::UserRow;
+
 use crate::compat::pydantic::{Failure, Opts};
 use crate::compat::pyvalue::{PyStr, PyValue};
+use crate::state::AppState;
 
 use super::decl::decl;
 use super::dispatch::{self, ErrData, Outcome};
@@ -72,8 +75,9 @@ fn accepts(headers: &HeaderMap) -> (bool, bool) {
     (json, sse)
 }
 
-/// `/mcp` 처리 — 인증은 바깥(`auth::bearer`)이 이미 했다
-pub async fn handle(req: Request) -> Response {
+/// `/mcp` 처리 — 인증은 바깥(`auth::bearer`)이 이미 했다. 토큰 발급자는 요청에 실려 온다
+pub async fn handle(State(state): State<AppState>, req: Request) -> Response {
+    let user = req.extensions().get::<UserRow>().cloned();
     let (parts, body) = req.into_parts();
     let headers = parts.headers;
     // RequestBodyLimitMiddleware — 선언한 길이부터, 그다음 읽으며
@@ -92,7 +96,7 @@ pub async fn handle(req: Request) -> Response {
         return modern(&parts.method, &bytes);
     }
     match parts.method {
-        Method::POST => post(&headers, &bytes, hint.as_deref()),
+        Method::POST => post(&state, user.as_ref(), &headers, &bytes, hint.as_deref()).await,
         Method::GET => get(&headers),
         Method::DELETE => rpc_error(
             StatusCode::METHOD_NOT_ALLOWED,
@@ -103,7 +107,13 @@ pub async fn handle(req: Request) -> Response {
     }
 }
 
-fn post(headers: &HeaderMap, bytes: &Bytes, hint: Option<&str>) -> Response {
+async fn post(
+    state: &AppState,
+    user: Option<&UserRow>,
+    headers: &HeaderMap,
+    bytes: &Bytes,
+    hint: Option<&str>,
+) -> Response {
     // TransportSecurityMiddleware — POST는 Content-Type을 먼저 본다(소문자로 application/json 시작)
     let ct = first(headers, "content-type");
     if !ct
@@ -189,7 +199,7 @@ fn post(headers: &HeaderMap, bytes: &Bytes, hint: Option<&str>) -> Response {
     };
     let params = field("params").filter(|p| !p.is_none());
     let version = hint.map_or_else(|| d.default_negotiated.clone(), str::to_string);
-    let outcome = dispatch::dispatch(&method, params.as_ref(), &version);
+    let outcome = dispatch::dispatch(state, user, &method, params.as_ref(), &version).await;
     sse_message(&envelope(&id, outcome))
 }
 

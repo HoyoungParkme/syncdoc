@@ -504,7 +504,7 @@ syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 | MCP | 파이썬 mcp SDK 2.2.0의 핸드셰이크 경로를 옮겼다(세션 없는 streamable HTTP) · 도구 선언은 파이썬 판에서 뽑는다(`cargo xtask mcp-tools`) | [[SYNC-API-002]] 도구 13을 같은 이름·설명·검증 문장으로 — 사용자 결정 2026-10-08(바이트까지 같다). rmcp는 SSE 꼴·검증 문장을 맞출 수 없어 쓰지 않는다 |
 | 데이터베이스 | PostgreSQL 16을 함께 담는다 — 바이너리(theseus 16.15)를 설치 폴더에 두고 `initdb`·`postgres`·`pg_ctl`을 앱이 직접 부른다 · 역할·DB `syncdoc` · 연결 수·메모리는 기본값 · sqlx | 파이썬 판과 같은 표([[SYNC-DOM-003]]). 역할 이름까지 같아 한 판의 덤프가 다른 판에 그대로 들어간다. 시험용 라이브러리(postgresql_embedded)는 fsync를 끄고 멈출 때 데이터 폴더를 지워 쓰지 않는다 · 기본값이어도 쓰는 만큼만 메모리에 올라온다(사용자 결정 2026-10-07 — L17에서 잰다) |
 | 이전 | **Alembic이 유일한 원본**이다. `alembic upgrade --sql`로 만든 SQL을 `local/migrations/`에 두고 실행 파일에 담는다. 이전 기록은 같은 `alembic_version` 표 | 스키마가 두 구현으로 갈리지 않게. 두 판의 스키마가 같은지는 검사로 본다 |
-| git | 윈도는 MinGit을 함께 담는다(GPL 고지와 원본 안내를 설치 파일에). 리눅스는 시스템 git(.deb가 의존한다) | 순수 Rust git은 아직 push를 받지 못한다(2026-10, gitoxide·libgit2) |
+| git | 윈도는 MinGit을 함께 담는다(GPL 고지와 원본 안내를 설치 파일에). 리눅스는 시스템 git(.deb가 의존한다) · **사용자 git 설정을 막는다** — 시스템·전역 설정 대신 빈 파일, 프롬프트·서명·autocrlf·자격 도우미 끔, `LC_ALL=C`, `safe.directory=*`(사용자 결정 2026-10-08) | 순수 Rust git은 아직 push를 받지 못한다(2026-10, gitoxide·libgit2). 파이썬 판은 Docker 안이라 사용자 설정이 없다 — 같은 깨끗한 환경을 만들어 같은 명령이 같은 결과를 낸다 |
 | 코드 그래프 | tree-sitter(파이썬·TS·JS·Rust 문법)로 함수·호출을 뽑고 graphrs Louvain(seed 42)으로 커뮤니티를 나눈다 | graphify는 파이썬 전용이다. 커뮤니티 모양은 파이썬 판과 조금 다를 수 있다 |
 | 모델 호출 | reqwest 스트리밍 — OpenAI 호환 Chat Completions | 5.3 그대로 |
 | 첨부 | PDF 글자는 pdf_oxide | 5.3 그대로 |

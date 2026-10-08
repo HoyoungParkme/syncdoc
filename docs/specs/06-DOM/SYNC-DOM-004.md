@@ -76,14 +76,14 @@ crates/app/src/
 ```
 crates/server/src/
 ├── lib.rs                      라우터 조립 · /health
-├── state.rs                    AppState — 연결 풀 · 로컬 사용자 설정 · 공개 주소
+├── state.rs                    AppState — 연결 풀 · 로컬 사용자 설정 · 공개 주소 · 서버 저장소 자리(`ServerRepos`, L6)
 ├── web/
 │   ├── guard.rs                Host·Origin 가드 (SEQ-C3) — 라우팅 바깥에서 모든 요청에
 │   ├── auth.rs                 현재 사용자 — 로컬 사용자
 │   ├── problem.rs              problem+json 응답 · 405 · 패닉
 │   ├── static_files.rs         화면 빌드(rust-embed) · 캐시 규칙 · 304 (INFRA 4.1)
 │   ├── schemas.rs              응답 형태 (API-001 4장)
-│   └── routes/                 API-001 경로 — account(/api/me · /api/me/tokens) · specs(/specs)
+│   └── routes/                 API-001 경로 — account(/api/me · /api/me/tokens) · specs(/specs) · projects(/api/projects 목록·만들기·지우기, L6)
 ├── mcp/                        /mcp — 파이썬 mcp SDK의 핸드셰이크 경로를 옮긴 것 (API-002 1장, 카드 L3)
 │   ├── auth.rs                 Bearer → AccountService.authenticate_token, 통과하면 응답 전에 커밋 (SEQ-C2)
 │   ├── transport.rs            streamable HTTP, 세션 없음 — Accept·Content-Type·본문 읽기·SSE 쓰기
@@ -126,10 +126,10 @@ crates/core/
     ├── migrate.rs                  이전 SQL을 올린다 (4.1) — 모든 crate의 시험도 이것으로 DB를 만든다
     ├── pipeline.rs                 쓰기 조율 — 프로젝트마다 읽기·쓰기 락, 순서는 파이썬과 같다
     ├── queries.rs                  읽기 조합
-    └── infra/                      바깥 — git 자식 프로세스 · upload-pack·receive-pack · 모델 호출
+    └── infra/                      바깥 — git 자식 프로세스(`git.rs`, L6 — 사용자 git 설정을 막는다) · upload-pack·receive-pack · 모델 호출
 ```
 
-지금(카드 L5) 있는 것은 `account`·`spec`·`markdown.rs`·`pycompat/`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. `spec/`의 정답 파일은 `crates/core/tests/golden/spec.json`(생성물, `cargo xtask spec-golden`)이다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
+지금(카드 L6) 있는 것은 `account`·`spec`·`project`·`reference`(미존재 참조 세기만)·`markdown.rs`·`pycompat/`·`queries.rs`(프로젝트 요약만)·`infra/git.rs`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. `spec/`의 정답 파일은 `crates/core/tests/golden/spec.json`(생성물, `cargo xtask spec-golden`)이다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
 
 **층** — 함수 단위 명세(MINISPEC 카드·API 엔드포인트·UI 화면)가 없는 코드가 어느 층이고 그 층을 무슨 문서가 정하는지([[SYNC-STD-001]] 2.6). 코드 그래프가 읽는다. 위에서부터 첫 줄이 이긴다. **줄은 카드마다 더한다** — 코드가 없는 줄은 검사기(`check_calls`)가 「안 맞는 줄」로 잡는다. 함수가 없는 파일(구조체만 — `state.rs`·`model.rs`)은 적지 않는다.
 
@@ -317,6 +317,39 @@ crates/core/
 - 켜는 중 실패는 `Problem::Internal`의 로그 문장으로 돌려주고 `main`이 끝 코드 1로 끝난다
 - 윈도에서 관리자 권한으로 켜졌으면 맨 처음 관리자 그룹을 뺀 토큰으로 자신을 다시 켠다 — PostgreSQL은 관리자 권한으로 돌지 않는다. `unsafe`는 이 모듈의 Win32 호출뿐이다(작업 공간 lint `unsafe_code = "deny"`, 이 모듈만 허용, L4)
 
+### 4.2 project (MS-013)
+
+#### ProjectService
+
+```mermaid
+classDiagram
+    class ProjectService {
+        +db: PgConnection
+        +repos: ServerRepos
+        +init_project(code, name, user, import_existing, storage) ProjectRow
+        +delete_project(code, user)
+        +get(code) ProjectRow
+        +get_owned(code, user) ProjectRow
+        +list_owned(user) Vec~ProjectRow~
+    }
+    class ServerRepos {
+        +Git git
+        +PathBuf origins
+        +PathBuf repos
+        +String specs_url
+    }
+    ProjectService --> ServerRepos
+```
+
+| 메서드 | 부르는 곳 | 근거 | 던지는 에러 |
+|---|---|---|---|
+| [[SYNC-MS-013#ProjectService.init_project]] | MCP `init_project` · `POST /api/projects` | [[SYNC-MS-001#ProjectService.init_project]] | `storage-unavailable` · `project-code-invalid` · `project-code-conflict` · `existing-specs` · `push-failed` · `not-implemented`(보관본 재구축, L11) |
+| [[SYNC-MS-013#ProjectService.delete_project]] | `DELETE /api/projects/{code}` | [[SYNC-MS-001#ProjectService.delete_project]] | `not-found` |
+| [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-013#ProjectService.get_owned]] | `get_template` · `delete_project` | [[SYNC-MS-001#ProjectService.get_owned]] | `not-found` |
+| [[SYNC-MS-013#ProjectService.list_owned]] | `queries.project_summary` | [[SYNC-MS-001#ProjectService.list_owned]] | — |
+
+규칙 — [[SYNC-DOM-002]] 4.1과 같다. **싱크독_로컬은 서버 저장뿐이다** — 서버 저장소는 `origins/{code}.git`, 작업 사본은 `repos/{code}`, 지우면 `origins/_archive/{code}-{UTC}.git`으로 보관한다(지우지 않는다). 코드마다 잠금을 쥔다. 동기화·재구축·첨부·git 입구는 그 카드가 더한다.
+
 ### 4.3 spec · markdown (MS-014)
 
 #### SpecService
@@ -368,10 +401,19 @@ classDiagram
 | [[SYNC-MS-014#SpecService.apply_frontmatter]] | 저장 파이프라인의 만들기(L7) | [[SYNC-MS-002#SpecService.apply_frontmatter]] | `convention-violation` |
 | [[SYNC-MS-014#SpecService.diff]] | 이력 diff(L8) | [[SYNC-MS-002#SpecService.diff]] | `not-found` |
 | [[SYNC-MS-014#SpecService.diff_bodies]] | `diff` · `cargo xtask spec-diff` | [[SYNC-MS-002#SpecService.diff]] | — |
+| [[SYNC-MS-014#SpecService.list_by_project]] | `queries.project_summary`(L6) | [[SYNC-MS-002#SpecService.list_by_project]] | — |
 
 markdown 넷([[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-014#markdown.masked_lines]] · [[SYNC-MS-014#markdown.headings]] · [[SYNC-MS-014#markdown.cut_blocks]])은 함수다 — spec과 reference(L7)가 같이 쓴다.
 
 규칙 — [[SYNC-DOM-002]] 4.2와 같다. 항목 판정은 `item_blocks` 한 곳이다. **파이썬 판과 바이트까지 같다**(사용자 결정 2026-10-08) — 문자 분류·repr·정규식·difflib은 `pycompat/`가 파이썬 3.12와 같게 하고, 맞춤은 정답 파일(`cargo test`)과 `cargo xtask spec-diff`가 본다. 항목 패턴 표(`TYPES`·`SUBTYPES`)는 파이썬과 같은 문자열이다. 나머지 메서드(문서·버전 조회, 만들기·저장, 상태, 휴지통…)는 그 카드가 더한다.
+
+### 4.4 reference (MS-015)
+
+| 메서드 | 부르는 곳 | 근거 | 던지는 에러 |
+|---|---|---|---|
+| [[SYNC-MS-015#ReferenceService.count_missing_by_document]] | `queries.project_summary` | [[SYNC-MS-003#ReferenceService.count_missing_by_document]] | — |
+
+`ReferenceService { db }`. 참조 뽑기·풀기(L7)와 조회(L8)는 그 카드가 그림과 함께 더한다.
 
 ### 4.5 account (MS-016)
 
@@ -426,6 +468,40 @@ classDiagram
 | [[SYNC-MS-016#AccountService.authenticate_token]] | MCP 입구(`mcp/auth`) | [[SYNC-SEQ-001#SEQ-C2]] | — |
 
 규칙 — [[SYNC-DOM-002]] 4.6과 같다. 로컬 사용자는 `kind=local` 행 하나뿐이다. 서비스는 연결을 빌려 받고 트랜잭션은 부르는 쪽이 쥔다. 토큰 원문은 발급 응답에만 있고 DB·로그에는 해시만 남는다. 커밋 작성자(L11)는 그 카드가 더한다.
+
+### 4.7 queries (MS-018)
+
+| 함수 | 부르는 곳 | 근거 | 던지는 에러 |
+|---|---|---|---|
+| [[SYNC-MS-018#queries.project_summary]] | `GET`·`POST /api/projects` · MCP `init_project` | [[SYNC-MS-008#queries.project_summary]] | — |
+
+모듈 함수다 — 연결을 첫 인자로 받는다. 나머지 조회는 L8이 더한다.
+
+### 4.8 git (MS-019)
+
+#### Git
+
+```mermaid
+classDiagram
+    class Git {
+        +PathBuf exe
+        +PathBuf global_config
+        +init_bare(path)
+        +clone(remote, workdir)
+        +exists(workdir, path) bool
+        +list(workdir, glob, git_ref) Vec~String~
+        +read(workdir, path, git_ref) String
+        +commit_push(workdir, message, user, files, delete) String
+        +init_specs(specs_url) IndexMap
+    }
+```
+
+| 메서드 | 부르는 곳 | 근거 | 던지는 에러 |
+|---|---|---|---|
+| [[SYNC-MS-019#Git.init_bare]] · [[SYNC-MS-019#Git.clone]] · [[SYNC-MS-019#Git.exists]] · [[SYNC-MS-019#Git.list]] · [[SYNC-MS-019#Git.init_specs]] · [[SYNC-MS-019#Git.commit_push]] | `ProjectService.init_project` | [[SYNC-MS-009]] | `push-failed` · `internal`(git 실패) |
+| [[SYNC-MS-019#Git.read]] | MCP `get_template`(저장소 규약 먼저) | [[SYNC-MS-009#git.read]] | `internal` |
+
+규칙 — git CLI를 자식 프로세스로 부른다(윈도 MinGit · 리눅스 시스템 git). **사용자 git 설정을 막는다**(사용자 결정 2026-10-08) — 시스템·전역 설정 끔, 프롬프트·서명·autocrlf 끔, `LC_ALL=C`, `safe.directory=*`. 파이썬 판이 Docker 안에서 받는 깨끗한 환경과 같게 해 같은 명령이 같은 결과를 낸다. git 입구(upload-pack·receive-pack)는 L10이 더한다.
 
 ---
 

@@ -77,6 +77,13 @@ jobs:
           }
           $me = Invoke-RestMethod http://127.0.0.1:8010/api/me
           if ($me.edition -ne 'closed') { throw "/api/me가 이상하다" }
+          # 함께 담은 MinGit으로 서버 저장 프로젝트를 만들고 지운다 — 권한을 내린 토큰에서도 git이 돈다(카드 L6)
+          $made = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8010/api/projects -ContentType 'application/json' -Body '{"storage":"server","code":"WIN","name":"windows"}'
+          if ($made.code -ne 'WIN' -or $made.storage -ne 'server') { throw "프로젝트를 못 만들었다" }
+          if (-not (Test-Path "$env:LOCALAPPDATA\SyncDoc Local\origins\WIN.git\HEAD")) { throw "서버 저장소가 없다" }
+          if (-not (Test-Path "$env:LOCALAPPDATA\SyncDoc Local\repos\WIN\docs\specs\README.md")) { throw "골격 커밋이 없다" }
+          Invoke-WebRequest -Method Delete -Uri http://127.0.0.1:8010/api/projects/WIN -UseBasicParsing | Out-Null
+          if (-not (Get-ChildItem "$env:LOCALAPPDATA\SyncDoc Local\origins\_archive" -Filter 'WIN-*.git')) { throw "보관되지 않았다" }
           # 러너는 관리자다 — 앱이 권한을 내려놓고 자신을 다시 켜서 둘이 돈다(기다리는 쪽과 서버)
           Write-Output "syncdoc-local 프로세스 $(@(Get-Process syncdoc-local).Count)개"
           # 콘솔이 없어 Ctrl+C를 못 보낸다 — 프로세스를 끝내고 PostgreSQL은 pg_ctl로 멈춘다
@@ -120,6 +127,11 @@ jobs:
           setsid sh -c 'echo $$ > "$1/pid"; exec syncdoc-local --data-dir "$1/d" --port 8010 --no-tray --no-browser' sh "$data" &
           for i in $(seq 1 120); do curl -fsS http://127.0.0.1:8010/health && break; sleep 0.5; done
           curl -fsS http://127.0.0.1:8010/api/me | grep -q '"edition":"closed"'
+          # 시스템 git으로 서버 저장 프로젝트를 만들고 지운다(카드 L6)
+          curl -fsS -X POST -H 'Content-Type: application/json' -d '{"storage":"server","code":"DEB","name":"deb"}' http://127.0.0.1:8010/api/projects | grep -q '"code":"DEB"'
+          test -f "$data/d/origins/DEB.git/HEAD"
+          curl -fsS -X DELETE http://127.0.0.1:8010/api/projects/DEB
+          ls "$data/d/origins/_archive/" | grep -q '^DEB-'
           kill -INT -- "-$(cat "$data/pid")"
           for i in $(seq 1 40); do [ ! -e "$data/d/instance.json" ] && break; sleep 0.5; done
           test ! -e "$data/d/instance.json"

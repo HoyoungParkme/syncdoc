@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-002, SYNC-MS-003, SYNC-STD-001, SYNC-STD-004]
 
 서비스는 연결을 빌려 받는다 — `SpecService<'c> { pub db: &'c mut PgConnection }`. DB가 필요 없는 함수는 연결 없이 부르는 연관 함수다(`SpecService::item_blocks(…)`). 트랜잭션은 부르는 쪽이 쥔다([[SYNC-STD-004#DEV-10]]).
 
-**카드 L5 몫은 엔진이다(2026-10-08)** — 마크다운 넷, 항목 블록, 규약 검증, frontmatter 채움, diff. 나머지 SpecService(문서·버전 조회, 만들기·저장, 상태, 휴지통…)는 쓰는 카드(L6·L7·L8·L9)가 이 문서에 더한다.
+**카드 L5 몫은 엔진이다(2026-10-08)** — 마크다운 넷, 항목 블록, 규약 검증, frontmatter 채움, diff. **카드 L6이 문서 목록(`list_by_project`)을 더했다** — 프로젝트 요약이 쓴다. 나머지 SpecService(문서·버전 조회, 만들기·저장, 상태, 휴지통…)는 쓰는 카드(L7·L8·L9)가 이 문서에 더한다.
 
 **파이썬 판과 바이트까지 같다**(사용자 결정 2026-10-08 — 유니코드까지). 파이썬 엔진은 YAML·마크다운 라이브러리 없이 정규식·`difflib`이고 메시지에 `repr`이 들어간다. 그래서
 - 문자 분류는 **파이썬 3.12(유니코드 15.0)의 표**를 쓴다 — 정규식의 `\s`·`\S`·`\d`·`\w`와 `str.strip()`. 표는 `crates/core/src/pycompat/`의 생성물이다(`cargo xtask unicode-tables`). Rust 표준의 `trim()`·`char::is_whitespace`·`regex`의 `\d`는 쓰지 않는다(`\x1c`~`\x1f`, 유니코드 판이 다르다)
@@ -42,6 +42,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-002, SYNC-MS-003, SYNC-STD-001, SYNC-STD-004]
 | [[#SpecService.apply_frontmatter]] | 생성 시 frontmatter 채움 |
 | [[#SpecService.diff]] | 두 버전 diff — 본문을 DB에서 |
 | [[#SpecService.diff_bodies]] | 두 본문 diff — DB 없이 |
+| [[#SpecService.list_by_project]] | 프로젝트 문서 목록 |
 
 ---
 
@@ -251,6 +252,23 @@ pub fn diff_bodies(from: &str, to: &str, doc_type: DocType, from_no: i32, to_no:
 **호출하는 것** [[#SpecService.item_blocks]]
 
 **테스트 관점** 정답 파일·무작위 차이 시험·git 이력 diff와 같다 · 항목 하나만 고침 → hunk 하나 · 공백만 바꿈 → 없음 · 항목 추가 → 전부 `add` · 역방향 → op가 뒤집힘 · `---` 줄 삭제 → `(del, ---)`(#345) · 200줄 넘는 블록(autojunk)도 파이썬과 같다 · `context`를 키우면 `ctx`만 는다
+
+---
+
+#### SpecService.list_by_project 프로젝트 문서 목록
+
+**시그니처**
+```rust
+pub async fn list_by_project(&mut self, project_id: i32, stage: Option<i32>, status: Option<DocStatus>, has_convention_error: Option<bool>) -> Result<Vec<DocumentSummary>, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-018#queries.project_summary]]
+
+**처리** [[SYNC-MS-002#SpecService.list_by_project]]와 같다 — `DB: documents where project_id` 가운데 휴지통이 아닌 것 · 조건(단계 번호 — `STD`는 단계 없음 · 상태 · 규약 오류) · 문서마다 최근 버전 하나(쿼리 한 번)의 작성자 `AuthorRef { kind, user_id, instructed_by_id, via }` · `incomplete_warnings`는 JSON 목록을 읽는다(없으면 빈 목록) · (단계, 없으면 99) → `doc_id` 차례
+
+**출력** `DocumentSummary` — `counts`는 비고 이름 붙은 작성자(`author`)는 없다 — `queries`가 채운다
+
+**테스트 관점** (시험 DB) 단계·`doc_id` 차례, `STD`는 맨 뒤 · 휴지통 문서는 안 나온다 · 작성자는 최근 버전의 것 · 버전이 없으면 작성자 없음 · `stage=6` → DOM만 · `status` 조건
 
 ---
 

@@ -40,6 +40,33 @@ pub enum Problem {
         violations: Vec<Violation>,
         warnings: Vec<Warning>,
     },
+    /// `storage-unavailable` — 이 서버에서 켜지 않은 저장 방식 (UC-A1 1a)
+    #[error("이 서버에서 켜지 않은 저장 방식 {storage}")]
+    StorageUnavailable {
+        storage: String,
+        enabled: Vec<String>,
+    },
+    /// `project-code-invalid` — 프로젝트 코드 형식
+    #[error("프로젝트 코드 형식")]
+    ProjectCodeInvalid { rule: String },
+    /// `project-code-conflict` — 이미 쓰이는 코드
+    #[error("이미 쓰이는 코드 {code}")]
+    ProjectCodeConflict { code: String },
+    /// `existing-specs` — 저장소에 명세가 이미 있다, 또는 같은 코드의 보관본이 있다(`archived_at`)
+    #[error("{}", if .archived_at.is_some() { "보관된 서버 저장소가 있음" } else { "docs/specs/가 이미 있음" })]
+    ExistingSpecs {
+        doc_count: i64,
+        archived_at: Option<String>,
+    },
+    /// `push-failed` — git이 원격에 못 밀었다(424)
+    #[error("{reason}")]
+    PushFailed { reason: String },
+    /// `not-implemented` — 뒤 카드가 여는 기능 (파이썬 `NotImplementedYet`)
+    #[error("{card}: 아직 구현되지 않음")]
+    NotImplemented { card: String },
+    /// git이 실패했다(파이썬 `GitError`) — `internal`로 나간다. `cmd`는 `git …`
+    #[error("{cmd}: {}", crate::pycompat::chars::strip(.stderr))]
+    Git { cmd: String, stderr: String },
     /// `internal` — 처리하지 못한 오류. `log`는 로그로만 간다 — 켤 때는 사람이 읽는 문장이다
     #[error("{log}")]
     Internal { log: String },
@@ -55,7 +82,13 @@ impl Problem {
             Problem::ForbiddenOrigin { .. } => Some("forbidden-origin"),
             Problem::InvalidRequest { .. } => Some("invalid-request"),
             Problem::ConventionViolation { .. } => Some("convention-violation"),
-            Problem::Internal { .. } => Some("internal"),
+            Problem::StorageUnavailable { .. } => Some("storage-unavailable"),
+            Problem::ProjectCodeInvalid { .. } => Some("project-code-invalid"),
+            Problem::ProjectCodeConflict { .. } => Some("project-code-conflict"),
+            Problem::ExistingSpecs { .. } => Some("existing-specs"),
+            Problem::PushFailed { .. } => Some("push-failed"),
+            Problem::NotImplemented { .. } => Some("not-implemented"),
+            Problem::Internal { .. } | Problem::Git { .. } => Some("internal"),
         }
     }
 
@@ -67,7 +100,11 @@ impl Problem {
             Problem::ForbiddenOrigin { .. } => 403,
             Problem::InvalidRequest { .. } => 422,
             Problem::ConventionViolation { .. } => 422,
-            Problem::Internal { .. } => 500,
+            Problem::StorageUnavailable { .. } | Problem::ProjectCodeInvalid { .. } => 422,
+            Problem::ProjectCodeConflict { .. } | Problem::ExistingSpecs { .. } => 409,
+            Problem::PushFailed { .. } => 424,
+            Problem::NotImplemented { .. } => 501,
+            Problem::Internal { .. } | Problem::Git { .. } => 500,
         }
     }
 
@@ -83,7 +120,7 @@ impl Problem {
     pub fn detail(&self) -> Option<String> {
         match self {
             Problem::Blank { detail, .. } => detail.clone(),
-            Problem::Internal { .. } => Some(INTERNAL_DETAIL.to_string()),
+            Problem::Internal { .. } | Problem::Git { .. } => Some(INTERNAL_DETAIL.to_string()),
             _ => Some(self.to_string()),
         }
     }
@@ -149,7 +186,25 @@ impl Problem {
                     ),
                 ),
             ],
-            Problem::Blank { .. } | Problem::Internal { .. } => vec![],
+            Problem::StorageUnavailable { storage, enabled } => vec![
+                ("storage", Value::from(storage.as_str())),
+                ("enabled", Value::from(enabled.clone())),
+            ],
+            Problem::ProjectCodeInvalid { rule } => vec![("rule", Value::from(rule.as_str()))],
+            Problem::ProjectCodeConflict { code } => vec![("code", Value::from(code.as_str()))],
+            Problem::ExistingSpecs {
+                doc_count,
+                archived_at,
+            } => {
+                let mut v = vec![("doc_count", Value::from(*doc_count))];
+                if let Some(a) = archived_at {
+                    v.push(("archived_at", Value::from(a.as_str())));
+                }
+                v
+            }
+            Problem::PushFailed { reason } => vec![("reason", Value::from(reason.as_str()))],
+            Problem::NotImplemented { card } => vec![("card", Value::from(card.as_str()))],
+            Problem::Blank { .. } | Problem::Internal { .. } | Problem::Git { .. } => vec![],
         }
     }
 }

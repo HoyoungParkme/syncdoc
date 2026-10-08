@@ -18,6 +18,13 @@ struct Specs;
 
 const SHARED: [&str; 2] = ["STD", "_templates"];
 
+/// 내장 사본 하나 — `STD/…`·`_templates/…`. 파이썬 `read_text(encoding="utf-8")`처럼 줄바꿈을 `\n`으로 (get_template)
+pub fn builtin(rel: &str) -> Option<String> {
+    let f = Specs::get(rel)?;
+    let text = String::from_utf8(f.data.into_owned()).ok()?;
+    Some(text.replace("\r\n", "\n").replace('\r', "\n"))
+}
+
 /// SYNC-API-001#GET/specs/{path}
 pub async fn spec_copy(uri: Uri) -> Response {
     let raw = uri.path().strip_prefix("/specs/").unwrap_or("");

@@ -17,8 +17,8 @@ use crate::pycompat::difflib::unified_diff;
 use crate::pycompat::re::compile;
 use crate::pycompat::repr::repr;
 use crate::types::{
-    Diff, DiffLine, DiffOp, DocStatus, DocType, Entry, Hunk, ItemBlock, ValidateResult, Violation,
-    Warning,
+    AuthorRef, Diff, DiffLine, DiffOp, DocStatus, DocType, DocumentSummary, Entry, Hunk, ItemBlock,
+    ValidateResult, Violation, Warning, stage_of,
 };
 
 /// 이력 diff의 앞뒤 줄 수 — 파이썬 `DIFF_CONTEXT_LINES`
@@ -739,5 +739,60 @@ impl SpecService<'_> {
             to_version: to_no,
             hunks,
         }
+    }
+
+    /// SYNC-MS-014#SpecService.list_by_project
+    pub async fn list_by_project(
+        &mut self,
+        project_id: i32,
+        stage: Option<i32>,
+        status: Option<DocStatus>,
+        has_convention_error: Option<bool>,
+    ) -> Result<Vec<DocumentSummary>, Problem> {
+        let mut rows: Vec<_> = repo::documents_of_project(&mut *self.db, project_id)
+            .await?
+            .into_iter()
+            .filter(|r| r.trashed_at.is_none())
+            .filter(|r| stage.is_none() || stage_of(&r.doc_type) == stage)
+            .filter(|r| status.is_none_or(|s| r.status == s.as_str()))
+            .filter(|r| has_convention_error.is_none_or(|h| r.has_convention_error == h))
+            .collect();
+        let ids: Vec<i32> = rows.iter().map(|r| r.id).collect();
+        let latest = repo::latest_versions(&mut *self.db, &ids).await?;
+        rows.sort_by(|a, b| {
+            (stage_of(&a.doc_type).unwrap_or(99), &a.doc_id)
+                .cmp(&(stage_of(&b.doc_type).unwrap_or(99), &b.doc_id))
+        });
+        rows.into_iter()
+            .map(|r| {
+                let warnings: Vec<String> =
+                    serde_json::from_str(r.incomplete_warnings.as_deref().unwrap_or("[]"))
+                        .map_err(|e| Problem::Internal {
+                            log: format!(
+                                "{}의 incomplete_warnings가 JSON 목록이 아니다 — {e}",
+                                r.doc_id
+                            ),
+                        })?;
+                Ok(DocumentSummary {
+                    id: r.id,
+                    stage: stage_of(&r.doc_type),
+                    last_author: latest.get(&r.id).map(|v| AuthorRef {
+                        kind: v.author_kind.clone(),
+                        user_id: v.author_user_id,
+                        instructed_by_id: v.instructed_by_user_id,
+                        via: v.via.clone(),
+                    }),
+                    doc_id: r.doc_id,
+                    doc_type: r.doc_type,
+                    status: r.status,
+                    current_version_no: r.current_version_no,
+                    has_convention_error: r.has_convention_error,
+                    incomplete_warnings: warnings,
+                    updated_at: r.updated_at,
+                    counts: Default::default(),
+                    trashed_at: r.trashed_at,
+                })
+            })
+            .collect()
     }
 }

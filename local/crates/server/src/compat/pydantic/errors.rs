@@ -105,6 +105,9 @@ pub enum ErrorKind {
     StringTooLong {
         max_length: usize,
     },
+    StringPatternMismatch {
+        pattern: String,
+    },
     DictType,
     ListType,
     BoolType,
@@ -157,6 +160,7 @@ impl ErrorKind {
             ErrorKind::StringUnicode => "string_unicode",
             ErrorKind::StringTooShort { .. } => "string_too_short",
             ErrorKind::StringTooLong { .. } => "string_too_long",
+            ErrorKind::StringPatternMismatch { .. } => "string_pattern_mismatch",
             ErrorKind::DictType => "dict_type",
             ErrorKind::ListType => "list_type",
             ErrorKind::BoolType => "bool_type",
@@ -232,6 +236,9 @@ impl ErrorKind {
                 "String should have at most {max_length} character{}",
                 plural(*max_length)
             ),
+            ErrorKind::StringPatternMismatch { pattern } => {
+                format!("String should match pattern '{pattern}'")
+            }
             ErrorKind::DictType => "Input should be a valid dictionary".into(),
             ErrorKind::ListType => "Input should be a valid list".into(),
             ErrorKind::BoolType => "Input should be a valid boolean".into(),

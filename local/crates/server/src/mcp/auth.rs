@@ -8,6 +8,7 @@ use axum::extract::{Request, State};
 use axum::http::{StatusCode, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
+use syncdoc_core::account::model::UserRow;
 use syncdoc_core::account::service::AccountService;
 use syncdoc_core::errors::Problem;
 
@@ -66,25 +67,28 @@ pub async fn bearer(State(state): State<AppState>, req: Request, next: Next) -> 
             });
         }
     };
-    let mut ok = false;
+    let mut user = None;
     if !raw.is_empty() {
         match authenticate(&state, &raw).await {
-            Ok(v) => ok = v,
+            Ok(u) => user = u,
             Err(p) => return render(&p),
         }
     }
-    if !ok {
+    let Some(user) = user else {
         return (
             StatusCode::UNAUTHORIZED,
             [(header::CONTENT_TYPE, "application/problem+json")],
             Body::from(UNAUTHORIZED),
         )
             .into_response();
-    }
+    };
+    // 토큰 발급자 — 도구가 「나」로 쓴다 (파이썬 `current_user_id`, API-002 1장)
+    let mut req = req;
+    req.extensions_mut().insert(user);
     next.run(req).await
 }
 
-async fn authenticate(state: &AppState, raw: &str) -> Result<bool, Problem> {
+async fn authenticate(state: &AppState, raw: &str) -> Result<Option<UserRow>, Problem> {
     let mut tx = state.pool.begin().await?;
     let user = AccountService { db: &mut tx }
         .authenticate_token(raw)
@@ -92,5 +96,5 @@ async fn authenticate(state: &AppState, raw: &str) -> Result<bool, Problem> {
     if user.is_some() {
         tx.commit().await?;
     }
-    Ok(user.is_some())
+    Ok(user)
 }
