@@ -1216,4 +1216,31 @@ impl SpecService<'_> {
             .map(|i| (i.item_id, i.id))
             .collect())
     }
+
+    /// SYNC-MS-014#SpecService.neighbors
+    ///
+    /// 바로 앞·뒤 단계 각각의 가장 작은 문서 ID — 휴지통 것은 빼고, 단계 밖(STD)이면 둘 다 없다
+    pub async fn neighbors(
+        &mut self,
+        doc_id: &str,
+    ) -> Result<(Option<String>, Option<String>), Problem> {
+        let Some(row) = repo::document_by_doc_id(&mut *self.db, doc_id).await? else {
+            return Err(not_found("document", doc_id));
+        };
+        let Some(stage) = stage_of(&row.doc_type) else {
+            return Ok((None, None));
+        };
+        let docs: Vec<DocumentRow> = repo::documents_of_project(&mut *self.db, row.project_id)
+            .await?
+            .into_iter()
+            .filter(|d| d.trashed_at.is_none())
+            .collect();
+        let first = |n: i32| {
+            docs.iter()
+                .filter(|d| stage_of(&d.doc_type) == Some(n))
+                .map(|d| d.doc_id.clone())
+                .min()
+        };
+        Ok((first(stage - 1), first(stage + 1)))
+    }
 }
