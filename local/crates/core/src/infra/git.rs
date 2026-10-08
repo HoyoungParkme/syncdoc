@@ -279,4 +279,32 @@ impl Git {
         .await?;
         Ok(())
     }
+
+    /// SYNC-MS-019#Git.exists
+    pub async fn exists(&self, workdir: &Path, path: &str) -> Result<bool, Problem> {
+        // HEAD 없음을 stderr 문구로 가리지 않는다(#349) — 가리키는 커밋이 없으면 조용히 끝 코드 1
+        let head = [
+            os("rev-parse"),
+            os("--verify"),
+            os("--quiet"),
+            os("HEAD^{commit}"),
+        ];
+        let o = self.exec(Some(workdir), &head).await?;
+        if o.code == 1 {
+            return Ok(false);
+        }
+        if o.code != 0 {
+            return Err(Problem::Git {
+                cmd: cmd_text(&head),
+                stderr: o.stderr,
+            });
+        }
+        let out = self
+            .run(
+                Some(workdir),
+                &[os("ls-tree"), os("HEAD"), os("--"), os(path)],
+            )
+            .await?;
+        Ok(!strip(&out).is_empty())
+    }
 }
