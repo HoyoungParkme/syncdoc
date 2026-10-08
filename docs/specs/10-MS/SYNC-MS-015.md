@@ -57,6 +57,8 @@ pub async fn extract(&mut self, document_id: i32, version_id: i32, body: &str, i
 
 **다른 점** 행을 넣는 차례가 원하는 것의 차례다 — 파이썬 세션이 `add`한 차례로 넣는 것과 같아 id 차례가 같다
 
+**호출하는 것** [[SYNC-MS-014#markdown.cut_blocks]] · [[SYNC-MS-014#markdown.masked_lines]]
+
 **테스트 관점** (시험 DB) `[[X#Y]]` 하나 → `added=1` · 코드블록 안 → 무시 · 대상 없는 참조 → `missing=1`, `raw_target` 그대로 · 같은 본문 다시 → `added=0, removed=0`, `extracted_version_id`가 새 판 · 항목 밖 참조 → 출발 항목 없음 · `[[#A]]` → 이 문서 항목 · `[[X#]]` → 문서 참조 · upstream과 같은 본문 참조 → 행 하나 · 삭제된 항목 → 미존재
 
 ---
