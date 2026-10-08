@@ -791,11 +791,13 @@ impl SpecService<'_> {
     }
 
     /// SYNC-MS-014#SpecService.list_by_project
+    ///
+    /// 상태는 문자열 그대로 비교한다 — MCP `list_documents`가 받은 값을 거르지 않는다(파이썬과 같다)
     pub async fn list_by_project(
         &mut self,
         project_id: i32,
         stage: Option<i32>,
-        status: Option<DocStatus>,
+        status: Option<&str>,
         has_convention_error: Option<bool>,
     ) -> Result<Vec<DocumentSummary>, Problem> {
         let mut rows: Vec<_> = repo::documents_of_project(&mut *self.db, project_id)
@@ -803,7 +805,7 @@ impl SpecService<'_> {
             .into_iter()
             .filter(|r| r.trashed_at.is_none())
             .filter(|r| stage.is_none() || stage_of(&r.doc_type) == stage)
-            .filter(|r| status.is_none_or(|s| r.status == s.as_str()))
+            .filter(|r| status.is_none_or(|s| r.status == s))
             .filter(|r| has_convention_error.is_none_or(|h| r.has_convention_error == h))
             .collect();
         let ids: Vec<i32> = rows.iter().map(|r| r.id).collect();
