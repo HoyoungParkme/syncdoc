@@ -1,6 +1,8 @@
 //! queries — 읽기 조합 (SYNC-MS-018 · SYNC-DOM-004 4.7). 파이썬 판 `core/queries.py`와 같은 이름·같은 처리.
 //! 여러 묶음의 서비스를 불러 응답 하나로 엮는다 — 쓰지 않는다. 프로젝트 요약(L6)과 MCP 읽기 도구의 넷(L7).
 
+use std::collections::HashMap;
+
 use indexmap::IndexMap;
 use sqlx::PgConnection;
 
@@ -11,7 +13,7 @@ use crate::project::service::{ProjectService, ServerRepos};
 use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
 use crate::types::{
-    ApiAuthor, AuthorRef, DocumentSummary, ProjectSummary, STAGES, StageSummary, Storage,
+    ApiAuthor, AuthorRef, Document, DocumentSummary, ProjectSummary, STAGES, StageSummary, Storage,
 };
 
 /// 작성자(id만) → 이름 붙은 작성자 — 파이썬 `_api_author`. 지시자는 id가 있을 때만
@@ -32,6 +34,11 @@ async fn api_author(
         instructed_by: r.instructed_by_id.and_then(|i| names.get(&i).cloned()),
         via: r.via.clone(),
     }))
+}
+
+/// 문서 ID의 프로젝트 코드 — 첫 `-` 앞(없으면 전부, 파이썬 `doc_id.split("-")[0]`)
+fn code_of(doc_id: &str) -> &str {
+    doc_id.split('-').next().unwrap_or("")
 }
 
 /// SYNC-MS-018#queries.project_summary
@@ -152,4 +159,49 @@ pub async fn document_list(
         d.author = api_author(&mut *db, d.last_author.as_ref()).await?;
     }
     Ok(docs)
+}
+
+/// SYNC-MS-018#queries.document_view
+pub async fn document_view(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    doc_id: &str,
+    user: &UserRow,
+) -> Result<Document, Problem> {
+    // 0. 본문을 읽기 전에 소유를 가른다 — 남의 문서가 잠깐이라도 비치면 안 된다
+    let (project, _) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code_of(doc_id), user)
+    .await?;
+    let mut doc = SpecService { db: &mut *db }.get_document(doc_id).await?;
+    (doc.prev_doc_id, doc.next_doc_id) = SpecService { db: &mut *db }.neighbors(doc_id).await?;
+    // 4a. 미존재 참조 — 문서 것은 중복 없이 정렬(완료 게이트가 보는 값과 같게), 항목 것은 처음 본 차례로
+    let missing: Vec<_> = ReferenceService { db: &mut *db }
+        .upstream_of_document(doc.summary.id, true)
+        .await?
+        .into_iter()
+        .filter(|e| e.is_missing)
+        .collect();
+    let mut all: Vec<String> = missing.iter().map(|e| e.raw_target.clone()).collect();
+    all.sort();
+    all.dedup();
+    doc.missing_refs = all;
+    let mut by_item: HashMap<i32, Vec<String>> = HashMap::new();
+    for e in &missing {
+        // 절 본문에서 온 것은 항목이 없다
+        let Some(pk) = e.from_item_pk else { continue };
+        let targets = by_item.entry(pk).or_default();
+        if !targets.contains(&e.raw_target) {
+            targets.push(e.raw_target.clone());
+        }
+    }
+    for item in &mut doc.items {
+        item.missing_refs = by_item.remove(&item.pk).unwrap_or_default();
+    }
+    doc.summary.author = api_author(&mut *db, doc.summary.last_author.as_ref()).await?;
+    // 브레드크럼은 코드가 아니라 이름으로 시작한다
+    doc.project_name = project.name;
+    Ok(doc)
 }
