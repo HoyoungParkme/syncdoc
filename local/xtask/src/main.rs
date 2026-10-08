@@ -5,7 +5,9 @@
 //!   `--check`는 다시 만들어 바이트를 비교한다(손으로 고친 것·빠뜨린 리비전을 잡는다)
 //! - `schema-check` — 시험 서버(5434)에 Alembic이 올린 DB와 Rust 판이 올린 DB를 만들어 스키마 덤프를 비교한다
 //! - `test-db-clean` — 시험이 남긴 `syncdoc_local_test_*` DB를 지운다
+//! - `mcp-tools [--check]` — 파이썬 판 MCP 서버에서 `crates/server/src/mcp/declarations.json`을 뽑는다(카드 L3)
 
+mod mcp_tools;
 mod migrations;
 mod pg_fetch;
 mod schema;
@@ -36,6 +38,11 @@ enum Cmd {
     SchemaCheck,
     /// 시험이 남긴 DB를 지운다
     TestDbClean,
+    /// MCP 선언을 파이썬 판에서 뽑는다 (--check: 다시 뽑아 비교만)
+    McpTools {
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 #[tokio::main]
@@ -45,6 +52,7 @@ async fn main() -> ExitCode {
         Cmd::Migrations { check } => migrations::run(check),
         Cmd::SchemaCheck => schema::run().await,
         Cmd::TestDbClean => testdb::clean().await,
+        Cmd::McpTools { check } => mcp_tools::run(check),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

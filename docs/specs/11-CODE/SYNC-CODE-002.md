@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 **MINISPEC은 카드의 첫 커밋으로 쓴다**([[SYNC-STD-004#DEV-13]]). 그래서 L1만 표가 있고 나머지는 하는 일과 선행만 있다 — 카드를 받을 때 그 카드의 표를 쓴다. 아직 없는 MINISPEC 항목을 미리 가리키지 않는다.
 
-**진행 상황**: 카드 17장(L1~L17). 완료 0(2026-10-07). L1은 계약 시험 없이 병합하고 완료란은 L2 뒤에 적는다(사용자 결정 2026-10-07).
+**진행 상황**: 카드 18장(L1~L18). 완료 2(L1·L2, 2026-10-07). L1은 계약 시험 없이 병합하고 완료란은 L2 뒤에 적었다(사용자 결정 2026-10-07).
 
 ---
 
@@ -43,14 +43,23 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | L1 |
 | 완료 | 2026-10-07 · 브랜치 `card/L2-contract`(47049c8 #339) · spec 6 + code 1 · `uv run pytest --target both --with-card L1` 46 통과·2 건너뜀(Rust L3) · 파이썬 판 24/24 · validate 0/0 · `check_calls` 층 없음 0·안 맞는 줄 0 · 되먹임: DOM-002 `contract/**` 층 줄을 거둠(그래프가 시험 파일을 뺀다) |
 
+#### L3 토큰·MCP — 토큰을 발급해 에이전트가 `/mcp`로 붙는다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-API-001#GET/api/me/tokens]] · [[SYNC-API-001#POST/api/me/tokens]] · [[SYNC-API-001#DELETE/api/me/tokens/{id}]] · [[SYNC-API-002]] 1장·2장 · [[SYNC-MS-016]] · [[SYNC-SEQ-001#SEQ-C2]] · [[SYNC-INFRA-001]] 9.8 · 사용자 결정 2026-10-08(`get_template`은 L6 · 도구 13개를 다 선언하고 못 만든 것은 `not-implemented` · 도구 선언·SSE 꼴·검증 문장까지 바이트로 같다 · MCP는 파이썬 SDK의 핸드셰이크 경로를 통째로 옮긴다, 2026-07-28 새 프로토콜은 L18) |
+| 구현 | `core/account` 토큰 넷([[SYNC-MS-016]]) · `server/web` 토큰 세 경로 · `server/mcp` — 인증(Bearer, 통과하면 응답 전에 커밋)·전송(streamable HTTP, 세션 없음)·분배·처리기·도구 선언(`declarations.json` — `cargo xtask mcp-tools`가 파이썬 판에서 만든다) · `server/compat` — 파이썬 호환 층(값·repr·파이썬 json·jiter·pydantic 오류 문장·lax 검증). 옮긴 판은 [[SYNC-DOM-004]] 1장. 못 만든 도구와 그것을 만드는 카드 — `init_project`·`get_template` L6 · `list_documents`·`get_document`·`get_item`·`get_references`·`create_document`·`update_document` L7 · `delete_document`·`restore_document`·`change_status` L9 · `upload_code` L10 · `get_code_graph` L12 |
+| 테스트 | `cargo test`(MS-016 테스트 관점 · 호환 층의 문장) · 계약 L3 — 토큰 세 경로의 모양과 값 · MCP 사례 표(인증·initialize·tools/list 바이트·SSE 꼴·Accept·Content-Type·봉투 오류·모르는 메서드·도구) · **두 판 차이 시험**(씨앗 고정 무작위 사례를 두 판에 보내 바이트로 비교, `--target both`) · 화면 UI-13 토큰 발급·폐기 |
+| 선행 | L1 |
+| 완료 | — |
+
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
-| L3 토큰·MCP | 토큰 발급·폐기·인증 · `/mcp`(rmcp, 이름 `syncdoc_local`) · 도구 13 선언(못 만든 것은 `not-implemented`) · `get_template` | L1 | M |
 | L4 설치형 껍데기 | 트레이·자동 시작·두 번째 실행 · NSIS(MinGit·PostgreSQL 포함)·.deb·AppImage · 릴리즈 워크플로 | L1 | L |
 | L5 명세 엔진 | frontmatter·규약 검증·항목·diff — 파이썬이 만든 정답과 맞춘다 | L1 | L |
-| L6 git·서버 저장 | git 어댑터 · 프로젝트 만들기·지우기(보관)·`init_project` | L3 · L5 | M |
+| L6 git·서버 저장 | git 어댑터 · 프로젝트 만들기·지우기(보관)·`init_project` · `get_template`(소유 프로젝트 · 저장소 `STD/`를 먼저, 사용자 결정 2026-10-08) | L3 · L5 | M |
 | L7 저장 파이프라인 | 저장 파이프라인·대기열 읽기·락 · MCP 읽기·쓰기 도구 | L6 | XL |
 | L8 웹 읽기 | 나머지 조회와 GET 경로(UI-2·4·5·7·8·9·15·18) | L7 | L |
 | L9 상태·되돌리기·휴지통 | 상태 바꾸기·되돌리기·휴지통·되살리기·영구 삭제 | L7 | M |
@@ -61,7 +70,8 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | L14 대화·질문 탭 | 대화·첨부(PDF) · 모델 스트리밍 · 질문 루프 · SSE | L8 · L12 | XL |
 | L15 번들 가져오기 | 파이썬 판 카드 BX(git 번들 가져오기)의 Rust 쪽 | L11 · BX | S |
 | L16 데이터 보호·「이 PC」 | 백업·되살리기·데이터 자리 옮기기 · UI-13 「이 PC」 묶음 · 같은 망 열기(`PUBLIC_BASE_URL`, 설정 파일만 — 사용자 결정 2026-10-07) | L4 · L11 | L |
-| L17 속도·출시 판정 | 두 판을 같은 PC에서 잰다 — [[SYNC-PRD-001#R15]] 속도 목표와 「파이썬 판보다 느린 항목 없음」 | L14~L16 | M |
+| L17 속도·출시 판정 | 두 판을 같은 PC에서 잰다 — [[SYNC-PRD-001#R15]] 속도 목표와 「파이썬 판보다 느린 항목 없음」 | L14~L16 · L18 | M |
+| L18 새 MCP 프로토콜 | 2026-07-28 — 핸드셰이크 없는 요청 하나짜리 봉투 · `server/discover`·`subscriptions/listen`. 파이썬 SDK의 `_streamable_http_modern`을 옮긴다(사용자 결정 2026-10-08) | L3 | L |
 
 #325(재구축이 파일을 지운 커밋에서 실패)와 카드 BX는 파이썬 판에서 먼저 한다 — [[SYNC-CODE-001]].
 
@@ -84,9 +94,9 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | [[SYNC-SCN-001#S9]] | L12 · L13 | 코드 그래프로 구현이 명세대로인지 본다 |
 | [[SYNC-SCN-001#S10]] | L6 · L10 | GitHub 없이 서버에 명세를 쌓는다 |
 
-**돌리는 법** — `cd contract && uv run pytest --target both`(기본). 파이썬 판은 지금 작업 트리로 이미지를 만들어 띄우고, Rust 판은 `local/`을 빌드해 띄운다(`cargo xtask pg-fetch` 먼저). 시험마다 그 기능을 닫는 카드를 적는다(`@pytest.mark.card("L3")`) — 파이썬 판은 전부 돌고, Rust 판은 이 문서의 완료란이 찬 카드만 돈다(나머지는 건너뜀으로 센다). 카드를 끝내기 전 확인은 `--with-card L3`.
+**돌리는 법** — `cd contract && uv run pytest --target both`(기본). 파이썬 판은 지금 작업 트리로 이미지를 만들어 띄우고, Rust 판은 `local/`을 빌드해 띄운다(`cargo xtask pg-fetch` 먼저). 시험마다 그 기능을 닫는 카드를 적는다(`@pytest.mark.card("L3")`) — 파이썬 판은 전부 돌고, Rust 판은 이 문서의 완료란이 찬 카드만 돈다(나머지는 건너뜀으로 센다). 카드를 끝내기 전 확인은 `--with-card L3`. **두 판 차이 시험**(카드 L3~)은 같은 무작위 사례(씨앗 고정)를 두 판에 보내 상태·머리·본문을 바이트로 비교한다 — 두 판이 다 떠 있을 때(`--target both`)만 돈다.
 
-**계약 밖** — API-001에 없는 프레임워크 동작은 두 판이 달라도 된다(사용자 결정 2026-10-07): 끝 슬래시 리다이렉트(307) · `/docs`·`/redoc`·`/openapi.json` · GET 경로의 HEAD · Range(206) · ETag 값의 꼴 · Host 머리 없는 요청. 화면과 에이전트는 이것들을 쓰지 않는다.
+**계약 밖** — API-001에 없는 프레임워크 동작은 두 판이 달라도 된다(사용자 결정 2026-10-07): 끝 슬래시 리다이렉트(307) · `/docs`·`/redoc`·`/openapi.json` · GET 경로의 HEAD · Range(206) · ETag 값의 꼴 · Host 머리 없는 요청 · 응답의 `date`·`server`·`connection` 머리와 본문을 나눠 보내는 꼴(chunked·content-length). 화면과 에이전트는 이것들을 쓰지 않는다. **MCP-Protocol-Version 머리가 핸드셰이크 판(2024-11-05~2025-11-25)이 아닌 요청**도 L18까지 계약 밖이다(사용자 결정 2026-10-08).
 
 속도는 카드 L17이 잰다 — [[SYNC-PRD-001#R15]]의 수치를 같은 PC에서 두 판을 나란히(9.8).
 

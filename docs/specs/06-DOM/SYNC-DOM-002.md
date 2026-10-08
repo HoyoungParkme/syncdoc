@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-002
 type: DOM
 title: 클래스 명세 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-DOM-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002]
 ---
 
@@ -169,6 +169,7 @@ frontend/
 | `frontend/vite.config.ts` | 빌드 설정 | [[SYNC-INFRA-001]] 8장 |
 | `tools/view_build.py` · `tools/wf_build.py` · `tools/check_view_*.py` | 뷰 생성·검사 | [[SYNC-STD-002]] |
 | `tools/*.py` | 검사기·개발 도구 | [[SYNC-STD-004#DEV-14]] · [[SYNC-STD-001]] |
+| `contract/**` | 계약 시험 | [[SYNC-INFRA-001]] 9.8 · [[SYNC-STD-004#DEV-14]] |
 
 ---
 

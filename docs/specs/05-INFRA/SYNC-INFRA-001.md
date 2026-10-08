@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
@@ -544,7 +544,8 @@ syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 
 ### 9.8 같은 기능과 속도
 
-- **같은 기능** — 공용 계약 시험(`contract/`) — 주소만 받는 HTTP·MCP·git 시나리오다. 파이썬 폐쇄망판(Docker)이 기준이고 Rust 판이 같은 결과를 내야 한다. 시험이 두 판을 직접 띄운다 — 파이썬 판은 작업 트리로 만든 이미지(빈 볼륨·임시 포트), Rust 판은 임시 데이터 자리. **계약 밖**(API-001에 없는 프레임워크 동작, 2026-10-07): 끝 슬래시 리다이렉트(307) · `/docs`·`/redoc`·`/openapi.json` · GET 경로의 HEAD · Range(206) · ETag 값의 꼴 · Host 머리 없는 요청
+- **같은 기능** — 공용 계약 시험(`contract/`) — 주소만 받는 HTTP·MCP·git 시나리오다. 파이썬 폐쇄망판(Docker)이 기준이고 Rust 판이 같은 결과를 내야 한다. 시험이 두 판을 직접 띄운다 — 파이썬 판은 작업 트리로 만든 이미지(빈 볼륨·임시 포트), Rust 판은 임시 데이터 자리. **계약 밖**(API-001에 없는 프레임워크 동작, 2026-10-07): 끝 슬래시 리다이렉트(307) · `/docs`·`/redoc`·`/openapi.json` · GET 경로의 HEAD · Range(206) · ETag 값의 꼴 · Host 머리 없는 요청 · 응답의 `date`·`server`·`connection` 머리와 본문을 나눠 보내는 꼴. MCP-Protocol-Version 머리가 핸드셰이크 판이 아닌 요청(2026-07-28 새 프로토콜)은 카드 L18까지 계약 밖이다
+- **MCP와 검증 문장** — Rust 판의 `/mcp`는 파이썬 mcp SDK의 핸드셰이크 경로를 통째로 옮긴다. 어떤 입력에도 상태·머리·본문(SSE 꼴과 pydantic 검증 문장까지)이 같다. REST의 `invalid-request`도 `loc`·`msg`가 같다(사용자 결정 2026-10-08). 이것은 사례 표로 다 덮을 수 없어 **두 판 차이 시험**이 지킨다 — 씨앗을 고정한 무작위 사례를 두 판에 보내 바이트로 비교한다. 옮긴 판과 자리는 [[SYNC-DOM-004]] 1장
 - **속도** — [[SYNC-PRD-001#R15]]의 수치를 같은 PC에서 두 판을 나란히 재어 본다 — 켜기(첫 실행·다시 켜기), 화면 조회, 문서 저장(git 포함), 싱크독 저장소의 코드 그래프, 켜 둔 메모리(PostgreSQL 포함)
 
 ---

@@ -44,7 +44,7 @@ pub async fn guard(State(state): State<AppState>, req: Request, next: Next) -> R
     if GITHUB_PATHS.iter().any(|p| path.starts_with(p)) {
         return render(&Problem::NotFound {
             resource: "path".into(),
-            id: path,
+            id: path.into(),
         });
     }
     if path == "/login" {

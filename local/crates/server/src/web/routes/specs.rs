@@ -60,7 +60,7 @@ pub async fn spec_copy(uri: Uri) -> Response {
 fn not_found(path: String) -> Response {
     render(&Problem::NotFound {
         resource: "specs".into(),
-        id: path,
+        id: path.into(),
     })
 }
 

@@ -3,6 +3,8 @@
 
 use time::OffsetDateTime;
 
+use crate::account::model::AccessTokenRow;
+
 /// 사용자 종류 — `users.kind`. DB enum이 아니라 varchar + 앱 검증 (SYNC-DOM-003)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UserKind {
@@ -19,6 +21,13 @@ impl UserKind {
             UserKind::Placeholder => "placeholder",
         }
     }
+}
+
+/// 토큰 발급 결과 — 원문(`raw`)은 이 값에만 있다 (SYNC-DOM-002 2.8 `IssuedToken`)
+#[derive(Clone, Debug)]
+pub struct IssuedToken {
+    pub token: AccessTokenRow,
+    pub raw: String,
 }
 
 /// API의 시각 — ISO 8601 UTC. 마이크로초 여섯 자리(0이면 뺀다), 끝은 `Z`.
