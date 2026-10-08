@@ -152,8 +152,11 @@ async fn origin_checked_only_on_writes() {
     )
     .await;
     assert_eq!(r.status, StatusCode::OK);
-    // /mcp·/git/은 토큰 경로 — Origin을 안 본다(아직 없는 경로라 404)
-    for path in ["/mcp", "/git/SYNC.git/info/refs"] {
+    // /mcp·/git/은 토큰 경로 — Origin을 안 본다(/mcp는 토큰이 없어 401, /git은 아직 없는 경로라 404)
+    for (path, want) in [
+        ("/mcp", StatusCode::UNAUTHORIZED),
+        ("/git/SYNC.git/info/refs", StatusCode::NOT_FOUND),
+    ] {
         let r = call(
             lazy_app(),
             Method::POST,
@@ -161,7 +164,7 @@ async fn origin_checked_only_on_writes() {
             &[HOST, ("origin", "http://evil.example")],
         )
         .await;
-        assert_eq!(r.status, StatusCode::NOT_FOUND, "{path}");
+        assert_eq!(r.status, want, "{path}");
     }
 }
 
@@ -215,7 +218,7 @@ async fn api_prefixes_are_404_problems() {
         "/api",
         "/api/nonexistent",
         "/auth/logout",
-        "/mcp",
+        "/mcp/x",
         "/git/x",
         "/specs",
         "/hooks/x",
