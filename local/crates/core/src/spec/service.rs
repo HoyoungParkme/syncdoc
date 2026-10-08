@@ -1207,4 +1207,13 @@ impl SpecService<'_> {
         .await?;
         Ok(version)
     }
+
+    /// SYNC-MS-014#SpecService.item_pks
+    pub async fn item_pks(&mut self, document_id: i32) -> Result<HashMap<String, i32>, Problem> {
+        Ok(repo::items_of(&mut *self.db, document_id, false)
+            .await?
+            .into_iter()
+            .map(|i| (i.item_id, i.id))
+            .collect())
+    }
 }
