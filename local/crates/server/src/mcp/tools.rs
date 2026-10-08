@@ -12,13 +12,15 @@ use serde_json::{Map, Value, json};
 use syncdoc_core::account::model::UserRow;
 use syncdoc_core::errors::Problem;
 use syncdoc_core::markdown::masked_lines;
+use syncdoc_core::pipeline::{self, SaveInput};
 use syncdoc_core::project::service::ProjectService;
 use syncdoc_core::pycompat::chars::strip;
 use syncdoc_core::pycompat::re::compile;
 use syncdoc_core::queries;
 use syncdoc_core::spec::{SUBTYPES, TYPES};
 use syncdoc_core::types::{
-    DocumentSummary, ItemRef, ProjectSummary, STAGES, Storage, py_isoformat,
+    Author, AuthorKind, DocumentSummary, Entry, ItemRef, ProjectSummary, STAGES, SaveResult,
+    Storage, py_isoformat,
 };
 
 use crate::compat::pydantic::{Failure, Opts};
@@ -82,6 +84,7 @@ pub async fn call(
         "get_document" => get_document(state, user, &typed).await,
         "get_item" => get_item(state, user, &typed).await,
         "get_references" => get_references(state, user, &typed).await,
+        "create_document" => create_document(state, user, &typed).await,
         _ => Err(Problem::NotImplemented {
             card: tool.card.to_string(),
         }),
@@ -255,6 +258,51 @@ async fn get_references(state: &AppState, user: &UserRow, a: &PyValue) -> Result
         "upstream": refs(&r.upstream),
         "downstream": refs(&r.downstream),
     }))
+}
+
+/// 토큰으로 들어온 요청은 발급자 계정 — `agent`·발급자·발급자·`mcp` (SEQ-C2, 파이썬 `_agent_author`)
+fn agent_author(user: &UserRow) -> Author {
+    Author {
+        kind: AuthorKind::Agent,
+        user: user.clone(),
+        instructed_by: Some(user.clone()),
+        via: Entry::Mcp,
+    }
+}
+
+/// 파이썬 `SaveResult.to_dict()`
+fn save_json(r: &SaveResult) -> Value {
+    json!({
+        "doc_id": r.doc_id,
+        "version_no": r.version_no,
+        "commit_hash": r.commit_hash,
+        "status": r.status,
+        "warnings": r.warnings,
+        "next_step": r.next_step,
+    })
+}
+
+/// SYNC-API-002#create_document
+///
+/// 타입은 거르지 않는다 — 모르는 타입도 파이썬처럼 문서 ID를 발급하고 규약 검사(`frontmatter.type`)에서 막힌다
+async fn create_document(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let r = pipeline::save_pipeline(
+        &state.pool,
+        &state.repos,
+        SaveInput {
+            entry: Entry::Mcp,
+            doc_id: None,
+            doc_type: Some(arg_str(a, "doc_type")),
+            body: arg_str(a, "body"),
+            expected_version: None,
+            project_code: Some(arg_str(a, "project_code")),
+            author: agent_author(user),
+            message: arg_str(a, "message"),
+            confirm_item_deletion: false,
+        },
+    )
+    .await?;
+    Ok(save_json(&r))
 }
 
 /// SYNC-API-002#get_template
