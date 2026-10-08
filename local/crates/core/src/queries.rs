@@ -13,7 +13,8 @@ use crate::project::service::{ProjectService, ServerRepos};
 use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
 use crate::types::{
-    ApiAuthor, AuthorRef, Document, DocumentSummary, ProjectSummary, STAGES, StageSummary, Storage,
+    ApiAuthor, AuthorRef, Document, DocumentSummary, ItemView, ProjectSummary, STAGES,
+    StageSummary, Storage,
 };
 
 /// 작성자(id만) → 이름 붙은 작성자 — 파이썬 `_api_author`. 지시자는 id가 있을 때만
@@ -204,4 +205,21 @@ pub async fn document_view(
     // 브레드크럼은 코드가 아니라 이름으로 시작한다
     doc.project_name = project.name;
     Ok(doc)
+}
+
+/// SYNC-MS-018#queries.item_view
+pub async fn item_view(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    doc_id: &str,
+    item_id: &str,
+    user: &UserRow,
+) -> Result<ItemView, Problem> {
+    ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code_of(doc_id), user)
+    .await?;
+    SpecService { db }.get_item(doc_id, item_id).await
 }
