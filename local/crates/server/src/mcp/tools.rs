@@ -1,10 +1,12 @@
 //! 도구 부르기 — mcp 2.2.0 `MCPServer._handle_call_tool`·`Tool.run`·`FuncMetadata.pre_parse_json`을 옮겼다.
 //! 인자 검증은 파이썬과 같은 문장을 낸다. 검증을 지난 도구는 그 카드가 처리기를 둔다 — 아직이면 `not-implemented`
-//! (SYNC-CODE-002 L3 표, 사용자 결정 2026-10-08). 카드 L6이 `init_project`·`get_template`를 열었다.
+//! (SYNC-CODE-002 L3 표, 사용자 결정 2026-10-08). 카드 L6이 `init_project`·`get_template`를, 카드 L7이
+//! 읽기 넷(`list_documents`·`get_document`·`get_item`·`get_references`)과 쓰기 둘(`create_document`·`update_document`)을 열었다.
 
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
+use num_bigint::BigInt;
 use regex::Regex;
 use serde_json::{Map, Value, json};
 use syncdoc_core::account::model::UserRow;
@@ -15,7 +17,7 @@ use syncdoc_core::pycompat::chars::strip;
 use syncdoc_core::pycompat::re::compile;
 use syncdoc_core::queries;
 use syncdoc_core::spec::{SUBTYPES, TYPES};
-use syncdoc_core::types::{DocumentSummary, ProjectSummary, Storage, py_isoformat};
+use syncdoc_core::types::{DocumentSummary, ProjectSummary, STAGES, Storage, py_isoformat};
 
 use crate::compat::pydantic::{Failure, Opts};
 use crate::compat::pyjson::{self, Depth};
@@ -74,6 +76,7 @@ pub async fn call(
     let result = match name {
         "init_project" => init_project(state, user, &typed).await,
         "get_template" => get_template(state, user, &typed).await,
+        "list_documents" => list_documents(state, user, &typed).await,
         _ => Err(Problem::NotImplemented {
             card: tool.card.to_string(),
         }),
@@ -111,6 +114,54 @@ async fn init_project(state: &AppState, user: &UserRow, a: &PyValue) -> Result<V
             log: format!("만든 프로젝트 {code}의 요약이 없다"),
         })?;
     Ok(project_json(&summary))
+}
+
+/// SYNC-API-002#list_documents
+///
+/// 11단계로 다시 묶는다(파이썬 `list_documents`) — `stage`가 1~11 밖이면 단계가 없다, `status`는 거르지 않고 비교만
+async fn list_documents(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let project_code = arg_str(a, "project_code");
+    let stage = arg_int(a, "stage").map(|b| {
+        i32::try_from(&b)
+            .ok()
+            .filter(|n| (1..=11).contains(n))
+            .unwrap_or(0)
+    });
+    let status = arg_opt_str(a, "status");
+    let mut c = state.pool.acquire().await?;
+    let docs = queries::document_list(
+        &mut c,
+        &state.repos,
+        &project_code,
+        user,
+        stage,
+        status.as_deref(),
+    )
+    .await?;
+    let mut stages = Vec::new();
+    for (i, doc_type) in STAGES.iter().enumerate() {
+        let n = i as i32 + 1;
+        if stage.is_some_and(|s| s != n) {
+            continue;
+        }
+        let mine: Vec<&DocumentSummary> = docs.iter().filter(|d| d.stage == Some(n)).collect();
+        // 가장 낮은 상태 — 초안이 하나라도 있으면 초안
+        let lowest = if mine.iter().any(|d| d.status == "draft") {
+            Some("draft")
+        } else if mine.is_empty() {
+            None
+        } else {
+            Some("approved")
+        };
+        stages.push(json!({
+            "stage": n,
+            "doc_type": doc_type,
+            "status": lowest,
+            "doc_count": mine.len(),
+            "docs": mine.iter().map(|d| summary_json(d)).collect::<Vec<_>>(),
+        }));
+    }
+    Ok(json!({"project_code": project_code, "stages": stages}))
 }
 
 /// SYNC-API-002#get_template
@@ -291,7 +342,20 @@ pub fn project_json(p: &ProjectSummary) -> Value {
     })
 }
 
-/// 파이썬 `_summary_json` — 이 경로의 문서 요약에는 이름 붙은 작성자가 없다(`last_author` 없음)
+/// 파이썬 `_author_json` — 사람은 로그인으로. 이름을 붙이지 않은 요약(프로젝트 요약의 `std_docs`)은 없음
+fn author_json(d: &DocumentSummary) -> Value {
+    match &d.author {
+        None => Value::Null,
+        Some(a) => json!({
+            "kind": a.kind,
+            "user": a.user.as_ref().map(|u| u.github_login.as_str()),
+            "instructed_by": a.instructed_by.as_ref().map(|u| u.github_login.as_str()),
+            "via": a.via,
+        }),
+    }
+}
+
+/// 파이썬 `_summary_json` — 시각은 `isoformat()`(`+00:00`)
 fn summary_json(d: &DocumentSummary) -> Value {
     json!({
         "doc_id": d.doc_id,
@@ -302,7 +366,7 @@ fn summary_json(d: &DocumentSummary) -> Value {
         "has_convention_error": d.has_convention_error,
         "incomplete_warnings": d.incomplete_warnings,
         "updated_at": py_isoformat(d.updated_at),
-        "last_author": Value::Null,
+        "last_author": author_json(d),
         "counts": d.counts,
     })
 }
@@ -323,6 +387,14 @@ fn arg_opt_str(v: &PyValue, name: &str) -> Option<String> {
     match arg(v, name) {
         None | Some(PyValue::None) => None,
         Some(_) => Some(arg_str(v, name)),
+    }
+}
+
+/// 검증을 지난 정수 인자 — 없거나 None이면 없음
+fn arg_int(v: &PyValue, name: &str) -> Option<BigInt> {
+    match arg(v, name) {
+        Some(PyValue::Int(i)) => Some(i.clone()),
+        _ => None,
     }
 }
 
