@@ -10,7 +10,19 @@ use super::model::ReferenceRow;
 use super::repo;
 use crate::errors::Problem;
 use crate::markdown::{REF, cut_blocks, masked_lines};
-use crate::types::ExtractResult;
+use crate::types::{ExtractResult, RefEdge};
+
+/// 행 → 간선 — 파이썬 `_edge`
+fn edge(r: ReferenceRow) -> RefEdge {
+    RefEdge {
+        from_item_pk: r.from_item_id,
+        to_item_pk: r.to_item_id,
+        to_document_id: r.to_document_id,
+        raw_target: r.raw_target,
+        is_missing: r.is_missing,
+        from_document_id: r.from_document_id,
+    }
+}
 
 /// 풀어 본 대상 — (항목 pk, 문서 pk, 미존재)
 type Target = (Option<i32>, Option<i32>, bool);
@@ -122,5 +134,14 @@ impl ReferenceService<'_> {
             return Ok(HashMap::new());
         }
         Ok(repo::count_missing_by_document(&mut *self.db, document_ids).await?)
+    }
+
+    /// SYNC-MS-015#ReferenceService.upstream
+    pub async fn upstream(&mut self, item_pk: i32) -> Result<Vec<RefEdge>, Problem> {
+        Ok(repo::from_item(&mut *self.db, item_pk)
+            .await?
+            .into_iter()
+            .map(edge)
+            .collect())
     }
 }
