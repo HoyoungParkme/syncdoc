@@ -13,8 +13,8 @@ use crate::project::service::{ProjectService, ServerRepos};
 use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
 use crate::types::{
-    ApiAuthor, AuthorRef, Document, DocumentSummary, ItemView, ProjectSummary, STAGES,
-    StageSummary, Storage,
+    ApiAuthor, AuthorRef, Document, DocumentSummary, ItemRef, ItemReferences, ItemView,
+    ProjectSummary, STAGES, StageSummary, Storage,
 };
 
 /// 작성자(id만) → 이름 붙은 작성자 — 파이썬 `_api_author`. 지시자는 id가 있을 때만
@@ -222,4 +222,115 @@ pub async fn item_view(
     .get_owned(code_of(doc_id), user)
     .await?;
     SpecService { db }.get_item(doc_id, item_id).await
+}
+
+/// 문서 pk → 문서 전체를 가리키는 `ItemRef`(항목 없음, 제목) — 파이썬 `_doc_refs`
+async fn doc_refs(db: &mut PgConnection, ids: &[i32]) -> Result<HashMap<i32, ItemRef>, Problem> {
+    Ok(SpecService { db }
+        .describe_documents(ids)
+        .await?
+        .into_iter()
+        .map(|(i, r)| {
+            let ref_ = ItemRef {
+                doc_id: Some(r.doc_id),
+                display_name: Some(r.title),
+                ..ItemRef::default()
+            };
+            (i, ref_)
+        })
+        .collect())
+}
+
+/// 미존재 참조의 `ItemRef` — 대상 없이 `raw_target`만
+fn missing_ref(raw_target: &str) -> ItemRef {
+    ItemRef {
+        raw_target: raw_target.to_string(),
+        is_missing: true,
+        ..ItemRef::default()
+    }
+}
+
+/// SYNC-MS-018#queries.item_references_view
+///
+/// 참조마다 새 `ItemRef`에 제 `raw_target` — 같은 대상을 두 꼴로 가리킨 참조가 서로 덮지 않는다(#353)
+pub async fn item_references_view(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    doc_id: &str,
+    item_id: &str,
+    user: &UserRow,
+) -> Result<ItemReferences, Problem> {
+    ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code_of(doc_id), user)
+    .await?;
+    let pk = SpecService { db: &mut *db }
+        .resolve_item(doc_id, item_id)
+        .await?;
+    let up = ReferenceService { db: &mut *db }.upstream(pk).await?;
+    // 이 항목을 가리키는 참조만 — 문서 전체를 가리킨 것은 항목의 하위가 아니다(#160)
+    let down = ReferenceService { db: &mut *db }.downstream(pk).await?;
+    let need: Vec<i32> = up
+        .iter()
+        .filter_map(|e| e.to_item_pk)
+        .chain(down.iter().filter_map(|e| e.from_item_pk))
+        .collect();
+    let names = SpecService { db: &mut *db }.describe_items(&need).await?;
+    let doc_ids: Vec<i32> = up
+        .iter()
+        .filter(|e| e.to_item_pk.is_none())
+        .filter_map(|e| e.to_document_id)
+        .collect();
+    let doc_names = doc_refs(&mut *db, &doc_ids).await?;
+    let upstream = up
+        .iter()
+        .map(|e| {
+            if e.is_missing {
+                return missing_ref(&e.raw_target);
+            }
+            // 항목이면 항목 이름에서, 없으면 같은 수의 문서에서(파이썬 `{**doc_names, **names}`)
+            let found = match e.to_item_pk {
+                Some(p) => names.get(&p).or_else(|| doc_names.get(&p)),
+                None => e.to_document_id.and_then(|d| doc_names.get(&d)),
+            };
+            match found {
+                Some(r) => ItemRef {
+                    raw_target: e.raw_target.clone(),
+                    ..r.clone()
+                },
+                None => missing_ref(&e.raw_target),
+            }
+        })
+        .collect();
+    // 항목 밖(절 본문·표)에서 건 참조는 출발 문서로 — 건너뛰면 패널이 「고립 항목」이라 했다(#160)
+    let from_ids: Vec<i32> = down
+        .iter()
+        .filter(|e| e.from_item_pk.is_none())
+        .map(|e| e.from_document_id)
+        .collect();
+    let froms = doc_refs(&mut *db, &from_ids).await?;
+    let downstream = down
+        .iter()
+        .filter_map(|e| {
+            let r = match e.from_item_pk {
+                Some(p) => names.get(&p),
+                None => froms.get(&e.from_document_id),
+            }?;
+            Some(ItemRef {
+                doc_id: r.doc_id.clone(),
+                item_id: r.item_id.clone(),
+                display_name: r.display_name.clone(),
+                raw_target: e.raw_target.clone(),
+                ..ItemRef::default()
+            })
+        })
+        .collect();
+    Ok(ItemReferences {
+        doc_id: doc_id.to_string(),
+        item_id: item_id.to_string(),
+        upstream,
+        downstream,
+    })
 }
