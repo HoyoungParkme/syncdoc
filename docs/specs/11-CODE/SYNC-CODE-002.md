@@ -57,9 +57,9 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 | 항목 | 내용 |
 |---|---|
-| 근거 | [[SYNC-INFRA-001]] 9.1·9.2·9.5 · [[SYNC-PRD-001#R15]] · [[SYNC-MS-012#tray.run]] · [[SYNC-MS-012#runtime.run]] · 사용자 결정 2026-10-08(트레이는 열기·끝내기 · 자동 시작 기본 끔, 리눅스는 XDG autostart(L16) · 바탕화면 바로 가기 기본 · 태그 → Release, 0.1.0 정식 · 아이콘은 새로 그린다 · x86_64, 바로 가기로 켜면 브라우저) |
-| 구현 | `crates/app` — `tray.rs`(tray-icon: 윈도 메시지 루프, 리눅스 StatusNotifierItem), `main.rs`(트레이가 메인 스레드), `runtime.run`(`--autostart`·첫 켜기의 브라우저·트레이 끝내기) · `packaging/` — 아이콘 원본·NOTICE·NSIS·.desktop·AppRun · `xtask` — `package windows\|linux`(재료를 모아 setup.exe·.deb·AppImage), `icon`, `pg-fetch --target` · `.github/workflows/local-release.yml` |
-| 테스트 | `cargo test`(트레이 끝내기 → 끄는 순서, `--autostart`면 브라우저 안 엶) · 워크플로 — 윈도 setup.exe를 조용히 깔아 켜고 `/health`, 지운 뒤 데이터 자리가 남는지 · 리눅스 .deb·AppImage도 같이 · 계약(L1~L3) 그대로 · 사람 확인 — 윈도에서 깔아 트레이·바로 가기·제거 |
+| 근거 | [[SYNC-INFRA-001]] 9.1·9.2·9.4·9.5 · [[SYNC-PRD-001#R15]] · [[SYNC-MS-012#tray.run]] · [[SYNC-MS-012#runtime.run]] · [[SYNC-MS-012#privilege.drop_admin]] · 사용자 결정 2026-10-08(트레이는 열기·끝내기 · 자동 시작 기본 끔, 리눅스는 XDG autostart(L16) · 바탕화면 바로 가기 기본 · 태그 → Release, 0.1.0 정식 · 아이콘은 새로 그린다 · x86_64, 바로 가기로 켜면 브라우저) |
+| 구현 | `crates/app` — `tray.rs`(tray-icon: 윈도 메시지 루프, 리눅스 StatusNotifierItem), `main.rs`(트레이가 메인 스레드), `privilege.rs`(윈도 관리자 권한 내려놓기 — PostgreSQL이 관리자 권한을 거부한다), `runtime.run`(`--autostart`·첫 켜기의 브라우저·트레이 끝내기) · `packaging/` — 아이콘 원본·NOTICE·NSIS·.desktop·AppRun · `xtask` — `package windows\|linux`(재료를 모아 setup.exe·.deb·AppImage), `icon`, `pg-fetch --target` · `.github/workflows/local-release.yml` |
+| 테스트 | `cargo test`(트레이 끝내기 → 끄는 순서, `--autostart`면 브라우저 안 엶) · 워크플로 — 윈도 setup.exe를 조용히 깔아 켜고(러너는 관리자 — 권한을 내려놓고 켠다) `/health`, 지운 뒤 데이터 자리가 남는지 · 리눅스 .deb·AppImage도 같이 · 계약(L1~L3) 그대로 · 사람 확인 — 윈도에서 깔아 트레이·바로 가기·제거 |
 | 선행 | L1 |
 | 완료 | — |
 
