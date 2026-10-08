@@ -115,6 +115,7 @@ pub fn validate(node: &Node, input: &PyValue, ctx: &Ctx<'_>, st: &mut State) -> 
             strict,
             min_length,
             max_length,
+            pattern,
         } => {
             let s = match input {
                 PyValue::Str(s) => s.clone(),
@@ -138,6 +139,18 @@ pub fn validate(node: &Node, input: &PyValue, ctx: &Ctx<'_>, st: &mut State) -> 
                     && len > *max
                 {
                     return Err(err(ErrorKind::StringTooLong { max_length: *max }, input));
+                }
+            }
+            // pydantic-core 차례 — 길이 다음 패턴
+            if let Some((p, re)) = pattern {
+                let Some(text) = s.as_str() else {
+                    return Err(unicode_err(input));
+                };
+                if !re.is_match(text) {
+                    return Err(err(
+                        ErrorKind::StringPatternMismatch { pattern: p.clone() },
+                        input,
+                    ));
                 }
             }
             Ok(PyValue::Str(s))

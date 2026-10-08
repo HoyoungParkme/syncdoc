@@ -91,6 +91,8 @@ pub enum Node {
         strict: bool,
         min_length: Option<usize>,
         max_length: Option<usize>,
+        /// pydantic-core 기본 엔진(rust-regex)과 같은 `regex` crate — `is_match`(어디든 맞으면)
+        pattern: Option<(String, regex::Regex)>,
     },
     Literal {
         expected: Vec<PyValue>,
@@ -296,7 +298,6 @@ fn build(s: &Value, cfg: &Config, defs: &mut HashMap<String, Node>) -> Result<No
         }
         "str" => {
             for k in [
-                "pattern",
                 "strip_whitespace",
                 "to_lower",
                 "to_upper",
@@ -308,10 +309,18 @@ fn build(s: &Value, cfg: &Config, defs: &mut HashMap<String, Node>) -> Result<No
                     return Err(SchemaError(format!("str {k}는 옮기지 않았다")));
                 }
             }
+            let pattern = match s.get("pattern").and_then(Value::as_str) {
+                Some(p) => Some((
+                    p.to_string(),
+                    regex::Regex::new(p).map_err(|e| SchemaError(format!("pattern {p}: {e}")))?,
+                )),
+                None => None,
+            };
             Node::Str {
                 strict,
                 min_length: usize_of("min_length").or(cfg.str_min_length),
                 max_length: usize_of("max_length").or(cfg.str_max_length),
+                pattern,
             }
         }
         "literal" => {

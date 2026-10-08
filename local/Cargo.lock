@@ -3461,6 +3461,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "percent-encoding",
+ "regex",
  "rust-embed",
  "ryu",
  "serde",

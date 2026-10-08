@@ -16,6 +16,7 @@ jiter = { workspace = true }
 num-bigint = { workspace = true }
 num-traits = { workspace = true }
 percent-encoding = { workspace = true }
+regex = { workspace = true }
 rust-embed = { workspace = true }
 ryu = { workspace = true }
 serde = { workspace = true }
