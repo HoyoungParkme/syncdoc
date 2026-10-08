@@ -848,4 +848,23 @@ impl SpecService<'_> {
             project_name: String::new(),
         })
     }
+
+    /// SYNC-MS-014#SpecService.issue_doc_id
+    pub async fn issue_doc_id(
+        &mut self,
+        project_id: i32,
+        code: &str,
+        doc_type: &str,
+    ) -> Result<String, Problem> {
+        let mut max = 0i64;
+        // 휴지통 것까지 센다 — 번호를 다시 쓰지 않는다. 끝 `-` 뒤 수(파이썬 `int(d.rsplit("-", 1)[1])`)
+        for d in repo::doc_ids_of_type(&mut *self.db, project_id, doc_type).await? {
+            let tail = d.rsplit_once('-').map_or(d.as_str(), |(_, t)| t);
+            let n: i64 = tail.parse().map_err(|_| Problem::Internal {
+                log: format!("문서 ID {d}의 번호를 못 읽는다"),
+            })?;
+            max = max.max(n);
+        }
+        Ok(format!("{code}-{doc_type}-{:03}", max + 1))
+    }
 }
