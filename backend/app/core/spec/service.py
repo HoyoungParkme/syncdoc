@@ -605,12 +605,15 @@ class SpecService:
                 op, text = ("add", b) if not a else ("del", a)
                 lines = [DiffLine(op, ln) for ln in text.rstrip("\n").split("\n")]
             else:
+                # 머리 두 줄(`--- `·`+++ `)만 버린다 — 줄 머리로 거르면 `---` 줄 삭제(`----`)와
+                # `++`로 시작하는 줄 추가(`+++x`)까지 사라진다 (#345)
+                out = list(
+                    difflib.unified_diff(a.split("\n"), b.split("\n"), n=context, lineterm="")
+                )[2:]
                 lines = [
                     DiffLine({"+": "add", "-": "del", " ": "ctx"}[ln[0]], ln[1:])
-                    for ln in difflib.unified_diff(
-                        a.split("\n"), b.split("\n"), n=context, lineterm=""
-                    )
-                    if ln[:3] not in ("---", "+++") and not ln.startswith("@@")
+                    for ln in out
+                    if not ln.startswith("@@")
                 ]
             hunks.append(Hunk(item_id=item_id, lines=lines))
         return Diff(from_version=from_no, to_version=to_no, hunks=hunks)

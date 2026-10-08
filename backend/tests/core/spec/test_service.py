@@ -859,6 +859,21 @@ def test_diff_hunks_per_item_whitespace_ignored_new_item_reverse(db_session: Ses
     )
 
 
+def test_diff_keeps_content_lines_that_look_like_headers(db_session: Session) -> None:
+    """#345 — `---` 줄을 지우거나 `++`로 시작하는 줄을 더해도 diff에 남는다."""
+    svc, a, d = _seed(db_session)
+    body2 = PRD.replace("한 줄로.\n", "한 줄로.\n---\n")
+    svc.save(d, body2, "h2", a, "spec: v2", [])
+    d2 = svc.get_document("EXMP-PRD-001")
+    svc.save(d2, PRD.replace("한 줄로.\n", "한 줄로.\n++x\n"), "h3", a, "spec: v3", [])
+    df = svc.diff("EXMP-PRD-001", 2, 3)
+    assert [h.item_id for h in df.hunks] == ["G1"]
+    assert [(ln.op, ln.text) for ln in df.hunks[0].lines if ln.op != "ctx"] == [
+        ("del", "---"),
+        ("add", "++x"),
+    ]
+
+
 RFQ_MIN = """---
 doc_id: EXMP-RFQ-001
 type: RFQ
