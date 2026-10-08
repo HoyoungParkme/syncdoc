@@ -607,11 +607,13 @@ fn problem_text(v: &Value) -> String {
     py_dumps(v)
 }
 
-/// 처리기의 실패 — 문제(Problem)는 `_problem`의 JSON, git 실패 같은 예외는 MCP SDK의 「Error executing tool」 문장
+/// 처리기의 실패 — 문제(Problem)는 `_problem`의 JSON. git·DB 실패 같은 예외는 mcp 2.2.0 `Tool.run`의
+/// `UnexpectedToolError` — 「Error executing tool {name}」뿐, 예외의 글은 서버에 남는다(로그)
 fn tool_error(name: &str, p: &Problem) -> String {
     match p {
         Problem::Git { .. } | Problem::Internal { .. } => {
-            error_result(&format!("Error executing tool {name}: {p}"))
+            tracing::error!("도구 {name} 실패 — {p}");
+            error_result(&format!("Error executing tool {name}"))
         }
         _ => error_result(&problem_text(&Value::Object(problem_dict(p)))),
     }
