@@ -73,11 +73,21 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | L1 · #345 |
 | 완료 | 2026-10-08 · 브랜치 `card/L5-spec-engine`(18cab61 #347) · 선행 #345(#346 — 파이썬 판 diff가 `---` 줄 삭제·`++` 줄 추가를 빠뜨리던 것) · spec 6 + code 15 · `cargo test` 76(정답 파일 122 사례 같음 · 실제 명세·템플릿 위반 0·경고 0 · 시험 DB로 item.reused·복구 예외·diff 판 조회·not-found) · `cargo xtask spec-diff` 기본 4671 사례·씨앗 1·2·3·77(5000) 각 11421 사례 다른 것 0 · `unicode-tables`·`spec-golden`·`migrations`·`mcp-tools --check` · `schema-check` 같음 · clippy(리눅스·윈도) · 윈도 `cargo check` · 워크플로 녹색 · `check_code` Rust 31/31 · `check_calls` 코드만·명세만·안 맞는 줄 0 · 계약 `--target both` 263 통과·1 건너뜀(L5 몫 없음) · 되먹임: MS-014 `validate`의 호출하는 것에 `parse_frontmatter`(check_calls가 찾음), STD-001 `item.pattern` 꼴을 검사기와 같게, server/compat의 `printable.rs`를 core `pycompat`으로 |
 
+#### L6 git·서버 저장 — 서버 저장으로 프로젝트를 만들고 지운다(보관)
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-MS-001]] · [[SYNC-MS-009]] · [[SYNC-UC-001#UC-A1]] · [[SYNC-UC-001#UC-H17]] · [[SYNC-SCN-001#S5]] · [[SYNC-SCN-001#S10]] · [[SYNC-INFRA-001]] 6장·9.1·9.2·9.3 · [[SYNC-API-002#init_project]] · [[SYNC-API-002#get_template]] · 사용자 결정 2026-10-08(`get_template`은 소유 프로젝트 · 저장소 `STD/`를 먼저 · 요약 전부 · 보관본 재구축 갈래만 L11 · Rust만 git 격리 · 파이썬 어긋남은 파이썬 먼저(#349)) |
+| 구현 | [[SYNC-MS-019#Git.init_bare]] · [[SYNC-MS-019#Git.clone]] · [[SYNC-MS-019#Git.exists]] · [[SYNC-MS-019#Git.list]] · [[SYNC-MS-019#Git.read]] · [[SYNC-MS-019#Git.commit_push]] · [[SYNC-MS-019#Git.init_specs]] · [[SYNC-MS-013#ProjectService.init_project]] · [[SYNC-MS-013#ProjectService.delete_project]] · [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-013#ProjectService.list_owned]] · [[SYNC-MS-014#SpecService.list_by_project]] · [[SYNC-MS-015#ReferenceService.count_missing_by_document]] · [[SYNC-MS-018#queries.project_summary]] · [[SYNC-MS-012#paths.git]] · 층 코드 — `types.rs` 요약 DTO · `errors.rs` 프로젝트 문제 다섯·`not-implemented`·git 실패 · server: MCP가 상태·인증된 사용자를 받는다, 도구 `init_project`·`get_template`, 경로 셋, `InitProject` 검증(pattern 더함) |
+| API | [[SYNC-API-002#init_project]] · [[SYNC-API-002#get_template]] · [[SYNC-API-001#GET/api/projects]] · [[SYNC-API-001#POST/api/projects]] · [[SYNC-API-001#DELETE/api/projects/{code}]] |
+| 테스트 | `cargo test`(git 어댑터는 임시 자리의 진짜 git과 사용자 설정 흉내 · 서비스·요약은 시험 DB) · 계약 L6 — MCP 만들기·중복·나쁜 코드·github 저장·`get_template` 타입·서브타입·없는 것, REST 만들기·422·지우기 → 다시 만들기 `existing-specs` · 두 판 차이 시험이 두 도구를 바이트로(`archived_at` 가림) · 워크플로 — 윈도 MinGit으로 만들기·지우기 |
+| 선행 | L3 · L5 · #349 |
+| 완료 | — |
+
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
-| L6 git·서버 저장 | git 어댑터 · 프로젝트 만들기·지우기(보관)·`init_project` · `get_template`(소유 프로젝트 · 저장소 `STD/`를 먼저, 사용자 결정 2026-10-08) | L3 · L5 | M |
 | L7 저장 파이프라인 | 저장 파이프라인·대기열 읽기·락 · MCP 읽기·쓰기 도구 | L6 | XL |
 | L8 웹 읽기 | 나머지 조회와 GET 경로(UI-2·4·5·7·8·9·15·18) | L7 | L |
 | L9 상태·되돌리기·휴지통 | 상태 바꾸기·되돌리기·휴지통·되살리기·영구 삭제 | L7 | M |
