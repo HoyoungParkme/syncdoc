@@ -94,6 +94,183 @@ pub struct ProjectService<'c> {
 }
 
 impl ProjectService<'_> {
+    fn archive_dir(&self) -> PathBuf {
+        self.repos.origins.join("_archive")
+    }
+
+    /// 그 코드의 보관본 — (UTC 시각, 번호) 순이라 끝이 가장 최근이다 (#349)
+    fn archives(&self, code: &str) -> Vec<PathBuf> {
+        let Ok(entries) = fs::read_dir(self.archive_dir()) else {
+            return Vec::new();
+        };
+        let prefix = format!("{code}-");
+        let mut found: Vec<(PathBuf, (String, u64, String))> = entries
+            .filter_map(Result::ok)
+            .filter_map(|e| {
+                let name = e.file_name().to_string_lossy().into_owned();
+                (name.starts_with(&prefix)
+                    && name.ends_with(".git")
+                    && name.len() >= prefix.len() + 4)
+                    .then(|| (e.path(), archive_key(&name, code)))
+            })
+            .collect();
+        found.sort_by(|a, b| a.1.cmp(&b.1));
+        found.into_iter().map(|(p, _)| p).collect()
+    }
+
+    /// 보관할 자리 `_archive/{code}-{UTC %Y%m%d%H%M%S}.git` — 같은 초에 있으면 뒤에 번호
+    fn archive_path(&self, code: &str) -> Result<PathBuf, Problem> {
+        let dir = self.archive_dir();
+        fs::create_dir_all(&dir)?;
+        let fmt = time::macros::format_description!("[year][month][day][hour][minute][second]");
+        let stamp = clock::now()
+            .to_offset(time::UtcOffset::UTC)
+            .format(&fmt)
+            .map_err(|e| Problem::Internal {
+                log: format!("보관 시각: {e}"),
+            })?;
+        let mut path = dir.join(format!("{code}-{stamp}.git"));
+        let mut n = 1;
+        while path.exists() {
+            path = dir.join(format!("{code}-{stamp}-{n}.git"));
+            n += 1;
+        }
+        Ok(path)
+    }
+
+    /// init_project 4 — 서버 저장소를 준비한다. (원본, 되살린 보관본의 원래 자리)
+    async fn server_origin(
+        &self,
+        code: &str,
+        import_existing: bool,
+    ) -> Result<(PathBuf, Option<PathBuf>), Problem> {
+        let origin = self.repos.origins.join(format!("{code}.git"));
+        if origin.exists() {
+            // 등록되지 않은 원본(지난 실패, 사람이 넣은 것) — 지우지 않고 보관한다
+            fs::rename(&origin, self.archive_path(code)?)?;
+        }
+        if let Some(latest) = self.archives(code).pop() {
+            if !import_existing {
+                let n = match self
+                    .repos
+                    .git
+                    .list(&latest, "docs/specs/*/*.md", "HEAD")
+                    .await
+                {
+                    Ok(v) => v.len() as i64,
+                    Err(Problem::Git { .. }) => 0, // 커밋이 하나도 없는 원본
+                    Err(other) => return Err(other),
+                };
+                return Err(Problem::ExistingSpecs {
+                    doc_count: n,
+                    archived_at: Some(archived_at(&latest, code)),
+                });
+            }
+            fs::rename(&latest, &origin)?; // 가장 최근 것을 되살린다
+            return Ok((origin, Some(latest)));
+        }
+        self.repos.git.init_bare(&origin).await?;
+        Ok((origin, None))
+    }
+
+    /// SYNC-MS-013#ProjectService.init_project
+    pub async fn init_project(
+        &mut self,
+        code: &str,
+        name: &str,
+        user: &UserRow,
+        import_existing: bool,
+        storage: Storage,
+    ) -> Result<(ProjectRow, RepositoryRow), Problem> {
+        let lock = lock_of(code);
+        let _held = lock.lock().await;
+        if storage != Storage::Server {
+            return Err(Problem::StorageUnavailable {
+                storage: storage.as_str().to_string(),
+                enabled: vec!["server".to_string()],
+            });
+        }
+        if !valid_code(code) {
+            return Err(Problem::ProjectCodeInvalid {
+                rule: "^[A-Z]{1,4}$".to_string(),
+            });
+        }
+        if repo::exists(&mut *self.db, code).await? {
+            return Err(Problem::ProjectCodeConflict {
+                code: code.to_string(),
+            });
+        }
+        let workdir = self.repos.repos.join(code);
+        let _ = fs::remove_dir_all(&workdir); // 지난 실패 잔재
+        let (origin, restored) = self.server_origin(code, import_existing).await?;
+        // 되돌림 — 새로 만든 원본은 지우고, 되살린 것은 보관 자리로 돌려놓는다
+        let undo_origin = || match &restored {
+            Some(back) => {
+                let _ = fs::rename(&origin, back);
+            }
+            None => {
+                let _ = fs::remove_dir_all(&origin);
+            }
+        };
+        let remote = origin.to_string_lossy().into_owned();
+        let git = &self.repos.git;
+        if let Err(p) = git.clone(&remote, &workdir).await {
+            let _ = fs::remove_dir_all(&workdir);
+            undo_origin();
+            return Err(match p {
+                Problem::Git { stderr, .. } => Problem::PushFailed {
+                    reason: format!("clone: {}", strip(&stderr)),
+                },
+                other => other,
+            });
+        }
+        let has = git.exists(&workdir, "docs/specs").await?;
+        if has && !import_existing {
+            let n = git.list(&workdir, "docs/specs/*/*.md", "HEAD").await?.len() as i64;
+            let _ = fs::remove_dir_all(&workdir);
+            undo_origin();
+            return Err(Problem::ExistingSpecs {
+                doc_count: n,
+                archived_at: None,
+            });
+        }
+        let mut tx = self.db.begin().await?;
+        let project = repo::add_project(&mut tx, code, name, user.id).await?;
+        let repository = repo::add_repository(
+            &mut tx,
+            project.id,
+            Storage::Server.as_str(),
+            &remote,
+            &workdir.to_string_lossy(),
+            user.id,
+        )
+        .await?;
+        if has {
+            // 되살린 보관본의 명세를 재구축으로 올리는 갈래 — 카드 L11
+            tx.rollback().await?;
+            let _ = fs::remove_dir_all(&workdir);
+            undo_origin();
+            return Err(Problem::NotImplemented {
+                card: "L11".to_string(),
+            });
+        }
+        let files = Git::init_specs(&self.repos.specs_url);
+        let message = format!("chore({code}): init syncdoc");
+        let hash = match git.commit_push(&workdir, &message, user, &files, &[]).await {
+            Ok(h) => h,
+            Err(p @ Problem::PushFailed { .. }) => {
+                tx.rollback().await?;
+                let _ = fs::remove_dir_all(&workdir);
+                undo_origin();
+                return Err(p);
+            }
+            Err(other) => return Err(other),
+        };
+        repo::set_last_processed(&mut tx, repository.id, &hash).await?;
+        tx.commit().await?;
+        self.get(code).await
+    }
+
     /// SYNC-MS-013#ProjectService.get
     pub async fn get(&mut self, code: &str) -> Result<(ProjectRow, RepositoryRow), Problem> {
         repo::by_code(&mut *self.db, code)
