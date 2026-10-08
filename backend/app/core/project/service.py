@@ -58,10 +58,24 @@ def _archive_dir() -> Path:
     return settings.ORIGINS_DIR / "_archive"
 
 
+_ARCHIVE_NAME = re.compile(r"(\d{14})(?:-(\d+))?\.git")
+
+
 def _archives(code: str) -> list[Path]:
-    """그 코드의 보관본 — 이름(UTC 시각) 순이라 끝이 가장 최근이다 (MS-001 3s)."""
+    """그 코드의 보관본 — (UTC 시각, 번호) 순이라 끝이 가장 최근이다 (MS-001 3s).
+
+    이름 문자열 순이면 같은 초의 `{code}-{시각}-1.git`이 `{code}-{시각}.git`보다 앞에 온다
+    (`-`가 `.`보다 앞) — 옛 것을 최신으로 고른다(#349). 꼴이 다른 이름은 맨 앞(가장 오래된 것)으로.
+    """
     d = _archive_dir()
-    return sorted(d.glob(f"{code}-*.git")) if d.exists() else []
+    if not d.exists():
+        return []
+
+    def key(p: Path) -> tuple[str, int, str]:
+        m = _ARCHIVE_NAME.fullmatch(p.name[len(code) + 1 :])
+        return (m.group(1), int(m.group(2) or 0), p.name) if m else ("", 0, p.name)
+
+    return sorted(d.glob(f"{code}-*.git"), key=key)
 
 
 def _archive_path(code: str) -> Path:

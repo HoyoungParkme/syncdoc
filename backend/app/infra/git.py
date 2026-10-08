@@ -33,8 +33,11 @@ class GitError(Exception):
 
 
 async def _exec(workdir: Path | None, *args: str) -> tuple[int, str, str]:
+    # 한글 경로를 따옴표·8진수 없이 받는다 — 기본값이면 경로 비교·glob이 빠뜨린다 (MS-009, #349)
     proc = await asyncio.create_subprocess_exec(
         "git",
+        "-c",
+        "core.quotepath=false",
         *args,
         cwd=workdir,
         stdout=asyncio.subprocess.PIPE,
@@ -370,12 +373,14 @@ async def exists(workdir: Path, path: str) -> bool:
     그것을 에러로 올리면 빈 저장소로 프로젝트를 시작하는 길이 막힌다(#6).
     HEAD 없음만 삼키고 다른 git 오류는 그대로 올린다.
     """
-    try:
-        return bool((await _run(workdir, "ls-tree", "HEAD", "--", path)).strip())
-    except GitError as e:
-        if "Not a valid object name" in e.stderr or "unknown revision" in e.stderr:
-            return False
-        raise
+    # HEAD 없음을 stderr 문구로 가리지 않는다 — git 로케일이 영어가 아니면 놓친다(#349).
+    # --verify --quiet는 가리키는 커밋이 없으면 조용히 끝 코드 1, 저장소가 아니면 128이다
+    code, _, err = await _exec(workdir, "rev-parse", "--verify", "--quiet", "HEAD^{commit}")
+    if code == 1:
+        return False
+    if code != 0:
+        raise GitError(["git", "rev-parse", "--verify", "--quiet", "HEAD^{commit}"], err)
+    return bool((await _run(workdir, "ls-tree", "HEAD", "--", path)).strip())
 
 
 _TYPES = ("RFQ", "PRD", "SCN", "UC", "INFRA", "DOM", "UI", "API", "SEQ", "MS", "CODE", "STD")
@@ -514,9 +519,7 @@ async def push_all(path: Path, remote_url: str, token: str | None) -> str:
     return (await _run(path, "rev-parse", "refs/heads/main")).strip()
 
 
-async def http_backend(
-    root: Path, env: dict[str, str], body: AsyncIterator[bytes]
-) -> CgiResponse:
+async def http_backend(root: Path, env: dict[str, str], body: AsyncIterator[bytes]) -> CgiResponse:
     """SYNC-MS-009#git.http_backend
 
     서버 저장소의 git 입구(카드 BB) — 이미지 안 git의 http-backend를 CGI로 돌린다. 앱의
