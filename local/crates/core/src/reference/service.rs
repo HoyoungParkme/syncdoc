@@ -168,4 +168,25 @@ impl ReferenceService<'_> {
                 .collect(),
         )
     }
+
+    /// SYNC-MS-015#ReferenceService.resolve_missing
+    ///
+    /// `target_doc_id`면 그 문서(또는 그 항목)를 가리키는 것만 — 저장 직후 좁혀 부른다
+    pub async fn resolve_missing(
+        &mut self,
+        project_id: i32,
+        target_doc_id: Option<&str>,
+    ) -> Result<i64, Problem> {
+        let mut n = 0;
+        for r in repo::missing_in_project(&mut *self.db, project_id, target_doc_id).await? {
+            let (to_item, to_doc, missing) =
+                self.resolve(&r.raw_target, r.from_document_id).await?;
+            if missing {
+                continue;
+            }
+            repo::set_target(&mut *self.db, r.id, to_item, to_doc).await?;
+            n += 1;
+        }
+        Ok(n)
+    }
 }
