@@ -12,7 +12,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-009, SYNC-INFRA-001, SYNC-STD-004]
 
 `crates/core/src/infra/git.rs`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.8. 파이썬 판 [[SYNC-MS-009]]의 `git.*`와 **같은 명령·같은 옵션·같은 처리**이고, 이 문서는 다른 점만 적는다([[SYNC-STD-001]] 2.10). 서비스가 아니다 — git CLI를 자식 프로세스로 부르는 얇은 층이다([[SYNC-INFRA-001]] 9.1·9.2 — 순수 Rust git은 아직 push를 받지 못한다).
 
-**카드 L6 몫은 서버 저장 프로젝트를 만들고 지우는 데 드는 일곱이다(2026-10-08).** 받기·이력·되돌리기(L7·L9·L11)와 git 입구의 upload-pack·receive-pack(L10)은 그 카드가 더한다.
+**카드 L6 몫은 서버 저장 프로젝트를 만들고 지우는 데 드는 일곱이다(2026-10-08).** 카드 L7이 받기·밀린 커밋 수 둘을 더했다(저장 파이프라인의 「밀린 커밋 읽기」·처리 지점 앞당기기). 이력·되돌리기(L9·L11)와 git 입구의 upload-pack·receive-pack(L10)은 그 카드가 더한다.
 
 **`Git { exe, global_config }`** — git 실행 파일과 빈 전역 설정 파일. 켤 때 [[SYNC-MS-012#runtime.run]]이 만들어 서버 상태에 둔다. 실행 파일은 [[SYNC-MS-012#paths.git]] — 윈도는 설치 폴더의 MinGit(`mingit/cmd/git.exe`), 리눅스는 시스템 git.
 
@@ -39,6 +39,8 @@ upstream: [SYNC-DOM-004, SYNC-MS-009, SYNC-INFRA-001, SYNC-STD-004]
 | [[#Git.read]] | 커밋된 파일 읽기 |
 | [[#Git.commit_push]] | 쓰고 커밋하고 민다 |
 | [[#Git.init_specs]] | 새 프로젝트의 골격 파일 |
+| [[#Git.fetch]] | 서버 저장소에서 받아 온다 |
+| [[#Git.rev_list_count]] | 밀린 커밋 수 |
 
 ---
 
@@ -163,6 +165,38 @@ pub fn init_specs(specs_url: &str) -> IndexMap<String, String>
 
 ---
 
+#### Git.fetch 서버 저장소에서 받아 온다
+
+**시그니처**
+```rust
+pub async fn fetch(&self, workdir: &Path) -> Result<String, Problem>
+```
+
+근거: [[SYNC-MS-009#git.fetch]]
+
+**처리** `git: remote get-url origin` · `git: fetch origin` · `→ git: rev-parse origin/main` — 작업 사본은 건드리지 않는다
+
+**다른 점** 사람을 받지 않는다 — 토큰 갈래(`https://` 원격)가 없다. 싱크독_로컬은 서버 저장뿐이다([[SYNC-PRD-001#R15]]). 원격 주소를 읽는 첫 명령은 파이썬 판처럼 부른다(없는 원격이면 거기서 `Problem::Git`)
+
+**테스트 관점** 밖에서 원격에 민 커밋 → 그 해시, 작업 사본 HEAD는 그대로 · 빈 원격(커밋 없음) → `Problem::Git`
+
+---
+
+#### Git.rev_list_count 밀린 커밋 수
+
+**시그니처**
+```rust
+pub async fn rev_list_count(&self, workdir: &Path, range: &str) -> Result<i64, Problem>
+```
+
+근거: [[SYNC-MS-009#git.rev_list_count]]
+
+**처리** `git: rev-list --count {range}` → 정수(앞뒤 공백을 걷고) · 정수가 아니면 `Problem::Internal`
+
+**테스트 관점** `a..b`에 커밋 하나 → 1 · 같은 것 → 0 · 없는 해시 → `Problem::Git`
+
+---
+
 ## 3. 미결사항
 
-없음. 받기·이력·git 입구는 그 카드가 더한다 — [[SYNC-CODE-002]].
+없음. 이력·되돌리기·git 입구는 그 카드가 더한다 — [[SYNC-CODE-002]].
