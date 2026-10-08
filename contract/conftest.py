@@ -37,6 +37,25 @@ LLM_KEY = "contract-key"
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption("--target", default="both", choices=["python", "rust", "both"])
     parser.addoption("--with-card", action="append", default=[], help="Rust 판에서 더 돌릴 카드")
+    parser.addoption(
+        "--update-snapshots",
+        action="store_true",
+        help="스냅숏을 파이썬 판의 답으로 다시 쓴다(--target python과 함께)",
+    )
+    parser.addoption("--diff-count", type=int, default=600, help="두 판 차이 시험의 사례 수")
+    parser.addoption("--diff-seed", type=int, default=20261008, help="두 판 차이 시험의 씨앗")
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    import snapshots
+
+    snapshots.UPDATE = config.getoption("--update-snapshots")
+
+
+def pytest_sessionfinish(session: pytest.Session) -> None:
+    import snapshots
+
+    snapshots.flush()
 
 
 def done_cards() -> set[str]:
@@ -181,13 +200,40 @@ def _servers(fake_llm: int) -> Iterator[dict]:
         next(gen, None)
 
 
+def _rust_allowed(request: pytest.FixtureRequest) -> bool:
+    marker = request.node.get_closest_marker("card")
+    card = marker.args[0] if marker else None
+    if card is None:
+        return True
+    return card in done_cards() | set(request.config.getoption("--with-card"))
+
+
 @pytest.fixture
 def server(request: pytest.FixtureRequest, _servers: dict) -> Server:
     target = request.param
-    marker = request.node.get_closest_marker("card")
-    card = marker.args[0] if marker else None
-    if target == "rust" and card is not None:
-        allowed = done_cards() | set(request.config.getoption("--with-card"))
-        if card not in allowed:
-            pytest.skip(f"Rust 판은 카드 {card}가 아직이다")
+    if target == "rust" and not _rust_allowed(request):
+        marker = request.node.get_closest_marker("card")
+        pytest.skip(f"Rust 판은 카드 {marker.args[0]}가 아직이다")
     return _servers["get"](target)
+
+
+@pytest.fixture
+def both(request: pytest.FixtureRequest, _servers: dict) -> tuple[Server, Server]:
+    """두 판 차이 시험 — 둘 다 띄울 때(`--target both`)만, Rust는 카드가 끝났거나 --with-card일 때만"""
+    if request.config.getoption("--target") != "both":
+        pytest.skip("두 판 차이 시험은 --target both에서만")
+    if not _rust_allowed(request):
+        pytest.skip("Rust 판은 이 카드가 아직이다")
+    return _servers["get"]("python"), _servers["get"]("rust")
+
+
+_TOKENS: dict[str, str] = {}
+
+
+def token_for(srv: Server) -> str:
+    """그 판에 MCP 토큰 하나 — 판마다 한 번 발급해 같이 쓴다"""
+    if srv.url not in _TOKENS:
+        r = srv.client().post("/api/me/tokens", json={"label": "contract"})
+        assert r.status_code == 201, r.text
+        _TOKENS[srv.url] = r.json()["token"]
+    return _TOKENS[srv.url]

@@ -1,0 +1,1150 @@
+{
+ "accept_json_only": {
+  "status": 406,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+ },
+ "accept_missing": {
+  "status": 406,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+ },
+ "accept_sse_only": {
+  "status": 406,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+ },
+ "accept_star": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\r\n\r\n"
+ },
+ "accept_wild_q": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\r\n\r\n"
+ },
+ "auth_first_ok_last_bad": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\": \"urn:syncdoc:unauthorized\", \"title\": \"unauthorized\", \"status\": 401, \"detail\": \"토큰 없음·폐기·만료\"}"
+ },
+ "auth_get": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\": \"urn:syncdoc:unauthorized\", \"title\": \"unauthorized\", \"status\": 401, \"detail\": \"토큰 없음·폐기·만료\"}"
+ },
+ "auth_last_wins": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\r\n\r\n"
+ },
+ "auth_lowercase": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\": \"urn:syncdoc:unauthorized\", \"title\": \"unauthorized\", \"status\": 401, \"detail\": \"토큰 없음·폐기·만료\"}"
+ },
+ "auth_none": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\": \"urn:syncdoc:unauthorized\", \"title\": \"unauthorized\", \"status\": 401, \"detail\": \"토큰 없음·폐기·만료\"}"
+ },
+ "auth_padded": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\r\n\r\n"
+ },
+ "auth_wrong": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\": \"urn:syncdoc:unauthorized\", \"title\": \"unauthorized\", \"status\": 401, \"detail\": \"토큰 없음·폐기·만료\"}"
+ },
+ "body_batch": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32602,\"message\":\"Validation error: 4 validation errors for union[JSONRPCRequest,JSONRPCNotification,JSONRPCResponse,JSONRPCError]\\nJSONRPCRequest\\n  Input should be a valid dictionary or instance of JSONRPCRequest [type=model_type, input_value=[{'jsonrpc': '2.0', 'id': 1, 'method': 'ping'}], input_type=list]\\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type\\nJSONRPCNotification\\n  Input should be a valid dictionary or instance of JSONRPCNotification [type=model_type, input_value=[{'jsonrpc': '2.0', 'id': 1, 'method': 'ping'}], input_type=list]\\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type\\nJSONRPCResponse\\n  Input should be a valid dictionary or instance of JSONRPCResponse [type=model_type, input_value=[{'jsonrpc': '2.0', 'id': 1, 'method': 'ping'}], input_type=list]\\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type\\nJSONRPCError\\n  Input should be a valid dictionary or instance of JSONRPCError [type=model_type, input_value=[{'jsonrpc': '2.0', 'id': 1, 'method': 'ping'}], input_type=list]\\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type\"}}"
+ },
+ "body_broken": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32700,\"message\":\"Parse error: EOF while parsing a value at line 1 column 11\"}}"
+ },
+ "body_empty": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32700,\"message\":\"Parse error: EOF while parsing a value at line 1 column 0\"}}"
+ },
+ "body_nan": {
+  "status": 202,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": ""
+ },
+ "body_not_object": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32602,\"message\":\"Validation error: 4 validation errors for union[JSONRPCRequest,JSONRPCNotification,JSONRPCResponse,JSONRPCError]\\nJSONRPCRequest\\n  Input should be a valid dictionary or instance of JSONRPCRequest [type=model_type, input_value='ping', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type\\nJSONRPCNotification\\n  Input should be a valid dictionary or instance of JSONRPCNotification [type=model_type, input_value='ping', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type\\nJSONRPCResponse\\n  Input should be a valid dictionary or instance of JSONRPCResponse [type=model_type, input_value='ping', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type\\nJSONRPCError\\n  Input should be a valid dictionary or instance of JSONRPCError [type=model_type, input_value='ping', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type\"}}"
+ },
+ "body_too_big_declared": {
+  "status": 413,
+  "headers": [],
+  "body": "Request body too large"
+ },
+ "body_trailing": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32700,\"message\":\"Parse error: trailing characters at line 1 column 47\"}}"
+ },
+ "call_arg_depth_ok": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"Error executing tool update_document: 1 validation error for update_documentArguments\\nchanged_items.0\\n  Input should be a valid string [type=string_type, input_value=[[[[[[[[[[[[[[[[[[[[[[[[[...]]]]]]]]]]]]]]]]]]]]]]]], input_type=list]\\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "call_arg_depth_over": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"Error executing tool update_document: 1 validation error for update_documentArguments\\nchanged_items\\n  Input should be a valid list [type=list_type, input_value='[[[[[[[[[[[[[[[[[[[[[[[[...]]]]]]]]]]]]]]]]]]]]]]]', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/list_type\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "call_bad_types": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"Error executing tool list_documents: 3 validation errors for list_documentsArguments\\nproject_code\\n  Input should be a valid string [type=string_type, input_value=1, input_type=int]\\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\\nstage\\n  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='x', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/int_parsing\\nstatus\\n  Input should be a valid string [type=string_type, input_value=[1], input_type=list]\\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "call_get_document": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"project X 없음\\\", \\\"resource\\\": \\\"project\\\", \\\"id\\\": \\\"X\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "call_init_bad": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"Error executing tool init_project: 2 validation errors for init_projectArguments\\nstorage\\n  Input should be 'github' or 'server' [type=literal_error, input_value='s3', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\\nname\\n  Field required [type=missing, input_value={'storage': 's3', 'code': 'X'}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "call_literal_bad": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"Error executing tool change_status: 1 validation error for change_statusArguments\\nto\\n  Input should be 'draft' or 'approved' [type=literal_error, input_value='done', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "call_missing_args": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"Error executing tool get_document: 1 validation error for get_documentArguments\\ndoc_id\\n  Field required [type=missing, input_value={}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "call_no_params": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32602,\"message\":\"Invalid request parameters\",\"data\":\"\"}}\r\n\r\n"
+ },
+ "call_pre_parse": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"Error executing tool update_document: 1 validation error for update_documentArguments\\nchanged_items.1\\n  Input should be a valid string [type=string_type, input_value=1, input_type=int]\\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "call_unknown_tool": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"Unknown tool: nope\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "call_upload_bad": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"Error executing tool upload_code: 2 validation errors for upload_codeArguments\\nfiles.0.path\\n  Input should be a valid string [type=string_type, input_value=1, input_type=int]\\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\\nfiles.0.content\\n  Field required [type=missing, input_value={'path': 1}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "complete": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32601,\"message\":\"Method not found\",\"data\":\"completion/complete\"}}\r\n\r\n"
+ },
+ "complete_bad": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32602,\"message\":\"Invalid request parameters\",\"data\":\"\"}}\r\n\r\n"
+ },
+ "ct_charset": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\r\n\r\n"
+ },
+ "ct_list": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\r\n\r\n"
+ },
+ "ct_missing": {
+  "status": 400,
+  "headers": [],
+  "body": "Invalid Content-Type header"
+ },
+ "ct_suffix": {
+  "status": 415,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Unsupported Media Type: Content-Type must be application/json\"}}"
+ },
+ "ct_text": {
+  "status": 400,
+  "headers": [],
+  "body": "Invalid Content-Type header"
+ },
+ "ct_upper": {
+  "status": 415,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Unsupported Media Type: Content-Type must be application/json\"}}"
+ },
+ "delete": {
+  "status": 405,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Method Not Allowed: Session termination not supported\"}}"
+ },
+ "discover": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32601,\"message\":\"Method not found\",\"data\":\"server/discover\"}}\r\n\r\n"
+ },
+ "env_bad_version": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32602,\"message\":\"Validation error: 6 validation errors for union[JSONRPCRequest,JSONRPCNotification,JSONRPCResponse,JSONRPCError]\\nJSONRPCRequest.jsonrpc\\n  Input should be '2.0' [type=literal_error, input_value='1.0', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\\nJSONRPCNotification.jsonrpc\\n  Input should be '2.0' [type=literal_error, input_value='1.0', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\\nJSONRPCResponse.jsonrpc\\n  Input should be '2.0' [type=literal_error, input_value='1.0', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\\nJSONRPCResponse.result\\n  Field required [type=missing, input_value={'jsonrpc': '1.0', 'id': 1, 'method': 'ping'}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\\nJSONRPCError.jsonrpc\\n  Input should be '2.0' [type=literal_error, input_value='1.0', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\\nJSONRPCError.error\\n  Field required [type=missing, input_value={'jsonrpc': '1.0', 'id': 1, 'method': 'ping'}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\"}}"
+ },
+ "env_id_big": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":123456789012345678901234567890,\"result\":{}}\r\n\r\n"
+ },
+ "env_id_bool": {
+  "status": 202,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": ""
+ },
+ "env_id_float": {
+  "status": 202,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": ""
+ },
+ "env_id_null": {
+  "status": 202,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": ""
+ },
+ "env_id_text": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":\"a\\\"\\\\\\n\\u0001é \",\"result\":{}}\r\n\r\n"
+ },
+ "env_long_values": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32602,\"message\":\"Validation error: 12 validation errors for union[JSONRPCRequest,JSONRPCNotification,JSONRPCResponse,JSONRPCError]\\nJSONRPCRequest.jsonrpc\\n  Input should be '2.0' [type=literal_error, input_value='222222222222222222222222...22222222222222222222222', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\\nJSONRPCRequest.id.int\\n  Input should be a valid integer [type=int_type, input_value=[1, 1, 1, 1, 1, 1, 1, 1, ... 1, 1, 1, 1, 1, 1, 1, 1], input_type=list]\\n    For further information visit https://errors.pydantic.dev/2.13/v/int_type\\nJSONRPCRequest.id.str\\n  Input should be a valid string [type=string_type, input_value=[1, 1, 1, 1, 1, 1, 1, 1, ... 1, 1, 1, 1, 1, 1, 1, 1], input_type=list]\\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\\nJSONRPCNotification.jsonrpc\\n  Input should be '2.0' [type=literal_error, input_value='222222222222222222222222...22222222222222222222222', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\\nJSONRPCResponse.jsonrpc\\n  Input should be '2.0' [type=literal_error, input_value='222222222222222222222222...22222222222222222222222', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\\nJSONRPCResponse.id.int\\n  Input should be a valid integer [type=int_type, input_value=[1, 1, 1, 1, 1, 1, 1, 1, ... 1, 1, 1, 1, 1, 1, 1, 1], input_type=list]\\n    For further information visit https://errors.pydantic.dev/2.13/v/int_type\\nJSONRPCResponse.id.str\\n  Input should be a valid string [type=string_type, input_value=[1, 1, 1, 1, 1, 1, 1, 1, ... 1, 1, 1, 1, 1, 1, 1, 1], input_type=list]\\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\\nJSONRPCResponse.result\\n  Field required [type=missing, input_value={'jsonrpc': '222222222222...xxxxxxxxxxxxxxxxxxxxxx'}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\\nJSONRPCError.jsonrpc\\n  Input should be '2.0' [type=literal_error, input_value='222222222222222222222222...22222222222222222222222', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\\nJSONRPCError.id.int\\n  Input should be a valid integer [type=int_type, input_value=[1, 1, 1, 1, 1, 1, 1, 1, ... 1, 1, 1, 1, 1, 1, 1, 1], input_type=list]\\n    For further information visit https://errors.pydantic.dev/2.13/v/int_type\\nJSONRPCError.id.str\\n  Input should be a valid string [type=string_type, input_value=[1, 1, 1, 1, 1, 1, 1, 1, ... 1, 1, 1, 1, 1, 1, 1, 1], input_type=list]\\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\\nJSONRPCError.error\\n  Field required [type=missing, input_value={'jsonrpc': '222222222222...xxxxxxxxxxxxxxxxxxxxxx'}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\"}}"
+ },
+ "env_method_int": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32602,\"message\":\"Validation error: 4 validation errors for union[JSONRPCRequest,JSONRPCNotification,JSONRPCResponse,JSONRPCError]\\nJSONRPCRequest.method\\n  Input should be a valid string [type=string_type, input_value=3, input_type=int]\\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\\nJSONRPCNotification.method\\n  Input should be a valid string [type=string_type, input_value=3, input_type=int]\\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\\nJSONRPCResponse.result\\n  Field required [type=missing, input_value={'jsonrpc': '2.0', 'id': 1, 'method': 3}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\\nJSONRPCError.error\\n  Field required [type=missing, input_value={'jsonrpc': '2.0', 'id': 1, 'method': 3}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\"}}"
+ },
+ "env_nothing": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32602,\"message\":\"Validation error: 11 validation errors for union[JSONRPCRequest,JSONRPCNotification,JSONRPCResponse,JSONRPCError]\\nJSONRPCRequest.jsonrpc\\n  Field required [type=missing, input_value={'a': 1}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\\nJSONRPCRequest.id\\n  Field required [type=missing, input_value={'a': 1}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\\nJSONRPCRequest.method\\n  Field required [type=missing, input_value={'a': 1}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\\nJSONRPCNotification.jsonrpc\\n  Field required [type=missing, input_value={'a': 1}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\\nJSONRPCNotification.method\\n  Field required [type=missing, input_value={'a': 1}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\\nJSONRPCResponse.jsonrpc\\n  Field required [type=missing, input_value={'a': 1}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\\nJSONRPCResponse.id\\n  Field required [type=missing, input_value={'a': 1}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\\nJSONRPCResponse.result\\n  Field required [type=missing, input_value={'a': 1}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\\nJSONRPCError.jsonrpc\\n  Field required [type=missing, input_value={'a': 1}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\\nJSONRPCError.id\\n  Field required [type=missing, input_value={'a': 1}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\\nJSONRPCError.error\\n  Field required [type=missing, input_value={'a': 1}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\"}}"
+ },
+ "env_params_list": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32602,\"message\":\"Validation error: 4 validation errors for union[JSONRPCRequest,JSONRPCNotification,JSONRPCResponse,JSONRPCError]\\nJSONRPCRequest.params\\n  Input should be a valid dictionary [type=dict_type, input_value=[1], input_type=list]\\n    For further information visit https://errors.pydantic.dev/2.13/v/dict_type\\nJSONRPCNotification.params\\n  Input should be a valid dictionary [type=dict_type, input_value=[1], input_type=list]\\n    For further information visit https://errors.pydantic.dev/2.13/v/dict_type\\nJSONRPCResponse.result\\n  Field required [type=missing, input_value={'jsonrpc': '2.0', 'id': ...: 'ping', 'params': [1]}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\\nJSONRPCError.error\\n  Field required [type=missing, input_value={'jsonrpc': '2.0', 'id': ...: 'ping', 'params': [1]}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\"}}"
+ },
+ "get_last_event_id": {
+  "status": 500,
+  "headers": [
+   [
+    "content-type",
+    "text/plain; charset=utf-8"
+   ]
+  ],
+  "body": "Internal Server Error"
+ },
+ "get_no_sse": {
+  "status": 406,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept text/event-stream\"}}"
+ },
+ "get_stream_headers": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ]
+ },
+ "initialize": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":{\"experimental\":{},\"prompts\":{\"listChanged\":false},\"resources\":{\"listChanged\":false,\"subscribe\":false},\"tools\":{\"listChanged\":false}},\"instructions\":\"싱크독 명세 도구. 쓰기 전에 get_template, 수정 전에 get_document. 프로젝트를 만들 때 저장 방식을 고른다 — 이 서버는 서버 저장만 쓴다. storage=\\\"server\\\"로 부른다. 묻지 않는다.\",\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"syncdoc_local\",\"version\":\"\"}}}\r\n\r\n"
+ },
+ "initialize_2024": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":{\"experimental\":{},\"prompts\":{\"listChanged\":false},\"resources\":{\"listChanged\":false,\"subscribe\":false},\"tools\":{\"listChanged\":false}},\"instructions\":\"싱크독 명세 도구. 쓰기 전에 get_template, 수정 전에 get_document. 프로젝트를 만들 때 저장 방식을 고른다 — 이 서버는 서버 저장만 쓴다. storage=\\\"server\\\"로 부른다. 묻지 않는다.\",\"protocolVersion\":\"2024-11-05\",\"serverInfo\":{\"name\":\"syncdoc_local\",\"version\":\"\"}}}\r\n\r\n"
+ },
+ "initialize_bad": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32602,\"message\":\"Invalid request parameters\",\"data\":\"\"}}\r\n\r\n"
+ },
+ "initialize_future": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":{\"experimental\":{},\"prompts\":{\"listChanged\":false},\"resources\":{\"listChanged\":false,\"subscribe\":false},\"tools\":{\"listChanged\":false}},\"instructions\":\"싱크독 명세 도구. 쓰기 전에 get_template, 수정 전에 get_document. 프로젝트를 만들 때 저장 방식을 고른다 — 이 서버는 서버 저장만 쓴다. storage=\\\"server\\\"로 부른다. 묻지 않는다.\",\"protocolVersion\":\"2025-11-25\",\"serverInfo\":{\"name\":\"syncdoc_local\",\"version\":\"\"}}}\r\n\r\n"
+ },
+ "initialize_no_params": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32602,\"message\":\"Invalid request parameters\",\"data\":\"\"}}\r\n\r\n"
+ },
+ "listen": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32601,\"message\":\"Method not found\",\"data\":\"subscriptions/listen\"}}\r\n\r\n"
+ },
+ "method_put": {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "GET, POST, DELETE"
+   ],
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:method-not-allowed\",\"title\":\"method-not-allowed\",\"status\":405,\"detail\":\"이 경로에 PUT 메서드는 없습니다\",\"allow\":[\"GET\",\"POST\",\"DELETE\"]}"
+ },
+ "method_unknown": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32601,\"message\":\"Method not found\",\"data\":\"nope/x\"}}\r\n\r\n"
+ },
+ "msg_error": {
+  "status": 202,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": ""
+ },
+ "msg_response": {
+  "status": 202,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": ""
+ },
+ "note_initialized": {
+  "status": 202,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": ""
+ },
+ "note_unknown": {
+  "status": 202,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": ""
+ },
+ "ping": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\r\n\r\n"
+ },
+ "ping_meta_bad": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32602,\"message\":\"Invalid request parameters\",\"data\":\"\"}}\r\n\r\n"
+ },
+ "prompts_get": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":0,\"message\":\"Unknown prompt: p\"}}\r\n\r\n"
+ },
+ "prompts_get_bad_args": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32602,\"message\":\"Invalid request parameters\",\"data\":\"\"}}\r\n\r\n"
+ },
+ "prompts_list": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"prompts\":[]}}\r\n\r\n"
+ },
+ "resources_list": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"resources\":[]}}\r\n\r\n"
+ },
+ "resources_read": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32602,\"message\":\"Unknown resource: file:///x\",\"data\":{\"uri\":\"file:///x\"}}}\r\n\r\n"
+ },
+ "resources_read_no_uri": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32602,\"message\":\"Invalid request parameters\",\"data\":\"\"}}\r\n\r\n"
+ },
+ "resources_subscribe": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32601,\"message\":\"Method not found\",\"data\":\"resources/subscribe\"}}\r\n\r\n"
+ },
+ "resources_templates": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"resourceTemplates\":[]}}\r\n\r\n"
+ },
+ "set_level": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32601,\"message\":\"Method not found\",\"data\":\"logging/setLevel\"}}\r\n\r\n"
+ },
+ "tools_list": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[{\"description\":\"싱크독 프로젝트를 만든다. 저장 방식(storage)을 고른다 — github: GitHub 저장소를 등록한다, server: 싱크독 서버 안에 저장소를 만든다(GitHub 없이). docs/specs/ 아래 11단계 디렉터리와 README를 커밋한다. 새 프로젝트를 시작할 때 한 번만 부른다. 같은 코드가 있으면 project-code-conflict, 저장소에 docs/specs/가 이미 있거나 서버 저장인데 같은 코드의 보관된 저장소가 있으면 existing-specs 에러가 나며 import_existing=true로 다시 부르면 기존 명세를 가져와(보관본은 되살려) 등록한다. GitHub 저장소가 아직 없으면 create_repo=true로 부른다 — 저장소를 만들어 주고(공개 여부는 private로 고르고, 빼면 비공개) 이어서 등록까지 한다. 사람이 저장소를 만들어 달라고 했을 때만 이 인자를 붙인다. remote_url은 storage=github일 때만, 그때는 필수다. 이 서버는 서버 저장만 쓴다. storage=\\\"server\\\"로 부른다. 묻지 않는다.\",\"inputSchema\":{\"properties\":{\"storage\":{\"enum\":[\"github\",\"server\"],\"title\":\"Storage\",\"type\":\"string\"},\"code\":{\"title\":\"Code\",\"type\":\"string\"},\"name\":{\"title\":\"Name\",\"type\":\"string\"},\"remote_url\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Remote Url\"},\"import_existing\":{\"default\":false,\"title\":\"Import Existing\",\"type\":\"boolean\"},\"create_repo\":{\"default\":false,\"title\":\"Create Repo\",\"type\":\"boolean\"},\"private\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Private\"}},\"required\":[\"storage\",\"code\",\"name\"],\"type\":\"object\",\"title\":\"init_projectArguments\"},\"name\":\"init_project\"},{\"description\":\"프로젝트의 11단계별 문서 목록과 각 문서의 상태·버전을 돌려준다. 프로젝트에 처음 붙었거나 어느 단계까지 채워졌는지 알아야 할 때 부른다. 문서 본문은 포함하지 않는다. 본문은 get_document로.\",\"inputSchema\":{\"properties\":{\"project_code\":{\"title\":\"Project Code\",\"type\":\"string\"},\"stage\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Stage\"},\"status\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Status\"}},\"required\":[\"project_code\"],\"type\":\"object\",\"title\":\"list_documentsArguments\"},\"name\":\"list_documents\"},{\"description\":\"문서 원본 MD 전체와 상태·버전을 돌려준다. 명세를 근거로 작업하기 전에 부른다. 응답의 version_no를 기억했다가 update_document에 expected_version으로 보내야 한다. status가 approved가 아니면 확정 명세가 아니다. 본문 안 [[문서ID#항목ID]]는 다른 항목 참조이며 get_item으로 따라갈 수 있다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"}},\"required\":[\"doc_id\"],\"type\":\"object\",\"title\":\"get_documentArguments\"},\"name\":\"get_document\"},{\"description\":\"문서 안 항목 하나의 본문 블록과 소속 문서의 상태·버전을 돌려준다. get_document로 문서 전체를 받는 대신 필요한 항목만 볼 때, 또는 본문에서 발견한 [[문서ID#항목ID]] 참조를 따라갈 때 부른다. 삭제된 항목이면 item-deleted 에러에 삭제 시점이 담긴다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"item_id\":{\"title\":\"Item Id\",\"type\":\"string\"}},\"required\":[\"doc_id\",\"item_id\"],\"type\":\"object\",\"title\":\"get_itemArguments\"},\"name\":\"get_item\"},{\"description\":\"서버 저장 프로젝트의 서버 저장소에 코드를 올린다 — git이 없는 PC에서 코드 대조를 보려고 부른다. 바뀐 파일(경로와 UTF-8 글자 전체)과 지운 경로를 보내면 커밋 하나로 만들고 코드 그래프를 다시 만든다. git이 있으면 git push가 낫다. 명세 파일(docs/specs/)은 받지 않는다 — 명세는 create_document·update_document로. 한 번에 UTF-8 합 5MB, 파일과 지운 경로 합 500개까지 — 넘으면 upload-too-large, 나눠 보낸다. 절대 경로·..·.git·비밀 꼴(.env·*.pem·*.key 등)·이진 파일은 upload-path-refused이고 그때는 아무것도 올라가지 않는다. GitHub 저장 프로젝트면 storage-mismatch — GitHub에 push한다.\",\"inputSchema\":{\"properties\":{\"project_code\":{\"title\":\"Project Code\",\"type\":\"string\"},\"files\":{\"items\":{\"$ref\":\"#/$defs/CodeFile\"},\"title\":\"Files\",\"type\":\"array\"},\"message\":{\"title\":\"Message\",\"type\":\"string\"},\"delete\":{\"anyOf\":[{\"items\":{\"type\":\"string\"},\"type\":\"array\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Delete\"}},\"required\":[\"project_code\",\"files\",\"message\"],\"type\":\"object\",\"$defs\":{\"CodeFile\":{\"description\":\"upload_code의 파일 하나 — 저장소 뿌리에서의 상대 경로와 UTF-8 글자 전체.\",\"properties\":{\"path\":{\"title\":\"Path\",\"type\":\"string\"},\"content\":{\"title\":\"Content\",\"type\":\"string\"}},\"required\":[\"path\",\"content\"],\"title\":\"CodeFile\",\"type\":\"object\"}},\"title\":\"upload_codeArguments\"},\"name\":\"upload_code\"},{\"description\":\"항목의 코드를 명세와 대조한 결과를 돌려준다. MINISPEC 항목이면 그 함수의 파일·줄, 부르는 것(명세 「호출하는 것」과 같음·코드만·명세만)과 불리는 곳을, 다른 항목이면 하위 체인에서 이어지는 MINISPEC 함수와 어긋남 수를. API·화면 항목처럼 그 항목의 함수가 코드에 있으면(docstring·파일 주석의 항목 ID) 그 함수와 항목 있는 이웃도 — 대조 없이(status null). 서버의 코드 그래프(graphify)로 계산한다 — 구현이 명세대로인지 볼 때 부른다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"item_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Item Id\"}},\"required\":[\"doc_id\"],\"type\":\"object\",\"title\":\"get_code_graphArguments\"},\"name\":\"get_code_graph\"},{\"description\":\"항목의 상위 참조(이 항목이 근거로 삼은 것)와 하위 참조(이 항목을 근거로 삼은 것)를 나눠 돌려준다. 이 항목이 왜 있는지, 바꾸면 어디에 영향이 가는지 알아야 할 때 부른다. 목록만 주고 본문은 펼치지 않는다. 필요한 항목만 get_item으로 다시 요청한다. 빈 목록이면 고립 항목이다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"item_id\":{\"title\":\"Item Id\",\"type\":\"string\"}},\"required\":[\"doc_id\",\"item_id\"],\"type\":\"object\",\"title\":\"get_referencesArguments\"},\"name\":\"get_references\"},{\"description\":\"문서 타입의 템플릿과 작성 규약을 돌려준다. create_document 전에 반드시 부른다. 반환에는 (1) 그 타입의 항목 ID 패턴·필수 절·항목 블록 구조, (2) 템플릿 MD 뼈대, (3) 채워진 예시가 담긴다. 항목은 ID로 시작하는 헤딩이어야 하고, 표 행은 항목이 아니며, 번호에 패딩을 두지 않는다는 공통 규약도 함께 온다. 템플릿은 싱크독에 내장된 최신 것이다 — 저장소의 docs/specs/_templates/ 사본이 아니다. DOM·API·UI는 무엇을 쓸지 subtype으로 말한다 — DOM은 도메인·클래스·ERD, API는 REST·MCP, UI는 화면 설계·와이어프레임. DOM·API는 서브타입마다 필수 절과 뼈대가 달라 subtype 없이 받으면 필수 절이 비어 오고 고를 수 있는 것이 subtypes에 온다.\",\"inputSchema\":{\"properties\":{\"project_code\":{\"title\":\"Project Code\",\"type\":\"string\"},\"doc_type\":{\"title\":\"Doc Type\",\"type\":\"string\"},\"subtype\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Subtype\"}},\"required\":[\"project_code\",\"doc_type\"],\"type\":\"object\",\"title\":\"get_templateArguments\"},\"name\":\"get_template\"},{\"description\":\"새 문서를 만든다. 문서 ID는 서버가 발급한다({코드}-{타입}-{번호}). 서버는 템플릿을 적용하지 않는다 — body가 get_template으로 받은 뼈대를 따라야 한다. DOM·API는 subtype을 주고 받는다(서브타입마다 필수 절이 다르다). 항목 ID(#R12 같은 것)는 body에 직접 붙인다. 서버는 발급하지 않고 형식·유일성만 검사한다. 기존 문서를 고치려면 이 도구가 아니라 update_document를 써야 한다. 문서 하나를 만들면 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 같은 단계라도 다음 문서는 사람이 웹에서 읽고 난 뒤에 만든다. DOM 셋은 순서가 있다: 클래스 명세는 API 문서가, ERD는 클래스 명세가 같은 프로젝트에 있어야 받는다(precondition-unmet). DOM 제목에는 도메인·클래스·ERD 중, UI 제목에는 화면 설계·와이어프레임 중, API 제목에는 REST·MCP 중 하나가 들어가야 한다.\",\"inputSchema\":{\"properties\":{\"project_code\":{\"title\":\"Project Code\",\"type\":\"string\"},\"doc_type\":{\"title\":\"Doc Type\",\"type\":\"string\"},\"body\":{\"title\":\"Body\",\"type\":\"string\"},\"message\":{\"title\":\"Message\",\"type\":\"string\"}},\"required\":[\"project_code\",\"doc_type\",\"body\",\"message\"],\"type\":\"object\",\"title\":\"create_documentArguments\"},\"name\":\"create_document\"},{\"description\":\"기존 문서의 본문을 교체해 새 버전을 만든다. 반드시 get_document를 먼저 부르고 그 응답의 body를 고쳐 보낸다 — version_no만 받아 오고 본문은 예전 것을 쓰면 안 된다. create_document는 frontmatter의 doc_id가 비어도 받지만(서버가 발급한다) 그 본문을 그대로 보내면 frontmatter.doc_id 위반이 된다. expected_version에는 그 응답의 version_no를 넣는다. 그 사이 문서가 바뀌었으면 version-conflict 에러에 현재 버전과 본문이 담기니, 그것을 읽고 병합해 다시 부른다. 본문에서 항목 ID가 사라지면 item-deletion-needs-confirm 에러에 끊어질 하위 항목이 문서ID#항목ID와 이름으로 담겨 오며, 그것을 사람에게 보여주고 확인받은 뒤 confirm_item_deletion=true로 다시 부른다. 완료 상태 문서를 고치면 초안으로 내려간다. 저장 뒤에는 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 사람이 웹에서 읽기 전에 다음 문서로 가지 않는다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"body\":{\"title\":\"Body\",\"type\":\"string\"},\"expected_version\":{\"title\":\"Expected Version\",\"type\":\"integer\"},\"message\":{\"title\":\"Message\",\"type\":\"string\"},\"changed_items\":{\"items\":{\"type\":\"string\"},\"title\":\"Changed Items\",\"type\":\"array\"},\"confirm_item_deletion\":{\"default\":false,\"title\":\"Confirm Item Deletion\",\"type\":\"boolean\"}},\"required\":[\"doc_id\",\"body\",\"expected_version\",\"message\",\"changed_items\"],\"type\":\"object\",\"title\":\"update_documentArguments\"},\"name\":\"update_document\"},{\"description\":\"문서를 휴지통에 넣는다 — 파일은 저장소에서 지워지고(커밋) 행·버전은 남아 restore_document로 되살릴 수 있다. 잘못 만든 문서를 치우는 길이다. 첫 호출은 document-deletion-needs-confirm 에러로 제목·버전 수·끊어질 참조 목록을 돌려주고 아직 넣지 않는다. 그것을 사람에게 보여주고 확인받은 뒤 confirm=true로 다시 부른다. 넣으면 이 문서를 가리키던 참조가 미존재(is_missing)로 돌아간다 — 되살리면 풀린다. 행까지 지우는 완전 삭제는 웹에서만.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"confirm\":{\"default\":false,\"title\":\"Confirm\",\"type\":\"boolean\"}},\"required\":[\"doc_id\"],\"type\":\"object\",\"title\":\"delete_documentArguments\"},\"name\":\"delete_document\"},{\"description\":\"휴지통의 문서를 되살린다 — 휴지통에 넣기 직전 내용으로 새 버전이 생기고 항목이 돌아오며, 그 항목을 가리키던 끊어진 참조가 풀린다. 휴지통에 없는 문서는 document-not-trashed. 옛 본문이 지금 규약을 위반하면 convention-violation으로 그대로 남는다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"}},\"required\":[\"doc_id\"],\"type\":\"object\",\"title\":\"restore_documentArguments\"},\"name\":\"restore_document\"},{\"description\":\"문서 상태를 바꾼다 — draft ⇄ approved. 사람이 「완료로 올려」라고 했을 때, 또는 쓰던 문서를 다 썼다고 스스로 판단했을 때 부른다. approved로 올릴 때 규약 오류·미완성·끊어진 참조가 하나라도 있으면 status-blocked — 목록을 고치고 다시 부르거나 사람에게 전한다. draft로 내리는 것은 막지 않는다. 본문의 status: 줄을 update_document로 바꾸면 frontmatter.status_change 위반이다 — 상태는 이 도구로만. 이력에 에이전트가 바꾼 것으로 남는다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"to\":{\"enum\":[\"draft\",\"approved\"],\"title\":\"To\",\"type\":\"string\"},\"reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Reason\"}},\"required\":[\"doc_id\",\"to\"],\"type\":\"object\",\"title\":\"change_statusArguments\"},\"name\":\"change_status\"}]}}\r\n\r\n"
+ },
+ "tools_list_2024": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[{\"description\":\"싱크독 프로젝트를 만든다. 저장 방식(storage)을 고른다 — github: GitHub 저장소를 등록한다, server: 싱크독 서버 안에 저장소를 만든다(GitHub 없이). docs/specs/ 아래 11단계 디렉터리와 README를 커밋한다. 새 프로젝트를 시작할 때 한 번만 부른다. 같은 코드가 있으면 project-code-conflict, 저장소에 docs/specs/가 이미 있거나 서버 저장인데 같은 코드의 보관된 저장소가 있으면 existing-specs 에러가 나며 import_existing=true로 다시 부르면 기존 명세를 가져와(보관본은 되살려) 등록한다. GitHub 저장소가 아직 없으면 create_repo=true로 부른다 — 저장소를 만들어 주고(공개 여부는 private로 고르고, 빼면 비공개) 이어서 등록까지 한다. 사람이 저장소를 만들어 달라고 했을 때만 이 인자를 붙인다. remote_url은 storage=github일 때만, 그때는 필수다. 이 서버는 서버 저장만 쓴다. storage=\\\"server\\\"로 부른다. 묻지 않는다.\",\"inputSchema\":{\"properties\":{\"storage\":{\"enum\":[\"github\",\"server\"],\"title\":\"Storage\",\"type\":\"string\"},\"code\":{\"title\":\"Code\",\"type\":\"string\"},\"name\":{\"title\":\"Name\",\"type\":\"string\"},\"remote_url\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Remote Url\"},\"import_existing\":{\"default\":false,\"title\":\"Import Existing\",\"type\":\"boolean\"},\"create_repo\":{\"default\":false,\"title\":\"Create Repo\",\"type\":\"boolean\"},\"private\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Private\"}},\"required\":[\"storage\",\"code\",\"name\"],\"type\":\"object\",\"title\":\"init_projectArguments\"},\"name\":\"init_project\"},{\"description\":\"프로젝트의 11단계별 문서 목록과 각 문서의 상태·버전을 돌려준다. 프로젝트에 처음 붙었거나 어느 단계까지 채워졌는지 알아야 할 때 부른다. 문서 본문은 포함하지 않는다. 본문은 get_document로.\",\"inputSchema\":{\"properties\":{\"project_code\":{\"title\":\"Project Code\",\"type\":\"string\"},\"stage\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Stage\"},\"status\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Status\"}},\"required\":[\"project_code\"],\"type\":\"object\",\"title\":\"list_documentsArguments\"},\"name\":\"list_documents\"},{\"description\":\"문서 원본 MD 전체와 상태·버전을 돌려준다. 명세를 근거로 작업하기 전에 부른다. 응답의 version_no를 기억했다가 update_document에 expected_version으로 보내야 한다. status가 approved가 아니면 확정 명세가 아니다. 본문 안 [[문서ID#항목ID]]는 다른 항목 참조이며 get_item으로 따라갈 수 있다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"}},\"required\":[\"doc_id\"],\"type\":\"object\",\"title\":\"get_documentArguments\"},\"name\":\"get_document\"},{\"description\":\"문서 안 항목 하나의 본문 블록과 소속 문서의 상태·버전을 돌려준다. get_document로 문서 전체를 받는 대신 필요한 항목만 볼 때, 또는 본문에서 발견한 [[문서ID#항목ID]] 참조를 따라갈 때 부른다. 삭제된 항목이면 item-deleted 에러에 삭제 시점이 담긴다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"item_id\":{\"title\":\"Item Id\",\"type\":\"string\"}},\"required\":[\"doc_id\",\"item_id\"],\"type\":\"object\",\"title\":\"get_itemArguments\"},\"name\":\"get_item\"},{\"description\":\"서버 저장 프로젝트의 서버 저장소에 코드를 올린다 — git이 없는 PC에서 코드 대조를 보려고 부른다. 바뀐 파일(경로와 UTF-8 글자 전체)과 지운 경로를 보내면 커밋 하나로 만들고 코드 그래프를 다시 만든다. git이 있으면 git push가 낫다. 명세 파일(docs/specs/)은 받지 않는다 — 명세는 create_document·update_document로. 한 번에 UTF-8 합 5MB, 파일과 지운 경로 합 500개까지 — 넘으면 upload-too-large, 나눠 보낸다. 절대 경로·..·.git·비밀 꼴(.env·*.pem·*.key 등)·이진 파일은 upload-path-refused이고 그때는 아무것도 올라가지 않는다. GitHub 저장 프로젝트면 storage-mismatch — GitHub에 push한다.\",\"inputSchema\":{\"properties\":{\"project_code\":{\"title\":\"Project Code\",\"type\":\"string\"},\"files\":{\"items\":{\"$ref\":\"#/$defs/CodeFile\"},\"title\":\"Files\",\"type\":\"array\"},\"message\":{\"title\":\"Message\",\"type\":\"string\"},\"delete\":{\"anyOf\":[{\"items\":{\"type\":\"string\"},\"type\":\"array\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Delete\"}},\"required\":[\"project_code\",\"files\",\"message\"],\"type\":\"object\",\"$defs\":{\"CodeFile\":{\"description\":\"upload_code의 파일 하나 — 저장소 뿌리에서의 상대 경로와 UTF-8 글자 전체.\",\"properties\":{\"path\":{\"title\":\"Path\",\"type\":\"string\"},\"content\":{\"title\":\"Content\",\"type\":\"string\"}},\"required\":[\"path\",\"content\"],\"title\":\"CodeFile\",\"type\":\"object\"}},\"title\":\"upload_codeArguments\"},\"name\":\"upload_code\"},{\"description\":\"항목의 코드를 명세와 대조한 결과를 돌려준다. MINISPEC 항목이면 그 함수의 파일·줄, 부르는 것(명세 「호출하는 것」과 같음·코드만·명세만)과 불리는 곳을, 다른 항목이면 하위 체인에서 이어지는 MINISPEC 함수와 어긋남 수를. API·화면 항목처럼 그 항목의 함수가 코드에 있으면(docstring·파일 주석의 항목 ID) 그 함수와 항목 있는 이웃도 — 대조 없이(status null). 서버의 코드 그래프(graphify)로 계산한다 — 구현이 명세대로인지 볼 때 부른다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"item_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Item Id\"}},\"required\":[\"doc_id\"],\"type\":\"object\",\"title\":\"get_code_graphArguments\"},\"name\":\"get_code_graph\"},{\"description\":\"항목의 상위 참조(이 항목이 근거로 삼은 것)와 하위 참조(이 항목을 근거로 삼은 것)를 나눠 돌려준다. 이 항목이 왜 있는지, 바꾸면 어디에 영향이 가는지 알아야 할 때 부른다. 목록만 주고 본문은 펼치지 않는다. 필요한 항목만 get_item으로 다시 요청한다. 빈 목록이면 고립 항목이다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"item_id\":{\"title\":\"Item Id\",\"type\":\"string\"}},\"required\":[\"doc_id\",\"item_id\"],\"type\":\"object\",\"title\":\"get_referencesArguments\"},\"name\":\"get_references\"},{\"description\":\"문서 타입의 템플릿과 작성 규약을 돌려준다. create_document 전에 반드시 부른다. 반환에는 (1) 그 타입의 항목 ID 패턴·필수 절·항목 블록 구조, (2) 템플릿 MD 뼈대, (3) 채워진 예시가 담긴다. 항목은 ID로 시작하는 헤딩이어야 하고, 표 행은 항목이 아니며, 번호에 패딩을 두지 않는다는 공통 규약도 함께 온다. 템플릿은 싱크독에 내장된 최신 것이다 — 저장소의 docs/specs/_templates/ 사본이 아니다. DOM·API·UI는 무엇을 쓸지 subtype으로 말한다 — DOM은 도메인·클래스·ERD, API는 REST·MCP, UI는 화면 설계·와이어프레임. DOM·API는 서브타입마다 필수 절과 뼈대가 달라 subtype 없이 받으면 필수 절이 비어 오고 고를 수 있는 것이 subtypes에 온다.\",\"inputSchema\":{\"properties\":{\"project_code\":{\"title\":\"Project Code\",\"type\":\"string\"},\"doc_type\":{\"title\":\"Doc Type\",\"type\":\"string\"},\"subtype\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Subtype\"}},\"required\":[\"project_code\",\"doc_type\"],\"type\":\"object\",\"title\":\"get_templateArguments\"},\"name\":\"get_template\"},{\"description\":\"새 문서를 만든다. 문서 ID는 서버가 발급한다({코드}-{타입}-{번호}). 서버는 템플릿을 적용하지 않는다 — body가 get_template으로 받은 뼈대를 따라야 한다. DOM·API는 subtype을 주고 받는다(서브타입마다 필수 절이 다르다). 항목 ID(#R12 같은 것)는 body에 직접 붙인다. 서버는 발급하지 않고 형식·유일성만 검사한다. 기존 문서를 고치려면 이 도구가 아니라 update_document를 써야 한다. 문서 하나를 만들면 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 같은 단계라도 다음 문서는 사람이 웹에서 읽고 난 뒤에 만든다. DOM 셋은 순서가 있다: 클래스 명세는 API 문서가, ERD는 클래스 명세가 같은 프로젝트에 있어야 받는다(precondition-unmet). DOM 제목에는 도메인·클래스·ERD 중, UI 제목에는 화면 설계·와이어프레임 중, API 제목에는 REST·MCP 중 하나가 들어가야 한다.\",\"inputSchema\":{\"properties\":{\"project_code\":{\"title\":\"Project Code\",\"type\":\"string\"},\"doc_type\":{\"title\":\"Doc Type\",\"type\":\"string\"},\"body\":{\"title\":\"Body\",\"type\":\"string\"},\"message\":{\"title\":\"Message\",\"type\":\"string\"}},\"required\":[\"project_code\",\"doc_type\",\"body\",\"message\"],\"type\":\"object\",\"title\":\"create_documentArguments\"},\"name\":\"create_document\"},{\"description\":\"기존 문서의 본문을 교체해 새 버전을 만든다. 반드시 get_document를 먼저 부르고 그 응답의 body를 고쳐 보낸다 — version_no만 받아 오고 본문은 예전 것을 쓰면 안 된다. create_document는 frontmatter의 doc_id가 비어도 받지만(서버가 발급한다) 그 본문을 그대로 보내면 frontmatter.doc_id 위반이 된다. expected_version에는 그 응답의 version_no를 넣는다. 그 사이 문서가 바뀌었으면 version-conflict 에러에 현재 버전과 본문이 담기니, 그것을 읽고 병합해 다시 부른다. 본문에서 항목 ID가 사라지면 item-deletion-needs-confirm 에러에 끊어질 하위 항목이 문서ID#항목ID와 이름으로 담겨 오며, 그것을 사람에게 보여주고 확인받은 뒤 confirm_item_deletion=true로 다시 부른다. 완료 상태 문서를 고치면 초안으로 내려간다. 저장 뒤에는 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 사람이 웹에서 읽기 전에 다음 문서로 가지 않는다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"body\":{\"title\":\"Body\",\"type\":\"string\"},\"expected_version\":{\"title\":\"Expected Version\",\"type\":\"integer\"},\"message\":{\"title\":\"Message\",\"type\":\"string\"},\"changed_items\":{\"items\":{\"type\":\"string\"},\"title\":\"Changed Items\",\"type\":\"array\"},\"confirm_item_deletion\":{\"default\":false,\"title\":\"Confirm Item Deletion\",\"type\":\"boolean\"}},\"required\":[\"doc_id\",\"body\",\"expected_version\",\"message\",\"changed_items\"],\"type\":\"object\",\"title\":\"update_documentArguments\"},\"name\":\"update_document\"},{\"description\":\"문서를 휴지통에 넣는다 — 파일은 저장소에서 지워지고(커밋) 행·버전은 남아 restore_document로 되살릴 수 있다. 잘못 만든 문서를 치우는 길이다. 첫 호출은 document-deletion-needs-confirm 에러로 제목·버전 수·끊어질 참조 목록을 돌려주고 아직 넣지 않는다. 그것을 사람에게 보여주고 확인받은 뒤 confirm=true로 다시 부른다. 넣으면 이 문서를 가리키던 참조가 미존재(is_missing)로 돌아간다 — 되살리면 풀린다. 행까지 지우는 완전 삭제는 웹에서만.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"confirm\":{\"default\":false,\"title\":\"Confirm\",\"type\":\"boolean\"}},\"required\":[\"doc_id\"],\"type\":\"object\",\"title\":\"delete_documentArguments\"},\"name\":\"delete_document\"},{\"description\":\"휴지통의 문서를 되살린다 — 휴지통에 넣기 직전 내용으로 새 버전이 생기고 항목이 돌아오며, 그 항목을 가리키던 끊어진 참조가 풀린다. 휴지통에 없는 문서는 document-not-trashed. 옛 본문이 지금 규약을 위반하면 convention-violation으로 그대로 남는다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"}},\"required\":[\"doc_id\"],\"type\":\"object\",\"title\":\"restore_documentArguments\"},\"name\":\"restore_document\"},{\"description\":\"문서 상태를 바꾼다 — draft ⇄ approved. 사람이 「완료로 올려」라고 했을 때, 또는 쓰던 문서를 다 썼다고 스스로 판단했을 때 부른다. approved로 올릴 때 규약 오류·미완성·끊어진 참조가 하나라도 있으면 status-blocked — 목록을 고치고 다시 부르거나 사람에게 전한다. draft로 내리는 것은 막지 않는다. 본문의 status: 줄을 update_document로 바꾸면 frontmatter.status_change 위반이다 — 상태는 이 도구로만. 이력에 에이전트가 바꾼 것으로 남는다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"to\":{\"enum\":[\"draft\",\"approved\"],\"title\":\"To\",\"type\":\"string\"},\"reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Reason\"}},\"required\":[\"doc_id\",\"to\"],\"type\":\"object\",\"title\":\"change_statusArguments\"},\"name\":\"change_status\"}]}}\r\n\r\n"
+ },
+ "tools_list_2025_11": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[{\"description\":\"싱크독 프로젝트를 만든다. 저장 방식(storage)을 고른다 — github: GitHub 저장소를 등록한다, server: 싱크독 서버 안에 저장소를 만든다(GitHub 없이). docs/specs/ 아래 11단계 디렉터리와 README를 커밋한다. 새 프로젝트를 시작할 때 한 번만 부른다. 같은 코드가 있으면 project-code-conflict, 저장소에 docs/specs/가 이미 있거나 서버 저장인데 같은 코드의 보관된 저장소가 있으면 existing-specs 에러가 나며 import_existing=true로 다시 부르면 기존 명세를 가져와(보관본은 되살려) 등록한다. GitHub 저장소가 아직 없으면 create_repo=true로 부른다 — 저장소를 만들어 주고(공개 여부는 private로 고르고, 빼면 비공개) 이어서 등록까지 한다. 사람이 저장소를 만들어 달라고 했을 때만 이 인자를 붙인다. remote_url은 storage=github일 때만, 그때는 필수다. 이 서버는 서버 저장만 쓴다. storage=\\\"server\\\"로 부른다. 묻지 않는다.\",\"inputSchema\":{\"properties\":{\"storage\":{\"enum\":[\"github\",\"server\"],\"title\":\"Storage\",\"type\":\"string\"},\"code\":{\"title\":\"Code\",\"type\":\"string\"},\"name\":{\"title\":\"Name\",\"type\":\"string\"},\"remote_url\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Remote Url\"},\"import_existing\":{\"default\":false,\"title\":\"Import Existing\",\"type\":\"boolean\"},\"create_repo\":{\"default\":false,\"title\":\"Create Repo\",\"type\":\"boolean\"},\"private\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Private\"}},\"required\":[\"storage\",\"code\",\"name\"],\"type\":\"object\",\"title\":\"init_projectArguments\"},\"name\":\"init_project\"},{\"description\":\"프로젝트의 11단계별 문서 목록과 각 문서의 상태·버전을 돌려준다. 프로젝트에 처음 붙었거나 어느 단계까지 채워졌는지 알아야 할 때 부른다. 문서 본문은 포함하지 않는다. 본문은 get_document로.\",\"inputSchema\":{\"properties\":{\"project_code\":{\"title\":\"Project Code\",\"type\":\"string\"},\"stage\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Stage\"},\"status\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Status\"}},\"required\":[\"project_code\"],\"type\":\"object\",\"title\":\"list_documentsArguments\"},\"name\":\"list_documents\"},{\"description\":\"문서 원본 MD 전체와 상태·버전을 돌려준다. 명세를 근거로 작업하기 전에 부른다. 응답의 version_no를 기억했다가 update_document에 expected_version으로 보내야 한다. status가 approved가 아니면 확정 명세가 아니다. 본문 안 [[문서ID#항목ID]]는 다른 항목 참조이며 get_item으로 따라갈 수 있다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"}},\"required\":[\"doc_id\"],\"type\":\"object\",\"title\":\"get_documentArguments\"},\"name\":\"get_document\"},{\"description\":\"문서 안 항목 하나의 본문 블록과 소속 문서의 상태·버전을 돌려준다. get_document로 문서 전체를 받는 대신 필요한 항목만 볼 때, 또는 본문에서 발견한 [[문서ID#항목ID]] 참조를 따라갈 때 부른다. 삭제된 항목이면 item-deleted 에러에 삭제 시점이 담긴다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"item_id\":{\"title\":\"Item Id\",\"type\":\"string\"}},\"required\":[\"doc_id\",\"item_id\"],\"type\":\"object\",\"title\":\"get_itemArguments\"},\"name\":\"get_item\"},{\"description\":\"서버 저장 프로젝트의 서버 저장소에 코드를 올린다 — git이 없는 PC에서 코드 대조를 보려고 부른다. 바뀐 파일(경로와 UTF-8 글자 전체)과 지운 경로를 보내면 커밋 하나로 만들고 코드 그래프를 다시 만든다. git이 있으면 git push가 낫다. 명세 파일(docs/specs/)은 받지 않는다 — 명세는 create_document·update_document로. 한 번에 UTF-8 합 5MB, 파일과 지운 경로 합 500개까지 — 넘으면 upload-too-large, 나눠 보낸다. 절대 경로·..·.git·비밀 꼴(.env·*.pem·*.key 등)·이진 파일은 upload-path-refused이고 그때는 아무것도 올라가지 않는다. GitHub 저장 프로젝트면 storage-mismatch — GitHub에 push한다.\",\"inputSchema\":{\"properties\":{\"project_code\":{\"title\":\"Project Code\",\"type\":\"string\"},\"files\":{\"items\":{\"$ref\":\"#/$defs/CodeFile\"},\"title\":\"Files\",\"type\":\"array\"},\"message\":{\"title\":\"Message\",\"type\":\"string\"},\"delete\":{\"anyOf\":[{\"items\":{\"type\":\"string\"},\"type\":\"array\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Delete\"}},\"required\":[\"project_code\",\"files\",\"message\"],\"type\":\"object\",\"$defs\":{\"CodeFile\":{\"description\":\"upload_code의 파일 하나 — 저장소 뿌리에서의 상대 경로와 UTF-8 글자 전체.\",\"properties\":{\"path\":{\"title\":\"Path\",\"type\":\"string\"},\"content\":{\"title\":\"Content\",\"type\":\"string\"}},\"required\":[\"path\",\"content\"],\"title\":\"CodeFile\",\"type\":\"object\"}},\"title\":\"upload_codeArguments\"},\"name\":\"upload_code\"},{\"description\":\"항목의 코드를 명세와 대조한 결과를 돌려준다. MINISPEC 항목이면 그 함수의 파일·줄, 부르는 것(명세 「호출하는 것」과 같음·코드만·명세만)과 불리는 곳을, 다른 항목이면 하위 체인에서 이어지는 MINISPEC 함수와 어긋남 수를. API·화면 항목처럼 그 항목의 함수가 코드에 있으면(docstring·파일 주석의 항목 ID) 그 함수와 항목 있는 이웃도 — 대조 없이(status null). 서버의 코드 그래프(graphify)로 계산한다 — 구현이 명세대로인지 볼 때 부른다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"item_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Item Id\"}},\"required\":[\"doc_id\"],\"type\":\"object\",\"title\":\"get_code_graphArguments\"},\"name\":\"get_code_graph\"},{\"description\":\"항목의 상위 참조(이 항목이 근거로 삼은 것)와 하위 참조(이 항목을 근거로 삼은 것)를 나눠 돌려준다. 이 항목이 왜 있는지, 바꾸면 어디에 영향이 가는지 알아야 할 때 부른다. 목록만 주고 본문은 펼치지 않는다. 필요한 항목만 get_item으로 다시 요청한다. 빈 목록이면 고립 항목이다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"item_id\":{\"title\":\"Item Id\",\"type\":\"string\"}},\"required\":[\"doc_id\",\"item_id\"],\"type\":\"object\",\"title\":\"get_referencesArguments\"},\"name\":\"get_references\"},{\"description\":\"문서 타입의 템플릿과 작성 규약을 돌려준다. create_document 전에 반드시 부른다. 반환에는 (1) 그 타입의 항목 ID 패턴·필수 절·항목 블록 구조, (2) 템플릿 MD 뼈대, (3) 채워진 예시가 담긴다. 항목은 ID로 시작하는 헤딩이어야 하고, 표 행은 항목이 아니며, 번호에 패딩을 두지 않는다는 공통 규약도 함께 온다. 템플릿은 싱크독에 내장된 최신 것이다 — 저장소의 docs/specs/_templates/ 사본이 아니다. DOM·API·UI는 무엇을 쓸지 subtype으로 말한다 — DOM은 도메인·클래스·ERD, API는 REST·MCP, UI는 화면 설계·와이어프레임. DOM·API는 서브타입마다 필수 절과 뼈대가 달라 subtype 없이 받으면 필수 절이 비어 오고 고를 수 있는 것이 subtypes에 온다.\",\"inputSchema\":{\"properties\":{\"project_code\":{\"title\":\"Project Code\",\"type\":\"string\"},\"doc_type\":{\"title\":\"Doc Type\",\"type\":\"string\"},\"subtype\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Subtype\"}},\"required\":[\"project_code\",\"doc_type\"],\"type\":\"object\",\"title\":\"get_templateArguments\"},\"name\":\"get_template\"},{\"description\":\"새 문서를 만든다. 문서 ID는 서버가 발급한다({코드}-{타입}-{번호}). 서버는 템플릿을 적용하지 않는다 — body가 get_template으로 받은 뼈대를 따라야 한다. DOM·API는 subtype을 주고 받는다(서브타입마다 필수 절이 다르다). 항목 ID(#R12 같은 것)는 body에 직접 붙인다. 서버는 발급하지 않고 형식·유일성만 검사한다. 기존 문서를 고치려면 이 도구가 아니라 update_document를 써야 한다. 문서 하나를 만들면 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 같은 단계라도 다음 문서는 사람이 웹에서 읽고 난 뒤에 만든다. DOM 셋은 순서가 있다: 클래스 명세는 API 문서가, ERD는 클래스 명세가 같은 프로젝트에 있어야 받는다(precondition-unmet). DOM 제목에는 도메인·클래스·ERD 중, UI 제목에는 화면 설계·와이어프레임 중, API 제목에는 REST·MCP 중 하나가 들어가야 한다.\",\"inputSchema\":{\"properties\":{\"project_code\":{\"title\":\"Project Code\",\"type\":\"string\"},\"doc_type\":{\"title\":\"Doc Type\",\"type\":\"string\"},\"body\":{\"title\":\"Body\",\"type\":\"string\"},\"message\":{\"title\":\"Message\",\"type\":\"string\"}},\"required\":[\"project_code\",\"doc_type\",\"body\",\"message\"],\"type\":\"object\",\"title\":\"create_documentArguments\"},\"name\":\"create_document\"},{\"description\":\"기존 문서의 본문을 교체해 새 버전을 만든다. 반드시 get_document를 먼저 부르고 그 응답의 body를 고쳐 보낸다 — version_no만 받아 오고 본문은 예전 것을 쓰면 안 된다. create_document는 frontmatter의 doc_id가 비어도 받지만(서버가 발급한다) 그 본문을 그대로 보내면 frontmatter.doc_id 위반이 된다. expected_version에는 그 응답의 version_no를 넣는다. 그 사이 문서가 바뀌었으면 version-conflict 에러에 현재 버전과 본문이 담기니, 그것을 읽고 병합해 다시 부른다. 본문에서 항목 ID가 사라지면 item-deletion-needs-confirm 에러에 끊어질 하위 항목이 문서ID#항목ID와 이름으로 담겨 오며, 그것을 사람에게 보여주고 확인받은 뒤 confirm_item_deletion=true로 다시 부른다. 완료 상태 문서를 고치면 초안으로 내려간다. 저장 뒤에는 결과의 next_step을 사람에게 그대로 전하고 멈춘다 — 사람이 웹에서 읽기 전에 다음 문서로 가지 않는다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"body\":{\"title\":\"Body\",\"type\":\"string\"},\"expected_version\":{\"title\":\"Expected Version\",\"type\":\"integer\"},\"message\":{\"title\":\"Message\",\"type\":\"string\"},\"changed_items\":{\"items\":{\"type\":\"string\"},\"title\":\"Changed Items\",\"type\":\"array\"},\"confirm_item_deletion\":{\"default\":false,\"title\":\"Confirm Item Deletion\",\"type\":\"boolean\"}},\"required\":[\"doc_id\",\"body\",\"expected_version\",\"message\",\"changed_items\"],\"type\":\"object\",\"title\":\"update_documentArguments\"},\"name\":\"update_document\"},{\"description\":\"문서를 휴지통에 넣는다 — 파일은 저장소에서 지워지고(커밋) 행·버전은 남아 restore_document로 되살릴 수 있다. 잘못 만든 문서를 치우는 길이다. 첫 호출은 document-deletion-needs-confirm 에러로 제목·버전 수·끊어질 참조 목록을 돌려주고 아직 넣지 않는다. 그것을 사람에게 보여주고 확인받은 뒤 confirm=true로 다시 부른다. 넣으면 이 문서를 가리키던 참조가 미존재(is_missing)로 돌아간다 — 되살리면 풀린다. 행까지 지우는 완전 삭제는 웹에서만.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"confirm\":{\"default\":false,\"title\":\"Confirm\",\"type\":\"boolean\"}},\"required\":[\"doc_id\"],\"type\":\"object\",\"title\":\"delete_documentArguments\"},\"name\":\"delete_document\"},{\"description\":\"휴지통의 문서를 되살린다 — 휴지통에 넣기 직전 내용으로 새 버전이 생기고 항목이 돌아오며, 그 항목을 가리키던 끊어진 참조가 풀린다. 휴지통에 없는 문서는 document-not-trashed. 옛 본문이 지금 규약을 위반하면 convention-violation으로 그대로 남는다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"}},\"required\":[\"doc_id\"],\"type\":\"object\",\"title\":\"restore_documentArguments\"},\"name\":\"restore_document\"},{\"description\":\"문서 상태를 바꾼다 — draft ⇄ approved. 사람이 「완료로 올려」라고 했을 때, 또는 쓰던 문서를 다 썼다고 스스로 판단했을 때 부른다. approved로 올릴 때 규약 오류·미완성·끊어진 참조가 하나라도 있으면 status-blocked — 목록을 고치고 다시 부르거나 사람에게 전한다. draft로 내리는 것은 막지 않는다. 본문의 status: 줄을 update_document로 바꾸면 frontmatter.status_change 위반이다 — 상태는 이 도구로만. 이력에 에이전트가 바꾼 것으로 남는다.\",\"inputSchema\":{\"properties\":{\"doc_id\":{\"title\":\"Doc Id\",\"type\":\"string\"},\"to\":{\"enum\":[\"draft\",\"approved\"],\"title\":\"To\",\"type\":\"string\"},\"reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"default\":null,\"title\":\"Reason\"}},\"required\":[\"doc_id\",\"to\"],\"type\":\"object\",\"title\":\"change_statusArguments\"},\"name\":\"change_status\"}]}}\r\n\r\n"
+ },
+ "tools_list_bad_cursor": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32602,\"message\":\"Invalid request parameters\",\"data\":\"\"}}\r\n\r\n"
+ }
+}

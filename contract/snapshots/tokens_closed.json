@@ -1,0 +1,260 @@
+{
+ "body_broken": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.14 — JSON decode error\",\"errors\":[{\"loc\":\"body.14\",\"msg\":\"JSON decode error\"}]}"
+ },
+ "body_depth_ok": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body — Input should be a valid dictionary or object to extract fields from\",\"errors\":[{\"loc\":\"body\",\"msg\":\"Input should be a valid dictionary or object to extract fields from\"}]}"
+ },
+ "body_depth_over": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"about:blank\",\"title\":\"There was an error parsing the body\",\"status\":400}"
+ },
+ "body_empty": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body — Field required\",\"errors\":[{\"loc\":\"body\",\"msg\":\"Field required\"}]}"
+ },
+ "body_int_too_long": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"about:blank\",\"title\":\"There was an error parsing the body\",\"status\":400}"
+ },
+ "body_list": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body — Input should be a valid dictionary or object to extract fields from\",\"errors\":[{\"loc\":\"body\",\"msg\":\"Input should be a valid dictionary or object to extract fields from\"}]}"
+ },
+ "body_no_content_type": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body — Input should be a valid dictionary or object to extract fields from\",\"errors\":[{\"loc\":\"body\",\"msg\":\"Input should be a valid dictionary or object to extract fields from\"}]}"
+ },
+ "body_not_utf8": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"about:blank\",\"title\":\"There was an error parsing the body\",\"status\":400}"
+ },
+ "body_null": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body — Field required\",\"errors\":[{\"loc\":\"body\",\"msg\":\"Field required\"}]}"
+ },
+ "body_text_plain": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body — Input should be a valid dictionary or object to extract fields from\",\"errors\":[{\"loc\":\"body\",\"msg\":\"Input should be a valid dictionary or object to extract fields from\"}]}"
+ },
+ "label_missing": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.label — Field required\",\"errors\":[{\"loc\":\"body.label\",\"msg\":\"Field required\"}]}"
+ },
+ "label_not_str": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.label — Input should be a valid string\",\"errors\":[{\"loc\":\"body.label\",\"msg\":\"Input should be a valid string\"}]}"
+ },
+ "label_surrogate": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.label — Input should be a valid string, unable to parse raw data as a unicode string\",\"errors\":[{\"loc\":\"body.label\",\"msg\":\"Input should be a valid string, unable to parse raw data as a unicode string\"}]}"
+ },
+ "label_too_long": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.label — String should have at most 50 characters\",\"errors\":[{\"loc\":\"body.label\",\"msg\":\"String should have at most 50 characters\"}]}"
+ },
+ "path_encoded": {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "DELETE"
+   ],
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:method-not-allowed\",\"title\":\"method-not-allowed\",\"status\":405,\"detail\":\"이 경로에 GET 메서드는 없습니다\",\"allow\":[\"DELETE\"]}"
+ },
+ "revoke_fraction": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"path.token_id — Input should be a valid integer, unable to parse string as an integer\",\"errors\":[{\"loc\":\"path.token_id\",\"msg\":\"Input should be a valid integer, unable to parse string as an integer\"}]}"
+ },
+ "revoke_huge": {
+  "status": 500,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:internal\",\"title\":\"internal\",\"status\":500,\"detail\":\"서버에서 처리하지 못한 오류입니다. 로그를 확인하세요.\"}"
+ },
+ "revoke_i32_over": {
+  "status": 500,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:internal\",\"title\":\"internal\",\"status\":500,\"detail\":\"서버에서 처리하지 못한 오류입니다. 로그를 확인하세요.\"}"
+ },
+ "revoke_i64_max": {
+  "status": 500,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:internal\",\"title\":\"internal\",\"status\":500,\"detail\":\"서버에서 처리하지 못한 오류입니다. 로그를 확인하세요.\"}"
+ },
+ "revoke_i64_min": {
+  "status": 500,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:internal\",\"title\":\"internal\",\"status\":500,\"detail\":\"서버에서 처리하지 못한 오류입니다. 로그를 확인하세요.\"}"
+ },
+ "revoke_i64_over": {
+  "status": 500,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:internal\",\"title\":\"internal\",\"status\":500,\"detail\":\"서버에서 처리하지 못한 오류입니다. 로그를 확인하세요.\"}"
+ },
+ "revoke_i64_under": {
+  "status": 500,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:internal\",\"title\":\"internal\",\"status\":500,\"detail\":\"서버에서 처리하지 못한 오류입니다. 로그를 확인하세요.\"}"
+ },
+ "revoke_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"access_token 999999 없음\",\"resource\":\"access_token\",\"id\":999999}"
+ },
+ "revoke_text": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"path.token_id — Input should be a valid integer, unable to parse string as an integer\",\"errors\":[{\"loc\":\"path.token_id\",\"msg\":\"Input should be a valid integer, unable to parse string as an integer\"}]}"
+ },
+ "tokens_put": {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "GET, POST"
+   ],
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:method-not-allowed\",\"title\":\"method-not-allowed\",\"status\":405,\"detail\":\"이 경로에 PUT 메서드는 없습니다\",\"allow\":[\"GET\",\"POST\"]}"
+ }
+}
