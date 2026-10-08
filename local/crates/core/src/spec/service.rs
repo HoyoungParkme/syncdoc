@@ -956,4 +956,22 @@ impl SpecService<'_> {
             doc_version_no: document.summary.current_version_no,
         })
     }
+
+    /// SYNC-MS-014#SpecService.detect_deleted_items
+    pub async fn detect_deleted_items(
+        &mut self,
+        document: &Document,
+        body: &str,
+    ) -> Result<Vec<i32>, Problem> {
+        let new_ids: HashSet<String> = blocks_of(body, &document.summary.doc_type, None)
+            .into_iter()
+            .map(|b| b.item_id)
+            .collect();
+        Ok(repo::items_of(&mut *self.db, document.summary.id, false)
+            .await?
+            .into_iter()
+            .filter(|i| !new_ids.contains(&i.item_id))
+            .map(|i| i.id)
+            .collect())
+    }
 }
