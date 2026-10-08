@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-013
 type: MS
 title: MINISPEC — ProjectService (Rust)
-status: draft
+status: approved
 upstream: [SYNC-DOM-004, SYNC-MS-001, SYNC-MS-019, SYNC-UC-001, SYNC-API-001, SYNC-API-002]
 ---
 
