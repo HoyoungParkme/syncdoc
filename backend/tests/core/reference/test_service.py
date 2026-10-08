@@ -198,3 +198,23 @@ def test_mark_missing_empties_both_targets_and_resolve_relinks(db_session: Sessi
     assert ref.resolve_missing(pid, target_doc_id="EXMP-RFQ-001") == 1
     assert (pks["G1"], q1, None, "EXMP-RFQ-001#Q1", False) in set(rows(db_session))
     assert ref.count_missing_by_document([d.id]) == {d.id: 2}
+
+
+def test_upstream_downstream_are_in_id_order_even_after_rows_change(db_session: Session) -> None:
+    """id 차례 — 재저장이 행을 고쳐도(extracted_version_id) 조회 차례가 그대로다 (#353)."""
+    svc, ref, d, v, pks, _ = _setup(db_session)
+    body = d.body.replace(
+        "근거 [[EXMP-RFQ-001#Q1]] · 같은 문서 [[#R1]]", "[[#R1]] [[EXMP-PRD-001#R1]]"
+    )
+    ref.extract(d.id, v.id, body, pks, [])
+    ids = [e.raw_target for e in ref.upstream(pks["G1"])]
+    first = db_session.execute(
+        text('SELECT min(id) FROM "references" WHERE from_item_id = :p'), {"p": pks["G1"]}
+    ).scalar_one()
+    # 첫 행을 고치면 PostgreSQL은 새 자리에 쓴다 — ORDER BY 없이 훑으면 차례가 바뀐다
+    db_session.execute(
+        text('UPDATE "references" SET extracted_version_id = extracted_version_id WHERE id = :i'),
+        {"i": first},
+    )
+    assert [e.raw_target for e in ref.upstream(pks["G1"])] == ids == ["#R1", "EXMP-PRD-001#R1"]
+    assert [e.raw_target for e in ref.downstream(pks["R1"])] == ["#R1", "EXMP-PRD-001#R1"]

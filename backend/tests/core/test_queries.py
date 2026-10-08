@@ -248,6 +248,32 @@ async def test_item_references_view_outside_item_and_whole_document(scoped: Sess
     ]  # 상위에서는 문서 전체를 가리킨 참조가 그대로 문서로
 
 
+async def test_item_references_view_same_target_two_forms_keep_own_raw_target(
+    scoped: Session,
+) -> None:
+    """한 항목이 같은 대상을 두 꼴로 가리키면 각자의 raw_target, id 차례 (#353).
+
+    전에는 describe_items의 공유 ItemRef를 고쳐 돌려줘 둘 다 마지막 raw_target이었다.
+    """
+    svc, ref = SpecService(scoped), ReferenceService(scoped)
+    p = make_project(scoped)
+    a = author(scoped)
+    prd = (
+        "---\ndoc_id: EXMP-PRD-001\ntype: PRD\ntitle: 제품\nstatus: draft\n---\n# PRD\n"
+        "#### G1 목표\n[[#R1]] 그리고 [[EXMP-PRD-001#R1]]\n#### R1 기능\n"
+    )
+    v = svc.create(p.id, "EXMP-PRD-001", DocType.PRD, prd, "h1", a, "spec: 테스트")
+    d = svc.get_document("EXMP-PRD-001")
+    ref.extract(d.id, v.id, d.body, {i.item_id: i.pk for i in d.items}, [])
+    g1 = await queries.item_references_view("EXMP-PRD-001", "G1", owner(scoped))
+    assert [(r.item_id, r.raw_target) for r in g1.upstream] == [
+        ("R1", "#R1"),
+        ("R1", "EXMP-PRD-001#R1"),
+    ]
+    r1 = await queries.item_references_view("EXMP-PRD-001", "R1", owner(scoped))
+    assert [r.raw_target for r in r1.downstream] == ["#R1", "EXMP-PRD-001#R1"]
+
+
 # ── B3: diff_with_impact · project_items ──
 def _b3(scoped: Session):
     """RFQ(Q1·Q2, rfq-writer) ← PRD(G1→Q1, G1→#R1, prd-writer). 참조 추출까지."""

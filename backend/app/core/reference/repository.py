@@ -14,9 +14,9 @@ class ReferenceRepository:
         self.session = session
 
     def from_item(self, item_pk: int) -> list[Reference]:
-        return list(
-            self.session.scalars(select(Reference).where(Reference.from_item_id == item_pk))
-        )
+        # id 차례 — 행이 고쳐져도(재저장) 조회 차례가 바뀌지 않게 (#353)
+        stmt = select(Reference).where(Reference.from_item_id == item_pk).order_by(Reference.id)
+        return list(self.session.scalars(stmt))
 
     def from_document(self, document_id: int, include_missing: bool = True) -> list[Reference]:
         stmt = select(Reference).where(Reference.from_document_id == document_id)
@@ -36,7 +36,8 @@ class ReferenceRepository:
         return list(self.session.scalars(stmt.order_by(Reference.id)))
 
     def to_item(self, item_pk: int) -> list[Reference]:
-        return list(self.session.scalars(select(Reference).where(Reference.to_item_id == item_pk)))
+        stmt = select(Reference).where(Reference.to_item_id == item_pk).order_by(Reference.id)
+        return list(self.session.scalars(stmt))
 
     def among(self, item_pks: set[int], document_ids: set[int]) -> list[Reference]:
         if not item_pks and not document_ids:

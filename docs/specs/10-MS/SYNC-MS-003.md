@@ -70,7 +70,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `upstream(item_pk: int) -> list[RefEdge]`
 
-**처리** `DB: references where from_item_pk = item_pk` → `RefEdge[]`. 미존재 포함
+**처리** `DB: references where from_item_pk = item_pk order by id` → `RefEdge[]`. 미존재 포함 · 차례는 id — 행이 고쳐져도(재저장의 `extracted_version_id`) 바뀌지 않는다(#353)
 
 ---
 
@@ -78,7 +78,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **시그니처** `downstream(item_pk: int) -> list[RefEdge]`
 
-**처리** `DB: references where to_item_pk = item_pk` → `RefEdge[]`
+**처리** `DB: references where to_item_pk = item_pk order by id` → `RefEdge[]` · 차례는 id(#353) — 항목 삭제 확인의 하위 목록도 이 차례
 
 ---
 
