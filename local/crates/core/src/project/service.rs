@@ -120,4 +120,12 @@ impl ProjectService<'_> {
         }
         Ok((p, r))
     }
+
+    /// SYNC-MS-013#ProjectService.list_owned
+    pub async fn list_owned(
+        &mut self,
+        user: &UserRow,
+    ) -> Result<Vec<(ProjectRow, RepositoryRow)>, Problem> {
+        Ok(repo::owned_by(&mut *self.db, user.id).await?)
+    }
 }
