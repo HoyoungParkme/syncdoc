@@ -550,7 +550,6 @@ flowchart BT
 닫힌 미결은 각 문서에 결정과 함께 남아 있다.
 
 **SYNC-CODE-002**
-- [ ] 저장소에 커밋된 `graphify-out/graph.json`을 따를지 — 파이썬 판은 그 파일이 있으면 그것을 쓴다([[SYNC-MS-011#codegraph.load]] 1). Rust 판에는 graphify가 없다. 카드 L12 전에 정한다
 - [ ] 되살리기가 Docker 판(파이썬 폐쇄망판)의 백업 파일도 받을지 — 두 판은 같은 표를 쓴다([[SYNC-INFRA-001]] 9.2). 카드 L16 전에 정한다
 
 ## 6. 미결사항
