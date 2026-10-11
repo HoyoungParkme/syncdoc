@@ -13,6 +13,10 @@ use syncdoc_core::types::{
     UserRef as UserRefDto, Version as VersionDto, iso_utc,
 };
 use syncdoc_core::types::{
+    AttachmentMeta as AttachmentMetaDto, ConversationBrief as ConversationBriefDto,
+    ConversationView as ConversationViewDto,
+};
+use syncdoc_core::types::{
     CodeBrief as CodeBriefDto, CodeCalls as CodeCallsDto, CodeFunction as CodeFunctionDto,
     CodeGraphInfo as CodeGraphInfoDto, CodeNodes as CodeNodesDto, CodeRef as CodeRefDto,
     CodeText as CodeTextDto, CodeView as CodeViewDto,
@@ -950,6 +954,118 @@ impl From<&CodeNodesDto> for CodeNodes {
                 .iter()
                 .map(|(a, b)| [a.clone(), b.clone()])
                 .collect(),
+        }
+    }
+}
+
+/// `AttachmentMeta` — 첨부 메타 (`web/schemas/conversations.py`, 카드 L14)
+#[derive(Debug, Serialize)]
+pub struct AttachmentMeta {
+    pub id: i32,
+    pub name: String,
+    pub mime: String,
+    pub size: i32,
+    pub turn_id: Option<i32>,
+    pub created_at: String,
+}
+
+impl From<&AttachmentMetaDto> for AttachmentMeta {
+    fn from(a: &AttachmentMetaDto) -> Self {
+        AttachmentMeta {
+            id: a.id,
+            name: a.name.clone(),
+            mime: a.mime.clone(),
+            size: a.size,
+            turn_id: a.turn_id,
+            created_at: iso_utc(a.created_at),
+        }
+    }
+}
+
+/// `Progress` — 진행 한 줄
+#[derive(Debug, Serialize)]
+pub struct Progress {
+    pub kind: String,
+    pub text: String,
+}
+
+/// `Turn` — 턴 하나
+#[derive(Debug, Serialize)]
+pub struct Turn {
+    pub id: i32,
+    pub seq: i32,
+    pub question: String,
+    pub answer: Option<String>,
+    pub progress: Vec<Progress>,
+    pub context_item_ids: Vec<String>,
+    pub error: Option<String>,
+    pub attachments: Vec<AttachmentMeta>,
+    pub created_at: String,
+    pub missing_refs: Vec<String>,
+}
+
+/// `ConversationBrief` — 대화 목록 한 줄
+#[derive(Debug, Serialize)]
+pub struct ConversationBrief {
+    pub id: i32,
+    pub title: String,
+    pub turn_count: i64,
+    pub updated_at: String,
+}
+
+impl From<&ConversationBriefDto> for ConversationBrief {
+    fn from(c: &ConversationBriefDto) -> Self {
+        ConversationBrief {
+            id: c.id,
+            title: c.title.clone(),
+            turn_count: c.turn_count,
+            updated_at: iso_utc(c.updated_at),
+        }
+    }
+}
+
+/// `Conversation` — 대화 하나(턴 전부 + 안 보낸 첨부)
+#[derive(Debug, Serialize)]
+pub struct Conversation {
+    pub id: i32,
+    pub title: String,
+    pub turn_count: i64,
+    pub updated_at: String,
+    pub turns: Vec<Turn>,
+    pub pending: Vec<AttachmentMeta>,
+}
+
+impl From<&ConversationViewDto> for Conversation {
+    fn from(v: &ConversationViewDto) -> Self {
+        Conversation {
+            id: v.id,
+            title: v.title.clone(),
+            turn_count: v.turn_count,
+            updated_at: iso_utc(v.updated_at),
+            turns: v
+                .turns
+                .iter()
+                .map(|t| Turn {
+                    id: t.id,
+                    seq: t.seq,
+                    question: t.question.clone(),
+                    answer: t.answer.clone(),
+                    progress: t
+                        .progress
+                        .iter()
+                        .map(|p| Progress {
+                            kind: p.kind.clone(),
+                            text: p.text.clone(),
+                        })
+                        .collect(),
+                    context_item_ids: t.context_item_ids.clone(),
+                    error: t.error.clone(),
+                    attachments: t.attachments.iter().map(AttachmentMeta::from).collect(),
+                    created_at: iso_utc(t.created_at),
+                    missing_refs: t.missing_refs.clone(),
+                })
+                .collect(),
+            pending: v.pending.iter().map(AttachmentMeta::from).collect(),
         }
     }
 }

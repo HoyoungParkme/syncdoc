@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use sqlx::PgPool;
+use syncdoc_core::infra::llm::Llm;
 use syncdoc_core::project::service::ServerRepos;
 
 #[derive(Clone)]
@@ -18,4 +19,6 @@ pub struct AppState {
     pub public_netloc: String,
     /// 서버 저장소 자리 — git·`origins/`·`repos/`·규약 주소 (SYNC-MS-013 0장, 카드 L6)
     pub repos: Arc<ServerRepos>,
+    /// 모델 — 설정의 주소·키·모델 (SYNC-MS-020, 카드 L14)
+    pub llm: Llm,
 }

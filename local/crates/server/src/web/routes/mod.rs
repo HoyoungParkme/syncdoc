@@ -3,6 +3,7 @@
 pub mod account;
 pub mod admin;
 pub mod code;
+pub mod conversations;
 pub mod documents;
 pub mod git;
 pub mod projects;

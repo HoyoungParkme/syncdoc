@@ -26,11 +26,8 @@ impl IntoResponse for ApiProblem {
     }
 }
 
-/// 문제 → 응답. `internal`은 로그 문장을 로그로 보낸다 — 본문은 고정 문구
-pub fn render(p: &Problem) -> Response {
-    if let Problem::Internal { log } = p {
-        tracing::error!("{log}");
-    }
+/// 파이썬 `Problem.to_dict()` — type·title·status·detail(비면 뺌)·확장 필드 차례. 응답·MCP·SSE `error`가 같이 쓴다
+pub fn problem_map(p: &Problem) -> Map<String, Value> {
     let mut body = Map::new();
     let kind = p
         .kind()
@@ -44,7 +41,15 @@ pub fn render(p: &Problem) -> Response {
     for (k, v) in p.extras() {
         body.insert(k.into(), v);
     }
-    let bytes = serde_json::to_vec(&Value::Object(body)).unwrap_or_default();
+    body
+}
+
+/// 문제 → 응답. `internal`은 로그 문장을 로그로 보낸다 — 본문은 고정 문구
+pub fn render(p: &Problem) -> Response {
+    if let Problem::Internal { log } = p {
+        tracing::error!("{log}");
+    }
+    let bytes = serde_json::to_vec(&Value::Object(problem_map(p))).unwrap_or_default();
     let status = StatusCode::from_u16(p.status()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     let mut resp = (
         status,

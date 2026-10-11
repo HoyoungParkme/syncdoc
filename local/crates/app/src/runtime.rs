@@ -142,6 +142,11 @@ pub async fn run(args: Args, tray: Option<TrayLink>) -> Result<(), Problem> {
         llm_enabled: conf.llm_enabled,
         public_netloc: format!("127.0.0.1:{port}"),
         repos: repos.clone(),
+        llm: syncdoc_core::infra::llm::Llm {
+            url: conf.llm_api_url.clone(),
+            key: conf.llm_api_key.clone(),
+            model: conf.llm_model.clone(),
+        },
     });
     let (stop, stopped) = oneshot::channel::<()>();
     let serving = tokio::spawn(async move {

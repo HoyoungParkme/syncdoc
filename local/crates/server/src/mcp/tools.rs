@@ -768,23 +768,7 @@ fn arg_bool(v: &PyValue, name: &str) -> bool {
 
 /// 파이썬 `Problem.to_dict()` — type·title·status·detail(비면 뺌)·확장 필드 차례
 fn problem_dict(p: &Problem) -> Map<String, Value> {
-    let mut m = Map::new();
-    m.insert(
-        "type".into(),
-        Value::from(match p.kind() {
-            Some(k) => format!("urn:syncdoc:{k}"),
-            None => "about:blank".to_string(),
-        }),
-    );
-    m.insert("title".into(), Value::from(p.title()));
-    m.insert("status".into(), Value::from(p.status()));
-    if let Some(d) = p.detail().filter(|d| !d.is_empty()) {
-        m.insert("detail".into(), Value::from(d));
-    }
-    for (k, v) in p.extras() {
-        m.insert(k.into(), v);
-    }
-    m
+    crate::web::problem::problem_map(p)
 }
 
 fn problem_text(v: &Value) -> String {
@@ -805,21 +789,7 @@ fn tool_error(name: &str, p: &Problem) -> String {
 
 /// 파이썬 `json.dumps(x, ensure_ascii=False)` — 기본 구분자 `, `·`: `, 키는 넣은 차례
 pub fn py_dumps(v: &Value) -> String {
-    match v {
-        Value::Object(m) => {
-            let items: Vec<String> = m
-                .iter()
-                .map(|(k, v)| format!("{}: {}", py_json_str(k), py_dumps(v)))
-                .collect();
-            format!("{{{}}}", items.join(", "))
-        }
-        Value::Array(a) => format!(
-            "[{}]",
-            a.iter().map(py_dumps).collect::<Vec<_>>().join(", ")
-        ),
-        Value::String(s) => py_json_str(s),
-        other => other.to_string(),
-    }
+    syncdoc_core::pycompat::json::dumps(v, false)
 }
 
 /// `pre_parse_json` — 모델 필드이고 주석이 `str`가 아닌 인자의 문자열을 JSON으로 읽어 본다.
@@ -845,11 +815,6 @@ fn pre_parse_json(
         }
     }
     out
-}
-
-/// 파이썬 `json.dumps(str, ensure_ascii=False)` — 제어 글자·따옴표·역슬래시만 이스케이프
-fn py_json_str(s: &str) -> String {
-    serde_json::to_string(s).unwrap_or_default()
 }
 
 /// `CallToolResult(content=[TextContent(text)])`를 판의 꼴로 — 키는 알파벳 차례, `isError`는 거짓으로 실린다

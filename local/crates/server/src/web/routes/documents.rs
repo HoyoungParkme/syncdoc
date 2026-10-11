@@ -1,5 +1,5 @@
 //! 문서 — 파이썬 판 `web/routers/documents.py`의 읽기(카드 L8): 문서·이력·diff·추적표.
-//! 카드 L9가 상태·되돌리기·휴지통 넣기·되살리기·완전 삭제를 더했다. 묻기(L14)는 그 카드가 더한다
+//! 카드 L9가 상태·되돌리기·휴지통 넣기·되살리기·완전 삭제를, 카드 L14가 묻기(SSE)를 더했다
 
 use std::sync::LazyLock;
 
@@ -32,6 +32,7 @@ static VERSION_NO: LazyLock<Validator> = LazyLock::new(schemas::version_no);
 static FLAG: LazyLock<Validator> = LazyLock::new(schemas::flag);
 static CHANGE_STATUS: LazyLock<Validator> = LazyLock::new(schemas::change_status);
 static REVERT: LazyLock<Validator> = LazyLock::new(schemas::revert);
+static ASK: LazyLock<Validator> = LazyLock::new(schemas::ask_request);
 
 /// SYNC-API-001#GET/api/docs/{docId}
 pub async fn get_document(
@@ -294,4 +295,36 @@ pub async fn revert(
     )
     .await?;
     Ok((StatusCode::CREATED, Json(SaveResult::from(&r))).into_response())
+}
+
+/// SYNC-API-001#POST/api/docs/{docId}/ask
+///
+/// 보고 있는 문서가 시작 맥락이고 항목은 힌트다(UC-H19). 모델이 도구로 같은 프로젝트를 읽는 동안 delta·note·read
+/// 이벤트를 흘리고 answer로 끝난다(SSE). 첫 이벤트(start) 전의 오류는 상태 코드, 뒤의 오류는 error 이벤트
+pub async fn ask(
+    State(state): State<AppState>,
+    Path(doc_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, ApiProblem> {
+    let body = fastapi::read_body(&headers, &body)?;
+    let user = {
+        let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+        current_user(&mut c, &state).await?
+    };
+    let req = fastapi::body_model(&body, &ASK)?;
+    let b = crate::web::sse::ask_body(&req, "item_id");
+    let rx = queries::ask_item(
+        &state.pool,
+        &state.repos,
+        &state.llm,
+        &doc_id,
+        b.hint.as_deref(),
+        b.conversation_id,
+        &b.question,
+        &b.attachment_ids,
+        &user,
+    )
+    .await?;
+    Ok(crate::web::sse::stream(rx))
 }
