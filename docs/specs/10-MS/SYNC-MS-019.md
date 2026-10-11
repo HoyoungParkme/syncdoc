@@ -12,7 +12,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-009, SYNC-INFRA-001, SYNC-STD-004]
 
 `crates/core/src/infra/git.rs`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.8. 파이썬 판 [[SYNC-MS-009]]의 `git.*`와 **같은 명령·같은 옵션·같은 처리**이고, 이 문서는 다른 점만 적는다([[SYNC-STD-001]] 2.10). 서비스가 아니다 — git CLI를 자식 프로세스로 부르는 얇은 층이다([[SYNC-INFRA-001]] 9.1·9.2 — 순수 Rust git은 아직 push를 받지 못한다).
 
-**카드 L6 몫은 서버 저장 프로젝트를 만들고 지우는 데 드는 일곱이다(2026-10-08).** 카드 L7이 받기·밀린 커밋 수 둘을 더했다(저장 파이프라인의 「밀린 커밋 읽기」·처리 지점 앞당기기). 카드 L10이 git 입구의 둘(광고·rpc)을 더했다(2026-10-11) — 파이썬 판의 `git http-backend`를 쓰지 않고 `upload-pack`·`receive-pack --stateless-rpc`를 직접 부르되, http-backend가 내는 머리·문장을 그대로 낸다(INFRA 9.1). 카드 L11이 밀린 커밋 처리·재구축의 넷(바뀐 파일·파일 이력·작업 사본 돌리기·README 맞추기)을 더했다(2026-10-11). 코드 그래프의 둘(바뀐 경로 전부·커밋 풀기)은 L12가 더한다.
+**카드 L6 몫은 서버 저장 프로젝트를 만들고 지우는 데 드는 일곱이다(2026-10-08).** 카드 L7이 받기·밀린 커밋 수 둘을 더했다(저장 파이프라인의 「밀린 커밋 읽기」·처리 지점 앞당기기). 카드 L10이 git 입구의 둘(광고·rpc)을 더했다(2026-10-11) — 파이썬 판의 `git http-backend`를 쓰지 않고 `upload-pack`·`receive-pack --stateless-rpc`를 직접 부르되, http-backend가 내는 머리·문장을 그대로 낸다(INFRA 9.1). 카드 L11이 밀린 커밋 처리·재구축의 넷(바뀐 파일·파일 이력·작업 사본 돌리기·README 맞추기)을 더했다(2026-10-11). 카드 L12가 코드 그래프의 둘(바뀐 경로 전부·커밋 풀기)을 더했다(2026-10-11).
 
 **`Git { exe, global_config }`** — git 실행 파일과 빈 전역 설정 파일. 켤 때 [[SYNC-MS-012#runtime.run]]이 만들어 서버 상태에 둔다. 실행 파일은 [[SYNC-MS-012#paths.git]] — 윈도는 설치 폴더의 MinGit(`mingit/cmd/git.exe`), 리눅스는 시스템 git.
 
@@ -47,6 +47,8 @@ upstream: [SYNC-DOM-004, SYNC-MS-009, SYNC-INFRA-001, SYNC-STD-004]
 | [[#Git.log]] | 파일 이력 |
 | [[#Git.checkout]] | 작업 사본을 커밋으로 |
 | [[#Git.sync_readme]] | 저장소 README를 지금 판으로 |
+| [[#Git.changed_paths]] | 범위에서 바뀐 경로 전부 |
+| [[#Git.archive]] | 커밋의 파일을 폴더에 푼다 |
 
 ---
 
@@ -303,6 +305,38 @@ pub async fn sync_readme(&self, workdir: &Path, user: &UserRow, code: &str, spec
 
 ---
 
+#### Git.changed_paths 범위에서 바뀐 경로 전부
+
+**시그니처**
+```rust
+pub async fn changed_paths(&self, workdir: &Path, range: &str) -> Result<Vec<String>, Problem>
+```
+
+근거: [[SYNC-MS-009#git.changed_paths]]
+
+**처리** `git: diff --name-only {range}` → 공백뿐이 아닌 줄들 — 명세 밖도 거르지 않는다(코드가 바뀌었는지만 본다)
+
+**테스트 관점** 코드·명세를 함께 바꾼 범위 → 둘 다
+
+---
+
+#### Git.archive 커밋의 파일을 폴더에 푼다
+
+**시그니처**
+```rust
+pub async fn archive(&self, workdir: &Path, commit: &str, dest: &Path) -> Result<(), Problem>
+```
+
+근거: [[SYNC-MS-009#git.archive]] · [[SYNC-INFRA-001]] 4.3 — 코드 그래프는 작업 사본에서 만들지 않는다
+
+**처리** `dest`를 만든다 · `git: archive --format=tar -o {dest}/.src.tar {commit}` · 그 tar를 `dest`에 푼다 — 보통 파일과 폴더만, 절대 경로·`..` 조각은 버린다 · tar를 지운다(실패해도) — 커밋된 파일만이라 `.gitignore`된 산출물이 섞이지 않는다
+
+**다른 점** 파이썬 `tarfile`의 `filter="data"` 대신 보통 파일·폴더만 푼다 — 심볼릭 링크는 따라가지도 만들지도 않는다(그래프는 파일을 읽기만 한다)
+
+**테스트 관점** 커밋 뒤 작업 사본을 고쳐도 커밋의 내용이 풀린다 · `.gitignore`된 파일은 없다 · 심볼릭 링크는 없다
+
+---
+
 ## 3. 미결사항
 
-없음. 코드 그래프의 둘(바뀐 경로 전부·커밋 풀기)은 L12가 더한다 — [[SYNC-CODE-002]].
+없음.
