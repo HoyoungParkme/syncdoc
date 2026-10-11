@@ -5,6 +5,7 @@
 Rust 판은 release 실행 파일, 파이썬 판은 작업 트리 이미지(폐쇄망판 Docker 묶음과 같은 구성 — 계약 시험의 것).
 목표는 R15 그대로: 켜기 3초(첫 실행 15초) · 조회 0.1초 · 저장 0.3초 · 코드 그래프 10초 · 메모리 300MB, 그리고
 파이썬 판보다 느린 항목이 없다.
+리눅스와 윈도에서 돈다 — 윈도는 윈도 디스크의 사본에서(파이썬 판은 Docker Desktop).
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import shutil
 import signal
 import statistics
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -27,6 +29,9 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 LOCAL = REPO / "local"
 PROJECT = "syncdoc-speed"
+WINDOWS = os.name == "nt"
+EXE = LOCAL / "target" / "release" / ("syncdoc-local.exe" if WINDOWS else "syncdoc-local")
+PG_DIR = LOCAL / "target" / "pg" / ("x86_64-pc-windows-msvc/16.15.0" if WINDOWS else "16.15.0")
 COMPOSE = ["docker", "compose", "-p", PROJECT, "-f", str(HERE / "python.compose.yml")]
 CODE = "SYNC"
 READS = [
@@ -72,10 +77,12 @@ class Rust:
         self.url = f"http://127.0.0.1:{self.port}"
 
     def start(self) -> float:
-        env = {**os.environ, "SYNCDOC_LOCAL_PG_DIR": str(LOCAL / "target" / "pg" / "16.15.0")}
+        env = {**os.environ, "SYNCDOC_LOCAL_PG_DIR": str(PG_DIR)}
+        if WINDOWS:  # 설치 폴더의 MinGit 대신 시스템 git
+            env.setdefault("SYNCDOC_LOCAL_GIT", shutil.which("git") or "git")
         t0 = time.monotonic()
         self.proc = subprocess.Popen(
-            [str(LOCAL / "target" / "release" / "syncdoc-local"), "--data-dir", str(self.data),
+            [str(EXE), "--data-dir", str(self.data),
              "--port", str(self.port), "--no-browser", "--no-tray"],
             env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )  # fmt: skip
@@ -83,12 +90,25 @@ class Rust:
         return time.monotonic() - t0
 
     def stop(self) -> None:
-        if self.proc and self.proc.poll() is None:
-            self.proc.send_signal(signal.SIGINT)
+        if not self.proc or self.proc.poll() is not None:
+            return
+        if WINDOWS:
+            # 콘솔 없는 자식에는 Ctrl+C를 못 보낸다 —
+            # 설치 시험(local-release.yml)처럼 끝내고 PostgreSQL은 pg_ctl로
+            self.proc.kill()
             self.proc.wait(60)
+            pg_ctl = str(PG_DIR / "bin" / "pg_ctl.exe")
+            pgdata = str(self.data / "pgdata")
+            subprocess.run([pg_ctl, "stop", "-D", pgdata, "-m", "fast", "-w"], capture_output=True)
+            return
+        self.proc.send_signal(signal.SIGINT)
+        self.proc.wait(60)
 
     def memory_mb(self) -> float:
-        """실행 파일과 그 PostgreSQL(데이터 자리의 pgdata로 띄운 것)의 PSS 합"""
+        """실행 파일과 그 PostgreSQL(데이터 자리의 pgdata로 띄운 것)의 PSS 합.
+        윈도는 개인 작업 집합(작업 관리자의 「메모리」)"""
+        if WINDOWS:
+            return private_ws_mb(self.proc.pid, str(self.data / "pgdata"))
         pids = {self.proc.pid}
         out = subprocess.run(["pgrep", "-f", str(self.data / "pgdata")], capture_output=True, text=True).stdout
         for pid in out.split():
@@ -105,6 +125,33 @@ def pss_kb(pid: int) -> int:
         return 0
     m = re.search(r"^Pss:\s+(\d+) kB", text, re.M)
     return int(m.group(1)) if m else 0
+
+
+def private_ws_mb(pid: int, pgdata: str) -> float:
+    """윈도 — 실행 파일과, 명령 줄에 pgdata가 있는 프로세스(postmaster)와 그 자손의
+    개인 작업 집합 합"""
+    script = (
+        "[Console]::OutputEncoding = [Text.Encoding]::UTF8;"
+        "@{p = @(Get-CimInstance Win32_Process"
+        " | Select-Object ProcessId, ParentProcessId, CommandLine);"
+        " w = @(Get-CimInstance Win32_PerfFormattedData_PerfProc_Process"
+        " | Select-Object IDProcess, WorkingSetPrivate)}"
+        " | ConvertTo-Json -Depth 3 -Compress"
+    )
+    cmd = ["powershell", "-NoProfile", "-Command", script]
+    out = subprocess.run(cmd, capture_output=True, encoding="utf-8", check=True).stdout
+    data = json.loads(out)
+    # pg_ctl은 경로를 C:/…처럼 슬래시로 넘긴다
+    want = pgdata.replace("\\", "/").lower()
+    found = {p["ProcessId"] for p in data["p"] if want in (p["CommandLine"] or "").lower()}
+    pids = {pid} | found
+    grown = True
+    while grown:
+        kids = {p["ProcessId"] for p in data["p"] if p["ParentProcessId"] in pids} - pids
+        pids |= kids
+        grown = bool(kids)
+    used = sum(int(w["WorkingSetPrivate"]) for w in data["w"] if w["IDProcess"] in pids)
+    return used / 1024 / 1024
 
 
 # ── 파이썬 판 ──
@@ -140,7 +187,7 @@ class Python:
     def memory_mb(self) -> float:
         out = subprocess.run(
             ["docker", "stats", "--no-stream", "--format", "{{.Name}} {{.MemUsage}}"],
-            capture_output=True, text=True, check=True,
+            capture_output=True, encoding="utf-8", check=True,
         ).stdout  # fmt: skip
         total = 0.0
         for line in out.splitlines():
@@ -226,7 +273,8 @@ def saves(url: str, tok: str, rounds: int) -> list[float]:
     """같은 문서를 고쳐 저장한다(git 커밋 포함) — 저장소 main의 원문에서 항목 하나의 설명 끝을 번갈아.
     승인 문서는 고치면 초안으로 내려가므로 저장 전마다 지금 상태·판을 읽어 frontmatter를 맞춘다"""
     path = "docs/specs/01-RFQ/SYNC-RFQ-001.md"
-    body = subprocess.run(["git", "-C", str(REPO), "show", f"main:{path}"], capture_output=True, text=True, check=True).stdout
+    show = ["git", "-C", str(REPO), "show", f"main:{path}"]
+    body = subprocess.run(show, capture_output=True, encoding="utf-8", check=True).stdout
     ts = []
     for i in range(rounds):
         cur = httpx.get(f"{url}/api/docs/SYNC-RFQ-001", timeout=30).json()
@@ -292,13 +340,14 @@ def run(rounds: int, out: Path) -> int:
     print("| 항목 | 목표 | Rust | 파이썬 | 판정 |\n|---|---|---|---|---|\n" + "\n".join(rows))
     for path in READS:
         print(f"  {path}: Rust {result['rust']['reads'][path] * 1000:.1f}ms · 파이썬 {result['python']['reads'][path] * 1000:.1f}ms")
-    out.write_text(json.dumps(result, ensure_ascii=False, indent=1))
+    out.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
     shutil.rmtree(tmp, ignore_errors=True)
     print("판정:", "통과" if ok else "못 미침")
     return 0 if ok else 1
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--rounds", type=int, default=20)
     ap.add_argument("--out", type=Path, default=REPO / "local" / "target" / "speed.json")
