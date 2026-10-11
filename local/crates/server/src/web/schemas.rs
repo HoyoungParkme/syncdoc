@@ -12,6 +12,10 @@ use syncdoc_core::types::{
     SaveResult as SaveResultDto, StageSummary, TrashResult as TrashResultDto,
     UserRef as UserRefDto, Version as VersionDto, iso_utc,
 };
+use syncdoc_core::types::{
+    HookStatus as HookStatusDto, RebuildResult as RebuildResultDto, RepoStatus as RepoStatusDto,
+    SyncResult as SyncResultDto,
+};
 
 /// `Me` — `User`(id·github_login·display_name·created_at)에 판·모델·저장 방식을 더한 것
 #[derive(Debug, Serialize)]
@@ -562,6 +566,112 @@ impl From<&TrashResultDto> for TrashResult {
             commit_hash: r.commit_hash.clone(),
             broken_refs: r.broken_refs,
             next_step: Some(r.next_step.clone()),
+        }
+    }
+}
+
+/// `RepoStatus` — UI-14 표 2 (카드 L11)
+#[derive(Debug, Serialize)]
+pub struct RepoStatus {
+    pub code: String,
+    pub name: String,
+    pub storage: String,
+    pub remote_url: Option<String>,
+    pub last_processed_commit: Option<String>,
+    pub synced_at: Option<String>,
+    pub behind_by: Option<i32>,
+    pub fetched_at: Option<String>,
+    pub error: Option<String>,
+    pub hook: String,
+    pub hook_error: Option<String>,
+}
+
+impl From<&RepoStatusDto> for RepoStatus {
+    fn from(r: &RepoStatusDto) -> Self {
+        RepoStatus {
+            code: r.code.clone(),
+            name: r.name.clone(),
+            storage: r.storage.clone(),
+            remote_url: r.remote_url.clone(),
+            last_processed_commit: r.last_processed_commit.clone(),
+            synced_at: r.synced_at.map(iso_utc),
+            behind_by: r.behind_by,
+            fetched_at: r.fetched_at.map(iso_utc),
+            error: r.error.clone(),
+            hook: r.hook.clone(),
+            hook_error: r.hook_error.clone(),
+        }
+    }
+}
+
+/// `RebuildError`
+#[derive(Debug, Serialize)]
+pub struct RebuildError {
+    pub doc_id: String,
+    pub detail: String,
+}
+
+/// `RebuildResult`
+#[derive(Debug, Serialize)]
+pub struct RebuildResult {
+    pub readme_updated: bool,
+    pub docs: i64,
+    pub items: i64,
+    pub references: i64,
+    pub versions: i64,
+    pub convention_errors: Vec<RebuildError>,
+}
+
+impl From<&RebuildResultDto> for RebuildResult {
+    fn from(r: &RebuildResultDto) -> Self {
+        RebuildResult {
+            readme_updated: r.readme_updated,
+            docs: r.docs,
+            items: r.items,
+            references: r.references,
+            versions: r.versions,
+            convention_errors: r
+                .convention_errors
+                .iter()
+                .map(|e| RebuildError {
+                    doc_id: e.doc_id.clone(),
+                    detail: e.detail.clone(),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// `HookStatus`
+#[derive(Debug, Serialize)]
+pub struct HookStatus {
+    pub hook: String,
+    pub hook_error: Option<String>,
+    pub created: bool,
+}
+
+impl From<&HookStatusDto> for HookStatus {
+    fn from(h: &HookStatusDto) -> Self {
+        HookStatus {
+            hook: h.hook.clone(),
+            hook_error: h.hook_error.clone(),
+            created: h.created,
+        }
+    }
+}
+
+/// `SyncResult`
+#[derive(Debug, Serialize)]
+pub struct SyncResult {
+    pub docs: i64,
+    pub fetched_at: Option<String>,
+}
+
+impl From<&SyncResultDto> for SyncResult {
+    fn from(r: &SyncResultDto) -> Self {
+        SyncResult {
+            docs: r.docs,
+            fetched_at: r.fetched_at.map(iso_utc),
         }
     }
 }
