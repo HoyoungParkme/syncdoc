@@ -15,8 +15,9 @@ use crate::reference::service::ReferenceService;
 use crate::spec::{DIFF_CONTEXT_LINES, SpecService};
 use crate::types::{
     ApiAuthor, AuthorRef, BrokenRefSummary, ChainItem, ChainRow, Diff, Document, DocumentSummary,
-    Graph, GraphEdge, GraphNode, GraphScope, ItemChain, ItemRef, ItemReferences, ItemView,
-    ProjectDetail, ProjectItem, ProjectSummary, STAGES, StageSummary, Storage, stage_of,
+    DownstreamDoc, DownstreamView, Graph, GraphEdge, GraphNode, GraphScope, ItemChain, ItemRef,
+    ItemReferences, ItemView, ProjectDetail, ProjectItem, ProjectSummary, STAGES, StageSummary,
+    Storage, stage_of,
 };
 
 /// 작성자(id만) → 이름 붙은 작성자 — 파이썬 `_api_author`. 지시자는 id가 있을 때만
@@ -709,4 +710,105 @@ pub async fn diff_with_impact(
             .unwrap_or(0);
     }
     Ok(d)
+}
+
+/// 문서 제목 — 없는 문서면 문서 ID (파이썬 `_title_of`)
+async fn title_of(db: &mut PgConnection, doc_id: &str) -> Result<String, Problem> {
+    let id = match (SpecService { db: &mut *db }).get_document(doc_id).await {
+        Ok(d) => d.summary.id,
+        Err(Problem::NotFound { .. }) => return Ok(doc_id.to_string()),
+        Err(other) => return Err(other),
+    };
+    Ok(SpecService { db }
+        .describe_documents(&[id])
+        .await?
+        .remove(&id)
+        .map_or_else(|| doc_id.to_string(), |r| r.title))
+}
+
+/// SYNC-MS-018#queries.downstream_view
+///
+/// 항목이 없는 문서는 문서 참조도 안 나온다 — 간선을 그 문서의 항목들로 찾는다(파이썬과 같다)
+pub async fn downstream_view(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    doc_id: &str,
+    user: &UserRow,
+) -> Result<DownstreamView, Problem> {
+    ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code_of(doc_id), user)
+    .await?;
+    let document = SpecService { db: &mut *db }.get_document(doc_id).await?;
+    let pks = SpecService { db: &mut *db }
+        .item_pks(document.summary.id)
+        .await?;
+    let by_pk: HashMap<i32, String> = pks.iter().map(|(i, p)| (*p, i.clone())).collect();
+    let pk_list: Vec<i32> = pks.values().copied().collect();
+    let edges: Vec<_> = ReferenceService { db: &mut *db }
+        .references_among(&pk_list, true)
+        .await?
+        .into_iter()
+        .filter(|e| {
+            e.to_item_pk.is_some_and(|p| by_pk.contains_key(&p))
+                || e.to_document_id == Some(document.summary.id)
+        })
+        .collect();
+    let item_pks: Vec<i32> = edges.iter().filter_map(|e| e.from_item_pk).collect();
+    let names = SpecService { db: &mut *db }
+        .describe_items(&item_pks)
+        .await?;
+    let doc_pks: Vec<i32> = edges.iter().map(|e| e.from_document_id).collect();
+    let docs = SpecService { db: &mut *db }
+        .describe_documents(&doc_pks)
+        .await?;
+    let mut by_item: IndexMap<String, Vec<ItemRef>> = IndexMap::new();
+    let mut by_doc: IndexMap<String, std::collections::BTreeSet<String>> = IndexMap::new();
+    for e in &edges {
+        let key = match e.to_item_pk.and_then(|p| by_pk.get(&p)) {
+            Some(i) => i.clone(),
+            None => "(문서)".to_string(),
+        };
+        // 출발 항목이면 이름 지도의 것 그대로(raw_target 없음), 아니면 출발 문서
+        let r = match e.from_item_pk.and_then(|p| names.get(&p)) {
+            Some(r) => r.clone(),
+            None => match docs.get(&e.from_document_id) {
+                Some(d) => ItemRef {
+                    doc_id: Some(d.doc_id.clone()),
+                    display_name: Some(d.title.clone()),
+                    raw_target: e.raw_target.clone(),
+                    ..ItemRef::default()
+                },
+                None => continue,
+            },
+        };
+        // 같은 문서 안 참조는 추적표 대상이 아니다
+        if r.doc_id.as_deref() == Some(doc_id) {
+            continue;
+        }
+        by_doc
+            .entry(r.doc_id.clone().unwrap_or_default())
+            .or_default()
+            .insert(key.clone());
+        by_item.entry(key).or_default().push(r);
+    }
+    let mut by_document = Vec::with_capacity(by_doc.len());
+    for (d, items) in by_doc {
+        let title = title_of(&mut *db, &d).await?;
+        by_document.push(DownstreamDoc {
+            doc_id: d,
+            title,
+            items: items.into_iter().collect(),
+        });
+    }
+    by_document.sort_by(|a, b| {
+        let stage = |d: &str| d.split('-').nth(1).and_then(stage_of).unwrap_or(99);
+        (stage(&a.doc_id), &a.doc_id).cmp(&(stage(&b.doc_id), &b.doc_id))
+    });
+    Ok(DownstreamView {
+        by_item,
+        by_document,
+    })
 }
