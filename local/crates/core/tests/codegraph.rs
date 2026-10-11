@@ -1,6 +1,6 @@
 //! 카드 L12 테스트 관점 — 코드 그래프 행(MS-022 CodeGraphService)·git 풀기(MS-019 changed_paths·archive)·
 //! 그래프 만들기와 걸기(MS-017 build_code_graph·schedule_code_graph·process_commit 5a·rebuild 10)·
-//! 코드 조회 넷(MS-018). 시험 DB · 임시 데이터 자리 · 진짜 git
+//! 코드 조회 넷(MS-018)과 카드 L13의 커뮤니티·코드 그래프 노드. 시험 DB · 임시 데이터 자리 · 진짜 git
 
 mod support;
 
@@ -405,7 +405,11 @@ async fn build_from_push_follows_committed_graph_json_and_keeps_old_on_failure()
             .iter()
             .any(|c| (c.0.as_str(), c.1.as_str()) == ("app/svc.py:1", "app/svc.py:6"))
     );
-    assert_eq!(r.graph.communities, Some(Vec::new()));
+    // 커뮤니티 — 함수마다 번호, 목록의 크기 합이 함수 수 (카드 L13)
+    let groups = r.graph.communities.as_ref().expect("커뮤니티");
+    assert!(!groups.is_empty());
+    assert!(r.graph.functions.iter().all(|f| f.community.is_some()));
+    assert_eq!(groups.iter().map(|c| c.size).sum::<i64>(), 3);
     assert_eq!(r.function_count, 3);
     // 커밋된 graph.json이 있으면 그것 — 출처 repo
     let raw = r#"{"nodes": [{"id": "f", "label": "f()", "file_type": "code", "source_file": "app/svc.py", "source_location": "L6", "_callable": true}], "links": []}"#;
@@ -585,6 +589,50 @@ async fn code_queries_compare_spec_calls_with_code() {
         not_found(queries::code_text(&mut c, &e.repos, CODE, "app/svc.py", 2, &e.user).await),
         ("function".into(), "app/svc.py:2".into())
     );
+    // 코드 그래프 노드 — 대조 상태·항목·층·커뮤니티·선 (카드 L13)
+    let nodes = queries::code_nodes(&mut c, &e.repos, CODE, &e.user)
+        .await
+        .expect("노드");
+    assert!(nodes.graph.is_some());
+    let node = |name: &str| {
+        nodes
+            .functions
+            .iter()
+            .find(|n| n.name == name)
+            .expect("함수")
+    };
+    let main = node("main");
+    assert_eq!(
+        (
+            main.ms.as_deref(),
+            main.item.as_deref(),
+            main.status.as_deref(),
+            main.layer.is_none()
+        ),
+        (
+            Some("LG-MS-001#svc.main"),
+            Some("LG-MS-001#svc.main"),
+            Some("spec_only"),
+            true
+        )
+    );
+    assert_eq!(node("helper").status.as_deref(), Some("same"));
+    let extra = node("extra");
+    assert_eq!((extra.ms.as_deref(), extra.status.as_deref()), (None, None));
+    assert_eq!(
+        extra
+            .layer
+            .as_ref()
+            .map(|l| (l.name.as_str(), l.specs.len())),
+        Some(("도우미", 0))
+    );
+    assert!(!nodes.communities.is_empty());
+    assert!(nodes.functions.iter().all(|f| f.community.is_some()));
+    assert!(
+        nodes
+            .calls
+            .contains(&("app/svc.py:1".to_string(), "app/svc.py:6".to_string()))
+    );
     // 그래프 없음
     sqlx::query("DELETE FROM code_graphs")
         .execute(&mut *c)
@@ -594,6 +642,10 @@ async fn code_queries_compare_spec_calls_with_code() {
         .await
         .expect("코드 탭");
     assert!(v.graph.is_none() && v.functions.is_empty() && !v.missing);
+    let nodes = queries::code_nodes(&mut c, &e.repos, CODE, &e.user)
+        .await
+        .expect("노드");
+    assert!(nodes.graph.is_none() && nodes.functions.is_empty() && nodes.calls.is_empty());
     assert!(
         queries::code_calls(&mut c, &e.repos, CODE, &e.user)
             .await

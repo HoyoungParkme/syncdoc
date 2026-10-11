@@ -1,0 +1,52 @@
+{
+ "calls": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"graph\":{\"commit_hash\":\"H\",\"source\":\"repo\",\"built_at\":\"T\",\"error\":null,\"function_count\":10},\"edges\":[{\"from\":\"LCN-MS-001#svc.get\",\"to\":\"LCN-MS-001#svc.helper\",\"status\":\"same\"},{\"from\":\"LCN-MS-001#svc.main\",\"to\":\"LCN-MS-001#svc.helper\",\"status\":\"same\"},{\"from\":\"LCN-MS-001#svc.main\",\"to\":\"LCN-MS-001#svc.other\",\"status\":\"spec_only\"},{\"from\":\"LCN-MS-001#svc.rs_entry\",\"to\":\"LCN-MS-001#svc.helper\",\"status\":\"spec_only\"}]}"
+ },
+ "graph_none": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"graph\":null,\"communities\":[],\"functions\":[],\"calls\":[]}"
+ },
+ "item_get": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"graph\":{\"commit_hash\":\"H\",\"source\":\"repo\",\"built_at\":\"T\",\"error\":null,\"function_count\":10},\"doc_id\":\"LCN-MS-001\",\"item_id\":\"svc.get\",\"is_ms\":true,\"missing\":false,\"function\":{\"ms_id\":\"LCN-MS-001#svc.get\",\"qual\":\"Repo.get\",\"file\":\"app/svc.py\",\"line\":26,\"end\":28,\"calls\":[{\"ms_id\":\"LCN-MS-001#svc.helper\",\"qual\":\"svc.helper\",\"file\":\"app/svc.py\",\"line\":11,\"status\":\"same\"}],\"callers\":[]},\"functions\":[{\"ms_id\":\"LCN-MS-001#svc.main\",\"qual\":\"svc.main\",\"file\":\"app/svc.py\",\"line\":6,\"same\":1,\"code_only\":0,\"spec_only\":1},{\"ms_id\":\"LCN-MS-001#svc.helper\",\"qual\":\"svc.helper\",\"file\":\"app/svc.py\",\"line\":11,\"same\":0,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCN-MS-001#svc.get\",\"qual\":\"Repo.get\",\"file\":\"app/svc.py\",\"line\":26,\"same\":1,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCN-MS-001#svc.other\",\"qual\":null,\"file\":null,\"line\":null,\"same\":0,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCN-MS-001#svc.rs_entry\",\"qual\":\"x.rs_entry\",\"file\":\"crates/x/src/lib.rs\",\"line\":2,\"same\":0,\"code_only\":0,\"spec_only\":1}]}"
+ },
+ "nodes": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"graph\":{\"commit_hash\":\"H\",\"source\":\"repo\",\"built_at\":\"T\",\"error\":null,\"function_count\":10},\"communities\":[{\"id\":0,\"label\":\"svc.py\",\"size\":3},{\"id\":1,\"label\":\"helper\",\"size\":3},{\"id\":2,\"label\":\"lib.rs\",\"size\":2},{\"id\":3,\"label\":\"app.ts\",\"size\":2}],\"functions\":[{\"key\":\"app/svc.py:6\",\"name\":\"main\",\"qual\":\"svc.main\",\"file\":\"app/svc.py\",\"line\":6,\"community\":0,\"item\":\"LCN-MS-001#svc.main\",\"ms\":\"LCN-MS-001#svc.main\",\"status\":\"spec_only\",\"layer\":null},{\"key\":\"app/svc.py:11\",\"name\":\"helper\",\"qual\":\"svc.helper\",\"file\":\"app/svc.py\",\"line\":11,\"community\":1,\"item\":\"LCN-MS-001#svc.helper\",\"ms\":\"LCN-MS-001#svc.helper\",\"status\":\"same\",\"layer\":null},{\"key\":\"app/svc.py:16\",\"name\":\"extra\",\"qual\":\"svc.extra\",\"file\":\"app/svc.py\",\"line\":16,\"community\":0,\"item\":null,\"ms\":null,\"status\":null,\"layer\":{\"name\":\"도우미\",\"specs\":[]}},{\"key\":\"app/svc.py:23\",\"name\":\"__init__\",\"qual\":\"Repo.__init__\",\"file\":\"app/svc.py\",\"line\":23,\"community\":1,\"item\":null,\"ms\":null,\"status\":null,\"layer\":{\"name\":\"도우미\",\"specs\":[]}},{\"key\":\"app/svc.py:26\",\"name\":\"get\",\"qual\":\"Repo.get\",\"file\":\"app/svc.py\",\"line\":26,\"community\":1,\"item\":\"LCN-MS-001#svc.get\",\"ms\":\"LCN-MS-001#svc.get\",\"status\":\"same\",\"layer\":null},{\"key\":\"app/util.py:1\",\"name\":\"fmt\",\"qual\":\"util.fmt\",\"file\":\"app/util.py\",\"line\":1,\"community\":0,\"item\":\"LCN-PRD-001#R1\",\"ms\":null,\"status\":null,\"layer\":null},{\"key\":\"web/app.ts:2\",\"name\":\"render\",\"qual\":\"app.render\",\"file\":\"web/app.ts\",\"line\":2,\"community\":3,\"item\":\"LCN-UI-001#UI-1\",\"ms\":null,\"status\":null,\"layer\":null},{\"key\":\"web/app.ts:6\",\"name\":\"label\",\"qual\":\"app.label\",\"file\":\"web/app.ts\",\"line\":6,\"community\":3,\"item\":\"LCN-UI-001#UI-1\",\"ms\":null,\"status\":null,\"layer\":null},{\"key\":\"crates/x/src/lib.rs:2\",\"name\":\"rs_entry\",\"qual\":\"x.rs_entry\",\"file\":\"crates/x/src/lib.rs\",\"line\":2,\"community\":2,\"item\":\"LCN-MS-001#svc.rs_entry\",\"ms\":\"LCN-MS-001#svc.rs_entry\",\"status\":\"spec_only\",\"layer\":null},{\"key\":\"crates/x/src/lib.rs:6\",\"name\":\"rs_helper\",\"qual\":\"x.rs_helper\",\"file\":\"crates/x/src/lib.rs\",\"line\":6,\"community\":2,\"item\":null,\"ms\":null,\"status\":null,\"layer\":{\"name\":\"도우미\",\"specs\":[]}}],\"calls\":[[\"app/svc.py:6\",\"app/svc.py:11\"],[\"app/svc.py:6\",\"app/svc.py:16\"],[\"app/svc.py:26\",\"app/svc.py:11\"],[\"web/app.ts:2\",\"web/app.ts:6\"],[\"app/svc.py:6\",\"app/util.py:1\"],[\"crates/x/src/lib.rs:2\",\"crates/x/src/lib.rs:6\"]]}"
+ },
+ "nodes_other_project": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ }
+}
