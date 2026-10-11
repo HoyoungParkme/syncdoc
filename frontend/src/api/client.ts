@@ -132,6 +132,7 @@ async function form<T>(url: string, fields: Record<string, string | File>): Prom
 export const api = {
   get: <T>(url: string) => call<T>('GET', url),
   post: <T>(url: string, body?: unknown) => call<T>('POST', url, body),
+  put: <T>(url: string, body?: unknown) => call<T>('PUT', url, body),
   del: <T>(url: string) => call<T>('DELETE', url),
   stream,
   upload,
@@ -139,6 +140,31 @@ export const api = {
 }
 
 // ── SYNC-API-001 4장 스키마 ──
+/** 백업 파일 하나 — SYNC-API-001 `BackupFile` (싱크독_로컬 설치형, 카드 L16) */
+export interface BackupFile {
+  name: string
+  size: number
+  encrypted: boolean
+}
+/** GET /api/local — 「이 PC」·「백업」 카드(UI-13 10·11). 설치형만 있고 파이썬 판은 404다. 키·암호 원문은 오지 않는다 */
+export interface LocalInfo {
+  login: string
+  name: string
+  llm_api_url: string
+  llm_api_key_set: boolean
+  llm_model: string
+  public_base_url: string
+  autostart: boolean
+  data_dir: string
+  backup: {
+    dir: string
+    encrypted: boolean
+    keep: number
+    files: BackupFile[]
+    last: { at: string; name: string | null; error: string | null } | null
+  }
+  last_op: { kind: 'settings' | 'restore' | 'move'; ok: boolean; message: string; at: string } | null
+}
 export interface UserRef {
   id: number
   github_login: string

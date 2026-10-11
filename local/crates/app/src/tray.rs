@@ -1,4 +1,4 @@
-//! 트레이 — 열기·끝내기 (SYNC-MS-012#tray.run · SYNC-INFRA-001 9.1·9.2, 카드 L4).
+//! 트레이 — 열기·지금 백업·끝내기 (SYNC-MS-012#tray.run · SYNC-INFRA-001 9.1·9.2·9.6, 카드 L4 · L16).
 //! 윈도는 트레이가 만든 스레드에서 메시지를 돌려야 한다 — 그래서 메인 스레드가 트레이 차지이고 tokio는 일꾼 스레드에서 돈다.
 //! 리눅스는 StatusNotifierItem(D-Bus, GTK 없이) — 메인 스레드는 끝나기를 기다리기만 한다.
 
@@ -16,10 +16,11 @@ use crate::runtime::{self, Args};
 /// 트레이 아이콘 32×32 RGBA — `cargo xtask icon`이 `packaging/icon.svg`에서 만든다
 const ICON: &[u8] = include_bytes!("../../../packaging/tray.rgba");
 
-/// `runtime.run`과 트레이 사이 — 켜진 주소는 트레이로, 「끝내기」는 runtime으로
+/// `runtime.run`과 트레이 사이 — 켜진 주소는 트레이로, 「끝내기」·「지금 백업」은 runtime으로
 pub struct TrayLink {
     pub url: mpsc::Sender<String>,
     pub quit: oneshot::Receiver<()>,
+    pub backup: tokio::sync::mpsc::UnboundedReceiver<()>,
 }
 
 /// SYNC-MS-012#tray.run
@@ -29,12 +30,14 @@ pub fn run(rt: &Runtime, args: Args) -> Result<(), Problem> {
     let (url_tx, url_rx) = mpsc::channel();
     let (quit_tx, quit_rx) = oneshot::channel();
     let (done_tx, done_rx) = mpsc::channel();
+    let (backup_tx, backup_rx) = tokio::sync::mpsc::unbounded_channel();
     rt.spawn(async move {
         let result = runtime::run(
             args,
             Some(TrayLink {
                 url: url_tx,
                 quit: quit_rx,
+                backup: backup_rx,
             }),
         )
         .await;
@@ -46,7 +49,7 @@ pub fn run(rt: &Runtime, args: Args) -> Result<(), Problem> {
         return done_rx.recv().unwrap_or(Ok(()));
     };
     let quit = Arc::new(Mutex::new(Some(quit_tx)));
-    let _tray = match build(&url, quit) {
+    let _tray = match build(&url, quit, backup_tx) {
         Ok(t) => Some(t),
         Err(e) => {
             tracing::warn!("트레이를 못 만들었다 — 트레이 없이 간다: {e}");
@@ -57,18 +60,26 @@ pub fn run(rt: &Runtime, args: Args) -> Result<(), Problem> {
     done_rx.recv().unwrap_or(Ok(()))
 }
 
-/// 메뉴 「열기」·「끝내기」, 아이콘 두 번 누르기 = 열기
-fn build(url: &str, quit: Arc<Mutex<Option<oneshot::Sender<()>>>>) -> Result<TrayIcon, String> {
+/// 메뉴 「열기」·「지금 백업」·「끝내기」, 아이콘 두 번 누르기 = 열기
+fn build(
+    url: &str,
+    quit: Arc<Mutex<Option<oneshot::Sender<()>>>>,
+    backup: tokio::sync::mpsc::UnboundedSender<()>,
+) -> Result<TrayIcon, String> {
     let open = MenuItem::new("열기", true, None);
+    let now = MenuItem::new("지금 백업", true, None);
     let end = MenuItem::new("끝내기", true, None);
     let menu = Menu::new();
-    menu.append_items(&[&open, &end])
+    menu.append_items(&[&open, &now, &end])
         .map_err(|e| e.to_string())?;
-    let (open_id, end_id) = (open.id().clone(), end.id().clone());
+    let (open_id, now_id, end_id) = (open.id().clone(), now.id().clone(), end.id().clone());
     let target = url.to_string();
     MenuEvent::set_event_handler(Some(move |e: MenuEvent| {
         if e.id == open_id {
             open_browser(&target);
+        } else if e.id == now_id {
+            // 결과는 로그와 설정 「백업」의 마지막 백업
+            let _ = backup.send(());
         } else if e.id == end_id
             && let Some(tx) = quit.lock().ok().and_then(|mut q| q.take())
         {

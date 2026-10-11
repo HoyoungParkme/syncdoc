@@ -183,11 +183,21 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | L11 · BX |
 | 완료 | 2026-10-11 · 브랜치 `card/L15-bundle`(7f15f04 #379) · spec 6 + code 5 · `cargo test` 183(폼 정답 748 — starlette에 넣어 얻은 답과 같다 · 상한 넷 · git `clone_bare` · 시험 DB — 번들 → 문서·상태·처리 지점, 골격 커밋 없음 · 번들 아님·main 없음 → 아무것도 안 남음) · 계약 `--target both --with-card L15` 1149 통과 — L15 66: 응답·가져온 뒤 프로젝트·문서·판 목록·폼 오류·405·404 바이트 같음 · clippy · 워크플로 녹색(리눅스·윈도) · `check_code` Rust 177/177 · `check_calls` 0 · 사람 확인(윈도 싱크독_로컬 UI-3 2.9 번들 파일로 가져오기)은 따로 · 되먹임: 폼 해석을 multer에서 python-multipart 옮김으로 바꿔 L14 첨부도 같은 길 · 계약 목록 응답은 다른 모듈이 만든 프로젝트가 섞여 그 시험의 코드만 거른다 |
 
+#### L16 데이터 보호·「이 PC」 — 백업·되살리기·데이터 자리·자동 시작·같은 망 열기
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R15]] · [[SYNC-INFRA-001]] 9.3·9.4·9.5·9.6 · [[SYNC-UI-002#UI-13]] 10·11·12 · 사용자 결정 2026-10-07(같은 망 열기는 설정 파일만) · 에이전트 판단 2026-10-11(사용자 목표 「끝까지」): **Docker 묶음의 백업도 되살린다** — 백업 꼴을 카드 BR과 같게(tar에 `db.dump`·`origins.tar`, 이름 `syncdoc-{날짜}-{시각}.tar.gpg`), 암호는 OpenPGP 대칭(rpgp — `gpg --symmetric`과 서로 풀린다), 시각은 지역(jiff) · 백업은 켠 채로 — 덤프 먼저, 서버 저장소는 저장소마다 `git clone --mirror --no-local`(쓰기 멈춤 없이 일관, 앞선 커밋은 켤 때 따라잡기가 메운다) · 되살리기·옮기기·설정 저장은 **같은 프로세스 안 다시 켜기** — runtime이 두 고리(데이터 자리 · 켜기)를 돌고, 처리기는 검사 뒤 202. 트레이·포트는 그대로 · 처리기(server)와 일(app)은 server의 `LocalOps` 트레이트로 잇는다 · DB 되살리기는 `public` 스키마를 비우고 `pg_restore --single-transaction`(덤프에 없는 표가 남지 않는다) · 켤 때마다 `ProjectService.rehome`이 서버 저장소·작업 사본 자리를 맞추고 없는 작업 사본을 만든다 · 옮긴 자리를 가리키는 파일은 기본 자리 옆 `{이름}.location` · 설정 쓰기는 toml_edit(주석 보존) · 남기는 수 14 고정 · `/api/local*`은 Rust 판만(계약 밖) |
+| 구현 | [[SYNC-MS-023#Local.info]] · [[SYNC-MS-023#Local.save_settings]] · [[SYNC-MS-023#Local.set_autostart]] · [[SYNC-MS-023#Local.backup_now]] · [[SYNC-MS-023#Local.restore]] · [[SYNC-MS-023#Local.move_to]] · [[SYNC-MS-023#backup.make]] · [[SYNC-MS-023#backup.list]] · [[SYNC-MS-023#backup.open]] · [[SYNC-MS-023#backup.restore]] · [[SYNC-MS-023#backup.daily]] · [[SYNC-MS-023#datadir.check]] · [[SYNC-MS-023#datadir.copy]] · [[SYNC-MS-023#autostart.enabled]] · [[SYNC-MS-023#autostart.set]] · [[SYNC-MS-012#runtime.run]] · [[SYNC-MS-012#runtime.bind]] · [[SYNC-MS-012#runtime.shutdown]] · [[SYNC-MS-012#tray.run]] · [[SYNC-MS-012#paths.data_dir]] · [[SYNC-MS-012#paths.set_data_dir]] · [[SYNC-MS-012#settings.load]] · [[SYNC-MS-012#settings.save]] · [[SYNC-MS-012#logs.init]] · [[SYNC-MS-012#logs.retarget]] · [[SYNC-MS-012#pg.start]] · [[SYNC-MS-013#ProjectService.rehome]] · `server/src/local.rs` · `routes/local.rs` · `SettingsDialog.tsx` 10·11·12 |
+| API | [[SYNC-API-001#GET/api/local]] · [[SYNC-API-001#PUT/api/local/settings]] · [[SYNC-API-001#PUT/api/local/autostart]] · [[SYNC-API-001#POST/api/local/backups]] · [[SYNC-API-001#POST/api/local/restore]] · [[SYNC-API-001#POST/api/local/move]] |
+| 테스트 | `cargo test`(진짜 PostgreSQL·git — 백업 꼴·암호·gpg와 서로 풀기(gpg가 있으면)·14개·되살리기와 되돌리기·옮기기 복사·확인·설정 값만 쓰기·자동 시작 파일·rehome) · 실행 파일 시험(설정 저장 → 같은 포트로 다시 뜸 · 백업 → 되살리기 · 옮기기) · 계약 L16 — **파이썬 판 컨테이너에서 `scripts/backup.sh`와 같은 차례로 뜬 백업을 새 Rust 판이 되살려** 프로젝트 목록·문서·판 목록이 파이썬 판과 바이트로 같다 · `check_ui` UI-13 · `tsc`·`oxlint`·`build` |
+| 선행 | L4 · L11 · L15 |
+| 완료 | — |
+
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
-| L16 데이터 보호·「이 PC」 | 백업·되살리기·데이터 자리 옮기기 · UI-13 「이 PC」 묶음 · 같은 망 열기(`PUBLIC_BASE_URL`, 설정 파일만 — 사용자 결정 2026-10-07) | L4 · L11 | L |
 | L17 속도·출시 판정 | 두 판을 같은 PC에서 잰다 — [[SYNC-PRD-001#R15]] 속도 목표와 「파이썬 판보다 느린 항목 없음」 | L14~L16 · L18 | M |
 | L18 새 MCP 프로토콜 | 2026-07-28 — 핸드셰이크 없는 요청 하나짜리 봉투 · `server/discover`·`subscriptions/listen`. 파이썬 SDK의 `_streamable_http_modern`을 옮긴다(사용자 결정 2026-10-08) | L3 | L |
 
@@ -214,7 +224,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 **돌리는 법** — `cd contract && uv run pytest --target both`(기본). 파이썬 판은 지금 작업 트리로 이미지를 만들어 띄우고, Rust 판은 `local/`을 빌드해 띄운다(`cargo xtask pg-fetch` 먼저). 시험마다 그 기능을 닫는 카드를 적는다(`@pytest.mark.card("L3")`) — 파이썬 판은 전부 돌고, Rust 판은 이 문서의 완료란이 찬 카드만 돈다(나머지는 건너뜀으로 센다). 카드를 끝내기 전 확인은 `--with-card L3`. **두 판 차이 시험**(카드 L3~)은 같은 무작위 사례(씨앗 고정)를 두 판에 보내 상태·머리·본문을 바이트로 비교한다 — 두 판이 다 떠 있을 때(`--target both`)만 돈다.
 
-**계약 밖** — API-001에 없는 프레임워크 동작은 두 판이 달라도 된다(사용자 결정 2026-10-07): 끝 슬래시 리다이렉트(307) · `/docs`·`/redoc`·`/openapi.json` · GET 경로의 HEAD · Range(206) · ETag 값의 꼴 · Host 머리 없는 요청 · 응답의 `date`·`server`·`connection` 머리와 본문을 나눠 보내는 꼴(chunked·content-length). 화면과 에이전트는 이것들을 쓰지 않는다. **MCP-Protocol-Version 머리가 핸드셰이크 판(2024-11-05~2025-11-25)이 아닌 요청**도 L18까지 계약 밖이다(사용자 결정 2026-10-08).
+**계약 밖** — API-001에 없는 프레임워크 동작은 두 판이 달라도 된다(사용자 결정 2026-10-07): 끝 슬래시 리다이렉트(307) · `/docs`·`/redoc`·`/openapi.json` · GET 경로의 HEAD · Range(206) · ETag 값의 꼴 · Host 머리 없는 요청 · 응답의 `date`·`server`·`connection` 머리와 본문을 나눠 보내는 꼴(chunked·content-length). **Rust 판만 가진 것** — `/api/local*`(이 PC·백업, 카드 L16 — 파이썬 판은 없는 경로)는 비교하지 않는다. 대신 계약 L16이 파이썬 판의 백업을 Rust 판이 되살린 결과를 비교한다. 화면과 에이전트는 이것들을 쓰지 않는다. **MCP-Protocol-Version 머리가 핸드셰이크 판(2024-11-05~2025-11-25)이 아닌 요청**도 L18까지 계약 밖이다(사용자 결정 2026-10-08).
 
 **명세 엔진**(카드 L5)은 HTTP로 닿기 전이라 계약 시험 대신 정답 파일(`cargo test`)과 `cargo xtask spec-diff`(두 판에 같은 본문을 돌려 바이트 비교)로 맞춘다 — 엔진을 고치면 둘 다 돌린다.
 
@@ -235,4 +245,4 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 - [x] `main`이 아닌 가지를 push했을 때 — 파이썬 판처럼 받아 두기만 하나([[SYNC-UC-001#UC-H21]] 3a), git을 부르기 전에 거절하나. Rust 판은 ref 명령을 먼저 읽으므로 둘 다 된다([[SYNC-INFRA-001]] 9.1). 카드 L10 전에 정한다 — 결정(에이전트 판단 2026-10-11, 사용자 목표 「끝까지」): 파이썬 판처럼 받아 두기만 한다. ref 명령을 미리 읽지 않고 되감기·지우기는 파이썬 판과 같은 저장소 설정이 거절한다(INFRA 9.1을 바로잡음). 계약 L10이 두 판에 진짜 push로 본다
 - [x] 저장소에 커밋된 `graphify-out/graph.json`을 따를지 — 파이썬 판은 그 파일이 있으면 그것을 쓴다([[SYNC-MS-011#codegraph.load]] 1). Rust 판에는 graphify가 없다. 카드 L12 전에 정한다 — 결정(에이전트 판단 2026-10-11, 사용자 목표 「끝까지」): 따른다. 같은 원형이면 두 판이 같은 줄이기·보강으로 바이트까지 같은 그래프를 낸다. 없으면 graphify 대신 tree-sitter로 뽑는다([[SYNC-MS-022]] 0장)
-- [ ] 되살리기가 Docker 판(파이썬 폐쇄망판)의 백업 파일도 받을지 — 두 판은 같은 표를 쓴다([[SYNC-INFRA-001]] 9.2). 카드 L16 전에 정한다
+- [x] 되살리기가 Docker 판(파이썬 폐쇄망판)의 백업 파일도 받을지 — 두 판은 같은 표를 쓴다([[SYNC-INFRA-001]] 9.2). 카드 L16 전에 정한다 — 결정(에이전트 판단 2026-10-11, 사용자 목표 「끝까지」): 받는다. 백업 꼴을 카드 BR과 같게 하고(OpenPGP 대칭 암호 — gpg와 서로 풀린다) 켤 때 서버 저장소 자리를 맞춘다(`ProjectService.rehome`). 계약 L16이 파이썬 판 컨테이너의 백업을 Rust 판에 되살려 본다

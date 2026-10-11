@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-001, SYNC-MS-019, SYNC-UC-001, SYNC-API-001, SY
 
 서비스는 연결과 저장소 자리를 빌려 받는다 — `ProjectService<'c> { pub db: &'c mut PgConnection, pub repos: &'c ServerRepos }`. `ServerRepos { git, origins, repos, specs_url }` — git 어댑터([[SYNC-MS-019]])·서버 저장소 자리 `origins/`·작업 사본 자리 `repos/`·README의 규약 주소. 켤 때 [[SYNC-MS-012#runtime.run]]이 만든다. 트랜잭션은 부르는 쪽이 쥔다([[SYNC-STD-004#DEV-10]]). 돌려주는 행은 `(ProjectRow, RepositoryRow)`다.
 
-**카드 L6 몫은 만들기·지우기(보관)와 조회 셋이다(2026-10-08). 카드 L8이 첨부 파일 경로 하나를, 카드 L10이 git 입구의 원본 경로 하나를, 카드 L11이 전체 목록·동기화 상태·통지·지금 가져오기·재구축 위임과 보관본 되살리기의 재구축 갈래를, 카드 L15가 번들로 가져오기를 더했다(2026-10-11).** 싱크독_로컬은 **서버 저장뿐**이다([[SYNC-PRD-001#R15]] — 파이썬 폐쇄망판의 `storage_modes == ["server"]`). GitHub 갈래(주소·저장소 만들기·통지)는 없고, `storage=github`는 첫 검사에서 `storage-unavailable`이다. 통지는 늘 `none`이다(파이썬 판의 서버 저장 갈래).
+**카드 L6 몫은 만들기·지우기(보관)와 조회 셋이다(2026-10-08). 카드 L8이 첨부 파일 경로 하나를, 카드 L10이 git 입구의 원본 경로 하나를, 카드 L11이 전체 목록·동기화 상태·통지·지금 가져오기·재구축 위임과 보관본 되살리기의 재구축 갈래를, 카드 L15가 번들로 가져오기를, 카드 L16이 켤 때 작업 사본 맞추기를 더했다(2026-10-11).** 싱크독_로컬은 **서버 저장뿐**이다([[SYNC-PRD-001#R15]] — 파이썬 폐쇄망판의 `storage_modes == ["server"]`). GitHub 갈래(주소·저장소 만들기·통지)는 없고, `storage=github`는 첫 검사에서 `storage-unavailable`이다. 통지는 늘 `none`이다(파이썬 판의 서버 저장 갈래).
 
 **보관본 되살리기**(사용자 결정 2026-10-08 — 재구축 갈래는 카드 L11) — 되살린 보관본에 명세가 있으면 파이썬 판처럼 재구축([[SYNC-MS-017#pipeline.rebuild]])으로 DB에 다시 올린다. 서비스가 pipeline을 부르는 자리는 이것과 [[#ProjectService.import_bundle]]·[[#ProjectService.sync_now]]·[[#ProjectService.rebuild_index]] 넷뿐이다(파이썬 판 DOM-002 3.2와 같다).
 
@@ -39,6 +39,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-001, SYNC-MS-019, SYNC-UC-001, SYNC-API-001, SY
 | [[#ProjectService.ensure_hook]] | push 통지를 건다 — 서버 저장은 없다 |
 | [[#ProjectService.sync_now]] | 지금 가져오기 |
 | [[#ProjectService.rebuild_index]] | 재구축 위임 |
+| [[#ProjectService.rehome]] | 서버 저장소·작업 사본 자리를 이 데이터 자리로 |
 
 ---
 
@@ -305,6 +306,31 @@ pub async fn rebuild_index(&mut self, pool: &PgPool, code: &str, user: &UserRow)
 **호출하는 것** [[#ProjectService.get_owned]] · [[SYNC-MS-019#Git.sync_readme]] · [[SYNC-MS-017#pipeline.rebuild]]
 
 **테스트 관점** 앱이 만든 프로젝트 → `readme_updated=false`, 문서 수·버전 수가 저장소와 같다 · README를 밖에서 바꿔 둔 뒤 → `true`, 커밋 하나 · 남의 것 → `not-found`, 아무것도 안 바뀐다
+
+---
+
+#### ProjectService.rehome 서버 저장소·작업 사본 자리를 이 데이터 자리로
+
+**시그니처**
+```rust
+pub async fn rehome(&mut self) -> Result<Vec<String>, Problem>
+```
+
+근거: [[SYNC-INFRA-001]] 9.1(켜기)·9.3(옮기기)·9.6(되살리기) · 카드 L16
+
+**처리** 켤 때마다 [[SYNC-MS-012#runtime.run]]이 부른다
+1. `DB: repositories join projects where storage='server'`를 코드 순으로
+2. 행마다 `origin = origins/{code}.git` · `workdir = repos/{code}`(절대 경로) · if 행의 `remote_url`·`workdir_path`가 다르다 → `DB: repositories update` — 옮긴 자리, 다른 데이터 자리(Docker 묶음 `/var/syncdoc/…`)의 백업을 되살린 것
+3. if `workdir`가 없고 `origin`이 있다 → `git.clone(origin, workdir)` — 되살리기·옮기기는 작업 사본을 복사하지 않는다 · 실패는 로그만(그 프로젝트 하나 때문에 켜기를 멈추지 않는다)
+4. `→` 작업 사본을 다시 만든 코드들
+
+**다른 점** 파이썬 판에 없다 — Docker 묶음은 자리가 고정이고 볼륨이 작업 사본을 들고 있다
+
+**예외** DB 실패 → `Problem`
+
+**호출하는 것** [[SYNC-MS-019#Git.clone]]
+
+**테스트 관점** (시험 DB · 임시 자리 · 진짜 git) 다른 자리를 가리키는 행 → 이 자리로 고쳐진다 · 작업 사본을 지우면 다시 만들어지고 원본 끝과 같다 · 원본이 없는 행은 건너뛴다 · 맞는 행은 아무것도 안 바뀐다
 
 ---
 

@@ -37,6 +37,8 @@ pub struct PgServer {
     pub port: u16,
     pub pgdata: PathBuf,
     pub bin: PathBuf,
+    /// 이번 암호 — 백업의 `pg_dump`·`pg_restore`가 환경 변수로 쓴다(카드 L16)
+    pub password: String,
     stopped: bool,
 }
 
@@ -76,6 +78,7 @@ pub async fn start(pg_dir: &Path, data_dir: &Path) -> Result<PgServer, Problem> 
                     port,
                     pgdata,
                     bin,
+                    password: pw,
                     stopped: false,
                 });
             }
@@ -278,7 +281,7 @@ fn write_private(path: &Path, text: &str) -> Result<(), Problem> {
 }
 
 /// 실행 파일 이름 — 윈도는 `.exe`
-fn exe(bin: &Path, name: &str) -> PathBuf {
+pub(crate) fn exe(bin: &Path, name: &str) -> PathBuf {
     if cfg!(windows) {
         bin.join(format!("{name}.exe"))
     } else {

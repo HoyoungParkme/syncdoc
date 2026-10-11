@@ -323,6 +323,59 @@ pub mod schemas {
         .expect("InitProject 스키마")
     }
 
+    /// 이 PC 설정 저장 — 칸마다 없어도 된다 (SYNC-API-001#PUT/api/local/settings, Rust 판만, 카드 L16)
+    pub fn local_settings() -> Validator {
+        let opt = |max: Option<u64>| {
+            let s = match max {
+                Some(m) => json!({"type": "str", "max_length": m}),
+                None => json!({"type": "str"}),
+            };
+            json!({"type": "model-field", "schema": {"type": "default", "schema": {"type": "nullable", "schema": s}, "default": null}})
+        };
+        Validator::new(
+            &json!({"type": "model", "cls": "LocalSettings", "schema": {"type": "model-fields", "fields": {
+                "name": opt(Some(100)), "llm_api_url": opt(None), "llm_api_key": opt(None),
+                "llm_model": opt(Some(100)), "backup_dir": opt(None), "backup_password": opt(None)},
+                "model_name": "LocalSettings"}, "config": {"title": "LocalSettings"}}),
+            "LocalSettings",
+        )
+        .expect("LocalSettings 스키마")
+    }
+
+    /// 자동 시작 `{on: bool}` (SYNC-API-001#PUT/api/local/autostart)
+    pub fn local_autostart() -> Validator {
+        Validator::new(
+            &json!({"type": "model", "cls": "LocalAutostart", "schema": {"type": "model-fields", "fields": {
+                "on": {"type": "model-field", "schema": {"type": "bool"}}},
+                "model_name": "LocalAutostart"}, "config": {"title": "LocalAutostart"}}),
+            "LocalAutostart",
+        )
+        .expect("LocalAutostart 스키마")
+    }
+
+    /// 되살리기 `{name: str, password: str | None}` (SYNC-API-001#POST/api/local/restore)
+    pub fn local_restore() -> Validator {
+        Validator::new(
+            &json!({"type": "model", "cls": "LocalRestore", "schema": {"type": "model-fields", "fields": {
+                "name": {"type": "model-field", "schema": {"type": "str", "min_length": 1}},
+                "password": {"type": "model-field", "schema": {"type": "default", "schema": {"type": "nullable", "schema": {"type": "str"}}, "default": null}}},
+                "model_name": "LocalRestore"}, "config": {"title": "LocalRestore"}}),
+            "LocalRestore",
+        )
+        .expect("LocalRestore 스키마")
+    }
+
+    /// 옮기기 `{dir: str}` (SYNC-API-001#POST/api/local/move)
+    pub fn local_move() -> Validator {
+        Validator::new(
+            &json!({"type": "model", "cls": "LocalMove", "schema": {"type": "model-fields", "fields": {
+                "dir": {"type": "model-field", "schema": {"type": "str", "min_length": 1}}},
+                "model_name": "LocalMove"}, "config": {"title": "LocalMove"}}),
+            "LocalMove",
+        )
+        .expect("LocalMove 스키마")
+    }
+
     /// 폼 `code: Annotated[str, Form(pattern=r"^[A-Z]{1,4}$")]` (SYNC-API-001#POST/api/projects/bundle, 카드 L15)
     pub fn bundle_code() -> Validator {
         Validator::new(&json!({"type": "str", "pattern": "^[A-Z]{1,4}$"}), "code")

@@ -837,6 +837,42 @@ impl Git {
         Ok(())
     }
 
+    /// SYNC-MS-019#Git.mirror
+    ///
+    /// 백업의 서버 저장소 사진(L16) — 켠 채로 떠도 참조와 객체가 맞게 upload-pack을 거친다(`--no-local`).
+    /// 원격을 지우고 HEAD를 원본대로, 받기 규칙은 init_bare와 같다
+    pub async fn mirror(&self, source: &Path, dest: &Path) -> Result<(), Problem> {
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let head = self
+            .run(Some(source), &[os("symbolic-ref"), os("HEAD")])
+            .await
+            .map(|h| strip(&h).to_string())
+            .unwrap_or_else(|_| "refs/heads/main".to_string());
+        self.run(
+            None,
+            &[
+                os("clone"),
+                os("--mirror"),
+                os("--no-local"),
+                os("-q"),
+                source.as_os_str(),
+                dest.as_os_str(),
+            ],
+        )
+        .await?;
+        let at = Some(dest);
+        self.run(at, &[os("remote"), os("remove"), os("origin")])
+            .await?;
+        self.run(at, &[os("symbolic-ref"), os("HEAD"), os(&head)])
+            .await?;
+        for key in RECEIVE_RULES {
+            self.run(at, &[os("config"), os(key), os("true")]).await?;
+        }
+        Ok(())
+    }
+
     /// SYNC-MS-019#Git.checkout
     pub async fn checkout(&self, workdir: &Path, git_ref: &str) -> Result<(), Problem> {
         self.run(Some(workdir), &[os("checkout"), os("--force"), os(git_ref)])

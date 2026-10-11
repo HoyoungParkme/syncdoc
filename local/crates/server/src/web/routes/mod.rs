@@ -6,6 +6,7 @@ pub mod code;
 pub mod conversations;
 pub mod documents;
 pub mod git;
+pub mod local;
 pub mod projects;
 pub mod references;
 pub mod specs;
