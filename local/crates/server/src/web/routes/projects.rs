@@ -55,20 +55,26 @@ pub async fn init_project(
     body: Bytes,
 ) -> Result<Response, ApiProblem> {
     let body = fastapi::read_body(&headers, &body)?;
-    let mut tx = state.pool.begin().await.map_err(Problem::from)?;
-    let user = current_user(&mut tx, &state).await?;
+    // 트랜잭션 없이 넘긴다 — 만들기의 커밋이 진짜 커밋이라 가져오기의 그래프 만들기가 그 뒤에 걸린다(MS-013 7)
+    let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+    let user = current_user(&mut c, &state).await?;
     let req = fastapi::body_model(&body, &INIT_PROJECT)?;
     let code = text(&req, "code");
     let storage = Storage::parse(&text(&req, "storage")).unwrap_or(Storage::Github);
     let import_existing = matches!(field(&req, "import_existing"), Some(PyValue::Bool(true)));
     ProjectService {
-        db: &mut tx,
+        db: &mut c,
         repos: &state.repos,
     }
-    .init_project(&code, &text(&req, "name"), &user, import_existing, storage)
+    .init_project(
+        &state.pool,
+        &code,
+        &text(&req, "name"),
+        &user,
+        import_existing,
+        storage,
+    )
     .await?;
-    tx.commit().await.map_err(Problem::from)?;
-    let mut c = state.pool.acquire().await.map_err(Problem::from)?;
     let summary = queries::project_summary(&mut c, &state.repos, &user)
         .await?
         .into_iter()

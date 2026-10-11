@@ -72,7 +72,7 @@ async fn init_makes_server_repo_and_skeleton_commit() {
         db: &mut c,
         repos: &p,
     }
-    .init_project("EX", "예시", &u, false, Storage::Server)
+    .init_project(&db.pool, "EX", "예시", &u, false, Storage::Server)
     .await
     .expect("만들기");
     assert_eq!((proj.code.as_str(), proj.owner_user_id), ("EX", u.id));
@@ -108,7 +108,10 @@ async fn rejects_github_bad_code_and_duplicates_without_side_effects() {
         db: &mut c,
         repos: &p,
     };
-    match s.init_project("GH", "x", &u, false, Storage::Github).await {
+    match s
+        .init_project(&db.pool, "GH", "x", &u, false, Storage::Github)
+        .await
+    {
         Err(Problem::StorageUnavailable { storage, enabled }) => {
             assert_eq!(
                 (storage.as_str(), enabled),
@@ -120,15 +123,15 @@ async fn rejects_github_bad_code_and_duplicates_without_side_effects() {
     assert!(!p.origins.join("GH.git").exists());
     for bad in ["ab", "ABCDE", "A1", ""] {
         assert!(matches!(
-            s.init_project(bad, "x", &u, false, Storage::Server).await,
+            s.init_project(&db.pool, bad, "x", &u, false, Storage::Server).await,
             Err(Problem::ProjectCodeInvalid { rule }) if rule == "^[A-Z]{1,4}$"
         ));
     }
-    s.init_project("DUP", "x", &u, false, Storage::Server)
+    s.init_project(&db.pool, "DUP", "x", &u, false, Storage::Server)
         .await
         .expect("처음");
     assert!(matches!(
-        s.init_project("DUP", "x", &u, false, Storage::Server).await,
+        s.init_project(&db.pool, "DUP", "x", &u, false, Storage::Server).await,
         Err(Problem::ProjectCodeConflict { code }) if code == "DUP"
     ));
 }
@@ -145,7 +148,7 @@ async fn delete_archives_then_recreate_asks_and_import_rebuilds() {
         db: &mut c,
         repos: &p,
     };
-    s.init_project("ARC", "보관", &u, false, Storage::Server)
+    s.init_project(&db.pool, "ARC", "보관", &u, false, Storage::Server)
         .await
         .expect("만들기");
     // 밖에서 명세 하나를 민다 — 보관본에 든다
@@ -195,7 +198,7 @@ async fn delete_archives_then_recreate_asks_and_import_rebuilds() {
     assert_eq!(kept.len(), 1);
     // 다시 만들기 → 보관본이 있다고 묻는다(골격뿐이라 명세 0), 아무것도 안 바뀜
     match s
-        .init_project("ARC", "보관", &u, false, Storage::Server)
+        .init_project(&db.pool, "ARC", "보관", &u, false, Storage::Server)
         .await
     {
         Err(Problem::ExistingSpecs {
@@ -210,7 +213,7 @@ async fn delete_archives_then_recreate_asks_and_import_rebuilds() {
     assert_eq!(archives(&p), kept);
     // 명세가 든 보관본을 가져오기 → 재구축(L11). 보관본이 원본으로 되살아나고 골격 커밋 없이 처리 지점이 원본 끝
     let (_, repo) = s
-        .init_project("ARC", "보관", &u, true, Storage::Server)
+        .init_project(&db.pool, "ARC", "보관", &u, true, Storage::Server)
         .await
         .expect("가져오기");
     assert!(archives(&p).is_empty());
@@ -242,7 +245,7 @@ async fn leftover_empty_origin_is_archived_and_import_restores_it() {
         repos: &p,
     };
     assert!(matches!(
-        s.init_project("LEFT", "x", &u, false, Storage::Server)
+        s.init_project(&db.pool, "LEFT", "x", &u, false, Storage::Server)
             .await,
         Err(Problem::ExistingSpecs {
             doc_count: 0,
@@ -251,7 +254,7 @@ async fn leftover_empty_origin_is_archived_and_import_restores_it() {
     ));
     assert_eq!(archives(&p).len(), 1);
     // 커밋 없는 보관본 + 가져오기 → 되살리고 골격 커밋
-    s.init_project("LEFT", "x", &u, true, Storage::Server)
+    s.init_project(&db.pool, "LEFT", "x", &u, true, Storage::Server)
         .await
         .expect("되살리기");
     assert!(archives(&p).is_empty());
@@ -275,7 +278,7 @@ async fn clone_failure_leaves_nothing() {
         db: &mut c,
         repos: &p,
     }
-    .init_project("CL", "x", &u, false, Storage::Server)
+    .init_project(&db.pool, "CL", "x", &u, false, Storage::Server)
     .await;
     assert!(matches!(r, Err(Problem::PushFailed { reason }) if reason.starts_with("clone: ")));
     assert!(!p.origins.join("CL.git").exists());
@@ -298,13 +301,13 @@ async fn delete_removes_rows_of_that_project_only_and_owned_listing() {
         db: &mut c,
         repos: &p,
     };
-    s.init_project("BB", "b", &u, false, Storage::Server)
+    s.init_project(&db.pool, "BB", "b", &u, false, Storage::Server)
         .await
         .expect("b");
-    s.init_project("AA", "a", &u, false, Storage::Server)
+    s.init_project(&db.pool, "AA", "a", &u, false, Storage::Server)
         .await
         .expect("a");
-    s.init_project("OT", "o", &other, false, Storage::Server)
+    s.init_project(&db.pool, "OT", "o", &other, false, Storage::Server)
         .await
         .expect("o");
     let mine: Vec<String> = s
@@ -361,7 +364,7 @@ async fn server_origin_owner_only_and_needs_the_folder() {
         db: &mut c,
         repos: &p,
     };
-    s.init_project("SO", "s", &u, false, Storage::Server)
+    s.init_project(&db.pool, "SO", "s", &u, false, Storage::Server)
         .await
         .expect("만들기");
     let origin = s.server_origin("SO", &u).await.expect("원본");

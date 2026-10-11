@@ -1,11 +1,11 @@
 //! pipeline — 쓰기 조율 (SYNC-MS-017 · SYNC-DOM-004 4.6). 파이썬 판 `core/pipeline.py`와 같은 이름·같은 처리·같은 차례.
 //! 여러 서비스를 한 트랜잭션으로 묶고 git과 DB의 차례를 쥔다 — 검사가 다 끝난 뒤에야 git, git이 끝난 뒤에야 DB.
-//! 카드 L7 몫은 `mcp` 입구다. 웹(L9)·GitHub·밀린 커밋 처리(L11)는 그 카드가 갈래를 더한다.
+//! 카드 L7 몫은 `mcp` 입구다. 웹(L9)·GitHub·밀린 커밋 처리(L11)·코드 그래프 만들기(L12)는 그 카드가 더했다.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use indexmap::IndexMap;
 use regex::{NoExpand, Regex};
@@ -15,6 +15,7 @@ use crate::account::model::UserRow;
 use crate::account::repo as account_repo;
 use crate::account::service::AccountService;
 use crate::clock;
+use crate::codegraph::CodeGraphService;
 use crate::errors::Problem;
 use crate::markdown::parse_frontmatter;
 use crate::project::repo as project_repo;
@@ -222,6 +223,22 @@ pub async fn process_commit(
         // 방금 head까지 처리했으니 뒤처짐은 0이다
         project_repo::set_fetched(&mut tx, repo.id, now).await?;
         tx.commit().await?;
+        // 5a. 코드 그래프 — 코드가 바뀌었거나 아직 없으면 (UC-S8). 명세만 바뀐 커밋은 건너뛴다
+        let paths = if last.as_deref().is_some_and(|l| !l.is_empty()) {
+            repos.git.changed_paths(&workdir, &range).await?
+        } else {
+            Vec::new()
+        };
+        let has_graph = {
+            let mut c = pool.acquire().await?;
+            CodeGraphService { db: &mut c }
+                .get(repo.project_id)
+                .await?
+                .is_some()
+        };
+        if syncdoc_codegraph::touches_code(&paths) || !has_graph {
+            schedule_code_graph(pool, repos, code, head);
+        }
     }
     Ok(results)
 }
@@ -1127,6 +1144,7 @@ pub async fn purge_document(
 /// 어느 단계든 실패하면 되돌리고 `rebuild-failed`
 pub async fn rebuild(
     conn: &mut PgConnection,
+    pool: &PgPool,
     repos: &ServerRepos,
     code: &str,
 ) -> Result<RebuildResult, Problem> {
@@ -1135,8 +1153,10 @@ pub async fn rebuild(
     let mut tx = conn.begin().await?;
     let (project, repo) = ProjectService { db: &mut tx, repos }.get(code).await?;
     match rebuild_in(&mut tx, repos, &project, &repo).await {
-        Ok(result) => {
+        Ok((result, head)) => {
             tx.commit().await?;
+            // 10. 재구축은 늘 다시 만든다 (UC-S8)
+            schedule_code_graph(pool, repos, code, &head);
             Ok(result)
         }
         Err(e) => {
@@ -1149,13 +1169,13 @@ pub async fn rebuild(
     }
 }
 
-/// `rebuild` 2~8 — 트랜잭션 안에서
+/// `rebuild` 2~8 — 트랜잭션 안에서. 읽은 끝(head)도 돌려준다
 async fn rebuild_in(
     tx: &mut PgConnection,
     repos: &ServerRepos,
     project: &crate::project::model::ProjectRow,
     repo: &crate::project::model::RepositoryRow,
-) -> Result<RebuildResult, Problem> {
+) -> Result<(RebuildResult, String), Problem> {
     let workdir = PathBuf::from(&repo.workdir_path);
     let mut result = RebuildResult::default();
     // 2
@@ -1287,26 +1307,13 @@ async fn rebuild_in(
     let now = clock::now();
     project_repo::advance_processed(&mut *tx, repo.id, &head, now).await?;
     project_repo::set_fetched(&mut *tx, repo.id, now).await?;
-    Ok(result)
+    Ok((result, head))
 }
 
 /// 코드 올리기 한도 — 한 번에 UTF-8 합 (사용자 결정 2026-09-30)
 const UPLOAD_BYTES: i64 = 5 * 1024 * 1024;
 /// 파일 + 지운 경로
 const UPLOAD_COUNT: i64 = 500;
-/// 비밀 꼴 — 파이썬 `CodeGraphService.DENY`
-const CODE_DENY: [&str; 6] = [".env*", "*.pem", "*.key", "id_rsa*", "*.p12", "*secret*"];
-
-/// 파이썬 `fnmatch` — `*`·`?`만(위 꼴에 쓰는 것). 대소문자는 부르는 쪽이 낮춘다
-fn fnmatch(name: &[char], pat: &[char]) -> bool {
-    match pat.split_first() {
-        None => name.is_empty(),
-        Some(('*', rest)) => (0..=name.len()).any(|i| fnmatch(&name[i..], rest)),
-        Some(('?', rest)) => !name.is_empty() && fnmatch(&name[1..], rest),
-        Some((c, rest)) => name.first() == Some(c) && fnmatch(&name[1..], rest),
-    }
-}
-
 /// `upload_code` 3 — 올릴 수 없는 경로의 이유. 올려도 되면 없음 (파이썬 `_refusal`, UC-A10 2b)
 fn refusal(path: &str) -> Option<&'static str> {
     if crate::pycompat::chars::strip(path).is_empty() {
@@ -1328,17 +1335,8 @@ fn refusal(path: &str) -> Option<&'static str> {
     if parts.len() >= 2 && parts[0] == "docs" && parts[1] == "specs" {
         return Some("명세 경로 — create_document·update_document로 쓴다");
     }
-    let name: Vec<char> = parts
-        .last()
-        .copied()
-        .unwrap_or("")
-        .to_lowercase()
-        .chars()
-        .collect();
-    if CODE_DENY
-        .iter()
-        .any(|pat| fnmatch(&name, &pat.chars().collect::<Vec<_>>()))
-    {
+    // 비밀 꼴 — 파이썬 `CodeGraphService.DENY`
+    if crate::codegraph::service::secret(parts.last().copied().unwrap_or("")) {
         return Some("비밀 꼴");
     }
     None
@@ -1538,6 +1536,142 @@ pub async fn poll_loop(pool: PgPool, repos: Arc<ServerRepos>, interval: Duration
             Ok(Ok(_)) => {}
             Ok(Err(e)) => tracing::warn!("poll_loop: {e}"),
             Err(e) => tracing::warn!("poll_loop: {e}"),
+        }
+    }
+}
+
+/// 프로젝트마다 그래프 만들기 하나 — 자리가 있으면 돌고 있다, 값은 「다음」 커밋(나중 것이 이긴다).
+/// 열쇠는 작업 사본 자리 — 같은 코드라도 데이터 자리가 다르면(시험) 다른 프로젝트다
+static GRAPH_JOBS: LazyLock<Mutex<HashMap<PathBuf, Option<String>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn graph_jobs() -> std::sync::MutexGuard<'static, HashMap<PathBuf, Option<String>>> {
+    GRAPH_JOBS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// 만들기 작업이 어떻게 끝나든(멈춰도) 자리를 비운다 — 남으면 다음 걸기가 「다음」만 적고 영영 안 돈다
+struct GraphJob(PathBuf);
+
+impl Drop for GraphJob {
+    fn drop(&mut self) {
+        graph_jobs().remove(&self.0);
+    }
+}
+
+/// SYNC-MS-017#pipeline.schedule_code_graph
+///
+/// 저장소 락 밖에서 돈다 — 추출에 수 초가 걸려도 명세 처리와 쓰기를 막지 않는다. 프로젝트마다
+/// 하나씩: 돌고 있으면 「다음」만 적고, 끝난 뒤 가장 최근 커밋으로 한 번 더(UC-S8 2b)
+pub fn schedule_code_graph(pool: &PgPool, repos: &ServerRepos, code: &str, commit: &str) {
+    let key = repos.repos.join(code);
+    {
+        let mut jobs = graph_jobs();
+        if let Some(next) = jobs.get_mut(&key) {
+            *next = Some(commit.to_string());
+            return;
+        }
+        jobs.insert(key.clone(), None);
+    }
+    let (pool, repos, code) = (pool.clone(), repos.clone(), code.to_string());
+    let mut commit = commit.to_string();
+    tokio::spawn(async move {
+        let job = GraphJob(key);
+        loop {
+            build_code_graph(&pool, &repos, &code, &commit).await;
+            let next = graph_jobs().get_mut(&job.0).and_then(Option::take);
+            match next {
+                Some(n) => commit = n,
+                None => break, // 자리는 job이 비운다
+            }
+        }
+    });
+}
+
+/// `build_code_graph` 2~3 — 커밋을 임시 폴더에 풀어 원형을 얻고 줄이고 보강한다. 실패는 이유 문장
+async fn graph_of(
+    repos: &ServerRepos,
+    workdir: &Path,
+    commit: &str,
+) -> Result<(String, syncdoc_codegraph::Graph), String> {
+    let tmp = tempfile::Builder::new()
+        .prefix("syncdoc-graph-")
+        .tempdir()
+        .map_err(|e| e.to_string())?;
+    repos
+        .git
+        .archive(workdir, commit, tmp.path())
+        .await
+        .map_err(|e| e.to_string())?;
+    let src = tmp.path().to_path_buf();
+    // 파일 읽기·파싱은 막히는 일이라 따로 — 커뮤니티는 카드 L13(그 전엔 빈 목록)
+    let built = tokio::task::spawn_blocking(move || {
+        let (source, raw) = syncdoc_codegraph::load(&src)?;
+        let mut graph = syncdoc_codegraph::enrich(&src, syncdoc_codegraph::reduce(&raw));
+        graph.communities = Some(Vec::new());
+        Ok::<_, syncdoc_codegraph::CodeGraphFailed>((source, graph))
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    drop(tmp);
+    built.map_err(|e| e.0)
+}
+
+/// SYNC-MS-017#pipeline.build_code_graph
+///
+/// 그 커밋을 임시 폴더에 풀어(작업 사본을 안 건드린다) 저장소의 graph.json이나 추출로 그래프를 얻고,
+/// 줄이고 보강해 한 행을 바꿔 끼운다. 배치라 실패는 삼키고 행에 남긴다
+pub async fn build_code_graph(pool: &PgPool, repos: &ServerRepos, code: &str, commit: &str) {
+    let found = async {
+        let mut c = pool.acquire().await?;
+        ProjectService { db: &mut c, repos }.get(code).await
+    }
+    .await;
+    let (project, repo) = match found {
+        Ok(x) => x,
+        Err(Problem::NotFound { .. }) => return, // 그새 해제됐다
+        Err(e) => {
+            tracing::warn!("code graph code={code} 프로젝트를 못 읽었다: {e}");
+            return;
+        }
+    };
+    let t0 = Instant::now();
+    let short: String = commit.chars().take(7).collect();
+    let saved = match graph_of(repos, Path::new(&repo.workdir_path), commit).await {
+        Ok((source, graph)) => {
+            let save = async {
+                let mut tx = pool.begin().await?;
+                CodeGraphService { db: &mut tx }
+                    .save(project.id, commit, &source, &graph)
+                    .await?;
+                tx.commit().await?;
+                Ok::<_, Problem>(())
+            }
+            .await;
+            save.map(|()| (source, graph)).map_err(|e| e.to_string())
+        }
+        Err(reason) => Err(reason),
+    };
+    match saved {
+        Ok((source, graph)) => tracing::info!(
+            "code graph code={code} commit={short} source={source} functions={} calls={} elapsed={:.1}s",
+            graph.functions.len(),
+            graph.calls.len(),
+            t0.elapsed().as_secs_f64()
+        ),
+        Err(reason) => {
+            // 배치다. 옛 그래프를 두고 이유만 남긴다 (UC-S8 2a) — 그새 프로젝트가 사라졌으면 남길 곳도 없다
+            let _ = async {
+                let mut tx = pool.begin().await?;
+                CodeGraphService { db: &mut tx }
+                    .fail(project.id, commit, &reason)
+                    .await?;
+                tx.commit().await?;
+                Ok::<_, Problem>(())
+            }
+            .await;
+            tracing::warn!("code graph code={code} commit={short} 실패: {reason}");
         }
     }
 }

@@ -176,6 +176,7 @@ impl ProjectService<'_> {
     /// SYNC-MS-013#ProjectService.init_project
     pub async fn init_project(
         &mut self,
+        pool: &PgPool,
         code: &str,
         name: &str,
         user: &UserRow,
@@ -252,13 +253,18 @@ impl ProjectService<'_> {
         if has {
             // 3a2·3b2 — 되살린 보관본의 명세를 재구축으로 가져온다. 같은 저장점이라 막 넣은 행을 본다.
             // 서비스가 pipeline을 부르는 자리(파이썬 판 DOM-002 3.2와 같다)
-            if let Err(p) = crate::pipeline::rebuild(&mut tx, self.repos, code).await {
+            if let Err(p) = crate::pipeline::rebuild(&mut tx, pool, self.repos, code).await {
                 drop(tx);
                 undo_origin();
                 return Err(p);
             }
             tx.commit().await?;
-            return self.get(code).await;
+            let found = self.get(code).await?;
+            // 재구축이 건 그래프 만들기는 아직 커밋되지 않은 프로젝트를 못 볼 수 있다 — 커밋 뒤 한 번 더 (L12)
+            if let Some(head) = found.1.last_processed_commit.as_deref() {
+                crate::pipeline::schedule_code_graph(pool, self.repos, code, head);
+            }
+            return Ok(found);
         }
         let files = Git::init_specs(&self.repos.specs_url);
         let message = format!("chore({code}): init syncdoc");
@@ -400,6 +406,7 @@ impl ProjectService<'_> {
     /// 들어가 밀림 0으로 끝난다. 밀기가 실패하면 인덱스는 건드리지 않는다(UC-S6 1a)
     pub async fn rebuild_index(
         &mut self,
+        pool: &PgPool,
         code: &str,
         user: &UserRow,
     ) -> Result<RebuildResult, Problem> {
@@ -414,7 +421,7 @@ impl ProjectService<'_> {
                 &self.repos.specs_url,
             )
             .await?;
-        let mut result = crate::pipeline::rebuild(&mut *self.db, self.repos, code).await?;
+        let mut result = crate::pipeline::rebuild(&mut *self.db, pool, self.repos, code).await?;
         result.readme_updated = hash.is_some();
         Ok(result)
     }
