@@ -303,6 +303,11 @@ pub mod schemas {
         .expect("MoveToGithub 스키마")
     }
 
+    /// 질의 `file: str = Query(min_length=1)` (GET /api/projects/{code}/code/source)
+    pub fn code_file() -> Validator {
+        Validator::new(&json!({"type": "str", "min_length": 1}), "str").expect("file 스키마")
+    }
+
     /// 질의 `confirm: bool = Query(False)` (DELETE /api/docs/{docId})
     pub fn flag() -> Validator {
         Validator::new(&json!({"type": "bool"}), "bool").expect("bool 스키마")

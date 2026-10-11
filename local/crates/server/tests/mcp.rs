@@ -174,7 +174,7 @@ async fn mcp_refuses_missing_and_revoked_tokens_alike() {
 }
 
 #[tokio::test]
-async fn tools_not_built_yet_name_their_card() {
+async fn last_tool_get_code_graph_answers() {
     let db = support::test_db().await;
     let app = router(db.pool.clone());
     let t = issue(&app, "x").await;
@@ -187,7 +187,9 @@ async fn tools_not_built_yet_name_their_card() {
         r#"{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"get_code_graph","arguments":{"doc_id":"SYNC-PRD-001"}}}"#,
     )
     .await;
+    // 카드 L12로 도구가 다 열렸다 — not-implemented 대신 그 도구의 답(남의·없는 프로젝트면 not-found)
     assert_eq!(s, StatusCode::OK);
-    assert!(body.contains(r#"\"card\": \"L12\""#), "{body}");
+    assert!(body.contains("urn:syncdoc:not-found"), "{body}");
+    assert!(!body.contains("not-implemented"), "{body}");
     assert!(body.contains(r#""isError":true"#), "{body}");
 }

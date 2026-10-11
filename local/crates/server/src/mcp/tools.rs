@@ -2,6 +2,7 @@
 //! 인자 검증은 파이썬과 같은 문장을 낸다. 검증을 지난 도구는 그 카드가 처리기를 둔다 — 아직이면 `not-implemented`
 //! (SYNC-CODE-002 L3 표, 사용자 결정 2026-10-08). 카드 L6이 `init_project`·`get_template`를, 카드 L7이
 //! 읽기 넷(`list_documents`·`get_document`·`get_item`·`get_references`)과 쓰기 둘(`create_document`·`update_document`)을 열었다.
+//! 카드 L9가 휴지통·되살리기·상태 셋을, L11이 `upload_code`를, L12가 `get_code_graph`를 열었다.
 
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -20,8 +21,8 @@ use syncdoc_core::pycompat::re::compile;
 use syncdoc_core::queries;
 use syncdoc_core::spec::{SUBTYPES, TYPES};
 use syncdoc_core::types::{
-    Author, AuthorKind, DocStatus, DocumentSummary, Entry, ItemRef, ProjectSummary, STAGES,
-    SaveResult, Storage, py_isoformat,
+    Author, AuthorKind, CodeRef, CodeView, DocStatus, DocumentSummary, Entry, ItemRef,
+    ProjectSummary, STAGES, SaveResult, Storage, py_isoformat,
 };
 
 use crate::compat::pydantic::{Failure, Opts};
@@ -91,6 +92,7 @@ pub async fn call(
         "restore_document" => restore_document(state, user, &typed).await,
         "change_status" => change_status(state, user, &typed).await,
         "upload_code" => upload_code(state, user, &typed).await,
+        "get_code_graph" => get_code_graph(state, user, &typed).await,
         _ => Err(Problem::NotImplemented {
             card: tool.card.to_string(),
         }),
@@ -162,12 +164,14 @@ async fn upload_code(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Va
 async fn init_project(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
     let code = arg_str(a, "code");
     let storage = Storage::parse(&arg_str(a, "storage")).unwrap_or(Storage::Github);
-    let mut tx = state.pool.begin().await?;
+    // 트랜잭션 없이 넘긴다 — 만들기의 커밋이 진짜 커밋이라 가져오기의 그래프 만들기가 그 뒤에 걸린다(MS-013 7)
+    let mut c = state.pool.acquire().await?;
     ProjectService {
-        db: &mut tx,
+        db: &mut c,
         repos: &state.repos,
     }
     .init_project(
+        &state.pool,
         &code,
         &arg_str(a, "name"),
         user,
@@ -175,8 +179,6 @@ async fn init_project(state: &AppState, user: &UserRow, a: &PyValue) -> Result<V
         storage,
     )
     .await?;
-    tx.commit().await?;
-    let mut c = state.pool.acquire().await?;
     let all = queries::project_summary(&mut c, &state.repos, user).await?;
     let summary = all
         .into_iter()
@@ -321,6 +323,61 @@ async fn get_references(state: &AppState, user: &UserRow, a: &PyValue) -> Result
         "upstream": refs(&r.upstream),
         "downstream": refs(&r.downstream),
     }))
+}
+
+/// SYNC-API-002#get_code_graph
+///
+/// 빈 `item_id`는 문서 단위(파이썬 `if item_id`) · `~`는 `/`
+async fn get_code_graph(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let mut c = state.pool.acquire().await?;
+    let item = arg_opt_str(a, "item_id")
+        .filter(|i| !i.is_empty())
+        .map(|i| i.replace('~', "/"));
+    let v = queries::code_view(
+        &mut c,
+        &state.repos,
+        &arg_str(a, "doc_id"),
+        item.as_deref(),
+        user,
+    )
+    .await?;
+    Ok(code_view_json(&v))
+}
+
+/// 파이썬 `_plain(CodeView)` — 데이터클래스 필드 차례, 시각은 `isoformat()`(`+00:00`)
+fn code_view_json(v: &CodeView) -> Value {
+    let code_ref = |r: &CodeRef| json!({"ms_id": r.ms_id, "qual": r.qual, "file": r.file, "line": r.line, "status": r.status});
+    json!({
+        "graph": v.graph.as_ref().map(|g| json!({
+            "commit_hash": g.commit_hash,
+            "source": g.source,
+            "built_at": py_isoformat(g.built_at),
+            "error": g.error,
+            "function_count": g.function_count,
+        })),
+        "doc_id": v.doc_id,
+        "item_id": v.item_id,
+        "is_ms": v.is_ms,
+        "missing": v.missing,
+        "function": v.function.as_ref().map(|f| json!({
+            "ms_id": f.ms_id,
+            "qual": f.qual,
+            "file": f.file,
+            "line": f.line,
+            "end": f.end,
+            "calls": f.calls.iter().map(code_ref).collect::<Vec<_>>(),
+            "callers": f.callers.iter().map(code_ref).collect::<Vec<_>>(),
+        })),
+        "functions": v.functions.iter().map(|b| json!({
+            "ms_id": b.ms_id,
+            "qual": b.qual,
+            "file": b.file,
+            "line": b.line,
+            "same": b.same,
+            "code_only": b.code_only,
+            "spec_only": b.spec_only,
+        })).collect::<Vec<_>>(),
+    })
 }
 
 /// 토큰으로 들어온 요청은 발급자 계정 — `agent`·발급자·발급자·`mcp` (SEQ-C2, 파이썬 `_agent_author`)
