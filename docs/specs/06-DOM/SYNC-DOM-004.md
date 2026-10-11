@@ -657,7 +657,7 @@ classDiagram
 | [[SYNC-MS-019#Git.commit_push]] · [[SYNC-MS-019#Git.fetch]] · [[SYNC-MS-019#Git.rev_list_count]] | 저장 파이프라인 | [[SYNC-MS-009]] | `push-failed` · `internal` |
 | [[SYNC-MS-019#Git.advertise_refs]] · [[SYNC-MS-019#Git.service_rpc]] | git 입구(`/git/*`, L10) | [[SYNC-MS-009#git.http_backend]] | `internal` |
 
-규칙 — git CLI를 자식 프로세스로 부른다(윈도 MinGit · 리눅스 시스템 git). **사용자 git 설정을 막는다**(사용자 결정 2026-10-08) — 시스템·전역 설정 끔, 프롬프트·서명·autocrlf 끔, `LC_ALL=C`, `safe.directory=*`. 파이썬 판이 Docker 안에서 받는 깨끗한 환경과 같게 해 같은 명령이 같은 결과를 낸다. git 입구(upload-pack·receive-pack)는 L10이 더했다 — http-backend 없이 `--stateless-rpc`를 직접 부르고 http-backend의 머리를 그대로 낸다.
+규칙 — git CLI를 자식 프로세스로 부른다(윈도 MinGit · 리눅스 시스템 git). **사용자 git 설정을 막는다**(사용자 결정 2026-10-08) — 시스템·전역 설정 끔, 프롬프트·서명·autocrlf 끔, `LC_ALL=C`, `safe.directory=*`. 파이썬 판이 Docker 안에서 받는 깨끗한 환경과 같게 해 같은 명령이 같은 결과를 낸다. git 입구(upload-pack·receive-pack)는 L10이 더했다 — http-backend 없이 `--stateless-rpc`를 직접 부르고 http-backend의 머리를 그대로 낸다. 파이썬 판이 CGI로 넘기는 것과 같게: 요청 머리(`Authorization`·`Content-Type`·`Content-Encoding`·`Git-Protocol`)는 latin-1로 읽고 · gzip 본문이 깨졌으면 서비스를 부르지 않고 빈 결과(http-backend는 죽고 자식도 끝난다) · 인증·원본을 지난 receive-pack 요청 뒤에는 응답이 무엇이든 밀린 커밋을 읽는다(파이썬 판 `BackgroundTask` 자리).
 
 ---
 
