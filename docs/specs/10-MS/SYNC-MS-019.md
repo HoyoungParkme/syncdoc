@@ -208,11 +208,11 @@ pub async fn advertise_refs(&self, origin: &Path, service: &str, protocol: Optio
 
 근거: [[SYNC-MS-009#git.http_backend]] · git `http-backend.c` `get_info_refs` · [[SYNC-INFRA-001]] 9.1
 
-**처리** http-backend의 `info/refs?service=` 그대로 — `service`는 `git-upload-pack`·`git-receive-pack`(부르는 쪽이 거른다) · `protocol`(요청 `Git-Protocol`)이 `version=2`를 담지 않으면 앞에 pkt-line `# service={service}\n`과 flush(`0000`) · 이어서 `git: {upload-pack|receive-pack} --stateless-rpc --advertise-refs {origin}`의 출력(`GIT_PROTOCOL={protocol}`을 넘겨)
+**처리** http-backend의 `info/refs?service=` 그대로 — `service`는 `git-upload-pack`·`git-receive-pack`(부르는 쪽이 거른다) · `protocol`(요청 `Git-Protocol`)을 `:`로 나눈 `version=` 값(`0`·`1`·`2`만 센다) 가운데 가장 큰 것이 2가 아니면 — git `determine_protocol_version_server` — 앞에 pkt-line `# service={service}\n`과 flush(`0000`) · 이어서 `git: {upload-pack|receive-pack} --stateless-rpc --advertise-refs {origin}`의 출력(`GIT_PROTOCOL={protocol}`을 넘겨)
 
 **다른 점** http-backend를 쓰지 않는다(INFRA 9.1 — MinGit에 의존을 줄인다). 머리는 부르는 쪽(입구)이 http-backend와 같이 붙인다 · 광고의 능력 목록·`agent=`는 git 판마다 다르다 — 두 판 바이트 비교 밖
 
-**테스트 관점** 빈 저장소 → 서비스 줄 + 빈 광고 · 커밋 뒤 → `refs/heads/main`이 있다 · v2 요청 → 서비스 줄 없이 v2 광고
+**테스트 관점** 빈 저장소 → 서비스 줄 + 빈 광고 · 커밋 뒤 → `refs/heads/main`이 있다 · v2 요청 → 서비스 줄 없이 v2 광고 · `version=20`·`xversion=2`는 v2가 아니다 · `version=1:version=2`는 v2
 
 ---
 
