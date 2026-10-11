@@ -36,8 +36,7 @@ pub async fn get_document(
 
 /// SYNC-API-001#GET/api/docs/{docId}/diff
 ///
-/// 질의 `from`·`to` — 1 이상 정수, 둘 다 필수. 판은 int4라 그 밖의 수는 어느 판도 아니다 —
-/// 파이썬과 같은 차례(소유 → 문서 → 첫 없는 판)로 같은 `not-found`를 낸다
+/// 질의 `from`·`to` — 1 이상 정수, 둘 다 필수. 판은 int4 — 그 밖의 수는 파이썬 판처럼 소유·문서를 본 뒤 500
 pub async fn diff(
     State(state): State<AppState>,
     Path(doc_id): Path<String>,
@@ -60,26 +59,17 @@ pub async fn diff(
             let d = queries::diff_with_impact(&mut c, &state.repos, &doc_id, f, t, &user).await?;
             Ok(Json(Diff::from(&d)))
         }
-        (f, _) => {
+        _ => {
+            // 파이썬 판은 int4 밖의 수를 판 조회에 묶다가 DB가 거절해 500이다 — 소유·문서는 그 앞에서 본다
             ProjectService {
                 db: &mut c,
                 repos: &state.repos,
             }
             .get_owned(doc_id.split('-').next().unwrap_or(""), &user)
             .await?;
-            let mut spec = SpecService { db: &mut c };
-            spec.get_document(&doc_id).await?;
-            let missing = match f {
-                // 앞 판이 int4 안이면 그것부터 본다 — 있으면 뒤 판(큰 수)이 없는 것
-                Ok(f) => {
-                    spec.diff(&doc_id, f, f, 0).await?;
-                    to
-                }
-                Err(_) => from,
-            };
-            Err(ApiProblem(Problem::NotFound {
-                resource: "version".into(),
-                id: serde_json::Value::from(format!("{doc_id} v{missing}")),
+            SpecService { db: &mut c }.get_document(&doc_id).await?;
+            Err(ApiProblem(Problem::Internal {
+                log: format!("판 번호가 int4 밖이다 — {from}, {to}"),
             }))
         }
     }
