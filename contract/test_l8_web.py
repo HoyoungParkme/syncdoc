@@ -32,6 +32,19 @@ def masked(reply) -> dict:
     return c
 
 
+def chain_sorted(c: dict) -> dict:
+    """체인 행 안의 차례는 파이썬 `set` 순회 차례 — 항목 pk 값에 매여 앞선 시험의 이력(판마다 다르다)에 따라 바뀐다.
+    계약은 행 안을 정렬해 보고, 차례 자체는 core 단위 시험(`pycompat::pyset`, 파이썬에서 뜬 정답)이 본다"""
+    if c["status"] != 200:
+        return c
+    data = json.loads(c["body"])
+    for row in data["rows"]:
+        row["items"].sort(
+            key=lambda i: (i["ref"]["doc_id"] or "", i["ref"]["item_id"] or "", i["role"])
+        )
+    return {**c, "body": json.dumps(data, ensure_ascii=False, separators=(",", ":"))}
+
+
 def mcp(server, name: str, args: dict):
     body = json.dumps(
         {
@@ -175,7 +188,10 @@ CASES = [
 def test_web_reads(server, seeded, case):
     seeded(server)
     name, path = case
-    check("web_closed", name, masked(request(server.port, "GET", path)), server.target)
+    got = masked(request(server.port, "GET", path))
+    if name.startswith("chain_"):
+        got = chain_sorted(got)
+    check("web_closed", name, got, server.target)
 
 
 def test_approved_scope_after_approval_reads_only_approved(server, seeded):
