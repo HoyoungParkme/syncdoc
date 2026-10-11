@@ -1,6 +1,6 @@
 //! 코드 그래프 — 파이썬 판 `web/routers/code.py`(카드 L12): 코드 탭·코드 보기·관계도 코드 호출·코드 그래프의 코드.
 //! 대조는 부를 때 계산한다 — 그래프는 code_graphs에서, 「호출하는 것」은 명세에서. itemId의 `~`는 `/`.
-//! 카드 L13이 노드 전부(`code-graph`)를 더했다. 묻기(`code/ask`)는 L14가 더한다
+//! 카드 L13이 노드 전부(`code-graph`)를, 카드 L14가 묻기(`code/ask`, SSE)를 더했다
 
 use std::sync::LazyLock;
 
@@ -20,6 +20,7 @@ use crate::web::schemas::{CodeCalls, CodeNodes, CodeText, CodeView};
 
 static CODE_FILE: LazyLock<Validator> = LazyLock::new(schemas::code_file);
 static LINE: LazyLock<Validator> = LazyLock::new(schemas::version_no);
+static ASK_CODE: LazyLock<Validator> = LazyLock::new(schemas::ask_code_request);
 
 /// SYNC-API-001#GET/api/docs/{docId}/code
 pub async fn doc_code(
@@ -123,4 +124,35 @@ pub async fn code_text(
         }
         Err(p) => Err(ApiProblem(p)),
     }
+}
+
+/// SYNC-API-001#POST/api/projects/{code}/code/ask
+///
+/// 코드 그래프에서 묻는다(UI-17 질문 탭) — 고른 함수(key)가 시작 맥락, 없으면 그래프 전체. 스트림은 문서에 묻기와 같다
+pub async fn ask_code(
+    State(state): State<AppState>,
+    Path(code): Path<String>,
+    headers: axum::http::HeaderMap,
+    body: axum::body::Bytes,
+) -> Result<axum::response::Response, ApiProblem> {
+    let body = fastapi::read_body(&headers, &body)?;
+    let user = {
+        let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+        current_user(&mut c, &state).await?
+    };
+    let req = fastapi::body_model(&body, &ASK_CODE)?;
+    let b = crate::web::sse::ask_body(&req, "key");
+    let rx = queries::ask_code(
+        &state.pool,
+        &state.repos,
+        &state.llm,
+        &code,
+        b.hint.as_deref(),
+        b.conversation_id,
+        &b.question,
+        &b.attachment_ids,
+        &user,
+    )
+    .await?;
+    Ok(crate::web::sse::stream(rx))
 }

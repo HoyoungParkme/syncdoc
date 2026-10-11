@@ -46,6 +46,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-011, SYNC-INFRA-001, SYNC-STD-004]
 | [[#CodeGraphService.save]] | 새 그래프로 바꿔 끼운다 |
 | [[#CodeGraphService.fail]] | 실패 이유만 남긴다 — 옛 그래프는 그대로 |
 | [[#CodeGraphService.read]] | 그래프 커밋의 파일을 줄 범위로 — 비밀 꼴 거부, 300줄 |
+| [[#CodeGraphService.delete_by_project]] | 프로젝트 해제와 함께 |
 
 ---
 
@@ -313,6 +314,21 @@ pub async fn read(&mut self, git: &Git, project_id: i32, workdir: &Path, path: &
 **호출하는 것** [[#CodeGraphService.get]] · [[SYNC-MS-019#Git.read]]
 
 **테스트 관점** 그래프 커밋의 내용이다(뒤에 바뀐 것이 아니다) · 300줄에서 자르고 `truncated` · `.env`·`id_rsa`·`secrets.yaml`·`../x`·절대 경로 → `not-found` · 그래프 없음 → `not-found`
+
+---
+
+#### CodeGraphService.delete_by_project 프로젝트 해제와 함께
+
+**시그니처**
+```rust
+pub async fn delete_by_project(&mut self, project_id: i32) -> Result<(), Problem>
+```
+
+근거: [[SYNC-MS-011#CodeGraphService.delete_by_project]] · [[SYNC-MS-013#ProjectService.delete_project]] 2
+
+**처리** `DB: delete code_graphs where project_id` — 소유 판정은 부르는 쪽이 했다(카드 L14가 더했다 — 그 전에는 프로젝트 해제가 바로 지웠다)
+
+**테스트 관점** 그 프로젝트의 행만
 
 ---
 

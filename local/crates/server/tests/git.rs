@@ -66,6 +66,7 @@ async fn real_git_clones_and_pushes_through_the_entrance() {
         local_login: "local".into(),
         local_name: "로컬".into(),
         llm_enabled: false,
+        llm: Default::default(),
         repos: std::sync::Arc::new(repos),
         public_netloc: format!("127.0.0.1:{port}"),
     };

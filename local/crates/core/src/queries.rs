@@ -1,6 +1,11 @@
 //! queries — 읽기 조합 (SYNC-MS-018 · SYNC-DOM-004 4.7). 파이썬 판 `core/queries.py`와 같은 이름·같은 처리.
 //! 여러 묶음의 서비스를 불러 응답 하나로 엮는다 — 쓰지 않는다. 프로젝트 요약(L6)·MCP 읽기 도구의 넷(L7)·웹 읽기(L8)·코드(L12).
 
+mod ask;
+mod ask_text;
+
+pub use ask::{ask_code, ask_item, ask_tool, conversation_view};
+
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 use std::sync::LazyLock;

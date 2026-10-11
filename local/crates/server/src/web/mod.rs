@@ -5,4 +5,5 @@ pub mod guard;
 pub mod problem;
 pub mod routes;
 pub mod schemas;
+pub mod sse;
 pub mod static_files;

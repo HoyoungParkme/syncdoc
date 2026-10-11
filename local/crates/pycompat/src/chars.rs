@@ -28,6 +28,15 @@ pub fn is_decimal(c: char) -> bool {
     within(&DECIMAL, u32::from(c))
 }
 
+/// 파이썬 `unicodedata.decimal(c)` — 십진 숫자의 값. 십진 숫자는 0부터 10개씩 이어져 있다(유니코드 안정성)
+pub fn decimal_value(c: char) -> Option<u32> {
+    let cp = u32::from(c);
+    DECIMAL
+        .iter()
+        .find(|&&(lo, hi)| lo <= cp && cp <= hi)
+        .map(|&(lo, _)| (cp - lo) % 10)
+}
+
 /// 파이썬 `c.isdigit()` — `\d`(`isdecimal`)보다 넓다
 pub fn is_digit(c: char) -> bool {
     within(&DIGIT, u32::from(c))

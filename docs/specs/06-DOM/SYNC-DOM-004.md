@@ -84,8 +84,9 @@ crates/server/src/
 │   ├── problem.rs              problem+json 응답 · 405 · 패닉
 │   ├── static_files.rs         화면 빌드(rust-embed) · 캐시 규칙 · 304 (INFRA 4.1)
 │   ├── schemas.rs              응답 형태 (API-001 4장)
+│   ├── sse.rs                  질문 스트림 — 이벤트를 `event:`·`data:` 프레임으로, 실패는 `error` (API-001 3.4, L14)
 │   └── routes/                 API-001 경로 — account(/api/me · /api/me/tokens) · specs(/specs) · projects(/api/projects 목록·만들기·지우기, L6 ·
-│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8 · 상태·되돌리기·휴지통·되살리기·완전 삭제, L9) · references(항목·참조·체인, L8) · git(/git 스마트 HTTP 입구 — 경로를 starlette 정규식처럼 가른다, L10) · admin(/api/admin/repos 동기화 상태·재구축·통지·지금 가져오기·옮기기, L11) · code(코드 탭·코드 보기·관계도 코드 호출·코드 그래프의 코드, L12 · 코드 그래프 노드, L13)
+│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8 · 상태·되돌리기·휴지통·되살리기·완전 삭제, L9) · references(항목·참조·체인, L8) · git(/git 스마트 HTTP 입구 — 경로를 starlette 정규식처럼 가른다, L10) · admin(/api/admin/repos 동기화 상태·재구축·통지·지금 가져오기·옮기기, L11) · code(코드 탭·코드 보기·관계도 코드 호출·코드 그래프의 코드, L12 · 코드 그래프 노드, L13 · 코드에 묻기, L14) · conversations(대화·첨부, L14) · 문서에 묻기(documents, L14)
 ├── mcp/                        /mcp — 파이썬 mcp SDK의 핸드셰이크 경로를 옮긴 것 (API-002 1장, 카드 L3)
 │   ├── auth.rs                 Bearer → AccountService.authenticate_token, 통과하면 응답 전에 커밋 (SEQ-C2)
 │   ├── transport.rs            streamable HTTP, 세션 없음 — Accept·Content-Type·본문 읽기·SSE 쓰기
@@ -131,7 +132,7 @@ crates/core/
     ├── migrate.rs                  이전 SQL을 올린다 (4.1) — 모든 crate의 시험도 이것으로 DB를 만든다
     ├── pipeline.rs                 쓰기 조율 — 프로젝트마다 읽기·쓰기 락, 순서는 파이썬과 같다 (L7 — 저장은 따로 띄운 작업에서)
     ├── queries.rs                  읽기 조합
-    └── infra/                      바깥 — git 자식 프로세스(`git.rs`, L6 — 사용자 git 설정을 막는다) · upload-pack·receive-pack · 모델 호출
+    └── infra/                      바깥 — git 자식 프로세스(`git.rs`, L6 — 사용자 git 설정을 막는다) · upload-pack·receive-pack · 모델 호출(`llm.rs`, L14)
 ```
 ```
 crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 (MS-022, L12)
@@ -145,7 +146,7 @@ crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 
 └── rust.rs                     tree-sitter-rust — 맨 위 fn·impl 메서드·`///`·use·호출
 ```
 
-지금(카드 L12) 있는 것은 `account`·`spec`·`project`·`reference`(뽑기·끊기·잇기·조회·관계도·미존재)·`codegraph`(그래프 행·코드 읽기)·`markdown.rs`·`pycompat/`·`pipeline.rs`(저장·커밋 처리·재구축·따라잡기·그래프 만들기)·`queries.rs`(프로젝트 요약·상세·문서 목록·문서·항목·참조·체인·관계도·diff 영향·추적표·문제 목록·코드·코드 그래프 노드)·`infra/git.rs`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. `spec/`의 정답 파일은 `crates/core/tests/golden/spec.json`(생성물, `cargo xtask spec-golden`)이다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
+지금(카드 L12) 있는 것은 `account`·`spec`·`project`·`reference`(뽑기·끊기·잇기·조회·관계도·미존재)·`codegraph`(그래프 행·코드 읽기)·`conversation`(대화·턴·첨부)·`markdown.rs`·`pycompat/`·`pipeline.rs`(저장·커밋 처리·재구축·따라잡기·그래프 만들기)·`queries.rs`(프로젝트 요약·상세·문서 목록·문서·항목·참조·체인·관계도·diff 영향·추적표·문제 목록·코드·코드 그래프 노드·묻기·대화)·`infra/git.rs`·`infra/llm.rs`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. `spec/`의 정답 파일은 `crates/core/tests/golden/spec.json`(생성물, `cargo xtask spec-golden`)이다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
 
 **층** — 함수 단위 명세(MINISPEC 카드·API 엔드포인트·UI 화면)가 없는 코드가 어느 층이고 그 층을 무슨 문서가 정하는지([[SYNC-STD-001]] 2.6). 코드 그래프가 읽는다. 위에서부터 첫 줄이 이긴다. **줄은 카드마다 더한다** — 코드가 없는 줄은 검사기(`check_calls`)가 「안 맞는 줄」로 잡는다. 함수가 없는 파일(구조체만 — `state.rs`·`model.rs`)은 적지 않는다.
 
@@ -160,6 +161,7 @@ crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 
 | `local/crates/server/src/web/static_files.rs` | 정적 파일 | [[SYNC-INFRA-001]] 4.1 |
 | `local/crates/core/src/types.rs` | 열거형·DTO | [[SYNC-DOM-002]] 2.7·2.8 |
 | `local/crates/server/src/web/schemas.rs` | 응답 형태 | [[SYNC-API-001]] 4장 |
+| `local/crates/server/src/web/sse.rs` | 질문 스트림 포장 | [[SYNC-API-001]] 3.4·3.6 |
 | `local/crates/core/src/clock.rs` | 시각 | [[SYNC-STD-004#DEV-18]] |
 | `local/crates/core/src/*/repo.rs` | 리포지토리 | [[SYNC-DOM-004]] 4장 · [[SYNC-DOM-003]] |
 | `local/crates/*/build.rs` | 빌드 설정 | [[SYNC-STD-004#DEV-7]] · [[SYNC-INFRA-001]] 9.2 |
@@ -665,9 +667,12 @@ classDiagram
 | [[SYNC-MS-018#queries.code_view]] | `GET /api/docs/{docId}/code` · `…/items/{itemId}/code` · MCP `get_code_graph`(L12) | [[SYNC-MS-008#queries.code_view]] | `not-found` · `item-deleted` |
 | [[SYNC-MS-018#queries.code_calls]] | `GET /api/projects/{code}/code-calls`(L12) | [[SYNC-MS-008#queries.code_calls]] | `not-found` |
 | [[SYNC-MS-018#queries.code_nodes]] | `GET /api/projects/{code}/code-graph`(L13) | [[SYNC-MS-008#queries.code_nodes]] | `not-found` |
+| [[SYNC-MS-018#queries.ask_item]] · [[SYNC-MS-018#queries.ask_code]] | `POST /api/docs/{docId}/ask` · `POST /api/projects/{code}/code/ask`(SSE, L14) | [[SYNC-MS-008#queries.ask_item]] | `llm-not-configured` · `not-found` · 시작 뒤는 `error` 이벤트(`llm-unavailable`·`not-found`) |
+| [[SYNC-MS-018#queries.ask_tool]] | 질문 루프(L14) | [[SYNC-MS-008#queries.ask_tool]] | `not-found`(남의 프로젝트) |
+| [[SYNC-MS-018#queries.conversation_view]] | `GET /api/conversations/{id}`(L14) | [[SYNC-MS-008#queries.conversation_view]] | `not-found` |
 | [[SYNC-MS-018#queries.code_source]] · [[SYNC-MS-018#queries.code_text]] | `GET …/items/{itemId}/code/source` · `GET /api/projects/{code}/code/source`(L12) | [[SYNC-MS-008#queries.code_source]] | `not-found`(code_graph·function·file) |
 
-모듈 함수다 — 연결을 첫 인자로 받는다. 나머지 조회(묻기 L14)는 그 카드가 더한다.
+모듈 함수다 — 연결을 첫 인자로 받는다. 묻기는 L14가 더했다 — 루프는 따로 띄운 작업이 돌고 이벤트를 통로로 넘긴다.
 
 ### 4.8 git (MS-019)
 
@@ -708,6 +713,73 @@ classDiagram
 | [[SYNC-MS-019#Git.changed_paths]] · [[SYNC-MS-019#Git.archive]] | 커밋 처리 5a · 그래프 만들기(L12) | [[SYNC-MS-009#git.archive]] | `internal` |
 
 규칙 — git CLI를 자식 프로세스로 부른다(윈도 MinGit · 리눅스 시스템 git). **사용자 git 설정을 막는다**(사용자 결정 2026-10-08) — 시스템·전역 설정 끔, 프롬프트·서명·autocrlf 끔, `LC_ALL=C`, `safe.directory=*`. 파이썬 판이 Docker 안에서 받는 깨끗한 환경과 같게 해 같은 명령이 같은 결과를 낸다. git 입구(upload-pack·receive-pack)는 L10이 더했다 — http-backend 없이 `--stateless-rpc`를 직접 부르고 http-backend의 머리를 그대로 낸다. 파이썬 판이 CGI로 넘기는 것과 같게: 요청 머리(`Authorization`·`Content-Type`·`Content-Encoding`·`Git-Protocol`)는 latin-1로 읽고 · gzip 본문이 깨졌으면 서비스를 부르지 않고 빈 결과(http-backend는 죽고 자식도 끝난다) · 인증·원본을 지난 receive-pack 요청 뒤에는 응답이 무엇이든 밀린 커밋을 읽는다(파이썬 판 `BackgroundTask` 자리).
+
+### 4.9 llm (MS-020)
+
+모델 호출 어댑터 — `crates/core/src/infra/llm.rs`. core는 이것을 통해서만 모델을 만진다. 와이어 형식(`content`·`function.arguments`)은 여기만 안다.
+
+```mermaid
+classDiagram
+    class Llm {
+        +String url
+        +String key
+        +String model
+        +step_stream(system, messages, tools, tool_choice, delta) LlmStep
+        +step(system, messages, tools, tool_choice) LlmStep
+    }
+    class LlmStep {
+        +Option~String~ text
+        +Vec~ToolCall~ tool_calls
+        +LlmUsage usage
+    }
+    Llm --> LlmStep
+```
+
+| 메서드 | 부르는 곳 | 근거 | 던지는 에러 |
+|---|---|---|---|
+| [[SYNC-MS-020#Llm.step_stream]] · [[SYNC-MS-020#Llm.step]] | `queries.ask_item`·`ask_code`의 루프(L14) | [[SYNC-MS-009#llm.step_stream]] | `llm-not-configured` · `llm-unavailable` |
+
+규칙 — [[SYNC-DOM-002]] 4.9의 llm과 같다. 설정 파일의 키·주소·모델로 만든다(앱 상태가 쥔다) — 둘 중 하나가 비면 네트워크 전에 `llm-not-configured`. 요청은 `reqwest`(rustls, 운영체제 인증서) — 사내 인증서를 쓰는 주소도 운영체제가 믿으면 붙는다.
+
+---
+
+### 4.10 conversation (MS-021)
+
+읽는 중 질의의 보관 — `crates/core/src/conversation`. 명세 묶음과 선이 없다(문서·항목 표를 읽지도 쓰지도 않는다).
+
+```mermaid
+classDiagram
+    class ConversationService {
+        +db: PgConnection
+        +repos: ServerRepos
+        +list(code, user) Vec~ConversationBrief~
+        +create(code, user, title) ConversationRow
+        +get(conv_id, user) ConversationView
+        +delete(conv_id, user)
+        +delete_by_project(project_id)
+        +add_turn(conv_id, question, attachment_ids) TurnRow
+        +finish_turn(turn_id, answer, progress, context_item_ids, error) TurnRow
+        +history(conv_id, limit) Vec~LlmMessage~
+        +add_attachment(conv_id, user, name, mime, data) AttachmentMeta
+        +remove_attachment(att_id, user)
+        +attachment_meta(att_id, user) AttachmentMeta
+        +attachment_bytes(att_id, user) (String, String, Vec)
+        +attachment_text(conv_id, att_id) Option~String~
+        +pending_images(turn_id) Vec
+    }
+```
+
+| 메서드 | 부르는 곳 | 근거 | 던지는 에러 |
+|---|---|---|---|
+| [[SYNC-MS-021#ConversationService.list]] · [[SYNC-MS-021#ConversationService.create]] · [[SYNC-MS-021#ConversationService.delete]] | `/api/projects/{code}/conversations` · `DELETE /api/conversations/{id}`(L14) | [[SYNC-MS-010#ConversationService.list]] | `not-found` |
+| [[SYNC-MS-021#ConversationService.get]] | `queries.conversation_view`·`ask_item`·`ask_code`(L14) | [[SYNC-MS-010#ConversationService.get]] | `not-found` |
+| [[SYNC-MS-021#ConversationService.delete_by_project]] | `ProjectService.delete_project`(L14) | [[SYNC-MS-010#ConversationService.delete_by_project]] | — |
+| [[SYNC-MS-021#ConversationService.add_turn]] · [[SYNC-MS-021#ConversationService.finish_turn]] · [[SYNC-MS-021#ConversationService.history]] · [[SYNC-MS-021#ConversationService.pending_images]] · [[SYNC-MS-021#ConversationService.attachment_text]] | 질문 루프(L14) | [[SYNC-MS-010#ConversationService.add_turn]] | `not-found` |
+| [[SYNC-MS-021#ConversationService.add_attachment]] · [[SYNC-MS-021#ConversationService.remove_attachment]] · [[SYNC-MS-021#ConversationService.attachment_meta]] · [[SYNC-MS-021#ConversationService.attachment_bytes]] | `/api/conversations/{id}/attachments` · `/api/attachments/{id}`(L14) | [[SYNC-MS-010#ConversationService.add_attachment]] | `not-found` · `attachment-type` · `attachment-too-large` · `attachment-limit` · `attachment-sent` |
+
+규칙 — [[SYNC-DOM-002]] 4.10과 같다. 소유 판정은 대화의 프로젝트로 하고 남의 것은 있는지 없는지를 말하지 않는다. PDF 글자는 `lopdf`로 뽑는다 — 파이썬 판(pypdf)과 글자가 다를 수 있다(모델만 읽는다, [[SYNC-MS-021#ConversationService.add_attachment]]).
+
+---
 
 ### 4.11 codegraph (MS-022)
 
@@ -750,6 +822,7 @@ classDiagram
         +save(project_id, commit_hash, source, graph) CodeGraphRow
         +fail(project_id, commit_hash, reason) CodeGraphRow
         +read(git, project_id, workdir, path, start, end) CodeText
+        +delete_by_project(project_id)
     }
     codegraph --> Graph
     Graph --> Function
@@ -764,7 +837,8 @@ classDiagram
 | [[SYNC-MS-022#codegraph.layer_table]] · [[SYNC-MS-022#codegraph.layers]] | 코드 그래프 노드(L13) | [[SYNC-MS-011#codegraph.layers]] | — |
 | [[SYNC-MS-022#codegraph.communities]] | `pipeline.build_code_graph`(L13) | [[SYNC-MS-011#codegraph.communities]] | — |
 | [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#CodeGraphService.save]] · [[SYNC-MS-022#CodeGraphService.fail]] | 그래프 만들기 · 코드 조회 · 커밋 처리 5a | [[SYNC-MS-011#CodeGraphService.save]] | — |
-| [[SYNC-MS-022#CodeGraphService.read]] | `queries.code_source`·`code_text` | [[SYNC-MS-011#CodeGraphService.read]] | `not-found`(code_graph·file) |
+| [[SYNC-MS-022#CodeGraphService.read]] | `queries.code_source`·`code_text`·질문 도구 `read_code` | [[SYNC-MS-011#CodeGraphService.read]] | `not-found`(code_graph·file) |
+| [[SYNC-MS-022#CodeGraphService.delete_by_project]] | `ProjectService.delete_project`(L14) | [[SYNC-MS-011#CodeGraphService.delete_by_project]] | — |
 
 규칙 — [[SYNC-DOM-002]] 4.11과 같다. 그래프는 DB에 줄인 모양(함수·선·항목 ID)으로, 코드 본문은 저장소에서 읽는다. 저장소에 커밋된 `graphify-out/graph.json`이 있으면 파이썬 판처럼 그것이 원형이다 — 없으면 graphify 대신 tree-sitter로 뽑는다([[SYNC-MS-022]] 0장, [[SYNC-INFRA-001]] 9.2). 커뮤니티는 파이썬 판이 부르는 networkx Louvain·graphify 허브 라벨을 옮겨 L13이 더했다 — 같은 원형이면 번호·라벨까지 같다.
 

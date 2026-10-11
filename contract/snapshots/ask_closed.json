@@ -1,0 +1,1812 @@
+{
+ "ask": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache"
+   ],
+   [
+    "content-type",
+    "text/event-stream; charset=utf-8"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: start\ndata: {\"doc_id\": \"LCA-PRD-001\", \"item_id\": \"R13\", \"key\": null}\n\nevent: delta\ndata: {\"text\": \"먼저 \"}\n\nevent: delta\ndata: {\"text\": \"R1을 읽는다\"}\n\nevent: note\ndata: {\"text\": \"먼저 R1을 읽는다\"}\n\nevent: note\ndata: {\"text\": \"R1 본문\"}\n\nevent: read\ndata: {\"tool\": \"get_item\", \"target\": \"LCA-PRD-001#R1\"}\n\nevent: note\ndata: {\"text\": \"메모\"}\n\nevent: read\ndata: {\"tool\": \"read_attachment\", \"target\": \"첨부:memo.md\"}\n\nevent: delta\ndata: {\"text\": \"답: LCA-PRD-001#R1은 첫 기능이다. \"}\n\nevent: delta\ndata: {\"text\": \"LCA-PRD-001#R99도 보라. `LCA-PRD-001#R1`\"}\n\nevent: answer\ndata: {\"answer\": \"답: [[LCA-PRD-001#R1]]은 첫 기능이다. [[LCA-PRD-001#R99]]도 보라. `LCA-PRD-001#R1`\", \"context_item_ids\": [\"LCA-PRD-001#R1\", \"첨부:memo.md\"], \"missing_refs\": [\"LCA-PRD-001#R99\"]}\n\n"
+ },
+ "ask_bad_item": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"item LCA-PRD-001#R99 없음\",\"resource\":\"item\",\"id\":\"LCA-PRD-001#R99\"}"
+ },
+ "ask_code": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache"
+   ],
+   [
+    "content-type",
+    "text/event-stream; charset=utf-8"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: start\ndata: {\"doc_id\": null, \"item_id\": null, \"key\": null}\n\nevent: delta\ndata: {\"text\": \"그래프가 없다\"}\n\nevent: answer\ndata: {\"answer\": \"그래프가 없다\", \"context_item_ids\": [], \"missing_refs\": []}\n\n"
+ },
+ "ask_code_key": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"function a.py:1 없음\",\"resource\":\"function\",\"id\":\"a.py:1\"}"
+ },
+ "ask_code_seen": [
+  {
+   "model": "gpt-4o",
+   "messages": [
+    {
+     "role": "system",
+     "content": "당신은 코드 그래프를 보는 사람 옆에서 그 함수를 설명한다. 프로젝트의 코드 그래프(함수·호출)와\n명세 문서들이 있고, 당신은 도구로 함수 본문과 명세 항목을 읽을 수 있다. 읽기만 한다.\n\n함수 자체를 묻는 질문(뭐 하는 함수야·왜 이렇게 했어)은 read_code로 본문을 읽고 답한다.\n어디서 쓰이는지·어떤 함수가 있는지 물으면 find_code로 이름을 찾아 불리는 곳을 따라간다.\n명세와 맞는지 물으면 항목이 있으면 code_graph로 대조(같음·코드만·명세만)를 보고 get_item으로\n그 항목을 읽어 견준다. 항목이 없는 함수면 부르는 것·불리는 곳의 항목을 따라간다 — 그 함수가\n어느 명세의 어느 자리를 받치는지 거기서 보인다. API·UI 항목인 함수는 대조가 없다 — get_item으로\n그 항목을 읽고 code_graph로 하위 MINISPEC 함수를 본다. 코드 근거는 파일:줄로, 명세 근거는\n[[문서ID#항목ID]]로 댄다. 코드 그래프가 없다고 적혀 있으면 그렇다고 말하고 지어내지 않는다.\n\n읽은 것만으로 답한다. 처음에는 아래 문서의 항목 목록만 있고 본문은 없다. 답에 필요한\n본문은 도구로 읽는다. 보고 있는 항목 자체를 묻는 질문(이게 뭐야·왜 이렇게 했어)은 그\n항목을 get_item으로 읽고 본문으로 답한다. 근거·영향을 물으면 get_references나\nitem_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽는다. get_document는\n문서 전체를 훑어야 할 때만 쓴다 — 크다. 앞 대화에서 읽은 것은 다시 실리지 않으므로\n필요하면 다시 읽는다.\n\n도구를 부를 때마다 reason에 한 줄로 무엇을 왜 읽는지 적는다. 그 줄이 사람에게 보인다.\n\n도구는 여덟 번까지, 전체 두 분 안이다. 「지금까지 읽은 것으로 답하라」는 말을 받으면\n더 읽지 않고 그때까지 읽은 것으로 답한다.\n\n근거나 참조를 물으면 먼저 보고 있는 항목을 get_item으로 읽는다 — 본문의 [[문서#항목]]\n링크가 정확한 문서 ID다. 항목 ID만으로 지금 문서를 짚지 않는다.\n\n모른다는 읽어도 정말 없을 때만 말하고, 그때는 어느 명세 단계(RFQ~CODE)가 아직 안\n쓰였는지 짚어 준다 — item_chain의 빈 단계나 「아직 없음」 참조가 그 근거다.\n지어내지 않는다.\n\n답에 근거를 댈 때는 읽은 항목 ID를 [[문서ID#항목ID]]로 그대로 쓴다. 없는 ID를 만들지 않는다.\n\n명세를 고치라고 하지 않는다. 당신은 읽기를 돕는 자리이고, 본문을 쓰는 것은 사람과\n그 사람의 에이전트가 한다.\n\n구조·관계·흐름을 묻거나 그림·마인드맵·그래프를 청하면 mermaid 코드블록으로\n그린다 — 코드블록의 언어 표시는 반드시 mermaid이고(mindmap·flowchart가 아니다) 첫 줄이\n그림 종류다. 관계는 flowchart, 가지치기는 mindmap, 항목 사이 참조는 classDiagram, 순서는\nsequenceDiagram. 노드 라벨에는 읽은 항목 ID(문서ID#항목ID)와 이름을 쓴다. 안 읽은 항목은\n그리지 않는다. mindmap은 들여쓰기만으로 가지를 만든다 — 중괄호·화살표·따옴표를 쓰지 않고\n라벨 안에 괄호·대괄호도 쓰지 않는다(이름에 괄호가 있으면 그 부분은 뺀다). 꼴은 이렇다:\n  mindmap\n    root((SYNC-PRD-001#R1 이름))\n      근거\n        Q1[SYNC-RFQ-001#Q1 이름]\n      파생\n        S1[SYNC-SCN-001#S1 이름]\nflowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨을 큰따옴표로 감싼다.\n그림 아래에 한두 문장으로 무엇을 그렸는지 적는다.\n\n답은 짧게 쓴다 — 문장은 한 뜻에 하나, 소제목은 굵은 한 줄, 목록은 한 줄씩. 항목을 댈 때는\n[[문서ID#항목ID]] 이름 한 번이고 그 이름을 풀어 다시 쓰지 않는다. 번호 목록은 1·2·3으로 이어서\n쓴다.\n\n구현을 물으면(「명세대로 구현됐어?」 「이 함수가 실제로 뭘 부르나」) code_graph로 그 항목의\n대조(같음·코드만·명세만)를 먼저 보고, 필요하면 read_code로 함수 본문을 읽는다. 함수를 이름으로\n찾거나 어디서 쓰이는지 물으면 find_code로 찾는다. 코드 근거는 파일:줄로 댄다. 코드 그래프가\n없다고 하면 그렇다고 말하고 지어내지 않는다.\n\n[코드 그래프] 커밋 h · 함수 0 · 호출 0\n[문서 목록]\nLCA-PRD-001 묻기 대조 · draft\n[보는 것] 그래프 전체\n[첨부]\n4 note.txt (text/plain, 1B) — read_attachment로 읽는다\n5 한글 이름.md (text/markdown, 3B) — read_attachment로 읽는다"
+    },
+    {
+     "role": "user",
+     "content": "그래프?"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_item",
+      "description": "문서 안 항목 하나의 본문 블록과 소속 문서의 상태·버전을 돌려준다. get_document로 문서 전체를 받는 대신 필요한 항목만 볼 때, 또는 본문에서 발견한 [[문서ID#항목ID]] 참조를 따라갈 때 부른다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "get_references",
+      "description": "항목의 상위 참조(이 항목이 근거로 삼은 것)와 하위 참조(이 항목을 근거로 삼은 것)를 나눠 돌려준다. 이 항목이 왜 있는지, 바꾸면 어디에 영향이 가는지 알아야 할 때 부른다. 목록만 주고 본문은 펼치지 않는다. 필요한 항목만 get_item으로 다시 요청한다. 문서 단위 참조는 제목·상태만, 아직 없는 대상은 note가 「아직 없음」이다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "item_chain",
+      "description": "항목에서 전이적으로 이어지는 상위·하위 항목을 11단계(RFQ~CODE) 행으로 돌려준다. ID와 이름만. 빈 단계도 행으로 남는다 — 어느 명세 단계가 아직 안 쓰였는지의 근거다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "list_documents",
+      "description": "이 프로젝트의 11단계별 문서 목록과 각 문서의 제목·상태·버전을 돌려준다. 어느 단계까지 채워졌는지 알아야 할 때 부른다. 문서 본문은 포함하지 않는다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "get_document",
+      "description": "문서 원본 MD 전체와 상태·버전·항목 목록을 돌려준다. 크다 — 문서 전체를 훑어야 할 때만 쓴다. 본문 안 [[문서ID#항목ID]]는 다른 항목 참조이며 get_item으로 따라갈 수 있다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "read_attachment",
+      "description": "이 대화에 붙인 글자·PDF 첨부의 글자를 읽는다. 시작 맥락의 [첨부] 줄에 있는 id로 부른다. 이미지는 붙인 질문에 이미 보였으므로 이 도구로 읽을 수 없다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "attachment_id": {
+         "type": "integer",
+         "description": "[첨부] 줄의 첨부 id"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "attachment_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "code_graph",
+      "description": "항목의 코드를 명세와 대조한 결과를 돌려준다. MINISPEC 항목이면 그 함수의 파일·줄, 부르는 것(명세 「호출하는 것」과 같음·코드만·명세만)과 불리는 곳을, 다른 항목이면 하위 체인에서 이어지는 MINISPEC 함수와 어긋남 수를. API·화면 항목처럼 그 항목의 함수가 코드에 있으면(docstring·파일 주석의 항목 ID) 그 함수와 항목 있는 이웃도 — 대조 없이(status null). 서버의 코드 그래프(graphify)로 계산한다 — 구현이 명세대로인지 볼 때 부른다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "read_code",
+      "description": "그래프를 만든 커밋의 코드를 읽는다. target은 항목 ID(문서ID#항목ID — MINISPEC·API·UI 어느 문서든) · 함수 이름(Class.fn, 하나뿐이면 이름만도) · 파일 경로(path · path:줄 — 그 줄의 함수 · path:시작-끝). 300줄까지, 줄마다 번호가 붙는다. 키·인증서 같은 비밀 파일은 읽을 수 없다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "target": {
+         "type": "string",
+         "description": "문서ID#항목ID · Class.fn · 이름 · 경로 · 경로:줄 · 경로:시작-끝"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "target",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "find_code",
+      "description": "코드 그래프에서 함수를 이름으로 찾는다. query는 함수 이름·Class.fn·파일 경로의 일부. 맞는 함수마다 파일:줄·항목(없으면 층)·불리는 곳을 준다 — 함수 30·불리는 곳 10까지. 어디서 쓰이는지 볼 때 부른다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "query": {
+         "type": "string",
+         "description": "함수 이름·Class.fn·파일 경로의 일부"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "query",
+        "reason"
+       ]
+      }
+     }
+    }
+   ],
+   "tool_choice": "auto",
+   "stream": true,
+   "stream_options": {
+    "include_usage": true
+   }
+  }
+ ],
+ "ask_fail": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache"
+   ],
+   [
+    "content-type",
+    "text/event-stream; charset=utf-8"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: start\ndata: {\"doc_id\": \"LCA-PRD-001\", \"item_id\": null, \"key\": null}\n\nevent: error\ndata: {\"type\": \"urn:syncdoc:llm-unavailable\", \"title\": \"llm-unavailable\", \"status\": 424, \"detail\": \"HTTP 500\", \"reason\": \"HTTP 500\"}\n\n"
+ },
+ "ask_fail_seen": [
+  {
+   "model": "gpt-4o",
+   "messages": [
+    {
+     "role": "system",
+     "content": "당신은 명세를 읽는 사람 옆에서 그 자리를 설명한다. 문서 하나가 열려 있고, 당신은 도구로\n같은 프로젝트의 다른 문서와 항목을 읽을 수 있다. 읽기만 한다 — 쓰는 도구는 없다.\n\n읽은 것만으로 답한다. 처음에는 아래 문서의 항목 목록만 있고 본문은 없다. 답에 필요한\n본문은 도구로 읽는다. 보고 있는 항목 자체를 묻는 질문(이게 뭐야·왜 이렇게 했어)은 그\n항목을 get_item으로 읽고 본문으로 답한다. 근거·영향을 물으면 get_references나\nitem_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽는다. get_document는\n문서 전체를 훑어야 할 때만 쓴다 — 크다. 앞 대화에서 읽은 것은 다시 실리지 않으므로\n필요하면 다시 읽는다.\n\n도구를 부를 때마다 reason에 한 줄로 무엇을 왜 읽는지 적는다. 그 줄이 사람에게 보인다.\n\n도구는 여덟 번까지, 전체 두 분 안이다. 「지금까지 읽은 것으로 답하라」는 말을 받으면\n더 읽지 않고 그때까지 읽은 것으로 답한다.\n\n근거나 참조를 물으면 먼저 보고 있는 항목을 get_item으로 읽는다 — 본문의 [[문서#항목]]\n링크가 정확한 문서 ID다. 항목 ID만으로 지금 문서를 짚지 않는다.\n\n모른다는 읽어도 정말 없을 때만 말하고, 그때는 어느 명세 단계(RFQ~CODE)가 아직 안\n쓰였는지 짚어 준다 — item_chain의 빈 단계나 「아직 없음」 참조가 그 근거다.\n지어내지 않는다.\n\n답에 근거를 댈 때는 읽은 항목 ID를 [[문서ID#항목ID]]로 그대로 쓴다. 없는 ID를 만들지 않는다.\n\n명세를 고치라고 하지 않는다. 당신은 읽기를 돕는 자리이고, 본문을 쓰는 것은 사람과\n그 사람의 에이전트가 한다.\n\n구조·관계·흐름을 묻거나 그림·마인드맵·그래프를 청하면 mermaid 코드블록으로\n그린다 — 코드블록의 언어 표시는 반드시 mermaid이고(mindmap·flowchart가 아니다) 첫 줄이\n그림 종류다. 관계는 flowchart, 가지치기는 mindmap, 항목 사이 참조는 classDiagram, 순서는\nsequenceDiagram. 노드 라벨에는 읽은 항목 ID(문서ID#항목ID)와 이름을 쓴다. 안 읽은 항목은\n그리지 않는다. mindmap은 들여쓰기만으로 가지를 만든다 — 중괄호·화살표·따옴표를 쓰지 않고\n라벨 안에 괄호·대괄호도 쓰지 않는다(이름에 괄호가 있으면 그 부분은 뺀다). 꼴은 이렇다:\n  mindmap\n    root((SYNC-PRD-001#R1 이름))\n      근거\n        Q1[SYNC-RFQ-001#Q1 이름]\n      파생\n        S1[SYNC-SCN-001#S1 이름]\nflowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨을 큰따옴표로 감싼다.\n그림 아래에 한두 문장으로 무엇을 그렸는지 적는다.\n\n답은 짧게 쓴다 — 문장은 한 뜻에 하나, 소제목은 굵은 한 줄, 목록은 한 줄씩. 항목을 댈 때는\n[[문서ID#항목ID]] 이름 한 번이고 그 이름을 풀어 다시 쓰지 않는다. 번호 목록은 1·2·3으로 이어서\n쓴다.\n\n구현을 물으면(「명세대로 구현됐어?」 「이 함수가 실제로 뭘 부르나」) code_graph로 그 항목의\n대조(같음·코드만·명세만)를 먼저 보고, 필요하면 read_code로 함수 본문을 읽는다. 함수를 이름으로\n찾거나 어디서 쓰이는지 물으면 find_code로 찾는다. 코드 근거는 파일:줄로 댄다. 코드 그래프가\n없다고 하면 그렇다고 말하고 지어내지 않는다.\n\n[문서] LCA-PRD-001 묻기 대조 · 상태 draft · v1\n[이 문서의 항목]\nR1 첫 기능\nR13 열셋째\n\n[첨부]\n1 memo.md (text/markdown, 29B) — read_attachment로 읽는다\n2 pic.png (image/png, 24B) — 이미지 — 붙인 질문에 보인다\n3 doc.pdf (application/pdf, 10B) — read_attachment로 읽는다"
+    },
+    {
+     "role": "user",
+     "content": "R1이 뭐야?"
+    },
+    {
+     "role": "assistant",
+     "content": "답: LCA-PRD-001#R1은 첫 기능이다. LCA-PRD-001#R99도 보라. `LCA-PRD-001#R1`"
+    },
+    {
+     "role": "user",
+     "content": "두 번째"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_item",
+      "description": "문서 안 항목 하나의 본문 블록과 소속 문서의 상태·버전을 돌려준다. get_document로 문서 전체를 받는 대신 필요한 항목만 볼 때, 또는 본문에서 발견한 [[문서ID#항목ID]] 참조를 따라갈 때 부른다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "get_references",
+      "description": "항목의 상위 참조(이 항목이 근거로 삼은 것)와 하위 참조(이 항목을 근거로 삼은 것)를 나눠 돌려준다. 이 항목이 왜 있는지, 바꾸면 어디에 영향이 가는지 알아야 할 때 부른다. 목록만 주고 본문은 펼치지 않는다. 필요한 항목만 get_item으로 다시 요청한다. 문서 단위 참조는 제목·상태만, 아직 없는 대상은 note가 「아직 없음」이다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "item_chain",
+      "description": "항목에서 전이적으로 이어지는 상위·하위 항목을 11단계(RFQ~CODE) 행으로 돌려준다. ID와 이름만. 빈 단계도 행으로 남는다 — 어느 명세 단계가 아직 안 쓰였는지의 근거다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "list_documents",
+      "description": "이 프로젝트의 11단계별 문서 목록과 각 문서의 제목·상태·버전을 돌려준다. 어느 단계까지 채워졌는지 알아야 할 때 부른다. 문서 본문은 포함하지 않는다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "get_document",
+      "description": "문서 원본 MD 전체와 상태·버전·항목 목록을 돌려준다. 크다 — 문서 전체를 훑어야 할 때만 쓴다. 본문 안 [[문서ID#항목ID]]는 다른 항목 참조이며 get_item으로 따라갈 수 있다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "read_attachment",
+      "description": "이 대화에 붙인 글자·PDF 첨부의 글자를 읽는다. 시작 맥락의 [첨부] 줄에 있는 id로 부른다. 이미지는 붙인 질문에 이미 보였으므로 이 도구로 읽을 수 없다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "attachment_id": {
+         "type": "integer",
+         "description": "[첨부] 줄의 첨부 id"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "attachment_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "code_graph",
+      "description": "항목의 코드를 명세와 대조한 결과를 돌려준다. MINISPEC 항목이면 그 함수의 파일·줄, 부르는 것(명세 「호출하는 것」과 같음·코드만·명세만)과 불리는 곳을, 다른 항목이면 하위 체인에서 이어지는 MINISPEC 함수와 어긋남 수를. API·화면 항목처럼 그 항목의 함수가 코드에 있으면(docstring·파일 주석의 항목 ID) 그 함수와 항목 있는 이웃도 — 대조 없이(status null). 서버의 코드 그래프(graphify)로 계산한다 — 구현이 명세대로인지 볼 때 부른다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "read_code",
+      "description": "그래프를 만든 커밋의 코드를 읽는다. target은 항목 ID(문서ID#항목ID — MINISPEC·API·UI 어느 문서든) · 함수 이름(Class.fn, 하나뿐이면 이름만도) · 파일 경로(path · path:줄 — 그 줄의 함수 · path:시작-끝). 300줄까지, 줄마다 번호가 붙는다. 키·인증서 같은 비밀 파일은 읽을 수 없다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "target": {
+         "type": "string",
+         "description": "문서ID#항목ID · Class.fn · 이름 · 경로 · 경로:줄 · 경로:시작-끝"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "target",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "find_code",
+      "description": "코드 그래프에서 함수를 이름으로 찾는다. query는 함수 이름·Class.fn·파일 경로의 일부. 맞는 함수마다 파일:줄·항목(없으면 층)·불리는 곳을 준다 — 함수 30·불리는 곳 10까지. 어디서 쓰이는지 볼 때 부른다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "query": {
+         "type": "string",
+         "description": "함수 이름·Class.fn·파일 경로의 일부"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "query",
+        "reason"
+       ]
+      }
+     }
+    }
+   ],
+   "tool_choice": "auto",
+   "stream": true,
+   "stream_options": {
+    "include_usage": true
+   }
+  }
+ ],
+ "ask_invalid": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.question — Field required\",\"errors\":[{\"loc\":\"body.question\",\"msg\":\"Field required\"},{\"loc\":\"body.conversation_id\",\"msg\":\"Input should be a valid integer, unable to parse string as an integer\"}]}"
+ },
+ "ask_no_conv": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"conversation 9999 없음\",\"resource\":\"conversation\",\"id\":9999}"
+ },
+ "ask_none_seen": [],
+ "ask_other_project": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "ask_seen": [
+  {
+   "model": "gpt-4o",
+   "messages": [
+    {
+     "role": "system",
+     "content": "당신은 명세를 읽는 사람 옆에서 그 자리를 설명한다. 문서 하나가 열려 있고, 당신은 도구로\n같은 프로젝트의 다른 문서와 항목을 읽을 수 있다. 읽기만 한다 — 쓰는 도구는 없다.\n\n읽은 것만으로 답한다. 처음에는 아래 문서의 항목 목록만 있고 본문은 없다. 답에 필요한\n본문은 도구로 읽는다. 보고 있는 항목 자체를 묻는 질문(이게 뭐야·왜 이렇게 했어)은 그\n항목을 get_item으로 읽고 본문으로 답한다. 근거·영향을 물으면 get_references나\nitem_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽는다. get_document는\n문서 전체를 훑어야 할 때만 쓴다 — 크다. 앞 대화에서 읽은 것은 다시 실리지 않으므로\n필요하면 다시 읽는다.\n\n도구를 부를 때마다 reason에 한 줄로 무엇을 왜 읽는지 적는다. 그 줄이 사람에게 보인다.\n\n도구는 여덟 번까지, 전체 두 분 안이다. 「지금까지 읽은 것으로 답하라」는 말을 받으면\n더 읽지 않고 그때까지 읽은 것으로 답한다.\n\n근거나 참조를 물으면 먼저 보고 있는 항목을 get_item으로 읽는다 — 본문의 [[문서#항목]]\n링크가 정확한 문서 ID다. 항목 ID만으로 지금 문서를 짚지 않는다.\n\n모른다는 읽어도 정말 없을 때만 말하고, 그때는 어느 명세 단계(RFQ~CODE)가 아직 안\n쓰였는지 짚어 준다 — item_chain의 빈 단계나 「아직 없음」 참조가 그 근거다.\n지어내지 않는다.\n\n답에 근거를 댈 때는 읽은 항목 ID를 [[문서ID#항목ID]]로 그대로 쓴다. 없는 ID를 만들지 않는다.\n\n명세를 고치라고 하지 않는다. 당신은 읽기를 돕는 자리이고, 본문을 쓰는 것은 사람과\n그 사람의 에이전트가 한다.\n\n구조·관계·흐름을 묻거나 그림·마인드맵·그래프를 청하면 mermaid 코드블록으로\n그린다 — 코드블록의 언어 표시는 반드시 mermaid이고(mindmap·flowchart가 아니다) 첫 줄이\n그림 종류다. 관계는 flowchart, 가지치기는 mindmap, 항목 사이 참조는 classDiagram, 순서는\nsequenceDiagram. 노드 라벨에는 읽은 항목 ID(문서ID#항목ID)와 이름을 쓴다. 안 읽은 항목은\n그리지 않는다. mindmap은 들여쓰기만으로 가지를 만든다 — 중괄호·화살표·따옴표를 쓰지 않고\n라벨 안에 괄호·대괄호도 쓰지 않는다(이름에 괄호가 있으면 그 부분은 뺀다). 꼴은 이렇다:\n  mindmap\n    root((SYNC-PRD-001#R1 이름))\n      근거\n        Q1[SYNC-RFQ-001#Q1 이름]\n      파생\n        S1[SYNC-SCN-001#S1 이름]\nflowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨을 큰따옴표로 감싼다.\n그림 아래에 한두 문장으로 무엇을 그렸는지 적는다.\n\n답은 짧게 쓴다 — 문장은 한 뜻에 하나, 소제목은 굵은 한 줄, 목록은 한 줄씩. 항목을 댈 때는\n[[문서ID#항목ID]] 이름 한 번이고 그 이름을 풀어 다시 쓰지 않는다. 번호 목록은 1·2·3으로 이어서\n쓴다.\n\n구현을 물으면(「명세대로 구현됐어?」 「이 함수가 실제로 뭘 부르나」) code_graph로 그 항목의\n대조(같음·코드만·명세만)를 먼저 보고, 필요하면 read_code로 함수 본문을 읽는다. 함수를 이름으로\n찾거나 어디서 쓰이는지 물으면 find_code로 찾는다. 코드 근거는 파일:줄로 댄다. 코드 그래프가\n없다고 하면 그렇다고 말하고 지어내지 않는다.\n\n[문서] LCA-PRD-001 묻기 대조 · 상태 draft · v1\n[이 문서의 항목]\nR1 첫 기능\nR13 열셋째\n[지금 보는 항목] R13 열셋째\n[첨부]\n1 memo.md (text/markdown, 29B) — read_attachment로 읽는다\n2 pic.png (image/png, 24B) — 이미지 — 붙인 질문에 보인다\n3 doc.pdf (application/pdf, 10B) — read_attachment로 읽는다"
+    },
+    {
+     "role": "user",
+     "content": [
+      {
+       "type": "text",
+       "text": "R1이 뭐야?"
+      },
+      {
+       "type": "image_url",
+       "image_url": {
+        "url": "data:image/png;base64,iVBORw0KGgoAAAAAAAAAAAAAAAAAAAAA"
+       }
+      }
+     ]
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_item",
+      "description": "문서 안 항목 하나의 본문 블록과 소속 문서의 상태·버전을 돌려준다. get_document로 문서 전체를 받는 대신 필요한 항목만 볼 때, 또는 본문에서 발견한 [[문서ID#항목ID]] 참조를 따라갈 때 부른다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "get_references",
+      "description": "항목의 상위 참조(이 항목이 근거로 삼은 것)와 하위 참조(이 항목을 근거로 삼은 것)를 나눠 돌려준다. 이 항목이 왜 있는지, 바꾸면 어디에 영향이 가는지 알아야 할 때 부른다. 목록만 주고 본문은 펼치지 않는다. 필요한 항목만 get_item으로 다시 요청한다. 문서 단위 참조는 제목·상태만, 아직 없는 대상은 note가 「아직 없음」이다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "item_chain",
+      "description": "항목에서 전이적으로 이어지는 상위·하위 항목을 11단계(RFQ~CODE) 행으로 돌려준다. ID와 이름만. 빈 단계도 행으로 남는다 — 어느 명세 단계가 아직 안 쓰였는지의 근거다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "list_documents",
+      "description": "이 프로젝트의 11단계별 문서 목록과 각 문서의 제목·상태·버전을 돌려준다. 어느 단계까지 채워졌는지 알아야 할 때 부른다. 문서 본문은 포함하지 않는다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "get_document",
+      "description": "문서 원본 MD 전체와 상태·버전·항목 목록을 돌려준다. 크다 — 문서 전체를 훑어야 할 때만 쓴다. 본문 안 [[문서ID#항목ID]]는 다른 항목 참조이며 get_item으로 따라갈 수 있다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "read_attachment",
+      "description": "이 대화에 붙인 글자·PDF 첨부의 글자를 읽는다. 시작 맥락의 [첨부] 줄에 있는 id로 부른다. 이미지는 붙인 질문에 이미 보였으므로 이 도구로 읽을 수 없다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "attachment_id": {
+         "type": "integer",
+         "description": "[첨부] 줄의 첨부 id"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "attachment_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "code_graph",
+      "description": "항목의 코드를 명세와 대조한 결과를 돌려준다. MINISPEC 항목이면 그 함수의 파일·줄, 부르는 것(명세 「호출하는 것」과 같음·코드만·명세만)과 불리는 곳을, 다른 항목이면 하위 체인에서 이어지는 MINISPEC 함수와 어긋남 수를. API·화면 항목처럼 그 항목의 함수가 코드에 있으면(docstring·파일 주석의 항목 ID) 그 함수와 항목 있는 이웃도 — 대조 없이(status null). 서버의 코드 그래프(graphify)로 계산한다 — 구현이 명세대로인지 볼 때 부른다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "read_code",
+      "description": "그래프를 만든 커밋의 코드를 읽는다. target은 항목 ID(문서ID#항목ID — MINISPEC·API·UI 어느 문서든) · 함수 이름(Class.fn, 하나뿐이면 이름만도) · 파일 경로(path · path:줄 — 그 줄의 함수 · path:시작-끝). 300줄까지, 줄마다 번호가 붙는다. 키·인증서 같은 비밀 파일은 읽을 수 없다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "target": {
+         "type": "string",
+         "description": "문서ID#항목ID · Class.fn · 이름 · 경로 · 경로:줄 · 경로:시작-끝"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "target",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "find_code",
+      "description": "코드 그래프에서 함수를 이름으로 찾는다. query는 함수 이름·Class.fn·파일 경로의 일부. 맞는 함수마다 파일:줄·항목(없으면 층)·불리는 곳을 준다 — 함수 30·불리는 곳 10까지. 어디서 쓰이는지 볼 때 부른다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "query": {
+         "type": "string",
+         "description": "함수 이름·Class.fn·파일 경로의 일부"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "query",
+        "reason"
+       ]
+      }
+     }
+    }
+   ],
+   "tool_choice": "auto",
+   "stream": true,
+   "stream_options": {
+    "include_usage": true
+   }
+  },
+  {
+   "model": "gpt-4o",
+   "messages": [
+    {
+     "role": "system",
+     "content": "당신은 명세를 읽는 사람 옆에서 그 자리를 설명한다. 문서 하나가 열려 있고, 당신은 도구로\n같은 프로젝트의 다른 문서와 항목을 읽을 수 있다. 읽기만 한다 — 쓰는 도구는 없다.\n\n읽은 것만으로 답한다. 처음에는 아래 문서의 항목 목록만 있고 본문은 없다. 답에 필요한\n본문은 도구로 읽는다. 보고 있는 항목 자체를 묻는 질문(이게 뭐야·왜 이렇게 했어)은 그\n항목을 get_item으로 읽고 본문으로 답한다. 근거·영향을 물으면 get_references나\nitem_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽는다. get_document는\n문서 전체를 훑어야 할 때만 쓴다 — 크다. 앞 대화에서 읽은 것은 다시 실리지 않으므로\n필요하면 다시 읽는다.\n\n도구를 부를 때마다 reason에 한 줄로 무엇을 왜 읽는지 적는다. 그 줄이 사람에게 보인다.\n\n도구는 여덟 번까지, 전체 두 분 안이다. 「지금까지 읽은 것으로 답하라」는 말을 받으면\n더 읽지 않고 그때까지 읽은 것으로 답한다.\n\n근거나 참조를 물으면 먼저 보고 있는 항목을 get_item으로 읽는다 — 본문의 [[문서#항목]]\n링크가 정확한 문서 ID다. 항목 ID만으로 지금 문서를 짚지 않는다.\n\n모른다는 읽어도 정말 없을 때만 말하고, 그때는 어느 명세 단계(RFQ~CODE)가 아직 안\n쓰였는지 짚어 준다 — item_chain의 빈 단계나 「아직 없음」 참조가 그 근거다.\n지어내지 않는다.\n\n답에 근거를 댈 때는 읽은 항목 ID를 [[문서ID#항목ID]]로 그대로 쓴다. 없는 ID를 만들지 않는다.\n\n명세를 고치라고 하지 않는다. 당신은 읽기를 돕는 자리이고, 본문을 쓰는 것은 사람과\n그 사람의 에이전트가 한다.\n\n구조·관계·흐름을 묻거나 그림·마인드맵·그래프를 청하면 mermaid 코드블록으로\n그린다 — 코드블록의 언어 표시는 반드시 mermaid이고(mindmap·flowchart가 아니다) 첫 줄이\n그림 종류다. 관계는 flowchart, 가지치기는 mindmap, 항목 사이 참조는 classDiagram, 순서는\nsequenceDiagram. 노드 라벨에는 읽은 항목 ID(문서ID#항목ID)와 이름을 쓴다. 안 읽은 항목은\n그리지 않는다. mindmap은 들여쓰기만으로 가지를 만든다 — 중괄호·화살표·따옴표를 쓰지 않고\n라벨 안에 괄호·대괄호도 쓰지 않는다(이름에 괄호가 있으면 그 부분은 뺀다). 꼴은 이렇다:\n  mindmap\n    root((SYNC-PRD-001#R1 이름))\n      근거\n        Q1[SYNC-RFQ-001#Q1 이름]\n      파생\n        S1[SYNC-SCN-001#S1 이름]\nflowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨을 큰따옴표로 감싼다.\n그림 아래에 한두 문장으로 무엇을 그렸는지 적는다.\n\n답은 짧게 쓴다 — 문장은 한 뜻에 하나, 소제목은 굵은 한 줄, 목록은 한 줄씩. 항목을 댈 때는\n[[문서ID#항목ID]] 이름 한 번이고 그 이름을 풀어 다시 쓰지 않는다. 번호 목록은 1·2·3으로 이어서\n쓴다.\n\n구현을 물으면(「명세대로 구현됐어?」 「이 함수가 실제로 뭘 부르나」) code_graph로 그 항목의\n대조(같음·코드만·명세만)를 먼저 보고, 필요하면 read_code로 함수 본문을 읽는다. 함수를 이름으로\n찾거나 어디서 쓰이는지 물으면 find_code로 찾는다. 코드 근거는 파일:줄로 댄다. 코드 그래프가\n없다고 하면 그렇다고 말하고 지어내지 않는다.\n\n[문서] LCA-PRD-001 묻기 대조 · 상태 draft · v1\n[이 문서의 항목]\nR1 첫 기능\nR13 열셋째\n[지금 보는 항목] R13 열셋째\n[첨부]\n1 memo.md (text/markdown, 29B) — read_attachment로 읽는다\n2 pic.png (image/png, 24B) — 이미지 — 붙인 질문에 보인다\n3 doc.pdf (application/pdf, 10B) — read_attachment로 읽는다"
+    },
+    {
+     "role": "user",
+     "content": [
+      {
+       "type": "text",
+       "text": "R1이 뭐야?"
+      },
+      {
+       "type": "image_url",
+       "image_url": {
+        "url": "data:image/png;base64,iVBORw0KGgoAAAAAAAAAAAAAAAAAAAAA"
+       }
+      }
+     ]
+    },
+    {
+     "role": "assistant",
+     "content": "먼저 R1을 읽는다",
+     "tool_calls": [
+      {
+       "id": "c1",
+       "type": "function",
+       "function": {
+        "name": "get_item",
+        "arguments": "{\"doc_id\": \"LCA-PRD-001\", \"item_id\": \"R1\", \"reason\": \"R1 \\ubcf8\\ubb38\"}"
+       }
+      },
+      {
+       "id": "c2",
+       "type": "function",
+       "function": {
+        "name": "read_attachment",
+        "arguments": "{\"attachment_id\": 1, \"reason\": \"\\uba54\\ubaa8\"}"
+       }
+      }
+     ]
+    },
+    {
+     "role": "tool",
+     "tool_call_id": "c1",
+     "content": "{\"doc_id\": \"LCA-PRD-001\", \"item_id\": \"R1\", \"display_name\": \"첫 기능\", \"doc_status\": \"draft\", \"doc_version_no\": 1, \"body\": \"#### R1 첫 기능\\n첫 기능을 설명한다.\\n\"}"
+    },
+    {
+     "role": "tool",
+     "tool_call_id": "c2",
+     "content": "{\"attachment_id\": 1, \"name\": \"memo.md\", \"mime\": \"text/markdown\", \"text\": \"# 메모\\n첨부 본문이다\\n\"}"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_item",
+      "description": "문서 안 항목 하나의 본문 블록과 소속 문서의 상태·버전을 돌려준다. get_document로 문서 전체를 받는 대신 필요한 항목만 볼 때, 또는 본문에서 발견한 [[문서ID#항목ID]] 참조를 따라갈 때 부른다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "get_references",
+      "description": "항목의 상위 참조(이 항목이 근거로 삼은 것)와 하위 참조(이 항목을 근거로 삼은 것)를 나눠 돌려준다. 이 항목이 왜 있는지, 바꾸면 어디에 영향이 가는지 알아야 할 때 부른다. 목록만 주고 본문은 펼치지 않는다. 필요한 항목만 get_item으로 다시 요청한다. 문서 단위 참조는 제목·상태만, 아직 없는 대상은 note가 「아직 없음」이다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "item_chain",
+      "description": "항목에서 전이적으로 이어지는 상위·하위 항목을 11단계(RFQ~CODE) 행으로 돌려준다. ID와 이름만. 빈 단계도 행으로 남는다 — 어느 명세 단계가 아직 안 쓰였는지의 근거다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "list_documents",
+      "description": "이 프로젝트의 11단계별 문서 목록과 각 문서의 제목·상태·버전을 돌려준다. 어느 단계까지 채워졌는지 알아야 할 때 부른다. 문서 본문은 포함하지 않는다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "get_document",
+      "description": "문서 원본 MD 전체와 상태·버전·항목 목록을 돌려준다. 크다 — 문서 전체를 훑어야 할 때만 쓴다. 본문 안 [[문서ID#항목ID]]는 다른 항목 참조이며 get_item으로 따라갈 수 있다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "read_attachment",
+      "description": "이 대화에 붙인 글자·PDF 첨부의 글자를 읽는다. 시작 맥락의 [첨부] 줄에 있는 id로 부른다. 이미지는 붙인 질문에 이미 보였으므로 이 도구로 읽을 수 없다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "attachment_id": {
+         "type": "integer",
+         "description": "[첨부] 줄의 첨부 id"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "attachment_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "code_graph",
+      "description": "항목의 코드를 명세와 대조한 결과를 돌려준다. MINISPEC 항목이면 그 함수의 파일·줄, 부르는 것(명세 「호출하는 것」과 같음·코드만·명세만)과 불리는 곳을, 다른 항목이면 하위 체인에서 이어지는 MINISPEC 함수와 어긋남 수를. API·화면 항목처럼 그 항목의 함수가 코드에 있으면(docstring·파일 주석의 항목 ID) 그 함수와 항목 있는 이웃도 — 대조 없이(status null). 서버의 코드 그래프(graphify)로 계산한다 — 구현이 명세대로인지 볼 때 부른다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "read_code",
+      "description": "그래프를 만든 커밋의 코드를 읽는다. target은 항목 ID(문서ID#항목ID — MINISPEC·API·UI 어느 문서든) · 함수 이름(Class.fn, 하나뿐이면 이름만도) · 파일 경로(path · path:줄 — 그 줄의 함수 · path:시작-끝). 300줄까지, 줄마다 번호가 붙는다. 키·인증서 같은 비밀 파일은 읽을 수 없다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "target": {
+         "type": "string",
+         "description": "문서ID#항목ID · Class.fn · 이름 · 경로 · 경로:줄 · 경로:시작-끝"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "target",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "find_code",
+      "description": "코드 그래프에서 함수를 이름으로 찾는다. query는 함수 이름·Class.fn·파일 경로의 일부. 맞는 함수마다 파일:줄·항목(없으면 층)·불리는 곳을 준다 — 함수 30·불리는 곳 10까지. 어디서 쓰이는지 볼 때 부른다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "query": {
+         "type": "string",
+         "description": "함수 이름·Class.fn·파일 경로의 일부"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "query",
+        "reason"
+       ]
+      }
+     }
+    }
+   ],
+   "tool_choice": "auto",
+   "stream": true,
+   "stream_options": {
+    "include_usage": true
+   }
+  }
+ ],
+ "ask_single": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache"
+   ],
+   [
+    "content-type",
+    "text/event-stream; charset=utf-8"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: start\ndata: {\"doc_id\": \"LCA-PRD-001\", \"item_id\": null, \"key\": null}\n\nevent: answer\ndata: {\"answer\": \"단발 답이다\", \"context_item_ids\": [], \"missing_refs\": []}\n\n"
+ },
+ "ask_single_seen": [
+  {
+   "model": "gpt-4o",
+   "messages": [
+    {
+     "role": "system",
+     "content": "당신은 명세를 읽는 사람 옆에서 그 자리를 설명한다. 문서 하나가 열려 있고, 당신은 도구로\n같은 프로젝트의 다른 문서와 항목을 읽을 수 있다. 읽기만 한다 — 쓰는 도구는 없다.\n\n읽은 것만으로 답한다. 처음에는 아래 문서의 항목 목록만 있고 본문은 없다. 답에 필요한\n본문은 도구로 읽는다. 보고 있는 항목 자체를 묻는 질문(이게 뭐야·왜 이렇게 했어)은 그\n항목을 get_item으로 읽고 본문으로 답한다. 근거·영향을 물으면 get_references나\nitem_chain으로 관계를 따라간 뒤 필요한 항목만 get_item으로 읽는다. get_document는\n문서 전체를 훑어야 할 때만 쓴다 — 크다. 앞 대화에서 읽은 것은 다시 실리지 않으므로\n필요하면 다시 읽는다.\n\n도구를 부를 때마다 reason에 한 줄로 무엇을 왜 읽는지 적는다. 그 줄이 사람에게 보인다.\n\n도구는 여덟 번까지, 전체 두 분 안이다. 「지금까지 읽은 것으로 답하라」는 말을 받으면\n더 읽지 않고 그때까지 읽은 것으로 답한다.\n\n근거나 참조를 물으면 먼저 보고 있는 항목을 get_item으로 읽는다 — 본문의 [[문서#항목]]\n링크가 정확한 문서 ID다. 항목 ID만으로 지금 문서를 짚지 않는다.\n\n모른다는 읽어도 정말 없을 때만 말하고, 그때는 어느 명세 단계(RFQ~CODE)가 아직 안\n쓰였는지 짚어 준다 — item_chain의 빈 단계나 「아직 없음」 참조가 그 근거다.\n지어내지 않는다.\n\n답에 근거를 댈 때는 읽은 항목 ID를 [[문서ID#항목ID]]로 그대로 쓴다. 없는 ID를 만들지 않는다.\n\n명세를 고치라고 하지 않는다. 당신은 읽기를 돕는 자리이고, 본문을 쓰는 것은 사람과\n그 사람의 에이전트가 한다.\n\n구조·관계·흐름을 묻거나 그림·마인드맵·그래프를 청하면 mermaid 코드블록으로\n그린다 — 코드블록의 언어 표시는 반드시 mermaid이고(mindmap·flowchart가 아니다) 첫 줄이\n그림 종류다. 관계는 flowchart, 가지치기는 mindmap, 항목 사이 참조는 classDiagram, 순서는\nsequenceDiagram. 노드 라벨에는 읽은 항목 ID(문서ID#항목ID)와 이름을 쓴다. 안 읽은 항목은\n그리지 않는다. mindmap은 들여쓰기만으로 가지를 만든다 — 중괄호·화살표·따옴표를 쓰지 않고\n라벨 안에 괄호·대괄호도 쓰지 않는다(이름에 괄호가 있으면 그 부분은 뺀다). 꼴은 이렇다:\n  mindmap\n    root((SYNC-PRD-001#R1 이름))\n      근거\n        Q1[SYNC-RFQ-001#Q1 이름]\n      파생\n        S1[SYNC-SCN-001#S1 이름]\nflowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨을 큰따옴표로 감싼다.\n그림 아래에 한두 문장으로 무엇을 그렸는지 적는다.\n\n답은 짧게 쓴다 — 문장은 한 뜻에 하나, 소제목은 굵은 한 줄, 목록은 한 줄씩. 항목을 댈 때는\n[[문서ID#항목ID]] 이름 한 번이고 그 이름을 풀어 다시 쓰지 않는다. 번호 목록은 1·2·3으로 이어서\n쓴다.\n\n구현을 물으면(「명세대로 구현됐어?」 「이 함수가 실제로 뭘 부르나」) code_graph로 그 항목의\n대조(같음·코드만·명세만)를 먼저 보고, 필요하면 read_code로 함수 본문을 읽는다. 함수를 이름으로\n찾거나 어디서 쓰이는지 물으면 find_code로 찾는다. 코드 근거는 파일:줄로 댄다. 코드 그래프가\n없다고 하면 그렇다고 말하고 지어내지 않는다.\n\n[문서] LCA-PRD-001 묻기 대조 · 상태 draft · v1\n[이 문서의 항목]\nR1 첫 기능\nR13 열셋째\n\n[첨부]\n1 memo.md (text/markdown, 29B) — read_attachment로 읽는다\n2 pic.png (image/png, 24B) — 이미지 — 붙인 질문에 보인다\n3 doc.pdf (application/pdf, 10B) — read_attachment로 읽는다"
+    },
+    {
+     "role": "user",
+     "content": "R1이 뭐야?"
+    },
+    {
+     "role": "assistant",
+     "content": "답: LCA-PRD-001#R1은 첫 기능이다. LCA-PRD-001#R99도 보라. `LCA-PRD-001#R1`"
+    },
+    {
+     "role": "user",
+     "content": "세 번째"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_item",
+      "description": "문서 안 항목 하나의 본문 블록과 소속 문서의 상태·버전을 돌려준다. get_document로 문서 전체를 받는 대신 필요한 항목만 볼 때, 또는 본문에서 발견한 [[문서ID#항목ID]] 참조를 따라갈 때 부른다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "get_references",
+      "description": "항목의 상위 참조(이 항목이 근거로 삼은 것)와 하위 참조(이 항목을 근거로 삼은 것)를 나눠 돌려준다. 이 항목이 왜 있는지, 바꾸면 어디에 영향이 가는지 알아야 할 때 부른다. 목록만 주고 본문은 펼치지 않는다. 필요한 항목만 get_item으로 다시 요청한다. 문서 단위 참조는 제목·상태만, 아직 없는 대상은 note가 「아직 없음」이다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "item_chain",
+      "description": "항목에서 전이적으로 이어지는 상위·하위 항목을 11단계(RFQ~CODE) 행으로 돌려준다. ID와 이름만. 빈 단계도 행으로 남는다 — 어느 명세 단계가 아직 안 쓰였는지의 근거다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "list_documents",
+      "description": "이 프로젝트의 11단계별 문서 목록과 각 문서의 제목·상태·버전을 돌려준다. 어느 단계까지 채워졌는지 알아야 할 때 부른다. 문서 본문은 포함하지 않는다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "get_document",
+      "description": "문서 원본 MD 전체와 상태·버전·항목 목록을 돌려준다. 크다 — 문서 전체를 훑어야 할 때만 쓴다. 본문 안 [[문서ID#항목ID]]는 다른 항목 참조이며 get_item으로 따라갈 수 있다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "read_attachment",
+      "description": "이 대화에 붙인 글자·PDF 첨부의 글자를 읽는다. 시작 맥락의 [첨부] 줄에 있는 id로 부른다. 이미지는 붙인 질문에 이미 보였으므로 이 도구로 읽을 수 없다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "attachment_id": {
+         "type": "integer",
+         "description": "[첨부] 줄의 첨부 id"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "attachment_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "code_graph",
+      "description": "항목의 코드를 명세와 대조한 결과를 돌려준다. MINISPEC 항목이면 그 함수의 파일·줄, 부르는 것(명세 「호출하는 것」과 같음·코드만·명세만)과 불리는 곳을, 다른 항목이면 하위 체인에서 이어지는 MINISPEC 함수와 어긋남 수를. API·화면 항목처럼 그 항목의 함수가 코드에 있으면(docstring·파일 주석의 항목 ID) 그 함수와 항목 있는 이웃도 — 대조 없이(status null). 서버의 코드 그래프(graphify)로 계산한다 — 구현이 명세대로인지 볼 때 부른다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "doc_id": {
+         "type": "string",
+         "description": "문서 ID. 예: SYNC-PRD-001"
+        },
+        "item_id": {
+         "type": "string",
+         "description": "항목 ID. 예: R11, queries.ask_item"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "doc_id",
+        "item_id",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "read_code",
+      "description": "그래프를 만든 커밋의 코드를 읽는다. target은 항목 ID(문서ID#항목ID — MINISPEC·API·UI 어느 문서든) · 함수 이름(Class.fn, 하나뿐이면 이름만도) · 파일 경로(path · path:줄 — 그 줄의 함수 · path:시작-끝). 300줄까지, 줄마다 번호가 붙는다. 키·인증서 같은 비밀 파일은 읽을 수 없다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "target": {
+         "type": "string",
+         "description": "문서ID#항목ID · Class.fn · 이름 · 경로 · 경로:줄 · 경로:시작-끝"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "target",
+        "reason"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "find_code",
+      "description": "코드 그래프에서 함수를 이름으로 찾는다. query는 함수 이름·Class.fn·파일 경로의 일부. 맞는 함수마다 파일:줄·항목(없으면 층)·불리는 곳을 준다 — 함수 30·불리는 곳 10까지. 어디서 쓰이는지 볼 때 부른다.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "query": {
+         "type": "string",
+         "description": "함수 이름·Class.fn·파일 경로의 일부"
+        },
+        "reason": {
+         "type": "string",
+         "description": "한 줄로 무엇을 왜 읽는지. 사람에게 보인다"
+        }
+       },
+       "required": [
+        "query",
+        "reason"
+       ]
+      }
+     }
+    }
+   ],
+   "tool_choice": "auto",
+   "stream": true,
+   "stream_options": {
+    "include_usage": true
+   }
+  }
+ ],
+ "ask_wrong_project_conv": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "conv_after_all": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"id\":1,\"title\":\"R1이 뭐야?\",\"turn_count\":3,\"updated_at\":\"T\",\"turns\":[{\"id\":1,\"seq\":1,\"question\":\"R1이 뭐야?\",\"answer\":\"답: [[LCA-PRD-001#R1]]은 첫 기능이다. [[LCA-PRD-001#R99]]도 보라. `LCA-PRD-001#R1`\",\"progress\":[{\"kind\":\"note\",\"text\":\"먼저 R1을 읽는다\"},{\"kind\":\"note\",\"text\":\"R1 본문\"},{\"kind\":\"read\",\"text\":\"get_item LCA-PRD-001#R1\"},{\"kind\":\"note\",\"text\":\"메모\"},{\"kind\":\"read\",\"text\":\"read_attachment 첨부:memo.md\"}],\"context_item_ids\":[\"LCA-PRD-001#R1\",\"첨부:memo.md\"],\"error\":null,\"attachments\":[{\"id\":1,\"name\":\"memo.md\",\"mime\":\"text/markdown\",\"size\":29,\"turn_id\":1,\"created_at\":\"T\"},{\"id\":2,\"name\":\"pic.png\",\"mime\":\"image/png\",\"size\":24,\"turn_id\":1,\"created_at\":\"T\"}],\"created_at\":\"T\",\"missing_refs\":[\"LCA-PRD-001#R99\"]},{\"id\":2,\"seq\":2,\"question\":\"두 번째\",\"answer\":null,\"progress\":[],\"context_item_ids\":[],\"error\":\"HTTP 500\",\"attachments\":[],\"created_at\":\"T\",\"missing_refs\":[]},{\"id\":3,\"seq\":3,\"question\":\"세 번째\",\"answer\":\"단발 답이다\",\"progress\":[],\"context_item_ids\":[],\"error\":null,\"attachments\":[],\"created_at\":\"T\",\"missing_refs\":[]}],\"pending\":[{\"id\":3,\"name\":\"doc.pdf\",\"mime\":\"application/pdf\",\"size\":10,\"turn_id\":null,\"created_at\":\"T\"}]}"
+ },
+ "conv_after_ask": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"id\":1,\"title\":\"R1이 뭐야?\",\"turn_count\":1,\"updated_at\":\"T\",\"turns\":[{\"id\":1,\"seq\":1,\"question\":\"R1이 뭐야?\",\"answer\":\"답: [[LCA-PRD-001#R1]]은 첫 기능이다. [[LCA-PRD-001#R99]]도 보라. `LCA-PRD-001#R1`\",\"progress\":[{\"kind\":\"note\",\"text\":\"먼저 R1을 읽는다\"},{\"kind\":\"note\",\"text\":\"R1 본문\"},{\"kind\":\"read\",\"text\":\"get_item LCA-PRD-001#R1\"},{\"kind\":\"note\",\"text\":\"메모\"},{\"kind\":\"read\",\"text\":\"read_attachment 첨부:memo.md\"}],\"context_item_ids\":[\"LCA-PRD-001#R1\",\"첨부:memo.md\"],\"error\":null,\"attachments\":[{\"id\":1,\"name\":\"memo.md\",\"mime\":\"text/markdown\",\"size\":29,\"turn_id\":1,\"created_at\":\"T\"},{\"id\":2,\"name\":\"pic.png\",\"mime\":\"image/png\",\"size\":24,\"turn_id\":1,\"created_at\":\"T\"}],\"created_at\":\"T\",\"missing_refs\":[\"LCA-PRD-001#R99\"]}],\"pending\":[{\"id\":3,\"name\":\"doc.pdf\",\"mime\":\"application/pdf\",\"size\":10,\"turn_id\":null,\"created_at\":\"T\"}]}"
+ },
+ "create": {
+  "status": 201,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"id\":1,\"title\":\"새 대화\",\"turn_count\":0,\"updated_at\":\"T\"}"
+ },
+ "create_bad": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.title — Input should be a valid string\",\"errors\":[{\"loc\":\"body.title\",\"msg\":\"Input should be a valid string\"}]}"
+ },
+ "create_other": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "create_raw": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body — Input should be a valid dictionary or object to extract fields from\",\"errors\":[{\"loc\":\"body\",\"msg\":\"Input should be a valid dictionary or object to extract fields from\"}]}"
+ },
+ "create_titled": {
+  "status": 201,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"id\":2,\"title\":\"제목 있는 대화\",\"turn_count\":0,\"updated_at\":\"T\"}"
+ },
+ "del_again": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"attachment 3 없음\",\"resource\":\"attachment\",\"id\":3}"
+ },
+ "del_conv": {
+  "status": 204,
+  "headers": [],
+  "body": ""
+ },
+ "del_pdf": {
+  "status": 204,
+  "headers": [],
+  "body": ""
+ },
+ "del_sent": {
+  "status": 409,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:attachment-sent\",\"title\":\"attachment-sent\",\"status\":409,\"detail\":\"이미 보낸 첨부는 뺄 수 없다\",\"attachment_id\":1}"
+ },
+ "get_conv_bad": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"path.id — Input should be a valid integer, unable to parse string as an integer\",\"errors\":[{\"loc\":\"path.id\",\"msg\":\"Input should be a valid integer, unable to parse string as an integer\"}]}"
+ },
+ "get_conv_huge": {
+  "status": 500,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:internal\",\"title\":\"internal\",\"status\":500,\"detail\":\"서버에서 처리하지 못한 오류입니다. 로그를 확인하세요.\"}"
+ },
+ "get_deleted": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"conversation 2 없음\",\"resource\":\"conversation\",\"id\":2}"
+ },
+ "get_korean": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "private, max-age=3600"
+   ],
+   [
+    "content-disposition",
+    "inline; filename*=UTF-8''%ED%95%9C%EA%B8%80%20%EC%9D%B4%EB%A6%84.md"
+   ],
+   [
+    "content-type",
+    "text/markdown; charset=utf-8"
+   ]
+  ],
+  "body": "글"
+ },
+ "get_md": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "private, max-age=3600"
+   ],
+   [
+    "content-disposition",
+    "inline; filename*=UTF-8''memo.md"
+   ],
+   [
+    "content-type",
+    "text/markdown; charset=utf-8"
+   ]
+  ],
+  "body": "# 메모\n첨부 본문이다\n"
+ },
+ "get_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"attachment 9999 없음\",\"resource\":\"attachment\",\"id\":9999}"
+ },
+ "get_png": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "private, max-age=3600"
+   ],
+   [
+    "content-disposition",
+    "inline; filename*=UTF-8''pic.png"
+   ],
+   [
+    "content-type",
+    "image/png"
+   ]
+  ],
+  "body": "\\x89PNG\r\n\u001a\n\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+ },
+ "list_after": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"id\":2,\"title\":\"그래프?\",\"turn_count\":1,\"updated_at\":\"T\"},{\"id\":1,\"title\":\"R1이 뭐야?\",\"turn_count\":3,\"updated_at\":\"T\"}]"
+ },
+ "list_empty": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[]"
+ },
+ "up_bad_id": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"path.id — Input should be a valid integer, unable to parse string as an integer\",\"errors\":[{\"loc\":\"path.id\",\"msg\":\"Input should be a valid integer, unable to parse string as an integer\"}]}"
+ },
+ "up_empty": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.file — Field required\",\"errors\":[{\"loc\":\"body.file\",\"msg\":\"Field required\"}]}"
+ },
+ "up_exe": {
+  "status": 415,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:attachment-type\",\"title\":\"attachment-type\",\"status\":415,\"detail\":\"받지 않는 종류: exe\",\"mime\":\"exe\"}"
+ },
+ "up_field": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.file — Value error, Expected UploadFile, received: <class 'str'>\",\"errors\":[{\"loc\":\"body.file\",\"msg\":\"Value error, Expected UploadFile, received: <class 'str'>\"}]}"
+ },
+ "up_json": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.file — Field required\",\"errors\":[{\"loc\":\"body.file\",\"msg\":\"Field required\"}]}"
+ },
+ "up_korean": {
+  "status": 201,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"id\":5,\"name\":\"한글 이름.md\",\"mime\":\"text/markdown\",\"size\":3,\"turn_id\":null,\"created_at\":\"T\"}"
+ },
+ "up_md": {
+  "status": 201,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"id\":1,\"name\":\"memo.md\",\"mime\":\"text/markdown\",\"size\":29,\"turn_id\":null,\"created_at\":\"T\"}"
+ },
+ "up_mismatch": {
+  "status": 415,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:attachment-type\",\"title\":\"attachment-type\",\"status\":415,\"detail\":\"받지 않는 종류: image/png\",\"mime\":\"image/png\"}"
+ },
+ "up_missing_conv": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"conversation 9999 없음\",\"resource\":\"conversation\",\"id\":9999}"
+ },
+ "up_no_boundary": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"about:blank\",\"title\":\"Missing boundary in multipart.\",\"status\":400}"
+ },
+ "up_octet": {
+  "status": 201,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"id\":4,\"name\":\"note.txt\",\"mime\":\"text/plain\",\"size\":1,\"turn_id\":null,\"created_at\":\"T\"}"
+ },
+ "up_pdf": {
+  "status": 201,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"id\":3,\"name\":\"doc.pdf\",\"mime\":\"application/pdf\",\"size\":10,\"turn_id\":null,\"created_at\":\"T\"}"
+ },
+ "up_png": {
+  "status": 201,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"id\":2,\"name\":\"pic.png\",\"mime\":\"image/png\",\"size\":24,\"turn_id\":null,\"created_at\":\"T\"}"
+ }
+}

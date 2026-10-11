@@ -20,6 +20,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from collections import deque
 from collections.abc import Iterator
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -103,15 +104,32 @@ def _wait_health(url: str, seconds: float = 180) -> None:
     raise RuntimeError(f"{url}/health가 {seconds}초 안에 안 떴다")
 
 
+# 가짜 모델의 대본과 받은 본문 — 질문 탭 카드(L14)의 시험이 채우고 읽는다. 대본이 비면 단발 「계약」
+FAKE_SCRIPT: deque[tuple[int, str, bytes]] = deque()
+FAKE_SEEN: list = []
+
+
 class _FakeLLM(BaseHTTPRequestHandler):
-    """OpenAI 호환 가짜 모델 — 질문 탭 카드(L14)가 쓴다. 지금은 주소가 있다는 것만."""
+    """OpenAI 호환 가짜 모델 — 대본대로 답하고(SSE·단발·오류) 받은 요청 본문을 남긴다.
+
+    두 판이 모델에 같은 것을 보냈는지 시험이 비교한다.
+    """
 
     def do_POST(self) -> None:
-        body = json.dumps({"choices": [{"message": {"role": "assistant", "content": "계약"}}]})
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
+        raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        try:
+            FAKE_SEEN.append(json.loads(raw))
+        except ValueError:
+            FAKE_SEEN.append(raw.decode("utf-8", "replace"))
+        if FAKE_SCRIPT:
+            status, ctype, body = FAKE_SCRIPT.popleft()
+        else:
+            msg = {"choices": [{"message": {"role": "assistant", "content": "계약"}}]}
+            status, ctype, body = 200, "application/json", json.dumps(msg).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", ctype)
         self.end_headers()
-        self.wfile.write(body.encode())
+        self.wfile.write(body)
 
     def log_message(self, *args: object) -> None:
         pass

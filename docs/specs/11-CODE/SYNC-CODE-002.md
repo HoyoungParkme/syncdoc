@@ -161,11 +161,21 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | L12 |
 | 완료 | 2026-10-11 · 브랜치 `card/L13-communities`(0d5b9a3 #373) · spec 3 + code 5 · `cargo test` 169(pycompat 정답 — 섞기·getrandbits·float 합이 파이썬 3.12와 비트까지 · codegraph 정답 파일의 커뮤니티 · 시험 DB — 그래프 행의 커뮤니티·코드 그래프 노드) · `cargo xtask codegraph-diff` — 싱크독 저장소 전체(함수 1986·커뮤니티 34)가 번호·라벨까지 파이썬 판과 같다 · 계약 `--target both --with-card L13` 987 통과·건너뜀 0 — L13: 코드 그래프 노드 바이트 같음, graph.json 없는 프로젝트는 꼴만 · clippy · 워크플로 녹색 · `check_code` Rust 154/154 · `check_calls` 0 · 사람 확인(윈도 싱크독_로컬 UI-17 코드 그래프의 커뮤니티 노드)은 따로 · 되먹임: graphify 원형에는 `multigraph` 키가 없어 networkx가 다중 그래프로 읽는다(라벨의 차수에 겹친 선이 든다) · L12 계약 고정 graph.json에서 graphify의 절대 경로 키를 뺐다 |
 
+#### L14 대화·질문 탭 — 읽다가 묻고, 모델이 관계도를 따라 읽는다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-SCN-001#S3]] · [[SYNC-SCN-001#S9]] · [[SYNC-UC-001#UC-H19]] · [[SYNC-PRD-001#R11]] · [[SYNC-INFRA-001]] 5.3 · 에이전트 판단 2026-10-11(사용자 목표 「끝까지」): PDF 글자는 pypdf 대신 `lopdf`로 — 쪽 잇기·빈 쪽·깨진 PDF 규칙은 같고 글자는 다를 수 있다(모델만 읽는다) · 모델 호출은 `reqwest`(rustls, 운영체제 인증서) · 질문 스트림은 따로 띄운 작업이 이벤트를 통로로 넘긴다(시작 전 실패는 상태 코드, 뒤는 `error` 이벤트, `internal`은 끊김) · 받는 쪽이 끊기면 턴을 `CancelledError`로 닫는다 · 앞 대화 10턴은 상수(설정 키는 다섯뿐) · 대화·코드 그래프 행의 `delete_by_project`를 두고 프로젝트 해제가 부른다 |
+| 구현 | [[SYNC-MS-020#Llm.step_stream]] · [[SYNC-MS-020#Llm.step]] · [[SYNC-MS-021#ConversationService.list]] · [[SYNC-MS-021#ConversationService.create]] · [[SYNC-MS-021#ConversationService.get]] · [[SYNC-MS-021#ConversationService.delete]] · [[SYNC-MS-021#ConversationService.delete_by_project]] · [[SYNC-MS-021#ConversationService.add_turn]] · [[SYNC-MS-021#ConversationService.finish_turn]] · [[SYNC-MS-021#ConversationService.history]] · [[SYNC-MS-021#ConversationService.add_attachment]] · [[SYNC-MS-021#ConversationService.remove_attachment]] · [[SYNC-MS-021#ConversationService.attachment_meta]] · [[SYNC-MS-021#ConversationService.attachment_bytes]] · [[SYNC-MS-021#ConversationService.attachment_text]] · [[SYNC-MS-021#ConversationService.pending_images]] · [[SYNC-MS-018#queries.ask_item]] · [[SYNC-MS-018#queries.ask_tool]] · [[SYNC-MS-018#queries.ask_code]] · [[SYNC-MS-018#queries.conversation_view]] · [[SYNC-MS-022#CodeGraphService.delete_by_project]] · [[SYNC-MS-013#ProjectService.delete_project]] 2 |
+| API | [[SYNC-API-001#GET/api/projects/{code}/conversations]] · [[SYNC-API-001#GET/api/conversations/{id}]] · [[SYNC-API-001#POST/api/conversations/{id}/attachments]] · [[SYNC-API-001#GET/api/attachments/{id}]] · [[SYNC-API-001#POST/api/docs/{docId}/ask]] · [[SYNC-API-001#POST/api/projects/{code}/code/ask]] |
+| 테스트 | `cargo test`(모델 스트림·단발·오류 접기를 작은 가짜 서버로 · 시험 DB — 대화·턴·첨부·종류·상한·소유 · 질문 루프 — 도구 아홉·상한·마무리·턴 닫기·답 속 링크) · 계약 L14 — 같은 가짜 모델(대본: 도구 호출 → 답, 조각 스트림)을 두 판이 불러 SSE 이벤트 바이트·대화 응답·첨부 응답이 같고 **두 판이 모델에 보낸 요청 본문도 같다** |
+| 선행 | L8 · L12 |
+| 완료 | — |
+
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
-| L14 대화·질문 탭 | 대화·첨부(PDF) · 모델 스트리밍 · 질문 루프 · SSE | L8 · L12 | XL |
 | L15 번들 가져오기 | 파이썬 판 카드 BX(git 번들 가져오기)의 Rust 쪽 | L11 · BX | S |
 | L16 데이터 보호·「이 PC」 | 백업·되살리기·데이터 자리 옮기기 · UI-13 「이 PC」 묶음 · 같은 망 열기(`PUBLIC_BASE_URL`, 설정 파일만 — 사용자 결정 2026-10-07) | L4 · L11 | L |
 | L17 속도·출시 판정 | 두 판을 같은 PC에서 잰다 — [[SYNC-PRD-001#R15]] 속도 목표와 「파이썬 판보다 느린 항목 없음」 | L14~L16 · L18 | M |

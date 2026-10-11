@@ -150,4 +150,11 @@ impl CodeGraphService<'_> {
             truncated,
         })
     }
+
+    /// SYNC-MS-022#CodeGraphService.delete_by_project
+    ///
+    /// 소유 판정은 부르는 쪽이 했다
+    pub async fn delete_by_project(&mut self, project_id: i32) -> Result<(), Problem> {
+        repo::delete_by_project(&mut *self.db, project_id).await
+    }
 }

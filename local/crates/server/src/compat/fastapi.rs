@@ -90,6 +90,85 @@ pub fn body_model(body: &Body, v: &Validator) -> Result<PyValue, Problem> {
     }
 }
 
+/// 선택 본문 모델 하나 — `req: Model | None = None`. 비었거나 `null`이면 없음
+pub fn body_model_optional(body: &Body, v: &Validator) -> Result<Option<PyValue>, Problem> {
+    match body {
+        Body::None => Ok(None),
+        other => body_model(other, v).map(Some),
+    }
+}
+
+/// 올린 파일 하나 — starlette `UploadFile`의 이름·종류(없으면 없음)·바이트
+pub struct Upload {
+    pub filename: Option<String>,
+    pub content_type: Option<String>,
+    pub data: Vec<u8>,
+}
+
+/// `file: UploadFile` 하나 — starlette `request.form()` + FastAPI 검증. multipart가 아니거나 비면 빈 폼(→ `Field required`),
+/// 경계가 없으면 starlette 문장의 400, 그 밖에 깨졌으면 FastAPI의 400, 같은 이름이 여럿이면 뒤의 것, 파일이 아닌 값이면 `Expected UploadFile`
+pub async fn form_file(headers: &HeaderMap, bytes: &[u8], name: &str) -> Result<Upload, Problem> {
+    let parse_error = || Problem::Blank {
+        status: 400,
+        title: "There was an error parsing the body".into(),
+        detail: None,
+    };
+    let missing = || Problem::InvalidRequest {
+        errors: vec![(format!("body.{name}"), ErrorKind::Missing.message())],
+    };
+    let ct = first_header(headers, "content-type").unwrap_or_default();
+    let (main, sub) = content_type(&ct);
+    if !(main == "multipart" && sub == "form-data") {
+        return Err(missing());
+    }
+    // starlette — 경계가 없으면 그 문장이 400의 제목, 빈 본문은 빈 폼
+    let boundary = multer::parse_boundary(&ct).map_err(|_| Problem::Blank {
+        status: 400,
+        title: "Missing boundary in multipart.".into(),
+        detail: None,
+    })?;
+    if bytes.is_empty() {
+        return Err(missing());
+    }
+    let body = bytes.to_vec();
+    let stream = futures_util::stream::once(async move {
+        Ok::<_, std::convert::Infallible>(axum::body::Bytes::from(body))
+    });
+    let mut mp = multer::Multipart::new(stream, boundary);
+    let mut found: Option<Option<Upload>> = None;
+    loop {
+        let field = mp.next_field().await.map_err(|_| parse_error())?;
+        let Some(field) = field else { break };
+        if field.name() != Some(name) {
+            continue;
+        }
+        let filename = field.file_name().map(str::to_string);
+        let content_type = field.headers().get("content-type").map(|v| {
+            v.as_bytes()
+                .iter()
+                .map(|&b| char::from(b))
+                .collect::<String>()
+        });
+        let is_file = filename.is_some();
+        let data = field.bytes().await.map_err(|_| parse_error())?.to_vec();
+        found = Some(is_file.then_some(Upload {
+            filename,
+            content_type,
+            data,
+        }));
+    }
+    match found {
+        None => Err(missing()),
+        Some(None) => Err(Problem::InvalidRequest {
+            errors: vec![(
+                format!("body.{name}"),
+                "Value error, Expected UploadFile, received: <class 'str'>".into(),
+            )],
+        }),
+        Some(Some(u)) => Ok(u),
+    }
+}
+
 /// 경로 값 정수 — `int` 필드의 lax 검증(문자열 → 정수)
 pub fn path_int(name: &str, raw: &str, v: &Validator) -> Result<num_bigint::BigInt, Problem> {
     match v.validate(&PyValue::Str(PyStr::from(raw)), Opts::default()) {
@@ -306,6 +385,45 @@ pub mod schemas {
     /// 질의 `file: str = Query(min_length=1)` (GET /api/projects/{code}/code/source)
     pub fn code_file() -> Validator {
         Validator::new(&json!({"type": "str", "min_length": 1}), "str").expect("file 스키마")
+    }
+
+    /// `AskRequest` — 파이썬 판 `web/schemas/documents.py` (POST /api/docs/{docId}/ask, 카드 L14)
+    pub fn ask_request() -> Validator {
+        Validator::new(
+            &json!({"type": "model", "cls": "AskRequest", "schema": {"type": "model-fields", "fields": {
+                "question": {"type": "model-field", "schema": {"type": "str"}},
+                "conversation_id": {"type": "model-field", "schema": {"type": "int"}},
+                "item_id": {"type": "model-field", "schema": {"type": "default", "schema": {"type": "nullable", "schema": {"type": "str"}}, "default": null}},
+                "attachment_ids": {"type": "model-field", "schema": {"type": "default", "schema": {"type": "list", "items_schema": {"type": "int"}}, "default": []}}},
+                "model_name": "AskRequest"}, "config": {"title": "AskRequest"}}),
+            "AskRequest",
+        )
+        .expect("AskRequest 스키마")
+    }
+
+    /// `AskCodeRequest` — 파이썬 판 `web/schemas/documents.py` (POST /api/projects/{code}/code/ask, 카드 L14)
+    pub fn ask_code_request() -> Validator {
+        Validator::new(
+            &json!({"type": "model", "cls": "AskCodeRequest", "schema": {"type": "model-fields", "fields": {
+                "question": {"type": "model-field", "schema": {"type": "str"}},
+                "conversation_id": {"type": "model-field", "schema": {"type": "int"}},
+                "key": {"type": "model-field", "schema": {"type": "default", "schema": {"type": "nullable", "schema": {"type": "str"}}, "default": null}},
+                "attachment_ids": {"type": "model-field", "schema": {"type": "default", "schema": {"type": "list", "items_schema": {"type": "int"}}, "default": []}}},
+                "model_name": "AskCodeRequest"}, "config": {"title": "AskCodeRequest"}}),
+            "AskCodeRequest",
+        )
+        .expect("AskCodeRequest 스키마")
+    }
+
+    /// `CreateConversation` — `title: str | None = None` (POST /api/projects/{code}/conversations, 카드 L14)
+    pub fn create_conversation() -> Validator {
+        Validator::new(
+            &json!({"type": "model", "cls": "CreateConversation", "schema": {"type": "model-fields", "fields": {
+                "title": {"type": "model-field", "schema": {"type": "default", "schema": {"type": "nullable", "schema": {"type": "str"}}, "default": null}}},
+                "model_name": "CreateConversation"}, "config": {"title": "CreateConversation"}}),
+            "CreateConversation",
+        )
+        .expect("CreateConversation 스키마")
     }
 
     /// 질의 `confirm: bool = Query(False)` (DELETE /api/docs/{docId})

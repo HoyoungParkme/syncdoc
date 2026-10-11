@@ -19,8 +19,13 @@ use crate::web::problem::{method_not_allowed, panic_response};
 use crate::web::routes::account::{issue_token, list_tokens, me, revoke_token};
 use crate::web::routes::admin::{hook, move_to_github, move_to_server, rebuild, repos, sync};
 use crate::web::routes::code::{
-    code_calls, code_nodes, code_text, doc_code, item_code, item_code_source,
+    ask_code, code_calls, code_nodes, code_text, doc_code, item_code, item_code_source,
 };
+use crate::web::routes::conversations::{
+    create_conversation, delete_attachment, delete_conversation, get_attachment, get_conversation,
+    list_conversations, upload_attachment,
+};
+use crate::web::routes::documents::ask;
 use crate::web::routes::documents::change_status;
 use crate::web::routes::documents::diff;
 use crate::web::routes::documents::downstream;
@@ -75,6 +80,24 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/api/projects/{code}/code-calls", get(code_calls))
         .route("/api/projects/{code}/code-graph", get(code_nodes))
+        .route("/api/projects/{code}/code/ask", post(ask_code))
+        .route(
+            "/api/projects/{code}/conversations",
+            get(list_conversations).post(create_conversation),
+        )
+        .route(
+            "/api/conversations/{id}",
+            get(get_conversation).delete(delete_conversation),
+        )
+        .route(
+            "/api/conversations/{id}/attachments",
+            post(upload_attachment),
+        )
+        .route(
+            "/api/attachments/{id}",
+            get(get_attachment).delete(delete_attachment),
+        )
+        .route("/api/docs/{doc_id}/ask", post(ask))
         .route("/api/projects/{code}/code/source", get(code_text))
         .route("/api/projects/{code}/trash", get(trash_list))
         .route(
