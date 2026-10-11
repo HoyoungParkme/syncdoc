@@ -56,6 +56,7 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 | 10 | `SYNC-MS-020` | MINISPEC — llm 어댑터 — 모델 호출 (Rust) | `10-MS/SYNC-MS-020.md` | 2 | 4 | DOM-004, MS-009, INFRA-001, STD-004 |
 | 10 | `SYNC-MS-021` | MINISPEC — ConversationService — 대화·턴·첨부 (Rust) | `10-MS/SYNC-MS-021.md` | 14 | 4 | DOM-004, MS-010, INFRA-001, STD-004 |
 | 10 | `SYNC-MS-022` | MINISPEC — codegraph — 코드 호출 그래프와 명세 대조 (Rust) | `10-MS/SYNC-MS-022.md` | 15 | 4 | DOM-004, MS-011, INFRA-001, STD-004 |
+| 10 | `SYNC-MS-023` | MINISPEC — 이 PC — 백업·되살리기·데이터 자리·자동 시작 (Rust) | `10-MS/SYNC-MS-023.md` | 15 | 4 | DOM-004, INFRA-001, API-001, UI-002, MS-012, STD-004 |
 | 11 | `SYNC-CODE-001` | 구현 계획 — 슬라이스 카드와 커밋 기록 | `CODE_구현계획_싱크독.md` | 34 | 6 | STD-004, MS-001, MS-002, MS-003, MS-006, MS-007, MS-008, MS-009, API-001, API-002, UI-002, SCN-001 |
 | 11 | `SYNC-CODE-002` | 구현 계획 — 싱크독_로컬 (Rust) 슬라이스 카드와 커밋 기록 | `11-CODE/SYNC-CODE-002.md` | 1 | 5 | STD-004, DOM-004, PRD-001, INFRA-001, API-001, API-002, UI-002, SCN-001 |
 | — | `SYNC-STD-001` | 명세 작성 규약 | `STD_명세작성규약_싱크독.md` | 0 | 11 | PRD-001 |
@@ -332,6 +333,12 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 - 2. 함수
 - 3. 미결사항
 
+**SYNC-MS-023** MINISPEC — 이 PC — 백업·되살리기·데이터 자리·자동 시작 (Rust)
+- 0. 이 문서가 다루는 것
+- 1. 함수 목록
+- 2. 함수
+- 3. 미결사항
+
 **SYNC-CODE-001** 구현 계획 — 슬라이스 카드와 커밋 기록
 - 0. 이 문서가 다루는 것
 - 1. 슬라이스
@@ -563,8 +570,7 @@ flowchart BT
 문서 전부의 미결사항 절에서 **열려 있는 것만** 모았다. 이 목록은 `tools/open_items.py`가 만든다 — 손으로 고치지 않는다. 원본을 고치고 다시 생성한다.
 닫힌 미결은 각 문서에 결정과 함께 남아 있다.
 
-**SYNC-CODE-002**
-- [ ] 되살리기가 Docker 판(파이썬 폐쇄망판)의 백업 파일도 받을지 — 두 판은 같은 표를 쓴다([[SYNC-INFRA-001]] 9.2). 카드 L16 전에 정한다
+_열린 미결이 없다. 각 문서의 미결사항 절에 결정과 함께 닫혀 있다._
 
 ## 6. 미결사항
 
