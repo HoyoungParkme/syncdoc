@@ -12,7 +12,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-011, SYNC-INFRA-001, SYNC-STD-004]
 
 `crates/codegraph`(순수 함수 — DB 없음)와 `crates/core/src/codegraph`(`CodeGraphService`)의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.11. 파이썬 판 [[SYNC-MS-011]]과 **같은 이름·같은 처리·같은 그래프 모양**이고, 이 문서는 다른 점만 적는다([[SYNC-STD-001]] 2.10). 「호출하는 것」과 테스트 관점은 제 것을 적는다.
 
-**카드 L12 몫은 추출·줄이기·보강·대조·층과 그래프 행이다(2026-10-11).** 커뮤니티(Louvain·허브 라벨)는 카드 L13이 이 문서에 더한다 — 그 전에는 함수마다 `community`가 없고(null) `communities`가 빈 목록이다.
+**카드 L12 몫은 추출·줄이기·보강·대조·층과 그래프 행이다(2026-10-11).** **카드 L13이 커뮤니티(Louvain·허브 라벨)를 더했다(2026-10-11)** — 파이썬 판이 부르는 networkx Louvain과 graphify의 그래프 읽기·허브 라벨을 옮겨 같은 원형이면 커뮤니티 번호·라벨까지 바이트로 같다([[#codegraph.communities]]).
 
 **graphify가 없다**([[SYNC-INFRA-001]] 9.2 — graphify는 파이썬 전용이다). 그래서
 - 저장소에 커밋된 `graphify-out/graph.json`이 있으면 파이썬 판처럼 그것을 원형으로 쓴다([[#codegraph.load]]) — 그때 두 판의 그래프는 같은 원형에서 같은 줄이기·보강을 거쳐 **바이트까지 같다**. 에이전트 판단 2026-10-11(사용자 목표 「끝까지」) — [[SYNC-CODE-002]] 4장 미결을 이렇게 닫았다
@@ -20,7 +20,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-011, SYNC-INFRA-001, SYNC-STD-004]
 
 **파이썬 `ast` 대신 tree-sitter-python**(0.25.0 — graphify가 쓰는 판). 보강이 `ast`로 읽는 것(맨 위 정의·클래스 메서드·데코레이터 줄·끝 줄·docstring·인자 주석·대입·속성·호출·import)을 같은 뜻으로 읽는다 — 끝 줄은 주석을 뺀 마지막 문장의 끝, docstring은 `inspect.cleandoc`을 거친 첫 줄, 걷는 차례는 `ast.walk`처럼 너비 우선. `ast.parse`가 실패할 파일(문법 오류 — tree-sitter의 `ERROR`·`MISSING`)은 건너뛴다. TS/JS(tree-sitter-typescript 0.23.2)·Rust(tree-sitter-rust 0.24.2)는 파이썬 판과 같은 문법 판이라 같은 나무다.
 
-**그래프 모양** — [[SYNC-MS-011]] 0장 그대로(`functions`·`calls`·`communities`). `Graph { functions: Vec<Function>, calls: Vec<Call>, communities: Vec<Community>, files: Vec<String> }` — `files`는 줄이기가 주고 보강이 쓰고 비운다(저장 모양에 없다). `Function { key, name, qual, file, line, end, item, ms, community }` · `Call = (from, to, via)`.
+**그래프 모양** — [[SYNC-MS-011]] 0장 그대로(`functions`·`calls`·`communities`). `Graph { functions: Vec<Function>, calls: Vec<Call>, communities: Option<Vec<Community>>, files: Vec<String> }` — `files`는 줄이기가 주고 보강이 쓰고 비운다(저장 모양에 없다). `communities`는 [[#codegraph.communities]]가 채운다(그 전에는 없다). `Function { key, name, qual, file, line, end, item, ms, community }` · `Call = (from, to, via)`.
 
 **표기** — `→` 반환·결과, `!` 예외(`Problem`), `DB:` 테이블 접근, `git:` [[SYNC-MS-019]], `·` 같은 단계 안 구분.
 
@@ -41,6 +41,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-011, SYNC-INFRA-001, SYNC-STD-004]
 | [[#codegraph.item_neighbors]] | 항목 있는 함수까지의 부르는 것·불리는 곳 |
 | [[#codegraph.layer_table]] | 클래스 명세 「폴더 구조」 절의 층 표를 읽는다 |
 | [[#codegraph.layers]] | 항목 없는 함수마다 층 |
+| [[#codegraph.communities]] | 함수를 Louvain 군집으로 묶는다 |
 | [[#CodeGraphService.get]] | 프로젝트의 그래프 행 |
 | [[#CodeGraphService.save]] | 새 그래프로 바꿔 끼운다 |
 | [[#CodeGraphService.fail]] | 실패 이유만 남긴다 — 옛 그래프는 그대로 |
@@ -230,6 +231,27 @@ pub fn layers(graph: &Graph, rows: &[LayerRow]) -> (HashMap<String, Layer>, Vec<
 
 ---
 
+#### codegraph.communities 함수를 Louvain 군집으로 묶는다
+
+**시그니처**
+```rust
+pub fn communities(raw: &Value, graph: Graph) -> Graph
+```
+
+근거: [[SYNC-MS-011#codegraph.communities]]
+
+**처리** [[SYNC-MS-011#codegraph.communities]] 1~7과 같다 — 테스트 노드와 그 선을 뺀 원형 → Louvain(노드는 이름 순, 선은 양 끝을 정렬한 차례로 다시 넣고, resolution 1.0·seed 42) → 군집은 크기 내림차순(같으면 정렬한 노드) 번호 → key의 커뮤니티, 없으면 파일의 다수 커뮤니티 → 그 커뮤니티의 함수를 품은 코드 노드 중 차수 최고(같으면 이름 순)의 이름이 라벨 → `communities = [{id, label, size}]`(함수 0인 군집은 빼고 크기 내림차순, 같으면 id)
+
+**다른 점** 파이썬 판이 부르는 라이브러리를 옮겼다(바이트까지 같게, 에이전트 판단 2026-10-11 — 사용자 목표 「끝까지」)
+- networkx 3.7 `louvain_communities` — `_one_level`(섞은 노드 차례로 옮기기, `defaultdict` 차례·`>`로만 바꾸기)·`_aggregate_graph`(선을 그래프 차례로 더한다)·`modularity`. 섞기는 파이썬 `random.Random(42)`(MT19937, `init_by_array`·`getrandbits`·`shuffle`), modularity의 군집 기여 합은 파이썬 3.12 `sum`(float는 Neumaier 보정) — `pycompat::random`·`pycompat::pysum`. 가중치는 정수라 차수·안쪽 선 합은 정확하다
+- graphify `load_node_link_graph` — `directed`·`multigraph`가 없으면 무향·다중 그래프(networkx 기본값)라 라벨의 차수에 겹친 선이 다 든다 · `label_communities_by_hub`
+- 노드 ID는 글자로 본다(graphify 원형은 글자다) · 군집·라벨이 실패할 길이 없어(예외를 내는 원형 꼴이 없다) 경고 로그도 없다
+- 커뮤니티가 없는 함수는 `community` 열쇠를 두지 않는다(파이썬은 null) — 읽는 쪽([[SYNC-MS-018#queries.code_nodes]])은 둘을 같게 본다
+
+**테스트 관점** [[SYNC-MS-011#codegraph.communities]]의 것 · 파이썬 판이 같은 원형·같은 파일로 낸 답과 바이트로 같다(정답 파일 · 싱크독 저장소 전체 — `cargo xtask codegraph-diff`) · 섞기·합이 파이썬 3.12와 비트까지 같다(`pycompat` 정답 `pyrandom.json`)
+
+---
+
 #### CodeGraphService.get 프로젝트의 그래프 행
 
 **시그니처**
@@ -296,4 +318,4 @@ pub async fn read(&mut self, git: &Git, project_id: i32, workdir: &Path, path: &
 
 ## 3. 미결사항
 
-없음. 커뮤니티는 카드 L13이 더한다 — [[SYNC-CODE-002]].
+없음.
