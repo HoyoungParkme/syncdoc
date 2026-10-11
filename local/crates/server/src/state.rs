@@ -6,6 +6,8 @@ use sqlx::PgPool;
 use syncdoc_core::infra::llm::Llm;
 use syncdoc_core::project::service::ServerRepos;
 
+use crate::local::LocalOps;
+
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
@@ -15,10 +17,12 @@ pub struct AppState {
     pub local_name: String,
     /// 모델 주소와 키가 다 있다 (INFRA 5.2 `llm_enabled`)
     pub llm_enabled: bool,
-    /// 공개 주소의 host:port — 같은 망 열기(L16) 전에는 `127.0.0.1:{실제 포트}` (INFRA 9.4)
+    /// 공개 주소의 host:port — `PUBLIC_BASE_URL`의 것, 없으면 `127.0.0.1:{실제 포트}` (INFRA 9.4)
     pub public_netloc: String,
     /// 서버 저장소 자리 — git·`origins/`·`repos/`·규약 주소 (SYNC-MS-013 0장, 카드 L6)
     pub repos: Arc<ServerRepos>,
     /// 모델 — 설정의 주소·키·모델 (SYNC-MS-020, 카드 L14)
     pub llm: Llm,
+    /// 이 PC — 설치형이 채운다(카드 L16). 없으면 `/api/local*`이 없는 경로
+    pub local: Option<Arc<dyn LocalOps>>,
 }

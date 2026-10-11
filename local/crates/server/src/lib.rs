@@ -2,12 +2,13 @@
 //! 처리기는 가져온 맨 이름으로 등록한다 — 경로로 적으면 코드 그래프가 조립에서 처리기로 선을 긋는다.
 
 pub mod compat;
+pub mod local;
 pub mod mcp;
 pub mod state;
 pub mod web;
 
 use axum::extract::DefaultBodyLimit;
-use axum::routing::{any, delete, get, post};
+use axum::routing::{any, delete, get, post, put};
 use axum::{Json, Router, middleware};
 use serde_json::{Value, json};
 use tower_http::catch_panic::CatchPanicLayer;
@@ -36,6 +37,9 @@ use crate::web::routes::documents::revert;
 use crate::web::routes::documents::trash_document;
 use crate::web::routes::documents::versions;
 use crate::web::routes::git::git_entrance;
+use crate::web::routes::local::{
+    get_local, post_backup, post_move, post_restore, put_autostart, put_settings,
+};
 use crate::web::routes::projects::{
     delete_project, get_file, get_project, graph, import_bundle, init_project, list_docs,
     list_items, list_projects, project_methods, trash_list,
@@ -48,7 +52,7 @@ use crate::web::static_files::fallback;
 
 /// 라우터 — 가드가 라우팅 바깥에서 모든 요청을 덮는다(404·405·정적 파일까지, SEQ-C3)
 pub fn app(state: AppState) -> Router {
-    let inner = Router::new()
+    let mut routes = Router::new()
         .route("/health", get(health))
         .route("/api/me", get(me))
         .route("/api/me/tokens", get(list_tokens).post(issue_token))
@@ -126,7 +130,18 @@ pub fn app(state: AppState) -> Router {
         )
         .merge(mcp::router(state.clone()))
         .route("/specs/", get(spec_copy))
-        .route("/specs/{*path}", get(spec_copy))
+        .route("/specs/{*path}", get(spec_copy));
+    // 이 PC — 설치형만(카드 L16). 비어 있으면 없는 경로(파이썬 판과 같다)
+    if state.local.is_some() {
+        routes = routes
+            .route("/api/local", get(get_local))
+            .route("/api/local/settings", put(put_settings))
+            .route("/api/local/autostart", put(put_autostart))
+            .route("/api/local/backups", post(post_backup))
+            .route("/api/local/restore", post(post_restore))
+            .route("/api/local/move", post(post_move));
+    }
+    let inner = routes
         .fallback(fallback)
         // 파이썬 판(FastAPI)은 본문 크기를 막지 않는다 — /mcp만 4MiB(MCP SDK)
         .layer(DefaultBodyLimit::disable())

@@ -24,6 +24,7 @@ fn state(pool: PgPool) -> AppState {
         local_name: "로컬".into(),
         llm_enabled: false,
         llm: Default::default(),
+        local: None,
         repos: std::sync::Arc::new(support::server_repos(
             &std::env::temp_dir().join("syncdoc-server-test"),
         )),

@@ -24,6 +24,7 @@ fn router(pool: PgPool) -> Router {
         local_name: "local".into(),
         llm_enabled: false,
         llm: Default::default(),
+        local: None,
         repos: std::sync::Arc::new(support::server_repos(
             &std::env::temp_dir().join("syncdoc-server-test"),
         )),
