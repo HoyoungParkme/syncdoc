@@ -265,3 +265,14 @@ pub async fn get_file(
     set(h, header::ETAG, &etag);
     Ok(resp)
 }
+
+/// SYNC-API-001#GET/api/projects/{code}/trash
+pub async fn trash_list(
+    State(state): State<AppState>,
+    Path(code): Path<String>,
+) -> Result<Json<Vec<DocumentSummary>>, ApiProblem> {
+    let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+    let user = current_user(&mut c, &state).await?;
+    let docs = queries::trash_list(&mut c, &state.repos, &code, &user).await?;
+    Ok(Json(docs.iter().map(DocumentSummary::from).collect()))
+}
