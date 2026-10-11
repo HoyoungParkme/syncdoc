@@ -606,3 +606,69 @@ async fn changed_files_latest_per_path_renames_and_skips() {
     );
     assert_eq!(got.len(), 2);
 }
+
+#[tokio::test]
+async fn log_oldest_first_follows_renames_and_skips_deletions() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, origin, work) = setup(tmp.path()).await;
+    g.commit_push(
+        &work,
+        "first",
+        &local_user(),
+        &files(&[("a.txt", "a\n")]),
+        &[],
+    )
+    .await
+    .expect("push");
+    let other = tmp.path().join("other");
+    sh(
+        tmp.path(),
+        &[
+            "clone",
+            "-q",
+            origin.to_str().expect("경로"),
+            other.to_str().expect("경로"),
+        ],
+    );
+    let (old, new) = (
+        "docs/specs/DOM/X-DOM-001.md",
+        "docs/specs/06-DOM/X-DOM-001.md",
+    );
+    put(&other, old, "v1\n");
+    push_as(&other, "a", "a@x", "spec: 초안\n\n둘째 줄\n\n셋째");
+    put(&other, old, "v2\n");
+    push_as(&other, "a", "9+octo@users.noreply.github.com", "spec: 수정");
+    std::fs::create_dir_all(other.join("docs/specs/06-DOM")).expect("폴더");
+    sh(&other, &["mv", old, new]);
+    push_as(&other, "a", "a@x", "옮김");
+    sh(&other, &["rm", "-q", new]);
+    push_as(&other, "a", "a@x", "trash(X-DOM-001)");
+    put(&other, new, "v3\n");
+    push_as(&other, "a", "a@x", "다시");
+    g.fetch(&work).await.expect("fetch");
+    sh(&work, &["checkout", "-q", "origin/main"]);
+    let got = g.log(&work, new).await.expect("이력");
+    let brief: Vec<(&str, &str)> = got
+        .iter()
+        .map(|c| (c.message.as_str(), c.path.as_str()))
+        .collect();
+    assert_eq!(
+        brief,
+        [
+            ("spec: 초안\n\n둘째 줄\n\n셋째", old),
+            ("spec: 수정", old),
+            ("옮김", new),
+            ("다시", new),
+        ]
+    );
+    assert_eq!(got[1].login, "octo");
+    for c in &got {
+        g.read(&work, &c.path, &c.hash).await.expect("읽힌다");
+    }
+    assert!(
+        g.log(&work, "docs/specs/02-PRD/없음.md")
+            .await
+            .expect("빈")
+            .is_empty()
+    );
+}

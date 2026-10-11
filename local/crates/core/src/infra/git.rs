@@ -13,7 +13,7 @@ use tokio::process::Command;
 use crate::account::model::UserRow;
 use crate::errors::Problem;
 use crate::pycompat::chars::{py_splitlines, strip};
-use crate::types::{ChangedFile, UserKind, stage_of};
+use crate::types::{ChangedFile, Commit, UserKind, stage_of};
 
 /// push가 거부되면 다시 미는 수 — INFRA 5.2 `PUSH_RETRIES` 기본값
 pub const PUSH_RETRIES: usize = 3;
@@ -680,6 +680,58 @@ impl Git {
             i += 4;
         }
         Ok(seen.into_values().flatten().collect())
+    }
+
+    /// SYNC-MS-019#Git.log
+    ///
+    /// `--follow`는 `--reverse`와 함께 쓰지 못한다 — 받아서 뒤집는다(#39). 지운 커밋은 뺀다(#325).
+    /// 커밋 경계는 앞쪽 구분자 `%x1e` — `--name-only`가 메시지 뒤에 빈 줄과 그때의 경로를 붙인다
+    pub async fn log(&self, workdir: &Path, path: &str) -> Result<Vec<Commit>, Problem> {
+        let out = self
+            .run(
+                Some(workdir),
+                &[
+                    os("log"),
+                    os("--follow"),
+                    os("--diff-filter=d"),
+                    os("--name-only"),
+                    os("--format=%x1e%H%x1f%an%x1f%ae%x1f%aI%x1f%s%n%b"),
+                    os("--"),
+                    os(path),
+                ],
+            )
+            .await?;
+        let mut commits = Vec::new();
+        for block in out.split('\u{1e}').skip(1) {
+            let mut f = block.splitn(5, '\u{1f}');
+            let (h, an, ae, date, rest) = (
+                f.next().unwrap_or(""),
+                f.next().unwrap_or(""),
+                f.next().unwrap_or(""),
+                f.next().unwrap_or(""),
+                f.next().unwrap_or(""),
+            );
+            let lines: Vec<&str> = rest.trim_end_matches('\n').split('\n').collect();
+            let (at_path, msg) = match lines.split_last() {
+                Some((last, head)) => (*last, head.join("\n")),
+                None => ("", String::new()),
+            };
+            let date =
+                time::OffsetDateTime::parse(date, &time::format_description::well_known::Rfc3339)
+                    .map_err(|e| Problem::Internal {
+                    log: format!("git log 시각을 못 읽었다 {date:?} — {e}"),
+                })?;
+            commits.push(Commit {
+                hash: h.to_string(),
+                login: login_of(an, ae),
+                date,
+                message: commit_message(msg.trim_matches('\n')),
+                email: ae.to_string(),
+                path: at_path.to_string(),
+            });
+        }
+        commits.reverse();
+        Ok(commits)
     }
 
     /// SYNC-MS-019#Git.advertise_refs
