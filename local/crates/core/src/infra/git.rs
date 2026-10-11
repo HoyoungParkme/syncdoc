@@ -248,6 +248,35 @@ impl Git {
     }
 }
 
+/// `Git.archive`의 풀기 — 보통 파일·폴더만, 저장소 안 경로만 (파이썬 `extractall(filter="data")` 대신)
+fn untar(tar: &Path, dest: &Path) -> Result<(), Problem> {
+    let mut a = tar::Archive::new(fs::File::open(tar)?);
+    for entry in a.entries()? {
+        let mut e = entry?;
+        let kind = e.header().entry_type();
+        if !(kind.is_file() || kind.is_dir()) {
+            continue;
+        }
+        let path = e.path()?.into_owned();
+        let inside = path
+            .components()
+            .all(|c| matches!(c, Component::Normal(_) | Component::CurDir));
+        if !inside {
+            continue;
+        }
+        let to = dest.join(&path);
+        if kind.is_dir() {
+            fs::create_dir_all(&to)?;
+        } else {
+            if let Some(parent) = to.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            e.unpack(&to)?;
+        }
+    }
+    Ok(())
+}
+
 /// 파이썬 `PurePosixPath(p).match(glob)` — 뒤에서부터 조각마다 맞춘다. 조각 안에서 `*`는 아무 글자들, `?`는 한 글자
 fn path_match(path: &str, glob: &str) -> bool {
     let parts: Vec<&str> = path
@@ -735,6 +764,48 @@ impl Git {
         }
         commits.reverse();
         Ok(commits)
+    }
+
+    /// SYNC-MS-019#Git.changed_paths
+    ///
+    /// 범위에서 바뀐 경로 전부 — `changed_files`와 달리 명세 밖도 거르지 않는다. 코드가 바뀌었는지(커밋 처리 5a)만 본다
+    pub async fn changed_paths(&self, workdir: &Path, range: &str) -> Result<Vec<String>, Problem> {
+        let out = self
+            .run(Some(workdir), &[os("diff"), os("--name-only"), os(range)])
+            .await?;
+        Ok(py_splitlines(&out)
+            .into_iter()
+            .filter(|l| !strip(l).is_empty())
+            .map(str::to_string)
+            .collect())
+    }
+
+    /// SYNC-MS-019#Git.archive
+    ///
+    /// 커밋된 파일만 `dest`에 푼다 — 작업 사본을 건드리지 않고 .gitignore된 산출물이 섞이지 않는다(INFRA 4.3).
+    /// 보통 파일과 폴더만 — 링크는 따라가지도 만들지도 않고, 절대 경로·`..` 조각은 버린다
+    pub async fn archive(&self, workdir: &Path, commit: &str, dest: &Path) -> Result<(), Problem> {
+        fs::create_dir_all(dest)?;
+        let tar = dest.join(".src.tar");
+        self.run(
+            Some(workdir),
+            &[
+                os("archive"),
+                os("--format=tar"),
+                os("-o"),
+                tar.as_os_str(),
+                os(commit),
+            ],
+        )
+        .await?;
+        let (from, to) = (tar.clone(), dest.to_path_buf());
+        let done = tokio::task::spawn_blocking(move || untar(&from, &to))
+            .await
+            .map_err(|e| Problem::Internal {
+                log: format!("tar 풀기가 멈췄다 — {e}"),
+            });
+        let _ = fs::remove_file(&tar);
+        done?
     }
 
     /// SYNC-MS-019#Git.checkout
