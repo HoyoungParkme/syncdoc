@@ -851,3 +851,49 @@ pub struct CodeCalls {
     pub graph: Option<CodeGraphInfo>,
     pub edges: Vec<CodeCallEdge>,
 }
+
+/// 코드 그래프의 커뮤니티 하나 (DOM-002 2.8 `CodeCommunity`, 카드 L13) — `size`는 든 함수 수
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeCommunity {
+    pub id: i64,
+    pub label: String,
+    pub size: i64,
+}
+
+/// 층 표 명세 칸의 조각 (DOM-002 2.8 `CodeLayerSpec`) — `ref_`는 `[[…]]` 안(없으면 없음)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeLayerSpec {
+    pub ref_: Option<String>,
+    pub note: String,
+}
+
+/// 항목 없는 함수의 층 (DOM-002 2.8 `CodeLayer`) — 도우미는 `name="도우미"`, `specs` 빈 것
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeLayer {
+    pub name: String,
+    pub specs: Vec<CodeLayerSpec>,
+}
+
+/// 코드 그래프 노드 하나 (DOM-002 2.8 `CodeNode`) — `status`는 MINISPEC 항목이 있을 때 코드만 > 명세만 > 같음
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeNode {
+    pub key: String,
+    pub name: String,
+    pub qual: String,
+    pub file: String,
+    pub line: i64,
+    pub community: Option<i64>,
+    pub item: Option<String>,
+    pub ms: Option<String>,
+    pub status: Option<String>,
+    pub layer: Option<CodeLayer>,
+}
+
+/// 코드 그래프 노드 전부 (DOM-002 2.8 `CodeNodes`, `queries.code_nodes`, UI-17)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeNodes {
+    pub graph: Option<CodeGraphInfo>,
+    pub communities: Vec<CodeCommunity>,
+    pub functions: Vec<CodeNode>,
+    pub calls: Vec<(String, String)>,
+}

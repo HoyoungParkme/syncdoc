@@ -14,8 +14,8 @@ use syncdoc_core::types::{
 };
 use syncdoc_core::types::{
     CodeBrief as CodeBriefDto, CodeCalls as CodeCallsDto, CodeFunction as CodeFunctionDto,
-    CodeGraphInfo as CodeGraphInfoDto, CodeRef as CodeRefDto, CodeText as CodeTextDto,
-    CodeView as CodeViewDto,
+    CodeGraphInfo as CodeGraphInfoDto, CodeNodes as CodeNodesDto, CodeRef as CodeRefDto,
+    CodeText as CodeTextDto, CodeView as CodeViewDto,
 };
 use syncdoc_core::types::{
     HookStatus as HookStatusDto, RebuildResult as RebuildResultDto, RepoStatus as RepoStatusDto,
@@ -854,6 +854,101 @@ impl From<&CodeCallsDto> for CodeCalls {
                     to: e.to.clone(),
                     status: e.status.clone(),
                 })
+                .collect(),
+        }
+    }
+}
+
+/// `CodeCommunity` — 커뮤니티 하나 (카드 L13)
+#[derive(Debug, Serialize)]
+pub struct CodeCommunity {
+    pub id: i64,
+    pub label: String,
+    pub size: i64,
+}
+
+/// `CodeLayerSpec` — 층 표 명세 칸의 조각
+#[derive(Debug, Serialize)]
+pub struct CodeLayerSpec {
+    #[serde(rename = "ref")]
+    pub ref_: Option<String>,
+    pub note: String,
+}
+
+/// `CodeLayer` — 항목 없는 함수의 층
+#[derive(Debug, Serialize)]
+pub struct CodeLayer {
+    pub name: String,
+    pub specs: Vec<CodeLayerSpec>,
+}
+
+/// `CodeNode` — 코드 그래프 노드 하나
+#[derive(Debug, Serialize)]
+pub struct CodeNode {
+    pub key: String,
+    pub name: String,
+    pub qual: String,
+    pub file: String,
+    pub line: i64,
+    pub community: Option<i64>,
+    pub item: Option<String>,
+    pub ms: Option<String>,
+    pub status: Option<String>,
+    pub layer: Option<CodeLayer>,
+}
+
+/// `CodeNodes` — 코드 그래프 노드 전부 (UI-17)
+#[derive(Debug, Serialize)]
+pub struct CodeNodes {
+    pub graph: Option<CodeGraphInfo>,
+    pub communities: Vec<CodeCommunity>,
+    pub functions: Vec<CodeNode>,
+    pub calls: Vec<[String; 2]>,
+}
+
+impl From<&CodeNodesDto> for CodeNodes {
+    fn from(n: &CodeNodesDto) -> Self {
+        CodeNodes {
+            graph: n.graph.as_ref().map(CodeGraphInfo::from),
+            communities: n
+                .communities
+                .iter()
+                .map(|c| CodeCommunity {
+                    id: c.id,
+                    label: c.label.clone(),
+                    size: c.size,
+                })
+                .collect(),
+            functions: n
+                .functions
+                .iter()
+                .map(|f| CodeNode {
+                    key: f.key.clone(),
+                    name: f.name.clone(),
+                    qual: f.qual.clone(),
+                    file: f.file.clone(),
+                    line: f.line,
+                    community: f.community,
+                    item: f.item.clone(),
+                    ms: f.ms.clone(),
+                    status: f.status.clone(),
+                    layer: f.layer.as_ref().map(|l| CodeLayer {
+                        name: l.name.clone(),
+                        specs: l
+                            .specs
+                            .iter()
+                            .map(|s| CodeLayerSpec {
+                                ref_: s.ref_.clone(),
+                                note: s.note.clone(),
+                            })
+                            .collect(),
+                    }),
+                })
+                .collect(),
+            calls: n
+                .calls
+                .iter()
+                .map(|(a, b)| [a.clone(), b.clone()])
                 .collect(),
         }
     }
