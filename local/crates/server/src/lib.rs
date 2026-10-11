@@ -23,6 +23,7 @@ use crate::web::routes::documents::downstream;
 use crate::web::routes::documents::get_document;
 use crate::web::routes::documents::purge_document;
 use crate::web::routes::documents::restore_document;
+use crate::web::routes::documents::revert;
 use crate::web::routes::documents::trash_document;
 use crate::web::routes::documents::versions;
 use crate::web::routes::projects::{
@@ -69,6 +70,7 @@ pub fn app(state: AppState) -> Router {
         .route("/api/docs/{doc_id}/restore", post(restore_document))
         .route("/api/docs/{doc_id}/purge", post(purge_document))
         .route("/api/docs/{doc_id}/status", post(change_status))
+        .route("/api/docs/{doc_id}/revert", post(revert))
         .merge(mcp::router(state.clone()))
         .route("/specs/", get(spec_copy))
         .route("/specs/{*path}", get(spec_copy))

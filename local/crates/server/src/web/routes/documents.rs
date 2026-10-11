@@ -31,6 +31,7 @@ use crate::web::schemas::{
 static VERSION_NO: LazyLock<Validator> = LazyLock::new(schemas::version_no);
 static FLAG: LazyLock<Validator> = LazyLock::new(schemas::flag);
 static CHANGE_STATUS: LazyLock<Validator> = LazyLock::new(schemas::change_status);
+static REVERT: LazyLock<Validator> = LazyLock::new(schemas::revert);
 
 /// SYNC-API-001#GET/api/docs/{docId}
 pub async fn get_document(
@@ -243,4 +244,39 @@ pub async fn change_status(
     let mut c = state.pool.acquire().await.map_err(Problem::from)?;
     let v = queries::document_view(&mut c, &state.repos, &d.summary.doc_id, &user).await?;
     Ok(Json(DocumentSummary::from(&v.summary)))
+}
+
+/// SYNC-API-001#POST/api/docs/{docId}/revert
+///
+/// 본문 `Revert { to_version ≥ 1, confirm_item_deletion }` — int4 밖의 판은 어느 판도 아니다(없는 판과 같다)
+pub async fn revert(
+    State(state): State<AppState>,
+    Path(doc_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, ApiProblem> {
+    let body = fastapi::read_body(&headers, &body)?;
+    let user = {
+        let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+        current_user(&mut c, &state).await?
+    };
+    let req = fastapi::body_model(&body, &REVERT)?;
+    let to_version = match field(&req, "to_version") {
+        Some(PyValue::Int(i)) => i32::try_from(i).unwrap_or(i32::MAX),
+        _ => 0,
+    };
+    let confirm = matches!(
+        field(&req, "confirm_item_deletion"),
+        Some(PyValue::Bool(true))
+    );
+    let r = pipeline::revert(
+        &state.pool,
+        &state.repos,
+        &doc_id,
+        to_version,
+        &user,
+        confirm,
+    )
+    .await?;
+    Ok((StatusCode::CREATED, Json(SaveResult::from(&r))).into_response())
 }
