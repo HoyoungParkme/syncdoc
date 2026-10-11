@@ -12,7 +12,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-008, SYNC-MS-014, SYNC-MS-015, SYNC-MS-016, SYN
 
 `crates/core/src/queries.rs`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.7. 파이썬 판 [[SYNC-MS-008]]과 **같은 이름·같은 처리**이고, 이 문서는 다른 점만 적는다([[SYNC-STD-001]] 2.10). 여러 묶음의 서비스를 불러 응답 하나로 엮는다 — 쓰지 않는다.
 
-**카드 L6 몫은 프로젝트 요약 하나다(2026-10-08)** — `init_project`·`POST /api/projects`가 돌려주고 `GET /api/projects`가 목록으로 낸다(사용자 결정 — 요약 전부, 문서가 있어도 맞게). **카드 L7이 MCP 읽기 도구의 넷을 더했다(2026-10-08)** — `list_documents`·`get_document`·`get_item`·`get_references`가 부른다. **카드 L8이 웹 읽기의 일곱을 더했다(2026-10-11)** — 프로젝트 상세·끊어진 참조 목록·관계도·체인·diff 영향·추적표·휴지통 목록(UI-4가 처음부터 부른다 — 휴지통 쓰기는 L9). **카드 L12가 코드의 넷을 더했다(2026-10-11)** — 코드 탭·관계도 코드 호출·코드 보기·코드 그래프의 코드. **카드 L13이 코드 그래프 노드를 더했다(2026-10-11)** — UI-17. 묻기(L14)는 그 카드가 더한다.
+**카드 L6 몫은 프로젝트 요약 하나다(2026-10-08)** — `init_project`·`POST /api/projects`가 돌려주고 `GET /api/projects`가 목록으로 낸다(사용자 결정 — 요약 전부, 문서가 있어도 맞게). **카드 L7이 MCP 읽기 도구의 넷을 더했다(2026-10-08)** — `list_documents`·`get_document`·`get_item`·`get_references`가 부른다. **카드 L8이 웹 읽기의 일곱을 더했다(2026-10-11)** — 프로젝트 상세·끊어진 참조 목록·관계도·체인·diff 영향·추적표·휴지통 목록(UI-4가 처음부터 부른다 — 휴지통 쓰기는 L9). **카드 L12가 코드의 넷을 더했다(2026-10-11)** — 코드 탭·관계도 코드 호출·코드 보기·코드 그래프의 코드. **카드 L13이 코드 그래프 노드를 더했다(2026-10-11)** — UI-17. **카드 L14가 묻기의 넷을 더했다(2026-10-11)** — 문서·코드 그래프에서 묻기(SSE)·모델이 부르는 읽기 도구·대화 하나.
 
 **파이썬 `set`의 차례** — [[#queries.item_chain]]은 폐포를 파이썬 `set`에 모아 그 순회 차례로 단계 행을 채운다. 행 안 항목의 차례가 응답 바이트이므로 Rust는 CPython 3.12의 정수 `set`(열린 주소·선형 탐사 9·`perturb`·크기 키움·`discard`의 빈 표시)을 그대로 흉내 낸 `pycompat::pyset`으로 같은 차례를 낸다(에이전트 판단 2026-10-11 — 「바이트까지」 결정을 따름).
 
@@ -43,6 +43,10 @@ upstream: [SYNC-DOM-004, SYNC-MS-008, SYNC-MS-014, SYNC-MS-015, SYNC-MS-016, SYN
 | [[#queries.code_source]] | 코드 보기 |
 | [[#queries.code_text]] | 코드 그래프의 코드 — 파일·줄로 |
 | [[#queries.code_nodes]] | 코드 그래프 노드 — 함수 전부·커뮤니티·대조 상태 |
+| [[#queries.ask_item]] | 문서를 읽다가 묻는다 — 모델이 관계도를 따라 읽는다 |
+| [[#queries.ask_tool]] | 모델이 부른 읽기 도구 하나를 실행한다 |
+| [[#queries.ask_code]] | 코드 그래프에서 묻는다 — 고른 함수가 시작 맥락 |
+| [[#queries.conversation_view]] | 대화 하나 — 답 속 참조를 실제 항목과 맞춘 링크로 |
 
 ---
 
@@ -379,6 +383,85 @@ pub async fn code_nodes(db: &mut PgConnection, repos: &ServerRepos, code: &str, 
 **호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-014#SpecService.list_by_project]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.item_blocks]] · [[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-022#codegraph.spec_calls]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.layer_table]] · [[SYNC-MS-022#codegraph.layers]]
 
 **테스트 관점** [[SYNC-MS-008#queries.code_nodes]]의 것
+
+---
+
+#### queries.ask_item 문서를 읽다가 묻는다
+
+**시그니처**
+```rust
+pub async fn ask_item(pool: &PgPool, repos: &ServerRepos, llm: &Llm, doc_id: &str, item_id: Option<&str>, conversation_id: i64, question: &str, attachment_ids: &[i64], user: &UserRow) -> Result<AskStream, Problem>
+```
+
+근거: [[SYNC-MS-008#queries.ask_item]] · [[SYNC-API-001#POST/api/docs/{docId}/ask]]
+
+**처리** [[SYNC-MS-008#queries.ask_item]] 0~7과 같다 — 키·주소 없음 → `! LlmNotConfigured` · 소유 → 대화(내 것·이 프로젝트) → 한 트랜잭션에서 앞 대화(10턴)·턴 만들기·이 턴의 이미지·시작 맥락(제목·상태·판·항목 `ID 이름`·`[지금 보는 항목]`·`[첨부]` 줄, 본문 없음 — 보는 항목이 없으면 턴을 `not-found`로 닫고 `! NotFound(item)`) → 커밋 → 루프(비공개 도우미 `ask_loop` — [[#queries.ask_code]]가 같이 쓴다): `start` → 모델 스트림의 조각마다 `delta` → 도구 호출이 없으면 답 → 있으면 곁들인 말 `note` · 호출마다 `reason`의 `note` → [[#queries.ask_tool]] → `read`(본 것) · 여덟 번이나 120초가 넘으면 마무리 문장을 넣고 `tool_choice="none"`으로 한 번(답이 비면 `! LlmUnavailable("상한 뒤에도 답이 없다")`) → 턴을 답으로 닫고 커밋 → 로그 한 줄 → 답 속 맨 ID를 실제 항목과 맞춘 링크로(`answer_links`) → `answer` · 시작 뒤의 실패는 턴을 오류(`reason` 또는 오류 종류 이름, 300자)로 닫고 내보낸다. 지시문·마무리 문장·도구 설명은 파이썬 판 글 그대로
+
+**다른 점**
+- 파이썬은 async 제너레이터 — 여기는 시작 전 검사까지 마치고 `AskStream`(이벤트 통로 `mpsc::Receiver<Result<AskEvent, Problem>>`)을 돌려준다. 루프는 따로 띄운 작업이 돌며 `start`를 먼저 넣는다 — 시작 전 실패는 `Err`(상태 코드), 뒤의 실패는 통로의 `Err`(`error` 이벤트)
+- `Problem::Internal`(파이썬의 `Problem` 밖 예외)은 통로를 닫아 스트림이 끊긴다 — 파이썬도 그 예외는 `error` 이벤트 없이 끊긴다
+- 받는 쪽이 끊기면(통로 닫힘) 다음 이벤트를 넣을 때 멈추고 턴을 `CancelledError`로 닫는다 — 파이썬은 응답 작업이 취소될 때 같은 이름으로 닫는다
+- `conversation_id`는 파이썬 정수(요청 본문)라 `i64` — int4 밖이면 대화 조회에서 `internal`(파이썬은 DB가 거절해 500)
+- 「답 속 참조」 정규식의 앞뒤 보기(`(?<!…)`·`(?!…)`)는 Rust `regex`에 없어 글자를 직접 본다 — 같은 규칙
+
+**호출하는 것** [[SYNC-MS-020#Llm.step_stream]] · [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-021#ConversationService.get]] · [[SYNC-MS-021#ConversationService.history]] · [[SYNC-MS-021#ConversationService.add_turn]] · [[SYNC-MS-021#ConversationService.pending_images]] · [[SYNC-MS-021#ConversationService.finish_turn]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.describe_documents]] · [[SYNC-MS-014#SpecService.list_items_by_project]] · [[#queries.ask_tool]]
+
+**테스트 관점** [[SYNC-MS-008#queries.ask_item]]의 것 — 키 없음은 네트워크 전 · 남의 대화·없는 항목은 스트림 전 · 도구 한 번 → `start`·`delta`·`note`·`read`·`answer` 차례 · 턴이 답으로 닫힌다 · 모델 실패 → `error` 이벤트, 턴은 오류 · 여덟 번째 뒤 마무리 호출 · 답 속 맨 ID가 링크, 없는 참조는 `missing_refs`
+
+---
+
+#### queries.ask_tool 모델이 부른 읽기 도구 하나
+
+**시그니처**
+```rust
+pub async fn ask_tool(db: &mut PgConnection, repos: &ServerRepos, name: &str, args: &Map<String, Value>, code: &str, user: &UserRow, conversation_id: i32) -> Result<ToolResult, Problem>
+```
+
+근거: [[SYNC-MS-008#queries.ask_tool]]
+
+**처리** [[SYNC-MS-008#queries.ask_tool]]과 같다 — 도구 아홉(`get_item`·`get_references`·`item_chain`·`list_documents`·`get_document`·`read_attachment`·`code_graph`·`read_code`·`find_code`)의 JSON(파이썬 `json.dumps(…, ensure_ascii=False)` 꼴)과 `target` · 모르는 도구·빠진 인자·다른 프로젝트 문서는 `{"error": …}` 글 · 남의 프로젝트는 `! NotFound` · 없음·삭제는 글(`hint`) · 인자 값은 파이썬 `str()`로 글자로(`None`·`True`·숫자 그대로)
+
+**다른 점** 연결을 받는다(파이썬은 도구마다 세션) · `attachment_id`는 파이썬 `int(… or 0)`처럼 정수·정수 글자·실수(버림)·참거짓을 받고 그 밖은 `internal`(파이썬은 `ValueError`로 끊긴다)
+
+**호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[#queries.item_view]] · [[#queries.item_references_view]] · [[#queries.item_chain]] · [[#queries.document_list]] · [[#queries.document_view]] · [[#queries.code_view]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.describe_documents]] · [[SYNC-MS-021#ConversationService.attachment_text]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#CodeGraphService.read]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.item_function]] · [[SYNC-MS-022#codegraph.layer_table]] · [[SYNC-MS-022#codegraph.layers]]
+
+**테스트 관점** [[SYNC-MS-008#queries.ask_tool]]의 것 — 아홉 도구의 키 · `read_code` 여러 꼴과 후보 · `find_code` 상한과 층 · 다른 프로젝트 문서 → 「없음」 · 남의 프로젝트 → `not-found` · DB에 쓰지 않는다
+
+---
+
+#### queries.ask_code 코드 그래프에서 묻는다
+
+**시그니처**
+```rust
+pub async fn ask_code(pool: &PgPool, repos: &ServerRepos, llm: &Llm, code: &str, key: Option<&str>, conversation_id: i64, question: &str, attachment_ids: &[i64], user: &UserRow) -> Result<AskStream, Problem>
+```
+
+근거: [[SYNC-MS-008#queries.ask_code]] · [[SYNC-API-001#POST/api/projects/{code}/code/ask]]
+
+**처리** [[SYNC-MS-008#queries.ask_code]] 0~4와 같다 — 시작 맥락만 다르고(문서 목록·그래프 머리·고른 함수 블록 — 대조 상태·`item`·층, 부르는 것·불리는 곳 20까지) 루프는 [[#queries.ask_item]]과 같은 `ask_loop` · `start`는 `{doc_id: null, item_id: null, key}`
+
+**다른 점** [[#queries.ask_item]]과 같다
+
+**호출하는 것** [[SYNC-MS-020#Llm.step_stream]] · [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-021#ConversationService.get]] · [[SYNC-MS-021#ConversationService.history]] · [[SYNC-MS-021#ConversationService.add_turn]] · [[SYNC-MS-021#ConversationService.pending_images]] · [[SYNC-MS-021#ConversationService.finish_turn]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-014#SpecService.list_by_project]] · [[SYNC-MS-014#SpecService.describe_documents]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.item_blocks]] · [[SYNC-MS-014#SpecService.list_items_by_project]] · [[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-022#codegraph.spec_calls]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.layer_table]] · [[SYNC-MS-022#codegraph.layers]] · [[#queries.ask_tool]]
+
+**테스트 관점** [[SYNC-MS-008#queries.ask_code]]의 것 — 시작 맥락의 문서 목록·그래프 머리·보는 함수·층 · 그래프 없음 → 그 줄로 답 · 없는 `key` → 스트림 전 `not-found function`
+
+---
+
+#### queries.conversation_view 대화 하나
+
+**시그니처**
+```rust
+pub async fn conversation_view(db: &mut PgConnection, repos: &ServerRepos, conv_id: i32, user: &UserRow) -> Result<ConversationView, Problem>
+```
+
+근거: [[SYNC-MS-008#queries.conversation_view]] · [[SYNC-API-001#GET/api/conversations/{id}]]
+
+**처리** [[SYNC-MS-008#queries.conversation_view]]와 같다 — 대화(내 것) → 소유 → 항목 색인 한 번 → 답 있는 턴마다 `answer_links`
+
+**호출하는 것** [[SYNC-MS-021#ConversationService.get]] · [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-014#SpecService.list_items_by_project]]
+
+**테스트 관점** 답 속 맨 ID가 링크 · 없는 참조 · 실패 턴은 그대로 · 남의 대화 → `not-found`
 
 ---
 
