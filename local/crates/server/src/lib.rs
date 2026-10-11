@@ -7,7 +7,7 @@ pub mod state;
 pub mod web;
 
 use axum::extract::DefaultBodyLimit;
-use axum::routing::{delete, get};
+use axum::routing::{delete, get, post};
 use axum::{Json, Router, middleware};
 use serde_json::{Value, json};
 use tower_http::catch_panic::CatchPanicLayer;
@@ -17,9 +17,14 @@ use crate::state::AppState;
 use crate::web::guard::guard;
 use crate::web::problem::{method_not_allowed, panic_response};
 use crate::web::routes::account::{issue_token, list_tokens, me, revoke_token};
+use crate::web::routes::documents::change_status;
 use crate::web::routes::documents::diff;
 use crate::web::routes::documents::downstream;
 use crate::web::routes::documents::get_document;
+use crate::web::routes::documents::purge_document;
+use crate::web::routes::documents::restore_document;
+use crate::web::routes::documents::revert;
+use crate::web::routes::documents::trash_document;
 use crate::web::routes::documents::versions;
 use crate::web::routes::projects::{
     delete_project, get_file, get_project, graph, init_project, list_docs, list_items,
@@ -48,7 +53,6 @@ pub fn app(state: AppState) -> Router {
         .route("/api/projects/{code}/graph", get(graph))
         .route("/api/projects/{code}/files/{*path}", get(get_file))
         .route("/api/projects/{code}/files/", get(get_file))
-        .route("/api/docs/{doc_id}", get(get_document))
         .route("/api/docs/{doc_id}/diff", get(diff))
         .route("/api/docs/{doc_id}/versions", get(versions))
         .route("/api/docs/{doc_id}/downstream", get(downstream))
@@ -59,6 +63,14 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/api/docs/{doc_id}/items/{item_id}/chain", get(item_chain))
         .route("/api/projects/{code}/trash", get(trash_list))
+        .route(
+            "/api/docs/{doc_id}",
+            get(get_document).delete(trash_document),
+        )
+        .route("/api/docs/{doc_id}/restore", post(restore_document))
+        .route("/api/docs/{doc_id}/purge", post(purge_document))
+        .route("/api/docs/{doc_id}/status", post(change_status))
+        .route("/api/docs/{doc_id}/revert", post(revert))
         .merge(mcp::router(state.clone()))
         .route("/specs/", get(spec_copy))
         .route("/specs/{*path}", get(spec_copy))

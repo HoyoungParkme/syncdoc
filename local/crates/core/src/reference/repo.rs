@@ -232,3 +232,18 @@ pub async fn count_to_items(
     .await?;
     Ok(rows.into_iter().collect())
 }
+
+/// 남이 이 문서(또는 그 항목 — 지운 것까지)를 가리키는 참조 — 자기 참조는 뺀다, id 차례
+pub async fn inbound_of_document(
+    db: &mut PgConnection,
+    document_id: i32,
+) -> Result<Vec<ReferenceRow>, sqlx::Error> {
+    sqlx::query_as::<_, ReferenceRow>(sqlx::AssertSqlSafe(format!(
+        r#"SELECT {COLUMNS} FROM "references"
+           WHERE (to_document_id = $1 OR to_item_id IN (SELECT id FROM items WHERE document_id = $1))
+             AND from_document_id <> $1 ORDER BY id"#
+    )))
+    .bind(document_id)
+    .fetch_all(db)
+    .await
+}

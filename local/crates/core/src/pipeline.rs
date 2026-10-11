@@ -21,7 +21,8 @@ use crate::pycompat::re::compile;
 use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
 use crate::types::{
-    Author, DeletedItem, DocStatus, Document, Entry, RefEdge, SaveResult, py_isoformat, spec_dir,
+    Author, AuthorKind, DeletedItem, DocStatus, Document, Entry, RefEdge, SaveResult, TrashResult,
+    py_isoformat, spec_dir,
 };
 
 /// frontmatter의 `status:` 줄 — 첫 것 하나만 갈아 끼운다(파이썬 `_set_status`, `re.M`)
@@ -30,7 +31,9 @@ static STATUS_LINE: LazyLock<Regex> = LazyLock::new(|| compile(r"(?m)^status: .*
 static UPSTREAM_TOKEN: LazyLock<Regex> = LazyLock::new(|| compile(r"[\w-]+"));
 
 /// 저장 입력 (파이썬 `save_pipeline`의 인자) — 만들기는 `doc_id` 없이 `project_code`·`doc_type`,
-/// 고치기는 `doc_id`·`expected_version`. `changed_items`는 파이썬도 쓰지 않아 받지 않는다
+/// 고치기는 `doc_id`·`expected_version`. `changed_items`는 파이썬도 쓰지 않아 받지 않는다.
+/// `reason`은 상태 바꾸기의 사유, `restore`는 되살림(휴지통 검사를 지난다), `read_first`는 0단계를 할지 —
+/// 부른 쪽(상태·되돌리기·되살리기)이 이미 읽었으면 거짓(파이썬 `session`을 넘긴 경우)
 #[derive(Clone, Debug)]
 pub struct SaveInput {
     pub entry: Entry,
@@ -42,6 +45,9 @@ pub struct SaveInput {
     pub author: Author,
     pub message: String,
     pub confirm_item_deletion: bool,
+    pub reason: Option<String>,
+    pub restore: bool,
+    pub read_first: bool,
 }
 
 type Locks = LazyLock<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>>;
@@ -148,15 +154,12 @@ pub async fn save_pipeline(
         })?
 }
 
-/// `save_pipeline` 본체 — 파이썬 `save_pipeline`·`_run`의 `mcp` 갈래, 같은 차례·같은 문장
+/// `save_pipeline` 본체 — 파이썬 `save_pipeline`·`_run`의 `mcp`·`web_revert`·`web_status` 갈래, 같은 차례·같은 문장
 async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<SaveResult, Problem> {
-    match input.entry {
-        Entry::Mcp => {}
-        Entry::WebRevert | Entry::WebStatus => {
-            return Err(Problem::NotImplemented { card: "L9".into() });
-        }
-        Entry::Github => return Err(Problem::NotImplemented { card: "L11".into() }),
+    if input.entry == Entry::Github {
+        return Err(Problem::NotImplemented { card: "L11".into() });
     }
+    let web_status = input.entry == Entry::WebStatus;
     // 앞. 프로젝트 코드 — 파이썬 `project_code or (doc_id.split("-")[0] if doc_id else None)`
     let code = match (&input.project_code, &input.doc_id) {
         (Some(c), _) if !c.is_empty() => c.clone(),
@@ -169,8 +172,10 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
         }
     };
     let author = &input.author;
-    // 0. 쓰기 전에 밀린 커밋을 읽는다 — 쓰기 락 밖이라 교착하지 않는다
-    read_pending(pool, repos, &code, &author.user).await?;
+    // 0. 쓰기 전에 밀린 커밋을 읽는다 — 쓰기 락 밖이라 교착하지 않는다. 부른 쪽이 이미 읽었으면 건너뛴다
+    if input.read_first {
+        read_pending(pool, repos, &code, &author.user).await?;
+    }
     let lock = write_lock(&code);
     let _held = lock.lock().await;
     let mut tx = pool.begin().await?;
@@ -184,8 +189,10 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
     let (doc_id, doc_type, document): (String, String, Option<Document>) = match &input.doc_id {
         Some(d) => {
             let doc = SpecService { db: &mut tx }.get_document(d).await?;
-            // 2. 휴지통 문서는 되살린 뒤 고친다
-            if let Some(t) = doc.summary.trashed_at {
+            // 2. 휴지통 문서는 되살린 뒤 고친다 — 되살림은 이 검사를 지난다
+            if let Some(t) = doc.summary.trashed_at
+                && !input.restore
+            {
                 return Err(Problem::DocumentTrashed {
                     trashed_at: py_isoformat(t),
                 });
@@ -237,7 +244,7 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
     }
     // 6. 삭제 확인 — 하위 참조는 출발 항목의 이름으로(#50)
     let mut deleted: Vec<i32> = Vec::new();
-    if let Some(doc) = &document {
+    if let Some(doc) = document.as_ref().filter(|_| !web_status) {
         deleted = SpecService { db: &mut tx }
             .detect_deleted_items(doc, &body)
             .await?;
@@ -275,6 +282,7 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
     }
     // 6a. 완료 문서를 고치면 본문의 status도 낮춘다 — **push 전에** (#47)
     if let Some(doc) = &document
+        && !web_status
         && doc.summary.status == "approved"
         && body != doc.body
     {
@@ -291,7 +299,34 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
         .git
         .commit_push(workdir, &input.message, &author.user, &files, &[])
         .await?;
-    // 8. 트랜잭션
+    // 8. 트랜잭션 — 상태 줄만 바꾼 것은 판을 만들지 않는다
+    if web_status && let Some(doc) = &document {
+        SpecService { db: &mut tx }
+            .apply_status(
+                doc,
+                &body,
+                Some(&commit_hash),
+                author,
+                input.reason.as_deref(),
+            )
+            .await?;
+        advance(repos, workdir, &mut tx, &repo, &commit_hash).await?;
+        tx.commit().await?;
+        let mut c = pool.acquire().await?;
+        let status = SpecService { db: &mut c }
+            .get_document(&doc_id)
+            .await?
+            .summary
+            .status;
+        return Ok(SaveResult {
+            doc_id,
+            version_no: doc.summary.current_version_no,
+            commit_hash,
+            status,
+            warnings: Vec::new(),
+            next_step: None,
+        });
+    }
     let version = match &document {
         None => {
             SpecService { db: &mut tx }
@@ -354,20 +389,8 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
     if !deleted.is_empty() {
         warnings.push(format!("ref.broken: {broken}"));
     }
-    // 13a. 처리 지점 — 앱이 민 커밋은 이 저장이 곧 처리다. 사이에 밖에서 push가 끼었으면 그대로 둔다
-    if let Some(last) = repo
-        .last_processed_commit
-        .as_deref()
-        .filter(|l| !l.is_empty())
-    {
-        let behind = repos
-            .git
-            .rev_list_count(workdir, &format!("{last}..{commit_hash}"))
-            .await?;
-        if behind == 1 {
-            project_repo::advance_processed(&mut tx, repo.id, &commit_hash, clock::now()).await?;
-        }
-    }
+    // 13a. 처리 지점
+    advance(repos, workdir, &mut tx, &repo, &commit_hash).await?;
     // 14. 커밋
     tx.commit().await?;
     let status = {
@@ -378,17 +401,424 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
             .summary
             .status
     };
-    // 15. 문서 하나 쓰고 멈추라는 규약(STD-001 1.8)을 응답이 매번 다시 말한다
-    let next_step = format!(
-        "{doc_id} v{} 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)",
-        version.version_no
-    );
+    // 15. 문서 하나 쓰고 멈추라는 규약(STD-001 1.8)을 응답이 매번 다시 말한다 — mcp만
+    let next_step = (input.entry == Entry::Mcp).then(|| {
+        format!(
+            "{doc_id} v{} 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)",
+            version.version_no
+        )
+    });
     Ok(SaveResult {
         doc_id,
         version_no: version.version_no,
         commit_hash,
         status,
         warnings,
-        next_step: Some(next_step),
+        next_step,
     })
+}
+
+/// 처리 지점을 앞당긴다 — 앱이 민 커밋은 그 저장이 곧 처리다(파이썬 `_advance_processed`, `made` 1).
+/// 처리 지점부터 이 커밋까지가 하나일 때만 — 사이에 밖에서 push가 끼었으면 그대로 둔다
+async fn advance(
+    repos: &ServerRepos,
+    workdir: &Path,
+    db: &mut sqlx::PgConnection,
+    repo: &crate::project::model::RepositoryRow,
+    commit_hash: &str,
+) -> Result<(), Problem> {
+    let Some(last) = repo
+        .last_processed_commit
+        .as_deref()
+        .filter(|l| !l.is_empty())
+    else {
+        return Ok(());
+    };
+    let behind = repos
+        .git
+        .rev_list_count(workdir, &format!("{last}..{commit_hash}"))
+        .await?;
+    if behind == 1 {
+        project_repo::advance_processed(db, repo.id, commit_hash, clock::now()).await?;
+    }
+    Ok(())
+}
+
+/// 문서 ID의 프로젝트 코드 — 첫 `-` 앞 (파이썬 `doc_id.split("-")[0]`)
+fn code_of(doc_id: &str) -> &str {
+    doc_id.split('-').next().unwrap_or("")
+}
+
+/// SYNC-MS-017#pipeline.change_status
+///
+/// 본문은 **저장소에서** 읽는다 — DB 본문으로 커밋하면 아직 읽지 않은 커밋의 내용이 통째로 되돌아간다(#137).
+/// 끊어진 참조는 읽을 때 센다 — 컬럼에 없다(STD-001 4장)
+pub async fn change_status(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    doc_id: &str,
+    to: DocStatus,
+    author: &Author,
+    reason: Option<&str>,
+) -> Result<Document, Problem> {
+    let code = code_of(doc_id);
+    // 0. 밀린 커밋을 먼저 — 소유 검사도 여기서. 락 밖
+    read_pending(pool, repos, code, &author.user).await?;
+    let mut c = pool.acquire().await?;
+    let (_, repo) = ProjectService { db: &mut c, repos }
+        .get_owned(code, &author.user)
+        .await?;
+    let document = SpecService { db: &mut c }.get_document(doc_id).await?;
+    if let Some(t) = document.summary.trashed_at {
+        return Err(Problem::DocumentTrashed {
+            trashed_at: py_isoformat(t),
+        });
+    }
+    let mut missing: Vec<String> = ReferenceService { db: &mut c }
+        .upstream_of_document(document.summary.id, true)
+        .await?
+        .into_iter()
+        .filter(|e| e.is_missing)
+        .map(|e| e.raw_target)
+        .collect();
+    missing.sort();
+    missing.dedup();
+    let s = &document.summary;
+    if to == DocStatus::Approved
+        && (s.has_convention_error || !s.incomplete_warnings.is_empty() || !missing.is_empty())
+    {
+        let mut warnings = s.incomplete_warnings.clone();
+        warnings.extend(missing.iter().map(|t| format!("ref.missing: {t}")));
+        return Err(Problem::StatusBlocked {
+            convention_error_detail: document.convention_error_detail.clone(),
+            warnings,
+        });
+    }
+    // 3a. 이미 그 상태 — 아무것도 안 한다
+    if s.status == to.as_str() {
+        return Ok(document);
+    }
+    let path = format!("docs/specs/{}/{doc_id}.md", spec_dir(&s.doc_type));
+    let src = match repos
+        .git
+        .read(Path::new(&repo.workdir_path), &path, "origin/main")
+        .await
+    {
+        Ok(b) => b,
+        // 저장소에 아직 파일이 없다 — 이 커밋이 파일을 만드는 복구가 된다
+        Err(Problem::Git { .. } | Problem::Internal { .. }) => {
+            tracing::warn!("change_status {doc_id}: origin/main에 {path}가 없다 — DB 본문으로");
+            document.body.clone()
+        }
+        Err(other) => return Err(other),
+    };
+    let new_body = STATUS_LINE
+        .replacen(&src, 1, NoExpand(&format!("status: {}", to.as_str())))
+        .into_owned();
+    save_pipeline(
+        pool,
+        repos,
+        SaveInput {
+            entry: Entry::WebStatus,
+            doc_id: Some(doc_id.to_string()),
+            doc_type: None,
+            body: new_body,
+            expected_version: Some(i64::from(s.current_version_no)),
+            project_code: None,
+            author: author.clone(),
+            message: format!(
+                "status({doc_id}): {} → {}\n\n{}",
+                s.status,
+                to.as_str(),
+                reason.unwrap_or("")
+            ),
+            confirm_item_deletion: false,
+            reason: reason.map(str::to_string),
+            restore: false,
+            read_first: false,
+        },
+    )
+    .await?;
+    let mut c = pool.acquire().await?;
+    SpecService { db: &mut c }.get_document(doc_id).await
+}
+
+/// SYNC-MS-017#pipeline.revert
+///
+/// 본문은 `versions.body`에서 — 되돌리기는 옛 판을 쓰는 것이 목적이다. 0단계가 밀린 것을 먼저 흡수한다
+pub async fn revert(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    doc_id: &str,
+    to_version: i32,
+    user: &UserRow,
+    confirm_item_deletion: bool,
+) -> Result<SaveResult, Problem> {
+    read_pending(pool, repos, code_of(doc_id), user).await?;
+    let mut c = pool.acquire().await?;
+    let document = SpecService { db: &mut c }.get_document(doc_id).await?;
+    let old_body = SpecService { db: &mut c }
+        .version_body(doc_id, to_version)
+        .await?;
+    let current = document.summary.current_version_no;
+    if to_version == current {
+        return Err(Problem::AlreadyCurrent);
+    }
+    drop(c);
+    save_pipeline(
+        pool,
+        repos,
+        SaveInput {
+            entry: Entry::WebRevert,
+            doc_id: Some(doc_id.to_string()),
+            doc_type: None,
+            body: old_body,
+            expected_version: Some(i64::from(current)),
+            project_code: None,
+            author: Author {
+                kind: AuthorKind::Human,
+                user: user.clone(),
+                instructed_by: None,
+                via: Entry::WebRevert,
+            },
+            message: format!("revert({doc_id}): v{current} → v{to_version} 내용으로"),
+            confirm_item_deletion,
+            reason: None,
+            restore: false,
+            read_first: false,
+        },
+    )
+    .await
+}
+
+/// 들어오는 참조를 사람이 읽을 이름으로 — `DOC#ITEM` 또는 `DOC`, 못 찾으면 `?`, 정렬 (파이썬 `_inbound_names`)
+async fn inbound_names(
+    db: &mut sqlx::PgConnection,
+    inbound: &[RefEdge],
+) -> Result<Vec<String>, Problem> {
+    let item_pks: Vec<i32> = inbound.iter().filter_map(|e| e.from_item_pk).collect();
+    let names = SpecService { db: &mut *db }
+        .describe_items(&item_pks)
+        .await?;
+    let doc_pks: Vec<i32> = inbound
+        .iter()
+        .filter(|e| e.from_item_pk.is_none())
+        .map(|e| e.from_document_id)
+        .collect();
+    let docs = SpecService { db: &mut *db }
+        .describe_documents(&doc_pks)
+        .await?;
+    let mut out: Vec<String> = inbound
+        .iter()
+        .map(|e| {
+            if let Some(r) = e.from_item_pk.and_then(|p| names.get(&p)) {
+                format!(
+                    "{}#{}",
+                    r.doc_id.as_deref().unwrap_or(""),
+                    r.item_id.as_deref().unwrap_or("")
+                )
+            } else {
+                docs.get(&e.from_document_id)
+                    .map_or_else(|| "?".to_string(), |d| d.doc_id.clone())
+            }
+        })
+        .collect();
+    out.sort();
+    Ok(out)
+}
+
+/// SYNC-MS-017#pipeline.trash_document
+///
+/// 따로 띄운 작업에서 — push한 뒤 DB를 쓰지 않은 채 멈추지 않는다
+pub async fn trash_document(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    doc_id: &str,
+    author: &Author,
+    confirm: bool,
+) -> Result<TrashResult, Problem> {
+    let (pool, repos, doc_id, author) = (
+        pool.clone(),
+        repos.clone(),
+        doc_id.to_string(),
+        author.clone(),
+    );
+    tokio::spawn(async move { trash(&pool, &repos, &doc_id, &author, confirm).await })
+        .await
+        .map_err(|e| Problem::Internal {
+            log: format!("휴지통 작업: {e}"),
+        })?
+}
+
+/// `trash_document` 본체 — 파이썬과 같은 차례
+async fn trash(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    doc_id: &str,
+    author: &Author,
+    confirm: bool,
+) -> Result<TrashResult, Problem> {
+    let code = code_of(doc_id);
+    // 0. 밀린 커밋을 먼저 — 락 밖
+    read_pending(pool, repos, code, &author.user).await?;
+    let lock = write_lock(code);
+    let _held = lock.lock().await;
+    let mut tx = pool.begin().await?;
+    let (_, repo) = ProjectService { db: &mut tx, repos }
+        .get_owned(code, &author.user)
+        .await?;
+    let document = SpecService { db: &mut tx }.get_document(doc_id).await?;
+    if let Some(t) = document.summary.trashed_at {
+        return Err(Problem::DocumentTrashed {
+            trashed_at: py_isoformat(t),
+        });
+    }
+    // 2. 끊어질 것 — 막지 않는다, 보여준다
+    let edges = ReferenceService { db: &mut tx }
+        .inbound_of_document(document.summary.id)
+        .await?;
+    let inbound = inbound_names(&mut tx, &edges).await?;
+    if !confirm {
+        let title = parse_frontmatter(&document.body)
+            .0
+            .get("title")
+            .cloned()
+            .unwrap_or_default();
+        return Err(Problem::DocumentDeletionNeedsConfirm {
+            doc_id: doc_id.to_string(),
+            title,
+            version_count: document.summary.current_version_no,
+            inbound_refs: inbound,
+        });
+    }
+    // 4. push — 여기까지 DB 쓰기 없음
+    let workdir = Path::new(&repo.workdir_path);
+    let path = format!(
+        "docs/specs/{}/{doc_id}.md",
+        spec_dir(&document.summary.doc_type)
+    );
+    let commit_hash = repos
+        .git
+        .commit_push(
+            workdir,
+            &format!("spec({doc_id}): 휴지통"),
+            &author.user,
+            &IndexMap::new(),
+            &[path],
+        )
+        .await?;
+    // 5. 항목 삭제됨 + 휴지통 표시 + 그것을 가리키던 참조는 미존재로
+    let pks = SpecService { db: &mut tx }
+        .trash(&document, &commit_hash, author)
+        .await?;
+    let broken = ReferenceService { db: &mut tx }.mark_missing(&pks).await?;
+    advance(repos, workdir, &mut tx, &repo, &commit_hash).await?;
+    tx.commit().await?;
+    Ok(TrashResult {
+        next_step: format!("{doc_id} 휴지통에 넣음 — 끊어진 참조 {broken}. 사람에게 알리고 멈춘다"),
+        doc_id: doc_id.to_string(),
+        commit_hash,
+        broken_refs: broken,
+    })
+}
+
+/// SYNC-MS-017#pipeline.restore_document
+///
+/// 휴지통에 넣기 직전 내용(휴지통 커밋의 부모)으로 새 판 — 항목이 돌아오고 기다리던 미존재 참조는 저장의 10a가 잇는다
+pub async fn restore_document(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    doc_id: &str,
+    author: &Author,
+) -> Result<SaveResult, Problem> {
+    let code = code_of(doc_id);
+    read_pending(pool, repos, code, &author.user).await?;
+    let mut c = pool.acquire().await?;
+    let (_, repo) = ProjectService { db: &mut c, repos }
+        .get_owned(code, &author.user)
+        .await?;
+    let document = SpecService { db: &mut c }.get_document(doc_id).await?;
+    if document.summary.trashed_at.is_none() {
+        return Err(Problem::DocumentNotTrashed);
+    }
+    let hash = SpecService { db: &mut c }
+        .trash_commit(document.summary.id)
+        .await?
+        .ok_or_else(|| Problem::Internal {
+            log: format!("{doc_id}의 휴지통 커밋이 없다"),
+        })?;
+    drop(c);
+    let path = format!(
+        "docs/specs/{}/{doc_id}.md",
+        spec_dir(&document.summary.doc_type)
+    );
+    let body = repos
+        .git
+        .read(Path::new(&repo.workdir_path), &path, &format!("{hash}^"))
+        .await?;
+    // 3. DB가 초안이다 — mcp 경로의 frontmatter.status_change에 안 걸리게
+    let body = STATUS_LINE
+        .replacen(&body, 1, NoExpand("status: draft"))
+        .into_owned();
+    let entry = if author.via == Entry::Mcp {
+        Entry::Mcp
+    } else {
+        Entry::WebRevert
+    };
+    save_pipeline(
+        pool,
+        repos,
+        SaveInput {
+            entry,
+            doc_id: Some(doc_id.to_string()),
+            doc_type: None,
+            body,
+            expected_version: Some(i64::from(document.summary.current_version_no)),
+            project_code: None,
+            author: author.clone(),
+            message: format!("spec({doc_id}): 되살림 — 휴지통에서"),
+            confirm_item_deletion: false,
+            reason: None,
+            restore: true,
+            read_first: false,
+        },
+    )
+    .await
+}
+
+/// SYNC-MS-017#pipeline.purge_document
+///
+/// 웹에서만 — 파일은 휴지통 커밋에서 이미 없다(push 없음). 밀린 커밋은 읽지 않는다(파이썬과 같다)
+pub async fn purge_document(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    doc_id: &str,
+    author: &Author,
+) -> Result<(), Problem> {
+    let code = code_of(doc_id);
+    let lock = write_lock(code);
+    let _held = lock.lock().await;
+    let mut tx = pool.begin().await?;
+    ProjectService { db: &mut tx, repos }
+        .get_owned(code, &author.user)
+        .await?;
+    let document = SpecService { db: &mut tx }.get_document(doc_id).await?;
+    if document.summary.trashed_at.is_none() {
+        return Err(Problem::DocumentNotTrashed);
+    }
+    // 2. 문지기 하나 — 아직 가리키는 곳. 미존재 참조는 `to_*`가 비어 여기 안 잡힌다
+    let edges = ReferenceService { db: &mut tx }
+        .inbound_of_document(document.summary.id)
+        .await?;
+    let inbound = inbound_names(&mut tx, &edges).await?;
+    if !inbound.is_empty() {
+        return Err(Problem::DocumentHasHistory {
+            inbound_refs: inbound,
+        });
+    }
+    SpecService { db: &mut tx }
+        .delete_document(&document)
+        .await?;
+    tx.commit().await?;
+    Ok(())
 }

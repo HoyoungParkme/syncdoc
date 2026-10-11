@@ -106,11 +106,21 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | L7 |
 | 완료 | 2026-10-11 · 브랜치 `card/L8-web-read`(0958593 #357) · spec 10 + code 38 · `cargo test` 121(조회는 시험 DB + 진짜 git으로 PRD ← SCN ← UC를 쌓아 · `pycompat::pyset`은 파이썬 3.12에서 뜬 404 사례와 같다) · 계약 `--target both --with-card L7 --with-card L8` 574 통과·1 건너뜀 — L8 63 사례가 파이썬 판과 바이트로 같다(해시·시각만 가림 · 체인 행 안 차례는 정렬해 비교) · clippy(리눅스·윈도) · 윈도 `cargo check` · 워크플로 녹색 · xtask `--check` 넷·`schema-check` · `check_code` Rust 93/93 · `check_calls` 0 · 브라우저로 훑음(Rust 판·임시 데이터) — UI-4·5·7·8·9 콘솔 오류 없음 · 사람 확인(화면 data-el대로)은 따로 · 되먹임: 휴지통 **목록**을 L8로 당김(UI-4가 처음부터 불러 404 — 브라우저로 찾음), 파이썬 판은 int4 밖 판 번호의 diff에서 DB 거절로 500(계약이 찾음 — 같게), CPython set의 `add`는 지나온 빈 표시 가운데 **마지막** 것을 다시 쓴다(setobject.c — 정답 사례가 찾음), 체인 행 안 차례는 pk 값(=앞선 이력)에 매여 판끼리 비교하려면 이력이 같아야 한다 |
 
+#### L9 상태·되돌리기·휴지통 — 사람이 웹에서 완료로 올리고, 되돌리고, 치운다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-MS-007#pipeline.change_status]] · [[SYNC-MS-007#pipeline.revert]] · [[SYNC-MS-007#pipeline.trash_document]] · [[SYNC-MS-007#pipeline.restore_document]] · [[SYNC-MS-007#pipeline.purge_document]] · [[SYNC-SCN-001#S2]] · [[SYNC-UC-001#UC-H7]] · [[SYNC-UC-001#UC-H8]] · [[SYNC-UC-001#UC-A7]] · [[SYNC-UC-001#UC-A8]] · [[SYNC-UC-001#UC-H18]] · 에이전트 판단 2026-10-11(사용자 목표 「끝까지」): 파이썬 판과 같은 차례·같은 문장, 휴지통 넣기도 따로 띄운 작업에서(push 뒤 DB까지) |
+| 구현 | [[SYNC-MS-017#pipeline.change_status]] · [[SYNC-MS-017#pipeline.revert]] · [[SYNC-MS-017#pipeline.trash_document]] · [[SYNC-MS-017#pipeline.restore_document]] · [[SYNC-MS-017#pipeline.purge_document]] · [[SYNC-MS-017#pipeline.save_pipeline]](웹 갈래) · [[SYNC-MS-014#SpecService.apply_status]] · [[SYNC-MS-014#SpecService.trash]] · [[SYNC-MS-014#SpecService.trash_commit]] · [[SYNC-MS-014#SpecService.version_body]] · [[SYNC-MS-014#SpecService.delete_document]] · [[SYNC-MS-015#ReferenceService.inbound_of_document]] · 층 코드 — `types.rs` `TrashResult` · `errors.rs` 문제 다섯 · server: 경로 다섯, MCP 도구 셋, 요청 본문 `ChangeStatus`·`Revert` |
+| API | [[SYNC-API-001#POST/api/docs/{docId}/status]] · [[SYNC-API-001#POST/api/docs/{docId}/revert]] · [[SYNC-API-001#DELETE/api/docs/{docId}]] · [[SYNC-API-001#POST/api/docs/{docId}/restore]] · [[SYNC-API-001#POST/api/docs/{docId}/purge]] · [[SYNC-API-002#change_status]] · [[SYNC-API-002#delete_document]] · [[SYNC-API-002#restore_document]] |
+| 테스트 | `cargo test`(시험 DB + 진짜 git) · 계약 L9 — 웹·MCP로 상태 올리기(막힘·풀림)·되돌리기(already-current·422)·휴지통 넣기(확인·끊긴 참조)·되살리기·완전 삭제(문지기·번호 재발급)를 파이썬 판과 바이트로 · 사람 확인 — UI-5·7의 완료·되돌리기·휴지통 버튼 |
+| 선행 | L8 |
+| 완료 | — |
+
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
-| L9 상태·되돌리기·휴지통 | 상태 바꾸기·되돌리기·휴지통·되살리기·영구 삭제 | L7 | M |
 | L10 git 입구·코드 올리기 | upload-pack·receive-pack(`main`) · `/git/*` · `upload_code` | L9 | L |
 | L11 따라잡기·재구축 | 커밋 처리·재구축·주기 확인·관리 경로·기존 저장소 들이기 | L10 · #325 | L |
 | L12 코드 그래프 | 파이썬·TS·JS·Rust 추출 · 명세 대조 · 코드 화면 · `get_code_graph` | L11 | L |

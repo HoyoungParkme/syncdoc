@@ -1430,4 +1430,103 @@ impl SpecService<'_> {
             .map(|r| summary_of(r, latest.get(&r.id)))
             .collect()
     }
+
+    /// SYNC-MS-014#SpecService.apply_status
+    ///
+    /// 판을 만들지 않는다 — 상태 변경 행과 문서의 상태·본문만
+    pub async fn apply_status(
+        &mut self,
+        document: &Document,
+        new_body: &str,
+        commit_hash: Option<&str>,
+        author: &Author,
+        reason: Option<&str>,
+    ) -> Result<(), Problem> {
+        let row = repo::document_by_id(&mut *self.db, document.summary.id)
+            .await?
+            .ok_or_else(|| Problem::Internal {
+                log: format!("상태를 바꿀 문서 {}가 없다", document.summary.doc_id),
+            })?;
+        let (fm, _) = markdown::parse_frontmatter(new_body);
+        let to = fm
+            .get("status")
+            .cloned()
+            .unwrap_or_else(|| row.status.clone());
+        repo::insert_status_change(
+            &mut *self.db,
+            &repo::NewStatusChange {
+                document_id: row.id,
+                from_status: Some(&row.status),
+                to_status: &to,
+                changed_by_user_id: author.user.id,
+                via: fold_via(author.via),
+                reason,
+                commit_hash,
+                changed_at: clock::now(),
+            },
+        )
+        .await?;
+        repo::set_status_body(&mut *self.db, row.id, &to, new_body).await?;
+        Ok(())
+    }
+
+    /// SYNC-MS-014#SpecService.trash
+    ///
+    /// 항목을 전부 지운 것으로 · 상태 변경 행(사유 「휴지통」 — 이 커밋이 되살릴 때의 열쇠) · 초안·휴지통 표시
+    pub async fn trash(
+        &mut self,
+        document: &Document,
+        commit_hash: &str,
+        author: &Author,
+    ) -> Result<Vec<i32>, Problem> {
+        let row = repo::document_by_id(&mut *self.db, document.summary.id)
+            .await?
+            .ok_or_else(|| Problem::Internal {
+                log: format!("휴지통에 넣을 문서 {}가 없다", document.summary.doc_id),
+            })?;
+        let mut pks = Vec::new();
+        for item in repo::items_of(&mut *self.db, row.id, false).await? {
+            repo::mark_item_deleted(&mut *self.db, item.id, clock::now()).await?;
+            pks.push(item.id);
+        }
+        repo::insert_status_change(
+            &mut *self.db,
+            &repo::NewStatusChange {
+                document_id: row.id,
+                from_status: Some(&row.status),
+                to_status: "draft",
+                changed_by_user_id: author.user.id,
+                via: fold_via(author.via),
+                reason: Some("휴지통"),
+                commit_hash: Some(commit_hash),
+                changed_at: clock::now(),
+            },
+        )
+        .await?;
+        repo::set_trashed(&mut *self.db, row.id, clock::now(), author.user.id).await?;
+        Ok(pks)
+    }
+
+    /// SYNC-MS-014#SpecService.trash_commit
+    pub async fn trash_commit(&mut self, document_id: i32) -> Result<Option<String>, Problem> {
+        Ok(repo::trash_commit(&mut *self.db, document_id).await?)
+    }
+
+    /// SYNC-MS-014#SpecService.version_body
+    pub async fn version_body(&mut self, doc_id: &str, version_no: i32) -> Result<String, Problem> {
+        let Some(row) = repo::document_by_doc_id(&mut *self.db, doc_id).await? else {
+            return Err(not_found("document", doc_id));
+        };
+        repo::version_bodies(&mut *self.db, row.id, &[version_no])
+            .await?
+            .remove(&version_no)
+            .ok_or_else(|| not_found("version", &format!("{doc_id} v{version_no}")))
+    }
+
+    /// SYNC-MS-014#SpecService.delete_document
+    ///
+    /// 문지기 검사는 하지 않는다 — `pipeline.purge_document`가 세고 부른다
+    pub async fn delete_document(&mut self, document: &Document) -> Result<i64, Problem> {
+        Ok(repo::delete_document_rows(&mut *self.db, document.summary.id).await? as i64)
+    }
 }

@@ -9,7 +9,8 @@ use syncdoc_core::types::{
     GraphEdge, GraphNode, ItemChain as ItemChainDto, ItemRef as ItemRefDto,
     ItemReferences as ItemReferencesDto, ItemView as ItemViewDto,
     ProjectDetail as ProjectDetailDto, ProjectItem, ProjectSummary as ProjectSummaryDto,
-    StageSummary, UserRef as UserRefDto, Version as VersionDto, iso_utc,
+    SaveResult as SaveResultDto, StageSummary, TrashResult as TrashResultDto,
+    UserRef as UserRefDto, Version as VersionDto, iso_utc,
 };
 
 /// `Me` — `User`(id·github_login·display_name·created_at)에 판·모델·저장 방식을 더한 것
@@ -517,6 +518,50 @@ impl From<&ProjectItem> for ProjectItemOut {
             ProjectItem::Document(d) => {
                 ProjectItemOut::Document(Box::new(DocumentSummary::from(&**d)))
             }
+        }
+    }
+}
+
+/// `SaveResult` — 웹 되돌리기·되살리기는 `next_step`이 null
+#[derive(Debug, Serialize)]
+pub struct SaveResult {
+    pub doc_id: String,
+    pub version_no: i32,
+    pub commit_hash: String,
+    pub status: String,
+    pub warnings: Vec<String>,
+    pub next_step: Option<String>,
+}
+
+impl From<&SaveResultDto> for SaveResult {
+    fn from(r: &SaveResultDto) -> Self {
+        SaveResult {
+            doc_id: r.doc_id.clone(),
+            version_no: r.version_no,
+            commit_hash: r.commit_hash.clone(),
+            status: r.status.clone(),
+            warnings: r.warnings.clone(),
+            next_step: r.next_step.clone(),
+        }
+    }
+}
+
+/// `TrashResult`
+#[derive(Debug, Serialize)]
+pub struct TrashResult {
+    pub doc_id: String,
+    pub commit_hash: String,
+    pub broken_refs: i64,
+    pub next_step: Option<String>,
+}
+
+impl From<&TrashResultDto> for TrashResult {
+    fn from(r: &TrashResultDto) -> Self {
+        TrashResult {
+            doc_id: r.doc_id.clone(),
+            commit_hash: r.commit_hash.clone(),
+            broken_refs: r.broken_refs,
+            next_step: Some(r.next_step.clone()),
         }
     }
 }

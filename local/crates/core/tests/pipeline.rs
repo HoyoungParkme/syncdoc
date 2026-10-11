@@ -68,6 +68,9 @@ impl Env {
                 author: self.author(),
                 message: format!("{doc_type} 만들기"),
                 confirm_item_deletion: false,
+                reason: None,
+                restore: false,
+                read_first: true,
             },
         )
         .await
@@ -93,6 +96,9 @@ impl Env {
                 author: self.author(),
                 message: format!("{doc_id} 고치기"),
                 confirm_item_deletion: confirm,
+                reason: None,
+                restore: false,
+                read_first: true,
             },
         )
         .await
@@ -271,6 +277,9 @@ async fn violations_leave_nothing_and_unknown_type_is_frontmatter_type() {
             author: e.author(),
             message: "m".into(),
             confirm_item_deletion: false,
+            reason: None,
+            restore: false,
+            read_first: true,
         },
     )
     .await;

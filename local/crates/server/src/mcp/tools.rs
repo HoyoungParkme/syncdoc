@@ -19,8 +19,8 @@ use syncdoc_core::pycompat::re::compile;
 use syncdoc_core::queries;
 use syncdoc_core::spec::{SUBTYPES, TYPES};
 use syncdoc_core::types::{
-    Author, AuthorKind, DocumentSummary, Entry, ItemRef, ProjectSummary, STAGES, SaveResult,
-    Storage, py_isoformat,
+    Author, AuthorKind, DocStatus, DocumentSummary, Entry, ItemRef, ProjectSummary, STAGES,
+    SaveResult, Storage, py_isoformat,
 };
 
 use crate::compat::pydantic::{Failure, Opts};
@@ -86,6 +86,9 @@ pub async fn call(
         "get_references" => get_references(state, user, &typed).await,
         "create_document" => create_document(state, user, &typed).await,
         "update_document" => update_document(state, user, &typed).await,
+        "delete_document" => delete_document(state, user, &typed).await,
+        "restore_document" => restore_document(state, user, &typed).await,
+        "change_status" => change_status(state, user, &typed).await,
         _ => Err(Problem::NotImplemented {
             card: tool.card.to_string(),
         }),
@@ -300,6 +303,9 @@ async fn create_document(state: &AppState, user: &UserRow, a: &PyValue) -> Resul
             author: agent_author(user),
             message: arg_str(a, "message"),
             confirm_item_deletion: false,
+            reason: None,
+            restore: false,
+            read_first: true,
         },
     )
     .await?;
@@ -330,10 +336,70 @@ async fn update_document(state: &AppState, user: &UserRow, a: &PyValue) -> Resul
             author: agent_author(user),
             message: arg_str(a, "message"),
             confirm_item_deletion: arg_bool(a, "confirm_item_deletion"),
+            reason: None,
+            restore: false,
+            read_first: true,
         },
     )
     .await?;
     Ok(save_json(&r))
+}
+
+/// SYNC-API-002#delete_document
+///
+/// 첫 호출은 확인 요청 — `confirm=true`로 다시 부르면 넣는다. 결과는 파이썬 `TrashResult.to_dict()` 꼴
+async fn delete_document(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let r = pipeline::trash_document(
+        &state.pool,
+        &state.repos,
+        &arg_str(a, "doc_id"),
+        &agent_author(user),
+        arg_bool(a, "confirm"),
+    )
+    .await?;
+    Ok(json!({
+        "doc_id": r.doc_id,
+        "commit_hash": r.commit_hash,
+        "broken_refs": r.broken_refs,
+        "next_step": r.next_step,
+    }))
+}
+
+/// SYNC-API-002#restore_document
+async fn restore_document(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let r = pipeline::restore_document(
+        &state.pool,
+        &state.repos,
+        &arg_str(a, "doc_id"),
+        &agent_author(user),
+    )
+    .await?;
+    Ok(save_json(&r))
+}
+
+/// SYNC-API-002#change_status
+///
+/// 웹 토글과 같은 `pipeline.change_status` — 다른 것은 작성자뿐(카드 BE). 답은 문서 요약(작성자 이름까지)
+async fn change_status(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let doc_id = arg_str(a, "doc_id");
+    let to = if arg_str(a, "to") == "approved" {
+        DocStatus::Approved
+    } else {
+        DocStatus::Draft
+    };
+    let author = agent_author(user);
+    pipeline::change_status(
+        &state.pool,
+        &state.repos,
+        &doc_id,
+        to,
+        &author,
+        arg_opt_str(a, "reason").as_deref(),
+    )
+    .await?;
+    let mut c = state.pool.acquire().await?;
+    let d = queries::document_view(&mut c, &state.repos, &doc_id, user).await?;
+    Ok(summary_json(&d.summary))
 }
 
 /// SYNC-API-002#get_template

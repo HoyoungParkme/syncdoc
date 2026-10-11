@@ -1,0 +1,559 @@
+{
+ "diff_after_revert": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"from_version\":2,\"to_version\":3,\"hunks\":[{\"item_id\":\"R1\",\"downstream_count\":1,\"lines\":[{\"op\":\"ctx\",\"text\":\"#### R1 첫 기능\"},{\"op\":\"del\",\"text\":\"고친 설명.\"},{\"op\":\"add\",\"text\":\"설명.\"},{\"op\":\"ctx\",\"text\":\"\"}]}]}"
+ },
+ "doc_after_status": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LWB-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{},\"trashed_at\":null,\"body\":\"---\\ndoc_id: LWB-PRD-001\\ntype: PRD\\ntitle: 쓰기 시험\\nstatus: draft\\n---\\n# 쓰기 시험\\n\\n## 1. 목표\\n\\n#### G1 목표\\n한 줄.\\n\\n## 2. 비목표\\n\\n## 3. 요구사항\\n\\n#### R1 첫 기능\\n설명.\\n\\n#### R2 둘째 기능\\n설명.\\n\\n## 4. 성공지표\\n\\n## 5. 미결사항\\n\",\"commit_hash\":\"H\",\"convention_error_detail\":null,\"items\":[{\"item_id\":\"G1\",\"display_name\":\"목표\",\"missing_refs\":[]},{\"item_id\":\"R1\",\"display_name\":\"첫 기능\",\"missing_refs\":[]},{\"item_id\":\"R2\",\"display_name\":\"둘째 기능\",\"missing_refs\":[]}],\"prev_doc_id\":null,\"next_doc_id\":\"LWB-SCN-001\",\"missing_refs\":[],\"project_name\":\"쓰기 시험\"}"
+ },
+ "docs_after_purge": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"type\":\"document\",\"doc_id\":\"LWB-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"draft\",\"current_version_no\":4,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"web\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null}]"
+ },
+ "edit_v2": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LWB-PRD-001\\\", \\\"version_no\\\": 2, \\\"commit_hash\\\": \\\"H\\\", \\\"status\\\": \\\"draft\\\", \\\"warnings\\\": [], \\\"next_step\\\": \\\"LWB-PRD-001 v2 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)\\\"}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "init": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"code\\\": \\\"LWB\\\", \\\"name\\\": \\\"쓰기 시험\\\", \\\"storage\\\": \\\"server\\\", \\\"remote_url\\\": null, \\\"stages\\\": [{\\\"stage\\\": 1, \\\"doc_type\\\": \\\"RFQ\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 2, \\\"doc_type\\\": \\\"PRD\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 3, \\\"doc_type\\\": \\\"SCN\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 4, \\\"doc_type\\\": \\\"UC\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 5, \\\"doc_type\\\": \\\"INFRA\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 6, \\\"doc_type\\\": \\\"DOM\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 7, \\\"doc_type\\\": \\\"UI\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 8, \\\"doc_type\\\": \\\"API\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 9, \\\"doc_type\\\": \\\"SEQ\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 10, \\\"doc_type\\\": \\\"MS\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}, {\\\"stage\\\": 11, \\\"doc_type\\\": \\\"CODE\\\", \\\"status\\\": null, \\\"doc_count\\\": 0, \\\"gate_warning\\\": false, \\\"broken_count\\\": 0}], \\\"std_docs\\\": [], \\\"counts\\\": {\\\"broken_ref\\\": 0, \\\"convention_errors\\\": 0, \\\"incomplete\\\": 0}, \\\"updated_at\\\": null}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "mcp_restore_again": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:document-not-trashed\\\", \\\"title\\\": \\\"document-not-trashed\\\", \\\"status\\\": 409, \\\"detail\\\": \\\"휴지통에 없는 문서\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "mcp_restore_missing": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"document LWB-PRD-404 없음\\\", \\\"resource\\\": \\\"document\\\", \\\"id\\\": \\\"LWB-PRD-404\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "mcp_status_bad_to": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"Error executing tool change_status: 1 validation error for change_statusArguments\\nto\\n  Input should be 'draft' or 'approved' [type=literal_error, input_value='x', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "mcp_status_blocked": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:status-blocked\\\", \\\"title\\\": \\\"status-blocked\\\", \\\"status\\\": 409, \\\"detail\\\": \\\"규약 오류 또는 미완성 문서는 완료로 올릴 수 없음\\\", \\\"convention_error_detail\\\": null, \\\"warnings\\\": [\\\"ref.missing: LWB-PRD-009#R1\\\"]}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "mcp_status_draft": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LWB-PRD-001\\\", \\\"doc_type\\\": \\\"PRD\\\", \\\"stage\\\": 2, \\\"status\\\": \\\"draft\\\", \\\"version_no\\\": 1, \\\"has_convention_error\\\": false, \\\"incomplete_warnings\\\": [], \\\"updated_at\\\": \\\"T\\\", \\\"last_author\\\": {\\\"kind\\\": \\\"agent\\\", \\\"user\\\": \\\"local\\\", \\\"instructed_by\\\": \\\"local\\\", \\\"via\\\": \\\"mcp\\\"}, \\\"counts\\\": {}}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "mcp_trash_ask": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:document-deletion-needs-confirm\\\", \\\"title\\\": \\\"쓰기 시험\\\", \\\"status\\\": 409, \\\"detail\\\": \\\"휴지통에 넣기는 사람 확인이 필요함\\\", \\\"doc_id\\\": \\\"LWB-PRD-001\\\", \\\"version_count\\\": 3, \\\"inbound_refs\\\": [\\\"LWB-SCN-001\\\", \\\"LWB-SCN-001#S1\\\", \\\"LWB-SCN-001#S1\\\"]}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "mcp_trash_missing": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"document LWB-PRD-404 없음\\\", \\\"resource\\\": \\\"document\\\", \\\"id\\\": \\\"LWB-PRD-404\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "mcp_trash_scn": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LWB-SCN-001\\\", \\\"commit_hash\\\": \\\"H\\\", \\\"broken_refs\\\": 0, \\\"next_step\\\": \\\"LWB-SCN-001 휴지통에 넣음 — 끊어진 참조 0. 사람에게 알리고 멈춘다\\\"}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "prd": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LWB-PRD-001\\\", \\\"version_no\\\": 1, \\\"commit_hash\\\": \\\"H\\\", \\\"status\\\": \\\"draft\\\", \\\"warnings\\\": [], \\\"next_step\\\": \\\"LWB-PRD-001 v1 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)\\\"}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "purge_has_history": {
+  "status": 409,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:document-has-history\",\"title\":\"document-has-history\",\"status\":409,\"detail\":\"아직 가리키는 곳이 있어 완전히 지울 수 없다\",\"inbound_refs\":[\"LWB-SCN-001\"]}"
+ },
+ "purge_not_trashed": {
+  "status": 409,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:document-not-trashed\",\"title\":\"document-not-trashed\",\"status\":409,\"detail\":\"휴지통에 없는 문서\"}"
+ },
+ "purge_scn": {
+  "status": 204,
+  "headers": [],
+  "body": ""
+ },
+ "rest_trash": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"doc_id\":\"LWB-PRD-001\",\"commit_hash\":\"H\",\"broken_refs\":2,\"next_step\":\"LWB-PRD-001 휴지통에 넣음 — 끊어진 참조 2. 사람에게 알리고 멈춘다\"}"
+ },
+ "rest_trash_again": {
+  "status": 409,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:document-trashed\",\"title\":\"document-trashed\",\"status\":409,\"detail\":\"휴지통에 있는 문서\",\"trashed_at\":\"T\"}"
+ },
+ "rest_trash_ask": {
+  "status": 409,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:document-deletion-needs-confirm\",\"title\":\"쓰기 시험\",\"status\":409,\"detail\":\"휴지통에 넣기는 사람 확인이 필요함\",\"doc_id\":\"LWB-PRD-001\",\"version_count\":3,\"inbound_refs\":[\"LWB-SCN-001\",\"LWB-SCN-001#S1\",\"LWB-SCN-001#S1\"]}"
+ },
+ "rest_trash_bad_confirm": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.confirm — Input should be a valid boolean, unable to interpret input\",\"errors\":[{\"loc\":\"query.confirm\",\"msg\":\"Input should be a valid boolean, unable to interpret input\"}]}"
+ },
+ "restore": {
+  "status": 201,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"doc_id\":\"LWB-PRD-001\",\"version_no\":4,\"commit_hash\":\"H\",\"status\":\"draft\",\"warnings\":[],\"next_step\":null}"
+ },
+ "revert_current": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:already-current\",\"title\":\"already-current\",\"status\":422,\"detail\":\"현재 버전으로는 되돌릴 수 없음\"}"
+ },
+ "revert_huge": {
+  "status": 500,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:internal\",\"title\":\"internal\",\"status\":500,\"detail\":\"서버에서 처리하지 못한 오류입니다. 로그를 확인하세요.\"}"
+ },
+ "revert_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"version LWB-PRD-001 v9 없음\",\"resource\":\"version\",\"id\":\"LWB-PRD-001 v9\"}"
+ },
+ "revert_missing_doc": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"document LWB-PRD-404 없음\",\"resource\":\"document\",\"id\":\"LWB-PRD-404\"}"
+ },
+ "revert_no_body": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body — Field required\",\"errors\":[{\"loc\":\"body\",\"msg\":\"Field required\"}]}"
+ },
+ "revert_v1": {
+  "status": 201,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"doc_id\":\"LWB-PRD-001\",\"version_no\":3,\"commit_hash\":\"H\",\"status\":\"draft\",\"warnings\":[],\"next_step\":null}"
+ },
+ "revert_zero": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.to_version — Input should be greater than or equal to 1\",\"errors\":[{\"loc\":\"body.to_version\",\"msg\":\"Input should be greater than or equal to 1\"}]}"
+ },
+ "scn": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LWB-SCN-001\\\", \\\"version_no\\\": 1, \\\"commit_hash\\\": \\\"H\\\", \\\"status\\\": \\\"draft\\\", \\\"warnings\\\": [], \\\"next_step\\\": \\\"LWB-SCN-001 v1 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)\\\"}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "scn_again": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"doc_id\\\": \\\"LWB-SCN-001\\\", \\\"version_no\\\": 1, \\\"commit_hash\\\": \\\"H\\\", \\\"status\\\": \\\"draft\\\", \\\"warnings\\\": [], \\\"next_step\\\": \\\"LWB-SCN-001 v1 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)\\\"}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "scn_broken": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LWB-SCN-001\",\"doc_type\":\"SCN\",\"stage\":3,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{},\"trashed_at\":null,\"body\":\"---\\ndoc_id: LWB-SCN-001\\ntype: SCN\\ntitle: 시나리오\\nstatus: draft\\nupstream: [LWB-PRD-001]\\n---\\n# 시나리오\\n\\n## 1. 페르소나\\n\\n#### P1 사람\\n누구.\\n\\n## 2. 시나리오\\n\\n#### S1 첫 흐름\\n근거: [[LWB-PRD-001#R1]] · [[LWB-PRD-001#R2]] · [[LWB-PRD-009#R1]]\\n\\n## 3. 대응표\\n\",\"commit_hash\":\"H\",\"convention_error_detail\":null,\"items\":[{\"item_id\":\"P1\",\"display_name\":\"사람\",\"missing_refs\":[]},{\"item_id\":\"S1\",\"display_name\":\"첫 흐름\",\"missing_refs\":[\"LWB-PRD-001#R1\",\"LWB-PRD-001#R2\",\"LWB-PRD-009#R1\"]}],\"prev_doc_id\":null,\"next_doc_id\":null,\"missing_refs\":[\"LWB-PRD-001#R1\",\"LWB-PRD-001#R2\",\"LWB-PRD-009#R1\"],\"project_name\":\"쓰기 시험\"}"
+ },
+ "scn_restored": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LWB-SCN-001\",\"doc_type\":\"SCN\",\"stage\":3,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{},\"trashed_at\":null,\"body\":\"---\\ndoc_id: LWB-SCN-001\\ntype: SCN\\ntitle: 시나리오\\nstatus: draft\\nupstream: [LWB-PRD-001]\\n---\\n# 시나리오\\n\\n## 1. 페르소나\\n\\n#### P1 사람\\n누구.\\n\\n## 2. 시나리오\\n\\n#### S1 첫 흐름\\n근거: [[LWB-PRD-001#R1]] · [[LWB-PRD-001#R2]] · [[LWB-PRD-009#R1]]\\n\\n## 3. 대응표\\n\",\"commit_hash\":\"H\",\"convention_error_detail\":null,\"items\":[{\"item_id\":\"P1\",\"display_name\":\"사람\",\"missing_refs\":[]},{\"item_id\":\"S1\",\"display_name\":\"첫 흐름\",\"missing_refs\":[\"LWB-PRD-009#R1\"]}],\"prev_doc_id\":\"LWB-PRD-001\",\"next_doc_id\":null,\"missing_refs\":[\"LWB-PRD-009#R1\"],\"project_name\":\"쓰기 시험\"}"
+ },
+ "status_again": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LWB-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"approved\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{},\"trashed_at\":null}"
+ },
+ "status_approve": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LWB-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"approved\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{},\"trashed_at\":null}"
+ },
+ "status_bad_to": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.to — Input should be 'draft' or 'approved'\",\"errors\":[{\"loc\":\"body.to\",\"msg\":\"Input should be 'draft' or 'approved'\"}]}"
+ },
+ "status_empty": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.to — Field required\",\"errors\":[{\"loc\":\"body.to\",\"msg\":\"Field required\"}]}"
+ },
+ "status_missing_doc": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"document LWB-PRD-404 없음\",\"resource\":\"document\",\"id\":\"LWB-PRD-404\"}"
+ },
+ "status_no_body": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body — Field required\",\"errors\":[{\"loc\":\"body\",\"msg\":\"Field required\"}]}"
+ },
+ "status_not_json": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.1 — JSON decode error\",\"errors\":[{\"loc\":\"body.1\",\"msg\":\"JSON decode error\"}]}"
+ },
+ "status_other_project": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "status_trashed": {
+  "status": 409,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:document-trashed\",\"title\":\"document-trashed\",\"status\":409,\"detail\":\"휴지통에 있는 문서\",\"trashed_at\":\"T\"}"
+ },
+ "trash_list": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"type\":\"document\",\"doc_id\":\"LWB-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"draft\",\"current_version_no\":3,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"web\"},\"counts\":{},\"trashed_at\":\"T\"}]"
+ },
+ "update_trashed": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:document-trashed\\\", \\\"title\\\": \\\"document-trashed\\\", \\\"status\\\": 409, \\\"detail\\\": \\\"휴지통에 있는 문서\\\", \\\"trashed_at\\\": \\\"T\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "versions_after_status": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"doc_id\":\"LWB-PRD-001\",\"version_no\":null,\"commit_hash\":\"H\",\"message\":\"status(LWB-PRD-001): approved → draft\",\"author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"created_at\":\"T\"},{\"doc_id\":\"LWB-PRD-001\",\"version_no\":null,\"commit_hash\":\"H\",\"message\":\"status(LWB-PRD-001): draft → approved\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"web\"},\"created_at\":\"T\"},{\"doc_id\":\"LWB-PRD-001\",\"version_no\":1,\"commit_hash\":\"H\",\"message\":\"PRD\",\"author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"created_at\":\"T\"}]"
+ }
+}
