@@ -297,6 +297,8 @@ pub async fn sync_readme(&self, workdir: &Path, user: &UserRow, code: &str, spec
 
 **다른 점** 받기에 사람이 없다(토큰 갈래 없음, [[#Git.fetch]]) · 규약 주소를 부르는 쪽이 넘긴다(파이썬은 설정)
 
+**호출하는 것** [[#Git.init_specs]] · [[#Git.fetch]] · [[#Git.read]] · [[#Git.commit_push]]
+
 **테스트 관점** 앱이 만든 저장소 → `None`, 커밋 없음 · README를 밖에서 고쳐 민 뒤 → 커밋 하나, 다시 부르면 `None` · README가 없는 저장소 → 만든다
 
 ---
