@@ -373,7 +373,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **처리**
 1. `git http-backend`를 띄운다. 환경은 `PATH`·`GIT_PROJECT_ROOT`·`GIT_HTTP_EXPORT_ALL=1`·`GIT_HTTP_MAX_REQUEST_BUFFER=100M`과 `env`뿐 — 앱의 환경(비밀)을 넘기지 않는다
-2. `body`를 stdin으로 흘리는 일과 stdout을 읽는 일을 **동시에** 한다 — 차례로 하면 파이프가 차서 멈춘다. stderr도 따로 비운다
+2. `body`를 stdin으로 흘리는 일과 stdout을 읽는 일을 **동시에** 한다 — 차례로 하면 파이프가 차서 멈춘다. stderr도 따로 비운다. 자식이 먼저 끝나 stdin이 닫혔으면(틀린 Content-Type의 415·거절 등) 남은 본문은 버린다 — 그 답은 stdout에 있고, 닫힌 파이프에 쓰면 uvloop가 `RuntimeError`를 낸다(#361)
 3. **본문을 다 넘길 때까지 응답을 시작하지 않는다.** 그동안 나온 stdout은 모아 둔다. `git http-backend`는 push 결과 머리를 본문을 다 읽기 전에 내놓는데, 그때 응답을 시작하면 큰 push(chunked)의 본문이 중간에 끊겼다(시험판 실측 — 360KB에서 끊겨 「early EOF」)
 4. 본문이 끝나면 stdin을 닫고, 모은 것에서 CGI 머리를 `\r\n\r\n`까지 읽는다. `Status:` 줄이 있으면 그 코드, 없으면 200. `Status:`는 헤더로 내보내지 않는다
 5. `→ CgiResponse(status, headers, body=남은 stdout 스트림)` — 스트림이 끝나면 프로세스를 기다리고, 도중에 끊기면 프로세스를 죽인다
@@ -384,7 +384,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 
 **호출하는 것** —
 
-**테스트 관점** `info/refs?service=git-upload-pack`·`git-receive-pack` 광고가 200과 알맞은 Content-Type · `REMOTE_USER`가 있으면 receive-pack 광고가 된다 · 실제 git 클라이언트로 clone·push(3MB chunked 포함)가 된다 · 되감기 push는 git이 거절 문구로 받는다
+**테스트 관점** `info/refs?service=git-upload-pack`·`git-receive-pack` 광고가 200과 알맞은 Content-Type · `REMOTE_USER`가 있으면 receive-pack 광고가 된다 · 자식이 본문 도중에 끝나도(틀린 Content-Type) uvloop에서 415 · 실제 git 클라이언트로 clone·push(3MB chunked 포함)가 된다 · 되감기 push는 git이 거절 문구로 받는다
 
 ---
 
