@@ -139,7 +139,7 @@ impl ProjectService<'_> {
     }
 
     /// init_project 4 — 서버 저장소를 준비한다. (원본, 되살린 보관본의 원래 자리)
-    async fn server_origin(
+    async fn prepare_origin(
         &self,
         code: &str,
         import_existing: bool,
@@ -202,7 +202,7 @@ impl ProjectService<'_> {
         }
         let workdir = self.repos.repos.join(code);
         let _ = fs::remove_dir_all(&workdir); // 지난 실패 잔재
-        let (origin, restored) = self.server_origin(code, import_existing).await?;
+        let (origin, restored) = self.prepare_origin(code, import_existing).await?;
         // 되돌림 — 새로 만든 원본은 지우고, 되살린 것은 보관 자리로 돌려놓는다
         let undo_origin = || match &restored {
             Some(back) => {
@@ -359,6 +359,21 @@ impl ProjectService<'_> {
             return Err(not_found());
         }
         Ok(target)
+    }
+
+    /// SYNC-MS-013#ProjectService.server_origin
+    ///
+    /// git 입구가 흘릴 서버 안 원본 — 남의 것·GitHub 저장·원본 없음은 같은 `not-found`(존재가 새지 않는다)
+    pub async fn server_origin(&mut self, code: &str, user: &UserRow) -> Result<PathBuf, Problem> {
+        let (_, repo) = self.get_owned(code, user).await?;
+        let origin = PathBuf::from(&repo.remote_url);
+        if repo.storage != Storage::Server.as_str() || !origin.is_dir() {
+            return Err(Problem::NotFound {
+                resource: "project".to_string(),
+                id: serde_json::Value::from(code),
+            });
+        }
+        Ok(origin)
     }
 }
 
