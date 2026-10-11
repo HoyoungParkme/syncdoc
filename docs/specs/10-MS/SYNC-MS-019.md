@@ -12,7 +12,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-009, SYNC-INFRA-001, SYNC-STD-004]
 
 `crates/core/src/infra/git.rs`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.8. 파이썬 판 [[SYNC-MS-009]]의 `git.*`와 **같은 명령·같은 옵션·같은 처리**이고, 이 문서는 다른 점만 적는다([[SYNC-STD-001]] 2.10). 서비스가 아니다 — git CLI를 자식 프로세스로 부르는 얇은 층이다([[SYNC-INFRA-001]] 9.1·9.2 — 순수 Rust git은 아직 push를 받지 못한다).
 
-**카드 L6 몫은 서버 저장 프로젝트를 만들고 지우는 데 드는 일곱이다(2026-10-08).** 카드 L7이 받기·밀린 커밋 수 둘을 더했다(저장 파이프라인의 「밀린 커밋 읽기」·처리 지점 앞당기기). 카드 L10이 git 입구의 둘(광고·rpc)을 더했다(2026-10-11) — 파이썬 판의 `git http-backend`를 쓰지 않고 `upload-pack`·`receive-pack --stateless-rpc`를 직접 부르되, http-backend가 내는 머리·문장을 그대로 낸다(INFRA 9.1). 카드 L11이 밀린 커밋 처리·재구축의 넷(바뀐 파일·파일 이력·작업 사본 돌리기·README 맞추기)을 더했다(2026-10-11). 카드 L12가 코드 그래프의 둘(바뀐 경로 전부·커밋 풀기)을 더했다(2026-10-11).
+**카드 L6 몫은 서버 저장 프로젝트를 만들고 지우는 데 드는 일곱이다(2026-10-08).** 카드 L7이 받기·밀린 커밋 수 둘을 더했다(저장 파이프라인의 「밀린 커밋 읽기」·처리 지점 앞당기기). 카드 L10이 git 입구의 둘(광고·rpc)을 더했다(2026-10-11) — 파이썬 판의 `git http-backend`를 쓰지 않고 `upload-pack`·`receive-pack --stateless-rpc`를 직접 부르되, http-backend가 내는 머리·문장을 그대로 낸다(INFRA 9.1). 카드 L11이 밀린 커밋 처리·재구축의 넷(바뀐 파일·파일 이력·작업 사본 돌리기·README 맞추기)을 더했다(2026-10-11). 카드 L12가 코드 그래프의 둘(바뀐 경로 전부·커밋 풀기)을 더했다(2026-10-11). 카드 L15가 번들 가져오기의 하나(통째로 복제)를 더했다(2026-10-11).
 
 **`Git { exe, global_config }`** — git 실행 파일과 빈 전역 설정 파일. 켤 때 [[SYNC-MS-012#runtime.run]]이 만들어 서버 상태에 둔다. 실행 파일은 [[SYNC-MS-012#paths.git]] — 윈도는 설치 폴더의 MinGit(`mingit/cmd/git.exe`), 리눅스는 시스템 git.
 
@@ -49,6 +49,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-009, SYNC-INFRA-001, SYNC-STD-004]
 | [[#Git.sync_readme]] | 저장소 README를 지금 판으로 |
 | [[#Git.changed_paths]] | 범위에서 바뀐 경로 전부 |
 | [[#Git.archive]] | 커밋의 파일을 폴더에 푼다 |
+| [[#Git.clone_bare]] | 번들을 서버 저장소로 통째로 |
 
 ---
 
@@ -334,6 +335,23 @@ pub async fn archive(&self, workdir: &Path, commit: &str, dest: &Path) -> Result
 **다른 점** 파이썬 `tarfile`의 `filter="data"` 대신 보통 파일·폴더만 푼다 — 심볼릭 링크는 따라가지도 만들지도 않는다(그래프는 파일을 읽기만 한다)
 
 **테스트 관점** 커밋 뒤 작업 사본을 고쳐도 커밋의 내용이 풀린다 · `.gitignore`된 파일은 없다 · 심볼릭 링크는 없다
+
+---
+
+#### Git.clone_bare 번들을 서버 저장소로 통째로
+
+**시그니처**
+```rust
+pub async fn clone_bare(&self, source: &str, path: &Path) -> Result<(), Problem>
+```
+
+근거: [[SYNC-MS-009#git.clone_bare]] · [[SYNC-UC-001#UC-A1]] 1c · 카드 L15
+
+**처리** [[SYNC-MS-009#git.clone_bare]]와 같은 명령 — 위 폴더를 만들고 `git: clone -q --bare {source} {path}` · 그 자리에서 `git: remote remove origin` · `git: symbolic-ref HEAD refs/heads/main` · [[#Git.init_bare]]와 같은 받기 규칙 셋. 가지·태그가 커밋 해시 그대로 온다
+
+**다른 점** 토큰을 받지 않는다 — 싱크독_로컬은 번들 파일(`source`는 그 경로)에서만 부른다
+
+**테스트 관점** 번들의 가지·태그가 같은 해시로 있다 · 원격이 없다 · HEAD가 `refs/heads/main` · 받기 규칙 셋이 `true` · 번들이 아닌 파일 → `Problem::Git`
 
 ---
 
