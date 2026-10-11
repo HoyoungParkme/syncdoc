@@ -365,6 +365,18 @@ impl ProjectService<'_> {
             .collect())
     }
 
+    /// SYNC-MS-013#ProjectService.ensure_hook
+    ///
+    /// 원본이 서버 안이라 밖에서 바뀌지 않는다 — 걸 통지가 없다(파이썬 판 1a)
+    pub async fn ensure_hook(&mut self, code: &str, user: &UserRow) -> Result<HookStatus, Problem> {
+        self.get_owned(code, user).await?;
+        Ok(HookStatus {
+            hook: "none".to_string(),
+            hook_error: Some("서버 저장소는 통지가 없다".to_string()),
+            created: false,
+        })
+    }
+
     /// SYNC-MS-013#ProjectService.asset_path
     ///
     /// 작업 사본 `docs/specs/` 안의 첨부 — 밖으로 나가는 경로·허용 밖 확장자·없는 파일은 전부 같은 `not-found`(file)

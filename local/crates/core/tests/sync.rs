@@ -849,3 +849,49 @@ async fn rebuild_survives_deleted_then_recreated_and_rolls_back_on_failure() {
     ));
 }
 
+#[tokio::test]
+async fn repo_status_is_mine_from_db_and_hook_is_none() {
+    let e = env().await;
+    let mut c = e.conn().await;
+    let other = user(&mut c, "other").await;
+    let mut ps = ProjectService {
+        db: &mut c,
+        repos: &e.repos,
+    };
+    ps.init_project("AB", "남의 것", &other, false, Storage::Server)
+        .await
+        .expect("남의 것");
+    let rows = ps.repo_status(&e.user).await.expect("상태");
+    assert_eq!(rows.len(), 1);
+    let r = &rows[0];
+    assert_eq!(
+        (r.code.as_str(), r.name.as_str(), r.storage.as_str()),
+        ("LS", "따라잡기 시험", "server")
+    );
+    assert_eq!(
+        (r.remote_url.clone(), r.hook.as_str(), r.behind_by),
+        (None, "none", None)
+    );
+    assert!(r.last_processed_commit.is_some());
+    sqlx::query("UPDATE repositories SET fetch_error = '받기 실패' WHERE project_id = (SELECT id FROM projects WHERE code = 'LS')")
+        .execute(&mut *ps.db)
+        .await
+        .expect("오류");
+    assert_eq!(
+        ps.repo_status(&e.user).await.expect("상태")[0]
+            .error
+            .as_deref(),
+        Some("받기 실패")
+    );
+    // 통지 — 늘 none
+    let h = ps.ensure_hook("LS", &e.user).await.expect("통지");
+    assert_eq!(
+        (h.hook.as_str(), h.hook_error.as_deref(), h.created),
+        ("none", Some("서버 저장소는 통지가 없다"), false)
+    );
+    assert!(matches!(
+        ps.ensure_hook("AB", &e.user).await,
+        Err(Problem::NotFound { .. })
+    ));
+}
+
