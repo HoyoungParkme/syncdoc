@@ -492,3 +492,17 @@ pub async fn items_of_project(
     .fetch_all(db)
     .await
 }
+
+/// 프로젝트의 휴지통 문서 — 최근에 넣은 것부터
+pub async fn trashed_of_project(
+    db: &mut PgConnection,
+    project_id: i32,
+) -> Result<Vec<DocumentRow>, sqlx::Error> {
+    sqlx::query_as::<_, DocumentRow>(sqlx::AssertSqlSafe(format!(
+        "SELECT {DOCUMENT_COLUMNS} FROM documents WHERE project_id = $1 AND trashed_at IS NOT NULL \
+         ORDER BY trashed_at DESC"
+    )))
+    .bind(project_id)
+    .fetch_all(db)
+    .await
+}

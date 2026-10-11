@@ -1420,4 +1420,14 @@ impl SpecService<'_> {
         }
         Ok(out)
     }
+
+    /// SYNC-MS-014#SpecService.list_trashed
+    pub async fn list_trashed(&mut self, project_id: i32) -> Result<Vec<DocumentSummary>, Problem> {
+        let rows = repo::trashed_of_project(&mut *self.db, project_id).await?;
+        let ids: Vec<i32> = rows.iter().map(|r| r.id).collect();
+        let latest = repo::latest_versions(&mut *self.db, &ids).await?;
+        rows.iter()
+            .map(|r| summary_of(r, latest.get(&r.id)))
+            .collect()
+    }
 }
