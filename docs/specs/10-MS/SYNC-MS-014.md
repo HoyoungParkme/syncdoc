@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-014
 type: MS
 title: MINISPEC — SpecService · markdown (Rust)
-status: approved
+status: draft
 upstream: [SYNC-DOM-004, SYNC-MS-002, SYNC-MS-003, SYNC-STD-001, SYNC-STD-004]
 ---
 
