@@ -89,12 +89,10 @@ pub async fn delete_project(&mut self, code: &str, user: &UserRow) -> Result<(),
 
 **처리** [[SYNC-MS-001#ProjectService.delete_project]]와 같다 — 코드마다 잠금을 쥐고
 1. `(p, r) = get_owned(code, user)`
-2. `DB:` 그 프로젝트의 `conversations`(턴·첨부는 FK로 함께)·`code_graphs` → 참조 셋(나가는 것·들어오는 문서·들어오는 항목) → `status_changes` → `items` → `versions` → `documents` → `repositories` → `projects`를 지운다
+2. [[SYNC-MS-021#ConversationService.delete_by_project]](턴·첨부는 FK로 함께) · [[SYNC-MS-022#CodeGraphService.delete_by_project]] → `DB:` 참조 셋(나가는 것·들어오는 문서·들어오는 항목) → `status_changes` → `items` → `versions` → `documents` → `repositories` → `projects`를 지운다
 3. 작업 사본을 지운다(실패는 넘긴다) · 서버 저장이고 원본이 있으면 보관 자리로 옮긴다 — **지우지 않는다**
 
-**다른 점** 대화·코드 그래프 행을 이 함수가 바로 지운다 — 그 묶음(L12·L14)의 서비스가 아직 없다. 그 카드가 `delete_by_project`를 두면 이 단계가 그것을 부른다
-
-**호출하는 것** [[#ProjectService.get_owned]]
+**호출하는 것** [[#ProjectService.get_owned]] · [[SYNC-MS-021#ConversationService.delete_by_project]] · [[SYNC-MS-022#CodeGraphService.delete_by_project]]
 
 **테스트 관점** 지운 뒤 `get` → `not-found` · 그 프로젝트의 문서·항목·버전·참조·대화·코드 그래프 행이 0 · 작업 사본이 없다 · 원본이 `_archive/{code}-{시각}.git`에, `origins/{code}.git`은 없다 · 다른 프로젝트 행은 그대로 · 남의 프로젝트 → `not-found`, 아무것도 안 지워짐
 
