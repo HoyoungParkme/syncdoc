@@ -658,6 +658,36 @@ async fn outside_push_becomes_documents_in_stage_order_and_deletions_break_refs(
 }
 
 #[tokio::test]
+async fn outside_push_with_duplicate_item_ids_is_saved_and_moves_on() {
+    // 같은 항목 ID가 둘인 파일도 저장하고 처리 지점이 넘어간다 — 항목은 처음 블록만 (#368)
+    let e = env().await;
+    let out = e.outside();
+    let dup = format!(
+        "{}\n#### R1 다시 쓴 기능\n설명.\n",
+        prd_file("draft", "설명.")
+    );
+    write(&out, "docs/specs/02-PRD/LS-PRD-001.md", &dup);
+    let head = commit_push(&out, "spec: 같은 항목 ID 둘");
+    assert_eq!(e.read_pending().await, 1);
+    assert_eq!(e.processed().await, head);
+    let mut c = e.conn().await;
+    let names: Vec<String> =
+        sqlx::query_scalar("SELECT display_name FROM items WHERE item_id = 'R1'")
+            .fetch_all(&mut *c)
+            .await
+            .expect("항목");
+    assert_eq!(names, ["첫 기능"]);
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            "SELECT count(*) FROM documents WHERE doc_id = 'LS-PRD-001' AND convention_error_detail LIKE '%item.duplicate: R1%'"
+        )
+        .await,
+        1
+    );
+}
+
+#[tokio::test]
 async fn trashed_deletes_skip_and_name_mismatch_marks_and_unknown_dir_stalls() {
     let e = env().await;
     let out = e.outside();
