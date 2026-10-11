@@ -1522,4 +1522,11 @@ impl SpecService<'_> {
             .remove(&version_no)
             .ok_or_else(|| not_found("version", &format!("{doc_id} v{version_no}")))
     }
+
+    /// SYNC-MS-014#SpecService.delete_document
+    ///
+    /// 문지기 검사는 하지 않는다 — `pipeline.purge_document`가 세고 부른다
+    pub async fn delete_document(&mut self, document: &Document) -> Result<i64, Problem> {
+        Ok(repo::delete_document_rows(&mut *self.db, document.summary.id).await? as i64)
+    }
 }
