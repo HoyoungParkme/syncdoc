@@ -31,12 +31,13 @@ local/                          싱크독_로컬 (Rust) — 실행 파일 하나
 ├── Cargo.toml · Cargo.lock     작업 공간 — crate 넷 + xtask. 의존 판은 여기 한곳에
 ├── rust-toolchain.toml         Rust 판 고정 — 1.99.0 (STD-001 1.9)
 ├── .cargo/config.toml          `cargo xtask` 별칭 · 개발용 PostgreSQL 자리(SYNCDOC_LOCAL_PG_DIR)
-├── crates/                     층마다 crate 하나. 의존은 app → server → core → codegraph 한 방향
+├── crates/                     층마다 crate 하나. 의존은 app → server → core → codegraph 한 방향, 맨 아래 pycompat
 │   ├── app/                    실행 파일 syncdoc-local — 켜기·끄기·설정·데이터 자리·PostgreSQL 자식 프로세스 ·
 │   │                           한 번만 실행·트레이·자동 시작·백업·주기 일
 │   ├── server/                 axum 한 서버 — REST·SSE·MCP(/mcp)·git 입구(/git) · 화면과 /specs(실행 파일에 담음)
 │   ├── core/                   도메인 묶음과 조율 — 파이썬 core/와 같은 묶음·같은 서비스 + infra · 이전
-│   └── codegraph/              코드 그래프의 순수 부분 — 추출·줄이기·보강·대조·커뮤니티. DB 없음
+│   ├── codegraph/              코드 그래프의 순수 부분 — 추출·줄이기·보강·대조·커뮤니티. DB 없음
+│   └── pycompat/               파이썬 호환 — core와 codegraph가 같이 쓴다(L12에서 core 밖으로 — core는 같은 이름으로 다시 내보낸다)
 ├── migrations/                 이전 SQL — 원본은 backend/alembic. `cargo xtask migrations`가 리비전마다
 │                               `alembic upgrade --sql`로 만든다. 손으로 고치지 않는다 (STD-004 DEV-7)
 ├── xtask/                      개발 도구 — pg-fetch(개발용 PostgreSQL 바이너리) · migrations [--check] ·
@@ -51,7 +52,7 @@ local/                          싱크독_로컬 (Rust) — 실행 파일 하나
 └── target/                     빌드 결과 (gitignore). target/pg/16.15.0 — pg-fetch가 받은 PostgreSQL
 ```
 
-**crate 이름** — 패키지 `syncdoc_app`(실행 파일 `syncdoc-local`) · `syncdoc_server` · `syncdoc_core` · `syncdoc_codegraph`. Rust 표준 `core`와 겹치지 않게 앞에 `syncdoc_`를 붙인다 — 이 문서의 `crates/core`는 `syncdoc_core`다.
+**crate 이름** — 패키지 `syncdoc_app`(실행 파일 `syncdoc-local`) · `syncdoc_server` · `syncdoc_core` · `syncdoc_codegraph` · `syncdoc_pycompat`. Rust 표준 `core`와 겹치지 않게 앞에 `syncdoc_`를 붙인다 — 이 문서의 `crates/core`는 `syncdoc_core`다.
 
 crate마다 `src/`와 거울 `tests/`를 둔다. 단위 시험은 그 모듈의 `#[cfg(test)]`도 된다([[SYNC-STD-004]] 1장). DB가 드는 시험은 시험 컨테이너(5434)에 시험마다 DB 하나를 만든다 — 공용 도우미는 `crates/core/tests/support/`.
 
@@ -117,8 +118,8 @@ crates/core/
     ├── types.rs                    열거형·DTO (DOM-002 2.7·2.8)
     ├── clock.rs                    저장 시각 — 프로세스 안에서 뒤로 안 간다 (STD-004 DEV-18)
     ├── markdown.rs                 순수 — frontmatter·코드 마스킹·헤딩·참조·항목 블록
-    ├── pycompat/                   파이썬 호환 — 문자 분류·repr·정규식·difflib을 파이썬 3.12와 같게 (L5)
-    │   ├── unicode.rs              생성물 — `re`의 \s·\d·\w와 str.isprintable 구간(유니코드 15.0). `cargo xtask unicode-tables`
+    ├── pycompat                    `crates/pycompat`(`syncdoc_pycompat`)를 다시 내보낸 것 — 문자 분류·repr·정규식·difflib을 파이썬 3.12와 같게 (L5, L12에서 crate로)
+    │   ├── unicode.rs              생성물 — `re`의 \s·\d·\w, str.isdigit·str.isprintable 구간(유니코드 15.0). `cargo xtask unicode-tables`
     │   ├── chars.rs                표 찾기 · 파이썬 strip
     │   ├── repr.rs                 파이썬 str repr — server/compat도 이것을 쓴다
     │   ├── re.rs                   파이썬 패턴 문자열의 \s·\S·\d·\w를 위 표로 바꿔 regex로 컴파일
@@ -151,7 +152,7 @@ crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 
 | `local/crates/server/src/lib.rs` | 서버 조립·`/health` | [[SYNC-INFRA-001]] 4.1·9.1 |
 | `local/crates/server/src/web/guard.rs` · `local/crates/server/src/web/auth.rs` · `local/crates/server/src/mcp/auth.rs` | 인증 | [[SYNC-INFRA-001]] 5장·9.4 · [[SYNC-SEQ-001#SEQ-C2]] · [[SYNC-SEQ-001#SEQ-C3]] |
 | `local/crates/server/src/mcp/**` | MCP 입구 | [[SYNC-API-002]] 1장·2장 · [[SYNC-INFRA-001]] 9.8 |
-| `local/crates/server/src/compat/**` · `local/crates/core/src/pycompat/**` | 파이썬 호환 | [[SYNC-INFRA-001]] 9.8 · [[SYNC-DOM-004]] 1장 |
+| `local/crates/server/src/compat/**` · `local/crates/pycompat/**` | 파이썬 호환 | [[SYNC-INFRA-001]] 9.8 · [[SYNC-DOM-004]] 1장 |
 | `local/crates/server/src/web/problem.rs` · `local/crates/core/src/errors.rs` | 에러 | [[SYNC-STD-004#DEV-5]] · [[SYNC-API-001]] 2장 |
 | `local/crates/server/src/web/static_files.rs` | 정적 파일 | [[SYNC-INFRA-001]] 4.1 |
 | `local/crates/core/src/types.rs` | 열거형·DTO | [[SYNC-DOM-002]] 2.7·2.8 |
@@ -274,7 +275,7 @@ crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 
 
 [[SYNC-DOM-002]] 3장과 같다 — Boundary → Control 선은 3.1, Control 사이의 선은 3.2 그대로다. 다른 점만 적는다.
 
-- **crate가 층을 지킨다** — `app → server → core → codegraph` 한 방향이다. 거꾸로 부르면 컴파일이 안 된다. 파이썬 판은 규칙([[SYNC-DOM-002]] 1장 「규칙」)과 검사기로 지키던 것이다
+- **crate가 층을 지킨다** — `app → server → core → codegraph` 한 방향이다(파이썬 호환 `pycompat`은 core·codegraph 아래 맨 밑). 거꾸로 부르면 컴파일이 안 된다. 파이썬 판은 규칙([[SYNC-DOM-002]] 1장 「규칙」)과 검사기로 지키던 것이다
 - **입구가 셋이다** — 웹·MCP·git이 `server`에 있고, 셋 다 `core`의 서비스·`pipeline`·`queries`만 부른다
 - **켜기·끄기·백업·주기 일은 `app`이 쥔다** — PostgreSQL과 git 자식 프로세스를 띄우고 멈추는 순서가 여기 있다([[SYNC-INFRA-001]] 9.1). 백업은 `core`의 쓰기 락을 쥐고 뜬다(9.6)
 - **두 구현은 서로 부르지 않는다**([[SYNC-STD-001]] 1.9) — 같은 표와 같은 화면 빌드를 쓸 뿐이다

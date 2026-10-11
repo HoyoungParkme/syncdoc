@@ -17,7 +17,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-002, SYNC-MS-003, SYNC-STD-001, SYNC-STD-004]
 **카드 L5 몫은 엔진이다(2026-10-08)** — 마크다운 넷, 항목 블록, 규약 검증, frontmatter 채움, diff. **카드 L6이 문서 목록(`list_by_project`)을, 카드 L7이 저장·조회(만들기·저장·문서·항목·이름·이웃·ID 발급·선행조건)를, 카드 L8이 이력·최근 변경·관계도 목록·pk 여럿·휴지통 목록을, 카드 L9가 상태 적용·휴지통 넣기·되살릴 커밋·옛 판 본문·완전 삭제를, 카드 L11이 파일 삭제 반영·인덱스 비우기·규약 결과 적기와 저장의 재구축·상태 커밋 갈래를 더했다(2026-10-11)** — 저장 파이프라인([[SYNC-MS-017]])과 읽기 조합이 쓴다. **타입은 문자열이다(L7)** — 파이썬처럼 에이전트가 보낸 모르는 타입도 받아 `frontmatter.type` 위반까지 같은 답을 낸다(`check`·`validate`·`apply_frontmatter`, 상태 조건도 문자열 그대로 비교). 나머지 SpecService는 쓰는 카드가 이 문서에 더한다.
 
 **파이썬 판과 바이트까지 같다**(사용자 결정 2026-10-08 — 유니코드까지). 파이썬 엔진은 YAML·마크다운 라이브러리 없이 정규식·`difflib`이고 메시지에 `repr`이 들어간다. 그래서
-- 문자 분류는 **파이썬 3.12(유니코드 15.0)의 표**를 쓴다 — 정규식의 `\s`·`\S`·`\d`·`\w`와 `str.strip()`. 표는 `crates/core/src/pycompat/`의 생성물이다(`cargo xtask unicode-tables`). Rust 표준의 `trim()`·`char::is_whitespace`·`regex`의 `\d`는 쓰지 않는다(`\x1c`~`\x1f`, 유니코드 판이 다르다)
+- 문자 분류는 **파이썬 3.12(유니코드 15.0)의 표**를 쓴다 — 정규식의 `\s`·`\S`·`\d`·`\w`와 `str.strip()`. 표는 `crates/pycompat/`의 생성물이다(`cargo xtask unicode-tables`, L12에서 core 밖 crate로). Rust 표준의 `trim()`·`char::is_whitespace`·`regex`의 `\d`는 쓰지 않는다(`\x1c`~`\x1f`, 유니코드 판이 다르다)
 - 길이·자르기는 코드 포인트다(파이썬 `len`·`[:40]`) · 메시지의 `{x!r}`는 파이썬 `repr`이다
 - `difflib`은 알고리즘째 옮긴다 — `SequenceMatcher`(autojunk: 200줄 이상이면 1%+1번 넘게 나오는 줄을 뺀다)·`get_grouped_opcodes`·`unified_diff`
 - 항목 패턴 표 `TYPES`·`SUBTYPES`는 파이썬과 글자 하나 다르지 않다 — 카드 L6의 `get_template`이 패턴 문자열을 그대로 내보낸다. Rust는 그 문자열을 위 표의 문자 클래스로 바꿔 컴파일한다
