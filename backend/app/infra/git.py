@@ -336,6 +336,7 @@ async def log(workdir: Path, path: str) -> list[Commit]:
         workdir,
         "log",
         "--follow",
+        "--diff-filter=d",  # 파일을 지운 커밋은 뺀다 — 그 커밋에는 읽을 본문이 없다(#325)
         "--name-only",
         "--format=%x1e%H%x1f%an%x1f%ae%x1f%aI%x1f%s%n%b",
         "--",
