@@ -1,5 +1,6 @@
 """SYNC-MS-009 테스트 관점 — git 어댑터. 임시 저장소로."""
 
+import asyncio
 import subprocess
 from pathlib import Path
 
@@ -740,6 +741,35 @@ async def test_http_backend_advertises_upload_and_receive_pack(tmp_path: Path) -
     r = await g.http_backend(tmp_path, env, _empty_body())
     _ = [c async for c in r.body]
     assert r.status == 403
+
+
+async def _late_body():
+    """첫 조각 뒤 자식이 끝날 틈을 두고 또 보낸다"""
+    yield b"0000"
+    await asyncio.sleep(0.5)
+    yield b"0000"
+
+
+def test_http_backend_child_done_first_is_not_an_error_on_uvloop(tmp_path: Path) -> None:
+    """틀린 Content-Type이면 http-backend는 본문을 읽지 않고 415로 끝난다 — 남은 본문을 닫힌 파이프에
+    쓰지 않는다(#361). 운영의 루프 uvloop는 닫힌 파이프에 쓰면 RuntimeError를 낸다."""
+    import uvloop
+
+    async def scenario() -> tuple[int, bytes]:
+        await g.init_bare(tmp_path / "ABC.git")
+        env = {
+            "REQUEST_METHOD": "POST",
+            "PATH_INFO": "/ABC.git/git-upload-pack",
+            "CONTENT_TYPE": "text/plain",
+        }
+        r = await g.http_backend(tmp_path, env, _late_body())
+        return r.status, b"".join([c async for c in r.body])
+
+    status, body = uvloop.run(scenario())
+    assert status == 415
+    assert body.startswith(
+        b"Expected POST with Content-Type 'application/x-git-upload-pack-request'"
+    )
 
 
 # ── commit_push 쓰기 경로 가드 (카드 BB) ──
