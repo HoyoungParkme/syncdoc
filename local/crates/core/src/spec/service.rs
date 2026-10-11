@@ -1511,4 +1511,15 @@ impl SpecService<'_> {
     pub async fn trash_commit(&mut self, document_id: i32) -> Result<Option<String>, Problem> {
         Ok(repo::trash_commit(&mut *self.db, document_id).await?)
     }
+
+    /// SYNC-MS-014#SpecService.version_body
+    pub async fn version_body(&mut self, doc_id: &str, version_no: i32) -> Result<String, Problem> {
+        let Some(row) = repo::document_by_doc_id(&mut *self.db, doc_id).await? else {
+            return Err(not_found("document", doc_id));
+        };
+        repo::version_bodies(&mut *self.db, row.id, &[version_no])
+            .await?
+            .remove(&version_no)
+            .ok_or_else(|| not_found("version", &format!("{doc_id} v{version_no}")))
+    }
 }
