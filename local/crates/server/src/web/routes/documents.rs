@@ -248,7 +248,7 @@ pub async fn change_status(
 
 /// SYNC-API-001#POST/api/docs/{docId}/revert
 ///
-/// 본문 `Revert { to_version ≥ 1, confirm_item_deletion }` — int4 밖의 판은 어느 판도 아니다(없는 판과 같다)
+/// 본문 `Revert { to_version ≥ 1, confirm_item_deletion }` — int4 밖의 판 번호는 파이썬 판처럼 500
 pub async fn revert(
     State(state): State<AppState>,
     Path(doc_id): Path<String>,
@@ -262,8 +262,23 @@ pub async fn revert(
     };
     let req = fastapi::body_model(&body, &REVERT)?;
     let to_version = match field(&req, "to_version") {
-        Some(PyValue::Int(i)) => i32::try_from(i).unwrap_or(i32::MAX),
-        _ => 0,
+        Some(PyValue::Int(i)) => i32::try_from(i).ok(),
+        _ => Some(0),
+    };
+    let Some(to_version) = to_version else {
+        // 파이썬 판은 int4 밖의 수를 판 조회에 묶다가 DB가 거절해 500 — 밀린 커밋·문서는 그 앞에서 본다
+        pipeline::read_pending(
+            &state.pool,
+            &state.repos,
+            doc_id.split('-').next().unwrap_or(""),
+            &user,
+        )
+        .await?;
+        let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+        SpecService { db: &mut c }.get_document(&doc_id).await?;
+        return Err(ApiProblem(Problem::Internal {
+            log: "되돌릴 판 번호가 int4 밖이다".into(),
+        }));
     };
     let confirm = matches!(
         field(&req, "confirm_item_deletion"),
