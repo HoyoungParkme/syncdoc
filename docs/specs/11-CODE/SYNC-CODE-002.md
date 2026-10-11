@@ -137,7 +137,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | API | [[SYNC-API-001#GET/api/admin/repos]] · [[SYNC-API-001#POST/api/admin/repos/{code}/rebuild]] · [[SYNC-API-001#POST/api/admin/repos/{code}/hook]] · [[SYNC-API-001#POST/api/admin/repos/{code}/sync]] · [[SYNC-API-001#POST/api/admin/repos/{code}/move-to-server]] · [[SYNC-API-001#POST/api/admin/repos/{code}/move-to-github]] · [[SYNC-API-002#upload_code]] |
 | 테스트 | `cargo test`(시험 DB · 임시 자리 · 진짜 git — 밀린 커밋 처리·파일 삭제·되살리기·앱 커밋 거르기·강등 커밋·재구축·코드 올리기·따라잡기) · 계약 L11 — 두 판에 진짜 `git push`로 명세를 넣어 문서·버전·참조가 바이트로 같고, 관리 경로 여섯·`upload_code`·보관본 가져오기를 바이트로 |
 | 선행 | L10 · #325 |
-| 완료 | — |
+| 완료 | 2026-10-11 · 브랜치 `card/L11-catch-up`(59f809a #369) · spec 10 + code 30 · `cargo test` 153(시험 DB · 임시 자리 · 진짜 git — 밀린 커밋 처리·파일 삭제·되살리기·앱 커밋 거르기·강등 커밋·재구축·코드 올리기·따라잡기·주기 확인, 실행 파일 시험: 꺼진 동안 민 명세가 켜면 문서) · 계약 `--target both --with-card L11` 887 통과·건너뜀 0 — L11 43 사례(진짜 push 흐름·관리 경로 여섯·upload_code)가 파이썬 판과 바이트로 같고 L6의 보관본 가져오기 시험도 Rust에서 돈다 · L3 두 판 차이 시험 씨앗 셋 · clippy(리눅스·윈도) · 윈도 `cargo check` · 워크플로 녹색 · `check_code` Rust 129/129 · `check_calls` 0 · 사람 확인(윈도 싱크독_로컬에 git push → 화면에 문서, UI-14 동기화·재구축·지금 가져오기)은 따로 · 되먹임: 파이썬 #325를 #366으로 먼저 고침(`git.log --diff-filter=d`) · 같은 항목 ID 둘을 git으로 밀면 두 판 모두 처리 지점이 멈춘다 — #368 · MCP 본문 한도(4MiB)가 올리기 한도(5MiB)보다 작아 크기 초과는 MCP로 닿지 않는다 · 저장 ↔ 커밋 처리의 future 고리는 사설 `process_file`을 상자에 담아 끊었다 |
 
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
