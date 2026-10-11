@@ -177,3 +177,24 @@ pub async fn restore_document(
     .await?;
     Ok((StatusCode::CREATED, Json(SaveResult::from(&r))).into_response())
 }
+
+/// SYNC-API-001#POST/api/docs/{docId}/purge
+///
+/// 204 — 파이썬 `Response(status_code=204)`라 content-type이 없다
+pub async fn purge_document(
+    State(state): State<AppState>,
+    Path(doc_id): Path<String>,
+) -> Result<Response, ApiProblem> {
+    let user = {
+        let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+        current_user(&mut c, &state).await?
+    };
+    pipeline::purge_document(
+        &state.pool,
+        &state.repos,
+        &doc_id,
+        &human(&user, Entry::WebStatus),
+    )
+    .await?;
+    Ok(StatusCode::NO_CONTENT.into_response())
+}

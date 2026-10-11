@@ -20,6 +20,7 @@ use crate::web::routes::account::{issue_token, list_tokens, me, revoke_token};
 use crate::web::routes::documents::diff;
 use crate::web::routes::documents::downstream;
 use crate::web::routes::documents::get_document;
+use crate::web::routes::documents::purge_document;
 use crate::web::routes::documents::restore_document;
 use crate::web::routes::documents::trash_document;
 use crate::web::routes::documents::versions;
@@ -65,6 +66,7 @@ pub fn app(state: AppState) -> Router {
             get(get_document).delete(trash_document),
         )
         .route("/api/docs/{doc_id}/restore", post(restore_document))
+        .route("/api/docs/{doc_id}/purge", post(purge_document))
         .merge(mcp::router(state.clone()))
         .route("/specs/", get(spec_copy))
         .route("/specs/{*path}", get(spec_copy))
