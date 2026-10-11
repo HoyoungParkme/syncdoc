@@ -895,3 +895,57 @@ async fn repo_status_is_mine_from_db_and_hook_is_none() {
     ));
 }
 
+#[tokio::test]
+async fn sync_now_reads_pending_and_rebuild_index_syncs_readme_first() {
+    let e = env().await;
+    let out = e.outside();
+    write(
+        &out,
+        "docs/specs/02-PRD/LS-PRD-001.md",
+        &prd_file("draft", "설명."),
+    );
+    commit_push(&out, "spec: PRD");
+    let mut c = e.conn().await;
+    let mut ps = ProjectService {
+        db: &mut c,
+        repos: &e.repos,
+    };
+    let r = ps
+        .sync_now(e.pool(), "LS", &e.user)
+        .await
+        .expect("지금 가져오기");
+    assert_eq!(r.docs, 1);
+    assert!(r.fetched_at.is_some());
+    assert_eq!(
+        ps.sync_now(e.pool(), "LS", &e.user).await.expect("또").docs,
+        0
+    );
+    // 재구축 위임 — README가 같으면 커밋 없음
+    let before = git(&e.origin(), &["rev-parse", "main"]);
+    let r = ps.rebuild_index("LS", &e.user).await.expect("재구축");
+    assert_eq!((r.readme_updated, r.docs, r.versions), (false, 1, 1));
+    assert_eq!(git(&e.origin(), &["rev-parse", "main"]), before);
+    // README를 밖에서 바꿔 둔 뒤 → 맞추고 커밋 하나, 밀림 0으로 끝난다
+    let out = e.outside();
+    write(&out, "docs/specs/README.md", "옛 README\n");
+    commit_push(&out, "README 바꿈");
+    let r = ps.rebuild_index("LS", &e.user).await.expect("재구축");
+    assert!(r.readme_updated);
+    let head = git(&e.origin(), &["rev-parse", "main"]);
+    assert_eq!(
+        git(&e.origin(), &["log", "-1", "--format=%s"]),
+        "chore(LS): README를 싱크독 규약 링크로"
+    );
+    assert_eq!(e.processed().await, head);
+    // 남의 것 → not-found, 아무것도 안 바뀐다
+    let stranger = user(&mut *ps.db, "stranger").await;
+    assert!(matches!(
+        ps.rebuild_index("LS", &stranger).await,
+        Err(Problem::NotFound { .. })
+    ));
+    assert!(matches!(
+        ps.sync_now(e.pool(), "LS", &stranger).await,
+        Err(Problem::NotFound { .. })
+    ));
+    assert_eq!(git(&e.origin(), &["rev-parse", "main"]), head);
+}

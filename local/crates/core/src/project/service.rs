@@ -394,6 +394,31 @@ impl ProjectService<'_> {
         })
     }
 
+    /// SYNC-MS-013#ProjectService.rebuild_index
+    ///
+    /// 소유 검사는 여기서(재구축은 `get`). README를 인덱스보다 **먼저** 맞춘다 — 그 커밋이 재구축의 받기 끝에
+    /// 들어가 밀림 0으로 끝난다. 밀기가 실패하면 인덱스는 건드리지 않는다(UC-S6 1a)
+    pub async fn rebuild_index(
+        &mut self,
+        code: &str,
+        user: &UserRow,
+    ) -> Result<RebuildResult, Problem> {
+        let (_, repo) = self.get_owned(code, user).await?;
+        let hash = self
+            .repos
+            .git
+            .sync_readme(
+                Path::new(&repo.workdir_path),
+                user,
+                code,
+                &self.repos.specs_url,
+            )
+            .await?;
+        let mut result = crate::pipeline::rebuild(&mut *self.db, self.repos, code).await?;
+        result.readme_updated = hash.is_some();
+        Ok(result)
+    }
+
     /// SYNC-MS-013#ProjectService.asset_path
     ///
     /// 작업 사본 `docs/specs/` 안의 첨부 — 밖으로 나가는 경로·허용 밖 확장자·없는 파일은 전부 같은 `not-found`(file)
