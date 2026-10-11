@@ -13,6 +13,7 @@
 //! - `unicode-tables [--check]` — 파이썬 3.12의 문자 분류 표 `crates/pycompat/src/unicode.rs`를 뽑는다(카드 L5 · L12에서 crate로)
 //! - `spec-golden [--check]` — 명세 엔진의 정답 파일 `crates/core/tests/golden/spec.json`을 파이썬 판으로 만든다(카드 L5)
 //! - `spec-diff [--seed S] [--count N]` — 지금의 명세·git 이력·무작위 본문을 두 판에 돌려 비교한다(카드 L5)
+//! - `speed [--rounds N]` — 같은 PC에서 두 판을 나란히 띄워 R15 속도를 잰다(카드 L17) — `contract/speed.py`
 
 mod codegraph_diff;
 mod codegraph_golden;
@@ -24,6 +25,7 @@ mod pg_fetch;
 mod schema;
 mod spec_diff;
 mod spec_golden;
+mod speed;
 mod testdb;
 mod unicode_tables;
 
@@ -93,6 +95,12 @@ enum Cmd {
         #[arg(long, default_value_t = 2000)]
         count: usize,
     },
+    /// 두 판 속도 — R15 목표와 「파이썬 판보다 느린 항목 없음」
+    Speed {
+        /// 조회·저장을 몇 번씩 재나
+        #[arg(long, default_value_t = 20)]
+        rounds: usize,
+    },
 }
 
 #[tokio::main]
@@ -110,6 +118,7 @@ async fn main() -> ExitCode {
         Cmd::SpecDiff { seed, count } => spec_diff::run(seed, count),
         Cmd::CodegraphGolden { check } => codegraph_golden::run(check),
         Cmd::CodegraphDiff => codegraph_diff::run(),
+        Cmd::Speed { rounds } => speed::run(rounds),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

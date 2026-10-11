@@ -57,6 +57,7 @@ Rust는 `local/`에서 돈다 — `cd local && cargo test` · `cargo fmt --check
 - `cargo xtask codegraph-diff` — 지금 커밋을 풀어 저장소의 graphify 원형으로 두 판의 줄이기·보강·대조·층·항목 함수를 바이트로 비교한다. `crates/codegraph`나 파이썬 판 `graph.py`를 고치면 돌린다
 - `cargo xtask package linux|windows` — 설치 파일(.deb·AppImage / setup.exe). `cargo build --release -p syncdoc_app`(화면 빌드 `npm run build` 뒤) 다음에. 윈도는 NSIS가 있는 윈도에서 · `cargo xtask icon` — `packaging/icon.svg`를 고쳤으면 icon.ico·icon.png·tray.rgba를 다시 만든다
 - **릴리즈** — `local/Cargo.toml`의 version을 올리고 병합한 뒤 태그 `local-v{판}`을 민다. `.github/workflows/local-release.yml`이 윈도·리눅스에서 만들고 깔아 켜 본 뒤 GitHub Release에 올린다(INFRA 9.5)
+- `cargo xtask speed` — 같은 PC에서 두 판을 나란히 띄워 R15 속도를 잰다(켜기·싱크독 저장소 번들 가져오기·코드 그래프·조회·저장·메모리). 목표에 못 미치거나 파이썬 판보다 느리면 실패 — 출시 판정(카드 L17)
 - `cargo xtask schema-check` — 시험 서버(5434)에 Alembic DB와 Rust DB를 만들어 스키마가 같은지 · `cargo xtask test-db-clean` — 시험이 남긴 `syncdoc_local_test_*` 지우기
 - `cargo run -p syncdoc_app -- --no-tray` — 싱크독_로컬을 띄운다(데이터는 `~/.local/share/syncdoc-local`, 다른 자리는 `--data-dir`). 윈도 브라우저로 http://127.0.0.1:8010
 검사기는 저장소 루트에서 돈다.

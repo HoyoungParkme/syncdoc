@@ -43,7 +43,7 @@ local/                          싱크독_로컬 (Rust) — 실행 파일 하나
 ├── xtask/                      개발 도구 — pg-fetch(개발용 PostgreSQL 바이너리) · migrations [--check] ·
 │                               schema-check(두 판의 스키마 같음) · test-db-clean · mcp-tools [--check](L3) ·
 │                               package windows|linux · icon · pg-fetch --target(L4) · unicode-tables [--check] ·
-│                               spec-golden [--check] · spec-diff(L5) · 속도 재기(L17)
+│                               spec-golden [--check] · spec-diff(L5) · speed(두 판 속도·출시 판정, L17)
 ├── packaging/                  설치 파일 재료 (L4) — `cargo xtask package`가 실행 파일·PostgreSQL·MinGit과 함께 모은다
 │   ├── icon.svg                앱 아이콘 원본 — `cargo xtask icon`이 icon.ico·icon.png·tray.rgba(32×32 RGBA)를 만든다(생성물)
 │   ├── NOTICE.txt              함께 담은 것과 라이선스·원본 주소(PostgreSQL · MinGit GPL)
