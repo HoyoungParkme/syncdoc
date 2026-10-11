@@ -721,3 +721,34 @@ pub struct RebuildResult {
     pub convention_errors: Vec<RebuildError>,
     pub readme_updated: bool,
 }
+
+/// 동기화 상태 한 줄 (API-001 `RepoStatus`, UI-14 표 2) — 서버 저장뿐이라 `remote_url`은 늘 없고 `hook`은 늘 `none`
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RepoStatus {
+    pub code: String,
+    pub name: String,
+    pub storage: String,
+    pub remote_url: Option<String>,
+    pub last_processed_commit: Option<String>,
+    pub synced_at: Option<OffsetDateTime>,
+    pub behind_by: Option<i32>,
+    pub fetched_at: Option<OffsetDateTime>,
+    pub error: Option<String>,
+    pub hook: String,
+    pub hook_error: Option<String>,
+}
+
+/// push 통지 상태 (API-001 `HookStatus`) — `ok`·`none`·`error`
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HookStatus {
+    pub hook: String,
+    pub hook_error: Option<String>,
+    pub created: bool,
+}
+
+/// 지금 가져오기 (API-001 `SyncResult`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SyncResult {
+    pub docs: i64,
+    pub fetched_at: Option<OffsetDateTime>,
+}

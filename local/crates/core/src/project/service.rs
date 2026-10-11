@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
 
-use sqlx::{Connection, PgConnection};
+use sqlx::{Connection, PgConnection, PgPool};
 
 use super::model::{ProjectRow, RepositoryRow};
 use super::repo;
@@ -16,7 +16,7 @@ use crate::clock;
 use crate::errors::Problem;
 use crate::infra::git::Git;
 use crate::pycompat::chars::strip;
-use crate::types::Storage;
+use crate::types::{HookStatus, RebuildResult, RepoStatus, Storage, SyncResult};
 
 /// 서버 저장소 자리 — git·서버 저장소·작업 사본·README의 규약 주소. 켤 때 `runtime.run`이 만든다
 #[derive(Clone, Debug)]
@@ -339,6 +339,30 @@ impl ProjectService<'_> {
     /// 전부다 — 따라잡기가 쓴다. 사람 경로에서 부르지 않는다(목록 화면은 `list_owned`)
     pub async fn list_projects(&mut self) -> Result<Vec<(ProjectRow, RepositoryRow)>, Problem> {
         Ok(repo::all(&mut *self.db).await?)
+    }
+
+    /// SYNC-MS-013#ProjectService.repo_status
+    ///
+    /// 원격을 타지 않는다 — 받기는 따라잡기가 하고 여기는 그 결과(DB)를 본다. 내가 소유한 것만
+    pub async fn repo_status(&mut self, user: &UserRow) -> Result<Vec<RepoStatus>, Problem> {
+        Ok(self
+            .list_owned(user)
+            .await?
+            .into_iter()
+            .map(|(p, r)| RepoStatus {
+                code: p.code,
+                name: p.name,
+                storage: r.storage,
+                remote_url: None, // 서버 저장 — 서버 안 경로는 내지 않는다
+                last_processed_commit: r.last_processed_commit,
+                synced_at: r.synced_at,
+                behind_by: r.behind_by,
+                fetched_at: r.fetched_at,
+                error: r.fetch_error,
+                hook: "none".to_string(), // 서버 저장소는 걸 통지가 없다
+                hook_error: r.hook_error,
+            })
+            .collect())
     }
 
     /// SYNC-MS-013#ProjectService.asset_path

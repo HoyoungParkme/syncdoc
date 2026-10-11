@@ -848,3 +848,4 @@ async fn rebuild_survives_deleted_then_recreated_and_rolls_back_on_failure() {
         Err(Problem::NotFound { .. })
     ));
 }
+
