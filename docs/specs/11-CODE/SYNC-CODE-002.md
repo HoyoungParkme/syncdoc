@@ -159,7 +159,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | API | [[SYNC-API-001#GET/api/projects/{code}/code-graph]] |
 | 테스트 | `cargo test`(pycompat 정답 — 섞기·합이 파이썬 3.12와 비트까지 · codegraph 정답 파일의 커뮤니티 · 시험 DB — 그래프 행의 커뮤니티·코드 그래프 노드) · `cargo xtask codegraph-diff`(싱크독 저장소 전체 커뮤니티) · 계약 L13 — L12의 고정 저장소로 코드 그래프 노드가 바이트로 같다 |
 | 선행 | L12 |
-| 완료 | — |
+| 완료 | 2026-10-11 · 브랜치 `card/L13-communities`(0d5b9a3 #373) · spec 3 + code 5 · `cargo test` 169(pycompat 정답 — 섞기·getrandbits·float 합이 파이썬 3.12와 비트까지 · codegraph 정답 파일의 커뮤니티 · 시험 DB — 그래프 행의 커뮤니티·코드 그래프 노드) · `cargo xtask codegraph-diff` — 싱크독 저장소 전체(함수 1986·커뮤니티 34)가 번호·라벨까지 파이썬 판과 같다 · 계약 `--target both --with-card L13` 987 통과·건너뜀 0 — L13: 코드 그래프 노드 바이트 같음, graph.json 없는 프로젝트는 꼴만 · clippy · 워크플로 녹색 · `check_code` Rust 154/154 · `check_calls` 0 · 사람 확인(윈도 싱크독_로컬 UI-17 코드 그래프의 커뮤니티 노드)은 따로 · 되먹임: graphify 원형에는 `multigraph` 키가 없어 networkx가 다중 그래프로 읽는다(라벨의 차수에 겹친 선이 든다) · L12 계약 고정 graph.json에서 graphify의 절대 경로 키를 뺐다 |
 
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
