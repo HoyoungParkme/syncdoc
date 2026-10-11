@@ -1553,6 +1553,26 @@ impl SpecService<'_> {
         Ok(())
     }
 
+    /// SYNC-MS-014#SpecService.mark_convention_error
+    ///
+    /// 규약 칸 셋을 통째로 바꾼다 — 저장이 적는 것과 같은 꼴
+    pub async fn mark_convention_error(
+        &mut self,
+        document_id: i32,
+        result: &ValidateResult,
+    ) -> Result<(), Problem> {
+        let (has_error, detail, warnings) = convention_columns(result);
+        repo::set_convention(
+            &mut *self.db,
+            document_id,
+            has_error,
+            detail.as_deref(),
+            warnings.as_deref(),
+        )
+        .await?;
+        Ok(())
+    }
+
     /// SYNC-MS-014#SpecService.mark_deleted
     ///
     /// 원본에서 파일이 사라지면 문서는 남기고 초안 + `file.deleted` — 항목은 전부 지운 것으로

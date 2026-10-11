@@ -303,3 +303,41 @@ async fn clear_index_drops_versions_and_commit_status_rows_only() {
     assert_eq!(scalar_i64(&mut c, "SELECT count(*) FROM items").await, 2);
 }
 
+#[tokio::test]
+async fn mark_convention_error_replaces_the_three_columns() {
+    use syncdoc_core::types::{ValidateResult, Violation};
+    let e = env().await;
+    let r = e.create("PRD", PRD).await;
+    let mut c = e.conn().await;
+    let mut spec = SpecService { db: &mut c };
+    let id = spec.get_document(&r.doc_id).await.expect("문서").summary.id;
+    let bad = ValidateResult {
+        violations: vec![Violation {
+            line: 2,
+            rule: "frontmatter.doc_id".into(),
+            message: "파일명 X ≠ 'Y'".into(),
+        }],
+        warnings: vec![],
+    };
+    spec.mark_convention_error(id, &bad).await.expect("오류");
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            "SELECT count(*) FROM documents WHERE has_convention_error AND convention_error_detail = 'frontmatter.doc_id: 파일명 X ≠ ''Y'''"
+        )
+        .await,
+        1
+    );
+    SpecService { db: &mut c }
+        .mark_convention_error(id, &ValidateResult::default())
+        .await
+        .expect("비움");
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            "SELECT count(*) FROM documents WHERE NOT has_convention_error AND convention_error_detail IS NULL AND incomplete_warnings IS NULL"
+        )
+        .await,
+        1
+    );
+}
