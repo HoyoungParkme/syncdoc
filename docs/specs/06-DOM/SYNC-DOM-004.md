@@ -62,14 +62,18 @@ crate마다 `src/`와 거울 `tests/`를 둔다. 단위 시험은 그 모듈의 
 crates/app/src/
 ├── main.rs                     진입 — 관리자 권한 내려놓기 → 인자를 읽어 runtime.run, 끝 코드 · 일꾼 스레드 스택(파이썬 판의 1만 겹 JSON을 받으려고, L3)
 ├── lib.rs                      공개 모듈
-├── runtime.rs                  켠다·포트에 묶는다·끈다
-├── tray.rs                     트레이 — 열기·끝내기 (윈도 메시지 루프 · 리눅스 StatusNotifierItem, L4)
+├── runtime.rs                  켠다(데이터 자리 고리 · 다시 켜기 고리, L16)·포트에 묶는다·서빙을 내린다
+├── tray.rs                     트레이 — 열기·지금 백업·끝내기 (윈도 메시지 루프 · 리눅스 StatusNotifierItem, L4 · L16)
 ├── privilege.rs                윈도 관리자 권한 내려놓기 — 관리자 그룹을 뺀 토큰으로 다시 켠다 (L4 · 저장소의 unsafe는 여기뿐)
-├── paths.rs                    데이터 자리 · PostgreSQL 바이너리 자리
-├── settings.rs                 settings.toml — INFRA 5.2와 같은 이름
-├── logs.rs                     logs/ — 날마다 한 파일, 최근 14개
+├── paths.rs                    데이터 자리(옮긴 자리를 가리키는 파일, L16) · PostgreSQL 바이너리 자리
+├── settings.rs                 settings.toml — INFRA 5.2와 같은 이름 · 값만 바꿔 쓰기(L16)
+├── logs.rs                     logs/ — 날마다 한 파일, 최근 14개 · 옮긴 자리로 바꾸기(L16)
 ├── instance.rs                 한 번만 실행 — 잠금 · instance.json · 두 번째 실행
-└── pg.rs                       함께 담은 PostgreSQL — initdb · postgres --single · pg_ctl
+├── pg.rs                       함께 담은 PostgreSQL — initdb · postgres --single · pg_ctl
+├── local.rs                    이 PC — 처리기가 부르는 `LocalOps`의 짝 · 다시 켜기 통로(`Op`) (4.12, L16)
+├── backup.rs                   백업 만들기·목록·풀어 보기·되살리기·하루 한 번 — Docker 묶음(BR)과 같은 꼴 (L16)
+├── datadir.rs                  데이터 자리 옮기기 — 자리 보기·복사·확인 (L16)
+└── autostart.rs                자동 시작 — 윈도 HKCU Run · 리눅스 XDG autostart (L16)
 ```
 
 **server/ 안** — 입구. 파이썬 `web/`에 해당한다
@@ -77,7 +81,8 @@ crates/app/src/
 ```
 crates/server/src/
 ├── lib.rs                      라우터 조립 · /health
-├── state.rs                    AppState — 연결 풀 · 로컬 사용자 설정 · 공개 주소 · 서버 저장소 자리(`ServerRepos`, L6)
+├── state.rs                    AppState — 연결 풀 · 로컬 사용자 설정 · 공개 주소 · 서버 저장소 자리(`ServerRepos`, L6) · 이 PC(`LocalOps`, L16)
+├── local.rs                    `LocalOps` — 설치형(app)이 쥔 이 PC 일의 문. 처리기가 부르고 app이 채운다 · 답 형태 (4.12, L16)
 ├── web/
 │   ├── guard.rs                Host·Origin 가드 (SEQ-C3) — 라우팅 바깥에서 모든 요청에
 │   ├── auth.rs                 현재 사용자 — 로컬 사용자
@@ -86,7 +91,7 @@ crates/server/src/
 │   ├── schemas.rs              응답 형태 (API-001 4장)
 │   ├── sse.rs                  질문 스트림 — 이벤트를 `event:`·`data:` 프레임으로, 실패는 `error` (API-001 3.4, L14)
 │   └── routes/                 API-001 경로 — account(/api/me · /api/me/tokens) · specs(/specs) · projects(/api/projects 목록·만들기·지우기, L6 ·
-│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8 · 상태·되돌리기·휴지통·되살리기·완전 삭제, L9) · references(항목·참조·체인, L8) · git(/git 스마트 HTTP 입구 — 경로를 starlette 정규식처럼 가른다, L10) · admin(/api/admin/repos 동기화 상태·재구축·통지·지금 가져오기·옮기기, L11) · code(코드 탭·코드 보기·관계도 코드 호출·코드 그래프의 코드, L12 · 코드 그래프 노드, L13 · 코드에 묻기, L14) · conversations(대화·첨부, L14) · 문서에 묻기(documents, L14)
+│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8 · 상태·되돌리기·휴지통·되살리기·완전 삭제, L9) · references(항목·참조·체인, L8) · git(/git 스마트 HTTP 입구 — 경로를 starlette 정규식처럼 가른다, L10) · admin(/api/admin/repos 동기화 상태·재구축·통지·지금 가져오기·옮기기, L11) · code(코드 탭·코드 보기·관계도 코드 호출·코드 그래프의 코드, L12 · 코드 그래프 노드, L13 · 코드에 묻기, L14) · conversations(대화·첨부, L14) · 문서에 묻기(documents, L14) · 번들로 가져오기(projects, L15) · local(/api/local 이 PC·백업·되살리기·옮기기, L16)
 ├── mcp/                        /mcp — 파이썬 mcp SDK의 핸드셰이크 경로를 옮긴 것 (API-002 1장, 카드 L3)
 │   ├── auth.rs                 Bearer → AccountService.authenticate_token, 통과하면 응답 전에 커밋 (SEQ-C2)
 │   ├── transport.rs            streamable HTTP, 세션 없음 — Accept·Content-Type·본문 읽기·SSE 쓰기
@@ -320,18 +325,20 @@ crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 
 |---|---|---|
 | [[SYNC-MS-012#runtime.run]] | 켠다 — 끌 때까지 | `main` |
 | [[SYNC-MS-012#runtime.bind]] | 127.0.0.1의 8010, 못 쓰면 8011~8019 | `runtime.run` |
-| [[SYNC-MS-012#runtime.shutdown]] | 끈다 | `runtime.run` |
-| [[SYNC-MS-012#tray.run]] | 트레이 — 열기·끝내기 | `main`(트레이가 있을 때) |
+| [[SYNC-MS-012#runtime.shutdown]] | 서빙을 내린다 — 끌 때와 다시 켤 때 | `runtime.run` |
+| [[SYNC-MS-012#tray.run]] | 트레이 — 열기·지금 백업·끝내기 | `main`(트레이가 있을 때) |
 | [[SYNC-MS-012#privilege.drop_admin]] | 윈도 관리자 권한을 내려놓고 다시 켠다 | `main`(맨 처음) |
 | [[SYNC-MS-012#paths.data_dir]] · [[SYNC-MS-012#paths.pg_dir]] | 데이터 자리 · PostgreSQL 바이너리 자리 | `runtime.run` |
-| [[SYNC-MS-012#settings.load]] | `settings.toml` | `runtime.run` |
-| [[SYNC-MS-012#logs.init]] | 로그 | `runtime.run` |
+| [[SYNC-MS-012#paths.set_data_dir]] | 옮긴 자리를 가리키는 파일 | `runtime.run`(옮기기, L16) |
+| [[SYNC-MS-012#settings.load]] · [[SYNC-MS-012#settings.save]] | `settings.toml` 읽기 · 값만 바꿔 쓰기 | `runtime.run` · `Local`(L16) |
+| [[SYNC-MS-012#logs.init]] · [[SYNC-MS-012#logs.retarget]] | 로그 · 옮긴 자리로 | `runtime.run` |
 | [[SYNC-MS-012#instance.acquire]] · [[SYNC-MS-012#instance.publish]] · [[SYNC-MS-012#instance.open_running]] | 한 번만 실행 | `runtime.run` |
 | [[SYNC-MS-012#pg.start]] · [[SYNC-MS-012#pg.stop]] | 함께 담은 PostgreSQL | `runtime.run` · `runtime.shutdown` |
 | [[SYNC-MS-012#migrate.apply]] | 이전 SQL | `runtime.run` · 모든 crate의 DB 시험 |
 
 규칙
-- 켜는 순서는 [[SYNC-INFRA-001]] 9.1 그대로다 — 잠금 → 로그 → 설정 → PostgreSQL → 이전 → 로컬 사용자 → 포트 → 서빙. 끄는 순서는 거꾸로
+- 켜는 순서는 [[SYNC-INFRA-001]] 9.1 그대로다 — 잠금 → 로그 → PostgreSQL → 설정 → 이전 → 로컬 사용자 → 포트 → 작업 사본 맞추기(L16) → 서빙. 끄는 순서는 거꾸로
+- **고리가 둘이다**(L16) — 바깥은 데이터 자리(잠금·로그 대상·PostgreSQL), 안은 켜기(설정·연결 풀·서빙). 설정 저장·되살리기는 안 고리를, 옮기기는 바깥 고리를 다시 돈다 — 프로그램과 트레이는 그대로, 포트는 같은 것을 먼저 다시 잡는다
 - PostgreSQL은 따로 프로세스 묶음으로 띄운다 — 터미널 신호가 먼저 닿지 않고, 멈추는 순서를 앱이 쥔다
 - 트레이가 있으면 메인 스레드는 트레이 차지다(윈도 메시지 루프) — 서버·PostgreSQL은 tokio 일꾼 스레드에서 돈다. 「끝내기」는 Ctrl+C와 같은 끄는 순서를 탄다(L4)
 - 켜는 중 실패는 `Problem::Internal`의 로그 문장으로 돌려주고 `main`이 끝 코드 1로 끝난다
@@ -368,6 +375,7 @@ classDiagram
 |---|---|---|---|
 | [[SYNC-MS-013#ProjectService.init_project]] | MCP `init_project` · `POST /api/projects` | [[SYNC-MS-001#ProjectService.init_project]] | `storage-unavailable` · `project-code-invalid` · `project-code-conflict` · `existing-specs` · `push-failed` · `rebuild-failed`(보관본 재구축, L11) |
 | [[SYNC-MS-013#ProjectService.import_bundle]] | `POST /api/projects/bundle`(L15) | [[SYNC-MS-001#ProjectService.import_bundle]] | `project-code-invalid` · `project-code-conflict` · `bundle-invalid` · `push-failed` · `rebuild-failed` |
+| [[SYNC-MS-013#ProjectService.rehome]] | `runtime.run`(켤 때마다, L16) | — (파이썬 판은 자리가 고정이다) | `internal` |
 | [[SYNC-MS-013#ProjectService.delete_project]] | `DELETE /api/projects/{code}` | [[SYNC-MS-001#ProjectService.delete_project]] | `not-found` |
 | [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-013#ProjectService.get_owned]] | `get_template` · `delete_project` | [[SYNC-MS-001#ProjectService.get_owned]] | `not-found` |
 | [[SYNC-MS-013#ProjectService.list_owned]] | `queries.project_summary` | [[SYNC-MS-001#ProjectService.list_owned]] | — |
@@ -704,6 +712,7 @@ classDiagram
         +changed_paths(workdir, range) Vec~String~
         +archive(workdir, commit, dest)
         +clone_bare(source, path)
+        +mirror(source, dest)
     }
 ```
 
@@ -716,6 +725,7 @@ classDiagram
 | [[SYNC-MS-019#Git.changed_files]] · [[SYNC-MS-019#Git.log]] · [[SYNC-MS-019#Git.checkout]] · [[SYNC-MS-019#Git.sync_readme]] | 밀린 커밋 처리·재구축·재구축 위임(L11) | [[SYNC-MS-009#git.changed_files]] | `push-failed` · `internal` |
 | [[SYNC-MS-019#Git.changed_paths]] · [[SYNC-MS-019#Git.archive]] | 커밋 처리 5a · 그래프 만들기(L12) | [[SYNC-MS-009#git.archive]] | `internal` |
 | [[SYNC-MS-019#Git.clone_bare]] · [[SYNC-MS-019#Git.rev_list_count]] · [[SYNC-MS-019#Git.clone]] | `ProjectService.import_bundle`(L15) | [[SYNC-MS-009#git.clone_bare]] | `internal`(git 실패 — 부르는 쪽이 `bundle-invalid`로) |
+| [[SYNC-MS-019#Git.mirror]] | `backup.make`(서버 저장소 사진, L16) | — (Docker 묶음은 볼륨을 tar로) | `internal`(부르는 쪽이 `backup-failed`로) |
 
 규칙 — git CLI를 자식 프로세스로 부른다(윈도 MinGit · 리눅스 시스템 git). **사용자 git 설정을 막는다**(사용자 결정 2026-10-08) — 시스템·전역 설정 끔, 프롬프트·서명·autocrlf 끔, `LC_ALL=C`, `safe.directory=*`. 파이썬 판이 Docker 안에서 받는 깨끗한 환경과 같게 해 같은 명령이 같은 결과를 낸다. git 입구(upload-pack·receive-pack)는 L10이 더했다 — http-backend 없이 `--stateless-rpc`를 직접 부르고 http-backend의 머리를 그대로 낸다. 파이썬 판이 CGI로 넘기는 것과 같게: 요청 머리(`Authorization`·`Content-Type`·`Content-Encoding`·`Git-Protocol`)는 latin-1로 읽고 · gzip 본문이 깨졌으면 서비스를 부르지 않고 빈 결과(http-backend는 죽고 자식도 끝난다) · 인증·원본을 지난 receive-pack 요청 뒤에는 응답이 무엇이든 밀린 커밋을 읽는다(파이썬 판 `BackgroundTask` 자리).
 
@@ -848,6 +858,65 @@ classDiagram
 규칙 — [[SYNC-DOM-002]] 4.11과 같다. 그래프는 DB에 줄인 모양(함수·선·항목 ID)으로, 코드 본문은 저장소에서 읽는다. 저장소에 커밋된 `graphify-out/graph.json`이 있으면 파이썬 판처럼 그것이 원형이다 — 없으면 graphify 대신 tree-sitter로 뽑는다([[SYNC-MS-022]] 0장, [[SYNC-INFRA-001]] 9.2). 커뮤니티는 파이썬 판이 부르는 networkx Louvain·graphify 허브 라벨을 옮겨 L13이 더했다 — 같은 원형이면 번호·라벨까지 같다.
 
 ---
+
+### 4.12 이 PC — 데이터 자리·백업·자동 시작 (MS-023)
+
+설치형만 가진 일이다(카드 L16). 처리기(server)는 app을 모른다 — crate 의존이 `app → server` 한 방향이라, server가 문(`LocalOps`)을 두고 app이 채워 서버 상태에 넣는다. 파이썬 판에는 없어 `local`이 비면(시험·다른 조립) `/api/local*`이 없는 경로다.
+
+```mermaid
+classDiagram
+    class LocalOps {
+        <<trait>>
+        +info() LocalInfo
+        +save_settings(change)
+        +set_autostart(on)
+        +backup_now() BackupFile
+        +restore(name, password)
+        +move_to(dir)
+    }
+    class Local {
+        +data_dir: PathBuf
+        +from_arg: bool
+        +pg: PgInfo
+        +git: Git
+        +shared: Arc~Shared~
+        +ops: UnboundedSender~Op~
+    }
+    class Shared {
+        +last_backup: Option~LastBackup~
+        +last_op: Option~LastOp~
+        +backup_lock: Mutex
+    }
+    class Op {
+        <<enum>>
+        Settings
+        Restore(Opened)
+        Move(PathBuf)
+    }
+    LocalOps <|.. Local
+    Local --> Shared
+    Local ..> Op : runtime으로
+```
+
+| 메서드·함수 | 부르는 곳 | 던지는 에러 |
+|---|---|---|
+| [[SYNC-MS-023#Local.info]] | `GET /api/local` | `internal` |
+| [[SYNC-MS-023#Local.save_settings]] · [[SYNC-MS-023#Local.set_autostart]] | `PUT /api/local/settings` · `PUT /api/local/autostart` | `internal` |
+| [[SYNC-MS-023#Local.backup_now]] | `POST /api/local/backups` · 트레이 「지금 백업」 · `backup.daily` | `backup-unconfigured` · `backup-failed` |
+| [[SYNC-MS-023#Local.restore]] | `POST /api/local/restore` | `backup-unconfigured` · `not-found`(backup) · `backup-invalid` |
+| [[SYNC-MS-023#Local.move_to]] | `POST /api/local/move` | `data-dir-invalid` |
+| [[SYNC-MS-023#backup.make]] · [[SYNC-MS-023#backup.list]] · [[SYNC-MS-023#backup.open]] | `Local` | `backup-failed` · `backup-invalid` |
+| [[SYNC-MS-023#backup.restore]] | `runtime.run`(서빙을 내린 뒤) | 그대로 — 실패하면 옆에 둔 것으로 돌아간다 |
+| [[SYNC-MS-023#backup.daily]] | `runtime.run`(서빙마다) | — (로그와 마지막 백업) |
+| [[SYNC-MS-023#datadir.check]] · [[SYNC-MS-023#datadir.copy]] | `Local.move_to` · `runtime.run`(PostgreSQL을 멈춘 뒤) | `data-dir-invalid` |
+| [[SYNC-MS-023#autostart.enabled]] · [[SYNC-MS-023#autostart.set]] | `Local` | `internal` |
+
+규칙
+- **다시 켜기는 runtime이 한다** — `Local`은 검사만 하고 `Op`를 보낸다. 처리기는 202로 답하고, runtime이 진행 중 요청과 쓰기 락을 기다린 뒤(끌 때와 같은 10초) 서빙을 내려 그 일을 한다. 실패해도 프로그램은 다시 켜진다 — 결과는 `last_op`
+- **백업은 켠 채로다** — 덤프가 먼저, 서버 저장소는 저장소마다 `git clone --mirror --no-local`. 「지금 백업」·트레이·하루 한 번은 한 줄로 선다(`backup_lock`)
+- **백업 꼴은 Docker 묶음(카드 BR)과 같다** — 서로의 백업을 되살린다. 암호는 OpenPGP 대칭(rpgp)
+- 자리를 가리키는 파일·데이터 자리 찾기는 4.1(`paths`), 켤 때 작업 사본 맞추기는 4.2(`ProjectService.rehome`)
+
 
 ## 5. 미결사항
 
