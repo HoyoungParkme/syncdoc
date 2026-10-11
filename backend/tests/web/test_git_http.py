@@ -7,6 +7,7 @@ TestClient로는 git이 붙지 못해 앱을 uvicorn으로 스레드에 띄운�
 
 from __future__ import annotations
 
+import base64
 import os
 import socket
 import subprocess
@@ -227,3 +228,21 @@ async def test_auth_commits_before_streaming(
             {"u": live["owner_id"]},
         ).scalar()
     assert used is not None, "인증이 커밋하지 않으면 last_used_at이 롤백된다"
+
+
+def test_malformed_basic_is_unauthorized_not_500() -> None:
+    """#363 — Basic 칸이 base64가 아니거나 ASCII 아닌 글자·UTF-8 아닌 바이트면 토큰이 없는 것(401)이다.
+
+    ASCII 아닌 글자는 `b64decode`가 `ValueError`를 내 500이었다. 세션은 닿지 않는다."""
+    from starlette.requests import Request
+
+    from app.web.routers.git import _token_user
+
+    for raw in (
+        b"Basic \xe9",
+        b"Basic eDp4\xe9",
+        b"Basic !!!",
+        b"Basic " + base64.b64encode(b"x:\xff"),
+    ):
+        req = Request({"type": "http", "headers": [(b"authorization", raw)]})
+        assert _token_user(req, None) is None, raw  # type: ignore[arg-type]
