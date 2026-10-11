@@ -46,13 +46,15 @@ syncdoc/            저장소 = 프로젝트
 ## 도구
 
 파이썬은 `backend/`에서 돈다 — `cd backend && uv run pytest` · `uv run ruff check .` · `uv run alembic upgrade head`.
-Rust는 `local/`에서 돈다 — `cd local && cargo test` · `cargo fmt --check` · `cargo clippy --all-targets -- -D warnings` · `cargo check --target x86_64-pc-windows-msvc`(카드 L1부터). 검사기(`check_code`·`check_calls`)는 두 구현을 다 읽는다(카드 BV·BW).
+Rust는 `local/`에서 돈다 — `cd local && cargo test` · `cargo fmt --check` · `cargo clippy --all-targets -- -D warnings` · `cargo check --target x86_64-pc-windows-msvc`(카드 L1~L11 — L12부터는 tree-sitter 문법의 C가 MSVC 헤더를 요구해 리눅스에서 못 돈다. 윈도 빌드는 PR 워크플로가 windows-2022에서 본다). 검사기(`check_code`·`check_calls`)는 두 구현을 다 읽는다(카드 BV·BW).
 - 처음 한 번 — C 링커(`sudo apt install build-essential pkg-config`, 사람이) · rustup(판은 `local/rust-toolchain.toml`이 고른다) · `cargo xtask pg-fetch`(개발·시험용 PostgreSQL 16.15를 `local/target/pg/`에)
 - `cargo xtask migrations` — Alembic 리비전을 더했으면 `local/migrations/`를 다시 만든다. `--check`는 다시 만들어 비교만(DEV-7)
 - `cargo xtask mcp-tools` — 파이썬 MCP 도구의 설명·인자를 바꿨으면 Rust 판의 `declarations.json`을 다시 만든다. `--check`는 비교만(DEV-7)
 - `cargo xtask unicode-tables` — 파이썬 3.12의 문자 분류 표(`local/crates/pycompat/src/unicode.rs`)를 다시 뽑는다. `--check`는 비교만(DEV-7)
 - `cargo xtask spec-golden` — 명세 엔진 정답 파일(`core/tests/golden/spec.json`, 꼴 모음을 입력째 얼림)을 파이썬 판으로 다시 만든다. `--check`는 비교만. `cargo test`가 Rust 답과 비교한다(카드 L5)
 - `cargo xtask spec-diff [--seed S] [--count N]` — 지금의 명세·템플릿, git 이력 diff, 씨앗 고정 무작위 본문을 두 판의 명세 엔진에 돌려 바이트로 비교한다. 엔진(`markdown.rs`·`spec/`·`pycompat/`)이나 파이썬 판 엔진을 고치면 돌린다
+- `cargo xtask codegraph-golden` — 코드 그래프 정답 파일(`crates/codegraph/tests/golden/codegraph.json`, 고정 시험 저장소의 graphify 원형과 파이썬 판 줄이기·보강 결과)을 다시 만든다. `--check`는 비교만. `cargo test`가 Rust 답과 비교한다(카드 L12)
+- `cargo xtask codegraph-diff` — 지금 커밋을 풀어 저장소의 graphify 원형으로 두 판의 줄이기·보강·대조·층·항목 함수를 바이트로 비교한다. `crates/codegraph`나 파이썬 판 `graph.py`를 고치면 돌린다
 - `cargo xtask package linux|windows` — 설치 파일(.deb·AppImage / setup.exe). `cargo build --release -p syncdoc_app`(화면 빌드 `npm run build` 뒤) 다음에. 윈도는 NSIS가 있는 윈도에서 · `cargo xtask icon` — `packaging/icon.svg`를 고쳤으면 icon.ico·icon.png·tray.rgba를 다시 만든다
 - **릴리즈** — `local/Cargo.toml`의 version을 올리고 병합한 뒤 태그 `local-v{판}`을 민다. `.github/workflows/local-release.yml`이 윈도·리눅스에서 만들고 깔아 켜 본 뒤 GitHub Release에 올린다(INFRA 9.5)
 - `cargo xtask schema-check` — 시험 서버(5434)에 Alembic DB와 Rust DB를 만들어 스키마가 같은지 · `cargo xtask test-db-clean` — 시험이 남긴 `syncdoc_local_test_*` 지우기

@@ -236,7 +236,7 @@ pub async fn process_commit(
                 .await?
                 .is_some()
         };
-        if syncdoc_codegraph::touches_code(&paths) || !has_graph {
+        if syncdoc_codegraph::graph::touches_code(&paths) || !has_graph {
             schedule_code_graph(pool, repos, code, head);
         }
     }
@@ -1607,8 +1607,9 @@ async fn graph_of(
     let src = tmp.path().to_path_buf();
     // 파일 읽기·파싱은 막히는 일이라 따로 — 커뮤니티는 카드 L13(그 전엔 빈 목록)
     let built = tokio::task::spawn_blocking(move || {
-        let (source, raw) = syncdoc_codegraph::load(&src)?;
-        let mut graph = syncdoc_codegraph::enrich(&src, syncdoc_codegraph::reduce(&raw));
+        let (source, raw) = syncdoc_codegraph::graph::load(&src)?;
+        let mut graph =
+            syncdoc_codegraph::enrich::enrich(&src, syncdoc_codegraph::graph::reduce(&raw));
         graph.communities = Some(Vec::new());
         Ok::<_, syncdoc_codegraph::CodeGraphFailed>((source, graph))
     })

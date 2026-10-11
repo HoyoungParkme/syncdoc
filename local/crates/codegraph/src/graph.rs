@@ -11,9 +11,7 @@ use serde_json::Value;
 use syncdoc_pycompat::chars::{lstrip, py_splitlines, strip};
 use syncdoc_pycompat::re::compile;
 
-use crate::{
-    Call, CallDiff, CodeGraphFailed, Function, Graph, Layer, LayerRow, LayerSpec, extract,
-};
+use crate::{Call, CallDiff, CodeGraphFailed, Function, Graph, Layer, LayerRow, LayerSpec};
 
 /// graphify가 읽는 코드 파일 — 이것이 바뀐 커밋만 그래프를 다시 만든다 (UC-S8 1a)
 const CODE_EXTS: [&str; 27] = [
@@ -193,7 +191,7 @@ pub fn load(src_dir: &Path) -> Result<(String, Value), CodeGraphFailed> {
             .map(|v| ("repo".to_string(), v))
             .map_err(|_| CodeGraphFailed("graph.json 형식".into()));
     }
-    Ok(("server".to_string(), extract(src_dir)?))
+    Ok(("server".to_string(), crate::extract::extract(src_dir)?))
 }
 
 /// SYNC-MS-022#codegraph.reduce

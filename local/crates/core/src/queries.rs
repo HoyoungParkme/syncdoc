@@ -936,8 +936,8 @@ async fn diffs_of(
 ) -> Result<IndexMap<String, CallDiff>, Problem> {
     let items = ms_items(&mut *db, project_id).await?;
     let impls = impl_of(&mut *db, project_id).await?;
-    let spec = syncdoc_codegraph::spec_calls(&items, Some(&impls));
-    Ok(syncdoc_codegraph::compare(graph, &spec)
+    let spec = syncdoc_codegraph::graph::spec_calls(&items, Some(&impls));
+    Ok(syncdoc_codegraph::graph::compare(graph, &spec)
         .into_iter()
         .map(|d| (d.ms_id.clone(), d))
         .collect())
@@ -1091,9 +1091,9 @@ pub async fn code_view(
     if let (None, Some(item)) = (&function, item_id.as_deref()) {
         // 3a — API·UI 항목의 함수: item으로 찾고 항목 있는 이웃까지, 대조 없음
         let ms_id = format!("{doc_id}#{item}");
-        if let Some(f) = syncdoc_codegraph::item_function(graph, &ms_id) {
+        if let Some(f) = syncdoc_codegraph::graph::item_function(graph, &ms_id) {
             missing = false;
-            let (fwd, back) = syncdoc_codegraph::item_neighbors(graph, &f.key);
+            let (fwd, back) = syncdoc_codegraph::graph::item_neighbors(graph, &f.key);
             let refs = |keys: &[String]| -> Vec<CodeRef> {
                 keys.iter()
                     .filter_map(|k| fns.get(k.as_str()))
@@ -1234,14 +1234,15 @@ pub async fn code_source(
     };
     let ms_id = format!("{doc_id}#{item_id}");
     let spec = BTreeMap::from([(ms_id.clone(), BTreeSet::new())]);
-    let d = syncdoc_codegraph::compare(&row.graph, &spec);
+    let d = syncdoc_codegraph::graph::compare(&row.graph, &spec);
     let fns = &row.graph.functions;
     let by_function = d
         .first()
         .and_then(|d| d.function.as_deref())
         .and_then(|k| fns.iter().find(|x| x.key == k));
     // API·UI 항목 — item으로
-    let Some(f) = by_function.or_else(|| syncdoc_codegraph::item_function(&row.graph, &ms_id))
+    let Some(f) =
+        by_function.or_else(|| syncdoc_codegraph::graph::item_function(&row.graph, &ms_id))
     else {
         return Err(Problem::NotFound {
             resource: "function".into(),

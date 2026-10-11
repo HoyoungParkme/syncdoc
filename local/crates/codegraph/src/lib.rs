@@ -2,9 +2,9 @@
 //! DB·git을 모르고 파일만 읽는다. 파이썬 판 `core/codegraph/graph.py`와 같은 이름·같은 처리·같은 그래프 모양이다 —
 //! 같은 원형이면 바이트까지 같은 그래프를 낸다(정답 파일 `tests/golden/codegraph.json`, `cargo xtask codegraph-golden`).
 
-mod enrich;
+pub mod enrich;
 mod extract;
-mod graph;
+pub mod graph;
 mod python;
 mod rust;
 mod ts;

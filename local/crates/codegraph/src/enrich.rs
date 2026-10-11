@@ -58,7 +58,8 @@ fn screen_items(src_dir: &Path, funcs: &mut [Function]) {
 ///
 /// 파이썬 파일을 다시 읽어 끝 줄·이름·항목 ID를 바로잡고 graphify가 놓친 호출을 더한다. TS/JS는 끝 줄·빠진 맨 위
 /// 함수·호출, 화면 코드는 첫 주석의 화면 ID, Rust는 정의·항목 ID·호출을 다 채운다. 다른 언어는 손대지 않는다
-pub fn enrich(src_dir: &Path, mut graph: Graph) -> Graph {
+pub fn enrich(src_dir: &Path, graph: Graph) -> Graph {
+    let mut graph = graph;
     let seen = std::mem::take(&mut graph.files);
     let mut by_loc: HashMap<(String, i64), usize> = HashMap::new();
     for (i, f) in graph.functions.iter().enumerate() {
