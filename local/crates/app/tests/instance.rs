@@ -57,11 +57,17 @@ async fn open_running_waits_for_a_starting_instance() {
 async fn bind_moves_to_the_next_port() {
     let taken = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
     let p = taken.local_addr().unwrap().port();
-    let l = bind(p, p.saturating_add(9)).await.expect("다음 포트");
+    let local: std::net::IpAddr = [127, 0, 0, 1].into();
+    let l = bind(local, p, p.saturating_add(9))
+        .await
+        .expect("다음 포트");
     let got = l.local_addr().unwrap();
     assert!(got.ip().is_loopback() && got.port() > p, "{got}");
-    let any = bind(0, 0).await.expect("아무 포트");
+    let any = bind(local, 0, 0).await.expect("아무 포트");
     assert!(any.local_addr().unwrap().port() > 0);
-    let err = bind(p, p).await.expect_err("다 막혔다");
+    // 같은 망 열기 — 준 주소에 묶인다 (L16)
+    let all = bind([0, 0, 0, 0].into(), 0, 0).await.expect("모든 주소");
+    assert!(all.local_addr().unwrap().ip().is_unspecified());
+    let err = bind(local, p, p).await.expect_err("다 막혔다");
     assert!(err.to_string().contains("다 못 쓴다"));
 }

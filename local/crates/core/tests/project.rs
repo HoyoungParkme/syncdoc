@@ -520,3 +520,48 @@ async fn import_bundle_refuses_bad_bundles_and_leaves_nothing() {
         Err(Problem::ProjectCodeConflict { .. })
     ));
 }
+
+/// L16 rehome — 다른 자리를 가리키는 행은 이 자리로, 없는 작업 사본은 다시 만들고, 원본이 없는 행은 건너뛴다
+#[tokio::test]
+async fn rehome_fixes_paths_and_reclones_missing_workdirs() {
+    let db = support::test_db().await;
+    let tmp = tempfile::tempdir().expect("임시");
+    let p = places(tmp.path());
+    let mut c = db.pool.acquire().await.expect("연결");
+    let u = user(&mut c, "local").await;
+    let mut s = ProjectService {
+        db: &mut c,
+        repos: &p,
+    };
+    for code in ["RHA", "RHB", "RHC"] {
+        s.init_project(&db.pool, code, "자리", &u, false, Storage::Server)
+            .await
+            .expect("만들기");
+    }
+    assert!(
+        s.rehome().await.expect("맞는 자리").is_empty(),
+        "맞으면 그대로"
+    );
+    // RHA — 다른 데이터 자리(Docker)의 경로 · RHB — 작업 사본이 없다 · RHC — 원본이 없다
+    sqlx::query(
+        "UPDATE repositories SET remote_url = '/var/syncdoc/origins/RHA.git', workdir_path = '/var/syncdoc/repos/RHA' \
+         WHERE project_id = (SELECT id FROM projects WHERE code = 'RHA')",
+    )
+    .execute(&mut *s.db)
+    .await
+    .unwrap();
+    std::fs::remove_dir_all(p.repos.join("RHA")).unwrap();
+    std::fs::remove_dir_all(p.repos.join("RHB")).unwrap();
+    std::fs::remove_dir_all(p.repos.join("RHC")).unwrap();
+    std::fs::remove_dir_all(p.origins.join("RHC.git")).unwrap();
+    let made = s.rehome().await.expect("맞추기");
+    assert_eq!(made, ["RHA", "RHB"]);
+    let (_, repo) = s.get("RHA").await.unwrap();
+    assert_eq!(repo.remote_url, p.origins.join("RHA.git").to_string_lossy());
+    assert_eq!(repo.workdir_path, p.repos.join("RHA").to_string_lossy());
+    assert_eq!(
+        sh(&p.repos.join("RHB"), &["rev-parse", "HEAD"]),
+        sh(&p.origins.join("RHB.git"), &["rev-parse", "main"])
+    );
+    assert!(!p.repos.join("RHC").exists());
+}

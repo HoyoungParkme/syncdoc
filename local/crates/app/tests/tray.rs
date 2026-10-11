@@ -24,11 +24,13 @@ async fn quit_from_tray_shuts_down_in_order() {
     ]);
     let (url_tx, url_rx) = mpsc::channel();
     let (quit_tx, quit_rx) = oneshot::channel();
+    let (backup_tx, backup_rx) = tokio::sync::mpsc::unbounded_channel();
     let running = tokio::spawn(run(
         args,
         Some(TrayLink {
             url: url_tx,
             quit: quit_rx,
+            backup: backup_rx,
         }),
     ));
     let url = tokio::task::spawn_blocking(move || url_rx.recv_timeout(Duration::from_secs(60)))
@@ -40,6 +42,8 @@ async fn quit_from_tray_shuts_down_in_order() {
         "{url}"
     );
     assert!(data.path().join("instance.json").is_file());
+    // 「지금 백업」 — 폴더가 없어도 서버는 그대로다(결과는 로그와 마지막 백업)
+    backup_tx.send(()).expect("지금 백업");
     quit_tx.send(()).expect("끝내기");
     tokio::time::timeout(Duration::from_secs(20), running)
         .await

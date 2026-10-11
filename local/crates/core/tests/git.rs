@@ -803,3 +803,50 @@ async fn clone_bare_from_bundle_keeps_hashes_without_remote() {
         Err(Problem::Git { .. })
     ));
 }
+
+/// L16 mirror — 백업 사진: 가지·태그 해시·HEAD가 원본과 같고 원격이 없다. 빈 저장소도
+#[tokio::test]
+async fn mirror_copies_refs_without_remote() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let g = git_for(tmp.path());
+    let origin = tmp.path().join("origins/M.git");
+    g.init_bare(&origin).await.expect("원본");
+    let work = tmp.path().join("w");
+    sh(
+        tmp.path(),
+        &[
+            "clone",
+            "-q",
+            origin.to_str().unwrap(),
+            work.to_str().unwrap(),
+        ],
+    );
+    std::fs::write(work.join("a.md"), "하나\n").unwrap();
+    sh(&work, &["add", "-A"]);
+    sh(&work, &["commit", "-q", "-m", "하나"]);
+    sh(&work, &["tag", "v1"]);
+    sh(
+        &work,
+        &[
+            "push",
+            "-q",
+            "origin",
+            "HEAD:main",
+            "v1",
+            "HEAD:refs/heads/side",
+        ],
+    );
+    let dest = tmp.path().join("snap/origins/M.git");
+    g.mirror(&origin, &dest).await.expect("거울");
+    for r in ["main", "v1", "side"] {
+        assert_eq!(sh(&dest, &["rev-parse", r]), sh(&origin, &["rev-parse", r]));
+    }
+    assert_eq!(sh(&dest, &["remote"]), "");
+    assert_eq!(sh(&dest, &["symbolic-ref", "HEAD"]), "refs/heads/main");
+    assert_eq!(sh(&dest, &["config", "receive.denyDeletes"]), "true");
+    let empty = tmp.path().join("origins/E.git");
+    g.init_bare(&empty).await.expect("빈 원본");
+    let edest = tmp.path().join("snap/origins/E.git");
+    g.mirror(&empty, &edest).await.expect("빈 거울");
+    assert_eq!(sh(&edest, &["symbolic-ref", "HEAD"]), "refs/heads/main");
+}
