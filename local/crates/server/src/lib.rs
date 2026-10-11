@@ -25,6 +25,7 @@ use crate::web::routes::projects::{
     delete_project, get_file, get_project, graph, init_project, list_docs, list_items,
     list_projects,
 };
+use crate::web::routes::references::item_view;
 use crate::web::routes::specs::spec_copy;
 use crate::web::static_files::fallback;
 
@@ -49,6 +50,7 @@ pub fn app(state: AppState) -> Router {
         .route("/api/docs/{doc_id}/diff", get(diff))
         .route("/api/docs/{doc_id}/versions", get(versions))
         .route("/api/docs/{doc_id}/downstream", get(downstream))
+        .route("/api/docs/{doc_id}/items/{item_id}", get(item_view))
         .merge(mcp::router(state.clone()))
         .route("/specs/", get(spec_copy))
         .route("/specs/{*path}", get(spec_copy))

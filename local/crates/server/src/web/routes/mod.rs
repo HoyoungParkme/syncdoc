@@ -3,4 +3,5 @@
 pub mod account;
 pub mod documents;
 pub mod projects;
+pub mod references;
 pub mod specs;
