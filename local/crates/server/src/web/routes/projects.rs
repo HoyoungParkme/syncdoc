@@ -18,11 +18,12 @@ use crate::compat::pyvalue::{PyStr, PyValue};
 use crate::state::AppState;
 use crate::web::auth::current_user;
 use crate::web::problem::ApiProblem;
-use crate::web::schemas::{DocumentSummary, ProjectDetail, ProjectSummary};
+use crate::web::schemas::{DocumentSummary, ProjectDetail, ProjectItemOut, ProjectSummary};
 
 static INIT_PROJECT: LazyLock<Validator> = LazyLock::new(schemas::init_project);
 static STAGE: LazyLock<Validator> = LazyLock::new(schemas::stage);
 static DOC_STATUS: LazyLock<Validator> = LazyLock::new(schemas::doc_status);
+static FLAG_KIND: LazyLock<Validator> = LazyLock::new(schemas::flag_kind);
 
 /// SYNC-API-001#GET/api/projects
 pub async fn list_projects(
@@ -136,4 +137,26 @@ pub async fn list_docs(
     let docs = queries::document_list(&mut c, &state.repos, &code, &user, stage, status.as_deref())
         .await?;
     Ok(Json(docs.iter().map(DocumentSummary::from).collect()))
+}
+
+/// SYNC-API-001#GET/api/projects/{code}/flags
+///
+/// 경로 이름은 flags로 남았다 — 끊어진 참조는 `references.is_missing`. `kind`는 필수
+pub async fn list_items(
+    State(state): State<AppState>,
+    Path(code): Path<String>,
+    RawQuery(raw): RawQuery,
+) -> Result<Json<Vec<ProjectItemOut>>, ApiProblem> {
+    let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+    let user = current_user(&mut c, &state).await?;
+    let q = fastapi::query_params(raw.as_deref());
+    let mut errors = Vec::new();
+    let kind = fastapi::query_field(&q, "kind", &FLAG_KIND, true, &mut errors);
+    fastapi::check_errors(errors)?;
+    let kind = match kind {
+        Some(PyValue::Str(PyStr::Utf8(s))) => s,
+        _ => String::new(),
+    };
+    let items = queries::project_items(&mut c, &state.repos, &code, &kind, &user).await?;
+    Ok(Json(items.iter().map(ProjectItemOut::from).collect()))
 }
