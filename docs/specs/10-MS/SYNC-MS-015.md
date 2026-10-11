@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-003, SYNC-MS-017, SYNC-STD-004]
 
 서비스는 연결을 빌려 받는다 — `ReferenceService<'c> { pub db: &'c mut PgConnection }`. 트랜잭션은 부르는 쪽이 쥔다([[SYNC-STD-004#DEV-10]]).
 
-**카드 L6 몫은 미존재 참조 세기 하나다(2026-10-08)** — 프로젝트 요약([[SYNC-MS-018#queries.project_summary]])이 쓴다. **카드 L7이 뽑기·끊기·잇기와 조회 셋을 더했다(2026-10-08)** — 저장 파이프라인([[SYNC-MS-017#pipeline.save_pipeline]])과 MCP 읽기 도구가 쓴다. **카드 L8이 웹 읽기의 셋을 더했다(2026-10-11)** — 관계도·추적표·diff 영향·끊어진 참조 목록. 휴지통 쪽(L9)은 그 카드가 더한다.
+**카드 L6 몫은 미존재 참조 세기 하나다(2026-10-08)** — 프로젝트 요약([[SYNC-MS-018#queries.project_summary]])이 쓴다. **카드 L7이 뽑기·끊기·잇기와 조회 셋을 더했다(2026-10-08)** — 저장 파이프라인([[SYNC-MS-017#pipeline.save_pipeline]])과 MCP 읽기 도구가 쓴다. **카드 L8이 웹 읽기의 셋을 더했다(2026-10-11)** — 관계도·추적표·diff 영향·끊어진 참조 목록. **카드 L9가 휴지통 문지기 하나를 더했다(2026-10-11).**
 
 돌려주는 간선은 `RefEdge { from_item_pk, to_item_pk, to_document_id, raw_target, is_missing, from_document_id }`([[SYNC-DOM-004]] 4.4) — 파이썬 `_edge`와 같은 꼴이다.
 
@@ -36,6 +36,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-003, SYNC-MS-017, SYNC-STD-004]
 | [[#ReferenceService.references_among]] | 노드 집합 사이 간선 |
 | [[#ReferenceService.count_downstream]] | 하위 건수 |
 | [[#ReferenceService.missing_in_project]] | 프로젝트의 미존재 참조 전부 |
+| [[#ReferenceService.inbound_of_document]] | 남이 이 문서에 건 참조 |
 
 ---
 
@@ -202,6 +203,22 @@ pub async fn missing_in_project(&mut self, project_id: i32) -> Result<Vec<RefEdg
 
 ---
 
+#### ReferenceService.inbound_of_document 남이 이 문서에 건 참조
+
+**시그니처**
+```rust
+pub async fn inbound_of_document(&mut self, document_id: i32) -> Result<Vec<RefEdge>, Problem>
+```
+
+근거: [[SYNC-MS-003#ReferenceService.inbound_of_document]] · [[SYNC-UC-001#UC-A7]] 2
+
+**처리** `DB: references where (to_document_id = id or to_item_id in (그 문서 항목 — 지운 것까지)) and from_document_id != id order by id` — 자기 참조는 뺀다. 미존재는 `to_*`가 비어 안 잡힌다
+
+**테스트 관점** (시험 DB) 아무도 안 가리키면 빈 것 · 다른 문서가 항목을 걸면 하나 · 같은 문서 안 참조는 안 센다 · 미존재는 안 센다
+
+
+---
+
 ## 3. 미결사항
 
-없음. 나머지 참조 함수(휴지통·재구축)는 L9·L11이 더한다 — [[SYNC-CODE-002]].
+없음. 재구축 쪽은 L11이 더한다 — [[SYNC-CODE-002]].
