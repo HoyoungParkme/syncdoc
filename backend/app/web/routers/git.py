@@ -10,7 +10,6 @@ WWW-Authenticate라 git이 다시 묻는다. 남의 것·GitHub 저장은 없는
 from __future__ import annotations
 
 import base64
-import binascii
 import logging
 
 from fastapi import APIRouter, Depends, Request
@@ -51,7 +50,7 @@ def _token_user(request: Request, session: Session) -> User | None:
         return None
     try:
         decoded = base64.b64decode(header[6:].strip(), validate=True).decode("utf-8")
-    except (binascii.Error, UnicodeDecodeError):
+    except ValueError:  # binascii.Error · UnicodeDecodeError · ASCII 아닌 글자(#363)
         return None
     _, _, token = decoded.partition(":")
     user = AccountService(session).authenticate_token(token) if token else None
