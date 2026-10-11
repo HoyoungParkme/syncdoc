@@ -84,7 +84,7 @@ crates/server/src/
 │   ├── static_files.rs         화면 빌드(rust-embed) · 캐시 규칙 · 304 (INFRA 4.1)
 │   ├── schemas.rs              응답 형태 (API-001 4장)
 │   └── routes/                 API-001 경로 — account(/api/me · /api/me/tokens) · specs(/specs) · projects(/api/projects 목록·만들기·지우기, L6 ·
-│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8 · 상태·되돌리기·휴지통·되살리기·완전 삭제, L9) · references(항목·참조·체인, L8)
+│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8 · 상태·되돌리기·휴지통·되살리기·완전 삭제, L9) · references(항목·참조·체인, L8) · git(/git 스마트 HTTP 입구 — 경로를 starlette 정규식처럼 가른다, L10)
 ├── mcp/                        /mcp — 파이썬 mcp SDK의 핸드셰이크 경로를 옮긴 것 (API-002 1장, 카드 L3)
 │   ├── auth.rs                 Bearer → AccountService.authenticate_token, 통과하면 응답 전에 커밋 (SEQ-C2)
 │   ├── transport.rs            streamable HTTP, 세션 없음 — Accept·Content-Type·본문 읽기·SSE 쓰기
@@ -334,6 +334,7 @@ classDiagram
         +get_owned(code, user) ProjectRow
         +list_owned(user) Vec~ProjectRow~
         +asset_path(code, path, user) PathBuf
+        +server_origin(code, user) PathBuf
     }
     class ServerRepos {
         +Git git
@@ -351,6 +352,7 @@ classDiagram
 | [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-013#ProjectService.get_owned]] | `get_template` · `delete_project` | [[SYNC-MS-001#ProjectService.get_owned]] | `not-found` |
 | [[SYNC-MS-013#ProjectService.list_owned]] | `queries.project_summary` | [[SYNC-MS-001#ProjectService.list_owned]] | — |
 | [[SYNC-MS-013#ProjectService.asset_path]] | `GET /api/projects/{code}/files/{path}`(L8) | [[SYNC-MS-001#ProjectService.asset_path]] | `not-found`(project·file) |
+| [[SYNC-MS-013#ProjectService.server_origin]] | git 입구 셋(L10) | [[SYNC-MS-001#ProjectService.server_origin]] | `not-found`(project) |
 
 규칙 — [[SYNC-DOM-002]] 4.1과 같다. **싱크독_로컬은 서버 저장뿐이다** — 서버 저장소는 `origins/{code}.git`, 작업 사본은 `repos/{code}`, 지우면 `origins/_archive/{code}-{UTC}.git`으로 보관한다(지우지 않는다). 코드마다 잠금을 쥔다. 동기화·재구축·첨부·git 입구는 그 카드가 더한다.
 
@@ -643,6 +645,8 @@ classDiagram
         +init_specs(specs_url) IndexMap
         +fetch(workdir) String
         +rev_list_count(workdir, range) i64
+        +advertise_refs(origin, service, protocol) Vec~u8~
+        +service_rpc(origin, service, body, protocol) Vec~u8~
     }
 ```
 
@@ -651,8 +655,9 @@ classDiagram
 | [[SYNC-MS-019#Git.init_bare]] · [[SYNC-MS-019#Git.clone]] · [[SYNC-MS-019#Git.exists]] · [[SYNC-MS-019#Git.list]] · [[SYNC-MS-019#Git.init_specs]] · [[SYNC-MS-019#Git.commit_push]] | `ProjectService.init_project` | [[SYNC-MS-009]] | `push-failed` · `internal`(git 실패) |
 | [[SYNC-MS-019#Git.read]] | MCP `get_template`(저장소 규약 먼저) | [[SYNC-MS-009#git.read]] | `internal` |
 | [[SYNC-MS-019#Git.commit_push]] · [[SYNC-MS-019#Git.fetch]] · [[SYNC-MS-019#Git.rev_list_count]] | 저장 파이프라인 | [[SYNC-MS-009]] | `push-failed` · `internal` |
+| [[SYNC-MS-019#Git.advertise_refs]] · [[SYNC-MS-019#Git.service_rpc]] | git 입구(`/git/*`, L10) | [[SYNC-MS-009#git.http_backend]] | `internal` |
 
-규칙 — git CLI를 자식 프로세스로 부른다(윈도 MinGit · 리눅스 시스템 git). **사용자 git 설정을 막는다**(사용자 결정 2026-10-08) — 시스템·전역 설정 끔, 프롬프트·서명·autocrlf 끔, `LC_ALL=C`, `safe.directory=*`. 파이썬 판이 Docker 안에서 받는 깨끗한 환경과 같게 해 같은 명령이 같은 결과를 낸다. git 입구(upload-pack·receive-pack)는 L10이 더한다.
+규칙 — git CLI를 자식 프로세스로 부른다(윈도 MinGit · 리눅스 시스템 git). **사용자 git 설정을 막는다**(사용자 결정 2026-10-08) — 시스템·전역 설정 끔, 프롬프트·서명·autocrlf 끔, `LC_ALL=C`, `safe.directory=*`. 파이썬 판이 Docker 안에서 받는 깨끗한 환경과 같게 해 같은 명령이 같은 결과를 낸다. git 입구(upload-pack·receive-pack)는 L10이 더했다 — http-backend 없이 `--stateless-rpc`를 직접 부르고 http-backend의 머리를 그대로 낸다.
 
 ---
 
