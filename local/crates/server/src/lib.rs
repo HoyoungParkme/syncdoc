@@ -17,6 +17,7 @@ use crate::state::AppState;
 use crate::web::guard::guard;
 use crate::web::problem::{method_not_allowed, panic_response};
 use crate::web::routes::account::{issue_token, list_tokens, me, revoke_token};
+use crate::web::routes::documents::diff;
 use crate::web::routes::documents::get_document;
 use crate::web::routes::projects::{
     delete_project, get_file, get_project, graph, init_project, list_docs, list_items,
@@ -43,6 +44,7 @@ pub fn app(state: AppState) -> Router {
         .route("/api/projects/{code}/files/{*path}", get(get_file))
         .route("/api/projects/{code}/files/", get(get_file))
         .route("/api/docs/{doc_id}", get(get_document))
+        .route("/api/docs/{doc_id}/diff", get(diff))
         .merge(mcp::router(state.clone()))
         .route("/specs/", get(spec_copy))
         .route("/specs/{*path}", get(spec_copy))
