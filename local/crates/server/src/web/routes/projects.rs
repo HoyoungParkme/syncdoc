@@ -1,4 +1,4 @@
-//! 프로젝트 — 파이썬 판 `web/routers/projects.py`의 목록·만들기·지우기(카드 L6)와 상세·문서·문제 목록·관계도·첨부(카드 L8)
+//! 프로젝트 — 파이썬 판 `web/routers/projects.py`의 목록·만들기·지우기(카드 L6)와 상세·문서·문제 목록·관계도·첨부(카드 L8), 번들로 가져오기(카드 L15)
 
 use std::sync::LazyLock;
 
@@ -25,6 +25,8 @@ static STAGE: LazyLock<Validator> = LazyLock::new(schemas::stage);
 static DOC_STATUS: LazyLock<Validator> = LazyLock::new(schemas::doc_status);
 static FLAG_KIND: LazyLock<Validator> = LazyLock::new(schemas::flag_kind);
 static GRAPH_SCOPE: LazyLock<Validator> = LazyLock::new(schemas::graph_scope);
+static BUNDLE_CODE: LazyLock<Validator> = LazyLock::new(schemas::bundle_code);
+static BUNDLE_NAME: LazyLock<Validator> = LazyLock::new(schemas::bundle_name);
 
 /// SYNC-API-001#GET/api/projects
 pub async fn list_projects(
@@ -83,6 +85,67 @@ pub async fn init_project(
             log: format!("만든 프로젝트 {code}의 요약이 없다"),
         })?;
     Ok((StatusCode::CREATED, Json(ProjectSummary::from(&summary))).into_response())
+}
+
+/// 빈 405 — 바깥 미들웨어가 `method-not-allowed`로 바꾼다. `allow`는 파이썬 판이 그 경로에서 맞추는 메서드
+fn not_allowed(allow: &[&str]) -> Response {
+    (
+        StatusCode::METHOD_NOT_ALLOWED,
+        [(header::ALLOW, allow.join(", "))],
+    )
+        .into_response()
+}
+
+/// SYNC-API-001#POST/api/projects/bundle
+///
+/// 파이썬 판은 정적 경로 `/api/projects/bundle`이다. axum에선 정적 경로가 `GET /api/projects/bundle`을 405로 막으므로
+/// `{code}` 경로에 POST를 붙이고 `bundle`일 때만 받는다 — 그 밖의 코드는 파이썬 판처럼 405(GET·DELETE)
+pub async fn import_bundle(
+    State(state): State<AppState>,
+    Path(code): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, ApiProblem> {
+    if code != "bundle" {
+        return Ok(not_allowed(&["GET", "DELETE"]));
+    }
+    // 폼 해석은 의존성보다 먼저 — 깨진 폼은 400 (FastAPI `get_request_handler`)
+    let mut form = fastapi::read_form(&headers, &body)?;
+    // 트랜잭션 없이 넘긴다 — 재구축이 건 그래프 만들기가 진짜 커밋 뒤에 걸린다(MS-013 import_bundle 8)
+    let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+    let user = current_user(&mut c, &state).await?;
+    // 칸 오류는 선언 차례로 한 번에 (code·name·bundle)
+    let mut errors = Vec::new();
+    let code = fastapi::form_text(&form, "code", &BUNDLE_CODE, &mut errors);
+    let name = fastapi::form_text(&form, "name", &BUNDLE_NAME, &mut errors);
+    let bundle = fastapi::form_upload(&mut form, "bundle", &mut errors);
+    let (Some(code), Some(name), Some(bundle)) = (code, name, bundle) else {
+        return Err(ApiProblem(Problem::InvalidRequest { errors }));
+    };
+    drop(form);
+    ProjectService {
+        db: &mut c,
+        repos: &state.repos,
+    }
+    .import_bundle(&state.pool, &code, &name, &user, &bundle.data)
+    .await?;
+    let summary = queries::project_summary(&mut c, &state.repos, &user)
+        .await?
+        .into_iter()
+        .find(|p| p.code == code)
+        .ok_or_else(|| Problem::Internal {
+            log: format!("가져온 프로젝트 {code}의 요약이 없다"),
+        })?;
+    Ok((StatusCode::CREATED, Json(ProjectSummary::from(&summary))).into_response())
+}
+
+/// `/api/projects/{code}`가 받지 않는 메서드 — 파이썬 판은 코드가 `bundle`일 때만 POST 경로도 맞는다
+pub async fn project_methods(Path(code): Path<String>) -> Response {
+    if code == "bundle" {
+        not_allowed(&["GET", "POST", "DELETE"])
+    } else {
+        not_allowed(&["GET", "DELETE"])
+    }
 }
 
 /// SYNC-API-001#DELETE/api/projects/{code}
