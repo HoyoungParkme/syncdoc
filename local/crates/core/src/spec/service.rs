@@ -1542,4 +1542,45 @@ impl SpecService<'_> {
     pub async fn delete_document(&mut self, document: &Document) -> Result<i64, Problem> {
         Ok(repo::delete_document_rows(&mut *self.db, document.summary.id).await? as i64)
     }
+
+    /// SYNC-MS-014#SpecService.mark_deleted
+    ///
+    /// 원본에서 파일이 사라지면 문서는 남기고 초안 + `file.deleted` — 항목은 전부 지운 것으로
+    pub async fn mark_deleted(
+        &mut self,
+        document: &Document,
+        commit_hash: &str,
+        author: &Author,
+    ) -> Result<Vec<i32>, Problem> {
+        let row = repo::document_by_id(&mut *self.db, document.summary.id)
+            .await?
+            .ok_or_else(|| not_found("document", &document.summary.doc_id))?;
+        let now = clock::now();
+        let mut pks = Vec::new();
+        for item in repo::items_of(&mut *self.db, row.id, false).await? {
+            repo::mark_item_deleted(&mut *self.db, item.id, now).await?;
+            pks.push(item.id);
+        }
+        repo::insert_status_change(
+            &mut *self.db,
+            &repo::NewStatusChange {
+                document_id: row.id,
+                from_status: Some(&row.status),
+                to_status: "draft",
+                changed_by_user_id: author.user.id,
+                via: fold_via(author.via),
+                reason: Some("파일 삭제됨"),
+                commit_hash: Some(commit_hash),
+                changed_at: now,
+            },
+        )
+        .await?;
+        repo::set_file_deleted(
+            &mut *self.db,
+            row.id,
+            &format!("file.deleted: {commit_hash}"),
+        )
+        .await?;
+        Ok(pks)
+    }
 }

@@ -213,3 +213,39 @@ async fn save_rebuild_numbers_by_remaining_versions_and_github_demotion_hash() {
         .expect("저장");
     assert_eq!(v.version_no, 2);
 }
+
+#[tokio::test]
+async fn mark_deleted_keeps_row_drafts_and_deletes_items() {
+    let e = env().await;
+    let r = e.create("PRD", PRD).await;
+    let mut c = e.conn().await;
+    let mut spec = SpecService { db: &mut c };
+    let doc = spec.get_document(&r.doc_id).await.expect("문서");
+    let pks = spec
+        .mark_deleted(&doc, "abc123", &e.author(Entry::Github))
+        .await
+        .expect("삭제 반영");
+    assert_eq!(pks.len(), 2);
+    let doc = spec.get_document(&r.doc_id).await.expect("행은 남는다");
+    assert_eq!(doc.summary.status, "draft");
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            "SELECT count(*) FROM documents WHERE has_convention_error AND convention_error_detail = 'file.deleted: abc123'"
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        scalar_i64(&mut c, "SELECT count(*) FROM items WHERE NOT is_deleted").await,
+        0
+    );
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            "SELECT count(*) FROM status_changes WHERE reason = '파일 삭제됨' AND commit_hash = 'abc123' AND to_status = 'draft'"
+        )
+        .await,
+        1
+    );
+}

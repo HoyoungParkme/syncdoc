@@ -589,3 +589,72 @@ pub async fn delete_document_rows(
     }
     Ok(n)
 }
+
+/// 파일 삭제 반영 — 초안·규약 오류 `file.deleted`. 값이 그대로면 쓰지 않는다(파이썬 ORM은 바뀐 것이 없으면 UPDATE를 내지 않는다 — `updated_at`)
+pub async fn set_file_deleted(
+    db: &mut PgConnection,
+    id: i32,
+    detail: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE documents SET status = 'draft', has_convention_error = true, convention_error_detail = $2, \
+         updated_at = now() WHERE id = $1 \
+         AND (status, has_convention_error, convention_error_detail) IS DISTINCT FROM ('draft', true, $2)",
+    )
+    .bind(id)
+    .bind(detail)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+/// 규약 칸 셋을 통째로 — 값이 그대로면 쓰지 않는다
+pub async fn set_convention(
+    db: &mut PgConnection,
+    id: i32,
+    has_error: bool,
+    detail: Option<&str>,
+    warnings: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE documents SET has_convention_error = $2, convention_error_detail = $3, incomplete_warnings = $4, \
+         updated_at = now() WHERE id = $1 \
+         AND (has_convention_error, convention_error_detail, incomplete_warnings) IS DISTINCT FROM ($2, $3, $4)",
+    )
+    .bind(id)
+    .bind(has_error)
+    .bind(detail)
+    .bind(warnings)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+/// 프로젝트 문서의 커밋 있는 상태 변경 — 재구축이 `status(` 커밋마다 다시 만드는 집합
+pub async fn delete_status_changes_with_commit(
+    db: &mut PgConnection,
+    project_id: i32,
+) -> Result<u64, sqlx::Error> {
+    Ok(sqlx::query(
+        "DELETE FROM status_changes WHERE commit_hash IS NOT NULL \
+         AND document_id IN (SELECT id FROM documents WHERE project_id = $1)",
+    )
+    .bind(project_id)
+    .execute(db)
+    .await?
+    .rows_affected())
+}
+
+/// 프로젝트의 판 전부
+pub async fn delete_versions_of_project(
+    db: &mut PgConnection,
+    project_id: i32,
+) -> Result<u64, sqlx::Error> {
+    Ok(sqlx::query(
+        "DELETE FROM versions WHERE document_id IN (SELECT id FROM documents WHERE project_id = $1)",
+    )
+    .bind(project_id)
+    .execute(db)
+    .await?
+    .rows_affected())
+}
