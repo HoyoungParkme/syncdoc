@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-019
 type: MS
 title: MINISPEC — git 어댑터 (Rust)
-status: draft
+status: approved
 upstream: [SYNC-DOM-004, SYNC-MS-009, SYNC-INFRA-001, SYNC-STD-004]
 ---
 
