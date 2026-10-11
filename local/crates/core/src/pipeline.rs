@@ -721,3 +721,67 @@ async fn trash(
         broken_refs: broken,
     })
 }
+
+/// SYNC-MS-017#pipeline.restore_document
+///
+/// 휴지통에 넣기 직전 내용(휴지통 커밋의 부모)으로 새 판 — 항목이 돌아오고 기다리던 미존재 참조는 저장의 10a가 잇는다
+pub async fn restore_document(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    doc_id: &str,
+    author: &Author,
+) -> Result<SaveResult, Problem> {
+    let code = code_of(doc_id);
+    read_pending(pool, repos, code, &author.user).await?;
+    let mut c = pool.acquire().await?;
+    let (_, repo) = ProjectService { db: &mut c, repos }
+        .get_owned(code, &author.user)
+        .await?;
+    let document = SpecService { db: &mut c }.get_document(doc_id).await?;
+    if document.summary.trashed_at.is_none() {
+        return Err(Problem::DocumentNotTrashed);
+    }
+    let hash = SpecService { db: &mut c }
+        .trash_commit(document.summary.id)
+        .await?
+        .ok_or_else(|| Problem::Internal {
+            log: format!("{doc_id}의 휴지통 커밋이 없다"),
+        })?;
+    drop(c);
+    let path = format!(
+        "docs/specs/{}/{doc_id}.md",
+        spec_dir(&document.summary.doc_type)
+    );
+    let body = repos
+        .git
+        .read(Path::new(&repo.workdir_path), &path, &format!("{hash}^"))
+        .await?;
+    // 3. DB가 초안이다 — mcp 경로의 frontmatter.status_change에 안 걸리게
+    let body = STATUS_LINE
+        .replacen(&body, 1, NoExpand("status: draft"))
+        .into_owned();
+    let entry = if author.via == Entry::Mcp {
+        Entry::Mcp
+    } else {
+        Entry::WebRevert
+    };
+    save_pipeline(
+        pool,
+        repos,
+        SaveInput {
+            entry,
+            doc_id: Some(doc_id.to_string()),
+            doc_type: None,
+            body,
+            expected_version: Some(i64::from(document.summary.current_version_no)),
+            project_code: None,
+            author: author.clone(),
+            message: format!("spec({doc_id}): 되살림 — 휴지통에서"),
+            confirm_item_deletion: false,
+            reason: None,
+            restore: true,
+            read_first: false,
+        },
+    )
+    .await
+}
