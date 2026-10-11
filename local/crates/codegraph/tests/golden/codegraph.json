@@ -1,0 +1,3033 @@
+{
+ "raw": {
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "nodes": [
+   {
+    "id": "backend_app_init",
+    "label": "app/__init__.py",
+    "file_type": "code",
+    "source_file": "backend/app/__init__.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_init",
+    "label": "core/__init__.py",
+    "file_type": "code",
+    "source_file": "backend/app/core/__init__.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_init",
+    "label": "thing/__init__.py",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/__init__.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_repository",
+    "label": "repository.py",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/repository.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_repository_thingrepo",
+    "label": "ThingRepo",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/repository.py",
+    "source_location": "L6",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_repository_thingrepo_init",
+    "label": ".__init__()",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/repository.py",
+    "source_location": "L7",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_repository_thingrepo_get",
+    "label": ".get()",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/repository.py",
+    "source_location": "L10",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_repository_thingrepo_add",
+    "label": ".add()",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/repository.py",
+    "source_location": "L13",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_repository_thingrepo_make",
+    "label": ".make()",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/repository.py",
+    "source_location": "L17",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_service",
+    "label": "service.py",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_service_thingservice",
+    "label": "ThingService",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L10",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_service_thingservice_init",
+    "label": ".__init__()",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L11",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_service_thingservice_get",
+    "label": ".get()",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L16",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_service_thingservice_create",
+    "label": ".create()",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L20",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_service_thingservice_rename",
+    "label": ".rename()",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L30",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_service_thingservice_private",
+    "label": "._private()",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L37",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_service_thingservice_private_inner",
+    "label": "inner()",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L38",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_service_build",
+    "label": "build()",
+    "file_type": "code",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L44",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_service_rationale_17",
+    "label": "FX-MS-001#ThingService.get 하나 읽기",
+    "file_type": "rationale",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L17",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_service_rationale_21",
+    "label": "FX-MS-001#ThingService.create 두 줄짜리 docstring — 첫 줄만 항목 ID다.",
+    "file_type": "rationale",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L21",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_service_rationale_31",
+    "label": "FX-MS-001#ThingService.rename",
+    "file_type": "rationale",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L31",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_thing_service_rationale_45",
+    "label": "FX-MS-001#thing.build 서비스를 만든다",
+    "file_type": "rationale",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L45",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_util",
+    "label": "util.py",
+    "file_type": "code",
+    "source_file": "backend/app/core/util.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_util_clean",
+    "label": "clean()",
+    "file_type": "code",
+    "source_file": "backend/app/core/util.py",
+    "source_location": "L6",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_util_audit",
+    "label": "audit()",
+    "file_type": "code",
+    "source_file": "backend/app/core/util.py",
+    "source_location": "L12",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_util_log",
+    "label": "log()",
+    "file_type": "code",
+    "source_file": "backend/app/core/util.py",
+    "source_location": "L17",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_util_typed",
+    "label": "typed()",
+    "file_type": "code",
+    "source_file": "backend/app/core/util.py",
+    "source_location": "L22",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_util_rationale_13",
+    "label": "FX-MS-002#util.audit 기록",
+    "file_type": "rationale",
+    "source_file": "backend/app/core/util.py",
+    "source_location": "L13",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_web_init",
+    "label": "web/__init__.py",
+    "file_type": "code",
+    "source_file": "backend/app/web/__init__.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_web_routers_init",
+    "label": "routers/__init__.py",
+    "file_type": "code",
+    "source_file": "backend/app/web/routers/__init__.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_web_routers_thing",
+    "label": "thing.py",
+    "file_type": "code",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "get",
+    "label": "get",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_web_routers_thing_get_thing",
+    "label": "get_thing()",
+    "file_type": "code",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L12",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "thingservice",
+    "label": "ThingService",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "post",
+    "label": "post",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_web_routers_thing_create_thing",
+    "label": "create_thing()",
+    "file_type": "code",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L18",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_web_routers_thing_rationale_1",
+    "label": "routers/thing — FX-API-001.",
+    "file_type": "rationale",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_web_routers_thing_rationale_13",
+    "label": "FX-API-001#GET/api/things/{thingId} — 물건 하나",
+    "file_type": "rationale",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L13",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_web_routers_thing_rationale_19",
+    "label": "FX-API-001#POST/api/things",
+    "file_type": "rationale",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L19",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_tests_test_thing",
+    "label": "test_thing.py",
+    "file_type": "code",
+    "source_file": "backend/tests/test_thing.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_tests_test_thing_test_build",
+    "label": "test_build()",
+    "file_type": "code",
+    "source_file": "backend/tests/test_thing.py",
+    "source_location": "L4",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_api_client",
+    "label": "client.ts",
+    "file_type": "code",
+    "source_file": "frontend/src/api/client.ts",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_api_client_api",
+    "label": "api",
+    "file_type": "code",
+    "source_file": "frontend/src/api/client.ts",
+    "source_location": "L2",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_api_client_joinpath",
+    "label": "joinPath()",
+    "file_type": "code",
+    "source_file": "frontend/src/api/client.ts",
+    "source_location": "L12",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_api_index",
+    "label": "index.ts",
+    "file_type": "code",
+    "source_file": "frontend/src/api/index.ts",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_api_index_base",
+    "label": "base()",
+    "file_type": "code",
+    "source_file": "frontend/src/api/index.ts",
+    "source_location": "L3",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_components_card",
+    "label": "Card.tsx",
+    "file_type": "code",
+    "source_file": "frontend/src/components/Card.tsx",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_components_card_card",
+    "label": "Card()",
+    "file_type": "code",
+    "source_file": "frontend/src/components/Card.tsx",
+    "source_location": "L4",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_components_card_helper",
+    "label": "helper()",
+    "file_type": "code",
+    "source_file": "frontend/src/components/Card.tsx",
+    "source_location": "L11",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_components_card_box",
+    "label": "Box",
+    "file_type": "code",
+    "source_file": "frontend/src/components/Card.tsx",
+    "source_location": "L14",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_components_card_box_open",
+    "label": ".open()",
+    "file_type": "code",
+    "source_file": "frontend/src/components/Card.tsx",
+    "source_location": "L15",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_lib_math",
+    "label": "math.js",
+    "file_type": "code",
+    "source_file": "frontend/src/lib/math.js",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_lib_math_add",
+    "label": "add()",
+    "file_type": "code",
+    "source_file": "frontend/src/lib/math.js",
+    "source_location": "L2",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_lib_math_calc",
+    "label": "Calc",
+    "file_type": "code",
+    "source_file": "frontend/src/lib/math.js",
+    "source_location": "L6",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_lib_math_calc_sum",
+    "label": ".sum()",
+    "file_type": "code",
+    "source_file": "frontend/src/lib/math.js",
+    "source_location": "L7",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_lib_math_twice",
+    "label": "twice()",
+    "file_type": "code",
+    "source_file": "frontend/src/lib/math.js",
+    "source_location": "L12",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_pages_thingpage",
+    "label": "ThingPage.tsx",
+    "file_type": "code",
+    "source_file": "frontend/src/pages/ThingPage.tsx",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_pages_thingpage_thingpage",
+    "label": "ThingPage()",
+    "file_type": "code",
+    "source_file": "frontend/src/pages/ThingPage.tsx",
+    "source_location": "L9",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_pages_thingpage_inner",
+    "label": "Inner()",
+    "file_type": "code",
+    "source_file": "frontend/src/pages/ThingPage.tsx",
+    "source_location": "L24",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_lib",
+    "label": "lib.rs",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/lib.rs",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_lib_top",
+    "label": "top()",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/lib.rs",
+    "source_location": "L10",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_repo",
+    "label": "repo.rs",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/repo.rs",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_repo_repo",
+    "label": "Repo",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/repo.rs",
+    "source_location": "L3",
+    "_rust_declaration_count": 1,
+    "_origin": "ast"
+   },
+   {
+    "id": "vec",
+    "label": "Vec",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "string",
+    "label": "String",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_repo_repo_new",
+    "label": ".new()",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/repo.rs",
+    "source_location": "L8",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_repo_repo_find",
+    "label": ".find()",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/repo.rs",
+    "source_location": "L12",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_repo_rs_option",
+    "label": "Option",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_service",
+    "label": "service.rs",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_service_thingservice",
+    "label": "ThingService",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L9",
+    "_rust_declaration_count": 1,
+    "_origin": "ast"
+   },
+   {
+    "id": "arc",
+    "label": "Arc",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_service_rs_option",
+    "label": "Option",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_service_count",
+    "label": "Count",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L14",
+    "_rust_declaration_count": 1,
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_service_count_count",
+    "label": ".count()",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L15",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_service_thingservice_new",
+    "label": ".new()",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L20",
+    "_origin": "ast"
+   },
+   {
+    "id": "self",
+    "label": "Self",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_service_thingservice_find",
+    "label": ".find()",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L27",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_service_thingservice_helper",
+    "label": ".helper()",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L34",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_service_wrapper_t",
+    "label": "Wrapper<T>",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L39",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_service_wrapper_t_count",
+    "label": ".count()",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L40",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_service_thingservice_count",
+    "label": ".count()",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L48",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_service_wrapper",
+    "label": "Wrapper",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L53",
+    "_rust_declaration_count": 1,
+    "_origin": "ast"
+   },
+   {
+    "id": "t",
+    "label": "T",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_service_counts",
+    "label": "counts()",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L58",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_util_mod",
+    "label": "mod.rs",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/util/mod.rs",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_util_mod_width",
+    "label": "width()",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/util/mod.rs",
+    "source_location": "L3",
+    "_origin": "ast"
+   },
+   {
+    "id": "local_crates_thing_src_util_mod_pad",
+    "label": "pad()",
+    "file_type": "code",
+    "source_file": "local/crates/thing/src/util/mod.rs",
+    "source_location": "L7",
+    "_origin": "ast"
+   },
+   {
+    "id": "functools",
+    "label": "functools",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
+    "id": "fastapi",
+    "label": "fastapi",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
+    "id": "ref_react",
+    "label": "ref_react",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
+    "id": "util",
+    "label": "util",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   }
+  ],
+  "links": [
+   {
+    "source": "backend_app_core_thing_repository",
+    "target": "backend_app_core_thing_repository_thingrepo",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/repository.py",
+    "source_location": "L6",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_repository_thingrepo",
+    "target": "backend_app_core_thing_repository_thingrepo_init",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/repository.py",
+    "source_location": "L7",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_repository_thingrepo",
+    "target": "backend_app_core_thing_repository_thingrepo_get",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/repository.py",
+    "source_location": "L10",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_repository_thingrepo",
+    "target": "backend_app_core_thing_repository_thingrepo_add",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/repository.py",
+    "source_location": "L13",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_repository_thingrepo",
+    "target": "backend_app_core_thing_repository_thingrepo_make",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/repository.py",
+    "source_location": "L17",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service",
+    "target": "backend_app_core_init",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L5",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service",
+    "target": "backend_app_core_thing_repository",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L6",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service",
+    "target": "backend_app_core_util",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L7",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service",
+    "target": "backend_app_core_thing_service_thingservice",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L10",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_thingservice",
+    "target": "backend_app_core_thing_service_thingservice_init",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L11",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_thingservice",
+    "target": "backend_app_core_thing_service_thingservice_get",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L16",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_thingservice",
+    "target": "backend_app_core_thing_service_thingservice_create",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L20",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_thingservice",
+    "target": "backend_app_core_thing_service_thingservice_rename",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L30",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_thingservice",
+    "target": "backend_app_core_thing_service_thingservice_private",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L37",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_thingservice_private",
+    "target": "backend_app_core_thing_service_thingservice_private_inner",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L38",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service",
+    "target": "backend_app_core_thing_service_build",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L44",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_thingservice_create",
+    "target": "backend_app_core_thing_service_thingservice_get",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L28",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_thingservice_private",
+    "target": "backend_app_core_thing_service_thingservice_private_inner",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L41",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_build",
+    "target": "backend_app_core_thing_service_thingservice",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L46",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_rationale_17",
+    "target": "backend_app_core_thing_service_thingservice_get",
+    "relation": "rationale_for",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L17",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_rationale_21",
+    "target": "backend_app_core_thing_service_thingservice_create",
+    "relation": "rationale_for",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L21",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_rationale_31",
+    "target": "backend_app_core_thing_service_thingservice_rename",
+    "relation": "rationale_for",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L31",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_rationale_45",
+    "target": "backend_app_core_thing_service_build",
+    "relation": "rationale_for",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L45",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_util",
+    "target": "functools",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/util.py",
+    "source_location": "L3",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_util",
+    "target": "backend_app_core_util_clean",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/util.py",
+    "source_location": "L6",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_util",
+    "target": "backend_app_core_util_audit",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/util.py",
+    "source_location": "L12",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_util",
+    "target": "backend_app_core_util_log",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/util.py",
+    "source_location": "L17",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_util",
+    "target": "backend_app_core_util_typed",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/util.py",
+    "source_location": "L22",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_util_audit",
+    "target": "backend_app_core_util_log",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/util.py",
+    "source_location": "L14",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_util_rationale_13",
+    "target": "backend_app_core_util_audit",
+    "relation": "rationale_for",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/util.py",
+    "source_location": "L13",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing",
+    "target": "fastapi",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L3",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing",
+    "target": "backend_app_core_thing_init",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L5",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing",
+    "target": "backend_app_core_thing_service",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L6",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing_get_thing",
+    "target": "get",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L11",
+    "weight": 1.0,
+    "context": "decorator",
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing",
+    "target": "backend_app_web_routers_thing_get_thing",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L12",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing_get_thing",
+    "target": "backend_app_core_thing_service_thingservice",
+    "relation": "references",
+    "context": "parameter_type",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L12",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing_create_thing",
+    "target": "post",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L17",
+    "weight": 1.0,
+    "context": "decorator",
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing",
+    "target": "backend_app_web_routers_thing_create_thing",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L18",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing_rationale_1",
+    "target": "backend_app_web_routers_thing",
+    "relation": "rationale_for",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing_rationale_13",
+    "target": "backend_app_web_routers_thing_get_thing",
+    "relation": "rationale_for",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L13",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing_rationale_19",
+    "target": "backend_app_web_routers_thing_create_thing",
+    "relation": "rationale_for",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L19",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_tests_test_thing",
+    "target": "backend_app_core_thing_service",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/tests/test_thing.py",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_tests_test_thing",
+    "target": "backend_tests_test_thing_test_build",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/tests/test_thing.py",
+    "source_location": "L4",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_api_client",
+    "target": "frontend_src_api_client_api",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/api/client.ts",
+    "source_location": "L2",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_api_client",
+    "target": "frontend_src_api_client_joinpath",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/api/client.ts",
+    "source_location": "L12",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_api_index",
+    "target": "frontend_src_api_client",
+    "relation": "imports_from",
+    "context": "re-export",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/api/index.ts",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_api_index",
+    "target": "frontend_src_api_client_api",
+    "relation": "re_exports",
+    "context": "re-export",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/api/index.ts",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_api_index",
+    "target": "frontend_src_api_index_base",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/api/index.ts",
+    "source_location": "L3",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_components_card",
+    "target": "frontend_src_api_client",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/components/Card.tsx",
+    "source_location": "L2",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_components_card",
+    "target": "frontend_src_api_client_joinpath",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/components/Card.tsx",
+    "source_location": "L2",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_components_card",
+    "target": "frontend_src_components_card_card",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/components/Card.tsx",
+    "source_location": "L4",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_components_card",
+    "target": "frontend_src_components_card_helper",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/components/Card.tsx",
+    "source_location": "L11",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_components_card",
+    "target": "frontend_src_components_card_box",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/components/Card.tsx",
+    "source_location": "L14",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_components_card_box",
+    "target": "frontend_src_components_card_box_open",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/components/Card.tsx",
+    "source_location": "L15",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_components_card_box_open",
+    "target": "frontend_src_components_card_helper",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/components/Card.tsx",
+    "source_location": "L16",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_lib_math",
+    "target": "frontend_src_lib_math_add",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/lib/math.js",
+    "source_location": "L2",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_lib_math",
+    "target": "frontend_src_lib_math_calc",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/lib/math.js",
+    "source_location": "L6",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_lib_math_calc",
+    "target": "frontend_src_lib_math_calc_sum",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/lib/math.js",
+    "source_location": "L7",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_lib_math",
+    "target": "frontend_src_lib_math_twice",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/lib/math.js",
+    "source_location": "L12",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_lib_math_calc_sum",
+    "target": "frontend_src_lib_math_add",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/lib/math.js",
+    "source_location": "L8",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_lib_math_twice",
+    "target": "frontend_src_lib_math_add",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/lib/math.js",
+    "source_location": "L13",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_pages_thingpage",
+    "target": "frontend_src_api_index",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/pages/ThingPage.tsx",
+    "source_location": "L4",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_pages_thingpage",
+    "target": "frontend_src_api_client",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/pages/ThingPage.tsx",
+    "source_location": "L5",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_pages_thingpage",
+    "target": "frontend_src_api_client_api",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/pages/ThingPage.tsx",
+    "source_location": "L5",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_pages_thingpage",
+    "target": "frontend_src_components_card",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/pages/ThingPage.tsx",
+    "source_location": "L6",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_pages_thingpage",
+    "target": "ref_react",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/pages/ThingPage.tsx",
+    "source_location": "L7",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_pages_thingpage",
+    "target": "frontend_src_pages_thingpage_thingpage",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/pages/ThingPage.tsx",
+    "source_location": "L9",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_pages_thingpage",
+    "target": "frontend_src_pages_thingpage_inner",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/pages/ThingPage.tsx",
+    "source_location": "L24",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_pages_thingpage_thingpage",
+    "target": "frontend_src_pages_thingpage_inner",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/pages/ThingPage.tsx",
+    "source_location": "L19",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_lib",
+    "target": "thingservice",
+    "relation": "imports_from",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/lib.rs",
+    "source_location": "L7",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_lib",
+    "target": "local_crates_thing_src_lib_top",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/lib.rs",
+    "source_location": "L10",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_repo",
+    "target": "local_crates_thing_src_repo_repo",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/repo.rs",
+    "source_location": "L3",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_repo_repo",
+    "target": "vec",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/repo.rs",
+    "source_location": "L4",
+    "weight": 1.0,
+    "context": "field",
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_repo_repo",
+    "target": "string",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/repo.rs",
+    "source_location": "L4",
+    "weight": 1.0,
+    "context": "generic_arg",
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_repo_repo",
+    "target": "local_crates_thing_src_repo_repo_new",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/repo.rs",
+    "source_location": "L8",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_repo_repo_new",
+    "target": "local_crates_thing_src_repo_repo",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/repo.rs",
+    "source_location": "L8",
+    "weight": 1.0,
+    "context": "return_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_repo_repo",
+    "target": "local_crates_thing_src_repo_repo_find",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/repo.rs",
+    "source_location": "L12",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_repo_repo_find",
+    "target": "local_crates_thing_src_repo_rs_option",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/repo.rs",
+    "source_location": "L12",
+    "weight": 1.0,
+    "context": "return_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_repo_repo_find",
+    "target": "string",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/repo.rs",
+    "source_location": "L12",
+    "weight": 1.0,
+    "context": "generic_arg",
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service",
+    "target": "arc",
+    "relation": "imports_from",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L3",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service",
+    "target": "local_crates_thing_src_repo_repo",
+    "relation": "imports_from",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L5",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service",
+    "target": "util",
+    "relation": "imports_from",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L6",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service",
+    "target": "local_crates_thing_src_service_thingservice",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L9",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_thingservice",
+    "target": "arc",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L10",
+    "weight": 1.0,
+    "context": "field",
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_thingservice",
+    "target": "local_crates_thing_src_repo_repo",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L10",
+    "weight": 1.0,
+    "context": "generic_arg",
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_thingservice",
+    "target": "local_crates_thing_src_service_rs_option",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L11",
+    "weight": 1.0,
+    "context": "field",
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_thingservice",
+    "target": "frontend_src_components_card_box",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L11",
+    "weight": 1.0,
+    "context": "generic_arg",
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service",
+    "target": "local_crates_thing_src_service_count",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L14",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_count",
+    "target": "local_crates_thing_src_service_count_count",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L15",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_thingservice",
+    "target": "local_crates_thing_src_service_thingservice_new",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L20",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_thingservice_new",
+    "target": "self",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L20",
+    "weight": 1.0,
+    "context": "return_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_thingservice",
+    "target": "local_crates_thing_src_service_thingservice_find",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L27",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_thingservice",
+    "target": "local_crates_thing_src_service_thingservice_helper",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L34",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_wrapper_t",
+    "target": "local_crates_thing_src_service_count",
+    "relation": "implements",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L39",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_wrapper_t",
+    "target": "local_crates_thing_src_service_wrapper_t_count",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L40",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_thingservice",
+    "target": "local_crates_thing_src_service_count",
+    "relation": "implements",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L45",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_thingservice",
+    "target": "local_crates_thing_src_service_thingservice_count",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L48",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service",
+    "target": "local_crates_thing_src_service_wrapper",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L53",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_wrapper",
+    "target": "t",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L53",
+    "weight": 1.0,
+    "context": "field",
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service",
+    "target": "local_crates_thing_src_service_counts",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L58",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_thingservice_find",
+    "target": "local_crates_thing_src_service_thingservice_new",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L28",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_thingservice_find",
+    "target": "local_crates_thing_src_service_thingservice_helper",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L31",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_thingservice_count",
+    "target": "local_crates_thing_src_service_thingservice_find",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L49",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_util_mod",
+    "target": "local_crates_thing_src_util_mod_width",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/util/mod.rs",
+    "source_location": "L3",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_util_mod",
+    "target": "local_crates_thing_src_util_mod_pad",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/util/mod.rs",
+    "source_location": "L7",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_util_mod_width",
+    "target": "local_crates_thing_src_util_mod_pad",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "local/crates/thing/src/util/mod.rs",
+    "source_location": "L4",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_api_index",
+    "target": "frontend_src_api_client",
+    "relation": "re_exports",
+    "context": "export",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/api/index.ts",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_pages_thingpage",
+    "target": "frontend_src_api_index_base",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/pages/ThingPage.tsx",
+    "source_location": "L4",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service",
+    "target": "backend_app_core_thing_repository_thingrepo",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L6",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service",
+    "target": "backend_app_core_util_clean",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L7",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing",
+    "target": "backend_app_core_thing_service_thingservice",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L6",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing",
+    "target": "backend_app_core_thing_service_build",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L6",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_tests_test_thing",
+    "target": "backend_app_core_thing_service_build",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/tests/test_thing.py",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing",
+    "target": "backend_app_core_util",
+    "relation": "imports_from",
+    "context": "submodule_import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L21",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_components_card_card",
+    "target": "frontend_src_api_client_joinpath",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/components/Card.tsx",
+    "source_location": "L6",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_pages_thingpage_thingpage",
+    "target": "frontend_src_api_index_base",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/pages/ThingPage.tsx",
+    "source_location": "L11",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_tests_test_thing_test_build",
+    "target": "backend_app_core_thing_service_build",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/tests/test_thing.py",
+    "source_location": "L5",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_thingservice",
+    "target": "backend_app_core_thing_repository_thingrepo",
+    "relation": "uses",
+    "confidence": "INFERRED",
+    "confidence_score": 0.95,
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L13",
+    "weight": 0.8,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing_get_thing",
+    "target": "backend_app_core_thing_service_thingservice",
+    "relation": "uses",
+    "confidence": "INFERRED",
+    "confidence_score": 0.95,
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L12",
+    "weight": 0.8,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_thingservice_init",
+    "target": "backend_app_core_thing_repository_thingrepo",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L13",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_thingservice_rename",
+    "target": "backend_app_core_thing_repository_thingrepo",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L32",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing_create_thing",
+    "target": "backend_app_core_thing_service_build",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L20",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "local_crates_thing_src_service_thingservice_find",
+    "target": "local_crates_thing_src_util_mod_pad",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "INFERRED",
+    "confidence_score": 0.85,
+    "source_file": "local/crates/thing/src/service.rs",
+    "source_location": "L30",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_thing_service_thingservice_create",
+    "target": "backend_app_core_thing_repository_thingrepo_make",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "backend/app/core/thing/service.py",
+    "source_location": "L25",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_web_routers_thing_create_thing",
+    "target": "backend_app_core_util_clean",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "backend/app/web/routers/thing.py",
+    "source_location": "L23",
+    "weight": 1.0,
+    "_origin": "ast"
+   }
+  ],
+  "directed": false
+ },
+ "reduced": {
+  "functions": [
+   {
+    "key": "backend/app/core/thing/repository.py:7",
+    "name": "__init__",
+    "qual": "ThingRepo.__init__",
+    "file": "backend/app/core/thing/repository.py",
+    "line": 7,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/thing/repository.py:10",
+    "name": "get",
+    "qual": "ThingRepo.get",
+    "file": "backend/app/core/thing/repository.py",
+    "line": 10,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/thing/repository.py:13",
+    "name": "add",
+    "qual": "ThingRepo.add",
+    "file": "backend/app/core/thing/repository.py",
+    "line": 13,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/thing/repository.py:17",
+    "name": "make",
+    "qual": "ThingRepo.make",
+    "file": "backend/app/core/thing/repository.py",
+    "line": 17,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/thing/service.py:11",
+    "name": "__init__",
+    "qual": "ThingService.__init__",
+    "file": "backend/app/core/thing/service.py",
+    "line": 11,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/thing/service.py:16",
+    "name": "get",
+    "qual": "ThingService.get",
+    "file": "backend/app/core/thing/service.py",
+    "line": 16,
+    "end": null,
+    "item": "FX-MS-001#ThingService.get",
+    "ms": "FX-MS-001#ThingService.get"
+   },
+   {
+    "key": "backend/app/core/thing/service.py:20",
+    "name": "create",
+    "qual": "ThingService.create",
+    "file": "backend/app/core/thing/service.py",
+    "line": 20,
+    "end": null,
+    "item": "FX-MS-001#ThingService.create",
+    "ms": "FX-MS-001#ThingService.create"
+   },
+   {
+    "key": "backend/app/core/thing/service.py:30",
+    "name": "rename",
+    "qual": "ThingService.rename",
+    "file": "backend/app/core/thing/service.py",
+    "line": 30,
+    "end": null,
+    "item": "FX-MS-001#ThingService.rename",
+    "ms": "FX-MS-001#ThingService.rename"
+   },
+   {
+    "key": "backend/app/core/thing/service.py:37",
+    "name": "_private",
+    "qual": "ThingService._private",
+    "file": "backend/app/core/thing/service.py",
+    "line": 37,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/thing/service.py:38",
+    "name": "inner",
+    "qual": "thing.inner",
+    "file": "backend/app/core/thing/service.py",
+    "line": 38,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/thing/service.py:44",
+    "name": "build",
+    "qual": "thing.build",
+    "file": "backend/app/core/thing/service.py",
+    "line": 44,
+    "end": null,
+    "item": "FX-MS-001#thing.build",
+    "ms": "FX-MS-001#thing.build"
+   },
+   {
+    "key": "backend/app/core/util.py:6",
+    "name": "clean",
+    "qual": "util.clean",
+    "file": "backend/app/core/util.py",
+    "line": 6,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/util.py:12",
+    "name": "audit",
+    "qual": "util.audit",
+    "file": "backend/app/core/util.py",
+    "line": 12,
+    "end": null,
+    "item": "FX-MS-002#util.audit",
+    "ms": "FX-MS-002#util.audit"
+   },
+   {
+    "key": "backend/app/core/util.py:17",
+    "name": "log",
+    "qual": "util.log",
+    "file": "backend/app/core/util.py",
+    "line": 17,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/util.py:22",
+    "name": "typed",
+    "qual": "util.typed",
+    "file": "backend/app/core/util.py",
+    "line": 22,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/web/routers/thing.py:12",
+    "name": "get_thing",
+    "qual": "thing.get_thing",
+    "file": "backend/app/web/routers/thing.py",
+    "line": 12,
+    "end": null,
+    "item": "FX-API-001#GET/api/things/{thingId}",
+    "ms": null
+   },
+   {
+    "key": "backend/app/web/routers/thing.py:18",
+    "name": "create_thing",
+    "qual": "thing.create_thing",
+    "file": "backend/app/web/routers/thing.py",
+    "line": 18,
+    "end": null,
+    "item": "FX-API-001#POST/api/things",
+    "ms": null
+   },
+   {
+    "key": "frontend/src/api/client.ts:12",
+    "name": "joinPath",
+    "qual": "client.joinPath",
+    "file": "frontend/src/api/client.ts",
+    "line": 12,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/api/index.ts:3",
+    "name": "base",
+    "qual": "api.base",
+    "file": "frontend/src/api/index.ts",
+    "line": 3,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/components/Card.tsx:4",
+    "name": "Card",
+    "qual": "Card.Card",
+    "file": "frontend/src/components/Card.tsx",
+    "line": 4,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/components/Card.tsx:11",
+    "name": "helper",
+    "qual": "Card.helper",
+    "file": "frontend/src/components/Card.tsx",
+    "line": 11,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/components/Card.tsx:15",
+    "name": "open",
+    "qual": "Box.open",
+    "file": "frontend/src/components/Card.tsx",
+    "line": 15,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/lib/math.js:2",
+    "name": "add",
+    "qual": "math.add",
+    "file": "frontend/src/lib/math.js",
+    "line": 2,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/lib/math.js:7",
+    "name": "sum",
+    "qual": "Calc.sum",
+    "file": "frontend/src/lib/math.js",
+    "line": 7,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/lib/math.js:12",
+    "name": "twice",
+    "qual": "math.twice",
+    "file": "frontend/src/lib/math.js",
+    "line": 12,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/pages/ThingPage.tsx:9",
+    "name": "ThingPage",
+    "qual": "ThingPage.ThingPage",
+    "file": "frontend/src/pages/ThingPage.tsx",
+    "line": 9,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/pages/ThingPage.tsx:24",
+    "name": "Inner",
+    "qual": "ThingPage.Inner",
+    "file": "frontend/src/pages/ThingPage.tsx",
+    "line": 24,
+    "end": null,
+    "item": null,
+    "ms": null
+   }
+  ],
+  "calls": [
+   [
+    "backend/app/core/thing/service.py:20",
+    "backend/app/core/thing/service.py:16",
+    "graphify"
+   ],
+   [
+    "backend/app/core/thing/service.py:37",
+    "backend/app/core/thing/service.py:38",
+    "graphify"
+   ],
+   [
+    "backend/app/core/util.py:12",
+    "backend/app/core/util.py:17",
+    "graphify"
+   ],
+   [
+    "frontend/src/components/Card.tsx:15",
+    "frontend/src/components/Card.tsx:11",
+    "graphify"
+   ],
+   [
+    "frontend/src/lib/math.js:7",
+    "frontend/src/lib/math.js:2",
+    "graphify"
+   ],
+   [
+    "frontend/src/lib/math.js:12",
+    "frontend/src/lib/math.js:2",
+    "graphify"
+   ],
+   [
+    "frontend/src/pages/ThingPage.tsx:9",
+    "frontend/src/pages/ThingPage.tsx:24",
+    "graphify"
+   ],
+   [
+    "frontend/src/components/Card.tsx:4",
+    "frontend/src/api/client.ts:12",
+    "graphify"
+   ],
+   [
+    "frontend/src/pages/ThingPage.tsx:9",
+    "frontend/src/api/index.ts:3",
+    "graphify"
+   ],
+   [
+    "backend/app/web/routers/thing.py:18",
+    "backend/app/core/thing/service.py:44",
+    "graphify"
+   ],
+   [
+    "backend/app/core/thing/service.py:20",
+    "backend/app/core/thing/repository.py:17",
+    "graphify"
+   ],
+   [
+    "backend/app/web/routers/thing.py:18",
+    "backend/app/core/util.py:6",
+    "graphify"
+   ]
+  ],
+  "files": [
+   "backend/app/__init__.py",
+   "backend/app/core/__init__.py",
+   "backend/app/core/thing/__init__.py",
+   "backend/app/core/thing/repository.py",
+   "backend/app/core/thing/service.py",
+   "backend/app/core/util.py",
+   "backend/app/web/__init__.py",
+   "backend/app/web/routers/__init__.py",
+   "backend/app/web/routers/thing.py",
+   "frontend/src/api/client.ts",
+   "frontend/src/api/index.ts",
+   "frontend/src/components/Card.tsx",
+   "frontend/src/lib/math.js",
+   "frontend/src/pages/ThingPage.tsx",
+   "local/crates/thing/src/lib.rs",
+   "local/crates/thing/src/repo.rs",
+   "local/crates/thing/src/service.rs",
+   "local/crates/thing/src/util/mod.rs"
+  ]
+ },
+ "enriched": {
+  "functions": [
+   {
+    "key": "backend/app/core/thing/repository.py:7",
+    "name": "__init__",
+    "qual": "ThingRepo.__init__",
+    "file": "backend/app/core/thing/repository.py",
+    "line": 7,
+    "end": 8,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/thing/repository.py:10",
+    "name": "get",
+    "qual": "ThingRepo.get",
+    "file": "backend/app/core/thing/repository.py",
+    "line": 10,
+    "end": 11,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/thing/repository.py:13",
+    "name": "add",
+    "qual": "ThingRepo.add",
+    "file": "backend/app/core/thing/repository.py",
+    "line": 13,
+    "end": 14,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/thing/repository.py:17",
+    "name": "make",
+    "qual": "ThingRepo.make",
+    "file": "backend/app/core/thing/repository.py",
+    "line": 17,
+    "end": 18,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/thing/service.py:11",
+    "name": "__init__",
+    "qual": "ThingService.__init__",
+    "file": "backend/app/core/thing/service.py",
+    "line": 11,
+    "end": 14,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/thing/service.py:16",
+    "name": "get",
+    "qual": "ThingService.get",
+    "file": "backend/app/core/thing/service.py",
+    "line": 16,
+    "end": 18,
+    "item": "FX-MS-001#ThingService.get",
+    "ms": "FX-MS-001#ThingService.get"
+   },
+   {
+    "key": "backend/app/core/thing/service.py:20",
+    "name": "create",
+    "qual": "ThingService.create",
+    "file": "backend/app/core/thing/service.py",
+    "line": 20,
+    "end": 28,
+    "item": "FX-MS-001#ThingService.create",
+    "ms": "FX-MS-001#ThingService.create"
+   },
+   {
+    "key": "backend/app/core/thing/service.py:30",
+    "name": "rename",
+    "qual": "ThingService.rename",
+    "file": "backend/app/core/thing/service.py",
+    "line": 30,
+    "end": 35,
+    "item": "FX-MS-001#ThingService.rename",
+    "ms": "FX-MS-001#ThingService.rename"
+   },
+   {
+    "key": "backend/app/core/thing/service.py:37",
+    "name": "_private",
+    "qual": "ThingService._private",
+    "file": "backend/app/core/thing/service.py",
+    "line": 37,
+    "end": 41,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/thing/service.py:38",
+    "name": "inner",
+    "qual": "thing.inner",
+    "file": "backend/app/core/thing/service.py",
+    "line": 38,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/thing/service.py:44",
+    "name": "build",
+    "qual": "thing.build",
+    "file": "backend/app/core/thing/service.py",
+    "line": 44,
+    "end": 48,
+    "item": "FX-MS-001#thing.build",
+    "ms": "FX-MS-001#thing.build"
+   },
+   {
+    "key": "backend/app/core/util.py:6",
+    "name": "clean",
+    "qual": "util.clean",
+    "file": "backend/app/core/util.py",
+    "line": 6,
+    "end": 8,
+    "item": "FX-MS-002#util.clean",
+    "ms": "FX-MS-002#util.clean"
+   },
+   {
+    "key": "backend/app/core/util.py:12",
+    "name": "audit",
+    "qual": "util.audit",
+    "file": "backend/app/core/util.py",
+    "line": 12,
+    "end": 14,
+    "item": "FX-MS-002#util.audit",
+    "ms": "FX-MS-002#util.audit"
+   },
+   {
+    "key": "backend/app/core/util.py:17",
+    "name": "log",
+    "qual": "util.log",
+    "file": "backend/app/core/util.py",
+    "line": 17,
+    "end": 18,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/core/util.py:22",
+    "name": "typed",
+    "qual": "util.typed",
+    "file": "backend/app/core/util.py",
+    "line": 22,
+    "end": 26,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "backend/app/web/routers/thing.py:12",
+    "name": "get_thing",
+    "qual": "thing.get_thing",
+    "file": "backend/app/web/routers/thing.py",
+    "line": 12,
+    "end": 14,
+    "item": "FX-API-001#GET/api/things/{thingId}",
+    "ms": null
+   },
+   {
+    "key": "backend/app/web/routers/thing.py:18",
+    "name": "create_thing",
+    "qual": "thing.create_thing",
+    "file": "backend/app/web/routers/thing.py",
+    "line": 18,
+    "end": 24,
+    "item": "FX-API-001#POST/api/things",
+    "ms": null
+   },
+   {
+    "key": "frontend/src/api/client.ts:12",
+    "name": "joinPath",
+    "qual": "client.joinPath",
+    "file": "frontend/src/api/client.ts",
+    "line": 12,
+    "end": 14,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/api/index.ts:3",
+    "name": "base",
+    "qual": "api.base",
+    "file": "frontend/src/api/index.ts",
+    "line": 3,
+    "end": 5,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/components/Card.tsx:4",
+    "name": "Card",
+    "qual": "Card.Card",
+    "file": "frontend/src/components/Card.tsx",
+    "line": 4,
+    "end": 9,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/components/Card.tsx:11",
+    "name": "helper",
+    "qual": "Card.helper",
+    "file": "frontend/src/components/Card.tsx",
+    "line": 11,
+    "end": 12,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/components/Card.tsx:15",
+    "name": "open",
+    "qual": "Box.open",
+    "file": "frontend/src/components/Card.tsx",
+    "line": 15,
+    "end": 17,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/lib/math.js:2",
+    "name": "add",
+    "qual": "math.add",
+    "file": "frontend/src/lib/math.js",
+    "line": 2,
+    "end": 4,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/lib/math.js:7",
+    "name": "sum",
+    "qual": "Calc.sum",
+    "file": "frontend/src/lib/math.js",
+    "line": 7,
+    "end": 9,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/lib/math.js:12",
+    "name": "twice",
+    "qual": "math.twice",
+    "file": "frontend/src/lib/math.js",
+    "line": 12,
+    "end": 14,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/pages/ThingPage.tsx:9",
+    "name": "ThingPage",
+    "qual": "ThingPage.ThingPage",
+    "file": "frontend/src/pages/ThingPage.tsx",
+    "line": 9,
+    "end": 22,
+    "item": "FX-UI-001#UI-3",
+    "ms": null
+   },
+   {
+    "key": "frontend/src/pages/ThingPage.tsx:24",
+    "name": "Inner",
+    "qual": "ThingPage.Inner",
+    "file": "frontend/src/pages/ThingPage.tsx",
+    "line": 24,
+    "end": 26,
+    "item": "FX-UI-001#UI-3",
+    "ms": null
+   },
+   {
+    "key": "frontend/src/api/client.ts:3",
+    "name": "get",
+    "qual": "api.get",
+    "file": "frontend/src/api/client.ts",
+    "line": 3,
+    "end": 3,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/api/client.ts:4",
+    "name": "post",
+    "qual": "api.post",
+    "file": "frontend/src/api/client.ts",
+    "line": 4,
+    "end": 6,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "frontend/src/api/client.ts:7",
+    "name": "del",
+    "qual": "api.del",
+    "file": "frontend/src/api/client.ts",
+    "line": 7,
+    "end": 9,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "local/crates/thing/src/lib.rs:10",
+    "name": "top",
+    "qual": "thing.top",
+    "file": "local/crates/thing/src/lib.rs",
+    "line": 10,
+    "end": 13,
+    "item": "FX-MS-003#thing.top",
+    "ms": "FX-MS-003#thing.top"
+   },
+   {
+    "key": "local/crates/thing/src/repo.rs:8",
+    "name": "new",
+    "qual": "Repo.new",
+    "file": "local/crates/thing/src/repo.rs",
+    "line": 8,
+    "end": 10,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "local/crates/thing/src/repo.rs:12",
+    "name": "find",
+    "qual": "Repo.find",
+    "file": "local/crates/thing/src/repo.rs",
+    "line": 12,
+    "end": 14,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "local/crates/thing/src/service.rs:20",
+    "name": "new",
+    "qual": "ThingService.new",
+    "file": "local/crates/thing/src/service.rs",
+    "line": 20,
+    "end": 22,
+    "item": "FX-MS-003#ThingService.new",
+    "ms": "FX-MS-003#ThingService.new"
+   },
+   {
+    "key": "local/crates/thing/src/service.rs:27",
+    "name": "find",
+    "qual": "ThingService.find",
+    "file": "local/crates/thing/src/service.rs",
+    "line": 27,
+    "end": 32,
+    "item": "FX-MS-003#ThingService.find",
+    "ms": "FX-MS-003#ThingService.find"
+   },
+   {
+    "key": "local/crates/thing/src/service.rs:34",
+    "name": "helper",
+    "qual": "ThingService.helper",
+    "file": "local/crates/thing/src/service.rs",
+    "line": 34,
+    "end": 36,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "local/crates/thing/src/service.rs:40",
+    "name": "count",
+    "qual": "Wrapper.count",
+    "file": "local/crates/thing/src/service.rs",
+    "line": 40,
+    "end": 42,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "local/crates/thing/src/service.rs:48",
+    "name": "count",
+    "qual": "ThingService.count",
+    "file": "local/crates/thing/src/service.rs",
+    "line": 48,
+    "end": 50,
+    "item": "FX-MS-003#ThingService.count",
+    "ms": "FX-MS-003#ThingService.count"
+   },
+   {
+    "key": "local/crates/thing/src/util/mod.rs:3",
+    "name": "width",
+    "qual": "util.width",
+    "file": "local/crates/thing/src/util/mod.rs",
+    "line": 3,
+    "end": 5,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "local/crates/thing/src/util/mod.rs:7",
+    "name": "pad",
+    "qual": "util.pad",
+    "file": "local/crates/thing/src/util/mod.rs",
+    "line": 7,
+    "end": 9,
+    "item": null,
+    "ms": null
+   }
+  ],
+  "calls": [
+   [
+    "backend/app/core/thing/service.py:20",
+    "backend/app/core/thing/service.py:16",
+    "graphify"
+   ],
+   [
+    "backend/app/core/thing/service.py:37",
+    "backend/app/core/thing/service.py:38",
+    "graphify"
+   ],
+   [
+    "backend/app/core/util.py:12",
+    "backend/app/core/util.py:17",
+    "graphify"
+   ],
+   [
+    "frontend/src/components/Card.tsx:15",
+    "frontend/src/components/Card.tsx:11",
+    "graphify"
+   ],
+   [
+    "frontend/src/lib/math.js:7",
+    "frontend/src/lib/math.js:2",
+    "graphify"
+   ],
+   [
+    "frontend/src/lib/math.js:12",
+    "frontend/src/lib/math.js:2",
+    "graphify"
+   ],
+   [
+    "frontend/src/pages/ThingPage.tsx:9",
+    "frontend/src/pages/ThingPage.tsx:24",
+    "graphify"
+   ],
+   [
+    "frontend/src/components/Card.tsx:4",
+    "frontend/src/api/client.ts:12",
+    "graphify"
+   ],
+   [
+    "frontend/src/pages/ThingPage.tsx:9",
+    "frontend/src/api/index.ts:3",
+    "graphify"
+   ],
+   [
+    "backend/app/web/routers/thing.py:18",
+    "backend/app/core/thing/service.py:44",
+    "graphify"
+   ],
+   [
+    "backend/app/core/thing/service.py:20",
+    "backend/app/core/thing/repository.py:17",
+    "graphify"
+   ],
+   [
+    "backend/app/web/routers/thing.py:18",
+    "backend/app/core/util.py:6",
+    "graphify"
+   ],
+   [
+    "frontend/src/pages/ThingPage.tsx:9",
+    "frontend/src/api/client.ts:3",
+    "enrich"
+   ],
+   [
+    "frontend/src/pages/ThingPage.tsx:24",
+    "frontend/src/api/client.ts:4",
+    "enrich"
+   ],
+   [
+    "local/crates/thing/src/lib.rs:10",
+    "local/crates/thing/src/service.rs:20",
+    "enrich"
+   ],
+   [
+    "local/crates/thing/src/lib.rs:10",
+    "local/crates/thing/src/service.rs:48",
+    "enrich"
+   ],
+   [
+    "local/crates/thing/src/lib.rs:10",
+    "local/crates/thing/src/util/mod.rs:3",
+    "enrich"
+   ],
+   [
+    "local/crates/thing/src/service.rs:20",
+    "local/crates/thing/src/repo.rs:8",
+    "enrich"
+   ],
+   [
+    "local/crates/thing/src/service.rs:27",
+    "local/crates/thing/src/repo.rs:12",
+    "enrich"
+   ],
+   [
+    "local/crates/thing/src/service.rs:27",
+    "local/crates/thing/src/repo.rs:8",
+    "enrich"
+   ],
+   [
+    "local/crates/thing/src/service.rs:27",
+    "local/crates/thing/src/service.rs:34",
+    "enrich"
+   ],
+   [
+    "local/crates/thing/src/service.rs:27",
+    "local/crates/thing/src/util/mod.rs:3",
+    "enrich"
+   ],
+   [
+    "local/crates/thing/src/service.rs:27",
+    "local/crates/thing/src/util/mod.rs:7",
+    "enrich"
+   ],
+   [
+    "local/crates/thing/src/service.rs:48",
+    "local/crates/thing/src/service.rs:27",
+    "enrich"
+   ],
+   [
+    "local/crates/thing/src/util/mod.rs:3",
+    "local/crates/thing/src/util/mod.rs:7",
+    "enrich"
+   ],
+   [
+    "backend/app/core/thing/service.py:16",
+    "backend/app/core/thing/repository.py:10",
+    "enrich"
+   ],
+   [
+    "backend/app/core/thing/service.py:20",
+    "backend/app/core/thing/repository.py:13",
+    "enrich"
+   ],
+   [
+    "backend/app/core/thing/service.py:20",
+    "backend/app/core/util.py:12",
+    "enrich"
+   ],
+   [
+    "backend/app/core/thing/service.py:20",
+    "backend/app/core/util.py:6",
+    "enrich"
+   ],
+   [
+    "backend/app/core/thing/service.py:30",
+    "backend/app/core/thing/repository.py:10",
+    "enrich"
+   ],
+   [
+    "backend/app/core/thing/service.py:30",
+    "backend/app/core/thing/repository.py:13",
+    "enrich"
+   ],
+   [
+    "backend/app/core/thing/service.py:44",
+    "backend/app/core/thing/service.py:16",
+    "enrich"
+   ],
+   [
+    "backend/app/core/util.py:22",
+    "backend/app/core/thing/repository.py:10",
+    "enrich"
+   ],
+   [
+    "backend/app/web/routers/thing.py:12",
+    "backend/app/core/thing/service.py:16",
+    "enrich"
+   ]
+  ]
+ }
+}
