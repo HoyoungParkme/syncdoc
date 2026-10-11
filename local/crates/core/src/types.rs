@@ -761,3 +761,11 @@ pub struct UploadResult {
     pub files: i64,
     pub deleted: i64,
 }
+
+/// 저장 방식을 옮긴 결과 (API-001 `MoveResult`) — 싱크독_로컬은 서버 저장뿐이라 옮기는 갈래가 없다(늘 거절)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MoveResult {
+    pub origin: String,
+    pub head: String,
+    pub hook: HookStatus,
+}

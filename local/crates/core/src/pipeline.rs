@@ -26,7 +26,7 @@ use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
 use crate::spec::repo as spec_repo;
 use crate::types::{
-    Author, AuthorKind, ChangedFile, DeletedItem, DocStatus, DocType, Document, Entry,
+    Author, AuthorKind, ChangedFile, DeletedItem, DocStatus, DocType, Document, Entry, MoveResult,
     RebuildError, RebuildResult, RefEdge, SaveResult, Storage, TrashResult, UploadResult,
     ValidateResult, Violation, py_isoformat, spec_dir, stage_of,
 };
@@ -1410,6 +1410,25 @@ pub async fn upload_code(
         commit,
         files: files.len() as i64,
         deleted: delete.len() as i64,
+    })
+}
+
+/// SYNC-MS-017#pipeline.move_to_server
+///
+/// 서버 저장뿐이라 파이썬 판 1에서 늘 멈춘다 — 옮기는 갈래(복제·통지 거두기·원격 바꾸기)가 없다
+pub async fn move_to_server(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+) -> Result<MoveResult, Problem> {
+    let mut c = pool.acquire().await?;
+    let (_, repo) = ProjectService { db: &mut c, repos }
+        .get_owned(code, user)
+        .await?;
+    Err(Problem::StorageMismatch {
+        storage: repo.storage,
+        detail: Some("이미 서버 저장이다".to_string()),
     })
 }
 
