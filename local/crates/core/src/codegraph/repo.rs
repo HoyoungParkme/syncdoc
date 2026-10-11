@@ -103,3 +103,12 @@ pub async fn put_error(
     .await?;
     row(raw)
 }
+
+/// 프로젝트의 행을 지운다
+pub async fn delete_by_project(db: &mut PgConnection, project_id: i32) -> Result<(), Problem> {
+    sqlx::query("DELETE FROM code_graphs WHERE project_id = $1")
+        .bind(project_id)
+        .execute(db)
+        .await?;
+    Ok(())
+}

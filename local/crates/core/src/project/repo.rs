@@ -21,6 +21,16 @@ async fn repository_of(
     .await
 }
 
+/// id로 — 프로젝트 행만(파이썬 `session.get(Project, id)`)
+pub async fn by_id(db: &mut PgConnection, id: i32) -> Result<Option<ProjectRow>, sqlx::Error> {
+    sqlx::query_as::<_, ProjectRow>(AssertSqlSafe(format!(
+        "SELECT {PROJECT} FROM projects WHERE id = $1"
+    )))
+    .bind(id)
+    .fetch_optional(db)
+    .await
+}
+
 /// 코드로 — 저장소 행까지. 저장소가 없는 프로젝트는 없는 것과 같다
 pub async fn by_code(
     db: &mut PgConnection,
@@ -130,10 +140,9 @@ pub async fn set_last_processed(
 }
 
 /// 프로젝트에 딸린 행을 자식부터 지운다 (MS-013 delete_project 2) — 대화(턴·첨부는 FK로)·코드 그래프부터
+/// 명세 표·저장소·프로젝트 행 — 대화·코드 그래프는 그 서비스가 먼저 지웠다
 pub async fn delete_all_of(db: &mut PgConnection, project_id: i32) -> Result<(), sqlx::Error> {
     for stmt in [
-        "DELETE FROM conversations WHERE project_id = $1",
-        "DELETE FROM code_graphs WHERE project_id = $1",
         r#"DELETE FROM "references" WHERE from_document_id IN (SELECT id FROM documents WHERE project_id = $1)"#,
         r#"DELETE FROM "references" WHERE to_document_id IN (SELECT id FROM documents WHERE project_id = $1)"#,
         r#"DELETE FROM "references" WHERE to_item_id IN (SELECT id FROM items WHERE document_id IN (SELECT id FROM documents WHERE project_id = $1))"#,

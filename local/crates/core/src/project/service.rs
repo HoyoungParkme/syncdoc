@@ -13,6 +13,8 @@ use super::model::{ProjectRow, RepositoryRow};
 use super::repo;
 use crate::account::model::UserRow;
 use crate::clock;
+use crate::codegraph::CodeGraphService;
+use crate::conversation::ConversationService;
 use crate::errors::Problem;
 use crate::infra::git::Git;
 use crate::pycompat::chars::strip;
@@ -296,6 +298,15 @@ impl ProjectService<'_> {
         let workdir = PathBuf::from(&repository.workdir_path);
         let origin = PathBuf::from(&repository.remote_url);
         let server = repository.storage == Storage::Server.as_str();
+        ConversationService {
+            db: &mut *self.db,
+            repos: self.repos,
+        }
+        .delete_by_project(project.id)
+        .await?;
+        CodeGraphService { db: &mut *self.db }
+            .delete_by_project(project.id)
+            .await?;
         repo::delete_all_of(&mut *self.db, project.id).await?;
         let _ = fs::remove_dir_all(&workdir);
         // 서버 저장이면 원본을 지우지 않고 보관한다 — 같은 코드로 가져오면 되살아난다(L11)
