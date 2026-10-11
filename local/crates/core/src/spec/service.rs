@@ -1469,4 +1469,41 @@ impl SpecService<'_> {
         repo::set_status_body(&mut *self.db, row.id, &to, new_body).await?;
         Ok(())
     }
+
+    /// SYNC-MS-014#SpecService.trash
+    ///
+    /// 항목을 전부 지운 것으로 · 상태 변경 행(사유 「휴지통」 — 이 커밋이 되살릴 때의 열쇠) · 초안·휴지통 표시
+    pub async fn trash(
+        &mut self,
+        document: &Document,
+        commit_hash: &str,
+        author: &Author,
+    ) -> Result<Vec<i32>, Problem> {
+        let row = repo::document_by_id(&mut *self.db, document.summary.id)
+            .await?
+            .ok_or_else(|| Problem::Internal {
+                log: format!("휴지통에 넣을 문서 {}가 없다", document.summary.doc_id),
+            })?;
+        let mut pks = Vec::new();
+        for item in repo::items_of(&mut *self.db, row.id, false).await? {
+            repo::mark_item_deleted(&mut *self.db, item.id, clock::now()).await?;
+            pks.push(item.id);
+        }
+        repo::insert_status_change(
+            &mut *self.db,
+            &repo::NewStatusChange {
+                document_id: row.id,
+                from_status: Some(&row.status),
+                to_status: "draft",
+                changed_by_user_id: author.user.id,
+                via: fold_via(author.via),
+                reason: Some("휴지통"),
+                commit_hash: Some(commit_hash),
+                changed_at: clock::now(),
+            },
+        )
+        .await?;
+        repo::set_trashed(&mut *self.db, row.id, clock::now(), author.user.id).await?;
+        Ok(pks)
+    }
 }
