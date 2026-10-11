@@ -1263,4 +1263,25 @@ impl SpecService<'_> {
         }
         Ok(item.id)
     }
+
+    /// SYNC-MS-014#SpecService.resolve_items
+    ///
+    /// 받은 차례가 아니라 id 차례다(파이썬과 같다). 없는 것·지운 것은 빠진다
+    pub async fn resolve_items(
+        &mut self,
+        doc_id: &str,
+        item_ids: &[String],
+    ) -> Result<Vec<i32>, Problem> {
+        let Some(row) = repo::document_by_doc_id(&mut *self.db, doc_id).await? else {
+            return Ok(Vec::new());
+        };
+        if item_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        Ok(repo::items_by_item_ids(&mut *self.db, row.id, item_ids)
+            .await?
+            .into_iter()
+            .map(|i| i.id)
+            .collect())
+    }
 }

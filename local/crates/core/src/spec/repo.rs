@@ -5,11 +5,30 @@ use std::collections::HashMap;
 use sqlx::PgConnection;
 use time::OffsetDateTime;
 
-use super::model::{DocumentRow, ItemRow, VersionRow};
+use super::model::{DocumentRow, ItemRow, StatusChangeRow, VersionRow};
 
 const ITEM_COLUMNS: &str = "id, document_id, item_id, display_name, is_deleted, deleted_at";
 const VERSION_COLUMNS: &str = "id, document_id, version_no, commit_hash, body, author_kind, \
      author_user_id, instructed_by_user_id, via, message, created_at";
+
+const STATUS_CHANGE_COLUMNS: &str = "id, document_id, from_status, to_status, changed_by_user_id, reason, \
+     commit_hash, changed_at, via";
+
+/// 판 행 + 그 문서의 ID
+#[derive(Debug, sqlx::FromRow)]
+pub struct VersionDocRow {
+    #[sqlx(flatten)]
+    pub version: VersionRow,
+    pub doc_id: String,
+}
+
+/// 상태 변경 행 + 그 문서의 ID
+#[derive(Debug, sqlx::FromRow)]
+pub struct StatusChangeDocRow {
+    #[sqlx(flatten)]
+    pub change: StatusChangeRow,
+    pub doc_id: String,
+}
 
 /// 항목 행 + 그 문서의 ID
 #[derive(Debug, sqlx::FromRow)]
@@ -380,4 +399,96 @@ pub async fn insert_status_change(
     .execute(db)
     .await?;
     Ok(())
+}
+
+/// 문서의 항목 가운데 그 ID들 — 지운 것은 빼고 id 차례
+pub async fn items_by_item_ids(
+    db: &mut PgConnection,
+    document_id: i32,
+    item_ids: &[String],
+) -> Result<Vec<ItemRow>, sqlx::Error> {
+    sqlx::query_as::<_, ItemRow>(sqlx::AssertSqlSafe(format!(
+        "SELECT {ITEM_COLUMNS} FROM items WHERE document_id = $1 AND item_id = ANY($2) AND NOT is_deleted ORDER BY id"
+    )))
+    .bind(document_id)
+    .bind(item_ids)
+    .fetch_all(db)
+    .await
+}
+
+/// 문서의 판 — 새 것부터
+pub async fn versions_of(
+    db: &mut PgConnection,
+    document_id: i32,
+) -> Result<Vec<VersionRow>, sqlx::Error> {
+    sqlx::query_as::<_, VersionRow>(sqlx::AssertSqlSafe(format!(
+        "SELECT {VERSION_COLUMNS} FROM versions WHERE document_id = $1 ORDER BY version_no DESC"
+    )))
+    .bind(document_id)
+    .fetch_all(db)
+    .await
+}
+
+/// 문서의 커밋 있는 상태 변경 — 새 것부터
+pub async fn status_changes_with_commit(
+    db: &mut PgConnection,
+    document_id: i32,
+) -> Result<Vec<StatusChangeRow>, sqlx::Error> {
+    sqlx::query_as::<_, StatusChangeRow>(sqlx::AssertSqlSafe(format!(
+        "SELECT {STATUS_CHANGE_COLUMNS} FROM status_changes WHERE document_id = $1 AND commit_hash IS NOT NULL \
+         ORDER BY changed_at DESC"
+    )))
+    .bind(document_id)
+    .fetch_all(db)
+    .await
+}
+
+/// 프로젝트의 최근 판 n개 — 휴지통 문서 것도
+pub async fn recent_versions(
+    db: &mut PgConnection,
+    project_id: i32,
+    n: i64,
+) -> Result<Vec<VersionDocRow>, sqlx::Error> {
+    sqlx::query_as::<_, VersionDocRow>(
+        "SELECT v.id, v.document_id, v.version_no, v.commit_hash, v.body, v.author_kind, v.author_user_id, \
+         v.instructed_by_user_id, v.via, v.message, v.created_at, d.doc_id FROM versions v \
+         JOIN documents d ON d.id = v.document_id WHERE d.project_id = $1 \
+         ORDER BY v.created_at DESC, v.id DESC LIMIT $2",
+    )
+    .bind(project_id)
+    .bind(n)
+    .fetch_all(db)
+    .await
+}
+
+/// 프로젝트의 최근 커밋 있는 상태 변경 n개
+pub async fn recent_status_changes(
+    db: &mut PgConnection,
+    project_id: i32,
+    n: i64,
+) -> Result<Vec<StatusChangeDocRow>, sqlx::Error> {
+    sqlx::query_as::<_, StatusChangeDocRow>(
+        "SELECT c.id, c.document_id, c.from_status, c.to_status, c.changed_by_user_id, c.reason, c.commit_hash, \
+         c.changed_at, c.via, d.doc_id FROM status_changes c JOIN documents d ON d.id = c.document_id \
+         WHERE d.project_id = $1 AND c.commit_hash IS NOT NULL ORDER BY c.changed_at DESC, c.id DESC LIMIT $2",
+    )
+    .bind(project_id)
+    .bind(n)
+    .fetch_all(db)
+    .await
+}
+
+/// 프로젝트의 지우지 않은 항목 + 문서 ID — 문서 ID·항목 id 차례
+pub async fn items_of_project(
+    db: &mut PgConnection,
+    project_id: i32,
+) -> Result<Vec<ItemDocRow>, sqlx::Error> {
+    sqlx::query_as::<_, ItemDocRow>(
+        "SELECT i.id, i.document_id, i.item_id, i.display_name, i.is_deleted, i.deleted_at, d.doc_id \
+         FROM items i JOIN documents d ON d.id = i.document_id \
+         WHERE d.project_id = $1 AND NOT i.is_deleted ORDER BY d.doc_id, i.id",
+    )
+    .bind(project_id)
+    .fetch_all(db)
+    .await
 }

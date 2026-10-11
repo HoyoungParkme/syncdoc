@@ -46,3 +46,17 @@ pub struct VersionRow {
     pub message: String,
     pub created_at: OffsetDateTime,
 }
+
+/// `status_changes` 한 행 — 상태가 바뀐 때(본문 수정의 자동 강등은 커밋이 없다)
+#[derive(Clone, Debug, sqlx::FromRow)]
+pub struct StatusChangeRow {
+    pub id: i32,
+    pub document_id: i32,
+    pub from_status: Option<String>,
+    pub to_status: String,
+    pub changed_by_user_id: i32,
+    pub reason: Option<String>,
+    pub commit_hash: Option<String>,
+    pub changed_at: OffsetDateTime,
+    pub via: String,
+}
