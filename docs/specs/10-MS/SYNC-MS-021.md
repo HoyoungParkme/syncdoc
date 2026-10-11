@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-021
 type: MS
 title: MINISPEC — ConversationService — 대화·턴·첨부 (Rust)
-status: draft
+status: approved
 upstream: [SYNC-DOM-004, SYNC-MS-010, SYNC-INFRA-001, SYNC-STD-004]
 ---
 
