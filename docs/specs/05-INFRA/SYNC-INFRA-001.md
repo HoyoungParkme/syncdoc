@@ -494,7 +494,7 @@ syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 - **켜기** — 한 번만 실행(잠금 파일) → PostgreSQL을 띄우고 이전 SQL을 올린다 → 로컬 사용자를 둔다 → 8010에 묶는다 → 밀린 커밋 따라잡기·주기 확인·하루 한 번 백업 확인을 돌린다 → 트레이. 8010을 못 쓰면 8011~8019 가운데 하나를 쓰고 알린다 — 윈도는 예약 포트 범위에 걸려 쓰던 포트가 막힐 수 있다. 바뀐 포트는 에이전트의 MCP 주소도 바꾼다
 - **두 번째 실행** — 이미 켜져 있으면 떠 있는 것을 브라우저로 열고 끝난다
 - **끄기** — 새 요청을 받지 않는다 → 쓰기 락이 풀리기를 기다린다(최대 10초) → git 자식을 끝낸다 → PostgreSQL을 멈춘다
-- **git 입구** — `git http-backend`를 쓰지 않는다. push 본문을 파일로 받아 ref 명령을 먼저 읽고, 가지 규칙([[SYNC-UC-001#UC-H21]])을 git을 부르기 전에 적용한 뒤 `git receive-pack --stateless-rpc`에 넘긴다. 받기는 `git upload-pack --stateless-rpc`다. 저장소 설정(앞당김·삭제 거부)은 파이썬 판과 같다
+- **git 입구** — `git http-backend`를 쓰지 않는다. 요청 본문을 다 받은 뒤(gzip이면 풀어) `git receive-pack --stateless-rpc`에 넘기고, 받기는 `git upload-pack --stateless-rpc`다. http-backend가 내는 머리(`Cache-Control`·`Content-Type`·`Expires`·`Pragma`)와 415 문장은 그대로 낸다. 가지 규칙([[SYNC-UC-001#UC-H21]] 3b — 되감기·지우기 거부)은 파이썬 판과 같은 저장소 설정이 지킨다(카드 L10에서 바로잡음 — 미리 ref 명령을 읽을 까닭이 없었다)
 
 ### 9.2 스택
 
