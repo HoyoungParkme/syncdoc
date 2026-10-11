@@ -170,7 +170,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | API | [[SYNC-API-001#GET/api/projects/{code}/conversations]] · [[SYNC-API-001#GET/api/conversations/{id}]] · [[SYNC-API-001#POST/api/conversations/{id}/attachments]] · [[SYNC-API-001#GET/api/attachments/{id}]] · [[SYNC-API-001#POST/api/docs/{docId}/ask]] · [[SYNC-API-001#POST/api/projects/{code}/code/ask]] |
 | 테스트 | `cargo test`(모델 스트림·단발·오류 접기를 작은 가짜 서버로 · 시험 DB — 대화·턴·첨부·종류·상한·소유 · 질문 루프 — 도구 아홉·상한·마무리·턴 닫기·답 속 링크) · 계약 L14 — 같은 가짜 모델(대본: 도구 호출 → 답, 조각 스트림)을 두 판이 불러 SSE 이벤트 바이트·대화 응답·첨부 응답이 같고 **두 판이 모델에 보낸 요청 본문도 같다** |
 | 선행 | L8 · L12 |
-| 완료 | — |
+| 완료 | 2026-10-11 · 브랜치 `card/L14-conversations`(417068f #375) · spec 6 + code 6 · `cargo test` 178(모델 스트림·단발·오류 접기를 작은 가짜 서버로 · 시험 DB — 대화·턴·첨부·종류·상한·소유·PDF 글자 · 질문 루프 — 도구·상한·마무리·턴 닫기·답 속 링크) · 계약 `--target both --with-card L14` 1083 통과 — L14 96: 같은 대본의 가짜 모델로 SSE 이벤트 바이트·대화·첨부 응답이 같고 두 판이 모델에 보낸 요청 본문도 같다 · clippy · 워크플로 녹색(리눅스·윈도) · `check_code` Rust 175/175 · `check_calls` 0 · 사람 확인(윈도 싱크독_로컬 UI-5·UI-17 묻기 탭 — 사내 모델로)은 따로 · 되먹임: 경계 없는 multipart의 제목은 starlette 문장(`Missing boundary in multipart.`) · 파이썬 판은 묻기 시작 전 실패(항목 없음 등)를 `session_scope`가 되돌려 턴이 남지 않는다 — Rust도 준비를 트랜잭션 하나로 · `check_calls`는 경로로 쓴 구조체 리터럴의 메서드를 못 따라간다(타입을 `use`하고 이름으로) · ask_tool의 「호출하는 것」에 `list_by_project`·`parse_frontmatter`를 더했다 |
 
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
