@@ -377,6 +377,23 @@ impl ProjectService<'_> {
         })
     }
 
+    /// SYNC-MS-013#ProjectService.sync_now
+    ///
+    /// 소유 검사·읽기 락·커밋 처리가 `read_pending` 안에 있다 — 두 벌 만들지 않는다
+    pub async fn sync_now(
+        &mut self,
+        pool: &PgPool,
+        code: &str,
+        user: &UserRow,
+    ) -> Result<SyncResult, Problem> {
+        let docs = crate::pipeline::read_pending(pool, self.repos, code, user).await?;
+        let (_, repo) = self.get_owned(code, user).await?; // read_pending이 다른 연결에서 적었다
+        Ok(SyncResult {
+            docs,
+            fetched_at: repo.fetched_at,
+        })
+    }
+
     /// SYNC-MS-013#ProjectService.asset_path
     ///
     /// 작업 사본 `docs/specs/` 안의 첨부 — 밖으로 나가는 경로·허용 밖 확장자·없는 파일은 전부 같은 `not-found`(file)
