@@ -233,4 +233,13 @@ impl ReferenceService<'_> {
         }
         Ok(repo::count_to_items(&mut *self.db, item_pks).await?)
     }
+
+    /// SYNC-MS-015#ReferenceService.missing_in_project
+    pub async fn missing_in_project(&mut self, project_id: i32) -> Result<Vec<RefEdge>, Problem> {
+        Ok(repo::missing_in_project(&mut *self.db, project_id, None)
+            .await?
+            .into_iter()
+            .map(edge)
+            .collect())
+    }
 }
