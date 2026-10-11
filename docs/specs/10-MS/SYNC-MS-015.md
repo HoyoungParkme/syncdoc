@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-003, SYNC-MS-017, SYNC-STD-004]
 
 서비스는 연결을 빌려 받는다 — `ReferenceService<'c> { pub db: &'c mut PgConnection }`. 트랜잭션은 부르는 쪽이 쥔다([[SYNC-STD-004#DEV-10]]).
 
-**카드 L6 몫은 미존재 참조 세기 하나다(2026-10-08)** — 프로젝트 요약([[SYNC-MS-018#queries.project_summary]])이 쓴다. **카드 L7이 뽑기·끊기·잇기와 조회 셋을 더했다(2026-10-08)** — 저장 파이프라인([[SYNC-MS-017#pipeline.save_pipeline]])과 MCP 읽기 도구가 쓴다. 나머지 조회(관계도·휴지통, L8·L9)는 그 카드가 더한다.
+**카드 L6 몫은 미존재 참조 세기 하나다(2026-10-08)** — 프로젝트 요약([[SYNC-MS-018#queries.project_summary]])이 쓴다. **카드 L7이 뽑기·끊기·잇기와 조회 셋을 더했다(2026-10-08)** — 저장 파이프라인([[SYNC-MS-017#pipeline.save_pipeline]])과 MCP 읽기 도구가 쓴다. **카드 L8이 웹 읽기의 셋을 더했다(2026-10-11)** — 관계도·추적표·diff 영향·끊어진 참조 목록. 휴지통 쪽(L9)은 그 카드가 더한다.
 
 돌려주는 간선은 `RefEdge { from_item_pk, to_item_pk, to_document_id, raw_target, is_missing, from_document_id }`([[SYNC-DOM-004]] 4.4) — 파이썬 `_edge`와 같은 꼴이다.
 
@@ -33,6 +33,9 @@ upstream: [SYNC-DOM-004, SYNC-MS-003, SYNC-MS-017, SYNC-STD-004]
 | [[#ReferenceService.resolve_missing]] | 미존재 참조 해제 |
 | [[#ReferenceService.mark_missing]] | 삭제된 항목을 가리키던 참조를 미존재로 |
 | [[#ReferenceService.count_missing_by_document]] | 문서별 미존재 참조 수 |
+| [[#ReferenceService.references_among]] | 노드 집합 사이 간선 |
+| [[#ReferenceService.count_downstream]] | 하위 건수 |
+| [[#ReferenceService.missing_in_project]] | 프로젝트의 미존재 참조 전부 |
 
 ---
 
@@ -151,6 +154,54 @@ pub async fn count_missing_by_document(&mut self, document_ids: &[i32]) -> Resul
 
 ---
 
+#### ReferenceService.references_among 노드 집합 사이 간선
+
+**시그니처**
+```rust
+pub async fn references_among(&mut self, item_pks: &[i32], include_document_targets: bool) -> Result<Vec<RefEdge>, Problem>
+```
+
+근거: [[SYNC-MS-003#ReferenceService.references_among]] · [[SYNC-SEQ-001#SEQ-14]]
+
+**처리** [[SYNC-MS-003#ReferenceService.references_among]]와 같다 — `docs = include_document_targets`면 `DB: items where id in pks`의 문서들, 아니면 없음 · 항목도 문서도 없으면 빈 목록(쿼리 없음) · `DB: references where from_item_id in pks or to_item_id in pks [or to_document_id in docs] order by id`. 미존재 포함
+
+**다른 점** 항목 pk를 집합이 아니라 조각으로 받는다 — 겹쳐도 같은 답
+
+**테스트 관점** 항목에서 나간 것·들어온 것·그 항목들의 문서를 가리킨 것 · 항목이 없으면 문서를 가리킨 것도 없다(파이썬과 같다)
+
+---
+
+#### ReferenceService.count_downstream 하위 건수
+
+**시그니처**
+```rust
+pub async fn count_downstream(&mut self, item_pks: &[i32]) -> Result<HashMap<i32, i64>, Problem>
+```
+
+근거: [[SYNC-MS-003#ReferenceService.count_downstream]]
+
+**처리** 빈 목록 → 빈 지도(쿼리 없음) · `DB: select to_item_id, count(*) from references where to_item_id in pks group by to_item_id` — 없는 키는 0으로 읽는다
+
+**테스트 관점** 하위 둘 → 2 · 없으면 키 없음
+
+---
+
+#### ReferenceService.missing_in_project 프로젝트의 미존재 참조 전부
+
+**시그니처**
+```rust
+pub async fn missing_in_project(&mut self, project_id: i32) -> Result<Vec<RefEdge>, Problem>
+```
+
+근거: [[SYNC-MS-003#ReferenceService.missing_in_project]] · [[SYNC-MS-018#queries.project_items]]
+
+**처리** `DB: references where is_missing and from_document_id in (그 프로젝트 문서 — 휴지통도) order by id` → 간선
+
+**테스트 관점** 미존재만, id 차례 · 다른 프로젝트 것은 없다
+
+
+---
+
 ## 3. 미결사항
 
-없음. 나머지 참조 함수는 L8·L9가 더한다 — [[SYNC-CODE-002]].
+없음. 나머지 참조 함수(휴지통·재구축)는 L9·L11이 더한다 — [[SYNC-CODE-002]].
