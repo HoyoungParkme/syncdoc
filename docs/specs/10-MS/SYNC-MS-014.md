@@ -419,11 +419,11 @@ pub async fn create(&mut self, project_id: i32, doc_id: &str, doc_type: &str, bo
 
 근거: [[SYNC-MS-002#SpecService.create]]
 
-**처리** [[SYNC-MS-002#SpecService.create]]와 같다 — `documents insert`(상태는 frontmatter가 `draft`·`approved`면 그것, 아니면 `draft` · 판 1 · 규약 결과 — `has_convention_error`, `convention_error_detail = "rule: message"`를 줄마다, `incomplete_warnings = 경고 「rule: message」들의 JSON 목록`(ensure_ascii 없이, 비면 없음)) · 항목 블록마다 `items insert`(블록 차례) · `versions insert`(판 1 · `author_kind` · 작성자·지시자 · `via`는 입구를 접은 것 — `web_revert`·`web_status` → `web` · message · `created_at=now`)
+**처리** [[SYNC-MS-002#SpecService.create]]와 같다 — `documents insert`(상태는 frontmatter가 `draft`·`approved`면 그것, 아니면 `draft` · 판 1 · 규약 결과 — `has_convention_error`, `convention_error_detail = "rule: message"`를 줄마다, `incomplete_warnings = 경고 「rule: message」들의 JSON 목록`(ensure_ascii 없이, 비면 없음)) · 항목 블록마다 `items insert`(블록 차례, **같은 ID는 처음 블록만** — #368) · `versions insert`(판 1 · `author_kind` · 작성자·지시자 · `via`는 입구를 접은 것 — `web_revert`·`web_status` → `web` · message · `created_at=now`)
 
 **호출하는 것** [[#SpecService.item_blocks]] · [[#markdown.parse_frontmatter]]
 
-**테스트 관점** 문서·항목·판 행 · 경고가 `incomplete_warnings`에 · `via=mcp`
+**테스트 관점** 문서·항목·판 행 · 경고가 `incomplete_warnings`에 · `via=mcp` · 같은 항목 ID 둘 → 항목 하나, 이름은 처음 것
 
 ---
 
@@ -436,13 +436,13 @@ pub async fn save(&mut self, document: &Document, body: &str, commit_hash: &str,
 
 근거: [[SYNC-MS-002#SpecService.save]]
 
-**처리** [[SYNC-MS-002#SpecService.save]]와 같다 — 판 = (`rebuild`면 남은 버전 수, 아니면 현재) + 1 · `versions insert` · 항목 블록마다 있으면 이름을 고치고 **되살리고**(`is_deleted=false`·`deleted_at` 없음), 없으면 `insert` · `deleted_item_pks`는 `is_deleted=true`·`deleted_at=now` · 새 상태 = `github`면 frontmatter 상태(`draft`·`approved`일 때만, 아니면 지금 것), 다른 입구는 지금 것 · 완료 문서이고 본문이 바뀌었고 (새 상태가 아직 `approved`이거나 `status_commit_hash`가 있으면) 상태를 `draft`로 · `status_changes insert(approved → draft, 바꾼 사람, via, "본문 수정으로 자동 강등", status_commit_hash)` · 본문·판·상태·규약 결과 · 휴지통에서 나온다 · `updated_at=now`
+**처리** [[SYNC-MS-002#SpecService.save]]와 같다 — 판 = (`rebuild`면 남은 버전 수, 아니면 현재) + 1 · `versions insert` · 항목 블록마다(같은 ID는 처음 블록만, #368) 있으면 이름을 고치고 **되살리고**(`is_deleted=false`·`deleted_at` 없음), 없으면 `insert` · `deleted_item_pks`는 `is_deleted=true`·`deleted_at=now` · 새 상태 = `github`면 frontmatter 상태(`draft`·`approved`일 때만, 아니면 지금 것), 다른 입구는 지금 것 · 완료 문서이고 본문이 바뀌었고 (새 상태가 아직 `approved`이거나 `status_commit_hash`가 있으면) 상태를 `draft`로 · `status_changes insert(approved → draft, 바꾼 사람, via, "본문 수정으로 자동 강등", status_commit_hash)` · 본문·판·상태·규약 결과 · 휴지통에서 나온다 · `updated_at=now`
 
 **다른 점** 없음(L11부터 — 그 전에는 재구축·상태 커밋 갈래가 없었다)
 
 **호출하는 것** [[#SpecService.item_blocks]] · [[#markdown.parse_frontmatter]]
 
-**테스트 관점** v2 · 지운 항목 표시 · 같은 ID가 다시 나타나면 되살림 · 완료 문서 → 초안·상태 변경 행 하나 · `rebuild` → 남은 버전 수 + 1 · `github`이 frontmatter를 `draft`로 내려 보냄 → 초안, 상태 변경 행 없음 · `github`이 완료 그대로 고침 + 상태 커밋 해시 → 초안, 그 해시의 상태 변경 행
+**테스트 관점** v2 · 지운 항목 표시 · 같은 ID가 다시 나타나면 되살림 · 완료 문서 → 초안·상태 변경 행 하나 · `rebuild` → 남은 버전 수 + 1 · `github`이 frontmatter를 `draft`로 내려 보냄 → 초안, 상태 변경 행 없음 · `github`이 완료 그대로 고침 + 상태 커밋 해시 → 초안, 그 해시의 상태 변경 행 · 밖에서 민 파일에 같은 항목 ID 둘 → 저장되고 처리 지점이 넘어간다(`item.duplicate` 규약 오류, 항목 하나)
 
 ---
 
