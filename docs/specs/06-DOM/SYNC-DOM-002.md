@@ -727,6 +727,7 @@ classDiagram
     class ProjectService {
         «service»
         +init_project(remote_url: str?, code: str, name: str, user: User, import_existing: bool = False, create_repo: bool = False, storage: Storage = Storage.github, private: bool? = None) Project
+        +import_bundle(code: str, name: str, user: User, data: bytes) Project
         +list_projects() list~Project~
         +list_owned(user: User) list~Project~
         +get(code: str) Project
@@ -768,6 +769,7 @@ classDiagram
 | 메서드 | 부르는 곳 | 유스케이스 | 던지는 에러 |
 |---|---|---|---|
 | `init_project` | [[SYNC-API-001#POST/api/projects]] · MCP [[SYNC-API-002#init_project]] | [[SYNC-UC-001#UC-A1]] | storage-unavailable, invalid-request, project-code-conflict, project-code-invalid, existing-specs, push-failed |
+| `import_bundle` | [[SYNC-API-001#POST/api/projects/bundle]] | [[SYNC-UC-001#UC-A1]] 1c | storage-unavailable, project-code-conflict, project-code-invalid, bundle-invalid, push-failed, rebuild-failed |
 | `list_projects` | scheduler · hooks (사람이 없는 경로) | [[SYNC-UC-001#UC-G1]] | |
 | `list_owned` | queries.project_summary · repo_status | [[SYNC-UC-001#UC-H14]] | |
 | `get` | pipeline(github 경로) · scheduler · hooks | — | not-found |

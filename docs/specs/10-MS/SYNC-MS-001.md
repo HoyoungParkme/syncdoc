@@ -27,6 +27,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | 함수 | 한 줄 |
 |---|---|
 | [[#ProjectService.init_project]] | 프로젝트 초기화 |
+| [[#ProjectService.import_bundle]] | 번들로 가져오기 — 서버 저장 + 재구축 |
 | [[#ProjectService.list_projects]] | 목록 — 시스템 경로 |
 | [[#ProjectService.list_owned]] | 내가 소유한 목록 — 사람 경로 |
 | [[#ProjectService.get]] | 코드 → 프로젝트 — 시스템 경로 |
@@ -86,6 +87,29 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **호출하는 것** `AccountService.github_token_for` · [[SYNC-MS-009#github.create_repo]] · [[SYNC-MS-009#git.clone]] [[SYNC-MS-009#git.exists]] [[SYNC-MS-009#git.list]] [[SYNC-MS-009#git.init_specs]] [[SYNC-MS-009#git.commit_push]] [[SYNC-MS-009#git.init_bare]] · [[SYNC-MS-007#pipeline.rebuild]] · [[#ProjectService.ensure_hook]]
 
 **테스트 관점** **서버 저장 → `ORIGINS_DIR/{code}.git`이 생기고(HEAD main) 골격 커밋 하나, GitHub을 안 부르고 토큰 없는 사람도 된다** · 켜지 않은 방식 → `storage-unavailable`, 아무것도 안 생김 · GitHub인데 주소 없음 → `invalid-request` · **보관본 있음 + 가져오기 아님 → `existing-specs`(`archived_at`), 아무것도 안 바뀜** · 가져오기 → 되살리고 재구축 버전 · 보관본 둘 → 가장 최근 것 · **같은 초에 둘(`…-1.git`) → 번호가 큰 것이 가장 최근**(#349) · 서버 저장 등록 실패 → 새 원본은 지워지고 되살린 것은 보관으로 돌아간다 · 이름 없이 남은 원본 → 보관으로 옮기고 `existing-specs` · **GitHub 저장 새 등록 → 통지가 걸린다(`hook_id`)**(#242) · **통지 걸기가 실패해도 프로젝트는 등록된다**(hook_error에 사유 — GitHub가 거절해도, 연결이 끊겨도) · 가져오기·서버 저장은 통지를 부르지 않는다 · 빈 저장소 → `docs/specs/` 생김, 커밋 하나, 11칸 null · **`owner_user_id`가 등록한 사람** · `docs/specs/` 있는 저장소 → `existing-specs`, workdir 없음, DB 행 없음 · `import_existing=true` → 재구축 결과 · clone 권한 없음 → `push-failed`, 아무것도 안 남음 · **없는 저장소 + `create_repo=false` → `push-failed`**(지금 동작) · **없는 저장소 + `true` → 저장소가 생기고 골격 커밋까지** · `private=False` → 공개로, `private=True` → 비공개로 만든다 · **`private`를 빼면 설정값(기본 비공개)**(카드 BS) · **이미 있는 저장소 + `true` → 만들지 않고 그대로 쓴다** · 만든 뒤 등록이 실패해도 **저장소는 남는다**
+
+---
+
+#### ProjectService.import_bundle 번들로 가져오기 — 서버 저장 + 재구축
+
+**시그니처** `async def import_bundle(code: str, name: str, user: User, data: bytes) -> Project`
+
+근거: [[SYNC-UC-001#UC-A1]] 1c · [[SYNC-API-001#POST/api/projects/bundle]] · [[SYNC-PRD-001#R14]] · [[SYNC-INFRA-001]] 9.7 · 사용자 결정 2026-10-07(가져오기는 git 번들 → 재구축, 두 판) · 에이전트 판단 2026-10-11(사용자 목표 「끝까지」 — 입구·검사·되돌림을 init_project의 서버 저장 갈래에 맞춘다, 카드 BX)
+
+**처리** — [[#ProjectService.init_project]]의 서버 저장 갈래와 같은 락·검사·되돌림
+0. 코드 단위 락 · if `"server" not in settings.storage_modes` → `! storage-unavailable {storage: server, enabled}`
+1. if 코드가 `[A-Z]{1,4}` 전체가 아니다 → `! project-code-invalid {rule}` · if `DB: projects where code` → `! project-code-conflict {code}`
+2. `workdir = REPOS_DIR / code` — 있으면 지운다 · `origin = ORIGINS_DIR / f"{code}.git"` — 이미 있으면(등록되지 않은 원본) **지우지 않고** 보관으로 옮긴다. 보관본은 되살리지 않는다
+3. `data`를 임시 파일에 쓰고 `git.clone_bare(그 파일, origin, None)` — 가지·태그를 해시 그대로, 원격을 지우고 HEAD를 main으로, 받기 규칙 셋 · if 실패 → `origin`을 지우고 `! bundle-invalid {reason: "번들 파일이 아니거나 깨졌다"}` · 임시 파일은 지운다
+4. `git.rev_list_count(origin, "refs/heads/main")` · if 실패 → `origin`을 지우고 `! bundle-invalid {reason: "main 가지가 없다"}`
+5. `git.clone(origin, workdir, None)` · if 실패 → 작업 사본·`origin`을 지우고 `! push-failed {reason: clone}`
+6. 저장점: `DB: projects insert (code, name, owner_user_id=user.id)` · `DB: repositories insert (storage=server, remote_url=origin, workdir_path, registered_by_user_id=user.id)`
+7. `pipeline.rebuild(code)` — 명세·버전·상태 이력을 커밋에서 되살리고 처리 지점을 main 끝으로 · if 실패 → `origin`·작업 사본을 지우고 그 문제(`rebuild-failed`) — 골격 커밋을 만들지 않는다
+8. `→ Project` — `ProjectSummary`는 입구가 만든다
+
+**호출하는 것** [[SYNC-MS-009#git.clone_bare]] [[SYNC-MS-009#git.rev_list_count]] [[SYNC-MS-009#git.clone]] · [[SYNC-MS-007#pipeline.rebuild]]
+
+**테스트 관점** 명세·상태 커밋이 든 저장소의 번들 → 프로젝트·문서·판·상태 이력이 그대로, 원본의 가지·태그 해시가 같다, 골격 커밋 없음, 처리 지점이 main 끝 · 번들이 아님 → `bundle-invalid`, 원본·작업 사본·행 없음 · main 없는 번들 → `bundle-invalid` · 코드 중복·형식·서버 저장 꺼짐 → 그 문제, 아무것도 안 생김 · 이름 없이 남은 원본 → 보관으로 옮기고 가져온다 · 재구축 실패 → 행·원본 없음
 
 ---
 
