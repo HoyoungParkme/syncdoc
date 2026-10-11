@@ -597,6 +597,22 @@ impl Git {
         );
         Ok(out)
     }
+
+    /// SYNC-MS-019#Git.service_rpc
+    ///
+    /// 본문은 부른 쪽이 다 받아(gzip이면 풀어) 넘긴다. 되감기·지우기 거절은 받기 규칙이 git 프로토콜 응답 안에서 한다
+    pub async fn service_rpc(
+        &self,
+        origin: &Path,
+        service: &str,
+        body: Vec<u8>,
+        protocol: Option<&str>,
+    ) -> Result<Vec<u8>, Problem> {
+        let sub = service.strip_prefix("git-").unwrap_or(service);
+        let o: &OsStr = origin.as_os_str();
+        self.pipe(&[os(sub), os("--stateless-rpc"), o], body, protocol)
+            .await
+    }
 }
 
 #[cfg(test)]
