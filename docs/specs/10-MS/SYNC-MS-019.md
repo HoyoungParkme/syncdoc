@@ -12,7 +12,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-009, SYNC-INFRA-001, SYNC-STD-004]
 
 `crates/core/src/infra/git.rs`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.8. 파이썬 판 [[SYNC-MS-009]]의 `git.*`와 **같은 명령·같은 옵션·같은 처리**이고, 이 문서는 다른 점만 적는다([[SYNC-STD-001]] 2.10). 서비스가 아니다 — git CLI를 자식 프로세스로 부르는 얇은 층이다([[SYNC-INFRA-001]] 9.1·9.2 — 순수 Rust git은 아직 push를 받지 못한다).
 
-**카드 L6 몫은 서버 저장 프로젝트를 만들고 지우는 데 드는 일곱이다(2026-10-08).** 카드 L7이 받기·밀린 커밋 수 둘을 더했다(저장 파이프라인의 「밀린 커밋 읽기」·처리 지점 앞당기기). 이력·되돌리기(L9·L11)와 git 입구의 upload-pack·receive-pack(L10)은 그 카드가 더한다.
+**카드 L6 몫은 서버 저장 프로젝트를 만들고 지우는 데 드는 일곱이다(2026-10-08).** 카드 L7이 받기·밀린 커밋 수 둘을 더했다(저장 파이프라인의 「밀린 커밋 읽기」·처리 지점 앞당기기). 카드 L10이 git 입구의 둘(광고·rpc)을 더했다(2026-10-11) — 파이썬 판의 `git http-backend`를 쓰지 않고 `upload-pack`·`receive-pack --stateless-rpc`를 직접 부르되, http-backend가 내는 머리·문장을 그대로 낸다(INFRA 9.1). 이력·되돌리기(L11)는 그 카드가 더한다.
 
 **`Git { exe, global_config }`** — git 실행 파일과 빈 전역 설정 파일. 켤 때 [[SYNC-MS-012#runtime.run]]이 만들어 서버 상태에 둔다. 실행 파일은 [[SYNC-MS-012#paths.git]] — 윈도는 설치 폴더의 MinGit(`mingit/cmd/git.exe`), 리눅스는 시스템 git.
 
@@ -41,6 +41,8 @@ upstream: [SYNC-DOM-004, SYNC-MS-009, SYNC-INFRA-001, SYNC-STD-004]
 | [[#Git.init_specs]] | 새 프로젝트의 골격 파일 |
 | [[#Git.fetch]] | 서버 저장소에서 받아 온다 |
 | [[#Git.rev_list_count]] | 밀린 커밋 수 |
+| [[#Git.advertise_refs]] | git 입구 — 참조 광고 |
+| [[#Git.service_rpc]] | git 입구 — 읽기·쓰기 |
 
 ---
 
@@ -194,6 +196,41 @@ pub async fn rev_list_count(&self, workdir: &Path, range: &str) -> Result<i64, P
 **처리** `git: rev-list --count {range}` → 정수(앞뒤 공백을 걷고) · 정수가 아니면 `Problem::Internal`
 
 **테스트 관점** `a..b`에 커밋 하나 → 1 · 같은 것 → 0 · 없는 해시 → `Problem::Git`
+
+---
+
+#### Git.advertise_refs git 입구 — 참조 광고
+
+**시그니처**
+```rust
+pub async fn advertise_refs(&self, origin: &Path, service: &str, protocol: Option<&str>) -> Result<Vec<u8>, Problem>
+```
+
+근거: [[SYNC-MS-009#git.http_backend]] · git `http-backend.c` `get_info_refs` · [[SYNC-INFRA-001]] 9.1
+
+**처리** http-backend의 `info/refs?service=` 그대로 — `service`는 `git-upload-pack`·`git-receive-pack`(부르는 쪽이 거른다) · `protocol`(요청 `Git-Protocol`)이 `version=2`를 담지 않으면 앞에 pkt-line `# service={service}\n`과 flush(`0000`) · 이어서 `git: {upload-pack|receive-pack} --stateless-rpc --advertise-refs {origin}`의 출력(`GIT_PROTOCOL={protocol}`을 넘겨)
+
+**다른 점** http-backend를 쓰지 않는다(INFRA 9.1 — MinGit에 의존을 줄인다). 머리는 부르는 쪽(입구)이 http-backend와 같이 붙인다 · 광고의 능력 목록·`agent=`는 git 판마다 다르다 — 두 판 바이트 비교 밖
+
+**테스트 관점** 빈 저장소 → 서비스 줄 + 빈 광고 · 커밋 뒤 → `refs/heads/main`이 있다 · v2 요청 → 서비스 줄 없이 v2 광고
+
+---
+
+#### Git.service_rpc git 입구 — 읽기·쓰기
+
+**시그니처**
+```rust
+pub async fn service_rpc(&self, origin: &Path, service: &str, body: Vec<u8>, protocol: Option<&str>) -> Result<Vec<u8>, Problem>
+```
+
+근거: [[SYNC-MS-009#git.http_backend]] · git `http-backend.c` `service_rpc`
+
+**처리** `git: {upload-pack|receive-pack} --stateless-rpc {origin}` — 본문을 표준 입력으로 넣는 일과 출력을 읽는 일을 **동시에**(차례로 하면 파이프가 찬다), 표준 오류도 비운다 · `GIT_PROTOCOL`을 넘긴다 · receive-pack은 받기 규칙(되감기·지우기·깨진 객체 거부 — [[#Git.init_bare]])이 지킨다 — 거절은 git 프로토콜 응답 안에 있다 · `→` 출력 전부
+
+**다른 점** 본문은 부르는 쪽이 다 받아(gzip이면 풀어) 넘긴다 — 파이썬 판이 「본문을 다 넘길 때까지 응답을 시작하지 않는다」를 손으로 지킨 것과 같은 결과 · 출력을 모아 한 번에 돌려준다
+
+**테스트 관점** (임시 자리 · 진짜 git) 진짜 git 클라이언트로 clone·push가 된다 · 되감는 push·지우는 push는 git 거절 문구로 · `main` 아닌 가지는 받는다
+
 
 ---
 
