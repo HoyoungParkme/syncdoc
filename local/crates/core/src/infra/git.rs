@@ -44,6 +44,9 @@ const SPEC_TYPES: [&str; 12] = [
     "RFQ", "PRD", "SCN", "UC", "INFRA", "DOM", "UI", "API", "SEQ", "MS", "CODE", "STD",
 ];
 
+/// 저장소 README 자리
+const README_PATH: &str = "docs/specs/README.md";
+
 /// 새 저장소의 `docs/specs/README.md` — 파이썬 `_readme()`와 글자 하나 다르지 않다. `{SPECS_URL}`이 규약 주소
 const README: &str = r#"# docs/specs — 명세 원본
 
@@ -579,7 +582,7 @@ impl Git {
         }
         files.insert("docs/specs/assets/.gitkeep".to_string(), String::new());
         files.insert(
-            "docs/specs/README.md".to_string(),
+            README_PATH.to_string(),
             README.replace("{SPECS_URL}", specs_url.trim_end_matches('/')),
         );
         files
@@ -739,6 +742,34 @@ impl Git {
         self.run(Some(workdir), &[os("checkout"), os("--force"), os(git_ref)])
             .await?;
         Ok(())
+    }
+
+    /// SYNC-MS-019#Git.sync_readme
+    ///
+    /// 재구축 위임이 저장소에 쓰는 유일한 것 — 같으면 커밋이 생기지 않는다
+    pub async fn sync_readme(
+        &self,
+        workdir: &Path,
+        user: &UserRow,
+        code: &str,
+        specs_url: &str,
+    ) -> Result<Option<String>, Problem> {
+        let mut files = Self::init_specs(specs_url);
+        let want = files.shift_remove(README_PATH).unwrap_or_default();
+        // push는 추적 참조를 고치지 않는다 — 비교 전에 받아 온다
+        self.fetch(workdir).await?;
+        let have = self
+            .read(workdir, README_PATH, "origin/main")
+            .await
+            .unwrap_or_default(); // README가 없는 저장소
+        if have == want {
+            return Ok(None);
+        }
+        let message = format!("chore({code}): README를 싱크독 규약 링크로");
+        let one = IndexMap::from([(README_PATH.to_string(), want)]);
+        Ok(Some(
+            self.commit_push(workdir, &message, user, &one, &[]).await?,
+        ))
     }
 
     /// SYNC-MS-019#Git.advertise_refs

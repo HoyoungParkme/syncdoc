@@ -698,3 +698,54 @@ async fn checkout_force_drops_local_edits() {
         Err(Problem::Git { .. })
     ));
 }
+
+#[tokio::test]
+async fn sync_readme_only_when_different() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, origin, work) = setup(tmp.path()).await;
+    let u = local_user();
+    let url = "http://127.0.0.1:8010/specs";
+    g.commit_push(&work, "init", &u, &Git::init_specs(url), &[])
+        .await
+        .expect("push");
+    assert_eq!(
+        g.sync_readme(&work, &u, "X", url).await.expect("같다"),
+        None
+    );
+    let other = tmp.path().join("other");
+    sh(
+        tmp.path(),
+        &[
+            "clone",
+            "-q",
+            origin.to_str().expect("경로"),
+            other.to_str().expect("경로"),
+        ],
+    );
+    put(&other, "docs/specs/README.md", "옛 README\n");
+    push_as(&other, "a", "a@x", "README 고침");
+    let hash = g
+        .sync_readme(&work, &u, "X", url)
+        .await
+        .expect("다르다")
+        .expect("커밋");
+    assert_eq!(
+        sh(&origin, &["log", "-1", "--format=%s"]),
+        "chore(X): README를 싱크독 규약 링크로"
+    );
+    assert_eq!(sh(&origin, &["rev-parse", "main"]), hash);
+    assert_eq!(
+        g.sync_readme(&work, &u, "X", url).await.expect("이제 같다"),
+        None
+    );
+    // README가 없는 저장소 — 만든다
+    sh(&other, &["pull", "-q", "origin", "main"]);
+    sh(&other, &["rm", "-q", "docs/specs/README.md"]);
+    push_as(&other, "a", "a@x", "README 지움");
+    assert!(
+        g.sync_readme(&work, &u, "X", url)
+            .await
+            .expect("없다")
+            .is_some()
+    );
+}
