@@ -268,6 +268,35 @@ pub mod schemas {
         Validator::new(&json!({"type": "int", "ge": 1}), "int").expect("판 번호 스키마")
     }
 
+    /// `ChangeStatus` — `to: Literal["draft", "approved"]`, `reason: str | None = None` (POST …/status)
+    pub fn change_status() -> Validator {
+        Validator::new(
+            &json!({"type": "model", "cls": "ChangeStatus", "schema": {"type": "model-fields", "fields": {
+                "to": {"type": "model-field", "schema": {"type": "literal", "expected": ["draft", "approved"]}},
+                "reason": {"type": "model-field", "schema": {"type": "default", "schema": {"type": "nullable", "schema": {"type": "str"}}, "default": null}}},
+                "model_name": "ChangeStatus"}, "config": {"title": "ChangeStatus"}}),
+            "ChangeStatus",
+        )
+        .expect("ChangeStatus 스키마")
+    }
+
+    /// `Revert` — `to_version: int = Field(ge=1)`, `confirm_item_deletion: bool = False` (POST …/revert)
+    pub fn revert() -> Validator {
+        Validator::new(
+            &json!({"type": "model", "cls": "Revert", "schema": {"type": "model-fields", "fields": {
+                "to_version": {"type": "model-field", "schema": {"type": "int", "ge": 1}},
+                "confirm_item_deletion": {"type": "model-field", "schema": {"type": "default", "schema": {"type": "bool"}, "default": false}}},
+                "model_name": "Revert"}, "config": {"title": "Revert"}}),
+            "Revert",
+        )
+        .expect("Revert 스키마")
+    }
+
+    /// 질의 `confirm: bool = Query(False)` (DELETE /api/docs/{docId})
+    pub fn flag() -> Validator {
+        Validator::new(&json!({"type": "bool"}), "bool").expect("bool 스키마")
+    }
+
     /// 경로의 `int` 값
     pub fn int() -> Validator {
         Validator::new(&json!({"type": "int"}), "int").expect("int 스키마")

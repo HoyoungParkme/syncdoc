@@ -1,17 +1,19 @@
 //! 문서 — 파이썬 판 `web/routers/documents.py`의 읽기(카드 L8): 문서·이력·diff·추적표.
-//! 상태·되돌리기·휴지통(L9)과 묻기(L14)는 그 카드가 더한다
+//! 카드 L9가 상태·되돌리기·휴지통 넣기·되살리기·완전 삭제를 더했다. 묻기(L14)는 그 카드가 더한다
 
 use std::sync::LazyLock;
 
 use axum::Json;
 use axum::extract::{Path, RawQuery, State};
 use num_bigint::BigInt;
+use syncdoc_core::account::model::UserRow;
 use syncdoc_core::account::service::AccountService;
 use syncdoc_core::errors::Problem;
+use syncdoc_core::pipeline;
 use syncdoc_core::project::service::ProjectService;
 use syncdoc_core::queries;
 use syncdoc_core::spec::SpecService;
-use syncdoc_core::types::ApiAuthor;
+use syncdoc_core::types::{ApiAuthor, Author, AuthorKind, Entry};
 
 use crate::compat::fastapi::{self, schemas};
 use crate::compat::pydantic::Validator;
@@ -19,9 +21,10 @@ use crate::compat::pyvalue::PyValue;
 use crate::state::AppState;
 use crate::web::auth::current_user;
 use crate::web::problem::ApiProblem;
-use crate::web::schemas::{Diff, Document, DownstreamView, Version};
+use crate::web::schemas::{Diff, Document, DownstreamView, TrashResult, Version};
 
 static VERSION_NO: LazyLock<Validator> = LazyLock::new(schemas::version_no);
+static FLAG: LazyLock<Validator> = LazyLock::new(schemas::flag);
 
 /// SYNC-API-001#GET/api/docs/{docId}
 pub async fn get_document(
@@ -114,4 +117,42 @@ pub async fn downstream(
     let user = current_user(&mut c, &state).await?;
     let d = queries::downstream_view(&mut c, &state.repos, &doc_id, &user).await?;
     Ok(Json(DownstreamView::from(&d)))
+}
+
+/// 웹의 사람 작성자 — `human`·사람·없음·`via` (파이썬 `_human`은 `web_status`, 되살리기는 `web_revert`)
+fn human(user: &UserRow, via: Entry) -> Author {
+    Author {
+        kind: AuthorKind::Human,
+        user: user.clone(),
+        instructed_by: None,
+        via,
+    }
+}
+
+/// SYNC-API-001#DELETE/api/docs/{docId}
+///
+/// `confirm` 없이 부르면 끊어질 것을 담은 `document-deletion-needs-confirm` — 화면(UI-5 13.2)이 보여주고 `confirm=true`로 다시 부른다
+pub async fn trash_document(
+    State(state): State<AppState>,
+    Path(doc_id): Path<String>,
+    RawQuery(raw): RawQuery,
+) -> Result<Json<TrashResult>, ApiProblem> {
+    let user = {
+        let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+        current_user(&mut c, &state).await?
+    };
+    let q = fastapi::query_params(raw.as_deref());
+    let mut errors = Vec::new();
+    let confirm = fastapi::query_field(&q, "confirm", &FLAG, false, &mut errors);
+    fastapi::check_errors(errors)?;
+    let confirm = matches!(confirm, Some(PyValue::Bool(true)));
+    let r = pipeline::trash_document(
+        &state.pool,
+        &state.repos,
+        &doc_id,
+        &human(&user, Entry::WebStatus),
+        confirm,
+    )
+    .await?;
+    Ok(Json(TrashResult::from(&r)))
 }
