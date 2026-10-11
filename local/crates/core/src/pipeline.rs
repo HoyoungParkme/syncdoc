@@ -17,6 +17,7 @@ use crate::errors::Problem;
 use crate::markdown::parse_frontmatter;
 use crate::project::repo as project_repo;
 use crate::project::service::{ProjectService, ServerRepos};
+use crate::pycompat::chars::is_digit;
 use crate::pycompat::re::compile;
 use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
@@ -821,4 +822,33 @@ pub async fn purge_document(
         .await?;
     tx.commit().await?;
     Ok(())
+}
+
+/// SYNC-MS-017#pipeline.type_of_dir
+///
+/// `06-DOM` → `DOM`, `STD` → `STD` — 앞 두 글자가 파이썬 `str.isdigit()`이고 `-`가 있을 때만 뗀다
+pub fn type_of_dir(name: &str) -> String {
+    let head: Vec<char> = name.chars().take(2).collect();
+    if !head.is_empty() && head.iter().all(|c| is_digit(*c)) && name.contains('-') {
+        return name.split_once('-').map_or(name, |(_, t)| t).to_string();
+    }
+    name.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::type_of_dir;
+
+    #[test]
+    fn type_of_dir_like_python() {
+        assert_eq!(type_of_dir("06-DOM"), "DOM");
+        assert_eq!(type_of_dir("STD"), "STD");
+        assert_eq!(type_of_dir("0-X"), "0-X"); // 앞 두 글자 `0-`는 숫자가 아니다
+        assert_eq!(type_of_dir("A1-X"), "A1-X");
+        assert_eq!(type_of_dir("²³-PRD"), "PRD"); // 파이썬 isdigit — \d가 아니다
+        assert_eq!(type_of_dir("١٢-PRD"), "PRD");
+        assert_eq!(type_of_dir("12"), "12");
+        assert_eq!(type_of_dir(""), "");
+        assert_eq!(type_of_dir("01-a-b"), "a-b");
+    }
 }

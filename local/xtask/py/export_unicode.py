@@ -1,7 +1,7 @@
 """cargo xtask unicode-tables — 파이썬 3.12의 문자 분류 표를 Rust 소스로 뽑는다.
 
 SYNC-STD-004#DEV-7 · SYNC-DOM-004 1장 pycompat. 손으로 고치지 않는다 — 이 스크립트가 다시 만든다.
-0..=0x10FFFF를 파이썬 `re`(str 패턴의 `\\s`·`\\d`·`\\w`)와 `str.isprintable()`에 돌려 구간으로 적는다.
+0..=0x10FFFF를 파이썬 `re`(str 패턴의 `\\s`·`\\d`·`\\w`)와 `str.isdigit()`·`str.isprintable()`에 돌려 구간으로 적는다.
 `str.strip()`이 벗기는 글자는 `\\s`와 같다(`str.isspace`) — 다르면 멈춘다.
 `uv run --project backend python local/xtask/py/export_unicode.py OUT`
 """
@@ -63,6 +63,7 @@ def main() -> None:
             table("SPACE", "`\\s` = `str.isspace()` — `strip()`이 벗기는 글자", ranges(SPACE.fullmatch)),
             table("DECIMAL", "`\\d` = `str.isdecimal()`", ranges(DECIMAL.fullmatch)),
             table("WORD", "`\\w` = `str.isalnum()` 또는 `_`", ranges(WORD.fullmatch)),
+            table("DIGIT", "`str.isdigit()` — `\\d`보다 넓다(위 첨자·동그라미 숫자)", ranges(str.isdigit)),
             table(
                 "NON_PRINTABLE",
                 "`str.isprintable()`이 거짓 — `repr`이 이스케이프할 글자",
