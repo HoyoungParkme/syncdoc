@@ -1195,13 +1195,20 @@ impl SpecService<'_> {
         message: &str,
         deleted_item_pks: &[i32],
         validate_result: &ValidateResult,
+        rebuild: bool,
+        status_commit_hash: Option<&str>,
     ) -> Result<VersionRow, Problem> {
         let row = repo::document_by_id(&mut *self.db, document.summary.id)
             .await?
             .ok_or_else(|| Problem::Internal {
                 log: format!("저장할 문서 {}가 없다", document.summary.doc_id),
             })?;
-        let new_no = row.current_version_no + 1;
+        // 재구축은 커밋 차례대로 다시 번호를 매긴다 — current_version_no는 ≥1 제약이라 남은 판 수 + 1
+        let new_no = if rebuild {
+            repo::version_count(&mut *self.db, row.id).await?
+        } else {
+            row.current_version_no
+        } + 1;
         let version = repo::insert_version(
             &mut *self.db,
             &new_version(row.id, new_no, commit_hash, body, author, message),
@@ -1229,8 +1236,14 @@ impl SpecService<'_> {
             (Entry::Github, Some(s)) => s,
             _ => row.status.as_str(),
         };
-        // 6. 자동 강등 — mcp·되돌리기는 이 자리에서 내린다(본문 커밋 하나에 담기므로 커밋 해시 없음) (#58)
-        if row.status == "approved" && body != row.current_body && new_status == "approved" {
+        // 6. 자동 강등 — 어느 쪽이 이미 상태를 정했는지 함께 본다 (#58)
+        // · mcp·되돌리기: 상태를 그대로 뒀다 → 여기서 내린다(본문 커밋 하나에 담기므로 커밋 해시 없음)
+        // · github에서 파이프라인이 내림: 6a가 본문을 이미 draft로 고쳤고 그 강등 커밋 해시를 준다
+        // · github에서 작성자가 스스로 내림: frontmatter가 진실 — 상태 변경 행을 남기지 않는다
+        if row.status == "approved"
+            && body != row.current_body
+            && (new_status == "approved" || status_commit_hash.is_some())
+        {
             new_status = "draft";
             repo::insert_status_change(
                 &mut *self.db,
@@ -1241,7 +1254,7 @@ impl SpecService<'_> {
                     changed_by_user_id: author.user.id,
                     via: fold_via(author.via),
                     reason: Some("본문 수정으로 자동 강등"),
-                    commit_hash: None,
+                    commit_hash: status_commit_hash,
                     changed_at: clock::now(),
                 },
             )

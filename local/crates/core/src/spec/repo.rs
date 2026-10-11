@@ -416,6 +416,15 @@ pub async fn items_by_item_ids(
     .await
 }
 
+/// 문서에 남은 판 수 — 재구축이 커밋 차례대로 번호를 다시 매긴다
+pub async fn version_count(db: &mut PgConnection, document_id: i32) -> Result<i32, sqlx::Error> {
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM versions WHERE document_id = $1")
+        .bind(document_id)
+        .fetch_one(db)
+        .await?;
+    Ok(i32::try_from(n).unwrap_or(i32::MAX))
+}
+
 /// 문서의 판 — 새 것부터
 pub async fn versions_of(
     db: &mut PgConnection,
