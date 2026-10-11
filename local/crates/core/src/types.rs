@@ -752,3 +752,12 @@ pub struct SyncResult {
     pub docs: i64,
     pub fetched_at: Option<OffsetDateTime>,
 }
+
+/// 코드 올리기 결과 (DOM-002 2.8 `UploadResult`, 카드 L11) — 같은 내용이면 `changed=false`
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UploadResult {
+    pub commit: String,
+    pub changed: bool,
+    pub files: i64,
+    pub deleted: i64,
+}

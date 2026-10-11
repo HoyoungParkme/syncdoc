@@ -27,8 +27,8 @@ use crate::spec::SpecService;
 use crate::spec::repo as spec_repo;
 use crate::types::{
     Author, AuthorKind, ChangedFile, DeletedItem, DocStatus, DocType, Document, Entry,
-    RebuildError, RebuildResult, RefEdge, SaveResult, TrashResult, ValidateResult, Violation,
-    py_isoformat, spec_dir, stage_of,
+    RebuildError, RebuildResult, RefEdge, SaveResult, Storage, TrashResult, UploadResult,
+    ValidateResult, Violation, py_isoformat, spec_dir, stage_of,
 };
 
 /// frontmatter의 `status:` 줄 — 첫 것 하나만 갈아 끼운다(파이썬 `_set_status`, `re.M`)
@@ -1284,6 +1284,135 @@ async fn rebuild_in(
     Ok(result)
 }
 
+/// 코드 올리기 한도 — 한 번에 UTF-8 합 (사용자 결정 2026-09-30)
+const UPLOAD_BYTES: i64 = 5 * 1024 * 1024;
+/// 파일 + 지운 경로
+const UPLOAD_COUNT: i64 = 500;
+/// 비밀 꼴 — 파이썬 `CodeGraphService.DENY`
+const CODE_DENY: [&str; 6] = [".env*", "*.pem", "*.key", "id_rsa*", "*.p12", "*secret*"];
+
+/// 파이썬 `fnmatch` — `*`·`?`만(위 꼴에 쓰는 것). 대소문자는 부르는 쪽이 낮춘다
+fn fnmatch(name: &[char], pat: &[char]) -> bool {
+    match pat.split_first() {
+        None => name.is_empty(),
+        Some(('*', rest)) => (0..=name.len()).any(|i| fnmatch(&name[i..], rest)),
+        Some(('?', rest)) => !name.is_empty() && fnmatch(&name[1..], rest),
+        Some((c, rest)) => name.first() == Some(c) && fnmatch(&name[1..], rest),
+    }
+}
+
+/// `upload_code` 3 — 올릴 수 없는 경로의 이유. 올려도 되면 없음 (파이썬 `_refusal`, UC-A10 2b)
+fn refusal(path: &str) -> Option<&'static str> {
+    if crate::pycompat::chars::strip(path).is_empty() {
+        return Some("빈 경로");
+    }
+    if path.contains('\\') {
+        return Some("역슬래시 — / 로 쓴다");
+    }
+    if path.starts_with('/') {
+        return Some("절대 경로");
+    }
+    let parts = path_parts(path);
+    if parts.contains(&"..") {
+        return Some("상위 경로(..)");
+    }
+    if parts.contains(&".git") {
+        return Some(".git");
+    }
+    if parts.len() >= 2 && parts[0] == "docs" && parts[1] == "specs" {
+        return Some("명세 경로 — create_document·update_document로 쓴다");
+    }
+    let name: Vec<char> = parts
+        .last()
+        .copied()
+        .unwrap_or("")
+        .to_lowercase()
+        .chars()
+        .collect();
+    if CODE_DENY
+        .iter()
+        .any(|pat| fnmatch(&name, &pat.chars().collect::<Vec<_>>()))
+    {
+        return Some("비밀 꼴");
+    }
+    None
+}
+
+/// SYNC-MS-017#pipeline.upload_code
+///
+/// git이 없는 PC의 코드를 서버 저장소에 커밋 하나로 넣는다(UC-A10). 명세 경로는 받지 않아 판이 생기지 않는다
+pub async fn upload_code(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    code: &str,
+    files: &IndexMap<String, String>,
+    delete: &[String],
+    message: &str,
+    author: &Author,
+) -> Result<UploadResult, Problem> {
+    let (_, repo) = {
+        let mut c = pool.acquire().await?;
+        ProjectService { db: &mut c, repos }
+            .get_owned(code, &author.user)
+            .await?
+    };
+    // 1
+    if repo.storage != Storage::Server.as_str() {
+        return Err(Problem::StorageMismatch {
+            storage: repo.storage.clone(),
+            detail: None,
+        });
+    }
+    // 2. 한도 — 락 밖
+    let size: i64 = files.values().map(|c| c.len() as i64).sum();
+    let count = (files.len() + delete.len()) as i64;
+    if size > UPLOAD_BYTES || count > UPLOAD_COUNT {
+        return Err(Problem::UploadTooLarge {
+            limit_bytes: UPLOAD_BYTES,
+            limit_count: UPLOAD_COUNT,
+            size,
+            count,
+        });
+    }
+    // 3. 경로 — 올릴 것 → 지울 것, 그다음 이진
+    let mut refused: Vec<(String, String)> = files
+        .keys()
+        .chain(delete.iter())
+        .filter_map(|p| refusal(p).map(|r| (p.clone(), r.to_string())))
+        .collect();
+    refused.extend(
+        files
+            .iter()
+            .filter(|(p, c)| c.contains('\0') && refusal(p).is_none())
+            .map(|(p, _)| (p.clone(), "글자가 아니다(이진)".to_string())),
+    );
+    if !refused.is_empty() {
+        return Err(Problem::UploadPathRefused { paths: refused });
+    }
+    // 4. 쓰기 전에 읽는다(DEV-19)
+    read_pending(pool, repos, code, &author.user).await?;
+    // 5
+    let workdir = PathBuf::from(&repo.workdir_path);
+    let (before, commit) = {
+        let lock = write_lock(code);
+        let _held = lock.lock().await;
+        let before = repos.git.fetch(&workdir).await?;
+        let commit = repos
+            .git
+            .commit_push(&workdir, message, &author.user, files, delete)
+            .await?;
+        (before, commit)
+    };
+    // 6. 처리 지점을 이 커밋으로 — 명세 경로가 없으니 판은 생기지 않는다(코드 그래프는 L12)
+    read_pending(pool, repos, code, &author.user).await?;
+    Ok(UploadResult {
+        changed: commit != before,
+        commit,
+        files: files.len() as i64,
+        deleted: delete.len() as i64,
+    })
+}
+
 /// SYNC-MS-017#pipeline.type_of_dir
 ///
 /// `06-DOM` → `DOM`, `STD` → `STD` — 앞 두 글자가 파이썬 `str.isdigit()`이고 `-`가 있을 때만 뗀다
@@ -1297,7 +1426,31 @@ pub fn type_of_dir(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::type_of_dir;
+    use super::{refusal, type_of_dir};
+
+    #[test]
+    fn refusal_like_python() {
+        // 파이썬 `_refusal`로 뜬 답
+        let cases = [
+            ("a/./docs/x", None),
+            (
+                "docs//specs/x",
+                Some("명세 경로 — create_document·update_document로 쓴다"),
+            ),
+            (
+                "./docs/specs/y",
+                Some("명세 경로 — create_document·update_document로 쓴다"),
+            ),
+            ("x/secretive.txt", Some("비밀 꼴")),
+            ("İd_rsa", None),
+            (".", None),
+            ("", Some("빈 경로")),
+            ("bin.dat", None),
+        ];
+        for (p, want) in cases {
+            assert_eq!(refusal(p), want, "{p:?}");
+        }
+    }
 
     #[test]
     fn type_of_dir_like_python() {

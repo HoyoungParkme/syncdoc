@@ -109,6 +109,23 @@ pub enum Problem {
     /// `push-failed` — git이 원격에 못 밀었다(424)
     #[error("{reason}")]
     PushFailed { reason: String },
+    /// `storage-mismatch` — 그 저장 방식에서는 안 되는 일(409). `detail`이 없으면 기본 문장
+    #[error("{}", .detail.clone().unwrap_or_else(|| format!("{} 저장 프로젝트다 — 코드는 GitHub에 push한다", .storage)))]
+    StorageMismatch {
+        storage: String,
+        detail: Option<String>,
+    },
+    /// `upload-too-large` — 코드 올리기 한도(413). 나눠 보낸다
+    #[error("한도를 넘는다 — 나눠 보낸다")]
+    UploadTooLarge {
+        limit_bytes: i64,
+        limit_count: i64,
+        size: i64,
+        count: i64,
+    },
+    /// `upload-path-refused` — 올릴 수 없는 경로(422). 하나라도 있으면 아무것도 올리지 않는다 — `(path, reason)`
+    #[error("올릴 수 없는 경로 {}개", .paths.len())]
+    UploadPathRefused { paths: Vec<(String, String)> },
     /// `rebuild-failed` — 재구축 실패, 롤백됨(500). `reason`은 실패한 단계의 문장
     #[error("재구축 실패, 롤백됨")]
     RebuildFailed { reason: String },
@@ -149,6 +166,9 @@ impl Problem {
             Problem::ExistingSpecs { .. } => Some("existing-specs"),
             Problem::PushFailed { .. } => Some("push-failed"),
             Problem::RebuildFailed { .. } => Some("rebuild-failed"),
+            Problem::StorageMismatch { .. } => Some("storage-mismatch"),
+            Problem::UploadTooLarge { .. } => Some("upload-too-large"),
+            Problem::UploadPathRefused { .. } => Some("upload-path-refused"),
             Problem::NotImplemented { .. } => Some("not-implemented"),
             Problem::Internal { .. } | Problem::Git { .. } => Some("internal"),
         }
@@ -176,6 +196,9 @@ impl Problem {
             Problem::ProjectCodeConflict { .. } | Problem::ExistingSpecs { .. } => 409,
             Problem::PushFailed { .. } => 424,
             Problem::RebuildFailed { .. } => 500,
+            Problem::StorageMismatch { .. } => 409,
+            Problem::UploadTooLarge { .. } => 413,
+            Problem::UploadPathRefused { .. } => 422,
             Problem::NotImplemented { .. } => 501,
             Problem::Internal { .. } | Problem::Git { .. } => 500,
         }
@@ -367,6 +390,38 @@ impl Problem {
                 vec![("reason", Value::from(reason.as_str()))]
             }
             Problem::NotImplemented { card } => vec![("card", Value::from(card.as_str()))],
+            Problem::StorageMismatch { storage, .. } => {
+                vec![("storage", Value::from(storage.as_str()))]
+            }
+            Problem::UploadTooLarge {
+                limit_bytes,
+                limit_count,
+                size,
+                count,
+            } => {
+                let mut limit = serde_json::Map::new();
+                limit.insert("bytes".into(), Value::from(*limit_bytes));
+                limit.insert("count".into(), Value::from(*limit_count));
+                vec![
+                    ("limit", Value::Object(limit)),
+                    ("size", Value::from(*size)),
+                    ("count", Value::from(*count)),
+                ]
+            }
+            Problem::UploadPathRefused { paths } => vec![(
+                "paths",
+                Value::from(
+                    paths
+                        .iter()
+                        .map(|(p, r)| {
+                            let mut m = serde_json::Map::new();
+                            m.insert("path".into(), Value::from(p.as_str()));
+                            m.insert("reason".into(), Value::from(r.as_str()));
+                            Value::Object(m)
+                        })
+                        .collect::<Vec<_>>(),
+                ),
+            )],
             Problem::Blank { .. } | Problem::Internal { .. } | Problem::Git { .. } => vec![],
         }
     }

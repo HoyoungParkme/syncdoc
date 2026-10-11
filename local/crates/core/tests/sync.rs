@@ -949,3 +949,111 @@ async fn sync_now_reads_pending_and_rebuild_index_syncs_readme_first() {
     ));
     assert_eq!(git(&e.origin(), &["rev-parse", "main"]), head);
 }
+
+#[tokio::test]
+async fn upload_code_commits_once_refuses_paths_and_limits() {
+    use indexmap::IndexMap;
+    let e = env().await;
+    let agent = e.author(Entry::Mcp);
+    let up = |files: Vec<(&str, String)>, delete: Vec<&str>| {
+        let files: IndexMap<String, String> =
+            files.into_iter().map(|(p, c)| (p.to_string(), c)).collect();
+        let delete: Vec<String> = delete.into_iter().map(String::from).collect();
+        let (pool, repos, agent) = (e.pool().clone(), e.repos.clone(), agent.clone());
+        async move {
+            pipeline::upload_code(&pool, &repos, CODE, &files, &delete, "코드", &agent).await
+        }
+    };
+    // 먼저 밖에서 민 명세 — 올린 뒤에도 문서로 살아 있다(DEV-19)
+    let out = e.outside();
+    write(
+        &out,
+        "docs/specs/02-PRD/LS-PRD-001.md",
+        &prd_file("draft", "설명."),
+    );
+    commit_push(&out, "spec: PRD");
+    let r = up(
+        vec![("a.py", "a = 1\n".into()), ("src/b.py", "b = 2\n".into())],
+        vec![],
+    )
+    .await
+    .expect("올리기");
+    assert!(r.changed && r.files == 2 && r.deleted == 0);
+    assert_eq!(git(&e.origin(), &["rev-parse", "main"]), r.commit);
+    assert_eq!(
+        git(&e.origin(), &["log", "-1", "--format=%an"]),
+        "hoyoung 님"
+    );
+    assert_eq!(e.processed().await, r.commit);
+    let mut c = e.conn().await;
+    assert_eq!(
+        scalar_i64(&mut c, "SELECT count(*) FROM documents").await,
+        1
+    );
+    // 지우기 하나 + 같은 내용 하나
+    let r2 = up(vec![("src/b.py", "b = 2\n".into())], vec!["a.py"])
+        .await
+        .expect("지우기");
+    assert!(r2.changed && r2.deleted == 1);
+    let r3 = up(vec![("src/b.py", "b = 2\n".into())], vec![])
+        .await
+        .expect("같다");
+    assert!(!r3.changed);
+    assert_eq!(r3.commit, r2.commit);
+    // 한도
+    match up(vec![("big.txt", "x".repeat(5 * 1024 * 1024 + 1))], vec![]).await {
+        Err(Problem::UploadTooLarge { size, count, .. }) => {
+            assert_eq!((size, count), (5 * 1024 * 1024 + 1, 1))
+        }
+        other => panic!("{other:?}"),
+    }
+    let many: Vec<(String, String)> = (0..501)
+        .map(|i| (format!("f{i}.txt"), String::new()))
+        .collect();
+    match up(
+        many.iter().map(|(p, c)| (p.as_str(), c.clone())).collect(),
+        vec![],
+    )
+    .await
+    {
+        Err(Problem::UploadTooLarge { count, .. }) => assert_eq!(count, 501),
+        other => panic!("{other:?}"),
+    }
+    // 거절 경로 여덟 — 전부 알리고 아무것도 올리지 않는다
+    let head = git(&e.origin(), &["rev-parse", "main"]);
+    match up(
+        vec![
+            ("/abs.py", "x".into()),
+            ("../x.py", "x".into()),
+            (".git/config", "x".into()),
+            ("docs/specs/02-PRD/x.md", "x".into()),
+            ("cfg/.env.local", "x".into()),
+            ("keys/Server.PEM", "x".into()),
+            ("a\\b.py", "x".into()),
+            ("bin.dat", "a\0b".into()),
+        ],
+        vec!["  "],
+    )
+    .await
+    {
+        Err(Problem::UploadPathRefused { paths }) => {
+            let reasons: Vec<&str> = paths.iter().map(|(_, r)| r.as_str()).collect();
+            assert_eq!(
+                reasons,
+                [
+                    "절대 경로",
+                    "상위 경로(..)",
+                    ".git",
+                    "명세 경로 — create_document·update_document로 쓴다",
+                    "비밀 꼴",
+                    "비밀 꼴",
+                    "역슬래시 — / 로 쓴다",
+                    "빈 경로",
+                    "글자가 아니다(이진)",
+                ]
+            );
+        }
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(git(&e.origin(), &["rev-parse", "main"]), head);
+}
