@@ -6,10 +6,12 @@ use std::sync::LazyLock;
 use axum::Json;
 use axum::extract::{Path, RawQuery, State};
 use num_bigint::BigInt;
+use syncdoc_core::account::service::AccountService;
 use syncdoc_core::errors::Problem;
 use syncdoc_core::project::service::ProjectService;
 use syncdoc_core::queries;
 use syncdoc_core::spec::SpecService;
+use syncdoc_core::types::ApiAuthor;
 
 use crate::compat::fastapi::{self, schemas};
 use crate::compat::pydantic::Validator;
@@ -17,7 +19,7 @@ use crate::compat::pyvalue::PyValue;
 use crate::state::AppState;
 use crate::web::auth::current_user;
 use crate::web::problem::ApiProblem;
-use crate::web::schemas::{Diff, Document};
+use crate::web::schemas::{Diff, Document, Version};
 
 static VERSION_NO: LazyLock<Validator> = LazyLock::new(schemas::version_no);
 
@@ -81,4 +83,34 @@ pub async fn diff(
             }))
         }
     }
+}
+
+/// SYNC-API-001#GET/api/docs/{docId}/versions
+///
+/// 파이썬 경로처럼 queries를 거치지 않는다(이력의 작성자 이름은 users_by_ids로, API-001 3.1 예외) — 소유 검사도 없다
+pub async fn versions(
+    State(state): State<AppState>,
+    Path(doc_id): Path<String>,
+) -> Result<Json<Vec<Version>>, ApiProblem> {
+    let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+    current_user(&mut c, &state).await?;
+    let mut rows = SpecService { db: &mut c }.list_versions(&doc_id).await?;
+    let ids: Vec<i32> = rows
+        .iter()
+        .map(|v| v.author.user_id)
+        .chain(rows.iter().filter_map(|v| v.author.instructed_by_id))
+        .collect();
+    let names = AccountService { db: &mut c }.users_by_ids(&ids).await?;
+    for v in &mut rows {
+        v.author_view = Some(ApiAuthor {
+            kind: v.author.kind.clone(),
+            user: names.get(&v.author.user_id).cloned(),
+            instructed_by: v
+                .author
+                .instructed_by_id
+                .and_then(|i| names.get(&i).cloned()),
+            via: v.author.via.clone(),
+        });
+    }
+    Ok(Json(rows.iter().map(Version::from).collect()))
 }
