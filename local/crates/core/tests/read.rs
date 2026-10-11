@@ -495,3 +495,36 @@ async fn asset_path_only_inside_specs_with_allowed_extensions() {
         Err(Problem::NotFound { resource, .. }) if resource == "project"
     ));
 }
+
+#[tokio::test]
+async fn trash_list_has_only_trashed_documents_newest_first() {
+    let e = env().await;
+    let mut c = e.conn().await;
+    assert!(
+        queries::trash_list(&mut c, &e.repos, CODE, &e.user)
+            .await
+            .expect("빈 휴지통")
+            .is_empty()
+    );
+    sqlx::query(
+        "UPDATE documents SET trashed_at = CASE doc_id WHEN 'LR-UC-001' THEN now() ELSE now() - interval '1 day' END \
+         WHERE doc_id IN ('LR-UC-001', 'LR-SCN-001')",
+    )
+    .execute(&mut *c)
+    .await
+    .expect("휴지통");
+    let t = queries::trash_list(&mut c, &e.repos, CODE, &e.user)
+        .await
+        .expect("휴지통");
+    let ids: Vec<&str> = t.iter().map(|d| d.doc_id.as_str()).collect();
+    assert_eq!(ids, ["LR-UC-001", "LR-SCN-001"]);
+    assert!(
+        t.iter()
+            .all(|d| d.trashed_at.is_some() && d.author.is_some() && d.counts.is_empty())
+    );
+    let other = user(&mut c, "other").await;
+    assert!(matches!(
+        queries::trash_list(&mut c, &e.repos, CODE, &other).await,
+        Err(Problem::NotFound { .. })
+    ));
+}
