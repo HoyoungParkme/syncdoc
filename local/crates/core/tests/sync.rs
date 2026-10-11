@@ -341,3 +341,30 @@ async fn mark_convention_error_replaces_the_three_columns() {
         1
     );
 }
+
+#[tokio::test]
+async fn reference_clear_drops_this_projects_references() {
+    use syncdoc_core::reference::service::ReferenceService;
+    let e = env().await;
+    e.create("PRD", PRD).await;
+    e.create(
+        "SCN",
+        "---\ndoc_id: \ntype: SCN\ntitle: 시나리오\nstatus: draft\nupstream: [LS-PRD-001]\n---\n# 시나리오\n\n## 1. 페르소나\n\n## 2. 시나리오\n\n#### S1 흐름\n근거: [[LS-PRD-001#R1]]\n\n## 3. 대응표\n",
+    )
+    .await;
+    let mut c = e.conn().await;
+    assert!(scalar_i64(&mut c, "SELECT count(*) FROM \"references\"").await > 0);
+    let pid = scalar_i64(&mut c, "SELECT id::bigint FROM projects").await as i32;
+    ReferenceService { db: &mut c }
+        .clear(pid)
+        .await
+        .expect("비우기");
+    assert_eq!(
+        scalar_i64(&mut c, "SELECT count(*) FROM \"references\"").await,
+        0
+    );
+    ReferenceService { db: &mut c }
+        .clear(pid + 1)
+        .await
+        .expect("다른 프로젝트");
+}

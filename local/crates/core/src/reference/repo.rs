@@ -247,3 +247,14 @@ pub async fn inbound_of_document(
     .fetch_all(db)
     .await
 }
+
+/// 프로젝트 문서에서 나간 참조 전부 — 재구축의 비우기
+pub async fn delete_in_project(db: &mut PgConnection, project_id: i32) -> Result<u64, sqlx::Error> {
+    Ok(sqlx::query(
+        "DELETE FROM \"references\" WHERE from_document_id IN (SELECT id FROM documents WHERE project_id = $1)",
+    )
+    .bind(project_id)
+    .execute(db)
+    .await?
+    .rows_affected())
+}
