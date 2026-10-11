@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-002, SYNC-MS-003, SYNC-STD-001, SYNC-STD-004]
 
 서비스는 연결을 빌려 받는다 — `SpecService<'c> { pub db: &'c mut PgConnection }`. DB가 필요 없는 함수는 연결 없이 부르는 연관 함수다(`SpecService::item_blocks(…)`). 트랜잭션은 부르는 쪽이 쥔다([[SYNC-STD-004#DEV-10]]).
 
-**카드 L5 몫은 엔진이다(2026-10-08)** — 마크다운 넷, 항목 블록, 규약 검증, frontmatter 채움, diff. **카드 L6이 문서 목록(`list_by_project`)을, 카드 L7이 저장·조회(만들기·저장·문서·항목·이름·이웃·ID 발급·선행조건)를, 카드 L8이 이력·최근 변경·관계도 목록·pk 여럿·휴지통 목록을 더했다(2026-10-11)** — 저장 파이프라인([[SYNC-MS-017]])과 읽기 조합이 쓴다. **타입은 문자열이다(L7)** — 파이썬처럼 에이전트가 보낸 모르는 타입도 받아 `frontmatter.type` 위반까지 같은 답을 낸다(`check`·`validate`·`apply_frontmatter`, 상태 조건도 문자열 그대로 비교). 나머지 SpecService(상태, 휴지통, 재구축…)는 쓰는 카드(L9·L11)가 이 문서에 더한다.
+**카드 L5 몫은 엔진이다(2026-10-08)** — 마크다운 넷, 항목 블록, 규약 검증, frontmatter 채움, diff. **카드 L6이 문서 목록(`list_by_project`)을, 카드 L7이 저장·조회(만들기·저장·문서·항목·이름·이웃·ID 발급·선행조건)를, 카드 L8이 이력·최근 변경·관계도 목록·pk 여럿·휴지통 목록을, 카드 L9가 상태 적용·휴지통 넣기·되살릴 커밋·옛 판 본문·완전 삭제를 더했다(2026-10-11)** — 저장 파이프라인([[SYNC-MS-017]])과 읽기 조합이 쓴다. **타입은 문자열이다(L7)** — 파이썬처럼 에이전트가 보낸 모르는 타입도 받아 `frontmatter.type` 위반까지 같은 답을 낸다(`check`·`validate`·`apply_frontmatter`, 상태 조건도 문자열 그대로 비교). 나머지 SpecService(상태, 휴지통, 재구축…)는 쓰는 카드(L9·L11)가 이 문서에 더한다.
 
 **파이썬 판과 바이트까지 같다**(사용자 결정 2026-10-08 — 유니코드까지). 파이썬 엔진은 YAML·마크다운 라이브러리 없이 정규식·`difflib`이고 메시지에 `repr`이 들어간다. 그래서
 - 문자 분류는 **파이썬 3.12(유니코드 15.0)의 표**를 쓴다 — 정규식의 `\s`·`\S`·`\d`·`\w`와 `str.strip()`. 표는 `crates/core/src/pycompat/`의 생성물이다(`cargo xtask unicode-tables`). Rust 표준의 `trim()`·`char::is_whitespace`·`regex`의 `\d`는 쓰지 않는다(`\x1c`~`\x1f`, 유니코드 판이 다르다)
@@ -60,6 +60,11 @@ upstream: [SYNC-DOM-004, SYNC-MS-002, SYNC-MS-003, SYNC-STD-001, SYNC-STD-004]
 | [[#SpecService.recent_changes]] | 최근 변경 N건 |
 | [[#SpecService.list_items_by_project]] | 관계도용 항목 목록 |
 | [[#SpecService.list_trashed]] | 휴지통 목록 |
+| [[#SpecService.apply_status]] | 상태 변경 적용 |
+| [[#SpecService.trash]] | 휴지통에 넣기 |
+| [[#SpecService.trash_commit]] | 휴지통 커밋 해시 |
+| [[#SpecService.version_body]] | 특정 버전 본문 |
+| [[#SpecService.delete_document]] | 완전 삭제 — 행 삭제 |
 
 ---
 
@@ -560,6 +565,86 @@ pub async fn list_trashed(&mut self, project_id: i32) -> Result<Vec<DocumentSumm
 **처리** `DB: documents where project_id and trashed_at is not null order by trashed_at desc` · 문서마다 최근 판의 작성자 · `→ DocumentSummary`(요약 꼴은 [[#SpecService.list_by_project]]와 같다)
 
 **테스트 관점** (시험 DB) 휴지통 문서만, 최근에 넣은 것부터 · 휴지통이 아닌 것은 없다
+
+---
+
+#### SpecService.apply_status 상태 변경 적용
+
+**시그니처**
+```rust
+pub async fn apply_status(&mut self, document: &Document, new_body: &str, commit_hash: Option<&str>, author: &Author, reason: Option<&str>) -> Result<(), Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.apply_status]] · [[SYNC-MS-017#pipeline.save_pipeline]]의 `web_status` 갈래
+
+**처리** [[SYNC-MS-002#SpecService.apply_status]]와 같다 — 판을 만들지 않는다 · `to` = 새 본문 frontmatter의 `status`(없으면 지금 상태) · `DB: status_changes insert (from=문서 행의 상태, to, 바꾼 사람, via=입구를 접은 것, reason, commit_hash, changed_at=저장 시각)` · `DB: documents update status=to, current_body=new_body`(갱신 시각은 DB `now()` — 파이썬 `onupdate`)
+
+**다른 점** 목표 상태(`to`) 인자는 받지 않는다 — 재구축(L11)만 쓴다
+
+**호출하는 것** [[#markdown.parse_frontmatter]]
+
+**테스트 관점** (시험 DB) 판 수 그대로 · 상태 변경 행에 커밋 해시와 사유 · 에이전트 → `via=mcp`, 웹 → `web`
+
+---
+
+#### SpecService.trash 휴지통에 넣기
+
+**시그니처**
+```rust
+pub async fn trash(&mut self, document: &Document, commit_hash: &str, author: &Author) -> Result<Vec<i32>, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.trash]] · [[SYNC-UC-001#UC-A7]] 5
+
+**처리** [[SYNC-MS-002#SpecService.trash]]와 같다 — 지우지 않은 항목을 id 차례로 전부 지운 것으로(항목마다 저장 시각) · `DB: status_changes insert (from=지금 상태, to=draft, 바꾼 사람, via 접음, reason "휴지통", commit_hash)` · `DB: documents update status=draft, trashed_at=저장 시각, trashed_by_user_id` · `→` 지운 항목 pk들
+
+**테스트 관점** (시험 DB) 항목 전부 지운 것 · `trashed_at` 있음 · 규약 오류는 그대로 · 상태 변경 행 `휴지통`
+
+---
+
+#### SpecService.trash_commit 휴지통 커밋 해시
+
+**시그니처**
+```rust
+pub async fn trash_commit(&mut self, document_id: i32) -> Result<Option<String>, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.trash_commit]]
+
+**처리** `DB: status_changes where document_id and reason = '휴지통' order by changed_at desc, id desc limit 1`의 `commit_hash`
+
+**테스트 관점** 두 번 넣었다 되살렸으면 나중 것
+
+---
+
+#### SpecService.version_body 특정 버전 본문
+
+**시그니처**
+```rust
+pub async fn version_body(&mut self, doc_id: &str, version_no: i32) -> Result<String, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.version_body]] · [[SYNC-MS-017#pipeline.revert]]
+
+**처리** 문서가 없으면 `! NotFound { resource: "document", id: doc_id }` · 판이 없으면 `! NotFound { resource: "version", id: "{doc_id} v{n}" }` · `→` 그 판의 본문
+
+**테스트 관점** 있는 판 → 본문 · 없는 판 → `not-found`(version)
+
+---
+
+#### SpecService.delete_document 완전 삭제 — 행 삭제
+
+**시그니처**
+```rust
+pub async fn delete_document(&mut self, document: &Document) -> Result<i64, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.delete_document]] · [[SYNC-UC-001#UC-H18]] 8
+
+**처리** 문지기 검사는 하지 않는다(부르는 쪽이 센다) · `DB:` 이 문서에서 나간 `references` → `items` → `versions` → `status_changes` → `documents`를 지운다(파이썬과 같은 차례) · `→` 지운 행 수 합
+
+**테스트 관점** (시험 DB) 그 문서 행 전부 사라짐 · 다른 문서는 그대로 · 지운 뒤 같은 번호를 다시 발급
+
 
 ---
 
