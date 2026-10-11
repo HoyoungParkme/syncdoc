@@ -87,6 +87,7 @@ pub async fn call(
         "create_document" => create_document(state, user, &typed).await,
         "update_document" => update_document(state, user, &typed).await,
         "delete_document" => delete_document(state, user, &typed).await,
+        "restore_document" => restore_document(state, user, &typed).await,
         _ => Err(Problem::NotImplemented {
             card: tool.card.to_string(),
         }),
@@ -361,6 +362,18 @@ async fn delete_document(state: &AppState, user: &UserRow, a: &PyValue) -> Resul
         "broken_refs": r.broken_refs,
         "next_step": r.next_step,
     }))
+}
+
+/// SYNC-API-002#restore_document
+async fn restore_document(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let r = pipeline::restore_document(
+        &state.pool,
+        &state.repos,
+        &arg_str(a, "doc_id"),
+        &agent_author(user),
+    )
+    .await?;
+    Ok(save_json(&r))
 }
 
 /// SYNC-API-002#get_template
