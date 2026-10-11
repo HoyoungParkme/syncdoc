@@ -1,13 +1,297 @@
 /** UI-13 설정 — SYNC-UI-002#UI-13. 어느 화면 위에서든 뜨는 다이얼로그. 닫으면 보던 화면 그대로.
  *  1 다이얼로그 · 2 내 계정(2.1 로그인 ID, 2.2 로그아웃, 2.3 커밋 이메일 행, 2.4 삭제, 2.5 입력, 2.6 추가)
  *  3 MCP 토큰(3.1 행, 3.2 폐기, 3.3 이름, 3.4 발급 열기, 3.5 마지막 사용, 3.6 발급)
- *  4 토큰 원문 상자(4.1 원문, 4.2 복사) · 5 관리 카드(5.1 열기) · 6 관리 영역(UI-14) · 7 닫기(✕) · 8 클라이언트 설정(8.1 스니펫) · 9 닫기 */
+ *  4 토큰 원문 상자(4.1 원문, 4.2 복사) · 5 관리 카드(5.1 열기) · 6 관리 영역(UI-14) · 7 닫기(✕) · 8 클라이언트 설정(8.1 스니펫) · 9 닫기
+ *  싱크독_로컬 설치형만(카드 L16) — 10 이 PC(10.1 이름 · 10.2 모델 주소 · 10.3 모델 키 · 10.4 모델 이름 · 10.5 저장하고 다시 켜기 ·
+ *  10.6 자동 시작 · 10.7 데이터 자리 · 10.8 새 자리 · 10.9 옮기기 · 10.10 마지막 다시 켜기) · 11 백업(11.1 폴더 · 11.2 암호 ·
+ *  11.3 저장하고 다시 켜기 · 11.4 지금 백업 · 11.5 마지막 백업 · 11.6 백업 행 · 11.7 되살리기 · 11.8 되살리기 암호) · 12 다시 켜는 중 */
 import { useEffect, useState } from 'react'
-import { ago, api, ApiError, MCP_NAME, type AccessToken, type CommitEmail, type Me } from '../api/client'
+import {
+  ago,
+  api,
+  ApiError,
+  MCP_NAME,
+  type AccessToken,
+  type CommitEmail,
+  type LocalInfo,
+  type Me,
+} from '../api/client'
 import { Admin } from '../pages/Admin'
 import { useEscape } from './ui'
 
 const day = (iso: string) => iso.slice(0, 10)
+
+/** 이 PC의 시각 — `YYYY-MM-DD HH:MM` */
+function when(iso: string): string {
+  const d = new Date(iso)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+/** 크기 — MB(소수 하나), 1MB 아래는 KB */
+function size(n: number): string {
+  return n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`
+}
+
+/** 문제의 `reason` — 없으면 문장 */
+function reason(e: unknown): string {
+  if (e instanceof ApiError) return String(e.problem.reason ?? e.message)
+  return '실패했습니다'
+}
+
+/** 「이 PC」·「백업」 카드 — 싱크독_로컬 설치형(Rust)만. `/api/local`이 404면(파이썬 판) 그리지 않는다 (UI-13 10·11·12, 카드 L16) */
+function LocalCards() {
+  const [info, setInfo] = useState<LocalInfo | null>(null)
+  const [name, setName] = useState('')
+  const [url, setUrl] = useState('')
+  const [key, setKey] = useState('')
+  const [model, setModel] = useState('')
+  const [moveTo, setMoveTo] = useState('')
+  const [dir, setDir] = useState('')
+  const [password, setPassword] = useState('')
+  const [restorePw, setRestorePw] = useState('')
+  const [busy, setBusy] = useState(false)
+  // 다시 켜는 중(12) — 202 뒤 마지막 다시 켜기(10.10)의 시각이 바뀔 때까지
+  const [restarting, setRestarting] = useState(false)
+  const [error, setError] = useState<{ at: string; text: string } | null>(null)
+  const fill = (v: LocalInfo) => {
+    setInfo(v)
+    setName(v.name)
+    setUrl(v.llm_api_url)
+    setModel(v.llm_model)
+    setKey('')
+    setDir(v.backup.dir)
+    setPassword('')
+  }
+  useEffect(() => {
+    api
+      .get<LocalInfo>('/api/local')
+      .then(fill)
+      .catch(() => setInfo(null)) // 파이썬 판 — 없는 경로
+  }, [])
+  if (!info) return null
+
+  async function restart(go: () => Promise<unknown>, at: string) {
+    setError(null)
+    const before = info?.last_op?.at ?? ''
+    try {
+      await go()
+    } catch (e) {
+      setError({ at, text: reason(e) })
+      return
+    }
+    setRestarting(true)
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 1000))
+      try {
+        const v = await api.get<LocalInfo>('/api/local')
+        if ((v.last_op?.at ?? '') !== before) {
+          fill(v)
+          break
+        }
+      } catch {
+        // 내려가 있다 — 다시 뜰 때까지
+      }
+    }
+    setRestarting(false)
+  }
+  const changed: Record<string, string> = {}
+  if (name !== info.name) changed.name = name
+  if (url !== info.llm_api_url) changed.llm_api_url = url
+  if (key) changed.llm_api_key = key
+  if (model !== info.llm_model) changed.llm_model = model
+  const backupChanged: Record<string, string> = {}
+  if (dir !== info.backup.dir) backupChanged.backup_dir = dir
+  if (password) backupChanged.backup_password = password
+  async function autostart(on: boolean) {
+    setInfo(await api.put<LocalInfo>('/api/local/autostart', { on }))
+  }
+  async function backupNow() {
+    setBusy(true)
+    try {
+      await api.post('/api/local/backups')
+    } catch {
+      // 실패는 마지막 백업(11.5)에 남는다
+    } finally {
+      fill(await api.get<LocalInfo>('/api/local'))
+      setBusy(false)
+    }
+  }
+  function move() {
+    // 규칙: 옮기기는 확인을 받는다
+    if (!confirm(`데이터를 ${moveTo}로 옮기고 다시 켤까요? 옛 폴더는 지우지 않습니다.`)) return
+    restart(() => api.post('/api/local/move', { dir: moveTo }), 'move')
+  }
+  function restore(file: string) {
+    // 규칙: 되살리기는 확인을 받는다 — 성공하면 백업 뒤의 일이 사라진다
+    if (!confirm(`${file} 때로 되돌릴까요? 그 뒤에 쌓인 명세·대화는 사라집니다.`)) return
+    restart(() => api.post('/api/local/restore', restorePw ? { name: file, password: restorePw } : { name: file }), 'restore')
+  }
+  const last = info.backup.last
+  return (
+    <>
+      {restarting && (
+        <div className="tokbox" data-el="12">
+          <b>다시 켜는 중…</b>화면이 저절로 돌아옵니다.
+        </div>
+      )}
+      <section className="card" data-el="10">
+        <div className="cardh">
+          <b>이 PC</b>
+        </div>
+        <p className="lbl">이 PC에서만 쓰는 값입니다. 저장하면 싱크독_로컬이 다시 켜집니다(몇 초).</p>
+        {info.last_op && (
+          <div className="row" data-el="10.10">
+            <span className={info.last_op.ok ? 'lbl' : 'lbl warn'}>
+              마지막 다시 켜기 — {info.last_op.message} · {when(info.last_op.at)}
+            </span>
+          </div>
+        )}
+        <div className="row">
+          <span className="two">
+            <b>이름</b>
+            <span className="lbl">아이디 {info.login} · 커밋 작성자</span>
+          </span>
+          <input className="inp wide" data-el="10.1" placeholder={info.login} value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="row">
+          <b>모델 주소</b>
+          <input
+            className="inp wide mono"
+            data-el="10.2"
+            placeholder="https://llm.사내/v1/chat/completions"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+          />
+        </div>
+        <div className="row">
+          <b>모델 키</b>
+          <input
+            className="inp wide mono"
+            type="password"
+            data-el="10.3"
+            placeholder={info.llm_api_key_set ? '정해 둠 — 바꿀 때만' : '없음'}
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+          />
+        </div>
+        <div className="row">
+          <b>모델 이름</b>
+          <input className="inp wide mono" data-el="10.4" placeholder="gpt-4o" value={model} onChange={(e) => setModel(e.target.value)} />
+        </div>
+        <div className="row">
+          <span className="grow" />
+          <button
+            className="btn sm solid"
+            type="button"
+            data-el="10.5"
+            disabled={restarting || Object.keys(changed).length === 0}
+            onClick={() => restart(() => api.put('/api/local/settings', changed), 'settings')}
+          >
+            저장하고 다시 켜기
+          </button>
+        </div>
+        {error?.at === 'settings' && <p className="lbl warn">{error.text}</p>}
+        <div className="row">
+          <label>
+            <input type="checkbox" data-el="10.6" checked={info.autostart} onChange={(e) => autostart(e.target.checked)} /> 로그인할 때
+            트레이로 켜기
+          </label>
+        </div>
+        <div className="row">
+          <span className="two">
+            <b>데이터 자리</b>
+            <span className="lbl mono" data-el="10.7">
+              {info.data_dir}
+            </span>
+          </span>
+        </div>
+        <div className="row">
+          <input className="inp wide mono" data-el="10.8" placeholder="새 폴더 — 없거나 빈 폴더" value={moveTo} onChange={(e) => setMoveTo(e.target.value)} />
+          <button className="btn sm" type="button" data-el="10.9" disabled={restarting || !moveTo.trim()} onClick={move}>
+            옮기기
+          </button>
+        </div>
+        {error?.at === 'move' && <p className="lbl warn">{error.text}</p>}
+      </section>
+
+      <section className="card" data-el="11">
+        <div className="cardh">
+          <b>백업</b>
+          <span className="grow" />
+          <button className="btn sm solid" type="button" data-el="11.4" disabled={busy || restarting || !info.backup.dir} onClick={backupNow}>
+            {busy ? '백업 중…' : '지금 백업'}
+          </button>
+        </div>
+        <p className="lbl">
+          하루 한 번 이 폴더에 DB와 서버 저장소를 묶어 둡니다. 최근 {info.backup.keep}개만 남깁니다. 암호를 잃으면 백업을 풀 수 없습니다 — 이 PC
+          밖에도 적어 두세요.
+        </p>
+        <div className="row">
+          <b>폴더</b>
+          <input className="inp wide mono" data-el="11.1" placeholder="D:\백업\syncdoc" value={dir} onChange={(e) => setDir(e.target.value)} />
+        </div>
+        <div className="row">
+          <b>암호</b>
+          <input
+            className="inp wide"
+            type="password"
+            data-el="11.2"
+            placeholder={info.backup.encrypted ? '정해 둠 — 바꿀 때만' : '없음 — 암호 없이 저장'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+        <div className="row">
+          <span className="grow" />
+          <button
+            className="btn sm solid"
+            type="button"
+            data-el="11.3"
+            disabled={restarting || Object.keys(backupChanged).length === 0}
+            onClick={() => restart(() => api.put('/api/local/settings', backupChanged), 'backup')}
+          >
+            저장하고 다시 켜기
+          </button>
+        </div>
+        {error?.at === 'backup' && <p className="lbl warn">{error.text}</p>}
+        {last && (
+          <div className="row" data-el="11.5">
+            <span className={last.error ? 'lbl warn' : 'lbl'}>
+              {last.error ? `마지막 백업 실패 — ${last.error}` : `마지막 백업 ${when(last.at)} · ${last.name}`}
+            </span>
+          </div>
+        )}
+        {info.backup.files.length > 0 && (
+          <div className="row">
+            <b>되살리기 암호</b>
+            <input
+              className="inp wide"
+              type="password"
+              data-el="11.8"
+              placeholder="비우면 설정의 암호"
+              value={restorePw}
+              onChange={(e) => setRestorePw(e.target.value)}
+            />
+          </div>
+        )}
+        {info.backup.files.map((f) => (
+          <div className="row" data-el="11.6" key={f.name}>
+            <span className="two">
+              <b className="mono">{f.name}</b>
+              <span className="lbl">{size(f.size)}</span>
+            </span>
+            <span className="grow" />
+            <button className="btn sm danger" type="button" data-el="11.7" disabled={restarting} onClick={() => restore(f.name)}>
+              되살리기
+            </button>
+          </div>
+        ))}
+        {error?.at === 'restore' && <p className="lbl warn">{error.text}</p>}
+      </section>
+    </>
+  )
+}
 
 export function SettingsDialog({ user, onClose }: { user: Me; onClose: () => void }) {
   // 폐쇄망판 — 로그인이 없고 모든 커밋이 로컬 사용자라 로그아웃·커밋 이메일이 없다 (UI-13 규칙, 카드 BC)
@@ -150,6 +434,8 @@ export function SettingsDialog({ user, onClose }: { user: Me; onClose: () => voi
             <p className="lbl">Claude Code · Codex · Gemini CLI가 같은 엔드포인트를 씁니다.</p>
             <pre className="snippet" data-el="8.1">{snippet}</pre>
           </section>
+
+          {closed && <LocalCards />}
 
           <section className="card" data-el="5">
             <div className="cardh">
