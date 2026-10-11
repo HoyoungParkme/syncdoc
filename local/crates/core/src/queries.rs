@@ -14,7 +14,7 @@ use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
 use crate::types::{
     ApiAuthor, AuthorRef, Document, DocumentSummary, ItemRef, ItemReferences, ItemView,
-    ProjectSummary, STAGES, StageSummary, Storage,
+    ProjectDetail, ProjectSummary, STAGES, StageSummary, Storage,
 };
 
 /// 작성자(id만) → 이름 붙은 작성자 — 파이썬 `_api_author`. 지시자는 id가 있을 때만
@@ -332,5 +332,58 @@ pub async fn item_references_view(
         item_id: item_id.to_string(),
         upstream,
         downstream,
+    })
+}
+
+/// SYNC-MS-018#queries.project_detail
+///
+/// 동기화 칸은 DB에 적힌 값 그대로 — 받아 오지 않는다(UI-4 요소 7)
+pub async fn project_detail(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+) -> Result<ProjectDetail, Problem> {
+    let (project, repo) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code, user)
+    .await?;
+    let mut recent = SpecService { db: &mut *db }
+        .recent_changes(project.id, 10)
+        .await?;
+    let ids: Vec<i32> = recent
+        .iter()
+        .map(|r| r.author.user_id)
+        .chain(recent.iter().filter_map(|r| r.author.instructed_by_id))
+        .collect();
+    let names = AccountService { db: &mut *db }.users_by_ids(&ids).await?;
+    for r in &mut recent {
+        r.author_view = Some(ApiAuthor {
+            kind: r.author.kind.clone(),
+            user: names.get(&r.author.user_id).cloned(),
+            instructed_by: r
+                .author
+                .instructed_by_id
+                .and_then(|i| names.get(&i).cloned()),
+            via: r.author.via.clone(),
+        });
+    }
+    let summary = project_summary(&mut *db, repos, user)
+        .await?
+        .into_iter()
+        .find(|p| p.code == code)
+        .ok_or_else(|| Problem::Internal {
+            log: format!("프로젝트 {code}의 요약이 없다"),
+        })?;
+    let docs = document_list(&mut *db, repos, code, user, None, None).await?;
+    Ok(ProjectDetail {
+        summary,
+        docs,
+        recent_changes: recent,
+        last_processed_commit: repo.last_processed_commit,
+        behind_by: repo.behind_by,
+        fetched_at: repo.fetched_at,
     })
 }
