@@ -749,3 +749,57 @@ async fn sync_readme_only_when_different() {
             .is_some()
     );
 }
+
+/// L15 clone_bare — 번들의 가지·태그가 해시 그대로, 원격 없음·HEAD main·받기 규칙. 번들이 아니면 `Problem::Git`
+#[tokio::test]
+async fn clone_bare_from_bundle_keeps_hashes_without_remote() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let g = git_for(tmp.path());
+    let src = tmp.path().join("src");
+    sh(
+        tmp.path(),
+        &["init", "-q", "-b", "main", src.to_str().expect("경로")],
+    );
+    std::fs::write(src.join("a.md"), "하나\n").expect("파일");
+    sh(&src, &["add", "-A"]);
+    sh(&src, &["commit", "-q", "-m", "하나"]);
+    sh(&src, &["tag", "v1"]);
+    sh(&src, &["branch", "side"]);
+    let bundle = tmp.path().join("x.bundle");
+    sh(
+        &src,
+        &[
+            "bundle",
+            "create",
+            "-q",
+            bundle.to_str().expect("경로"),
+            "--all",
+        ],
+    );
+    let origin = tmp.path().join("origins/B.git");
+    g.clone_bare(bundle.to_str().expect("경로"), &origin)
+        .await
+        .expect("복제");
+    for r in ["main", "v1", "side"] {
+        assert_eq!(sh(&origin, &["rev-parse", r]), sh(&src, &["rev-parse", r]));
+    }
+    assert_eq!(sh(&origin, &["remote"]), "");
+    assert_eq!(sh(&origin, &["symbolic-ref", "HEAD"]), "refs/heads/main");
+    for key in [
+        "receive.denyNonFastForwards",
+        "receive.denyDeletes",
+        "receive.fsckObjects",
+    ] {
+        assert_eq!(sh(&origin, &["config", key]), "true");
+    }
+    let junk = tmp.path().join("junk.bundle");
+    std::fs::write(&junk, b"not a bundle").expect("쓰레기");
+    assert!(matches!(
+        g.clone_bare(
+            junk.to_str().expect("경로"),
+            &tmp.path().join("origins/J.git")
+        )
+        .await,
+        Err(Problem::Git { .. })
+    ));
+}
