@@ -183,3 +183,85 @@ pub async fn graph(
     let g = queries::graph_view(&mut c, &state.repos, &code, &user, scope).await?;
     Ok(Json(Graph::from(&g)))
 }
+
+/// 첨부의 content-type — 파이썬 판 컨테이너의 `mimetypes.guess_type`(/etc/mime.types 없음)이 내는 그대로.
+/// 표에 없는 것(webp·woff·woff2·ttf)은 starlette 기본값 `application/octet-stream`, `text/*`에는 charset
+fn asset_content_type(path: &std::path::Path) -> &'static str {
+    let ext = path
+        .extension()
+        .map(|e| e.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "css" => "text/css; charset=utf-8",
+        _ => "application/octet-stream",
+    }
+}
+
+/// 파이썬 `str(float)` — 정수면 `.0`을 붙인다(ETag 재료)
+fn py_float(x: f64) -> String {
+    let s = format!("{x}");
+    if s.contains('.') || s.contains('e') || s.contains("inf") || s.contains("NaN") {
+        s
+    } else {
+        format!("{s}.0")
+    }
+}
+
+/// SYNC-API-001#GET/api/projects/{code}/files/{path}
+///
+/// 첨부(이미지·폰트·css)를 작업 사본에서 — starlette `FileResponse`와 같은 머리(차례까지). svg는 직접 열어도
+/// 스크립트가 앱 출처에서 못 돌게 `sandbox`. Range는 계약 밖이라 받지 않는다(늘 전체)
+pub async fn get_file(
+    State(state): State<AppState>,
+    Path(params): Path<std::collections::HashMap<String, String>>,
+) -> Result<Response, ApiProblem> {
+    // `/files/`도 같은 처리기 — 파이썬 `{path:path}`는 빈 것도 받는다
+    let code = params.get("code").cloned().unwrap_or_default();
+    let path = params.get("path").cloned().unwrap_or_default();
+    let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+    let user = current_user(&mut c, &state).await?;
+    let target = ProjectService {
+        db: &mut c,
+        repos: &state.repos,
+    }
+    .asset_path(&code, &path, &user)
+    .await?;
+    drop(c);
+    let meta = tokio::fs::metadata(&target).await.map_err(Problem::from)?;
+    let bytes = tokio::fs::read(&target).await.map_err(Problem::from)?;
+    let mtime = meta.modified().map_err(Problem::from)?;
+    let secs = mtime
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs_f64())
+        .unwrap_or(0.0);
+    let etag = {
+        use md5::Digest;
+        let digest = md5::Md5::digest(format!("{}-{}", py_float(secs), meta.len()).as_bytes());
+        let hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
+        format!("\"{hex}\"")
+    };
+    let mut resp = Response::new(axum::body::Body::from(bytes));
+    let h = resp.headers_mut();
+    let set = |h: &mut HeaderMap, k: header::HeaderName, v: &str| {
+        if let Ok(v) = header::HeaderValue::from_str(v) {
+            h.insert(k, v);
+        }
+    };
+    set(h, header::CACHE_CONTROL, "private, max-age=60");
+    if target
+        .extension()
+        .is_some_and(|e| e.to_string_lossy().to_lowercase() == "svg")
+    {
+        set(h, header::CONTENT_SECURITY_POLICY, "sandbox");
+    }
+    set(h, header::CONTENT_TYPE, asset_content_type(&target));
+    set(h, header::ACCEPT_RANGES, "bytes");
+    set(h, header::CONTENT_LENGTH, &meta.len().to_string());
+    set(h, header::LAST_MODIFIED, &httpdate::fmt_http_date(mtime));
+    set(h, header::ETAG, &etag);
+    Ok(resp)
+}

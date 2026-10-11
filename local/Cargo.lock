@@ -3460,6 +3460,7 @@ dependencies = [
  "httpdate",
  "indexmap",
  "jiter",
+ "md-5",
  "num-bigint",
  "num-traits",
  "percent-encoding",
