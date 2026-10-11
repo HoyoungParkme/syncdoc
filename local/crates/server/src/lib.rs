@@ -18,7 +18,7 @@ use crate::web::guard::guard;
 use crate::web::problem::{method_not_allowed, panic_response};
 use crate::web::routes::account::{issue_token, list_tokens, me, revoke_token};
 use crate::web::routes::projects::{
-    delete_project, get_project, init_project, list_docs, list_items, list_projects,
+    delete_project, get_project, graph, init_project, list_docs, list_items, list_projects,
 };
 use crate::web::routes::specs::spec_copy;
 use crate::web::static_files::fallback;
@@ -37,6 +37,7 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/api/projects/{code}/docs", get(list_docs))
         .route("/api/projects/{code}/flags", get(list_items))
+        .route("/api/projects/{code}/graph", get(graph))
         .merge(mcp::router(state.clone()))
         .route("/specs/", get(spec_copy))
         .route("/specs/{*path}", get(spec_copy))

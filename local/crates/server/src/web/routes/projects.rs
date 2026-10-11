@@ -10,7 +10,7 @@ use axum::response::{IntoResponse, Response};
 use syncdoc_core::errors::Problem;
 use syncdoc_core::project::service::ProjectService;
 use syncdoc_core::queries;
-use syncdoc_core::types::Storage;
+use syncdoc_core::types::{GraphScope, Storage};
 
 use crate::compat::fastapi::{self, schemas};
 use crate::compat::pydantic::Validator;
@@ -18,12 +18,13 @@ use crate::compat::pyvalue::{PyStr, PyValue};
 use crate::state::AppState;
 use crate::web::auth::current_user;
 use crate::web::problem::ApiProblem;
-use crate::web::schemas::{DocumentSummary, ProjectDetail, ProjectItemOut, ProjectSummary};
+use crate::web::schemas::{DocumentSummary, Graph, ProjectDetail, ProjectItemOut, ProjectSummary};
 
 static INIT_PROJECT: LazyLock<Validator> = LazyLock::new(schemas::init_project);
 static STAGE: LazyLock<Validator> = LazyLock::new(schemas::stage);
 static DOC_STATUS: LazyLock<Validator> = LazyLock::new(schemas::doc_status);
 static FLAG_KIND: LazyLock<Validator> = LazyLock::new(schemas::flag_kind);
+static GRAPH_SCOPE: LazyLock<Validator> = LazyLock::new(schemas::graph_scope);
 
 /// SYNC-API-001#GET/api/projects
 pub async fn list_projects(
@@ -159,4 +160,26 @@ pub async fn list_items(
     };
     let items = queries::project_items(&mut c, &state.repos, &code, &kind, &user).await?;
     Ok(Json(items.iter().map(ProjectItemOut::from).collect()))
+}
+
+/// SYNC-API-001#GET/api/projects/{code}/graph
+///
+/// 질의 `scope` — `all`(기본)·`approved`
+pub async fn graph(
+    State(state): State<AppState>,
+    Path(code): Path<String>,
+    RawQuery(raw): RawQuery,
+) -> Result<Json<Graph>, ApiProblem> {
+    let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+    let user = current_user(&mut c, &state).await?;
+    let q = fastapi::query_params(raw.as_deref());
+    let mut errors = Vec::new();
+    let scope = fastapi::query_field(&q, "scope", &GRAPH_SCOPE, false, &mut errors);
+    fastapi::check_errors(errors)?;
+    let scope = match scope {
+        Some(PyValue::Str(PyStr::Utf8(s))) if s == "approved" => GraphScope::Approved,
+        _ => GraphScope::All,
+    };
+    let g = queries::graph_view(&mut c, &state.repos, &code, &user, scope).await?;
+    Ok(Json(Graph::from(&g)))
 }
