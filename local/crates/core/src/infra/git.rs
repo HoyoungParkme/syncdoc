@@ -734,6 +734,13 @@ impl Git {
         Ok(commits)
     }
 
+    /// SYNC-MS-019#Git.checkout
+    pub async fn checkout(&self, workdir: &Path, git_ref: &str) -> Result<(), Problem> {
+        self.run(Some(workdir), &[os("checkout"), os("--force"), os(git_ref)])
+            .await?;
+        Ok(())
+    }
+
     /// SYNC-MS-019#Git.advertise_refs
     ///
     /// http-backend `get_info_refs` 그대로 — v2가 아니면 앞에 `# service=…` pkt-line과 flush

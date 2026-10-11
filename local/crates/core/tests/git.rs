@@ -672,3 +672,29 @@ async fn log_oldest_first_follows_renames_and_skips_deletions() {
             .is_empty()
     );
 }
+
+#[tokio::test]
+async fn checkout_force_drops_local_edits() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, _, work) = setup(tmp.path()).await;
+    g.commit_push(
+        &work,
+        "first",
+        &local_user(),
+        &files(&[("a.txt", "a\n")]),
+        &[],
+    )
+    .await
+    .expect("push");
+    g.fetch(&work).await.expect("fetch"); // push는 추적 참조를 고치지 않는다 — 재구축도 받고 나서 돌린다
+    std::fs::write(work.join("a.txt"), "고침\n").expect("고침");
+    g.checkout(&work, "origin/main").await.expect("checkout");
+    assert_eq!(
+        std::fs::read_to_string(work.join("a.txt")).expect("읽기"),
+        "a\n"
+    );
+    assert!(matches!(
+        g.checkout(&work, "없는-가지").await,
+        Err(Problem::Git { .. })
+    ));
+}
