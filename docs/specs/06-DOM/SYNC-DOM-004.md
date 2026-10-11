@@ -84,13 +84,13 @@ crates/server/src/
 │   ├── static_files.rs         화면 빌드(rust-embed) · 캐시 규칙 · 304 (INFRA 4.1)
 │   ├── schemas.rs              응답 형태 (API-001 4장)
 │   └── routes/                 API-001 경로 — account(/api/me · /api/me/tokens) · specs(/specs) · projects(/api/projects 목록·만들기·지우기, L6 ·
-│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8 · 상태·되돌리기·휴지통·되살리기·완전 삭제, L9) · references(항목·참조·체인, L8) · git(/git 스마트 HTTP 입구 — 경로를 starlette 정규식처럼 가른다, L10)
+│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8 · 상태·되돌리기·휴지통·되살리기·완전 삭제, L9) · references(항목·참조·체인, L8) · git(/git 스마트 HTTP 입구 — 경로를 starlette 정규식처럼 가른다, L10) · admin(/api/admin/repos 동기화 상태·재구축·통지·지금 가져오기·옮기기, L11)
 ├── mcp/                        /mcp — 파이썬 mcp SDK의 핸드셰이크 경로를 옮긴 것 (API-002 1장, 카드 L3)
 │   ├── auth.rs                 Bearer → AccountService.authenticate_token, 통과하면 응답 전에 커밋 (SEQ-C2)
 │   ├── transport.rs            streamable HTTP, 세션 없음 — Accept·Content-Type·본문 읽기·SSE 쓰기
 │   ├── dispatch.rs             JSON-RPC 봉투 검증 · 메서드 표(판마다) · 요청·알림 나누기 · 오류 꼴
 │   ├── handlers.rs             initialize·ping·tools·resources·prompts — MCPServer와 같은 답
-│   ├── tools.rs                도구 13개 — 인자 검증 후 카드마다 처리기, 없으면 not-implemented
+│   ├── tools.rs                도구 13개 — 인자 검증 후 카드마다 처리기, 없으면 not-implemented(L11까지 12개)
 │   └── declarations.json       도구 선언·안내문·서버 이름 — `cargo xtask mcp-tools`가 파이썬 판에서 만든다. 손으로 안 고친다
 └── compat/                     파이썬 호환 층 — 오류 문장·값 꼴을 파이썬 판과 바이트로 같게 (INFRA 9.8)
     ├── pyvalue.rs              JSON → 파이썬 값(dict 순서·큰 정수·inf·nan·짝 없는 서로게이트) · repr(문자 표는 core `pycompat`)
@@ -347,14 +347,17 @@ classDiagram
 
 | 메서드 | 부르는 곳 | 근거 | 던지는 에러 |
 |---|---|---|---|
-| [[SYNC-MS-013#ProjectService.init_project]] | MCP `init_project` · `POST /api/projects` | [[SYNC-MS-001#ProjectService.init_project]] | `storage-unavailable` · `project-code-invalid` · `project-code-conflict` · `existing-specs` · `push-failed` · `not-implemented`(보관본 재구축, L11) |
+| [[SYNC-MS-013#ProjectService.init_project]] | MCP `init_project` · `POST /api/projects` | [[SYNC-MS-001#ProjectService.init_project]] | `storage-unavailable` · `project-code-invalid` · `project-code-conflict` · `existing-specs` · `push-failed` · `rebuild-failed`(보관본 재구축, L11) |
 | [[SYNC-MS-013#ProjectService.delete_project]] | `DELETE /api/projects/{code}` | [[SYNC-MS-001#ProjectService.delete_project]] | `not-found` |
 | [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-013#ProjectService.get_owned]] | `get_template` · `delete_project` | [[SYNC-MS-001#ProjectService.get_owned]] | `not-found` |
 | [[SYNC-MS-013#ProjectService.list_owned]] | `queries.project_summary` | [[SYNC-MS-001#ProjectService.list_owned]] | — |
 | [[SYNC-MS-013#ProjectService.asset_path]] | `GET /api/projects/{code}/files/{path}`(L8) | [[SYNC-MS-001#ProjectService.asset_path]] | `not-found`(project·file) |
 | [[SYNC-MS-013#ProjectService.server_origin]] | git 입구 셋(L10) | [[SYNC-MS-001#ProjectService.server_origin]] | `not-found`(project) |
+| [[SYNC-MS-013#ProjectService.list_projects]] | `pipeline.catch_up`(L11) | [[SYNC-MS-001#ProjectService.list_projects]] | — |
+| [[SYNC-MS-013#ProjectService.repo_status]] · [[SYNC-MS-013#ProjectService.ensure_hook]] | `GET /api/admin/repos` · `POST …/hook`(L11) | [[SYNC-MS-001#ProjectService.repo_status]] | `not-found` |
+| [[SYNC-MS-013#ProjectService.sync_now]] · [[SYNC-MS-013#ProjectService.rebuild_index]] | `POST …/sync` · `POST …/rebuild`(L11) | [[SYNC-MS-001#ProjectService.sync_now]] | `not-found` · `rebuild-failed` · `push-failed` |
 
-규칙 — [[SYNC-DOM-002]] 4.1과 같다. **싱크독_로컬은 서버 저장뿐이다** — 서버 저장소는 `origins/{code}.git`, 작업 사본은 `repos/{code}`, 지우면 `origins/_archive/{code}-{UTC}.git`으로 보관한다(지우지 않는다). 코드마다 잠금을 쥔다. 동기화·재구축·첨부·git 입구는 그 카드가 더한다.
+규칙 — [[SYNC-DOM-002]] 4.1과 같다. **싱크독_로컬은 서버 저장뿐이다** — 서버 저장소는 `origins/{code}.git`, 작업 사본은 `repos/{code}`, 지우면 `origins/_archive/{code}-{UTC}.git`으로 보관한다(지우지 않는다). 코드마다 잠금을 쥔다. 서비스가 pipeline을 부르는 자리는 보관본 가져오기·지금 가져오기·재구축 위임 셋이다(L11, 파이썬 판 DOM-002 3.2와 같다).
 
 ### 4.3 spec · markdown (MS-014)
 
@@ -450,6 +453,7 @@ classDiagram
 | [[SYNC-MS-014#SpecService.issue_doc_id]] · [[SYNC-MS-014#SpecService.precondition]] · [[SYNC-MS-014#SpecService.create]] | 저장 파이프라인의 만들기 | [[SYNC-MS-002#SpecService.create]] | `precondition-unmet`(파이프라인이) |
 | [[SYNC-MS-014#SpecService.detect_deleted_items]] · [[SYNC-MS-014#SpecService.save]] · [[SYNC-MS-014#SpecService.item_pks]] | 저장 파이프라인의 고치기 | [[SYNC-MS-002#SpecService.save]] | — |
 | [[SYNC-MS-014#SpecService.get_document]] | 저장 파이프라인 · `queries.document_view` | [[SYNC-MS-002#SpecService.get_document]] | `not-found` |
+| [[SYNC-MS-014#SpecService.mark_deleted]] · [[SYNC-MS-014#SpecService.clear_index]] · [[SYNC-MS-014#SpecService.mark_convention_error]] | 밀린 커밋 처리·재구축(L11) | [[SYNC-MS-002#SpecService.mark_deleted]] | — |
 | [[SYNC-MS-014#SpecService.get_item]] · [[SYNC-MS-014#SpecService.resolve_item]] | `queries.item_view` · `queries.item_references_view` | [[SYNC-MS-002#SpecService.get_item]] | `not-found`(`available_items`) · `item-deleted` |
 | [[SYNC-MS-014#SpecService.describe_items]] · [[SYNC-MS-014#SpecService.describe_documents]] · [[SYNC-MS-014#SpecService.neighbors]] | 저장 파이프라인(삭제 확인) · `queries` | [[SYNC-MS-002#SpecService.describe_items]] | — |
 
@@ -495,9 +499,10 @@ classDiagram
 | [[SYNC-MS-015#ReferenceService.upstream_of_document]] | `queries.document_view` | [[SYNC-MS-003#ReferenceService.upstream_of_document]] | — |
 | [[SYNC-MS-015#ReferenceService.count_missing_by_document]] | `queries.project_summary` · `queries.document_list` | [[SYNC-MS-003#ReferenceService.count_missing_by_document]] | — |
 | [[SYNC-MS-015#ReferenceService.inbound_of_document]] | 휴지통 넣기·완전 삭제의 문지기(L9) | [[SYNC-MS-003#ReferenceService.inbound_of_document]] | — |
+| [[SYNC-MS-015#ReferenceService.clear]] | 재구축(L11) | [[SYNC-MS-003#ReferenceService.clear]] | — |
 | [[SYNC-MS-015#ReferenceService.references_among]] · [[SYNC-MS-015#ReferenceService.count_downstream]] · [[SYNC-MS-015#ReferenceService.missing_in_project]] | `queries.graph_view`·`downstream_view`·`diff_with_impact`·`project_items`(L8) | [[SYNC-MS-003#ReferenceService.references_among]] | — |
 
-규칙 — [[SYNC-DOM-002]] 4.3과 같다. 참조 행이 끊어짐을 스스로 말한다(`is_missing`·`raw_target`) — 따로 표가 없다. 조회 차례는 id다(#353). 휴지통·재구축 쪽은 L9·L11이 더한다.
+규칙 — [[SYNC-DOM-002]] 4.3과 같다. 참조 행이 끊어짐을 스스로 말한다(`is_missing`·`raw_target`) — 따로 표가 없다. 조회 차례는 id다(#353).
 
 ### 4.5 account (MS-016)
 
@@ -552,8 +557,9 @@ classDiagram
 | [[SYNC-MS-016#AccountService.revoke_token]] | `DELETE /api/me/tokens/{id}` | [[SYNC-MS-006#AccountService.revoke_token]] | `not-found` |
 | [[SYNC-MS-016#AccountService.authenticate_token]] | MCP 입구(`mcp/auth`) | [[SYNC-SEQ-001#SEQ-C2]] | — |
 | [[SYNC-MS-016#AccountService.users_by_ids]] | `queries.document_list` · `queries.document_view` | [[SYNC-MS-006#AccountService.users_by_ids]] | — |
+| [[SYNC-MS-016#AccountService.user_for_commit]] | 밀린 커밋 처리·재구축(L11) | [[SYNC-MS-006#AccountService.user_for_commit]] | `internal`(로컬 사용자 없음) |
 
-규칙 — [[SYNC-DOM-002]] 4.6과 같다. 로컬 사용자는 `kind=local` 행 하나뿐이다. 서비스는 연결을 빌려 받고 트랜잭션은 부르는 쪽이 쥔다. 토큰 원문은 발급 응답에만 있고 DB·로그에는 해시만 남는다. 커밋 작성자(L11)는 그 카드가 더한다.
+규칙 — [[SYNC-DOM-002]] 4.6과 같다. 로컬 사용자는 `kind=local` 행 하나뿐이다. 서비스는 연결을 빌려 받고 트랜잭션은 부르는 쪽이 쥔다. 토큰 원문은 발급 응답에만 있고 DB·로그에는 해시만 남는다. 커밋 작성자는 늘 로컬 사용자다(L11).
 
 ### 4.6 pipeline (MS-017)
 
@@ -572,6 +578,14 @@ classDiagram
         +trash_document(pool, repos, doc_id, author, confirm) TrashResult
         +restore_document(pool, repos, doc_id, author) SaveResult
         +purge_document(pool, repos, doc_id, author)
+        +process_commit(pool, repos, code, head, locked) Vec~SaveResult~
+        +type_of_dir(name) String
+        +rebuild(conn, repos, code) RebuildResult
+        +upload_code(pool, repos, code, files, delete, message, author) UploadResult
+        +move_to_server(pool, repos, code, user) MoveResult
+        +move_to_github(pool, repos, code, user, remote_url) MoveResult
+        +catch_up(pool, repos) Vec~SaveResult~
+        +poll_loop(pool, repos, interval)
     }
     class SaveInput {
         +Entry entry
@@ -583,6 +597,7 @@ classDiagram
         +Author author
         +String message
         +bool confirm_item_deletion
+        +Option~String~ commit_hash
     }
     class SaveResult {
         +String doc_id
@@ -601,12 +616,17 @@ classDiagram
 | [[SYNC-MS-017#pipeline.change_status]] | `POST /api/docs/{docId}/status` · MCP `change_status` | [[SYNC-MS-007#pipeline.change_status]] | `status-blocked` · `document-trashed` · `not-found` |
 | [[SYNC-MS-017#pipeline.revert]] | `POST /api/docs/{docId}/revert` | [[SYNC-MS-007#pipeline.revert]] | `already-current` · `not-found` · 저장의 것 |
 | [[SYNC-MS-017#pipeline.trash_document]] · [[SYNC-MS-017#pipeline.restore_document]] · [[SYNC-MS-017#pipeline.purge_document]] | `DELETE /api/docs/{docId}` · `POST …/restore` · `POST …/purge` · MCP `delete_document`·`restore_document` | [[SYNC-MS-007#pipeline.trash_document]] | `document-deletion-needs-confirm` · `document-trashed` · `document-not-trashed` · `document-has-history` · `push-failed` |
-| [[SYNC-MS-017#pipeline.save_pipeline]] | MCP `create_document` · `update_document` | [[SYNC-MS-007#pipeline.save_pipeline]] | `not-found` · `document-trashed` · `precondition-unmet` · `convention-violation` · `version-conflict` · `item-deletion-needs-confirm` · `push-failed` · `not-implemented`(밀린 커밋, L11) · `internal`(git) |
-| [[SYNC-MS-017#pipeline.read_pending]] | `save_pipeline` | [[SYNC-MS-007#pipeline.read_pending]] | `not-found` · `not-implemented`(L11) · `internal`(git) |
+| [[SYNC-MS-017#pipeline.save_pipeline]] | MCP `create_document` · `update_document` | [[SYNC-MS-007#pipeline.save_pipeline]] | `not-found` · `document-trashed` · `precondition-unmet` · `convention-violation` · `version-conflict` · `item-deletion-needs-confirm` · `push-failed` · `internal`(git) |
+| [[SYNC-MS-017#pipeline.read_pending]] | `save_pipeline` · git 입구의 push 뒤 · `ProjectService.sync_now` | [[SYNC-MS-007#pipeline.read_pending]] | `not-found` · `internal`(git) |
+| [[SYNC-MS-017#pipeline.process_commit]] · [[SYNC-MS-017#pipeline.type_of_dir]] | `read_pending` · `catch_up`(L11) | [[SYNC-MS-007#pipeline.process_commit]] | `internal`(git) — 파일 하나의 실패는 처리 지점만 멈춘다 |
+| [[SYNC-MS-017#pipeline.rebuild]] | `ProjectService.rebuild_index` · `init_project`(보관본 가져오기)(L11) | [[SYNC-MS-007#pipeline.rebuild]] | `rebuild-failed` |
+| [[SYNC-MS-017#pipeline.upload_code]] | MCP `upload_code`(L11) | [[SYNC-MS-007#pipeline.upload_code]] | `not-found` · `upload-too-large` · `upload-path-refused` · `push-failed` |
+| [[SYNC-MS-017#pipeline.move_to_server]] · [[SYNC-MS-017#pipeline.move_to_github]] | `POST …/move-to-server` · `…/move-to-github`(L11) | [[SYNC-MS-007#pipeline.move_to_server]] | `storage-mismatch` · `storage-unavailable` · `not-found` |
+| [[SYNC-MS-017#pipeline.catch_up]] · [[SYNC-MS-017#pipeline.poll_loop]] | 켤 때 `runtime.run`(L11) | [[SYNC-MS-007#scheduler.catch_up]] | — (저장소마다 `fetch_error`) |
 | [[SYNC-MS-017#pipeline.write_lock]] · [[SYNC-MS-017#pipeline.read_lock]] | `save_pipeline` · `read_pending` | [[SYNC-MS-007]] 락 | — |
 | [[SYNC-MS-017#pipeline.wait_idle]] | `runtime.shutdown` | [[SYNC-INFRA-001]] 9.1 | — |
 
-규칙 — [[SYNC-DOM-002]] 4.4와 같다. 프로젝트마다 쓰기 락 하나·읽기 락 하나, 프로세스 전역이고 시간 제한이 없다. 읽기 → 쓰기 차례(`read_pending`은 쓰기 락 밖). 검사가 다 끝난 뒤에야 git을 쓰고, git이 끝난 뒤에야 DB를 쓴다 — 실패하면 DB는 그대로다. 저장은 따로 띄운 작업에서 돌아 부른 요청이 끊겨도 끝까지 간다. 웹 갈래(상태·되돌리기·되살림)는 L9가 더했다. GitHub 입구 갈래와 주기 일(scheduler)은 L11이 더한다.
+규칙 — [[SYNC-DOM-002]] 4.4와 같다. 프로젝트마다 쓰기 락 하나·읽기 락 하나, 프로세스 전역이고 시간 제한이 없다. 읽기 → 쓰기 차례(`read_pending`은 쓰기 락 밖). 검사가 다 끝난 뒤에야 git을 쓰고, git이 끝난 뒤에야 DB를 쓴다 — 실패하면 DB는 그대로다. 저장은 따로 띄운 작업에서 돌아 부른 요청이 끊겨도 끝까지 간다. 웹 갈래(상태·되돌리기·되살림)는 L9가, 서버 저장소 push 갈래(`github`)·밀린 커밋 처리·재구축·따라잡기는 L11이 더했다 — 파이썬 판 `scheduler` 모듈의 둘도 여기 둔다. 코드 그래프 만들기는 L12.
 
 ### 4.7 queries (MS-018)
 
@@ -647,6 +667,10 @@ classDiagram
         +rev_list_count(workdir, range) i64
         +advertise_refs(origin, service, protocol) Vec~u8~
         +service_rpc(origin, service, body, protocol) Vec~u8~
+        +changed_files(workdir, range, prefix) Vec~ChangedFile~
+        +log(workdir, path) Vec~Commit~
+        +checkout(workdir, git_ref)
+        +sync_readme(workdir, user, code, specs_url) Option~String~
     }
 ```
 
@@ -656,6 +680,7 @@ classDiagram
 | [[SYNC-MS-019#Git.read]] | MCP `get_template`(저장소 규약 먼저) | [[SYNC-MS-009#git.read]] | `internal` |
 | [[SYNC-MS-019#Git.commit_push]] · [[SYNC-MS-019#Git.fetch]] · [[SYNC-MS-019#Git.rev_list_count]] | 저장 파이프라인 | [[SYNC-MS-009]] | `push-failed` · `internal` |
 | [[SYNC-MS-019#Git.advertise_refs]] · [[SYNC-MS-019#Git.service_rpc]] | git 입구(`/git/*`, L10) | [[SYNC-MS-009#git.http_backend]] | `internal` |
+| [[SYNC-MS-019#Git.changed_files]] · [[SYNC-MS-019#Git.log]] · [[SYNC-MS-019#Git.checkout]] · [[SYNC-MS-019#Git.sync_readme]] | 밀린 커밋 처리·재구축·재구축 위임(L11) | [[SYNC-MS-009#git.changed_files]] | `push-failed` · `internal` |
 
 규칙 — git CLI를 자식 프로세스로 부른다(윈도 MinGit · 리눅스 시스템 git). **사용자 git 설정을 막는다**(사용자 결정 2026-10-08) — 시스템·전역 설정 끔, 프롬프트·서명·autocrlf 끔, `LC_ALL=C`, `safe.directory=*`. 파이썬 판이 Docker 안에서 받는 깨끗한 환경과 같게 해 같은 명령이 같은 결과를 낸다. git 입구(upload-pack·receive-pack)는 L10이 더했다 — http-backend 없이 `--stateless-rpc`를 직접 부르고 http-backend의 머리를 그대로 낸다. 파이썬 판이 CGI로 넘기는 것과 같게: 요청 머리(`Authorization`·`Content-Type`·`Content-Encoding`·`Git-Protocol`)는 latin-1로 읽고 · gzip 본문이 깨졌으면 서비스를 부르지 않고 빈 결과(http-backend는 죽고 자식도 끝난다) · 인증·원본을 지난 receive-pack 요청 뒤에는 응답이 무엇이든 밀린 커밋을 읽는다(파이썬 판 `BackgroundTask` 자리).
 
