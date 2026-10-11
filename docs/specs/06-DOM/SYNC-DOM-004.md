@@ -84,7 +84,7 @@ crates/server/src/
 │   ├── static_files.rs         화면 빌드(rust-embed) · 캐시 규칙 · 304 (INFRA 4.1)
 │   ├── schemas.rs              응답 형태 (API-001 4장)
 │   └── routes/                 API-001 경로 — account(/api/me · /api/me/tokens) · specs(/specs) · projects(/api/projects 목록·만들기·지우기, L6 ·
-│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8) · references(항목·참조·체인, L8)
+│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8 · 상태·되돌리기·휴지통·되살리기·완전 삭제, L9) · references(항목·참조·체인, L8)
 ├── mcp/                        /mcp — 파이썬 mcp SDK의 핸드셰이크 경로를 옮긴 것 (API-002 1장, 카드 L3)
 │   ├── auth.rs                 Bearer → AccountService.authenticate_token, 통과하면 응답 전에 커밋 (SEQ-C2)
 │   ├── transport.rs            streamable HTTP, 세션 없음 — Accept·Content-Type·본문 읽기·SSE 쓰기
@@ -386,6 +386,11 @@ classDiagram
         +recent_changes(project_id, n) Vec~Version~
         +list_items_by_project(project_id) Vec~ItemBrief~
         +list_trashed(project_id) Vec~DocumentSummary~
+        +apply_status(document, new_body, commit_hash, author, reason)
+        +trash(document, commit_hash, author) Vec~i32~
+        +trash_commit(document_id) Option~String~
+        +version_body(doc_id, version_no) String
+        +delete_document(document) i64
     }
     class Document {
         +i32 id
@@ -438,6 +443,7 @@ classDiagram
 | [[SYNC-MS-014#SpecService.diff_bodies]] | `diff` · `cargo xtask spec-diff` | [[SYNC-MS-002#SpecService.diff]] | — |
 | [[SYNC-MS-014#SpecService.list_by_project]] | `queries.project_summary`(L6) · `queries.document_list`(L7) · `queries.project_items`·`graph_view`(L8) | [[SYNC-MS-002#SpecService.list_by_project]] | — |
 | [[SYNC-MS-014#SpecService.list_versions]] · [[SYNC-MS-014#SpecService.recent_changes]] | `GET /api/docs/{docId}/versions` · `queries.project_detail`(L8) | [[SYNC-MS-002#SpecService.list_versions]] | `not-found` |
+| [[SYNC-MS-014#SpecService.apply_status]] · [[SYNC-MS-014#SpecService.trash]] · [[SYNC-MS-014#SpecService.trash_commit]] · [[SYNC-MS-014#SpecService.version_body]] · [[SYNC-MS-014#SpecService.delete_document]] | 상태·되돌리기·휴지통(L9) | [[SYNC-MS-002#SpecService.trash]] | `not-found` |
 | [[SYNC-MS-014#SpecService.list_items_by_project]] · [[SYNC-MS-014#SpecService.resolve_items]] · [[SYNC-MS-014#SpecService.list_trashed]] | `queries.graph_view` · `queries.diff_with_impact` · `queries.trash_list`(L8) | [[SYNC-MS-002#SpecService.list_items_by_project]] | — |
 | [[SYNC-MS-014#SpecService.issue_doc_id]] · [[SYNC-MS-014#SpecService.precondition]] · [[SYNC-MS-014#SpecService.create]] | 저장 파이프라인의 만들기 | [[SYNC-MS-002#SpecService.create]] | `precondition-unmet`(파이프라인이) |
 | [[SYNC-MS-014#SpecService.detect_deleted_items]] · [[SYNC-MS-014#SpecService.save]] · [[SYNC-MS-014#SpecService.item_pks]] | 저장 파이프라인의 고치기 | [[SYNC-MS-002#SpecService.save]] | — |
@@ -466,6 +472,7 @@ classDiagram
         +references_among(item_pks, include_document_targets) Vec~RefEdge~
         +count_downstream(item_pks) HashMap~i32, i64~
         +missing_in_project(project_id) Vec~RefEdge~
+        +inbound_of_document(document_id) Vec~RefEdge~
         +count_missing_by_document(document_ids) HashMap~i32, i64~
     }
     class RefEdge {
@@ -485,6 +492,7 @@ classDiagram
 | [[SYNC-MS-015#ReferenceService.upstream]] · [[SYNC-MS-015#ReferenceService.downstream]] | `queries.item_references_view` · 저장 파이프라인(삭제 확인) | [[SYNC-MS-003#ReferenceService.downstream]] | — |
 | [[SYNC-MS-015#ReferenceService.upstream_of_document]] | `queries.document_view` | [[SYNC-MS-003#ReferenceService.upstream_of_document]] | — |
 | [[SYNC-MS-015#ReferenceService.count_missing_by_document]] | `queries.project_summary` · `queries.document_list` | [[SYNC-MS-003#ReferenceService.count_missing_by_document]] | — |
+| [[SYNC-MS-015#ReferenceService.inbound_of_document]] | 휴지통 넣기·완전 삭제의 문지기(L9) | [[SYNC-MS-003#ReferenceService.inbound_of_document]] | — |
 | [[SYNC-MS-015#ReferenceService.references_among]] · [[SYNC-MS-015#ReferenceService.count_downstream]] · [[SYNC-MS-015#ReferenceService.missing_in_project]] | `queries.graph_view`·`downstream_view`·`diff_with_impact`·`project_items`(L8) | [[SYNC-MS-003#ReferenceService.references_among]] | — |
 
 규칙 — [[SYNC-DOM-002]] 4.3과 같다. 참조 행이 끊어짐을 스스로 말한다(`is_missing`·`raw_target`) — 따로 표가 없다. 조회 차례는 id다(#353). 휴지통·재구축 쪽은 L9·L11이 더한다.
@@ -557,6 +565,11 @@ classDiagram
         +wait_idle(limit) bool
         +read_pending(pool, repos, code, user) i64
         +save_pipeline(pool, repos, input) SaveResult
+        +change_status(pool, repos, doc_id, to, author, reason) Document
+        +revert(pool, repos, doc_id, to_version, user, confirm_item_deletion) SaveResult
+        +trash_document(pool, repos, doc_id, author, confirm) TrashResult
+        +restore_document(pool, repos, doc_id, author) SaveResult
+        +purge_document(pool, repos, doc_id, author)
     }
     class SaveInput {
         +Entry entry
@@ -583,12 +596,15 @@ classDiagram
 
 | 함수 | 부르는 곳 | 근거 | 던지는 에러 |
 |---|---|---|---|
+| [[SYNC-MS-017#pipeline.change_status]] | `POST /api/docs/{docId}/status` · MCP `change_status` | [[SYNC-MS-007#pipeline.change_status]] | `status-blocked` · `document-trashed` · `not-found` |
+| [[SYNC-MS-017#pipeline.revert]] | `POST /api/docs/{docId}/revert` | [[SYNC-MS-007#pipeline.revert]] | `already-current` · `not-found` · 저장의 것 |
+| [[SYNC-MS-017#pipeline.trash_document]] · [[SYNC-MS-017#pipeline.restore_document]] · [[SYNC-MS-017#pipeline.purge_document]] | `DELETE /api/docs/{docId}` · `POST …/restore` · `POST …/purge` · MCP `delete_document`·`restore_document` | [[SYNC-MS-007#pipeline.trash_document]] | `document-deletion-needs-confirm` · `document-trashed` · `document-not-trashed` · `document-has-history` · `push-failed` |
 | [[SYNC-MS-017#pipeline.save_pipeline]] | MCP `create_document` · `update_document` | [[SYNC-MS-007#pipeline.save_pipeline]] | `not-found` · `document-trashed` · `precondition-unmet` · `convention-violation` · `version-conflict` · `item-deletion-needs-confirm` · `push-failed` · `not-implemented`(밀린 커밋, L11) · `internal`(git) |
 | [[SYNC-MS-017#pipeline.read_pending]] | `save_pipeline` | [[SYNC-MS-007#pipeline.read_pending]] | `not-found` · `not-implemented`(L11) · `internal`(git) |
 | [[SYNC-MS-017#pipeline.write_lock]] · [[SYNC-MS-017#pipeline.read_lock]] | `save_pipeline` · `read_pending` | [[SYNC-MS-007]] 락 | — |
 | [[SYNC-MS-017#pipeline.wait_idle]] | `runtime.shutdown` | [[SYNC-INFRA-001]] 9.1 | — |
 
-규칙 — [[SYNC-DOM-002]] 4.4와 같다. 프로젝트마다 쓰기 락 하나·읽기 락 하나, 프로세스 전역이고 시간 제한이 없다. 읽기 → 쓰기 차례(`read_pending`은 쓰기 락 밖). 검사가 다 끝난 뒤에야 git을 쓰고, git이 끝난 뒤에야 DB를 쓴다 — 실패하면 DB는 그대로다. 저장은 따로 띄운 작업에서 돌아 부른 요청이 끊겨도 끝까지 간다. 웹·GitHub 입구 갈래와 주기 일(scheduler)은 L9·L11이 더한다.
+규칙 — [[SYNC-DOM-002]] 4.4와 같다. 프로젝트마다 쓰기 락 하나·읽기 락 하나, 프로세스 전역이고 시간 제한이 없다. 읽기 → 쓰기 차례(`read_pending`은 쓰기 락 밖). 검사가 다 끝난 뒤에야 git을 쓰고, git이 끝난 뒤에야 DB를 쓴다 — 실패하면 DB는 그대로다. 저장은 따로 띄운 작업에서 돌아 부른 요청이 끊겨도 끝까지 간다. 웹 갈래(상태·되돌리기·되살림)는 L9가 더했다. GitHub 입구 갈래와 주기 일(scheduler)은 L11이 더한다.
 
 ### 4.7 queries (MS-018)
 
