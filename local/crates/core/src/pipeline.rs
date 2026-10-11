@@ -785,3 +785,40 @@ pub async fn restore_document(
     )
     .await
 }
+
+/// SYNC-MS-017#pipeline.purge_document
+///
+/// 웹에서만 — 파일은 휴지통 커밋에서 이미 없다(push 없음). 밀린 커밋은 읽지 않는다(파이썬과 같다)
+pub async fn purge_document(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    doc_id: &str,
+    author: &Author,
+) -> Result<(), Problem> {
+    let code = code_of(doc_id);
+    let lock = write_lock(code);
+    let _held = lock.lock().await;
+    let mut tx = pool.begin().await?;
+    ProjectService { db: &mut tx, repos }
+        .get_owned(code, &author.user)
+        .await?;
+    let document = SpecService { db: &mut tx }.get_document(doc_id).await?;
+    if document.summary.trashed_at.is_none() {
+        return Err(Problem::DocumentNotTrashed);
+    }
+    // 2. 문지기 하나 — 아직 가리키는 곳. 미존재 참조는 `to_*`가 비어 여기 안 잡힌다
+    let edges = ReferenceService { db: &mut tx }
+        .inbound_of_document(document.summary.id)
+        .await?;
+    let inbound = inbound_names(&mut tx, &edges).await?;
+    if !inbound.is_empty() {
+        return Err(Problem::DocumentHasHistory {
+            inbound_refs: inbound,
+        });
+    }
+    SpecService { db: &mut tx }
+        .delete_document(&document)
+        .await?;
+    tx.commit().await?;
+    Ok(())
+}
