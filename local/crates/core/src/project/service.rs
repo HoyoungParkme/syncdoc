@@ -290,6 +290,112 @@ impl ProjectService<'_> {
         self.get(code).await
     }
 
+    /// SYNC-MS-013#ProjectService.import_bundle
+    ///
+    /// 다른 곳의 저장소를 git 번들 하나로 옮겨 온다(UC-A1 1c, L15). 번들의 커밋으로 서버 저장소를 만들고 재구축으로
+    /// 명세·버전·상태 이력을 되살린다 — 골격 커밋은 없다. 잠금·검사·되돌림은 init_project와 같다. 보관본은 되살리지 않는다
+    pub async fn import_bundle(
+        &mut self,
+        pool: &PgPool,
+        code: &str,
+        name: &str,
+        user: &UserRow,
+        data: &[u8],
+    ) -> Result<(ProjectRow, RepositoryRow), Problem> {
+        let lock = lock_of(code);
+        let _held = lock.lock().await;
+        if !valid_code(code) {
+            return Err(Problem::ProjectCodeInvalid {
+                rule: "^[A-Z]{1,4}$".to_string(),
+            });
+        }
+        if repo::exists(&mut *self.db, code).await? {
+            return Err(Problem::ProjectCodeConflict {
+                code: code.to_string(),
+            });
+        }
+        let workdir = self.repos.repos.join(code);
+        let _ = fs::remove_dir_all(&workdir);
+        let origin = self.repos.origins.join(format!("{code}.git"));
+        if origin.exists() {
+            fs::rename(&origin, self.archive_path(code)?)?; // 원본을 잃는 길을 두지 않는다
+        }
+        let invalid = |reason: &str| Problem::BundleInvalid {
+            reason: reason.to_string(),
+        };
+        {
+            let tmp = tempfile::Builder::new()
+                .prefix("syncdoc-bundle-")
+                .tempdir()?;
+            let bundle = tmp.path().join("import.bundle");
+            fs::write(&bundle, data)?;
+            match self
+                .repos
+                .git
+                .clone_bare(&bundle.to_string_lossy(), &origin)
+                .await
+            {
+                Ok(()) => {}
+                Err(Problem::Git { .. }) => {
+                    let _ = fs::remove_dir_all(&origin);
+                    return Err(invalid("번들 파일이 아니거나 깨졌다"));
+                }
+                Err(other) => return Err(other),
+            }
+        }
+        match self
+            .repos
+            .git
+            .rev_list_count(&origin, "refs/heads/main")
+            .await
+        {
+            Ok(_) => {}
+            Err(Problem::Git { .. }) => {
+                let _ = fs::remove_dir_all(&origin);
+                return Err(invalid("main 가지가 없다"));
+            }
+            Err(other) => return Err(other),
+        }
+        let undo = || {
+            let _ = fs::remove_dir_all(&workdir);
+            let _ = fs::remove_dir_all(&origin);
+        };
+        let remote = origin.to_string_lossy().into_owned();
+        if let Err(p) = self.repos.git.clone(&remote, &workdir).await {
+            undo();
+            return Err(match p {
+                Problem::Git { stderr, .. } => Problem::PushFailed {
+                    reason: format!("clone: {}", strip(&stderr)),
+                },
+                other => other,
+            });
+        }
+        let mut tx = self.db.begin().await?;
+        let project = repo::add_project(&mut tx, code, name, user.id).await?;
+        repo::add_repository(
+            &mut tx,
+            project.id,
+            Storage::Server.as_str(),
+            &remote,
+            &workdir.to_string_lossy(),
+            user.id,
+        )
+        .await?;
+        // 서비스가 pipeline을 부르는 자리(파이썬 판 DOM-002 3.2와 같다) — 같은 저장점이라 막 넣은 행을 본다
+        if let Err(p) = crate::pipeline::rebuild(&mut tx, pool, self.repos, code).await {
+            drop(tx);
+            undo();
+            return Err(p);
+        }
+        tx.commit().await?;
+        let found = self.get(code).await?;
+        // 재구축이 건 그래프 만들기는 아직 커밋되지 않은 프로젝트를 못 볼 수 있다 — 커밋 뒤 한 번 더 (init_project 8)
+        if let Some(head) = found.1.last_processed_commit.as_deref() {
+            crate::pipeline::schedule_code_graph(pool, self.repos, code, head);
+        }
+        Ok(found)
+    }
+
     /// SYNC-MS-013#ProjectService.delete_project
     pub async fn delete_project(&mut self, code: &str, user: &UserRow) -> Result<(), Problem> {
         let lock = lock_of(code);
