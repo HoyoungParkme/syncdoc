@@ -300,6 +300,9 @@ async fn create_document(state: &AppState, user: &UserRow, a: &PyValue) -> Resul
             author: agent_author(user),
             message: arg_str(a, "message"),
             confirm_item_deletion: false,
+            reason: None,
+            restore: false,
+            read_first: true,
         },
     )
     .await?;
@@ -330,6 +333,9 @@ async fn update_document(state: &AppState, user: &UserRow, a: &PyValue) -> Resul
             author: agent_author(user),
             message: arg_str(a, "message"),
             confirm_item_deletion: arg_bool(a, "confirm_item_deletion"),
+            reason: None,
+            restore: false,
+            read_first: true,
         },
     )
     .await?;

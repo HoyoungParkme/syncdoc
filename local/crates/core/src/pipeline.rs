@@ -30,7 +30,9 @@ static STATUS_LINE: LazyLock<Regex> = LazyLock::new(|| compile(r"(?m)^status: .*
 static UPSTREAM_TOKEN: LazyLock<Regex> = LazyLock::new(|| compile(r"[\w-]+"));
 
 /// 저장 입력 (파이썬 `save_pipeline`의 인자) — 만들기는 `doc_id` 없이 `project_code`·`doc_type`,
-/// 고치기는 `doc_id`·`expected_version`. `changed_items`는 파이썬도 쓰지 않아 받지 않는다
+/// 고치기는 `doc_id`·`expected_version`. `changed_items`는 파이썬도 쓰지 않아 받지 않는다.
+/// `reason`은 상태 바꾸기의 사유, `restore`는 되살림(휴지통 검사를 지난다), `read_first`는 0단계를 할지 —
+/// 부른 쪽(상태·되돌리기·되살리기)이 이미 읽었으면 거짓(파이썬 `session`을 넘긴 경우)
 #[derive(Clone, Debug)]
 pub struct SaveInput {
     pub entry: Entry,
@@ -42,6 +44,9 @@ pub struct SaveInput {
     pub author: Author,
     pub message: String,
     pub confirm_item_deletion: bool,
+    pub reason: Option<String>,
+    pub restore: bool,
+    pub read_first: bool,
 }
 
 type Locks = LazyLock<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>>;
@@ -148,15 +153,12 @@ pub async fn save_pipeline(
         })?
 }
 
-/// `save_pipeline` 본체 — 파이썬 `save_pipeline`·`_run`의 `mcp` 갈래, 같은 차례·같은 문장
+/// `save_pipeline` 본체 — 파이썬 `save_pipeline`·`_run`의 `mcp`·`web_revert`·`web_status` 갈래, 같은 차례·같은 문장
 async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<SaveResult, Problem> {
-    match input.entry {
-        Entry::Mcp => {}
-        Entry::WebRevert | Entry::WebStatus => {
-            return Err(Problem::NotImplemented { card: "L9".into() });
-        }
-        Entry::Github => return Err(Problem::NotImplemented { card: "L11".into() }),
+    if input.entry == Entry::Github {
+        return Err(Problem::NotImplemented { card: "L11".into() });
     }
+    let web_status = input.entry == Entry::WebStatus;
     // 앞. 프로젝트 코드 — 파이썬 `project_code or (doc_id.split("-")[0] if doc_id else None)`
     let code = match (&input.project_code, &input.doc_id) {
         (Some(c), _) if !c.is_empty() => c.clone(),
@@ -169,8 +171,10 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
         }
     };
     let author = &input.author;
-    // 0. 쓰기 전에 밀린 커밋을 읽는다 — 쓰기 락 밖이라 교착하지 않는다
-    read_pending(pool, repos, &code, &author.user).await?;
+    // 0. 쓰기 전에 밀린 커밋을 읽는다 — 쓰기 락 밖이라 교착하지 않는다. 부른 쪽이 이미 읽었으면 건너뛴다
+    if input.read_first {
+        read_pending(pool, repos, &code, &author.user).await?;
+    }
     let lock = write_lock(&code);
     let _held = lock.lock().await;
     let mut tx = pool.begin().await?;
@@ -184,8 +188,10 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
     let (doc_id, doc_type, document): (String, String, Option<Document>) = match &input.doc_id {
         Some(d) => {
             let doc = SpecService { db: &mut tx }.get_document(d).await?;
-            // 2. 휴지통 문서는 되살린 뒤 고친다
-            if let Some(t) = doc.summary.trashed_at {
+            // 2. 휴지통 문서는 되살린 뒤 고친다 — 되살림은 이 검사를 지난다
+            if let Some(t) = doc.summary.trashed_at
+                && !input.restore
+            {
                 return Err(Problem::DocumentTrashed {
                     trashed_at: py_isoformat(t),
                 });
@@ -237,7 +243,7 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
     }
     // 6. 삭제 확인 — 하위 참조는 출발 항목의 이름으로(#50)
     let mut deleted: Vec<i32> = Vec::new();
-    if let Some(doc) = &document {
+    if let Some(doc) = document.as_ref().filter(|_| !web_status) {
         deleted = SpecService { db: &mut tx }
             .detect_deleted_items(doc, &body)
             .await?;
@@ -275,6 +281,7 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
     }
     // 6a. 완료 문서를 고치면 본문의 status도 낮춘다 — **push 전에** (#47)
     if let Some(doc) = &document
+        && !web_status
         && doc.summary.status == "approved"
         && body != doc.body
     {
@@ -291,7 +298,34 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
         .git
         .commit_push(workdir, &input.message, &author.user, &files, &[])
         .await?;
-    // 8. 트랜잭션
+    // 8. 트랜잭션 — 상태 줄만 바꾼 것은 판을 만들지 않는다
+    if web_status && let Some(doc) = &document {
+        SpecService { db: &mut tx }
+            .apply_status(
+                doc,
+                &body,
+                Some(&commit_hash),
+                author,
+                input.reason.as_deref(),
+            )
+            .await?;
+        advance(repos, workdir, &mut tx, &repo, &commit_hash).await?;
+        tx.commit().await?;
+        let mut c = pool.acquire().await?;
+        let status = SpecService { db: &mut c }
+            .get_document(&doc_id)
+            .await?
+            .summary
+            .status;
+        return Ok(SaveResult {
+            doc_id,
+            version_no: doc.summary.current_version_no,
+            commit_hash,
+            status,
+            warnings: Vec::new(),
+            next_step: None,
+        });
+    }
     let version = match &document {
         None => {
             SpecService { db: &mut tx }
@@ -354,20 +388,8 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
     if !deleted.is_empty() {
         warnings.push(format!("ref.broken: {broken}"));
     }
-    // 13a. 처리 지점 — 앱이 민 커밋은 이 저장이 곧 처리다. 사이에 밖에서 push가 끼었으면 그대로 둔다
-    if let Some(last) = repo
-        .last_processed_commit
-        .as_deref()
-        .filter(|l| !l.is_empty())
-    {
-        let behind = repos
-            .git
-            .rev_list_count(workdir, &format!("{last}..{commit_hash}"))
-            .await?;
-        if behind == 1 {
-            project_repo::advance_processed(&mut tx, repo.id, &commit_hash, clock::now()).await?;
-        }
-    }
+    // 13a. 처리 지점
+    advance(repos, workdir, &mut tx, &repo, &commit_hash).await?;
     // 14. 커밋
     tx.commit().await?;
     let status = {
@@ -378,17 +400,45 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
             .summary
             .status
     };
-    // 15. 문서 하나 쓰고 멈추라는 규약(STD-001 1.8)을 응답이 매번 다시 말한다
-    let next_step = format!(
-        "{doc_id} v{} 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)",
-        version.version_no
-    );
+    // 15. 문서 하나 쓰고 멈추라는 규약(STD-001 1.8)을 응답이 매번 다시 말한다 — mcp만
+    let next_step = (input.entry == Entry::Mcp).then(|| {
+        format!(
+            "{doc_id} v{} 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)",
+            version.version_no
+        )
+    });
     Ok(SaveResult {
         doc_id,
         version_no: version.version_no,
         commit_hash,
         status,
         warnings,
-        next_step: Some(next_step),
+        next_step,
     })
+}
+
+/// 처리 지점을 앞당긴다 — 앱이 민 커밋은 그 저장이 곧 처리다(파이썬 `_advance_processed`, `made` 1).
+/// 처리 지점부터 이 커밋까지가 하나일 때만 — 사이에 밖에서 push가 끼었으면 그대로 둔다
+async fn advance(
+    repos: &ServerRepos,
+    workdir: &Path,
+    db: &mut sqlx::PgConnection,
+    repo: &crate::project::model::RepositoryRow,
+    commit_hash: &str,
+) -> Result<(), Problem> {
+    let Some(last) = repo
+        .last_processed_commit
+        .as_deref()
+        .filter(|l| !l.is_empty())
+    else {
+        return Ok(());
+    };
+    let behind = repos
+        .git
+        .rev_list_count(workdir, &format!("{last}..{commit_hash}"))
+        .await?;
+    if behind == 1 {
+        project_repo::advance_processed(db, repo.id, commit_hash, clock::now()).await?;
+    }
+    Ok(())
 }

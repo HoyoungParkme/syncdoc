@@ -50,6 +50,9 @@ impl Env {
                 author: self.author(),
                 message: format!("{doc_type} 만들기"),
                 confirm_item_deletion: false,
+                reason: None,
+                restore: false,
+                read_first: true,
             },
         )
         .await
@@ -71,6 +74,9 @@ impl Env {
                 author: self.author(),
                 message: "고침".into(),
                 confirm_item_deletion: true,
+                reason: None,
+                restore: false,
+                read_first: true,
             },
         )
         .await
