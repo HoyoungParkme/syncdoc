@@ -46,7 +46,7 @@ syncdoc/            저장소 = 프로젝트
 ## 도구
 
 파이썬은 `backend/`에서 돈다 — `cd backend && uv run pytest` · `uv run ruff check .` · `uv run alembic upgrade head`.
-Rust는 `local/`에서 돈다 — `cd local && cargo test` · `cargo fmt --check` · `cargo clippy --all-targets -- -D warnings` · `cargo check --target x86_64-pc-windows-msvc`(카드 L1~L11 — L12부터는 tree-sitter 문법의 C가 MSVC 헤더를 요구해 리눅스에서 못 돈다. 윈도 빌드는 PR 워크플로가 windows-2022에서 본다). 검사기(`check_code`·`check_calls`)는 두 구현을 다 읽는다(카드 BV·BW).
+Rust는 `local/`에서 돈다 — `cd local && cargo test` · `cargo fmt --check` · `cargo clippy --all-targets -- -D warnings` · `cargo check --target x86_64-pc-windows-msvc`(카드 L1~L11 — L12부터는 tree-sitter 문법의 C가 MSVC 헤더를 요구해 리눅스에서 못 돈다. 윈도 빌드는 PR 워크플로가 windows-2022에서 본다). **이 PC의 윈도에서 직접** — 윈도 디스크의 사본(`git clone --config core.autocrlf=false \\wsl.localhost\Ubuntu\…\syncdoc C:\Users\edgar\dev\syncdoc` — 줄 끝을 바꾸면 정답 파일 비교가 깨진다)에서 `cargo test`·clippy·`cargo xtask speed`. PostgreSQL은 `cargo xtask pg-fetch --target x86_64-pc-windows-msvc`, 시험·실행에는 `SYNCDOC_LOCAL_PG_DIR`(그 자리 `…\target\pg\x86_64-pc-windows-msvc\16.15.0`)·`SYNCDOC_LOCAL_GIT`(시스템 git)를 준다. WSL에서 `powershell.exe -File`로 부른다. 검사기(`check_code`·`check_calls`)는 두 구현을 다 읽는다(카드 BV·BW).
 - 처음 한 번 — C 링커(`sudo apt install build-essential pkg-config`, 사람이) · rustup(판은 `local/rust-toolchain.toml`이 고른다) · `cargo xtask pg-fetch`(개발·시험용 PostgreSQL 16.15를 `local/target/pg/`에)
 - `cargo xtask migrations` — Alembic 리비전을 더했으면 `local/migrations/`를 다시 만든다. `--check`는 다시 만들어 비교만(DEV-7)
 - `cargo xtask mcp-tools` — 파이썬 MCP 도구의 설명·인자를 바꿨으면 Rust 판의 `declarations.json`을 다시 만든다. `--check`는 비교만(DEV-7)
@@ -57,7 +57,7 @@ Rust는 `local/`에서 돈다 — `cd local && cargo test` · `cargo fmt --check
 - `cargo xtask codegraph-diff` — 지금 커밋을 풀어 저장소의 graphify 원형으로 두 판의 줄이기·보강·대조·층·항목 함수를 바이트로 비교한다. `crates/codegraph`나 파이썬 판 `graph.py`를 고치면 돌린다
 - `cargo xtask package linux|windows` — 설치 파일(.deb·AppImage / setup.exe). `cargo build --release -p syncdoc_app`(화면 빌드 `npm run build` 뒤) 다음에. 윈도는 NSIS가 있는 윈도에서 · `cargo xtask icon` — `packaging/icon.svg`를 고쳤으면 icon.ico·icon.png·tray.rgba를 다시 만든다
 - **릴리즈** — `local/Cargo.toml`의 version을 올리고 병합한 뒤 태그 `local-v{판}`을 민다. `.github/workflows/local-release.yml`이 윈도·리눅스에서 만들고 깔아 켜 본 뒤 GitHub Release에 올린다(INFRA 9.5)
-- `cargo xtask speed` — 같은 PC에서 두 판을 나란히 띄워 R15 속도를 잰다(켜기·싱크독 저장소 번들 가져오기·코드 그래프·조회·저장·메모리). 목표에 못 미치거나 파이썬 판보다 느리면 실패 — 출시 판정(카드 L17)
+- `cargo xtask speed` — 같은 PC에서 두 판을 나란히 띄워 R15 속도를 잰다(켜기·싱크독 저장소 번들 가져오기·코드 그래프·조회·저장·메모리). 목표에 못 미치거나 파이썬 판보다 느리면 실패 — 출시 판정(카드 L17). 리눅스와 윈도(위의 윈도 사본) 둘 다 통과해야 한다
 - `cargo xtask schema-check` — 시험 서버(5434)에 Alembic DB와 Rust DB를 만들어 스키마가 같은지 · `cargo xtask test-db-clean` — 시험이 남긴 `syncdoc_local_test_*` 지우기
 - `cargo run -p syncdoc_app -- --no-tray` — 싱크독_로컬을 띄운다(데이터는 `~/.local/share/syncdoc-local`, 다른 자리는 `--data-dir`). 윈도 브라우저로 http://127.0.0.1:8010
 검사기는 저장소 루트에서 돈다.
