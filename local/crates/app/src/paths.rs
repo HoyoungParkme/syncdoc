@@ -1,5 +1,6 @@
 //! 자리 — 데이터 자리와 PostgreSQL 바이너리·git 실행 파일 자리 (SYNC-INFRA-001 9.2·9.3)
 
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use directories::BaseDirs;
@@ -12,11 +13,43 @@ const DATA_NAME: &str = "SyncDoc Local";
 const DATA_NAME: &str = "syncdoc-local";
 
 /// SYNC-MS-012#paths.data_dir
+///
+/// 기본 자리 옆 `{이름}.location`이 있으면 그 자리 — 옮긴 데이터 자리(카드 L16)
 pub fn data_dir() -> Result<PathBuf, Problem> {
+    let default = default_dir()?;
+    match fs::read_to_string(pointer_of(&default)) {
+        Ok(text) if !text.trim().is_empty() => Ok(PathBuf::from(text.trim())),
+        _ => Ok(default),
+    }
+}
+
+/// SYNC-MS-012#paths.set_data_dir
+///
+/// 가리키는 파일은 옛 폴더 밖(기본 자리 옆)이라 옛 폴더를 지워도 남는다
+pub fn set_data_dir(dir: &Path) -> Result<(), Problem> {
+    let pointer = pointer_of(&default_dir()?);
+    if let Some(parent) = pointer.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let tmp = pointer.with_extension("location.tmp");
+    fs::write(&tmp, std::path::absolute(dir)?.to_string_lossy().as_bytes())?;
+    fs::rename(&tmp, &pointer)?;
+    Ok(())
+}
+
+/// 기본 데이터 자리 — 윈도 `%LOCALAPPDATA%\SyncDoc Local`, 리눅스 `~/.local/share/syncdoc-local`
+fn default_dir() -> Result<PathBuf, Problem> {
     let base = BaseDirs::new().ok_or_else(|| Problem::Internal {
         log: "사용자 폴더를 모른다 — --data-dir로 데이터 자리를 준다".into(),
     })?;
     Ok(base.data_local_dir().join(DATA_NAME))
+}
+
+/// 기본 자리 옆 가리키는 파일 — `SyncDoc Local.location`·`syncdoc-local.location`
+fn pointer_of(default: &Path) -> PathBuf {
+    let mut name = default.as_os_str().to_os_string();
+    name.push(".location");
+    PathBuf::from(name)
 }
 
 /// SYNC-MS-012#paths.pg_dir

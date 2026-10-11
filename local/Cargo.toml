@@ -24,6 +24,7 @@ syncdoc_server = { path = "crates/server" }
 syncdoc_codegraph = { path = "crates/codegraph" }
 syncdoc_pycompat = { path = "crates/pycompat" }
 
+async-trait = "0.1"
 axum = "0.8.9"
 clap = { version = "4.6", features = ["derive"] }
 directories = "6.0"
@@ -35,12 +36,16 @@ base64 = "0.22"
 flate2 = "1.1"
 httpdate = "1.0"
 md-5 = "0.11"
+jiff = "0.2"
 jiter = "=0.14.0"
 lopdf = { version = "0.45", default-features = false }
 num-bigint = "0.4.6"
 num-traits = "0.2"
 percent-encoding = "2.3"
+pgp = { version = "0.21", default-features = false }
 rand = "0.10"
+# rpgp(백업 암호)가 받는 판 — rand_core 0.6 (카드 L16)
+rand_08 = { package = "rand", version = "0.8" }
 regex = "1.13"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots", "stream", "http2"] }
 resvg = { version = "0.48", default-features = false, features = ["text"] }
@@ -61,6 +66,7 @@ thiserror = "2.0"
 time = "0.3"
 tokio = { version = "1.53", features = ["macros", "rt-multi-thread", "net", "process", "signal", "time", "fs", "io-util", "sync"] }
 toml = "1.1"
+toml_edit = "0.25"
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.7", features = ["catch-panic"] }
 tracing = "0.1.44"
@@ -69,6 +75,7 @@ tracing-appender = "0.2.5"
 tracing-subscriber = { version = "0.3", features = ["fmt", "registry"] }
 url = "=2.5.8"
 webbrowser = "1.2"
+winreg = "0.56"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Console", "Win32_System_Environment", "Win32_System_SystemServices", "Win32_System_Threading"] }
 
 [workspace.lints.rust]
