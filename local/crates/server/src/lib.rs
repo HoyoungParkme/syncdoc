@@ -18,7 +18,9 @@ use crate::web::guard::guard;
 use crate::web::problem::{method_not_allowed, panic_response};
 use crate::web::routes::account::{issue_token, list_tokens, me, revoke_token};
 use crate::web::routes::admin::{hook, move_to_github, move_to_server, rebuild, repos, sync};
-use crate::web::routes::code::{code_calls, code_text, doc_code, item_code, item_code_source};
+use crate::web::routes::code::{
+    code_calls, code_nodes, code_text, doc_code, item_code, item_code_source,
+};
 use crate::web::routes::documents::change_status;
 use crate::web::routes::documents::diff;
 use crate::web::routes::documents::downstream;
@@ -72,6 +74,7 @@ pub fn app(state: AppState) -> Router {
             get(item_code_source),
         )
         .route("/api/projects/{code}/code-calls", get(code_calls))
+        .route("/api/projects/{code}/code-graph", get(code_nodes))
         .route("/api/projects/{code}/code/source", get(code_text))
         .route("/api/projects/{code}/trash", get(trash_list))
         .route(

@@ -1,6 +1,6 @@
 //! 코드 그래프 — 파이썬 판 `web/routers/code.py`(카드 L12): 코드 탭·코드 보기·관계도 코드 호출·코드 그래프의 코드.
 //! 대조는 부를 때 계산한다 — 그래프는 code_graphs에서, 「호출하는 것」은 명세에서. itemId의 `~`는 `/`.
-//! 노드 전부(`code-graph`)는 L13, 묻기(`code/ask`)는 L14가 더한다
+//! 카드 L13이 노드 전부(`code-graph`)를 더했다. 묻기(`code/ask`)는 L14가 더한다
 
 use std::sync::LazyLock;
 
@@ -16,7 +16,7 @@ use crate::compat::pyvalue::{PyStr, PyValue};
 use crate::state::AppState;
 use crate::web::auth::current_user;
 use crate::web::problem::ApiProblem;
-use crate::web::schemas::{CodeCalls, CodeText, CodeView};
+use crate::web::schemas::{CodeCalls, CodeNodes, CodeText, CodeView};
 
 static CODE_FILE: LazyLock<Validator> = LazyLock::new(schemas::code_file);
 static LINE: LazyLock<Validator> = LazyLock::new(schemas::version_no);
@@ -71,6 +71,17 @@ pub async fn code_calls(
     let user = current_user(&mut c, &state).await?;
     let v = queries::code_calls(&mut c, &state.repos, &code, &user).await?;
     Ok(Json(CodeCalls::from(&v)))
+}
+
+/// SYNC-API-001#GET/api/projects/{code}/code-graph
+pub async fn code_nodes(
+    State(state): State<AppState>,
+    Path(code): Path<String>,
+) -> Result<Json<CodeNodes>, ApiProblem> {
+    let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+    let user = current_user(&mut c, &state).await?;
+    let v = queries::code_nodes(&mut c, &state.repos, &code, &user).await?;
+    Ok(Json(CodeNodes::from(&v)))
 }
 
 /// SYNC-API-001#GET/api/projects/{code}/code/source

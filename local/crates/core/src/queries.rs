@@ -22,10 +22,11 @@ use crate::reference::service::ReferenceService;
 use crate::spec::{DIFF_CONTEXT_LINES, SpecService};
 use crate::types::{
     ApiAuthor, AuthorRef, BrokenRefSummary, ChainItem, ChainRow, CodeBrief, CodeCallEdge,
-    CodeCalls, CodeFunction, CodeGraphInfo, CodeRef, CodeText, CodeView, Diff, DocType, Document,
-    DocumentSummary, DownstreamDoc, DownstreamView, Graph, GraphEdge, GraphNode, GraphScope,
-    ItemChain, ItemRef, ItemReferences, ItemView, ProjectDetail, ProjectItem, ProjectSummary,
-    STAGES, StageSummary, Storage, stage_of,
+    CodeCalls, CodeCommunity, CodeFunction, CodeGraphInfo, CodeLayer, CodeLayerSpec, CodeNode,
+    CodeNodes, CodeRef, CodeText, CodeView, Diff, DocType, Document, DocumentSummary,
+    DownstreamDoc, DownstreamView, Graph, GraphEdge, GraphNode, GraphScope, ItemChain, ItemRef,
+    ItemReferences, ItemView, ProjectDetail, ProjectItem, ProjectSummary, STAGES, StageSummary,
+    Storage, stage_of,
 };
 
 /// 작성자(id만) → 이름 붙은 작성자 — 파이썬 `_api_author`. 지시자는 id가 있을 때만
@@ -1305,4 +1306,134 @@ pub async fn code_text(
         Some(end),
     )
     .await
+}
+
+/// 항목 없는 함수 key → 층 — 프로젝트 클래스 명세 전부의 층 표를 문서 차례로 이어 붙인다 (파이썬 `_layers`)
+async fn layers_of(
+    db: &mut PgConnection,
+    project_id: i32,
+    graph: &CodeGraph,
+) -> Result<HashMap<String, CodeLayer>, Problem> {
+    let mut rows = Vec::new();
+    for doc_id in class_docs(&mut *db, project_id).await? {
+        let body = SpecService { db: &mut *db }
+            .get_document(&doc_id)
+            .await?
+            .body;
+        rows.extend(syncdoc_codegraph::graph::layer_table(&body));
+    }
+    let (layer_of, _) = syncdoc_codegraph::graph::layers(graph, &rows);
+    Ok(layer_of
+        .into_iter()
+        .map(|(k, v)| {
+            let specs = v
+                .specs
+                .into_iter()
+                .map(|s| CodeLayerSpec {
+                    ref_: s.ref_,
+                    note: s.note,
+                })
+                .collect();
+            (
+                k,
+                CodeLayer {
+                    name: v.name,
+                    specs,
+                },
+            )
+        })
+        .collect())
+}
+
+/// SYNC-MS-018#queries.code_nodes
+///
+/// 함수 전부·호출 선·커뮤니티(UI-17). 항목이 있는 함수의 상태는 코드 탭과 같은 대조로
+pub async fn code_nodes(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+) -> Result<CodeNodes, Problem> {
+    let (project, _) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code, user)
+    .await?;
+    let Some(row) = CodeGraphService { db: &mut *db }.get(project.id).await? else {
+        return Ok(CodeNodes {
+            graph: None,
+            communities: Vec::new(),
+            functions: Vec::new(),
+            calls: Vec::new(),
+        });
+    };
+    let diffs = diffs_of(&mut *db, project.id, &row.graph).await?;
+    // 2a — 항목 없는 함수의 층
+    let layer_of = layers_of(&mut *db, project.id, &row.graph).await?;
+    let mut by_key: HashMap<&str, &CallDiff> = HashMap::new();
+    for d in diffs.values() {
+        if let Some(f) = d.function.as_deref() {
+            by_key.insert(f, d);
+        }
+    }
+    let functions = row
+        .graph
+        .functions
+        .iter()
+        .map(|f| {
+            let d = by_key.get(f.key.as_str());
+            let status = d.map(|d| {
+                if !d.code_only.is_empty() {
+                    "code_only"
+                } else if !d.spec_only.is_empty() {
+                    "spec_only"
+                } else {
+                    "same"
+                }
+                .to_string()
+            });
+            let ms = d.map(|d| d.ms_id.clone());
+            CodeNode {
+                key: f.key.clone(),
+                name: f.name.clone(),
+                qual: f.qual.clone(),
+                file: f.file.clone(),
+                line: f.line,
+                community: f.community,
+                // 옛 그래프(2026-10-02 이전)는 item이 없다 — ms로
+                item: f
+                    .item
+                    .clone()
+                    .filter(|i| !i.is_empty())
+                    .or_else(|| ms.clone()),
+                ms,
+                status,
+                layer: layer_of.get(&f.key).cloned(),
+            }
+        })
+        .collect();
+    let communities = row
+        .graph
+        .communities
+        .iter()
+        .flatten()
+        .map(|c| CodeCommunity {
+            id: c.id,
+            label: c.label.clone(),
+            size: c.size,
+        })
+        .collect();
+    let calls = row
+        .graph
+        .calls
+        .iter()
+        .map(|c| (c.0.clone(), c.1.clone()))
+        .collect();
+    Ok(CodeNodes {
+        graph: Some(graph_info(&row)),
+        communities,
+        functions,
+        calls,
+    })
 }

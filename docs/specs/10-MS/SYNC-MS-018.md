@@ -12,7 +12,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-008, SYNC-MS-014, SYNC-MS-015, SYNC-MS-016, SYN
 
 `crates/core/src/queries.rs`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.7. 파이썬 판 [[SYNC-MS-008]]과 **같은 이름·같은 처리**이고, 이 문서는 다른 점만 적는다([[SYNC-STD-001]] 2.10). 여러 묶음의 서비스를 불러 응답 하나로 엮는다 — 쓰지 않는다.
 
-**카드 L6 몫은 프로젝트 요약 하나다(2026-10-08)** — `init_project`·`POST /api/projects`가 돌려주고 `GET /api/projects`가 목록으로 낸다(사용자 결정 — 요약 전부, 문서가 있어도 맞게). **카드 L7이 MCP 읽기 도구의 넷을 더했다(2026-10-08)** — `list_documents`·`get_document`·`get_item`·`get_references`가 부른다. **카드 L8이 웹 읽기의 일곱을 더했다(2026-10-11)** — 프로젝트 상세·끊어진 참조 목록·관계도·체인·diff 영향·추적표·휴지통 목록(UI-4가 처음부터 부른다 — 휴지통 쓰기는 L9). **카드 L12가 코드의 넷을 더했다(2026-10-11)** — 코드 탭·관계도 코드 호출·코드 보기·코드 그래프의 코드. 코드 그래프 노드(L13)·묻기(L14)는 그 카드가 더한다.
+**카드 L6 몫은 프로젝트 요약 하나다(2026-10-08)** — `init_project`·`POST /api/projects`가 돌려주고 `GET /api/projects`가 목록으로 낸다(사용자 결정 — 요약 전부, 문서가 있어도 맞게). **카드 L7이 MCP 읽기 도구의 넷을 더했다(2026-10-08)** — `list_documents`·`get_document`·`get_item`·`get_references`가 부른다. **카드 L8이 웹 읽기의 일곱을 더했다(2026-10-11)** — 프로젝트 상세·끊어진 참조 목록·관계도·체인·diff 영향·추적표·휴지통 목록(UI-4가 처음부터 부른다 — 휴지통 쓰기는 L9). **카드 L12가 코드의 넷을 더했다(2026-10-11)** — 코드 탭·관계도 코드 호출·코드 보기·코드 그래프의 코드. **카드 L13이 코드 그래프 노드를 더했다(2026-10-11)** — UI-17. 묻기(L14)는 그 카드가 더한다.
 
 **파이썬 `set`의 차례** — [[#queries.item_chain]]은 폐포를 파이썬 `set`에 모아 그 순회 차례로 단계 행을 채운다. 행 안 항목의 차례가 응답 바이트이므로 Rust는 CPython 3.12의 정수 `set`(열린 주소·선형 탐사 9·`perturb`·크기 키움·`discard`의 빈 표시)을 그대로 흉내 낸 `pycompat::pyset`으로 같은 차례를 낸다(에이전트 판단 2026-10-11 — 「바이트까지」 결정을 따름).
 
@@ -42,6 +42,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-008, SYNC-MS-014, SYNC-MS-015, SYNC-MS-016, SYN
 | [[#queries.code_calls]] | 관계도 코드 호출 |
 | [[#queries.code_source]] | 코드 보기 |
 | [[#queries.code_text]] | 코드 그래프의 코드 — 파일·줄로 |
+| [[#queries.code_nodes]] | 코드 그래프 노드 — 함수 전부·커뮤니티·대조 상태 |
 
 ---
 
@@ -361,6 +362,23 @@ pub async fn code_text(db: &mut PgConnection, repos: &ServerRepos, code: &str, f
 **호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#CodeGraphService.read]]
 
 **테스트 관점** 함수의 시작 줄 → 그 함수 · 없는 줄 → `not-found`(function) · 그래프 없음 → `not-found`(code_graph)
+
+---
+
+#### queries.code_nodes 코드 그래프 노드 — 함수 전부·커뮤니티·대조 상태
+
+**시그니처**
+```rust
+pub async fn code_nodes(db: &mut PgConnection, repos: &ServerRepos, code: &str, user: &UserRow) -> Result<CodeNodes, Problem>
+```
+
+근거: [[SYNC-MS-008#queries.code_nodes]] · [[SYNC-API-001#GET/api/projects/{code}/code-graph]]
+
+**처리** [[SYNC-MS-008#queries.code_nodes]] 0~5와 같다 — 소유 → 그래프 행(없으면 `graph` 없이 빈 것 셋) → 대조(`code_view`와 같은 재료)에서 함수 key → 대조 줄 · 층(프로젝트 클래스 명세 전부의 층 표를 문서 차례로 이어 [[SYNC-MS-022#codegraph.layers]]) → 함수마다 `CodeNode { key, name, qual, file, line, community, item: item 또는 ms, ms, status: 코드만 > 명세만 > 같음, layer }` · `communities`는 그래프 그대로(없으면 빈 것) · `calls`는 선마다 `[from, to]`
+
+**호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-014#SpecService.list_by_project]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.item_blocks]] · [[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-022#codegraph.spec_calls]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.layer_table]] · [[SYNC-MS-022#codegraph.layers]]
+
+**테스트 관점** [[SYNC-MS-008#queries.code_nodes]]의 것
 
 ---
 

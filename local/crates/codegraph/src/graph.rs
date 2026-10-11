@@ -100,7 +100,7 @@ pub(crate) fn is_test(file: &str) -> bool {
 }
 
 /// 노드 이름 → 함수 이름 — 앞 `.`과 뒤 `()`를 뗀다
-fn clean(label: &str) -> String {
+pub(crate) fn clean(label: &str) -> String {
     let s = strip(label).trim_start_matches('.');
     s.strip_suffix("()").unwrap_or(s).to_string()
 }
@@ -127,7 +127,7 @@ pub(crate) fn item_of(first_line: &str) -> (Option<String>, Option<String>) {
 
 // ── JSON 값을 파이썬처럼 ──
 
-fn truthy(v: Option<&Value>) -> bool {
+pub(crate) fn truthy(v: Option<&Value>) -> bool {
     match v {
         None | Some(Value::Null) => false,
         Some(Value::Bool(b)) => *b,
@@ -139,7 +139,7 @@ fn truthy(v: Option<&Value>) -> bool {
 }
 
 /// 파이썬 `str(v)` — 글자는 그대로
-fn py_str(v: &Value) -> String {
+pub(crate) fn py_str(v: &Value) -> String {
     match v {
         Value::String(s) => s.clone(),
         Value::Null => "None".into(),
@@ -154,7 +154,7 @@ fn text_of(n: &Value, key: &str) -> String {
 }
 
 /// raw 노드의 (파일, 줄) — `source_file` + `source_location`의 `L` 뒤 숫자
-fn node_key(n: &Value) -> Option<(String, i64)> {
+pub(crate) fn node_key(n: &Value) -> Option<(String, i64)> {
     let file = n.get("source_file").filter(|v| truthy(Some(v)))?;
     let loc = match n.get("source_location") {
         Some(v) if truthy(Some(v)) => py_str(v),

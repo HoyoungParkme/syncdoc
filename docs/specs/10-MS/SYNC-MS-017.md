@@ -16,7 +16,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-007, SYNC-MS-013, SYNC-MS-014, SYNC-MS-015, SYN
 
 **락** — 프로젝트 코드마다 둘, 프로세스 전역(파이썬 모듈 사전과 같다). **쓰기 락**은 저장을 한 줄로 세우고, **읽기 락**은 밀린 커밋 읽기(fetch)를 한 줄로 세운다. 차례는 읽기 → 쓰기 — `read_pending`은 쓰기 락 **밖**에서 부른다(같은 락이면 교착, [[SYNC-STD-004#DEV-19]]). 시간 제한은 없다. 프로젝트 만들기·지우기의 잠금([[SYNC-MS-013]])과는 따로다. 끌 때 [[SYNC-MS-012#runtime.shutdown]]이 쓰기 락이 다 풀리기를 기다린다.
 
-**카드 L7 몫은 `mcp` 입구다(2026-10-08)** — 에이전트의 `create_document`·`update_document`. **카드 L9가 상태 바꾸기·되돌리기·휴지통 넣기·되살리기·완전 삭제와 저장의 `web_status`·`web_revert`·되살림 갈래를 더했다(2026-10-11).** **카드 L11이 밀린 커밋 처리·재구축·코드 올리기·저장 방식 옮기기·따라잡기와 저장의 `github` 갈래를 더했다(2026-10-11)** — 서버 저장소에 git으로 민 것(L10 git 입구)이 문서가 된다. **카드 L12가 코드 그래프 걸기·만들기를 더했다(2026-10-11)** — 커밋 처리(5a)·재구축(10)·코드 올리기(커밋 처리를 거쳐)가 건다.
+**카드 L7 몫은 `mcp` 입구다(2026-10-08)** — 에이전트의 `create_document`·`update_document`. **카드 L9가 상태 바꾸기·되돌리기·휴지통 넣기·되살리기·완전 삭제와 저장의 `web_status`·`web_revert`·되살림 갈래를 더했다(2026-10-11).** **카드 L11이 밀린 커밋 처리·재구축·코드 올리기·저장 방식 옮기기·따라잡기와 저장의 `github` 갈래를 더했다(2026-10-11)** — 서버 저장소에 git으로 민 것(L10 git 입구)이 문서가 된다. **카드 L12가 코드 그래프 걸기·만들기를 더했다(2026-10-11)** — 커밋 처리(5a)·재구축(10)·코드 올리기(커밋 처리를 거쳐)가 건다. 카드 L13이 만들기에 커뮤니티를 더했다(2026-10-11).
 
 **표기** — `→` 반환·결과, `!` 예외(`Problem`), `DB:` 테이블 접근, `git:` [[SYNC-MS-019]], `·` 같은 단계 안 구분.
 
@@ -482,18 +482,16 @@ pub async fn build_code_graph(pool: &PgPool, repos: &ServerRepos, code: &str, co
 **처리** [[SYNC-MS-007#pipeline.build_code_graph]]와 같은 차례
 1. `ProjectService.get(code)` — 없으면 그냥 끝(그새 해제됐다)
 2. 임시 폴더에 `git.archive(작업 사본, commit, 임시)` — 작업 사본을 건드리지 않는다
-3. `(source, raw) = codegraph.load(임시)` · `graph = codegraph.enrich(임시, codegraph.reduce(raw))` — 파일 읽기·파싱은 막히는 일이라 따로(블로킹 작업)에서
-4. `CodeGraphService.save(project, commit, source, graph)` 커밋 · 로그 「code graph code=… commit=… source=… functions=n calls=n elapsed=…」
+3. `(source, raw) = codegraph.load(임시)` · `graph = codegraph.communities(raw, codegraph.enrich(임시, codegraph.reduce(raw)))` — 커뮤니티는 보강 뒤에(보강이 더한 함수도 받는다) · 파일 읽기·파싱·군집은 막히는 일이라 따로(블로킹 작업)에서
+4. `CodeGraphService.save(project, commit, source, graph)` 커밋 · 로그 「code graph code=… commit=… source=… functions=n calls=n communities=n elapsed=…」
 - 어느 단계든 실패하면 `CodeGraphService.fail(project, commit, 이유)` 커밋(그새 해제됐으면 남길 곳이 없다 — 삼킨다) · 경고 로그 — 배치라 옛 그래프를 두고 이유만 남긴다(UC-S8 2a). 이유는 `CodeGraphFailed`면 그 문장, 아니면 오류 문장
 
-**다른 점** 커뮤니티(3의 `communities`)는 카드 L13 — 그 전에는 `community`가 없고 `communities`가 빈 목록
+**호출하는 것** [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-019#Git.archive]] · [[SYNC-MS-022#codegraph.load]] · [[SYNC-MS-022#codegraph.reduce]] · [[SYNC-MS-022#codegraph.enrich]] · [[SYNC-MS-022#codegraph.communities]] · [[SYNC-MS-022#CodeGraphService.save]] · [[SYNC-MS-022#CodeGraphService.fail]]
 
-**호출하는 것** [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-019#Git.archive]] · [[SYNC-MS-022#codegraph.load]] · [[SYNC-MS-022#codegraph.reduce]] · [[SYNC-MS-022#codegraph.enrich]] · [[SYNC-MS-022#CodeGraphService.save]] · [[SYNC-MS-022#CodeGraphService.fail]]
-
-**테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 파이썬 코드를 민 커밋 → 함수·선·항목이 든 그래프 행, 출처 `server` · 커밋된 graph.json이 있으면 `repo` · 깨진 graph.json → 옛 그래프를 두고 `error` · 해제된 프로젝트 → 아무것도 안 한다
+**테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 파이썬 코드를 민 커밋 → 함수·선·항목·커뮤니티가 든 그래프 행, 출처 `server` · 커밋된 graph.json이 있으면 `repo` · 깨진 graph.json → 옛 그래프를 두고 `error` · 해제된 프로젝트 → 아무것도 안 한다
 
 ---
 
 ## 3. 미결사항
 
-없음. 커뮤니티는 카드 L13이 그래프 만들기에 더한다 — [[SYNC-CODE-002]].
+없음.

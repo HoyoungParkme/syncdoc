@@ -1,14 +1,6 @@
 {
   "input_tokens": 0,
   "output_tokens": 0,
-  "failed_sources": [],
-  "extracted_sources": [
-    "/tmp/claude-1000/-home-hypark-dev-personal-syncdoc/1cb36dc9-bdad-4019-91d5-96d615aed739/scratchpad/l12src/app/__init__.py",
-    "/tmp/claude-1000/-home-hypark-dev-personal-syncdoc/1cb36dc9-bdad-4019-91d5-96d615aed739/scratchpad/l12src/app/svc.py",
-    "/tmp/claude-1000/-home-hypark-dev-personal-syncdoc/1cb36dc9-bdad-4019-91d5-96d615aed739/scratchpad/l12src/app/util.py",
-    "/tmp/claude-1000/-home-hypark-dev-personal-syncdoc/1cb36dc9-bdad-4019-91d5-96d615aed739/scratchpad/l12src/crates/x/src/lib.rs",
-    "/tmp/claude-1000/-home-hypark-dev-personal-syncdoc/1cb36dc9-bdad-4019-91d5-96d615aed739/scratchpad/l12src/web/app.ts"
-  ],
   "nodes": [
     {
       "id": "app_init",

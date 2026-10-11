@@ -1605,12 +1605,13 @@ async fn graph_of(
         .await
         .map_err(|e| e.to_string())?;
     let src = tmp.path().to_path_buf();
-    // 파일 읽기·파싱은 막히는 일이라 따로 — 커뮤니티는 카드 L13(그 전엔 빈 목록)
+    // 파일 읽기·파싱·군집은 막히는 일이라 따로 — 커뮤니티는 보강 뒤에(보강이 더한 함수도 받는다)
     let built = tokio::task::spawn_blocking(move || {
         let (source, raw) = syncdoc_codegraph::graph::load(&src)?;
-        let mut graph =
-            syncdoc_codegraph::enrich::enrich(&src, syncdoc_codegraph::graph::reduce(&raw));
-        graph.communities = Some(Vec::new());
+        let graph = syncdoc_codegraph::community::communities(
+            &raw,
+            syncdoc_codegraph::enrich::enrich(&src, syncdoc_codegraph::graph::reduce(&raw)),
+        );
         Ok::<_, syncdoc_codegraph::CodeGraphFailed>((source, graph))
     })
     .await
@@ -1656,9 +1657,10 @@ pub async fn build_code_graph(pool: &PgPool, repos: &ServerRepos, code: &str, co
     };
     match saved {
         Ok((source, graph)) => tracing::info!(
-            "code graph code={code} commit={short} source={source} functions={} calls={} elapsed={:.1}s",
+            "code graph code={code} commit={short} source={source} functions={} calls={} communities={} elapsed={:.1}s",
             graph.functions.len(),
             graph.calls.len(),
+            graph.communities.as_ref().map_or(0, Vec::len),
             t0.elapsed().as_secs_f64()
         ),
         Err(reason) => {
