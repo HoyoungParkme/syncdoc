@@ -332,6 +332,13 @@ impl ProjectService<'_> {
         Ok(repo::owned_by(&mut *self.db, user.id).await?)
     }
 
+    /// SYNC-MS-013#ProjectService.list_projects
+    ///
+    /// 전부다 — 따라잡기가 쓴다. 사람 경로에서 부르지 않는다(목록 화면은 `list_owned`)
+    pub async fn list_projects(&mut self) -> Result<Vec<(ProjectRow, RepositoryRow)>, Problem> {
+        Ok(repo::all(&mut *self.db).await?)
+    }
+
     /// SYNC-MS-013#ProjectService.asset_path
     ///
     /// 작업 사본 `docs/specs/` 안의 첨부 — 밖으로 나가는 경로·허용 밖 확장자·없는 파일은 전부 같은 `not-found`(file)

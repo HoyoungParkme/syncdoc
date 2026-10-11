@@ -398,3 +398,27 @@ async fn user_for_commit_is_always_the_local_user() {
     ));
 }
 
+#[tokio::test]
+async fn list_projects_is_everyones_by_code() {
+    let e = env().await;
+    let mut c = e.conn().await;
+    let other = user(&mut c, "other").await;
+    ProjectService {
+        db: &mut c,
+        repos: &e.repos,
+    }
+    .init_project("AB", "남의 것", &other, false, Storage::Server)
+    .await
+    .expect("남의 프로젝트");
+    let codes: Vec<String> = ProjectService {
+        db: &mut c,
+        repos: &e.repos,
+    }
+    .list_projects()
+    .await
+    .expect("목록")
+    .into_iter()
+    .map(|(p, _)| p.code)
+    .collect();
+    assert_eq!(codes, ["AB", "LS"]);
+}

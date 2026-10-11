@@ -37,6 +37,22 @@ pub async fn by_code(
 }
 
 /// 소유자의 프로젝트 — 코드 차례
+/// 전부 — 코드 순(배치 경로)
+pub async fn all(db: &mut PgConnection) -> Result<Vec<(ProjectRow, RepositoryRow)>, sqlx::Error> {
+    let ps = sqlx::query_as::<_, ProjectRow>(AssertSqlSafe(format!(
+        "SELECT {PROJECT} FROM projects ORDER BY code"
+    )))
+    .fetch_all(&mut *db)
+    .await?;
+    let mut out = Vec::with_capacity(ps.len());
+    for p in ps {
+        if let Some(r) = repository_of(db, p.id).await? {
+            out.push((p, r));
+        }
+    }
+    Ok(out)
+}
+
 pub async fn owned_by(
     db: &mut PgConnection,
     user_id: i32,
