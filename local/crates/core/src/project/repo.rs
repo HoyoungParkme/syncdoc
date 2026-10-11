@@ -191,3 +191,35 @@ pub async fn advance_processed(
         .await?;
     Ok(())
 }
+
+/// 따라잡기가 잰 뒤처짐 — 성공한 주기가 옛 실패 사유를 지운다
+pub async fn set_behind(
+    db: &mut PgConnection,
+    repository_id: i32,
+    behind_by: Option<i32>,
+    at: OffsetDateTime,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE repositories SET behind_by = $2, fetched_at = $3, fetch_error = NULL WHERE id = $1",
+    )
+    .bind(repository_id)
+    .bind(behind_by)
+    .bind(at)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+/// 따라잡기가 실패한 사유 — 화면(UI-14)이 올린다(#46)
+pub async fn set_fetch_error(
+    db: &mut PgConnection,
+    repository_id: i32,
+    reason: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE repositories SET fetch_error = $2 WHERE id = $1")
+        .bind(repository_id)
+        .bind(reason)
+        .execute(db)
+        .await?;
+    Ok(())
+}

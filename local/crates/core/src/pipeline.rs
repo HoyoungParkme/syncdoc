@@ -1453,6 +1453,74 @@ pub async fn move_to_github(
     })
 }
 
+/// SYNC-MS-017#pipeline.catch_up
+///
+/// 저장소마다 읽기 락 안에서 받고 → 뒤처짐을 DB에 적고 → 밀렸으면 커밋 처리. 저장소 하나가 실패해도 다음 저장소 —
+/// 사유를 `fetch_error`에 남긴다(로그만 남기면 따라잡기가 죽은 프로젝트가 조용히 멈춘다, #46)
+pub async fn catch_up(pool: &PgPool, repos: &ServerRepos) -> Result<Vec<SaveResult>, Problem> {
+    let projects = {
+        let mut c = pool.acquire().await?;
+        ProjectService { db: &mut c, repos }.list_projects().await?
+    };
+    let mut out = Vec::new();
+    for (project, repo) in projects {
+        match catch_up_one(pool, repos, &project.code, repo.id).await {
+            Ok(results) => out.extend(results),
+            Err(e) => {
+                tracing::warn!("catch_up {}: {e}", repo.remote_url);
+                let reason: String = e.to_string().chars().take(300).collect();
+                let written = async {
+                    let mut c = pool.acquire().await?;
+                    project_repo::set_fetch_error(&mut c, repo.id, &reason).await
+                }
+                .await;
+                if let Err(e2) = written {
+                    tracing::warn!("catch_up {}: 실패 사유를 못 적었다: {e2}", repo.remote_url);
+                }
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// `catch_up` 1~3 — 저장소 하나, 읽기 락 안에서. 처리 지점도 락 안에서 다시 읽는다(#194)
+async fn catch_up_one(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    code: &str,
+    repository_id: i32,
+) -> Result<Vec<SaveResult>, Problem> {
+    let lock = read_lock(code);
+    let _held = lock.lock().await;
+    let (_, repo) = {
+        let mut c = pool.acquire().await?;
+        ProjectService { db: &mut c, repos }.get(code).await?
+    };
+    let last = repo.last_processed_commit.filter(|l| !l.is_empty());
+    let workdir = PathBuf::from(&repo.workdir_path);
+    let head = repos.git.fetch(&workdir).await?;
+    let behind = match &last {
+        Some(l) => Some(
+            i32::try_from(
+                repos
+                    .git
+                    .rev_list_count(&workdir, &format!("{l}..{head}"))
+                    .await?,
+            )
+            .unwrap_or(i32::MAX),
+        ),
+        None => None,
+    };
+    {
+        let mut c = pool.acquire().await?;
+        project_repo::set_behind(&mut c, repository_id, behind, clock::now()).await?;
+    }
+    if last.as_deref() != Some(head.as_str()) {
+        return process_commit(pool, repos, code, &head, true).await;
+    }
+    Ok(Vec::new())
+}
+
 /// SYNC-MS-017#pipeline.type_of_dir
 ///
 /// `06-DOM` → `DOM`, `STD` → `STD` — 앞 두 글자가 파이썬 `str.isdigit()`이고 `-`가 있을 때만 뗀다

@@ -569,7 +569,9 @@ impl Env {
 
     async fn processed(&self) -> String {
         let mut c = self.conn().await;
-        sqlx::query_scalar::<_, String>("SELECT last_processed_commit FROM repositories")
+        sqlx::query_scalar::<_, String>(
+            "SELECT r.last_processed_commit FROM repositories r JOIN projects p ON p.id = r.project_id WHERE p.code = 'LS'",
+        )
             .fetch_one(&mut *c)
             .await
             .expect("처리 지점")
@@ -1092,3 +1094,62 @@ async fn moves_are_refused_on_the_local_edition() {
         Err(Problem::NotFound { .. })
     ));
 }
+
+#[tokio::test]
+async fn catch_up_processes_each_repo_and_records_failures() {
+    let e = env().await;
+    let mut c = e.conn().await;
+    // 앞 저장소(코드 순 AB)는 작업 사본이 사라져 실패한다
+    ProjectService {
+        db: &mut c,
+        repos: &e.repos,
+    }
+    .init_project("AB", "깨진 것", &e.user, false, Storage::Server)
+    .await
+    .expect("둘째 프로젝트");
+    sqlx::query("UPDATE repositories SET workdir_path = '/없는/자리' WHERE project_id = (SELECT id FROM projects WHERE code = 'AB')")
+        .execute(&mut *c)
+        .await
+        .expect("깨기");
+    let out = e.outside();
+    write(
+        &out,
+        "docs/specs/02-PRD/LS-PRD-001.md",
+        &prd_file("draft", "설명."),
+    );
+    let head = commit_push(&out, "spec: PRD");
+    let results = pipeline::catch_up(e.pool(), &e.repos)
+        .await
+        .expect("따라잡기");
+    assert_eq!(results.len(), 1);
+    assert_eq!(e.processed().await, head);
+    let (behind, fetched, error): (Option<i32>, bool, Option<String>) = sqlx::query_as(
+        "SELECT behind_by, fetched_at IS NOT NULL, fetch_error FROM repositories r JOIN projects p ON p.id = r.project_id WHERE p.code = 'LS'",
+    )
+    .fetch_one(&mut *c)
+    .await
+    .expect("LS");
+    assert_eq!((behind, fetched, error), (Some(0), true, None));
+    let error: Option<String> = sqlx::query_scalar(
+        "SELECT fetch_error FROM repositories r JOIN projects p ON p.id = r.project_id WHERE p.code = 'AB'",
+    )
+    .fetch_one(&mut *c)
+    .await
+    .expect("AB");
+    assert!(error.is_some_and(|e| !e.is_empty() && e.chars().count() <= 300));
+    // 고치면 다음 성공이 사유를 지운다
+    sqlx::query("UPDATE repositories SET workdir_path = $1 WHERE project_id = (SELECT id FROM projects WHERE code = 'AB')")
+        .bind(e.repos.repos.join("AB").to_string_lossy().into_owned())
+        .execute(&mut *c)
+        .await
+        .expect("고치기");
+    pipeline::catch_up(e.pool(), &e.repos).await.expect("다시");
+    let error: Option<String> = sqlx::query_scalar(
+        "SELECT fetch_error FROM repositories r JOIN projects p ON p.id = r.project_id WHERE p.code = 'AB'",
+    )
+    .fetch_one(&mut *c)
+    .await
+    .expect("AB");
+    assert_eq!(error, None);
+}
+
