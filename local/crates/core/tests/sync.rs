@@ -368,3 +368,33 @@ async fn reference_clear_drops_this_projects_references() {
         .await
         .expect("다른 프로젝트");
 }
+
+#[tokio::test]
+async fn user_for_commit_is_always_the_local_user() {
+    use syncdoc_core::account::service::AccountService;
+    let e = env().await; // 환경의 사용자가 kind=local 행 하나
+    let mut c = e.conn().await;
+    for (mail, login) in [
+        ("a@x", "a"),
+        ("9+octo@users.noreply.github.com", "octo"),
+        ("", ""),
+    ] {
+        let u = AccountService { db: &mut c }
+            .user_for_commit(mail, login)
+            .await
+            .expect("사용자");
+        assert_eq!(u.id, e.user.id);
+    }
+    // 로컬 사용자가 없으면 internal — 켤 때 둔다
+    sqlx::query("UPDATE users SET kind = 'github'")
+        .execute(&mut *c)
+        .await
+        .expect("바꾸기");
+    assert!(matches!(
+        AccountService { db: &mut c }
+            .user_for_commit("a@x", "a")
+            .await,
+        Err(Problem::Internal { .. })
+    ));
+}
+
