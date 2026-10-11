@@ -184,10 +184,10 @@ async fn tools_not_built_yet_name_their_card() {
         Method::POST,
         "/mcp",
         &[("authorization", &bearer), ACCEPT, JSON],
-        r#"{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"change_status","arguments":{"doc_id":"SYNC-PRD-001","to":"approved"}}}"#,
+        r#"{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"get_code_graph","arguments":{"doc_id":"SYNC-PRD-001"}}}"#,
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    assert!(body.contains(r#"\"card\": \"L9\""#), "{body}");
+    assert!(body.contains(r#"\"card\": \"L12\""#), "{body}");
     assert!(body.contains(r#""isError":true"#), "{body}");
 }
