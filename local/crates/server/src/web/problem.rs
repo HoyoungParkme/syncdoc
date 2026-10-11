@@ -68,12 +68,17 @@ pub fn render(p: &Problem) -> Response {
 /// `allow`에 싣는 메서드 — 이 순서로 (파이썬 판 main.py `_METHODS`)
 const METHODS: [&str; 5] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
+/// 처리기가 일부러 낸 빈 405 — 바꾸지 않는다(MCP 2026-07-28 입구의 `Allow: POST`, 카드 L18)
+#[derive(Clone, Copy)]
+pub struct Bare405;
+
 /// 405 — 라우터가 낸 빈 405를 problem으로. `allow`는 그 경로가 받는 것 가운데 METHODS만(HEAD는 뺀다)
 pub async fn method_not_allowed(req: Request, next: Next) -> Response {
     let method = req.method().to_string();
     let resp = next.run(req).await;
     if resp.status() != StatusCode::METHOD_NOT_ALLOWED
         || resp.headers().contains_key(header::CONTENT_TYPE)
+        || resp.extensions().get::<Bare405>().is_some()
     {
         return resp;
     }

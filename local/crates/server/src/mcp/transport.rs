@@ -56,8 +56,8 @@ fn rpc_error(status: StatusCode, code: i64, message: &str) -> Response {
     (status, [(header::CONTENT_TYPE, "application/json")], body).into_response()
 }
 
-/// `check_accept_headers` — (json, sse)
-fn accepts(headers: &HeaderMap) -> (bool, bool) {
+/// `check_accept_headers` — (json, sse). 2026-07-28 입구도 같은 것을 쓴다
+pub(super) fn accepts(headers: &HeaderMap) -> (bool, bool) {
     let accept = first(headers, "accept").unwrap_or_default();
     let types: Vec<String> = accept
         .split(',')
@@ -93,7 +93,8 @@ pub async fn handle(State(state): State<AppState>, req: Request) -> Response {
     if let Some(v) = &hint
         && !decl().handshake.contains(v)
     {
-        return modern(&parts.method, &bytes);
+        // 핸드셰이크 판이 아닌 머리(모르는 값까지) — 새 프로토콜 입구가 분류해 답한다 (L18)
+        return super::modern::handle(&state, user.as_ref(), &parts.method, &headers, &bytes).await;
     }
     match parts.method {
         Method::POST => post(&state, user.as_ref(), &headers, &bytes, hint.as_deref()).await,
@@ -212,6 +213,10 @@ fn envelope(id: &PyValue, outcome: Outcome) -> String {
     };
     match outcome {
         Outcome::Ok(result) => format!("{{\"jsonrpc\":\"2.0\",\"id\":{id},\"result\":{result}}}"),
+        // 핸드셰이크 판에는 없는 메서드라 판 문지기가 먼저 막는다
+        Outcome::Listen(_) => format!(
+            "{{\"jsonrpc\":\"2.0\",\"id\":{id},\"error\":{{\"code\":-32601,\"message\":\"Method not found\",\"data\":\"subscriptions/listen\"}}}}"
+        ),
         Outcome::Err {
             code,
             message,
@@ -332,41 +337,6 @@ fn py_utc(t: time::OffsetDateTime) -> String {
         t.minute(),
         t.second()
     )
-}
-
-/// 2026-07-28 새 프로토콜 — 카드 L18까지 계약 밖. 파이썬 판이 핸드셰이크 꼴 요청에 내는 거절만 흉내 낸다
-fn modern(method: &Method, bytes: &Bytes) -> Response {
-    if method != Method::POST {
-        return rpc_error(
-            StatusCode::BAD_REQUEST,
-            -32600,
-            "Bad Request: Unsupported protocol version",
-        );
-    }
-    let id = JsonValue::parse(bytes, true)
-        .ok()
-        .and_then(|v| match v {
-            JsonValue::Object(o) => o
-                .iter()
-                .rev()
-                .find(|(k, _)| k == "id")
-                .map(|(_, v)| match v {
-                    JsonValue::Int(i) => i.to_string(),
-                    JsonValue::Str(s) => serde_json::to_string(s.as_ref()).unwrap_or_default(),
-                    _ => "null".into(),
-                }),
-            _ => None,
-        })
-        .unwrap_or_else(|| "null".into());
-    let body = format!(
-        "{{\"jsonrpc\":\"2.0\",\"id\":{id},\"error\":{{\"code\":-32602,\"message\":\"params._meta must be an object carrying the required 'io.modelcontextprotocol/protocolVersion' and 'io.modelcontextprotocol/clientCapabilities' envelope keys\"}}}}"
-    );
-    (
-        StatusCode::BAD_REQUEST,
-        [(header::CONTENT_TYPE, "application/json")],
-        body,
-    )
-        .into_response()
 }
 
 #[cfg(test)]
