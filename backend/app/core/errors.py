@@ -193,6 +193,17 @@ class ProjectCodeInvalid(Problem):
         super().__init__("프로젝트 코드 형식", rule=rule)
 
 
+class BundleInvalid(Problem):
+    """UC-A1 1c2 — 번들로 가져오려는데 git 번들이 아니거나 깨졌거나 main 가지가 없다 (카드 BX)."""
+
+    type = "urn:syncdoc:bundle-invalid"
+    status = 422
+    title = "bundle-invalid"
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason, reason=reason)
+
+
 class ExistingSpecs(Problem):
     """UC-A1 3a — 저장소에 docs/specs/가 있다. 3b — 서버 저장인데 같은 코드의 보관본이 있다.
 
