@@ -21,8 +21,8 @@ use crate::pycompat::re::compile;
 use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
 use crate::types::{
-    Author, AuthorKind, DeletedItem, DocStatus, Document, Entry, RefEdge, SaveResult, py_isoformat,
-    spec_dir,
+    Author, AuthorKind, DeletedItem, DocStatus, Document, Entry, RefEdge, SaveResult, TrashResult,
+    py_isoformat, spec_dir,
 };
 
 /// frontmatter의 `status:` 줄 — 첫 것 하나만 갈아 끼운다(파이썬 `_set_status`, `re.M`)
@@ -589,4 +589,135 @@ pub async fn revert(
         },
     )
     .await
+}
+
+/// 들어오는 참조를 사람이 읽을 이름으로 — `DOC#ITEM` 또는 `DOC`, 못 찾으면 `?`, 정렬 (파이썬 `_inbound_names`)
+async fn inbound_names(
+    db: &mut sqlx::PgConnection,
+    inbound: &[RefEdge],
+) -> Result<Vec<String>, Problem> {
+    let item_pks: Vec<i32> = inbound.iter().filter_map(|e| e.from_item_pk).collect();
+    let names = SpecService { db: &mut *db }
+        .describe_items(&item_pks)
+        .await?;
+    let doc_pks: Vec<i32> = inbound
+        .iter()
+        .filter(|e| e.from_item_pk.is_none())
+        .map(|e| e.from_document_id)
+        .collect();
+    let docs = SpecService { db: &mut *db }
+        .describe_documents(&doc_pks)
+        .await?;
+    let mut out: Vec<String> = inbound
+        .iter()
+        .map(|e| {
+            if let Some(r) = e.from_item_pk.and_then(|p| names.get(&p)) {
+                format!(
+                    "{}#{}",
+                    r.doc_id.as_deref().unwrap_or(""),
+                    r.item_id.as_deref().unwrap_or("")
+                )
+            } else {
+                docs.get(&e.from_document_id)
+                    .map_or_else(|| "?".to_string(), |d| d.doc_id.clone())
+            }
+        })
+        .collect();
+    out.sort();
+    Ok(out)
+}
+
+/// SYNC-MS-017#pipeline.trash_document
+///
+/// 따로 띄운 작업에서 — push한 뒤 DB를 쓰지 않은 채 멈추지 않는다
+pub async fn trash_document(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    doc_id: &str,
+    author: &Author,
+    confirm: bool,
+) -> Result<TrashResult, Problem> {
+    let (pool, repos, doc_id, author) = (
+        pool.clone(),
+        repos.clone(),
+        doc_id.to_string(),
+        author.clone(),
+    );
+    tokio::spawn(async move { trash(&pool, &repos, &doc_id, &author, confirm).await })
+        .await
+        .map_err(|e| Problem::Internal {
+            log: format!("휴지통 작업: {e}"),
+        })?
+}
+
+/// `trash_document` 본체 — 파이썬과 같은 차례
+async fn trash(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    doc_id: &str,
+    author: &Author,
+    confirm: bool,
+) -> Result<TrashResult, Problem> {
+    let code = code_of(doc_id);
+    // 0. 밀린 커밋을 먼저 — 락 밖
+    read_pending(pool, repos, code, &author.user).await?;
+    let lock = write_lock(code);
+    let _held = lock.lock().await;
+    let mut tx = pool.begin().await?;
+    let (_, repo) = ProjectService { db: &mut tx, repos }
+        .get_owned(code, &author.user)
+        .await?;
+    let document = SpecService { db: &mut tx }.get_document(doc_id).await?;
+    if let Some(t) = document.summary.trashed_at {
+        return Err(Problem::DocumentTrashed {
+            trashed_at: py_isoformat(t),
+        });
+    }
+    // 2. 끊어질 것 — 막지 않는다, 보여준다
+    let edges = ReferenceService { db: &mut tx }
+        .inbound_of_document(document.summary.id)
+        .await?;
+    let inbound = inbound_names(&mut tx, &edges).await?;
+    if !confirm {
+        let title = parse_frontmatter(&document.body)
+            .0
+            .get("title")
+            .cloned()
+            .unwrap_or_default();
+        return Err(Problem::DocumentDeletionNeedsConfirm {
+            doc_id: doc_id.to_string(),
+            title,
+            version_count: document.summary.current_version_no,
+            inbound_refs: inbound,
+        });
+    }
+    // 4. push — 여기까지 DB 쓰기 없음
+    let workdir = Path::new(&repo.workdir_path);
+    let path = format!(
+        "docs/specs/{}/{doc_id}.md",
+        spec_dir(&document.summary.doc_type)
+    );
+    let commit_hash = repos
+        .git
+        .commit_push(
+            workdir,
+            &format!("spec({doc_id}): 휴지통"),
+            &author.user,
+            &IndexMap::new(),
+            &[path],
+        )
+        .await?;
+    // 5. 항목 삭제됨 + 휴지통 표시 + 그것을 가리키던 참조는 미존재로
+    let pks = SpecService { db: &mut tx }
+        .trash(&document, &commit_hash, author)
+        .await?;
+    let broken = ReferenceService { db: &mut tx }.mark_missing(&pks).await?;
+    advance(repos, workdir, &mut tx, &repo, &commit_hash).await?;
+    tx.commit().await?;
+    Ok(TrashResult {
+        next_step: format!("{doc_id} 휴지통에 넣음 — 끊어진 참조 {broken}. 사람에게 알리고 멈춘다"),
+        doc_id: doc_id.to_string(),
+        commit_hash,
+        broken_refs: broken,
+    })
 }
