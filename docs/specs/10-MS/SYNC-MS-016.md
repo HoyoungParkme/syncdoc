@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-006, SYNC-SEQ-001, SYNC-API-001]
 
 서비스는 연결을 빌려 받는다 — `AccountService<'c> { pub db: &'c mut PgConnection }`. 트랜잭션은 부르는 쪽(켜기·웹 입구)이 쥔다([[SYNC-STD-004#DEV-10]]). 돌려주는 행은 `UserRow`다([[SYNC-STD-004#DEV-2]]).
 
-**카드 L1 몫은 로컬 사용자 둘이고(2026-10-07), 카드 L3가 토큰 넷을, 카드 L7이 표시 정보 하나를 더했다(2026-10-08).** 커밋 작성자(L11)는 그 카드가 이 문서에 더한다.
+**카드 L1 몫은 로컬 사용자 둘이고(2026-10-07), 카드 L3가 토큰 넷을, 카드 L7이 표시 정보 하나를 더했다(2026-10-08).** 카드 L11이 커밋 작성자 하나를 더했다(2026-10-11).
 
 **토큰은 파이썬 판과 같은 꼴이다** — 원문 `syncdoc_pat_` + 32바이트를 base64url(채움 없음)로 쓴 43자, DB에는 원문의 sha256 16진 64자만. 두 판은 같은 표를 쓰므로 한 판이 발급한 토큰을 다른 판이 그대로 받는다(데이터 자리를 옮겨 와도). 돌려주는 토큰 행은 `AccessTokenRow`, 발급 결과는 `IssuedToken { token, raw }`다([[SYNC-DOM-004]] 4.5).
 
@@ -31,6 +31,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-006, SYNC-SEQ-001, SYNC-API-001]
 | [[#AccountService.revoke_token]] | 토큰 폐기 |
 | [[#AccountService.authenticate_token]] | MCP 인증 |
 | [[#AccountService.users_by_ids]] | 여러 사용자 표시 정보 |
+| [[#AccountService.user_for_commit]] | 커밋 작성자 → 사용자 |
 
 ---
 
@@ -172,6 +173,23 @@ pub async fn users_by_ids(&mut self, ids: &[i32]) -> Result<HashMap<i32, UserRef
 **호출되는 것** [[SYNC-MS-018#queries.document_list]] · [[SYNC-MS-018#queries.document_view]] — 작성자(`AuthorRef`)를 이름으로
 
 **테스트 관점** 둘 → 둘 · 없는 id → 키 없음 · 빈 목록 → 빈 지도
+
+---
+
+#### AccountService.user_for_commit 커밋 작성자 → 사용자
+
+**시그니처**
+```rust
+pub async fn user_for_commit(&mut self, email: &str, login: &str) -> Result<UserRow, Problem>
+```
+
+근거: [[SYNC-MS-006#AccountService.user_for_commit]] · [[SYNC-PRD-001#R15]]
+
+**처리** 폐쇄망판 갈래 — 늘 로컬 사용자다. 혼자 쓰는 판이라 저장소의 모든 커밋이 그 사람 것이다 · 로컬 사용자 행이 없으면 `! Internal` — 켤 때 [[#AccountService.ensure_local_user]]가 둔다
+
+**다른 점** 이메일 → 아이디 → 자리표시 갈래(GitHub 판)가 없다 — `email`·`login`은 받기만 한다. 자리표시를 만들지 않으므로 `author.unknown`도 생기지 않는다
+
+**테스트 관점** 아무 메일·아이디 → 로컬 사용자
 
 ---
 
