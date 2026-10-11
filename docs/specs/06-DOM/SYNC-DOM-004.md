@@ -130,8 +130,18 @@ crates/core/
     ├── queries.rs                  읽기 조합
     └── infra/                      바깥 — git 자식 프로세스(`git.rs`, L6 — 사용자 git 설정을 막는다) · upload-pack·receive-pack · 모델 호출
 ```
+```
+crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 (MS-022, L12)
+├── lib.rs                      그래프 모양(Graph·Function·CallDiff·층)과 오류 CodeGraphFailed
+├── graph.rs                    touches_code · load · reduce · spec_calls · compare · item_function · item_neighbors · layer_table · layers
+├── extract.rs                  graphify 대신 — 파일 노드와 파이썬 정의·같은 파일 호출의 원형
+├── enrich.rs                   보강 — 파이썬(python.rs) · TS/JS(ts.rs) · 화면 ID · Rust(rust.rs)
+├── python.rs                   tree-sitter-python으로 `ast`의 뜻을 읽는다 — 정의·끝 줄·docstring·대입·속성·호출·import
+├── ts.rs                       tree-sitter-typescript — 맨 위 정의·끝 줄·상대 import·호출
+└── rust.rs                     tree-sitter-rust — 맨 위 fn·impl 메서드·`///`·use·호출
+```
 
-지금(카드 L8) 있는 것은 `account`·`spec`·`project`·`reference`(뽑기·끊기·잇기·조회·관계도·미존재)·`markdown.rs`·`pycompat/`·`pipeline.rs`(MCP 저장)·`queries.rs`(프로젝트 요약·상세·문서 목록·문서·항목·참조·체인·관계도·diff 영향·추적표·문제 목록)·`infra/git.rs`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. `spec/`의 정답 파일은 `crates/core/tests/golden/spec.json`(생성물, `cargo xtask spec-golden`)이다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
+지금(카드 L12) 있는 것은 `account`·`spec`·`project`·`reference`(뽑기·끊기·잇기·조회·관계도·미존재)·`codegraph`(그래프 행·코드 읽기)·`markdown.rs`·`pycompat/`·`pipeline.rs`(저장·커밋 처리·재구축·따라잡기·그래프 만들기)·`queries.rs`(프로젝트 요약·상세·문서 목록·문서·항목·참조·체인·관계도·diff 영향·추적표·문제 목록·코드)·`infra/git.rs`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. `spec/`의 정답 파일은 `crates/core/tests/golden/spec.json`(생성물, `cargo xtask spec-golden`)이다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
 
 **층** — 함수 단위 명세(MINISPEC 카드·API 엔드포인트·UI 화면)가 없는 코드가 어느 층이고 그 층을 무슨 문서가 정하는지([[SYNC-STD-001]] 2.6). 코드 그래프가 읽는다. 위에서부터 첫 줄이 이긴다. **줄은 카드마다 더한다** — 코드가 없는 줄은 검사기(`check_calls`)가 「안 맞는 줄」로 잡는다. 함수가 없는 파일(구조체만 — `state.rs`·`model.rs`)은 적지 않는다.
 
@@ -150,6 +160,7 @@ crates/core/
 | `local/crates/core/src/*/repo.rs` | 리포지토리 | [[SYNC-DOM-004]] 4장 · [[SYNC-DOM-003]] |
 | `local/crates/*/build.rs` | 빌드 설정 | [[SYNC-STD-004#DEV-7]] · [[SYNC-INFRA-001]] 9.2 |
 | `local/xtask/**` | 개발 도구 | [[SYNC-STD-004#DEV-7]] · [[SYNC-STD-004#DEV-14]] |
+| `local/crates/codegraph/src/*.rs` | 코드 그래프 보강 | [[SYNC-MS-022]] 0장 · [[SYNC-MS-011#codegraph.enrich]] |
 
 ---
 
@@ -623,10 +634,11 @@ classDiagram
 | [[SYNC-MS-017#pipeline.upload_code]] | MCP `upload_code`(L11) | [[SYNC-MS-007#pipeline.upload_code]] | `not-found` · `upload-too-large` · `upload-path-refused` · `push-failed` |
 | [[SYNC-MS-017#pipeline.move_to_server]] · [[SYNC-MS-017#pipeline.move_to_github]] | `POST …/move-to-server` · `…/move-to-github`(L11) | [[SYNC-MS-007#pipeline.move_to_server]] | `storage-mismatch` · `storage-unavailable` · `not-found` |
 | [[SYNC-MS-017#pipeline.catch_up]] · [[SYNC-MS-017#pipeline.poll_loop]] | 켤 때 `runtime.run`(L11) | [[SYNC-MS-007#scheduler.catch_up]] | — (저장소마다 `fetch_error`) |
+| [[SYNC-MS-017#pipeline.schedule_code_graph]] · [[SYNC-MS-017#pipeline.build_code_graph]] | 커밋 처리 5a · 재구축 10 · 보관본 가져오기(L12) | [[SYNC-MS-007#pipeline.build_code_graph]] | — (실패는 그래프 행의 `error`) |
 | [[SYNC-MS-017#pipeline.write_lock]] · [[SYNC-MS-017#pipeline.read_lock]] | `save_pipeline` · `read_pending` | [[SYNC-MS-007]] 락 | — |
 | [[SYNC-MS-017#pipeline.wait_idle]] | `runtime.shutdown` | [[SYNC-INFRA-001]] 9.1 | — |
 
-규칙 — [[SYNC-DOM-002]] 4.4와 같다. 프로젝트마다 쓰기 락 하나·읽기 락 하나, 프로세스 전역이고 시간 제한이 없다. 읽기 → 쓰기 차례(`read_pending`은 쓰기 락 밖). 검사가 다 끝난 뒤에야 git을 쓰고, git이 끝난 뒤에야 DB를 쓴다 — 실패하면 DB는 그대로다. 저장은 따로 띄운 작업에서 돌아 부른 요청이 끊겨도 끝까지 간다. 웹 갈래(상태·되돌리기·되살림)는 L9가, 서버 저장소 push 갈래(`github`)·밀린 커밋 처리·재구축·따라잡기는 L11이 더했다 — 파이썬 판 `scheduler` 모듈의 둘도 여기 둔다. 코드 그래프 만들기는 L12.
+규칙 — [[SYNC-DOM-002]] 4.4와 같다. 프로젝트마다 쓰기 락 하나·읽기 락 하나, 프로세스 전역이고 시간 제한이 없다. 읽기 → 쓰기 차례(`read_pending`은 쓰기 락 밖). 검사가 다 끝난 뒤에야 git을 쓰고, git이 끝난 뒤에야 DB를 쓴다 — 실패하면 DB는 그대로다. 저장은 따로 띄운 작업에서 돌아 부른 요청이 끊겨도 끝까지 간다. 웹 갈래(상태·되돌리기·되살림)는 L9가, 서버 저장소 push 갈래(`github`)·밀린 커밋 처리·재구축·따라잡기는 L11이 더했다 — 파이썬 판 `scheduler` 모듈의 둘도 여기 둔다. 코드 그래프 걸기·만들기는 L12가 더했다(커뮤니티는 L13).
 
 ### 4.7 queries (MS-018)
 
@@ -644,8 +656,11 @@ classDiagram
 | [[SYNC-MS-018#queries.diff_with_impact]] | `GET /api/docs/{docId}/diff` | [[SYNC-MS-008#queries.diff_with_impact]] | `not-found` |
 | [[SYNC-MS-018#queries.downstream_view]] | `GET /api/docs/{docId}/downstream` | [[SYNC-MS-008#queries.downstream_view]] | `not-found` |
 | [[SYNC-MS-018#queries.trash_list]] | `GET /api/projects/{code}/trash` | [[SYNC-MS-008#queries.trash_list]] | `not-found` |
+| [[SYNC-MS-018#queries.code_view]] | `GET /api/docs/{docId}/code` · `…/items/{itemId}/code` · MCP `get_code_graph`(L12) | [[SYNC-MS-008#queries.code_view]] | `not-found` · `item-deleted` |
+| [[SYNC-MS-018#queries.code_calls]] | `GET /api/projects/{code}/code-calls`(L12) | [[SYNC-MS-008#queries.code_calls]] | `not-found` |
+| [[SYNC-MS-018#queries.code_source]] · [[SYNC-MS-018#queries.code_text]] | `GET …/items/{itemId}/code/source` · `GET /api/projects/{code}/code/source`(L12) | [[SYNC-MS-008#queries.code_source]] | `not-found`(code_graph·function·file) |
 
-모듈 함수다 — 연결을 첫 인자로 받는다. 나머지 조회(코드 L12·묻기 L14)는 그 카드가 더한다.
+모듈 함수다 — 연결을 첫 인자로 받는다. 나머지 조회(코드 그래프 노드 L13·묻기 L14)는 그 카드가 더한다.
 
 ### 4.8 git (MS-019)
 
@@ -671,6 +686,8 @@ classDiagram
         +log(workdir, path) Vec~Commit~
         +checkout(workdir, git_ref)
         +sync_readme(workdir, user, code, specs_url) Option~String~
+        +changed_paths(workdir, range) Vec~String~
+        +archive(workdir, commit, dest)
     }
 ```
 
@@ -681,8 +698,66 @@ classDiagram
 | [[SYNC-MS-019#Git.commit_push]] · [[SYNC-MS-019#Git.fetch]] · [[SYNC-MS-019#Git.rev_list_count]] | 저장 파이프라인 | [[SYNC-MS-009]] | `push-failed` · `internal` |
 | [[SYNC-MS-019#Git.advertise_refs]] · [[SYNC-MS-019#Git.service_rpc]] | git 입구(`/git/*`, L10) | [[SYNC-MS-009#git.http_backend]] | `internal` |
 | [[SYNC-MS-019#Git.changed_files]] · [[SYNC-MS-019#Git.log]] · [[SYNC-MS-019#Git.checkout]] · [[SYNC-MS-019#Git.sync_readme]] | 밀린 커밋 처리·재구축·재구축 위임(L11) | [[SYNC-MS-009#git.changed_files]] | `push-failed` · `internal` |
+| [[SYNC-MS-019#Git.changed_paths]] · [[SYNC-MS-019#Git.archive]] | 커밋 처리 5a · 그래프 만들기(L12) | [[SYNC-MS-009#git.archive]] | `internal` |
 
 규칙 — git CLI를 자식 프로세스로 부른다(윈도 MinGit · 리눅스 시스템 git). **사용자 git 설정을 막는다**(사용자 결정 2026-10-08) — 시스템·전역 설정 끔, 프롬프트·서명·autocrlf 끔, `LC_ALL=C`, `safe.directory=*`. 파이썬 판이 Docker 안에서 받는 깨끗한 환경과 같게 해 같은 명령이 같은 결과를 낸다. git 입구(upload-pack·receive-pack)는 L10이 더했다 — http-backend 없이 `--stateless-rpc`를 직접 부르고 http-backend의 머리를 그대로 낸다. 파이썬 판이 CGI로 넘기는 것과 같게: 요청 머리(`Authorization`·`Content-Type`·`Content-Encoding`·`Git-Protocol`)는 latin-1로 읽고 · gzip 본문이 깨졌으면 서비스를 부르지 않고 빈 결과(http-backend는 죽고 자식도 끝난다) · 인증·원본을 지난 receive-pack 요청 뒤에는 응답이 무엇이든 밀린 커밋을 읽는다(파이썬 판 `BackgroundTask` 자리).
+
+### 4.11 codegraph (MS-022)
+
+순수 부분은 `codegraph` crate의 모듈 함수다 — DB·git을 모르고 파일만 읽는다. 그래프 행은 `core`의 `CodeGraphService`다.
+
+```mermaid
+classDiagram
+    class codegraph {
+        +touches_code(paths) bool
+        +load(src_dir) (String, Value)
+        +extract(src_dir) Value
+        +reduce(raw) Graph
+        +enrich(src_dir, graph) Graph
+        +spec_calls(items, impl_of) BTreeMap
+        +compare(graph, spec) Vec~CallDiff~
+        +item_function(graph, item_id) Function
+        +item_neighbors(graph, key) (Vec, Vec)
+        +layer_table(body) Vec~LayerRow~
+        +layers(graph, rows) (HashMap, Vec)
+    }
+    class Graph {
+        +Vec~Function~ functions
+        +Vec~Call~ calls
+        +Vec~Community~ communities
+    }
+    class Function {
+        +String key
+        +String name
+        +String qual
+        +String file
+        +i64 line
+        +Option~i64~ end
+        +Option~String~ item
+        +Option~String~ ms
+        +Option~i64~ community
+    }
+    class CodeGraphService {
+        +get(project_id) CodeGraphRow
+        +save(project_id, commit_hash, source, graph) CodeGraphRow
+        +fail(project_id, commit_hash, reason) CodeGraphRow
+        +read(git, project_id, workdir, path, start, end) CodeText
+    }
+    codegraph --> Graph
+    Graph --> Function
+    CodeGraphService --> Graph
+```
+
+| 메서드 | 부르는 곳 | 근거 | 던지는 에러 |
+|---|---|---|---|
+| [[SYNC-MS-022#codegraph.touches_code]] | 커밋 처리 5a | [[SYNC-MS-011#codegraph.touches_code]] | — |
+| [[SYNC-MS-022#codegraph.load]] · [[SYNC-MS-022#codegraph.extract]] · [[SYNC-MS-022#codegraph.reduce]] · [[SYNC-MS-022#codegraph.enrich]] | `pipeline.build_code_graph` | [[SYNC-MS-011#codegraph.load]] | `CodeGraphFailed`(그래프 행의 `error`로) |
+| [[SYNC-MS-022#codegraph.spec_calls]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.item_function]] · [[SYNC-MS-022#codegraph.item_neighbors]] | 코드 조회 넷 | [[SYNC-MS-011#codegraph.compare]] | — |
+| [[SYNC-MS-022#codegraph.layer_table]] · [[SYNC-MS-022#codegraph.layers]] | 코드 그래프 노드(L13) | [[SYNC-MS-011#codegraph.layers]] | — |
+| [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#CodeGraphService.save]] · [[SYNC-MS-022#CodeGraphService.fail]] | 그래프 만들기 · 코드 조회 · 커밋 처리 5a | [[SYNC-MS-011#CodeGraphService.save]] | — |
+| [[SYNC-MS-022#CodeGraphService.read]] | `queries.code_source`·`code_text` | [[SYNC-MS-011#CodeGraphService.read]] | `not-found`(code_graph·file) |
+
+규칙 — [[SYNC-DOM-002]] 4.11과 같다. 그래프는 DB에 줄인 모양(함수·선·항목 ID)으로, 코드 본문은 저장소에서 읽는다. 저장소에 커밋된 `graphify-out/graph.json`이 있으면 파이썬 판처럼 그것이 원형이다 — 없으면 graphify 대신 tree-sitter로 뽑는다([[SYNC-MS-022]] 0장, [[SYNC-INFRA-001]] 9.2). 커뮤니티는 L13이 더한다.
 
 ---
 
