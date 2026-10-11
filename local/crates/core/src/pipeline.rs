@@ -21,7 +21,8 @@ use crate::pycompat::re::compile;
 use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
 use crate::types::{
-    Author, DeletedItem, DocStatus, Document, Entry, RefEdge, SaveResult, py_isoformat, spec_dir,
+    Author, AuthorKind, DeletedItem, DocStatus, Document, Entry, RefEdge, SaveResult, py_isoformat,
+    spec_dir,
 };
 
 /// frontmatter의 `status:` 줄 — 첫 것 하나만 갈아 끼운다(파이썬 `_set_status`, `re.M`)
@@ -540,4 +541,52 @@ pub async fn change_status(
     .await?;
     let mut c = pool.acquire().await?;
     SpecService { db: &mut c }.get_document(doc_id).await
+}
+
+/// SYNC-MS-017#pipeline.revert
+///
+/// 본문은 `versions.body`에서 — 되돌리기는 옛 판을 쓰는 것이 목적이다. 0단계가 밀린 것을 먼저 흡수한다
+pub async fn revert(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    doc_id: &str,
+    to_version: i32,
+    user: &UserRow,
+    confirm_item_deletion: bool,
+) -> Result<SaveResult, Problem> {
+    read_pending(pool, repos, code_of(doc_id), user).await?;
+    let mut c = pool.acquire().await?;
+    let document = SpecService { db: &mut c }.get_document(doc_id).await?;
+    let old_body = SpecService { db: &mut c }
+        .version_body(doc_id, to_version)
+        .await?;
+    let current = document.summary.current_version_no;
+    if to_version == current {
+        return Err(Problem::AlreadyCurrent);
+    }
+    drop(c);
+    save_pipeline(
+        pool,
+        repos,
+        SaveInput {
+            entry: Entry::WebRevert,
+            doc_id: Some(doc_id.to_string()),
+            doc_type: None,
+            body: old_body,
+            expected_version: Some(i64::from(current)),
+            project_code: None,
+            author: Author {
+                kind: AuthorKind::Human,
+                user: user.clone(),
+                instructed_by: None,
+                via: Entry::WebRevert,
+            },
+            message: format!("revert({doc_id}): v{current} → v{to_version} 내용으로"),
+            confirm_item_deletion,
+            reason: None,
+            restore: false,
+            read_first: false,
+        },
+    )
+    .await
 }
