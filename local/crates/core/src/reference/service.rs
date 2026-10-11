@@ -253,4 +253,12 @@ impl ReferenceService<'_> {
             .map(edge)
             .collect())
     }
+
+    /// SYNC-MS-015#ReferenceService.clear
+    ///
+    /// 판을 가리키는 유일한 외래 키(`extracted_version_id`)라 인덱스 비우기보다 먼저(MS-007 rebuild 4a, #38)
+    pub async fn clear(&mut self, project_id: i32) -> Result<(), Problem> {
+        repo::delete_in_project(&mut *self.db, project_id).await?;
+        Ok(())
+    }
 }

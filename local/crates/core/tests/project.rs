@@ -134,7 +134,7 @@ async fn rejects_github_bad_code_and_duplicates_without_side_effects() {
 }
 
 #[tokio::test]
-async fn delete_archives_then_recreate_asks_and_import_is_l11() {
+async fn delete_archives_then_recreate_asks_and_import_rebuilds() {
     let db = support::test_db().await;
     let tmp = tempfile::tempdir().expect("임시");
     let p = places(tmp.path());
@@ -148,6 +148,38 @@ async fn delete_archives_then_recreate_asks_and_import_is_l11() {
     s.init_project("ARC", "보관", &u, false, Storage::Server)
         .await
         .expect("만들기");
+    // 밖에서 명세 하나를 민다 — 보관본에 든다
+    let out = tmp.path().join("out");
+    sh(
+        tmp.path(),
+        &[
+            "clone",
+            "-q",
+            p.origins.join("ARC.git").to_str().expect("경로"),
+            out.to_str().expect("경로"),
+        ],
+    );
+    std::fs::write(
+        out.join("docs/specs/02-PRD/ARC-PRD-001.md"),
+        "---\ndoc_id: ARC-PRD-001\ntype: PRD\ntitle: 보관\nstatus: draft\n---\n# 보관\n\n## 1. 목표\n\n## 2. 비목표\n\n## 3. 요구사항\n\n#### R1 하나\n설명.\n\n## 4. 성공지표\n\n## 5. 미결사항\n",
+    )
+    .expect("명세");
+    sh(&out, &["add", "-A"]);
+    sh(
+        &out,
+        &[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "-m",
+            "spec: 밖",
+        ],
+    );
+    sh(&out, &["push", "-q", "origin", "HEAD:main"]);
+    let pushed = sh(&out, &["rev-parse", "HEAD"]);
     // 남의 것 → 없는 것과 같은 답, 아무것도 안 지워짐
     assert!(matches!(
         s.delete_project("ARC", &other).await,
@@ -170,20 +202,28 @@ async fn delete_archives_then_recreate_asks_and_import_is_l11() {
             doc_count,
             archived_at,
         }) => {
-            assert_eq!(doc_count, 0);
+            assert_eq!(doc_count, 1);
             assert!(archived_at.is_some_and(|a| a.ends_with("+00:00")));
         }
         other => panic!("{other:?}"),
     }
     assert_eq!(archives(&p), kept);
-    // 명세가 든 보관본을 가져오기 → 재구축(L11). 보관본은 제자리, 행 없음
-    assert!(matches!(
-        s.init_project("ARC", "보관", &u, true, Storage::Server).await,
-        Err(Problem::NotImplemented { card }) if card == "L11"
-    ));
-    assert_eq!(archives(&p), kept);
-    assert!(!p.origins.join("ARC.git").exists());
-    assert!(matches!(s.get("ARC").await, Err(Problem::NotFound { .. })));
+    // 명세가 든 보관본을 가져오기 → 재구축(L11). 보관본이 원본으로 되살아나고 골격 커밋 없이 처리 지점이 원본 끝
+    let (_, repo) = s
+        .init_project("ARC", "보관", &u, true, Storage::Server)
+        .await
+        .expect("가져오기");
+    assert!(archives(&p).is_empty());
+    assert_eq!(
+        sh(&p.origins.join("ARC.git"), &["rev-parse", "main"]),
+        pushed
+    );
+    assert_eq!(repo.last_processed_commit.as_deref(), Some(pushed.as_str()));
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM documents WHERE doc_id = 'ARC-PRD-001'")
+        .fetch_one(&mut *s.db)
+        .await
+        .expect("문서");
+    assert_eq!(n, 1);
 }
 
 #[tokio::test]

@@ -13,7 +13,7 @@ use tokio::process::Command;
 use crate::account::model::UserRow;
 use crate::errors::Problem;
 use crate::pycompat::chars::{py_splitlines, strip};
-use crate::types::{UserKind, stage_of};
+use crate::types::{ChangedFile, Commit, UserKind, stage_of};
 
 /// push가 거부되면 다시 미는 수 — INFRA 5.2 `PUSH_RETRIES` 기본값
 pub const PUSH_RETRIES: usize = 3;
@@ -43,6 +43,9 @@ const RECEIVE_RULES: [&str; 3] = [
 const SPEC_TYPES: [&str; 12] = [
     "RFQ", "PRD", "SCN", "UC", "INFRA", "DOM", "UI", "API", "SEQ", "MS", "CODE", "STD",
 ];
+
+/// 저장소 README 자리
+const README_PATH: &str = "docs/specs/README.md";
 
 /// 새 저장소의 `docs/specs/README.md` — 파이썬 `_readme()`와 글자 하나 다르지 않다. `{SPECS_URL}`이 규약 주소
 const README: &str = r#"# docs/specs — 명세 원본
@@ -110,6 +113,42 @@ fn cmd_text(args: &[&OsStr]) -> String {
         s.push_str(&a.to_string_lossy());
     }
     s
+}
+
+/// 커밋 작성자 → 아이디 — noreply 메일이면 앞부분(ID+ 접두어를 뗀다), 아니면 이름 (파이썬 `_login_of`)
+fn login_of(name: &str, email: &str) -> String {
+    if email.ends_with("@users.noreply.github.com") {
+        let local = email.split('@').next().unwrap_or("");
+        return local.rsplit('+').next().unwrap_or("").to_string();
+    }
+    name.to_string()
+}
+
+/// 「제목\n본문」 → 본문이 있으면 `제목\n\n본문`(걷어서), 없으면 제목 (파이썬 `_message`)
+fn commit_message(subject_body: &str) -> String {
+    let (subject, body) = subject_body.split_once('\n').unwrap_or((subject_body, ""));
+    let body = strip(body);
+    if body.is_empty() {
+        subject.to_string()
+    } else {
+        format!("{subject}\n\n{body}")
+    }
+}
+
+/// 파이썬 `PurePosixPath(p).parts` — `/`로 가르고 빈 조각·`.`은 버린다(절대 경로면 앞에 `/`)
+fn posix_parts(path: &str) -> Vec<&str> {
+    let mut out: Vec<&str> = Vec::new();
+    if path.starts_with('/') {
+        out.push("/");
+    }
+    out.extend(path.split('/').filter(|p| !p.is_empty() && *p != "."));
+    out
+}
+
+fn is_hash(s: &str) -> bool {
+    s.len() == 40
+        && s.bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 impl Git {
@@ -543,7 +582,7 @@ impl Git {
         }
         files.insert("docs/specs/assets/.gitkeep".to_string(), String::new());
         files.insert(
-            "docs/specs/README.md".to_string(),
+            README_PATH.to_string(),
             README.replace("{SPECS_URL}", specs_url.trim_end_matches('/')),
         );
         files
@@ -569,6 +608,168 @@ impl Git {
         strip(&out).parse().map_err(|_| Problem::Internal {
             log: format!("git rev-list --count {range}의 출력이 수가 아니다: {out}"),
         })
+    }
+
+    /// SYNC-MS-019#Git.changed_files
+    ///
+    /// 커밋은 최신부터 — 경로마다 처음 본 것(가장 최근)만. 이름 바꾸기는 새 경로의 `M`으로 접고 옛 경로는 막는다(#31)
+    pub async fn changed_files(
+        &self,
+        workdir: &Path,
+        range: &str,
+        prefix: &str,
+    ) -> Result<Vec<ChangedFile>, Problem> {
+        let out = self
+            .run(
+                Some(workdir),
+                &[
+                    os("log"),
+                    os("--name-status"),
+                    os("--format=%H%x00%an%x00%ae%x00%s%n%b%x00"),
+                    os(range),
+                    os("--"),
+                    os(prefix),
+                ],
+            )
+            .await?;
+        // 막힌 옛 경로는 None — 더 앞선 커밋의 같은 경로를 막는다
+        let mut seen: std::collections::BTreeMap<String, Option<ChangedFile>> =
+            std::collections::BTreeMap::new();
+        let tokens: Vec<&str> = out.split('\0').collect();
+        let mut hash = strip(tokens[0]).to_string();
+        let mut i = 4;
+        while i < tokens.len() {
+            let (an, ae, msg) = (tokens[i - 3], tokens[i - 2], tokens[i - 1]);
+            let lines: Vec<&str> = tokens[i].split('\n').collect();
+            let last = strip(lines.last().copied().unwrap_or(""));
+            let next_hash = if is_hash(last) {
+                last.to_string()
+            } else {
+                String::new()
+            };
+            for line in &lines {
+                if !line.contains('\t') {
+                    continue;
+                }
+                let mut cols = line.split('\t');
+                let mut status = cols.next().unwrap_or("").to_string();
+                let paths: Vec<&str> = cols.collect();
+                let path = paths.last().copied().unwrap_or("");
+                if status.starts_with('R') && paths.len() == 2 {
+                    seen.entry(paths[0].to_string()).or_insert(None);
+                    status = "M".to_string();
+                }
+                let parts = posix_parts(path);
+                if parts.contains(&"_templates")
+                    || parts.contains(&"assets")
+                    || parts.len() <= 3
+                    || seen.contains_key(path)
+                {
+                    continue;
+                }
+                seen.insert(
+                    path.to_string(),
+                    Some(ChangedFile {
+                        path: path.to_string(),
+                        status: status.chars().next().map(String::from).unwrap_or_default(),
+                        commit_hash: hash.clone(),
+                        author_login: login_of(an, ae),
+                        message: commit_message(msg),
+                        author_email: ae.to_string(),
+                    }),
+                );
+            }
+            hash = next_hash;
+            i += 4;
+        }
+        Ok(seen.into_values().flatten().collect())
+    }
+
+    /// SYNC-MS-019#Git.log
+    ///
+    /// `--follow`는 `--reverse`와 함께 쓰지 못한다 — 받아서 뒤집는다(#39). 지운 커밋은 뺀다(#325).
+    /// 커밋 경계는 앞쪽 구분자 `%x1e` — `--name-only`가 메시지 뒤에 빈 줄과 그때의 경로를 붙인다
+    pub async fn log(&self, workdir: &Path, path: &str) -> Result<Vec<Commit>, Problem> {
+        let out = self
+            .run(
+                Some(workdir),
+                &[
+                    os("log"),
+                    os("--follow"),
+                    os("--diff-filter=d"),
+                    os("--name-only"),
+                    os("--format=%x1e%H%x1f%an%x1f%ae%x1f%aI%x1f%s%n%b"),
+                    os("--"),
+                    os(path),
+                ],
+            )
+            .await?;
+        let mut commits = Vec::new();
+        for block in out.split('\u{1e}').skip(1) {
+            let mut f = block.splitn(5, '\u{1f}');
+            let (h, an, ae, date, rest) = (
+                f.next().unwrap_or(""),
+                f.next().unwrap_or(""),
+                f.next().unwrap_or(""),
+                f.next().unwrap_or(""),
+                f.next().unwrap_or(""),
+            );
+            let lines: Vec<&str> = rest.trim_end_matches('\n').split('\n').collect();
+            let (at_path, msg) = match lines.split_last() {
+                Some((last, head)) => (*last, head.join("\n")),
+                None => ("", String::new()),
+            };
+            let date =
+                time::OffsetDateTime::parse(date, &time::format_description::well_known::Rfc3339)
+                    .map_err(|e| Problem::Internal {
+                    log: format!("git log 시각을 못 읽었다 {date:?} — {e}"),
+                })?;
+            commits.push(Commit {
+                hash: h.to_string(),
+                login: login_of(an, ae),
+                date,
+                message: commit_message(msg.trim_matches('\n')),
+                email: ae.to_string(),
+                path: at_path.to_string(),
+            });
+        }
+        commits.reverse();
+        Ok(commits)
+    }
+
+    /// SYNC-MS-019#Git.checkout
+    pub async fn checkout(&self, workdir: &Path, git_ref: &str) -> Result<(), Problem> {
+        self.run(Some(workdir), &[os("checkout"), os("--force"), os(git_ref)])
+            .await?;
+        Ok(())
+    }
+
+    /// SYNC-MS-019#Git.sync_readme
+    ///
+    /// 재구축 위임이 저장소에 쓰는 유일한 것 — 같으면 커밋이 생기지 않는다
+    pub async fn sync_readme(
+        &self,
+        workdir: &Path,
+        user: &UserRow,
+        code: &str,
+        specs_url: &str,
+    ) -> Result<Option<String>, Problem> {
+        let mut files = Self::init_specs(specs_url);
+        let want = files.shift_remove(README_PATH).unwrap_or_default();
+        // push는 추적 참조를 고치지 않는다 — 비교 전에 받아 온다
+        self.fetch(workdir).await?;
+        let have = self
+            .read(workdir, README_PATH, "origin/main")
+            .await
+            .unwrap_or_default(); // README가 없는 저장소
+        if have == want {
+            return Ok(None);
+        }
+        let message = format!("chore({code}): README를 싱크독 규약 링크로");
+        let one = IndexMap::from([(README_PATH.to_string(), want)]);
+        Ok(Some(
+            self.commit_push(workdir, &message, user, &one, &[]).await?,
+        ))
     }
 
     /// SYNC-MS-019#Git.advertise_refs

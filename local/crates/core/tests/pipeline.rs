@@ -71,6 +71,7 @@ impl Env {
                 reason: None,
                 restore: false,
                 read_first: true,
+                commit_hash: None,
             },
         )
         .await
@@ -99,6 +100,7 @@ impl Env {
                 reason: None,
                 restore: false,
                 read_first: true,
+                commit_hash: None,
             },
         )
         .await
@@ -280,6 +282,7 @@ async fn violations_leave_nothing_and_unknown_type_is_frontmatter_type() {
             reason: None,
             restore: false,
             read_first: true,
+            commit_hash: None,
         },
     )
     .await;
@@ -699,7 +702,7 @@ async fn dropped_caller_still_finishes_the_save() {
 }
 
 #[tokio::test]
-async fn outside_commit_is_card_l11_and_idle_wait_times_out() {
+async fn outside_commit_is_read_first_and_idle_wait_times_out() {
     let e = env().await;
     // 앱이 만든 프로젝트 → 밀린 것 없음, 확인 시각이 적힌다
     assert_eq!(
@@ -716,7 +719,7 @@ async fn outside_commit_is_card_l11_and_idle_wait_times_out() {
             .expect("저장소");
     assert_eq!((behind, fetched), (Some(0), true));
     drop(c);
-    // 밖에서 서버 저장소에 민 커밋 → L11
+    // 밖에서 서버 저장소에 민 커밋 — 저장 전에 먼저 읽고(L11) 저장한다. 처리 지점은 저장한 커밋
     let outside = e._tmp.path().join("outside");
     let origin = e.repos.origins.join(format!("{CODE}.git"));
     git(
@@ -744,10 +747,14 @@ async fn outside_commit_is_card_l11_and_idle_wait_times_out() {
         ],
     );
     git(&outside, &["push", "-q", "origin", "HEAD:main"]);
-    assert!(matches!(
-        e.create("PRD", PRD).await,
-        Err(Problem::NotImplemented { card }) if card == "L11"
-    ));
+    let saved = e.create("PRD", PRD).await.expect("밀린 것을 읽고 저장");
+    let mut c = e.conn().await;
+    let last: String = sqlx::query_scalar("SELECT last_processed_commit FROM repositories")
+        .fetch_one(&mut *c)
+        .await
+        .expect("처리 지점");
+    assert_eq!(last, saved.commit_hash);
+    drop(c);
     // 쓰기 락을 쥐고 있으면 기다림이 끝나지 않는다
     let lock = pipeline::write_lock(CODE);
     assert!(std::sync::Arc::ptr_eq(&lock, &pipeline::write_lock(CODE)));

@@ -680,3 +680,92 @@ mod tests {
         );
     }
 }
+
+/// 범위에서 바뀐 명세 파일 하나 — 그 경로의 가장 최근 커밋 (DOM-002 2.8 `ChangedFile`, 카드 L11)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ChangedFile {
+    pub path: String,
+    /// `A`·`M`·`D`… 첫 글자 — 이름 바꾸기는 `M`으로 접는다
+    pub status: String,
+    pub commit_hash: String,
+    pub author_login: String,
+    pub message: String,
+    pub author_email: String,
+}
+
+/// 파일 이력의 커밋 하나 — `path`는 그 커밋 시점의 경로 (DOM-002 2.8 `Commit`, 카드 L11)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Commit {
+    pub hash: String,
+    pub login: String,
+    pub date: OffsetDateTime,
+    pub message: String,
+    pub email: String,
+    pub path: String,
+}
+
+/// 재구축 결과의 규약 오류 한 줄 (API-001 `RebuildResult.convention_errors[]`)
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct RebuildError {
+    pub doc_id: String,
+    pub detail: String,
+}
+
+/// 재구축 결과 (API-001 `RebuildResult`, 카드 L11) — `readme_updated`는 재구축 위임이 채운다
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RebuildResult {
+    pub docs: i64,
+    pub items: i64,
+    pub references: i64,
+    pub versions: i64,
+    pub convention_errors: Vec<RebuildError>,
+    pub readme_updated: bool,
+}
+
+/// 동기화 상태 한 줄 (API-001 `RepoStatus`, UI-14 표 2) — 서버 저장뿐이라 `remote_url`은 늘 없고 `hook`은 늘 `none`
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RepoStatus {
+    pub code: String,
+    pub name: String,
+    pub storage: String,
+    pub remote_url: Option<String>,
+    pub last_processed_commit: Option<String>,
+    pub synced_at: Option<OffsetDateTime>,
+    pub behind_by: Option<i32>,
+    pub fetched_at: Option<OffsetDateTime>,
+    pub error: Option<String>,
+    pub hook: String,
+    pub hook_error: Option<String>,
+}
+
+/// push 통지 상태 (API-001 `HookStatus`) — `ok`·`none`·`error`
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HookStatus {
+    pub hook: String,
+    pub hook_error: Option<String>,
+    pub created: bool,
+}
+
+/// 지금 가져오기 (API-001 `SyncResult`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SyncResult {
+    pub docs: i64,
+    pub fetched_at: Option<OffsetDateTime>,
+}
+
+/// 코드 올리기 결과 (DOM-002 2.8 `UploadResult`, 카드 L11) — 같은 내용이면 `changed=false`
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UploadResult {
+    pub commit: String,
+    pub changed: bool,
+    pub files: i64,
+    pub deleted: i64,
+}
+
+/// 저장 방식을 옮긴 결과 (API-001 `MoveResult`) — 싱크독_로컬은 서버 저장뿐이라 옮기는 갈래가 없다(늘 거절)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MoveResult {
+    pub origin: String,
+    pub head: String,
+    pub hook: HookStatus,
+}

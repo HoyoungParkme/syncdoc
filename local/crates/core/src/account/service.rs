@@ -40,6 +40,18 @@ impl AccountService<'_> {
         }
     }
 
+    /// SYNC-MS-016#AccountService.user_for_commit
+    ///
+    /// 폐쇄망판 — 늘 로컬 사용자다(혼자 쓰는 판, PRD R15). 켤 때 `ensure_local_user`가 둔다
+    pub async fn user_for_commit(&mut self, email: &str, login: &str) -> Result<UserRow, Problem> {
+        let _ = (email, login); // GitHub 판의 이메일 → 아이디 → 자리표시 갈래가 없다
+        repo::local_user(&mut *self.db)
+            .await?
+            .ok_or_else(|| Problem::Internal {
+                log: "로컬 사용자가 없다 — 켤 때 ensure_local_user가 둔다".into(),
+            })
+    }
+
     /// SYNC-MS-016#AccountService.local_user
     pub async fn local_user(
         &mut self,

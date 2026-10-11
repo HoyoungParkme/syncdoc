@@ -1,7 +1,7 @@
 //! 파이썬 문자 분류와 `str.strip()` — 생성물 표(`unicode.rs`)를 찾는다 (SYNC-DOM-004 1장 pycompat).
 //! Rust 표준(`trim`·`char::is_whitespace`)은 `\x1c`~`\x1f`를 공백으로 안 보고 유니코드 판도 다르다.
 
-use super::unicode::{DECIMAL, NON_PRINTABLE, SPACE, WORD};
+use super::unicode::{DECIMAL, DIGIT, NON_PRINTABLE, SPACE, WORD};
 
 /// 오름차순 구간 표에 들었나
 pub fn within(table: &[(u32, u32)], cp: u32) -> bool {
@@ -26,6 +26,11 @@ pub fn is_space(c: char) -> bool {
 /// 파이썬 `c.isdecimal()` = `re`의 `\d`
 pub fn is_decimal(c: char) -> bool {
     within(&DECIMAL, u32::from(c))
+}
+
+/// 파이썬 `c.isdigit()` — `\d`(`isdecimal`)보다 넓다
+pub fn is_digit(c: char) -> bool {
+    within(&DIGIT, u32::from(c))
 }
 
 /// 파이썬 `c.isalnum() or c == "_"` = `re`의 `\w`

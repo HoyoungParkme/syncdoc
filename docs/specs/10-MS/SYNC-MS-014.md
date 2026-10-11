@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-002, SYNC-MS-003, SYNC-STD-001, SYNC-STD-004]
 
 서비스는 연결을 빌려 받는다 — `SpecService<'c> { pub db: &'c mut PgConnection }`. DB가 필요 없는 함수는 연결 없이 부르는 연관 함수다(`SpecService::item_blocks(…)`). 트랜잭션은 부르는 쪽이 쥔다([[SYNC-STD-004#DEV-10]]).
 
-**카드 L5 몫은 엔진이다(2026-10-08)** — 마크다운 넷, 항목 블록, 규약 검증, frontmatter 채움, diff. **카드 L6이 문서 목록(`list_by_project`)을, 카드 L7이 저장·조회(만들기·저장·문서·항목·이름·이웃·ID 발급·선행조건)를, 카드 L8이 이력·최근 변경·관계도 목록·pk 여럿·휴지통 목록을, 카드 L9가 상태 적용·휴지통 넣기·되살릴 커밋·옛 판 본문·완전 삭제를 더했다(2026-10-11)** — 저장 파이프라인([[SYNC-MS-017]])과 읽기 조합이 쓴다. **타입은 문자열이다(L7)** — 파이썬처럼 에이전트가 보낸 모르는 타입도 받아 `frontmatter.type` 위반까지 같은 답을 낸다(`check`·`validate`·`apply_frontmatter`, 상태 조건도 문자열 그대로 비교). 나머지 SpecService(상태, 휴지통, 재구축…)는 쓰는 카드(L9·L11)가 이 문서에 더한다.
+**카드 L5 몫은 엔진이다(2026-10-08)** — 마크다운 넷, 항목 블록, 규약 검증, frontmatter 채움, diff. **카드 L6이 문서 목록(`list_by_project`)을, 카드 L7이 저장·조회(만들기·저장·문서·항목·이름·이웃·ID 발급·선행조건)를, 카드 L8이 이력·최근 변경·관계도 목록·pk 여럿·휴지통 목록을, 카드 L9가 상태 적용·휴지통 넣기·되살릴 커밋·옛 판 본문·완전 삭제를, 카드 L11이 파일 삭제 반영·인덱스 비우기·규약 결과 적기와 저장의 재구축·상태 커밋 갈래를 더했다(2026-10-11)** — 저장 파이프라인([[SYNC-MS-017]])과 읽기 조합이 쓴다. **타입은 문자열이다(L7)** — 파이썬처럼 에이전트가 보낸 모르는 타입도 받아 `frontmatter.type` 위반까지 같은 답을 낸다(`check`·`validate`·`apply_frontmatter`, 상태 조건도 문자열 그대로 비교). 나머지 SpecService는 쓰는 카드가 이 문서에 더한다.
 
 **파이썬 판과 바이트까지 같다**(사용자 결정 2026-10-08 — 유니코드까지). 파이썬 엔진은 YAML·마크다운 라이브러리 없이 정규식·`difflib`이고 메시지에 `repr`이 들어간다. 그래서
 - 문자 분류는 **파이썬 3.12(유니코드 15.0)의 표**를 쓴다 — 정규식의 `\s`·`\S`·`\d`·`\w`와 `str.strip()`. 표는 `crates/core/src/pycompat/`의 생성물이다(`cargo xtask unicode-tables`). Rust 표준의 `trim()`·`char::is_whitespace`·`regex`의 `\d`는 쓰지 않는다(`\x1c`~`\x1f`, 유니코드 판이 다르다)
@@ -65,6 +65,9 @@ upstream: [SYNC-DOM-004, SYNC-MS-002, SYNC-MS-003, SYNC-STD-001, SYNC-STD-004]
 | [[#SpecService.trash_commit]] | 휴지통 커밋 해시 |
 | [[#SpecService.version_body]] | 특정 버전 본문 |
 | [[#SpecService.delete_document]] | 완전 삭제 — 행 삭제 |
+| [[#SpecService.mark_deleted]] | 파일 삭제 반영 |
+| [[#SpecService.clear_index]] | 재구축 전에 인덱스를 비운다 |
+| [[#SpecService.mark_convention_error]] | 규약 결과를 적는다 |
 
 ---
 
@@ -428,18 +431,18 @@ pub async fn create(&mut self, project_id: i32, doc_id: &str, doc_type: &str, bo
 
 **시그니처**
 ```rust
-pub async fn save(&mut self, document: &Document, body: &str, commit_hash: &str, author: &Author, message: &str, deleted_item_pks: &[i32], validate_result: &ValidateResult) -> Result<VersionRow, Problem>
+pub async fn save(&mut self, document: &Document, body: &str, commit_hash: &str, author: &Author, message: &str, deleted_item_pks: &[i32], validate_result: &ValidateResult, rebuild: bool, status_commit_hash: Option<&str>) -> Result<VersionRow, Problem>
 ```
 
 근거: [[SYNC-MS-002#SpecService.save]]
 
-**처리** [[SYNC-MS-002#SpecService.save]]의 `mcp` 갈래와 같다 — 판 = 현재 + 1 · `versions insert` · 항목 블록마다 있으면 이름을 고치고 **되살리고**(`is_deleted=false`·`deleted_at` 없음), 없으면 `insert` · `deleted_item_pks`는 `is_deleted=true`·`deleted_at=now` · 완료 문서이고 본문이 바뀌었으면 상태를 `draft`로 · `status_changes insert(approved → draft, 바꾼 사람, via, "본문 수정으로 자동 강등", 커밋 없음)` · 본문·판·상태·규약 결과 · 휴지통에서 나온다 · `updated_at=now`
+**처리** [[SYNC-MS-002#SpecService.save]]와 같다 — 판 = (`rebuild`면 남은 버전 수, 아니면 현재) + 1 · `versions insert` · 항목 블록마다 있으면 이름을 고치고 **되살리고**(`is_deleted=false`·`deleted_at` 없음), 없으면 `insert` · `deleted_item_pks`는 `is_deleted=true`·`deleted_at=now` · 새 상태 = `github`면 frontmatter 상태(`draft`·`approved`일 때만, 아니면 지금 것), 다른 입구는 지금 것 · 완료 문서이고 본문이 바뀌었고 (새 상태가 아직 `approved`이거나 `status_commit_hash`가 있으면) 상태를 `draft`로 · `status_changes insert(approved → draft, 바꾼 사람, via, "본문 수정으로 자동 강등", status_commit_hash)` · 본문·판·상태·규약 결과 · 휴지통에서 나온다 · `updated_at=now`
 
-**다른 점** 재구축(`rebuild`)·상태 커밋 해시(`github` 입구)는 L11 — 받지 않는다
+**다른 점** 없음(L11부터 — 그 전에는 재구축·상태 커밋 갈래가 없었다)
 
 **호출하는 것** [[#SpecService.item_blocks]] · [[#markdown.parse_frontmatter]]
 
-**테스트 관점** v2 · 지운 항목 표시 · 같은 ID가 다시 나타나면 되살림 · 완료 문서 → 초안·상태 변경 행 하나
+**테스트 관점** v2 · 지운 항목 표시 · 같은 ID가 다시 나타나면 되살림 · 완료 문서 → 초안·상태 변경 행 하나 · `rebuild` → 남은 버전 수 + 1 · `github`이 frontmatter를 `draft`로 내려 보냄 → 초안, 상태 변경 행 없음 · `github`이 완료 그대로 고침 + 상태 커밋 해시 → 초안, 그 해시의 상태 변경 행
 
 ---
 
@@ -645,6 +648,52 @@ pub async fn delete_document(&mut self, document: &Document) -> Result<i64, Prob
 
 **테스트 관점** (시험 DB) 그 문서 행 전부 사라짐 · 다른 문서는 그대로 · 지운 뒤 같은 번호를 다시 발급
 
+---
+
+#### SpecService.mark_deleted 파일 삭제 반영
+
+**시그니처**
+```rust
+pub async fn mark_deleted(&mut self, document: &Document, commit_hash: &str, author: &Author) -> Result<Vec<i32>, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.mark_deleted]] · [[SYNC-MS-017#pipeline.process_commit]]
+
+**처리** [[SYNC-MS-002#SpecService.mark_deleted]]와 같다 — 지워지지 않은 항목 전부 `is_deleted=true`·`deleted_at=now`(pk 차례로 모은다) · `status_changes insert(지금 상태 → draft, author, via 접음, "파일 삭제됨", commit_hash)` · 문서 `status=draft`·`has_convention_error=true`·`convention_error_detail="file.deleted: {commit_hash}"` · `→` 지운 항목 pk
+
+**테스트 관점** 문서 행 남음·초안·항목 전부 삭제·상태 변경 행 · 되살려 저장하면 `file.deleted`가 지워지고 항목이 살아난다
+
+---
+
+#### SpecService.clear_index 재구축 전에 인덱스를 비운다
+
+**시그니처**
+```rust
+pub async fn clear_index(&mut self, project_id: i32) -> Result<(), Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.clear_index]] · [[SYNC-MS-017#pipeline.rebuild]] 4
+
+**처리** 그 프로젝트 문서의 커밋 있는 상태 변경을 지운다(재구축이 다시 만든다, #38) · 그 프로젝트의 버전 전부를 지운다 · 문서·항목은 남긴다(항목 pk를 지킨다) — 버전을 가리키는 참조(`extracted_version_id`)는 부르는 쪽이 먼저 지운다([[SYNC-MS-015#ReferenceService.clear]])
+
+**테스트 관점** 버전 0 · 커밋 없는 상태 변경은 남는다 · 다른 프로젝트 것은 그대로
+
+---
+
+#### SpecService.mark_convention_error 규약 결과를 적는다
+
+**시그니처**
+```rust
+pub async fn mark_convention_error(&mut self, document_id: i32, result: &ValidateResult) -> Result<(), Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.mark_convention_error]]
+
+**처리** 문서의 규약 칸 셋(`has_convention_error`·`convention_error_detail`·`incomplete_warnings`)을 `result`로 **통째로 바꾼다** — [[#SpecService.save]]가 적는 것과 같은 꼴
+
+**다른 점** 위반·경고 둘을 `ValidateResult` 하나로 받는다(파이썬은 목록 둘)
+
+**테스트 관점** 위반 하나 → 오류 칸에 `rule: message` · 빈 결과 → 오류 없음·경고 없음
 
 ---
 

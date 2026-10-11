@@ -292,6 +292,17 @@ pub mod schemas {
         .expect("Revert 스키마")
     }
 
+    /// `MoveToGithub` — `remote_url: str = Field(min_length=1)` (POST /api/admin/repos/{code}/move-to-github)
+    pub fn move_to_github() -> Validator {
+        Validator::new(
+            &json!({"type": "model", "cls": "MoveToGithub", "schema": {"type": "model-fields", "fields": {
+                "remote_url": {"type": "model-field", "schema": {"type": "str", "min_length": 1}}},
+                "model_name": "MoveToGithub"}, "config": {"title": "MoveToGithub"}}),
+            "MoveToGithub",
+        )
+        .expect("MoveToGithub 스키마")
+    }
+
     /// 질의 `confirm: bool = Query(False)` (DELETE /api/docs/{docId})
     pub fn flag() -> Validator {
         Validator::new(&json!({"type": "bool"}), "bool").expect("bool 스키마")

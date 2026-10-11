@@ -17,6 +17,7 @@ use crate::state::AppState;
 use crate::web::guard::guard;
 use crate::web::problem::{method_not_allowed, panic_response};
 use crate::web::routes::account::{issue_token, list_tokens, me, revoke_token};
+use crate::web::routes::admin::{hook, move_to_github, move_to_server, rebuild, repos, sync};
 use crate::web::routes::documents::change_status;
 use crate::web::routes::documents::diff;
 use crate::web::routes::documents::downstream;
@@ -73,6 +74,18 @@ pub fn app(state: AppState) -> Router {
         .route("/api/docs/{doc_id}/status", post(change_status))
         .route("/api/docs/{doc_id}/revert", post(revert))
         .route("/git/{*rest}", any(git_entrance))
+        .route("/api/admin/repos", get(repos))
+        .route("/api/admin/repos/{code}/rebuild", post(rebuild))
+        .route("/api/admin/repos/{code}/hook", post(hook))
+        .route("/api/admin/repos/{code}/sync", post(sync))
+        .route(
+            "/api/admin/repos/{code}/move-to-server",
+            post(move_to_server),
+        )
+        .route(
+            "/api/admin/repos/{code}/move-to-github",
+            post(move_to_github),
+        )
         .merge(mcp::router(state.clone()))
         .route("/specs/", get(spec_copy))
         .route("/specs/{*path}", get(spec_copy))

@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
 
-use sqlx::{Connection, PgConnection};
+use sqlx::{Connection, PgConnection, PgPool};
 
 use super::model::{ProjectRow, RepositoryRow};
 use super::repo;
@@ -16,7 +16,7 @@ use crate::clock;
 use crate::errors::Problem;
 use crate::infra::git::Git;
 use crate::pycompat::chars::strip;
-use crate::types::Storage;
+use crate::types::{HookStatus, RebuildResult, RepoStatus, Storage, SyncResult};
 
 /// 서버 저장소 자리 — git·서버 저장소·작업 사본·README의 규약 주소. 켤 때 `runtime.run`이 만든다
 #[derive(Clone, Debug)]
@@ -250,13 +250,15 @@ impl ProjectService<'_> {
         )
         .await?;
         if has {
-            // 되살린 보관본의 명세를 재구축으로 올리는 갈래 — 카드 L11
-            tx.rollback().await?;
-            let _ = fs::remove_dir_all(&workdir);
-            undo_origin();
-            return Err(Problem::NotImplemented {
-                card: "L11".to_string(),
-            });
+            // 3a2·3b2 — 되살린 보관본의 명세를 재구축으로 가져온다. 같은 저장점이라 막 넣은 행을 본다.
+            // 서비스가 pipeline을 부르는 자리(파이썬 판 DOM-002 3.2와 같다)
+            if let Err(p) = crate::pipeline::rebuild(&mut tx, self.repos, code).await {
+                drop(tx);
+                undo_origin();
+                return Err(p);
+            }
+            tx.commit().await?;
+            return self.get(code).await;
         }
         let files = Git::init_specs(&self.repos.specs_url);
         let message = format!("chore({code}): init syncdoc");
@@ -330,6 +332,91 @@ impl ProjectService<'_> {
         user: &UserRow,
     ) -> Result<Vec<(ProjectRow, RepositoryRow)>, Problem> {
         Ok(repo::owned_by(&mut *self.db, user.id).await?)
+    }
+
+    /// SYNC-MS-013#ProjectService.list_projects
+    ///
+    /// 전부다 — 따라잡기가 쓴다. 사람 경로에서 부르지 않는다(목록 화면은 `list_owned`)
+    pub async fn list_projects(&mut self) -> Result<Vec<(ProjectRow, RepositoryRow)>, Problem> {
+        Ok(repo::all(&mut *self.db).await?)
+    }
+
+    /// SYNC-MS-013#ProjectService.repo_status
+    ///
+    /// 원격을 타지 않는다 — 받기는 따라잡기가 하고 여기는 그 결과(DB)를 본다. 내가 소유한 것만
+    pub async fn repo_status(&mut self, user: &UserRow) -> Result<Vec<RepoStatus>, Problem> {
+        Ok(self
+            .list_owned(user)
+            .await?
+            .into_iter()
+            .map(|(p, r)| RepoStatus {
+                code: p.code,
+                name: p.name,
+                storage: r.storage,
+                remote_url: None, // 서버 저장 — 서버 안 경로는 내지 않는다
+                last_processed_commit: r.last_processed_commit,
+                synced_at: r.synced_at,
+                behind_by: r.behind_by,
+                fetched_at: r.fetched_at,
+                error: r.fetch_error,
+                hook: "none".to_string(), // 서버 저장소는 걸 통지가 없다
+                hook_error: r.hook_error,
+            })
+            .collect())
+    }
+
+    /// SYNC-MS-013#ProjectService.ensure_hook
+    ///
+    /// 원본이 서버 안이라 밖에서 바뀌지 않는다 — 걸 통지가 없다(파이썬 판 1a)
+    pub async fn ensure_hook(&mut self, code: &str, user: &UserRow) -> Result<HookStatus, Problem> {
+        self.get_owned(code, user).await?;
+        Ok(HookStatus {
+            hook: "none".to_string(),
+            hook_error: Some("서버 저장소는 통지가 없다".to_string()),
+            created: false,
+        })
+    }
+
+    /// SYNC-MS-013#ProjectService.sync_now
+    ///
+    /// 소유 검사·읽기 락·커밋 처리가 `read_pending` 안에 있다 — 두 벌 만들지 않는다
+    pub async fn sync_now(
+        &mut self,
+        pool: &PgPool,
+        code: &str,
+        user: &UserRow,
+    ) -> Result<SyncResult, Problem> {
+        let docs = crate::pipeline::read_pending(pool, self.repos, code, user).await?;
+        let (_, repo) = self.get_owned(code, user).await?; // read_pending이 다른 연결에서 적었다
+        Ok(SyncResult {
+            docs,
+            fetched_at: repo.fetched_at,
+        })
+    }
+
+    /// SYNC-MS-013#ProjectService.rebuild_index
+    ///
+    /// 소유 검사는 여기서(재구축은 `get`). README를 인덱스보다 **먼저** 맞춘다 — 그 커밋이 재구축의 받기 끝에
+    /// 들어가 밀림 0으로 끝난다. 밀기가 실패하면 인덱스는 건드리지 않는다(UC-S6 1a)
+    pub async fn rebuild_index(
+        &mut self,
+        code: &str,
+        user: &UserRow,
+    ) -> Result<RebuildResult, Problem> {
+        let (_, repo) = self.get_owned(code, user).await?;
+        let hash = self
+            .repos
+            .git
+            .sync_readme(
+                Path::new(&repo.workdir_path),
+                user,
+                code,
+                &self.repos.specs_url,
+            )
+            .await?;
+        let mut result = crate::pipeline::rebuild(&mut *self.db, self.repos, code).await?;
+        result.readme_updated = hash.is_some();
+        Ok(result)
     }
 
     /// SYNC-MS-013#ProjectService.asset_path

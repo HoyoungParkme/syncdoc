@@ -37,6 +37,22 @@ pub async fn by_code(
 }
 
 /// 소유자의 프로젝트 — 코드 차례
+/// 전부 — 코드 순(배치 경로)
+pub async fn all(db: &mut PgConnection) -> Result<Vec<(ProjectRow, RepositoryRow)>, sqlx::Error> {
+    let ps = sqlx::query_as::<_, ProjectRow>(AssertSqlSafe(format!(
+        "SELECT {PROJECT} FROM projects ORDER BY code"
+    )))
+    .fetch_all(&mut *db)
+    .await?;
+    let mut out = Vec::with_capacity(ps.len());
+    for p in ps {
+        if let Some(r) = repository_of(db, p.id).await? {
+            out.push((p, r));
+        }
+    }
+    Ok(out)
+}
+
 pub async fn owned_by(
     db: &mut PgConnection,
     user_id: i32,
@@ -171,6 +187,38 @@ pub async fn advance_processed(
         .bind(repository_id)
         .bind(commit)
         .bind(at)
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
+/// 따라잡기가 잰 뒤처짐 — 성공한 주기가 옛 실패 사유를 지운다
+pub async fn set_behind(
+    db: &mut PgConnection,
+    repository_id: i32,
+    behind_by: Option<i32>,
+    at: OffsetDateTime,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE repositories SET behind_by = $2, fetched_at = $3, fetch_error = NULL WHERE id = $1",
+    )
+    .bind(repository_id)
+    .bind(behind_by)
+    .bind(at)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+/// 따라잡기가 실패한 사유 — 화면(UI-14)이 올린다(#46)
+pub async fn set_fetch_error(
+    db: &mut PgConnection,
+    repository_id: i32,
+    reason: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE repositories SET fetch_error = $2 WHERE id = $1")
+        .bind(repository_id)
+        .bind(reason)
         .execute(db)
         .await?;
     Ok(())

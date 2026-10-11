@@ -16,7 +16,7 @@ upstream: [SYNC-DOM-004, SYNC-INFRA-001, SYNC-PRD-001, SYNC-SEQ-001, SYNC-STD-00
 
 **켜는 중 실패는 HTTP가 아니다.** 이 문서의 함수도 `Result<_, Problem>`을 돌려주지만([[SYNC-STD-004#DEV-5]]) 켜는 중에 난 것은 `Problem::Internal`의 로그 문장이 사람이 읽는 말이다 — `main`이 그 문장을 표준 오류와 로그에 남기고 끝 코드 1로 끝난다.
 
-**카드 L1 몫이고(2026-10-07) 카드 L4가 트레이와 첫 켜기의 브라우저, 윈도 관리자 권한 내려놓기를, 카드 L6이 git 자리와 서버 저장소 자리를 더했다(2026-10-08).** git 자식 프로세스(L6·L10)·쓰기 락 기다림(L7)·밀린 커밋 따라잡기와 주기 확인(L11)·하루 한 번 백업 확인과 데이터 자리 옮기기(L16)는 그 카드가 [[#runtime.run]]·[[#runtime.shutdown]]에 단계를 더한다.
+**카드 L1 몫이고(2026-10-07) 카드 L4가 트레이와 첫 켜기의 브라우저, 윈도 관리자 권한 내려놓기를, 카드 L6이 git 자리와 서버 저장소 자리를, 카드 L11이 밀린 커밋 따라잡기와 주기 확인을 더했다(2026-10-11).** 하루 한 번 백업 확인과 데이터 자리 옮기기(L16)는 그 카드가 [[#runtime.run]]·[[#runtime.shutdown]]에 단계를 더한다.
 
 ---
 
@@ -65,15 +65,16 @@ pub async fn run(args: Args, tray: Option<TrayLink>) -> Result<(), Problem>
 6. 연결 풀(sqlx 기본, 최대 10)을 연다 · 연결 하나로 `migrate.apply` · 트랜잭션을 열어 `AccountService { db }.ensure_local_user(settings.local_login, settings.local_name)` 후 커밋 — 5 뒤에서 실패하면 `pg.stop` 뒤 그 `Problem`
 7. `listener = runtime.bind(port, port + 9)`(0이면 `bind(0, 0)`) · 받은 포트가 `port`가 아니면 「{port}을 못 써 {실제}에 열었다 — 에이전트의 MCP 주소도 바뀐다」를 로그와 표준 출력에
 8. `instance.publish(data, 실제 포트)` · 서버를 조립한다(공개 주소 `http://127.0.0.1:{실제 포트}` — 같은 망 열기는 L16 · 서버 저장소 자리 `ServerRepos { git: Git { exe: paths.git(), global_config: data/gitconfig }, origins: data/origins, repos: data/repos, specs_url: {공개 주소}/specs }` — 카드 L6) · 「싱크독_로컬 — http://127.0.0.1:{실제 포트}/」를 표준 출력에 · `tray`가 있으면 주소를 보낸다 · if `--autostart`도 `--no-browser`도 아니다 → 기본 브라우저로 연다(못 열면 로그만) — 바로 가기로 켠 사람은 화면을 바로 본다(사용자 결정 2026-10-08)
+8a. 따라잡기 — [[SYNC-MS-017#pipeline.catch_up]]을 따로 한 번 띄우고(기다리지 않는다 — 꺼져 있던 동안 쌓인 커밋) [[SYNC-MS-017#pipeline.poll_loop]]`(300초)`를 띄운다(INFRA 9.1 켜기)
 9. 끄기 신호(Ctrl+C·SIGTERM) 또는 트레이의 「끝내기」를 기다린다 → `runtime.shutdown(running)`
 
 **출력** `Ok(())` — `main`이 끝 코드 0
 
 **예외** 1~8의 `Problem`은 그대로 — `main`이 끝 코드 1
 
-**호출하는 것** [[#paths.data_dir]] · [[#instance.acquire]] · [[#instance.open_running]] · [[#logs.init]] · [[#settings.load]] · [[#paths.pg_dir]] · [[#paths.git]] · [[#pg.start]] · [[#migrate.apply]] · [[SYNC-MS-016#AccountService.ensure_local_user]] · [[#runtime.bind]] · [[#instance.publish]] · [[#runtime.shutdown]] · [[#pg.stop]]
+**호출하는 것** [[#paths.data_dir]] · [[#instance.acquire]] · [[#instance.open_running]] · [[#logs.init]] · [[#settings.load]] · [[#paths.pg_dir]] · [[#paths.git]] · [[#pg.start]] · [[#migrate.apply]] · [[SYNC-MS-016#AccountService.ensure_local_user]] · [[#runtime.bind]] · [[#instance.publish]] · [[SYNC-MS-017#pipeline.catch_up]] · [[SYNC-MS-017#pipeline.poll_loop]] · [[#runtime.shutdown]] · [[#pg.stop]]
 
-**테스트 관점** 실행 파일 시험(임시 데이터 자리) — 켜면 `/health`·`/api/me`가 뜨고 `instance.json`이 생긴다 · 트레이의 끝내기 신호로도 끝난다(끄는 순서는 같다) · `--autostart`·`--no-browser`면 브라우저를 열지 않는다 · 두 번째 실행은 주소를 찍고 끝 코드 0 · SIGINT로 10초 안에 끝나고 `postmaster.pid`·`instance.json`이 없다 · 다시 켜면 같은 데이터 · `LOCAL_LOGIN`이 남의 아이디면 끝 코드 1과 그 문장, PostgreSQL은 멈춰 있다 · 켜기 시간을 찍어 둔다(첫 실행·다시 켜기 — 판정은 L17)
+**테스트 관점** 실행 파일 시험(임시 데이터 자리) — 꺼진 동안 서버 저장소에 민 명세 커밋이 켜면 문서가 된다 · 켜면 `/health`·`/api/me`가 뜨고 `instance.json`이 생긴다 · 트레이의 끝내기 신호로도 끝난다(끄는 순서는 같다) · `--autostart`·`--no-browser`면 브라우저를 열지 않는다 · 두 번째 실행은 주소를 찍고 끝 코드 0 · SIGINT로 10초 안에 끝나고 `postmaster.pid`·`instance.json`이 없다 · 다시 켜면 같은 데이터 · `LOCAL_LOGIN`이 남의 아이디면 끝 코드 1과 그 문장, PostgreSQL은 멈춰 있다 · 켜기 시간을 찍어 둔다(첫 실행·다시 켜기 — 판정은 L17)
 
 ---
 
@@ -105,10 +106,11 @@ pub async fn shutdown(running: Running) -> Result<(), Problem>
 
 근거: [[SYNC-INFRA-001]] 9.1 끄기
 
-**입력** `Running` — 서버 작업·끄기 신호·연결 풀·`PgServer`·데이터 자리·잠금·로그 지킴이
+**입력** `Running` — 서버 작업·끄기 신호·따라잡기 작업 둘·연결 풀·`PgServer`·데이터 자리·잠금·로그 지킴이
 
 **처리**
 1. 서버에 끄기 신호 — 새 연결을 받지 않는다
+1a. 따라잡기·주기 확인 작업을 멈춘다(파이썬 판 `lifespan`이 끌 때 취소하는 것과 같다)
 2. 진행 중 요청과 쓰기 락([[SYNC-MS-017#pipeline.wait_idle]])을 합쳐 최대 10초 기다린다 · 넘으면 끊는다 — INFRA 9.1의 「쓰기 락이 풀리기를 기다린다」. 요청이 끊겨도 저장은 따로 돌므로([[SYNC-MS-017#pipeline.save_pipeline]]) git과 DB 사이에 있는 저장까지(카드 L7)
 3. 연결 풀을 닫는다
 4. `pg.stop(pg)`

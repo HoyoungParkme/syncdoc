@@ -1195,13 +1195,20 @@ impl SpecService<'_> {
         message: &str,
         deleted_item_pks: &[i32],
         validate_result: &ValidateResult,
+        rebuild: bool,
+        status_commit_hash: Option<&str>,
     ) -> Result<VersionRow, Problem> {
         let row = repo::document_by_id(&mut *self.db, document.summary.id)
             .await?
             .ok_or_else(|| Problem::Internal {
                 log: format!("저장할 문서 {}가 없다", document.summary.doc_id),
             })?;
-        let new_no = row.current_version_no + 1;
+        // 재구축은 커밋 차례대로 다시 번호를 매긴다 — current_version_no는 ≥1 제약이라 남은 판 수 + 1
+        let new_no = if rebuild {
+            repo::version_count(&mut *self.db, row.id).await?
+        } else {
+            row.current_version_no
+        } + 1;
         let version = repo::insert_version(
             &mut *self.db,
             &new_version(row.id, new_no, commit_hash, body, author, message),
@@ -1229,8 +1236,14 @@ impl SpecService<'_> {
             (Entry::Github, Some(s)) => s,
             _ => row.status.as_str(),
         };
-        // 6. 자동 강등 — mcp·되돌리기는 이 자리에서 내린다(본문 커밋 하나에 담기므로 커밋 해시 없음) (#58)
-        if row.status == "approved" && body != row.current_body && new_status == "approved" {
+        // 6. 자동 강등 — 어느 쪽이 이미 상태를 정했는지 함께 본다 (#58)
+        // · mcp·되돌리기: 상태를 그대로 뒀다 → 여기서 내린다(본문 커밋 하나에 담기므로 커밋 해시 없음)
+        // · github에서 파이프라인이 내림: 6a가 본문을 이미 draft로 고쳤고 그 강등 커밋 해시를 준다
+        // · github에서 작성자가 스스로 내림: frontmatter가 진실 — 상태 변경 행을 남기지 않는다
+        if row.status == "approved"
+            && body != row.current_body
+            && (new_status == "approved" || status_commit_hash.is_some())
+        {
             new_status = "draft";
             repo::insert_status_change(
                 &mut *self.db,
@@ -1241,7 +1254,7 @@ impl SpecService<'_> {
                     changed_by_user_id: author.user.id,
                     via: fold_via(author.via),
                     reason: Some("본문 수정으로 자동 강등"),
-                    commit_hash: None,
+                    commit_hash: status_commit_hash,
                     changed_at: clock::now(),
                 },
             )
@@ -1528,5 +1541,76 @@ impl SpecService<'_> {
     /// 문지기 검사는 하지 않는다 — `pipeline.purge_document`가 세고 부른다
     pub async fn delete_document(&mut self, document: &Document) -> Result<i64, Problem> {
         Ok(repo::delete_document_rows(&mut *self.db, document.summary.id).await? as i64)
+    }
+
+    /// SYNC-MS-014#SpecService.clear_index
+    ///
+    /// 판을 가리키는 참조는 부르는 쪽이 먼저 지운다(MS-017 rebuild 4a, #38). 문서·항목은 남긴다 — 항목 pk를 지킨다
+    pub async fn clear_index(&mut self, project_id: i32) -> Result<(), Problem> {
+        // 커밋 있는 상태 변경은 재구축이 다시 만든다 — 안 지우면 재구축할 때마다 쌓인다
+        repo::delete_status_changes_with_commit(&mut *self.db, project_id).await?;
+        repo::delete_versions_of_project(&mut *self.db, project_id).await?;
+        Ok(())
+    }
+
+    /// SYNC-MS-014#SpecService.mark_convention_error
+    ///
+    /// 규약 칸 셋을 통째로 바꾼다 — 저장이 적는 것과 같은 꼴
+    pub async fn mark_convention_error(
+        &mut self,
+        document_id: i32,
+        result: &ValidateResult,
+    ) -> Result<(), Problem> {
+        let (has_error, detail, warnings) = convention_columns(result);
+        repo::set_convention(
+            &mut *self.db,
+            document_id,
+            has_error,
+            detail.as_deref(),
+            warnings.as_deref(),
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// SYNC-MS-014#SpecService.mark_deleted
+    ///
+    /// 원본에서 파일이 사라지면 문서는 남기고 초안 + `file.deleted` — 항목은 전부 지운 것으로
+    pub async fn mark_deleted(
+        &mut self,
+        document: &Document,
+        commit_hash: &str,
+        author: &Author,
+    ) -> Result<Vec<i32>, Problem> {
+        let row = repo::document_by_id(&mut *self.db, document.summary.id)
+            .await?
+            .ok_or_else(|| not_found("document", &document.summary.doc_id))?;
+        let now = clock::now();
+        let mut pks = Vec::new();
+        for item in repo::items_of(&mut *self.db, row.id, false).await? {
+            repo::mark_item_deleted(&mut *self.db, item.id, now).await?;
+            pks.push(item.id);
+        }
+        repo::insert_status_change(
+            &mut *self.db,
+            &repo::NewStatusChange {
+                document_id: row.id,
+                from_status: Some(&row.status),
+                to_status: "draft",
+                changed_by_user_id: author.user.id,
+                via: fold_via(author.via),
+                reason: Some("파일 삭제됨"),
+                commit_hash: Some(commit_hash),
+                changed_at: now,
+            },
+        )
+        .await?;
+        repo::set_file_deleted(
+            &mut *self.db,
+            row.id,
+            &format!("file.deleted: {commit_hash}"),
+        )
+        .await?;
+        Ok(pks)
     }
 }

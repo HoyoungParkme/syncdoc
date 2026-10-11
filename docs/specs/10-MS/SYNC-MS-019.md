@@ -12,7 +12,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-009, SYNC-INFRA-001, SYNC-STD-004]
 
 `crates/core/src/infra/git.rs`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.8. 파이썬 판 [[SYNC-MS-009]]의 `git.*`와 **같은 명령·같은 옵션·같은 처리**이고, 이 문서는 다른 점만 적는다([[SYNC-STD-001]] 2.10). 서비스가 아니다 — git CLI를 자식 프로세스로 부르는 얇은 층이다([[SYNC-INFRA-001]] 9.1·9.2 — 순수 Rust git은 아직 push를 받지 못한다).
 
-**카드 L6 몫은 서버 저장 프로젝트를 만들고 지우는 데 드는 일곱이다(2026-10-08).** 카드 L7이 받기·밀린 커밋 수 둘을 더했다(저장 파이프라인의 「밀린 커밋 읽기」·처리 지점 앞당기기). 카드 L10이 git 입구의 둘(광고·rpc)을 더했다(2026-10-11) — 파이썬 판의 `git http-backend`를 쓰지 않고 `upload-pack`·`receive-pack --stateless-rpc`를 직접 부르되, http-backend가 내는 머리·문장을 그대로 낸다(INFRA 9.1). 이력·되돌리기(L11)는 그 카드가 더한다.
+**카드 L6 몫은 서버 저장 프로젝트를 만들고 지우는 데 드는 일곱이다(2026-10-08).** 카드 L7이 받기·밀린 커밋 수 둘을 더했다(저장 파이프라인의 「밀린 커밋 읽기」·처리 지점 앞당기기). 카드 L10이 git 입구의 둘(광고·rpc)을 더했다(2026-10-11) — 파이썬 판의 `git http-backend`를 쓰지 않고 `upload-pack`·`receive-pack --stateless-rpc`를 직접 부르되, http-backend가 내는 머리·문장을 그대로 낸다(INFRA 9.1). 카드 L11이 밀린 커밋 처리·재구축의 넷(바뀐 파일·파일 이력·작업 사본 돌리기·README 맞추기)을 더했다(2026-10-11). 코드 그래프의 둘(바뀐 경로 전부·커밋 풀기)은 L12가 더한다.
 
 **`Git { exe, global_config }`** — git 실행 파일과 빈 전역 설정 파일. 켤 때 [[SYNC-MS-012#runtime.run]]이 만들어 서버 상태에 둔다. 실행 파일은 [[SYNC-MS-012#paths.git]] — 윈도는 설치 폴더의 MinGit(`mingit/cmd/git.exe`), 리눅스는 시스템 git.
 
@@ -43,6 +43,10 @@ upstream: [SYNC-DOM-004, SYNC-MS-009, SYNC-INFRA-001, SYNC-STD-004]
 | [[#Git.rev_list_count]] | 밀린 커밋 수 |
 | [[#Git.advertise_refs]] | git 입구 — 참조 광고 |
 | [[#Git.service_rpc]] | git 입구 — 읽기·쓰기 |
+| [[#Git.changed_files]] | 범위의 바뀐 명세 파일 |
+| [[#Git.log]] | 파일 이력 |
+| [[#Git.checkout]] | 작업 사본을 커밋으로 |
+| [[#Git.sync_readme]] | 저장소 README를 지금 판으로 |
 
 ---
 
@@ -231,9 +235,74 @@ pub async fn service_rpc(&self, origin: &Path, service: &str, body: Vec<u8>, pro
 
 **테스트 관점** (임시 자리 · 진짜 git) 진짜 git 클라이언트로 clone·push가 된다 · 되감는 push·지우는 push는 git 거절 문구로 · `main` 아닌 가지는 받는다
 
+---
+
+#### Git.changed_files 범위의 바뀐 명세 파일
+
+**시그니처**
+```rust
+pub async fn changed_files(&self, workdir: &Path, range: &str, prefix: &str) -> Result<Vec<ChangedFile>, Problem>
+```
+
+근거: [[SYNC-MS-009#git.changed_files]]
+
+**처리** [[SYNC-MS-009#git.changed_files]]와 같은 명령·같은 갈라 읽기 — `git: log --name-status --format=%H%x00%an%x00%ae%x00%s%n%b%x00 {range} -- {prefix}` · NUL로 갈라 첫 해시 뒤로 넷씩(작성자 이름·메일·「제목\n본문」·「상태 줄들\n다음 해시」) · 커밋은 최신부터 — 경로마다 처음 본 것(가장 최근)만 · 이름 바꾸기(`R…\t옛\t새`)는 새 경로의 `M`으로 접고 옛 경로는 막는다(#31) · `_templates`·`assets` 조각이 있거나 조각이 넷 미만(`docs/specs/README.md`)이면 뺀다 · 경로 순으로 `→ [ChangedFile { path, status(첫 글자), commit_hash, author_login, message, author_email }]`
+- `author_login` — 메일이 `@users.noreply.github.com`으로 끝나면 `@` 앞의 마지막 `+` 뒤, 아니면 이름(파이썬 `_login_of`)
+- `message` — 제목과 본문을 가르고, 본문을 걷어 비지 않았으면 `{제목}\n\n{본문}`, 아니면 제목(파이썬 `_message`)
+
+**테스트 관점** 커밋 둘에 같은 파일 → 최근 것 하나 · 지운 파일 → `D` · 이름 바꾸기 → 새 경로 `M`, 옛 경로 없음 · README·템플릿·첨부는 빠진다 · 여러 줄 메시지
+
+---
+
+#### Git.log 파일 이력
+
+**시그니처**
+```rust
+pub async fn log(&self, workdir: &Path, path: &str) -> Result<Vec<Commit>, Problem>
+```
+
+근거: [[SYNC-MS-009#git.log]]
+
+**처리** [[SYNC-MS-009#git.log]]와 같다 — `git: log --follow --diff-filter=d --name-only --format=%x1e%H%x1f%an%x1f%ae%x1f%aI%x1f%s%n%b -- {path}` · `%x1e`로 갈라 커밋마다 `%x1f` 넷으로 해시·이름·메일·시각·나머지 · 나머지의 끝 공백을 걷은 마지막 줄이 그 커밋 시점의 경로, 그 앞이 메시지(앞뒤 빈 줄을 걷고 `_message`) · 받아서 뒤집어 오래된 것부터 `→ [Commit { hash, login, date, message, email, path }]`. 지운 커밋은 빠진다(#325)
+
+**테스트 관점** 오래된 것부터 · 이름이 바뀐 경로 — 옛 이름 시절 커밋의 `path`가 옛 경로 · 지웠다 되살린 파일 — 지운 커밋만 빠진다 · 여러 줄 메시지에서 경로를 떼어 낸다 · 없는 경로는 빈 목록
+
+---
+
+#### Git.checkout 작업 사본을 커밋으로
+
+**시그니처**
+```rust
+pub async fn checkout(&self, workdir: &Path, git_ref: &str) -> Result<(), Problem>
+```
+
+근거: [[SYNC-MS-009#git.checkout]]
+
+**처리** `git: checkout --force {git_ref}`
+
+**테스트 관점** 작업 사본을 고쳐 둔 채 `origin/main`으로 → 고친 것이 사라지고 원격 끝과 같다
+
+---
+
+#### Git.sync_readme 저장소 README를 지금 판으로
+
+**시그니처**
+```rust
+pub async fn sync_readme(&self, workdir: &Path, user: &UserRow, code: &str, specs_url: &str) -> Result<Option<String>, Problem>
+```
+
+근거: [[SYNC-MS-009#git.sync_readme]] · [[SYNC-UC-001#UC-S6]] 1a
+
+**처리** 원하는 것 = [[#Git.init_specs]]의 README(규약 주소 `specs_url`) · [[#Git.fetch]] · `have = git.read(작업 사본, "docs/specs/README.md", "origin/main")`(읽지 못하면 빈 글) · 같으면 `→ None`(커밋이 생기지 않는다) · 다르면 `→ git.commit_push(작업 사본, "chore({code}): README를 싱크독 규약 링크로", user, {README: 원하는 것}, [])`
+
+**다른 점** 받기에 사람이 없다(토큰 갈래 없음, [[#Git.fetch]]) · 규약 주소를 부르는 쪽이 넘긴다(파이썬은 설정)
+
+**호출하는 것** [[#Git.init_specs]] · [[#Git.fetch]] · [[#Git.read]] · [[#Git.commit_push]]
+
+**테스트 관점** 앱이 만든 저장소 → `None`, 커밋 없음 · README를 밖에서 고쳐 민 뒤 → 커밋 하나, 다시 부르면 `None` · README가 없는 저장소 → 만든다
 
 ---
 
 ## 3. 미결사항
 
-없음. 이력·되돌리기·git 입구는 그 카드가 더한다 — [[SYNC-CODE-002]].
+없음. 코드 그래프의 둘(바뀐 경로 전부·커밋 풀기)은 L12가 더한다 — [[SYNC-CODE-002]].

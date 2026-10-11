@@ -215,3 +215,91 @@ fn single_user(data: &Path, sql: &str) {
         .unwrap();
     assert!(child.wait().unwrap().success());
 }
+
+/// 본문 있는 요청 — JSON
+fn http_json(port: u16, method: &str, path: &str, body: &str) -> (u16, String) {
+    let mut s = TcpStream::connect(("127.0.0.1", port)).expect("연결");
+    let req = format!(
+        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+        body.len()
+    );
+    s.write_all(req.as_bytes()).unwrap();
+    let mut buf = String::new();
+    s.read_to_string(&mut buf).unwrap();
+    let status = buf
+        .split(' ')
+        .nth(1)
+        .and_then(|c| c.parse().ok())
+        .unwrap_or(0);
+    let body = buf
+        .split_once("\r\n\r\n")
+        .map(|(_, b)| b.to_string())
+        .unwrap_or_default();
+    (status, body)
+}
+
+fn git(cwd: &Path, args: &[&str]) {
+    let out = Command::new("git")
+        .args(["-c", "user.name=밖", "-c", "user.email=out@example.com"])
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .expect("git");
+    assert!(
+        out.status.success(),
+        "{args:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
+fn push_while_off_becomes_a_document_on_start() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = dir.path();
+    let mut child = spawn(data);
+    let (port, _) = wait_port(data, &mut child);
+    let (status, body) = http_json(
+        port,
+        "POST",
+        "/api/projects",
+        r#"{"storage": "server", "code": "BT", "name": "켜기 따라잡기"}"#,
+    );
+    assert_eq!(status, 201, "{body}");
+    assert!(interrupt(&mut child).status.success());
+    // 꺼진 동안 서버 저장소에 명세를 민다
+    let out = dir.path().join("outside");
+    git(
+        dir.path(),
+        &[
+            "clone",
+            "-q",
+            data.join("origins/BT.git").to_str().unwrap(),
+            out.to_str().unwrap(),
+        ],
+    );
+    fs::write(
+        out.join("docs/specs/02-PRD/BT-PRD-001.md"),
+        "---\ndoc_id: BT-PRD-001\ntype: PRD\ntitle: 켜기\nstatus: draft\n---\n# 켜기\n\n## 1. 목표\n\n## 2. 비목표\n\n## 3. 요구사항\n\n#### R1 하나\n설명.\n\n## 4. 성공지표\n\n## 5. 미결사항\n",
+    )
+    .unwrap();
+    git(&out, &["add", "-A"]);
+    git(&out, &["commit", "-q", "-m", "spec: 꺼진 동안"]);
+    git(&out, &["push", "-q", "origin", "HEAD:main"]);
+    // 다시 켜면 따라잡기가 문서로 만든다
+    let mut child = spawn(data);
+    let (port, _) = wait_port(data, &mut child);
+    let host = format!("127.0.0.1:{port}");
+    let t0 = Instant::now();
+    loop {
+        let (_, docs) = http(port, "GET", "/api/projects/BT/docs", &[("Host", &host)]);
+        if docs.contains("BT-PRD-001") {
+            break;
+        }
+        assert!(
+            t0.elapsed() < Duration::from_secs(30),
+            "따라잡기가 안 됐다 — {docs}"
+        );
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    assert!(interrupt(&mut child).status.success());
+}

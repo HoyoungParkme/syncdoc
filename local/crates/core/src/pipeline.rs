@@ -3,26 +3,32 @@
 //! 카드 L7 몫은 `mcp` 입구다. 웹(L9)·GitHub·밀린 커밋 처리(L11)는 그 카드가 갈래를 더한다.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use indexmap::IndexMap;
 use regex::{NoExpand, Regex};
-use sqlx::PgPool;
+use sqlx::{Connection, PgConnection, PgPool};
 
 use crate::account::model::UserRow;
+use crate::account::repo as account_repo;
+use crate::account::service::AccountService;
 use crate::clock;
 use crate::errors::Problem;
 use crate::markdown::parse_frontmatter;
 use crate::project::repo as project_repo;
 use crate::project::service::{ProjectService, ServerRepos};
+use crate::pycompat::chars::is_digit;
 use crate::pycompat::re::compile;
+use crate::pycompat::repr::repr;
 use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
+use crate::spec::repo as spec_repo;
 use crate::types::{
-    Author, AuthorKind, DeletedItem, DocStatus, Document, Entry, RefEdge, SaveResult, TrashResult,
-    py_isoformat, spec_dir,
+    Author, AuthorKind, ChangedFile, DeletedItem, DocStatus, DocType, Document, Entry, MoveResult,
+    RebuildError, RebuildResult, RefEdge, SaveResult, Storage, TrashResult, UploadResult,
+    ValidateResult, Violation, py_isoformat, spec_dir, stage_of,
 };
 
 /// frontmatter의 `status:` 줄 — 첫 것 하나만 갈아 끼운다(파이썬 `_set_status`, `re.M`)
@@ -33,7 +39,8 @@ static UPSTREAM_TOKEN: LazyLock<Regex> = LazyLock::new(|| compile(r"[\w-]+"));
 /// 저장 입력 (파이썬 `save_pipeline`의 인자) — 만들기는 `doc_id` 없이 `project_code`·`doc_type`,
 /// 고치기는 `doc_id`·`expected_version`. `changed_items`는 파이썬도 쓰지 않아 받지 않는다.
 /// `reason`은 상태 바꾸기의 사유, `restore`는 되살림(휴지통 검사를 지난다), `read_first`는 0단계를 할지 —
-/// 부른 쪽(상태·되돌리기·되살리기)이 이미 읽었으면 거짓(파이썬 `session`을 넘긴 경우)
+/// 부른 쪽(상태·되돌리기·되살리기)이 이미 읽었으면 거짓(파이썬 `session`을 넘긴 경우), `github`은 늘 거짓.
+/// `commit_hash`는 `github` 입구의 파일 커밋(다른 입구는 없음)
 #[derive(Clone, Debug)]
 pub struct SaveInput {
     pub entry: Entry,
@@ -48,6 +55,7 @@ pub struct SaveInput {
     pub reason: Option<String>,
     pub restore: bool,
     pub read_first: bool,
+    pub commit_hash: Option<String>,
 }
 
 type Locks = LazyLock<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>>;
@@ -100,8 +108,8 @@ pub async fn wait_idle(limit: Duration) -> bool {
 
 /// SYNC-MS-017#pipeline.read_pending
 ///
-/// 저장소에 쓰기 전에 밀린 커밋을 먼저 읽는다(DEV-19). **쓰기 락 밖에서 부른다**.
-/// 밀린 것이 있으면 카드 L11(커밋 처리)까지 저장하지 않는다(사용자 결정 2026-10-08)
+/// 저장소에 쓰기 전에 밀린 커밋을 먼저 읽는다(DEV-19). **쓰기 락 밖에서 부른다** —
+/// 커밋 처리가 파일마다 저장(쓰기 락)을 부른다
 pub async fn read_pending(
     pool: &PgPool,
     repos: &ServerRepos,
@@ -133,9 +141,246 @@ pub async fn read_pending(
         }
         return Ok(0);
     }
-    Err(Problem::NotImplemented {
-        card: "L11".to_string(),
-    })
+    // 이미 읽기 락 안이다
+    Ok(process_commit(pool, repos, code, &head, true).await?.len() as i64)
+}
+
+/// SYNC-MS-017#pipeline.process_commit
+///
+/// 전체가 읽기 락 안이다 — git 입구의 push 뒤·따라잡기·`read_pending`이 한 줄로 선다(#194).
+/// `locked`는 이미 그 락을 쥔 부른 쪽이다. 파일 하나가 실패해도 다음 파일 — 실패가 있으면 처리 지점을 옮기지 않는다
+pub async fn process_commit(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    code: &str,
+    head: &str,
+    locked: bool,
+) -> Result<Vec<SaveResult>, Problem> {
+    let lock = read_lock(code);
+    let _held = if locked {
+        None
+    } else {
+        Some(lock.lock().await)
+    };
+    // 1. 처리 지점은 락 안에서 다시 읽는다 — 앞서 기다린 실행이 이미 따라잡아 놨을 수 있다
+    let (_, repo) = {
+        let mut c = pool.acquire().await?;
+        ProjectService { db: &mut c, repos }.get(code).await?
+    };
+    let last = repo.last_processed_commit.clone();
+    if last.as_deref() == Some(head) {
+        return Ok(Vec::new());
+    }
+    let workdir = PathBuf::from(&repo.workdir_path);
+    repos.git.fetch(&workdir).await?;
+    // 2. 이미 처리한 커밋이거나 그 조상이면 아무것도 안 한다 — 처리 지점을 뒤로 돌리지 않는다
+    if let Some(l) = last.as_deref().filter(|l| !l.is_empty())
+        && repos
+            .git
+            .rev_list_count(&workdir, &format!("{l}..{head}"))
+            .await?
+            == 0
+    {
+        return Ok(Vec::new());
+    }
+    let range = match last.as_deref().filter(|l| !l.is_empty()) {
+        Some(l) => format!("{l}..{head}"),
+        None => head.to_string(),
+    };
+    let mut files = repos
+        .git
+        .changed_files(&workdir, &range, "docs/specs/")
+        .await?;
+    // 3b. 파이썬 판 그대로 — 디렉터리 이름(`02-PRD`)으로 찾아 번호 붙은 디렉터리는 모두 99, 경로 순이 곧 단계 순
+    files.sort_by(|a, b| {
+        let key = |f: &ChangedFile| {
+            let parts = path_parts(&f.path);
+            let stage = if parts.len() > 3 {
+                stage_of(parts[2])
+            } else {
+                stage_of("")
+            };
+            (stage.unwrap_or(99), f.path.clone())
+        };
+        key(a).cmp(&key(b))
+    });
+    let mut results = Vec::new();
+    let mut failed: Vec<String> = Vec::new();
+    for f in &files {
+        match process_file(pool, repos, &workdir, code, f, head).await {
+            Ok(r) => results.extend(r),
+            Err(e) => {
+                tracing::warn!("process_commit {code} {}: {e}", f.path);
+                failed.push(f.path.clone());
+            }
+        }
+    }
+    if failed.is_empty() {
+        let mut tx = pool.begin().await?;
+        let now = clock::now();
+        project_repo::advance_processed(&mut tx, repo.id, head, now).await?;
+        // 방금 head까지 처리했으니 뒤처짐은 0이다
+        project_repo::set_fetched(&mut tx, repo.id, now).await?;
+        tx.commit().await?;
+    }
+    Ok(results)
+}
+
+/// 파이썬 `Path(p).parts` — `/`로 가르고 빈 조각·`.`은 버린다
+fn path_parts(path: &str) -> Vec<&str> {
+    path.split('/')
+        .filter(|p| !p.is_empty() && *p != ".")
+        .collect()
+}
+
+/// 파이썬 `Path(p).stem` — 마지막 조각에서 마지막 확장자를 뗀다(맨 앞 `.`은 확장자가 아니다)
+fn path_stem(path: &str) -> &str {
+    let name = path_parts(path).last().copied().unwrap_or("");
+    match name.rfind('.') {
+        Some(i) if i > 0 && i < name.len() - 1 => &name[..i],
+        _ => name,
+    }
+}
+
+type Processed<'a> = std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<Vec<SaveResult>, Problem>> + Send + 'a>,
+>;
+
+/// `process_commit` 4 — 파일 하나. 삭제면 `mark_deleted`, 아니면 github 저장 + 파일 이름·디렉터리 위반 덧붙임.
+/// 상자에 담은 future다 — 저장 → 밀린 커밋 읽기 → 커밋 처리 → 저장이 서로 부르는 고리를 여기서 끊는다
+/// (그래야 저장을 따로 띄울 수 있다)
+fn process_file<'a>(
+    pool: &'a PgPool,
+    repos: &'a ServerRepos,
+    workdir: &'a Path,
+    code: &'a str,
+    f: &'a ChangedFile,
+    head: &'a str,
+) -> Processed<'a> {
+    Box::pin(process_file_inner(pool, repos, workdir, code, f, head))
+}
+
+async fn process_file_inner(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    workdir: &Path,
+    code: &str,
+    f: &ChangedFile,
+    head: &str,
+) -> Result<Vec<SaveResult>, Problem> {
+    let doc_id = path_stem(&f.path).to_string();
+    let parts = path_parts(&f.path);
+    let dir_type = if parts.len() > 3 {
+        type_of_dir(parts[2])
+    } else {
+        String::new()
+    };
+    let user = {
+        let mut c = pool.acquire().await?;
+        AccountService { db: &mut c }
+            .user_for_commit(&f.author_email, &f.author_login)
+            .await?
+    };
+    let author = Author {
+        kind: AuthorKind::Human,
+        user,
+        instructed_by: None,
+        via: Entry::Github,
+    };
+    if f.status == "D" {
+        let mut tx = pool.begin().await?;
+        let found = SpecService { db: &mut tx }.get_document(&doc_id).await;
+        let document = match found {
+            // 앱이 완전 삭제로 지운 문서의 삭제 커밋이거나 등록 전에 사라진 파일
+            Err(Problem::NotFound { .. }) => return Ok(Vec::new()),
+            Err(p) => return Err(p),
+            Ok(d) => d,
+        };
+        if document.summary.trashed_at.is_some() {
+            return Ok(Vec::new()); // 앱이 휴지통에 넣은 삭제 커밋 — 이미 반영돼 있다
+        }
+        let pks = SpecService { db: &mut tx }
+            .mark_deleted(&document, &f.commit_hash, &author)
+            .await?;
+        ReferenceService { db: &mut tx }.mark_missing(&pks).await?;
+        tx.commit().await?;
+        return Ok(Vec::new());
+    }
+    // 앱이 직접 민 커밋(저장·상태·되돌리기)은 이미 기록돼 있다 — 다시 저장하면 같은 커밋의 판이 둘
+    let known: Vec<String> = {
+        let mut c = pool.acquire().await?;
+        let versions = SpecService { db: &mut c }.list_versions(&doc_id).await;
+        match versions {
+            Ok(vs) => vs.into_iter().map(|v| v.commit_hash).collect(),
+            Err(Problem::NotFound { .. }) => Vec::new(),
+            Err(p) => return Err(p),
+        }
+    };
+    if known.contains(&f.commit_hash) {
+        return Ok(Vec::new());
+    }
+    let body = repos.git.read(workdir, &f.path, head).await?;
+    // 파이썬 `DocType(dir_type)` — 모르는 디렉터리면 그 파일은 실패한다(사람 실수라 알린다)
+    if DocType::parse(&dir_type).is_none() {
+        return Err(Problem::Internal {
+            log: format!("{} is not a valid DocType", repr(&dir_type)),
+        });
+    }
+    let r = save_pipeline(
+        pool,
+        repos,
+        SaveInput {
+            entry: Entry::Github,
+            doc_id: Some(doc_id.clone()),
+            doc_type: Some(dir_type.clone()),
+            body: body.clone(),
+            expected_version: None,
+            project_code: Some(code.to_string()),
+            author,
+            message: f.message.clone(),
+            confirm_item_deletion: false,
+            reason: None,
+            restore: false,
+            read_first: false,
+            commit_hash: Some(f.commit_hash.clone()),
+        },
+    )
+    .await?;
+    let (fm, _) = parse_frontmatter(&body);
+    let shown = |k: &str| fm.get(k).map_or_else(|| "None".to_string(), |v| repr(v));
+    let mut extra = Vec::new();
+    if fm.get("doc_id").map(String::as_str) != Some(doc_id.as_str()) {
+        extra.push(Violation {
+            line: 2,
+            rule: "frontmatter.doc_id".into(),
+            message: format!("파일명 {doc_id} ≠ {}", shown("doc_id")),
+        });
+    }
+    if fm.get("type").map(String::as_str) != Some(dir_type.as_str()) {
+        extra.push(Violation {
+            line: 2,
+            rule: "frontmatter.doc_id".into(),
+            message: format!("디렉터리 {dir_type} ≠ type {}", shown("type")),
+        });
+    }
+    if !extra.is_empty() {
+        let mut tx = pool.begin().await?;
+        let mut spec = SpecService { db: &mut tx };
+        let vr = spec.validate(&body, &dir_type, Entry::Github, None).await?;
+        let id = spec.get_document(&doc_id).await?.summary.id;
+        let mut violations = vr.violations;
+        violations.extend(extra);
+        spec.mark_convention_error(
+            id,
+            &ValidateResult {
+                violations,
+                warnings: vr.warnings,
+            },
+        )
+        .await?;
+        tx.commit().await?;
+    }
+    Ok(vec![r])
 }
 
 /// SYNC-MS-017#pipeline.save_pipeline
@@ -154,12 +399,11 @@ pub async fn save_pipeline(
         })?
 }
 
-/// `save_pipeline` 본체 — 파이썬 `save_pipeline`·`_run`의 `mcp`·`web_revert`·`web_status` 갈래, 같은 차례·같은 문장
+/// `save_pipeline` 본체 — 파이썬 `save_pipeline`·`_run`, 같은 차례·같은 문장
 async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<SaveResult, Problem> {
-    if input.entry == Entry::Github {
-        return Err(Problem::NotImplemented { card: "L11".into() });
-    }
     let web_status = input.entry == Entry::WebStatus;
+    // 서버 저장소에 git으로 민 것 — 원본이 진실이라 막지 않고, 묻지 않고, 밀지 않는다
+    let github = input.entry == Entry::Github;
     // 앞. 프로젝트 코드 — 파이썬 `project_code or (doc_id.split("-")[0] if doc_id else None)`
     let code = match (&input.project_code, &input.doc_id) {
         (Some(c), _) if !c.is_empty() => c.clone(),
@@ -179,25 +423,40 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
     let lock = write_lock(&code);
     let _held = lock.lock().await;
     let mut tx = pool.begin().await?;
-    // 1. 사람 경로는 소유를 가른다 — 남의 프로젝트는 없는 것과 같다
-    let (project, repo) = ProjectService { db: &mut tx, repos }
-        .get_owned(&code, &author.user)
-        .await?;
+    // 1. 사람 경로는 소유를 가른다 — 남의 프로젝트는 없는 것과 같다. github은 사람이 없는 배치다
+    let (project, repo) = if github {
+        ProjectService { db: &mut tx, repos }.get(&code).await?
+    } else {
+        ProjectService { db: &mut tx, repos }
+            .get_owned(&code, &author.user)
+            .await?
+    };
     let workdir = Path::new(&repo.workdir_path);
     let mut body = input.body.clone();
     // 2·3. 대상 문서 또는 생성
     let (doc_id, doc_type, document): (String, String, Option<Document>) = match &input.doc_id {
         Some(d) => {
-            let doc = SpecService { db: &mut tx }.get_document(d).await?;
-            // 2. 휴지통 문서는 되살린 뒤 고친다 — 되살림은 이 검사를 지난다
-            if let Some(t) = doc.summary.trashed_at
-                && !input.restore
-            {
-                return Err(Problem::DocumentTrashed {
-                    trashed_at: py_isoformat(t),
-                });
+            let found = SpecService { db: &mut tx }.get_document(d).await;
+            match found {
+                // github 신규 파일 — 파일 이름이 doc_id, frontmatter는 그대로
+                Err(Problem::NotFound { .. }) if github => {
+                    (d.clone(), input.doc_type.clone().unwrap_or_default(), None)
+                }
+                Err(p) => return Err(p),
+                Ok(doc) => {
+                    // 2. 휴지통 문서는 되살린 뒤 고친다 — 되살림은 이 검사를 지난다. github은 파일이
+                    // 다시 push된 것 자체가 되살리기다(save가 휴지통을 비운다)
+                    if let Some(t) = doc.summary.trashed_at
+                        && !input.restore
+                        && !github
+                    {
+                        return Err(Problem::DocumentTrashed {
+                            trashed_at: py_isoformat(t),
+                        });
+                    }
+                    (d.clone(), doc.summary.doc_type.clone(), Some(doc))
+                }
             }
-            (d.clone(), doc.summary.doc_type.clone(), Some(doc))
         }
         None => {
             let doc_type = input.doc_type.clone().unwrap_or_default();
@@ -227,7 +486,7 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
     let vr = SpecService { db: &mut tx }
         .validate(&body, &doc_type, input.entry, current)
         .await?;
-    if !vr.violations.is_empty() {
+    if !vr.violations.is_empty() && !github {
         return Err(Problem::ConventionViolation {
             violations: vr.violations.clone(),
             warnings: vr.warnings.clone(),
@@ -235,6 +494,7 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
     }
     // 5. 판 — 검증 뒤
     if let Some(doc) = &document
+        && !github
         && input.expected_version != Some(i64::from(doc.summary.current_version_no))
     {
         return Err(Problem::VersionConflict {
@@ -248,6 +508,9 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
         deleted = SpecService { db: &mut tx }
             .detect_deleted_items(doc, &body)
             .await?;
+    }
+    // github 진입은 물어볼 상대가 없다 — 커밋이 진실(SEQ-2). 삭제는 끊어진 참조로 통보
+    if let Some(doc) = document.as_ref().filter(|_| !web_status && !github) {
         let mut downstream: Vec<(i32, Vec<RefEdge>)> = Vec::with_capacity(deleted.len());
         for pk in &deleted {
             let edges = ReferenceService { db: &mut tx }.downstream(*pk).await?;
@@ -280,25 +543,53 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
             return Err(Problem::ItemDeletionNeedsConfirm { deleted_items });
         }
     }
-    // 6a. 완료 문서를 고치면 본문의 status도 낮춘다 — **push 전에** (#47)
+    // 6a. 완료 문서를 고치면 본문의 status도 낮춘다 — **push 전에** (#47).
+    // github은 작성자가 스스로 내렸으면 그것이 진실이다(frontmatter가 아직 approved일 때만)
+    let path = format!("docs/specs/{}/{doc_id}.md", spec_dir(&doc_type));
+    let mut status_commit_hash: Option<String> = None;
     if let Some(doc) = &document
         && !web_status
         && doc.summary.status == "approved"
         && body != doc.body
+        && (!github
+            || parse_frontmatter(&body).0.get("status").map(String::as_str) == Some("approved"))
     {
         body = STATUS_LINE
             .replacen(&body, 1, NoExpand("status: draft"))
             .into_owned();
+        if github {
+            // 커밋이 이미 저장소에 있으니 강등을 커밋 하나로 더 민다 — 그 해시를 상태 변경에 적어야
+            // 다음 처리가 앱 커밋으로 거른다(#58). 미는 사람은 저장소를 등록한 사람이다
+            let pusher = account_repo::user_by_id(&mut tx, repo.registered_by_user_id)
+                .await?
+                .ok_or_else(|| Problem::Internal {
+                    log: format!("저장소 {code}를 등록한 사람이 없다"),
+                })?;
+            let one = IndexMap::from([(path.clone(), body.clone())]);
+            status_commit_hash = Some(
+                repos
+                    .git
+                    .commit_push(
+                        workdir,
+                        &format!("status({doc_id}): approved → draft\n\n본문 수정으로 자동 강등"),
+                        &pusher,
+                        &one,
+                        &[],
+                    )
+                    .await?,
+            );
+        }
     }
-    // 7. push — 여기까지 DB 쓰기 없음
-    let files = IndexMap::from([(
-        format!("docs/specs/{}/{doc_id}.md", spec_dir(&doc_type)),
-        body.clone(),
-    )]);
-    let commit_hash = repos
-        .git
-        .commit_push(workdir, &input.message, &author.user, &files, &[])
-        .await?;
+    // 7. push — 여기까지 DB 쓰기 없음. github은 커밋이 이미 저장소에 있다
+    let commit_hash = if github {
+        input.commit_hash.clone().unwrap_or_default()
+    } else {
+        let files = IndexMap::from([(path.clone(), body.clone())]);
+        repos
+            .git
+            .commit_push(workdir, &input.message, &author.user, &files, &[])
+            .await?
+    };
     // 8. 트랜잭션 — 상태 줄만 바꾼 것은 판을 만들지 않는다
     if web_status && let Some(doc) = &document {
         SpecService { db: &mut tx }
@@ -352,6 +643,8 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
                     &input.message,
                     &deleted,
                     &vr,
+                    false,
+                    status_commit_hash.as_deref(),
                 )
                 .await?
         }
@@ -389,8 +682,10 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
     if !deleted.is_empty() {
         warnings.push(format!("ref.broken: {broken}"));
     }
-    // 13a. 처리 지점
-    advance(repos, workdir, &mut tx, &repo, &commit_hash).await?;
+    // 13a. 처리 지점 — 앱이 민 커밋은 이 저장이 곧 처리다. github은 처리하는 쪽이 옮긴다
+    if !github {
+        advance(repos, workdir, &mut tx, &repo, &commit_hash).await?;
+    }
     // 14. 커밋
     tx.commit().await?;
     let status = {
@@ -536,6 +831,7 @@ pub async fn change_status(
             reason: reason.map(str::to_string),
             restore: false,
             read_first: false,
+            commit_hash: None,
         },
     )
     .await?;
@@ -586,6 +882,7 @@ pub async fn revert(
             reason: None,
             restore: false,
             read_first: false,
+            commit_hash: None,
         },
     )
     .await
@@ -781,6 +1078,7 @@ pub async fn restore_document(
             reason: None,
             restore: true,
             read_first: false,
+            commit_hash: None,
         },
     )
     .await
@@ -821,4 +1119,478 @@ pub async fn purge_document(
         .await?;
     tx.commit().await?;
     Ok(())
+}
+
+/// SYNC-MS-017#pipeline.rebuild
+///
+/// 쓰기 락을 쥐고 `conn` 위에 트랜잭션 하나 — 이미 트랜잭션이면 저장점(보관본 가져오기가 막 넣은 행을 본다).
+/// 어느 단계든 실패하면 되돌리고 `rebuild-failed`
+pub async fn rebuild(
+    conn: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+) -> Result<RebuildResult, Problem> {
+    let lock = write_lock(code);
+    let _held = lock.lock().await;
+    let mut tx = conn.begin().await?;
+    let (project, repo) = ProjectService { db: &mut tx, repos }.get(code).await?;
+    match rebuild_in(&mut tx, repos, &project, &repo).await {
+        Ok(result) => {
+            tx.commit().await?;
+            Ok(result)
+        }
+        Err(e) => {
+            drop(tx); // 되돌린다 — DB는 재구축 전과 같다
+            tracing::warn!("rebuild {code} 실패: {e}");
+            Err(Problem::RebuildFailed {
+                reason: e.to_string(),
+            })
+        }
+    }
+}
+
+/// `rebuild` 2~8 — 트랜잭션 안에서
+async fn rebuild_in(
+    tx: &mut PgConnection,
+    repos: &ServerRepos,
+    project: &crate::project::model::ProjectRow,
+    repo: &crate::project::model::RepositoryRow,
+) -> Result<RebuildResult, Problem> {
+    let workdir = PathBuf::from(&repo.workdir_path);
+    let mut result = RebuildResult::default();
+    // 2
+    let head = repos.git.fetch(&workdir).await?;
+    repos.git.checkout(&workdir, "origin/main").await?;
+    // 4. 판을 가리키는 외래 키는 참조의 것 하나 — 먼저 지운다(#38)
+    ReferenceService { db: &mut *tx }.clear(project.id).await?;
+    SpecService { db: &mut *tx }.clear_index(project.id).await?;
+    // 5·6
+    for path in repos.git.list(&workdir, "docs/specs/*/*.md", &head).await? {
+        let doc_id = path_stem(&path).to_string();
+        let parts = path_parts(&path);
+        let dir_type = if parts.len() > 3 {
+            type_of_dir(parts[2])
+        } else {
+            String::new()
+        };
+        if DocType::parse(&dir_type).is_none() {
+            result.convention_errors.push(RebuildError {
+                doc_id,
+                detail: format!("frontmatter.doc_id: 알 수 없는 디렉터리 {dir_type}"),
+            });
+            continue;
+        }
+        let found = SpecService { db: &mut *tx }.get_document(&doc_id).await;
+        let mut document = match found {
+            Ok(d) => Some(d),
+            Err(Problem::NotFound { .. }) => None,
+            Err(p) => return Err(p),
+        };
+        for c in repos.git.log(&workdir, &path).await? {
+            // 그 커밋 시점의 경로로 읽는다 — 이름이 바뀐 문서는 옛 커밋에서 옛 경로에 있다(#39)
+            let at = if c.path.is_empty() { &path } else { &c.path };
+            let body = repos.git.read(&workdir, at, &c.hash).await?;
+            let user = AccountService { db: &mut *tx }
+                .user_for_commit(&c.email, &c.login)
+                .await?;
+            let author = Author {
+                kind: AuthorKind::Human,
+                user,
+                instructed_by: None,
+                via: Entry::Github,
+            };
+            let mut spec = SpecService { db: &mut *tx };
+            match &document {
+                Some(doc) if c.message.starts_with("status(") => {
+                    spec.apply_status(doc, &body, Some(&c.hash), &author, None)
+                        .await?;
+                }
+                _ => {
+                    let vr = spec.validate(&body, &dir_type, Entry::Github, None).await?;
+                    match &document {
+                        None => {
+                            spec.create(
+                                project.id, &doc_id, &dir_type, &body, &c.hash, &author,
+                                &c.message, &vr,
+                            )
+                            .await?;
+                        }
+                        Some(doc) => {
+                            let deleted = spec.detect_deleted_items(doc, &body).await?;
+                            spec.save(
+                                doc, &body, &c.hash, &author, &c.message, &deleted, &vr, true, None,
+                            )
+                            .await?;
+                        }
+                    }
+                    result.versions += 1;
+                }
+            }
+            document = Some(spec.get_document(&doc_id).await?);
+        }
+        let Some(document) = document else {
+            continue;
+        };
+        let (fm, _) = parse_frontmatter(&document.body);
+        let upstream = fm
+            .get("upstream")
+            .map_or("", String::as_str)
+            .trim_matches(['[', ']']);
+        let upstream_ids: Vec<String> = UPSTREAM_TOKEN
+            .find_iter(upstream)
+            .map(|m| m.as_str().to_string())
+            .collect();
+        // 판을 가리키는 칸은 비울 수 없다 — 판 없는 문서(이력이 status( 커밋뿐)는 파이썬 판도 DB가 거절한다
+        let version_id = spec_repo::latest_version(&mut *tx, document.summary.id)
+            .await?
+            .map(|v| v.id)
+            .ok_or_else(|| Problem::Internal {
+                log: format!("{doc_id}에 판이 없다"),
+            })?;
+        let item_pks = SpecService { db: &mut *tx }
+            .item_pks(document.summary.id)
+            .await?;
+        let ex = ReferenceService { db: &mut *tx }
+            .extract(
+                document.summary.id,
+                version_id,
+                &document.body,
+                &item_pks,
+                &upstream_ids,
+            )
+            .await?;
+        let mut spec = SpecService { db: &mut *tx };
+        let vr = spec
+            .validate(&document.body, &dir_type, Entry::Github, None)
+            .await?;
+        spec.mark_convention_error(document.summary.id, &vr).await?;
+        if !vr.violations.is_empty() {
+            let detail = vr
+                .violations
+                .iter()
+                .map(|v| format!("{}: {}", v.rule, v.message))
+                .collect::<Vec<_>>()
+                .join("\n");
+            result
+                .convention_errors
+                .push(RebuildError { doc_id, detail });
+        }
+        result.docs += 1;
+        result.items += document.items.len() as i64;
+        result.references += ex.added;
+    }
+    // 7. 파일 차례 때문에 미존재였던 참조를 푼다
+    ReferenceService { db: &mut *tx }
+        .resolve_missing(project.id, None)
+        .await?;
+    // 8. 재구축은 head까지 읽었다
+    let now = clock::now();
+    project_repo::advance_processed(&mut *tx, repo.id, &head, now).await?;
+    project_repo::set_fetched(&mut *tx, repo.id, now).await?;
+    Ok(result)
+}
+
+/// 코드 올리기 한도 — 한 번에 UTF-8 합 (사용자 결정 2026-09-30)
+const UPLOAD_BYTES: i64 = 5 * 1024 * 1024;
+/// 파일 + 지운 경로
+const UPLOAD_COUNT: i64 = 500;
+/// 비밀 꼴 — 파이썬 `CodeGraphService.DENY`
+const CODE_DENY: [&str; 6] = [".env*", "*.pem", "*.key", "id_rsa*", "*.p12", "*secret*"];
+
+/// 파이썬 `fnmatch` — `*`·`?`만(위 꼴에 쓰는 것). 대소문자는 부르는 쪽이 낮춘다
+fn fnmatch(name: &[char], pat: &[char]) -> bool {
+    match pat.split_first() {
+        None => name.is_empty(),
+        Some(('*', rest)) => (0..=name.len()).any(|i| fnmatch(&name[i..], rest)),
+        Some(('?', rest)) => !name.is_empty() && fnmatch(&name[1..], rest),
+        Some((c, rest)) => name.first() == Some(c) && fnmatch(&name[1..], rest),
+    }
+}
+
+/// `upload_code` 3 — 올릴 수 없는 경로의 이유. 올려도 되면 없음 (파이썬 `_refusal`, UC-A10 2b)
+fn refusal(path: &str) -> Option<&'static str> {
+    if crate::pycompat::chars::strip(path).is_empty() {
+        return Some("빈 경로");
+    }
+    if path.contains('\\') {
+        return Some("역슬래시 — / 로 쓴다");
+    }
+    if path.starts_with('/') {
+        return Some("절대 경로");
+    }
+    let parts = path_parts(path);
+    if parts.contains(&"..") {
+        return Some("상위 경로(..)");
+    }
+    if parts.contains(&".git") {
+        return Some(".git");
+    }
+    if parts.len() >= 2 && parts[0] == "docs" && parts[1] == "specs" {
+        return Some("명세 경로 — create_document·update_document로 쓴다");
+    }
+    let name: Vec<char> = parts
+        .last()
+        .copied()
+        .unwrap_or("")
+        .to_lowercase()
+        .chars()
+        .collect();
+    if CODE_DENY
+        .iter()
+        .any(|pat| fnmatch(&name, &pat.chars().collect::<Vec<_>>()))
+    {
+        return Some("비밀 꼴");
+    }
+    None
+}
+
+/// SYNC-MS-017#pipeline.upload_code
+///
+/// git이 없는 PC의 코드를 서버 저장소에 커밋 하나로 넣는다(UC-A10). 명세 경로는 받지 않아 판이 생기지 않는다
+pub async fn upload_code(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    code: &str,
+    files: &IndexMap<String, String>,
+    delete: &[String],
+    message: &str,
+    author: &Author,
+) -> Result<UploadResult, Problem> {
+    let (_, repo) = {
+        let mut c = pool.acquire().await?;
+        ProjectService { db: &mut c, repos }
+            .get_owned(code, &author.user)
+            .await?
+    };
+    // 1
+    if repo.storage != Storage::Server.as_str() {
+        return Err(Problem::StorageMismatch {
+            storage: repo.storage.clone(),
+            detail: None,
+        });
+    }
+    // 2. 한도 — 락 밖
+    let size: i64 = files.values().map(|c| c.len() as i64).sum();
+    let count = (files.len() + delete.len()) as i64;
+    if size > UPLOAD_BYTES || count > UPLOAD_COUNT {
+        return Err(Problem::UploadTooLarge {
+            limit_bytes: UPLOAD_BYTES,
+            limit_count: UPLOAD_COUNT,
+            size,
+            count,
+        });
+    }
+    // 3. 경로 — 올릴 것 → 지울 것, 그다음 이진
+    let mut refused: Vec<(String, String)> = files
+        .keys()
+        .chain(delete.iter())
+        .filter_map(|p| refusal(p).map(|r| (p.clone(), r.to_string())))
+        .collect();
+    refused.extend(
+        files
+            .iter()
+            .filter(|(p, c)| c.contains('\0') && refusal(p).is_none())
+            .map(|(p, _)| (p.clone(), "글자가 아니다(이진)".to_string())),
+    );
+    if !refused.is_empty() {
+        return Err(Problem::UploadPathRefused { paths: refused });
+    }
+    // 4. 쓰기 전에 읽는다(DEV-19)
+    read_pending(pool, repos, code, &author.user).await?;
+    // 5
+    let workdir = PathBuf::from(&repo.workdir_path);
+    let (before, commit) = {
+        let lock = write_lock(code);
+        let _held = lock.lock().await;
+        let before = repos.git.fetch(&workdir).await?;
+        let commit = repos
+            .git
+            .commit_push(&workdir, message, &author.user, files, delete)
+            .await?;
+        (before, commit)
+    };
+    // 6. 처리 지점을 이 커밋으로 — 명세 경로가 없으니 판은 생기지 않는다(코드 그래프는 L12)
+    read_pending(pool, repos, code, &author.user).await?;
+    Ok(UploadResult {
+        changed: commit != before,
+        commit,
+        files: files.len() as i64,
+        deleted: delete.len() as i64,
+    })
+}
+
+/// SYNC-MS-017#pipeline.move_to_server
+///
+/// 서버 저장뿐이라 파이썬 판 1에서 늘 멈춘다 — 옮기는 갈래(복제·통지 거두기·원격 바꾸기)가 없다
+pub async fn move_to_server(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+) -> Result<MoveResult, Problem> {
+    let mut c = pool.acquire().await?;
+    let (_, repo) = ProjectService { db: &mut c, repos }
+        .get_owned(code, user)
+        .await?;
+    Err(Problem::StorageMismatch {
+        storage: repo.storage,
+        detail: Some("이미 서버 저장이다".to_string()),
+    })
+}
+
+/// SYNC-MS-017#pipeline.move_to_github
+///
+/// 서버 저장이고 GitHub 저장은 켜지 않은 방식이다 — 파이썬 판 1a에서 늘 멈춘다. `remote_url`은 받기만 한다
+pub async fn move_to_github(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+    remote_url: &str,
+) -> Result<MoveResult, Problem> {
+    let _ = remote_url;
+    let mut c = pool.acquire().await?;
+    ProjectService { db: &mut c, repos }
+        .get_owned(code, user)
+        .await?;
+    Err(Problem::StorageUnavailable {
+        storage: Storage::Github.as_str().to_string(),
+        enabled: vec![Storage::Server.as_str().to_string()],
+    })
+}
+
+/// SYNC-MS-017#pipeline.catch_up
+///
+/// 저장소마다 읽기 락 안에서 받고 → 뒤처짐을 DB에 적고 → 밀렸으면 커밋 처리. 저장소 하나가 실패해도 다음 저장소 —
+/// 사유를 `fetch_error`에 남긴다(로그만 남기면 따라잡기가 죽은 프로젝트가 조용히 멈춘다, #46)
+pub async fn catch_up(pool: &PgPool, repos: &ServerRepos) -> Result<Vec<SaveResult>, Problem> {
+    let projects = {
+        let mut c = pool.acquire().await?;
+        ProjectService { db: &mut c, repos }.list_projects().await?
+    };
+    let mut out = Vec::new();
+    for (project, repo) in projects {
+        match catch_up_one(pool, repos, &project.code, repo.id).await {
+            Ok(results) => out.extend(results),
+            Err(e) => {
+                tracing::warn!("catch_up {}: {e}", repo.remote_url);
+                let reason: String = e.to_string().chars().take(300).collect();
+                let written = async {
+                    let mut c = pool.acquire().await?;
+                    project_repo::set_fetch_error(&mut c, repo.id, &reason).await
+                }
+                .await;
+                if let Err(e2) = written {
+                    tracing::warn!("catch_up {}: 실패 사유를 못 적었다: {e2}", repo.remote_url);
+                }
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// `catch_up` 1~3 — 저장소 하나, 읽기 락 안에서. 처리 지점도 락 안에서 다시 읽는다(#194)
+async fn catch_up_one(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    code: &str,
+    repository_id: i32,
+) -> Result<Vec<SaveResult>, Problem> {
+    let lock = read_lock(code);
+    let _held = lock.lock().await;
+    let (_, repo) = {
+        let mut c = pool.acquire().await?;
+        ProjectService { db: &mut c, repos }.get(code).await?
+    };
+    let last = repo.last_processed_commit.filter(|l| !l.is_empty());
+    let workdir = PathBuf::from(&repo.workdir_path);
+    let head = repos.git.fetch(&workdir).await?;
+    let behind = match &last {
+        Some(l) => Some(
+            i32::try_from(
+                repos
+                    .git
+                    .rev_list_count(&workdir, &format!("{l}..{head}"))
+                    .await?,
+            )
+            .unwrap_or(i32::MAX),
+        ),
+        None => None,
+    };
+    {
+        let mut c = pool.acquire().await?;
+        project_repo::set_behind(&mut c, repository_id, behind, clock::now()).await?;
+    }
+    if last.as_deref() != Some(head.as_str()) {
+        return process_commit(pool, repos, code, &head, true).await;
+    }
+    Ok(Vec::new())
+}
+
+/// SYNC-MS-017#pipeline.poll_loop
+///
+/// `interval` 자고 따라잡기 — 끝없이. 한 주기는 따로 띄워 패닉까지 받아 낸다(반복이 멈추면 폴링이 영영 없다)
+pub async fn poll_loop(pool: PgPool, repos: Arc<ServerRepos>, interval: Duration) {
+    loop {
+        tokio::time::sleep(interval).await;
+        let (p, r) = (pool.clone(), repos.clone());
+        match tokio::spawn(async move { catch_up(&p, &r).await }).await {
+            Ok(Ok(_)) => {}
+            Ok(Err(e)) => tracing::warn!("poll_loop: {e}"),
+            Err(e) => tracing::warn!("poll_loop: {e}"),
+        }
+    }
+}
+
+/// SYNC-MS-017#pipeline.type_of_dir
+///
+/// `06-DOM` → `DOM`, `STD` → `STD` — 앞 두 글자가 파이썬 `str.isdigit()`이고 `-`가 있을 때만 뗀다
+pub fn type_of_dir(name: &str) -> String {
+    let head: Vec<char> = name.chars().take(2).collect();
+    if !head.is_empty() && head.iter().all(|c| is_digit(*c)) && name.contains('-') {
+        return name.split_once('-').map_or(name, |(_, t)| t).to_string();
+    }
+    name.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{refusal, type_of_dir};
+
+    #[test]
+    fn refusal_like_python() {
+        // 파이썬 `_refusal`로 뜬 답
+        let cases = [
+            ("a/./docs/x", None),
+            (
+                "docs//specs/x",
+                Some("명세 경로 — create_document·update_document로 쓴다"),
+            ),
+            (
+                "./docs/specs/y",
+                Some("명세 경로 — create_document·update_document로 쓴다"),
+            ),
+            ("x/secretive.txt", Some("비밀 꼴")),
+            ("İd_rsa", None),
+            (".", None),
+            ("", Some("빈 경로")),
+            ("bin.dat", None),
+        ];
+        for (p, want) in cases {
+            assert_eq!(refusal(p), want, "{p:?}");
+        }
+    }
+
+    #[test]
+    fn type_of_dir_like_python() {
+        assert_eq!(type_of_dir("06-DOM"), "DOM");
+        assert_eq!(type_of_dir("STD"), "STD");
+        assert_eq!(type_of_dir("0-X"), "0-X"); // 앞 두 글자 `0-`는 숫자가 아니다
+        assert_eq!(type_of_dir("A1-X"), "A1-X");
+        assert_eq!(type_of_dir("²³-PRD"), "PRD"); // 파이썬 isdigit — \d가 아니다
+        assert_eq!(type_of_dir("١٢-PRD"), "PRD");
+        assert_eq!(type_of_dir("12"), "12");
+        assert_eq!(type_of_dir(""), "");
+        assert_eq!(type_of_dir("01-a-b"), "a-b");
+    }
 }

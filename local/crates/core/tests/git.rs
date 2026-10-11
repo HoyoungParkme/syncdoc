@@ -492,3 +492,260 @@ async fn service_rpc_ls_refs_and_flush_only() {
         pkt_lines(&out)
     );
 }
+
+/// 다른 사본에서 작성자를 정해 커밋하고 민다
+fn push_as(dir: &Path, name: &str, email: &str, message: &str) -> String {
+    let out = Command::new("git")
+        .args([
+            "-c",
+            &format!("user.name={name}"),
+            "-c",
+            &format!("user.email={email}"),
+        ])
+        .args(["commit", "-q", "-m", message])
+        .current_dir(dir)
+        .output()
+        .expect("git");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    sh(dir, &["push", "-q", "origin", "HEAD:main"]);
+    sh(dir, &["rev-parse", "HEAD"])
+}
+
+fn put(dir: &Path, path: &str, text: &str) {
+    let f = dir.join(path);
+    std::fs::create_dir_all(f.parent().expect("부모")).expect("폴더");
+    std::fs::write(f, text).expect("파일");
+    sh(dir, &["add", path]);
+}
+
+#[tokio::test]
+async fn changed_files_latest_per_path_renames_and_skips() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, origin, work) = setup(tmp.path()).await;
+    let u = local_user();
+    let base = g
+        .commit_push(&work, "first", &u, &files(&[("a.txt", "a\n")]), &[])
+        .await
+        .expect("push");
+    let other = tmp.path().join("other");
+    sh(
+        tmp.path(),
+        &[
+            "clone",
+            "-q",
+            origin.to_str().expect("경로"),
+            other.to_str().expect("경로"),
+        ],
+    );
+    put(&other, "docs/specs/02-PRD/X-PRD-001.md", "v1\n");
+    put(&other, "docs/specs/README.md", "r\n");
+    put(&other, "docs/specs/assets/a.png", "p");
+    put(&other, "docs/specs/_templates/t.md", "t\n");
+    push_as(&other, "홍 길동", "hong@example.com", "spec: 첫");
+    put(&other, "docs/specs/02-PRD/X-PRD-001.md", "v2\n");
+    put(&other, "docs/specs/03-SCN/X-SCN-001.md", "s\n");
+    let c2 = push_as(
+        &other,
+        "Octo Cat",
+        "123+octo@users.noreply.github.com",
+        "spec: 둘\n\n  본문 줄  \n",
+    );
+    sh(
+        &other,
+        &[
+            "mv",
+            "docs/specs/03-SCN/X-SCN-001.md",
+            "docs/specs/03-SCN/X-SCN-002.md",
+        ],
+    );
+    let c3 = push_as(&other, "a", "a@x", "옮김");
+    sh(&other, &["rm", "-q", "docs/specs/02-PRD/X-PRD-001.md"]);
+    let c4 = push_as(&other, "b", "b@x", "지움");
+    let head = g.fetch(&work).await.expect("fetch");
+    assert_eq!(head, c4);
+    let got = g
+        .changed_files(&work, &format!("{base}..{head}"), "docs/specs/")
+        .await
+        .expect("바뀐 파일");
+    let brief: Vec<(&str, &str, &str)> = got
+        .iter()
+        .map(|f| (f.path.as_str(), f.status.as_str(), f.commit_hash.as_str()))
+        .collect();
+    assert_eq!(
+        brief,
+        [
+            ("docs/specs/02-PRD/X-PRD-001.md", "D", c4.as_str()),
+            ("docs/specs/03-SCN/X-SCN-002.md", "M", c3.as_str()),
+        ]
+    );
+    // 범위를 c2까지로 — 여러 줄 메시지·noreply 아이디
+    let got = g
+        .changed_files(&work, &format!("{base}..{c2}"), "docs/specs/")
+        .await
+        .expect("바뀐 파일");
+    let scn = got
+        .iter()
+        .find(|f| f.path.ends_with("X-SCN-001.md"))
+        .expect("SCN");
+    assert_eq!(scn.message, "spec: 둘\n\n본문 줄");
+    assert_eq!(
+        (scn.author_login.as_str(), scn.author_email.as_str()),
+        ("octo", "123+octo@users.noreply.github.com")
+    );
+    let prd = got
+        .iter()
+        .find(|f| f.path.ends_with("X-PRD-001.md"))
+        .expect("PRD");
+    assert_eq!(
+        (prd.status.as_str(), prd.commit_hash.as_str()),
+        ("M", c2.as_str())
+    );
+    assert_eq!(got.len(), 2);
+}
+
+#[tokio::test]
+async fn log_oldest_first_follows_renames_and_skips_deletions() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, origin, work) = setup(tmp.path()).await;
+    g.commit_push(
+        &work,
+        "first",
+        &local_user(),
+        &files(&[("a.txt", "a\n")]),
+        &[],
+    )
+    .await
+    .expect("push");
+    let other = tmp.path().join("other");
+    sh(
+        tmp.path(),
+        &[
+            "clone",
+            "-q",
+            origin.to_str().expect("경로"),
+            other.to_str().expect("경로"),
+        ],
+    );
+    let (old, new) = (
+        "docs/specs/DOM/X-DOM-001.md",
+        "docs/specs/06-DOM/X-DOM-001.md",
+    );
+    put(&other, old, "v1\n");
+    push_as(&other, "a", "a@x", "spec: 초안\n\n둘째 줄\n\n셋째");
+    put(&other, old, "v2\n");
+    push_as(&other, "a", "9+octo@users.noreply.github.com", "spec: 수정");
+    std::fs::create_dir_all(other.join("docs/specs/06-DOM")).expect("폴더");
+    sh(&other, &["mv", old, new]);
+    push_as(&other, "a", "a@x", "옮김");
+    sh(&other, &["rm", "-q", new]);
+    push_as(&other, "a", "a@x", "trash(X-DOM-001)");
+    put(&other, new, "v3\n");
+    push_as(&other, "a", "a@x", "다시");
+    g.fetch(&work).await.expect("fetch");
+    sh(&work, &["checkout", "-q", "origin/main"]);
+    let got = g.log(&work, new).await.expect("이력");
+    let brief: Vec<(&str, &str)> = got
+        .iter()
+        .map(|c| (c.message.as_str(), c.path.as_str()))
+        .collect();
+    assert_eq!(
+        brief,
+        [
+            ("spec: 초안\n\n둘째 줄\n\n셋째", old),
+            ("spec: 수정", old),
+            ("옮김", new),
+            ("다시", new),
+        ]
+    );
+    assert_eq!(got[1].login, "octo");
+    for c in &got {
+        g.read(&work, &c.path, &c.hash).await.expect("읽힌다");
+    }
+    assert!(
+        g.log(&work, "docs/specs/02-PRD/없음.md")
+            .await
+            .expect("빈")
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn checkout_force_drops_local_edits() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, _, work) = setup(tmp.path()).await;
+    g.commit_push(
+        &work,
+        "first",
+        &local_user(),
+        &files(&[("a.txt", "a\n")]),
+        &[],
+    )
+    .await
+    .expect("push");
+    g.fetch(&work).await.expect("fetch"); // push는 추적 참조를 고치지 않는다 — 재구축도 받고 나서 돌린다
+    std::fs::write(work.join("a.txt"), "고침\n").expect("고침");
+    g.checkout(&work, "origin/main").await.expect("checkout");
+    assert_eq!(
+        std::fs::read_to_string(work.join("a.txt")).expect("읽기"),
+        "a\n"
+    );
+    assert!(matches!(
+        g.checkout(&work, "없는-가지").await,
+        Err(Problem::Git { .. })
+    ));
+}
+
+#[tokio::test]
+async fn sync_readme_only_when_different() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, origin, work) = setup(tmp.path()).await;
+    let u = local_user();
+    let url = "http://127.0.0.1:8010/specs";
+    g.commit_push(&work, "init", &u, &Git::init_specs(url), &[])
+        .await
+        .expect("push");
+    assert_eq!(
+        g.sync_readme(&work, &u, "X", url).await.expect("같다"),
+        None
+    );
+    let other = tmp.path().join("other");
+    sh(
+        tmp.path(),
+        &[
+            "clone",
+            "-q",
+            origin.to_str().expect("경로"),
+            other.to_str().expect("경로"),
+        ],
+    );
+    put(&other, "docs/specs/README.md", "옛 README\n");
+    push_as(&other, "a", "a@x", "README 고침");
+    let hash = g
+        .sync_readme(&work, &u, "X", url)
+        .await
+        .expect("다르다")
+        .expect("커밋");
+    assert_eq!(
+        sh(&origin, &["log", "-1", "--format=%s"]),
+        "chore(X): README를 싱크독 규약 링크로"
+    );
+    assert_eq!(sh(&origin, &["rev-parse", "main"]), hash);
+    assert_eq!(
+        g.sync_readme(&work, &u, "X", url).await.expect("이제 같다"),
+        None
+    );
+    // README가 없는 저장소 — 만든다
+    sh(&other, &["pull", "-q", "origin", "main"]);
+    sh(&other, &["rm", "-q", "docs/specs/README.md"]);
+    push_as(&other, "a", "a@x", "README 지움");
+    assert!(
+        g.sync_readme(&work, &u, "X", url)
+            .await
+            .expect("없다")
+            .is_some()
+    );
+}

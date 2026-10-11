@@ -1,0 +1,494 @@
+{
+ "admin_hook": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"hook\":\"none\",\"hook_error\":\"서버 저장소는 통지가 없다\",\"created\":false}"
+ },
+ "admin_rebuild": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"readme_updated\":false,\"docs\":3,\"items\":3,\"references\":3,\"versions\":6,\"convention_errors\":[]}"
+ },
+ "admin_repos": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"code\":\"LSY\",\"name\":\"따라잡기 시험\",\"storage\":\"server\",\"remote_url\":null,\"last_processed_commit\":\"H\",\"synced_at\":\"T\",\"behind_by\":0,\"fetched_at\":\"T\",\"error\":null,\"hook\":\"none\",\"hook_error\":null}]"
+ },
+ "admin_sync": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"docs\":0,\"fetched_at\":\"T\"}"
+ },
+ "after_push_docs": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"type\":\"document\",\"doc_id\":\"LSY-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null},{\"type\":\"document\",\"doc_id\":\"LSY-SCN-001\",\"doc_type\":\"SCN\",\"stage\":3,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null}]"
+ },
+ "after_push_prd": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LSY-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{},\"trashed_at\":null,\"body\":\"---\\ndoc_id: LSY-PRD-001\\ntype: PRD\\ntitle: 따라잡기\\nstatus: draft\\n---\\n# 따라잡기\\n\\n## 1. 목표\\n\\n## 2. 비목표\\n\\n## 3. 요구사항\\n\\n#### R1 첫 기능\\n설명.\\n\\n#### R2 둘째 기능\\n설명.\\n\\n## 4. 성공지표\\n\\n## 5. 미결사항\\n\",\"commit_hash\":\"H\",\"convention_error_detail\":null,\"items\":[{\"item_id\":\"R1\",\"display_name\":\"첫 기능\",\"missing_refs\":[]},{\"item_id\":\"R2\",\"display_name\":\"둘째 기능\",\"missing_refs\":[]}],\"prev_doc_id\":null,\"next_doc_id\":\"LSY-SCN-001\",\"missing_refs\":[],\"project_name\":\"따라잡기 시험\"}"
+ },
+ "after_push_scn": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LSY-SCN-001\",\"doc_type\":\"SCN\",\"stage\":3,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{},\"trashed_at\":null,\"body\":\"---\\ndoc_id: LSY-SCN-001\\ntype: SCN\\ntitle: 시나리오\\nstatus: draft\\nupstream: [LSY-PRD-001]\\n---\\n# 시나리오\\n\\n## 1. 페르소나\\n\\n## 2. 시나리오\\n\\n#### S1 흐름\\n근거: [[LSY-PRD-001#R1]] · [[LSY-PRD-001#R2]]\\n\\n## 3. 대응표\\n\",\"commit_hash\":\"H\",\"convention_error_detail\":null,\"items\":[{\"item_id\":\"S1\",\"display_name\":\"흐름\",\"missing_refs\":[]}],\"prev_doc_id\":\"LSY-PRD-001\",\"next_doc_id\":null,\"missing_refs\":[],\"project_name\":\"따라잡기 시험\"}"
+ },
+ "after_push_versions": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"doc_id\":\"LSY-PRD-001\",\"version_no\":1,\"commit_hash\":\"H\",\"message\":\"spec: PRD·SCN\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"}]"
+ },
+ "after_rebuild_docs": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"type\":\"document\",\"doc_id\":\"LSY-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"draft\",\"current_version_no\":4,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null},{\"type\":\"document\",\"doc_id\":\"LSY-SCN-001\",\"doc_type\":\"SCN\",\"stage\":3,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null},{\"type\":\"document\",\"doc_id\":\"LSY-UC-007\",\"doc_type\":\"UC\",\"stage\":4,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[\"section.missing: 액터\",\"section.missing: 사용자 목표 수준 유스케이스\",\"section.missing: 하위기능 수준 유스케이스\",\"section.missing: 대응표\",\"item.none\"],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null}]"
+ },
+ "after_rebuild_versions": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"doc_id\":\"LSY-PRD-001\",\"version_no\":4,\"commit_hash\":\"H\",\"message\":\"PRD 되살림\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"},{\"doc_id\":\"LSY-PRD-001\",\"version_no\":null,\"commit_hash\":\"H\",\"message\":\"status(LSY-PRD-001): draft → draft\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"},{\"doc_id\":\"LSY-PRD-001\",\"version_no\":3,\"commit_hash\":\"H\",\"message\":\"spec: 완료 문서를 밖에서\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"},{\"doc_id\":\"LSY-PRD-001\",\"version_no\":null,\"commit_hash\":\"H\",\"message\":\"status(LSY-PRD-001): draft → approved\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"},{\"doc_id\":\"LSY-PRD-001\",\"version_no\":2,\"commit_hash\":\"H\",\"message\":\"spec: PRD 고침\\n\\n본문 줄\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"},{\"doc_id\":\"LSY-PRD-001\",\"version_no\":1,\"commit_hash\":\"H\",\"message\":\"spec: PRD·SCN\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"}]"
+ },
+ "deleted_flags": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"type\":\"broken_ref\",\"source\":{\"doc_id\":\"LSY-SCN-001\",\"item_id\":\"S1\",\"display_name\":\"흐름\",\"raw_target\":\"\",\"is_missing\":false},\"raw_target\":\"LSY-PRD-001#R1\"},{\"type\":\"broken_ref\",\"source\":{\"doc_id\":\"LSY-SCN-001\",\"item_id\":\"S1\",\"display_name\":\"흐름\",\"raw_target\":\"\",\"is_missing\":false},\"raw_target\":\"LSY-PRD-001#R2\"}]"
+ },
+ "deleted_prd": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LSY-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"draft\",\"current_version_no\":3,\"has_convention_error\":true,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{},\"trashed_at\":null,\"body\":\"---\\ndoc_id: LSY-PRD-001\\ntype: PRD\\ntitle: 따라잡기\\nstatus: draft\\n---\\n# 따라잡기\\n\\n## 1. 목표\\n\\n## 2. 비목표\\n\\n## 3. 요구사항\\n\\n#### R1 첫 기능\\n고친 설명.\\n\\n#### R2 둘째 기능\\n더 고침.\\n\\n## 4. 성공지표\\n\\n## 5. 미결사항\\n\",\"commit_hash\":\"H\",\"convention_error_detail\":\"file.deleted: H\",\"items\":[],\"prev_doc_id\":null,\"next_doc_id\":\"LSY-SCN-001\",\"missing_refs\":[],\"project_name\":\"따라잡기 시험\"}"
+ },
+ "deleted_scn": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LSY-SCN-001\",\"doc_type\":\"SCN\",\"stage\":3,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{},\"trashed_at\":null,\"body\":\"---\\ndoc_id: LSY-SCN-001\\ntype: SCN\\ntitle: 시나리오\\nstatus: draft\\nupstream: [LSY-PRD-001]\\n---\\n# 시나리오\\n\\n## 1. 페르소나\\n\\n## 2. 시나리오\\n\\n#### S1 흐름\\n근거: [[LSY-PRD-001#R1]] · [[LSY-PRD-001#R2]]\\n\\n## 3. 대응표\\n\",\"commit_hash\":\"H\",\"convention_error_detail\":null,\"items\":[{\"item_id\":\"S1\",\"display_name\":\"흐름\",\"missing_refs\":[\"LSY-PRD-001#R1\",\"LSY-PRD-001#R2\"]}],\"prev_doc_id\":\"LSY-PRD-001\",\"next_doc_id\":null,\"missing_refs\":[\"LSY-PRD-001#R1\",\"LSY-PRD-001#R2\"],\"project_name\":\"따라잡기 시험\"}"
+ },
+ "demoted_prd": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LSY-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"draft\",\"current_version_no\":3,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{},\"trashed_at\":null,\"body\":\"---\\ndoc_id: LSY-PRD-001\\ntype: PRD\\ntitle: 따라잡기\\nstatus: draft\\n---\\n# 따라잡기\\n\\n## 1. 목표\\n\\n## 2. 비목표\\n\\n## 3. 요구사항\\n\\n#### R1 첫 기능\\n고친 설명.\\n\\n#### R2 둘째 기능\\n더 고침.\\n\\n## 4. 성공지표\\n\\n## 5. 미결사항\\n\",\"commit_hash\":\"H\",\"convention_error_detail\":null,\"items\":[{\"item_id\":\"R1\",\"display_name\":\"첫 기능\",\"missing_refs\":[]},{\"item_id\":\"R2\",\"display_name\":\"둘째 기능\",\"missing_refs\":[]}],\"prev_doc_id\":null,\"next_doc_id\":\"LSY-SCN-001\",\"missing_refs\":[],\"project_name\":\"따라잡기 시험\"}"
+ },
+ "demoted_versions": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"doc_id\":\"LSY-PRD-001\",\"version_no\":null,\"commit_hash\":\"H\",\"message\":\"status(LSY-PRD-001): approved → draft\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"},{\"doc_id\":\"LSY-PRD-001\",\"version_no\":3,\"commit_hash\":\"H\",\"message\":\"spec: 완료 문서를 밖에서\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"},{\"doc_id\":\"LSY-PRD-001\",\"version_no\":null,\"commit_hash\":\"H\",\"message\":\"status(LSY-PRD-001): draft → approved\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"web\"},\"created_at\":\"T\"},{\"doc_id\":\"LSY-PRD-001\",\"version_no\":2,\"commit_hash\":\"H\",\"message\":\"spec: PRD 고침\\n\\n본문 줄\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"},{\"doc_id\":\"LSY-PRD-001\",\"version_no\":1,\"commit_hash\":\"H\",\"message\":\"spec: PRD·SCN\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"}]"
+ },
+ "edit_diff": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"from_version\":1,\"to_version\":2,\"hunks\":[{\"item_id\":\"R1\",\"downstream_count\":1,\"lines\":[{\"op\":\"ctx\",\"text\":\"#### R1 첫 기능\"},{\"op\":\"del\",\"text\":\"설명.\"},{\"op\":\"add\",\"text\":\"고친 설명.\"},{\"op\":\"ctx\",\"text\":\"\"}]}]}"
+ },
+ "edit_versions": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"doc_id\":\"LSY-PRD-001\",\"version_no\":2,\"commit_hash\":\"H\",\"message\":\"spec: PRD 고침\\n\\n본문 줄\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"},{\"doc_id\":\"LSY-PRD-001\",\"version_no\":1,\"commit_hash\":\"H\",\"message\":\"spec: PRD·SCN\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"}]"
+ },
+ "hook_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "mismatch_doc": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LSY-UC-007\",\"doc_type\":\"UC\",\"stage\":4,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":true,\"incomplete_warnings\":[\"section.missing: 액터\",\"section.missing: 사용자 목표 수준 유스케이스\",\"section.missing: 하위기능 수준 유스케이스\",\"section.missing: 대응표\",\"item.none\"],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{},\"trashed_at\":null,\"body\":\"---\\ndoc_id: LSY-UC-001\\ntype: SCN\\ntitle: 이름 어긋남\\nstatus: draft\\n---\\n# 이름\\n\",\"commit_hash\":\"H\",\"convention_error_detail\":\"frontmatter.doc_id: 파일명 LSY-UC-007 ≠ 'LSY-UC-001'\\nfrontmatter.doc_id: 디렉터리 UC ≠ type 'SCN'\",\"items\":[],\"prev_doc_id\":\"LSY-SCN-001\",\"next_doc_id\":null,\"missing_refs\":[],\"project_name\":\"따라잡기 시험\"}"
+ },
+ "move_github": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:storage-unavailable\",\"title\":\"storage-unavailable\",\"status\":422,\"detail\":\"이 서버에서 켜지 않은 저장 방식 github\",\"storage\":\"github\",\"enabled\":[\"server\"]}"
+ },
+ "move_github_empty": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.remote_url — String should have at least 1 character\",\"errors\":[{\"loc\":\"body.remote_url\",\"msg\":\"String should have at least 1 character\"}]}"
+ },
+ "move_github_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "move_github_no_body": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body — Field required\",\"errors\":[{\"loc\":\"body\",\"msg\":\"Field required\"}]}"
+ },
+ "move_github_not_json": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.1 — JSON decode error\",\"errors\":[{\"loc\":\"body.1\",\"msg\":\"JSON decode error\"}]}"
+ },
+ "move_github_number": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.remote_url — Input should be a valid string\",\"errors\":[{\"loc\":\"body.remote_url\",\"msg\":\"Input should be a valid string\"}]}"
+ },
+ "move_server": {
+  "status": 409,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:storage-mismatch\",\"title\":\"storage-mismatch\",\"status\":409,\"detail\":\"이미 서버 저장이다\",\"storage\":\"server\"}"
+ },
+ "move_server_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "rebuild_get": {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "POST"
+   ],
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:method-not-allowed\",\"title\":\"method-not-allowed\",\"status\":405,\"detail\":\"이 경로에 GET 메서드는 없습니다\",\"allow\":[\"POST\"]}"
+ },
+ "rebuild_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "repos_post": {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "GET"
+   ],
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:method-not-allowed\",\"title\":\"method-not-allowed\",\"status\":405,\"detail\":\"이 경로에 POST 메서드는 없습니다\",\"allow\":[\"GET\"]}"
+ },
+ "restored_prd": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LSY-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"draft\",\"current_version_no\":4,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{},\"trashed_at\":null,\"body\":\"---\\ndoc_id: LSY-PRD-001\\ntype: PRD\\ntitle: 따라잡기\\nstatus: draft\\n---\\n# 따라잡기\\n\\n## 1. 목표\\n\\n## 2. 비목표\\n\\n## 3. 요구사항\\n\\n#### R1 첫 기능\\n되살림.\\n\\n#### R2 둘째 기능\\n설명.\\n\\n## 4. 성공지표\\n\\n## 5. 미결사항\\n\",\"commit_hash\":\"H\",\"convention_error_detail\":null,\"items\":[{\"item_id\":\"R1\",\"display_name\":\"첫 기능\",\"missing_refs\":[]},{\"item_id\":\"R2\",\"display_name\":\"둘째 기능\",\"missing_refs\":[]}],\"prev_doc_id\":null,\"next_doc_id\":\"LSY-SCN-001\",\"missing_refs\":[],\"project_name\":\"따라잡기 시험\"}"
+ },
+ "restored_scn": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LSY-SCN-001\",\"doc_type\":\"SCN\",\"stage\":3,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{},\"trashed_at\":null,\"body\":\"---\\ndoc_id: LSY-SCN-001\\ntype: SCN\\ntitle: 시나리오\\nstatus: draft\\nupstream: [LSY-PRD-001]\\n---\\n# 시나리오\\n\\n## 1. 페르소나\\n\\n## 2. 시나리오\\n\\n#### S1 흐름\\n근거: [[LSY-PRD-001#R1]] · [[LSY-PRD-001#R2]]\\n\\n## 3. 대응표\\n\",\"commit_hash\":\"H\",\"convention_error_detail\":null,\"items\":[{\"item_id\":\"S1\",\"display_name\":\"흐름\",\"missing_refs\":[]}],\"prev_doc_id\":\"LSY-PRD-001\",\"next_doc_id\":null,\"missing_refs\":[],\"project_name\":\"따라잡기 시험\"}"
+ },
+ "sync_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "upload": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"commit\\\": \\\"H\\\", \\\"changed\\\": true, \\\"files\\\": 2, \\\"deleted\\\": 0}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "upload_delete": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"commit\\\": \\\"H\\\", \\\"changed\\\": true, \\\"files\\\": 0, \\\"deleted\\\": 1}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "upload_dup_paths": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"commit\\\": \\\"H\\\", \\\"changed\\\": true, \\\"files\\\": 1, \\\"deleted\\\": 0}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "upload_missing": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"project NOPE 없음\\\", \\\"resource\\\": \\\"project\\\", \\\"id\\\": \\\"NOPE\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "upload_no_files": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"Error executing tool upload_code: 1 validation error for upload_codeArguments\\nfiles\\n  Field required [type=missing, input_value={'project_code': 'LSY', 'message': 'm'}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "upload_refused": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:upload-path-refused\\\", \\\"title\\\": \\\"upload-path-refused\\\", \\\"status\\\": 422, \\\"detail\\\": \\\"올릴 수 없는 경로 9개\\\", \\\"paths\\\": [{\\\"path\\\": \\\"/abs.py\\\", \\\"reason\\\": \\\"절대 경로\\\"}, {\\\"path\\\": \\\"../up.py\\\", \\\"reason\\\": \\\"상위 경로(..)\\\"}, {\\\"path\\\": \\\".git/config\\\", \\\"reason\\\": \\\".git\\\"}, {\\\"path\\\": \\\"docs/specs/02-PRD/x.md\\\", \\\"reason\\\": \\\"명세 경로 — create_document·update_document로 쓴다\\\"}, {\\\"path\\\": \\\"cfg/.env.local\\\", \\\"reason\\\": \\\"비밀 꼴\\\"}, {\\\"path\\\": \\\"keys/Server.PEM\\\", \\\"reason\\\": \\\"비밀 꼴\\\"}, {\\\"path\\\": \\\"a\\\\\\\\b.py\\\", \\\"reason\\\": \\\"역슬래시 — / 로 쓴다\\\"}, {\\\"path\\\": \\\"  \\\", \\\"reason\\\": \\\"빈 경로\\\"}, {\\\"path\\\": \\\"bin.dat\\\", \\\"reason\\\": \\\"글자가 아니다(이진)\\\"}]}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "upload_repos": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"code\":\"LSY\",\"name\":\"따라잡기 시험\",\"storage\":\"server\",\"remote_url\":null,\"last_processed_commit\":\"H\",\"synced_at\":\"T\",\"behind_by\":0,\"fetched_at\":\"T\",\"error\":null,\"hook\":\"none\",\"hook_error\":null}]"
+ },
+ "upload_same": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"commit\\\": \\\"H\\\", \\\"changed\\\": false, \\\"files\\\": 1, \\\"deleted\\\": 0}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "upload_too_many": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:upload-too-large\\\", \\\"title\\\": \\\"upload-too-large\\\", \\\"status\\\": 413, \\\"detail\\\": \\\"한도를 넘는다 — 나눠 보낸다\\\", \\\"limit\\\": {\\\"bytes\\\": 5242880, \\\"count\\\": 500}, \\\"size\\\": 0, \\\"count\\\": 501}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ }
+}
