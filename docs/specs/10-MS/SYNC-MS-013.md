@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-001, SYNC-MS-019, SYNC-UC-001, SYNC-API-001, SY
 
 서비스는 연결과 저장소 자리를 빌려 받는다 — `ProjectService<'c> { pub db: &'c mut PgConnection, pub repos: &'c ServerRepos }`. `ServerRepos { git, origins, repos, specs_url }` — git 어댑터([[SYNC-MS-019]])·서버 저장소 자리 `origins/`·작업 사본 자리 `repos/`·README의 규약 주소. 켤 때 [[SYNC-MS-012#runtime.run]]이 만든다. 트랜잭션은 부르는 쪽이 쥔다([[SYNC-STD-004#DEV-10]]). 돌려주는 행은 `(ProjectRow, RepositoryRow)`다.
 
-**카드 L6 몫은 만들기·지우기(보관)와 조회 셋이다(2026-10-08).** 싱크독_로컬은 **서버 저장뿐**이다([[SYNC-PRD-001#R15]] — 파이썬 폐쇄망판의 `storage_modes == ["server"]`). GitHub 갈래(주소·저장소 만들기·통지)는 없고, `storage=github`는 첫 검사에서 `storage-unavailable`이다. 동기화 상태·지금 가져오기·재구축(L11), 첨부(L8), git 입구 원본(L10)은 그 카드가 더한다.
+**카드 L6 몫은 만들기·지우기(보관)와 조회 셋이다(2026-10-08). 카드 L8이 첨부 파일 경로 하나를 더했다(2026-10-11).** 싱크독_로컬은 **서버 저장뿐**이다([[SYNC-PRD-001#R15]] — 파이썬 폐쇄망판의 `storage_modes == ["server"]`). GitHub 갈래(주소·저장소 만들기·통지)는 없고, `storage=github`는 첫 검사에서 `storage-unavailable`이다. 동기화 상태·지금 가져오기·재구축(L11), git 입구 원본(L10)은 그 카드가 더한다.
 
 **보관본 되살리기는 카드 L11이다**(사용자 결정 2026-10-08). 되살린 보관본에 명세가 있으면 파이썬 판은 재구축([[SYNC-MS-007#pipeline.rebuild]])으로 DB에 다시 올린다 — 그 갈래만 `not-implemented(L11)`를 내고 되살린 것을 돌려놓는다. 나머지(보관본 알림 `existing-specs`, 비어 있는 보관본 되살리기)는 파이썬 판과 같다.
 
@@ -31,6 +31,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-001, SYNC-MS-019, SYNC-UC-001, SYNC-API-001, SY
 | [[#ProjectService.get]] | 코드 → 프로젝트 — 시스템 경로 |
 | [[#ProjectService.get_owned]] | 코드 → 내 프로젝트 — 사람 경로 |
 | [[#ProjectService.list_owned]] | 내가 소유한 목록 |
+| [[#ProjectService.asset_path]] | 첨부 파일 경로 |
 
 ---
 
@@ -140,6 +141,32 @@ pub async fn list_owned(&mut self, user: &UserRow) -> Result<Vec<(ProjectRow, Re
 
 ---
 
+#### ProjectService.asset_path 첨부 파일 경로
+
+**시그니처**
+```rust
+pub async fn asset_path(&mut self, code: &str, path: &str, user: &UserRow) -> Result<PathBuf, Problem>
+```
+
+근거: [[SYNC-MS-001#ProjectService.asset_path]] · [[SYNC-API-001#GET/api/projects/{code}/files/{path}]]
+
+**처리** [[SYNC-MS-001#ProjectService.asset_path]]와 같다
+1. `get_owned(code, user)`
+2. `base = repos/{code}/docs/specs`를 풀어 둔다(심볼릭 링크까지 — 파이썬 `resolve()`)
+3. `target = base/path`를 풀어 `base` 안이 아니면 → `! NotFound { resource: "file", id: path }`
+4. 확장자(소문자)가 `png jpg jpeg gif webp svg css woff woff2 ttf` 밖이면 → 같은 `not-found`
+5. 파일이 아니면 → 같은 `not-found`
+6. `→ target`
+
+**다른 점** 파이썬 `resolve()`는 없는 경로도 문자열로 푼다 — Rust는 있는 가장 긴 앞부분을 풀고 나머지를 붙인다(같은 답). 작업 사본 자리는 `repos.repos`
+
+**호출하는 것** [[#ProjectService.get_owned]]
+
+**테스트 관점** (시험 DB · 임시 자리) 있는 그림 → 그 경로 · `../../etc/passwd` → `not-found`(file) · 바깥을 가리키는 심볼릭 링크 → `not-found` · `.md` → `not-found` · 없는 파일 → `not-found` · 남의 프로젝트 → `not-found`(project)
+
+
+---
+
 ## 3. 미결사항
 
-없음. 동기화·재구축·첨부·git 입구는 그 카드가 더한다 — [[SYNC-CODE-002]].
+없음. 동기화·재구축·git 입구는 그 카드가 더한다 — [[SYNC-CODE-002]].

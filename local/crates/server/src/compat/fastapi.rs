@@ -1,4 +1,4 @@
-//! FastAPI 요청 읽기 — FastAPI 0.141.1 `routing.py`(본문)·`dependencies`(경로 값)를 옮겼다 (SYNC-DOM-004 1장 compat).
+//! FastAPI 요청 읽기 — FastAPI 0.141.1 `routing.py`(본문)·`dependencies`(경로 값·질의 값)를 옮겼다 (SYNC-DOM-004 1장 compat).
 //! 실패는 파이썬 판 처리기(`main.py`)가 바꿔 내는 그대로 — `invalid-request`(loc·msg) 또는 400 `about:blank`.
 
 use axum::http::HeaderMap;
@@ -108,6 +108,91 @@ pub fn path_int(name: &str, raw: &str, v: &Validator) -> Result<num_bigint::BigI
     }
 }
 
+/// 파이썬 `urllib.parse.unquote_to_bytes` + UTF-8 `errors="replace"` — `%XX`만 바이트로, 나머지는 그대로
+fn py_unquote(s: &str) -> String {
+    let b = s.as_bytes();
+    let hex = |c: u8| (c as char).to_digit(16).map(|d| d as u8);
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%'
+            && i + 2 < b.len()
+            && let (Some(h), Some(l)) = (hex(b[i + 1]), hex(b[i + 2]))
+        {
+            out.push(h * 16 + l);
+            i += 3;
+            continue;
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// starlette `QueryParams` — `parse_qsl(keep_blank_values=True)`: `&`로 나누고, 빈 조각은 버리고,
+/// `=`가 없으면 값이 빈 것, `+`는 빈칸, `%XX`를 푼다. 받은 차례 그대로
+pub fn query_params(raw: Option<&str>) -> Vec<(String, String)> {
+    let Some(q) = raw.filter(|q| !q.is_empty()) else {
+        return Vec::new();
+    };
+    q.split('&')
+        .filter(|kv| !kv.is_empty())
+        .map(|kv| {
+            let (k, v) = kv.split_once('=').unwrap_or((kv, ""));
+            (
+                py_unquote(&k.replace('+', " ")),
+                py_unquote(&v.replace('+', " ")),
+            )
+        })
+        .collect()
+}
+
+/// 질의 값 하나 — 같은 이름이 여럿이면 마지막(starlette `QueryParams.get`)
+pub fn query_get<'a>(params: &'a [(String, String)], name: &str) -> Option<&'a str> {
+    params
+        .iter()
+        .rev()
+        .find(|(k, _)| k == name)
+        .map(|(_, v)| v.as_str())
+}
+
+/// 질의 필드 하나 검증 — FastAPI `request_params_to_args`: 없으면 필수일 때 `Field required`, 아니면 기본값(None).
+/// 오류는 `(query.{이름}, 문장)`들로 `errors`에 쌓는다
+pub fn query_field(
+    params: &[(String, String)],
+    name: &str,
+    v: &Validator,
+    required: bool,
+    errors: &mut Vec<(String, String)>,
+) -> Option<PyValue> {
+    let Some(raw) = query_get(params, name) else {
+        if required {
+            errors.push((format!("query.{name}"), ErrorKind::Missing.message()));
+        }
+        return None;
+    };
+    match v.validate(&PyValue::Str(PyStr::from(raw)), Opts::default()) {
+        Ok(out) => Some(out),
+        Err(Failure::Invalid(e)) => {
+            errors.extend(e.lines.iter().map(|l| pair(&format!("query.{name}"), l)));
+            None
+        }
+        Err(Failure::Exception(log)) => {
+            errors.push((format!("query.{name}"), log));
+            None
+        }
+    }
+}
+
+/// 쌓인 검증 오류 → `invalid-request` (없으면 통과)
+pub fn check_errors(errors: Vec<(String, String)>) -> Result<(), Problem> {
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(Problem::InvalidRequest { errors })
+    }
+}
+
 /// 손으로 쓴 core schema — 파이썬 판 `web/schemas`의 요청 모델 (스키마가 작아 옮겨 적는다)
 pub mod schemas {
     use serde_json::json;
@@ -142,6 +227,47 @@ pub mod schemas {
         .expect("InitProject 스키마")
     }
 
+    /// 질의 `stage: int | None = Query(None, ge=1, le=11)` (SYNC-API-001#GET/api/projects/{code}/docs)
+    pub fn stage() -> Validator {
+        Validator::new(
+            &json!({"type": "nullable", "schema": {"type": "int", "ge": 1, "le": 11}}),
+            "stage",
+        )
+        .expect("stage 스키마")
+    }
+
+    /// 질의 `status: str | None = Query(None, pattern="^(draft|approved)$")`
+    pub fn doc_status() -> Validator {
+        Validator::new(
+            &json!({"type": "nullable", "schema": {"type": "str", "pattern": "^(draft|approved)$"}}),
+            "status",
+        )
+        .expect("status 스키마")
+    }
+
+    /// 질의 `kind: str = Query(pattern="^(broken_ref|convention_errors|incomplete)$")` (…/flags)
+    pub fn flag_kind() -> Validator {
+        Validator::new(
+            &json!({"type": "str", "pattern": "^(broken_ref|convention_errors|incomplete)$"}),
+            "kind",
+        )
+        .expect("kind 스키마")
+    }
+
+    /// 질의 `scope: GraphScope = GraphScope.all` — 값이 둘인 StrEnum(오류 문장이 literal과 같다)
+    pub fn graph_scope() -> Validator {
+        Validator::new(
+            &json!({"type": "literal", "expected": ["all", "approved"]}),
+            "scope",
+        )
+        .expect("scope 스키마")
+    }
+
+    /// 질의 `int = Query(ge=1)` (…/diff의 `from`·`to`)
+    pub fn version_no() -> Validator {
+        Validator::new(&json!({"type": "int", "ge": 1}), "int").expect("판 번호 스키마")
+    }
+
     /// 경로의 `int` 값
     pub fn int() -> Validator {
         Validator::new(&json!({"type": "int"}), "int").expect("int 스키마")
@@ -151,6 +277,23 @@ pub mod schemas {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn query_like_parse_qsl() {
+        let q = query_params(Some("a=1&&b&c=x+y%20z&a=2&d=%zz%E2%82%AC%FF"));
+        assert_eq!(
+            q,
+            [
+                ("a".to_string(), "1".to_string()),
+                ("b".to_string(), String::new()),
+                ("c".to_string(), "x y z".to_string()),
+                ("a".to_string(), "2".to_string()),
+                ("d".to_string(), "%zz€\u{fffd}".to_string()),
+            ]
+        );
+        assert_eq!(query_get(&q, "a"), Some("2"));
+        assert!(query_params(None).is_empty());
+    }
 
     #[test]
     fn content_type_like_email_message() {

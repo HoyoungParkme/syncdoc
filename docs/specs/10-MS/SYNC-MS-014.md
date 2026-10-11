@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-002, SYNC-MS-003, SYNC-STD-001, SYNC-STD-004]
 
 서비스는 연결을 빌려 받는다 — `SpecService<'c> { pub db: &'c mut PgConnection }`. DB가 필요 없는 함수는 연결 없이 부르는 연관 함수다(`SpecService::item_blocks(…)`). 트랜잭션은 부르는 쪽이 쥔다([[SYNC-STD-004#DEV-10]]).
 
-**카드 L5 몫은 엔진이다(2026-10-08)** — 마크다운 넷, 항목 블록, 규약 검증, frontmatter 채움, diff. **카드 L6이 문서 목록(`list_by_project`)을, 카드 L7이 저장·조회(만들기·저장·문서·항목·이름·이웃·ID 발급·선행조건)를 더했다** — 저장 파이프라인([[SYNC-MS-017]])과 읽기 조합이 쓴다. **타입은 문자열이다(L7)** — 파이썬처럼 에이전트가 보낸 모르는 타입도 받아 `frontmatter.type` 위반까지 같은 답을 낸다(`check`·`validate`·`apply_frontmatter`, 상태 조건도 문자열 그대로 비교). 나머지 SpecService(문서·버전 조회, 만들기·저장, 상태, 휴지통…)는 쓰는 카드(L7·L8·L9)가 이 문서에 더한다.
+**카드 L5 몫은 엔진이다(2026-10-08)** — 마크다운 넷, 항목 블록, 규약 검증, frontmatter 채움, diff. **카드 L6이 문서 목록(`list_by_project`)을, 카드 L7이 저장·조회(만들기·저장·문서·항목·이름·이웃·ID 발급·선행조건)를, 카드 L8이 이력·최근 변경·관계도 목록·pk 여럿·휴지통 목록을 더했다(2026-10-11)** — 저장 파이프라인([[SYNC-MS-017]])과 읽기 조합이 쓴다. **타입은 문자열이다(L7)** — 파이썬처럼 에이전트가 보낸 모르는 타입도 받아 `frontmatter.type` 위반까지 같은 답을 낸다(`check`·`validate`·`apply_frontmatter`, 상태 조건도 문자열 그대로 비교). 나머지 SpecService(상태, 휴지통, 재구축…)는 쓰는 카드(L9·L11)가 이 문서에 더한다.
 
 **파이썬 판과 바이트까지 같다**(사용자 결정 2026-10-08 — 유니코드까지). 파이썬 엔진은 YAML·마크다운 라이브러리 없이 정규식·`difflib`이고 메시지에 `repr`이 들어간다. 그래서
 - 문자 분류는 **파이썬 3.12(유니코드 15.0)의 표**를 쓴다 — 정규식의 `\s`·`\S`·`\d`·`\w`와 `str.strip()`. 표는 `crates/core/src/pycompat/`의 생성물이다(`cargo xtask unicode-tables`). Rust 표준의 `trim()`·`char::is_whitespace`·`regex`의 `\d`는 쓰지 않는다(`\x1c`~`\x1f`, 유니코드 판이 다르다)
@@ -55,6 +55,11 @@ upstream: [SYNC-DOM-004, SYNC-MS-002, SYNC-MS-003, SYNC-STD-001, SYNC-STD-004]
 | [[#SpecService.item_pks]] | 문서의 항목 pk 지도 |
 | [[#SpecService.neighbors]] | 앞뒤 단계 문서 |
 | [[#SpecService.resolve_item]] | doc_id·item_id → pk |
+| [[#SpecService.resolve_items]] | doc_id·item_id 여럿 → pk |
+| [[#SpecService.list_versions]] | 버전 + 상태변경 이력 |
+| [[#SpecService.recent_changes]] | 최근 변경 N건 |
+| [[#SpecService.list_items_by_project]] | 관계도용 항목 목록 |
+| [[#SpecService.list_trashed]] | 휴지통 목록 |
 
 ---
 
@@ -475,6 +480,86 @@ pub async fn resolve_item(&mut self, doc_id: &str, item_id: &str) -> Result<i32,
 **처리** 문서·항목(지운 것까지)이 없으면 `! NotFound { resource: "item", id: "{doc_id}#{item_id}" }` · 지웠으면 `! ItemDeleted` · `→ pk`. `~`는 바꾸지 않는다(파이썬과 같다)
 
 **테스트 관점** 없는 문서도 `item` not-found · 지운 항목 → `item-deleted`
+
+---
+
+#### SpecService.resolve_items doc_id·item_id 여럿 → pk
+
+**시그니처**
+```rust
+pub async fn resolve_items(&mut self, doc_id: &str, item_ids: &[String]) -> Result<Vec<i32>, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.resolve_items]]
+
+**처리** 문서가 없으면 빈 목록 · `DB: items where document_id and item_id in ids and not is_deleted order by id` → pk들(**id 차례** — 받은 ID 차례가 아니다, 파이썬과 같다). 빈 목록이면 쿼리 없이 빈 것
+
+**테스트 관점** 없는 ID·지운 항목은 빠진다 · 차례는 id
+
+---
+
+#### SpecService.list_versions 버전 + 상태변경 이력
+
+**시그니처**
+```rust
+pub async fn list_versions(&mut self, doc_id: &str) -> Result<Vec<Version>, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.list_versions]] · [[SYNC-API-001#GET/api/docs/{docId}/versions]]
+
+**처리** [[SYNC-MS-002#SpecService.list_versions]]와 같다 — 문서가 없으면 `! NotFound { resource: "document", id }` · `DB: versions where document_id order by version_no desc` → `Version { doc_id, version_no, commit_hash, message, author: 판의 작성자, created_at }` · 이어서 `DB: status_changes where document_id and commit_hash is not null order by changed_at desc` → `Version { version_no: 없음, message: "status({doc_id}): {from} → {to}", author: 상태 작성자, created_at: changed_at }` — 상태 작성자는 `via`가 `mcp`면 `agent`·바꾼 사람·바꾼 사람·`mcp`, 아니면 `human`·바꾼 사람·없음·`via` · 둘을 `(created_at, 상태 행인가)` 내림차순으로 안정 정렬(파이썬 `sort(reverse=True)`)
+
+**출력** `Version`(DTO) — 작성자는 id만, 이름은 입구가 [[SYNC-MS-016#AccountService.users_by_ids]]로
+
+**테스트 관점** (시험 DB) 판 셋 → 새 것부터 · 커밋 없는 자동 강등은 안 나온다 · 커밋 있는 상태 변경은 `version_no` 없이 · `via=mcp` 상태 행은 `agent` · 없는 문서 → `not-found`
+
+---
+
+#### SpecService.recent_changes 최근 변경 N건
+
+**시그니처**
+```rust
+pub async fn recent_changes(&mut self, project_id: i32, n: i64) -> Result<Vec<Version>, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.recent_changes]] · UI-4 요소 5
+
+**처리** [[SYNC-MS-002#SpecService.recent_changes]]와 같다 — 프로젝트 전체의 `versions`(`created_at desc, id desc limit n`)와 커밋 있는 `status_changes`(`changed_at desc, id desc limit n`)를 [[#SpecService.list_versions]]와 같은 꼴·같은 정렬로 합쳐 앞 `n`개. 행마다 그 문서 ID — 휴지통 문서 것도
+
+**테스트 관점** (시험 DB) 두 문서의 판 → 새 것부터 `n`개 · 다른 프로젝트 것은 없다
+
+---
+
+#### SpecService.list_items_by_project 관계도용 항목 목록
+
+**시그니처**
+```rust
+pub async fn list_items_by_project(&mut self, project_id: i32) -> Result<Vec<ItemBrief>, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.list_items_by_project]] · [[SYNC-MS-018#queries.graph_view]]
+
+**처리** [[SYNC-MS-002#SpecService.list_items_by_project]]와 같다 — 프로젝트 문서를 `(단계, 없으면 99) → doc_id` 차례로 문서 노드 `ItemBrief { pk: 문서 id, doc_id, item_id: 없음, stage, display_name: 없음 }` · 이어서 `DB: items join documents where project_id and not is_deleted order by doc_id, id`의 항목 노드. **휴지통 문서도 들어온다**(파이썬과 같다)
+
+**다른 점** 단계·문서 조건(`stage`·`doc_id`)은 받지 않는다 — 부르는 곳(관계도)이 쓰지 않는다
+
+**테스트 관점** 문서 노드가 먼저 단계 차례로, 항목은 문서 ID·id 차례 · 지운 항목은 없다
+
+
+---
+
+#### SpecService.list_trashed 휴지통 목록
+
+**시그니처**
+```rust
+pub async fn list_trashed(&mut self, project_id: i32) -> Result<Vec<DocumentSummary>, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.list_trashed]] · [[SYNC-UI-002#UI-4]] 8
+
+**처리** `DB: documents where project_id and trashed_at is not null order by trashed_at desc` · 문서마다 최근 판의 작성자 · `→ DocumentSummary`(요약 꼴은 [[#SpecService.list_by_project]]와 같다)
+
+**테스트 관점** (시험 DB) 휴지통 문서만, 최근에 넣은 것부터 · 휴지통이 아닌 것은 없다
 
 ---
 

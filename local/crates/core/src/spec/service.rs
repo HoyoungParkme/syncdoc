@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use regex::Regex;
 use sqlx::PgConnection;
 
-use super::model::{DocumentRow, VersionRow};
+use super::model::{DocumentRow, StatusChangeRow, VersionRow};
 use super::repo;
 use crate::clock;
 use crate::errors::Problem;
@@ -20,8 +20,8 @@ use crate::pycompat::re::compile;
 use crate::pycompat::repr::repr;
 use crate::types::{
     Author, AuthorRef, Diff, DiffLine, DiffOp, DocItem, DocRef, DocStatus, DocType, Document,
-    DocumentSummary, Entry, Hunk, ItemBlock, ItemRef, ItemView, ValidateResult, Violation, Warning,
-    fold_via, py_isoformat, stage_of,
+    DocumentSummary, Entry, Hunk, ItemBlock, ItemBrief, ItemRef, ItemView, ValidateResult, Version,
+    Violation, Warning, fold_via, py_isoformat, stage_of,
 };
 
 /// 이력 diff의 앞뒤 줄 수 — 파이썬 `DIFF_CONTEXT_LINES`
@@ -398,6 +398,62 @@ fn new_version<'a>(
         message,
         created_at: clock::now(),
     }
+}
+
+/// 상태 변경 행 → 작성자 — `mcp`면 에이전트(발급자가 곧 지시자, 카드 BE), 아니면 사람 (파이썬 `_status_author`)
+fn status_author(c: &StatusChangeRow) -> AuthorRef {
+    if c.via == "mcp" {
+        AuthorRef {
+            kind: "agent".to_string(),
+            user_id: c.changed_by_user_id,
+            instructed_by_id: Some(c.changed_by_user_id),
+            via: "mcp".to_string(),
+        }
+    } else {
+        AuthorRef {
+            kind: "human".to_string(),
+            user_id: c.changed_by_user_id,
+            instructed_by_id: None,
+            via: c.via.clone(),
+        }
+    }
+}
+
+/// 판 행 → 이력 한 줄
+fn version_of(doc_id: &str, v: &VersionRow) -> Version {
+    Version {
+        doc_id: doc_id.to_string(),
+        version_no: Some(v.version_no),
+        commit_hash: v.commit_hash.clone(),
+        message: v.message.clone(),
+        author: author_of(v),
+        author_view: None,
+        created_at: v.created_at,
+    }
+}
+
+/// 상태 변경 행 → 이력 한 줄 — 판 번호 없이 `status({doc_id}): {from} → {to}`
+fn status_version_of(doc_id: &str, c: &StatusChangeRow) -> Version {
+    Version {
+        doc_id: doc_id.to_string(),
+        version_no: None,
+        commit_hash: c.commit_hash.clone().unwrap_or_default(),
+        message: format!(
+            "status({doc_id}): {} → {}",
+            c.from_status.as_deref().unwrap_or("None"),
+            c.to_status
+        ),
+        author: status_author(c),
+        author_view: None,
+        created_at: c.changed_at,
+    }
+}
+
+/// 새 것부터, 같은 시각이면 상태 행 먼저 — 파이썬 `sort(key=(created_at, version_no is None), reverse=True)`(안정)
+fn newest_first(rows: &mut [Version]) {
+    rows.sort_by(|a, b| {
+        (b.created_at, b.version_no.is_none()).cmp(&(a.created_at, a.version_no.is_none()))
+    });
 }
 
 fn not_found(resource: &str, id: &str) -> Problem {
@@ -1262,5 +1318,116 @@ impl SpecService<'_> {
             });
         }
         Ok(item.id)
+    }
+
+    /// SYNC-MS-014#SpecService.resolve_items
+    ///
+    /// 받은 차례가 아니라 id 차례다(파이썬과 같다). 없는 것·지운 것은 빠진다
+    pub async fn resolve_items(
+        &mut self,
+        doc_id: &str,
+        item_ids: &[String],
+    ) -> Result<Vec<i32>, Problem> {
+        let Some(row) = repo::document_by_doc_id(&mut *self.db, doc_id).await? else {
+            return Ok(Vec::new());
+        };
+        if item_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        Ok(repo::items_by_item_ids(&mut *self.db, row.id, item_ids)
+            .await?
+            .into_iter()
+            .map(|i| i.id)
+            .collect())
+    }
+
+    /// SYNC-MS-014#SpecService.list_versions
+    pub async fn list_versions(&mut self, doc_id: &str) -> Result<Vec<Version>, Problem> {
+        let Some(row) = repo::document_by_doc_id(&mut *self.db, doc_id).await? else {
+            return Err(not_found("document", doc_id));
+        };
+        let mut rows: Vec<Version> = repo::versions_of(&mut *self.db, row.id)
+            .await?
+            .iter()
+            .map(|v| version_of(doc_id, v))
+            .collect();
+        rows.extend(
+            repo::status_changes_with_commit(&mut *self.db, row.id)
+                .await?
+                .iter()
+                .map(|c| status_version_of(doc_id, c)),
+        );
+        newest_first(&mut rows);
+        Ok(rows)
+    }
+
+    /// SYNC-MS-014#SpecService.recent_changes
+    pub async fn recent_changes(
+        &mut self,
+        project_id: i32,
+        n: i64,
+    ) -> Result<Vec<Version>, Problem> {
+        let mut rows: Vec<Version> = repo::recent_versions(&mut *self.db, project_id, n)
+            .await?
+            .iter()
+            .map(|r| version_of(&r.doc_id, &r.version))
+            .collect();
+        rows.extend(
+            repo::recent_status_changes(&mut *self.db, project_id, n)
+                .await?
+                .iter()
+                .map(|r| status_version_of(&r.doc_id, &r.change)),
+        );
+        newest_first(&mut rows);
+        rows.truncate(usize::try_from(n).unwrap_or(0));
+        Ok(rows)
+    }
+
+    /// SYNC-MS-014#SpecService.list_items_by_project
+    ///
+    /// 문서 노드(단계·ID 차례) 다음 항목 노드(문서 ID·id 차례). 휴지통 문서도 들어온다(파이썬과 같다)
+    pub async fn list_items_by_project(
+        &mut self,
+        project_id: i32,
+    ) -> Result<Vec<ItemBrief>, Problem> {
+        let mut docs = repo::documents_of_project(&mut *self.db, project_id).await?;
+        docs.sort_by(|a, b| {
+            (stage_of(&a.doc_type).unwrap_or(99), &a.doc_id)
+                .cmp(&(stage_of(&b.doc_type).unwrap_or(99), &b.doc_id))
+        });
+        let mut out: Vec<ItemBrief> = docs
+            .iter()
+            .map(|d| ItemBrief {
+                pk: d.id,
+                doc_id: d.doc_id.clone(),
+                item_id: None,
+                stage: stage_of(&d.doc_type),
+                display_name: None,
+            })
+            .collect();
+        let stage_by_doc: HashMap<i32, Option<i32>> =
+            docs.iter().map(|d| (d.id, stage_of(&d.doc_type))).collect();
+        for r in repo::items_of_project(&mut *self.db, project_id).await? {
+            if let Some(stage) = stage_by_doc.get(&r.item.document_id) {
+                out.push(ItemBrief {
+                    pk: r.item.id,
+                    doc_id: r.doc_id,
+                    item_id: Some(r.item.item_id),
+                    stage: *stage,
+                    display_name: r.item.display_name,
+                });
+            }
+        }
+        Ok(out)
+    }
+
+    /// SYNC-MS-014#SpecService.list_trashed
+    pub async fn list_trashed(&mut self, project_id: i32) -> Result<Vec<DocumentSummary>, Problem> {
+        let rows = repo::trashed_of_project(&mut *self.db, project_id).await?;
+        let ids: Vec<i32> = rows.iter().map(|r| r.id).collect();
+        let latest = repo::latest_versions(&mut *self.db, &ids).await?;
+        rows.iter()
+            .map(|r| summary_of(r, latest.get(&r.id)))
+            .collect()
     }
 }

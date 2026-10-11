@@ -4,8 +4,12 @@ use indexmap::IndexMap;
 use serde::Serialize;
 use syncdoc_core::account::model::AccessTokenRow;
 use syncdoc_core::types::{
-    DocumentSummary as DocumentSummaryDto, ProjectSummary as ProjectSummaryDto, StageSummary,
-    iso_utc,
+    ApiAuthor, BrokenRefSummary as BrokenRefDto, Diff as DiffDto, Document as DocumentDto,
+    DocumentSummary as DocumentSummaryDto, DownstreamView as DownstreamDto, Graph as GraphDto,
+    GraphEdge, GraphNode, ItemChain as ItemChainDto, ItemRef as ItemRefDto,
+    ItemReferences as ItemReferencesDto, ItemView as ItemViewDto,
+    ProjectDetail as ProjectDetailDto, ProjectItem, ProjectSummary as ProjectSummaryDto,
+    StageSummary, UserRef as UserRefDto, Version as VersionDto, iso_utc,
 };
 
 /// `Me` — `User`(id·github_login·display_name·created_at)에 판·모델·저장 방식을 더한 것
@@ -54,7 +58,67 @@ pub struct IssuedToken {
     pub raw: String,
 }
 
-/// `DocumentSummary` — `web/schemas/documents.py` (판별 필드 `type`이 맨 앞). 요약 경로의 작성자 이름은 없다
+/// `UserRef` — `web/schemas/common.py`
+#[derive(Debug, Serialize)]
+pub struct UserRef {
+    pub id: i32,
+    pub github_login: String,
+    pub display_name: String,
+}
+
+impl From<&UserRefDto> for UserRef {
+    fn from(u: &UserRefDto) -> Self {
+        UserRef {
+            id: u.id,
+            github_login: u.github_login.clone(),
+            display_name: u.display_name.clone(),
+        }
+    }
+}
+
+/// `Author` — 이름 붙은 작성자
+#[derive(Debug, Serialize)]
+pub struct Author {
+    pub kind: String,
+    pub user: Option<UserRef>,
+    pub instructed_by: Option<UserRef>,
+    pub via: String,
+}
+
+impl From<&ApiAuthor> for Author {
+    fn from(a: &ApiAuthor) -> Self {
+        Author {
+            kind: a.kind.clone(),
+            user: a.user.as_ref().map(UserRef::from),
+            instructed_by: a.instructed_by.as_ref().map(UserRef::from),
+            via: a.via.clone(),
+        }
+    }
+}
+
+/// `ItemRef` — `web/schemas/common.py`(안쪽 `is_deleted`·`deleted_at`은 내보내지 않는다)
+#[derive(Debug, Serialize)]
+pub struct ItemRef {
+    pub doc_id: Option<String>,
+    pub item_id: Option<String>,
+    pub display_name: Option<String>,
+    pub raw_target: String,
+    pub is_missing: bool,
+}
+
+impl From<&ItemRefDto> for ItemRef {
+    fn from(r: &ItemRefDto) -> Self {
+        ItemRef {
+            doc_id: r.doc_id.clone(),
+            item_id: r.item_id.clone(),
+            display_name: r.display_name.clone(),
+            raw_target: r.raw_target.clone(),
+            is_missing: r.is_missing,
+        }
+    }
+}
+
+/// `DocumentSummary` — `web/schemas/documents.py` (판별 필드 `type`이 맨 앞). 작성자는 읽기 조합이 이름을 붙인 것
 #[derive(Debug, Serialize)]
 pub struct DocumentSummary {
     #[serde(rename = "type")]
@@ -67,7 +131,7 @@ pub struct DocumentSummary {
     pub has_convention_error: bool,
     pub incomplete_warnings: Vec<String>,
     pub updated_at: String,
-    pub last_author: Option<()>,
+    pub last_author: Option<Author>,
     pub counts: IndexMap<String, i64>,
     pub trashed_at: Option<String>,
 }
@@ -84,7 +148,7 @@ impl From<&DocumentSummaryDto> for DocumentSummary {
             has_convention_error: d.has_convention_error,
             incomplete_warnings: d.incomplete_warnings.clone(),
             updated_at: iso_utc(d.updated_at),
-            last_author: None,
+            last_author: d.author.as_ref().map(Author::from),
             counts: d.counts.clone(),
             trashed_at: d.trashed_at.map(iso_utc),
         }
@@ -115,6 +179,344 @@ impl From<&ProjectSummaryDto> for ProjectSummary {
             std_docs: p.std_docs.iter().map(DocumentSummary::from).collect(),
             counts: p.counts.clone(),
             updated_at: p.updated_at.map(iso_utc),
+        }
+    }
+}
+
+/// `Document.items[]`
+#[derive(Debug, Serialize)]
+pub struct DocItem {
+    pub item_id: String,
+    pub display_name: Option<String>,
+    pub missing_refs: Vec<String>,
+}
+
+/// `Document` — `DocumentSummary`의 키 뒤에 본문·해시·항목·이웃
+#[derive(Debug, Serialize)]
+pub struct Document {
+    #[serde(flatten)]
+    pub summary: DocumentSummary,
+    pub body: String,
+    pub commit_hash: Option<String>,
+    pub convention_error_detail: Option<String>,
+    pub items: Vec<DocItem>,
+    pub prev_doc_id: Option<String>,
+    pub next_doc_id: Option<String>,
+    pub missing_refs: Vec<String>,
+    pub project_name: String,
+}
+
+impl From<&DocumentDto> for Document {
+    fn from(d: &DocumentDto) -> Self {
+        Document {
+            summary: DocumentSummary::from(&d.summary),
+            body: d.body.clone(),
+            commit_hash: d.commit_hash.clone(),
+            convention_error_detail: d.convention_error_detail.clone(),
+            items: d
+                .items
+                .iter()
+                .map(|i| DocItem {
+                    item_id: i.item_id.clone(),
+                    display_name: i.display_name.clone(),
+                    missing_refs: i.missing_refs.clone(),
+                })
+                .collect(),
+            prev_doc_id: d.prev_doc_id.clone(),
+            next_doc_id: d.next_doc_id.clone(),
+            missing_refs: d.missing_refs.clone(),
+            project_name: d.project_name.clone(),
+        }
+    }
+}
+
+/// `ItemView` — 항목 블록 (UI-18)
+#[derive(Debug, Serialize)]
+pub struct ItemView {
+    pub doc_id: String,
+    pub item_id: String,
+    pub display_name: Option<String>,
+    pub body: String,
+    pub doc_status: String,
+    pub doc_version_no: i32,
+}
+
+impl From<&ItemViewDto> for ItemView {
+    fn from(v: &ItemViewDto) -> Self {
+        ItemView {
+            doc_id: v.doc_id.clone(),
+            item_id: v.item_id.clone(),
+            display_name: v.display_name.clone(),
+            body: v.body.clone(),
+            doc_status: v.doc_status.clone(),
+            doc_version_no: v.doc_version_no,
+        }
+    }
+}
+
+/// `ItemReferences`
+#[derive(Debug, Serialize)]
+pub struct ItemReferences {
+    pub doc_id: String,
+    pub item_id: String,
+    pub upstream: Vec<ItemRef>,
+    pub downstream: Vec<ItemRef>,
+}
+
+impl From<&ItemReferencesDto> for ItemReferences {
+    fn from(r: &ItemReferencesDto) -> Self {
+        ItemReferences {
+            doc_id: r.doc_id.clone(),
+            item_id: r.item_id.clone(),
+            upstream: r.upstream.iter().map(ItemRef::from).collect(),
+            downstream: r.downstream.iter().map(ItemRef::from).collect(),
+        }
+    }
+}
+
+/// `DiffLine`
+#[derive(Debug, Serialize)]
+pub struct DiffLine {
+    pub op: &'static str,
+    pub text: String,
+}
+
+/// `Hunk` — 키는 `item_id`·`downstream_count`·`lines` 차례(파이썬 모델의 선언 차례)
+#[derive(Debug, Serialize)]
+pub struct Hunk {
+    pub item_id: Option<String>,
+    pub downstream_count: i64,
+    pub lines: Vec<DiffLine>,
+}
+
+/// `Diff`
+#[derive(Debug, Serialize)]
+pub struct Diff {
+    pub from_version: i32,
+    pub to_version: i32,
+    pub hunks: Vec<Hunk>,
+}
+
+impl From<&DiffDto> for Diff {
+    fn from(d: &DiffDto) -> Self {
+        use syncdoc_core::types::DiffOp;
+        Diff {
+            from_version: d.from_version,
+            to_version: d.to_version,
+            hunks: d
+                .hunks
+                .iter()
+                .map(|h| Hunk {
+                    item_id: h.item_id.clone(),
+                    downstream_count: h.downstream_count,
+                    lines: h
+                        .lines
+                        .iter()
+                        .map(|l| DiffLine {
+                            op: match l.op {
+                                DiffOp::Add => "add",
+                                DiffOp::Del => "del",
+                                DiffOp::Ctx => "ctx",
+                            },
+                            text: l.text.clone(),
+                        })
+                        .collect(),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// `ChainItem`
+#[derive(Debug, Serialize)]
+pub struct ChainItem {
+    #[serde(rename = "ref")]
+    pub ref_: ItemRef,
+    pub role: String,
+    pub status: String,
+}
+
+/// `ChainRow`
+#[derive(Debug, Serialize)]
+pub struct ChainRow {
+    pub stage: i32,
+    pub doc_type: String,
+    pub items: Vec<ChainItem>,
+}
+
+/// `ItemChain` — 행은 늘 11
+#[derive(Debug, Serialize)]
+pub struct ItemChain {
+    pub item: ItemRef,
+    pub upstream_count: i64,
+    pub downstream_count: i64,
+    pub rows: Vec<ChainRow>,
+}
+
+impl From<&ItemChainDto> for ItemChain {
+    fn from(c: &ItemChainDto) -> Self {
+        ItemChain {
+            item: ItemRef::from(&c.item),
+            upstream_count: c.upstream_count,
+            downstream_count: c.downstream_count,
+            rows: c
+                .rows
+                .iter()
+                .map(|r| ChainRow {
+                    stage: r.stage,
+                    doc_type: r.doc_type.clone(),
+                    items: r
+                        .items
+                        .iter()
+                        .map(|i| ChainItem {
+                            ref_: ItemRef::from(&i.ref_),
+                            role: i.role.clone(),
+                            status: i.status.clone(),
+                        })
+                        .collect(),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// `Version` — 이력 한 줄
+#[derive(Debug, Serialize)]
+pub struct Version {
+    pub doc_id: String,
+    pub version_no: Option<i32>,
+    pub commit_hash: String,
+    pub message: String,
+    pub author: Option<Author>,
+    pub created_at: String,
+}
+
+impl From<&VersionDto> for Version {
+    fn from(v: &VersionDto) -> Self {
+        Version {
+            doc_id: v.doc_id.clone(),
+            version_no: v.version_no,
+            commit_hash: v.commit_hash.clone(),
+            message: v.message.clone(),
+            author: v.author_view.as_ref().map(Author::from),
+            created_at: iso_utc(v.created_at),
+        }
+    }
+}
+
+/// `ProjectDetail` — `ProjectSummary`의 키 뒤에 문서·최근 변경·동기화 칸
+#[derive(Debug, Serialize)]
+pub struct ProjectDetail {
+    #[serde(flatten)]
+    pub summary: ProjectSummary,
+    pub docs: Vec<DocumentSummary>,
+    pub recent_changes: Vec<Version>,
+    pub last_processed_commit: Option<String>,
+    pub behind_by: Option<i32>,
+    pub fetched_at: Option<String>,
+}
+
+impl From<&ProjectDetailDto> for ProjectDetail {
+    fn from(p: &ProjectDetailDto) -> Self {
+        ProjectDetail {
+            summary: ProjectSummary::from(&p.summary),
+            docs: p.docs.iter().map(DocumentSummary::from).collect(),
+            recent_changes: p.recent_changes.iter().map(Version::from).collect(),
+            last_processed_commit: p.last_processed_commit.clone(),
+            behind_by: p.behind_by,
+            fetched_at: p.fetched_at.map(iso_utc),
+        }
+    }
+}
+
+/// `Graph` — 노드·간선(간선의 `from`)·브레드크럼 이름
+#[derive(Debug, Serialize)]
+pub struct Graph {
+    pub nodes: Vec<GraphNode>,
+    pub edges: Vec<GraphEdge>,
+    pub project_name: String,
+}
+
+impl From<&GraphDto> for Graph {
+    fn from(g: &GraphDto) -> Self {
+        Graph {
+            nodes: g.nodes.clone(),
+            edges: g.edges.clone(),
+            project_name: g.project_name.clone(),
+        }
+    }
+}
+
+/// `DownstreamDoc`
+#[derive(Debug, Serialize)]
+pub struct DownstreamDoc {
+    pub doc_id: String,
+    pub title: String,
+    pub items: Vec<String>,
+}
+
+/// `DownstreamView` — 키는 도착 항목 ID(문서 단위는 「(문서)」)
+#[derive(Debug, Serialize)]
+pub struct DownstreamView {
+    pub by_item: IndexMap<String, Vec<ItemRef>>,
+    pub by_document: Vec<DownstreamDoc>,
+}
+
+impl From<&DownstreamDto> for DownstreamView {
+    fn from(d: &DownstreamDto) -> Self {
+        DownstreamView {
+            by_item: d
+                .by_item
+                .iter()
+                .map(|(k, v)| (k.clone(), v.iter().map(ItemRef::from).collect()))
+                .collect(),
+            by_document: d
+                .by_document
+                .iter()
+                .map(|x| DownstreamDoc {
+                    doc_id: x.doc_id.clone(),
+                    title: x.title.clone(),
+                    items: x.items.clone(),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// `BrokenRefSummary` — 판별 필드 `type`이 맨 앞
+#[derive(Debug, Serialize)]
+pub struct BrokenRefSummary {
+    #[serde(rename = "type")]
+    pub kind: &'static str,
+    pub source: ItemRef,
+    pub raw_target: String,
+}
+
+impl From<&BrokenRefDto> for BrokenRefSummary {
+    fn from(b: &BrokenRefDto) -> Self {
+        BrokenRefSummary {
+            kind: "broken_ref",
+            source: ItemRef::from(&b.source),
+            raw_target: b.raw_target.clone(),
+        }
+    }
+}
+
+/// `GET …/flags`의 한 행 — 끊어진 참조이거나 문서 요약
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum ProjectItemOut {
+    Broken(BrokenRefSummary),
+    Document(Box<DocumentSummary>),
+}
+
+impl From<&ProjectItem> for ProjectItemOut {
+    fn from(x: &ProjectItem) -> Self {
+        match x {
+            ProjectItem::Broken(b) => ProjectItemOut::Broken(BrokenRefSummary::from(b)),
+            ProjectItem::Document(d) => {
+                ProjectItemOut::Document(Box::new(DocumentSummary::from(&**d)))
+            }
         }
     }
 }

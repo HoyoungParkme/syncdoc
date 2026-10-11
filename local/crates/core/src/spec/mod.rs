@@ -4,5 +4,5 @@ pub mod model;
 pub mod repo;
 pub mod service;
 
-pub use model::{DocumentRow, ItemRow, VersionRow};
+pub use model::{DocumentRow, ItemRow, StatusChangeRow, VersionRow};
 pub use service::{DIFF_CONTEXT_LINES, SUBTYPES, SpecService, TYPES};

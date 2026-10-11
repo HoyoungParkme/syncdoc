@@ -10,11 +10,14 @@ use crate::account::model::UserRow;
 use crate::account::service::AccountService;
 use crate::errors::Problem;
 use crate::project::service::{ProjectService, ServerRepos};
+use crate::pycompat::pyset::IntSet;
 use crate::reference::service::ReferenceService;
-use crate::spec::SpecService;
+use crate::spec::{DIFF_CONTEXT_LINES, SpecService};
 use crate::types::{
-    ApiAuthor, AuthorRef, Document, DocumentSummary, ItemRef, ItemReferences, ItemView,
-    ProjectSummary, STAGES, StageSummary, Storage,
+    ApiAuthor, AuthorRef, BrokenRefSummary, ChainItem, ChainRow, Diff, Document, DocumentSummary,
+    DownstreamDoc, DownstreamView, Graph, GraphEdge, GraphNode, GraphScope, ItemChain, ItemRef,
+    ItemReferences, ItemView, ProjectDetail, ProjectItem, ProjectSummary, STAGES, StageSummary,
+    Storage, stage_of,
 };
 
 /// 작성자(id만) → 이름 붙은 작성자 — 파이썬 `_api_author`. 지시자는 id가 있을 때만
@@ -333,4 +336,503 @@ pub async fn item_references_view(
         upstream,
         downstream,
     })
+}
+
+/// SYNC-MS-018#queries.project_detail
+///
+/// 동기화 칸은 DB에 적힌 값 그대로 — 받아 오지 않는다(UI-4 요소 7)
+pub async fn project_detail(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+) -> Result<ProjectDetail, Problem> {
+    let (project, repo) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code, user)
+    .await?;
+    let mut recent = SpecService { db: &mut *db }
+        .recent_changes(project.id, 10)
+        .await?;
+    let ids: Vec<i32> = recent
+        .iter()
+        .map(|r| r.author.user_id)
+        .chain(recent.iter().filter_map(|r| r.author.instructed_by_id))
+        .collect();
+    let names = AccountService { db: &mut *db }.users_by_ids(&ids).await?;
+    for r in &mut recent {
+        r.author_view = Some(ApiAuthor {
+            kind: r.author.kind.clone(),
+            user: names.get(&r.author.user_id).cloned(),
+            instructed_by: r
+                .author
+                .instructed_by_id
+                .and_then(|i| names.get(&i).cloned()),
+            via: r.author.via.clone(),
+        });
+    }
+    let summary = project_summary(&mut *db, repos, user)
+        .await?
+        .into_iter()
+        .find(|p| p.code == code)
+        .ok_or_else(|| Problem::Internal {
+            log: format!("프로젝트 {code}의 요약이 없다"),
+        })?;
+    let docs = document_list(&mut *db, repos, code, user, None, None).await?;
+    Ok(ProjectDetail {
+        summary,
+        docs,
+        recent_changes: recent,
+        last_processed_commit: repo.last_processed_commit,
+        behind_by: repo.behind_by,
+        fetched_at: repo.fetched_at,
+    })
+}
+
+/// SYNC-MS-018#queries.project_items
+///
+/// `kind`는 라우터가 패턴으로 거른다 — 그 밖은 파이썬 `ValueError`처럼 처리하지 못한 오류
+pub async fn project_items(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+    kind: &str,
+    user: &UserRow,
+) -> Result<Vec<ProjectItem>, Problem> {
+    let (project, _) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code, user)
+    .await?;
+    match kind {
+        "broken_ref" => {
+            let edges = ReferenceService { db: &mut *db }
+                .missing_in_project(project.id)
+                .await?;
+            let item_pks: Vec<i32> = edges.iter().filter_map(|e| e.from_item_pk).collect();
+            let names = SpecService { db: &mut *db }
+                .describe_items(&item_pks)
+                .await?;
+            let doc_ids: Vec<i32> = edges
+                .iter()
+                .filter(|e| e.from_item_pk.is_none())
+                .map(|e| e.from_document_id)
+                .collect();
+            let docs = doc_refs(&mut *db, &doc_ids).await?;
+            Ok(edges
+                .iter()
+                .filter_map(|e| {
+                    let src = match e.from_item_pk {
+                        Some(p) => names.get(&p),
+                        None => docs.get(&e.from_document_id),
+                    }?;
+                    Some(ProjectItem::Broken(BrokenRefSummary {
+                        source: src.clone(),
+                        raw_target: e.raw_target.clone(),
+                    }))
+                })
+                .collect())
+        }
+        "convention_errors" => Ok(SpecService { db: &mut *db }
+            .list_by_project(project.id, None, None, Some(true))
+            .await?
+            .into_iter()
+            .map(|d| ProjectItem::Document(Box::new(d)))
+            .collect()),
+        "incomplete" => Ok(SpecService { db: &mut *db }
+            .list_by_project(project.id, None, None, None)
+            .await?
+            .into_iter()
+            .filter(|d| !d.incomplete_warnings.is_empty())
+            .map(|d| ProjectItem::Document(Box::new(d)))
+            .collect()),
+        other => Err(Problem::Internal {
+            log: format!("unknown kind {other}"),
+        }),
+    }
+}
+
+/// SYNC-MS-018#queries.graph_view
+///
+/// 11단계를 다 그리되 범위로 골라낸다. 끝점이 범위 밖인 간선은 버린다 — 범위 밖과 미존재 참조는 다르다
+pub async fn graph_view(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+    scope: GraphScope,
+) -> Result<Graph, Problem> {
+    let (project, _) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code, user)
+    .await?;
+    let mut briefs = SpecService { db: &mut *db }
+        .list_items_by_project(project.id)
+        .await?;
+    if scope == GraphScope::Approved {
+        let ok: std::collections::HashSet<String> = SpecService { db: &mut *db }
+            .list_by_project(project.id, None, Some("approved"), None)
+            .await?
+            .into_iter()
+            .map(|d| d.doc_id)
+            .collect();
+        briefs.retain(|b| ok.contains(&b.doc_id));
+    }
+    let node_id = |doc_id: &str, item_id: Option<&str>| match item_id {
+        Some(i) => format!("{doc_id}#{i}"),
+        None => doc_id.to_string(),
+    };
+    let item_ids: HashMap<i32, String> = briefs
+        .iter()
+        .filter_map(|b| {
+            b.item_id
+                .as_deref()
+                .map(|i| (b.pk, node_id(&b.doc_id, Some(i))))
+        })
+        .collect();
+    let doc_ids: HashMap<i32, String> = briefs
+        .iter()
+        .filter(|b| b.item_id.is_none())
+        .map(|b| (b.pk, b.doc_id.clone()))
+        .collect();
+    let pks: Vec<i32> = item_ids.keys().copied().collect();
+    let edges = ReferenceService { db: &mut *db }
+        .references_among(&pks, true)
+        .await?;
+    let mut out_edges = Vec::new();
+    let mut touched: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for e in &edges {
+        let src = match e.from_item_pk {
+            Some(p) => item_ids.get(&p),
+            None => doc_ids.get(&e.from_document_id),
+        };
+        let Some(src) = src else { continue };
+        let dst = if let Some(p) = e.to_item_pk {
+            // 대상이 범위 밖이다. 미존재 참조가 아니므로 그리지 않는다
+            let Some(d) = item_ids.get(&p) else { continue };
+            Some(d.clone())
+        } else if let Some(d) = e.to_document_id {
+            let Some(d) = doc_ids.get(&d) else { continue };
+            Some(d.clone())
+        } else {
+            None
+        };
+        touched.insert(src.clone());
+        if let Some(d) = &dst {
+            touched.insert(d.clone());
+        }
+        out_edges.push(GraphEdge {
+            from_: src.clone(),
+            to: dst,
+            raw_target: e.raw_target.clone(),
+            is_missing: e.is_missing,
+        });
+    }
+    let nodes = briefs
+        .iter()
+        .map(|b| {
+            let id = node_id(&b.doc_id, b.item_id.as_deref());
+            GraphNode {
+                isolated: !touched.contains(&id),
+                id,
+                doc_id: b.doc_id.clone(),
+                item_id: b.item_id.clone(),
+                stage: b.stage,
+            }
+        })
+        .collect();
+    Ok(Graph {
+        nodes,
+        edges: out_edges,
+        project_name: project.name,
+    })
+}
+
+/// 한 방향으로 너비 우선 — 본 것은 파이썬 `set`에, 사이클은 본 표시로 멈추고 끝에 시작점을 뺀다 (파이썬 `_closure`)
+async fn closure(db: &mut PgConnection, start: i32, upward: bool) -> Result<IntSet, Problem> {
+    let mut seen = IntSet::new();
+    let mut queue = std::collections::VecDeque::from([start]);
+    while let Some(pk) = queue.pop_front() {
+        let edges = if upward {
+            ReferenceService { db: &mut *db }.upstream(pk).await?
+        } else {
+            ReferenceService { db: &mut *db }.downstream(pk).await?
+        };
+        for e in edges {
+            let next = if upward { e.to_item_pk } else { e.from_item_pk };
+            if let Some(n) = next
+                && let Ok(key) = u64::try_from(n)
+                && !seen.contains(key)
+            {
+                seen.add(key);
+                queue.push_back(n);
+            }
+        }
+    }
+    if let Ok(key) = u64::try_from(start) {
+        seen.discard(key);
+    }
+    Ok(seen)
+}
+
+/// SYNC-MS-018#queries.item_chain
+///
+/// 직접 참조가 아니라 전이적 폐포다. 역할은 어느 폐포에서 나왔는지로 정한다 — 단계 번호로 정하면 되돌아오는
+/// 참조에서 근거를 파생으로 잘못 적는다. 한 단계 안의 차례는 파이썬 `set`의 순회 차례다
+pub async fn item_chain(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    doc_id: &str,
+    item_id: &str,
+    user: &UserRow,
+) -> Result<ItemChain, Problem> {
+    ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code_of(doc_id), user)
+    .await?;
+    let pk = SpecService { db: &mut *db }
+        .resolve_item(doc_id, item_id)
+        .await?;
+    let ups = closure(&mut *db, pk, true).await?;
+    let downs = closure(&mut *db, pk, false).await?;
+    let as_pk = |k: u64| i32::try_from(k).unwrap_or(0);
+    let mut all: Vec<i32> = ups.iter().map(as_pk).collect();
+    all.extend(downs.iter().map(as_pk));
+    all.push(pk);
+    let described = SpecService { db: &mut *db }.describe_items(&all).await?;
+    let mut statuses: HashMap<String, String> = HashMap::new();
+    for r in described.values() {
+        if let Some(d) = &r.doc_id
+            && !statuses.contains_key(d)
+        {
+            let status = SpecService { db: &mut *db }
+                .get_document(d)
+                .await?
+                .summary
+                .status;
+            statuses.insert(d.clone(), status);
+        }
+    }
+    let order = std::iter::once((pk, "self"))
+        .chain(ups.iter().map(|k| (as_pk(k), "upstream")))
+        .chain(downs.iter().map(|k| (as_pk(k), "downstream")));
+    let mut by_stage: HashMap<i32, Vec<ChainItem>> = HashMap::new();
+    for (p, role) in order {
+        let Some(r) = described.get(&p) else { continue };
+        let Some(d) = &r.doc_id else { continue };
+        // STD는 단계 밖이라 체인에 안 놓는다
+        let Some(stage) = d.split('-').nth(1).and_then(stage_of) else {
+            continue;
+        };
+        by_stage.entry(stage).or_default().push(ChainItem {
+            ref_: r.clone(),
+            role: role.to_string(),
+            status: statuses
+                .get(d)
+                .cloned()
+                .unwrap_or_else(|| "draft".to_string()),
+        });
+    }
+    let item = described
+        .get(&pk)
+        .cloned()
+        .ok_or_else(|| Problem::Internal {
+            log: format!("{doc_id}#{item_id}의 표시 정보가 없다"),
+        })?;
+    Ok(ItemChain {
+        item,
+        upstream_count: ups.len() as i64,
+        downstream_count: downs.len() as i64,
+        // 항상 11행 — 체인이 어디서 끊겼는지가 이 화면의 목적이다
+        rows: STAGES
+            .iter()
+            .enumerate()
+            .map(|(i, t)| {
+                let stage = i as i32 + 1;
+                ChainRow {
+                    stage,
+                    doc_type: (*t).to_string(),
+                    items: by_stage.remove(&stage).unwrap_or_default(),
+                }
+            })
+            .collect(),
+    })
+}
+
+/// SYNC-MS-018#queries.diff_with_impact
+pub async fn diff_with_impact(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    doc_id: &str,
+    from_no: i32,
+    to_no: i32,
+    user: &UserRow,
+) -> Result<Diff, Problem> {
+    ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code_of(doc_id), user)
+    .await?;
+    let mut d = SpecService { db: &mut *db }
+        .diff(doc_id, from_no, to_no, DIFF_CONTEXT_LINES)
+        .await?;
+    let ids: Vec<String> = d.hunks.iter().filter_map(|h| h.item_id.clone()).collect();
+    let pks = SpecService { db: &mut *db }
+        .resolve_items(doc_id, &ids)
+        .await?;
+    // 항목 ID → pk — 이름에서 되짚는다(파이썬 `describe_items`)
+    let by_id: HashMap<String, i32> = SpecService { db: &mut *db }
+        .describe_items(&pks)
+        .await?
+        .into_iter()
+        .filter_map(|(pk, r)| r.item_id.map(|i| (i, pk)))
+        .collect();
+    let pk_list: Vec<i32> = by_id.values().copied().collect();
+    let counts = ReferenceService { db: &mut *db }
+        .count_downstream(&pk_list)
+        .await?;
+    for h in &mut d.hunks {
+        // 새 항목·항목 밖은 0
+        h.downstream_count = h
+            .item_id
+            .as_ref()
+            .and_then(|i| by_id.get(i))
+            .and_then(|pk| counts.get(pk))
+            .copied()
+            .unwrap_or(0);
+    }
+    Ok(d)
+}
+
+/// 문서 제목 — 없는 문서면 문서 ID (파이썬 `_title_of`)
+async fn title_of(db: &mut PgConnection, doc_id: &str) -> Result<String, Problem> {
+    let id = match (SpecService { db: &mut *db }).get_document(doc_id).await {
+        Ok(d) => d.summary.id,
+        Err(Problem::NotFound { .. }) => return Ok(doc_id.to_string()),
+        Err(other) => return Err(other),
+    };
+    Ok(SpecService { db }
+        .describe_documents(&[id])
+        .await?
+        .remove(&id)
+        .map_or_else(|| doc_id.to_string(), |r| r.title))
+}
+
+/// SYNC-MS-018#queries.downstream_view
+///
+/// 항목이 없는 문서는 문서 참조도 안 나온다 — 간선을 그 문서의 항목들로 찾는다(파이썬과 같다)
+pub async fn downstream_view(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    doc_id: &str,
+    user: &UserRow,
+) -> Result<DownstreamView, Problem> {
+    ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code_of(doc_id), user)
+    .await?;
+    let document = SpecService { db: &mut *db }.get_document(doc_id).await?;
+    let pks = SpecService { db: &mut *db }
+        .item_pks(document.summary.id)
+        .await?;
+    let by_pk: HashMap<i32, String> = pks.iter().map(|(i, p)| (*p, i.clone())).collect();
+    let pk_list: Vec<i32> = pks.values().copied().collect();
+    let edges: Vec<_> = ReferenceService { db: &mut *db }
+        .references_among(&pk_list, true)
+        .await?
+        .into_iter()
+        .filter(|e| {
+            e.to_item_pk.is_some_and(|p| by_pk.contains_key(&p))
+                || e.to_document_id == Some(document.summary.id)
+        })
+        .collect();
+    let item_pks: Vec<i32> = edges.iter().filter_map(|e| e.from_item_pk).collect();
+    let names = SpecService { db: &mut *db }
+        .describe_items(&item_pks)
+        .await?;
+    let doc_pks: Vec<i32> = edges.iter().map(|e| e.from_document_id).collect();
+    let docs = SpecService { db: &mut *db }
+        .describe_documents(&doc_pks)
+        .await?;
+    let mut by_item: IndexMap<String, Vec<ItemRef>> = IndexMap::new();
+    let mut by_doc: IndexMap<String, std::collections::BTreeSet<String>> = IndexMap::new();
+    for e in &edges {
+        let key = match e.to_item_pk.and_then(|p| by_pk.get(&p)) {
+            Some(i) => i.clone(),
+            None => "(문서)".to_string(),
+        };
+        // 출발 항목이면 이름 지도의 것 그대로(raw_target 없음), 아니면 출발 문서
+        let r = match e.from_item_pk.and_then(|p| names.get(&p)) {
+            Some(r) => r.clone(),
+            None => match docs.get(&e.from_document_id) {
+                Some(d) => ItemRef {
+                    doc_id: Some(d.doc_id.clone()),
+                    display_name: Some(d.title.clone()),
+                    raw_target: e.raw_target.clone(),
+                    ..ItemRef::default()
+                },
+                None => continue,
+            },
+        };
+        // 같은 문서 안 참조는 추적표 대상이 아니다
+        if r.doc_id.as_deref() == Some(doc_id) {
+            continue;
+        }
+        by_doc
+            .entry(r.doc_id.clone().unwrap_or_default())
+            .or_default()
+            .insert(key.clone());
+        by_item.entry(key).or_default().push(r);
+    }
+    let mut by_document = Vec::with_capacity(by_doc.len());
+    for (d, items) in by_doc {
+        let title = title_of(&mut *db, &d).await?;
+        by_document.push(DownstreamDoc {
+            doc_id: d,
+            title,
+            items: items.into_iter().collect(),
+        });
+    }
+    by_document.sort_by(|a, b| {
+        let stage = |d: &str| d.split('-').nth(1).and_then(stage_of).unwrap_or(99);
+        (stage(&a.doc_id), &a.doc_id).cmp(&(stage(&b.doc_id), &b.doc_id))
+    });
+    Ok(DownstreamView {
+        by_item,
+        by_document,
+    })
+}
+
+/// SYNC-MS-018#queries.trash_list
+///
+/// 건수는 안 센다 — 휴지통 목록에는 수치가 없다
+pub async fn trash_list(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+) -> Result<Vec<DocumentSummary>, Problem> {
+    let (project, _) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code, user)
+    .await?;
+    let mut docs = SpecService { db: &mut *db }
+        .list_trashed(project.id)
+        .await?;
+    for d in &mut docs {
+        d.author = api_author(&mut *db, d.last_author.as_ref()).await?;
+    }
+    Ok(docs)
 }

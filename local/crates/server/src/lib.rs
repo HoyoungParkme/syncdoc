@@ -17,7 +17,17 @@ use crate::state::AppState;
 use crate::web::guard::guard;
 use crate::web::problem::{method_not_allowed, panic_response};
 use crate::web::routes::account::{issue_token, list_tokens, me, revoke_token};
-use crate::web::routes::projects::{delete_project, init_project, list_projects};
+use crate::web::routes::documents::diff;
+use crate::web::routes::documents::downstream;
+use crate::web::routes::documents::get_document;
+use crate::web::routes::documents::versions;
+use crate::web::routes::projects::{
+    delete_project, get_file, get_project, graph, init_project, list_docs, list_items,
+    list_projects, trash_list,
+};
+use crate::web::routes::references::item_chain;
+use crate::web::routes::references::item_references;
+use crate::web::routes::references::item_view;
 use crate::web::routes::specs::spec_copy;
 use crate::web::static_files::fallback;
 
@@ -29,7 +39,26 @@ pub fn app(state: AppState) -> Router {
         .route("/api/me/tokens", get(list_tokens).post(issue_token))
         .route("/api/me/tokens/{token_id}", delete(revoke_token))
         .route("/api/projects", get(list_projects).post(init_project))
-        .route("/api/projects/{code}", delete(delete_project))
+        .route(
+            "/api/projects/{code}",
+            get(get_project).delete(delete_project),
+        )
+        .route("/api/projects/{code}/docs", get(list_docs))
+        .route("/api/projects/{code}/flags", get(list_items))
+        .route("/api/projects/{code}/graph", get(graph))
+        .route("/api/projects/{code}/files/{*path}", get(get_file))
+        .route("/api/projects/{code}/files/", get(get_file))
+        .route("/api/docs/{doc_id}", get(get_document))
+        .route("/api/docs/{doc_id}/diff", get(diff))
+        .route("/api/docs/{doc_id}/versions", get(versions))
+        .route("/api/docs/{doc_id}/downstream", get(downstream))
+        .route("/api/docs/{doc_id}/items/{item_id}", get(item_view))
+        .route(
+            "/api/docs/{doc_id}/items/{item_id}/references",
+            get(item_references),
+        )
+        .route("/api/docs/{doc_id}/items/{item_id}/chain", get(item_chain))
+        .route("/api/projects/{code}/trash", get(trash_list))
         .merge(mcp::router(state.clone()))
         .route("/specs/", get(spec_copy))
         .route("/specs/{*path}", get(spec_copy))
