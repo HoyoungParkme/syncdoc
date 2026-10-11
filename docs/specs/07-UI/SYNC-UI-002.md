@@ -2008,6 +2008,45 @@ status: draft
     </div>
   </div>
 </div>
+<div class="var">싱크독_로컬 설치형(Rust) — 클라이언트 설정 아래에 「이 PC」(10)·「백업」(11)이 더 있다. 파이썬 판에는 없다(카드 L16)</div>
+<div class="sd h" style="min-height:900px">
+  <div class="top"><span class="logo">싱크독_로컬</span><span class="tb">사용 방법</span><span class="tb on">설정</span></div>
+  <div class="ov" style="padding-top:24px">
+    <div class="dlg set">
+      <div class="db">
+        <section class="card" data-el="10">
+          <div class="ch">이 PC</div>
+          <div class="cb">
+            <p class="desc">이 PC에서만 쓰는 값입니다. 저장하면 싱크독_로컬이 다시 켜집니다(몇 초).</p>
+            <div class="row" data-el="10.10"><span class="m">마지막 다시 켜기 — 되살리기 성공 · 10:42</span></div>
+            <div class="row"><span class="two"><b>이름</b><span class="m">아이디 local · 커밋 작성자</span></span><input class="in" data-el="10.1" placeholder="local"></div>
+            <div class="row"><span class="two"><b>모델 주소</b></span><input class="in m" data-el="10.2" placeholder="https://llm.사내/v1/chat/completions"></div>
+            <div class="row"><span class="two"><b>모델 키</b></span><input class="in m" type="password" data-el="10.3" placeholder="정해 둠 — 바꿀 때만"></div>
+            <div class="row"><span class="two"><b>모델 이름</b></span><input class="in m" data-el="10.4" placeholder="gpt-4o"></div>
+            <div class="row"><span class="sp"></span><span class="b sm solid" data-el="10.5">저장하고 다시 켜기</span></div>
+            <div class="row"><label><input type="checkbox" data-el="10.6"> 로그인할 때 트레이로 켜기</label></div>
+            <div class="row"><span class="two"><b>데이터 자리</b><span class="m" data-el="10.7">C:\Users\홍길동\AppData\Local\SyncDoc Local</span></span></div>
+            <div class="row"><input class="in m" data-el="10.8" placeholder="D:\SyncDoc"><span class="b sm" data-el="10.9">옮기기</span></div>
+          </div>
+        </section>
+        <section class="card" data-el="11">
+          <div class="ch">백업<span class="sp"></span><span class="b sm solid" data-el="11.4">지금 백업</span></div>
+          <div class="cb">
+            <p class="desc">하루 한 번 이 폴더에 DB와 서버 저장소를 묶어 둡니다. 최근 14개만 남깁니다. 암호를 잃으면 백업을 풀 수 없습니다 — 이 PC 밖에도 적어 두세요.</p>
+            <div class="row"><span class="two"><b>폴더</b></span><input class="in m" data-el="11.1" placeholder="D:\백업\syncdoc"></div>
+            <div class="row"><span class="two"><b>암호</b></span><input class="in m" type="password" data-el="11.2" placeholder="없음 — 암호 없이 저장"></div>
+            <div class="row"><span class="sp"></span><span class="b sm solid" data-el="11.3">저장하고 다시 켜기</span></div>
+            <div class="row" data-el="11.5"><span class="m">마지막 백업 2026-10-11 09:00 · syncdoc-20261011-090002.tar.gpg</span></div>
+            <div class="row"><span class="two"><b>되살리기 암호</b></span><input class="in m" type="password" data-el="11.8" placeholder="비우면 설정의 암호"></div>
+            <div class="row" data-el="11.6"><span class="two"><b class="m">syncdoc-20261011-090002.tar.gpg</b><span class="m">12.4 MB</span></span><span class="sp"></span><span class="b sm danger" data-el="11.7">되살리기</span></div>
+            <div class="row"><span class="two"><b class="m">syncdoc-20261010-090001.tar.gpg</b><span class="m">12.1 MB</span></span><span class="sp"></span><span class="b sm danger">되살리기</span></div>
+          </div>
+        </section>
+        <div class="tokbox" data-el="12"><b>다시 켜는 중…</b>화면이 저절로 돌아옵니다.</div>
+      </div>
+    </div>
+  </div>
+</div>
 ```
 
 ### 요소
@@ -2039,6 +2078,27 @@ status: draft
 | 8 | 클라이언트 설정 | 카드 | 에이전트에 붙여넣을 MCP 설정 | — |
 | 8.1 | 설정 스니펫 | 텍스트 | 읽기 전용 JSON. 주소와 토큰 자리. **서버 이름은 판 이름**이다 — `syncdoc_github`·`syncdoc_local`(카드 BU) | — |
 | 9 | 닫기 | 버튼 | | 닫힘 |
+| 10 | 이 PC | 카드 | 싱크독_로컬 설치형(Rust)만 — `GET /api/local`이 404면(파이썬 판) 없다. 이 PC에서만 쓰는 설정 | — |
+| 10.1 | 이름 | 입력 | `LOCAL_NAME`. 자리표시는 아이디(`LOCAL_LOGIN`) — 비우면 아이디가 이름이다. 아이디는 바꾸지 않는다(커밋 작성자) | — |
+| 10.2 | 모델 주소 | 입력 | `LLM_API_URL`. 비었거나 `http(s)://` | — |
+| 10.3 | 모델 키 | 입력(가림) | `LLM_API_KEY`. **원문은 오지 않는다** — 자리표시가 `정해 둠 — 바꿀 때만` 또는 `없음`. 비워 두면 그대로 | — |
+| 10.4 | 모델 이름 | 입력 | `LLM_MODEL` | — |
+| 10.5 | 저장하고 다시 켜기 | 버튼 | 10.1~10.4 가운데 바뀐 것이 없으면 비활성 | 바뀐 칸만 보내고 다시 켜기(12) |
+| 10.6 | 자동 시작 | 체크 | 로그인할 때 트레이로 켜기. 윈도는 설치 화면의 체크와 같은 값이다 | 바로 걸거나 푼다(다시 켜지 않는다) |
+| 10.7 | 데이터 자리 | 텍스트 | 지금 데이터 자리. 고정폭 | — |
+| 10.8 | 새 자리 | 입력 | 옮길 폴더 — 없거나 빈 폴더 | — |
+| 10.9 | 옮기기 | 버튼 | 10.8이 비면 비활성 | 확인 후 옮기고 다시 켜기(12). 거절이면 그 자리에 `reason` |
+| 10.10 | 마지막 다시 켜기 | 텍스트 | 켠 뒤 마지막 다시 켜기(설정 저장·되살리기·옮기기)의 결과와 시각. 없으면 줄이 없다. 실패면 빨강으로 `message` | — |
+| 11 | 백업 | 카드 | 10과 같은 판에만. 하루 한 번 백업의 폴더·암호, 지금 백업, 폴더의 백업 파일 | — |
+| 11.1 | 백업 폴더 | 입력 | `BACKUP_DIR` — 비면 백업하지 않는다 | — |
+| 11.2 | 암호 | 입력(가림) | `BACKUP_PASSWORD`. 원문은 오지 않는다 — 자리표시가 `정해 둠 — 바꿀 때만` 또는 `없음 — 암호 없이 저장` | — |
+| 11.3 | 저장하고 다시 켜기 | 버튼 | 11.1·11.2가 그대로면 비활성 | 다시 켜기(12) |
+| 11.4 | 지금 백업 | 버튼 | 카드 머리. 폴더가 없으면 비활성. 도는 동안 `백업 중…` | 하나 만들고 목록을 다시 읽는다. 실패면 11.5에 오류 |
+| 11.5 | 마지막 백업 | 텍스트 | 켠 뒤 마지막 백업 시도의 시각과 파일, 실패면 빨강으로 오류. 없으면 줄이 없다 | — |
+| 11.6 | 백업 행 | 행 | 폴더의 백업 파일 하나 — 이름(고정폭)·크기. 새것부터. Docker 묶음(카드 BR)이 만든 것도 같은 이름이라 함께 보인다 | — |
+| 11.7 | 되살리기 | 버튼 | 행마다. 빨강 | 확인 후 되살리고 다시 켜기(12). 풀리지 않으면 그 자리에 `reason`(아무것도 안 바뀜) |
+| 11.8 | 되살리기 암호 | 입력(가림) | 다른 암호로 만든 백업(Docker 묶음 따위)을 되살릴 때만. 비우면 설정의 암호 | — |
+| 12 | 다시 켜는 중 | 영역 | 202를 받은 뒤 `/health`가 다시 답할 때까지. 돌아오면 설정을 다시 읽는다(10.10) | — |
 
 ### 규칙
 
@@ -2060,6 +2120,12 @@ status: draft
 - **이메일 하나는 사람 하나다.** 남이 이미 등록한 이메일은 거부된다(409 `email-taken`). 먼저 등록한 쪽이 임자다. 사칭을 완전히 막지는 못하지만 권한은 안 준다 — push는 여전히 그 사람의 OAuth 토큰이 있어야 한다
 - **삭제(2.4)는 확인을 받는다.** 다음 재구축에서 그 이메일로 들어온 커밋이 자리표시로 돌아간다
 - **폐쇄망판([[SYNC-PRD-001#R15]])의 내 계정은 한 줄이다** — 로컬 사용자의 아이디(2.1)와 「로그인 없음 · 이 PC · {이름}」. 로그아웃(2.2)이 없다 — 로그인이 없다. 커밋 이메일(2.3~2.6)도 없다 — 혼자 쓰는 판은 저장소의 모든 커밋을 그 사람 것으로 보므로 이을 것이 없다([[SYNC-MS-006#AccountService.user_for_commit]]). 그래서 S-3도 일어나지 않는다
+- **「이 PC」(10)·「백업」(11)은 싱크독_로컬 설치형(Rust)만 있다**(카드 L16) — 설치형 프로그램이 이 PC의 설정 파일·자동 시작·데이터 자리·백업을 쥐고 있어서다. Docker 묶음은 환경 변수와 `scripts/backup.sh`가 맡는다. 화면은 `GET /api/local`이 404면 두 카드를 그리지 않는다
+- **카드 순서(설치형)는 MCP 토큰 · 클라이언트 설정 · 이 PC · 백업 · 관리 · 내 계정이다**
+- **저장은 다시 켜기다** — 모델·이름·백업 설정은 켤 때 읽는다. 저장(10.5·11.3)·되살리기(11.7)·옮기기(10.9)는 202를 받은 뒤 다시 켜는 중(12)을 띄우고, 돌아오면 결과(10.10)를 보인다. 자동 시작(10.6)과 지금 백업(11.4)은 다시 켜지 않는다
+- **키와 암호는 화면에 돌아오지 않는다**(10.3·11.2) — 있는지만 자리표시로 말한다. 비워 둔 칸은 보내지 않는다(그대로). 지우려면 서버가 받는 빈 문자열을 보내야 해서 「지우기」는 두지 않는다 — 설정 파일에서 지운다
+- **되살리기와 옮기기는 확인을 받는다**(11.7·10.9). 되살리기는 지금 상태를 옆에 두고 하므로 실패하면 돌아오지만, 성공하면 백업 뒤의 일이 사라진다 — 확인 문구에 그 백업의 시각을 넣는다
+- **같은 망 열기는 화면에 없다** — 열면 그 망의 누구나 로그인 없이 쓴다. 설정 파일(`PUBLIC_BASE_URL`)에만 둔다([[SYNC-PRD-001#R15]])
 - **행에 토큰 접두어를 두지 않는다.** 서버는 해시만 저장하므로 접두어를 남기려면 컬럼을 따로 만들어야 하는데, 이름(label)이 이미 어느 토큰인지 말한다. 컬럼 하나를 더 두고 기존 토큰은 빈칸으로 남기는 값을 치를 만큼은 아니다(#20)
 
 ### 시나리오
@@ -2080,6 +2146,12 @@ status: draft
 2. 설정 → 내 계정에서 이메일 입력(2.5)에 `git config user.email` 값을 적고 추가(2.6)
 3. 관리(5.1)를 열고 인덱스 재구축을 돌린다
 4. 버전 작성자가 내 계정으로 바뀐다
+
+**S-4 백업을 걸고 되살린다 (싱크독_로컬 설치형)**
+1. 백업(11)의 폴더(11.1)에 다른 디스크 폴더를, 암호(11.2)에 암호를 적고 저장하고 다시 켜기(11.3)
+2. 다시 켜는 중(12) 뒤 지금 백업(11.4) — 행(11.6)이 생기고 마지막 백업(11.5)에 그 파일
+3. 어제 것으로 되돌리고 싶다 — 그 행의 되살리기(11.7)를 누르고 확인
+4. 다시 켜는 중(12) 뒤 마지막 다시 켜기(10.10)가 `되살리기 성공`, 문서는 그 백업 때로 돌아가 있다
 
 ---
 
