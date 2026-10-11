@@ -176,10 +176,10 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 | 항목 | 내용 |
 |---|---|
-| 근거 | [[SYNC-UC-001#UC-A1]] 1c · [[SYNC-PRD-001#R14]] · [[SYNC-INFRA-001]] 9.7 · 파이썬 판 카드 BX([[SYNC-CODE-001]], #376) · 에이전트 판단 2026-10-11(사용자 목표 「끝까지」): 입구는 `/api/projects/{code}` 경로에 POST를 붙여 `code`가 `bundle`일 때만 가져오기 — 정적 경로를 따로 두면 axum은 `GET /api/projects/bundle`을 405로 막지만 파이썬 판은 `{code}`의 GET으로 떨어져 `not-found`다. 그 밖의 코드로 POST하면 파이썬 판처럼 405(`Allow: GET, DELETE`) · 폼은 starlette·FastAPI 꼴 그대로 — multipart와 urlencoded, 같은 이름은 뒤의 것, 빈 문자열은 없는 것, 파일 아닌 칸 1MB 넘음·이름 없는 칸은 400(starlette 문장), 칸 오류는 선언 차례(`code`·`name`·`bundle`) · 크기 상한 없음(파이썬 판과 같다) |
-| 구현 | [[SYNC-MS-013#ProjectService.import_bundle]] · [[SYNC-MS-019#Git.clone_bare]] · `errors.rs` `BundleInvalid` · `compat/fastapi.rs` 폼 · `routes/projects.rs` |
+| 근거 | [[SYNC-UC-001#UC-A1]] 1c · [[SYNC-PRD-001#R14]] · [[SYNC-INFRA-001]] 9.7 · 파이썬 판 카드 BX([[SYNC-CODE-001]], #376) · 에이전트 판단 2026-10-11(사용자 목표 「끝까지」): 입구는 `/api/projects/{code}` 경로에 POST를 붙여 `code`가 `bundle`일 때만 가져오기 — 정적 경로를 따로 두면 axum은 `GET /api/projects/bundle`을 405로 막지만 파이썬 판은 `{code}`의 GET으로 떨어져 `not-found`다. 그 밖의 코드로 POST하면 파이썬 판처럼 405(`Allow: GET, DELETE`) · 폼은 starlette·FastAPI 꼴 그대로 — multipart와 urlencoded, 같은 이름은 뒤의 것, 빈 문자열은 없는 것, 파일 아닌 칸 1MB 넘음·이름 없는 칸은 400(starlette 문장), 칸 오류는 선언 차례(`code`·`name`·`bundle`) · 폼 해석은 multer를 빼고 python-multipart 0.0.32 파서를 옮긴다(`compat/form.rs`) — 깨진 본문(경계·머리·끝 없음)의 답까지 같고 L14 첨부도 같은 길을 탄다. 문자 집합은 UTF-8·latin-1·ASCII 이름만 안다(그 밖은 latin-1 — 계약 밖) · 크기 상한 없음(파이썬 판과 같다) |
+| 구현 | [[SYNC-MS-013#ProjectService.import_bundle]] · [[SYNC-MS-019#Git.clone_bare]] · `errors.rs` `BundleInvalid` · `compat/form.rs` · `compat/fastapi.rs` 폼 칸 · `routes/projects.rs` |
 | API | [[SYNC-API-001#POST/api/projects/bundle]] |
-| 테스트 | `cargo test`(git — 번들의 가지·태그 해시·원격 없음·HEAD·받기 규칙 · 시험 DB — 번들 → 문서·상태 이력·처리 지점, 골격 커밋 없음 · 번들 아님·main 없음 → `bundle-invalid`, 아무것도 안 남음 · 코드 형식·중복 · 남은 원본은 보관으로) · 계약 L15 — 같은 번들(고정 저장소를 시험이 git으로 묶는다)로 두 판의 응답·문서 목록·이력이 같고, 폼 오류·405가 바이트로 같다 |
+| 테스트 | `cargo test`(폼 정답 — `xtask/py/form_cases.py`가 starlette에 넣어 얻은 답과 같다, 상한 넷 · git — 번들의 가지·태그 해시·원격 없음·HEAD·받기 규칙 · 시험 DB — 번들 → 문서·상태 이력·처리 지점, 골격 커밋 없음 · 번들 아님·main 없음 → `bundle-invalid`, 아무것도 안 남음 · 코드 형식·중복 · 남은 원본은 보관으로) · 계약 L15 — 같은 번들(고정 저장소를 시험이 git으로 묶는다)로 두 판의 응답·문서 목록·이력이 같고, 폼 오류·405가 바이트로 같다 |
 | 선행 | L11 · BX |
 | 완료 | — |
 
