@@ -139,11 +139,21 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | L10 · #325 |
 | 완료 | 2026-10-11 · 브랜치 `card/L11-catch-up`(59f809a #369) · spec 10 + code 30 · `cargo test` 153(시험 DB · 임시 자리 · 진짜 git — 밀린 커밋 처리·파일 삭제·되살리기·앱 커밋 거르기·강등 커밋·재구축·코드 올리기·따라잡기·주기 확인, 실행 파일 시험: 꺼진 동안 민 명세가 켜면 문서) · 계약 `--target both --with-card L11` 887 통과·건너뜀 0 — L11 43 사례(진짜 push 흐름·관리 경로 여섯·upload_code)가 파이썬 판과 바이트로 같고 L6의 보관본 가져오기 시험도 Rust에서 돈다 · L3 두 판 차이 시험 씨앗 셋 · clippy(리눅스·윈도) · 윈도 `cargo check` · 워크플로 녹색 · `check_code` Rust 129/129 · `check_calls` 0 · 사람 확인(윈도 싱크독_로컬에 git push → 화면에 문서, UI-14 동기화·재구축·지금 가져오기)은 따로 · 되먹임: 파이썬 #325를 #366으로 먼저 고침(`git.log --diff-filter=d`) · 같은 항목 ID 둘을 git으로 밀면 두 판 모두 처리 지점이 멈춘다 — #368 · MCP 본문 한도(4MiB)가 올리기 한도(5MiB)보다 작아 크기 초과는 MCP로 닿지 않는다 · 저장 ↔ 커밋 처리의 future 고리는 사설 `process_file`을 상자에 담아 끊었다 |
 
+#### L12 코드 그래프 — 코드가 명세대로인지 본다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-SCN-001#S9]] · [[SYNC-UC-001#UC-S8]] · [[SYNC-UC-001#UC-H20]] · [[SYNC-PRD-001#R13]] · [[SYNC-INFRA-001]] 9.2 · 에이전트 판단 2026-10-11(사용자 목표 「끝까지」): 4장 미결 「커밋된 graph.json」 — 파이썬 판처럼 따른다(그때 두 판이 같은 원형에서 바이트까지 같다) · graph.json이 없으면 graphify 대신 tree-sitter로 원형을 뽑는다 — graphify의 이름 풀이를 다 옮기지 않아 호출 선이 파이썬 판보다 적을 수 있다 · 파이썬 `ast` 대신 tree-sitter-python · 커뮤니티는 L13(그 전엔 `community` 없음) · 코드에 묻기(`code/ask`)는 L14 |
+| 구현 | [[SYNC-MS-022#codegraph.touches_code]] · [[SYNC-MS-022#codegraph.load]] · [[SYNC-MS-022#codegraph.extract]] · [[SYNC-MS-022#codegraph.reduce]] · [[SYNC-MS-022#codegraph.enrich]] · [[SYNC-MS-022#codegraph.spec_calls]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.item_function]] · [[SYNC-MS-022#codegraph.item_neighbors]] · [[SYNC-MS-022#codegraph.layer_table]] · [[SYNC-MS-022#codegraph.layers]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#CodeGraphService.save]] · [[SYNC-MS-022#CodeGraphService.fail]] · [[SYNC-MS-022#CodeGraphService.read]] · [[SYNC-MS-017#pipeline.schedule_code_graph]] · [[SYNC-MS-017#pipeline.build_code_graph]] · [[SYNC-MS-017#pipeline.process_commit]] 5a · [[SYNC-MS-017#pipeline.rebuild]] 10 · [[SYNC-MS-013#ProjectService.init_project]](가져오기 뒤) · [[SYNC-MS-019#Git.changed_paths]] · [[SYNC-MS-019#Git.archive]] · [[SYNC-MS-018#queries.code_view]] · [[SYNC-MS-018#queries.code_calls]] · [[SYNC-MS-018#queries.code_source]] · [[SYNC-MS-018#queries.code_text]] |
+| API | [[SYNC-API-001#GET/api/docs/{docId}/code]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/code]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/code/source]] · [[SYNC-API-001#GET/api/projects/{code}/code-calls]] · [[SYNC-API-001#GET/api/projects/{code}/code/source]] · [[SYNC-API-002#get_code_graph]] |
+| 테스트 | `cargo test`(정답 파일 — 파이썬 판이 같은 원형·같은 파일로 낸 줄이기·보강 결과와 바이트로 같다, 싱크독 저장소의 graphify 원형으로 · 시험 DB · 임시 자리 · 진짜 git — 코드 push 뒤 그래프·출처·실패 남기기) · 계약 L12 — 두 판에 같은 `graphify-out/graph.json`과 코드를 push해 코드 탭·관계도 코드 호출·코드 보기·`get_code_graph`가 바이트로 같고, graph.json 없는 프로젝트는 꼴만 |
+| 선행 | L11 |
+| 완료 | — |
+
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
-| L12 코드 그래프 | 파이썬·TS·JS·Rust 추출 · 명세 대조 · 코드 화면 · `get_code_graph` · 커밋 처리·재구축·코드 올리기가 그래프를 건다(`schedule_code_graph`·`build_code_graph` — L11에서 넘어옴) | L11 | L |
 | L13 커뮤니티·노드 | graphrs Louvain(seed 42) · 허브 라벨 · 노드 목록 | L12 | M |
 | L14 대화·질문 탭 | 대화·첨부(PDF) · 모델 스트리밍 · 질문 루프 · SSE | L8 · L12 | XL |
 | L15 번들 가져오기 | 파이썬 판 카드 BX(git 번들 가져오기)의 Rust 쪽 | L11 · BX | S |
@@ -194,5 +204,5 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 ## 4. 미결사항
 
 - [x] `main`이 아닌 가지를 push했을 때 — 파이썬 판처럼 받아 두기만 하나([[SYNC-UC-001#UC-H21]] 3a), git을 부르기 전에 거절하나. Rust 판은 ref 명령을 먼저 읽으므로 둘 다 된다([[SYNC-INFRA-001]] 9.1). 카드 L10 전에 정한다 — 결정(에이전트 판단 2026-10-11, 사용자 목표 「끝까지」): 파이썬 판처럼 받아 두기만 한다. ref 명령을 미리 읽지 않고 되감기·지우기는 파이썬 판과 같은 저장소 설정이 거절한다(INFRA 9.1을 바로잡음). 계약 L10이 두 판에 진짜 push로 본다
-- [ ] 저장소에 커밋된 `graphify-out/graph.json`을 따를지 — 파이썬 판은 그 파일이 있으면 그것을 쓴다([[SYNC-MS-011#codegraph.load]] 1). Rust 판에는 graphify가 없다. 카드 L12 전에 정한다
+- [x] 저장소에 커밋된 `graphify-out/graph.json`을 따를지 — 파이썬 판은 그 파일이 있으면 그것을 쓴다([[SYNC-MS-011#codegraph.load]] 1). Rust 판에는 graphify가 없다. 카드 L12 전에 정한다 — 결정(에이전트 판단 2026-10-11, 사용자 목표 「끝까지」): 따른다. 같은 원형이면 두 판이 같은 줄이기·보강으로 바이트까지 같은 그래프를 낸다. 없으면 graphify 대신 tree-sitter로 뽑는다([[SYNC-MS-022]] 0장)
 - [ ] 되살리기가 Docker 판(파이썬 폐쇄망판)의 백업 파일도 받을지 — 두 판은 같은 표를 쓴다([[SYNC-INFRA-001]] 9.2). 카드 L16 전에 정한다
