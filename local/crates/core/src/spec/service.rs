@@ -1172,7 +1172,12 @@ impl SpecService<'_> {
             },
         )
         .await?;
+        // 같은 항목 ID는 처음 블록만 — 둘째부터는 validate가 item.duplicate로 남겼다 (#368)
+        let mut seen = HashSet::new();
         for b in blocks_of(body, doc_type, fm.get("title").map(String::as_str)) {
+            if !seen.insert(b.item_id.clone()) {
+                continue;
+            }
             repo::insert_item(&mut *self.db, id, &b.item_id, &b.display_name).await?;
         }
         Ok(repo::insert_version(
@@ -1215,7 +1220,11 @@ impl SpecService<'_> {
         )
         .await?;
         let (fm, _) = markdown::parse_frontmatter(body);
+        let mut seen = HashSet::new(); // 같은 항목 ID는 처음 블록만 (#368)
         for b in blocks_of(body, &row.doc_type, fm.get("title").map(String::as_str)) {
+            if !seen.insert(b.item_id.clone()) {
+                continue;
+            }
             match repo::item_of(&mut *self.db, row.id, &b.item_id).await? {
                 // 본문에 다시 나타났으므로 되살린다 (MS-002 save 3, #15)
                 Some(item) => repo::restore_item(&mut *self.db, item.id, &b.display_name).await?,

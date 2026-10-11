@@ -195,6 +195,27 @@ async def test_github_entry_saves_violations_as_convention_error(scoped: Session
     assert scoped.execute(text("SELECT via FROM versions WHERE version_no=2")).scalar() == "github"
 
 
+async def test_outside_push_with_duplicate_item_ids_is_saved_and_moves_on(
+    scoped: Session, proj
+) -> None:
+    """밖에서 민 새 파일에 같은 항목 ID가 둘이어도 저장하고 처리 지점이 넘어간다 —
+    항목은 처음 블록만, item.duplicate는 규약 오류로 (#368)"""
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    await create(proj)
+    repo = proj["project"].repository
+    repo.last_processed_commit = g(remote, "rev-parse", "main")
+    scoped.flush()
+    g(other, "pull", "-q", "--rebase", "origin", "main")
+    dup = RFQ + "#### Q1 다시 쓴 요구\n내용\n"
+    write_commit_push(other, RFQ_FILE, dup, "spec(EXMP-RFQ-001): 밖에서 생성")
+
+    assert await pipeline.read_pending("EXMP", proj["user"]) == 1
+    assert repo.last_processed_commit == g(remote, "rev-parse", "main")
+    d = SpecService(scoped).get_document("EXMP-RFQ-001")
+    assert d.has_convention_error and "item.duplicate: Q1" in d.convention_error_detail
+    assert [(i.item_id, i.display_name) for i in d.items] == [("Q1", "첫 요구"), ("Q2", "둘째")]
+
+
 async def test_web_status_entry_commits_status_only(scoped: Session, proj) -> None:
     await create(proj)
     human = Author(

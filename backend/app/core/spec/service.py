@@ -334,7 +334,12 @@ class SpecService:
         if validate_result is not None:  # save 7단계와 같은 규칙 — 첫 저장부터 경고가 남는다
             _apply_validate(row, validate_result)
         self.repo.add(row)
+        # 같은 항목 ID는 처음 블록만 — 둘째부터는 validate가 item.duplicate로 남겼다 (#368)
+        seen: set[str] = set()
         for b in self.item_blocks(body, doc_type, fm.get("title")):
+            if b.item_id in seen:
+                continue
+            seen.add(b.item_id)
             self.session.add(
                 Item(document_id=row.id, item_id=b.item_id, display_name=b.display_name)
             )
@@ -460,7 +465,11 @@ class SpecService:
         version = self._new_version(row.id, new_no, commit_hash, body, author, message)
         self.repo.add(version)
         fm, _ = parse_frontmatter(body)
+        seen: set[str] = set()  # 같은 항목 ID는 처음 블록만 (#368)
         for b in self.item_blocks(body, row.doc_type, fm.get("title")):
+            if b.item_id in seen:
+                continue
+            seen.add(b.item_id)
             item = self.repo.item_of(row.id, b.item_id)
             if item is not None:
                 item.display_name = b.display_name

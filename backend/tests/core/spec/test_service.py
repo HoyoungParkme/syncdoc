@@ -550,6 +550,22 @@ def test_save_bumps_version_and_upserts_items(db_session: Session) -> None:
     assert d2.incomplete_warnings == []
 
 
+def test_create_and_save_keep_first_of_duplicate_item_ids(db_session: Session) -> None:
+    """같은 항목 ID가 둘이면 처음 블록만 — github 입구는 위반이어도 저장한다 (#368)"""
+    svc = SpecService(db_session)
+    p = make_project(db_session)
+    a = author(db_session)
+    dup = PRD + "\n#### R1 다시 쓴 기능\n내용\n"
+    svc.create(p.id, "EXMP-PRD-001", DocType.PRD, dup, "h1", a, "spec: 테스트")
+    d = svc.get_document("EXMP-PRD-001")
+    first = [("G1", "첫 목표"), ("R1", "첫 기능"), ("N1", "성능")]
+    assert [(i.item_id, i.display_name) for i in d.items] == first
+    svc.save(d, dup + "\n#### N1 또 성능\n내용\n", "h2", a, "spec: 테스트", [])
+    d2 = svc.get_document("EXMP-PRD-001")
+    assert d2.current_version_no == 2
+    assert [(i.item_id, i.display_name) for i in d2.items] == first
+
+
 def test_save_approved_document_demotes_to_draft_with_status_change(db_session: Session) -> None:
     svc, a, d = _seed(db_session, "approved")
     svc.save(d, d.body.replace("한 줄로.", "두 줄로."), "h2", a, "spec: 테스트", [])
