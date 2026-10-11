@@ -680,3 +680,26 @@ mod tests {
         );
     }
 }
+
+/// 범위에서 바뀐 명세 파일 하나 — 그 경로의 가장 최근 커밋 (DOM-002 2.8 `ChangedFile`, 카드 L11)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ChangedFile {
+    pub path: String,
+    /// `A`·`M`·`D`… 첫 글자 — 이름 바꾸기는 `M`으로 접는다
+    pub status: String,
+    pub commit_hash: String,
+    pub author_login: String,
+    pub message: String,
+    pub author_email: String,
+}
+
+/// 파일 이력의 커밋 하나 — `path`는 그 커밋 시점의 경로 (DOM-002 2.8 `Commit`, 카드 L11)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Commit {
+    pub hash: String,
+    pub login: String,
+    pub date: OffsetDateTime,
+    pub message: String,
+    pub email: String,
+    pub path: String,
+}

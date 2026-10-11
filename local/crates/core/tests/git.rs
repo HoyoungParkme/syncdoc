@@ -492,3 +492,117 @@ async fn service_rpc_ls_refs_and_flush_only() {
         pkt_lines(&out)
     );
 }
+
+/// 다른 사본에서 작성자를 정해 커밋하고 민다
+fn push_as(dir: &Path, name: &str, email: &str, message: &str) -> String {
+    let out = Command::new("git")
+        .args([
+            "-c",
+            &format!("user.name={name}"),
+            "-c",
+            &format!("user.email={email}"),
+        ])
+        .args(["commit", "-q", "-m", message])
+        .current_dir(dir)
+        .output()
+        .expect("git");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    sh(dir, &["push", "-q", "origin", "HEAD:main"]);
+    sh(dir, &["rev-parse", "HEAD"])
+}
+
+fn put(dir: &Path, path: &str, text: &str) {
+    let f = dir.join(path);
+    std::fs::create_dir_all(f.parent().expect("부모")).expect("폴더");
+    std::fs::write(f, text).expect("파일");
+    sh(dir, &["add", path]);
+}
+
+#[tokio::test]
+async fn changed_files_latest_per_path_renames_and_skips() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, origin, work) = setup(tmp.path()).await;
+    let u = local_user();
+    let base = g
+        .commit_push(&work, "first", &u, &files(&[("a.txt", "a\n")]), &[])
+        .await
+        .expect("push");
+    let other = tmp.path().join("other");
+    sh(
+        tmp.path(),
+        &[
+            "clone",
+            "-q",
+            origin.to_str().expect("경로"),
+            other.to_str().expect("경로"),
+        ],
+    );
+    put(&other, "docs/specs/02-PRD/X-PRD-001.md", "v1\n");
+    put(&other, "docs/specs/README.md", "r\n");
+    put(&other, "docs/specs/assets/a.png", "p");
+    put(&other, "docs/specs/_templates/t.md", "t\n");
+    push_as(&other, "홍 길동", "hong@example.com", "spec: 첫");
+    put(&other, "docs/specs/02-PRD/X-PRD-001.md", "v2\n");
+    put(&other, "docs/specs/03-SCN/X-SCN-001.md", "s\n");
+    let c2 = push_as(
+        &other,
+        "Octo Cat",
+        "123+octo@users.noreply.github.com",
+        "spec: 둘\n\n  본문 줄  \n",
+    );
+    sh(
+        &other,
+        &[
+            "mv",
+            "docs/specs/03-SCN/X-SCN-001.md",
+            "docs/specs/03-SCN/X-SCN-002.md",
+        ],
+    );
+    let c3 = push_as(&other, "a", "a@x", "옮김");
+    sh(&other, &["rm", "-q", "docs/specs/02-PRD/X-PRD-001.md"]);
+    let c4 = push_as(&other, "b", "b@x", "지움");
+    let head = g.fetch(&work).await.expect("fetch");
+    assert_eq!(head, c4);
+    let got = g
+        .changed_files(&work, &format!("{base}..{head}"), "docs/specs/")
+        .await
+        .expect("바뀐 파일");
+    let brief: Vec<(&str, &str, &str)> = got
+        .iter()
+        .map(|f| (f.path.as_str(), f.status.as_str(), f.commit_hash.as_str()))
+        .collect();
+    assert_eq!(
+        brief,
+        [
+            ("docs/specs/02-PRD/X-PRD-001.md", "D", c4.as_str()),
+            ("docs/specs/03-SCN/X-SCN-002.md", "M", c3.as_str()),
+        ]
+    );
+    // 범위를 c2까지로 — 여러 줄 메시지·noreply 아이디
+    let got = g
+        .changed_files(&work, &format!("{base}..{c2}"), "docs/specs/")
+        .await
+        .expect("바뀐 파일");
+    let scn = got
+        .iter()
+        .find(|f| f.path.ends_with("X-SCN-001.md"))
+        .expect("SCN");
+    assert_eq!(scn.message, "spec: 둘\n\n본문 줄");
+    assert_eq!(
+        (scn.author_login.as_str(), scn.author_email.as_str()),
+        ("octo", "123+octo@users.noreply.github.com")
+    );
+    let prd = got
+        .iter()
+        .find(|f| f.path.ends_with("X-PRD-001.md"))
+        .expect("PRD");
+    assert_eq!(
+        (prd.status.as_str(), prd.commit_hash.as_str()),
+        ("M", c2.as_str())
+    );
+    assert_eq!(got.len(), 2);
+}
