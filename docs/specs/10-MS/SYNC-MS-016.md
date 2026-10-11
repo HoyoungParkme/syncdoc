@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-016
 type: MS
 title: MINISPEC — AccountService (Rust)
-status: approved
+status: draft
 upstream: [SYNC-DOM-004, SYNC-MS-006, SYNC-SEQ-001, SYNC-API-001]
 ---
 
