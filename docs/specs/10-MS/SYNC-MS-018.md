@@ -12,7 +12,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-008, SYNC-MS-014, SYNC-MS-015, SYNC-MS-016, SYN
 
 `crates/core/src/queries.rs`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.7. 파이썬 판 [[SYNC-MS-008]]과 **같은 이름·같은 처리**이고, 이 문서는 다른 점만 적는다([[SYNC-STD-001]] 2.10). 여러 묶음의 서비스를 불러 응답 하나로 엮는다 — 쓰지 않는다.
 
-**카드 L6 몫은 프로젝트 요약 하나다(2026-10-08)** — `init_project`·`POST /api/projects`가 돌려주고 `GET /api/projects`가 목록으로 낸다(사용자 결정 — 요약 전부, 문서가 있어도 맞게). **카드 L7이 MCP 읽기 도구의 넷을 더했다(2026-10-08)** — `list_documents`·`get_document`·`get_item`·`get_references`가 부른다. **카드 L8이 웹 읽기의 여섯을 더했다(2026-10-11)** — 프로젝트 상세·끊어진 참조 목록·관계도·체인·diff 영향·추적표. 휴지통 목록(L9)·코드(L12)·묻기(L14)는 그 카드가 더한다.
+**카드 L6 몫은 프로젝트 요약 하나다(2026-10-08)** — `init_project`·`POST /api/projects`가 돌려주고 `GET /api/projects`가 목록으로 낸다(사용자 결정 — 요약 전부, 문서가 있어도 맞게). **카드 L7이 MCP 읽기 도구의 넷을 더했다(2026-10-08)** — `list_documents`·`get_document`·`get_item`·`get_references`가 부른다. **카드 L8이 웹 읽기의 일곱을 더했다(2026-10-11)** — 프로젝트 상세·끊어진 참조 목록·관계도·체인·diff 영향·추적표·휴지통 목록(UI-4가 처음부터 부른다 — 휴지통 쓰기는 L9). 코드(L12)·묻기(L14)는 그 카드가 더한다.
 
 **파이썬 `set`의 차례** — [[#queries.item_chain]]은 폐포를 파이썬 `set`에 모아 그 순회 차례로 단계 행을 채운다. 행 안 항목의 차례가 응답 바이트이므로 Rust는 CPython 3.12의 정수 `set`(열린 주소·선형 탐사 9·`perturb`·크기 키움·`discard`의 빈 표시)을 그대로 흉내 낸 `pycompat::pyset`으로 같은 차례를 낸다(에이전트 판단 2026-10-11 — 「바이트까지」 결정을 따름).
 
@@ -37,6 +37,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-008, SYNC-MS-014, SYNC-MS-015, SYNC-MS-016, SYN
 | [[#queries.item_chain]] | 항목의 11단계 체인 |
 | [[#queries.diff_with_impact]] | diff + 하위 건수 |
 | [[#queries.downstream_view]] | 이 문서를 참조하는 것 |
+| [[#queries.trash_list]] | 휴지통 목록 |
 
 ---
 
@@ -274,6 +275,23 @@ pub async fn downstream_view(db: &mut PgConnection, repos: &ServerRepos, doc_id:
 
 ---
 
+#### queries.trash_list 휴지통 목록
+
+**시그니처**
+```rust
+pub async fn trash_list(db: &mut PgConnection, repos: &ServerRepos, code: &str, user: &UserRow) -> Result<Vec<DocumentSummary>, Problem>
+```
+
+근거: [[SYNC-MS-008#queries.trash_list]] · [[SYNC-API-001#GET/api/projects/{code}/trash]]
+
+**처리** [[SYNC-MS-008#queries.trash_list]]와 같다 — `get_owned(code, user)` · `SpecService.list_trashed` · 문서마다 작성자 이름 · 건수는 안 센다(`counts` 빈 것)
+
+**호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-014#SpecService.list_trashed]] · [[SYNC-MS-016#AccountService.users_by_ids]]
+
+**테스트 관점** (시험 DB) 휴지통 문서만 · 남의 프로젝트 → `not-found`
+
+---
+
 ## 3. 미결사항
 
-없음. 나머지 조회(휴지통·코드·묻기)는 그 카드가 더한다 — [[SYNC-CODE-002]].
+없음. 나머지 조회(코드·묻기)는 그 카드가 더한다 — [[SYNC-CODE-002]].
