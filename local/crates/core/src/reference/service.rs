@@ -242,4 +242,15 @@ impl ReferenceService<'_> {
             .map(edge)
             .collect())
     }
+
+    /// SYNC-MS-015#ReferenceService.inbound_of_document
+    ///
+    /// 휴지통·완전 삭제의 문지기 — 미존재는 `to_*`가 비어 안 잡힌다
+    pub async fn inbound_of_document(&mut self, document_id: i32) -> Result<Vec<RefEdge>, Problem> {
+        Ok(repo::inbound_of_document(&mut *self.db, document_id)
+            .await?
+            .into_iter()
+            .map(edge)
+            .collect())
+    }
 }
