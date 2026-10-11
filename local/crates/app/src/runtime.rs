@@ -54,12 +54,17 @@ pub struct Args {
 pub struct Running {
     pub server: JoinHandle<std::io::Result<()>>,
     pub stop: oneshot::Sender<()>,
+    /// 켤 때 따라잡기와 주기 확인 (카드 L11)
+    pub background: Vec<JoinHandle<()>>,
     pub pool: PgPool,
     pub pg: PgServer,
     pub data_dir: PathBuf,
     pub lock: File,
     pub logs: WorkerGuard,
 }
+
+/// 주기 확인 — 파이썬 판 `POLL_INTERVAL_SECONDS` 기본값. 설정 키는 다섯뿐이라 고정한다(INFRA 9.3)
+const POLL_INTERVAL: Duration = Duration::from_secs(300);
 
 /// SYNC-MS-012#runtime.run
 pub async fn run(args: Args, tray: Option<TrayLink>) -> Result<(), Problem> {
@@ -121,7 +126,7 @@ pub async fn run(args: Args, tray: Option<TrayLink>) -> Result<(), Problem> {
     }
     instance::publish(&data, port)?;
     let root = std::path::absolute(&data)?;
-    let repos = ServerRepos {
+    let repos = Arc::new(ServerRepos {
         git: Git {
             exe: git_exe,
             global_config: root.join("gitconfig"),
@@ -129,14 +134,14 @@ pub async fn run(args: Args, tray: Option<TrayLink>) -> Result<(), Problem> {
         origins: root.join("origins"),
         repos: root.join("repos"),
         specs_url: format!("http://127.0.0.1:{port}/specs"),
-    };
+    });
     let app = syncdoc_server::app(AppState {
         pool: pool.clone(),
         local_login: conf.local_login.clone(),
         local_name: conf.local_name.clone(),
         llm_enabled: conf.llm_enabled,
         public_netloc: format!("127.0.0.1:{port}"),
-        repos: Arc::new(repos),
+        repos: repos.clone(),
     });
     let (stop, stopped) = oneshot::channel::<()>();
     let serving = tokio::spawn(async move {
@@ -146,6 +151,16 @@ pub async fn run(args: Args, tray: Option<TrayLink>) -> Result<(), Problem> {
             })
             .await
     });
+    // 8a. 따라잡기 — 꺼져 있던 동안 쌓인 커밋(기다리지 않는다) · 주기 확인 (INFRA 9.1 켜기)
+    let catching = {
+        let (p, r) = (pool.clone(), repos.clone());
+        tokio::spawn(async move {
+            if let Err(e) = pipeline::catch_up(&p, &r).await {
+                tracing::warn!("켤 때 따라잡기: {e}");
+            }
+        })
+    };
+    let polling = tokio::spawn(pipeline::poll_loop(pool.clone(), repos, POLL_INTERVAL));
     let url = format!("http://127.0.0.1:{port}/");
     tracing::info!("싱크독_로컬 — {url}");
     println!("싱크독_로컬 — {url}");
@@ -166,6 +181,7 @@ pub async fn run(args: Args, tray: Option<TrayLink>) -> Result<(), Problem> {
     shutdown(Running {
         server: serving,
         stop,
+        background: vec![catching, polling],
         pool,
         pg: server,
         data_dir: data,
@@ -211,6 +227,7 @@ pub async fn shutdown(running: Running) -> Result<(), Problem> {
     let Running {
         server,
         stop,
+        background,
         pool,
         pg: db,
         data_dir,
@@ -218,6 +235,10 @@ pub async fn shutdown(running: Running) -> Result<(), Problem> {
         logs: guard,
     } = running;
     let _ = stop.send(());
+    // 1a. 따라잡기·주기 확인을 멈춘다 — 그 안의 저장은 따로 돌아 아래에서 기다린다
+    for task in background {
+        task.abort();
+    }
     let abort = server.abort_handle();
     // 진행 중 요청과 쓰기 락을 합쳐 10초 — 요청이 끊겨도 저장은 따로 돌아 git과 DB 사이에 있을 수 있다 (INFRA 9.1)
     let limit = Duration::from_secs(10);
