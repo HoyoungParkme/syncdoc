@@ -83,7 +83,8 @@ crates/server/src/
 │   ├── problem.rs              problem+json 응답 · 405 · 패닉
 │   ├── static_files.rs         화면 빌드(rust-embed) · 캐시 규칙 · 304 (INFRA 4.1)
 │   ├── schemas.rs              응답 형태 (API-001 4장)
-│   └── routes/                 API-001 경로 — account(/api/me · /api/me/tokens) · specs(/specs) · projects(/api/projects 목록·만들기·지우기, L6)
+│   └── routes/                 API-001 경로 — account(/api/me · /api/me/tokens) · specs(/specs) · projects(/api/projects 목록·만들기·지우기, L6 ·
+│                               상세·문서·문제 목록·관계도·첨부, L8) · documents(/api/docs 문서·이력·diff·추적표, L8) · references(항목·참조·체인, L8)
 ├── mcp/                        /mcp — 파이썬 mcp SDK의 핸드셰이크 경로를 옮긴 것 (API-002 1장, 카드 L3)
 │   ├── auth.rs                 Bearer → AccountService.authenticate_token, 통과하면 응답 전에 커밋 (SEQ-C2)
 │   ├── transport.rs            streamable HTTP, 세션 없음 — Accept·Content-Type·본문 읽기·SSE 쓰기
@@ -96,7 +97,7 @@ crates/server/src/
     ├── pyjson.rs               파이썬 `json.loads`(`_json.c`) — FastAPI 본문·도구 인자 미리 읽기의 오류 위치·C 재귀 한도
     ├── pydantic/               검증 — 파이썬 판이 내보낸 core schema를 읽어(schema) lax 규칙으로 검증하고(validate)
     │                           같은 오류 줄·문장·`N validation errors for …` 꼴을 낸다(errors). smart union의 고르기까지
-    ├── fastapi.rs              요청 본문(Content-Type·json.loads)·경로 값 → invalid-request(loc·msg) · 400
+    ├── fastapi.rs              요청 본문(Content-Type·json.loads)·경로 값·질의 문자열(starlette `parse_qsl`, 같은 이름은 마지막) → invalid-request(loc·msg) · 400
     └── uvicorn.rs              요청 경로를 `unquote`로 풀어 라우팅한다(`/api/m%65` = `/api/me`)
 ```
 
@@ -121,7 +122,8 @@ crates/core/
     │   ├── chars.rs                표 찾기 · 파이썬 strip
     │   ├── repr.rs                 파이썬 str repr — server/compat도 이것을 쓴다
     │   ├── re.rs                   파이썬 패턴 문자열의 \s·\S·\d·\w를 위 표로 바꿔 regex로 컴파일
-    │   └── difflib.rs              SequenceMatcher(autojunk) · get_grouped_opcodes · unified_diff
+    │   ├── difflib.rs              SequenceMatcher(autojunk) · get_grouped_opcodes · unified_diff
+    │   └── pyset.rs                CPython 3.12 정수 `set`의 순회 차례 — 열린 주소·선형 탐사·크기 키움·`discard` (L8, `item_chain`)
     ├── errors.rs                   Problem 열거형 하나에 problem+json 종류 전부 (STD-004 DEV-5)
     ├── migrate.rs                  이전 SQL을 올린다 (4.1) — 모든 crate의 시험도 이것으로 DB를 만든다
     ├── pipeline.rs                 쓰기 조율 — 프로젝트마다 읽기·쓰기 락, 순서는 파이썬과 같다 (L7 — 저장은 따로 띄운 작업에서)
@@ -129,7 +131,7 @@ crates/core/
     └── infra/                      바깥 — git 자식 프로세스(`git.rs`, L6 — 사용자 git 설정을 막는다) · upload-pack·receive-pack · 모델 호출
 ```
 
-지금(카드 L7) 있는 것은 `account`·`spec`·`project`·`reference`(뽑기·끊기·잇기·조회 셋·미존재 세기)·`markdown.rs`·`pycompat/`·`pipeline.rs`(MCP 저장)·`queries.rs`(프로젝트 요약·문서 목록·문서·항목·참조)·`infra/git.rs`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. `spec/`의 정답 파일은 `crates/core/tests/golden/spec.json`(생성물, `cargo xtask spec-golden`)이다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
+지금(카드 L8) 있는 것은 `account`·`spec`·`project`·`reference`(뽑기·끊기·잇기·조회·관계도·미존재)·`markdown.rs`·`pycompat/`·`pipeline.rs`(MCP 저장)·`queries.rs`(프로젝트 요약·상세·문서 목록·문서·항목·참조·체인·관계도·diff 영향·추적표·문제 목록)·`infra/git.rs`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. `spec/`의 정답 파일은 `crates/core/tests/golden/spec.json`(생성물, `cargo xtask spec-golden`)이다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
 
 **층** — 함수 단위 명세(MINISPEC 카드·API 엔드포인트·UI 화면)가 없는 코드가 어느 층이고 그 층을 무슨 문서가 정하는지([[SYNC-STD-001]] 2.6). 코드 그래프가 읽는다. 위에서부터 첫 줄이 이긴다. **줄은 카드마다 더한다** — 코드가 없는 줄은 검사기(`check_calls`)가 「안 맞는 줄」로 잡는다. 함수가 없는 파일(구조체만 — `state.rs`·`model.rs`)은 적지 않는다.
 
@@ -331,6 +333,7 @@ classDiagram
         +get(code) ProjectRow
         +get_owned(code, user) ProjectRow
         +list_owned(user) Vec~ProjectRow~
+        +asset_path(code, path, user) PathBuf
     }
     class ServerRepos {
         +Git git
@@ -347,6 +350,7 @@ classDiagram
 | [[SYNC-MS-013#ProjectService.delete_project]] | `DELETE /api/projects/{code}` | [[SYNC-MS-001#ProjectService.delete_project]] | `not-found` |
 | [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-013#ProjectService.get_owned]] | `get_template` · `delete_project` | [[SYNC-MS-001#ProjectService.get_owned]] | `not-found` |
 | [[SYNC-MS-013#ProjectService.list_owned]] | `queries.project_summary` | [[SYNC-MS-001#ProjectService.list_owned]] | — |
+| [[SYNC-MS-013#ProjectService.asset_path]] | `GET /api/projects/{code}/files/{path}`(L8) | [[SYNC-MS-001#ProjectService.asset_path]] | `not-found`(project·file) |
 
 규칙 — [[SYNC-DOM-002]] 4.1과 같다. **싱크독_로컬은 서버 저장뿐이다** — 서버 저장소는 `origins/{code}.git`, 작업 사본은 `repos/{code}`, 지우면 `origins/_archive/{code}-{UTC}.git`으로 보관한다(지우지 않는다). 코드마다 잠금을 쥔다. 동기화·재구축·첨부·git 입구는 그 카드가 더한다.
 
@@ -377,6 +381,10 @@ classDiagram
         +item_pks(document_id) HashMap~String, i32~
         +neighbors(doc_id) Option~String~
         +resolve_item(doc_id, item_id) i32
+        +resolve_items(doc_id, item_ids) Vec~i32~
+        +list_versions(doc_id) Vec~Version~
+        +recent_changes(project_id, n) Vec~Version~
+        +list_items_by_project(project_id) Vec~ItemBrief~
     }
     class Document {
         +i32 id
@@ -427,7 +435,9 @@ classDiagram
 | [[SYNC-MS-014#SpecService.apply_frontmatter]] | 저장 파이프라인의 만들기(L7) | [[SYNC-MS-002#SpecService.apply_frontmatter]] | `convention-violation` |
 | [[SYNC-MS-014#SpecService.diff]] | 이력 diff(L8) | [[SYNC-MS-002#SpecService.diff]] | `not-found` |
 | [[SYNC-MS-014#SpecService.diff_bodies]] | `diff` · `cargo xtask spec-diff` | [[SYNC-MS-002#SpecService.diff]] | — |
-| [[SYNC-MS-014#SpecService.list_by_project]] | `queries.project_summary`(L6) · `queries.document_list`(L7) | [[SYNC-MS-002#SpecService.list_by_project]] | — |
+| [[SYNC-MS-014#SpecService.list_by_project]] | `queries.project_summary`(L6) · `queries.document_list`(L7) · `queries.project_items`·`graph_view`(L8) | [[SYNC-MS-002#SpecService.list_by_project]] | — |
+| [[SYNC-MS-014#SpecService.list_versions]] · [[SYNC-MS-014#SpecService.recent_changes]] | `GET /api/docs/{docId}/versions` · `queries.project_detail`(L8) | [[SYNC-MS-002#SpecService.list_versions]] | `not-found` |
+| [[SYNC-MS-014#SpecService.list_items_by_project]] · [[SYNC-MS-014#SpecService.resolve_items]] | `queries.graph_view` · `queries.diff_with_impact`(L8) | [[SYNC-MS-002#SpecService.list_items_by_project]] | — |
 | [[SYNC-MS-014#SpecService.issue_doc_id]] · [[SYNC-MS-014#SpecService.precondition]] · [[SYNC-MS-014#SpecService.create]] | 저장 파이프라인의 만들기 | [[SYNC-MS-002#SpecService.create]] | `precondition-unmet`(파이프라인이) |
 | [[SYNC-MS-014#SpecService.detect_deleted_items]] · [[SYNC-MS-014#SpecService.save]] · [[SYNC-MS-014#SpecService.item_pks]] | 저장 파이프라인의 고치기 | [[SYNC-MS-002#SpecService.save]] | — |
 | [[SYNC-MS-014#SpecService.get_document]] | 저장 파이프라인 · `queries.document_view` | [[SYNC-MS-002#SpecService.get_document]] | `not-found` |
@@ -452,6 +462,9 @@ classDiagram
         +upstream_of_document(document_id, include_missing) Vec~RefEdge~
         +resolve_missing(project_id, target_doc_id) i64
         +mark_missing(item_pks) i64
+        +references_among(item_pks, include_document_targets) Vec~RefEdge~
+        +count_downstream(item_pks) HashMap~i32, i64~
+        +missing_in_project(project_id) Vec~RefEdge~
         +count_missing_by_document(document_ids) HashMap~i32, i64~
     }
     class RefEdge {
@@ -471,8 +484,9 @@ classDiagram
 | [[SYNC-MS-015#ReferenceService.upstream]] · [[SYNC-MS-015#ReferenceService.downstream]] | `queries.item_references_view` · 저장 파이프라인(삭제 확인) | [[SYNC-MS-003#ReferenceService.downstream]] | — |
 | [[SYNC-MS-015#ReferenceService.upstream_of_document]] | `queries.document_view` | [[SYNC-MS-003#ReferenceService.upstream_of_document]] | — |
 | [[SYNC-MS-015#ReferenceService.count_missing_by_document]] | `queries.project_summary` · `queries.document_list` | [[SYNC-MS-003#ReferenceService.count_missing_by_document]] | — |
+| [[SYNC-MS-015#ReferenceService.references_among]] · [[SYNC-MS-015#ReferenceService.count_downstream]] · [[SYNC-MS-015#ReferenceService.missing_in_project]] | `queries.graph_view`·`downstream_view`·`diff_with_impact`·`project_items`(L8) | [[SYNC-MS-003#ReferenceService.references_among]] | — |
 
-규칙 — [[SYNC-DOM-002]] 4.3과 같다. 참조 행이 끊어짐을 스스로 말한다(`is_missing`·`raw_target`) — 따로 표가 없다. 조회 차례는 id다(#353). 나머지 조회(관계도·휴지통)는 L8·L9가 더한다.
+규칙 — [[SYNC-DOM-002]] 4.3과 같다. 참조 행이 끊어짐을 스스로 말한다(`is_missing`·`raw_target`) — 따로 표가 없다. 조회 차례는 id다(#353). 휴지통·재구축 쪽은 L9·L11이 더한다.
 
 ### 4.5 account (MS-016)
 
@@ -583,9 +597,15 @@ classDiagram
 | [[SYNC-MS-018#queries.document_list]] | MCP `list_documents` | [[SYNC-MS-008#queries.document_list]] | `not-found` |
 | [[SYNC-MS-018#queries.document_view]] | MCP `get_document` | [[SYNC-MS-008#queries.document_view]] | `not-found` |
 | [[SYNC-MS-018#queries.item_view]] | MCP `get_item` | [[SYNC-MS-008#queries.item_view]] | `not-found`(`available_items`) · `item-deleted` |
-| [[SYNC-MS-018#queries.item_references_view]] | MCP `get_references` | [[SYNC-MS-008#queries.item_references_view]] | `not-found` · `item-deleted` |
+| [[SYNC-MS-018#queries.item_references_view]] | MCP `get_references` · `GET …/items/{itemId}/references`(L8) | [[SYNC-MS-008#queries.item_references_view]] | `not-found` · `item-deleted` |
+| [[SYNC-MS-018#queries.project_detail]] | `GET /api/projects/{code}` | [[SYNC-MS-008#queries.project_detail]] | `not-found` |
+| [[SYNC-MS-018#queries.project_items]] | `GET /api/projects/{code}/flags` | [[SYNC-MS-008#queries.project_items]] | `not-found` |
+| [[SYNC-MS-018#queries.graph_view]] | `GET /api/projects/{code}/graph` | [[SYNC-MS-008#queries.graph_view]] | `not-found` |
+| [[SYNC-MS-018#queries.item_chain]] | `GET …/items/{itemId}/chain` | [[SYNC-MS-008#queries.item_chain]] | `not-found` · `item-deleted` |
+| [[SYNC-MS-018#queries.diff_with_impact]] | `GET /api/docs/{docId}/diff` | [[SYNC-MS-008#queries.diff_with_impact]] | `not-found` |
+| [[SYNC-MS-018#queries.downstream_view]] | `GET /api/docs/{docId}/downstream` | [[SYNC-MS-008#queries.downstream_view]] | `not-found` |
 
-모듈 함수다 — 연결을 첫 인자로 받는다. 나머지 조회는 L8이 더한다.
+모듈 함수다 — 연결을 첫 인자로 받는다. 나머지 조회(휴지통 L9·코드 L12·묻기 L14)는 그 카드가 더한다.
 
 ### 4.8 git (MS-019)
 
