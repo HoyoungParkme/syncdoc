@@ -1,4 +1,4 @@
-//! 프로젝트 — 파이썬 판 `web/routers/projects.py`의 목록·만들기·지우기 (카드 L6)
+//! 프로젝트 — 파이썬 판 `web/routers/projects.py`의 목록·만들기·지우기(카드 L6)와 상세·문서·문제 목록·관계도·첨부(카드 L8)
 
 use std::sync::LazyLock;
 
@@ -18,7 +18,7 @@ use crate::compat::pyvalue::{PyStr, PyValue};
 use crate::state::AppState;
 use crate::web::auth::current_user;
 use crate::web::problem::ApiProblem;
-use crate::web::schemas::ProjectSummary;
+use crate::web::schemas::{ProjectDetail, ProjectSummary};
 
 static INIT_PROJECT: LazyLock<Validator> = LazyLock::new(schemas::init_project);
 
@@ -95,4 +95,15 @@ pub async fn delete_project(
         [(header::CONTENT_TYPE, "application/json")],
     )
         .into_response())
+}
+
+/// SYNC-API-001#GET/api/projects/{code}
+pub async fn get_project(
+    State(state): State<AppState>,
+    Path(code): Path<String>,
+) -> Result<Json<ProjectDetail>, ApiProblem> {
+    let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+    let user = current_user(&mut c, &state).await?;
+    let d = queries::project_detail(&mut c, &state.repos, &code, &user).await?;
+    Ok(Json(ProjectDetail::from(&d)))
 }
