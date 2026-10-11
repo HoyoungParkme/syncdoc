@@ -89,6 +89,10 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:attachment-limit` | 409 | 아직 안 보낸 첨부가 이미 8개 | `limit` | [[SYNC-UC-001#UC-H19]] 1b |
 | `urn:syncdoc:llm-unavailable` | 424 | 모델 호출 실패. **사용량 초과도 여기 접힌다.** 스트림 중이면 `error` 이벤트로 온다(1장) | `reason` | [[SYNC-UC-001#UC-H19]] 4a |
 | `about:blank` | 그 코드 | 위 어느 것도 아닌 **프레임워크 HTTP 오류**. `title`은 상태 문구(RFC 9457) | — | — |
+| `urn:syncdoc:backup-unconfigured` | 409 | 싱크독_로컬(Rust) — 백업 폴더를 정하지 않고 「지금 백업」(카드 L16) | — | — |
+| `urn:syncdoc:backup-invalid` | 422 | 싱크독_로컬(Rust) — 되살리려는 파일이 싱크독 백업이 아니거나 깨졌거나 암호가 틀리다. 아무것도 바꾸지 않는다(카드 L16) | `reason` | — |
+| `urn:syncdoc:backup-failed` | 500 | 싱크독_로컬(Rust) — 백업을 만들다 실패했다(덤프·폴더 쓰기). 반쯤 쓴 파일은 남기지 않는다(카드 L16) | `reason` | — |
+| `urn:syncdoc:data-dir-invalid` | 422 | 싱크독_로컬(Rust) — 옮길 데이터 자리가 절대 경로가 아니거나, 비어 있지 않거나, 지금 자리와 겹치거나, 쓸 수 없다(카드 L16) | `reason` | — |
 | `urn:syncdoc:internal` | 500 | **예상 못 한 오류.** 위 어느 것도 아닌 예외가 라우터에서 샜다 | — | — |
 
 ---
@@ -1658,6 +1662,215 @@ MINISPEC 항목인데 코드에 함수가 없으면 `function: null`·`missing: 
         $ref: '#/components/responses/Problem'
 ```
 
+### 3.11 이 PC (싱크독_로컬 Rust 판만)
+
+싱크독_로컬 설치형([[SYNC-INFRA-001]] 9장)만 가진 경로다 — 설정 「이 PC」·「백업」 카드([[SYNC-UI-002#UI-13]] 10·11)가 부른다. **파이썬 판(싱크독_깃허브·Docker 싱크독_로컬 묶음)에는 없다**(없는 경로 `not-found` 404) — 화면은 `GET /api/local`이 404면 두 카드를 보이지 않는다. 공용 계약 시험 밖이다([[SYNC-CODE-002]] 2장). 카드 L16
+
+**다시 켜기** — 설정 저장·되살리기·데이터 자리 옮기기는 검사를 마친 뒤 `202`로 답하고, 진행 중 요청이 끝나면 서버가 내려가 그 일을 하고 같은 포트로 다시 뜬다(프로그램은 그대로, [[SYNC-INFRA-001]] 9.6). 화면은 `/health`가 다시 답할 때까지 기다린 뒤 `GET /api/local`의 `last_op`으로 결과를 본다
+
+#### GET/api/local 이 PC 설정·백업 상태
+
+화면 [[SYNC-UI-002#UI-13]] 10·11 · [[SYNC-PRD-001#R15]]
+
+```yaml
+/api/local:
+  get:
+    summary: 「이 PC」·「백업」 카드가 그리는 것 — 설정 값(키 원문은 주지 않는다), 자동 시작, 데이터 자리, 백업 폴더의 파일, 마지막 백업·다시 켜기 결과
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login, name, llm_api_url, llm_api_key_set, llm_model, public_base_url, autostart, data_dir, backup, last_op]
+              properties:
+                login: {type: string, description: LOCAL_LOGIN — 화면에서 바꾸지 않는다(커밋 작성자)}
+                name: {type: string, description: LOCAL_NAME 그대로(비면 아이디가 이름)}
+                llm_api_url: {type: string}
+                llm_api_key_set: {type: boolean, description: 키가 있나 — 원문은 주지 않는다}
+                llm_model: {type: string}
+                public_base_url: {type: string, description: 같은 망 열기 — 설정 파일에만(화면에서 바꾸지 않는다). 비면 이 PC만}
+                autostart: {type: boolean, description: 로그인 때 자동 시작이 걸려 있나 — 윈도 HKCU Run · 리눅스 XDG autostart}
+                data_dir: {type: string, description: 지금 데이터 자리(절대 경로)}
+                backup:
+                  type: object
+                  required: [dir, encrypted, keep, files, last]
+                  properties:
+                    dir: {type: string, description: BACKUP_DIR — 비면 백업하지 않는다}
+                    encrypted: {type: boolean, description: 암호가 정해져 있나(BACKUP_PASSWORD) — 원문은 주지 않는다}
+                    keep: {type: integer, description: 남기는 수 — 14}
+                    files:
+                      type: array
+                      description: 폴더의 `syncdoc-*.tar`·`syncdoc-*.tar.gpg` — 새것부터. Docker 묶음(카드 BR)이 만든 것도 같은 이름이라 함께 보인다
+                      items: {$ref: '#/components/schemas/BackupFile'}
+                    last:
+                      type: object
+                      nullable: true
+                      description: 켠 뒤 마지막 백업 시도
+                      properties:
+                        at: {type: string, format: date-time}
+                        name: {type: string, nullable: true}
+                        error: {type: string, nullable: true}
+                last_op:
+                  type: object
+                  nullable: true
+                  description: 켠 뒤 마지막 다시 켜기(설정 저장·되살리기·옮기기)
+                  properties:
+                    kind: {type: string, enum: [settings, restore, move]}
+                    ok: {type: boolean}
+                    message: {type: string}
+                    at: {type: string, format: date-time}
+```
+
+#### PUT/api/local/settings 설정 저장 — 다시 켠다
+
+화면 [[SYNC-UI-002#UI-13]] 10.5·11.3
+
+```yaml
+/api/local/settings:
+  put:
+    summary: >
+      settings.toml의 값만 바꾼다(주석·다른 키는 그대로). 빠진 칸은 그대로 둔다. 저장한 뒤 다시 켠다 — 모델·이름은
+      켤 때 읽는다. 아이디(LOCAL_LOGIN)와 같은 망 열기(PUBLIC_BASE_URL)는 여기서 바꾸지 않는다
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name: {type: string, maxLength: 100}
+              llm_api_url: {type: string, description: 비었거나 http(s)://}
+              llm_api_key: {type: string, description: 빈 문자열이면 키를 지운다}
+              llm_model: {type: string, maxLength: 100}
+              backup_dir: {type: string, description: 비었거나 절대 경로}
+              backup_password: {type: string, description: 빈 문자열이면 암호 없이(.tar)}
+    responses:
+      '202':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                restarting: {type: boolean, enum: [true]}
+      '422':
+        description: invalid-request
+```
+
+#### PUT/api/local/autostart 자동 시작 켜고 끄기
+
+화면 [[SYNC-UI-002#UI-13]] 10.6 · [[SYNC-INFRA-001]] 9.5
+
+```yaml
+/api/local/autostart:
+  put:
+    summary: 로그인 때 트레이로 켜기 — 윈도 HKCU Run 값 `SyncDoc Local`(설치 파일이 쓰는 것과 같은 이름), 리눅스 `~/.config/autostart/syncdoc-local.desktop`. 다시 켜지 않는다
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [on]
+            properties:
+              on: {type: boolean}
+    responses:
+      '200':
+        description: GET /api/local과 같은 꼴
+      '422':
+        description: invalid-request
+```
+
+#### POST/api/local/backups 지금 백업
+
+화면 [[SYNC-UI-002#UI-13]] 11.4 · 트레이 「지금 백업」 · [[SYNC-INFRA-001]] 9.6
+
+```yaml
+/api/local/backups:
+  post:
+    summary: >
+      백업 하나를 지금 만든다 — DB 덤프와 서버 저장소 묶음, 암호가 있으면 OpenPGP(gpg와 같은 꼴)로. 켠 채로 뜬다.
+      최근 14개만 남긴다. 하루 한 번 백업과 같은 함수다
+    responses:
+      '201':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BackupFile'
+      '409':
+        description: backup-unconfigured
+      '500':
+        description: backup-failed
+```
+
+#### POST/api/local/restore 되살리기 — 다시 켠다
+
+화면 [[SYNC-UI-002#UI-13]] 11.7 · [[SYNC-INFRA-001]] 9.6
+
+```yaml
+/api/local/restore:
+  post:
+    summary: >
+      백업 폴더의 파일 하나로 되돌린다. 먼저 풀어 보고(암호·덤프·서버 저장소 묶음) 틀리면 아무것도 바꾸지 않고
+      backup-invalid. 맞으면 202 — 서버가 내려가 지금 상태를 옆에 두고, DB를 되돌리고, 서버 저장소를 바꾸고, 작업
+      사본을 다시 만든 뒤 다시 뜬다. 실패하면 옆에 둔 것으로 돌아간다. Docker 싱크독_로컬 묶음(카드 BR)의 백업도 받는다
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name]
+            properties:
+              name: {type: string, description: 백업 폴더 안의 파일 이름}
+              password: {type: string, description: 없으면 설정의 암호. 다른 암호로 만든 백업(Docker 묶음)이면 여기에}
+    responses:
+      '202':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                restarting: {type: boolean, enum: [true]}
+      '404':
+        description: not-found (resource backup)
+      '409':
+        description: backup-unconfigured
+      '422':
+        description: backup-invalid · invalid-request
+```
+
+#### POST/api/local/move 데이터 자리 옮기기 — 다시 켠다
+
+화면 [[SYNC-UI-002#UI-13]] 10.9 · [[SYNC-INFRA-001]] 9.3
+
+```yaml
+/api/local/move:
+  post:
+    summary: >
+      데이터 자리를 고른 폴더로 옮긴다. 검사(절대 경로·없거나 빈 폴더·지금 자리와 안 겹침·쓸 수 있음)를 지나면 202 —
+      서버와 PostgreSQL을 멈추고 DB·서버 저장소·설정을 복사해 확인한 뒤, 자리를 가리키는 파일을 바꾸고 새 자리에서
+      다시 뜬다. 작업 사본은 다시 만든다. 옛 폴더는 지우지 않는다
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [dir]
+            properties:
+              dir: {type: string}
+    responses:
+      '202':
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                restarting: {type: boolean, enum: [true]}
+      '422':
+        description: data-dir-invalid · invalid-request
+```
+
 ---
 
 ## 4. 스키마
@@ -1843,6 +2056,13 @@ components:
         gate_warning:
           type: boolean
           description: 앞 단계에 미완료가 있는데 문서가 있다(1b)
+    BackupFile:
+      type: object
+      required: [name, size, encrypted]
+      properties:
+        name: {type: string, description: "syncdoc-{YYYYMMDD}-{HHMMSS}.tar(.gpg) — 이 PC의 지역 시각"}
+        size: {type: integer}
+        encrypted: {type: boolean, description: 이름이 .gpg로 끝난다}
     ProjectSummary:
       type: object
       properties:
