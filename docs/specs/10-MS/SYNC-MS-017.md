@@ -16,7 +16,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-007, SYNC-MS-013, SYNC-MS-014, SYNC-MS-015, SYN
 
 **락** — 프로젝트 코드마다 둘, 프로세스 전역(파이썬 모듈 사전과 같다). **쓰기 락**은 저장을 한 줄로 세우고, **읽기 락**은 밀린 커밋 읽기(fetch)를 한 줄로 세운다. 차례는 읽기 → 쓰기 — `read_pending`은 쓰기 락 **밖**에서 부른다(같은 락이면 교착, [[SYNC-STD-004#DEV-19]]). 시간 제한은 없다. 프로젝트 만들기·지우기의 잠금([[SYNC-MS-013]])과는 따로다. 끌 때 [[SYNC-MS-012#runtime.shutdown]]이 쓰기 락이 다 풀리기를 기다린다.
 
-**카드 L7 몫은 `mcp` 입구다(2026-10-08)** — 에이전트의 `create_document`·`update_document`. 웹의 상태 바꾸기·되돌리기·휴지통(`web_status`·`web_revert`·`restore`, L9)과 GitHub·서버 저장소 push 처리(`github`, L11)는 그 카드가 이 문서에 갈래를 더한다. **밀린 커밋 처리는 L11이다**(사용자 결정 2026-10-08) — 처리 지점과 서버 저장소 끝이 다르면 저장하지 않고 `not-implemented(L11)`. L10 전에는 앱만 쓰므로 생기지 않는다.
+**카드 L7 몫은 `mcp` 입구다(2026-10-08)** — 에이전트의 `create_document`·`update_document`. **카드 L9가 상태 바꾸기·되돌리기·휴지통 넣기·되살리기·완전 삭제와 저장의 `web_status`·`web_revert`·되살림 갈래를 더했다(2026-10-11).** 서버 저장소 push 처리(`github`, L11)는 그 카드가 갈래를 더한다. **밀린 커밋 처리는 L11이다**(사용자 결정 2026-10-08) — 처리 지점과 서버 저장소 끝이 다르면 저장하지 않고 `not-implemented(L11)`. L10 전에는 앱만 쓰므로 생기지 않는다.
 
 **표기** — `→` 반환·결과, `!` 예외(`Problem`), `DB:` 테이블 접근, `git:` [[SYNC-MS-019]], `·` 같은 단계 안 구분.
 
@@ -31,6 +31,11 @@ upstream: [SYNC-DOM-004, SYNC-MS-007, SYNC-MS-013, SYNC-MS-014, SYNC-MS-015, SYN
 | [[#pipeline.wait_idle]] | 쓰기 락이 다 풀리기를 기다린다 |
 | [[#pipeline.read_pending]] | 쓰기 전에 밀린 커밋을 읽는다 |
 | [[#pipeline.save_pipeline]] | 저장 — 검사 → push → DB → 참조 |
+| [[#pipeline.change_status]] | 초안 ⇄ 완료 토글 |
+| [[#pipeline.revert]] | 되돌리기 |
+| [[#pipeline.trash_document]] | 휴지통에 넣기 |
+| [[#pipeline.restore_document]] | 휴지통에서 되살리기 |
+| [[#pipeline.purge_document]] | 완전 삭제 |
 
 ---
 
@@ -116,35 +121,135 @@ pub async fn save_pipeline(pool: &PgPool, repos: &ServerRepos, input: SaveInput)
 
 근거: [[SYNC-MS-007#pipeline.save_pipeline]] · [[SYNC-SEQ-001#SEQ-1]] · [[SYNC-UC-001#UC-A6]] · [[SYNC-API-002#create_document]] · [[SYNC-API-002#update_document]]
 
-**입력** `SaveInput { entry, doc_id, doc_type, body, expected_version, project_code, author, message, confirm_item_deletion }` — 만들기는 `doc_id` 없이 `project_code`·`doc_type`(아무 문자열 — 파이썬처럼 거르지 않는다), 고치기는 `doc_id`·`expected_version`. `author`는 `Author { kind, user, instructed_by, via }`(에이전트는 `agent`·발급자·발급자·`mcp`)
+**입력** `SaveInput { entry, doc_id, doc_type, body, expected_version, project_code, author, message, confirm_item_deletion, reason, restore, read_first }` — 만들기는 `doc_id` 없이 `project_code`·`doc_type`(아무 문자열 — 파이썬처럼 거르지 않는다), 고치기는 `doc_id`·`expected_version`. `author`는 `Author { kind, user, instructed_by, via }`(에이전트는 `agent`·발급자·발급자·`mcp`). `reason`은 상태 바꾸기의 사유, `restore`는 되살림(휴지통 검사를 지난다), `read_first`는 0단계를 할지 — 부르는 쪽(상태·되돌리기·되살리기)이 이미 읽었으면 거짓(파이썬 `session`을 넘긴 경우)
 
 **처리** [[SYNC-MS-007#pipeline.save_pipeline]]의 `mcp` 갈래와 같은 차례·같은 문장
 - 앞. `code = project_code`가 비지 않았으면 그것, 아니면 `doc_id`가 비지 않았으면 그 첫 `-` 앞 · 없으면 `! NotFound { resource: "project", id: "None" }`(파이썬 `str(None)`)
-- 0. 쓰기 락 **밖**에서 `read_pending(code, author.user)`
+- 0. `read_first`면 쓰기 락 **밖**에서 `read_pending(code, author.user)`
 - 쓰기 락을 쥐고 트랜잭션 하나
 - 1. `ProjectService.get_owned(code, author.user)`
-- 2. 고치기 — `SpecService.get_document(doc_id)`(없으면 `not-found`) · 타입은 문서의 것 · 휴지통이면 `! DocumentTrashed { trashed_at }`(파이썬 `isoformat`)
+- 2. 고치기 — `SpecService.get_document(doc_id)`(없으면 `not-found`) · 타입은 문서의 것 · 휴지통이고 `restore`가 아니면 `! DocumentTrashed { trashed_at }`(파이썬 `isoformat`)
 - 3. 만들기 — `doc_id = SpecService.issue_doc_id(project, code, doc_type)` · `body = SpecService.apply_frontmatter(body, doc_id, doc_type, draft)` · 3a. `SpecService.precondition(project, doc_type, frontmatter 제목)` · 못 채우면 `! PreconditionUnmet { requires, have }`
-- 4. `vr = SpecService.validate(body, doc_type, mcp, 문서 상태)` · 위반이 있으면 `! ConventionViolation { violations, warnings }`
+- 4. `vr = SpecService.validate(body, doc_type, entry, 문서 상태)` · 위반이 있으면 `! ConventionViolation { violations, warnings }`
 - 5. 고치기 — `expected_version`이 현재 판이 아니면 `! VersionConflict { current_version, current_body }`(검증 **뒤**)
-- 6. 고치기 — `deleted = SpecService.detect_deleted_items(문서, body)` · 그 항목마다 `ReferenceService.downstream` · 하위가 하나라도 있고 `confirm_item_deletion`이 아니면 출발 항목 이름(`SpecService.describe_items`)으로 `! ItemDeletionNeedsConfirm { deleted_items: [{item_id, downstream: [{doc_id, item_id, display_name}]}] }` — 항목이 없는 하위는 목록에서 빠진다
-- 6a. 고치기 — 완료 문서이고 본문이 다르면 본문의 첫 `^status: .*$` 줄을 `status: draft`로(push **전에**)
+- 6. 고치기이고 `web_status`가 아니면 — `deleted = SpecService.detect_deleted_items(문서, body)` · 그 항목마다 `ReferenceService.downstream` · 하위가 하나라도 있고 `confirm_item_deletion`이 아니면 출발 항목 이름(`SpecService.describe_items`)으로 `! ItemDeletionNeedsConfirm { deleted_items: [{item_id, downstream: [{doc_id, item_id, display_name}]}] }` — 항목이 없는 하위는 목록에서 빠진다
+- 6a. 고치기이고 `web_status`가 아니면 — 완료 문서이고 본문이 다르면 본문의 첫 `^status: .*$` 줄을 `status: draft`로(push **전에**)
 - 7. `commit_hash = git.commit_push(작업 사본, message, author.user, {docs/specs/{NN-TYPE}/{doc_id}.md: body}, [])` — 여기까지 DB 쓰기 없음. 같은 본문이면 커밋 없이 HEAD
+- 8w. `web_status` — `SpecService.apply_status(문서, body, commit_hash, author, reason)` · 13a(1) · 커밋 · `→ SaveResult { doc_id, version_no: 지금 판, commit_hash, status: 다시 읽은 상태, warnings: [], next_step: 없음 }`
 - 8. 만들기 → `SpecService.create(…, vr)` · 고치기 → `SpecService.save(문서, body, commit_hash, author, message, deleted, vr)`
 - 9. `broken = ReferenceService.mark_missing(deleted)`
 - 10. `ReferenceService.extract(문서, 판, body, SpecService.item_pks(문서), frontmatter upstream의 [\w-]+ 낱말들)` · 10a. `ReferenceService.resolve_missing(project, doc_id)`
 - 경고 = `vr`의 경고마다 `rule: message`(빈 message면 `rule`) · `deleted`가 있으면 `ref.broken: {broken}`
 - 13a. 처리 지점이 있고 `git.rev_list_count(작업 사본, "{처리 지점}..{commit_hash}")`가 1이면 처리 지점을 `commit_hash`로·`synced_at=now`
-- 14. 커밋 · 15. `status = SpecService.get_document(doc_id).status` · `next_step = "{doc_id} v{판} 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)"`
+- 14. 커밋 · 15. `status = SpecService.get_document(doc_id).status` · `mcp`면 `next_step = "{doc_id} v{판} 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)"`, 웹이면 없음
 - `→ SaveResult { doc_id, version_no, commit_hash, status, warnings, next_step }`
 
-**다른 점** 입구 갈래는 `mcp`만(카드 L7) — 다른 입구는 `! NotImplemented`(그 카드) · `changed_items`는 파이썬도 쓰지 않는다 — 받지 않는다 · **0부터 끝까지 따로 띄운 작업(`tokio::spawn`)에서 돈다** — 부른 요청이 끊겨도(연결이 닫혀 입구의 future가 버려져도) push한 뒤 DB를 쓰지 않은 채 멈추지 않는다. 파이썬 판은 연결이 끊겨도 처리기가 끝까지 돈다
+**다른 점** `github` 입구는 `! NotImplemented { card: "L11" }` · `changed_items`는 파이썬도 쓰지 않는다 — 받지 않는다 · **0부터 끝까지 따로 띄운 작업(`tokio::spawn`)에서 돈다** — 부른 요청이 끊겨도(연결이 닫혀 입구의 future가 버려져도) push한 뒤 DB를 쓰지 않은 채 멈추지 않는다. 파이썬 판은 연결이 끊겨도 처리기가 끝까지 돈다
 
 **예외** 위의 것 · git 실패는 `Problem::Git`(파이썬 `GitError` — MCP는 「Error executing tool」 문장) · `push-failed`
 
-**호출하는 것** [[#pipeline.read_pending]] · [[#pipeline.write_lock]] · [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.issue_doc_id]] · [[SYNC-MS-014#SpecService.apply_frontmatter]] · [[SYNC-MS-014#SpecService.precondition]] · [[SYNC-MS-014#SpecService.validate]] · [[SYNC-MS-014#SpecService.detect_deleted_items]] · [[SYNC-MS-015#ReferenceService.downstream]] · [[SYNC-MS-014#SpecService.describe_items]] · [[SYNC-MS-019#Git.commit_push]] · [[SYNC-MS-014#SpecService.create]] · [[SYNC-MS-014#SpecService.save]] · [[SYNC-MS-015#ReferenceService.mark_missing]] · [[SYNC-MS-014#SpecService.item_pks]] · [[SYNC-MS-015#ReferenceService.extract]] · [[SYNC-MS-015#ReferenceService.resolve_missing]] · [[SYNC-MS-019#Git.rev_list_count]] · [[SYNC-MS-014#markdown.parse_frontmatter]](제목·upstream)
+**호출하는 것** [[#pipeline.read_pending]] · [[#pipeline.write_lock]] · [[SYNC-MS-014#SpecService.apply_status]] · [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.issue_doc_id]] · [[SYNC-MS-014#SpecService.apply_frontmatter]] · [[SYNC-MS-014#SpecService.precondition]] · [[SYNC-MS-014#SpecService.validate]] · [[SYNC-MS-014#SpecService.detect_deleted_items]] · [[SYNC-MS-015#ReferenceService.downstream]] · [[SYNC-MS-014#SpecService.describe_items]] · [[SYNC-MS-019#Git.commit_push]] · [[SYNC-MS-014#SpecService.create]] · [[SYNC-MS-014#SpecService.save]] · [[SYNC-MS-015#ReferenceService.mark_missing]] · [[SYNC-MS-014#SpecService.item_pks]] · [[SYNC-MS-015#ReferenceService.extract]] · [[SYNC-MS-015#ReferenceService.resolve_missing]] · [[SYNC-MS-019#Git.rev_list_count]] · [[SYNC-MS-014#markdown.parse_frontmatter]](제목·upstream)
 
 **테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 만들기 → ID 발급·frontmatter·커밋 하나(원격 main = 반환 해시)·참조 행·`via=mcp` · 위반 → 아무것도 안 남고 HEAD 그대로 · 고치기 → v2·커밋·참조 갈아끼움 · 낡은 판 → `version-conflict`(현재 판·본문) · 하위 있는 항목 삭제 → 확인 요청, 확인 뒤 `ref.broken: 1`·미존재 참조 · 지운 ID를 에이전트가 다시 쓰면 `item.reused`(되살리기는 웹, L9) · 나중에 만든 상위 문서가 기다리던 미존재 참조를 잇는다 · 같은 본문 → 커밋 없이 HEAD로 새 판, 참조 행 그대로 · 완료 문서 고치기 → 초안·상태 변경 행 하나 · 동시 저장 둘 → 둘째가 `version-conflict` · 모르는 타입 → `frontmatter.type` 위반 · 처리 지점이 앱 커밋만큼 앞선다 · 부른 쪽을 중간에 버려도 저장이 끝까지 간다(커밋과 행이 둘 다 있다)
+
+---
+
+#### pipeline.change_status 초안 ⇄ 완료 토글
+
+**시그니처**
+```rust
+pub async fn change_status(pool: &PgPool, repos: &ServerRepos, doc_id: &str, to: DocStatus, author: &Author, reason: Option<&str>) -> Result<Document, Problem>
+```
+
+근거: [[SYNC-MS-007#pipeline.change_status]] · [[SYNC-UC-001#UC-H8]] · [[SYNC-API-001#POST/api/docs/{docId}/status]] · [[SYNC-API-002#change_status]]
+
+**처리** [[SYNC-MS-007#pipeline.change_status]]와 같은 차례
+0. `read_pending(doc_id의 첫 "-" 앞, author.user)` — 소유 검사도 여기서
+1. `get_owned` · `document = SpecService.get_document(doc_id)` · 휴지통이면 `! DocumentTrashed`
+2. `missing` = `ReferenceService.upstream_of_document(문서, true)`의 미존재 `raw_target`을 중복 없이 정렬 · `approved`로 올리는데 규약 오류·경고·`missing`이 있으면 `! StatusBlocked { convention_error_detail, warnings: 경고 + ["ref.missing: {t}"…] }`
+3. 이미 그 상태면 `→ document`(아무것도 안 한다)
+4. 본문은 **저장소에서** — `Git.read(작업 사본, docs/specs/{NN-TYPE}/{doc_id}.md, "origin/main")`, 못 읽으면 DB 본문 · 첫 `status:` 줄을 `to`로
+5. `save_pipeline(web_status, doc_id, 본문, 지금 판, author, "status({doc_id}): {지금} → {to}\n\n{reason 또는 빈 것}", reason, read_first: 거짓)`
+6. `→ SpecService.get_document(doc_id)`
+
+**호출하는 것** [[#pipeline.read_pending]] · [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-015#ReferenceService.upstream_of_document]] · [[SYNC-MS-019#Git.read]] · [[#pipeline.save_pipeline]]
+
+**테스트 관점** (시험 DB · 진짜 git) 완료로 → frontmatter `status: approved` 커밋, 판 그대로, 상태 변경 행에 해시 · 미존재 참조·경고 → `status-blocked`(`ref.missing:`) · 내리기는 막지 않는다 · 같은 상태 → 커밋 없음 · 휴지통 → `document-trashed` · 에이전트 → `via=mcp`
+
+---
+
+#### pipeline.revert 되돌리기
+
+**시그니처**
+```rust
+pub async fn revert(pool: &PgPool, repos: &ServerRepos, doc_id: &str, to_version: i32, user: &UserRow, confirm_item_deletion: bool) -> Result<SaveResult, Problem>
+```
+
+근거: [[SYNC-MS-007#pipeline.revert]] · [[SYNC-UC-001#UC-H7]] · [[SYNC-API-001#POST/api/docs/{docId}/revert]]
+
+**처리** [[SYNC-MS-007#pipeline.revert]]와 같은 차례 — `read_pending` · `document = get_document` · `old = SpecService.version_body(doc_id, to_version)` · 지금 판이면 `! AlreadyCurrent` · `save_pipeline(web_revert, doc_id, old, 지금 판, Author { human, user, 없음, web_revert }, "revert({doc_id}): v{지금} → v{to_version} 내용으로", confirm_item_deletion, read_first: 거짓)`
+
+**호출하는 것** [[#pipeline.read_pending]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.version_body]] · [[#pipeline.save_pipeline]]
+
+**테스트 관점** (시험 DB · 진짜 git) v2에서 v1로 → v3 · 지금 판 → `already-current` · 없는 판 → `not-found` · 지운 항목을 되돌리면 `item.reused`가 아니다(복원)
+
+---
+
+#### pipeline.trash_document 휴지통에 넣기
+
+**시그니처**
+```rust
+pub async fn trash_document(pool: &PgPool, repos: &ServerRepos, doc_id: &str, author: &Author, confirm: bool) -> Result<TrashResult, Problem>
+```
+
+근거: [[SYNC-MS-007#pipeline.trash_document]] · [[SYNC-UC-001#UC-A7]] · [[SYNC-API-002#delete_document]] · [[SYNC-API-001#DELETE/api/docs/{docId}]]
+
+**처리** [[SYNC-MS-007#pipeline.trash_document]]와 같은 차례 — 따로 띄운 작업에서(push 뒤 DB까지 끝까지)
+0. `read_pending`(락 밖)
+1. 쓰기 락 · 트랜잭션 · `get_owned` · `document = get_document` · 휴지통이면 `! DocumentTrashed`
+2. `inbound` = `ReferenceService.inbound_of_document`를 이름으로(`DOC#ITEM` 또는 `DOC`, 못 찾으면 `?`) 정렬
+3. `confirm`이 아니면 `! DocumentDeletionNeedsConfirm { doc_id, title: frontmatter 제목(없으면 빈 것), version_count: 지금 판, inbound_refs }`
+4. `commit_hash = Git.commit_push(작업 사본, "spec({doc_id}): 휴지통", author.user, {}, [경로])`
+5. `pks = SpecService.trash` · `broken = ReferenceService.mark_missing(pks)` · 처리 지점(13a, 1) · 커밋
+6. `→ TrashResult { doc_id, commit_hash, broken_refs, next_step: "{doc_id} 휴지통에 넣음 — 끊어진 참조 {broken}. 사람에게 알리고 멈춘다" }`
+
+**호출하는 것** [[#pipeline.read_pending]] · [[#pipeline.write_lock]] · [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-015#ReferenceService.inbound_of_document]] · [[SYNC-MS-014#SpecService.describe_items]] · [[SYNC-MS-014#SpecService.describe_documents]] · [[SYNC-MS-019#Git.commit_push]] · [[SYNC-MS-014#SpecService.trash]] · [[SYNC-MS-015#ReferenceService.mark_missing]] · [[SYNC-MS-019#Git.rev_list_count]] · [[SYNC-MS-014#markdown.parse_frontmatter]]
+
+**테스트 관점** (시험 DB · 진짜 git) 확인 없이 → 끊어질 것 목록 · 확인 → 원격에서 파일 사라짐, `broken_refs`가 그 수, 그 참조들이 미존재 · 두 번 → `document-trashed` · 처리 지점이 그 커밋
+
+---
+
+#### pipeline.restore_document 휴지통에서 되살리기
+
+**시그니처**
+```rust
+pub async fn restore_document(pool: &PgPool, repos: &ServerRepos, doc_id: &str, author: &Author) -> Result<SaveResult, Problem>
+```
+
+근거: [[SYNC-MS-007#pipeline.restore_document]] · [[SYNC-UC-001#UC-A8]] · [[SYNC-API-002#restore_document]] · [[SYNC-API-001#POST/api/docs/{docId}/restore]]
+
+**처리** [[SYNC-MS-007#pipeline.restore_document]]와 같은 차례 — `read_pending` · `get_owned` · `document = get_document` · 휴지통이 아니면 `! DocumentNotTrashed` · `h = SpecService.trash_commit` · 본문 = `Git.read(작업 사본, 경로, "{h}^")`의 `status:`를 `draft`로 · `save_pipeline(author.via가 mcp면 mcp 아니면 web_revert, doc_id, 본문, 지금 판, author, "spec({doc_id}): 되살림 — 휴지통에서", restore: 참, read_first: 거짓)` — 항목이 돌아오고 그것을 기다리던 미존재 참조는 저장의 10a가 잇는다
+
+**호출하는 것** [[#pipeline.read_pending]] · [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.trash_commit]] · [[SYNC-MS-019#Git.read]] · [[#pipeline.save_pipeline]]
+
+**테스트 관점** (시험 DB · 진짜 git) 넣기 → 되살리기 → 본문이 직전과 같고 판 +1 · 항목 돌아옴 · 끊긴 참조 다시 이어짐 · 휴지통이 아니면 `document-not-trashed`
+
+---
+
+#### pipeline.purge_document 완전 삭제
+
+**시그니처**
+```rust
+pub async fn purge_document(pool: &PgPool, repos: &ServerRepos, doc_id: &str, author: &Author) -> Result<(), Problem>
+```
+
+근거: [[SYNC-MS-007#pipeline.purge_document]] · [[SYNC-UC-001#UC-H18]] 6~8 · [[SYNC-API-001#POST/api/docs/{docId}/purge]]
+
+**처리** [[SYNC-MS-007#pipeline.purge_document]]와 같다 — 쓰기 락 · 트랜잭션 · `get_owned` · `get_document` · 휴지통이 아니면 `! DocumentNotTrashed` · `inbound`(이름)이 있으면 `! DocumentHasHistory { inbound_refs }` · `SpecService.delete_document` · 커밋. push 없음(파일은 휴지통 커밋에서 이미 없다). 밀린 커밋은 읽지 않는다(파이썬과 같다)
+
+**호출하는 것** [[#pipeline.write_lock]] · [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-015#ReferenceService.inbound_of_document]] · [[SYNC-MS-014#SpecService.describe_items]] · [[SYNC-MS-014#SpecService.describe_documents]] · [[SYNC-MS-014#SpecService.delete_document]]
+
+**테스트 관점** (시험 DB) 휴지통 아님 → `document-not-trashed` · 남이 아직 가리킴 → `document-has-history` · 다 걷어낸 뒤 → 행 없음, 같은 번호 다시 발급
 
 ---
 
