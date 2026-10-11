@@ -12,11 +12,11 @@ use crate::errors::Problem;
 use crate::project::service::{ProjectService, ServerRepos};
 use crate::pycompat::pyset::IntSet;
 use crate::reference::service::ReferenceService;
-use crate::spec::SpecService;
+use crate::spec::{DIFF_CONTEXT_LINES, SpecService};
 use crate::types::{
-    ApiAuthor, AuthorRef, BrokenRefSummary, ChainItem, ChainRow, Document, DocumentSummary, Graph,
-    GraphEdge, GraphNode, GraphScope, ItemChain, ItemRef, ItemReferences, ItemView, ProjectDetail,
-    ProjectItem, ProjectSummary, STAGES, StageSummary, Storage, stage_of,
+    ApiAuthor, AuthorRef, BrokenRefSummary, ChainItem, ChainRow, Diff, Document, DocumentSummary,
+    Graph, GraphEdge, GraphNode, GraphScope, ItemChain, ItemRef, ItemReferences, ItemView,
+    ProjectDetail, ProjectItem, ProjectSummary, STAGES, StageSummary, Storage, stage_of,
 };
 
 /// 작성자(id만) → 이름 붙은 작성자 — 파이썬 `_api_author`. 지시자는 id가 있을 때만
@@ -663,4 +663,50 @@ pub async fn item_chain(
             })
             .collect(),
     })
+}
+
+/// SYNC-MS-018#queries.diff_with_impact
+pub async fn diff_with_impact(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    doc_id: &str,
+    from_no: i32,
+    to_no: i32,
+    user: &UserRow,
+) -> Result<Diff, Problem> {
+    ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code_of(doc_id), user)
+    .await?;
+    let mut d = SpecService { db: &mut *db }
+        .diff(doc_id, from_no, to_no, DIFF_CONTEXT_LINES)
+        .await?;
+    let ids: Vec<String> = d.hunks.iter().filter_map(|h| h.item_id.clone()).collect();
+    let pks = SpecService { db: &mut *db }
+        .resolve_items(doc_id, &ids)
+        .await?;
+    // 항목 ID → pk — 이름에서 되짚는다(파이썬 `describe_items`)
+    let by_id: HashMap<String, i32> = SpecService { db: &mut *db }
+        .describe_items(&pks)
+        .await?
+        .into_iter()
+        .filter_map(|(pk, r)| r.item_id.map(|i| (i, pk)))
+        .collect();
+    let pk_list: Vec<i32> = by_id.values().copied().collect();
+    let counts = ReferenceService { db: &mut *db }
+        .count_downstream(&pk_list)
+        .await?;
+    for h in &mut d.hunks {
+        // 새 항목·항목 밖은 0
+        h.downstream_count = h
+            .item_id
+            .as_ref()
+            .and_then(|i| by_id.get(i))
+            .and_then(|pk| counts.get(pk))
+            .copied()
+            .unwrap_or(0);
+    }
+    Ok(d)
 }
