@@ -155,10 +155,10 @@ async fn origin_checked_only_on_writes() {
     )
     .await;
     assert_eq!(r.status, StatusCode::OK);
-    // /mcp·/git/은 토큰 경로 — Origin을 안 본다(/mcp는 토큰이 없어 401, /git은 아직 없는 경로라 404)
+    // /mcp·/git/은 토큰 경로 — Origin을 안 본다(둘 다 토큰이 없어 401)
     for (path, want) in [
         ("/mcp", StatusCode::UNAUTHORIZED),
-        ("/git/SYNC.git/info/refs", StatusCode::NOT_FOUND),
+        ("/git/SYNC.git/git-receive-pack", StatusCode::UNAUTHORIZED),
     ] {
         let r = call(
             lazy_app(),

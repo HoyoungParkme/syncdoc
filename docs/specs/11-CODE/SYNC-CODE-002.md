@@ -117,12 +117,22 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | L8 |
 | 완료 | 2026-10-11 · 브랜치 `card/L9-status-trash`(af7a06d #359) · spec 5 + code 25 · `cargo test` 124(시험 DB + 진짜 git — 완료로·막힘·내리기, 되돌리기, 휴지통·문지기·되살리기·완전 삭제와 번호 재발급) · 계약 `--target both --with-card L7 --with-card L8 --with-card L9` 666 통과·1 건너뜀 — L9 46 사례가 파이썬 판과 바이트로 같다 · L3 두 판 차이 시험 씨앗 1·2 × 2000 다른 것 0(세 도구가 실제로 돈다) · clippy(리눅스·윈도) · 윈도 `cargo check` · 워크플로 녹색 · `check_code` Rust 104/104 · `check_calls` 0 · 사람 확인(UI-5·7의 완료·되돌리기·휴지통 버튼)은 따로 · 되먹임: 파이썬 판은 int4 밖 `to_version`도 DB 거절로 500(diff와 같다 — 같게), 문제의 확장 필드 `title`(휴지통 확인의 문서 제목)이 problem 제목을 덮는 파이썬 꼴 그대로 |
 
+#### L10 git 입구 — 서버 저장소에 git으로 clone·push한다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UC-001#UC-H21]] · [[SYNC-SEQ-001#SEQ-29]] · [[SYNC-MS-009#git.http_backend]] · [[SYNC-MS-001#ProjectService.server_origin]] · [[SYNC-INFRA-001]] 9.1 · [[SYNC-SCN-001#S10]] · 에이전트 판단 2026-10-11(사용자 목표 「끝까지」): `upload_code`는 L11로 — 올린 뒤 밀린 커밋 처리(`process_commit`)를 타야 끝난다 · push 뒤 밀린 커밋 읽기는 L11 전까지 `not-implemented`를 로그로만(파이썬처럼 배치 — 폴링이 메운다) · git 판(파이썬 컨테이너 2.47·이 PC 2.43·MinGit)마다 광고 바이트가 달라 계약은 상태·머리와 진짜 clone·push로 본다 |
+| 구현 | [[SYNC-MS-013#ProjectService.server_origin]] · [[SYNC-MS-019#Git.advertise_refs]] · [[SYNC-MS-019#Git.service_rpc]] · server: `/git/{*rest}`를 `^(?P<code>[^/]+)\.git/(info/refs|git-upload-pack|git-receive-pack)$`로 가르는 입구 · Basic 인증(비밀번호 칸 = 개인 토큰) · 401 challenge · http-backend 머리·415 |
+| API | [[SYNC-API-001#GET/git/{code}.git/info/refs]] · [[SYNC-API-001#POST/git/{code}.git/git-upload-pack]] · [[SYNC-API-001#POST/git/{code}.git/git-receive-pack]] |
+| 테스트 | `cargo test`(임시 자리 진짜 git으로 광고·rpc) · 계약 L10 — 두 판에 진짜 `git clone`·`git push`(main·다른 가지·되감기·지우기), 인증 없음·틀린 토큰·남의 것·dumb·틀린 Content-Type·틀린 메서드는 바이트로 |
+| 선행 | L9 |
+| 완료 | — |
+
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
-| L10 git 입구·코드 올리기 | upload-pack·receive-pack(`main`) · `/git/*` · `upload_code` | L9 | L |
-| L11 따라잡기·재구축 | 커밋 처리·재구축·주기 확인·관리 경로·기존 저장소 들이기 | L10 · #325 | L |
+| L11 따라잡기·재구축 | 커밋 처리·재구축·주기 확인·관리 경로·기존 저장소 들이기 · `upload_code`(L10에서 넘어옴 — 올린 뒤 커밋 처리를 탄다) | L10 · #325 | L |
 | L12 코드 그래프 | 파이썬·TS·JS·Rust 추출 · 명세 대조 · 코드 화면 · `get_code_graph` | L11 | L |
 | L13 커뮤니티·노드 | graphrs Louvain(seed 42) · 허브 라벨 · 노드 목록 | L12 | M |
 | L14 대화·질문 탭 | 대화·첨부(PDF) · 모델 스트리밍 · 질문 루프 · SSE | L8 · L12 | XL |
@@ -173,6 +183,6 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 ## 4. 미결사항
 
-- [ ] `main`이 아닌 가지를 push했을 때 — 파이썬 판처럼 받아 두기만 하나([[SYNC-UC-001#UC-H21]] 3a), git을 부르기 전에 거절하나. Rust 판은 ref 명령을 먼저 읽으므로 둘 다 된다([[SYNC-INFRA-001]] 9.1). 카드 L10 전에 정한다
+- [x] `main`이 아닌 가지를 push했을 때 — 파이썬 판처럼 받아 두기만 하나([[SYNC-UC-001#UC-H21]] 3a), git을 부르기 전에 거절하나. Rust 판은 ref 명령을 먼저 읽으므로 둘 다 된다([[SYNC-INFRA-001]] 9.1). 카드 L10 전에 정한다 — 결정(에이전트 판단 2026-10-11, 사용자 목표 「끝까지」): 파이썬 판처럼 받아 두기만 한다. ref 명령을 미리 읽지 않고 되감기·지우기는 파이썬 판과 같은 저장소 설정이 거절한다(INFRA 9.1을 바로잡음). 계약 L10이 두 판에 진짜 push로 본다
 - [ ] 저장소에 커밋된 `graphify-out/graph.json`을 따를지 — 파이썬 판은 그 파일이 있으면 그것을 쓴다([[SYNC-MS-011#codegraph.load]] 1). Rust 판에는 graphify가 없다. 카드 L12 전에 정한다
 - [ ] 되살리기가 Docker 판(파이썬 폐쇄망판)의 백업 파일도 받을지 — 두 판은 같은 표를 쓴다([[SYNC-INFRA-001]] 9.2). 카드 L16 전에 정한다

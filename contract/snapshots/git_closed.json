@@ -1,0 +1,756 @@
+{
+ "b64_double_pad": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "b64_extra_pad": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "b64_inner_space": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "b64_nbsp": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-advertisement"
+   ]
+  ],
+  "body": null
+ },
+ "b64_nel": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-advertisement"
+   ]
+  ],
+  "body": null
+ },
+ "b64_no_pad": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "b64_non_ascii": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "b64_not_utf8": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "b64_one_extra_pad": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "b64_short_pad": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "b64_three_pads": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "b64_trailing_bits": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-advertisement"
+   ]
+  ],
+  "body": null
+ },
+ "b64_urlsafe": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "git_bare_name": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"path /git/LGT/info/refs 없음\",\"resource\":\"path\",\"id\":\"/git/LGT/info/refs\"}"
+ },
+ "git_one_segment": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"path /git/x 없음\",\"resource\":\"path\",\"id\":\"/git/x\"}"
+ },
+ "git_other_file": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"path /git/LGT.git/HEAD 없음\",\"resource\":\"path\",\"id\":\"/git/LGT.git/HEAD\"}"
+ },
+ "git_root": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"path /git 없음\",\"resource\":\"path\",\"id\":\"/git\"}"
+ },
+ "receive_flush_only": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-receive-pack-result"
+   ]
+  ],
+  "body": ""
+ },
+ "receive_gzip_broken": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-receive-pack-result"
+   ]
+  ],
+  "body": ""
+ },
+ "receive_missing_project": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "receive_put": {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "POST"
+   ],
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:method-not-allowed\",\"title\":\"method-not-allowed\",\"status\":405,\"detail\":\"이 경로에 PUT 메서드는 없습니다\",\"allow\":[\"POST\"]}"
+ },
+ "receive_wrong_type": {
+  "status": 415,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ]
+  ],
+  "body": "Expected POST with Content-Type 'application/x-git-receive-pack-request', but received 'text/plain' instead.\n"
+ },
+ "refs_basic_empty": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "refs_basic_empty_token": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "refs_basic_garbage": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "refs_basic_no_colon": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "refs_bearer": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "refs_colon_in_token": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "refs_delete": {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "GET"
+   ],
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:method-not-allowed\",\"title\":\"method-not-allowed\",\"status\":405,\"detail\":\"이 경로에 DELETE 메서드는 없습니다\",\"allow\":[\"GET\"]}"
+ },
+ "refs_dotted_code": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project a.b 없음\",\"resource\":\"project\",\"id\":\"a.b\"}"
+ },
+ "refs_double_encoded": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"path /git/LGT%2Egit/info/refs 없음\",\"resource\":\"path\",\"id\":\"/git/LGT%2Egit/info/refs\"}"
+ },
+ "refs_empty_service": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"git-service - 없음\",\"resource\":\"git-service\",\"id\":\"-\"}"
+ },
+ "refs_encoded_dot": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-advertisement"
+   ]
+  ],
+  "body": null
+ },
+ "refs_korean_code": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project 한 없음\",\"resource\":\"project\",\"id\":\"한\"}"
+ },
+ "refs_missing_no_auth": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "refs_missing_project": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "refs_no_auth": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "refs_no_service": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"git-service - 없음\",\"resource\":\"git-service\",\"id\":\"-\"}"
+ },
+ "refs_ok": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-advertisement"
+   ]
+  ],
+  "body": null
+ },
+ "refs_ok_lower": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-advertisement"
+   ]
+  ],
+  "body": null
+ },
+ "refs_ok_no_user": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-advertisement"
+   ]
+  ],
+  "body": null
+ },
+ "refs_other_service": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"git-service git-upload-archive 없음\",\"resource\":\"git-service\",\"id\":\"git-upload-archive\"}"
+ },
+ "refs_post": {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "GET"
+   ],
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:method-not-allowed\",\"title\":\"method-not-allowed\",\"status\":405,\"detail\":\"이 경로에 POST 메서드는 없습니다\",\"allow\":[\"GET\"]}"
+ },
+ "refs_receive": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-receive-pack-advertisement"
+   ]
+  ],
+  "body": null
+ },
+ "refs_service_encoded": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-advertisement"
+   ]
+  ],
+  "body": null
+ },
+ "refs_service_first_only": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"git-service x 없음\",\"resource\":\"git-service\",\"id\":\"x\"}"
+ },
+ "refs_service_last_wins": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-receive-pack-advertisement"
+   ]
+  ],
+  "body": null
+ },
+ "refs_v2": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-advertisement"
+   ]
+  ],
+  "body": null
+ },
+ "refs_wrong_token": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "upload_empty_body": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-result"
+   ]
+  ],
+  "body": ""
+ },
+ "upload_empty_type": {
+  "status": 415,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ]
+  ],
+  "body": "Expected POST with Content-Type 'application/x-git-upload-pack-request', but received '' instead.\n"
+ },
+ "upload_flush_only": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-result"
+   ]
+  ],
+  "body": ""
+ },
+ "upload_get": {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "POST"
+   ],
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:method-not-allowed\",\"title\":\"method-not-allowed\",\"status\":405,\"detail\":\"이 경로에 GET 메서드는 없습니다\",\"allow\":[\"POST\"]}"
+ },
+ "upload_gzip_broken": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-result"
+   ]
+  ],
+  "body": ""
+ },
+ "upload_gzip_cut": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-result"
+   ]
+  ],
+  "body": ""
+ },
+ "upload_gzip_empty": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-result"
+   ]
+  ],
+  "body": ""
+ },
+ "upload_gzip_flush": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-result"
+   ]
+  ],
+  "body": ""
+ },
+ "upload_gzip_trailing": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-result"
+   ]
+  ],
+  "body": ""
+ },
+ "upload_gzip_upper": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-result"
+   ]
+  ],
+  "body": ""
+ },
+ "upload_no_auth": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"git 입구 — 비밀번호 칸에 개인 토큰\"}"
+ },
+ "upload_no_type": {
+  "status": 415,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ]
+  ],
+  "body": "Expected POST with Content-Type 'application/x-git-upload-pack-request', but received '' instead.\n"
+ },
+ "upload_type_latin1": {
+  "status": 415,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ]
+  ],
+  "body": "Expected POST with Content-Type 'application/x-git-upload-pack-request', but received 'text/é' instead.\n"
+ },
+ "upload_type_params": {
+  "status": 415,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ]
+  ],
+  "body": "Expected POST with Content-Type 'application/x-git-upload-pack-request', but received 'application/x-git-upload-pack-request; a=b' instead.\n"
+ },
+ "upload_wrong_type": {
+  "status": 415,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ]
+  ],
+  "body": "Expected POST with Content-Type 'application/x-git-upload-pack-request', but received 'application/x-git-receive-pack-request' instead.\n"
+ },
+ "upload_x_gzip": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, max-age=0, must-revalidate"
+   ],
+   [
+    "content-type",
+    "application/x-git-upload-pack-result"
+   ]
+  ],
+  "body": ""
+ }
+}

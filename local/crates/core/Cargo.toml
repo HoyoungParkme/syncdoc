@@ -23,7 +23,6 @@ tracing = { workspace = true }
 tempfile = { workspace = true }
 time = { workspace = true, features = ["macros"] }
 tokio = { workspace = true }
-tracing = { workspace = true }
 
 [lints]
 workspace = true

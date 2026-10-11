@@ -7,7 +7,7 @@ pub mod state;
 pub mod web;
 
 use axum::extract::DefaultBodyLimit;
-use axum::routing::{delete, get, post};
+use axum::routing::{any, delete, get, post};
 use axum::{Json, Router, middleware};
 use serde_json::{Value, json};
 use tower_http::catch_panic::CatchPanicLayer;
@@ -26,6 +26,7 @@ use crate::web::routes::documents::restore_document;
 use crate::web::routes::documents::revert;
 use crate::web::routes::documents::trash_document;
 use crate::web::routes::documents::versions;
+use crate::web::routes::git::git_entrance;
 use crate::web::routes::projects::{
     delete_project, get_file, get_project, graph, init_project, list_docs, list_items,
     list_projects, trash_list,
@@ -71,6 +72,7 @@ pub fn app(state: AppState) -> Router {
         .route("/api/docs/{doc_id}/purge", post(purge_document))
         .route("/api/docs/{doc_id}/status", post(change_status))
         .route("/api/docs/{doc_id}/revert", post(revert))
+        .route("/git/{*rest}", any(git_entrance))
         .merge(mcp::router(state.clone()))
         .route("/specs/", get(spec_copy))
         .route("/specs/{*path}", get(spec_copy))
