@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-022
 type: MS
 title: MINISPEC — codegraph — 코드 호출 그래프와 명세 대조 (Rust)
-status: draft
+status: approved
 upstream: [SYNC-DOM-004, SYNC-MS-011, SYNC-INFRA-001, SYNC-STD-004]
 ---
 
