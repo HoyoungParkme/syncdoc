@@ -126,7 +126,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | API | [[SYNC-API-001#GET/git/{code}.git/info/refs]] · [[SYNC-API-001#POST/git/{code}.git/git-upload-pack]] · [[SYNC-API-001#POST/git/{code}.git/git-receive-pack]] |
 | 테스트 | `cargo test`(임시 자리 진짜 git으로 광고·rpc) · 계약 L10 — 두 판에 진짜 `git clone`·`git push`(main·다른 가지·되감기·지우기), 인증 없음·틀린 토큰·남의 것·dumb·틀린 Content-Type·틀린 메서드는 바이트로 |
 | 선행 | L9 |
-| 완료 | — |
+| 완료 | 2026-10-11 · 브랜치 `card/L10-git-entrance`(31c9973 #365) · spec 9 + code 9 · `cargo test` 128(임시 자리 진짜 git — 광고·v2 판 판별·rpc·`server_origin`, 서버 시험은 진짜 git 클라이언트로 clone·main push·다른 가지·되감기 거절·지우기 거절·틀린 토큰) · 계약 `--target both --with-card L10` 800 통과·1 건너뜀 — L10 67 사례(401·404·405·415·Basic 해석·gzip)가 파이썬 판과 바이트로 같고 두 판에 진짜 clone·push · L3 두 판 차이 시험 씨앗 셋 · clippy(리눅스·윈도) · 윈도 `cargo check` · 워크플로 녹색 · `check_code` Rust 107/107 · `check_calls` 0 · 사람 확인(윈도 싱크독_로컬에 `git clone`·`git push`)은 따로 · 되먹임: 계약이 파이썬 판 버그 둘을 찾아 먼저 고쳤다 — #361(http-backend가 먼저 끝나면 약 1% 500) · #363(Basic 칸에 ASCII 아닌 글자면 500). 파이썬 3.12.13의 `b64decode(validate=True)`는 엄격(정규 `=`만, 남는 비트는 받음) — 로컬 3.12.3과 다르다 · 4장 미결(main 아닌 가지) 닫음 |
 
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
