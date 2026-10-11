@@ -14,9 +14,9 @@ upstream: [SYNC-DOM-004, SYNC-MS-001, SYNC-MS-019, SYNC-UC-001, SYNC-API-001, SY
 
 서비스는 연결과 저장소 자리를 빌려 받는다 — `ProjectService<'c> { pub db: &'c mut PgConnection, pub repos: &'c ServerRepos }`. `ServerRepos { git, origins, repos, specs_url }` — git 어댑터([[SYNC-MS-019]])·서버 저장소 자리 `origins/`·작업 사본 자리 `repos/`·README의 규약 주소. 켤 때 [[SYNC-MS-012#runtime.run]]이 만든다. 트랜잭션은 부르는 쪽이 쥔다([[SYNC-STD-004#DEV-10]]). 돌려주는 행은 `(ProjectRow, RepositoryRow)`다.
 
-**카드 L6 몫은 만들기·지우기(보관)와 조회 셋이다(2026-10-08). 카드 L8이 첨부 파일 경로 하나를, 카드 L10이 git 입구의 원본 경로 하나를, 카드 L11이 전체 목록·동기화 상태·통지·지금 가져오기·재구축 위임과 보관본 되살리기의 재구축 갈래를 더했다(2026-10-11).** 싱크독_로컬은 **서버 저장뿐**이다([[SYNC-PRD-001#R15]] — 파이썬 폐쇄망판의 `storage_modes == ["server"]`). GitHub 갈래(주소·저장소 만들기·통지)는 없고, `storage=github`는 첫 검사에서 `storage-unavailable`이다. 통지는 늘 `none`이다(파이썬 판의 서버 저장 갈래).
+**카드 L6 몫은 만들기·지우기(보관)와 조회 셋이다(2026-10-08). 카드 L8이 첨부 파일 경로 하나를, 카드 L10이 git 입구의 원본 경로 하나를, 카드 L11이 전체 목록·동기화 상태·통지·지금 가져오기·재구축 위임과 보관본 되살리기의 재구축 갈래를, 카드 L15가 번들로 가져오기를 더했다(2026-10-11).** 싱크독_로컬은 **서버 저장뿐**이다([[SYNC-PRD-001#R15]] — 파이썬 폐쇄망판의 `storage_modes == ["server"]`). GitHub 갈래(주소·저장소 만들기·통지)는 없고, `storage=github`는 첫 검사에서 `storage-unavailable`이다. 통지는 늘 `none`이다(파이썬 판의 서버 저장 갈래).
 
-**보관본 되살리기**(사용자 결정 2026-10-08 — 재구축 갈래는 카드 L11) — 되살린 보관본에 명세가 있으면 파이썬 판처럼 재구축([[SYNC-MS-017#pipeline.rebuild]])으로 DB에 다시 올린다. 서비스가 pipeline을 부르는 자리는 이것과 [[#ProjectService.sync_now]]·[[#ProjectService.rebuild_index]] 셋뿐이다(파이썬 판 DOM-002 3.2와 같다).
+**보관본 되살리기**(사용자 결정 2026-10-08 — 재구축 갈래는 카드 L11) — 되살린 보관본에 명세가 있으면 파이썬 판처럼 재구축([[SYNC-MS-017#pipeline.rebuild]])으로 DB에 다시 올린다. 서비스가 pipeline을 부르는 자리는 이것과 [[#ProjectService.import_bundle]]·[[#ProjectService.sync_now]]·[[#ProjectService.rebuild_index]] 넷뿐이다(파이썬 판 DOM-002 3.2와 같다).
 
 **표기** — `→` 반환·결과, `!` 예외(`Problem`), `DB:` 테이블 접근, `git:` [[SYNC-MS-019]], `·` 같은 단계 안 구분.
 
@@ -27,6 +27,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-001, SYNC-MS-019, SYNC-UC-001, SYNC-API-001, SY
 | 함수 | 한 줄 |
 |---|---|
 | [[#ProjectService.init_project]] | 프로젝트 만들기 — 서버 저장소와 골격 커밋 |
+| [[#ProjectService.import_bundle]] | 번들로 가져오기 — 서버 저장 + 재구축 |
 | [[#ProjectService.delete_project]] | 등록 해제 — 서버 저장소는 보관 |
 | [[#ProjectService.get]] | 코드 → 프로젝트 — 시스템 경로 |
 | [[#ProjectService.get_owned]] | 코드 → 내 프로젝트 — 사람 경로 |
@@ -75,6 +76,35 @@ pub async fn init_project(&mut self, pool: &PgPool, code: &str, name: &str, user
 **호출하는 것** [[SYNC-MS-019#Git.init_bare]] · [[SYNC-MS-019#Git.list]] · [[SYNC-MS-019#Git.clone]] · [[SYNC-MS-019#Git.exists]] · [[SYNC-MS-019#Git.init_specs]] · [[SYNC-MS-019#Git.commit_push]] · [[SYNC-MS-017#pipeline.rebuild]] · [[SYNC-MS-017#pipeline.schedule_code_graph]] · [[#ProjectService.get]](돌려줄 행)
 
 **테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 새 프로젝트 → `origins/{code}.git`(HEAD main, 받기 규칙 셋)과 골격 커밋 하나(14파일, `chore({code}): init syncdoc`), `last_processed_commit`이 원격 main · `github` → `storage-unavailable`, 아무것도 안 생김 · 나쁜 코드 → `project-code-invalid` · 같은 코드 → `project-code-conflict` · 지운 뒤 같은 코드 → `existing-specs`(`doc_count`·`archived_at`), 아무것도 안 바뀜 · 같은 초 보관본 둘 → 번호가 큰 것 · 이름 없이 남은 원본 → 보관으로 옮기고 `existing-specs` · 비어 있는 보관본 + 가져오기 → 되살리고 골격 커밋 · 명세가 있는 보관본 + 가져오기 → 재구축으로 문서·버전이 다시 올라오고 처리 지점이 원본 끝, 골격 커밋 없음 · 재구축이 실패하면 행 없음·보관본은 제자리 · clone 실패 → 새 원본·작업 사본·행 없음
+
+---
+
+#### ProjectService.import_bundle 번들로 가져오기 — 서버 저장 + 재구축
+
+**시그니처**
+```rust
+pub async fn import_bundle(&mut self, pool: &PgPool, code: &str, name: &str, user: &UserRow, data: &[u8]) -> Result<(ProjectRow, RepositoryRow), Problem>
+```
+
+근거: [[SYNC-MS-001#ProjectService.import_bundle]] · [[SYNC-UC-001#UC-A1]] 1c · [[SYNC-PRD-001#R14]] · [[SYNC-INFRA-001]] 9.7 · 카드 L15
+
+**처리** [[SYNC-MS-001#ProjectService.import_bundle]]과 같은 차례 — [[#ProjectService.init_project]]와 같은 코드 잠금
+1. if 코드가 `[A-Z]{1,4}` 전체가 아니다 → `! ProjectCodeInvalid { rule: "^[A-Z]{1,4}$" }` · if `DB: projects where code` 있음 → `! ProjectCodeConflict { code }`
+2. `workdir = repos/{code}` — 있으면 지운다 · `origin = origins/{code}.git` — 이미 있으면(등록되지 않은 원본) **지우지 않고** 보관 자리로 옮긴다([[#ProjectService.init_project]] 4와 같은 이름). 보관본은 되살리지 않는다
+3. 임시 폴더(`syncdoc-bundle-` 머리)에 `data`를 `import.bundle`로 쓰고 `git.clone_bare(그 파일, origin)` · `Problem::Git`이면 `origin`을 지우고 `! BundleInvalid { reason: "번들 파일이 아니거나 깨졌다" }` · 임시 폴더는 지운다
+4. `git.rev_list_count(origin, "refs/heads/main")` · `Problem::Git`이면 `origin`을 지우고 `! BundleInvalid { reason: "main 가지가 없다" }`
+5. `git.clone(origin, workdir)` · 실패 → 작업 사본·`origin`을 지우고 `! PushFailed("clone: {stderr}")`
+6. 트랜잭션(부르는 쪽이 트랜잭션이면 저장점): `DB: projects insert (code, name, owner_user_id=user.id)` · `DB: repositories insert (storage='server', remote_url=origin 절대 경로, workdir_path, registered_by_user_id=user.id)`
+7. `pipeline.rebuild(그 트랜잭션, pool, repos, code)` — 명세·버전·상태 이력을 커밋에서 되살리고 처리 지점을 main 끝으로 · 실패 → 트랜잭션을 버리고 작업 사본·`origin`을 지우고 그 `Problem` — 골격 커밋을 만들지 않는다
+8. 커밋 · 커밋 뒤 `pipeline.schedule_code_graph(pool, repos, code, 처리 지점)`([[#ProjectService.init_project]] 8과 같은 까닭) · `→ (프로젝트 행, 저장소 행)` — `ProjectSummary`는 입구가 만든다
+
+**다른 점** 서버 저장 켜짐 검사가 없다 — 싱크독_로컬은 서버 저장뿐이다 · 연결 풀을 받는다(7·8의 그래프 만들기)
+
+**예외** 1~7의 `Problem` · 파일 실패는 `Problem::Internal`
+
+**호출하는 것** [[SYNC-MS-019#Git.clone_bare]] · [[SYNC-MS-019#Git.rev_list_count]] · [[SYNC-MS-019#Git.clone]] · [[SYNC-MS-017#pipeline.rebuild]] · [[SYNC-MS-017#pipeline.schedule_code_graph]] · [[#ProjectService.get]](돌려줄 행)
+
+**테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 명세 두 커밋(초안 → 상태)과 태그가 든 저장소의 번들 → 원본의 main·태그 해시가 같고 원격 없음·HEAD main·받기 규칙, 골격 커밋 없음, 처리 지점이 main 끝, 문서 상태가 `approved` · 번들 아님 → `bundle-invalid`(`번들 파일이 아니거나 깨졌다`), 원본 없음 · main 없는 번들 → `bundle-invalid`(`main 가지가 없다`), 원본·작업 사본·행 없음 · 나쁜 코드 → `project-code-invalid` · 같은 코드 → `project-code-conflict` · 이름 없이 남은 원본 → 보관으로 옮기고 가져온다
 
 ---
 
