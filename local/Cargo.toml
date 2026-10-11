@@ -3,7 +3,14 @@
 
 [workspace]
 resolver = "3"
-members = ["crates/app", "crates/server", "crates/core", "crates/codegraph", "xtask"]
+members = [
+    "crates/app",
+    "crates/server",
+    "crates/core",
+    "crates/codegraph",
+    "crates/pycompat",
+    "xtask",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -14,6 +21,8 @@ publish = false
 [workspace.dependencies]
 syncdoc_core = { path = "crates/core" }
 syncdoc_server = { path = "crates/server" }
+syncdoc_codegraph = { path = "crates/codegraph" }
+syncdoc_pycompat = { path = "crates/pycompat" }
 
 axum = "0.8.9"
 clap = { version = "4.6", features = ["derive"] }

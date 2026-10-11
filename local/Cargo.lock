@@ -3444,11 +3444,21 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "sqlx",
+ "syncdoc_codegraph",
+ "syncdoc_pycompat",
  "tempfile",
  "thiserror 2.0.21",
  "time",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "syncdoc_pycompat"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde_json",
 ]
 
 [[package]]

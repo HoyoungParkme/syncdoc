@@ -9,7 +9,7 @@ pub mod markdown;
 pub mod migrate;
 pub mod pipeline;
 pub mod project;
-pub mod pycompat;
+pub use syncdoc_pycompat as pycompat;
 pub mod queries;
 pub mod reference;
 pub mod spec;

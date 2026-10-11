@@ -8,7 +8,7 @@
 //! - `test-db-clean` — 시험이 남긴 `syncdoc_local_test_*` DB를 지운다
 //! - `icon` — `packaging/icon.svg`에서 icon.ico·icon.png·tray.rgba를 만든다(카드 L4)
 //! - `mcp-tools [--check]` — 파이썬 판 MCP 서버에서 `crates/server/src/mcp/declarations.json`을 뽑는다(카드 L3)
-//! - `unicode-tables [--check]` — 파이썬 3.12의 문자 분류 표 `crates/core/src/pycompat/unicode.rs`를 뽑는다(카드 L5)
+//! - `unicode-tables [--check]` — 파이썬 3.12의 문자 분류 표 `crates/pycompat/src/unicode.rs`를 뽑는다(카드 L5 · L12에서 crate로)
 //! - `spec-golden [--check]` — 명세 엔진의 정답 파일 `crates/core/tests/golden/spec.json`을 파이썬 판으로 만든다(카드 L5)
 //! - `spec-diff [--seed S] [--count N]` — 지금의 명세·git 이력·무작위 본문을 두 판에 돌려 비교한다(카드 L5)
 
