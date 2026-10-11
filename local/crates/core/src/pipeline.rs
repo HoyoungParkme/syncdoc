@@ -442,3 +442,102 @@ async fn advance(
     }
     Ok(())
 }
+
+/// 문서 ID의 프로젝트 코드 — 첫 `-` 앞 (파이썬 `doc_id.split("-")[0]`)
+fn code_of(doc_id: &str) -> &str {
+    doc_id.split('-').next().unwrap_or("")
+}
+
+/// SYNC-MS-017#pipeline.change_status
+///
+/// 본문은 **저장소에서** 읽는다 — DB 본문으로 커밋하면 아직 읽지 않은 커밋의 내용이 통째로 되돌아간다(#137).
+/// 끊어진 참조는 읽을 때 센다 — 컬럼에 없다(STD-001 4장)
+pub async fn change_status(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    doc_id: &str,
+    to: DocStatus,
+    author: &Author,
+    reason: Option<&str>,
+) -> Result<Document, Problem> {
+    let code = code_of(doc_id);
+    // 0. 밀린 커밋을 먼저 — 소유 검사도 여기서. 락 밖
+    read_pending(pool, repos, code, &author.user).await?;
+    let mut c = pool.acquire().await?;
+    let (_, repo) = ProjectService { db: &mut c, repos }
+        .get_owned(code, &author.user)
+        .await?;
+    let document = SpecService { db: &mut c }.get_document(doc_id).await?;
+    if let Some(t) = document.summary.trashed_at {
+        return Err(Problem::DocumentTrashed {
+            trashed_at: py_isoformat(t),
+        });
+    }
+    let mut missing: Vec<String> = ReferenceService { db: &mut c }
+        .upstream_of_document(document.summary.id, true)
+        .await?
+        .into_iter()
+        .filter(|e| e.is_missing)
+        .map(|e| e.raw_target)
+        .collect();
+    missing.sort();
+    missing.dedup();
+    let s = &document.summary;
+    if to == DocStatus::Approved
+        && (s.has_convention_error || !s.incomplete_warnings.is_empty() || !missing.is_empty())
+    {
+        let mut warnings = s.incomplete_warnings.clone();
+        warnings.extend(missing.iter().map(|t| format!("ref.missing: {t}")));
+        return Err(Problem::StatusBlocked {
+            convention_error_detail: document.convention_error_detail.clone(),
+            warnings,
+        });
+    }
+    // 3a. 이미 그 상태 — 아무것도 안 한다
+    if s.status == to.as_str() {
+        return Ok(document);
+    }
+    let path = format!("docs/specs/{}/{doc_id}.md", spec_dir(&s.doc_type));
+    let src = match repos
+        .git
+        .read(Path::new(&repo.workdir_path), &path, "origin/main")
+        .await
+    {
+        Ok(b) => b,
+        // 저장소에 아직 파일이 없다 — 이 커밋이 파일을 만드는 복구가 된다
+        Err(Problem::Git { .. } | Problem::Internal { .. }) => {
+            tracing::warn!("change_status {doc_id}: origin/main에 {path}가 없다 — DB 본문으로");
+            document.body.clone()
+        }
+        Err(other) => return Err(other),
+    };
+    let new_body = STATUS_LINE
+        .replacen(&src, 1, NoExpand(&format!("status: {}", to.as_str())))
+        .into_owned();
+    save_pipeline(
+        pool,
+        repos,
+        SaveInput {
+            entry: Entry::WebStatus,
+            doc_id: Some(doc_id.to_string()),
+            doc_type: None,
+            body: new_body,
+            expected_version: Some(i64::from(s.current_version_no)),
+            project_code: None,
+            author: author.clone(),
+            message: format!(
+                "status({doc_id}): {} → {}\n\n{}",
+                s.status,
+                to.as_str(),
+                reason.unwrap_or("")
+            ),
+            confirm_item_deletion: false,
+            reason: reason.map(str::to_string),
+            restore: false,
+            read_first: false,
+        },
+    )
+    .await?;
+    let mut c = pool.acquire().await?;
+    SpecService { db: &mut c }.get_document(doc_id).await
+}
