@@ -1360,4 +1360,26 @@ impl SpecService<'_> {
         newest_first(&mut rows);
         Ok(rows)
     }
+
+    /// SYNC-MS-014#SpecService.recent_changes
+    pub async fn recent_changes(
+        &mut self,
+        project_id: i32,
+        n: i64,
+    ) -> Result<Vec<Version>, Problem> {
+        let mut rows: Vec<Version> = repo::recent_versions(&mut *self.db, project_id, n)
+            .await?
+            .iter()
+            .map(|r| version_of(&r.doc_id, &r.version))
+            .collect();
+        rows.extend(
+            repo::recent_status_changes(&mut *self.db, project_id, n)
+                .await?
+                .iter()
+                .map(|r| status_version_of(&r.doc_id, &r.change)),
+        );
+        newest_first(&mut rows);
+        rows.truncate(usize::try_from(n).unwrap_or(0));
+        Ok(rows)
+    }
 }
