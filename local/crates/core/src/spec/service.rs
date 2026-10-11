@@ -1543,6 +1543,16 @@ impl SpecService<'_> {
         Ok(repo::delete_document_rows(&mut *self.db, document.summary.id).await? as i64)
     }
 
+    /// SYNC-MS-014#SpecService.clear_index
+    ///
+    /// 판을 가리키는 참조는 부르는 쪽이 먼저 지운다(MS-017 rebuild 4a, #38). 문서·항목은 남긴다 — 항목 pk를 지킨다
+    pub async fn clear_index(&mut self, project_id: i32) -> Result<(), Problem> {
+        // 커밋 있는 상태 변경은 재구축이 다시 만든다 — 안 지우면 재구축할 때마다 쌓인다
+        repo::delete_status_changes_with_commit(&mut *self.db, project_id).await?;
+        repo::delete_versions_of_project(&mut *self.db, project_id).await?;
+        Ok(())
+    }
+
     /// SYNC-MS-014#SpecService.mark_deleted
     ///
     /// 원본에서 파일이 사라지면 문서는 남기고 초안 + `file.deleted` — 항목은 전부 지운 것으로

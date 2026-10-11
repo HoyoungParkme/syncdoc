@@ -249,3 +249,57 @@ async fn mark_deleted_keeps_row_drafts_and_deletes_items() {
         1
     );
 }
+
+#[tokio::test]
+async fn clear_index_drops_versions_and_commit_status_rows_only() {
+    let e = env().await;
+    let r = e.create("PRD", PRD).await;
+    pipeline::change_status(
+        e.pool(),
+        &e.repos,
+        &r.doc_id,
+        DocStatus::Approved,
+        &e.author(Entry::WebStatus),
+        None,
+    )
+    .await
+    .expect("완료로");
+    let mut c = e.conn().await;
+    sqlx::query(
+        "INSERT INTO status_changes (document_id, from_status, to_status, changed_by_user_id, via, reason, changed_at) \
+         SELECT id, 'approved', 'draft', $1, 'mcp', '커밋 없음', now() FROM documents",
+    )
+    .bind(e.user.id)
+    .execute(&mut *c)
+    .await
+    .expect("커밋 없는 행");
+    let pid = scalar_i64(&mut c, "SELECT id::bigint FROM projects").await as i32;
+    // 판을 가리키는 참조가 없을 때 — 참조는 부르는 쪽이 먼저 지운다
+    sqlx::query("DELETE FROM \"references\"")
+        .execute(&mut *c)
+        .await
+        .expect("참조");
+    SpecService { db: &mut c }
+        .clear_index(pid)
+        .await
+        .expect("비우기");
+    assert_eq!(scalar_i64(&mut c, "SELECT count(*) FROM versions").await, 0);
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            "SELECT count(*) FROM status_changes WHERE commit_hash IS NOT NULL"
+        )
+        .await,
+        0
+    );
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            "SELECT count(*) FROM status_changes WHERE commit_hash IS NULL"
+        )
+        .await,
+        1
+    );
+    assert_eq!(scalar_i64(&mut c, "SELECT count(*) FROM items").await, 2);
+}
+
