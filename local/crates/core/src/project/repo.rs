@@ -139,6 +139,22 @@ pub async fn set_last_processed(
     Ok(())
 }
 
+/// 서버 저장소·작업 사본 자리를 고친다 (MS-013 rehome 2, L16)
+pub async fn set_paths(
+    db: &mut PgConnection,
+    repository_id: i32,
+    remote_url: &str,
+    workdir_path: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE repositories SET remote_url = $2, workdir_path = $3 WHERE id = $1")
+        .bind(repository_id)
+        .bind(remote_url)
+        .bind(workdir_path)
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
 /// 프로젝트에 딸린 행을 자식부터 지운다 (MS-013 delete_project 2) — 대화(턴·첨부는 FK로)·코드 그래프부터
 /// 명세 표·저장소·프로젝트 행 — 대화·코드 그래프는 그 서비스가 먼저 지웠다
 pub async fn delete_all_of(db: &mut PgConnection, project_id: i32) -> Result<(), sqlx::Error> {

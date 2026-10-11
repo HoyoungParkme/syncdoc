@@ -396,6 +396,40 @@ impl ProjectService<'_> {
         Ok(found)
     }
 
+    /// SYNC-MS-013#ProjectService.rehome
+    ///
+    /// 켤 때마다 — 서버 저장 행의 원본·작업 사본 자리를 이 데이터 자리로 맞추고 없는 작업 사본을 만든다(L16).
+    /// 옮긴 자리·다른 자리(Docker `/var/syncdoc/…`)의 백업을 되살린 것. 작업 사본 하나의 실패는 로그만
+    pub async fn rehome(&mut self) -> Result<Vec<String>, Problem> {
+        let mut cloned = Vec::new();
+        for (project, repository) in repo::all(&mut *self.db).await? {
+            if repository.storage != Storage::Server.as_str() {
+                continue;
+            }
+            let code = project.code;
+            let origin = self.repos.origins.join(format!("{code}.git"));
+            let workdir = self.repos.repos.join(&code);
+            let (remote, work) = (
+                origin.to_string_lossy().into_owned(),
+                workdir.to_string_lossy().into_owned(),
+            );
+            if repository.remote_url != remote || repository.workdir_path != work {
+                repo::set_paths(&mut *self.db, repository.id, &remote, &work).await?;
+            }
+            if workdir.is_dir() || !origin.is_dir() {
+                continue;
+            }
+            match self.repos.git.clone(&remote, &workdir).await {
+                Ok(()) => cloned.push(code),
+                Err(p) => {
+                    let _ = fs::remove_dir_all(&workdir);
+                    tracing::warn!("{code}의 작업 사본을 다시 만들지 못했다 — {p}");
+                }
+            }
+        }
+        Ok(cloned)
+    }
+
     /// SYNC-MS-013#ProjectService.delete_project
     pub async fn delete_project(&mut self, code: &str, user: &UserRow) -> Result<(), Problem> {
         let lock = lock_of(code);

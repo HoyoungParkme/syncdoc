@@ -103,6 +103,18 @@ pub enum Problem {
     /// `bundle-invalid` — git 번들이 아니거나 깨졌거나 main 가지가 없다 (UC-A1 1c2, L15)
     #[error("{reason}")]
     BundleInvalid { reason: String },
+    /// `backup-unconfigured` — 백업 폴더를 정하지 않았다 (싱크독_로컬 Rust만, L16)
+    #[error("백업 폴더를 정하지 않았다")]
+    BackupUnconfigured,
+    /// `backup-invalid` — 되살릴 파일이 싱크독 백업이 아니거나 깨졌거나 암호가 틀리다 (L16)
+    #[error("{reason}")]
+    BackupInvalid { reason: String },
+    /// `backup-failed` — 백업을 만들다 실패했다 (L16)
+    #[error("{reason}")]
+    BackupFailed { reason: String },
+    /// `data-dir-invalid` — 옮길 데이터 자리가 맞지 않다 (L16)
+    #[error("{reason}")]
+    DataDirInvalid { reason: String },
     /// `existing-specs` — 저장소에 명세가 이미 있다, 또는 같은 코드의 보관본이 있다(`archived_at`)
     #[error("{}", if .archived_at.is_some() { "보관된 서버 저장소가 있음" } else { "docs/specs/가 이미 있음" })]
     ExistingSpecs {
@@ -185,6 +197,10 @@ impl Problem {
             Problem::ProjectCodeInvalid { .. } => Some("project-code-invalid"),
             Problem::ProjectCodeConflict { .. } => Some("project-code-conflict"),
             Problem::BundleInvalid { .. } => Some("bundle-invalid"),
+            Problem::BackupUnconfigured => Some("backup-unconfigured"),
+            Problem::BackupInvalid { .. } => Some("backup-invalid"),
+            Problem::BackupFailed { .. } => Some("backup-failed"),
+            Problem::DataDirInvalid { .. } => Some("data-dir-invalid"),
             Problem::ExistingSpecs { .. } => Some("existing-specs"),
             Problem::PushFailed { .. } => Some("push-failed"),
             Problem::RebuildFailed { .. } => Some("rebuild-failed"),
@@ -222,7 +238,11 @@ impl Problem {
             Problem::ConventionViolation { .. } => 422,
             Problem::StorageUnavailable { .. }
             | Problem::ProjectCodeInvalid { .. }
-            | Problem::BundleInvalid { .. } => 422,
+            | Problem::BundleInvalid { .. }
+            | Problem::BackupInvalid { .. }
+            | Problem::DataDirInvalid { .. } => 422,
+            Problem::BackupUnconfigured => 409,
+            Problem::BackupFailed { .. } => 500,
             Problem::ProjectCodeConflict { .. } | Problem::ExistingSpecs { .. } => 409,
             Problem::PushFailed { .. } => 424,
             Problem::RebuildFailed { .. } => 500,
@@ -350,7 +370,10 @@ impl Problem {
             Problem::DocumentHasHistory { inbound_refs } => {
                 vec![("inbound_refs", Value::from(inbound_refs.clone()))]
             }
-            Problem::AlreadyCurrent | Problem::DocumentNotTrashed | Problem::LlmNotConfigured => {
+            Problem::AlreadyCurrent
+            | Problem::DocumentNotTrashed
+            | Problem::LlmNotConfigured
+            | Problem::BackupUnconfigured => {
                 vec![]
             }
             Problem::AttachmentType { mime } => vec![("mime", Value::from(mime.as_str()))],
@@ -361,7 +384,11 @@ impl Problem {
             Problem::AttachmentSent { attachment_id } => {
                 vec![("attachment_id", Value::from(*attachment_id))]
             }
-            Problem::LlmUnavailable { reason } | Problem::BundleInvalid { reason } => {
+            Problem::LlmUnavailable { reason }
+            | Problem::BundleInvalid { reason }
+            | Problem::BackupInvalid { reason }
+            | Problem::BackupFailed { reason }
+            | Problem::DataDirInvalid { reason } => {
                 vec![("reason", Value::from(reason.as_str()))]
             }
             Problem::MethodNotAllowed { allow, .. } => vec![("allow", Value::from(allow.clone()))],
