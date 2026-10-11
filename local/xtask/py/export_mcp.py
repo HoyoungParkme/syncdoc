@@ -3,6 +3,8 @@
 SYNC-STD-004#DEV-7 · SYNC-DOM-004 1장(mcp/·compat/). 손으로 고치지 않는다 — 이 스크립트가 다시 만든다.
 뽑는 것: 서버 이름·안내문·능력, 판마다 고정 결과(initialize·tools/list·빈 목록들)의 바이트,
 pydantic core schema(봉투·메서드 표면·처리기 인자·도구 인자)와 검증기 제목, 판 목록.
+2026-07-28(카드 L18): 그 판의 메서드 표면·요청/알림 봉투 검증기, 고정 결과(server/discover·목록들 — 캐시 힌트와
+serverInfo 도장까지, 파이썬 판 MCP 앱에 새 프로토콜 요청을 보내 받은 그대로), serverInfo 도장.
 `uv run --project backend python local/xtask/py/export_mcp.py OUT` — 작업 자리는 `.env`가 없는 곳이어야 한다.
 """
 
@@ -121,6 +123,41 @@ async def results():
     return out
 
 
+def modern_results() -> dict:
+    """2026-07-28 고정 결과 — 파이썬 판 MCP 앱(세션 없음)에 새 프로토콜 요청을 보내 받은 `result`를 바이트로.
+
+    응답 본문은 `json.dumps(body, separators=(",", ":"))`(ensure_ascii)라 읽어 같은 꼴로 다시 쓰면 같다.
+    """
+    from mcp.server.transport_security import TransportSecuritySettings
+    from mcp_types import CLIENT_CAPABILITIES_META_KEY, PROTOCOL_VERSION_META_KEY
+    from starlette.testclient import TestClient
+
+    app = server.streamable_http_app(
+        streamable_http_path="/mcp",
+        stateless_http=True,
+        transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+    )
+    v = MODERN_PROTOCOL_VERSIONS[-1]
+    out = {}
+    with TestClient(app) as c:
+        for m in ("server/discover", "tools/list", "resources/list", "resources/templates/list", "prompts/list"):
+            body = {
+                "jsonrpc": "2.0",
+                "id": 0,
+                "method": m,
+                "params": {"_meta": {PROTOCOL_VERSION_META_KEY: v, CLIENT_CAPABILITIES_META_KEY: {}}},
+            }
+            r = c.post(
+                "/mcp",
+                json=body,
+                headers={"accept": "application/json, text/event-stream", "mcp-protocol-version": v, "mcp-method": m},
+            )
+            if r.status_code != 200 or r.headers.get("content-type") != "application/json":
+                raise SystemExit(f"{m}: {r.status_code} {r.text[:300]}")
+            out[m] = json.dumps(json.loads(r.text)["result"], separators=(",", ":"))
+    return {v: out}
+
+
 def main(path: str) -> None:
     tools = server._tool_manager._tools  # noqa: SLF001
     tool_args = {}
@@ -138,6 +175,8 @@ def main(path: str) -> None:
     handshake_methods = {
         v: sorted(m for (m, vv) in methods.CLIENT_REQUESTS if vv == v) for v in KNOWN_PROTOCOL_VERSIONS
     }
+    modern = MODERN_PROTOCOL_VERSIONS[-1]
+    surface_modern = {m: schema_of(cls) for (m, v), cls in methods.CLIENT_REQUESTS.items() if v == modern}
     handlers = {}
     for m in sorted(LOW._request_handlers):  # noqa: SLF001
         handlers[m] = schema_of(LOW._request_handlers[m].params_type)  # noqa: SLF001
@@ -164,12 +203,17 @@ def main(path: str) -> None:
         # RequestStateBoundary(미들웨어, 검증 전) — 이 메서드에 requestState가 오면 늘 거절(키가 프로세스마다 새것)
         "input_required_methods": sorted(methods.INPUT_REQUIRED_METHODS),
         "results": asyncio.run(results()),
+        "results_modern": modern_results(),
+        "server_info_stamp": json.dumps(LOW.server_info_stamp, separators=(",", ":")),
         "schemas": {
             "envelope": schema_of(TypeAdapter(jsonrpc.JSONRPCMessage)),
             "surface": surface,
             "handlers": handlers,
             "initialize_params": schema_of(mcp_types.InitializeRequestParams),
             "tool_args": tool_args,
+            "surface_modern": dict(sorted(surface_modern.items())),
+            "request_modern": schema_of(mcp_types.JSONRPCRequest),
+            "notification_modern": schema_of(mcp_types.JSONRPCNotification),
         },
     }
     check_functions(out["schemas"], "schemas")
