@@ -8,10 +8,14 @@
 //! - `test-db-clean` — 시험이 남긴 `syncdoc_local_test_*` DB를 지운다
 //! - `icon` — `packaging/icon.svg`에서 icon.ico·icon.png·tray.rgba를 만든다(카드 L4)
 //! - `mcp-tools [--check]` — 파이썬 판 MCP 서버에서 `crates/server/src/mcp/declarations.json`을 뽑는다(카드 L3)
+//! - `codegraph-diff` — 지금 커밋에 두 판의 코드 그래프 줄이기·보강을 돌려 비교한다(카드 L12)
+//! - `codegraph-golden [--check]` — 코드 그래프 정답 파일 `crates/codegraph/tests/golden/codegraph.json`을 파이썬 판으로(카드 L12)
 //! - `unicode-tables [--check]` — 파이썬 3.12의 문자 분류 표 `crates/pycompat/src/unicode.rs`를 뽑는다(카드 L5 · L12에서 crate로)
 //! - `spec-golden [--check]` — 명세 엔진의 정답 파일 `crates/core/tests/golden/spec.json`을 파이썬 판으로 만든다(카드 L5)
 //! - `spec-diff [--seed S] [--count N]` — 지금의 명세·git 이력·무작위 본문을 두 판에 돌려 비교한다(카드 L5)
 
+mod codegraph_diff;
+mod codegraph_golden;
 mod icon;
 mod mcp_tools;
 mod migrations;
@@ -75,6 +79,13 @@ enum Cmd {
         #[arg(long)]
         check: bool,
     },
+    /// 코드 그래프의 정답 파일을 파이썬 판으로 만든다 (--check: 다시 만들어 비교만)
+    CodegraphGolden {
+        #[arg(long)]
+        check: bool,
+    },
+    /// 코드 그래프 차이 시험 — 지금 커밋에 두 판의 줄이기·보강을 같은 원형으로 돌려 비교한다
+    CodegraphDiff,
     /// 명세 엔진 차이 시험 — 두 판에 같은 본문을 돌려 비교한다
     SpecDiff {
         #[arg(long, default_value_t = 20261008)]
@@ -97,6 +108,8 @@ async fn main() -> ExitCode {
         Cmd::UnicodeTables { check } => unicode_tables::run(check),
         Cmd::SpecGolden { check } => spec_golden::run(check),
         Cmd::SpecDiff { seed, count } => spec_diff::run(seed, count),
+        Cmd::CodegraphGolden { check } => codegraph_golden::run(check),
+        Cmd::CodegraphDiff => codegraph_diff::run(),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

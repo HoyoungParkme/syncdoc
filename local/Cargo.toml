@@ -47,6 +47,10 @@ rust-embed = { version = "8.12", features = ["interpolate-folder-path", "include
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order", "arbitrary_precision"] }
 sha2 = "0.10"
+tree-sitter = "0.25"
+tree-sitter-python = "=0.25.0"
+tree-sitter-rust = "=0.24.2"
+tree-sitter-typescript = "=0.23.2"
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres", "derive", "time"] }
 tempfile = "3"
 tao = "0.37"
