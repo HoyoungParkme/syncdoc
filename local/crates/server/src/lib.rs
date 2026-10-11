@@ -7,7 +7,7 @@ pub mod state;
 pub mod web;
 
 use axum::extract::DefaultBodyLimit;
-use axum::routing::{delete, get};
+use axum::routing::{delete, get, post};
 use axum::{Json, Router, middleware};
 use serde_json::{Value, json};
 use tower_http::catch_panic::CatchPanicLayer;
@@ -20,6 +20,7 @@ use crate::web::routes::account::{issue_token, list_tokens, me, revoke_token};
 use crate::web::routes::documents::diff;
 use crate::web::routes::documents::downstream;
 use crate::web::routes::documents::get_document;
+use crate::web::routes::documents::restore_document;
 use crate::web::routes::documents::trash_document;
 use crate::web::routes::documents::versions;
 use crate::web::routes::projects::{
@@ -63,6 +64,7 @@ pub fn app(state: AppState) -> Router {
             "/api/docs/{doc_id}",
             get(get_document).delete(trash_document),
         )
+        .route("/api/docs/{doc_id}/restore", post(restore_document))
         .merge(mcp::router(state.clone()))
         .route("/specs/", get(spec_copy))
         .route("/specs/{*path}", get(spec_copy))

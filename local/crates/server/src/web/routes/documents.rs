@@ -5,6 +5,8 @@ use std::sync::LazyLock;
 
 use axum::Json;
 use axum::extract::{Path, RawQuery, State};
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use num_bigint::BigInt;
 use syncdoc_core::account::model::UserRow;
 use syncdoc_core::account::service::AccountService;
@@ -21,7 +23,7 @@ use crate::compat::pyvalue::PyValue;
 use crate::state::AppState;
 use crate::web::auth::current_user;
 use crate::web::problem::ApiProblem;
-use crate::web::schemas::{Diff, Document, DownstreamView, TrashResult, Version};
+use crate::web::schemas::{Diff, Document, DownstreamView, SaveResult, TrashResult, Version};
 
 static VERSION_NO: LazyLock<Validator> = LazyLock::new(schemas::version_no);
 static FLAG: LazyLock<Validator> = LazyLock::new(schemas::flag);
@@ -155,4 +157,23 @@ pub async fn trash_document(
     )
     .await?;
     Ok(Json(TrashResult::from(&r)))
+}
+
+/// SYNC-API-001#POST/api/docs/{docId}/restore
+pub async fn restore_document(
+    State(state): State<AppState>,
+    Path(doc_id): Path<String>,
+) -> Result<Response, ApiProblem> {
+    let user = {
+        let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+        current_user(&mut c, &state).await?
+    };
+    let r = pipeline::restore_document(
+        &state.pool,
+        &state.repos,
+        &doc_id,
+        &human(&user, Entry::WebRevert),
+    )
+    .await?;
+    Ok((StatusCode::CREATED, Json(SaveResult::from(&r))).into_response())
 }
