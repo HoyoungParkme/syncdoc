@@ -84,7 +84,7 @@ crates/server/src/
 │   ├── static_files.rs         화면 빌드(rust-embed) · 캐시 규칙 · 304 (INFRA 4.1)
 │   ├── schemas.rs              응답 형태 (API-001 4장)
 │   └── routes/                 API-001 경로 — account(/api/me · /api/me/tokens) · specs(/specs) · projects(/api/projects 목록·만들기·지우기, L6 ·
-│                               상세·문서·문제 목록·관계도·첨부, L8) · documents(/api/docs 문서·이력·diff·추적표, L8) · references(항목·참조·체인, L8)
+│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8) · references(항목·참조·체인, L8)
 ├── mcp/                        /mcp — 파이썬 mcp SDK의 핸드셰이크 경로를 옮긴 것 (API-002 1장, 카드 L3)
 │   ├── auth.rs                 Bearer → AccountService.authenticate_token, 통과하면 응답 전에 커밋 (SEQ-C2)
 │   ├── transport.rs            streamable HTTP, 세션 없음 — Accept·Content-Type·본문 읽기·SSE 쓰기
@@ -385,6 +385,7 @@ classDiagram
         +list_versions(doc_id) Vec~Version~
         +recent_changes(project_id, n) Vec~Version~
         +list_items_by_project(project_id) Vec~ItemBrief~
+        +list_trashed(project_id) Vec~DocumentSummary~
     }
     class Document {
         +i32 id
@@ -437,7 +438,7 @@ classDiagram
 | [[SYNC-MS-014#SpecService.diff_bodies]] | `diff` · `cargo xtask spec-diff` | [[SYNC-MS-002#SpecService.diff]] | — |
 | [[SYNC-MS-014#SpecService.list_by_project]] | `queries.project_summary`(L6) · `queries.document_list`(L7) · `queries.project_items`·`graph_view`(L8) | [[SYNC-MS-002#SpecService.list_by_project]] | — |
 | [[SYNC-MS-014#SpecService.list_versions]] · [[SYNC-MS-014#SpecService.recent_changes]] | `GET /api/docs/{docId}/versions` · `queries.project_detail`(L8) | [[SYNC-MS-002#SpecService.list_versions]] | `not-found` |
-| [[SYNC-MS-014#SpecService.list_items_by_project]] · [[SYNC-MS-014#SpecService.resolve_items]] | `queries.graph_view` · `queries.diff_with_impact`(L8) | [[SYNC-MS-002#SpecService.list_items_by_project]] | — |
+| [[SYNC-MS-014#SpecService.list_items_by_project]] · [[SYNC-MS-014#SpecService.resolve_items]] · [[SYNC-MS-014#SpecService.list_trashed]] | `queries.graph_view` · `queries.diff_with_impact` · `queries.trash_list`(L8) | [[SYNC-MS-002#SpecService.list_items_by_project]] | — |
 | [[SYNC-MS-014#SpecService.issue_doc_id]] · [[SYNC-MS-014#SpecService.precondition]] · [[SYNC-MS-014#SpecService.create]] | 저장 파이프라인의 만들기 | [[SYNC-MS-002#SpecService.create]] | `precondition-unmet`(파이프라인이) |
 | [[SYNC-MS-014#SpecService.detect_deleted_items]] · [[SYNC-MS-014#SpecService.save]] · [[SYNC-MS-014#SpecService.item_pks]] | 저장 파이프라인의 고치기 | [[SYNC-MS-002#SpecService.save]] | — |
 | [[SYNC-MS-014#SpecService.get_document]] | 저장 파이프라인 · `queries.document_view` | [[SYNC-MS-002#SpecService.get_document]] | `not-found` |
@@ -604,8 +605,9 @@ classDiagram
 | [[SYNC-MS-018#queries.item_chain]] | `GET …/items/{itemId}/chain` | [[SYNC-MS-008#queries.item_chain]] | `not-found` · `item-deleted` |
 | [[SYNC-MS-018#queries.diff_with_impact]] | `GET /api/docs/{docId}/diff` | [[SYNC-MS-008#queries.diff_with_impact]] | `not-found` |
 | [[SYNC-MS-018#queries.downstream_view]] | `GET /api/docs/{docId}/downstream` | [[SYNC-MS-008#queries.downstream_view]] | `not-found` |
+| [[SYNC-MS-018#queries.trash_list]] | `GET /api/projects/{code}/trash` | [[SYNC-MS-008#queries.trash_list]] | `not-found` |
 
-모듈 함수다 — 연결을 첫 인자로 받는다. 나머지 조회(휴지통 L9·코드 L12·묻기 L14)는 그 카드가 더한다.
+모듈 함수다 — 연결을 첫 인자로 받는다. 나머지 조회(코드 L12·묻기 L14)는 그 카드가 더한다.
 
 ### 4.8 git (MS-019)
 
