@@ -897,3 +897,139 @@ pub struct CodeNodes {
     pub functions: Vec<CodeNode>,
     pub calls: Vec<(String, String)>,
 }
+
+// ── 대화·질문 (카드 L14) — DOM-002 2.8·2.9
+
+/// 첨부 메타 — 바이트·글자 없이 (DOM-002 2.8 `AttachmentMeta`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AttachmentMeta {
+    pub id: i32,
+    pub name: String,
+    pub mime: String,
+    pub size: i32,
+    pub turn_id: Option<i32>,
+    pub created_at: OffsetDateTime,
+}
+
+/// 진행 한 줄 — `note`(모델이 쓴 말)·`read`(읽은 것). 턴에 그대로 남는다
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Progress {
+    pub kind: String,
+    pub text: String,
+}
+
+/// 턴 하나 (DOM-002 2.8 `TurnView`) — `missing_refs`는 내보낼 때 답 속 없는 참조
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TurnView {
+    pub id: i32,
+    pub seq: i32,
+    pub question: String,
+    pub answer: Option<String>,
+    pub progress: Vec<Progress>,
+    pub context_item_ids: Vec<String>,
+    pub error: Option<String>,
+    pub attachments: Vec<AttachmentMeta>,
+    pub created_at: OffsetDateTime,
+    pub missing_refs: Vec<String>,
+}
+
+/// 대화 목록 한 줄 (DOM-002 2.8 `ConversationBrief`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConversationBrief {
+    pub id: i32,
+    pub title: String,
+    pub turn_count: i64,
+    pub updated_at: OffsetDateTime,
+}
+
+/// 대화 하나 (DOM-002 2.8 `ConversationView`) — 턴 전부 + 안 보낸 첨부
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConversationView {
+    pub id: i32,
+    pub title: String,
+    pub turn_count: i64,
+    pub updated_at: OffsetDateTime,
+    pub turns: Vec<TurnView>,
+    pub pending: Vec<AttachmentMeta>,
+    pub project_code: String,
+}
+
+/// 모델이 부를 도구 하나 (DOM-002 2.8 `ToolSpec`) — `parameters`는 JSON Schema
+#[derive(Clone, Debug, PartialEq)]
+pub struct ToolSpec {
+    pub name: &'static str,
+    pub description: &'static str,
+    pub parameters: serde_json::Value,
+}
+
+/// 모델의 도구 호출 하나 (DOM-002 2.8 `ToolCall`) — `arguments`는 JSON 객체
+#[derive(Clone, Debug, PartialEq)]
+pub struct ToolCall {
+    pub id: String,
+    pub name: String,
+    pub arguments: serde_json::Map<String, serde_json::Value>,
+}
+
+/// 토큰 수 (DOM-002 2.8 `LlmUsage`)
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct LlmUsage {
+    pub prompt_tokens: i64,
+    pub completion_tokens: i64,
+}
+
+/// 모델 한 번의 답 (DOM-002 2.8 `LlmStep`) — 글(없을 수 있다)·도구 호출·토큰
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct LlmStep {
+    pub text: Option<String>,
+    pub tool_calls: Vec<ToolCall>,
+    pub usage: LlmUsage,
+}
+
+/// 대화록 한 줄 — 우리 키(`role`·`text`)로 쌓고 와이어 형식은 어댑터가 옮긴다 (MS-009 llm.step 입력)
+#[derive(Clone, Debug, PartialEq)]
+pub enum LlmMessage {
+    /// `{role: user|assistant, text}` · 이 턴에 붙인 이미지는 user에만
+    Text {
+        role: &'static str,
+        text: String,
+        images: Vec<(String, Vec<u8>)>,
+    },
+    /// `{role: assistant, text, tool_calls}`
+    Calls {
+        text: String,
+        tool_calls: Vec<ToolCall>,
+    },
+    /// `{role: tool, tool_call_id, text}`
+    Tool { tool_call_id: String, text: String },
+}
+
+/// 도구 실행 결과 (DOM-002 2.8 `ToolResult`) — `target`은 「본 것」에 실을 것, 목록 도구는 없음
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ToolResult {
+    pub target: Option<String>,
+    pub text: String,
+}
+
+/// 질문 스트림의 이벤트 하나 (DOM-002 2.8 `AskEvent`, API-001 3.4)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AskEvent {
+    Start {
+        doc_id: Option<String>,
+        item_id: Option<String>,
+        key: Option<String>,
+    },
+    Delta(String),
+    Note(String),
+    Read {
+        tool: String,
+        target: Option<String>,
+    },
+    Answer {
+        answer: String,
+        context_item_ids: Vec<String>,
+        missing_refs: Vec<String>,
+    },
+}
+
+/// 질문 스트림 — 시작 뒤의 이벤트와 실패(`error` 이벤트). 통로가 닫히면 끝
+pub type AskStream = tokio::sync::mpsc::UnboundedReceiver<Result<AskEvent, crate::errors::Problem>>;

@@ -129,6 +129,24 @@ pub enum Problem {
     /// `rebuild-failed` — 재구축 실패, 롤백됨(500). `reason`은 실패한 단계의 문장
     #[error("재구축 실패, 롤백됨")]
     RebuildFailed { reason: String },
+    /// `attachment-type` — 받지 않는 파일 종류(415)
+    #[error("받지 않는 종류: {mime}")]
+    AttachmentType { mime: String },
+    /// `attachment-too-large` — 상한 초과(413). 이미지 10MiB, 글자·PDF 1MiB
+    #[error("너무 큽니다: {size}B > {limit}B")]
+    AttachmentTooLarge { limit: i64, size: i64 },
+    /// `attachment-limit` — 아직 안 보낸 첨부가 이미 상한(409)
+    #[error("한 질문에 {limit}개까지")]
+    AttachmentLimit { limit: i64 },
+    /// `attachment-sent` — 보낸 첨부는 턴의 일부라 못 뺀다(409)
+    #[error("이미 보낸 첨부는 뺄 수 없다")]
+    AttachmentSent { attachment_id: i64 },
+    /// `llm-not-configured` — 모델 키·주소가 없다(503)
+    #[error("모델 키가 없다 — 읽는 중 질의가 꺼져 있다")]
+    LlmNotConfigured,
+    /// `llm-unavailable` — 모델 호출 실패(424). 사용량 초과도 여기 접힌다
+    #[error("{reason}")]
+    LlmUnavailable { reason: String },
     /// `not-implemented` — 뒤 카드가 여는 기능 (파이썬 `NotImplementedYet`)
     #[error("{card}: 아직 구현되지 않음")]
     NotImplemented { card: String },
@@ -169,6 +187,12 @@ impl Problem {
             Problem::StorageMismatch { .. } => Some("storage-mismatch"),
             Problem::UploadTooLarge { .. } => Some("upload-too-large"),
             Problem::UploadPathRefused { .. } => Some("upload-path-refused"),
+            Problem::AttachmentType { .. } => Some("attachment-type"),
+            Problem::AttachmentTooLarge { .. } => Some("attachment-too-large"),
+            Problem::AttachmentLimit { .. } => Some("attachment-limit"),
+            Problem::AttachmentSent { .. } => Some("attachment-sent"),
+            Problem::LlmNotConfigured => Some("llm-not-configured"),
+            Problem::LlmUnavailable { .. } => Some("llm-unavailable"),
             Problem::NotImplemented { .. } => Some("not-implemented"),
             Problem::Internal { .. } | Problem::Git { .. } => Some("internal"),
         }
@@ -199,6 +223,11 @@ impl Problem {
             Problem::StorageMismatch { .. } => 409,
             Problem::UploadTooLarge { .. } => 413,
             Problem::UploadPathRefused { .. } => 422,
+            Problem::AttachmentType { .. } => 415,
+            Problem::AttachmentTooLarge { .. } => 413,
+            Problem::AttachmentLimit { .. } | Problem::AttachmentSent { .. } => 409,
+            Problem::LlmNotConfigured => 503,
+            Problem::LlmUnavailable { .. } => 424,
             Problem::NotImplemented { .. } => 501,
             Problem::Internal { .. } | Problem::Git { .. } => 500,
         }
@@ -315,7 +344,18 @@ impl Problem {
             Problem::DocumentHasHistory { inbound_refs } => {
                 vec![("inbound_refs", Value::from(inbound_refs.clone()))]
             }
-            Problem::AlreadyCurrent | Problem::DocumentNotTrashed => vec![],
+            Problem::AlreadyCurrent | Problem::DocumentNotTrashed | Problem::LlmNotConfigured => {
+                vec![]
+            }
+            Problem::AttachmentType { mime } => vec![("mime", Value::from(mime.as_str()))],
+            Problem::AttachmentTooLarge { limit, size } => {
+                vec![("limit", Value::from(*limit)), ("size", Value::from(*size))]
+            }
+            Problem::AttachmentLimit { limit } => vec![("limit", Value::from(*limit))],
+            Problem::AttachmentSent { attachment_id } => {
+                vec![("attachment_id", Value::from(*attachment_id))]
+            }
+            Problem::LlmUnavailable { reason } => vec![("reason", Value::from(reason.as_str()))],
             Problem::MethodNotAllowed { allow, .. } => vec![("allow", Value::from(allow.clone()))],
             Problem::ForbiddenOrigin { host, origin } => match (host, origin) {
                 (Some(h), _) => vec![("host", Value::from(h.as_str()))],

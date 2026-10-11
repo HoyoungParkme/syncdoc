@@ -1,6 +1,6 @@
 [package]
 name = "syncdoc_pycompat"
-description = "싱크독_로컬 파이썬 호환 — 문자 분류·repr·정규식·difflib·정수 set·random·sum (SYNC-DOM-004 crates/pycompat)"
+description = "싱크독_로컬 파이썬 호환 — 문자 분류·repr·정규식·difflib·정수 set·random·sum·json (SYNC-DOM-004 crates/pycompat)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,9 +8,8 @@ publish.workspace = true
 
 [dependencies]
 regex = { workspace = true }
-
-[dev-dependencies]
 serde_json = { workspace = true }
+
 
 [lints]
 workspace = true
