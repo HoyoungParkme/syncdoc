@@ -1058,3 +1058,37 @@ async fn upload_code_commits_once_refuses_paths_and_limits() {
     assert_eq!(git(&e.origin(), &["rev-parse", "main"]), head);
 }
 
+#[tokio::test]
+async fn moves_are_refused_on_the_local_edition() {
+    let e = env().await;
+    match pipeline::move_to_server(e.pool(), &e.repos, CODE, &e.user).await {
+        Err(Problem::StorageMismatch { storage, detail }) => {
+            assert_eq!(
+                (storage.as_str(), detail.as_deref()),
+                ("server", Some("이미 서버 저장이다"))
+            );
+        }
+        other => panic!("{other:?}"),
+    }
+    match pipeline::move_to_github(e.pool(), &e.repos, CODE, &e.user, "https://github.com/a/b")
+        .await
+    {
+        Err(Problem::StorageUnavailable { storage, enabled }) => {
+            assert_eq!(
+                (storage.as_str(), enabled),
+                ("github", vec!["server".to_string()])
+            );
+        }
+        other => panic!("{other:?}"),
+    }
+    let mut c = e.conn().await;
+    let stranger = user(&mut c, "stranger").await;
+    assert!(matches!(
+        pipeline::move_to_server(e.pool(), &e.repos, CODE, &stranger).await,
+        Err(Problem::NotFound { .. })
+    ));
+    assert!(matches!(
+        pipeline::move_to_github(e.pool(), &e.repos, CODE, &stranger, "x").await,
+        Err(Problem::NotFound { .. })
+    ));
+}

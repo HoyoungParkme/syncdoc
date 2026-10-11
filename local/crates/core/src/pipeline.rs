@@ -1432,6 +1432,27 @@ pub async fn move_to_server(
     })
 }
 
+/// SYNC-MS-017#pipeline.move_to_github
+///
+/// 서버 저장이고 GitHub 저장은 켜지 않은 방식이다 — 파이썬 판 1a에서 늘 멈춘다. `remote_url`은 받기만 한다
+pub async fn move_to_github(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+    remote_url: &str,
+) -> Result<MoveResult, Problem> {
+    let _ = remote_url;
+    let mut c = pool.acquire().await?;
+    ProjectService { db: &mut c, repos }
+        .get_owned(code, user)
+        .await?;
+    Err(Problem::StorageUnavailable {
+        storage: Storage::Github.as_str().to_string(),
+        enabled: vec![Storage::Server.as_str().to_string()],
+    })
+}
+
 /// SYNC-MS-017#pipeline.type_of_dir
 ///
 /// `06-DOM` → `DOM`, `STD` → `STD` — 앞 두 글자가 파이썬 `str.isdigit()`이고 `-`가 있을 때만 뗀다
