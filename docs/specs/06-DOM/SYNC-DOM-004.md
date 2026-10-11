@@ -85,7 +85,7 @@ crates/server/src/
 │   ├── static_files.rs         화면 빌드(rust-embed) · 캐시 규칙 · 304 (INFRA 4.1)
 │   ├── schemas.rs              응답 형태 (API-001 4장)
 │   └── routes/                 API-001 경로 — account(/api/me · /api/me/tokens) · specs(/specs) · projects(/api/projects 목록·만들기·지우기, L6 ·
-│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8 · 상태·되돌리기·휴지통·되살리기·완전 삭제, L9) · references(항목·참조·체인, L8) · git(/git 스마트 HTTP 입구 — 경로를 starlette 정규식처럼 가른다, L10) · admin(/api/admin/repos 동기화 상태·재구축·통지·지금 가져오기·옮기기, L11)
+│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8 · 상태·되돌리기·휴지통·되살리기·완전 삭제, L9) · references(항목·참조·체인, L8) · git(/git 스마트 HTTP 입구 — 경로를 starlette 정규식처럼 가른다, L10) · admin(/api/admin/repos 동기화 상태·재구축·통지·지금 가져오기·옮기기, L11) · code(코드 탭·코드 보기·관계도 코드 호출·코드 그래프의 코드, L12)
 ├── mcp/                        /mcp — 파이썬 mcp SDK의 핸드셰이크 경로를 옮긴 것 (API-002 1장, 카드 L3)
 │   ├── auth.rs                 Bearer → AccountService.authenticate_token, 통과하면 응답 전에 커밋 (SEQ-C2)
 │   ├── transport.rs            streamable HTTP, 세션 없음 — Accept·Content-Type·본문 읽기·SSE 쓰기
