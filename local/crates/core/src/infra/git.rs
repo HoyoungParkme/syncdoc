@@ -153,6 +153,49 @@ impl Git {
         })
     }
 
+    /// git 입구의 자식 — 본문을 표준 입력으로 넣는 일과 출력을 읽는 일을 동시에(차례로 하면 파이프가 찬다).
+    /// 끝 코드와 상관없이 표준 출력을 돌려준다 — http-backend도 응답을 보낸 뒤에야 끝 코드를 본다
+    async fn pipe(
+        &self,
+        args: &[&OsStr],
+        input: Vec<u8>,
+        protocol: Option<&str>,
+    ) -> Result<Vec<u8>, Problem> {
+        let mut c = self.command(None, args);
+        c.stdin(Stdio::piped());
+        if let Some(p) = protocol {
+            c.env("GIT_PROTOCOL", p);
+        }
+        let mut child = c.spawn().map_err(|e| Problem::Internal {
+            log: format!("{}을 못 돌렸다 — {e}", cmd_text(args)),
+        })?;
+        let mut stdin = child.stdin.take();
+        let feed = tokio::spawn(async move {
+            if let Some(w) = stdin.as_mut() {
+                use tokio::io::AsyncWriteExt;
+                // 자식이 먼저 끝났으면(거절 등) 그 답은 표준 출력에 있다
+                let _ = w.write_all(&input).await;
+                let _ = w.shutdown().await;
+            }
+        });
+        let out = child
+            .wait_with_output()
+            .await
+            .map_err(|e| Problem::Internal {
+                log: format!("{}을 기다리지 못했다 — {e}", cmd_text(args)),
+            })?;
+        let _ = feed.await;
+        if !out.status.success() {
+            tracing::warn!(
+                "{} 끝 코드 {:?} — {}",
+                cmd_text(args),
+                out.status.code(),
+                String::from_utf8_lossy(&out.stderr)
+            );
+        }
+        Ok(out.stdout)
+    }
+
     /// 끝 코드가 0이 아니면 `Problem::Git`(파이썬 `_run`)
     async fn run(&self, cwd: Option<&Path>, args: &[&OsStr]) -> Result<String, Problem> {
         let o = self.exec(cwd, args).await?;
@@ -526,6 +569,33 @@ impl Git {
         strip(&out).parse().map_err(|_| Problem::Internal {
             log: format!("git rev-list --count {range}의 출력이 수가 아니다: {out}"),
         })
+    }
+
+    /// SYNC-MS-019#Git.advertise_refs
+    ///
+    /// http-backend `get_info_refs` 그대로 — v2가 아니면 앞에 `# service=…` pkt-line과 flush
+    pub async fn advertise_refs(
+        &self,
+        origin: &Path,
+        service: &str,
+        protocol: Option<&str>,
+    ) -> Result<Vec<u8>, Problem> {
+        let mut out = Vec::new();
+        if !protocol.is_some_and(|p| p.contains("version=2")) {
+            let line = format!("# service={service}\n");
+            out.extend(format!("{:04x}{line}0000", line.len() + 4).into_bytes());
+        }
+        let sub = service.strip_prefix("git-").unwrap_or(service);
+        let o: &OsStr = origin.as_os_str();
+        out.extend(
+            self.pipe(
+                &[os(sub), os("--stateless-rpc"), os("--advertise-refs"), o],
+                Vec::new(),
+                protocol,
+            )
+            .await?,
+        );
+        Ok(out)
     }
 }
 
