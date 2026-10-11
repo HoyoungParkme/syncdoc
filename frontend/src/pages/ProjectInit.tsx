@@ -1,6 +1,6 @@
 /** UI-3 프로젝트 초기화 — SYNC-UI-002#UI-3. **UI-2 위의 다이얼로그**. UC-A1 사람 경로.
  *  1 헤더 · 2 입력 폼(2.7 저장 방식, 2.1 주소, 2.2 코드, 2.3 이름, 2.4 코드 오류, 2.5 커밋될 것,
- *  2.6 없으면 만든다, 2.8 공개 여부)
+ *  2.6 없으면 만든다, 2.8 공개 여부, 2.9 번들 파일 — 서버 저장이면 다른 곳의 저장소를 옮겨 온다(카드 BX))
  *  3.1 초기화 · 3.2 취소 · 3.3 닫기(✕) · 4 기존 명세 발견(4.1 가져와서 등록, 4.2 취소) · 5 push 실패
  *  화면은 검사하지 않는다 — 서버가 코드 형식·중복 → 저장소 접근 → docs/specs 존재 순으로 판정한다. */
 import { useState } from 'react'
@@ -40,11 +40,18 @@ export function ProjectInit({
   const [createRepo, setCreateRepo] = useState(false)
   // 2.8 — 새로 만들 저장소의 공개 여부. 처음 선택은 서버 설정(기본 비공개)이라 고르지 않으면 실수로 공개되지 않는다 (카드 BS)
   const [priv, setPriv] = useState(repoPrivate)
+  // 2.9 — 번들 파일. 서버 저장일 때만, 고르면 그 커밋으로 가져온다(UC-A1 1c, 카드 BX)
+  const [bundle, setBundle] = useState<File | null>(null)
 
   async function submit(importExisting = false) {
     setCodeErr('')
     setBanner('')
     try {
+      if (server && bundle) {
+        await api.form('/api/projects/bundle', { code, name, bundle })
+        onDone()
+        return
+      }
       await api.post('/api/projects', {
         storage,
         remote_url: server ? null : remote,
@@ -70,6 +77,7 @@ export function ProjectInit({
       // 저장소는 만들어졌을 수도 있다 — 앱이 남의 저장소를 지우지 않는다(카드 F)
       else if (k === 'repo-create-failed') setBanner(`저장소를 만들지 못했습니다: ${String(e.problem.reason ?? '')}`)
       else if (k === 'not-implemented') setBanner('기존 명세 가져오기는 아직 구현되지 않았습니다(B4).')
+      else if (k === 'bundle-invalid') setBanner(`번들을 가져오지 못했습니다: ${String(e.problem.reason ?? '')}`)
       else setBanner(e.message)
       setExisting((x) => (k === 'existing-specs' ? x : null))
     }
@@ -121,6 +129,17 @@ export function ProjectInit({
         )}
         <label>이름</label>
         <input className="inp wide" data-el="2.3" value={name} onChange={(e) => setName(e.target.value)} placeholder="데모 프로젝트" />
+        {server && (
+          <>
+            <label>
+              번들 파일 <span className="lbl">(선택 — 다른 곳의 저장소를 옮겨 올 때)</span>
+            </label>
+            <input type="file" data-el="2.9" accept=".bundle" onChange={(e) => setBundle(e.target.files?.[0] ?? null)} />
+            <div className="lbl">
+              <code>git bundle create 이름.bundle --all</code>로 만든 파일
+            </div>
+          </>
+        )}
         {!server && (
           <label className="chk">
             <input type="checkbox" data-el="2.6" checked={createRepo} onChange={(e) => setCreateRepo(e.target.checked)} />{' '}
@@ -142,10 +161,16 @@ export function ProjectInit({
         {existing === null && (
           <div className="willcommit" data-el="2.5">
             <b>커밋될 것</b>
-            {server && <div>이 서버 안에 저장소를 새로 만든다</div>}
-            <div className="mono">docs/specs/{'{01-RFQ, 02-PRD, … , 11-CODE}'}/ · STD/</div>
-            <div className="mono">docs/specs/assets/</div>
-            <div className="mono">docs/specs/README.md — 규약 링크</div>
+            {server && bundle ? (
+              <div>번들의 커밋을 그대로 가져온다 — 골격 커밋을 만들지 않는다</div>
+            ) : (
+              <>
+                {server && <div>이 서버 안에 저장소를 새로 만든다</div>}
+                <div className="mono">docs/specs/{'{01-RFQ, 02-PRD, … , 11-CODE}'}/ · STD/</div>
+                <div className="mono">docs/specs/assets/</div>
+                <div className="mono">docs/specs/README.md — 규약 링크</div>
+              </>
+            )}
           </div>
         )}
         {banner && (
