@@ -95,11 +95,21 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | L6 · #353 |
 | 완료 | 2026-10-08 · 브랜치 `card/L7-save-pipeline`(4a56078 #355) · 선행 #353(#354 — 파이썬 판 참조 조회 차례·`get_references`의 `raw_target` 덮어쓰기) · spec 14 + code 45 · `cargo test` 111(파이프라인 끝에서 끝 — 시험 DB + 진짜 git: 동시 저장 둘이면 둘째가 `version-conflict`, 부른 쪽을 버려도 저장이 끝까지, 밖의 커밋은 `not-implemented(L11)`, 쓰기 락 기다림) · 계약 `--target both --with-card L7` 447 통과·1 건너뜀(보관본 재구축 L11) — 스냅숏 `documents_closed` 51 사례가 파이썬 판과 바이트로 같다(해시·시각만 가림) · 문서 도구만 겨냥한 두 판 차이 시험(상태를 쌓으며 무작위 본문·참조·항목) 씨앗 1·2·3·77 × 1000 다른 것 0(씨앗 2 — 저장 165·삭제 확인 23·참조 조회 111) · L3 차이 시험 씨앗 1·2·3 × 2000 다른 것 0 · `spec-golden --check`·`spec-diff`(4692 사례) 다른 것 0 · xtask `--check` 넷·`schema-check` · clippy(리눅스·윈도) · 윈도 `cargo check` · 워크플로 녹색 · `check_code` Rust 77/77 · `check_calls` 0 · 되먹임: MCP 도구의 예상 밖 실패(git·DB)는 mcp 2.2.0처럼 「Error executing tool {name}」뿐(L6부터 글을 붙이고 있었다 — 빈 커밋 메시지 사례가 찾음), MS-017 테스트 관점 — 에이전트가 지운 ID를 다시 쓰면 `item.reused`(되살리기는 웹, L9), 「호출하는 것」 빠진 것(check_calls — MS-014 다섯·MS-015 extract·MS-017), L3 계약의 JSON 깊이 「넘음」을 9988로(파이썬 판이 같은 프로세스에서도 9987겹을 읽기도 못 읽기도 한다) |
 
+#### L8 웹 읽기 — 화면이 프로젝트·문서·이력·관계도·체인을 읽는다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-MS-008]] · [[SYNC-MS-002]] · [[SYNC-MS-003]] · [[SYNC-MS-001#ProjectService.asset_path]] · [[SYNC-SCN-001#S2]] · [[SYNC-SCN-001#S3]] · [[SYNC-SCN-001#S4]] · [[SYNC-SCN-001#S6]] · [[SYNC-UI-002]] UI-2·4·5·7·8·9·15·18 · 에이전트 판단 2026-10-11(사용자 목표 「끝까지」 — 묻지 않고 진행, 끝에 모아 보고): 휴지통 목록은 L9 · 커밋 이메일은 L11 · 파이썬 `set` 차례까지 바이트로(`pycompat::pyset`) · 첨부 content-type은 파이썬 판 컨테이너(/etc/mime.types 없음)의 답 그대로 · `versions`는 파이썬 경로처럼 소유 검사가 없다 |
+| 구현 | [[SYNC-MS-014#SpecService.resolve_items]] · [[SYNC-MS-014#SpecService.list_versions]] · [[SYNC-MS-014#SpecService.recent_changes]] · [[SYNC-MS-014#SpecService.list_items_by_project]] · [[SYNC-MS-015#ReferenceService.references_among]] · [[SYNC-MS-015#ReferenceService.count_downstream]] · [[SYNC-MS-015#ReferenceService.missing_in_project]] · [[SYNC-MS-013#ProjectService.asset_path]] · [[SYNC-MS-018#queries.project_detail]] · [[SYNC-MS-018#queries.project_items]] · [[SYNC-MS-018#queries.graph_view]] · [[SYNC-MS-018#queries.item_chain]] · [[SYNC-MS-018#queries.diff_with_impact]] · [[SYNC-MS-018#queries.downstream_view]] · 층 코드 — `types.rs` 이력·관계도·체인·추적표 DTO · `pycompat/pyset.rs` · server: 경로 열둘, `schemas.rs` 응답 꼴(작성자 이름까지), `compat/fastapi.rs` 질의 문자열 검증 |
+| API | [[SYNC-API-001#GET/api/projects/{code}]] · [[SYNC-API-001#GET/api/projects/{code}/docs]] · [[SYNC-API-001#GET/api/projects/{code}/flags]] · [[SYNC-API-001#GET/api/projects/{code}/graph]] · [[SYNC-API-001#GET/api/projects/{code}/files/{path}]] · [[SYNC-API-001#GET/api/docs/{docId}]] · [[SYNC-API-001#GET/api/docs/{docId}/versions]] · [[SYNC-API-001#GET/api/docs/{docId}/diff]] · [[SYNC-API-001#GET/api/docs/{docId}/downstream]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/references]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/chain]] |
+| 테스트 | `cargo test`(조회는 시험 DB + 진짜 git, `pyset`은 파이썬에서 뜬 차례와 비교) · 계약 L8 — MCP로 쌓은 프로젝트를 REST로 읽어 파이썬 판과 바이트로(해시·시각 가림): 상세·목록(단계·상태 조건과 422)·문제 목록 셋·관계도(범위)·첨부 not-found·문서·이력·diff(422·not-found)·추적표·항목·참조·체인 · 사람 확인 — 화면 UI-2·4·5·7·8·9·15·18을 data-el대로 |
+| 선행 | L7 |
+| 완료 | — |
+
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
-| L8 웹 읽기 | 나머지 조회와 GET 경로(UI-2·4·5·7·8·9·15·18) | L7 | L |
 | L9 상태·되돌리기·휴지통 | 상태 바꾸기·되돌리기·휴지통·되살리기·영구 삭제 | L7 | M |
 | L10 git 입구·코드 올리기 | upload-pack·receive-pack(`main`) · `/git/*` · `upload_code` | L9 | L |
 | L11 따라잡기·재구축 | 커밋 처리·재구축·주기 확인·관리 경로·기존 저장소 들이기 | L10 · #325 | L |
