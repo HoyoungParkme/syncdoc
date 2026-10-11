@@ -109,6 +109,9 @@ pub enum Problem {
     /// `push-failed` — git이 원격에 못 밀었다(424)
     #[error("{reason}")]
     PushFailed { reason: String },
+    /// `rebuild-failed` — 재구축 실패, 롤백됨(500). `reason`은 실패한 단계의 문장
+    #[error("재구축 실패, 롤백됨")]
+    RebuildFailed { reason: String },
     /// `not-implemented` — 뒤 카드가 여는 기능 (파이썬 `NotImplementedYet`)
     #[error("{card}: 아직 구현되지 않음")]
     NotImplemented { card: String },
@@ -145,6 +148,7 @@ impl Problem {
             Problem::ProjectCodeConflict { .. } => Some("project-code-conflict"),
             Problem::ExistingSpecs { .. } => Some("existing-specs"),
             Problem::PushFailed { .. } => Some("push-failed"),
+            Problem::RebuildFailed { .. } => Some("rebuild-failed"),
             Problem::NotImplemented { .. } => Some("not-implemented"),
             Problem::Internal { .. } | Problem::Git { .. } => Some("internal"),
         }
@@ -171,6 +175,7 @@ impl Problem {
             Problem::StorageUnavailable { .. } | Problem::ProjectCodeInvalid { .. } => 422,
             Problem::ProjectCodeConflict { .. } | Problem::ExistingSpecs { .. } => 409,
             Problem::PushFailed { .. } => 424,
+            Problem::RebuildFailed { .. } => 500,
             Problem::NotImplemented { .. } => 501,
             Problem::Internal { .. } | Problem::Git { .. } => 500,
         }
@@ -358,7 +363,9 @@ impl Problem {
                 }
                 v
             }
-            Problem::PushFailed { reason } => vec![("reason", Value::from(reason.as_str()))],
+            Problem::PushFailed { reason } | Problem::RebuildFailed { reason } => {
+                vec![("reason", Value::from(reason.as_str()))]
+            }
             Problem::NotImplemented { card } => vec![("card", Value::from(card.as_str()))],
             Problem::Blank { .. } | Problem::Internal { .. } | Problem::Git { .. } => vec![],
         }

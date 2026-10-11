@@ -703,3 +703,21 @@ pub struct Commit {
     pub email: String,
     pub path: String,
 }
+
+/// 재구축 결과의 규약 오류 한 줄 (API-001 `RebuildResult.convention_errors[]`)
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct RebuildError {
+    pub doc_id: String,
+    pub detail: String,
+}
+
+/// 재구축 결과 (API-001 `RebuildResult`, 카드 L11) — `readme_updated`는 재구축 위임이 채운다
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RebuildResult {
+    pub docs: i64,
+    pub items: i64,
+    pub references: i64,
+    pub versions: i64,
+    pub convention_errors: Vec<RebuildError>,
+    pub readme_updated: bool,
+}

@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use indexmap::IndexMap;
 use regex::{NoExpand, Regex};
-use sqlx::PgPool;
+use sqlx::{Connection, PgConnection, PgPool};
 
 use crate::account::model::UserRow;
 use crate::account::repo as account_repo;
@@ -24,9 +24,11 @@ use crate::pycompat::re::compile;
 use crate::pycompat::repr::repr;
 use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
+use crate::spec::repo as spec_repo;
 use crate::types::{
-    Author, AuthorKind, ChangedFile, DeletedItem, DocStatus, DocType, Document, Entry, RefEdge,
-    SaveResult, TrashResult, ValidateResult, Violation, py_isoformat, spec_dir, stage_of,
+    Author, AuthorKind, ChangedFile, DeletedItem, DocStatus, DocType, Document, Entry,
+    RebuildError, RebuildResult, RefEdge, SaveResult, TrashResult, ValidateResult, Violation,
+    py_isoformat, spec_dir, stage_of,
 };
 
 /// frontmatter의 `status:` 줄 — 첫 것 하나만 갈아 끼운다(파이썬 `_set_status`, `re.M`)
@@ -1112,6 +1114,174 @@ pub async fn purge_document(
         .await?;
     tx.commit().await?;
     Ok(())
+}
+
+/// SYNC-MS-017#pipeline.rebuild
+///
+/// 쓰기 락을 쥐고 `conn` 위에 트랜잭션 하나 — 이미 트랜잭션이면 저장점(보관본 가져오기가 막 넣은 행을 본다).
+/// 어느 단계든 실패하면 되돌리고 `rebuild-failed`
+pub async fn rebuild(
+    conn: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+) -> Result<RebuildResult, Problem> {
+    let lock = write_lock(code);
+    let _held = lock.lock().await;
+    let mut tx = conn.begin().await?;
+    let (project, repo) = ProjectService { db: &mut tx, repos }.get(code).await?;
+    match rebuild_in(&mut tx, repos, &project, &repo).await {
+        Ok(result) => {
+            tx.commit().await?;
+            Ok(result)
+        }
+        Err(e) => {
+            drop(tx); // 되돌린다 — DB는 재구축 전과 같다
+            tracing::warn!("rebuild {code} 실패: {e}");
+            Err(Problem::RebuildFailed {
+                reason: e.to_string(),
+            })
+        }
+    }
+}
+
+/// `rebuild` 2~8 — 트랜잭션 안에서
+async fn rebuild_in(
+    tx: &mut PgConnection,
+    repos: &ServerRepos,
+    project: &crate::project::model::ProjectRow,
+    repo: &crate::project::model::RepositoryRow,
+) -> Result<RebuildResult, Problem> {
+    let workdir = PathBuf::from(&repo.workdir_path);
+    let mut result = RebuildResult::default();
+    // 2
+    let head = repos.git.fetch(&workdir).await?;
+    repos.git.checkout(&workdir, "origin/main").await?;
+    // 4. 판을 가리키는 외래 키는 참조의 것 하나 — 먼저 지운다(#38)
+    ReferenceService { db: &mut *tx }.clear(project.id).await?;
+    SpecService { db: &mut *tx }.clear_index(project.id).await?;
+    // 5·6
+    for path in repos.git.list(&workdir, "docs/specs/*/*.md", &head).await? {
+        let doc_id = path_stem(&path).to_string();
+        let parts = path_parts(&path);
+        let dir_type = if parts.len() > 3 {
+            type_of_dir(parts[2])
+        } else {
+            String::new()
+        };
+        if DocType::parse(&dir_type).is_none() {
+            result.convention_errors.push(RebuildError {
+                doc_id,
+                detail: format!("frontmatter.doc_id: 알 수 없는 디렉터리 {dir_type}"),
+            });
+            continue;
+        }
+        let mut document = match (SpecService { db: &mut *tx }).get_document(&doc_id).await {
+            Ok(d) => Some(d),
+            Err(Problem::NotFound { .. }) => None,
+            Err(p) => return Err(p),
+        };
+        for c in repos.git.log(&workdir, &path).await? {
+            // 그 커밋 시점의 경로로 읽는다 — 이름이 바뀐 문서는 옛 커밋에서 옛 경로에 있다(#39)
+            let at = if c.path.is_empty() { &path } else { &c.path };
+            let body = repos.git.read(&workdir, at, &c.hash).await?;
+            let user = AccountService { db: &mut *tx }
+                .user_for_commit(&c.email, &c.login)
+                .await?;
+            let author = Author {
+                kind: AuthorKind::Human,
+                user,
+                instructed_by: None,
+                via: Entry::Github,
+            };
+            let mut spec = SpecService { db: &mut *tx };
+            match &document {
+                Some(doc) if c.message.starts_with("status(") => {
+                    spec.apply_status(doc, &body, Some(&c.hash), &author, None)
+                        .await?;
+                }
+                _ => {
+                    let vr = spec.validate(&body, &dir_type, Entry::Github, None).await?;
+                    match &document {
+                        None => {
+                            spec.create(
+                                project.id, &doc_id, &dir_type, &body, &c.hash, &author,
+                                &c.message, &vr,
+                            )
+                            .await?;
+                        }
+                        Some(doc) => {
+                            let deleted = spec.detect_deleted_items(doc, &body).await?;
+                            spec.save(
+                                doc, &body, &c.hash, &author, &c.message, &deleted, &vr, true, None,
+                            )
+                            .await?;
+                        }
+                    }
+                    result.versions += 1;
+                }
+            }
+            document = Some(spec.get_document(&doc_id).await?);
+        }
+        let Some(document) = document else {
+            continue;
+        };
+        let (fm, _) = parse_frontmatter(&document.body);
+        let upstream = fm
+            .get("upstream")
+            .map_or("", String::as_str)
+            .trim_matches(['[', ']']);
+        let upstream_ids: Vec<String> = UPSTREAM_TOKEN
+            .find_iter(upstream)
+            .map(|m| m.as_str().to_string())
+            .collect();
+        // 판을 가리키는 칸은 비울 수 없다 — 판 없는 문서(이력이 status( 커밋뿐)는 파이썬 판도 DB가 거절한다
+        let version_id = spec_repo::latest_version(&mut *tx, document.summary.id)
+            .await?
+            .map(|v| v.id)
+            .ok_or_else(|| Problem::Internal {
+                log: format!("{doc_id}에 판이 없다"),
+            })?;
+        let item_pks = SpecService { db: &mut *tx }
+            .item_pks(document.summary.id)
+            .await?;
+        let ex = ReferenceService { db: &mut *tx }
+            .extract(
+                document.summary.id,
+                version_id,
+                &document.body,
+                &item_pks,
+                &upstream_ids,
+            )
+            .await?;
+        let mut spec = SpecService { db: &mut *tx };
+        let vr = spec
+            .validate(&document.body, &dir_type, Entry::Github, None)
+            .await?;
+        spec.mark_convention_error(document.summary.id, &vr).await?;
+        if !vr.violations.is_empty() {
+            let detail = vr
+                .violations
+                .iter()
+                .map(|v| format!("{}: {}", v.rule, v.message))
+                .collect::<Vec<_>>()
+                .join("\n");
+            result
+                .convention_errors
+                .push(RebuildError { doc_id, detail });
+        }
+        result.docs += 1;
+        result.items += document.items.len() as i64;
+        result.references += ex.added;
+    }
+    // 7. 파일 차례 때문에 미존재였던 참조를 푼다
+    ReferenceService { db: &mut *tx }
+        .resolve_missing(project.id, None)
+        .await?;
+    // 8. 재구축은 head까지 읽었다
+    let now = clock::now();
+    project_repo::advance_processed(&mut *tx, repo.id, &head, now).await?;
+    project_repo::set_fetched(&mut *tx, repo.id, now).await?;
+    Ok(result)
 }
 
 /// SYNC-MS-017#pipeline.type_of_dir

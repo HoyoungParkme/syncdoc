@@ -716,3 +716,135 @@ async fn trashed_deletes_skip_and_name_mismatch_marks_and_unknown_dir_stalls() {
     assert_eq!(e.read_pending().await, 0);
     assert_eq!(e.processed().await, h);
 }
+
+impl Env {
+    async fn rebuild(&self) -> Result<syncdoc_core::types::RebuildResult, Problem> {
+        let mut c = self.conn().await;
+        pipeline::rebuild(&mut c, &self.repos, CODE).await
+    }
+}
+
+#[tokio::test]
+async fn rebuild_matches_repository_keeps_item_pks_and_is_idempotent() {
+    let e = env().await;
+    let out = e.outside();
+    write(
+        &out,
+        "docs/specs/02-PRD/LS-PRD-001.md",
+        &prd_file("draft", "설명."),
+    );
+    write(
+        &out,
+        "docs/specs/03-SCN/LS-SCN-001.md",
+        &scn_file("LS-SCN-001", "[[LS-PRD-001#R1]] [[LS-PRD-009#R1]]"),
+    );
+    commit_push(&out, "spec: 둘");
+    write(
+        &out,
+        "docs/specs/02-PRD/LS-PRD-001.md",
+        &prd_file("draft", "고친 설명."),
+    );
+    commit_push(&out, "spec: PRD 고침");
+    e.read_pending().await;
+    pipeline::change_status(
+        e.pool(),
+        &e.repos,
+        "LS-PRD-001",
+        DocStatus::Approved,
+        &e.author(Entry::WebStatus),
+        None,
+    )
+    .await
+    .expect("완료로");
+    let mut c = e.conn().await;
+    let pks_before = scalar_i64(&mut c, "SELECT sum(id)::bigint FROM items").await;
+    let r = e.rebuild().await.expect("재구축");
+    // PRD 판 둘 + SCN 하나 — status( 커밋은 판이 아니다
+    assert_eq!((r.docs, r.items, r.versions), (2, 3, 3));
+    assert_eq!(r.references, 3, "{r:?}"); // R1→, 없는 PRD-009, 문서 upstream
+    assert!(r.convention_errors.is_empty(), "{:?}", r.convention_errors);
+    assert_eq!(
+        scalar_i64(&mut c, "SELECT sum(id)::bigint FROM items").await,
+        pks_before
+    );
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            "SELECT count(*) FROM status_changes WHERE commit_hash IS NOT NULL"
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            "SELECT count(*) FROM documents WHERE doc_id = 'LS-PRD-001' AND status = 'approved'"
+        )
+        .await,
+        1
+    );
+    let head = git(&e.origin(), &["rev-parse", "main"]);
+    assert_eq!(e.processed().await, head);
+    // 두 번 — 같다, 상태 변경 행이 쌓이지 않는다
+    let r2 = e.rebuild().await.expect("다시");
+    assert_eq!((r2.docs, r2.versions), (2, 3));
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            "SELECT count(*) FROM status_changes WHERE commit_hash IS NOT NULL"
+        )
+        .await,
+        1
+    );
+}
+
+#[tokio::test]
+async fn rebuild_survives_deleted_then_recreated_and_rolls_back_on_failure() {
+    let e = env().await;
+    let out = e.outside();
+    write(
+        &out,
+        "docs/specs/02-PRD/LS-PRD-001.md",
+        &prd_file("draft", "설명."),
+    );
+    commit_push(&out, "spec: PRD");
+    git(&out, &["rm", "-q", "docs/specs/02-PRD/LS-PRD-001.md"]);
+    commit_push(&out, "trash(LS-PRD-001)");
+    write(
+        &out,
+        "docs/specs/02-PRD/LS-PRD-001.md",
+        &prd_file("draft", "다시."),
+    );
+    commit_push(&out, "spec: 다시");
+    write(&out, "docs/specs/BOGUS/LS-X-001.md", "x\n");
+    commit_push(&out, "모르는 디렉터리");
+    let r = e.rebuild().await.expect("지운 커밋이 있어도 끝난다(#325)");
+    assert_eq!((r.docs, r.versions), (1, 2));
+    assert_eq!(r.convention_errors.len(), 1);
+    assert_eq!(
+        (
+            r.convention_errors[0].doc_id.as_str(),
+            r.convention_errors[0].detail.as_str()
+        ),
+        ("LS-X-001", "frontmatter.doc_id: 알 수 없는 디렉터리 BOGUS")
+    );
+    // 실패 → 되돌린다
+    let mut c = e.conn().await;
+    let versions = scalar_i64(&mut c, "SELECT count(*) FROM versions").await;
+    sqlx::query("UPDATE repositories SET workdir_path = '/없는/자리'")
+        .execute(&mut *c)
+        .await
+        .expect("자리");
+    assert!(matches!(
+        e.rebuild().await,
+        Err(Problem::RebuildFailed { .. })
+    ));
+    assert_eq!(
+        scalar_i64(&mut c, "SELECT count(*) FROM versions").await,
+        versions
+    );
+    assert!(matches!(
+        pipeline::rebuild(&mut c, &e.repos, "NOPE").await,
+        Err(Problem::NotFound { .. })
+    ));
+}
