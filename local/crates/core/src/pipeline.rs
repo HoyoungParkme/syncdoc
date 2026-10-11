@@ -289,7 +289,8 @@ async fn process_file_inner(
     };
     if f.status == "D" {
         let mut tx = pool.begin().await?;
-        let document = match (SpecService { db: &mut tx }).get_document(&doc_id).await {
+        let found = SpecService { db: &mut tx }.get_document(&doc_id).await;
+        let document = match found {
             // 앱이 완전 삭제로 지운 문서의 삭제 커밋이거나 등록 전에 사라진 파일
             Err(Problem::NotFound { .. }) => return Ok(Vec::new()),
             Err(p) => return Err(p),
@@ -308,7 +309,8 @@ async fn process_file_inner(
     // 앱이 직접 민 커밋(저장·상태·되돌리기)은 이미 기록돼 있다 — 다시 저장하면 같은 커밋의 판이 둘
     let known: Vec<String> = {
         let mut c = pool.acquire().await?;
-        match (SpecService { db: &mut c }).list_versions(&doc_id).await {
+        let versions = SpecService { db: &mut c }.list_versions(&doc_id).await;
+        match versions {
             Ok(vs) => vs.into_iter().map(|v| v.commit_hash).collect(),
             Err(Problem::NotFound { .. }) => Vec::new(),
             Err(p) => return Err(p),
@@ -433,26 +435,29 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
     let mut body = input.body.clone();
     // 2·3. 대상 문서 또는 생성
     let (doc_id, doc_type, document): (String, String, Option<Document>) = match &input.doc_id {
-        Some(d) => match (SpecService { db: &mut tx }).get_document(d).await {
-            // github 신규 파일 — 파일 이름이 doc_id, frontmatter는 그대로
-            Err(Problem::NotFound { .. }) if github => {
-                (d.clone(), input.doc_type.clone().unwrap_or_default(), None)
-            }
-            Err(p) => return Err(p),
-            Ok(doc) => {
-                // 2. 휴지통 문서는 되살린 뒤 고친다 — 되살림은 이 검사를 지난다. github은 파일이
-                // 다시 push된 것 자체가 되살리기다(save가 휴지통을 비운다)
-                if let Some(t) = doc.summary.trashed_at
-                    && !input.restore
-                    && !github
-                {
-                    return Err(Problem::DocumentTrashed {
-                        trashed_at: py_isoformat(t),
-                    });
+        Some(d) => {
+            let found = SpecService { db: &mut tx }.get_document(d).await;
+            match found {
+                // github 신규 파일 — 파일 이름이 doc_id, frontmatter는 그대로
+                Err(Problem::NotFound { .. }) if github => {
+                    (d.clone(), input.doc_type.clone().unwrap_or_default(), None)
                 }
-                (d.clone(), doc.summary.doc_type.clone(), Some(doc))
+                Err(p) => return Err(p),
+                Ok(doc) => {
+                    // 2. 휴지통 문서는 되살린 뒤 고친다 — 되살림은 이 검사를 지난다. github은 파일이
+                    // 다시 push된 것 자체가 되살리기다(save가 휴지통을 비운다)
+                    if let Some(t) = doc.summary.trashed_at
+                        && !input.restore
+                        && !github
+                    {
+                        return Err(Problem::DocumentTrashed {
+                            trashed_at: py_isoformat(t),
+                        });
+                    }
+                    (d.clone(), doc.summary.doc_type.clone(), Some(doc))
+                }
             }
-        },
+        }
         None => {
             let doc_type = input.doc_type.clone().unwrap_or_default();
             let doc_id = SpecService { db: &mut tx }
@@ -1175,7 +1180,8 @@ async fn rebuild_in(
             });
             continue;
         }
-        let mut document = match (SpecService { db: &mut *tx }).get_document(&doc_id).await {
+        let found = SpecService { db: &mut *tx }.get_document(&doc_id).await;
+        let mut document = match found {
             Ok(d) => Some(d),
             Err(Problem::NotFound { .. }) => None,
             Err(p) => return Err(p),

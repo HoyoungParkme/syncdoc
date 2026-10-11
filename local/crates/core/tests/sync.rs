@@ -31,10 +31,6 @@ impl Env {
         &self.db.pool
     }
 
-    fn workdir(&self) -> PathBuf {
-        self.repos.repos.join(CODE)
-    }
-
     fn origin(&self) -> PathBuf {
         self.repos.origins.join(format!("{CODE}.git"))
     }
