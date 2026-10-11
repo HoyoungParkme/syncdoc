@@ -65,6 +65,29 @@ pub enum Problem {
     /// `document-trashed` — 휴지통에 있는 문서. 시각은 파이썬 `isoformat()` (UC-A7 1a)
     #[error("휴지통에 있는 문서")]
     DocumentTrashed { trashed_at: String },
+    /// `status-blocked` — 규약 오류·미완성·끊어진 참조가 있어 완료로 못 올린다 (UC-H8 1a)
+    #[error("규약 오류 또는 미완성 문서는 완료로 올릴 수 없음")]
+    StatusBlocked {
+        convention_error_detail: Option<String>,
+        warnings: Vec<String>,
+    },
+    /// `already-current` — 지금 판으로는 되돌릴 수 없다
+    #[error("현재 버전으로는 되돌릴 수 없음")]
+    AlreadyCurrent,
+    /// `document-deletion-needs-confirm` — 휴지통에 넣기 전 확인. 끊어질 것을 담는다 (UC-A7 2~4)
+    #[error("휴지통에 넣기는 사람 확인이 필요함")]
+    DocumentDeletionNeedsConfirm {
+        doc_id: String,
+        title: String,
+        version_count: i32,
+        inbound_refs: Vec<String>,
+    },
+    /// `document-not-trashed` — 휴지통에 없는 문서를 되살리거나 완전히 지우려 함 (UC-A8 1a)
+    #[error("휴지통에 없는 문서")]
+    DocumentNotTrashed,
+    /// `document-has-history` — 아직 가리키는 곳이 있어 완전히 못 지운다 (UC-H18 7)
+    #[error("아직 가리키는 곳이 있어 완전히 지울 수 없다")]
+    DocumentHasHistory { inbound_refs: Vec<String> },
     /// `storage-unavailable` — 이 서버에서 켜지 않은 저장 방식 (UC-A1 1a)
     #[error("이 서버에서 켜지 않은 저장 방식 {storage}")]
     StorageUnavailable {
@@ -108,6 +131,11 @@ impl Problem {
             Problem::ItemDeletionNeedsConfirm { .. } => Some("item-deletion-needs-confirm"),
             Problem::PreconditionUnmet { .. } => Some("precondition-unmet"),
             Problem::DocumentTrashed { .. } => Some("document-trashed"),
+            Problem::StatusBlocked { .. } => Some("status-blocked"),
+            Problem::AlreadyCurrent => Some("already-current"),
+            Problem::DocumentDeletionNeedsConfirm { .. } => Some("document-deletion-needs-confirm"),
+            Problem::DocumentNotTrashed => Some("document-not-trashed"),
+            Problem::DocumentHasHistory { .. } => Some("document-has-history"),
             Problem::MethodNotAllowed { .. } => Some("method-not-allowed"),
             Problem::ForbiddenOrigin { .. } => Some("forbidden-origin"),
             Problem::InvalidRequest { .. } => Some("invalid-request"),
@@ -129,7 +157,12 @@ impl Problem {
             Problem::ItemDeleted { .. } => 410,
             Problem::VersionConflict { .. }
             | Problem::ItemDeletionNeedsConfirm { .. }
-            | Problem::DocumentTrashed { .. } => 409,
+            | Problem::DocumentTrashed { .. }
+            | Problem::StatusBlocked { .. }
+            | Problem::DocumentDeletionNeedsConfirm { .. }
+            | Problem::DocumentNotTrashed
+            | Problem::DocumentHasHistory { .. } => 409,
+            Problem::AlreadyCurrent => 422,
             Problem::PreconditionUnmet { .. } => 422,
             Problem::MethodNotAllowed { .. } => 405,
             Problem::ForbiddenOrigin { .. } => 403,
@@ -230,6 +263,31 @@ impl Problem {
             Problem::DocumentTrashed { trashed_at } => {
                 vec![("trashed_at", Value::from(trashed_at.as_str()))]
             }
+            Problem::StatusBlocked {
+                convention_error_detail,
+                warnings,
+            } => vec![
+                (
+                    "convention_error_detail",
+                    Value::from(convention_error_detail.clone()),
+                ),
+                ("warnings", Value::from(warnings.clone())),
+            ],
+            Problem::DocumentDeletionNeedsConfirm {
+                doc_id,
+                title,
+                version_count,
+                inbound_refs,
+            } => vec![
+                ("doc_id", Value::from(doc_id.as_str())),
+                ("title", Value::from(title.as_str())),
+                ("version_count", Value::from(*version_count)),
+                ("inbound_refs", Value::from(inbound_refs.clone())),
+            ],
+            Problem::DocumentHasHistory { inbound_refs } => {
+                vec![("inbound_refs", Value::from(inbound_refs.clone()))]
+            }
+            Problem::AlreadyCurrent | Problem::DocumentNotTrashed => vec![],
             Problem::MethodNotAllowed { allow, .. } => vec![("allow", Value::from(allow.clone()))],
             Problem::ForbiddenOrigin { host, origin } => match (host, origin) {
                 (Some(h), _) => vec![("host", Value::from(h.as_str()))],

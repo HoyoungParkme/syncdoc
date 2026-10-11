@@ -567,6 +567,15 @@ pub enum ProjectItem {
     Document(Box<DocumentSummary>),
 }
 
+/// 휴지통에 넣은 결과 (API-002 `delete_document`) — `broken_refs`는 끊어진 참조 수
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TrashResult {
+    pub doc_id: String,
+    pub commit_hash: String,
+    pub broken_refs: i64,
+    pub next_step: String,
+}
+
 /// 하위 참조가 있는 지운 항목 — `item-deletion-needs-confirm`의 한 칸. 하위는 출발 항목의 이름으로
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeletedItem {
