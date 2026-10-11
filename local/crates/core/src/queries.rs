@@ -812,3 +812,27 @@ pub async fn downstream_view(
         by_document,
     })
 }
+
+/// SYNC-MS-018#queries.trash_list
+///
+/// 건수는 안 센다 — 휴지통 목록에는 수치가 없다
+pub async fn trash_list(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+) -> Result<Vec<DocumentSummary>, Problem> {
+    let (project, _) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code, user)
+    .await?;
+    let mut docs = SpecService { db: &mut *db }
+        .list_trashed(project.id)
+        .await?;
+    for d in &mut docs {
+        d.author = api_author(&mut *db, d.last_author.as_ref()).await?;
+    }
+    Ok(docs)
+}
