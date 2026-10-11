@@ -1506,4 +1506,9 @@ impl SpecService<'_> {
         repo::set_trashed(&mut *self.db, row.id, clock::now(), author.user.id).await?;
         Ok(pks)
     }
+
+    /// SYNC-MS-014#SpecService.trash_commit
+    pub async fn trash_commit(&mut self, document_id: i32) -> Result<Option<String>, Problem> {
+        Ok(repo::trash_commit(&mut *self.db, document_id).await?)
+    }
 }
