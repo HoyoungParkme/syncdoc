@@ -547,6 +547,8 @@ async def http_backend(root: Path, env: dict[str, str], body: AsyncIterator[byte
     async def feed() -> None:
         try:
             async for chunk in body:
+                if stdin.is_closing():
+                    break  # 자식이 먼저 끝났다 — 닫힌 파이프에 쓰면 uvloop가 RuntimeError(#361)
                 if chunk:
                     stdin.write(chunk)
                     await stdin.drain()
