@@ -99,11 +99,12 @@ crates/server/src/
     ├── pyjson.rs               파이썬 `json.loads`(`_json.c`) — FastAPI 본문·도구 인자 미리 읽기의 오류 위치·C 재귀 한도
     ├── pydantic/               검증 — 파이썬 판이 내보낸 core schema를 읽어(schema) lax 규칙으로 검증하고(validate)
     │                           같은 오류 줄·문장·`N validation errors for …` 꼴을 낸다(errors). smart union의 고르기까지
-    ├── fastapi.rs              요청 본문(Content-Type·json.loads)·경로 값·질의 문자열(starlette `parse_qsl`, 같은 이름은 마지막) → invalid-request(loc·msg) · 400
+    ├── fastapi.rs              요청 본문(Content-Type·json.loads)·경로 값·질의 문자열(starlette `parse_qsl`, 같은 이름은 마지막)·폼 칸(빈 글자는 없음, 글자/파일 바꿈) → invalid-request(loc·msg) · 400
+    ├── form.rs                 starlette `Request.form()` — python-multipart 파서(multipart·urlencoded)와 starlette 상한·문장. 깨진 본문의 답까지 같다(L15)
     └── uvicorn.rs              요청 경로를 `unquote`로 풀어 라우팅한다(`/api/m%65` = `/api/me`)
 ```
 
-**옮긴 판** — `mcp/`와 `compat/`는 파이썬 판이 쓰는 꾸러미의 동작을 옮긴다(사용자 결정 2026-10-08 — 검증 문장까지 바이트로 같다, MCP는 핸드셰이크 경로 전부). 기준 판은 `backend/uv.lock`의 mcp 2.2.0 · pydantic 2.13.5(pydantic-core 2.46.5) · FastAPI 0.141.1 · starlette 1.6.0 · sse-starlette 3.4.11과 Python 3.12다. JSON 읽기는 pydantic-core와 같은 `jiter` crate를 같은 판으로 쓴다. 파이썬 쪽이 판을 올리면 계약 시험의 두 판 차이 시험이 어긋남을 잡는다 — 그때 이 층을 따라 고친다. 2026-07-28 새 프로토콜(`_streamable_http_modern`)은 카드 L18이다
+**옮긴 판** — `mcp/`와 `compat/`는 파이썬 판이 쓰는 꾸러미의 동작을 옮긴다(사용자 결정 2026-10-08 — 검증 문장까지 바이트로 같다, MCP는 핸드셰이크 경로 전부). 기준 판은 `backend/uv.lock`의 mcp 2.2.0 · pydantic 2.13.5(pydantic-core 2.46.5) · FastAPI 0.141.1 · starlette 1.6.0 · python-multipart 0.0.32 · sse-starlette 3.4.11과 Python 3.12다. JSON 읽기는 pydantic-core와 같은 `jiter` crate를 같은 판으로 쓴다. 파이썬 쪽이 판을 올리면 계약 시험의 두 판 차이 시험이 어긋남을 잡는다 — 그때 이 층을 따라 고친다. 2026-07-28 새 프로토콜(`_streamable_http_modern`)은 카드 L18이다
 
 **core/ 안** — 묶음은 파이썬 `core/`와 같다.
 
