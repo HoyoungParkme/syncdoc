@@ -1153,3 +1153,30 @@ async fn catch_up_processes_each_repo_and_records_failures() {
     assert_eq!(error, None);
 }
 
+#[tokio::test]
+async fn poll_loop_picks_up_a_push_on_the_next_tick() {
+    let e = env().await;
+    let task = tokio::spawn(pipeline::poll_loop(
+        e.pool().clone(),
+        std::sync::Arc::new(e.repos.clone()),
+        std::time::Duration::from_millis(200),
+    ));
+    let out = e.outside();
+    write(
+        &out,
+        "docs/specs/02-PRD/LS-PRD-001.md",
+        &prd_file("draft", "설명."),
+    );
+    commit_push(&out, "spec: PRD");
+    let mut c = e.conn().await;
+    let mut n = 0;
+    for _ in 0..50 {
+        n = scalar_i64(&mut c, "SELECT count(*) FROM documents").await;
+        if n == 1 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
+    task.abort();
+    assert_eq!(n, 1);
+}

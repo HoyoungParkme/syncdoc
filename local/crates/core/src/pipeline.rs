@@ -1521,6 +1521,21 @@ async fn catch_up_one(
     Ok(Vec::new())
 }
 
+/// SYNC-MS-017#pipeline.poll_loop
+///
+/// `interval` 자고 따라잡기 — 끝없이. 한 주기는 따로 띄워 패닉까지 받아 낸다(반복이 멈추면 폴링이 영영 없다)
+pub async fn poll_loop(pool: PgPool, repos: Arc<ServerRepos>, interval: Duration) {
+    loop {
+        tokio::time::sleep(interval).await;
+        let (p, r) = (pool.clone(), repos.clone());
+        match tokio::spawn(async move { catch_up(&p, &r).await }).await {
+            Ok(Ok(_)) => {}
+            Ok(Err(e)) => tracing::warn!("poll_loop: {e}"),
+            Err(e) => tracing::warn!("poll_loop: {e}"),
+        }
+    }
+}
+
 /// SYNC-MS-017#pipeline.type_of_dir
 ///
 /// `06-DOM` → `DOM`, `STD` → `STD` — 앞 두 글자가 파이썬 `str.isdigit()`이고 `-`가 있을 때만 뗀다
