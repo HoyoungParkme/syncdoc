@@ -2,6 +2,7 @@
 
 pub mod account;
 pub mod admin;
+pub mod code;
 pub mod documents;
 pub mod git;
 pub mod projects;

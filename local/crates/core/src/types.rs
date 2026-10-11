@@ -769,3 +769,85 @@ pub struct MoveResult {
     pub head: String,
     pub hook: HookStatus,
 }
+
+/// 코드 그래프 행의 머리 (DOM-002 2.8 `CodeGraphInfo`, 카드 L12) — 몸통(graph)은 싣지 않는다
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeGraphInfo {
+    pub commit_hash: Option<String>,
+    pub source: Option<String>,
+    pub built_at: OffsetDateTime,
+    pub error: Option<String>,
+    pub function_count: i32,
+}
+
+/// 부르는 것(`status` 있음)·불리는 곳(`status` 없음) 한 줄 (DOM-002 2.8 `CodeRef`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeRef {
+    pub ms_id: String,
+    pub qual: Option<String>,
+    pub file: Option<String>,
+    pub line: Option<i64>,
+    pub status: Option<String>,
+}
+
+/// 함수 목록 한 줄 (DOM-002 2.8 `CodeBrief`, UI-5 8.22)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeBrief {
+    pub ms_id: String,
+    pub qual: Option<String>,
+    pub file: Option<String>,
+    pub line: Option<i64>,
+    pub same: i64,
+    pub code_only: i64,
+    pub spec_only: i64,
+}
+
+/// 항목의 함수 — `calls`는 어긋난 줄(코드만·명세만)이 위 (DOM-002 2.8 `CodeFunction`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeFunction {
+    pub ms_id: String,
+    pub qual: String,
+    pub file: String,
+    pub line: i64,
+    pub end: Option<i64>,
+    pub calls: Vec<CodeRef>,
+    pub callers: Vec<CodeRef>,
+}
+
+/// 코드 탭 (DOM-002 2.8 `CodeView`, `queries.code_view`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeView {
+    pub graph: Option<CodeGraphInfo>,
+    pub doc_id: String,
+    pub item_id: Option<String>,
+    pub is_ms: bool,
+    pub missing: bool,
+    pub function: Option<CodeFunction>,
+    pub functions: Vec<CodeBrief>,
+}
+
+/// 코드 본문 한 토막 (DOM-002 2.8 `CodeText`, `CodeGraphService.read`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeText {
+    pub path: String,
+    pub start: i64,
+    pub end: i64,
+    pub commit_hash: String,
+    pub text: String,
+    pub truncated: bool,
+}
+
+/// 관계도 코드 호출 선 하나 (API-001 `CodeCallEdge`) — `status`는 `same`·`code_only`·`spec_only`
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeCallEdge {
+    pub from: String,
+    pub to: String,
+    pub status: String,
+}
+
+/// 관계도 코드 호출 (API-001 `CodeCalls`, `queries.code_calls`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeCalls {
+    pub graph: Option<CodeGraphInfo>,
+    pub edges: Vec<CodeCallEdge>,
+}

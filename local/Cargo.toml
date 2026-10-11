@@ -3,7 +3,14 @@
 
 [workspace]
 resolver = "3"
-members = ["crates/app", "crates/server", "crates/core", "crates/codegraph", "xtask"]
+members = [
+    "crates/app",
+    "crates/server",
+    "crates/core",
+    "crates/codegraph",
+    "crates/pycompat",
+    "xtask",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -14,6 +21,8 @@ publish = false
 [workspace.dependencies]
 syncdoc_core = { path = "crates/core" }
 syncdoc_server = { path = "crates/server" }
+syncdoc_codegraph = { path = "crates/codegraph" }
+syncdoc_pycompat = { path = "crates/pycompat" }
 
 axum = "0.8.9"
 clap = { version = "4.6", features = ["derive"] }
@@ -38,6 +47,11 @@ rust-embed = { version = "8.12", features = ["interpolate-folder-path", "include
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order", "arbitrary_precision"] }
 sha2 = "0.10"
+tar = { version = "0.4", default-features = false }
+tree-sitter = "0.25"
+tree-sitter-python = "=0.25.0"
+tree-sitter-rust = "=0.24.2"
+tree-sitter-typescript = "=0.23.2"
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres", "derive", "time"] }
 tempfile = "3"
 tao = "0.37"

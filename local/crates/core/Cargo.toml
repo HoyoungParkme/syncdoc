@@ -7,6 +7,8 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+syncdoc_codegraph = { workspace = true }
+syncdoc_pycompat = { workspace = true }
 indexmap = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
@@ -14,13 +16,14 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 sqlx = { workspace = true }
+tar = { workspace = true }
+tempfile = { workspace = true }
 thiserror = { workspace = true }
 time = { workspace = true, features = ["macros", "formatting", "parsing"] }
 tokio = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-tempfile = { workspace = true }
 time = { workspace = true, features = ["macros"] }
 tokio = { workspace = true }
 

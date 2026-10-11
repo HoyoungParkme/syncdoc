@@ -1,6 +1,6 @@
 """파이썬 3.12 정수 set의 순회 차례 정답 (카드 L8, core pycompat::pyset).
 
-`uv run --project ../backend python xtask/py/pyset_cases.py > crates/core/tests/golden/pyset.json`
+`uv run --project ../backend python xtask/py/pyset_cases.py > crates/pycompat/tests/golden/pyset.json`
 씨앗 고정 — 넣기·빼기 차례와 그때마다의 순회 차례를 적는다. 손으로 고치지 않는다.
 """
 

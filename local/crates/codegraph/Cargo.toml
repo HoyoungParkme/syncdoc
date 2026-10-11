@@ -1,12 +1,24 @@
 [package]
 name = "syncdoc_codegraph"
-description = "싱크독_로컬 코드 그래프의 순수 부분 (SYNC-DOM-004 crates/codegraph) — 카드 L12부터"
+description = "싱크독_로컬 코드 그래프의 순수 부분 — 추출·줄이기·보강·대조·층 (SYNC-DOM-004 crates/codegraph, SYNC-MS-022)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+indexmap = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+syncdoc_pycompat = { workspace = true }
+tree-sitter = { workspace = true }
+tree-sitter-python = { workspace = true }
+tree-sitter-rust = { workspace = true }
+tree-sitter-typescript = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

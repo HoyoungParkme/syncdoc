@@ -1,5 +1,5 @@
 //! 파이썬 문자 분류 표 — 파이썬 3.12에서 뽑는다 (SYNC-STD-004#DEV-7 · SYNC-DOM-004 1장 pycompat, 카드 L5).
-//! `re`의 `\s`·`\d`·`\w`와 `str.isprintable()`을 `crates/core/src/pycompat/unicode.rs` 하나에 담는다.
+//! `re`의 `\s`·`\d`·`\w`와 `str.isprintable()`을 `crates/pycompat/src/unicode.rs` 하나에 담는다(카드 L12에서 core 밖 crate로).
 //! 파이썬이 원본이다 — 이 파일을 손으로 고치지 않는다. 스크립트는 `xtask/py/export_unicode.py`.
 
 use std::fs;
@@ -11,9 +11,8 @@ use crate::{local_root, python};
 fn dest() -> PathBuf {
     local_root()
         .join("crates")
-        .join("core")
-        .join("src")
         .join("pycompat")
+        .join("src")
         .join("unicode.rs")
 }
 

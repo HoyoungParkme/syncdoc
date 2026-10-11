@@ -53,6 +53,7 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 | 10 | `SYNC-MS-017` | MINISPEC — pipeline — 쓰기 조율 (Rust) | `10-MS/SYNC-MS-017.md` | 5 | 4 | DOM-004, MS-007, MS-013, MS-014, MS-015, SEQ-001, STD-004 |
 | 10 | `SYNC-MS-018` | MINISPEC — queries — 읽기 조합 (Rust) | `10-MS/SYNC-MS-018.md` | 1 | 4 | DOM-004, MS-008, API-001, API-002 |
 | 10 | `SYNC-MS-019` | MINISPEC — git 어댑터 (Rust) | `10-MS/SYNC-MS-019.md` | 7 | 4 | DOM-004, MS-009, INFRA-001, STD-004 |
+| 10 | `SYNC-MS-022` | MINISPEC — codegraph — 코드 호출 그래프와 명세 대조 (Rust) | `10-MS/SYNC-MS-022.md` | 15 | 4 | DOM-004, MS-011, INFRA-001, STD-004 |
 | 11 | `SYNC-CODE-001` | 구현 계획 — 슬라이스 카드와 커밋 기록 | `CODE_구현계획_싱크독.md` | 34 | 6 | STD-004, MS-001, MS-002, MS-003, MS-006, MS-007, MS-008, MS-009, API-001, API-002, UI-002, SCN-001 |
 | 11 | `SYNC-CODE-002` | 구현 계획 — 싱크독_로컬 (Rust) 슬라이스 카드와 커밋 기록 | `11-CODE/SYNC-CODE-002.md` | 1 | 5 | STD-004, DOM-004, PRD-001, INFRA-001, API-001, API-002, UI-002, SCN-001 |
 | — | `SYNC-STD-001` | 명세 작성 규약 | `STD_명세작성규약_싱크독.md` | 0 | 11 | PRD-001 |
@@ -311,6 +312,12 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 - 2. 함수
 - 3. 미결사항
 
+**SYNC-MS-022** MINISPEC — codegraph — 코드 호출 그래프와 명세 대조 (Rust)
+- 0. 이 문서가 다루는 것
+- 1. 함수 목록
+- 2. 함수
+- 3. 미결사항
+
 **SYNC-CODE-001** 구현 계획 — 슬라이스 카드와 커밋 기록
 - 0. 이 문서가 다루는 것
 - 1. 슬라이스
@@ -543,7 +550,6 @@ flowchart BT
 닫힌 미결은 각 문서에 결정과 함께 남아 있다.
 
 **SYNC-CODE-002**
-- [ ] 저장소에 커밋된 `graphify-out/graph.json`을 따를지 — 파이썬 판은 그 파일이 있으면 그것을 쓴다([[SYNC-MS-011#codegraph.load]] 1). Rust 판에는 graphify가 없다. 카드 L12 전에 정한다
 - [ ] 되살리기가 Docker 판(파이썬 폐쇄망판)의 백업 파일도 받을지 — 두 판은 같은 표를 쓴다([[SYNC-INFRA-001]] 9.2). 카드 L16 전에 정한다
 
 ## 6. 미결사항

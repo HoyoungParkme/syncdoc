@@ -112,7 +112,7 @@ async fn env() -> Env {
         db: &mut tx,
         repos: &repos,
     }
-    .init_project(CODE, "읽기 시험", &u, false, Storage::Server)
+    .init_project(&db.pool, CODE, "읽기 시험", &u, false, Storage::Server)
     .await
     .expect("프로젝트");
     tx.commit().await.expect("커밋");

@@ -1,23 +1,31 @@
 //! queries — 읽기 조합 (SYNC-MS-018 · SYNC-DOM-004 4.7). 파이썬 판 `core/queries.py`와 같은 이름·같은 처리.
-//! 여러 묶음의 서비스를 불러 응답 하나로 엮는다 — 쓰지 않는다. 프로젝트 요약(L6)과 MCP 읽기 도구의 넷(L7).
+//! 여러 묶음의 서비스를 불러 응답 하나로 엮는다 — 쓰지 않는다. 프로젝트 요약(L6)·MCP 읽기 도구의 넷(L7)·웹 읽기(L8)·코드(L12).
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::path::Path;
+use std::sync::LazyLock;
 
 use indexmap::IndexMap;
+use regex::Regex;
 use sqlx::PgConnection;
+use syncdoc_codegraph::{CallDiff, Function as CodeFn, Graph as CodeGraph};
 
 use crate::account::model::UserRow;
 use crate::account::service::AccountService;
+use crate::codegraph::{CodeGraphRow, CodeGraphService};
 use crate::errors::Problem;
+use crate::markdown::parse_frontmatter;
 use crate::project::service::{ProjectService, ServerRepos};
 use crate::pycompat::pyset::IntSet;
+use crate::pycompat::re::compile;
 use crate::reference::service::ReferenceService;
 use crate::spec::{DIFF_CONTEXT_LINES, SpecService};
 use crate::types::{
-    ApiAuthor, AuthorRef, BrokenRefSummary, ChainItem, ChainRow, Diff, Document, DocumentSummary,
-    DownstreamDoc, DownstreamView, Graph, GraphEdge, GraphNode, GraphScope, ItemChain, ItemRef,
-    ItemReferences, ItemView, ProjectDetail, ProjectItem, ProjectSummary, STAGES, StageSummary,
-    Storage, stage_of,
+    ApiAuthor, AuthorRef, BrokenRefSummary, ChainItem, ChainRow, CodeBrief, CodeCallEdge,
+    CodeCalls, CodeFunction, CodeGraphInfo, CodeRef, CodeText, CodeView, Diff, DocType, Document,
+    DocumentSummary, DownstreamDoc, DownstreamView, Graph, GraphEdge, GraphNode, GraphScope,
+    ItemChain, ItemRef, ItemReferences, ItemView, ProjectDetail, ProjectItem, ProjectSummary,
+    STAGES, StageSummary, Storage, stage_of,
 };
 
 /// 작성자(id만) → 이름 붙은 작성자 — 파이썬 `_api_author`. 지시자는 id가 있을 때만
@@ -39,6 +47,9 @@ async fn api_author(
         via: r.via.clone(),
     }))
 }
+
+/// upstream 낱말 — 파이썬 `re.findall(r"[\w-]+", …)`
+static UPSTREAM_WORD: LazyLock<Regex> = LazyLock::new(|| compile(r"[\w-]+"));
 
 /// 문서 ID의 프로젝트 코드 — 첫 `-` 앞(없으면 전부, 파이썬 `doc_id.split("-")[0]`)
 fn code_of(doc_id: &str) -> &str {
@@ -835,4 +846,463 @@ pub async fn trash_list(
         d.author = api_author(&mut *db, d.last_author.as_ref()).await?;
     }
     Ok(docs)
+}
+
+// ── 코드 그래프 (카드 L12) — 대조는 부를 때 계산한다. 그래프는 code_graphs, 「호출하는 것」은 명세
+
+/// 그래프 행의 머리 — 몸통은 싣지 않는다
+fn graph_info(row: &CodeGraphRow) -> CodeGraphInfo {
+    CodeGraphInfo {
+        commit_hash: row.commit_hash.clone(),
+        source: row.source.clone(),
+        built_at: row.built_at,
+        error: row.error.clone(),
+        function_count: row.function_count,
+    }
+}
+
+/// 프로젝트의 MINISPEC 항목마다 (문서ID#항목ID, 블록) — `spec_calls`의 재료 (파이썬 `_ms_items`)
+async fn ms_items(
+    db: &mut PgConnection,
+    project_id: i32,
+) -> Result<Vec<(String, String)>, Problem> {
+    let mut spec = SpecService { db };
+    let mut out = Vec::new();
+    for d in spec
+        .list_by_project(project_id, stage_of("MS"), None, None)
+        .await?
+    {
+        let doc = spec.get_document(&d.doc_id).await?;
+        let Some(t) = DocType::parse(&doc.summary.doc_type) else {
+            continue;
+        };
+        for b in SpecService::item_blocks(&doc.body, t, None) {
+            out.push((format!("{}#{}", doc.summary.doc_id, b.item_id), b.text));
+        }
+    }
+    Ok(out)
+}
+
+/// 프로젝트의 클래스 명세 — DOM 문서 중 제목에 「클래스」가 든 것 전부, 문서 순서 (파이썬 `_class_docs`).
+/// 구현이 둘이면 클래스 명세도 둘이다(STD-001 2.6)
+async fn class_docs(db: &mut PgConnection, project_id: i32) -> Result<Vec<String>, Problem> {
+    let mut spec = SpecService { db };
+    let mut out = Vec::new();
+    for d in spec
+        .list_by_project(project_id, stage_of("DOM"), None, None)
+        .await?
+    {
+        let doc = spec.get_document(&d.doc_id).await?;
+        let fm = parse_frontmatter(&doc.body).0;
+        if fm.get("title").is_some_and(|t| t.contains("클래스")) {
+            out.push(d.doc_id);
+        }
+    }
+    Ok(out)
+}
+
+/// MS 문서 ID → 그 문서 upstream의 클래스 명세 — 꼭 하나일 때만 (파이썬 `_impl_of`, MS-018 code_view 2)
+async fn impl_of(
+    db: &mut PgConnection,
+    project_id: i32,
+) -> Result<HashMap<String, String>, Problem> {
+    let classes = class_docs(&mut *db, project_id).await?;
+    let mut spec = SpecService { db };
+    let mut out = HashMap::new();
+    for d in spec
+        .list_by_project(project_id, stage_of("MS"), None, None)
+        .await?
+    {
+        let body = spec.get_document(&d.doc_id).await?.body;
+        let fm = parse_frontmatter(&body).0;
+        let up = fm.get("upstream").map_or("", String::as_str);
+        let hits: Vec<&str> = UPSTREAM_WORD
+            .find_iter(up.trim_matches(['[', ']']))
+            .map(|m| m.as_str())
+            .filter(|x| classes.iter().any(|c| c == x))
+            .collect();
+        if let [one] = hits[..] {
+            out.insert(d.doc_id, one.to_string());
+        }
+    }
+    Ok(out)
+}
+
+/// 항목 ID → 대조 한 줄 — 대조의 차례(항목 ID 순) 그대로 (파이썬 `_diffs`)
+async fn diffs_of(
+    db: &mut PgConnection,
+    project_id: i32,
+    graph: &CodeGraph,
+) -> Result<IndexMap<String, CallDiff>, Problem> {
+    let items = ms_items(&mut *db, project_id).await?;
+    let impls = impl_of(&mut *db, project_id).await?;
+    let spec = syncdoc_codegraph::graph::spec_calls(&items, Some(&impls));
+    Ok(syncdoc_codegraph::graph::compare(graph, &spec)
+        .into_iter()
+        .map(|d| (d.ms_id.clone(), d))
+        .collect())
+}
+
+/// 부르는 것·불리는 곳 한 줄 — 대조에 그 항목의 함수가 없으면 자리 없이 (파이썬 `_code_ref`)
+fn code_ref(
+    ms_id: &str,
+    diffs: &IndexMap<String, CallDiff>,
+    fns: &HashMap<&str, &CodeFn>,
+    status: Option<&str>,
+) -> CodeRef {
+    let f = diffs
+        .get(ms_id)
+        .and_then(|d| d.function.as_deref())
+        .and_then(|k| fns.get(k));
+    CodeRef {
+        ms_id: ms_id.to_string(),
+        qual: f.map(|f| f.qual.clone()),
+        file: f.map(|f| f.file.clone()),
+        line: f.map(|f| f.line),
+        status: status.map(str::to_string),
+    }
+}
+
+/// `item_neighbors`의 함수 → 대조 없는 한 줄 — 항목 ID는 그 함수의 item (파이썬 `_item_ref`)
+fn item_ref(f: &CodeFn) -> CodeRef {
+    CodeRef {
+        ms_id: f.item.clone().unwrap_or_default(),
+        qual: Some(f.qual.clone()),
+        file: Some(f.file.clone()),
+        line: Some(f.line),
+        status: None,
+    }
+}
+
+/// 함수 목록 한 줄 (파이썬 `_code_brief`)
+fn code_brief(d: &CallDiff, fns: &HashMap<&str, &CodeFn>) -> CodeBrief {
+    let f = d.function.as_deref().and_then(|k| fns.get(k));
+    CodeBrief {
+        ms_id: d.ms_id.clone(),
+        qual: f.map(|f| f.qual.clone()),
+        file: f.map(|f| f.file.clone()),
+        line: f.map(|f| f.line),
+        same: d.same.len() as i64,
+        code_only: d.code_only.len() as i64,
+        spec_only: d.spec_only.len() as i64,
+    }
+}
+
+/// key → 함수 — 같은 key면 뒤의 것 (파이썬 dict)
+fn by_key(graph: &CodeGraph) -> HashMap<&str, &CodeFn> {
+    graph
+        .functions
+        .iter()
+        .map(|f| (f.key.as_str(), f))
+        .collect()
+}
+
+/// SYNC-MS-018#queries.code_view
+///
+/// MINISPEC 항목이면 그 함수의 부르는 것(코드만·명세만·같음 순)·불리는 곳, 다른 항목이면 하위
+/// 체인의 MINISPEC 함수, MINISPEC 문서 단위면 그 문서 함수 전부. 그래프가 없으면 `graph` 없이
+pub async fn code_view(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    doc_id: &str,
+    item_id: Option<&str>,
+    user: &UserRow,
+) -> Result<CodeView, Problem> {
+    let (project, _) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code_of(doc_id), user)
+    .await?;
+    let doc = SpecService { db: &mut *db }.get_document(doc_id).await?;
+    if let Some(item) = item_id {
+        SpecService { db: &mut *db }
+            .resolve_item(doc_id, item)
+            .await?;
+    }
+    let is_ms = doc.summary.doc_type == "MS";
+    let item_id = item_id.map(str::to_string);
+    let Some(row) = CodeGraphService { db: &mut *db }.get(project.id).await? else {
+        return Ok(CodeView {
+            graph: None,
+            doc_id: doc_id.to_string(),
+            item_id,
+            is_ms,
+            missing: false,
+            function: None,
+            functions: Vec::new(),
+        });
+    };
+    let info = graph_info(&row);
+    let graph = &row.graph;
+    let diffs = diffs_of(&mut *db, project.id, graph).await?;
+    let order: Vec<String> = DocType::parse(&doc.summary.doc_type)
+        .map(|t| SpecService::item_blocks(&doc.body, t, None))
+        .unwrap_or_default()
+        .into_iter()
+        .map(|b| b.item_id)
+        .collect();
+    let fns = by_key(graph);
+    let mut function: Option<CodeFunction> = None;
+    let mut missing = false;
+    if let (true, Some(item)) = (is_ms, item_id.as_deref()) {
+        let ms_id = format!("{doc_id}#{item}");
+        let found = diffs.get(&ms_id).and_then(|d| {
+            d.function
+                .as_deref()
+                .and_then(|k| fns.get(k))
+                .map(|f| (d, f))
+        });
+        match found {
+            None => missing = true,
+            Some((d, f)) => {
+                let calls = d
+                    .code_only
+                    .iter()
+                    .map(|x| code_ref(x, &diffs, &fns, Some("code_only")))
+                    .chain(
+                        d.spec_only
+                            .iter()
+                            .map(|x| code_ref(x, &diffs, &fns, Some("spec_only"))),
+                    )
+                    .chain(
+                        d.same
+                            .iter()
+                            .map(|x| code_ref(x, &diffs, &fns, Some("same"))),
+                    )
+                    .collect();
+                let callers = diffs
+                    .values()
+                    .filter(|o| o.same.contains(&ms_id) || o.code_only.contains(&ms_id))
+                    .map(|o| code_ref(&o.ms_id, &diffs, &fns, None))
+                    .collect();
+                function = Some(CodeFunction {
+                    ms_id: ms_id.clone(),
+                    qual: f.qual.clone(),
+                    file: f.file.clone(),
+                    line: f.line,
+                    end: f.end,
+                    calls,
+                    callers,
+                });
+            }
+        }
+    }
+    if let (None, Some(item)) = (&function, item_id.as_deref()) {
+        // 3a — API·UI 항목의 함수: item으로 찾고 항목 있는 이웃까지, 대조 없음
+        let ms_id = format!("{doc_id}#{item}");
+        if let Some(f) = syncdoc_codegraph::graph::item_function(graph, &ms_id) {
+            missing = false;
+            let (fwd, back) = syncdoc_codegraph::graph::item_neighbors(graph, &f.key);
+            let refs = |keys: &[String]| -> Vec<CodeRef> {
+                keys.iter()
+                    .filter_map(|k| fns.get(k.as_str()))
+                    .map(|f| item_ref(f))
+                    .collect()
+            };
+            function = Some(CodeFunction {
+                ms_id,
+                qual: f.qual.clone(),
+                file: f.file.clone(),
+                line: f.line,
+                end: f.end,
+                calls: refs(&fwd),
+                callers: refs(&back),
+            });
+        }
+    }
+    let mut functions = Vec::new();
+    if let (Some(item), false) = (item_id.as_deref(), is_ms) {
+        let chain = item_chain(&mut *db, repos, doc_id, item, user).await?;
+        for r in chain.rows.iter().filter(|r| r.doc_type == "MS") {
+            for ci in &r.items {
+                let Some(it) = ci.ref_.item_id.as_deref().filter(|i| !i.is_empty()) else {
+                    continue;
+                };
+                if ci.role != "downstream" {
+                    continue;
+                }
+                let id = format!("{}#{it}", ci.ref_.doc_id.as_deref().unwrap_or("None"));
+                if let Some(d) = diffs.get(&id) {
+                    functions.push(code_brief(d, &fns));
+                }
+            }
+        }
+    } else if is_ms {
+        for i in &order {
+            if let Some(d) = diffs.get(&format!("{doc_id}#{i}")) {
+                functions.push(code_brief(d, &fns));
+            }
+        }
+    }
+    Ok(CodeView {
+        graph: Some(info),
+        doc_id: doc_id.to_string(),
+        item_id,
+        is_ms,
+        missing,
+        function,
+        functions,
+    })
+}
+
+/// SYNC-MS-018#queries.code_calls
+///
+/// MINISPEC 항목 사이의 호출 선 — 같음·코드만·명세만(UI-8 2.6)
+pub async fn code_calls(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+) -> Result<CodeCalls, Problem> {
+    let (project, _) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code, user)
+    .await?;
+    let Some(row) = CodeGraphService { db: &mut *db }.get(project.id).await? else {
+        return Ok(CodeCalls {
+            graph: None,
+            edges: Vec::new(),
+        });
+    };
+    let diffs = diffs_of(&mut *db, project.id, &row.graph).await?;
+    let mut edges = Vec::new();
+    for d in diffs.values() {
+        for (status, xs) in [
+            ("same", &d.same),
+            ("code_only", &d.code_only),
+            ("spec_only", &d.spec_only),
+        ] {
+            edges.extend(xs.iter().map(|x| CodeCallEdge {
+                from: d.ms_id.clone(),
+                to: x.clone(),
+                status: status.to_string(),
+            }));
+        }
+    }
+    Ok(CodeCalls {
+        graph: Some(graph_info(&row)),
+        edges,
+    })
+}
+
+/// 같은 파일에서 이 함수 다음 함수의 앞 줄 — 끝 줄을 모르는(파이썬 밖) 함수의 끝 (파이썬 `_next_start`)
+fn next_start(functions: &[CodeFn], f: &CodeFn) -> Option<i64> {
+    functions
+        .iter()
+        .filter(|g| g.file == f.file && g.line > f.line)
+        .map(|g| g.line)
+        .min()
+        .map(|l| l - 1)
+}
+
+/// 함수의 끝 줄 — 끝 줄, 없으면 다음 함수 앞 줄, 그것도 없으면 시작 + 59
+fn end_of(functions: &[CodeFn], f: &CodeFn) -> i64 {
+    f.end
+        .filter(|e| *e != 0)
+        .or_else(|| next_start(functions, f).filter(|e| *e != 0))
+        .unwrap_or(f.line + 59)
+}
+
+/// SYNC-MS-018#queries.code_source
+///
+/// 코드 보기(8.21). 그래프 커밋의 저장소에서 읽는다 — 읽기는 `CodeGraphService.read` 한곳
+pub async fn code_source(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    doc_id: &str,
+    item_id: &str,
+    user: &UserRow,
+) -> Result<CodeText, Problem> {
+    let (project, repo) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code_of(doc_id), user)
+    .await?;
+    SpecService { db: &mut *db }
+        .resolve_item(doc_id, item_id)
+        .await?;
+    let mut svc = CodeGraphService { db: &mut *db };
+    let Some(row) = svc.get(project.id).await? else {
+        return Err(Problem::NotFound {
+            resource: "code_graph".into(),
+            id: project.code.clone().into(),
+        });
+    };
+    let ms_id = format!("{doc_id}#{item_id}");
+    let spec = BTreeMap::from([(ms_id.clone(), BTreeSet::new())]);
+    let d = syncdoc_codegraph::graph::compare(&row.graph, &spec);
+    let fns = &row.graph.functions;
+    let by_function = d
+        .first()
+        .and_then(|d| d.function.as_deref())
+        .and_then(|k| fns.iter().find(|x| x.key == k));
+    // API·UI 항목 — item으로
+    let Some(f) =
+        by_function.or_else(|| syncdoc_codegraph::graph::item_function(&row.graph, &ms_id))
+    else {
+        return Err(Problem::NotFound {
+            resource: "function".into(),
+            id: ms_id.into(),
+        });
+    };
+    let end = end_of(fns, f);
+    let (file, line) = (f.file.clone(), f.line);
+    svc.read(
+        &repos.git,
+        project.id,
+        Path::new(&repo.workdir_path),
+        &file,
+        line,
+        Some(end),
+    )
+    .await
+}
+
+/// SYNC-MS-018#queries.code_text
+///
+/// 코드 그래프의 코드(UI-17 4.6). 그래프의 함수를 파일·시작 줄로 짚는다 — 항목이 없어도 읽는다.
+/// 읽기는 `code_source`와 같은 `CodeGraphService.read` 한곳이라 코드 탭과 같은 본문이다
+pub async fn code_text(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+    file: &str,
+    line: i64,
+    user: &UserRow,
+) -> Result<CodeText, Problem> {
+    let (project, repo) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code, user)
+    .await?;
+    let mut svc = CodeGraphService { db: &mut *db };
+    let Some(row) = svc.get(project.id).await? else {
+        return Err(Problem::NotFound {
+            resource: "code_graph".into(),
+            id: project.code.clone().into(),
+        });
+    };
+    let fns = &row.graph.functions;
+    let Some(f) = fns.iter().find(|x| x.file == file && x.line == line) else {
+        return Err(Problem::NotFound {
+            resource: "function".into(),
+            id: format!("{file}:{line}").into(),
+        });
+    };
+    let end = end_of(fns, f);
+    let (path, start) = (f.file.clone(), f.line);
+    svc.read(
+        &repos.git,
+        project.id,
+        Path::new(&repo.workdir_path),
+        &path,
+        start,
+        Some(end),
+    )
+    .await
 }

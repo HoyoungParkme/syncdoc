@@ -1,0 +1,371 @@
+{
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "failed_sources": [],
+  "extracted_sources": [
+    "/tmp/claude-1000/-home-hypark-dev-personal-syncdoc/1cb36dc9-bdad-4019-91d5-96d615aed739/scratchpad/l12src/app/__init__.py",
+    "/tmp/claude-1000/-home-hypark-dev-personal-syncdoc/1cb36dc9-bdad-4019-91d5-96d615aed739/scratchpad/l12src/app/svc.py",
+    "/tmp/claude-1000/-home-hypark-dev-personal-syncdoc/1cb36dc9-bdad-4019-91d5-96d615aed739/scratchpad/l12src/app/util.py",
+    "/tmp/claude-1000/-home-hypark-dev-personal-syncdoc/1cb36dc9-bdad-4019-91d5-96d615aed739/scratchpad/l12src/crates/x/src/lib.rs",
+    "/tmp/claude-1000/-home-hypark-dev-personal-syncdoc/1cb36dc9-bdad-4019-91d5-96d615aed739/scratchpad/l12src/web/app.ts"
+  ],
+  "nodes": [
+    {
+      "id": "app_init",
+      "label": "__init__.py",
+      "file_type": "code",
+      "source_file": "app/__init__.py",
+      "source_location": "L1",
+      "_origin": "ast"
+    },
+    {
+      "id": "app_svc",
+      "label": "svc.py",
+      "file_type": "code",
+      "source_file": "app/svc.py",
+      "source_location": "L1",
+      "_origin": "ast"
+    },
+    {
+      "id": "app_svc_main",
+      "label": "main()",
+      "file_type": "code",
+      "source_file": "app/svc.py",
+      "source_location": "L6",
+      "_callable": true,
+      "_origin": "ast"
+    },
+    {
+      "id": "app_svc_helper",
+      "label": "helper()",
+      "file_type": "code",
+      "source_file": "app/svc.py",
+      "source_location": "L11",
+      "_callable": true,
+      "_origin": "ast"
+    },
+    {
+      "id": "app_svc_extra",
+      "label": "extra()",
+      "file_type": "code",
+      "source_file": "app/svc.py",
+      "source_location": "L16",
+      "_callable": true,
+      "_origin": "ast"
+    },
+    {
+      "id": "app_svc_repo",
+      "label": "Repo",
+      "file_type": "code",
+      "source_file": "app/svc.py",
+      "source_location": "L20",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast"
+    },
+    {
+      "id": "app_svc_repo_init",
+      "label": ".__init__()",
+      "file_type": "code",
+      "source_file": "app/svc.py",
+      "source_location": "L23",
+      "_callable": true,
+      "_origin": "ast"
+    },
+    {
+      "id": "app_svc_repo_get",
+      "label": ".get()",
+      "file_type": "code",
+      "source_file": "app/svc.py",
+      "source_location": "L26",
+      "_callable": true,
+      "_origin": "ast"
+    },
+    {
+      "id": "app_svc_rationale_12",
+      "label": "LCG-MS-001#svc.helper",
+      "file_type": "rationale",
+      "source_file": "app/svc.py",
+      "source_location": "L12",
+      "_origin": "ast"
+    },
+    {
+      "id": "app_util",
+      "label": "util.py",
+      "file_type": "code",
+      "source_file": "app/util.py",
+      "source_location": "L1",
+      "_origin": "ast"
+    },
+    {
+      "id": "app_util_fmt",
+      "label": "fmt()",
+      "file_type": "code",
+      "source_file": "app/util.py",
+      "source_location": "L1",
+      "_callable": true,
+      "_origin": "ast"
+    },
+    {
+      "id": "crates_x_src_lib",
+      "label": "lib.rs",
+      "file_type": "code",
+      "source_file": "crates/x/src/lib.rs",
+      "source_location": "L1",
+      "_origin": "ast"
+    },
+    {
+      "id": "crates_x_src_lib_rs_entry",
+      "label": "rs_entry()",
+      "file_type": "code",
+      "source_file": "crates/x/src/lib.rs",
+      "source_location": "L2",
+      "_origin": "ast"
+    },
+    {
+      "id": "crates_x_src_lib_rs_helper",
+      "label": "rs_helper()",
+      "file_type": "code",
+      "source_file": "crates/x/src/lib.rs",
+      "source_location": "L6",
+      "_origin": "ast"
+    },
+    {
+      "id": "web_app",
+      "label": "app.ts",
+      "file_type": "code",
+      "source_file": "web/app.ts",
+      "source_location": "L1",
+      "_origin": "ast"
+    },
+    {
+      "id": "web_app_render",
+      "label": "render()",
+      "file_type": "code",
+      "source_file": "web/app.ts",
+      "source_location": "L2",
+      "_callable": true,
+      "_origin": "ast"
+    },
+    {
+      "id": "web_app_label",
+      "label": "label()",
+      "file_type": "code",
+      "source_file": "web/app.ts",
+      "source_location": "L6",
+      "_callable": true,
+      "_origin": "ast"
+    }
+  ],
+  "links": [
+    {
+      "source": "app_svc",
+      "target": "app_util",
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "app/svc.py",
+      "source_location": "L3",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "app_svc",
+      "target": "app_svc_main",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app/svc.py",
+      "source_location": "L6",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "app_svc",
+      "target": "app_svc_helper",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app/svc.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "app_svc",
+      "target": "app_svc_extra",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app/svc.py",
+      "source_location": "L16",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "app_svc",
+      "target": "app_svc_repo",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app/svc.py",
+      "source_location": "L20",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "app_svc_repo",
+      "target": "app_svc_repo_init",
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "app/svc.py",
+      "source_location": "L23",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "app_svc_repo",
+      "target": "app_svc_repo_get",
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "app/svc.py",
+      "source_location": "L26",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "app_svc_main",
+      "target": "app_svc_helper",
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app/svc.py",
+      "source_location": "L8",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "app_svc_main",
+      "target": "app_svc_extra",
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app/svc.py",
+      "source_location": "L8",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "app_svc_repo_get",
+      "target": "app_svc_helper",
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app/svc.py",
+      "source_location": "L28",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "app_svc_rationale_12",
+      "target": "app_svc_helper",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "app/svc.py",
+      "source_location": "L12",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "app_util",
+      "target": "app_util_fmt",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app/util.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "crates_x_src_lib",
+      "target": "crates_x_src_lib_rs_entry",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "crates/x/src/lib.rs",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "crates_x_src_lib",
+      "target": "crates_x_src_lib_rs_helper",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "crates/x/src/lib.rs",
+      "source_location": "L6",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "crates_x_src_lib_rs_entry",
+      "target": "crates_x_src_lib_rs_helper",
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "crates/x/src/lib.rs",
+      "source_location": "L3",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "web_app",
+      "target": "web_app_render",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "web/app.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "web_app",
+      "target": "web_app_label",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "web/app.ts",
+      "source_location": "L6",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "web_app_render",
+      "target": "web_app_label",
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "web/app.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "app_svc",
+      "target": "app_util_fmt",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "app/svc.py",
+      "source_location": "L3",
+      "weight": 1.0,
+      "_origin": "ast"
+    },
+    {
+      "source": "app_svc_main",
+      "target": "app_util_fmt",
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app/svc.py",
+      "source_location": "L8",
+      "weight": 1.0,
+      "_origin": "ast"
+    }
+  ],
+  "directed": false
+}

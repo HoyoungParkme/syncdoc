@@ -204,7 +204,7 @@ mod tests {
     /// 파이썬 3.12에서 뜬 차례와 같다 — `xtask/py/pyset_cases.py`
     #[test]
     fn order_like_python_312() {
-        let raw = include_str!("../../tests/golden/pyset.json");
+        let raw = include_str!("../tests/golden/pyset.json");
         let data: serde_json::Value = serde_json::from_str(raw).expect("정답");
         let cases = data["cases"].as_array().expect("사례");
         assert!(cases.len() > 400);

@@ -114,7 +114,7 @@ async fn env() -> Env {
         db: &mut tx,
         repos: &repos,
     }
-    .init_project(CODE, "따라잡기 시험", &u, false, Storage::Server)
+    .init_project(&db.pool, CODE, "따라잡기 시험", &u, false, Storage::Server)
     .await
     .expect("프로젝트");
     tx.commit().await.expect("커밋");
@@ -404,7 +404,7 @@ async fn list_projects_is_everyones_by_code() {
         db: &mut c,
         repos: &e.repos,
     }
-    .init_project("AB", "남의 것", &other, false, Storage::Server)
+    .init_project(e.pool(), "AB", "남의 것", &other, false, Storage::Server)
     .await
     .expect("남의 프로젝트");
     let codes: Vec<String> = ProjectService {
@@ -718,7 +718,7 @@ async fn trashed_deletes_skip_and_name_mismatch_marks_and_unknown_dir_stalls() {
 impl Env {
     async fn rebuild(&self) -> Result<syncdoc_core::types::RebuildResult, Problem> {
         let mut c = self.conn().await;
-        pipeline::rebuild(&mut c, &self.repos, CODE).await
+        pipeline::rebuild(&mut c, self.pool(), &self.repos, CODE).await
     }
 }
 
@@ -842,7 +842,7 @@ async fn rebuild_survives_deleted_then_recreated_and_rolls_back_on_failure() {
         versions
     );
     assert!(matches!(
-        pipeline::rebuild(&mut c, &e.repos, "NOPE").await,
+        pipeline::rebuild(&mut c, e.pool(), &e.repos, "NOPE").await,
         Err(Problem::NotFound { .. })
     ));
 }
@@ -856,7 +856,7 @@ async fn repo_status_is_mine_from_db_and_hook_is_none() {
         db: &mut c,
         repos: &e.repos,
     };
-    ps.init_project("AB", "남의 것", &other, false, Storage::Server)
+    ps.init_project(e.pool(), "AB", "남의 것", &other, false, Storage::Server)
         .await
         .expect("남의 것");
     let rows = ps.repo_status(&e.user).await.expect("상태");
@@ -920,14 +920,20 @@ async fn sync_now_reads_pending_and_rebuild_index_syncs_readme_first() {
     );
     // 재구축 위임 — README가 같으면 커밋 없음
     let before = git(&e.origin(), &["rev-parse", "main"]);
-    let r = ps.rebuild_index("LS", &e.user).await.expect("재구축");
+    let r = ps
+        .rebuild_index(e.pool(), "LS", &e.user)
+        .await
+        .expect("재구축");
     assert_eq!((r.readme_updated, r.docs, r.versions), (false, 1, 1));
     assert_eq!(git(&e.origin(), &["rev-parse", "main"]), before);
     // README를 밖에서 바꿔 둔 뒤 → 맞추고 커밋 하나, 밀림 0으로 끝난다
     let out = e.outside();
     write(&out, "docs/specs/README.md", "옛 README\n");
     commit_push(&out, "README 바꿈");
-    let r = ps.rebuild_index("LS", &e.user).await.expect("재구축");
+    let r = ps
+        .rebuild_index(e.pool(), "LS", &e.user)
+        .await
+        .expect("재구축");
     assert!(r.readme_updated);
     let head = git(&e.origin(), &["rev-parse", "main"]);
     assert_eq!(
@@ -938,7 +944,7 @@ async fn sync_now_reads_pending_and_rebuild_index_syncs_readme_first() {
     // 남의 것 → not-found, 아무것도 안 바뀐다
     let stranger = user(&mut *ps.db, "stranger").await;
     assert!(matches!(
-        ps.rebuild_index("LS", &stranger).await,
+        ps.rebuild_index(e.pool(), "LS", &stranger).await,
         Err(Problem::NotFound { .. })
     ));
     assert!(matches!(
@@ -1100,7 +1106,7 @@ async fn catch_up_processes_each_repo_and_records_failures() {
         db: &mut c,
         repos: &e.repos,
     }
-    .init_project("AB", "깨진 것", &e.user, false, Storage::Server)
+    .init_project(e.pool(), "AB", "깨진 것", &e.user, false, Storage::Server)
     .await
     .expect("둘째 프로젝트");
     sqlx::query("UPDATE repositories SET workdir_path = '/없는/자리' WHERE project_id = (SELECT id FROM projects WHERE code = 'AB')")

@@ -45,7 +45,7 @@ pub async fn rebuild(
         db: &mut c,
         repos: &state.repos,
     }
-    .rebuild_index(&code, &user)
+    .rebuild_index(&state.pool, &code, &user)
     .await?;
     Ok(Json(RebuildResult::from(&r)))
 }

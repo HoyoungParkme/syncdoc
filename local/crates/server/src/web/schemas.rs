@@ -13,6 +13,11 @@ use syncdoc_core::types::{
     UserRef as UserRefDto, Version as VersionDto, iso_utc,
 };
 use syncdoc_core::types::{
+    CodeBrief as CodeBriefDto, CodeCalls as CodeCallsDto, CodeFunction as CodeFunctionDto,
+    CodeGraphInfo as CodeGraphInfoDto, CodeRef as CodeRefDto, CodeText as CodeTextDto,
+    CodeView as CodeViewDto,
+};
+use syncdoc_core::types::{
     HookStatus as HookStatusDto, RebuildResult as RebuildResultDto, RepoStatus as RepoStatusDto,
     SyncResult as SyncResultDto,
 };
@@ -672,6 +677,184 @@ impl From<&SyncResultDto> for SyncResult {
         SyncResult {
             docs: r.docs,
             fetched_at: r.fetched_at.map(iso_utc),
+        }
+    }
+}
+
+/// `CodeGraphInfo` — 코드 그래프 행의 머리 (`web/schemas/code.py`, 카드 L12)
+#[derive(Debug, Serialize)]
+pub struct CodeGraphInfo {
+    pub commit_hash: Option<String>,
+    pub source: Option<String>,
+    pub built_at: String,
+    pub error: Option<String>,
+    pub function_count: i32,
+}
+
+impl From<&CodeGraphInfoDto> for CodeGraphInfo {
+    fn from(g: &CodeGraphInfoDto) -> Self {
+        CodeGraphInfo {
+            commit_hash: g.commit_hash.clone(),
+            source: g.source.clone(),
+            built_at: iso_utc(g.built_at),
+            error: g.error.clone(),
+            function_count: g.function_count,
+        }
+    }
+}
+
+/// `CodeRef` — 부르는 것·불리는 곳 한 줄
+#[derive(Debug, Serialize)]
+pub struct CodeRef {
+    pub ms_id: String,
+    pub qual: Option<String>,
+    pub file: Option<String>,
+    pub line: Option<i64>,
+    pub status: Option<String>,
+}
+
+impl From<&CodeRefDto> for CodeRef {
+    fn from(r: &CodeRefDto) -> Self {
+        CodeRef {
+            ms_id: r.ms_id.clone(),
+            qual: r.qual.clone(),
+            file: r.file.clone(),
+            line: r.line,
+            status: r.status.clone(),
+        }
+    }
+}
+
+/// `CodeBrief` — 함수 목록 한 줄
+#[derive(Debug, Serialize)]
+pub struct CodeBrief {
+    pub ms_id: String,
+    pub qual: Option<String>,
+    pub file: Option<String>,
+    pub line: Option<i64>,
+    pub same: i64,
+    pub code_only: i64,
+    pub spec_only: i64,
+}
+
+impl From<&CodeBriefDto> for CodeBrief {
+    fn from(b: &CodeBriefDto) -> Self {
+        CodeBrief {
+            ms_id: b.ms_id.clone(),
+            qual: b.qual.clone(),
+            file: b.file.clone(),
+            line: b.line,
+            same: b.same,
+            code_only: b.code_only,
+            spec_only: b.spec_only,
+        }
+    }
+}
+
+/// `CodeFunction` — 항목의 함수
+#[derive(Debug, Serialize)]
+pub struct CodeFunction {
+    pub ms_id: String,
+    pub qual: String,
+    pub file: String,
+    pub line: i64,
+    pub end: Option<i64>,
+    pub calls: Vec<CodeRef>,
+    pub callers: Vec<CodeRef>,
+}
+
+impl From<&CodeFunctionDto> for CodeFunction {
+    fn from(f: &CodeFunctionDto) -> Self {
+        CodeFunction {
+            ms_id: f.ms_id.clone(),
+            qual: f.qual.clone(),
+            file: f.file.clone(),
+            line: f.line,
+            end: f.end,
+            calls: f.calls.iter().map(CodeRef::from).collect(),
+            callers: f.callers.iter().map(CodeRef::from).collect(),
+        }
+    }
+}
+
+/// `CodeView` — 코드 탭 (UI-5 8.18~8.22)
+#[derive(Debug, Serialize)]
+pub struct CodeView {
+    pub graph: Option<CodeGraphInfo>,
+    pub doc_id: String,
+    pub item_id: Option<String>,
+    pub is_ms: bool,
+    pub missing: bool,
+    pub function: Option<CodeFunction>,
+    pub functions: Vec<CodeBrief>,
+}
+
+impl From<&CodeViewDto> for CodeView {
+    fn from(v: &CodeViewDto) -> Self {
+        CodeView {
+            graph: v.graph.as_ref().map(CodeGraphInfo::from),
+            doc_id: v.doc_id.clone(),
+            item_id: v.item_id.clone(),
+            is_ms: v.is_ms,
+            missing: v.missing,
+            function: v.function.as_ref().map(CodeFunction::from),
+            functions: v.functions.iter().map(CodeBrief::from).collect(),
+        }
+    }
+}
+
+/// `CodeText` — 코드 보기 (UI-5 8.21 · UI-17 4.6)
+#[derive(Debug, Serialize)]
+pub struct CodeText {
+    pub path: String,
+    pub start: i64,
+    pub end: i64,
+    pub commit_hash: String,
+    pub text: String,
+    pub truncated: bool,
+}
+
+impl From<&CodeTextDto> for CodeText {
+    fn from(t: &CodeTextDto) -> Self {
+        CodeText {
+            path: t.path.clone(),
+            start: t.start,
+            end: t.end,
+            commit_hash: t.commit_hash.clone(),
+            text: t.text.clone(),
+            truncated: t.truncated,
+        }
+    }
+}
+
+/// `CodeCallEdge` — 파이썬 `from_`은 `from`으로 나간다
+#[derive(Debug, Serialize)]
+pub struct CodeCallEdge {
+    pub from: String,
+    pub to: String,
+    pub status: String,
+}
+
+/// `CodeCalls` — 관계도 코드 호출 (UI-8 2.6)
+#[derive(Debug, Serialize)]
+pub struct CodeCalls {
+    pub graph: Option<CodeGraphInfo>,
+    pub edges: Vec<CodeCallEdge>,
+}
+
+impl From<&CodeCallsDto> for CodeCalls {
+    fn from(c: &CodeCallsDto) -> Self {
+        CodeCalls {
+            graph: c.graph.as_ref().map(CodeGraphInfo::from),
+            edges: c
+                .edges
+                .iter()
+                .map(|e| CodeCallEdge {
+                    from: e.from.clone(),
+                    to: e.to.clone(),
+                    status: e.status.clone(),
+                })
+                .collect(),
         }
     }
 }

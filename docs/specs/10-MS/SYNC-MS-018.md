@@ -12,7 +12,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-008, SYNC-MS-014, SYNC-MS-015, SYNC-MS-016, SYN
 
 `crates/core/src/queries.rs`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.7. 파이썬 판 [[SYNC-MS-008]]과 **같은 이름·같은 처리**이고, 이 문서는 다른 점만 적는다([[SYNC-STD-001]] 2.10). 여러 묶음의 서비스를 불러 응답 하나로 엮는다 — 쓰지 않는다.
 
-**카드 L6 몫은 프로젝트 요약 하나다(2026-10-08)** — `init_project`·`POST /api/projects`가 돌려주고 `GET /api/projects`가 목록으로 낸다(사용자 결정 — 요약 전부, 문서가 있어도 맞게). **카드 L7이 MCP 읽기 도구의 넷을 더했다(2026-10-08)** — `list_documents`·`get_document`·`get_item`·`get_references`가 부른다. **카드 L8이 웹 읽기의 일곱을 더했다(2026-10-11)** — 프로젝트 상세·끊어진 참조 목록·관계도·체인·diff 영향·추적표·휴지통 목록(UI-4가 처음부터 부른다 — 휴지통 쓰기는 L9). 코드(L12)·묻기(L14)는 그 카드가 더한다.
+**카드 L6 몫은 프로젝트 요약 하나다(2026-10-08)** — `init_project`·`POST /api/projects`가 돌려주고 `GET /api/projects`가 목록으로 낸다(사용자 결정 — 요약 전부, 문서가 있어도 맞게). **카드 L7이 MCP 읽기 도구의 넷을 더했다(2026-10-08)** — `list_documents`·`get_document`·`get_item`·`get_references`가 부른다. **카드 L8이 웹 읽기의 일곱을 더했다(2026-10-11)** — 프로젝트 상세·끊어진 참조 목록·관계도·체인·diff 영향·추적표·휴지통 목록(UI-4가 처음부터 부른다 — 휴지통 쓰기는 L9). **카드 L12가 코드의 넷을 더했다(2026-10-11)** — 코드 탭·관계도 코드 호출·코드 보기·코드 그래프의 코드. 코드 그래프 노드(L13)·묻기(L14)는 그 카드가 더한다.
 
 **파이썬 `set`의 차례** — [[#queries.item_chain]]은 폐포를 파이썬 `set`에 모아 그 순회 차례로 단계 행을 채운다. 행 안 항목의 차례가 응답 바이트이므로 Rust는 CPython 3.12의 정수 `set`(열린 주소·선형 탐사 9·`perturb`·크기 키움·`discard`의 빈 표시)을 그대로 흉내 낸 `pycompat::pyset`으로 같은 차례를 낸다(에이전트 판단 2026-10-11 — 「바이트까지」 결정을 따름).
 
@@ -38,6 +38,10 @@ upstream: [SYNC-DOM-004, SYNC-MS-008, SYNC-MS-014, SYNC-MS-015, SYNC-MS-016, SYN
 | [[#queries.diff_with_impact]] | diff + 하위 건수 |
 | [[#queries.downstream_view]] | 이 문서를 참조하는 것 |
 | [[#queries.trash_list]] | 휴지통 목록 |
+| [[#queries.code_view]] | 코드 탭 — 항목의 코드 대조 |
+| [[#queries.code_calls]] | 관계도 코드 호출 |
+| [[#queries.code_source]] | 코드 보기 |
+| [[#queries.code_text]] | 코드 그래프의 코드 — 파일·줄로 |
 
 ---
 
@@ -289,6 +293,74 @@ pub async fn trash_list(db: &mut PgConnection, repos: &ServerRepos, code: &str, 
 **호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-014#SpecService.list_trashed]] · [[SYNC-MS-016#AccountService.users_by_ids]]
 
 **테스트 관점** (시험 DB) 휴지통 문서만 · 남의 프로젝트 → `not-found`
+
+---
+
+#### queries.code_view 코드 탭 — 항목의 코드 대조
+
+**시그니처**
+```rust
+pub async fn code_view(db: &mut PgConnection, repos: &ServerRepos, doc_id: &str, item_id: Option<&str>, user: &UserRow) -> Result<CodeView, Problem>
+```
+
+근거: [[SYNC-MS-008#queries.code_view]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/code]] · [[SYNC-API-001#GET/api/docs/{docId}/code]] · [[SYNC-API-002#get_code_graph]]
+
+**처리** [[SYNC-MS-008#queries.code_view]] 0~6과 같다 — 프로젝트 소유 → 문서 → 항목 → 그래프 행(없으면 `graph` 없이) → 프로젝트 MINISPEC 항목의 「호출하는 것」(`impl_of` — MS 문서 `upstream` 중 제목에 「클래스」가 든 DOM 문서가 꼭 하나일 때) → 대조 → MINISPEC 항목이면 그 함수의 부르는 것(코드만 → 명세만 → 같음)·불리는 곳, 못 찾으면 `item_function`·`item_neighbors`(대조 없음) · MINISPEC 밖 항목이면 하위 체인의 MINISPEC 함수 · MINISPEC 문서 단위면 그 문서 항목 전부(블록 차례). `graph` 머리는 `{commit_hash, source, built_at, error, function_count}`
+
+**호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.resolve_item]] · [[SYNC-MS-014#SpecService.list_by_project]] · [[SYNC-MS-014#SpecService.item_blocks]] · [[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#codegraph.spec_calls]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.item_function]] · [[SYNC-MS-022#codegraph.item_neighbors]] · [[#queries.item_chain]]
+
+**테스트 관점** [[SYNC-MS-008#queries.code_view]]의 것
+
+---
+
+#### queries.code_calls 관계도 코드 호출
+
+**시그니처**
+```rust
+pub async fn code_calls(db: &mut PgConnection, repos: &ServerRepos, code: &str, user: &UserRow) -> Result<CodeCalls, Problem>
+```
+
+근거: [[SYNC-MS-008#queries.code_calls]] · [[SYNC-API-001#GET/api/projects/{code}/code-calls]]
+
+**처리** [[SYNC-MS-008#queries.code_calls]]와 같다 — 대조의 항목마다 같음 → 코드만 → 명세만 차례로 선 `{from, to, status}`(대조는 항목 ID 순)
+
+**호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#codegraph.spec_calls]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-014#SpecService.list_by_project]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.item_blocks]] · [[SYNC-MS-014#markdown.parse_frontmatter]]
+
+**테스트 관점** 그래프 없음 → `graph` 없이 빈 선 · 같음·코드만·명세만이 다 나온다
+
+---
+
+#### queries.code_source 코드 보기
+
+**시그니처**
+```rust
+pub async fn code_source(db: &mut PgConnection, repos: &ServerRepos, doc_id: &str, item_id: &str, user: &UserRow) -> Result<CodeText, Problem>
+```
+
+근거: [[SYNC-MS-008#queries.code_source]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/code/source]]
+
+**처리** [[SYNC-MS-008#queries.code_source]]와 같다 — 소유·항목 → 그래프 없으면 `! NotFound(code_graph, 코드)` → `compare(graph, {항목: ∅})`의 함수, 없으면 `item_function` → 없으면 `! NotFound(function, 항목)` → 끝 줄(없으면 같은 파일 다음 함수 앞 줄, 그것도 없으면 시작 + 59) → `CodeGraphService.read`
+
+**호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-014#SpecService.resolve_item]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.item_function]] · [[SYNC-MS-022#CodeGraphService.read]]
+
+**테스트 관점** MINISPEC 항목 → 그 함수의 줄 · API 항목 → `item`의 함수 · 함수 없는 항목 → `not-found`(function) · 그래프 없음 → `not-found`(code_graph)
+
+---
+
+#### queries.code_text 코드 그래프의 코드 — 파일·줄로
+
+**시그니처**
+```rust
+pub async fn code_text(db: &mut PgConnection, repos: &ServerRepos, code: &str, file: &str, line: i64, user: &UserRow) -> Result<CodeText, Problem>
+```
+
+근거: [[SYNC-MS-008#queries.code_text]] · [[SYNC-API-001#GET/api/projects/{code}/code/source]]
+
+**처리** [[SYNC-MS-008#queries.code_text]]와 같다 — 그래프의 함수 중 파일·시작 줄이 같은 것(없으면 `! NotFound(function, "{file}:{line}")`) → `code_source`와 같은 끝 줄 → `CodeGraphService.read`
+
+**호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#CodeGraphService.read]]
+
+**테스트 관점** 함수의 시작 줄 → 그 함수 · 없는 줄 → `not-found`(function) · 그래프 없음 → `not-found`(code_graph)
 
 ---
 

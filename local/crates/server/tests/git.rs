@@ -53,7 +53,7 @@ async fn real_git_clones_and_pushes_through_the_entrance() {
         db: &mut tx,
         repos: &repos,
     }
-    .init_project("LG", "깃", &user, false, Storage::Server)
+    .init_project(&db.pool, "LG", "깃", &user, false, Storage::Server)
     .await
     .expect("프로젝트");
     tx.commit().await.expect("커밋");

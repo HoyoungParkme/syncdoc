@@ -47,7 +47,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-001, SYNC-MS-019, SYNC-UC-001, SYNC-API-001, SY
 
 **시그니처**
 ```rust
-pub async fn init_project(&mut self, code: &str, name: &str, user: &UserRow, import_existing: bool, storage: Storage) -> Result<(ProjectRow, RepositoryRow), Problem>
+pub async fn init_project(&mut self, pool: &PgPool, code: &str, name: &str, user: &UserRow, import_existing: bool, storage: Storage) -> Result<(ProjectRow, RepositoryRow), Problem>
 ```
 
 근거: [[SYNC-MS-001#ProjectService.init_project]] · [[SYNC-UC-001#UC-A1]] · [[SYNC-SCN-001#S5]] · [[SYNC-SCN-001#S10]]
@@ -61,18 +61,18 @@ pub async fn init_project(&mut self, code: &str, name: &str, user: &UserRow, imp
    - if 보관본이 있고 `import_existing` → 가장 최근 것을 `origin`으로 되살린다 · 아니면 `git.init_bare(origin)`
 5. `git.clone(origin, workdir)` · 실패 → 작업 사본을 지우고 원본을 되돌리고(새로 만든 것은 지우고 되살린 것은 보관 자리로) `! PushFailed("clone: {stderr}")`
 6. `has = git.exists(workdir, "docs/specs")` · if `has`이고 `import_existing`이 아니다 → `n = git.list(workdir, …)`의 수 · 지우고 되돌리고 `! ExistingSpecs { doc_count: n }`
-7. 저장점을 열고 `DB: projects insert (code, name, owner_user_id=user.id)` · `DB: repositories insert (project_id, storage='server', remote_url=origin 절대 경로, workdir_path, registered_by_user_id=user.id)`
-8. if `has`이고 `import_existing` → `pipeline.rebuild(저장점, repos, code)` — 같은 저장점 안이라 막 넣은 행을 본다 · 실패하면 원본을 되돌리고(되살린 것은 보관 자리로) 그 `Problem` · 골격 커밋 없이 10으로 — 처리 지점은 재구축이 원본 끝으로 적었다
-9. `files = Git::init_specs(repos.specs_url)` · `hash = git.commit_push(workdir, "chore({code}): init syncdoc", user, files, [])` · 실패 → 저장점을 되돌리고 작업 사본을 지우고 원본을 되돌리고 그 `Problem` · `DB: repositories update last_processed_commit=hash`
+7. 트랜잭션을 열고(부르는 쪽이 이미 트랜잭션이면 저장점 — REST·MCP 입구는 트랜잭션 없이 연결을 넘긴다) `DB: projects insert (code, name, owner_user_id=user.id)` · `DB: repositories insert (project_id, storage='server', remote_url=origin 절대 경로, workdir_path, registered_by_user_id=user.id)`
+8. if `has`이고 `import_existing` → `pipeline.rebuild(그 트랜잭션, pool, repos, code)` — 같은 트랜잭션 안이라 막 넣은 행을 본다 · 실패하면 원본을 되돌리고(되살린 것은 보관 자리로) 그 `Problem` · 골격 커밋 없이 10으로 — 처리 지점은 재구축이 원본 끝으로 적었다 · 커밋 뒤 `pipeline.schedule_code_graph(pool, repos, code, 처리 지점)` — 재구축이 건 것은 아직 커밋되지 않은 프로젝트를 못 볼 수 있다(카드 L12)
+9. `files = Git::init_specs(repos.specs_url)` · `hash = git.commit_push(workdir, "chore({code}): init syncdoc", user, files, [])` · 실패 → 트랜잭션을 되돌리고 작업 사본을 지우고 원본을 되돌리고 그 `Problem` · `DB: repositories update last_processed_commit=hash`
 10. `→ (프로젝트 행, 저장소 행)`
 
 보관 자리 — `origins/_archive/{code}-{UTC %Y%m%d%H%M%S}.git`, 같은 초에 있으면 `-1`·`-2`…를 붙인다. 시각은 [[SYNC-STD-004#DEV-18]]의 저장 시각
 
-**다른 점** GitHub 인자(`remote_url`·`create_repo`·`private`)가 없다 — MCP 도구·REST 본문에는 있지만 서버 저장에서 파이썬 판도 안 쓴다 
+**다른 점** GitHub 인자(`remote_url`·`create_repo`·`private`)가 없다 — MCP 도구·REST 본문에는 있지만 서버 저장에서 파이썬 판도 안 쓴다 · 연결 풀을 받는다 — 8의 그래프 만들기는 따로 띄운 작업이 제 연결로 한다(카드 L12)
 
 **예외** 1~9의 `Problem` · git·파일 실패는 `Problem::Git`·`Problem::Internal`(파이썬 판도 그대로 올린다)
 
-**호출하는 것** [[SYNC-MS-019#Git.init_bare]] · [[SYNC-MS-019#Git.list]] · [[SYNC-MS-019#Git.clone]] · [[SYNC-MS-019#Git.exists]] · [[SYNC-MS-019#Git.init_specs]] · [[SYNC-MS-019#Git.commit_push]] · [[SYNC-MS-017#pipeline.rebuild]] · [[#ProjectService.get]](돌려줄 행)
+**호출하는 것** [[SYNC-MS-019#Git.init_bare]] · [[SYNC-MS-019#Git.list]] · [[SYNC-MS-019#Git.clone]] · [[SYNC-MS-019#Git.exists]] · [[SYNC-MS-019#Git.init_specs]] · [[SYNC-MS-019#Git.commit_push]] · [[SYNC-MS-017#pipeline.rebuild]] · [[SYNC-MS-017#pipeline.schedule_code_graph]] · [[#ProjectService.get]](돌려줄 행)
 
 **테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 새 프로젝트 → `origins/{code}.git`(HEAD main, 받기 규칙 셋)과 골격 커밋 하나(14파일, `chore({code}): init syncdoc`), `last_processed_commit`이 원격 main · `github` → `storage-unavailable`, 아무것도 안 생김 · 나쁜 코드 → `project-code-invalid` · 같은 코드 → `project-code-conflict` · 지운 뒤 같은 코드 → `existing-specs`(`doc_count`·`archived_at`), 아무것도 안 바뀜 · 같은 초 보관본 둘 → 번호가 큰 것 · 이름 없이 남은 원본 → 보관으로 옮기고 `existing-specs` · 비어 있는 보관본 + 가져오기 → 되살리고 골격 커밋 · 명세가 있는 보관본 + 가져오기 → 재구축으로 문서·버전이 다시 올라오고 처리 지점이 원본 끝, 골격 커밋 없음 · 재구축이 실패하면 행 없음·보관본은 제자리 · clone 실패 → 새 원본·작업 사본·행 없음
 
@@ -267,12 +267,12 @@ pub async fn sync_now(&mut self, pool: &PgPool, code: &str, user: &UserRow) -> R
 
 **시그니처**
 ```rust
-pub async fn rebuild_index(&mut self, code: &str, user: &UserRow) -> Result<RebuildResult, Problem>
+pub async fn rebuild_index(&mut self, pool: &PgPool, code: &str, user: &UserRow) -> Result<RebuildResult, Problem>
 ```
 
 근거: [[SYNC-MS-001#ProjectService.rebuild_index]] · [[SYNC-UC-001#UC-S6]] 1a
 
-**처리** [[#ProjectService.get_owned]] — 소유 검사는 여기서(재구축은 `get`) · README를 인덱스보다 **먼저** 맞춘다 — `hash = git.sync_readme(작업 사본, user, code, repos.specs_url)`(그 커밋이 재구축의 받기 끝에 들어가 밀림 0으로 끝난다, 실패하면 인덱스를 건드리지 않는다) · `result = pipeline.rebuild(이 연결, repos, code)` · `→ result`에 `readme_updated = hash가 있다`
+**처리** [[#ProjectService.get_owned]] — 소유 검사는 여기서(재구축은 `get`) · README를 인덱스보다 **먼저** 맞춘다 — `hash = git.sync_readme(작업 사본, user, code, repos.specs_url)`(그 커밋이 재구축의 받기 끝에 들어가 밀림 0으로 끝난다, 실패하면 인덱스를 건드리지 않는다) · `result = pipeline.rebuild(이 연결, pool, repos, code)` — 풀은 재구축 10의 그래프 만들기가 쓴다(카드 L12) · `→ result`에 `readme_updated = hash가 있다`
 
 **호출하는 것** [[#ProjectService.get_owned]] · [[SYNC-MS-019#Git.sync_readme]] · [[SYNC-MS-017#pipeline.rebuild]]
 
