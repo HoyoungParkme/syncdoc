@@ -10,12 +10,13 @@ use crate::account::model::UserRow;
 use crate::account::service::AccountService;
 use crate::errors::Problem;
 use crate::project::service::{ProjectService, ServerRepos};
+use crate::pycompat::pyset::IntSet;
 use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
 use crate::types::{
-    ApiAuthor, AuthorRef, BrokenRefSummary, Document, DocumentSummary, Graph, GraphEdge, GraphNode,
-    GraphScope, ItemRef, ItemReferences, ItemView, ProjectDetail, ProjectItem, ProjectSummary,
-    STAGES, StageSummary, Storage,
+    ApiAuthor, AuthorRef, BrokenRefSummary, ChainItem, ChainRow, Document, DocumentSummary, Graph,
+    GraphEdge, GraphNode, GraphScope, ItemChain, ItemRef, ItemReferences, ItemView, ProjectDetail,
+    ProjectItem, ProjectSummary, STAGES, StageSummary, Storage, stage_of,
 };
 
 /// 작성자(id만) → 이름 붙은 작성자 — 파이썬 `_api_author`. 지시자는 id가 있을 때만
@@ -548,5 +549,118 @@ pub async fn graph_view(
         nodes,
         edges: out_edges,
         project_name: project.name,
+    })
+}
+
+/// 한 방향으로 너비 우선 — 본 것은 파이썬 `set`에, 사이클은 본 표시로 멈추고 끝에 시작점을 뺀다 (파이썬 `_closure`)
+async fn closure(db: &mut PgConnection, start: i32, upward: bool) -> Result<IntSet, Problem> {
+    let mut seen = IntSet::new();
+    let mut queue = std::collections::VecDeque::from([start]);
+    while let Some(pk) = queue.pop_front() {
+        let edges = if upward {
+            ReferenceService { db: &mut *db }.upstream(pk).await?
+        } else {
+            ReferenceService { db: &mut *db }.downstream(pk).await?
+        };
+        for e in edges {
+            let next = if upward { e.to_item_pk } else { e.from_item_pk };
+            if let Some(n) = next
+                && let Ok(key) = u64::try_from(n)
+                && !seen.contains(key)
+            {
+                seen.add(key);
+                queue.push_back(n);
+            }
+        }
+    }
+    if let Ok(key) = u64::try_from(start) {
+        seen.discard(key);
+    }
+    Ok(seen)
+}
+
+/// SYNC-MS-018#queries.item_chain
+///
+/// 직접 참조가 아니라 전이적 폐포다. 역할은 어느 폐포에서 나왔는지로 정한다 — 단계 번호로 정하면 되돌아오는
+/// 참조에서 근거를 파생으로 잘못 적는다. 한 단계 안의 차례는 파이썬 `set`의 순회 차례다
+pub async fn item_chain(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    doc_id: &str,
+    item_id: &str,
+    user: &UserRow,
+) -> Result<ItemChain, Problem> {
+    ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code_of(doc_id), user)
+    .await?;
+    let pk = SpecService { db: &mut *db }
+        .resolve_item(doc_id, item_id)
+        .await?;
+    let ups = closure(&mut *db, pk, true).await?;
+    let downs = closure(&mut *db, pk, false).await?;
+    let as_pk = |k: u64| i32::try_from(k).unwrap_or(0);
+    let mut all: Vec<i32> = ups.iter().map(as_pk).collect();
+    all.extend(downs.iter().map(as_pk));
+    all.push(pk);
+    let described = SpecService { db: &mut *db }.describe_items(&all).await?;
+    let mut statuses: HashMap<String, String> = HashMap::new();
+    for r in described.values() {
+        if let Some(d) = &r.doc_id
+            && !statuses.contains_key(d)
+        {
+            let status = SpecService { db: &mut *db }
+                .get_document(d)
+                .await?
+                .summary
+                .status;
+            statuses.insert(d.clone(), status);
+        }
+    }
+    let order = std::iter::once((pk, "self"))
+        .chain(ups.iter().map(|k| (as_pk(k), "upstream")))
+        .chain(downs.iter().map(|k| (as_pk(k), "downstream")));
+    let mut by_stage: HashMap<i32, Vec<ChainItem>> = HashMap::new();
+    for (p, role) in order {
+        let Some(r) = described.get(&p) else { continue };
+        let Some(d) = &r.doc_id else { continue };
+        // STD는 단계 밖이라 체인에 안 놓는다
+        let Some(stage) = d.split('-').nth(1).and_then(stage_of) else {
+            continue;
+        };
+        by_stage.entry(stage).or_default().push(ChainItem {
+            ref_: r.clone(),
+            role: role.to_string(),
+            status: statuses
+                .get(d)
+                .cloned()
+                .unwrap_or_else(|| "draft".to_string()),
+        });
+    }
+    let item = described
+        .get(&pk)
+        .cloned()
+        .ok_or_else(|| Problem::Internal {
+            log: format!("{doc_id}#{item_id}의 표시 정보가 없다"),
+        })?;
+    Ok(ItemChain {
+        item,
+        upstream_count: ups.len() as i64,
+        downstream_count: downs.len() as i64,
+        // 항상 11행 — 체인이 어디서 끊겼는지가 이 화면의 목적이다
+        rows: STAGES
+            .iter()
+            .enumerate()
+            .map(|(i, t)| {
+                let stage = i as i32 + 1;
+                ChainRow {
+                    stage,
+                    doc_type: (*t).to_string(),
+                    items: by_stage.remove(&stage).unwrap_or_default(),
+                }
+            })
+            .collect(),
     })
 }
