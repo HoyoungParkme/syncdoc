@@ -172,16 +172,26 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | L8 · L12 |
 | 완료 | 2026-10-11 · 브랜치 `card/L14-conversations`(417068f #375) · spec 6 + code 6 · `cargo test` 178(모델 스트림·단발·오류 접기를 작은 가짜 서버로 · 시험 DB — 대화·턴·첨부·종류·상한·소유·PDF 글자 · 질문 루프 — 도구·상한·마무리·턴 닫기·답 속 링크) · 계약 `--target both --with-card L14` 1083 통과 — L14 96: 같은 대본의 가짜 모델로 SSE 이벤트 바이트·대화·첨부 응답이 같고 두 판이 모델에 보낸 요청 본문도 같다 · clippy · 워크플로 녹색(리눅스·윈도) · `check_code` Rust 175/175 · `check_calls` 0 · 사람 확인(윈도 싱크독_로컬 UI-5·UI-17 묻기 탭 — 사내 모델로)은 따로 · 되먹임: 경계 없는 multipart의 제목은 starlette 문장(`Missing boundary in multipart.`) · 파이썬 판은 묻기 시작 전 실패(항목 없음 등)를 `session_scope`가 되돌려 턴이 남지 않는다 — Rust도 준비를 트랜잭션 하나로 · `check_calls`는 경로로 쓴 구조체 리터럴의 메서드를 못 따라간다(타입을 `use`하고 이름으로) · ask_tool의 「호출하는 것」에 `list_by_project`·`parse_frontmatter`를 더했다 |
 
+#### L15 번들 가져오기 — 다른 곳의 저장소를 서버 저장 프로젝트로
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UC-001#UC-A1]] 1c · [[SYNC-PRD-001#R14]] · [[SYNC-INFRA-001]] 9.7 · 파이썬 판 카드 BX([[SYNC-CODE-001]], #376) · 에이전트 판단 2026-10-11(사용자 목표 「끝까지」): 입구는 `/api/projects/{code}` 경로에 POST를 붙여 `code`가 `bundle`일 때만 가져오기 — 정적 경로를 따로 두면 axum은 `GET /api/projects/bundle`을 405로 막지만 파이썬 판은 `{code}`의 GET으로 떨어져 `not-found`다. 그 밖의 코드로 POST하면 파이썬 판처럼 405(`Allow: GET, DELETE`) · 폼은 starlette·FastAPI 꼴 그대로 — multipart와 urlencoded, 같은 이름은 뒤의 것, 빈 문자열은 없는 것, 파일 아닌 칸 1MB 넘음·이름 없는 칸은 400(starlette 문장), 칸 오류는 선언 차례(`code`·`name`·`bundle`) · 폼 해석은 multer를 빼고 python-multipart 0.0.32 파서를 옮긴다(`compat/form.rs`) — 깨진 본문(경계·머리·끝 없음)의 답까지 같고 L14 첨부도 같은 길을 탄다. 문자 집합은 UTF-8·latin-1·ASCII 이름만 안다(그 밖은 latin-1 — 계약 밖) · 크기 상한 없음(파이썬 판과 같다) |
+| 구현 | [[SYNC-MS-013#ProjectService.import_bundle]] · [[SYNC-MS-019#Git.clone_bare]] · `errors.rs` `BundleInvalid` · `compat/form.rs` · `compat/fastapi.rs` 폼 칸 · `routes/projects.rs` |
+| API | [[SYNC-API-001#POST/api/projects/bundle]] |
+| 테스트 | `cargo test`(폼 정답 — `xtask/py/form_cases.py`가 starlette에 넣어 얻은 답과 같다, 상한 넷 · git — 번들의 가지·태그 해시·원격 없음·HEAD·받기 규칙 · 시험 DB — 번들 → 문서·상태 이력·처리 지점, 골격 커밋 없음 · 번들 아님·main 없음 → `bundle-invalid`, 아무것도 안 남음 · 코드 형식·중복 · 남은 원본은 보관으로) · 계약 L15 — 같은 번들(고정 저장소를 시험이 git으로 묶는다)로 두 판의 응답·문서 목록·이력이 같고, 폼 오류·405가 바이트로 같다 |
+| 선행 | L11 · BX |
+| 완료 | — |
+
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
-| L15 번들 가져오기 | 파이썬 판 카드 BX(git 번들 가져오기)의 Rust 쪽 | L11 · BX | S |
 | L16 데이터 보호·「이 PC」 | 백업·되살리기·데이터 자리 옮기기 · UI-13 「이 PC」 묶음 · 같은 망 열기(`PUBLIC_BASE_URL`, 설정 파일만 — 사용자 결정 2026-10-07) | L4 · L11 | L |
 | L17 속도·출시 판정 | 두 판을 같은 PC에서 잰다 — [[SYNC-PRD-001#R15]] 속도 목표와 「파이썬 판보다 느린 항목 없음」 | L14~L16 · L18 | M |
 | L18 새 MCP 프로토콜 | 2026-07-28 — 핸드셰이크 없는 요청 하나짜리 봉투 · `server/discover`·`subscriptions/listen`. 파이썬 SDK의 `_streamable_http_modern`을 옮긴다(사용자 결정 2026-10-08) | L3 | L |
 
-카드 BX는 파이썬 판에서 먼저 한다 — [[SYNC-CODE-001]]. #325(재구축이 파일을 지운 커밋에서 실패)는 #366으로 끝났다.
+카드 BX는 파이썬 판에서 먼저 했다 — [[SYNC-CODE-001]](#376). #325(재구축이 파일을 지운 커밋에서 실패)는 #366으로 끝났다.
 
 ---
 

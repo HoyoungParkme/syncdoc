@@ -808,6 +808,35 @@ impl Git {
         done?
     }
 
+    /// SYNC-MS-019#Git.clone_bare
+    ///
+    /// 번들을 서버 저장소로 통째로 — 가지·태그가 해시 그대로. 원격을 지우고 HEAD를 main으로, 받기 규칙은 init_bare와 같다
+    pub async fn clone_bare(&self, source: &str, path: &Path) -> Result<(), Problem> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        self.run(
+            None,
+            &[
+                os("clone"),
+                os("-q"),
+                os("--bare"),
+                os(source),
+                path.as_os_str(),
+            ],
+        )
+        .await?;
+        let at = Some(path);
+        self.run(at, &[os("remote"), os("remove"), os("origin")])
+            .await?;
+        self.run(at, &[os("symbolic-ref"), os("HEAD"), os("refs/heads/main")])
+            .await?;
+        for key in RECEIVE_RULES {
+            self.run(at, &[os("config"), os(key), os("true")]).await?;
+        }
+        Ok(())
+    }
+
     /// SYNC-MS-019#Git.checkout
     pub async fn checkout(&self, workdir: &Path, git_ref: &str) -> Result<(), Problem> {
         self.run(Some(workdir), &[os("checkout"), os("--force"), os(git_ref)])

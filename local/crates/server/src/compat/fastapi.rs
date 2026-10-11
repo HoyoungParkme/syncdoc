@@ -98,74 +98,91 @@ pub fn body_model_optional(body: &Body, v: &Validator) -> Result<Option<PyValue>
     }
 }
 
-/// 올린 파일 하나 — starlette `UploadFile`의 이름·종류(없으면 없음)·바이트
-pub struct Upload {
-    pub filename: Option<String>,
-    pub content_type: Option<String>,
-    pub data: Vec<u8>,
+pub use super::form::{FormValue, Upload, read_form};
+
+/// FastAPI `_get_multidict_value` — 같은 이름은 뒤의 것, 빈 문자열은 없는 것(`Form`·`File` 칸). (자리, 값)
+fn form_value<'a>(form: &'a [(String, FormValue)], name: &str) -> Option<(usize, &'a FormValue)> {
+    form.iter()
+        .enumerate()
+        .rev()
+        .find(|(_, (n, _))| n == name)
+        .map(|(i, (_, v))| (i, v))
+        .filter(|(_, v)| !matches!(v, FormValue::Text(t) if t.is_empty()))
 }
 
-/// `file: UploadFile` 하나 — starlette `request.form()` + FastAPI 검증. multipart가 아니거나 비면 빈 폼(→ `Field required`),
-/// 경계가 없으면 starlette 문장의 400, 그 밖에 깨졌으면 FastAPI의 400, 같은 이름이 여럿이면 뒤의 것, 파일이 아닌 값이면 `Expected UploadFile`
-pub async fn form_file(headers: &HeaderMap, bytes: &[u8], name: &str) -> Result<Upload, Problem> {
-    let parse_error = || Problem::Blank {
-        status: 400,
-        title: "There was an error parsing the body".into(),
-        detail: None,
-    };
-    let missing = || Problem::InvalidRequest {
-        errors: vec![(format!("body.{name}"), ErrorKind::Missing.message())],
-    };
-    let ct = first_header(headers, "content-type").unwrap_or_default();
-    let (main, sub) = content_type(&ct);
-    if !(main == "multipart" && sub == "form-data") {
-        return Err(missing());
-    }
-    // starlette — 경계가 없으면 그 문장이 400의 제목, 빈 본문은 빈 폼
-    let boundary = multer::parse_boundary(&ct).map_err(|_| Problem::Blank {
-        status: 400,
-        title: "Missing boundary in multipart.".into(),
-        detail: None,
-    })?;
-    if bytes.is_empty() {
-        return Err(missing());
-    }
-    let body = bytes.to_vec();
-    let stream = futures_util::stream::once(async move {
-        Ok::<_, std::convert::Infallible>(axum::body::Bytes::from(body))
-    });
-    let mut mp = multer::Multipart::new(stream, boundary);
-    let mut found: Option<Option<Upload>> = None;
-    loop {
-        let field = mp.next_field().await.map_err(|_| parse_error())?;
-        let Some(field) = field else { break };
-        if field.name() != Some(name) {
-            continue;
+/// 글자 칸 하나 — `Annotated[str, Form(...)]`. 없으면 `Field required`, 파일이면 pydantic `str`의 `string_type`,
+/// 아니면 그 검증. 오류는 `(body.{이름}, 문장)`들로 `errors`에 쌓는다(FastAPI는 선언 차례로 모은다)
+pub fn form_text(
+    form: &[(String, FormValue)],
+    name: &str,
+    v: &Validator,
+    errors: &mut Vec<(String, String)>,
+) -> Option<String> {
+    let loc = format!("body.{name}");
+    match form_value(form, name) {
+        None => {
+            errors.push((loc, ErrorKind::Missing.message()));
+            None
         }
-        let filename = field.file_name().map(str::to_string);
-        let content_type = field.headers().get("content-type").map(|v| {
-            v.as_bytes()
-                .iter()
-                .map(|&b| char::from(b))
-                .collect::<String>()
-        });
-        let is_file = filename.is_some();
-        let data = field.bytes().await.map_err(|_| parse_error())?.to_vec();
-        found = Some(is_file.then_some(Upload {
-            filename,
-            content_type,
-            data,
-        }));
+        Some((_, FormValue::File(_))) => {
+            errors.push((loc, ErrorKind::StringType.message()));
+            None
+        }
+        Some((_, FormValue::Text(t))) => {
+            match v.validate(&PyValue::Str(PyStr::from(t.as_str())), Opts::default()) {
+                Ok(PyValue::Str(out)) => out.as_str().map(str::to_string),
+                Ok(_) => {
+                    errors.push((loc, "검증한 값이 글자가 아니다".into()));
+                    None
+                }
+                Err(Failure::Invalid(e)) => {
+                    errors.extend(e.lines.iter().map(|l| pair(&loc, l)));
+                    None
+                }
+                Err(Failure::Exception(log)) => {
+                    errors.push((loc, log));
+                    None
+                }
+            }
+        }
     }
-    match found {
-        None => Err(missing()),
-        Some(None) => Err(Problem::InvalidRequest {
-            errors: vec![(
-                format!("body.{name}"),
+}
+
+/// 파일 칸 하나 — `UploadFile`(`File()`). 없으면 `Field required`, 글자면 FastAPI `UploadFile._validate`의
+/// `Expected UploadFile`. 폼에서 꺼내 간다(번들은 클 수 있다)
+pub fn form_upload(
+    form: &mut Vec<(String, FormValue)>,
+    name: &str,
+    errors: &mut Vec<(String, String)>,
+) -> Option<Upload> {
+    let loc = format!("body.{name}");
+    let at = match form_value(form, name) {
+        None => {
+            errors.push((loc, ErrorKind::Missing.message()));
+            return None;
+        }
+        Some((_, FormValue::Text(_))) => {
+            errors.push((
+                loc,
                 "Value error, Expected UploadFile, received: <class 'str'>".into(),
-            )],
-        }),
-        Some(Some(u)) => Ok(u),
+            ));
+            return None;
+        }
+        Some((at, FormValue::File(_))) => at,
+    };
+    match form.remove(at) {
+        (_, FormValue::File(f)) => Some(f),
+        _ => None,
+    }
+}
+
+/// `file: UploadFile` 하나 — starlette `request.form()` + FastAPI 검증(L14 첨부)
+pub fn form_file(headers: &HeaderMap, bytes: &[u8], name: &str) -> Result<Upload, Problem> {
+    let mut form = read_form(headers, bytes)?;
+    let mut errors = Vec::new();
+    match form_upload(&mut form, name, &mut errors) {
+        Some(u) => Ok(u),
+        None => Err(Problem::InvalidRequest { errors }),
     }
 }
 
@@ -304,6 +321,17 @@ pub mod schemas {
             "InitProject",
         )
         .expect("InitProject 스키마")
+    }
+
+    /// 폼 `code: Annotated[str, Form(pattern=r"^[A-Z]{1,4}$")]` (SYNC-API-001#POST/api/projects/bundle, 카드 L15)
+    pub fn bundle_code() -> Validator {
+        Validator::new(&json!({"type": "str", "pattern": "^[A-Z]{1,4}$"}), "code")
+            .expect("code 스키마")
+    }
+
+    /// 폼 `name: Annotated[str, Form(max_length=100)]`
+    pub fn bundle_name() -> Validator {
+        Validator::new(&json!({"type": "str", "max_length": 100}), "name").expect("name 스키마")
     }
 
     /// 질의 `stage: int | None = Query(None, ge=1, le=11)` (SYNC-API-001#GET/api/projects/{code}/docs)

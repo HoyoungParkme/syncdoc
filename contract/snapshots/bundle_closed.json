@@ -1,0 +1,334 @@
+{
+ "after_delete": {
+  "status": 201,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"code\":\"LBC\",\"name\":\"다시\",\"storage\":\"server\",\"remote_url\":null,\"stages\":[{\"stage\":1,\"doc_type\":\"RFQ\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":2,\"doc_type\":\"PRD\",\"status\":\"approved\",\"doc_count\":1,\"gate_warning\":false,\"broken_count\":0},{\"stage\":3,\"doc_type\":\"SCN\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":4,\"doc_type\":\"UC\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":5,\"doc_type\":\"INFRA\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":6,\"doc_type\":\"DOM\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":7,\"doc_type\":\"UI\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":8,\"doc_type\":\"API\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":9,\"doc_type\":\"SEQ\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":10,\"doc_type\":\"MS\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":11,\"doc_type\":\"CODE\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0}],\"std_docs\":[],\"counts\":{\"broken_ref\":0,\"convention_errors\":0,\"incomplete\":0},\"updated_at\":\"T\"}"
+ },
+ "bad_code": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.code — String should match pattern '^[A-Z]{1,4}$'\",\"errors\":[{\"loc\":\"body.code\",\"msg\":\"String should match pattern '^[A-Z]{1,4}$'\"}]}"
+ },
+ "broken": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"about:blank\",\"title\":\"There was an error parsing the body\",\"status\":400}"
+ },
+ "delete_bundle": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project bundle 없음\",\"resource\":\"project\",\"id\":\"bundle\"}"
+ },
+ "detail": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"code\":\"LBA\",\"name\":\"번들 대조\",\"storage\":\"server\",\"remote_url\":null,\"stages\":[{\"stage\":1,\"doc_type\":\"RFQ\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":2,\"doc_type\":\"PRD\",\"status\":\"approved\",\"doc_count\":1,\"gate_warning\":false,\"broken_count\":0},{\"stage\":3,\"doc_type\":\"SCN\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":4,\"doc_type\":\"UC\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":5,\"doc_type\":\"INFRA\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":6,\"doc_type\":\"DOM\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":7,\"doc_type\":\"UI\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":8,\"doc_type\":\"API\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":9,\"doc_type\":\"SEQ\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":10,\"doc_type\":\"MS\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":11,\"doc_type\":\"CODE\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0}],\"std_docs\":[],\"counts\":{\"broken_ref\":0,\"convention_errors\":0,\"incomplete\":0},\"updated_at\":\"T\",\"docs\":[{\"type\":\"document\",\"doc_id\":\"LBA-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"approved\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null}],\"recent_changes\":[{\"doc_id\":\"LBA-PRD-001\",\"version_no\":null,\"commit_hash\":\"3ec5f05e30676766d95078e43488b29d283e1393\",\"message\":\"status(LBA-PRD-001): draft → approved\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"},{\"doc_id\":\"LBA-PRD-001\",\"version_no\":1,\"commit_hash\":\"a7eb95c0d9abe4d85e9a847e954095b94feb47c2\",\"message\":\"spec(LBA-PRD-001): 초안\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"}],\"last_processed_commit\":\"3ec5f05e30676766d95078e43488b29d283e1393\",\"behind_by\":0,\"fetched_at\":\"T\"}"
+ },
+ "doc": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LBA-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"approved\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{},\"trashed_at\":null,\"body\":\"---\\ndoc_id: LBA-PRD-001\\ntype: PRD\\ntitle: 번들 대조\\nstatus: approved\\n---\\n# 번들 대조\\n\\n## 1. 목표\\n\\n## 2. 비목표\\n\\n## 3. 요구사항\\n\\n#### R1 첫 기능\\n첫 기능을 설명한다.\\n\\n## 4. 성공지표\\n\\n## 5. 미결사항\\n\",\"commit_hash\":\"a7eb95c0d9abe4d85e9a847e954095b94feb47c2\",\"convention_error_detail\":null,\"items\":[{\"item_id\":\"R1\",\"display_name\":\"첫 기능\",\"missing_refs\":[]}],\"prev_doc_id\":null,\"next_doc_id\":null,\"missing_refs\":[],\"project_name\":\"번들 대조\"}"
+ },
+ "docs": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"type\":\"document\",\"doc_id\":\"LBA-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"approved\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null}]"
+ },
+ "docs_again": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"type\":\"document\",\"doc_id\":\"LBC-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"approved\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null}]"
+ },
+ "dup": {
+  "status": 409,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:project-code-conflict\",\"title\":\"project-code-conflict\",\"status\":409,\"detail\":\"이미 쓰이는 코드 LBA\",\"code\":\"LBA\"}"
+ },
+ "empty_code": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.code — Field required\",\"errors\":[{\"loc\":\"body.code\",\"msg\":\"Field required\"},{\"loc\":\"body.name\",\"msg\":\"Field required\"}]}"
+ },
+ "empty_file": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:bundle-invalid\",\"title\":\"bundle-invalid\",\"status\":422,\"detail\":\"번들 파일이 아니거나 깨졌다\",\"reason\":\"번들 파일이 아니거나 깨졌다\"}"
+ },
+ "empty_form": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.code — Field required\",\"errors\":[{\"loc\":\"body.code\",\"msg\":\"Field required\"},{\"loc\":\"body.name\",\"msg\":\"Field required\"},{\"loc\":\"body.bundle\",\"msg\":\"Field required\"}]}"
+ },
+ "file_as_code": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.code — Input should be a valid string\",\"errors\":[{\"loc\":\"body.code\",\"msg\":\"Input should be a valid string\"}]}"
+ },
+ "get_bundle": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project bundle 없음\",\"resource\":\"project\",\"id\":\"bundle\"}"
+ },
+ "json": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.code — Field required\",\"errors\":[{\"loc\":\"body.code\",\"msg\":\"Field required\"},{\"loc\":\"body.name\",\"msg\":\"Field required\"},{\"loc\":\"body.bundle\",\"msg\":\"Field required\"}]}"
+ },
+ "last_value_wins": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.code — String should match pattern '^[A-Z]{1,4}$'\",\"errors\":[{\"loc\":\"body.code\",\"msg\":\"String should match pattern '^[A-Z]{1,4}$'\"}]}"
+ },
+ "list": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"code\":\"LBC\",\"name\":\"다시\",\"storage\":\"server\",\"remote_url\":null,\"stages\":[{\"stage\":1,\"doc_type\":\"RFQ\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":2,\"doc_type\":\"PRD\",\"status\":\"approved\",\"doc_count\":1,\"gate_warning\":false,\"broken_count\":0},{\"stage\":3,\"doc_type\":\"SCN\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":4,\"doc_type\":\"UC\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":5,\"doc_type\":\"INFRA\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":6,\"doc_type\":\"DOM\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":7,\"doc_type\":\"UI\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":8,\"doc_type\":\"API\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":9,\"doc_type\":\"SEQ\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":10,\"doc_type\":\"MS\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":11,\"doc_type\":\"CODE\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0}],\"std_docs\":[],\"counts\":{\"broken_ref\":0,\"convention_errors\":0,\"incomplete\":0},\"updated_at\":\"T\"},{\"code\":\"LBA\",\"name\":\"번들 대조\",\"storage\":\"server\",\"remote_url\":null,\"stages\":[{\"stage\":1,\"doc_type\":\"RFQ\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":2,\"doc_type\":\"PRD\",\"status\":\"approved\",\"doc_count\":1,\"gate_warning\":false,\"broken_count\":0},{\"stage\":3,\"doc_type\":\"SCN\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":4,\"doc_type\":\"UC\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":5,\"doc_type\":\"INFRA\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":6,\"doc_type\":\"DOM\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":7,\"doc_type\":\"UI\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":8,\"doc_type\":\"API\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":9,\"doc_type\":\"SEQ\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":10,\"doc_type\":\"MS\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":11,\"doc_type\":\"CODE\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0}],\"std_docs\":[],\"counts\":{\"broken_ref\":0,\"convention_errors\":0,\"incomplete\":0},\"updated_at\":\"T\"}]"
+ },
+ "long_name": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.name — String should have at most 100 characters\",\"errors\":[{\"loc\":\"body.name\",\"msg\":\"String should have at most 100 characters\"}]}"
+ },
+ "missing_file": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.bundle — Field required\",\"errors\":[{\"loc\":\"body.bundle\",\"msg\":\"Field required\"}]}"
+ },
+ "no_body": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.code — Field required\",\"errors\":[{\"loc\":\"body.code\",\"msg\":\"Field required\"},{\"loc\":\"body.name\",\"msg\":\"Field required\"},{\"loc\":\"body.bundle\",\"msg\":\"Field required\"}]}"
+ },
+ "no_boundary": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"about:blank\",\"title\":\"Missing boundary in multipart.\",\"status\":400}"
+ },
+ "no_main": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:bundle-invalid\",\"title\":\"bundle-invalid\",\"status\":422,\"detail\":\"main 가지가 없다\",\"reason\":\"main 가지가 없다\"}"
+ },
+ "no_name": {
+  "status": 400,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"about:blank\",\"title\":\"The Content-Disposition header field \\\"name\\\" must be provided.\",\"status\":400}"
+ },
+ "not_bundle": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:bundle-invalid\",\"title\":\"bundle-invalid\",\"status\":422,\"detail\":\"번들 파일이 아니거나 깨졌다\",\"reason\":\"번들 파일이 아니거나 깨졌다\"}"
+ },
+ "ok": {
+  "status": 201,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"code\":\"LBA\",\"name\":\"번들 대조\",\"storage\":\"server\",\"remote_url\":null,\"stages\":[{\"stage\":1,\"doc_type\":\"RFQ\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":2,\"doc_type\":\"PRD\",\"status\":\"approved\",\"doc_count\":1,\"gate_warning\":false,\"broken_count\":0},{\"stage\":3,\"doc_type\":\"SCN\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":4,\"doc_type\":\"UC\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":5,\"doc_type\":\"INFRA\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":6,\"doc_type\":\"DOM\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":7,\"doc_type\":\"UI\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":8,\"doc_type\":\"API\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":9,\"doc_type\":\"SEQ\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":10,\"doc_type\":\"MS\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":11,\"doc_type\":\"CODE\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0}],\"std_docs\":[],\"counts\":{\"broken_ref\":0,\"convention_errors\":0,\"incomplete\":0},\"updated_at\":\"T\"}"
+ },
+ "patch_other": {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "GET, DELETE"
+   ],
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:method-not-allowed\",\"title\":\"method-not-allowed\",\"status\":405,\"detail\":\"이 경로에 PATCH 메서드는 없습니다\",\"allow\":[\"GET\",\"DELETE\"]}"
+ },
+ "post_other": {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "GET, DELETE"
+   ],
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:method-not-allowed\",\"title\":\"method-not-allowed\",\"status\":405,\"detail\":\"이 경로에 POST 메서드는 없습니다\",\"allow\":[\"GET\",\"DELETE\"]}"
+ },
+ "put_bundle": {
+  "status": 405,
+  "headers": [
+   [
+    "allow",
+    "GET, POST, DELETE"
+   ],
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:method-not-allowed\",\"title\":\"method-not-allowed\",\"status\":405,\"detail\":\"이 경로에 PUT 메서드는 없습니다\",\"allow\":[\"GET\",\"POST\",\"DELETE\"]}"
+ },
+ "text_as_file": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.bundle — Value error, Expected UploadFile, received: <class 'str'>\",\"errors\":[{\"loc\":\"body.bundle\",\"msg\":\"Value error, Expected UploadFile, received: <class 'str'>\"}]}"
+ },
+ "urlencoded": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.bundle — Value error, Expected UploadFile, received: <class 'str'>\",\"errors\":[{\"loc\":\"body.bundle\",\"msg\":\"Value error, Expected UploadFile, received: <class 'str'>\"}]}"
+ },
+ "versions": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"doc_id\":\"LBA-PRD-001\",\"version_no\":null,\"commit_hash\":\"3ec5f05e30676766d95078e43488b29d283e1393\",\"message\":\"status(LBA-PRD-001): draft → approved\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"},{\"doc_id\":\"LBA-PRD-001\",\"version_no\":1,\"commit_hash\":\"a7eb95c0d9abe4d85e9a847e954095b94feb47c2\",\"message\":\"spec(LBA-PRD-001): 초안\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"}]"
+ },
+ "versions_again": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"doc_id\":\"LBC-PRD-001\",\"version_no\":null,\"commit_hash\":\"e206a65c36ce8dd5bd96bfc38921cbd2389d6218\",\"message\":\"status(LBC-PRD-001): draft → approved\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"},{\"doc_id\":\"LBC-PRD-001\",\"version_no\":1,\"commit_hash\":\"90981c9a1cf26e2eefc5bb7a6fc8bc180a98f1ec\",\"message\":\"spec(LBC-PRD-001): 초안\",\"author\":{\"kind\":\"human\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":null,\"via\":\"github\"},\"created_at\":\"T\"}]"
+ }
+}

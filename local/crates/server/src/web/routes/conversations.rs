@@ -145,7 +145,7 @@ pub async fn upload_attachment(
     body: Bytes,
 ) -> Result<Response, ApiProblem> {
     // 폼 해석은 의존성보다 먼저 — 깨진 multipart는 400 (FastAPI `get_request_handler`)
-    let file = fastapi::form_file(&headers, &body, "file").await;
+    let file = fastapi::form_file(&headers, &body, "file");
     if let Err(p @ Problem::Blank { .. }) = file {
         return Err(ApiProblem(p));
     }

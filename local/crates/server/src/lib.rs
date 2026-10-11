@@ -37,8 +37,8 @@ use crate::web::routes::documents::trash_document;
 use crate::web::routes::documents::versions;
 use crate::web::routes::git::git_entrance;
 use crate::web::routes::projects::{
-    delete_project, get_file, get_project, graph, init_project, list_docs, list_items,
-    list_projects, trash_list,
+    delete_project, get_file, get_project, graph, import_bundle, init_project, list_docs,
+    list_items, list_projects, project_methods, trash_list,
 };
 use crate::web::routes::references::item_chain;
 use crate::web::routes::references::item_references;
@@ -56,7 +56,10 @@ pub fn app(state: AppState) -> Router {
         .route("/api/projects", get(list_projects).post(init_project))
         .route(
             "/api/projects/{code}",
-            get(get_project).delete(delete_project),
+            get(get_project)
+                .delete(delete_project)
+                .post(import_bundle)
+                .fallback(project_methods),
         )
         .route("/api/projects/{code}/docs", get(list_docs))
         .route("/api/projects/{code}/flags", get(list_items))

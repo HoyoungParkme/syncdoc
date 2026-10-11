@@ -379,3 +379,144 @@ async fn server_origin_owner_only_and_needs_the_folder() {
         Err(Problem::NotFound { resource, id }) if resource == "project" && id == "NOPE"
     ));
 }
+
+const BND_DRAFT: &str = "---\ndoc_id: BND-PRD-001\ntype: PRD\ntitle: 번들\nstatus: draft\n---\n# 번들\n\n## 1. 목표\n\n## 2. 비목표\n\n## 3. 요구사항\n\n#### R1 하나\n설명.\n\n## 4. 성공지표\n\n## 5. 미결사항\n";
+
+/// 명세 두 커밋(초안 → 상태)과 태그가 든 저장소의 번들 — 파이썬 판 시험 `_bundle`과 같은 꼴
+fn bundle(tmp: &Path, branch: &str) -> Vec<u8> {
+    let src = tmp.join(format!("src-{branch}"));
+    sh(
+        tmp,
+        &["init", "-q", "-b", branch, src.to_str().expect("경로")],
+    );
+    let f = src.join("docs/specs/02-PRD/BND-PRD-001.md");
+    std::fs::create_dir_all(f.parent().expect("위")).expect("폴더");
+    let commit = |text: &str, msg: &str| {
+        std::fs::write(&f, text).expect("명세");
+        sh(&src, &["add", "-A"]);
+        sh(
+            &src,
+            &[
+                "-c",
+                "user.name=밖",
+                "-c",
+                "user.email=out@example.com",
+                "commit",
+                "-q",
+                "-m",
+                msg,
+            ],
+        );
+    };
+    commit(BND_DRAFT, "spec(BND-PRD-001): 초안");
+    commit(
+        &BND_DRAFT.replace("status: draft", "status: approved"),
+        "status(BND-PRD-001): draft → approved",
+    );
+    sh(&src, &["tag", "v1"]);
+    let out = tmp.join(format!("{branch}.bundle"));
+    sh(
+        &src,
+        &[
+            "bundle",
+            "create",
+            "-q",
+            out.to_str().expect("경로"),
+            "--all",
+        ],
+    );
+    std::fs::read(out).expect("번들")
+}
+
+/// L15 import_bundle — 번들의 커밋으로 서버 저장소, 재구축으로 판·상태. 골격 커밋 없음. 이름 없이 남은 원본은 보관으로
+#[tokio::test]
+async fn import_bundle_restores_specs_and_status_without_skeleton() {
+    let db = support::test_db().await;
+    let tmp = tempfile::tempdir().expect("임시");
+    let p = places(tmp.path());
+    let mut c = db.pool.acquire().await.expect("연결");
+    let u = user(&mut c, "local").await;
+    let data = bundle(tmp.path(), "main");
+    let origin = p.origins.join("BND.git");
+    p.git.init_bare(&origin).await.expect("남은 원본");
+    let mut s = ProjectService {
+        db: &mut c,
+        repos: &p,
+    };
+    let (project, repo) = s
+        .import_bundle(&db.pool, "BND", "번들", &u, &data)
+        .await
+        .expect("가져오기");
+    assert_eq!(archives(&p).len(), 1);
+    let src = tmp.path().join("src-main");
+    assert_eq!(
+        (project.code.as_str(), project.name.as_str()),
+        ("BND", "번들")
+    );
+    assert_eq!(repo.storage, "server");
+    assert_eq!(repo.remote_url, origin.to_string_lossy());
+    for r in ["main", "v1"] {
+        assert_eq!(sh(&origin, &["rev-parse", r]), sh(&src, &["rev-parse", r]));
+    }
+    assert_eq!(sh(&origin, &["symbolic-ref", "HEAD"]), "refs/heads/main");
+    assert_eq!(
+        sh(&origin, &["config", "receive.denyNonFastForwards"]),
+        "true"
+    );
+    assert_eq!(sh(&origin, &["remote"]), "");
+    assert!(!sh(&origin, &["log", "--format=%s", "main"]).contains("init syncdoc"));
+    assert_eq!(
+        repo.last_processed_commit.as_deref(),
+        Some(sh(&origin, &["rev-parse", "main"]).as_str())
+    );
+    let status: String =
+        sqlx::query_scalar("SELECT status FROM documents WHERE doc_id = 'BND-PRD-001'")
+            .fetch_one(&mut *s.db)
+            .await
+            .expect("문서");
+    assert_eq!(status, "approved");
+}
+
+/// UC-A1 1c2 — 번들 아님·main 없음 → bundle-invalid, 원본·작업 사본·행 없음. 코드 형식·중복
+#[tokio::test]
+async fn import_bundle_refuses_bad_bundles_and_leaves_nothing() {
+    let db = support::test_db().await;
+    let tmp = tempfile::tempdir().expect("임시");
+    let p = places(tmp.path());
+    let mut c = db.pool.acquire().await.expect("연결");
+    let u = user(&mut c, "u").await;
+    let mut s = ProjectService {
+        db: &mut c,
+        repos: &p,
+    };
+    let reason = |r: Result<_, Problem>| match r {
+        Err(Problem::BundleInvalid { reason }) => reason,
+        other => panic!("{:?}", other.map(|_: (_, _)| ())),
+    };
+    assert_eq!(
+        reason(
+            s.import_bundle(&db.pool, "BAD", "x", &u, b"not a bundle")
+                .await
+        ),
+        "번들 파일이 아니거나 깨졌다"
+    );
+    assert!(!p.origins.join("BAD.git").exists());
+    let trunk = bundle(tmp.path(), "trunk");
+    assert_eq!(
+        reason(s.import_bundle(&db.pool, "BAD", "x", &u, &trunk).await),
+        "main 가지가 없다"
+    );
+    assert!(!p.origins.join("BAD.git").exists() && !p.repos.join("BAD").exists());
+    assert!(matches!(s.get("BAD").await, Err(Problem::NotFound { .. })));
+    assert!(matches!(
+        s.import_bundle(&db.pool, "bad", "x", &u, b"").await,
+        Err(Problem::ProjectCodeInvalid { .. })
+    ));
+    s.init_project(&db.pool, "DUP", "x", &u, false, Storage::Server)
+        .await
+        .expect("만들기");
+    assert!(matches!(
+        s.import_bundle(&db.pool, "DUP", "x", &u, b"").await,
+        Err(Problem::ProjectCodeConflict { .. })
+    ));
+}

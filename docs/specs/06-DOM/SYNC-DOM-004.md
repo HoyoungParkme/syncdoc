@@ -99,11 +99,12 @@ crates/server/src/
     ├── pyjson.rs               파이썬 `json.loads`(`_json.c`) — FastAPI 본문·도구 인자 미리 읽기의 오류 위치·C 재귀 한도
     ├── pydantic/               검증 — 파이썬 판이 내보낸 core schema를 읽어(schema) lax 규칙으로 검증하고(validate)
     │                           같은 오류 줄·문장·`N validation errors for …` 꼴을 낸다(errors). smart union의 고르기까지
-    ├── fastapi.rs              요청 본문(Content-Type·json.loads)·경로 값·질의 문자열(starlette `parse_qsl`, 같은 이름은 마지막) → invalid-request(loc·msg) · 400
+    ├── fastapi.rs              요청 본문(Content-Type·json.loads)·경로 값·질의 문자열(starlette `parse_qsl`, 같은 이름은 마지막)·폼 칸(빈 글자는 없음, 글자/파일 바꿈) → invalid-request(loc·msg) · 400
+    ├── form.rs                 starlette `Request.form()` — python-multipart 파서(multipart·urlencoded)와 starlette 상한·문장. 깨진 본문의 답까지 같다(L15)
     └── uvicorn.rs              요청 경로를 `unquote`로 풀어 라우팅한다(`/api/m%65` = `/api/me`)
 ```
 
-**옮긴 판** — `mcp/`와 `compat/`는 파이썬 판이 쓰는 꾸러미의 동작을 옮긴다(사용자 결정 2026-10-08 — 검증 문장까지 바이트로 같다, MCP는 핸드셰이크 경로 전부). 기준 판은 `backend/uv.lock`의 mcp 2.2.0 · pydantic 2.13.5(pydantic-core 2.46.5) · FastAPI 0.141.1 · starlette 1.6.0 · sse-starlette 3.4.11과 Python 3.12다. JSON 읽기는 pydantic-core와 같은 `jiter` crate를 같은 판으로 쓴다. 파이썬 쪽이 판을 올리면 계약 시험의 두 판 차이 시험이 어긋남을 잡는다 — 그때 이 층을 따라 고친다. 2026-07-28 새 프로토콜(`_streamable_http_modern`)은 카드 L18이다
+**옮긴 판** — `mcp/`와 `compat/`는 파이썬 판이 쓰는 꾸러미의 동작을 옮긴다(사용자 결정 2026-10-08 — 검증 문장까지 바이트로 같다, MCP는 핸드셰이크 경로 전부). 기준 판은 `backend/uv.lock`의 mcp 2.2.0 · pydantic 2.13.5(pydantic-core 2.46.5) · FastAPI 0.141.1 · starlette 1.6.0 · python-multipart 0.0.32 · sse-starlette 3.4.11과 Python 3.12다. JSON 읽기는 pydantic-core와 같은 `jiter` crate를 같은 판으로 쓴다. 파이썬 쪽이 판을 올리면 계약 시험의 두 판 차이 시험이 어긋남을 잡는다 — 그때 이 층을 따라 고친다. 2026-07-28 새 프로토콜(`_streamable_http_modern`)은 카드 L18이다
 
 **core/ 안** — 묶음은 파이썬 `core/`와 같다.
 
@@ -346,6 +347,7 @@ classDiagram
         +db: PgConnection
         +repos: ServerRepos
         +init_project(pool, code, name, user, import_existing, storage) ProjectRow
+        +import_bundle(pool, code, name, user, data) ProjectRow
         +delete_project(code, user)
         +get(code) ProjectRow
         +get_owned(code, user) ProjectRow
@@ -365,6 +367,7 @@ classDiagram
 | 메서드 | 부르는 곳 | 근거 | 던지는 에러 |
 |---|---|---|---|
 | [[SYNC-MS-013#ProjectService.init_project]] | MCP `init_project` · `POST /api/projects` | [[SYNC-MS-001#ProjectService.init_project]] | `storage-unavailable` · `project-code-invalid` · `project-code-conflict` · `existing-specs` · `push-failed` · `rebuild-failed`(보관본 재구축, L11) |
+| [[SYNC-MS-013#ProjectService.import_bundle]] | `POST /api/projects/bundle`(L15) | [[SYNC-MS-001#ProjectService.import_bundle]] | `project-code-invalid` · `project-code-conflict` · `bundle-invalid` · `push-failed` · `rebuild-failed` |
 | [[SYNC-MS-013#ProjectService.delete_project]] | `DELETE /api/projects/{code}` | [[SYNC-MS-001#ProjectService.delete_project]] | `not-found` |
 | [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-013#ProjectService.get_owned]] | `get_template` · `delete_project` | [[SYNC-MS-001#ProjectService.get_owned]] | `not-found` |
 | [[SYNC-MS-013#ProjectService.list_owned]] | `queries.project_summary` | [[SYNC-MS-001#ProjectService.list_owned]] | — |
@@ -638,11 +641,11 @@ classDiagram
 | [[SYNC-MS-017#pipeline.save_pipeline]] | MCP `create_document` · `update_document` | [[SYNC-MS-007#pipeline.save_pipeline]] | `not-found` · `document-trashed` · `precondition-unmet` · `convention-violation` · `version-conflict` · `item-deletion-needs-confirm` · `push-failed` · `internal`(git) |
 | [[SYNC-MS-017#pipeline.read_pending]] | `save_pipeline` · git 입구의 push 뒤 · `ProjectService.sync_now` | [[SYNC-MS-007#pipeline.read_pending]] | `not-found` · `internal`(git) |
 | [[SYNC-MS-017#pipeline.process_commit]] · [[SYNC-MS-017#pipeline.type_of_dir]] | `read_pending` · `catch_up`(L11) | [[SYNC-MS-007#pipeline.process_commit]] | `internal`(git) — 파일 하나의 실패는 처리 지점만 멈춘다 |
-| [[SYNC-MS-017#pipeline.rebuild]] | `ProjectService.rebuild_index` · `init_project`(보관본 가져오기)(L11) | [[SYNC-MS-007#pipeline.rebuild]] | `rebuild-failed` |
+| [[SYNC-MS-017#pipeline.rebuild]] | `ProjectService.rebuild_index` · `init_project`(보관본 가져오기)(L11) · `import_bundle`(L15) | [[SYNC-MS-007#pipeline.rebuild]] | `rebuild-failed` |
 | [[SYNC-MS-017#pipeline.upload_code]] | MCP `upload_code`(L11) | [[SYNC-MS-007#pipeline.upload_code]] | `not-found` · `upload-too-large` · `upload-path-refused` · `push-failed` |
 | [[SYNC-MS-017#pipeline.move_to_server]] · [[SYNC-MS-017#pipeline.move_to_github]] | `POST …/move-to-server` · `…/move-to-github`(L11) | [[SYNC-MS-007#pipeline.move_to_server]] | `storage-mismatch` · `storage-unavailable` · `not-found` |
 | [[SYNC-MS-017#pipeline.catch_up]] · [[SYNC-MS-017#pipeline.poll_loop]] | 켤 때 `runtime.run`(L11) | [[SYNC-MS-007#scheduler.catch_up]] | — (저장소마다 `fetch_error`) |
-| [[SYNC-MS-017#pipeline.schedule_code_graph]] · [[SYNC-MS-017#pipeline.build_code_graph]] | 커밋 처리 5a · 재구축 10 · 보관본 가져오기(L12) | [[SYNC-MS-007#pipeline.build_code_graph]] | — (실패는 그래프 행의 `error`) |
+| [[SYNC-MS-017#pipeline.schedule_code_graph]] · [[SYNC-MS-017#pipeline.build_code_graph]] | 커밋 처리 5a · 재구축 10 · 보관본 가져오기(L12) · 번들 가져오기(L15) | [[SYNC-MS-007#pipeline.build_code_graph]] | — (실패는 그래프 행의 `error`) |
 | [[SYNC-MS-017#pipeline.write_lock]] · [[SYNC-MS-017#pipeline.read_lock]] | `save_pipeline` · `read_pending` | [[SYNC-MS-007]] 락 | — |
 | [[SYNC-MS-017#pipeline.wait_idle]] | `runtime.shutdown` | [[SYNC-INFRA-001]] 9.1 | — |
 
@@ -700,6 +703,7 @@ classDiagram
         +sync_readme(workdir, user, code, specs_url) Option~String~
         +changed_paths(workdir, range) Vec~String~
         +archive(workdir, commit, dest)
+        +clone_bare(source, path)
     }
 ```
 
@@ -711,6 +715,7 @@ classDiagram
 | [[SYNC-MS-019#Git.advertise_refs]] · [[SYNC-MS-019#Git.service_rpc]] | git 입구(`/git/*`, L10) | [[SYNC-MS-009#git.http_backend]] | `internal` |
 | [[SYNC-MS-019#Git.changed_files]] · [[SYNC-MS-019#Git.log]] · [[SYNC-MS-019#Git.checkout]] · [[SYNC-MS-019#Git.sync_readme]] | 밀린 커밋 처리·재구축·재구축 위임(L11) | [[SYNC-MS-009#git.changed_files]] | `push-failed` · `internal` |
 | [[SYNC-MS-019#Git.changed_paths]] · [[SYNC-MS-019#Git.archive]] | 커밋 처리 5a · 그래프 만들기(L12) | [[SYNC-MS-009#git.archive]] | `internal` |
+| [[SYNC-MS-019#Git.clone_bare]] · [[SYNC-MS-019#Git.rev_list_count]] · [[SYNC-MS-019#Git.clone]] | `ProjectService.import_bundle`(L15) | [[SYNC-MS-009#git.clone_bare]] | `internal`(git 실패 — 부르는 쪽이 `bundle-invalid`로) |
 
 규칙 — git CLI를 자식 프로세스로 부른다(윈도 MinGit · 리눅스 시스템 git). **사용자 git 설정을 막는다**(사용자 결정 2026-10-08) — 시스템·전역 설정 끔, 프롬프트·서명·autocrlf 끔, `LC_ALL=C`, `safe.directory=*`. 파이썬 판이 Docker 안에서 받는 깨끗한 환경과 같게 해 같은 명령이 같은 결과를 낸다. git 입구(upload-pack·receive-pack)는 L10이 더했다 — http-backend 없이 `--stateless-rpc`를 직접 부르고 http-backend의 머리를 그대로 낸다. 파이썬 판이 CGI로 넘기는 것과 같게: 요청 머리(`Authorization`·`Content-Type`·`Content-Encoding`·`Git-Protocol`)는 latin-1로 읽고 · gzip 본문이 깨졌으면 서비스를 부르지 않고 빈 결과(http-backend는 죽고 자식도 끝난다) · 인증·원본을 지난 receive-pack 요청 뒤에는 응답이 무엇이든 밀린 커밋을 읽는다(파이썬 판 `BackgroundTask` 자리).
 

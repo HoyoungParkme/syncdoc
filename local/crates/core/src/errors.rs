@@ -100,6 +100,9 @@ pub enum Problem {
     /// `project-code-conflict` — 이미 쓰이는 코드
     #[error("이미 쓰이는 코드 {code}")]
     ProjectCodeConflict { code: String },
+    /// `bundle-invalid` — git 번들이 아니거나 깨졌거나 main 가지가 없다 (UC-A1 1c2, L15)
+    #[error("{reason}")]
+    BundleInvalid { reason: String },
     /// `existing-specs` — 저장소에 명세가 이미 있다, 또는 같은 코드의 보관본이 있다(`archived_at`)
     #[error("{}", if .archived_at.is_some() { "보관된 서버 저장소가 있음" } else { "docs/specs/가 이미 있음" })]
     ExistingSpecs {
@@ -181,6 +184,7 @@ impl Problem {
             Problem::StorageUnavailable { .. } => Some("storage-unavailable"),
             Problem::ProjectCodeInvalid { .. } => Some("project-code-invalid"),
             Problem::ProjectCodeConflict { .. } => Some("project-code-conflict"),
+            Problem::BundleInvalid { .. } => Some("bundle-invalid"),
             Problem::ExistingSpecs { .. } => Some("existing-specs"),
             Problem::PushFailed { .. } => Some("push-failed"),
             Problem::RebuildFailed { .. } => Some("rebuild-failed"),
@@ -216,7 +220,9 @@ impl Problem {
             Problem::ForbiddenOrigin { .. } => 403,
             Problem::InvalidRequest { .. } => 422,
             Problem::ConventionViolation { .. } => 422,
-            Problem::StorageUnavailable { .. } | Problem::ProjectCodeInvalid { .. } => 422,
+            Problem::StorageUnavailable { .. }
+            | Problem::ProjectCodeInvalid { .. }
+            | Problem::BundleInvalid { .. } => 422,
             Problem::ProjectCodeConflict { .. } | Problem::ExistingSpecs { .. } => 409,
             Problem::PushFailed { .. } => 424,
             Problem::RebuildFailed { .. } => 500,
@@ -355,7 +361,9 @@ impl Problem {
             Problem::AttachmentSent { attachment_id } => {
                 vec![("attachment_id", Value::from(*attachment_id))]
             }
-            Problem::LlmUnavailable { reason } => vec![("reason", Value::from(reason.as_str()))],
+            Problem::LlmUnavailable { reason } | Problem::BundleInvalid { reason } => {
+                vec![("reason", Value::from(reason.as_str()))]
+            }
             Problem::MethodNotAllowed { allow, .. } => vec![("allow", Value::from(allow.clone()))],
             Problem::ForbiddenOrigin { host, origin } => match (host, origin) {
                 (Some(h), _) => vec![("host", Value::from(h.as_str()))],
