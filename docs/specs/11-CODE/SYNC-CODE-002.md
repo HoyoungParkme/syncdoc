@@ -148,7 +148,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | API | [[SYNC-API-001#GET/api/docs/{docId}/code]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/code]] · [[SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/code/source]] · [[SYNC-API-001#GET/api/projects/{code}/code-calls]] · [[SYNC-API-001#GET/api/projects/{code}/code/source]] · [[SYNC-API-002#get_code_graph]] |
 | 테스트 | `cargo test`(정답 파일 — 파이썬 판이 같은 원형·같은 파일로 낸 줄이기·보강 결과와 바이트로 같다, 싱크독 저장소의 graphify 원형으로 · 시험 DB · 임시 자리 · 진짜 git — 코드 push 뒤 그래프·출처·실패 남기기) · 계약 L12 — 두 판에 같은 `graphify-out/graph.json`과 코드를 push해 코드 탭·관계도 코드 호출·코드 보기·`get_code_graph`가 바이트로 같고, graph.json 없는 프로젝트는 꼴만 |
 | 선행 | L11 |
-| 완료 | — |
+| 완료 | 2026-10-11 · 브랜치 `card/L12-code-graph`(5ef2d58 #371) · spec 11 + code 12 · `cargo test` 166(정답 파일 — 고정 저장소의 줄이기·보강이 파이썬 판과 바이트로 같다 · 시험 DB · 임시 자리 · 진짜 git — 그래프 행·코드 읽기·풀기·만들기·걸기·코드 조회) · `cargo xtask codegraph-diff` — 싱크독 저장소 전체(함수 1986·선 3404, 대조·층·항목 함수까지)가 파이썬 판과 같다 · 계약 `--target both --with-card L12` 975 통과·건너뜀 0 — L12 88 사례(같은 코드·graph.json push → 코드 탭·코드 보기·관계도·코드 그래프의 코드·get_code_graph, graph.json 없는 프로젝트는 꼴만) · L3 두 판 차이 시험 씨앗 셋 · clippy · 워크플로 녹색(윈도 빌드·설치·실행) · `check_code` Rust 152/152 · `check_calls` 0 · 사람 확인(윈도 싱크독_로컬에 코드 push → UI-5 코드 탭·UI-8 관계도 코드 호출)은 따로 · 되먹임: 검사기(코드 그래프)는 crate 밖에서 다시 내보낸 이름(`syncdoc_codegraph::load`)을 못 풀어 모듈 경로로 부른다 · 리눅스의 윈도 교차 검사는 L12부터 tree-sitter C 때문에 못 돈다 — PR 워크플로가 본다 · pycompat 집합 시험의 정답 자리를 crate 안으로 고침 |
 
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
