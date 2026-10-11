@@ -13,8 +13,8 @@ use crate::project::service::{ProjectService, ServerRepos};
 use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
 use crate::types::{
-    ApiAuthor, AuthorRef, Document, DocumentSummary, ItemRef, ItemReferences, ItemView,
-    ProjectDetail, ProjectSummary, STAGES, StageSummary, Storage,
+    ApiAuthor, AuthorRef, BrokenRefSummary, Document, DocumentSummary, ItemRef, ItemReferences,
+    ItemView, ProjectDetail, ProjectItem, ProjectSummary, STAGES, StageSummary, Storage,
 };
 
 /// 작성자(id만) → 이름 붙은 작성자 — 파이썬 `_api_author`. 지시자는 id가 있을 때만
@@ -386,4 +386,68 @@ pub async fn project_detail(
         behind_by: repo.behind_by,
         fetched_at: repo.fetched_at,
     })
+}
+
+/// SYNC-MS-018#queries.project_items
+///
+/// `kind`는 라우터가 패턴으로 거른다 — 그 밖은 파이썬 `ValueError`처럼 처리하지 못한 오류
+pub async fn project_items(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+    kind: &str,
+    user: &UserRow,
+) -> Result<Vec<ProjectItem>, Problem> {
+    let (project, _) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code, user)
+    .await?;
+    match kind {
+        "broken_ref" => {
+            let edges = ReferenceService { db: &mut *db }
+                .missing_in_project(project.id)
+                .await?;
+            let item_pks: Vec<i32> = edges.iter().filter_map(|e| e.from_item_pk).collect();
+            let names = SpecService { db: &mut *db }
+                .describe_items(&item_pks)
+                .await?;
+            let doc_ids: Vec<i32> = edges
+                .iter()
+                .filter(|e| e.from_item_pk.is_none())
+                .map(|e| e.from_document_id)
+                .collect();
+            let docs = doc_refs(&mut *db, &doc_ids).await?;
+            Ok(edges
+                .iter()
+                .filter_map(|e| {
+                    let src = match e.from_item_pk {
+                        Some(p) => names.get(&p),
+                        None => docs.get(&e.from_document_id),
+                    }?;
+                    Some(ProjectItem::Broken(BrokenRefSummary {
+                        source: src.clone(),
+                        raw_target: e.raw_target.clone(),
+                    }))
+                })
+                .collect())
+        }
+        "convention_errors" => Ok(SpecService { db: &mut *db }
+            .list_by_project(project.id, None, None, Some(true))
+            .await?
+            .into_iter()
+            .map(|d| ProjectItem::Document(Box::new(d)))
+            .collect()),
+        "incomplete" => Ok(SpecService { db: &mut *db }
+            .list_by_project(project.id, None, None, None)
+            .await?
+            .into_iter()
+            .filter(|d| !d.incomplete_warnings.is_empty())
+            .map(|d| ProjectItem::Document(Box::new(d)))
+            .collect()),
+        other => Err(Problem::Internal {
+            log: format!("unknown kind {other}"),
+        }),
+    }
 }
