@@ -14,7 +14,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-002, SYNC-MS-003, SYNC-STD-001, SYNC-STD-004]
 
 서비스는 연결을 빌려 받는다 — `SpecService<'c> { pub db: &'c mut PgConnection }`. DB가 필요 없는 함수는 연결 없이 부르는 연관 함수다(`SpecService::item_blocks(…)`). 트랜잭션은 부르는 쪽이 쥔다([[SYNC-STD-004#DEV-10]]).
 
-**카드 L5 몫은 엔진이다(2026-10-08)** — 마크다운 넷, 항목 블록, 규약 검증, frontmatter 채움, diff. **카드 L6이 문서 목록(`list_by_project`)을, 카드 L7이 저장·조회(만들기·저장·문서·항목·이름·이웃·ID 발급·선행조건)를, 카드 L8이 이력·최근 변경·관계도 목록·pk 여럿을 더했다(2026-10-11)** — 저장 파이프라인([[SYNC-MS-017]])과 읽기 조합이 쓴다. **타입은 문자열이다(L7)** — 파이썬처럼 에이전트가 보낸 모르는 타입도 받아 `frontmatter.type` 위반까지 같은 답을 낸다(`check`·`validate`·`apply_frontmatter`, 상태 조건도 문자열 그대로 비교). 나머지 SpecService(상태, 휴지통, 재구축…)는 쓰는 카드(L9·L11)가 이 문서에 더한다.
+**카드 L5 몫은 엔진이다(2026-10-08)** — 마크다운 넷, 항목 블록, 규약 검증, frontmatter 채움, diff. **카드 L6이 문서 목록(`list_by_project`)을, 카드 L7이 저장·조회(만들기·저장·문서·항목·이름·이웃·ID 발급·선행조건)를, 카드 L8이 이력·최근 변경·관계도 목록·pk 여럿·휴지통 목록을 더했다(2026-10-11)** — 저장 파이프라인([[SYNC-MS-017]])과 읽기 조합이 쓴다. **타입은 문자열이다(L7)** — 파이썬처럼 에이전트가 보낸 모르는 타입도 받아 `frontmatter.type` 위반까지 같은 답을 낸다(`check`·`validate`·`apply_frontmatter`, 상태 조건도 문자열 그대로 비교). 나머지 SpecService(상태, 휴지통, 재구축…)는 쓰는 카드(L9·L11)가 이 문서에 더한다.
 
 **파이썬 판과 바이트까지 같다**(사용자 결정 2026-10-08 — 유니코드까지). 파이썬 엔진은 YAML·마크다운 라이브러리 없이 정규식·`difflib`이고 메시지에 `repr`이 들어간다. 그래서
 - 문자 분류는 **파이썬 3.12(유니코드 15.0)의 표**를 쓴다 — 정규식의 `\s`·`\S`·`\d`·`\w`와 `str.strip()`. 표는 `crates/core/src/pycompat/`의 생성물이다(`cargo xtask unicode-tables`). Rust 표준의 `trim()`·`char::is_whitespace`·`regex`의 `\d`는 쓰지 않는다(`\x1c`~`\x1f`, 유니코드 판이 다르다)
@@ -59,6 +59,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-002, SYNC-MS-003, SYNC-STD-001, SYNC-STD-004]
 | [[#SpecService.list_versions]] | 버전 + 상태변경 이력 |
 | [[#SpecService.recent_changes]] | 최근 변경 N건 |
 | [[#SpecService.list_items_by_project]] | 관계도용 항목 목록 |
+| [[#SpecService.list_trashed]] | 휴지통 목록 |
 
 ---
 
@@ -544,6 +545,21 @@ pub async fn list_items_by_project(&mut self, project_id: i32) -> Result<Vec<Ite
 
 **테스트 관점** 문서 노드가 먼저 단계 차례로, 항목은 문서 ID·id 차례 · 지운 항목은 없다
 
+
+---
+
+#### SpecService.list_trashed 휴지통 목록
+
+**시그니처**
+```rust
+pub async fn list_trashed(&mut self, project_id: i32) -> Result<Vec<DocumentSummary>, Problem>
+```
+
+근거: [[SYNC-MS-002#SpecService.list_trashed]] · [[SYNC-UI-002#UI-4]] 8
+
+**처리** `DB: documents where project_id and trashed_at is not null order by trashed_at desc` · 문서마다 최근 판의 작성자 · `→ DocumentSummary`(요약 꼴은 [[#SpecService.list_by_project]]와 같다)
+
+**테스트 관점** (시험 DB) 휴지통 문서만, 최근에 넣은 것부터 · 휴지통이 아닌 것은 없다
 
 ---
 
