@@ -308,3 +308,31 @@ async fn delete_removes_rows_of_that_project_only_and_owned_listing() {
         .expect("대화");
     assert_eq!(convs, 1);
 }
+
+#[tokio::test]
+async fn server_origin_owner_only_and_needs_the_folder() {
+    let db = support::test_db().await;
+    let tmp = tempfile::tempdir().expect("임시");
+    let p = places(tmp.path());
+    let mut c = db.pool.acquire().await.expect("연결");
+    let u = user(&mut c, "local").await;
+    let other = user(&mut c, "other").await;
+    let mut s = ProjectService {
+        db: &mut c,
+        repos: &p,
+    };
+    s.init_project("SO", "s", &u, false, Storage::Server)
+        .await
+        .expect("만들기");
+    let origin = s.server_origin("SO", &u).await.expect("원본");
+    assert_eq!(origin, tmp.path().join("origins/SO.git"));
+    let not_found = |r: Result<PathBuf, Problem>| matches!(r, Err(Problem::NotFound { resource, id }) if resource == "project" && id == "SO");
+    // 남의 것·원본 폴더가 없는 것은 없는 프로젝트와 같은 답
+    assert!(not_found(s.server_origin("SO", &other).await));
+    std::fs::rename(&origin, tmp.path().join("moved.git")).expect("옮기기");
+    assert!(not_found(s.server_origin("SO", &u).await));
+    assert!(matches!(
+        s.server_origin("NOPE", &u).await,
+        Err(Problem::NotFound { resource, id }) if resource == "project" && id == "NOPE"
+    ));
+}
