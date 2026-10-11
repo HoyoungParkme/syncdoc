@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -44,6 +46,24 @@ async def init_project(
     )
     session.commit()
     summary = next(p for p in await queries.project_summary(user) if p.code == req.code)
+    return ProjectSummary.of(summary)
+
+
+@router.post("/bundle", response_model=ProjectSummary, status_code=201)
+async def import_bundle(
+    code: Annotated[str, Form(pattern=r"^[A-Z]{1,4}$")],
+    name: Annotated[str, Form(max_length=100)],
+    bundle: Annotated[UploadFile, File()],
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> ProjectSummary:
+    """SYNC-API-001#POST/api/projects/bundle
+
+    git 번들 하나로 서버 저장 프로젝트를 만든다(UC-A1 1c, 카드 BX). 등록하는 사람이 소유자다.
+    """
+    await ProjectService(session).import_bundle(code, name, user, await bundle.read())
+    session.commit()
+    summary = next(p for p in await queries.project_summary(user) if p.code == code)
     return ProjectSummary.of(summary)
 
 

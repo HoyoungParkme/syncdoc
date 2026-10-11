@@ -1436,6 +1436,17 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 
 ---
 
+#### BX 번들로 가져오기 — 다른 곳의 저장소를 서버 저장 프로젝트로
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R14]] · [[SYNC-INFRA-001]] 9.7 · [[SYNC-UC-001#UC-A1]] 1c · 사용자 결정 2026-10-07(가져오기는 git 번들 → 재구축, 두 판 · #325 먼저) · 에이전트 판단 2026-10-11(사용자 목표 「끝까지」): 입구는 따로 `POST /api/projects/bundle`(multipart — code·name·bundle), 화면은 UI-3 서버 저장소의 번들 파일 칸(2.9) · 번들을 서버 저장소로 통째로(`git.clone_bare`, 카드 BQ와 같은 함수) → `main`이 있어야 한다 → 재구축 · 골격 커밋을 만들지 않는다 · 같은 코드의 보관본은 되살리지 않는다(남은 원본은 보관으로 옮긴다) · 새 문제 `bundle-invalid`(422) · MCP 도구는 두지 않는다(번들은 사람이 가진 파일이다) · 크기 상한 없음. 싱크독_로컬 쪽은 [[SYNC-CODE-002]] 카드 L15 |
+| 구현 | [[SYNC-MS-001#ProjectService.import_bundle]] · `routers/projects.py` 번들 경로 · `errors.py` `BundleInvalid` · `ProjectInit.tsx` 2.9 · `client.ts` `form` |
+| API | [[SYNC-API-001#POST/api/projects/bundle]] |
+| 테스트 | 서비스: 명세·상태 커밋이 든 저장소의 번들 → 문서·판·상태 이력·가지·태그 해시가 그대로, 골격 커밋 없음 · 번들 아님·main 없음 → `bundle-invalid`, 아무것도 안 남음 · 코드 중복·형식·서버 저장 꺼짐 · 재구축 실패 → 되돌림 · 경로: multipart 셋, 빠진 칸 → `invalid-request` · `check_ui` UI-3 · `tsc`·`oxlint`·`build` |
+| 선행 | BA · BQ |
+| 완료 | — |
+
 ## 2. 통합 테스트 시나리오
 
 시나리오 S1~S7을 그대로 E2E 테스트로. 각 슬라이스의 `테스트` 행에 나눠 들어가 있다. 전부 통과하면 PRD 성공지표 측정을 시작한다.

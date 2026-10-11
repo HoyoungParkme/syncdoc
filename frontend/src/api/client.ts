@@ -116,12 +116,26 @@ async function upload<T>(url: string, file: File): Promise<T> {
   return JSON.parse(text) as T
 }
 
+/** 폼 하나 — POST multipart(글자 칸·파일). 번들로 가져오기(카드 BX)가 쓴다 */
+async function form<T>(url: string, fields: Record<string, string | File>): Promise<T> {
+  const fd = new FormData()
+  for (const [k, v] of Object.entries(fields)) {
+    if (typeof v === 'string') fd.append(k, v)
+    else fd.append(k, v, v.name)
+  }
+  const r = await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' })
+  const text = await r.text()
+  if (!r.ok) throw new ApiError(problemOf(r, text))
+  return JSON.parse(text) as T
+}
+
 export const api = {
   get: <T>(url: string) => call<T>('GET', url),
   post: <T>(url: string, body?: unknown) => call<T>('POST', url, body),
   del: <T>(url: string) => call<T>('DELETE', url),
   stream,
   upload,
+  form,
 }
 
 // ── SYNC-API-001 4장 스키마 ──

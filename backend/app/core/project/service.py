@@ -6,6 +6,7 @@ import asyncio
 import logging
 import re
 import shutil
+import tempfile
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,6 +17,7 @@ from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import AccountService
 from app.core.errors import (
+    BundleInvalid,
     ExistingSpecs,
     InvalidRequest,
     NotFound,
@@ -235,6 +237,70 @@ class ProjectService:
         if storage == Storage.github:
             await self._hook_on_init(code, user, repository)
         return self.repo.by_code(code)
+
+    async def import_bundle(self, code: str, name: str, user: User, data: bytes) -> Project:
+        """SYNC-MS-001#ProjectService.import_bundle
+
+        다른 곳의 저장소를 git 번들 하나로 옮겨 온다(UC-A1 1c, 카드 BX). 번들의 커밋으로
+        서버 저장소를 만들고 재구축으로 명세·버전·상태 이력을 되살린다 — 골격 커밋은 없다.
+        락·검사·되돌림은 init_project의 서버 저장 갈래와 같다. 보관본은 되살리지 않는다
+        (이름 없이 남은 원본만 보관으로 옮긴다).
+        """
+        async with _lock(code):
+            if Storage.server.value not in settings.storage_modes:
+                raise StorageUnavailable(Storage.server.value, settings.storage_modes)
+            if not re.fullmatch(r"[A-Z]{1,4}", code):
+                raise ProjectCodeInvalid("^[A-Z]{1,4}$")
+            if self.repo.exists(code):
+                raise ProjectCodeConflict(code)
+            workdir = settings.REPOS_DIR / code
+            shutil.rmtree(workdir, ignore_errors=True)
+            origin = settings.ORIGINS_DIR / f"{code}.git"
+            if origin.exists():
+                origin.rename(_archive_path(code))  # 원본을 잃는 길을 두지 않는다
+            with tempfile.TemporaryDirectory(prefix="syncdoc-bundle-") as tmp:
+                bundle = Path(tmp) / "import.bundle"
+                bundle.write_bytes(data)
+                try:
+                    await git.clone_bare(str(bundle), origin, None)
+                except GitError as e:
+                    shutil.rmtree(origin, ignore_errors=True)
+                    raise BundleInvalid("번들 파일이 아니거나 깨졌다") from e
+            try:
+                await git.rev_list_count(origin, "refs/heads/main")
+            except GitError as e:
+                shutil.rmtree(origin, ignore_errors=True)
+                raise BundleInvalid("main 가지가 없다") from e
+
+            def undo() -> None:
+                shutil.rmtree(workdir, ignore_errors=True)
+                shutil.rmtree(origin, ignore_errors=True)
+
+            try:
+                await git.clone(str(origin), workdir, None)
+            except GitError as e:
+                undo()
+                raise PushFailed(f"clone: {e.stderr.strip()}") from e
+            self.session.begin_nested()
+            project = Project(code=code, name=name, owner_user_id=user.id)
+            self.repo.add(project)
+            self.repo.add(
+                Repository(
+                    project_id=project.id,
+                    storage=Storage.server.value,
+                    remote_url=str(origin),
+                    workdir_path=str(workdir),
+                    registered_by_user_id=user.id,
+                )
+            )
+            from app.core import pipeline  # init_project의 가져오기와 같은 자리(DOM-002 3.2)
+
+            try:
+                await pipeline.rebuild(code, session=self.session)
+            except BaseException:
+                undo()
+                raise
+            return self.repo.by_code(code)
 
     async def _hook_on_init(self, code: str, user: User, repository: Repository) -> None:
         """init_project 9a — push 통지를 건다(#242). 무엇이 실패해도 등록을 깨지 않는다.

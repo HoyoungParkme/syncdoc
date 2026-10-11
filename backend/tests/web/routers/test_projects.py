@@ -178,6 +178,33 @@ def test_init_project_server_storage_and_storage_rules(
     assert r.json()["enabled"] == ["github"]
 
 
+def test_import_bundle_web_path(client: TestClient, scoped: Session, tmp_path, monkeypatch) -> None:
+    """카드 BX — multipart(code·name·bundle) → 201 요약, 빠진 칸은 입력 검증, 번들 아님은 bundle-invalid."""
+    from app.config import settings
+    from tests.core.project.test_service import _bundle
+
+    monkeypatch.setattr(settings, "REPOS_DIR", tmp_path / "repos")
+    login(client, scoped)
+    data = _bundle(tmp_path)
+    r = client.post(
+        "/api/projects/bundle",
+        data={"code": "BND", "name": "번들"},
+        files={"bundle": ("x.bundle", data, "application/octet-stream")},
+    )
+    assert r.status_code == 201, r.text
+    assert (r.json()["code"], r.json()["storage"]) == ("BND", "server")
+    r = client.post("/api/projects/bundle", data={"code": "BND"})
+    assert r.status_code == 422
+    assert [e["loc"] for e in r.json()["errors"]] == ["body.name", "body.bundle"]
+    r = client.post(
+        "/api/projects/bundle",
+        data={"code": "BNE", "name": "x"},
+        files={"bundle": ("x.bundle", b"nope", "application/octet-stream")},
+    )
+    assert r.status_code == 422 and r.json()["type"] == "urn:syncdoc:bundle-invalid"
+    assert r.json()["reason"] == "번들 파일이 아니거나 깨졌다"
+
+
 def test_other_owner_project_is_invisible(client: TestClient, scoped: Session) -> None:
     """R12 — 목록에 안 뜨고, 주소를 직접 쳐도 없는 프로젝트와 같은 답이다."""
     p = make_project(scoped, "EXMP")

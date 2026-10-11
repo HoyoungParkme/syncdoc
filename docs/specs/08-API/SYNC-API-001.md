@@ -65,6 +65,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:project-code-invalid` | 422 | 코드 형식 | `rule` | [[SYNC-UC-001#UC-A1]] 2b |
 | `urn:syncdoc:invalid-request` | 422 | 요청 본문·쿼리·경로 값이 정의(아래 3장 스키마)에 안 맞다 — 입력 검증. `detail`은 첫 오류 한 줄(`body.to — …`) | `errors: [{loc, msg}]` — `loc`은 `body.to`처럼 점으로 이은 위치 | — |
 | `urn:syncdoc:existing-specs` | 409 | `docs/specs/` 이미 있음. 서버 저장이면 같은 코드의 **보관된 저장소**가 있음 | `doc_count` · `archived_at`(보관본일 때만, 가장 최근 것을 보관한 때) | [[SYNC-UC-001#UC-A1]] 3a, 3b |
+| `urn:syncdoc:bundle-invalid` | 422 | 번들로 가져오려는데 git 번들이 아니거나 깨졌거나(필요한 커밋이 빠진 번들 포함) `main` 가지가 없다. 아무것도 남기지 않는다(카드 BX) | `reason` | [[SYNC-UC-001#UC-A1]] 1c2 |
 | `urn:syncdoc:storage-unavailable` | 422 | 이 서버에서 켜지 않은 저장 방식으로 프로젝트를 만들거나 옮기려 함 | `storage` · `enabled: [켜진 방식…]` | [[SYNC-UC-001#UC-A1]] 1a, [[SYNC-UC-001#UC-H23]] 2c |
 | `urn:syncdoc:forbidden-origin` | 403 | 폐쇄망판에서 요청 Host가 허용 목록 밖이거나, 쓰기 요청의 Origin이 이 서버가 아니다 — 로그인이 없는 웹을 다른 이름·다른 사이트가 부르는 것을 막는다 | `host` 또는 `origin` | [[SYNC-PRD-001#R15]] |
 | `urn:syncdoc:storage-mismatch` | 409 | 서버 저장 프로젝트에만 되는 일을 GitHub 저장 프로젝트에 — 코드 올리기. 또는 이미 서버 저장인 프로젝트를 서버 저장으로 옮기려 함(카드 BQ), 이미 GitHub 저장인 프로젝트를 GitHub로 되돌리려 함(카드 BT) | `storage` | [[SYNC-UC-001#UC-A10]] 1a, [[SYNC-UC-001#UC-H22]] 2b, [[SYNC-UC-001#UC-H23]] 2b |
@@ -278,6 +279,48 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
         $ref: '#/components/responses/Problem'
       '424':
         $ref: '#/components/responses/Problem'
+```
+
+#### POST/api/projects/bundle 번들로 가져오기
+
+화면 [[SYNC-UI-001#UI-3]] · 유스케이스 [[SYNC-UC-001#UC-A1]] 1c · 서비스 `ProjectService.import_bundle`
+
+```yaml
+/api/projects/bundle:
+  post:
+    summary: "git 번들 파일 하나로 서버 저장 프로젝트를 만든다 — 명세·버전·상태 이력은 재구축으로 커밋에서 되살아난다 (UI-3, [[SYNC-UC-001#UC-A1]] 1c, [[SYNC-PRD-001#R14]]). 등록하는 사람이 소유자가 된다"
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [code, name, bundle]
+            properties:
+              code:
+                type: string
+                pattern: ^[A-Z]{1,4}$
+              name:
+                type: string
+                maxLength: 100
+              bundle:
+                type: string
+                format: binary
+                description: >
+                  `git bundle create {파일} --all`로 만든 번들. `main` 가지가 있어야 한다. 서버 저장이 켜져 있어야 한다
+                  (아니면 storage-unavailable). 크기 상한은 두지 않는다
+    responses:
+      '201':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectSummary'
+      '409':
+        description: project-code-conflict
+      '422':
+        description: storage-unavailable · project-code-invalid · bundle-invalid · invalid-request
+      '500':
+        description: rebuild-failed — 재구축이 실패해 아무것도 남기지 않았다
 ```
 
 #### GET/api/projects/{code} 프로젝트 상세
