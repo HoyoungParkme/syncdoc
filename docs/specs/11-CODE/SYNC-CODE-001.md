@@ -1445,7 +1445,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | API | [[SYNC-API-001#POST/api/projects/bundle]] |
 | 테스트 | 서비스: 명세·상태 커밋이 든 저장소의 번들 → 문서·판·상태 이력·가지·태그 해시가 그대로, 골격 커밋 없음 · 번들 아님·main 없음 → `bundle-invalid`, 아무것도 안 남음 · 코드 중복·형식·서버 저장 꺼짐 · 재구축 실패 → 되돌림 · 경로: multipart 셋, 빠진 칸 → `invalid-request` · `check_ui` UI-3 · `tsc`·`oxlint`·`build` |
 | 선행 | BA · BQ |
-| 완료 | — |
+| 완료 | 2026-10-11 · 브랜치 `card/BX-bundle-import`(f276f97 #376) · spec 4 + code 4 · 테스트 486 · `ruff`·`tsc`·`build` · `validate` 0/0 · `check_code` 파이썬 172/172 · `check_calls` 0 · `check_ui` 14/14 · 워크플로 녹색(리눅스·윈도) · 운영: 전체 재생성 배포, 공개 주소 200 · 찾은 것: 폴더째 `ruff format`은 관계없는 시험 파일 서식까지 바꾼다 — 고친 파일만 · 화면(UI-3 2.9 번들 파일)은 사람이 직접(DEV-17) |
 
 ## 2. 통합 테스트 시나리오
 
