@@ -1430,4 +1430,43 @@ impl SpecService<'_> {
             .map(|r| summary_of(r, latest.get(&r.id)))
             .collect()
     }
+
+    /// SYNC-MS-014#SpecService.apply_status
+    ///
+    /// 판을 만들지 않는다 — 상태 변경 행과 문서의 상태·본문만
+    pub async fn apply_status(
+        &mut self,
+        document: &Document,
+        new_body: &str,
+        commit_hash: Option<&str>,
+        author: &Author,
+        reason: Option<&str>,
+    ) -> Result<(), Problem> {
+        let row = repo::document_by_id(&mut *self.db, document.summary.id)
+            .await?
+            .ok_or_else(|| Problem::Internal {
+                log: format!("상태를 바꿀 문서 {}가 없다", document.summary.doc_id),
+            })?;
+        let (fm, _) = markdown::parse_frontmatter(new_body);
+        let to = fm
+            .get("status")
+            .cloned()
+            .unwrap_or_else(|| row.status.clone());
+        repo::insert_status_change(
+            &mut *self.db,
+            &repo::NewStatusChange {
+                document_id: row.id,
+                from_status: Some(&row.status),
+                to_status: &to,
+                changed_by_user_id: author.user.id,
+                via: fold_via(author.via),
+                reason,
+                commit_hash,
+                changed_at: clock::now(),
+            },
+        )
+        .await?;
+        repo::set_status_body(&mut *self.db, row.id, &to, new_body).await?;
+        Ok(())
+    }
 }

@@ -506,3 +506,77 @@ pub async fn trashed_of_project(
     .fetch_all(db)
     .await
 }
+
+/// 상태와 본문을 고친다 — 판은 그대로(상태 바꾸기)
+pub async fn set_status_body(
+    db: &mut PgConnection,
+    id: i32,
+    status: &str,
+    body: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE documents SET status = $2, current_body = $3, updated_at = now() WHERE id = $1",
+    )
+    .bind(id)
+    .bind(status)
+    .bind(body)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+/// 휴지통 표시 — 상태는 초안으로
+pub async fn set_trashed(
+    db: &mut PgConnection,
+    id: i32,
+    at: OffsetDateTime,
+    by: i32,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE documents SET status = 'draft', trashed_at = $2, trashed_by_user_id = $3, updated_at = now() \
+         WHERE id = $1",
+    )
+    .bind(id)
+    .bind(at)
+    .bind(by)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+/// 마지막 휴지통 커밋 — 되살릴 때 「직전 내용」을 찾는 열쇠
+pub async fn trash_commit(
+    db: &mut PgConnection,
+    document_id: i32,
+) -> Result<Option<String>, sqlx::Error> {
+    Ok(sqlx::query_scalar::<_, Option<String>>(
+        "SELECT commit_hash FROM status_changes WHERE document_id = $1 AND reason = '휴지통' \
+         ORDER BY changed_at DESC, id DESC LIMIT 1",
+    )
+    .bind(document_id)
+    .fetch_optional(db)
+    .await?
+    .flatten())
+}
+
+/// 문서에 딸린 행을 자식부터 지운다 — 나간 참조 → 항목 → 판 → 상태 변경 → 문서. 지운 행 수 합
+pub async fn delete_document_rows(
+    db: &mut PgConnection,
+    document_id: i32,
+) -> Result<u64, sqlx::Error> {
+    let mut n = 0;
+    for sql in [
+        r#"DELETE FROM "references" WHERE from_document_id = $1"#,
+        "DELETE FROM items WHERE document_id = $1",
+        "DELETE FROM versions WHERE document_id = $1",
+        "DELETE FROM status_changes WHERE document_id = $1",
+        "DELETE FROM documents WHERE id = $1",
+    ] {
+        n += sqlx::query(sql)
+            .bind(document_id)
+            .execute(&mut *db)
+            .await?
+            .rows_affected();
+    }
+    Ok(n)
+}
