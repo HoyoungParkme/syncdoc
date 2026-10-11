@@ -17,6 +17,7 @@ use syncdoc_core::account::service::AccountService;
 use syncdoc_core::errors::Problem;
 use syncdoc_core::pipeline;
 use syncdoc_core::project::service::ProjectService;
+use syncdoc_core::pycompat::chars::strip;
 
 use crate::compat::fastapi;
 use crate::state::AppState;
@@ -60,23 +61,30 @@ fn challenge() -> Response {
     resp
 }
 
-/// Basic의 비밀번호 칸이 개인 토큰 — 통과하면 곧바로 커밋한다(사용 흔적·토큰 행 잠금, #318) (파이썬 `_token_user`)
+/// starlette `Headers.get` — 같은 이름이면 처음 것, latin-1로 푼다. 파이썬 판은 이 글자를 CGI 변수로 넘긴다(UTF-8)
+fn latin1(headers: &HeaderMap, name: &str) -> String {
+    headers
+        .get(name)
+        .map(|v| v.as_bytes().iter().map(|&b| char::from(b)).collect())
+        .unwrap_or_default()
+}
+
+/// Basic의 비밀번호 칸이 개인 토큰 — 통과하면 곧바로 커밋한다(사용 흔적·토큰 행 잠금, #318) (파이썬 `_token_user`).
+/// 앞 여섯 글자가 `basic `(대소문자 무시) · 나머지를 파이썬 `str.strip()` · 파이썬 3.12 `b64decode(validate=True)`는
+/// 정규 `=`만 받고 남는 비트는 받는다 · UTF-8이 아니거나 `:`가 없거나 토큰이 비면 없는 것
 async fn token_user(state: &AppState, headers: &HeaderMap) -> Result<Option<UserRow>, Problem> {
-    let value = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
-    if !value
-        .get(..6)
-        .is_some_and(|p| p.eq_ignore_ascii_case("basic "))
-    {
+    let value = latin1(headers, "authorization");
+    let mut chars = value.chars();
+    let prefix: String = chars.by_ref().take(6).collect();
+    if !prefix.eq_ignore_ascii_case("basic ") {
         return Ok(None);
     }
+    let rest: String = chars.collect();
     let engine = base64::engine::GeneralPurpose::new(
         &base64::alphabet::STANDARD,
         base64::engine::GeneralPurposeConfig::new().with_decode_allow_trailing_bits(true),
     );
-    let Ok(raw) = engine.decode(value[6..].trim()) else {
+    let Ok(raw) = engine.decode(strip(&rest)) else {
         return Ok(None);
     };
     let Ok(decoded) = String::from_utf8(raw) else {
@@ -115,59 +123,23 @@ async fn serve(
         .server_origin(code, &user)
         .await?
     };
-    let protocol = headers
-        .get("git-protocol")
-        .and_then(|v| v.to_str().ok())
-        .filter(|v| !v.is_empty());
-    let mut resp = Response::default();
-    nocache(resp.headers_mut());
+    let protocol = Some(latin1(headers, "git-protocol")).filter(|v| !v.is_empty());
     if !rpc {
         let out = state
             .repos
             .git
-            .advertise_refs(&origin, service, protocol)
+            .advertise_refs(&origin, service, protocol.as_deref())
             .await?;
-        set_type(&mut resp, &format!("application/x-{service}-advertisement"));
-        *resp.body_mut() = Body::from(out);
-        return Ok(resp);
-    }
-    // http-backend `check_content_type` — 다르면 415와 문장
-    let want = format!("application/x-{service}-request");
-    let got = headers
-        .get(header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
-    if got != want {
-        *resp.status_mut() = StatusCode::UNSUPPORTED_MEDIA_TYPE;
-        *resp.body_mut() = Body::from(format!(
-            "Expected POST with Content-Type '{want}', but received '{got}' instead.\n"
+        return Ok(reply(
+            StatusCode::OK,
+            Some(&format!("application/x-{service}-advertisement")),
+            out,
         ));
-        return Ok(resp);
     }
-    let encoding = headers
-        .get(header::CONTENT_ENCODING)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
-    let input = if matches!(encoding, "gzip" | "x-gzip") {
-        let mut out = Vec::new();
-        flate2::read::GzDecoder::new(&body[..])
-            .read_to_end(&mut out)
-            .map_err(|e| Problem::Internal {
-                log: format!("git 입구 gzip 본문을 못 풀었다 — {e}"),
-            })?;
-        out
-    } else {
-        body.to_vec()
-    };
-    let out = state
-        .repos
-        .git
-        .service_rpc(&origin, service, input, protocol)
-        .await?;
-    set_type(&mut resp, &format!("application/x-{service}-result"));
-    *resp.body_mut() = Body::from(out);
+    let resp = rpc_reply(state, &origin, service, headers, body, protocol.as_deref()).await?;
     if service == "git-receive-pack" {
-        // push를 받은 뒤 밀린 커밋을 곧바로 읽는다(SEQ-29) — 배치다, 실패는 폴링이 메운다
+        // 응답이 무엇이든(415·깨진 gzip까지) 밀린 커밋을 곧바로 읽는다 — 파이썬 판 `BackgroundTask` 자리(SEQ-29).
+        // 배치다, 실패는 폴링이 메운다
         let (state, code) = (state.clone(), code.to_string());
         tokio::spawn(async move {
             if let Err(e) = pipeline::read_pending(&state.pool, &state.repos, &code, &user).await {
@@ -178,10 +150,59 @@ async fn serve(
     Ok(resp)
 }
 
-fn set_type(resp: &mut Response, value: &str) {
-    if let Ok(v) = HeaderValue::from_str(value) {
+/// http-backend `service_rpc` — Content-Type이 다르면 415와 문장, gzip이면 풀어 서비스에 넘긴다
+async fn rpc_reply(
+    state: &AppState,
+    origin: &std::path::Path,
+    service: &str,
+    headers: &HeaderMap,
+    body: Bytes,
+    protocol: Option<&str>,
+) -> Result<Response, Problem> {
+    // http-backend `check_content_type` — 머리 글자 그대로(파이썬 판이 latin-1로 읽어 UTF-8로 넘긴다)
+    let want = format!("application/x-{service}-request");
+    let got = latin1(headers, "content-type");
+    if got != want {
+        let text =
+            format!("Expected POST with Content-Type '{want}', but received '{got}' instead.\n");
+        return Ok(reply(
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            None,
+            text.into_bytes(),
+        ));
+    }
+    let result = format!("application/x-{service}-result");
+    let input = if matches!(
+        latin1(headers, "content-encoding").as_str(),
+        "gzip" | "x-gzip"
+    ) {
+        let mut out = Vec::new();
+        if let Err(e) = flate2::read::GzDecoder::new(&body[..]).read_to_end(&mut out) {
+            // http-backend는 `die`하고 자식도 함께 끝난다 — 머리는 이미 나갔고 본문은 빈다
+            tracing::warn!("git 입구 gzip 본문을 못 풀었다 — {e}");
+            return Ok(reply(StatusCode::OK, Some(&result), Vec::new()));
+        }
+        out
+    } else {
+        body.to_vec()
+    };
+    let out = state
+        .repos
+        .git
+        .service_rpc(origin, service, input, protocol)
+        .await?;
+    Ok(reply(StatusCode::OK, Some(&result), out))
+}
+
+/// http-backend의 응답 — 캐시 막는 머리 셋과 (있으면) Content-Type
+fn reply(status: StatusCode, content_type: Option<&str>, body: Vec<u8>) -> Response {
+    let mut resp = Response::new(Body::from(body));
+    *resp.status_mut() = status;
+    nocache(resp.headers_mut());
+    if let Some(v) = content_type.and_then(|t| HeaderValue::from_str(t).ok()) {
         resp.headers_mut().insert(header::CONTENT_TYPE, v);
     }
+    resp
 }
 
 /// SYNC-API-001#GET/git/{code}.git/info/refs

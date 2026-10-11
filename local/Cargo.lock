@@ -3474,6 +3474,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "syncdoc_core",
+ "tempfile",
  "time",
  "tokio",
  "tower",
