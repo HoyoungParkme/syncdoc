@@ -652,6 +652,24 @@ async def test_log_follows_renamed_path_oldest_first(repos: dict[str, Path]) -> 
         assert await g.read(repos["work"], c.path, c.hash)  # 전부 읽힌다
 
 
+async def test_log_skips_the_commit_that_deleted_the_file(repos: dict[str, Path]) -> None:
+    """지웠다 되살린 파일 — 지운 커밋만 빠지고 나머지는 다 읽힌다 (#325)."""
+    o = repos["other"]
+    path = "docs/specs/07-UI/SYNC-UI-009.md"
+    write_commit_push(o, path, "v1", "spec(SYNC-UI-009): 초안")
+    git(o, "rm", "-q", path)
+    git(o, "commit", "-q", "-m", "trash(SYNC-UI-009)")
+    git(o, "push", "-q", "origin", "HEAD:main")
+    write_commit_push(o, path, "v2", "spec(SYNC-UI-009): 다시")
+    await g.fetch(repos["work"])
+    await g.checkout(repos["work"], "origin/HEAD")
+
+    got = await g.log(repos["work"], path)
+
+    assert [c.message for c in got] == ["spec(SYNC-UI-009): 초안", "spec(SYNC-UI-009): 다시"]
+    assert [await g.read(repos["work"], c.path, c.hash) for c in got] == ["v1", "v2"]
+
+
 async def test_log_separates_path_from_multiline_message(repos: dict[str, Path]) -> None:
     """본문에 빈 줄이 있어도 경로를 제대로 떼어 낸다 (#39)."""
     o = repos["other"]

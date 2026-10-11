@@ -735,6 +735,24 @@ async def test_rebuild_restores_versions_references_and_survives_rerun(
     assert scoped.execute(text('SELECT count(*) FROM "references"')).scalar() == 2
 
 
+async def test_rebuild_survives_a_deleted_then_recreated_document(scoped: Session, proj) -> None:
+    """#325 — 지운 커밋은 버전이 아니다. 지웠다 되살린 문서가 있어도 재구축이 끝난다."""
+    other, remote = proj["repos"]["other"], proj["repos"]["remote"]
+    _push_history(other, remote)
+    g(other, "rm", "-q", PRD_FILE)
+    g(other, "commit", "-q", "-m", "trash(EXMP-PRD-001)")
+    g(other, "push", "-q", "origin", "HEAD:main")
+    write_commit_push(
+        other, PRD_FILE, PRD_BODY.replace("한 줄로.", "세 줄로."), "spec(EXMP-PRD-001): 다시"
+    )
+
+    r = await pipeline.rebuild("EXMP")
+
+    assert (r.docs, r.versions) == (3, 5)  # 앞의 4 + 되살린 커밋 하나
+    prd = SpecService(scoped).get_document("EXMP-PRD-001")
+    assert (prd.current_version_no, "세 줄로." in prd.body) == (3, True)
+
+
 async def test_repo_status_and_rebuild_index(scoped: Session, proj) -> None:
     from app.core.project.service import ProjectService
 

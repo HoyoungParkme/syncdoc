@@ -416,7 +416,7 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 4a. **`versions`를 가리키는 FK는 `references.extracted_version_id` 하나다**([[SYNC-MS-002#SpecService.clear_index]]) — 4단계가 먼저 지운다. 지우는 테이블에 걸린 FK를 안 세서 실물 재구축이 죽은 적이 있다(#38). 전파결정·플래그가 사라지면서 재연결 단계(옛 3a·7a·7b)도 사라졌다
 5. `paths = git.list(repo, "docs/specs/*/*.md")` (`_templates`·`assets` 제외. 번호 붙은 디렉터리도 `*`에 걸린다)
 6. 파일마다:
-   - `log = git.log(repo, path)` 오래된 것부터 `[(hash, login, email, date, message, path)]`
+   - `log = git.log(repo, path)` 오래된 것부터 `[(hash, login, email, date, message, path)]` — **파일을 지운 커밋은 없다**([[SYNC-MS-009#git.log]], #325). 지금 있는 파일이니 뒤의 커밋이 되살렸다. `process_commit`의 D처럼 `mark_deleted`하지 않는다 — 그 효과(`draft`·`file.deleted`·항목 삭제)는 되살린 커밋의 저장이 덮고, 앱이 만든 삭제(휴지통)와 밖에서 지운 것을 재구축은 가르지 못한다. 남지 않는 것은 밖에서 지웠을 때의 「파일 삭제됨」 상태 변경 행 하나다
    - 커밋마다: `body = git.read(c.path @ hash)` — **그 커밋 시점의 경로로 읽는다.** 이름이 바뀐 문서는 옛 커밋에서 옛 경로에 있어 지금 경로로는 못 읽는다(#39) · `user = account.user_for_commit(email, login)` — `process_commit` 4단계와 **같은 순서**(이메일 → login → 자리표시)
      - if `message.startswith("status(")` → `spec.apply_status(…, commit_hash=hash)`만 (StatusChange 복원)
      - else if 이 문서의 첫 커밋 → `spec.create(...)` · else → `spec.save(document, body, hash, author, message, deleted=spec.detect_deleted_items(document, body), validate_result, rebuild=True)` — `version_no`는 남은 버전 수 + 1, `items` upsert. 커밋마다 삭제 항목도 반영한다
@@ -446,6 +446,7 @@ async def rebuild(code: str, session: Session | None = None) -> RebuildResult
 - 커밋 이메일을 등록하고 재구축: 버전 작성자가 그 사람으로 바뀌고 `author.unknown`이 사라진다
 - `status(` 커밋: Version 안 늘고 StatusChange 생김
 - 중간 실패: DB가 재구축 전과 같음
+- **지웠다 되살린 문서가 있어도 재구축이 끝난다** — 지운 커밋은 버전이 아니다(#325)
 - 재구축 뒤 코드 그래프 만들기가 걸린다(카드 AX)
 
 ---
