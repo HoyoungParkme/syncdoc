@@ -233,7 +233,9 @@ def flow(_servers, tmp_path_factory):
         push(server, CODE, work, "깨진 그래프")
         wait_graph(server, CODE, lambda g: g["error"] is not None)
         got["broken_calls"] = rest(server, "GET", f"/api/projects/{CODE}/code-calls")
-        got["broken_source"] = rest(server, "GET", "/api/docs/LCG-MS-001/items/svc.helper/code/source")
+        got["broken_source"] = rest(
+            server, "GET", "/api/docs/LCG-MS-001/items/svc.helper/code/source"
+        )
         # 7. graph.json 없는 프로젝트 — 각 판이 뽑는다
         mcp(server, "init_project", {"storage": "server", "code": BARE, "name": "뽑기 시험"})
         bare = clone(server, tmp, BARE)
