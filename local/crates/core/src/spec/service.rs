@@ -20,8 +20,8 @@ use crate::pycompat::re::compile;
 use crate::pycompat::repr::repr;
 use crate::types::{
     Author, AuthorRef, Diff, DiffLine, DiffOp, DocItem, DocRef, DocStatus, DocType, Document,
-    DocumentSummary, Entry, Hunk, ItemBlock, ItemRef, ItemView, ValidateResult, Version, Violation,
-    Warning, fold_via, py_isoformat, stage_of,
+    DocumentSummary, Entry, Hunk, ItemBlock, ItemBrief, ItemRef, ItemView, ValidateResult, Version,
+    Violation, Warning, fold_via, py_isoformat, stage_of,
 };
 
 /// 이력 diff의 앞뒤 줄 수 — 파이썬 `DIFF_CONTEXT_LINES`
@@ -1381,5 +1381,43 @@ impl SpecService<'_> {
         newest_first(&mut rows);
         rows.truncate(usize::try_from(n).unwrap_or(0));
         Ok(rows)
+    }
+
+    /// SYNC-MS-014#SpecService.list_items_by_project
+    ///
+    /// 문서 노드(단계·ID 차례) 다음 항목 노드(문서 ID·id 차례). 휴지통 문서도 들어온다(파이썬과 같다)
+    pub async fn list_items_by_project(
+        &mut self,
+        project_id: i32,
+    ) -> Result<Vec<ItemBrief>, Problem> {
+        let mut docs = repo::documents_of_project(&mut *self.db, project_id).await?;
+        docs.sort_by(|a, b| {
+            (stage_of(&a.doc_type).unwrap_or(99), &a.doc_id)
+                .cmp(&(stage_of(&b.doc_type).unwrap_or(99), &b.doc_id))
+        });
+        let mut out: Vec<ItemBrief> = docs
+            .iter()
+            .map(|d| ItemBrief {
+                pk: d.id,
+                doc_id: d.doc_id.clone(),
+                item_id: None,
+                stage: stage_of(&d.doc_type),
+                display_name: None,
+            })
+            .collect();
+        let stage_by_doc: HashMap<i32, Option<i32>> =
+            docs.iter().map(|d| (d.id, stage_of(&d.doc_type))).collect();
+        for r in repo::items_of_project(&mut *self.db, project_id).await? {
+            if let Some(stage) = stage_by_doc.get(&r.item.document_id) {
+                out.push(ItemBrief {
+                    pk: r.item.id,
+                    doc_id: r.doc_id,
+                    item_id: Some(r.item.item_id),
+                    stage: *stage,
+                    display_name: r.item.display_name,
+                });
+            }
+        }
+        Ok(out)
     }
 }
