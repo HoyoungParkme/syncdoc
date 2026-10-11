@@ -115,7 +115,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | API | [[SYNC-API-001#POST/api/docs/{docId}/status]] · [[SYNC-API-001#POST/api/docs/{docId}/revert]] · [[SYNC-API-001#DELETE/api/docs/{docId}]] · [[SYNC-API-001#POST/api/docs/{docId}/restore]] · [[SYNC-API-001#POST/api/docs/{docId}/purge]] · [[SYNC-API-002#change_status]] · [[SYNC-API-002#delete_document]] · [[SYNC-API-002#restore_document]] |
 | 테스트 | `cargo test`(시험 DB + 진짜 git) · 계약 L9 — 웹·MCP로 상태 올리기(막힘·풀림)·되돌리기(already-current·422)·휴지통 넣기(확인·끊긴 참조)·되살리기·완전 삭제(문지기·번호 재발급)를 파이썬 판과 바이트로 · 사람 확인 — UI-5·7의 완료·되돌리기·휴지통 버튼 |
 | 선행 | L8 |
-| 완료 | — |
+| 완료 | 2026-10-11 · 브랜치 `card/L9-status-trash`(af7a06d #359) · spec 5 + code 25 · `cargo test` 124(시험 DB + 진짜 git — 완료로·막힘·내리기, 되돌리기, 휴지통·문지기·되살리기·완전 삭제와 번호 재발급) · 계약 `--target both --with-card L7 --with-card L8 --with-card L9` 666 통과·1 건너뜀 — L9 46 사례가 파이썬 판과 바이트로 같다 · L3 두 판 차이 시험 씨앗 1·2 × 2000 다른 것 0(세 도구가 실제로 돈다) · clippy(리눅스·윈도) · 윈도 `cargo check` · 워크플로 녹색 · `check_code` Rust 104/104 · `check_calls` 0 · 사람 확인(UI-5·7의 완료·되돌리기·휴지통 버튼)은 따로 · 되먹임: 파이썬 판은 int4 밖 `to_version`도 DB 거절로 500(diff와 같다 — 같게), 문제의 확장 필드 `title`(휴지통 확인의 문서 제목)이 problem 제목을 덮는 파이썬 꼴 그대로 |
 
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
