@@ -181,7 +181,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | API | [[SYNC-API-001#POST/api/projects/bundle]] |
 | 테스트 | `cargo test`(폼 정답 — `xtask/py/form_cases.py`가 starlette에 넣어 얻은 답과 같다, 상한 넷 · git — 번들의 가지·태그 해시·원격 없음·HEAD·받기 규칙 · 시험 DB — 번들 → 문서·상태 이력·처리 지점, 골격 커밋 없음 · 번들 아님·main 없음 → `bundle-invalid`, 아무것도 안 남음 · 코드 형식·중복 · 남은 원본은 보관으로) · 계약 L15 — 같은 번들(고정 저장소를 시험이 git으로 묶는다)로 두 판의 응답·문서 목록·이력이 같고, 폼 오류·405가 바이트로 같다 |
 | 선행 | L11 · BX |
-| 완료 | — |
+| 완료 | 2026-10-11 · 브랜치 `card/L15-bundle`(7f15f04 #379) · spec 6 + code 5 · `cargo test` 183(폼 정답 748 — starlette에 넣어 얻은 답과 같다 · 상한 넷 · git `clone_bare` · 시험 DB — 번들 → 문서·상태·처리 지점, 골격 커밋 없음 · 번들 아님·main 없음 → 아무것도 안 남음) · 계약 `--target both --with-card L15` 1149 통과 — L15 66: 응답·가져온 뒤 프로젝트·문서·판 목록·폼 오류·405·404 바이트 같음 · clippy · 워크플로 녹색(리눅스·윈도) · `check_code` Rust 177/177 · `check_calls` 0 · 사람 확인(윈도 싱크독_로컬 UI-3 2.9 번들 파일로 가져오기)은 따로 · 되먹임: 폼 해석을 multer에서 python-multipart 옮김으로 바꿔 L14 첨부도 같은 길 · 계약 목록 응답은 다른 모듈이 만든 프로젝트가 섞여 그 시험의 코드만 거른다 |
 
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
