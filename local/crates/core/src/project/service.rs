@@ -331,6 +331,61 @@ impl ProjectService<'_> {
     ) -> Result<Vec<(ProjectRow, RepositoryRow)>, Problem> {
         Ok(repo::owned_by(&mut *self.db, user.id).await?)
     }
+
+    /// SYNC-MS-013#ProjectService.asset_path
+    ///
+    /// 작업 사본 `docs/specs/` 안의 첨부 — 밖으로 나가는 경로·허용 밖 확장자·없는 파일은 전부 같은 `not-found`(file)
+    pub async fn asset_path(
+        &mut self,
+        code: &str,
+        path: &str,
+        user: &UserRow,
+    ) -> Result<PathBuf, Problem> {
+        self.get_owned(code, user).await?;
+        let base = py_resolve(&self.repos.repos.join(code).join("docs").join("specs"));
+        let target = py_resolve(&base.join(path));
+        let not_found = || Problem::NotFound {
+            resource: "file".to_string(),
+            id: serde_json::Value::from(path),
+        };
+        if !target.starts_with(&base) {
+            return Err(not_found());
+        }
+        let ext = target
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        if !ASSET_EXTENSIONS.contains(&ext.as_str()) || !target.is_file() {
+            return Err(not_found());
+        }
+        Ok(target)
+    }
+}
+
+/// 첨부로 내주는 확장자 (파이썬 `_ASSET_EXTENSIONS`) — 문서(`.md`)는 이 길로 안 준다
+const ASSET_EXTENSIONS: [&str; 10] = [
+    "png", "jpg", "jpeg", "gif", "webp", "svg", "css", "woff", "woff2", "ttf",
+];
+
+/// 파이썬 `Path.resolve()`(엄격하지 않게) — 조각마다 있으면 링크까지 풀고, 없으면 글자로 잇는다. `..`은 푼 경로에서 하나 뺀다
+fn py_resolve(p: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for c in p.components() {
+        match c {
+            std::path::Component::ParentDir => {
+                out.pop();
+            }
+            std::path::Component::CurDir => {}
+            std::path::Component::Normal(n) => {
+                out.push(n);
+                if let Ok(real) = fs::canonicalize(&out) {
+                    out = real;
+                }
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
 }
 
 #[cfg(test)]
