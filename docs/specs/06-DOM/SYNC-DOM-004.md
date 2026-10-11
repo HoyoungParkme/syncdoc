@@ -85,7 +85,7 @@ crates/server/src/
 │   ├── static_files.rs         화면 빌드(rust-embed) · 캐시 규칙 · 304 (INFRA 4.1)
 │   ├── schemas.rs              응답 형태 (API-001 4장)
 │   └── routes/                 API-001 경로 — account(/api/me · /api/me/tokens) · specs(/specs) · projects(/api/projects 목록·만들기·지우기, L6 ·
-│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8 · 상태·되돌리기·휴지통·되살리기·완전 삭제, L9) · references(항목·참조·체인, L8) · git(/git 스마트 HTTP 입구 — 경로를 starlette 정규식처럼 가른다, L10) · admin(/api/admin/repos 동기화 상태·재구축·통지·지금 가져오기·옮기기, L11) · code(코드 탭·코드 보기·관계도 코드 호출·코드 그래프의 코드, L12)
+│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8 · 상태·되돌리기·휴지통·되살리기·완전 삭제, L9) · references(항목·참조·체인, L8) · git(/git 스마트 HTTP 입구 — 경로를 starlette 정규식처럼 가른다, L10) · admin(/api/admin/repos 동기화 상태·재구축·통지·지금 가져오기·옮기기, L11) · code(코드 탭·코드 보기·관계도 코드 호출·코드 그래프의 코드, L12 · 코드 그래프 노드, L13)
 ├── mcp/                        /mcp — 파이썬 mcp SDK의 핸드셰이크 경로를 옮긴 것 (API-002 1장, 카드 L3)
 │   ├── auth.rs                 Bearer → AccountService.authenticate_token, 통과하면 응답 전에 커밋 (SEQ-C2)
 │   ├── transport.rs            streamable HTTP, 세션 없음 — Accept·Content-Type·본문 읽기·SSE 쓰기
@@ -124,7 +124,9 @@ crates/core/
     │   ├── repr.rs                 파이썬 str repr — server/compat도 이것을 쓴다
     │   ├── re.rs                   파이썬 패턴 문자열의 \s·\S·\d·\w를 위 표로 바꿔 regex로 컴파일
     │   ├── difflib.rs              SequenceMatcher(autojunk) · get_grouped_opcodes · unified_diff
-    │   └── pyset.rs                CPython 3.12 정수 `set`의 순회 차례 — 열린 주소·선형 탐사·크기 키움·`discard` (L8, `item_chain`)
+    │   ├── pyset.rs                CPython 3.12 정수 `set`의 순회 차례 — 열린 주소·선형 탐사·크기 키움·`discard` (L8, `item_chain`)
+    │   ├── random.rs               `random.Random` — MT19937·정수 씨앗·`getrandbits`·`shuffle` (L13, Louvain)
+    │   └── pysum.rs                내장 `sum` — float는 Neumaier 보정(3.12) (L13, modularity)
     ├── errors.rs                   Problem 열거형 하나에 problem+json 종류 전부 (STD-004 DEV-5)
     ├── migrate.rs                  이전 SQL을 올린다 (4.1) — 모든 crate의 시험도 이것으로 DB를 만든다
     ├── pipeline.rs                 쓰기 조율 — 프로젝트마다 읽기·쓰기 락, 순서는 파이썬과 같다 (L7 — 저장은 따로 띄운 작업에서)
@@ -136,13 +138,14 @@ crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 
 ├── lib.rs                      그래프 모양(Graph·Function·CallDiff·층)과 오류 CodeGraphFailed
 ├── graph.rs                    touches_code · load · reduce · spec_calls · compare · item_function · item_neighbors · layer_table · layers
 ├── extract.rs                  graphify 대신 — 파일 노드와 파이썬 정의·같은 파일 호출의 원형
+├── community.rs                커뮤니티 — networkx Louvain(seed 42)·graphify 그래프 읽기·허브 라벨을 옮겼다 (L13)
 ├── enrich.rs                   보강 — 파이썬(python.rs) · TS/JS(ts.rs) · 화면 ID · Rust(rust.rs)
 ├── python.rs                   tree-sitter-python으로 `ast`의 뜻을 읽는다 — 정의·끝 줄·docstring·대입·속성·호출·import
 ├── ts.rs                       tree-sitter-typescript — 맨 위 정의·끝 줄·상대 import·호출
 └── rust.rs                     tree-sitter-rust — 맨 위 fn·impl 메서드·`///`·use·호출
 ```
 
-지금(카드 L12) 있는 것은 `account`·`spec`·`project`·`reference`(뽑기·끊기·잇기·조회·관계도·미존재)·`codegraph`(그래프 행·코드 읽기)·`markdown.rs`·`pycompat/`·`pipeline.rs`(저장·커밋 처리·재구축·따라잡기·그래프 만들기)·`queries.rs`(프로젝트 요약·상세·문서 목록·문서·항목·참조·체인·관계도·diff 영향·추적표·문제 목록·코드)·`infra/git.rs`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. `spec/`의 정답 파일은 `crates/core/tests/golden/spec.json`(생성물, `cargo xtask spec-golden`)이다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
+지금(카드 L12) 있는 것은 `account`·`spec`·`project`·`reference`(뽑기·끊기·잇기·조회·관계도·미존재)·`codegraph`(그래프 행·코드 읽기)·`markdown.rs`·`pycompat/`·`pipeline.rs`(저장·커밋 처리·재구축·따라잡기·그래프 만들기)·`queries.rs`(프로젝트 요약·상세·문서 목록·문서·항목·참조·체인·관계도·diff 영향·추적표·문제 목록·코드·코드 그래프 노드)·`infra/git.rs`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. `spec/`의 정답 파일은 `crates/core/tests/golden/spec.json`(생성물, `cargo xtask spec-golden`)이다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
 
 **층** — 함수 단위 명세(MINISPEC 카드·API 엔드포인트·UI 화면)가 없는 코드가 어느 층이고 그 층을 무슨 문서가 정하는지([[SYNC-STD-001]] 2.6). 코드 그래프가 읽는다. 위에서부터 첫 줄이 이긴다. **줄은 카드마다 더한다** — 코드가 없는 줄은 검사기(`check_calls`)가 「안 맞는 줄」로 잡는다. 함수가 없는 파일(구조체만 — `state.rs`·`model.rs`)은 적지 않는다.
 
@@ -641,7 +644,7 @@ classDiagram
 | [[SYNC-MS-017#pipeline.write_lock]] · [[SYNC-MS-017#pipeline.read_lock]] | `save_pipeline` · `read_pending` | [[SYNC-MS-007]] 락 | — |
 | [[SYNC-MS-017#pipeline.wait_idle]] | `runtime.shutdown` | [[SYNC-INFRA-001]] 9.1 | — |
 
-규칙 — [[SYNC-DOM-002]] 4.4와 같다. 프로젝트마다 쓰기 락 하나·읽기 락 하나, 프로세스 전역이고 시간 제한이 없다. 읽기 → 쓰기 차례(`read_pending`은 쓰기 락 밖). 검사가 다 끝난 뒤에야 git을 쓰고, git이 끝난 뒤에야 DB를 쓴다 — 실패하면 DB는 그대로다. 저장은 따로 띄운 작업에서 돌아 부른 요청이 끊겨도 끝까지 간다. 웹 갈래(상태·되돌리기·되살림)는 L9가, 서버 저장소 push 갈래(`github`)·밀린 커밋 처리·재구축·따라잡기는 L11이 더했다 — 파이썬 판 `scheduler` 모듈의 둘도 여기 둔다. 코드 그래프 걸기·만들기는 L12가 더했다(커뮤니티는 L13).
+규칙 — [[SYNC-DOM-002]] 4.4와 같다. 프로젝트마다 쓰기 락 하나·읽기 락 하나, 프로세스 전역이고 시간 제한이 없다. 읽기 → 쓰기 차례(`read_pending`은 쓰기 락 밖). 검사가 다 끝난 뒤에야 git을 쓰고, git이 끝난 뒤에야 DB를 쓴다 — 실패하면 DB는 그대로다. 저장은 따로 띄운 작업에서 돌아 부른 요청이 끊겨도 끝까지 간다. 웹 갈래(상태·되돌리기·되살림)는 L9가, 서버 저장소 push 갈래(`github`)·밀린 커밋 처리·재구축·따라잡기는 L11이 더했다 — 파이썬 판 `scheduler` 모듈의 둘도 여기 둔다. 코드 그래프 걸기·만들기는 L12가, 그 커뮤니티는 L13이 더했다.
 
 ### 4.7 queries (MS-018)
 
@@ -661,9 +664,10 @@ classDiagram
 | [[SYNC-MS-018#queries.trash_list]] | `GET /api/projects/{code}/trash` | [[SYNC-MS-008#queries.trash_list]] | `not-found` |
 | [[SYNC-MS-018#queries.code_view]] | `GET /api/docs/{docId}/code` · `…/items/{itemId}/code` · MCP `get_code_graph`(L12) | [[SYNC-MS-008#queries.code_view]] | `not-found` · `item-deleted` |
 | [[SYNC-MS-018#queries.code_calls]] | `GET /api/projects/{code}/code-calls`(L12) | [[SYNC-MS-008#queries.code_calls]] | `not-found` |
+| [[SYNC-MS-018#queries.code_nodes]] | `GET /api/projects/{code}/code-graph`(L13) | [[SYNC-MS-008#queries.code_nodes]] | `not-found` |
 | [[SYNC-MS-018#queries.code_source]] · [[SYNC-MS-018#queries.code_text]] | `GET …/items/{itemId}/code/source` · `GET /api/projects/{code}/code/source`(L12) | [[SYNC-MS-008#queries.code_source]] | `not-found`(code_graph·function·file) |
 
-모듈 함수다 — 연결을 첫 인자로 받는다. 나머지 조회(코드 그래프 노드 L13·묻기 L14)는 그 카드가 더한다.
+모듈 함수다 — 연결을 첫 인자로 받는다. 나머지 조회(묻기 L14)는 그 카드가 더한다.
 
 ### 4.8 git (MS-019)
 
@@ -723,6 +727,7 @@ classDiagram
         +item_neighbors(graph, key) (Vec, Vec)
         +layer_table(body) Vec~LayerRow~
         +layers(graph, rows) (HashMap, Vec)
+        +communities(raw, graph) Graph
     }
     class Graph {
         +Vec~Function~ functions
@@ -757,10 +762,11 @@ classDiagram
 | [[SYNC-MS-022#codegraph.load]] · [[SYNC-MS-022#codegraph.extract]] · [[SYNC-MS-022#codegraph.reduce]] · [[SYNC-MS-022#codegraph.enrich]] | `pipeline.build_code_graph` | [[SYNC-MS-011#codegraph.load]] | `CodeGraphFailed`(그래프 행의 `error`로) |
 | [[SYNC-MS-022#codegraph.spec_calls]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.item_function]] · [[SYNC-MS-022#codegraph.item_neighbors]] | 코드 조회 넷 | [[SYNC-MS-011#codegraph.compare]] | — |
 | [[SYNC-MS-022#codegraph.layer_table]] · [[SYNC-MS-022#codegraph.layers]] | 코드 그래프 노드(L13) | [[SYNC-MS-011#codegraph.layers]] | — |
+| [[SYNC-MS-022#codegraph.communities]] | `pipeline.build_code_graph`(L13) | [[SYNC-MS-011#codegraph.communities]] | — |
 | [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#CodeGraphService.save]] · [[SYNC-MS-022#CodeGraphService.fail]] | 그래프 만들기 · 코드 조회 · 커밋 처리 5a | [[SYNC-MS-011#CodeGraphService.save]] | — |
 | [[SYNC-MS-022#CodeGraphService.read]] | `queries.code_source`·`code_text` | [[SYNC-MS-011#CodeGraphService.read]] | `not-found`(code_graph·file) |
 
-규칙 — [[SYNC-DOM-002]] 4.11과 같다. 그래프는 DB에 줄인 모양(함수·선·항목 ID)으로, 코드 본문은 저장소에서 읽는다. 저장소에 커밋된 `graphify-out/graph.json`이 있으면 파이썬 판처럼 그것이 원형이다 — 없으면 graphify 대신 tree-sitter로 뽑는다([[SYNC-MS-022]] 0장, [[SYNC-INFRA-001]] 9.2). 커뮤니티는 L13이 더한다.
+규칙 — [[SYNC-DOM-002]] 4.11과 같다. 그래프는 DB에 줄인 모양(함수·선·항목 ID)으로, 코드 본문은 저장소에서 읽는다. 저장소에 커밋된 `graphify-out/graph.json`이 있으면 파이썬 판처럼 그것이 원형이다 — 없으면 graphify 대신 tree-sitter로 뽑는다([[SYNC-MS-022]] 0장, [[SYNC-INFRA-001]] 9.2). 커뮤니티는 파이썬 판이 부르는 networkx Louvain·graphify 허브 라벨을 옮겨 L13이 더했다 — 같은 원형이면 번호·라벨까지 같다.
 
 ---
 

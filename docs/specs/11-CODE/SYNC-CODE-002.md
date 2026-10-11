@@ -150,11 +150,21 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | L11 |
 | 완료 | 2026-10-11 · 브랜치 `card/L12-code-graph`(5ef2d58 #371) · spec 11 + code 12 · `cargo test` 166(정답 파일 — 고정 저장소의 줄이기·보강이 파이썬 판과 바이트로 같다 · 시험 DB · 임시 자리 · 진짜 git — 그래프 행·코드 읽기·풀기·만들기·걸기·코드 조회) · `cargo xtask codegraph-diff` — 싱크독 저장소 전체(함수 1986·선 3404, 대조·층·항목 함수까지)가 파이썬 판과 같다 · 계약 `--target both --with-card L12` 975 통과·건너뜀 0 — L12 88 사례(같은 코드·graph.json push → 코드 탭·코드 보기·관계도·코드 그래프의 코드·get_code_graph, graph.json 없는 프로젝트는 꼴만) · L3 두 판 차이 시험 씨앗 셋 · clippy · 워크플로 녹색(윈도 빌드·설치·실행) · `check_code` Rust 152/152 · `check_calls` 0 · 사람 확인(윈도 싱크독_로컬에 코드 push → UI-5 코드 탭·UI-8 관계도 코드 호출)은 따로 · 되먹임: 검사기(코드 그래프)는 crate 밖에서 다시 내보낸 이름(`syncdoc_codegraph::load`)을 못 풀어 모듈 경로로 부른다 · 리눅스의 윈도 교차 검사는 L12부터 tree-sitter C 때문에 못 돈다 — PR 워크플로가 본다 · pycompat 집합 시험의 정답 자리를 crate 안으로 고침 |
 
+#### L13 커뮤니티·노드 — 코드 그래프를 무리로 묶어 본다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-SCN-001#S9]] · [[SYNC-UC-001#UC-S8]] 3 · [[SYNC-UC-001#UC-H20]] · [[SYNC-PRD-001#R13]] · [[SYNC-INFRA-001]] 9.2 · 에이전트 판단 2026-10-11(사용자 목표 「끝까지」): graphrs가 아니라 파이썬 판이 부르는 networkx 3.7 Louvain을 옮긴다 — 섞기는 파이썬 `random.Random(42)`(MT19937), modularity 합은 파이썬 3.12 `sum`(Neumaier 보정), graphify `load_node_link_graph`(다중 그래프 기본 — 차수에 겹친 선)·허브 라벨까지. 같은 원형이면 커뮤니티 번호·라벨이 바이트로 같다(INFRA 9.2의 「조금 다를 수 있다」를 쓰지 않는다) |
+| 구현 | [[SYNC-MS-022#codegraph.communities]] · [[SYNC-MS-017#pipeline.build_code_graph]] 3 · [[SYNC-MS-018#queries.code_nodes]] |
+| API | [[SYNC-API-001#GET/api/projects/{code}/code-graph]] |
+| 테스트 | `cargo test`(pycompat 정답 — 섞기·합이 파이썬 3.12와 비트까지 · codegraph 정답 파일의 커뮤니티 · 시험 DB — 그래프 행의 커뮤니티·코드 그래프 노드) · `cargo xtask codegraph-diff`(싱크독 저장소 전체 커뮤니티) · 계약 L13 — L12의 고정 저장소로 코드 그래프 노드가 바이트로 같다 |
+| 선행 | L12 |
+| 완료 | — |
+
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
-| L13 커뮤니티·노드 | graphrs Louvain(seed 42) · 허브 라벨 · 노드 목록 | L12 | M |
 | L14 대화·질문 탭 | 대화·첨부(PDF) · 모델 스트리밍 · 질문 루프 · SSE | L8 · L12 | XL |
 | L15 번들 가져오기 | 파이썬 판 카드 BX(git 번들 가져오기)의 Rust 쪽 | L11 · BX | S |
 | L16 데이터 보호·「이 PC」 | 백업·되살리기·데이터 자리 옮기기 · UI-13 「이 PC」 묶음 · 같은 망 열기(`PUBLIC_BASE_URL`, 설정 파일만 — 사용자 결정 2026-10-07) | L4 · L11 | L |
