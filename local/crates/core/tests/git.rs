@@ -459,3 +459,36 @@ async fn advertise_refs_service_line_unless_v2() {
         );
     }
 }
+
+#[tokio::test]
+async fn service_rpc_ls_refs_and_flush_only() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, origin, work) = setup(tmp.path()).await;
+    g.commit_push(
+        &work,
+        "first",
+        &local_user(),
+        &files(&[("a.txt", "a\n")]),
+        &[],
+    )
+    .await
+    .expect("push");
+    // 빈 요청(flush만) — 아무것도 원하지 않는다, 답도 비었다
+    let out = g
+        .service_rpc(&origin, "git-upload-pack", b"0000".to_vec(), None)
+        .await
+        .expect("rpc");
+    assert!(out.is_empty(), "{out:?}");
+    // v2 ls-refs — main이 보인다
+    let req = b"0014command=ls-refs\n00010009peel\n0000".to_vec();
+    let out = g
+        .service_rpc(&origin, "git-upload-pack", req, Some("version=2"))
+        .await
+        .expect("rpc");
+    let head = sh(&origin, &["rev-parse", "main"]);
+    assert!(
+        pkt_lines(&out).contains(&format!("{head} refs/heads/main\n")),
+        "{:?}",
+        pkt_lines(&out)
+    );
+}
