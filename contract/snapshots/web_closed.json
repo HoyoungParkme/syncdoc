@@ -579,6 +579,26 @@
   ],
   "body": "{\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S1\",\"upstream\":[{\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R1\",\"display_name\":\"첫 기능\",\"raw_target\":\"LWA-PRD-001#R1\",\"is_missing\":false},{\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R2\",\"display_name\":\"둘째 기능\",\"raw_target\":\"LWA-PRD-001#R2\",\"is_missing\":false},{\"doc_id\":null,\"item_id\":null,\"display_name\":null,\"raw_target\":\"LWA-PRD-009#R1\",\"is_missing\":true}],\"downstream\":[{\"doc_id\":\"LWA-UC-001\",\"item_id\":\"UC-A1\",\"display_name\":\"첫 일\",\"raw_target\":\"LWA-SCN-001#S1\",\"is_missing\":false},{\"doc_id\":\"LWA-UC-001\",\"item_id\":\"UC-A2\",\"display_name\":\"둘째 일\",\"raw_target\":\"LWA-SCN-001#S1\",\"is_missing\":false}]}"
  },
+ "trash_empty": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[]"
+ },
+ "trash_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
  "versions_missing": {
   "status": 404,
   "headers": [

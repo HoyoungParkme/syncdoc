@@ -145,6 +145,8 @@ CASES = [
     ("graph_approved", "/api/projects/LWA/graph?scope=approved"),
     ("graph_bad_scope", "/api/projects/LWA/graph?scope=APPROVED"),
     ("graph_missing", "/api/projects/NOPE/graph"),
+    ("trash_empty", "/api/projects/LWA/trash"),
+    ("trash_missing", "/api/projects/NOPE/trash"),
     ("file_none", "/api/projects/LWA/files/assets/x.png"),
     ("file_outside", "/api/projects/LWA/files/../../../../etc/passwd.png"),
     ("file_outside_encoded", "/api/projects/LWA/files/..%2F..%2Fx.png"),
