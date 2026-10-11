@@ -13,8 +13,9 @@ use crate::project::service::{ProjectService, ServerRepos};
 use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
 use crate::types::{
-    ApiAuthor, AuthorRef, BrokenRefSummary, Document, DocumentSummary, ItemRef, ItemReferences,
-    ItemView, ProjectDetail, ProjectItem, ProjectSummary, STAGES, StageSummary, Storage,
+    ApiAuthor, AuthorRef, BrokenRefSummary, Document, DocumentSummary, Graph, GraphEdge, GraphNode,
+    GraphScope, ItemRef, ItemReferences, ItemView, ProjectDetail, ProjectItem, ProjectSummary,
+    STAGES, StageSummary, Storage,
 };
 
 /// 작성자(id만) → 이름 붙은 작성자 — 파이썬 `_api_author`. 지시자는 id가 있을 때만
@@ -450,4 +451,102 @@ pub async fn project_items(
             log: format!("unknown kind {other}"),
         }),
     }
+}
+
+/// SYNC-MS-018#queries.graph_view
+///
+/// 11단계를 다 그리되 범위로 골라낸다. 끝점이 범위 밖인 간선은 버린다 — 범위 밖과 미존재 참조는 다르다
+pub async fn graph_view(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+    scope: GraphScope,
+) -> Result<Graph, Problem> {
+    let (project, _) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code, user)
+    .await?;
+    let mut briefs = SpecService { db: &mut *db }
+        .list_items_by_project(project.id)
+        .await?;
+    if scope == GraphScope::Approved {
+        let ok: std::collections::HashSet<String> = SpecService { db: &mut *db }
+            .list_by_project(project.id, None, Some("approved"), None)
+            .await?
+            .into_iter()
+            .map(|d| d.doc_id)
+            .collect();
+        briefs.retain(|b| ok.contains(&b.doc_id));
+    }
+    let node_id = |doc_id: &str, item_id: Option<&str>| match item_id {
+        Some(i) => format!("{doc_id}#{i}"),
+        None => doc_id.to_string(),
+    };
+    let item_ids: HashMap<i32, String> = briefs
+        .iter()
+        .filter_map(|b| {
+            b.item_id
+                .as_deref()
+                .map(|i| (b.pk, node_id(&b.doc_id, Some(i))))
+        })
+        .collect();
+    let doc_ids: HashMap<i32, String> = briefs
+        .iter()
+        .filter(|b| b.item_id.is_none())
+        .map(|b| (b.pk, b.doc_id.clone()))
+        .collect();
+    let pks: Vec<i32> = item_ids.keys().copied().collect();
+    let edges = ReferenceService { db: &mut *db }
+        .references_among(&pks, true)
+        .await?;
+    let mut out_edges = Vec::new();
+    let mut touched: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for e in &edges {
+        let src = match e.from_item_pk {
+            Some(p) => item_ids.get(&p),
+            None => doc_ids.get(&e.from_document_id),
+        };
+        let Some(src) = src else { continue };
+        let dst = if let Some(p) = e.to_item_pk {
+            // 대상이 범위 밖이다. 미존재 참조가 아니므로 그리지 않는다
+            let Some(d) = item_ids.get(&p) else { continue };
+            Some(d.clone())
+        } else if let Some(d) = e.to_document_id {
+            let Some(d) = doc_ids.get(&d) else { continue };
+            Some(d.clone())
+        } else {
+            None
+        };
+        touched.insert(src.clone());
+        if let Some(d) = &dst {
+            touched.insert(d.clone());
+        }
+        out_edges.push(GraphEdge {
+            from_: src.clone(),
+            to: dst,
+            raw_target: e.raw_target.clone(),
+            is_missing: e.is_missing,
+        });
+    }
+    let nodes = briefs
+        .iter()
+        .map(|b| {
+            let id = node_id(&b.doc_id, b.item_id.as_deref());
+            GraphNode {
+                isolated: !touched.contains(&id),
+                id,
+                doc_id: b.doc_id.clone(),
+                item_id: b.item_id.clone(),
+                stage: b.stage,
+            }
+        })
+        .collect();
+    Ok(Graph {
+        nodes,
+        edges: out_edges,
+        project_name: project.name,
+    })
 }
