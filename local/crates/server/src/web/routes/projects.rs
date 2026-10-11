@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 
 use axum::Json;
 use axum::body::Bytes;
-use axum::extract::{Path, State};
+use axum::extract::{Path, RawQuery, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use syncdoc_core::errors::Problem;
@@ -18,9 +18,11 @@ use crate::compat::pyvalue::{PyStr, PyValue};
 use crate::state::AppState;
 use crate::web::auth::current_user;
 use crate::web::problem::ApiProblem;
-use crate::web::schemas::{ProjectDetail, ProjectSummary};
+use crate::web::schemas::{DocumentSummary, ProjectDetail, ProjectSummary};
 
 static INIT_PROJECT: LazyLock<Validator> = LazyLock::new(schemas::init_project);
+static STAGE: LazyLock<Validator> = LazyLock::new(schemas::stage);
+static DOC_STATUS: LazyLock<Validator> = LazyLock::new(schemas::doc_status);
 
 /// SYNC-API-001#GET/api/projects
 pub async fn list_projects(
@@ -106,4 +108,32 @@ pub async fn get_project(
     let user = current_user(&mut c, &state).await?;
     let d = queries::project_detail(&mut c, &state.repos, &code, &user).await?;
     Ok(Json(ProjectDetail::from(&d)))
+}
+
+/// SYNC-API-001#GET/api/projects/{code}/docs
+///
+/// 질의 `stage`(1~11)·`status`(draft·approved) — 틀리면 422, 둘 다 틀리면 둘 다 싣는다
+pub async fn list_docs(
+    State(state): State<AppState>,
+    Path(code): Path<String>,
+    RawQuery(raw): RawQuery,
+) -> Result<Json<Vec<DocumentSummary>>, ApiProblem> {
+    let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+    let user = current_user(&mut c, &state).await?;
+    let q = fastapi::query_params(raw.as_deref());
+    let mut errors = Vec::new();
+    let stage = fastapi::query_field(&q, "stage", &STAGE, false, &mut errors);
+    let status = fastapi::query_field(&q, "status", &DOC_STATUS, false, &mut errors);
+    fastapi::check_errors(errors)?;
+    let stage = match stage {
+        Some(PyValue::Int(i)) => i32::try_from(&i).ok(),
+        _ => None,
+    };
+    let status = match status {
+        Some(PyValue::Str(PyStr::Utf8(s))) => Some(s),
+        _ => None,
+    };
+    let docs = queries::document_list(&mut c, &state.repos, &code, &user, stage, status.as_deref())
+        .await?;
+    Ok(Json(docs.iter().map(DocumentSummary::from).collect()))
 }
