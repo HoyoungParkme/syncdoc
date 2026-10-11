@@ -750,3 +750,95 @@ def test_archive_origin_moves_to_archive_without_name_clash(
         assert (dest / "HEAD").read_text(encoding="utf-8").endswith(f"{n}\n")
         dests.append(dest)
     assert dests[0] != dests[1] and all(d.name.startswith("ARC-") for d in dests)
+
+
+# ── 번들로 가져오기 (카드 BX, UC-A1 1c) ──
+
+
+def _bundle(tmp_path: Path, with_main: bool = True) -> bytes:
+    """명세 두 커밋(초안 → 상태)과 태그가 든 저장소의 번들"""
+    src = tmp_path / "src"
+    g(tmp_path, "init", "-q", "-b", "main" if with_main else "trunk", str(src))
+    f = src / "docs/specs/01-RFQ/BND-RFQ-001.md"
+    f.parent.mkdir(parents=True)
+    f.write_text(SRV_RFQ.replace("SRV", "BND"), encoding="utf-8")
+    g(src, "add", "-A")
+    g(
+        src,
+        "-c",
+        "user.name=밖",
+        "-c",
+        "user.email=out@example.com",
+        "commit",
+        "-q",
+        "-m",
+        "spec(BND-RFQ-001): 초안",
+    )
+    f.write_text(
+        SRV_RFQ.replace("SRV", "BND").replace("status: draft", "status: approved"),
+        encoding="utf-8",
+    )
+    g(src, "add", "-A")
+    g(
+        src,
+        "-c",
+        "user.name=밖",
+        "-c",
+        "user.email=out@example.com",
+        "commit",
+        "-q",
+        "-m",
+        "status(BND-RFQ-001): draft → approved",
+    )
+    g(src, "tag", "v1")
+    out = tmp_path / "x.bundle"
+    g(src, "bundle", "create", "-q", str(out), "--all")
+    return out.read_bytes()
+
+
+async def test_import_bundle_restores_specs_versions_and_status_without_skeleton(
+    db_session: Session, repos_dir, origins_dir: Path, tmp_path: Path
+) -> None:
+    """MS-001 import_bundle — 번들의 커밋으로 서버 저장소, 재구축으로 판·상태. 골격 커밋 없음."""
+    from app.core.spec.service import SpecService
+
+    user = make_user(db_session, login="local", token=None)
+    data = _bundle(tmp_path)
+    project = await ProjectService(db_session).import_bundle("BND", "번들", user, data)
+    origin = origins_dir / "BND.git"
+    assert project.repository.storage == "server"
+    assert project.repository.remote_url == str(origin)
+    assert g(origin, "rev-parse", "main") == g(tmp_path / "src", "rev-parse", "main")
+    assert g(origin, "rev-parse", "v1") == g(tmp_path / "src", "rev-parse", "v1")
+    assert g(origin, "symbolic-ref", "HEAD") == "refs/heads/main"
+    assert g(origin, "config", "receive.denyNonFastForwards") == "true"
+    assert g(origin, "remote") == ""
+    assert "init syncdoc" not in g(origin, "log", "--format=%s", "main")
+    assert project.repository.last_processed_commit == g(origin, "rev-parse", "main")
+    doc = SpecService(db_session).get_document("BND-RFQ-001")
+    assert doc.status == "approved"
+
+
+async def test_import_bundle_refuses_bad_bundles_and_leaves_nothing(
+    db_session: Session, repos_dir, origins_dir: Path, tmp_path: Path
+) -> None:
+    """UC-A1 1c2 — 번들 아님·main 없음 → bundle-invalid, 원본·작업 사본·행 없음."""
+    from app.core.errors import BundleInvalid, ProjectCodeConflict, ProjectCodeInvalid
+    from app.core.types import Storage
+
+    user = make_user(db_session, login="u")
+    svc = ProjectService(db_session)
+    with pytest.raises(BundleInvalid) as ei:
+        await svc.import_bundle("BAD", "x", user, b"not a bundle")
+    assert ei.value.extra == {"reason": "번들 파일이 아니거나 깨졌다"}
+    assert not (origins_dir / "BAD.git").exists()
+    with pytest.raises(BundleInvalid) as ei:
+        await svc.import_bundle("BAD", "x", user, _bundle(tmp_path, with_main=False))
+    assert ei.value.extra == {"reason": "main 가지가 없다"}
+    assert not (origins_dir / "BAD.git").exists() and not (repos_dir / "BAD").exists()
+    assert not svc.repo.exists("BAD")
+    with pytest.raises(ProjectCodeInvalid):
+        await svc.import_bundle("bad", "x", user, b"")
+    await svc.init_project(None, "DUP", "x", user, storage=Storage.server)
+    with pytest.raises(ProjectCodeConflict):
+        await svc.import_bundle("DUP", "x", user, b"")
