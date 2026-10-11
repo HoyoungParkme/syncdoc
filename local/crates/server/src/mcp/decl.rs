@@ -1,5 +1,6 @@
 //! MCP 선언 — `declarations.json`(파이썬 판에서 `cargo xtask mcp-tools`가 뽑은 것)을 읽어 둔다.
 //! 서버 이름·안내문이 든 고정 결과, 판 목록, 검증기(봉투·메서드 표면·처리기 인자·도구 인자).
+//! 2026-07-28(카드 L18) — 그 판의 메서드 표면·요청/알림 봉투 검증기, 고정 결과(server/discover·목록들), serverInfo 도장.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
@@ -23,6 +24,8 @@ pub struct ToolDecl {
 pub struct Decl {
     pub url_prefix: String,
     pub handshake: Vec<String>,
+    /// 핸드셰이크 없는 판 — 2026-07-28 (L18)
+    pub modern: Vec<String>,
     pub latest_handshake: String,
     pub default_negotiated: String,
     pub spec_client_methods: HashSet<String>,
@@ -30,10 +33,17 @@ pub struct Decl {
     pub handled: HashSet<String>,
     /// `requestState`를 실어 오면 검증 전에 거절하는 메서드 (`RequestStateBoundary`)
     pub input_required: HashSet<String>,
-    /// 판 → 메서드 → 결과 JSON(바이트 그대로)
+    /// 판 → 메서드 → 결과 JSON(바이트 그대로). 2026-07-28 것은 캐시 힌트·serverInfo 도장까지 든 ASCII 꼴
     pub results: HashMap<String, HashMap<String, String>>,
+    /// `_meta`의 `io.modelcontextprotocol/serverInfo` 값 — 2026-07-28 결과에 찍는다
+    pub server_info_stamp: String,
     pub envelope: Validator,
     pub surface: HashMap<String, Validator>,
+    /// 2026-07-28의 메서드 표면
+    pub surface_modern: HashMap<String, Validator>,
+    /// 2026-07-28 요청 하나·알림 하나의 봉투 (`JSONRPCRequest`·`JSONRPCNotification`)
+    pub request_modern: Validator,
+    pub notification_modern: Validator,
     pub handlers: HashMap<String, Validator>,
     pub initialize_params: Validator,
     pub tools: HashMap<String, ToolDecl>,
@@ -100,24 +110,27 @@ fn load() -> Decl {
             );
         }
     }
-    let results = d["results"]
-        .as_object()
-        .map(|o| {
-            o.iter()
-                .map(|(ver, m)| {
-                    let inner = m
-                        .as_object()
-                        .map(|mm| {
-                            mm.iter()
-                                .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
-                                .collect()
-                        })
-                        .unwrap_or_default();
-                    (ver.clone(), inner)
-                })
-                .collect()
-        })
-        .unwrap_or_default();
+    let as_results = |r: &Value| -> HashMap<String, HashMap<String, String>> {
+        r.as_object()
+            .map(|o| {
+                o.iter()
+                    .map(|(ver, m)| {
+                        let inner = m
+                            .as_object()
+                            .map(|mm| {
+                                mm.iter()
+                                    .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                        (ver.clone(), inner)
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let mut results = as_results(&d["results"]);
+    results.extend(as_results(&d["results_modern"]));
     let methods_by_version = d["methods_by_version"]
         .as_object()
         .map(|o| {
@@ -129,6 +142,7 @@ fn load() -> Decl {
     Decl {
         url_prefix: d["pydantic_url_prefix"].as_str().unwrap_or("").to_string(),
         handshake: strings(&d["protocol"]["handshake"]),
+        modern: strings(&d["protocol"]["modern"]),
         latest_handshake: d["protocol"]["latest_handshake"]
             .as_str()
             .unwrap_or("")
@@ -142,8 +156,12 @@ fn load() -> Decl {
         handled: strings(&d["handled_methods"]).into_iter().collect(),
         input_required: strings(&d["input_required_methods"]).into_iter().collect(),
         results,
+        server_info_stamp: d["server_info_stamp"].as_str().unwrap_or("").to_string(),
         envelope: validator(&s["envelope"]),
         surface: map(&s["surface"]),
+        surface_modern: map(&s["surface_modern"]),
+        request_modern: validator(&s["request_modern"]),
+        notification_modern: validator(&s["notification_modern"]),
         handlers: map(&s["handlers"]),
         initialize_params: validator(&s["initialize_params"]),
         tools,
@@ -167,5 +185,8 @@ mod tests {
         assert_eq!(d.tools.len(), 13);
         assert!(d.handshake.contains(&"2025-06-18".to_string()));
         assert!(d.results["2025-06-18"]["initialize"].contains("\"syncdoc_local\""));
+        assert_eq!(d.modern, ["2026-07-28"]);
+        assert!(d.results["2026-07-28"]["server/discover"].contains("\"supportedVersions\""));
+        assert_eq!(d.surface_modern.len(), 10);
     }
 }

@@ -1,10 +1,11 @@
 //! `/mcp` — 에이전트 입구 (SYNC-API-002 · SYNC-DOM-004 1장 mcp/).
 //! 파이썬 mcp SDK 2.2.0의 핸드셰이크 경로를 옮겼다 — 세션 없는 streamable HTTP, 서버 이름 `syncdoc_local`.
-//! 2026-07-28 새 프로토콜은 카드 L18.
+//! 2026-07-28 새 프로토콜(핸드셰이크 없는 요청 하나짜리 봉투)은 `modern` — 판 머리가 핸드셰이크 판이 아니면 그리로 (카드 L18).
 
 pub mod auth;
 pub mod decl;
 pub mod dispatch;
+pub mod modern;
 pub mod tools;
 pub mod transport;
 

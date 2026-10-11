@@ -33,20 +33,36 @@ pub fn dumps_str(s: &str, ensure_ascii: bool) -> String {
 
 /// 파이썬 `json.dumps(v, ensure_ascii=…)`
 pub fn dumps(v: &Value, ensure_ascii: bool) -> String {
+    dump(v, ensure_ascii, (", ", ": "))
+}
+
+/// 파이썬 `json.dumps(v, separators=(",", ":"))` — MCP 2026-07-28 응답(카드 L18)
+pub fn dumps_compact(v: &Value, ensure_ascii: bool) -> String {
+    dump(v, ensure_ascii, (",", ":"))
+}
+
+fn dump(v: &Value, ensure_ascii: bool, sep: (&str, &str)) -> String {
     match v {
         Value::Object(m) => {
             let items: Vec<String> = m
                 .iter()
-                .map(|(k, v)| format!("{}: {}", dumps_str(k, ensure_ascii), dumps(v, ensure_ascii)))
+                .map(|(k, v)| {
+                    format!(
+                        "{}{}{}",
+                        dumps_str(k, ensure_ascii),
+                        sep.1,
+                        dump(v, ensure_ascii, sep)
+                    )
+                })
                 .collect();
-            format!("{{{}}}", items.join(", "))
+            format!("{{{}}}", items.join(sep.0))
         }
         Value::Array(a) => format!(
             "[{}]",
             a.iter()
-                .map(|x| dumps(x, ensure_ascii))
+                .map(|x| dump(x, ensure_ascii, sep))
                 .collect::<Vec<_>>()
-                .join(", ")
+                .join(sep.0)
         ),
         Value::String(s) => dumps_str(s, ensure_ascii),
         Value::Bool(true) => "true".into(),
