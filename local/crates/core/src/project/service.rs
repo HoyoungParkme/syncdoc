@@ -250,13 +250,15 @@ impl ProjectService<'_> {
         )
         .await?;
         if has {
-            // 되살린 보관본의 명세를 재구축으로 올리는 갈래 — 카드 L11
-            tx.rollback().await?;
-            let _ = fs::remove_dir_all(&workdir);
-            undo_origin();
-            return Err(Problem::NotImplemented {
-                card: "L11".to_string(),
-            });
+            // 3a2·3b2 — 되살린 보관본의 명세를 재구축으로 가져온다. 같은 저장점이라 막 넣은 행을 본다.
+            // 서비스가 pipeline을 부르는 자리(파이썬 판 DOM-002 3.2와 같다)
+            if let Err(p) = crate::pipeline::rebuild(&mut tx, self.repos, code).await {
+                drop(tx);
+                undo_origin();
+                return Err(p);
+            }
+            tx.commit().await?;
+            return self.get(code).await;
         }
         let files = Git::init_specs(&self.repos.specs_url);
         let message = format!("chore({code}): init syncdoc");
