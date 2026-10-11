@@ -2,6 +2,7 @@
 //! DB·git을 모르고 파일만 읽는다. 파이썬 판 `core/codegraph/graph.py`와 같은 이름·같은 처리·같은 그래프 모양이다 —
 //! 같은 원형이면 바이트까지 같은 그래프를 낸다(정답 파일 `tests/golden/codegraph.json`, `cargo xtask codegraph-golden`).
 
+pub mod community;
 pub mod enrich;
 mod extract;
 pub mod graph;
@@ -11,6 +12,7 @@ mod ts;
 
 use serde::{Deserialize, Serialize};
 
+pub use community::communities;
 pub use enrich::enrich;
 pub use extract::extract;
 pub use graph::{

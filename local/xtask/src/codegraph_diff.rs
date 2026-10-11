@@ -1,4 +1,4 @@
-//! 코드 그래프 차이 시험 — 지금 커밋을 풀어 두 판의 줄이기·보강을 같은 원형으로 돌려 비교한다 (SYNC-MS-022, 카드 L12).
+//! 코드 그래프 차이 시험 — 지금 커밋을 풀어 두 판의 줄이기·보강·커뮤니티를 같은 원형으로 돌려 비교한다 (SYNC-MS-022, 카드 L12·L13).
 //! 원형은 파이썬 판 graphify가 만든다. 다르면 처음 몇 곳을 보이고 실패한다. 커밋하지 않는다(정답 파일은 codegraph-golden).
 
 use std::process::Command;
@@ -55,6 +55,30 @@ pub fn run() -> Result<(), String> {
                 a.len(),
                 b.len()
             ));
+        }
+    }
+    // 커뮤니티 — 같은 원형·같은 보강으로(카드 L13). 파이썬은 커뮤니티 없는 함수에도 `community: null`을 둔다
+    let grouped = syncdoc_codegraph::communities(
+        &py["raw"],
+        syncdoc_codegraph::enrich(&src, syncdoc_codegraph::reduce(&py["raw"])),
+    );
+    let mut grouped = serde_json::to_value(&grouped).map_err(|e| e.to_string())?;
+    null_community(&mut grouped);
+    for part in ["functions", "communities"] {
+        let (a, b) = (py["communities"][part].as_array(), grouped[part].as_array());
+        let (Some(a), Some(b)) = (a, b) else {
+            return Err(format!("communities.{part}가 없다"));
+        };
+        println!("communities.{part}: 파이썬 {} · Rust {}", a.len(), b.len());
+        for (i, (x, y)) in a.iter().zip(b).enumerate() {
+            if x != y {
+                diffs.push(format!(
+                    "communities.{part}[{i}]\n  파이썬 {x}\n  Rust   {y}"
+                ));
+            }
+        }
+        if a.len() != b.len() {
+            diffs.push(format!("communities.{part} 수가 다르다"));
         }
     }
     // 대조·층 — 같은 재료(MS 항목·클래스 명세 본문)로
@@ -163,4 +187,15 @@ pub fn run() -> Result<(), String> {
         println!("{d}");
     }
     Err(format!("{}곳이 다르다", diffs.len()))
+}
+
+/// 파이썬처럼 함수마다 `community` 열쇠를 둔다(없으면 null)
+pub fn null_community(graph: &mut Value) {
+    if let Some(fs) = graph.get_mut("functions").and_then(Value::as_array_mut) {
+        for f in fs {
+            if let Some(o) = f.as_object_mut() {
+                o.entry("community").or_insert(Value::Null);
+            }
+        }
+    }
 }

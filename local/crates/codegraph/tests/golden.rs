@@ -1,10 +1,10 @@
-//! SYNC-MS-022 테스트 관점 — 파이썬 판이 같은 원형·같은 파일로 낸 줄이기·보강 결과와 바이트로 같다.
+//! SYNC-MS-022 테스트 관점 — 파이썬 판이 같은 원형·같은 파일로 낸 줄이기·보강·커뮤니티 결과와 바이트로 같다.
 //! 정답은 `cargo xtask codegraph-golden`이 고정 시험 저장소(`tests/fixture`)에서 만든다.
 
 use std::path::PathBuf;
 
 use serde_json::Value;
-use syncdoc_codegraph::{enrich, reduce};
+use syncdoc_codegraph::{communities, enrich, reduce};
 
 fn here() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests")
@@ -55,4 +55,31 @@ fn enrich_matches_python() {
     );
     same("enriched.calls", &got["calls"], &g["enriched"]["calls"]);
     assert!(got.get("files").is_none(), "보강 뒤에는 files가 없다");
+}
+
+#[test]
+fn communities_match_python() {
+    let g = golden();
+    let got = communities(
+        &g["raw"],
+        enrich(&here().join("fixture"), reduce(&g["raw"])),
+    );
+    let mut got = serde_json::to_value(&got).expect("직렬화");
+    // 파이썬은 커뮤니티 없는 함수에도 `community: null`을 둔다
+    for f in got["functions"].as_array_mut().expect("함수") {
+        f.as_object_mut()
+            .expect("객체")
+            .entry("community")
+            .or_insert(Value::Null);
+    }
+    same(
+        "communities.functions",
+        &got["functions"],
+        &g["communities"]["functions"],
+    );
+    same(
+        "communities.communities",
+        &got["communities"],
+        &g["communities"]["communities"],
+    );
 }

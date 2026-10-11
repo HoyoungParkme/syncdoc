@@ -27,6 +27,7 @@ def main() -> None:
     specs = str(src / "docs" / "specs")
     raw = asyncio.run(graphify.extract(src))
     graph = cg.enrich(src, cg.reduce(copy.deepcopy(raw)))
+    grouped = cg.communities(copy.deepcopy(raw), copy.deepcopy(graph))
     # 대조·층 — 검사기(check_calls)와 같은 재료
     items = check_calls.ms_items(specs)
     impl_of = proj.class_doc_of(specs)
@@ -39,6 +40,7 @@ def main() -> None:
     data = {
         "raw": raw,
         "enriched": graph,
+        "communities": grouped,
         "items": items,
         "impl_of": impl_of,
         "bodies": bodies,
