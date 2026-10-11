@@ -1,0 +1,602 @@
+{
+ "chain_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"item LWA-UC-001#UC-A9 없음\",\"resource\":\"item\",\"id\":\"LWA-UC-001#UC-A9\"}"
+ },
+ "chain_r1": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"item\":{\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R1\",\"display_name\":\"첫 기능\",\"raw_target\":\"\",\"is_missing\":false},\"upstream_count\":0,\"downstream_count\":4,\"rows\":[{\"stage\":1,\"doc_type\":\"RFQ\",\"items\":[]},{\"stage\":2,\"doc_type\":\"PRD\",\"items\":[{\"ref\":{\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R1\",\"display_name\":\"첫 기능\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"self\",\"status\":\"draft\"}]},{\"stage\":3,\"doc_type\":\"SCN\",\"items\":[{\"ref\":{\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S1\",\"display_name\":\"첫 흐름\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"downstream\",\"status\":\"draft\"},{\"ref\":{\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S2\",\"display_name\":\"둘째 흐름\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"downstream\",\"status\":\"draft\"}]},{\"stage\":4,\"doc_type\":\"UC\",\"items\":[{\"ref\":{\"doc_id\":\"LWA-UC-001\",\"item_id\":\"UC-A1\",\"display_name\":\"첫 일\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"downstream\",\"status\":\"draft\"},{\"ref\":{\"doc_id\":\"LWA-UC-001\",\"item_id\":\"UC-A2\",\"display_name\":\"둘째 일\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"downstream\",\"status\":\"draft\"}]},{\"stage\":5,\"doc_type\":\"INFRA\",\"items\":[]},{\"stage\":6,\"doc_type\":\"DOM\",\"items\":[]},{\"stage\":7,\"doc_type\":\"UI\",\"items\":[]},{\"stage\":8,\"doc_type\":\"API\",\"items\":[]},{\"stage\":9,\"doc_type\":\"SEQ\",\"items\":[]},{\"stage\":10,\"doc_type\":\"MS\",\"items\":[]},{\"stage\":11,\"doc_type\":\"CODE\",\"items\":[]}]}"
+ },
+ "chain_s1": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"item\":{\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S1\",\"display_name\":\"첫 흐름\",\"raw_target\":\"\",\"is_missing\":false},\"upstream_count\":2,\"downstream_count\":2,\"rows\":[{\"stage\":1,\"doc_type\":\"RFQ\",\"items\":[]},{\"stage\":2,\"doc_type\":\"PRD\",\"items\":[{\"ref\":{\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R1\",\"display_name\":\"첫 기능\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"upstream\",\"status\":\"draft\"},{\"ref\":{\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R2\",\"display_name\":\"둘째 기능\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"upstream\",\"status\":\"draft\"}]},{\"stage\":3,\"doc_type\":\"SCN\",\"items\":[{\"ref\":{\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S1\",\"display_name\":\"첫 흐름\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"self\",\"status\":\"draft\"}]},{\"stage\":4,\"doc_type\":\"UC\",\"items\":[{\"ref\":{\"doc_id\":\"LWA-UC-001\",\"item_id\":\"UC-A1\",\"display_name\":\"첫 일\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"downstream\",\"status\":\"draft\"},{\"ref\":{\"doc_id\":\"LWA-UC-001\",\"item_id\":\"UC-A2\",\"display_name\":\"둘째 일\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"downstream\",\"status\":\"draft\"}]},{\"stage\":5,\"doc_type\":\"INFRA\",\"items\":[]},{\"stage\":6,\"doc_type\":\"DOM\",\"items\":[]},{\"stage\":7,\"doc_type\":\"UI\",\"items\":[]},{\"stage\":8,\"doc_type\":\"API\",\"items\":[]},{\"stage\":9,\"doc_type\":\"SEQ\",\"items\":[]},{\"stage\":10,\"doc_type\":\"MS\",\"items\":[]},{\"stage\":11,\"doc_type\":\"CODE\",\"items\":[]}]}"
+ },
+ "chain_uc": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"item\":{\"doc_id\":\"LWA-UC-001\",\"item_id\":\"UC-A1\",\"display_name\":\"첫 일\",\"raw_target\":\"\",\"is_missing\":false},\"upstream_count\":5,\"downstream_count\":0,\"rows\":[{\"stage\":1,\"doc_type\":\"RFQ\",\"items\":[]},{\"stage\":2,\"doc_type\":\"PRD\",\"items\":[{\"ref\":{\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R1\",\"display_name\":\"첫 기능\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"upstream\",\"status\":\"draft\"},{\"ref\":{\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R2\",\"display_name\":\"둘째 기능\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"upstream\",\"status\":\"draft\"}]},{\"stage\":3,\"doc_type\":\"SCN\",\"items\":[{\"ref\":{\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"P1\",\"display_name\":\"사람\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"upstream\",\"status\":\"draft\"},{\"ref\":{\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S1\",\"display_name\":\"첫 흐름\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"upstream\",\"status\":\"draft\"},{\"ref\":{\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S2\",\"display_name\":\"둘째 흐름\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"upstream\",\"status\":\"draft\"}]},{\"stage\":4,\"doc_type\":\"UC\",\"items\":[{\"ref\":{\"doc_id\":\"LWA-UC-001\",\"item_id\":\"UC-A1\",\"display_name\":\"첫 일\",\"raw_target\":\"\",\"is_missing\":false},\"role\":\"self\",\"status\":\"draft\"}]},{\"stage\":5,\"doc_type\":\"INFRA\",\"items\":[]},{\"stage\":6,\"doc_type\":\"DOM\",\"items\":[]},{\"stage\":7,\"doc_type\":\"UI\",\"items\":[]},{\"stage\":8,\"doc_type\":\"API\",\"items\":[]},{\"stage\":9,\"doc_type\":\"SEQ\",\"items\":[]},{\"stage\":10,\"doc_type\":\"MS\",\"items\":[]},{\"stage\":11,\"doc_type\":\"CODE\",\"items\":[]}]}"
+ },
+ "detail": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"code\":\"LWA\",\"name\":\"웹 시험\",\"storage\":\"server\",\"remote_url\":null,\"stages\":[{\"stage\":1,\"doc_type\":\"RFQ\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":2,\"doc_type\":\"PRD\",\"status\":\"draft\",\"doc_count\":1,\"gate_warning\":false,\"broken_count\":0},{\"stage\":3,\"doc_type\":\"SCN\",\"status\":\"draft\",\"doc_count\":1,\"gate_warning\":true,\"broken_count\":1},{\"stage\":4,\"doc_type\":\"UC\",\"status\":\"draft\",\"doc_count\":1,\"gate_warning\":true,\"broken_count\":0},{\"stage\":5,\"doc_type\":\"INFRA\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":6,\"doc_type\":\"DOM\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":7,\"doc_type\":\"UI\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":8,\"doc_type\":\"API\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":9,\"doc_type\":\"SEQ\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":10,\"doc_type\":\"MS\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0},{\"stage\":11,\"doc_type\":\"CODE\",\"status\":null,\"doc_count\":0,\"gate_warning\":false,\"broken_count\":0}],\"std_docs\":[],\"counts\":{\"broken_ref\":1,\"convention_errors\":0,\"incomplete\":0},\"updated_at\":\"T\",\"docs\":[{\"type\":\"document\",\"doc_id\":\"LWA-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"draft\",\"current_version_no\":2,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null},{\"type\":\"document\",\"doc_id\":\"LWA-SCN-001\",\"doc_type\":\"SCN\",\"stage\":3,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{\"broken_ref\":1},\"trashed_at\":null},{\"type\":\"document\",\"doc_id\":\"LWA-UC-001\",\"doc_type\":\"UC\",\"stage\":4,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null}],\"recent_changes\":[{\"doc_id\":\"LWA-PRD-001\",\"version_no\":2,\"commit_hash\":\"H\",\"message\":\"R1 고침\",\"author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"created_at\":\"T\"},{\"doc_id\":\"LWA-UC-001\",\"version_no\":1,\"commit_hash\":\"H\",\"message\":\"UC\",\"author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"created_at\":\"T\"},{\"doc_id\":\"LWA-SCN-001\",\"version_no\":1,\"commit_hash\":\"H\",\"message\":\"SCN\",\"author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"created_at\":\"T\"},{\"doc_id\":\"LWA-PRD-001\",\"version_no\":1,\"commit_hash\":\"H\",\"message\":\"PRD\",\"author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"created_at\":\"T\"}],\"last_processed_commit\":\"H\",\"behind_by\":0,\"fetched_at\":\"T\"}"
+ },
+ "detail_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "diff": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"from_version\":1,\"to_version\":2,\"hunks\":[{\"item_id\":\"R1\",\"downstream_count\":3,\"lines\":[{\"op\":\"ctx\",\"text\":\"#### R1 첫 기능\"},{\"op\":\"del\",\"text\":\"설명.\"},{\"op\":\"add\",\"text\":\"고친 설명.\"},{\"op\":\"ctx\",\"text\":\"\"}]},{\"item_id\":\"R4\",\"downstream_count\":0,\"lines\":[{\"op\":\"add\",\"text\":\"#### R4 새것\"},{\"op\":\"add\",\"text\":\"새.\"}]}]}"
+ },
+ "diff_back": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"from_version\":2,\"to_version\":1,\"hunks\":[{\"item_id\":\"R1\",\"downstream_count\":3,\"lines\":[{\"op\":\"ctx\",\"text\":\"#### R1 첫 기능\"},{\"op\":\"del\",\"text\":\"고친 설명.\"},{\"op\":\"add\",\"text\":\"설명.\"},{\"op\":\"ctx\",\"text\":\"\"}]},{\"item_id\":\"R4\",\"downstream_count\":0,\"lines\":[{\"op\":\"del\",\"text\":\"#### R4 새것\"},{\"op\":\"del\",\"text\":\"새.\"}]}]}"
+ },
+ "diff_huge_from": {
+  "status": 500,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:internal\",\"title\":\"internal\",\"status\":500,\"detail\":\"서버에서 처리하지 못한 오류입니다. 로그를 확인하세요.\"}"
+ },
+ "diff_huge_to": {
+  "status": 500,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:internal\",\"title\":\"internal\",\"status\":500,\"detail\":\"서버에서 처리하지 못한 오류입니다. 로그를 확인하세요.\"}"
+ },
+ "diff_missing_doc": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"document LWA-PRD-404 없음\",\"resource\":\"document\",\"id\":\"LWA-PRD-404\"}"
+ },
+ "diff_missing_version": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"version LWA-PRD-001 v9 없음\",\"resource\":\"version\",\"id\":\"LWA-PRD-001 v9\"}"
+ },
+ "diff_no_query": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.from — Field required\",\"errors\":[{\"loc\":\"query.from\",\"msg\":\"Field required\"},{\"loc\":\"query.to\",\"msg\":\"Field required\"}]}"
+ },
+ "diff_same": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"from_version\":2,\"to_version\":2,\"hunks\":[]}"
+ },
+ "diff_text": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.to — Input should be a valid integer, unable to parse string as an integer\",\"errors\":[{\"loc\":\"query.to\",\"msg\":\"Input should be a valid integer, unable to parse string as an integer\"}]}"
+ },
+ "diff_zero": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.from — Input should be greater than or equal to 1\",\"errors\":[{\"loc\":\"query.from\",\"msg\":\"Input should be greater than or equal to 1\"}]}"
+ },
+ "doc_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"document LWA-PRD-404 없음\",\"resource\":\"document\",\"id\":\"LWA-PRD-404\"}"
+ },
+ "doc_other_project": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "doc_prd": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LWA-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"draft\",\"current_version_no\":2,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{},\"trashed_at\":null,\"body\":\"---\\ndoc_id: LWA-PRD-001\\ntype: PRD\\ntitle: 웹 시험\\nstatus: draft\\n---\\n# 웹 시험\\n\\n## 1. 목표\\n\\n#### G1 첫 목표\\n한 줄.\\n\\n## 2. 비목표\\n\\n## 3. 요구사항\\n\\n#### R1 첫 기능\\n고친 설명.\\n\\n#### R2 둘째 기능\\n설명.\\n\\n#### R3 외톨이\\n설명.\\n\\n## 4. 성공지표\\n\\n## 5. 미결사항\\n\\n#### R4 새것\\n새.\\n\",\"commit_hash\":\"H\",\"convention_error_detail\":null,\"items\":[{\"item_id\":\"G1\",\"display_name\":\"첫 목표\",\"missing_refs\":[]},{\"item_id\":\"R1\",\"display_name\":\"첫 기능\",\"missing_refs\":[]},{\"item_id\":\"R2\",\"display_name\":\"둘째 기능\",\"missing_refs\":[]},{\"item_id\":\"R3\",\"display_name\":\"외톨이\",\"missing_refs\":[]},{\"item_id\":\"R4\",\"display_name\":\"새것\",\"missing_refs\":[]}],\"prev_doc_id\":null,\"next_doc_id\":\"LWA-SCN-001\",\"missing_refs\":[],\"project_name\":\"웹 시험\"}"
+ },
+ "doc_scn": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"type\":\"document\",\"doc_id\":\"LWA-SCN-001\",\"doc_type\":\"SCN\",\"stage\":3,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{},\"trashed_at\":null,\"body\":\"---\\ndoc_id: LWA-SCN-001\\ntype: SCN\\ntitle: 시나리오\\nstatus: draft\\nupstream: [LWA-PRD-001]\\n---\\n# 시나리오\\n\\n## 1. 페르소나\\n\\n#### P1 사람\\n누구.\\n\\n## 2. 시나리오\\n\\n#### S1 첫 흐름\\n근거: [[LWA-PRD-001#R1]] · [[LWA-PRD-001#R2]] · [[LWA-PRD-009#R1]]\\n\\n#### S2 둘째 흐름\\n근거: [[LWA-PRD-001#R1]] · [[#P1]]\\n\\n## 3. 대응표\\n\\n표에서 [[LWA-PRD-001#R1]] · [[LWA-PRD-001]]\\n\",\"commit_hash\":\"H\",\"convention_error_detail\":null,\"items\":[{\"item_id\":\"P1\",\"display_name\":\"사람\",\"missing_refs\":[]},{\"item_id\":\"S1\",\"display_name\":\"첫 흐름\",\"missing_refs\":[\"LWA-PRD-009#R1\"]},{\"item_id\":\"S2\",\"display_name\":\"둘째 흐름\",\"missing_refs\":[]}],\"prev_doc_id\":\"LWA-PRD-001\",\"next_doc_id\":\"LWA-UC-001\",\"missing_refs\":[\"LWA-PRD-009#R1\"],\"project_name\":\"웹 시험\"}"
+ },
+ "docs": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"type\":\"document\",\"doc_id\":\"LWA-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"draft\",\"current_version_no\":2,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null},{\"type\":\"document\",\"doc_id\":\"LWA-SCN-001\",\"doc_type\":\"SCN\",\"stage\":3,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{\"broken_ref\":1},\"trashed_at\":null},{\"type\":\"document\",\"doc_id\":\"LWA-UC-001\",\"doc_type\":\"UC\",\"stage\":4,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null}]"
+ },
+ "docs_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "docs_plus_space": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.status — String should match pattern '^(draft|approved)$'\",\"errors\":[{\"loc\":\"query.status\",\"msg\":\"String should match pattern '^(draft|approved)$'\"}]}"
+ },
+ "docs_stage0": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.stage — Input should be greater than or equal to 1\",\"errors\":[{\"loc\":\"query.stage\",\"msg\":\"Input should be greater than or equal to 1\"}]}"
+ },
+ "docs_stage12": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.stage — Input should be less than or equal to 11\",\"errors\":[{\"loc\":\"query.stage\",\"msg\":\"Input should be less than or equal to 11\"}]}"
+ },
+ "docs_stage2": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"type\":\"document\",\"doc_id\":\"LWA-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"draft\",\"current_version_no\":2,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null}]"
+ },
+ "docs_stage_empty": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.stage — Input should be a valid integer, unable to parse string as an integer\",\"errors\":[{\"loc\":\"query.stage\",\"msg\":\"Input should be a valid integer, unable to parse string as an integer\"}]}"
+ },
+ "docs_stage_last_wins": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"type\":\"document\",\"doc_id\":\"LWA-SCN-001\",\"doc_type\":\"SCN\",\"stage\":3,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{\"broken_ref\":1},\"trashed_at\":null}]"
+ },
+ "docs_stage_text": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.stage — Input should be a valid integer, unable to parse string as an integer\",\"errors\":[{\"loc\":\"query.stage\",\"msg\":\"Input should be a valid integer, unable to parse string as an integer\"}]}"
+ },
+ "docs_status": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"type\":\"document\",\"doc_id\":\"LWA-PRD-001\",\"doc_type\":\"PRD\",\"stage\":2,\"status\":\"draft\",\"current_version_no\":2,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null},{\"type\":\"document\",\"doc_id\":\"LWA-SCN-001\",\"doc_type\":\"SCN\",\"stage\":3,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{\"broken_ref\":1},\"trashed_at\":null},{\"type\":\"document\",\"doc_id\":\"LWA-UC-001\",\"doc_type\":\"UC\",\"stage\":4,\"status\":\"draft\",\"current_version_no\":1,\"has_convention_error\":false,\"incomplete_warnings\":[],\"updated_at\":\"T\",\"last_author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"counts\":{\"broken_ref\":0},\"trashed_at\":null}]"
+ },
+ "docs_status_bad": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.status — String should match pattern '^(draft|approved)$'\",\"errors\":[{\"loc\":\"query.status\",\"msg\":\"String should match pattern '^(draft|approved)$'\"}]}"
+ },
+ "docs_two_errors": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.stage — Input should be less than or equal to 11\",\"errors\":[{\"loc\":\"query.stage\",\"msg\":\"Input should be less than or equal to 11\"},{\"loc\":\"query.status\",\"msg\":\"String should match pattern '^(draft|approved)$'\"}]}"
+ },
+ "downstream_prd": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"by_item\":{\"R1\":[{\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S1\",\"display_name\":\"첫 흐름\",\"raw_target\":\"\",\"is_missing\":false},{\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S2\",\"display_name\":\"둘째 흐름\",\"raw_target\":\"\",\"is_missing\":false},{\"doc_id\":\"LWA-SCN-001\",\"item_id\":null,\"display_name\":\"시나리오\",\"raw_target\":\"LWA-PRD-001#R1\",\"is_missing\":false}],\"R2\":[{\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S1\",\"display_name\":\"첫 흐름\",\"raw_target\":\"\",\"is_missing\":false}],\"(문서)\":[{\"doc_id\":\"LWA-SCN-001\",\"item_id\":null,\"display_name\":\"시나리오\",\"raw_target\":\"LWA-PRD-001\",\"is_missing\":false}]},\"by_document\":[{\"doc_id\":\"LWA-SCN-001\",\"title\":\"시나리오\",\"items\":[\"(문서)\",\"R1\",\"R2\"]}]}"
+ },
+ "downstream_scn": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"by_item\":{\"S1\":[{\"doc_id\":\"LWA-UC-001\",\"item_id\":\"UC-A1\",\"display_name\":\"첫 일\",\"raw_target\":\"\",\"is_missing\":false},{\"doc_id\":\"LWA-UC-001\",\"item_id\":\"UC-A2\",\"display_name\":\"둘째 일\",\"raw_target\":\"\",\"is_missing\":false}],\"S2\":[{\"doc_id\":\"LWA-UC-001\",\"item_id\":\"UC-A1\",\"display_name\":\"첫 일\",\"raw_target\":\"\",\"is_missing\":false}]},\"by_document\":[{\"doc_id\":\"LWA-UC-001\",\"title\":\"유스케이스\",\"items\":[\"S1\",\"S2\"]}]}"
+ },
+ "downstream_uc": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"by_item\":{},\"by_document\":[]}"
+ },
+ "file_empty": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"file  없음\",\"resource\":\"file\",\"id\":\"\"}"
+ },
+ "file_markdown": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"file 02-PRD/LWA-PRD-001.md 없음\",\"resource\":\"file\",\"id\":\"02-PRD/LWA-PRD-001.md\"}"
+ },
+ "file_none": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"file assets/x.png 없음\",\"resource\":\"file\",\"id\":\"assets/x.png\"}"
+ },
+ "file_other_project": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "file_outside": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"file ../../../../etc/passwd.png 없음\",\"resource\":\"file\",\"id\":\"../../../../etc/passwd.png\"}"
+ },
+ "file_outside_encoded": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"file ../../x.png 없음\",\"resource\":\"file\",\"id\":\"../../x.png\"}"
+ },
+ "file_readme": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"file README.md 없음\",\"resource\":\"file\",\"id\":\"README.md\"}"
+ },
+ "flags_bad_kind": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.kind — String should match pattern '^(broken_ref|convention_errors|incomplete)$'\",\"errors\":[{\"loc\":\"query.kind\",\"msg\":\"String should match pattern '^(broken_ref|convention_errors|incomplete)$'\"}]}"
+ },
+ "flags_broken": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"type\":\"broken_ref\",\"source\":{\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S1\",\"display_name\":\"첫 흐름\",\"raw_target\":\"\",\"is_missing\":false},\"raw_target\":\"LWA-PRD-009#R1\"}]"
+ },
+ "flags_errors": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[]"
+ },
+ "flags_incomplete": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[]"
+ },
+ "flags_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "flags_no_kind": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.kind — Field required\",\"errors\":[{\"loc\":\"query.kind\",\"msg\":\"Field required\"}]}"
+ },
+ "graph": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"nodes\":[{\"id\":\"LWA-PRD-001\",\"doc_id\":\"LWA-PRD-001\",\"item_id\":null,\"stage\":2,\"isolated\":false},{\"id\":\"LWA-SCN-001\",\"doc_id\":\"LWA-SCN-001\",\"item_id\":null,\"stage\":3,\"isolated\":false},{\"id\":\"LWA-UC-001\",\"doc_id\":\"LWA-UC-001\",\"item_id\":null,\"stage\":4,\"isolated\":true},{\"id\":\"LWA-PRD-001#G1\",\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"G1\",\"stage\":2,\"isolated\":true},{\"id\":\"LWA-PRD-001#R1\",\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R1\",\"stage\":2,\"isolated\":false},{\"id\":\"LWA-PRD-001#R2\",\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R2\",\"stage\":2,\"isolated\":false},{\"id\":\"LWA-PRD-001#R3\",\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R3\",\"stage\":2,\"isolated\":true},{\"id\":\"LWA-PRD-001#R4\",\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R4\",\"stage\":2,\"isolated\":true},{\"id\":\"LWA-SCN-001#P1\",\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"P1\",\"stage\":3,\"isolated\":false},{\"id\":\"LWA-SCN-001#S1\",\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S1\",\"stage\":3,\"isolated\":false},{\"id\":\"LWA-SCN-001#S2\",\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S2\",\"stage\":3,\"isolated\":false},{\"id\":\"LWA-UC-001#UC-A1\",\"doc_id\":\"LWA-UC-001\",\"item_id\":\"UC-A1\",\"stage\":4,\"isolated\":false},{\"id\":\"LWA-UC-001#UC-A2\",\"doc_id\":\"LWA-UC-001\",\"item_id\":\"UC-A2\",\"stage\":4,\"isolated\":false}],\"edges\":[{\"from\":\"LWA-SCN-001#S1\",\"to\":\"LWA-PRD-001#R1\",\"raw_target\":\"LWA-PRD-001#R1\",\"is_missing\":false},{\"from\":\"LWA-SCN-001#S1\",\"to\":\"LWA-PRD-001#R2\",\"raw_target\":\"LWA-PRD-001#R2\",\"is_missing\":false},{\"from\":\"LWA-SCN-001#S1\",\"to\":null,\"raw_target\":\"LWA-PRD-009#R1\",\"is_missing\":true},{\"from\":\"LWA-SCN-001#S2\",\"to\":\"LWA-PRD-001#R1\",\"raw_target\":\"LWA-PRD-001#R1\",\"is_missing\":false},{\"from\":\"LWA-SCN-001#S2\",\"to\":\"LWA-SCN-001#P1\",\"raw_target\":\"#P1\",\"is_missing\":false},{\"from\":\"LWA-SCN-001\",\"to\":\"LWA-PRD-001#R1\",\"raw_target\":\"LWA-PRD-001#R1\",\"is_missing\":false},{\"from\":\"LWA-SCN-001\",\"to\":\"LWA-PRD-001\",\"raw_target\":\"LWA-PRD-001\",\"is_missing\":false},{\"from\":\"LWA-UC-001#UC-A1\",\"to\":\"LWA-SCN-001#S1\",\"raw_target\":\"LWA-SCN-001#S1\",\"is_missing\":false},{\"from\":\"LWA-UC-001#UC-A1\",\"to\":\"LWA-SCN-001#S2\",\"raw_target\":\"LWA-SCN-001#S2\",\"is_missing\":false},{\"from\":\"LWA-UC-001#UC-A2\",\"to\":\"LWA-SCN-001#S1\",\"raw_target\":\"LWA-SCN-001#S1\",\"is_missing\":false}],\"project_name\":\"웹 시험\"}"
+ },
+ "graph_approved": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"nodes\":[],\"edges\":[],\"project_name\":\"웹 시험\"}"
+ },
+ "graph_bad_scope": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.scope — Input should be 'all' or 'approved'\",\"errors\":[{\"loc\":\"query.scope\",\"msg\":\"Input should be 'all' or 'approved'\"}]}"
+ },
+ "graph_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "item_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"item LWA-PRD-001#R9 없음\",\"resource\":\"item\",\"id\":\"LWA-PRD-001#R9\",\"available_items\":[\"G1\",\"R1\",\"R2\",\"R3\",\"R4\"]}"
+ },
+ "item_r1": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R1\",\"display_name\":\"첫 기능\",\"body\":\"#### R1 첫 기능\\n고친 설명.\\n\",\"doc_status\":\"draft\",\"doc_version_no\":2}"
+ },
+ "item_tilde": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"item LWA-PRD-001#R/1 없음\",\"resource\":\"item\",\"id\":\"LWA-PRD-001#R/1\",\"available_items\":[\"G1\",\"R1\",\"R2\",\"R3\",\"R4\"]}"
+ },
+ "refs_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"item LWA-SCN-001#S9 없음\",\"resource\":\"item\",\"id\":\"LWA-SCN-001#S9\"}"
+ },
+ "refs_r1": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R1\",\"upstream\":[],\"downstream\":[{\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S1\",\"display_name\":\"첫 흐름\",\"raw_target\":\"LWA-PRD-001#R1\",\"is_missing\":false},{\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S2\",\"display_name\":\"둘째 흐름\",\"raw_target\":\"LWA-PRD-001#R1\",\"is_missing\":false},{\"doc_id\":\"LWA-SCN-001\",\"item_id\":null,\"display_name\":\"시나리오\",\"raw_target\":\"LWA-PRD-001#R1\",\"is_missing\":false}]}"
+ },
+ "refs_s1": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"doc_id\":\"LWA-SCN-001\",\"item_id\":\"S1\",\"upstream\":[{\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R1\",\"display_name\":\"첫 기능\",\"raw_target\":\"LWA-PRD-001#R1\",\"is_missing\":false},{\"doc_id\":\"LWA-PRD-001\",\"item_id\":\"R2\",\"display_name\":\"둘째 기능\",\"raw_target\":\"LWA-PRD-001#R2\",\"is_missing\":false},{\"doc_id\":null,\"item_id\":null,\"display_name\":null,\"raw_target\":\"LWA-PRD-009#R1\",\"is_missing\":true}],\"downstream\":[{\"doc_id\":\"LWA-UC-001\",\"item_id\":\"UC-A1\",\"display_name\":\"첫 일\",\"raw_target\":\"LWA-SCN-001#S1\",\"is_missing\":false},{\"doc_id\":\"LWA-UC-001\",\"item_id\":\"UC-A2\",\"display_name\":\"둘째 일\",\"raw_target\":\"LWA-SCN-001#S1\",\"is_missing\":false}]}"
+ },
+ "versions_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"document LWA-PRD-404 없음\",\"resource\":\"document\",\"id\":\"LWA-PRD-404\"}"
+ },
+ "versions_prd": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"doc_id\":\"LWA-PRD-001\",\"version_no\":2,\"commit_hash\":\"H\",\"message\":\"R1 고침\",\"author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"created_at\":\"T\"},{\"doc_id\":\"LWA-PRD-001\",\"version_no\":1,\"commit_hash\":\"H\",\"message\":\"PRD\",\"author\":{\"kind\":\"agent\",\"user\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"instructed_by\":{\"id\":1,\"github_login\":\"local\",\"display_name\":\"local\"},\"via\":\"mcp\"},\"created_at\":\"T\"}]"
+ }
+}
