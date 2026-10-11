@@ -3,7 +3,7 @@
 //! 카드 L7 몫은 `mcp` 입구다. 웹(L9)·GitHub·밀린 커밋 처리(L11)는 그 카드가 갈래를 더한다.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
@@ -13,6 +13,7 @@ use sqlx::PgPool;
 
 use crate::account::model::UserRow;
 use crate::account::repo as account_repo;
+use crate::account::service::AccountService;
 use crate::clock;
 use crate::errors::Problem;
 use crate::markdown::parse_frontmatter;
@@ -20,11 +21,12 @@ use crate::project::repo as project_repo;
 use crate::project::service::{ProjectService, ServerRepos};
 use crate::pycompat::chars::is_digit;
 use crate::pycompat::re::compile;
+use crate::pycompat::repr::repr;
 use crate::reference::service::ReferenceService;
 use crate::spec::SpecService;
 use crate::types::{
-    Author, AuthorKind, DeletedItem, DocStatus, Document, Entry, RefEdge, SaveResult, TrashResult,
-    py_isoformat, spec_dir,
+    Author, AuthorKind, ChangedFile, DeletedItem, DocStatus, DocType, Document, Entry, RefEdge,
+    SaveResult, TrashResult, ValidateResult, Violation, py_isoformat, spec_dir, stage_of,
 };
 
 /// frontmatter의 `status:` 줄 — 첫 것 하나만 갈아 끼운다(파이썬 `_set_status`, `re.M`)
@@ -104,8 +106,8 @@ pub async fn wait_idle(limit: Duration) -> bool {
 
 /// SYNC-MS-017#pipeline.read_pending
 ///
-/// 저장소에 쓰기 전에 밀린 커밋을 먼저 읽는다(DEV-19). **쓰기 락 밖에서 부른다**.
-/// 밀린 것이 있으면 카드 L11(커밋 처리)까지 저장하지 않는다(사용자 결정 2026-10-08)
+/// 저장소에 쓰기 전에 밀린 커밋을 먼저 읽는다(DEV-19). **쓰기 락 밖에서 부른다** —
+/// 커밋 처리가 파일마다 저장(쓰기 락)을 부른다
 pub async fn read_pending(
     pool: &PgPool,
     repos: &ServerRepos,
@@ -137,9 +139,244 @@ pub async fn read_pending(
         }
         return Ok(0);
     }
-    Err(Problem::NotImplemented {
-        card: "L11".to_string(),
-    })
+    // 이미 읽기 락 안이다
+    Ok(process_commit(pool, repos, code, &head, true).await?.len() as i64)
+}
+
+/// SYNC-MS-017#pipeline.process_commit
+///
+/// 전체가 읽기 락 안이다 — git 입구의 push 뒤·따라잡기·`read_pending`이 한 줄로 선다(#194).
+/// `locked`는 이미 그 락을 쥔 부른 쪽이다. 파일 하나가 실패해도 다음 파일 — 실패가 있으면 처리 지점을 옮기지 않는다
+pub async fn process_commit(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    code: &str,
+    head: &str,
+    locked: bool,
+) -> Result<Vec<SaveResult>, Problem> {
+    let lock = read_lock(code);
+    let _held = if locked {
+        None
+    } else {
+        Some(lock.lock().await)
+    };
+    // 1. 처리 지점은 락 안에서 다시 읽는다 — 앞서 기다린 실행이 이미 따라잡아 놨을 수 있다
+    let (_, repo) = {
+        let mut c = pool.acquire().await?;
+        ProjectService { db: &mut c, repos }.get(code).await?
+    };
+    let last = repo.last_processed_commit.clone();
+    if last.as_deref() == Some(head) {
+        return Ok(Vec::new());
+    }
+    let workdir = PathBuf::from(&repo.workdir_path);
+    repos.git.fetch(&workdir).await?;
+    // 2. 이미 처리한 커밋이거나 그 조상이면 아무것도 안 한다 — 처리 지점을 뒤로 돌리지 않는다
+    if let Some(l) = last.as_deref().filter(|l| !l.is_empty())
+        && repos
+            .git
+            .rev_list_count(&workdir, &format!("{l}..{head}"))
+            .await?
+            == 0
+    {
+        return Ok(Vec::new());
+    }
+    let range = match last.as_deref().filter(|l| !l.is_empty()) {
+        Some(l) => format!("{l}..{head}"),
+        None => head.to_string(),
+    };
+    let mut files = repos
+        .git
+        .changed_files(&workdir, &range, "docs/specs/")
+        .await?;
+    // 3b. 파이썬 판 그대로 — 디렉터리 이름(`02-PRD`)으로 찾아 번호 붙은 디렉터리는 모두 99, 경로 순이 곧 단계 순
+    files.sort_by(|a, b| {
+        let key = |f: &ChangedFile| {
+            let parts = path_parts(&f.path);
+            let stage = if parts.len() > 3 {
+                stage_of(parts[2])
+            } else {
+                stage_of("")
+            };
+            (stage.unwrap_or(99), f.path.clone())
+        };
+        key(a).cmp(&key(b))
+    });
+    let mut results = Vec::new();
+    let mut failed: Vec<String> = Vec::new();
+    for f in &files {
+        match process_file(pool, repos, &workdir, code, f, head).await {
+            Ok(r) => results.extend(r),
+            Err(e) => {
+                tracing::warn!("process_commit {code} {}: {e}", f.path);
+                failed.push(f.path.clone());
+            }
+        }
+    }
+    if failed.is_empty() {
+        let mut tx = pool.begin().await?;
+        let now = clock::now();
+        project_repo::advance_processed(&mut tx, repo.id, head, now).await?;
+        // 방금 head까지 처리했으니 뒤처짐은 0이다
+        project_repo::set_fetched(&mut tx, repo.id, now).await?;
+        tx.commit().await?;
+    }
+    Ok(results)
+}
+
+/// 파이썬 `Path(p).parts` — `/`로 가르고 빈 조각·`.`은 버린다
+fn path_parts(path: &str) -> Vec<&str> {
+    path.split('/')
+        .filter(|p| !p.is_empty() && *p != ".")
+        .collect()
+}
+
+/// 파이썬 `Path(p).stem` — 마지막 조각에서 마지막 확장자를 뗀다(맨 앞 `.`은 확장자가 아니다)
+fn path_stem(path: &str) -> &str {
+    let name = path_parts(path).last().copied().unwrap_or("");
+    match name.rfind('.') {
+        Some(i) if i > 0 && i < name.len() - 1 => &name[..i],
+        _ => name,
+    }
+}
+
+type Processed<'a> = std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<Vec<SaveResult>, Problem>> + Send + 'a>,
+>;
+
+/// `process_commit` 4 — 파일 하나. 삭제면 `mark_deleted`, 아니면 github 저장 + 파일 이름·디렉터리 위반 덧붙임.
+/// 상자에 담은 future다 — 저장 → 밀린 커밋 읽기 → 커밋 처리 → 저장이 서로 부르는 고리를 여기서 끊는다
+/// (그래야 저장을 따로 띄울 수 있다)
+fn process_file<'a>(
+    pool: &'a PgPool,
+    repos: &'a ServerRepos,
+    workdir: &'a Path,
+    code: &'a str,
+    f: &'a ChangedFile,
+    head: &'a str,
+) -> Processed<'a> {
+    Box::pin(process_file_inner(pool, repos, workdir, code, f, head))
+}
+
+async fn process_file_inner(
+    pool: &PgPool,
+    repos: &ServerRepos,
+    workdir: &Path,
+    code: &str,
+    f: &ChangedFile,
+    head: &str,
+) -> Result<Vec<SaveResult>, Problem> {
+    let doc_id = path_stem(&f.path).to_string();
+    let parts = path_parts(&f.path);
+    let dir_type = if parts.len() > 3 {
+        type_of_dir(parts[2])
+    } else {
+        String::new()
+    };
+    let user = {
+        let mut c = pool.acquire().await?;
+        AccountService { db: &mut c }
+            .user_for_commit(&f.author_email, &f.author_login)
+            .await?
+    };
+    let author = Author {
+        kind: AuthorKind::Human,
+        user,
+        instructed_by: None,
+        via: Entry::Github,
+    };
+    if f.status == "D" {
+        let mut tx = pool.begin().await?;
+        let document = match (SpecService { db: &mut tx }).get_document(&doc_id).await {
+            // 앱이 완전 삭제로 지운 문서의 삭제 커밋이거나 등록 전에 사라진 파일
+            Err(Problem::NotFound { .. }) => return Ok(Vec::new()),
+            Err(p) => return Err(p),
+            Ok(d) => d,
+        };
+        if document.summary.trashed_at.is_some() {
+            return Ok(Vec::new()); // 앱이 휴지통에 넣은 삭제 커밋 — 이미 반영돼 있다
+        }
+        let pks = SpecService { db: &mut tx }
+            .mark_deleted(&document, &f.commit_hash, &author)
+            .await?;
+        ReferenceService { db: &mut tx }.mark_missing(&pks).await?;
+        tx.commit().await?;
+        return Ok(Vec::new());
+    }
+    // 앱이 직접 민 커밋(저장·상태·되돌리기)은 이미 기록돼 있다 — 다시 저장하면 같은 커밋의 판이 둘
+    let known: Vec<String> = {
+        let mut c = pool.acquire().await?;
+        match (SpecService { db: &mut c }).list_versions(&doc_id).await {
+            Ok(vs) => vs.into_iter().map(|v| v.commit_hash).collect(),
+            Err(Problem::NotFound { .. }) => Vec::new(),
+            Err(p) => return Err(p),
+        }
+    };
+    if known.contains(&f.commit_hash) {
+        return Ok(Vec::new());
+    }
+    let body = repos.git.read(workdir, &f.path, head).await?;
+    // 파이썬 `DocType(dir_type)` — 모르는 디렉터리면 그 파일은 실패한다(사람 실수라 알린다)
+    if DocType::parse(&dir_type).is_none() {
+        return Err(Problem::Internal {
+            log: format!("{} is not a valid DocType", repr(&dir_type)),
+        });
+    }
+    let r = save_pipeline(
+        pool,
+        repos,
+        SaveInput {
+            entry: Entry::Github,
+            doc_id: Some(doc_id.clone()),
+            doc_type: Some(dir_type.clone()),
+            body: body.clone(),
+            expected_version: None,
+            project_code: Some(code.to_string()),
+            author,
+            message: f.message.clone(),
+            confirm_item_deletion: false,
+            reason: None,
+            restore: false,
+            read_first: false,
+            commit_hash: Some(f.commit_hash.clone()),
+        },
+    )
+    .await?;
+    let (fm, _) = parse_frontmatter(&body);
+    let shown = |k: &str| fm.get(k).map_or_else(|| "None".to_string(), |v| repr(v));
+    let mut extra = Vec::new();
+    if fm.get("doc_id").map(String::as_str) != Some(doc_id.as_str()) {
+        extra.push(Violation {
+            line: 2,
+            rule: "frontmatter.doc_id".into(),
+            message: format!("파일명 {doc_id} ≠ {}", shown("doc_id")),
+        });
+    }
+    if fm.get("type").map(String::as_str) != Some(dir_type.as_str()) {
+        extra.push(Violation {
+            line: 2,
+            rule: "frontmatter.doc_id".into(),
+            message: format!("디렉터리 {dir_type} ≠ type {}", shown("type")),
+        });
+    }
+    if !extra.is_empty() {
+        let mut tx = pool.begin().await?;
+        let mut spec = SpecService { db: &mut tx };
+        let vr = spec.validate(&body, &dir_type, Entry::Github, None).await?;
+        let id = spec.get_document(&doc_id).await?.summary.id;
+        let mut violations = vr.violations;
+        violations.extend(extra);
+        spec.mark_convention_error(
+            id,
+            &ValidateResult {
+                violations,
+                warnings: vr.warnings,
+            },
+        )
+        .await?;
+        tx.commit().await?;
+    }
+    Ok(vec![r])
 }
 
 /// SYNC-MS-017#pipeline.save_pipeline

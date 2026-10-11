@@ -540,3 +540,179 @@ async fn save_pipeline_github_saves_violations_and_pushes_only_the_demotion() {
         1
     );
 }
+
+fn scn_file(doc_id: &str, refs: &str) -> String {
+    format!(
+        "---\ndoc_id: {doc_id}\ntype: SCN\ntitle: 시나리오\nstatus: draft\nupstream: [LS-PRD-001]\n---\n# 시나리오\n\n## 1. 페르소나\n\n## 2. 시나리오\n\n#### S1 흐름\n근거: {refs}\n\n## 3. 대응표\n"
+    )
+}
+
+fn write(dir: &Path, path: &str, text: &str) {
+    let f = dir.join(path);
+    std::fs::create_dir_all(f.parent().expect("부모")).expect("폴더");
+    std::fs::write(f, text).expect("파일");
+    git(dir, &["add", path]);
+}
+
+fn commit_push(dir: &Path, message: &str) -> String {
+    git(dir, &["commit", "-q", "-m", message]);
+    git(dir, &["push", "-q", "origin", "HEAD:main"]);
+    git(dir, &["rev-parse", "HEAD"])
+}
+
+impl Env {
+    async fn read_pending(&self) -> i64 {
+        pipeline::read_pending(self.pool(), &self.repos, CODE, &self.user)
+            .await
+            .expect("밀린 커밋")
+    }
+
+    async fn processed(&self) -> String {
+        let mut c = self.conn().await;
+        sqlx::query_scalar::<_, String>("SELECT last_processed_commit FROM repositories")
+            .fetch_one(&mut *c)
+            .await
+            .expect("처리 지점")
+    }
+}
+
+#[tokio::test]
+async fn outside_push_becomes_documents_in_stage_order_and_deletions_break_refs() {
+    let e = env().await;
+    let out = e.outside();
+    write(
+        &out,
+        "docs/specs/03-SCN/LS-SCN-001.md",
+        &scn_file("LS-SCN-001", "[[LS-PRD-001#R1]]"),
+    );
+    write(
+        &out,
+        "docs/specs/02-PRD/LS-PRD-001.md",
+        &prd_file("draft", "설명."),
+    );
+    let head = commit_push(&out, "spec: PRD·SCN 한 커밋");
+    assert_eq!(e.read_pending().await, 2);
+    assert_eq!(e.processed().await, head);
+    let mut c = e.conn().await;
+    // 상위가 먼저 저장돼 하위의 참조가 미존재가 아니다
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            "SELECT count(*) FROM \"references\" WHERE is_missing"
+        )
+        .await,
+        0
+    );
+    assert_eq!(scalar_i64(&mut c, "SELECT count(*) FROM versions").await, 2);
+    // 같은 head를 다시 — 아무것도 안 한다
+    assert_eq!(e.read_pending().await, 0);
+    // 앱이 민 커밋은 거른다 — 판이 하나만 는다
+    let r = e
+        .create("UC", "# 유스케이스\n\n## 1. 액터\n\n## 2. 사용자 목표 수준 유스케이스\n\n## 3. 하위기능 수준 유스케이스\n\n## 4. 대응표\n")
+        .await;
+    assert_eq!(r.version_no, 1);
+    assert_eq!(scalar_i64(&mut c, "SELECT count(*) FROM versions").await, 3);
+    // 밖에서 PRD를 지운다 → 초안·file.deleted·하위 참조 끊김, 문서 행은 남는다
+    let out = e.outside();
+    git(&out, &["rm", "-q", "docs/specs/02-PRD/LS-PRD-001.md"]);
+    let del = commit_push(&out, "PRD 지움");
+    e.read_pending().await;
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            &format!("SELECT count(*) FROM documents WHERE doc_id = 'LS-PRD-001' AND convention_error_detail = 'file.deleted: {del}'")
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            "SELECT count(*) FROM \"references\" WHERE is_missing"
+        )
+        .await,
+        1
+    );
+    // 되살려 민다 → 오류가 풀리고 항목이 살아나고 참조가 다시 이어진다
+    write(
+        &out,
+        "docs/specs/02-PRD/LS-PRD-001.md",
+        &prd_file("draft", "다시 설명."),
+    );
+    commit_push(&out, "PRD 되살림");
+    e.read_pending().await;
+    assert_eq!(
+        scalar_i64(&mut c, "SELECT count(*) FROM documents WHERE doc_id = 'LS-PRD-001' AND NOT has_convention_error").await,
+        1
+    );
+    assert_eq!(
+        scalar_i64(&mut c, "SELECT count(*) FROM items WHERE is_deleted").await,
+        0
+    );
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            "SELECT count(*) FROM \"references\" WHERE is_missing"
+        )
+        .await,
+        0
+    );
+}
+
+#[tokio::test]
+async fn trashed_deletes_skip_and_name_mismatch_marks_and_unknown_dir_stalls() {
+    let e = env().await;
+    let out = e.outside();
+    write(
+        &out,
+        "docs/specs/02-PRD/LS-PRD-001.md",
+        &prd_file("draft", "설명."),
+    );
+    commit_push(&out, "PRD");
+    e.read_pending().await;
+    let mut c = e.conn().await;
+    // 휴지통 문서의 삭제 커밋 — 이미 반영돼 있다
+    sqlx::query("UPDATE documents SET trashed_at = now()")
+        .execute(&mut *c)
+        .await
+        .expect("휴지통");
+    git(&out, &["rm", "-q", "docs/specs/02-PRD/LS-PRD-001.md"]);
+    commit_push(&out, "trash(LS-PRD-001)");
+    e.read_pending().await;
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            "SELECT count(*) FROM documents WHERE has_convention_error"
+        )
+        .await,
+        0
+    );
+    // 파일 이름 ≠ frontmatter doc_id·type → 저장되고 규약 오류
+    write(
+        &out,
+        "docs/specs/03-SCN/LS-SCN-007.md",
+        &scn_file("LS-SCN-001", "[[#S1]]").replace("type: SCN", "type: UC"),
+    );
+    let h = commit_push(&out, "이름 어긋남");
+    e.read_pending().await;
+    assert_eq!(e.processed().await, h);
+    let detail: String = sqlx::query_scalar(
+        "SELECT convention_error_detail FROM documents WHERE doc_id = 'LS-SCN-007'",
+    )
+    .fetch_one(&mut *c)
+    .await
+    .expect("오류");
+    assert!(
+        detail.contains("frontmatter.doc_id: 파일명 LS-SCN-007 ≠ 'LS-SCN-001'"),
+        "{detail}"
+    );
+    assert!(
+        detail.contains("frontmatter.doc_id: 디렉터리 SCN ≠ type 'UC'"),
+        "{detail}"
+    );
+    // 모르는 디렉터리 — 그 파일이 실패해 처리 지점이 그대로다
+    write(&out, "docs/specs/BOGUS/LS-BOGUS-001.md", "x\n");
+    commit_push(&out, "모르는 디렉터리");
+    assert_eq!(e.read_pending().await, 0);
+    assert_eq!(e.processed().await, h);
+}
