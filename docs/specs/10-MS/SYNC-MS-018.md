@@ -398,7 +398,7 @@ pub async fn ask_item(pool: &PgPool, repos: &ServerRepos, llm: &Llm, doc_id: &st
 **처리** [[SYNC-MS-008#queries.ask_item]] 0~7과 같다 — 키·주소 없음 → `! LlmNotConfigured` · 소유 → 대화(내 것·이 프로젝트) → 한 트랜잭션에서 앞 대화(10턴)·턴 만들기·이 턴의 이미지·시작 맥락(제목·상태·판·항목 `ID 이름`·`[지금 보는 항목]`·`[첨부]` 줄, 본문 없음 — 보는 항목이 없으면 턴을 `not-found`로 닫고 `! NotFound(item)`) → 커밋 → 루프(비공개 도우미 `ask_loop` — [[#queries.ask_code]]가 같이 쓴다): `start` → 모델 스트림의 조각마다 `delta` → 도구 호출이 없으면 답 → 있으면 곁들인 말 `note` · 호출마다 `reason`의 `note` → [[#queries.ask_tool]] → `read`(본 것) · 여덟 번이나 120초가 넘으면 마무리 문장을 넣고 `tool_choice="none"`으로 한 번(답이 비면 `! LlmUnavailable("상한 뒤에도 답이 없다")`) → 턴을 답으로 닫고 커밋 → 로그 한 줄 → 답 속 맨 ID를 실제 항목과 맞춘 링크로(`answer_links`) → `answer` · 시작 뒤의 실패는 턴을 오류(`reason` 또는 오류 종류 이름, 300자)로 닫고 내보낸다. 지시문·마무리 문장·도구 설명은 파이썬 판 글 그대로
 
 **다른 점**
-- 파이썬은 async 제너레이터 — 여기는 시작 전 검사까지 마치고 `AskStream`(이벤트 통로 `mpsc::Receiver<Result<AskEvent, Problem>>`)을 돌려준다. 루프는 따로 띄운 작업이 돌며 `start`를 먼저 넣는다 — 시작 전 실패는 `Err`(상태 코드), 뒤의 실패는 통로의 `Err`(`error` 이벤트)
+- 파이썬은 async 제너레이터 — 여기는 시작 전 검사까지 마치고 `AskStream`(이벤트 통로 `mpsc::UnboundedReceiver<Result<AskEvent, Problem>>` — 글자 조각을 기다림 없이 넣는다)을 돌려준다. 루프는 따로 띄운 작업이 돌며 `start`를 먼저 넣는다 — 시작 전 실패는 `Err`(상태 코드), 뒤의 실패는 통로의 `Err`(`error` 이벤트)
 - `Problem::Internal`(파이썬의 `Problem` 밖 예외)은 통로를 닫아 스트림이 끊긴다 — 파이썬도 그 예외는 `error` 이벤트 없이 끊긴다
 - 받는 쪽이 끊기면(통로 닫힘) 다음 이벤트를 넣을 때 멈추고 턴을 `CancelledError`로 닫는다 — 파이썬은 응답 작업이 취소될 때 같은 이름으로 닫는다
 - `conversation_id`는 파이썬 정수(요청 본문)라 `i64` — int4 밖이면 대화 조회에서 `internal`(파이썬은 DB가 거절해 500)
@@ -423,7 +423,7 @@ pub async fn ask_tool(db: &mut PgConnection, repos: &ServerRepos, name: &str, ar
 
 **다른 점** 연결을 받는다(파이썬은 도구마다 세션) · `attachment_id`는 파이썬 `int(… or 0)`처럼 정수·정수 글자·실수(버림)·참거짓을 받고 그 밖은 `internal`(파이썬은 `ValueError`로 끊긴다)
 
-**호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[#queries.item_view]] · [[#queries.item_references_view]] · [[#queries.item_chain]] · [[#queries.document_list]] · [[#queries.document_view]] · [[#queries.code_view]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.describe_documents]] · [[SYNC-MS-021#ConversationService.attachment_text]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#CodeGraphService.read]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.item_function]] · [[SYNC-MS-022#codegraph.layer_table]] · [[SYNC-MS-022#codegraph.layers]]
+**호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[#queries.item_view]] · [[#queries.item_references_view]] · [[#queries.item_chain]] · [[#queries.document_list]] · [[#queries.document_view]] · [[#queries.code_view]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.describe_documents]] · [[SYNC-MS-014#SpecService.list_by_project]] · [[SYNC-MS-014#markdown.parse_frontmatter]](`find_code`의 층 — 클래스 명세 찾기) · [[SYNC-MS-021#ConversationService.attachment_text]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#CodeGraphService.read]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.item_function]] · [[SYNC-MS-022#codegraph.layer_table]] · [[SYNC-MS-022#codegraph.layers]]
 
 **테스트 관점** [[SYNC-MS-008#queries.ask_tool]]의 것 — 아홉 도구의 키 · `read_code` 여러 꼴과 후보 · `find_code` 상한과 층 · 다른 프로젝트 문서 → 「없음」 · 남의 프로젝트 → `not-found` · DB에 쓰지 않는다
 
