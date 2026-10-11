@@ -128,12 +128,22 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | L9 |
 | 완료 | 2026-10-11 · 브랜치 `card/L10-git-entrance`(31c9973 #365) · spec 9 + code 9 · `cargo test` 128(임시 자리 진짜 git — 광고·v2 판 판별·rpc·`server_origin`, 서버 시험은 진짜 git 클라이언트로 clone·main push·다른 가지·되감기 거절·지우기 거절·틀린 토큰) · 계약 `--target both --with-card L10` 800 통과·1 건너뜀 — L10 67 사례(401·404·405·415·Basic 해석·gzip)가 파이썬 판과 바이트로 같고 두 판에 진짜 clone·push · L3 두 판 차이 시험 씨앗 셋 · clippy(리눅스·윈도) · 윈도 `cargo check` · 워크플로 녹색 · `check_code` Rust 107/107 · `check_calls` 0 · 사람 확인(윈도 싱크독_로컬에 `git clone`·`git push`)은 따로 · 되먹임: 계약이 파이썬 판 버그 둘을 찾아 먼저 고쳤다 — #361(http-backend가 먼저 끝나면 약 1% 500) · #363(Basic 칸에 ASCII 아닌 글자면 500). 파이썬 3.12.13의 `b64decode(validate=True)`는 엄격(정규 `=`만, 남는 비트는 받음) — 로컬 3.12.3과 다르다 · 4장 미결(main 아닌 가지) 닫음 |
 
+#### L11 따라잡기·재구축 — 서버 저장소에 민 것이 문서가 된다
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-SCN-001#S7]] · [[SYNC-SCN-001#S10]] 6 · [[SYNC-UC-001#UC-G1]] · [[SYNC-UC-001#UC-G2]] · [[SYNC-UC-001#UC-S6]] · [[SYNC-UC-001#UC-A10]] · [[SYNC-SEQ-001#SEQ-2]] · [[SYNC-SEQ-001#SEQ-21]] · [[SYNC-SEQ-001#SEQ-29]] · [[SYNC-SEQ-001#SEQ-30]] · [[SYNC-INFRA-001]] 9.1 켜기 · 파이썬 #325(재구축이 지운 커밋에서 실패 — #366으로 먼저 고침) · 에이전트 판단 2026-10-11(사용자 목표 「끝까지」): 코드 그래프 만들기(`schedule_code_graph`)는 L12 — 커밋 처리·재구축·코드 올리기가 부르지 않는다 · 주기 확인은 300초 고정(설정 키는 다섯뿐) · 파이썬 `scheduler`의 둘은 pipeline에 · 옮기기 둘은 서버 저장뿐이라 늘 거절 · 작성자는 늘 로컬 사용자 |
+| 구현 | [[SYNC-MS-017#pipeline.read_pending]](밀린 커밋 처리까지) · [[SYNC-MS-017#pipeline.save_pipeline]](`github` 갈래 — 강등 커밋 포함) · [[SYNC-MS-017#pipeline.process_commit]] · [[SYNC-MS-017#pipeline.type_of_dir]] · [[SYNC-MS-017#pipeline.rebuild]] · [[SYNC-MS-017#pipeline.upload_code]] · [[SYNC-MS-017#pipeline.move_to_server]] · [[SYNC-MS-017#pipeline.move_to_github]] · [[SYNC-MS-017#pipeline.catch_up]] · [[SYNC-MS-017#pipeline.poll_loop]] · [[SYNC-MS-013#ProjectService.list_projects]] · [[SYNC-MS-013#ProjectService.repo_status]] · [[SYNC-MS-013#ProjectService.ensure_hook]] · [[SYNC-MS-013#ProjectService.sync_now]] · [[SYNC-MS-013#ProjectService.rebuild_index]] · [[SYNC-MS-013#ProjectService.init_project]](보관본 가져오기의 재구축) · [[SYNC-MS-014#SpecService.save]](재구축·상태 커밋) · [[SYNC-MS-014#SpecService.mark_deleted]] · [[SYNC-MS-014#SpecService.clear_index]] · [[SYNC-MS-014#SpecService.mark_convention_error]] · [[SYNC-MS-015#ReferenceService.clear]] · [[SYNC-MS-016#AccountService.user_for_commit]] · [[SYNC-MS-019#Git.changed_files]] · [[SYNC-MS-019#Git.log]] · [[SYNC-MS-019#Git.checkout]] · [[SYNC-MS-019#Git.sync_readme]] · [[SYNC-MS-012#runtime.run]](켜기에 따라잡기·주기 확인) · [[SYNC-MS-012#runtime.shutdown]] · pycompat `is_digit`(파이썬 `str.isdigit` 표) |
+| API | [[SYNC-API-001#GET/api/admin/repos]] · [[SYNC-API-001#POST/api/admin/repos/{code}/rebuild]] · [[SYNC-API-001#POST/api/admin/repos/{code}/hook]] · [[SYNC-API-001#POST/api/admin/repos/{code}/sync]] · [[SYNC-API-001#POST/api/admin/repos/{code}/move-to-server]] · [[SYNC-API-001#POST/api/admin/repos/{code}/move-to-github]] · [[SYNC-API-002#upload_code]] |
+| 테스트 | `cargo test`(시험 DB · 임시 자리 · 진짜 git — 밀린 커밋 처리·파일 삭제·되살리기·앱 커밋 거르기·강등 커밋·재구축·코드 올리기·따라잡기) · 계약 L11 — 두 판에 진짜 `git push`로 명세를 넣어 문서·버전·참조가 바이트로 같고, 관리 경로 여섯·`upload_code`·보관본 가져오기를 바이트로 |
+| 선행 | L10 · #325 |
+| 완료 | — |
+
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
-| L11 따라잡기·재구축 | 커밋 처리·재구축·주기 확인·관리 경로·기존 저장소 들이기 · `upload_code`(L10에서 넘어옴 — 올린 뒤 커밋 처리를 탄다) | L10 · #325 | L |
-| L12 코드 그래프 | 파이썬·TS·JS·Rust 추출 · 명세 대조 · 코드 화면 · `get_code_graph` | L11 | L |
+| L12 코드 그래프 | 파이썬·TS·JS·Rust 추출 · 명세 대조 · 코드 화면 · `get_code_graph` · 커밋 처리·재구축·코드 올리기가 그래프를 건다(`schedule_code_graph`·`build_code_graph` — L11에서 넘어옴) | L11 | L |
 | L13 커뮤니티·노드 | graphrs Louvain(seed 42) · 허브 라벨 · 노드 목록 | L12 | M |
 | L14 대화·질문 탭 | 대화·첨부(PDF) · 모델 스트리밍 · 질문 루프 · SSE | L8 · L12 | XL |
 | L15 번들 가져오기 | 파이썬 판 카드 BX(git 번들 가져오기)의 Rust 쪽 | L11 · BX | S |
@@ -141,7 +151,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | L17 속도·출시 판정 | 두 판을 같은 PC에서 잰다 — [[SYNC-PRD-001#R15]] 속도 목표와 「파이썬 판보다 느린 항목 없음」 | L14~L16 · L18 | M |
 | L18 새 MCP 프로토콜 | 2026-07-28 — 핸드셰이크 없는 요청 하나짜리 봉투 · `server/discover`·`subscriptions/listen`. 파이썬 SDK의 `_streamable_http_modern`을 옮긴다(사용자 결정 2026-10-08) | L3 | L |
 
-#325(재구축이 파일을 지운 커밋에서 실패)와 카드 BX는 파이썬 판에서 먼저 한다 — [[SYNC-CODE-001]].
+카드 BX는 파이썬 판에서 먼저 한다 — [[SYNC-CODE-001]]. #325(재구축이 파일을 지운 커밋에서 실패)는 #366으로 끝났다.
 
 ---
 
