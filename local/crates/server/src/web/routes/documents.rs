@@ -19,7 +19,7 @@ use crate::compat::pyvalue::PyValue;
 use crate::state::AppState;
 use crate::web::auth::current_user;
 use crate::web::problem::ApiProblem;
-use crate::web::schemas::{Diff, Document, Version};
+use crate::web::schemas::{Diff, Document, DownstreamView, Version};
 
 static VERSION_NO: LazyLock<Validator> = LazyLock::new(schemas::version_no);
 
@@ -113,4 +113,15 @@ pub async fn versions(
         });
     }
     Ok(Json(rows.iter().map(Version::from).collect()))
+}
+
+/// SYNC-API-001#GET/api/docs/{docId}/downstream
+pub async fn downstream(
+    State(state): State<AppState>,
+    Path(doc_id): Path<String>,
+) -> Result<Json<DownstreamView>, ApiProblem> {
+    let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+    let user = current_user(&mut c, &state).await?;
+    let d = queries::downstream_view(&mut c, &state.repos, &doc_id, &user).await?;
+    Ok(Json(DownstreamView::from(&d)))
 }

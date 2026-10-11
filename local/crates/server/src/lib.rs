@@ -18,6 +18,7 @@ use crate::web::guard::guard;
 use crate::web::problem::{method_not_allowed, panic_response};
 use crate::web::routes::account::{issue_token, list_tokens, me, revoke_token};
 use crate::web::routes::documents::diff;
+use crate::web::routes::documents::downstream;
 use crate::web::routes::documents::get_document;
 use crate::web::routes::documents::versions;
 use crate::web::routes::projects::{
@@ -47,6 +48,7 @@ pub fn app(state: AppState) -> Router {
         .route("/api/docs/{doc_id}", get(get_document))
         .route("/api/docs/{doc_id}/diff", get(diff))
         .route("/api/docs/{doc_id}/versions", get(versions))
+        .route("/api/docs/{doc_id}/downstream", get(downstream))
         .merge(mcp::router(state.clone()))
         .route("/specs/", get(spec_copy))
         .route("/specs/{*path}", get(spec_copy))
