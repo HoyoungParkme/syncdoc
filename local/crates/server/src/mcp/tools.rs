@@ -19,8 +19,8 @@ use syncdoc_core::pycompat::re::compile;
 use syncdoc_core::queries;
 use syncdoc_core::spec::{SUBTYPES, TYPES};
 use syncdoc_core::types::{
-    Author, AuthorKind, DocumentSummary, Entry, ItemRef, ProjectSummary, STAGES, SaveResult,
-    Storage, py_isoformat,
+    Author, AuthorKind, DocStatus, DocumentSummary, Entry, ItemRef, ProjectSummary, STAGES,
+    SaveResult, Storage, py_isoformat,
 };
 
 use crate::compat::pydantic::{Failure, Opts};
@@ -88,6 +88,7 @@ pub async fn call(
         "update_document" => update_document(state, user, &typed).await,
         "delete_document" => delete_document(state, user, &typed).await,
         "restore_document" => restore_document(state, user, &typed).await,
+        "change_status" => change_status(state, user, &typed).await,
         _ => Err(Problem::NotImplemented {
             card: tool.card.to_string(),
         }),
@@ -374,6 +375,31 @@ async fn restore_document(state: &AppState, user: &UserRow, a: &PyValue) -> Resu
     )
     .await?;
     Ok(save_json(&r))
+}
+
+/// SYNC-API-002#change_status
+///
+/// 웹 토글과 같은 `pipeline.change_status` — 다른 것은 작성자뿐(카드 BE). 답은 문서 요약(작성자 이름까지)
+async fn change_status(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let doc_id = arg_str(a, "doc_id");
+    let to = if arg_str(a, "to") == "approved" {
+        DocStatus::Approved
+    } else {
+        DocStatus::Draft
+    };
+    let author = agent_author(user);
+    pipeline::change_status(
+        &state.pool,
+        &state.repos,
+        &doc_id,
+        to,
+        &author,
+        arg_opt_str(a, "reason").as_deref(),
+    )
+    .await?;
+    let mut c = state.pool.acquire().await?;
+    let d = queries::document_view(&mut c, &state.repos, &doc_id, user).await?;
+    Ok(summary_json(&d.summary))
 }
 
 /// SYNC-API-002#get_template
