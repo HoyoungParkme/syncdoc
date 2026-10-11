@@ -581,7 +581,7 @@ impl Git {
         protocol: Option<&str>,
     ) -> Result<Vec<u8>, Problem> {
         let mut out = Vec::new();
-        if !protocol.is_some_and(|p| p.contains("version=2")) {
+        if protocol_version(protocol) != 2 {
             let line = format!("# service={service}\n");
             out.extend(format!("{:04x}{line}0000", line.len() + 4).into_bytes());
         }
@@ -615,6 +615,20 @@ impl Git {
     }
 }
 
+/// git `determine_protocol_version_server` — `:`로 나눈 `version=` 값 가운데 가장 큰 것(`0`·`1`·`2`만 센다)
+fn protocol_version(protocol: Option<&str>) -> u8 {
+    protocol
+        .unwrap_or("")
+        .split(':')
+        .filter_map(|item| match item.strip_prefix("version=")? {
+            "0" => Some(0),
+            "1" => Some(1),
+            "2" => Some(2),
+            _ => None,
+        })
+        .max()
+        .unwrap_or(0)
+}
 #[cfg(test)]
 mod tests {
     use super::*;

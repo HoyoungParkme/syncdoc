@@ -385,3 +385,77 @@ async fn fetch_sees_outside_push_without_touching_workdir_and_counts_range() {
         Err(Problem::Git { .. })
     ));
 }
+
+/// pkt-line 머리 넷을 건너 한 줄씩 — 광고를 읽는다
+fn pkt_lines(mut b: &[u8]) -> Vec<String> {
+    let mut out = Vec::new();
+    while b.len() >= 4 {
+        let n =
+            usize::from_str_radix(std::str::from_utf8(&b[..4]).expect("길이"), 16).expect("길이");
+        if n < 4 {
+            out.push(format!("{n:04x}"));
+            b = &b[4..];
+            continue;
+        }
+        out.push(String::from_utf8_lossy(&b[4..n]).into_owned());
+        b = &b[n..];
+    }
+    out
+}
+
+#[tokio::test]
+async fn advertise_refs_service_line_unless_v2() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, origin, work) = setup(tmp.path()).await;
+    // 빈 저장소 — 서비스 줄 + flush, 참조 없음(capabilities^{})
+    let empty = g
+        .advertise_refs(&origin, "git-upload-pack", None)
+        .await
+        .expect("광고");
+    let lines = pkt_lines(&empty);
+    assert_eq!(lines[..2], ["# service=git-upload-pack\n", "0000"]);
+    assert!(lines[2].starts_with("0000000000000000000000000000000000000000 capabilities^{}"));
+    g.commit_push(
+        &work,
+        "first",
+        &local_user(),
+        &files(&[("a.txt", "a\n")]),
+        &[],
+    )
+    .await
+    .expect("push");
+    let head = sh(&origin, &["rev-parse", "main"]);
+    for service in ["git-upload-pack", "git-receive-pack"] {
+        let out = g
+            .advertise_refs(&origin, service, None)
+            .await
+            .expect("광고");
+        let lines = pkt_lines(&out);
+        assert_eq!(lines[0], format!("# service={service}\n"));
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.starts_with(&format!("{head} refs/heads/main"))),
+            "{lines:?}"
+        );
+    }
+    // v2 — 서비스 줄 없이 `version 2`
+    for proto in ["version=2", "version=1:version=2", "x=y:version=2"] {
+        let out = g
+            .advertise_refs(&origin, "git-upload-pack", Some(proto))
+            .await
+            .expect("광고");
+        assert!(out.starts_with(b"000eversion 2\n"), "{proto}");
+    }
+    // v2가 아니다 — git이 세지 않는 값
+    for proto in ["version=20", "xversion=2", "version=1", "version=", ""] {
+        let out = g
+            .advertise_refs(&origin, "git-upload-pack", Some(proto))
+            .await
+            .expect("광고");
+        assert!(
+            out.starts_with(b"001e# service=git-upload-pack\n0000"),
+            "{proto}"
+        );
+    }
+}
