@@ -64,6 +64,7 @@ impl Env {
                 reason: None,
                 restore: false,
                 read_first: true,
+                commit_hash: None,
             },
         )
         .await
@@ -87,6 +88,7 @@ impl Env {
                 reason: None,
                 restore: false,
                 read_first: true,
+                commit_hash: None,
             },
         )
         .await

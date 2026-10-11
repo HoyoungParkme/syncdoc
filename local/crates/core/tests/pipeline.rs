@@ -71,6 +71,7 @@ impl Env {
                 reason: None,
                 restore: false,
                 read_first: true,
+                commit_hash: None,
             },
         )
         .await
@@ -99,6 +100,7 @@ impl Env {
                 reason: None,
                 restore: false,
                 read_first: true,
+                commit_hash: None,
             },
         )
         .await
@@ -280,6 +282,7 @@ async fn violations_leave_nothing_and_unknown_type_is_frontmatter_type() {
             reason: None,
             restore: false,
             read_first: true,
+            commit_hash: None,
         },
     )
     .await;

@@ -65,6 +65,7 @@ impl Env {
                 reason: None,
                 restore: false,
                 read_first: true,
+                commit_hash: None,
             },
         )
         .await
@@ -421,4 +422,121 @@ async fn list_projects_is_everyones_by_code() {
     .map(|(p, _)| p.code)
     .collect();
     assert_eq!(codes, ["AB", "LS"]);
+}
+
+fn prd_file(status: &str, text: &str) -> String {
+    format!(
+        "---\ndoc_id: LS-PRD-001\ntype: PRD\ntitle: 따라잡기 시험\nstatus: {status}\n---\n{}",
+        PRD.replace("설명.", text)
+    )
+}
+
+impl Env {
+    async fn github(&self, doc_id: &str, body: &str, commit: &str) -> SaveResult {
+        pipeline::save_pipeline(
+            self.pool(),
+            &self.repos,
+            SaveInput {
+                entry: Entry::Github,
+                doc_id: Some(doc_id.into()),
+                doc_type: Some("PRD".into()),
+                body: body.into(),
+                expected_version: None,
+                project_code: Some(CODE.into()),
+                author: Author {
+                    kind: AuthorKind::Human,
+                    user: self.user.clone(),
+                    instructed_by: None,
+                    via: Entry::Github,
+                },
+                message: "밖에서".into(),
+                confirm_item_deletion: false,
+                reason: None,
+                restore: false,
+                read_first: false,
+                commit_hash: Some(commit.into()),
+            },
+        )
+        .await
+        .expect("github 저장")
+    }
+}
+
+#[tokio::test]
+async fn save_pipeline_github_saves_violations_and_pushes_only_the_demotion() {
+    let e = env().await;
+    let head0 = git(&e.origin(), &["rev-parse", "main"]);
+    // 새 파일 — 위반(frontmatter 상태가 둘 밖)이 있어도 저장, 밀지 않는다, 처리 지점도 그대로
+    let broken = prd_file("weird", "설명.");
+    let r = e
+        .github(
+            "LS-PRD-001",
+            &broken,
+            "1111111111111111111111111111111111111111",
+        )
+        .await;
+    assert_eq!((r.version_no, r.next_step.clone()), (1, None));
+    assert_eq!(git(&e.origin(), &["rev-parse", "main"]), head0);
+    let mut c = e.conn().await;
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            "SELECT count(*) FROM documents WHERE has_convention_error"
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            &format!("SELECT count(*) FROM repositories WHERE last_processed_commit = '{head0}'")
+        )
+        .await,
+        1
+    );
+    // 완료 문서를 밖에서 완료 그대로 고침 → 초안과 강등 커밋 하나(등록한 사람), 상태 변경 행에 그 해시
+    sqlx::query("UPDATE documents SET status = 'approved'")
+        .execute(&mut *c)
+        .await
+        .expect("완료로");
+    let r = e
+        .github(
+            "LS-PRD-001",
+            &prd_file("approved", "고친 설명."),
+            "2222222222222222222222222222222222222222",
+        )
+        .await;
+    assert_eq!((r.version_no, r.status.as_str()), (2, "draft"));
+    let demoted = git(&e.origin(), &["rev-parse", "main"]);
+    assert_ne!(demoted, head0);
+    assert_eq!(
+        git(&e.origin(), &["log", "-1", "--format=%s%n%b%an"]),
+        "status(LS-PRD-001): approved → draft\n본문 수정으로 자동 강등\nhoyoung 님"
+    );
+    assert_eq!(
+        scalar_i64(
+            &mut c,
+            &format!("SELECT count(*) FROM status_changes WHERE commit_hash = '{demoted}'")
+        )
+        .await,
+        1
+    );
+    // 작성자가 스스로 frontmatter를 내려 민 것 → 강등 커밋 없음, 상태 변경 행 없음
+    sqlx::query("UPDATE documents SET status = 'approved'")
+        .execute(&mut *c)
+        .await
+        .expect("완료로");
+    let r = e
+        .github(
+            "LS-PRD-001",
+            &prd_file("draft", "또 고친 설명."),
+            "3333333333333333333333333333333333333333",
+        )
+        .await;
+    assert_eq!(r.status, "draft");
+    assert_eq!(git(&e.origin(), &["rev-parse", "main"]), demoted);
+    assert_eq!(
+        scalar_i64(&mut c, "SELECT count(*) FROM status_changes").await,
+        1
+    );
 }

@@ -306,6 +306,7 @@ async fn create_document(state: &AppState, user: &UserRow, a: &PyValue) -> Resul
             reason: None,
             restore: false,
             read_first: true,
+            commit_hash: None,
         },
     )
     .await?;
@@ -339,6 +340,7 @@ async fn update_document(state: &AppState, user: &UserRow, a: &PyValue) -> Resul
             reason: None,
             restore: false,
             read_first: true,
+            commit_hash: None,
         },
     )
     .await?;
