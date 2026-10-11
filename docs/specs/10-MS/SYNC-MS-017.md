@@ -16,7 +16,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-007, SYNC-MS-013, SYNC-MS-014, SYNC-MS-015, SYN
 
 **락** — 프로젝트 코드마다 둘, 프로세스 전역(파이썬 모듈 사전과 같다). **쓰기 락**은 저장을 한 줄로 세우고, **읽기 락**은 밀린 커밋 읽기(fetch)를 한 줄로 세운다. 차례는 읽기 → 쓰기 — `read_pending`은 쓰기 락 **밖**에서 부른다(같은 락이면 교착, [[SYNC-STD-004#DEV-19]]). 시간 제한은 없다. 프로젝트 만들기·지우기의 잠금([[SYNC-MS-013]])과는 따로다. 끌 때 [[SYNC-MS-012#runtime.shutdown]]이 쓰기 락이 다 풀리기를 기다린다.
 
-**카드 L7 몫은 `mcp` 입구다(2026-10-08)** — 에이전트의 `create_document`·`update_document`. **카드 L9가 상태 바꾸기·되돌리기·휴지통 넣기·되살리기·완전 삭제와 저장의 `web_status`·`web_revert`·되살림 갈래를 더했다(2026-10-11).** **카드 L11이 밀린 커밋 처리·재구축·코드 올리기·저장 방식 옮기기·따라잡기와 저장의 `github` 갈래를 더했다(2026-10-11)** — 서버 저장소에 git으로 민 것(L10 git 입구)이 문서가 된다. **코드 그래프 만들기(파이썬 `schedule_code_graph`)는 L12다** — 그 전에는 커밋 처리·재구축이 부르지 않는다.
+**카드 L7 몫은 `mcp` 입구다(2026-10-08)** — 에이전트의 `create_document`·`update_document`. **카드 L9가 상태 바꾸기·되돌리기·휴지통 넣기·되살리기·완전 삭제와 저장의 `web_status`·`web_revert`·되살림 갈래를 더했다(2026-10-11).** **카드 L11이 밀린 커밋 처리·재구축·코드 올리기·저장 방식 옮기기·따라잡기와 저장의 `github` 갈래를 더했다(2026-10-11)** — 서버 저장소에 git으로 민 것(L10 git 입구)이 문서가 된다. **카드 L12가 코드 그래프 걸기·만들기를 더했다(2026-10-11)** — 커밋 처리(5a)·재구축(10)·코드 올리기(커밋 처리를 거쳐)가 건다.
 
 **표기** — `→` 반환·결과, `!` 예외(`Problem`), `DB:` 테이블 접근, `git:` [[SYNC-MS-019]], `·` 같은 단계 안 구분.
 
@@ -44,6 +44,8 @@ upstream: [SYNC-DOM-004, SYNC-MS-007, SYNC-MS-013, SYNC-MS-014, SYNC-MS-015, SYN
 | [[#pipeline.move_to_github]] | GitHub 저장으로 되돌리기 — 켜지 않은 방식 |
 | [[#pipeline.catch_up]] | 밀린 커밋 따라잡기 |
 | [[#pipeline.poll_loop]] | 주기 확인 |
+| [[#pipeline.schedule_code_graph]] | 코드 그래프 만들기를 걸어 둔다 |
+| [[#pipeline.build_code_graph]] | 코드 그래프를 만든다 |
 
 ---
 
@@ -281,16 +283,16 @@ pub async fn process_commit(pool: &PgPool, repos: &ServerRepos, code: &str, head
    - `body = git.read(작업 사본, 경로, head)` · `dir_type`이 타입이 아니면 그 파일은 실패(파이썬 `DocType(dir_type)`의 `ValueError` — 처리 지점이 나아가지 않는다, 사람 실수라 알린다)
    - `r = save_pipeline(SaveInput { entry: github, doc_id, doc_type: dir_type, body, author, message: 커밋 메시지, commit_hash: 파일의 커밋, read_first: false, … })`
    - frontmatter의 `doc_id`가 파일 이름이 아니면 `Violation(2, "frontmatter.doc_id", "파일명 {doc_id} ≠ {repr(fm doc_id)}")` · `type`이 디렉터리가 아니면 `Violation(2, "frontmatter.doc_id", "디렉터리 {dir_type} ≠ type {repr(fm type)}")` · 하나라도 있으면 `vr = SpecService.validate(body, dir_type, github, 없음)` 뒤에 붙여 `SpecService.mark_convention_error` · 커밋 · `[r]`
-5. 실패가 없으면 `DB: repositories update last_processed_commit=head, synced_at=now, behind_by=0, fetched_at=now` 커밋
+5. 실패가 없으면 `DB: repositories update last_processed_commit=head, synced_at=now, behind_by=0, fetched_at=now` 커밋 · 5a. 처리 지점이 있었으면 `paths = git.changed_paths(작업 사본, "{처리 지점}..{head}")`(없었으면 빈 것) · `codegraph.touches_code(paths)`이거나 그래프 행이 없으면([[SYNC-MS-022#CodeGraphService.get]]) `schedule_code_graph(code, head)` — 명세만 바뀐 커밋은 그래프가 있으면 건너뛴다
 6. `→` 결과 모음
 
-**다른 점** 저장소 행 대신 코드를 받는다(파이썬은 행에서 코드를 찾는다) · 5a(코드 그래프)는 L12 · 작성자는 늘 로컬 사용자라 `author.unknown`이 없다([[SYNC-MS-016#AccountService.user_for_commit]])
+**다른 점** 저장소 행 대신 코드를 받는다(파이썬은 행에서 코드를 찾는다) · 작성자는 늘 로컬 사용자라 `author.unknown`이 없다([[SYNC-MS-016#AccountService.user_for_commit]])
 
 **예외** 1·2의 git 실패 · 파일 하나의 실패는 예외가 아니다(처리 지점만 멈춘다)
 
-**호출하는 것** [[#pipeline.read_lock]] · [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-019#Git.fetch]] · [[SYNC-MS-019#Git.rev_list_count]] · [[SYNC-MS-019#Git.changed_files]] · [[#pipeline.type_of_dir]] · [[SYNC-MS-019#Git.read]] · [[SYNC-MS-016#AccountService.user_for_commit]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.mark_deleted]] · [[SYNC-MS-015#ReferenceService.mark_missing]] · [[SYNC-MS-014#SpecService.list_versions]] · [[#pipeline.save_pipeline]] · [[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-014#SpecService.validate]] · [[SYNC-MS-014#SpecService.mark_convention_error]]
+**호출하는 것** [[#pipeline.read_lock]] · [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-019#Git.fetch]] · [[SYNC-MS-019#Git.rev_list_count]] · [[SYNC-MS-019#Git.changed_files]] · [[#pipeline.type_of_dir]] · [[SYNC-MS-019#Git.read]] · [[SYNC-MS-016#AccountService.user_for_commit]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.mark_deleted]] · [[SYNC-MS-015#ReferenceService.mark_missing]] · [[SYNC-MS-014#SpecService.list_versions]] · [[#pipeline.save_pipeline]] · [[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-014#SpecService.validate]] · [[SYNC-MS-014#SpecService.mark_convention_error]] · [[SYNC-MS-019#Git.changed_paths]] · [[SYNC-MS-022#codegraph.touches_code]] · [[SYNC-MS-022#CodeGraphService.get]] · [[#pipeline.schedule_code_graph]]
 
-**테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 밖에서 민 커밋 하나에 파일 둘(상위·하위) → 결과 둘, 하위의 참조가 미존재가 아니다 · 앱이 민 커밋은 거른다(버전이 늘지 않는다) · 파일 삭제 push → 초안·`file.deleted`·하위 참조 끊김 · 되살려 push → 오류가 풀리고 항목이 산다 · 휴지통 문서의 삭제 커밋 → 건너뛴다 · 파일 이름 ≠ frontmatter `doc_id` → 저장되고 규약 오류 · 모르는 디렉터리 → 처리 지점이 그대로 · 같은 head를 두 번 → 둘째는 `[]`
+**테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 코드 파일을 민 커밋 → 그래프가 생긴다 · 명세만 민 커밋 → 그래프가 있으면 다시 만들지 않는다 · 밖에서 민 커밋 하나에 파일 둘(상위·하위) → 결과 둘, 하위의 참조가 미존재가 아니다 · 앱이 민 커밋은 거른다(버전이 늘지 않는다) · 파일 삭제 push → 초안·`file.deleted`·하위 참조 끊김 · 되살려 push → 오류가 풀리고 항목이 산다 · 휴지통 문서의 삭제 커밋 → 건너뛴다 · 파일 이름 ≠ frontmatter `doc_id` → 저장되고 규약 오류 · 모르는 디렉터리 → 처리 지점이 그대로 · 같은 head를 두 번 → 둘째는 `[]`
 
 ---
 
@@ -327,15 +329,15 @@ pub async fn rebuild(conn: &mut PgConnection, repos: &ServerRepos, code: &str) -
    - 문서가 끝내 없으면 다음 · `ReferenceService.extract(문서, 지금 판, 본문, item_pks, upstream 낱말들)` · `vr = validate(본문, dir_type, github, 없음)` · `SpecService.mark_convention_error(문서, vr)` · 위반이 있으면 `convention_errors`에 `{doc_id, "rule: message" 줄들}` · `docs += 1` · `items += 문서 항목 수` · `references += 뽑은 수`
 7. `ReferenceService.resolve_missing(project, 없음)`
 8. `DB: repositories update last_processed_commit=head, synced_at=now, behind_by=0, fetched_at=now`
-9. 커밋 · `→ RebuildResult { docs, items, references, versions, convention_errors, readme_updated: false }`
+9. 커밋 · 10. `schedule_code_graph(code, head)` — 재구축은 늘 다시 만든다(UC-S8) · `→ RebuildResult { docs, items, references, versions, convention_errors, readme_updated: false }`
 
-**다른 점** 연결을 받는다 — 보관본 가져오기([[SYNC-MS-013#ProjectService.init_project]] 8)가 막 넣은 행이 있는 자기 저장점을 넘긴다(파이썬 `session`) · 10(코드 그래프)은 L12 · 작성자는 늘 로컬 사용자라 `author.unknown`이 없다
+**다른 점** 연결을 받는다 — 보관본 가져오기([[SYNC-MS-013#ProjectService.init_project]] 8)가 막 넣은 행이 있는 자기 저장점을 넘긴다(파이썬 `session`). 그때 10의 그래프 만들기는 아직 커밋되지 않은 프로젝트를 못 보고 그냥 끝날 수 있다 — 가져오기가 커밋 뒤에 한 번 더 건다 · 작성자는 늘 로컬 사용자라 `author.unknown`이 없다
 
 **예외** 어느 단계든 실패하면 되돌리고 `! RebuildFailed { reason }`(로그에 남긴다)
 
-**호출하는 것** [[#pipeline.write_lock]] · [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-019#Git.fetch]] · [[SYNC-MS-019#Git.checkout]] · [[#pipeline.type_of_dir]] · [[SYNC-MS-015#ReferenceService.clear]] · [[SYNC-MS-014#SpecService.clear_index]] · [[SYNC-MS-019#Git.list]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-019#Git.log]] · [[SYNC-MS-019#Git.read]] · [[SYNC-MS-016#AccountService.user_for_commit]] · [[SYNC-MS-014#SpecService.apply_status]] · [[SYNC-MS-014#SpecService.validate]] · [[SYNC-MS-014#SpecService.create]] · [[SYNC-MS-014#SpecService.detect_deleted_items]] · [[SYNC-MS-014#SpecService.save]] · [[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-015#ReferenceService.extract]] · [[SYNC-MS-014#SpecService.item_pks]] · [[SYNC-MS-014#SpecService.mark_convention_error]] · [[SYNC-MS-015#ReferenceService.resolve_missing]]
+**호출하는 것** [[#pipeline.write_lock]] · [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-019#Git.fetch]] · [[SYNC-MS-019#Git.checkout]] · [[#pipeline.type_of_dir]] · [[SYNC-MS-015#ReferenceService.clear]] · [[SYNC-MS-014#SpecService.clear_index]] · [[SYNC-MS-019#Git.list]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-019#Git.log]] · [[SYNC-MS-019#Git.read]] · [[SYNC-MS-016#AccountService.user_for_commit]] · [[SYNC-MS-014#SpecService.apply_status]] · [[SYNC-MS-014#SpecService.validate]] · [[SYNC-MS-014#SpecService.create]] · [[SYNC-MS-014#SpecService.detect_deleted_items]] · [[SYNC-MS-014#SpecService.save]] · [[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-015#ReferenceService.extract]] · [[SYNC-MS-014#SpecService.item_pks]] · [[SYNC-MS-014#SpecService.mark_convention_error]] · [[SYNC-MS-015#ReferenceService.resolve_missing]] · [[#pipeline.schedule_code_graph]]
 
-**테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) DB를 비운 뒤 재구축 → 문서·항목·참조·버전 수가 저장소와 같다 · 항목 pk가 전후로 같다 · `status(` 커밋 → 판이 늘지 않고 상태 변경 행 · 두 번 해도 상태 변경 행이 늘지 않는다 · 지웠다 되살린 문서가 있어도 끝난다 · 중간 실패 → DB가 재구축 전과 같다
+**테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 재구축 뒤 그래프가 생긴다 · DB를 비운 뒤 재구축 → 문서·항목·참조·버전 수가 저장소와 같다 · 항목 pk가 전후로 같다 · `status(` 커밋 → 판이 늘지 않고 상태 변경 행 · 두 번 해도 상태 변경 행이 늘지 않는다 · 지웠다 되살린 문서가 있어도 끝난다 · 중간 실패 → DB가 재구축 전과 같다
 
 ---
 
@@ -355,10 +357,10 @@ pub async fn upload_code(pool: &PgPool, repos: &ServerRepos, code: &str, files: 
 3. 경로마다(올릴 것 → 지울 것 차례) 거절 사유 — 빈 경로(파이썬 `strip` 뒤) `빈 경로` · `\` `역슬래시 — / 로 쓴다` · 절대 경로 `절대 경로` · `..` 조각 `상위 경로(..)` · `.git` 조각 `.git` · `docs/specs`로 시작 `명세 경로 — create_document·update_document로 쓴다` · 이름(소문자)이 비밀 꼴(파이썬 `CODE_DENY` + `fnmatch`) `비밀 꼴` · 그다음 거절되지 않은 올릴 것 가운데 NUL이 든 것 `글자가 아니다(이진)` · 하나라도 있으면 `! UploadPathRefused { paths: [{path, reason}] }`
 4. `read_pending(code, author.user)`
 5. 쓰기 락 안에서 `before = git.fetch(작업 사본)` · `commit = git.commit_push(작업 사본, message, author.user, files, delete)`
-6. `read_pending(code, author.user)` — 처리 지점을 이 커밋으로 옮긴다(명세 경로가 없으니 버전은 생기지 않는다)
+6. `read_pending(code, author.user)` — 처리 지점을 이 커밋으로 옮기고, 코드가 바뀌었으면 커밋 처리(5a)가 코드 그래프를 건다(명세 경로가 없으니 버전은 생기지 않는다)
 7. `→ UploadResult { commit, changed: commit != before, files: 파일 수, deleted: 지운 경로 수 }`
 
-**다른 점** 6의 코드 그래프는 L12 · 경로 규칙의 `PurePosixPath`는 파이썬 판처럼 `/`로 조각낸다(빈 조각·`.` 조각은 버린다 — 파이썬 `parts`), 절대 경로는 `/`로 시작
+**다른 점** 경로 규칙의 `PurePosixPath`는 파이썬 판처럼 `/`로 조각낸다(빈 조각·`.` 조각은 버린다 — 파이썬 `parts`), 절대 경로는 `/`로 시작
 
 **예외** `not-found` · `upload-too-large` · `upload-path-refused` · `push-failed` · git 실패
 
@@ -449,6 +451,49 @@ pub async fn poll_loop(pool: PgPool, repos: Arc<ServerRepos>, interval: Duration
 
 ---
 
+#### pipeline.schedule_code_graph 코드 그래프 만들기를 걸어 둔다
+
+**시그니처**
+```rust
+pub fn schedule_code_graph(pool: &PgPool, repos: &ServerRepos, code: &str, commit: &str)
+```
+
+근거: [[SYNC-MS-007#pipeline.schedule_code_graph]] · [[SYNC-UC-001#UC-S8]] 2b
+
+**처리** [[SYNC-MS-007#pipeline.schedule_code_graph]]와 같다 — 저장소 락 밖, 프로젝트마다 하나. 그 프로젝트의 만들기가 돌고 있으면 「다음」만 적고(나중 것이 이긴다) 돌아온다 · 아니면 따로 띄운 작업이 `build_code_graph(code, commit)`를 하고, 끝난 뒤 「다음」이 있으면 그것으로 한 번 더 — 없을 때까지
+
+**다른 점** 연결 풀과 저장소 자리를 받는다(파이썬은 모듈 전역)
+
+**호출하는 것** [[#pipeline.build_code_graph]]
+
+**테스트 관점** 돌고 있는 동안 둘을 걸면 마지막 것으로 한 번 더 만들고 끝난다 · 다른 프로젝트는 따로 돈다
+
+---
+
+#### pipeline.build_code_graph 코드 그래프를 만든다
+
+**시그니처**
+```rust
+pub async fn build_code_graph(pool: &PgPool, repos: &ServerRepos, code: &str, commit: &str)
+```
+
+근거: [[SYNC-MS-007#pipeline.build_code_graph]] · [[SYNC-UC-001#UC-S8]] · [[SYNC-INFRA-001]] 4.3
+
+**처리** [[SYNC-MS-007#pipeline.build_code_graph]]와 같은 차례
+1. `ProjectService.get(code)` — 없으면 그냥 끝(그새 해제됐다)
+2. 임시 폴더에 `git.archive(작업 사본, commit, 임시)` — 작업 사본을 건드리지 않는다
+3. `(source, raw) = codegraph.load(임시)` · `graph = codegraph.enrich(임시, codegraph.reduce(raw))` — 파일 읽기·파싱은 막히는 일이라 따로(블로킹 작업)에서
+4. `CodeGraphService.save(project, commit, source, graph)` 커밋 · 로그 「code graph code=… commit=… source=… functions=n calls=n elapsed=…」
+- 어느 단계든 실패하면 `CodeGraphService.fail(project, commit, 이유)` 커밋(그새 해제됐으면 남길 곳이 없다 — 삼킨다) · 경고 로그 — 배치라 옛 그래프를 두고 이유만 남긴다(UC-S8 2a). 이유는 `CodeGraphFailed`면 그 문장, 아니면 오류 문장
+
+**다른 점** 커뮤니티(3의 `communities`)는 카드 L13 — 그 전에는 `community`가 없고 `communities`가 빈 목록
+
+**호출하는 것** [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-019#Git.archive]] · [[SYNC-MS-022#codegraph.load]] · [[SYNC-MS-022#codegraph.reduce]] · [[SYNC-MS-022#codegraph.enrich]] · [[SYNC-MS-022#CodeGraphService.save]] · [[SYNC-MS-022#CodeGraphService.fail]]
+
+**테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 파이썬 코드를 민 커밋 → 함수·선·항목이 든 그래프 행, 출처 `server` · 커밋된 graph.json이 있으면 `repo` · 깨진 graph.json → 옛 그래프를 두고 `error` · 해제된 프로젝트 → 아무것도 안 한다
+
+---
+
 ## 3. 미결사항
 
-없음. 코드 그래프 만들기는 L12가 더한다 — [[SYNC-CODE-002]].
+없음. 커뮤니티는 카드 L13이 그래프 만들기에 더한다 — [[SYNC-CODE-002]].
