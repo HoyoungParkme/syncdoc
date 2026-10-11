@@ -194,12 +194,22 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | L4 · L11 · L15 |
 | 완료 | 2026-10-11 · 브랜치 `card/L16-local`(bbf27b4 #381) · spec 11 + code 8 · `cargo test` 197(진짜 PostgreSQL·git — 백업 꼴·암호·gpg와 서로 풀기·14개·되살리기와 되돌리기·옮기기 복사 확인·설정 값만 쓰기·자동 시작·rehome·mirror · 실행 파일 — 설정 저장 → 같은 포트로 다시 뜸 · 백업 → 되살리기 · 옮기기) · 계약 `--target both --with-card L16` 1150 통과 — L16: 파이썬 판 컨테이너에서 BR 차례로 뜬 gpg 백업을 새 Rust 판이 되살려 프로젝트 목록·문서 목록·문서·판 목록·diff가 바이트로 같고 이어서 셋째 판을 쓴다 · clippy · 워크플로 녹색(리눅스·윈도) · `check_code` Rust 197/197 · `check_calls` 0 · `check_ui` 14/14 · 브라우저(playwright)로 UI-13 저장 → 다시 켜기 → 지금 백업 → 되살리기 · 사람 확인(윈도 UI-13 이 PC·백업·옮기기·자동 시작·트레이 지금 백업)은 따로 · 되먹임: `tokio::select!` 안의 호출은 코드 그래프가 못 본다(runtime.run 「호출하는 것」에서 뺐다) · `Git`의 `clone`(작업 사본 받기)이 `Clone::clone`을 가린다 — `Clone::clone(&git)` · 화면 줄의 이름표가 한 글자씩 접혀 줄 꾸밈을 더했다 |
 
+#### L18 새 MCP 프로토콜 — 2026-07-28, 핸드셰이크 없는 요청 하나짜리 봉투
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-API-002]] 1장 · [[SYNC-INFRA-001]] 9.2·9.8 · 사용자 결정 2026-10-08(파이썬 SDK의 `_streamable_http_modern`을 옮긴다) · 에이전트 판단 2026-10-11(사용자 목표 「끝까지」): `MCP-Protocol-Version`이 핸드셰이크 판이 아니면(모르는 값까지) 새 입구 — 보안(Content-Type)·메서드(405 `Allow: POST`, 본문 없음 — 바깥 405 변환을 비켜 간다)·Accept·`json.loads`·알림 202·봉투(`JSONRPCRequest`/`JSONRPCNotification`)·머리 중복·분류 사다리(_meta·머리 줄·판)를 파이썬 판 차례·문장 그대로 · 디스패치는 핸드셰이크 경로와 같은 `dispatch`에 그 판의 표면 검증기와 고정 결과(`server/discover`·목록들 — 캐시 힌트·serverInfo 도장까지)를 파이썬 판에서 뽑아 쓴다(`cargo xtask mcp-tools`) · `tools/call` 결과에 `resultType`·serverInfo 도장 · 처리기의 그 밖의 예외는 `INTERNAL_ERROR` · 응답은 `json.dumps(…, separators=(",", ":"))`(ASCII)라 pycompat에 `dumps_compact` · 15초 안에 알림 없이 끝나면 JSON, 넘기면 SSE로 바꾸고 15초마다 `: ping` · `subscriptions/listen`은 확인 프레임 뒤 ping(앱이 사건을 내지 않는다), 상한 1024 · `Mcp-Param-*` 머리 검증은 옮기지 않는다 — 도구 스키마에 `x-mcp-header`가 없어 파이썬 판도 늘 통과한다 · 본문 JSON 깊이는 파이썬이 9987겹 언저리에서 한 겹쯤 흔들려 많은 쪽(9986까지 받음)을 따른다 |
+| 구현 | `mcp/modern.rs` · `mcp/dispatch.rs`(판별 표면·`server/discover`·`subscriptions/listen`·`tools/call` 꼴) · `mcp/decl.rs` · `xtask/py/export_mcp.py`(`results_modern`·`surface_modern`·봉투·도장) · `web/problem.rs` `Bare405` · pycompat `dumps_compact` |
+| API | [[SYNC-API-002]] 1장(전송·판) |
+| 테스트 | `cargo test`(머리 값 base64 표지 · 상태 표 · 멈춘 시계로 15초 넘긴 처리기의 SSE·ping·마지막 사건 · 듣기 확인 프레임·ping·자리 돌려주기) · 계약 L18 — 사례 표 69(입구·알림·봉투·머리 중복·사다리·문지기·표면·처리기·목록·`tools/call`·듣기 첫 프레임)가 파이썬 판과 바이트로 같고, 무작위 차이 시험(씨앗 셋 × 1500)과 JSON 깊이 경계(한 겹 안, 경계 ±3 바이트 같음) |
+| 선행 | L3 |
+| 완료 | — |
+
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
 | 카드 | 하는 일 | 선행 | 크기 |
 |---|---|---|---|
 | L17 속도·출시 판정 | 두 판을 같은 PC에서 잰다 — [[SYNC-PRD-001#R15]] 속도 목표와 「파이썬 판보다 느린 항목 없음」 | L14~L16 · L18 | M |
-| L18 새 MCP 프로토콜 | 2026-07-28 — 핸드셰이크 없는 요청 하나짜리 봉투 · `server/discover`·`subscriptions/listen`. 파이썬 SDK의 `_streamable_http_modern`을 옮긴다(사용자 결정 2026-10-08) | L3 | L |
 
 카드 BX는 파이썬 판에서 먼저 했다 — [[SYNC-CODE-001]](#376). #325(재구축이 파일을 지운 커밋에서 실패)는 #366으로 끝났다.
 
@@ -224,7 +234,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 **돌리는 법** — `cd contract && uv run pytest --target both`(기본). 파이썬 판은 지금 작업 트리로 이미지를 만들어 띄우고, Rust 판은 `local/`을 빌드해 띄운다(`cargo xtask pg-fetch` 먼저). 시험마다 그 기능을 닫는 카드를 적는다(`@pytest.mark.card("L3")`) — 파이썬 판은 전부 돌고, Rust 판은 이 문서의 완료란이 찬 카드만 돈다(나머지는 건너뜀으로 센다). 카드를 끝내기 전 확인은 `--with-card L3`. **두 판 차이 시험**(카드 L3~)은 같은 무작위 사례(씨앗 고정)를 두 판에 보내 상태·머리·본문을 바이트로 비교한다 — 두 판이 다 떠 있을 때(`--target both`)만 돈다.
 
-**계약 밖** — API-001에 없는 프레임워크 동작은 두 판이 달라도 된다(사용자 결정 2026-10-07): 끝 슬래시 리다이렉트(307) · `/docs`·`/redoc`·`/openapi.json` · GET 경로의 HEAD · Range(206) · ETag 값의 꼴 · Host 머리 없는 요청 · 응답의 `date`·`server`·`connection` 머리와 본문을 나눠 보내는 꼴(chunked·content-length). **Rust 판만 가진 것** — `/api/local*`(이 PC·백업, 카드 L16 — 파이썬 판은 없는 경로)는 비교하지 않는다. 대신 계약 L16이 파이썬 판의 백업을 Rust 판이 되살린 결과를 비교한다. 화면과 에이전트는 이것들을 쓰지 않는다. **MCP-Protocol-Version 머리가 핸드셰이크 판(2024-11-05~2025-11-25)이 아닌 요청**도 L18까지 계약 밖이다(사용자 결정 2026-10-08).
+**계약 밖** — API-001에 없는 프레임워크 동작은 두 판이 달라도 된다(사용자 결정 2026-10-07): 끝 슬래시 리다이렉트(307) · `/docs`·`/redoc`·`/openapi.json` · GET 경로의 HEAD · Range(206) · ETag 값의 꼴 · Host 머리 없는 요청 · 응답의 `date`·`server`·`connection` 머리와 본문을 나눠 보내는 꼴(chunked·content-length). **Rust 판만 가진 것** — `/api/local*`(이 PC·백업, 카드 L16 — 파이썬 판은 없는 경로)는 비교하지 않는다. 대신 계약 L16이 파이썬 판의 백업을 Rust 판이 되살린 결과를 비교한다. 화면과 에이전트는 이것들을 쓰지 않는다. 새 프로토콜(2026-07-28)의 본문 JSON 깊이의 정확한 경계는 파이썬 판이 한 겹쯤 흔들려 바이트 비교 밖이다 — 계약 L18은 두 판 경계가 한 겹 안인지와 경계 ±3에서 같은지를 본다(카드 L18). 15초를 넘기는 처리기의 SSE 바꿈은 도구가 그만큼 걸리지 않아 계약에서 닿지 않는다 — `cargo test`의 멈춘 시계로 본다.
 
 **명세 엔진**(카드 L5)은 HTTP로 닿기 전이라 계약 시험 대신 정답 파일(`cargo test`)과 `cargo xtask spec-diff`(두 판에 같은 본문을 돌려 바이트 비교)로 맞춘다 — 엔진을 고치면 둘 다 돌린다.
 
