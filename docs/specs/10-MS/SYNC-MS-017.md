@@ -315,7 +315,7 @@ pub fn type_of_dir(name: &str) -> String
 
 **시그니처**
 ```rust
-pub async fn rebuild(conn: &mut PgConnection, repos: &ServerRepos, code: &str) -> Result<RebuildResult, Problem>
+pub async fn rebuild(conn: &mut PgConnection, pool: &PgPool, repos: &ServerRepos, code: &str) -> Result<RebuildResult, Problem>
 ```
 
 근거: [[SYNC-MS-007#pipeline.rebuild]] · [[SYNC-SEQ-001#SEQ-21]] · [[SYNC-UC-001#UC-S6]]
@@ -329,9 +329,9 @@ pub async fn rebuild(conn: &mut PgConnection, repos: &ServerRepos, code: &str) -
    - 문서가 끝내 없으면 다음 · `ReferenceService.extract(문서, 지금 판, 본문, item_pks, upstream 낱말들)` · `vr = validate(본문, dir_type, github, 없음)` · `SpecService.mark_convention_error(문서, vr)` · 위반이 있으면 `convention_errors`에 `{doc_id, "rule: message" 줄들}` · `docs += 1` · `items += 문서 항목 수` · `references += 뽑은 수`
 7. `ReferenceService.resolve_missing(project, 없음)`
 8. `DB: repositories update last_processed_commit=head, synced_at=now, behind_by=0, fetched_at=now`
-9. 커밋 · 10. `schedule_code_graph(code, head)` — 재구축은 늘 다시 만든다(UC-S8) · `→ RebuildResult { docs, items, references, versions, convention_errors, readme_updated: false }`
+9. 커밋 · 10. `schedule_code_graph(pool, repos, code, head)` — 재구축은 늘 다시 만든다(UC-S8) · `→ RebuildResult { docs, items, references, versions, convention_errors, readme_updated: false }`
 
-**다른 점** 연결을 받는다 — 보관본 가져오기([[SYNC-MS-013#ProjectService.init_project]] 8)가 막 넣은 행이 있는 자기 저장점을 넘긴다(파이썬 `session`). 그때 10의 그래프 만들기는 아직 커밋되지 않은 프로젝트를 못 보고 그냥 끝날 수 있다 — 가져오기가 커밋 뒤에 한 번 더 건다 · 작성자는 늘 로컬 사용자라 `author.unknown`이 없다
+**다른 점** 연결을 받는다 — 보관본 가져오기([[SYNC-MS-013#ProjectService.init_project]] 8)가 막 넣은 행이 있는 자기 저장점을 넘긴다(파이썬 `session`). 그때 10의 그래프 만들기는 아직 커밋되지 않은 프로젝트를 못 보고 그냥 끝날 수 있다 — 가져오기가 커밋 뒤에 한 번 더 건다 · 연결 풀도 받는다 — 연결은 트랜잭션이라 따로 띄운 그래프 만들기에 줄 수 없다 · 작성자는 늘 로컬 사용자라 `author.unknown`이 없다
 
 **예외** 어느 단계든 실패하면 되돌리고 `! RebuildFailed { reason }`(로그에 남긴다)
 

@@ -340,7 +340,7 @@ classDiagram
     class ProjectService {
         +db: PgConnection
         +repos: ServerRepos
-        +init_project(code, name, user, import_existing, storage) ProjectRow
+        +init_project(pool, code, name, user, import_existing, storage) ProjectRow
         +delete_project(code, user)
         +get(code) ProjectRow
         +get_owned(code, user) ProjectRow
@@ -592,12 +592,14 @@ classDiagram
         +purge_document(pool, repos, doc_id, author)
         +process_commit(pool, repos, code, head, locked) Vec~SaveResult~
         +type_of_dir(name) String
-        +rebuild(conn, repos, code) RebuildResult
+        +rebuild(conn, pool, repos, code) RebuildResult
         +upload_code(pool, repos, code, files, delete, message, author) UploadResult
         +move_to_server(pool, repos, code, user) MoveResult
         +move_to_github(pool, repos, code, user, remote_url) MoveResult
         +catch_up(pool, repos) Vec~SaveResult~
         +poll_loop(pool, repos, interval)
+        +schedule_code_graph(pool, repos, code, commit)
+        +build_code_graph(pool, repos, code, commit)
     }
     class SaveInput {
         +Entry entry
