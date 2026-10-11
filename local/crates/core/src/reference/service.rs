@@ -222,4 +222,15 @@ impl ReferenceService<'_> {
             .map(edge)
             .collect())
     }
+
+    /// SYNC-MS-015#ReferenceService.count_downstream
+    pub async fn count_downstream(
+        &mut self,
+        item_pks: &[i32],
+    ) -> Result<HashMap<i32, i64>, Problem> {
+        if item_pks.is_empty() {
+            return Ok(HashMap::new());
+        }
+        Ok(repo::count_to_items(&mut *self.db, item_pks).await?)
+    }
 }
