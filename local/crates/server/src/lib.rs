@@ -17,6 +17,7 @@ use crate::state::AppState;
 use crate::web::guard::guard;
 use crate::web::problem::{method_not_allowed, panic_response};
 use crate::web::routes::account::{issue_token, list_tokens, me, revoke_token};
+use crate::web::routes::documents::change_status;
 use crate::web::routes::documents::diff;
 use crate::web::routes::documents::downstream;
 use crate::web::routes::documents::get_document;
@@ -67,6 +68,7 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/api/docs/{doc_id}/restore", post(restore_document))
         .route("/api/docs/{doc_id}/purge", post(purge_document))
+        .route("/api/docs/{doc_id}/status", post(change_status))
         .merge(mcp::router(state.clone()))
         .route("/specs/", get(spec_copy))
         .route("/specs/{*path}", get(spec_copy))

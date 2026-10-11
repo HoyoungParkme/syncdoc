@@ -4,8 +4,9 @@
 use std::sync::LazyLock;
 
 use axum::Json;
+use axum::body::Bytes;
 use axum::extract::{Path, RawQuery, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use num_bigint::BigInt;
 use syncdoc_core::account::model::UserRow;
@@ -15,18 +16,21 @@ use syncdoc_core::pipeline;
 use syncdoc_core::project::service::ProjectService;
 use syncdoc_core::queries;
 use syncdoc_core::spec::SpecService;
-use syncdoc_core::types::{ApiAuthor, Author, AuthorKind, Entry};
+use syncdoc_core::types::{ApiAuthor, Author, AuthorKind, DocStatus, Entry};
 
 use crate::compat::fastapi::{self, schemas};
 use crate::compat::pydantic::Validator;
-use crate::compat::pyvalue::PyValue;
+use crate::compat::pyvalue::{PyStr, PyValue};
 use crate::state::AppState;
 use crate::web::auth::current_user;
 use crate::web::problem::ApiProblem;
-use crate::web::schemas::{Diff, Document, DownstreamView, SaveResult, TrashResult, Version};
+use crate::web::schemas::{
+    Diff, Document, DocumentSummary, DownstreamView, SaveResult, TrashResult, Version,
+};
 
 static VERSION_NO: LazyLock<Validator> = LazyLock::new(schemas::version_no);
 static FLAG: LazyLock<Validator> = LazyLock::new(schemas::flag);
+static CHANGE_STATUS: LazyLock<Validator> = LazyLock::new(schemas::change_status);
 
 /// SYNC-API-001#GET/api/docs/{docId}
 pub async fn get_document(
@@ -197,4 +201,46 @@ pub async fn purge_document(
     )
     .await?;
     Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+/// 검증을 지난 본문의 필드
+fn field<'a>(v: &'a PyValue, name: &str) -> Option<&'a PyValue> {
+    v.as_dict().and_then(|d| d.get(&PyStr::from(name)))
+}
+
+/// SYNC-API-001#POST/api/docs/{docId}/status
+///
+/// 토글 — 완료로 올릴 때 규약 오류·미완성·끊어진 참조가 있으면 `status-blocked`(UC-H8 1a). 답은 문서 요약
+pub async fn change_status(
+    State(state): State<AppState>,
+    Path(doc_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<DocumentSummary>, ApiProblem> {
+    let body = fastapi::read_body(&headers, &body)?;
+    let user = {
+        let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+        current_user(&mut c, &state).await?
+    };
+    let req = fastapi::body_model(&body, &CHANGE_STATUS)?;
+    let to = match field(&req, "to") {
+        Some(PyValue::Str(PyStr::Utf8(s))) if s == "approved" => DocStatus::Approved,
+        _ => DocStatus::Draft,
+    };
+    let reason = match field(&req, "reason") {
+        Some(PyValue::Str(PyStr::Utf8(s))) => Some(s.clone()),
+        _ => None,
+    };
+    let d = pipeline::change_status(
+        &state.pool,
+        &state.repos,
+        &doc_id,
+        to,
+        &human(&user, Entry::WebStatus),
+        reason.as_deref(),
+    )
+    .await?;
+    let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+    let v = queries::document_view(&mut c, &state.repos, &d.summary.doc_id, &user).await?;
+    Ok(Json(DocumentSummary::from(&v.summary)))
 }
