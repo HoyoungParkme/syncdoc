@@ -1,0 +1,504 @@
+{
+ "broken_calls": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"graph\":{\"commit_hash\":\"H\",\"source\":\"repo\",\"built_at\":\"T\",\"error\":\"h: graph.json 형식\",\"function_count\":10},\"edges\":[{\"from\":\"LCG-MS-001#svc.get\",\"to\":\"LCG-MS-001#svc.helper\",\"status\":\"same\"},{\"from\":\"LCG-MS-001#svc.main\",\"to\":\"LCG-MS-001#svc.helper\",\"status\":\"same\"},{\"from\":\"LCG-MS-001#svc.main\",\"to\":\"LCG-MS-001#svc.other\",\"status\":\"spec_only\"},{\"from\":\"LCG-MS-001#svc.rs_entry\",\"to\":\"LCG-MS-001#svc.helper\",\"status\":\"spec_only\"}]}"
+ },
+ "broken_source": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"path\":\"app/svc.py\",\"start\":11,\"end\":13,\"commit_hash\":\"H\",\"text\":\"def helper():\\n    \\\"\\\"\\\"LCG-MS-001#svc.helper\\\"\\\"\\\"\\n    return 1\",\"truncated\":false}"
+ },
+ "calls": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"graph\":{\"commit_hash\":\"H\",\"source\":\"repo\",\"built_at\":\"T\",\"error\":null,\"function_count\":10},\"edges\":[{\"from\":\"LCG-MS-001#svc.get\",\"to\":\"LCG-MS-001#svc.helper\",\"status\":\"same\"},{\"from\":\"LCG-MS-001#svc.main\",\"to\":\"LCG-MS-001#svc.helper\",\"status\":\"same\"},{\"from\":\"LCG-MS-001#svc.main\",\"to\":\"LCG-MS-001#svc.other\",\"status\":\"spec_only\"},{\"from\":\"LCG-MS-001#svc.rs_entry\",\"to\":\"LCG-MS-001#svc.helper\",\"status\":\"spec_only\"}]}"
+ },
+ "calls_none": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"graph\":null,\"edges\":[]}"
+ },
+ "calls_other_project": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "doc_ms": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"graph\":{\"commit_hash\":\"H\",\"source\":\"repo\",\"built_at\":\"T\",\"error\":null,\"function_count\":10},\"doc_id\":\"LCG-MS-001\",\"item_id\":null,\"is_ms\":true,\"missing\":false,\"function\":null,\"functions\":[{\"ms_id\":\"LCG-MS-001#svc.main\",\"qual\":\"svc.main\",\"file\":\"app/svc.py\",\"line\":6,\"same\":1,\"code_only\":0,\"spec_only\":1},{\"ms_id\":\"LCG-MS-001#svc.helper\",\"qual\":\"svc.helper\",\"file\":\"app/svc.py\",\"line\":11,\"same\":0,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCG-MS-001#svc.get\",\"qual\":\"Repo.get\",\"file\":\"app/svc.py\",\"line\":26,\"same\":1,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCG-MS-001#svc.other\",\"qual\":null,\"file\":null,\"line\":null,\"same\":0,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCG-MS-001#svc.rs_entry\",\"qual\":\"x.rs_entry\",\"file\":\"crates/x/src/lib.rs\",\"line\":2,\"same\":0,\"code_only\":0,\"spec_only\":1}]}"
+ },
+ "doc_nope": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"document LCG-MS-999 없음\",\"resource\":\"document\",\"id\":\"LCG-MS-999\"}"
+ },
+ "doc_other_project": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "doc_prd": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"graph\":{\"commit_hash\":\"H\",\"source\":\"repo\",\"built_at\":\"T\",\"error\":null,\"function_count\":10},\"doc_id\":\"LCG-PRD-001\",\"item_id\":null,\"is_ms\":false,\"missing\":false,\"function\":null,\"functions\":[]}"
+ },
+ "item_get": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"graph\":{\"commit_hash\":\"H\",\"source\":\"repo\",\"built_at\":\"T\",\"error\":null,\"function_count\":10},\"doc_id\":\"LCG-MS-001\",\"item_id\":\"svc.get\",\"is_ms\":true,\"missing\":false,\"function\":{\"ms_id\":\"LCG-MS-001#svc.get\",\"qual\":\"Repo.get\",\"file\":\"app/svc.py\",\"line\":26,\"end\":28,\"calls\":[{\"ms_id\":\"LCG-MS-001#svc.helper\",\"qual\":\"svc.helper\",\"file\":\"app/svc.py\",\"line\":11,\"status\":\"same\"}],\"callers\":[]},\"functions\":[{\"ms_id\":\"LCG-MS-001#svc.main\",\"qual\":\"svc.main\",\"file\":\"app/svc.py\",\"line\":6,\"same\":1,\"code_only\":0,\"spec_only\":1},{\"ms_id\":\"LCG-MS-001#svc.helper\",\"qual\":\"svc.helper\",\"file\":\"app/svc.py\",\"line\":11,\"same\":0,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCG-MS-001#svc.get\",\"qual\":\"Repo.get\",\"file\":\"app/svc.py\",\"line\":26,\"same\":1,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCG-MS-001#svc.other\",\"qual\":null,\"file\":null,\"line\":null,\"same\":0,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCG-MS-001#svc.rs_entry\",\"qual\":\"x.rs_entry\",\"file\":\"crates/x/src/lib.rs\",\"line\":2,\"same\":0,\"code_only\":0,\"spec_only\":1}]}"
+ },
+ "item_main": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"graph\":{\"commit_hash\":\"H\",\"source\":\"repo\",\"built_at\":\"T\",\"error\":null,\"function_count\":10},\"doc_id\":\"LCG-MS-001\",\"item_id\":\"svc.main\",\"is_ms\":true,\"missing\":false,\"function\":{\"ms_id\":\"LCG-MS-001#svc.main\",\"qual\":\"svc.main\",\"file\":\"app/svc.py\",\"line\":6,\"end\":8,\"calls\":[{\"ms_id\":\"LCG-MS-001#svc.other\",\"qual\":null,\"file\":null,\"line\":null,\"status\":\"spec_only\"},{\"ms_id\":\"LCG-MS-001#svc.helper\",\"qual\":\"svc.helper\",\"file\":\"app/svc.py\",\"line\":11,\"status\":\"same\"}],\"callers\":[]},\"functions\":[{\"ms_id\":\"LCG-MS-001#svc.main\",\"qual\":\"svc.main\",\"file\":\"app/svc.py\",\"line\":6,\"same\":1,\"code_only\":0,\"spec_only\":1},{\"ms_id\":\"LCG-MS-001#svc.helper\",\"qual\":\"svc.helper\",\"file\":\"app/svc.py\",\"line\":11,\"same\":0,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCG-MS-001#svc.get\",\"qual\":\"Repo.get\",\"file\":\"app/svc.py\",\"line\":26,\"same\":1,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCG-MS-001#svc.other\",\"qual\":null,\"file\":null,\"line\":null,\"same\":0,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCG-MS-001#svc.rs_entry\",\"qual\":\"x.rs_entry\",\"file\":\"crates/x/src/lib.rs\",\"line\":2,\"same\":0,\"code_only\":0,\"spec_only\":1}]}"
+ },
+ "item_nope": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"item LCG-MS-001#nope 없음\",\"resource\":\"item\",\"id\":\"LCG-MS-001#nope\"}"
+ },
+ "item_other": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"graph\":{\"commit_hash\":\"H\",\"source\":\"repo\",\"built_at\":\"T\",\"error\":null,\"function_count\":10},\"doc_id\":\"LCG-MS-001\",\"item_id\":\"svc.other\",\"is_ms\":true,\"missing\":true,\"function\":null,\"functions\":[{\"ms_id\":\"LCG-MS-001#svc.main\",\"qual\":\"svc.main\",\"file\":\"app/svc.py\",\"line\":6,\"same\":1,\"code_only\":0,\"spec_only\":1},{\"ms_id\":\"LCG-MS-001#svc.helper\",\"qual\":\"svc.helper\",\"file\":\"app/svc.py\",\"line\":11,\"same\":0,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCG-MS-001#svc.get\",\"qual\":\"Repo.get\",\"file\":\"app/svc.py\",\"line\":26,\"same\":1,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCG-MS-001#svc.other\",\"qual\":null,\"file\":null,\"line\":null,\"same\":0,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCG-MS-001#svc.rs_entry\",\"qual\":\"x.rs_entry\",\"file\":\"crates/x/src/lib.rs\",\"line\":2,\"same\":0,\"code_only\":0,\"spec_only\":1}]}"
+ },
+ "item_prd": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"graph\":{\"commit_hash\":\"H\",\"source\":\"repo\",\"built_at\":\"T\",\"error\":null,\"function_count\":10},\"doc_id\":\"LCG-PRD-001\",\"item_id\":\"R1\",\"is_ms\":false,\"missing\":false,\"function\":{\"ms_id\":\"LCG-PRD-001#R1\",\"qual\":\"util.fmt\",\"file\":\"app/util.py\",\"line\":1,\"end\":3,\"calls\":[],\"callers\":[{\"ms_id\":\"LCG-MS-001#svc.main\",\"qual\":\"svc.main\",\"file\":\"app/svc.py\",\"line\":6,\"status\":null}]},\"functions\":[{\"ms_id\":\"LCG-MS-001#svc.main\",\"qual\":\"svc.main\",\"file\":\"app/svc.py\",\"line\":6,\"same\":1,\"code_only\":0,\"spec_only\":1}]}"
+ },
+ "item_rs": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"graph\":{\"commit_hash\":\"H\",\"source\":\"repo\",\"built_at\":\"T\",\"error\":null,\"function_count\":10},\"doc_id\":\"LCG-MS-001\",\"item_id\":\"svc.rs_entry\",\"is_ms\":true,\"missing\":false,\"function\":{\"ms_id\":\"LCG-MS-001#svc.rs_entry\",\"qual\":\"x.rs_entry\",\"file\":\"crates/x/src/lib.rs\",\"line\":2,\"end\":4,\"calls\":[{\"ms_id\":\"LCG-MS-001#svc.helper\",\"qual\":\"svc.helper\",\"file\":\"app/svc.py\",\"line\":11,\"status\":\"spec_only\"}],\"callers\":[]},\"functions\":[{\"ms_id\":\"LCG-MS-001#svc.main\",\"qual\":\"svc.main\",\"file\":\"app/svc.py\",\"line\":6,\"same\":1,\"code_only\":0,\"spec_only\":1},{\"ms_id\":\"LCG-MS-001#svc.helper\",\"qual\":\"svc.helper\",\"file\":\"app/svc.py\",\"line\":11,\"same\":0,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCG-MS-001#svc.get\",\"qual\":\"Repo.get\",\"file\":\"app/svc.py\",\"line\":26,\"same\":1,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCG-MS-001#svc.other\",\"qual\":null,\"file\":null,\"line\":null,\"same\":0,\"code_only\":0,\"spec_only\":0},{\"ms_id\":\"LCG-MS-001#svc.rs_entry\",\"qual\":\"x.rs_entry\",\"file\":\"crates/x/src/lib.rs\",\"line\":2,\"same\":0,\"code_only\":0,\"spec_only\":1}]}"
+ },
+ "mcp_bad_type": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"Error executing tool get_code_graph: 1 validation error for get_code_graphArguments\\ndoc_id\\n  Input should be a valid string [type=string_type, input_value=3, input_type=int]\\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "mcp_doc": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"graph\\\": {\\\"commit_hash\\\": \\\"H\\\", \\\"source\\\": \\\"repo\\\", \\\"built_at\\\": \\\"T\\\", \\\"error\\\": null, \\\"function_count\\\": 10}, \\\"doc_id\\\": \\\"LCG-MS-001\\\", \\\"item_id\\\": null, \\\"is_ms\\\": true, \\\"missing\\\": false, \\\"function\\\": null, \\\"functions\\\": [{\\\"ms_id\\\": \\\"LCG-MS-001#svc.main\\\", \\\"qual\\\": \\\"svc.main\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 6, \\\"same\\\": 1, \\\"code_only\\\": 0, \\\"spec_only\\\": 1}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.helper\\\", \\\"qual\\\": \\\"svc.helper\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 11, \\\"same\\\": 0, \\\"code_only\\\": 0, \\\"spec_only\\\": 0}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.get\\\", \\\"qual\\\": \\\"Repo.get\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 26, \\\"same\\\": 1, \\\"code_only\\\": 0, \\\"spec_only\\\": 0}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.other\\\", \\\"qual\\\": null, \\\"file\\\": null, \\\"line\\\": null, \\\"same\\\": 0, \\\"code_only\\\": 0, \\\"spec_only\\\": 0}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.rs_entry\\\", \\\"qual\\\": \\\"x.rs_entry\\\", \\\"file\\\": \\\"crates/x/src/lib.rs\\\", \\\"line\\\": 2, \\\"same\\\": 0, \\\"code_only\\\": 0, \\\"spec_only\\\": 1}]}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "mcp_item": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"graph\\\": {\\\"commit_hash\\\": \\\"H\\\", \\\"source\\\": \\\"repo\\\", \\\"built_at\\\": \\\"T\\\", \\\"error\\\": null, \\\"function_count\\\": 10}, \\\"doc_id\\\": \\\"LCG-MS-001\\\", \\\"item_id\\\": \\\"svc.main\\\", \\\"is_ms\\\": true, \\\"missing\\\": false, \\\"function\\\": {\\\"ms_id\\\": \\\"LCG-MS-001#svc.main\\\", \\\"qual\\\": \\\"svc.main\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 6, \\\"end\\\": 8, \\\"calls\\\": [{\\\"ms_id\\\": \\\"LCG-MS-001#svc.other\\\", \\\"qual\\\": null, \\\"file\\\": null, \\\"line\\\": null, \\\"status\\\": \\\"spec_only\\\"}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.helper\\\", \\\"qual\\\": \\\"svc.helper\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 11, \\\"status\\\": \\\"same\\\"}], \\\"callers\\\": []}, \\\"functions\\\": [{\\\"ms_id\\\": \\\"LCG-MS-001#svc.main\\\", \\\"qual\\\": \\\"svc.main\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 6, \\\"same\\\": 1, \\\"code_only\\\": 0, \\\"spec_only\\\": 1}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.helper\\\", \\\"qual\\\": \\\"svc.helper\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 11, \\\"same\\\": 0, \\\"code_only\\\": 0, \\\"spec_only\\\": 0}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.get\\\", \\\"qual\\\": \\\"Repo.get\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 26, \\\"same\\\": 1, \\\"code_only\\\": 0, \\\"spec_only\\\": 0}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.other\\\", \\\"qual\\\": null, \\\"file\\\": null, \\\"line\\\": null, \\\"same\\\": 0, \\\"code_only\\\": 0, \\\"spec_only\\\": 0}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.rs_entry\\\", \\\"qual\\\": \\\"x.rs_entry\\\", \\\"file\\\": \\\"crates/x/src/lib.rs\\\", \\\"line\\\": 2, \\\"same\\\": 0, \\\"code_only\\\": 0, \\\"spec_only\\\": 1}]}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "mcp_item_empty": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"graph\\\": {\\\"commit_hash\\\": \\\"H\\\", \\\"source\\\": \\\"repo\\\", \\\"built_at\\\": \\\"T\\\", \\\"error\\\": null, \\\"function_count\\\": 10}, \\\"doc_id\\\": \\\"LCG-MS-001\\\", \\\"item_id\\\": null, \\\"is_ms\\\": true, \\\"missing\\\": false, \\\"function\\\": null, \\\"functions\\\": [{\\\"ms_id\\\": \\\"LCG-MS-001#svc.main\\\", \\\"qual\\\": \\\"svc.main\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 6, \\\"same\\\": 1, \\\"code_only\\\": 0, \\\"spec_only\\\": 1}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.helper\\\", \\\"qual\\\": \\\"svc.helper\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 11, \\\"same\\\": 0, \\\"code_only\\\": 0, \\\"spec_only\\\": 0}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.get\\\", \\\"qual\\\": \\\"Repo.get\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 26, \\\"same\\\": 1, \\\"code_only\\\": 0, \\\"spec_only\\\": 0}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.other\\\", \\\"qual\\\": null, \\\"file\\\": null, \\\"line\\\": null, \\\"same\\\": 0, \\\"code_only\\\": 0, \\\"spec_only\\\": 0}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.rs_entry\\\", \\\"qual\\\": \\\"x.rs_entry\\\", \\\"file\\\": \\\"crates/x/src/lib.rs\\\", \\\"line\\\": 2, \\\"same\\\": 0, \\\"code_only\\\": 0, \\\"spec_only\\\": 1}]}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "mcp_item_null": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"graph\\\": {\\\"commit_hash\\\": \\\"H\\\", \\\"source\\\": \\\"repo\\\", \\\"built_at\\\": \\\"T\\\", \\\"error\\\": null, \\\"function_count\\\": 10}, \\\"doc_id\\\": \\\"LCG-MS-001\\\", \\\"item_id\\\": null, \\\"is_ms\\\": true, \\\"missing\\\": false, \\\"function\\\": null, \\\"functions\\\": [{\\\"ms_id\\\": \\\"LCG-MS-001#svc.main\\\", \\\"qual\\\": \\\"svc.main\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 6, \\\"same\\\": 1, \\\"code_only\\\": 0, \\\"spec_only\\\": 1}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.helper\\\", \\\"qual\\\": \\\"svc.helper\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 11, \\\"same\\\": 0, \\\"code_only\\\": 0, \\\"spec_only\\\": 0}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.get\\\", \\\"qual\\\": \\\"Repo.get\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 26, \\\"same\\\": 1, \\\"code_only\\\": 0, \\\"spec_only\\\": 0}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.other\\\", \\\"qual\\\": null, \\\"file\\\": null, \\\"line\\\": null, \\\"same\\\": 0, \\\"code_only\\\": 0, \\\"spec_only\\\": 0}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.rs_entry\\\", \\\"qual\\\": \\\"x.rs_entry\\\", \\\"file\\\": \\\"crates/x/src/lib.rs\\\", \\\"line\\\": 2, \\\"same\\\": 0, \\\"code_only\\\": 0, \\\"spec_only\\\": 1}]}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "mcp_missing": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"graph\\\": {\\\"commit_hash\\\": \\\"H\\\", \\\"source\\\": \\\"repo\\\", \\\"built_at\\\": \\\"T\\\", \\\"error\\\": null, \\\"function_count\\\": 10}, \\\"doc_id\\\": \\\"LCG-MS-001\\\", \\\"item_id\\\": \\\"svc.other\\\", \\\"is_ms\\\": true, \\\"missing\\\": true, \\\"function\\\": null, \\\"functions\\\": [{\\\"ms_id\\\": \\\"LCG-MS-001#svc.main\\\", \\\"qual\\\": \\\"svc.main\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 6, \\\"same\\\": 1, \\\"code_only\\\": 0, \\\"spec_only\\\": 1}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.helper\\\", \\\"qual\\\": \\\"svc.helper\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 11, \\\"same\\\": 0, \\\"code_only\\\": 0, \\\"spec_only\\\": 0}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.get\\\", \\\"qual\\\": \\\"Repo.get\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 26, \\\"same\\\": 1, \\\"code_only\\\": 0, \\\"spec_only\\\": 0}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.other\\\", \\\"qual\\\": null, \\\"file\\\": null, \\\"line\\\": null, \\\"same\\\": 0, \\\"code_only\\\": 0, \\\"spec_only\\\": 0}, {\\\"ms_id\\\": \\\"LCG-MS-001#svc.rs_entry\\\", \\\"qual\\\": \\\"x.rs_entry\\\", \\\"file\\\": \\\"crates/x/src/lib.rs\\\", \\\"line\\\": 2, \\\"same\\\": 0, \\\"code_only\\\": 0, \\\"spec_only\\\": 1}]}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "mcp_no_args": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"Error executing tool get_code_graph: 1 validation error for get_code_graphArguments\\ndoc_id\\n  Field required [type=missing, input_value={}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "mcp_nope": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"document LCG-MS-999 없음\\\", \\\"resource\\\": \\\"document\\\", \\\"id\\\": \\\"LCG-MS-999\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "mcp_prd": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"graph\\\": {\\\"commit_hash\\\": \\\"H\\\", \\\"source\\\": \\\"repo\\\", \\\"built_at\\\": \\\"T\\\", \\\"error\\\": null, \\\"function_count\\\": 10}, \\\"doc_id\\\": \\\"LCG-PRD-001\\\", \\\"item_id\\\": \\\"R1\\\", \\\"is_ms\\\": false, \\\"missing\\\": false, \\\"function\\\": {\\\"ms_id\\\": \\\"LCG-PRD-001#R1\\\", \\\"qual\\\": \\\"util.fmt\\\", \\\"file\\\": \\\"app/util.py\\\", \\\"line\\\": 1, \\\"end\\\": 3, \\\"calls\\\": [], \\\"callers\\\": [{\\\"ms_id\\\": \\\"LCG-MS-001#svc.main\\\", \\\"qual\\\": \\\"svc.main\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 6, \\\"status\\\": null}]}, \\\"functions\\\": [{\\\"ms_id\\\": \\\"LCG-MS-001#svc.main\\\", \\\"qual\\\": \\\"svc.main\\\", \\\"file\\\": \\\"app/svc.py\\\", \\\"line\\\": 6, \\\"same\\\": 1, \\\"code_only\\\": 0, \\\"spec_only\\\": 1}]}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "source_get": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"path\":\"app/svc.py\",\"start\":26,\"end\":28,\"commit_hash\":\"H\",\"text\":\"    def get(self, key):\\n        \\\"\\\"\\\"LCG-MS-001#svc.get\\\"\\\"\\\"\\n        return helper() + self.n\",\"truncated\":false}"
+ },
+ "source_helper": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"path\":\"app/svc.py\",\"start\":11,\"end\":13,\"commit_hash\":\"H\",\"text\":\"def helper():\\n    \\\"\\\"\\\"LCG-MS-001#svc.helper\\\"\\\"\\\"\\n    return 1\",\"truncated\":false}"
+ },
+ "source_nope": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"item LCG-MS-001#nope 없음\",\"resource\":\"item\",\"id\":\"LCG-MS-001#nope\"}"
+ },
+ "source_other": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"function LCG-MS-001#svc.other 없음\",\"resource\":\"function\",\"id\":\"LCG-MS-001#svc.other\"}"
+ },
+ "source_r1": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"path\":\"app/util.py\",\"start\":1,\"end\":3,\"commit_hash\":\"H\",\"text\":\"def fmt(x):\\n    \\\"\\\"\\\"LCG-PRD-001#R1\\\"\\\"\\\"\\n    return str(x)  # 끝 줄 뒤 주석\",\"truncated\":false}"
+ },
+ "source_rs": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"path\":\"crates/x/src/lib.rs\",\"start\":2,\"end\":4,\"commit_hash\":\"H\",\"text\":\"pub fn rs_entry() -> i32 {\\n    rs_helper()\\n}\",\"truncated\":false}"
+ },
+ "text_file_empty": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.file — String should have at least 1 character\",\"errors\":[{\"loc\":\"query.file\",\"msg\":\"String should have at least 1 character\"}]}"
+ },
+ "text_line_huge": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"function app/svc.py:99999999999999999999999 없음\",\"resource\":\"function\",\"id\":\"app/svc.py:99999999999999999999999\"}"
+ },
+ "text_line_word": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.line — Input should be a valid integer, unable to parse string as an integer\",\"errors\":[{\"loc\":\"query.line\",\"msg\":\"Input should be a valid integer, unable to parse string as an integer\"}]}"
+ },
+ "text_line_zero": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.line — Input should be greater than or equal to 1\",\"errors\":[{\"loc\":\"query.line\",\"msg\":\"Input should be greater than or equal to 1\"}]}"
+ },
+ "text_main": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"path\":\"app/svc.py\",\"start\":6,\"end\":8,\"commit_hash\":\"H\",\"text\":\"def main():\\n    \\\"\\\"\\\"LCG-MS-001#svc.main\\\"\\\"\\\"\\n    return helper() + extra() + len(fmt(1))\",\"truncated\":false}"
+ },
+ "text_no_file": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.file — Field required\",\"errors\":[{\"loc\":\"query.file\",\"msg\":\"Field required\"}]}"
+ },
+ "text_no_fn": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"function app/svc.py:7 없음\",\"resource\":\"function\",\"id\":\"app/svc.py:7\"}"
+ },
+ "text_no_query": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"query.file — Field required\",\"errors\":[{\"loc\":\"query.file\",\"msg\":\"Field required\"},{\"loc\":\"query.line\",\"msg\":\"Field required\"}]}"
+ },
+ "text_none": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"code_graph LCG 없음\",\"resource\":\"code_graph\",\"id\":\"LCG\"}"
+ },
+ "text_other_project": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "text_rs": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"path\":\"crates/x/src/lib.rs\",\"start\":2,\"end\":4,\"commit_hash\":\"H\",\"text\":\"pub fn rs_entry() -> i32 {\\n    rs_helper()\\n}\",\"truncated\":false}"
+ },
+ "text_ts": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"path\":\"web/app.ts\",\"start\":2,\"end\":4,\"commit_hash\":\"H\",\"text\":\"export function render(): string {\\n  return label();\\n}\",\"truncated\":false}"
+ },
+ "text_ts_helper": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"path\":\"web/app.ts\",\"start\":6,\"end\":8,\"commit_hash\":\"H\",\"text\":\"function label(): string {\\n  return \\\"x\\\";\\n}\",\"truncated\":false}"
+ }
+}
