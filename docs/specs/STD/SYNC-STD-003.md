@@ -53,6 +53,8 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 | 10 | `SYNC-MS-017` | MINISPEC — pipeline — 쓰기 조율 (Rust) | `10-MS/SYNC-MS-017.md` | 5 | 4 | DOM-004, MS-007, MS-013, MS-014, MS-015, SEQ-001, STD-004 |
 | 10 | `SYNC-MS-018` | MINISPEC — queries — 읽기 조합 (Rust) | `10-MS/SYNC-MS-018.md` | 1 | 4 | DOM-004, MS-008, API-001, API-002 |
 | 10 | `SYNC-MS-019` | MINISPEC — git 어댑터 (Rust) | `10-MS/SYNC-MS-019.md` | 7 | 4 | DOM-004, MS-009, INFRA-001, STD-004 |
+| 10 | `SYNC-MS-020` | MINISPEC — llm 어댑터 — 모델 호출 (Rust) | `10-MS/SYNC-MS-020.md` | 2 | 4 | DOM-004, MS-009, INFRA-001, STD-004 |
+| 10 | `SYNC-MS-021` | MINISPEC — ConversationService — 대화·턴·첨부 (Rust) | `10-MS/SYNC-MS-021.md` | 14 | 4 | DOM-004, MS-010, INFRA-001, STD-004 |
 | 10 | `SYNC-MS-022` | MINISPEC — codegraph — 코드 호출 그래프와 명세 대조 (Rust) | `10-MS/SYNC-MS-022.md` | 15 | 4 | DOM-004, MS-011, INFRA-001, STD-004 |
 | 11 | `SYNC-CODE-001` | 구현 계획 — 슬라이스 카드와 커밋 기록 | `CODE_구현계획_싱크독.md` | 34 | 6 | STD-004, MS-001, MS-002, MS-003, MS-006, MS-007, MS-008, MS-009, API-001, API-002, UI-002, SCN-001 |
 | 11 | `SYNC-CODE-002` | 구현 계획 — 싱크독_로컬 (Rust) 슬라이스 카드와 커밋 기록 | `11-CODE/SYNC-CODE-002.md` | 1 | 5 | STD-004, DOM-004, PRD-001, INFRA-001, API-001, API-002, UI-002, SCN-001 |
@@ -307,6 +309,18 @@ upstream: [SYNC-STD-001, SYNC-STD-002]
 - 3. 미결사항
 
 **SYNC-MS-019** MINISPEC — git 어댑터 (Rust)
+- 0. 이 문서가 다루는 것
+- 1. 함수 목록
+- 2. 함수
+- 3. 미결사항
+
+**SYNC-MS-020** MINISPEC — llm 어댑터 — 모델 호출 (Rust)
+- 0. 이 문서가 다루는 것
+- 1. 함수 목록
+- 2. 함수
+- 3. 미결사항
+
+**SYNC-MS-021** MINISPEC — ConversationService — 대화·턴·첨부 (Rust)
 - 0. 이 문서가 다루는 것
 - 1. 함수 목록
 - 2. 함수
