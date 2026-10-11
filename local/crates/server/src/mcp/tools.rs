@@ -86,6 +86,7 @@ pub async fn call(
         "get_references" => get_references(state, user, &typed).await,
         "create_document" => create_document(state, user, &typed).await,
         "update_document" => update_document(state, user, &typed).await,
+        "delete_document" => delete_document(state, user, &typed).await,
         _ => Err(Problem::NotImplemented {
             card: tool.card.to_string(),
         }),
@@ -340,6 +341,26 @@ async fn update_document(state: &AppState, user: &UserRow, a: &PyValue) -> Resul
     )
     .await?;
     Ok(save_json(&r))
+}
+
+/// SYNC-API-002#delete_document
+///
+/// 첫 호출은 확인 요청 — `confirm=true`로 다시 부르면 넣는다. 결과는 파이썬 `TrashResult.to_dict()` 꼴
+async fn delete_document(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let r = pipeline::trash_document(
+        &state.pool,
+        &state.repos,
+        &arg_str(a, "doc_id"),
+        &agent_author(user),
+        arg_bool(a, "confirm"),
+    )
+    .await?;
+    Ok(json!({
+        "doc_id": r.doc_id,
+        "commit_hash": r.commit_hash,
+        "broken_refs": r.broken_refs,
+        "next_step": r.next_step,
+    }))
 }
 
 /// SYNC-API-002#get_template
