@@ -14,7 +14,6 @@ base64 = { workspace = true }
 flate2 = { workspace = true }
 httpdate = { workspace = true }
 md-5 = { workspace = true }
-multer = { workspace = true }
 indexmap = { workspace = true }
 jiter = { workspace = true }
 num-bigint = { workspace = true }

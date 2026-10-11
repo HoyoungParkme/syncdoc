@@ -35,7 +35,6 @@ base64 = "0.22"
 flate2 = "1.1"
 httpdate = "1.0"
 md-5 = "0.11"
-multer = "3"
 jiter = "=0.14.0"
 lopdf = { version = "0.45", default-features = false }
 num-bigint = "0.4.6"
