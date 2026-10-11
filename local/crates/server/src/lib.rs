@@ -25,6 +25,7 @@ use crate::web::routes::projects::{
     delete_project, get_file, get_project, graph, init_project, list_docs, list_items,
     list_projects,
 };
+use crate::web::routes::references::item_chain;
 use crate::web::routes::references::item_references;
 use crate::web::routes::references::item_view;
 use crate::web::routes::specs::spec_copy;
@@ -56,6 +57,7 @@ pub fn app(state: AppState) -> Router {
             "/api/docs/{doc_id}/items/{item_id}/references",
             get(item_references),
         )
+        .route("/api/docs/{doc_id}/items/{item_id}/chain", get(item_chain))
         .merge(mcp::router(state.clone()))
         .route("/specs/", get(spec_copy))
         .route("/specs/{*path}", get(spec_copy))

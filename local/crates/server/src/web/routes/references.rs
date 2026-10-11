@@ -9,7 +9,7 @@ use syncdoc_core::queries;
 use crate::state::AppState;
 use crate::web::auth::current_user;
 use crate::web::problem::ApiProblem;
-use crate::web::schemas::{ItemReferences, ItemView};
+use crate::web::schemas::{ItemChain, ItemReferences, ItemView};
 
 /// SYNC-API-001#GET/api/docs/{docId}/items/{itemId}
 pub async fn item_view(
@@ -45,4 +45,22 @@ pub async fn item_references(
     )
     .await?;
     Ok(Json(ItemReferences::from(&r)))
+}
+
+/// SYNC-API-001#GET/api/docs/{docId}/items/{itemId}/chain
+pub async fn item_chain(
+    State(state): State<AppState>,
+    Path((doc_id, item_id)): Path<(String, String)>,
+) -> Result<Json<ItemChain>, ApiProblem> {
+    let mut c = state.pool.acquire().await.map_err(Problem::from)?;
+    let user = current_user(&mut c, &state).await?;
+    let chain = queries::item_chain(
+        &mut c,
+        &state.repos,
+        &doc_id,
+        &item_id.replace('~', "/"),
+        &user,
+    )
+    .await?;
+    Ok(Json(ItemChain::from(&chain)))
 }
