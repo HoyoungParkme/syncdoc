@@ -191,3 +191,44 @@ pub async fn set_target(
     .await?;
     Ok(())
 }
+
+/// 항목들의 문서 — 차례 없음
+pub async fn document_ids_of_items(
+    db: &mut PgConnection,
+    item_pks: &[i32],
+) -> Result<Vec<i32>, sqlx::Error> {
+    sqlx::query_scalar::<_, i32>("SELECT DISTINCT document_id FROM items WHERE id = ANY($1)")
+        .bind(item_pks)
+        .fetch_all(db)
+        .await
+}
+
+/// 항목에서 나가거나 항목에 들어오는 참조, 또는 그 문서들을 가리키는 참조 — id 차례
+pub async fn among(
+    db: &mut PgConnection,
+    item_pks: &[i32],
+    document_ids: &[i32],
+) -> Result<Vec<ReferenceRow>, sqlx::Error> {
+    sqlx::query_as::<_, ReferenceRow>(sqlx::AssertSqlSafe(format!(
+        r#"SELECT {COLUMNS} FROM "references"
+           WHERE from_item_id = ANY($1) OR to_item_id = ANY($1) OR to_document_id = ANY($2) ORDER BY id"#
+    )))
+    .bind(item_pks)
+    .bind(document_ids)
+    .fetch_all(db)
+    .await
+}
+
+/// 항목마다 하위(그 항목을 가리키는 참조) 수
+pub async fn count_to_items(
+    db: &mut PgConnection,
+    item_pks: &[i32],
+) -> Result<HashMap<i32, i64>, sqlx::Error> {
+    let rows = sqlx::query_as::<_, (i32, i64)>(
+        r#"SELECT to_item_id, count(*) FROM "references" WHERE to_item_id = ANY($1) GROUP BY to_item_id"#,
+    )
+    .bind(item_pks)
+    .fetch_all(db)
+    .await?;
+    Ok(rows.into_iter().collect())
+}

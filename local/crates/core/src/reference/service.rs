@@ -199,4 +199,27 @@ impl ReferenceService<'_> {
         }
         Ok(repo::mark_missing(&mut *self.db, item_pks).await? as i64)
     }
+
+    /// SYNC-MS-015#ReferenceService.references_among
+    ///
+    /// 항목이 없으면 문서를 가리킨 것도 없다 — 문서는 그 항목들의 문서다(파이썬과 같다)
+    pub async fn references_among(
+        &mut self,
+        item_pks: &[i32],
+        include_document_targets: bool,
+    ) -> Result<Vec<RefEdge>, Problem> {
+        let docs = if include_document_targets && !item_pks.is_empty() {
+            repo::document_ids_of_items(&mut *self.db, item_pks).await?
+        } else {
+            Vec::new()
+        };
+        if item_pks.is_empty() && docs.is_empty() {
+            return Ok(Vec::new());
+        }
+        Ok(repo::among(&mut *self.db, item_pks, &docs)
+            .await?
+            .into_iter()
+            .map(edge)
+            .collect())
+    }
 }
