@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 **MINISPEC은 카드의 첫 커밋으로 쓴다**([[SYNC-STD-004#DEV-13]]). 그래서 L1만 표가 있고 나머지는 하는 일과 선행만 있다 — 카드를 받을 때 그 카드의 표를 쓴다. 아직 없는 MINISPEC 항목을 미리 가리키지 않는다.
 
-**진행 상황**: 카드 18장(L1~L18). 완료 6(L1·L2 2026-10-07, L3~L6 2026-10-08). 첫 릴리즈 `local-v0.1.0`(L4). L1은 계약 시험 없이 병합하고 완료란은 L2 뒤에 적었다(사용자 결정 2026-10-07).
+**진행 상황**: 카드 18장(L1~L18). 완료 16(L1·L2 2026-10-07, L3~L6 2026-10-08, L7~L16 2026-10-11). 첫 릴리즈 `local-v0.1.0`(L4). L1은 계약 시험 없이 병합하고 완료란은 L2 뒤에 적었다(사용자 결정 2026-10-07). 남은 것 L18(새 MCP 프로토콜)·L17(속도·출시 판정)
 
 ---
 
@@ -192,7 +192,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | API | [[SYNC-API-001#GET/api/local]] · [[SYNC-API-001#PUT/api/local/settings]] · [[SYNC-API-001#PUT/api/local/autostart]] · [[SYNC-API-001#POST/api/local/backups]] · [[SYNC-API-001#POST/api/local/restore]] · [[SYNC-API-001#POST/api/local/move]] |
 | 테스트 | `cargo test`(진짜 PostgreSQL·git — 백업 꼴·암호·gpg와 서로 풀기(gpg가 있으면)·14개·되살리기와 되돌리기·옮기기 복사·확인·설정 값만 쓰기·자동 시작 파일·rehome) · 실행 파일 시험(설정 저장 → 같은 포트로 다시 뜸 · 백업 → 되살리기 · 옮기기) · 계약 L16 — **파이썬 판 컨테이너에서 `scripts/backup.sh`와 같은 차례로 뜬 백업을 새 Rust 판이 되살려** 프로젝트 목록·문서·판 목록이 파이썬 판과 바이트로 같다 · `check_ui` UI-13 · `tsc`·`oxlint`·`build` |
 | 선행 | L4 · L11 · L15 |
-| 완료 | — |
+| 완료 | 2026-10-11 · 브랜치 `card/L16-local`(bbf27b4 #381) · spec 11 + code 8 · `cargo test` 197(진짜 PostgreSQL·git — 백업 꼴·암호·gpg와 서로 풀기·14개·되살리기와 되돌리기·옮기기 복사 확인·설정 값만 쓰기·자동 시작·rehome·mirror · 실행 파일 — 설정 저장 → 같은 포트로 다시 뜸 · 백업 → 되살리기 · 옮기기) · 계약 `--target both --with-card L16` 1150 통과 — L16: 파이썬 판 컨테이너에서 BR 차례로 뜬 gpg 백업을 새 Rust 판이 되살려 프로젝트 목록·문서 목록·문서·판 목록·diff가 바이트로 같고 이어서 셋째 판을 쓴다 · clippy · 워크플로 녹색(리눅스·윈도) · `check_code` Rust 197/197 · `check_calls` 0 · `check_ui` 14/14 · 브라우저(playwright)로 UI-13 저장 → 다시 켜기 → 지금 백업 → 되살리기 · 사람 확인(윈도 UI-13 이 PC·백업·옮기기·자동 시작·트레이 지금 백업)은 따로 · 되먹임: `tokio::select!` 안의 호출은 코드 그래프가 못 본다(runtime.run 「호출하는 것」에서 뺐다) · `Git`의 `clone`(작업 사본 받기)이 `Clone::clone`을 가린다 — `Clone::clone(&git)` · 화면 줄의 이름표가 한 글자씩 접혀 줄 꾸밈을 더했다 |
 
 **다음 카드** — 받을 때 표를 쓴다. 하는 일과 선행만 먼저 적는다.
 
