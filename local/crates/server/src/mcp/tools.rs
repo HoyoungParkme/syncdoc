@@ -6,6 +6,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
+use indexmap::IndexMap;
 use num_bigint::BigInt;
 use regex::Regex;
 use serde_json::{Map, Value, json};
@@ -89,6 +90,7 @@ pub async fn call(
         "delete_document" => delete_document(state, user, &typed).await,
         "restore_document" => restore_document(state, user, &typed).await,
         "change_status" => change_status(state, user, &typed).await,
+        "upload_code" => upload_code(state, user, &typed).await,
         _ => Err(Problem::NotImplemented {
             card: tool.card.to_string(),
         }),
@@ -97,6 +99,63 @@ pub async fn call(
         Ok(v) => ok_result(&py_dumps(&v)),
         Err(p) => tool_error(name, &p),
     }
+}
+
+/// SYNC-API-002#upload_code
+///
+/// 파일은 `{path: content}`(같은 경로면 뒤의 내용·앞의 자리 — 파이썬 dict). UTF-8로 못 바꾸는 글자(짝 없는
+/// 서로게이트)는 파이썬이 소유 검사 뒤 크기를 잴 때 예외를 낸다 — 같은 자리에서 같은 답
+async fn upload_code(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let code = arg_str(a, "project_code");
+    let mut files: IndexMap<String, String> = IndexMap::new();
+    let mut lossy = false;
+    if let Some(PyValue::List(items)) = arg(a, "files") {
+        for f in items {
+            match (arg(f, "path"), arg(f, "content")) {
+                (Some(PyValue::Str(PyStr::Utf8(p))), Some(PyValue::Str(PyStr::Utf8(c)))) => {
+                    files.insert(p.clone(), c.clone());
+                }
+                _ => lossy = true,
+            }
+        }
+    }
+    let mut delete = Vec::new();
+    if let Some(PyValue::List(items)) = arg(a, "delete") {
+        for d in items {
+            match d {
+                PyValue::Str(PyStr::Utf8(p)) => delete.push(p.clone()),
+                _ => lossy = true,
+            }
+        }
+    }
+    if lossy {
+        let mut c = state.pool.acquire().await?;
+        ProjectService {
+            db: &mut c,
+            repos: &state.repos,
+        }
+        .get_owned(&code, user)
+        .await?;
+        return Err(Problem::Internal {
+            log: "upload_code: UTF-8로 못 바꾸는 글자".into(),
+        });
+    }
+    let r = pipeline::upload_code(
+        &state.pool,
+        &state.repos,
+        &code,
+        &files,
+        &delete,
+        &arg_str(a, "message"),
+        &agent_author(user),
+    )
+    .await?;
+    Ok(json!({
+        "commit": r.commit,
+        "changed": r.changed,
+        "files": r.files,
+        "deleted": r.deleted,
+    }))
 }
 
 /// SYNC-API-002#init_project
