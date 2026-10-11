@@ -11,7 +11,14 @@ import socket
 from dataclasses import dataclass
 
 #: 비교하는 머리 — 나머지는 계약 밖
-CONTRACT_HEADERS = ("content-type", "cache-control", "x-accel-buffering", "allow", "location")
+CONTRACT_HEADERS = (
+    "content-type",
+    "cache-control",
+    "x-accel-buffering",
+    "allow",
+    "location",
+    "content-disposition",
+)
 
 
 @dataclass
