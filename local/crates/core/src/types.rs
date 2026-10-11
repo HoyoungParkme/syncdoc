@@ -445,6 +445,128 @@ pub struct SaveResult {
     pub next_step: Option<String>,
 }
 
+/// 이력 한 줄 (API-001 `Version`) — 상태 커밋이면 `version_no`가 없다. 작성자는 id만, 이름(`author_view`)은 입구가
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Version {
+    pub doc_id: String,
+    pub version_no: Option<i32>,
+    pub commit_hash: String,
+    pub message: String,
+    pub author: AuthorRef,
+    pub author_view: Option<ApiAuthor>,
+    pub created_at: OffsetDateTime,
+}
+
+/// 프로젝트 상세 (API-001 `ProjectDetail`) — 요약 + 문서 목록 + 최근 변경 + 동기화 칸(DB 값 그대로)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ProjectDetail {
+    pub summary: ProjectSummary,
+    pub docs: Vec<DocumentSummary>,
+    pub recent_changes: Vec<Version>,
+    pub last_processed_commit: Option<String>,
+    pub behind_by: Option<i32>,
+    pub fetched_at: Option<OffsetDateTime>,
+}
+
+/// 관계도 노드 원천 (DOM-002 2.8 `ItemBrief`) — 문서 노드는 `item_id`가 없고 `pk`가 문서 id
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ItemBrief {
+    pub pk: i32,
+    pub doc_id: String,
+    pub item_id: Option<String>,
+    pub stage: Option<i32>,
+    pub display_name: Option<String>,
+}
+
+/// 관계도 범위 (UI-8) — 잘라내는 게 아니라 골라낸다
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GraphScope {
+    All,
+    Approved,
+}
+
+/// 관계도 노드 (API-001 `Graph.nodes[]`) — id는 `DOC#ITEM`, 문서 노드는 `DOC`
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct GraphNode {
+    pub id: String,
+    pub doc_id: String,
+    pub item_id: Option<String>,
+    pub stage: Option<i32>,
+    pub isolated: bool,
+}
+
+/// 관계도 간선 (API-001 `Graph.edges[]`) — 미존재면 `to`가 없다
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct GraphEdge {
+    #[serde(rename = "from")]
+    pub from_: String,
+    pub to: Option<String>,
+    pub raw_target: String,
+    pub is_missing: bool,
+}
+
+/// 관계도 (API-001 `Graph`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Graph {
+    pub nodes: Vec<GraphNode>,
+    pub edges: Vec<GraphEdge>,
+    pub project_name: String,
+}
+
+/// 체인 한 칸 (API-001 `ItemChain.rows[].items[]`) — 역할은 폐포 방향
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ChainItem {
+    pub ref_: ItemRef,
+    pub role: String,
+    pub status: String,
+}
+
+/// 체인 한 단계 — 비어도 온다
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ChainRow {
+    pub stage: i32,
+    pub doc_type: String,
+    pub items: Vec<ChainItem>,
+}
+
+/// 항목의 11단계 체인 (API-001 `ItemChain`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ItemChain {
+    pub item: ItemRef,
+    pub upstream_count: i64,
+    pub downstream_count: i64,
+    pub rows: Vec<ChainRow>,
+}
+
+/// 추적표의 문서 한 줄 (API-001 `DownstreamView.by_document[]`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DownstreamDoc {
+    pub doc_id: String,
+    pub title: String,
+    pub items: Vec<String>,
+}
+
+/// 이 문서를 참조하는 것 (API-001 `DownstreamView`) — 문서 단위 참조의 키는 `"(문서)"`
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DownstreamView {
+    pub by_item: IndexMap<String, Vec<ItemRef>>,
+    pub by_document: Vec<DownstreamDoc>,
+}
+
+/// 끊어진 참조 한 행 (API-001 `BrokenRefSummary`) — `source`는 출발 항목, 항목 밖이면 출발 문서
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BrokenRefSummary {
+    pub source: ItemRef,
+    pub raw_target: String,
+}
+
+/// 문제 목록 한 행 (`GET …/flags`) — 끊어진 참조이거나 문서
+#[derive(Clone, Debug, PartialEq)]
+pub enum ProjectItem {
+    Broken(BrokenRefSummary),
+    Document(Box<DocumentSummary>),
+}
+
 /// 하위 참조가 있는 지운 항목 — `item-deletion-needs-confirm`의 한 칸. 하위는 출발 항목의 이름으로
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeletedItem {
