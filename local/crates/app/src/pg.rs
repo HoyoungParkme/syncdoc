@@ -134,12 +134,14 @@ impl Drop for PgServer {
 /// 디스크에 내리기를 아직 마치지 않은 데이터 자리의 표식 — `pgdata` 옆(카드 L19)
 pub const SYNC_MARK: &str = "pgdata.sync";
 
-/// `initdb --sync-only` — 미뤄 둔 디스크에 내리기(fsync)만
+/// `initdb --sync-only` — 미뤄 둔 디스크에 내리기(fsync)만. 앱이 끝나면 함께 끝난다 — 윈도는 끝난 앱의
+/// 자식이 남아 설치 폴더를 쥔다. 마치지 못했으면 표식이 남아 다음 켜기가 다시 한다(카드 L19)
 async fn sync_only(bin: &Path, pgdata: &Path) -> Result<(), Problem> {
     let out = Command::new(exe(bin, "initdb"))
         .arg("--sync-only")
         .arg("-D")
         .arg(pgdata)
+        .kill_on_drop(true)
         .output()
         .await;
     checked(out, "initdb --sync-only", None)
