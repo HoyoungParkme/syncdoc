@@ -833,6 +833,41 @@ async fn close_lets_the_repo_move_and_reads_reopen() {
 }
 
 #[tokio::test]
+async fn gc_packs_one_pack_per_save_over_the_limit() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, origin, work) = setup(tmp.path()).await;
+    let u = local_user();
+    // 저장마다 팩 하나(fastimport.unpackLimit=0) — 문턱(50)을 넘게
+    for i in 0..55 {
+        let body = format!("{i}\n");
+        g.commit(
+            &origin,
+            &work,
+            &format!("{i}"),
+            &u,
+            &files(&[("n.md", &body)]),
+            &[],
+        )
+        .await
+        .expect("커밋");
+    }
+    let packs = || {
+        std::fs::read_dir(origin.join("objects/pack"))
+            .expect("팩")
+            .flatten()
+            .filter(|e| e.path().extension().is_some_and(|x| x == "pack"))
+            .count()
+    };
+    let before = packs();
+    assert!(before > 50, "{before}");
+    let head = sh(&origin, &["rev-parse", "main"]);
+    g.gc(&origin).await.expect("gc");
+    assert!(packs() < before, "{before} → {}", packs());
+    assert_eq!(sh(&origin, &["rev-parse", "main"]), head);
+    assert_eq!(g.read(&origin, "n.md", "HEAD").await.expect("읽기"), "54\n");
+}
+
+#[tokio::test]
 async fn gc_packs_loose_objects_over_the_threshold() {
     let tmp = tempfile::tempdir().expect("임시");
     let (g, origin, work) = setup(tmp.path()).await;

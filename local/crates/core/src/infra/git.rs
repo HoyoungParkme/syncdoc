@@ -933,13 +933,21 @@ impl Git {
         })
     }
 
-    /// `git fast-import --quiet --done`에 한 번에 넣는다 — 끝 코드·표준 출력·표준 오류
+    /// `git fast-import --quiet --done`에 한 번에 넣는다 — 끝 코드·표준 출력·표준 오류.
+    /// 팩을 그대로 둔다(`fastimport.unpackLimit=0`) — 작은 것을 낱낱의 객체로 풀려고 `unpack-objects`를 하나 더
+    /// 띄우지 않게. 쌓인 팩은 하루 한 번 `gc`가 묶는다(카드 L19)
     async fn fast_import(
         &self,
         origin: &Path,
         stream: Vec<u8>,
     ) -> Result<(i32, String, String), Problem> {
-        let args = [os("fast-import"), os("--quiet"), os("--done")];
+        let args = [
+            os("-c"),
+            os("fastimport.unpackLimit=0"),
+            os("fast-import"),
+            os("--quiet"),
+            os("--done"),
+        ];
         let mut c = self.command(Some(origin), &args);
         c.stdin(Stdio::piped());
         let mut child = c.spawn().map_err(|e| Problem::Internal {
