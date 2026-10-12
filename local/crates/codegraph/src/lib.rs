@@ -12,7 +12,7 @@ mod ts;
 
 use serde::{Deserialize, Serialize};
 
-pub use community::communities;
+pub use community::{communities, widen};
 pub use enrich::enrich;
 pub use extract::extract;
 pub use graph::{

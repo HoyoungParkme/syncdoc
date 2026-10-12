@@ -6,13 +6,13 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use indexmap::IndexMap;
-use serde_json::Value;
+use serde_json::{Value, json};
 use syncdoc_pycompat::chars::strip;
 use syncdoc_pycompat::pysum::py_sum;
 use syncdoc_pycompat::random::PyRandom;
 
 use crate::graph::{clean, is_test, node_key, py_str, truthy};
-use crate::{Community, Function, Graph};
+use crate::{Call, Community, Function, Graph};
 
 /// networkx `louvain_communities`의 `threshold`
 const THRESHOLD: f64 = 0.0000001;
@@ -450,6 +450,78 @@ fn hub_labels(
         labels.insert(cid, clean(&label));
     }
     labels
+}
+
+/// SYNC-MS-022#codegraph.widen
+///
+/// 추출 원형에 보강이 찾은 함수(`파일:줄` 노드)와 호출 선을 더한다 — 추출은 TS/JS·Rust를 파일 노드로만 두어 그 함수들이
+/// 커뮤니티를 못 받았다(카드 L20). 커밋된 graph.json 원형에는 부르지 않는다(파이썬 판과 바이트로 같은 길)
+pub fn widen(raw: &Value, graph: &Graph) -> Value {
+    let key = if raw.get("links").is_some() {
+        "links"
+    } else {
+        "edges"
+    };
+    let mut nodes: Vec<Value> = raw
+        .get("nodes")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut links: Vec<Value> = raw
+        .get(key)
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut ids: HashSet<String> = nodes
+        .iter()
+        .filter_map(|n| n.get("id").map(py_str))
+        .collect();
+    let mut keys: HashSet<String> = nodes
+        .iter()
+        .filter_map(node_key)
+        .map(|(f, l)| format!("{f}:{l}"))
+        .collect();
+    // 무향 — 양 끝을 정렬한 쌍으로 같은 선을 한 번만
+    let pair = |a: &str, b: &str| {
+        if a <= b {
+            (a.to_string(), b.to_string())
+        } else {
+            (b.to_string(), a.to_string())
+        }
+    };
+    let end = |e: &Value, k: &str| e.get(k).map(py_str).unwrap_or_default();
+    let mut pairs: HashSet<(String, String)> = links
+        .iter()
+        .map(|e| pair(&end(e, "source"), &end(e, "target")))
+        .collect();
+    for f in &graph.functions {
+        if !keys.insert(f.key.clone()) {
+            continue;
+        }
+        nodes.push(
+            json!({"id": f.key, "label": format!("{}()", f.name), "file_type": "code",
+            "source_file": f.file, "source_location": format!("L{}", f.line), "_callable": true}),
+        );
+        ids.insert(f.key.clone());
+        if ids.contains(&f.file) && pairs.insert(pair(&f.file, &f.key)) {
+            links.push(
+                json!({"source": f.file, "target": f.key, "relation": "contains",
+                "confidence": "EXTRACTED"}),
+            );
+        }
+    }
+    for Call(from, to, _) in &graph.calls {
+        if ids.contains(from) && ids.contains(to) && pairs.insert(pair(from, to)) {
+            links.push(json!({"source": from, "target": to, "relation": "calls",
+                "confidence": "EXTRACTED"}));
+        }
+    }
+    let mut out = raw.clone();
+    if let Some(o) = out.as_object_mut() {
+        o.insert("nodes".into(), Value::Array(nodes));
+        o.insert(key.into(), Value::Array(links));
+    }
+    out
 }
 
 /// SYNC-MS-022#codegraph.communities
