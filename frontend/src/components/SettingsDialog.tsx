@@ -447,7 +447,7 @@ export function SettingsDialog({ user, onClose }: { user: Me; onClose: () => voi
             </div>
             {adminOpen && (
               <div className="admin" data-el="6">
-                <Admin />
+                <Admin onLeave={onClose} />
               </div>
             )}
           </section>
