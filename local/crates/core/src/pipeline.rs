@@ -17,6 +17,7 @@ use crate::account::service::AccountService;
 use crate::clock;
 use crate::codegraph::CodeGraphService;
 use crate::errors::Problem;
+use crate::infra::git::Committed;
 use crate::markdown::parse_frontmatter;
 use crate::project::repo as project_repo;
 use crate::project::service::{ProjectService, ServerRepos};
@@ -133,15 +134,16 @@ pub async fn read_pending(
             .await?
             .flatten()
     };
-    let head = repos.git.fetch(Path::new(&repo.workdir_path)).await?;
+    // 받지 않는다 — 서버 저장소의 main 끝을 읽는다(MS-017 0장, 카드 L19)
+    let head = repos.git.head(Path::new(&repo.remote_url)).await?;
     // 처리 지점이 없는 것은 등록 중뿐이다 — 등록이 스스로 저장소를 읽는다
-    if last.as_deref().is_none_or(|l| l == head) {
+    let Some(head) = head.filter(|h| last.as_deref().is_some_and(|l| l != h)) else {
         if last.is_some() {
             let mut c = pool.acquire().await?;
             project_repo::set_fetched(&mut c, repo.id, clock::now()).await?;
         }
         return Ok(0);
-    }
+    };
     // 이미 읽기 락 안이다
     Ok(process_commit(pool, repos, code, &head, true).await?.len() as i64)
 }
@@ -172,13 +174,13 @@ pub async fn process_commit(
     if last.as_deref() == Some(head) {
         return Ok(Vec::new());
     }
+    let origin = PathBuf::from(&repo.remote_url);
     let workdir = PathBuf::from(&repo.workdir_path);
-    repos.git.fetch(&workdir).await?;
     // 2. 이미 처리한 커밋이거나 그 조상이면 아무것도 안 한다 — 처리 지점을 뒤로 돌리지 않는다
     if let Some(l) = last.as_deref().filter(|l| !l.is_empty())
         && repos
             .git
-            .rev_list_count(&workdir, &format!("{l}..{head}"))
+            .rev_list_count(&origin, &format!("{l}..{head}"))
             .await?
             == 0
     {
@@ -190,7 +192,7 @@ pub async fn process_commit(
     };
     let mut files = repos
         .git
-        .changed_files(&workdir, &range, "docs/specs/")
+        .changed_files(&origin, &range, "docs/specs/")
         .await?;
     // 3b. 파이썬 판 그대로 — 디렉터리 이름(`02-PRD`)으로 찾아 번호 붙은 디렉터리는 모두 99, 경로 순이 곧 단계 순
     files.sort_by(|a, b| {
@@ -208,7 +210,7 @@ pub async fn process_commit(
     let mut results = Vec::new();
     let mut failed: Vec<String> = Vec::new();
     for f in &files {
-        match process_file(pool, repos, &workdir, code, f, head).await {
+        match process_file(pool, repos, &origin, code, f, head).await {
             Ok(r) => results.extend(r),
             Err(e) => {
                 tracing::warn!("process_commit {code} {}: {e}", f.path);
@@ -223,9 +225,13 @@ pub async fn process_commit(
         // 방금 head까지 처리했으니 뒤처짐은 0이다
         project_repo::set_fetched(&mut tx, repo.id, now).await?;
         tx.commit().await?;
+        // 작업 사본 폴더를 head로 — 첨부 파일 읽기만 쓴다(카드 L19)
+        if let Err(e) = repos.git.materialize(&origin, head, &workdir).await {
+            tracing::warn!("작업 사본 폴더 {code}: {e}");
+        }
         // 5a. 코드 그래프 — 코드가 바뀌었거나 아직 없으면 (UC-S8). 명세만 바뀐 커밋은 건너뛴다
         let paths = if last.as_deref().is_some_and(|l| !l.is_empty()) {
-            repos.git.changed_paths(&workdir, &range).await?
+            repos.git.changed_paths(&origin, &range).await?
         } else {
             Vec::new()
         };
@@ -269,18 +275,18 @@ type Processed<'a> = std::pin::Pin<
 fn process_file<'a>(
     pool: &'a PgPool,
     repos: &'a ServerRepos,
-    workdir: &'a Path,
+    origin: &'a Path,
     code: &'a str,
     f: &'a ChangedFile,
     head: &'a str,
 ) -> Processed<'a> {
-    Box::pin(process_file_inner(pool, repos, workdir, code, f, head))
+    Box::pin(process_file_inner(pool, repos, origin, code, f, head))
 }
 
 async fn process_file_inner(
     pool: &PgPool,
     repos: &ServerRepos,
-    workdir: &Path,
+    origin: &Path,
     code: &str,
     f: &ChangedFile,
     head: &str,
@@ -336,7 +342,7 @@ async fn process_file_inner(
     if known.contains(&f.commit_hash) {
         return Ok(Vec::new());
     }
-    let body = repos.git.read(workdir, &f.path, head).await?;
+    let body = repos.git.read(origin, &f.path, head).await?;
     // 파이썬 `DocType(dir_type)` — 모르는 디렉터리면 그 파일은 실패한다(사람 실수라 알린다)
     if DocType::parse(&dir_type).is_none() {
         return Err(Problem::Internal {
@@ -448,6 +454,7 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
             .get_owned(&code, &author.user)
             .await?
     };
+    let origin = Path::new(&repo.remote_url);
     let workdir = Path::new(&repo.workdir_path);
     let mut body = input.body.clone();
     // 2·3. 대상 문서 또는 생성
@@ -586,26 +593,34 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
             status_commit_hash = Some(
                 repos
                     .git
-                    .commit_push(
+                    .commit(
+                        origin,
                         workdir,
                         &format!("status({doc_id}): approved → draft\n\n본문 수정으로 자동 강등"),
                         &pusher,
                         &one,
                         &[],
                     )
-                    .await?,
+                    .await?
+                    .hash,
             );
         }
     }
-    // 7. push — 여기까지 DB 쓰기 없음. github은 커밋이 이미 저장소에 있다
-    let commit_hash = if github {
-        input.commit_hash.clone().unwrap_or_default()
+    // 7. 커밋 — 여기까지 DB 쓰기 없음. github은 커밋이 이미 저장소에 있다
+    let made = if github {
+        None
     } else {
         let files = IndexMap::from([(path.clone(), body.clone())]);
-        repos
-            .git
-            .commit_push(workdir, &input.message, &author.user, &files, &[])
-            .await?
+        Some(
+            repos
+                .git
+                .commit(origin, workdir, &input.message, &author.user, &files, &[])
+                .await?,
+        )
+    };
+    let commit_hash = match &made {
+        Some(m) => m.hash.clone(),
+        None => input.commit_hash.clone().unwrap_or_default(),
     };
     // 8. 트랜잭션 — 상태 줄만 바꾼 것은 판을 만들지 않는다
     if web_status && let Some(doc) = &document {
@@ -618,7 +633,7 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
                 input.reason.as_deref(),
             )
             .await?;
-        advance(repos, workdir, &mut tx, &repo, &commit_hash).await?;
+        advance(&mut tx, &repo, made.as_ref()).await?;
         tx.commit().await?;
         let mut c = pool.acquire().await?;
         let status = SpecService { db: &mut c }
@@ -701,7 +716,7 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
     }
     // 13a. 처리 지점 — 앱이 민 커밋은 이 저장이 곧 처리다. github은 처리하는 쪽이 옮긴다
     if !github {
-        advance(repos, workdir, &mut tx, &repo, &commit_hash).await?;
+        advance(&mut tx, &repo, made.as_ref()).await?;
     }
     // 14. 커밋
     tx.commit().await?;
@@ -730,15 +745,17 @@ async fn save(pool: &PgPool, repos: &ServerRepos, input: SaveInput) -> Result<Sa
     })
 }
 
-/// 처리 지점을 앞당긴다 — 앱이 민 커밋은 그 저장이 곧 처리다(파이썬 `_advance_processed`, `made` 1).
-/// 처리 지점부터 이 커밋까지가 하나일 때만 — 사이에 밖에서 push가 끼었으면 그대로 둔다
+/// 처리 지점을 앞당긴다 — 앱이 만든 커밋은 그 저장이 곧 처리다(파이썬 `_advance_processed`, `made` 1).
+/// 그 커밋의 부모가 처리 지점일 때만 — 파이썬 `rev_list_count("{처리 지점}..{해시}") == 1`과 같은 판정이다.
+/// 사이에 밖에서 push가 끼었으면 부모가 처리 지점이 아니라 그대로 둔다(MS-017 0장, 카드 L19)
 async fn advance(
-    repos: &ServerRepos,
-    workdir: &Path,
     db: &mut sqlx::PgConnection,
     repo: &crate::project::model::RepositoryRow,
-    commit_hash: &str,
+    made: Option<&Committed>,
 ) -> Result<(), Problem> {
+    let Some(made) = made else {
+        return Ok(());
+    };
     let Some(last) = repo
         .last_processed_commit
         .as_deref()
@@ -746,12 +763,8 @@ async fn advance(
     else {
         return Ok(());
     };
-    let behind = repos
-        .git
-        .rev_list_count(workdir, &format!("{last}..{commit_hash}"))
-        .await?;
-    if behind == 1 {
-        project_repo::advance_processed(db, repo.id, commit_hash, clock::now()).await?;
+    if made.parent.as_deref() == Some(last) && made.hash != last {
+        project_repo::advance_processed(db, repo.id, &made.hash, clock::now()).await?;
     }
     Ok(())
 }
@@ -813,7 +826,7 @@ pub async fn change_status(
     let path = format!("docs/specs/{}/{doc_id}.md", spec_dir(&s.doc_type));
     let src = match repos
         .git
-        .read(Path::new(&repo.workdir_path), &path, "origin/main")
+        .read(Path::new(&repo.remote_url), &path, "refs/heads/main")
         .await
     {
         Ok(b) => b,
@@ -1005,28 +1018,29 @@ async fn trash(
             inbound_refs: inbound,
         });
     }
-    // 4. push — 여기까지 DB 쓰기 없음
-    let workdir = Path::new(&repo.workdir_path);
+    // 4. 커밋 — 여기까지 DB 쓰기 없음
     let path = format!(
         "docs/specs/{}/{doc_id}.md",
         spec_dir(&document.summary.doc_type)
     );
-    let commit_hash = repos
+    let made = repos
         .git
-        .commit_push(
-            workdir,
+        .commit(
+            Path::new(&repo.remote_url),
+            Path::new(&repo.workdir_path),
             &format!("spec({doc_id}): 휴지통"),
             &author.user,
             &IndexMap::new(),
             &[path],
         )
         .await?;
+    let commit_hash = made.hash.clone();
     // 5. 항목 삭제됨 + 휴지통 표시 + 그것을 가리키던 참조는 미존재로
     let pks = SpecService { db: &mut tx }
         .trash(&document, &commit_hash, author)
         .await?;
     let broken = ReferenceService { db: &mut tx }.mark_missing(&pks).await?;
-    advance(repos, workdir, &mut tx, &repo, &commit_hash).await?;
+    advance(&mut tx, &repo, Some(&made)).await?;
     tx.commit().await?;
     Ok(TrashResult {
         next_step: format!("{doc_id} 휴지통에 넣음 — 끊어진 참조 {broken}. 사람에게 알리고 멈춘다"),
@@ -1068,7 +1082,7 @@ pub async fn restore_document(
     );
     let body = repos
         .git
-        .read(Path::new(&repo.workdir_path), &path, &format!("{hash}^"))
+        .read(Path::new(&repo.remote_url), &path, &format!("{hash}^"))
         .await?;
     // 3. DB가 초안이다 — mcp 경로의 frontmatter.status_change에 안 걸리게
     let body = STATUS_LINE
@@ -1155,6 +1169,11 @@ pub async fn rebuild(
     match rebuild_in(&mut tx, repos, &project, &repo).await {
         Ok((result, head)) => {
             tx.commit().await?;
+            // 9. 작업 사본 폴더를 head로 — 파이썬의 `checkout origin/main` (카드 L19)
+            let (origin, workdir) = (Path::new(&repo.remote_url), Path::new(&repo.workdir_path));
+            if let Err(e) = repos.git.materialize(origin, &head, workdir).await {
+                tracing::warn!("작업 사본 폴더 {code}: {e}");
+            }
             // 10. 재구축은 늘 다시 만든다 (UC-S8)
             schedule_code_graph(pool, repos, code, &head);
             Ok(result)
@@ -1176,16 +1195,18 @@ async fn rebuild_in(
     project: &crate::project::model::ProjectRow,
     repo: &crate::project::model::RepositoryRow,
 ) -> Result<(RebuildResult, String), Problem> {
-    let workdir = PathBuf::from(&repo.workdir_path);
+    let origin = PathBuf::from(&repo.remote_url);
     let mut result = RebuildResult::default();
-    // 2
-    let head = repos.git.fetch(&workdir).await?;
-    repos.git.checkout(&workdir, "origin/main").await?;
+    // 2. 받지 않는다 — 서버 저장소의 main 끝 (카드 L19)
+    let head = repos.git.head(&origin).await?.ok_or_else(|| Problem::Git {
+        cmd: "git rev-parse refs/heads/main".into(),
+        stderr: "빈 저장소다".into(),
+    })?;
     // 4. 판을 가리키는 외래 키는 참조의 것 하나 — 먼저 지운다(#38)
     ReferenceService { db: &mut *tx }.clear(project.id).await?;
     SpecService { db: &mut *tx }.clear_index(project.id).await?;
     // 5·6
-    for path in repos.git.list(&workdir, "docs/specs/*/*.md", &head).await? {
+    for path in repos.git.list(&origin, "docs/specs/*/*.md", &head).await? {
         let doc_id = path_stem(&path).to_string();
         let parts = path_parts(&path);
         let dir_type = if parts.len() > 3 {
@@ -1206,10 +1227,10 @@ async fn rebuild_in(
             Err(Problem::NotFound { .. }) => None,
             Err(p) => return Err(p),
         };
-        for c in repos.git.log(&workdir, &path).await? {
+        for c in repos.git.log(&origin, &path).await? {
             // 그 커밋 시점의 경로로 읽는다 — 이름이 바뀐 문서는 옛 커밋에서 옛 경로에 있다(#39)
             let at = if c.path.is_empty() { &path } else { &c.path };
-            let body = repos.git.read(&workdir, at, &c.hash).await?;
+            let body = repos.git.read(&origin, at, &c.hash).await?;
             let user = AccountService { db: &mut *tx }
                 .user_for_commit(&c.email, &c.login)
                 .await?;
@@ -1396,17 +1417,19 @@ pub async fn upload_code(
     // 4. 쓰기 전에 읽는다(DEV-19)
     read_pending(pool, repos, code, &author.user).await?;
     // 5
-    let workdir = PathBuf::from(&repo.workdir_path);
-    let (before, commit) = {
+    let (origin, workdir) = (
+        PathBuf::from(&repo.remote_url),
+        PathBuf::from(&repo.workdir_path),
+    );
+    let made = {
         let lock = write_lock(code);
         let _held = lock.lock().await;
-        let before = repos.git.fetch(&workdir).await?;
-        let commit = repos
+        repos
             .git
-            .commit_push(&workdir, message, &author.user, files, delete)
-            .await?;
-        (before, commit)
+            .commit(&origin, &workdir, message, &author.user, files, delete)
+            .await?
     };
+    let (before, commit) = (made.parent.unwrap_or_default(), made.hash);
     // 6. 처리 지점을 이 커밋으로 — 명세 경로가 없으니 판은 생기지 않는다(코드 그래프는 L12)
     read_pending(pool, repos, code, &author.user).await?;
     Ok(UploadResult {
@@ -1501,14 +1524,18 @@ async fn catch_up_one(
         ProjectService { db: &mut c, repos }.get(code).await?
     };
     let last = repo.last_processed_commit.filter(|l| !l.is_empty());
-    let workdir = PathBuf::from(&repo.workdir_path);
-    let head = repos.git.fetch(&workdir).await?;
+    let origin = PathBuf::from(&repo.remote_url);
+    // 받지 않는다 — 서버 저장소의 main 끝. 커밋이 없는 저장소는 건너뛴다 (카드 L19)
+    let Some(head) = repos.git.head(&origin).await? else {
+        return Ok(Vec::new());
+    };
     let behind = match &last {
+        Some(l) if *l == head => Some(0),
         Some(l) => Some(
             i32::try_from(
                 repos
                     .git
-                    .rev_list_count(&workdir, &format!("{l}..{head}"))
+                    .rev_list_count(&origin, &format!("{l}..{head}"))
                     .await?,
             )
             .unwrap_or(i32::MAX),
@@ -1592,7 +1619,7 @@ pub fn schedule_code_graph(pool: &PgPool, repos: &ServerRepos, code: &str, commi
 /// `build_code_graph` 2~3 — 커밋을 임시 폴더에 풀어 원형을 얻고 줄이고 보강한다. 실패는 이유 문장
 async fn graph_of(
     repos: &ServerRepos,
-    workdir: &Path,
+    origin: &Path,
     commit: &str,
 ) -> Result<(String, syncdoc_codegraph::Graph), String> {
     let tmp = tempfile::Builder::new()
@@ -1601,7 +1628,7 @@ async fn graph_of(
         .map_err(|e| e.to_string())?;
     repos
         .git
-        .archive(workdir, commit, tmp.path())
+        .archive(origin, commit, tmp.path())
         .await
         .map_err(|e| e.to_string())?;
     let src = tmp.path().to_path_buf();
@@ -1640,7 +1667,7 @@ pub async fn build_code_graph(pool: &PgPool, repos: &ServerRepos, code: &str, co
     };
     let t0 = Instant::now();
     let short: String = commit.chars().take(7).collect();
-    let saved = match graph_of(repos, Path::new(&repo.workdir_path), commit).await {
+    let saved = match graph_of(repos, Path::new(&repo.remote_url), commit).await {
         Ok((source, graph)) => {
             let save = async {
                 let mut tx = pool.begin().await?;

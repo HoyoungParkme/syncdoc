@@ -82,7 +82,8 @@ fn git_from(env: Option<std::ffi::OsString>, exe_dir: Option<PathBuf>) -> Result
         .filter(|v| !v.is_empty())
         .map(PathBuf::from)
         // 윈도는 설치 폴더의 MinGit — PATH를 고치지 않는다
-        .or_else(|| exe_dir.map(|d| d.join("mingit").join("cmd").join("git.exe")));
+        // 런처 `cmd/git.exe`가 아니라 진짜 git — 런처는 git마다 프로세스를 하나 더 띄운다(카드 L19)
+        .or_else(|| exe_dir.map(|d| d.join("mingit").join("ucrt64").join("bin").join("git.exe")));
     match given {
         Some(p) if p.is_file() => Ok(p),
         Some(p) => Err(Problem::Internal {

@@ -63,7 +63,14 @@ pub struct Serving {
     pub pool: PgPool,
     /// 이 PC — 트레이의 「지금 백업」이 부른다
     pub local: Arc<Local>,
+    /// git 읽기 프로세스를 끌 때 모두 끈다(카드 L19)
+    pub git: Git,
 }
+
+/// 데이터 자리의 git 전역 설정 — 사용자 설정 대신(카드 L6). 자동 gc·maintenance를 끄고 하루 한 번
+/// `Git.gc`가 대신한다(카드 L19). 켤 때마다 이 내용으로 쓴다
+const GITCONFIG: &str =
+    "[gc]\n\tauto = 0\n[maintenance]\n\tauto = false\n[receive]\n\tautogc = false\n";
 
 /// 주기 확인 — 파이썬 판 `POLL_INTERVAL_SECONDS` 기본값. 설정 키에 없어 고정한다(INFRA 9.3)
 const POLL_INTERVAL: Duration = Duration::from_secs(300);
@@ -84,10 +91,7 @@ fn make_dirs(data: &Path) -> Result<(), Problem> {
     ] {
         fs::create_dir_all(dir)?;
     }
-    let global_config = data.join("gitconfig");
-    if !global_config.is_file() {
-        fs::write(&global_config, "")?;
-    }
+    fs::write(data.join("gitconfig"), GITCONFIG)?;
     Ok(())
 }
 
@@ -270,12 +274,9 @@ async fn serve(
         conf.public_base_url.clone()
     };
     let root = std::path::absolute(data)?;
-    let git = Git {
-        exe: git_exe.to_path_buf(),
-        global_config: root.join("gitconfig"),
-    };
+    let git = Git::new(git_exe.to_path_buf(), root.join("gitconfig"));
     let repos = Arc::new(ServerRepos {
-        git: Clone::clone(&git), // Git::clone(작업 사본 받기)와 이름이 겹친다
+        git: git.clone(),
         origins: root.join("origins"),
         repos: root.join("repos"),
         specs_url: format!("{public}/specs"),
@@ -300,7 +301,7 @@ async fn serve(
             port: pg.port,
             password: pg.password.clone(),
         },
-        git,
+        git: git.clone(),
         shared: shared.clone(),
         ops: ops.clone(),
     });
@@ -344,6 +345,7 @@ async fn serve(
             background: vec![catching, polling, daily],
             pool,
             local,
+            git,
         },
         port,
     ))
@@ -351,7 +353,11 @@ async fn serve(
 
 /// 연결 풀을 열고 이전 SQL을 올린 뒤 로컬 사용자를 둔다
 async fn prepare(server: &PgServer, conf: &Settings) -> Result<PgPool, Problem> {
+    // 쉬는 연결을 닫지 않는다 — 윈도는 연결마다 postgres 프로세스를 띄워 다시 맺는 값이 크다(카드 L19)
     let pool = PgPoolOptions::new()
+        .max_connections(10)
+        .idle_timeout(None)
+        .max_lifetime(None)
         .connect_with(server.options.clone())
         .await?;
     let mut conn = pool.acquire().await?;
@@ -397,6 +403,7 @@ pub async fn shutdown(serving: Serving) {
         background,
         pool,
         local,
+        git,
     } = serving;
     drop(local);
     let _ = stop.send(());
@@ -416,6 +423,8 @@ pub async fn shutdown(serving: Serving) {
         tracing::warn!("저장이 끝나기를 10초 기다렸다 — 끊는다");
     }
     pool.close().await;
+    // 5. 읽기 프로세스를 모두 끈다 — 되살리기·옮기기가 서버 저장소 폴더를 바꾸기 전에(윈도는 열린 팩 파일이 있으면 못 한다)
+    Git::close_all(&git).await;
 }
 
 fn remove_instance(data_dir: &Path) {

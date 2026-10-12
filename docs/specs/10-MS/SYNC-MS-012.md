@@ -60,15 +60,15 @@ pub async fn run(args: Args, tray: Option<TrayLink>) -> Result<(), Problem>
 **입력** `Args` — `--data-dir`(없으면 [[#paths.data_dir]]) · `--port`(기본 8010, 0이면 OS가 고른 포트 — 시험용) · `--no-tray`(트레이 없이 — 개발·시험) · `--no-browser`(브라우저를 열지 않는다 — 시험용) · `--autostart`(로그인 때 자동 시작이 붙인다 — 트레이로만, 브라우저를 열지 않는다. 사용자 결정 2026-10-08). `tray` — [[#tray.run]]이 넘긴 짝: 켜진 주소를 보낼 곳 · 「끝내기」를 받을 곳 · 「지금 백업」을 받을 곳. `--no-tray`면 없다
 
 **처리** 고리가 둘이다 — 바깥은 데이터 자리(잠금·로그 대상·PostgreSQL), 안은 켜기(설정·연결 풀·서빙). 다시 켜기(카드 L16)는 프로그램과 트레이를 그대로 두고 고리를 다시 돈다
-1. `data = args.data_dir` 또는 `paths.data_dir()` · `data`와 그 안 `logs/`·`origins/`·`repos/`를 만든다 · 빈 `gitconfig`를 둔다 — git이 사용자 전역 설정 대신 읽는다([[SYNC-MS-019]] 0장, 카드 L6)
+1. `data = args.data_dir` 또는 `paths.data_dir()` · `data`와 그 안 `logs/`·`origins/`·`repos/`를 만든다 · `gitconfig`를 고정 내용으로 쓴다(켤 때마다 — `gc.auto=0` · `maintenance.auto=false` · `receive.autogc=false`) — git이 사용자 전역 설정 대신 읽는다. 자동 정리를 끄고 하루 한 번 [[SYNC-MS-019#Git.gc]]가 대신한다([[SYNC-MS-019]] 0장, 카드 L6·L19)
 2. `lock = instance.acquire(data)` · if `None`(이미 켜져 있다) → `url = instance.open_running(data, !no_browser)` · 표준 출력에 `url` · `→ Ok`
 3. `guard = logs.init(data)` — 이 뒤로 로그가 파일과 표준 오류에 남는다 · 프로세스 내내 사는 `Shared`(마지막 백업·마지막 다시 켜기·백업 잠금, [[SYNC-MS-023]] 0장)
 4. **바깥 고리(데이터 자리)** — `pg = pg.start(paths.pg_dir(), data)`
 5. **안 고리(켜기)**
    1. `settings = settings.load(data)`
-   2. 연결 풀(sqlx 기본, 최대 10)을 연다 · 연결 하나로 `migrate.apply` · 트랜잭션을 열어 `AccountService { db }.ensure_local_user(settings.local_login, settings.local_name)` 후 커밋 — 실패하면 `pg.stop` 뒤 그 `Problem`
+   2. 연결 풀(최대 10, 쉬는 연결을 닫지 않는다 — `idle_timeout`·`max_lifetime` 없음. 윈도는 연결마다 postgres 프로세스를 띄워 다시 맺는 값이 크다, 카드 L19)을 연다 · 연결 하나로 `migrate.apply` · 트랜잭션을 열어 `AccountService { db }.ensure_local_user(settings.local_login, settings.local_name)` 후 커밋 — 실패하면 `pg.stop` 뒤 그 `Problem`
    3. 묶는 곳 — `settings.public_base_url`이 있으면 모든 주소(`0.0.0.0`), 없으면 `127.0.0.1`(같은 망 열기, INFRA 9.4) · 처음이면 `listener = runtime.bind(곳, port, port + 9)`(0이면 `bind(곳, 0, 0)`), 다시 켜는 것이면 지난 포트를 먼저 · 받은 포트가 `port`가 아니면 「{port}을 못 써 {실제}에 열었다 — 에이전트의 MCP 주소도 바뀐다」를 로그와 표준 출력에
-   4. `instance.publish(data, 실제 포트)` · 공개 주소 = `settings.public_base_url`(끝 `/`를 뗀 것) 또는 `http://127.0.0.1:{실제 포트}` · 서버 저장소 자리 `ServerRepos { git: Git { exe: paths.git(), global_config: data/gitconfig }, origins: data/origins, repos: data/repos, specs_url: {공개 주소}/specs }`(카드 L6)
+   4. `instance.publish(data, 실제 포트)` · 공개 주소 = `settings.public_base_url`(끝 `/`를 뗀 것) 또는 `http://127.0.0.1:{실제 포트}` · 서버 저장소 자리 `ServerRepos { git: Git::new(paths.git(), data/gitconfig), origins: data/origins, repos: data/repos, specs_url: {공개 주소}/specs }`(카드 L6·L19)
    5. 작업 사본 맞추기 — `ProjectService { db, repos }.rehome()`([[SYNC-MS-013#ProjectService.rehome]]) · 다시 만든 코드는 로그에(카드 L16 — 옮긴 자리·되살린 백업) · 서버를 조립한다 — 가드의 공개 netloc(공개 주소의 `이름[:포트]`) · 이 PC `Local`([[SYNC-MS-023]] — 데이터 자리·PostgreSQL·git·`Shared`·다시 켜기 통로)
    6. 따라잡기 — [[SYNC-MS-017#pipeline.catch_up]]을 따로 한 번 띄우고(기다리지 않는다 — 꺼져 있던 동안 쌓인 커밋) [[SYNC-MS-017#pipeline.poll_loop]]`(300초)`와 [[SYNC-MS-023#backup.daily]]를 띄운다(INFRA 9.1 켜기·9.6)
    7. 처음 켜질 때만 — 「싱크독_로컬 — http://127.0.0.1:{실제 포트}/」를 로그와 표준 출력에 · `tray`가 있으면 주소를 보낸다 · if `--autostart`도 `--no-browser`도 아니다 → 기본 브라우저로 연다(못 열면 로그만, 사용자 결정 2026-10-08)
@@ -83,7 +83,7 @@ pub async fn run(args: Args, tray: Option<TrayLink>) -> Result<(), Problem>
 
 **예외** 1~5의 `Problem`은 그대로 — `main`이 끝 코드 1. 다시 켠 뒤 5에서 실패해도 그렇다(설정 저장은 처리기가 먼저 검사한다)
 
-**호출하는 것** [[#paths.data_dir]] · [[#instance.acquire]] · [[#instance.open_running]] · [[#logs.init]] · [[#settings.load]] · [[#paths.pg_dir]] · [[#paths.git]] · [[#pg.start]] · [[#migrate.apply]] · [[SYNC-MS-016#AccountService.ensure_local_user]] · [[SYNC-MS-013#ProjectService.rehome]] · [[#runtime.bind]] · [[#instance.publish]] · [[SYNC-MS-017#pipeline.catch_up]] · [[SYNC-MS-017#pipeline.poll_loop]] · [[SYNC-MS-023#backup.daily]] · [[#runtime.shutdown]] · [[#pg.stop]] · [[SYNC-MS-023#backup.restore]] · [[SYNC-MS-023#datadir.copy]] · [[#paths.set_data_dir]] · [[#logs.retarget]]
+**호출하는 것** [[#paths.data_dir]] · [[#instance.acquire]] · [[#instance.open_running]] · [[#logs.init]] · [[#settings.load]] · [[#paths.pg_dir]] · [[#paths.git]] · [[SYNC-MS-019#Git.new]] · [[#pg.start]] · [[#migrate.apply]] · [[SYNC-MS-016#AccountService.ensure_local_user]] · [[SYNC-MS-013#ProjectService.rehome]] · [[#runtime.bind]] · [[#instance.publish]] · [[SYNC-MS-017#pipeline.catch_up]] · [[SYNC-MS-017#pipeline.poll_loop]] · [[SYNC-MS-023#backup.daily]] · [[#runtime.shutdown]] · [[#pg.stop]] · [[SYNC-MS-023#backup.restore]] · [[SYNC-MS-023#datadir.copy]] · [[#paths.set_data_dir]] · [[#logs.retarget]]
 
 **테스트 관점** 실행 파일 시험(임시 데이터 자리) — 꺼진 동안 서버 저장소에 민 명세 커밋이 켜면 문서가 된다 · 켜면 `/health`·`/api/me`가 뜨고 `instance.json`이 생긴다 · 트레이의 끝내기 신호로도 끝난다(끄는 순서는 같다) · `--autostart`·`--no-browser`면 브라우저를 열지 않는다 · 두 번째 실행은 주소를 찍고 끝 코드 0 · SIGINT로 10초 안에 끝나고 `postmaster.pid`·`instance.json`이 없다 · 다시 켜면 같은 데이터 · `LOCAL_LOGIN`이 남의 아이디면 끝 코드 1과 그 문장, PostgreSQL은 멈춰 있다 · 켜기 시간을 찍어 둔다(첫 실행·다시 켜기 — 판정은 L17) · 설정 저장 → 같은 포트로 다시 뜨고 바뀐 이름이 `/api/me`에 · 백업 → 문서 더함 → 되살리기 → 그 문서가 없다 · 옮기기 → 새 자리에서 같은 문서, 옛 자리는 그대로, `instance.json`은 새 자리에 · `PUBLIC_BASE_URL`이면 그 이름의 Host가 통과한다
 ---
@@ -115,19 +115,20 @@ pub async fn shutdown(serving: Serving)
 
 근거: [[SYNC-INFRA-001]] 9.1 끄기 · 9.6 다시 켜기(카드 L16)
 
-**입력** `Serving` — 서버 작업·끄기 신호·따로 띄운 작업(따라잡기·주기 확인·하루 한 번 백업)·연결 풀
+**입력** `Serving` — 서버 작업·끄기 신호·따로 띄운 작업(따라잡기·주기 확인·하루 한 번 백업)·연결 풀·git 어댑터
 
 **처리**
 1. 서버에 끄기 신호 — 새 연결을 받지 않는다
 2. 따로 띄운 작업을 멈춘다(파이썬 판 `lifespan`이 끌 때 취소하는 것과 같다)
 3. 진행 중 요청과 쓰기 락([[SYNC-MS-017#pipeline.wait_idle]])을 합쳐 최대 10초 기다린다 · 넘으면 끊는다 — INFRA 9.1의 「쓰기 락이 풀리기를 기다린다」. 요청이 끊겨도 저장은 따로 돌므로([[SYNC-MS-017#pipeline.save_pipeline]]) git과 DB 사이에 있는 저장까지(카드 L7)
 4. 연결 풀을 닫는다
+5. git 읽기 프로세스를 모두 끈다([[SYNC-MS-019#Git.close_all]], 카드 L19) — 되살리기·옮기기가 서버 저장소 폴더를 바꾸거나 옮기기 전에(윈도는 열린 팩 파일이 있으면 못 한다)
 
 PostgreSQL·`instance.json`·잠금은 [[#runtime.run]]이 쥔다 — 끌 때는 그 뒤 `pg.stop`, 다시 켤 때는 그대로(옮기기면 `pg.stop`)
 
-**호출하는 것** [[SYNC-MS-017#pipeline.wait_idle]]
+**호출하는 것** [[SYNC-MS-017#pipeline.wait_idle]] · [[SYNC-MS-019#Git.close_all]]
 
-**테스트 관점** 느린 요청이 있어도 10초 안에 끝난다 · 끝난 뒤 그 포트를 다시 묶을 수 있다
+**테스트 관점** 느린 요청이 있어도 10초 안에 끝난다 · 읽기 프로세스를 끄는 것은 [[SYNC-MS-019#Git.close_all]] 시험이 본다(띄운 것이 모두 끝나고 폴더를 옮길 수 있다) · 끝난 뒤 그 포트를 다시 묶을 수 있다
 ---
 
 #### tray.run 트레이 — 열기·끝내기
@@ -245,7 +246,7 @@ pub fn git() -> Result<PathBuf, Problem>
 
 근거: [[SYNC-INFRA-001]] 9.1·9.2 — 윈도는 함께 담은 MinGit, 리눅스는 시스템 git(카드 L6)
 
-**처리** 환경 변수 `SYNCDOC_LOCAL_GIT`가 있으면 그것 · 윈도는 실행 파일 옆 `mingit/cmd/git.exe` · 그 밖은 `git`(PATH에서 찾는다 — .deb가 의존한다) · 자리를 준 것(환경 변수·윈도)인데 파일이 없으면 `Problem`
+**처리** 환경 변수 `SYNCDOC_LOCAL_GIT`가 있으면 그것 · 윈도는 실행 파일 옆 `mingit/ucrt64/bin/git.exe` — MinGit의 진짜 git. 런처 `cmd/git.exe`는 그것을 한 번 더 띄워 git마다 프로세스가 둘이다(카드 L19 — 같은 PC에서 63ms → 45ms) · 그 밖은 `git`(PATH에서 찾는다 — .deb가 의존한다) · 자리를 준 것(환경 변수·윈도)인데 파일이 없으면 `Problem`
 
 **예외** `! Internal`(「git을 못 찾았다 — {자리}」)
 
@@ -396,17 +397,19 @@ pub async fn start(pg_dir: &Path, data_dir: &Path) -> Result<PgServer, Problem>
 **처리**
 1. `bin/initdb`·`bin/postgres`·`bin/pg_ctl`이 있나 — 없으면 `Problem`
 2. `pw` = 무작위 32자(영숫자)
-3. if `pgdata/`가 없다(처음) → `initdb -D pgdata.init -U syncdoc -A scram-sha-256 --pwfile=… -E UTF8 --locale=C` — 암호 파일은 사용자만 읽고 바로 지운다 · `pgdata.init`을 `pgdata`로 이름 바꿈 — 반쯤 만든 것을 다음 실행이 완성본으로 읽지 않게. 역할 이름은 Docker 판과 같은 `syncdoc`이다 — 한 판의 덤프가 다른 판에 그대로 들어간다
+3. if `pgdata/`가 없다(처음) → `initdb -D pgdata.init -U syncdoc -A scram-sha-256 --pwfile=… -E UTF8 --locale=C --no-sync` — 암호 파일은 사용자만 읽고 바로 지운다 · 표식 `pgdata.sync`(빈 파일)를 두고 `pgdata.init`을 `pgdata`로 이름 바꿈 — 반쯤 만든 것을 다음 실행이 완성본으로 읽지 않게 · 디스크에 내리기(`fsync`)는 7 뒤로 미룬다(카드 L19 — 윈도에서 initdb 6.5초가 3.3초). 역할 이름은 Docker 판과 같은 `syncdoc`이다 — 한 판의 덤프가 다른 판에 그대로 들어간다
 4. if `pgdata/postmaster.pid`가 있고 `pg_ctl status`가 돌고 있다 → `pg_ctl stop -m fast` — 지난번 비정상 종료로 남은 서버
 5. `postgres --single -D pgdata postgres`의 표준 입력으로 `ALTER ROLE syncdoc PASSWORD pw` · `ALTER SYSTEM SET` `listen_addresses='127.0.0.1'` · `timezone='UTC'` · `log_timezone='UTC'` · `logging_collector=on` · `log_directory='../logs'` · `log_filename='postgresql-%Y-%m-%d.log'` · 유닉스는 `unix_socket_directories=''` — 켤 때마다 암호가 바뀐다. 암호는 디스크·명령줄·로그에 남지 않는다
 6. `127.0.0.1:0`에 잠깐 묶어 빈 포트를 얻고 `pg_ctl start -D pgdata -w -t 60 -l logs/postgresql-boot.log -o "-p {포트}"` — 따로 프로세스 묶음으로 띄운다. `pg_ctl`의 표준 출력·오류는 `logs/pg_ctl.log`로 받는다 — 윈도의 `pg_ctl`은 핸들을 물려주며 서버를 띄워, 파이프로 받으면 서버가 끝날 때까지 기다린다. 터미널의 Ctrl+C가 PostgreSQL에 바로 닿지 않게 하고, 멈추는 순서는 [[#runtime.shutdown]]이 쥔다 · 실패하면 다른 포트로 두 번 더
+3a. if 표식 `pgdata.sync`가 있다(지난번 디스크에 내리기를 마치지 못했다) → `initdb --sync-only -D pgdata`를 끝내고 표식을 지운다 — 서버를 띄우기 전에
 7. `syncdoc` 역할로 `postgres` DB에 붙어 `syncdoc` DB가 없으면 만든다
+8. 이번에 3을 했으면 따로 띄운 작업에서 `initdb --sync-only -D pgdata` · 끝나면 표식을 지운다(실패는 로그만 — 표식이 남아 다음 켜기의 3a가 다시 한다) · 기다리지 않는다 · 앱이 끝나면 함께 끝낸다(윈도는 끝난 앱의 자식이 남아 설치 폴더를 쥔다 — 표식이 남아 다음 켜기가 다시 한다)
 
 **출력** `PgServer { options, port, pgdata, bin, password }` — `options`는 127.0.0.1·포트·`syncdoc`·`pw`·DB `syncdoc`, `password`는 `pw`(백업의 `pg_dump`·`pg_restore`가 환경 변수로 쓴다, 카드 L16). 놓이면(패닉 등) `pg_ctl stop`을 한 번 시도한다
 
 **예외** 1 · `initdb`·`postgres --single`·`pg_ctl` 실패(로그 경로와 함께) · 7 → `! Internal`
 
-**테스트 관점** (진짜 바이너리, 임시 데이터 자리) 처음 → 역할 `syncdoc` · `SHOW listen_addresses`가 127.0.0.1 · `SHOW fsync`가 on · 인코딩 UTF8·정렬 C · DB `syncdoc`이 있다 · 두 번째 → 데이터가 그대로 · 새 암호만 되고 옛 암호는 안 된다 · 앞 서버를 멈추지 않고 버려도 다음 `start`가 된다 · 암호 파일이 남지 않는다
+**테스트 관점** (진짜 바이너리, 임시 데이터 자리) 처음 → 역할 `syncdoc` · `SHOW listen_addresses`가 127.0.0.1 · `SHOW fsync`가 on · 표식이 생겼다가 뒤에서 지워진다 · 표식을 남겨 두고 켜면 서버가 뜨기 전에 지워진다 · 인코딩 UTF8·정렬 C · DB `syncdoc`이 있다 · 두 번째 → 데이터가 그대로 · 새 암호만 되고 옛 암호는 안 된다 · 앞 서버를 멈추지 않고 버려도 다음 `start`가 된다 · 암호 파일이 남지 않는다
 
 ---
 

@@ -78,7 +78,7 @@ class Rust:
 
     def start(self) -> float:
         env = {**os.environ, "SYNCDOC_LOCAL_PG_DIR": str(PG_DIR)}
-        if WINDOWS:  # 설치 폴더의 MinGit 대신 시스템 git
+        if WINDOWS:  # xtask가 설치판과 같은 고정 MinGit을 넘긴다(카드 L19) — 없으면 시스템 git
             env.setdefault("SYNCDOC_LOCAL_GIT", shutil.which("git") or "git")
         t0 = time.monotonic()
         self.proc = subprocess.Popen(
@@ -210,9 +210,10 @@ def token(url: str) -> str:
     return r.json()["token"]
 
 
-def mcp(url: str, tok: str, name: str, args: dict) -> dict:
+def mcp(c: httpx.Client, url: str, tok: str, name: str, args: dict) -> dict:
+    """연결을 다시 쓴다 — 윈도에서 클라이언트를 새로 만들면 인증서를 읽느라 300ms쯤이 붙는다(두 판에 똑같이)"""
     body = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": name, "arguments": args}}
-    r = httpx.post(
+    r = c.post(
         f"{url}/mcp",
         json=body,
         headers={"Authorization": f"Bearer {tok}", "Accept": "application/json, text/event-stream"},
@@ -276,16 +277,18 @@ def saves(url: str, tok: str, rounds: int) -> list[float]:
     show = ["git", "-C", str(REPO), "show", f"main:{path}"]
     body = subprocess.run(show, capture_output=True, encoding="utf-8", check=True).stdout
     ts = []
+    c = httpx.Client(timeout=120)
     for i in range(rounds):
-        cur = httpx.get(f"{url}/api/docs/SYNC-RFQ-001", timeout=30).json()
+        cur = c.get(f"{url}/api/docs/SYNC-RFQ-001").json()
         text = re.sub(r"^status: \w+", f"status: {cur['status']}", body, count=1, flags=re.M)
         text = re.sub(r"(\n#### Q1 [^\n]*\n[^\n]*)", lambda m: m.group(1) + f" (속도 {i})", text, count=1)
         t0 = time.perf_counter()
-        mcp(url, tok, "update_document", {
+        mcp(c, url, tok, "update_document", {
             "doc_id": "SYNC-RFQ-001", "body": text, "expected_version": cur["current_version_no"],
             "message": f"속도 {i}", "changed_items": ["Q1"],
         })  # fmt: skip
         ts.append(time.perf_counter() - t0)
+    c.close()
     return ts
 
 

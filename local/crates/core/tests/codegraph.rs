@@ -43,8 +43,9 @@ impl Env {
         self.pool().acquire().await.expect("연결")
     }
 
-    fn workdir(&self) -> PathBuf {
-        self.repos.repos.join(CODE)
+    /// 서버 저장소 — git은 늘 여기서 돈다(카드 L19)
+    fn origin(&self) -> PathBuf {
+        self.repos.origins.join(format!("{CODE}.git"))
     }
 
     /// 서버 저장소의 다른 사본 — 밖에서 git으로 미는 사람
@@ -260,7 +261,8 @@ async fn read_is_the_graph_commit_and_refuses_secrets_and_escapes() {
     e.push(&[("app/long.py", "바뀜\n")], "뒤 커밋");
     let mut c = e.conn().await;
     let mut svc = CodeGraphService { db: &mut c };
-    let wd = e.workdir();
+    // 코드는 서버 저장소에서 읽는다(카드 L19)
+    let wd = e.origin();
     // 그래프 없음 → not-found(code_graph)
     assert_eq!(
         not_found(
@@ -272,8 +274,6 @@ async fn read_is_the_graph_commit_and_refuses_secrets_and_escapes() {
     svc.save(e.project_id, &first, "server", &Graph::default())
         .await
         .expect("저장");
-    // 작업 사본은 아직 골격 — 원본에서 받아 둔다(읽기는 그 커밋의 개체를 본다)
-    e.repos.git.fetch(&wd).await.expect("받기");
     let t = svc
         .read(
             &e.repos.git,
@@ -371,8 +371,7 @@ async fn changed_paths_and_archive_only_committed_regular_files() {
 async fn build_from_push_follows_committed_graph_json_and_keeps_old_on_failure() {
     let e = env().await;
     let head = e.push(&[("app/svc.py", SVC)], "코드");
-    // 밀린 커밋 읽기는 그래프 만들기를 따로 건다 — 여기서는 직접 부르므로 받기만
-    e.repos.git.fetch(&e.workdir()).await.expect("받기");
+    // 밀린 커밋 읽기는 그래프 만들기를 따로 건다 — 여기서는 직접 부른다(받기 없음 — 서버 저장소에서 읽는다)
     pipeline::build_code_graph(e.pool(), &e.repos, CODE, &head).await;
     let r = e
         .wait_row(|r| r.commit_hash.as_deref() == Some(head.as_str()))
@@ -414,7 +413,6 @@ async fn build_from_push_follows_committed_graph_json_and_keeps_old_on_failure()
     // 커밋된 graph.json이 있으면 그것 — 출처 repo
     let raw = r#"{"nodes": [{"id": "f", "label": "f()", "file_type": "code", "source_file": "app/svc.py", "source_location": "L6", "_callable": true}], "links": []}"#;
     let head = e.push(&[("graphify-out/graph.json", raw)], "그래프");
-    e.repos.git.fetch(&e.workdir()).await.expect("받기");
     pipeline::build_code_graph(e.pool(), &e.repos, CODE, &head).await;
     let r = e.row().await.expect("행");
     assert_eq!(
@@ -425,7 +423,6 @@ async fn build_from_push_follows_committed_graph_json_and_keeps_old_on_failure()
     assert_eq!(r.function_count, 3);
     // 깨진 graph.json → 옛 그래프를 두고 error
     let bad = e.push(&[("graphify-out/graph.json", "{깨짐")], "깨진 그래프");
-    e.repos.git.fetch(&e.workdir()).await.expect("받기");
     pipeline::build_code_graph(e.pool(), &e.repos, CODE, &bad).await;
     let after = e.row().await.expect("행");
     assert_eq!(after.commit_hash, r.commit_hash);
@@ -490,7 +487,6 @@ async fn scheduling_while_running_builds_the_last_once_more() {
     let a = e.push(&[("app/a.py", "def a():\n    return 1\n")], "a");
     let b = e.push(&[("app/b.py", "def b():\n    return 2\n")], "b");
     let c = e.push(&[("app/c.py", "def c():\n    return 3\n")], "c");
-    e.repos.git.fetch(&e.workdir()).await.expect("받기");
     pipeline::schedule_code_graph(e.pool(), &e.repos, CODE, &a);
     pipeline::schedule_code_graph(e.pool(), &e.repos, CODE, &b);
     pipeline::schedule_code_graph(e.pool(), &e.repos, CODE, &c);

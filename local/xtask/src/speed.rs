@@ -8,7 +8,17 @@ use crate::{local_root, repo_root};
 
 pub fn run(rounds: usize) -> Result<(), String> {
     let contract = repo_root().join("contract");
-    let status = Command::new("uv")
+    let mut uv = Command::new("uv");
+    // 윈도는 설치판처럼 고정 MinGit의 진짜 git으로 잰다 — 시스템 git이 아니다(카드 L19)
+    if cfg!(windows) && std::env::var_os("SYNCDOC_LOCAL_GIT").is_none() {
+        let dest = local_root().join("target").join("mingit");
+        let exe = dest.join("ucrt64").join("bin").join("git.exe");
+        if !exe.is_file() {
+            crate::package::mingit(&dest)?;
+        }
+        uv.env("SYNCDOC_LOCAL_GIT", exe);
+    }
+    let status = uv
         .args(["run", "--quiet", "--project"])
         .arg(&contract)
         .arg("python")

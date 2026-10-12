@@ -12,10 +12,7 @@ use syncdoc_core::spec::SpecService;
 
 fn repos() -> ServerRepos {
     ServerRepos {
-        git: Git {
-            exe: "git".into(),
-            global_config: "/dev/null".into(),
-        },
+        git: Git::new("git".into(), "/dev/null".into()),
         origins: "/nonexistent/origins".into(),
         repos: "/nonexistent/repos".into(),
         specs_url: "http://x/specs".into(),

@@ -142,8 +142,8 @@ fn windows() -> Result<(), String> {
     Ok(())
 }
 
-/// MinGit을 받아 해시를 보고 푼다
-fn mingit(dest: &Path) -> Result<(), String> {
+/// MinGit을 받아 해시를 보고 푼다 — 설치 파일과 윈도 속도 재기(카드 L19)가 같은 것을 쓴다
+pub fn mingit(dest: &Path) -> Result<(), String> {
     let dl = local_root().join("target").join("package").join("dl");
     fs::create_dir_all(&dl).map_err(|e| e.to_string())?;
     let zip = dl.join(MINGIT_ZIP);

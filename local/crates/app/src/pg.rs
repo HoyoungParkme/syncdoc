@@ -57,8 +57,14 @@ pub async fn start(pg_dir: &Path, data_dir: &Path) -> Result<PgServer, Problem> 
     let logs = data_dir.join("logs");
     fs::create_dir_all(&logs)?;
     let pw = password();
-    if !pgdata.exists() {
+    let mark = data_dir.join(SYNC_MARK);
+    let fresh = !pgdata.exists();
+    if fresh {
         initdb(&bin, data_dir, &pgdata, &pw).await?;
+    } else if mark.exists() {
+        // 3a. 지난번 디스크에 내리기를 마치지 못했다 — 서버를 띄우기 전에 끝낸다
+        sync_only(&bin, &pgdata).await?;
+        let _ = fs::remove_file(&mark);
     }
     if pgdata.join("postmaster.pid").exists() && ctl_running(&bin, &pgdata).await {
         ctl_stop(&bin, &pgdata).await?; // 지난번 비정상 종료로 남은 서버
@@ -72,6 +78,18 @@ pub async fn start(pg_dir: &Path, data_dir: &Path) -> Result<PgServer, Problem> 
                 if let Err(p) = create_db(port, &pw).await {
                     let _ = ctl_stop(&bin, &pgdata).await;
                     return Err(p);
+                }
+                if fresh {
+                    // 8. 미룬 디스크에 내리기 — 기다리지 않는다. 못 마치면 표식이 남아 다음 켜기의 3a가 한다
+                    let (bin, pgdata, mark) = (bin.clone(), pgdata.clone(), mark.clone());
+                    tokio::spawn(async move {
+                        match sync_only(&bin, &pgdata).await {
+                            Ok(()) => {
+                                let _ = fs::remove_file(&mark);
+                            }
+                            Err(p) => tracing::warn!("initdb --sync-only — {p}"),
+                        }
+                    });
                 }
                 return Ok(PgServer {
                     options: options(port, &pw, DB),
@@ -113,7 +131,24 @@ impl Drop for PgServer {
     }
 }
 
-/// 처음 — `pgdata.init`에 만들고 다 되면 이름을 바꾼다. 반쯤 만든 것을 완성본으로 읽지 않게
+/// 디스크에 내리기를 아직 마치지 않은 데이터 자리의 표식 — `pgdata` 옆(카드 L19)
+pub const SYNC_MARK: &str = "pgdata.sync";
+
+/// `initdb --sync-only` — 미뤄 둔 디스크에 내리기(fsync)만. 앱이 끝나면 함께 끝난다 — 윈도는 끝난 앱의
+/// 자식이 남아 설치 폴더를 쥔다. 마치지 못했으면 표식이 남아 다음 켜기가 다시 한다(카드 L19)
+async fn sync_only(bin: &Path, pgdata: &Path) -> Result<(), Problem> {
+    let out = Command::new(exe(bin, "initdb"))
+        .arg("--sync-only")
+        .arg("-D")
+        .arg(pgdata)
+        .kill_on_drop(true)
+        .output()
+        .await;
+    checked(out, "initdb --sync-only", None)
+}
+
+/// 처음 — `pgdata.init`에 만들고 다 되면 이름을 바꾼다. 반쯤 만든 것을 완성본으로 읽지 않게.
+/// 디스크에 내리기는 서버가 뜬 뒤로 미룬다(`--no-sync` + 표식, 카드 L19 — 윈도에서 6.5초가 3.3초)
 async fn initdb(bin: &Path, data_dir: &Path, pgdata: &Path, pw: &str) -> Result<(), Problem> {
     let staging = data_dir.join("pgdata.init");
     if staging.exists() {
@@ -133,12 +168,14 @@ async fn initdb(bin: &Path, data_dir: &Path, pgdata: &Path, pw: &str) -> Result<
             "UTF8",
             "--locale=C",
             "--no-instructions",
+            "--no-sync",
         ])
         .arg(format!("--pwfile={}", pwfile.display()))
         .output()
         .await;
     let _ = fs::remove_file(&pwfile);
     checked(out, "initdb", None)?;
+    fs::write(data_dir.join(SYNC_MARK), "")?;
     fs::rename(&staging, pgdata)?;
     Ok(())
 }

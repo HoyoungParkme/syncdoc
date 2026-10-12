@@ -20,6 +20,7 @@ use crate::account::service::AccountService;
 use crate::codegraph::{CodeGraphRow, CodeGraphService};
 use crate::errors::Problem;
 use crate::markdown::parse_frontmatter;
+use crate::project::model::{ProjectRow, RepositoryRow};
 use crate::project::service::{ProjectService, ServerRepos};
 use crate::pycompat::pyset::IntSet;
 use crate::pycompat::re::compile;
@@ -75,9 +76,27 @@ pub async fn project_summary(
     .list_owned(user)
     .await?;
     let mut out = Vec::with_capacity(projects.len());
-    for (p, r) in projects {
+    for (p, r) in &projects {
+        out.push(project_summary_of(&mut *db, p, r).await?);
+    }
+    // 최근 것 먼저, 문서 없는 것은 뒤에 원래 차례로 — 파이썬 안정 정렬(reverse=True)
+    out.sort_by(|a, b| {
+        (b.updated_at.is_some(), b.updated_at).cmp(&(a.updated_at.is_some(), a.updated_at))
+    });
+    Ok(out)
+}
+
+/// SYNC-MS-018#queries.project_summary_of
+///
+/// 프로젝트 하나 — 파이썬 판은 `project_summary` 안의 고리다. 상세가 이 프로젝트만 요약하려고 뗐다(카드 L19)
+pub async fn project_summary_of(
+    db: &mut PgConnection,
+    project: &ProjectRow,
+    repo: &RepositoryRow,
+) -> Result<ProjectSummary, Problem> {
+    {
         let docs = SpecService { db: &mut *db }
-            .list_by_project(p.id, None, None, None)
+            .list_by_project(project.id, None, None, None)
             .await?;
         let ids: Vec<i32> = docs.iter().map(|d| d.id).collect();
         // 프로젝트당 한 번 — 단계마다 부르면 같은 프로젝트를 11번 훑는다
@@ -125,13 +144,13 @@ pub async fn project_summary(
                 .filter(|d| !d.incomplete_warnings.is_empty())
                 .count() as i64,
         );
-        let storage = Storage::parse(&r.storage).unwrap_or(Storage::Github);
-        out.push(ProjectSummary {
-            code: p.code,
-            name: p.name,
+        let storage = Storage::parse(&repo.storage).unwrap_or(Storage::Github);
+        Ok(ProjectSummary {
+            code: project.code.clone(),
+            name: project.name.clone(),
             storage,
             // 서버 저장이면 없음 — 서버 안 경로는 밖으로 안 낸다
-            remote_url: (storage != Storage::Server).then_some(r.remote_url),
+            remote_url: (storage != Storage::Server).then(|| repo.remote_url.clone()),
             stages,
             std_docs: docs
                 .iter()
@@ -140,13 +159,8 @@ pub async fn project_summary(
                 .collect(),
             counts,
             updated_at: docs.iter().map(|d| d.updated_at).max(),
-        });
+        })
     }
-    // 최근 것 먼저, 문서 없는 것은 뒤에 원래 차례로 — 파이썬 안정 정렬(reverse=True)
-    out.sort_by(|a, b| {
-        (b.updated_at.is_some(), b.updated_at).cmp(&(a.updated_at.is_some(), a.updated_at))
-    });
-    Ok(out)
 }
 
 /// SYNC-MS-018#queries.document_list
@@ -172,12 +186,24 @@ pub async fn document_list(
     let missing = ReferenceService { db: &mut *db }
         .count_missing_by_document(&ids)
         .await?;
+    // 작성자 이름도 한 번에 — 파이썬은 문서마다 묻는다(같은 답, 카드 L19)
+    let ids: Vec<i32> = docs
+        .iter()
+        .filter_map(|d| d.last_author.as_ref())
+        .flat_map(|a| std::iter::once(a.user_id).chain(a.instructed_by_id))
+        .collect();
+    let names = AccountService { db: &mut *db }.users_by_ids(&ids).await?;
     for d in &mut docs {
         d.counts.insert(
             "broken_ref".to_string(),
             missing.get(&d.id).copied().unwrap_or(0),
         );
-        d.author = api_author(&mut *db, d.last_author.as_ref()).await?;
+        d.author = d.last_author.as_ref().map(|r| ApiAuthor {
+            kind: r.kind.clone(),
+            user: names.get(&r.user_id).cloned(),
+            instructed_by: r.instructed_by_id.and_then(|i| names.get(&i).cloned()),
+            via: r.via.clone(),
+        });
     }
     Ok(docs)
 }
@@ -390,13 +416,8 @@ pub async fn project_detail(
             via: r.author.via.clone(),
         });
     }
-    let summary = project_summary(&mut *db, repos, user)
-        .await?
-        .into_iter()
-        .find(|p| p.code == code)
-        .ok_or_else(|| Problem::Internal {
-            log: format!("프로젝트 {code}의 요약이 없다"),
-        })?;
+    // 이 프로젝트만 — 파이썬은 내 것 전부를 요약하고 고른다(같은 답, 카드 L19)
+    let summary = project_summary_of(&mut *db, &project, &repo).await?;
     let docs = document_list(&mut *db, repos, code, user, None, None).await?;
     Ok(ProjectDetail {
         summary,
@@ -1260,7 +1281,7 @@ pub async fn code_source(
     svc.read(
         &repos.git,
         project.id,
-        Path::new(&repo.workdir_path),
+        Path::new(&repo.remote_url),
         &file,
         line,
         Some(end),
@@ -1305,7 +1326,7 @@ pub async fn code_text(
     svc.read(
         &repos.git,
         project.id,
-        Path::new(&repo.workdir_path),
+        Path::new(&repo.remote_url),
         &path,
         start,
         Some(end),

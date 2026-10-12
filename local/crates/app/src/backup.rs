@@ -538,12 +538,47 @@ fn due(dir: &Path) -> bool {
         .unwrap_or(true)
 }
 
+/// 오늘(지역 날짜) 정리를 아직 안 했나
+fn clean_due(cleaned: Option<jiff::civil::Date>, today: jiff::civil::Date) -> bool {
+    cleaned != Some(today)
+}
+
+/// 정리할 서버 저장소 — `origins/{code}.git`만(보관본 폴더 `_archive`는 빼고), 코드 순
+fn to_clean(origins: &Path) -> Vec<(String, PathBuf)> {
+    let mut out: Vec<(String, PathBuf)> = fs::read_dir(origins)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            Some((name.strip_suffix(".git")?.to_string(), e.path()))
+        })
+        .collect();
+    out.sort();
+    out
+}
+
 /// SYNC-MS-023#backup.daily
 pub async fn daily(local: Arc<Local>) {
     tokio::time::sleep(Duration::from_secs(60)).await;
     let mut tick = tokio::time::interval(Duration::from_secs(3600));
+    // 정리한 날(지역 날짜) — 메모리에. 켤 때마다 첫 확인에서 한 번(쌓인 것이 없으면 git이 아무것도 안 한다)
+    let mut cleaned: Option<jiff::civil::Date> = None;
     loop {
         tick.tick().await;
+        let today = jiff::Zoned::now().date();
+        if clean_due(cleaned, today) {
+            // 자동 gc·maintenance를 끈 대신 하루 한 번 — 백업 폴더가 없어도, 백업보다 먼저(카드 L19)
+            for (code, origin) in to_clean(&local.data_dir.join("origins")) {
+                let lock = syncdoc_core::pipeline::write_lock(&code);
+                let _held = lock.lock().await;
+                if let Err(p) = local.git.gc(&origin).await {
+                    tracing::warn!("git gc {code} — {p}");
+                }
+            }
+            cleaned = Some(today);
+        }
         let Ok(conf) = settings::load(&local.data_dir) else {
             continue;
         };
@@ -559,6 +594,22 @@ pub async fn daily(local: Arc<Local>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clean_once_a_day_and_only_server_repos() {
+        let today = jiff::civil::date(2026, 10, 12);
+        assert!(clean_due(None, today));
+        assert!(!clean_due(Some(today), today));
+        assert!(clean_due(Some(jiff::civil::date(2026, 10, 11)), today));
+        let tmp = tempfile::tempdir().expect("임시");
+        for d in ["B.git", "A.git", "_archive/A-20261012000000.git", "x"] {
+            fs::create_dir_all(tmp.path().join(d)).expect("폴더");
+        }
+        fs::write(tmp.path().join("C.git"), "파일").expect("파일");
+        let got: Vec<String> = to_clean(tmp.path()).into_iter().map(|(c, _)| c).collect();
+        assert_eq!(got, ["A", "B"]);
+        assert!(to_clean(&tmp.path().join("없음")).is_empty());
+    }
 
     #[test]
     fn due_only_when_today_is_missing() {
