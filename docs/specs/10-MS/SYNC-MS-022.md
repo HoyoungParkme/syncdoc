@@ -302,14 +302,14 @@ pub async fn fail(&mut self, project_id: i32, commit_hash: &str, reason: &str) -
 
 **시그니처**
 ```rust
-pub async fn read(&mut self, git: &Git, project_id: i32, workdir: &Path, path: &str, start: i64, end: Option<i64>) -> Result<CodeText, Problem>
+pub async fn read(&mut self, git: &Git, project_id: i32, origin: &Path, path: &str, start: i64, end: Option<i64>) -> Result<CodeText, Problem>
 ```
 
 근거: [[SYNC-MS-011#CodeGraphService.read]]
 
-**처리** [[SYNC-MS-011#CodeGraphService.read]]와 같다 — 그래프가 없거나 커밋이 없으면 `! NotFound(code_graph, 프로젝트 id)` · 경로는 `\`를 `/`로 바꿔 `PurePosixPath`처럼 다듬는다(빈 조각·`.`을 버린다) — 절대 경로·`..` 조각·빈 경로·비밀 꼴(이름 소문자로 `DENY`)은 `! NotFound(file, 받은 path)` · `git.read(workdir, 다듬은 경로, 그래프 커밋)` — 실패하면 같은 `not-found` · 줄은 파이썬 `splitlines` · `start = max(1, start)` · `end = min(줄 수, end가 0이 아니면 end, 아니면 줄 수)` · `end - start + 1`이 300을 넘으면 `end = start + 299`·`truncated` · `→ CodeText { path: 다듬은 경로, start, end, commit_hash, text: start..=end 줄을 \n로 이은 것, truncated }`
+**처리** [[SYNC-MS-011#CodeGraphService.read]]와 같다 — 그래프가 없거나 커밋이 없으면 `! NotFound(code_graph, 프로젝트 id)` · 경로는 `\`를 `/`로 바꿔 `PurePosixPath`처럼 다듬는다(빈 조각·`.`을 버린다) — 절대 경로·`..` 조각·빈 경로·비밀 꼴(이름 소문자로 `DENY`)은 `! NotFound(file, 받은 path)` · `git.read(origin, 다듬은 경로, 그래프 커밋)` — 실패하면 같은 `not-found` · 줄은 파이썬 `splitlines` · `start = max(1, start)` · `end = min(줄 수, end가 0이 아니면 end, 아니면 줄 수)` · `end - start + 1`이 300을 넘으면 `end = start + 299`·`truncated` · `→ CodeText { path: 다듬은 경로, start, end, commit_hash, text: start..=end 줄을 \n로 이은 것, truncated }`
 
-**다른 점** git 어댑터를 받는다(파이썬은 모듈 함수)
+**다른 점** git 어댑터를 받는다(파이썬은 모듈 함수) · 작업 사본 대신 서버 저장소에서 읽는다(카드 L19 — [[SYNC-MS-019]] 0장)
 
 **호출하는 것** [[#CodeGraphService.get]] · [[SYNC-MS-019#Git.read]]
 
