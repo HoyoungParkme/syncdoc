@@ -104,10 +104,7 @@ pub fn server_repos(root: &std::path::Path) -> syncdoc_core::project::service::S
     let global = root.join("gitconfig");
     let _ = std::fs::write(&global, "");
     syncdoc_core::project::service::ServerRepos {
-        git: syncdoc_core::infra::git::Git {
-            exe: "git".into(),
-            global_config: global,
-        },
+        git: syncdoc_core::infra::git::Git::new("git".into(), global),
         origins: root.join("origins"),
         repos: root.join("repos"),
         specs_url: "http://127.0.0.1:8010/specs".into(),

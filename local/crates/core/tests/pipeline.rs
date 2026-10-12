@@ -45,6 +45,11 @@ impl Env {
         self.repos.repos.join(CODE)
     }
 
+    /// 서버 저장소 — git은 늘 여기서 돈다(카드 L19)
+    fn origin(&self) -> std::path::PathBuf {
+        self.repos.origins.join(format!("{CODE}.git"))
+    }
+
     fn author(&self) -> Author {
         Author {
             kind: AuthorKind::Agent,
@@ -191,6 +196,12 @@ async fn create_issues_id_commits_and_extracts_references() {
     );
     // 파일은 {NN-TYPE}/{doc_id}.md, frontmatter는 서버가 채웠다
     let file = git(&origin, &["show", "main:docs/specs/02-PRD/LP-PRD-001.md"]);
+    // 작업 사본 폴더에도 같은 파일(카드 L19 — 첨부 파일 읽기가 쓴다)
+    assert_eq!(
+        std::fs::read_to_string(e.workdir().join("docs/specs/02-PRD/LP-PRD-001.md")).expect("폴더"),
+        file + "\n"
+    );
+    let file = git(&origin, &["show", "main:docs/specs/02-PRD/LP-PRD-001.md"]);
     assert!(
         file.starts_with(
             "---\ndoc_id: LP-PRD-001\ntype: PRD\ntitle: 저장 시험\nstatus: draft\n---\n"
@@ -250,7 +261,7 @@ async fn create_issues_id_commits_and_extracts_references() {
 #[tokio::test]
 async fn violations_leave_nothing_and_unknown_type_is_frontmatter_type() {
     let e = env().await;
-    let before = git(&e.workdir(), &["rev-parse", "HEAD"]);
+    let before = git(&e.origin(), &["rev-parse", "HEAD"]);
     let bad = PRD.replace("#### R2", "#### R02");
     match e.create("PRD", &bad).await {
         Err(Problem::ConventionViolation { violations, .. }) => {
@@ -290,7 +301,7 @@ async fn violations_leave_nothing_and_unknown_type_is_frontmatter_type() {
         matches!(&r, Err(Problem::NotFound { resource, id }) if resource == "project" && id == "None"),
         "{r:?}"
     );
-    assert_eq!(git(&e.workdir(), &["rev-parse", "HEAD"]), before);
+    assert_eq!(git(&e.origin(), &["rev-parse", "HEAD"]), before);
     let mut c = e.conn().await;
     assert_eq!(
         scalar_i64(&mut c, "SELECT count(*) FROM documents").await,
@@ -497,7 +508,7 @@ async fn later_upstream_resolves_waiting_references() {
     );
     // 같은 본문을 다시 → 커밋 없이 HEAD로 새 판, 참조는 그대로(같은 행)
     drop(c);
-    let before = git(&e.workdir(), &["rev-parse", "HEAD"]);
+    let before = git(&e.origin(), &["rev-parse", "HEAD"]);
     let body = e.body_of("LP-SCN-001").await;
     let mut c = e.conn().await;
     let ids: Vec<i32> = sqlx::query_scalar(r#"SELECT id FROM "references" ORDER BY id"#)
@@ -629,7 +640,7 @@ async fn approved_document_is_demoted_on_edit() {
         .expect("고치기");
     assert_eq!(r.status, "draft");
     let file = git(
-        &e.workdir(),
+        &e.origin(),
         &["show", "HEAD:docs/specs/02-PRD/LP-PRD-001.md"],
     );
     assert!(file.contains("status: draft\n") && file.contains("고친 설명."));
@@ -698,7 +709,7 @@ async fn dropped_caller_still_finishes_the_save() {
         .fetch_one(&mut *c)
         .await
         .expect("판");
-    assert_eq!(git(&e.workdir(), &["rev-parse", "HEAD"]), hash);
+    assert_eq!(git(&e.origin(), &["rev-parse", "HEAD"]), hash);
 }
 
 #[tokio::test]

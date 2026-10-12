@@ -591,6 +591,13 @@ async fn outside_push_becomes_documents_in_stage_order_and_deletions_break_refs(
     let head = commit_push(&out, "spec: PRD·SCN 한 커밋");
     assert_eq!(e.read_pending().await, 2);
     assert_eq!(e.processed().await, head);
+    // 작업 사본 폴더가 head의 docs/specs (카드 L19)
+    let folder = e.repos.repos.join(CODE);
+    assert_eq!(
+        std::fs::read_to_string(folder.join("docs/specs/02-PRD/LS-PRD-001.md")).expect("폴더"),
+        prd_file("draft", "설명.")
+    );
+    assert!(!folder.join(".git").exists());
     let mut c = e.conn().await;
     // 상위가 먼저 저장돼 하위의 참조가 미존재가 아니다
     assert_eq!(
@@ -813,6 +820,22 @@ async fn rebuild_matches_repository_keeps_item_pks_and_is_idempotent() {
     );
     let head = git(&e.origin(), &["rev-parse", "main"]);
     assert_eq!(e.processed().await, head);
+    // 작업 사본 폴더가 head의 docs/specs (카드 L19)
+    assert_eq!(
+        git(
+            &e.origin(),
+            &["ls-tree", "-r", "--name-only", "main", "--", "docs/specs"]
+        )
+        .lines()
+        .filter(|p| e.repos.repos.join(CODE).join(p).is_file())
+        .count(),
+        git(
+            &e.origin(),
+            &["ls-tree", "-r", "--name-only", "main", "--", "docs/specs"]
+        )
+        .lines()
+        .count()
+    );
     // 두 번 — 같다, 상태 변경 행이 쌓이지 않는다
     let r2 = e.rebuild().await.expect("다시");
     assert_eq!((r2.docs, r2.versions), (2, 3));
@@ -859,7 +882,8 @@ async fn rebuild_survives_deleted_then_recreated_and_rolls_back_on_failure() {
     // 실패 → 되돌린다
     let mut c = e.conn().await;
     let versions = scalar_i64(&mut c, "SELECT count(*) FROM versions").await;
-    sqlx::query("UPDATE repositories SET workdir_path = '/없는/자리'")
+    // git은 서버 저장소에서 돈다(카드 L19) — 그 자리를 깨면 재구축이 실패한다
+    sqlx::query("UPDATE repositories SET remote_url = '/없는/자리'")
         .execute(&mut *c)
         .await
         .expect("자리");
@@ -1139,7 +1163,7 @@ async fn catch_up_processes_each_repo_and_records_failures() {
     .init_project(e.pool(), "AB", "깨진 것", &e.user, false, Storage::Server)
     .await
     .expect("둘째 프로젝트");
-    sqlx::query("UPDATE repositories SET workdir_path = '/없는/자리' WHERE project_id = (SELECT id FROM projects WHERE code = 'AB')")
+    sqlx::query("UPDATE repositories SET remote_url = '/없는/자리' WHERE project_id = (SELECT id FROM projects WHERE code = 'AB')")
         .execute(&mut *c)
         .await
         .expect("깨기");
@@ -1170,8 +1194,8 @@ async fn catch_up_processes_each_repo_and_records_failures() {
     .expect("AB");
     assert!(error.is_some_and(|e| !e.is_empty() && e.chars().count() <= 300));
     // 고치면 다음 성공이 사유를 지운다
-    sqlx::query("UPDATE repositories SET workdir_path = $1 WHERE project_id = (SELECT id FROM projects WHERE code = 'AB')")
-        .bind(e.repos.repos.join("AB").to_string_lossy().into_owned())
+    sqlx::query("UPDATE repositories SET remote_url = $1 WHERE project_id = (SELECT id FROM projects WHERE code = 'AB')")
+        .bind(e.repos.origins.join("AB.git").to_string_lossy().into_owned())
         .execute(&mut *c)
         .await
         .expect("고치기");
