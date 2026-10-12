@@ -265,11 +265,11 @@ pub async fn daily(local: Arc<Local>)
 
 근거: [[SYNC-INFRA-001]] 9.6 · 6.1(카드 BR — 매시 불러 오늘 것이 있으면 건너뛴다)
 
-**처리** 켜고 1분 뒤부터 한 시간마다 — `settings.load` · if `backup_dir`가 있고 `backup.list`에 오늘(지역 날짜) `syncdoc-{YYYYMMDD}-`로 시작하는 것이 없다 → `local.backup_now()`(실패는 로그와 마지막 백업에만) · 끝없이 돈다 — runtime이 다시 켜거나 끌 때 멈춘다
+**처리** 켜고 1분 뒤부터 한 시간마다 — 오늘(지역 날짜) 정리를 아직 안 했으면 `origins/*.git`(보관본은 빼고)마다 그 코드의 쓰기 락([[SYNC-MS-017#pipeline.write_lock]])을 쥐고 `git.gc(원본)`(실패는 로그만) · 한 날짜는 메모리에(켤 때마다 첫 확인에서 한 번 — 쌓인 것이 없으면 git이 아무것도 안 한다, 카드 L19) · 그다음 `settings.load` · if `backup_dir`가 있고 `backup.list`에 오늘(지역 날짜) `syncdoc-{YYYYMMDD}-`로 시작하는 것이 없다 → `local.backup_now()`(실패는 로그와 마지막 백업에만) · 끝없이 돈다 — runtime이 다시 켜거나 끌 때 멈춘다
 
-**호출하는 것** [[SYNC-MS-012#settings.load]] · [[#backup.list]] · [[#Local.backup_now]]
+**호출하는 것** [[SYNC-MS-017#pipeline.write_lock]] · [[SYNC-MS-019#Git.gc]] · [[SYNC-MS-012#settings.load]] · [[#backup.list]] · [[#Local.backup_now]]
 
-**테스트 관점** 오늘 것이 있으면 만들지 않는다 · 폴더가 없으면 아무것도 안 한다
+**테스트 관점** 오늘 것이 있으면 만들지 않는다 · 폴더가 없으면 백업은 안 하고 정리는 한다 · 같은 날 두 번째 확인은 정리하지 않는다
 
 ---
 
