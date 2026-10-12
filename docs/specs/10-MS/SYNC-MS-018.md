@@ -16,7 +16,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-008, SYNC-MS-014, SYNC-MS-015, SYNC-MS-016, SYN
 
 **파이썬 `set`의 차례** — [[#queries.item_chain]]은 폐포를 파이썬 `set`에 모아 그 순회 차례로 단계 행을 채운다. 행 안 항목의 차례가 응답 바이트이므로 Rust는 CPython 3.12의 정수 `set`(열린 주소·선형 탐사 9·`perturb`·크기 키움·`discard`의 빈 표시)을 그대로 흉내 낸 `pycompat::pyset`으로 같은 차례를 낸다(에이전트 판단 2026-10-11 — 「바이트까지」 결정을 따름).
 
-**작성자 이름** — 문서의 작성자 `AuthorRef`를 `ApiAuthor { kind, user, instructed_by, via }`로(파이썬 `_api_author`): `AccountService.users_by_ids([user_id, instructed_by_id])` 한 번 · `user`는 그 지도의 것(없으면 없음) · `instructed_by`는 id가 있을 때만.
+**작성자 이름** — 문서의 작성자 `AuthorRef`를 `ApiAuthor { kind, user, instructed_by, via }`로(파이썬 `_api_author`): `AccountService.users_by_ids([user_id, instructed_by_id])` 한 번 · `user`는 그 지도의 것(없으면 없음) · `instructed_by`는 id가 있을 때만. 문서 여럿이면 모든 id를 모아 한 번 묻고 같은 지도에서 꺼낸다 — 답은 같다(카드 L19).
 
 **다른 점(전체)** 파이썬은 함수마다 세션을 연다 — Rust는 부르는 쪽의 연결을 받는다(첫 인자 `db`). 프로젝트를 읽는 함수는 서버 저장소 자리(`repos` — [[SYNC-MS-013]] 0장)도 받는다 — `ProjectService`가 그 둘로 선다.
 
@@ -27,6 +27,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-008, SYNC-MS-014, SYNC-MS-015, SYNC-MS-016, SYN
 | 함수 | 한 줄 |
 |---|---|
 | [[#queries.project_summary]] | 내 프로젝트들의 요약 — 11단계·STD 문서·수 |
+| [[#queries.project_summary_of]] | 프로젝트 하나의 요약 |
 | [[#queries.document_list]] | 문서 목록 + 문서별 건수 |
 | [[#queries.document_view]] | 문서 + 미존재 참조 + 이웃 |
 | [[#queries.item_view]] | 항목 블록 |
@@ -61,17 +62,37 @@ pub async fn project_summary(db: &mut PgConnection, repos: &ServerRepos, user: &
 
 근거: [[SYNC-MS-008#queries.project_summary]] · [[SYNC-UC-001#UC-H14]] · [[SYNC-API-001#GET/api/projects]]
 
-**처리** [[SYNC-MS-008#queries.project_summary]]와 같다
-1. 프로젝트마다(`ProjectService.list_owned` — 코드 차례) `docs = SpecService.list_by_project(id)` · `per_doc = ReferenceService.count_missing_by_document(docs의 id)`
+**처리** [[SYNC-MS-008#queries.project_summary]]와 같다 — 프로젝트마다(`ProjectService.list_owned` — 코드 차례) [[#queries.project_summary_of]] · `updated_at`이 있는 것을 먼저 그 내림차순, 없는 것은 뒤에 원래 차례로(파이썬 안정 정렬)
+
+**출력** `[ProjectSummary]` — 꼴은 [[#queries.project_summary_of]]
+
+**호출하는 것** [[SYNC-MS-013#ProjectService.list_owned]] · [[#queries.project_summary_of]]
+
+**테스트 관점** (시험 DB) 두 프로젝트 → 최근 것 먼저, 문서 없는 것은 뒤 · 남의 프로젝트는 안 나온다
+
+---
+
+#### queries.project_summary_of 프로젝트 하나의 요약
+
+**시그니처**
+```rust
+pub async fn project_summary_of(db: &mut PgConnection, project: &ProjectRow, repo: &RepositoryRow) -> Result<ProjectSummary, Problem>
+```
+
+근거: [[SYNC-MS-008#queries.project_summary]] · 카드 L19 — 상세([[#queries.project_detail]])가 이 프로젝트만 요약한다
+
+**처리**
+1. `docs = SpecService.list_by_project(id)` · `per_doc = ReferenceService.count_missing_by_document(docs의 id)`
 2. 단계 1~11(`RFQ`…`CODE`)마다 그 단계 문서 — `status`는 하나라도 `draft`면 `draft`, 다 `approved`면 `approved`, 없으면 없음 · `gate_warning`은 문서가 있고 앞 단계 가운데 문서가 있는데 `approved`가 아닌 것이 있나 · `broken_count`는 그 단계 문서들의 미존재 참조 합
 3. `counts` — `broken_ref`(미존재 참조 합)·`convention_errors`(규약 오류 문서 수)·`incomplete`(경고 있는 문서 수) · `std_docs` — 타입 `STD` 문서 · `updated_at` — 문서들의 가장 늦은 것, 없으면 없음 · `remote_url` — 서버 저장이면 없음
-4. `updated_at`이 있는 것을 먼저 그 내림차순, 없는 것은 뒤에 원래 차례로(파이썬 안정 정렬)
+
+**다른 점** 파이썬은 `project_summary` 안의 고리다 — 상세가 프로젝트 하나만 요약하려고 떼어 냈다(카드 L19)
 
 **출력** `ProjectSummary { code, name, storage, remote_url, stages[11], std_docs, counts, updated_at }`. 입구가 직렬화한다 — REST는 pydantic 꼴(`Z`), MCP는 파이썬 `_project_json` 꼴(`+00:00`, `std_docs`의 `last_author`는 늘 없음 — 파이썬 판에서 이 경로는 작성자 이름을 붙이지 않는다)
 
-**호출하는 것** [[SYNC-MS-013#ProjectService.list_owned]] · [[SYNC-MS-014#SpecService.list_by_project]] · [[SYNC-MS-015#ReferenceService.count_missing_by_document]]
+**호출하는 것** [[SYNC-MS-014#SpecService.list_by_project]] · [[SYNC-MS-015#ReferenceService.count_missing_by_document]]
 
-**테스트 관점** (시험 DB) 새 프로젝트 → 11칸 모두 없음·수 0·`updated_at` 없음 · 단계에 초안 하나 + 완료 하나 → 그 단계 `draft` · 앞 단계 초안 뒤 단계 문서 → `gate_warning` · 휴지통 문서는 안 센다 · 미존재 참조 → 단계 `broken_count`와 `counts.broken_ref` · `STD` 문서는 `std_docs`에만(단계 밖) · 두 프로젝트 → 최근 것 먼저, 문서 없는 것은 뒤 · 남의 프로젝트는 안 나온다
+**테스트 관점** (시험 DB) 새 프로젝트 → 11칸 모두 없음·수 0·`updated_at` 없음 · 단계에 초안 하나 + 완료 하나 → 그 단계 `draft` · 앞 단계 초안 뒤 단계 문서 → `gate_warning` · 휴지통 문서는 안 센다 · 미존재 참조 → 단계 `broken_count`와 `counts.broken_ref` · `STD` 문서는 `std_docs`에만(단계 밖)
 
 ---
 
@@ -84,7 +105,9 @@ pub async fn document_list(db: &mut PgConnection, repos: &ServerRepos, code: &st
 
 근거: [[SYNC-MS-008#queries.document_list]] · [[SYNC-API-002#list_documents]]
 
-**처리** [[SYNC-MS-008#queries.document_list]]와 같다 — `ProjectService.get_owned(code, user)` · `SpecService.list_by_project(id, stage, status, 없음)` · `ReferenceService.count_missing_by_document(ids)` 한 번 · 문서마다 `counts = {broken_ref: 수 또는 0}` · `author` = 위 「작성자 이름」(문서마다 — 파이썬과 같다)
+**처리** [[SYNC-MS-008#queries.document_list]]와 같다 — `ProjectService.get_owned(code, user)` · `SpecService.list_by_project(id, stage, status, 없음)` · `ReferenceService.count_missing_by_document(ids)` 한 번 · 문서마다 `counts = {broken_ref: 수 또는 0}` · `author` = 위 「작성자 이름」 — 모든 문서의 id를 모아 `users_by_ids` 한 번
+
+**다른 점** 파이썬은 문서마다 묻는다(N+1) — 같은 답을 한 번에(윈도 조회 0.1초, 카드 L19)
 
 **호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-014#SpecService.list_by_project]] · [[SYNC-MS-015#ReferenceService.count_missing_by_document]] · [[SYNC-MS-016#AccountService.users_by_ids]]
 
@@ -168,10 +191,12 @@ pub async fn project_detail(db: &mut PgConnection, repos: &ServerRepos, code: &s
 1. `(project, repo) = ProjectService.get_owned(code, user)`
 2. `recent = SpecService.recent_changes(project.id, 10)` · 작성자 이름을 `AccountService.users_by_ids`로 한 번(판마다 `ApiAuthor`)
 3. `repo`의 `last_processed_commit`·`behind_by`·`fetched_at` — DB에 적힌 그대로(받아 오지 않는다)
-4. `summary = project_summary(user)`에서 이 코드의 것 · `docs = document_list(code, user)`
+4. `summary = project_summary_of(project, repo)` — 이 프로젝트만 · `docs = document_list(code, user)`
 5. `→ ProjectDetail { summary, docs, recent_changes, last_processed_commit, behind_by, fetched_at }`
 
-**호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-014#SpecService.recent_changes]] · [[SYNC-MS-016#AccountService.users_by_ids]] · [[#queries.project_summary]] · [[#queries.document_list]]
+**다른 점** 파이썬은 내 프로젝트 전부를 요약하고 이 코드의 것을 고른다 — 이 프로젝트만 요약한다(같은 답, 카드 L19)
+
+**호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-014#SpecService.recent_changes]] · [[SYNC-MS-016#AccountService.users_by_ids]] · [[#queries.project_summary_of]] · [[#queries.document_list]]
 
 **테스트 관점** (시험 DB) 남의 프로젝트 → `not-found` · 최근 변경은 새 것부터 열 개, 작성자 이름 · 동기화 칸은 DB 값 그대로
 
