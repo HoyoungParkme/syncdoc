@@ -504,7 +504,7 @@ syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 | MCP | 파이썬 mcp SDK 2.2.0의 핸드셰이크 경로를 옮겼다(세션 없는 streamable HTTP) · 2026-07-28 새 프로토콜(핸드셰이크 없는 요청 하나짜리 봉투 — `_streamable_http_modern`, 카드 L18)도 · 도구 선언·그 판의 고정 결과는 파이썬 판에서 뽑는다(`cargo xtask mcp-tools`) | [[SYNC-API-002]] 도구 13을 같은 이름·설명·검증 문장으로 — 사용자 결정 2026-10-08(바이트까지 같다). rmcp는 SSE 꼴·검증 문장을 맞출 수 없어 쓰지 않는다 |
 | 데이터베이스 | PostgreSQL 16을 함께 담는다 — 바이너리(theseus 16.15)를 설치 폴더에 두고 `initdb`·`postgres`·`pg_ctl`을 앱이 직접 부른다 · 역할·DB `syncdoc` · 연결 수·메모리는 기본값 · sqlx | 파이썬 판과 같은 표([[SYNC-DOM-003]]). 역할 이름까지 같아 한 판의 덤프가 다른 판에 그대로 들어간다. 시험용 라이브러리(postgresql_embedded)는 fsync를 끄고 멈출 때 데이터 폴더를 지워 쓰지 않는다 · 기본값이어도 쓰는 만큼만 메모리에 올라온다(사용자 결정 2026-10-07 — L17에서 잰다) |
 | 이전 | **Alembic이 유일한 원본**이다. `alembic upgrade --sql`로 만든 SQL을 `local/migrations/`에 두고 실행 파일에 담는다. 이전 기록은 같은 `alembic_version` 표 | 스키마가 두 구현으로 갈리지 않게. 두 판의 스키마가 같은지는 검사로 본다 |
-| git | 윈도는 MinGit을 함께 담는다(GPL 고지와 원본 안내를 설치 파일에). 리눅스는 시스템 git(.deb가 의존한다) · **사용자 git 설정을 막는다** — 시스템·전역 설정 대신 빈 파일, 프롬프트·서명·autocrlf·자격 도우미 끔, `LC_ALL=C`, `safe.directory=*`(사용자 결정 2026-10-08) | 순수 Rust git은 아직 push를 받지 못한다(2026-10, gitoxide·libgit2). 파이썬 판은 Docker 안이라 사용자 설정이 없다 — 같은 깨끗한 환경을 만들어 같은 명령이 같은 결과를 낸다 |
+| git | 윈도는 MinGit을 함께 담는다(GPL 고지와 원본 안내를 설치 파일에). 리눅스는 시스템 git(.deb가 의존한다) · **사용자 git 설정을 막는다** — 시스템·전역 설정 대신 앱의 파일, 프롬프트·서명·autocrlf·자격 도우미 끔, `LC_ALL=C`, `safe.directory=*`(사용자 결정 2026-10-08) · **git 프로세스를 적게**(사용자 결정 2026-10-11·12, 카드 L19) — 윈도는 MinGit의 진짜 git(`ucrt64/bin/git.exe`)을 바로 부르고, 작업 사본은 git이 아닌 폴더라 git은 늘 서버 저장소에서 돈다: 커밋은 `git fast-import` 하나, 읽기는 저장소마다 오래 사는 `git cat-file --batch` 하나, 자동 gc·maintenance는 끄고 하루 한 번 정리 | 순수 Rust git은 아직 push를 받지 못한다(2026-10, gitoxide·libgit2). 파이썬 판은 Docker 안이라 사용자 설정이 없다 — 같은 깨끗한 환경을 만들어 같은 명령이 같은 결과를 낸다. 윈도는 git 프로세스 하나가 50~70ms(Defender) — 파이썬 판처럼 작업 사본에서 받고·쓰고·커밋하고·밀면 저장 한 번에 git이 스물 남짓 떠 0.3초를 못 넘는다 |
 | 코드 그래프 | 저장소에 커밋된 `graphify-out/graph.json`이 있으면 그것, 없으면 tree-sitter(파이썬·TS·JS·Rust 문법)로 함수·호출을 뽑고, 파이썬 판이 부르는 networkx Louvain(seed 42)과 graphify 허브 라벨을 옮긴 것으로 커뮤니티를 나눈다(카드 L12·L13) | graphify는 파이썬 전용이다. 같은 원형이면 커뮤니티까지 파이썬 판과 같다. 원형을 뽑으면 호출 선이 파이썬 판보다 적을 수 있다 |
 | 모델 호출 | reqwest 스트리밍 — OpenAI 호환 Chat Completions | 5.3 그대로 |
 | 첨부 | PDF 글자는 lopdf(카드 L14 — 쪽 잇기·빈 쪽·깨진 PDF 규칙은 같고 글자는 다를 수 있다) | 5.3 그대로 |
@@ -515,7 +515,7 @@ syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 
 ### 9.3 데이터 자리
 
-- **기본** — 윈도 `%LOCALAPPDATA%\SyncDoc Local`, 리눅스 `~/.local/share/syncdoc-local`. 안에 `pgdata/`(DB) · `origins/`(서버 저장소 — 원본, 6장) · `repos/`(작업 사본) · `settings.toml` · `logs/` · `syncdoc-local.lock`(한 번만 실행) · `instance.json`(켜진 주소 — 두 번째 실행이 읽는다)
+- **기본** — 윈도 `%LOCALAPPDATA%\SyncDoc Local`, 리눅스 `~/.local/share/syncdoc-local`. 안에 `pgdata/`(DB) · `origins/`(서버 저장소 — 원본, 6장) · `repos/`(작업 사본 — 서버 저장소 `main`의 `docs/specs/`를 풀어 둔 폴더, git이 아니다. 첨부 파일 읽기만 쓴다) · `settings.toml` · `logs/` · `syncdoc-local.lock`(한 번만 실행) · `instance.json`(켜진 주소 — 두 번째 실행이 읽는다)
 - **`settings.toml`** — 키 이름은 5.2와 같다(`LOCAL_LOGIN`·`LOCAL_NAME`·`LLM_API_URL`·`LLM_API_KEY`·`LLM_MODEL`·`PUBLIC_BASE_URL`, 사용자 결정 2026-10-07)에 백업 둘(`BACKUP_DIR`·`BACKUP_PASSWORD`, 카드 L16). 첫 실행 때 기본값과 설명 주석이 든 파일을 만든다. 설정 「이 PC」·「백업」 카드가 값만 바꾸고(주석·다른 키는 그대로) 다시 켠다. 아이디와 `PUBLIC_BASE_URL`은 파일에서만 바꾼다
 - **`logs/`** — 앱 `syncdoc-local.{날짜}.log`와 PostgreSQL `postgresql-{날짜}.log`, 날마다 한 파일·종류마다 최근 14개(사용자 결정 2026-10-07)
 - **프로그램과 데이터를 나눈다** — 실행 파일·PostgreSQL·MinGit은 설치 폴더에, 데이터는 데이터 자리에. 덮어 설치해도 데이터는 그대로다
@@ -552,7 +552,7 @@ syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 
 - **같은 기능** — 공용 계약 시험(`contract/`) — 주소만 받는 HTTP·MCP·git 시나리오다. 파이썬 폐쇄망판(Docker)이 기준이고 Rust 판이 같은 결과를 내야 한다. 시험이 두 판을 직접 띄운다 — 파이썬 판은 작업 트리로 만든 이미지(빈 볼륨·임시 포트), Rust 판은 임시 데이터 자리. **계약 밖**(API-001에 없는 프레임워크 동작, 2026-10-07): 끝 슬래시 리다이렉트(307) · `/docs`·`/redoc`·`/openapi.json` · GET 경로의 HEAD · Range(206) · ETag 값의 꼴 · Host 머리 없는 요청 · 응답의 `date`·`server`·`connection` 머리와 본문을 나눠 보내는 꼴. 새 프로토콜(2026-07-28)의 본문 JSON 깊이의 정확한 경계는 파이썬 판이 9987겹 언저리에서 한 겹쯤 흔들려 바이트 비교 밖이다(카드 L18)
 - **MCP와 검증 문장** — Rust 판의 `/mcp`는 파이썬 mcp SDK의 핸드셰이크 경로를 통째로 옮긴다. 어떤 입력에도 상태·머리·본문(SSE 꼴과 pydantic 검증 문장까지)이 같다. REST의 `invalid-request`도 `loc`·`msg`가 같다(사용자 결정 2026-10-08). 이것은 사례 표로 다 덮을 수 없어 **두 판 차이 시험**이 지킨다 — 씨앗을 고정한 무작위 사례를 두 판에 보내 바이트로 비교한다. 옮긴 판과 자리는 [[SYNC-DOM-004]] 1장
-- **속도** — [[SYNC-PRD-001#R15]]의 수치를 같은 PC에서 두 판을 나란히 재어 본다 — 켜기(첫 실행·다시 켜기), 화면 조회, 문서 저장(git 포함), 싱크독 저장소의 코드 그래프, 켜 둔 메모리(PostgreSQL 포함) · 재는 법은 `cargo xtask speed`(`contract/speed.py` — 싱크독 저장소를 두 판에 번들로 가져와 같은 일을 시키고 표와 판정을 낸다, 카드 L17)
+- **속도** — [[SYNC-PRD-001#R15]]의 수치를 같은 PC에서 두 판을 나란히 재어 본다 — 켜기(첫 실행·다시 켜기), 화면 조회, 문서 저장(git 포함), 싱크독 저장소의 코드 그래프, 켜 둔 메모리(PostgreSQL 포함) · 재는 법은 `cargo xtask speed`(`contract/speed.py` — 싱크독 저장소를 두 판에 번들로 가져와 같은 일을 시키고 표와 판정을 낸다, 카드 L17) · **리눅스와 윈도 둘 다**(같은 PC의 윈도 디스크 사본에서, Rust 판의 git은 설치판처럼 고정 MinGit — #387, 카드 L19)
 
 ---
 
