@@ -30,10 +30,7 @@ fn sh(cwd: &Path, args: &[&str]) -> String {
 fn git_for(data: &Path) -> Git {
     let global = data.join("gitconfig");
     fs::write(&global, "").expect("빈 설정");
-    Git {
-        exe: "git".into(),
-        global_config: global,
-    }
+    Git::new("git".into(), global)
 }
 
 /// 원본에 커밋 하나를 민다 — 그 해시

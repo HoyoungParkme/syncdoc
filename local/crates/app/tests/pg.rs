@@ -82,3 +82,31 @@ async fn start_stop_and_restart_with_new_password() {
         "멈춘 뒤에는 붙을 수 없다"
     );
 }
+
+/// 첫 켜기는 디스크에 내리기를 뒤로 미룬다(카드 L19) — 표식이 생겼다가 뒤에서 지워지고,
+/// 표식을 남겨 두고 켜면 서버를 띄우기 전에 마친다
+#[tokio::test]
+async fn first_start_defers_sync_behind_a_mark() {
+    let bins = pg_dir().expect("cargo xtask pg-fetch로 받은 PostgreSQL");
+    let dir = tempfile::tempdir().unwrap();
+    let mark = dir.path().join(syncdoc_app::pg::SYNC_MARK);
+    let first = start(&bins, dir.path()).await.expect("처음 띄운다");
+    // 뒤에서 `initdb --sync-only`가 끝나면 표식이 없어진다
+    let mut waited = 0;
+    while mark.exists() && waited < 600 {
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        waited += 1;
+    }
+    assert!(!mark.exists(), "뒤의 동기화가 표식을 지운다");
+    stop(first).await.expect("멈춘다");
+    // 지난번에 마치지 못한 것처럼 표식을 두고 켠다 — 서버가 뜨기 전에 지워진다
+    std::fs::write(&mark, "").unwrap();
+    let again = start(&bins, dir.path()).await.expect("다시 띄운다");
+    assert!(!mark.exists(), "켜기 전에 마친다");
+    let mut c = PgConnection::connect_with(&again.options)
+        .await
+        .expect("붙는다");
+    assert_eq!(show(&mut c, "fsync").await, "on");
+    c.close().await.unwrap();
+    stop(again).await.expect("멈춘다");
+}

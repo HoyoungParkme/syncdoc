@@ -138,7 +138,7 @@ impl LocalOps for Local {
             bin: self.pg.bin.clone(),
             port: self.pg.port,
             pg_password: self.pg.password.clone(),
-            git: Clone::clone(&self.git), // Git::clone(작업 사본 받기)와 이름이 겹친다
+            git: self.git.clone(),
             origins: self.data_dir.join("origins"),
             work: self.data_dir.join("tmp"),
         };
