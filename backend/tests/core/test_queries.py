@@ -368,6 +368,10 @@ async def test_graph_view_full_stage_scope_and_isolated(scoped: Session) -> None
     iso = {n.id for n in gr.nodes if n.isolated}
     assert iso == {"EXMP-RFQ-001#Q2"}  # 아무도 참조 안 함 (코드블록 참조는 추출 안 됨)
     assert {n.stage for n in gr.nodes if n.doc_id == "EXMP-PRD-001"} == {2}
+    # 항목 노드는 제목, 문서 노드는 없음 — UI-8 찾기 (카드 CB)
+    names = {n.id: n.display_name for n in gr.nodes}
+    assert names["EXMP-RFQ-001#Q1"] == "첫 요구" and names["EXMP-PRD-001#G1"] == "목표"
+    assert names["EXMP-RFQ-001"] is None and names["EXMP-PRD-001"] is None
     assert all(n.stage is not None for n in gr.nodes)
     # 승인만: 문서 상태가 승인인 문서의 항목만. EXMP 시드는 전부 draft라 비어야 한다
     g_ok = await queries.graph_view("EXMP", owner(scoped), GraphScope.approved)

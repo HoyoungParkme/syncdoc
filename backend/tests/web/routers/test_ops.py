@@ -34,6 +34,9 @@ def test_graph_versions_downstream_via_api(client: TestClient, scoped: Session) 
         "is_missing": False,
     } in gr["edges"]
     assert next(n for n in gr["nodes"] if n["id"] == "EXMP-RFQ-001#Q2")["isolated"] is True
+    q2 = next(n for n in gr["nodes"] if n["id"] == "EXMP-RFQ-001#Q2")
+    assert q2["display_name"] == "둘째"  # 항목 제목 — UI-8 찾기 (카드 CB)
+    assert next(n for n in gr["nodes"] if n["id"] == "EXMP-RFQ-001")["display_name"] is None
     assert client.get("/api/projects/EXMP/graph", params={"scope": "approved"}).status_code == 200
     assert client.get("/api/projects/EXMP/graph", params={"scope": "nope"}).status_code == 422
     d2 = svc.get_document("EXMP-PRD-001")
