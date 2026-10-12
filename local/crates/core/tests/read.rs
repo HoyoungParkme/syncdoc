@@ -254,6 +254,9 @@ async fn graph_nodes_edges_isolated_and_approved_scope() {
         .find(|n| n.id == "LR-PRD-001#R3")
         .expect("R3");
     assert!(r3.isolated);
+    // 항목 노드는 제목, 문서 노드는 없음 — UI-8 찾기 (카드 L21)
+    assert_eq!(r3.display_name.as_deref(), Some("외톨이"));
+    assert!(g.nodes[0].display_name.is_none());
     let missing = g
         .edges
         .iter()

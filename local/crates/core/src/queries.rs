@@ -581,6 +581,7 @@ pub async fn graph_view(
                 doc_id: b.doc_id.clone(),
                 item_id: b.item_id.clone(),
                 stage: b.stage,
+                display_name: b.display_name.clone(),
             }
         })
         .collect();

@@ -485,7 +485,7 @@ pub enum GraphScope {
     Approved,
 }
 
-/// 관계도 노드 (API-001 `Graph.nodes[]`) — id는 `DOC#ITEM`, 문서 노드는 `DOC`
+/// 관계도 노드 (API-001 `Graph.nodes[]`) — id는 `DOC#ITEM`, 문서 노드는 `DOC`. `display_name`은 항목 제목(문서 노드는 없음)
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct GraphNode {
     pub id: String,
@@ -493,6 +493,8 @@ pub struct GraphNode {
     pub item_id: Option<String>,
     pub stage: Option<i32>,
     pub isolated: bool,
+    /// UI-8 찾기(2.7)·툴팁 (카드 CB·L21)
+    pub display_name: Option<String>,
 }
 
 /// 관계도 간선 (API-001 `Graph.edges[]`) — 미존재면 `to`가 없다
