@@ -74,7 +74,7 @@ pub async fn init_project(&mut self, pool: &PgPool, code: &str, name: &str, user
 
 **예외** 1~9의 `Problem` · git·파일 실패는 `Problem::Git`·`Problem::Internal`(파이썬 판도 그대로 올린다)
 
-**호출하는 것** [[SYNC-MS-019#Git.init_bare]] · [[SYNC-MS-019#Git.list]] · [[SYNC-MS-019#Git.exists]] · [[SYNC-MS-019#Git.init_specs]] · [[SYNC-MS-019#Git.commit]] · [[SYNC-MS-017#pipeline.rebuild]] · [[SYNC-MS-017#pipeline.schedule_code_graph]] · [[#ProjectService.get]](돌려줄 행)
+**호출하는 것** [[SYNC-MS-019#Git.init_bare]] · [[SYNC-MS-019#Git.list]] · [[SYNC-MS-019#Git.exists]] · [[SYNC-MS-019#Git.init_specs]] · [[SYNC-MS-019#Git.commit]] · [[SYNC-MS-019#Git.close]](되돌리기 전 — 윈도는 열린 팩이 있으면 원본을 옮기지도 지우지도 못한다) · [[SYNC-MS-017#pipeline.rebuild]] · [[SYNC-MS-017#pipeline.schedule_code_graph]] · [[#ProjectService.get]](돌려줄 행)
 
 **테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 새 프로젝트 → `origins/{code}.git`(HEAD main, 받기 규칙 셋)과 골격 커밋 하나(14파일, `chore({code}): init syncdoc`), `last_processed_commit`이 원본 main, 작업 사본 폴더에 골격의 `docs/specs/`(`.git` 없음) · `github` → `storage-unavailable`, 아무것도 안 생김 · 나쁜 코드 → `project-code-invalid` · 같은 코드 → `project-code-conflict` · 지운 뒤 같은 코드 → `existing-specs`(`doc_count`·`archived_at`), 아무것도 안 바뀜 · 같은 초 보관본 둘 → 번호가 큰 것 · 이름 없이 남은 원본 → 보관으로 옮기고 `existing-specs` · 비어 있는 보관본 + 가져오기 → 되살리고 골격 커밋 · 명세가 있는 보관본 + 가져오기 → 재구축으로 문서·버전이 다시 올라오고 처리 지점이 원본 끝, 골격 커밋 없음 · 재구축이 실패하면 행 없음·보관본은 제자리
 
@@ -103,7 +103,7 @@ pub async fn import_bundle(&mut self, pool: &PgPool, code: &str, name: &str, use
 
 **예외** 1~7의 `Problem` · 파일 실패는 `Problem::Internal`
 
-**호출하는 것** [[SYNC-MS-019#Git.clone_bare]] · [[SYNC-MS-019#Git.rev_list_count]] · [[SYNC-MS-017#pipeline.rebuild]] · [[SYNC-MS-017#pipeline.schedule_code_graph]] · [[#ProjectService.get]](돌려줄 행)
+**호출하는 것** [[SYNC-MS-019#Git.clone_bare]] · [[SYNC-MS-019#Git.rev_list_count]] · [[SYNC-MS-019#Git.close]](7의 되돌리기 전) · [[SYNC-MS-017#pipeline.rebuild]] · [[SYNC-MS-017#pipeline.schedule_code_graph]] · [[#ProjectService.get]](돌려줄 행)
 
 **테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 명세 두 커밋(초안 → 상태)과 태그가 든 저장소의 번들 → 원본의 main·태그 해시가 같고 원격 없음·HEAD main·받기 규칙, 골격 커밋 없음, 처리 지점이 main 끝, 문서 상태가 `approved` · 번들 아님 → `bundle-invalid`(`번들 파일이 아니거나 깨졌다`), 원본 없음 · main 없는 번들 → `bundle-invalid`(`main 가지가 없다`), 원본·작업 사본·행 없음 · 나쁜 코드 → `project-code-invalid` · 같은 코드 → `project-code-conflict` · 이름 없이 남은 원본 → 보관으로 옮기고 가져온다
 
