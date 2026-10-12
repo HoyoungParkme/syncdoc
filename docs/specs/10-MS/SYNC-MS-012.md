@@ -405,6 +405,8 @@ pub async fn start(pg_dir: &Path, data_dir: &Path) -> Result<PgServer, Problem>
 7. `syncdoc` 역할로 `postgres` DB에 붙어 `syncdoc` DB가 없으면 만든다
 8. 이번에 3을 했으면 따로 띄운 작업에서 `initdb --sync-only -D pgdata` · 끝나면 표식을 지운다(실패는 로그만 — 표식이 남아 다음 켜기의 3a가 다시 한다) · 기다리지 않는다 · 앱이 끝나면 함께 끝낸다(윈도는 끝난 앱의 자식이 남아 설치 폴더를 쥔다 — 표식이 남아 다음 켜기가 다시 한다)
 
+도구(`initdb`·`postgres --single`·`pg_ctl`)는 윈도에서 창 없이(`CREATE_NO_WINDOW`) 띄운다 — git과 같다([[SYNC-MS-019]] 0장). 앱은 창 없는 실행 파일이라 콘솔 프로그램을 그냥 띄우면 새 콘솔 창이 열리고, 6의 서버가 그 창을 물려받아 창을 닫으면 PostgreSQL이 끝난다(#392)
+
 **출력** `PgServer { options, port, pgdata, bin, password }` — `options`는 127.0.0.1·포트·`syncdoc`·`pw`·DB `syncdoc`, `password`는 `pw`(백업의 `pg_dump`·`pg_restore`가 환경 변수로 쓴다, 카드 L16). 놓이면(패닉 등) `pg_ctl stop`을 한 번 시도한다
 
 **예외** 1 · `initdb`·`postgres --single`·`pg_ctl` 실패(로그 경로와 함께) · 7 → `! Internal`
@@ -422,7 +424,7 @@ pub async fn stop(server: PgServer) -> Result<(), Problem>
 
 근거: [[SYNC-INFRA-001]] 9.1 끄기
 
-**처리** `pg_ctl stop -D pgdata -m fast -w -t 30` · 이미 멈춰 있으면(`postmaster.pid` 없음) 성공
+**처리** `pg_ctl stop -D pgdata -m fast -w -t 30` — 윈도는 창 없이([[#pg.start]]와 같다) · 이미 멈춰 있으면(`postmaster.pid` 없음) 성공
 
 **예외** 멈추지 못하면 `! Internal`(로그 경로와 함께)
 
