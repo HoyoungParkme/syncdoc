@@ -403,7 +403,7 @@ pub async fn start(pg_dir: &Path, data_dir: &Path) -> Result<PgServer, Problem>
 6. `127.0.0.1:0`에 잠깐 묶어 빈 포트를 얻고 `pg_ctl start -D pgdata -w -t 60 -l logs/postgresql-boot.log -o "-p {포트}"` — 따로 프로세스 묶음으로 띄운다. `pg_ctl`의 표준 출력·오류는 `logs/pg_ctl.log`로 받는다 — 윈도의 `pg_ctl`은 핸들을 물려주며 서버를 띄워, 파이프로 받으면 서버가 끝날 때까지 기다린다. 터미널의 Ctrl+C가 PostgreSQL에 바로 닿지 않게 하고, 멈추는 순서는 [[#runtime.shutdown]]이 쥔다 · 실패하면 다른 포트로 두 번 더
 3a. if 표식 `pgdata.sync`가 있다(지난번 디스크에 내리기를 마치지 못했다) → `initdb --sync-only -D pgdata`를 끝내고 표식을 지운다 — 서버를 띄우기 전에
 7. `syncdoc` 역할로 `postgres` DB에 붙어 `syncdoc` DB가 없으면 만든다
-8. 이번에 3을 했으면 따로 띄운 작업에서 `initdb --sync-only -D pgdata` · 끝나면 표식을 지운다(실패는 로그만 — 표식이 남아 다음 켜기의 3a가 다시 한다) · 기다리지 않는다
+8. 이번에 3을 했으면 따로 띄운 작업에서 `initdb --sync-only -D pgdata` · 끝나면 표식을 지운다(실패는 로그만 — 표식이 남아 다음 켜기의 3a가 다시 한다) · 기다리지 않는다 · 앱이 끝나면 함께 끝낸다(윈도는 끝난 앱의 자식이 남아 설치 폴더를 쥔다 — 표식이 남아 다음 켜기가 다시 한다)
 
 **출력** `PgServer { options, port, pgdata, bin, password }` — `options`는 127.0.0.1·포트·`syncdoc`·`pw`·DB `syncdoc`, `password`는 `pw`(백업의 `pg_dump`·`pg_restore`가 환경 변수로 쓴다, 카드 L16). 놓이면(패닉 등) `pg_ctl stop`을 한 번 시도한다
 
