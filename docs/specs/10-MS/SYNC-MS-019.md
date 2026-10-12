@@ -156,7 +156,7 @@ pub async fn commit(&self, origin: &Path, workdir: &Path, message: &str, user: &
 
 **처리** [[SYNC-MS-009#git.commit_push]]와 같은 결과 — 서버 저장소 `main` 위에 커밋 하나
 1. 경로 가드 — 쓸 것·지울 것마다 빈 경로·`.git` 조각·작업 사본 폴더 밖(심볼릭 링크를 풀어서)이면 `! PushFailed("작업 사본 밖 경로: {p}")`, 아무것도 쓰기 전에(파이썬 판과 같은 문장)
-2. 메시지를 `git commit -m`처럼 정리한다(git `strbuf_stripspace` — 줄마다 끝의 공백(` `·`\t`·`\r`·`\n`)을 걷고, 앞뒤 빈 줄을 버리고, 빈 줄 여럿은 하나로, 끝에 줄바꿈 하나) · 비면 `Problem::Git`(파이썬 판의 `git commit`이 「빈 메시지」로 실패하는 것과 같다 — 응답은 `internal`)
+2. 메시지를 `git commit -m`처럼 정리한다(git `strbuf_stripspace` — 줄마다 끝의 공백(` `·`\t`·`\r`·`\n`)을 걷고, 앞뒤 빈 줄을 버리고, 빈 줄 여럿은 하나로, 끝에 줄바꿈 하나) · 비면 `Problem::Git`(파이썬 판의 `git commit`이 「빈 메시지」로 실패하는 것과 같다 — 응답은 `internal`). 4에서 바뀐 것이 있을 때만 본다 — 파이썬 판도 바뀐 것이 없으면 커밋하지 않아 메시지를 보지 않는다
 3. `parent = Git.head`(빈 저장소면 없음)
 4. 바뀐 것이 없다 — 쓸 파일마다 `parent`의 그 경로가 같은 내용이고 지울 경로마다 `parent`에 없다 → 커밋 없이 `→ Committed { hash: parent, parent }`(파이썬 `diff --cached --quiet`와 같다)
 5. 본인 = `{표시 이름} <{login}@syncdoc.local>` — 로컬 사용자(`kind=local`). 아니면 `@users.noreply.github.com`(파이썬 판과 같은 규칙) · git처럼 앞뒤의 군더더기(공백 이하·`,:;<>"\'`)를 걷고 안의 줄바꿈·`<`·`>`를 뺀다 · 시각 = 지금 초, 현지 오프셋(`±HHMM`)
@@ -167,7 +167,9 @@ pub async fn commit(&self, origin: &Path, workdir: &Path, message: &str, user: &
 
 **다른 점** 0장 「프로세스를 적게」 — 받기·되돌리기·밀기가 없고 fast-import 하나다 · 저장 도중 밖에서 같은 파일을 밀었으면 rebase로 합치지 않고 `conflict`(파이썬 판은 합친다 — 계약 밖) · 부모를 돌려준다 — 처리 지점 앞당기기가 `rev-list --count` 없이 「부모 = 처리 지점」으로 같은 판정을 한다([[SYNC-MS-017#pipeline.save_pipeline]] 13a) · 쓰는 사람은 `UserRow` · 재시도 수는 상수
 
-**테스트 관점** **같은 트리·부모·본인·시각이면 `git commit`이 만든 커밋과 해시가 같다**(메시지 꼴 — 끝 공백·앞뒤 빈 줄·빈 줄 여럿·`\r\n`·끝 줄바꿈 없음·한글) · 오프셋이 `git var GIT_COMMITTER_IDENT`와 같다 · 반환 해시 = `main` · 같은 내용 → 커밋 없음 · 빈 저장소 → 첫 커밋(부모 없음) · 지우기 · 실행 비트가 있던 파일을 고쳐도 `100755` · 사이에 밖에서 다른 파일을 밀었다 → 그 위에 커밋 · 같은 파일 → `conflict`, `main`은 밖의 것 · 빈 메시지 → `Problem::Git` · `.git/`·`..`·바깥 링크 → `PushFailed`, 아무것도 안 씀 · 폴더에 쓴 것·지운 것이 그대로 · 사용자 `~/.gitconfig`가 있어도 같은 커밋
+**호출하는 것** [[#Git.head]]
+
+**테스트 관점** **같은 트리·부모·본인·시각이면 `git commit`이 만든 커밋과 해시가 같다**(메시지 꼴 — 끝 공백·앞뒤 빈 줄·빈 줄 여럿·`\r\n`·끝 줄바꿈 없음·한글) · 오프셋이 `git var GIT_COMMITTER_IDENT`와 같다 · 반환 해시 = `main` · 같은 내용 → 커밋 없음 · 빈 저장소 → 첫 커밋(부모 없음) · 지우기 · 실행 비트가 있던 파일을 고쳐도 `100755` · 사이에 밖에서 다른 파일을 밀었다 → 그 위에 커밋 · 같은 파일 → `conflict`, `main`은 밖의 것 · 빈 메시지 → 바뀐 것이 있으면 `Problem::Git`, 없으면 커밋 없이 부모 · `.git/`·`..`·바깥 링크 → `PushFailed`, 아무것도 안 씀 · 폴더에 쓴 것·지운 것이 그대로 · 사용자 `~/.gitconfig`가 있어도 같은 커밋
 
 ---
 
@@ -433,7 +435,7 @@ pub async fn gc(&self, origin: &Path) -> Result<(), Problem>
 
 **호출하는 것** [[#Git.close]]
 
-**테스트 관점** 팩 쉰 개 넘게 쌓인 저장소 → 팩이 줄고 `main`·내용은 그대로 · 쌓인 것이 없으면 그대로
+**테스트 관점** 낱낱의 객체가 문턱(6700)을 넘은 저장소 → 팩으로 묶이고 `main`·내용은 그대로 — 작은 커밋마다 fast-import는 낱낱의 객체로 쓴다(`fastimport.unpackLimit`) · 쌓인 것이 없으면 그대로
 
 ---
 
