@@ -46,6 +46,18 @@ const STATUS_MARK: Record<string, string> = { same: '✓', code_only: '▲', spe
 const STATUS_CLS: Record<string, string> = { same: 'same', code_only: 'code', spec_only: 'spec' }
 /** 파일 경로면 파일 이름만 — 전체는 title로 (6 트리) */
 const short = (label: string) => (label.includes('/') ? label.slice(label.lastIndexOf('/') + 1) : label)
+/** 노드 ID에서 나온 고정 흔들림 -0.5~0.5 둘 — 시작 위치가 열 때마다 같다 (카드 BZ). FNV-1a로 씨앗, mulberry32로 두 수 */
+const jitter = (id: string): [number, number] => {
+  let h = 2166136261
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619)
+  const next = () => {
+    h = (h + 0x6d2b79f5) | 0
+    let t = Math.imul(h ^ (h >>> 15), 1 | h)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296 - 0.5
+  }
+  return [next(), next()]
+}
 const cNodeId = (cid: number) => `c:${cid}`
 const fNodeId = (key: string) => `f:${key}`
 /** 6 트리 한 단 — 폴더(한 단씩)와 그 안 파일. 접힌 폴더 안은 그리지 않는다 */
@@ -126,6 +138,7 @@ export function CodeGraph() {
   const focusRef = useRef<Sel | null>(null)
   const treeFocusRef = useRef<{ keys: Set<string>; cids: Set<number> } | null>(null)
   const fitted = useRef(false) // 처음 안정될 때 한 번 전체가 보이게 맞춘다
+  const lastExpanded = useRef<Set<number> | null>(null) // 펼침이 바뀐 때만 움직이며 퍼진다 (카드 BZ)
   // 펼친 뒤 따라갈 자리 — 배치가 멈출 때까지 틱마다 다시 맞춘다. 사용자가 끌거나 휠을 굴리면 그만 (#295)
   const frameRef = useRef<{ kind: 'center'; key: string } | { kind: 'fit'; keys: Set<string> } | null>(null)
   const applyFrameRef = useRef<() => void>(() => {}) // 배치 틱이 부른다 — 시뮬레이션은 한 번 만들어지므로 ref로
@@ -241,12 +254,13 @@ export function CodeGraph() {
     const nodes = shown.nodes.map((n) => {
       const prev = old.get(n.id)
       if (prev) return Object.assign(prev, { r: n.r, size: n.size, label: n.label, fn: n.fn, cid: n.cid })
-      let x = W / 2 + (Math.random() - 0.5) * 80
-      let y = H / 2 + (Math.random() - 0.5) * 80
+      const [jx, jy] = jitter(n.id)
+      let x = W / 2 + jx * 80
+      let y = H / 2 + jy * 80
       const home = n.cid !== null ? old.get(cNodeId(n.cid)) : undefined
       if (home && home.x !== undefined && home.y !== undefined) {
-        x = home.x + (Math.random() - 0.5) * 60
-        y = home.y + (Math.random() - 0.5) * 60
+        x = home.x + jx * 60
+        y = home.y + jy * 60
       } else if (n.kind === 'c') {
         // 접을 때 — 그 안 함수들의 가운데에서
         const members = nodesRef.current.filter((m) => m.kind === 'f' && m.cid === n.cid && m.x !== undefined)
@@ -295,8 +309,22 @@ export function CodeGraph() {
         .distance((l) => ((l.source as GNode).kind === 'c' && (l.target as GNode).kind === 'c' ? 140 : 32))
         .strength(0.5),
     )
-    sim.alpha(0.6).restart()
+    // 펼치기·접기는 움직이며 퍼진다. 처음과 범례로 숨기기를 바꾼 때는 그리기 전에 멈출 때까지 미리 돌린다 —
+    // 열면 멈춘 그림이다 (카드 BZ). tick()은 'tick'을 쏘지 않으니 맞춤·다시 그리기는 여기서
+    const expanding = lastExpanded.current !== null && lastExpanded.current !== expanded
+    lastExpanded.current = expanded
+    if (expanding) sim.alpha(0.6).restart()
+    else {
+      sim.stop().alpha(0.6)
+      while (sim.alpha() > sim.alphaMin()) sim.tick()
+      if (!fitted.current && nodes.length) {
+        fitted.current = true
+        fitAll()
+      }
+      bump((t) => t + 1)
+    }
     dirty.current = true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shown])
 
   useEffect(
