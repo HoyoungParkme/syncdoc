@@ -2,7 +2,7 @@
 doc_id: SYNC-CODE-002
 type: CODE
 title: 구현 계획 — 싱크독_로컬 (Rust) 슬라이스 카드와 커밋 기록
-status: draft
+status: approved
 upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-001, SYNC-API-002, SYNC-UI-002, SYNC-SCN-001]
 ---
 
