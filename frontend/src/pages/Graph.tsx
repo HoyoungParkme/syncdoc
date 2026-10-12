@@ -9,8 +9,8 @@
 import { ProjName } from '../components/ui'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { api, STAGE_TYPES, type CodeCalls, type Graph as GraphData, type GraphScope } from '../api/client'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { api, docPath, STAGE_TYPES, type CodeCalls, type Graph as GraphData, type GraphScope } from '../api/client'
 import { ItemChain } from '../components/ItemChain'
 
 /** 열 간격과 노드 폭이 다르다 — 그 차(32px)가 간선이 지나는 거터다 */
@@ -32,6 +32,7 @@ type Placed = { id: string; col: number; row: number; label: string; title: stri
 export function Graph() {
   const { code = '' } = useParams()
   const [sp, setSp] = useSearchParams()
+  const nav = useNavigate()
   const scope = (sp.get('scope') ?? 'all') as GraphScope
   const codeOn = sp.get('code') === '1' // 2.6 — URL ?code=1
   const [calls, setCalls] = useState<CodeCalls | null>(null)
@@ -127,7 +128,10 @@ export function Graph() {
                 style={{ left: colX(n.col), top: rowY(n.row), width: NODE_W, height: NODE_H }}
                 onMouseEnter={() => setFocus(n.id)}
                 onMouseLeave={() => setFocus(null)}
-                onClick={() => n.itemId && setChain({ docId: n.docId, itemId: n.itemId })}
+                onClick={() =>
+                  // 항목이면 UI-15, 문서 노드(항목 없이 문서 ID만)는 그 문서의 UI-5 (#398)
+                  n.itemId ? setChain({ docId: n.docId, itemId: n.itemId }) : nav(docPath(n.docId))
+                }
                 title={n.title}
               >
                 <span className="nlabel">
