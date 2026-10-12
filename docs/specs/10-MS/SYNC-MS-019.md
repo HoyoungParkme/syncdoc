@@ -160,7 +160,7 @@ pub async fn commit(&self, origin: &Path, workdir: &Path, message: &str, user: &
 3. `parent = Git.head`(빈 저장소면 없음)
 4. 바뀐 것이 없다 — 쓸 파일마다 `parent`의 그 경로가 같은 내용이고 지울 경로마다 `parent`에 없다 → 커밋 없이 `→ Committed { hash: parent, parent }`(파이썬 `diff --cached --quiet`와 같다)
 5. 본인 = `{표시 이름} <{login}@syncdoc.local>` — 로컬 사용자(`kind=local`). 아니면 `@users.noreply.github.com`(파이썬 판과 같은 규칙) · git처럼 앞뒤의 군더더기(공백 이하·`,:;<>"\'`)를 걷고 안의 줄바꿈·`<`·`>`를 뺀다 · 시각 = 지금 초, 현지 오프셋(`±HHMM`)
-6. `git: fast-import --quiet --done`에 한 번에 넣는다 — `commit refs/heads/main` · `mark :1` · `author`·`committer`(5와 같은 줄) · `data`(2의 메시지) · `from {parent}`(있을 때) · 쓸 파일마다 `M {모드} inline {경로}` + `data`(UTF-8 그대로, 줄바꿈 바꾸지 않음) — 모드는 `parent`에 있던 경로면 그 모드(`100644`·`100755`), 아니면 `100644`(파이썬 `git add`가 작업 사본 모드를 지키는 것과 같다) · 지울 것마다 `D {경로}` · `get-mark :1`(새 해시가 표준 출력으로) · `done` · 경로에 `"`·`\`·줄바꿈이 있거나 `"`로 시작하면 C 꼴로 따옴
+6. `git: -c fastimport.unpackLimit=0 fast-import --quiet --done`에 한 번에 넣는다(팩을 그대로 둔다 — 작은 것을 낱낱의 객체로 풀려고 `unpack-objects`를 하나 더 띄우지 않게. 쌓인 팩은 [[#Git.gc]]가 묶는다) — `commit refs/heads/main` · `mark :1` · `author`·`committer`(5와 같은 줄) · `data`(2의 메시지) · `from {parent}`(있을 때) · 쓸 파일마다 `M {모드} inline {경로}` + `data`(UTF-8 그대로, 줄바꿈 바꾸지 않음) — 모드는 `parent`에 있던 경로면 그 모드(`100644`·`100755`), 아니면 `100644`(파이썬 `git add`가 작업 사본 모드를 지키는 것과 같다) · 지울 것마다 `D {경로}` · `get-mark :1`(새 해시가 표준 출력으로) · `done` · 경로에 `"`·`\`·줄바꿈이 있거나 `"`로 시작하면 C 꼴로 따옴
 7. fast-import는 `main`이 `parent`일 때만 옮긴다(앞으로만) — 거부(끝 코드가 0이 아님)이고 지금 `main`이 `parent`가 아니다(사이에 밖에서 밀었다) → 쓸 것·지울 것 가운데 하나라도 `parent`와 지금 `main`에서 내용이 다르면 `! PushFailed("conflict")` · 아니면 지금 `main`을 `parent`로 6을 다시(세 번까지 — `PUSH_RETRIES`, [[SYNC-INFRA-001]] 5.2) · 다른 실패 → `! PushFailed(stderr)`
 8. 작업 사본 폴더에 `docs/specs/` 아래의 쓴 것을 쓰고 지운 것을 지운다(폴더가 있을 때 — [[#Git.materialize]]가 만든다)
 9. `→ Committed { hash: 새 해시, parent }`
@@ -435,7 +435,7 @@ pub async fn gc(&self, origin: &Path) -> Result<(), Problem>
 
 **호출하는 것** [[#Git.close]]
 
-**테스트 관점** 낱낱의 객체가 문턱(6700)을 넘은 저장소 → 팩으로 묶이고 `main`·내용은 그대로 — 작은 커밋마다 fast-import는 낱낱의 객체로 쓴다(`fastimport.unpackLimit`) · 쌓인 것이 없으면 그대로
+**테스트 관점** 저장마다 팩이 하나라 팩이 문턱(50)을 넘은 저장소 → 팩이 줄고 `main`·내용은 그대로 · 낱낱의 객체(6700 넘게 — 밖에서 민 작은 push는 낱낱의 객체로 온다)도 묶인다 · 쌓인 것이 없으면 그대로
 
 ---
 
