@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-023
 type: MS
 title: MINISPEC — 이 PC — 백업·되살리기·데이터 자리·자동 시작 (Rust)
-status: approved
+status: draft
 upstream: [SYNC-DOM-004, SYNC-INFRA-001, SYNC-API-001, SYNC-UI-002, SYNC-MS-012, SYNC-STD-004]
 ---
 
