@@ -2,7 +2,7 @@
 doc_id: SYNC-INFRA-001
 type: INFRA
 title: 인프라 아키텍처 — 싱크독
-status: draft
+status: approved
 upstream: [SYNC-PRD-001, SYNC-UC-001]
 ---
 
