@@ -52,7 +52,7 @@ jobs:
           Start-Process $setup -ArgumentList '/S' -Wait
           $dir = "$env:LOCALAPPDATA\Programs\SyncDoc Local"
           $exe = "$dir\syncdoc-local.exe"
-          foreach ($p in @($exe, "$dir\postgresql\bin\postgres.exe", "$dir\mingit\cmd\git.exe", "$dir\NOTICE.txt", "$dir\uninstall.exe")) {
+          foreach ($p in @($exe, "$dir\postgresql\bin\postgres.exe", "$dir\mingit\cmd\git.exe", "$dir\mingit\ucrt64\bin\git.exe", "$dir\NOTICE.txt", "$dir\uninstall.exe")) {
             if (-not (Test-Path $p)) { throw "없다 — $p" }
           }
           $menu = [Environment]::GetFolderPath('Programs')

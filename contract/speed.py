@@ -78,7 +78,7 @@ class Rust:
 
     def start(self) -> float:
         env = {**os.environ, "SYNCDOC_LOCAL_PG_DIR": str(PG_DIR)}
-        if WINDOWS:  # 설치 폴더의 MinGit 대신 시스템 git
+        if WINDOWS:  # xtask가 설치판과 같은 고정 MinGit을 넘긴다(카드 L19) — 없으면 시스템 git
             env.setdefault("SYNCDOC_LOCAL_GIT", shutil.which("git") or "git")
         t0 = time.monotonic()
         self.proc = subprocess.Popen(
