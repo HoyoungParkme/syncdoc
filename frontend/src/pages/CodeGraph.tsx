@@ -12,8 +12,9 @@
  *  카드 BG — 트리는 폴더 한 단씩, 폴더·파일을 고르면 그 아래 함수 노드를 펼쳐 보인다(트리 포커스). 4.7 명세 —
  *    항목·근거(상위 참조)·하위 참조(…/references, 참조 탭과 같은 자료), 항목 없으면 가까운 항목
  *
- *  배치는 브라우저가 한다 — 서버는 노드·선·커뮤니티만 준다(MS-008 code_nodes). 커뮤니티는 서버가 그래프를
- *  만들 때 계산한 것(MS-011 communities). d3-force는 번들 안에 있어 바깥 요청이 없다 — 폐쇄망판도 같다. */
+ *  배치는 브라우저가 한다 — 서버는 노드·선·커뮤니티만 준다(MS-008 code_nodes). 커뮤니티 묶음은 서버가 그래프를
+ *  만들 때 계산한 것(MS-011 communities)이고, 이름과 큰 무리 나누기는 받은 직후 화면이 한다(codeGroups, 카드 BY).
+ *  d3-force는 번들 안에 있어 바깥 요청이 없다 — 폐쇄망판도 같다. */
 import { ItemIdBadge, ProjName } from '../components/ui'
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type Simulation, type SimulationLinkDatum, type SimulationNodeDatum } from 'd3-force'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -23,6 +24,7 @@ import { AskPanel } from './DocView'
 import { ASK, CG_TREE, Handle, readStore, useWidth, writeStore } from '../components/panes'
 import type { AskChat } from '../components/Shell'
 import { CodeLines } from './codeSrc'
+import { regroup, type ViewNodes } from './codeGroups'
 import { ItemPeek, type PeekTarget } from '../components/ItemPeek'
 
 type Sel = { kind: 'c'; id: number } | { kind: 'f'; key: string }
@@ -42,15 +44,8 @@ interface GLink extends SimulationLinkDatum<GNode> {
 const PALETTE = 12
 const STATUS_MARK: Record<string, string> = { same: '✓', code_only: '▲', spec_only: '◌' }
 const STATUS_CLS: Record<string, string> = { same: 'same', code_only: 'code', spec_only: 'spec' }
-/** 라벨이 파일 경로 꼴이면 파일 이름만 — 전체는 title로 (UI-17 규칙) */
+/** 파일 경로면 파일 이름만 — 전체는 title로 (6 트리) */
 const short = (label: string) => (label.includes('/') ? label.slice(label.lastIndexOf('/') + 1) : label)
-/** 커뮤니티의 허브 함수(UI-17 규칙 「허브 함수」, #306) — 라벨과 같은 이름 → 라벨 클래스의 메서드 → 라벨 파일의 함수 → 첫 함수.
- *  members는 호출 많은 순이라 단계마다 첫째가 호출 많은 것 */
-const hubOf = (label: string, members: CodeNode[]): CodeNode | undefined =>
-  members.find((f) => f.qual === label || f.name === label) ??
-  members.find((f) => f.qual.startsWith(`${label}.`)) ??
-  members.find((f) => f.file === label || f.file.endsWith(`/${label}`)) ??
-  members[0]
 const cNodeId = (cid: number) => `c:${cid}`
 const fNodeId = (key: string) => `f:${key}`
 /** 6 트리 한 단 — 폴더(한 단씩)와 그 안 파일. 접힌 폴더 안은 그리지 않는다 */
@@ -102,7 +97,7 @@ export function CodeGraph() {
     if (!sp.get('panel') && (last === 'spec' || (last === 'ask' && askTab))) setTab(last)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
-  const [data, setData] = useState<CodeNodes | null>(null)
+  const [data, setData] = useState<ViewNodes | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set())
   const [hidden, setHidden] = useState<Set<number>>(() => new Set())
@@ -139,7 +134,7 @@ export function CodeGraph() {
   useEffect(() => {
     api
       .get<CodeNodes>(`/api/projects/${code}/code-graph`)
-      .then(setData)
+      .then((d) => setData(regroup(d))) // 이름·큰 무리 나누기는 화면이 (카드 BY)
       .catch((e) => setErr(e instanceof ApiError ? e.message : String(e)))
   }, [code])
 
@@ -385,7 +380,7 @@ export function CodeGraph() {
           ctx.font = `600 ${11 / k}px ${getComputedStyle(document.documentElement).getPropertyValue('--font-mono')}`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
-          ctx.fillText(short(n.label), n.x!, n.y!, n.r * 1.9)
+          ctx.fillText(n.label, n.x!, n.y!, n.r * 1.9)
         } else if (n.kind === 'f' && k >= 1.8 && !dim) {
           ctx.fillStyle = col.ink
           ctx.font = `${10 / k}px ${getComputedStyle(document.documentElement).getPropertyValue('--font-mono')}`
@@ -642,10 +637,12 @@ export function CodeGraph() {
   const selComm = sel?.kind === 'c' ? commOf.get(sel.id) : undefined
   const callsOf = (key: string) => (data?.calls ?? []).filter(([a]) => a === key).map(([, b]) => byKey.get(b)).filter((f): f is CodeNode => !!f)
   const callersOf = (key: string) => (data?.calls ?? []).filter(([, b]) => b === key).map(([a]) => byKey.get(a)).filter((f): f is CodeNode => !!f)
-  const allMembers = selComm ? data!.functions.filter((f) => f.community === selComm.id).sort((a, b) => (degree.get(b.key) ?? 0) - (degree.get(a.key) ?? 0)) : []
+  const allMembers = selComm
+    ? data!.functions.filter((f) => f.community === selComm.id).sort((a, b) => (degree.get(b.key) ?? 0) - (degree.get(a.key) ?? 0) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+    : []
   const members = allMembers.slice(0, 20)
-  // 4.6 코드 — 함수를 골랐으면 그 함수, 커뮤니티면 허브 함수(hubOf — 라벨의 클래스 메서드·파일 함수 중 호출 많은 것, #306)
-  const codeTarget = selFn ?? (selComm ? hubOf(selComm.label, allMembers) : undefined)
+  // 4.6 코드 — 함수를 골랐으면 그 함수, 커뮤니티면 허브 함수 — 호출이 가장 많은 함수, 같으면 key 순(4.2의 첫째, 카드 BY)
+  const codeTarget = selFn ?? (selComm ? allMembers[0] : undefined)
   const codeKey = codeTarget?.key
   useEffect(() => {
     if (!codeKey || !codeTarget) {
@@ -881,9 +878,9 @@ export function CodeGraph() {
           {selFn.file}:{selFn.line}
         </div>
         {selFn.community !== null && commOf.has(selFn.community) && (
-          <span className="chip" data-el="4.5" onClick={() => collapse(selFn.community!)} title={commOf.get(selFn.community)!.label}>
+          <span className="chip" data-el="4.5" onClick={() => collapse(selFn.community!)} title={commOf.get(selFn.community)!.full}>
             <i style={{ background: `var(--cg-${(selFn.community % PALETTE) + 1})` }} />
-            {short(commOf.get(selFn.community)!.label)} · 함수 {commOf.get(selFn.community)!.size} · 접기
+            {commOf.get(selFn.community)!.label} · 함수 {commOf.get(selFn.community)!.size} · 접기
           </span>
         )}
       </div>
@@ -901,8 +898,8 @@ export function CodeGraph() {
   ) : selComm ? (
     <>
       <div data-el="4.1">
-        <div className="nm" title={selComm.label}>
-          {short(selComm.label)}
+        <div className="nm" title={selComm.full}>
+          {selComm.label}
         </div>
         <div className="meta">커뮤니티 · 함수 {selComm.size}</div>
         <span className="chip" data-el="4.5" onClick={() => (expanded.has(selComm.id) ? collapse(selComm.id) : setExpanded((s) => new Set(s).add(selComm.id)))}>
@@ -923,7 +920,7 @@ export function CodeGraph() {
       <div className="nm">{codeTarget.qual}</div>
       <div className="meta">
         {codeTarget.file}:{codeTarget.line}
-        {selComm ? ` · ${short(selComm.label)}의 허브` : ''}
+        {selComm ? ` · ${selComm.label}의 허브` : ''}
       </div>
       {specBlock(codeTarget)}
     </>
@@ -993,8 +990,8 @@ export function CodeGraph() {
                   })}
                 </svg>
                 {focusNode.kind === 'c' ? (
-                  <div className="cgn c" data-el="3.1" style={toScreen(focusNode)} title={focusNode.label}>
-                    {short(focusNode.label)}
+                  <div className="cgn c" data-el="3.1" style={toScreen(focusNode)} title={commOf.get(focusNode.cid!)?.full}>
+                    {focusNode.label}
                     <span className="sub">함수 {focusNode.size} · 펼치기</span>
                   </div>
                 ) : (
@@ -1015,10 +1012,10 @@ export function CodeGraph() {
           </div>
           <div className="cglegend" data-el="5">
             {(data?.communities ?? []).map((c, i) => (
-              <label className={`row${hidden.has(c.id) ? ' off' : ''}`} key={c.id} data-el={i === 0 ? '5.1' : undefined} title={c.label}>
+              <label className={`row${hidden.has(c.id) ? ' off' : ''}`} key={c.id} data-el={i === 0 ? '5.1' : undefined} title={c.full}>
                 <input type="checkbox" checked={!hidden.has(c.id)} onChange={() => toggleHidden(c.id)} />
                 <i style={{ background: `var(--cg-${(c.id % PALETTE) + 1})` }} />
-                {short(c.label)} · {c.size}
+                {c.label} · {c.size}
               </label>
             ))}
             <span className="grow" />
