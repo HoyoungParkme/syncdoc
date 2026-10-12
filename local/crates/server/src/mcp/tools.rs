@@ -547,7 +547,8 @@ async fn get_template(state: &AppState, user: &UserRow, a: &PyValue) -> Result<V
     .get_owned(&project_code, user)
     .await?;
     tx.commit().await?;
-    let workdir = PathBuf::from(&repository.workdir_path);
+    // 작업 사본이 git이 아니다 — 서버 저장소에서 읽는다(카드 L19)
+    let workdir = PathBuf::from(&repository.remote_url);
     // 템플릿은 내장이 먼저(#94) · 서브타입 뼈대가 없으면 타입 것
     let mut name = match &subtype {
         Some(s) => format!("{doc_type}-{s}"),

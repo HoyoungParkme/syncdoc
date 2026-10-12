@@ -108,7 +108,7 @@ impl CodeGraphService<'_> {
         &mut self,
         git: &Git,
         project_id: i32,
-        workdir: &Path,
+        origin: &Path,
         path: &str,
         start: i64,
         end: Option<i64>,
@@ -126,7 +126,7 @@ impl CodeGraphService<'_> {
             return Err(not_found("file", path));
         }
         let rel = parts.join("/");
-        let text = match git.read(workdir, &rel, &commit).await {
+        let text = match git.read(origin, &rel, &commit).await {
             Ok(t) => t,
             Err(_) => return Err(not_found("file", path)),
         };

@@ -476,7 +476,7 @@ async fn read_code(
         .read(
             &repos.git,
             project.id,
-            std::path::Path::new(&repo.workdir_path),
+            std::path::Path::new(&repo.remote_url),
             &path,
             start,
             end,
