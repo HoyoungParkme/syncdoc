@@ -7,7 +7,8 @@ import { Link } from 'react-router-dom'
 import { ago, api, ApiError, docPath, type HookStatus, type RebuildResult, type RepoStatus, type SyncResult } from '../api/client'
 import { ProjName, toast, Tooltip, useEscape } from '../components/ui'
 
-export function Admin() {
+/** onLeave — 다른 화면으로 가는 링크(5.2)를 누르면 부른다. 설정 창(UI-13)을 닫는다 (#394) */
+export function Admin({ onLeave }: { onLeave: () => void }) {
   const [repos, setRepos] = useState<RepoStatus[]>([])
   const [confirm, setConfirm] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -225,7 +226,7 @@ export function Admin() {
                 {result.r.convention_errors.map((e) => (
                   <span key={e.doc_id}>
                     {' '}
-                    — <Link to={docPath(e.doc_id)}>{e.doc_id}</Link> {e.detail.split('\n')[0]}
+                    — <Link to={docPath(e.doc_id)} onClick={onLeave}>{e.doc_id}</Link> {e.detail.split('\n')[0]}
                   </span>
                 ))}
               </span>
