@@ -685,6 +685,8 @@ a.arow:hover{background:var(--bg-subtle)}
 /* 이 항목 칩 — 채우지 않는다. 자리 표시는 행 배경과 왼쪽 라벨이 이미 하고 있다 */
 .chip.me{background:var(--bg-card);border:1.5px solid var(--ink-body);font-weight:var(--w-semibold);cursor:default}
 .chip.gone{border-style:dashed;color:var(--ink-disabled);cursor:default}
+/* 문서 묶음(3.4) — 이 항목 밖 칩이 24개 넘는 단계를 문서별로 접은 것. 항목 칩과 갈리게 바탕을 깐다 (카드 CA) */
+.chip.docgrp{background:var(--bg-subtle);font-family:var(--font-mono);font-size:var(--text-mono-sm)}
 /* UI-9 순서대로 읽기 */
 /* 화면 높이를 채우고 본문만 스크롤한다. 레일은 위에 붙어 있는다 */
 .readscreen{height:100%;display:flex;flex-direction:column;overflow:hidden}
