@@ -6,7 +6,7 @@
  *  9 단계 이동 · 10 원본(10.1 MD, 10.2 복사, 10.3 원문, 10.4 렌더링)
  *  질문 탭(8.4 탭 · 8.5 맥락 줄 · 8.6 입력 · 8.7 대화 · 8.9 진행 줄) — 카드 U·Y. 대화는 Shell이 프로젝트 단위로 든다 */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import mermaid from 'mermaid'
 import { ago, api, ApiError, docPath, incompleteOf, warnText, type AskAnswer, type AskDelta, type AskNote, type AskRead, type AttachmentMeta, type CodeFunction, type CodeText, type CodeView, type Conversation, type ConversationBrief, type Document, type DownstreamView, type ItemRef, type ItemReferences, type Me, type Problem } from '../api/client'
 import { CodeLines } from './codeSrc'
@@ -160,6 +160,17 @@ export function DocView() {
       if (typeof cleanup === 'function') cleanup()
     }
   }, [view, tab, doc, nav, setSp])
+
+  // 같은 문서 안 이동(7.2 참조 · UI-18 「이동」 · 주소창)은 `#item-X`만 바뀌어 위 효과가 다시 돌지 않는다 —
+  // 지금 문서의 항목이면 여기서 스크롤·선택한다. 다른 문서로 가는 진입은 위 효과가 본문을 그린 뒤에 한다 (#393)
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (!hash.startsWith('#item-') || !doc || doc.doc_id !== docId) return
+    const it = hash.slice(6)
+    if (!doc.items.some((i) => i.item_id === it)) return
+    document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' })
+    setSelected(it)
+  }, [hash, doc, docId])
 
   useEffect(() => {
     // 지금 문서의 항목일 때만 — 문서가 바뀐 첫 커밋엔 doc이 옛 문서라 옛 선택으로 새 문서에 묻지 않는다 (#198)
