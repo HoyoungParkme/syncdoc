@@ -1,8 +1,11 @@
-//! SYNC-MS-022 테스트 관점 — touches_code · load · extract (나머지는 정답 파일과 `cargo xtask codegraph-diff`가 본다)
+//! SYNC-MS-022 테스트 관점 — touches_code · load · extract · widen (나머지는 정답 파일과 `cargo xtask codegraph-diff`가 본다)
 
 use std::path::PathBuf;
 
-use syncdoc_codegraph::{enrich, extract, load, reduce, touches_code};
+use std::collections::HashSet;
+
+use serde_json::Value;
+use syncdoc_codegraph::{communities, enrich, extract, load, reduce, touches_code, widen};
 
 fn fixture() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixture")
@@ -115,4 +118,92 @@ fn fixture_extract_reduces_and_enriches_without_files() {
     assert!(g.functions.iter().any(|f| f.qual == "ThingService.create"
         && f.ms.as_deref() == Some("FX-MS-001#ThingService.create")));
     assert!(!g.functions.iter().any(|f| f.file.contains("tests/")));
+}
+
+/// 추출 원형만으로 묶으면 TS·Rust 함수가 커뮤니티 없이 남는다 → 넓히면 함수가 다 커뮤니티를 받는다 (카드 L20)
+#[test]
+fn widen_gives_ts_and_rust_functions_communities() {
+    let raw = extract(&fixture()).expect("추출");
+    let g = enrich(&fixture(), reduce(&raw));
+    let other = |f: &&syncdoc_codegraph::Function| !f.file.ends_with(".py");
+    assert!(g.functions.iter().filter(other).count() > 5);
+    let before = communities(&raw, g.clone());
+    assert!(
+        before
+            .functions
+            .iter()
+            .filter(other)
+            .all(|f| f.community.is_none())
+    );
+    let after = communities(&widen(&raw, &g), g.clone());
+    assert!(after.functions.iter().all(|f| f.community.is_some()));
+    let sizes: i64 = after
+        .communities
+        .as_ref()
+        .expect("목록")
+        .iter()
+        .map(|c| c.size)
+        .sum();
+    assert_eq!(sizes, after.functions.len() as i64);
+}
+
+/// 넓힌 원형의 모양 — 원래 것 뒤에 더하고, 파이썬 노드는 다시 안 더하고, contains·calls, 같은 쌍은 하나
+#[test]
+fn widen_appends_function_nodes_contains_and_calls() {
+    let raw = extract(&fixture()).expect("추출");
+    let g = enrich(&fixture(), reduce(&raw));
+    let wide = widen(&raw, &g);
+    let arr = |v: &Value, k: &str| v[k].as_array().expect(k).clone();
+    let (nodes, links) = (arr(&wide, "nodes"), arr(&wide, "links"));
+    let (raw_nodes, raw_links) = (arr(&raw, "nodes"), arr(&raw, "links"));
+    assert_eq!(nodes[..raw_nodes.len()], raw_nodes[..]);
+    assert_eq!(links[..raw_links.len()], raw_links[..]);
+    // 함수 key마다 노드가 꼭 하나
+    let ids: Vec<&str> = nodes
+        .iter()
+        .map(|n| n["id"].as_str().expect("id"))
+        .collect();
+    for f in &g.functions {
+        assert_eq!(ids.iter().filter(|i| **i == f.key).count(), 1, "{}", f.key);
+    }
+    // 더한 노드는 graphify 함수 노드 꼴
+    let rs = g
+        .functions
+        .iter()
+        .find(|f| f.file.ends_with(".rs"))
+        .expect("Rust 함수");
+    let node = nodes
+        .iter()
+        .find(|n| n["id"] == rs.key.as_str())
+        .expect("노드");
+    assert_eq!(node["source_file"], rs.file.as_str());
+    assert_eq!(node["source_location"], format!("L{}", rs.line).as_str());
+    assert_eq!(node["_callable"], true);
+    let has = |s: &str, t: &str, rel: &str| {
+        links
+            .iter()
+            .any(|e| e["source"] == s && e["target"] == t && e["relation"] == rel)
+    };
+    assert!(has(&rs.file, &rs.key, "contains"));
+    // 보강이 이은 다른 파일 호출이 calls 선으로
+    let cross = g
+        .calls
+        .iter()
+        .find(|c| c.0.split(':').next() != c.1.split(':').next())
+        .expect("다른 파일 호출");
+    assert!(links.iter().any(|e| e["relation"] == "calls"
+        && ((e["source"] == cross.0.as_str() && e["target"] == cross.1.as_str())
+            || (e["source"] == cross.1.as_str() && e["target"] == cross.0.as_str()))));
+    // 같은 쌍(무향)은 하나
+    let mut seen = HashSet::new();
+    for e in &links {
+        let (a, b) = (
+            e["source"].as_str().expect("s"),
+            e["target"].as_str().expect("t"),
+        );
+        assert!(
+            seen.insert(if a <= b { (a, b) } else { (b, a) }),
+            "{a} — {b}"
+        );
+    }
 }

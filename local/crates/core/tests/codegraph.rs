@@ -367,6 +367,43 @@ async fn changed_paths_and_archive_only_committed_regular_files() {
     assert!(!dest.join(".src.tar").exists());
 }
 
+/// graph.json 없이 Rust·TS도 민 커밋 → 추출 원형을 넓혀 그 함수들도 커뮤니티를 받는다 (카드 L20)
+#[tokio::test]
+async fn build_from_push_groups_rust_and_ts_functions() {
+    let e = env().await;
+    let rs = "pub fn top() -> i32 {\n    helper() + 1\n}\n\nfn helper() -> i32 {\n    2\n}\n";
+    let ts = "export function load(): number {\n  return parse('x')\n}\n\nfunction parse(s: string): number {\n  return s.length\n}\n";
+    let head = e.push(
+        &[
+            ("app/svc.py", SVC),
+            ("local/crates/thing/src/lib.rs", rs),
+            ("frontend/src/api/client.ts", ts),
+        ],
+        "세 언어",
+    );
+    pipeline::build_code_graph(e.pool(), &e.repos, CODE, &head).await;
+    let r = e
+        .wait_row(|r| r.commit_hash.as_deref() == Some(head.as_str()))
+        .await;
+    assert_eq!(
+        (r.source.as_deref(), r.error.as_deref()),
+        (Some("server"), None)
+    );
+    let files: Vec<&str> = r.graph.functions.iter().map(|f| f.file.as_str()).collect();
+    assert!(files.contains(&"local/crates/thing/src/lib.rs"));
+    assert!(files.contains(&"frontend/src/api/client.ts"));
+    assert!(r.graph.functions.iter().all(|f| f.community.is_some()));
+    let sizes: i64 = r
+        .graph
+        .communities
+        .as_ref()
+        .expect("커뮤니티")
+        .iter()
+        .map(|c| c.size)
+        .sum();
+    assert_eq!(sizes, i64::from(r.function_count));
+}
+
 #[tokio::test]
 async fn build_from_push_follows_committed_graph_json_and_keeps_old_on_failure() {
     let e = env().await;

@@ -16,7 +16,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-011, SYNC-INFRA-001, SYNC-STD-004]
 
 **graphify가 없다**([[SYNC-INFRA-001]] 9.2 — graphify는 파이썬 전용이다). 그래서
 - 저장소에 커밋된 `graphify-out/graph.json`이 있으면 파이썬 판처럼 그것을 원형으로 쓴다([[#codegraph.load]]) — 그때 두 판의 그래프는 같은 원형에서 같은 줄이기·보강을 거쳐 **바이트까지 같다**. 에이전트 판단 2026-10-11(사용자 목표 「끝까지」) — [[SYNC-CODE-002]] 4장 미결을 이렇게 닫았다
-- 없으면 [[#codegraph.extract]]가 graphify 대신 원형을 만든다 — 파이썬·TS/JS·Rust 파일을 tree-sitter로 읽어 graphify의 노드·선 모양으로. graphify의 이름 풀이를 다 옮기지 않으므로 **호출 선은 파이썬 판과 다를 수 있다**(보강이 잡는 선은 같다). 화면·대조의 모양은 같다
+- 없으면 [[#codegraph.extract]]가 graphify 대신 원형을 만든다 — 파이썬·TS/JS·Rust 파일을 tree-sitter로 읽어 graphify의 노드·선 모양으로. graphify의 이름 풀이를 다 옮기지 않으므로 **호출 선은 파이썬 판과 다를 수 있다**(보강이 잡는 선은 같다). 화면·대조의 모양은 같다. **커뮤니티는 보강이 찾은 함수·호출을 원형에 더해 묶는다**([[#codegraph.widen]], 카드 L20) — 추출 원형은 TS/JS·Rust가 파일 노드뿐이라 그대로 묶으면 그 함수들이 커뮤니티 없이 남는다(싱크독 저장소에서 1361개). 파이썬 판의 graphify 원형은 모든 언어의 정의·호출을 담아 함수가 다 커뮤니티를 받는다. 사용자 결정 2026-10-12
 
 **파이썬 `ast` 대신 tree-sitter-python**(0.25.0 — graphify가 쓰는 판). 보강이 `ast`로 읽는 것(맨 위 정의·클래스 메서드·데코레이터 줄·끝 줄·docstring·인자 주석·대입·속성·호출·import)을 같은 뜻으로 읽는다 — 끝 줄은 주석을 뺀 마지막 문장의 끝, docstring은 `inspect.cleandoc`을 거친 첫 줄, 걷는 차례는 `ast.walk`처럼 너비 우선. `ast.parse`가 실패할 파일(문법 오류 — tree-sitter의 `ERROR`·`MISSING`)은 건너뛴다. TS/JS(tree-sitter-typescript 0.23.2)·Rust(tree-sitter-rust 0.24.2)는 파이썬 판과 같은 문법 판이라 같은 나무다.
 
@@ -41,6 +41,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-011, SYNC-INFRA-001, SYNC-STD-004]
 | [[#codegraph.item_neighbors]] | 항목 있는 함수까지의 부르는 것·불리는 곳 |
 | [[#codegraph.layer_table]] | 클래스 명세 「폴더 구조」 절의 층 표를 읽는다 |
 | [[#codegraph.layers]] | 항목 없는 함수마다 층 |
+| [[#codegraph.widen]] | 추출 원형에 보강이 찾은 함수·호출을 더한다 — 커뮤니티가 다 묶게 |
 | [[#codegraph.communities]] | 함수를 Louvain 군집으로 묶는다 |
 | [[#CodeGraphService.get]] | 프로젝트의 그래프 행 |
 | [[#CodeGraphService.save]] | 새 그래프로 바꿔 끼운다 |
@@ -99,7 +100,7 @@ pub fn extract(src_dir: &Path) -> Result<Value, CodeGraphFailed>
 1. 파일 — `src_dir` 아래를 걸어(`.git`·`graphify-out`·`node_modules`·`target` 폴더는 빼고) 경로 순으로, 확장자가 `.py .ts .tsx .js .jsx .mjs .rs`인 파일마다 파일 노드 `{id: 경로, label: 이름, file_type: "code", source_file: 경로}`
 2. 파이썬 파일 — tree-sitter-python으로 읽어(문법 오류면 파일 노드만) 맨 위 `def`(데코레이터를 벗겨)·`class`, 클래스 몸통의 `def`마다 노드 — 함수 `{id: "{경로}:{줄}", label: "{이름}()", file_type: "code", source_file, source_location: "L{def 줄}", _callable: true}` · 클래스 `{…, label: 이름, _callable_class: true}` · 선 `contains`(파일 → 맨 위 함수·클래스) · `method`(클래스 → 메서드)
 3. 파이썬 호출 — 맨 위 함수·메서드 몸통의 `f(…)`(이름 호출)마다 같은 파일 맨 위 함수 `f`가 있으면 선 `{source, target, relation: "calls", confidence: "EXTRACTED"}` — 같은 쌍은 하나
-4. TS/JS·Rust는 파일 노드만 — 정의·끝 줄·호출은 [[#codegraph.enrich]]가 다 채운다(파이썬 판도 graphify의 Rust 함수는 `_callable`이 없어 보강이 다 채운다)
+4. TS/JS·Rust는 파일 노드만 — 정의·끝 줄·호출은 [[#codegraph.enrich]]가 다 채운다(파이썬 판도 graphify의 Rust 함수는 `_callable`이 없어 보강이 다 채운다). 커뮤니티를 묶을 원형은 [[#codegraph.widen]]이 보강 뒤에 넓힌다
 5. `→ {"directed": false, "multigraph": false, "graph": {}, "nodes": […], "links": […]}`
 
 **다른 점** graphify(파이썬 판)의 이름 풀이·중첩 함수·다른 언어 23종은 옮기지 않는다 — 파이썬은 같은 파일의 이름 호출만, 나머지 호출은 보강이 잇는다. 그래서 graph.json이 없는 저장소는 호출 선이 파이썬 판보다 적을 수 있다(0장)
@@ -229,6 +230,31 @@ pub fn layers(graph: &Graph, rows: &[LayerRow]) -> (HashMap<String, Layer>, Vec<
 **처리** [[SYNC-MS-011#codegraph.layers]]와 같다 — `Layer { name, specs }`
 
 **테스트 관점** [[SYNC-MS-011#codegraph.layers]]의 것
+
+---
+
+#### codegraph.widen 추출 원형을 넓힌다 — 보강이 찾은 함수·호출까지
+
+**시그니처**
+```rust
+pub fn widen(raw: &Value, graph: &Graph) -> Value
+```
+
+근거: 사용자 결정 2026-10-12(카드 L20) — 추출 원형([[#codegraph.extract]])은 TS/JS·Rust가 파일 노드뿐이라 그 함수들이 커뮤니티 없이 낱개로 남았다(화면 UI-17은 낱개 노드 1361개를 그려 배치가 멈추는 데 54초). 파이썬 판의 graphify 원형은 모든 언어의 정의·호출을 담는다
+
+**입력** 추출 원형, 보강을 마친 그래프
+
+**처리**
+1. 원형 노드의 id 집합과 (파일, 줄) 열쇠 집합(`source_file`과 `source_location: "L{줄}"`이 있는 노드) · 원형 선의 쌍 집합(양 끝을 정렬 — 무향)
+2. 함수 차례로 — `key`가 열쇠 집합에 없으면 노드 `{id: key, label: "{name}()", file_type: "code", source_file: file, source_location: "L{line}", _callable: true}`를 더한다(같은 key는 한 번) · 그 파일의 파일 노드(id = 파일 경로)가 있으면 선 `{source: 파일, target: key, relation: "contains", confidence: "EXTRACTED"}`
+3. 호출 차례로 `(from, to, _)` — 양 끝이 다 노드 id(2에서 더한 것 포함)이고 그 쌍의 선이 아직 없으면 선 `{source: from, target: to, relation: "calls", confidence: "EXTRACTED"}` — 파이썬 함수 노드의 id도 `{경로}:{줄}`이라 보강이 이은 다른 파일 호출까지 든다
+4. → 원형 사본 — 노드·선은 원래 것 뒤에 더하고 나머지 열쇠는 그대로
+
+**출력** 넓힌 원형 — [[#codegraph.communities]]에 넣는다
+
+**다른 점** 파이썬 판에 없다 — graphify 원형이 이미 모든 언어를 담는다. 그래서 커밋된 graph.json을 쓴 원형(출처 `repo`)에는 부르지 않는다 — 그때 두 판이 바이트까지 같다([[SYNC-MS-017#pipeline.build_code_graph]] 3)
+
+**테스트 관점** 시험 저장소를 추출 → 줄이기 → 보강 → 넓히기 → 커뮤니티 → 함수가 다 커뮤니티를 받는다(TS·Rust 포함) · 파이썬 함수 노드는 다시 더하지 않는다 · 파일 노드 → 함수 `contains` · 다른 파일 호출이 `calls` · 같은 쌍은 하나 · 원래 노드·선의 차례는 그대로
 
 ---
 

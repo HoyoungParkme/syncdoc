@@ -1632,13 +1632,17 @@ async fn graph_of(
         .await
         .map_err(|e| e.to_string())?;
     let src = tmp.path().to_path_buf();
-    // 파일 읽기·파싱·군집은 막히는 일이라 따로 — 커뮤니티는 보강 뒤에(보강이 더한 함수도 받는다)
+    // 파일 읽기·파싱·군집은 막히는 일이라 따로 — 커뮤니티는 보강 뒤에(보강이 더한 함수도 받는다).
+    // 추출 원형은 TS/JS·Rust가 파일 노드뿐이라 보강이 찾은 함수·호출을 더해 묶는다(카드 L20) — graph.json이면 그대로
     let built = tokio::task::spawn_blocking(move || {
         let (source, raw) = syncdoc_codegraph::graph::load(&src)?;
-        let graph = syncdoc_codegraph::community::communities(
-            &raw,
-            syncdoc_codegraph::enrich::enrich(&src, syncdoc_codegraph::graph::reduce(&raw)),
-        );
+        let graph = syncdoc_codegraph::enrich::enrich(&src, syncdoc_codegraph::graph::reduce(&raw));
+        let raw = if source == "server" {
+            syncdoc_codegraph::community::widen(&raw, &graph)
+        } else {
+            raw
+        };
+        let graph = syncdoc_codegraph::community::communities(&raw, graph);
         Ok::<_, syncdoc_codegraph::CodeGraphFailed>((source, graph))
     })
     .await
