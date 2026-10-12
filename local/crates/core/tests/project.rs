@@ -371,6 +371,8 @@ async fn server_origin_owner_only_and_needs_the_folder() {
     let not_found = |r: Result<PathBuf, Problem>| matches!(r, Err(Problem::NotFound { resource, id }) if resource == "project" && id == "SO");
     // 남의 것·원본 폴더가 없는 것은 없는 프로젝트와 같은 답
     assert!(not_found(s.server_origin("SO", &other).await));
+    // 읽기 프로세스를 끈 뒤에 옮긴다 — 윈도는 열린 팩이 있으면 못 옮긴다(앱도 끄고 옮긴다)
+    p.git.close_all().await;
     std::fs::rename(&origin, tmp.path().join("moved.git")).expect("옮기기");
     assert!(not_found(s.server_origin("SO", &u).await));
     assert!(matches!(
@@ -552,6 +554,7 @@ async fn rehome_fixes_paths_and_reclones_missing_workdirs() {
     std::fs::remove_dir_all(p.repos.join("RHA")).unwrap();
     std::fs::remove_dir_all(p.repos.join("RHB")).unwrap();
     std::fs::remove_dir_all(p.repos.join("RHC")).unwrap();
+    p.git.close_all().await; // 윈도는 열린 팩이 있으면 못 지운다
     std::fs::remove_dir_all(p.origins.join("RHC.git")).unwrap();
     // RHD — 옛 판(0.1·0.2)이 만든 clone
     std::fs::remove_dir_all(p.repos.join("RHD")).unwrap();

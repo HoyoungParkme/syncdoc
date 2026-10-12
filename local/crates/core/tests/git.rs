@@ -32,6 +32,8 @@ fn sh(cwd: &Path, args: &[&str]) -> String {
     let out = Command::new("git")
         .args(["-c", "user.name=seed", "-c", "user.email=seed@example.com"])
         .args(["-c", "gc.auto=0", "-c", "maintenance.auto=false"])
+        // 앱의 git과 같게 — 윈도 git의 시스템 설정은 autocrlf=true라 add가 CRLF를 바꾼다
+        .args(["-c", "core.autocrlf=false"])
         .args(args)
         .current_dir(cwd)
         .output()
