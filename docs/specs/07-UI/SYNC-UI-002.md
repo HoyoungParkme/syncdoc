@@ -2350,7 +2350,7 @@ status: draft
   .chip .m{font-size:12px}
   .chip.me{border:1.5px solid var(--ink);font-weight:600}
   .chip.gone{border-style:dashed;color:var(--mute)}
-  .chip.grp{background:var(--sub);font-family:var(--mono);font-size:12px}
+  .chip.docgrp{background:var(--sub);font-family:var(--mono);font-size:12px}
 </style>
 <div class="sd">
   <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb">설정</span><span class="tb">로그아웃</span></div>
@@ -2376,7 +2376,7 @@ status: draft
           <div class="crow"><div class="cst">7 UI<span class="role">파생 ↓</span></div><div class="chips"><span class="chip"><i class="dot"></i><span class="m">UI-002#UI-5</span>문서 뷰</span></div></div>
           <div class="crow"><div class="cst">8 API<span class="role">파생 ↓</span></div><div class="chips"><span class="chip"><i class="dot"></i><span class="m">API-002#save_document</span>명세 저장</span></div></div>
           <div class="crow empty"><div class="cst">9 SEQ</div><div class="chips">이 단계에는 이어지는 항목이 없다</div></div>
-          <div class="crow"><div class="cst">10 MS<span class="role">파생 ↓</span></div><div class="chips"><!-- 이 항목 밖 칩이 24개 넘는 단계는 문서별로 접는다 --><span class="chip grp" data-el="3.4">MS-002 · 31개 ▸</span><span class="chip grp">MS-008 · 12개 ▾</span><span class="chip"><i class="dot"></i><span class="m">MS-008#queries.graph_view</span>참조 그래프</span><span class="chip grp">MS-009 · 7개 ▸</span></div></div>
+          <div class="crow"><div class="cst">10 MS<span class="role">파생 ↓</span></div><div class="chips"><!-- 이 항목 밖 칩이 24개 넘는 단계는 문서별로 접는다 --><span class="chip docgrp" data-el="3.4">MS-002 · 31개 ▸</span><span class="chip docgrp">MS-008 · 12개 ▾</span><span class="chip"><i class="dot"></i><span class="m">MS-008#queries.graph_view</span>참조 그래프</span><span class="chip docgrp">MS-009 · 7개 ▸</span></div></div>
           <div class="crow empty"><div class="cst">11 CODE</div><div class="chips">이 단계에는 이어지는 항목이 없다</div></div>
         </div>
       </div>
