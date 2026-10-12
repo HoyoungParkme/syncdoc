@@ -14,7 +14,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 
 **MINISPEC은 카드의 첫 커밋으로 쓴다**([[SYNC-STD-004#DEV-13]]). 그래서 L1만 표가 있고 나머지는 하는 일과 선행만 있다 — 카드를 받을 때 그 카드의 표를 쓴다. 아직 없는 MINISPEC 항목을 미리 가리키지 않는다.
 
-**진행 상황**: 카드 19장(L1~L19). 완료 18(L1·L2 2026-10-07, L3~L6 2026-10-08, L7~L18 2026-10-11). 첫 릴리즈 `local-v0.1.0`(L4), 리눅스 출시 판정 통과 뒤 `local-v0.2.0`(L17) — 윈도 판정은 못 미쳐 카드 L19. 남은 것 L19(윈도 속도) L1은 계약 시험 없이 병합하고 완료란은 L2 뒤에 적었다(사용자 결정 2026-10-07)
+**진행 상황**: 카드 19장(L1~L19). 완료 19(L1·L2 2026-10-07, L3~L6 2026-10-08, L7~L18 2026-10-11, L19 2026-10-12). 첫 릴리즈 `local-v0.1.0`(L4), 리눅스 출시 판정 통과 뒤 `local-v0.2.0`(L17) — 윈도 판정은 못 미쳐 카드 L19, 두 판정 통과 뒤 `local-v0.3.0`(L19). L1은 계약 시험 없이 병합하고 완료란은 L2 뒤에 적었다(사용자 결정 2026-10-07)
 
 ---
 
@@ -223,9 +223,9 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | [[SYNC-MS-019#Git.new]] · [[SYNC-MS-019#Git.commit]] · [[SYNC-MS-019#Git.head]] · [[SYNC-MS-019#Git.read]] · [[SYNC-MS-019#Git.exists]] · [[SYNC-MS-019#Git.materialize]] · [[SYNC-MS-019#Git.sync_readme]] · [[SYNC-MS-019#Git.close]] · [[SYNC-MS-019#Git.close_all]] · [[SYNC-MS-019#Git.gc]] · [[SYNC-MS-017#pipeline.read_pending]] · [[SYNC-MS-017#pipeline.save_pipeline]] · [[SYNC-MS-017#pipeline.process_commit]] · [[SYNC-MS-017#pipeline.rebuild]] · [[SYNC-MS-017#pipeline.upload_code]] · [[SYNC-MS-017#pipeline.catch_up]] · [[SYNC-MS-013#ProjectService.init_project]] · [[SYNC-MS-013#ProjectService.import_bundle]] · [[SYNC-MS-013#ProjectService.delete_project]] · [[SYNC-MS-013#ProjectService.rehome]] · [[SYNC-MS-022#CodeGraphService.read]] · [[SYNC-MS-018#queries.document_list]] · [[SYNC-MS-018#queries.project_summary_of]] · [[SYNC-MS-018#queries.project_detail]] · [[SYNC-MS-012#runtime.run]] · [[SYNC-MS-012#runtime.shutdown]] · [[SYNC-MS-012#paths.git]] · [[SYNC-MS-012#pg.start]] · [[SYNC-MS-023#backup.daily]] · `contract/speed.py`·`xtask speed`(윈도는 고정 MinGit) · `local/Cargo.toml` 판 |
 | 테스트 | `cargo test`(리눅스·윈도 사본) — fast-import 커밋이 `git commit`과 해시가 같다(메시지 꼴·오프셋) · 읽기 프로세스가 뒤에 생긴 커밋·옮긴 `main`을 본다 · 경합 → 다른 파일은 그 위에, 같은 파일은 `conflict` · 작업 사본 폴더가 `main`의 `docs/specs/` · 옛 clone이 폴더로 · gc가 팩을 줄인다 · initdb 표식 · 계약 `--target both` 전체(응답 바이트 그대로) · **`cargo xtask speed` 리눅스와 윈도 둘 다 통과** |
 | 선행 | L17 · #387 · #368 |
-| 완료 | — |
+| 완료 | 2026-10-12 · 브랜치 `card/L19-windows-speed`(3a4e41d #390) · spec 16 + code 11 · `cargo test` 리눅스 208 · **윈도 사본 199**(처음 돌린 윈도에서 시험 둘을 바로잡았다 — 윈도 git의 시스템 `autocrlf=true`, 열린 팩의 os error 32) · 계약 `--target both` 1286(응답 바이트 그대로) · clippy(리눅스·윈도) · xtask `--check` 넷·`schema-check` · `check_code` Rust 201/201 · `check_calls` 0 · 워크플로 녹색(리눅스·윈도 — 설치판 MinGit으로 프로젝트 만들고 지우고 제거까지) · **판정(같은 PC, Rust/파이썬)** 윈도: 첫 켜기 5.66/7.67초 · 다시 1.42/4.41초 · 조회 72/512ms · 저장 109/259ms(전 2.2~2.5초) · 그래프 4.16/9.69초 · 메모리 116/504MB · 가져오기 31/59초(전 221~271초) / 리눅스: 1.24/9.17초 · 0.23/4.89초 · 30/606ms · 32/431ms · 1.05/10.9초 · 283/513MB(목표 300에 붙었다 — 연결을 닫지 않아 PostgreSQL 백엔드가 남는다) · 26/98초 → **두 판정 통과, 판 0.3.0, 태그 `local-v0.3.0`** · 되먹임: MinGit 2.56의 진짜 git은 `ucrt64/bin/git.exe`(`mingw64`가 아니다) · fast-import는 작은 커밋을 낱낱의 객체로 풀려고 `unpack-objects`를 하나 더 띄운다 → `fastimport.unpackLimit=0` · 저장 한 번을 나눠 보니 서버 안은 190~250ms였고 나머지는 시험 쪽 — 윈도에서 httpx 클라이언트를 새로 만들 때마다 인증서를 읽느라 ~300ms(두 판에 같이 붙었다) → 연결 재사용 · 윈도 CI 설치 시험: 강제로 끝낸 앱의 자식 `initdb --sync-only`가 남아 `postgresql` 폴더를 쥐었다 → 앱과 함께 끝내고 시험이 기다린다 · 시험 git의 자동 gc가 `gc.pid`를 쥐면 시험의 gc가 건너뛴다 · `pg_ctl start`·PowerShell `Start-Process -Wait`는 자손까지 기다린다 · 사람 확인(윈도에서 설치판으로 저장·git push·백업 되살리기·옮기기)은 따로 |
 
-**다음 카드** — 없다. L19가 윈도 판정을 맞추면 0.3.0.
+**다음 카드** — 없다. 19장을 다 받았다(2026-10-12).
 
 카드 BX는 파이썬 판에서 먼저 했다 — [[SYNC-CODE-001]](#376). #325(재구축이 파일을 지운 커밋에서 실패)는 #366으로 끝났다.
 
