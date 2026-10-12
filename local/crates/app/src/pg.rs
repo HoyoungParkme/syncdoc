@@ -121,7 +121,10 @@ pub async fn stop(server: PgServer) -> Result<(), Problem> {
 impl Drop for PgServer {
     fn drop(&mut self) {
         if !self.stopped && self.pgdata.join("postmaster.pid").exists() {
-            let _ = std::process::Command::new(exe(&self.bin, "pg_ctl"))
+            let mut cmd = std::process::Command::new(exe(&self.bin, "pg_ctl"));
+            #[cfg(windows)]
+            std::os::windows::process::CommandExt::creation_flags(&mut cmd, CREATE_NO_WINDOW);
+            let _ = cmd
                 .arg("stop")
                 .arg("-D")
                 .arg(&self.pgdata)
@@ -137,7 +140,7 @@ pub const SYNC_MARK: &str = "pgdata.sync";
 /// `initdb --sync-only` — 미뤄 둔 디스크에 내리기(fsync)만. 앱이 끝나면 함께 끝난다 — 윈도는 끝난 앱의
 /// 자식이 남아 설치 폴더를 쥔다. 마치지 못했으면 표식이 남아 다음 켜기가 다시 한다(카드 L19)
 async fn sync_only(bin: &Path, pgdata: &Path) -> Result<(), Problem> {
-    let out = Command::new(exe(bin, "initdb"))
+    let out = tool(bin, "initdb")
         .arg("--sync-only")
         .arg("-D")
         .arg(pgdata)
@@ -156,7 +159,7 @@ async fn initdb(bin: &Path, data_dir: &Path, pgdata: &Path, pw: &str) -> Result<
     }
     let pwfile = data_dir.join("pgdata.pw");
     write_private(&pwfile, pw)?;
-    let out = Command::new(exe(bin, "initdb"))
+    let out = tool(bin, "initdb")
         .arg("-D")
         .arg(&staging)
         .args([
@@ -187,7 +190,7 @@ async fn configure(bin: &Path, pgdata: &Path, pw: &str) -> Result<(), Problem> {
     for (k, v) in SETTINGS {
         sql += &format!("ALTER SYSTEM SET {k} = '{v}'\n");
     }
-    let mut child = Command::new(exe(bin, "postgres"))
+    let mut child = tool(bin, "postgres")
         .arg("--single")
         .arg("-D")
         .arg(pgdata)
@@ -210,7 +213,7 @@ async fn ctl_start(bin: &Path, pgdata: &Path, logs: &Path, port: u16) -> Result<
     let out_path = logs.join("pg_ctl.log");
     let out = fs::File::create(&out_path)?;
     let err = out.try_clone()?;
-    let mut cmd = Command::new(exe(bin, "pg_ctl"));
+    let mut cmd = tool(bin, "pg_ctl");
     cmd.arg("start")
         .arg("-D")
         .arg(pgdata)
@@ -225,7 +228,7 @@ async fn ctl_start(bin: &Path, pgdata: &Path, logs: &Path, port: u16) -> Result<
     #[cfg(unix)]
     cmd.process_group(0);
     #[cfg(windows)]
-    cmd.creation_flags(0x0000_0200); // CREATE_NEW_PROCESS_GROUP
+    cmd.creation_flags(CREATE_NO_WINDOW | 0x0000_0200); // 창 없이 · CREATE_NEW_PROCESS_GROUP
     cmd.stdin(Stdio::null()).stdout(out).stderr(err);
     let status = cmd.status().await.map_err(|e| Problem::Internal {
         log: format!("pg_ctl start을 못 돌렸다 — {e}"),
@@ -244,7 +247,7 @@ async fn ctl_start(bin: &Path, pgdata: &Path, logs: &Path, port: u16) -> Result<
 }
 
 async fn ctl_running(bin: &Path, pgdata: &Path) -> bool {
-    Command::new(exe(bin, "pg_ctl"))
+    tool(bin, "pg_ctl")
         .arg("status")
         .arg("-D")
         .arg(pgdata)
@@ -254,7 +257,7 @@ async fn ctl_running(bin: &Path, pgdata: &Path) -> bool {
 }
 
 async fn ctl_stop(bin: &Path, pgdata: &Path) -> Result<(), Problem> {
-    let out = Command::new(exe(bin, "pg_ctl"))
+    let out = tool(bin, "pg_ctl")
         .arg("stop")
         .arg("-D")
         .arg(pgdata)
@@ -324,6 +327,20 @@ pub(crate) fn exe(bin: &Path, name: &str) -> PathBuf {
     } else {
         bin.join(name)
     }
+}
+
+/// 윈도의 `CREATE_NO_WINDOW` — 창 없는 앱이 콘솔 프로그램을 그냥 띄우면 새 콘솔 창이 열리고, 서버가 그 창을
+/// 물려받아 창을 닫으면 PostgreSQL이 끝난다(#392). git과 같다(SYNC-MS-019 0장)
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// 도구 하나 — 윈도는 창 없이
+fn tool(bin: &Path, name: &str) -> Command {
+    #[cfg_attr(not(windows), allow(unused_mut))]
+    let mut cmd = Command::new(exe(bin, name));
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
 }
 
 /// 실패면 끝 코드와 표준 오류 마지막 줄들 — 암호가 든 출력은 가린다
