@@ -524,13 +524,17 @@ class GraphScope(StrEnum):
 
 @dataclass(frozen=True)
 class GraphNode:
-    """SYNC-API-001 Graph.nodes[] — id는 DOC#ITEM, 문서 노드는 DOC."""
+    """SYNC-API-001 Graph.nodes[] — id는 DOC#ITEM, 문서 노드는 DOC.
+
+    display_name은 항목 제목 — 문서 노드는 None (카드 CB).
+    """
 
     id: str
     doc_id: str
     item_id: str | None
     stage: int | None
     isolated: bool
+    display_name: str | None = None  # UI-8 찾기(2.7)·툴팁 (카드 CB)
 
 
 @dataclass(frozen=True)

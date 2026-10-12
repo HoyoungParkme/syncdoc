@@ -2,12 +2,14 @@
  *  1 헤더(1.1 통계) · 2 툴바(2.1 전체, 2.2 완료만, 2.4 포커스 라벨, 2.5 전체보기)
  *  3 캔버스(3.1 노드, 3.2 참조 간선, 3.3 되돌아오는 간선, 3.4 미존재 참조, 3.5 고립 노드) · 4 범례
  *  2.6 코드 호출 — MINISPEC 열에 실제 호출(3.6 같음 · 3.7 코드만 · 3.8 명세만)을 겹친다 (카드 AY)
+ *  카드 CB — 노드는 다, 선은 고른 것만: 2.7 찾기(ID·항목 제목) · 2.8 고르기(단계·문서 하나) · 2.9 선 모두 보기.
+ *    선은 활성 노드(호버 → 찾기의 지금 항목 → 고른 항목들)에 닿는 것만 그린다
  *
  *  배치는 브라우저가 한다 — 서버는 노드·간선 목록만 준다(MS-008 graph_view 8).
  *  라이브러리를 안 쓴다: 열이 고정이고 간선 넷이 저마다 다른 길로 가야 해서
  *  범용 그래프 엔진의 배치·라우팅과 계속 싸우게 된다. */
 import { ProjName } from '../components/ui'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, docPath, STAGE_TYPES, type CodeCalls, type Graph as GraphData, type GraphScope } from '../api/client'
@@ -27,7 +29,7 @@ const R = 8
 /** 코드 호출을 끈 때의 빈 목록 — 렌더마다 새 배열이면 포커스 계산(useMemo)이 매번 다시 돈다 */
 const NO_CALLS: CodeCalls['edges'] = []
 
-type Placed = { id: string; col: number; row: number; label: string; title: string; iso: boolean; docId: string; itemId: string | null }
+type Placed = { id: string; col: number; row: number; label: string; title: string; name: string | null; iso: boolean; docId: string; itemId: string | null }
 
 export function Graph() {
   const { code = '' } = useParams()
@@ -40,6 +42,21 @@ export function Graph() {
   const [focus, setFocus] = useState<string | null>(null)
   const [full, setFull] = useState(false)
   const [chain, setChain] = useState<{ docId: string; itemId: string } | null>(null)
+  const closeChain = useCallback(() => setChain(null), []) // 다시 그려도 UI-15가 다시 읽지 않게 — 같은 함수
+  // 카드 CB — 2.7 찾기(300ms 뒤) · 2.8 고르기 · 2.9 선 모두 보기. 셋 다 주소에 안 남긴다(호버처럼 그 자리의 조작)
+  const [q, setQ] = useState('')
+  const [qd, setQd] = useState('')
+  const [cur, setCur] = useState(0)
+  const [pick, setPick] = useState('') // '' | 'stage:N' | 'doc:DOC'
+  const [allEdges, setAllEdges] = useState(false)
+  const canvasRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setQd(q.trim().toLowerCase())
+      setCur(0)
+    }, 300)
+    return () => clearTimeout(t)
+  }, [q])
   useEffect(() => {
     api.get<GraphData>(`/api/projects/${code}/graph?scope=${scope}`).then(setG)
   }, [code, scope])
@@ -81,12 +98,66 @@ export function Graph() {
     return { focus, up, down, code, all: new Set([focus, ...up, ...down]) }
   }, [g, focus, codeEdges])
 
+  // 2.7 찾기 — ID(접두 없이도 부분 일치)·항목 제목. 맞는 것은 열·행 차례
+  const matches = useMemo(
+    () => (layout && qd ? layout.nodes.filter((n) => n.title.toLowerCase().includes(qd) || (n.name ?? '').toLowerCase().includes(qd)) : []),
+    [layout, qd],
+  )
+  const hitIds = useMemo(() => new Set(matches.map((n) => n.id)), [matches])
+  const curNode = matches.length ? matches[cur % matches.length] : null
+  // 2.8 고르기 — 단계 하나 또는 문서 하나의 노드
+  const picked = useMemo(() => {
+    if (!layout || !pick) return null
+    const [kind, v] = [pick.slice(0, pick.indexOf(':')), pick.slice(pick.indexOf(':') + 1)]
+    return new Set(layout.nodes.filter((n) => (kind === 'stage' ? String(n.col) === v : n.docId === v)).map((n) => n.id))
+  }, [layout, pick])
+  // 선을 그릴 활성 노드 — 호버가 앞서고, 찾기가 고르기보다 앞선다 (UI-8 규칙)
+  const active = useMemo(() => (focus ? new Set([focus]) : qd ? new Set(curNode ? [curNode.id] : []) : picked), [focus, qd, curNode, picked])
+  // 찾은 지금 항목으로 캔버스를 옮긴다
+  useEffect(() => {
+    const box = canvasRef.current
+    if (!box || !curNode) return
+    box.scrollTo({ left: Math.max(0, colX(curNode.col) - box.clientWidth / 2 + NODE_W / 2), top: Math.max(0, rowY(curNode.row) - box.clientHeight / 2), behavior: 'smooth' })
+  }, [curNode])
+  const onFindKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && matches.length) setCur((c) => (c + 1) % matches.length)
+    if (e.key === 'Escape') {
+      setQ('')
+      setQd('')
+    }
+  }
+  const pickOptions = useMemo(() => {
+    if (!g) return []
+    const out: { v: string; label: string }[] = []
+    STAGE_TYPES.forEach((t, i) => {
+      const docs = [...new Set(g.nodes.filter((n) => n.stage === i + 1).map((n) => n.doc_id))].sort()
+      if (!docs.length) return
+      out.push({ v: `stage:${i + 1}`, label: `${i + 1} ${t} (단계)` })
+      for (const d of docs) out.push({ v: `doc:${d}`, label: `\u00a0\u00a0${d.split('-').slice(1).join('-')}` })
+    })
+    return out
+  }, [g])
+
   const stats = g
     ? `${code} · 문서 ${new Set(g.nodes.map((n) => n.doc_id)).size} · 항목 ${g.nodes.filter((n) => n.item_id).length} · 참조 ${g.edges.length}`
     : code
   const focusLabel = focus
     ? `${focus} — 상위 ${near?.up.size ?? 0} · 하위 ${near?.down.size ?? 0}`
-    : '노드에 마우스를 올려 그 항목만 보기'
+    : qd
+      ? curNode
+        ? `${(cur % matches.length) + 1}/${matches.length} · ${curNode.label}${curNode.name ? ' ' + curNode.name : ''}`
+        : '찾는 항목 없음'
+      : picked
+        ? `${pickOptions.find((o) => o.v === pick)?.label.trim() ?? ''} — 항목 ${picked.size}`
+        : '노드에 마우스를 올리거나 찾고 골라 그 항목의 참조 보기'
+
+  // 노드 밝힘·흐림 — 호버가 앞서고(이웃 밖은 흐림), 그다음 찾기(맞는 것 밝힘·지금 항목 진하게), 그다음 고르기
+  const nodeMark = (id: string) => {
+    if (near) return !near.all.has(id) && !near.code.has(id) ? ' dim' : ''
+    if (qd) return hitIds.has(id) ? (curNode?.id === id ? ' hit cur' : ' hit') : ' dim'
+    if (picked) return picked.has(id) ? ' hit' : ' dim'
+    return ''
+  }
 
   const card = (
     <div className={`gcard${full ? ' full' : ''}`}>
@@ -100,6 +171,23 @@ export function Graph() {
           완료만
         </span>
         <span className="sep" />
+        <span data-el="2.7">
+          <input className="inp" value={q} placeholder="항목 ID · 제목 찾기" onChange={(e) => setQ(e.target.value)} onKeyDown={onFindKey} />
+        </span>
+        <span data-el="2.8">
+          <select className="inp" value={pick} onChange={(e) => setPick(e.target.value)}>
+            <option value="">고르지 않음</option>
+            {pickOptions.map((o) => (
+              <option key={o.v} value={o.v}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </span>
+        <span className={`btn sm${allEdges ? ' on' : ''}`} data-el="2.9" onClick={() => setAllEdges((v) => !v)}>
+          선 모두 보기
+        </span>
+        <span className="sep" />
         <span className="lbl" data-el="2.4">
           {codeOn && calls && !calls.graph ? '코드 그래프 없음 — 코드를 push하면 만들어집니다' : focusLabel}
         </span>
@@ -111,7 +199,7 @@ export function Graph() {
           {full ? '전체보기 끄기' : '전체보기'}
         </span>
       </div>
-      <div className="canvas" data-el="3">
+      <div className="canvas" data-el="3" ref={canvasRef}>
         {layout && (
           <div className="cinner" style={{ width: layout.w, height: layout.h }}>
             {STAGE_TYPES.map((t, i) => (
@@ -119,11 +207,11 @@ export function Graph() {
                 {i + 1} {t}
               </div>
             ))}
-            <Edges layout={layout} g={g!} near={near} calls={codeEdges} />
+            <Edges layout={layout} g={g!} near={near} calls={codeEdges} active={allEdges ? null : (active ?? new Set())} />
             {layout.nodes.map((n) => (
               <div
                 key={n.id}
-                className={`node${n.iso ? ' iso' : ''}${near && !near.all.has(n.id) && !near.code.has(n.id) ? ' dim' : ''}`}
+                className={`node${n.iso ? ' iso' : ''}${nodeMark(n.id)}`}
                 data-el={n.iso ? '3.5' : '3.1'}
                 style={{ left: colX(n.col), top: rowY(n.row), width: NODE_W, height: NODE_H }}
                 onMouseEnter={() => setFocus(n.id)}
@@ -132,7 +220,7 @@ export function Graph() {
                   // 항목이면 UI-15, 문서 노드(항목 없이 문서 ID만)는 그 문서의 UI-5 (#398)
                   n.itemId ? setChain({ docId: n.docId, itemId: n.itemId }) : nav(docPath(n.docId))
                 }
-                title={n.title}
+                title={n.name ? `${n.title} ${n.name}` : n.title}
               >
                 <span className="nlabel">
                   {n.iso && '◌ '}
@@ -187,7 +275,7 @@ export function Graph() {
           </>
         )}
         <span className="grow" />
-        <span>노드에 마우스를 올리면 그 항목의 참조만 남는다 · 클릭 → 11단계 흐름</span>
+        <span>선은 마우스를 올리거나 찾고 고른 항목 것만 · 클릭 → 11단계 흐름</span>
       </div>
     </div>
   )
@@ -212,7 +300,7 @@ export function Graph() {
       </div>
       {/* 전체보기는 상단 바까지 덮는다 — 그래서 body로 포털을 쓴다 */}
       {full ? createPortal(card, document.body) : card}
-      {chain && <ItemChain docId={chain.docId} itemId={chain.itemId} onPick={setChain} onClose={() => setChain(null)} />}
+      {chain && <ItemChain docId={chain.docId} itemId={chain.itemId} onPick={setChain} onClose={closeChain} />}
     </div>
   )
 }
@@ -261,6 +349,7 @@ function place(g: GraphData) {
         row,
         label: n.item_id ? `${short}#${n.item_id}` : short,
         title: n.item_id ? `${n.doc_id}#${n.item_id}` : n.doc_id,
+        name: n.display_name,
         iso: n.isolated,
         docId: n.doc_id,
         itemId: n.item_id,
@@ -287,18 +376,22 @@ function Edges({
   g,
   near,
   calls,
+  active,
 }: {
   layout: Layout
   g: GraphData
   near: { all: Set<string>; focus: string } | null
   calls: CodeCalls['edges']
+  /** 선을 그릴 활성 노드 — null이면 「선 모두 보기」(2.9)로 다 그린다 (카드 CB) */
+  active: Set<string> | null
 }) {
+  const shows = (a: string, b: string | null) => !active || active.has(a) || (b !== null && active.has(b))
   // 와이어프레임처럼 종류마다 한 번씩만 요소 번호를 붙인다 (DEV-17 반복 행 규칙)
   const seen = { e: false, back: false, gone: false }
   const paths: React.ReactNode[] = []
   g.edges.forEach((edge, i) => {
     const f = layout.pos.get(edge.from)
-    if (!f) return
+    if (!f || !shows(edge.from, edge.to)) return
     const fx = colX(f.col)
     const fy = rowY(f.row) + NODE_H / 2
     const lit = !near || (near.all.has(edge.from) && (!edge.to || near.all.has(edge.to)))
@@ -343,7 +436,7 @@ function Edges({
   calls.forEach((c, i) => {
     const f = layout.pos.get(c.from)
     const t = layout.pos.get(c.to)
-    if (!f || !t) return // 범위 밖
+    if (!f || !t || !shows(c.from, c.to)) return // 범위 밖 · 고른 것 밖
     const [cls, gap] = kinds[c.status]
     const x = colX(f.col) + NODE_W
     const fy = rowY(f.row) + NODE_H / 2 + (c.status === 'code_only' ? 3 : c.status === 'spec_only' ? -3 : 0)

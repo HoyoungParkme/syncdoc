@@ -360,6 +360,7 @@ async def graph_view(code: str, user: User, scope: GraphScope = GraphScope.all) 
                 b.item_id,
                 b.stage,
                 True,
+                b.display_name,
             )
             for b in briefs
         }
@@ -386,7 +387,7 @@ async def graph_view(code: str, user: User, scope: GraphScope = GraphScope.all) 
                 touched.add(dst)
         return Graph(
             nodes=[
-                GraphNode(n.id, n.doc_id, n.item_id, n.stage, n.id not in touched)
+                GraphNode(n.id, n.doc_id, n.item_id, n.stage, n.id not in touched, n.display_name)
                 for n in nodes.values()
             ],
             edges=out_edges,

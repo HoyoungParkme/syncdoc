@@ -629,6 +629,11 @@ a.arow:hover{background:var(--bg-subtle)}
 .node.iso{border-style:dashed;color:var(--ink-disabled)}
 /* 올린 노드의 직접 이웃만 남기고 나머지는 흐린다. 전이는 UI-15가 한다 */
 .node.dim{opacity:.16}
+/* 찾은·고른 노드(2.7·2.8) — 밝힌다. 찾기의 지금 항목은 더 진하게 (카드 CB) */
+.node.hit{border-color:var(--ink-body);box-shadow:var(--shadow-node-focus)}
+.node.cur{background:var(--caution-bg);border-color:var(--caution-ink)}
+.gbar .inp{width:180px;padding:var(--space-3) var(--space-8);flex:none}
+.gbar select.inp{width:150px}
 .edges{position:absolute;left:0;top:0;pointer-events:none;z-index:1}
 .edges .e{fill:none;stroke:var(--graph-edge);stroke-width:1.2;marker-end:url(#ah)}
 .edges .e.back{stroke:var(--ref-backlink);stroke-width:1.4;stroke-dasharray:5 3;marker-end:url(#ahr)}

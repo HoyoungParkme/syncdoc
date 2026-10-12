@@ -320,6 +320,8 @@ export interface GraphNode {
   item_id: string | null
   stage: number | null
   isolated: boolean
+  /** 항목 제목 — UI-8 찾기(2.7)·툴팁. 문서 노드는 null (카드 CB) */
+  display_name: string | null
 }
 /** UI-8 범위 — 잘라내는 게 아니라 골라낸다 */
 export type GraphScope = 'all' | 'approved'

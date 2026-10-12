@@ -422,12 +422,12 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 4. `pks = {n.pk}` · `edges = ReferenceService.references_among(pks, include_document_targets=True)`
 5. **끝점이 `pks` 밖인 간선은 버린다.** 범위를 좁혀 대상 노드가 빠진 것과, 대상 항목이 애초에 없는 것은 다르다 — 앞은 안 그리고 뒤만 `to=None`으로 그린다
 6. `isolated = {n.pk} - {e.from} - {e.to}` (UC-H4 2a)
-7. 노드 `id = f"{doc_id}#{item_id}"` (문서 노드는 `doc_id`만) · 노드에 `stage`(1~11)
+7. 노드 `id = f"{doc_id}#{item_id}"` (문서 노드는 `doc_id`만) · 노드에 `stage`(1~11)와 항목 제목 `display_name`(`ItemBrief.display_name` — 문서 노드는 없음. UI-8 찾기 2.7, 카드 CB)
 8. `→ Graph(nodes, edges, project_name=project.name)`. **좌표 없음** — 열 안 순서 정렬은 브라우저가 한다(UI-002 UI-8 규칙). `project_name`은 브레드크럼용(UI-8 요소 1)
 
 **호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · `SpecService.list_items_by_project` · `ReferenceService.references_among` · [[SYNC-MS-002#SpecService.list_by_project]]
 
-**테스트 관점** `all` → 항목 수 = 노드 수(문서 노드 포함) · `approved` → 완료 문서의 항목만, 그 밖으로 나가는 간선은 없음 · 참조 없는 항목 → `isolated=True` · **범위 밖 대상 간선이 미존재 참조로 새지 않는다**
+**테스트 관점** `all` → 항목 수 = 노드 수(문서 노드 포함) · 항목 노드에 제목, 문서 노드는 `display_name` 없음 · `approved` → 완료 문서의 항목만, 그 밖으로 나가는 간선은 없음 · 참조 없는 항목 → `isolated=True` · **범위 밖 대상 간선이 미존재 참조로 새지 않는다**
 
 ---
 

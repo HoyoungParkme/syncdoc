@@ -2267,6 +2267,10 @@ components:
               isolated:
                 type: boolean
                 description: "참조 없음([[SYNC-UC-001#UC-H4]] 2a)"
+              display_name:
+                type: string
+                nullable: true
+                description: "항목 제목 — UI-8 찾기(2.7)·툴팁. 문서 노드는 null(카드 CB)"
         edges:
           type: array
           items:

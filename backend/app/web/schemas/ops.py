@@ -17,6 +17,7 @@ class GraphNode(Base):
     item_id: str | None
     stage: int | None
     isolated: bool
+    display_name: str | None  # 항목 제목 — UI-8 찾기 (카드 CB)
 
 
 class GraphEdge(Base):
