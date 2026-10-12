@@ -10,6 +10,7 @@ publish.workspace = true
 syncdoc_codegraph = { workspace = true }
 syncdoc_pycompat = { workspace = true }
 indexmap = { workspace = true }
+jiff = { workspace = true }
 lopdf = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }

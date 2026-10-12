@@ -11,11 +11,8 @@ use time::OffsetDateTime;
 
 fn git_for(tmp: &Path) -> Git {
     let global = tmp.join("gitconfig");
-    std::fs::write(&global, "").expect("빈 설정");
-    Git {
-        exe: "git".into(),
-        global_config: global,
-    }
+    std::fs::write(&global, "[gc]\n\tauto = 0\n[maintenance]\n\tauto = false\n").expect("설정");
+    Git::new("git".into(), global)
 }
 
 fn local_user() -> UserRow {
@@ -30,10 +27,11 @@ fn local_user() -> UserRow {
     }
 }
 
-/// 시험이 직접 부르는 git — 작성자를 붙인다
+/// 시험이 직접 부르는 git — 작성자를 붙인다. 자동 gc는 끈다(뒤에서 돌며 `gc.pid`를 쥐면 시험의 gc가 건너뛴다)
 fn sh(cwd: &Path, args: &[&str]) -> String {
     let out = Command::new("git")
         .args(["-c", "user.name=seed", "-c", "user.email=seed@example.com"])
+        .args(["-c", "gc.auto=0", "-c", "maintenance.auto=false"])
         .args(args)
         .current_dir(cwd)
         .output()
@@ -53,16 +51,33 @@ fn files(pairs: &[(&str, &str)]) -> IndexMap<String, String> {
         .collect()
 }
 
-/// 서버 저장소 + 작업 사본
+/// 서버 저장소 + 작업 사본 폴더(git이 아니다 — 카드 L19)
 async fn setup(tmp: &Path) -> (Git, PathBuf, PathBuf) {
     let g = git_for(tmp);
     let origin = tmp.join("origins/X.git");
     let work = tmp.join("repos/X");
     g.init_bare(&origin).await.expect("init_bare");
-    g.clone(origin.to_str().expect("경로"), &work)
-        .await
-        .expect("clone");
+    std::fs::create_dir_all(&work).expect("폴더");
     (g, origin, work)
+}
+
+/// 서버 저장소를 받은 다른 사본 — 밖에서 미는 사람
+fn outside(tmp: &Path, origin: &Path) -> PathBuf {
+    let other = tmp.join("other");
+    if !other.exists() {
+        sh(
+            tmp,
+            &[
+                "clone",
+                "-q",
+                origin.to_str().expect("경로"),
+                other.to_str().expect("경로"),
+            ],
+        );
+    } else {
+        sh(&other, &["pull", "-q", "origin", "main"]);
+    }
+    other
 }
 
 #[tokio::test]
@@ -82,10 +97,11 @@ async fn init_bare_main_and_receive_rules() {
 #[tokio::test]
 async fn exists_empty_committed_and_not_a_repo() {
     let tmp = tempfile::tempdir().expect("임시");
-    let (g, _, work) = setup(tmp.path()).await;
-    assert!(!g.exists(&work, "docs/specs").await.expect("빈 저장소"));
+    let (g, origin, work) = setup(tmp.path()).await;
+    assert!(!g.exists(&origin, "docs/specs").await.expect("빈 저장소"));
     let u = local_user();
-    g.commit_push(
+    g.commit(
+        &origin,
         &work,
         "first",
         &u,
@@ -93,15 +109,12 @@ async fn exists_empty_committed_and_not_a_repo() {
         &[],
     )
     .await
-    .expect("push");
-    assert!(g.exists(&work, "docs/specs").await.expect("있다"));
+    .expect("커밋");
+    assert!(g.exists(&origin, "docs/specs").await.expect("있다"));
+    // 폴더에만 있는 것은 커밋된 것이 아니다
     std::fs::create_dir_all(work.join("docs/specs/04-UC")).expect("폴더");
     std::fs::write(work.join("docs/specs/04-UC/x.md"), "uncommitted").expect("파일");
-    assert!(
-        !g.exists(&work, "docs/specs/04-UC")
-            .await
-            .expect("작업 사본만")
-    );
+    assert!(!g.exists(&origin, "docs/specs/04-UC").await.expect("폴더만"));
     std::fs::create_dir_all(tmp.path().join("plain")).expect("폴더");
     assert!(matches!(
         g.exists(&tmp.path().join("plain"), "docs").await,
@@ -110,33 +123,35 @@ async fn exists_empty_committed_and_not_a_repo() {
 }
 
 #[tokio::test]
-async fn commit_push_first_commit_identity_and_noop() {
+async fn commit_first_commit_identity_folder_and_noop() {
     let tmp = tempfile::tempdir().expect("임시");
     let (g, origin, work) = setup(tmp.path()).await;
     let u = local_user();
-    let h = g
-        .commit_push(
-            &work,
-            "chore(X): init syncdoc",
-            &u,
-            &Git::init_specs("http://127.0.0.1:8010/specs"),
-            &[],
-        )
+    let mut fs = Git::init_specs("http://127.0.0.1:8010/specs");
+    fs.insert("src/main.rs".into(), "fn main() {}\n".into());
+    let made = g
+        .commit(&origin, &work, "chore(X): init syncdoc", &u, &fs, &[])
         .await
-        .expect("push");
-    assert_eq!(sh(&origin, &["rev-parse", "main"]), h);
+        .expect("커밋");
+    assert_eq!(made.parent, None);
+    assert_eq!(sh(&origin, &["rev-parse", "main"]), made.hash);
     assert_eq!(
         sh(&origin, &["log", "-1", "--format=%an <%ae> %s"]),
         "로컬 <local@syncdoc.local> chore(X): init syncdoc"
     );
     let listed = sh(&origin, &["ls-tree", "-r", "--name-only", "main"]);
-    assert_eq!(listed.lines().count(), 14);
-    assert!(!listed.contains("_templates"));
-    // 같은 내용 → 커밋 없음
+    assert_eq!(listed.lines().count(), 15);
+    // 폴더에는 docs/specs만 — 첨부 파일 읽기만 쓴다
+    assert!(work.join("docs/specs/README.md").is_file());
+    assert!(work.join("docs/specs/assets/.gitkeep").is_file());
+    assert!(!work.join("src").exists());
+    assert!(!work.join(".git").exists());
+    // 같은 내용 → 커밋 없음, 빈 메시지라도
     let again = g
-        .commit_push(
+        .commit(
+            &origin,
             &work,
-            "noop",
+            " \n",
             &u,
             &files(&[(
                 "docs/specs/README.md",
@@ -146,164 +161,248 @@ async fn commit_push_first_commit_identity_and_noop() {
         )
         .await
         .expect("noop");
-    assert_eq!(again, h);
+    assert_eq!(again.hash, made.hash);
+    assert_eq!(again.parent.as_deref(), Some(made.hash.as_str()));
+    // 바뀐 것이 있는데 빈 메시지 → git commit처럼 실패, main 그대로
+    let r = g
+        .commit(&origin, &work, "  \n\t", &u, &files(&[("a.md", "x")]), &[])
+        .await;
+    assert!(matches!(r, Err(Problem::Git { .. })), "{r:?}");
+    assert_eq!(sh(&origin, &["rev-parse", "main"]), made.hash);
+    // 지우기 — 폴더에서도
+    let gone = g
+        .commit(
+            &origin,
+            &work,
+            "지움",
+            &u,
+            &IndexMap::new(),
+            &["docs/specs/README.md".to_string()],
+        )
+        .await
+        .expect("지우기");
+    assert_eq!(gone.parent.as_deref(), Some(made.hash.as_str()));
+    assert!(!work.join("docs/specs/README.md").exists());
+    assert!(!sh(&origin, &["ls-tree", "-r", "--name-only", "main"]).contains("README"));
+}
+
+/// 우리 커밋을 `git commit`으로 다시 만든다 — 같은 부모·파일·본인·시각이면 해시가 같아야 한다
+fn recommit(
+    tmp: &Path,
+    origin: &Path,
+    ours: &str,
+    files: &[(&str, &str)],
+    message: &str,
+) -> String {
+    let clone = tmp.join(format!("re-{}", &ours[..8]));
+    sh(
+        tmp,
+        &[
+            "clone",
+            "-q",
+            origin.to_str().expect("경로"),
+            clone.to_str().expect("경로"),
+        ],
+    );
+    sh(&clone, &["checkout", "-q", &format!("{ours}^")]);
+    for (p, body) in files {
+        let f = clone.join(p);
+        std::fs::create_dir_all(f.parent().expect("부모")).expect("폴더");
+        std::fs::write(&f, body).expect("파일");
+        sh(&clone, &["add", "--", p]);
+    }
+    let raw = sh(origin, &["cat-file", "-p", ours]);
+    let ident = |who: &str| {
+        let line = raw
+            .lines()
+            .find(|l| l.starts_with(who))
+            .expect("본인 줄")
+            .to_string();
+        let gt = line.rfind('>').expect(">");
+        (
+            line[who.len() + 1..=gt].to_string(),
+            line[gt + 2..].to_string(),
+        )
+    };
+    let (author, date) = ident("author");
+    let (name, email) = author.split_once(" <").expect("이름");
+    let out = Command::new("git")
+        .args([
+            "-c",
+            &format!("user.name={name}"),
+            "-c",
+            &format!("user.email={}", email.trim_end_matches('>')),
+            "-c",
+            "core.autocrlf=false",
+            "commit",
+            "-q",
+            "-m",
+            message,
+        ])
+        .env("GIT_AUTHOR_DATE", &date)
+        .env("GIT_COMMITTER_DATE", &date)
+        .current_dir(&clone)
+        .output()
+        .expect("git commit");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    sh(&clone, &["rev-parse", "HEAD"])
 }
 
 #[tokio::test]
-async fn list_and_read() {
+async fn commit_bytes_match_git_commit() {
     let tmp = tempfile::tempdir().expect("임시");
-    let (g, _, work) = setup(tmp.path()).await;
+    let (g, origin, work) = setup(tmp.path()).await;
+    let mut u = local_user();
+    let base = g
+        .commit(&origin, &work, "base", &u, &files(&[("a.md", "0\n")]), &[])
+        .await
+        .expect("base");
+    assert!(base.parent.is_none());
+    let messages = [
+        "spec(X-PRD-001): 초안",
+        "제목\n\n본문  \n\n\n둘째 문단\t\n",
+        "\n\n  앞뒤 빈 줄\r\n\r\n끝  ",
+        "끝 줄바꿈 없음",
+        "여러\n줄\n\n\n\n모음\n\n",
+    ];
+    for (i, m) in messages.iter().enumerate() {
+        if i == 3 {
+            u.display_name = " <로컬>, ".into(); // git처럼 군더더기를 걷는다
+        }
+        let body = format!("가\r\n나 {i}\n");
+        let fs = [
+            ("a.md", body.as_str()),
+            ("docs/specs/02-PRD/새 문서.md", "새\n"),
+        ];
+        let made = g
+            .commit(&origin, &work, m, &u, &files(&fs), &[])
+            .await
+            .expect("커밋");
+        assert_eq!(
+            recommit(tmp.path(), &origin, &made.hash, &fs, m),
+            made.hash,
+            "{m:?}"
+        );
+    }
+    // 현지 오프셋 — git이 지금 쓰는 것과 같다
+    let ours = sh(
+        &origin,
+        &["log", "-1", "--format=%ad", "--date=raw", "main"],
+    );
+    let theirs = sh(tmp.path(), &["var", "GIT_COMMITTER_IDENT"]);
+    assert_eq!(ours.rsplit(' ').next(), theirs.rsplit(' ').next());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn commit_keeps_executable_mode() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, origin, work) = setup(tmp.path()).await;
+    let u = local_user();
+    g.commit(
+        &origin,
+        &work,
+        "base",
+        &u,
+        &files(&[("run.sh", "echo 1\n")]),
+        &[],
+    )
+    .await
+    .expect("base");
+    let other = outside(tmp.path(), &origin);
+    sh(&other, &["update-index", "--chmod=+x", "run.sh"]);
+    sh(&other, &["commit", "-qm", "x"]);
+    sh(&other, &["push", "-q", "origin", "HEAD:main"]);
+    g.commit(
+        &origin,
+        &work,
+        "고침",
+        &u,
+        &files(&[("run.sh", "echo 2\n"), ("new.sh", "n\n")]),
+        &[],
+    )
+    .await
+    .expect("고침");
+    let tree = sh(&origin, &["ls-tree", "main"]);
+    assert!(
+        tree.lines()
+            .any(|l| l.starts_with("100755") && l.ends_with("run.sh")),
+        "{tree}"
+    );
+    assert!(
+        tree.lines()
+            .any(|l| l.starts_with("100644") && l.ends_with("new.sh")),
+        "{tree}"
+    );
+}
+
+#[tokio::test]
+async fn list_read_and_reader_sees_later_commits() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, origin, work) = setup(tmp.path()).await;
     let u = local_user();
     let mut fs = Git::init_specs("http://x/specs");
     fs.insert("docs/specs/02-PRD/한글-문서.md".into(), "가\r\n나\n".into());
     fs.insert("docs/specs/02-PRD/sub/deep.md".into(), "x".into());
     fs.insert("docs/specs/_templates/PRD.md".into(), "x".into());
     fs.insert("docs/specs/assets/a.md".into(), "x".into());
-    g.commit_push(&work, "m", &u, &fs, &[]).await.expect("push");
+    g.commit(&origin, &work, "m", &u, &fs, &[])
+        .await
+        .expect("커밋");
     let got = g
-        .list(&work, "docs/specs/*/*.md", "HEAD")
+        .list(&origin, "docs/specs/*/*.md", "HEAD")
         .await
         .expect("list");
     assert_eq!(got, ["docs/specs/02-PRD/한글-문서.md"]);
     assert_eq!(
-        g.read(&work, "docs/specs/02-PRD/한글-문서.md", "HEAD")
+        g.read(&origin, "docs/specs/02-PRD/한글-문서.md", "HEAD")
             .await
             .expect("read"),
         "가\r\n나\n"
     );
-    assert!(matches!(
-        g.read(&work, "docs/specs/none.md", "HEAD").await,
-        Err(Problem::Git { .. })
-    ));
-}
-
-/// push 직전에 다른 사본이 원격을 한 번 앞서게 한다 — 우리 push가 거부되어 rebase 길을 탄다
-#[cfg(unix)]
-fn race_hook(work: &Path, other: &Path, file: &str, content: &str) {
-    use std::os::unix::fs::PermissionsExt;
-    let mark = other.join(".raced");
-    let hook = work.join(".git/hooks/pre-push");
-    let script = format!(
-        "#!/bin/sh\nunset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE\nif [ ! -f '{m}' ]; then touch '{m}'; cd '{o}' && printf '{c}' > '{f}' && git -c user.name=o -c user.email=o@x commit -qam race && git push -q origin HEAD:main; fi\n",
-        m = mark.display(),
-        o = other.display(),
-        c = content,
-        f = file
+    let missing = g.read(&origin, "docs/specs/none.md", "HEAD").await;
+    assert!(
+        matches!(&missing, Err(Problem::Git { cmd, stderr }) if cmd == "git show HEAD:docs/specs/none.md" && stderr.contains("does not exist")),
+        "{missing:?}"
     );
-    std::fs::write(&hook, script).expect("훅");
-    std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).expect("권한");
-}
-
-#[cfg(unix)]
-#[tokio::test]
-async fn commit_push_rebases_when_rejected() {
-    let tmp = tempfile::tempdir().expect("임시");
-    let (g, origin, work) = setup(tmp.path()).await;
-    let u = local_user();
-    g.commit_push(
-        &work,
-        "base",
-        &u,
-        &files(&[("a.md", "1\n"), ("b.md", "1\n")]),
-        &[],
-    )
-    .await
-    .expect("base");
-    let other = tmp.path().join("other");
-    sh(
-        tmp.path(),
-        &[
-            "clone",
-            "-q",
-            origin.to_str().expect("경로"),
-            other.to_str().expect("경로"),
-        ],
-    );
-    race_hook(&work, &other, "b.md", "2\\n");
-    let h = g
-        .commit_push(&work, "mine", &u, &files(&[("a.md", "2\n")]), &[])
-        .await
-        .expect("rebase");
-    assert_eq!(sh(&origin, &["rev-parse", "main"]), h);
-    assert_eq!(
-        sh(&origin, &["log", "--format=%s", "-3", "main"]),
-        "mine\nrace\nbase"
-    );
-}
-
-#[cfg(unix)]
-#[tokio::test]
-async fn commit_push_conflict_restores_workdir() {
-    let tmp = tempfile::tempdir().expect("임시");
-    let (g, origin, work) = setup(tmp.path()).await;
-    let u = local_user();
-    g.commit_push(&work, "base", &u, &files(&[("a.md", "1\n")]), &[])
-        .await
-        .expect("base");
-    let other = tmp.path().join("other");
-    sh(
-        tmp.path(),
-        &[
-            "clone",
-            "-q",
-            origin.to_str().expect("경로"),
-            other.to_str().expect("경로"),
-        ],
-    );
-    race_hook(&work, &other, "a.md", "theirs\\n");
-    let r = g
-        .commit_push(&work, "mine", &u, &files(&[("a.md", "mine\n")]), &[])
-        .await;
-    assert!(matches!(r, Err(Problem::PushFailed { reason }) if reason == "conflict"));
-    assert_eq!(
-        std::fs::read_to_string(work.join("a.md")).expect("a"),
-        "theirs\n"
-    );
-    assert_eq!(sh(&work, &["status", "--porcelain"]), "");
-}
-
-#[tokio::test]
-async fn commit_push_writes_on_top_of_remote() {
-    let tmp = tempfile::tempdir().expect("임시");
-    let (g, origin, work) = setup(tmp.path()).await;
-    let u = local_user();
-    g.commit_push(
-        &work,
-        "base",
-        &u,
-        &files(&[("a.md", "1\n"), ("b.md", "1\n")]),
-        &[],
-    )
-    .await
-    .expect("base");
-    let other = tmp.path().join("other");
-    sh(
-        tmp.path(),
-        &[
-            "clone",
-            origin.to_str().expect("경로"),
-            other.to_str().expect("경로"),
-        ],
-    );
-    std::fs::write(other.join("b.md"), "2\n").expect("쓰기");
-    sh(&other, &["commit", "-qam", "theirs"]);
+    // 읽기 프로세스를 띄운 뒤 밖에서 민 커밋 — main도 내용도 본다
+    let other = outside(tmp.path(), &origin);
+    std::fs::write(other.join("later.md"), "나중\n").expect("파일");
+    sh(&other, &["add", "later.md"]);
+    sh(&other, &["commit", "-qm", "나중"]);
     sh(&other, &["push", "-q", "origin", "HEAD:main"]);
-    // 다른 파일 → fetch 뒤 reset 위에 쓰므로 그대로 성공
-    let h = g
-        .commit_push(&work, "mine", &u, &files(&[("a.md", "2\n")]), &[])
-        .await
-        .expect("race");
-    assert_eq!(sh(&origin, &["rev-parse", "main"]), h);
+    let later = sh(&other, &["rev-parse", "HEAD"]);
     assert_eq!(
-        std::fs::read_to_string(work.join("b.md")).expect("b"),
-        "2\n"
+        g.head(&origin).await.expect("head").as_deref(),
+        Some(later.as_str())
     );
+    assert_eq!(
+        g.read(&origin, "later.md", "refs/heads/main")
+            .await
+            .expect("읽기"),
+        "나중\n"
+    );
+    // 끈 뒤에도 다시 띄워 읽는다
+    g.close(&origin).await;
+    assert_eq!(
+        g.read(&origin, "later.md", &later).await.expect("다시"),
+        "나중\n"
+    );
+    // 저장소 자리가 없으면 Internal
+    assert!(matches!(
+        g.read(&tmp.path().join("none.git"), "a", "HEAD").await,
+        Err(Problem::Internal { .. })
+    ));
 }
 
 #[tokio::test]
 async fn path_guard_rejects_before_writing() {
     let tmp = tempfile::tempdir().expect("임시");
-    let (g, _, work) = setup(tmp.path()).await;
+    let (g, origin, work) = setup(tmp.path()).await;
     let u = local_user();
     for bad in [
         ".git/hooks/pre-commit",
@@ -312,16 +411,17 @@ async fn path_guard_rejects_before_writing() {
         "",
     ] {
         let r = g
-            .commit_push(&work, "m", &u, &files(&[(bad, "x")]), &[])
+            .commit(&origin, &work, "m", &u, &files(&[(bad, "x")]), &[])
             .await;
         assert!(matches!(r, Err(Problem::PushFailed { .. })), "{bad}");
     }
     assert!(!tmp.path().join("repos/escape.md").exists());
+    assert_eq!(g.head(&origin).await.expect("head"), None);
     #[cfg(unix)]
     {
         std::os::unix::fs::symlink(tmp.path(), work.join("out")).expect("링크");
         let r = g
-            .commit_push(&work, "m", &u, &files(&[("out/x.md", "x")]), &[])
+            .commit(&origin, &work, "m", &u, &files(&[("out/x.md", "x")]), &[])
             .await;
         assert!(
             matches!(r, Err(Problem::PushFailed { reason }) if reason.starts_with("작업 사본 밖 경로"))
@@ -330,57 +430,46 @@ async fn path_guard_rejects_before_writing() {
 }
 
 #[tokio::test]
-async fn clone_of_missing_remote_is_git_error() {
-    let tmp = tempfile::tempdir().expect("임시");
-    let g = git_for(tmp.path());
-    let r = g
-        .clone(
-            tmp.path().join("nope.git").to_str().expect("경로"),
-            &tmp.path().join("w"),
-        )
-        .await;
-    assert!(matches!(r, Err(Problem::Git { cmd, .. }) if cmd.starts_with("git clone ")));
-}
-
-#[tokio::test]
-async fn fetch_sees_outside_push_without_touching_workdir_and_counts_range() {
+async fn head_and_rev_list_count_on_the_server_repo() {
     let tmp = tempfile::tempdir().expect("임시");
     let (g, origin, work) = setup(tmp.path()).await;
-    // 빈 원격 — origin/main이 없다
-    assert!(matches!(g.fetch(&work).await, Err(Problem::Git { .. })));
+    assert_eq!(g.head(&origin).await.expect("빈"), None);
     let first = g
-        .commit_push(&work, "첫", &local_user(), &files(&[("a.md", "a")]), &[])
+        .commit(
+            &origin,
+            &work,
+            "첫",
+            &local_user(),
+            &files(&[("a.md", "a")]),
+            &[],
+        )
         .await
-        .expect("첫 커밋");
-    assert_eq!(g.fetch(&work).await.expect("fetch"), first);
-    // 밖에서 민 커밋 → 그 해시, 작업 사본 HEAD는 그대로
-    let other = tmp.path().join("other");
-    sh(
-        tmp.path(),
-        &[
-            "clone",
-            "-q",
-            origin.to_str().expect("경로"),
-            other.to_str().expect("경로"),
-        ],
+        .expect("첫 커밋")
+        .hash;
+    assert_eq!(
+        g.head(&origin).await.expect("head").as_deref(),
+        Some(first.as_str())
     );
+    let other = outside(tmp.path(), &origin);
     std::fs::write(other.join("b.md"), "b").expect("파일");
     sh(&other, &["add", "b.md"]);
     sh(&other, &["commit", "-q", "-m", "밖"]);
     sh(&other, &["push", "-q", "origin", "HEAD:main"]);
-    let outside = sh(&other, &["rev-parse", "HEAD"]);
-    assert_eq!(g.fetch(&work).await.expect("fetch"), outside);
-    assert_eq!(sh(&work, &["rev-parse", "HEAD"]), first);
-    let range = format!("{first}..{outside}");
-    assert_eq!(g.rev_list_count(&work, &range).await.expect("수"), 1);
+    let outside_head = sh(&other, &["rev-parse", "HEAD"]);
     assert_eq!(
-        g.rev_list_count(&work, &format!("{first}..{first}"))
+        g.head(&origin).await.expect("head").as_deref(),
+        Some(outside_head.as_str())
+    );
+    let range = format!("{first}..{outside_head}");
+    assert_eq!(g.rev_list_count(&origin, &range).await.expect("수"), 1);
+    assert_eq!(
+        g.rev_list_count(&origin, &format!("{first}..{first}"))
             .await
             .expect("수"),
         0
     );
     assert!(matches!(
-        g.rev_list_count(&work, "0123456789abcdef0123456789abcdef01234567..HEAD")
+        g.rev_list_count(&origin, "0123456789abcdef0123456789abcdef01234567..HEAD")
             .await,
         Err(Problem::Git { .. })
     ));
@@ -415,7 +504,8 @@ async fn advertise_refs_service_line_unless_v2() {
     let lines = pkt_lines(&empty);
     assert_eq!(lines[..2], ["# service=git-upload-pack\n", "0000"]);
     assert!(lines[2].starts_with("0000000000000000000000000000000000000000 capabilities^{}"));
-    g.commit_push(
+    g.commit(
+        &origin,
         &work,
         "first",
         &local_user(),
@@ -423,7 +513,7 @@ async fn advertise_refs_service_line_unless_v2() {
         &[],
     )
     .await
-    .expect("push");
+    .expect("커밋");
     let head = sh(&origin, &["rev-parse", "main"]);
     for service in ["git-upload-pack", "git-receive-pack"] {
         let out = g
@@ -464,7 +554,8 @@ async fn advertise_refs_service_line_unless_v2() {
 async fn service_rpc_ls_refs_and_flush_only() {
     let tmp = tempfile::tempdir().expect("임시");
     let (g, origin, work) = setup(tmp.path()).await;
-    g.commit_push(
+    g.commit(
+        &origin,
         &work,
         "first",
         &local_user(),
@@ -472,7 +563,7 @@ async fn service_rpc_ls_refs_and_flush_only() {
         &[],
     )
     .await
-    .expect("push");
+    .expect("커밋");
     // 빈 요청(flush만) — 아무것도 원하지 않는다, 답도 비었다
     let out = g
         .service_rpc(&origin, "git-upload-pack", b"0000".to_vec(), None)
@@ -528,19 +619,18 @@ async fn changed_files_latest_per_path_renames_and_skips() {
     let (g, origin, work) = setup(tmp.path()).await;
     let u = local_user();
     let base = g
-        .commit_push(&work, "first", &u, &files(&[("a.txt", "a\n")]), &[])
+        .commit(
+            &origin,
+            &work,
+            "first",
+            &u,
+            &files(&[("a.txt", "a\n")]),
+            &[],
+        )
         .await
-        .expect("push");
-    let other = tmp.path().join("other");
-    sh(
-        tmp.path(),
-        &[
-            "clone",
-            "-q",
-            origin.to_str().expect("경로"),
-            other.to_str().expect("경로"),
-        ],
-    );
+        .expect("커밋")
+        .hash;
+    let other = outside(tmp.path(), &origin);
     put(&other, "docs/specs/02-PRD/X-PRD-001.md", "v1\n");
     put(&other, "docs/specs/README.md", "r\n");
     put(&other, "docs/specs/assets/a.png", "p");
@@ -565,10 +655,10 @@ async fn changed_files_latest_per_path_renames_and_skips() {
     let c3 = push_as(&other, "a", "a@x", "옮김");
     sh(&other, &["rm", "-q", "docs/specs/02-PRD/X-PRD-001.md"]);
     let c4 = push_as(&other, "b", "b@x", "지움");
-    let head = g.fetch(&work).await.expect("fetch");
+    let head = g.head(&origin).await.expect("head").expect("main");
     assert_eq!(head, c4);
     let got = g
-        .changed_files(&work, &format!("{base}..{head}"), "docs/specs/")
+        .changed_files(&origin, &format!("{base}..{head}"), "docs/specs/")
         .await
         .expect("바뀐 파일");
     let brief: Vec<(&str, &str, &str)> = got
@@ -584,7 +674,7 @@ async fn changed_files_latest_per_path_renames_and_skips() {
     );
     // 범위를 c2까지로 — 여러 줄 메시지·noreply 아이디
     let got = g
-        .changed_files(&work, &format!("{base}..{c2}"), "docs/specs/")
+        .changed_files(&origin, &format!("{base}..{c2}"), "docs/specs/")
         .await
         .expect("바뀐 파일");
     let scn = got
@@ -611,7 +701,8 @@ async fn changed_files_latest_per_path_renames_and_skips() {
 async fn log_oldest_first_follows_renames_and_skips_deletions() {
     let tmp = tempfile::tempdir().expect("임시");
     let (g, origin, work) = setup(tmp.path()).await;
-    g.commit_push(
+    g.commit(
+        &origin,
         &work,
         "first",
         &local_user(),
@@ -619,17 +710,8 @@ async fn log_oldest_first_follows_renames_and_skips_deletions() {
         &[],
     )
     .await
-    .expect("push");
-    let other = tmp.path().join("other");
-    sh(
-        tmp.path(),
-        &[
-            "clone",
-            "-q",
-            origin.to_str().expect("경로"),
-            other.to_str().expect("경로"),
-        ],
-    );
+    .expect("커밋");
+    let other = outside(tmp.path(), &origin);
     let (old, new) = (
         "docs/specs/DOM/X-DOM-001.md",
         "docs/specs/06-DOM/X-DOM-001.md",
@@ -645,9 +727,7 @@ async fn log_oldest_first_follows_renames_and_skips_deletions() {
     push_as(&other, "a", "a@x", "trash(X-DOM-001)");
     put(&other, new, "v3\n");
     push_as(&other, "a", "a@x", "다시");
-    g.fetch(&work).await.expect("fetch");
-    sh(&work, &["checkout", "-q", "origin/main"]);
-    let got = g.log(&work, new).await.expect("이력");
+    let got = g.log(&origin, new).await.expect("이력");
     let brief: Vec<(&str, &str)> = got
         .iter()
         .map(|c| (c.message.as_str(), c.path.as_str()))
@@ -663,10 +743,10 @@ async fn log_oldest_first_follows_renames_and_skips_deletions() {
     );
     assert_eq!(got[1].login, "octo");
     for c in &got {
-        g.read(&work, &c.path, &c.hash).await.expect("읽힌다");
+        g.read(&origin, &c.path, &c.hash).await.expect("읽힌다");
     }
     assert!(
-        g.log(&work, "docs/specs/02-PRD/없음.md")
+        g.log(&origin, "docs/specs/02-PRD/없음.md")
             .await
             .expect("빈")
             .is_empty()
@@ -674,29 +754,134 @@ async fn log_oldest_first_follows_renames_and_skips_deletions() {
 }
 
 #[tokio::test]
-async fn checkout_force_drops_local_edits() {
+async fn materialize_writes_only_docs_specs_and_replaces_old_clone() {
     let tmp = tempfile::tempdir().expect("임시");
-    let (g, _, work) = setup(tmp.path()).await;
-    g.commit_push(
+    let (g, origin, work) = setup(tmp.path()).await;
+    let u = local_user();
+    let code_only = g
+        .commit(
+            &origin,
+            &work,
+            "코드",
+            &u,
+            &files(&[("src/a.rs", "a\n")]),
+            &[],
+        )
+        .await
+        .expect("커밋")
+        .hash;
+    // docs/specs가 없는 커밋 → 빈 폴더
+    g.materialize(&origin, &code_only, &work).await.expect("빈");
+    assert_eq!(std::fs::read_dir(&work).expect("폴더").count(), 0);
+    let head = g
+        .commit(
+            &origin,
+            &work,
+            "명세",
+            &u,
+            &files(&[
+                ("docs/specs/02-PRD/X.md", "p\n"),
+                ("docs/specs/assets/x.png", "png"),
+            ]),
+            &[],
+        )
+        .await
+        .expect("커밋")
+        .hash;
+    // 옛 판의 clone(.git이 있는 폴더) → .git 없이 다시
+    std::fs::create_dir_all(work.join(".git")).expect(".git");
+    std::fs::write(work.join("stale.md"), "옛").expect("파일");
+    g.materialize(&origin, &head, &work).await.expect("다시");
+    assert!(!work.join(".git").exists());
+    assert!(!work.join("stale.md").exists());
+    assert!(!work.join("src").exists());
+    assert_eq!(
+        std::fs::read_to_string(work.join("docs/specs/02-PRD/X.md")).expect("p"),
+        "p\n"
+    );
+    assert_eq!(
+        std::fs::read(work.join("docs/specs/assets/x.png")).expect("png"),
+        b"png"
+    );
+}
+
+#[tokio::test]
+async fn close_lets_the_repo_move_and_reads_reopen() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, origin, work) = setup(tmp.path()).await;
+    g.commit(
+        &origin,
         &work,
-        "first",
+        "a",
         &local_user(),
-        &files(&[("a.txt", "a\n")]),
+        &files(&[("a.md", "a")]),
         &[],
     )
     .await
-    .expect("push");
-    g.fetch(&work).await.expect("fetch"); // push는 추적 참조를 고치지 않는다 — 재구축도 받고 나서 돌린다
-    std::fs::write(work.join("a.txt"), "고침\n").expect("고침");
-    g.checkout(&work, "origin/main").await.expect("checkout");
-    assert_eq!(
-        std::fs::read_to_string(work.join("a.txt")).expect("읽기"),
-        "a\n"
+    .expect("커밋");
+    let copy = g.clone();
+    assert_eq!(copy.read(&origin, "a.md", "HEAD").await.expect("읽기"), "a");
+    // 복제본이 띄운 것도 원본의 close_all이 끈다 — 끈 뒤 폴더를 옮길 수 있다(윈도는 열린 팩이 있으면 못 한다)
+    g.close_all().await;
+    let moved = tmp.path().join("origins/_archive/X-1.git");
+    std::fs::create_dir_all(moved.parent().expect("부모")).expect("폴더");
+    std::fs::rename(&origin, &moved).expect("옮기기");
+    assert_eq!(g.read(&moved, "a.md", "HEAD").await.expect("다시"), "a");
+    g.close(&moved).await;
+}
+
+#[tokio::test]
+async fn gc_packs_loose_objects_over_the_threshold() {
+    let tmp = tempfile::tempdir().expect("임시");
+    let (g, origin, work) = setup(tmp.path()).await;
+    // 작은 커밋마다 fast-import는 낱낱의 객체로 쓴다(fastimport.unpackLimit) — 문턱(6700)을 넉넉히 넘게 쌓는다.
+    // gc --auto는 objects/17 하나로 어림한다(256배)
+    let tree = tmp.path().join("tree");
+    for i in 0..12000 {
+        let d = tree.join(format!("d{}", i % 70));
+        std::fs::create_dir_all(&d).expect("폴더");
+        std::fs::write(d.join(format!("{i}.md")), format!("{i}\n")).expect("파일");
+    }
+    let (gd, wt) = (
+        format!("--git-dir={}", origin.display()),
+        format!("--work-tree={}", tree.display()),
     );
-    assert!(matches!(
-        g.checkout(&work, "없는-가지").await,
-        Err(Problem::Git { .. })
-    ));
+    sh(tmp.path(), &[&gd, &wt, "add", "-A"]);
+    sh(tmp.path(), &[&gd, &wt, "commit", "-q", "-m", "많이"]);
+    let loose = || {
+        std::fs::read_dir(origin.join("objects"))
+            .expect("객체")
+            .flatten()
+            .filter(|e| e.file_name().len() == 2)
+            .map(|e| std::fs::read_dir(e.path()).map_or(0, Iterator::count))
+            .sum::<usize>()
+    };
+    let before = loose();
+    assert!(before > 11000, "{before}");
+    let head = sh(&origin, &["rev-parse", "main"]);
+    assert_eq!(
+        g.read(&origin, "d0/0.md", "HEAD").await.expect("읽기"),
+        "0\n"
+    );
+    g.gc(&origin).await.expect("gc"); // 읽기 프로세스를 끄고 돈다
+    assert!(loose() < 100, "{before} → {}", loose());
+    assert_eq!(sh(&origin, &["rev-parse", "main"]), head);
+    assert_eq!(
+        g.read(&origin, "d69/11969.md", "HEAD").await.expect("읽기"),
+        "11969\n"
+    );
+    // 쌓인 것이 없으면 아무것도 안 한다
+    let packs = std::fs::read_dir(origin.join("objects/pack"))
+        .expect("팩")
+        .count();
+    g.gc(&origin).await.expect("다시");
+    assert_eq!(
+        std::fs::read_dir(origin.join("objects/pack"))
+            .expect("팩")
+            .count(),
+        packs
+    );
+    let _ = work;
 }
 
 #[tokio::test]
@@ -705,27 +890,20 @@ async fn sync_readme_only_when_different() {
     let (g, origin, work) = setup(tmp.path()).await;
     let u = local_user();
     let url = "http://127.0.0.1:8010/specs";
-    g.commit_push(&work, "init", &u, &Git::init_specs(url), &[])
+    g.commit(&origin, &work, "init", &u, &Git::init_specs(url), &[])
         .await
-        .expect("push");
+        .expect("커밋");
     assert_eq!(
-        g.sync_readme(&work, &u, "X", url).await.expect("같다"),
+        g.sync_readme(&origin, &work, &u, "X", url)
+            .await
+            .expect("같다"),
         None
     );
-    let other = tmp.path().join("other");
-    sh(
-        tmp.path(),
-        &[
-            "clone",
-            "-q",
-            origin.to_str().expect("경로"),
-            other.to_str().expect("경로"),
-        ],
-    );
+    let other = outside(tmp.path(), &origin);
     put(&other, "docs/specs/README.md", "옛 README\n");
     push_as(&other, "a", "a@x", "README 고침");
     let hash = g
-        .sync_readme(&work, &u, "X", url)
+        .sync_readme(&origin, &work, &u, "X", url)
         .await
         .expect("다르다")
         .expect("커밋");
@@ -734,8 +912,15 @@ async fn sync_readme_only_when_different() {
         "chore(X): README를 싱크독 규약 링크로"
     );
     assert_eq!(sh(&origin, &["rev-parse", "main"]), hash);
+    assert!(
+        std::fs::read_to_string(work.join("docs/specs/README.md"))
+            .expect("폴더")
+            .contains(url)
+    );
     assert_eq!(
-        g.sync_readme(&work, &u, "X", url).await.expect("이제 같다"),
+        g.sync_readme(&origin, &work, &u, "X", url)
+            .await
+            .expect("이제 같다"),
         None
     );
     // README가 없는 저장소 — 만든다
@@ -743,7 +928,7 @@ async fn sync_readme_only_when_different() {
     sh(&other, &["rm", "-q", "docs/specs/README.md"]);
     push_as(&other, "a", "a@x", "README 지움");
     assert!(
-        g.sync_readme(&work, &u, "X", url)
+        g.sync_readme(&origin, &work, &u, "X", url)
             .await
             .expect("없다")
             .is_some()
