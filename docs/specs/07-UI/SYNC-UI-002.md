@@ -2350,6 +2350,7 @@ status: draft
   .chip .m{font-size:12px}
   .chip.me{border:1.5px solid var(--ink);font-weight:600}
   .chip.gone{border-style:dashed;color:var(--mute)}
+  .chip.grp{background:var(--sub);font-family:var(--mono);font-size:12px}
 </style>
 <div class="sd">
   <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb">설정</span><span class="tb">로그아웃</span></div>
@@ -2375,7 +2376,7 @@ status: draft
           <div class="crow"><div class="cst">7 UI<span class="role">파생 ↓</span></div><div class="chips"><span class="chip"><i class="dot"></i><span class="m">UI-002#UI-5</span>문서 뷰</span></div></div>
           <div class="crow"><div class="cst">8 API<span class="role">파생 ↓</span></div><div class="chips"><span class="chip"><i class="dot"></i><span class="m">API-002#save_document</span>명세 저장</span></div></div>
           <div class="crow empty"><div class="cst">9 SEQ</div><div class="chips">이 단계에는 이어지는 항목이 없다</div></div>
-          <div class="crow"><div class="cst">10 MS<span class="role">파생 ↓</span></div><div class="chips"><span class="chip"><i class="dot"></i><span class="m">MS-002#SpecService.save</span>저장</span><span class="chip gone"><span class="m">MS-009#Pipeline.run</span>(없는 항목)</span></div></div>
+          <div class="crow"><div class="cst">10 MS<span class="role">파생 ↓</span></div><div class="chips"><!-- 이 항목 밖 칩이 24개 넘는 단계는 문서별로 접는다 --><span class="chip grp" data-el="3.4">MS-002 · 31개 ▸</span><span class="chip grp">MS-008 · 12개 ▾</span><span class="chip"><i class="dot"></i><span class="m">MS-008#queries.graph_view</span>참조 그래프</span><span class="chip grp">MS-009 · 7개 ▸</span></div></div>
           <div class="crow empty"><div class="cst">11 CODE</div><div class="chips">이 단계에는 이어지는 항목이 없다</div></div>
         </div>
       </div>
@@ -2402,6 +2403,7 @@ status: draft
 | 3.1 | 항목 칩 | 칩 | 상태 점 · 항목 ID · 제목. 없는 항목이면 점선과 `(없는 항목)` | 그 항목 기준으로 다시 그린다 |
 | 3.2 | 단계 라벨 | 텍스트 | 단계 번호·코드와 역할(`근거 ↑` / `이 항목` / `파생 ↓`) | — |
 | 3.3 | 빈 단계 | 텍스트 | `이 단계에는 이어지는 항목이 없다` | — |
+| 3.4 | 문서 묶음 | 칩 | 「문서 ID · n개 ▸」(펼치면 ▾) — 이 항목 밖 칩이 24개 넘는 단계에서 그 단계의 항목을 문서별로 접은 것. 문서 ID 순 | 펼침·접힘 — 그 문서의 항목 칩(3.1)이 묶음 바로 뒤에 |
 | 4 | 문서 뷰로 열기 | 버튼 | | 기준 항목의 UI-5 해당 위치 |
 | 5 | 닫기(✕) | 버튼 | | 닫힘 |
 | 6 | 닫기 | 버튼 | | 닫힘 |
@@ -2412,6 +2414,7 @@ status: draft
 - **역할(3.2)은 단계 번호가 아니라 폐포 방향으로 정한다.** 상위 폐포에 든 항목이 있는 단계는 `근거 ↑`, 하위 폐포면 `파생 ↓`. 되돌아오는 참조가 있으면 근거가 오른쪽 단계에 놓일 수 있는데, 단계 번호로 판정하면 그걸 `파생`으로 잘못 적는다
 - 한 단계에 두 방향이 다 걸리면 `근거 ↑ · 파생 ↓`로 함께 적는다
 - **항목이 없는 단계도 회색으로 남긴다.** 체인이 어디서 끊겼는지 보이는 게 이 화면의 목적이다. 빈 단계를 접으면 "UI 단계에 아무것도 안 이어졌다"는 사실이 안 보인다
+- **한 단계의 항목이 24개 넘으면 문서별로 접는다**(사용자 결정 2026-10-12, 카드 CA) — 허브 항목(`PRD-001#R1`처럼 하위가 수백 개)이면 칩이 수백 개라 체인을 훑을 수 없었다. 이 항목 칩을 뺀 칩이 24개 넘는 단계만, 그 칩들을 문서별 묶음(3.4)으로 바꾼다. 이 항목 칩·빈 단계·24개 이하 단계는 그대로. 묶음을 누르면 그 문서의 칩만 그 자리에 펼친다. 다른 항목으로 옮기면(칩 클릭) 다시 다 접힌다. 서버는 그대로 전이적 폐포 전부를 주고 묶기는 화면이 한다
 - 칩(3.1)을 누르면 그 항목 기준으로 다시 그린다. 뒤로 가기는 없다 — 계속 따라가는 화면이지 되짚는 화면이 아니다
 - 범위(UI-8 2.1~2.3)와 무관하게 항상 전체 참조를 본다. 범위는 그리는 것을 고르는 조작이지 관계를 지우는 조작이 아니다
 - 다이얼로그 폭은 `720px`. 넓히면 칩 사이가 벌어져 행이 헐거워진다
@@ -2435,6 +2438,11 @@ status: draft
 2. UI-5가 그 항목 위치에서 열린다
 
 ---
+
+**S-4 허브 항목을 훑는다** — 카드 CA
+1. UI-8에서 하위가 수백 개인 `PRD-001#R3` 노드를 누른다
+2. 항목이 많은 단계(DOM·UI·API·SEQ·MS)는 「`MS-002 · 31개 ▸`」처럼 문서별 묶음(3.4)으로 접혀 있다. 11단계가 한 화면에 들어온다
+3. `MS-008` 묶음을 누르면 그 문서의 칩만 펼쳐진다. 칩을 누르면 그 항목 기준으로 다시 그려지고 묶음은 다시 접힌다
 
 ## UI-16 사용 방법
 
