@@ -827,6 +827,7 @@ classDiagram
         +item_neighbors(graph, key) (Vec, Vec)
         +layer_table(body) Vec~LayerRow~
         +layers(graph, rows) (HashMap, Vec)
+        +widen(raw, graph) Value
         +communities(raw, graph) Graph
     }
     class Graph {
@@ -863,6 +864,7 @@ classDiagram
 | [[SYNC-MS-022#codegraph.load]] · [[SYNC-MS-022#codegraph.extract]] · [[SYNC-MS-022#codegraph.reduce]] · [[SYNC-MS-022#codegraph.enrich]] | `pipeline.build_code_graph` | [[SYNC-MS-011#codegraph.load]] | `CodeGraphFailed`(그래프 행의 `error`로) |
 | [[SYNC-MS-022#codegraph.spec_calls]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.item_function]] · [[SYNC-MS-022#codegraph.item_neighbors]] | 코드 조회 넷 | [[SYNC-MS-011#codegraph.compare]] | — |
 | [[SYNC-MS-022#codegraph.layer_table]] · [[SYNC-MS-022#codegraph.layers]] | 코드 그래프 노드(L13) | [[SYNC-MS-011#codegraph.layers]] | — |
+| [[SYNC-MS-022#codegraph.widen]] | `pipeline.build_code_graph` — 추출 원형일 때만(L20) | 사용자 결정 2026-10-12 — 파이썬 판에 없다(graphify 원형이 모든 언어를 담는다) | — |
 | [[SYNC-MS-022#codegraph.communities]] | `pipeline.build_code_graph`(L13) | [[SYNC-MS-011#codegraph.communities]] | — |
 | [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#CodeGraphService.save]] · [[SYNC-MS-022#CodeGraphService.fail]] | 그래프 만들기 · 코드 조회 · 커밋 처리 5a | [[SYNC-MS-011#CodeGraphService.save]] | — |
 | [[SYNC-MS-022#CodeGraphService.read]] | `queries.code_source`·`code_text`·질문 도구 `read_code` | [[SYNC-MS-011#CodeGraphService.read]] | `not-found`(code_graph·file) |
