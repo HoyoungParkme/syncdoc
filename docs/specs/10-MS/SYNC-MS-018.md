@@ -239,11 +239,11 @@ pub async fn graph_view(db: &mut PgConnection, repos: &ServerRepos, code: &str, 
 2. `approved`면 `SpecService.list_by_project(…, status "approved")`의 문서 것만
 3. 항목 노드 `{pk: "DOC#ITEM"}` · 문서 노드 `{문서 pk: "DOC"}` · `edges = ReferenceService.references_among(항목 pk들, true)`
 4. 간선마다 출발 = 출발 항목이 있으면 그 항목 노드, 없으면 출발 문서 노드 · 없으면 버린다 · 도착 = 항목이면 그 항목 노드(없으면 버린다 — 범위 밖), 문서면 그 문서 노드(없으면 버린다), 미존재면 없음 · `GraphEdge { from, to, raw_target, is_missing }`
-5. 노드마다 `isolated` = 어느 간선에도 안 닿았나 · `→ Graph { nodes, edges, project_name }`
+5. 노드마다 `isolated` = 어느 간선에도 안 닿았나 · `display_name` = 항목 제목(`ItemBrief.display_name`, 문서 노드는 없음 — UI-8 찾기, 카드 L21) · `→ Graph { nodes, edges, project_name }`
 
 **호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-014#SpecService.list_items_by_project]] · [[SYNC-MS-014#SpecService.list_by_project]] · [[SYNC-MS-015#ReferenceService.references_among]]
 
-**테스트 관점** (시험 DB) 노드 = 문서 + 항목 · 미존재는 `to` 없음 · `approved`면 완료 문서만, 밖으로 가는 간선은 없다 · 참조 없는 항목은 `isolated`
+**테스트 관점** (시험 DB) 노드 = 문서 + 항목 · 항목 노드에 제목, 문서 노드는 없음 · 미존재는 `to` 없음 · `approved`면 완료 문서만, 밖으로 가는 간선은 없다 · 참조 없는 항목은 `isolated`
 
 ---
 
