@@ -12,12 +12,19 @@ upstream: [SYNC-DOM-004, SYNC-MS-009, SYNC-INFRA-001, SYNC-STD-004]
 
 `crates/core/src/infra/git.rs`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.8. 파이썬 판 [[SYNC-MS-009]]의 `git.*`와 **같은 명령·같은 옵션·같은 처리**이고, 이 문서는 다른 점만 적는다([[SYNC-STD-001]] 2.10). 서비스가 아니다 — git CLI를 자식 프로세스로 부르는 얇은 층이다([[SYNC-INFRA-001]] 9.1·9.2 — 순수 Rust git은 아직 push를 받지 못한다).
 
-**카드 L6 몫은 서버 저장 프로젝트를 만들고 지우는 데 드는 일곱이다(2026-10-08).** 카드 L7이 받기·밀린 커밋 수 둘을 더했다(저장 파이프라인의 「밀린 커밋 읽기」·처리 지점 앞당기기). 카드 L10이 git 입구의 둘(광고·rpc)을 더했다(2026-10-11) — 파이썬 판의 `git http-backend`를 쓰지 않고 `upload-pack`·`receive-pack --stateless-rpc`를 직접 부르되, http-backend가 내는 머리·문장을 그대로 낸다(INFRA 9.1). 카드 L11이 밀린 커밋 처리·재구축의 넷(바뀐 파일·파일 이력·작업 사본 돌리기·README 맞추기)을 더했다(2026-10-11). 카드 L12가 코드 그래프의 둘(바뀐 경로 전부·커밋 풀기)을 더했다(2026-10-11). 카드 L15가 번들 가져오기의 하나(통째로 복제)를, 카드 L16이 백업의 하나(거울 복제)를 더했다(2026-10-11).
+**카드 L6 몫은 서버 저장 프로젝트를 만들고 지우는 데 드는 일곱이다(2026-10-08).** 카드 L7이 받기·밀린 커밋 수 둘을 더했다(저장 파이프라인의 「밀린 커밋 읽기」·처리 지점 앞당기기). 카드 L10이 git 입구의 둘(광고·rpc)을 더했다(2026-10-11) — 파이썬 판의 `git http-backend`를 쓰지 않고 `upload-pack`·`receive-pack --stateless-rpc`를 직접 부르되, http-backend가 내는 머리·문장을 그대로 낸다(INFRA 9.1). 카드 L11이 밀린 커밋 처리·재구축의 넷(바뀐 파일·파일 이력·작업 사본 돌리기·README 맞추기)을 더했다(2026-10-11). 카드 L12가 코드 그래프의 둘(바뀐 경로 전부·커밋 풀기)을 더했다(2026-10-11). 카드 L15가 번들 가져오기의 하나(통째로 복제)를, 카드 L16이 백업의 하나(거울 복제)를 더했다(2026-10-11). **카드 L19가 작업 사본을 git에서 뺐다(2026-10-12)** — 아래 「프로세스를 적게」.
 
-**`Git { exe, global_config }`** — git 실행 파일과 빈 전역 설정 파일. 켤 때 [[SYNC-MS-012#runtime.run]]이 만들어 서버 상태에 둔다. 실행 파일은 [[SYNC-MS-012#paths.git]] — 윈도는 설치 폴더의 MinGit(`mingit/cmd/git.exe`), 리눅스는 시스템 git.
+**`Git { exe, global_config, readers }`** — git 실행 파일 · 전역 설정 파일 · 저장소마다 오래 사는 읽기 프로세스(아래). 켤 때 [[SYNC-MS-012#runtime.run]]이 [[#Git.new]]로 만들어 서버 상태에 둔다. 실행 파일은 [[SYNC-MS-012#paths.git]] — 윈도는 설치 폴더의 MinGit(`mingit/ucrt64/bin/git.exe` — 런처 `cmd/git.exe`를 거르지 않는다), 리눅스는 시스템 git.
+
+**프로세스를 적게**(카드 L19, 사용자 결정 2026-10-11·12) — 윈도는 git 프로세스 하나가 50~70ms다(Defender가 켜진 PC, 2026-10 같은 PC에서 잼). 파이썬 판처럼 작업 사본에서 받고(fetch)·쓰고·커밋하고·밀면(push) 저장 한 번에 git이 스물 남짓 떠 0.3초([[SYNC-PRD-001#R15]])를 못 넘는다. 그래서 Rust 판은 **같은 결과를 다른 차례로** 만든다
+- **작업 사본은 git이 아니다** — `repos/{code}`는 서버 저장소 `main`의 `docs/specs/`를 풀어 둔 폴더다([[#Git.materialize]]). 첨부 파일 읽기([[SYNC-MS-013#ProjectService.asset_path]])만 쓴다. git은 늘 서버 저장소(`origins/{code}.git`)에서 돈다 — 받기·되돌리기·밀기가 없다
+- **커밋은 `git fast-import` 하나**([[#Git.commit]]) — 서버 저장소의 `main` 위에 바로 커밋하고 `main`을 앞으로만 옮긴다. 커밋 객체는 `git commit`이 만든 것과 바이트로 같다(본인 줄·시각·메시지 정리)
+- **읽기는 저장소마다 오래 사는 `git cat-file --batch` 하나**(`readers`) — 처음 쓸 때 띄우고 다음 읽기부터 파이프로 묻는다. 없다는 답이면 그때만 원래 명령을 띄워 같은 오류 문장을 낸다 · 저장소 이름을 바꾸거나 지우기 전·gc 전·끌 때 끈다([[#Git.close]] — 윈도는 열린 팩 파일이 있으면 바꾸지도 지우지도 못한다)
+- **자동 maintenance를 끈다** — 전역 설정 파일에 `gc.auto=0` · `maintenance.auto=false` · `receive.autogc=false`([[SYNC-MS-012#runtime.run]] 1). git이 스스로 띄우던 gc·maintenance가 없어지고, 하루 한 번 [[#Git.gc]]가 대신한다([[SYNC-MS-023#backup.daily]])
+- 저장 도중 밖에서 같은 파일을 밀었으면 파이썬 판은 rebase로 합치고 Rust 판은 `conflict`로 돌려준다(계약 밖 — [[SYNC-CODE-002]] 2장)
 
 **사용자 git 설정을 막는다**(사용자 결정 2026-10-08 — Rust만 격리). 파이썬 판은 Docker 안에서 돌아 시스템·전역 설정이 없다. Rust 판은 사용자 PC에서 돌아 `~/.gitconfig`의 서명·훅·autocrlf·자격 도우미와 언어가 끼어든다. 그래서 모든 git을 이렇게 부른다 — 파이썬 판이 받는 깨끗한 환경을 똑같이 만든다
-- 환경: `GIT_CONFIG_NOSYSTEM=1` · `GIT_CONFIG_GLOBAL={global_config}`(빈 파일 — `~/.gitconfig`·XDG 설정 대신) · `GIT_TERMINAL_PROMPT=0` · `LC_ALL=C` · `LANGUAGE=C`
+- 환경: `GIT_CONFIG_NOSYSTEM=1` · `GIT_CONFIG_GLOBAL={global_config}`(앱이 쓰는 고정 내용 — `~/.gitconfig`·XDG 설정 대신. git이 띄우는 자식 git도 읽는다) · `GIT_TERMINAL_PROMPT=0` · `LC_ALL=C` · `LANGUAGE=C`
 - 앞 인자: `-c core.quotepath=false`(파이썬 판과 같다, #349) `-c core.autocrlf=false` `-c commit.gpgsign=false` `-c credential.helper=` `-c safe.directory=*`(앱이 만든 저장소만 연다 — 윈도 관리자 계정에서 권한을 내린 토큰이 만든 폴더도)
 - 윈도는 창 없이(`CREATE_NO_WINDOW`) · 부른 쪽이 끊기면 자식도 끝난다(`kill_on_drop`) · 시간 제한은 없다(파이썬 판과 같다)
 - 표준 출력은 UTF-8 그대로(아니면 `! Internal`), 표준 오류는 깨진 바이트를 바꿔 읽는다
@@ -32,29 +39,47 @@ upstream: [SYNC-DOM-004, SYNC-MS-009, SYNC-INFRA-001, SYNC-STD-004]
 
 | 함수 | 한 줄 |
 |---|---|
+| [[#Git.new]] | 어댑터 만들기 |
 | [[#Git.init_bare]] | 서버 저장소 만들기 |
-| [[#Git.clone]] | 작업 사본 받기 |
 | [[#Git.exists]] | 커밋된 경로가 있나 |
 | [[#Git.list]] | 명세 파일 목록 |
 | [[#Git.read]] | 커밋된 파일 읽기 |
-| [[#Git.commit_push]] | 쓰고 커밋하고 민다 |
+| [[#Git.commit]] | 서버 저장소에 바로 커밋한다 |
 | [[#Git.init_specs]] | 새 프로젝트의 골격 파일 |
-| [[#Git.fetch]] | 서버 저장소에서 받아 온다 |
+| [[#Git.head]] | 서버 저장소의 main 끝 |
 | [[#Git.rev_list_count]] | 밀린 커밋 수 |
 | [[#Git.advertise_refs]] | git 입구 — 참조 광고 |
 | [[#Git.service_rpc]] | git 입구 — 읽기·쓰기 |
 | [[#Git.changed_files]] | 범위의 바뀐 명세 파일 |
 | [[#Git.log]] | 파일 이력 |
-| [[#Git.checkout]] | 작업 사본을 커밋으로 |
 | [[#Git.sync_readme]] | 저장소 README를 지금 판으로 |
 | [[#Git.changed_paths]] | 범위에서 바뀐 경로 전부 |
 | [[#Git.archive]] | 커밋의 파일을 폴더에 푼다 |
+| [[#Git.materialize]] | 작업 사본 폴더를 커밋의 `docs/specs/`로 |
 | [[#Git.clone_bare]] | 번들을 서버 저장소로 통째로 |
 | [[#Git.mirror]] | 서버 저장소의 거울 — 백업 사진 |
+| [[#Git.close]] | 저장소의 읽기 프로세스를 끈다 |
+| [[#Git.close_all]] | 읽기 프로세스를 모두 끈다 |
+| [[#Git.gc]] | 하루 한 번 정리 |
 
 ---
 
 ## 2. 함수
+
+#### Git.new 어댑터 만들기
+
+**시그니처**
+```rust
+pub fn new(exe: PathBuf, global_config: PathBuf) -> Git
+```
+
+근거: 0장 「프로세스를 적게」 · 카드 L19
+
+**처리** 실행 파일·전역 설정 파일을 담고 읽기 프로세스 지도는 비운다 · 복제하면 지도를 함께 쓴다(서버 상태·파이프라인·백업이 같은 프로세스를 본다)
+
+**테스트 관점** 복제본이 띄운 읽기 프로세스를 원본의 [[#Git.close_all]]이 끈다
+
+---
 
 #### Git.init_bare 서버 저장소 만들기
 
@@ -71,35 +96,20 @@ pub async fn init_bare(&self, path: &Path) -> Result<(), Problem>
 
 ---
 
-#### Git.clone 작업 사본 받기
-
-**시그니처**
-```rust
-pub async fn clone(&self, remote: &str, workdir: &Path) -> Result<(), Problem>
-```
-
-근거: [[SYNC-MS-009#git.clone]]
-
-**처리** `git: clone {remote} {workdir}`(전체 이력) · `git: remote set-url origin {remote}`(작업 사본에서)
-
-**다른 점** 토큰을 받지 않는다 — 싱크독_로컬은 서버 저장뿐이다([[SYNC-PRD-001#R15]])
-
-**테스트 관점** 빈 저장소도 받는다 · 없는 자리 → `Problem::Git`
-
----
-
 #### Git.exists 커밋된 경로가 있나
 
 **시그니처**
 ```rust
-pub async fn exists(&self, workdir: &Path, path: &str) -> Result<bool, Problem>
+pub async fn exists(&self, origin: &Path, path: &str) -> Result<bool, Problem>
 ```
 
 근거: [[SYNC-MS-009#git.exists]] · #349
 
-**처리** [[SYNC-MS-009#git.exists]]와 같다 — `git: rev-parse --verify --quiet HEAD^{commit}` · if 끝 코드 1 → `false`(커밋이 없다) · if 다른 실패 → `Problem::Git` · `git: ls-tree HEAD -- {path}` 출력이 비지 않았나
+**처리** [[SYNC-MS-009#git.exists]]와 같은 판정 — `HEAD:{path}`가 읽기 프로세스에 있나(커밋이 없으면 없다)
 
-**테스트 관점** 빈 저장소 → `false` · 커밋된 경로 → `true` · 작업 사본에만 있는 것 → `false` · 저장소가 아닌 자리 → `Problem::Git`
+**다른 점** 서버 저장소의 `HEAD`(= `main`)에서 본다 · 프로세스를 띄우지 않는다(0장)
+
+**테스트 관점** 빈 저장소 → `false` · 커밋된 경로 → `true` · 저장소가 아닌 자리 → `Problem::Git`
 
 ---
 
@@ -107,12 +117,12 @@ pub async fn exists(&self, workdir: &Path, path: &str) -> Result<bool, Problem>
 
 **시그니처**
 ```rust
-pub async fn list(&self, workdir: &Path, glob: &str, git_ref: &str) -> Result<Vec<String>, Problem>
+pub async fn list(&self, origin: &Path, glob: &str, git_ref: &str) -> Result<Vec<String>, Problem>
 ```
 
 근거: [[SYNC-MS-009#git.list]]
 
-**처리** `git: ls-tree -r --name-only {git_ref} -- docs/specs` · 줄마다 파이썬 `PurePosixPath(p).match(glob)`(뒤에서부터 조각마다 `*`·`?` 맞추기)이고 조각에 `_templates`·`assets`가 없는 것 · 차례 그대로. 맨 저장소(보관본)에도 부른다
+**처리** `git: ls-tree -r --name-only {git_ref} -- docs/specs` · 줄마다 파이썬 `PurePosixPath(p).match(glob)`(뒤에서부터 조각마다 `*`·`?` 맞추기)이고 조각에 `_templates`·`assets`가 없는 것 · 차례 그대로. 서버 저장소·보관본에서 부른다
 
 **테스트 관점** `docs/specs/*/*.md`에 번호 붙은 폴더가 걸린다 · 더 깊은 경로·`_templates/`·`assets/`는 빠진다 · 한글 이름 문서도 센다
 
@@ -122,39 +132,42 @@ pub async fn list(&self, workdir: &Path, glob: &str, git_ref: &str) -> Result<Ve
 
 **시그니처**
 ```rust
-pub async fn read(&self, workdir: &Path, path: &str, git_ref: &str) -> Result<String, Problem>
+pub async fn read(&self, origin: &Path, path: &str, git_ref: &str) -> Result<String, Problem>
 ```
 
 근거: [[SYNC-MS-009#git.read]]
 
-**처리** `git: show {git_ref}:{path}` → 출력 그대로 · 없는 파일 → `Problem::Git` · 작업 사본 자리가 없으면 `Problem::Internal`(파이썬 `OSError` — 부르는 쪽이 둘 다 내장 사본으로 떨어진다)
+**처리** `git: show {git_ref}:{path}`와 같은 답 — 읽기 프로세스에 `{git_ref}:{path}`를 묻는다 · 블롭이면 내용 그대로(UTF-8이 아니면 `Problem::Internal`) · 없다·블롭이 아니다 → 그때만 `git: show {git_ref}:{path}`를 띄워 그 결과(없는 파일이면 그 오류 문장의 `Problem::Git`) · 저장소 자리가 없으면 `Problem::Internal`(파이썬 `OSError` — 부르는 쪽이 둘 다 내장 사본으로 떨어진다)
 
-**테스트 관점** 커밋된 내용 그대로(줄바꿈 바꾸지 않음) · 없는 경로 → `Problem::Git`
+**다른 점** 0장 「프로세스를 적게」 — 읽기 프로세스가 죽었으면 한 번 다시 띄운다
+
+**테스트 관점** 커밋된 내용 그대로(줄바꿈 바꾸지 않음) · 없는 경로 → `Problem::Git`, `git show`와 같은 문장 · **읽기 프로세스를 띄운 뒤 만든 커밋·옮긴 `main`을 읽는다** · 죽인 뒤 다시 읽는다
 
 ---
 
-#### Git.commit_push 쓰고 커밋하고 민다
+#### Git.commit 서버 저장소에 바로 커밋한다
 
 **시그니처**
 ```rust
-pub async fn commit_push(&self, workdir: &Path, message: &str, user: &UserRow, files: &IndexMap<String, String>, delete: &[String]) -> Result<String, Problem>
+pub async fn commit(&self, origin: &Path, workdir: &Path, message: &str, user: &UserRow, files: &IndexMap<String, String>, delete: &[String]) -> Result<Committed, Problem>
 ```
 
-근거: [[SYNC-MS-009#git.commit_push]] · [[SYNC-INFRA-001]] 4.3
+근거: [[SYNC-MS-009#git.commit_push]] · 0장 「프로세스를 적게」 · 카드 L19
 
-**처리** [[SYNC-MS-009#git.commit_push]]와 같은 차례
-1. `origin = git: remote get-url origin` · if `https://`로 시작 → `! PushFailed("미등록")`(GitHub 토큰이 없다 — 파이썬 판의 토큰 없는 사람과 같은 답)
-2. `git: fetch origin` · `git: rev-parse --verify --quiet origin/main` · if 있다 → `git: reset --hard origin/main`
-3. 경로 가드 — 쓸 것·지울 것마다 빈 경로·`.git` 조각·작업 사본 밖(심볼릭 링크를 풀어서)이면 `! PushFailed("작업 사본 밖 경로: {p}")`, 아무것도 쓰기 전에
-4. 파일을 UTF-8 그대로 쓴다(위 폴더를 만들고, 줄바꿈을 바꾸지 않는다) · 실패 → 되돌리고(`reset --hard origin/main` 또는 `update-ref -d HEAD`) `git: clean -fdq` · `! PushFailed("쓰기 실패: {경로} {사유}")`
-5. `git: add -- {files…}`(넣은 차례) · `git: rm -q --ignore-unmatch -- {delete…}` · if `git: diff --cached --quiet`가 0 → 커밋 없이 `→ git: rev-parse HEAD`
-6. `git: -c user.name={표시 이름} -c user.email={login}@syncdoc.local commit -q -m {message}` — 로컬 사용자(`kind=local`). 아니면 `@users.noreply.github.com`(파이썬 판과 같은 규칙)
-7. 세 번까지 다시(`PUSH_RETRIES` 3, [[SYNC-INFRA-001]] 5.2): `git: push --porcelain {origin} HEAD:main` · 성공 → 끝 · `--porcelain`에 `!` 줄이 없는 실패 → 되돌리고 `! PushFailed(stderr 또는 stdout)` · 마지막에도 거부 → 되돌리고 같은 것 · 거부 → `git: fetch origin` · `git: -c user.name=… -c user.email=… rebase origin/main` · 충돌 → `git: rebase --abort` · `git: reset --hard origin/main` · `! PushFailed("conflict")` · 사이에 기다리지 않는다
-8. `→ git: rev-parse HEAD`
+**처리** [[SYNC-MS-009#git.commit_push]]와 같은 결과 — 서버 저장소 `main` 위에 커밋 하나
+1. 경로 가드 — 쓸 것·지울 것마다 빈 경로·`.git` 조각·작업 사본 폴더 밖(심볼릭 링크를 풀어서)이면 `! PushFailed("작업 사본 밖 경로: {p}")`, 아무것도 쓰기 전에(파이썬 판과 같은 문장)
+2. 메시지를 `git commit -m`처럼 정리한다(git `strbuf_stripspace` — 줄마다 끝의 공백(` `·`\t`·`\r`·`\n`)을 걷고, 앞뒤 빈 줄을 버리고, 빈 줄 여럿은 하나로, 끝에 줄바꿈 하나) · 비면 `Problem::Git`(파이썬 판의 `git commit`이 「빈 메시지」로 실패하는 것과 같다 — 응답은 `internal`)
+3. `parent = Git.head`(빈 저장소면 없음)
+4. 바뀐 것이 없다 — 쓸 파일마다 `parent`의 그 경로가 같은 내용이고 지울 경로마다 `parent`에 없다 → 커밋 없이 `→ Committed { hash: parent, parent }`(파이썬 `diff --cached --quiet`와 같다)
+5. 본인 = `{표시 이름} <{login}@syncdoc.local>` — 로컬 사용자(`kind=local`). 아니면 `@users.noreply.github.com`(파이썬 판과 같은 규칙) · git처럼 앞뒤의 군더더기(공백 이하·`,:;<>"\'`)를 걷고 안의 줄바꿈·`<`·`>`를 뺀다 · 시각 = 지금 초, 현지 오프셋(`±HHMM`)
+6. `git: fast-import --quiet --done`에 한 번에 넣는다 — `commit refs/heads/main` · `mark :1` · `author`·`committer`(5와 같은 줄) · `data`(2의 메시지) · `from {parent}`(있을 때) · 쓸 파일마다 `M {모드} inline {경로}` + `data`(UTF-8 그대로, 줄바꿈 바꾸지 않음) — 모드는 `parent`에 있던 경로면 그 모드(`100644`·`100755`), 아니면 `100644`(파이썬 `git add`가 작업 사본 모드를 지키는 것과 같다) · 지울 것마다 `D {경로}` · `get-mark :1`(새 해시가 표준 출력으로) · `done` · 경로에 `"`·`\`·줄바꿈이 있거나 `"`로 시작하면 C 꼴로 따옴
+7. fast-import는 `main`이 `parent`일 때만 옮긴다(앞으로만) — 거부(끝 코드가 0이 아님)이고 지금 `main`이 `parent`가 아니다(사이에 밖에서 밀었다) → 쓸 것·지울 것 가운데 하나라도 `parent`와 지금 `main`에서 내용이 다르면 `! PushFailed("conflict")` · 아니면 지금 `main`을 `parent`로 6을 다시(세 번까지 — `PUSH_RETRIES`, [[SYNC-INFRA-001]] 5.2) · 다른 실패 → `! PushFailed(stderr)`
+8. 작업 사본 폴더에 `docs/specs/` 아래의 쓴 것을 쓰고 지운 것을 지운다(폴더가 있을 때 — [[#Git.materialize]]가 만든다)
+9. `→ Committed { hash: 새 해시, parent }`
 
-**다른 점** 쓰는 사람은 `UserRow`(파이썬 `Author.user`) · 지울 것이 없으면 빈 조각 · 재시도 수는 상수(설정 파일에 없다)
+**다른 점** 0장 「프로세스를 적게」 — 받기·되돌리기·밀기가 없고 fast-import 하나다 · 저장 도중 밖에서 같은 파일을 밀었으면 rebase로 합치지 않고 `conflict`(파이썬 판은 합친다 — 계약 밖) · 부모를 돌려준다 — 처리 지점 앞당기기가 `rev-list --count` 없이 「부모 = 처리 지점」으로 같은 판정을 한다([[SYNC-MS-017#pipeline.save_pipeline]] 13a) · 쓰는 사람은 `UserRow` · 재시도 수는 상수
 
-**테스트 관점** 커밋 하나가 원격에 · 반환 해시 = 원격 main · 로컬 사용자 이메일 `{login}@syncdoc.local` · 같은 내용 → 커밋 없음 · 빈 원격 → 첫 커밋 · 원격이 앞섬 → rebase 뒤 성공 · 같은 줄 충돌 → `conflict`, 작업 사본 원상 · `.git/`·`..`·바깥 링크 → `PushFailed`, 아무것도 안 씀 · 사용자 `~/.gitconfig`의 서명·훅·autocrlf가 있어도 같은 커밋
+**테스트 관점** **같은 트리·부모·본인·시각이면 `git commit`이 만든 커밋과 해시가 같다**(메시지 꼴 — 끝 공백·앞뒤 빈 줄·빈 줄 여럿·`\r\n`·끝 줄바꿈 없음·한글) · 오프셋이 `git var GIT_COMMITTER_IDENT`와 같다 · 반환 해시 = `main` · 같은 내용 → 커밋 없음 · 빈 저장소 → 첫 커밋(부모 없음) · 지우기 · 실행 비트가 있던 파일을 고쳐도 `100755` · 사이에 밖에서 다른 파일을 밀었다 → 그 위에 커밋 · 같은 파일 → `conflict`, `main`은 밖의 것 · 빈 메시지 → `Problem::Git` · `.git/`·`..`·바깥 링크 → `PushFailed`, 아무것도 안 씀 · 폴더에 쓴 것·지운 것이 그대로 · 사용자 `~/.gitconfig`가 있어도 같은 커밋
 
 ---
 
@@ -175,20 +188,20 @@ pub fn init_specs(specs_url: &str) -> IndexMap<String, String>
 
 ---
 
-#### Git.fetch 서버 저장소에서 받아 온다
+#### Git.head 서버 저장소의 main 끝
 
 **시그니처**
 ```rust
-pub async fn fetch(&self, workdir: &Path) -> Result<String, Problem>
+pub async fn head(&self, origin: &Path) -> Result<Option<String>, Problem>
 ```
 
-근거: [[SYNC-MS-009#git.fetch]]
+근거: [[SYNC-MS-009#git.fetch]] · 0장 「프로세스를 적게」
 
-**처리** `git: remote get-url origin` · `git: fetch origin` · `→ git: rev-parse origin/main` — 작업 사본은 건드리지 않는다
+**처리** 읽기 프로세스에 `refs/heads/main`을 묻는다 · 커밋이면 `→ Some(해시)` · 없다(빈 저장소) → `None`
 
-**다른 점** 사람을 받지 않는다 — 토큰 갈래(`https://` 원격)가 없다. 싱크독_로컬은 서버 저장뿐이다([[SYNC-PRD-001#R15]]). 원격 주소를 읽는 첫 명령은 파이썬 판처럼 부른다(없는 원격이면 거기서 `Problem::Git`)
+**다른 점** 파이썬 `git.fetch`(작업 사본으로 받아 `origin/main`)를 갈음한다 — 작업 사본이 git이 아니다(0장). 받지 않는다
 
-**테스트 관점** 밖에서 원격에 민 커밋 → 그 해시, 작업 사본 HEAD는 그대로 · 빈 원격(커밋 없음) → `Problem::Git`
+**테스트 관점** 빈 저장소 → `None` · 밖에서 민 커밋 → 그 해시(읽기 프로세스를 띄운 뒤라도)
 
 ---
 
@@ -196,7 +209,7 @@ pub async fn fetch(&self, workdir: &Path) -> Result<String, Problem>
 
 **시그니처**
 ```rust
-pub async fn rev_list_count(&self, workdir: &Path, range: &str) -> Result<i64, Problem>
+pub async fn rev_list_count(&self, origin: &Path, range: &str) -> Result<i64, Problem>
 ```
 
 근거: [[SYNC-MS-009#git.rev_list_count]]
@@ -245,7 +258,7 @@ pub async fn service_rpc(&self, origin: &Path, service: &str, body: Vec<u8>, pro
 
 **시그니처**
 ```rust
-pub async fn changed_files(&self, workdir: &Path, range: &str, prefix: &str) -> Result<Vec<ChangedFile>, Problem>
+pub async fn changed_files(&self, origin: &Path, range: &str, prefix: &str) -> Result<Vec<ChangedFile>, Problem>
 ```
 
 근거: [[SYNC-MS-009#git.changed_files]]
@@ -262,29 +275,14 @@ pub async fn changed_files(&self, workdir: &Path, range: &str, prefix: &str) -> 
 
 **시그니처**
 ```rust
-pub async fn log(&self, workdir: &Path, path: &str) -> Result<Vec<Commit>, Problem>
+pub async fn log(&self, origin: &Path, path: &str) -> Result<Vec<Commit>, Problem>
 ```
 
 근거: [[SYNC-MS-009#git.log]]
 
-**처리** [[SYNC-MS-009#git.log]]와 같다 — `git: log --follow --diff-filter=d --name-only --format=%x1e%H%x1f%an%x1f%ae%x1f%aI%x1f%s%n%b -- {path}` · `%x1e`로 갈라 커밋마다 `%x1f` 넷으로 해시·이름·메일·시각·나머지 · 나머지의 끝 공백을 걷은 마지막 줄이 그 커밋 시점의 경로, 그 앞이 메시지(앞뒤 빈 줄을 걷고 `_message`) · 받아서 뒤집어 오래된 것부터 `→ [Commit { hash, login, date, message, email, path }]`. 지운 커밋은 빠진다(#325)
+**처리** [[SYNC-MS-009#git.log]]와 같다(서버 저장소의 `HEAD`에서) — `git: log --follow --diff-filter=d --name-only --format=%x1e%H%x1f%an%x1f%ae%x1f%aI%x1f%s%n%b -- {path}` · `%x1e`로 갈라 커밋마다 `%x1f` 넷으로 해시·이름·메일·시각·나머지 · 나머지의 끝 공백을 걷은 마지막 줄이 그 커밋 시점의 경로, 그 앞이 메시지(앞뒤 빈 줄을 걷고 `_message`) · 받아서 뒤집어 오래된 것부터 `→ [Commit { hash, login, date, message, email, path }]`. 지운 커밋은 빠진다(#325)
 
 **테스트 관점** 오래된 것부터 · 이름이 바뀐 경로 — 옛 이름 시절 커밋의 `path`가 옛 경로 · 지웠다 되살린 파일 — 지운 커밋만 빠진다 · 여러 줄 메시지에서 경로를 떼어 낸다 · 없는 경로는 빈 목록
-
----
-
-#### Git.checkout 작업 사본을 커밋으로
-
-**시그니처**
-```rust
-pub async fn checkout(&self, workdir: &Path, git_ref: &str) -> Result<(), Problem>
-```
-
-근거: [[SYNC-MS-009#git.checkout]]
-
-**처리** `git: checkout --force {git_ref}`
-
-**테스트 관점** 작업 사본을 고쳐 둔 채 `origin/main`으로 → 고친 것이 사라지고 원격 끝과 같다
 
 ---
 
@@ -292,16 +290,16 @@ pub async fn checkout(&self, workdir: &Path, git_ref: &str) -> Result<(), Proble
 
 **시그니처**
 ```rust
-pub async fn sync_readme(&self, workdir: &Path, user: &UserRow, code: &str, specs_url: &str) -> Result<Option<String>, Problem>
+pub async fn sync_readme(&self, origin: &Path, workdir: &Path, user: &UserRow, code: &str, specs_url: &str) -> Result<Option<String>, Problem>
 ```
 
 근거: [[SYNC-MS-009#git.sync_readme]] · [[SYNC-UC-001#UC-S6]] 1a
 
-**처리** 원하는 것 = [[#Git.init_specs]]의 README(규약 주소 `specs_url`) · [[#Git.fetch]] · `have = git.read(작업 사본, "docs/specs/README.md", "origin/main")`(읽지 못하면 빈 글) · 같으면 `→ None`(커밋이 생기지 않는다) · 다르면 `→ git.commit_push(작업 사본, "chore({code}): README를 싱크독 규약 링크로", user, {README: 원하는 것}, [])`
+**처리** 원하는 것 = [[#Git.init_specs]]의 README(규약 주소 `specs_url`) · `have = git.read(서버 저장소, "docs/specs/README.md", "refs/heads/main")`(읽지 못하면 빈 글) · 같으면 `→ None`(커밋이 생기지 않는다) · 다르면 `→ git.commit(서버 저장소, 작업 사본, "chore({code}): README를 싱크독 규약 링크로", user, {README: 원하는 것}, [])`의 해시
 
-**다른 점** 받기에 사람이 없다(토큰 갈래 없음, [[#Git.fetch]]) · 규약 주소를 부르는 쪽이 넘긴다(파이썬은 설정)
+**다른 점** 받지 않는다(0장) · 규약 주소를 부르는 쪽이 넘긴다(파이썬은 설정)
 
-**호출하는 것** [[#Git.init_specs]] · [[#Git.fetch]] · [[#Git.read]] · [[#Git.commit_push]]
+**호출하는 것** [[#Git.init_specs]] · [[#Git.read]] · [[#Git.commit]]
 
 **테스트 관점** 앱이 만든 저장소 → `None`, 커밋 없음 · README를 밖에서 고쳐 민 뒤 → 커밋 하나, 다시 부르면 `None` · README가 없는 저장소 → 만든다
 
@@ -311,7 +309,7 @@ pub async fn sync_readme(&self, workdir: &Path, user: &UserRow, code: &str, spec
 
 **시그니처**
 ```rust
-pub async fn changed_paths(&self, workdir: &Path, range: &str) -> Result<Vec<String>, Problem>
+pub async fn changed_paths(&self, origin: &Path, range: &str) -> Result<Vec<String>, Problem>
 ```
 
 근거: [[SYNC-MS-009#git.changed_paths]]
@@ -326,7 +324,7 @@ pub async fn changed_paths(&self, workdir: &Path, range: &str) -> Result<Vec<Str
 
 **시그니처**
 ```rust
-pub async fn archive(&self, workdir: &Path, commit: &str, dest: &Path) -> Result<(), Problem>
+pub async fn archive(&self, origin: &Path, commit: &str, dest: &Path) -> Result<(), Problem>
 ```
 
 근거: [[SYNC-MS-009#git.archive]] · [[SYNC-INFRA-001]] 4.3 — 코드 그래프는 작업 사본에서 만들지 않는다
@@ -335,7 +333,24 @@ pub async fn archive(&self, workdir: &Path, commit: &str, dest: &Path) -> Result
 
 **다른 점** 파이썬 `tarfile`의 `filter="data"` 대신 보통 파일·폴더만 푼다 — 심볼릭 링크는 따라가지도 만들지도 않는다(그래프는 파일을 읽기만 한다)
 
-**테스트 관점** 커밋 뒤 작업 사본을 고쳐도 커밋의 내용이 풀린다 · `.gitignore`된 파일은 없다 · 심볼릭 링크는 없다
+**테스트 관점** 커밋의 내용이 풀린다 · `.gitignore`된 파일은 없다 · 심볼릭 링크는 없다
+
+---
+
+#### Git.materialize 작업 사본 폴더를 커밋의 `docs/specs/`로
+
+**시그니처**
+```rust
+pub async fn materialize(&self, origin: &Path, commit: &str, workdir: &Path) -> Result<(), Problem>
+```
+
+근거: 0장 「프로세스를 적게」 · [[SYNC-MS-013#ProjectService.asset_path]] · 카드 L19
+
+**처리** `workdir`를 지우고 다시 만든다(옛 판의 clone — `.git`이 있는 것도) · `commit`에 `docs/specs`가 있으면 `git: archive --format=tar -o {workdir}/.src.tar {commit} -- docs/specs`를 [[#Git.archive]]와 같은 규칙으로 푼다(보통 파일·폴더만) · tar를 지운다
+
+**다른 점** 파이썬 판의 작업 사본(clone)을 갈음한다 — 첨부 파일 읽기만 이 폴더를 쓴다(0장)
+
+**테스트 관점** 커밋의 `docs/specs/` 파일만 · 옛 clone 폴더 → `.git` 없이 다시 · `docs/specs`가 없는 커밋 → 빈 폴더
 
 ---
 
@@ -370,6 +385,55 @@ pub async fn mirror(&self, source: &Path, dest: &Path) -> Result<(), Problem>
 **다른 점** 파이썬 판에 없다 — Docker 묶음의 백업(카드 BR)은 볼륨을 `tar`로 묶는다
 
 **테스트 관점** 가지·태그 해시가 원본과 같다 · 원격이 없다 · HEAD가 원본과 같다 · 받기 규칙 셋 · 빈 저장소도 된다
+
+---
+
+#### Git.close 저장소의 읽기 프로세스를 끈다
+
+**시그니처**
+```rust
+pub async fn close(&self, origin: &Path)
+```
+
+근거: 0장 「프로세스를 적게」 · 카드 L19
+
+**처리** 그 저장소의 읽기 프로세스가 있으면 지도에서 빼고 끝내고 끝나기를 기다린다 · 다음 읽기가 다시 띄운다
+
+**테스트 관점** 끈 뒤 저장소 폴더 이름을 바꿀 수 있다(윈도) · 끈 뒤 읽기 → 다시 띄워 읽는다
+
+---
+
+#### Git.close_all 읽기 프로세스를 모두 끈다
+
+**시그니처**
+```rust
+pub async fn close_all(&self)
+```
+
+근거: 0장 · [[SYNC-MS-012#runtime.shutdown]] · 카드 L19
+
+**처리** 지도의 저장소마다 [[#Git.close]]
+
+**호출하는 것** [[#Git.close]]
+
+**테스트 관점** 띄운 것이 모두 끝난다
+
+---
+
+#### Git.gc 하루 한 번 정리
+
+**시그니처**
+```rust
+pub async fn gc(&self, origin: &Path) -> Result<(), Problem>
+```
+
+근거: 0장 「자동 maintenance를 끈다」 · [[SYNC-MS-023#backup.daily]] · 카드 L19
+
+**처리** [[#Git.close]] · `git: -c gc.auto=6700 -c gc.autoPackLimit=50 -c gc.autoDetach=false gc --auto --quiet`(서버 저장소에서 — 전역 설정의 `gc.auto=0`을 이 한 번만 git 기본 문턱으로 되돌린다. 쌓인 것이 문턱 아래면 아무것도 하지 않는다 · 뒤로 떨어져 돌지 않는다)
+
+**호출하는 것** [[#Git.close]]
+
+**테스트 관점** 팩 쉰 개 넘게 쌓인 저장소 → 팩이 줄고 `main`·내용은 그대로 · 쌓인 것이 없으면 그대로
 
 ---
 
