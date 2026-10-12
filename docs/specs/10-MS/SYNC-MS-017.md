@@ -141,14 +141,14 @@ pub async fn save_pipeline(pool: &PgPool, repos: &ServerRepos, input: SaveInput)
 - 4. `vr = SpecService.validate(body, doc_type, entry, 문서 상태)` · 위반이 있으면 `! ConventionViolation { violations, warnings }` · github — 막지 않는다(원본이 진실)
 - 5. 고치기 — `expected_version`이 현재 판이 아니면 `! VersionConflict { current_version, current_body }`(검증 **뒤**) · github — 보지 않는다
 - 6. 고치기이고 `web_status`가 아니면 — `deleted = SpecService.detect_deleted_items(문서, body)` · 그 항목마다 `ReferenceService.downstream` · 하위가 하나라도 있고 `confirm_item_deletion`이 아니면 출발 항목 이름(`SpecService.describe_items`)으로 `! ItemDeletionNeedsConfirm { deleted_items: [{item_id, downstream: [{doc_id, item_id, display_name}]}] }` — 항목이 없는 하위는 목록에서 빠진다 · github — 묻지 않는다(커밋이 진실, 끊어진 참조로 통보)
-- 6a. 고치기이고 `web_status`가 아니면 — 완료 문서이고 본문이 다르면(github은 frontmatter가 아직 `approved`일 때만 — 작성자가 스스로 내렸으면 그것이 진실) 본문의 첫 `^status: .*$` 줄을 `status: draft`로(push **전에**) · github — 커밋이 이미 저장소에 있으니 강등을 커밋 하나로 더 민다: `status_commit_hash = git.commit(서버 저장소, 작업 사본, "status({doc_id}): approved → draft\n\n본문 수정으로 자동 강등", 등록한 사람, {경로: body}, [])`의 해시 · 13a(그 커밋) — 미는 사람은 저장소를 등록한 사람, 그 해시를 상태 변경에 적어 다음 처리가 앱 커밋으로 거른다(#58)
+- 6a. 고치기이고 `web_status`가 아니면 — 완료 문서이고 본문이 다르면(github은 frontmatter가 아직 `approved`일 때만 — 작성자가 스스로 내렸으면 그것이 진실) 본문의 첫 `^status: .*$` 줄을 `status: draft`로(push **전에**) · github — 커밋이 이미 저장소에 있으니 강등을 커밋 하나로 더 민다: `status_commit_hash = git.commit(서버 저장소, 작업 사본, "status({doc_id}): approved → draft\n\n본문 수정으로 자동 강등", 등록한 사람, {경로: body}, [])`의 해시 — 미는 사람은 저장소를 등록한 사람, 그 해시를 상태 변경에 적어 다음 처리가 앱 커밋으로 거른다(#58)
 - 7. `made = git.commit(서버 저장소, 작업 사본, message, author.user, {docs/specs/{NN-TYPE}/{doc_id}.md: body}, [])` · `commit_hash = made.hash` — 여기까지 DB 쓰기 없음. 같은 본문이면 커밋 없이 `main` 끝 · github — 커밋하지 않는다(`input.commit_hash`)
 - 8w. `web_status` — `SpecService.apply_status(문서, body, commit_hash, author, reason)` · 13a(1) · 커밋 · `→ SaveResult { doc_id, version_no: 지금 판, commit_hash, status: 다시 읽은 상태, warnings: [], next_step: 없음 }`
 - 8. 만들기 → `SpecService.create(…, vr)` · 고치기 → `SpecService.save(문서, body, commit_hash, author, message, deleted, vr, false, status_commit_hash)`
 - 9. `broken = ReferenceService.mark_missing(deleted)`
 - 10. `ReferenceService.extract(문서, 판, body, SpecService.item_pks(문서), frontmatter upstream의 [\w-]+ 낱말들)` · 10a. `ReferenceService.resolve_missing(project, doc_id)`
 - 경고 = `vr`의 경고마다 `rule: message`(빈 message면 `rule`) · `deleted`가 있으면 `ref.broken: {broken}`
-- 13a. 앱이 만든 커밋(7 — github은 6a)의 부모가 처리 지점이고 해시가 부모와 다르면 처리 지점을 그 해시로·`synced_at=now`(파이썬 `rev_list_count("{처리 지점}..{해시}") == 1`과 같은 판정 — 사이에 밖의 커밋이 끼었으면 부모가 처리 지점이 아니다)
+- 13a. github이 아니고 앱이 만든 커밋(7)의 부모가 처리 지점이고 해시가 부모와 다르면 처리 지점을 그 해시로·`synced_at=now`(파이썬 `rev_list_count("{처리 지점}..{해시}") == 1`과 같은 판정 — 사이에 밖의 커밋이 끼었으면 부모가 처리 지점이 아니다)
 - 14. 커밋 · 15. `status = SpecService.get_document(doc_id).status` · `mcp`면 `next_step = "{doc_id} v{판} 저장됨. 사람에게 웹에서 읽으라고 하고 멈춘다 — 다음 문서는 사람이 읽고 난 뒤에 (STD-001 1.8)"`, 웹·github이면 없음
 - `→ SaveResult { doc_id, version_no, commit_hash, status, warnings, next_step }`
 
