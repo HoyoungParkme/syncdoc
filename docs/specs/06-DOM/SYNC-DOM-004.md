@@ -289,7 +289,7 @@ crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 
 
 - **crate가 층을 지킨다** — `app → server → core → codegraph` 한 방향이다(파이썬 호환 `pycompat`은 core·codegraph 아래 맨 밑). 거꾸로 부르면 컴파일이 안 된다. 파이썬 판은 규칙([[SYNC-DOM-002]] 1장 「규칙」)과 검사기로 지키던 것이다
 - **입구가 셋이다** — 웹·MCP·git이 `server`에 있고, 셋 다 `core`의 서비스·`pipeline`·`queries`만 부른다
-- **켜기·끄기·백업·주기 일은 `app`이 쥔다** — PostgreSQL과 git 자식 프로세스를 띄우고 멈추는 순서가 여기 있다([[SYNC-INFRA-001]] 9.1). 백업은 `core`의 쓰기 락을 쥐고 뜬다(9.6)
+- **켜기·끄기·백업·주기 일은 `app`이 쥔다** — PostgreSQL과 git 자식 프로세스를 띄우고 멈추는 순서가 여기 있다([[SYNC-INFRA-001]] 9.1). 백업은 켠 채로 뜬다 — 덤프가 먼저, 서버 저장소는 거울 복제(9.6). 하루 한 번 git 정리는 저장소마다 `core`의 쓰기 락을 쥐고 한다(카드 L19)
 - **두 구현은 서로 부르지 않는다**([[SYNC-STD-001]] 1.9) — 같은 표와 같은 화면 빌드를 쓸 뿐이다
 
 ---
@@ -386,7 +386,7 @@ classDiagram
 | [[SYNC-MS-013#ProjectService.repo_status]] · [[SYNC-MS-013#ProjectService.ensure_hook]] | `GET /api/admin/repos` · `POST …/hook`(L11) | [[SYNC-MS-001#ProjectService.repo_status]] | `not-found` |
 | [[SYNC-MS-013#ProjectService.sync_now]] · [[SYNC-MS-013#ProjectService.rebuild_index]] | `POST …/sync` · `POST …/rebuild`(L11) | [[SYNC-MS-001#ProjectService.sync_now]] | `not-found` · `rebuild-failed` · `push-failed` |
 
-규칙 — [[SYNC-DOM-002]] 4.1과 같다. **싱크독_로컬은 서버 저장뿐이다** — 서버 저장소는 `origins/{code}.git`, 작업 사본은 `repos/{code}`, 지우면 `origins/_archive/{code}-{UTC}.git`으로 보관한다(지우지 않는다). 코드마다 잠금을 쥔다. 서비스가 pipeline을 부르는 자리는 보관본 가져오기·지금 가져오기·재구축 위임 셋이다(L11, 파이썬 판 DOM-002 3.2와 같다).
+규칙 — [[SYNC-DOM-002]] 4.1과 같다. **싱크독_로컬은 서버 저장뿐이다** — 서버 저장소는 `origins/{code}.git`, 작업 사본은 `repos/{code}`(git이 아닌 폴더 — 서버 저장소 `main`의 `docs/specs/`, L19), 지우면 `origins/_archive/{code}-{UTC}.git`으로 보관한다(지우지 않는다). 코드마다 잠금을 쥔다. 서비스가 pipeline을 부르는 자리는 보관본 가져오기·지금 가져오기·재구축 위임 셋이다(L11, 파이썬 판 DOM-002 3.2와 같다).
 
 ### 4.3 spec · markdown (MS-014)
 
@@ -475,7 +475,7 @@ classDiagram
 | [[SYNC-MS-014#SpecService.apply_frontmatter]] | 저장 파이프라인의 만들기(L7) | [[SYNC-MS-002#SpecService.apply_frontmatter]] | `convention-violation` |
 | [[SYNC-MS-014#SpecService.diff]] | 이력 diff(L8) | [[SYNC-MS-002#SpecService.diff]] | `not-found` |
 | [[SYNC-MS-014#SpecService.diff_bodies]] | `diff` · `cargo xtask spec-diff` | [[SYNC-MS-002#SpecService.diff]] | — |
-| [[SYNC-MS-014#SpecService.list_by_project]] | `queries.project_summary`(L6) · `queries.document_list`(L7) · `queries.project_items`·`graph_view`(L8) | [[SYNC-MS-002#SpecService.list_by_project]] | — |
+| [[SYNC-MS-014#SpecService.list_by_project]] | `queries.project_summary_of`(L6·L19) · `queries.document_list`(L7) · `queries.project_items`·`graph_view`(L8) | [[SYNC-MS-002#SpecService.list_by_project]] | — |
 | [[SYNC-MS-014#SpecService.list_versions]] · [[SYNC-MS-014#SpecService.recent_changes]] | `GET /api/docs/{docId}/versions` · `queries.project_detail`(L8) | [[SYNC-MS-002#SpecService.list_versions]] | `not-found` |
 | [[SYNC-MS-014#SpecService.apply_status]] · [[SYNC-MS-014#SpecService.trash]] · [[SYNC-MS-014#SpecService.trash_commit]] · [[SYNC-MS-014#SpecService.version_body]] · [[SYNC-MS-014#SpecService.delete_document]] | 상태·되돌리기·휴지통(L9) | [[SYNC-MS-002#SpecService.trash]] | `not-found` |
 | [[SYNC-MS-014#SpecService.list_items_by_project]] · [[SYNC-MS-014#SpecService.resolve_items]] · [[SYNC-MS-014#SpecService.list_trashed]] | `queries.graph_view` · `queries.diff_with_impact` · `queries.trash_list`(L8) | [[SYNC-MS-002#SpecService.list_items_by_project]] | — |
@@ -526,7 +526,7 @@ classDiagram
 | [[SYNC-MS-015#ReferenceService.extract]] · [[SYNC-MS-015#ReferenceService.resolve_missing]] · [[SYNC-MS-015#ReferenceService.mark_missing]] | 저장 파이프라인 | [[SYNC-MS-003#ReferenceService.extract]] | — |
 | [[SYNC-MS-015#ReferenceService.upstream]] · [[SYNC-MS-015#ReferenceService.downstream]] | `queries.item_references_view` · 저장 파이프라인(삭제 확인) | [[SYNC-MS-003#ReferenceService.downstream]] | — |
 | [[SYNC-MS-015#ReferenceService.upstream_of_document]] | `queries.document_view` | [[SYNC-MS-003#ReferenceService.upstream_of_document]] | — |
-| [[SYNC-MS-015#ReferenceService.count_missing_by_document]] | `queries.project_summary` · `queries.document_list` | [[SYNC-MS-003#ReferenceService.count_missing_by_document]] | — |
+| [[SYNC-MS-015#ReferenceService.count_missing_by_document]] | `queries.project_summary_of` · `queries.document_list` | [[SYNC-MS-003#ReferenceService.count_missing_by_document]] | — |
 | [[SYNC-MS-015#ReferenceService.inbound_of_document]] | 휴지통 넣기·완전 삭제의 문지기(L9) | [[SYNC-MS-003#ReferenceService.inbound_of_document]] | — |
 | [[SYNC-MS-015#ReferenceService.clear]] | 재구축(L11) | [[SYNC-MS-003#ReferenceService.clear]] | — |
 | [[SYNC-MS-015#ReferenceService.references_among]] · [[SYNC-MS-015#ReferenceService.count_downstream]] · [[SYNC-MS-015#ReferenceService.missing_in_project]] | `queries.graph_view`·`downstream_view`·`diff_with_impact`·`project_items`(L8) | [[SYNC-MS-003#ReferenceService.references_among]] | — |
@@ -665,6 +665,7 @@ classDiagram
 | 함수 | 부르는 곳 | 근거 | 던지는 에러 |
 |---|---|---|---|
 | [[SYNC-MS-018#queries.project_summary]] | `GET`·`POST /api/projects` · MCP `init_project` | [[SYNC-MS-008#queries.project_summary]] | — |
+| [[SYNC-MS-018#queries.project_summary_of]] | `queries.project_summary` · `queries.project_detail`(L19 — 상세는 그 프로젝트만) | [[SYNC-MS-008#queries.project_summary]] | — |
 | [[SYNC-MS-018#queries.document_list]] | MCP `list_documents` | [[SYNC-MS-008#queries.document_list]] | `not-found` |
 | [[SYNC-MS-018#queries.document_view]] | MCP `get_document` | [[SYNC-MS-008#queries.document_view]] | `not-found` |
 | [[SYNC-MS-018#queries.item_view]] | MCP `get_item` | [[SYNC-MS-008#queries.item_view]] | `not-found`(`available_items`) · `item-deleted` |
@@ -695,40 +696,51 @@ classDiagram
     class Git {
         +PathBuf exe
         +PathBuf global_config
+        -Readers readers
+        +new(exe, global_config) Git
         +init_bare(path)
-        +clone(remote, workdir)
-        +exists(workdir, path) bool
-        +list(workdir, glob, git_ref) Vec~String~
-        +read(workdir, path, git_ref) String
-        +commit_push(workdir, message, user, files, delete) String
+        +exists(origin, path) bool
+        +list(origin, glob, git_ref) Vec~String~
+        +read(origin, path, git_ref) String
+        +commit(origin, workdir, message, user, files, delete) Committed
         +init_specs(specs_url) IndexMap
-        +fetch(workdir) String
-        +rev_list_count(workdir, range) i64
+        +head(origin) Option~String~
+        +rev_list_count(origin, range) i64
         +advertise_refs(origin, service, protocol) Vec~u8~
         +service_rpc(origin, service, body, protocol) Vec~u8~
-        +changed_files(workdir, range, prefix) Vec~ChangedFile~
-        +log(workdir, path) Vec~Commit~
-        +checkout(workdir, git_ref)
-        +sync_readme(workdir, user, code, specs_url) Option~String~
-        +changed_paths(workdir, range) Vec~String~
-        +archive(workdir, commit, dest)
+        +changed_files(origin, range, prefix) Vec~ChangedFile~
+        +log(origin, path) Vec~Commit~
+        +sync_readme(origin, workdir, user, code, specs_url) Option~String~
+        +changed_paths(origin, range) Vec~String~
+        +archive(origin, commit, dest)
+        +materialize(origin, commit, workdir)
         +clone_bare(source, path)
         +mirror(source, dest)
+        +close(origin)
+        +close_all()
+        +gc(origin)
     }
+    class Committed {
+        +String hash
+        +Option~String~ parent
+    }
+    Git ..> Committed
 ```
 
 | 메서드 | 부르는 곳 | 근거 | 던지는 에러 |
 |---|---|---|---|
-| [[SYNC-MS-019#Git.init_bare]] · [[SYNC-MS-019#Git.clone]] · [[SYNC-MS-019#Git.exists]] · [[SYNC-MS-019#Git.list]] · [[SYNC-MS-019#Git.init_specs]] · [[SYNC-MS-019#Git.commit_push]] | `ProjectService.init_project` | [[SYNC-MS-009]] | `push-failed` · `internal`(git 실패) |
+| [[SYNC-MS-019#Git.new]] | `runtime.run`(서버 상태) | 카드 L19 | — |
+| [[SYNC-MS-019#Git.init_bare]] · [[SYNC-MS-019#Git.exists]] · [[SYNC-MS-019#Git.list]] · [[SYNC-MS-019#Git.init_specs]] · [[SYNC-MS-019#Git.commit]] | `ProjectService.init_project` | [[SYNC-MS-009]] | `push-failed` · `internal`(git 실패) |
 | [[SYNC-MS-019#Git.read]] | MCP `get_template`(저장소 규약 먼저) | [[SYNC-MS-009#git.read]] | `internal` |
-| [[SYNC-MS-019#Git.commit_push]] · [[SYNC-MS-019#Git.fetch]] · [[SYNC-MS-019#Git.rev_list_count]] | 저장 파이프라인 | [[SYNC-MS-009]] | `push-failed` · `internal` |
+| [[SYNC-MS-019#Git.commit]] · [[SYNC-MS-019#Git.head]] · [[SYNC-MS-019#Git.rev_list_count]] | 저장 파이프라인 | [[SYNC-MS-009]] | `push-failed` · `internal` |
 | [[SYNC-MS-019#Git.advertise_refs]] · [[SYNC-MS-019#Git.service_rpc]] | git 입구(`/git/*`, L10) | [[SYNC-MS-009#git.http_backend]] | `internal` |
-| [[SYNC-MS-019#Git.changed_files]] · [[SYNC-MS-019#Git.log]] · [[SYNC-MS-019#Git.checkout]] · [[SYNC-MS-019#Git.sync_readme]] | 밀린 커밋 처리·재구축·재구축 위임(L11) | [[SYNC-MS-009#git.changed_files]] | `push-failed` · `internal` |
+| [[SYNC-MS-019#Git.changed_files]] · [[SYNC-MS-019#Git.log]] · [[SYNC-MS-019#Git.sync_readme]] · [[SYNC-MS-019#Git.materialize]] | 밀린 커밋 처리·재구축·재구축 위임(L11) · 켤 때 작업 사본 맞추기(L19) | [[SYNC-MS-009#git.changed_files]] | `push-failed` · `internal` |
 | [[SYNC-MS-019#Git.changed_paths]] · [[SYNC-MS-019#Git.archive]] | 커밋 처리 5a · 그래프 만들기(L12) | [[SYNC-MS-009#git.archive]] | `internal` |
-| [[SYNC-MS-019#Git.clone_bare]] · [[SYNC-MS-019#Git.rev_list_count]] · [[SYNC-MS-019#Git.clone]] | `ProjectService.import_bundle`(L15) | [[SYNC-MS-009#git.clone_bare]] | `internal`(git 실패 — 부르는 쪽이 `bundle-invalid`로) |
+| [[SYNC-MS-019#Git.clone_bare]] · [[SYNC-MS-019#Git.rev_list_count]] | `ProjectService.import_bundle`(L15) | [[SYNC-MS-009#git.clone_bare]] | `internal`(git 실패 — 부르는 쪽이 `bundle-invalid`로) |
 | [[SYNC-MS-019#Git.mirror]] | `backup.make`(서버 저장소 사진, L16) | — (Docker 묶음은 볼륨을 tar로) | `internal`(부르는 쪽이 `backup-failed`로) |
+| [[SYNC-MS-019#Git.close]] · [[SYNC-MS-019#Git.close_all]] · [[SYNC-MS-019#Git.gc]] | `ProjectService.delete_project` · `runtime.shutdown` · `backup.daily`(L19) | — | `internal`(정리 실패는 로그만) |
 
-규칙 — git CLI를 자식 프로세스로 부른다(윈도 MinGit · 리눅스 시스템 git). **사용자 git 설정을 막는다**(사용자 결정 2026-10-08) — 시스템·전역 설정 끔, 프롬프트·서명·autocrlf 끔, `LC_ALL=C`, `safe.directory=*`. 파이썬 판이 Docker 안에서 받는 깨끗한 환경과 같게 해 같은 명령이 같은 결과를 낸다. git 입구(upload-pack·receive-pack)는 L10이 더했다 — http-backend 없이 `--stateless-rpc`를 직접 부르고 http-backend의 머리를 그대로 낸다. 파이썬 판이 CGI로 넘기는 것과 같게: 요청 머리(`Authorization`·`Content-Type`·`Content-Encoding`·`Git-Protocol`)는 latin-1로 읽고 · gzip 본문이 깨졌으면 서비스를 부르지 않고 빈 결과(http-backend는 죽고 자식도 끝난다) · 인증·원본을 지난 receive-pack 요청 뒤에는 응답이 무엇이든 밀린 커밋을 읽는다(파이썬 판 `BackgroundTask` 자리).
+규칙 — git CLI를 자식 프로세스로 부른다(윈도 MinGit의 `ucrt64/bin/git.exe` · 리눅스 시스템 git). **프로세스를 적게**(카드 L19, 사용자 결정 2026-10-11·12) — 작업 사본은 git이 아닌 폴더(서버 저장소 `main`의 `docs/specs/`)이고 git은 늘 서버 저장소에서 돈다: 커밋은 `fast-import` 하나(`git commit`과 같은 객체), 읽기는 저장소마다 오래 사는 `cat-file --batch` 하나, 자동 gc·maintenance는 끄고 하루 한 번 정리한다([[SYNC-MS-019]] 0장). **사용자 git 설정을 막는다**(사용자 결정 2026-10-08) — 시스템·전역 설정 끔, 프롬프트·서명·autocrlf 끔, `LC_ALL=C`, `safe.directory=*`. 파이썬 판이 Docker 안에서 받는 깨끗한 환경과 같게 해 같은 명령이 같은 결과를 낸다. git 입구(upload-pack·receive-pack)는 L10이 더했다 — http-backend 없이 `--stateless-rpc`를 직접 부르고 http-backend의 머리를 그대로 낸다. 파이썬 판이 CGI로 넘기는 것과 같게: 요청 머리(`Authorization`·`Content-Type`·`Content-Encoding`·`Git-Protocol`)는 latin-1로 읽고 · gzip 본문이 깨졌으면 서비스를 부르지 않고 빈 결과(http-backend는 죽고 자식도 끝난다) · 인증·원본을 지난 receive-pack 요청 뒤에는 응답이 무엇이든 밀린 커밋을 읽는다(파이썬 판 `BackgroundTask` 자리).
 
 ### 4.9 llm (MS-020)
 
@@ -837,7 +849,7 @@ classDiagram
         +get(project_id) CodeGraphRow
         +save(project_id, commit_hash, source, graph) CodeGraphRow
         +fail(project_id, commit_hash, reason) CodeGraphRow
-        +read(git, project_id, workdir, path, start, end) CodeText
+        +read(git, project_id, origin, path, start, end) CodeText
         +delete_by_project(project_id)
     }
     codegraph --> Graph
