@@ -18,10 +18,7 @@ fn places(tmp: &Path) -> ServerRepos {
     std::fs::create_dir_all(tmp.join("origins")).expect("origins");
     std::fs::create_dir_all(tmp.join("repos")).expect("repos");
     ServerRepos {
-        git: Git {
-            exe: "git".into(),
-            global_config: global,
-        },
+        git: Git::new("git".into(), global),
         origins: tmp.join("origins"),
         repos: tmp.join("repos"),
         specs_url: "http://127.0.0.1:8010/specs".into(),
@@ -95,6 +92,8 @@ async fn init_makes_server_repo_and_skeleton_commit() {
         14
     );
     assert!(p.repos.join("EX/docs/specs/README.md").is_file());
+    // 작업 사본은 git이 아닌 폴더(카드 L19)
+    assert!(!p.repos.join("EX/.git").exists());
 }
 
 #[tokio::test]
@@ -265,11 +264,11 @@ async fn leftover_empty_origin_is_archived_and_import_restores_it() {
 }
 
 #[tokio::test]
-async fn clone_failure_leaves_nothing() {
+async fn workdir_failure_leaves_nothing() {
     let db = support::test_db().await;
     let tmp = tempfile::tempdir().expect("임시");
     let mut p = places(tmp.path());
-    // 작업 사본 자리가 파일이라 clone이 실패한다
+    // 작업 사본 자리가 파일이라 폴더를 못 만든다
     std::fs::write(tmp.path().join("notdir"), "x").expect("파일");
     p.repos = tmp.path().join("notdir");
     let mut c = db.pool.acquire().await.expect("연결");
@@ -280,7 +279,7 @@ async fn clone_failure_leaves_nothing() {
     }
     .init_project(&db.pool, "CL", "x", &u, false, Storage::Server)
     .await;
-    assert!(matches!(r, Err(Problem::PushFailed { reason }) if reason.starts_with("clone: ")));
+    assert!(r.is_err());
     assert!(!p.origins.join("CL.git").exists());
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM projects")
         .fetch_one(&mut *c)
@@ -533,7 +532,7 @@ async fn rehome_fixes_paths_and_reclones_missing_workdirs() {
         db: &mut c,
         repos: &p,
     };
-    for code in ["RHA", "RHB", "RHC"] {
+    for code in ["RHA", "RHB", "RHC", "RHD"] {
         s.init_project(&db.pool, code, "자리", &u, false, Storage::Server)
             .await
             .expect("만들기");
@@ -554,14 +553,27 @@ async fn rehome_fixes_paths_and_reclones_missing_workdirs() {
     std::fs::remove_dir_all(p.repos.join("RHB")).unwrap();
     std::fs::remove_dir_all(p.repos.join("RHC")).unwrap();
     std::fs::remove_dir_all(p.origins.join("RHC.git")).unwrap();
+    // RHD — 옛 판(0.1·0.2)이 만든 clone
+    std::fs::remove_dir_all(p.repos.join("RHD")).unwrap();
+    sh(
+        tmp.path(),
+        &[
+            "clone",
+            "-q",
+            p.origins.join("RHD.git").to_str().unwrap(),
+            p.repos.join("RHD").to_str().unwrap(),
+        ],
+    );
     let made = s.rehome().await.expect("맞추기");
-    assert_eq!(made, ["RHA", "RHB"]);
+    assert_eq!(made, ["RHA", "RHB", "RHD"]);
     let (_, repo) = s.get("RHA").await.unwrap();
     assert_eq!(repo.remote_url, p.origins.join("RHA.git").to_string_lossy());
     assert_eq!(repo.workdir_path, p.repos.join("RHA").to_string_lossy());
-    assert_eq!(
-        sh(&p.repos.join("RHB"), &["rev-parse", "HEAD"]),
-        sh(&p.origins.join("RHB.git"), &["rev-parse", "main"])
-    );
+    // 원본 main의 docs/specs 폴더 — git이 아니다(카드 L19)
+    for code in ["RHB", "RHD"] {
+        let w = p.repos.join(code);
+        assert!(w.join("docs/specs/README.md").is_file(), "{code}");
+        assert!(!w.join(".git").exists(), "{code}");
+    }
     assert!(!p.repos.join("RHC").exists());
 }

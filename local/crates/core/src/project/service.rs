@@ -17,7 +17,6 @@ use crate::codegraph::CodeGraphService;
 use crate::conversation::ConversationService;
 use crate::errors::Problem;
 use crate::infra::git::Git;
-use crate::pycompat::chars::strip;
 use crate::types::{HookStatus, RebuildResult, RepoStatus, Storage, SyncResult};
 
 /// 서버 저장소 자리 — git·서버 저장소·작업 사본·README의 규약 주소. 켤 때 `runtime.run`이 만든다
@@ -205,6 +204,8 @@ impl ProjectService<'_> {
         }
         let workdir = self.repos.repos.join(code);
         let _ = fs::remove_dir_all(&workdir); // 지난 실패 잔재
+        // 작업 사본은 git이 아닌 폴더 — 골격 커밋이 `docs/specs/`를 쓴다(카드 L19)
+        fs::create_dir_all(&workdir)?;
         let (origin, restored) = self.prepare_origin(code, import_existing).await?;
         // 되돌림 — 새로 만든 원본은 지우고, 되살린 것은 보관 자리로 돌려놓는다
         let undo_origin = || match &restored {
@@ -216,25 +217,17 @@ impl ProjectService<'_> {
             }
         };
         let remote = origin.to_string_lossy().into_owned();
-        if let Err(p) = self.repos.git.clone(&remote, &workdir).await {
-            let _ = fs::remove_dir_all(&workdir);
-            undo_origin();
-            return Err(match p {
-                Problem::Git { stderr, .. } => Problem::PushFailed {
-                    reason: format!("clone: {}", strip(&stderr)),
-                },
-                other => other,
-            });
-        }
-        let has = self.repos.git.exists(&workdir, "docs/specs").await?;
+        // 5. 받지 않는다 — git은 원본에서 돈다(카드 L19)
+        let has = self.repos.git.exists(&origin, "docs/specs").await?;
         if has && !import_existing {
             let n = self
                 .repos
                 .git
-                .list(&workdir, "docs/specs/*/*.md", "HEAD")
+                .list(&origin, "docs/specs/*/*.md", "HEAD")
                 .await?
                 .len() as i64;
             let _ = fs::remove_dir_all(&workdir);
+            self.repos.git.close(&origin).await;
             undo_origin();
             return Err(Problem::ExistingSpecs {
                 doc_count: n,
@@ -257,6 +250,7 @@ impl ProjectService<'_> {
             // 서비스가 pipeline을 부르는 자리(파이썬 판 DOM-002 3.2와 같다)
             if let Err(p) = crate::pipeline::rebuild(&mut tx, pool, self.repos, code).await {
                 drop(tx);
+                self.repos.git.close(&origin).await;
                 undo_origin();
                 return Err(p);
             }
@@ -273,13 +267,14 @@ impl ProjectService<'_> {
         let hash = match self
             .repos
             .git
-            .commit_push(&workdir, &message, user, &files, &[])
+            .commit(&origin, &workdir, &message, user, &files, &[])
             .await
         {
-            Ok(h) => h,
+            Ok(made) => made.hash,
             Err(p @ Problem::PushFailed { .. }) => {
                 tx.rollback().await?;
                 let _ = fs::remove_dir_all(&workdir);
+                self.repos.git.close(&origin).await;
                 undo_origin();
                 return Err(p);
             }
@@ -361,15 +356,7 @@ impl ProjectService<'_> {
             let _ = fs::remove_dir_all(&origin);
         };
         let remote = origin.to_string_lossy().into_owned();
-        if let Err(p) = self.repos.git.clone(&remote, &workdir).await {
-            undo();
-            return Err(match p {
-                Problem::Git { stderr, .. } => Problem::PushFailed {
-                    reason: format!("clone: {}", strip(&stderr)),
-                },
-                other => other,
-            });
-        }
+        // 5. 받지 않는다 — 작업 사본 폴더는 재구축이 맞춘다(카드 L19)
         let mut tx = self.db.begin().await?;
         let project = repo::add_project(&mut tx, code, name, user.id).await?;
         repo::add_repository(
@@ -384,6 +371,7 @@ impl ProjectService<'_> {
         // 서비스가 pipeline을 부르는 자리(파이썬 판 DOM-002 3.2와 같다) — 같은 저장점이라 막 넣은 행을 본다
         if let Err(p) = crate::pipeline::rebuild(&mut tx, pool, self.repos, code).await {
             drop(tx);
+            self.repos.git.close(&origin).await;
             undo();
             return Err(p);
         }
@@ -416,10 +404,16 @@ impl ProjectService<'_> {
             if repository.remote_url != remote || repository.workdir_path != work {
                 repo::set_paths(&mut *self.db, repository.id, &remote, &work).await?;
             }
-            if workdir.is_dir() || !origin.is_dir() {
+            // 없거나 옛 판의 clone(`.git`)이면 main의 `docs/specs/` 폴더로 (카드 L19)
+            if !origin.is_dir() || (workdir.is_dir() && !workdir.join(".git").exists()) {
                 continue;
             }
-            match self.repos.git.clone(&remote, &workdir).await {
+            let made = match self.repos.git.head(&origin).await {
+                Ok(Some(head)) => self.repos.git.materialize(&origin, &head, &workdir).await,
+                Ok(None) => continue,
+                Err(p) => Err(p),
+            };
+            match made {
                 Ok(()) => cloned.push(code),
                 Err(p) => {
                     let _ = fs::remove_dir_all(&workdir);
@@ -449,8 +443,10 @@ impl ProjectService<'_> {
             .await?;
         repo::delete_all_of(&mut *self.db, project.id).await?;
         let _ = fs::remove_dir_all(&workdir);
-        // 서버 저장이면 원본을 지우지 않고 보관한다 — 같은 코드로 가져오면 되살아난다(L11)
+        // 서버 저장이면 원본을 지우지 않고 보관한다 — 같은 코드로 가져오면 되살아난다(L11).
+        // 읽기 프로세스를 먼저 끈다 — 윈도는 열린 팩 파일이 있으면 옮기지 못한다(카드 L19)
         if server && origin.exists() {
+            self.repos.git.close(&origin).await;
             fs::rename(&origin, self.archive_path(code)?)?;
         }
         Ok(())
@@ -566,6 +562,7 @@ impl ProjectService<'_> {
             .repos
             .git
             .sync_readme(
+                Path::new(&repo.remote_url),
                 Path::new(&repo.workdir_path),
                 user,
                 code,
