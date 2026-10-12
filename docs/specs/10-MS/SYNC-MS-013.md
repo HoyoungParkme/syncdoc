@@ -12,7 +12,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-001, SYNC-MS-019, SYNC-UC-001, SYNC-API-001, SY
 
 `crates/core/src/project/service.rs`의 함수(목록은 1장). 클래스 명세 [[SYNC-DOM-004]] 4.2. 파이썬 판 [[SYNC-MS-001]]과 **같은 이름·같은 처리**이고, 이 문서는 다른 점만 적는다([[SYNC-STD-001]] 2.10). 「호출하는 것」과 테스트 관점은 제 것을 적는다.
 
-서비스는 연결과 저장소 자리를 빌려 받는다 — `ProjectService<'c> { pub db: &'c mut PgConnection, pub repos: &'c ServerRepos }`. `ServerRepos { git, origins, repos, specs_url }` — git 어댑터([[SYNC-MS-019]])·서버 저장소 자리 `origins/`·작업 사본 자리 `repos/`·README의 규약 주소. 켤 때 [[SYNC-MS-012#runtime.run]]이 만든다. 트랜잭션은 부르는 쪽이 쥔다([[SYNC-STD-004#DEV-10]]). 돌려주는 행은 `(ProjectRow, RepositoryRow)`다.
+서비스는 연결과 저장소 자리를 빌려 받는다 — `ProjectService<'c> { pub db: &'c mut PgConnection, pub repos: &'c ServerRepos }`. `ServerRepos { git, origins, repos, specs_url }` — git 어댑터([[SYNC-MS-019]])·서버 저장소 자리 `origins/`·작업 사본 폴더 자리 `repos/`·README의 규약 주소. **작업 사본은 git이 아니다(카드 L19, 2026-10-12)** — 서버 저장소 `main`의 `docs/specs/`를 풀어 둔 폴더이고 첨부 파일 읽기만 쓴다. git은 늘 서버 저장소에서 돈다([[SYNC-MS-019]] 0장 「프로세스를 적게」). 켤 때 [[SYNC-MS-012#runtime.run]]이 만든다. 트랜잭션은 부르는 쪽이 쥔다([[SYNC-STD-004#DEV-10]]). 돌려주는 행은 `(ProjectRow, RepositoryRow)`다.
 
 **카드 L6 몫은 만들기·지우기(보관)와 조회 셋이다(2026-10-08). 카드 L8이 첨부 파일 경로 하나를, 카드 L10이 git 입구의 원본 경로 하나를, 카드 L11이 전체 목록·동기화 상태·통지·지금 가져오기·재구축 위임과 보관본 되살리기의 재구축 갈래를, 카드 L15가 번들로 가져오기를, 카드 L16이 켤 때 작업 사본 맞추기를 더했다(2026-10-11).** 싱크독_로컬은 **서버 저장뿐**이다([[SYNC-PRD-001#R15]] — 파이썬 폐쇄망판의 `storage_modes == ["server"]`). GitHub 갈래(주소·저장소 만들기·통지)는 없고, `storage=github`는 첫 검사에서 `storage-unavailable`이다. 통지는 늘 `none`이다(파이썬 판의 서버 저장 갈래).
 
@@ -57,26 +57,26 @@ pub async fn init_project(&mut self, pool: &PgPool, code: &str, name: &str, user
 **처리** [[SYNC-MS-001#ProjectService.init_project]]의 서버 저장 갈래와 같은 차례 — 코드마다 잠금을 쥐고(같은 코드의 만들기·지우기가 서로의 작업 사본을 지우지 않게)
 1. if `storage`가 `server`가 아니다 → `! StorageUnavailable { storage, enabled: ["server"] }`
 2. if 코드가 `[A-Z]{1,4}` 전체가 아니다 → `! ProjectCodeInvalid { rule: "^[A-Z]{1,4}$" }` · if `DB: projects where code` 있음 → `! ProjectCodeConflict { code }`
-3. `workdir = repos/{code}` — 있으면 지운다(지난 실패 잔재)
+3. `workdir = repos/{code}` — 있으면 지우고(지난 실패 잔재) 빈 폴더로 만든다
 4. `origin = origins/{code}.git` · if 이미 있다(등록되지 않은 원본) → **지우지 않고** 보관 자리로 옮긴다 · `archives = origins/_archive/{code}-*.git`을 (시각, 번호) 순으로(#349)
    - if 보관본이 있고 `import_existing`이 아니다 → `n = git.list(가장 최근, "docs/specs/*/*.md", "HEAD")`의 수(git 실패면 0) · `! ExistingSpecs { doc_count: n, archived_at: 이름의 시각 }`(파이썬 `isoformat` — `2026-10-08T12:34:56+00:00`, 못 읽으면 이름 그대로)
    - if 보관본이 있고 `import_existing` → 가장 최근 것을 `origin`으로 되살린다 · 아니면 `git.init_bare(origin)`
-5. `git.clone(origin, workdir)` · 실패 → 작업 사본을 지우고 원본을 되돌리고(새로 만든 것은 지우고 되살린 것은 보관 자리로) `! PushFailed("clone: {stderr}")`
-6. `has = git.exists(workdir, "docs/specs")` · if `has`이고 `import_existing`이 아니다 → `n = git.list(workdir, …)`의 수 · 지우고 되돌리고 `! ExistingSpecs { doc_count: n }`
+5. 받지 않는다 — git은 `origin`에서 돈다([[SYNC-MS-019]] 0장, 카드 L19)
+6. `has = git.exists(origin, "docs/specs")` · if `has`이고 `import_existing`이 아니다 → `n = git.list(origin, …, "HEAD")`의 수 · 지우고 되돌리고(새로 만든 원본은 지우고 되살린 것은 보관 자리로) `! ExistingSpecs { doc_count: n }`
 7. 트랜잭션을 열고(부르는 쪽이 이미 트랜잭션이면 저장점 — REST·MCP 입구는 트랜잭션 없이 연결을 넘긴다) `DB: projects insert (code, name, owner_user_id=user.id)` · `DB: repositories insert (project_id, storage='server', remote_url=origin 절대 경로, workdir_path, registered_by_user_id=user.id)`
 8. if `has`이고 `import_existing` → `pipeline.rebuild(그 트랜잭션, pool, repos, code)` — 같은 트랜잭션 안이라 막 넣은 행을 본다 · 실패하면 원본을 되돌리고(되살린 것은 보관 자리로) 그 `Problem` · 골격 커밋 없이 10으로 — 처리 지점은 재구축이 원본 끝으로 적었다 · 커밋 뒤 `pipeline.schedule_code_graph(pool, repos, code, 처리 지점)` — 재구축이 건 것은 아직 커밋되지 않은 프로젝트를 못 볼 수 있다(카드 L12)
-9. `files = Git::init_specs(repos.specs_url)` · `hash = git.commit_push(workdir, "chore({code}): init syncdoc", user, files, [])` · 실패 → 트랜잭션을 되돌리고 작업 사본을 지우고 원본을 되돌리고 그 `Problem` · `DB: repositories update last_processed_commit=hash`
+9. `files = Git::init_specs(repos.specs_url)` · `hash = git.commit(origin, workdir, "chore({code}): init syncdoc", user, files, [])`의 해시(빈 원본이면 첫 커밋 — 작업 사본 폴더에 골격의 `docs/specs/`가 쓰인다) · 실패 → 트랜잭션을 되돌리고 작업 사본을 지우고 원본을 되돌리고 그 `Problem` · `DB: repositories update last_processed_commit=hash`
 10. `→ (프로젝트 행, 저장소 행)`
 
 보관 자리 — `origins/_archive/{code}-{UTC %Y%m%d%H%M%S}.git`, 같은 초에 있으면 `-1`·`-2`…를 붙인다. 시각은 [[SYNC-STD-004#DEV-18]]의 저장 시각
 
-**다른 점** GitHub 인자(`remote_url`·`create_repo`·`private`)가 없다 — MCP 도구·REST 본문에는 있지만 서버 저장에서 파이썬 판도 안 쓴다 · 연결 풀을 받는다 — 8의 그래프 만들기는 따로 띄운 작업이 제 연결로 한다(카드 L12)
+**다른 점** GitHub 인자(`remote_url`·`create_repo`·`private`)가 없다 — MCP 도구·REST 본문에는 있지만 서버 저장에서 파이썬 판도 안 쓴다 · 연결 풀을 받는다 — 8의 그래프 만들기는 따로 띄운 작업이 제 연결로 한다(카드 L12) · 작업 사본을 받지 않는다(5 — 카드 L19) — 파이썬 판의 「clone 실패」 갈래가 없다
 
 **예외** 1~9의 `Problem` · git·파일 실패는 `Problem::Git`·`Problem::Internal`(파이썬 판도 그대로 올린다)
 
-**호출하는 것** [[SYNC-MS-019#Git.init_bare]] · [[SYNC-MS-019#Git.list]] · [[SYNC-MS-019#Git.clone]] · [[SYNC-MS-019#Git.exists]] · [[SYNC-MS-019#Git.init_specs]] · [[SYNC-MS-019#Git.commit_push]] · [[SYNC-MS-017#pipeline.rebuild]] · [[SYNC-MS-017#pipeline.schedule_code_graph]] · [[#ProjectService.get]](돌려줄 행)
+**호출하는 것** [[SYNC-MS-019#Git.init_bare]] · [[SYNC-MS-019#Git.list]] · [[SYNC-MS-019#Git.exists]] · [[SYNC-MS-019#Git.init_specs]] · [[SYNC-MS-019#Git.commit]] · [[SYNC-MS-017#pipeline.rebuild]] · [[SYNC-MS-017#pipeline.schedule_code_graph]] · [[#ProjectService.get]](돌려줄 행)
 
-**테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 새 프로젝트 → `origins/{code}.git`(HEAD main, 받기 규칙 셋)과 골격 커밋 하나(14파일, `chore({code}): init syncdoc`), `last_processed_commit`이 원격 main · `github` → `storage-unavailable`, 아무것도 안 생김 · 나쁜 코드 → `project-code-invalid` · 같은 코드 → `project-code-conflict` · 지운 뒤 같은 코드 → `existing-specs`(`doc_count`·`archived_at`), 아무것도 안 바뀜 · 같은 초 보관본 둘 → 번호가 큰 것 · 이름 없이 남은 원본 → 보관으로 옮기고 `existing-specs` · 비어 있는 보관본 + 가져오기 → 되살리고 골격 커밋 · 명세가 있는 보관본 + 가져오기 → 재구축으로 문서·버전이 다시 올라오고 처리 지점이 원본 끝, 골격 커밋 없음 · 재구축이 실패하면 행 없음·보관본은 제자리 · clone 실패 → 새 원본·작업 사본·행 없음
+**테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 새 프로젝트 → `origins/{code}.git`(HEAD main, 받기 규칙 셋)과 골격 커밋 하나(14파일, `chore({code}): init syncdoc`), `last_processed_commit`이 원본 main, 작업 사본 폴더에 골격의 `docs/specs/`(`.git` 없음) · `github` → `storage-unavailable`, 아무것도 안 생김 · 나쁜 코드 → `project-code-invalid` · 같은 코드 → `project-code-conflict` · 지운 뒤 같은 코드 → `existing-specs`(`doc_count`·`archived_at`), 아무것도 안 바뀜 · 같은 초 보관본 둘 → 번호가 큰 것 · 이름 없이 남은 원본 → 보관으로 옮기고 `existing-specs` · 비어 있는 보관본 + 가져오기 → 되살리고 골격 커밋 · 명세가 있는 보관본 + 가져오기 → 재구축으로 문서·버전이 다시 올라오고 처리 지점이 원본 끝, 골격 커밋 없음 · 재구축이 실패하면 행 없음·보관본은 제자리
 
 ---
 
@@ -94,16 +94,16 @@ pub async fn import_bundle(&mut self, pool: &PgPool, code: &str, name: &str, use
 2. `workdir = repos/{code}` — 있으면 지운다 · `origin = origins/{code}.git` — 이미 있으면(등록되지 않은 원본) **지우지 않고** 보관 자리로 옮긴다([[#ProjectService.init_project]] 4와 같은 이름). 보관본은 되살리지 않는다
 3. 임시 폴더(`syncdoc-bundle-` 머리)에 `data`를 `import.bundle`로 쓰고 `git.clone_bare(그 파일, origin)` · `Problem::Git`이면 `origin`을 지우고 `! BundleInvalid { reason: "번들 파일이 아니거나 깨졌다" }` · 임시 폴더는 지운다
 4. `git.rev_list_count(origin, "refs/heads/main")` · `Problem::Git`이면 `origin`을 지우고 `! BundleInvalid { reason: "main 가지가 없다" }`
-5. `git.clone(origin, workdir)` · 실패 → 작업 사본·`origin`을 지우고 `! PushFailed("clone: {stderr}")`
+5. 받지 않는다 — 작업 사본 폴더는 7의 재구축이 맞춘다([[SYNC-MS-019]] 0장, 카드 L19)
 6. 트랜잭션(부르는 쪽이 트랜잭션이면 저장점): `DB: projects insert (code, name, owner_user_id=user.id)` · `DB: repositories insert (storage='server', remote_url=origin 절대 경로, workdir_path, registered_by_user_id=user.id)`
 7. `pipeline.rebuild(그 트랜잭션, pool, repos, code)` — 명세·버전·상태 이력을 커밋에서 되살리고 처리 지점을 main 끝으로 · 실패 → 트랜잭션을 버리고 작업 사본·`origin`을 지우고 그 `Problem` — 골격 커밋을 만들지 않는다
 8. 커밋 · 커밋 뒤 `pipeline.schedule_code_graph(pool, repos, code, 처리 지점)`([[#ProjectService.init_project]] 8과 같은 까닭) · `→ (프로젝트 행, 저장소 행)` — `ProjectSummary`는 입구가 만든다
 
-**다른 점** 서버 저장 켜짐 검사가 없다 — 싱크독_로컬은 서버 저장뿐이다 · 연결 풀을 받는다(7·8의 그래프 만들기)
+**다른 점** 서버 저장 켜짐 검사가 없다 — 싱크독_로컬은 서버 저장뿐이다 · 연결 풀을 받는다(7·8의 그래프 만들기) · 작업 사본을 받지 않는다(5)
 
 **예외** 1~7의 `Problem` · 파일 실패는 `Problem::Internal`
 
-**호출하는 것** [[SYNC-MS-019#Git.clone_bare]] · [[SYNC-MS-019#Git.rev_list_count]] · [[SYNC-MS-019#Git.clone]] · [[SYNC-MS-017#pipeline.rebuild]] · [[SYNC-MS-017#pipeline.schedule_code_graph]] · [[#ProjectService.get]](돌려줄 행)
+**호출하는 것** [[SYNC-MS-019#Git.clone_bare]] · [[SYNC-MS-019#Git.rev_list_count]] · [[SYNC-MS-017#pipeline.rebuild]] · [[SYNC-MS-017#pipeline.schedule_code_graph]] · [[#ProjectService.get]](돌려줄 행)
 
 **테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 명세 두 커밋(초안 → 상태)과 태그가 든 저장소의 번들 → 원본의 main·태그 해시가 같고 원격 없음·HEAD main·받기 규칙, 골격 커밋 없음, 처리 지점이 main 끝, 문서 상태가 `approved` · 번들 아님 → `bundle-invalid`(`번들 파일이 아니거나 깨졌다`), 원본 없음 · main 없는 번들 → `bundle-invalid`(`main 가지가 없다`), 원본·작업 사본·행 없음 · 나쁜 코드 → `project-code-invalid` · 같은 코드 → `project-code-conflict` · 이름 없이 남은 원본 → 보관으로 옮기고 가져온다
 
@@ -121,9 +121,9 @@ pub async fn delete_project(&mut self, code: &str, user: &UserRow) -> Result<(),
 **처리** [[SYNC-MS-001#ProjectService.delete_project]]와 같다 — 코드마다 잠금을 쥐고
 1. `(p, r) = get_owned(code, user)`
 2. [[SYNC-MS-021#ConversationService.delete_by_project]](턴·첨부는 FK로 함께) · [[SYNC-MS-022#CodeGraphService.delete_by_project]] → `DB:` 참조 셋(나가는 것·들어오는 문서·들어오는 항목) → `status_changes` → `items` → `versions` → `documents` → `repositories` → `projects`를 지운다
-3. 작업 사본을 지운다(실패는 넘긴다) · 서버 저장이고 원본이 있으면 보관 자리로 옮긴다 — **지우지 않는다**
+3. 작업 사본 폴더를 지운다(실패는 넘긴다) · 서버 저장이고 원본이 있으면 그 읽기 프로세스를 끄고(`git.close(원본)` — 윈도는 열린 팩 파일이 있으면 옮기지 못한다, 카드 L19) 보관 자리로 옮긴다 — **지우지 않는다**
 
-**호출하는 것** [[#ProjectService.get_owned]] · [[SYNC-MS-021#ConversationService.delete_by_project]] · [[SYNC-MS-022#CodeGraphService.delete_by_project]]
+**호출하는 것** [[#ProjectService.get_owned]] · [[SYNC-MS-021#ConversationService.delete_by_project]] · [[SYNC-MS-022#CodeGraphService.delete_by_project]] · [[SYNC-MS-019#Git.close]]
 
 **테스트 관점** 지운 뒤 `get` → `not-found` · 그 프로젝트의 문서·항목·버전·참조·대화·코드 그래프 행이 0 · 작업 사본이 없다 · 원본이 `_archive/{code}-{시각}.git`에, `origins/{code}.git`은 없다 · 다른 프로젝트 행은 그대로 · 남의 프로젝트 → `not-found`, 아무것도 안 지워짐
 
@@ -301,7 +301,7 @@ pub async fn rebuild_index(&mut self, pool: &PgPool, code: &str, user: &UserRow)
 
 근거: [[SYNC-MS-001#ProjectService.rebuild_index]] · [[SYNC-UC-001#UC-S6]] 1a
 
-**처리** [[#ProjectService.get_owned]] — 소유 검사는 여기서(재구축은 `get`) · README를 인덱스보다 **먼저** 맞춘다 — `hash = git.sync_readme(작업 사본, user, code, repos.specs_url)`(그 커밋이 재구축의 받기 끝에 들어가 밀림 0으로 끝난다, 실패하면 인덱스를 건드리지 않는다) · `result = pipeline.rebuild(이 연결, pool, repos, code)` — 풀은 재구축 10의 그래프 만들기가 쓴다(카드 L12) · `→ result`에 `readme_updated = hash가 있다`
+**처리** [[#ProjectService.get_owned]] — 소유 검사는 여기서(재구축은 `get`) · README를 인덱스보다 **먼저** 맞춘다 — `hash = git.sync_readme(원본, 작업 사본, user, code, repos.specs_url)`(그 커밋이 재구축의 받기 끝에 들어가 밀림 0으로 끝난다, 실패하면 인덱스를 건드리지 않는다) · `result = pipeline.rebuild(이 연결, pool, repos, code)` — 풀은 재구축 10의 그래프 만들기가 쓴다(카드 L12) · `→ result`에 `readme_updated = hash가 있다`
 
 **호출하는 것** [[#ProjectService.get_owned]] · [[SYNC-MS-019#Git.sync_readme]] · [[SYNC-MS-017#pipeline.rebuild]]
 
@@ -321,16 +321,16 @@ pub async fn rehome(&mut self) -> Result<Vec<String>, Problem>
 **처리** 켤 때마다 [[SYNC-MS-012#runtime.run]]이 부른다
 1. `DB: repositories join projects where storage='server'`를 코드 순으로
 2. 행마다 `origin = origins/{code}.git` · `workdir = repos/{code}`(절대 경로) · if 행의 `remote_url`·`workdir_path`가 다르다 → `DB: repositories update` — 옮긴 자리, 다른 데이터 자리(Docker 묶음 `/var/syncdoc/…`)의 백업을 되살린 것
-3. if `workdir`가 없고 `origin`이 있다 → `git.clone(origin, workdir)` — 되살리기·옮기기는 작업 사본을 복사하지 않는다 · 실패는 로그만(그 프로젝트 하나 때문에 켜기를 멈추지 않는다)
+3. if `origin`이 있고, `workdir`가 없거나 옛 판의 clone(`workdir/.git`이 있다)이다 → `head = git.head(origin)` · 있으면 `git.materialize(origin, head, workdir)` — 되살리기·옮기기는 작업 사본을 복사하지 않는다 · 0.1·0.2 판이 만든 clone은 폴더로 바꾼다(카드 L19) · 실패는 로그만(그 프로젝트 하나 때문에 켜기를 멈추지 않는다)
 4. `→` 작업 사본을 다시 만든 코드들
 
 **다른 점** 파이썬 판에 없다 — Docker 묶음은 자리가 고정이고 볼륨이 작업 사본을 들고 있다
 
 **예외** DB 실패 → `Problem`
 
-**호출하는 것** [[SYNC-MS-019#Git.clone]]
+**호출하는 것** [[SYNC-MS-019#Git.head]] · [[SYNC-MS-019#Git.materialize]]
 
-**테스트 관점** (시험 DB · 임시 자리 · 진짜 git) 다른 자리를 가리키는 행 → 이 자리로 고쳐진다 · 작업 사본을 지우면 다시 만들어지고 원본 끝과 같다 · 원본이 없는 행은 건너뛴다 · 맞는 행은 아무것도 안 바뀐다
+**테스트 관점** (시험 DB · 임시 자리 · 진짜 git) 다른 자리를 가리키는 행 → 이 자리로 고쳐진다 · 작업 사본을 지우면 다시 만들어지고 원본 main의 `docs/specs/`와 같다 · 옛 clone(`.git`이 있다) → `.git` 없는 폴더로 · 원본이 없는 행은 건너뛴다 · 맞는 행은 아무것도 안 바뀐다
 
 ---
 
