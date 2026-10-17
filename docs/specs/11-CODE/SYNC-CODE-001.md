@@ -1516,7 +1516,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | [[SYNC-MS-024#infra.units]] · [[SYNC-MS-024#infra.infra]] · `core/codegraph/infra.py` · `flow.extend` 2·6 |
 | 테스트 | MS-024 테스트 관점(units·infra) · 싱크독 저장소 — PostgreSQL·외부 모델 API·서버 받침대(FastAPI·Axum)·화면(Vite), 비밀번호가 남지 않는다 |
 | 선행 | CD |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/CE-flow-infra` · spec 1 + code 2 · 파이썬 `pytest` 510 · `ruff` · `check_code` MS-024 7/7 · 싱크독 저장소: 단위 4(FastAPI·Vite·Axum 둘), 장비 — 브라우저·서버 셋·PostgreSQL(컨테이너 localhost:5432)·외부 HTTP, 호출 155곳에 장비, 흐름 2.3초 |
 
 #### CF 흐름 보기 ④ — 조회 API
 
