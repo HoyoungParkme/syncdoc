@@ -46,6 +46,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-008, SYNC-MS-014, SYNC-MS-015, SYNC-MS-016, SYN
 | [[#queries.code_nodes]] | 코드 그래프 노드 — 함수 전부·커뮤니티·대조 상태 |
 | [[#queries.flow_view]] | 흐름 보기 — 그래프·흐름 키·층 표·대조 상태 |
 | [[#queries.flow_of]] | 함수 하나의 흐름 — MCP get_flow |
+| [[#queries.trace_spans]] | 기록 도구가 감쌀 함수 |
 | [[#queries.ask_item]] | 문서를 읽다가 묻는다 — 모델이 관계도를 따라 읽는다 |
 | [[#queries.ask_tool]] | 모델이 부른 읽기 도구 하나를 실행한다 |
 | [[#queries.ask_code]] | 코드 그래프에서 묻는다 — 고른 함수가 시작 맥락 |
@@ -446,6 +447,23 @@ pub async fn flow_of(db: &mut PgConnection, repos: &ServerRepos, code: &str, fun
 **호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#CodeGraphService.value]] · [[SYNC-MS-014#SpecService.list_by_project]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.item_blocks]] · [[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-022#codegraph.spec_calls]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.layer_table]] · [[SYNC-MS-022#codegraph.layers]]
 
 **테스트 관점** [[SYNC-MS-008#queries.flow_of]]의 것 · 계약 시험(카드 L26)
+
+---
+
+#### queries.trace_spans 기록 도구가 감쌀 함수
+
+**시그니처**
+```rust
+pub async fn trace_spans(db: &mut PgConnection, repos: &ServerRepos, code: &str, user: &UserRow) -> Result<TraceSpans, Problem>
+```
+
+근거: [[SYNC-MS-008#queries.trace_spans]] · [[SYNC-API-001#GET/api/projects/{code}/trace-spans]]
+
+**처리** [[SYNC-MS-008#queries.trace_spans]] 0~3 그대로 — 그래프 값([[SYNC-MS-022#CodeGraphService.value]])의 함수 중 `end`가 있는 것, 장비 중 `host`가 있는 것
+
+**호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#CodeGraphService.value]]
+
+**테스트 관점** [[SYNC-MS-008#queries.trace_spans]]의 것 · 계약 시험(카드 L28)
 
 ---
 

@@ -90,6 +90,8 @@ from app.core.types import (
     Storage,
     ToolResult,
     ToolSpec,
+    TraceSpan,
+    TraceSpans,
     UserRef,
 )
 from app.infra import llm
@@ -1584,6 +1586,28 @@ async def flow_of(code: str, function: str, user: User) -> FlowOf:
         [_flow_function(f, by_key, layer_of) for f in callees],
         [nodes[d] for d in devices if d in nodes],
     )
+
+
+async def trace_spans(code: str, user: User) -> TraceSpans:
+    """SYNC-MS-008#queries.trace_spans
+
+    기록 도구가 감쌀 함수 — 그래프 함수 중 끝 줄을 아는 것의 범위·라우트, 주소를 아는 장비, 그래프 커밋.
+    그래프가 없으면 빈 것(기록 도구가 「코드를 먼저 push하세요」).
+    """
+    with db.session_scope() as s:
+        project = ProjectService(s).get_owned(code, user)
+        row = CodeGraphService(s).get(project.id)
+        if row is None:
+            return TraceSpans(None, [], [])
+        g = row.graph
+        commit = row.commit_hash
+    spans = [
+        TraceSpan(f["key"], f["file"], f["line"], f["end"], f["name"], f["qual"], f.get("route"))
+        for f in g["functions"]
+        if f.get("end") is not None
+    ]
+    infra = [n for n in g.get("infra", {}).get("nodes", []) if n.get("host")]
+    return TraceSpans(commit, spans, infra)
 
 
 def _next_start(functions: list[dict], f: dict) -> int | None:

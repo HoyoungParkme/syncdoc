@@ -427,9 +427,11 @@ class ProjectService:
             # conversation이 project를 본다
             from app.core.codegraph.service import CodeGraphService
             from app.core.conversation.service import ConversationService
+            from app.core.trace.service import TraceService
 
             ConversationService(self.session).delete_by_project(project.id)
             CodeGraphService(self.session).delete_by_project(project.id)  # 2a. 코드 그래프
+            TraceService(self.session).delete_by_project(project.id)  # 2b. 실행 기록
             server = project.repository.storage == Storage.server
             origin = Path(project.repository.remote_url)
             self.repo.delete_all_of(project.id)

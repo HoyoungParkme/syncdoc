@@ -365,6 +365,19 @@ pub mod schemas {
         .expect("LocalRestore 스키마")
     }
 
+    /// 요청 보내기 `{method, url, body}` (SYNC-API-001#POST/api/local/request, 카드 L30 — 파이썬 판에 없다)
+    pub fn local_request() -> Validator {
+        Validator::new(
+            &json!({"type": "model", "cls": "LocalRequest", "schema": {"type": "model-fields", "fields": {
+                "method": {"type": "model-field", "schema": {"type": "literal", "expected": ["GET", "POST", "PUT", "PATCH", "DELETE"]}},
+                "url": {"type": "model-field", "schema": {"type": "str", "min_length": 1}},
+                "body": {"type": "model-field", "schema": {"type": "default", "schema": {"type": "nullable", "schema": {"type": "str"}}, "default": null}}},
+                "model_name": "LocalRequest"}, "config": {"title": "LocalRequest"}}),
+            "LocalRequest",
+        )
+        .expect("LocalRequest 스키마")
+    }
+
     /// 옮기기 `{dir: str}` (SYNC-API-001#POST/api/local/move)
     pub fn local_move() -> Validator {
         Validator::new(
@@ -513,6 +526,13 @@ pub mod schemas {
     }
 
     /// 경로의 `int` 값
+    /// `TraceRecord` — 파이썬 판 `web/schemas/trace.py`의 core schema 그대로 (POST /api/projects/{code}/traces, 카드 L28)
+    pub fn trace_record() -> Validator {
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("trace_record.json")).expect("TraceRecord JSON");
+        Validator::new(&schema, "TraceRecord").expect("TraceRecord 스키마")
+    }
+
     pub fn int() -> Validator {
         Validator::new(&json!({"type": "int"}), "int").expect("int 스키마")
     }

@@ -584,9 +584,9 @@ syncdoc-local trace-web --to <서버> --project <코드> --target http://localho
 - **준비** — 서버에서 프로젝트 그래프의 함수 범위(파일·시작·끝 줄·열쇠)·라우트·장비 주소와 커밋을 받는다(`GET /api/projects/{code}/trace-spans`). 작업 사본(`--cwd`)이 git이면 HEAD를 그 커밋과 비교해 다르면 한 줄로 알린다
 - **언어 알아보기** — 띄울 명령의 첫 낱말과 `--cwd`의 파일로 — `python`·`uv`·`uvicorn`·`gunicorn`·`flask`·`celery`·`manage.py` → Python · `node`·`npm`·`pnpm`·`yarn`·`tsx`·`next` → Node · `cargo` → Rust. 모르면 끝낸다
 - **붙이기** — Python은 `PYTHONPATH` 앞에 기록기 폴더, Node는 `NODE_OPTIONS`에 `--import` 로더, Rust는 `--cwd`의 작업 공간을 임시 폴더에 사본으로 떠서 함수 첫머리에 도우미 호출을 넣고 사본에서 띄운다. 공통 환경 변수 `SYNCDOC_TRACE_SPANS`(범위 파일)·`SYNCDOC_TRACE_OUT`(기록 폴더)·`SYNCDOC_TRACE_JOB`(작업이면 1)
-- **모으기와 올리기** — 기록기는 요청·작업 하나가 끝나면 기록 하나를 기록 폴더에 JSON으로 쓴다(Rust는 UDP로 도구에 보내고 도구가 쓴다). 도구가 폴더를 지켜보다가 새 파일을 `POST /api/projects/{code}/traces`로 올리고 지운다. 실패하면 세 번 다시 보내고 그래도 안 되면 한 줄 알리고 버린다
-- **끝내기** — 띄운 프로그램이 끝나면 남은 기록을 올리고 끝난다. Ctrl+C는 프로그램에 넘긴다. 임시 폴더(기록기·사본)는 지운다
-- **브라우저**(`trace-web`) — `--port`(기본 3124)에 프록시를 열어 `--target`으로 넘기고, HTML에 브라우저 런타임을 끼우고 화면 모듈에 계측을 넣는다. 화면 기록은 「화면」 표시로 같은 길로 올린다
+- **모으기와 올리기** — 기록기는 요청·작업 하나가 끝나면 기록 하나를 기록 폴더에 JSON으로 쓴다(Rust 도우미도 파일로 — 표준 라이브러리만). 도구가 폴더를 지켜보다가 새 파일을 `POST /api/projects/{code}/traces`로 올리고 지운다. 실패하면 세 번 다시 보내고 그래도 안 되면 한 줄 알리고 버린다
+- **끝내기** — 띄운 프로그램이 끝나면 남은 기록을 올리고 끝난다. Ctrl+C는 프로그램에 넘긴다. 임시 폴더(기록기)는 지운다. Rust 사본과 빌드 폴더는 캐시 자리에 두고 다음에 다시 쓴다(처음부터 빌드하지 않게, 카드 L29)
+- **브라우저**(`trace-web`) — Node.js로 돈다(화면 개발 서버가 이미 Node다). `--port`(기본 3124)에 프록시를 열어 `--target`으로 넘기고, HTML에 브라우저 런타임을 끼우고 화면 모듈에 계측을 넣는다. 화면 기록은 「화면」 표시로 같은 길로 올린다
 - **상한** — 기록 하나 사건 2만 개 · 4MB. 넘으면 기록기가 사건을 더 담지 않고 `truncated`를 켠다
 
 ---

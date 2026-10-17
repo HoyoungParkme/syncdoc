@@ -306,7 +306,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | `cargo xtask migrations`(Alembic 리비전에서) · [[SYNC-MS-027]] `TraceService` · `core/src/trace/` · `ProjectService.delete_project` |
 | 테스트 | `cargo test`(시험 DB) · `cargo xtask schema-check` |
 | 선행 | CI · L26 |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/L27-trace-rust` · spec 2 + code 3 · `cargo test` trace 5(시험 DB) · `schema-check` 같다(alembic 0019) · `migrations --check` · clippy · `check_code` Rust 218/218 · 되먹임: 파이썬 판이 새로 넣은 기록의 `started_at`을 받은 시간대로 돌려주던 것(목록은 UTC)을 UTC로 맞췄다 |
 
 #### L28 실행 기록 ② — 기록 API·토큰 경로 (Rust)
 
@@ -316,7 +316,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | [[SYNC-MS-018]] `queries.trace_spans` · `server/src/web/routes/traces.rs`·`code.rs` · `guard.rs` 토큰 경로 |
 | 테스트 | 계약 `--with-card L28` |
 | 선행 | CJ · L27 |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/L28-trace-api-rust` · spec 2 + code 3 · 계약 `--target both --with-card L28` `test_l28_traces.py` 54 통과(trace-spans 토큰·로컬·틀린 토큰 401·올리기 201/200·꼴·시각·4MB 413·JSON 아님·남의 것·목록·하나·아주 큰 id·커버리지·지우기) · clippy · 되먹임: 파이썬 판이 DB 정수 범위 밖 기록 번호에 500을 내던 것을 404로 |
 
 #### L29 실행 기록 ③ — 기록 도구 `syncdoc-local trace`·`trace-web`
 
@@ -326,7 +326,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | [[SYNC-MS-027]] 기록 도구 · `crates/app/src/trace/` · `crates/app/tracers/`(Python·Node·브라우저·Rust 기록기 — 사건의 `fn`을 그래프 열쇠로) |
 | 테스트 | `cargo test`(언어 알아보기·환경 변수·올리기 다시 보내기·Rust 사본 계측) · E2E: 스크래치 FastAPI·Express·axum 앱을 기록 도구로 띄워 요청 → 두 판에 기록이 올라오고 대상 저장소 `git status`가 그대로 · 비밀 이름의 값이 `***` |
 | 선행 | CJ · L28 |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/L29-trace-tool` · spec 3 + code 2 · `cargo test` 기록 도구 7·사본 계측 3 · clippy · E2E(임시 싱크독_로컬 8011): 스크래치 FastAPI(기록 2 — 200·500, `password`는 `***`, 예외 남음) · 순수 Node http(기록 2, `token` 값 가림) · std Rust `--job`(계측 사본에서 `cargo run`, 작업 기록 1) · Vite 앱 `trace-web`(Playwright로 버튼 → 화면 기록 1) — 모두 사건의 함수가 그래프 열쇠, 작업 사본 그대로 · `check_code` Rust 230/230 · `check_calls` 0 · 되먹임: 생성기 식·람다(`<…>`)는 그래프 함수가 아니라 기록하지 않는다(안쪽 호출은 바깥 함수에) · 기록기마다 다른 꼴(ms 소수·kind 없음)은 도구가 올리기 전에 맞춘다(`trace.normalize`) · Rust 사본·빌드 폴더는 캐시에 남긴다 · trace-web은 Node 프록시 · Rust 도우미도 파일로(UDP 아님) |
 
 #### L30 실행 기록 ④ — 요청 보내기 `POST /api/local/request`
 
@@ -337,7 +337,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | API | [[SYNC-API-001#POST/api/local/request]] |
 | 테스트 | `cargo test`(localhost 아님 → refused · 닿지 못함 → failed · 1MB 자르기 · 리다이렉트 안 따름) |
 | 선행 | L29 |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/L30-local-request` · spec 1 + code 1 · `cargo test` 4(localhost 아님 → refused · 닿지 못함 → failed · 1MB 자르기 · 리다이렉트 안 따름·머리 소문자) · clippy · `check_code` Rust 231/231 |
 
 #### L31 실행 기록 ⑤ — MCP list_traces·get_trace (Rust)
 
@@ -347,7 +347,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | `server/src/mcp/tools.rs` · `cargo xtask mcp-tools` |
 | 테스트 | 계약 `--with-card L31` · 판 0.5.0 — 태그 `local-v0.5.0` |
 | 선행 | CL · L30 |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/L31-mcp-traces-rust` · code 3 · `cargo xtask mcp-tools --check` · 계약 `--target both --with-card L28 --with-card L31` + L3·L18 364 통과(MCP 도구 16개 스냅숏) · clippy · 판 0.5.0 — 태그 `local-v0.5.0` |
 
 **다음 카드** — L22(흐름 보기, 2026-10-12 사용자 결정 — view_arc를 두 판의 기능으로). 1차 L22~L26 → `local-v0.4.0`, 2차 L27~L31 → `local-v0.5.0`.
 

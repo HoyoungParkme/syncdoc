@@ -103,6 +103,18 @@ pub enum Problem {
     /// `bundle-invalid` — git 번들이 아니거나 깨졌거나 main 가지가 없다 (UC-A1 1c2, L15)
     #[error("{reason}")]
     BundleInvalid { reason: String },
+    /// `unauthorized` — 기록 도구의 토큰이 틀렸다(폐쇄망판에서 세션 대신 토큰을 받는 두 경로만, API-001 1장, L28)
+    #[error("{detail}")]
+    Unauthorized { detail: String },
+    /// `trace-invalid` — 올린 실행 기록이 꼴에 안 맞거나 상한을 넘는다. 본문 4MB 초과만 상태 413 (UC-S9 2a, L28)
+    #[error("{reason}")]
+    TraceInvalid { reason: String, status: u16 },
+    /// `request-refused` — 요청 보내기 주소가 localhost가 아니다 (싱크독_로컬 Rust만, UC-H26 3a, L30)
+    #[error("localhost로만 보낸다: {url}")]
+    RequestRefused { url: String },
+    /// `request-failed` — 요청 보내기가 닿지 못했거나 10초 안에 답이 없다 (UC-H26 3b, L30)
+    #[error("{reason}")]
+    RequestFailed { reason: String },
     /// `backup-unconfigured` — 백업 폴더를 정하지 않았다 (싱크독_로컬 Rust만, L16)
     #[error("백업 폴더를 정하지 않았다")]
     BackupUnconfigured,
@@ -197,6 +209,10 @@ impl Problem {
             Problem::ProjectCodeInvalid { .. } => Some("project-code-invalid"),
             Problem::ProjectCodeConflict { .. } => Some("project-code-conflict"),
             Problem::BundleInvalid { .. } => Some("bundle-invalid"),
+            Problem::Unauthorized { .. } => Some("unauthorized"),
+            Problem::TraceInvalid { .. } => Some("trace-invalid"),
+            Problem::RequestRefused { .. } => Some("request-refused"),
+            Problem::RequestFailed { .. } => Some("request-failed"),
             Problem::BackupUnconfigured => Some("backup-unconfigured"),
             Problem::BackupInvalid { .. } => Some("backup-invalid"),
             Problem::BackupFailed { .. } => Some("backup-failed"),
@@ -241,6 +257,10 @@ impl Problem {
             | Problem::BundleInvalid { .. }
             | Problem::BackupInvalid { .. }
             | Problem::DataDirInvalid { .. } => 422,
+            Problem::Unauthorized { .. } => 401,
+            Problem::TraceInvalid { status, .. } => *status,
+            Problem::RequestRefused { .. } => 422,
+            Problem::RequestFailed { .. } => 424,
             Problem::BackupUnconfigured => 409,
             Problem::BackupFailed { .. } => 500,
             Problem::ProjectCodeConflict { .. } | Problem::ExistingSpecs { .. } => 409,
@@ -373,6 +393,7 @@ impl Problem {
             Problem::AlreadyCurrent
             | Problem::DocumentNotTrashed
             | Problem::LlmNotConfigured
+            | Problem::Unauthorized { .. }
             | Problem::BackupUnconfigured => {
                 vec![]
             }
@@ -385,12 +406,15 @@ impl Problem {
                 vec![("attachment_id", Value::from(*attachment_id))]
             }
             Problem::LlmUnavailable { reason }
+            | Problem::TraceInvalid { reason, .. }
+            | Problem::RequestFailed { reason }
             | Problem::BundleInvalid { reason }
             | Problem::BackupInvalid { reason }
             | Problem::BackupFailed { reason }
             | Problem::DataDirInvalid { reason } => {
                 vec![("reason", Value::from(reason.as_str()))]
             }
+            Problem::RequestRefused { url } => vec![("url", Value::from(url.as_str()))],
             Problem::MethodNotAllowed { allow, .. } => vec![("allow", Value::from(allow.clone()))],
             Problem::ForbiddenOrigin { host, origin } => match (host, origin) {
                 (Some(h), _) => vec![("host", Value::from(h.as_str()))],

@@ -48,7 +48,7 @@ async fn empty_db_gets_every_revision() {
     .fetch_one(&mut *c)
     .await
     .expect("표 수");
-    assert_eq!(tables, 14);
+    assert_eq!(tables, 15); // 0019 traces (카드 L27)
     // 다시 → 올릴 것이 없다
     assert!(migrate::apply(&mut c).await.expect("다시").is_empty());
 }

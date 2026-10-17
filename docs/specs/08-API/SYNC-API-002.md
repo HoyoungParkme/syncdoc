@@ -514,19 +514,19 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ```json
 {
   "name": "list_traces",
-  "description": "프로젝트의 실행 기록 목록을 최근 것부터 돌려준다 — 종류(back 서버 요청·front 화면·job 작업)·방법·경로·상태·오류 한 줄·걸린 시간·사건 수·잘림·기록할 때의 커밋. 기록은 사람이 PC에서 기록 도구(syncdoc-local trace)로 올린 것이다. 비어 있으면 hint에 기록 도구 명령이 온다.",
+  "description": "프로젝트의 실행 기록 목록을 최근 것부터 돌려준다 — 종류(back 서버 요청·front 화면·job 작업)·방법·경로·상태·오류 한 줄·걸린 시간·사건 수·잘림·기록할 때의 커밋. 기록은 사람이 PC에서 기록 도구(syncdoc-local trace)로 올린 것이다. 비어 있으면 hint에 기록 도구 명령이 온다. limit은 1~300(기본 30).",
   "inputSchema": {
     "type": "object",
     "required": ["project_code"],
     "properties": {
-      "project_code": { "type": "string", "pattern": "^[A-Z]{1,4}$" },
-      "limit": { "type": "integer", "minimum": 1, "maximum": 300, "default": 30 }
+      "project_code": { "type": "string" },
+      "limit": { "type": "integer", "default": 30, "description": "1~300 밖이면 그 끝으로" }
     }
   }
 }
 ```
 
-**결과** `{ "traces": [TraceBrief…], "hint": "…" | null }` — `TraceBrief`는 [[SYNC-API-001]] 4장. `hint`는 기록이 없을 때만
+**결과** `{ "traces": [TraceBrief…], "hint": "…" | null }` — `TraceBrief`는 [[SYNC-API-001]] 4장(시각은 `+00:00` 꼴 — 다른 도구와 같다). `hint`는 기록이 없을 때만 — 「기록이 없다 — 사람의 PC에서 기록 도구로 올린다: syncdoc-local trace --to <이 서버 주소> --project {코드} -- <서버를 띄우는 명령> (작업이면 --job, 화면은 syncdoc-local trace-web)」
 
 **에러**: `not-found`(남의 프로젝트)
 
@@ -535,14 +535,14 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 ```json
 {
   "name": "get_trace",
-  "description": "실행 기록 하나를 사건까지 돌려준다 — 불린 함수(그래프 열쇠)와 부모·인자·반환값·예외, DB·HTTP 같은 장비 사건, 시간. 비밀 이름의 값은 기록 도구가 ***로 가렸다. 실패한 요청이 어디서 왜 실패했는지 볼 때 부른다. 사건이 많으면 max_events에서 자르고 truncated를 켠다.",
+  "description": "실행 기록 하나를 사건까지 돌려준다 — 불린 함수(그래프 열쇠)와 부모·인자·반환값·예외, DB·HTTP 같은 장비 사건, 시간. 비밀 이름의 값은 기록 도구가 ***로 가렸다. 실패한 요청이 어디서 왜 실패했는지 볼 때 부른다. 사건이 많으면 max_events(1~2000, 기본 400)에서 자르고 truncated를 켠다.",
   "inputSchema": {
     "type": "object",
     "required": ["project_code", "trace_id"],
     "properties": {
-      "project_code": { "type": "string", "pattern": "^[A-Z]{1,4}$" },
+      "project_code": { "type": "string" },
       "trace_id": { "type": "integer" },
-      "max_events": { "type": "integer", "minimum": 1, "maximum": 2000, "default": 400 }
+      "max_events": { "type": "integer", "default": 400, "description": "1~2000 밖이면 그 끝으로" }
     }
   }
 }

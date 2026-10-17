@@ -52,6 +52,8 @@ async def test_tools_listed_with_descriptions() -> None:
         "upload_code",  # 카드 BB
         "change_status",  # 카드 BE
         "get_flow",  # 카드 CH
+        "list_traces",  # 카드 CL
+        "get_trace",
     }
     assert (
         "status-blocked" in names["change_status"] and "update_document" in names["change_status"]
@@ -445,3 +447,27 @@ async def test_upload_code_tool_puts_code_in_a_server_project(
         message="m",
     )
     assert err and p["type"] == "urn:syncdoc:upload-path-refused"
+
+
+async def test_list_and_get_trace(scoped: Session, as_user) -> None:
+    """SYNC-API-002 list_traces·get_trace — 비면 hint, 최근 것부터, max_events에서 자른다(카드 CL)."""
+    from app.core.trace.service import TraceService
+    from tests.core.spec.test_service import make_project, owner
+    from tests.core.trace.test_service import record
+
+    p = make_project(scoped)
+    err, v = await call("list_traces", project_code="EXMP")
+    assert not err and v["traces"] == [] and "syncdoc-local trace" in v["hint"]
+    uid = owner(scoped).id
+    TraceService(scoped).save(p.id, uid, record("a"))
+    b, _ = TraceService(scoped).save(p.id, uid, record("b"))
+    scoped.commit()
+    err, v = await call("list_traces", project_code="EXMP", limit=1)
+    assert not err and [t["trace_key"] for t in v["traces"]] == ["b"] and v["hint"] is None
+    err, v = await call("get_trace", project_code="EXMP", trace_id=b.id, max_events=2)
+    assert not err and len(v["record"]["events"]) == 2 and v["record"]["truncated"] is True
+    assert v["started_at"].endswith("+00:00")
+    err, v = await call("get_trace", project_code="EXMP", trace_id=999999)
+    assert err and v["resource"] == "trace"
+    err, v = await call("list_traces", project_code="NOPE")
+    assert err and v["resource"] == "project"

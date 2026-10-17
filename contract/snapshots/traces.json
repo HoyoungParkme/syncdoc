@@ -1,0 +1,365 @@
+{
+ "coverage": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"traces\":2,\"keys\":[\"backend/app/api/items.py:14\",\"backend/app/core/service.py:4\"],\"infra\":[{\"kind\":\"db\",\"target\":\"db:5432\"}]}"
+ },
+ "delete_all": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"deleted\":1}"
+ },
+ "delete_one": {
+  "status": 204,
+  "headers": [],
+  "body": ""
+ },
+ "delete_one_again": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"trace 1 없음\",\"resource\":\"trace\",\"id\":\"1\"}"
+ },
+ "list": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[{\"id\":2,\"trace_key\":\"k2\",\"kind\":\"job\",\"method\":null,\"path\":\"/v1/items/3\",\"status\":200,\"error\":null,\"started_at\":\"T\",\"ms\":12,\"commit_hash\":null,\"event_count\":3,\"truncated\":false,\"received_at\":\"T\"},{\"id\":1,\"trace_key\":\"k1\",\"kind\":\"back\",\"method\":\"GET\",\"path\":\"/v1/items/3\",\"status\":200,\"error\":null,\"started_at\":\"T\",\"ms\":12,\"commit_hash\":null,\"event_count\":3,\"truncated\":false,\"received_at\":\"T\"}]"
+ },
+ "list_empty": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "[]"
+ },
+ "list_other": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "mcp_get": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"id\\\": 1, \\\"trace_key\\\": \\\"k1\\\", \\\"kind\\\": \\\"back\\\", \\\"method\\\": \\\"GET\\\", \\\"path\\\": \\\"/v1/items/3\\\", \\\"status\\\": 200, \\\"error\\\": null, \\\"started_at\\\": \\\"T\\\", \\\"ms\\\": 12, \\\"commit_hash\\\": null, \\\"event_count\\\": 3, \\\"truncated\\\": false, \\\"received_at\\\": \\\"T\\\", \\\"record\\\": {\\\"id\\\": \\\"k1\\\", \\\"ms\\\": 12, \\\"kind\\\": \\\"back\\\", \\\"path\\\": \\\"/v1/items/3\\\", \\\"error\\\": null, \\\"commit\\\": null, \\\"events\\\": [{\\\"i\\\": 0, \\\"fn\\\": \\\"backend/app/api/items.py:14\\\", \\\"t0\\\": 0, \\\"t1\\\": 9, \\\"ret\\\": \\\"{'id': 3}\\\", \\\"args\\\": {\\\"item_id\\\": \\\"3\\\"}, \\\"name\\\": \\\"read\\\", \\\"parent\\\": -1}, {\\\"i\\\": 1, \\\"fn\\\": \\\"@infra\\\", \\\"t0\\\": 1, \\\"t1\\\": 2, \\\"infra\\\": {\\\"op\\\": \\\"SELECT 1\\\", \\\"kind\\\": \\\"db\\\", \\\"target\\\": \\\"db:5432\\\"}, \\\"parent\\\": 0}], \\\"method\\\": \\\"GET\\\", \\\"status\\\": 200, \\\"version\\\": 1, \\\"startedAt\\\": \\\"2026-10-17T10:02:03.25+09:00\\\", \\\"truncated\\\": true}}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "mcp_get_missing": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"trace 99999999999999999999 없음\\\", \\\"resource\\\": \\\"trace\\\", \\\"id\\\": \\\"99999999999999999999\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "mcp_list": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"traces\\\": [{\\\"id\\\": 2, \\\"trace_key\\\": \\\"k2\\\", \\\"kind\\\": \\\"job\\\", \\\"method\\\": null, \\\"path\\\": \\\"/v1/items/3\\\", \\\"status\\\": 200, \\\"error\\\": null, \\\"started_at\\\": \\\"T\\\", \\\"ms\\\": 12, \\\"commit_hash\\\": null, \\\"event_count\\\": 3, \\\"truncated\\\": false, \\\"received_at\\\": \\\"T\\\"}], \\\"hint\\\": null}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "mcp_list_big_limit": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"traces\\\": [{\\\"id\\\": 2, \\\"trace_key\\\": \\\"k2\\\", \\\"kind\\\": \\\"job\\\", \\\"method\\\": null, \\\"path\\\": \\\"/v1/items/3\\\", \\\"status\\\": 200, \\\"error\\\": null, \\\"started_at\\\": \\\"T\\\", \\\"ms\\\": 12, \\\"commit_hash\\\": null, \\\"event_count\\\": 3, \\\"truncated\\\": false, \\\"received_at\\\": \\\"T\\\"}, {\\\"id\\\": 1, \\\"trace_key\\\": \\\"k1\\\", \\\"kind\\\": \\\"back\\\", \\\"method\\\": \\\"GET\\\", \\\"path\\\": \\\"/v1/items/3\\\", \\\"status\\\": 200, \\\"error\\\": null, \\\"started_at\\\": \\\"T\\\", \\\"ms\\\": 12, \\\"commit_hash\\\": null, \\\"event_count\\\": 3, \\\"truncated\\\": false, \\\"received_at\\\": \\\"T\\\"}], \\\"hint\\\": null}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "mcp_list_empty": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"traces\\\": [], \\\"hint\\\": \\\"기록이 없다 — 사람의 PC에서 기록 도구로 올린다: syncdoc-local trace --to <이 서버 주소> --project LTR -- <서버를 띄우는 명령> (작업이면 --job, 화면은 syncdoc-local trace-web)\\\"}\",\"type\":\"text\"}],\"isError\":false}}\r\n\r\n"
+ },
+ "mcp_list_other": {
+  "status": 200,
+  "headers": [
+   [
+    "cache-control",
+    "no-cache, no-transform"
+   ],
+   [
+    "content-type",
+    "text/event-stream"
+   ],
+   [
+    "x-accel-buffering",
+    "no"
+   ]
+  ],
+  "body": "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"text\":\"{\\\"type\\\": \\\"urn:syncdoc:not-found\\\", \\\"title\\\": \\\"not-found\\\", \\\"status\\\": 404, \\\"detail\\\": \\\"project NOPE 없음\\\", \\\"resource\\\": \\\"project\\\", \\\"id\\\": \\\"NOPE\\\"}\",\"type\":\"text\"}],\"isError\":true}}\r\n\r\n"
+ },
+ "one": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"id\":1,\"trace_key\":\"k1\",\"kind\":\"back\",\"method\":\"GET\",\"path\":\"/v1/items/3\",\"status\":200,\"error\":null,\"started_at\":\"T\",\"ms\":12,\"commit_hash\":null,\"event_count\":3,\"truncated\":false,\"received_at\":\"T\",\"record\":{\"id\":\"k1\",\"ms\":12,\"kind\":\"back\",\"path\":\"/v1/items/3\",\"error\":null,\"commit\":null,\"events\":[{\"i\":0,\"fn\":\"backend/app/api/items.py:14\",\"t0\":0,\"t1\":9,\"ret\":\"{'id': 3}\",\"args\":{\"item_id\":\"3\"},\"name\":\"read\",\"parent\":-1},{\"i\":1,\"fn\":\"@infra\",\"t0\":1,\"t1\":2,\"infra\":{\"op\":\"SELECT 1\",\"kind\":\"db\",\"target\":\"db:5432\"},\"parent\":0},{\"i\":2,\"fn\":\"backend/app/core/service.py:4\",\"t0\":3,\"parent\":0}],\"method\":\"GET\",\"status\":200,\"version\":1,\"startedAt\":\"2026-10-17T10:02:03.25+09:00\",\"truncated\":false}}"
+ },
+ "one_huge": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"trace 99999999999999999999999 없음\",\"resource\":\"trace\",\"id\":\"99999999999999999999999\"}"
+ },
+ "one_missing": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"trace 999999 없음\",\"resource\":\"trace\",\"id\":\"999999\"}"
+ },
+ "one_text": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"path.trace_id — Input should be a valid integer, unable to parse string as an integer\",\"errors\":[{\"loc\":\"path.trace_id\",\"msg\":\"Input should be a valid integer, unable to parse string as an integer\"}]}"
+ },
+ "spans_bad_token": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"토큰 없음·폐기·만료\"}"
+ },
+ "spans_local": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"commit_hash\":\"H\",\"spans\":[{\"key\":\"backend/app/api/items.py:9\",\"file\":\"backend/app/api/items.py\",\"line\":9,\"end\":10,\"name\":\"get_svc\",\"qual\":\"items.get_svc\",\"route\":null},{\"key\":\"backend/app/api/items.py:14\",\"file\":\"backend/app/api/items.py\",\"line\":14,\"end\":26,\"name\":\"read\",\"qual\":\"items.read\",\"route\":{\"path\":\"/v1/items/{item_id}\",\"method\":\"GET\"}},{\"key\":\"backend/app/api/items.py:30\",\"file\":\"backend/app/api/items.py\",\"line\":30,\"end\":33,\"name\":\"make\",\"qual\":\"items.make\",\"route\":{\"path\":\"/v1/items\",\"method\":\"POST\"}},{\"key\":\"backend/app/core/db.py:5\",\"file\":\"backend/app/core/db.py\",\"line\":5,\"end\":10,\"name\":\"save\",\"qual\":\"db.save\",\"route\":null},{\"key\":\"backend/app/core/service.py:4\",\"file\":\"backend/app/core/service.py\",\"line\":4,\"end\":5,\"name\":\"helper\",\"qual\":\"core.helper\",\"route\":null},{\"key\":\"backend/app/core/service.py:9\",\"file\":\"backend/app/core/service.py\",\"line\":9,\"end\":10,\"name\":\"__init__\",\"qual\":\"Svc.__init__\",\"route\":null},{\"key\":\"backend/app/core/service.py:12\",\"file\":\"backend/app/core/service.py\",\"line\":12,\"end\":14,\"name\":\"fetch\",\"qual\":\"Svc.fetch\",\"route\":null},{\"key\":\"backend/app/main.py:10\",\"file\":\"backend/app/main.py\",\"line\":10,\"end\":11,\"name\":\"health\",\"qual\":\"main.health\",\"route\":{\"path\":\"/health\",\"method\":\"GET\"}},{\"key\":\"frontend/src/pages/Items.tsx:4\",\"file\":\"frontend/src/pages/Items.tsx\",\"line\":4,\"end\":8,\"name\":\"Items\",\"qual\":\"Items.Items\",\"route\":null},{\"key\":\"frontend/src/pages/Items.tsx:10\",\"file\":\"frontend/src/pages/Items.tsx\",\"line\":10,\"end\":12,\"name\":\"Card\",\"qual\":\"Items.Card\",\"route\":null},{\"key\":\"scripts/seed.py:4\",\"file\":\"scripts/seed.py\",\"line\":4,\"end\":5,\"name\":\"go\",\"qual\":\"seed.go\",\"route\":null},{\"key\":\"server/cats.ts:4\",\"file\":\"server/cats.ts\",\"line\":4,\"end\":6,\"name\":\"one\",\"qual\":\"CatsController.one\",\"route\":{\"path\":\"/cats/{id}\",\"method\":\"GET\"}},{\"key\":\"server/index.ts:7\",\"file\":\"server/index.ts\",\"line\":7,\"end\":11,\"name\":\"show\",\"qual\":\"server.show\",\"route\":{\"path\":\"/users/{id}\",\"method\":\"GET\"}},{\"key\":\"web/app/api/things/[id]/route.ts:1\",\"file\":\"web/app/api/things/[id]/route.ts\",\"line\":1,\"end\":3,\"name\":\"GET\",\"qual\":\"route.GET\",\"route\":{\"path\":\"/api/things/{id}\",\"method\":\"GET\"}},{\"key\":\"frontend/src/api/client.ts:2\",\"file\":\"frontend/src/api/client.ts\",\"line\":2,\"end\":2,\"name\":\"get\",\"qual\":\"api.get\",\"route\":null},{\"key\":\"rs/src/lib.rs:5\",\"file\":\"rs/src/lib.rs\",\"line\":5,\"end\":7,\"name\":\"app\",\"qual\":\"rs.app\",\"route\":null},{\"key\":\"rs/src/lib.rs:9\",\"file\":\"rs/src/lib.rs\",\"line\":9,\"end\":11,\"name\":\"list\",\"qual\":\"rs.list\",\"route\":{\"path\":\"/api/x\",\"method\":\"GET\"}},{\"key\":\"rs/src/lib.rs:13\",\"file\":\"rs/src/lib.rs\",\"line\":13,\"end\":18,\"name\":\"make\",\"qual\":\"rs.make\",\"route\":{\"path\":\"/api/x\",\"method\":\"POST\"}},{\"key\":\"rs/src/lib.rs:20\",\"file\":\"rs/src/lib.rs\",\"line\":20,\"end\":22,\"name\":\"helper\",\"qual\":\"rs.helper\",\"route\":null},{\"key\":\"rs/src/lib.rs:25\",\"file\":\"rs/src/lib.rs\",\"line\":25,\"end\":25,\"name\":\"hi\",\"qual\":\"rs.hi\",\"route\":{\"path\":\"/hi\",\"method\":\"GET\"}}],\"infra\":[{\"id\":\"infra:server:backend\",\"dir\":\"backend\",\"host\":\"localhost:8000\",\"kind\":\"backend\",\"name\":\"FastAPI 서버\",\"where\":\"local\",\"evidence\":[\"FastAPI — backend\"]},{\"id\":\"infra:server:server\",\"dir\":\"server\",\"host\":\"localhost:4100\",\"kind\":\"backend\",\"name\":\"Express 서버\",\"where\":\"local\",\"evidence\":[\"Express — server\"]},{\"id\":\"infra:db\",\"dir\":null,\"host\":\"db:5432\",\"kind\":\"db\",\"name\":\"PostgreSQL\",\"where\":\"container\",\"evidence\":[\"코드: sqlalchemy, @prisma/client, sqlx — backend/app/core/db.py 외 2개 파일\",\"의존성: sqlx — rs/Cargo.toml\",\"의존성: @prisma/client — server/package.json\",\"docker-compose: db (postgres:16, 포트 15432) — docker-compose.yml\",\"설정: .env.example DATABASE_URL → localhost:15432\",\"설정: backend/app/config.py DATABASE_URL → db:5432\"]},{\"id\":\"infra:redis\",\"dir\":null,\"host\":\"your-redis-host\",\"kind\":\"cache\",\"name\":\"Redis\",\"where\":\"container\",\"evidence\":[\"의존성: redis — backend/pyproject.toml\",\"docker-compose: cache (redis:7) — docker-compose.yml\",\"설정: .env.example REDIS_HOST → your-redis-host\"]}]}"
+ },
+ "spans_none": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"commit_hash\":null,\"spans\":[],\"infra\":[]}"
+ },
+ "spans_other": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "spans_token": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"commit_hash\":\"H\",\"spans\":[{\"key\":\"backend/app/api/items.py:9\",\"file\":\"backend/app/api/items.py\",\"line\":9,\"end\":10,\"name\":\"get_svc\",\"qual\":\"items.get_svc\",\"route\":null},{\"key\":\"backend/app/api/items.py:14\",\"file\":\"backend/app/api/items.py\",\"line\":14,\"end\":26,\"name\":\"read\",\"qual\":\"items.read\",\"route\":{\"path\":\"/v1/items/{item_id}\",\"method\":\"GET\"}},{\"key\":\"backend/app/api/items.py:30\",\"file\":\"backend/app/api/items.py\",\"line\":30,\"end\":33,\"name\":\"make\",\"qual\":\"items.make\",\"route\":{\"path\":\"/v1/items\",\"method\":\"POST\"}},{\"key\":\"backend/app/core/db.py:5\",\"file\":\"backend/app/core/db.py\",\"line\":5,\"end\":10,\"name\":\"save\",\"qual\":\"db.save\",\"route\":null},{\"key\":\"backend/app/core/service.py:4\",\"file\":\"backend/app/core/service.py\",\"line\":4,\"end\":5,\"name\":\"helper\",\"qual\":\"core.helper\",\"route\":null},{\"key\":\"backend/app/core/service.py:9\",\"file\":\"backend/app/core/service.py\",\"line\":9,\"end\":10,\"name\":\"__init__\",\"qual\":\"Svc.__init__\",\"route\":null},{\"key\":\"backend/app/core/service.py:12\",\"file\":\"backend/app/core/service.py\",\"line\":12,\"end\":14,\"name\":\"fetch\",\"qual\":\"Svc.fetch\",\"route\":null},{\"key\":\"backend/app/main.py:10\",\"file\":\"backend/app/main.py\",\"line\":10,\"end\":11,\"name\":\"health\",\"qual\":\"main.health\",\"route\":{\"path\":\"/health\",\"method\":\"GET\"}},{\"key\":\"frontend/src/pages/Items.tsx:4\",\"file\":\"frontend/src/pages/Items.tsx\",\"line\":4,\"end\":8,\"name\":\"Items\",\"qual\":\"Items.Items\",\"route\":null},{\"key\":\"frontend/src/pages/Items.tsx:10\",\"file\":\"frontend/src/pages/Items.tsx\",\"line\":10,\"end\":12,\"name\":\"Card\",\"qual\":\"Items.Card\",\"route\":null},{\"key\":\"scripts/seed.py:4\",\"file\":\"scripts/seed.py\",\"line\":4,\"end\":5,\"name\":\"go\",\"qual\":\"seed.go\",\"route\":null},{\"key\":\"server/cats.ts:4\",\"file\":\"server/cats.ts\",\"line\":4,\"end\":6,\"name\":\"one\",\"qual\":\"CatsController.one\",\"route\":{\"path\":\"/cats/{id}\",\"method\":\"GET\"}},{\"key\":\"server/index.ts:7\",\"file\":\"server/index.ts\",\"line\":7,\"end\":11,\"name\":\"show\",\"qual\":\"server.show\",\"route\":{\"path\":\"/users/{id}\",\"method\":\"GET\"}},{\"key\":\"web/app/api/things/[id]/route.ts:1\",\"file\":\"web/app/api/things/[id]/route.ts\",\"line\":1,\"end\":3,\"name\":\"GET\",\"qual\":\"route.GET\",\"route\":{\"path\":\"/api/things/{id}\",\"method\":\"GET\"}},{\"key\":\"frontend/src/api/client.ts:2\",\"file\":\"frontend/src/api/client.ts\",\"line\":2,\"end\":2,\"name\":\"get\",\"qual\":\"api.get\",\"route\":null},{\"key\":\"rs/src/lib.rs:5\",\"file\":\"rs/src/lib.rs\",\"line\":5,\"end\":7,\"name\":\"app\",\"qual\":\"rs.app\",\"route\":null},{\"key\":\"rs/src/lib.rs:9\",\"file\":\"rs/src/lib.rs\",\"line\":9,\"end\":11,\"name\":\"list\",\"qual\":\"rs.list\",\"route\":{\"path\":\"/api/x\",\"method\":\"GET\"}},{\"key\":\"rs/src/lib.rs:13\",\"file\":\"rs/src/lib.rs\",\"line\":13,\"end\":18,\"name\":\"make\",\"qual\":\"rs.make\",\"route\":{\"path\":\"/api/x\",\"method\":\"POST\"}},{\"key\":\"rs/src/lib.rs:20\",\"file\":\"rs/src/lib.rs\",\"line\":20,\"end\":22,\"name\":\"helper\",\"qual\":\"rs.helper\",\"route\":null},{\"key\":\"rs/src/lib.rs:25\",\"file\":\"rs/src/lib.rs\",\"line\":25,\"end\":25,\"name\":\"hi\",\"qual\":\"rs.hi\",\"route\":{\"path\":\"/hi\",\"method\":\"GET\"}}],\"infra\":[{\"id\":\"infra:server:backend\",\"dir\":\"backend\",\"host\":\"localhost:8000\",\"kind\":\"backend\",\"name\":\"FastAPI 서버\",\"where\":\"local\",\"evidence\":[\"FastAPI — backend\"]},{\"id\":\"infra:server:server\",\"dir\":\"server\",\"host\":\"localhost:4100\",\"kind\":\"backend\",\"name\":\"Express 서버\",\"where\":\"local\",\"evidence\":[\"Express — server\"]},{\"id\":\"infra:db\",\"dir\":null,\"host\":\"db:5432\",\"kind\":\"db\",\"name\":\"PostgreSQL\",\"where\":\"container\",\"evidence\":[\"코드: sqlalchemy, @prisma/client, sqlx — backend/app/core/db.py 외 2개 파일\",\"의존성: sqlx — rs/Cargo.toml\",\"의존성: @prisma/client — server/package.json\",\"docker-compose: db (postgres:16, 포트 15432) — docker-compose.yml\",\"설정: .env.example DATABASE_URL → localhost:15432\",\"설정: backend/app/config.py DATABASE_URL → db:5432\"]},{\"id\":\"infra:redis\",\"dir\":null,\"host\":\"your-redis-host\",\"kind\":\"cache\",\"name\":\"Redis\",\"where\":\"container\",\"evidence\":[\"의존성: redis — backend/pyproject.toml\",\"docker-compose: cache (redis:7) — docker-compose.yml\",\"설정: .env.example REDIS_HOST → your-redis-host\"]}]}"
+ },
+ "upload": {
+  "status": 201,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"id\":1,\"trace_key\":\"k1\",\"kind\":\"back\",\"method\":\"GET\",\"path\":\"/v1/items/3\",\"status\":200,\"error\":null,\"started_at\":\"T\",\"ms\":12,\"commit_hash\":null,\"event_count\":3,\"truncated\":false,\"received_at\":\"T\"}"
+ },
+ "upload_again": {
+  "status": 200,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"id\":1,\"trace_key\":\"k1\",\"kind\":\"back\",\"method\":\"GET\",\"path\":\"/v1/items/3\",\"status\":200,\"error\":null,\"started_at\":\"T\",\"ms\":12,\"commit_hash\":null,\"event_count\":3,\"truncated\":false,\"received_at\":\"T\"}"
+ },
+ "upload_bad_token": {
+  "status": 401,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:unauthorized\",\"title\":\"unauthorized\",\"status\":401,\"detail\":\"토큰 없음·폐기·만료\"}"
+ },
+ "upload_big": {
+  "status": 413,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:trace-invalid\",\"title\":\"trace-invalid\",\"status\":413,\"detail\":\"본문이 4MB를 넘는다\",\"reason\":\"본문이 4MB를 넘는다\"}"
+ },
+ "upload_local": {
+  "status": 201,
+  "headers": [
+   [
+    "content-type",
+    "application/json"
+   ]
+  ],
+  "body": "{\"id\":2,\"trace_key\":\"k2\",\"kind\":\"job\",\"method\":null,\"path\":\"/v1/items/3\",\"status\":200,\"error\":null,\"started_at\":\"T\",\"ms\":12,\"commit_hash\":null,\"event_count\":3,\"truncated\":false,\"received_at\":\"T\"}"
+ },
+ "upload_not_json": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.1 — JSON decode error\",\"errors\":[{\"loc\":\"body.1\",\"msg\":\"JSON decode error\"}]}"
+ },
+ "upload_orphan": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:trace-invalid\",\"title\":\"trace-invalid\",\"status\":422,\"detail\":\"events[0] — 부모가 없다\",\"reason\":\"events[0] — 부모가 없다\"}"
+ },
+ "upload_other": {
+  "status": 404,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:not-found\",\"title\":\"not-found\",\"status\":404,\"detail\":\"project NOPE 없음\",\"resource\":\"project\",\"id\":\"NOPE\"}"
+ },
+ "upload_shape": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:invalid-request\",\"title\":\"invalid-request\",\"status\":422,\"detail\":\"body.kind — Input should be 'back', 'front' or 'job'\",\"errors\":[{\"loc\":\"body.kind\",\"msg\":\"Input should be 'back', 'front' or 'job'\"},{\"loc\":\"body.ms\",\"msg\":\"Input should be greater than or equal to 0\"}]}"
+ },
+ "upload_time": {
+  "status": 422,
+  "headers": [
+   [
+    "content-type",
+    "application/problem+json"
+   ]
+  ],
+  "body": "{\"type\":\"urn:syncdoc:trace-invalid\",\"title\":\"trace-invalid\",\"status\":422,\"detail\":\"startedAt — 시각이 아니다\",\"reason\":\"startedAt — 시각이 아니다\"}"
+ }
+}

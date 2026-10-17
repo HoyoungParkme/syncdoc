@@ -136,6 +136,22 @@ def current_user(request: Request, session: Session = Depends(get_session)) -> U
     return user
 
 
+def token_or_session_user(request: Request, session: Session = Depends(get_session)) -> User:
+    """기록 도구의 두 경로(trace-spans·traces 올리기) 의존성 — API-001 1장 · SEQ-36 (카드 CJ).
+
+    `Authorization: Bearer`가 있으면 개인 토큰이 사람을 정한다(MCP·git과 같다 — 틀리면 401,
+    폐쇄망판도 토큰). 없으면 세션(current_user). 통과한 토큰의 last_used_at이 남도록 커밋한다.
+    """
+    header = request.headers.get("authorization", "")
+    if not header.startswith("Bearer "):
+        return current_user(request, session)
+    user = AccountService(session).authenticate_token(header.removeprefix("Bearer ").strip())
+    if user is None:
+        raise Unauthorized("토큰 없음·폐기·만료")
+    session.commit()
+    return user
+
+
 # ───────────────────────── 폐쇄망판 가드 (SEQ-C3) ─────────────────────────
 
 _LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}

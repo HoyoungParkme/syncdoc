@@ -59,6 +59,7 @@ fn card_of(tool: &str) -> &'static str {
         "upload_code" => "L11",
         "get_code_graph" => "L12",
         "get_flow" => "L26",
+        "list_traces" | "get_trace" => "L31",
         _ => "L3",
     }
 }
@@ -183,7 +184,7 @@ mod tests {
     #[test]
     fn declarations_load() {
         let d = decl();
-        assert_eq!(d.tools.len(), 13);
+        assert_eq!(d.tools.len(), 16); // get_flow(L26) · list_traces·get_trace(L31)
         assert!(d.handshake.contains(&"2025-06-18".to_string()));
         assert!(d.results["2025-06-18"]["initialize"].contains("\"syncdoc_local\""));
         assert_eq!(d.modern, ["2026-07-28"]);

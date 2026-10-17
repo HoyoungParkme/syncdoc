@@ -21,6 +21,7 @@ use crate::web::routes::account::{issue_token, list_tokens, me, revoke_token};
 use crate::web::routes::admin::{hook, move_to_github, move_to_server, rebuild, repos, sync};
 use crate::web::routes::code::{
     ask_code, code_calls, code_nodes, code_text, doc_code, flow_view, item_code, item_code_source,
+    trace_spans,
 };
 use crate::web::routes::conversations::{
     create_conversation, delete_attachment, delete_conversation, get_attachment, get_conversation,
@@ -38,7 +39,7 @@ use crate::web::routes::documents::trash_document;
 use crate::web::routes::documents::versions;
 use crate::web::routes::git::git_entrance;
 use crate::web::routes::local::{
-    get_local, post_backup, post_move, post_restore, put_autostart, put_settings,
+    get_local, post_backup, post_move, post_request, post_restore, put_autostart, put_settings,
 };
 use crate::web::routes::projects::{
     delete_project, get_file, get_project, graph, import_bundle, init_project, list_docs,
@@ -48,6 +49,9 @@ use crate::web::routes::references::item_chain;
 use crate::web::routes::references::item_references;
 use crate::web::routes::references::item_view;
 use crate::web::routes::specs::spec_copy;
+use crate::web::routes::traces::{
+    delete_trace, delete_traces, get_trace, list_traces, trace_coverage, upload_trace,
+};
 use crate::web::static_files::fallback;
 
 /// 라우터 — 가드가 라우팅 바깥에서 모든 요청을 덮는다(404·405·정적 파일까지, SEQ-C3)
@@ -88,6 +92,16 @@ pub fn app(state: AppState) -> Router {
         .route("/api/projects/{code}/code-calls", get(code_calls))
         .route("/api/projects/{code}/code-graph", get(code_nodes))
         .route("/api/projects/{code}/flow", get(flow_view))
+        .route("/api/projects/{code}/trace-spans", get(trace_spans))
+        .route(
+            "/api/projects/{code}/traces",
+            post(upload_trace).get(list_traces).delete(delete_traces),
+        )
+        .route("/api/projects/{code}/traces/coverage", get(trace_coverage))
+        .route(
+            "/api/projects/{code}/traces/{trace_id}",
+            get(get_trace).delete(delete_trace),
+        )
         .route("/api/projects/{code}/code/ask", post(ask_code))
         .route(
             "/api/projects/{code}/conversations",
@@ -140,7 +154,8 @@ pub fn app(state: AppState) -> Router {
             .route("/api/local/autostart", put(put_autostart))
             .route("/api/local/backups", post(post_backup))
             .route("/api/local/restore", post(post_restore))
-            .route("/api/local/move", post(post_move));
+            .route("/api/local/move", post(post_move))
+            .route("/api/local/request", post(post_request));
     }
     let inner = routes
         .fallback(fallback)

@@ -20,6 +20,8 @@ use syncdoc_core::pycompat::chars::strip;
 use syncdoc_core::pycompat::re::compile;
 use syncdoc_core::queries;
 use syncdoc_core::spec::{SUBTYPES, TYPES};
+use syncdoc_core::trace::TraceService;
+use syncdoc_core::types::TraceBrief;
 use syncdoc_core::types::{
     Author, AuthorKind, CodeGraphInfo, CodeRef, CodeView, DocStatus, DocumentSummary, Entry,
     FlowFunction, FlowOf, ItemRef, ProjectSummary, STAGES, SaveResult, Storage, py_isoformat,
@@ -94,6 +96,8 @@ pub async fn call(
         "upload_code" => upload_code(state, user, &typed).await,
         "get_code_graph" => get_code_graph(state, user, &typed).await,
         "get_flow" => get_flow(state, user, &typed).await,
+        "list_traces" => list_traces(state, user, &typed).await,
+        "get_trace" => get_trace(state, user, &typed).await,
         _ => Err(Problem::NotImplemented {
             card: tool.card.to_string(),
         }),
@@ -357,6 +361,100 @@ async fn get_flow(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value
     )
     .await?;
     Ok(flow_of_json(&v))
+}
+
+/// 파이썬 `TRACE_HINT` — 기록이 없을 때의 안내
+const TRACE_HINT: &str = "기록이 없다 — 사람의 PC에서 기록 도구로 올린다: syncdoc-local trace --to <이 서버 주소> --project {code} -- <서버를 띄우는 명령> (작업이면 --job, 화면은 syncdoc-local trace-web)";
+
+/// 정수 인자를 [lo, hi]로 — 없으면 기본값 (파이썬 `max(lo, min(x, hi))`)
+fn clamp_arg(a: &PyValue, name: &str, default: i64, lo: i64, hi: i64) -> i64 {
+    match arg_int(a, name) {
+        None => default,
+        Some(n) if n < BigInt::from(lo) => lo,
+        Some(n) if n > BigInt::from(hi) => hi,
+        Some(n) => i64::try_from(&n).unwrap_or(default),
+    }
+}
+
+/// 파이썬 `_plain(TraceBrief)` — 데이터클래스 필드 차례, 시각은 `isoformat()`
+fn trace_brief_json(b: &TraceBrief) -> Map<String, Value> {
+    let v = json!({
+        "id": b.id,
+        "trace_key": b.trace_key,
+        "kind": b.kind,
+        "method": b.method,
+        "path": b.path,
+        "status": b.status,
+        "error": b.error,
+        "started_at": py_isoformat(b.started_at),
+        "ms": b.ms,
+        "commit_hash": b.commit_hash,
+        "event_count": b.event_count,
+        "truncated": b.truncated,
+        "received_at": py_isoformat(b.received_at),
+    });
+    match v {
+        Value::Object(m) => m,
+        _ => Map::new(),
+    }
+}
+
+/// SYNC-API-002#list_traces
+async fn list_traces(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let code = arg_str(a, "project_code");
+    let limit = clamp_arg(a, "limit", 30, 1, 300);
+    let mut c = state.pool.acquire().await?;
+    let (project, _) = ProjectService {
+        db: &mut c,
+        repos: &state.repos,
+    }
+    .get_owned(&code, user)
+    .await?;
+    let items = TraceService { db: &mut c }
+        .list_recent(project.id, limit)
+        .await?;
+    let hint = if items.is_empty() {
+        Value::from(TRACE_HINT.replace("{code}", &code))
+    } else {
+        Value::Null
+    };
+    Ok(json!({
+        "traces": items.iter().map(|b| Value::Object(trace_brief_json(b))).collect::<Vec<_>>(),
+        "hint": hint,
+    }))
+}
+
+/// SYNC-API-002#get_trace
+async fn get_trace(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let code = arg_str(a, "project_code");
+    let n = clamp_arg(a, "max_events", 400, 1, 2000) as usize;
+    let mut c = state.pool.acquire().await?;
+    let (project, _) = ProjectService {
+        db: &mut c,
+        repos: &state.repos,
+    }
+    .get_owned(&code, user)
+    .await?;
+    let raw = arg_int(a, "trace_id").unwrap_or_default();
+    let Ok(id) = i64::try_from(&raw) else {
+        return Err(Problem::NotFound {
+            resource: "trace".into(),
+            id: raw.to_string().into(),
+        });
+    };
+    let v = TraceService { db: &mut c }.get(project.id, id).await?;
+    let mut record = v.record.clone();
+    if let Some(events) = record.get_mut("events").and_then(Value::as_array_mut)
+        && events.len() > n
+    {
+        events.truncate(n);
+        if let Some(o) = record.as_object_mut() {
+            o.insert("truncated".into(), Value::Bool(true));
+        }
+    }
+    let mut out = trace_brief_json(&v.brief);
+    out.insert("record".into(), record);
+    Ok(Value::Object(out))
 }
 
 /// 파이썬 `_plain(CodeGraphInfo)`

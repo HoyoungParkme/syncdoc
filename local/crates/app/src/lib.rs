@@ -11,4 +11,5 @@ pub mod pg;
 pub mod privilege;
 pub mod runtime;
 pub mod settings;
+pub mod trace;
 pub mod tray;

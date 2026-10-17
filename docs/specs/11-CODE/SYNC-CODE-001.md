@@ -1557,7 +1557,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | Alembic 리비전 `traces` · `core/trace/models.py`·`repository.py`·`service.py` — [[SYNC-MS-025]] 전부 · [[SYNC-MS-001#ProjectService.delete_project]] 2b |
 | 테스트 | MS-025 테스트 관점 · 해제 시험 · `cargo xtask migrations` 다시(Rust는 L27) |
 | 선행 | CH |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/CI-traces` · spec 3 + code 7 · 파이썬 `pytest` TraceService 8 · 마이그레이션 시험(traces 표·인덱스) · `ruff` · `check_code` 파이썬 188/188 · `cargo xtask migrations` 0019 |
 
 #### CJ 실행 기록 ② — 기록 API·토큰 경로
 
@@ -1568,7 +1568,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | API | [[SYNC-API-001#GET/api/projects/{code}/trace-spans]] · [[SYNC-API-001#POST/api/projects/{code}/traces]] · `GET`·`DELETE …/traces` · `GET …/traces/coverage` · `GET`·`DELETE …/traces/{id}` |
 | 테스트 | 라우터 시험(토큰·세션·남의 것·4MB·같은 기록 200) · 계약 시험(L28) |
 | 선행 | CI |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/CJ-trace-api` · code 3 · 파이썬 라우터 시험 4(토큰·세션·남의 것·4MB 413·같은 기록 200·꼴 422) · `pytest` 525 · 계약 L28 54 사례 두 판 같다 · `check_code` 188/188 · `check_calls` 0 |
 
 #### CK 실행 기록 ③ — UI-19 기록 목록·재생
 
@@ -1578,7 +1578,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `frontend/src/flow/` 기록 목록·재생 패널·커버리지·기록 켜기 안내(명령은 서버 주소로)·요청 보내기(`GET /api/local`이 404면 curl 복사) · `client.ts` |
 | 테스트 | `check_ui` UI-19 · `tsc`·`oxlint`·`build` · 브라우저(DEV-17): 기록 도구로 올린 기록이 목록에 뜨고 재생·장비 왕복 |
 | 선행 | CJ · L29(기록 도구가 있어야 E2E) |
-| 완료 | — |
+| 완료 | 2026-10-17 · 화면은 카드 CG 때 함께 넣었다(기록 목록·재생·커버리지·기록 켜기 안내·기록 지우기·요청 보내기/curl) — 이 카드는 이음과 확인 · `check_ui` UI-19 42/42 · `tsc`·`oxlint`·`build` · 브라우저(DEV-17, 에이전트가 Playwright로): 기록 도구로 올린 기록이 5.3 목록에 뜨고(500 기록은 오류 툴팁) 고르면 7.1~7.3 재생(3D 경로·사건 목록·응답) · API 흐름 6.6 요청 보내기(싱크독_로컬 — 200·본문) · 화면 기록(trace-web)도 목록에 · 사람 확인은 따로 |
 
 #### CL 실행 기록 ④ — MCP list_traces·get_trace
 
@@ -1588,7 +1588,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `mcp/tools.py` — [[SYNC-MS-025#TraceService.list_recent]] · [[SYNC-MS-025#TraceService.get]] |
 | 테스트 | MCP 시험 · 계약 시험(L31) |
 | 선행 | CK |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/CL-mcp-traces` · spec 1 + code 1 · MCP 시험(비면 hint·최근 것부터·limit·max_events 자르기·없는 기록·남의 프로젝트) · `pytest` · 도구 16개 · 계약(L31) 두 판 같다 |
 
 ## 2. 통합 테스트 시나리오
 

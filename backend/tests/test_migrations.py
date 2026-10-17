@@ -27,6 +27,7 @@ TABLES = {
     "turns",
     "attachments",
     "code_graphs",  # 0015 — 코드 그래프 (카드 AX)
+    "traces",  # 0019 — 실행 기록 (카드 CI)
 }
 PARTIAL_INDEXES = {
     "ix_documents_has_convention_error",
@@ -62,6 +63,9 @@ def test_upgrade_creates_13_tables_and_indexes(alembic_cfg: Config) -> None:
     assert PARTIAL_INDEXES <= set(defs)
     assert all("WHERE" in defs[n] for n in PARTIAL_INDEXES)
     assert "version_no DESC" in defs["ix_versions_document_id_version_no_desc"]
+    # 0019 — traces 최근 목록 인덱스 · (project_id, trace_key) 유일 (카드 CI)
+    assert "id DESC" in defs["ix_traces_project_recent"]
+    assert "UNIQUE" in defs["uq_traces_project_key"]
     # 0012 — projects.owner_user_id not null + FK 인덱스 (DOM-003 3장)
     cols = {c["name"]: c for c in insp.get_columns("projects")}
     assert cols["owner_user_id"]["nullable"] is False

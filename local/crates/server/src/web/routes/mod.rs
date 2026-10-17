@@ -10,3 +10,4 @@ pub mod local;
 pub mod projects;
 pub mod references;
 pub mod specs;
+pub mod traces;
