@@ -482,13 +482,13 @@ pub async fn build_code_graph(pool: &PgPool, repos: &ServerRepos, code: &str, co
 **처리** [[SYNC-MS-007#pipeline.build_code_graph]]와 같은 차례
 1. `ProjectService.get(code)` — 없으면 그냥 끝(그새 해제됐다)
 2. 임시 폴더에 `git.archive(서버 저장소, commit, 임시)` — 작업 사본 폴더를 건드리지 않는다
-3. `(source, raw) = codegraph.load(임시)` · `graph = codegraph.enrich(임시, codegraph.reduce(raw))` · 출처가 `server`(추출)면 `raw = codegraph.widen(raw, graph)` — 추출 원형은 TS/JS·Rust가 파일 노드뿐이라 보강이 찾은 함수·호출을 더한다(카드 L20, 커밋된 graph.json이면 그대로 — 파이썬 판과 바이트로 같다) · `graph = codegraph.communities(raw, graph)` — 커뮤니티는 보강 뒤에(보강이 더한 함수도 받는다) · 파일 읽기·파싱·군집은 막히는 일이라 따로(블로킹 작업)에서
-4. `CodeGraphService.save(project, commit, source, graph)` 커밋 · 로그 「code graph code=… commit=… source=… functions=n calls=n communities=n elapsed=…」
+3. `(source, raw) = codegraph.load(임시)` · `graph = codegraph.enrich(임시, codegraph.reduce(raw))` · 출처가 `server`(추출)면 `raw = codegraph.widen(raw, graph)` — 추출 원형은 TS/JS·Rust가 파일 노드뿐이라 보강이 찾은 함수·호출을 더한다(카드 L20, 커밋된 graph.json이면 그대로 — 파이썬 판과 바이트로 같다) · `graph = codegraph.communities(raw, graph)` — 커뮤니티는 보강 뒤에(보강이 더한 함수도 받는다) · 그래프를 값으로 바꿔 `flow.extend(임시, 값)` — 흐름 키(카드 L22, [[SYNC-MS-026]] 0장 — 파이썬 판은 커뮤니티 앞이지만 결과는 같다) · 파일 읽기·파싱·군집은 막히는 일이라 따로(블로킹 작업)에서
+4. `CodeGraphService.save(project, commit, source, 값)` 커밋 · 로그 「code graph code=… commit=… source=… functions=n calls=n communities=n elapsed=…」
 - 어느 단계든 실패하면 `CodeGraphService.fail(project, commit, 이유)` 커밋(그새 해제됐으면 남길 곳이 없다 — 삼킨다) · 경고 로그 — 배치라 옛 그래프를 두고 이유만 남긴다(UC-S8 2a). 이유는 `CodeGraphFailed`면 그 문장, 아니면 오류 문장
 
-**호출하는 것** [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-019#Git.archive]] · [[SYNC-MS-022#codegraph.load]] · [[SYNC-MS-022#codegraph.reduce]] · [[SYNC-MS-022#codegraph.enrich]] · [[SYNC-MS-022#codegraph.widen]] · [[SYNC-MS-022#codegraph.communities]] · [[SYNC-MS-022#CodeGraphService.save]] · [[SYNC-MS-022#CodeGraphService.fail]]
+**호출하는 것** [[SYNC-MS-013#ProjectService.get]] · [[SYNC-MS-019#Git.archive]] · [[SYNC-MS-022#codegraph.load]] · [[SYNC-MS-022#codegraph.reduce]] · [[SYNC-MS-022#codegraph.enrich]] · [[SYNC-MS-022#codegraph.widen]] · [[SYNC-MS-022#codegraph.communities]] · [[SYNC-MS-026#flow.extend]] · [[SYNC-MS-022#CodeGraphService.save]] · [[SYNC-MS-022#CodeGraphService.fail]]
 
-**테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 파이썬 코드를 민 커밋 → 함수·선·항목·커뮤니티가 든 그래프 행, 출처 `server` · Rust·TS 코드도 민 커밋 → 그 함수들도 커뮤니티를 받는다(카드 L20) · 커밋된 graph.json이 있으면 `repo` · 깨진 graph.json → 옛 그래프를 두고 `error` · 해제된 프로젝트 → 아무것도 안 한다
+**테스트 관점** (시험 DB · 임시 데이터 자리 · 진짜 git) 파이썬 코드를 민 커밋 → 함수·선·항목·커뮤니티가 든 그래프 행, 출처 `server` · Rust·TS 코드도 민 커밋 → 그 함수들도 커뮤니티를 받는다(카드 L20) · 흐름 키(`files`·`units`·`http`·`infra`, 함수의 `steps`·`route`)가 든다(카드 L22) · 커밋된 graph.json이 있으면 `repo` · 깨진 graph.json → 옛 그래프를 두고 `error` · 해제된 프로젝트 → 아무것도 안 한다
 
 ---
 
