@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-024
 type: MS
 title: MINISPEC — codegraph 흐름 — 호출 순서·라우트·화면 요청·장비·실행 단위
-status: approved
+status: draft
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-MS-011, SYNC-INFRA-001]
 ---
 
