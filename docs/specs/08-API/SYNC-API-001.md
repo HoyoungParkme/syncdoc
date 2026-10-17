@@ -3046,17 +3046,17 @@ components:
               status: {type: string, enum: [same, code_only, spec_only]}
     FlowStep:
       type: object
-      description: 함수의 호출 순서 한 줄(카드 CC) — 줄·차례대로
+      description: 함수의 호출 순서 한 줄(카드 CC) — 줄·차례대로. 기본값인 키(to·infra 없음, 거짓인 표시)는 싣지 않는다. 대상도 장비도 없는 호출은 없다
       required: [k, line, label]
       properties:
         k: {type: string, enum: [call, return, raise]}
         line: {type: integer}
         label: {type: string, description: "부른 모양(`self.repo.save`)·반환·예외 글자, 80자까지"}
-        to: {type: string, nullable: true, description: 부르는 함수의 열쇠 — 그래프 안에서 풀렸을 때만}
-        inferred: {type: boolean, description: 이름으로 짐작해 이었다}
-        deferred: {type: boolean, description: 콜백 안 — 나중에 불림}
-        awaited: {type: boolean}
-        infra: {type: string, nullable: true, description: 이 호출이 닿는 장비 id(InfraNode.id)}
+        to: {type: string, description: 부르는 함수의 열쇠 — 그래프 안에서 풀렸을 때만 있다}
+        inferred: {type: boolean, enum: [true], description: 이름으로 짐작해 이었다 — 참일 때만}
+        deferred: {type: boolean, enum: [true], description: 콜백 안 — 나중에 불림. 참일 때만}
+        awaited: {type: boolean, enum: [true], description: 참일 때만}
+        infra: {type: string, description: 이 호출이 닿는 장비 id(InfraNode.id) — 있을 때만}
     FlowFunction:
       type: object
       description: 흐름 보기의 함수 하나 — CodeNodes의 함수에 끝 줄·라우트·호출 순서를 더했다

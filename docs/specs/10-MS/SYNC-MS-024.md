@@ -23,7 +23,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-MS-011, SYNC-INFRA-001
 | 키 | 모양 | 뜻 |
 |---|---|---|
 | `files` | `[{path, lang, loc}]` | 저장소의 코드 파일 전부 — [[#flow.files]] |
-| `functions[].steps` | `[{k, line, label, to, inferred, deferred, awaited, infra}]` | 함수의 호출 순서 — [[#steps.steps]] |
+| `functions[].steps` | `[{k, line, label, to?, inferred?, deferred?, awaited?, infra?}]` — `?`는 있을 때만 | 함수의 호출 순서 — [[#steps.steps]] |
 | `functions[].route` | `{method, path}` 또는 null | 함수가 받는 라우트 — [[#routes.routes]] |
 | `http` | `[{from, to, inferred}]` | 화면 요청 → 라우트 함수 — [[#routes.http_links]] |
 | `infra` | `{nodes: [InfraNode], links: [{from, to, protocol}]}` | 장비와 연결 — [[#infra.infra]] |
@@ -68,14 +68,15 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-MS-011, SYNC-INFRA-001
 4. `routes(src_dir, graph)` — 함수마다 `route`
 5. `graph["http"] = http_links(src_dir, graph)`
 6. `infra(src_dir, graph)` — `graph["infra"]`와 steps의 `infra`
-7. 2~6은 각각 따로 감싼다 — 하나가 예외를 내면 그 키만 빈 값(`units`·`http` `[]`, `infra` `{"nodes": [], "links": []}`, 함수의 `steps` `[]`·`route` null)으로 두고 로그 한 줄, 나머지는 계속한다. 1이 실패하면 `files` `[]`
-8. `→ graph` (같은 객체)
+7. **지우기** — 함수마다 steps에서 `to`도 `infra`도 없는 `call`을 뺀다(라이브러리 `split` 같은 것 — 재생에 쓸 데가 없고 그래프가 몇 MB로 커진다). 반환·예외는 둔다
+8. 2~7은 각각 따로 감싼다 — 하나가 예외를 내면 그 키만 빈 값(`units`·`http` `[]`, `infra` `{"nodes": [], "links": []}`, 함수의 `steps` `[]`·`route` null)으로 두고 로그 한 줄, 나머지는 계속한다. 1이 실패하면 `files` `[]`
+9. `→ graph` (같은 객체)
 
 **출력** 흐름 키가 든 그래프. 함수마다 `steps`·`route` 키가 반드시 있다
 
 **호출하는 것** [[#flow.files]] · [[#infra.units]] · [[#steps.steps]] · [[#routes.routes]] · [[#routes.http_links]] · [[#infra.infra]]
 
-**테스트 관점** 키 여섯이 다 생긴다 · 한 단계가 터져도 그 키만 비고 그래프는 돌아온다 · 함수마다 `steps`·`route`가 있다
+**테스트 관점** 키 여섯이 다 생긴다 · 한 단계가 터져도 그 키만 비고 그래프는 돌아온다 · 함수마다 `steps`·`route`가 있다 · 대상도 장비도 없는 호출이 빠지고 반환·예외는 남는다
 
 ---
 
@@ -104,31 +105,31 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-MS-011, SYNC-INFRA-001
 **입력** `graph` — `functions`·`calls`가 있는 그래프
 
 **처리**
-1. 파일마다(그래프 함수의 `file` 중 세 언어) 한 번 읽는다. 읽거나 파싱하지 못하면 그 파일 함수는 `steps: []`
+1. 파일마다(그래프 함수의 `file` 중 세 언어) 한 번 읽는다. 맨 앞 UTF-8 BOM은 떼고 센다. UTF-8이 아니거나 파싱하지 못하면(파이썬 `SyntaxError`) 그 파일 함수는 `steps: []`. 바이트 위치는 파일 바이트(BOM을 뗀) 안의 자리 — 파이썬은 줄의 시작 바이트 + `col_offset`
 2. **정의 찾기** — 파일의 모든 함수 정의(중첩 포함)를 줄로 색인한다
    - 파이썬: `FunctionDef`·`AsyncFunctionDef` — `def` 줄과 첫 데코레이터 줄 둘 다
    - TS/JS: `function_declaration`·`generator_function_declaration`·`method_definition`·`function_expression`·`arrow_function` — 그 노드의 첫 줄, 그리고 `lexical_declaration`·`variable_declaration`·`export_statement`·`pair`·`public_field_definition`의 값으로 들어 있으면 그 문의 첫 줄
    - Rust: `function_item` — `fn` 낱말이 든 줄
    - 그래프 함수 `line`에 맞는 정의가 없으면 `steps: []`. 둘 이상이면 시작 바이트가 앞선 것
-3. **훑기** — 정의의 몸통(파이썬은 `body`와 매개변수 기본값, TS/JS는 `body`, Rust는 `body`)을 다 내려가며 아래 「사건」을 모은다. **중첩 정의**(파이썬 `def`·`lambda`, TS/JS 함수·화살표, Rust `closure_expression`·중첩 `function_item`) 안은 계속 내려가되 그 안의 사건은 `deferred: true`이고 그 안의 `return`·`raise`는 모으지 않는다. 파이썬 `class` 정의 안은 내려가지 않는다
+3. **훑기** — 정의의 몸통(`body` — 파이썬은 매개변수 기본값의 `Depends(…)`도)을 다 내려가며 아래 「사건」을 모은다. **중첩 정의**(파이썬 `def`·`lambda`, TS/JS 함수·화살표, Rust `closure_expression`·중첩 `function_item`) 안은 계속 내려가되 그 안의 사건은 `deferred: true`이고 그 안의 `return`·`raise`는 모으지 않는다. 파이썬 `class` 정의 안은 내려가지 않는다
 4. **사건** — 각 사건은 `(끝 바이트, 시작 바이트, 내용)`
-   - 호출 — 파이썬 `Call` · TS/JS `call_expression`(함수 자리가 `import`이면 뺀다) · Rust `call_expression`. 함수 자리의 소스 글자가 `label`, 끝 바이트는 호출식 전체의 끝. 파이썬 `Depends(…)`가 매개변수 기본값이면 `label`은 `Depends(` + 첫 인자 글자 + `)`이고 `line`은 함수 정의의 `def` 줄이며 끝 바이트는 -1(맨 앞)
+   - 호출 — 파이썬 `Call` · TS/JS `call_expression`(함수 자리가 `import`이면 뺀다) · Rust `call_expression`. 함수 자리의 소스 글자가 `label`, 끝 바이트는 호출식 전체의 끝. 파이썬 `Depends(…)`가 매개변수 기본값이면 `label`은 `Depends(` + 첫 인자 글자 + `)`이고 `line`은 함수 정의의 `def` 줄이다. 기본값의 다른 호출은 사건이 아니다
    - JSX — TS/JS `jsx_opening_element`·`jsx_self_closing_element`의 이름이 대문자로 시작하면(`Comp`·`Foo.Bar`) 호출 하나, `label` = `<` + 이름 + `>`
    - 반환 — 파이썬 `Return` · TS/JS `return_statement` · Rust `return_expression`. `label` = `return` 또는 `return ` + 값 글자
    - 예외 — 파이썬 `Raise`(`raise ` + 예외 글자, 없으면 `raise`) · TS/JS `throw_statement`(`throw ` + 값 글자). Rust는 없다
    - `awaited` — 호출이 파이썬 `Await`의 값 그 자체 · TS/JS `await_expression`의 자식 그 자체 · Rust `await_expression`의 앞 식 그 자체일 때
-5. **차례** — 사건을 `(끝 바이트, -시작 바이트)` 오름차순으로 — 안쪽 호출이 먼저, `return f()`에서 호출이 반환보다 먼저
-6. **글자** — 소스 바이트를 UTF-8로 읽고(못 읽는 바이트는 대체 문자), 공백 문자 묶음(`\s+`, 파이썬 `str.split()`과 같은 공백)을 한 칸으로, 앞뒤를 자른다. 글자 수(코드 포인트)가 70을 넘으면 앞 69자 + `…`. 반환·예외는 합친 뒤 자른다
+5. **차례** — Depends 사건이 맨 앞(시작 바이트 차례), 나머지는 `(끝 바이트, -시작 바이트)` 오름차순 — 안쪽 호출이 먼저, `return f()`에서 호출이 반환보다 먼저
+6. **글자** — 글자를 뽑는 식(호출의 함수 자리·반환 값·예외 값·Depends 인자)이 괄호로만 싸여 있으면 괄호를 벗긴 안쪽 식이다(파이썬 `ast`에는 괄호 노드가 없다 — 괄호 묶음 튜플 `(a, b)`는 튜플이라 괄호째). 소스 바이트를 UTF-8로 읽고(못 읽는 바이트는 대체 문자), 공백 문자 묶음(`\s+`, 파이썬 `str.split()`과 같은 공백)을 한 칸으로, 앞뒤를 자르고, `.` 바로 앞뒤의 한 칸을 지운다(여러 줄 사슬 `map\n  .lock()` → `map.lock`). 글자 수(코드 포인트)가 70을 넘으면 앞 69자 + `…`. 반환·예외는 합친 뒤 자른다
 7. **줄** — 호출·JSX·반환·예외가 시작하는 줄(1부터). Depends는 2의 `def` 줄
-8. **대상(`to`)** — 호출의 마지막 이름: 파이썬 `Name.id` · `Attribute.attr` / TS/JS `identifier` · `member_expression`의 `property` · JSX 이름의 마지막 조각 / Rust `identifier` · `field_expression`의 `field` · `scoped_identifier`의 `name` · `generic_function`이면 그 안의 함수. Depends는 첫 인자의 마지막 이름. 이름이 없으면(`f()()`, `a[0]()`) `to` null
+8. **대상(`to`)** — 호출의 마지막 이름: 파이썬 `Name.id` · `Attribute.attr` / TS/JS `identifier` · `member_expression`의 `property` · JSX 이름의 마지막 조각 / Rust `identifier` · `field_expression`의 `field` · `scoped_identifier`의 `name` · `generic_function`이면 그 안의 함수. Depends는 첫 인자의 마지막 이름. 이름이 없으면(`f()()`, `a[0]()`) `to` null. Depends의 첫 인자는 맨 이름 호출과 같이 본다
    - 이 함수에서 나가는 호출 선(`calls`의 from이 이 함수) 중 대상 함수의 `name`이 그 이름인 것이 **딱 하나**면 그 함수 열쇠, `inferred: false`
-   - 없으면 그래프 전체에서 `name`이 그 이름인 함수가 **딱 하나**이고 그것이 이 함수가 아니면 그 열쇠, `inferred: true`
+   - 없고 호출이 **맨 이름·경로 호출**(파이썬 `Name` · TS/JS `identifier` · Rust `identifier`·`scoped_identifier`)이면, 그래프에서 **같은 언어**(1의 세 갈래) 파일의 함수 중 `name`이 그 이름인 것이 **딱 하나**이고 그것이 이 함수가 아닐 때 그 열쇠, `inferred: true`. 메서드 호출(`x.m()`)은 짐작하지 않는다 — 받는 쪽 타입을 모르면 `split`·`clone` 같은 이름이 엉뚱한 언어의 함수에 붙는다
    - 그 밖 null, `inferred: false`
 9. 한 함수에 사건이 200개를 넘으면 차례대로 앞 200개만
-10. 함수마다 `steps = [{k, line, label, to, inferred, deferred, awaited, infra: null}]` — `k`는 `call`(JSX 포함)·`return`·`raise`. 반환·예외의 `to`는 null. `infra`는 [[#infra.infra]]가 채운다
+10. 함수마다 `steps = [{k, line, label, …}]` — `k`는 `call`(JSX 포함)·`return`·`raise`. **기본값인 키는 싣지 않는다** — `to`는 있을 때만, `inferred`·`deferred`·`awaited`는 참일 때만(`true`). 키 차례는 `k, line, label, to, inferred, deferred, awaited`. `infra`는 [[#infra.infra]]가 있을 때만 `awaited` 뒤에 단다
 11. 정의를 못 찾은 함수·세 언어가 아닌 함수는 `steps: []` · `→ graph`
 
-**테스트 관점** 중첩 호출 `f(g(x))` → g, f · 형제 호출은 앞에서부터 · `return f()` → 호출, 반환 · `await` 표시 · 중첩 함수·화살표·클로저 안 호출이 `deferred`이고 그 안 `return`은 없다 · 파이썬 데코레이터 달린 함수도 찾는다 · Depends가 맨 앞 · JSX `<Comp>` · 글자 공백 접기와 70자 자르기(한글 포함) · 나가는 선으로 `to`(같은 이름 둘이면 null) · 선이 없을 때 전체에서 하나뿐인 이름 → `inferred` · 200개 자르기 · 파싱 실패 파일 → 빈 목록
+**테스트 관점** 중첩 호출 `f(g(x))` → g, f · 형제 호출은 앞에서부터 · `return f()` → 호출, 반환 · `await` 표시 · 중첩 함수·화살표·클로저 안 호출이 `deferred`이고 그 안 `return`은 없다 · 파이썬 데코레이터 달린 함수도 찾는다 · Depends가 맨 앞 · JSX `<Comp>` · 글자 공백 접기와 70자 자르기(한글 포함) · 나가는 선으로 `to`(같은 이름 둘이면 null) · 선이 없을 때 맨 이름 호출은 같은 언어에서 하나뿐인 이름 → `inferred`, 메서드 호출·다른 언어는 짐작하지 않는다 · 기본값 키가 빠진다 · `.` 앞뒤 공백 · 200개 자르기 · 파싱 실패 파일 → 빈 목록
 
 ---
 

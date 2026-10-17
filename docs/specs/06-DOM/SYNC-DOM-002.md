@@ -496,7 +496,7 @@ classDiagram
 | `CodeNode` | `key` · `name` · `qual` · `file` · `line` · `community: int \| None` · `item: str \| None` · `ms: str \| None` · `status: str \| None` · `layer: CodeLayer \| None` | 코드 그래프 노드 하나. `item`은 속한 명세 항목(어느 문서든 — 카드 BJ), `ms`는 그중 MINISPEC 항목. `status`는 `ms`가 있을 때 `compare`로 — `code_only` > `spec_only` > `same`. `layer`는 항목이 없을 때 클래스 명세 층 표로(카드 BM) |
 | `CodeNodes` | `graph: CodeGraphInfo \| None` · `communities: list~CodeCommunity~` · `functions: list~CodeNode~` · `calls: list~list~str~~` | queries.code_nodes → API `CodeNodes`(UI-17 코드 그래프) |
 | `ConversationView` | `ConversationBrief` + `turns: list~TurnView~` + `pending: list~AttachmentMeta~`(아직 안 보낸 첨부) | ConversationService.get → queries.conversation_view → API `Conversation` |
-| `FlowStep` | `k: str`(`call`·`return`·`raise`) · `line: int` · `label: str` · `to: str \| None`(부르는 함수 열쇠) · `inferred: bool` · `deferred: bool` · `awaited: bool` · `infra: str \| None`(닿는 장비 id) | 함수 하나의 호출 순서 한 줄([[SYNC-MS-024]] 0장, 카드 CC) |
+| `FlowStep` | `k: str`(`call`·`return`·`raise`) · `line: int` · `label: str` · `to: str`(부르는 함수 열쇠) · `inferred`·`deferred`·`awaited: true` · `infra: str`(닿는 장비 id) — `k`·`line`·`label` 밖은 있을 때만 싣는다 | 함수 하나의 호출 순서 한 줄([[SYNC-MS-024]] 0장, 카드 CC) |
 | `FlowRoute` | `method: str` · `path: str` | 함수가 받는 라우트(카드 CD) |
 | `FlowFunction` | `CodeNode` + `end: int \| None` · `route: FlowRoute \| None` · `steps: list~FlowStep~` | 흐름 보기의 함수 하나 |
 | `FlowFile` | `path: str` · `lang: str \| None` · `loc: int` | 코드 파일 하나 — 함수를 못 읽는 언어도(UC-H24 3a) |
