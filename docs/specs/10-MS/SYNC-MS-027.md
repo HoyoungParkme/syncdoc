@@ -39,6 +39,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-025, SYNC-INFRA-001, SYNC-API-001]
 | [[#trace.watch]] | 기록 폴더를 훑어 올린다 |
 | [[#trace.copy_rust]] | Rust 작업 공간을 계측한 사본으로 |
 | [[#trace.proxy]] | 화면 기록 — Node 프록시 |
+| [[#local.request]] | 이 PC의 개발 서버로 요청 하나를 대신 보낸다 |
 
 ---
 
@@ -284,6 +285,25 @@ pub async fn proxy(args: WebArgs) -> ExitCode
 **호출하는 것** [[#trace.fetch_spans]] · [[#trace.unpack]] · [[#trace.span_table]] · [[#trace.watch]]
 
 **테스트 관점** E2E — Vite 앱을 프록시로 열어 버튼 → 화면 기록 하나(`@fetch` 포함)
+
+---
+
+#### local.request 이 PC의 개발 서버로 요청 하나를 대신 보낸다
+
+**시그니처**
+```rust
+pub async fn request(method: &str, url: &str, body: Option<&str>) -> Result<LocalReply, Problem>
+```
+
+근거: [[SYNC-UC-001#UC-H26]] · [[SYNC-SEQ-001#SEQ-37]] · [[SYNC-API-001#POST/api/local/request]] · [[SYNC-INFRA-001#C14]] · 사용자 결정 2026-10-12(로컬 판만)
+
+**처리**
+1. 주소 — `http`·`https`이고 호스트가 `localhost`·`127.0.0.1`·`::1`이 아니면(읽지 못해도) `! request-refused {url}`
+2. 보낸다 — 리다이렉트를 따르지 않고 10초. `GET`이 아니고 본문이 있으면 `Content-Type: application/json`
+3. 닿지 못하거나 시간이 지나면 `! request-failed {reason}`
+4. `→ LocalReply { status, headers(이름 소문자, 같은 이름은 `, `로 잇는다), body(UTF-8 — 못 읽는 바이트는 대체 문자), truncated(1MB에서 잘렸나), ms }`
+
+**테스트 관점** localhost 아님 → refused · 닿지 못함 → failed · 1MB 자르기 · 리다이렉트를 따르지 않는다 · 머리 이름이 소문자
 
 ---
 
