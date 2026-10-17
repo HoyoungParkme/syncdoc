@@ -56,6 +56,7 @@ from app.core.types import (
     CodeFunction,
     CodeGraphInfo,
     CodeLayer,
+    CodeLayerRow,
     CodeLayerSpec,
     CodeNode,
     CodeNodes,
@@ -70,6 +71,8 @@ from app.core.types import (
     DocumentSummary,
     DownstreamDoc,
     DownstreamView,
+    FlowFunction,
+    FlowView,
     Graph,
     GraphEdge,
     GraphNode,
@@ -1280,17 +1283,26 @@ def _diffs(s: Session, project_id: int, graph: dict) -> dict[str, CallDiff]:
     return {d.ms_id: d for d in codegraph.compare(graph, spec)}
 
 
-def _layers(s: Session, project_id: int, graph: dict) -> dict[str, CodeLayer]:
+def _layer_rows(s: Session, project_id: int) -> list[dict]:
+    """프로젝트 클래스 명세 전부의 층 표를 문서 순서대로 이어 붙인 줄들 (MS-008 code_nodes 2a)."""
+    spec = SpecService(s)
+    rows: list[dict] = []
+    for doc_id in _class_docs(s, project_id):
+        rows.extend(codegraph.layer_table(spec.get_document(doc_id).body))
+    return rows
+
+
+def _layers(
+    s: Session, project_id: int, graph: dict, rows: list[dict] | None = None
+) -> dict[str, CodeLayer]:  # noqa: E501
     """항목 없는 함수 key → 층 (MS-008 code_nodes 2a, 카드 BM).
 
     프로젝트 클래스 명세 전부의 층 표를 문서 순서대로 이어 붙인다 — 구현이 둘이면 클래스 명세도
     둘이다(카드 BV). 없으면 표 없이(도우미만). 표는 볼 때 읽는다 — 「호출하는 것」처럼 명세만 고쳐도
     바로 바뀐다.
     """
-    spec = SpecService(s)
-    rows: list[dict] = []
-    for doc_id in _class_docs(s, project_id):
-        rows.extend(codegraph.layer_table(spec.get_document(doc_id).body))
+    if rows is None:
+        rows = _layer_rows(s, project_id)
     layer_of, _ = codegraph.layers(graph, rows)
     return {
         k: CodeLayer(v["name"], [CodeLayerSpec(x["ref"], x["note"]) for x in v["specs"]])
@@ -1465,6 +1477,65 @@ async def code_nodes(code: str, user: User) -> CodeNodes:
         CodeCommunity(c["id"], c["label"], c["size"]) for c in row.graph.get("communities", [])
     ]
     return CodeNodes(info, communities, functions, [[a, b] for a, b, *_ in row.graph["calls"]])
+
+
+def _flow_function(f: dict, by_key: dict, layer_of: dict) -> FlowFunction:
+    """그래프 함수 하나 → FlowFunction — 대조·층은 code_nodes 3과 같다 (MS-008 flow_view 3)."""
+    d = by_key.get(f["key"])
+    status = None
+    if d is not None:
+        status = "code_only" if d.code_only else "spec_only" if d.spec_only else "same"
+    ms = d.ms_id if d else None
+    return FlowFunction(
+        f["key"],
+        f["name"],
+        f["qual"],
+        f["file"],
+        f["line"],
+        f.get("end"),
+        f.get("community"),
+        f.get("item") or ms,
+        ms,
+        status,
+        layer_of.get(f["key"]),
+        f.get("route"),
+        f.get("steps", []),
+    )
+
+
+async def flow_view(code: str, user: User) -> FlowView:
+    """SYNC-MS-008#queries.flow_view
+
+    흐름 보기(UI-19) — 그래프의 흐름 키(파일·호출 순서·라우트·화면 요청·장비·실행 단위)와 층 표,
+    code_nodes와 같은 대조·층을 한 번에. 옛 그래프(흐름 키 없음)는 빈 값.
+    """
+    with db.session_scope() as s:
+        project = ProjectService(s).get_owned(code, user)
+        row = CodeGraphService(s).get(project.id)
+        if row is None:
+            return FlowView(None, [], [], [], [], {"nodes": [], "links": []}, [], [], [])
+        info = _graph_info(row)
+        diffs = _diffs(s, project.id, row.graph)
+        rows = _layer_rows(s, project.id)
+        layer_of = _layers(s, project.id, row.graph, rows)
+    by_key = {d.function: d for d in diffs.values() if d.function}
+    g = row.graph
+    return FlowView(
+        info,
+        g.get("files", []),
+        [_flow_function(f, by_key, layer_of) for f in g["functions"]],
+        [[a, b] for a, b, *_ in g["calls"]],
+        g.get("http", []),
+        g.get("infra", {"nodes": [], "links": []}),
+        g.get("units", []),
+        [
+            CodeLayerRow(
+                r["name"], r["patterns"], [CodeLayerSpec(x["ref"], x["note"]) for x in r["specs"]]
+            )  # noqa: E501
+            for r in rows
+        ],
+        [CodeCommunity(c["id"], c["label"], c["size"]) for c in g.get("communities", [])],
+    )
 
 
 def _next_start(functions: list[dict], f: dict) -> int | None:
