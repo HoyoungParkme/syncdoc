@@ -1506,7 +1506,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | [[SYNC-MS-024#routes.routes]] · [[SYNC-MS-024#routes.http_links]] · `core/codegraph/routes.py` · `flow.extend` 4·5 |
 | 테스트 | MS-024 테스트 관점(routes·http) · 싱크독 저장소 — FastAPI 라우트와 axum 라우트가 함수에, 화면 `api.get(…)`이 라우트에 |
 | 선행 | CC |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/CD-flow-routes` · spec 1 + code 2 · 파이썬 `pytest` 506 · `ruff` · `check_code` MS-024 7/7 · 싱크독 저장소: 라우트 89(파이썬 60·Rust 28·도구 1), 화면 요청 연결 71(짐작 26 — 두 판이 같은 경로를 가져 둘로 갈린 것) |
 
 #### CE 흐름 보기 ③ — 장비·실행 단위
 

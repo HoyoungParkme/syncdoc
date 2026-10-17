@@ -223,3 +223,124 @@ def test_extend_survives_a_failing_step(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(steps, "steps", boom)
     flow.extend(tmp_path, g)
     assert g["files"] and all(f["steps"] == [] for f in g["functions"])
+
+
+# ── routes ──
+from app.core.codegraph import routes  # noqa: E402
+
+
+def _routes_of(tmp_path: Path, files: dict[str, str], funcs: list[dict]) -> dict[str, dict]:
+    _write(tmp_path, files)
+    g = {"functions": funcs, "calls": [], "files": [{"path": p} for p in files]}
+    routes.routes(tmp_path, g)
+    return {f["qual"]: f["route"] for f in g["functions"]}
+
+
+def test_routes_python_fastapi_flask_blueprint_include(tmp_path: Path) -> None:
+    files = {
+        "app/main.py": "from app.api import items as items_mod\n"
+                       "app.include_router(items_mod.router, prefix='/v1')\n",
+        "app/api/items.py": "router = APIRouter(prefix='/items')\n\n"
+                            "@router.get('/{item_id}/')\ndef read(item_id):\n    pass\n\n"
+                            "@router.api_route('', methods=['POST'])\ndef make():\n    pass\n",
+        "web/f.py": "bp = Blueprint('x', __name__, url_prefix='/bp')\n\n"
+                    "@bp.route('/u/<int:uid>', methods=['PUT'])\ndef upd(uid):\n    pass\n\n"
+                    "@app.get('/plain')\ndef plain():\n    pass\n",
+    }  # fmt: skip
+    funcs = [_fn("app/api/items.py", 3, "read"), _fn("app/api/items.py", 7, "make"),
+             _fn("web/f.py", 4, "upd"), _fn("web/f.py", 8, "plain")]  # fmt: skip
+    got = _routes_of(tmp_path, files, funcs)
+    assert got["read"] == {"method": "GET", "path": "/v1/items/{item_id}"}
+    assert got["make"] == {"method": "POST", "path": "/v1/items"}
+    assert got["upd"] == {"method": "PUT", "path": "/bp/u/{uid}"}
+    assert got["plain"] == {"method": "GET", "path": "/plain"}
+
+
+def test_routes_typescript_express_nest_next(tmp_path: Path) -> None:
+    files = {
+        "srv/app.ts": "const app = express()\nfunction show(req, res) {}\n"
+                      "app.get('/users/:id', auth, show)\napp.post('/users', (req, res) => {})\n",
+        "srv/c.ts": "@Controller('cats')\nclass CatsController {\n  @Get(':id')\n  one() {}\n}\n",
+        "web/app/api/items/[id]/route.ts": "export async function GET(req) {}\n",
+    }  # fmt: skip
+    funcs = [_fn("srv/app.ts", 2, "show"), _fn("srv/app.ts", 4, "anon"),
+             _fn("srv/c.ts", 4, "one"), _fn("web/app/api/items/[id]/route.ts", 1, "GET")]  # fmt: skip
+    got = _routes_of(tmp_path, files, funcs)
+    assert got["show"] == {"method": "GET", "path": "/users/{id}"}
+    assert got["anon"] == {"method": "POST", "path": "/users"}  # 인라인 핸들러
+    assert got["one"] == {"method": "GET", "path": "/cats/{id}"}
+    assert got["GET"] == {"method": "GET", "path": "/api/items/{id}"}
+
+
+def test_routes_rust_axum_chain_and_actix(tmp_path: Path) -> None:
+    files = {
+        "src/lib.rs": 'fn app() -> Router {\n    Router::new()\n'
+                      '        .route("/api/x", get(list).post(handlers::make))\n}\n'
+                      "async fn list() {}\nasync fn make() {}\n\n"
+                      '#[get("/hi/")]\nasync fn hi() {}\n',
+    }  # fmt: skip
+    funcs = [_fn("src/lib.rs", 5, "list"), _fn("src/lib.rs", 6, "make"), _fn("src/lib.rs", 9, "hi")]
+    got = _routes_of(tmp_path, files, funcs)
+    assert got["list"] == {"method": "GET", "path": "/api/x"}
+    assert got["make"] == {"method": "POST", "path": "/api/x"}
+    assert got["hi"] == {"method": "GET", "path": "/hi"}
+
+
+# ── http_links ──
+def _http(tmp_path: Path, front: str, extra: list[dict] | None = None) -> list[dict]:
+    _write(tmp_path, {"web/p.tsx": front})
+    funcs = [_fn("web/p.tsx", 1, "load")] + (extra or [])
+    funcs_routes = [
+        ("api/a.py:1", "GET", "/api/projects/{code}/flow"),
+        ("api/a.py:2", "POST", "/api/projects/{code}/traces"),
+        ("api/a.py:3", "GET", "/api/projects/list"),
+        ("api/a.py:4", "GET", "/api/projects/{code}"),
+    ]
+    for key, m, p in funcs_routes:
+        f = _fn("api/a.py", int(key.rsplit(":", 1)[1]), "r")
+        f["route"] = {"method": m, "path": p}
+        funcs.append(f)
+    return routes.http_links(tmp_path, {"functions": funcs, "calls": [], "units": []})
+
+
+def test_http_template_exact_and_fetch_method(tmp_path: Path) -> None:
+    got = _http(tmp_path, "export async function load(code) {\n"
+                          "  await api.get(`/api/projects/${code}/flow?x=1`)\n"
+                          "  await fetch(`/api/projects/${code}/traces`, { method: 'POST' })\n}\n")  # fmt: skip
+    assert got == [
+        {"from": "web/p.tsx:1", "to": "api/a.py:1", "inferred": False},
+        {"from": "web/p.tsx:1", "to": "api/a.py:2", "inferred": False},
+    ]
+
+
+def test_http_literal_beats_param_and_wildcard_on_literal_is_guess(tmp_path: Path) -> None:
+    got = _http(tmp_path, "export function load(x) {\n"
+                          "  api.get('/api/projects/list')\n  api.get(`/api/${x}/list`)\n}\n")  # fmt: skip
+    assert {"from": "web/p.tsx:1", "to": "api/a.py:3", "inferred": False} in got
+    assert {"from": "web/p.tsx:1", "to": "api/a.py:4", "inferred": False} not in got
+
+
+def test_http_suffix_match_and_router_registration(tmp_path: Path) -> None:
+    _write(tmp_path, {"web/p.tsx": "const app = express()\nexport function load() {\n"
+                                   "  app.get('/projects/{c}/flow', h)\n"
+                                   "  api.get('/projects/a/flow')\n}\n"})  # fmt: skip
+    f = _fn("api/a.py", 1, "r")
+    f["route"] = {"method": "GET", "path": "/api/projects/{code}/flow"}
+    g = {"functions": [_fn("web/p.tsx", 2, "load"), f], "calls": [], "units": []}
+    # 라우트 등록(app.get)은 요청이 아니고, api.get은 끝맞춤이라 짐작이다
+    assert routes.http_links(tmp_path, g) == [
+        {"from": "web/p.tsx:2", "to": "api/a.py:1", "inferred": True}
+    ]
+    _write(tmp_path, {"web/p.tsx": "const app = express()\nexport function load() {\n"
+                                   "  app.get('/api/projects/{c}/flow', h)\n}\n"})  # fmt: skip
+    assert routes.http_links(tmp_path, g) == []
+
+
+def test_http_ignores_non_front_files(tmp_path: Path) -> None:
+    _write(tmp_path, {"srv/x.ts": "export function load() {\n  api.get('/api/projects/list')\n}\n"})
+    f = _fn("api/a.py", 3, "r")
+    f["route"] = {"method": "GET", "path": "/api/projects/list"}
+    g = {"functions": [_fn("srv/x.ts", 1, "load"), f], "calls": [], "units": []}
+    assert routes.http_links(tmp_path, g) == []
+    g["units"] = [{"kind": "web", "dir": "srv"}]
+    assert routes.http_links(tmp_path, g)[0]["to"] == "api/a.py:3"
