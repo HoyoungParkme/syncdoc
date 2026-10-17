@@ -155,6 +155,9 @@ export function ProjectDetail() {
         <Link className="btn" data-el="2.3" to={`/p/${code}/code-graph`}>
           코드 그래프
         </Link>
+        <Link className="btn" data-el="2.4" to={`/p/${code}/flow`}>
+          흐름 보기
+        </Link>
         <Link className="btn" data-el="2.2" to={`/p/${code}/read`}>
           순서대로 읽기
         </Link>

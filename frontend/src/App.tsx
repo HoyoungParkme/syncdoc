@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Shell } from './components/Shell'
 import { CodeGraph } from './pages/CodeGraph'
 import { DocView } from './pages/DocView'
+import { Flow } from './pages/Flow'
 import { Graph } from './pages/Graph'
 import { History } from './pages/History'
 import { ReadOrder } from './pages/ReadOrder'
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/p/:code/d/:docId/history" element={<History />} />
           <Route path="/p/:code/graph" element={<Graph />} />
           <Route path="/p/:code/code-graph" element={<CodeGraph />} />
+          <Route path="/p/:code/flow" element={<Flow />} />
           <Route path="/p/:code/read" element={<ReadOrder />} />
         </Route>
       </Routes>

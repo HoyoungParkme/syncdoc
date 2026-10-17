@@ -103,9 +103,16 @@ def spec_elements(spec: str) -> dict[str, Screen]:
 
 
 def code_elements(src: str, screen_of: re.Pattern[str]) -> dict[str, tuple[str, set[str]]]:
-    """화면 → (파일, data-el 집합). 화면은 파일 첫 주석의 {CODE}-UI-002#UI-N."""
+    """화면 → (파일, data-el 집합). 화면은 파일 첫 주석의 {CODE}-UI-002#UI-N.
+
+    한 화면이 여러 파일이면(UI-19 흐름 보기 — 페이지와 `flow/` 패널·장면, 카드 CG) 합쳐 센다.
+    `.ts`도 본다 — 3D 장면이 이름표를 DOM으로 만들며 `dataset.el`을 단다. 파일 칸은 처음 것과 「외 N」.
+    """
     out: dict[str, tuple[str, set[str]]] = {}
-    for path in sorted(glob.glob(os.path.join(src, "**", "*.tsx"), recursive=True)):
+    count: dict[str, int] = {}
+    paths = glob.glob(os.path.join(src, "**", "*.tsx"), recursive=True)
+    paths += glob.glob(os.path.join(src, "**", "*.ts"), recursive=True)
+    for path in sorted(paths):
         text = open(path, encoding="utf-8").read()
         head = text.split("*/", 1)[0] if text.startswith("/**") else ""
         m = screen_of.search(head)
@@ -119,7 +126,17 @@ def code_elements(src: str, screen_of: re.Pattern[str]) -> dict[str, tuple[str, 
                 els.update(LITERAL.findall(expr))
         els.update(a or b for a, b in PROP_EL.findall(text))
         els.update(DATASET_EL.findall(text))
-        out[m.group(1)] = (os.path.relpath(path, os.path.dirname(src)), els)
+        screen = m.group(1)
+        count[screen] = count.get(screen, 0) + 1
+        if screen in out:
+            first, prev = out[screen]
+            out[screen] = (first, prev | els)
+        else:
+            out[screen] = (os.path.relpath(path, os.path.dirname(src)), els)
+    for screen, n in count.items():
+        if n > 1:
+            first, els = out[screen]
+            out[screen] = (f"{first.split(' 외')[0]} 외 {n - 1}", els)
     return out
 
 

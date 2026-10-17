@@ -585,7 +585,7 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 1. `row = CodeGraphService.get(project.id)` · if None → 빈 `FlowView(graph=None, files=[], functions=[], calls=[], http=[], infra={nodes: [], links: []}, units=[], layers=[], communities=[])`
 2. [[#queries.code_nodes]] 2·2a와 같이 대조(`by_key`)와 층(`rows`·`layer_of`)
 3. 함수마다 `FlowFunction` — `code_nodes` 3의 `CodeNode` 값에 `end = f.get("end")` · `route = f.get("route")` · `steps = f.get("steps", [])`
-4. `files`·`http`·`units` = 그래프의 것(없으면 `[]`) · `infra` = 그래프의 것(없으면 빈 노드·선) · `calls = [[a, b] for a, b, _ in row.graph["calls"]]` · `communities` = 그래프의 것(없으면 `[]`) · `layers = [CodeLayerRow(name, patterns, specs)]` — `rows`에서
+4. `files`·`http`·`units` = 그래프의 것(없으면 `[]`) · `infra` = 그래프의 것(없으면 빈 노드·선) · `calls = [[a, b] for a, b, _ in row.graph["calls"]]` · `communities` = 그래프의 것(없으면 `[]`) · `layers = [CodeLayerRow(doc, name, patterns, specs)]` — `rows`에서, `doc`은 그 줄을 읽은 클래스 명세 ID(UI-19 6.8이 그 문서로 잇는다)
 5. `→ FlowView(graph=머리(row), …)`
 
 **호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-011#codegraph.spec_calls]] · [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#codegraph.layer_table]] · [[SYNC-MS-011#codegraph.layers]]

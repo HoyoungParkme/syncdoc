@@ -471,7 +471,7 @@ async def test_flow_view_carries_flow_keys_with_status_and_layers(scoped: Sessio
     assert v.files == GRAPH_FLOW["files"] and v.http == GRAPH_FLOW["http"]
     assert v.infra == GRAPH_FLOW["infra"] and v.units == GRAPH_FLOW["units"]
     assert v.layers == [
-        CodeLayerRow("리포지토리", ["b.py"], [CodeLayerSpec("EXMP-PRD-001", "4장")])
+        CodeLayerRow("EXMP-DOM-002", "리포지토리", ["b.py"], [CodeLayerSpec("EXMP-PRD-001", "4장")])
     ]
     assert [c.label for c in v.communities] == ["svc"]
 

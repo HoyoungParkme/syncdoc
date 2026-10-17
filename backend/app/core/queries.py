@@ -72,6 +72,7 @@ from app.core.types import (
     DownstreamDoc,
     DownstreamView,
     FlowFunction,
+    FlowOf,
     FlowView,
     Graph,
     GraphEdge,
@@ -1288,7 +1289,9 @@ def _layer_rows(s: Session, project_id: int) -> list[dict]:
     spec = SpecService(s)
     rows: list[dict] = []
     for doc_id in _class_docs(s, project_id):
-        rows.extend(codegraph.layer_table(spec.get_document(doc_id).body))
+        rows.extend(
+            dict(r, doc=doc_id) for r in codegraph.layer_table(spec.get_document(doc_id).body)
+        )
     return rows
 
 
@@ -1530,11 +1533,56 @@ async def flow_view(code: str, user: User) -> FlowView:
         g.get("units", []),
         [
             CodeLayerRow(
-                r["name"], r["patterns"], [CodeLayerSpec(x["ref"], x["note"]) for x in r["specs"]]
+                r["doc"],
+                r["name"],
+                r["patterns"],
+                [CodeLayerSpec(x["ref"], x["note"]) for x in r["specs"]],
             )  # noqa: E501
             for r in rows
         ],
         [CodeCommunity(c["id"], c["label"], c["size"]) for c in g.get("communities", [])],
+    )
+
+
+async def flow_of(code: str, function: str, user: User) -> FlowOf:
+    """SYNC-MS-008#queries.flow_of
+
+    함수 하나의 흐름 — 열쇠(`파일:줄`) 또는 MINISPEC 항목 ID로 짚어 호출 순서·라우트, 한 단 아래 함수와
+    닿는 장비(MCP get_flow). 그래프가 없거나 그 함수가 없으면 not-found.
+    """
+    with db.session_scope() as s:
+        project = ProjectService(s).get_owned(code, user)
+        row = CodeGraphService(s).get(project.id)
+        if row is None:
+            raise NotFound("code_graph", code)
+        g = row.graph
+        hit = next((f for f in g["functions"] if f["key"] == function), None) or next(
+            (f for f in g["functions"] if function in (f.get("ms"), f.get("item"))), None
+        )
+        if hit is None:
+            raise NotFound("function", function)
+        info = _graph_info(row)
+        diffs = _diffs(s, project.id, g)
+        layer_of = _layers(s, project.id, g)
+    by_key = {d.function: d for d in diffs.values() if d.function}
+    fns = {f["key"]: f for f in g["functions"]}
+    callees: list[dict] = []
+    devices: list[str] = []
+    for f in [hit]:
+        for st in f.get("steps", []):
+            to = st.get("to")
+            if to and to in fns and fns[to] not in callees and to != hit["key"]:
+                callees.append(fns[to])
+    for f in [hit, *callees]:
+        for st in f.get("steps", []):
+            if st.get("infra") and st["infra"] not in devices:
+                devices.append(st["infra"])
+    nodes = {n["id"]: n for n in g.get("infra", {}).get("nodes", [])}
+    return FlowOf(
+        info,
+        _flow_function(hit, by_key, layer_of),
+        [_flow_function(f, by_key, layer_of) for f in callees],
+        [nodes[d] for d in devices if d in nodes],
     )
 
 

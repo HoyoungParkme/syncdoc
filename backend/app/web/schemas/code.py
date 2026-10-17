@@ -113,6 +113,7 @@ class CodeNodes(Base):
 
 
 class CodeLayerRow(Base):
+    doc: str
     name: str
     patterns: list[str]
     specs: list[CodeLayerSpec]

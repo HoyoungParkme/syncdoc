@@ -877,8 +877,12 @@ class CodeNodes:
 
 @dataclass(frozen=True)
 class CodeLayerRow:
-    """SYNC-DOM-002 2.8 — 층 표 한 줄 — 흐름 보기의 층 열(카드 CF)."""
+    """SYNC-DOM-002 2.8 — 층 표 한 줄 — 흐름 보기의 층 열·층 지도(카드 CF·CG).
 
+    doc은 그 줄이 든 클래스 명세 ID.
+    """
+
+    doc: str
     name: str
     patterns: list[str]
     specs: list[CodeLayerSpec]
@@ -922,6 +926,19 @@ class FlowView:
     units: list[dict]
     layers: list[CodeLayerRow]
     communities: list[CodeCommunity]
+
+
+@dataclass(frozen=True)
+class FlowOf:
+    """SYNC-DOM-002 2.8 — queries.flow_of → MCP get_flow(카드 CH).
+
+    callees는 steps의 to가 가리키는 함수(한 단).
+    """
+
+    graph: CodeGraphInfo | None
+    function: FlowFunction
+    callees: list[FlowFunction]
+    infra: list[dict]
 
 
 AskEvent = AskStart | AskDelta | AskNote | AskRead | AskAnswer
