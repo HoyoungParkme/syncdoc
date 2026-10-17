@@ -21,8 +21,8 @@ use syncdoc_core::pycompat::re::compile;
 use syncdoc_core::queries;
 use syncdoc_core::spec::{SUBTYPES, TYPES};
 use syncdoc_core::types::{
-    Author, AuthorKind, CodeRef, CodeView, DocStatus, DocumentSummary, Entry, ItemRef,
-    ProjectSummary, STAGES, SaveResult, Storage, py_isoformat,
+    Author, AuthorKind, CodeGraphInfo, CodeRef, CodeView, DocStatus, DocumentSummary, Entry,
+    FlowFunction, FlowOf, ItemRef, ProjectSummary, STAGES, SaveResult, Storage, py_isoformat,
 };
 
 use crate::compat::pydantic::{Failure, Opts};
@@ -93,6 +93,7 @@ pub async fn call(
         "change_status" => change_status(state, user, &typed).await,
         "upload_code" => upload_code(state, user, &typed).await,
         "get_code_graph" => get_code_graph(state, user, &typed).await,
+        "get_flow" => get_flow(state, user, &typed).await,
         _ => Err(Problem::NotImplemented {
             card: tool.card.to_string(),
         }),
@@ -342,6 +343,63 @@ async fn get_code_graph(state: &AppState, user: &UserRow, a: &PyValue) -> Result
     )
     .await?;
     Ok(code_view_json(&v))
+}
+
+/// SYNC-API-002#get_flow
+async fn get_flow(state: &AppState, user: &UserRow, a: &PyValue) -> Result<Value, Problem> {
+    let mut c = state.pool.acquire().await?;
+    let v = queries::flow_of(
+        &mut c,
+        &state.repos,
+        &arg_str(a, "project_code"),
+        &arg_str(a, "function"),
+        user,
+    )
+    .await?;
+    Ok(flow_of_json(&v))
+}
+
+/// 파이썬 `_plain(CodeGraphInfo)`
+fn graph_info_json(g: &CodeGraphInfo) -> Value {
+    json!({
+        "commit_hash": g.commit_hash,
+        "source": g.source,
+        "built_at": py_isoformat(g.built_at),
+        "error": g.error,
+        "function_count": g.function_count,
+    })
+}
+
+/// 파이썬 `_plain(FlowFunction)` — 데이터클래스 필드 차례, `route`·`steps`는 그래프에 든 그대로
+fn flow_function_json(f: &FlowFunction) -> Value {
+    json!({
+        "key": f.key,
+        "name": f.name,
+        "qual": f.qual,
+        "file": f.file,
+        "line": f.line,
+        "end": f.end,
+        "community": f.community,
+        "item": f.item,
+        "ms": f.ms,
+        "status": f.status,
+        "layer": f.layer.as_ref().map(|l| json!({
+            "name": l.name,
+            "specs": l.specs.iter().map(|s| json!({"ref": s.ref_, "note": s.note})).collect::<Vec<_>>(),
+        })),
+        "route": f.route,
+        "steps": f.steps,
+    })
+}
+
+/// 파이썬 `_plain(FlowOf)`
+fn flow_of_json(v: &FlowOf) -> Value {
+    json!({
+        "graph": v.graph.as_ref().map(graph_info_json),
+        "function": flow_function_json(&v.function),
+        "callees": v.callees.iter().map(flow_function_json).collect::<Vec<_>>(),
+        "infra": v.infra,
+    })
 }
 
 /// 파이썬 `_plain(CodeView)` — 데이터클래스 필드 차례, 시각은 `isoformat()`(`+00:00`)

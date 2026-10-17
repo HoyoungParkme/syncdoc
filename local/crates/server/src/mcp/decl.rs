@@ -58,6 +58,7 @@ fn card_of(tool: &str) -> &'static str {
         "delete_document" | "restore_document" | "change_status" => "L9",
         "upload_code" => "L11",
         "get_code_graph" => "L12",
+        "get_flow" => "L26",
         _ => "L3",
     }
 }
