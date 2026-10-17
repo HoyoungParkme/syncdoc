@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-018
 type: MS
 title: MINISPEC — queries — 읽기 조합 (Rust)
-status: approved
+status: draft
 upstream: [SYNC-DOM-004, SYNC-MS-008, SYNC-MS-014, SYNC-MS-015, SYNC-MS-016, SYNC-API-001, SYNC-API-002]
 ---
 
