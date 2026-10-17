@@ -22,6 +22,10 @@ use syncdoc_app::{privilege, tray};
 const WORKER_STACK: usize = 256 * 1024 * 1024;
 
 fn main() -> ExitCode {
+    // 기록 도구 — 하위 명령 `trace`·`trace-web`은 서버를 켜지 않는다 (SYNC-INFRA-001 9.9, 카드 L29)
+    if let Some(which) = syncdoc_app::trace::requested() {
+        return syncdoc_app::trace::main(&which);
+    }
     if let Some(code) = privilege::drop_admin() {
         // 다시 켠 자식의 끝 코드 그대로 — 윈도 끝 코드는 32비트라 ExitCode(8비트)로 줄이지 않는다
         std::process::exit(code as i32);

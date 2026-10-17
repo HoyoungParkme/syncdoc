@@ -47,6 +47,7 @@ rand = "0.10"
 # rpgp(백업 암호)가 받는 판 — rand_core 0.6 (카드 L16)
 rand_08 = { package = "rand", version = "0.8" }
 regex = "1.13"
+rpassword = "7.4"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots", "stream", "http2"] }
 resvg = { version = "0.48", default-features = false, features = ["text"] }
 ryu = "1.0"

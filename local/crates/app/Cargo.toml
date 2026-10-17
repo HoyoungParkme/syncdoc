@@ -19,6 +19,10 @@ clap = { workspace = true }
 directories = { workspace = true }
 jiff = { workspace = true }
 pgp = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+rpassword = { workspace = true }
+rust-embed = { workspace = true }
 rand = { workspace = true }
 rand_08 = { workspace = true }
 serde_json = { workspace = true }
