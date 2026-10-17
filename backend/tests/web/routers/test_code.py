@@ -25,6 +25,11 @@ def test_code_endpoints(client: TestClient, scoped: Session, monkeypatch) -> Non
         and len(nodes["functions"]) == 4
     )
     assert nodes["functions"][0]["status"] == "code_only" and nodes["communities"] == []
+    flow = client.get("/api/projects/EXMP/flow").json()  # UI-19 (카드 CF)
+    assert set(flow) == {"graph", "files", "functions", "calls", "http", "infra", "units",
+                         "layers", "communities"}  # fmt: skip
+    assert flow["functions"][0]["steps"] == [] and flow["functions"][0]["route"] is None
+    assert flow["infra"] == {"nodes": [], "links": []} and len(flow["functions"]) == 4
     miss = client.get("/api/docs/EXMP-MS-001/items/svc.gone/code/source")
     assert miss.status_code == 404 and miss.json()["resource"] == "function"
     # 코드 그래프의 코드 — 파일·줄로, 항목 없는 함수도 (UI-17 4.6, 카드 BF)
@@ -46,6 +51,7 @@ def test_code_endpoints(client: TestClient, scoped: Session, monkeypatch) -> Non
     assert client.get("/api/docs/EXMP-MS-001/items/svc.save/code").status_code == 404
     assert client.get("/api/projects/EXMP/code-calls").status_code == 404
     assert client.get("/api/projects/EXMP/code-graph").status_code == 404
+    assert client.get("/api/projects/EXMP/flow").status_code == 404
     r = client.get("/api/projects/EXMP/code/source", params={"file": "a.py", "line": 1})
     assert r.status_code == 404
 
