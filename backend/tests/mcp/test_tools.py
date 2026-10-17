@@ -51,6 +51,7 @@ async def test_tools_listed_with_descriptions() -> None:
         "get_code_graph",  # 카드 AZ
         "upload_code",  # 카드 BB
         "change_status",  # 카드 BE
+        "get_flow",  # 카드 CH
     }
     assert (
         "status-blocked" in names["change_status"] and "update_document" in names["change_status"]
@@ -388,6 +389,37 @@ async def test_get_code_graph(scoped: Session, as_user) -> None:
     assert [c["status"] for c in v["function"]["calls"]] == ["code_only", "spec_only", "same"]
     err, v = await call("get_code_graph", doc_id="NOPE-MS-001")
     assert err and v["type"] == "urn:syncdoc:not-found"
+
+
+async def test_get_flow(scoped: Session, as_user) -> None:
+    """SYNC-API-002 get_flow — 함수 하나의 호출 순서·한 단 아래·닿는 장비(카드 CH)."""
+    from app.core.codegraph.service import CodeGraphService
+    from tests.core.codegraph.test_queries import GRAPH, MS
+
+    p = _seed(scoped, as_user)
+    SpecService(scoped).create(p.id, "EXMP-MS-001", DocType.MS, MS, "h2", as_user, "spec: 테스트")
+    err, v = await call("get_flow", project_code="EXMP", function="a.py:1")
+    assert err and v["resource"] == "code_graph"  # 아직 그래프가 없다
+    graph = dict(
+        GRAPH,
+        functions=[
+            dict(f, steps=[{"k": "call", "line": 2, "label": "check", "to": "a.py:5", "infra": "infra:db"}])
+            if f["key"] == "a.py:1"
+            else dict(f, steps=[])
+            for f in GRAPH["functions"]
+        ],
+        infra={"nodes": [{"id": "infra:db", "kind": "db", "name": "PostgreSQL"}], "links": []},
+    )  # fmt: skip
+    CodeGraphService(scoped).save(p.id, "c" * 40, "server", graph)
+    err, v = await call("get_flow", project_code="EXMP", function="a.py:1")
+    assert (
+        not err and v["function"]["qual"] == "svc.save" and v["function"]["status"] == "code_only"
+    )
+    assert [c["key"] for c in v["callees"]] == ["a.py:5"] and v["infra"][0]["id"] == "infra:db"
+    err, v = await call("get_flow", project_code="EXMP", function="EXMP-MS-001#svc.check")
+    assert not err and v["function"]["key"] == "a.py:5"  # MINISPEC 항목 ID로도
+    err, v = await call("get_flow", project_code="EXMP", function="a.py:999")
+    assert err and v["resource"] == "function"
 
 
 async def test_upload_code_tool_puts_code_in_a_server_project(
