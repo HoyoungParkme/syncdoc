@@ -53,7 +53,8 @@ def _started(text: str) -> datetime:
         t = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError:
         raise TraceInvalid("startedAt — 시각이 아니다") from None
-    return t if t.tzinfo is not None else t.replace(tzinfo=UTC)
+    # 받은 시간대가 아니라 UTC로 — 넣은 직후의 머리와 목록(DB에서 읽은 것)이 같은 글이 된다
+    return (t if t.tzinfo is not None else t.replace(tzinfo=UTC)).astimezone(UTC)
 
 
 class TraceService:

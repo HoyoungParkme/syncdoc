@@ -50,9 +50,11 @@ def test_save_returns_brief_and_same_key_once(db_session: Session) -> None:
         "a" * 40,
     )
     assert b.started_at.isoformat() == "2026-10-17T01:02:03+00:00"
+    k, _ = svc.save(p.id, owner(db_session).id, record("kst", startedAt="2026-10-17T10:02:03.5+09:00"))
+    assert k.started_at.isoformat() == "2026-10-17T01:02:03.500000+00:00"  # UTC로
     again, new2 = svc.save(p.id, owner(db_session).id, record(path="/other"))
     assert not new2 and again.id == b.id and again.path == "/api/x"
-    assert db_session.execute(text("select count(*) from traces")).scalar() == 1
+    assert db_session.execute(text("select count(*) from traces")).scalar() == 2
 
 
 def test_save_keeps_recent_per_project(db_session: Session, monkeypatch) -> None:
