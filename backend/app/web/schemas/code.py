@@ -110,3 +110,39 @@ class CodeNodes(Base):
     communities: list[CodeCommunity]
     functions: list[CodeNode]
     calls: list[list[str]]
+
+
+class CodeLayerRow(Base):
+    name: str
+    patterns: list[str]
+    specs: list[CodeLayerSpec]
+
+
+class FlowFunction(Base):
+    key: str
+    name: str
+    qual: str
+    file: str
+    line: int
+    end: int | None
+    community: int | None
+    item: str | None
+    ms: str | None
+    status: str | None
+    layer: CodeLayer | None
+    route: dict | None
+    steps: list[dict]
+
+
+class FlowView(Base):
+    """SYNC-API-001 4장 FlowView — 흐름 보기(UI-19). 흐름 키는 그래프에 든 그대로 (카드 CF)."""
+
+    graph: CodeGraphInfo | None
+    files: list[dict]
+    functions: list[FlowFunction]
+    calls: list[list[str]]
+    http: list[dict]
+    infra: dict
+    units: list[dict]
+    layers: list[CodeLayerRow]
+    communities: list[CodeCommunity]

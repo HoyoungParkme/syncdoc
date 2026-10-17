@@ -34,6 +34,7 @@ from app.web.routers import (
     code,
     conversations,
     documents,
+    flow,
     hooks,
     projects,
     references,
@@ -109,6 +110,7 @@ for r in (
     references.router,
     conversations.router,
     code.router,
+    flow.router,  # 흐름 보기 (카드 CF)
     admin.router,
     hooks.router,
     git_router.router,  # 서버 저장소 git 입구 (카드 BB)
