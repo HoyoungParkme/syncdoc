@@ -17,6 +17,7 @@ use crate::codegraph::CodeGraphService;
 use crate::conversation::ConversationService;
 use crate::errors::Problem;
 use crate::infra::git::Git;
+use crate::trace::TraceService;
 use crate::types::{HookStatus, RebuildResult, RepoStatus, Storage, SyncResult};
 
 /// 서버 저장소 자리 — git·서버 저장소·작업 사본·README의 규약 주소. 켤 때 `runtime.run`이 만든다
@@ -441,7 +442,7 @@ impl ProjectService<'_> {
         CodeGraphService { db: &mut *self.db }
             .delete_by_project(project.id)
             .await?;
-        crate::trace::TraceService { db: &mut *self.db }
+        TraceService { db: &mut *self.db }
             .delete_by_project(project.id)
             .await?;
         repo::delete_all_of(&mut *self.db, project.id).await?;
