@@ -505,7 +505,7 @@ classDiagram
 | `InfraLink` | `from_` · `to` · `protocol: str` | 장비 사이 선 |
 | `FlowUnit` | `name` · `kind`(`server`·`web`·`job`) · `dir` · `framework: str \| None` · `command: str \| None` · `port: int \| None` · `lang` | 실행 단위 — 기록 도구 명령의 재료(카드 CE) |
 | `FlowView` | `graph: CodeGraphInfo \| None` · `files: list~FlowFile~` · `functions: list~FlowFunction~` · `calls: list~list~str~~` · `http: list~FlowHttp~` · `infra: {nodes, links}` · `units: list~FlowUnit~` · `layers: list~CodeLayerRow~` · `communities: list~CodeCommunity~` | queries.flow_view → API `FlowView`(UI-19) |
-| `CodeLayerRow` | `name: str` · `patterns: list~str~` · `specs: list~CodeLayerSpec~` | 층 표 한 줄 — 흐름 보기의 층 열(카드 CF) |
+| `CodeLayerRow` | `doc: str`(그 줄이 든 클래스 명세 ID) · `name: str` · `patterns: list~str~` · `specs: list~CodeLayerSpec~` | 층 표 한 줄 — 흐름 보기의 층 열·층 지도(카드 CF·CG) |
 | `FlowOf` | `graph: CodeGraphInfo \| None` · `function: FlowFunction` · `callees: list~FlowFunction~`(steps의 `to`가 가리키는 함수들, 한 단) · `infra: list~InfraNode~`(닿는 장비) | queries.flow_of → MCP `get_flow`(카드 CH) |
 | `TraceSpan` | `key` · `file` · `line` · `end` · `name` · `route: FlowRoute \| None` | 기록 도구가 감쌀 함수 하나 |
 | `TraceSpans` | `commit_hash: str \| None` · `spans: list~TraceSpan~` · `infra: list~InfraNode~` | queries.trace_spans → API `TraceSpans` → 기록 도구(카드 CJ) |

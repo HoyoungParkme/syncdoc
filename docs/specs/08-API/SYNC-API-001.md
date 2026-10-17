@@ -3145,6 +3145,7 @@ components:
           items:
             type: object
             properties:
+              doc: {type: string, description: 그 줄이 든 클래스 명세 문서 ID — 층 지도(UI-19 6.8)가 그 문서로 잇는다}
               name: {type: string}
               patterns: {type: array, items: {type: string}}
               specs: {type: array, items: {type: object, properties: {ref: {type: string, nullable: true}, note: {type: string}}}}
