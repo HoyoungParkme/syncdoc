@@ -10,7 +10,7 @@ from app.core.codegraph.service import CodeGraphService
 from app.core.errors import NotFound
 from app.core.reference.service import ReferenceService
 from app.core.spec.service import SpecService
-from app.core.types import CodeLayer, CodeLayerSpec, DocType
+from app.core.types import CodeLayer, CodeLayerRow, CodeLayerSpec, DocType
 from tests.core.account.test_service import make_user
 from tests.core.reference.test_service import PRD, RFQ
 from tests.core.spec.test_service import author, make_project, owner
@@ -439,3 +439,52 @@ async def test_code_text_reads_any_function_by_file_and_line(scoped: Session, mo
 
 def _project_id(scoped: Session) -> int:
     return scoped.execute(text("SELECT id FROM projects WHERE code='EXMP'")).scalar_one()
+
+
+# ── flow_view (MS-008, 카드 CF) ──
+GRAPH_FLOW = dict(
+    GRAPH_LAYERS,
+    functions=[
+        dict(f, steps=[{"k": "call", "line": f["line"] + 1, "label": "x", "to": "a.py:5"}],
+             route={"method": "GET", "path": "/x"} if f["qual"] == "routers.get_code" else None)
+        for f in GRAPH_LAYERS["functions"]
+    ],
+    files=[{"path": "a.py", "lang": "python", "loc": 20}, {"path": "m.go", "lang": "go", "loc": 3}],
+    http=[{"from": "Page.tsx:10", "to": "a.py:17", "inferred": False}],
+    infra={"nodes": [{"id": "infra:db", "kind": "db"}], "links": []},
+    units=[{"name": "app", "kind": "server"}],
+    communities=[{"id": 0, "label": "svc", "size": 4}],
+)  # fmt: skip
+
+
+async def test_flow_view_carries_flow_keys_with_status_and_layers(scoped: Session) -> None:
+    p = _seed_items(scoped, GRAPH_FLOW)
+    SpecService(scoped).create(p.id, "EXMP-DOM-002", DocType.DOM, CLS, "h5", author(scoped), "spec")
+    v = await queries.flow_view("EXMP", owner(scoped))
+    nodes = await queries.code_nodes("EXMP", owner(scoped))
+    assert [(f.key, f.status, f.item, f.layer) for f in v.functions] == [
+        (n.key, n.status, n.item, n.layer) for n in nodes.functions
+    ]  # code_nodes와 같은 대조·층
+    by = {f.qual: f for f in v.functions}
+    assert by["routers.get_code"].route == {"method": "GET", "path": "/x"}
+    assert by["svc.save"].steps[0]["to"] == "a.py:5" and by["svc.save"].end == 4
+    assert v.files == GRAPH_FLOW["files"] and v.http == GRAPH_FLOW["http"]
+    assert v.infra == GRAPH_FLOW["infra"] and v.units == GRAPH_FLOW["units"]
+    assert v.layers == [
+        CodeLayerRow("리포지토리", ["b.py"], [CodeLayerSpec("EXMP-PRD-001", "4장")])
+    ]
+    assert [c.label for c in v.communities] == ["svc"]
+
+
+async def test_flow_view_old_graph_no_graph_and_not_owned(scoped: Session) -> None:
+    _seed(scoped)  # 흐름 키를 모르는 옛 그래프
+    v = await queries.flow_view("EXMP", owner(scoped))
+    assert (
+        v.files == [] and v.http == [] and v.units == [] and v.infra == {"nodes": [], "links": []}
+    )
+    assert all(f.steps == [] and f.route is None for f in v.functions)
+    with pytest.raises(NotFound):
+        await queries.flow_view("EXMP", make_user(scoped, login="stranger"))
+    scoped.execute(text("DELETE FROM code_graphs"))
+    empty = await queries.flow_view("EXMP", owner(scoped))
+    assert empty.graph is None and empty.functions == []
