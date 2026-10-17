@@ -44,6 +44,8 @@ upstream: [SYNC-DOM-004, SYNC-MS-008, SYNC-MS-014, SYNC-MS-015, SYNC-MS-016, SYN
 | [[#queries.code_source]] | 코드 보기 |
 | [[#queries.code_text]] | 코드 그래프의 코드 — 파일·줄로 |
 | [[#queries.code_nodes]] | 코드 그래프 노드 — 함수 전부·커뮤니티·대조 상태 |
+| [[#queries.flow_view]] | 흐름 보기 — 그래프·흐름 키·층 표·대조 상태 |
+| [[#queries.flow_of]] | 함수 하나의 흐름 — MCP get_flow |
 | [[#queries.ask_item]] | 문서를 읽다가 묻는다 — 모델이 관계도를 따라 읽는다 |
 | [[#queries.ask_tool]] | 모델이 부른 읽기 도구 하나를 실행한다 |
 | [[#queries.ask_code]] | 코드 그래프에서 묻는다 — 고른 함수가 시작 맥락 |
@@ -408,6 +410,42 @@ pub async fn code_nodes(db: &mut PgConnection, repos: &ServerRepos, code: &str, 
 **호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-014#SpecService.list_by_project]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.item_blocks]] · [[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-022#codegraph.spec_calls]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.layer_table]] · [[SYNC-MS-022#codegraph.layers]]
 
 **테스트 관점** [[SYNC-MS-008#queries.code_nodes]]의 것
+
+---
+
+#### queries.flow_view 흐름 보기 — 그래프·흐름 키·층 표·대조 상태
+
+**시그니처**
+```rust
+pub async fn flow_view(db: &mut PgConnection, repos: &ServerRepos, code: &str, user: &UserRow) -> Result<FlowView, Problem>
+```
+
+근거: [[SYNC-MS-008#queries.flow_view]] · [[SYNC-API-001#GET/api/projects/{code}/flow]] · [[SYNC-MS-026]] 0장(흐름 키는 `Graph` 밖의 값)
+
+**처리** [[SYNC-MS-008#queries.flow_view]] 0~5와 같다 — 소유 → 그래프 행(없으면 빈 `FlowView`) · 저장된 그래프 값([[SYNC-MS-022#CodeGraphService.value]]) → 대조·층은 [[#queries.code_nodes]]와 같은 재료(층 표 줄은 클래스 명세 ID와 함께) → 함수마다 `FlowFunction`(그래프 값의 함수에서 — `end`·`route`·`steps`는 든 그대로, 없으면 null·null·`[]`) · `files`·`http`·`units`·`infra`·`communities`는 값 그대로(없으면 빈 것) · `calls`는 `[from, to]`
+
+**다른 점** 흐름 키를 `Graph`로 읽지 않는다 — 행의 그래프 값을 따로 읽는다(JSONB 키 차례 그대로라 파이썬 판과 바이트로 같다)
+
+**호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#CodeGraphService.value]] · [[SYNC-MS-014#SpecService.list_by_project]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.item_blocks]] · [[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-022#codegraph.spec_calls]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.layer_table]] · [[SYNC-MS-022#codegraph.layers]]
+
+**테스트 관점** [[SYNC-MS-008#queries.flow_view]]의 것 · 계약 시험(카드 L25) — 파이썬 판 응답과 바이트로 같다
+
+---
+
+#### queries.flow_of 함수 하나의 흐름 — MCP get_flow
+
+**시그니처**
+```rust
+pub async fn flow_of(db: &mut PgConnection, repos: &ServerRepos, code: &str, function: &str, user: &UserRow) -> Result<FlowOf, Problem>
+```
+
+근거: [[SYNC-MS-008#queries.flow_of]] · [[SYNC-API-002]] `get_flow`
+
+**처리** [[SYNC-MS-008#queries.flow_of]] 0~5와 같다 — 그래프 없음 → `not-found(code_graph)` · 함수는 열쇠, 아니면 `ms`·`item`이 같은 첫 함수(없으면 `not-found(function)`) · 그 함수와 `callees`(steps의 `to`, 처음 본 차례·하나씩·자기 자신 빼고)의 `FlowFunction` · 닿는 장비는 그 함수와 callees의 `steps.infra`(처음 본 차례)에 해당하는 장비 노드
+
+**호출하는 것** [[SYNC-MS-013#ProjectService.get_owned]] · [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#CodeGraphService.value]] · [[SYNC-MS-014#SpecService.list_by_project]] · [[SYNC-MS-014#SpecService.get_document]] · [[SYNC-MS-014#SpecService.item_blocks]] · [[SYNC-MS-014#markdown.parse_frontmatter]] · [[SYNC-MS-022#codegraph.spec_calls]] · [[SYNC-MS-022#codegraph.compare]] · [[SYNC-MS-022#codegraph.layer_table]] · [[SYNC-MS-022#codegraph.layers]]
+
+**테스트 관점** [[SYNC-MS-008#queries.flow_of]]의 것 · 계약 시험(카드 L26)
 
 ---
 

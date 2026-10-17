@@ -51,6 +51,21 @@ pub async fn get(db: &mut PgConnection, project_id: i32) -> Result<Option<CodeGr
     raw.map(row).transpose()
 }
 
+/// 저장된 그래프 값 그대로 — JSONB가 돌려준 키 차례. 행이 없으면 없음
+pub async fn value(db: &mut PgConnection, project_id: i32) -> Result<Option<Value>, Problem> {
+    let text: Option<(String,)> =
+        sqlx::query_as("SELECT graph::text FROM code_graphs WHERE project_id = $1")
+            .bind(project_id)
+            .fetch_optional(db)
+            .await?;
+    text.map(|(t,)| {
+        serde_json::from_str(&t).map_err(|e| Problem::Internal {
+            log: format!("code_graphs {project_id}의 graph를 못 읽었다: {e}"),
+        })
+    })
+    .transpose()
+}
+
 /// 새 그래프로 — 행이 없으면 만들고 있으면 한 번에 바꿔 끼운다. 실패 이유는 지운다
 pub async fn put(
     db: &mut PgConnection,

@@ -877,6 +877,7 @@ classDiagram
     }
     class CodeGraphService {
         +get(project_id) CodeGraphRow
+        +value(project_id) Value
         +save(project_id, commit_hash, source, graph) CodeGraphRow
         +fail(project_id, commit_hash, reason) CodeGraphRow
         +read(git, project_id, origin, path, start, end) CodeText
@@ -896,6 +897,7 @@ classDiagram
 | [[SYNC-MS-022#codegraph.widen]] | `pipeline.build_code_graph` — 추출 원형일 때만(L20) | 사용자 결정 2026-10-12 — 파이썬 판에 없다(graphify 원형이 모든 언어를 담는다) | — |
 | [[SYNC-MS-022#codegraph.communities]] | `pipeline.build_code_graph`(L13) | [[SYNC-MS-011#codegraph.communities]] | — |
 | [[SYNC-MS-022#CodeGraphService.get]] · [[SYNC-MS-022#CodeGraphService.save]] · [[SYNC-MS-022#CodeGraphService.fail]] | 그래프 만들기 · 코드 조회 · 커밋 처리 5a | [[SYNC-MS-011#CodeGraphService.save]] | — |
+| [[SYNC-MS-022#CodeGraphService.value]] | `queries.flow_view`·`flow_of`(L25·L26) | [[SYNC-MS-026]] 0장 — 파이썬 판에 없다(행의 그래프가 곧 사전) | — |
 | [[SYNC-MS-022#CodeGraphService.read]] | `queries.code_source`·`code_text`·질문 도구 `read_code` | [[SYNC-MS-011#CodeGraphService.read]] | `not-found`(code_graph·file) |
 | [[SYNC-MS-022#CodeGraphService.delete_by_project]] | `ProjectService.delete_project`(L14) | [[SYNC-MS-011#CodeGraphService.delete_by_project]] | — |
 

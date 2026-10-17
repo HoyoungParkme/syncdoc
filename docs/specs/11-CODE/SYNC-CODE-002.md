@@ -282,11 +282,11 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-CODE-001#CF]] |
-| 구현 | [[SYNC-MS-018]] `queries.flow_view` · `types.rs` · `server/src/web/routes/flow.rs` · `schemas.rs` |
+| 구현 | [[SYNC-MS-018]] `queries.flow_view` · `types.rs` · `server/src/web/routes/code.rs`(모듈을 `flow`로 두면 코드 그래프가 `codegraph::flow`와 못 가른다) · `schemas.rs` |
 | API | [[SYNC-API-001#GET/api/projects/{code}/flow]] |
 | 테스트 | `cargo test` · 계약 `--target both --with-card L25` — 파이썬 판 스냅숏과 바이트로 같다 |
 | 선행 | CF · L24 |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/L25-flow-api-rust`(L26과 한 브랜치) · spec 4 + code 4 · 계약 `--target both --with-card L25 --with-card L26` `test_l25_flow.py` 16 통과(흐름 고정 저장소와 graph.json — `/flow` 응답이 파이썬 판과 바이트로 같다) · clippy · `check_code` Rust 212/212 · `check_calls` 0(흐름) · 되먹임: 서버 경로를 `routes/flow.rs`로 두면 모듈 꼬리 `flow`가 `codegraph::flow`와 겹쳐 그래프 만들기의 `flow.extend` 호출을 못 푼다 → `routes/code.rs` |
 
 #### L26 흐름 보기 ⑥ — MCP get_flow (Rust)
 
@@ -296,7 +296,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | [[SYNC-MS-018]] `queries.flow_of` · `server/src/mcp/tools.rs` · `cargo xtask mcp-tools` |
 | 테스트 | 계약 `--with-card L26` |
 | 선행 | CH · L25 |
-| 완료 | — |
+| 완료 | 2026-10-17 · L25와 한 브랜치 — `cargo xtask mcp-tools`(선언 15개 — CH 때 다시 만들지 않았던 것을 함께) · `--check` 같다 · 계약 get_flow 넷(그래프 없음·열쇠·항목 ID·없는 함수) 바이트로 같다 |
 
 #### L27 실행 기록 ① — traces 표·TraceService (Rust)
 
@@ -313,7 +313,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-CODE-001#CJ]] |
-| 구현 | [[SYNC-MS-018]] `queries.trace_spans` · `server/src/web/routes/traces.rs`·`flow.rs` · `guard.rs` 토큰 경로 |
+| 구현 | [[SYNC-MS-018]] `queries.trace_spans` · `server/src/web/routes/traces.rs`·`code.rs` · `guard.rs` 토큰 경로 |
 | 테스트 | 계약 `--with-card L28` |
 | 선행 | CJ · L27 |
 | 완료 | — |
