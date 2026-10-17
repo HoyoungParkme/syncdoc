@@ -900,6 +900,56 @@ pub struct CodeNodes {
     pub calls: Vec<(String, String)>,
 }
 
+/// 층 표 한 줄 (DOM-002 2.8 `CodeLayerRow`) — `doc`은 그 줄이 든 클래스 명세 ID (카드 L25)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeLayerRow {
+    pub doc: String,
+    pub name: String,
+    pub patterns: Vec<String>,
+    pub specs: Vec<CodeLayerSpec>,
+}
+
+/// 흐름 보기의 함수 하나 (DOM-002 2.8 `FlowFunction`) — `route`·`steps`는 그래프에 든 그대로
+#[derive(Clone, Debug, PartialEq)]
+pub struct FlowFunction {
+    pub key: String,
+    pub name: String,
+    pub qual: String,
+    pub file: String,
+    pub line: i64,
+    pub end: Option<i64>,
+    pub community: Option<i64>,
+    pub item: Option<String>,
+    pub ms: Option<String>,
+    pub status: Option<String>,
+    pub layer: Option<CodeLayer>,
+    pub route: serde_json::Value,
+    pub steps: Vec<serde_json::Value>,
+}
+
+/// 흐름 보기 (DOM-002 2.8 `FlowView`, `queries.flow_view`, UI-19) — `files`·`http`·`infra`·`units`는 그래프 그대로
+#[derive(Clone, Debug, PartialEq)]
+pub struct FlowView {
+    pub graph: Option<CodeGraphInfo>,
+    pub files: Vec<serde_json::Value>,
+    pub functions: Vec<FlowFunction>,
+    pub calls: Vec<(String, String)>,
+    pub http: Vec<serde_json::Value>,
+    pub infra: serde_json::Value,
+    pub units: Vec<serde_json::Value>,
+    pub layers: Vec<CodeLayerRow>,
+    pub communities: Vec<CodeCommunity>,
+}
+
+/// 함수 하나의 흐름 (DOM-002 2.8 `FlowOf`, `queries.flow_of`, MCP get_flow)
+#[derive(Clone, Debug, PartialEq)]
+pub struct FlowOf {
+    pub graph: Option<CodeGraphInfo>,
+    pub function: FlowFunction,
+    pub callees: Vec<FlowFunction>,
+    pub infra: Vec<serde_json::Value>,
+}
+
 // ── 대화·질문 (카드 L14) — DOM-002 2.8·2.9
 
 /// 첨부 메타 — 바이트·글자 없이 (DOM-002 2.8 `AttachmentMeta`)
