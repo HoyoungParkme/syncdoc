@@ -165,10 +165,11 @@ crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 
 ├── python.rs                   tree-sitter-python으로 `ast`의 뜻을 읽는다 — 정의·끝 줄·docstring·대입·속성·호출·import
 ├── ts.rs                       tree-sitter-typescript — 맨 위 정의·끝 줄·상대 import·호출
 ├── rust.rs                     tree-sitter-rust — 맨 위 fn·impl 메서드·`///`·use·호출
-├── flow.rs                     흐름 보기의 더하기 조율 · 파일 목록 (MS-026, L22~L24)
-├── steps.rs                    호출 순서 — 파이썬·TS/JS·Rust (L22)
-├── routes.rs                   라우트·화면 요청 잇기 (L23)
-└── infra.rs                    장비·실행 단위 — 의존성·compose·설정·라이브러리 호출 표 (L24)
+└── flow/                       흐름 보기의 더하기 (MS-026, L22~L24) — 폴더로 둔다: 모듈 꼬리 `infra`·`routes`가 core·server와 겹치면 코드 그래프가 경로를 못 푼다
+    ├── mod.rs                  조율 · 파일 목록
+    ├── steps.rs                호출 순서 — 파이썬·TS/JS·Rust (L22)
+    ├── routes.rs               라우트·화면 요청 잇기 (L23)
+    └── infra.rs                장비·실행 단위 — 의존성·compose·설정·라이브러리 호출 표 (L24)
 ```
 
 지금(카드 L12) 있는 것은 `account`·`spec`·`project`·`reference`(뽑기·끊기·잇기·조회·관계도·미존재)·`codegraph`(그래프 행·코드 읽기)·`conversation`(대화·턴·첨부)·`markdown.rs`·`pycompat/`·`pipeline.rs`(저장·커밋 처리·재구축·따라잡기·그래프 만들기)·`queries.rs`(프로젝트 요약·상세·문서 목록·문서·항목·참조·체인·관계도·diff 영향·추적표·문제 목록·코드·코드 그래프 노드·묻기·대화)·`infra/git.rs`·`infra/llm.rs`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. `spec/`의 정답 파일은 `crates/core/tests/golden/spec.json`(생성물, `cargo xtask spec-golden`)이다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
@@ -340,7 +341,7 @@ crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 
 | 4.10 | conversation | MS-021 | `crates/core/src/conversation` | [[SYNC-MS-010]] |
 | 4.11 | codegraph | MS-022 | `crates/codegraph` · `crates/core/src/codegraph` | [[SYNC-MS-011]] |
 | 4.12 | 데이터 자리 옮기기 · 백업 | MS-023 | `crates/app` | — (Docker 판은 `scripts/backup.sh`, [[SYNC-CODE-001#BR]]) |
-| 4.13 | 흐름 보기의 더하기 | [[SYNC-MS-026]] | `crates/codegraph/src/{flow,steps,routes,infra}.rs` | [[SYNC-MS-024]] |
+| 4.13 | 흐름 보기의 더하기 | [[SYNC-MS-026]] | `crates/codegraph/src/flow/{mod,steps,routes,infra}.rs` | [[SYNC-MS-024]] |
 | 4.14 | trace · 기록 도구 | [[SYNC-MS-027]] | `crates/core/src/trace` · `crates/app/src/trace` · `crates/app/tracers` | [[SYNC-MS-025]] — 기록 도구는 Rust 판에만 있다([[SYNC-INFRA-001]] 9.9) |
 
 
