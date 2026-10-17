@@ -34,7 +34,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-011, SYNC-INFRA-001, SYNC-STD-004]
 | [[#codegraph.load]] | 저장소의 graph.json이 있으면 그것, 없으면 추출 |
 | [[#codegraph.extract]] | graphify 대신 — tree-sitter로 원형을 만든다 |
 | [[#codegraph.reduce]] | 함수·호출 선만 남긴다 |
-| [[#codegraph.enrich]] | 파이썬·TS/JS·Rust 코드로 그래프를 보강한다 |
+| [[#codegraph.enrich]] | 파이썬·TS/JS·Rust·Java·Go 코드로 그래프를 보강한다 |
 | [[#codegraph.spec_calls]] | 명세의 「호출하는 것」을 항목 ID 집합으로 |
 | [[#codegraph.compare]] | 명세 호출과 코드 호출을 같음·코드만·명세만으로 |
 | [[#codegraph.item_function]] | 항목 ID → 그 항목의 함수 |
@@ -98,17 +98,17 @@ pub fn extract(src_dir: &Path) -> Result<Value, CodeGraphFailed>
 근거: [[SYNC-INFRA-001]] 9.2 · [[SYNC-MS-009#graphify.extract]]
 
 **처리** graphify `graph.json`(node-link)의 모양으로 — 줄이기·보강·커뮤니티가 읽는 것만
-1. 파일 — `src_dir` 아래를 걸어(`.git`·`graphify-out`·`node_modules`·`target` 폴더는 빼고) 경로 순으로, 확장자가 `.py .ts .tsx .js .jsx .mjs .rs`인 파일마다 파일 노드 `{id: 경로, label: 이름, file_type: "code", source_file: 경로}`
+1. 파일 — `src_dir` 아래를 걸어(`.git`·`graphify-out`·`node_modules`·`target` 폴더는 빼고) 경로 순으로, 확장자가 `.py .ts .tsx .js .jsx .mjs .rs .java .go`인 파일마다 파일 노드 `{id: 경로, label: 이름, file_type: "code", source_file: 경로}`
 2. 파이썬 파일 — tree-sitter-python으로 읽어(문법 오류면 파일 노드만) 맨 위 `def`(데코레이터를 벗겨)·`class`, 클래스 몸통의 `def`마다 노드 — 함수 `{id: "{경로}:{줄}", label: "{이름}()", file_type: "code", source_file, source_location: "L{def 줄}", _callable: true}` · 클래스 `{…, label: 이름, _callable_class: true}` · 선 `contains`(파일 → 맨 위 함수·클래스) · `method`(클래스 → 메서드)
 3. 파이썬 호출 — 맨 위 함수·메서드 몸통의 `f(…)`(이름 호출)마다 같은 파일 맨 위 함수 `f`가 있으면 선 `{source, target, relation: "calls", confidence: "EXTRACTED"}` — 같은 쌍은 하나
-4. TS/JS·Rust는 파일 노드만 — 정의·끝 줄·호출은 [[#codegraph.enrich]]가 다 채운다(파이썬 판도 graphify의 Rust 함수는 `_callable`이 없어 보강이 다 채운다). 커뮤니티를 묶을 원형은 [[#codegraph.widen]]이 보강 뒤에 넓힌다
+4. TS/JS·Rust·Java·Go는 파일 노드만 — 정의·끝 줄·호출은 [[#codegraph.enrich]]가 다 채운다(파이썬 판도 graphify의 Rust·Go 함수는 `_callable`이 없고 Java는 끝 줄·파일 사이 호출이 없어 보강이 채운다, 카드 L32). 커뮤니티를 묶을 원형은 [[#codegraph.widen]]이 보강 뒤에 넓힌다
 5. `→ {"directed": false, "multigraph": false, "graph": {}, "nodes": […], "links": […]}`
 
 **다른 점** graphify(파이썬 판)의 이름 풀이·중첩 함수·다른 언어 23종은 옮기지 않는다 — 파이썬은 같은 파일의 이름 호출만, 나머지 호출은 보강이 잇는다. 그래서 graph.json이 없는 저장소는 호출 선이 파이썬 판보다 적을 수 있다(0장)
 
 **예외** `src_dir`이 폴더가 아니면 `! CodeGraphFailed("폴더 없음: {이름}")`
 
-**테스트 관점** 파이썬 맨 위 함수·데코레이터 함수·클래스 메서드가 함수 노드, 줄은 `def` 줄 · 같은 파일 이름 호출이 `calls` · 문법 오류 파일은 파일 노드만 · `.ts`·`.rs`는 파일 노드만 · `node_modules`·`.git`은 안 걷는다 · 줄이기 → 보강을 거치면 맨 위 함수·메서드가 다 있다
+**테스트 관점** 파이썬 맨 위 함수·데코레이터 함수·클래스 메서드가 함수 노드, 줄은 `def` 줄 · 같은 파일 이름 호출이 `calls` · 문법 오류 파일은 파일 노드만 · `.ts`·`.rs`·`.java`·`.go`는 파일 노드만 · `node_modules`·`.git`은 안 걷는다 · 줄이기 → 보강을 거치면 맨 위 함수·메서드가 다 있다
 
 ---
 
@@ -127,7 +127,7 @@ pub fn reduce(raw: &Value) -> Graph
 
 ---
 
-#### codegraph.enrich 파이썬·TS/JS·Rust 코드로 그래프를 보강한다
+#### codegraph.enrich 파이썬·TS/JS·Rust·Java·Go 코드로 그래프를 보강한다
 
 **시그니처**
 ```rust
@@ -136,7 +136,7 @@ pub fn enrich(src_dir: &Path, graph: Graph) -> Graph
 
 근거: [[SYNC-MS-011#codegraph.enrich]]
 
-**처리** [[SYNC-MS-011#codegraph.enrich]] 1~6과 같은 차례·같은 규칙 — 파이썬(1·2·4·5) · TS/JS 2a~2d · 화면 ID 3 · Rust 2e~2h. 더하기만 하고, 깨진 파일은 건너뛰고, `files`를 쓰고 비운다
+**처리** [[SYNC-MS-011#codegraph.enrich]] 1~6과 같은 차례·같은 규칙 — 파이썬(1·2·4·5) · TS/JS 2a~2d · 화면 ID 3 · Rust 2e~2h · Java 2i·2j(`java.rs`) · Go 2k·2l(`go.rs`, 카드 L32 — 파이썬 판과 같은 판의 문법 `tree-sitter-java` 0.23.5 · `tree-sitter-go` 0.25.0). 더하기만 하고, 깨진 파일은 건너뛰고, `files`를 쓰고 비운다
 
 **다른 점** 파이썬 파일은 `ast` 대신 tree-sitter-python으로 읽는다(0장) — 정의는 모듈 맨 위와 클래스 몸통(데코레이터를 벗겨), 머리 줄은 `def` 줄과 데코레이터 줄들, 끝 줄은 주석을 뺀 마지막 문장의 끝, docstring은 몸통 첫 문장이 글자 상수(접두어 `r`·`u`, 이어 붙인 상수는 이어서, `b`·`f`는 아니다)일 때 `cleandoc`한 첫 줄. 대입·속성은 너비 우선으로 걷고, 속성은 대입·`del`·`for`의 과녁이 아닐 때만 읽기다
 
