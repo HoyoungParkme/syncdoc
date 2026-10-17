@@ -950,6 +950,59 @@ pub struct FlowOf {
     pub infra: Vec<serde_json::Value>,
 }
 
+/// 실행 기록의 머리 (DOM-002 2.8 `TraceBrief`, 카드 L27) — 목록 한 줄. 기록은 싣지 않는다
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TraceBrief {
+    pub id: i64,
+    pub trace_key: String,
+    pub kind: String,
+    pub method: Option<String>,
+    pub path: String,
+    pub status: Option<i64>,
+    pub error: Option<String>,
+    pub started_at: OffsetDateTime,
+    pub ms: i64,
+    pub commit_hash: Option<String>,
+    pub event_count: i64,
+    pub truncated: bool,
+    pub received_at: OffsetDateTime,
+}
+
+/// 실행 기록 하나 (DOM-002 2.8 `TraceView`) — 머리와 받은 기록 그대로
+#[derive(Clone, Debug, PartialEq)]
+pub struct TraceView {
+    pub brief: TraceBrief,
+    pub record: serde_json::Value,
+}
+
+/// 기록에 나온 함수 열쇠와 실제로 닿은 장비 (DOM-002 2.8 `TraceCoverage`) — 장비는 (종류, 대상)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TraceCoverage {
+    pub traces: i64,
+    pub keys: Vec<String>,
+    pub infra: Vec<(String, String)>,
+}
+
+/// 기록 도구가 감쌀 함수 하나 (DOM-002 2.8 `TraceSpan`, 카드 L28)
+#[derive(Clone, Debug, PartialEq)]
+pub struct TraceSpan {
+    pub key: String,
+    pub file: String,
+    pub line: i64,
+    pub end: i64,
+    pub name: String,
+    pub qual: String,
+    pub route: serde_json::Value,
+}
+
+/// 기록 도구의 준비 (DOM-002 2.8 `TraceSpans`, `queries.trace_spans`)
+#[derive(Clone, Debug, PartialEq)]
+pub struct TraceSpans {
+    pub commit_hash: Option<String>,
+    pub spans: Vec<TraceSpan>,
+    pub infra: Vec<serde_json::Value>,
+}
+
 // ── 대화·질문 (카드 L14) — DOM-002 2.8·2.9
 
 /// 첨부 메타 — 바이트·글자 없이 (DOM-002 2.8 `AttachmentMeta`)
