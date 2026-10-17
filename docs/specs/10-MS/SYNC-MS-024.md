@@ -141,7 +141,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-MS-011, SYNC-INFRA-001
 
 **처리** — 함수마다 `route`를 null로 두고, 찾은 것만 채운다. 경로 매개변수는 `{이름}` 꼴로 맞춘다(Flask `<int:id>`→`{id}`, Express `:id`→`{id}`, Next `[id]`→`{id}`, `[...rest]`→`{rest}`). 경로는 앞에 `/`를 붙이고 끝 `/`는 뗀다(`/`만 남으면 `/`)
 
-1. **파이썬** — 파일마다
+1. **파이썬** — 파일마다(그래프 `files`의 `.py` 전부 — 함수 없는 `main.py`의 `include_router`도 읽는다)
    - 라우터 이름 표: 맨 위 `X = APIRouter(…)`·`FastAPI(…)`·`Blueprint(…)`·`Flask(…)`(생성자 이름의 마지막 조각으로) — `prefix=` 키워드가 글자 상수면 그 접두어(Blueprint는 `url_prefix=`)
    - 함수의 데코레이터 `@X.get|post|put|patch|delete|head|options(경로, …)` → `{method: 대문자, path: 접두어 + 경로}` · `@X.route(경로, methods=[…])` → 첫 방법(없으면 `GET`) · `@X.api_route(경로, methods=[…])` 같다. `X`는 이름 표의 것이거나 임의 이름(`app`) — 이름 표에 없으면 접두어 없이
    - `app.include_router(X, prefix="…")`가 같은 저장소의 다른 파일 `X`를 가리키면 접두어를 앞에 더한다 — `from 모듈 import router as X`·`모듈.router` 꼴만, 한 단만
