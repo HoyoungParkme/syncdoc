@@ -48,6 +48,8 @@ erDiagram
     conversations ||--o{ attachments : holds
     turns |o--o{ attachments : attached
     projects ||--o| code_graphs : graphed
+    projects ||--o{ traces : recorded
+    users ||--o{ traces : uploaded
 
     projects {
         int id PK
@@ -188,6 +190,24 @@ erDiagram
         timestamptz built_at
         varchar error
     }
+    traces {
+        int id PK
+        int project_id FK
+        int user_id FK
+        varchar trace_key
+        varchar kind
+        varchar method
+        varchar path
+        int status
+        varchar error
+        timestamptz started_at
+        int ms
+        varchar commit_hash
+        int event_count
+        boolean truncated
+        jsonb record
+        timestamptz received_at
+    }
 ```
 
 **설계 규칙**
@@ -197,6 +217,7 @@ erDiagram
 - 삭제 컬럼은 `items`에만 있다. 문서·버전은 삭제하지 않는다 — 문서는 `documents.trashed_at`으로 **휴지통**에 넣는다(행은 남는다). **행까지 지우는 것**은 휴지통 안에서 다른 문서가 가리키지 않을 때만([[SYNC-MS-002#SpecService.delete_document]]) — 그 문서에 딸린 상태변경은 같이 지운다
 - **대화 세 표(`conversations`·`turns`·`attachments`)는 명세 표와 선이 없다.** `projects`·`users`를 FK로 가리킬 뿐 `documents`·`items`를 가리키지 않는다 — 문서 ID는 턴의 글자 속에만 있다. 재구축이 건드리지 않고, 프로젝트 행이 지워지면(`ProjectService.delete_project`) `ON DELETE CASCADE`로 함께 사라진다. 대화를 지우면 턴·첨부도 같은 cascade. 리비전 `0014_conversations`가 세 표를 한 번에 만든다(카드 AQ) — 첨부 행은 AR가 채우지만 표는 대화와 같이 있어야 대화 조회가 한 모양이다
 - **`code_graphs`는 명세 표와 선이 없다**(카드 AX). `projects`만 가리키고 PK가 곧 `project_id`라 프로젝트마다 한 행이다. 항목 ID는 `graph` 안의 글자다. 재구축이 지우지 않는다 — 재구축 뒤 새로 만들어 바꿔 끼운다([[SYNC-UC-001#UC-S8]])
+- **`traces`는 명세 표·`code_graphs`와 선이 없다**(카드 CI). `projects`·`users`만 가리킨다. 사건의 함수는 그래프의 함수 열쇠를 글자로 든다 — 그래프가 바뀌어도 기록은 그대로다. 넣을 때마다 그 프로젝트의 행이 300개를 넘으면 `received_at`(같으면 `id`)이 오래된 것부터 지운다. 재구축이 건드리지 않고, 프로젝트 행이 지워지면 cascade로 사라진다
 - **재구축(UC-S6)은 `versions`·`references`만 지운다.** `documents`·`items`는 지우지 않는다 — 항목 ID 재사용 금지의 근거(`items.is_deleted`)와 휴지통 상태(`documents.trashed_at`)가 거기 산다. `items`는 upsert
 - 상태 변경은 `versions` 행을 만들지 않는다. `status_changes.commit_hash`가 그 커밋을 가리킨다
 - `references`의 `to_item_id`와 `to_document_id`는 CHECK로 하나만 채워지게 한다. `is_missing=true`면 둘 다 null
@@ -392,11 +413,33 @@ erDiagram
 | project_id | int | PK, FK not null, ON DELETE CASCADE | 어느 프로젝트의 그래프인가. 프로젝트마다 하나 | |
 | commit_hash | varchar(40) | null | 이 그래프를 만든 커밋. 첫 빌드부터 실패했으면 null | `2e243f4…` |
 | source | varchar(10) | null | `repo`(저장소에 커밋된 graphify 결과) · `server`(서버가 추출). 앱 검증 | `server` |
-| graph | jsonb | not null | 줄인 모양 `{functions, calls, communities}`([[SYNC-MS-011]] 0장). 함수마다 `community`(없으면 null)·`item`(속한 명세 항목, 없으면 null). **2026-10-01 이전에 만든 행에는 `communities`가, 2026-10-02 이전 행에는 `item`이 없다** — 읽는 쪽이 빈 것·`ms`로 보고, 다음 코드 push가 채운다(마이그레이션 없음 — JSONB 안 키다, 카드 BD·BJ). 코드 본문 없음 | |
+| graph | jsonb | not null | 줄인 모양 `{functions, calls, communities}`([[SYNC-MS-011]] 0장). 함수마다 `community`(없으면 null)·`item`(속한 명세 항목, 없으면 null). **흐름 보기(2026-10-12, [[SYNC-PRD-001#R16]])부터** 함수마다 `steps`(호출 순서)·`route`(받는 라우트, 없으면 null), 그래프에 `http`(화면 요청 → 라우트 함수)·`infra`(장비·연결)·`units`(실행 단위)가 더해진다 — 꼴은 [[SYNC-MS-011]] 0장. **2026-10-01 이전에 만든 행에는 `communities`가, 2026-10-02 이전 행에는 `item`이, 2026-10-12 이전 행에는 위의 다섯 키가 없다** — 읽는 쪽이 빈 것·`ms`로 보고, 다음 코드 push가 채운다(마이그레이션 없음 — JSONB 안 키다, 카드 BD·BJ). 코드 본문 없음 | |
 | function_count | int | not null, default 0 | 함수 수. 관리·로그용 | `1471` |
 | call_count | int | not null, default 0 | 호출 선 수 | `2192` |
 | built_at | timestamptz | not null | 마지막으로 성공하거나 실패한 시각 | |
 | error | varchar(300) | null | 마지막 빌드가 실패한 이유(`커밋7자: 이유`). 성공하면 비운다 | `2e243f4: 시간 초과` |
+
+### traces
+
+클래스: [[SYNC-DOM-002#Trace]]
+
+| 컬럼 | 타입 | 제약 | 의미 | 예시 |
+|---|---|---|---|---|
+| project_id | int | FK not null, ON DELETE CASCADE | 어느 프로젝트의 기록인가. 프로젝트 해제와 함께 사라진다 | |
+| user_id | int | FK not null | 올린 사람(토큰의 주인) | |
+| trace_key | varchar(64) | not null, UK(project_id, trace_key) | 기록 도구가 붙인 기록 ID. 다시 보낸 같은 기록을 두 번 넣지 않는다 | `1739.fastapi.0042` |
+| kind | varchar(8) | not null | `back`(서버 요청) · `front`(화면) · `job`(작업). 앱 검증 | `back` |
+| method | varchar(10) | null | HTTP 방법. 작업이면 null | `POST` |
+| path | varchar(500) | not null | 요청 경로, 작업이면 작업 이름 | `/api/docs/SYNC-PRD-001/status` |
+| status | int | null | 응답 상태. 모르면 null | `409` |
+| error | varchar(300) | null | 맨 위에서 빠져나간 예외의 한 줄 | `ConflictError: version` |
+| started_at | timestamptz | not null | 요청·작업이 시작된 시각(기록 도구 PC의 시계) | |
+| ms | int | not null | 걸린 밀리초 | `38` |
+| commit_hash | varchar(40) | null | 기록할 때 작업 사본의 HEAD. git이 아니면 null | `a1b2c3d…` |
+| event_count | int | not null | 사건 수 — 목록이 `record`를 풀지 않고 보인다 | `214` |
+| truncated | boolean | not null, default false | 사건이 상한(2만 개·4MB)에서 잘렸나 | |
+| record | jsonb | not null | 기록 전체 `{version, id, kind, method, path, status, error, startedAt, ms, query?, page?, truncated, events}`([[SYNC-MS-024]] 0장). 비밀 값은 기록 도구가 이미 가렸다 | |
+| received_at | timestamptz | not null | 서버가 받은 시각. 목록 정렬·300개 자르기 기준 | |
 
 ## 3. 인덱스와 정규화
 
@@ -419,6 +462,7 @@ erDiagram
 | turns | `(conversation_id, seq)` unique | 순번 유일 + 대화의 턴 차례 |
 | attachments | `(conversation_id)` · `(turn_id)` · `(user_id)` | 대화의 첨부 메타 · 턴의 이미지 · FK 컬럼(DEV-8) |
 | code_graphs | PK `(project_id)` — 이미 | 프로젝트의 그래프 하나. 다른 조회가 없다 |
+| traces | `(project_id, id desc)` · `(user_id)` | 최근 기록 목록·300개 넘는 것 지우기 · FK 컬럼(DEV-8). `(project_id, trace_key)`는 UK라 이미 |
 
 **정규화** — 전 테이블 3NF. 의도적 비정규화 하나([[SYNC-STD-004#DEV-9]]): `documents.current_body`(조회 캐시, `versions.body`와 같음 — **읽기 전용 캐시다**, DEV-19). `versions.body` 전체 저장은 비정규화가 아니라 git 사본이다.
 
