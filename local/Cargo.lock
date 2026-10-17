@@ -5014,7 +5014,7 @@ dependencies = [
 
 [[package]]
 name = "syncdoc_app"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -5051,7 +5051,7 @@ dependencies = [
 
 [[package]]
 name = "syncdoc_codegraph"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "indexmap",
  "regex",
@@ -5067,7 +5067,7 @@ dependencies = [
 
 [[package]]
 name = "syncdoc_core"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -5094,7 +5094,7 @@ dependencies = [
 
 [[package]]
 name = "syncdoc_pycompat"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "regex",
  "serde_json",
@@ -5102,7 +5102,7 @@ dependencies = [
 
 [[package]]
 name = "syncdoc_server"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -6495,7 +6495,7 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 
 [[package]]
 name = "xtask"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "clap",
  "resvg",
