@@ -877,8 +877,9 @@ class CodeNodes:
 
 @dataclass(frozen=True)
 class CodeLayerRow:
-    """SYNC-DOM-002 2.8 — 층 표 한 줄 — 흐름 보기의 층 열(카드 CF)."""
+    """SYNC-DOM-002 2.8 — 층 표 한 줄 — 흐름 보기의 층 열·층 지도(카드 CF·CG). doc은 그 줄의 클래스 명세."""
 
+    doc: str
     name: str
     patterns: list[str]
     specs: list[CodeLayerSpec]

@@ -1288,7 +1288,9 @@ def _layer_rows(s: Session, project_id: int) -> list[dict]:
     spec = SpecService(s)
     rows: list[dict] = []
     for doc_id in _class_docs(s, project_id):
-        rows.extend(codegraph.layer_table(spec.get_document(doc_id).body))
+        rows.extend(
+            dict(r, doc=doc_id) for r in codegraph.layer_table(spec.get_document(doc_id).body)
+        )
     return rows
 
 
@@ -1530,7 +1532,10 @@ async def flow_view(code: str, user: User) -> FlowView:
         g.get("units", []),
         [
             CodeLayerRow(
-                r["name"], r["patterns"], [CodeLayerSpec(x["ref"], x["note"]) for x in r["specs"]]
+                r["doc"],
+                r["name"],
+                r["patterns"],
+                [CodeLayerSpec(x["ref"], x["note"]) for x in r["specs"]],
             )  # noqa: E501
             for r in rows
         ],
