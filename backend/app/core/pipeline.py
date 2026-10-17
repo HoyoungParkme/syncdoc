@@ -24,6 +24,7 @@ from app.config import settings
 from app.core.account.models import User
 from app.core.account.service import AccountService
 from app.core.clock import now_utc
+from app.core.codegraph import flow as codeflow
 from app.core.codegraph import graph as codegraph
 from app.core.codegraph.service import DENY as CODE_DENY
 from app.core.codegraph.service import CodeGraphService
@@ -886,8 +887,11 @@ async def build_code_graph(code: str, commit: str) -> None:
             src = Path(tmp)
             await git.archive(workdir, commit, src)
             source, raw = await codegraph.load(src)
-            # 커뮤니티는 enrich 뒤에 — 보강이 더한 함수도 받는다 (MS-007 3, 카드 BD)
-            graph = codegraph.communities(raw, codegraph.enrich(src, codegraph.reduce(raw)))
+            # 커뮤니티는 enrich 뒤에 — 보강이 더한 함수도 받는다 (MS-007 3, 카드 BD).
+            # 흐름 키(파일·호출 순서·라우트·장비)는 enrich 뒤·커뮤니티 앞 (카드 CC~CE)
+            graph = codegraph.communities(
+                raw, codeflow.extend(src, codegraph.enrich(src, codegraph.reduce(raw)))
+            )
         with db.session_scope() as s:
             CodeGraphService(s).save(pid, commit, source, graph)
             s.commit()
