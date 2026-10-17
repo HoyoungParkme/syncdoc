@@ -296,7 +296,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | [[SYNC-MS-018]] `queries.flow_of` · `server/src/mcp/tools.rs` · `cargo xtask mcp-tools` |
 | 테스트 | 계약 `--with-card L26` |
 | 선행 | CH · L25 |
-| 완료 | 2026-10-17 · L25와 한 브랜치 — `cargo xtask mcp-tools`(선언 15개 — CH 때 다시 만들지 않았던 것을 함께) · `--check` 같다 · 계약 get_flow 넷(그래프 없음·열쇠·항목 ID·없는 함수) 바이트로 같다 |
+| 완료 | 2026-10-17 · L25와 한 브랜치 — `cargo xtask mcp-tools`(선언 15개 — CH 때 다시 만들지 않았던 것을 함께) · `--check` 같다 · 계약 get_flow 넷(그래프 없음·열쇠·항목 ID·없는 함수) 바이트로 같다 · 판 0.4.0 — 태그 `local-v0.4.0` |
 
 #### L27 실행 기록 ① — traces 표·TraceService (Rust)
 
