@@ -23,6 +23,7 @@ static SETTINGS: LazyLock<Validator> = LazyLock::new(schemas::local_settings);
 static AUTOSTART: LazyLock<Validator> = LazyLock::new(schemas::local_autostart);
 static RESTORE: LazyLock<Validator> = LazyLock::new(schemas::local_restore);
 static MOVE: LazyLock<Validator> = LazyLock::new(schemas::local_move);
+static REQUEST: LazyLock<Validator> = LazyLock::new(schemas::local_request);
 
 /// 이 PC의 문 — 경로는 이것이 있을 때만 걸린다
 fn ops(state: &AppState) -> Result<Arc<dyn LocalOps>, Problem> {
@@ -124,6 +125,21 @@ pub async fn post_restore(
         .restore(&name, password.as_deref().filter(|p| !p.is_empty()))
         .await?;
     Ok(restarting())
+}
+
+/// SYNC-API-001#POST/api/local/request
+///
+/// 이 PC의 개발 서버로 요청을 대신 보낸다(UI-19 6.2·6.6, 카드 L30). 설치형이 아니어도(시험 서버) 된다
+pub async fn post_request(headers: HeaderMap, body: Bytes) -> Result<Response, ApiProblem> {
+    let body = fastapi::read_body(&headers, &body)?;
+    let req = fastapi::body_model(&body, &REQUEST)?;
+    let reply = crate::local::request(
+        &opt_text(&req, "method").unwrap_or_default(),
+        &opt_text(&req, "url").unwrap_or_default(),
+        opt_text(&req, "body").as_deref(),
+    )
+    .await?;
+    Ok(Json(reply).into_response())
 }
 
 /// SYNC-API-001#POST/api/local/move

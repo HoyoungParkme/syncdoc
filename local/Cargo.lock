@@ -5118,6 +5118,7 @@ dependencies = [
  "num-traits",
  "percent-encoding",
  "regex",
+ "reqwest",
  "rust-embed",
  "ryu",
  "serde",

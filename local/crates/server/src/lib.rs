@@ -39,7 +39,7 @@ use crate::web::routes::documents::trash_document;
 use crate::web::routes::documents::versions;
 use crate::web::routes::git::git_entrance;
 use crate::web::routes::local::{
-    get_local, post_backup, post_move, post_restore, put_autostart, put_settings,
+    get_local, post_backup, post_move, post_request, post_restore, put_autostart, put_settings,
 };
 use crate::web::routes::projects::{
     delete_project, get_file, get_project, graph, import_bundle, init_project, list_docs,
@@ -154,7 +154,8 @@ pub fn app(state: AppState) -> Router {
             .route("/api/local/autostart", put(put_autostart))
             .route("/api/local/backups", post(post_backup))
             .route("/api/local/restore", post(post_restore))
-            .route("/api/local/move", post(post_move));
+            .route("/api/local/move", post(post_move))
+            .route("/api/local/request", post(post_request));
     }
     let inner = routes
         .fallback(fallback)
