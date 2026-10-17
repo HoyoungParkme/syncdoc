@@ -2,7 +2,7 @@
 doc_id: SYNC-DOM-001
 type: DOM
 title: 도메인 모델 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-UC-001, SYNC-INFRA-001]
 ---
 
