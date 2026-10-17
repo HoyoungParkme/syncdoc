@@ -58,6 +58,7 @@ def flow(_servers, tmp_path_factory):
         base = f"/api/projects/{CODE}"
         auth = [("Authorization", f"Bearer {token}")]
         got["spans_none"] = request(server.port, "GET", f"{base}/trace-spans", auth)
+        got["mcp_list_empty"] = mcp(server, "list_traces", {"project_code": CODE})
         work = clone(server, tmp, CODE)
         fixture(work)
         head = push(server, CODE, work, "흐름 고정 저장소")
@@ -84,6 +85,11 @@ def flow(_servers, tmp_path_factory):
         got["upload_other"] = post(server, "/api/projects/NOPE/traces", one, token)
         got["list"] = rest(server, "GET", f"{base}/traces")
         ids = [t["id"] for t in json.loads(got["list"].body)]
+        got["mcp_list"] = mcp(server, "list_traces", {"project_code": CODE, "limit": 1})
+        got["mcp_list_big_limit"] = mcp(server, "list_traces", {"project_code": CODE, "limit": 99999})
+        got["mcp_get"] = mcp(server, "get_trace", {"project_code": CODE, "trace_id": ids[-1], "max_events": 2})
+        got["mcp_get_missing"] = mcp(server, "get_trace", {"project_code": CODE, "trace_id": 99999999999999999999})
+        got["mcp_list_other"] = mcp(server, "list_traces", {"project_code": "NOPE"})
         got["one"] = rest(server, "GET", f"{base}/traces/{ids[-1]}")
         got["one_missing"] = rest(server, "GET", f"{base}/traces/999999")
         got["one_huge"] = rest(server, "GET", f"{base}/traces/99999999999999999999999")
@@ -111,6 +117,16 @@ KEYS = [
 
 @pytest.mark.parametrize("key", KEYS)
 def test_trace_replies(server, flow, key):
+    check("traces", key, masked(flow(server)[key]), server.target)
+
+
+MCP_KEYS = ["mcp_list_empty", "mcp_list", "mcp_list_big_limit", "mcp_get", "mcp_get_missing", "mcp_list_other"]
+
+
+@pytest.mark.card("L31")
+@pytest.mark.parametrize("key", MCP_KEYS)
+def test_trace_tools(server, flow, key):
+    """MCP list_traces·get_trace (카드 CL·L31)"""
     check("traces", key, masked(flow(server)[key]), server.target)
 
 
