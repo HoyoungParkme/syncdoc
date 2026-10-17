@@ -255,7 +255,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | [[SYNC-MS-026]] `flow.extend`·`files`·`steps` · `crates/codegraph/src/flow/mod.rs`·`steps.rs` · `core/src/pipeline.rs` 그래프 만들기 |
 | 테스트 | `cargo test` · 정답 파일(`codegraph-golden`에 흐름 키) · `cargo xtask codegraph-diff` — 파이썬 판과 바이트로 같다 |
 | 선행 | CC · L21 |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/L22-flow-rust`(L23·L24와 한 브랜치) · spec 6 + code 5 · `cargo test` 213 · fmt · clippy · 정답 파일 `flow`(고정 시험 저장소) · 흐름 사례 22(파이썬 판 흐름 시험 입력) · `codegraph-diff` 같다(싱크독 함수 2745 — 그리고 임시로 다른 저장소 다섯 view_arc·video_agent·qbot-h·LastTalk·competition-crawler도 같다) · `check_code` Rust 209/209 · `check_calls` 흐름 0 · 되먹임: 모듈 꼬리 `infra`·`routes`가 core·server와 겹치면 코드 그래프가 경로를 못 풀어 → `codegraph/src/flow/` 아래로 · 파이썬 판 Nest `export class` 데코레이터를 놓치던 것을 정답 파일을 만들다 찾아 고쳤다 |
 
 #### L23 흐름 보기 ② — 라우트·화면 요청 (Rust)
 
@@ -265,7 +265,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | [[SYNC-MS-026]] `routes`·`http_links` · `crates/codegraph/src/flow/routes.rs` |
 | 테스트 | `cargo test` · 정답 파일 · `codegraph-diff` |
 | 선행 | CD · L22 |
-| 완료 | — |
+| 완료 | 2026-10-17 · L22와 한 브랜치 — 정답 파일·흐름 사례(라우트 셋·화면 요청 다섯)·`codegraph-diff` 같다 |
 
 #### L24 흐름 보기 ③ — 장비·실행 단위 (Rust)
 
@@ -275,7 +275,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | [[SYNC-MS-026]] `units`·`infra` · `crates/codegraph/src/flow/infra.rs` |
 | 테스트 | `cargo test` · 정답 파일 · `codegraph-diff` |
 | 선행 | CE · L23 |
-| 완료 | — |
+| 완료 | 2026-10-17 · L22와 한 브랜치 — 정답 파일·흐름 사례(실행 단위·장비 셋)·`codegraph-diff` 같다 · 그래프 만들기가 흐름 키를 더해 저장한다(시험 DB 시험) |
 
 #### L25 흐름 보기 ④ — 조회 API (Rust)
 
