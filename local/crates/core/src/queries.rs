@@ -32,7 +32,7 @@ use crate::types::{
     CodeNode, CodeNodes, CodeRef, CodeText, CodeView, Diff, DocType, Document, DocumentSummary,
     DownstreamDoc, DownstreamView, FlowFunction, FlowOf, FlowView, Graph, GraphEdge, GraphNode,
     GraphScope, ItemChain, ItemRef, ItemReferences, ItemView, ProjectDetail, ProjectItem,
-    ProjectSummary, STAGES, StageSummary, Storage, stage_of,
+    ProjectSummary, STAGES, StageSummary, Storage, TraceSpan, TraceSpans, stage_of,
 };
 
 /// 작성자(id만) → 이름 붙은 작성자 — 파이썬 `_api_author`. 지시자는 id가 있을 때만
@@ -1632,6 +1632,71 @@ pub async fn flow_view(
         units: value_list(&g, "units"),
         layers,
         communities,
+    })
+}
+
+/// SYNC-MS-018#queries.trace_spans
+///
+/// 기록 도구가 감쌀 함수 — 그래프 함수 중 끝 줄을 아는 것의 범위·라우트, 주소를 아는 장비, 그래프 커밋.
+/// 그래프가 없으면 빈 것
+pub async fn trace_spans(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+) -> Result<TraceSpans, Problem> {
+    let (project, _) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code, user)
+    .await?;
+    let mut svc = CodeGraphService { db: &mut *db };
+    let (Some(row), Some(g)) = (svc.get(project.id).await?, svc.value(project.id).await?) else {
+        return Ok(TraceSpans {
+            commit_hash: None,
+            spans: Vec::new(),
+            infra: Vec::new(),
+        });
+    };
+    let text = |f: &serde_json::Value, k: &str| {
+        f.get(k)
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+            .to_string()
+    };
+    let spans = value_list(&g, "functions")
+        .iter()
+        .filter_map(|f| {
+            let end = f.get("end").and_then(serde_json::Value::as_i64)?;
+            Some(TraceSpan {
+                key: text(f, "key"),
+                file: text(f, "file"),
+                line: f
+                    .get("line")
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(0),
+                end,
+                name: text(f, "name"),
+                qual: text(f, "qual"),
+                route: f.get("route").cloned().unwrap_or(serde_json::Value::Null),
+            })
+        })
+        .collect();
+    let infra = g
+        .get("infra")
+        .map(|i| value_list(i, "nodes"))
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|n| {
+            n.get("host")
+                .is_some_and(|h| !h.is_null() && h.as_str() != Some(""))
+        })
+        .collect();
+    Ok(TraceSpans {
+        commit_hash: row.commit_hash.clone(),
+        spans,
+        infra,
     })
 }
 
