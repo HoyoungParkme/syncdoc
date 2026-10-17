@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-026
 type: MS
 title: MINISPEC — codegraph 흐름 — 호출 순서·라우트·화면 요청·장비·실행 단위 (Rust)
-status: approved
+status: draft
 upstream: [SYNC-DOM-004, SYNC-MS-024, SYNC-MS-022, SYNC-INFRA-001]
 ---
 
