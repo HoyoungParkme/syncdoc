@@ -247,7 +247,109 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | L8 · CB |
 | 완료 | 2026-10-12 · 브랜치 `card/L21-graph-titles`(c7a069f #406) · spec 2 + code 2 · `cargo test` 211 · fmt · clippy · 계약 `--target both --with-card L21` 전체 1286 통과(L8 graph 사례가 새 스냅숏과 바이트로 같다) · 파이썬 `pytest` 488 · `check_code` 374/374(파이썬 172·Rust 202) · `check_calls` 0 · 워크플로 녹색 · 판 0.3.3 — 태그 `local-v0.3.3` |
 
-**다음 카드** — 없다. 21장을 다 받았다(2026-10-12).
+#### L22 흐름 보기 ① — 파일 목록·호출 순서 (Rust)
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-CODE-001#CC]] · [[SYNC-MS-024]] · 사용자 결정 2026-10-12(두 판 같은 그래프) |
+| 구현 | [[SYNC-MS-026]] `flow.extend`·`files`·`steps` · `crates/codegraph/src/flow.rs`·`steps.rs` · `core/src/pipeline.rs` 그래프 만들기 |
+| 테스트 | `cargo test` · 정답 파일(`codegraph-golden`에 흐름 키) · `cargo xtask codegraph-diff` — 파이썬 판과 바이트로 같다 |
+| 선행 | CC · L21 |
+| 완료 | — |
+
+#### L23 흐름 보기 ② — 라우트·화면 요청 (Rust)
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-CODE-001#CD]] |
+| 구현 | [[SYNC-MS-026]] `routes`·`http_links` · `crates/codegraph/src/routes.rs` |
+| 테스트 | `cargo test` · 정답 파일 · `codegraph-diff` |
+| 선행 | CD · L22 |
+| 완료 | — |
+
+#### L24 흐름 보기 ③ — 장비·실행 단위 (Rust)
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-CODE-001#CE]] |
+| 구현 | [[SYNC-MS-026]] `units`·`infra` · `crates/codegraph/src/infra.rs` |
+| 테스트 | `cargo test` · 정답 파일 · `codegraph-diff` |
+| 선행 | CE · L23 |
+| 완료 | — |
+
+#### L25 흐름 보기 ④ — 조회 API (Rust)
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-CODE-001#CF]] |
+| 구현 | [[SYNC-MS-018]] `queries.flow_view` · `types.rs` · `server/src/web/routes/flow.rs` · `schemas.rs` |
+| API | [[SYNC-API-001#GET/api/projects/{code}/flow]] |
+| 테스트 | `cargo test` · 계약 `--target both --with-card L25` — 파이썬 판 스냅숏과 바이트로 같다 |
+| 선행 | CF · L24 |
+| 완료 | — |
+
+#### L26 흐름 보기 ⑥ — MCP get_flow (Rust)
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-CODE-001#CH]] |
+| 구현 | [[SYNC-MS-018]] `queries.flow_of` · `server/src/mcp/tools.rs` · `cargo xtask mcp-tools` |
+| 테스트 | 계약 `--with-card L26` |
+| 선행 | CH · L25 |
+| 완료 | — |
+
+#### L27 실행 기록 ① — traces 표·TraceService (Rust)
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-CODE-001#CI]] · [[SYNC-MS-025]] |
+| 구현 | `cargo xtask migrations`(Alembic 리비전에서) · [[SYNC-MS-027]] `TraceService` · `core/src/trace/` · `ProjectService.delete_project` |
+| 테스트 | `cargo test`(시험 DB) · `cargo xtask schema-check` |
+| 선행 | CI · L26 |
+| 완료 | — |
+
+#### L28 실행 기록 ② — 기록 API·토큰 경로 (Rust)
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-CODE-001#CJ]] |
+| 구현 | [[SYNC-MS-018]] `queries.trace_spans` · `server/src/web/routes/traces.rs`·`flow.rs` · `guard.rs` 토큰 경로 |
+| 테스트 | 계약 `--with-card L28` |
+| 선행 | CJ · L27 |
+| 완료 | — |
+
+#### L29 실행 기록 ③ — 기록 도구 `syncdoc-local trace`·`trace-web`
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R17]] · [[SYNC-UC-001#UC-H25]] · [[SYNC-INFRA-001]] 9.9 · [[SYNC-INFRA-001#C12]]·C13 · 사용자 결정 2026-10-12(로컬 판 실행 파일의 하위 명령) · view_arc `trace.mts`·`web-proxy.mts`·`native/rust.mts`·`runtime/*` |
+| 구현 | [[SYNC-MS-027]] 기록 도구 · `crates/app/src/trace/` · `crates/app/tracers/`(Python·Node·브라우저·Rust 기록기 — 사건의 `fn`을 그래프 열쇠로) |
+| 테스트 | `cargo test`(언어 알아보기·환경 변수·올리기 다시 보내기·Rust 사본 계측) · E2E: 스크래치 FastAPI·Express·axum 앱을 기록 도구로 띄워 요청 → 두 판에 기록이 올라오고 대상 저장소 `git status`가 그대로 · 비밀 이름의 값이 `***` |
+| 선행 | CJ · L28 |
+| 완료 | — |
+
+#### L30 실행 기록 ④ — 요청 보내기 `POST /api/local/request`
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UC-001#UC-H26]] · [[SYNC-SEQ-001#SEQ-37]] · [[SYNC-INFRA-001#C14]] |
+| 구현 | [[SYNC-MS-027]] `local.request` · `server/src/web/routes/local.rs` |
+| API | [[SYNC-API-001#POST/api/local/request]] |
+| 테스트 | `cargo test`(localhost 아님 → refused · 닿지 못함 → failed · 1MB 자르기 · 리다이렉트 안 따름) |
+| 선행 | L29 |
+| 완료 | — |
+
+#### L31 실행 기록 ⑤ — MCP list_traces·get_trace (Rust)
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-CODE-001#CL]] |
+| 구현 | `server/src/mcp/tools.rs` · `cargo xtask mcp-tools` |
+| 테스트 | 계약 `--with-card L31` · 판 0.5.0 — 태그 `local-v0.5.0` |
+| 선행 | CL · L30 |
+| 완료 | — |
+
+**다음 카드** — L22(흐름 보기, 2026-10-12 사용자 결정 — view_arc를 두 판의 기능으로). 1차 L22~L26 → `local-v0.4.0`, 2차 L27~L31 → `local-v0.5.0`.
 
 카드 BX는 파이썬 판에서 먼저 했다 — [[SYNC-CODE-001]](#376). #325(재구축이 파일을 지운 커밋에서 실패)는 #366으로 끝났다.
 
