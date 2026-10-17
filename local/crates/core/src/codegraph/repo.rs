@@ -1,5 +1,6 @@
 //! code_graphs 조회·저장 — DB만 안다 (SYNC-DOM-004 4장 · SYNC-DOM-003)
 
+use serde_json::Value;
 use sqlx::PgConnection;
 use syncdoc_codegraph::Graph;
 use time::OffsetDateTime;
@@ -56,12 +57,13 @@ pub async fn put(
     project_id: i32,
     commit_hash: &str,
     source: &str,
-    graph: &Graph,
+    graph: &Value,
     built_at: OffsetDateTime,
 ) -> Result<CodeGraphRow, Problem> {
     let body = serde_json::to_string(graph).map_err(|e| Problem::Internal {
         log: format!("그래프를 JSON으로 못 바꿨다: {e}"),
     })?;
+    let count = |k: &str| graph.get(k).and_then(Value::as_array).map_or(0, Vec::len) as i32;
     let raw = sqlx::query_as::<_, Raw>(sqlx::AssertSqlSafe(format!(
         "INSERT INTO code_graphs (project_id, commit_hash, source, graph, function_count, call_count, built_at, error)
          VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, NULL)
@@ -75,8 +77,8 @@ pub async fn put(
     .bind(commit_hash)
     .bind(source)
     .bind(body)
-    .bind(graph.functions.len() as i32)
-    .bind(graph.calls.len() as i32)
+    .bind(count("functions"))
+    .bind(count("calls"))
     .bind(built_at)
     .fetch_one(db)
     .await?;

@@ -5,7 +5,6 @@ use std::path::Path;
 
 use serde_json::Value;
 use sqlx::PgConnection;
-use syncdoc_codegraph::Graph;
 
 use super::model::CodeGraphRow;
 use super::repo;
@@ -73,7 +72,7 @@ impl CodeGraphService<'_> {
         project_id: i32,
         commit_hash: &str,
         source: &str,
-        graph: &Graph,
+        graph: &Value,
     ) -> Result<CodeGraphRow, Problem> {
         repo::put(
             &mut *self.db,

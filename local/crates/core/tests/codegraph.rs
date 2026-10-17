@@ -208,9 +208,14 @@ async fn save_replaces_one_row_and_fail_keeps_old_graph() {
         functions: vec![function("a.py:1", "a")],
         ..Graph::default()
     };
-    svc.save(e.project_id, "1111111", "server", &g1)
-        .await
-        .expect("저장");
+    svc.save(
+        e.project_id,
+        "1111111",
+        "server",
+        &serde_json::to_value(&g1).expect("값"),
+    )
+    .await
+    .expect("저장");
     let g2 = Graph {
         functions: vec![function("a.py:1", "a"), function("a.py:5", "b")],
         calls: vec![Call("a.py:1".into(), "a.py:5".into(), "enrich".into())],
@@ -218,7 +223,12 @@ async fn save_replaces_one_row_and_fail_keeps_old_graph() {
         files: Vec::new(),
     };
     let r = svc
-        .save(e.project_id, "2222222", "repo", &g2)
+        .save(
+            e.project_id,
+            "2222222",
+            "repo",
+            &serde_json::to_value(&g2).expect("값"),
+        )
         .await
         .expect("저장");
     assert_eq!(
@@ -271,9 +281,14 @@ async fn read_is_the_graph_commit_and_refuses_secrets_and_escapes() {
         ),
         ("code_graph".into(), e.project_id.to_string())
     );
-    svc.save(e.project_id, &first, "server", &Graph::default())
-        .await
-        .expect("저장");
+    svc.save(
+        e.project_id,
+        &first,
+        "server",
+        &serde_json::json!({"functions": [], "calls": []}),
+    )
+    .await
+    .expect("저장");
     let t = svc
         .read(
             &e.repos.git,
@@ -402,6 +417,39 @@ async fn build_from_push_groups_rust_and_ts_functions() {
         .map(|c| c.size)
         .sum();
     assert_eq!(sizes, i64::from(r.function_count));
+    // 흐름 키 — 값 위에 더해 저장된다(카드 L22). 읽은 `Graph`는 흐름의 files를 이름으로 읽지 않는다
+    assert!(r.graph.files.is_empty());
+    let (text,): (String,) =
+        sqlx::query_as("SELECT graph::text FROM code_graphs WHERE project_id = $1")
+            .bind(e.project_id)
+            .fetch_one(e.pool())
+            .await
+            .expect("행");
+    let v: serde_json::Value = serde_json::from_str(&text).expect("JSON");
+    for k in ["files", "units", "http", "infra"] {
+        assert!(v.get(k).is_some(), "{k}");
+    }
+    assert!(
+        v["files"]
+            .as_array()
+            .expect("files")
+            .iter()
+            .any(|f| f["path"] == "frontend/src/api/client.ts")
+    );
+    let load = v["functions"]
+        .as_array()
+        .expect("함수")
+        .iter()
+        .find(|f| f["name"] == "load")
+        .expect("load");
+    assert_eq!(load["route"], serde_json::Value::Null);
+    assert!(
+        load["steps"]
+            .as_array()
+            .expect("steps")
+            .iter()
+            .any(|st| st["k"] == "call" && st["to"] == "frontend/src/api/client.ts:5")
+    );
 }
 
 #[tokio::test]

@@ -1621,7 +1621,7 @@ async fn graph_of(
     repos: &ServerRepos,
     origin: &Path,
     commit: &str,
-) -> Result<(String, syncdoc_codegraph::Graph), String> {
+) -> Result<(String, syncdoc_codegraph::Graph, serde_json::Value), String> {
     let tmp = tempfile::Builder::new()
         .prefix("syncdoc-graph-")
         .tempdir()
@@ -1632,7 +1632,7 @@ async fn graph_of(
         .await
         .map_err(|e| e.to_string())?;
     let src = tmp.path().to_path_buf();
-    // 파일 읽기·파싱·군집은 막히는 일이라 따로 — 커뮤니티는 보강 뒤에(보강이 더한 함수도 받는다).
+    // 파일 읽기·파싱·군집·흐름은 막히는 일이라 따로 — 커뮤니티는 보강 뒤에(보강이 더한 함수도 받는다).
     // 추출 원형은 TS/JS·Rust가 파일 노드뿐이라 보강이 찾은 함수·호출을 더해 묶는다(카드 L20) — graph.json이면 그대로
     let built = tokio::task::spawn_blocking(move || {
         let (source, raw) = syncdoc_codegraph::graph::load(&src)?;
@@ -1643,7 +1643,11 @@ async fn graph_of(
             raw
         };
         let graph = syncdoc_codegraph::community::communities(&raw, graph);
-        Ok::<_, syncdoc_codegraph::CodeGraphFailed>((source, graph))
+        // 흐름 키는 값 위에 더한다 — 줄이기의 `files`와 이름이 같다(카드 L22, SYNC-MS-026 0장)
+        let mut value = serde_json::to_value(&graph)
+            .map_err(|e| syncdoc_codegraph::CodeGraphFailed(e.to_string()))?;
+        syncdoc_codegraph::flow::extend(&src, &mut value);
+        Ok::<_, syncdoc_codegraph::CodeGraphFailed>((source, graph, value))
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -1672,11 +1676,11 @@ pub async fn build_code_graph(pool: &PgPool, repos: &ServerRepos, code: &str, co
     let t0 = Instant::now();
     let short: String = commit.chars().take(7).collect();
     let saved = match graph_of(repos, Path::new(&repo.remote_url), commit).await {
-        Ok((source, graph)) => {
+        Ok((source, graph, value)) => {
             let save = async {
                 let mut tx = pool.begin().await?;
                 CodeGraphService { db: &mut tx }
-                    .save(project.id, commit, &source, &graph)
+                    .save(project.id, commit, &source, &value)
                     .await?;
                 tx.commit().await?;
                 Ok::<_, Problem>(())
