@@ -35,6 +35,7 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 
 **웹이 쓰지 않는 것** — 본문 생성·수정 엔드포인트는 없다. 본문 쓰기는 MCP와 저장소 push뿐이다(PRD R9). 웹의 쓰기는 상태 토글·되돌리기·휴지통·토큰·재구축, 그리고 **대화·첨부**(3.5 — 명세가 아니라 읽는 사람의 메모, [[SYNC-PRD-001]] 2장)까지다.
 - **업로드는 `POST /api/conversations/{id}/attachments` 하나다**(multipart/form-data). 나머지 요청 본문은 전부 JSON이다
+- **기록 도구가 부르는 두 경로는 개인 토큰으로도 된다** — `GET /api/projects/{code}/trace-spans`와 `POST /api/projects/{code}/traces`([[SYNC-INFRA-001]] 9.9, 카드 CJ). `Authorization: Bearer {토큰}`이 있으면 세션 대신 토큰이 사람을 정한다(MCP·git과 같다 — 허용 목록 밖 주인이면 401, 폐쇄망판에서도 Origin을 보지 않는다). 토큰이 틀리면 401이다. 다른 경로에서 토큰은 쓰지 않는다
 
 ---
 
@@ -93,6 +94,9 @@ upstream: [SYNC-UI-002, SYNC-DOM-002, SYNC-DOM-003]
 | `urn:syncdoc:backup-invalid` | 422 | 싱크독_로컬(Rust) — 되살리려는 파일이 싱크독 백업이 아니거나 깨졌거나 암호가 틀리다. 아무것도 바꾸지 않는다(카드 L16) | `reason` | — |
 | `urn:syncdoc:backup-failed` | 500 | 싱크독_로컬(Rust) — 백업을 만들다 실패했다(덤프·폴더 쓰기). 반쯤 쓴 파일은 남기지 않는다(카드 L16) | `reason` | — |
 | `urn:syncdoc:data-dir-invalid` | 422 | 싱크독_로컬(Rust) — 옮길 데이터 자리가 절대 경로가 아니거나, 비어 있지 않거나, 지금 자리와 겹치거나, 쓸 수 없다(카드 L16) | `reason` | — |
+| `urn:syncdoc:trace-invalid` | 422 | 올린 실행 기록이 꼴(3.12 `TraceRecord`)에 안 맞거나 상한(사건 2만 개·본문 4MB)을 넘는다. 아무것도 남기지 않는다(카드 CJ) | `reason` | [[SYNC-UC-001#UC-S9]] 2a |
+| `urn:syncdoc:request-refused` | 422 | 싱크독_로컬 요청 보내기 — 주소가 localhost·127.0.0.1·::1이 아니다(카드 L30) | `url` | [[SYNC-UC-001#UC-H26]] 3a |
+| `urn:syncdoc:request-failed` | 424 | 싱크독_로컬 요청 보내기 — 그 포트에 닿지 못했거나 10초 안에 답이 없다(카드 L30) | `reason` | [[SYNC-UC-001#UC-H26]] 3b |
 | `urn:syncdoc:internal` | 500 | **예상 못 한 오류.** 위 어느 것도 아닌 예외가 라우터에서 샜다 | — | — |
 
 ---
@@ -1839,6 +1843,46 @@ MINISPEC 항목인데 코드에 함수가 없으면 `function: null`·`missing: 
         description: backup-invalid · invalid-request
 ```
 
+#### POST/api/local/request 이 PC의 개발 서버로 요청을 보낸다
+
+화면 [[SYNC-UI-002#UI-19]] 6.2·6.6 · 유스케이스 [[SYNC-UC-001#UC-H26]] · [[SYNC-INFRA-001#C14]]
+
+```yaml
+/api/local/request:
+  post:
+    summary: >
+      localhost(127.0.0.1·::1)의 개발 서버로 요청 하나를 대신 보낸다 — 싱크독_로컬만(파이썬 판은 404). 리다이렉트를 따르지 않고,
+      10초·응답 본문 1MB에서 자른다. 기록을 켠 서버면 그 기록이 기록 도구로 올라온다
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [method, url]
+            properties:
+              method: {type: string, enum: [GET, POST, PUT, PATCH, DELETE]}
+              url: {type: string, description: "http://localhost:{포트}/{경로}?{쿼리}"}
+              body: {type: string, nullable: true, description: 보낼 본문(JSON 글자). GET이면 무시}
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status, headers, body, truncated, ms]
+              properties:
+                status: {type: integer}
+                headers: {type: object, additionalProperties: {type: string}, description: 응답 머리 — 이름은 소문자}
+                body: {type: string, description: 본문을 UTF-8로 읽은 것(못 읽는 바이트는 대체 문자)}
+                truncated: {type: boolean, description: 1MB에서 잘렸나}
+                ms: {type: integer}
+      '422':
+        description: request-refused · invalid-request
+      '424':
+        description: request-failed
+```
+
 #### POST/api/local/move 데이터 자리 옮기기 — 다시 켠다
 
 화면 [[SYNC-UI-002#UI-13]] 10.9 · [[SYNC-INFRA-001]] 9.3
@@ -1869,6 +1913,193 @@ MINISPEC 항목인데 코드에 함수가 없으면 `function: null`·`missing: 
                 restarting: {type: boolean, enum: [true]}
       '422':
         description: data-dir-invalid · invalid-request
+```
+
+### 3.12 흐름 보기·실행 기록
+
+흐름 보기([[SYNC-PRD-001#R16]])와 실행 기록([[SYNC-PRD-001#R17]]). 두 판이 같다 — 계약 시험이 바이트로 본다(카드 L25·L28). 기록 도구가 부르는 두 경로는 개인 토큰으로도 된다(1장).
+
+#### GET/api/projects/{code}/flow 흐름 보기
+
+화면 [[SYNC-UI-002#UI-19]] · 유스케이스 [[SYNC-UC-001#UC-H24]] · 서비스 [[SYNC-MS-008#queries.flow_view]]
+
+```yaml
+/api/projects/{code}/flow:
+  get:
+    summary: "흐름 보기(UI-19) — 코드 그래프의 파일·함수(호출 순서·라우트)·호출·화면 요청·장비·실행 단위·층 표·대조 상태를 한 번에"
+    parameters:
+    - $ref: '#/components/parameters/code'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlowView'
+      '404':
+        $ref: '#/components/responses/NotFound'
+```
+
+그래프가 없으면 `graph: null`에 빈 목록(UC-H24 1a). 흐름 키를 모르는 옛 그래프(2026-10-12 이전)면 `files`·`http`·`units`가 빈 목록, `infra`가 빈 노드·선, 함수의 `route`가 null·`steps`가 빈 목록 — 화면이 「다음 코드 push에 호출 순서가 생깁니다」(UC-H24 4a). `status`·`item`·`ms`·`community`·`layer`는 `GET …/code-graph`(UI-17)와 같은 값이다 — 같은 함수(`compare`·`layers`)로. `layers`는 클래스 명세 층 표의 줄들이다(없으면 빈 목록 — 화면이 짐작한다). 응답은 1MB 남짓이다.
+
+#### GET/api/projects/{code}/trace-spans 기록 도구가 감쌀 함수
+
+유스케이스 [[SYNC-UC-001#UC-H25]] 기본 흐름 2 · 서비스 [[SYNC-MS-008#queries.trace_spans]] · 개인 토큰 가능(1장)
+
+```yaml
+/api/projects/{code}/trace-spans:
+  get:
+    summary: "기록 도구의 준비 — 그래프 커밋, 함수마다 파일·시작·끝 줄·이름·라우트, 장비 주소(호스트·포트)"
+    parameters:
+    - $ref: '#/components/parameters/code'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TraceSpans'
+      '401':
+        description: unauthorized — 토큰이 틀렸거나 세션이 없다
+      '404':
+        $ref: '#/components/responses/NotFound'
+```
+
+그래프가 없으면 `commit_hash: null`·빈 목록 — 기록 도구가 「코드를 먼저 push하세요」라고 말하고 끝낸다. 끝 줄을 모르는 함수(`end` null)는 싣지 않는다.
+
+#### POST/api/projects/{code}/traces 실행 기록 하나를 올린다
+
+유스케이스 [[SYNC-UC-001#UC-S9]] · 서비스 [[SYNC-MS-025#TraceService.save]] · 개인 토큰 가능(1장)
+
+```yaml
+/api/projects/{code}/traces:
+  post:
+    summary: "기록 도구가 기록 하나를 올린다. 같은 id(trace_key)를 다시 올리면 있는 것을 그대로 돌려준다(200). 넣은 뒤 프로젝트의 기록이 300개를 넘으면 오래된 것부터 지운다"
+    parameters:
+    - $ref: '#/components/parameters/code'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TraceRecord'
+    responses:
+      '201':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TraceBrief'
+      '200':
+        description: 같은 trace_key가 이미 있다 — 그 TraceBrief
+      '401':
+        description: unauthorized
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '413':
+        description: trace-invalid — 본문 4MB 초과(상태만 413, 종류는 trace-invalid)
+      '422':
+        description: trace-invalid · invalid-request
+```
+
+#### GET/api/projects/{code}/traces 실행 기록 목록
+
+화면 [[SYNC-UI-002#UI-19]] 5.3 · 서비스 [[SYNC-MS-025#TraceService.list_recent]]
+
+```yaml
+/api/projects/{code}/traces:
+  get:
+    summary: "최근 실행 기록 — 받은 때 내림차순, 최대 300. 사건은 싣지 않는다"
+    parameters:
+    - $ref: '#/components/parameters/code'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: array
+              items: {$ref: '#/components/schemas/TraceBrief'}
+      '404':
+        $ref: '#/components/responses/NotFound'
+```
+
+#### DELETE/api/projects/{code}/traces 실행 기록을 다 지운다
+
+화면 [[SYNC-UI-002#UI-19]] 5.11 · 서비스 [[SYNC-MS-025#TraceService.delete]]
+
+```yaml
+/api/projects/{code}/traces:
+  delete:
+    summary: 이 프로젝트의 실행 기록을 다 지운다
+    parameters:
+    - $ref: '#/components/parameters/code'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deleted]
+              properties:
+                deleted: {type: integer}
+      '404':
+        $ref: '#/components/responses/NotFound'
+```
+
+#### GET/api/projects/{code}/traces/coverage 기록 커버리지
+
+화면 [[SYNC-UI-002#UI-19]] 2.3·5.8 · 서비스 [[SYNC-MS-025#TraceService.coverage]]
+
+```yaml
+/api/projects/{code}/traces/coverage:
+  get:
+    summary: "남아 있는 기록 전부에 나온 함수 열쇠와 실제로 닿은 장비(종류·대상)"
+    parameters:
+    - $ref: '#/components/parameters/code'
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TraceCoverage'
+      '404':
+        $ref: '#/components/responses/NotFound'
+```
+
+#### GET/api/projects/{code}/traces/{id} 실행 기록 하나
+
+화면 [[SYNC-UI-002#UI-19]] 7 · 서비스 [[SYNC-MS-025#TraceService.get]]
+
+```yaml
+/api/projects/{code}/traces/{id}:
+  get:
+    summary: 기록 하나 — 머리와 기록 전체(사건 포함)
+    parameters:
+    - $ref: '#/components/parameters/code'
+    - {in: path, name: id, required: true, schema: {type: integer}}
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TraceView'
+      '404':
+        description: not-found (resource project · trace)
+```
+
+#### DELETE/api/projects/{code}/traces/{id} 실행 기록 하나를 지운다
+
+서비스 [[SYNC-MS-025#TraceService.delete]]
+
+```yaml
+/api/projects/{code}/traces/{id}:
+  delete:
+    summary: 기록 하나를 지운다
+    parameters:
+    - $ref: '#/components/parameters/code'
+    - {in: path, name: id, required: true, schema: {type: integer}}
+    responses:
+      '204':
+        description: 지웠다
+      '404':
+        description: not-found (resource project · trace)
 ```
 
 ---
@@ -2813,6 +3044,208 @@ components:
               from: {type: string, description: "부르는 MINISPEC 항목 DOC#ITEM"}
               to: {type: string}
               status: {type: string, enum: [same, code_only, spec_only]}
+    FlowStep:
+      type: object
+      description: 함수의 호출 순서 한 줄(카드 CC) — 줄·차례대로
+      required: [k, line, label]
+      properties:
+        k: {type: string, enum: [call, return, raise]}
+        line: {type: integer}
+        label: {type: string, description: "부른 모양(`self.repo.save`)·반환·예외 글자, 80자까지"}
+        to: {type: string, nullable: true, description: 부르는 함수의 열쇠 — 그래프 안에서 풀렸을 때만}
+        inferred: {type: boolean, description: 이름으로 짐작해 이었다}
+        deferred: {type: boolean, description: 콜백 안 — 나중에 불림}
+        awaited: {type: boolean}
+        infra: {type: string, nullable: true, description: 이 호출이 닿는 장비 id(InfraNode.id)}
+    FlowFunction:
+      type: object
+      description: 흐름 보기의 함수 하나 — CodeNodes의 함수에 끝 줄·라우트·호출 순서를 더했다
+      properties:
+        key: {type: string}
+        name: {type: string}
+        qual: {type: string}
+        file: {type: string}
+        line: {type: integer}
+        end: {type: integer, nullable: true}
+        community: {type: integer, nullable: true}
+        item: {type: string, nullable: true}
+        ms: {type: string, nullable: true}
+        status: {type: string, nullable: true, enum: [same, code_only, spec_only]}
+        layer: {nullable: true, description: CodeNodes 함수의 layer와 같다}
+        route:
+          type: object
+          nullable: true
+          properties:
+            method: {type: string}
+            path: {type: string}
+        steps: {type: array, items: {$ref: '#/components/schemas/FlowStep'}}
+    InfraNode:
+      type: object
+      description: 장비 하나(카드 CE). 주소는 호스트·포트만
+      properties:
+        id: {type: string, description: "infra:db · infra:backend:backend 꼴"}
+        kind: {type: string, enum: [browser, backend, db, cache, storage, queue, search, api]}
+        name: {type: string}
+        where: {type: string, enum: [local, container, external]}
+        host: {type: string, nullable: true}
+        evidence: {type: array, items: {type: string}, description: "찾은 근거 — `dep:psycopg` · `compose:db` · `config:settings.toml` · `code:backend/app/db.py`"}
+        dir: {type: string, nullable: true, description: 서버·화면이면 그 폴더}
+    FlowView:
+      type: object
+      description: 흐름 보기(UI-19). 배치는 브라우저가 한다
+      properties:
+        graph: {nullable: true, allOf: [{$ref: '#/components/schemas/CodeGraphInfo'}]}
+        files:
+          type: array
+          items:
+            type: object
+            properties:
+              path: {type: string}
+              lang: {type: string, nullable: true, description: "python · typescript · javascript · rust · 그 밖은 확장자"}
+              loc: {type: integer}
+        functions: {type: array, items: {$ref: '#/components/schemas/FlowFunction'}}
+        calls: {type: array, items: {type: array, items: {type: string}}, description: "[부르는 key, 불리는 key]"}
+        http:
+          type: array
+          description: 화면 요청 → 라우트 함수
+          items:
+            type: object
+            properties:
+              from: {type: string}
+              to: {type: string}
+              inferred: {type: boolean}
+        infra:
+          type: object
+          properties:
+            nodes: {type: array, items: {$ref: '#/components/schemas/InfraNode'}}
+            links:
+              type: array
+              items:
+                type: object
+                properties:
+                  from: {type: string}
+                  to: {type: string}
+                  protocol: {type: string}
+        units:
+          type: array
+          description: 실행 단위 — 기록 도구 명령의 재료(UI-19 5.2)
+          items:
+            type: object
+            properties:
+              name: {type: string}
+              kind: {type: string, enum: [server, web, job]}
+              dir: {type: string}
+              lang: {type: string}
+              framework: {type: string, nullable: true}
+              command: {type: string, nullable: true}
+              port: {type: integer, nullable: true}
+        layers:
+          type: array
+          description: 클래스 명세 층 표의 줄 — 위에서부터
+          items:
+            type: object
+            properties:
+              name: {type: string}
+              patterns: {type: array, items: {type: string}}
+              specs: {type: array, items: {type: object, properties: {ref: {type: string, nullable: true}, note: {type: string}}}}
+        communities: {type: array, items: {type: object, properties: {id: {type: integer}, label: {type: string}, size: {type: integer}}}}
+    TraceSpans:
+      type: object
+      description: 기록 도구의 준비(카드 CJ)
+      properties:
+        commit_hash: {type: string, nullable: true}
+        spans:
+          type: array
+          items:
+            type: object
+            properties:
+              key: {type: string}
+              file: {type: string}
+              line: {type: integer}
+              end: {type: integer}
+              name: {type: string}
+              qual: {type: string}
+              route: {nullable: true, type: object, properties: {method: {type: string}, path: {type: string}}}
+        infra: {type: array, items: {$ref: '#/components/schemas/InfraNode'}}
+    TraceRecord:
+      type: object
+      description: >
+        기록 도구가 올리는 기록 하나 — view_arc의 RuntimeRecord에 `commit`을 더했다. 사건의 `fn`은 그래프 함수 열쇠(`파일:줄`),
+        장비 사건은 `@infra`, 브라우저 요청은 `@fetch`. 비밀 값은 기록 도구가 이미 가렸다
+      required: [version, id, kind, method, path, startedAt, ms, truncated, events]
+      properties:
+        version: {type: integer, enum: [1]}
+        id: {type: string, maxLength: 64}
+        kind: {type: string, enum: [back, front, job]}
+        method: {type: string, maxLength: 10, description: 작업이면 JOB}
+        path: {type: string, maxLength: 500, description: 요청 경로 · 작업 이름}
+        status: {type: integer, nullable: true}
+        error: {type: string, nullable: true}
+        startedAt: {type: string, format: date-time}
+        ms: {type: integer, minimum: 0}
+        commit: {type: string, nullable: true, maxLength: 40, description: 작업 사본의 HEAD}
+        query: {type: string, nullable: true}
+        page: {type: string, nullable: true, description: 화면 기록의 페이지 경로}
+        truncated: {type: boolean}
+        events:
+          type: array
+          maxItems: 20000
+          items:
+            type: object
+            required: [i, parent, fn, t0]
+            properties:
+              i: {type: integer}
+              parent: {type: integer, description: 부모 사건의 i, 맨 위면 -1}
+              fn: {type: string}
+              name: {type: string}
+              line: {type: integer}
+              callLine: {type: integer, nullable: true}
+              args: {type: object, nullable: true, additionalProperties: {type: string}}
+              kind: {type: string, enum: [call, resume]}
+              via: {type: string}
+              fetch: {type: object, properties: {method: {type: string}, url: {type: string}, path: {type: string}, status: {type: integer}}}
+              infra: {type: object, properties: {kind: {type: string, enum: [db, http, redis, s3]}, target: {type: string}, op: {type: string}}}
+              t0: {type: number}
+              t1: {type: number}
+              ret: {type: string}
+              exc: {type: string}
+              yield: {type: boolean}
+    TraceBrief:
+      type: object
+      description: 실행 기록의 머리 — 목록 한 줄
+      properties:
+        id: {type: integer}
+        trace_key: {type: string}
+        kind: {type: string, enum: [back, front, job]}
+        method: {type: string, nullable: true}
+        path: {type: string}
+        status: {type: integer, nullable: true}
+        error: {type: string, nullable: true}
+        started_at: {type: string, format: date-time}
+        ms: {type: integer}
+        commit_hash: {type: string, nullable: true}
+        event_count: {type: integer}
+        truncated: {type: boolean}
+        received_at: {type: string, format: date-time}
+    TraceView:
+      allOf:
+      - $ref: '#/components/schemas/TraceBrief'
+      - type: object
+        properties:
+          record: {$ref: '#/components/schemas/TraceRecord'}
+    TraceCoverage:
+      type: object
+      properties:
+        traces: {type: integer, description: 센 기록 수}
+        keys: {type: array, items: {type: string}, description: 기록에 나온 함수 열쇠 — 글자 순}
+        infra:
+          type: array
+          description: 실제로 닿은 장비 — 종류·대상(호스트:포트), 글자 순
+          items:
+            type: object
+            properties:
+              kind: {type: string}
+              target: {type: string}
     CodeNodes:
       type: object
       description: 코드 그래프 노드 전부(UI-17, 카드 BD). 배치는 브라우저가 한다
