@@ -194,6 +194,7 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 1. `project = get_owned(code, user)` · 없거나 남의 것이면 `! not-found`. 해제는 소유자만 한다
 2. [[SYNC-MS-010#ConversationService.delete_by_project]]`(project.id)` — 대화·턴·첨부(2026-09-29 보관 결정). 명세 표보다 먼저, 같은 트랜잭션
 2a. [[SYNC-MS-011#CodeGraphService.delete_by_project]]`(project.id)` — 코드 그래프(카드 AX). 같은 자리
+2b. [[SYNC-MS-025#TraceService.delete_by_project]]`(project.id)` — 실행 기록(카드 CI). 같은 자리
 3. `DB: 이 프로젝트의 references · items · versions · status_changes · documents · repositories · projects` 순서로 삭제. 외래키를 물고 있으므로 자식부터
 4. `shutil.rmtree(workdir, ignore_errors=True)` — 작업 사본 회수
 4a. 서버 저장이면 원본(`repository.remote_url`)을 `ORIGINS_DIR/_archive/{code}-{UTC %Y%m%d%H%M%S}.git`으로 옮긴다 — **지우지 않는다**([[SYNC-UC-001#UC-H17]]). DB를 지운 뒤(flush), 작업 사본 삭제와 같은 자리다. 부르는 쪽의 커밋이 그 뒤에 실패하면 행이 남은 채 원본이 보관 폴더에 가 있으니 운영자가 되돌린다 — 드물다([[SYNC-INFRA-001]] 6장)
@@ -206,9 +207,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 **돌아오지 않는 것이 있다.** 상태 변경 이력(`status_changes`)은 원본에 없는 정보다(인프라 6장). 그래서 이 함수는 **되돌릴 수 없는 동작**이고, 부르는 쪽이
 사람에게 확인을 받아야 한다.
 
-**호출하는 것** [[#ProjectService.get_owned]] · [[SYNC-MS-010#ConversationService.delete_by_project]] · [[SYNC-MS-011#CodeGraphService.delete_by_project]]
+**호출하는 것** [[#ProjectService.get_owned]] · [[SYNC-MS-010#ConversationService.delete_by_project]] · [[SYNC-MS-011#CodeGraphService.delete_by_project]] · [[SYNC-MS-025#TraceService.delete_by_project]]
 
-**테스트 관점** 삭제 후 `get` → not-found · 그 프로젝트의 대화·첨부·코드 그래프 행이 0 · 작업 사본 디렉터리가 사라짐 · **서버 저장 → 원본이 `_archive/{code}-{시각}.git`으로 옮겨지고 `ORIGINS_DIR/{code}.git`은 없다** · 같은 저장소를 다시 등록할 수 있음(중복 등록 검사에 안 걸림) · 다른 프로젝트의 문서는 그대로 · **남의 프로젝트 → `not-found`, 아무것도 안 지워짐**
+**테스트 관점** 삭제 후 `get` → not-found · 그 프로젝트의 대화·첨부·코드 그래프·실행 기록 행이 0 · 작업 사본 디렉터리가 사라짐 · **서버 저장 → 원본이 `_archive/{code}-{시각}.git`으로 옮겨지고 `ORIGINS_DIR/{code}.git`은 없다** · 같은 저장소를 다시 등록할 수 있음(중복 등록 검사에 안 걸림) · 다른 프로젝트의 문서는 그대로 · **남의 프로젝트 → `not-found`, 아무것도 안 지워짐**
 
 ---
 
