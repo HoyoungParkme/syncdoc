@@ -28,6 +28,15 @@ _RS_VERBS = {"get": "GET", "post": "POST", "put": "PUT", "patch": "PATCH", "dele
 _NEXT_ROUTE = re.compile(r"(^|/)app/(.*/)?route\.(ts|js)$")
 _FLASK_PARAM = re.compile(r"<(?:[^<>:]+:)?([^<>]+)>")
 _EXPRESS_PARAM = re.compile(r":([A-Za-z_][A-Za-z0-9_]*)")
+_SPRING = {"GetMapping": "GET", "PostMapping": "POST", "PutMapping": "PUT",
+           "PatchMapping": "PATCH", "DeleteMapping": "DELETE", "RequestMapping": None}  # fmt: skip
+_SPRING_PARAM = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*):[^{}]*\}")
+_GO_VERBS = {"GET": "GET", "POST": "POST", "PUT": "PUT", "PATCH": "PATCH", "DELETE": "DELETE",
+             "Get": "GET", "Post": "POST", "Put": "PUT", "Patch": "PATCH", "Delete": "DELETE",
+             "HandleFunc": "ANY", "Handle": "ANY", "Any": "ANY"}  # fmt: skip
+_GO_PATTERN = re.compile(r"^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(/.*)$", re.A)
+_GIN_PARAM = re.compile(r"[:*]([A-Za-z_][A-Za-z0-9_]*)")
+_GO_REST = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\.\.\.\}")
 _REQ_NAMES = frozenset({"fetch", "get", "post", "put", "patch", "delete", "del", "head", "request"})
 
 
@@ -426,6 +435,148 @@ def _rs_routes(src: bytes) -> tuple[list[tuple[str, str, str]], dict[int, dict]]
     return chains, attrs
 
 
+# ---------------------------------------------------------------- Java·Go (카드 CN)
+
+
+def _java_str(n, src: bytes) -> str | None:
+    """Java 글자 상수의 내용 — `"…"`만(이어 붙이기·상수 이름은 모른다)."""
+    if n is None or n.type != "string_literal":
+        return None
+    return "".join(_text(c, src) for c in n.named_children if c.type == "string_fragment")
+
+
+def _java_annotations(decl, src: bytes) -> list[tuple[str, object]]:
+    """선언의 어노테이션 — [(이름의 마지막 조각, 인자 목록 | None)] 적힌 차례."""
+    mods = next((c for c in decl.children if c.type == "modifiers"), None)
+    out: list[tuple[str, object]] = []
+    for a in mods.named_children if mods is not None else []:
+        if a.type not in ("annotation", "marker_annotation"):
+            continue
+        name = a.child_by_field_name("name")
+        if name is not None:
+            out.append((_text(name, src).rsplit(".", 1)[-1], a.child_by_field_name("arguments")))
+    return out
+
+
+def _java_path(args, src: bytes) -> str | None:
+    """`("/x")` · `(value = "/x")` · `(path = {"/x", "/y"})` → 첫 경로. 경로가 없으면 None."""
+    if args is None:
+        return None
+    for c in args.named_children:
+        val = c
+        if c.type == "element_value_pair":
+            key = c.child_by_field_name("key")
+            if key is None or _text(key, src) not in ("value", "path"):
+                continue
+            val = c.child_by_field_name("value")
+        if val is not None and val.type == "element_value_array_initializer":
+            val = next((x for x in val.named_children if x.type == "string_literal"), None)
+        got = _java_str(val, src)
+        if got is not None:
+            return got
+    return None
+
+
+def _java_method(args, src: bytes) -> str:
+    """`@RequestMapping(method = RequestMethod.POST)` → POST, 없으면 ANY."""
+    for c in args.named_children if args is not None else []:
+        if c.type != "element_value_pair":
+            continue
+        key = c.child_by_field_name("key")
+        if key is None or _text(key, src) != "method":
+            continue
+        val = c.child_by_field_name("value")
+        if val is not None and val.type == "element_value_array_initializer":
+            val = val.named_children[0] if val.named_children else None
+        if val is not None:
+            return _text(val, src).rsplit(".", 1)[-1].upper()
+    return "ANY"
+
+
+def _java_routes(src: bytes) -> dict[int, dict]:
+    """Spring — 클래스 `@RequestMapping` 접두어 + 메서드 `@GetMapping`… → {선언 첫 줄: route}."""
+    from app.core.codegraph.javago import _parse
+
+    out: dict[int, dict] = {}
+    for cls in _walk(_parse("java", src)):
+        if cls.type != "class_declaration":
+            continue
+        prefix = ""
+        for name, args in _java_annotations(cls, src):
+            if name == "RequestMapping":
+                prefix = _java_path(args, src) or ""
+                break
+        body = cls.child_by_field_name("body")
+        for m in body.named_children if body is not None else []:
+            if m.type != "method_declaration":
+                continue
+            for name, args in _java_annotations(m, src):
+                if name not in _SPRING:
+                    continue
+                method = _SPRING[name] or _java_method(args, src)
+                path = _SPRING_PARAM.sub(r"{\1}", _join(prefix, _java_path(args, src) or ""))
+                out.setdefault(m.start_point[0] + 1, {"method": method, "path": path})
+                break
+    return out
+
+
+def _go_routes(src: bytes) -> list[tuple[str, str, str]]:
+    """Go — `X.HandleFunc("경로", h)`·gin·echo `X.GET`·chi `X.Get` → [(방법, 경로, 핸들러 이름)].
+    `g := r.Group("/p")`의 접두어를 그 이름에 붙인다(같은 파일, 위에서부터)."""
+    from app.core.codegraph.javago import _parse
+
+    def lit(n) -> str | None:
+        if n is None or n.type not in ("interpreted_string_literal", "raw_string_literal"):
+            return None
+        return "".join(_text(c, src) for c in n.named_children
+                       if c.type in ("interpreted_string_literal_content",
+                                     "raw_string_literal_content"))  # fmt: skip
+
+    groups: dict[str, str] = {}
+    out: list[tuple[str, str, str]] = []
+    for n in _walk(_parse("go", src)):
+        if n.type == "short_var_declaration":
+            left, right = n.child_by_field_name("left"), n.child_by_field_name("right")
+            names = [c for c in left.named_children] if left is not None else []
+            vals = [c for c in right.named_children] if right is not None else []
+            if len(names) != 1 or len(vals) != 1 or vals[0].type != "call_expression":
+                continue
+            f = vals[0].child_by_field_name("function")
+            args = _args(vals[0])
+            if f is None or f.type != "selector_expression" or not args:
+                continue
+            op, field = f.child_by_field_name("operand"), f.child_by_field_name("field")
+            p = lit(args[0])
+            if field is not None and _text(field, src) == "Group" and p is not None:
+                base = groups.get(_text(op, src), "") if op is not None else ""
+                groups[_text(names[0], src)] = base + p
+            continue
+        if n.type != "call_expression":
+            continue
+        f = n.child_by_field_name("function")
+        if f is None or f.type != "selector_expression":
+            continue
+        field = f.child_by_field_name("field")
+        verb = _GO_VERBS.get(_text(field, src)) if field is not None else None
+        args = _args(n)
+        path = lit(args[0]) if args else None
+        if verb is None or path is None or len(args) < 2:
+            continue
+        m = _GO_PATTERN.match(path)
+        if m:
+            verb, path = m.group(1), m.group(2)
+        h = _unparen(args[-1])
+        if h.type == "selector_expression":
+            h = h.child_by_field_name("field")
+        if h is None or h.type not in ("identifier", "field_identifier"):
+            continue
+        op = f.child_by_field_name("operand")
+        prefix = groups.get(_text(op, src), "") if op is not None else ""
+        path = _GO_REST.sub(r"{\1}", _GIN_PARAM.sub(r"{\1}", _join(prefix, path)))
+        out.append((verb, path, _text(h, src)))
+    return out
+
+
 # ---------------------------------------------------------------- 묶기
 
 
@@ -433,7 +584,8 @@ def routes(src_dir: Path, graph: dict) -> dict:
     """SYNC-MS-024#routes.routes
 
     함수마다 받는 라우트 `{method, path}` 또는 null — FastAPI·Flask 데코레이터, Express·Fastify·Hono
-    등록, NestJS 데코레이터, Next `app/**/route.ts`, axum `.route` 사슬, actix 속성.
+    등록, NestJS 데코레이터, Next `app/**/route.ts`, axum `.route` 사슬, actix 속성,
+    Spring 어노테이션, Go `HandleFunc`·gin·echo·chi 등록.
     """
     funcs = graph["functions"]
     for f in funcs:
@@ -493,6 +645,30 @@ def routes(src_dir: Path, graph: dict) -> dict:
         for ln, route in sorted(attrs.items()):
             if ln in here:
                 give(here[ln], route)
+
+    for file in sorted(by_file):
+        if not file.endswith(".java"):
+            continue
+        src = _read(src_dir, file)
+        if src is None:
+            continue
+        for ln, route in sorted(_java_routes(src).items()):
+            if ln in by_file[file]:
+                give(by_file[file][ln], route)
+
+    go_names = {name: fs for (suffix, name), fs in by_name.items() if suffix == ".go"}
+    for file in sorted(by_file):
+        if not file.endswith(".go"):
+            continue
+        src = _read(src_dir, file)
+        if src is None:
+            continue
+        folder = str(PurePosixPath(file).parent)
+        for method, path, h in _go_routes(src):
+            fs = go_names.get(h, [])
+            cands = [f for f in fs if str(PurePosixPath(f["file"]).parent) == folder] or fs
+            if len(cands) == 1:
+                give(cands[0], {"method": method, "path": path})
     return graph
 
 

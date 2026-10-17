@@ -20,6 +20,8 @@ _BOM = b"\xef\xbb\xbf"
 _PY = (".py",)
 _TS = (".ts", ".tsx", ".js", ".jsx", ".mjs")
 _RS = (".rs",)
+_JAVA = (".java",)
+_GO = (".go",)
 
 _TS_FN = frozenset({"function_declaration", "generator_function_declaration", "method_definition",
                     "function_expression", "arrow_function"})  # fmt: skip
@@ -51,6 +53,10 @@ def _lang(file: str) -> str | None:
         return "ts"
     if file.endswith(_RS):
         return "rs"
+    if file.endswith(_JAVA):
+        return "java"
+    if file.endswith(_GO):
+        return "go"
     return None
 
 
@@ -354,6 +360,130 @@ def _rs_events(fn, src: bytes) -> list[_Ev]:
     return out
 
 
+# ---------------------------------------------------------------- Java·Go (tree-sitter, 카드 CN)
+
+
+def _jg_root(lang: str, src: bytes):
+    from app.core.codegraph.javago import _parse
+
+    return _parse(lang, src)
+
+
+_JAVA_FN = frozenset({"method_declaration", "constructor_declaration"})
+_GO_FN = frozenset({"function_declaration", "method_declaration"})
+
+
+def _start_defs(root, kinds: frozenset) -> dict[int, object]:
+    """줄 → 정의 — 선언의 첫 줄(Java는 어노테이션 줄부터, Go는 `func` 줄). 같은 줄이면 앞선 것."""
+    out: dict[int, object] = {}
+    for n in sorted((n for n in _walk(root) if n.type in kinds), key=lambda n: n.start_byte):
+        out.setdefault(n.start_point[0] + 1, n)
+    return out
+
+
+def _java_ident(n, src: bytes) -> tuple | None:
+    """`m()` → (m, 맨 이름) · `x.m()` → (m, 메서드)."""
+    name = n.child_by_field_name("name")
+    if name is None:
+        return None
+    return _text(name, src), n.child_by_field_name("object") is None
+
+
+def _java_events(fn, src: bytes) -> list[_Ev]:
+    out: list[_Ev] = []
+    body = fn.child_by_field_name("body")
+    if body is None:
+        return out
+
+    def ev(n, k: str, label: str, ident: tuple | None, deferred: bool) -> None:
+        out.append(_Ev((1, n.end_byte, -n.start_byte), k, n.start_point[0] + 1, _label(label),
+                       ident, deferred, False))  # fmt: skip
+
+    def visit(n, deferred: bool) -> None:
+        t = n.type
+        if t == "lambda_expression":
+            b = n.child_by_field_name("body")
+            if b is not None:
+                visit(b, True)
+            return
+        if t in ("class_body", "class_declaration", "interface_declaration", "enum_declaration",
+                 "record_declaration"):  # fmt: skip
+            return
+        if t == "method_invocation":
+            name = n.child_by_field_name("name")
+            if name is not None:
+                label = src[n.start_byte : name.end_byte].decode("utf-8", errors="replace")
+                ev(n, "call", label, _java_ident(n, src), deferred)
+        elif t == "object_creation_expression":
+            ty = n.child_by_field_name("type")
+            if ty is not None:
+                from app.core.codegraph.javago import _jtype
+
+                tn = _jtype(ty, src)
+                ev(n, "call", f"new {_text(ty, src)}", (tn, True) if tn else None, deferred)
+        elif t == "return_statement" and not deferred:
+            vals = [c for c in n.named_children if c.type not in ("line_comment", "block_comment")]
+            label = "return" if not vals else f"return {_text(_unparen(vals[0]), src)}"
+            ev(n, "return", label, None, False)
+        elif t == "throw_statement" and not deferred:
+            vals = [c for c in n.named_children if c.type not in ("line_comment", "block_comment")]
+            label = "throw" if not vals else f"throw {_text(_unparen(vals[0]), src)}"
+            ev(n, "raise", label, None, False)
+        for c in n.children:
+            visit(c, deferred)
+
+    visit(body, False)
+    return out
+
+
+def _go_ident(fn, src: bytes) -> tuple | None:
+    fn = _unparen(fn)
+    if fn is None:
+        return None
+    if fn.type == "identifier":
+        return _text(fn, src), True
+    if fn.type == "selector_expression":
+        field = fn.child_by_field_name("field")
+        return (_text(field, src), False) if field is not None else None
+    return None
+
+
+def _go_events(fn, src: bytes) -> list[_Ev]:
+    out: list[_Ev] = []
+    body = fn.child_by_field_name("body")
+    if body is None:
+        return out
+
+    def ev(n, k: str, label: str, ident: tuple | None, deferred: bool) -> None:
+        out.append(_Ev((1, n.end_byte, -n.start_byte), k, n.start_point[0] + 1, _label(label),
+                       ident, deferred, False))  # fmt: skip
+
+    def visit(n, deferred: bool) -> None:
+        t = n.type
+        if t == "func_literal":
+            b = n.child_by_field_name("body")
+            if b is not None:
+                visit(b, True)
+            return
+        if t in ("go_statement", "defer_statement"):
+            for c in n.children:
+                visit(c, True)
+            return
+        if t == "call_expression":
+            f = n.child_by_field_name("function")
+            if f is not None:
+                ev(n, "call", _text(_unparen(f), src), _go_ident(f, src), deferred)
+        elif t == "return_statement" and not deferred:
+            vals = [c for c in n.named_children if c.type != "comment"]
+            label = "return" if not vals else f"return {_text(vals[0], src)}"
+            ev(n, "return", label, None, False)
+        for c in n.children:
+            visit(c, deferred)
+
+    visit(body, False)
+    return out
+
+
 # ---------------------------------------------------------------- 묶기
 
 
@@ -368,8 +498,13 @@ def _events_of(lang: str, file: str, src: bytes) -> dict[int, list[_Ev]]:
     if lang == "ts":
         root = _ts_root(file, src)
         return {ln: _ts_events(n, src) for ln, n in _ts_defs(root).items()}
-    root = _rs_root(src)
-    return {ln: _rs_events(n, src) for ln, n in _rs_defs(root).items()}
+    if lang == "rs":
+        root = _rs_root(src)
+        return {ln: _rs_events(n, src) for ln, n in _rs_defs(root).items()}
+    root = _jg_root(lang, src)
+    if lang == "java":
+        return {ln: _java_events(n, src) for ln, n in _start_defs(root, _JAVA_FN).items()}
+    return {ln: _go_events(n, src) for ln, n in _start_defs(root, _GO_FN).items()}
 
 
 def steps(src_dir: Path, graph: dict) -> dict:
