@@ -15,94 +15,611 @@ use tree_sitter::Node;
 use syncdoc_pycompat::chars::{decimal_value, lstrip, py_splitlines, strip};
 use syncdoc_pycompat::re::compile as py_re;
 
-use crate::flow::{ascii, children, named_children, read, rs_parse, text, ts_parse, unparen, walk, walk_files};
+use super::routes::is_front;
+use super::steps::{rs_defs, ts_defs};
+use super::{
+    ascii, children, named_children, read, rs_parse, text, ts_parse, unparen, walk, walk_files,
+};
 use crate::graph::is_test;
 use crate::python;
-use crate::routes::is_front;
-use crate::steps::{rs_defs, ts_defs};
 
 /// 패키지 → (id, kind, name, io, protocol) — 파이썬 판 `LIBS`와 같은 차례
 const LIBS: &[(&str, &str, &str, &str, &str, &str)] = &[
-    ("sqlalchemy", "db", "db", "DB", r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#, "SQL"),
-    ("sqlmodel", "db", "db", "DB", r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#, "SQL"),
-    ("psycopg2", "db", "db", "PostgreSQL", r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#, "SQL"),
-    ("psycopg", "db", "db", "PostgreSQL", r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#, "SQL"),
-    ("asyncpg", "db", "db", "PostgreSQL", r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#, "SQL"),
-    ("pymysql", "db", "db", "MySQL", r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#, "SQL"),
-    ("sqlite3", "db", "db", "SQLite", r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#, "SQL"),
-    ("aiosqlite", "db", "db", "SQLite", r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#, "SQL"),
-    ("pymongo", "mongo", "db", "MongoDB", r#"^(find\w*|insert\w*|update\w*|delete\w*|replace_one|aggregate|count_documents|bulk_write)$"#, "Mongo"),
-    ("motor", "mongo", "db", "MongoDB", r#"^(find\w*|insert\w*|update\w*|delete\w*|replace_one|aggregate|count_documents|bulk_write)$"#, "Mongo"),
-    ("neo4j", "neo4j", "db", "Neo4j", r#"^(run|execute_query|execute_read|execute_write)$"#, "Bolt"),
-    ("redis", "redis", "cache", "Redis", r#"^(get|set\w*|mget|mset|hget\w*|hset\w*|hdel|incr\w*|decr\w*|expire\w*|delete|exists|[lr]push|[lr]pop|lrange|publish|xadd|xread\w*|zadd|zrange\w*|sadd|smembers|ping|from_url)$"#, "Redis"),
-    ("boto3", "storage", "storage", "S3 저장소", r#"^(put_object|get_object|upload_\w+|download_\w+|list_objects\w*|list_buckets|delete_object\w*|head_object|head_bucket|create_bucket|copy_object|generate_presigned_url)$"#, "S3"),
-    ("minio", "storage", "storage", "MinIO", r#"^(put_object|get_object|fput_object|fget_object|list_objects|remove_object|stat_object|bucket_exists|make_bucket)$"#, "S3"),
-    ("openai", "openai", "api", "OpenAI API", r#"^(create|parse|stream)$"#, "HTTPS"),
-    ("anthropic", "anthropic", "api", "Anthropic API", r#"^(create|stream)$"#, "HTTPS"),
-    ("requests", "http", "api", "외부 HTTP", r#"^(get|post|put|patch|delete|head|request|send)$"#, "HTTPS"),
-    ("httpx", "http", "api", "외부 HTTP", r#"^(get|post|put|patch|delete|head|request|send|stream)$"#, "HTTPS"),
-    ("aiohttp", "http", "api", "외부 HTTP", r#"^(get|post|put|patch|delete|head|request)$"#, "HTTPS"),
-    ("urllib", "http", "api", "외부 HTTP", r#"^(urlopen)$"#, "HTTPS"),
-    ("elasticsearch", "search", "search", "Elasticsearch", r#"^(search|index|get|delete|bulk|update)$"#, "HTTP"),
-    ("opensearchpy", "search", "search", "OpenSearch", r#"^(search|index|get|delete|bulk|update)$"#, "HTTP"),
-    ("pika", "queue", "queue", "메시지 큐", r#"^(basic_publish|basic_consume|publish)$"#, "AMQP"),
-    ("aio_pika", "queue", "queue", "메시지 큐", r#"^(publish|consume)$"#, "AMQP"),
-    ("kafka", "queue", "queue", "Kafka", r#"^(send|poll|produce)$"#, "Kafka"),
-    ("aiokafka", "queue", "queue", "Kafka", r#"^(send\w*|getone|getmany)$"#, "Kafka"),
-    ("celery", "queue", "queue", "작업 큐", r#"^(delay|apply_async|send_task)$"#, "AMQP"),
-    ("pg", "db", "db", "PostgreSQL", r#"^(query|connect)$"#, "SQL"),
-    ("@neondatabase/serverless", "db", "db", "PostgreSQL", r#"^(query|connect|transaction)$"#, "SQL"),
-    ("mysql2", "db", "db", "MySQL", r#"^(query|execute|getConnection)$"#, "SQL"),
-    ("better-sqlite3", "db", "db", "SQLite", r#"^(run|get|all|exec|iterate)$"#, "SQL"),
-    ("drizzle-orm", "db", "db", "DB", r#"^(select|selectDistinct|insert|update|delete|execute|findMany|findFirst|transaction|batch)$"#, "SQL"),
-    ("@prisma/client", "db", "db", "DB", r#"^(findMany|findFirst|findUnique|findUniqueOrThrow|findFirstOrThrow|create|createMany|update|updateMany|upsert|delete|deleteMany|count|aggregate|groupBy|\$queryRaw\w*|\$executeRaw\w*|\$transaction)$"#, "SQL"),
-    ("typeorm", "db", "db", "DB", r#"^(find\w*|save|insert|update|delete|remove|softDelete|query|count\w*|getMany|getOne|getRawMany|getRawOne|execute|exist\w*)$"#, "SQL"),
-    ("sequelize", "db", "db", "DB", r#"^(findAll|findOne|findByPk|findOrCreate|findAndCountAll|create|bulkCreate|update|destroy|count|query|upsert)$"#, "SQL"),
-    ("knex", "db", "db", "DB", r#"^(select|insert|update|del|delete|raw|first|then)$"#, "SQL"),
-    ("mongoose", "mongo", "db", "MongoDB", r#"^(find\w*|create|insertMany|update\w*|delete\w*|replaceOne|aggregate|count\w*|save|exec|exists)$"#, "Mongo"),
-    ("mongodb", "mongo", "db", "MongoDB", r#"^(find\w*|insert\w*|update\w*|delete\w*|replaceOne|aggregate|countDocuments|bulkWrite|toArray)$"#, "Mongo"),
-    ("ioredis", "redis", "cache", "Redis", r#"^(get|set\w*|mget|mset|hget\w*|hset\w*|hdel|incr\w*|decr\w*|expire\w*|del|exists|[lr]push|[lr]pop|lrange|publish|xadd|xread\w*|zadd|zrange\w*|sadd|smembers|ping|eval)$"#, "Redis"),
-    ("@upstash/redis", "redis", "cache", "Redis", r#"^(get|set\w*|del|incr\w*|expire|hget\w*|hset\w*|lpush|rpush|lrange)$"#, "HTTPS"),
-    ("bullmq", "redis", "cache", "Redis", r#"^(add|addBulk)$"#, "Redis"),
-    ("@aws-sdk/client-s3", "storage", "storage", "S3 저장소", r#"^send$"#, "S3"),
-    ("@aws-sdk/lib-storage", "storage", "storage", "S3 저장소", r#"^done$"#, "S3"),
-    ("aws-sdk", "storage", "storage", "S3 저장소", r#"^(putObject|getObject|upload|deleteObject\w*|listObjects\w*|headObject|getSignedUrl\w*|promise)$"#, "S3"),
-    ("@anthropic-ai/sdk", "anthropic", "api", "Anthropic API", r#"^(create|stream)$"#, "HTTPS"),
-    ("@google/generative-ai", "gemini", "api", "Gemini API", r#"^(generateContent\w*|embedContent|countTokens|sendMessage\w*)$"#, "HTTPS"),
-    ("@google/genai", "gemini", "api", "Gemini API", r#"^(generateContent\w*|embedContent|countTokens|sendMessage\w*)$"#, "HTTPS"),
-    ("axios", "http", "api", "외부 HTTP", r#"^(get|post|put|patch|delete|head|request)$"#, "HTTPS"),
-    ("node-fetch", "http", "api", "외부 HTTP", r#"^fetch$"#, "HTTPS"),
-    ("undici", "http", "api", "외부 HTTP", r#"^(fetch|request)$"#, "HTTPS"),
+    (
+        "sqlalchemy",
+        "db",
+        "db",
+        "DB",
+        r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#,
+        "SQL",
+    ),
+    (
+        "sqlmodel",
+        "db",
+        "db",
+        "DB",
+        r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#,
+        "SQL",
+    ),
+    (
+        "psycopg2",
+        "db",
+        "db",
+        "PostgreSQL",
+        r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#,
+        "SQL",
+    ),
+    (
+        "psycopg",
+        "db",
+        "db",
+        "PostgreSQL",
+        r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#,
+        "SQL",
+    ),
+    (
+        "asyncpg",
+        "db",
+        "db",
+        "PostgreSQL",
+        r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#,
+        "SQL",
+    ),
+    (
+        "pymysql",
+        "db",
+        "db",
+        "MySQL",
+        r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#,
+        "SQL",
+    ),
+    (
+        "sqlite3",
+        "db",
+        "db",
+        "SQLite",
+        r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#,
+        "SQL",
+    ),
+    (
+        "aiosqlite",
+        "db",
+        "db",
+        "SQLite",
+        r#"^(execute\w*|exec|scalars?|get|add|add_all|commit|flush|delete|merge|refresh|query|stream\w*|fetch\w*|copy_\w+|bulk_\w+)$"#,
+        "SQL",
+    ),
+    (
+        "pymongo",
+        "mongo",
+        "db",
+        "MongoDB",
+        r#"^(find\w*|insert\w*|update\w*|delete\w*|replace_one|aggregate|count_documents|bulk_write)$"#,
+        "Mongo",
+    ),
+    (
+        "motor",
+        "mongo",
+        "db",
+        "MongoDB",
+        r#"^(find\w*|insert\w*|update\w*|delete\w*|replace_one|aggregate|count_documents|bulk_write)$"#,
+        "Mongo",
+    ),
+    (
+        "neo4j",
+        "neo4j",
+        "db",
+        "Neo4j",
+        r#"^(run|execute_query|execute_read|execute_write)$"#,
+        "Bolt",
+    ),
+    (
+        "redis",
+        "redis",
+        "cache",
+        "Redis",
+        r#"^(get|set\w*|mget|mset|hget\w*|hset\w*|hdel|incr\w*|decr\w*|expire\w*|delete|exists|[lr]push|[lr]pop|lrange|publish|xadd|xread\w*|zadd|zrange\w*|sadd|smembers|ping|from_url)$"#,
+        "Redis",
+    ),
+    (
+        "boto3",
+        "storage",
+        "storage",
+        "S3 저장소",
+        r#"^(put_object|get_object|upload_\w+|download_\w+|list_objects\w*|list_buckets|delete_object\w*|head_object|head_bucket|create_bucket|copy_object|generate_presigned_url)$"#,
+        "S3",
+    ),
+    (
+        "minio",
+        "storage",
+        "storage",
+        "MinIO",
+        r#"^(put_object|get_object|fput_object|fget_object|list_objects|remove_object|stat_object|bucket_exists|make_bucket)$"#,
+        "S3",
+    ),
+    (
+        "openai",
+        "openai",
+        "api",
+        "OpenAI API",
+        r#"^(create|parse|stream)$"#,
+        "HTTPS",
+    ),
+    (
+        "anthropic",
+        "anthropic",
+        "api",
+        "Anthropic API",
+        r#"^(create|stream)$"#,
+        "HTTPS",
+    ),
+    (
+        "requests",
+        "http",
+        "api",
+        "외부 HTTP",
+        r#"^(get|post|put|patch|delete|head|request|send)$"#,
+        "HTTPS",
+    ),
+    (
+        "httpx",
+        "http",
+        "api",
+        "외부 HTTP",
+        r#"^(get|post|put|patch|delete|head|request|send|stream)$"#,
+        "HTTPS",
+    ),
+    (
+        "aiohttp",
+        "http",
+        "api",
+        "외부 HTTP",
+        r#"^(get|post|put|patch|delete|head|request)$"#,
+        "HTTPS",
+    ),
+    (
+        "urllib",
+        "http",
+        "api",
+        "외부 HTTP",
+        r#"^(urlopen)$"#,
+        "HTTPS",
+    ),
+    (
+        "elasticsearch",
+        "search",
+        "search",
+        "Elasticsearch",
+        r#"^(search|index|get|delete|bulk|update)$"#,
+        "HTTP",
+    ),
+    (
+        "opensearchpy",
+        "search",
+        "search",
+        "OpenSearch",
+        r#"^(search|index|get|delete|bulk|update)$"#,
+        "HTTP",
+    ),
+    (
+        "pika",
+        "queue",
+        "queue",
+        "메시지 큐",
+        r#"^(basic_publish|basic_consume|publish)$"#,
+        "AMQP",
+    ),
+    (
+        "aio_pika",
+        "queue",
+        "queue",
+        "메시지 큐",
+        r#"^(publish|consume)$"#,
+        "AMQP",
+    ),
+    (
+        "kafka",
+        "queue",
+        "queue",
+        "Kafka",
+        r#"^(send|poll|produce)$"#,
+        "Kafka",
+    ),
+    (
+        "aiokafka",
+        "queue",
+        "queue",
+        "Kafka",
+        r#"^(send\w*|getone|getmany)$"#,
+        "Kafka",
+    ),
+    (
+        "celery",
+        "queue",
+        "queue",
+        "작업 큐",
+        r#"^(delay|apply_async|send_task)$"#,
+        "AMQP",
+    ),
+    (
+        "pg",
+        "db",
+        "db",
+        "PostgreSQL",
+        r#"^(query|connect)$"#,
+        "SQL",
+    ),
+    (
+        "@neondatabase/serverless",
+        "db",
+        "db",
+        "PostgreSQL",
+        r#"^(query|connect|transaction)$"#,
+        "SQL",
+    ),
+    (
+        "mysql2",
+        "db",
+        "db",
+        "MySQL",
+        r#"^(query|execute|getConnection)$"#,
+        "SQL",
+    ),
+    (
+        "better-sqlite3",
+        "db",
+        "db",
+        "SQLite",
+        r#"^(run|get|all|exec|iterate)$"#,
+        "SQL",
+    ),
+    (
+        "drizzle-orm",
+        "db",
+        "db",
+        "DB",
+        r#"^(select|selectDistinct|insert|update|delete|execute|findMany|findFirst|transaction|batch)$"#,
+        "SQL",
+    ),
+    (
+        "@prisma/client",
+        "db",
+        "db",
+        "DB",
+        r#"^(findMany|findFirst|findUnique|findUniqueOrThrow|findFirstOrThrow|create|createMany|update|updateMany|upsert|delete|deleteMany|count|aggregate|groupBy|\$queryRaw\w*|\$executeRaw\w*|\$transaction)$"#,
+        "SQL",
+    ),
+    (
+        "typeorm",
+        "db",
+        "db",
+        "DB",
+        r#"^(find\w*|save|insert|update|delete|remove|softDelete|query|count\w*|getMany|getOne|getRawMany|getRawOne|execute|exist\w*)$"#,
+        "SQL",
+    ),
+    (
+        "sequelize",
+        "db",
+        "db",
+        "DB",
+        r#"^(findAll|findOne|findByPk|findOrCreate|findAndCountAll|create|bulkCreate|update|destroy|count|query|upsert)$"#,
+        "SQL",
+    ),
+    (
+        "knex",
+        "db",
+        "db",
+        "DB",
+        r#"^(select|insert|update|del|delete|raw|first|then)$"#,
+        "SQL",
+    ),
+    (
+        "mongoose",
+        "mongo",
+        "db",
+        "MongoDB",
+        r#"^(find\w*|create|insertMany|update\w*|delete\w*|replaceOne|aggregate|count\w*|save|exec|exists)$"#,
+        "Mongo",
+    ),
+    (
+        "mongodb",
+        "mongo",
+        "db",
+        "MongoDB",
+        r#"^(find\w*|insert\w*|update\w*|delete\w*|replaceOne|aggregate|countDocuments|bulkWrite|toArray)$"#,
+        "Mongo",
+    ),
+    (
+        "ioredis",
+        "redis",
+        "cache",
+        "Redis",
+        r#"^(get|set\w*|mget|mset|hget\w*|hset\w*|hdel|incr\w*|decr\w*|expire\w*|del|exists|[lr]push|[lr]pop|lrange|publish|xadd|xread\w*|zadd|zrange\w*|sadd|smembers|ping|eval)$"#,
+        "Redis",
+    ),
+    (
+        "@upstash/redis",
+        "redis",
+        "cache",
+        "Redis",
+        r#"^(get|set\w*|del|incr\w*|expire|hget\w*|hset\w*|lpush|rpush|lrange)$"#,
+        "HTTPS",
+    ),
+    (
+        "bullmq",
+        "redis",
+        "cache",
+        "Redis",
+        r#"^(add|addBulk)$"#,
+        "Redis",
+    ),
+    (
+        "@aws-sdk/client-s3",
+        "storage",
+        "storage",
+        "S3 저장소",
+        r#"^send$"#,
+        "S3",
+    ),
+    (
+        "@aws-sdk/lib-storage",
+        "storage",
+        "storage",
+        "S3 저장소",
+        r#"^done$"#,
+        "S3",
+    ),
+    (
+        "aws-sdk",
+        "storage",
+        "storage",
+        "S3 저장소",
+        r#"^(putObject|getObject|upload|deleteObject\w*|listObjects\w*|headObject|getSignedUrl\w*|promise)$"#,
+        "S3",
+    ),
+    (
+        "@anthropic-ai/sdk",
+        "anthropic",
+        "api",
+        "Anthropic API",
+        r#"^(create|stream)$"#,
+        "HTTPS",
+    ),
+    (
+        "@google/generative-ai",
+        "gemini",
+        "api",
+        "Gemini API",
+        r#"^(generateContent\w*|embedContent|countTokens|sendMessage\w*)$"#,
+        "HTTPS",
+    ),
+    (
+        "@google/genai",
+        "gemini",
+        "api",
+        "Gemini API",
+        r#"^(generateContent\w*|embedContent|countTokens|sendMessage\w*)$"#,
+        "HTTPS",
+    ),
+    (
+        "axios",
+        "http",
+        "api",
+        "외부 HTTP",
+        r#"^(get|post|put|patch|delete|head|request)$"#,
+        "HTTPS",
+    ),
+    (
+        "node-fetch",
+        "http",
+        "api",
+        "외부 HTTP",
+        r#"^fetch$"#,
+        "HTTPS",
+    ),
+    (
+        "undici",
+        "http",
+        "api",
+        "외부 HTTP",
+        r#"^(fetch|request)$"#,
+        "HTTPS",
+    ),
     ("fetch", "http", "api", "외부 HTTP", r#"^fetch$"#, "HTTPS"),
-    ("kafkajs", "queue", "queue", "Kafka", r#"^(send|sendBatch)$"#, "Kafka"),
-    ("amqplib", "queue", "queue", "RabbitMQ", r#"^(publish|sendToQueue)$"#, "AMQP"),
-    ("@elastic/elasticsearch", "search", "search", "Elasticsearch", r#"^(search|index|get|delete|bulk|update)$"#, "HTTP"),
-    ("neo4j-driver", "neo4j", "db", "Neo4j", r#"^(run|executeQuery|executeRead|executeWrite)$"#, "Bolt"),
-    ("@supabase/supabase-js", "supabase", "db", "Supabase", r#"^(select|insert|update|delete|upsert|rpc|upload|download)$"#, "HTTPS"),
-    ("sqlx", "db", "db", "DB", r#"^(fetch\w*|execute\w*)$"#, "SQL"),
-    ("tokio_postgres", "db", "db", "PostgreSQL", r#"^(query\w*|execute\w*|prepare)$"#, "SQL"),
-    ("reqwest", "http", "api", "외부 HTTP", r#"^(send|get|post|put|patch|delete|head)$"#, "HTTPS"),
-    ("aws_sdk_s3", "storage", "storage", "S3 저장소", r#"^send$"#, "S3"),
+    (
+        "kafkajs",
+        "queue",
+        "queue",
+        "Kafka",
+        r#"^(send|sendBatch)$"#,
+        "Kafka",
+    ),
+    (
+        "amqplib",
+        "queue",
+        "queue",
+        "RabbitMQ",
+        r#"^(publish|sendToQueue)$"#,
+        "AMQP",
+    ),
+    (
+        "@elastic/elasticsearch",
+        "search",
+        "search",
+        "Elasticsearch",
+        r#"^(search|index|get|delete|bulk|update)$"#,
+        "HTTP",
+    ),
+    (
+        "neo4j-driver",
+        "neo4j",
+        "db",
+        "Neo4j",
+        r#"^(run|executeQuery|executeRead|executeWrite)$"#,
+        "Bolt",
+    ),
+    (
+        "@supabase/supabase-js",
+        "supabase",
+        "db",
+        "Supabase",
+        r#"^(select|insert|update|delete|upsert|rpc|upload|download)$"#,
+        "HTTPS",
+    ),
+    (
+        "sqlx",
+        "db",
+        "db",
+        "DB",
+        r#"^(fetch\w*|execute\w*)$"#,
+        "SQL",
+    ),
+    (
+        "tokio_postgres",
+        "db",
+        "db",
+        "PostgreSQL",
+        r#"^(query\w*|execute\w*|prepare)$"#,
+        "SQL",
+    ),
+    (
+        "reqwest",
+        "http",
+        "api",
+        "외부 HTTP",
+        r#"^(send|get|post|put|patch|delete|head)$"#,
+        "HTTPS",
+    ),
+    (
+        "aws_sdk_s3",
+        "storage",
+        "storage",
+        "S3 저장소",
+        r#"^send$"#,
+        "S3",
+    ),
 ];
 /// 의존성 패키지 → (id, kind, name, protocol) — 파이썬 판 `DEPS`
 const DEPS: &[(&str, &str, &str, &str, &str)] = &[
-    (r#"^(pg|postgres|pg-promise|slonik|@neondatabase\/serverless|@vercel\/postgres|org\.postgresql:postgresql|github\.com\/lib\/pq|github\.com\/jackc\/pgx(\/v\d)?|tokio-postgres|npgsql(\..*)?|r2dbc-postgresql)$"#, "db", "db", "PostgreSQL", "SQL"),
-    (r#"^(mysql2?|com\.mysql:mysql-connector-j|mysql:mysql-connector-java|org\.mariadb\.jdbc:mariadb-java-client|github\.com\/go-sql-driver\/mysql|mysql_async|mysql\.data|pomelo\.entityframeworkcore\.mysql)$"#, "db", "db", "MySQL", "SQL"),
-    (r#"^(better-sqlite3|sqlite3|github\.com\/mattn\/go-sqlite3|rusqlite|microsoft\.data\.sqlite|org\.xerial:sqlite-jdbc)$"#, "db", "db", "SQLite", "SQL"),
-    (r#"^(@prisma\/client|drizzle-orm|typeorm|sequelize|knex|kysely|@mikro-orm\/core|org\.springframework\.boot:spring-boot-starter-data-(jpa|jdbc|r2dbc)|org\.springframework\.boot:spring-boot-starter-jdbc|gorm\.io\/gorm|sqlx|diesel|sea-orm|microsoft\.entityframeworkcore(\..*)?|org\.jooq:jooq|org\.mybatis.*)$"#, "db", "db", "DB", "SQL"),
-    (r#"^(mongodb|mongoose|org\.springframework\.boot:spring-boot-starter-data-mongodb.*|org\.mongodb:.*|go\.mongodb\.org\/mongo-driver.*|mongodb\.driver)$"#, "mongo", "db", "MongoDB", "Mongo"),
-    (r#"^(redis|ioredis|@upstash\/redis|bullmq|bull|org\.springframework\.boot:spring-boot-starter-data-redis.*|redis\.clients:jedis|org\.redisson:.*|github\.com\/(redis|go-redis)\/(go-)?redis(\/v\d)?|stackexchange\.redis|predis\/predis)$"#, "redis", "cache", "Redis", "Redis"),
-    (r#"^(minio|io\.minio:minio|github\.com\/minio\/minio-go(\/v\d)?)$"#, "storage", "storage", "MinIO", "S3"),
-    (r#"^(@aws-sdk\/client-s3|aws-sdk|software\.amazon\.awssdk:s3|com\.amazonaws:aws-java-sdk-s3|github\.com\/aws\/aws-sdk-go-v2\/service\/s3|aws-sdk-s3|awssdk\.s3|aws\/aws-sdk-php)$"#, "storage", "storage", "S3 저장소", "S3"),
-    (r#"^(openai|org\.springframework\.ai:spring-ai-(starter-model-)?openai.*|github\.com\/(sashabaranov|openai)\/(go-)?openai(-go)?|async-openai|com\.openai:openai-java)$"#, "openai", "api", "OpenAI API", "HTTPS"),
-    (r#"^(@anthropic-ai\/sdk|com\.anthropic:anthropic-java|github\.com\/anthropics\/anthropic-sdk-go)$"#, "anthropic", "api", "Anthropic API", "HTTPS"),
-    (r#"^(@google\/generative-ai|@google\/genai)$"#, "gemini", "api", "Gemini API", "HTTPS"),
-    (r#"^(kafkajs|org\.springframework\.kafka:spring-kafka|org\.apache\.kafka:kafka-clients|github\.com\/segmentio\/kafka-go|github\.com\/(ibm|shopify)\/sarama|rdkafka|confluent\.kafka)$"#, "queue", "queue", "Kafka", "Kafka"),
-    (r#"^(amqplib|org\.springframework\.boot:spring-boot-starter-amqp|github\.com\/rabbitmq\/amqp091-go|lapin|rabbitmq\.client)$"#, "queue", "queue", "RabbitMQ", "AMQP"),
-    (r#"^(@elastic\/elasticsearch|@opensearch-project\/opensearch|org\.springframework\.boot:spring-boot-starter-data-elasticsearch|co\.elastic\.clients:.*|org\.opensearch\.client:.*|github\.com\/elastic\/go-elasticsearch(\/v\d)?|elasticsearch|opensearch)$"#, "search", "search", "Elasticsearch", "HTTP"),
-    (r#"^(neo4j-driver|org\.springframework\.boot:spring-boot-starter-data-neo4j|org\.neo4j\.driver:.*|neo4rs)$"#, "neo4j", "db", "Neo4j", "Bolt"),
-    (r#"^@supabase\/supabase-js$"#, "supabase", "db", "Supabase", "HTTPS"),
-    (r#"^firebase-admin$"#, "firebase", "api", "Firebase", "HTTPS"),
+    (
+        r#"^(pg|postgres|pg-promise|slonik|@neondatabase\/serverless|@vercel\/postgres|org\.postgresql:postgresql|github\.com\/lib\/pq|github\.com\/jackc\/pgx(\/v\d)?|tokio-postgres|npgsql(\..*)?|r2dbc-postgresql)$"#,
+        "db",
+        "db",
+        "PostgreSQL",
+        "SQL",
+    ),
+    (
+        r#"^(mysql2?|com\.mysql:mysql-connector-j|mysql:mysql-connector-java|org\.mariadb\.jdbc:mariadb-java-client|github\.com\/go-sql-driver\/mysql|mysql_async|mysql\.data|pomelo\.entityframeworkcore\.mysql)$"#,
+        "db",
+        "db",
+        "MySQL",
+        "SQL",
+    ),
+    (
+        r#"^(better-sqlite3|sqlite3|github\.com\/mattn\/go-sqlite3|rusqlite|microsoft\.data\.sqlite|org\.xerial:sqlite-jdbc)$"#,
+        "db",
+        "db",
+        "SQLite",
+        "SQL",
+    ),
+    (
+        r#"^(@prisma\/client|drizzle-orm|typeorm|sequelize|knex|kysely|@mikro-orm\/core|org\.springframework\.boot:spring-boot-starter-data-(jpa|jdbc|r2dbc)|org\.springframework\.boot:spring-boot-starter-jdbc|gorm\.io\/gorm|sqlx|diesel|sea-orm|microsoft\.entityframeworkcore(\..*)?|org\.jooq:jooq|org\.mybatis.*)$"#,
+        "db",
+        "db",
+        "DB",
+        "SQL",
+    ),
+    (
+        r#"^(mongodb|mongoose|org\.springframework\.boot:spring-boot-starter-data-mongodb.*|org\.mongodb:.*|go\.mongodb\.org\/mongo-driver.*|mongodb\.driver)$"#,
+        "mongo",
+        "db",
+        "MongoDB",
+        "Mongo",
+    ),
+    (
+        r#"^(redis|ioredis|@upstash\/redis|bullmq|bull|org\.springframework\.boot:spring-boot-starter-data-redis.*|redis\.clients:jedis|org\.redisson:.*|github\.com\/(redis|go-redis)\/(go-)?redis(\/v\d)?|stackexchange\.redis|predis\/predis)$"#,
+        "redis",
+        "cache",
+        "Redis",
+        "Redis",
+    ),
+    (
+        r#"^(minio|io\.minio:minio|github\.com\/minio\/minio-go(\/v\d)?)$"#,
+        "storage",
+        "storage",
+        "MinIO",
+        "S3",
+    ),
+    (
+        r#"^(@aws-sdk\/client-s3|aws-sdk|software\.amazon\.awssdk:s3|com\.amazonaws:aws-java-sdk-s3|github\.com\/aws\/aws-sdk-go-v2\/service\/s3|aws-sdk-s3|awssdk\.s3|aws\/aws-sdk-php)$"#,
+        "storage",
+        "storage",
+        "S3 저장소",
+        "S3",
+    ),
+    (
+        r#"^(openai|org\.springframework\.ai:spring-ai-(starter-model-)?openai.*|github\.com\/(sashabaranov|openai)\/(go-)?openai(-go)?|async-openai|com\.openai:openai-java)$"#,
+        "openai",
+        "api",
+        "OpenAI API",
+        "HTTPS",
+    ),
+    (
+        r#"^(@anthropic-ai\/sdk|com\.anthropic:anthropic-java|github\.com\/anthropics\/anthropic-sdk-go)$"#,
+        "anthropic",
+        "api",
+        "Anthropic API",
+        "HTTPS",
+    ),
+    (
+        r#"^(@google\/generative-ai|@google\/genai)$"#,
+        "gemini",
+        "api",
+        "Gemini API",
+        "HTTPS",
+    ),
+    (
+        r#"^(kafkajs|org\.springframework\.kafka:spring-kafka|org\.apache\.kafka:kafka-clients|github\.com\/segmentio\/kafka-go|github\.com\/(ibm|shopify)\/sarama|rdkafka|confluent\.kafka)$"#,
+        "queue",
+        "queue",
+        "Kafka",
+        "Kafka",
+    ),
+    (
+        r#"^(amqplib|org\.springframework\.boot:spring-boot-starter-amqp|github\.com\/rabbitmq\/amqp091-go|lapin|rabbitmq\.client)$"#,
+        "queue",
+        "queue",
+        "RabbitMQ",
+        "AMQP",
+    ),
+    (
+        r#"^(@elastic\/elasticsearch|@opensearch-project\/opensearch|org\.springframework\.boot:spring-boot-starter-data-elasticsearch|co\.elastic\.clients:.*|org\.opensearch\.client:.*|github\.com\/elastic\/go-elasticsearch(\/v\d)?|elasticsearch|opensearch)$"#,
+        "search",
+        "search",
+        "Elasticsearch",
+        "HTTP",
+    ),
+    (
+        r#"^(neo4j-driver|org\.springframework\.boot:spring-boot-starter-data-neo4j|org\.neo4j\.driver:.*|neo4rs)$"#,
+        "neo4j",
+        "db",
+        "Neo4j",
+        "Bolt",
+    ),
+    (
+        r#"^@supabase\/supabase-js$"#,
+        "supabase",
+        "db",
+        "Supabase",
+        "HTTPS",
+    ),
+    (
+        r#"^firebase-admin$"#,
+        "firebase",
+        "api",
+        "Firebase",
+        "HTTPS",
+    ),
 ];
 const IMAGES: &[(&str, &str, &str, &str)] = &[
     (r#"pgvector"#, "db", "db", "PostgreSQL (pgvector)"),
@@ -112,7 +629,12 @@ const IMAGES: &[(&str, &str, &str, &str)] = &[
     (r#"neo4j|memgraph"#, "neo4j", "db", "Neo4j"),
     (r#"redis|valkey|dragonfly"#, "redis", "cache", "Redis"),
     (r#"minio"#, "storage", "storage", "MinIO (S3)"),
-    (r#"elasticsearch|opensearch"#, "search", "search", "Elasticsearch"),
+    (
+        r#"elasticsearch|opensearch"#,
+        "search",
+        "search",
+        "Elasticsearch",
+    ),
     (r#"rabbitmq"#, "queue", "queue", "RabbitMQ"),
     (r#"kafka|redpanda"#, "queue", "queue", "Kafka"),
 ];
@@ -126,8 +648,18 @@ const SCHEMES: &[(&str, &str, &str, &str)] = &[
     (r#"^amqps?$"#, "queue", "queue", "메시지 큐"),
 ];
 const HTTP_KEYS: &[(&str, &str, &str, &str)] = &[
-    (r#"STORAGE|S3|MINIO|BUCKET"#, "storage", "storage", "S3 저장소"),
-    (r#"ELASTIC|OPENSEARCH|SEARCH_URL"#, "search", "search", "Elasticsearch"),
+    (
+        r#"STORAGE|S3|MINIO|BUCKET"#,
+        "storage",
+        "storage",
+        "S3 저장소",
+    ),
+    (
+        r#"ELASTIC|OPENSEARCH|SEARCH_URL"#,
+        "search",
+        "search",
+        "Elasticsearch",
+    ),
 ];
 const HOST_KEYS: &[(&str, &str, &str, &str)] = &[
     (r#"redis|valkey"#, "redis", "cache", "Redis"),
@@ -146,7 +678,13 @@ const NOT_APP_RE: &str = r#"(^|/)(tests?|scripts?|e2e|evals?|fixtures|examples?|
 const PLACEHOLDER_RE: &str = r#"^(host|hostname|server|your[-_.]?\w*|db[-_]?host|database[-_]?host|<.*>|x{3,}|(.*\.)?example\.(com|org|net))$"#;
 const IDENT_RE: &str = r#"^[A-Za-z_][A-Za-z0-9_]*"#;
 
-const LOCAL_HOSTS: [&str; 5] = ["localhost", "127.0.0.1", "::1", "0.0.0.0", "host.docker.internal"];
+const LOCAL_HOSTS: [&str; 5] = [
+    "localhost",
+    "127.0.0.1",
+    "::1",
+    "0.0.0.0",
+    "host.docker.internal",
+];
 const SKIP: [&str; 12] = [
     "node_modules",
     "vendor",
@@ -215,12 +753,18 @@ lazy_re!(PORT_FLAG, ascii(r"(?:--port|-p)[ =](\d+)", false));
 lazy_re!(TOML_TABLE, Regex::new(r"^\[([^\[\]]+)\]$").expect("toml"));
 lazy_re!(TOML_KEY, ascii(r"^([A-Za-z0-9_-]+)\s*[.=]", false));
 lazy_re!(TOML_NAME, py_re(r#"^name\s*=\s*"([^"]*)""#));
-lazy_re!(DEP_DIR_SKIP, Regex::new(r"^(tests?|examples?|fixtures|docs)$").expect("dir"));
+lazy_re!(
+    DEP_DIR_SKIP,
+    Regex::new(r"^(tests?|examples?|fixtures|docs)$").expect("dir")
+);
 lazy_re!(PYPROJECT_DEPS, py_re(r"(?ms)^dependencies\s*=\s*\[(.*?)\]"));
 lazy_re!(QUOTED, Regex::new(r#"["']([^"']+)["']"#).expect("quoted"));
 lazy_re!(REQ_NAME_SP, ascii(r"^\s*([A-Za-z0-9_.-]+)", false));
 lazy_re!(REQ_NAME, ascii(r"^([A-Za-z0-9_.-]+)", false));
-lazy_re!(REQ_FILE, Regex::new(r"^requirements[^/]*\.txt$").expect("req"));
+lazy_re!(
+    REQ_FILE,
+    Regex::new(r"^requirements[^/]*\.txt$").expect("req")
+);
 lazy_re!(LINE_SPLIT, Regex::new(r"\r?\n").expect("split"));
 lazy_re!(COMMENT_TAIL, py_re(r"\s+#.*$"));
 lazy_re!(SVC_LINE, ascii(r"^[\w.-]+:\s*$", false));
@@ -234,18 +778,45 @@ lazy_re!(BRACED, ascii(r"\$\{(\w+)(?::?-([^}]*))?\}", false));
 lazy_re!(DOLLAR, ascii(r"\$(\w+)", false));
 lazy_re!(DEFAULTS, ascii(r"\$\{[\w.]+:-?([^}]*)\}", false));
 lazy_re!(YAML_FILE, Regex::new(r"\.ya?ml$").expect("yaml"));
-lazy_re!(YAML_LINE, ascii(r"^(\s*)([\w.-]+)\s*:\s*(.*?)\s*(?:\s#.*)?$", false));
-lazy_re!(ENV_LINE, ascii(r"^\s*(?:export\s+)?([\w.-]+)\s*[=:]\s*(.*?)\s*$", false));
-lazy_re!(CONFIG_PY, Regex::new(r"^(config|settings|conf)\.py$").expect("cfg"));
-lazy_re!(APP_YAML, ascii(r"^(application|bootstrap)(-[\w.]+)?\.(ya?ml|properties)$", false));
+lazy_re!(
+    YAML_LINE,
+    ascii(r"^(\s*)([\w.-]+)\s*:\s*(.*?)\s*(?:\s#.*)?$", false)
+);
+lazy_re!(
+    ENV_LINE,
+    ascii(r"^\s*(?:export\s+)?([\w.-]+)\s*[=:]\s*(.*?)\s*$", false)
+);
+lazy_re!(
+    CONFIG_PY,
+    Regex::new(r"^(config|settings|conf)\.py$").expect("cfg")
+);
+lazy_re!(
+    APP_YAML,
+    ascii(
+        r"^(application|bootstrap)(-[\w.]+)?\.(ya?ml|properties)$",
+        false
+    )
+);
 lazy_re!(TEST_DIR, Regex::new(r"(^|/)test/").expect("test"));
 lazy_re!(SLASHES, Regex::new(r"^/+").expect("slash"));
 lazy_re!(AUTH_SPLIT, Regex::new(r"[/?#]").expect("auth"));
 lazy_re!(HOST_PORT, ascii(r"^\[?([^\]:]+)\]?(?::(\d+))?$", false));
 lazy_re!(HTTPS, Regex::new(r"^https?$").expect("https"));
-lazy_re!(URL_ANY, ascii(r#"(?m)(?:^|["'\s=:])([A-Z][A-Z0-9_]*)?\s*[=:,(]?\s*["']?([a-z][a-z0-9+.-]*)://([^\s"'`]*)"#, false));
-lazy_re!(CONFIG_FILE, Regex::new(r"\.(ya?ml|properties)$|(^|/)\.env[^/]*$").expect("cfg file"));
-lazy_re!(URL_VALUE, ascii(r#"^["']?(?:jdbc:)?([a-z][a-z0-9+.-]*)://([^\s"'`]*)"#, true));
+lazy_re!(
+    URL_ANY,
+    ascii(
+        r#"(?m)(?:^|["'\s=:])([A-Z][A-Z0-9_]*)?\s*[=:,(]?\s*["']?([a-z][a-z0-9+.-]*)://([^\s"'`]*)"#,
+        false
+    )
+);
+lazy_re!(
+    CONFIG_FILE,
+    Regex::new(r"\.(ya?ml|properties)$|(^|/)\.env[^/]*$").expect("cfg file")
+);
+lazy_re!(
+    URL_VALUE,
+    ascii(r#"^["']?(?:jdbc:)?([a-z][a-z0-9+.-]*)://([^\s"'`]*)"#, true)
+);
 lazy_re!(HOST_KEY, ascii(r"^(.*?)[._-]?host(name)?$", true));
 lazy_re!(HOST_BAD, py_re(r"[\s/$]"));
 lazy_re!(HOST_TAIL, py_re(r"(?i)host(name)?$"));
@@ -268,7 +839,11 @@ fn entries(path: &Path) -> Vec<(String, PathBuf, bool)> {
         .flatten()
         .map(|e| {
             let is_dir = e.file_type().is_ok_and(|t| t.is_dir());
-            (e.file_name().to_string_lossy().into_owned(), e.path(), is_dir)
+            (
+                e.file_name().to_string_lossy().into_owned(),
+                e.path(),
+                is_dir,
+            )
         })
         .collect();
     out.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
@@ -359,7 +934,15 @@ fn sub(src_dir: &Path, d: &str) -> PathBuf {
     }
 }
 
-fn unit(name: String, kind: &str, d: &str, lang: &str, framework: &str, command: Option<String>, port: Option<i64>) -> Value {
+fn unit(
+    name: String,
+    kind: &str,
+    d: &str,
+    lang: &str,
+    framework: &str,
+    command: Option<String>,
+    port: Option<i64>,
+) -> Value {
     json!({
         "name": name,
         "kind": kind,
@@ -371,7 +954,7 @@ fn unit(name: String, kind: &str, d: &str, lang: &str, framework: &str, command:
     })
 }
 
-fn obj<'v>(v: Option<&'v Value>) -> Option<&'v Map<String, Value>> {
+fn obj(v: Option<&Value>) -> Option<&Map<String, Value>> {
     v.and_then(Value::as_object)
 }
 
@@ -467,7 +1050,9 @@ fn py_assign(n: Node) -> Option<(Vec<Node>, Option<Node>)> {
             targets.push(l);
         }
         match cur.child_by_field_name("right") {
-            Some(r) if r.kind() == "assignment" && r.child_by_field_name("type").is_none() => cur = r,
+            Some(r) if r.kind() == "assignment" && r.child_by_field_name("type").is_none() => {
+                cur = r
+            }
             r => return Some((targets, r)),
         }
     }
@@ -493,7 +1078,11 @@ fn module_assigns(root: Node) -> Vec<(Vec<Node>, Option<Node>)> {
 
 fn py_unit(src_dir: &Path, d: &str, names: &HashSet<String>) -> Option<Value> {
     let base = sub(src_dir, d);
-    let uv = if is_file(&base.join("uv.lock")) { "uv run " } else { "" };
+    let uv = if is_file(&base.join("uv.lock")) {
+        "uv run "
+    } else {
+        ""
+    };
     if names.contains("manage.py") {
         return Some(unit(
             unit_name(d),
@@ -539,12 +1128,28 @@ fn py_unit(src_dir: &Path, d: &str, names: &HashSet<String>) -> Option<Value> {
             };
             let m = py_module(&rel);
             let (cmd, port, k) = match kind.as_str() {
-                "FastAPI" => (format!("uvicorn {m}:{var} --port 8000"), Some(8000), "server"),
-                "Flask" => (format!("flask --app {m} run --port 5000"), Some(5000), "server"),
+                "FastAPI" => (
+                    format!("uvicorn {m}:{var} --port 8000"),
+                    Some(8000),
+                    "server",
+                ),
+                "Flask" => (
+                    format!("flask --app {m} run --port 5000"),
+                    Some(5000),
+                    "server",
+                ),
                 "Celery" => (format!("celery -A {m} worker"), None, "job"),
                 _ => continue,
             };
-            return Some(unit(unit_name(d), k, d, "python", &kind, Some(format!("{uv}{cmd}")), port));
+            return Some(unit(
+                unit_name(d),
+                k,
+                d,
+                "python",
+                &kind,
+                Some(format!("{uv}{cmd}")),
+                port,
+            ));
         }
     }
     None
@@ -699,7 +1304,9 @@ fn py_root<'t>(mut n: Node<'t>) -> Node<'t> {
             "attribute" => n.child_by_field_name("object"),
             "call" => n.child_by_field_name("function"),
             "subscript" => n.child_by_field_name("value"),
-            "await" => named_children(n).into_iter().find(|c| c.kind() != "comment"),
+            "await" => named_children(n)
+                .into_iter()
+                .find(|c| c.kind() != "comment"),
             _ => None,
         };
         match next {
@@ -904,7 +1511,9 @@ fn py_env(text: &str) -> Option<FileEnv> {
                                         continue;
                                     }
                                     let p = (cx.pkg_of_ann)(st.child_by_field_name("type"))
-                                        .or_else(|| (cx.pkg_of_value)(st.child_by_field_name("right")));
+                                        .or_else(|| {
+                                            (cx.pkg_of_value)(st.child_by_field_name("right"))
+                                        });
                                     if let Some(p) = p {
                                         env.insert(python::text(t, cx.src).to_string(), p);
                                     }
@@ -913,7 +1522,10 @@ fn py_env(text: &str) -> Option<FileEnv> {
                                 {
                                     for t in targets {
                                         if t.kind() == "identifier" {
-                                            env.insert(python::text(t, cx.src).to_string(), p.clone());
+                                            env.insert(
+                                                python::text(t, cx.src).to_string(),
+                                                p.clone(),
+                                            );
                                         }
                                     }
                                 }
@@ -950,7 +1562,11 @@ fn py_env(text: &str) -> Option<FileEnv> {
                     if let Some(d) = child
                         .parent()
                         .filter(|p| p.kind() == "decorated_definition")
-                        .and_then(|p| named_children(p).into_iter().find(|c| c.kind() == "decorator"))
+                        .and_then(|p| {
+                            named_children(p)
+                                .into_iter()
+                                .find(|c| c.kind() == "decorator")
+                        })
                     {
                         lines.push(d.start_position().row as i64 + 1);
                     }
@@ -1037,7 +1653,8 @@ fn ts_env(file: &str, src: &[u8]) -> FileEnv {
         if st.kind() != "import_statement" {
             continue;
         }
-        let Some(spec) = ts_string(st.child_by_field_name("source"), src).filter(|s| !s.is_empty()) else {
+        let Some(spec) = ts_string(st.child_by_field_name("source"), src).filter(|s| !s.is_empty())
+        else {
             continue;
         };
         let Some(pkg) = pkg_norm(&spec).filter(|p| !p.is_empty()) else {
@@ -1054,7 +1671,10 @@ fn ts_env(file: &str, src: &[u8]) -> FileEnv {
                     }
                 }
                 "namespace_import" | "import_clause" => {
-                    if let Some(i) = named_children(n).into_iter().find(|c| c.kind() == "identifier") {
+                    if let Some(i) = named_children(n)
+                        .into_iter()
+                        .find(|c| c.kind() == "identifier")
+                    {
                         table.insert(text(i, src), pkg.clone());
                     }
                 }
@@ -1066,13 +1686,21 @@ fn ts_env(file: &str, src: &[u8]) -> FileEnv {
         if n.kind() != "variable_declarator" {
             continue;
         }
-        let (Some(val), Some(name)) = (n.child_by_field_name("value"), n.child_by_field_name("name")) else {
+        let (Some(val), Some(name)) = (
+            n.child_by_field_name("value"),
+            n.child_by_field_name("name"),
+        ) else {
             continue;
         };
         if name.kind() != "identifier" || val.kind() != "call_expression" {
             continue;
         }
-        if val.child_by_field_name("function").map(|f| text(f, src)).as_deref() == Some("require") {
+        if val
+            .child_by_field_name("function")
+            .map(|f| text(f, src))
+            .as_deref()
+            == Some("require")
+        {
             let arg = val
                 .child_by_field_name("arguments")
                 .and_then(|a| named_children(a).into_iter().next());
@@ -1088,7 +1716,10 @@ fn ts_env(file: &str, src: &[u8]) -> FileEnv {
         for n in walk(scope) {
             match n.kind() {
                 "variable_declarator" => {
-                    let (Some(name), Some(val)) = (n.child_by_field_name("name"), n.child_by_field_name("value")) else {
+                    let (Some(name), Some(val)) = (
+                        n.child_by_field_name("name"),
+                        n.child_by_field_name("value"),
+                    ) else {
                         continue;
                     };
                     if name.kind() != "identifier" {
@@ -1101,7 +1732,10 @@ fn ts_env(file: &str, src: &[u8]) -> FileEnv {
                     }
                 }
                 "required_parameter" | "optional_parameter" => {
-                    let (Some(pat), Some(ty)) = (n.child_by_field_name("pattern"), n.child_by_field_name("type")) else {
+                    let (Some(pat), Some(ty)) = (
+                        n.child_by_field_name("pattern"),
+                        n.child_by_field_name("type"),
+                    ) else {
                         continue;
                     };
                     if pat.kind() != "identifier" {
@@ -1123,7 +1757,10 @@ fn ts_env(file: &str, src: &[u8]) -> FileEnv {
         } else {
             st
         };
-        if matches!(target.kind(), "lexical_declaration" | "variable_declaration") {
+        if matches!(
+            target.kind(),
+            "lexical_declaration" | "variable_declaration"
+        ) {
             module_env.extend(var_pkgs(target));
         }
     }
@@ -1149,7 +1786,10 @@ fn rs_env(src: &[u8]) -> FileEnv {
         match n.kind() {
             "use_as_clause" => {
                 let first = first_seg(n.child_by_field_name("path"), src);
-                let c = crate_.map(str::to_string).or(first).filter(|c| !c.is_empty());
+                let c = crate_
+                    .map(str::to_string)
+                    .or(first)
+                    .filter(|c| !c.is_empty());
                 if let (Some(alias), Some(c)) = (n.child_by_field_name("alias"), &c) {
                     table.insert(text(alias, src), c.clone());
                 }
@@ -1209,9 +1849,10 @@ fn rs_env(src: &[u8]) -> FileEnv {
                 }
                 "field_expression" => n = cur.child_by_field_name("value"),
                 "call_expression" | "generic_function" => n = cur.child_by_field_name("function"),
-                "await_expression" | "try_expression" | "reference_expression" | "parenthesized_expression" => {
-                    n = named_children(cur).into_iter().next()
-                }
+                "await_expression"
+                | "try_expression"
+                | "reference_expression"
+                | "parenthesized_expression" => n = named_children(cur).into_iter().next(),
                 _ => return None,
             }
         }
@@ -1225,7 +1866,10 @@ fn rs_env(src: &[u8]) -> FileEnv {
                 if p.kind() != "parameter" {
                     continue;
                 }
-                let (Some(pat), Some(ty)) = (p.child_by_field_name("pattern"), p.child_by_field_name("type")) else {
+                let (Some(pat), Some(ty)) = (
+                    p.child_by_field_name("pattern"),
+                    p.child_by_field_name("type"),
+                ) else {
                     continue;
                 };
                 if let Some(hit) = type_hit(ty, src, &table) {
@@ -1238,7 +1882,10 @@ fn rs_env(src: &[u8]) -> FileEnv {
                 if n.kind() != "let_declaration" {
                     continue;
                 }
-                let (Some(pat), Some(val)) = (n.child_by_field_name("pattern"), n.child_by_field_name("value")) else {
+                let (Some(pat), Some(val)) = (
+                    n.child_by_field_name("pattern"),
+                    n.child_by_field_name("value"),
+                ) else {
                     continue;
                 };
                 if pat.kind() != "identifier" {
@@ -1258,7 +1905,9 @@ fn rs_env(src: &[u8]) -> FileEnv {
 
 fn label_root(label: &str, lang: &str) -> Option<String> {
     let root = RE.ident.find(label)?.as_str().to_string();
-    if lang == "py" && root == "self" && label.starts_with("self.")
+    if lang == "py"
+        && root == "self"
+        && label.starts_with("self.")
         && let Some(m2) = RE.ident.find(&label[5..])
     {
         return Some(format!("self.{}", m2.as_str()));
@@ -1302,7 +1951,9 @@ fn deps(src_dir: &Path) -> Vec<(String, String)> {
                     .and_then(Value::as_object)
                     .map(|m| m.keys().cloned().collect())
                     .unwrap_or_default();
-                if ds.iter().any(|d| RE.front_only.is_match(d)) && !ds.iter().any(|d| RE.server_deps.is_match(d)) {
+                if ds.iter().any(|d| RE.front_only.is_match(d))
+                    && !ds.iter().any(|d| RE.server_deps.is_match(d))
+                {
                     continue;
                 }
                 names = ds;
@@ -1394,16 +2045,24 @@ fn parse_compose(text: &str) -> Vec<Service> {
             continue;
         }
         let svc = out.last_mut().expect("서비스");
-        if indent == svc_indent + 2 || (indent > svc_indent && KEY_LINE.is_match(t) && !t.starts_with('-')) {
+        if indent == svc_indent + 2
+            || (indent > svc_indent && KEY_LINE.is_match(t) && !t.starts_with('-'))
+        {
             in_ports = PORTS_LINE.is_match(t);
         }
         if let Some(m) = IMAGE_LINE.captures(t) {
             svc.image = Some(m[1].to_string());
         }
         if in_ports && t.starts_with('-') {
-            let spec = QUOTE_END.replace(&PORT_DASH.replace(t, ""), "").into_owned();
+            let spec = QUOTE_END
+                .replace(&PORT_DASH.replace(t, ""), "")
+                .into_owned();
             let parts: Vec<&str> = spec.split(':').collect();
-            let p = if parts.len() >= 2 { parts[parts.len() - 2] } else { parts[0] };
+            let p = if parts.len() >= 2 {
+                parts[parts.len() - 2]
+            } else {
+                parts[0]
+            };
             if let Some(port) = py_int(p) {
                 svc.ports.push(port);
             }
@@ -1417,7 +2076,9 @@ fn config_entries(file: &str, text: &str) -> Vec<(String, String)> {
     if YAML_FILE.is_match(file) {
         let mut stack: Vec<(usize, String)> = Vec::new();
         for raw in LINE_SPLIT.split(text) {
-            let Some(m) = YAML_LINE.captures(raw) else { continue };
+            let Some(m) = YAML_LINE.captures(raw) else {
+                continue;
+            };
             if strip(raw).starts_with('#') {
                 continue;
             }
@@ -1477,7 +2138,13 @@ fn config_files(src_dir: &Path) -> Vec<(PathBuf, String, i64)> {
     let mut ds: Vec<(PathBuf, String)> = vec![(src_dir.to_path_buf(), String::new())];
     ds.extend(dirs(src_dir).into_iter().map(|n| (src_dir.join(&n), n)));
     for (d, rel) in &ds {
-        let join = |n: &str| if rel.is_empty() { n.to_string() } else { format!("{rel}/{n}") };
+        let join = |n: &str| {
+            if rel.is_empty() {
+                n.to_string()
+            } else {
+                format!("{rel}/{n}")
+            }
+        };
         for n in [".env", ".env.local", ".env.development"] {
             if is_file(&d.join(n)) {
                 out.push((d.join(n), join(n), 4));
@@ -1494,7 +2161,10 @@ fn config_files(src_dir: &Path) -> Vec<(PathBuf, String, i64)> {
             return;
         }
         for (name, full, is_dir) in entries(path) {
-            if name.starts_with('.') || SKIP.contains(&name.as_str()) || CONFIG_SKIP_MORE.contains(&name.as_str()) {
+            if name.starts_with('.')
+                || SKIP.contains(&name.as_str())
+                || CONFIG_SKIP_MORE.contains(&name.as_str())
+            {
                 continue;
             }
             let r = if rel.is_empty() {
@@ -1504,7 +2174,9 @@ fn config_files(src_dir: &Path) -> Vec<(PathBuf, String, i64)> {
             };
             if is_dir {
                 visit(&full, &r, depth + 1, out);
-            } else if CONFIG_PY.is_match(&name) || (APP_YAML.is_match(&name) && !TEST_DIR.is_match(&r)) {
+            } else if CONFIG_PY.is_match(&name)
+                || (APP_YAML.is_match(&name) && !TEST_DIR.is_match(&r))
+            {
                 out.push((full, r, 3));
             }
         }
@@ -1522,14 +2194,19 @@ fn host_of(scheme: &str, rest: &str) -> Option<(String, Option<i64>, String)> {
         return Some((
             "file".into(),
             None,
-            if file.is_empty() { "메모리".into() } else { base.to_string() },
+            if file.is_empty() {
+                "메모리".into()
+            } else {
+                base.to_string()
+            },
         ));
     }
     let first = AUTH_SPLIT.split(rest).next().unwrap_or("");
     let authority = first.rsplit('@').next().unwrap_or("");
     let m = HOST_PORT.captures(authority.split(',').next().unwrap_or(""))?;
     let host = m.get(1).map(|x| x.as_str()).unwrap_or("");
-    if host.is_empty() || host.contains('{') || host.contains('$') || RE.placeholder.is_match(host) {
+    if host.is_empty() || host.contains('{') || host.contains('$') || RE.placeholder.is_match(host)
+    {
         return None;
     }
     let port = m.get(2).and_then(|p| p.as_str().parse::<i64>().ok());
@@ -1543,10 +2220,17 @@ fn host_of(scheme: &str, rest: &str) -> Option<(String, Option<i64>, String)> {
 /// ORM 설정 파일 — (경로, 저장소 상대 경로)
 fn orm_files(src_dir: &Path) -> Vec<(PathBuf, String)> {
     let mut ds: Vec<(PathBuf, String)> = vec![(src_dir.to_path_buf(), String::new())];
-    let subs: Vec<(PathBuf, String)> = dirs(src_dir).into_iter().map(|n| (src_dir.join(&n), n)).collect();
+    let subs: Vec<(PathBuf, String)> = dirs(src_dir)
+        .into_iter()
+        .map(|n| (src_dir.join(&n), n))
+        .collect();
     ds.extend(subs.iter().cloned());
     for (s, rel) in &subs {
-        ds.extend(dirs(s).into_iter().map(|n| (s.join(&n), format!("{rel}/{n}"))));
+        ds.extend(
+            dirs(s)
+                .into_iter()
+                .map(|n| (s.join(&n), format!("{rel}/{n}"))),
+        );
     }
     let mut out: Vec<(PathBuf, String)> = Vec::new();
     for (d, rel) in &ds {
@@ -1559,7 +2243,11 @@ fn orm_files(src_dir: &Path) -> Vec<(PathBuf, String)> {
         ] {
             let p = d.join(n);
             if is_file(&p) && !out.iter().any(|(q, _)| *q == p) {
-                let r = if rel.is_empty() { n.to_string() } else { format!("{rel}/{n}") };
+                let r = if rel.is_empty() {
+                    n.to_string()
+                } else {
+                    format!("{rel}/{n}")
+                };
                 out.push((p, r));
             }
         }
@@ -1569,7 +2257,11 @@ fn orm_files(src_dir: &Path) -> Vec<(PathBuf, String)> {
 
 fn better(a: &str, b: &str) -> String {
     let score = |s: &str| if s == "DB" { 0 } else { plen(s) };
-    if score(b) > score(a) { b.into() } else { a.into() }
+    if score(b) > score(a) {
+        b.into()
+    } else {
+        a.into()
+    }
 }
 
 // ---------------------------------------------------------------- 묶기
@@ -1653,7 +2345,10 @@ impl Book {
 fn lang_of(file: &str) -> Option<&'static str> {
     if file.ends_with(".py") {
         Some("py")
-    } else if [".ts", ".tsx", ".js", ".jsx", ".mjs"].iter().any(|e| file.ends_with(e)) {
+    } else if [".ts", ".tsx", ".js", ".jsx", ".mjs"]
+        .iter()
+        .any(|e| file.ends_with(e))
+    {
         Some("ts")
     } else if file.ends_with(".rs") {
         Some("rs")
@@ -1663,7 +2358,10 @@ fn lang_of(file: &str) -> Option<&'static str> {
 }
 
 fn s(v: &Value, k: &str) -> String {
-    v.get(k).and_then(Value::as_str).unwrap_or_default().to_string()
+    v.get(k)
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string()
 }
 
 /// SYNC-MS-026#infra.infra
@@ -1671,7 +2369,11 @@ fn s(v: &Value, k: &str) -> String {
 /// 장비(코드 호출·의존성·compose·설정 주소·ORM)와 연결 — `graph["infra"] = {nodes, links}`.
 /// 호출 순서 중 장비로 가는 호출에 `infra`를 단다. 주소는 호스트·포트만.
 pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Option<String>>>) {
-    let unit_list: Vec<Value> = graph.get("units").and_then(Value::as_array).cloned().unwrap_or_default();
+    let unit_list: Vec<Value> = graph
+        .get("units")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     let web_dirs: Vec<String> = unit_list
         .iter()
         .filter(|u| u.get("kind").and_then(Value::as_str) == Some("web"))
@@ -1721,7 +2423,9 @@ pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Opt
                 }
                 let Some(pkg) = pkg else { continue };
                 let Some(li) = lib_of(&pkg) else { continue };
-                let Some(Some(ident)) = ids.get(i) else { continue };
+                let Some(Some(ident)) = ids.get(i) else {
+                    continue;
+                };
                 if !RE.libs_io[li].is_match(ident) {
                     continue;
                 }
@@ -1750,7 +2454,11 @@ pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Opt
         let joined = libs_of.get(fid).map(|v| v.join(", ")).unwrap_or_default();
         let ev = format!(
             "코드: {} — {}{more}",
-            if joined.is_empty() { lib.3.to_string() } else { joined },
+            if joined.is_empty() {
+                lib.3.to_string()
+            } else {
+                joined
+            },
             fl[0]
         );
         let where_ = (lib.2 == "api").then_some("external");
@@ -1767,7 +2475,16 @@ pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Opt
         };
         let (_, fid, kind, name, protocol) = DEPS[i];
         let where_ = (kind == "api" || fid == "supabase").then_some("external");
-        book.add(fid, kind, name, where_, None, &[format!("의존성: {dep} — {dfile}")], Some(protocol), 1);
+        book.add(
+            fid,
+            kind,
+            name,
+            where_,
+            None,
+            &[format!("의존성: {dep} — {dfile}")],
+            Some(protocol),
+            1,
+        );
         book.at(fid, &dfile);
     }
 
@@ -1783,7 +2500,9 @@ pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Opt
                 continue;
             }
             let t = text_of(&p).unwrap_or_default();
-            let env = text_of(&d.join(".env")).map(|e| env_pairs(&e)).unwrap_or_default();
+            let env = text_of(&d.join(".env"))
+                .map(|e| env_pairs(&e))
+                .unwrap_or_default();
             for svc in parse_compose(&compose_vars(&env, &t)) {
                 let image = svc.image.clone().unwrap_or_default();
                 let Some(i) = RE.images.iter().position(|r| r.is_match(&image)) else {
@@ -1800,7 +2519,11 @@ pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Opt
                     let ps: Vec<String> = svc.ports.iter().map(i64::to_string).collect();
                     format!(", 포트 {}", ps.join(", "))
                 };
-                let r = if rel.is_empty() { n.to_string() } else { format!("{rel}/{n}") };
+                let r = if rel.is_empty() {
+                    n.to_string()
+                } else {
+                    format!("{rel}/{n}")
+                };
                 let ev = format!("docker-compose: {} ({image}{ports}) — {r}", svc.name);
                 book.add(fid, kind, name, Some("container"), None, &[ev], None, 2);
             }
@@ -1828,14 +2551,31 @@ pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Opt
             .position(|r| r.is_match(scheme))
             .map(|i| SCHEMES[i]);
         if hit.is_none() && HTTPS.is_match(scheme) {
-            hit = RE.http_keys.iter().position(|r| r.is_match(key)).map(|i| HTTP_KEYS[i]);
+            hit = RE
+                .http_keys
+                .iter()
+                .position(|r| r.is_match(key))
+                .map(|i| HTTP_KEYS[i]);
         }
         let (Some((_, fid, kind, name)), Some((host, port, label))) = (hit, parsed) else {
             return;
         };
-        let sep = if key.is_empty() { String::new() } else { format!(" {key}") };
+        let sep = if key.is_empty() {
+            String::new()
+        } else {
+            format!(" {key}")
+        };
         let ev = format!("설정: {rel}{sep} → {label}");
-        book.add(fid, kind, name, Some(where_of(scheme, &host, port)), Some(&label), &[ev], None, rank);
+        book.add(
+            fid,
+            kind,
+            name,
+            Some(where_of(scheme, &host, port)),
+            Some(&label),
+            &[ev],
+            None,
+            rank,
+        );
         book.at(fid, rel);
     };
     for (path, rel, rank) in config_files(src_dir) {
@@ -1844,18 +2584,28 @@ pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Opt
         if CONFIG_FILE.is_match(&rel) {
             let fname = rel.rsplit('/').next().unwrap_or("");
             let entries = config_entries(fname, &t);
-            let by_key: HashMap<String, String> =
-                entries.iter().map(|(k, v)| (k.to_lowercase(), v.clone())).collect();
+            let by_key: HashMap<String, String> = entries
+                .iter()
+                .map(|(k, v)| (k.to_lowercase(), v.clone()))
+                .collect();
             for (key, value) in &entries {
                 if let Some(u) = URL_VALUE.captures(value) {
                     from_url(&mut book, key, &u[1].to_lowercase(), &u[2], &rel, rank);
                     continue;
                 }
-                let Some(hk) = HOST_KEY.captures(key) else { continue };
+                let Some(hk) = HOST_KEY.captures(key) else {
+                    continue;
+                };
                 let g1 = hk.get(1).map(|x| x.as_str()).unwrap_or("");
-                let hit = RE.host_keys.iter().position(|r| r.is_match(g1)).map(|i| HOST_KEYS[i]);
+                let hit = RE
+                    .host_keys
+                    .iter()
+                    .position(|r| r.is_match(g1))
+                    .map(|i| HOST_KEYS[i]);
                 let host = strip(&QUOTE_EDGES.replace_all(value, "")).to_string();
-                let Some((_, fid, kind, name)) = hit else { continue };
+                let Some((_, fid, kind, name)) = hit else {
+                    continue;
+                };
                 if host.is_empty() || HOST_BAD.is_match(&host) || RE.placeholder.is_match(&host) {
                     continue;
                 }
@@ -1866,7 +2616,8 @@ pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Opt
                     .filter(|p| DIGITS.is_match(p))
                     .and_then(|p| {
                         p.chars().try_fold(0i64, |acc, c| {
-                            acc.checked_mul(10)?.checked_add(i64::from(decimal_value(c)?))
+                            acc.checked_mul(10)?
+                                .checked_add(i64::from(decimal_value(c)?))
                         })
                     });
                 let label = match port {
@@ -1874,7 +2625,16 @@ pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Opt
                     _ => host.clone(),
                 };
                 let ev = format!("설정: {rel} {key} → {label}");
-                book.add(fid, kind, name, Some(where_of("", &host, port)), Some(&label), &[ev], None, rank);
+                book.add(
+                    fid,
+                    kind,
+                    name,
+                    Some(where_of("", &host, port)),
+                    Some(&label),
+                    &[ev],
+                    None,
+                    rank,
+                );
                 book.at(fid, &rel);
             }
         } else {
@@ -1911,7 +2671,16 @@ pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Opt
         let kind = kind.unwrap_or_default();
         if let Some(name) = orm_name(&kind) {
             let fid = if kind == "mongodb" { "mongo" } else { "db" };
-            book.add(fid, "db", name, None, None, &[format!("ORM 설정: {rel} ({kind})")], Some("SQL"), 1);
+            book.add(
+                fid,
+                "db",
+                name,
+                None,
+                None,
+                &[format!("ORM 설정: {rel} ({kind})")],
+                Some("SQL"),
+                1,
+            );
             book.at(fid, &rel);
         }
     }
@@ -1979,7 +2748,13 @@ pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Opt
             .where_
             .clone()
             .filter(|w| !w.is_empty())
-            .unwrap_or_else(|| if fd.kind == "api" { "external".into() } else { "local".into() });
+            .unwrap_or_else(|| {
+                if fd.kind == "api" {
+                    "external".into()
+                } else {
+                    "local".into()
+                }
+            });
         nodes.push(json!({
             "id": format!("infra:{fid}"),
             "kind": fd.kind,
@@ -2035,17 +2810,28 @@ pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Opt
                 .protocol
                 .clone()
                 .filter(|p| !p.is_empty())
-                .or_else(|| LIBS.iter().find(|l| l.1 == fid.as_str()).map(|l| l.5.to_string()))
+                .or_else(|| {
+                    LIBS.iter()
+                        .find(|l| l.1 == fid.as_str())
+                        .map(|l| l.5.to_string())
+                })
                 .unwrap_or_default();
             let users: HashSet<String> = book
                 .seen_at
                 .get(*fid)
-                .map(|xs| xs.iter().filter_map(|x| server_of(x)).map(|sv| s(sv, "id")).collect())
+                .map(|xs| {
+                    xs.iter()
+                        .filter_map(|x| server_of(x))
+                        .map(|sv| s(sv, "id"))
+                        .collect()
+                })
                 .unwrap_or_default();
             for sv in &servers {
                 let id = s(sv, "id");
                 if users.is_empty() || users.contains(&id) || servers.len() == 1 {
-                    links.push(json!({"from": id, "to": format!("infra:{fid}"), "protocol": protocol}));
+                    links.push(
+                        json!({"from": id, "to": format!("infra:{fid}"), "protocol": protocol}),
+                    );
                 }
             }
         }

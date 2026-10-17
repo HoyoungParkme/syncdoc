@@ -11,7 +11,10 @@ use tree_sitter::{Node, Parser, Tree};
 use syncdoc_pycompat::chars::{is_space, strip};
 
 use crate::graph::{CODE_EXTS, is_test};
-use crate::{infra, routes, steps};
+
+pub mod infra;
+pub mod routes;
+pub mod steps;
 
 /// 모든 흐름 함수가 건너뛰는 폴더 (MS-024 0장) — 이름이 `.`으로 시작하는 폴더도
 pub(crate) const SKIP_DIRS: [&str; 12] = [
@@ -271,14 +274,14 @@ pub fn extend(src_dir: &Path, graph: &mut Value) {
         return;
     };
     obj.insert("files".into(), Value::Array(files(src_dir)));
-    obj.insert("units".into(), Value::Array(infra::units(src_dir)));
-    let idents = steps::steps(src_dir, graph);
-    routes::routes(src_dir, graph);
-    let http = routes::http_links(src_dir, graph);
+    obj.insert("units".into(), Value::Array(self::infra::units(src_dir)));
+    let idents = self::steps::steps(src_dir, graph);
+    self::routes::routes(src_dir, graph);
+    let http = self::routes::http_links(src_dir, graph);
     if let Some(o) = graph.as_object_mut() {
         o.insert("http".into(), Value::Array(http));
     }
-    infra::infra(src_dir, graph, &idents);
+    self::infra::infra(src_dir, graph, &idents);
     for f in functions_mut(graph) {
         f.entry("route").or_insert(Value::Null);
         let kept: Vec<Value> = f

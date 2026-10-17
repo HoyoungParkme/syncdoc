@@ -16,6 +16,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import flow_cases
 from app.core.codegraph import flow
 from app.core.codegraph import graph as cg
 from app.infra import graphify
@@ -48,6 +49,8 @@ def main() -> None:
         "communities": grouped,
         "flow_raw": flow_raw,
         "flow": flowed,
+        # 흐름 사례 — 파이썬 판 흐름 시험의 입력과 답(flow_cases.py)
+        "flow_cases": [{**c, "out": flow_cases.run(c)} for c in flow_cases.cases()],
     }
     out.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
 

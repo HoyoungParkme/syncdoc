@@ -6096,5 +6096,3280 @@
     }
    ]
   }
- }
+ },
+ "flow_cases": [
+  {
+   "name": "files",
+   "op": "files",
+   "graph": {},
+   "files": {
+    "b.py": "x = 1\n",
+    "a/c.ts": "let a\nlet b",
+    "node_modules/x/i.js": "1",
+    ".hidden/hooks/h.py": "1",
+    "tests/test_x.py": "1",
+    "src/x.test.ts": "1",
+    "main.go": "",
+    "README.md": "# r"
+   },
+   "out": [
+    {
+     "path": "a/c.ts",
+     "lang": "typescript",
+     "loc": 2
+    },
+    {
+     "path": "b.py",
+     "lang": "python",
+     "loc": 1
+    },
+    {
+     "path": "main.go",
+     "lang": "go",
+     "loc": 0
+    }
+   ]
+  },
+  {
+   "name": "steps_py",
+   "op": "steps",
+   "files": {
+    "app/h.py": "from fastapi import Depends\n\n\ndef helper(x):\n    return x\n\n\ndef dep():\n    pass\n\n\n@decorated\ndef handler(a=Depends(dep)):\n    v = helper(helper(1))\n    if v:\n        raise ValueError(\"나쁜 값 \" * 30)\n    cb = lambda: helper(2)\n\n    def inner():\n        return helper(3)\n\n    return (v)\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "app/h.py:4",
+      "name": "helper",
+      "qual": "helper",
+      "file": "app/h.py",
+      "line": 4,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "app/h.py:8",
+      "name": "dep",
+      "qual": "dep",
+      "file": "app/h.py",
+      "line": 8,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "app/h.py:12",
+      "name": "handler",
+      "qual": "handler",
+      "file": "app/h.py",
+      "line": 12,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": [
+     [
+      "app/h.py:12",
+      "app/h.py:4",
+      "graphify"
+     ]
+    ]
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "app/h.py:4",
+      "name": "helper",
+      "qual": "helper",
+      "file": "app/h.py",
+      "line": 4,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "return",
+        "line": 5,
+        "label": "return x"
+       }
+      ]
+     },
+     {
+      "key": "app/h.py:8",
+      "name": "dep",
+      "qual": "dep",
+      "file": "app/h.py",
+      "line": 8,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": []
+     },
+     {
+      "key": "app/h.py:12",
+      "name": "handler",
+      "qual": "handler",
+      "file": "app/h.py",
+      "line": 12,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 13,
+        "label": "Depends(dep)",
+        "to": "app/h.py:8",
+        "inferred": true
+       },
+       {
+        "k": "call",
+        "line": 14,
+        "label": "helper",
+        "to": "app/h.py:4"
+       },
+       {
+        "k": "call",
+        "line": 14,
+        "label": "helper",
+        "to": "app/h.py:4"
+       },
+       {
+        "k": "call",
+        "line": 16,
+        "label": "ValueError"
+       },
+       {
+        "k": "raise",
+        "line": 16,
+        "label": "raise ValueError(\"나쁜 값 \" * 30)"
+       },
+       {
+        "k": "call",
+        "line": 17,
+        "label": "helper",
+        "to": "app/h.py:4",
+        "deferred": true
+       },
+       {
+        "k": "call",
+        "line": 20,
+        "label": "helper",
+        "to": "app/h.py:4",
+        "deferred": true
+       },
+       {
+        "k": "return",
+        "line": 22,
+        "label": "return v"
+       }
+      ]
+     }
+    ],
+    "calls": [
+     [
+      "app/h.py:12",
+      "app/h.py:4",
+      "graphify"
+     ]
+    ]
+   }
+  },
+  {
+   "name": "steps_label_cut",
+   "op": "steps",
+   "files": {
+    "m.py": "def f():\n    return aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+    "k.py": "def g():\n    return '한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글'\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "m.py:1",
+      "name": "f",
+      "qual": "f",
+      "file": "m.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "k.py:1",
+      "name": "g",
+      "qual": "g",
+      "file": "k.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": []
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "m.py:1",
+      "name": "f",
+      "qual": "f",
+      "file": "m.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "return",
+        "line": 2,
+        "label": "return aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…"
+       }
+      ]
+     },
+     {
+      "key": "k.py:1",
+      "name": "g",
+      "qual": "g",
+      "file": "k.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "return",
+        "line": 2,
+        "label": "return '한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한글한…"
+       }
+      ]
+     }
+    ],
+    "calls": []
+   }
+  },
+  {
+   "name": "steps_unique_name",
+   "op": "steps",
+   "files": {
+    "a.py": "def go(x):\n    x.run()\n    run()\n    split()\n",
+    "b.py": "def run():\n    pass\n",
+    "c.py": "def run():\n    pass\n",
+    "d.ts": "export function split() {}\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "a.py:1",
+      "name": "go",
+      "qual": "go",
+      "file": "a.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "b.py:1",
+      "name": "run",
+      "qual": "run",
+      "file": "b.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "c.py:1",
+      "name": "run",
+      "qual": "run",
+      "file": "c.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "d.ts:1",
+      "name": "split",
+      "qual": "split",
+      "file": "d.ts",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": [
+     [
+      "a.py:1",
+      "b.py:1",
+      "graphify"
+     ]
+    ]
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "a.py:1",
+      "name": "go",
+      "qual": "go",
+      "file": "a.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 2,
+        "label": "x.run",
+        "to": "b.py:1"
+       },
+       {
+        "k": "call",
+        "line": 3,
+        "label": "run",
+        "to": "b.py:1"
+       },
+       {
+        "k": "call",
+        "line": 4,
+        "label": "split"
+       }
+      ]
+     },
+     {
+      "key": "b.py:1",
+      "name": "run",
+      "qual": "run",
+      "file": "b.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": []
+     },
+     {
+      "key": "c.py:1",
+      "name": "run",
+      "qual": "run",
+      "file": "c.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": []
+     },
+     {
+      "key": "d.ts:1",
+      "name": "split",
+      "qual": "split",
+      "file": "d.ts",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": []
+     }
+    ],
+    "calls": [
+     [
+      "a.py:1",
+      "b.py:1",
+      "graphify"
+     ]
+    ]
+   }
+  },
+  {
+   "name": "steps_method_not_guessed",
+   "op": "steps",
+   "files": {
+    "a.py": "def go(x):\n    x.only()\n",
+    "b.py": "def only():\n    pass\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "a.py:1",
+      "name": "go",
+      "qual": "go",
+      "file": "a.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "b.py:1",
+      "name": "only",
+      "qual": "only",
+      "file": "b.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": []
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "a.py:1",
+      "name": "go",
+      "qual": "go",
+      "file": "a.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 2,
+        "label": "x.only"
+       }
+      ]
+     },
+     {
+      "key": "b.py:1",
+      "name": "only",
+      "qual": "only",
+      "file": "b.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": []
+     }
+    ],
+    "calls": []
+   }
+  },
+  {
+   "name": "steps_ts",
+   "op": "steps",
+   "files": {
+    "web/p.tsx": "import { api } from './client'\n\nexport const load = async (id: string) => {\n  const r = await api.get(`/x/${id}`)\n  items.map((i) => fmt(i))\n  return r\n}\n\nexport function fmt(v) {\n  if (!v) throw new Error('없음')\n  return <Card v={v} />\n}\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "web/p.tsx:3",
+      "name": "load",
+      "qual": "load",
+      "file": "web/p.tsx",
+      "line": 3,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "web/p.tsx:9",
+      "name": "fmt",
+      "qual": "fmt",
+      "file": "web/p.tsx",
+      "line": 9,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": [
+     [
+      "web/p.tsx:3",
+      "web/p.tsx:9",
+      "enrich"
+     ]
+    ]
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "web/p.tsx:3",
+      "name": "load",
+      "qual": "load",
+      "file": "web/p.tsx",
+      "line": 3,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 4,
+        "label": "api.get",
+        "awaited": true
+       },
+       {
+        "k": "call",
+        "line": 5,
+        "label": "fmt",
+        "to": "web/p.tsx:9",
+        "deferred": true
+       },
+       {
+        "k": "call",
+        "line": 5,
+        "label": "items.map"
+       },
+       {
+        "k": "return",
+        "line": 6,
+        "label": "return r"
+       }
+      ]
+     },
+     {
+      "key": "web/p.tsx:9",
+      "name": "fmt",
+      "qual": "fmt",
+      "file": "web/p.tsx",
+      "line": 9,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "raise",
+        "line": 10,
+        "label": "throw new Error('없음')"
+       },
+       {
+        "k": "call",
+        "line": 11,
+        "label": "<Card>"
+       },
+       {
+        "k": "return",
+        "line": 11,
+        "label": "return <Card v={v} />"
+       }
+      ]
+     }
+    ],
+    "calls": [
+     [
+      "web/p.tsx:3",
+      "web/p.tsx:9",
+      "enrich"
+     ]
+    ]
+   }
+  },
+  {
+   "name": "steps_rs",
+   "op": "steps",
+   "files": {
+    "src/lib.rs": "pub fn helper(x: i32) -> i32 {\n    x\n}\n\n/// 문서\n#[inline]\npub async fn run(db: &Db) -> i32 {\n    let v = helper(Self::make(1));\n    db.save(v).await;\n    let c = |y| helper(y);\n    return v;\n}\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "src/lib.rs:1",
+      "name": "helper",
+      "qual": "helper",
+      "file": "src/lib.rs",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "src/lib.rs:7",
+      "name": "run",
+      "qual": "run",
+      "file": "src/lib.rs",
+      "line": 7,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": [
+     [
+      "src/lib.rs:7",
+      "src/lib.rs:1",
+      "enrich"
+     ]
+    ]
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "src/lib.rs:1",
+      "name": "helper",
+      "qual": "helper",
+      "file": "src/lib.rs",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": []
+     },
+     {
+      "key": "src/lib.rs:7",
+      "name": "run",
+      "qual": "run",
+      "file": "src/lib.rs",
+      "line": 7,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 8,
+        "label": "Self::make"
+       },
+       {
+        "k": "call",
+        "line": 8,
+        "label": "helper",
+        "to": "src/lib.rs:1"
+       },
+       {
+        "k": "call",
+        "line": 9,
+        "label": "db.save",
+        "awaited": true
+       },
+       {
+        "k": "call",
+        "line": 10,
+        "label": "helper",
+        "to": "src/lib.rs:1",
+        "deferred": true
+       },
+       {
+        "k": "return",
+        "line": 11,
+        "label": "return v"
+       }
+      ]
+     }
+    ],
+    "calls": [
+     [
+      "src/lib.rs:7",
+      "src/lib.rs:1",
+      "enrich"
+     ]
+    ]
+   }
+  },
+  {
+   "name": "steps_bad_file",
+   "op": "steps",
+   "files": {
+    "x.py": "def f(:\n",
+    "y.py": {
+     "hex": "fffe20646566206728293a20706173730a"
+    },
+    "w.py": "﻿def h():\n    k()\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "x.py:1",
+      "name": "f",
+      "qual": "f",
+      "file": "x.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "y.py:1",
+      "name": "g",
+      "qual": "g",
+      "file": "y.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "z.go:1",
+      "name": "h",
+      "qual": "h",
+      "file": "z.go",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "w.py:1",
+      "name": "h",
+      "qual": "h",
+      "file": "w.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": []
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "x.py:1",
+      "name": "f",
+      "qual": "f",
+      "file": "x.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": []
+     },
+     {
+      "key": "y.py:1",
+      "name": "g",
+      "qual": "g",
+      "file": "y.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": []
+     },
+     {
+      "key": "z.go:1",
+      "name": "h",
+      "qual": "h",
+      "file": "z.go",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": []
+     },
+     {
+      "key": "w.py:1",
+      "name": "h",
+      "qual": "h",
+      "file": "w.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 2,
+        "label": "k"
+       }
+      ]
+     }
+    ],
+    "calls": []
+   }
+  },
+  {
+   "name": "steps_cap",
+   "op": "steps",
+   "files": {
+    "m.py": "def f():\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n    g()\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "m.py:1",
+      "name": "f",
+      "qual": "f",
+      "file": "m.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": []
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "m.py:1",
+      "name": "f",
+      "qual": "f",
+      "file": "m.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 2,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 3,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 4,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 5,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 6,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 7,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 8,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 9,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 10,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 11,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 12,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 13,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 14,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 15,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 16,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 17,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 18,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 19,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 20,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 21,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 22,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 23,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 24,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 25,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 26,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 27,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 28,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 29,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 30,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 31,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 32,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 33,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 34,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 35,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 36,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 37,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 38,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 39,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 40,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 41,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 42,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 43,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 44,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 45,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 46,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 47,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 48,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 49,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 50,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 51,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 52,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 53,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 54,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 55,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 56,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 57,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 58,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 59,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 60,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 61,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 62,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 63,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 64,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 65,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 66,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 67,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 68,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 69,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 70,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 71,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 72,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 73,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 74,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 75,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 76,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 77,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 78,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 79,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 80,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 81,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 82,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 83,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 84,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 85,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 86,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 87,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 88,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 89,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 90,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 91,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 92,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 93,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 94,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 95,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 96,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 97,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 98,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 99,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 100,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 101,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 102,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 103,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 104,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 105,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 106,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 107,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 108,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 109,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 110,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 111,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 112,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 113,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 114,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 115,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 116,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 117,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 118,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 119,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 120,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 121,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 122,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 123,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 124,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 125,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 126,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 127,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 128,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 129,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 130,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 131,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 132,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 133,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 134,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 135,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 136,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 137,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 138,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 139,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 140,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 141,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 142,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 143,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 144,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 145,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 146,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 147,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 148,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 149,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 150,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 151,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 152,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 153,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 154,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 155,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 156,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 157,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 158,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 159,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 160,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 161,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 162,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 163,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 164,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 165,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 166,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 167,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 168,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 169,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 170,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 171,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 172,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 173,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 174,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 175,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 176,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 177,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 178,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 179,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 180,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 181,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 182,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 183,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 184,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 185,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 186,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 187,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 188,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 189,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 190,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 191,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 192,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 193,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 194,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 195,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 196,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 197,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 198,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 199,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 200,
+        "label": "g"
+       },
+       {
+        "k": "call",
+        "line": 201,
+        "label": "g"
+       }
+      ]
+     }
+    ],
+    "calls": []
+   }
+  },
+  {
+   "name": "extend_py",
+   "op": "extend",
+   "files": {
+    "app/h.py": "from fastapi import Depends\n\n\ndef helper(x):\n    return x\n\n\ndef dep():\n    pass\n\n\n@decorated\ndef handler(a=Depends(dep)):\n    v = helper(helper(1))\n    if v:\n        raise ValueError(\"나쁜 값 \" * 30)\n    cb = lambda: helper(2)\n\n    def inner():\n        return helper(3)\n\n    return (v)\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "app/h.py:4",
+      "name": "helper",
+      "qual": "helper",
+      "file": "app/h.py",
+      "line": 4,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "app/h.py:8",
+      "name": "dep",
+      "qual": "dep",
+      "file": "app/h.py",
+      "line": 8,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "app/h.py:12",
+      "name": "handler",
+      "qual": "handler",
+      "file": "app/h.py",
+      "line": 12,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": [
+     [
+      "app/h.py:12",
+      "app/h.py:4",
+      "graphify"
+     ]
+    ]
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "app/h.py:4",
+      "name": "helper",
+      "qual": "helper",
+      "file": "app/h.py",
+      "line": 4,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "return",
+        "line": 5,
+        "label": "return x"
+       }
+      ],
+      "route": null
+     },
+     {
+      "key": "app/h.py:8",
+      "name": "dep",
+      "qual": "dep",
+      "file": "app/h.py",
+      "line": 8,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [],
+      "route": null
+     },
+     {
+      "key": "app/h.py:12",
+      "name": "handler",
+      "qual": "handler",
+      "file": "app/h.py",
+      "line": 12,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 13,
+        "label": "Depends(dep)",
+        "to": "app/h.py:8",
+        "inferred": true
+       },
+       {
+        "k": "call",
+        "line": 14,
+        "label": "helper",
+        "to": "app/h.py:4"
+       },
+       {
+        "k": "call",
+        "line": 14,
+        "label": "helper",
+        "to": "app/h.py:4"
+       },
+       {
+        "k": "raise",
+        "line": 16,
+        "label": "raise ValueError(\"나쁜 값 \" * 30)"
+       },
+       {
+        "k": "call",
+        "line": 17,
+        "label": "helper",
+        "to": "app/h.py:4",
+        "deferred": true
+       },
+       {
+        "k": "call",
+        "line": 20,
+        "label": "helper",
+        "to": "app/h.py:4",
+        "deferred": true
+       },
+       {
+        "k": "return",
+        "line": 22,
+        "label": "return v"
+       }
+      ],
+      "route": null
+     }
+    ],
+    "calls": [
+     [
+      "app/h.py:12",
+      "app/h.py:4",
+      "graphify"
+     ]
+    ],
+    "files": [
+     {
+      "path": "app/h.py",
+      "lang": "python",
+      "loc": 22
+     }
+    ],
+    "units": [],
+    "http": [],
+    "infra": {
+     "nodes": [
+      {
+       "id": "infra:backend",
+       "kind": "backend",
+       "name": "백엔드 서버",
+       "where": "local",
+       "host": null,
+       "evidence": [
+        "백엔드 코드가 이 PC에서 돈다"
+       ],
+       "dir": ""
+      }
+     ],
+     "links": []
+    }
+   }
+  },
+  {
+   "name": "routes_py",
+   "op": "routes",
+   "files": {
+    "app/main.py": "from app.api import items as items_mod\napp.include_router(items_mod.router, prefix='/v1')\n",
+    "app/api/items.py": "router = APIRouter(prefix='/items')\n\n@router.get('/{item_id}/')\ndef read(item_id):\n    pass\n\n@router.api_route('', methods=['POST'])\ndef make():\n    pass\n",
+    "web/f.py": "bp = Blueprint('x', __name__, url_prefix='/bp')\n\n@bp.route('/u/<int:uid>', methods=['PUT'])\ndef upd(uid):\n    pass\n\n@app.get('/plain')\ndef plain():\n    pass\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "app/api/items.py:3",
+      "name": "read",
+      "qual": "read",
+      "file": "app/api/items.py",
+      "line": 3,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "app/api/items.py:7",
+      "name": "make",
+      "qual": "make",
+      "file": "app/api/items.py",
+      "line": 7,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "web/f.py:4",
+      "name": "upd",
+      "qual": "upd",
+      "file": "web/f.py",
+      "line": 4,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "web/f.py:8",
+      "name": "plain",
+      "qual": "plain",
+      "file": "web/f.py",
+      "line": 8,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": [],
+    "files": [
+     {
+      "path": "app/main.py"
+     }
+    ]
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "app/api/items.py:3",
+      "name": "read",
+      "qual": "read",
+      "file": "app/api/items.py",
+      "line": 3,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/v1/items/{item_id}"
+      }
+     },
+     {
+      "key": "app/api/items.py:7",
+      "name": "make",
+      "qual": "make",
+      "file": "app/api/items.py",
+      "line": 7,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "POST",
+       "path": "/v1/items"
+      }
+     },
+     {
+      "key": "web/f.py:4",
+      "name": "upd",
+      "qual": "upd",
+      "file": "web/f.py",
+      "line": 4,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "PUT",
+       "path": "/bp/u/{uid}"
+      }
+     },
+     {
+      "key": "web/f.py:8",
+      "name": "plain",
+      "qual": "plain",
+      "file": "web/f.py",
+      "line": 8,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/plain"
+      }
+     }
+    ],
+    "calls": [],
+    "files": [
+     {
+      "path": "app/main.py"
+     }
+    ]
+   }
+  },
+  {
+   "name": "routes_ts",
+   "op": "routes",
+   "files": {
+    "srv/app.ts": "const app = express()\nfunction show(req, res) {}\napp.get('/users/:id', auth, show)\napp.post('/users', (req, res) => {})\n",
+    "srv/c.ts": "@Controller('cats')\nclass CatsController {\n  @Get(':id')\n  one() {}\n}\n",
+    "srv/d.ts": "@Controller('dogs')\nexport class DogsController {\n  @Post()\n  make() {}\n}\n",
+    "web/app/api/items/[id]/route.ts": "export async function GET(req) {}\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "srv/app.ts:2",
+      "name": "show",
+      "qual": "show",
+      "file": "srv/app.ts",
+      "line": 2,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "srv/app.ts:4",
+      "name": "anon",
+      "qual": "anon",
+      "file": "srv/app.ts",
+      "line": 4,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "srv/c.ts:4",
+      "name": "one",
+      "qual": "one",
+      "file": "srv/c.ts",
+      "line": 4,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "srv/d.ts:4",
+      "name": "make",
+      "qual": "make",
+      "file": "srv/d.ts",
+      "line": 4,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "web/app/api/items/[id]/route.ts:1",
+      "name": "GET",
+      "qual": "GET",
+      "file": "web/app/api/items/[id]/route.ts",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": []
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "srv/app.ts:2",
+      "name": "show",
+      "qual": "show",
+      "file": "srv/app.ts",
+      "line": 2,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/users/{id}"
+      }
+     },
+     {
+      "key": "srv/app.ts:4",
+      "name": "anon",
+      "qual": "anon",
+      "file": "srv/app.ts",
+      "line": 4,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "POST",
+       "path": "/users"
+      }
+     },
+     {
+      "key": "srv/c.ts:4",
+      "name": "one",
+      "qual": "one",
+      "file": "srv/c.ts",
+      "line": 4,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/cats/{id}"
+      }
+     },
+     {
+      "key": "srv/d.ts:4",
+      "name": "make",
+      "qual": "make",
+      "file": "srv/d.ts",
+      "line": 4,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "POST",
+       "path": "/dogs"
+      }
+     },
+     {
+      "key": "web/app/api/items/[id]/route.ts:1",
+      "name": "GET",
+      "qual": "GET",
+      "file": "web/app/api/items/[id]/route.ts",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/api/items/{id}"
+      }
+     }
+    ],
+    "calls": []
+   }
+  },
+  {
+   "name": "routes_rs",
+   "op": "routes",
+   "files": {
+    "src/lib.rs": "fn app() -> Router {\n    Router::new()\n        .route(\"/api/x\", get(list).post(handlers::make))\n}\nasync fn list() {}\nasync fn make() {}\n\n#[get(\"/hi/\")]\nasync fn hi() {}\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "src/lib.rs:5",
+      "name": "list",
+      "qual": "list",
+      "file": "src/lib.rs",
+      "line": 5,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "src/lib.rs:6",
+      "name": "make",
+      "qual": "make",
+      "file": "src/lib.rs",
+      "line": 6,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "src/lib.rs:9",
+      "name": "hi",
+      "qual": "hi",
+      "file": "src/lib.rs",
+      "line": 9,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": []
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "src/lib.rs:5",
+      "name": "list",
+      "qual": "list",
+      "file": "src/lib.rs",
+      "line": 5,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/api/x"
+      }
+     },
+     {
+      "key": "src/lib.rs:6",
+      "name": "make",
+      "qual": "make",
+      "file": "src/lib.rs",
+      "line": 6,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "POST",
+       "path": "/api/x"
+      }
+     },
+     {
+      "key": "src/lib.rs:9",
+      "name": "hi",
+      "qual": "hi",
+      "file": "src/lib.rs",
+      "line": 9,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/hi"
+      }
+     }
+    ],
+    "calls": []
+   }
+  },
+  {
+   "name": "http_template_fetch",
+   "op": "http",
+   "files": {
+    "web/p.tsx": "export async function load(code) {\n  await api.get(`/api/projects/${code}/flow?x=1`)\n  await fetch(`/api/projects/${code}/traces`, { method: 'POST' })\n}\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "web/p.tsx:1",
+      "name": "load",
+      "qual": "load",
+      "file": "web/p.tsx",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "api/a.py:1",
+      "name": "r",
+      "qual": "r",
+      "file": "api/a.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/api/projects/{code}/flow"
+      }
+     },
+     {
+      "key": "api/a.py:2",
+      "name": "r",
+      "qual": "r",
+      "file": "api/a.py",
+      "line": 2,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "POST",
+       "path": "/api/projects/{code}/traces"
+      }
+     },
+     {
+      "key": "api/a.py:3",
+      "name": "r",
+      "qual": "r",
+      "file": "api/a.py",
+      "line": 3,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/api/projects/list"
+      }
+     },
+     {
+      "key": "api/a.py:4",
+      "name": "r",
+      "qual": "r",
+      "file": "api/a.py",
+      "line": 4,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/api/projects/{code}"
+      }
+     }
+    ],
+    "calls": [],
+    "units": []
+   },
+   "out": [
+    {
+     "from": "web/p.tsx:1",
+     "to": "api/a.py:1",
+     "inferred": false
+    },
+    {
+     "from": "web/p.tsx:1",
+     "to": "api/a.py:2",
+     "inferred": false
+    }
+   ]
+  },
+  {
+   "name": "http_literal_wins",
+   "op": "http",
+   "files": {
+    "web/p.tsx": "export function load(x) {\n  api.get('/api/projects/list')\n  api.get(`/api/${x}/list`)\n}\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "web/p.tsx:1",
+      "name": "load",
+      "qual": "load",
+      "file": "web/p.tsx",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "api/a.py:1",
+      "name": "r",
+      "qual": "r",
+      "file": "api/a.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/api/projects/{code}/flow"
+      }
+     },
+     {
+      "key": "api/a.py:2",
+      "name": "r",
+      "qual": "r",
+      "file": "api/a.py",
+      "line": 2,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "POST",
+       "path": "/api/projects/{code}/traces"
+      }
+     },
+     {
+      "key": "api/a.py:3",
+      "name": "r",
+      "qual": "r",
+      "file": "api/a.py",
+      "line": 3,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/api/projects/list"
+      }
+     },
+     {
+      "key": "api/a.py:4",
+      "name": "r",
+      "qual": "r",
+      "file": "api/a.py",
+      "line": 4,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/api/projects/{code}"
+      }
+     }
+    ],
+    "calls": [],
+    "units": []
+   },
+   "out": [
+    {
+     "from": "web/p.tsx:1",
+     "to": "api/a.py:3",
+     "inferred": false
+    }
+   ]
+  },
+  {
+   "name": "http_suffix_and_router",
+   "op": "http",
+   "files": {
+    "web/p.tsx": "const app = express()\nexport function load() {\n  app.get('/projects/{c}/flow', h)\n  api.get('/projects/a/flow')\n}\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "web/p.tsx:2",
+      "name": "load",
+      "qual": "load",
+      "file": "web/p.tsx",
+      "line": 2,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "api/a.py:1",
+      "name": "r",
+      "qual": "r",
+      "file": "api/a.py",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/api/projects/{code}/flow"
+      }
+     }
+    ],
+    "calls": [],
+    "units": []
+   },
+   "out": [
+    {
+     "from": "web/p.tsx:2",
+     "to": "api/a.py:1",
+     "inferred": true
+    }
+   ]
+  },
+  {
+   "name": "http_non_front",
+   "op": "http",
+   "files": {
+    "srv/x.ts": "export function load() {\n  api.get('/api/projects/list')\n}\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "srv/x.ts:1",
+      "name": "load",
+      "qual": "load",
+      "file": "srv/x.ts",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "api/a.py:3",
+      "name": "r",
+      "qual": "r",
+      "file": "api/a.py",
+      "line": 3,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/api/projects/list"
+      }
+     }
+    ],
+    "calls": [],
+    "units": []
+   },
+   "out": []
+  },
+  {
+   "name": "http_web_unit",
+   "op": "http",
+   "files": {
+    "srv/x.ts": "export function load() {\n  api.get('/api/projects/list')\n}\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "srv/x.ts:1",
+      "name": "load",
+      "qual": "load",
+      "file": "srv/x.ts",
+      "line": 1,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "api/a.py:3",
+      "name": "r",
+      "qual": "r",
+      "file": "api/a.py",
+      "line": 3,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/api/projects/list"
+      }
+     }
+    ],
+    "calls": [],
+    "units": [
+     {
+      "kind": "web",
+      "dir": "srv"
+     }
+    ]
+   },
+   "out": [
+    {
+     "from": "srv/x.ts:1",
+     "to": "api/a.py:3",
+     "inferred": false
+    }
+   ]
+  },
+  {
+   "name": "units",
+   "op": "units",
+   "graph": {
+    "functions": []
+   },
+   "files": {
+    "api/package.json": "{\"dependencies\": {\"express\": \"4\"}, \"scripts\": {\"dev\": \"tsx w --port 4100\"}}",
+    "api/tsconfig.json": "{}",
+    "web/package.json": "{\"devDependencies\": {\"vite\": \"5\"}, \"dependencies\": {\"react\": \"18\"}, \"scripts\": {\"dev\": \"vite\"}}",
+    "site/package.json": "{\"dependencies\": {\"next\": \"15\"}, \"scripts\": {\"start\": \"next start\"}}",
+    "broken/package.json": "{nope",
+    "srv/pyproject.toml": "[project]\nname='x'\n",
+    "srv/uv.lock": "",
+    "srv/app/main.py": "from fastapi import FastAPI\napp = FastAPI()\n",
+    "fl/requirements.txt": "flask\n",
+    "fl/web.py": "server = Flask(__name__)\n",
+    "dj/manage.py": "",
+    "wk/requirements.txt": "celery\n",
+    "wk/tasks.py": "celery_app = Celery('t')\n",
+    "rs/Cargo.toml": "[package]\nname = \"svc\"\n\n[dependencies]\naxum = \"0.8\"\n",
+    "ws/Cargo.toml": "[workspace]\nmembers = []\n",
+    "a/b/c/d/package.json": "{\"dependencies\": {\"express\": \"4\"}}"
+   },
+   "out": [
+    {
+     "name": "api",
+     "kind": "server",
+     "dir": "api",
+     "lang": "typescript",
+     "framework": "Express",
+     "command": "npm run dev",
+     "port": 4100
+    },
+    {
+     "name": "dj",
+     "kind": "server",
+     "dir": "dj",
+     "lang": "python",
+     "framework": "Django",
+     "command": "python manage.py runserver 8000",
+     "port": 8000
+    },
+    {
+     "name": "fl",
+     "kind": "server",
+     "dir": "fl",
+     "lang": "python",
+     "framework": "Flask",
+     "command": "flask --app web run --port 5000",
+     "port": 5000
+    },
+    {
+     "name": "rs",
+     "kind": "server",
+     "dir": "rs",
+     "lang": "rust",
+     "framework": "Axum",
+     "command": "cargo run -p svc",
+     "port": null
+    },
+    {
+     "name": "site",
+     "kind": "web",
+     "dir": "site",
+     "lang": "javascript",
+     "framework": "Next.js",
+     "command": "npm start",
+     "port": 3000
+    },
+    {
+     "name": "srv",
+     "kind": "server",
+     "dir": "srv",
+     "lang": "python",
+     "framework": "FastAPI",
+     "command": "uv run uvicorn app.main:app --port 8000",
+     "port": 8000
+    },
+    {
+     "name": "web",
+     "kind": "web",
+     "dir": "web",
+     "lang": "javascript",
+     "framework": "Vite",
+     "command": "npm run dev",
+     "port": 5173
+    },
+    {
+     "name": "wk",
+     "kind": "job",
+     "dir": "wk",
+     "lang": "python",
+     "framework": "Celery",
+     "command": "celery -A tasks worker",
+     "port": null
+    }
+   ]
+  },
+  {
+   "name": "infra_code_calls",
+   "op": "infra",
+   "files": {
+    "app/db.py": "from sqlalchemy import select\nfrom sqlalchemy.orm import Session\ndef save(s: Session):\n    q = select(1)\n    s.execute(q)\n",
+    "app/llm.py": "from openai import OpenAI\nclass Bot:\n    def __init__(self):\n        self.client = OpenAI()\n    def ask(self):\n        return self.client.chat.completions.create(model='x')\n",
+    "app/w.py": "import httpx\nasync def pull():\n    async with httpx.AsyncClient() as c:\n        await c.get('https://x')\n",
+    "srv/p.ts": "import { PrismaClient } from '@prisma/client'\nconst prisma = new PrismaClient()\nexport async function list() {\n  return prisma.user.findMany()\n}\n",
+    "core/src/q.rs": "use sqlx::PgPool;\npub async fn one(pool: &PgPool) {\n    sqlx::query(\"x\").fetch_one(pool).await;\n}\n",
+    "scripts/seed.py": "import redis\ndef go():\n    redis.Redis().set('a', 1)\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "app/db.py:3",
+      "name": "save",
+      "qual": "save",
+      "file": "app/db.py",
+      "line": 3,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "app/llm.py:5",
+      "name": "ask",
+      "qual": "ask",
+      "file": "app/llm.py",
+      "line": 5,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "app/w.py:2",
+      "name": "pull",
+      "qual": "pull",
+      "file": "app/w.py",
+      "line": 2,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "srv/p.ts:3",
+      "name": "list",
+      "qual": "list",
+      "file": "srv/p.ts",
+      "line": 3,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "core/src/q.rs:2",
+      "name": "one",
+      "qual": "one",
+      "file": "core/src/q.rs",
+      "line": 2,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "scripts/seed.py:2",
+      "name": "go",
+      "qual": "go",
+      "file": "scripts/seed.py",
+      "line": 2,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": [],
+    "units": [],
+    "http": []
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "app/db.py:3",
+      "name": "save",
+      "qual": "save",
+      "file": "app/db.py",
+      "line": 3,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 4,
+        "label": "select"
+       },
+       {
+        "k": "call",
+        "line": 5,
+        "label": "s.execute",
+        "infra": "infra:db"
+       }
+      ]
+     },
+     {
+      "key": "app/llm.py:5",
+      "name": "ask",
+      "qual": "ask",
+      "file": "app/llm.py",
+      "line": 5,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 6,
+        "label": "self.client.chat.completions.create",
+        "infra": "infra:openai"
+       },
+       {
+        "k": "return",
+        "line": 6,
+        "label": "return self.client.chat.completions.create(model='x')"
+       }
+      ]
+     },
+     {
+      "key": "app/w.py:2",
+      "name": "pull",
+      "qual": "pull",
+      "file": "app/w.py",
+      "line": 2,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 3,
+        "label": "httpx.AsyncClient"
+       },
+       {
+        "k": "call",
+        "line": 4,
+        "label": "c.get",
+        "awaited": true,
+        "infra": "infra:http"
+       }
+      ]
+     },
+     {
+      "key": "srv/p.ts:3",
+      "name": "list",
+      "qual": "list",
+      "file": "srv/p.ts",
+      "line": 3,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 4,
+        "label": "prisma.user.findMany",
+        "infra": "infra:db"
+       },
+       {
+        "k": "return",
+        "line": 4,
+        "label": "return prisma.user.findMany()"
+       }
+      ]
+     },
+     {
+      "key": "core/src/q.rs:2",
+      "name": "one",
+      "qual": "one",
+      "file": "core/src/q.rs",
+      "line": 2,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 3,
+        "label": "sqlx::query"
+       },
+       {
+        "k": "call",
+        "line": 3,
+        "label": "sqlx::query(\"x\").fetch_one",
+        "awaited": true,
+        "infra": "infra:db"
+       }
+      ]
+     },
+     {
+      "key": "scripts/seed.py:2",
+      "name": "go",
+      "qual": "go",
+      "file": "scripts/seed.py",
+      "line": 2,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 3,
+        "label": "redis.Redis"
+       },
+       {
+        "k": "call",
+        "line": 3,
+        "label": "redis.Redis().set"
+       }
+      ]
+     }
+    ],
+    "calls": [],
+    "units": [],
+    "http": [],
+    "infra": {
+     "nodes": [
+      {
+       "id": "infra:backend",
+       "kind": "backend",
+       "name": "백엔드 서버",
+       "where": "local",
+       "host": null,
+       "evidence": [
+        "백엔드 코드가 이 PC에서 돈다"
+       ],
+       "dir": ""
+      },
+      {
+       "id": "infra:db",
+       "kind": "db",
+       "name": "DB",
+       "where": "local",
+       "host": null,
+       "evidence": [
+        "코드: sqlalchemy, @prisma/client, sqlx — app/db.py 외 2개 파일"
+       ],
+       "dir": null
+      },
+      {
+       "id": "infra:http",
+       "kind": "api",
+       "name": "외부 HTTP",
+       "where": "external",
+       "host": null,
+       "evidence": [
+        "코드: httpx — app/w.py"
+       ],
+       "dir": null
+      },
+      {
+       "id": "infra:openai",
+       "kind": "api",
+       "name": "OpenAI API",
+       "where": "external",
+       "host": null,
+       "evidence": [
+        "코드: openai — app/llm.py"
+       ],
+       "dir": null
+      }
+     ],
+     "links": [
+      {
+       "from": "infra:backend",
+       "to": "infra:db",
+       "protocol": "SQL"
+      },
+      {
+       "from": "infra:backend",
+       "to": "infra:http",
+       "protocol": "HTTPS"
+      },
+      {
+       "from": "infra:backend",
+       "to": "infra:openai",
+       "protocol": "HTTPS"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "infra_deps_compose_config",
+   "op": "infra",
+   "files": {
+    "package.json": "{\"dependencies\": {\"express\": \"4\", \"ioredis\": \"5\"}}",
+    "web/package.json": "{\"dependencies\": {\"react\": \"18\", \"pg\": \"8\"}}",
+    "docker-compose.yml": "services:\n  db:\n    image: postgres:16\n    ports:\n      - \"15432:5432\"\n  cache:\n    image: redis:7\n",
+    ".env.example": "DATABASE_URL=postgresql://user:secret@localhost:15432/app\nREDIS_HOST=your-redis-host\n",
+    "app/config.py": "MONGO = 'mongodb://admin:pw@mongo.example.org:27017/x'\n",
+    "conf/application.yml": "spring:\n  datasource:\n    url: jdbc:mysql://mysql:3306/x\nredis:\n  host: cache\n  port: 6380\n",
+    "prisma/schema.prisma": "datasource db {\n  provider = \"postgresql\"\n}\n",
+    "requirements.txt": "boto3==1\n-e .\n# c\n",
+    "pyproject.toml": "[project]\ndependencies = [\"neo4j>=5\", \"elasticsearch\"]\n"
+   },
+   "graph": {
+    "functions": [],
+    "calls": [],
+    "units": [],
+    "http": []
+   },
+   "out": {
+    "functions": [],
+    "calls": [],
+    "units": [],
+    "http": [],
+    "infra": {
+     "nodes": [
+      {
+       "id": "infra:db",
+       "kind": "db",
+       "name": "PostgreSQL",
+       "where": "external",
+       "host": "mysql:3306",
+       "evidence": [
+        "docker-compose: db (postgres:16, 포트 15432) — docker-compose.yml",
+        "설정: .env.example DATABASE_URL → localhost:15432",
+        "설정: conf/application.yml spring.datasource.url → mysql:3306",
+        "ORM 설정: prisma/schema.prisma (postgresql)"
+       ],
+       "dir": null
+      },
+      {
+       "id": "infra:redis",
+       "kind": "cache",
+       "name": "Redis",
+       "where": "container",
+       "host": "cache:6380",
+       "evidence": [
+        "의존성: ioredis — package.json",
+        "docker-compose: cache (redis:7) — docker-compose.yml",
+        "설정: .env.example REDIS_HOST → your-redis-host",
+        "설정: conf/application.yml redis.host → cache:6380"
+       ],
+       "dir": null
+      },
+      {
+       "id": "infra:search",
+       "kind": "search",
+       "name": "Elasticsearch",
+       "where": "local",
+       "host": null,
+       "evidence": [
+        "의존성: elasticsearch — pyproject.toml"
+       ],
+       "dir": null
+      }
+     ],
+     "links": []
+    }
+   }
+  },
+  {
+   "name": "infra_links_by_dir",
+   "op": "infra",
+   "files": {
+    "a/db.py": "import psycopg\ndef q(c: psycopg.Connection):\n    c.execute('x')\n",
+    "b/h.py": "import httpx\ndef g():\n    httpx.get('https://x')\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "a/db.py:2",
+      "name": "q",
+      "qual": "q",
+      "file": "a/db.py",
+      "line": 2,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "b/h.py:2",
+      "name": "g",
+      "qual": "g",
+      "file": "b/h.py",
+      "line": 2,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": [],
+    "units": [
+     {
+      "name": "a",
+      "kind": "server",
+      "dir": "a",
+      "framework": "FastAPI",
+      "port": 8000
+     },
+     {
+      "name": "b",
+      "kind": "server",
+      "dir": "b",
+      "framework": "Flask",
+      "port": null
+     }
+    ],
+    "http": []
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "a/db.py:2",
+      "name": "q",
+      "qual": "q",
+      "file": "a/db.py",
+      "line": 2,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 3,
+        "label": "c.execute",
+        "infra": "infra:db"
+       }
+      ]
+     },
+     {
+      "key": "b/h.py:2",
+      "name": "g",
+      "qual": "g",
+      "file": "b/h.py",
+      "line": 2,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 3,
+        "label": "httpx.get",
+        "infra": "infra:http"
+       }
+      ]
+     }
+    ],
+    "calls": [],
+    "units": [
+     {
+      "name": "a",
+      "kind": "server",
+      "dir": "a",
+      "framework": "FastAPI",
+      "port": 8000
+     },
+     {
+      "name": "b",
+      "kind": "server",
+      "dir": "b",
+      "framework": "Flask",
+      "port": null
+     }
+    ],
+    "http": [],
+    "infra": {
+     "nodes": [
+      {
+       "id": "infra:server:a",
+       "kind": "backend",
+       "name": "FastAPI 서버",
+       "where": "local",
+       "host": "localhost:8000",
+       "evidence": [
+        "FastAPI — a"
+       ],
+       "dir": "a"
+      },
+      {
+       "id": "infra:server:b",
+       "kind": "backend",
+       "name": "Flask 서버",
+       "where": "local",
+       "host": null,
+       "evidence": [
+        "Flask — b"
+       ],
+       "dir": "b"
+      },
+      {
+       "id": "infra:db",
+       "kind": "db",
+       "name": "DB",
+       "where": "local",
+       "host": null,
+       "evidence": [
+        "코드: psycopg — a/db.py"
+       ],
+       "dir": null
+      },
+      {
+       "id": "infra:http",
+       "kind": "api",
+       "name": "외부 HTTP",
+       "where": "external",
+       "host": null,
+       "evidence": [
+        "코드: httpx — b/h.py"
+       ],
+       "dir": null
+      }
+     ],
+     "links": [
+      {
+       "from": "infra:server:a",
+       "to": "infra:db",
+       "protocol": "SQL"
+      },
+      {
+       "from": "infra:server:b",
+       "to": "infra:http",
+       "protocol": "HTTPS"
+      }
+     ]
+    }
+   }
+  }
+ ]
 }

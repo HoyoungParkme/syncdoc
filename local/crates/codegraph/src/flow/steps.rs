@@ -7,7 +7,9 @@ use std::path::Path;
 use serde_json::{Map, Value};
 use tree_sitter::Node;
 
-use crate::flow::{children, label, lang_of, named_children, read, rs_parse, text, ts_parse, unparen, walk};
+use super::{
+    children, label, lang_of, named_children, read, rs_parse, text, ts_parse, unparen, walk,
+};
 use crate::python;
 
 const MAX_STEPS: usize = 200;
@@ -34,7 +36,14 @@ fn row(n: Node) -> i64 {
     n.start_position().row as i64 + 1
 }
 
-fn ev(n: Node, k: &'static str, label_text: &str, ident: Option<(String, bool)>, deferred: bool, awaited: bool) -> Ev {
+fn ev(
+    n: Node,
+    k: &'static str,
+    label_text: &str,
+    ident: Option<(String, bool)>,
+    deferred: bool,
+    awaited: bool,
+) -> Ev {
     Ev {
         order: (1, n.end_byte() as i64, -(n.start_byte() as i64)),
         k,
@@ -85,7 +94,9 @@ fn py_ident(n: Node, src: &[u8]) -> Option<(String, bool)> {
     let n = unparen(n);
     match n.kind() {
         "identifier" => Some((text(n, src), true)),
-        "attribute" => n.child_by_field_name("attribute").map(|a| (text(a, src), false)),
+        "attribute" => n
+            .child_by_field_name("attribute")
+            .map(|a| (text(a, src), false)),
         _ => None,
     }
 }
@@ -113,7 +124,12 @@ fn positional(call: Node) -> Vec<Node> {
         .map(|a| {
             named_children(a)
                 .into_iter()
-                .filter(|c| !matches!(c.kind(), "keyword_argument" | "comment" | "dictionary_splat"))
+                .filter(|c| {
+                    !matches!(
+                        c.kind(),
+                        "keyword_argument" | "comment" | "dictionary_splat"
+                    )
+                })
                 .collect()
         })
         .unwrap_or_default()
@@ -178,7 +194,14 @@ fn py_events(fn_node: Node, src: &[u8]) -> Vec<Ev> {
             }
             "call" => {
                 if let Some(f) = n.child_by_field_name("function") {
-                    out.push(ev(n, "call", &text(unparen(f), src), py_ident(f, src), deferred, awaited));
+                    out.push(ev(
+                        n,
+                        "call",
+                        &text(unparen(f), src),
+                        py_ident(f, src),
+                        deferred,
+                        awaited,
+                    ));
                 }
             }
             "return_statement" if !deferred => {
@@ -228,7 +251,10 @@ pub(crate) fn ts_defs(root: Node) -> HashMap<i64, Node> {
                         lines.push(row(ex));
                     }
                 }
-            } else if matches!(p.kind(), "pair" | "public_field_definition" | "export_statement") {
+            } else if matches!(
+                p.kind(),
+                "pair" | "public_field_definition" | "export_statement"
+            ) {
                 lines.push(row(p));
             }
         }
@@ -250,7 +276,9 @@ fn ts_ident(f: Node, src: &[u8]) -> Option<(String, bool)> {
     let f = unparen(f);
     match f.kind() {
         "identifier" => Some((text(f, src), true)),
-        "member_expression" => f.child_by_field_name("property").map(|p| (text(p, src), false)),
+        "member_expression" => f
+            .child_by_field_name("property")
+            .map(|p| (text(p, src), false)),
         _ => None,
     }
 }
@@ -280,7 +308,14 @@ fn ts_events(fn_node: Node, src: &[u8]) -> Vec<Ev> {
                 if let Some(f) = n.child_by_field_name("function")
                     && f.kind() != "import"
                 {
-                    out.push(ev(n, "call", &text(unparen(f), src), ts_ident(f, src), deferred, awaited));
+                    out.push(ev(
+                        n,
+                        "call",
+                        &text(unparen(f), src),
+                        ts_ident(f, src),
+                        deferred,
+                        awaited,
+                    ));
                 }
             }
             "jsx_opening_element" | "jsx_self_closing_element" => {
@@ -289,7 +324,14 @@ fn ts_events(fn_node: Node, src: &[u8]) -> Vec<Ev> {
                     if nm.chars().next().is_some_and(char::is_uppercase) {
                         let last = nm.rsplit('.').next().unwrap_or(&nm).to_string();
                         let bare = !nm.contains('.');
-                        out.push(ev(n, "call", &format!("<{nm}>"), Some((last, bare)), deferred, false));
+                        out.push(ev(
+                            n,
+                            "call",
+                            &format!("<{nm}>"),
+                            Some((last, bare)),
+                            deferred,
+                            false,
+                        ));
                     }
                 }
             }
@@ -325,7 +367,10 @@ pub(crate) fn rs_defs(root: Node) -> HashMap<i64, Node> {
         if n.kind() != "function_item" {
             continue;
         }
-        let kw = children(n).into_iter().find(|c| c.kind() == "fn").unwrap_or(n);
+        let kw = children(n)
+            .into_iter()
+            .find(|c| c.kind() == "fn")
+            .unwrap_or(n);
         found.push((row(kw), n.start_byte(), n));
     }
     found.sort_by_key(|(ln, b, _)| (*ln, *b));
@@ -339,9 +384,13 @@ pub(crate) fn rs_defs(root: Node) -> HashMap<i64, Node> {
 fn rs_ident(f: Node, src: &[u8]) -> Option<(String, bool)> {
     let f = unparen(f);
     match f.kind() {
-        "generic_function" => f.child_by_field_name("function").and_then(|g| rs_ident(g, src)),
+        "generic_function" => f
+            .child_by_field_name("function")
+            .and_then(|g| rs_ident(g, src)),
         "identifier" => Some((text(f, src), true)),
-        "field_expression" => f.child_by_field_name("field").map(|x| (text(x, src), false)),
+        "field_expression" => f
+            .child_by_field_name("field")
+            .map(|x| (text(x, src), false)),
         "scoped_identifier" => f.child_by_field_name("name").map(|x| (text(x, src), true)),
         _ => None,
     }
@@ -368,11 +417,21 @@ fn rs_events(fn_node: Node, src: &[u8]) -> Vec<Ev> {
             }
             "call_expression" => {
                 if let Some(f) = n.child_by_field_name("function") {
-                    out.push(ev(n, "call", &text(unparen(f), src), rs_ident(f, src), deferred, awaited));
+                    out.push(ev(
+                        n,
+                        "call",
+                        &text(unparen(f), src),
+                        rs_ident(f, src),
+                        deferred,
+                        awaited,
+                    ));
                 }
             }
             "return_expression" if !deferred => {
-                let l = match named_children(n).into_iter().find(|c| c.kind() != "line_comment") {
+                let l = match named_children(n)
+                    .into_iter()
+                    .find(|c| c.kind() != "line_comment")
+                {
                     Some(v) => format!("return {}", text(unparen(v), src)),
                     None => "return".into(),
                 };
@@ -425,7 +484,10 @@ fn events_of(lang: &str, file: &str, src: &[u8]) -> HashMap<i64, Vec<Ev>> {
 }
 
 fn s(v: &Value, k: &str) -> String {
-    v.get(k).and_then(Value::as_str).unwrap_or_default().to_string()
+    v.get(k)
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string()
 }
 
 /// SYNC-MS-026#steps.steps
@@ -445,7 +507,10 @@ pub fn steps(src_dir: &Path, graph: &mut Value) -> HashMap<String, Vec<Option<St
     }
     let mut out_edges: HashMap<String, Vec<String>> = HashMap::new();
     for c in graph["calls"].as_array().cloned().unwrap_or_default() {
-        let (a, b) = (c[0].as_str().unwrap_or_default(), c[1].as_str().unwrap_or_default());
+        let (a, b) = (
+            c[0].as_str().unwrap_or_default(),
+            c[1].as_str().unwrap_or_default(),
+        );
         let e = out_edges.entry(a.to_string()).or_default();
         if !e.iter().any(|x| x == b) {
             e.push(b.to_string());
@@ -462,7 +527,9 @@ pub fn steps(src_dir: &Path, graph: &mut Value) -> HashMap<String, Vec<Option<St
     let mut idents: HashMap<String, Vec<Option<String>>> = HashMap::new();
     for file in files {
         let Some(lang) = lang_of(&file) else { continue };
-        let Some(src) = read(src_dir, &file) else { continue };
+        let Some(src) = read(src_dir, &file) else {
+            continue;
+        };
         let mut events = events_of(lang, &file, &src);
         for f in funcs.iter().filter(|f| s(f, "file") == file) {
             let line = f["line"].as_i64().unwrap_or(0);
@@ -480,7 +547,13 @@ pub fn steps(src_dir: &Path, graph: &mut Value) -> HashMap<String, Vec<Option<St
             idents.insert(
                 key.clone(),
                 evs.iter()
-                    .map(|e| if e.k == "call" { e.ident.as_ref().map(|i| i.0.clone()) } else { None })
+                    .map(|e| {
+                        if e.k == "call" {
+                            e.ident.as_ref().map(|i| i.0.clone())
+                        } else {
+                            None
+                        }
+                    })
                     .collect(),
             );
             result.insert(key, steps);
@@ -488,8 +561,15 @@ pub fn steps(src_dir: &Path, graph: &mut Value) -> HashMap<String, Vec<Option<St
     }
     if let Some(arr) = graph.get_mut("functions").and_then(Value::as_array_mut) {
         for f in arr.iter_mut().filter_map(Value::as_object_mut) {
-            let key = f.get("key").and_then(Value::as_str).unwrap_or_default().to_string();
-            f.insert("steps".into(), Value::Array(result.remove(&key).unwrap_or_default()));
+            let key = f
+                .get("key")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            f.insert(
+                "steps".into(),
+                Value::Array(result.remove(&key).unwrap_or_default()),
+            );
         }
     }
     idents
@@ -509,12 +589,19 @@ fn step(
     {
         let local: Vec<&String> = out_edges
             .get(key)
-            .map(|v| v.iter().filter(|b| name_of.get(*b) == Some(ident)).collect())
+            .map(|v| {
+                v.iter()
+                    .filter(|b| name_of.get(*b) == Some(ident))
+                    .collect()
+            })
             .unwrap_or_default();
         if local.len() == 1 {
             to = Some(local[0].clone());
         } else if local.is_empty() && *bare {
-            let cands = by_name.get(&(lang, ident.clone())).cloned().unwrap_or_default();
+            let cands = by_name
+                .get(&(lang, ident.clone()))
+                .cloned()
+                .unwrap_or_default();
             if cands.len() == 1 && cands[0] != key {
                 to = Some(cands[0].clone());
                 inferred = true;

@@ -10,7 +10,7 @@ use regex::Regex;
 use serde_json::{Value, json};
 use tree_sitter::Node;
 
-use crate::flow::{named_children, read, rs_parse, text, ts_parse, unparen, walk};
+use super::{named_children, read, rs_parse, text, ts_parse, unparen, walk};
 use crate::graph::suffix;
 use crate::python;
 
@@ -133,7 +133,12 @@ fn py_args(call: Node) -> Vec<Node> {
         .map(|a| {
             named_children(a)
                 .into_iter()
-                .filter(|c| !matches!(c.kind(), "keyword_argument" | "comment" | "dictionary_splat"))
+                .filter(|c| {
+                    !matches!(
+                        c.kind(),
+                        "keyword_argument" | "comment" | "dictionary_splat"
+                    )
+                })
                 .collect()
         })
         .unwrap_or_default()
@@ -144,7 +149,10 @@ fn py_kw<'t>(call: Node<'t>, name: &str, src: &str) -> Option<Node<'t>> {
     named_children(args)
         .into_iter()
         .filter(|c| c.kind() == "keyword_argument")
-        .find(|k| k.child_by_field_name("name").is_some_and(|n| python::text(n, src) == name))
+        .find(|k| {
+            k.child_by_field_name("name")
+                .is_some_and(|n| python::text(n, src) == name)
+        })
         .and_then(|k| k.child_by_field_name("value"))
 }
 
@@ -189,14 +197,21 @@ fn py_tables(t: &PyTree) -> HashMap<String, String> {
                 r => break r,
             }
         };
-        let Some(value) = value.map(unparen) else { continue };
+        let Some(value) = value.map(unparen) else {
+            continue;
+        };
         if value.kind() != "call" {
             continue;
         }
-        let Some(kind) = value.child_by_field_name("function").and_then(|f| last_name(f, src)) else {
+        let Some(kind) = value
+            .child_by_field_name("function")
+            .and_then(|f| last_name(f, src))
+        else {
             continue;
         };
-        let Some(key) = py_router(&kind) else { continue };
+        let Some(key) = py_router(&kind) else {
+            continue;
+        };
         let prefix = key
             .and_then(|k| const_str(py_kw(value, k, src), src))
             .unwrap_or_default();
@@ -223,7 +238,10 @@ fn py_dotted(file: &str) -> String {
 
 /// `app.include_router(Z, prefix="…")` → {(파일, 라우터 이름): 접두어} — 한 단만
 fn py_include_prefixes(trees: &[PyTree]) -> HashMap<(String, String), String> {
-    let dotted: Vec<(String, &str)> = trees.iter().map(|t| (py_dotted(&t.file), t.file.as_str())).collect();
+    let dotted: Vec<(String, &str)> = trees
+        .iter()
+        .map(|t| (py_dotted(&t.file), t.file.as_str()))
+        .collect();
     let file_of = |m: &str| -> Option<String> {
         let suffix = format!(".{m}");
         let hits: Vec<&str> = dotted
@@ -261,7 +279,10 @@ fn py_include_prefixes(trees: &[PyTree]) -> HashMap<(String, String), String> {
                             "wildcard_import" => ("*".to_string(), None),
                             _ => continue,
                         };
-                        names.insert(asname.unwrap_or_else(|| name.clone()), (module.clone(), name));
+                        names.insert(
+                            asname.unwrap_or_else(|| name.clone()),
+                            (module.clone(), name),
+                        );
                     }
                 }
                 "import_statement" => {
@@ -276,7 +297,8 @@ fn py_include_prefixes(trees: &[PyTree]) -> HashMap<(String, String), String> {
                             ),
                             _ => continue,
                         };
-                        let key = asname.unwrap_or_else(|| name.split('.').next().unwrap_or("").to_string());
+                        let key = asname
+                            .unwrap_or_else(|| name.split('.').next().unwrap_or("").to_string());
                         names.insert(key, (name, String::new()));
                     }
                 }
@@ -291,7 +313,10 @@ fn py_include_prefixes(trees: &[PyTree]) -> HashMap<(String, String), String> {
                 continue;
             };
             if f.kind() != "attribute"
-                || f.child_by_field_name("attribute").map(|a| py_text(a, src)).as_deref() != Some("include_router")
+                || f.child_by_field_name("attribute")
+                    .map(|a| py_text(a, src))
+                    .as_deref()
+                    != Some("include_router")
             {
                 continue;
             }
@@ -361,7 +386,10 @@ fn py_routes(trees: &[PyTree]) -> BTreeMap<(String, i64), Value> {
                 .unwrap_or_default();
             let mut found = None;
             for d in &decos {
-                let Some(call) = named_children(*d).into_iter().find(|c| c.kind() != "comment").map(unparen)
+                let Some(call) = named_children(*d)
+                    .into_iter()
+                    .find(|c| c.kind() != "comment")
+                    .map(unparen)
                 else {
                     continue;
                 };
@@ -402,7 +430,10 @@ fn py_routes(trees: &[PyTree]) -> BTreeMap<(String, i64), Value> {
                             first = const_str(Some(*e), src);
                         }
                     }
-                    first.filter(|s| !s.is_empty()).unwrap_or_else(|| "GET".into()).to_uppercase()
+                    first
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or_else(|| "GET".into())
+                        .to_uppercase()
                 } else {
                     continue;
                 };
@@ -412,7 +443,10 @@ fn py_routes(trees: &[PyTree]) -> BTreeMap<(String, i64), Value> {
                     .get(&(t.file.clone(), owner_name))
                     .cloned()
                     .unwrap_or_default();
-                found = Some(route(&method, join(&format!("{inc}{prefix}"), &flask(&path))));
+                found = Some(route(
+                    &method,
+                    join(&format!("{inc}{prefix}"), &flask(&path)),
+                ));
                 break;
             }
             let Some(r) = found else { continue };
@@ -473,8 +507,10 @@ pub(crate) fn ts_router_names(root: Node, src: &[u8]) -> HashSet<String> {
         if n.kind() != "variable_declarator" {
             continue;
         }
-        let (Some(name), Some(val)) = (n.child_by_field_name("name"), n.child_by_field_name("value"))
-        else {
+        let (Some(name), Some(val)) = (
+            n.child_by_field_name("name"),
+            n.child_by_field_name("value"),
+        ) else {
             continue;
         };
         if name.kind() != "identifier" {
@@ -544,8 +580,10 @@ fn ts_routes(
             if f.kind() != "member_expression" {
                 continue;
             }
-            let (Some(obj), Some(prop)) = (f.child_by_field_name("object"), f.child_by_field_name("property"))
-            else {
+            let (Some(obj), Some(prop)) = (
+                f.child_by_field_name("object"),
+                f.child_by_field_name("property"),
+            ) else {
                 continue;
             };
             if !routers.contains(&text(obj, src)) {
@@ -610,7 +648,8 @@ fn ts_routes(
                     if matches!(
                         verb.as_str(),
                         "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS"
-                    ) && let Some(i) = here_get(here, row(st)).or_else(|| here_get(here, row(node)))
+                    ) && let Some(i) =
+                        here_get(here, row(st)).or_else(|| here_get(here, row(node)))
                     {
                         out.push((i, route(&verb, next_path(file))));
                     }
@@ -636,9 +675,9 @@ fn nest(cls: Node, src: &[u8], here: &Here, out: &mut Vec<(usize, Value)>) {
     // `export class`의 데코레이터는 export_statement의 자식이다
     let mut kids = Vec::new();
     if let Some(p) = cls.parent().filter(|p| p.kind() == "export_statement") {
-        kids.extend(crate::flow::children(p));
+        kids.extend(super::children(p));
     }
-    kids.extend(crate::flow::children(cls));
+    kids.extend(super::children(cls));
     for c in kids {
         if c.kind() == "decorator"
             && let Some((name, arg)) = deco_call(c, src)
@@ -652,14 +691,18 @@ fn nest(cls: Node, src: &[u8], here: &Here, out: &mut Vec<(usize, Value)>) {
         return;
     };
     let mut pending: Vec<Node> = Vec::new();
-    for m in crate::flow::children(body) {
+    for m in super::children(body) {
         if m.kind() == "decorator" {
             pending.push(m);
             continue;
         }
         if m.kind() == "method_definition" {
             let mut decos = pending.clone();
-            decos.extend(crate::flow::children(m).into_iter().filter(|c| c.kind() == "decorator"));
+            decos.extend(
+                super::children(m)
+                    .into_iter()
+                    .filter(|c| c.kind() == "decorator"),
+            );
             for d in decos {
                 if let Some((name, arg)) = deco_call(d, src)
                     && let Some(verb) = nest_verb(&name)
@@ -741,11 +784,17 @@ fn rs_routes(src: &[u8]) -> (Vec<RsChain>, BTreeMap<i64, Value>) {
     };
     for n in walk(tree.root_node()) {
         if n.kind() == "call_expression" {
-            let Some(f) = n.child_by_field_name("function").filter(|f| f.kind() == "field_expression")
+            let Some(f) = n
+                .child_by_field_name("function")
+                .filter(|f| f.kind() == "field_expression")
             else {
                 continue;
             };
-            if f.child_by_field_name("field").map(|x| text(x, src)).as_deref() != Some("route") {
+            if f.child_by_field_name("field")
+                .map(|x| text(x, src))
+                .as_deref()
+                != Some("route")
+            {
                 continue;
             }
             let a = args(n);
@@ -760,9 +809,13 @@ fn rs_routes(src: &[u8]) -> (Vec<RsChain>, BTreeMap<i64, Value>) {
             }
         } else if n.kind() == "function_item" {
             let mut prev = n.prev_named_sibling();
-            while let Some(p) = prev.filter(|p| matches!(p.kind(), "attribute_item" | "line_comment")) {
+            while let Some(p) =
+                prev.filter(|p| matches!(p.kind(), "attribute_item" | "line_comment"))
+            {
                 if p.kind() == "attribute_item"
-                    && let Some(attr) = named_children(p).into_iter().find(|c| c.kind() == "attribute")
+                    && let Some(attr) = named_children(p)
+                        .into_iter()
+                        .find(|c| c.kind() == "attribute")
                 {
                     let kids = named_children(attr);
                     let nm = kids.first().map(|x| text(*x, src)).unwrap_or_default();
@@ -772,7 +825,7 @@ fn rs_routes(src: &[u8]) -> (Vec<RsChain>, BTreeMap<i64, Value>) {
                             .into_iter()
                             .find(|c| c.kind() == "string_literal");
                         if let Some(path) = rs_str(lit, src) {
-                            let kw = crate::flow::children(n)
+                            let kw = super::children(n)
                                 .into_iter()
                                 .find(|c| c.kind() == "fn")
                                 .unwrap_or(n);
@@ -790,7 +843,10 @@ fn rs_routes(src: &[u8]) -> (Vec<RsChain>, BTreeMap<i64, Value>) {
 // ---------------------------------------------------------------- 묶기
 
 fn s(v: &Value, k: &str) -> String {
-    v.get(k).and_then(Value::as_str).unwrap_or_default().to_string()
+    v.get(k)
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string()
 }
 
 /// SYNC-MS-026#routes.routes
@@ -823,7 +879,11 @@ pub fn routes(src_dir: &Path, graph: &mut Value) {
         }
     };
 
-    let mut py_files: Vec<String> = by_file.keys().filter(|f| f.ends_with(".py")).cloned().collect();
+    let mut py_files: Vec<String> = by_file
+        .keys()
+        .filter(|f| f.ends_with(".py"))
+        .cloned()
+        .collect();
     if let Some(fs) = graph.get("files").and_then(Value::as_array) {
         for f in fs {
             if let Some(p) = f.get("path").and_then(Value::as_str)
@@ -837,7 +897,9 @@ pub fn routes(src_dir: &Path, graph: &mut Value) {
     py_files.dedup();
     let mut trees = Vec::new();
     for file in py_files {
-        let Some(src) = read(src_dir, &file) else { continue };
+        let Some(src) = read(src_dir, &file) else {
+            continue;
+        };
         let Some(pf) = python::parse(&String::from_utf8_lossy(&src)) else {
             continue;
         };
@@ -855,14 +917,19 @@ pub fn routes(src_dir: &Path, graph: &mut Value) {
     keys.sort();
     for k in keys {
         if TS_EXTS.contains(&k.0.as_str()) {
-            ts_names.entry(k.1.clone()).or_default().extend(by_name[k].iter().copied());
+            ts_names
+                .entry(k.1.clone())
+                .or_default()
+                .extend(by_name[k].iter().copied());
         }
     }
     for (file, here) in &by_file {
         if !TS_EXTS.iter().any(|e| file.ends_with(e)) {
             continue;
         }
-        let Some(src) = read(src_dir, file) else { continue };
+        let Some(src) = read(src_dir, file) else {
+            continue;
+        };
         for (i, r) in ts_routes(file, &src, &ts_names, here, &names) {
             give(i, &r);
         }
@@ -872,7 +939,9 @@ pub fn routes(src_dir: &Path, graph: &mut Value) {
         if !file.ends_with(".rs") {
             continue;
         }
-        let Some(src) = read(src_dir, file) else { continue };
+        let Some(src) = read(src_dir, file) else {
+            continue;
+        };
         let (chains, attrs) = rs_routes(&src);
         for (method, path, h) in chains {
             let local: Vec<usize> = here
@@ -881,7 +950,10 @@ pub fn routes(src_dir: &Path, graph: &mut Value) {
                 .filter(|i| names[*i] == h)
                 .collect();
             let cands = if local.is_empty() {
-                by_name.get(&(".rs".to_string(), h.clone())).cloned().unwrap_or_default()
+                by_name
+                    .get(&(".rs".to_string(), h.clone()))
+                    .cloned()
+                    .unwrap_or_default()
             } else {
                 local
             };
@@ -906,7 +978,10 @@ pub fn routes(src_dir: &Path, graph: &mut Value) {
 }
 
 fn segs(path: &str) -> Vec<String> {
-    path.split('/').filter(|s| !s.is_empty()).map(str::to_string).collect()
+    path.split('/')
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 /// 칸마다 맞추기 → (글자-글자 맞은 수, 짐작인가) 또는 없음
@@ -942,7 +1017,11 @@ fn pick(req: &[String], method: &str, routes: &[RouteRow], suffix: bool) -> Vec<
         if suffix && segs.len() <= req.len() {
             continue;
         }
-        let cand = if suffix { &segs[segs.len() - req.len()..] } else { &segs[..] };
+        let cand = if suffix {
+            &segs[segs.len() - req.len()..]
+        } else {
+            &segs[..]
+        };
         let Some((score, guess)) = matches(req, cand) else {
             continue;
         };
@@ -992,7 +1071,13 @@ pub fn http_links(src_dir: &Path, graph: &Value) -> Vec<Value> {
     let routes: Vec<RouteRow> = funcs
         .iter()
         .filter(|f| f.get("route").is_some_and(|r| r.is_object()))
-        .map(|f| (s(f, "key"), segs(&s(&f["route"], "path")), s(&f["route"], "method")))
+        .map(|f| {
+            (
+                s(f, "key"),
+                segs(&s(&f["route"], "path")),
+                s(&f["route"], "method"),
+            )
+        })
         .collect();
     if routes.is_empty() {
         return Vec::new();
@@ -1006,11 +1091,15 @@ pub fn http_links(src_dir: &Path, graph: &Value) -> Vec<Value> {
     }
     let mut found: BTreeMap<(String, String), bool> = BTreeMap::new();
     for (file, fs) in &by_file {
-        let Some(src) = read(src_dir, file) else { continue };
-        let Some(tree) = ts_parse(file, &src) else { continue };
+        let Some(src) = read(src_dir, file) else {
+            continue;
+        };
+        let Some(tree) = ts_parse(file, &src) else {
+            continue;
+        };
         let root = tree.root_node();
         let routers = ts_router_names(root, &src);
-        let defs = crate::steps::ts_defs(root);
+        let defs = super::steps::ts_defs(root);
         for f in fs {
             let Some(body) = defs
                 .get(&f["line"].as_i64().unwrap_or(0))

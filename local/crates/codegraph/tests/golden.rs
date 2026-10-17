@@ -104,5 +104,8 @@ fn flow_matches_python() {
     same("flow.infra", &got["infra"], &want["infra"]);
     let mut keys: Vec<&String> = got.as_object().expect("객체").keys().collect();
     keys.sort();
-    assert_eq!(keys, ["calls", "files", "functions", "http", "infra", "units"]);
+    assert_eq!(
+        keys,
+        ["calls", "files", "functions", "http", "infra", "units"]
+    );
 }

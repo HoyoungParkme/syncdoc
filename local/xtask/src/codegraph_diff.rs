@@ -192,10 +192,16 @@ pub fn run() -> Result<(), String> {
         match (a.as_array(), b.as_array()) {
             (Some(a), Some(b)) => {
                 if let Some((i, (x, y))) = a.iter().zip(b).enumerate().find(|(_, (x, y))| x != y) {
-                    diffs.push(format!("  flow.{part}[{i}]\n    파이썬 {x}\n    Rust   {y}"));
+                    diffs.push(format!(
+                        "  flow.{part}[{i}]\n    파이썬 {x}\n    Rust   {y}"
+                    ));
                 }
                 if a.len() != b.len() {
-                    diffs.push(format!("  flow.{part} 수 — 파이썬 {} · Rust {}", a.len(), b.len()));
+                    diffs.push(format!(
+                        "  flow.{part} 수 — 파이썬 {} · Rust {}",
+                        a.len(),
+                        b.len()
+                    ));
                 }
             }
             _ => diffs.push(format!("  파이썬 {a}\n  Rust   {b}")),
