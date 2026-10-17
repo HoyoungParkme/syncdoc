@@ -75,9 +75,9 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001]
 
 **시그니처** `def get(project_id: int, trace_id: int) -> TraceView`
 
-**처리** `DB: SELECT * FROM traces WHERE id=? AND project_id=?` · 없으면 `! not-found {resource: "trace", id}` · `→ TraceView(머리, record)`
+**처리** `DB: SELECT * FROM traces WHERE id=? AND project_id=?`(id가 DB 정수 범위 밖이면 묻지 않고 없음) · 없으면 `! not-found {resource: "trace", id}` · `→ TraceView(머리, record)`
 
-**테스트 관점** 다른 프로젝트의 id → not-found
+**테스트 관점** 다른 프로젝트의 id → not-found · 아주 큰 id → not-found
 
 ---
 
