@@ -1,4 +1,4 @@
-//! 코드 그래프 차이 시험 — 지금 커밋을 풀어 두 판의 줄이기·보강·커뮤니티를 같은 원형으로 돌려 비교한다 (SYNC-MS-022, 카드 L12·L13).
+//! 코드 그래프 차이 시험 — 지금 커밋을 풀어 두 판의 줄이기·보강·커뮤니티·흐름을 같은 원형으로 돌려 비교한다 (SYNC-MS-022·026, 카드 L12·L13·L22).
 //! 원형은 파이썬 판 graphify가 만든다. 다르면 처음 몇 곳을 보이고 실패한다. 커밋하지 않는다(정답 파일은 codegraph-golden).
 
 use std::process::Command;
@@ -177,6 +177,34 @@ pub fn run() -> Result<(), String> {
             }
         } else {
             println!("{name}: 같다");
+        }
+    }
+    // 흐름 — 같은 보강 결과에 흐름 키를 더한다(카드 L22~L24)
+    let mut flowed = serde_json::to_value(&graph).map_err(|e| e.to_string())?;
+    syncdoc_codegraph::flow::extend(&src, &mut flowed);
+    for part in ["files", "units", "functions", "http", "infra"] {
+        let (a, b) = (&py["flow"][part], &flowed[part]);
+        if a == b {
+            println!("flow.{part}: 같다");
+            continue;
+        }
+        diffs.push(format!("flow.{part}가 다르다"));
+        match (a.as_array(), b.as_array()) {
+            (Some(a), Some(b)) => {
+                if let Some((i, (x, y))) = a.iter().zip(b).enumerate().find(|(_, (x, y))| x != y) {
+                    diffs.push(format!(
+                        "  flow.{part}[{i}]\n    파이썬 {x}\n    Rust   {y}"
+                    ));
+                }
+                if a.len() != b.len() {
+                    diffs.push(format!(
+                        "  flow.{part} 수 — 파이썬 {} · Rust {}",
+                        a.len(),
+                        b.len()
+                    ));
+                }
+            }
+            _ => diffs.push(format!("  파이썬 {a}\n  Rust   {b}")),
         }
     }
     if diffs.is_empty() {

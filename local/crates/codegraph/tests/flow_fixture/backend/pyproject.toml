@@ -1,0 +1,8 @@
+[project]
+name = "api"
+dependencies = [
+  "fastapi",
+  "httpx>=0.27",
+  "sqlalchemy",
+  "redis>=5",
+]

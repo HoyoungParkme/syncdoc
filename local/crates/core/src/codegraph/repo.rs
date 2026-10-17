@@ -1,5 +1,6 @@
 //! code_graphs 조회·저장 — DB만 안다 (SYNC-DOM-004 4장 · SYNC-DOM-003)
 
+use serde_json::Value;
 use sqlx::PgConnection;
 use syncdoc_codegraph::Graph;
 use time::OffsetDateTime;
@@ -50,18 +51,34 @@ pub async fn get(db: &mut PgConnection, project_id: i32) -> Result<Option<CodeGr
     raw.map(row).transpose()
 }
 
+/// 저장된 그래프 값 그대로 — JSONB가 돌려준 키 차례. 행이 없으면 없음
+pub async fn value(db: &mut PgConnection, project_id: i32) -> Result<Option<Value>, Problem> {
+    let text: Option<(String,)> =
+        sqlx::query_as("SELECT graph::text FROM code_graphs WHERE project_id = $1")
+            .bind(project_id)
+            .fetch_optional(db)
+            .await?;
+    text.map(|(t,)| {
+        serde_json::from_str(&t).map_err(|e| Problem::Internal {
+            log: format!("code_graphs {project_id}의 graph를 못 읽었다: {e}"),
+        })
+    })
+    .transpose()
+}
+
 /// 새 그래프로 — 행이 없으면 만들고 있으면 한 번에 바꿔 끼운다. 실패 이유는 지운다
 pub async fn put(
     db: &mut PgConnection,
     project_id: i32,
     commit_hash: &str,
     source: &str,
-    graph: &Graph,
+    graph: &Value,
     built_at: OffsetDateTime,
 ) -> Result<CodeGraphRow, Problem> {
     let body = serde_json::to_string(graph).map_err(|e| Problem::Internal {
         log: format!("그래프를 JSON으로 못 바꿨다: {e}"),
     })?;
+    let count = |k: &str| graph.get(k).and_then(Value::as_array).map_or(0, Vec::len) as i32;
     let raw = sqlx::query_as::<_, Raw>(sqlx::AssertSqlSafe(format!(
         "INSERT INTO code_graphs (project_id, commit_hash, source, graph, function_count, call_count, built_at, error)
          VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, NULL)
@@ -75,8 +92,8 @@ pub async fn put(
     .bind(commit_hash)
     .bind(source)
     .bind(body)
-    .bind(graph.functions.len() as i32)
-    .bind(graph.calls.len() as i32)
+    .bind(count("functions"))
+    .bind(count("calls"))
     .bind(built_at)
     .fetch_one(db)
     .await?;

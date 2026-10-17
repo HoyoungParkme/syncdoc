@@ -5,6 +5,7 @@
 pub mod community;
 pub mod enrich;
 mod extract;
+pub mod flow;
 pub mod graph;
 mod python;
 mod rust;
@@ -61,8 +62,24 @@ pub struct Graph {
     pub calls: Vec<Call>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub communities: Option<Vec<Community>>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// 흐름 보기의 `files`(객체 목록, SYNC-MS-026)는 이름이 같아도 읽지 않는다 — 글자만 남긴다
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "names_only"
+    )]
     pub files: Vec<String>,
+}
+
+fn names_only<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
+    let v = serde_json::Value::deserialize(d)?;
+    Ok(v.as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default())
 }
 
 /// 명세 호출과 코드 호출의 대조 한 줄 (DOM-002 2.8 `CallDiff`)

@@ -5,7 +5,6 @@ use std::path::Path;
 
 use serde_json::Value;
 use sqlx::PgConnection;
-use syncdoc_codegraph::Graph;
 
 use super::model::CodeGraphRow;
 use super::repo;
@@ -65,6 +64,13 @@ impl CodeGraphService<'_> {
         repo::get(&mut *self.db, project_id).await
     }
 
+    /// SYNC-MS-022#CodeGraphService.value
+    ///
+    /// 저장된 그래프 값 그대로 — 흐름 키는 `Graph` 밖이라 따로 읽는다(SYNC-MS-026 0장)
+    pub async fn value(&mut self, project_id: i32) -> Result<Option<Value>, Problem> {
+        repo::value(&mut *self.db, project_id).await
+    }
+
     /// SYNC-MS-022#CodeGraphService.save
     ///
     /// 한 행을 한 번에 바꿔 끼운다 — 반쯤 바뀐 그래프를 읽는 일이 없다. 앞의 실패 이유는 지운다
@@ -73,7 +79,7 @@ impl CodeGraphService<'_> {
         project_id: i32,
         commit_hash: &str,
         source: &str,
-        graph: &Graph,
+        graph: &Value,
     ) -> Result<CodeGraphRow, Problem> {
         repo::put(
             &mut *self.db,

@@ -28,11 +28,11 @@ use crate::reference::service::ReferenceService;
 use crate::spec::{DIFF_CONTEXT_LINES, SpecService};
 use crate::types::{
     ApiAuthor, AuthorRef, BrokenRefSummary, ChainItem, ChainRow, CodeBrief, CodeCallEdge,
-    CodeCalls, CodeCommunity, CodeFunction, CodeGraphInfo, CodeLayer, CodeLayerSpec, CodeNode,
-    CodeNodes, CodeRef, CodeText, CodeView, Diff, DocType, Document, DocumentSummary,
-    DownstreamDoc, DownstreamView, Graph, GraphEdge, GraphNode, GraphScope, ItemChain, ItemRef,
-    ItemReferences, ItemView, ProjectDetail, ProjectItem, ProjectSummary, STAGES, StageSummary,
-    Storage, stage_of,
+    CodeCalls, CodeCommunity, CodeFunction, CodeGraphInfo, CodeLayer, CodeLayerRow, CodeLayerSpec,
+    CodeNode, CodeNodes, CodeRef, CodeText, CodeView, Diff, DocType, Document, DocumentSummary,
+    DownstreamDoc, DownstreamView, FlowFunction, FlowOf, FlowView, Graph, GraphEdge, GraphNode,
+    GraphScope, ItemChain, ItemRef, ItemReferences, ItemView, ProjectDetail, ProjectItem,
+    ProjectSummary, STAGES, StageSummary, Storage, stage_of,
 };
 
 /// 작성자(id만) → 이름 붙은 작성자 — 파이썬 `_api_author`. 지시자는 id가 있을 때만
@@ -1335,22 +1335,34 @@ pub async fn code_text(
     .await
 }
 
-/// 항목 없는 함수 key → 층 — 프로젝트 클래스 명세 전부의 층 표를 문서 차례로 이어 붙인다 (파이썬 `_layers`)
-async fn layers_of(
+/// 프로젝트 클래스 명세 전부의 층 표 — 문서 차례로 이은 줄과 그 문서 ID (파이썬 `_layer_rows`)
+async fn layer_rows(
     db: &mut PgConnection,
     project_id: i32,
-    graph: &CodeGraph,
-) -> Result<HashMap<String, CodeLayer>, Problem> {
+) -> Result<Vec<(String, syncdoc_codegraph::LayerRow)>, Problem> {
     let mut rows = Vec::new();
     for doc_id in class_docs(&mut *db, project_id).await? {
         let body = SpecService { db: &mut *db }
             .get_document(&doc_id)
             .await?
             .body;
-        rows.extend(syncdoc_codegraph::graph::layer_table(&body));
+        rows.extend(
+            syncdoc_codegraph::graph::layer_table(&body)
+                .into_iter()
+                .map(|r| (doc_id.clone(), r)),
+        );
     }
+    Ok(rows)
+}
+
+/// 항목 없는 함수 key → 층 — 층 표 줄로 (파이썬 `_layers`)
+fn layers_from(
+    graph: &CodeGraph,
+    rows: &[(String, syncdoc_codegraph::LayerRow)],
+) -> HashMap<String, CodeLayer> {
+    let rows: Vec<syncdoc_codegraph::LayerRow> = rows.iter().map(|(_, r)| r.clone()).collect();
     let (layer_of, _) = syncdoc_codegraph::graph::layers(graph, &rows);
-    Ok(layer_of
+    layer_of
         .into_iter()
         .map(|(k, v)| {
             let specs = v
@@ -1369,7 +1381,17 @@ async fn layers_of(
                 },
             )
         })
-        .collect())
+        .collect()
+}
+
+/// 항목 없는 함수 key → 층 (MS-008 code_nodes 2a) — 프로젝트 클래스 명세 전부의 층 표를 문서 차례로 잇는다
+async fn layers_of(
+    db: &mut PgConnection,
+    project_id: i32,
+    graph: &CodeGraph,
+) -> Result<HashMap<String, CodeLayer>, Problem> {
+    let rows = layer_rows(&mut *db, project_id).await?;
+    Ok(layers_from(graph, &rows))
 }
 
 /// SYNC-MS-018#queries.code_nodes
@@ -1462,5 +1484,257 @@ pub async fn code_nodes(
         communities,
         functions,
         calls,
+    })
+}
+
+/// 그래프 값의 함수 하나 → `FlowFunction` — 대조·층은 `code_nodes`와 같다 (파이썬 `_flow_function`)
+fn flow_function(
+    f: &serde_json::Value,
+    by_key: &HashMap<&str, &CallDiff>,
+    layer_of: &HashMap<String, CodeLayer>,
+) -> FlowFunction {
+    let text = |k: &str| {
+        f.get(k)
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string)
+    };
+    let key = text("key").unwrap_or_default();
+    let d = by_key.get(key.as_str());
+    let status = d.map(|d| {
+        if !d.code_only.is_empty() {
+            "code_only"
+        } else if !d.spec_only.is_empty() {
+            "spec_only"
+        } else {
+            "same"
+        }
+        .to_string()
+    });
+    let ms = d.map(|d| d.ms_id.clone());
+    FlowFunction {
+        name: text("name").unwrap_or_default(),
+        qual: text("qual").unwrap_or_default(),
+        file: text("file").unwrap_or_default(),
+        line: f
+            .get("line")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        end: f.get("end").and_then(serde_json::Value::as_i64),
+        community: f.get("community").and_then(serde_json::Value::as_i64),
+        item: text("item")
+            .filter(|i| !i.is_empty())
+            .or_else(|| ms.clone()),
+        ms,
+        status,
+        layer: layer_of.get(&key).cloned(),
+        route: f.get("route").cloned().unwrap_or(serde_json::Value::Null),
+        steps: f
+            .get("steps")
+            .and_then(serde_json::Value::as_array)
+            .cloned()
+            .unwrap_or_default(),
+        key,
+    }
+}
+
+fn value_list(v: &serde_json::Value, k: &str) -> Vec<serde_json::Value> {
+    v.get(k)
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// SYNC-MS-018#queries.flow_view
+///
+/// 흐름 보기(UI-19) — 그래프 값의 흐름 키와 층 표, `code_nodes`와 같은 대조·층을 한 번에. 옛 그래프(흐름 키 없음)는 빈 값
+pub async fn flow_view(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+    user: &UserRow,
+) -> Result<FlowView, Problem> {
+    let (project, _) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code, user)
+    .await?;
+    let mut svc = CodeGraphService { db: &mut *db };
+    let (Some(row), Some(g)) = (svc.get(project.id).await?, svc.value(project.id).await?) else {
+        return Ok(FlowView {
+            graph: None,
+            files: Vec::new(),
+            functions: Vec::new(),
+            calls: Vec::new(),
+            http: Vec::new(),
+            infra: serde_json::json!({"nodes": [], "links": []}),
+            units: Vec::new(),
+            layers: Vec::new(),
+            communities: Vec::new(),
+        });
+    };
+    let diffs = diffs_of(&mut *db, project.id, &row.graph).await?;
+    let rows = layer_rows(&mut *db, project.id).await?;
+    let layer_of = layers_from(&row.graph, &rows);
+    let mut by_key: HashMap<&str, &CallDiff> = HashMap::new();
+    for d in diffs.values() {
+        if let Some(f) = d.function.as_deref() {
+            by_key.insert(f, d);
+        }
+    }
+    let functions = value_list(&g, "functions")
+        .iter()
+        .map(|f| flow_function(f, &by_key, &layer_of))
+        .collect();
+    let calls = row
+        .graph
+        .calls
+        .iter()
+        .map(|c| (c.0.clone(), c.1.clone()))
+        .collect();
+    let layers = rows
+        .into_iter()
+        .map(|(doc, r)| CodeLayerRow {
+            doc,
+            name: r.name,
+            patterns: r.patterns,
+            specs: r
+                .specs
+                .into_iter()
+                .map(|x| CodeLayerSpec {
+                    ref_: x.ref_,
+                    note: x.note,
+                })
+                .collect(),
+        })
+        .collect();
+    let communities = row
+        .graph
+        .communities
+        .iter()
+        .flatten()
+        .map(|c| CodeCommunity {
+            id: c.id,
+            label: c.label.clone(),
+            size: c.size,
+        })
+        .collect();
+    Ok(FlowView {
+        graph: Some(graph_info(&row)),
+        files: value_list(&g, "files"),
+        functions,
+        calls,
+        http: value_list(&g, "http"),
+        infra: g
+            .get("infra")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({"nodes": [], "links": []})),
+        units: value_list(&g, "units"),
+        layers,
+        communities,
+    })
+}
+
+/// SYNC-MS-018#queries.flow_of
+///
+/// 함수 하나의 흐름 — 열쇠(`파일:줄`) 또는 MINISPEC 항목 ID로 짚어 호출 순서·라우트, 한 단 아래 함수와
+/// 닿는 장비(MCP get_flow). 그래프가 없거나 그 함수가 없으면 not-found
+pub async fn flow_of(
+    db: &mut PgConnection,
+    repos: &ServerRepos,
+    code: &str,
+    function: &str,
+    user: &UserRow,
+) -> Result<FlowOf, Problem> {
+    let (project, _) = ProjectService {
+        db: &mut *db,
+        repos,
+    }
+    .get_owned(code, user)
+    .await?;
+    let mut svc = CodeGraphService { db: &mut *db };
+    let (Some(row), Some(g)) = (svc.get(project.id).await?, svc.value(project.id).await?) else {
+        return Err(Problem::NotFound {
+            resource: "code_graph".into(),
+            id: code.to_string().into(),
+        });
+    };
+    let fns = value_list(&g, "functions");
+    let s = |f: &serde_json::Value, k: &str| {
+        f.get(k)
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string)
+    };
+    let hit = fns
+        .iter()
+        .find(|f| s(f, "key").as_deref() == Some(function))
+        .or_else(|| {
+            fns.iter().find(|f| {
+                s(f, "ms").as_deref() == Some(function) || s(f, "item").as_deref() == Some(function)
+            })
+        })
+        .cloned();
+    let Some(hit) = hit else {
+        return Err(Problem::NotFound {
+            resource: "function".into(),
+            id: function.to_string().into(),
+        });
+    };
+    let diffs = diffs_of(&mut *db, project.id, &row.graph).await?;
+    let layer_of = layers_of(&mut *db, project.id, &row.graph).await?;
+    let mut by_key: HashMap<&str, &CallDiff> = HashMap::new();
+    for d in diffs.values() {
+        if let Some(f) = d.function.as_deref() {
+            by_key.insert(f, d);
+        }
+    }
+    let by_fn: HashMap<String, &serde_json::Value> = fns
+        .iter()
+        .map(|f| (s(f, "key").unwrap_or_default(), f))
+        .collect();
+    let hit_key = s(&hit, "key").unwrap_or_default();
+    let steps_of = |f: &serde_json::Value| value_list(f, "steps");
+    let mut callees: Vec<&serde_json::Value> = Vec::new();
+    for st in steps_of(&hit) {
+        if let Some(to) = st.get("to").and_then(serde_json::Value::as_str)
+            && to != hit_key
+            && let Some(f) = by_fn.get(to)
+            && !callees.contains(f)
+        {
+            callees.push(f);
+        }
+    }
+    let mut devices: Vec<String> = Vec::new();
+    for f in std::iter::once(&hit).chain(callees.iter().copied()) {
+        for st in steps_of(f) {
+            if let Some(d) = st.get("infra").and_then(serde_json::Value::as_str)
+                && !d.is_empty()
+                && !devices.iter().any(|x| x == d)
+            {
+                devices.push(d.to_string());
+            }
+        }
+    }
+    let nodes = g
+        .get("infra")
+        .map(|i| value_list(i, "nodes"))
+        .unwrap_or_default();
+    let mut node_of: HashMap<String, serde_json::Value> = HashMap::new();
+    for n in nodes {
+        if let Some(id) = n.get("id").and_then(serde_json::Value::as_str) {
+            node_of.insert(id.to_string(), n.clone());
+        }
+    }
+    Ok(FlowOf {
+        graph: Some(graph_info(&row)),
+        function: flow_function(&hit, &by_key, &layer_of),
+        callees: callees
+            .iter()
+            .map(|f| flow_function(f, &by_key, &layer_of))
+            .collect(),
+        infra: devices
+            .iter()
+            .filter_map(|d| node_of.get(d).cloned())
+            .collect(),
     })
 }

@@ -308,7 +308,7 @@ def test_get_stream_stays_open(server):
 
 
 async def test_real_client_connects(server):
-    """실제 MCP 클라이언트(파이썬 SDK)로 — 서버 이름 `syncdoc_local`, 도구 13개"""
+    """실제 MCP 클라이언트(파이썬 SDK)로 — 서버 이름 `syncdoc_local`, 도구 14개(get_flow, 카드 L26)"""
     headers = {"Authorization": f"Bearer {token_for(server)}"}
     async with httpx.AsyncClient(headers=headers, timeout=30) as hc:
         async with streamable_http_client(f"{server.url}/mcp", http_client=hc) as (read, write):
@@ -316,4 +316,4 @@ async def test_real_client_connects(server):
                 init = await s.initialize()
                 assert init.server_info.name == "syncdoc_local"
                 tools = await s.list_tools()
-                assert len(tools.tools) == 13
+                assert len(tools.tools) == 14

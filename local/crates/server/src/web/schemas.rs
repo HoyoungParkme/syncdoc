@@ -18,8 +18,9 @@ use syncdoc_core::types::{
 };
 use syncdoc_core::types::{
     CodeBrief as CodeBriefDto, CodeCalls as CodeCallsDto, CodeFunction as CodeFunctionDto,
-    CodeGraphInfo as CodeGraphInfoDto, CodeNodes as CodeNodesDto, CodeRef as CodeRefDto,
-    CodeText as CodeTextDto, CodeView as CodeViewDto,
+    CodeGraphInfo as CodeGraphInfoDto, CodeLayer as CodeLayerDto, CodeNodes as CodeNodesDto,
+    CodeRef as CodeRefDto, CodeText as CodeTextDto, CodeView as CodeViewDto,
+    FlowFunction as FlowFunctionDto, FlowView as FlowViewDto,
 };
 use syncdoc_core::types::{
     HookStatus as HookStatusDto, RebuildResult as RebuildResultDto, RepoStatus as RepoStatusDto,
@@ -953,6 +954,125 @@ impl From<&CodeNodesDto> for CodeNodes {
                 .calls
                 .iter()
                 .map(|(a, b)| [a.clone(), b.clone()])
+                .collect(),
+        }
+    }
+}
+
+fn code_layer(l: &CodeLayerDto) -> CodeLayer {
+    CodeLayer {
+        name: l.name.clone(),
+        specs: l
+            .specs
+            .iter()
+            .map(|s| CodeLayerSpec {
+                ref_: s.ref_.clone(),
+                note: s.note.clone(),
+            })
+            .collect(),
+    }
+}
+
+/// `CodeLayerRow` — 층 표 한 줄 (카드 L25)
+#[derive(Debug, Serialize)]
+pub struct CodeLayerRow {
+    pub doc: String,
+    pub name: String,
+    pub patterns: Vec<String>,
+    pub specs: Vec<CodeLayerSpec>,
+}
+
+/// `FlowFunction` — 흐름 보기의 함수 하나. `route`·`steps`는 그래프에 든 그대로
+#[derive(Debug, Serialize)]
+pub struct FlowFunction {
+    pub key: String,
+    pub name: String,
+    pub qual: String,
+    pub file: String,
+    pub line: i64,
+    pub end: Option<i64>,
+    pub community: Option<i64>,
+    pub item: Option<String>,
+    pub ms: Option<String>,
+    pub status: Option<String>,
+    pub layer: Option<CodeLayer>,
+    pub route: serde_json::Value,
+    pub steps: Vec<serde_json::Value>,
+}
+
+impl From<&FlowFunctionDto> for FlowFunction {
+    fn from(f: &FlowFunctionDto) -> Self {
+        FlowFunction {
+            key: f.key.clone(),
+            name: f.name.clone(),
+            qual: f.qual.clone(),
+            file: f.file.clone(),
+            line: f.line,
+            end: f.end,
+            community: f.community,
+            item: f.item.clone(),
+            ms: f.ms.clone(),
+            status: f.status.clone(),
+            layer: f.layer.as_ref().map(code_layer),
+            route: f.route.clone(),
+            steps: f.steps.clone(),
+        }
+    }
+}
+
+/// `FlowView` — 흐름 보기(UI-19). 흐름 키는 그래프에 든 그대로 (카드 L25)
+#[derive(Debug, Serialize)]
+pub struct FlowView {
+    pub graph: Option<CodeGraphInfo>,
+    pub files: Vec<serde_json::Value>,
+    pub functions: Vec<FlowFunction>,
+    pub calls: Vec<[String; 2]>,
+    pub http: Vec<serde_json::Value>,
+    pub infra: serde_json::Value,
+    pub units: Vec<serde_json::Value>,
+    pub layers: Vec<CodeLayerRow>,
+    pub communities: Vec<CodeCommunity>,
+}
+
+impl From<&FlowViewDto> for FlowView {
+    fn from(v: &FlowViewDto) -> Self {
+        FlowView {
+            graph: v.graph.as_ref().map(CodeGraphInfo::from),
+            files: v.files.clone(),
+            functions: v.functions.iter().map(FlowFunction::from).collect(),
+            calls: v
+                .calls
+                .iter()
+                .map(|(a, b)| [a.clone(), b.clone()])
+                .collect(),
+            http: v.http.clone(),
+            infra: v.infra.clone(),
+            units: v.units.clone(),
+            layers: v
+                .layers
+                .iter()
+                .map(|r| CodeLayerRow {
+                    doc: r.doc.clone(),
+                    name: r.name.clone(),
+                    patterns: r.patterns.clone(),
+                    specs: r
+                        .specs
+                        .iter()
+                        .map(|s| CodeLayerSpec {
+                            ref_: s.ref_.clone(),
+                            note: s.note.clone(),
+                        })
+                        .collect(),
+                })
+                .collect(),
+            communities: v
+                .communities
+                .iter()
+                .map(|c| CodeCommunity {
+                    id: c.id,
+                    label: c.label.clone(),
+                    size: c.size,
+                })
                 .collect(),
         }
     }

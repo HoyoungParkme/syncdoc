@@ -14,7 +14,7 @@ use syncdoc_pycompat::re::compile;
 use crate::{Call, CallDiff, CodeGraphFailed, Function, Graph, Layer, LayerRow, LayerSpec};
 
 /// graphify가 읽는 코드 파일 — 이것이 바뀐 커밋만 그래프를 다시 만든다 (UC-S8 1a)
-const CODE_EXTS: [&str; 27] = [
+pub(crate) const CODE_EXTS: [&str; 27] = [
     ".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".go", ".rs", ".java", ".kt", ".scala", ".rb",
     ".php", ".cs", ".c", ".h", ".cpp", ".hpp", ".swift", ".lua", ".ex", ".exs", ".jl", ".sh",
     ".sql", ".vue", ".svelte",
