@@ -527,7 +527,7 @@ syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 | 백업 암호 | OpenPGP 대칭 암호(rpgp — SEIPDv1·AES256). `gpg --symmetric`과 서로 풀린다(카드 L16) | Docker 묶음의 백업(6.1, gpg)을 되살리고, 설치형의 백업을 `gpg -d`로도 푼다 |
 | 화면 | 같은 React 빌드(`npm run build`)를 실행 파일에 담는다. `/specs`·템플릿 사본도 담는다 | 화면은 하나다([[#C11]]) |
 | 트레이·자동 시작 | tray-icon(윈도 메시지 루프 · 리눅스 StatusNotifierItem, GTK 없이) · 윈도 사용자 시작 프로그램(HKCU Run) · 리눅스 XDG autostart(`~/.config/autostart`) | [[SYNC-PRD-001#R15]]. 트레이는 데스크톱 세션이 있어야 뜬다 — 그래서 리눅스는 데스크톱 로그인 때 켜는 XDG autostart다(사용자 결정 2026-10-08) |
-| 기록 도구 | 같은 실행 파일의 하위 명령 `trace`·`trace-web`(clap). 기록기(Python `sitecustomize`·`syncdoc_tracer.py`, Node 로더 `*.mjs`와 typescript, 브라우저 런타임, Rust 도우미 모듈)를 실행 파일에 담아 쓸 때 데이터 자리 밖 임시 폴더에 푼다 · 올리기는 reqwest | [[#C12]]·[[#C13]]. 싱크독_깃허브 사용자도 이 파일 하나로 기록한다 — 서버는 켜지 않아도 된다. 9.9 |
+| 기록 도구 | 같은 실행 파일의 하위 명령 `trace`·`trace-web`(clap). 기록기(Python `sitecustomize`·`syncdoc_tracer.py`, Node 로더 `*.mjs`와 typescript, 브라우저 런타임, Rust 도우미 모듈, Java JDI 디버거 `SyncdocJdi.java`, Go 도우미 패키지 `syncdoctrace.go`)를 실행 파일에 담아 쓸 때 데이터 자리 밖 임시 폴더에 푼다 · 올리기는 reqwest | [[#C12]]·[[#C13]]. 싱크독_깃허브 사용자도 이 파일 하나로 기록한다 — 서버는 켜지 않아도 된다. 9.9 |
 | 설치 파일 | 윈도 NSIS setup.exe · 리눅스 .deb·AppImage. GitHub Actions의 윈도·리눅스 러너가 만든다. 서명은 없다 | Rust용 MSI 도구(WiX v3)는 지원이 끝났다 |
 
 ### 9.3 데이터 자리
@@ -582,8 +582,8 @@ syncdoc-local trace-web --to <서버> --project <코드> --target http://localho
 
 - **토큰** — `SYNCDOC_TOKEN` 환경 변수, 없으면 터미널에서 묻는다(화면에 찍지 않는다). 저장하지 않는다
 - **준비** — 서버에서 프로젝트 그래프의 함수 범위(파일·시작·끝 줄·열쇠)·라우트·장비 주소와 커밋을 받는다(`GET /api/projects/{code}/trace-spans`). 작업 사본(`--cwd`)이 git이면 HEAD를 그 커밋과 비교해 다르면 한 줄로 알린다
-- **언어 알아보기** — 띄울 명령의 첫 낱말과 `--cwd`의 파일로 — `python`·`uv`·`uvicorn`·`gunicorn`·`flask`·`celery`·`manage.py` → Python · `node`·`npm`·`pnpm`·`yarn`·`tsx`·`next` → Node · `cargo` → Rust. 모르면 끝낸다
-- **붙이기** — Python은 `PYTHONPATH` 앞에 기록기 폴더, Node는 `NODE_OPTIONS`에 `--import` 로더, Rust는 `--cwd`의 작업 공간을 임시 폴더에 사본으로 떠서 함수 첫머리에 도우미 호출을 넣고 사본에서 띄운다. 공통 환경 변수 `SYNCDOC_TRACE_SPANS`(범위 파일)·`SYNCDOC_TRACE_OUT`(기록 폴더)·`SYNCDOC_TRACE_JOB`(작업이면 1)
+- **언어 알아보기** — 띄울 명령의 첫 낱말과 `--cwd`의 파일로 — `python`·`uv`·`uvicorn`·`gunicorn`·`flask`·`celery`·`manage.py` → Python · `node`·`npm`·`pnpm`·`yarn`·`tsx`·`next` → Node · `cargo` → Rust · `mvn`·`mvnw`·`gradle`·`gradlew`·`java` → Java · `go` → Go(앞의 것이 이긴다, 카드 L34). 모르면 끝낸다
+- **붙이기** — Python은 `PYTHONPATH` 앞에 기록기 폴더, Node는 `NODE_OPTIONS`에 `--import` 로더, Rust는 `--cwd`의 작업 공간을 임시 폴더에 사본으로 떠서 함수 첫머리에 도우미 호출을 넣고 사본에서 띄운다. Java는 JDK(jdk.jdi 모듈, `SYNCDOC_JAVA_HOME`→`JAVA_HOME`→PATH)로 JDI 디버거를 먼저 띄우고 `JAVA_TOOL_OPTIONS`에 jdwp 에이전트(대상이 디버거에 붙는다, `suspend=y`)를 더한다 — 그래프 메서드의 첫 위치에만 중단점을 걸어 그 메서드만 느려진다. 바이트코드도 코드도 고치지 않는다. Go는 그래프 함수 첫머리에 `defer` 도우미 호출을 끼운 사본과 도우미 패키지를 캐시 자리에 쓰고 `GOFLAGS=-overlay=`로 빌드가 원본 대신 보게 한다(원본은 그대로, 줄 번호도 같다). 공통 환경 변수 `SYNCDOC_TRACE_SPANS`(범위 파일)·`SYNCDOC_TRACE_OUT`(기록 폴더)·`SYNCDOC_TRACE_JOB`(작업이면 1)
 - **모으기와 올리기** — 기록기는 요청·작업 하나가 끝나면 기록 하나를 기록 폴더에 JSON으로 쓴다(Rust 도우미도 파일로 — 표준 라이브러리만). 도구가 폴더를 지켜보다가 새 파일을 `POST /api/projects/{code}/traces`로 올리고 지운다. 실패하면 세 번 다시 보내고 그래도 안 되면 한 줄 알리고 버린다
 - **끝내기** — 띄운 프로그램이 끝나면 남은 기록을 올리고 끝난다. Ctrl+C는 프로그램에 넘긴다. 임시 폴더(기록기)는 지운다. Rust 사본과 빌드 폴더는 캐시 자리에 두고 다음에 다시 쓴다(처음부터 빌드하지 않게, 카드 L29)
 - **브라우저**(`trace-web`) — Node.js로 돈다(화면 개발 서버가 이미 Node다). `--port`(기본 3124)에 프록시를 열어 `--target`으로 넘기고, HTML에 브라우저 런타임을 끼우고 화면 모듈에 계측을 넣는다. 화면 기록은 「화면」 표시로 같은 길로 올린다

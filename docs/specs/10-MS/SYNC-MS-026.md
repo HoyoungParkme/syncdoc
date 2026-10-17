@@ -20,7 +20,9 @@ upstream: [SYNC-DOM-004, SYNC-MS-024, SYNC-MS-022, SYNC-INFRA-001]
 - 매개변수 기본값의 Depends — `default_parameter`·`typed_default_parameter`의 값
 - 변수 표의 주석 이름 — `ast.walk`처럼 너비 우선으로 처음 만나는 이름
 
-**정규식** — 파이썬 판이 `re.ASCII`로 쓴 표는 `\w`·`\d`·`\s`를 ASCII 꼴로 바꿔 컴파일한다(regex crate의 `\w`는 유니코드다). 글자 공백 접기(steps 6)만 파이썬 `str.split()`의 공백(유니코드 — `syncdoc_pycompat`의 표)이다.
+**Java·Go**(카드 L33) — 파이썬 판과 같은 판의 문법(`tree-sitter-java` 0.23.5 · `tree-sitter-go` 0.25.0)으로 같은 노드를 읽는다. 파서와 타입 읽기는 보강([[SYNC-MS-022#codegraph.enrich]])의 `java.rs`·`go.rs`를 같이 쓴다. Go import 경로의 `/vN` 떼기는 regex crate에 앞보기가 없어 `/`로 나눈 조각(첫 조각 말고) 중 `v` + 십진 숫자인 것을 뺀다 — 파이썬 `/v\d+(?=/|$)`와 같다.
+
+**정규식** — 파이썬 판이 `re.ASCII`로 쓴 표는 `\w`·`\d`·`\s`를 ASCII 꼴로 바꿔 컴파일한다(regex crate의 `\w`는 유니코드다). `\b`는 `(?-u:\b)`로 쓴다. 글자 공백 접기(steps 6)만 파이썬 `str.split()`의 공백(유니코드 — `syncdoc_pycompat`의 표)이다.
 
 **표기** — `→` 반환·결과, `·` 같은 단계 안 구분.
 

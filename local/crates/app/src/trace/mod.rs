@@ -1,7 +1,10 @@
 //! 기록 도구 — `syncdoc-local trace`·`trace-web` 하위 명령 (SYNC-INFRA-001 9.9 · SYNC-MS-027, 카드 L29).
 //! 사용자 프로그램을 기록기와 함께 띄우고, 기록을 개인 토큰으로 서버(두 판 어느 쪽이든)에 올린다. 서버(앱)를 켜지 않는다.
-//! 기록기(Python·Node·브라우저·Rust 도우미)는 실행 파일에 담겨 있다가 임시 폴더에 풀린다. view_arc `trace.mts`를 옮겼다.
+//! 기록기(Python·Node·브라우저·Rust 도우미·Java 디버거·Go 도우미)는 실행 파일에 담겨 있다가 임시 폴더에 풀린다.
+//! view_arc `trace.mts`를 옮겼다.
 
+mod go_copy;
+mod jdi;
 mod rust_copy;
 
 use std::collections::BTreeMap;
@@ -14,6 +17,8 @@ use clap::Parser;
 use rust_embed::RustEmbed;
 use serde_json::{Map, Value, json};
 
+pub use go_copy::{go_overlay, instrument_go};
+pub use jdi::{java_setup, table_lines as java_table};
 pub use rust_copy::{copy_rust, instrument as instrument_rust, mask as mask_rust};
 
 #[derive(RustEmbed)]
@@ -139,11 +144,14 @@ pub enum Lang {
     Python,
     Node,
     Rust,
+    Java,
+    Go,
 }
 
 /// SYNC-MS-027#trace.detect
 ///
-/// 띄울 명령의 낱말(경로를 뗀 이름)로 — cargo → Rust, 파이썬 실행기 → Python, node·npm 따위 → Node. 모르면 없음
+/// 띄울 명령의 낱말(경로·`.exe`·`.cmd`·`.bat`을 뗀 이름)로 — cargo → Rust, 파이썬 실행기 → Python, node·npm 따위 → Node,
+/// mvn·gradle·java → Java, go → Go. 앞의 것이 이긴다. 모르면 없음
 pub fn detect(command: &[String]) -> Option<Lang> {
     let words: Vec<String> = command
         .iter()
@@ -154,7 +162,9 @@ pub fn detect(command: &[String]) -> Option<Lang> {
         })
         .map(|w| {
             let base = w.rsplit(['/', '\\']).next().unwrap_or(&w).to_string();
-            base.strip_suffix(".exe")
+            [".exe", ".cmd", ".bat"]
+                .iter()
+                .find_map(|x| base.strip_suffix(x))
                 .map(str::to_string)
                 .unwrap_or(base)
         })
@@ -183,6 +193,10 @@ pub fn detect(command: &[String]) -> Option<Lang> {
         "node", "npm", "npx", "pnpm", "yarn", "tsx", "ts-node", "next", "nodemon", "bun",
     ]) {
         Some(Lang::Node)
+    } else if any(&["mvn", "mvnw", "gradle", "gradlew", "java"]) {
+        Some(Lang::Java)
+    } else if any(&["go"]) {
+        Some(Lang::Go)
     } else {
         None
     }
@@ -202,6 +216,12 @@ impl Kit {
     }
     pub fn rust_helper(&self) -> PathBuf {
         self.dir.join("rust").join("syncdoc_trace.rs")
+    }
+    pub fn java_debugger(&self) -> PathBuf {
+        self.dir.join("java").join("SyncdocJdi.java")
+    }
+    pub fn go_helper(&self) -> PathBuf {
+        self.dir.join("go").join("syncdoctrace.go")
     }
 }
 
@@ -675,7 +695,7 @@ pub async fn run(args: TraceArgs) -> ExitCode {
         .unwrap_or_else(|| PathBuf::from("."));
     let Some(lang) = detect(&args.command) else {
         say(
-            "띄울 명령의 언어를 모른다 — Python(uv·python·uvicorn…)·Node(npm·node·tsx…)·Rust(cargo)만 기록한다",
+            "띄울 명령의 언어를 모른다 — Python(uv·python·uvicorn…)·Node(npm·node·tsx…)·Rust(cargo)·Java(mvn·gradle·java)·Go(go)만 기록한다",
         );
         return ExitCode::from(2);
     };
@@ -710,6 +730,43 @@ pub async fn run(args: TraceArgs) -> ExitCode {
     }
     let mut env = env_for(lang, &kit, &spans_path, &out, &p.root, args.job);
     let mut run_cwd = cwd.clone();
+    let mut debugger: Option<tokio::process::Child> = None;
+    if lang == Lang::Java {
+        match java_setup(&kit, &table, tmp.path(), &out, args.job).await {
+            Ok(j) => {
+                say(&format!(
+                    "Java 디버거(JDI)가 127.0.0.1:{}에서 JVM을 기다린다 — JVM이 붙을 때 잠깐 멈췄다 이어 간다",
+                    j.port
+                ));
+                env.extend(j.env);
+                debugger = Some(j.child);
+            }
+            Err(e) => {
+                say(&e);
+                return ExitCode::from(2);
+            }
+        }
+    }
+    if lang == Lang::Go {
+        match go_setup(&kit, &table, &p.root) {
+            Ok((overlay, n)) => {
+                say(&format!(
+                    "Go 파일 {n}개를 계측한 사본으로 빌드한다 — 원본은 그대로 ({})",
+                    overlay.display()
+                ));
+                let flag = format!("-overlay={}", overlay.display());
+                let goflags = match std::env::var("GOFLAGS") {
+                    Ok(old) if !old.trim().is_empty() => format!("{flag} {old}"),
+                    _ => flag,
+                };
+                env.push(("GOFLAGS".into(), goflags));
+            }
+            Err(e) => {
+                say(&e);
+                return ExitCode::from(2);
+            }
+        }
+    }
     if lang == Lang::Rust {
         match rust_setup(&kit, &table, &cwd, &p.root) {
             Ok((dir, target, n)) => {
@@ -735,6 +792,8 @@ pub async fn run(args: TraceArgs) -> ExitCode {
             Lang::Python => "Python",
             Lang::Node => "Node",
             Lang::Rust => "Rust",
+            Lang::Java => "Java",
+            Lang::Go => "Go",
         },
         base(&args.to),
         args.project
@@ -763,7 +822,9 @@ pub async fn run(args: TraceArgs) -> ExitCode {
             }
         }
     };
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    // Java 디버거는 JVM이 끝난 뒤 열린 기록을 닫아 쓴다 — 조금 더 기다린다
+    let settle = if debugger.is_some() { 1500 } else { 300 };
+    tokio::time::sleep(Duration::from_millis(settle)).await;
     watch(
         &p.client,
         &out,
@@ -773,17 +834,15 @@ pub async fn run(args: TraceArgs) -> ExitCode {
         p.commit.as_deref(),
     )
     .await;
+    if let Some(mut d) = debugger {
+        let _ = d.kill().await;
+    }
     drop(tmp);
     ExitCode::from(u8::try_from(code).unwrap_or(1))
 }
 
-/// Rust 사본 — 사본과 빌드 폴더는 캐시 자리에 두고 다시 쓴다(매번 처음부터 빌드하지 않게)
-fn rust_setup(
-    kit: &Kit,
-    table: &SpanTable,
-    cwd: &Path,
-    root: &Path,
-) -> Result<(PathBuf, PathBuf, usize), String> {
+/// 캐시 자리 — 저장소 뿌리마다 하나(Rust 사본·빌드 폴더, Go 겹침)
+fn cache_for(root: &Path) -> (PathBuf, String) {
     let cache = directories::ProjectDirs::from("", "", "syncdoc-local")
         .map(|d| d.cache_dir().to_path_buf())
         .unwrap_or_else(std::env::temp_dir)
@@ -794,6 +853,35 @@ fn rust_setup(
         root.hash(&mut h);
         format!("{:016x}", h.finish())
     };
+    (cache, id)
+}
+
+/// Go 겹침 — 계측한 사본과 도우미 패키지는 캐시 자리에. → (겹침 JSON, 계측한 파일 수)
+fn go_setup(kit: &Kit, table: &SpanTable, root: &Path) -> Result<(PathBuf, usize), String> {
+    if which("go").is_none() {
+        return Err("Go 실행 기록에는 Go 도구가 필요하다 — https://go.dev/dl".into());
+    }
+    let (cache, id) = cache_for(root);
+    let helper = std::fs::read_to_string(kit.go_helper()).map_err(|e| e.to_string())?;
+    let routes: std::collections::HashSet<String> =
+        table.routes.iter().map(|r| r.0.clone()).collect();
+    let o = go_overlay(
+        &table.files,
+        &routes,
+        &helper,
+        &cache.join(format!("{id}-go")),
+    )?;
+    Ok((o.json, o.instrumented))
+}
+
+/// Rust 사본 — 사본과 빌드 폴더는 캐시 자리에 두고 다시 쓴다(매번 처음부터 빌드하지 않게)
+fn rust_setup(
+    kit: &Kit,
+    table: &SpanTable,
+    cwd: &Path,
+    root: &Path,
+) -> Result<(PathBuf, PathBuf, usize), String> {
+    let (cache, id) = cache_for(root);
     let helper_src = std::fs::read_to_string(kit.rust_helper()).map_err(|e| e.to_string())?;
     let q = |s: &str| serde_json::to_string(s).unwrap_or_default();
     let routes: Vec<String> = table
@@ -935,6 +1023,9 @@ mod tests {
         );
         assert_eq!(detect(&c("npm run dev")), Some(Lang::Node));
         assert_eq!(detect(&c("cargo run -p svc")), Some(Lang::Rust));
+        assert_eq!(detect(&c("./mvnw spring-boot:run")), Some(Lang::Java));
+        assert_eq!(detect(&c("gradlew.bat bootRun")), Some(Lang::Java));
+        assert_eq!(detect(&c("go run ./cmd/api")), Some(Lang::Go));
         assert_eq!(detect(&c("./server")), None);
     }
 
@@ -990,5 +1081,6 @@ mod tests {
                 .is_file()
         );
         assert!(kit.rust_helper().is_file());
+        assert!(kit.java_debugger().is_file() && kit.go_helper().is_file());
     }
 }

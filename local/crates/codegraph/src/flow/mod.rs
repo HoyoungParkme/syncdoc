@@ -174,7 +174,7 @@ pub(crate) fn ascii(pattern: &str, ignore_case: bool) -> Regex {
     Regex::new(&format!("{flags}{out}")).expect("흐름 정규식")
 }
 
-/// 파일 확장자의 세 갈래 — 파이썬 `py` · TS/JS `ts` · Rust `rs`
+/// 파일 확장자의 다섯 갈래 — 파이썬 `py` · TS/JS `ts` · Rust `rs` · Java `java` · Go `go`
 pub(crate) fn lang_of(file: &str) -> Option<&'static str> {
     if file.ends_with(".py") {
         Some("py")
@@ -185,6 +185,10 @@ pub(crate) fn lang_of(file: &str) -> Option<&'static str> {
         Some("ts")
     } else if file.ends_with(".rs") {
         Some("rs")
+    } else if file.ends_with(".java") {
+        Some("java")
+    } else if file.ends_with(".go") {
+        Some("go")
     } else {
         None
     }

@@ -469,3 +469,205 @@ def test_infra_links_split_by_server_dir(tmp_path: Path) -> None:
     ) not in links
     servers = [n for n in g["infra"]["nodes"] if n["kind"] == "backend"]
     assert servers[0]["host"] == "localhost:8000" and servers[1]["host"] is None
+
+
+# ── Java·Go (카드 CN) ──
+JAVA = """\
+package com.ex;
+
+@RestController
+@RequestMapping("/api/items")
+public class ItemController {
+    private final ItemRepository repo;
+    private final JdbcTemplate jdbc;
+
+    @GetMapping("/{id:\\\\d+}")
+    public Item read(long id) {
+        Runnable r = () -> helper(id);
+        if (id < 0) {
+            throw new IllegalArgumentException("bad " + id);
+        }
+        this.jdbc.query("select 1");
+        return repo.findById(id).orElse(helper(id));
+    }
+
+    @RequestMapping(value = "/", method = RequestMethod.POST)
+    public Item make() {
+        return new Item(1);
+    }
+
+    @RequestMapping(path = {"/any"})
+    public void any() {}
+
+    private Item helper(long id) {
+        return null;
+    }
+}
+
+interface ItemRepository extends JpaRepository<Item, Long> {
+}
+
+class Item {
+    Item(long id) {}
+}
+"""
+
+GO = """\
+package main
+
+import (
+	"database/sql"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+)
+
+type Server struct {
+	db  *sql.DB
+	rdb *redis.Client
+}
+
+func (s *Server) list(c *gin.Context) {
+	rows, err := s.db.Query("select 1")
+	_ = rows
+	if err != nil {
+		return
+	}
+	defer s.rdb.Close()
+	go func() { helper() }()
+	s.rdb.Get(c, "k")
+	resp, _ := http.Get("https://x")
+	_ = resp
+	helper()
+}
+
+func helper() int {
+	return 1
+}
+
+func hello(w http.ResponseWriter, r *http.Request) {}
+
+func main() {
+	s := &Server{}
+	r := gin.Default()
+	api := r.Group("/api")
+	api.GET("/items/:id", s.list)
+	http.HandleFunc("POST /hello/{rest...}", hello)
+	r.Run(":9090")
+}
+"""
+
+
+def _jg(tmp_path: Path) -> dict:
+    j, go = "svc/src/main/java/com/ex/ItemController.java", "gosvc/main.go"
+    _write(tmp_path, {j: JAVA, go: GO})
+    funcs = [_fn(j, 9, "read"), _fn(j, 19, "make"), _fn(j, 24, "any"), _fn(j, 27, "helper"),
+             _fn(j, 36, "Item"), _fn(go, 16, "list"), _fn(go, 30, "helper"),
+             _fn(go, 34, "hello"), _fn(go, 36, "main")]  # fmt: skip
+    calls = [[f"{j}:9", f"{j}:27", "enrich"], [f"{j}:19", f"{j}:36", "enrich"],
+             [f"{go}:16", f"{go}:30", "enrich"]]  # fmt: skip
+    return {"functions": funcs, "calls": calls, "files": [{"path": j}, {"path": go}]}
+
+
+def test_steps_java_lambda_throw_new_and_this(tmp_path: Path) -> None:
+    g = _jg(tmp_path)
+    steps.steps(tmp_path, g)
+    by = {f["key"].split("/")[-1]: f["steps"] for f in g["functions"]}
+    read = [(s["k"], s["label"], s.get("to", "").rsplit(":", 1)[-1] or None, s.get("deferred"))
+            for s in by["ItemController.java:9"]]  # fmt: skip
+    assert read == [
+        ("call", "helper", "27", True),  # 람다 안
+        ("call", "new IllegalArgumentException", None, None),
+        ("raise", 'throw new IllegalArgumentException("bad " + id)', None, None),
+        ("call", "this.jdbc.query", None, None),
+        ("call", "repo.findById", None, None),
+        ("call", "helper", "27", None),
+        ("call", "repo.findById(id).orElse", None, None),
+        ("return", "return repo.findById(id).orElse(helper(id))", None, None),
+    ]
+    make = by["ItemController.java:19"]
+    assert make[0] == {"k": "call", "line": 21, "label": "new Item", "to": g["functions"][4]["key"]}
+
+
+def test_steps_go_defer_go_and_return(tmp_path: Path) -> None:
+    g = _jg(tmp_path)
+    steps.steps(tmp_path, g)
+    lst = next(f for f in g["functions"] if f["key"] == "gosvc/main.go:16")["steps"]
+    got = [(s["k"], s["label"], s.get("deferred")) for s in lst]
+    assert got == [
+        ("call", "s.db.Query", None),
+        ("return", "return", None),
+        ("call", "s.rdb.Close", True),
+        ("call", "helper", True),
+        ("call", "func() { helper() }", True),
+        ("call", "s.rdb.Get", None),
+        ("call", "http.Get", None),
+        ("call", "helper", None),
+    ]
+    assert lst[-1]["to"] == "gosvc/main.go:30" and "inferred" not in lst[-1]
+
+
+def test_routes_java_spring_and_go_gin_net_http(tmp_path: Path) -> None:
+    g = _jg(tmp_path)
+    routes.routes(tmp_path, g)
+    got = {f["key"].split("/")[-1]: f["route"] for f in g["functions"]}
+    assert got["ItemController.java:9"] == {"method": "GET", "path": "/api/items/{id}"}
+    assert got["ItemController.java:19"] == {"method": "POST", "path": "/api/items"}
+    assert got["ItemController.java:24"] == {"method": "ANY", "path": "/api/items/any"}
+    assert got["ItemController.java:27"] is None
+    assert got["main.go:16"] == {"method": "GET", "path": "/api/items/{id}"}  # Group 접두어 · :id
+    assert got["main.go:34"] == {"method": "POST", "path": "/hello/{rest}"}  # Go 1.22 꼴
+
+
+def test_units_spring_and_go(tmp_path: Path) -> None:
+    _write(tmp_path, {
+        "svc/pom.xml": "<project><parent><artifactId>spring-boot-starter-parent</artifactId>"
+                       "</parent></project>",
+        "svc/mvnw": "",
+        "svc/src/main/resources/application.yml": "server:\n  port: ${PORT:8081}\n",
+        "gsvc/build.gradle": "plugins { id 'org.springframework.boot' version '3' }\n",
+        "plain/pom.xml": "<project></project>",
+        "gosvc/go.mod": "module ex.com/g\n\nrequire github.com/gin-gonic/gin v1.10.0\n",
+        "gosvc/cmd/api/main.go": 'package main\n\nfunc main() { r.Run(":9090") }\n',
+        "gosvc/cmd/api/main_test.go": "package main\nfunc main() {}\n",
+        "cli/go.mod": "module ex.com/cli\n",
+        "cli/main.go": "package main\n\nfunc main() {}\n",
+    })  # fmt: skip
+    got = {u["dir"]: u for u in infra.units(tmp_path, {"functions": []})}
+    assert got["svc"] == {"name": "svc", "kind": "server", "dir": "svc", "lang": "java",
+                          "framework": "Spring Boot", "command": "./mvnw spring-boot:run",
+                          "port": 8081}  # fmt: skip
+    assert (got["gsvc"]["command"], got["gsvc"]["port"]) == ("gradle bootRun", 8080)
+    assert got["gosvc"] == {"name": "gosvc", "kind": "server", "dir": "gosvc", "lang": "go",
+                            "framework": "Gin", "command": "go run ./cmd/api",
+                            "port": 9090}  # fmt: skip
+    assert "plain" not in got and "cli" not in got  # net/http를 안 가져오는 main은 서버가 아니다
+
+
+def test_infra_java_go_calls_and_deps(tmp_path: Path) -> None:
+    g = _jg(tmp_path)
+    _write(tmp_path, {
+        "svc/pom.xml": "<dependencies><dependency><groupId>org.postgresql</groupId>"
+                       "<artifactId>postgresql</artifactId></dependency></dependencies>",
+        "gosvc/go.mod": "module ex.com/g\n\nrequire (\n\tgithub.com/redis/go-redis/v9 v9.5.0\n)\n",
+    })  # fmt: skip
+    g["units"], g["http"] = [], []
+    steps.steps(tmp_path, g)
+    infra.infra(tmp_path, g)
+    marks = {f["key"].split("/")[-1]: [(s["label"], s.get("infra")) for s in f["steps"]
+                                       if s["k"] == "call"] for f in g["functions"]}  # fmt: skip
+    assert ("this.jdbc.query", "infra:db") in marks["ItemController.java:9"]
+    assert ("repo.findById", "infra:db") in marks["ItemController.java:9"]  # JpaRepository
+    assert ("new IllegalArgumentException", None) in marks["ItemController.java:9"]
+    assert ("s.db.Query", "infra:db") in marks["main.go:16"]  # 받는 쪽 구조체 필드
+    assert ("s.rdb.Get", "infra:redis") in marks["main.go:16"]
+    assert ("s.rdb.Close", None) in marks["main.go:16"]  # io에 안 맞는다
+    assert ("http.Get", "infra:http") in marks["main.go:16"]
+    nodes = {n["id"]: n for n in g["infra"]["nodes"]}
+    assert nodes["infra:db"]["evidence"] == [
+        "코드: jdbc, spring-data, database/sql — svc/src/main/java/com/ex/ItemController.java 외 1개 파일",
+        "의존성: org.postgresql:postgresql — svc/pom.xml",
+    ]
+    assert "의존성: github.com/redis/go-redis/v9 — gosvc/go.mod" in nodes["infra:redis"]["evidence"]
+    assert "infra:backend" in nodes

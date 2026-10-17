@@ -6,7 +6,7 @@ import type { FlowUnit, TraceBrief } from '../api/client'
 import type { CodeGraph } from './types'
 import type { Branch } from './TracePanel'
 
-const TRACEABLE = new Set(['python', 'typescript', 'javascript', 'rust'])
+const TRACEABLE = new Set(['python', 'typescript', 'javascript', 'rust', 'java', 'go'])
 
 /** 5.2 — 실행 단위마다 기록 도구 명령 */
 function command(unit: FlowUnit, code: string, to: string): string | null {

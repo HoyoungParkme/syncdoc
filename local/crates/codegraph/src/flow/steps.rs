@@ -447,6 +447,152 @@ fn rs_events(fn_node: Node, src: &[u8]) -> Vec<Ev> {
     out
 }
 
+// ---------------------------------------------------------------- Java·Go (카드 L33)
+
+/// 줄 → 정의 — 선언의 첫 줄(Java는 어노테이션 줄부터, Go는 `func` 줄). 같은 줄이면 앞선 것
+pub(crate) fn start_defs<'t>(root: Node<'t>, kinds: &[&str]) -> HashMap<i64, Node<'t>> {
+    let mut found: Vec<Node> = walk(root)
+        .into_iter()
+        .filter(|n| kinds.contains(&n.kind()))
+        .collect();
+    found.sort_by_key(|n| n.start_byte());
+    let mut out = HashMap::new();
+    for n in found {
+        out.entry(row(n)).or_insert(n);
+    }
+    out
+}
+
+const JAVA_FN: [&str; 2] = ["method_declaration", "constructor_declaration"];
+const GO_FN: [&str; 2] = ["function_declaration", "method_declaration"];
+const JAVA_SKIP: [&str; 5] = [
+    "class_body",
+    "class_declaration",
+    "interface_declaration",
+    "enum_declaration",
+    "record_declaration",
+];
+
+fn java_events(fn_node: Node, src: &[u8]) -> Vec<Ev> {
+    let mut out = Vec::new();
+    let Some(body) = fn_node.child_by_field_name("body") else {
+        return out;
+    };
+    fn first(n: Node) -> Option<Node> {
+        named_children(n)
+            .into_iter()
+            .find(|c| c.kind() != "line_comment" && c.kind() != "block_comment")
+    }
+    fn visit(n: Node, src: &[u8], deferred: bool, out: &mut Vec<Ev>) {
+        let k = n.kind();
+        if k == "lambda_expression" {
+            if let Some(b) = n.child_by_field_name("body") {
+                visit(b, src, true, out);
+            }
+            return;
+        }
+        if JAVA_SKIP.contains(&k) {
+            return;
+        }
+        match k {
+            "method_invocation" => {
+                if let Some(name) = n.child_by_field_name("name") {
+                    let l =
+                        String::from_utf8_lossy(&src[n.start_byte()..name.end_byte()]).into_owned();
+                    let ident = Some((text(name, src), n.child_by_field_name("object").is_none()));
+                    out.push(ev(n, "call", &l, ident, deferred, false));
+                }
+            }
+            "object_creation_expression" => {
+                if let Some(ty) = n.child_by_field_name("type") {
+                    let ident = crate::java::jtype(Some(ty), src).map(|t| (t, true));
+                    let l = format!("new {}", text(ty, src));
+                    out.push(ev(n, "call", &l, ident, deferred, false));
+                }
+            }
+            "return_statement" if !deferred => {
+                let l = match first(n) {
+                    Some(v) => format!("return {}", text(unparen(v), src)),
+                    None => "return".into(),
+                };
+                out.push(ev(n, "return", &l, None, false, false));
+            }
+            "throw_statement" if !deferred => {
+                let l = match first(n) {
+                    Some(v) => format!("throw {}", text(unparen(v), src)),
+                    None => "throw".into(),
+                };
+                out.push(ev(n, "raise", &l, None, false, false));
+            }
+            _ => {}
+        }
+        for c in children(n) {
+            visit(c, src, deferred, out);
+        }
+    }
+    visit(body, src, false, &mut out);
+    out
+}
+
+fn go_ident(f: Node, src: &[u8]) -> Option<(String, bool)> {
+    let f = unparen(f);
+    match f.kind() {
+        "identifier" => Some((text(f, src), true)),
+        "selector_expression" => f
+            .child_by_field_name("field")
+            .map(|x| (text(x, src), false)),
+        _ => None,
+    }
+}
+
+fn go_events(fn_node: Node, src: &[u8]) -> Vec<Ev> {
+    let mut out = Vec::new();
+    let Some(body) = fn_node.child_by_field_name("body") else {
+        return out;
+    };
+    fn visit(n: Node, src: &[u8], deferred: bool, out: &mut Vec<Ev>) {
+        match n.kind() {
+            "func_literal" => {
+                if let Some(b) = n.child_by_field_name("body") {
+                    visit(b, src, true, out);
+                }
+                return;
+            }
+            "go_statement" | "defer_statement" => {
+                for c in children(n) {
+                    visit(c, src, true, out);
+                }
+                return;
+            }
+            "call_expression" => {
+                if let Some(f) = n.child_by_field_name("function") {
+                    out.push(ev(
+                        n,
+                        "call",
+                        &text(unparen(f), src),
+                        go_ident(f, src),
+                        deferred,
+                        false,
+                    ));
+                }
+            }
+            "return_statement" if !deferred => {
+                let l = match first_value(n) {
+                    Some(v) => format!("return {}", text(v, src)),
+                    None => "return".into(),
+                };
+                out.push(ev(n, "return", &l, None, false, false));
+            }
+            _ => {}
+        }
+        for c in children(n) {
+            visit(c, src, deferred, out);
+        }
+    }
+    visit(body, src, false, &mut out);
+    out
+}
+
 // ---------------------------------------------------------------- 묶기
 
 /// 파일의 정의 줄 → 그 정의의 사건들. 못 읽으면 빈 사전
@@ -471,13 +617,31 @@ fn events_of(lang: &str, file: &str, src: &[u8]) -> HashMap<i64, Vec<Ev>> {
                 .map(|(ln, n)| (ln, ts_events(n, src)))
                 .collect()
         }
-        _ => {
+        "rs" => {
             let Some(tree) = rs_parse(src) else {
                 return HashMap::new();
             };
             rs_defs(tree.root_node())
                 .into_iter()
                 .map(|(ln, n)| (ln, rs_events(n, src)))
+                .collect()
+        }
+        "java" => {
+            let Some(tree) = crate::java::parse(src) else {
+                return HashMap::new();
+            };
+            start_defs(tree.root_node(), &JAVA_FN)
+                .into_iter()
+                .map(|(ln, n)| (ln, java_events(n, src)))
+                .collect()
+        }
+        _ => {
+            let Some(tree) = crate::go::parse(src) else {
+                return HashMap::new();
+            };
+            start_defs(tree.root_node(), &GO_FN)
+                .into_iter()
+                .map(|(ln, n)| (ln, go_events(n, src)))
                 .collect()
         }
     }

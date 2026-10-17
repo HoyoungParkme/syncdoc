@@ -174,7 +174,7 @@ export function toCodeGraph(view: FlowView, name: string): CodeGraph {
     framework: u.framework ?? '',
     ...(u.command ? { run: { cmd: u.command, cwd: u.dir, from: '목록 파일' } } : {}),
     ...(u.port ? { port: u.port } : {}),
-    trace: ['python', 'typescript', 'javascript', 'rust'].includes(u.lang) ? 'ready' : 'none',
+    trace: ['python', 'typescript', 'javascript', 'rust', 'java', 'go'].includes(u.lang) ? 'ready' : 'none',
   }))
   const fns = view.functions
   return {

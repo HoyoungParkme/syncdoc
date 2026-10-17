@@ -30,7 +30,7 @@ static ITEM_ID: LazyLock<Regex> = LazyLock::new(|| compile(r"^([A-Z][A-Z0-9]*-[A
 static MS_DOC: LazyLock<Regex> = LazyLock::new(|| compile(r"^[A-Z][A-Z0-9]*-MS-\d+#"));
 static TEST_FILE: LazyLock<Regex> = LazyLock::new(|| {
     compile(
-        r"(^|/)(tests?|__tests__)/|(^|/)(test_[^/]*|[^/]*_test)\.py$|\.(test|spec)\.[jt]sx?$|(^|/)conftest\.py$",
+        r"(^|/)(tests?|__tests__)/|(^|/)(test_[^/]*|[^/]*_test)\.py$|\.(test|spec)\.[jt]sx?$|(^|/)conftest\.py$|_test\.go$",
     )
 });
 static REF: LazyLock<Regex> = LazyLock::new(|| compile(r"\[\[([^\]]+)\]\]"));

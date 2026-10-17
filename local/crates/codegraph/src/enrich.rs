@@ -1,4 +1,4 @@
-//! 보강 — 파이썬·TS/JS·화면 ID·Rust (SYNC-MS-022#codegraph.enrich · MS-011 enrich 1~6).
+//! 보강 — 파이썬·TS/JS·화면 ID·Rust·Java·Go (SYNC-MS-022#codegraph.enrich · MS-011 enrich 1~6).
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::Path;
@@ -11,7 +11,7 @@ use syncdoc_pycompat::re::compile;
 use crate::graph::{item_of, module};
 use crate::python::{self, Ctx, PyFile};
 use crate::ts::TS_EXTS;
-use crate::{Call, Function, Graph, rust, ts};
+use crate::{Call, Function, Graph, go, java, rust, ts};
 
 /// 화면 코드 파일 첫 주석의 화면 ID — 그 파일 함수 전부의 item (MS-011 enrich 3)
 static SCREEN_ID: LazyLock<Regex> = LazyLock::new(|| compile(r"[A-Z][A-Z0-9]*-UI-\d{3}#UI-\d+"));
@@ -57,7 +57,7 @@ fn screen_items(src_dir: &Path, funcs: &mut [Function]) {
 /// SYNC-MS-022#codegraph.enrich
 ///
 /// 파이썬 파일을 다시 읽어 끝 줄·이름·항목 ID를 바로잡고 graphify가 놓친 호출을 더한다. TS/JS는 끝 줄·빠진 맨 위
-/// 함수·호출, 화면 코드는 첫 주석의 화면 ID, Rust는 정의·항목 ID·호출을 다 채운다. 다른 언어는 손대지 않는다
+/// 함수·호출, 화면 코드는 첫 주석의 화면 ID, Rust·Java·Go는 정의·항목 ID·호출을 다 채운다. 다른 언어는 손대지 않는다
 pub fn enrich(src_dir: &Path, graph: Graph) -> Graph {
     let mut graph = graph;
     let seen = std::mem::take(&mut graph.files);
@@ -165,6 +165,18 @@ pub fn enrich(src_dir: &Path, graph: Graph) -> Graph {
         .cloned()
         .collect();
     rust::enrich(src_dir, &mut graph, &rs_seen); // 2e~2h
+    let java_seen: Vec<String> = seen
+        .iter()
+        .filter(|x| x.ends_with(".java"))
+        .cloned()
+        .collect();
+    java::enrich(src_dir, &mut graph, &java_seen); // 2i·2j
+    let go_seen: Vec<String> = seen
+        .iter()
+        .filter(|x| x.ends_with(".go"))
+        .cloned()
+        .collect();
+    go::enrich(src_dir, &mut graph, &go_seen); // 2k·2l
     let file_imports: Vec<_> = trees
         .iter()
         .map(|(file, t)| python::imports(&python::top_imports(t), file, &ctx, &t.src))

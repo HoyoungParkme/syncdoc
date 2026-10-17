@@ -400,11 +400,11 @@ def test_enrich_resolves_five_forms_and_fixes_names(tmp_path: Path) -> None:
 
 
 def test_enrich_skips_other_languages_and_broken_files(tmp_path: Path) -> None:
-    (tmp_path / "a.go").write_text("package a\nfunc F() {}\n", encoding="utf-8")
+    (tmp_path / "a.rb").write_text("def f\nend\n", encoding="utf-8")
     (tmp_path / "bad.py").write_text("def (:\n", encoding="utf-8")
-    g = {"functions": [_fn("a.go", 2, "F"), _fn("bad.py", 1, "x")], "calls": []}
+    g = {"functions": [_fn("a.rb", 1, "f"), _fn("bad.py", 1, "x")], "calls": []}
     cg.enrich(tmp_path, g)
-    assert [f["qual"] for f in g["functions"]] == ["", ""]  # Go·깨진 파이썬은 손대지 않는다
+    assert [f["qual"] for f in g["functions"]] == ["", ""]  # Ruby·깨진 파이썬은 손대지 않는다
     assert [f["end"] for f in g["functions"]] == [None, None]
     assert [f["item"] for f in g["functions"]] == [None, None]  # 화면 ID 없는 파일은 그대로
 
@@ -675,6 +675,233 @@ async def test_enrich_rs_keys_match_graphify_nodes_so_communities_attach(tmp_pat
     g = cg.communities(raw, cg.enrich(src, cg.reduce(raw)))
     rust = [f for f in g["functions"] if f["file"].endswith(".rs")]
     assert len(rust) >= 8 and all(f["community"] is not None for f in rust)
+
+
+# ── enrich — Java·Go (MS-011 enrich 2i~2l, 카드 CM) ──
+CONTROLLER_JAVA = """package com.ex.web;
+
+import com.ex.svc.ItemService;
+
+@RestController
+public class ItemController {
+    private final ItemService service;
+
+    public ItemController(ItemService service) {
+        this.service = service;
+    }
+
+    /**
+     * SYNC-MS-001#items.read
+     * 둘째 줄은 항목이 아니다
+     */
+    @GetMapping("/{id}")
+    public Item read(long id) {
+        Runnable r = new Runnable() {
+            public void run() { helper(); }
+        };
+        var audit = new Audit();
+        audit.log(id);
+        this.service.find(id);
+        Audit.stamp();
+        return check(id);
+    }
+
+    // SYNC-MS-001#items.check
+    private Item check(long id) {
+        Helper h = null;
+        h.go();
+        return null;
+    }
+
+    static class Inner {
+        void deep() { }
+    }
+}
+"""
+
+SERVICE_JAVA = """package com.ex.svc;
+
+public class ItemService {
+    public Item find(long id) {
+        return find(id, 0);
+    }
+
+    public Item find(long id, int v) {
+        return null;
+    }
+}
+
+class Audit {
+    Audit() { }
+    void log(long id) { }
+    static void stamp() { }
+}
+
+interface Helper {
+    void go();
+    default void twice() { go(); go(); }
+}
+"""
+
+
+def _java_src(tmp_path: Path) -> list[str]:
+    files = {"src/main/java/com/ex/web/ItemController.java": CONTROLLER_JAVA,
+             "src/main/java/com/ex/svc/ItemService.java": SERVICE_JAVA,
+             "src/test/java/com/ex/ItemTest.java": "class ItemTest { void t() { } }\\n",
+             "src/main/java/com/ex/Broken.java": "class (((\\n"}  # fmt: skip
+    for rel, body in files.items():
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text(body, encoding="utf-8")
+    return list(files)
+
+
+def test_enrich_java_defs_items_and_calls(tmp_path: Path) -> None:
+    files = _java_src(tmp_path)
+    g = {"functions": [], "calls": [], "files": files}
+    cg.enrich(tmp_path, g)
+    ctl, svc = (
+        "src/main/java/com/ex/web/ItemController.java",
+        "src/main/java/com/ex/svc/ItemService.java",
+    )
+    by = {f["key"]: f for f in g["functions"]}
+    # 2i — key는 어노테이션 줄부터, 생성자 이름은 클래스, 중첩 타입의 qual은 가장 안쪽 타입
+    read = by[f"{ctl}:17"]
+    assert (read["qual"], read["end"], read["item"], read["ms"]) == (
+        "ItemController.read",
+        27,
+        "SYNC-MS-001#items.read",
+        "SYNC-MS-001#items.read",
+    )
+    assert by[f"{ctl}:9"]["qual"] == "ItemController.ItemController"
+    assert by[f"{ctl}:30"]["item"] == "SYNC-MS-001#items.check"  # `//` 주석
+    assert by[f"{ctl}:37"]["qual"] == "Inner.deep"
+    assert by[f"{svc}:14"]["qual"] == "Audit.Audit"
+    quals = {f["qual"] for f in g["functions"]}
+    assert "Helper.twice" in quals and "Helper.go" not in quals  # 몸통 없는 선언은 아니다
+    assert "ItemController.run" not in quals and "Runnable.run" not in quals  # 익명 클래스
+    assert not any(f["file"].endswith(("ItemTest.java", "Broken.java")) for f in g["functions"])
+    # 2j — 필드 타입(this.x) · var x = new T() · 정적 T.m() · new T() · 같은 타입 m() · 매개변수·지역 타입 ·
+    # 오버로드는 다 잇는다
+    enriched = {(a, b) for a, b, via in g["calls"] if via == "enrich"}
+    find1, find2 = f"{svc}:4", f"{svc}:8"
+    assert {(read["key"], find1), (read["key"], find2), (read["key"], f"{svc}:14"),
+            (read["key"], f"{svc}:15"), (read["key"], f"{svc}:16"), (read["key"], f"{ctl}:30"),
+            (find1, find2)} <= enriched  # fmt: skip
+    assert not any(a == f"{ctl}:30" for a, _ in enriched)  # h.go() — go는 몸통이 없다
+    assert (find1, find1) not in enriched  # 제 자신은 잇지 않는다
+    assert "files" not in g
+
+
+def test_enrich_java_drops_simple_name_defined_twice(tmp_path: Path) -> None:
+    for rel in ("a/Dup.java", "b/Dup.java"):
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text("class Dup { void m() { } }\n", encoding="utf-8")
+    (tmp_path / "C.java").write_text(
+        "class C { void c(Dup d) { d.m(); new Dup(); } }\n", encoding="utf-8"
+    )
+    g = {"functions": [], "calls": [], "files": ["a/Dup.java", "b/Dup.java", "C.java"]}
+    cg.enrich(tmp_path, g)
+    assert len(g["functions"]) == 3 and g["calls"] == []
+
+
+async def test_enrich_java_keys_match_graphify_nodes(tmp_path: Path) -> None:
+    """key의 줄이 graphify Java 노드의 줄과 같다 — 두 노드가 생기지 않고 커뮤니티가 붙는다."""
+    _java_src(tmp_path)
+    (tmp_path / "src/main/java/com/ex/Broken.java").unlink()
+    _source, raw = await cg.load(tmp_path)
+    g = cg.communities(raw, cg.enrich(tmp_path, cg.reduce(raw)))
+    java = [f for f in g["functions"] if f["file"].endswith(".java")]
+    keys = [f["key"] for f in java]
+    assert (
+        len(keys) == len(set(keys)) and len({(f["file"], f["qual"]) for f in java}) == len(java) - 1
+    )
+    assert all(f["community"] is not None for f in java)
+
+
+GO_MOD = "module example.com/shop\n\ngo 1.22\n"
+
+MAIN_GO = """package main
+
+import (
+	"net/http"
+
+	st "example.com/shop/store"
+	"example.com/shop/util"
+)
+
+// SYNC-MS-001#svc.hello
+// 둘째 줄은 항목이 아니다
+func hello(w http.ResponseWriter, r *http.Request) {
+	s := &st.Store{}
+	_ = s
+	st.Open()
+	util.Clean()
+	greet()
+	var c Cart
+	c.Add()
+	go func() { greet() }()
+}
+
+func greet() {}
+
+type Cart struct{}
+
+func (c *Cart) Add() {
+	c.Sum()
+}
+
+func (c Cart) Sum() int { return 0 }
+
+func main() {
+	http.HandleFunc("/hello", hello)
+	h := Cart{}
+	h.Add()
+}
+"""
+
+STORE_GO = """package store
+
+type Store struct{}
+
+// Open — 가게를 연다
+func Open() *Store { return &Store{} }
+
+func (s *Store) Get(k string) string { return k }
+"""
+
+
+def test_enrich_go_defs_items_and_calls(tmp_path: Path) -> None:
+    files = {"go.mod": GO_MOD, "cmd/main.go": MAIN_GO, "store/store.go": STORE_GO,
+             "store/store_test.go": "package store\nfunc TestX() {}\n"}  # fmt: skip
+    for rel, body in files.items():
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text(body, encoding="utf-8")
+    g = {"functions": [], "calls": [], "files": [r for r in files if r.endswith(".go")]}
+    cg.enrich(tmp_path, g)
+    by = {f["key"]: f for f in g["functions"]}
+    hello = by["cmd/main.go:12"]
+    assert (hello["qual"], hello["end"], hello["item"], hello["ms"]) == (
+        "main.hello",
+        21,
+        "SYNC-MS-001#svc.hello",
+        "SYNC-MS-001#svc.hello",
+    )
+    assert by["cmd/main.go:27"]["qual"] == "Cart.Add"  # 포인터 받는 쪽
+    assert by["cmd/main.go:31"]["qual"] == "Cart.Sum"
+    assert by["store/store.go:6"]["qual"] == "store.Open"
+    assert by["store/store.go:6"]["item"] is None  # 항목 ID가 아닌 주석
+    assert by["store/store.go:8"]["qual"] == "Store.Get"
+    assert not any(f["file"].endswith("_test.go") for f in g["functions"])
+    enriched = {(a, b) for a, b, via in g["calls"] if via == "enrich"}
+    # 2l — 같은 폴더 함수 · go.mod 모듈의 다른 패키지(별칭) · var x T 뒤 x.m · 받는 쪽 · x := T{} 뒤 x.m
+    assert enriched == {
+        ("cmd/main.go:12", "store/store.go:6"),
+        ("cmd/main.go:12", "cmd/main.go:23"),
+        ("cmd/main.go:12", "cmd/main.go:27"),
+        ("cmd/main.go:27", "cmd/main.go:31"),
+        ("cmd/main.go:33", "cmd/main.go:27"),
+    }  # util은 저장소에 없는 폴더, HandleFunc의 hello는 값이지 호출이 아니다
+    assert "files" not in g
 
 
 def test_spec_calls_reads_only_the_calls_line() -> None:

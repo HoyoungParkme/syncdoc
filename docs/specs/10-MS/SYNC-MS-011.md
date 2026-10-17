@@ -96,7 +96,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 근거: 사용자 결정 2026-09-30 — DB에 줄인 모양으로(싱크독 저장소 4.6 MB → 454 KB)
 
 **처리**
-1. 함수 = `_callable`이 참이고 `_callable_class`가 아닌 노드. `file` = `source_file`, `line` = `source_location`의 `L` 뒤 숫자, `key` = `f"{file}:{line}"`, `name` = `label`에서 앞 `.`과 뒤 `()`를 뗀 것. **테스트 파일의 노드는 함수가 아니다** — 테스트는 구현이 아니라 대조에서 뺀다. 테스트 파일은 경로에 `tests/`·`test/`·`__tests__/` 단이 있거나, 이름이 `test_*.py`·`*_test.py`·`*.test.*`·`*.spec.*`(js·jsx·ts·tsx)·`conftest.py`인 것 — [[#codegraph.communities]]도 같은 판정
+1. 함수 = `_callable`이 참이고 `_callable_class`가 아닌 노드. `file` = `source_file`, `line` = `source_location`의 `L` 뒤 숫자, `key` = `f"{file}:{line}"`, `name` = `label`에서 앞 `.`과 뒤 `()`를 뗀 것. **테스트 파일의 노드는 함수가 아니다** — 테스트는 구현이 아니라 대조에서 뺀다. 테스트 파일은 경로에 `tests/`·`test/`·`__tests__/` 단이 있거나, 이름이 `test_*.py`·`*_test.py`·`*.test.*`·`*.spec.*`(js·jsx·ts·tsx)·`conftest.py`·`*_test.go`인 것(Java는 `src/test/` 단으로 걸린다) — [[#codegraph.communities]]도 같은 판정
 2. `qual` — 메서드면 `method` 선으로 매단 클래스 노드의 이름을 붙여 `Class.fn`, 아니면 `모듈.fn`. 모듈 이름은 파일 이름에서 확장자를 뗀 것이고, 그것이 `service`·`__init__`·`index`면 **그 폴더 이름** — `core/codegraph/service.py`의 함수는 `codegraph.x`
 3. `item` — `rationale_for` 선으로 붙은 docstring 노드의 라벨이 `^[A-Z][A-Z0-9]*-[A-Z]+-\d+#\S+`로 시작하면 그 ID(공백 앞까지 — `SYNC-API-001#GET/api/docs/{docId} — 설명`에서 ` — ` 앞). 아니면 null. `ms` — `item`이 `-MS-` 문서의 항목이면 같은 값, 아니면 null(카드 BJ — 전에는 MINISPEC ID만 읽었다)
 4. `calls` = `calls`·`indirect_call` 선 중 양 끝이 1의 함수인 것 → `[from_key, to_key, "graphify"]`. 같은 쌍은 하나로
@@ -107,7 +107,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 ---
 
-#### codegraph.enrich 파이썬·TS/JS·Rust 코드로 그래프를 보강한다
+#### codegraph.enrich 파이썬·TS/JS·Rust·Java·Go 코드로 그래프를 보강한다
 
 **시그니처** `def enrich(src_dir: Path, graph: dict) -> dict`
 
@@ -115,7 +115,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 
 **입력** `graph` — `reduce`의 결과. `src_dir` — 같은 커밋의 파일
 
-**처리** — `graph.functions` 중 `.py` 파일(1·2·4·5)과 `.ts/.tsx/.js/.jsx/.mjs` 파일(2a~2d·3), 그리고 `.rs` 파일(2e~2h)만. TS/JS와 Rust는 `graph.functions`의 파일에 더해 `reduce`가 준 `files`의 그 언어 파일도 읽는다 — graphify가 객체 리터럴 안 화살표만 든 파일(`export const api = { get: () => … }`)을 함수 0개로 놓쳐도 그 파일을 다시 읽는다(#282, 2026-10-02 사용자 결정 「graphify가 읽은 파일 전부」). `files`는 다 쓴 뒤 그래프에서 지운다. 다른 언어(Go 등)는 손대지 않는다. 보강은 **더하기만** 한다 — graphify가 준 함수·선을 지우지 않는다
+**처리** — `graph.functions` 중 `.py` 파일(1·2·4·5)과 `.ts/.tsx/.js/.jsx/.mjs` 파일(2a~2d·3), `.rs` 파일(2e~2h), `.java` 파일(2i·2j), `.go` 파일(2k·2l)만. TS/JS·Rust·Java·Go는 `graph.functions`의 파일에 더해 `reduce`가 준 `files`의 그 언어 파일도 읽는다 — graphify가 객체 리터럴 안 화살표만 든 파일(`export const api = { get: () => … }`)을 함수 0개로 놓쳐도 그 파일을 다시 읽는다(#282, 2026-10-02 사용자 결정 「graphify가 읽은 파일 전부」). `files`는 다 쓴 뒤 그래프에서 지운다. 다른 언어(Kotlin 등)는 손대지 않는다. 보강은 **더하기만** 한다 — graphify가 준 함수·선을 지우지 않는다
 1. 파일마다 `ast.parse`. 함수 정의를 `(파일, def 줄)`과 `(파일, 첫 데코레이터 줄)` 둘로 찾아 그래프의 함수에 맞춘다(graphify가 어느 줄을 머리로 삼든 맞는다). 못 맞춘 정의는 새 함수로 더한다
 2. 맞춘 함수마다 `end` = `end_lineno` · `qual` = AST로 본 `Class.fn`/`모듈.fn`(2단계 규칙과 같다) · docstring 첫 줄이 항목 ID(`reduce` 3의 정규식)면 `item`을 그것으로, `-MS-` 문서면 `ms`도(AST가 진실)
 2a. TS/JS — 파일마다 tree-sitter(`tree-sitter-typescript` — graphify가 이미 쓰는 문법. `.tsx`·`.jsx`는 TSX, 나머지는 TypeScript 문법)로 읽는다. **맨 위 정의**: `[export [default]] function f` · `const f = (…) => …` / `function` · `class C { m() }` → `C.m` · `const o = { m() {}, k: () => … }` → `o.m`·`o.k`. 머리 줄은 선언문의 첫 줄과 함수 노드의 첫 줄 둘로 그래프의 함수에 맞추고, 못 맞춘 정의는 새 함수로 더한다(`item`·`ms` null)
@@ -126,12 +126,16 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-STD-001]
 2f. 정의 바로 앞의 문서 주석(`///` — 사이의 속성 `#[…]`은 건너뛴다) 첫 줄이 항목 ID(`reduce` 3의 정규식)면 `item`, `-MS-` 문서면 `ms`도
 2g. 이름표 — 모듈 경로(파일의 `src/` 아래 경로. `crate::infra::git`은 `infra::git`·`git` 꼬리로 찾고, 두 파일에 겹치는 꼬리는 뺀다) → 파일 · 파일의 맨 위 `fn` · 타입의 메서드 · 구조체 필드의 타입(`&`·`Arc`·`Box`·`Rc`·`Option`을 벗긴 이름) · 파일 맨 위 `use`(별칭 `as`·묶음 `{a, b as c}`·`crate`·`self`·`super`)
 2h. 맨 위 정의의 몸통에서 `f(…)`(같은 파일이나 `use`한 함수) · `T::m`·`Self::m`·`모듈::f`(경로 — 부르든 값으로 넘기든) · `x.m(…)`(타입을 아는 `x` — 인자 `x: T`·`&T`·`&mut T`, `let x: T`, `let x = T::…(…)`·`T { … }`(`?`·`.await`를 벗겨), `self`, `self.필드`) → 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다. 트레이트 객체·제네릭 인자·매크로 안 호출은 풀지 않는다([[SYNC-STD-004#DEV-16]] Rust)
+2i. Java — 파일마다 tree-sitter(`tree-sitter-java`)로 읽는다(테스트 파일은 뺀다). **정의**: 클래스·인터페이스·enum·record 선언(중첩 포함)의 몸통에 있는, 몸통이 있는 메서드와 생성자 — 메서드 몸통 안(익명 클래스·람다)은 정의로 보지 않는다. key는 `파일:선언 첫 줄`(어노테이션·수식어가 든 줄부터 — graphify Java 노드의 줄과 같다) · 이름 = 메서드 이름, 생성자는 클래스 이름 · `qual` = `가장 안쪽 타입.이름` · `end` = 선언 끝 줄 · 선언 바로 앞의 주석(`/** … */`·`/* … */`·`//` 묶음) 첫 줄(주석 기호와 앞 `*`를 뗀 첫 빈 줄 아닌 줄)이 항목 ID면 `item`, `-MS-` 문서면 `ms`도 · 못 맞춘 정의는 새 함수로 더한다
+2j. Java 호출 — 이름표: 타입 단순 이름 → 메서드 이름 → key들(오버로드는 다). 두 파일에 같은 단순 이름의 타입이 있으면 그 이름은 쓰지 않는다. 정의 몸통에서 `m(…)`·`this.m(…)` → 같은 타입의 `m` · `x.m(…)` — `x`의 타입을 알 때(필드 선언, 매개변수, 지역 변수 선언 `T x = …`, `var x = new T(…)`, `this.x`) → `T.m` · `T.m(…)`(타입 이름 — 정적) → `T.m` · `new T(…)` → `T`의 생성자 → 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 제네릭은 떼고(`List<T>` → `List`) 이름표에 없는 타입은 잇지 않는다
+2k. Go — 파일마다 tree-sitter(`tree-sitter-go`)로 읽는다(테스트 `_test.go`는 뺀다). **정의**: 파일 맨 위 `func f` → `패키지.f`(패키지 = `package` 줄의 이름) · `func (r *T) m` → `T.m`(포인터·제네릭을 뗀다). key는 `파일:func 줄` · `end` = 선언 끝 줄 · 바로 앞 `//` 주석 묶음 첫 줄이 항목 ID면 `item`·`ms`
+2l. Go 호출 — 같은 폴더가 한 패키지다. 이름표: 폴더 → 함수 이름 → key · 폴더 → 타입 → 메서드 → key · 저장소의 `go.mod` 모듈 경로로 import 경로 → 폴더(별칭 `x "…"`이면 그 이름, 아니면 경로 끝). 정의 몸통에서 `f(…)` → 같은 폴더의 `f` · `p.F(…)` — `p`가 저장소 안 패키지를 가리키는 import면 그 폴더의 `F` · `x.m(…)` — `x`의 타입을 알 때(받는 쪽 `r`, 매개변수 `x T`·`x *T`, `x := T{…}`·`&T{…}`, `var x T`) → 같은 폴더 `T.m` → 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 인터페이스 값·고루틴 안 클로저 호출은 풀지 않는다
 3. 화면 코드 — 파일마다 **첫 주석**(맨 위 `/** … */` 또는 `//` 묶음)에서 `[A-Z][A-Z0-9]*-UI-\d{3}#UI-\d+`를 찾아, 그 파일 함수 중 `item`이 없는 것 전부에 준다(`ms`는 건드리지 않는다). 화면 하나 = 파일 하나(DEV-17)라 파일 단위로 잇는다. 첫 주석에 화면 ID가 없는 파일(공용 부품·뷰 렌더러)은 그대로 null. 2026-10-02 사용자 결정, 카드 BJ
 4. 함수 몸통에서 **타입을 아는 변수**를 모은다 — 인자 주석 `x: Cls` · `x = Cls(…)` · `a, b = A(…), B(…)`. `Cls`는 이 그래프 안에 정의된 클래스 이름일 때만. 그리고 **타입을 아는 속성** — 클래스 `__init__`의 `self.x = Cls(…)`(또는 `self.x: Cls = …`)는 그 클래스 메서드 전부에서 `self.x`의 타입이다(카드 BM — 서비스가 리포지토리를 `self.repo`로 들고 부르는 134곳이 그래프에 없어 리포지토리 93개 중 89개가 외톨이였다)
 5. 호출 `x.m(…)`(4의 변수) · `Cls(…).m(…)` · `Cls.m(…)`(클래스 이름으로 — 정적·클래스 메서드) · `self.m(…)`(메서드 안) · `self.x.m(…)`(4의 속성) → `Cls.m`이 그래프에 있으면 `[이 함수, 그 함수, "enrich"]`. 이미 있는 선이면 더하지 않는다. `Cls`는 파이썬 파일에 정의된 클래스뿐이다(1의 이름표) — `Cls.m(…)`은 graphify도 잇지만, 같은 이름의 타입이 다른 언어에도 있으면(Rust 판의 `AccountService`, [[SYNC-INFRA-001#C11]]) 「모호하다」며 버린다. 두 구현은 같은 이름을 쓰므로(STD-001 2.10) 파이썬 이름표로 다시 잇는다(#336)
 6. `→ graph` (같은 객체에 더해 돌려준다)
 
-**테스트 관점** 다섯 꼴이 각각 선을 만든다 — 주석·대입·튜플 대입·즉석 생성·`self` · `__init__`의 `self.repo = Repo(…)` 뒤 다른 메서드의 `self.repo.get(…)` → `Repo.get` · `Cls.m(…)` — 같은 이름의 Rust 타입이 있어 graphify가 버려도 파이썬 메서드로 잇는다(#336) · 모르는 클래스는 안 만든다 · graphify가 이미 잡은 선은 겹치지 않는다 · 데코레이터 달린 함수도 맞춘다 · MINISPEC docstring ID가 `item`·`ms`로, API docstring ID는 `item`만 · `.tsx` 첫 주석의 화면 ID가 그 파일 함수 전부의 `item`으로(`ms`는 null), 화면 ID 없는 파일은 null · TS/JS — 맨 위 함수의 끝 줄·qual(function·const 화살표·class 메서드·객체 리터럴 메서드와 화살표) · graphify가 놓친 맨 위 정의를 더하고 화면 ID도 받는다 · 중첩 함수는 끝 줄만, 지우지 않는다 · graphify가 함수 0개로 본 TS 파일도 `files`로 읽어 `api.get`과 그 선을 더하고, 결과에 `files`가 남지 않는다(#282) · 같은 파일·상대 import(별칭·default·`index`)·JSX·`o.m` 호출이 `enrich` 선으로 · 패키지 import는 안 잇는다 · 깨진 파일은 건너뛴다 · **Rust** — 맨 위 `fn`과 `impl` 메서드(제네릭 타입·트레이트 impl)의 qual·끝 줄, `///` 첫 줄의 항목(속성을 건너), key가 graphify Rust 노드의 줄과 같다 · `#[cfg(test)]` 모듈 안 함수는 없다 · `Self::m`·`self.m`·`self.필드.m`·`T::m`·`모듈::f`·`use` 별칭·`let x = T::new()` 뒤 `x.m` 호출이 `enrich` 선으로 · 모르는 타입은 잇지 않는다 · 결과에 `files`가 남지 않는다
+**테스트 관점** 다섯 꼴이 각각 선을 만든다 — 주석·대입·튜플 대입·즉석 생성·`self` · `__init__`의 `self.repo = Repo(…)` 뒤 다른 메서드의 `self.repo.get(…)` → `Repo.get` · `Cls.m(…)` — 같은 이름의 Rust 타입이 있어 graphify가 버려도 파이썬 메서드로 잇는다(#336) · 모르는 클래스는 안 만든다 · graphify가 이미 잡은 선은 겹치지 않는다 · 데코레이터 달린 함수도 맞춘다 · MINISPEC docstring ID가 `item`·`ms`로, API docstring ID는 `item`만 · `.tsx` 첫 주석의 화면 ID가 그 파일 함수 전부의 `item`으로(`ms`는 null), 화면 ID 없는 파일은 null · TS/JS — 맨 위 함수의 끝 줄·qual(function·const 화살표·class 메서드·객체 리터럴 메서드와 화살표) · graphify가 놓친 맨 위 정의를 더하고 화면 ID도 받는다 · 중첩 함수는 끝 줄만, 지우지 않는다 · graphify가 함수 0개로 본 TS 파일도 `files`로 읽어 `api.get`과 그 선을 더하고, 결과에 `files`가 남지 않는다(#282) · 같은 파일·상대 import(별칭·default·`index`)·JSX·`o.m` 호출이 `enrich` 선으로 · 패키지 import는 안 잇는다 · 깨진 파일은 건너뛴다 · **Rust** — 맨 위 `fn`과 `impl` 메서드(제네릭 타입·트레이트 impl)의 qual·끝 줄, `///` 첫 줄의 항목(속성을 건너), key가 graphify Rust 노드의 줄과 같다 · `#[cfg(test)]` 모듈 안 함수는 없다 · `Self::m`·`self.m`·`self.필드.m`·`T::m`·`모듈::f`·`use` 별칭·`let x = T::new()` 뒤 `x.m` 호출이 `enrich` 선으로 · 모르는 타입은 잇지 않는다 · 결과에 `files`가 남지 않는다 · **Java** — 메서드·생성자의 key(어노테이션 줄)·qual·끝 줄, Javadoc 첫 줄 항목 · 메서드 안 익명 클래스는 정의가 아니다 · 같은 타입·필드 타입·지역 변수·`var x = new T()`·정적·`new T()` 호출이 선으로 · 같은 단순 이름의 타입이 둘이면 안 잇는다 · **Go** — `func`·메서드의 key·qual(`패키지.f`·`T.m`)·끝 줄, `//` 첫 줄 항목 · `_test.go`는 없다 · 같은 폴더 함수·`go.mod` 모듈의 다른 패키지(별칭 포함)·받는 쪽·매개변수 타입의 메서드 호출이 선으로
 
 ---
 
