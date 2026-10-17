@@ -298,12 +298,12 @@ pub async fn get(&mut self, project_id: i32) -> Result<Option<CodeGraphRow>, Pro
 
 **시그니처**
 ```rust
-pub async fn save(&mut self, project_id: i32, commit_hash: &str, source: &str, graph: &Graph) -> Result<CodeGraphRow, Problem>
+pub async fn save(&mut self, project_id: i32, commit_hash: &str, source: &str, graph: &Value) -> Result<CodeGraphRow, Problem>
 ```
 
-근거: [[SYNC-MS-011#CodeGraphService.save]]
+근거: [[SYNC-MS-011#CodeGraphService.save]] · [[SYNC-MS-026]] 0장 — 흐름 키는 `Graph` 구조체 밖의 값이다
 
-**처리** [[SYNC-MS-011#CodeGraphService.save]]와 같다 — 행이 없으면 만들고, 있으면 커밋·출처·그래프·함수 수·선 수·`built_at=now`를 한 번에, `error`는 비운다
+**처리** [[SYNC-MS-011#CodeGraphService.save]]와 같다 — 행이 없으면 만들고, 있으면 커밋·출처·그래프·함수 수·선 수·`built_at=now`를 한 번에, `error`는 비운다. 그래프는 직렬화한 값(흐름 키 포함)을 그대로 넣고, 함수 수·선 수는 그 값의 `functions`·`calls` 길이다. 읽을 때(`get`)는 `Graph`로 읽는다 — 흐름 키는 건너뛰고, 흐름의 `files`(객체 목록)는 줄이기의 `files`(이름 목록)로 읽지 않는다
 
 **테스트 관점** 두 번 저장하면 행 하나, 뒤의 것 · 앞의 `error`가 지워진다 · 개수 열이 맞다
 
