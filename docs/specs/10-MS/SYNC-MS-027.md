@@ -310,6 +310,8 @@ pub fn go_overlay(files: &[(PathBuf, Vec<Span>)], routes: &HashSet<String>, help
 
 **도우미**(`tracers/go/syncdoctrace.go`, 표준 라이브러리만) — `Enter(열쇠, 이름, 값…)`·`Exit`. 고루틴별 스택으로 부모, 빈 스택에서 `*http.Request`를 받은 함수(gin·echo 문맥의 요청 포함)가 들어오면 요청 기록(실제 메서드·경로·쿼리), `SYNCDOC_TRACE_JOB=1`이면 그 밖 맨 위 함수가 작업 기록. 상태는 응답 값의 `status` 필드(net/http·gin·echo). 값은 reflect로 필드만, 비밀 이름은 `***`. 이름은 `SYNCDOC_TRACE_SPANS`의 이름 표. 시각은 밀리초까지
 
+**호출하는 것** [[#trace.instrument_go]]
+
 **테스트 관점** E2E — `GET /sum/{n}` 두 번 → 기록 둘(200), 다른 패키지 함수까지 사건 · `token` 인자가 `***` · 작업 사본이 그대로
 
 ---
