@@ -392,6 +392,9 @@ def steps(src_dir: Path, graph: dict) -> dict:
     for f in funcs:
         f["steps"] = []
         by_file[f["file"]].append(f)
+    # 호출마다 마지막 이름 — 장비 판정(infra.infra)이 쓰고 flow.extend가 지운다. 결과에 안 나간다
+    idents: dict[str, list[str | None]] = {}
+    graph["_idents"] = idents
 
     for file, fs in by_file.items():
         lang = _lang(file)
@@ -414,6 +417,7 @@ def steps(src_dir: Path, graph: dict) -> dict:
                 continue
             evs = sorted(evs, key=lambda e: e.order)[:MAX_STEPS]
             f["steps"] = [_step(e, f["key"], lang, out_edges, by_name, name_of) for e in evs]
+            idents[f["key"]] = [e.ident if e.k == "call" else None for e in evs]
     return graph
 
 

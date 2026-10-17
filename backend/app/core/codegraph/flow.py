@@ -103,6 +103,7 @@ def extend(src_dir: Path, graph: dict) -> dict:
     except Exception:
         log.exception("flow infra")
         graph["infra"] = {"nodes": [], "links": []}
+    graph.pop("_idents", None)
     for f in graph["functions"]:
         f.setdefault("route", None)
         # 대상도 장비도 없는 호출은 뺀다 — 재생에 쓸 데가 없고 그래프가 커진다 (MS-024 extend 7)

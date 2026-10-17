@@ -35,6 +35,8 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-MS-011, SYNC-INFRA-001
 
 **테스트 파일** — [[SYNC-MS-011#codegraph.reduce]] 1의 판정과 같다. 흐름에서 뺀다(`files`에도 없다).
 
+**걷는 차례와 정규식** — 폴더를 걸을 때는 이름의 바이트 순이다(파일 시스템 차례에 기대지 않는다). 표의 정규식은 view_arc(JS)의 것을 옮겼다 — `\w`·`\d`·`\s`는 ASCII 뜻이고(파이썬 `re.ASCII`), `/i`는 대소문자 무시다.
+
 ---
 
 ## 1. 함수 목록
@@ -125,6 +127,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-MS-011, SYNC-INFRA-001
    - 이 함수에서 나가는 호출 선(`calls`의 from이 이 함수) 중 대상 함수의 `name`이 그 이름인 것이 **딱 하나**면 그 함수 열쇠, `inferred: false`
    - 없고 호출이 **맨 이름·경로 호출**(파이썬 `Name` · TS/JS `identifier` · Rust `identifier`·`scoped_identifier`)이면, 그래프에서 **같은 언어**(1의 세 갈래) 파일의 함수 중 `name`이 그 이름인 것이 **딱 하나**이고 그것이 이 함수가 아닐 때 그 열쇠, `inferred: true`. 메서드 호출(`x.m()`)은 짐작하지 않는다 — 받는 쪽 타입을 모르면 `split`·`clone` 같은 이름이 엉뚱한 언어의 함수에 붙는다
    - 그 밖 null, `inferred: false`
+   - 장비 판정([[#infra.infra]])이 쓰도록 각 호출의 마지막 이름을 함께 남긴다 — 결과에는 나가지 않는다
 9. 한 함수에 사건이 200개를 넘으면 차례대로 앞 200개만
 10. 함수마다 `steps = [{k, line, label, …}]` — `k`는 `call`(JSX 포함)·`return`·`raise`. **기본값인 키는 싣지 않는다** — `to`는 있을 때만, `inferred`·`deferred`·`awaited`는 참일 때만(`true`). 키 차례는 `k, line, label, to, inferred, deferred, awaited`. `infra`는 [[#infra.infra]]가 있을 때만 `awaited` 뒤에 단다
 11. 정의를 못 찾은 함수·세 언어가 아닌 함수는 `steps: []` · `→ graph`
@@ -207,13 +210,13 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-MS-011, SYNC-INFRA-001
 - `DEPS`·`IMAGES`·`SCHEMES`·`HTTP_KEYS`·`HOST_KEYS`·`PLACEHOLDER`·`LOCAL_HOSTS`·`NOT_APP` — view_arc `infra.mts` 그대로(DEPS의 Java·Go·.NET·PHP 패턴 조각도 그대로 둔다 — 맞을 파일이 없을 뿐이다)
 
 **처리**
-1. **함수의 패키지** — 파일마다 import 표: 파이썬 `import a.b as c`→`c: a` · `import a.b`→`a: a` · `from a.b import c as d`→`d: a`(상대 import는 뺀다) · TS/JS `import x from 'p'`·`import {a as b} from 'p'`·`import * as n from 'p'`·`const x = require('p')`(상대 경로·`node:`는 뺀다, `@scope/name/sub`는 `@scope/name`, `name/sub`는 `name`) · Rust 맨 위 `use a::…`의 첫 조각들(`a`). 함수마다 변수 → 패키지: 매개변수 주석 안의 이름 중 표에 있는 첫 것 · `v = X(…)`·`const v = new X(…)`·`let v = X::new(…)`처럼 오른쪽 식의 맨 앞 이름이 표에 있을 때 · 파이썬 메서드면 그 클래스 `__init__`의 `self.a = X(…)`·`self.a: T`도 `self.a`로
-2. **호출 순서에 장비** — 앱 코드(경로가 `NOT_APP`에 맞지 않고 화면 파일이 아닌 것)의 함수마다 steps의 `call` 중 `to`가 null인 것: 함수 자리 식의 맨 앞 이름(파이썬은 `self.a`까지 한 덩어리, Rust 경로 `a::b`는 `a`)으로 1의 패키지를 찾고, 없으면 Rust 경로의 첫 조각·TS/JS 전역 `fetch`를 패키지로. `LIBS[패키지]`가 있고 마지막 이름이 `io`에 맞으면 그 step의 `infra = "infra:" + id`. 장비 id마다 근거 `코드: {패키지들 — 처음 본 차례, ', '로} — {첫 파일}`(파일이 둘 이상이면 ` 외 N개 파일`)
-3. **의존성** — 깊이 3까지 `package.json`(그 파일의 `dependencies`에 `FRONT_ONLY`가 있고 `SERVER_DEPS`가 없으면 건너뛴다)·`Cargo.toml`(`[dependencies]` 표의 키)·`pyproject.toml`(`dependencies = [...]` 안 글자의 이름 부분)·`requirements*.txt`(줄의 이름 부분) → `DEPS` 첫 맞는 줄. 근거 `의존성: {이름} — {파일}`
+1. **함수의 패키지** — 앱 코드 파일(세 언어)마다 import 표: 파이썬 `import a.b as c`→`c: a` · `import a.b`→`a: a` · `from a.b import c as d`→`d: a`(상대 import는 뺀다) · TS/JS `import x from 'p'`·`import {a as b} from 'p'`·`import * as n from 'p'`·`const x = require('p')`(상대 경로·`node:`는 뺀다, `@scope/name/sub`는 `@scope/name`, `name/sub`는 `name`) · Rust 맨 위 `use a::…`의 첫 조각들(`a`). Rust는 `use` 경로의 첫 조각이 패키지이고, 가져온 마지막 이름(별칭)과 그 첫 조각 둘 다 표에 든다(`use reqwest::Client` → `Client: reqwest`·`reqwest: reqwest`). 변수 → 패키지: 파일 맨 위와 함수 몸통의 `v = X(…)`·파이썬 `with X(…) as v`·`const v = new X(…)`·`let v = X::new(…)`처럼 오른쪽 식의 맨 앞 이름이 표에 있을 때 · 함수 매개변수의 타입 주석 안 이름 중 표에 있는 첫 것 · 파이썬 메서드면 그 클래스 `__init__`의 `self.a = X(…)`·`self.a: T`도 `self.a`로
+2. **호출 순서에 장비** — 앱 코드(경로가 `NOT_APP`에 맞지 않고 화면 파일이 아닌 것)의 함수마다 steps의 `call` 중 `to`가 없는 것: `label`의 맨 앞 이름(글자 `[A-Za-z_][A-Za-z0-9_]*`. 파이썬은 `self.a`까지 한 덩어리)으로 1의 변수, 없으면 import 표에서 패키지를 찾는다. TS/JS 맨 앞 이름이 `fetch`이고 표에 없으면 패키지 `fetch`. `LIBS[패키지]`가 있고 steps가 남긴 마지막 이름이 `io`에 맞으면 그 step의 `infra = "infra:" + id`. 장비 id마다 근거 `코드: {패키지들 — 처음 본 차례, ', '로} — {첫 파일}`(파일이 둘 이상이면 ` 외 N개 파일`)
+3. **의존성** — 깊이 3까지 `package.json`(그 파일의 `dependencies`에 `FRONT_ONLY`가 있고 `SERVER_DEPS`가 없으면 건너뛴다)·`Cargo.toml`(이름이 `dependencies`로 끝나는 표의 키 — `[dependencies]`·`[dev-dependencies]`·`[workspace.dependencies]`)·`pyproject.toml`(`dependencies = [...]` 안 글자의 이름 부분)·`requirements*.txt`(줄의 이름 부분) → `DEPS` 첫 맞는 줄. 근거 `의존성: {이름} — {파일}`
 4. **docker-compose** — 루트와 한 단 아래 폴더의 `docker-compose.yml|yaml`·`compose.yml|yaml`·`docker-compose.dev.yml` → view_arc `parseCompose`로 서비스·이미지·포트, `IMAGES` 첫 맞는 줄 → `where: container`. 근거 `docker-compose: {서비스} ({이미지}[, 포트 …]) — {파일}`. 같은 폴더 `.env`의 값으로 `${VAR:-기본}`을 채운다(그 파일이 저장소에 있을 때만 — 커밋되지 않은 `.env`는 서버가 모른다)
-5. **설정 주소** — 루트와 한 단 아래의 `.env`·`.env.local`·`.env.development`(순위 4) · `.env.example`·`.env.sample`·`.env.template`(1) · 깊이 7까지 `config.py`·`settings.py`·`conf.py`·`application*.yml|yaml|properties`(3). 키·값에서 `scheme://` 주소 → 호스트·포트만(view_arc `hostOf`), `SCHEMES`(http면 `HTTP_KEYS`) 첫 맞는 줄. `…_HOST`·`…_PORT` 짝은 `HOST_KEYS`로. `where` = sqlite면 `local` · 호스트가 compose 서비스 이름이거나 이 PC 이름이면서 그 포트를 compose가 열었으면 `container` · 이 PC 이름이면 `local` · 그 밖 `external`. 근거 `설정: {파일} {키} → {호스트:포트}`
+5. **설정 주소** — 루트와 한 단 아래의 `.env`·`.env.local`·`.env.development`(순위 4) · `.env.example`·`.env.sample`·`.env.template`(1) · 깊이 7까지 `config.py`·`settings.py`·`conf.py`·`application*.yml|yaml|properties`(3, `test/` 아래는 빼고 — 0장 폴더와 `bin obj tests test data docs`는 건너뛴다). 파일 차례는 폴더마다 위 차례, 그다음 깊이 걷기. 키·값에서 `scheme://` 주소 → 호스트·포트만(view_arc `hostOf`), `SCHEMES`(http면 `HTTP_KEYS`) 첫 맞는 줄. `…_HOST`·`…_PORT` 짝은 `HOST_KEYS`로. `where` = sqlite면 `local` · 호스트가 compose 서비스 이름이거나 이 PC 이름이면서 그 포트를 compose가 열었으면 `container` · 이 PC 이름이면 `local` · 그 밖 `external`. 근거 `설정: {파일} {키} → {호스트:포트}`
 6. **ORM** — `schema.prisma`의 `provider`·`drizzle.config.*`의 `dialect` → 근거 `ORM 설정: {파일} ({종류})`
-7. **합치기** — 같은 장비 id를 여러 곳에서 찾으면 근거를 다 모으고(처음 본 차례, 겹치면 하나), `where`·`host`는 순위가 큰 근거(코드·의존성·ORM 1 · compose 2 · 설정 그 순위)의 것으로, `name`은 더 구체적인 것(`DB`보다 다른 이름, 그다음 긴 것)
+7. **합치기** — 같은 장비 id를 여러 곳에서 찾으면 근거를 다 모으고(처음 본 차례, 겹치면 하나), `where`·`host`는 순위가 큰 근거(코드·의존성·ORM 1 · compose 2 · 설정 그 순위)의 것으로(`host`가 비어 있으면 순위가 낮은 근거의 것으로 채운다), `name`은 더 구체적인 것(`DB`보다 다른 이름, 그다음 긴 것)
 8. **노드** — 차례대로
    - 화면 함수가 하나라도 있거나 `web` 단위가 있으면 `{id: "infra:browser", kind: "browser", name: "브라우저", where: "local", host: null, evidence: ["화면 코드가 브라우저에서 돈다"], dir: null}`
    - `server` 단위마다 `{id: "infra:server:" + name, kind: "backend", name: framework + " 서버", where: "local", host: port가 있으면 "localhost:" + port, evidence: [framework + " — " + (dir 또는 "루트")], dir}` — 백엔드 함수(화면 파일이 아닌 세 언어 함수)가 있는데 `server` 단위가 없으면 `{id: "infra:backend", name: "백엔드 서버", evidence: ["백엔드 코드가 이 PC에서 돈다"], dir: ""}` 하나

@@ -344,3 +344,116 @@ def test_http_ignores_non_front_files(tmp_path: Path) -> None:
     assert routes.http_links(tmp_path, g) == []
     g["units"] = [{"kind": "web", "dir": "srv"}]
     assert routes.http_links(tmp_path, g)[0]["to"] == "api/a.py:3"
+
+
+# ── units ──
+from app.core.codegraph import infra  # noqa: E402
+
+
+def test_units_node_python_rust(tmp_path: Path) -> None:
+    _write(tmp_path, {
+        "api/package.json": '{"dependencies": {"express": "4"}, "scripts": {"dev": "tsx w --port 4100"}}',
+        "api/tsconfig.json": "{}",
+        "web/package.json": '{"devDependencies": {"vite": "5"}, "dependencies": {"react": "18"},'
+                            ' "scripts": {"dev": "vite"}}',
+        "site/package.json": '{"dependencies": {"next": "15"}, "scripts": {"start": "next start"}}',
+        "broken/package.json": "{nope",
+        "srv/pyproject.toml": "[project]\nname='x'\n",
+        "srv/uv.lock": "",
+        "srv/app/main.py": "from fastapi import FastAPI\napp = FastAPI()\n",
+        "fl/requirements.txt": "flask\n",
+        "fl/web.py": "server = Flask(__name__)\n",
+        "dj/manage.py": "",
+        "wk/requirements.txt": "celery\n",
+        "wk/tasks.py": "celery_app = Celery('t')\n",
+        "rs/Cargo.toml": '[package]\nname = "svc"\n\n[dependencies]\naxum = "0.8"\n',
+        "ws/Cargo.toml": "[workspace]\nmembers = []\n",
+        "a/b/c/d/package.json": '{"dependencies": {"express": "4"}}',
+    })  # fmt: skip
+    got = {u["dir"]: u for u in infra.units(tmp_path, {"functions": []})}
+    assert got["api"] == {"name": "api", "kind": "server", "dir": "api", "lang": "typescript",
+                          "framework": "Express", "command": "npm run dev", "port": 4100}  # fmt: skip
+    assert (got["web"]["kind"], got["web"]["framework"], got["web"]["port"]) == ("web", "Vite", 5173)
+    assert (got["site"]["framework"], got["site"]["command"], got["site"]["port"]) == (
+        "Next.js", "npm start", 3000)  # fmt: skip
+    assert got["srv"]["command"] == "uv run uvicorn app.main:app --port 8000"
+    assert got["fl"]["command"] == "flask --app web run --port 5000"
+    assert got["dj"]["framework"] == "Django" and got["dj"]["port"] == 8000
+    assert (got["wk"]["kind"], got["wk"]["command"]) == ("job", "celery -A tasks worker")
+    assert got["rs"]["command"] == "cargo run -p svc" and got["rs"]["lang"] == "rust"
+    assert "broken" not in got and "ws" not in got and "a/b/c/d" not in got
+    assert [u["dir"] for u in infra.units(tmp_path, {"functions": []})] == sorted(got)
+
+
+# ── infra ──
+def _infra(tmp_path: Path, files: dict[str, str], funcs: list[dict], units: list | None = None):
+    _write(tmp_path, files)
+    g = {"functions": funcs, "calls": [], "units": units or [], "http": []}
+    from app.core.codegraph import steps as st
+
+    st.steps(tmp_path, g)
+    infra.infra(tmp_path, g)
+    return g
+
+
+def test_infra_code_calls_mark_steps(tmp_path: Path) -> None:
+    files = {
+        "app/db.py": "from sqlalchemy import select\nfrom sqlalchemy.orm import Session\n"
+                     "def save(s: Session):\n    q = select(1)\n    s.execute(q)\n",
+        "app/llm.py": "from openai import OpenAI\nclass Bot:\n    def __init__(self):\n"
+                      "        self.client = OpenAI()\n    def ask(self):\n"
+                      "        return self.client.chat.completions.create(model='x')\n",
+        "srv/p.ts": "import { PrismaClient } from '@prisma/client'\nconst prisma = new PrismaClient()\n"
+                    "export async function list() {\n  return prisma.user.findMany()\n}\n",
+        "core/src/q.rs": "use sqlx::PgPool;\npub async fn one(pool: &PgPool) {\n"
+                         "    sqlx::query(\"x\").fetch_one(pool).await;\n}\n",
+        "scripts/seed.py": "import redis\ndef go():\n    redis.Redis().set('a', 1)\n",
+    }  # fmt: skip
+    funcs = [_fn("app/db.py", 3, "save"), _fn("app/llm.py", 5, "ask"), _fn("srv/p.ts", 3, "list"),
+             _fn("core/src/q.rs", 2, "one"), _fn("scripts/seed.py", 2, "go")]  # fmt: skip
+    g = _infra(tmp_path, files, funcs)
+    marks = {f["name"]: [(s["label"], s.get("infra")) for s in f["steps"]] for f in g["functions"]}
+    assert ("s.execute", "infra:db") in marks["save"] and ("select", None) in marks["save"]
+    assert ("self.client.chat.completions.create", "infra:openai") in marks["ask"]
+    assert ("prisma.user.findMany", "infra:db") in marks["list"]
+    assert ('sqlx::query("x").fetch_one', "infra:db") in marks["one"]
+    assert all(m is None for _, m in marks["go"])  # 스크립트는 앱 코드가 아니다
+    ids = [n["id"] for n in g["infra"]["nodes"]]
+    assert ids == ["infra:backend", "infra:db", "infra:openai"]
+    db = next(n for n in g["infra"]["nodes"] if n["id"] == "infra:db")
+    assert db["evidence"][0] == "코드: sqlalchemy, @prisma/client, sqlx — app/db.py 외 2개 파일"
+
+
+def test_infra_deps_compose_config_host_only(tmp_path: Path) -> None:
+    files = {
+        "package.json": '{"dependencies": {"express": "4", "ioredis": "5"}}',
+        "web/package.json": '{"dependencies": {"react": "18", "pg": "8"}}',
+        "docker-compose.yml": "services:\n  db:\n    image: postgres:16\n    ports:\n"
+                              "      - \"15432:5432\"\n  cache:\n    image: redis:7\n",
+        ".env.example": "DATABASE_URL=postgresql://user:secret@localhost:15432/app\n"
+                        "REDIS_HOST=your-redis-host\n",
+        "app/config.py": "MONGO = 'mongodb://admin:pw@mongo.example.org:27017/x'\n",
+    }  # fmt: skip
+    g = _infra(tmp_path, files, [])
+    nodes = {n["id"]: n for n in g["infra"]["nodes"]}
+    assert nodes["infra:db"]["where"] == "container" and nodes["infra:db"]["host"] == "localhost:15432"
+    assert nodes["infra:redis"]["evidence"][0] == "의존성: ioredis — package.json"
+    assert "infra:mongo" not in nodes  # example.org는 자리 표시
+    text = repr(g["infra"])
+    assert "secret" not in text and "user:" not in text  # 비밀번호가 남지 않는다
+    assert not any("pg —" in e for n in nodes.values() for e in n["evidence"])  # 화면 전용 의존성
+
+
+def test_infra_links_split_by_server_dir(tmp_path: Path) -> None:
+    files = {
+        "a/db.py": "import psycopg\ndef q(c: psycopg.Connection):\n    c.execute('x')\n",
+        "b/h.py": "import httpx\ndef g():\n    httpx.get('https://x')\n",
+    }  # fmt: skip
+    units = [{"name": "a", "kind": "server", "dir": "a", "framework": "FastAPI", "port": 8000},
+             {"name": "b", "kind": "server", "dir": "b", "framework": "Flask", "port": None}]  # fmt: skip
+    g = _infra(tmp_path, files, [_fn("a/db.py", 2, "q"), _fn("b/h.py", 2, "g")], units)
+    links = [(link["from"], link["to"]) for link in g["infra"]["links"]]
+    assert ("infra:server:a", "infra:db") in links and ("infra:server:b", "infra:db") not in links
+    assert ("infra:server:b", "infra:http") in links and ("infra:server:a", "infra:http") not in links
+    servers = [n for n in g["infra"]["nodes"] if n["kind"] == "backend"]
+    assert servers[0]["host"] == "localhost:8000" and servers[1]["host"] is None

@@ -875,6 +875,55 @@ class CodeNodes:
     calls: list[list[str]]
 
 
+@dataclass(frozen=True)
+class CodeLayerRow:
+    """SYNC-DOM-002 2.8 — 층 표 한 줄 — 흐름 보기의 층 열(카드 CF)."""
+
+    name: str
+    patterns: list[str]
+    specs: list[CodeLayerSpec]
+
+
+@dataclass(frozen=True)
+class FlowFunction:
+    """SYNC-DOM-002 2.8 — 흐름 보기의 함수 하나 — CodeNode에 끝 줄·라우트·호출 순서(카드 CF).
+
+    `route`·`steps`는 그래프에 든 그대로다(MS-024 0장 — steps는 기본값 키를 싣지 않는다).
+    """
+
+    key: str
+    name: str
+    qual: str
+    file: str
+    line: int
+    end: int | None
+    community: int | None
+    item: str | None
+    ms: str | None
+    status: str | None
+    layer: CodeLayer | None
+    route: dict | None
+    steps: list[dict]
+
+
+@dataclass(frozen=True)
+class FlowView:
+    """SYNC-DOM-002 2.8 — queries.flow_view → API FlowView(UI-19 흐름 보기, 카드 CF).
+
+    `files`·`http`·`infra`·`units`는 그래프에 든 그대로다(MS-024 0장).
+    """
+
+    graph: CodeGraphInfo | None
+    files: list[dict]
+    functions: list[FlowFunction]
+    calls: list[list[str]]
+    http: list[dict]
+    infra: dict
+    units: list[dict]
+    layers: list[CodeLayerRow]
+    communities: list[CodeCommunity]
+
+
 AskEvent = AskStart | AskDelta | AskNote | AskRead | AskAnswer
 
 
