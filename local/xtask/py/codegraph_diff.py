@@ -1,4 +1,4 @@
-"""cargo xtask codegraph-diff — 폴더 하나에 파이썬 판 graphify 원형과 줄이기·보강 결과를 낸다(SYNC-MS-022, 카드 L12).
+"""cargo xtask codegraph-diff — 폴더 하나에 파이썬 판 graphify 원형과 줄이기·보강·흐름 결과를 낸다(SYNC-MS-022·026, 카드 L12·L22).
 
 `uv run --project backend python local/xtask/py/codegraph_diff.py SRC OUT` — SRC는 커밋을 푼 폴더(graphify가
 그 안에 graphify-out/을 만든다). Rust 판이 같은 원형·같은 폴더로 낸 답과 xtask가 비교한다.
@@ -12,6 +12,7 @@ import json
 import sys
 from pathlib import Path
 
+from app.core.codegraph import flow
 from app.core.codegraph import graph as cg
 from app.infra import graphify
 
@@ -55,6 +56,8 @@ def main() -> None:
         "unmatched": unmatched,
         "item_function": {i: (cg.item_function(graph, i) or {}).get("key") for i in item_ids},
         "item_neighbors": {f["key"]: list(cg.item_neighbors(graph, f["key"])) for f in graph["functions"]},
+        # 흐름 — 같은 보강 결과에 흐름 키를 더한다(카드 L22~L24)
+        "flow": flow.extend(src, copy.deepcopy(graph)),
     }
     out.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 

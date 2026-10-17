@@ -365,7 +365,7 @@ impl Ctx {
 }
 
 /// 너비 우선으로 모든 노드 — 파이썬 `ast.walk`의 차례
-fn walk(root: Node) -> Vec<Node> {
+pub(crate) fn walk(root: Node) -> Vec<Node> {
     let mut out = Vec::new();
     let mut q = VecDeque::from([root]);
     while let Some(n) = q.pop_front() {
@@ -521,7 +521,7 @@ pub(crate) fn self_attrs(init: Node, src: &str) -> HashMap<String, String> {
 }
 
 /// 상대 import의 점 수와 모듈 — `from ..a.b import x` → (2, "a.b")
-fn from_module(n: Node, src: &str) -> (usize, String) {
+pub(crate) fn from_module(n: Node, src: &str) -> (usize, String) {
     let Some(m) = n.child_by_field_name("module_name") else {
         return (0, String::new());
     };
@@ -542,7 +542,7 @@ fn from_module(n: Node, src: &str) -> (usize, String) {
 }
 
 /// 점 이름 — 사이 공백을 걷는다(`a . b`도 파이썬은 `a.b`)
-fn dotted(n: Node, src: &str) -> String {
+pub(crate) fn dotted(n: Node, src: &str) -> String {
     named_children(n)
         .into_iter()
         .filter(|c| c.kind() == "identifier")

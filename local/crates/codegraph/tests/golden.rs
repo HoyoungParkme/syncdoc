@@ -83,3 +83,26 @@ fn communities_match_python() {
         &g["communities"]["communities"],
     );
 }
+
+/// SYNC-MS-026 테스트 관점 — 흐름 키 여섯이 파이썬 판과 같다 (카드 L22~L24)
+fn flowed() -> (Value, Value) {
+    let g = golden();
+    let src = here().join("flow_fixture");
+    let mut got = serde_json::to_value(enrich(&src, reduce(&g["flow_raw"]))).expect("직렬화");
+    syncdoc_codegraph::flow::extend(&src, &mut got);
+    (got, g["flow"].clone())
+}
+
+#[test]
+fn flow_matches_python() {
+    let (got, want) = flowed();
+    same("flow.files", &got["files"], &want["files"]);
+    same("flow.units", &got["units"], &want["units"]);
+    same("flow.functions", &got["functions"], &want["functions"]);
+    same("flow.calls", &got["calls"], &want["calls"]);
+    same("flow.http", &got["http"], &want["http"]);
+    same("flow.infra", &got["infra"], &want["infra"]);
+    let mut keys: Vec<&String> = got.as_object().expect("객체").keys().collect();
+    keys.sort();
+    assert_eq!(keys, ["calls", "files", "functions", "http", "infra", "units"]);
+}
