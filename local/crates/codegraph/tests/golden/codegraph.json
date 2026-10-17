@@ -3692,5 +3692,2409 @@
     "size": 1
    }
   ]
+ },
+ "flow_raw": {
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "nodes": [
+   {
+    "id": "backend_app_init",
+    "label": "app/__init__.py",
+    "file_type": "code",
+    "source_file": "backend/app/__init__.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_api_init",
+    "label": "api/__init__.py",
+    "file_type": "code",
+    "source_file": "backend/app/api/__init__.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_api_items",
+    "label": "items.py",
+    "file_type": "code",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_api_items_get_svc",
+    "label": "get_svc()",
+    "file_type": "code",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L9",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_api_items_py_get",
+    "label": "get",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_api_items_read",
+    "label": "read()",
+    "file_type": "code",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L14",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_api_items_read_inner",
+    "label": "inner()",
+    "file_type": "code",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L20",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "api_route",
+    "label": "api_route",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_api_items_make",
+    "label": "make()",
+    "file_type": "code",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L30",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_config",
+    "label": "config.py",
+    "file_type": "code",
+    "source_file": "backend/app/config.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_init",
+    "label": "core/__init__.py",
+    "file_type": "code",
+    "source_file": "backend/app/core/__init__.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_db",
+    "label": "db.py",
+    "file_type": "code",
+    "source_file": "backend/app/core/db.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_db_save",
+    "label": "save()",
+    "file_type": "code",
+    "source_file": "backend/app/core/db.py",
+    "source_location": "L5",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "session",
+    "label": "Session",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_service",
+    "label": "service.py",
+    "file_type": "code",
+    "source_file": "backend/app/core/service.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_service_helper",
+    "label": "helper()",
+    "file_type": "code",
+    "source_file": "backend/app/core/service.py",
+    "source_location": "L4",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_service_svc",
+    "label": "Svc",
+    "file_type": "code",
+    "source_file": "backend/app/core/service.py",
+    "source_location": "L8",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_service_svc_init",
+    "label": ".__init__()",
+    "file_type": "code",
+    "source_file": "backend/app/core/service.py",
+    "source_location": "L9",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_core_service_svc_fetch",
+    "label": ".fetch()",
+    "file_type": "code",
+    "source_file": "backend/app/core/service.py",
+    "source_location": "L12",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_main",
+    "label": "main.py",
+    "file_type": "code",
+    "source_file": "backend/app/main.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_main_py_get",
+    "label": "get",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "backend_app_main_health",
+    "label": "health()",
+    "file_type": "code",
+    "source_file": "backend/app/main.py",
+    "source_location": "L10",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "pkg_api",
+    "label": "api",
+    "file_type": "code",
+    "type": "package",
+    "ecosystem": "python",
+    "source_file": "backend/pyproject.toml",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_package",
+    "label": "frontend/package.json",
+    "file_type": "code",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_package_dependencies",
+    "label": "dependencies",
+    "file_type": "code",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_package_dependencies_react",
+    "label": "react",
+    "file_type": "code",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "ref_react",
+    "label": "react",
+    "file_type": "concept",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_package_dependencies_pg",
+    "label": "pg",
+    "file_type": "code",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "ref_pg",
+    "label": "pg",
+    "file_type": "concept",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_package_devdependencies",
+    "label": "devDependencies",
+    "file_type": "code",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_package_devdependencies_vite",
+    "label": "vite",
+    "file_type": "code",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "ref_vite",
+    "label": "vite",
+    "file_type": "concept",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_package_scripts",
+    "label": "scripts",
+    "file_type": "code",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_package_scripts_dev",
+    "label": "dev",
+    "file_type": "code",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_api_client",
+    "label": "client.ts",
+    "file_type": "code",
+    "source_file": "frontend/src/api/client.ts",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_api_client_api",
+    "label": "api",
+    "file_type": "code",
+    "source_file": "frontend/src/api/client.ts",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_pages_items",
+    "label": "Items.tsx",
+    "file_type": "code",
+    "source_file": "frontend/src/pages/Items.tsx",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_pages_items_items",
+    "label": "Items()",
+    "file_type": "code",
+    "source_file": "frontend/src/pages/Items.tsx",
+    "source_location": "L4",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_src_pages_items_card",
+    "label": "Card()",
+    "file_type": "code",
+    "source_file": "frontend/src/pages/Items.tsx",
+    "source_location": "L10",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "frontend_tsconfig",
+    "label": "tsconfig.json",
+    "file_type": "code",
+    "source_file": "frontend/tsconfig.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "pkg_rsvc",
+    "label": "rsvc",
+    "file_type": "code",
+    "type": "package",
+    "ecosystem": "cargo",
+    "source_file": "rs/Cargo.toml",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "rs_src_lib",
+    "label": "lib.rs",
+    "file_type": "code",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "rs_src_lib_app",
+    "label": "app()",
+    "file_type": "code",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L5",
+    "_origin": "ast"
+   },
+   {
+    "id": "router",
+    "label": "Router",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "rs_src_lib_list",
+    "label": "list()",
+    "file_type": "code",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L9",
+    "_origin": "ast"
+   },
+   {
+    "id": "pgpool",
+    "label": "PgPool",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "rs_src_lib_make",
+    "label": "make()",
+    "file_type": "code",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L13",
+    "_origin": "ast"
+   },
+   {
+    "id": "rs_src_lib_helper",
+    "label": "helper()",
+    "file_type": "code",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L20",
+    "_origin": "ast"
+   },
+   {
+    "id": "rs_src_lib_hi",
+    "label": "hi()",
+    "file_type": "code",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L25",
+    "_origin": "ast"
+   },
+   {
+    "id": "scripts_seed",
+    "label": "seed.py",
+    "file_type": "code",
+    "source_file": "scripts/seed.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "scripts_seed_go",
+    "label": "go()",
+    "file_type": "code",
+    "source_file": "scripts/seed.py",
+    "source_location": "L4",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "server_cats",
+    "label": "cats.ts",
+    "file_type": "code",
+    "source_file": "server/cats.ts",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "server_cats_catscontroller",
+    "label": "CatsController",
+    "file_type": "code",
+    "source_file": "server/cats.ts",
+    "source_location": "L2",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "controller",
+    "label": "Controller",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "server_cats_ts_get",
+    "label": "Get",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "server_cats_catscontroller_one",
+    "label": ".one()",
+    "file_type": "code",
+    "source_file": "server/cats.ts",
+    "source_location": "L4",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "server_index",
+    "label": "index.ts",
+    "file_type": "code",
+    "source_file": "server/index.ts",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "server_index_prisma",
+    "label": "prisma",
+    "file_type": "code",
+    "source_file": "server/index.ts",
+    "source_location": "L4",
+    "_origin": "ast"
+   },
+   {
+    "id": "server_index_app",
+    "label": "app",
+    "file_type": "code",
+    "source_file": "server/index.ts",
+    "source_location": "L5",
+    "_origin": "ast"
+   },
+   {
+    "id": "server_index_show",
+    "label": "show()",
+    "file_type": "code",
+    "source_file": "server/index.ts",
+    "source_location": "L7",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "server_package",
+    "label": "server/package.json",
+    "file_type": "code",
+    "source_file": "server/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "server_package_dependencies",
+    "label": "dependencies",
+    "file_type": "code",
+    "source_file": "server/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "server_package_dependencies_express",
+    "label": "express",
+    "file_type": "code",
+    "source_file": "server/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "ref_express",
+    "label": "express",
+    "file_type": "concept",
+    "source_file": "server/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "server_package_dependencies_prisma_client",
+    "label": "@prisma/client",
+    "file_type": "code",
+    "source_file": "server/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "ref_prisma_client",
+    "label": "@prisma/client",
+    "file_type": "concept",
+    "source_file": "server/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "server_package_scripts",
+    "label": "scripts",
+    "file_type": "code",
+    "source_file": "server/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "server_package_scripts_start",
+    "label": "start",
+    "file_type": "code",
+    "source_file": "server/package.json",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "tests_test_x",
+    "label": "test_x.py",
+    "file_type": "code",
+    "source_file": "tests/test_x.py",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "tests_test_x_test_x",
+    "label": "test_x()",
+    "file_type": "code",
+    "source_file": "tests/test_x.py",
+    "source_location": "L1",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "web_app_api_things_id_route",
+    "label": "route.ts",
+    "file_type": "code",
+    "source_file": "web/app/api/things/[id]/route.ts",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "web_app_api_things_id_route_get",
+    "label": "GET()",
+    "file_type": "code",
+    "source_file": "web/app/api/things/[id]/route.ts",
+    "source_location": "L1",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "fastapi",
+    "label": "fastapi",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
+    "id": "sqlalchemy",
+    "label": "sqlalchemy",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
+    "id": "sqlalchemy_orm",
+    "label": "sqlalchemy_orm",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
+    "id": "httpx",
+    "label": "httpx",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
+    "id": "axum",
+    "label": "axum",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
+    "id": "client",
+    "label": "client",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
+    "id": "redis",
+    "label": "redis",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   }
+  ],
+  "links": [
+   {
+    "source": "backend_app_api_items",
+    "target": "fastapi",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items",
+    "target": "backend_app_core_db",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L3",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items",
+    "target": "backend_app_core_service",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L4",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items",
+    "target": "backend_app_api_items_get_svc",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L9",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items_read",
+    "target": "backend_app_api_items_py_get",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L13",
+    "weight": 1.0,
+    "context": "decorator",
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items",
+    "target": "backend_app_api_items_read",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L14",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items_read",
+    "target": "backend_app_core_service_svc",
+    "relation": "references",
+    "context": "parameter_type",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L14",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items_read",
+    "target": "backend_app_api_items_read_inner",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L20",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items_make",
+    "target": "api_route",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L29",
+    "weight": 1.0,
+    "context": "decorator",
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items",
+    "target": "backend_app_api_items_make",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L30",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_db",
+    "target": "sqlalchemy",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/db.py",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_db",
+    "target": "sqlalchemy_orm",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/db.py",
+    "source_location": "L2",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_db",
+    "target": "backend_app_core_db_save",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/db.py",
+    "source_location": "L5",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_db_save",
+    "target": "session",
+    "relation": "references",
+    "context": "parameter_type",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/db.py",
+    "source_location": "L5",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_service",
+    "target": "httpx",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/service.py",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_service",
+    "target": "backend_app_core_service_helper",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/service.py",
+    "source_location": "L4",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_service",
+    "target": "backend_app_core_service_svc",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/service.py",
+    "source_location": "L8",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_service_svc",
+    "target": "backend_app_core_service_svc_init",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/service.py",
+    "source_location": "L9",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_core_service_svc",
+    "target": "backend_app_core_service_svc_fetch",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/core/service.py",
+    "source_location": "L12",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_main",
+    "target": "fastapi",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/main.py",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_main",
+    "target": "backend_app_api_init",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/main.py",
+    "source_location": "L3",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_main_health",
+    "target": "backend_app_main_py_get",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/main.py",
+    "source_location": "L9",
+    "weight": 1.0,
+    "context": "decorator",
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_main",
+    "target": "backend_app_main_health",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/main.py",
+    "source_location": "L10",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "pkg_api",
+    "target": "pkg_fastapi",
+    "relation": "depends_on",
+    "context": "dependency",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "backend/pyproject.toml",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "pkg_api",
+    "target": "pkg_httpx",
+    "relation": "depends_on",
+    "context": "dependency",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "backend/pyproject.toml",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "pkg_api",
+    "target": "pkg_sqlalchemy",
+    "relation": "depends_on",
+    "context": "dependency",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "backend/pyproject.toml",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "pkg_api",
+    "target": "pkg_redis",
+    "relation": "depends_on",
+    "context": "dependency",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "backend/pyproject.toml",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_package",
+    "target": "frontend_package_dependencies",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_package_dependencies",
+    "target": "frontend_package_dependencies_react",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_package",
+    "target": "ref_react",
+    "relation": "imports",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_package_dependencies",
+    "target": "frontend_package_dependencies_pg",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_package",
+    "target": "ref_pg",
+    "relation": "imports",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_package",
+    "target": "frontend_package_devdependencies",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_package_devdependencies",
+    "target": "frontend_package_devdependencies_vite",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_package",
+    "target": "ref_vite",
+    "relation": "imports",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_package",
+    "target": "frontend_package_scripts",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_package_scripts",
+    "target": "frontend_package_scripts_dev",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_api_client",
+    "target": "frontend_src_api_client_api",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/api/client.ts",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_pages_items",
+    "target": "frontend_src_api_client",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/pages/Items.tsx",
+    "source_location": "L2",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_pages_items",
+    "target": "frontend_src_api_client_api",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/pages/Items.tsx",
+    "source_location": "L2",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_pages_items",
+    "target": "frontend_src_pages_items_items",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/pages/Items.tsx",
+    "source_location": "L4",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_pages_items",
+    "target": "frontend_src_pages_items_card",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/pages/Items.tsx",
+    "source_location": "L10",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "frontend_src_pages_items_items",
+    "target": "frontend_src_pages_items_card",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "frontend/src/pages/Items.tsx",
+    "source_location": "L7",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "pkg_rsvc",
+    "target": "pkg_axum",
+    "relation": "depends_on",
+    "context": "dependency",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "rs/Cargo.toml",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "pkg_rsvc",
+    "target": "pkg_sqlx",
+    "relation": "depends_on",
+    "context": "dependency",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "rs/Cargo.toml",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "pkg_rsvc",
+    "target": "pkg_reqwest",
+    "relation": "depends_on",
+    "context": "dependency",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "rs/Cargo.toml",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "rs_src_lib",
+    "target": "axum",
+    "relation": "imports_from",
+    "confidence": "EXTRACTED",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L1",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "rs_src_lib",
+    "target": "client",
+    "relation": "imports_from",
+    "confidence": "EXTRACTED",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L2",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "rs_src_lib",
+    "target": "pgpool",
+    "relation": "imports_from",
+    "confidence": "EXTRACTED",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L3",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "rs_src_lib",
+    "target": "rs_src_lib_app",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L5",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "rs_src_lib_app",
+    "target": "router",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L5",
+    "weight": 1.0,
+    "context": "return_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "rs_src_lib",
+    "target": "rs_src_lib_list",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L9",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "rs_src_lib_list",
+    "target": "pgpool",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L9",
+    "weight": 1.0,
+    "context": "parameter_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "rs_src_lib",
+    "target": "rs_src_lib_make",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L13",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "rs_src_lib",
+    "target": "rs_src_lib_helper",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L20",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "rs_src_lib",
+    "target": "rs_src_lib_hi",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L25",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "rs_src_lib_make",
+    "target": "rs_src_lib_helper",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "rs/src/lib.rs",
+    "source_location": "L16",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "scripts_seed",
+    "target": "redis",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "scripts/seed.py",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "scripts_seed",
+    "target": "scripts_seed_go",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "scripts/seed.py",
+    "source_location": "L4",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "server_cats",
+    "target": "server_cats_catscontroller",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "server/cats.ts",
+    "source_location": "L2",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "server_cats_catscontroller",
+    "target": "controller",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "server/cats.ts",
+    "source_location": "L1",
+    "weight": 1.0,
+    "context": "decorator",
+    "_origin": "ast"
+   },
+   {
+    "source": "server_cats_catscontroller_one",
+    "target": "server_cats_ts_get",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "server/cats.ts",
+    "source_location": "L3",
+    "weight": 1.0,
+    "context": "decorator",
+    "_origin": "ast"
+   },
+   {
+    "source": "server_cats_catscontroller",
+    "target": "server_cats_catscontroller_one",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "server/cats.ts",
+    "source_location": "L4",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "server_index",
+    "target": "ref_express",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "server/index.ts",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "server_index",
+    "target": "ref_prisma_client",
+    "relation": "imports_from",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "server/index.ts",
+    "source_location": "L2",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "server_index",
+    "target": "server_index_prisma",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "server/index.ts",
+    "source_location": "L4",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "server_index",
+    "target": "server_index_app",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "server/index.ts",
+    "source_location": "L5",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "server_index",
+    "target": "server_index_show",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "server/index.ts",
+    "source_location": "L7",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "server_index",
+    "target": "server_index_show",
+    "relation": "indirect_call",
+    "context": "argument",
+    "confidence": "INFERRED",
+    "confidence_score": 0.85,
+    "source_file": "server/index.ts",
+    "source_location": "L13",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "server_package",
+    "target": "server_package_dependencies",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "server/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "server_package_dependencies",
+    "target": "server_package_dependencies_express",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "server/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "server_package",
+    "target": "ref_express",
+    "relation": "imports",
+    "confidence": "EXTRACTED",
+    "source_file": "server/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "server_package_dependencies",
+    "target": "server_package_dependencies_prisma_client",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "server/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "server_package",
+    "target": "ref_prisma_client",
+    "relation": "imports",
+    "confidence": "EXTRACTED",
+    "source_file": "server/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "server_package",
+    "target": "server_package_scripts",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "server/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "server_package_scripts",
+    "target": "server_package_scripts_start",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "server/package.json",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "tests_test_x",
+    "target": "tests_test_x_test_x",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "tests/test_x.py",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "web_app_api_things_id_route",
+    "target": "web_app_api_things_id_route_get",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "web/app/api/things/[id]/route.ts",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items",
+    "target": "backend_app_core_db_save",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L3",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items",
+    "target": "backend_app_core_service_svc",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L4",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items",
+    "target": "backend_app_core_service_helper",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L4",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_main",
+    "target": "backend_app_api_items",
+    "relation": "imports_from",
+    "context": "submodule_import",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/main.py",
+    "source_location": "L3",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items_get_svc",
+    "target": "backend_app_core_service_svc",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L10",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items_get_svc",
+    "target": "backend_app_core_service_svc",
+    "relation": "uses",
+    "confidence": "INFERRED",
+    "confidence_score": 0.95,
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L10",
+    "weight": 0.8,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items_read",
+    "target": "backend_app_core_service_svc",
+    "relation": "uses",
+    "confidence": "INFERRED",
+    "confidence_score": 0.95,
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L14",
+    "weight": 0.8,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items_read",
+    "target": "backend_app_core_service_helper",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L15",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items_read_inner",
+    "target": "backend_app_core_service_helper",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L21",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "backend_app_api_items_make",
+    "target": "backend_app_core_db_save",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "backend/app/api/items.py",
+    "source_location": "L31",
+    "weight": 1.0,
+    "_origin": "ast"
+   }
+  ],
+  "directed": false
+ },
+ "flow": {
+  "functions": [
+   {
+    "key": "backend/app/api/items.py:9",
+    "name": "get_svc",
+    "qual": "items.get_svc",
+    "file": "backend/app/api/items.py",
+    "line": 9,
+    "end": 10,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "return",
+      "line": 10,
+      "label": "return Svc()"
+     }
+    ],
+    "route": null
+   },
+   {
+    "key": "backend/app/api/items.py:14",
+    "name": "read",
+    "qual": "items.read",
+    "file": "backend/app/api/items.py",
+    "line": 14,
+    "end": 26,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "call",
+      "line": 14,
+      "label": "Depends(get_svc)",
+      "to": "backend/app/api/items.py:9",
+      "inferred": true
+     },
+     {
+      "k": "call",
+      "line": 15,
+      "label": "helper",
+      "to": "backend/app/core/service.py:4"
+     },
+     {
+      "k": "call",
+      "line": 15,
+      "label": "helper",
+      "to": "backend/app/core/service.py:4"
+     },
+     {
+      "k": "call",
+      "line": 17,
+      "label": "helper",
+      "to": "backend/app/core/service.py:4"
+     },
+     {
+      "k": "raise",
+      "line": 17,
+      "label": "raise ValueError(f\"없음 {helper(0)}\")"
+     },
+     {
+      "k": "call",
+      "line": 18,
+      "label": "helper",
+      "to": "backend/app/core/service.py:4",
+      "deferred": true
+     },
+     {
+      "k": "call",
+      "line": 21,
+      "label": "helper",
+      "to": "backend/app/core/service.py:4",
+      "deferred": true
+     },
+     {
+      "k": "call",
+      "line": 23,
+      "label": "svc.fetch",
+      "to": "backend/app/core/service.py:12",
+      "awaited": true
+     },
+     {
+      "k": "return",
+      "line": 26,
+      "label": "return data"
+     }
+    ],
+    "route": {
+     "method": "GET",
+     "path": "/v1/items/{item_id}"
+    }
+   },
+   {
+    "key": "backend/app/api/items.py:20",
+    "name": "inner",
+    "qual": "items.inner",
+    "file": "backend/app/api/items.py",
+    "line": 20,
+    "end": null,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "call",
+      "line": 21,
+      "label": "helper",
+      "to": "backend/app/core/service.py:4"
+     },
+     {
+      "k": "return",
+      "line": 21,
+      "label": "return helper(3)"
+     }
+    ],
+    "route": null
+   },
+   {
+    "key": "backend/app/api/items.py:30",
+    "name": "make",
+    "qual": "items.make",
+    "file": "backend/app/api/items.py",
+    "line": 30,
+    "end": 32,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "call",
+      "line": 31,
+      "label": "save",
+      "to": "backend/app/core/db.py:5"
+     },
+     {
+      "k": "return",
+      "line": 32,
+      "label": "return {\"id\": 1, \"name\": \"아주 긴 이름을 가진 결과를 돌려준다 — 칠십 자를 넘겨 잘리는지 보려고 더 …"
+     }
+    ],
+    "route": {
+     "method": "POST",
+     "path": "/v1/items"
+    }
+   },
+   {
+    "key": "backend/app/core/db.py:5",
+    "name": "save",
+    "qual": "db.save",
+    "file": "backend/app/core/db.py",
+    "line": 5,
+    "end": 10,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "call",
+      "line": 7,
+      "label": "s.execute",
+      "infra": "infra:db"
+     },
+     {
+      "k": "call",
+      "line": 8,
+      "label": "s.commit",
+      "infra": "infra:db"
+     },
+     {
+      "k": "call",
+      "line": 10,
+      "label": "other.flush",
+      "infra": "infra:db"
+     }
+    ],
+    "route": null
+   },
+   {
+    "key": "backend/app/core/service.py:4",
+    "name": "helper",
+    "qual": "core.helper",
+    "file": "backend/app/core/service.py",
+    "line": 4,
+    "end": 5,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "return",
+      "line": 5,
+      "label": "return x"
+     }
+    ],
+    "route": null
+   },
+   {
+    "key": "backend/app/core/service.py:9",
+    "name": "__init__",
+    "qual": "Svc.__init__",
+    "file": "backend/app/core/service.py",
+    "line": 9,
+    "end": 10,
+    "item": null,
+    "ms": null,
+    "steps": [],
+    "route": null
+   },
+   {
+    "key": "backend/app/core/service.py:12",
+    "name": "fetch",
+    "qual": "Svc.fetch",
+    "file": "backend/app/core/service.py",
+    "line": 12,
+    "end": 14,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "call",
+      "line": 13,
+      "label": "self.client.get",
+      "infra": "infra:http"
+     },
+     {
+      "k": "return",
+      "line": 14,
+      "label": "return r.json()"
+     }
+    ],
+    "route": null
+   },
+   {
+    "key": "backend/app/main.py:10",
+    "name": "health",
+    "qual": "main.health",
+    "file": "backend/app/main.py",
+    "line": 10,
+    "end": 11,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "return",
+      "line": 11,
+      "label": "return {\"ok\": True}"
+     }
+    ],
+    "route": {
+     "method": "GET",
+     "path": "/health"
+    }
+   },
+   {
+    "key": "frontend/src/pages/Items.tsx:4",
+    "name": "Items",
+    "qual": "Items.Items",
+    "file": "frontend/src/pages/Items.tsx",
+    "line": 4,
+    "end": 8,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "call",
+      "line": 5,
+      "label": "api.get",
+      "to": "frontend/src/api/client.ts:2"
+     },
+     {
+      "k": "call",
+      "line": 7,
+      "label": "<Card>",
+      "to": "frontend/src/pages/Items.tsx:10"
+     },
+     {
+      "k": "return",
+      "line": 7,
+      "label": "return <Card id={id} />"
+     }
+    ],
+    "route": null
+   },
+   {
+    "key": "frontend/src/pages/Items.tsx:10",
+    "name": "Card",
+    "qual": "Items.Card",
+    "file": "frontend/src/pages/Items.tsx",
+    "line": 10,
+    "end": 12,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "return",
+      "line": 11,
+      "label": "return <div>{id}</div>"
+     }
+    ],
+    "route": null
+   },
+   {
+    "key": "scripts/seed.py:4",
+    "name": "go",
+    "qual": "seed.go",
+    "file": "scripts/seed.py",
+    "line": 4,
+    "end": 5,
+    "item": null,
+    "ms": null,
+    "steps": [],
+    "route": null
+   },
+   {
+    "key": "server/cats.ts:4",
+    "name": "one",
+    "qual": "CatsController.one",
+    "file": "server/cats.ts",
+    "line": 4,
+    "end": 6,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "return",
+      "line": 5,
+      "label": "return 1"
+     }
+    ],
+    "route": {
+     "method": "GET",
+     "path": "/cats/{id}"
+    }
+   },
+   {
+    "key": "server/index.ts:7",
+    "name": "show",
+    "qual": "server.show",
+    "file": "server/index.ts",
+    "line": 7,
+    "end": 11,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "call",
+      "line": 8,
+      "label": "prisma.user.findMany",
+      "awaited": true,
+      "infra": "infra:db"
+     },
+     {
+      "k": "raise",
+      "line": 9,
+      "label": "throw new Error('없음')"
+     }
+    ],
+    "route": {
+     "method": "GET",
+     "path": "/users/{id}"
+    }
+   },
+   {
+    "key": "web/app/api/things/[id]/route.ts:1",
+    "name": "GET",
+    "qual": "route.GET",
+    "file": "web/app/api/things/[id]/route.ts",
+    "line": 1,
+    "end": 3,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "call",
+      "line": 2,
+      "label": "fetch",
+      "infra": "infra:http"
+     },
+     {
+      "k": "return",
+      "line": 2,
+      "label": "return fetch('https://example.org/x')"
+     }
+    ],
+    "route": {
+     "method": "GET",
+     "path": "/api/things/{id}"
+    }
+   },
+   {
+    "key": "frontend/src/api/client.ts:2",
+    "name": "get",
+    "qual": "api.get",
+    "file": "frontend/src/api/client.ts",
+    "line": 2,
+    "end": 2,
+    "item": null,
+    "ms": null,
+    "steps": [],
+    "route": null
+   },
+   {
+    "key": "rs/src/lib.rs:5",
+    "name": "app",
+    "qual": "rs.app",
+    "file": "rs/src/lib.rs",
+    "line": 5,
+    "end": 7,
+    "item": null,
+    "ms": null,
+    "steps": [],
+    "route": null
+   },
+   {
+    "key": "rs/src/lib.rs:9",
+    "name": "list",
+    "qual": "rs.list",
+    "file": "rs/src/lib.rs",
+    "line": 9,
+    "end": 11,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "call",
+      "line": 10,
+      "label": "sqlx::query(\"select 1\").fetch_one",
+      "awaited": true,
+      "infra": "infra:db"
+     }
+    ],
+    "route": {
+     "method": "GET",
+     "path": "/api/x"
+    }
+   },
+   {
+    "key": "rs/src/lib.rs:13",
+    "name": "make",
+    "qual": "rs.make",
+    "file": "rs/src/lib.rs",
+    "line": 13,
+    "end": 18,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "call",
+      "line": 15,
+      "label": "c.get",
+      "infra": "infra:http"
+     },
+     {
+      "k": "call",
+      "line": 15,
+      "label": "c.get(\"u\").send",
+      "awaited": true,
+      "infra": "infra:http"
+     },
+     {
+      "k": "call",
+      "line": 16,
+      "label": "helper",
+      "to": "rs/src/lib.rs:20",
+      "deferred": true
+     },
+     {
+      "k": "call",
+      "line": 17,
+      "label": "helper",
+      "to": "rs/src/lib.rs:20"
+     }
+    ],
+    "route": {
+     "method": "POST",
+     "path": "/api/x"
+    }
+   },
+   {
+    "key": "rs/src/lib.rs:20",
+    "name": "helper",
+    "qual": "rs.helper",
+    "file": "rs/src/lib.rs",
+    "line": 20,
+    "end": 22,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "return",
+      "line": 21,
+      "label": "return x"
+     }
+    ],
+    "route": null
+   },
+   {
+    "key": "rs/src/lib.rs:25",
+    "name": "hi",
+    "qual": "rs.hi",
+    "file": "rs/src/lib.rs",
+    "line": 25,
+    "end": 25,
+    "item": null,
+    "ms": null,
+    "steps": [],
+    "route": {
+     "method": "GET",
+     "path": "/hi"
+    }
+   }
+  ],
+  "calls": [
+   [
+    "frontend/src/pages/Items.tsx:4",
+    "frontend/src/pages/Items.tsx:10",
+    "graphify"
+   ],
+   [
+    "backend/app/api/items.py:14",
+    "backend/app/core/service.py:4",
+    "graphify"
+   ],
+   [
+    "backend/app/api/items.py:20",
+    "backend/app/core/service.py:4",
+    "graphify"
+   ],
+   [
+    "backend/app/api/items.py:30",
+    "backend/app/core/db.py:5",
+    "graphify"
+   ],
+   [
+    "frontend/src/pages/Items.tsx:4",
+    "frontend/src/api/client.ts:2",
+    "enrich"
+   ],
+   [
+    "rs/src/lib.rs:13",
+    "rs/src/lib.rs:20",
+    "enrich"
+   ],
+   [
+    "backend/app/api/items.py:14",
+    "backend/app/core/service.py:12",
+    "enrich"
+   ]
+  ],
+  "files": [
+   {
+    "path": "backend/app/__init__.py",
+    "lang": "python",
+    "loc": 0
+   },
+   {
+    "path": "backend/app/api/__init__.py",
+    "lang": "python",
+    "loc": 0
+   },
+   {
+    "path": "backend/app/api/items.py",
+    "lang": "python",
+    "loc": 32
+   },
+   {
+    "path": "backend/app/config.py",
+    "lang": "python",
+    "loc": 2
+   },
+   {
+    "path": "backend/app/core/__init__.py",
+    "lang": "python",
+    "loc": 0
+   },
+   {
+    "path": "backend/app/core/db.py",
+    "lang": "python",
+    "loc": 10
+   },
+   {
+    "path": "backend/app/core/service.py",
+    "lang": "python",
+    "loc": 14
+   },
+   {
+    "path": "backend/app/main.py",
+    "lang": "python",
+    "loc": 11
+   },
+   {
+    "path": "frontend/src/api/client.ts",
+    "lang": "typescript",
+    "loc": 3
+   },
+   {
+    "path": "frontend/src/pages/Items.tsx",
+    "lang": "typescript",
+    "loc": 12
+   },
+   {
+    "path": "rs/src/lib.rs",
+    "lang": "rust",
+    "loc": 25
+   },
+   {
+    "path": "scripts/seed.py",
+    "lang": "python",
+    "loc": 5
+   },
+   {
+    "path": "server/cats.ts",
+    "lang": "typescript",
+    "loc": 7
+   },
+   {
+    "path": "server/index.ts",
+    "lang": "typescript",
+    "loc": 16
+   },
+   {
+    "path": "web/app/api/things/[id]/route.ts",
+    "lang": "typescript",
+    "loc": 3
+   }
+  ],
+  "units": [
+   {
+    "name": "backend",
+    "kind": "server",
+    "dir": "backend",
+    "lang": "python",
+    "framework": "FastAPI",
+    "command": "uv run uvicorn app.main:app --port 8000",
+    "port": 8000
+   },
+   {
+    "name": "frontend",
+    "kind": "web",
+    "dir": "frontend",
+    "lang": "typescript",
+    "framework": "Vite",
+    "command": "npm run dev",
+    "port": 5174
+   },
+   {
+    "name": "rs",
+    "kind": "server",
+    "dir": "rs",
+    "lang": "rust",
+    "framework": "Axum",
+    "command": "cargo run -p rsvc",
+    "port": null
+   },
+   {
+    "name": "server",
+    "kind": "server",
+    "dir": "server",
+    "lang": "javascript",
+    "framework": "Express",
+    "command": "npm start",
+    "port": 4100
+   }
+  ],
+  "http": [
+   {
+    "from": "frontend/src/pages/Items.tsx:4",
+    "to": "backend/app/api/items.py:14",
+    "inferred": false
+   },
+   {
+    "from": "frontend/src/pages/Items.tsx:4",
+    "to": "backend/app/api/items.py:30",
+    "inferred": false
+   }
+  ],
+  "infra": {
+   "nodes": [
+    {
+     "id": "infra:browser",
+     "kind": "browser",
+     "name": "브라우저",
+     "where": "local",
+     "host": null,
+     "evidence": [
+      "화면 코드가 브라우저에서 돈다"
+     ],
+     "dir": null
+    },
+    {
+     "id": "infra:server:backend",
+     "kind": "backend",
+     "name": "FastAPI 서버",
+     "where": "local",
+     "host": "localhost:8000",
+     "evidence": [
+      "FastAPI — backend"
+     ],
+     "dir": "backend"
+    },
+    {
+     "id": "infra:server:rs",
+     "kind": "backend",
+     "name": "Axum 서버",
+     "where": "local",
+     "host": null,
+     "evidence": [
+      "Axum — rs"
+     ],
+     "dir": "rs"
+    },
+    {
+     "id": "infra:server:server",
+     "kind": "backend",
+     "name": "Express 서버",
+     "where": "local",
+     "host": "localhost:4100",
+     "evidence": [
+      "Express — server"
+     ],
+     "dir": "server"
+    },
+    {
+     "id": "infra:db",
+     "kind": "db",
+     "name": "PostgreSQL",
+     "where": "container",
+     "host": "db:5432",
+     "evidence": [
+      "코드: sqlalchemy, @prisma/client, sqlx — backend/app/core/db.py 외 2개 파일",
+      "의존성: sqlx — rs/Cargo.toml",
+      "의존성: @prisma/client — server/package.json",
+      "docker-compose: db (postgres:16, 포트 15432) — docker-compose.yml",
+      "설정: .env.example DATABASE_URL → localhost:15432",
+      "설정: backend/app/config.py DATABASE_URL → db:5432"
+     ],
+     "dir": null
+    },
+    {
+     "id": "infra:http",
+     "kind": "api",
+     "name": "외부 HTTP",
+     "where": "external",
+     "host": null,
+     "evidence": [
+      "코드: httpx, fetch, reqwest — backend/app/core/service.py 외 2개 파일"
+     ],
+     "dir": null
+    },
+    {
+     "id": "infra:redis",
+     "kind": "cache",
+     "name": "Redis",
+     "where": "container",
+     "host": "your-redis-host",
+     "evidence": [
+      "의존성: redis — backend/pyproject.toml",
+      "docker-compose: cache (redis:7) — docker-compose.yml",
+      "설정: .env.example REDIS_HOST → your-redis-host"
+     ],
+     "dir": null
+    }
+   ],
+   "links": [
+    {
+     "from": "infra:browser",
+     "to": "infra:server:backend",
+     "protocol": "HTTP"
+    },
+    {
+     "from": "infra:server:backend",
+     "to": "infra:db",
+     "protocol": "SQL"
+    },
+    {
+     "from": "infra:server:rs",
+     "to": "infra:db",
+     "protocol": "SQL"
+    },
+    {
+     "from": "infra:server:server",
+     "to": "infra:db",
+     "protocol": "SQL"
+    },
+    {
+     "from": "infra:server:backend",
+     "to": "infra:http",
+     "protocol": "HTTPS"
+    },
+    {
+     "from": "infra:server:rs",
+     "to": "infra:http",
+     "protocol": "HTTPS"
+    },
+    {
+     "from": "infra:server:backend",
+     "to": "infra:redis",
+     "protocol": "Redis"
+    }
+   ]
+  }
  }
 }

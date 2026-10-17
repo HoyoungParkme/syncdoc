@@ -1,0 +1,1 @@
+{"dependencies": {"react": "18", "pg": "8"}, "devDependencies": {"vite": "5"}, "scripts": {"dev": "vite --port 5174"}}
