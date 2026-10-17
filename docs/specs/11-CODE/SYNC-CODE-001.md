@@ -1557,7 +1557,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | Alembic 리비전 `traces` · `core/trace/models.py`·`repository.py`·`service.py` — [[SYNC-MS-025]] 전부 · [[SYNC-MS-001#ProjectService.delete_project]] 2b |
 | 테스트 | MS-025 테스트 관점 · 해제 시험 · `cargo xtask migrations` 다시(Rust는 L27) |
 | 선행 | CH |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/CI-traces` · spec 3 + code 7 · 파이썬 `pytest` TraceService 8 · 마이그레이션 시험(traces 표·인덱스) · `ruff` · `check_code` 파이썬 188/188 · `cargo xtask migrations` 0019 |
 
 #### CJ 실행 기록 ② — 기록 API·토큰 경로
 
