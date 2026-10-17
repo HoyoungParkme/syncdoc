@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import re
 from contextvars import ContextVar
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, is_dataclass, replace
 from pathlib import Path
 from typing import Any, Literal
 
@@ -26,6 +26,7 @@ from app.core.errors import NotFound, Problem, Unauthorized
 from app.core.markdown import masked_lines
 from app.core.project.service import ProjectService
 from app.core.spec.service import SUBTYPES, TYPES
+from app.core.trace.service import TraceService
 from app.core.types import (
     STAGE_OF,
     Author,
@@ -341,6 +342,52 @@ async def get_flow(project_code: str, function: str) -> CallToolResult:
     except Problem as p:
         return _problem(p)
     return _ok(v)
+
+
+TRACE_HINT = (
+    "기록이 없다 — 사람의 PC에서 기록 도구로 올린다: syncdoc-local trace --to <이 서버 주소> --project {code} "
+    "-- <서버를 띄우는 명령> (작업이면 --job, 화면은 syncdoc-local trace-web)"
+)
+
+
+@server.tool(
+    description="프로젝트의 실행 기록 목록을 최근 것부터 돌려준다 — 종류(back 서버 요청·front 화면·job 작업)·방법·경로·"
+    "상태·오류 한 줄·걸린 시간·사건 수·잘림·기록할 때의 커밋. 기록은 사람이 PC에서 기록 도구(syncdoc-local trace)로 "
+    "올린 것이다. 비어 있으면 hint에 기록 도구 명령이 온다. limit은 1~300(기본 30)."
+)
+async def list_traces(project_code: str, limit: int = 30) -> CallToolResult:
+    """SYNC-API-002#list_traces"""
+    try:
+        with db.session_scope() as s:
+            user = _user(s)
+            project = ProjectService(s).get_owned(project_code, user)
+            items = TraceService(s).list_recent(project.id, max(1, min(limit, 300)))
+    except Problem as p:
+        return _problem(p)
+    return _ok({"traces": items, "hint": None if items else TRACE_HINT.format(code=project_code)})
+
+
+@server.tool(
+    description="실행 기록 하나를 사건까지 돌려준다 — 불린 함수(그래프 열쇠)와 부모·인자·반환값·예외, DB·HTTP 같은 장비 "
+    "사건, 시간. 비밀 이름의 값은 기록 도구가 ***로 가렸다. 실패한 요청이 어디서 왜 실패했는지 볼 때 부른다. 사건이 많으면 "
+    "max_events(1~2000, 기본 400)에서 자르고 truncated를 켠다."
+)
+async def get_trace(project_code: str, trace_id: int, max_events: int = 400) -> CallToolResult:
+    """SYNC-API-002#get_trace"""
+    try:
+        with db.session_scope() as s:
+            user = _user(s)
+            project = ProjectService(s).get_owned(project_code, user)
+            v = TraceService(s).get(project.id, trace_id)
+    except Problem as p:
+        return _problem(p)
+    n = max(1, min(max_events, 2000))
+    record = dict(v.record)
+    events = record.get("events") or []
+    if len(events) > n:
+        record["events"] = events[:n]
+        record["truncated"] = True
+    return _ok(replace(v, record=record))
 
 
 @server.tool(
