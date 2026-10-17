@@ -83,6 +83,7 @@ app/
 │   ├── account/            사용자, 액세스토큰
 │   ├── conversation/       대화, 턴, 첨부 — 읽는 중 질의의 보관 (2026-09-29, 카드 AQ·AR)
 │   ├── codegraph/          코드 그래프 — graph.py(순수: 추출·줄이기·보강·대조) · service.py(한 행 읽고 쓰기) (2026-09-30, 카드 AX)
+│   │                       javago.py(순수: Java·Go 보강, 2026-10-17 카드 CM)
 │   │                       흐름 보기(2026-10-12, 카드 CC~CE) — flow.py(순수: 더하기 조율·파일 목록) · steps.py(호출 순서) · routes.py(라우트·화면 요청) · infra.py(장비·실행 단위)
 │   ├── trace/              실행 기록 — 기록 받기·300개·커버리지 (2026-10-12, 카드 CI·CJ)
 │   │
@@ -165,6 +166,7 @@ frontend/
 | `backend/app/core/types.py` | 열거형·DTO | [[SYNC-DOM-002]] 2.7·2.8 |
 | `backend/app/core/errors.py` | 에러 | [[SYNC-STD-004#DEV-5]] · [[SYNC-API-001]] 2장 |
 | `backend/app/core/clock.py` | 시각 | [[SYNC-STD-004#DEV-18]] |
+| `backend/app/core/codegraph/javago.py` | 그래프 보강(Java·Go) | [[SYNC-MS-011#codegraph.enrich]] 2i~2l |
 | `backend/app/core/markdown.py` | 명세 파싱 | [[SYNC-STD-001]] 1장·3장 |
 | `backend/app/web/auth.py` · `backend/app/mcp/auth.py` | 인증 | [[SYNC-INFRA-001]] 5장 |
 | `backend/app/web/schemas/*` | 웹 스키마 | [[SYNC-API-001]] 4장 |
