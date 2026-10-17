@@ -188,6 +188,7 @@ crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 
 | `local/crates/core/src/types.rs` | 열거형·DTO | [[SYNC-DOM-002]] 2.7·2.8 |
 | `local/crates/server/src/web/schemas.rs` | 응답 형태 | [[SYNC-API-001]] 4장 |
 | `local/crates/server/src/web/sse.rs` | 질문 스트림 포장 | [[SYNC-API-001]] 3.4·3.6 |
+| `local/crates/app/tracers/**` | 기록기(사용자 프로그램 안에서 돈다 — Python·Node·브라우저·Rust 도우미) | [[SYNC-INFRA-001]] 9.9 · [[SYNC-MS-027]] 2장 trace |
 | `local/crates/core/src/clock.rs` | 시각 | [[SYNC-STD-004#DEV-18]] |
 | `local/crates/core/src/*/repo.rs` | 리포지토리 | [[SYNC-DOM-004]] 4장 · [[SYNC-DOM-003]] |
 | `local/crates/*/build.rs` | 빌드 설정 | [[SYNC-STD-004#DEV-7]] · [[SYNC-INFRA-001]] 9.2 |
@@ -995,14 +996,16 @@ classDiagram
     }
     class trace_cmd {
         +run(args) ExitCode
-        +detect(command, cwd) Lang
+        +detect(command) Lang
         +unpack(dir) Kit
-        +env_for(lang, kit, spans, out) Vec
-        +watch(out, upload) 
-        +fetch_spans(to, project, token) TraceSpans
-        +send(to, project, token, record) 
-        +copy_rust(cwd, spans, dir) PathBuf
-        +proxy(target, port, kit, spans, out)
+        +span_table(spans, root) SpanTable
+        +env_for(lang, kit, spans, out, root, job) Vec
+        +normalize(record, commit)
+        +watch(client, out, to, project, token, commit) usize
+        +fetch_spans(client, to, project, token) Value
+        +send(client, to, project, token, record) u16
+        +copy_rust(cwd, files, copy, helper) Prepared
+        +proxy(args) ExitCode
     }
 ```
 
