@@ -59,6 +59,7 @@ fn card_of(tool: &str) -> &'static str {
         "upload_code" => "L11",
         "get_code_graph" => "L12",
         "get_flow" => "L26",
+        "list_traces" | "get_trace" => "L31",
         _ => "L3",
     }
 }
