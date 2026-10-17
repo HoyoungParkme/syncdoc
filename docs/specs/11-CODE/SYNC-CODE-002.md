@@ -316,7 +316,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | [[SYNC-MS-018]] `queries.trace_spans` · `server/src/web/routes/traces.rs`·`code.rs` · `guard.rs` 토큰 경로 |
 | 테스트 | 계약 `--with-card L28` |
 | 선행 | CJ · L27 |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/L28-trace-api-rust` · spec 2 + code 3 · 계약 `--target both --with-card L28` `test_l28_traces.py` 54 통과(trace-spans 토큰·로컬·틀린 토큰 401·올리기 201/200·꼴·시각·4MB 413·JSON 아님·남의 것·목록·하나·아주 큰 id·커버리지·지우기) · clippy · 되먹임: 파이썬 판이 DB 정수 범위 밖 기록 번호에 500을 내던 것을 404로 |
 
 #### L29 실행 기록 ③ — 기록 도구 `syncdoc-local trace`·`trace-web`
 

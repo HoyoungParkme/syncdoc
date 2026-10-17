@@ -1568,7 +1568,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | API | [[SYNC-API-001#GET/api/projects/{code}/trace-spans]] · [[SYNC-API-001#POST/api/projects/{code}/traces]] · `GET`·`DELETE …/traces` · `GET …/traces/coverage` · `GET`·`DELETE …/traces/{id}` |
 | 테스트 | 라우터 시험(토큰·세션·남의 것·4MB·같은 기록 200) · 계약 시험(L28) |
 | 선행 | CI |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/CJ-trace-api` · code 3 · 파이썬 라우터 시험 4(토큰·세션·남의 것·4MB 413·같은 기록 200·꼴 422) · `pytest` 525 · 계약 L28 54 사례 두 판 같다 · `check_code` 188/188 · `check_calls` 0 |
 
 #### CK 실행 기록 ③ — UI-19 기록 목록·재생
 
