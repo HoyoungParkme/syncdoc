@@ -441,6 +441,9 @@ impl ProjectService<'_> {
         CodeGraphService { db: &mut *self.db }
             .delete_by_project(project.id)
             .await?;
+        crate::trace::TraceService { db: &mut *self.db }
+            .delete_by_project(project.id)
+            .await?;
         repo::delete_all_of(&mut *self.db, project.id).await?;
         let _ = fs::remove_dir_all(&workdir);
         // 서버 저장이면 원본을 지우지 않고 보관한다 — 같은 코드로 가져오면 되살아난다(L11).
