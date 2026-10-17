@@ -39,6 +39,7 @@ from app.web.routers import (
     projects,
     references,
     specs,
+    traces,
 )
 from app.web.routers import git as git_router
 
@@ -111,6 +112,7 @@ for r in (
     conversations.router,
     code.router,
     flow.router,  # 흐름 보기 (카드 CF)
+    traces.router,  # 실행 기록 (카드 CJ)
     admin.router,
     hooks.router,
     git_router.router,  # 서버 저장소 git 입구 (카드 BB)
