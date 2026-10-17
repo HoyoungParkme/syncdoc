@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-027
 type: MS
 title: MINISPEC — trace — 실행 기록 받기·기록 도구·요청 보내기 (Rust)
-status: draft
+status: approved
 upstream: [SYNC-DOM-004, SYNC-MS-025, SYNC-INFRA-001, SYNC-API-001]
 ---
 
