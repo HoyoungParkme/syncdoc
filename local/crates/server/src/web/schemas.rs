@@ -20,7 +20,8 @@ use syncdoc_core::types::{
     CodeBrief as CodeBriefDto, CodeCalls as CodeCallsDto, CodeFunction as CodeFunctionDto,
     CodeGraphInfo as CodeGraphInfoDto, CodeLayer as CodeLayerDto, CodeNodes as CodeNodesDto,
     CodeRef as CodeRefDto, CodeText as CodeTextDto, CodeView as CodeViewDto,
-    FlowFunction as FlowFunctionDto, FlowView as FlowViewDto,
+    FlowFunction as FlowFunctionDto, FlowView as FlowViewDto, TraceBrief as TraceBriefDto,
+    TraceCoverage as TraceCoverageDto, TraceSpans as TraceSpansDto, TraceView as TraceViewDto,
 };
 use syncdoc_core::types::{
     HookStatus as HookStatusDto, RebuildResult as RebuildResultDto, RepoStatus as RepoStatusDto,
@@ -1076,6 +1077,131 @@ impl From<&FlowViewDto> for FlowView {
                 .collect(),
         }
     }
+}
+
+/// `TraceBrief` — 실행 기록의 머리 (`web/schemas/trace.py`, 카드 L28)
+#[derive(Debug, Serialize)]
+pub struct TraceBrief {
+    pub id: i64,
+    pub trace_key: String,
+    pub kind: String,
+    pub method: Option<String>,
+    pub path: String,
+    pub status: Option<i64>,
+    pub error: Option<String>,
+    pub started_at: String,
+    pub ms: i64,
+    pub commit_hash: Option<String>,
+    pub event_count: i64,
+    pub truncated: bool,
+    pub received_at: String,
+}
+
+impl From<&TraceBriefDto> for TraceBrief {
+    fn from(b: &TraceBriefDto) -> Self {
+        TraceBrief {
+            id: b.id,
+            trace_key: b.trace_key.clone(),
+            kind: b.kind.clone(),
+            method: b.method.clone(),
+            path: b.path.clone(),
+            status: b.status,
+            error: b.error.clone(),
+            started_at: iso_utc(b.started_at),
+            ms: b.ms,
+            commit_hash: b.commit_hash.clone(),
+            event_count: b.event_count,
+            truncated: b.truncated,
+            received_at: iso_utc(b.received_at),
+        }
+    }
+}
+
+/// `TraceView` — 머리와 받은 기록 그대로
+#[derive(Debug, Serialize)]
+pub struct TraceView {
+    #[serde(flatten)]
+    pub brief: TraceBrief,
+    pub record: serde_json::Value,
+}
+
+impl From<&TraceViewDto> for TraceView {
+    fn from(v: &TraceViewDto) -> Self {
+        TraceView {
+            brief: TraceBrief::from(&v.brief),
+            record: v.record.clone(),
+        }
+    }
+}
+
+/// `TraceCoverage` — 기록에 나온 함수 열쇠와 닿은 장비
+#[derive(Debug, Serialize)]
+pub struct TraceCoverage {
+    pub traces: i64,
+    pub keys: Vec<String>,
+    pub infra: Vec<serde_json::Value>,
+}
+
+impl From<&TraceCoverageDto> for TraceCoverage {
+    fn from(c: &TraceCoverageDto) -> Self {
+        TraceCoverage {
+            traces: c.traces,
+            keys: c.keys.clone(),
+            infra: c
+                .infra
+                .iter()
+                .map(|(k, t)| serde_json::json!({"kind": k, "target": t}))
+                .collect(),
+        }
+    }
+}
+
+/// `TraceSpan` — 기록 도구가 감쌀 함수 하나
+#[derive(Debug, Serialize)]
+pub struct TraceSpan {
+    pub key: String,
+    pub file: String,
+    pub line: i64,
+    pub end: i64,
+    pub name: String,
+    pub qual: String,
+    pub route: serde_json::Value,
+}
+
+/// `TraceSpans` — 기록 도구의 준비
+#[derive(Debug, Serialize)]
+pub struct TraceSpans {
+    pub commit_hash: Option<String>,
+    pub spans: Vec<TraceSpan>,
+    pub infra: Vec<serde_json::Value>,
+}
+
+impl From<&TraceSpansDto> for TraceSpans {
+    fn from(t: &TraceSpansDto) -> Self {
+        TraceSpans {
+            commit_hash: t.commit_hash.clone(),
+            spans: t
+                .spans
+                .iter()
+                .map(|s| TraceSpan {
+                    key: s.key.clone(),
+                    file: s.file.clone(),
+                    line: s.line,
+                    end: s.end,
+                    name: s.name.clone(),
+                    qual: s.qual.clone(),
+                    route: s.route.clone(),
+                })
+                .collect(),
+            infra: t.infra.clone(),
+        }
+    }
+}
+
+/// `Deleted` — 지운 수
+#[derive(Debug, Serialize)]
+pub struct Deleted {
+    pub deleted: i64,
 }
 
 /// `AttachmentMeta` — 첨부 메타 (`web/schemas/conversations.py`, 카드 L14)

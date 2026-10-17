@@ -15,9 +15,9 @@ use crate::compat::fastapi::{self, schemas};
 use crate::compat::pydantic::Validator;
 use crate::compat::pyvalue::{PyStr, PyValue};
 use crate::state::AppState;
-use crate::web::auth::current_user;
+use crate::web::auth::{current_user, token_or_session_user};
 use crate::web::problem::ApiProblem;
-use crate::web::schemas::{CodeCalls, CodeNodes, CodeText, CodeView, FlowView};
+use crate::web::schemas::{CodeCalls, CodeNodes, CodeText, CodeView, FlowView, TraceSpans};
 
 static CODE_FILE: LazyLock<Validator> = LazyLock::new(schemas::code_file);
 static LINE: LazyLock<Validator> = LazyLock::new(schemas::version_no);
@@ -95,6 +95,21 @@ pub async fn flow_view(
     let user = current_user(&mut c, &state).await?;
     let v = queries::flow_view(&mut c, &state.repos, &code, &user).await?;
     Ok(Json(FlowView::from(&v)))
+}
+
+/// SYNC-API-001#GET/api/projects/{code}/trace-spans
+///
+/// 기록 도구의 준비 — 개인 토큰으로도 된다(API-001 1장, 카드 L28)
+pub async fn trace_spans(
+    State(state): State<AppState>,
+    Path(code): Path<String>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<TraceSpans>, ApiProblem> {
+    let mut tx = state.pool.begin().await.map_err(Problem::from)?;
+    let user = token_or_session_user(&mut tx, &state, &headers).await?;
+    let v = queries::trace_spans(&mut tx, &state.repos, &code, &user).await?;
+    tx.commit().await.map_err(Problem::from)?;
+    Ok(Json(TraceSpans::from(&v)))
 }
 
 /// SYNC-API-001#GET/api/projects/{code}/code/source

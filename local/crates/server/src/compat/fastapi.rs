@@ -513,6 +513,13 @@ pub mod schemas {
     }
 
     /// 경로의 `int` 값
+    /// `TraceRecord` — 파이썬 판 `web/schemas/trace.py`의 core schema 그대로 (POST /api/projects/{code}/traces, 카드 L28)
+    pub fn trace_record() -> Validator {
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("trace_record.json")).expect("TraceRecord JSON");
+        Validator::new(&schema, "TraceRecord").expect("TraceRecord 스키마")
+    }
+
     pub fn int() -> Validator {
         Validator::new(&json!({"type": "int"}), "int").expect("int 스키마")
     }
