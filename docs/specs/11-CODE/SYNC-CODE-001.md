@@ -1598,7 +1598,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | [[SYNC-MS-011#codegraph.enrich]] 2i~2l · `core/codegraph/javago.py` · 테스트 파일에 `*_test.go` |
 | 테스트 | MS-011 테스트 관점(Java·Go) · graphify Java 노드와 key가 같다(커뮤니티가 붙는다) · `check_code`·`check_calls` |
 | 선행 | CL |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `spec/java-go`(CN·L32~L34와 한 브랜치) · spec 2 + code 1 · `pytest` 535 · `ruff` · `check_code` 188/188 · `check_calls` 0 · graphify Java 노드와 key가 같다(선언 첫 줄 — 어노테이션 줄부터, 되먹임으로 명세를 고쳤다) |
 
 #### CN 흐름 보기 ⑧ — Java·Go 호출 순서·라우트·장비·실행 단위
 
@@ -1608,7 +1608,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | [[SYNC-MS-024]] steps·routes·infra의 Java·Go(Spring 어노테이션·Go 등록 호출·Java 받는 쪽 타입·Go import 경로·pom/gradle/go.mod·Spring Boot·Go 단위) · `steps.py`·`routes.py`·`infra.py` · 화면 「기록 가능」에 java·go |
 | 테스트 | MS-024 테스트 관점(Java·Go) · 정답 파일·`codegraph-diff`(L32·L33) |
 | 선행 | CM |
-| 완료 | — |
+| 완료 | 2026-10-17 · 같은 브랜치 · spec 2 + code 2 · MS-024 테스트 관점 Java·Go 5 · 계약 L25·L28 스냅숏을 파이썬 판으로 다시 떴다(흐름 시험 저장소에 Spring·Go를 더해서) · 두 판 계약 1368 통과 |
 
 ## 2. 통합 테스트 시나리오
 
