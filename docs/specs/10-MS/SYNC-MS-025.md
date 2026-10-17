@@ -2,7 +2,7 @@
 doc_id: SYNC-MS-025
 type: MS
 title: MINISPEC — trace — 실행 기록 받기·목록·커버리지
-status: draft
+status: approved
 upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001]
 ---
 
