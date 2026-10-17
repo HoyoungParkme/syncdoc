@@ -498,6 +498,196 @@ const LIBS: &[(&str, &str, &str, &str, &str, &str)] = &[
         r#"^send$"#,
         "S3",
     ),
+    // Java — 받는 쪽 타입(JAVA_TYPES·저장소 인터페이스)으로 장비 호출만 골랐다 · Go — import 경로(`/vN` 조각을 뗀 것)
+    ("spring-data", "db", "db", "DB", r#"."#, "SQL"),
+    ("jdbc", "db", "db", "DB", r#"."#, "SQL"),
+    ("jpa", "db", "db", "DB", r#"."#, "SQL"),
+    ("jooq", "db", "db", "DB", r#"."#, "SQL"),
+    ("mybatis", "db", "db", "DB", r#"."#, "SQL"),
+    ("java-mongo", "mongo", "db", "MongoDB", r#"."#, "Mongo"),
+    ("java-neo4j", "neo4j", "db", "Neo4j", r#"."#, "Bolt"),
+    ("java-redis", "redis", "cache", "Redis", r#"."#, "Redis"),
+    ("java-http", "http", "api", "외부 HTTP", r#"."#, "HTTPS"),
+    ("java-kafka", "queue", "queue", "Kafka", r#"."#, "Kafka"),
+    ("java-amqp", "queue", "queue", "메시지 큐", r#"."#, "AMQP"),
+    ("java-s3", "storage", "storage", "S3 저장소", r#"."#, "S3"),
+    (
+        "java-search",
+        "search",
+        "search",
+        "Elasticsearch",
+        r#"."#,
+        "HTTP",
+    ),
+    ("spring-ai", "llm", "api", "LLM API", r#"."#, "HTTPS"),
+    (
+        "database/sql",
+        "db",
+        "db",
+        "DB",
+        r#"^(Query\w*|Exec\w*|Prepare\w*|Begin\w*|Ping\w*)$"#,
+        "SQL",
+    ),
+    (
+        "github.com/jackc/pgx",
+        "db",
+        "db",
+        "PostgreSQL",
+        r#"^(Query\w*|Exec\w*|Begin\w*|SendBatch|CopyFrom|Ping)$"#,
+        "SQL",
+    ),
+    (
+        "github.com/jackc/pgx/pgxpool",
+        "db",
+        "db",
+        "PostgreSQL",
+        r#"^(Query\w*|Exec\w*|Begin\w*|SendBatch|CopyFrom|Ping)$"#,
+        "SQL",
+    ),
+    (
+        "gorm.io/gorm",
+        "db",
+        "db",
+        "DB",
+        r#"^(Create|Save|First|Find|Take|Last|Delete|Updates?|Exec|Raw|Count|Scan|Pluck|Transaction)$"#,
+        "SQL",
+    ),
+    (
+        "go.mongodb.org/mongo-driver/mongo",
+        "mongo",
+        "db",
+        "MongoDB",
+        r#"^(Find\w*|Insert\w*|Update\w*|Delete\w*|ReplaceOne|Aggregate|CountDocuments|BulkWrite)$"#,
+        "Mongo",
+    ),
+    (
+        "github.com/redis/go-redis",
+        "redis",
+        "cache",
+        "Redis",
+        r#"^(Get|Set\w*|Del|Exists|Expire\w*|Incr\w*|Decr\w*|HGet\w*|HSet\w*|HDel|[LR]Push|[LR]Pop|LRange|Publish|Subscribe|XAdd|XRead\w*|ZAdd|ZRange\w*|SAdd|SMembers|Ping)$"#,
+        "Redis",
+    ),
+    (
+        "github.com/go-redis/redis",
+        "redis",
+        "cache",
+        "Redis",
+        r#"^(Get|Set\w*|Del|Exists|Expire\w*|Incr\w*|Decr\w*|HGet\w*|HSet\w*|HDel|[LR]Push|[LR]Pop|LRange|Publish|Subscribe|XAdd|XRead\w*|ZAdd|ZRange\w*|SAdd|SMembers|Ping)$"#,
+        "Redis",
+    ),
+    (
+        "net/http",
+        "http",
+        "api",
+        "외부 HTTP",
+        r#"^(Get|Post|PostForm|Head|Do)$"#,
+        "HTTPS",
+    ),
+    (
+        "github.com/aws/aws-sdk-go-v2/service/s3",
+        "storage",
+        "storage",
+        "S3 저장소",
+        r#"^(PutObject|GetObject|ListObjects\w*|DeleteObjects?|HeadObject|CopyObject|CreateBucket|ListBuckets)$"#,
+        "S3",
+    ),
+    (
+        "github.com/sashabaranov/go-openai",
+        "openai",
+        "api",
+        "OpenAI API",
+        r#"^(CreateChatCompletion\w*|CreateCompletion\w*|CreateEmbeddings)$"#,
+        "HTTPS",
+    ),
+    (
+        "github.com/anthropics/anthropic-sdk-go",
+        "anthropic",
+        "api",
+        "Anthropic API",
+        r#"^(New|NewStreaming)$"#,
+        "HTTPS",
+    ),
+    (
+        "github.com/segmentio/kafka-go",
+        "queue",
+        "queue",
+        "Kafka",
+        r#"^(WriteMessages|ReadMessage|FetchMessage|CommitMessages)$"#,
+        "Kafka",
+    ),
+    (
+        "github.com/rabbitmq/amqp091-go",
+        "queue",
+        "queue",
+        "RabbitMQ",
+        r#"^(Publish\w*|Consume\w*)$"#,
+        "AMQP",
+    ),
+];
+/// Java 타입 → LIBS 키 — 필드·매개변수·지역 변수의 타입이 이것이면 그 메서드 호출은 장비 호출
+const JAVA_TYPES: &[(&str, &str)] = &[
+    ("JdbcTemplate", "jdbc"),
+    ("NamedParameterJdbcTemplate", "jdbc"),
+    ("JdbcClient", "jdbc"),
+    ("EntityManager", "jpa"),
+    ("DSLContext", "jooq"),
+    ("SqlSession", "mybatis"),
+    ("RestTemplate", "java-http"),
+    ("WebClient", "java-http"),
+    ("RestClient", "java-http"),
+    ("OkHttpClient", "java-http"),
+    ("HttpClient", "java-http"),
+    ("CloseableHttpClient", "java-http"),
+    ("RedisTemplate", "java-redis"),
+    ("StringRedisTemplate", "java-redis"),
+    ("ReactiveRedisTemplate", "java-redis"),
+    ("ReactiveStringRedisTemplate", "java-redis"),
+    ("RedissonClient", "java-redis"),
+    ("Jedis", "java-redis"),
+    ("JedisPool", "java-redis"),
+    ("MongoTemplate", "java-mongo"),
+    ("ReactiveMongoTemplate", "java-mongo"),
+    ("MongoClient", "java-mongo"),
+    ("MongoDatabase", "java-mongo"),
+    ("KafkaTemplate", "java-kafka"),
+    ("RabbitTemplate", "java-amqp"),
+    ("AmqpTemplate", "java-amqp"),
+    ("S3Client", "java-s3"),
+    ("S3AsyncClient", "java-s3"),
+    ("AmazonS3", "java-s3"),
+    ("S3Presigner", "java-s3"),
+    ("MinioClient", "java-s3"),
+    ("ElasticsearchClient", "java-search"),
+    ("RestHighLevelClient", "java-search"),
+    ("ElasticsearchOperations", "java-search"),
+    ("OpenSearchClient", "java-search"),
+    ("ChatClient", "spring-ai"),
+    ("ChatModel", "spring-ai"),
+    ("EmbeddingModel", "spring-ai"),
+    ("VectorStore", "spring-ai"),
+];
+/// 저장소 인터페이스가 넓히는 타입 → LIBS 키 (표 차례로 첫 맞는 줄)
+const REPO_BASES: &[(&str, &str)] = &[
+    (r"^(Mongo|ReactiveMongo)Repository$", "java-mongo"),
+    (r"^Elasticsearch(Crud)?Repository$", "java-search"),
+    (r"^Neo4jRepository$", "java-neo4j"),
+    (
+        r"^(Jpa|Crud|ListCrud|PagingAndSorting|ListPagingAndSorting|R2dbc|ReactiveCrud|Revision)\w*$|^Repository$|^JpaSpecificationExecutor$|^QuerydslPredicateExecutor$",
+        "spring-data",
+    ),
+];
+/// 패키지 이름이 경로의 마지막 조각에서 안 나오는 Go 경로
+const GO_NAMES: &[(&str, &str)] = &[
+    ("github.com/rabbitmq/amqp091-go", "amqp"),
+    ("github.com/anthropics/anthropic-sdk-go", "anthropic"),
+];
+const GO_FRAMEWORKS: &[(&str, &str)] = &[
+    ("gin-gonic/gin", "Gin"),
+    ("labstack/echo", "Echo"),
+    ("go-chi/chi", "chi"),
+    ("gofiber/fiber", "Fiber"),
+    ("gorilla/mux", "gorilla/mux"),
 ];
 /// 의존성 패키지 → (id, kind, name, protocol) — 파이썬 판 `DEPS`
 const DEPS: &[(&str, &str, &str, &str, &str)] = &[
@@ -707,16 +897,21 @@ const COMPOSE: [&str; 5] = [
     "compose.yaml",
     "docker-compose.dev.yml",
 ];
-const MANIFESTS: [&str; 5] = [
+const MANIFESTS: [&str; 9] = [
     "package.json",
     "pyproject.toml",
     "requirements.txt",
     "manage.py",
     "Cargo.toml",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "go.mod",
 ];
 
 struct Compiled {
     libs_io: Vec<Regex>,
+    repo_bases: Vec<Regex>,
     deps: Vec<Regex>,
     images: Vec<Regex>,
     schemes: Vec<Regex>,
@@ -731,6 +926,7 @@ struct Compiled {
 
 static RE: LazyLock<Compiled> = LazyLock::new(|| Compiled {
     libs_io: LIBS.iter().map(|l| ascii(l.4, false)).collect(),
+    repo_bases: REPO_BASES.iter().map(|r| ascii(r.0, false)).collect(),
     deps: DEPS.iter().map(|d| ascii(d.0, true)).collect(),
     images: IMAGES.iter().map(|d| ascii(d.0, false)).collect(),
     schemes: SCHEMES.iter().map(|d| ascii(d.0, false)).collect(),
@@ -823,6 +1019,43 @@ lazy_re!(HOST_TAIL, py_re(r"(?i)host(name)?$"));
 lazy_re!(DIGITS, py_re(r"^\d+$"));
 lazy_re!(PRISMA_PROVIDER, ascii(r#"provider\s*=\s*"(\w+)""#, false));
 lazy_re!(DIALECT, py_re(r#"dialect\s*:\s*["'](\w+)["']"#));
+lazy_re!(
+    POM_DEP,
+    py_re(r"<dependency>[\s\S]*?<groupId>([^<]+)</groupId>[\s\S]*?<artifactId>([^<]+)<")
+);
+lazy_re!(
+    GRADLE_DEP,
+    ascii(
+        r#"(?:implementation|api|runtimeOnly|compileOnly)\s*\(?\s*["']([\w.-]+):([\w.-]+)"#,
+        false
+    )
+);
+lazy_re!(
+    GO_REQUIRE,
+    ascii(
+        r"(?m)^\s*(?:require\s+)?([\w.-]+\.[\w.-]+/[\w./-]+)\s+v[\d.]",
+        false
+    )
+);
+lazy_re!(SPRING_DEFAULTS, ascii(r"\$\{[\w.]+:-?([^}]*)\}", false));
+lazy_re!(
+    SPRING_YAML_PORT,
+    ascii(r"(?m)^server:\s*\n(?:\s+.*\n)*?\s+port:\s*(\d+)", false)
+);
+lazy_re!(
+    SPRING_PROP_PORT,
+    ascii(r"(?m)^server\.port\s*=\s*(\d+)", false)
+);
+lazy_re!(
+    SPRING_TEXT,
+    Regex::new(r"spring-boot|springframework\.boot").expect("spring")
+);
+lazy_re!(GO_MAIN, ascii(r"(?m)^package main(?-u:\b)", false));
+lazy_re!(GO_PORT, ascii(r#"["'`](?:[\w.]*):(\d{4,5})["'`]"#, false));
+lazy_re!(
+    GO_TWO,
+    ascii(r"^([A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*)", false)
+);
 
 fn lib_of(pkg: &str) -> Option<usize> {
     LIBS.iter().position(|l| l.0 == pkg)
@@ -1237,10 +1470,123 @@ fn rust_unit(src_dir: &Path, d: &str) -> Option<Value> {
     ))
 }
 
+/// `src/main/resources/application.yml|yaml|properties`의 `server.port` — 없으면 8080
+fn spring_port(src_dir: &Path, d: &str) -> i64 {
+    for f in [
+        "application.yml",
+        "application.yaml",
+        "application.properties",
+    ] {
+        let Some(text) = text_of(&sub(src_dir, d).join("src/main/resources").join(f)) else {
+            continue;
+        };
+        let text = SPRING_DEFAULTS.replace_all(&text, "$1");
+        let m = SPRING_YAML_PORT
+            .captures(&text)
+            .or_else(|| SPRING_PROP_PORT.captures(&text));
+        if let Some(m) = m
+            && let Some(v) = py_int(&m[1])
+        {
+            return v;
+        }
+    }
+    8080
+}
+
+/// Spring Boot — `pom.xml`·`build.gradle(.kts)`(그 차례로 첫 것)에 `spring-boot`가 있으면
+fn java_unit(src_dir: &Path, d: &str, names: &HashSet<String>) -> Option<Value> {
+    for file in ["pom.xml", "build.gradle", "build.gradle.kts"] {
+        if !names.contains(file) {
+            continue;
+        }
+        let text = text_of(&sub(src_dir, d).join(file)).unwrap_or_default();
+        if !SPRING_TEXT.is_match(&text) {
+            return None;
+        }
+        let gradle = file != "pom.xml";
+        let wrapper = is_file(&sub(src_dir, d).join(if gradle { "gradlew" } else { "mvnw" }));
+        let command = match (gradle, wrapper) {
+            (true, true) => "./gradlew bootRun",
+            (true, false) => "gradle bootRun",
+            (false, true) => "./mvnw spring-boot:run",
+            (false, false) => "mvn spring-boot:run",
+        };
+        return Some(unit(
+            unit_name(d),
+            "server",
+            d,
+            "java",
+            "Spring Boot",
+            Some(command.to_string()),
+            Some(spring_port(src_dir, d)),
+        ));
+    }
+    None
+}
+
+/// Go — `go.mod` 폴더 아래 깊이 4까지 `.go`(테스트 빼고, 경로 바이트 순) 중 `package main`과 `func main(`이 든 첫
+/// 파일. net/http는 그 파일이 `net/http`를 가져올 때만
+fn go_unit(src_dir: &Path, d: &str) -> Option<Value> {
+    let base = sub(src_dir, d);
+    let module = text_of(&base.join("go.mod")).unwrap_or_default();
+    let framework = GO_FRAMEWORKS
+        .iter()
+        .find(|(pat, _)| module.contains(pat))
+        .map_or("net/http", |(_, fw)| *fw);
+    fn visit(path: &Path, rel: &str, depth: usize, out: &mut Vec<String>) {
+        for (name, full, is_dir) in entries(path) {
+            let r = if rel.is_empty() {
+                name.clone()
+            } else {
+                format!("{rel}/{name}")
+            };
+            if is_dir {
+                if depth < 4 && !name.starts_with('.') && !SKIP.contains(&name.as_str()) {
+                    visit(&full, &r, depth + 1, out);
+                }
+            } else if name.ends_with(".go") && !is_test(&name) {
+                out.push(r);
+            }
+        }
+    }
+    let mut found = Vec::new();
+    visit(&base, "", 1, &mut found);
+    found.sort();
+    for rel in found {
+        let text = text_of(&base.join(&rel)).unwrap_or_default();
+        if !(GO_MAIN.is_match(&text) && text.contains("func main(")) {
+            continue;
+        }
+        if framework == "net/http" && !text.contains("net/http") {
+            return None;
+        }
+        let main_dir = rel.rsplit_once('/').map_or("", |(dd, _)| dd);
+        let command = if main_dir.is_empty() {
+            "go run .".to_string()
+        } else {
+            format!("go run ./{main_dir}")
+        };
+        let port = GO_PORT
+            .captures(&text)
+            .and_then(|m| py_int(&m[1]))
+            .unwrap_or(8080);
+        return Some(unit(
+            unit_name(d),
+            "server",
+            d,
+            "go",
+            framework,
+            Some(command),
+            Some(port),
+        ));
+    }
+    None
+}
+
 /// SYNC-MS-026#infra.units
 ///
 /// 실행 단위 — `package.json`(서버·화면) · 파이썬(Django·FastAPI·Flask·Celery) · `Cargo.toml`(Axum·
-/// Actix). 깊이 3까지, `(dir, name)` 바이트 순.
+/// Actix) · Spring Boot · Go. 깊이 3까지, `(dir, name)` 바이트 순.
 pub fn units(src_dir: &Path) -> Vec<Value> {
     let mut by_dir: IndexMap<String, HashSet<String>> = IndexMap::new();
     for (d, name) in manifests(src_dir) {
@@ -1265,6 +1611,18 @@ pub fn units(src_dir: &Path) -> Vec<Value> {
         }
         if names.contains("Cargo.toml")
             && let Some(u) = rust_unit(src_dir, d)
+        {
+            out.push(u);
+        }
+        if ["pom.xml", "build.gradle", "build.gradle.kts"]
+            .iter()
+            .any(|n| names.contains(*n))
+            && let Some(u) = java_unit(src_dir, d, names)
+        {
+            out.push(u);
+        }
+        if names.contains("go.mod")
+            && let Some(u) = go_unit(src_dir, d)
         {
             out.push(u);
         }
@@ -1903,8 +2261,325 @@ fn rs_env(src: &[u8]) -> FileEnv {
     (table, funcs)
 }
 
+/// 저장소 인터페이스 → LIBS 키 — `interface R extends JpaRepository<…>` (REPO_BASES 첫 줄)
+fn java_repos(src_dir: &Path, files: &[String]) -> HashMap<String, String> {
+    let mut out: HashMap<String, String> = HashMap::new();
+    for file in files {
+        let Some(src) = read(src_dir, file) else {
+            continue;
+        };
+        let Some(tree) = crate::java::parse(&src) else {
+            continue;
+        };
+        for n in walk(tree.root_node()) {
+            if n.kind() != "interface_declaration" {
+                continue;
+            }
+            let Some(name) = n.child_by_field_name("name") else {
+                continue;
+            };
+            let Some(ext) = named_children(n)
+                .into_iter()
+                .find(|c| c.kind() == "extends_interfaces")
+            else {
+                continue;
+            };
+            let bases: Vec<String> = walk(ext)
+                .into_iter()
+                .filter(|t| {
+                    matches!(
+                        t.kind(),
+                        "type_identifier" | "generic_type" | "scoped_type_identifier"
+                    ) && t.parent().is_some_and(|p| p.kind() == "type_list")
+                })
+                .filter_map(|t| crate::java::jtype(Some(t), &src))
+                .filter(|b| !b.is_empty())
+                .collect();
+            let hit = REPO_BASES.iter().enumerate().find_map(|(i, (_, lib))| {
+                bases
+                    .iter()
+                    .any(|b| RE.repo_bases[i].is_match(b))
+                    .then_some(*lib)
+            });
+            if let Some(lib) = hit {
+                out.entry(text(name, &src))
+                    .or_insert_with(|| lib.to_string());
+            }
+        }
+    }
+    out
+}
+
+/// Java — 정의 첫 줄 → {변수: LIBS 키}. 둘러싼 클래스의 필드·매개변수·지역 변수의 타입이 `known`에 있을 때
+fn java_env(src: &[u8], known: &HashMap<String, String>) -> FileEnv {
+    let mut funcs: HashMap<i64, Env> = HashMap::new();
+    let Some(tree) = crate::java::parse(src) else {
+        return (Env::new(), funcs);
+    };
+    for cls in walk(tree.root_node()) {
+        if !matches!(
+            cls.kind(),
+            "class_declaration" | "enum_declaration" | "record_declaration"
+        ) {
+            continue;
+        }
+        let Some(body) = cls.child_by_field_name("body") else {
+            continue;
+        };
+        let mut fields: Env = HashMap::new();
+        for m in named_children(body) {
+            if m.kind() != "field_declaration" {
+                continue;
+            }
+            let t = crate::java::jtype(m.child_by_field_name("type"), src);
+            for d in named_children(m) {
+                let dn = if d.kind() == "variable_declarator" {
+                    d.child_by_field_name("name")
+                } else {
+                    None
+                };
+                if let (Some(lib), Some(dn)) = (t.as_ref().and_then(|t| known.get(t)), dn) {
+                    fields.insert(text(dn, src), lib.clone());
+                }
+            }
+        }
+        for m in named_children(body) {
+            if !matches!(m.kind(), "method_declaration" | "constructor_declaration")
+                || m.child_by_field_name("body").is_none()
+            {
+                continue;
+            }
+            let mut env = fields.clone();
+            for (v, t) in crate::java::locals(m, src) {
+                if let Some(lib) = known.get(&t) {
+                    env.insert(v, lib.clone());
+                }
+            }
+            funcs
+                .entry(m.start_position().row as i64 + 1)
+                .or_insert(env);
+        }
+    }
+    (Env::new(), funcs)
+}
+
+/// Go import 경로의 `/vN` 조각을 뗀다 — `github.com/redis/go-redis/v9` → `…/go-redis`
+fn go_path(path: &str) -> String {
+    let parts: Vec<&str> = path.split('/').collect();
+    let mut out: Vec<&str> = Vec::new();
+    for (i, p) in parts.iter().enumerate() {
+        let version = i > 0
+            && p.len() > 1
+            && p.starts_with('v')
+            && p[1..].chars().all(|c| decimal_value(c).is_some());
+        if !version {
+            out.push(p);
+        }
+    }
+    out.join("/")
+}
+
+/// import 경로 → 패키지 이름 — `/vN`을 떼고 GO_NAMES, 아니면 마지막 조각(앞 `go-`·뒤 `-go` 뗌)
+fn go_name(path: &str) -> String {
+    let path = go_path(path);
+    if let Some((_, n)) = GO_NAMES.iter().find(|(p, _)| *p == path) {
+        return (*n).to_string();
+    }
+    let last = path.rsplit('/').next().unwrap_or("");
+    let last = last.strip_prefix("go-").unwrap_or(last);
+    last.strip_suffix("-go").unwrap_or(last).to_string()
+}
+
+/// Go — import 표 {이름: 경로}와 정의 줄 → {변수: 경로}
+fn go_env(src: &[u8]) -> FileEnv {
+    let mut table: Env = HashMap::new();
+    let mut funcs: HashMap<i64, Env> = HashMap::new();
+    let Some(tree) = crate::go::parse(src) else {
+        return (table, funcs);
+    };
+    let root = tree.root_node();
+    for c in named_children(root) {
+        if c.kind() != "import_declaration" {
+            continue;
+        }
+        for spec in walk(c) {
+            if spec.kind() != "import_spec" {
+                continue;
+            }
+            let Some(path_node) = spec.child_by_field_name("path") else {
+                continue;
+            };
+            let path = text(path_node, src)
+                .trim_matches(|ch| ch == '"' || ch == '`')
+                .to_string();
+            let name = match spec.child_by_field_name("name") {
+                Some(a) => text(a, src),
+                None => go_name(&path),
+            };
+            if name != "_" && name != "." {
+                table.insert(name, go_path(&path));
+            }
+        }
+    }
+    let pkg_of_type = |t: Option<Node>| -> Option<String> {
+        let mut t = t;
+        while let Some(x) = t
+            && matches!(
+                x.kind(),
+                "pointer_type" | "generic_type" | "parenthesized_type"
+            )
+        {
+            t = named_children(x).first().copied();
+        }
+        let t = t.filter(|x| x.kind() == "qualified_type")?;
+        let pk = t.child_by_field_name("package")?;
+        table.get(&text(pk, src)).cloned()
+    };
+    let pkg_of_value = |v: Option<Node>| -> Option<String> {
+        let mut v = v;
+        while let Some(x) = v {
+            match x.kind() {
+                "unary_expression" => v = x.child_by_field_name("operand"),
+                "composite_literal" => return pkg_of_type(x.child_by_field_name("type")),
+                "call_expression" => v = x.child_by_field_name("function"),
+                "selector_expression" => v = x.child_by_field_name("operand"),
+                "identifier" => return table.get(&text(x, src)).cloned(),
+                _ => return None,
+            }
+        }
+        None
+    };
+    let mut structs: HashMap<String, IndexMap<String, String>> = HashMap::new();
+    for c in named_children(root) {
+        if c.kind() != "type_declaration" {
+            continue;
+        }
+        for spec in named_children(c) {
+            if spec.kind() != "type_spec" {
+                continue;
+            }
+            let (Some(name), Some(ty)) = (
+                spec.child_by_field_name("name"),
+                spec.child_by_field_name("type"),
+            ) else {
+                continue;
+            };
+            if ty.kind() != "struct_type" {
+                continue;
+            }
+            let mut fields: IndexMap<String, String> = IndexMap::new();
+            for fd in walk(ty) {
+                if fd.kind() != "field_declaration" {
+                    continue;
+                }
+                let pkg = pkg_of_type(fd.child_by_field_name("type"));
+                for nm in named_children(fd) {
+                    if nm.kind() == "field_identifier"
+                        && let Some(p) = &pkg
+                    {
+                        fields.insert(text(nm, src), p.clone());
+                    }
+                }
+            }
+            structs.insert(text(name, src), fields);
+        }
+    }
+    for f in named_children(root) {
+        if !matches!(f.kind(), "function_declaration" | "method_declaration") {
+            continue;
+        }
+        let mut env: Env = HashMap::new();
+        let recv = if f.kind() == "method_declaration" {
+            f.child_by_field_name("receiver")
+        } else {
+            None
+        };
+        for p in recv.map(named_children).unwrap_or_default() {
+            if p.kind() != "parameter_declaration" {
+                continue;
+            }
+            let rn = p.child_by_field_name("name");
+            let mut rt = p.child_by_field_name("type");
+            while let Some(x) = rt
+                && matches!(x.kind(), "pointer_type" | "generic_type")
+            {
+                rt = named_children(x).first().copied();
+            }
+            if let (Some(rn), Some(rt)) = (rn, rt)
+                && rt.kind() == "type_identifier"
+                && let Some(fields) = structs.get(&text(rt, src))
+            {
+                for (fname, pkg) in fields {
+                    env.insert(format!("{}.{fname}", text(rn, src)), pkg.clone());
+                }
+            }
+        }
+        for p in f
+            .child_by_field_name("parameters")
+            .map(named_children)
+            .unwrap_or_default()
+        {
+            if p.kind() != "parameter_declaration" {
+                continue;
+            }
+            let Some(pkg) = pkg_of_type(p.child_by_field_name("type")) else {
+                continue;
+            };
+            for nm in named_children(p) {
+                if nm.kind() == "identifier" {
+                    env.insert(text(nm, src), pkg.clone());
+                }
+            }
+        }
+        if let Some(body) = f.child_by_field_name("body") {
+            for n in walk(body) {
+                match n.kind() {
+                    "short_var_declaration" => {
+                        let names = n
+                            .child_by_field_name("left")
+                            .map(named_children)
+                            .unwrap_or_default();
+                        let vals = n
+                            .child_by_field_name("right")
+                            .map(named_children)
+                            .unwrap_or_default();
+                        if let (Some(first), Some(v)) = (names.first(), vals.first())
+                            && first.kind() == "identifier"
+                            && let Some(pkg) = pkg_of_value(Some(*v))
+                        {
+                            env.insert(text(*first, src), pkg);
+                        }
+                    }
+                    "var_spec" => {
+                        let pkg = pkg_of_type(n.child_by_field_name("type")).or_else(|| {
+                            n.child_by_field_name("value")
+                                .and_then(|v| named_children(v).first().copied())
+                                .and_then(|v| pkg_of_value(Some(v)))
+                        });
+                        if let Some(pkg) = pkg
+                            && let Some(nm) = named_children(n)
+                                .into_iter()
+                                .find(|x| x.kind() == "identifier")
+                        {
+                            env.insert(text(nm, src), pkg);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        funcs
+            .entry(f.start_position().row as i64 + 1)
+            .or_insert(env);
+    }
+    (table, funcs)
+}
+
 fn label_root(label: &str, lang: &str) -> Option<String> {
     let root = RE.ident.find(label)?.as_str().to_string();
+    if lang == "java" && root == "this" && label.starts_with("this.") {
+        return RE.ident.find(&label[5..]).map(|m| m.as_str().to_string());
+    }
     if lang == "py"
         && root == "self"
         && label.starts_with("self.")
@@ -1972,6 +2647,21 @@ fn deps(src_dir: &Path) -> Vec<(String, String)> {
                             names.push(nm[1].to_string());
                         }
                     }
+                }
+            } else if name == "pom.xml" {
+                let t = text_of(&full).unwrap_or_default();
+                for m in POM_DEP.captures_iter(&t) {
+                    names.push(format!("{}:{}", strip(&m[1]), strip(&m[2])));
+                }
+            } else if name == "build.gradle" || name == "build.gradle.kts" {
+                let t = text_of(&full).unwrap_or_default();
+                for m in GRADLE_DEP.captures_iter(&t) {
+                    names.push(format!("{}:{}", &m[1], &m[2]));
+                }
+            } else if name == "go.mod" {
+                let t = text_of(&full).unwrap_or_default();
+                for m in GO_REQUIRE.captures_iter(&t) {
+                    names.push(m[1].to_string());
                 }
             } else if REQ_FILE.is_match(&name) {
                 let t = text_of(&full).unwrap_or_default();
@@ -2352,6 +3042,10 @@ fn lang_of(file: &str) -> Option<&'static str> {
         Some("ts")
     } else if file.ends_with(".rs") {
         Some("rs")
+    } else if file.ends_with(".java") {
+        Some("java")
+    } else if file.ends_with(".go") {
+        Some("go")
     } else {
         None
     }
@@ -2382,6 +3076,24 @@ pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Opt
     let mut book = Book::default();
 
     // 1·2. 코드 — 호출 순서에 장비를 단다
+    let mut java_files: Vec<String> = graph
+        .get("files")
+        .and_then(Value::as_array)
+        .map(|fs| {
+            fs.iter()
+                .filter_map(|f| f.get("path").and_then(Value::as_str))
+                .filter(|p| p.ends_with(".java"))
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default();
+    java_files.sort();
+    java_files.dedup();
+    let mut java_known: HashMap<String, String> = JAVA_TYPES
+        .iter()
+        .map(|(t, l)| ((*t).to_string(), (*l).to_string()))
+        .collect();
+    java_known.extend(java_repos(src_dir, &java_files));
     let mut envs: HashMap<String, FileEnv> = HashMap::new();
     let mut files_of: IndexMap<&'static str, Vec<String>> = IndexMap::new();
     let mut libs_of: IndexMap<&'static str, Vec<String>> = IndexMap::new();
@@ -2397,7 +3109,9 @@ pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Opt
                     .and_then(|src| match lang {
                         "py" => py_env(std::str::from_utf8(&src).ok()?),
                         "ts" => Some(ts_env(&file, &src)),
-                        _ => Some(rs_env(&src)),
+                        "rs" => Some(rs_env(&src)),
+                        "java" => Some(java_env(&src, &java_known)),
+                        _ => Some(go_env(&src)),
                     })
                     .unwrap_or_default();
                 envs.insert(file.clone(), env);
@@ -2417,7 +3131,13 @@ pub fn infra(src_dir: &Path, graph: &mut Value, idents: &HashMap<String, Vec<Opt
                 let Some(root) = label_root(st["label"].as_str().unwrap_or_default(), lang) else {
                     continue;
                 };
-                let mut pkg = env.get(&root).or_else(|| table.get(&root)).cloned();
+                let label = st["label"].as_str().unwrap_or_default();
+                let two = if lang == "go" {
+                    GO_TWO.captures(label).and_then(|m| env.get(&m[1]).cloned())
+                } else {
+                    None
+                };
+                let mut pkg = two.or_else(|| env.get(&root).or_else(|| table.get(&root)).cloned());
                 if pkg.is_none() && lang == "ts" && root == "fetch" {
                     pkg = Some("fetch".into());
                 }

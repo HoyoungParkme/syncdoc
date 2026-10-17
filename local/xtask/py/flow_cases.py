@@ -41,6 +41,23 @@ def _routed(file: str, line: int, method: str, path: str) -> dict:
     return f
 
 
+_J, _G = "svc/src/main/java/com/ex/ItemController.java", "gosvc/main.go"
+
+
+def _jg_files() -> dict:
+    return {_J: T.JAVA, _G: T.GO}
+
+
+def _jg_graph() -> dict:
+    j, go = _J, _G
+    funcs = [_fn(j, 9, "read"), _fn(j, 19, "make"), _fn(j, 24, "any"), _fn(j, 27, "helper"),
+             _fn(j, 36, "Item"), _fn(go, 16, "list"), _fn(go, 30, "helper"),
+             _fn(go, 34, "hello"), _fn(go, 36, "main")]  # fmt: skip
+    calls = [[f"{j}:9", f"{j}:27", "enrich"], [f"{j}:19", f"{j}:36", "enrich"],
+             [f"{go}:16", f"{go}:30", "enrich"]]  # fmt: skip
+    return {"functions": funcs, "calls": calls, "files": [{"path": j}, {"path": go}]}
+
+
 def cases() -> list[dict]:
     """[{name, op, files, graph}] — op는 files·steps·extend·routes·http·units·infra(steps 뒤)."""
     py = "app/h.py"
@@ -187,6 +204,34 @@ def cases() -> list[dict]:
                    "units": [{"name": "a", "kind": "server", "dir": "a", "framework": "FastAPI", "port": 8000},
                              {"name": "b", "kind": "server", "dir": "b", "framework": "Flask", "port": None}],
                    "http": []}},
+        # Java·Go (카드 CN·L33)
+        {"name": "steps_java_go", "op": "steps", "files": _jg_files(), "graph": _jg_graph()},
+        {"name": "routes_java_go", "op": "routes", "files": _jg_files(), "graph": _jg_graph()},
+        {"name": "extend_java_go", "op": "extend", "files": _jg_files(), "graph": _jg_graph()},
+        {"name": "units_java_go", "op": "units", "graph": {"functions": []},
+         "files": {"svc/pom.xml": "<project><parent><artifactId>spring-boot-starter-parent</artifactId>"
+                                  "</parent></project>",
+                   "svc/mvnw": "",
+                   "svc/src/main/resources/application.yml": "server:\n  port: ${PORT:8081}\n",
+                   "gsvc/build.gradle": "plugins { id 'org.springframework.boot' version '3' }\n",
+                   "ksvc/build.gradle.kts": 'plugins { id("org.springframework.boot") }\n',
+                   "ksvc/gradlew": "",
+                   "ksvc/src/main/resources/application.properties": "server.port=7070\n",
+                   "plain/pom.xml": "<project></project>",
+                   "gosvc/go.mod": "module ex.com/g\n\nrequire github.com/gin-gonic/gin v1.10.0\n",
+                   "gosvc/cmd/api/main.go": 'package main\n\nfunc main() { r.Run(":9090") }\n',
+                   "gosvc/cmd/api/main_test.go": "package main\nfunc main() {}\n",
+                   "hsvc/go.mod": "module ex.com/h\n",
+                   "hsvc/main.go": 'package main\n\nimport "net/http"\n\nfunc main() {}\n',
+                   "cli/go.mod": "module ex.com/cli\n",
+                   "cli/main.go": "package main\n\nfunc main() {}\n"}},
+        {"name": "infra_java_go", "op": "infra",
+         "files": {**_jg_files(),
+                   "svc/pom.xml": "<dependencies><dependency><groupId>org.postgresql</groupId>"
+                                  "<artifactId>postgresql</artifactId></dependency></dependencies>",
+                   "svc/build.gradle": "dependencies {\n  implementation 'org.springframework.kafka:spring-kafka:3'\n}\n",
+                   "gosvc/go.mod": "module ex.com/g\n\nrequire (\n\tgithub.com/redis/go-redis/v9 v9.5.0\n)\n"},
+         "graph": {**_jg_graph(), "units": [], "http": []}},
     ]  # fmt: skip
     return out
 

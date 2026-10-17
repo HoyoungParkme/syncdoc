@@ -30,6 +30,40 @@ static FLASK_PARAM: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"<(?:[^<>:]+:)?([^<>]+)>").expect("flask"));
 static EXPRESS_PARAM: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r":([A-Za-z_][A-Za-z0-9_]*)").expect("express"));
+static SPRING_PARAM: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\{([A-Za-z_][A-Za-z0-9_]*):[^{}]*\}").expect("spring"));
+static GO_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)[\t\n\x0B\x0C\r ]+(/.*)$")
+        .expect("go pattern")
+});
+static GIN_PARAM: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[:*]([A-Za-z_][A-Za-z0-9_]*)").expect("gin"));
+static GO_REST: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\{([A-Za-z_][A-Za-z0-9_]*)\.\.\.\}").expect("go rest"));
+
+fn spring_verb(v: &str) -> Option<Option<&'static str>> {
+    Some(match v {
+        "GetMapping" => Some("GET"),
+        "PostMapping" => Some("POST"),
+        "PutMapping" => Some("PUT"),
+        "PatchMapping" => Some("PATCH"),
+        "DeleteMapping" => Some("DELETE"),
+        "RequestMapping" => None,
+        _ => return None,
+    })
+}
+
+fn go_verb(v: &str) -> Option<&'static str> {
+    Some(match v {
+        "GET" | "Get" => "GET",
+        "POST" | "Post" => "POST",
+        "PUT" | "Put" => "PUT",
+        "PATCH" | "Patch" => "PATCH",
+        "DELETE" | "Delete" => "DELETE",
+        "HandleFunc" | "Handle" | "Any" => "ANY",
+        _ => return None,
+    })
+}
 
 /// 파이썬 라우터 생성자 → 접두어 인자 이름 (`Flask`는 접두어가 없다)
 fn py_router(kind: &str) -> Option<Option<&'static str>> {
@@ -842,6 +876,238 @@ fn rs_routes(src: &[u8]) -> (Vec<RsChain>, BTreeMap<i64, Value>) {
 
 // ---------------------------------------------------------------- 묶기
 
+// ---------------------------------------------------------------- Java·Go (카드 L33)
+
+/// Java 글자 상수의 내용 — `"…"`만
+fn java_str(n: Option<Node>, src: &[u8]) -> Option<String> {
+    let n = n.filter(|n| n.kind() == "string_literal")?;
+    Some(
+        named_children(n)
+            .into_iter()
+            .filter(|c| c.kind() == "string_fragment")
+            .map(|c| text(c, src))
+            .collect(),
+    )
+}
+
+/// 선언의 어노테이션 — [(이름의 마지막 조각, 인자 목록)] 적힌 차례
+fn java_annotations<'t>(decl: Node<'t>, src: &[u8]) -> Vec<(String, Option<Node<'t>>)> {
+    let mut c = decl.walk();
+    let Some(mods) = decl.children(&mut c).find(|x| x.kind() == "modifiers") else {
+        return Vec::new();
+    };
+    named_children(mods)
+        .into_iter()
+        .filter(|a| matches!(a.kind(), "annotation" | "marker_annotation"))
+        .filter_map(|a| {
+            let name = a.child_by_field_name("name")?;
+            let nm = text(name, src);
+            let last = nm.rsplit('.').next().unwrap_or("").to_string();
+            Some((last, a.child_by_field_name("arguments")))
+        })
+        .collect()
+}
+
+/// `("/x")` · `(value = "/x")` · `(path = {"/x", "/y"})` → 첫 경로
+fn java_path(args: Option<Node>, src: &[u8]) -> Option<String> {
+    for c in named_children(args?) {
+        let mut val = Some(c);
+        if c.kind() == "element_value_pair" {
+            let key = c.child_by_field_name("key").map(|k| text(k, src));
+            if !matches!(key.as_deref(), Some("value" | "path")) {
+                continue;
+            }
+            val = c.child_by_field_name("value");
+        }
+        if let Some(v) = val
+            && v.kind() == "element_value_array_initializer"
+        {
+            val = named_children(v)
+                .into_iter()
+                .find(|x| x.kind() == "string_literal");
+        }
+        if let Some(got) = java_str(val, src) {
+            return Some(got);
+        }
+    }
+    None
+}
+
+/// `@RequestMapping(method = RequestMethod.POST)` → POST, 없으면 ANY
+fn java_method(args: Option<Node>, src: &[u8]) -> String {
+    for c in args.map(named_children).unwrap_or_default() {
+        if c.kind() != "element_value_pair" {
+            continue;
+        }
+        if c.child_by_field_name("key")
+            .map(|k| text(k, src))
+            .as_deref()
+            != Some("method")
+        {
+            continue;
+        }
+        let mut val = c.child_by_field_name("value");
+        if let Some(v) = val
+            && v.kind() == "element_value_array_initializer"
+        {
+            val = named_children(v).first().copied();
+        }
+        if let Some(v) = val {
+            let t = text(v, src);
+            return t.rsplit('.').next().unwrap_or("").to_uppercase();
+        }
+    }
+    "ANY".into()
+}
+
+/// Spring — 클래스 `@RequestMapping` 접두어 + 메서드 `@GetMapping`… → {선언 첫 줄: route}
+fn java_routes(src: &[u8]) -> BTreeMap<i64, Value> {
+    let mut out = BTreeMap::new();
+    let Some(tree) = crate::java::parse(src) else {
+        return out;
+    };
+    for cls in walk(tree.root_node()) {
+        if cls.kind() != "class_declaration" {
+            continue;
+        }
+        let prefix = java_annotations(cls, src)
+            .into_iter()
+            .find(|(n, _)| n == "RequestMapping")
+            .map(|(_, a)| java_path(a, src).unwrap_or_default())
+            .unwrap_or_default();
+        let Some(body) = cls.child_by_field_name("body") else {
+            continue;
+        };
+        for m in named_children(body) {
+            if m.kind() != "method_declaration" {
+                continue;
+            }
+            for (name, args) in java_annotations(m, src) {
+                let Some(verb) = spring_verb(&name) else {
+                    continue;
+                };
+                let method = verb.map_or_else(|| java_method(args, src), str::to_string);
+                let joined = join(&prefix, &java_path(args, src).unwrap_or_default());
+                let path = SPRING_PARAM.replace_all(&joined, "{$1}").into_owned();
+                out.entry(row(m)).or_insert_with(|| route(&method, path));
+                break;
+            }
+        }
+    }
+    out
+}
+
+/// Go — `X.HandleFunc("경로", h)`·gin·echo·chi 등록 → [(방법, 경로, 핸들러 이름)]
+fn go_routes(src: &[u8]) -> Vec<(String, String, String)> {
+    let mut out = Vec::new();
+    let Some(tree) = crate::go::parse(src) else {
+        return out;
+    };
+    let lit = |n: Option<Node>| -> Option<String> {
+        let n = n.filter(|n| {
+            matches!(
+                n.kind(),
+                "interpreted_string_literal" | "raw_string_literal"
+            )
+        })?;
+        Some(
+            named_children(n)
+                .into_iter()
+                .filter(|c| {
+                    matches!(
+                        c.kind(),
+                        "interpreted_string_literal_content" | "raw_string_literal_content"
+                    )
+                })
+                .map(|c| text(c, src))
+                .collect(),
+        )
+    };
+    let mut groups: HashMap<String, String> = HashMap::new();
+    for n in walk(tree.root_node()) {
+        if n.kind() == "short_var_declaration" {
+            let names = n
+                .child_by_field_name("left")
+                .map(named_children)
+                .unwrap_or_default();
+            let vals = n
+                .child_by_field_name("right")
+                .map(named_children)
+                .unwrap_or_default();
+            if names.len() != 1 || vals.len() != 1 || vals[0].kind() != "call_expression" {
+                continue;
+            }
+            let a = args(vals[0]);
+            let Some(f) = vals[0]
+                .child_by_field_name("function")
+                .filter(|f| f.kind() == "selector_expression")
+            else {
+                continue;
+            };
+            if a.is_empty() {
+                continue;
+            }
+            let (op, field) = (
+                f.child_by_field_name("operand"),
+                f.child_by_field_name("field"),
+            );
+            if let (Some(field), Some(p)) = (field, lit(a.first().copied()))
+                && text(field, src) == "Group"
+            {
+                let base = op
+                    .and_then(|o| groups.get(&text(o, src)).cloned())
+                    .unwrap_or_default();
+                groups.insert(text(names[0], src), base + &p);
+            }
+            continue;
+        }
+        if n.kind() != "call_expression" {
+            continue;
+        }
+        let Some(f) = n
+            .child_by_field_name("function")
+            .filter(|f| f.kind() == "selector_expression")
+        else {
+            continue;
+        };
+        let verb = f
+            .child_by_field_name("field")
+            .and_then(|x| go_verb(&text(x, src)));
+        let a = args(n);
+        let path = lit(a.first().copied());
+        let (Some(verb), Some(path)) = (verb, path) else {
+            continue;
+        };
+        if a.len() < 2 {
+            continue;
+        }
+        let (mut verb, mut path) = (verb.to_string(), path);
+        if let Some(c) = GO_PATTERN.captures(&path) {
+            let (v, p) = (c[1].to_string(), c[2].to_string());
+            verb = v;
+            path = p;
+        }
+        let mut h = Some(unparen(a[a.len() - 1]));
+        if let Some(x) = h
+            && x.kind() == "selector_expression"
+        {
+            h = x.child_by_field_name("field");
+        }
+        let Some(h) = h.filter(|x| matches!(x.kind(), "identifier" | "field_identifier")) else {
+            continue;
+        };
+        let prefix = f
+            .child_by_field_name("operand")
+            .and_then(|o| groups.get(&text(o, src)).cloned())
+            .unwrap_or_default();
+        let joined = join(&prefix, &path);
+        let gin = GIN_PARAM.replace_all(&joined, "{$1}").into_owned();
+        let p = GO_REST.replace_all(&gin, "{$1}").into_owned();
+        out.push((verb, p, text(h, src)));
+    }
+    out
+}
+
 fn s(v: &Value, k: &str) -> String {
     v.get(k)
         .and_then(Value::as_str)
@@ -964,6 +1230,46 @@ pub fn routes(src_dir: &Path, graph: &mut Value) {
         for (ln, r) in attrs {
             if let Some(i) = here_get(here, ln) {
                 give(i, &r);
+            }
+        }
+    }
+
+    for (file, here) in &by_file {
+        if !file.ends_with(".java") {
+            continue;
+        }
+        let Some(src) = read(src_dir, file) else {
+            continue;
+        };
+        for (ln, r) in java_routes(&src) {
+            if let Some(i) = here_get(here, ln) {
+                give(i, &r);
+            }
+        }
+    }
+
+    let files_of: Vec<String> = funcs.iter().map(|f| s(f, "file")).collect();
+    for file in by_file.keys() {
+        if !file.ends_with(".go") {
+            continue;
+        }
+        let Some(src) = read(src_dir, file) else {
+            continue;
+        };
+        let folder = crate::go::dir_of_file(file);
+        for (method, path, h) in go_routes(&src) {
+            let all = by_name
+                .get(&(".go".to_string(), h))
+                .cloned()
+                .unwrap_or_default();
+            let same: Vec<usize> = all
+                .iter()
+                .copied()
+                .filter(|i| crate::go::dir_of_file(&files_of[*i]) == folder)
+                .collect();
+            let cands = if same.is_empty() { all } else { same };
+            if cands.len() == 1 {
+                give(cands[0], &route(&method, path));
             }
         }
     }

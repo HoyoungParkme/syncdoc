@@ -512,6 +512,345 @@
     "_origin": "ast"
    },
    {
+    "id": "gosvc_cmd_main",
+    "label": "main.go",
+    "file_type": "code",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "gosvc_cmd_main_hello",
+    "label": "hello()",
+    "file_type": "code",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L12",
+    "_origin": "ast"
+   },
+   {
+    "id": "gosvc_cmd_main_greet",
+    "label": "greet()",
+    "file_type": "code",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L23",
+    "_origin": "ast"
+   },
+   {
+    "id": "cmd_cart",
+    "label": "Cart",
+    "file_type": "code",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L25",
+    "_origin": "ast"
+   },
+   {
+    "id": "cmd_cart_add",
+    "label": ".Add()",
+    "file_type": "code",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L27",
+    "_origin": "ast"
+   },
+   {
+    "id": "cmd_cart_sum",
+    "label": ".Sum()",
+    "file_type": "code",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L31",
+    "_origin": "ast"
+   },
+   {
+    "id": "gosvc_cmd_main_main",
+    "label": "main()",
+    "file_type": "code",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L33",
+    "_origin": "ast"
+   },
+   {
+    "id": "pkg_example_com_shop",
+    "label": "example.com/shop",
+    "file_type": "code",
+    "type": "package",
+    "ecosystem": "go",
+    "source_file": "gosvc/go.mod",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "gosvc_store_store",
+    "label": "store.go",
+    "file_type": "code",
+    "source_file": "gosvc/store/store.go",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "store_store",
+    "label": "Store",
+    "file_type": "code",
+    "source_file": "gosvc/store/store.go",
+    "source_location": "L3",
+    "_origin": "ast"
+   },
+   {
+    "id": "gosvc_store_store_open",
+    "label": "Open()",
+    "file_type": "code",
+    "source_file": "gosvc/store/store.go",
+    "source_location": "L6",
+    "_origin": "ast"
+   },
+   {
+    "id": "store_store_get",
+    "label": ".Get()",
+    "file_type": "code",
+    "source_file": "gosvc/store/store.go",
+    "source_location": "L8",
+    "_origin": "ast"
+   },
+   {
+    "id": "gosvc_store_store_test",
+    "label": "store_test.go",
+    "file_type": "code",
+    "source_file": "gosvc/store/store_test.go",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "gosvc_store_store_test_testx",
+    "label": "TestX()",
+    "file_type": "code",
+    "source_file": "gosvc/store/store_test.go",
+    "source_location": "L2",
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_svc_itemservice",
+    "label": "ItemService.java",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_svc_itemservice_itemservice",
+    "label": "ItemService",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L3",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_svc_itemservice_itemservice_find",
+    "label": ".find()",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L4",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_svc_itemservice_java_item",
+    "label": "Item",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_svc_itemservice_audit",
+    "label": "Audit",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L13",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_svc_itemservice_audit_audit",
+    "label": ".Audit()",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L14",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_svc_itemservice_audit_log",
+    "label": ".log()",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L15",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_svc_itemservice_audit_stamp",
+    "label": ".stamp()",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L16",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_svc_itemservice_helper",
+    "label": "Helper",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L19",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_svc_itemservice_helper_go",
+    "label": ".go()",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L20",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_svc_itemservice_helper_twice",
+    "label": ".twice()",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L21",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_web_itemcontroller",
+    "label": "ItemController.java",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller",
+    "label": "ItemController",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L5",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "restcontroller",
+    "label": "RestController",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller_itemcontroller",
+    "label": ".ItemController()",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L9",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller_read",
+    "label": ".read()",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L17",
+    "_callable": true,
+    "metadata": {
+     "unresolved_calls": [
+      {
+       "callee": "log",
+       "receiver_type": "var",
+       "lang": "java",
+       "line": "L23"
+      }
+     ]
+    },
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_web_itemcontroller_java_item",
+    "label": "Item",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "getmapping",
+    "label": "GetMapping",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller_check",
+    "label": ".check()",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L30",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_web_itemcontroller_inner",
+    "label": "Inner",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L36",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_main_java_com_ex_web_itemcontroller_inner_deep",
+    "label": ".deep()",
+    "file_type": "code",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L37",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_test_java_com_ex_itemtest",
+    "label": "ItemTest.java",
+    "file_type": "code",
+    "source_file": "java/src/test/java/com/ex/ItemTest.java",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_test_java_com_ex_itemtest_itemtest",
+    "label": "ItemTest",
+    "file_type": "code",
+    "source_file": "java/src/test/java/com/ex/ItemTest.java",
+    "source_location": "L1",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "java_src_test_java_com_ex_itemtest_itemtest_t",
+    "label": ".t()",
+    "file_type": "code",
+    "source_file": "java/src/test/java/com/ex/ItemTest.java",
+    "source_location": "L1",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
     "id": "local_crates_thing_src_lib",
     "label": "lib.rs",
     "file_type": "code",
@@ -740,6 +1079,22 @@
     "_origin": "ast"
    },
    {
+    "id": "go_type_net_http_responsewriter",
+    "label": "net/http.ResponseWriter",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "go_type_net_http_request",
+    "label": "net/http.Request",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
     "id": "functools",
     "label": "functools",
     "file_type": "concept",
@@ -758,6 +1113,22 @@
    {
     "id": "ref_react",
     "label": "ref_react",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
+    "id": "go_pkg_net_http",
+    "label": "go_pkg_net_http",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
+    "id": "go_pkg_example_com_shop_util",
+    "label": "go_pkg_example_com_shop_util",
     "file_type": "concept",
     "type": "external",
     "external": true,
@@ -1492,6 +1863,518 @@
     "_origin": "ast"
    },
    {
+    "source": "gosvc_cmd_main",
+    "target": "go_pkg_net_http",
+    "relation": "imports_from",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L4",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_cmd_main",
+    "target": "gosvc_store_store",
+    "relation": "imports_from",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L6",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_cmd_main",
+    "target": "gosvc_store_store_test",
+    "relation": "imports_from",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L6",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_cmd_main",
+    "target": "go_pkg_example_com_shop_util",
+    "relation": "imports_from",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L7",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_cmd_main",
+    "target": "gosvc_cmd_main_hello",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L12",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_cmd_main_hello",
+    "target": "go_type_net_http_responsewriter",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L12",
+    "weight": 1.0,
+    "context": "parameter_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_cmd_main_hello",
+    "target": "go_type_net_http_request",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L12",
+    "weight": 1.0,
+    "context": "parameter_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_cmd_main",
+    "target": "gosvc_cmd_main_greet",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L23",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_cmd_main",
+    "target": "cmd_cart",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L25",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "cmd_cart",
+    "target": "cmd_cart_add",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L27",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "cmd_cart",
+    "target": "cmd_cart_sum",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L31",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_cmd_main",
+    "target": "gosvc_cmd_main_main",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L33",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_cmd_main_hello",
+    "target": "gosvc_cmd_main_greet",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L17",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_cmd_main_hello",
+    "target": "cmd_cart_add",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L19",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "cmd_cart_add",
+    "target": "cmd_cart_sum",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L28",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_cmd_main_main",
+    "target": "cmd_cart_add",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L36",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_store_store",
+    "target": "store_store",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/store/store.go",
+    "source_location": "L3",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_store_store",
+    "target": "gosvc_store_store_open",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/store/store.go",
+    "source_location": "L6",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_store_store_open",
+    "target": "store_store",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/store/store.go",
+    "source_location": "L6",
+    "weight": 1.0,
+    "context": "return_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "store_store",
+    "target": "store_store_get",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/store/store.go",
+    "source_location": "L8",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_store_store_test",
+    "target": "gosvc_store_store_test_testx",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/store/store_test.go",
+    "source_location": "L2",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_svc_itemservice",
+    "target": "java_src_main_java_com_ex_svc_itemservice_itemservice",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L3",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_svc_itemservice_itemservice",
+    "target": "java_src_main_java_com_ex_svc_itemservice_itemservice_find",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L4",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_svc_itemservice_itemservice_find",
+    "target": "java_src_main_java_com_ex_svc_itemservice_java_item",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L4",
+    "weight": 1.0,
+    "context": "return_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_svc_itemservice",
+    "target": "java_src_main_java_com_ex_svc_itemservice_audit",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L13",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_svc_itemservice_audit",
+    "target": "java_src_main_java_com_ex_svc_itemservice_audit_audit",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L14",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_svc_itemservice_audit",
+    "target": "java_src_main_java_com_ex_svc_itemservice_audit_log",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L15",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_svc_itemservice_audit",
+    "target": "java_src_main_java_com_ex_svc_itemservice_audit_stamp",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L16",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_svc_itemservice",
+    "target": "java_src_main_java_com_ex_svc_itemservice_helper",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L19",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_svc_itemservice_helper",
+    "target": "java_src_main_java_com_ex_svc_itemservice_helper_go",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L20",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_svc_itemservice_helper",
+    "target": "java_src_main_java_com_ex_svc_itemservice_helper_twice",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L21",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_svc_itemservice_itemservice_find",
+    "target": "java_src_main_java_com_ex_svc_itemservice_itemservice_find",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L5",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_svc_itemservice_helper_twice",
+    "target": "java_src_main_java_com_ex_svc_itemservice_helper_go",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "source_location": "L21",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller",
+    "target": "java_src_main_java_com_ex_svc_itemservice_itemservice",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L3",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller",
+    "target": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L5",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller",
+    "target": "restcontroller",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L5",
+    "weight": 1.0,
+    "context": "attribute",
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller",
+    "target": "java_src_main_java_com_ex_svc_itemservice_itemservice",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L7",
+    "weight": 1.0,
+    "context": "field",
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller",
+    "target": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller_itemcontroller",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L9",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller_itemcontroller",
+    "target": "java_src_main_java_com_ex_svc_itemservice_itemservice",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L9",
+    "weight": 1.0,
+    "context": "parameter_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller",
+    "target": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller_read",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L17",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller_read",
+    "target": "java_src_main_java_com_ex_web_itemcontroller_java_item",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L17",
+    "weight": 1.0,
+    "context": "return_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller_read",
+    "target": "getmapping",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L17",
+    "weight": 1.0,
+    "context": "attribute",
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller",
+    "target": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller_check",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L30",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller_check",
+    "target": "java_src_main_java_com_ex_web_itemcontroller_java_item",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L30",
+    "weight": 1.0,
+    "context": "return_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller",
+    "target": "java_src_main_java_com_ex_web_itemcontroller_inner",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L36",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller_inner",
+    "target": "java_src_main_java_com_ex_web_itemcontroller_inner_deep",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L37",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller_read",
+    "target": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller_check",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L26",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_test_java_com_ex_itemtest",
+    "target": "java_src_test_java_com_ex_itemtest_itemtest",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/test/java/com/ex/ItemTest.java",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_test_java_com_ex_itemtest_itemtest",
+    "target": "java_src_test_java_com_ex_itemtest_itemtest_t",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "java/src/test/java/com/ex/ItemTest.java",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
     "source": "local_crates_thing_src_lib",
     "target": "thingservice",
     "relation": "imports_from",
@@ -2060,6 +2943,18 @@
     "_origin": "ast"
    },
    {
+    "source": "gosvc_cmd_main_hello",
+    "target": "gosvc_store_store_open",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "gosvc/cmd/main.go",
+    "source_location": "L15",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
     "source": "local_crates_thing_src_service_thingservice_find",
     "target": "local_crates_thing_src_util_mod_pad",
     "relation": "calls",
@@ -2092,6 +2987,42 @@
     "confidence_score": 1.0,
     "source_file": "backend/app/web/routers/thing.py",
     "source_location": "L23",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller_read",
+    "target": "java_src_main_java_com_ex_svc_itemservice_audit_stamp",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L25",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller_read",
+    "target": "java_src_main_java_com_ex_svc_itemservice_itemservice_find",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "INFERRED",
+    "confidence_score": 0.8,
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L24",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "java_src_main_java_com_ex_web_itemcontroller_itemcontroller_check",
+    "target": "java_src_main_java_com_ex_svc_itemservice_helper_go",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "INFERRED",
+    "confidence_score": 0.8,
+    "source_file": "java/src/main/java/com/ex/web/ItemController.java",
+    "source_location": "L32",
     "weight": 1.0,
     "_origin": "ast"
    }
@@ -2369,6 +3300,106 @@
     "end": null,
     "item": null,
     "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:4",
+    "name": "find",
+    "qual": "ItemService.find",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 4,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:14",
+    "name": "Audit",
+    "qual": "Audit.Audit",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 14,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:15",
+    "name": "log",
+    "qual": "Audit.log",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 15,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:16",
+    "name": "stamp",
+    "qual": "Audit.stamp",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 16,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:20",
+    "name": "go",
+    "qual": "Helper.go",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 20,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:21",
+    "name": "twice",
+    "qual": "Helper.twice",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 21,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/web/ItemController.java:9",
+    "name": "ItemController",
+    "qual": "ItemController.ItemController",
+    "file": "java/src/main/java/com/ex/web/ItemController.java",
+    "line": 9,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/web/ItemController.java:17",
+    "name": "read",
+    "qual": "ItemController.read",
+    "file": "java/src/main/java/com/ex/web/ItemController.java",
+    "line": 17,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/web/ItemController.java:30",
+    "name": "check",
+    "qual": "ItemController.check",
+    "file": "java/src/main/java/com/ex/web/ItemController.java",
+    "line": 30,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/web/ItemController.java:37",
+    "name": "deep",
+    "qual": "Inner.deep",
+    "file": "java/src/main/java/com/ex/web/ItemController.java",
+    "line": 37,
+    "end": null,
+    "item": null,
+    "ms": null
    }
   ],
   "calls": [
@@ -2408,6 +3439,16 @@
     "graphify"
    ],
    [
+    "java/src/main/java/com/ex/svc/ItemService.java:21",
+    "java/src/main/java/com/ex/svc/ItemService.java:20",
+    "graphify"
+   ],
+   [
+    "java/src/main/java/com/ex/web/ItemController.java:17",
+    "java/src/main/java/com/ex/web/ItemController.java:30",
+    "graphify"
+   ],
+   [
     "frontend/src/components/Card.tsx:4",
     "frontend/src/api/client.ts:12",
     "graphify"
@@ -2431,6 +3472,11 @@
     "backend/app/web/routers/thing.py:18",
     "backend/app/core/util.py:6",
     "graphify"
+   ],
+   [
+    "java/src/main/java/com/ex/web/ItemController.java:17",
+    "java/src/main/java/com/ex/svc/ItemService.java:16",
+    "graphify"
    ]
   ],
   "files": [
@@ -2448,6 +3494,11 @@
    "frontend/src/components/Card.tsx",
    "frontend/src/lib/math.js",
    "frontend/src/pages/ThingPage.tsx",
+   "gosvc/cmd/main.go",
+   "gosvc/go.mod",
+   "gosvc/store/store.go",
+   "java/src/main/java/com/ex/svc/ItemService.java",
+   "java/src/main/java/com/ex/web/ItemController.java",
    "local/crates/thing/src/lib.rs",
    "local/crates/thing/src/repo.rs",
    "local/crates/thing/src/service.rs",
@@ -2727,6 +3778,106 @@
     "ms": null
    },
    {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:4",
+    "name": "find",
+    "qual": "ItemService.find",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 4,
+    "end": 6,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:14",
+    "name": "Audit",
+    "qual": "Audit.Audit",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 14,
+    "end": 14,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:15",
+    "name": "log",
+    "qual": "Audit.log",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 15,
+    "end": 15,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:16",
+    "name": "stamp",
+    "qual": "Audit.stamp",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 16,
+    "end": 16,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:20",
+    "name": "go",
+    "qual": "Helper.go",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 20,
+    "end": null,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:21",
+    "name": "twice",
+    "qual": "Helper.twice",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 21,
+    "end": 21,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/web/ItemController.java:9",
+    "name": "ItemController",
+    "qual": "ItemController.ItemController",
+    "file": "java/src/main/java/com/ex/web/ItemController.java",
+    "line": 9,
+    "end": 11,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/web/ItemController.java:17",
+    "name": "read",
+    "qual": "ItemController.read",
+    "file": "java/src/main/java/com/ex/web/ItemController.java",
+    "line": 17,
+    "end": 27,
+    "item": "SYNC-MS-001#items.read",
+    "ms": "SYNC-MS-001#items.read"
+   },
+   {
+    "key": "java/src/main/java/com/ex/web/ItemController.java:30",
+    "name": "check",
+    "qual": "ItemController.check",
+    "file": "java/src/main/java/com/ex/web/ItemController.java",
+    "line": 30,
+    "end": 34,
+    "item": "SYNC-MS-001#items.check",
+    "ms": "SYNC-MS-001#items.check"
+   },
+   {
+    "key": "java/src/main/java/com/ex/web/ItemController.java:37",
+    "name": "deep",
+    "qual": "Inner.deep",
+    "file": "java/src/main/java/com/ex/web/ItemController.java",
+    "line": 37,
+    "end": 37,
+    "item": null,
+    "ms": null
+   },
+   {
     "key": "frontend/src/api/client.ts:3",
     "name": "get",
     "qual": "api.get",
@@ -2855,6 +4006,86 @@
     "end": 9,
     "item": null,
     "ms": null
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:8",
+    "name": "find",
+    "qual": "ItemService.find",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 8,
+    "end": 10,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "gosvc/cmd/main.go:12",
+    "name": "hello",
+    "qual": "main.hello",
+    "file": "gosvc/cmd/main.go",
+    "line": 12,
+    "end": 21,
+    "item": "SYNC-MS-001#svc.hello",
+    "ms": "SYNC-MS-001#svc.hello"
+   },
+   {
+    "key": "gosvc/cmd/main.go:23",
+    "name": "greet",
+    "qual": "main.greet",
+    "file": "gosvc/cmd/main.go",
+    "line": 23,
+    "end": 23,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "gosvc/cmd/main.go:27",
+    "name": "Add",
+    "qual": "Cart.Add",
+    "file": "gosvc/cmd/main.go",
+    "line": 27,
+    "end": 29,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "gosvc/cmd/main.go:31",
+    "name": "Sum",
+    "qual": "Cart.Sum",
+    "file": "gosvc/cmd/main.go",
+    "line": 31,
+    "end": 31,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "gosvc/cmd/main.go:33",
+    "name": "main",
+    "qual": "main.main",
+    "file": "gosvc/cmd/main.go",
+    "line": 33,
+    "end": 37,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "gosvc/store/store.go:6",
+    "name": "Open",
+    "qual": "store.Open",
+    "file": "gosvc/store/store.go",
+    "line": 6,
+    "end": 6,
+    "item": null,
+    "ms": null
+   },
+   {
+    "key": "gosvc/store/store.go:8",
+    "name": "Get",
+    "qual": "Store.Get",
+    "file": "gosvc/store/store.go",
+    "line": 8,
+    "end": 8,
+    "item": null,
+    "ms": null
    }
   ],
   "calls": [
@@ -2894,6 +4125,16 @@
     "graphify"
    ],
    [
+    "java/src/main/java/com/ex/svc/ItemService.java:21",
+    "java/src/main/java/com/ex/svc/ItemService.java:20",
+    "graphify"
+   ],
+   [
+    "java/src/main/java/com/ex/web/ItemController.java:17",
+    "java/src/main/java/com/ex/web/ItemController.java:30",
+    "graphify"
+   ],
+   [
     "frontend/src/components/Card.tsx:4",
     "frontend/src/api/client.ts:12",
     "graphify"
@@ -2916,6 +4157,11 @@
    [
     "backend/app/web/routers/thing.py:18",
     "backend/app/core/util.py:6",
+    "graphify"
+   ],
+   [
+    "java/src/main/java/com/ex/web/ItemController.java:17",
+    "java/src/main/java/com/ex/svc/ItemService.java:16",
     "graphify"
    ],
    [
@@ -2981,6 +4227,56 @@
    [
     "local/crates/thing/src/util/mod.rs:3",
     "local/crates/thing/src/util/mod.rs:7",
+    "enrich"
+   ],
+   [
+    "java/src/main/java/com/ex/svc/ItemService.java:4",
+    "java/src/main/java/com/ex/svc/ItemService.java:8",
+    "enrich"
+   ],
+   [
+    "java/src/main/java/com/ex/web/ItemController.java:17",
+    "java/src/main/java/com/ex/svc/ItemService.java:14",
+    "enrich"
+   ],
+   [
+    "java/src/main/java/com/ex/web/ItemController.java:17",
+    "java/src/main/java/com/ex/svc/ItemService.java:15",
+    "enrich"
+   ],
+   [
+    "java/src/main/java/com/ex/web/ItemController.java:17",
+    "java/src/main/java/com/ex/svc/ItemService.java:4",
+    "enrich"
+   ],
+   [
+    "java/src/main/java/com/ex/web/ItemController.java:17",
+    "java/src/main/java/com/ex/svc/ItemService.java:8",
+    "enrich"
+   ],
+   [
+    "gosvc/cmd/main.go:12",
+    "gosvc/cmd/main.go:23",
+    "enrich"
+   ],
+   [
+    "gosvc/cmd/main.go:12",
+    "gosvc/cmd/main.go:27",
+    "enrich"
+   ],
+   [
+    "gosvc/cmd/main.go:12",
+    "gosvc/store/store.go:6",
+    "enrich"
+   ],
+   [
+    "gosvc/cmd/main.go:27",
+    "gosvc/cmd/main.go:31",
+    "enrich"
+   ],
+   [
+    "gosvc/cmd/main.go:33",
+    "gosvc/cmd/main.go:27",
     "enrich"
    ],
    [
@@ -3041,7 +4337,7 @@
     "end": 8,
     "item": null,
     "ms": null,
-    "community": 0
+    "community": 3
    },
    {
     "key": "backend/app/core/thing/repository.py:10",
@@ -3052,7 +4348,7 @@
     "end": 11,
     "item": null,
     "ms": null,
-    "community": 0
+    "community": 3
    },
    {
     "key": "backend/app/core/thing/repository.py:13",
@@ -3063,7 +4359,7 @@
     "end": 14,
     "item": null,
     "ms": null,
-    "community": 0
+    "community": 3
    },
    {
     "key": "backend/app/core/thing/repository.py:17",
@@ -3074,7 +4370,7 @@
     "end": 18,
     "item": null,
     "ms": null,
-    "community": 0
+    "community": 3
    },
    {
     "key": "backend/app/core/thing/service.py:11",
@@ -3085,7 +4381,7 @@
     "end": 14,
     "item": null,
     "ms": null,
-    "community": 0
+    "community": 3
    },
    {
     "key": "backend/app/core/thing/service.py:16",
@@ -3096,7 +4392,7 @@
     "end": 18,
     "item": "FX-MS-001#ThingService.get",
     "ms": "FX-MS-001#ThingService.get",
-    "community": 0
+    "community": 3
    },
    {
     "key": "backend/app/core/thing/service.py:20",
@@ -3107,7 +4403,7 @@
     "end": 28,
     "item": "FX-MS-001#ThingService.create",
     "ms": "FX-MS-001#ThingService.create",
-    "community": 0
+    "community": 3
    },
    {
     "key": "backend/app/core/thing/service.py:30",
@@ -3118,7 +4414,7 @@
     "end": 35,
     "item": "FX-MS-001#ThingService.rename",
     "ms": "FX-MS-001#ThingService.rename",
-    "community": 0
+    "community": 3
    },
    {
     "key": "backend/app/core/thing/service.py:37",
@@ -3129,7 +4425,7 @@
     "end": 41,
     "item": null,
     "ms": null,
-    "community": 0
+    "community": 3
    },
    {
     "key": "backend/app/core/thing/service.py:38",
@@ -3140,7 +4436,7 @@
     "end": null,
     "item": null,
     "ms": null,
-    "community": 0
+    "community": 3
    },
    {
     "key": "backend/app/core/thing/service.py:44",
@@ -3151,7 +4447,7 @@
     "end": 48,
     "item": "FX-MS-001#thing.build",
     "ms": "FX-MS-001#thing.build",
-    "community": 3
+    "community": 0
    },
    {
     "key": "backend/app/core/util.py:6",
@@ -3162,7 +4458,7 @@
     "end": 8,
     "item": "FX-MS-002#util.clean",
     "ms": "FX-MS-002#util.clean",
-    "community": 3
+    "community": 0
    },
    {
     "key": "backend/app/core/util.py:12",
@@ -3173,7 +4469,7 @@
     "end": 14,
     "item": "FX-MS-002#util.audit",
     "ms": "FX-MS-002#util.audit",
-    "community": 5
+    "community": 0
    },
    {
     "key": "backend/app/core/util.py:17",
@@ -3184,7 +4480,7 @@
     "end": 18,
     "item": null,
     "ms": null,
-    "community": 5
+    "community": 0
    },
    {
     "key": "backend/app/core/util.py:22",
@@ -3195,7 +4491,7 @@
     "end": 26,
     "item": null,
     "ms": null,
-    "community": 5
+    "community": 0
    },
    {
     "key": "backend/app/web/routers/thing.py:12",
@@ -3206,7 +4502,7 @@
     "end": 14,
     "item": "FX-API-001#GET/api/things/{thingId}",
     "ms": null,
-    "community": 3
+    "community": 0
    },
    {
     "key": "backend/app/web/routers/thing.py:18",
@@ -3217,7 +4513,7 @@
     "end": 24,
     "item": "FX-API-001#POST/api/things",
     "ms": null,
-    "community": 3
+    "community": 0
    },
    {
     "key": "frontend/src/api/client.ts:12",
@@ -3228,7 +4524,7 @@
     "end": 14,
     "item": null,
     "ms": null,
-    "community": 2
+    "community": 5
    },
    {
     "key": "frontend/src/api/index.ts:3",
@@ -3239,7 +4535,7 @@
     "end": 5,
     "item": null,
     "ms": null,
-    "community": 2
+    "community": 5
    },
    {
     "key": "frontend/src/components/Card.tsx:4",
@@ -3250,7 +4546,7 @@
     "end": 9,
     "item": null,
     "ms": null,
-    "community": 2
+    "community": 5
    },
    {
     "key": "frontend/src/components/Card.tsx:11",
@@ -3261,7 +4557,7 @@
     "end": 12,
     "item": null,
     "ms": null,
-    "community": 2
+    "community": 5
    },
    {
     "key": "frontend/src/components/Card.tsx:15",
@@ -3272,7 +4568,7 @@
     "end": 17,
     "item": null,
     "ms": null,
-    "community": 2
+    "community": 5
    },
    {
     "key": "frontend/src/lib/math.js:2",
@@ -3283,7 +4579,7 @@
     "end": 4,
     "item": null,
     "ms": null,
-    "community": 6
+    "community": 7
    },
    {
     "key": "frontend/src/lib/math.js:7",
@@ -3294,7 +4590,7 @@
     "end": 9,
     "item": null,
     "ms": null,
-    "community": 6
+    "community": 7
    },
    {
     "key": "frontend/src/lib/math.js:12",
@@ -3305,7 +4601,7 @@
     "end": 14,
     "item": null,
     "ms": null,
-    "community": 6
+    "community": 7
    },
    {
     "key": "frontend/src/pages/ThingPage.tsx:9",
@@ -3316,7 +4612,7 @@
     "end": 22,
     "item": "FX-UI-001#UI-3",
     "ms": null,
-    "community": 2
+    "community": 5
    },
    {
     "key": "frontend/src/pages/ThingPage.tsx:24",
@@ -3327,7 +4623,117 @@
     "end": 26,
     "item": "FX-UI-001#UI-3",
     "ms": null,
-    "community": 2
+    "community": 5
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:4",
+    "name": "find",
+    "qual": "ItemService.find",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 4,
+    "end": 6,
+    "item": null,
+    "ms": null,
+    "community": 1
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:14",
+    "name": "Audit",
+    "qual": "Audit.Audit",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 14,
+    "end": 14,
+    "item": null,
+    "ms": null,
+    "community": 1
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:15",
+    "name": "log",
+    "qual": "Audit.log",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 15,
+    "end": 15,
+    "item": null,
+    "ms": null,
+    "community": 1
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:16",
+    "name": "stamp",
+    "qual": "Audit.stamp",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 16,
+    "end": 16,
+    "item": null,
+    "ms": null,
+    "community": 1
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:20",
+    "name": "go",
+    "qual": "Helper.go",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 20,
+    "end": null,
+    "item": null,
+    "ms": null,
+    "community": 1
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:21",
+    "name": "twice",
+    "qual": "Helper.twice",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 21,
+    "end": 21,
+    "item": null,
+    "ms": null,
+    "community": 1
+   },
+   {
+    "key": "java/src/main/java/com/ex/web/ItemController.java:9",
+    "name": "ItemController",
+    "qual": "ItemController.ItemController",
+    "file": "java/src/main/java/com/ex/web/ItemController.java",
+    "line": 9,
+    "end": 11,
+    "item": null,
+    "ms": null,
+    "community": 1
+   },
+   {
+    "key": "java/src/main/java/com/ex/web/ItemController.java:17",
+    "name": "read",
+    "qual": "ItemController.read",
+    "file": "java/src/main/java/com/ex/web/ItemController.java",
+    "line": 17,
+    "end": 27,
+    "item": "SYNC-MS-001#items.read",
+    "ms": "SYNC-MS-001#items.read",
+    "community": 1
+   },
+   {
+    "key": "java/src/main/java/com/ex/web/ItemController.java:30",
+    "name": "check",
+    "qual": "ItemController.check",
+    "file": "java/src/main/java/com/ex/web/ItemController.java",
+    "line": 30,
+    "end": 34,
+    "item": "SYNC-MS-001#items.check",
+    "ms": "SYNC-MS-001#items.check",
+    "community": 1
+   },
+   {
+    "key": "java/src/main/java/com/ex/web/ItemController.java:37",
+    "name": "deep",
+    "qual": "Inner.deep",
+    "file": "java/src/main/java/com/ex/web/ItemController.java",
+    "line": 37,
+    "end": 37,
+    "item": null,
+    "ms": null,
+    "community": 1
    },
    {
     "key": "frontend/src/api/client.ts:3",
@@ -3338,7 +4744,7 @@
     "end": 3,
     "item": null,
     "ms": null,
-    "community": 2
+    "community": 5
    },
    {
     "key": "frontend/src/api/client.ts:4",
@@ -3349,7 +4755,7 @@
     "end": 6,
     "item": null,
     "ms": null,
-    "community": 2
+    "community": 5
    },
    {
     "key": "frontend/src/api/client.ts:7",
@@ -3360,7 +4766,7 @@
     "end": 9,
     "item": null,
     "ms": null,
-    "community": 2
+    "community": 5
    },
    {
     "key": "local/crates/thing/src/lib.rs:10",
@@ -3371,7 +4777,7 @@
     "end": 13,
     "item": "FX-MS-003#thing.top",
     "ms": "FX-MS-003#thing.top",
-    "community": 7
+    "community": 8
    },
    {
     "key": "local/crates/thing/src/repo.rs:8",
@@ -3382,7 +4788,7 @@
     "end": 10,
     "item": null,
     "ms": null,
-    "community": 4
+    "community": 6
    },
    {
     "key": "local/crates/thing/src/repo.rs:12",
@@ -3393,7 +4799,7 @@
     "end": 14,
     "item": null,
     "ms": null,
-    "community": 4
+    "community": 6
    },
    {
     "key": "local/crates/thing/src/service.rs:20",
@@ -3404,7 +4810,7 @@
     "end": 22,
     "item": "FX-MS-003#ThingService.new",
     "ms": "FX-MS-003#ThingService.new",
-    "community": 1
+    "community": 2
    },
    {
     "key": "local/crates/thing/src/service.rs:27",
@@ -3415,7 +4821,7 @@
     "end": 32,
     "item": "FX-MS-003#ThingService.find",
     "ms": "FX-MS-003#ThingService.find",
-    "community": 1
+    "community": 2
    },
    {
     "key": "local/crates/thing/src/service.rs:34",
@@ -3426,7 +4832,7 @@
     "end": 36,
     "item": null,
     "ms": null,
-    "community": 1
+    "community": 2
    },
    {
     "key": "local/crates/thing/src/service.rs:40",
@@ -3437,7 +4843,7 @@
     "end": 42,
     "item": null,
     "ms": null,
-    "community": 1
+    "community": 2
    },
    {
     "key": "local/crates/thing/src/service.rs:48",
@@ -3448,7 +4854,7 @@
     "end": 50,
     "item": "FX-MS-003#ThingService.count",
     "ms": "FX-MS-003#ThingService.count",
-    "community": 1
+    "community": 2
    },
    {
     "key": "local/crates/thing/src/util/mod.rs:3",
@@ -3459,7 +4865,7 @@
     "end": 5,
     "item": null,
     "ms": null,
-    "community": 8
+    "community": 2
    },
    {
     "key": "local/crates/thing/src/util/mod.rs:7",
@@ -3470,7 +4876,95 @@
     "end": 9,
     "item": null,
     "ms": null,
-    "community": 8
+    "community": 2
+   },
+   {
+    "key": "java/src/main/java/com/ex/svc/ItemService.java:8",
+    "name": "find",
+    "qual": "ItemService.find",
+    "file": "java/src/main/java/com/ex/svc/ItemService.java",
+    "line": 8,
+    "end": 10,
+    "item": null,
+    "ms": null,
+    "community": 1
+   },
+   {
+    "key": "gosvc/cmd/main.go:12",
+    "name": "hello",
+    "qual": "main.hello",
+    "file": "gosvc/cmd/main.go",
+    "line": 12,
+    "end": 21,
+    "item": "SYNC-MS-001#svc.hello",
+    "ms": "SYNC-MS-001#svc.hello",
+    "community": 4
+   },
+   {
+    "key": "gosvc/cmd/main.go:23",
+    "name": "greet",
+    "qual": "main.greet",
+    "file": "gosvc/cmd/main.go",
+    "line": 23,
+    "end": 23,
+    "item": null,
+    "ms": null,
+    "community": 4
+   },
+   {
+    "key": "gosvc/cmd/main.go:27",
+    "name": "Add",
+    "qual": "Cart.Add",
+    "file": "gosvc/cmd/main.go",
+    "line": 27,
+    "end": 29,
+    "item": null,
+    "ms": null,
+    "community": 4
+   },
+   {
+    "key": "gosvc/cmd/main.go:31",
+    "name": "Sum",
+    "qual": "Cart.Sum",
+    "file": "gosvc/cmd/main.go",
+    "line": 31,
+    "end": 31,
+    "item": null,
+    "ms": null,
+    "community": 4
+   },
+   {
+    "key": "gosvc/cmd/main.go:33",
+    "name": "main",
+    "qual": "main.main",
+    "file": "gosvc/cmd/main.go",
+    "line": 33,
+    "end": 37,
+    "item": null,
+    "ms": null,
+    "community": 4
+   },
+   {
+    "key": "gosvc/store/store.go:6",
+    "name": "Open",
+    "qual": "store.Open",
+    "file": "gosvc/store/store.go",
+    "line": 6,
+    "end": 6,
+    "item": null,
+    "ms": null,
+    "community": 4
+   },
+   {
+    "key": "gosvc/store/store.go:8",
+    "name": "Get",
+    "qual": "Store.Get",
+    "file": "gosvc/store/store.go",
+    "line": 8,
+    "end": 8,
+    "item": null,
+    "ms": null,
+    "community": 4
    }
   ],
   "calls": [
@@ -3510,6 +5004,16 @@
     "graphify"
    ],
    [
+    "java/src/main/java/com/ex/svc/ItemService.java:21",
+    "java/src/main/java/com/ex/svc/ItemService.java:20",
+    "graphify"
+   ],
+   [
+    "java/src/main/java/com/ex/web/ItemController.java:17",
+    "java/src/main/java/com/ex/web/ItemController.java:30",
+    "graphify"
+   ],
+   [
     "frontend/src/components/Card.tsx:4",
     "frontend/src/api/client.ts:12",
     "graphify"
@@ -3532,6 +5036,11 @@
    [
     "backend/app/web/routers/thing.py:18",
     "backend/app/core/util.py:6",
+    "graphify"
+   ],
+   [
+    "java/src/main/java/com/ex/web/ItemController.java:17",
+    "java/src/main/java/com/ex/svc/ItemService.java:16",
     "graphify"
    ],
    [
@@ -3600,6 +5109,56 @@
     "enrich"
    ],
    [
+    "java/src/main/java/com/ex/svc/ItemService.java:4",
+    "java/src/main/java/com/ex/svc/ItemService.java:8",
+    "enrich"
+   ],
+   [
+    "java/src/main/java/com/ex/web/ItemController.java:17",
+    "java/src/main/java/com/ex/svc/ItemService.java:14",
+    "enrich"
+   ],
+   [
+    "java/src/main/java/com/ex/web/ItemController.java:17",
+    "java/src/main/java/com/ex/svc/ItemService.java:15",
+    "enrich"
+   ],
+   [
+    "java/src/main/java/com/ex/web/ItemController.java:17",
+    "java/src/main/java/com/ex/svc/ItemService.java:4",
+    "enrich"
+   ],
+   [
+    "java/src/main/java/com/ex/web/ItemController.java:17",
+    "java/src/main/java/com/ex/svc/ItemService.java:8",
+    "enrich"
+   ],
+   [
+    "gosvc/cmd/main.go:12",
+    "gosvc/cmd/main.go:23",
+    "enrich"
+   ],
+   [
+    "gosvc/cmd/main.go:12",
+    "gosvc/cmd/main.go:27",
+    "enrich"
+   ],
+   [
+    "gosvc/cmd/main.go:12",
+    "gosvc/store/store.go:6",
+    "enrich"
+   ],
+   [
+    "gosvc/cmd/main.go:27",
+    "gosvc/cmd/main.go:31",
+    "enrich"
+   ],
+   [
+    "gosvc/cmd/main.go:33",
+    "gosvc/cmd/main.go:27",
+    "enrich"
+   ],
+   [
     "backend/app/core/thing/service.py:16",
     "backend/app/core/thing/repository.py:10",
     "enrich"
@@ -3647,47 +5206,47 @@
   ],
   "communities": [
    {
-    "id": 0,
+    "id": 1,
+    "label": "ItemController",
+    "size": 11
+   },
+   {
+    "id": 3,
     "label": "ThingService",
     "size": 10
    },
    {
-    "id": 2,
+    "id": 5,
     "label": "ThingPage.tsx",
     "size": 10
    },
    {
-    "id": 1,
-    "label": "ThingService",
-    "size": 5
-   },
-   {
-    "id": 3,
+    "id": 0,
     "label": "thing.py",
-    "size": 4
+    "size": 7
    },
    {
-    "id": 5,
-    "label": "util.py",
-    "size": 3
+    "id": 2,
+    "label": "ThingService",
+    "size": 7
    },
    {
-    "id": 6,
+    "id": 4,
+    "label": "main.go",
+    "size": 7
+   },
+   {
+    "id": 7,
     "label": "math.js",
     "size": 3
    },
    {
-    "id": 4,
+    "id": 6,
     "label": "Repo",
     "size": 2
    },
    {
     "id": 8,
-    "label": "pad",
-    "size": 2
-   },
-   {
-    "id": 7,
     "label": "lib.rs",
     "size": 1
    }
@@ -4033,6 +5592,64 @@
     "_origin": "ast"
    },
    {
+    "id": "pkg_example_com_gosvc",
+    "label": "example.com/gosvc",
+    "file_type": "code",
+    "type": "package",
+    "ecosystem": "go",
+    "source_file": "gosvc/go.mod",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "gosvc_main",
+    "label": "main.go",
+    "file_type": "code",
+    "source_file": "gosvc/main.go",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "gosvc_server",
+    "label": "Server",
+    "file_type": "code",
+    "source_file": "gosvc/main.go",
+    "source_location": "L11",
+    "_origin": "ast"
+   },
+   {
+    "id": "redis_client",
+    "label": "redis.Client",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "gosvc_server_hello",
+    "label": ".hello()",
+    "file_type": "code",
+    "source_file": "gosvc/main.go",
+    "source_location": "L17",
+    "_origin": "ast"
+   },
+   {
+    "id": "gosvc_main_greet",
+    "label": "greet()",
+    "file_type": "code",
+    "source_file": "gosvc/main.go",
+    "source_location": "L25",
+    "_origin": "ast"
+   },
+   {
+    "id": "gosvc_main_main",
+    "label": "main()",
+    "file_type": "code",
+    "source_file": "gosvc/main.go",
+    "source_location": "L29",
+    "_origin": "ast"
+   },
+   {
     "id": "pkg_rsvc",
     "label": "rsvc",
     "file_type": "code",
@@ -4264,6 +5881,166 @@
     "_origin": "ast"
    },
    {
+    "id": "spring_src_main_java_com_ex_itemcontroller",
+    "label": "ItemController.java",
+    "file_type": "code",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "spring_src_main_java_com_ex_itemcontroller_itemcontroller",
+    "label": "ItemController",
+    "file_type": "code",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L5",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "restcontroller",
+    "label": "RestController",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "requestmapping",
+    "label": "RequestMapping",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "spring_src_main_java_com_ex_itemcontroller_itemcontroller_itemcontroller",
+    "label": ".ItemController()",
+    "file_type": "code",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L10",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "spring_src_main_java_com_ex_itemcontroller_itemcontroller_read",
+    "label": ".read()",
+    "file_type": "code",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L15",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "getmapping",
+    "label": "GetMapping",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "spring_src_main_java_com_ex_itemcontroller_itemcontroller_make",
+    "label": ".make()",
+    "file_type": "code",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L23",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "postmapping",
+    "label": "PostMapping",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "spring_src_main_java_com_ex_itemservice",
+    "label": "ItemService.java",
+    "file_type": "code",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L1",
+    "_origin": "ast"
+   },
+   {
+    "id": "spring_src_main_java_com_ex_itemservice_itemservice",
+    "label": "ItemService",
+    "file_type": "code",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L5",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "spring_src_main_java_com_ex_itemservice_itemservice_itemservice",
+    "label": ".ItemService()",
+    "file_type": "code",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L9",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "spring_src_main_java_com_ex_itemservice_itemservice_find",
+    "label": ".find()",
+    "file_type": "code",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L13",
+    "_callable": true,
+    "metadata": {
+     "unresolved_calls": [
+      {
+       "callee": "getForObject",
+       "receiver_type": "RestTemplate",
+       "lang": "java",
+       "line": "L15"
+      }
+     ]
+    },
+    "_origin": "ast"
+   },
+   {
+    "id": "spring_src_main_java_com_ex_itemservice_itemservice_save",
+    "label": ".save()",
+    "file_type": "code",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L19",
+    "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "spring_src_main_java_com_ex_itemservice_itemrepository",
+    "label": "ItemRepository",
+    "file_type": "code",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L24",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "jparepository",
+    "label": "JpaRepository",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "spring_src_main_java_com_ex_itemservice_item",
+    "label": "Item",
+    "file_type": "code",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L27",
+    "_callable": true,
+    "_callable_class": true,
+    "_origin": "ast"
+   },
+   {
     "id": "tests_test_x",
     "label": "test_x.py",
     "file_type": "code",
@@ -4295,6 +6072,38 @@
     "source_file": "web/app/api/things/[id]/route.ts",
     "source_location": "L1",
     "_callable": true,
+    "_origin": "ast"
+   },
+   {
+    "id": "org_springframework_web_client_resttemplate",
+    "label": "org.springframework.web.client.RestTemplate",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "go_type_database_sql_db",
+    "label": "database/sql.DB",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "go_type_net_http_responsewriter",
+    "label": "net/http.ResponseWriter",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
+    "_origin": "ast"
+   },
+   {
+    "id": "go_type_net_http_request",
+    "label": "net/http.Request",
+    "file_type": "code",
+    "source_file": "",
+    "source_location": "",
     "_origin": "ast"
    },
    {
@@ -4330,6 +6139,38 @@
     "source_file": ""
    },
    {
+    "id": "go_pkg_database_sql",
+    "label": "go_pkg_database_sql",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
+    "id": "go_pkg_fmt",
+    "label": "go_pkg_fmt",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
+    "id": "go_pkg_net_http",
+    "label": "go_pkg_net_http",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
+    "id": "go_pkg_github_com_redis_go_redis_v9",
+    "label": "go_pkg_github_com_redis_go_redis_v9",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
     "id": "axum",
     "label": "axum",
     "file_type": "concept",
@@ -4348,6 +6189,14 @@
    {
     "id": "redis",
     "label": "redis",
+    "file_type": "concept",
+    "type": "external",
+    "external": true,
+    "source_file": ""
+   },
+   {
+    "id": "annotation",
+    "label": "annotation",
     "file_type": "concept",
     "type": "external",
     "external": true,
@@ -4813,6 +6662,157 @@
     "_origin": "ast"
    },
    {
+    "source": "pkg_example_com_gosvc",
+    "target": "pkg_github_com_redis_go_redis_v9",
+    "relation": "depends_on",
+    "context": "dependency",
+    "confidence": "EXTRACTED",
+    "confidence_score": 1.0,
+    "source_file": "gosvc/go.mod",
+    "source_location": "L1",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_main",
+    "target": "go_pkg_database_sql",
+    "relation": "imports_from",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/main.go",
+    "source_location": "L4",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_main",
+    "target": "go_pkg_fmt",
+    "relation": "imports_from",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/main.go",
+    "source_location": "L5",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_main",
+    "target": "go_pkg_net_http",
+    "relation": "imports_from",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/main.go",
+    "source_location": "L6",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_main",
+    "target": "go_pkg_github_com_redis_go_redis_v9",
+    "relation": "imports_from",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/main.go",
+    "source_location": "L8",
+    "weight": 1.0,
+    "context": "import",
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_main",
+    "target": "gosvc_server",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/main.go",
+    "source_location": "L11",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_server",
+    "target": "go_type_database_sql_db",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/main.go",
+    "source_location": "L12",
+    "weight": 1.0,
+    "context": "field",
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_server",
+    "target": "redis_client",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/main.go",
+    "source_location": "L13",
+    "weight": 1.0,
+    "context": "field",
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_server",
+    "target": "gosvc_server_hello",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/main.go",
+    "source_location": "L17",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_server_hello",
+    "target": "go_type_net_http_responsewriter",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/main.go",
+    "source_location": "L17",
+    "weight": 1.0,
+    "context": "parameter_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_server_hello",
+    "target": "go_type_net_http_request",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/main.go",
+    "source_location": "L17",
+    "weight": 1.0,
+    "context": "parameter_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_main",
+    "target": "gosvc_main_greet",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/main.go",
+    "source_location": "L25",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_main",
+    "target": "gosvc_main_main",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/main.go",
+    "source_location": "L29",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "gosvc_server_hello",
+    "target": "gosvc_main_greet",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "EXTRACTED",
+    "source_file": "gosvc/main.go",
+    "source_location": "L22",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
     "source": "pkg_rsvc",
     "target": "pkg_axum",
     "relation": "depends_on",
@@ -5164,6 +7164,292 @@
     "_origin": "ast"
    },
    {
+    "source": "spring_src_main_java_com_ex_itemcontroller",
+    "target": "annotation",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L3",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemcontroller",
+    "target": "spring_src_main_java_com_ex_itemcontroller_itemcontroller",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L5",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemcontroller_itemcontroller",
+    "target": "restcontroller",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L5",
+    "weight": 1.0,
+    "context": "attribute",
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemcontroller_itemcontroller",
+    "target": "requestmapping",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L5",
+    "weight": 1.0,
+    "context": "attribute",
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemcontroller_itemcontroller",
+    "target": "spring_src_main_java_com_ex_itemservice_itemservice",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L8",
+    "weight": 1.0,
+    "context": "field",
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemcontroller_itemcontroller",
+    "target": "spring_src_main_java_com_ex_itemcontroller_itemcontroller_itemcontroller",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L10",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemcontroller_itemcontroller_itemcontroller",
+    "target": "spring_src_main_java_com_ex_itemservice_itemservice",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L10",
+    "weight": 1.0,
+    "context": "parameter_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemcontroller_itemcontroller",
+    "target": "spring_src_main_java_com_ex_itemcontroller_itemcontroller_read",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L15",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemcontroller_itemcontroller_read",
+    "target": "spring_src_main_java_com_ex_itemservice_item",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L15",
+    "weight": 1.0,
+    "context": "return_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemcontroller_itemcontroller_read",
+    "target": "getmapping",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L15",
+    "weight": 1.0,
+    "context": "attribute",
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemcontroller_itemcontroller",
+    "target": "spring_src_main_java_com_ex_itemcontroller_itemcontroller_make",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L23",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemcontroller_itemcontroller_make",
+    "target": "spring_src_main_java_com_ex_itemservice_item",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L23",
+    "weight": 1.0,
+    "context": "parameter_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemcontroller_itemcontroller_make",
+    "target": "postmapping",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L23",
+    "weight": 1.0,
+    "context": "attribute",
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemservice",
+    "target": "org_springframework_web_client_resttemplate",
+    "relation": "imports",
+    "context": "import",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L3",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemservice",
+    "target": "spring_src_main_java_com_ex_itemservice_itemservice",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L5",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemservice_itemservice",
+    "target": "spring_src_main_java_com_ex_itemservice_itemrepository",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L6",
+    "weight": 1.0,
+    "context": "field",
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemservice_itemservice",
+    "target": "org_springframework_web_client_resttemplate",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L7",
+    "weight": 1.0,
+    "context": "field",
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemservice_itemservice",
+    "target": "spring_src_main_java_com_ex_itemservice_itemservice_itemservice",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L9",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemservice_itemservice_itemservice",
+    "target": "spring_src_main_java_com_ex_itemservice_itemrepository",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L9",
+    "weight": 1.0,
+    "context": "parameter_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemservice_itemservice",
+    "target": "spring_src_main_java_com_ex_itemservice_itemservice_find",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L13",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemservice_itemservice_find",
+    "target": "spring_src_main_java_com_ex_itemservice_item",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L13",
+    "weight": 1.0,
+    "context": "return_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemservice_itemservice",
+    "target": "spring_src_main_java_com_ex_itemservice_itemservice_save",
+    "relation": "method",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L19",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemservice_itemservice_save",
+    "target": "spring_src_main_java_com_ex_itemservice_item",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L19",
+    "weight": 1.0,
+    "context": "parameter_type",
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemservice",
+    "target": "spring_src_main_java_com_ex_itemservice_itemrepository",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L24",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemservice_itemrepository",
+    "target": "jparepository",
+    "relation": "inherits",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L24",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemservice_itemrepository",
+    "target": "spring_src_main_java_com_ex_itemservice_item",
+    "relation": "references",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L24",
+    "weight": 1.0,
+    "context": "generic_arg",
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemservice",
+    "target": "spring_src_main_java_com_ex_itemservice_item",
+    "relation": "contains",
+    "confidence": "EXTRACTED",
+    "source_file": "spring/src/main/java/com/ex/ItemService.java",
+    "source_location": "L27",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
     "source": "tests_test_x",
     "target": "tests_test_x_test_x",
     "relation": "contains",
@@ -5293,6 +7579,30 @@
     "confidence_score": 1.0,
     "source_file": "backend/app/api/items.py",
     "source_location": "L31",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemcontroller_itemcontroller_read",
+    "target": "spring_src_main_java_com_ex_itemservice_itemservice_find",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "INFERRED",
+    "confidence_score": 0.8,
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L20",
+    "weight": 1.0,
+    "_origin": "ast"
+   },
+   {
+    "source": "spring_src_main_java_com_ex_itemcontroller_itemcontroller_make",
+    "target": "spring_src_main_java_com_ex_itemservice_itemservice_save",
+    "relation": "calls",
+    "context": "call",
+    "confidence": "INFERRED",
+    "confidence_score": 0.8,
+    "source_file": "spring/src/main/java/com/ex/ItemController.java",
+    "source_location": "L25",
     "weight": 1.0,
     "_origin": "ast"
    }
@@ -5658,6 +7968,149 @@
     }
    },
    {
+    "key": "spring/src/main/java/com/ex/ItemController.java:10",
+    "name": "ItemController",
+    "qual": "ItemController.ItemController",
+    "file": "spring/src/main/java/com/ex/ItemController.java",
+    "line": 10,
+    "end": 12,
+    "item": null,
+    "ms": null,
+    "steps": [],
+    "route": null
+   },
+   {
+    "key": "spring/src/main/java/com/ex/ItemController.java:15",
+    "name": "read",
+    "qual": "ItemController.read",
+    "file": "spring/src/main/java/com/ex/ItemController.java",
+    "line": 15,
+    "end": 21,
+    "item": "SYNC-MS-001#items.read",
+    "ms": "SYNC-MS-001#items.read",
+    "steps": [
+     {
+      "k": "raise",
+      "line": 18,
+      "label": "throw new IllegalArgumentException(\"bad\")"
+     },
+     {
+      "k": "call",
+      "line": 20,
+      "label": "service.find",
+      "to": "spring/src/main/java/com/ex/ItemService.java:13"
+     },
+     {
+      "k": "return",
+      "line": 20,
+      "label": "return service.find(id)"
+     }
+    ],
+    "route": {
+     "method": "GET",
+     "path": "/api/items/{id}"
+    }
+   },
+   {
+    "key": "spring/src/main/java/com/ex/ItemController.java:23",
+    "name": "make",
+    "qual": "ItemController.make",
+    "file": "spring/src/main/java/com/ex/ItemController.java",
+    "line": 23,
+    "end": 26,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "call",
+      "line": 25,
+      "label": "service.save",
+      "to": "spring/src/main/java/com/ex/ItemService.java:19"
+     },
+     {
+      "k": "return",
+      "line": 25,
+      "label": "return service.save(item)"
+     }
+    ],
+    "route": {
+     "method": "POST",
+     "path": "/api/items"
+    }
+   },
+   {
+    "key": "spring/src/main/java/com/ex/ItemService.java:9",
+    "name": "ItemService",
+    "qual": "ItemService.ItemService",
+    "file": "spring/src/main/java/com/ex/ItemService.java",
+    "line": 9,
+    "end": 11,
+    "item": null,
+    "ms": null,
+    "steps": [],
+    "route": null
+   },
+   {
+    "key": "spring/src/main/java/com/ex/ItemService.java:13",
+    "name": "find",
+    "qual": "ItemService.find",
+    "file": "spring/src/main/java/com/ex/ItemService.java",
+    "line": 13,
+    "end": 17,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "call",
+      "line": 14,
+      "label": "repo.findById",
+      "infra": "infra:db"
+     },
+     {
+      "k": "call",
+      "line": 14,
+      "label": "repo.findById(id).orElseThrow",
+      "infra": "infra:db"
+     },
+     {
+      "k": "call",
+      "line": 15,
+      "label": "http.getForObject",
+      "infra": "infra:http"
+     },
+     {
+      "k": "return",
+      "line": 16,
+      "label": "return found"
+     }
+    ],
+    "route": null
+   },
+   {
+    "key": "spring/src/main/java/com/ex/ItemService.java:19",
+    "name": "save",
+    "qual": "ItemService.save",
+    "file": "spring/src/main/java/com/ex/ItemService.java",
+    "line": 19,
+    "end": 21,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "call",
+      "line": 20,
+      "label": "repo.save",
+      "infra": "infra:db"
+     },
+     {
+      "k": "return",
+      "line": 20,
+      "label": "return repo.save(item)"
+     }
+    ],
+    "route": null
+   },
+   {
     "key": "web/app/api/things/[id]/route.ts:1",
     "name": "GET",
     "qual": "route.GET",
@@ -5805,6 +8258,70 @@
      "method": "GET",
      "path": "/hi"
     }
+   },
+   {
+    "key": "gosvc/main.go:17",
+    "name": "hello",
+    "qual": "Server.hello",
+    "file": "gosvc/main.go",
+    "line": 17,
+    "end": 23,
+    "item": "SYNC-MS-001#svc.hello",
+    "ms": "SYNC-MS-001#svc.hello",
+    "steps": [
+     {
+      "k": "call",
+      "line": 19,
+      "label": "s.rdb.Incr",
+      "infra": "infra:redis"
+     },
+     {
+      "k": "call",
+      "line": 20,
+      "label": "s.db.QueryRow",
+      "infra": "infra:db"
+     },
+     {
+      "k": "call",
+      "line": 22,
+      "label": "greet",
+      "to": "gosvc/main.go:25"
+     }
+    ],
+    "route": {
+     "method": "GET",
+     "path": "/hello/{name}"
+    }
+   },
+   {
+    "key": "gosvc/main.go:25",
+    "name": "greet",
+    "qual": "main.greet",
+    "file": "gosvc/main.go",
+    "line": 25,
+    "end": 27,
+    "item": null,
+    "ms": null,
+    "steps": [
+     {
+      "k": "return",
+      "line": 26,
+      "label": "return \"hi \" + name"
+     }
+    ],
+    "route": null
+   },
+   {
+    "key": "gosvc/main.go:29",
+    "name": "main",
+    "qual": "main.main",
+    "file": "gosvc/main.go",
+    "line": 29,
+    "end": 33,
+    "item": null,
+    "ms": null,
+    "steps": [],
+    "route": null
    }
   ],
   "calls": [
@@ -5836,6 +8353,21 @@
    [
     "rs/src/lib.rs:13",
     "rs/src/lib.rs:20",
+    "enrich"
+   ],
+   [
+    "spring/src/main/java/com/ex/ItemController.java:15",
+    "spring/src/main/java/com/ex/ItemService.java:13",
+    "enrich"
+   ],
+   [
+    "spring/src/main/java/com/ex/ItemController.java:23",
+    "spring/src/main/java/com/ex/ItemService.java:19",
+    "enrich"
+   ],
+   [
+    "gosvc/main.go:17",
+    "gosvc/main.go:25",
     "enrich"
    ],
    [
@@ -5896,6 +8428,11 @@
     "loc": 12
    },
    {
+    "path": "gosvc/main.go",
+    "lang": "go",
+    "loc": 33
+   },
+   {
     "path": "rs/src/lib.rs",
     "lang": "rust",
     "loc": 25
@@ -5914,6 +8451,16 @@
     "path": "server/index.ts",
     "lang": "typescript",
     "loc": 16
+   },
+   {
+    "path": "spring/src/main/java/com/ex/ItemController.java",
+    "lang": "java",
+    "loc": 27
+   },
+   {
+    "path": "spring/src/main/java/com/ex/ItemService.java",
+    "lang": "java",
+    "loc": 28
    },
    {
     "path": "web/app/api/things/[id]/route.ts",
@@ -5941,6 +8488,15 @@
     "port": 5174
    },
    {
+    "name": "gosvc",
+    "kind": "server",
+    "dir": "gosvc",
+    "lang": "go",
+    "framework": "net/http",
+    "command": "go run .",
+    "port": 8090
+   },
+   {
     "name": "rs",
     "kind": "server",
     "dir": "rs",
@@ -5957,6 +8513,15 @@
     "framework": "Express",
     "command": "npm start",
     "port": 4100
+   },
+   {
+    "name": "spring",
+    "kind": "server",
+    "dir": "spring",
+    "lang": "java",
+    "framework": "Spring Boot",
+    "command": "./mvnw spring-boot:run",
+    "port": 8085
    }
   ],
   "http": [
@@ -5996,6 +8561,17 @@
      "dir": "backend"
     },
     {
+     "id": "infra:server:gosvc",
+     "kind": "backend",
+     "name": "net/http 서버",
+     "where": "local",
+     "host": "localhost:8090",
+     "evidence": [
+      "net/http — gosvc"
+     ],
+     "dir": "gosvc"
+    },
+    {
      "id": "infra:server:rs",
      "kind": "backend",
      "name": "Axum 서버",
@@ -6018,18 +8594,32 @@
      "dir": "server"
     },
     {
+     "id": "infra:server:spring",
+     "kind": "backend",
+     "name": "Spring Boot 서버",
+     "where": "local",
+     "host": "localhost:8085",
+     "evidence": [
+      "Spring Boot — spring"
+     ],
+     "dir": "spring"
+    },
+    {
      "id": "infra:db",
      "kind": "db",
      "name": "PostgreSQL",
      "where": "container",
      "host": "db:5432",
      "evidence": [
-      "코드: sqlalchemy, @prisma/client, sqlx — backend/app/core/db.py 외 2개 파일",
+      "코드: sqlalchemy, @prisma/client, spring-data, sqlx, database/sql — backend/app/core/db.py 외 4개 파일",
       "의존성: sqlx — rs/Cargo.toml",
       "의존성: @prisma/client — server/package.json",
+      "의존성: org.springframework.boot:spring-boot-starter-data-jpa — spring/pom.xml",
+      "의존성: org.postgresql:postgresql — spring/pom.xml",
       "docker-compose: db (postgres:16, 포트 15432) — docker-compose.yml",
       "설정: .env.example DATABASE_URL → localhost:15432",
-      "설정: backend/app/config.py DATABASE_URL → db:5432"
+      "설정: backend/app/config.py DATABASE_URL → db:5432",
+      "설정: spring/src/main/resources/application.properties spring.datasource.url → localhost:5432"
      ],
      "dir": null
     },
@@ -6040,7 +8630,7 @@
      "where": "external",
      "host": null,
      "evidence": [
-      "코드: httpx, fetch, reqwest — backend/app/core/service.py 외 2개 파일"
+      "코드: httpx, java-http, fetch, reqwest — backend/app/core/service.py 외 3개 파일"
      ],
      "dir": null
     },
@@ -6051,7 +8641,9 @@
      "where": "container",
      "host": "your-redis-host",
      "evidence": [
+      "코드: github.com/redis/go-redis — gosvc/main.go",
       "의존성: redis — backend/pyproject.toml",
+      "의존성: github.com/redis/go-redis/v9 — gosvc/go.mod",
       "docker-compose: cache (redis:7) — docker-compose.yml",
       "설정: .env.example REDIS_HOST → your-redis-host"
      ],
@@ -6070,6 +8662,11 @@
      "protocol": "SQL"
     },
     {
+     "from": "infra:server:gosvc",
+     "to": "infra:db",
+     "protocol": "SQL"
+    },
+    {
      "from": "infra:server:rs",
      "to": "infra:db",
      "protocol": "SQL"
@@ -6080,6 +8677,11 @@
      "protocol": "SQL"
     },
     {
+     "from": "infra:server:spring",
+     "to": "infra:db",
+     "protocol": "SQL"
+    },
+    {
      "from": "infra:server:backend",
      "to": "infra:http",
      "protocol": "HTTPS"
@@ -6090,7 +8692,17 @@
      "protocol": "HTTPS"
     },
     {
+     "from": "infra:server:spring",
+     "to": "infra:http",
+     "protocol": "HTTPS"
+    },
+    {
      "from": "infra:server:backend",
+     "to": "infra:redis",
+     "protocol": "Redis"
+    },
+    {
+     "from": "infra:server:gosvc",
      "to": "infra:redis",
      "protocol": "Redis"
     }
@@ -9366,6 +11978,1686 @@
        "from": "infra:server:b",
        "to": "infra:http",
        "protocol": "HTTPS"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "steps_java_go",
+   "op": "steps",
+   "files": {
+    "svc/src/main/java/com/ex/ItemController.java": "package com.ex;\n\n@RestController\n@RequestMapping(\"/api/items\")\npublic class ItemController {\n    private final ItemRepository repo;\n    private final JdbcTemplate jdbc;\n\n    @GetMapping(\"/{id:\\\\d+}\")\n    public Item read(long id) {\n        Runnable r = () -> helper(id);\n        if (id < 0) {\n            throw new IllegalArgumentException(\"bad \" + id);\n        }\n        this.jdbc.query(\"select 1\");\n        return repo.findById(id).orElse(helper(id));\n    }\n\n    @RequestMapping(value = \"/\", method = RequestMethod.POST)\n    public Item make() {\n        return new Item(1);\n    }\n\n    @RequestMapping(path = {\"/any\"})\n    public void any() {}\n\n    private Item helper(long id) {\n        return null;\n    }\n}\n\ninterface ItemRepository extends JpaRepository<Item, Long> {\n}\n\nclass Item {\n    Item(long id) {}\n}\n",
+    "gosvc/main.go": "package main\n\nimport (\n\t\"database/sql\"\n\t\"net/http\"\n\n\t\"github.com/gin-gonic/gin\"\n\t\"github.com/redis/go-redis/v9\"\n)\n\ntype Server struct {\n\tdb  *sql.DB\n\trdb *redis.Client\n}\n\nfunc (s *Server) list(c *gin.Context) {\n\trows, err := s.db.Query(\"select 1\")\n\t_ = rows\n\tif err != nil {\n\t\treturn\n\t}\n\tdefer s.rdb.Close()\n\tgo func() { helper() }()\n\ts.rdb.Get(c, \"k\")\n\tresp, _ := http.Get(\"https://x\")\n\t_ = resp\n\thelper()\n}\n\nfunc helper() int {\n\treturn 1\n}\n\nfunc hello(w http.ResponseWriter, r *http.Request) {}\n\nfunc main() {\n\ts := &Server{}\n\tr := gin.Default()\n\tapi := r.Group(\"/api\")\n\tapi.GET(\"/items/:id\", s.list)\n\thttp.HandleFunc(\"POST /hello/{rest...}\", hello)\n\tr.Run(\":9090\")\n}\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:9",
+      "name": "read",
+      "qual": "read",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 9,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:19",
+      "name": "make",
+      "qual": "make",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 19,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:24",
+      "name": "any",
+      "qual": "any",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 24,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:27",
+      "name": "helper",
+      "qual": "helper",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 27,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:36",
+      "name": "Item",
+      "qual": "Item",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:16",
+      "name": "list",
+      "qual": "list",
+      "file": "gosvc/main.go",
+      "line": 16,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:30",
+      "name": "helper",
+      "qual": "helper",
+      "file": "gosvc/main.go",
+      "line": 30,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:34",
+      "name": "hello",
+      "qual": "hello",
+      "file": "gosvc/main.go",
+      "line": 34,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:36",
+      "name": "main",
+      "qual": "main",
+      "file": "gosvc/main.go",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": [
+     [
+      "svc/src/main/java/com/ex/ItemController.java:9",
+      "svc/src/main/java/com/ex/ItemController.java:27",
+      "enrich"
+     ],
+     [
+      "svc/src/main/java/com/ex/ItemController.java:19",
+      "svc/src/main/java/com/ex/ItemController.java:36",
+      "enrich"
+     ],
+     [
+      "gosvc/main.go:16",
+      "gosvc/main.go:30",
+      "enrich"
+     ]
+    ],
+    "files": [
+     {
+      "path": "svc/src/main/java/com/ex/ItemController.java"
+     },
+     {
+      "path": "gosvc/main.go"
+     }
+    ]
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:9",
+      "name": "read",
+      "qual": "read",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 9,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 11,
+        "label": "helper",
+        "to": "svc/src/main/java/com/ex/ItemController.java:27",
+        "deferred": true
+       },
+       {
+        "k": "call",
+        "line": 13,
+        "label": "new IllegalArgumentException"
+       },
+       {
+        "k": "raise",
+        "line": 13,
+        "label": "throw new IllegalArgumentException(\"bad \" + id)"
+       },
+       {
+        "k": "call",
+        "line": 15,
+        "label": "this.jdbc.query"
+       },
+       {
+        "k": "call",
+        "line": 16,
+        "label": "repo.findById"
+       },
+       {
+        "k": "call",
+        "line": 16,
+        "label": "helper",
+        "to": "svc/src/main/java/com/ex/ItemController.java:27"
+       },
+       {
+        "k": "call",
+        "line": 16,
+        "label": "repo.findById(id).orElse"
+       },
+       {
+        "k": "return",
+        "line": 16,
+        "label": "return repo.findById(id).orElse(helper(id))"
+       }
+      ]
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:19",
+      "name": "make",
+      "qual": "make",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 19,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 21,
+        "label": "new Item",
+        "to": "svc/src/main/java/com/ex/ItemController.java:36"
+       },
+       {
+        "k": "return",
+        "line": 21,
+        "label": "return new Item(1)"
+       }
+      ]
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:24",
+      "name": "any",
+      "qual": "any",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 24,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": []
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:27",
+      "name": "helper",
+      "qual": "helper",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 27,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "return",
+        "line": 28,
+        "label": "return null"
+       }
+      ]
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:36",
+      "name": "Item",
+      "qual": "Item",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": []
+     },
+     {
+      "key": "gosvc/main.go:16",
+      "name": "list",
+      "qual": "list",
+      "file": "gosvc/main.go",
+      "line": 16,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 17,
+        "label": "s.db.Query"
+       },
+       {
+        "k": "return",
+        "line": 20,
+        "label": "return"
+       },
+       {
+        "k": "call",
+        "line": 22,
+        "label": "s.rdb.Close",
+        "deferred": true
+       },
+       {
+        "k": "call",
+        "line": 23,
+        "label": "helper",
+        "to": "gosvc/main.go:30",
+        "deferred": true
+       },
+       {
+        "k": "call",
+        "line": 23,
+        "label": "func() { helper() }",
+        "deferred": true
+       },
+       {
+        "k": "call",
+        "line": 24,
+        "label": "s.rdb.Get"
+       },
+       {
+        "k": "call",
+        "line": 25,
+        "label": "http.Get"
+       },
+       {
+        "k": "call",
+        "line": 27,
+        "label": "helper",
+        "to": "gosvc/main.go:30"
+       }
+      ]
+     },
+     {
+      "key": "gosvc/main.go:30",
+      "name": "helper",
+      "qual": "helper",
+      "file": "gosvc/main.go",
+      "line": 30,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "return",
+        "line": 31,
+        "label": "return 1"
+       }
+      ]
+     },
+     {
+      "key": "gosvc/main.go:34",
+      "name": "hello",
+      "qual": "hello",
+      "file": "gosvc/main.go",
+      "line": 34,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": []
+     },
+     {
+      "key": "gosvc/main.go:36",
+      "name": "main",
+      "qual": "main",
+      "file": "gosvc/main.go",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 38,
+        "label": "gin.Default"
+       },
+       {
+        "k": "call",
+        "line": 39,
+        "label": "r.Group"
+       },
+       {
+        "k": "call",
+        "line": 40,
+        "label": "api.GET"
+       },
+       {
+        "k": "call",
+        "line": 41,
+        "label": "http.HandleFunc"
+       },
+       {
+        "k": "call",
+        "line": 42,
+        "label": "r.Run"
+       }
+      ]
+     }
+    ],
+    "calls": [
+     [
+      "svc/src/main/java/com/ex/ItemController.java:9",
+      "svc/src/main/java/com/ex/ItemController.java:27",
+      "enrich"
+     ],
+     [
+      "svc/src/main/java/com/ex/ItemController.java:19",
+      "svc/src/main/java/com/ex/ItemController.java:36",
+      "enrich"
+     ],
+     [
+      "gosvc/main.go:16",
+      "gosvc/main.go:30",
+      "enrich"
+     ]
+    ],
+    "files": [
+     {
+      "path": "svc/src/main/java/com/ex/ItemController.java"
+     },
+     {
+      "path": "gosvc/main.go"
+     }
+    ]
+   }
+  },
+  {
+   "name": "routes_java_go",
+   "op": "routes",
+   "files": {
+    "svc/src/main/java/com/ex/ItemController.java": "package com.ex;\n\n@RestController\n@RequestMapping(\"/api/items\")\npublic class ItemController {\n    private final ItemRepository repo;\n    private final JdbcTemplate jdbc;\n\n    @GetMapping(\"/{id:\\\\d+}\")\n    public Item read(long id) {\n        Runnable r = () -> helper(id);\n        if (id < 0) {\n            throw new IllegalArgumentException(\"bad \" + id);\n        }\n        this.jdbc.query(\"select 1\");\n        return repo.findById(id).orElse(helper(id));\n    }\n\n    @RequestMapping(value = \"/\", method = RequestMethod.POST)\n    public Item make() {\n        return new Item(1);\n    }\n\n    @RequestMapping(path = {\"/any\"})\n    public void any() {}\n\n    private Item helper(long id) {\n        return null;\n    }\n}\n\ninterface ItemRepository extends JpaRepository<Item, Long> {\n}\n\nclass Item {\n    Item(long id) {}\n}\n",
+    "gosvc/main.go": "package main\n\nimport (\n\t\"database/sql\"\n\t\"net/http\"\n\n\t\"github.com/gin-gonic/gin\"\n\t\"github.com/redis/go-redis/v9\"\n)\n\ntype Server struct {\n\tdb  *sql.DB\n\trdb *redis.Client\n}\n\nfunc (s *Server) list(c *gin.Context) {\n\trows, err := s.db.Query(\"select 1\")\n\t_ = rows\n\tif err != nil {\n\t\treturn\n\t}\n\tdefer s.rdb.Close()\n\tgo func() { helper() }()\n\ts.rdb.Get(c, \"k\")\n\tresp, _ := http.Get(\"https://x\")\n\t_ = resp\n\thelper()\n}\n\nfunc helper() int {\n\treturn 1\n}\n\nfunc hello(w http.ResponseWriter, r *http.Request) {}\n\nfunc main() {\n\ts := &Server{}\n\tr := gin.Default()\n\tapi := r.Group(\"/api\")\n\tapi.GET(\"/items/:id\", s.list)\n\thttp.HandleFunc(\"POST /hello/{rest...}\", hello)\n\tr.Run(\":9090\")\n}\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:9",
+      "name": "read",
+      "qual": "read",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 9,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:19",
+      "name": "make",
+      "qual": "make",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 19,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:24",
+      "name": "any",
+      "qual": "any",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 24,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:27",
+      "name": "helper",
+      "qual": "helper",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 27,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:36",
+      "name": "Item",
+      "qual": "Item",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:16",
+      "name": "list",
+      "qual": "list",
+      "file": "gosvc/main.go",
+      "line": 16,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:30",
+      "name": "helper",
+      "qual": "helper",
+      "file": "gosvc/main.go",
+      "line": 30,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:34",
+      "name": "hello",
+      "qual": "hello",
+      "file": "gosvc/main.go",
+      "line": 34,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:36",
+      "name": "main",
+      "qual": "main",
+      "file": "gosvc/main.go",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": [
+     [
+      "svc/src/main/java/com/ex/ItemController.java:9",
+      "svc/src/main/java/com/ex/ItemController.java:27",
+      "enrich"
+     ],
+     [
+      "svc/src/main/java/com/ex/ItemController.java:19",
+      "svc/src/main/java/com/ex/ItemController.java:36",
+      "enrich"
+     ],
+     [
+      "gosvc/main.go:16",
+      "gosvc/main.go:30",
+      "enrich"
+     ]
+    ],
+    "files": [
+     {
+      "path": "svc/src/main/java/com/ex/ItemController.java"
+     },
+     {
+      "path": "gosvc/main.go"
+     }
+    ]
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:9",
+      "name": "read",
+      "qual": "read",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 9,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/api/items/{id}"
+      }
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:19",
+      "name": "make",
+      "qual": "make",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 19,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "POST",
+       "path": "/api/items"
+      }
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:24",
+      "name": "any",
+      "qual": "any",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 24,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "ANY",
+       "path": "/api/items/any"
+      }
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:27",
+      "name": "helper",
+      "qual": "helper",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 27,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:36",
+      "name": "Item",
+      "qual": "Item",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": null
+     },
+     {
+      "key": "gosvc/main.go:16",
+      "name": "list",
+      "qual": "list",
+      "file": "gosvc/main.go",
+      "line": 16,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "GET",
+       "path": "/api/items/{id}"
+      }
+     },
+     {
+      "key": "gosvc/main.go:30",
+      "name": "helper",
+      "qual": "helper",
+      "file": "gosvc/main.go",
+      "line": 30,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": null
+     },
+     {
+      "key": "gosvc/main.go:34",
+      "name": "hello",
+      "qual": "hello",
+      "file": "gosvc/main.go",
+      "line": 34,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": {
+       "method": "POST",
+       "path": "/hello/{rest}"
+      }
+     },
+     {
+      "key": "gosvc/main.go:36",
+      "name": "main",
+      "qual": "main",
+      "file": "gosvc/main.go",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "route": null
+     }
+    ],
+    "calls": [
+     [
+      "svc/src/main/java/com/ex/ItemController.java:9",
+      "svc/src/main/java/com/ex/ItemController.java:27",
+      "enrich"
+     ],
+     [
+      "svc/src/main/java/com/ex/ItemController.java:19",
+      "svc/src/main/java/com/ex/ItemController.java:36",
+      "enrich"
+     ],
+     [
+      "gosvc/main.go:16",
+      "gosvc/main.go:30",
+      "enrich"
+     ]
+    ],
+    "files": [
+     {
+      "path": "svc/src/main/java/com/ex/ItemController.java"
+     },
+     {
+      "path": "gosvc/main.go"
+     }
+    ]
+   }
+  },
+  {
+   "name": "extend_java_go",
+   "op": "extend",
+   "files": {
+    "svc/src/main/java/com/ex/ItemController.java": "package com.ex;\n\n@RestController\n@RequestMapping(\"/api/items\")\npublic class ItemController {\n    private final ItemRepository repo;\n    private final JdbcTemplate jdbc;\n\n    @GetMapping(\"/{id:\\\\d+}\")\n    public Item read(long id) {\n        Runnable r = () -> helper(id);\n        if (id < 0) {\n            throw new IllegalArgumentException(\"bad \" + id);\n        }\n        this.jdbc.query(\"select 1\");\n        return repo.findById(id).orElse(helper(id));\n    }\n\n    @RequestMapping(value = \"/\", method = RequestMethod.POST)\n    public Item make() {\n        return new Item(1);\n    }\n\n    @RequestMapping(path = {\"/any\"})\n    public void any() {}\n\n    private Item helper(long id) {\n        return null;\n    }\n}\n\ninterface ItemRepository extends JpaRepository<Item, Long> {\n}\n\nclass Item {\n    Item(long id) {}\n}\n",
+    "gosvc/main.go": "package main\n\nimport (\n\t\"database/sql\"\n\t\"net/http\"\n\n\t\"github.com/gin-gonic/gin\"\n\t\"github.com/redis/go-redis/v9\"\n)\n\ntype Server struct {\n\tdb  *sql.DB\n\trdb *redis.Client\n}\n\nfunc (s *Server) list(c *gin.Context) {\n\trows, err := s.db.Query(\"select 1\")\n\t_ = rows\n\tif err != nil {\n\t\treturn\n\t}\n\tdefer s.rdb.Close()\n\tgo func() { helper() }()\n\ts.rdb.Get(c, \"k\")\n\tresp, _ := http.Get(\"https://x\")\n\t_ = resp\n\thelper()\n}\n\nfunc helper() int {\n\treturn 1\n}\n\nfunc hello(w http.ResponseWriter, r *http.Request) {}\n\nfunc main() {\n\ts := &Server{}\n\tr := gin.Default()\n\tapi := r.Group(\"/api\")\n\tapi.GET(\"/items/:id\", s.list)\n\thttp.HandleFunc(\"POST /hello/{rest...}\", hello)\n\tr.Run(\":9090\")\n}\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:9",
+      "name": "read",
+      "qual": "read",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 9,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:19",
+      "name": "make",
+      "qual": "make",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 19,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:24",
+      "name": "any",
+      "qual": "any",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 24,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:27",
+      "name": "helper",
+      "qual": "helper",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 27,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:36",
+      "name": "Item",
+      "qual": "Item",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:16",
+      "name": "list",
+      "qual": "list",
+      "file": "gosvc/main.go",
+      "line": 16,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:30",
+      "name": "helper",
+      "qual": "helper",
+      "file": "gosvc/main.go",
+      "line": 30,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:34",
+      "name": "hello",
+      "qual": "hello",
+      "file": "gosvc/main.go",
+      "line": 34,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:36",
+      "name": "main",
+      "qual": "main",
+      "file": "gosvc/main.go",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": [
+     [
+      "svc/src/main/java/com/ex/ItemController.java:9",
+      "svc/src/main/java/com/ex/ItemController.java:27",
+      "enrich"
+     ],
+     [
+      "svc/src/main/java/com/ex/ItemController.java:19",
+      "svc/src/main/java/com/ex/ItemController.java:36",
+      "enrich"
+     ],
+     [
+      "gosvc/main.go:16",
+      "gosvc/main.go:30",
+      "enrich"
+     ]
+    ],
+    "files": [
+     {
+      "path": "svc/src/main/java/com/ex/ItemController.java"
+     },
+     {
+      "path": "gosvc/main.go"
+     }
+    ]
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:9",
+      "name": "read",
+      "qual": "read",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 9,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 11,
+        "label": "helper",
+        "to": "svc/src/main/java/com/ex/ItemController.java:27",
+        "deferred": true
+       },
+       {
+        "k": "raise",
+        "line": 13,
+        "label": "throw new IllegalArgumentException(\"bad \" + id)"
+       },
+       {
+        "k": "call",
+        "line": 15,
+        "label": "this.jdbc.query",
+        "infra": "infra:db"
+       },
+       {
+        "k": "call",
+        "line": 16,
+        "label": "repo.findById",
+        "infra": "infra:db"
+       },
+       {
+        "k": "call",
+        "line": 16,
+        "label": "helper",
+        "to": "svc/src/main/java/com/ex/ItemController.java:27"
+       },
+       {
+        "k": "call",
+        "line": 16,
+        "label": "repo.findById(id).orElse",
+        "infra": "infra:db"
+       },
+       {
+        "k": "return",
+        "line": 16,
+        "label": "return repo.findById(id).orElse(helper(id))"
+       }
+      ],
+      "route": {
+       "method": "GET",
+       "path": "/api/items/{id}"
+      }
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:19",
+      "name": "make",
+      "qual": "make",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 19,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 21,
+        "label": "new Item",
+        "to": "svc/src/main/java/com/ex/ItemController.java:36"
+       },
+       {
+        "k": "return",
+        "line": 21,
+        "label": "return new Item(1)"
+       }
+      ],
+      "route": {
+       "method": "POST",
+       "path": "/api/items"
+      }
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:24",
+      "name": "any",
+      "qual": "any",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 24,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [],
+      "route": {
+       "method": "ANY",
+       "path": "/api/items/any"
+      }
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:27",
+      "name": "helper",
+      "qual": "helper",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 27,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "return",
+        "line": 28,
+        "label": "return null"
+       }
+      ],
+      "route": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:36",
+      "name": "Item",
+      "qual": "Item",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [],
+      "route": null
+     },
+     {
+      "key": "gosvc/main.go:16",
+      "name": "list",
+      "qual": "list",
+      "file": "gosvc/main.go",
+      "line": 16,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 17,
+        "label": "s.db.Query",
+        "infra": "infra:db"
+       },
+       {
+        "k": "return",
+        "line": 20,
+        "label": "return"
+       },
+       {
+        "k": "call",
+        "line": 23,
+        "label": "helper",
+        "to": "gosvc/main.go:30",
+        "deferred": true
+       },
+       {
+        "k": "call",
+        "line": 24,
+        "label": "s.rdb.Get",
+        "infra": "infra:redis"
+       },
+       {
+        "k": "call",
+        "line": 25,
+        "label": "http.Get",
+        "infra": "infra:http"
+       },
+       {
+        "k": "call",
+        "line": 27,
+        "label": "helper",
+        "to": "gosvc/main.go:30"
+       }
+      ],
+      "route": {
+       "method": "GET",
+       "path": "/api/items/{id}"
+      }
+     },
+     {
+      "key": "gosvc/main.go:30",
+      "name": "helper",
+      "qual": "helper",
+      "file": "gosvc/main.go",
+      "line": 30,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "return",
+        "line": 31,
+        "label": "return 1"
+       }
+      ],
+      "route": null
+     },
+     {
+      "key": "gosvc/main.go:34",
+      "name": "hello",
+      "qual": "hello",
+      "file": "gosvc/main.go",
+      "line": 34,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [],
+      "route": {
+       "method": "POST",
+       "path": "/hello/{rest}"
+      }
+     },
+     {
+      "key": "gosvc/main.go:36",
+      "name": "main",
+      "qual": "main",
+      "file": "gosvc/main.go",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [],
+      "route": null
+     }
+    ],
+    "calls": [
+     [
+      "svc/src/main/java/com/ex/ItemController.java:9",
+      "svc/src/main/java/com/ex/ItemController.java:27",
+      "enrich"
+     ],
+     [
+      "svc/src/main/java/com/ex/ItemController.java:19",
+      "svc/src/main/java/com/ex/ItemController.java:36",
+      "enrich"
+     ],
+     [
+      "gosvc/main.go:16",
+      "gosvc/main.go:30",
+      "enrich"
+     ]
+    ],
+    "files": [
+     {
+      "path": "gosvc/main.go",
+      "lang": "go",
+      "loc": 43
+     },
+     {
+      "path": "svc/src/main/java/com/ex/ItemController.java",
+      "lang": "java",
+      "loc": 37
+     }
+    ],
+    "units": [],
+    "http": [],
+    "infra": {
+     "nodes": [
+      {
+       "id": "infra:backend",
+       "kind": "backend",
+       "name": "백엔드 서버",
+       "where": "local",
+       "host": null,
+       "evidence": [
+        "백엔드 코드가 이 PC에서 돈다"
+       ],
+       "dir": ""
+      },
+      {
+       "id": "infra:db",
+       "kind": "db",
+       "name": "DB",
+       "where": "local",
+       "host": null,
+       "evidence": [
+        "코드: jdbc, spring-data, database/sql — svc/src/main/java/com/ex/ItemController.java 외 1개 파일"
+       ],
+       "dir": null
+      },
+      {
+       "id": "infra:http",
+       "kind": "api",
+       "name": "외부 HTTP",
+       "where": "external",
+       "host": null,
+       "evidence": [
+        "코드: net/http — gosvc/main.go"
+       ],
+       "dir": null
+      },
+      {
+       "id": "infra:redis",
+       "kind": "cache",
+       "name": "Redis",
+       "where": "local",
+       "host": null,
+       "evidence": [
+        "코드: github.com/redis/go-redis — gosvc/main.go"
+       ],
+       "dir": null
+      }
+     ],
+     "links": [
+      {
+       "from": "infra:backend",
+       "to": "infra:db",
+       "protocol": "SQL"
+      },
+      {
+       "from": "infra:backend",
+       "to": "infra:http",
+       "protocol": "HTTPS"
+      },
+      {
+       "from": "infra:backend",
+       "to": "infra:redis",
+       "protocol": "Redis"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "units_java_go",
+   "op": "units",
+   "graph": {
+    "functions": []
+   },
+   "files": {
+    "svc/pom.xml": "<project><parent><artifactId>spring-boot-starter-parent</artifactId></parent></project>",
+    "svc/mvnw": "",
+    "svc/src/main/resources/application.yml": "server:\n  port: ${PORT:8081}\n",
+    "gsvc/build.gradle": "plugins { id 'org.springframework.boot' version '3' }\n",
+    "ksvc/build.gradle.kts": "plugins { id(\"org.springframework.boot\") }\n",
+    "ksvc/gradlew": "",
+    "ksvc/src/main/resources/application.properties": "server.port=7070\n",
+    "plain/pom.xml": "<project></project>",
+    "gosvc/go.mod": "module ex.com/g\n\nrequire github.com/gin-gonic/gin v1.10.0\n",
+    "gosvc/cmd/api/main.go": "package main\n\nfunc main() { r.Run(\":9090\") }\n",
+    "gosvc/cmd/api/main_test.go": "package main\nfunc main() {}\n",
+    "hsvc/go.mod": "module ex.com/h\n",
+    "hsvc/main.go": "package main\n\nimport \"net/http\"\n\nfunc main() {}\n",
+    "cli/go.mod": "module ex.com/cli\n",
+    "cli/main.go": "package main\n\nfunc main() {}\n"
+   },
+   "out": [
+    {
+     "name": "gosvc",
+     "kind": "server",
+     "dir": "gosvc",
+     "lang": "go",
+     "framework": "Gin",
+     "command": "go run ./cmd/api",
+     "port": 9090
+    },
+    {
+     "name": "gsvc",
+     "kind": "server",
+     "dir": "gsvc",
+     "lang": "java",
+     "framework": "Spring Boot",
+     "command": "gradle bootRun",
+     "port": 8080
+    },
+    {
+     "name": "hsvc",
+     "kind": "server",
+     "dir": "hsvc",
+     "lang": "go",
+     "framework": "net/http",
+     "command": "go run .",
+     "port": 8080
+    },
+    {
+     "name": "ksvc",
+     "kind": "server",
+     "dir": "ksvc",
+     "lang": "java",
+     "framework": "Spring Boot",
+     "command": "./gradlew bootRun",
+     "port": 7070
+    },
+    {
+     "name": "svc",
+     "kind": "server",
+     "dir": "svc",
+     "lang": "java",
+     "framework": "Spring Boot",
+     "command": "./mvnw spring-boot:run",
+     "port": 8081
+    }
+   ]
+  },
+  {
+   "name": "infra_java_go",
+   "op": "infra",
+   "files": {
+    "svc/src/main/java/com/ex/ItemController.java": "package com.ex;\n\n@RestController\n@RequestMapping(\"/api/items\")\npublic class ItemController {\n    private final ItemRepository repo;\n    private final JdbcTemplate jdbc;\n\n    @GetMapping(\"/{id:\\\\d+}\")\n    public Item read(long id) {\n        Runnable r = () -> helper(id);\n        if (id < 0) {\n            throw new IllegalArgumentException(\"bad \" + id);\n        }\n        this.jdbc.query(\"select 1\");\n        return repo.findById(id).orElse(helper(id));\n    }\n\n    @RequestMapping(value = \"/\", method = RequestMethod.POST)\n    public Item make() {\n        return new Item(1);\n    }\n\n    @RequestMapping(path = {\"/any\"})\n    public void any() {}\n\n    private Item helper(long id) {\n        return null;\n    }\n}\n\ninterface ItemRepository extends JpaRepository<Item, Long> {\n}\n\nclass Item {\n    Item(long id) {}\n}\n",
+    "gosvc/main.go": "package main\n\nimport (\n\t\"database/sql\"\n\t\"net/http\"\n\n\t\"github.com/gin-gonic/gin\"\n\t\"github.com/redis/go-redis/v9\"\n)\n\ntype Server struct {\n\tdb  *sql.DB\n\trdb *redis.Client\n}\n\nfunc (s *Server) list(c *gin.Context) {\n\trows, err := s.db.Query(\"select 1\")\n\t_ = rows\n\tif err != nil {\n\t\treturn\n\t}\n\tdefer s.rdb.Close()\n\tgo func() { helper() }()\n\ts.rdb.Get(c, \"k\")\n\tresp, _ := http.Get(\"https://x\")\n\t_ = resp\n\thelper()\n}\n\nfunc helper() int {\n\treturn 1\n}\n\nfunc hello(w http.ResponseWriter, r *http.Request) {}\n\nfunc main() {\n\ts := &Server{}\n\tr := gin.Default()\n\tapi := r.Group(\"/api\")\n\tapi.GET(\"/items/:id\", s.list)\n\thttp.HandleFunc(\"POST /hello/{rest...}\", hello)\n\tr.Run(\":9090\")\n}\n",
+    "svc/pom.xml": "<dependencies><dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId></dependency></dependencies>",
+    "svc/build.gradle": "dependencies {\n  implementation 'org.springframework.kafka:spring-kafka:3'\n}\n",
+    "gosvc/go.mod": "module ex.com/g\n\nrequire (\n\tgithub.com/redis/go-redis/v9 v9.5.0\n)\n"
+   },
+   "graph": {
+    "functions": [
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:9",
+      "name": "read",
+      "qual": "read",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 9,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:19",
+      "name": "make",
+      "qual": "make",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 19,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:24",
+      "name": "any",
+      "qual": "any",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 24,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:27",
+      "name": "helper",
+      "qual": "helper",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 27,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:36",
+      "name": "Item",
+      "qual": "Item",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:16",
+      "name": "list",
+      "qual": "list",
+      "file": "gosvc/main.go",
+      "line": 16,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:30",
+      "name": "helper",
+      "qual": "helper",
+      "file": "gosvc/main.go",
+      "line": 30,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:34",
+      "name": "hello",
+      "qual": "hello",
+      "file": "gosvc/main.go",
+      "line": 34,
+      "end": null,
+      "item": null,
+      "ms": null
+     },
+     {
+      "key": "gosvc/main.go:36",
+      "name": "main",
+      "qual": "main",
+      "file": "gosvc/main.go",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null
+     }
+    ],
+    "calls": [
+     [
+      "svc/src/main/java/com/ex/ItemController.java:9",
+      "svc/src/main/java/com/ex/ItemController.java:27",
+      "enrich"
+     ],
+     [
+      "svc/src/main/java/com/ex/ItemController.java:19",
+      "svc/src/main/java/com/ex/ItemController.java:36",
+      "enrich"
+     ],
+     [
+      "gosvc/main.go:16",
+      "gosvc/main.go:30",
+      "enrich"
+     ]
+    ],
+    "files": [
+     {
+      "path": "svc/src/main/java/com/ex/ItemController.java"
+     },
+     {
+      "path": "gosvc/main.go"
+     }
+    ],
+    "units": [],
+    "http": []
+   },
+   "out": {
+    "functions": [
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:9",
+      "name": "read",
+      "qual": "read",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 9,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 11,
+        "label": "helper",
+        "to": "svc/src/main/java/com/ex/ItemController.java:27",
+        "deferred": true
+       },
+       {
+        "k": "call",
+        "line": 13,
+        "label": "new IllegalArgumentException"
+       },
+       {
+        "k": "raise",
+        "line": 13,
+        "label": "throw new IllegalArgumentException(\"bad \" + id)"
+       },
+       {
+        "k": "call",
+        "line": 15,
+        "label": "this.jdbc.query",
+        "infra": "infra:db"
+       },
+       {
+        "k": "call",
+        "line": 16,
+        "label": "repo.findById",
+        "infra": "infra:db"
+       },
+       {
+        "k": "call",
+        "line": 16,
+        "label": "helper",
+        "to": "svc/src/main/java/com/ex/ItemController.java:27"
+       },
+       {
+        "k": "call",
+        "line": 16,
+        "label": "repo.findById(id).orElse",
+        "infra": "infra:db"
+       },
+       {
+        "k": "return",
+        "line": 16,
+        "label": "return repo.findById(id).orElse(helper(id))"
+       }
+      ]
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:19",
+      "name": "make",
+      "qual": "make",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 19,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 21,
+        "label": "new Item",
+        "to": "svc/src/main/java/com/ex/ItemController.java:36"
+       },
+       {
+        "k": "return",
+        "line": 21,
+        "label": "return new Item(1)"
+       }
+      ]
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:24",
+      "name": "any",
+      "qual": "any",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 24,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": []
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:27",
+      "name": "helper",
+      "qual": "helper",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 27,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "return",
+        "line": 28,
+        "label": "return null"
+       }
+      ]
+     },
+     {
+      "key": "svc/src/main/java/com/ex/ItemController.java:36",
+      "name": "Item",
+      "qual": "Item",
+      "file": "svc/src/main/java/com/ex/ItemController.java",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": []
+     },
+     {
+      "key": "gosvc/main.go:16",
+      "name": "list",
+      "qual": "list",
+      "file": "gosvc/main.go",
+      "line": 16,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 17,
+        "label": "s.db.Query",
+        "infra": "infra:db"
+       },
+       {
+        "k": "return",
+        "line": 20,
+        "label": "return"
+       },
+       {
+        "k": "call",
+        "line": 22,
+        "label": "s.rdb.Close",
+        "deferred": true
+       },
+       {
+        "k": "call",
+        "line": 23,
+        "label": "helper",
+        "to": "gosvc/main.go:30",
+        "deferred": true
+       },
+       {
+        "k": "call",
+        "line": 23,
+        "label": "func() { helper() }",
+        "deferred": true
+       },
+       {
+        "k": "call",
+        "line": 24,
+        "label": "s.rdb.Get",
+        "infra": "infra:redis"
+       },
+       {
+        "k": "call",
+        "line": 25,
+        "label": "http.Get",
+        "infra": "infra:http"
+       },
+       {
+        "k": "call",
+        "line": 27,
+        "label": "helper",
+        "to": "gosvc/main.go:30"
+       }
+      ]
+     },
+     {
+      "key": "gosvc/main.go:30",
+      "name": "helper",
+      "qual": "helper",
+      "file": "gosvc/main.go",
+      "line": 30,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "return",
+        "line": 31,
+        "label": "return 1"
+       }
+      ]
+     },
+     {
+      "key": "gosvc/main.go:34",
+      "name": "hello",
+      "qual": "hello",
+      "file": "gosvc/main.go",
+      "line": 34,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": []
+     },
+     {
+      "key": "gosvc/main.go:36",
+      "name": "main",
+      "qual": "main",
+      "file": "gosvc/main.go",
+      "line": 36,
+      "end": null,
+      "item": null,
+      "ms": null,
+      "steps": [
+       {
+        "k": "call",
+        "line": 38,
+        "label": "gin.Default"
+       },
+       {
+        "k": "call",
+        "line": 39,
+        "label": "r.Group"
+       },
+       {
+        "k": "call",
+        "line": 40,
+        "label": "api.GET"
+       },
+       {
+        "k": "call",
+        "line": 41,
+        "label": "http.HandleFunc"
+       },
+       {
+        "k": "call",
+        "line": 42,
+        "label": "r.Run"
+       }
+      ]
+     }
+    ],
+    "calls": [
+     [
+      "svc/src/main/java/com/ex/ItemController.java:9",
+      "svc/src/main/java/com/ex/ItemController.java:27",
+      "enrich"
+     ],
+     [
+      "svc/src/main/java/com/ex/ItemController.java:19",
+      "svc/src/main/java/com/ex/ItemController.java:36",
+      "enrich"
+     ],
+     [
+      "gosvc/main.go:16",
+      "gosvc/main.go:30",
+      "enrich"
+     ]
+    ],
+    "files": [
+     {
+      "path": "svc/src/main/java/com/ex/ItemController.java"
+     },
+     {
+      "path": "gosvc/main.go"
+     }
+    ],
+    "units": [],
+    "http": [],
+    "infra": {
+     "nodes": [
+      {
+       "id": "infra:backend",
+       "kind": "backend",
+       "name": "백엔드 서버",
+       "where": "local",
+       "host": null,
+       "evidence": [
+        "백엔드 코드가 이 PC에서 돈다"
+       ],
+       "dir": ""
+      },
+      {
+       "id": "infra:db",
+       "kind": "db",
+       "name": "PostgreSQL",
+       "where": "local",
+       "host": null,
+       "evidence": [
+        "코드: jdbc, spring-data, database/sql — svc/src/main/java/com/ex/ItemController.java 외 1개 파일",
+        "의존성: org.postgresql:postgresql — svc/pom.xml"
+       ],
+       "dir": null
+      },
+      {
+       "id": "infra:http",
+       "kind": "api",
+       "name": "외부 HTTP",
+       "where": "external",
+       "host": null,
+       "evidence": [
+        "코드: net/http — gosvc/main.go"
+       ],
+       "dir": null
+      },
+      {
+       "id": "infra:queue",
+       "kind": "queue",
+       "name": "Kafka",
+       "where": "local",
+       "host": null,
+       "evidence": [
+        "의존성: org.springframework.kafka:spring-kafka — svc/build.gradle"
+       ],
+       "dir": null
+      },
+      {
+       "id": "infra:redis",
+       "kind": "cache",
+       "name": "Redis",
+       "where": "local",
+       "host": null,
+       "evidence": [
+        "코드: github.com/redis/go-redis — gosvc/main.go",
+        "의존성: github.com/redis/go-redis/v9 — gosvc/go.mod"
+       ],
+       "dir": null
+      }
+     ],
+     "links": [
+      {
+       "from": "infra:backend",
+       "to": "infra:db",
+       "protocol": "SQL"
+      },
+      {
+       "from": "infra:backend",
+       "to": "infra:http",
+       "protocol": "HTTPS"
+      },
+      {
+       "from": "infra:backend",
+       "to": "infra:queue",
+       "protocol": "Kafka"
+      },
+      {
+       "from": "infra:backend",
+       "to": "infra:redis",
+       "protocol": "Redis"
       }
      ]
     }
