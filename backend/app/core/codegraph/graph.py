@@ -70,7 +70,8 @@ async def load(src_dir: Path) -> tuple[str, dict]:
 
 
 _TEST_FILE = re.compile(
-    r"(^|/)(tests?|__tests__)/|(^|/)(test_[^/]*|[^/]*_test)\.py$|\.(test|spec)\.[jt]sx?$|(^|/)conftest\.py$"
+    r"(^|/)(tests?|__tests__)/|(^|/)(test_[^/]*|[^/]*_test)\.py$|\.(test|spec)\.[jt]sx?$"
+    r"|(^|/)conftest\.py$|_test\.go$"
 )
 
 
@@ -1066,7 +1067,8 @@ def enrich(src_dir: Path, graph: dict) -> dict:
     변수에 담은 객체의 메서드, 가져온 모듈·함수, 인자로 넘기는 메서드. TS/JS는 tree-sitter로 끝 줄·
     빠진 맨 위 함수·호출을 채운다(카드 BL). 화면 코드는 파일 첫 주석의 화면 ID를 item으로 잇는다
     (카드 BJ). Rust는 graphify가 함수를 주지 않아 tree-sitter로 정의·항목 ID·호출을 다 채운다
-    (카드 BV). 다른 언어는 손대지 않는다.
+    (카드 BV). Java·Go도 tree-sitter로 정의·끝 줄·항목 ID·호출을 채운다(카드 CM).
+    다른 언어는 손대지 않는다.
     """
     seen = graph.pop("files", [])  # graphify가 읽은 코드 파일 — 언어마다 나눠 쓰고 저장 모양엔 없다
     funcs: list[dict] = graph["functions"]
@@ -1108,6 +1110,11 @@ def enrich(src_dir: Path, graph: dict) -> dict:
     _enrich_ts(src_dir, graph, [x for x in seen if x.endswith(_TS_EXTS)])  # 2a~2d — 화면 ID(3) 앞에
     _screen_items(src_dir, funcs)
     _enrich_rs(src_dir, graph, [x for x in seen if x.endswith(".rs")])  # 2e~2h
+    from app.core.codegraph import javago
+
+    java, go = [x for x in seen if x.endswith(".java")], [x for x in seen if x.endswith(".go")]
+    javago.enrich_java(src_dir, graph, java, _is_test, _item_of)  # 2i·2j
+    javago.enrich_go(src_dir, graph, go, _is_test, _item_of)  # 2k·2l
     file_imports = {file: _imports(tree.body, file, ctx) for file, tree in trees.items()}
     have = {(c[0], c[1]) for c in graph["calls"]}
     for file, f, cls, fn in found:
