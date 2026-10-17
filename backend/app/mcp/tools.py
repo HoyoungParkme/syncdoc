@@ -327,6 +327,23 @@ async def get_code_graph(doc_id: str, item_id: str | None = None) -> CallToolRes
 
 
 @server.tool(
+    description="함수 하나가 실제로 어떻게 흐르는지 — 호출 순서(부르는 것·줄·반환·예외, 이름으로 짐작한 연결은 "
+    "inferred, 콜백 안은 deferred), 그 함수가 받는 라우트, 그 순서에서 닿는 장비(DB·캐시·외부 API — 호스트·포트만)와 "
+    "한 단 아래 함수들의 순서를 돌려준다. 코드 그래프에서 읽는다 — 코드를 다 열지 않고 흐름을 알고 싶을 때 부른다. "
+    "함수는 그래프 열쇠(파일:줄) 또는 MINISPEC 항목 ID로 짚는다."
+)
+async def get_flow(project_code: str, function: str) -> CallToolResult:
+    """SYNC-API-002#get_flow"""
+    try:
+        with db.session_scope() as s:
+            user = _user(s)
+        v = await queries.flow_of(project_code, function, user)
+    except Problem as p:
+        return _problem(p)
+    return _ok(v)
+
+
+@server.tool(
     description="항목의 상위 참조(이 항목이 근거로 삼은 것)와 하위 참조(이 항목을 근거로 삼은 것)를 나눠 돌려준다. "
     "이 항목이 왜 있는지, 바꾸면 어디에 영향이 가는지 알아야 할 때 부른다. 목록만 주고 본문은 펼치지 않는다. "
     "필요한 항목만 get_item으로 다시 요청한다. 빈 목록이면 고립 항목이다."
