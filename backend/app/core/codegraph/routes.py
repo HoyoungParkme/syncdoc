@@ -319,7 +319,11 @@ def _deco_call(d, src: bytes) -> tuple[str, str | None] | None:
 
 def _nest(cls, src: bytes, here: dict, out: list) -> None:
     prefix = None
-    for c in cls.children:
+    # `export class`의 데코레이터는 export_statement의 자식이다
+    owners = (
+        [cls.parent] if cls.parent is not None and cls.parent.type == "export_statement" else []
+    )
+    for c in [*(ch for o in owners for ch in o.children), *cls.children]:
         if c.type == "decorator":
             got = _deco_call(c, src)
             if got and got[0] == "Controller":

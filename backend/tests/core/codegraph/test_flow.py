@@ -38,7 +38,7 @@ def test_files_lists_code_skips_dirs_and_tests_sorted(tmp_path: Path) -> None:
 
 
 # ── steps ──
-PY = '''\
+PY = """\
 from fastapi import Depends
 
 
@@ -61,7 +61,7 @@ def handler(a=Depends(dep)):
         return helper(3)
 
     return (v)
-'''
+"""
 
 
 def _graph_py(tmp_path: Path) -> dict:
@@ -261,14 +261,17 @@ def test_routes_typescript_express_nest_next(tmp_path: Path) -> None:
         "srv/app.ts": "const app = express()\nfunction show(req, res) {}\n"
                       "app.get('/users/:id', auth, show)\napp.post('/users', (req, res) => {})\n",
         "srv/c.ts": "@Controller('cats')\nclass CatsController {\n  @Get(':id')\n  one() {}\n}\n",
+        "srv/d.ts": "@Controller('dogs')\nexport class DogsController {\n  @Post()\n  make() {}\n}\n",
         "web/app/api/items/[id]/route.ts": "export async function GET(req) {}\n",
     }  # fmt: skip
     funcs = [_fn("srv/app.ts", 2, "show"), _fn("srv/app.ts", 4, "anon"),
-             _fn("srv/c.ts", 4, "one"), _fn("web/app/api/items/[id]/route.ts", 1, "GET")]  # fmt: skip
+             _fn("srv/c.ts", 4, "one"), _fn("srv/d.ts", 4, "make"),
+             _fn("web/app/api/items/[id]/route.ts", 1, "GET")]  # fmt: skip
     got = _routes_of(tmp_path, files, funcs)
     assert got["show"] == {"method": "GET", "path": "/users/{id}"}
     assert got["anon"] == {"method": "POST", "path": "/users"}  # 인라인 핸들러
     assert got["one"] == {"method": "GET", "path": "/cats/{id}"}
+    assert got["make"] == {"method": "POST", "path": "/dogs"}  # export class
     assert got["GET"] == {"method": "GET", "path": "/api/items/{id}"}
 
 
@@ -373,7 +376,11 @@ def test_units_node_python_rust(tmp_path: Path) -> None:
     got = {u["dir"]: u for u in infra.units(tmp_path, {"functions": []})}
     assert got["api"] == {"name": "api", "kind": "server", "dir": "api", "lang": "typescript",
                           "framework": "Express", "command": "npm run dev", "port": 4100}  # fmt: skip
-    assert (got["web"]["kind"], got["web"]["framework"], got["web"]["port"]) == ("web", "Vite", 5173)
+    assert (got["web"]["kind"], got["web"]["framework"], got["web"]["port"]) == (
+        "web",
+        "Vite",
+        5173,
+    )
     assert (got["site"]["framework"], got["site"]["command"], got["site"]["port"]) == (
         "Next.js", "npm start", 3000)  # fmt: skip
     assert got["srv"]["command"] == "uv run uvicorn app.main:app --port 8000"
@@ -436,7 +443,9 @@ def test_infra_deps_compose_config_host_only(tmp_path: Path) -> None:
     }  # fmt: skip
     g = _infra(tmp_path, files, [])
     nodes = {n["id"]: n for n in g["infra"]["nodes"]}
-    assert nodes["infra:db"]["where"] == "container" and nodes["infra:db"]["host"] == "localhost:15432"
+    assert (
+        nodes["infra:db"]["where"] == "container" and nodes["infra:db"]["host"] == "localhost:15432"
+    )
     assert nodes["infra:redis"]["evidence"][0] == "의존성: ioredis — package.json"
     assert "infra:mongo" not in nodes  # example.org는 자리 표시
     text = repr(g["infra"])
@@ -454,6 +463,9 @@ def test_infra_links_split_by_server_dir(tmp_path: Path) -> None:
     g = _infra(tmp_path, files, [_fn("a/db.py", 2, "q"), _fn("b/h.py", 2, "g")], units)
     links = [(link["from"], link["to"]) for link in g["infra"]["links"]]
     assert ("infra:server:a", "infra:db") in links and ("infra:server:b", "infra:db") not in links
-    assert ("infra:server:b", "infra:http") in links and ("infra:server:a", "infra:http") not in links
+    assert ("infra:server:b", "infra:http") in links and (
+        "infra:server:a",
+        "infra:http",
+    ) not in links
     servers = [n for n in g["infra"]["nodes"] if n["kind"] == "backend"]
     assert servers[0]["host"] == "localhost:8000" and servers[1]["host"] is None
