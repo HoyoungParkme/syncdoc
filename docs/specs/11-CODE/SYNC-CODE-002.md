@@ -347,7 +347,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | `server/src/mcp/tools.rs` · `cargo xtask mcp-tools` |
 | 테스트 | 계약 `--with-card L31` · 판 0.5.0 — 태그 `local-v0.5.0` |
 | 선행 | CL · L30 |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/L31-mcp-traces-rust` · code 3 · `cargo xtask mcp-tools --check` · 계약 `--target both --with-card L28 --with-card L31` + L3·L18 364 통과(MCP 도구 16개 스냅숏) · clippy · 판 0.5.0 — 태그 `local-v0.5.0` |
 
 **다음 카드** — L22(흐름 보기, 2026-10-12 사용자 결정 — view_arc를 두 판의 기능으로). 1차 L22~L26 → `local-v0.4.0`, 2차 L27~L31 → `local-v0.5.0`.
 
