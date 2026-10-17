@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
@@ -39,8 +40,19 @@ def _brief(row) -> TraceBrief:
     )
 
 
+_ISO = re.compile(
+    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})?", re.ASCII
+)
+
+
 def _started(text: str) -> datetime:
-    t = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    """`startedAt` — ISO 8601(초까지·소수 6자리까지·Z나 ±hh:mm). 시간대가 없으면 UTC."""
+    try:
+        if not _ISO.fullmatch(text):
+            raise ValueError(text)
+        t = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        raise TraceInvalid("startedAt — 시각이 아니다") from None
     return t if t.tzinfo is not None else t.replace(tzinfo=UTC)
 
 
@@ -63,6 +75,7 @@ class TraceService:
             if e["parent"] != -1 and e["parent"] not in seen:
                 raise TraceInvalid(f"events[{n}] — 부모가 없다")
             seen.add(e["i"])
+        started = _started(record["startedAt"])
         old = self.repo.by_key(project_id, record["id"])
         if old is not None:
             return _brief(old), False
@@ -78,7 +91,7 @@ class TraceService:
                 path=record["path"],
                 status=record.get("status"),
                 error=error[:300] if error is not None else None,
-                started_at=_started(record["startedAt"]),
+                started_at=started,
                 ms=record["ms"],
                 commit_hash=record.get("commit"),
                 event_count=len(events),
@@ -91,7 +104,7 @@ class TraceService:
         self.session.flush()
         return _brief(row), True
 
-    def list_recent(self, project_id: int, limit: int = KEEP) -> list[TraceBrief]:
+    def list_recent(self, project_id: int, limit: int = 300) -> list[TraceBrief]:
         """SYNC-MS-025#TraceService.list_recent"""
         return [_brief(r) for r in self.repo.recent(project_id, limit)]
 
