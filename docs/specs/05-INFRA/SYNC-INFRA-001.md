@@ -141,7 +141,7 @@ graph TB
 | 모델 호출 | 외부 모델 API. `infra/llm.py` 어댑터 하나 | 읽는 중 질의([[SYNC-PRD-001#R11]])에만. 5.3 |
 | 첨부 | `python-multipart`(업로드 파싱) · `pypdf`(PDF 글자 추출). 바이트는 PostgreSQL `bytea` | 질문에 붙이는 파일(5.3). 새 저장 서비스를 두지 않는다 — 10MB×수십 개 규모라 DB로 충분하고, 커지면 바이트 자리만 객체 저장소로 옮긴다 |
 | 코드 그래프 | graphify(`graphifyy` — tree-sitter 문법 26종, 모델 없음) + 싱크독의 보강(호출 순서·라우트·화면 요청은 Python AST·tree-sitter-typescript·tree-sitter-rust로, 장비는 의존성 목록·compose·설정 파일·라이브러리 호출 표로 — [[SYNC-PRD-001#R16]], 두 판이 바이트까지 같다; 파이썬은 AST, TS/JS는 graphify가 이미 쓰는 tree-sitter-typescript — 카드 BL, Rust는 tree-sitter-rust로 정의·호출을 보강이 다 맡는다 — 카드 BV) + networkx Louvain(`louvain_communities`, resolution 1.0, seed 42, 모델 없음)과 graphify의 허브 라벨을 서버 프로세스 안에서 — 함수의 커뮤니티(UI-17). graphify `cluster`는 안 쓴다 — 응집도 재쪼개기가 커뮤니티를 100개 넘게 만든다(#253). 싱크독 저장소 1초쯤 | 명세↔코드 대조([[SYNC-PRD-001#R13]]). 결과는 DB `code_graphs`에 줄인 모양으로(6장). 이미지가 170MB쯤 커진다 |
-| 흐름 보기 | three.js(npm으로 번들에 담는다 — [[#C10]]). 흐름 보기 화면(UI-18)만 따로 나눠 그 화면을 열 때 불러온다 · 장면은 InstancedMesh와 OrbitControls, 움직임이 없으면 그리기를 멈춘다 | [[SYNC-PRD-001#R16]]. 다른 화면의 첫 짐을 늘리지 않는다 |
+| 흐름 보기 | three.js(npm으로 번들에 담는다 — [[#C10]]). 흐름 보기 화면(UI-19)만 따로 나눠 그 화면을 열 때 불러온다 · 장면은 InstancedMesh와 OrbitControls, 움직임이 없으면 그리기를 멈춘다 | [[SYNC-PRD-001#R16]]. 다른 화면의 첫 짐을 늘리지 않는다 |
 | 실행 기록 | DB `traces`(프로젝트마다 최근 300개, 기록 하나 사건 2만 개·4MB까지 — 넘으면 기록 도구가 잘라 `truncated`) · 올리기는 개인 토큰 | [[SYNC-PRD-001#R17]]. 기록은 사람이 다시 만들 수 있는 것이라 원본 저장소에 두지 않는다 |
 | git 입구 | `git http-backend`(이미지 안 git을 CGI로) | 서버 저장소의 clone·push([[SYNC-PRD-001#R14]]). 따로 Git 서버를 두지 않고 앱 경로 하나로 받는다 |
 | 실행 | Docker Compose (app + db) | 명령 하나로 켜고 끈다 |

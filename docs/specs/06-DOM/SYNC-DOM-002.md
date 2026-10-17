@@ -1212,9 +1212,9 @@ code_calls(code, user) -> CodeCalls                SEQ-27  compare → MINISPEC 
 code_nodes(code, user) -> CodeNodes                SEQ-31  code_graphs 행의 함수 전부 + 커뮤니티 + compare로 항목·상태 (UI-17 코드 그래프)
 code_source(doc_id, item_id, user) -> CodeText     SEQ-27  함수의 파일·줄 → CodeGraphService.read (그래프 커밋의 저장소에서)
 code_text(code, file, line, user) -> CodeText      SEQ-31  그래프의 함수를 파일·줄로 짚어 CodeGraphService.read (UI-17 코드 4.6, 카드 BF)
-flow_view(code, user) -> FlowView                  SEQ-34  code_graphs 행 + compare로 항목·상태 + 층 표 + 흐름 키들 (UI-19, 카드 CF)
-flow_of(code, key, user) -> FlowOf                 SEQ-34  함수 하나(열쇠 `파일:줄` 또는 MINISPEC 항목 ID)의 steps·라우트·닿는 장비와 한 단 아래 함수 (MCP get_flow, 카드 CH)
-trace_spans(code, user) -> TraceSpans              SEQ-35  기록 도구가 감쌀 함수 범위·라우트·장비 주소 + 그래프 커밋 (카드 CJ)
+flow_view(code, user) -> FlowView                  SEQ-35  code_graphs 행 + compare로 항목·상태 + 층 표 + 흐름 키들 (UI-19, 카드 CF)
+flow_of(code, key, user) -> FlowOf                 SEQ-35  함수 하나(열쇠 `파일:줄` 또는 MINISPEC 항목 ID)의 steps·라우트·닿는 장비와 한 단 아래 함수 (MCP get_flow, 카드 CH)
+trace_spans(code, user) -> TraceSpans              SEQ-36  기록 도구가 감쌀 함수 범위·라우트·장비 주소 + 그래프 커밋 (카드 CJ)
 ask_code(code, key?, conversation_id, question, attachment_ids, user) -> AsyncIterator[AskEvent]
                                                     SEQ-32  코드 그래프에서 묻는다 — 문서 목록·그래프 머리·고른 함수 블록이 시작 맥락, 루프는 ask_item과 같은 _ask_loop (UI-17 질문 탭, 카드 BI)
 ask_item(doc_id, item_id?, conversation_id, question, attachment_ids, user) -> AsyncIterator[AskEvent]
