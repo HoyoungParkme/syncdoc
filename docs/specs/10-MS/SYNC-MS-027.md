@@ -38,6 +38,9 @@ upstream: [SYNC-DOM-004, SYNC-MS-025, SYNC-INFRA-001, SYNC-API-001]
 | [[#trace.send]] | 기록 하나를 올린다 |
 | [[#trace.watch]] | 기록 폴더를 훑어 올린다 |
 | [[#trace.copy_rust]] | Rust 작업 공간을 계측한 사본으로 |
+| [[#trace.java_setup]] | Java — JDI 디버거를 띄우고 대상 JVM이 붙게 |
+| [[#trace.go_overlay]] | Go — 계측한 사본과 도우미 패키지를 빌드 겹침으로 |
+| [[#trace.instrument_go]] | Go 파일 하나의 함수 첫머리에 도우미 호출을 끼운다 |
 | [[#trace.proxy]] | 화면 기록 — Node 프록시 |
 | [[#local.request]] | 이 PC의 개발 서버로 요청 하나를 대신 보낸다 |
 
@@ -140,13 +143,13 @@ pub async fn run(args: TraceArgs) -> ExitCode
 1. 언어 — [[#trace.detect]]. 모르면 한 줄 알리고 끝 코드 2
 2. 준비 — 토큰(`SYNCDOC_TOKEN`, 없으면 터미널에서 화면에 안 찍고 묻는다) · [[#trace.fetch_spans]] · 그래프가 없으면(커밋 null) 「코드를 먼저 push하세요」 끝 코드 2 · 저장소 뿌리(`git rev-parse --show-toplevel`, 아니면 `--cwd`)의 HEAD가 그래프 커밋과 다르면 한 줄 알림
 3. 임시 폴더에 [[#trace.unpack]] · [[#trace.span_table]]을 범위 파일로 · [[#trace.env_for]]
-4. Rust면 [[#trace.copy_rust]] — 사본에서 띄우고 `CARGO_TARGET_DIR`도 캐시 자리
+4. Rust면 [[#trace.copy_rust]] — 사본에서 띄우고 `CARGO_TARGET_DIR`도 캐시 자리 · Java면 [[#trace.java_setup]] — 그 환경 변수를 더하고, 끝나면 디버거를 끈다(남은 기록을 닫아 쓰도록 1.5초 기다린 뒤 올린다) · Go면 [[#trace.go_overlay]] — `GOFLAGS` 앞에 `-overlay={JSON}`(사본은 캐시 자리 `{뿌리 해시}-go`)
 5. 띄운다(표준 입출력은 그대로) · 0.4초마다 [[#trace.watch]] · Ctrl+C는 프로그램이 받는다 — 도구는 끝나기를 기다린다
 6. 끝나면 남은 기록을 [[#trace.watch]]로 올리고 임시 폴더를 지운다 · 끝 코드는 프로그램의 것
 
-**호출하는 것** [[#trace.detect]] · [[#trace.fetch_spans]] · [[#trace.unpack]] · [[#trace.span_table]] · [[#trace.env_for]] · [[#trace.copy_rust]] · [[#trace.watch]]
+**호출하는 것** [[#trace.detect]] · [[#trace.fetch_spans]] · [[#trace.unpack]] · [[#trace.span_table]] · [[#trace.env_for]] · [[#trace.copy_rust]] · [[#trace.java_setup]] · [[#trace.go_overlay]] · [[#trace.watch]]
 
-**테스트 관점** E2E(스크래치 FastAPI·순수 Node http·std Rust `--job`) — 기록이 올라오고 사건의 함수가 그래프 열쇠 · 비밀 이름의 값이 `***` · 작업 사본이 그대로
+**테스트 관점** E2E(스크래치 FastAPI·순수 Node http·std Rust `--job`·Java HttpServer + Spring 꼴 어노테이션·Go net/http 1.22 꼴) — 기록이 올라오고 사건의 함수가 그래프 열쇠 · 비밀 이름의 값이 `***` · 작업 사본이 그대로
 
 ---
 
@@ -157,9 +160,9 @@ pub async fn run(args: TraceArgs) -> ExitCode
 pub fn detect(command: &[String]) -> Option<Lang>
 ```
 
-**처리** 명령의 낱말(공백·`;`·`&`·`|`로 나누고 경로·`.exe`를 뗀 이름) 중 — `cargo` → Rust · `python`·`python3(.x)`·`py`·`uv`·`uvicorn`·`gunicorn`·`flask`·`celery`·`manage.py`·`hypercorn`·`fastapi`·`poetry`·`pipenv` → Python · `node`·`npm`·`npx`·`pnpm`·`yarn`·`tsx`·`ts-node`·`next`·`nodemon`·`bun` → Node. 앞의 것이 이긴다. 없으면 없음
+**처리** 명령의 낱말(공백·`;`·`&`·`|`로 나누고 경로·`.exe`·`.cmd`·`.bat`을 뗀 이름) 중 — `cargo` → Rust · `python`·`python3(.x)`·`py`·`uv`·`uvicorn`·`gunicorn`·`flask`·`celery`·`manage.py`·`hypercorn`·`fastapi`·`poetry`·`pipenv` → Python · `node`·`npm`·`npx`·`pnpm`·`yarn`·`tsx`·`ts-node`·`next`·`nodemon`·`bun` → Node · `mvn`·`mvnw`·`gradle`·`gradlew`·`java` → Java · `go` → Go. 앞의 것이 이긴다. 없으면 없음
 
-**테스트 관점** `uv run uvicorn …` · 경로 붙은 `python3` · `npm run dev` · `cargo run` · 모르는 것 → 없음
+**테스트 관점** `uv run uvicorn …` · 경로 붙은 `python3` · `npm run dev` · `cargo run` · `./mvnw spring-boot:run` · `gradlew.bat bootRun` · `go run ./cmd/api` · 모르는 것 → 없음
 
 ---
 
@@ -170,9 +173,9 @@ pub fn detect(command: &[String]) -> Option<Lang>
 pub fn unpack(dir: &Path) -> std::io::Result<Kit>
 ```
 
-**처리** 실행 파일에 담긴 `crates/app/tracers/`(python·node·rust)를 `dir`에, Node 기록기가 쓰는 TypeScript 파서(화면 빌드와 같은 판 — `frontend/node_modules/typescript`의 `package.json`·`lib/typescript.js`)를 `dir/node/node_modules/typescript`에
+**처리** 실행 파일에 담긴 `crates/app/tracers/`(python·node·rust·java·go)를 `dir`에, Node 기록기가 쓰는 TypeScript 파서(화면 빌드와 같은 판 — `frontend/node_modules/typescript`의 `package.json`·`lib/typescript.js`)를 `dir/node/node_modules/typescript`에
 
-**테스트 관점** 풀면 `sitecustomize.py`·`node-tracer.mjs`·TypeScript·Rust 도우미가 있다
+**테스트 관점** 풀면 `sitecustomize.py`·`node-tracer.mjs`·TypeScript·Rust 도우미·`SyncdocJdi.java`·`syncdoctrace.go`가 있다
 
 ---
 
@@ -270,6 +273,57 @@ pub fn copy_rust(cwd: &Path, files: &[(PathBuf, Vec<Span>)], copy: &Path, helper
 **다른 점** 사본과 빌드 폴더는 캐시 자리(`syncdoc-local/trace/{뿌리 해시}-copy`·`-target`)에 두고 다시 쓴다 — 매번 처음부터 빌드하지 않게. 원본은 고치지 않는다
 
 **테스트 관점** 가리기(문자열·주석·원시 문자열·수명) · 매개변수 이름(패턴·self) · 줄 수 그대로 · 몸통 없는 트레이트 선언 · E2E(std Rust `--job`)
+
+---
+
+#### trace.java_setup Java — JDI 디버거를 띄우고 대상 JVM이 붙게
+
+**시그니처**
+```rust
+pub async fn java_setup(kit: &Kit, table: &SpanTable, work: &Path, out: &Path, job: bool) -> Result<JavaSetup, String>
+```
+
+근거: view_arc `native/java.mts`·`runtime/VaJdi.java` · 사용자 결정 2026-10-12(Java 기록기는 뒤 카드) — 2026-10-17 「나머지 지금 해줘」
+
+**처리**
+1. JDK — `SYNCDOC_JAVA_HOME` → `JAVA_HOME` → PATH의 `java`(실제 자리의 두 단 위) 중 `bin/java --list-modules`에 `jdk.jdi@`가 있는 첫 것. 없으면 「JDK 11 이상(jdk.jdi)이 필요하다」
+2. 범위 표 `work/jdi.txt`(탭) — `S 절대 경로 시작 끝 열쇠`(범위의 `.java`) · `R 열쇠 메서드 경로`(Java 라우트) · `P 패키지`(그 파일들의 `package` 줄, 처음 본 차례) · `H 호스트:포트 종류` · `N 열쇠 이름`. 패키지가 없으면 「그래프에서 찾지 못했다」
+3. 빈 포트(127.0.0.1:0)에 `java SyncdocJdi.java {포트} {표} {out} {0|1}`을 띄워 표준 출력의 `LISTENING `을 30초까지 기다린다 — 못 받으면 끄고 실패
+4. → 디버거 프로세스와 `JAVA_TOOL_OPTIONS = -agentlib:jdwp=transport=dt_socket,server=n,address=127.0.0.1:{포트},suspend=y`(있던 값은 뒤에)
+
+**디버거**(`tracers/java/SyncdocJdi.java`, 표준 JDK만) — 붙는 JVM마다(Maven·Gradle처럼 여럿이어도) 프로젝트 패키지의 클래스가 올라올 때 그래프 메서드의 첫 위치에만 중단점(생성자·람다·합성 메서드·프록시 클래스는 뺀다 — 모든 진입 사건을 켜면 JVM 전체가 해석 모드로 돈다). 메서드 → 열쇠는 소스 경로가 끝나는 범위 중 줄이 든 가장 좁은 것. 빈 스택에서 라우트 메서드가 들어오면 요청 기록(메서드·경로는 라우트의 것), `--job`이면 그 밖 맨 위 메서드가 작업 기록. 기록 중인 스레드에서만 끝·예외·JDBC 드라이버 `execute*`(→ `@infra` db 사건, SQL 앞 100자) 사건을 켠다. 값은 필드만 읽는다(대상 메서드를 부르지 않는다), 비밀 이름은 `***`. 상태는 HTTP를 못 읽어 맨 위 메서드가 예외로 빠져나가면 500, 아니면 200. 시각은 밀리초까지
+
+**테스트 관점** E2E — 라우트 메서드 요청 두 번 → 기록 둘(하나는 예외 500), 사건의 함수가 그래프 열쇠 · `token` 인자가 `***` · 작업 사본이 그대로
+
+---
+
+#### trace.go_overlay Go — 계측한 사본과 도우미 패키지를 빌드 겹침으로
+
+**시그니처**
+```rust
+pub fn go_overlay(files: &[(PathBuf, Vec<Span>)], routes: &HashSet<String>, helper_src: &str, out: &Path) -> Result<Overlay, String>
+```
+
+근거: view_arc `native/go.mts`·`runtime/go/viewarctrace.go`
+
+**처리** `out`을 비우고 범위의 `.go`(`_test.go` 빼고)마다 — 위로 가장 가까운 `go.mod`의 모듈(없으면 건너뛴다) · [[#trace.instrument_go]](도우미 import 경로 `{모듈}/syncdoctrace`) · 계측했으면 `out/files/{절대 경로}`에 쓰고 겹침에 원본 → 사본 · 모듈 뿌리마다 처음 한 번 `{뿌리}/syncdoctrace/syncdoctrace.go` → `out/helpers/{n}/syncdoctrace.go`(도우미를 그대로). 계측한 것이 없으면 「그래프에서 찾지 못했다」. `out/overlay.json` = `{"Replace": {…}}` → 그 자리와 계측한 파일 수
+
+**도우미**(`tracers/go/syncdoctrace.go`, 표준 라이브러리만) — `Enter(열쇠, 이름, 값…)`·`Exit`. 고루틴별 스택으로 부모, 빈 스택에서 `*http.Request`를 받은 함수(gin·echo 문맥의 요청 포함)가 들어오면 요청 기록(실제 메서드·경로·쿼리), `SYNCDOC_TRACE_JOB=1`이면 그 밖 맨 위 함수가 작업 기록. 상태는 응답 값의 `status` 필드(net/http·gin·echo). 값은 reflect로 필드만, 비밀 이름은 `***`. 이름은 `SYNCDOC_TRACE_SPANS`의 이름 표. 시각은 밀리초까지
+
+**테스트 관점** E2E — `GET /sum/{n}` 두 번 → 기록 둘(200), 다른 패키지 함수까지 사건 · `token` 인자가 `***` · 작업 사본이 그대로
+
+---
+
+#### trace.instrument_go Go 파일 하나의 함수 첫머리에 도우미 호출을 끼운다
+
+**시그니처**
+```rust
+pub fn instrument_go(source: &str, spans: &[Span], import_path: &str, routes: &HashSet<String>) -> Option<String>
+```
+
+**처리** 주석·문자열·룬·원시 문자열을 가린 글에서(자리는 그대로) 범위마다 — 그 줄의 `func` → (받는 쪽 괄호) → 이름 → (타입 매개변수 `[…]`) → 매개변수 괄호 → 결과 뒤 깊이 0의 첫 `{`(결과 타입의 `struct{…}`·`interface{…}`는 건너뛰고, 줄이 `,`·`(`로 끝나지 않는데 줄이 바뀌면 몸통 없는 선언) 바로 뒤에 ` defer syncdoctrace.Exit(syncdoctrace.Enter("열쇠", "이름", 이름…));` — 매개변수 이름은 칸마다 첫 낱말(이름 없는 매개변수 목록이면 없음, `_` 뺌). 라우트 열쇠면 그 몸통 안 함수 리터럴 중 매개변수에 `http.ResponseWriter`·`*http.Request`·`*gin.Context`·`echo.Context`·`*fiber.Ctx`가 있고 `{`가 같은 줄인 것에도 같은 열쇠로 끼운다. `package` 줄 끝에 `; import syncdoctrace "{import_path}"`. 끼운 것이 없으면 없음. 줄 수는 그대로다
+
+**테스트 관점** 가리기(문자열·주석·원시 문자열의 `{`·`}`) · 받는 쪽·제네릭·struct 결과 · 이름 없는 매개변수 · 인터페이스 메서드·주석 안 `func`는 아니다 · 라우트 안 핸들러 리터럴 · 줄 수 그대로
 
 ---
 
