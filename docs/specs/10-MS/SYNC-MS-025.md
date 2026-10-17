@@ -87,7 +87,9 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001]
 
 근거: UI-19 5.11 · [[SYNC-API-001#DELETE/api/projects/{code}/traces]]
 
-**처리** `trace_id`가 있으면 그 행만(없으면 `! not-found {resource: "trace"}`), 없으면 그 프로젝트 전부 · `→ 지운 수`
+**처리** `trace_id`가 있으면 그 행만(없으면 `! not-found {resource: "trace"}` — [[#TraceService.get]]으로 본다), 없으면 그 프로젝트 전부 · `→ 지운 수`
+
+**호출하는 것** [[#TraceService.get]]
 
 **테스트 관점** 하나 · 전부 · 다른 프로젝트는 그대로 · 없는 id → not-found
 
