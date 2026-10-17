@@ -20,6 +20,7 @@ from app.core.types import TraceBrief, TraceCoverage, TraceView
 KEEP = 300  # 프로젝트마다 남기는 수 (2026-10-12 사용자 결정)
 MAX_EVENTS = 20000
 MAX_BYTES = 4 * 1024 * 1024  # 본문 — 라우터가 먼저 본다
+_INT4 = (-(2**31), 2**31 - 1)  # traces.id
 
 
 def _brief(row) -> TraceBrief:
@@ -110,8 +111,11 @@ class TraceService:
         return [_brief(r) for r in self.repo.recent(project_id, limit)]
 
     def get(self, project_id: int, trace_id: int) -> TraceView:
-        """SYNC-MS-025#TraceService.get"""
-        row = self.repo.get(project_id, trace_id)
+        """SYNC-MS-025#TraceService.get
+
+        id가 DB 정수 범위 밖이면 그런 행은 없다 — 없는 기록과 같은 not-found.
+        """
+        row = self.repo.get(project_id, trace_id) if _INT4[0] <= trace_id <= _INT4[1] else None
         if row is None:
             raise NotFound("trace", str(trace_id))
         b = _brief(row)
@@ -119,8 +123,8 @@ class TraceService:
 
     def delete(self, project_id: int, trace_id: int | None = None) -> int:
         """SYNC-MS-025#TraceService.delete"""
-        if trace_id is not None and self.repo.get(project_id, trace_id) is None:
-            raise NotFound("trace", str(trace_id))
+        if trace_id is not None:
+            self.get(project_id, trace_id)  # 없으면 not-found
         n = self.repo.delete(project_id, trace_id)
         self.session.flush()
         return n
