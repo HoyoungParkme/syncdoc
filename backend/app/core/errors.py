@@ -204,6 +204,21 @@ class BundleInvalid(Problem):
         super().__init__(reason, reason=reason)
 
 
+class TraceInvalid(Problem):
+    """UC-S9 2a — 올린 실행 기록이 꼴(TraceRecord)에 안 맞거나 상한을 넘는다 (카드 CI·CJ).
+
+    아무것도 남기지 않는다. 본문 4MB 초과는 상태만 413이다(API-001 3.12).
+    """
+
+    type = "urn:syncdoc:trace-invalid"
+    status = 422
+    title = "trace-invalid"
+
+    def __init__(self, reason: str, status: int = 422) -> None:
+        super().__init__(reason, reason=reason)
+        self.status = status
+
+
 class ExistingSpecs(Problem):
     """UC-A1 3a — 저장소에 docs/specs/가 있다. 3b — 서버 저장인데 같은 코드의 보관본이 있다.
 

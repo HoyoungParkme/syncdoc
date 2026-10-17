@@ -941,6 +941,76 @@ class FlowOf:
     infra: list[dict]
 
 
+@dataclass(frozen=True)
+class TraceBrief:
+    """SYNC-DOM-002 2.8 — 실행 기록의 머리(목록 한 줄, 카드 CI). record는 싣지 않는다."""
+
+    id: int
+    trace_key: str
+    kind: str
+    method: str | None
+    path: str
+    status: int | None
+    error: str | None
+    started_at: datetime
+    ms: int
+    commit_hash: str | None
+    event_count: int
+    truncated: bool
+    received_at: datetime
+
+
+@dataclass(frozen=True)
+class TraceView:
+    """SYNC-DOM-002 2.8 — 실행 기록 하나 — 머리와 기록 전체(카드 CI)."""
+
+    id: int
+    trace_key: str
+    kind: str
+    method: str | None
+    path: str
+    status: int | None
+    error: str | None
+    started_at: datetime
+    ms: int
+    commit_hash: str | None
+    event_count: int
+    truncated: bool
+    received_at: datetime
+    record: dict
+
+
+@dataclass(frozen=True)
+class TraceCoverage:
+    """SYNC-DOM-002 2.8 — 기록에 나온 함수 열쇠와 실제로 닿은 장비(카드 CI)."""
+
+    traces: int
+    keys: list[str]
+    infra: list[dict]
+
+
+@dataclass(frozen=True)
+class TraceSpan:
+    """SYNC-DOM-002 2.8 — 기록 도구가 감쌀 함수 하나(카드 CJ)."""
+
+    key: str
+    file: str
+    line: int
+    end: int
+    name: str
+    qual: str
+    route: dict | None
+
+
+@dataclass(frozen=True)
+class TraceSpans:
+    """SYNC-DOM-002 2.8 — queries.trace_spans → API TraceSpans → 기록 도구(카드 CJ)."""
+
+    commit_hash: str | None
+    spans: list[TraceSpan]
+    infra: list[dict]
+
+
 AskEvent = AskStart | AskDelta | AskNote | AskRead | AskAnswer
 
 
