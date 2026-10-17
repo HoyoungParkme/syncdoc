@@ -349,7 +349,37 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 선행 | CL · L30 |
 | 완료 | 2026-10-17 · 브랜치 `card/L31-mcp-traces-rust` · code 3 · `cargo xtask mcp-tools --check` · 계약 `--target both --with-card L28 --with-card L31` + L3·L18 364 통과(MCP 도구 16개 스냅숏) · clippy · 판 0.5.0 — 태그 `local-v0.5.0` |
 
-**다음 카드** — L22(흐름 보기, 2026-10-12 사용자 결정 — view_arc를 두 판의 기능으로). 1차 L22~L26 → `local-v0.4.0`, 2차 L27~L31 → `local-v0.5.0`.
+#### L32 흐름 보기 ⑦ — Java·Go 그래프 보강 (Rust)
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-CODE-001#CM]] · [[SYNC-MS-022]] |
+| 구현 | `crates/codegraph/src/java.rs`·`go.rs` · 추출에 `.java`·`.go` 파일 노드 · `tree-sitter-java` 0.23.5·`tree-sitter-go` 0.25.0(파이썬 판과 같은 판) |
+| 테스트 | 정답 파일(고정 시험 저장소에 Java·Go) · `codegraph-diff` |
+| 선행 | CM · L31 |
+| 완료 | — |
+
+#### L33 흐름 보기 ⑧ — Java·Go 호출 순서·라우트·장비 (Rust)
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-CODE-001#CN]] · [[SYNC-MS-026]] |
+| 구현 | `crates/codegraph/src/flow/steps.rs`·`routes.rs`·`infra.rs` |
+| 테스트 | 정답 파일(흐름 시험 저장소에 Spring·Go) · 흐름 사례(Java·Go 다섯) · `codegraph-diff` |
+| 선행 | CN · L32 |
+| 완료 | — |
+
+#### L34 실행 기록 ⑥ — Java·Go 기록기
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R17]] · [[SYNC-INFRA-001]] 9.9 · view_arc `native/java.mts`·`native/go.mts`·`runtime/VaJdi.java`·`runtime/go/viewarctrace.go` |
+| 구현 | [[SYNC-MS-027#trace.java_setup]] · [[SYNC-MS-027#trace.go_overlay]] · [[SYNC-MS-027#trace.instrument_go]] · [[SYNC-MS-027#trace.detect]] · `crates/app/src/trace/jdi.rs`·`go_copy.rs` · `crates/app/tracers/java/SyncdocJdi.java`·`go/syncdoctrace.go` |
+| 테스트 | `cargo test`(언어 알아보기·Go 계측) · E2E: Java(HttpServer + Spring 꼴 어노테이션, JDK 21)·Go(net/http 1.22 꼴)를 기록 도구로 띄워 요청 → 기록이 올라오고 사건의 함수가 그래프 열쇠 · 비밀 이름의 값 `***` · 작업 사본 그대로 · 판 0.6.0 — 태그 `local-v0.6.0` |
+| 선행 | L33 |
+| 완료 | — |
+
+**다음 카드** — L22(흐름 보기, 2026-10-12 사용자 결정 — view_arc를 두 판의 기능으로). 1차 L22~L26 → `local-v0.4.0`, 2차 L27~L31 → `local-v0.5.0`, 3차 Java·Go L32~L34 → `local-v0.6.0`.
 
 카드 BX는 파이썬 판에서 먼저 했다 — [[SYNC-CODE-001]](#376). #325(재구축이 파일을 지운 커밋에서 실패)는 #366으로 끝났다.
 
