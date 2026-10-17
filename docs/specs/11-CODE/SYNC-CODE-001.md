@@ -1537,7 +1537,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | `frontend/src/flow/`(장면·배치·모델·흐름·층·장비 세계 · 패널) · `pages/Flow.tsx`(경로 `/p/:code/flow`, three.js는 동적 import) · `ProjectDetail.tsx` 2.4 · `CodeGraph.tsx` 「흐름에서 보기」 · `client.ts` · `styles.css`(흐름 토큰 9) · `tools/check_ui.py` — 한 화면이 여러 파일이면 합쳐 센다 |
 | 테스트 | `check_ui` UI-4·UI-19 · `check_tokens` · `tsc`·`oxlint`·`build`(three 조각이 따로) · 브라우저(DEV-17): 장비 장면 → 받침대 → 파일 → 함수 → 재생 · API 흐름 · 덧칠 명세 · 코드 그래프 오가기 |
 | 선행 | CF |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/CG-flow-screen` · spec 1 + code 5 · `tsc`·`oxlint`(새 경고 0)·`build`(흐름 조각 698KB 따로, 첫 짐 그대로) · `check_ui` 15/15(UI-19 42/42 — 파일 11을 합쳐 셈) · `check_tokens` 0 · `check_view_html` 51/51 · `validate` 0/0 · 브라우저(DEV-17, 파이썬 미리보기에 싱크독 저장소): 장비 장면 — 브라우저·FastAPI·Axum 받침대, PostgreSQL(컨테이너 localhost:5432)·외부 HTTP · `?focus=pipeline.py:392` → 코드 단계로 들어가 층 펼침·상세 5.4~5.7(호출 14, MS-007 ✓) · 호출 흐름 재생 → 7.1~7.3(호출 231·단계 608) · API 흐름 `POST /api/docs/{doc_id}/status` → 층 열(명세 층 표, 서버 함수 984/987)·번호·층 위반 0 · 기록 API가 없는 서버(CJ 전)는 목록을 비우고 묻기를 멈춘다 |
 
 #### CH 흐름 보기 ⑥ — MCP get_flow
 
