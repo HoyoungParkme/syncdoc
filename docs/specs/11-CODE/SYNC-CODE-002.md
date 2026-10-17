@@ -357,7 +357,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | `crates/codegraph/src/java.rs`·`go.rs` · 추출에 `.java`·`.go` 파일 노드 · `tree-sitter-java` 0.23.5·`tree-sitter-go` 0.25.0(파이썬 판과 같은 판) |
 | 테스트 | 정답 파일(고정 시험 저장소에 Java·Go) · `codegraph-diff` |
 | 선행 | CM · L31 |
-| 완료 | — |
+| 완료 | 2026-10-17 · 같은 브랜치 · spec 3 + code 1 · 정답 파일 `enriched`·`communities` 같다 · `codegraph-diff` 이 저장소 같다 + 임시로 Go `net/http`(함수 1299·호출 1179)·Java `java.util.concurrent`+`java.net.http`(함수 5863·호출 8030)도 같다 |
 
 #### L33 흐름 보기 ⑧ — Java·Go 호출 순서·라우트·장비 (Rust)
 
@@ -367,7 +367,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | `crates/codegraph/src/flow/steps.rs`·`routes.rs`·`infra.rs` |
 | 테스트 | 정답 파일(흐름 시험 저장소에 Spring·Go) · 흐름 사례(Java·Go 다섯) · `codegraph-diff` |
 | 선행 | CN · L32 |
-| 완료 | — |
+| 완료 | 2026-10-17 · 같은 브랜치 · code 1 · 정답 파일 `flow`(Spring·Go 단위·라우트·장비) · 흐름 사례 27 · `codegraph-diff` 같다 · `cargo test` 232 · clippy |
 
 #### L34 실행 기록 ⑥ — Java·Go 기록기
 
@@ -377,7 +377,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | [[SYNC-MS-027#trace.java_setup]] · [[SYNC-MS-027#trace.go_overlay]] · [[SYNC-MS-027#trace.instrument_go]] · [[SYNC-MS-027#trace.detect]] · `crates/app/src/trace/jdi.rs`·`go_copy.rs` · `crates/app/tracers/java/SyncdocJdi.java`·`go/syncdoctrace.go` |
 | 테스트 | `cargo test`(언어 알아보기·Go 계측) · E2E: Java(HttpServer + Spring 꼴 어노테이션, JDK 21)·Go(net/http 1.22 꼴)를 기록 도구로 띄워 요청 → 기록이 올라오고 사건의 함수가 그래프 열쇠 · 비밀 이름의 값 `***` · 작업 사본 그대로 · 판 0.6.0 — 태그 `local-v0.6.0` |
 | 선행 | L33 |
-| 완료 | — |
+| 완료 | 2026-10-17 · 같은 브랜치 · spec 1 + code 1 · `cargo test` 기록 도구(언어 알아보기·Go 계측 3) · E2E(임시 싱크독_로컬 8012, JDK 21·Go 1.23): Java HttpServer+Spring 꼴 어노테이션 — 기록 2(200·예외 500), `token` `***` · Go net/http 1.22 꼴 — 기록 2(200), 다른 패키지 함수까지 · 사건의 함수가 그래프 열쇠, 작업 사본 그대로 · 브라우저(Playwright)로 Java 기록 재생 · 되먹임: 기록기 시각은 밀리초까지(나노초는 서버가 시각으로 안 받는다) · JDI는 HTTP 상태를 못 읽어 예외 500·아니면 200 · Spring 실제 앱(Maven)은 이 PC WSL에 Maven이 없어 못 돌렸다 · 판 0.6.0 |
 
 **다음 카드** — L22(흐름 보기, 2026-10-12 사용자 결정 — view_arc를 두 판의 기능으로). 1차 L22~L26 → `local-v0.4.0`, 2차 L27~L31 → `local-v0.5.0`, 3차 Java·Go L32~L34 → `local-v0.6.0`.
 
