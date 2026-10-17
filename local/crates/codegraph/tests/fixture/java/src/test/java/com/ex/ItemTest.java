@@ -1,0 +1,1 @@
+class ItemTest { void t() { } }

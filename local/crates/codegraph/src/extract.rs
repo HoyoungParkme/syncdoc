@@ -1,6 +1,6 @@
 //! graphify 대신 — tree-sitter로 원형을 만든다 (SYNC-MS-022#codegraph.extract, INFRA 9.2).
 //! graphify `graph.json`(node-link)의 모양으로, 줄이기·보강·커뮤니티가 읽는 것만: 파일 노드, 파이썬 맨 위 함수·클래스·
-//! 메서드와 그 사이 `contains`·`method` 선, 같은 파일 이름 호출. TS/JS·Rust는 파일 노드만 — 보강이 다 채운다.
+//! 메서드와 그 사이 `contains`·`method` 선, 같은 파일 이름 호출. TS/JS·Rust·Java·Go는 파일 노드만 — 보강이 다 채운다.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::Path;
@@ -11,7 +11,9 @@ use crate::CodeGraphFailed;
 use crate::graph::name;
 use crate::python;
 
-const EXTS: [&str; 7] = [".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".rs"];
+const EXTS: [&str; 9] = [
+    ".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".rs", ".java", ".go",
+];
 const SKIP_DIRS: [&str; 4] = [".git", "graphify-out", "node_modules", "target"];
 
 fn walk(root: &Path, rel: &str, out: &mut BTreeSet<String>) {
