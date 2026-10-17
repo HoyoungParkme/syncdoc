@@ -2,7 +2,7 @@
 doc_id: SYNC-SCN-001
 type: SCN
 title: 사용자 시나리오 — 싱크독
-status: approved
+status: draft
 upstream: [SYNC-PRD-001]
 ---
 
