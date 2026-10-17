@@ -81,13 +81,17 @@ crates/app/src/
     ├── spool.rs                기록 폴더 지켜보기·UDP 받기 → 올리기
     ├── upload.rs               서버와 말하기 — 범위 받기·기록 올리기(다시 보내기)
     ├── rust_copy.rs            Rust 작업 공간 사본 — 함수 첫머리에 도우미 호출
+    ├── jdi.rs                  Java — JDK 찾기·범위 표·JDI 디버거 띄우기·JAVA_TOOL_OPTIONS (L34)
+    ├── go_copy.rs              Go — 함수 첫머리 계측 사본·도우미 패키지·빌드 겹침 JSON (L34)
     └── web_proxy.rs            화면 기록 프록시 — HTML에 런타임, 모듈에 계측
 
 crates/app/tracers/             기록기 원본 — 실행 파일에 담는다(include_bytes). view_arc `analyzer/runtime/`에서 옮겼다 (카드 L29)
 ├── python/                     sitecustomize.py · syncdoc_tracer.py — 표준 라이브러리만
 ├── node/                       hooks.mjs · tracer.mjs · instrument.mjs · typescript.js(Apache-2.0, 판 고정)
 ├── browser/runtime.js          화면 런타임
-└── rust/syncdoc_trace.rs       Rust 도우미 모듈 — 표준 라이브러리만, UDP로 보낸다
+├── rust/syncdoc_trace.rs       Rust 도우미 모듈 — 표준 라이브러리만, UDP로 보낸다
+├── java/SyncdocJdi.java        Java JDI 디버거 — 표준 JDK만, 대상 JVM이 붙는다 (L34)
+└── go/syncdoctrace.go          Go 도우미 패키지 — 표준 라이브러리만, 빌드 겹침으로 넣는다 (L34)
 ```
 
 **server/ 안** — 입구. 파이썬 `web/`에 해당한다
@@ -190,7 +194,7 @@ crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 
 | `local/crates/core/src/types.rs` | 열거형·DTO | [[SYNC-DOM-002]] 2.7·2.8 |
 | `local/crates/server/src/web/schemas.rs` | 응답 형태 | [[SYNC-API-001]] 4장 |
 | `local/crates/server/src/web/sse.rs` | 질문 스트림 포장 | [[SYNC-API-001]] 3.4·3.6 |
-| `local/crates/app/tracers/**` | 기록기(사용자 프로그램 안에서 돈다 — Python·Node·브라우저·Rust 도우미) | [[SYNC-INFRA-001]] 9.9 · [[SYNC-MS-027]] 2장 trace |
+| `local/crates/app/tracers/**` | 기록기(사용자 프로그램 안에서 돈다 — Python·Node·브라우저·Rust 도우미·Java 디버거·Go 도우미) | [[SYNC-INFRA-001]] 9.9 · [[SYNC-MS-027]] 2장 trace |
 | `local/crates/core/src/clock.rs` | 시각 | [[SYNC-STD-004#DEV-18]] |
 | `local/crates/core/src/*/repo.rs` | 리포지토리 | [[SYNC-DOM-004]] 4장 · [[SYNC-DOM-003]] |
 | `local/crates/*/build.rs` | 빌드 설정 | [[SYNC-STD-004#DEV-7]] · [[SYNC-INFRA-001]] 9.2 |
