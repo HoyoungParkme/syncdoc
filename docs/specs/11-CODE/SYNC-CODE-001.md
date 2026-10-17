@@ -1547,7 +1547,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 구현 | [[SYNC-MS-008#queries.flow_of]] · `mcp/tools.py` `get_flow` |
 | 테스트 | MS-008 테스트 관점 · MCP 시험 · 계약 시험(L26) |
 | 선행 | CG |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/CH-mcp-flow` · code 1 · 파이썬 `pytest` 516 · `ruff` · `check_code` flow_of ✓ · MCP 도구 14개(Rust 판 선언은 L26의 `cargo xtask mcp-tools`) |
 
 #### CI 실행 기록 ① — traces 표·TraceService
 
