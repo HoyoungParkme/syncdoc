@@ -12,7 +12,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001]
 
 `core/trace/service.py`(`TraceService`)와 `core/trace/repository.py` — 목록은 1장. 클래스 명세 [[SYNC-DOM-002]] 4.12를 함수 내부까지 내린 것. 실행 기록([[SYNC-PRD-001#R17]])을 받아 두고(최근 300개) 목록·하나·커버리지로 내준다. **기록을 고치지 않는다** — 비밀 가리기는 기록 도구의 일이다([[SYNC-INFRA-001#C13]]). 소유 검사는 부르는 쪽(라우터·MCP 도구)이 `ProjectService.get_owned`로 먼저 한다.
 
-형식은 [[SYNC-STD-001]] 2.10. 내부 타입 `TraceBrief`·`TraceView`·`TraceCoverage`는 [[SYNC-DOM-002]] 2.8.
+형식은 [[SYNC-STD-001]] 2.10. 서비스는 다른 서비스처럼 세션을 받아 만든다 — 함수는 동기다(DB 왕복뿐). 내부 타입 `TraceBrief`·`TraceView`·`TraceCoverage`는 [[SYNC-DOM-002]] 2.8.
 
 **상수** — `KEEP = 300`(프로젝트마다 남기는 수) · `MAX_EVENTS = 20000` · `MAX_BYTES = 4 * 1024 * 1024`(본문).
 
@@ -35,7 +35,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001]
 
 #### TraceService.save 기록 하나를 받는다
 
-**시그니처** `async def save(project_id: int, user_id: int, record: dict) -> tuple[TraceBrief, bool]`
+**시그니처** `def save(project_id: int, user_id: int, record: dict) -> tuple[TraceBrief, bool]`
 
 근거: [[SYNC-UC-001#UC-S9]] · [[SYNC-API-001#POST/api/projects/{code}/traces]] · [[SYNC-SEQ-001#SEQ-36]] · 사용자 결정 2026-10-12(300개)
 
@@ -60,7 +60,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001]
 
 #### TraceService.list_recent 최근 기록 머리
 
-**시그니처** `async def list_recent(project_id: int, limit: int = 300) -> list[TraceBrief]`
+**시그니처** `def list_recent(project_id: int, limit: int = 300) -> list[TraceBrief]`
 
 근거: [[SYNC-UC-001#UC-H25]] 6 · [[SYNC-UC-001#UC-A11]] 3
 
@@ -72,7 +72,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001]
 
 #### TraceService.get 기록 하나
 
-**시그니처** `async def get(project_id: int, trace_id: int) -> TraceView`
+**시그니처** `def get(project_id: int, trace_id: int) -> TraceView`
 
 **처리** `DB: SELECT * FROM traces WHERE id=? AND project_id=?` · 없으면 `! not-found {resource: "trace", id}` · `→ TraceView(머리, record)`
 
@@ -82,7 +82,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001]
 
 #### TraceService.delete 하나 또는 전부 지우기
 
-**시그니처** `async def delete(project_id: int, trace_id: int | None = None) -> int`
+**시그니처** `def delete(project_id: int, trace_id: int | None = None) -> int`
 
 근거: UI-19 5.11 · [[SYNC-API-001#DELETE/api/projects/{code}/traces]]
 
@@ -94,7 +94,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001]
 
 #### TraceService.coverage 기록에 나온 함수와 닿은 장비
 
-**시그니처** `async def coverage(project_id: int) -> TraceCoverage`
+**시그니처** `def coverage(project_id: int) -> TraceCoverage`
 
 근거: [[SYNC-UC-001#UC-H25]] 6 「커버리지」 · UI-19 2.3·5.8
 
@@ -109,7 +109,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001]
 
 #### TraceService.delete_by_project 프로젝트 해제와 함께
 
-**시그니처** `async def delete_by_project(project_id: int) -> None`
+**시그니처** `def delete_by_project(project_id: int) -> None`
 
 **처리** `DB: DELETE FROM traces WHERE project_id=?`
 
