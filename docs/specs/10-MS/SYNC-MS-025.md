@@ -43,6 +43,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001]
 
 **처리**
 1. 꼴 — `events`마다 `parent`가 `-1`이거나 앞선 사건의 `i`인지, `i`가 0부터 차례인지. 아니면 `! trace-invalid {reason: "events[n] — 부모가 없다" | "events[n] — i가 차례가 아니다"}`
+   · `startedAt`이 ISO 8601(`YYYY-MM-DDTHH:MM:SS`, 소수 1~6자리, `Z`나 `±hh:mm` — 없으면 UTC)이 아니거나 없는 날짜면 `! trace-invalid {reason: "startedAt — 시각이 아니다"}`
 2. `DB: SELECT … FROM traces WHERE project_id=? AND trace_key=?` · 있으면 `→ (그 행의 TraceBrief, False)` — 다시 보낸 같은 기록이다
 3. 행 — `trace_key = record.id` · `kind` · `method = None if kind == "job" else record.method` · `path` · `status` · `error`(300자에서 자른다 — `record`는 그대로) · `started_at = record.startedAt`(시간대가 없으면 UTC) · `ms` · `commit_hash = record.commit` · `event_count = len(events)` · `truncated` · `record` 그대로 · `received_at = clock.now()`
 4. `DB: INSERT` · 같은 트랜잭션에서 `DB: DELETE FROM traces WHERE project_id=? AND id NOT IN (SELECT id … ORDER BY received_at DESC, id DESC LIMIT 300)`
@@ -54,7 +55,7 @@ upstream: [SYNC-DOM-002, SYNC-DOM-003, SYNC-SEQ-001, SYNC-API-001]
 
 **호출하는 것** —
 
-**테스트 관점** 넣으면 머리가 돌아오고 `event_count`가 맞다 · 같은 `id`를 다시 → 새 행 없이 `False` · 301번째를 넣으면 가장 오래된 것이 지워진다(다른 프로젝트는 그대로) · `job`은 `method` None · 부모 없는 사건 → `trace-invalid`, 행 없음 · `error` 301자 → 컬럼은 300, `record`는 그대로
+**테스트 관점** 넣으면 머리가 돌아오고 `event_count`가 맞다 · 같은 `id`를 다시 → 새 행 없이 `False` · 301번째를 넣으면 가장 오래된 것이 지워진다(다른 프로젝트는 그대로) · `job`은 `method` None · 부모 없는 사건 → `trace-invalid`, 행 없음 · `startedAt`이 시각이 아니면(`2026-13-01T…`·날짜만) `trace-invalid` · `error` 301자 → 컬럼은 300, `record`는 그대로
 
 ---
 
