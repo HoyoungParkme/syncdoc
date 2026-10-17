@@ -44,6 +44,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-011, SYNC-INFRA-001, SYNC-STD-004]
 | [[#codegraph.widen]] | 추출 원형에 보강이 찾은 함수·호출을 더한다 — 커뮤니티가 다 묶게 |
 | [[#codegraph.communities]] | 함수를 Louvain 군집으로 묶는다 |
 | [[#CodeGraphService.get]] | 프로젝트의 그래프 행 |
+| [[#CodeGraphService.value]] | 저장된 그래프 값 그대로 — 흐름 키 포함 |
 | [[#CodeGraphService.save]] | 새 그래프로 바꿔 끼운다 |
 | [[#CodeGraphService.fail]] | 실패 이유만 남긴다 — 옛 그래프는 그대로 |
 | [[#CodeGraphService.read]] | 그래프 커밋의 파일을 줄 범위로 — 비밀 꼴 거부, 300줄 |
@@ -291,6 +292,21 @@ pub async fn get(&mut self, project_id: i32) -> Result<Option<CodeGraphRow>, Pro
 **처리** `DB: code_graphs where project_id` → 행 또는 없음
 
 **테스트 관점** 없으면 없음
+
+---
+
+#### CodeGraphService.value 저장된 그래프 값 그대로 — 흐름 키 포함
+
+**시그니처**
+```rust
+pub async fn value(&mut self, project_id: i32) -> Result<Option<Value>, Problem>
+```
+
+근거: [[SYNC-MS-026]] 0장 — 흐름 키는 `Graph` 구조체 밖이다 · 파이썬 판은 행의 `graph`가 곧 사전이라 이 함수가 없다
+
+**처리** `DB: code_graphs.graph where project_id` → JSON 값(키 차례는 JSONB가 돌려준 그대로) 또는 없음
+
+**테스트 관점** 없으면 없음 · 저장한 흐름 키가 있다
 
 ---
 
