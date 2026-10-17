@@ -10,7 +10,7 @@ upstream: [SYNC-DOM-004, SYNC-MS-024, SYNC-MS-022, SYNC-INFRA-001]
 
 ## 0. 이 문서가 다루는 것
 
-`crates/codegraph/src/flow.rs`·`steps.rs`·`routes.rs`·`infra.rs`(순수 함수 — DB 없음) — 목록은 1장. 클래스 명세 [[SYNC-DOM-004]] 4.13. 파이썬 판 [[SYNC-MS-024]]과 **같은 이름·같은 처리·같은 결과(바이트)**이고, 이 문서는 다른 점만 적는다([[SYNC-STD-001]] 2.10). 같은지는 정답 파일(`tests/golden/codegraph.json`의 `flow` — 고정 시험 저장소)과 `cargo xtask codegraph-diff`(지금 커밋)가 본다.
+`crates/codegraph/src/flow/`의 `mod.rs`·`steps.rs`·`routes.rs`·`infra.rs`(순수 함수 — DB 없음, 모듈은 `flow::steps`처럼 `flow` 아래) — 목록은 1장. 클래스 명세 [[SYNC-DOM-004]] 4.13. 파이썬 판 [[SYNC-MS-024]]과 **같은 이름·같은 처리·같은 결과(바이트)**이고, 이 문서는 다른 점만 적는다([[SYNC-STD-001]] 2.10). 같은지는 정답 파일(`tests/golden/codegraph.json`의 `flow` — 고정 시험 저장소)과 `cargo xtask codegraph-diff`(지금 커밋)가 본다.
 
 **값(JSON) 위에서 더한다.** 흐름 키(`files`·`units`·`http`·`infra`, 함수의 `steps`·`route`)는 `Graph` 구조체가 아니라 직렬화한 그래프 값(`serde_json::Value`, 키 차례를 지킨다)에 더한다 — `Graph.files`(줄이기의 파일 이름 목록)와 흐름의 `files`(객체 목록)가 이름이 같아서다. 그래서 그래프 만들기는 커뮤니티 **뒤에** 흐름을 더한다([[SYNC-MS-017#pipeline.build_code_graph]]). 파이썬 판은 커뮤니티 앞이지만 두 단계는 서로의 키를 보지 않고, 객체 키의 차례는 비교(값 비교)와 저장(JSONB)이 따지지 않는다.
 
@@ -55,7 +55,7 @@ pub fn extend(src_dir: &Path, graph: &mut Value)
 
 **호출하는 것** [[#flow.files]] · [[#infra.units]] · [[#steps.steps]] · [[#routes.routes]] · [[#routes.http_links]] · [[#infra.infra]]
 
-**테스트 관점** 정답 파일의 `flow`와 같다 · 키 여섯 · 대상도 장비도 없는 호출이 빠진다
+**테스트 관점** 정답 파일의 `flow`와 같다 · 키 여섯 · 대상도 장비도 없는 호출이 빠진다 · 흐름 사례(정답 파일의 `flow_cases` — 파이썬 판 흐름 시험의 입력과 답, `xtask/py/flow_cases.py`)가 모두 같다
 
 ---
 

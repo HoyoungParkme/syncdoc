@@ -252,7 +252,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-CODE-001#CC]] · [[SYNC-MS-024]] · 사용자 결정 2026-10-12(두 판 같은 그래프) |
-| 구현 | [[SYNC-MS-026]] `flow.extend`·`files`·`steps` · `crates/codegraph/src/flow.rs`·`steps.rs` · `core/src/pipeline.rs` 그래프 만들기 |
+| 구현 | [[SYNC-MS-026]] `flow.extend`·`files`·`steps` · `crates/codegraph/src/flow/mod.rs`·`steps.rs` · `core/src/pipeline.rs` 그래프 만들기 |
 | 테스트 | `cargo test` · 정답 파일(`codegraph-golden`에 흐름 키) · `cargo xtask codegraph-diff` — 파이썬 판과 바이트로 같다 |
 | 선행 | CC · L21 |
 | 완료 | — |
@@ -262,7 +262,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-CODE-001#CD]] |
-| 구현 | [[SYNC-MS-026]] `routes`·`http_links` · `crates/codegraph/src/routes.rs` |
+| 구현 | [[SYNC-MS-026]] `routes`·`http_links` · `crates/codegraph/src/flow/routes.rs` |
 | 테스트 | `cargo test` · 정답 파일 · `codegraph-diff` |
 | 선행 | CD · L22 |
 | 완료 | — |
@@ -272,7 +272,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-CODE-001#CE]] |
-| 구현 | [[SYNC-MS-026]] `units`·`infra` · `crates/codegraph/src/infra.rs` |
+| 구현 | [[SYNC-MS-026]] `units`·`infra` · `crates/codegraph/src/flow/infra.rs` |
 | 테스트 | `cargo test` · 정답 파일 · `codegraph-diff` |
 | 선행 | CE · L23 |
 | 완료 | — |
