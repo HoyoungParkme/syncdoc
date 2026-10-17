@@ -306,7 +306,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | `cargo xtask migrations`(Alembic 리비전에서) · [[SYNC-MS-027]] `TraceService` · `core/src/trace/` · `ProjectService.delete_project` |
 | 테스트 | `cargo test`(시험 DB) · `cargo xtask schema-check` |
 | 선행 | CI · L26 |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/L27-trace-rust` · spec 2 + code 3 · `cargo test` trace 5(시험 DB) · `schema-check` 같다(alembic 0019) · `migrations --check` · clippy · `check_code` Rust 218/218 · 되먹임: 파이썬 판이 새로 넣은 기록의 `started_at`을 받은 시간대로 돌려주던 것(목록은 UTC)을 UTC로 맞췄다 |
 
 #### L28 실행 기록 ② — 기록 API·토큰 경로 (Rust)
 
