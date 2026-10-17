@@ -1527,7 +1527,7 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | API | [[SYNC-API-001#GET/api/projects/{code}/flow]] |
 | 테스트 | MS-008 테스트 관점 · 라우터 시험 · 계약 시험 새 사례(L25 — 파이썬 판 스냅숏) |
 | 선행 | CE |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/CF-flow-api` · code 3 · 파이썬 `pytest` 512 · `ruff` · `check_code` MS-008 flow_view ✓ · 계약 시험 사례는 L25에서 파이썬 스냅숏과 함께(두 판을 견줄 때) |
 
 #### CG 흐름 보기 ⑤ — UI-19 화면
 
