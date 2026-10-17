@@ -1531,6 +1531,11 @@ async def test_build_code_graph_from_archive(scoped: Session, proj, monkeypatch)
     save, get = quals["pipe.save"]["key"], quals["SpecService.get"]["key"]
     assert [save, get, "enrich"] in row.graph["calls"]  # 즉석 생성 호출을 보강이 잡았다
     assert row.graph["communities"] and all("community" in f for f in row.graph["functions"])
+    # 흐름 키 — 파일 목록과 함수마다 호출 순서·라우트 (MS-024, 카드 CC)
+    assert {"files", "units", "http", "infra"} <= set(row.graph)
+    assert {f["path"] for f in row.graph["files"]} >= {"backend/app/pipe.py", "backend/app/spec.py"}
+    assert all("steps" in f and "route" in f for f in row.graph["functions"])
+    assert any(st.get("to") == get for st in quals["pipe.save"]["steps"])
     assert not (work / "graphify-out").exists()  # 작업 사본을 더럽히지 않는다
     # 추출이 실패하면 옛 그래프가 남고 이유만 (UC-S8 2a)
     old = row.graph
