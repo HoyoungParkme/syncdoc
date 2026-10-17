@@ -549,6 +549,90 @@ export interface CodeNodes {
   calls: [string, string][]
 }
 
+/** GET /api/projects/{code}/flow — UI-19 흐름 보기(카드 CF). 흐름 키는 그래프에 든 그대로 — MS-024 0장 */
+export interface FlowStep {
+  k: 'call' | 'return' | 'raise'
+  line: number
+  label: string
+  /** 아래 키는 있을 때만 온다 */
+  to?: string
+  inferred?: true
+  deferred?: true
+  awaited?: true
+  infra?: string
+}
+export interface FlowRoute {
+  method: string
+  path: string
+}
+export interface FlowFunction extends CodeNode {
+  end: number | null
+  route: FlowRoute | null
+  steps: FlowStep[]
+}
+export interface FlowFile {
+  path: string
+  lang: string | null
+  loc: number
+}
+export interface FlowInfraNode {
+  id: string
+  kind: 'browser' | 'backend' | 'db' | 'cache' | 'storage' | 'queue' | 'search' | 'api'
+  name: string
+  where: 'local' | 'container' | 'external'
+  host: string | null
+  evidence: string[]
+  dir: string | null
+}
+export interface FlowUnit {
+  name: string
+  kind: 'server' | 'web' | 'job'
+  dir: string
+  lang: string
+  framework: string | null
+  command: string | null
+  port: number | null
+}
+export interface CodeLayerRow {
+  /** 그 줄이 든 클래스 명세 문서 ID — 층 지도(UI-19 6.8)가 잇는다 */
+  doc: string
+  name: string
+  patterns: string[]
+  specs: { ref: string | null; note: string }[]
+}
+export interface FlowView {
+  graph: CodeGraphInfo | null
+  files: FlowFile[]
+  functions: FlowFunction[]
+  calls: [string, string][]
+  http: { from: string; to: string; inferred: boolean }[]
+  infra: { nodes: FlowInfraNode[]; links: { from: string; to: string; protocol: string }[] }
+  units: FlowUnit[]
+  layers: CodeLayerRow[]
+  communities: CodeCommunity[]
+}
+/** 실행 기록 머리 — GET /api/projects/{code}/traces (카드 CJ) */
+export interface TraceBrief {
+  id: number
+  trace_key: string
+  kind: 'back' | 'front' | 'job'
+  method: string | null
+  path: string
+  status: number | null
+  error: string | null
+  started_at: string
+  ms: number
+  commit_hash: string | null
+  event_count: number
+  truncated: boolean
+  received_at: string
+}
+export interface TraceCoverage {
+  traces: number
+  keys: string[]
+  infra: { kind: string; target: string }[]
+}
+
 export interface DownstreamView {
   by_item: Record<string, ItemRef[]>
   by_document: { doc_id: string; title: string; items: string[] }[]
