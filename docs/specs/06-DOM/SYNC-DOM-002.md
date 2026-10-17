@@ -1437,7 +1437,7 @@ classDiagram
 classDiagram
     class TraceService {
         «service»
-        +save(project_id: int, user_id: int, record: dict) TraceBrief
+        +save(project_id: int, user_id: int, record: dict) tuple~TraceBrief, bool~
         +list_recent(project_id: int, limit: int = 300) list~TraceBrief~
         +get(project_id: int, trace_id: int) TraceView
         +delete(project_id: int, trace_id: int?) int
