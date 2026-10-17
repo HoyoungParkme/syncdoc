@@ -326,7 +326,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 구현 | [[SYNC-MS-027]] 기록 도구 · `crates/app/src/trace/` · `crates/app/tracers/`(Python·Node·브라우저·Rust 기록기 — 사건의 `fn`을 그래프 열쇠로) |
 | 테스트 | `cargo test`(언어 알아보기·환경 변수·올리기 다시 보내기·Rust 사본 계측) · E2E: 스크래치 FastAPI·Express·axum 앱을 기록 도구로 띄워 요청 → 두 판에 기록이 올라오고 대상 저장소 `git status`가 그대로 · 비밀 이름의 값이 `***` |
 | 선행 | CJ · L28 |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/L29-trace-tool` · spec 3 + code 2 · `cargo test` 기록 도구 7·사본 계측 3 · clippy · E2E(임시 싱크독_로컬 8011): 스크래치 FastAPI(기록 2 — 200·500, `password`는 `***`, 예외 남음) · 순수 Node http(기록 2, `token` 값 가림) · std Rust `--job`(계측 사본에서 `cargo run`, 작업 기록 1) · Vite 앱 `trace-web`(Playwright로 버튼 → 화면 기록 1) — 모두 사건의 함수가 그래프 열쇠, 작업 사본 그대로 · `check_code` Rust 230/230 · `check_calls` 0 · 되먹임: 생성기 식·람다(`<…>`)는 그래프 함수가 아니라 기록하지 않는다(안쪽 호출은 바깥 함수에) · 기록기마다 다른 꼴(ms 소수·kind 없음)은 도구가 올리기 전에 맞춘다(`trace.normalize`) · Rust 사본·빌드 폴더는 캐시에 남긴다 · trace-web은 Node 프록시 · Rust 도우미도 파일로(UDP 아님) |
 
 #### L30 실행 기록 ④ — 요청 보내기 `POST /api/local/request`
 
@@ -337,7 +337,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | API | [[SYNC-API-001#POST/api/local/request]] |
 | 테스트 | `cargo test`(localhost 아님 → refused · 닿지 못함 → failed · 1MB 자르기 · 리다이렉트 안 따름) |
 | 선행 | L29 |
-| 완료 | — |
+| 완료 | 2026-10-17 · 브랜치 `card/L30-local-request` · spec 1 + code 1 · `cargo test` 4(localhost 아님 → refused · 닿지 못함 → failed · 1MB 자르기 · 리다이렉트 안 따름·머리 소문자) · clippy · `check_code` Rust 231/231 |
 
 #### L31 실행 기록 ⑤ — MCP list_traces·get_trace (Rust)
 
