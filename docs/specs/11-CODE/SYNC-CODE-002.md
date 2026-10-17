@@ -282,7 +282,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-CODE-001#CF]] |
-| 구현 | [[SYNC-MS-018]] `queries.flow_view` · `types.rs` · `server/src/web/routes/flow.rs` · `schemas.rs` |
+| 구현 | [[SYNC-MS-018]] `queries.flow_view` · `types.rs` · `server/src/web/routes/code.rs`(모듈을 `flow`로 두면 코드 그래프가 `codegraph::flow`와 못 가른다) · `schemas.rs` |
 | API | [[SYNC-API-001#GET/api/projects/{code}/flow]] |
 | 테스트 | `cargo test` · 계약 `--target both --with-card L25` — 파이썬 판 스냅숏과 바이트로 같다 |
 | 선행 | CF · L24 |
@@ -313,7 +313,7 @@ upstream: [SYNC-STD-004, SYNC-DOM-004, SYNC-PRD-001, SYNC-INFRA-001, SYNC-API-00
 | 항목 | 내용 |
 |---|---|
 | 근거 | [[SYNC-CODE-001#CJ]] |
-| 구현 | [[SYNC-MS-018]] `queries.trace_spans` · `server/src/web/routes/traces.rs`·`flow.rs` · `guard.rs` 토큰 경로 |
+| 구현 | [[SYNC-MS-018]] `queries.trace_spans` · `server/src/web/routes/traces.rs`·`code.rs` · `guard.rs` 토큰 경로 |
 | 테스트 | 계약 `--with-card L28` |
 | 선행 | CJ · L27 |
 | 완료 | — |
