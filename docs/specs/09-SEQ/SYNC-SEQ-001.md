@@ -1151,6 +1151,7 @@ sequenceDiagram
             CG-->>P: ("server", 원형)
         end
         P->>CG: reduce(원형) → enrich(임시 폴더, 그래프) — 함수·호출 선만, 파이썬 보강
+        P->>CG: flow.extend(임시 폴더, 그래프) — 파일 목록·호출 순서·라우트·화면 요청·장비·실행 단위 (카드 CC~CE, SEQ-35)
         P->>CG: communities(원형, 그래프) — graphify 군집, 함수마다 커뮤니티 (카드 BD)
         P->>CS: save(project_id, head, source, graph)
         CS->>DB: code_graphs 한 행 교체 · error 비움
@@ -1636,6 +1637,125 @@ sequenceDiagram
 - push는 **되감지 않고 한꺼번에**(`--atomic`)다 — GitHub 쪽이 갈라져 있으면 하나도 올라가지 않는다. 확인(5)이 실패해 되돌릴 때 GitHub에 올라간 가지·태그는 그대로 둔다 — 서버 저장소와 같은 커밋이라 다시 부르면 이어서 된다
 - 공개 여부는 바꾸지 않는다 — 사람이 GitHub에서 미리 정한다([[SYNC-UC-001#UC-A1]] 3과 같은 원칙)
 - git 입구([[#SEQ-29]])의 push는 이 락 밖이다 — 옮기는 동안 서버 저장소로 push하지 않는다. 옮긴 뒤로는 GitHub 저장이라 git 입구가 그 프로젝트를 not-found로 막는다
+
+---
+
+## SEQ-35 흐름 보기를 연다
+
+[[SYNC-UC-001#UC-H24]] · [[SYNC-UC-001#UC-A11]] 1~2. UI-19 · MCP `get_flow`. 흐름 키(파일·호출 순서·라우트·화면 요청·장비·실행 단위)는 SEQ-26이 만들 때 붙였다 — 읽을 때는 대조·층만 계산한다(SEQ-31과 같다).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사람
+    participant A as 에이전트
+    participant RF as routers/flow
+    participant M as mcp/tools
+    participant Q as queries
+    participant PS as ProjectService
+    participant CS as CodeGraphService
+    participant S as SpecService
+    participant CG as codegraph/graph.py
+
+    U->>RF: GET /api/projects/{code}/flow — UI-4 2.4 · UI-17 4.10
+    RF->>Q: flow_view(code, user)
+    Q->>PS: get_owned — 남의 것이면 not-found
+    Q->>CS: get(project_id)
+    alt 그래프 없음 (1a)
+        Q-->>RF: FlowView {graph: null, 빈 목록}
+    end
+    Q->>S: MINISPEC 「호출하는 것」 → CG.spec_calls → compare — SEQ-31과 같다
+    Q->>S: 클래스 명세 「폴더 구조」 → CG.layer_table → layers — 층 표 줄도 그대로 싣는다
+    Q-->>RF: FlowView {files, functions(steps·route·…), calls, http, infra, units, layers, communities}
+    RF-->>U: 응답 (1MB 남짓, 한 번)
+    U->>U: three.js 조각을 불러오고(이 화면만) 배치·장면을 브라우저가 만든다
+    opt 기록이 있으면 — SEQ-36이 올린 것
+        U->>RF: GET …/traces · …/traces/coverage — 보이는 동안 2초마다 목록
+        U->>RF: GET …/traces/{id} — 고른 기록을 재생
+    end
+
+    A->>M: get_flow(project_code, function)
+    M->>Q: flow_of(code, function, user)
+    Q->>PS: get_owned
+    Q->>CS: get(project_id) → 열쇠(파일:줄)로, 아니면 MINISPEC 항목으로 함수를 찾는다
+    Q-->>M: FlowOf {function, callees(steps의 to, 한 단), infra(닿는 장비)}
+```
+
+**읽을 때 볼 것**
+- 흐름은 저장하지 않는다 — 그래프 행에 든 흐름 키와 명세를 읽을 때마다 합친다. 클래스 명세의 층 표만 고쳐도 다음 요청부터 바뀐다
+- 배치(판·건물·층·열)는 브라우저가 한다 — 서버는 좌표를 모른다. three.js는 이 화면에서만 불러온다
+- `flow_of`의 `callees`는 한 단만이다 — 더 깊이는 에이전트가 다시 부른다
+
+---
+
+## SEQ-36 기록 도구가 실행 기록을 올린다
+
+[[SYNC-UC-001#UC-H25]] · [[SYNC-UC-001#UC-S9]]. 사람의 PC에서 기록 도구(싱크독_로컬 실행 파일의 하위 명령)가 사용자 프로그램을 띄우고, 기록을 개인 토큰으로 서버(두 판 어느 쪽이든)에 올린다. 서버는 사용자 코드를 띄우지 않는다([[SYNC-INFRA-001#C12]]).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사람
+    participant T as 기록 도구<br/>syncdoc-local trace
+    participant P as 사용자 프로그램<br/>+ 기록기
+    participant RT as routers/traces · flow
+    participant Q as queries
+    participant AS as AccountService
+    participant TS as TraceService
+    participant DB
+
+    U->>T: syncdoc-local trace --to {서버} --project {코드} -- {명령}
+    T->>RT: GET /api/projects/{code}/trace-spans (Bearer 토큰)
+    RT->>AS: authenticate_token — 틀리면 401 (2a)
+    RT->>Q: trace_spans(code, user) — get_owned · 그래프의 함수 범위·라우트·장비
+    RT-->>T: TraceSpans {commit_hash, spans, infra}
+    T->>T: git HEAD ≠ commit_hash면 한 줄 알림 (2b) · 언어 알아보기 (3a·3b)
+    T->>T: 기록기를 임시 폴더에 풀고 범위 파일을 쓴다 · Rust면 사본을 떠 계측 (3e)
+    T->>P: 띄운다 — PYTHONPATH · NODE_OPTIONS · SYNCDOC_TRACE_* 환경 변수
+    loop 요청·작업 하나마다
+        P->>P: 불린 프로젝트 함수·인자·반환·예외·장비 사건을 모은다 · 비밀 값은 *** (N5)
+        P->>T: 기록 하나 — 기록 폴더에 JSON (Rust는 UDP)
+        T->>RT: POST /api/projects/{code}/traces (Bearer, TraceRecord)
+        RT->>AS: authenticate_token
+        RT->>TS: save(project_id, user_id, record) — 소유는 라우터가 get_owned로 먼저
+        TS->>DB: 같은 trace_key면 그대로 · 아니면 넣고 300개 넘는 것 지우기 (한 트랜잭션)
+        RT-->>T: 201 TraceBrief (같은 것이면 200)
+        alt 닿지 못함 (5a)
+            T->>T: 세 번 다시 · 그래도 안 되면 한 줄 알리고 버린다
+        end
+    end
+    U->>P: 끈다 (Ctrl+C는 프로그램에)
+    T->>T: 남은 기록을 올리고 임시 폴더를 지운다
+```
+
+**읽을 때 볼 것**
+- **서버는 기록을 고치지 않는다** — 꼴·크기만 보고(`trace-invalid`) 그대로 둔다. 비밀 가리기는 기록기의 일이다
+- **같은 기록을 두 번 보내도 하나다** — 다시 보내기가 안전하다(`trace_key` UK)
+- 토큰은 이 두 경로에서만 사람을 정한다(API-001 1장). 화면은 세션(로컬 판은 로컬 사용자)으로 같은 기록을 읽는다
+
+---
+
+## SEQ-37 싱크독_로컬에서 개발 서버로 요청을 보낸다
+
+[[SYNC-UC-001#UC-H26]]. UI-19 6.2·6.6. 싱크독_로컬만 — 파이썬 판에는 이 경로가 없다(화면이 `GET /api/local` 404로 알고 curl 명령 복사를 보인다).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사람
+    participant RL as routes/local (Rust)
+    participant D as 개발 서버<br/>localhost:{포트}
+
+    U->>RL: POST /api/local/request {method, url, body}
+    RL->>RL: url의 호스트가 localhost·127.0.0.1·::1인가 — 아니면 request-refused (3a)
+    RL->>D: 요청 — 리다이렉트 안 따름 · 10초
+    alt 닿지 못함·시간 초과 (3b)
+        RL-->>U: 424 request-failed
+    end
+    D-->>RL: 응답 — 본문은 1MB에서 자른다
+    RL-->>U: {status, headers, body, truncated, ms}
+    Note over D: 기록을 켠 서버면 SEQ-36의 기록이 따로 올라온다 — 화면은 목록에서 받는다
+```
 
 ---
 

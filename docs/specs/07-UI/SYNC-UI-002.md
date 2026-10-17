@@ -796,6 +796,7 @@ status: draft
       <span class="sp"></span>
       <span class="b" data-el="2.1">참조 그래프</span>
       <span class="b" data-el="2.3">코드 그래프</span>
+      <span class="b" data-el="2.4">흐름 보기</span>
       <span class="b" data-el="2.2">순서대로 읽기</span>
     </div>
 
@@ -907,6 +908,7 @@ status: draft
 | 2.1 | 참조 그래프 | 버튼 | | UI-8로 |
 | 2.2 | 순서대로 읽기 | 버튼 | | UI-9로 |
 | 2.3 | 코드 그래프 | 버튼 | 참조 그래프와 순서대로 읽기 사이 | UI-17로 |
+| 2.4 | 흐름 보기 | 버튼 | 코드 그래프 다음 | UI-19로(카드 CG) |
 | 3 | 요약 수치 | 영역 | 프로젝트 전체의 끊어진 참조·규약 오류·미완성 건수. 0이면 흐리게 | — |
 | 3.2 | 끊어진 참조 | 수치 | 가리키는 곳이 없는 참조(`references.is_missing`) 수. 항목이 삭제됐거나 아직 안 쓰였다 | 목록 다이얼로그(6). UC-H14 기본 흐름 4 |
 | 3.4 | 규약 오류 | 수치 | has_convention_error 문서 수 | 목록 다이얼로그(6) |
@@ -3008,6 +3010,277 @@ syncdoc_github: https://{싱크독 주소}/mcp (HTTP) - ✔ Connected</div><figc
 2. 트리 손잡이(6.4)를 오른쪽으로 끈다 — 트리가 넓어지고, 새로고침해도 그 폭이다
 3. 사이드바 손잡이(4.10)를 왼쪽으로 끌어 넓힌다 — UI-5 문서 뷰에서 질문·코드 탭을 열어도 같은 폭이다
 4. 「코드」 → 「명세」 → 「질문」으로 탭을 바꾼다 — 그림 폭이 그대로다. 새로고침하면 마지막 탭으로 열린다
+
+---
+
+## UI-19 흐름 보기
+
+| 항목 | 내용 |
+|---|---|
+| 화면 설계 | [[SYNC-UI-001#UI-19]] |
+| 경로 | `/p/{프로젝트코드}/flow` · `?view=api`면 API 흐름 · `?focus={파일:줄}`이면 그 함수를 골라 코드 단계로 · `?trace={id}`면 그 기록을 재생. 고르면 주소가 바뀌고(히스토리는 안 쌓음) 풀면 빠진다 |
+| 진입 | UI-4 흐름 보기 버튼(2.4) · UI-17 함수 사이드바의 「흐름에서 보기」(4.10) |
+| 유스케이스 | [[SYNC-UC-001#UC-H24]] · [[SYNC-UC-001#UC-H25]] 기본 흐름 6 · [[SYNC-UC-001#UC-H26]] |
+
+### 배치
+
+도시 — 장비 장면에서 코드 단계로(UC-H24 1~4), 그 아래 같은 화면의 API 흐름·기록 재생 상태.
+
+```html
+<style>
+  /* 카드 CG — UI-17과 같은 틀: 브레드크럼 줄(1) · 툴바(2) · 3단(탐색기 3 | 장면 4 | 패널 5). 장면만 어두운 바탕(7장 18) */
+  .fvbar{display:flex;align-items:center;gap:10px;height:50px;padding:0 22px;background:#fff;border-bottom:1px solid var(--line);font-size:13.5px}
+  .fvbar .crumb{color:var(--ink3)} .fvbar .sep{color:var(--mute);font-size:12px}
+  .fvtool{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--line);background:#fff;font-size:13px}
+  .fvtool .seg{display:inline-flex;border:1px solid var(--line2);border-radius:6px;overflow:hidden}
+  .fvtool .seg span{padding:3px 10px;color:var(--ink3);cursor:pointer}
+  .fvtool .seg span.on{background:var(--ink);color:#fff}
+  .fvtool .in{width:200px;height:28px;font-size:13px}
+  .fv3{display:grid;grid-template-columns:230px minmax(0,1fr) 380px;height:640px}
+  .fvtree{background:var(--sub);overflow:auto;font:12.5px var(--mono);padding:8px 0;border-right:1px solid var(--line)}
+  .fvtree .th{display:flex;align-items:center;padding:2px 10px 6px;font:600 12px var(--sans);color:var(--ink3)}
+  .fvtree .th .b{margin-left:auto}
+  .fvtree .tr{display:flex;align-items:center;gap:5px;padding:2px 10px;white-space:nowrap;cursor:pointer;color:var(--ink2)}
+  .fvtree .tr.on{background:#fff;font-weight:600;color:var(--ink)}
+  .fvtree .tag{font:600 10px var(--sans);color:var(--dim);border:1px solid var(--line2);border-radius:4px;padding:0 4px}
+  /* 장면(4) — three.js 캔버스. 여기서는 이름표 자리만. 바탕은 --fv-bg */
+  .fvscene{position:relative;background:var(--fv-bg);overflow:hidden}
+  .fvscene .zone{position:absolute;font:600 11px var(--sans);color:rgba(255,255,255,.55);letter-spacing:.04em}
+  .fvscene .plate{position:absolute;padding:4px 8px;border-radius:6px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;font:600 11.5px var(--mono)}
+  .fvscene .plate .sub{display:block;font:400 10.5px var(--sans);color:rgba(255,255,255,.6)}
+  .fvscene .dev{position:absolute;padding:3px 8px;border-radius:999px;color:#0b0d10;font:600 11px var(--sans)}
+  .fvscene .crumbs{position:absolute;left:12px;top:10px;color:rgba(255,255,255,.8);font:12px var(--mono)}
+  .fvscene .crumbs b{color:var(--fv-accent)}
+  .fvscene .pick{position:absolute;padding:4px 8px;border-radius:6px;background:var(--fv-accent);color:#0b0d10;font:600 11.5px var(--mono)}
+  .fvscene .legend{position:absolute;left:12px;bottom:10px;display:flex;gap:12px;font:11.5px var(--sans);color:rgba(255,255,255,.7)}
+  .fvscene .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}
+  .fvside{display:flex;flex-direction:column;min-height:0;background:#fff;border-left:1px solid var(--line);font-size:13px}
+  .fvside .pb{flex:1;min-height:0;overflow:auto;padding:14px 16px}
+  .fvside .k{font:600 12px var(--sans);color:var(--ink3);margin:14px 0 6px}
+  .fvside .nm{font:600 13.5px var(--mono);color:var(--ink);word-break:break-all}
+  .fvside .meta{font:12px var(--mono);color:var(--dim);margin-top:3px}
+  .fvside .stat{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .fvside .stat div{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:11.5px var(--sans);color:var(--ink3)}
+  .fvside .stat b{display:block;font:600 15px var(--sans);color:var(--ink)}
+  .fvside pre{margin:6px 0 0;padding:8px;background:var(--sub2);border-radius:6px;font:12px/1.5 var(--mono);white-space:pre-wrap}
+  .fvside .row{display:flex;align-items:center;gap:6px;padding:4px 0;font:12.5px var(--mono);border-bottom:1px solid var(--hair)}
+  .fvside .row .m{font:600 11px var(--mono);color:var(--ink3);width:46px}
+  .fvside .row .st{margin-left:auto;font:600 11px var(--mono)}
+  .fvside .row .st.err{color:var(--warn)}
+  .fvside .chip{display:inline-block;padding:0 6px;border-radius:4px;background:var(--sub2);font:600 11px var(--sans);color:var(--ink3)}
+  .fvside .lnk{display:inline-block;margin-top:10px;color:var(--ink);text-decoration:underline;font-size:13px}
+</style>
+<div class="sd">
+  <div class="top"><span class="logo">싱크독</span><span class="tb">사용 방법</span><span class="tb">설정</span><span class="tb">로그아웃</span></div>
+  <div class="fvbar" data-el="1">
+    <span class="crumb"><span class="m bd">[SYNC]</span> 싱크독</span><span class="sep">›</span><b>흐름 보기</b>
+    <span class="sp"></span>
+    <span class="lbl" data-el="1.1">파일 412 · 함수 2,318 · 라우트 96 · 장비 4 · 그래프 b8b571f · 방금</span>
+  </div>
+  <div class="fvtool" data-el="2">
+    <span class="seg" data-el="2.1"><span class="on">도시</span><span>API 흐름</span></span>
+    <span class="seg" data-el="2.2"><span>장비</span><span class="on">폴더</span><span>코드</span></span>
+    <span class="seg" data-el="2.3"><span class="on">기본</span><span>커버리지</span><span>명세</span></span>
+    <span data-el="2.4"><input class="in" placeholder="함수 · 파일 · 경로"></span>
+    <span class="sp"></span>
+    <span class="b sm" data-el="2.5">코드 그래프로</span>
+  </div>
+  <div class="fv3">
+    <aside class="fvtree" data-el="3">
+      <div class="th">탐색기<span class="b sm" data-el="3.3">접기</span></div>
+      <div class="tr" data-el="3.1">▾ backend <span class="tag">서버</span></div>
+      <div class="tr" style="padding-left:24px">▾ app/core</div>
+      <div class="tr on" data-el="3.2" style="padding-left:38px">▾ pipeline.py</div>
+      <div class="tr" style="padding-left:52px">save_pipeline</div>
+      <div class="tr" style="padding-left:52px"><span class="tag">POST</span> change_status</div>
+      <div class="tr">▸ frontend <span class="tag">화면</span></div>
+      <div class="tr">▸ tools <span class="tag">보조</span></div>
+    </aside>
+    <div class="fvscene" data-el="4">
+      <div class="crumbs" data-el="4.5">backend › app/core › <b>pipeline.py</b></div>
+      <span class="zone" data-el="4.1" style="left:40px;top:60px">이 PC</span>
+      <span class="zone" style="right:40px;top:60px">외부 · 클라우드</span>
+      <span class="plate" data-el="4.2" style="left:180px;top:300px">backend<span class="sub">FastAPI · 이 PC · :8000</span></span>
+      <span class="plate" style="left:420px;top:330px">frontend<span class="sub">Vite · 브라우저</span></span>
+      <span class="dev" data-el="4.3" style="left:120px;top:110px;background:var(--fv-db)">PostgreSQL · localhost:5432</span>
+      <span class="dev" style="right:70px;top:110px;background:var(--fv-ext)">모델 API · 외부</span>
+      <span class="pick" data-el="4.4" style="left:260px;top:220px">change_status</span>
+      <div class="legend"><span><i style="background:var(--fv-front)"></i>화면</span><span><i style="background:var(--fv-endpoint)"></i>엔드포인트</span><span><i style="background:var(--fv-service)"></i>서비스</span><span><i style="background:var(--fv-repo)"></i>저장소</span></div>
+    </div>
+    <aside class="fvside" data-el="5">
+      <div class="pb">
+        <div class="stat" data-el="5.1"><div><b>412</b>파일</div><div><b>2,318</b>함수</div><div><b>96</b>라우트</div><div><b>4</b>장비</div></div>
+        <div class="k">실행 기록</div>
+        <div data-el="5.2">아직 기록이 없습니다. 이 PC에서 띄우세요 — 싱크독_로컬 실행 파일이 있어야 합니다
+          <pre>syncdoc-local trace --to https://syncdoc.example.com --project SYNC -- uv run uvicorn app.main:app --port 8001</pre>
+          <span class="b sm">복사</span> <span class="lbl">backend · FastAPI · 기록 가능</span></div>
+        <div data-el="5.3">
+          <div class="row"><span class="m">POST</span>/api/docs/SYNC-PRD-001/status<span class="st err">409</span></div>
+          <div class="row"><span class="m">GET</span>/api/projects<span class="st">200</span></div>
+        </div>
+        <span class="b sm" data-el="5.11">기록 지우기</span>
+        <div class="k">함수</div>
+        <div data-el="5.4"><div class="nm">pipeline.change_status</div><div class="meta">backend/app/core/pipeline.py:412 · 서비스 층 · <span class="chip">POST /api/docs/{doc_id}/status</span></div></div>
+        <span class="b sm" data-el="5.5">호출 흐름 재생</span>
+        <div class="k">호출하는 것</div>
+        <div data-el="5.6"><div class="row">1 · SpecService.get_owned</div><div class="row">2 · git.commit <span class="chip">→ 저장소</span></div><div class="row">3 · session.flush <span class="chip">→ PostgreSQL</span></div></div>
+        <div class="k">명세</div>
+        <div data-el="5.7"><div class="row">MS-007#pipeline.change_status <span class="st">▲ 코드만 1</span></div><a class="lnk">코드 그래프에서 보기</a></div>
+        <div class="k">장비</div>
+        <div data-el="5.8"><div class="nm">PostgreSQL</div><div class="meta">DB · 이 PC · localhost:5432</div></div>
+        <div data-el="5.9"><div class="row">의존성 psycopg</div><div class="row">compose db: postgres:16</div></div>
+        <div data-el="5.10"><div class="row">SpecService.save · session.execute</div></div>
+      </div>
+    </aside>
+  </div>
+</div>
+<!-- 같은 화면의 둘째 상태 — API 흐름과 기록 재생(UC-H24 5 · UC-H25 6 · UC-H26) -->
+<div class="fvcap">API 흐름과 기록 재생</div>
+<style>
+  .fvcap{margin:18px 0 6px;font:600 13px var(--sans);color:var(--ink3)}
+  .fvapi{display:grid;grid-template-columns:260px minmax(0,1fr) 380px;height:640px}
+  .fvlist{background:var(--sub);overflow:auto;border-right:1px solid var(--line);font-size:12.5px}
+  .fvlist .g{padding:8px 12px 4px;font:600 11.5px var(--sans);color:var(--dim)}
+  .fvlist .api{display:flex;align-items:center;gap:6px;padding:4px 12px;font:12.5px var(--mono);cursor:pointer}
+  .fvlist .api.on{background:#fff;font-weight:600}
+  .fvlist .api .m{width:44px;font:600 11px var(--mono);color:var(--ink3)}
+  .fvlist .api .run{margin-left:auto;color:var(--ink3)}
+  .fvcols{position:relative;background:var(--fv-bg);overflow:hidden}
+  .fvcols .col{position:absolute;top:14px;color:rgba(255,255,255,.7);font:600 11.5px var(--sans)}
+  .fvcols .blk{position:absolute;padding:5px 8px;border-radius:5px;color:#0b0d10;font:600 11px var(--mono)}
+  .fvcols .no{position:absolute;color:#fff;font:600 11px var(--mono)}
+  .fvcols .trip{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;font:12px var(--sans)}
+  .fvplay{display:flex;gap:6px;align-items:center;margin-top:8px}
+  .fvev{font:12px var(--mono)}
+  .fvev .e{padding:3px 0;border-bottom:1px solid var(--hair)}
+  .fvev .e.on{background:var(--note)}
+  .fvev .e .t{float:right;color:var(--dim)}
+</style>
+<div class="sd">
+  <div class="fvtool"><span class="seg"><span>도시</span><span class="on">API 흐름</span></span></div>
+  <div class="fvapi">
+    <aside class="fvlist" data-el="6.1">
+      <div class="g">docs</div>
+      <div class="api"><span class="m">GET</span>/api/docs/{doc_id}<span class="run" data-el="6.2">▶</span></div>
+      <div class="api on"><span class="m">POST</span>/api/docs/{doc_id}/status<span class="run">▶</span></div>
+      <div class="g">projects</div>
+      <div class="api"><span class="m">GET</span>/api/projects</div>
+    </aside>
+    <div class="fvcols" data-el="4">
+      <span class="col" style="left:30px">화면</span><span class="col" style="left:200px">엔드포인트</span><span class="col" style="left:380px">서비스</span><span class="col" style="left:560px">저장소</span>
+      <span class="blk" style="left:30px;top:120px;background:var(--fv-front)">DocView.setStatus</span>
+      <span class="blk" style="left:200px;top:120px;background:var(--fv-endpoint)">change_status</span>
+      <span class="no" style="left:330px;top:100px">1</span>
+      <span class="blk" style="left:380px;top:180px;background:var(--fv-service)">pipeline.change_status</span>
+      <span class="blk" style="left:560px;top:240px;background:var(--fv-repo)">DocumentRepo.update</span>
+      <span class="trip" data-el="4.6">PostgreSQL · UPDATE documents · 3ms</span>
+    </div>
+    <aside class="fvside">
+      <div class="pb">
+        <div data-el="6.3"><div class="nm">POST /api/docs/{doc_id}/status</div><div class="meta">change_status · 함수 7 · 화면 호출 2</div></div>
+        <div class="fvtool" data-el="6.4" style="padding:6px 0;border:0"><span class="seg"><span class="on">층</span><span>호출 깊이</span></span> 깊이 <span class="seg"><span>2</span><span class="on">4</span><span>6</span></span></div>
+        <span class="b sm" data-el="6.5">이 API 흐름 재생</span>
+        <details data-el="6.6" open><summary>요청 보내기</summary>
+          <div class="meta">http://localhost:<input class="in" style="width:60px" value="8000"> /api/docs/SYNC-PRD-001/status</div>
+          <pre>{"status": "approved", "reason": ""}</pre>
+          <label><input type="checkbox"> 쓰기 요청을 보냅니다</label> <span class="b sm">보내기</span></details>
+        <div class="k">층 위반</div>
+        <div data-el="6.7"><div class="row">화면 → 저장소 · 건너뜀</div></div>
+        <div class="k">층 지도</div>
+        <div data-el="6.8" class="meta">클래스 명세 「폴더 구조」 층 표 · 12줄 · 함수 87% 맞음</div>
+        <div class="k">재생</div>
+        <div data-el="7.1"><div class="nm">POST /api/docs/SYNC-PRD-001/status · 409</div><div class="meta">갈래 2 · 38ms · 호출 14 · a1b2c3d</div></div>
+        <div class="fvplay" data-el="7.2"><span class="b sm">⏮</span><span class="b sm">◀</span><span class="b sm">⏸</span><span class="b sm">▶</span><span class="b sm">1×</span></div>
+        <div class="fvev" data-el="7.3">
+          <div class="e">→ change_status(doc_id='SYNC-PRD-001', body={status:'approved'})<span class="t">0ms</span></div>
+          <div class="e on">⇄ PostgreSQL SELECT documents<span class="t">2ms</span></div>
+          <div class="e">✕ ConflictError('version')<span class="t">31ms</span></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+```
+
+### 요소
+
+| # | 이름 | 종류 | 보여주는 것 | 누르면 |
+|---|---|---|---|---|
+| 1 | 브레드크럼 줄 | 영역 | `[코드] 이름 › 흐름 보기` — UI-17과 같은 줄 | 이름 → UI-4 |
+| 1.1 | 요약 | 텍스트 | 파일·함수·라우트·장비 수, 그래프 커밋 7자·만든 때. 그래프가 흐름 키를 모르는 옛 것이면 「다음 코드 push에 호출 순서가 생깁니다」(UC-H24 4a) | — |
+| 2 | 툴바 | 영역 | | — |
+| 2.1 | 보기 | 전환 | 도시 · API 흐름 | 바꾼다. 주소 `?view=api` |
+| 2.2 | 단계 | 전환 | 장비 · 폴더 · 코드 — 지금 카메라 단계 | 그 단계로 카메라가 간다 |
+| 2.3 | 덧칠 | 전환 | 기본 · 커버리지 · 명세 | 함수를 상태별 색으로 칠한다. 커버리지는 기록이 하나 이상일 때만 켜진다 |
+| 2.4 | 찾기 | 입력 | 함수 이름·파일·라우트 경로 | 300ms 뒤 첫 맞는 것을 고른다. 없으면 「없음」 |
+| 2.5 | 코드 그래프로 | 버튼 | 고른 함수가 있으면 그것을 | UI-17 `?focus=` |
+| 3 | 탐색기 | 트리 | 맨 위 폴더(화면·서버·보조 꼬리표) › 폴더 › 파일 › 함수(라우트면 메서드 꼬리표). 한 자식뿐인 폴더 사슬은 합쳐 보인다 | |
+| 3.1 | 트리 줄 | 행 | 폴더·파일·함수 | 폴더·파일 → 그곳으로 카메라 · 함수 → 고른다 |
+| 3.2 | 고른 줄 | 행 | 장면에서 고른 것과 같다 | — |
+| 3.3 | 접기 | 버튼 | | 탐색기를 접고 장면을 넓힌다. 기억한다 |
+| 4 | 장면 | 캔버스 | three.js — 도시면 구역·받침대·장비·연결선·판(폴더)·건물(파일)·층(함수), API 흐름이면 층 열·블록·호·번호. 바탕은 어둡다(7장 18) | 고른 대상으로 카메라가 간다. 끌어 돌리고 굴려 확대 |
+| 4.1 | 구역 이름표 | 이름표 | 이 PC · 컨테이너 · 외부·클라우드 | — |
+| 4.2 | 받침대 이름표 | 이름표 | 서버·화면 실행 단위 — 이름·프레임워크·위치·포트 | 그 위 코드로 들어간다 |
+| 4.3 | 장비 이름표 | 이름표 | 이름·위치·호스트:포트 | 장비를 고른다(5.8) |
+| 4.4 | 고른 것 이름표 | 이름표 | 고른 함수·파일 이름, 강조색 | — |
+| 4.5 | 위치 | 빵부스러기 | 폴더 › 파일 › 함수 — 코드 단계에서만 | 그 단계로 |
+| 4.6 | 장비 왕복 | 안내 | 재생 중 경계 사건의 장비·동작·시간 | — |
+| 5 | 패널 | 영역 | 고른 것에 따라 아래 묶음이 바뀐다 — 아무것도 없으면 개요·실행 기록 | — |
+| 5.1 | 개요 | 수치 | 파일·함수·라우트·장비 | — |
+| 5.2 | 실행 기록 켜기 | 안내 | 실행 단위마다 기록 도구 명령(`--to`는 이 서버 주소, 작업이면 `--job`과 부작용 경고)·기록 가능 여부. 기록이 없을 때만 | 복사 |
+| 5.3 | 기록 목록 | 목록 | 최근 기록 — 종류(서버·화면·작업)·방법·경로·상태·걸린 시간·갈래 색·「잘림」. 2초마다 새로 읽는다 | 그 기록을 재생(7) · 주소 `?trace=` |
+| 5.4 | 함수 상세 | 패널 | 이름·파일:줄·층·라우트·시그니처 | — |
+| 5.5 | 호출 흐름 재생 | 버튼 | | 그 함수의 steps를 재생(7.2와 같은 조작) |
+| 5.6 | 호출하는 것 | 목록 | steps 차례 — 부르는 함수·「→ 장비」·「추정」·「나중에 불림」·반환·예외 | 그 함수를 고른다 |
+| 5.7 | 명세 | 목록 | 함수의 항목과 대조(같음·코드만·명세만, UI-17 4.7과 같은 자료) | 항목 → UI-18 · 「코드 그래프에서 보기」 → UI-17 |
+| 5.8 | 장비 상세 | 패널 | 종류·이름·위치·호스트:포트. 기록에서 실제 주소를 봤으면 그것으로 | — |
+| 5.9 | 찾은 근거 | 목록 | 의존성·compose·설정·코드·실행 기록 | — |
+| 5.10 | 쓰는 함수 | 목록 | 이 장비로 요청을 보내는 함수와 동작 | 그 함수를 고른다 |
+| 5.11 | 기록 지우기 | 버튼 | 기록이 있을 때 | 확인 뒤 이 프로젝트의 기록을 다 지운다 |
+| 6.1 | API 목록 | 목록 | 묶음별 방법·경로·화면 호출 수 | 그 API를 고른다 |
+| 6.2 | 실행 | 버튼 | ▶ — 싱크독_로컬만. 싱크독_깃허브는 「명령 복사」(같은 요청의 curl) | 값이 필요 없는 GET이면 바로 보내고, 아니면 요청 보내기(6.6)를 펼친다 |
+| 6.3 | API 상세 | 패널 | 방법·경로·핸들러·함수 수·화면 호출 수 | — |
+| 6.4 | 열·깊이 | 전환 | 열 기준(층·호출 깊이)·깊이 1~6 | 다시 그린다 |
+| 6.5 | 이 API 흐름 재생 | 버튼 | | 핸들러부터 steps를 재생 |
+| 6.6 | 요청 보내기 | 접이 | 싱크독_로컬만 — 포트·경로 변수·쿼리·본문(요청 모델 필드로 뼈대). 쓰기 요청은 확인 칸 | 보낸다(UC-H26) — 응답 상태·본문·시간 |
+| 6.7 | 층 위반 | 목록 | 거꾸로·건너뜀 호출 | 그 호출의 두 함수를 밝힌다 |
+| 6.8 | 층 지도 | 텍스트 | 층의 출처 — 클래스 명세 층 표(줄 수·맞은 비율) 또는 「짐작」 | 층 표 → UI-5 그 문서 |
+| 7.1 | 기록 머리 | 텍스트 | 방법·경로·상태·갈래·걸린 시간·호출 수·커밋 7자·「잘림」·「작업」·「화면」 | — |
+| 7.2 | 재생 조작 | 버튼 | 처음·이전·멈춤/재생·다음·속도(½·1·2·4×) | 재생을 다룬다 |
+| 7.3 | 사건 목록 | 목록 | 호출(인자)·반환(값)·예외·장비 사건과 시간. 지금 단계를 밝힌다. 비밀 이름의 값은 `***`(기록 도구가 가렸다) | 그 단계로 |
+
+### 규칙
+- **그래프는 코드 그래프 하나다** — `GET /api/projects/{code}/flow`가 그래프 행과 층 표·대조 상태를 한 번에 준다. 화면이 따로 분석하지 않는다. 배치(판·건물·층·열)는 브라우저가 한다 — view_arc `lib/viewer`를 옮긴 것(카드 CG)
+- **층**은 클래스 명세 층 표의 이름이다. 표가 없거나 함수가 어느 줄에도 안 맞으면 이름의 구조 낱말(router·service·repository…)과 호출 방향으로 짐작하고 6.8에 「짐작」이라 적는다(UC-H24 3b). 화면에서 층을 고치지 않는다
+- **언어** — Python·TS/JS·Rust 파일만 함수 층이 있다. 다른 언어 파일은 층 없는 건물이고 고르면 「이 언어는 아직 함수를 읽지 않습니다」(UC-H24 3a)
+- **이름표가 겹치면** 다른 자리(받침대 앞면 양 끝·앞쪽)를 차례로 써 보고 그래도 겹치면 숨긴다. 움직임이 없으면 그리기를 멈춘다
+- **재생** — 정적 재생(5.5·6.5)은 steps를 따라 층에서 층으로 빛이 간다. 기록 재생(5.3)은 사건을 따라가고 장비 사건에서 카메라가 장비까지 빠졌다 돌아온다(4.6). 같은 API의 다른 갈래는 다른 색, 기록에 안 탄 호출은 회색 점선
+- **기록**은 이 화면이 보일 때 2초마다 목록을 다시 읽는다. 새 기록이 오면 「실시간」이 켜져 있을 때 바로 재생한다. 기록 사건의 함수 열쇠가 그래프에 없으면(커밋이 다르다) 그 사건은 목록에만 보이고 장면에서는 건너뛴다
+- **판 차이** — 요청 보내기(6.6)와 ▶(6.2)는 싱크독_로컬만 있다([[SYNC-INFRA-001#C14]]). 화면은 `GET /api/local`이 404면 깃허브 판으로 보고 「명령 복사」를 보인다
+- **비밀** — 장비 주소는 호스트·포트만 온다. 화면이 더 가리지 않는다
+- **열 때** — three.js 조각은 이 화면에서만 불러온다. 불러오는 동안 장면 자리에 「장면을 불러오는 중」
+
+### 시나리오
+
+**S-1 장비에서 함수까지** — UC-H24 1~4
+1. UI-4에서 「흐름 보기」(2.4)를 누른다. 장비 장면 — 이 PC 구역에 PostgreSQL, 외부 구역에 모델 API, backend·frontend 받침대
+2. backend 받침대(4.2)를 누른다 — 그 위 도시로 카메라가 들어간다. 단계(2.2)가 「폴더」가 된다
+3. 탐색기(3)에서 `pipeline.py`를 누르면 코드 단계로, `change_status`를 누르면 고른다. 패널에 함수 상세(5.4)·호출하는 것(5.6)
+4. 「호출 흐름 재생」(5.5) — 호출이 차례로 빛나고, 「→ PostgreSQL」 줄에서 장비까지 선이 밝는다
+
+**S-2 API 하나의 흐름** — UC-H24 5
+1. 보기(2.1)를 「API 흐름」으로. API 목록(6.1)에서 `POST /api/docs/{doc_id}/status`
+2. 층 열에 함수 블록이 서고 호 위에 번호. 층 위반(6.7)에 「화면 → 저장소 · 건너뜀」
+3. 「이 API 흐름 재생」(6.5)
+
+**S-3 실제 요청을 기록한다** — UC-H25
+1. 기록이 없어 패널에 「실행 기록 켜기」(5.2). 명령을 복사해 터미널에서 친다
+2. 요청을 보내면 기록 목록(5.3)에 줄이 생기고 바로 재생된다 — 기록 머리(7.1)·사건 목록(7.3), 장비 사건에서 장비 왕복(4.6)
+3. 덧칠(2.3)을 「커버리지」로 — 기록에 나온 함수만 칠해진다
+
+**S-4 싱크독_로컬에서 바로 보낸다** — UC-H26
+1. API 흐름에서 ▶(6.2) — GET이면 바로 가고 응답이 보인다
+2. POST는 요청 보내기(6.6)가 펼쳐진다. 확인 칸을 체크해야 「보내기」가 켜진다
 
 ---
 

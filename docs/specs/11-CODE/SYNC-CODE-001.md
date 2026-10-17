@@ -1488,6 +1488,108 @@ upstream: [SYNC-STD-004, SYNC-MS-001, SYNC-MS-002, SYNC-MS-003, SYNC-MS-006, SYN
 | 선행 | CA |
 | 완료 | 2026-10-12 · 브랜치 `card/CB-graph-find`(bdc25c5 #405) · spec 6 + code 3 · 파이썬 `pytest` 488 · `ruff` · 계약 L8 graph 스냅숏을 파이썬 판으로 다시(Rust는 L21) · `tsc`·`oxlint`·`build` · `check_ui` UI-8 21/21 · 워크플로 녹색 · 브라우저(Rust 판 디버그 실행 + L21): 처음 노드 840·선 0 · `PRD-001#R` → 14 밝힘·선 6·Enter 2/14·Esc · `버전`(제목) → 24 · `Git.commit` → 캔버스가 `MS-009#git.commit_push`로·선 16·툴팁 제목 · 문서 `SCN-001` → 항목 14·선 140 · 호버 → 선 12 · 선 모두 보기 → 4,387 · 문서 노드는 제목이 없다(문서 요약에 제목 칸이 없어 ID로 찾는다) |
 
+#### CC 흐름 보기 ① — 파일 목록·호출 순서
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-RFQ-001#Q9]] · [[SYNC-PRD-001#R16]] · [[SYNC-UC-001#UC-S8]] 4 · [[SYNC-SEQ-001#SEQ-26]] · 사용자 결정 2026-10-12: view_arc를 두 판의 흐름 보기로, 그래프는 하나(코드 그래프를 키운다), 언어는 Python·TS/JS·Rust 먼저 |
+| 구현 | [[SYNC-MS-024#flow.extend]](파일·호출 순서만 — 나머지 키는 빈 값으로 두고 CD·CE가 채운다) · [[SYNC-MS-024#flow.files]] · [[SYNC-MS-024#steps.steps]] · [[SYNC-MS-007#pipeline.build_code_graph]] 3 · `core/codegraph/flow.py`·`steps.py` |
+| 테스트 | MS-024 테스트 관점(files·steps) · pipeline 시험에 흐름 키 · `check_code`·`check_calls` · 싱크독 저장소에서 `flow.extend` → 함수마다 steps, 시간 |
+| 선행 | CB |
+| 완료 | — |
+
+#### CD 흐름 보기 ② — 라우트·화면 요청
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R16]] 라우트·화면 요청 · [[SYNC-UC-001#UC-S8]] 4 |
+| 구현 | [[SYNC-MS-024#routes.routes]] · [[SYNC-MS-024#routes.http_links]] · `core/codegraph/routes.py` · `flow.extend` 4·5 |
+| 테스트 | MS-024 테스트 관점(routes·http) · 싱크독 저장소 — FastAPI 라우트와 axum 라우트가 함수에, 화면 `api.get(…)`이 라우트에 |
+| 선행 | CC |
+| 완료 | — |
+
+#### CE 흐름 보기 ③ — 장비·실행 단위
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R16]] 장비 · [[SYNC-PRD-001#R17]] 기록 도구 명령 · [[SYNC-UC-001#UC-S8]] 5 · [[SYNC-INFRA-001#C13]] 호스트·포트만 |
+| 구현 | [[SYNC-MS-024#infra.units]] · [[SYNC-MS-024#infra.infra]] · `core/codegraph/infra.py` · `flow.extend` 2·6 |
+| 테스트 | MS-024 테스트 관점(units·infra) · 싱크독 저장소 — PostgreSQL·외부 모델 API·서버 받침대(FastAPI·Axum)·화면(Vite), 비밀번호가 남지 않는다 |
+| 선행 | CD |
+| 완료 | — |
+
+#### CF 흐름 보기 ④ — 조회 API
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UC-001#UC-H24]] · [[SYNC-SEQ-001#SEQ-35]] |
+| 구현 | [[SYNC-MS-008#queries.flow_view]] · `types.py`(FlowView 묶음) · `web/routers/flow.py` · `web/schemas/flow.py` |
+| API | [[SYNC-API-001#GET/api/projects/{code}/flow]] |
+| 테스트 | MS-008 테스트 관점 · 라우터 시험 · 계약 시험 새 사례(L25 — 파이썬 판 스냅숏) |
+| 선행 | CE |
+| 완료 | — |
+
+#### CG 흐름 보기 ⑤ — UI-19 화면
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UI-002#UI-19]] · [[SYNC-UI-001]] 7장 18 · [[SYNC-UC-001#UC-H24]] · view_arc `lib/viewer/*`·`components/code-viewer/*`를 옮긴다 |
+| 구현 | `frontend/src/flow/`(장면·배치·모델·흐름·층·장비 세계 · 패널) · `pages/Flow.tsx`(경로 `/p/:code/flow`, three.js는 동적 import) · `ProjectDetail.tsx` 2.4 · `CodeGraph.tsx` 「흐름에서 보기」 · `client.ts` · `styles.css`(흐름 토큰 9) · `tools/check_ui.py` — 한 화면이 여러 파일이면 합쳐 센다 |
+| 테스트 | `check_ui` UI-4·UI-19 · `check_tokens` · `tsc`·`oxlint`·`build`(three 조각이 따로) · 브라우저(DEV-17): 장비 장면 → 받침대 → 파일 → 함수 → 재생 · API 흐름 · 덧칠 명세 · 코드 그래프 오가기 |
+| 선행 | CF |
+| 완료 | — |
+
+#### CH 흐름 보기 ⑥ — MCP get_flow
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UC-001#UC-A11]] 1~2 · [[SYNC-API-002]] `get_flow` · 사용자 결정 2026-10-12(조회 도구를 더한다) |
+| 구현 | [[SYNC-MS-008#queries.flow_of]] · `mcp/tools.py` `get_flow` |
+| 테스트 | MS-008 테스트 관점 · MCP 시험 · 계약 시험(L26) |
+| 선행 | CG |
+| 완료 | — |
+
+#### CI 실행 기록 ① — traces 표·TraceService
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-PRD-001#R17]] · [[SYNC-UC-001#UC-S9]] · [[SYNC-DOM-003#traces]] · 사용자 결정 2026-10-12(300개) |
+| 구현 | Alembic 리비전 `traces` · `core/trace/models.py`·`repository.py`·`service.py` — [[SYNC-MS-025]] 전부 · [[SYNC-MS-001#ProjectService.delete_project]] 2b |
+| 테스트 | MS-025 테스트 관점 · 해제 시험 · `cargo xtask migrations` 다시(Rust는 L27) |
+| 선행 | CH |
+| 완료 | — |
+
+#### CJ 실행 기록 ② — 기록 API·토큰 경로
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UC-001#UC-H25]] · [[SYNC-UC-001#UC-S9]] · [[SYNC-SEQ-001#SEQ-36]] · [[SYNC-API-001]] 1장(기록 도구의 두 경로는 개인 토큰) |
+| 구현 | [[SYNC-MS-008#queries.trace_spans]] · `web/routers/traces.py`·`flow.py`(trace-spans) · `web/auth.py` 토큰 의존성 · `web/schemas/trace.py` |
+| API | [[SYNC-API-001#GET/api/projects/{code}/trace-spans]] · [[SYNC-API-001#POST/api/projects/{code}/traces]] · `GET`·`DELETE …/traces` · `GET …/traces/coverage` · `GET`·`DELETE …/traces/{id}` |
+| 테스트 | 라우터 시험(토큰·세션·남의 것·4MB·같은 기록 200) · 계약 시험(L28) |
+| 선행 | CI |
+| 완료 | — |
+
+#### CK 실행 기록 ③ — UI-19 기록 목록·재생
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UI-002#UI-19]] 5.2·5.3·5.11·7·6.2·6.6 · [[SYNC-UC-001#UC-H25]] 6 · [[SYNC-UC-001#UC-H26]] |
+| 구현 | `frontend/src/flow/` 기록 목록·재생 패널·커버리지·기록 켜기 안내(명령은 서버 주소로)·요청 보내기(`GET /api/local`이 404면 curl 복사) · `client.ts` |
+| 테스트 | `check_ui` UI-19 · `tsc`·`oxlint`·`build` · 브라우저(DEV-17): 기록 도구로 올린 기록이 목록에 뜨고 재생·장비 왕복 |
+| 선행 | CJ · L29(기록 도구가 있어야 E2E) |
+| 완료 | — |
+
+#### CL 실행 기록 ④ — MCP list_traces·get_trace
+
+| 항목 | 내용 |
+|---|---|
+| 근거 | [[SYNC-UC-001#UC-A11]] 3·4 · [[SYNC-API-002]] `list_traces`·`get_trace` |
+| 구현 | `mcp/tools.py` — [[SYNC-MS-025#TraceService.list_recent]] · [[SYNC-MS-025#TraceService.get]] |
+| 테스트 | MCP 시험 · 계약 시험(L31) |
+| 선행 | CK |
+| 완료 | — |
+
 ## 2. 통합 테스트 시나리오
 
 시나리오 S1~S7을 그대로 E2E 테스트로. 각 슬라이스의 `테스트` 행에 나눠 들어가 있다. 전부 통과하면 PRD 성공지표 측정을 시작한다.

@@ -83,6 +83,8 @@ app/
 │   ├── account/            사용자, 액세스토큰
 │   ├── conversation/       대화, 턴, 첨부 — 읽는 중 질의의 보관 (2026-09-29, 카드 AQ·AR)
 │   ├── codegraph/          코드 그래프 — graph.py(순수: 추출·줄이기·보강·대조) · service.py(한 행 읽고 쓰기) (2026-09-30, 카드 AX)
+│   │                       흐름 보기(2026-10-12, 카드 CC~CE) — flow.py(순수: 더하기 조율·파일 목록) · steps.py(호출 순서) · routes.py(라우트·화면 요청) · infra.py(장비·실행 단위)
+│   ├── trace/              실행 기록 — 기록 받기·300개·커버리지 (2026-10-12, 카드 CI·CJ)
 │   │
 │   ├── types.py            2.7 열거형 · 2.8 DTO. 묶음 전부가 쓰므로 묶음 밖
 │   ├── clock.py            저장하는 시각. **프로세스 안에서 절대 뒤로 안 간다** (STD-004 DEV-18). 묶음 전부가 쓴다
@@ -94,7 +96,7 @@ app/
 ├── scheduler.py            폴링([[SYNC-MS-007#scheduler.catch_up]]). POLL_INTERVAL_SECONDS(기본 300, 테스트 0)
 │
 ├── web/                    REST API. core를 호출만 한다
-│   ├── routers/            git.py는 서버 저장소의 git 입구(카드 BB) — /git/{코드}.git
+│   ├── routers/            git.py는 서버 저장소의 git 입구(카드 BB) — /git/{코드}.git · flow.py(흐름·기록 범위) · traces.py(실행 기록)
 │   ├── schemas/            요청·응답 형태
 │   ├── auth.py             GitHub OAuth·세션. 폐쇄망판은 세션 없이 로컬 사용자(카드 BC)
 │   └── static/             React 빌드 결과 (gitignore). /{path:path} SPA 폴백은 라우트 맨 끝
@@ -142,11 +144,14 @@ frontend/
     ├── components/            두 화면 이상이 쓰는 조각만 — Shell · ui · panes · DiffBox · ItemChain · DiagramFull · HowTo · SettingsDialog
     ├── api/client.ts          서버 호출 한곳. 화면이 직접 fetch 하지 않는다
     ├── view/                  원본 탭 렌더링 — md · views · uc · wireframe · seq · ms
+    ├── flow/                  흐름 보기(UI-19)만 쓰는 것 — 장면(three.js)·배치·모델·흐름·층·장비 세계와 그 화면의 패널들. 이 화면을 열 때만 불러온다
     ├── assets/                번들에 들어가는 이미지
     └── styles.css · styles.view.css   [[SYNC-UI-001]] 3장 토큰의 전사
 ```
 
 **기본형과 다른 점, 그리고 왜.** [[SYNC-STD-001]] 1.9의 프런트 기본형에 `view/`는 없다. 원본 탭 렌더링은 화면도 아니고 서버 호출도 아닌 **순수 변환**이라 `pages`·`components`·`api` 어디에도 맞지 않는다 — 백엔드의 `shared/`에 해당하는 자리다. `tools/view_build.py`를 TS로 옮긴 것이라 파이썬 쪽과 짝이 맞아야 해서 파일 이름까지 같이 간다. 나머지는 기본형 그대로다.
+
+**`flow/`도 기본형에 없다.** 흐름 보기(UI-19)는 view_arc에서 옮겨 온 3D 뷰어로, 순수 계산(배치·모델·흐름)과 three.js 장면, 그 화면만 쓰는 패널 열 몇 개가 한 덩어리다. `pages/`에 두면 화면 하나 = 파일 하나가 깨지고 `components/`는 두 화면 이상이 쓰는 것만이라 어디에도 맞지 않는다 — 그래서 `view/`처럼 기능 폴더 하나로 둔다. 화면 진입은 `pages/Flow.tsx` 하나이고 나머지는 거기서만 불린다. 빌드는 이 폴더를 따로 나눠(동적 import) 다른 화면의 첫 짐을 늘리지 않는다([[SYNC-INFRA-001]] 3장).
 
 **빌드 결과는 백엔드 이미지로 간다** — `frontend` 빌드 산출물이 `backend/app/web/static`에 들어가고 거기서 서빙된다(INFRA 8장). 그래서 컨테이너가 하나다.
 
@@ -165,6 +170,7 @@ frontend/
 | `backend/app/web/schemas/*` | 웹 스키마 | [[SYNC-API-001]] 4장 |
 | `backend/app/web/sse.py` | 질문 스트림 | [[SYNC-API-001]] 3.4·3.6 |
 | `frontend/src/view/**` | 뷰 렌더러 | [[SYNC-STD-002]] |
+| `frontend/src/flow/**` | 흐름 보기 | [[SYNC-UI-002#UI-19]] · [[SYNC-UI-001]] 7장 18 |
 | `frontend/src/api/*` | API 클라이언트 | [[SYNC-API-001]] |
 | `frontend/src/main.tsx` · `frontend/src/App.tsx` · `frontend/src/components/*` · `frontend/src/pages/*` | 화면 공용 부품 | [[SYNC-UI-001]] · [[SYNC-UI-002]] |
 | `frontend/vite.config.ts` | 빌드 설정 | [[SYNC-INFRA-001]] 8장 |
@@ -490,10 +496,26 @@ classDiagram
 | `CodeNode` | `key` · `name` · `qual` · `file` · `line` · `community: int \| None` · `item: str \| None` · `ms: str \| None` · `status: str \| None` · `layer: CodeLayer \| None` | 코드 그래프 노드 하나. `item`은 속한 명세 항목(어느 문서든 — 카드 BJ), `ms`는 그중 MINISPEC 항목. `status`는 `ms`가 있을 때 `compare`로 — `code_only` > `spec_only` > `same`. `layer`는 항목이 없을 때 클래스 명세 층 표로(카드 BM) |
 | `CodeNodes` | `graph: CodeGraphInfo \| None` · `communities: list~CodeCommunity~` · `functions: list~CodeNode~` · `calls: list~list~str~~` | queries.code_nodes → API `CodeNodes`(UI-17 코드 그래프) |
 | `ConversationView` | `ConversationBrief` + `turns: list~TurnView~` + `pending: list~AttachmentMeta~`(아직 안 보낸 첨부) | ConversationService.get → queries.conversation_view → API `Conversation` |
+| `FlowStep` | `k: str`(`call`·`return`·`raise`) · `line: int` · `label: str` · `to: str \| None`(부르는 함수 열쇠) · `inferred: bool` · `deferred: bool` · `awaited: bool` · `infra: str \| None`(닿는 장비 id) | 함수 하나의 호출 순서 한 줄([[SYNC-MS-024]] 0장, 카드 CC) |
+| `FlowRoute` | `method: str` · `path: str` | 함수가 받는 라우트(카드 CD) |
+| `FlowFunction` | `CodeNode` + `end: int \| None` · `route: FlowRoute \| None` · `steps: list~FlowStep~` | 흐름 보기의 함수 하나 |
+| `FlowFile` | `path: str` · `lang: str \| None` · `loc: int` | 코드 파일 하나 — 함수를 못 읽는 언어도(UC-H24 3a) |
+| `FlowHttp` | `from_: str`(화면 쪽 함수) · `to: str`(라우트 함수) · `inferred: bool` | 화면 요청 → 라우트(카드 CD) |
+| `InfraNode` | `id` · `kind`(`browser`·`backend`·`db`·`cache`·`storage`·`queue`·`search`·`api`) · `name` · `where`(`local`·`container`·`external`) · `host: str \| None`(호스트·포트만) · `evidence: list~str~` · `dir: str \| None`(서버면 그 폴더) | 장비 하나(카드 CE) |
+| `InfraLink` | `from_` · `to` · `protocol: str` | 장비 사이 선 |
+| `FlowUnit` | `name` · `kind`(`server`·`web`·`job`) · `dir` · `framework: str \| None` · `command: str \| None` · `port: int \| None` · `lang` | 실행 단위 — 기록 도구 명령의 재료(카드 CE) |
+| `FlowView` | `graph: CodeGraphInfo \| None` · `files: list~FlowFile~` · `functions: list~FlowFunction~` · `calls: list~list~str~~` · `http: list~FlowHttp~` · `infra: {nodes, links}` · `units: list~FlowUnit~` · `layers: list~CodeLayerRow~` · `communities: list~CodeCommunity~` | queries.flow_view → API `FlowView`(UI-19) |
+| `CodeLayerRow` | `name: str` · `patterns: list~str~` · `specs: list~CodeLayerSpec~` | 층 표 한 줄 — 흐름 보기의 층 열(카드 CF) |
+| `FlowOf` | `graph: CodeGraphInfo \| None` · `function: FlowFunction` · `callees: list~FlowFunction~`(steps의 `to`가 가리키는 함수들, 한 단) · `infra: list~InfraNode~`(닿는 장비) | queries.flow_of → MCP `get_flow`(카드 CH) |
+| `TraceSpan` | `key` · `file` · `line` · `end` · `name` · `route: FlowRoute \| None` | 기록 도구가 감쌀 함수 하나 |
+| `TraceSpans` | `commit_hash: str \| None` · `spans: list~TraceSpan~` · `infra: list~InfraNode~` | queries.trace_spans → API `TraceSpans` → 기록 도구(카드 CJ) |
+| `TraceBrief` | `id` · `trace_key` · `kind` · `method` · `path` · `status` · `error` · `started_at` · `ms` · `commit_hash` · `event_count` · `truncated` · `received_at` | TraceService.list_recent → API·MCP `list_traces` |
+| `TraceView` | `TraceBrief` + `record: dict` | TraceService.get → API·MCP `get_trace` |
+| `TraceCoverage` | `keys: list~str~`(기록에 나온 함수 열쇠) · `infra: list~{kind, target}~`(실제로 닿은 장비) · `traces: int` | TraceService.coverage → API(UI-19 커버리지·장비 주소) |
 
 타입은 여기 한 곳에만 정의한다.
 
-엔티티는 2.1~2.6과 2.9·2.10, 열거형은 2.7.
+엔티티는 2.1~2.6과 2.9·2.10·2.11, 열거형은 2.7.
 
 ### 2.9 대화
 
@@ -597,7 +619,43 @@ classDiagram
 관계
 - `CodeGraph` 0..1 — 1 `Project` (ID만. PK가 곧 `project_id` — 프로젝트마다 하나. 해제와 함께 cascade)
 
-**`graph`는 줄인 모양이다** — `{functions: [{key, name, qual, file, line, end, item, ms, community}], calls: [[from, to, via]], communities: [{id, label, size}]}`([[SYNC-MS-011]] 0장). import·포함 관계·문서 노드는 버리되, 그것으로 계산한 **커뮤니티**는 함수마다 번호로 남긴다(카드 BD). **코드 본문과 대조 결과는 없다** — 본문은 저장소에서, 대조는 읽을 때.
+**`graph`는 줄인 모양이다** — `{functions: [{key, name, qual, file, line, end, item, ms, community}], calls: [[from, to, via]], communities: [{id, label, size}]}`([[SYNC-MS-011]] 0장). 흐름 보기(2026-10-12)부터 함수마다 `steps`·`route`, 그래프에 `files`·`http`·`infra`·`units`가 더해진다([[SYNC-MS-024]] 0장). import·포함 관계·문서 노드는 버리되, 그것으로 계산한 **커뮤니티**는 함수마다 번호로 남긴다(카드 BD). **코드 본문과 대조 결과는 없다** — 본문은 저장소에서, 대조는 읽을 때.
+
+### 2.11 실행 기록
+
+2026-10-12에 들어온 묶음([[SYNC-PRD-001#R17]], 카드 CI). 2.10 뒤에 둔다 — 번호를 안 바꾸기 위해서다.
+
+#### Trace 실행 기록
+
+테이블: [[SYNC-DOM-003#traces]] · 도메인: [[SYNC-DOM-001#Trace]]
+
+```mermaid
+classDiagram
+    class Trace {
+        +int id
+        +int project_id
+        +int user_id
+        +str trace_key
+        +str kind
+        +str method
+        +str path
+        +int status
+        +str error
+        +datetime started_at
+        +int ms
+        +str commit_hash
+        +int event_count
+        +bool truncated
+        +dict record
+        +datetime received_at
+    }
+```
+
+관계
+- `Trace` * — 1 `Project` (ID만. 해제와 함께 cascade)
+- `Trace` * — 1 `User` (ID만. 올린 사람)
+
+**`record`는 기록 도구가 보낸 그대로다** — 서버는 꼴과 크기만 보고 고치지 않는다. 사건의 함수는 그래프의 함수 열쇠(`파일:줄`)를 글자로 든다. 목록에 쓰는 머리(`method`·`path`·`status`·`ms`·`event_count`…)는 받을 때 `record`에서 뽑아 컬럼에 둔다 — 목록이 JSONB를 풀지 않는다.
 
 ---
 
@@ -1154,6 +1212,9 @@ code_calls(code, user) -> CodeCalls                SEQ-27  compare → MINISPEC 
 code_nodes(code, user) -> CodeNodes                SEQ-31  code_graphs 행의 함수 전부 + 커뮤니티 + compare로 항목·상태 (UI-17 코드 그래프)
 code_source(doc_id, item_id, user) -> CodeText     SEQ-27  함수의 파일·줄 → CodeGraphService.read (그래프 커밋의 저장소에서)
 code_text(code, file, line, user) -> CodeText      SEQ-31  그래프의 함수를 파일·줄로 짚어 CodeGraphService.read (UI-17 코드 4.6, 카드 BF)
+flow_view(code, user) -> FlowView                  SEQ-35  code_graphs 행 + compare로 항목·상태 + 층 표 + 흐름 키들 (UI-19, 카드 CF)
+flow_of(code, key, user) -> FlowOf                 SEQ-35  함수 하나(열쇠 `파일:줄` 또는 MINISPEC 항목 ID)의 steps·라우트·닿는 장비와 한 단 아래 함수 (MCP get_flow, 카드 CH)
+trace_spans(code, user) -> TraceSpans              SEQ-36  기록 도구가 감쌀 함수 범위·라우트·장비 주소 + 그래프 커밋 (카드 CJ)
 ask_code(code, key?, conversation_id, question, attachment_ids, user) -> AsyncIterator[AskEvent]
                                                     SEQ-32  코드 그래프에서 묻는다 — 문서 목록·그래프 머리·고른 함수 블록이 시작 맥락, 루프는 ask_item과 같은 _ask_loop (UI-17 질문 탭, 카드 BI)
 ask_item(doc_id, item_id?, conversation_id, question, attachment_ids, user) -> AsyncIterator[AskEvent]
@@ -1165,6 +1226,8 @@ ask_tool(name, args, code, user, conversation_id) -> ToolResult
 ```
 
 **규칙** — **모든 함수가 `user: User`를 명시 인자로 받고 첫 줄에서 `ProjectService.get_owned`(목록은 `list_owned`)를 지난다.** `doc_id`로 들어오는 것은 `doc_id.split("-")[0]`이 코드다. 소유가 아니면 본문·항목·참조를 읽기 전에 not-found로 끝난다. `queries`는 쓰지 않는다. 읽고 조합만 한다. 건수는 `document_ids`로 묶어 한 번에 묻는다(N+1 금지). 단계 11칸 계산(가장 낮은 상태·gate_warning)은 `project_summary` 안에 있다 — `ProjectService`가 아니라.
+
+**흐름·기록 조회도 같은 규칙이다** — `flow_view`·`flow_of`·`trace_spans`는 첫 줄에서 소유를 본다. 기록 목록·하나·커버리지는 한 묶음(`TraceService`)만 필요해 라우터가 소유 검사 뒤 서비스를 바로 부른다.
 
 ### 4.9 infra — 어댑터
 
@@ -1300,6 +1363,25 @@ classDiagram
         +delete_by_project(project_id: int) None
         +read(project_id: int, workdir: Path, path: str, start: int, end: int?) CodeText
     }
+    class flow_py {
+        «module»
+        +extend(src_dir: Path, graph: dict) dict
+        +files(src_dir: Path) list
+    }
+    class steps_py {
+        «module»
+        +steps(src_dir: Path, graph: dict) dict
+    }
+    class routes_py {
+        «module»
+        +routes(src_dir: Path, graph: dict) dict
+        +http_links(src_dir: Path, graph: dict) list
+    }
+    class infra_py {
+        «module»
+        +infra(src_dir: Path, graph: dict) dict
+        +units(src_dir: Path, graph: dict) list
+    }
     class graph_py {
         «module»
         +touches_code(paths: list~str~) bool
@@ -1337,12 +1419,47 @@ classDiagram
 | `get` · `save` · `fail` | `pipeline.build_code_graph` · `process_commit`(그래프가 없나) | UC-S8 |
 | `delete_by_project` | [[SYNC-MS-001#ProjectService.delete_project]] | UC-H17 |
 | `read` | `queries.code_source`(코드 탭 8.21) · `queries.ask_tool`(`read_code`, 카드 AZ) | UC-H20 · 커밋된 파일만, 비밀 꼴 거부, 300줄 — 한곳에 둔다 |
+| `flow.extend` | `pipeline.build_code_graph`(enrich 뒤, communities 앞) · `tools/check_calls.py`는 안 부른다 | UC-S8 4·5 — `steps`·`routes`·`http_links`·`infra`·`units`·`files`를 차례로 부른다(카드 CC~CE) |
+| `steps` · `routes` · `http_links` · `infra` · `units` · `files` | `flow.extend` | [[SYNC-MS-024]] — 두 판이 바이트까지 같다(정답 파일) |
 
 **규칙이 사는 곳**
 - `graph.py`는 순수하다 — DB·세션을 모른다. 검사기가 같은 결과를 내야 하기 때문
 - `save`: 한 행을 통째로 바꿔 끼운다. 반쯤 바뀐 그래프를 읽는 일이 없다
 - `fail`: 옛 그래프를 건드리지 않는다
-- 시그니처·처리는 [[SYNC-MS-011]]
+- 시그니처·처리는 [[SYNC-MS-011]], 흐름 보기의 더하기는 [[SYNC-MS-024]]
+- `flow.py`·`steps.py`·`routes.py`·`infra.py`도 순수하다. 그래프를 받아 키를 더한 새 그래프를 돌려준다 — 실패하면 그 키만 비우고 나머지 그래프는 그대로 저장된다
+
+### 4.12 trace
+
+#### TraceService
+
+```mermaid
+classDiagram
+    class TraceService {
+        «service»
+        +save(project_id: int, user_id: int, record: dict) TraceBrief
+        +list_recent(project_id: int, limit: int = 300) list~TraceBrief~
+        +get(project_id: int, trace_id: int) TraceView
+        +delete(project_id: int, trace_id: int?) int
+        +coverage(project_id: int) TraceCoverage
+        +delete_by_project(project_id: int) None
+    }
+    class Trace
+    TraceService --> Trace
+```
+
+| 메서드 | 부르는 곳 | 근거 |
+|---|---|---|
+| `save` | `POST /api/projects/{code}/traces` | UC-S9 — 꼴·상한을 보고 넣은 뒤 300개 넘는 것을 지운다. 같은 `trace_key`는 두 번 넣지 않고 있는 것을 돌려준다 |
+| `list_recent` · `get` | `GET …/traces` · `GET …/traces/{id}` · MCP `list_traces`·`get_trace` | UC-H25 6 · UC-A11 |
+| `delete` | `DELETE …/traces`(전부) · `DELETE …/traces/{id}` | UI-19 기록 지우기 |
+| `coverage` | `GET …/traces/coverage` | UC-H25 6 — 커버리지 덧칠과 실제로 닿은 장비 주소 |
+| `delete_by_project` | [[SYNC-MS-001#ProjectService.delete_project]] | UC-H17 — cascade가 지우지만 명시한다 |
+
+**규칙이 사는 곳**
+- 받은 `record`를 고치지 않는다 — 비밀 가리기는 기록 도구의 일이다([[SYNC-INFRA-001#C13]]). 서버는 꼴·크기만 본다
+- 300개 자르기는 `save` 한 트랜잭션 안에서 — 동시에 올려도 301개가 남지 않는다
+- 시그니처·처리는 [[SYNC-MS-025]]
 
 ---
 

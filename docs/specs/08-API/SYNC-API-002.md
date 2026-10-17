@@ -12,7 +12,7 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 ## 0. 이 문서가 다루는 것
 
-에이전트(Claude Code · Codex · Gemini 등)가 싱크독에 붙을 때 쓰는 MCP 도구 13개. 유스케이스 [[SYNC-UC-001#UC-A1]]~A6에 대응하고, 쓰기는 create/update 둘로 나눈다. `get_template`은 [[SYNC-STD-001]] 규약을 에이전트에게 전달하는 통로다.
+에이전트(Claude Code · Codex · Gemini 등)가 싱크독에 붙을 때 쓰는 MCP 도구 16개. 유스케이스 [[SYNC-UC-001#UC-A1]]~A6에 대응하고, 쓰기는 create/update 둘로 나눈다. `get_template`은 [[SYNC-STD-001]] 규약을 에이전트에게 전달하는 통로다.
 
 **이 문서의 독자는 에이전트다.** 각 도구의 `description`이 에이전트가 도구를 고를 때 읽는 문장이므로, 언제 쓰고 언제 쓰지 않는지를 거기에 담는다.
 
@@ -46,6 +46,9 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 | `get_template` | (STD-001 전달) | — 내장 템플릿 · 저장소 `STD/` 읽기 | |
 | `get_code_graph` | [[SYNC-UC-001#UC-A9]] | queries.code_view (코드 그래프, 카드 AZ) | |
 | `upload_code` | [[SYNC-UC-001#UC-A10]] | pipeline.upload_code (서버 저장소에 코드, 카드 BB) | ○ |
+| `get_flow` | [[SYNC-UC-001#UC-A11]] 1~2 | queries.flow_of (흐름 보기, 카드 CH) | |
+| `list_traces` | [[SYNC-UC-001#UC-A11]] 3 | TraceService.list_recent (실행 기록, 카드 CL) | |
+| `get_trace` | [[SYNC-UC-001#UC-A11]] 4 | TraceService.get (실행 기록, 카드 CL) | |
 
 ---
 
@@ -485,6 +488,70 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
 
 **에러**: `storage-mismatch`(1a) · `upload-too-large`(2a, 확장 필드 `limit`·`size`·`count`) · `upload-path-refused`(2b, `paths[{path, reason}]`) · `push-failed` · `not-found`(남의 프로젝트)
 
+### get_flow
+
+```json
+{
+  "name": "get_flow",
+  "description": "함수 하나가 실제로 어떻게 흐르는지 — 호출 순서(부르는 것·줄·반환·예외, 이름으로 짐작한 연결은 inferred, 콜백 안은 deferred), 그 함수가 받는 라우트, 그 순서에서 닿는 장비(DB·캐시·외부 API — 호스트·포트만)와 한 단 아래 함수들의 순서를 돌려준다. 코드 그래프에서 읽는다 — 코드를 다 열지 않고 흐름을 알고 싶을 때 부른다. 함수는 그래프 열쇠(파일:줄) 또는 MINISPEC 항목 ID로 짚는다.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["project_code", "function"],
+    "properties": {
+      "project_code": { "type": "string", "pattern": "^[A-Z]{1,4}$" },
+      "function": { "type": "string", "description": "그래프 열쇠 `backend/app/core/pipeline.py:412` 또는 MINISPEC 항목 ID `SYNC-MS-007#pipeline.change_status`" }
+    }
+  }
+}
+```
+
+**결과** [[SYNC-DOM-002]] 2.8 `FlowOf` — `graph`(그래프 머리) · `function`(FlowFunction — `steps[{k, line, label, to, inferred, deferred, awaited, infra}]`·`route`) · `callees[FlowFunction…]` · `infra[InfraNode…]`
+
+**에러**: `not-found`(프로젝트 · `resource: function` — 그래프에 그 함수가 없다 · `resource: code_graph` — 그래프가 아직 없다)
+
+### list_traces
+
+```json
+{
+  "name": "list_traces",
+  "description": "프로젝트의 실행 기록 목록을 최근 것부터 돌려준다 — 종류(back 서버 요청·front 화면·job 작업)·방법·경로·상태·오류 한 줄·걸린 시간·사건 수·잘림·기록할 때의 커밋. 기록은 사람이 PC에서 기록 도구(syncdoc-local trace)로 올린 것이다. 비어 있으면 hint에 기록 도구 명령이 온다.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["project_code"],
+    "properties": {
+      "project_code": { "type": "string", "pattern": "^[A-Z]{1,4}$" },
+      "limit": { "type": "integer", "minimum": 1, "maximum": 300, "default": 30 }
+    }
+  }
+}
+```
+
+**결과** `{ "traces": [TraceBrief…], "hint": "…" | null }` — `TraceBrief`는 [[SYNC-API-001]] 4장. `hint`는 기록이 없을 때만
+
+**에러**: `not-found`(남의 프로젝트)
+
+### get_trace
+
+```json
+{
+  "name": "get_trace",
+  "description": "실행 기록 하나를 사건까지 돌려준다 — 불린 함수(그래프 열쇠)와 부모·인자·반환값·예외, DB·HTTP 같은 장비 사건, 시간. 비밀 이름의 값은 기록 도구가 ***로 가렸다. 실패한 요청이 어디서 왜 실패했는지 볼 때 부른다. 사건이 많으면 max_events에서 자르고 truncated를 켠다.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["project_code", "trace_id"],
+    "properties": {
+      "project_code": { "type": "string", "pattern": "^[A-Z]{1,4}$" },
+      "trace_id": { "type": "integer" },
+      "max_events": { "type": "integer", "minimum": 1, "maximum": 2000, "default": 400 }
+    }
+  }
+}
+```
+
+**결과** [[SYNC-API-001]] 4장 `TraceView` — 다만 `record.events`는 앞에서부터 `max_events`개, 넘으면 `record.truncated: true`
+
+**에러**: `not-found`(프로젝트 · `resource: trace`)
+
 ---
 
 ## 4. 에이전트 순서
@@ -538,6 +605,12 @@ upstream: [SYNC-UC-001, SYNC-DOM-002, SYNC-DOM-003, SYNC-STD-001]
      - status-blocked → warnings(section.missing·ref.missing)와 convention_error_detail을 고치고 다시. 못 고치는 것(상위 문서가 아직 없어 끊어진 참조)은 사람에게 전한다
   2. 완료 문서를 고쳐야 하면 그냥 update_document — 저절로 초안으로 내려간다. 먼저 draft로 내릴 필요 없다
   3. 올린 뒤에도 멈춘다 — 사람이 웹에서 읽는 순서는 그대로다 (STD-001 1.8)
+
+코드가 어떻게 흐르는지 볼 때 (흐름 보기·실행 기록)
+  1. get_flow(project, 함수)  — 호출 순서·라우트·닿는 장비. 함수는 열쇠(파일:줄)나 MINISPEC 항목 ID
+  2. 실제로 어떻게 돌았는지는 list_traces(project) → get_trace(project, id)
+     - 기록이 없으면 hint의 명령을 사람에게 전한다 — 기록은 사람이 자기 PC에서 띄운다. 에이전트가 대신 띄우지 않는다
+  3. 기록의 함수 열쇠가 get_flow에 없으면 기록할 때의 커밋이 그래프와 다르다 — commit_hash를 보고 사람에게 말한다
 
 지울 때 (잘못 만든 문서)
   1. delete_document(doc_id)

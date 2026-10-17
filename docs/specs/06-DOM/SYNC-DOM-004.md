@@ -73,7 +73,21 @@ crates/app/src/
 ├── local.rs                    이 PC — 처리기가 부르는 `LocalOps`의 짝 · 다시 켜기 통로(`Op`) (4.12, L16)
 ├── backup.rs                   백업 만들기·목록·풀어 보기·되살리기·하루 한 번 — Docker 묶음(BR)과 같은 꼴 (L16)
 ├── datadir.rs                  데이터 자리 옮기기 — 자리 보기·복사·확인 (L16)
-└── autostart.rs                자동 시작 — 윈도 HKCU Run · 리눅스 XDG autostart (L16)
+├── autostart.rs                자동 시작 — 윈도 HKCU Run · 리눅스 XDG autostart (L16)
+└── trace/                      기록 도구 — 하위 명령 `trace`·`trace-web` (INFRA 9.9, MS-027, 카드 L29)
+    ├── mod.rs                  하위 명령 진입 — 인자·토큰·준비·띄우기·끝내기
+    ├── detect.rs               띄울 명령의 언어 알아보기
+    ├── kit.rs                  함께 담은 기록기를 임시 폴더에 풀기 · 환경 변수
+    ├── spool.rs                기록 폴더 지켜보기·UDP 받기 → 올리기
+    ├── upload.rs               서버와 말하기 — 범위 받기·기록 올리기(다시 보내기)
+    ├── rust_copy.rs            Rust 작업 공간 사본 — 함수 첫머리에 도우미 호출
+    └── web_proxy.rs            화면 기록 프록시 — HTML에 런타임, 모듈에 계측
+
+crates/app/tracers/             기록기 원본 — 실행 파일에 담는다(include_bytes). view_arc `analyzer/runtime/`에서 옮겼다 (카드 L29)
+├── python/                     sitecustomize.py · syncdoc_tracer.py — 표준 라이브러리만
+├── node/                       hooks.mjs · tracer.mjs · instrument.mjs · typescript.js(Apache-2.0, 판 고정)
+├── browser/runtime.js          화면 런타임
+└── rust/syncdoc_trace.rs       Rust 도우미 모듈 — 표준 라이브러리만, UDP로 보낸다
 ```
 
 **server/ 안** — 입구. 파이썬 `web/`에 해당한다
@@ -91,7 +105,7 @@ crates/server/src/
 │   ├── schemas.rs              응답 형태 (API-001 4장)
 │   ├── sse.rs                  질문 스트림 — 이벤트를 `event:`·`data:` 프레임으로, 실패는 `error` (API-001 3.4, L14)
 │   └── routes/                 API-001 경로 — account(/api/me · /api/me/tokens) · specs(/specs) · projects(/api/projects 목록·만들기·지우기, L6 ·
-│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · documents(/api/docs 문서·이력·diff·추적표, L8 · 상태·되돌리기·휴지통·되살리기·완전 삭제, L9) · references(항목·참조·체인, L8) · git(/git 스마트 HTTP 입구 — 경로를 starlette 정규식처럼 가른다, L10) · admin(/api/admin/repos 동기화 상태·재구축·통지·지금 가져오기·옮기기, L11) · code(코드 탭·코드 보기·관계도 코드 호출·코드 그래프의 코드, L12 · 코드 그래프 노드, L13 · 코드에 묻기, L14) · conversations(대화·첨부, L14) · 문서에 묻기(documents, L14) · 번들로 가져오기(projects, L15) · local(/api/local 이 PC·백업·되살리기·옮기기, L16)
+│                               상세·문서·문제 목록·관계도·첨부·휴지통 목록, L8) · flow(흐름 보기·기록 범위, L25) · traces(실행 기록, L28) · local에 요청 보내기(L30) · documents(/api/docs 문서·이력·diff·추적표, L8 · 상태·되돌리기·휴지통·되살리기·완전 삭제, L9) · references(항목·참조·체인, L8) · git(/git 스마트 HTTP 입구 — 경로를 starlette 정규식처럼 가른다, L10) · admin(/api/admin/repos 동기화 상태·재구축·통지·지금 가져오기·옮기기, L11) · code(코드 탭·코드 보기·관계도 코드 호출·코드 그래프의 코드, L12 · 코드 그래프 노드, L13 · 코드에 묻기, L14) · conversations(대화·첨부, L14) · 문서에 묻기(documents, L14) · 번들로 가져오기(projects, L15) · local(/api/local 이 PC·백업·되살리기·옮기기, L16)
 ├── mcp/                        /mcp — 파이썬 mcp SDK의 핸드셰이크 경로를 옮긴 것 (API-002 1장, 카드 L3)
 │   ├── auth.rs                 Bearer → AccountService.authenticate_token, 통과하면 응답 전에 커밋 (SEQ-C2)
 │   ├── transport.rs            streamable HTTP, 세션 없음 — Accept·Content-Type·본문 읽기·SSE 쓰기
@@ -119,7 +133,7 @@ crates/core/
 ├── build.rs                    local/migrations/*.sql을 실행 파일에 담는 목록을 만든다
 └── src/
     ├── lib.rs                      공개 모듈
-    ├── project/ · spec/ · reference/ · account/ · conversation/ · codegraph/
+    ├── project/ · spec/ · reference/ · account/ · conversation/ · codegraph/ · trace/(실행 기록, L27)
     │   ├── model.rs                행 = 도메인 객체(`…Row`). 속성은 DOM-003 그대로
     │   ├── repo.rs                 조회·저장. DB만 안다
     │   └── service.rs              규칙. 여기서만 모델을 만진다
@@ -150,7 +164,11 @@ crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 
 ├── enrich.rs                   보강 — 파이썬(python.rs) · TS/JS(ts.rs) · 화면 ID · Rust(rust.rs)
 ├── python.rs                   tree-sitter-python으로 `ast`의 뜻을 읽는다 — 정의·끝 줄·docstring·대입·속성·호출·import
 ├── ts.rs                       tree-sitter-typescript — 맨 위 정의·끝 줄·상대 import·호출
-└── rust.rs                     tree-sitter-rust — 맨 위 fn·impl 메서드·`///`·use·호출
+├── rust.rs                     tree-sitter-rust — 맨 위 fn·impl 메서드·`///`·use·호출
+├── flow.rs                     흐름 보기의 더하기 조율 · 파일 목록 (MS-026, L22~L24)
+├── steps.rs                    호출 순서 — 파이썬·TS/JS·Rust (L22)
+├── routes.rs                   라우트·화면 요청 잇기 (L23)
+└── infra.rs                    장비·실행 단위 — 의존성·compose·설정·라이브러리 호출 표 (L24)
 ```
 
 지금(카드 L12) 있는 것은 `account`·`spec`·`project`·`reference`(뽑기·끊기·잇기·조회·관계도·미존재)·`codegraph`(그래프 행·코드 읽기)·`conversation`(대화·턴·첨부)·`markdown.rs`·`pycompat/`·`pipeline.rs`(저장·커밋 처리·재구축·따라잡기·그래프 만들기)·`queries.rs`(프로젝트 요약·상세·문서 목록·문서·항목·참조·체인·관계도·diff 영향·추적표·문제 목록·코드·코드 그래프 노드·묻기·대화)·`infra/git.rs`·`infra/llm.rs`·`types.rs`·`clock.rs`·`errors.rs`·`migrate.rs`다. `spec/`의 정답 파일은 `crates/core/tests/golden/spec.json`(생성물, `cargo xtask spec-golden`)이다. 나머지 묶음과 `codegraph`·`app`·`server`의 다음 파일은 그 카드가 만들고 여기에 적는다.
@@ -277,6 +295,14 @@ crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 
 
 `syncdoc_core::codegraph::CodeGraphRow` — [[SYNC-DOM-002#CodeGraph]]. 그래프를 만드는 순수 부분은 `codegraph` crate다
 
+### 2.6a 실행 기록
+
+#### Trace 실행 기록
+
+테이블: [[SYNC-DOM-003#traces]] · 도메인: [[SYNC-DOM-001#Trace]]
+
+`syncdoc_core::trace::TraceRow` — [[SYNC-DOM-002#Trace]]. 받은 `record`를 고치지 않고 300개를 넘으면 오래된 것부터 지운다
+
 ### 2.7 열거형·DTO
 
 [[SYNC-DOM-002]] 2.7·2.8 그대로 — `syncdoc_core::types`. 직렬화 이름(JSON 키·열거형 값)도 같다. 화면과 에이전트가 두 판을 가리지 않는다.
@@ -314,6 +340,8 @@ crates/codegraph/src/            순수 — DB·git 없음, 파일만 읽는다 
 | 4.10 | conversation | MS-021 | `crates/core/src/conversation` | [[SYNC-MS-010]] |
 | 4.11 | codegraph | MS-022 | `crates/codegraph` · `crates/core/src/codegraph` | [[SYNC-MS-011]] |
 | 4.12 | 데이터 자리 옮기기 · 백업 | MS-023 | `crates/app` | — (Docker 판은 `scripts/backup.sh`, [[SYNC-CODE-001#BR]]) |
+| 4.13 | 흐름 보기의 더하기 | [[SYNC-MS-026]] | `crates/codegraph/src/{flow,steps,routes,infra}.rs` | [[SYNC-MS-024]] |
+| 4.14 | trace · 기록 도구 | [[SYNC-MS-027]] | `crates/core/src/trace` · `crates/app/src/trace` · `crates/app/tracers` | [[SYNC-MS-025]] — 기록 도구는 Rust 판에만 있다([[SYNC-INFRA-001]] 9.9) |
 
 
 데이터 자리의 **기본값 찾기**는 4.1(MS-012 `paths.data_dir`)이고, 옮기기와 그 자리를 가리키는 파일은 4.12다.
@@ -872,8 +900,6 @@ classDiagram
 
 규칙 — [[SYNC-DOM-002]] 4.11과 같다. 그래프는 DB에 줄인 모양(함수·선·항목 ID)으로, 코드 본문은 저장소에서 읽는다. 저장소에 커밋된 `graphify-out/graph.json`이 있으면 파이썬 판처럼 그것이 원형이다 — 없으면 graphify 대신 tree-sitter로 뽑는다([[SYNC-MS-022]] 0장, [[SYNC-INFRA-001]] 9.2). 커뮤니티는 파이썬 판이 부르는 networkx Louvain·graphify 허브 라벨을 옮겨 L13이 더했다 — 같은 원형이면 번호·라벨까지 같다.
 
----
-
 ### 4.12 이 PC — 데이터 자리·백업·자동 시작 (MS-023)
 
 설치형만 가진 일이다(카드 L16). 처리기(server)는 app을 모른다 — crate 의존이 `app → server` 한 방향이라, server가 문(`LocalOps`)을 두고 app이 채워 서버 상태에 넣는다. 파이썬 판에는 없어 `local`이 비면(시험·다른 조립) `/api/local*`이 없는 경로다.
@@ -932,6 +958,52 @@ classDiagram
 - **백업 꼴은 Docker 묶음(카드 BR)과 같다** — 서로의 백업을 되살린다. 암호는 OpenPGP 대칭(rpgp)
 - 자리를 가리키는 파일·데이터 자리 찾기는 4.1(`paths`), 켤 때 작업 사본 맞추기는 4.2(`ProjectService.rehome`)
 
+
+### 4.13 흐름 보기의 더하기 (MS-026)
+
+`codegraph` crate의 순수 함수다 — [[SYNC-DOM-002]] 4.11의 `flow`·`steps`·`routes`·`infra` 모듈과 같은 이름·같은 결과(바이트)다. 같은지는 정답 파일(`crates/codegraph/tests/golden/codegraph.json`에 흐름 키를 더한다)과 `cargo xtask codegraph-diff`가 본다.
+
+```mermaid
+classDiagram
+    class flow {
+        +extend(src_dir, graph) Value
+        +files(src_dir) Vec~Value~
+        +steps(src_dir, graph) Value
+        +routes(src_dir, graph) Value
+        +http_links(src_dir, graph) Vec~Value~
+        +infra(src_dir, graph) Value
+        +units(src_dir, graph) Vec~Value~
+    }
+```
+
+### 4.14 trace · 기록 도구 (MS-027)
+
+`core`의 `TraceService`는 [[SYNC-DOM-002]] 4.12와 같은 메서드·같은 규칙이다. **기록 도구는 Rust 판에만 있다** — 실행 파일의 하위 명령이고 서버(앱)를 켜지 않고 돈다. 파이썬 판 사용자도 이것으로 기록한다([[SYNC-INFRA-001#C12]]).
+
+```mermaid
+classDiagram
+    class TraceService {
+        +save(project_id, user_id, record) TraceBrief
+        +list_recent(project_id, limit) Vec~TraceBrief~
+        +get(project_id, trace_id) TraceView
+        +delete(project_id, trace_id) i64
+        +coverage(project_id) TraceCoverage
+        +delete_by_project(project_id)
+    }
+    class trace_cmd {
+        +run(args) ExitCode
+        +detect(command, cwd) Lang
+        +unpack(dir) Kit
+        +env_for(lang, kit, spans, out) Vec
+        +watch(out, upload) 
+        +fetch_spans(to, project, token) TraceSpans
+        +send(to, project, token, record) 
+        +copy_rust(cwd, spans, dir) PathBuf
+        +proxy(target, port, kit, spans, out)
+    }
+```
+
+---
 
 ## 5. 미결사항
 

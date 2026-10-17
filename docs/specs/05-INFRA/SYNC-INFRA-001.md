@@ -64,6 +64,18 @@ upstream: [SYNC-PRD-001, SYNC-UC-001]
 #### C11 명세 하나, 구현 둘 — 싱크독_깃허브는 파이썬(`backend/`), 싱크독_로컬은 Rust(`local/`). 클래스 명세·MINISPEC·구현 계획만 구현마다 둔다
 
 출처: [[SYNC-RFQ-001#Q8]] · [[SYNC-PRD-001#R15]] — 사용자 결정 2026-10-07. 요구·시나리오·유스케이스·인프라·도메인·데이터·화면·인터페이스·시퀀스 명세는 두 구현이 함께 쓴다. 화면(React 빌드)과 데이터베이스 표(PostgreSQL, [[SYNC-DOM-003]])도 하나다. 두 구현은 서로 부르지 않고 같은 API·같은 화면을 각자 낸다 — 같은지는 공용 계약 시험으로 본다(9.8)
+#### C12 사용자 프로그램은 그 PC에서 기록 도구가 띄운다 — 서버는 사용자 코드를 실행하지 않는다
+
+출처: [[SYNC-PRD-001#R17]] — 사용자 결정 2026-10-12. 싱크독_깃허브 서버는 사람의 PC에 닿지 못하고, 싱크독_로컬도 앱이 사용자 코드를 띄우지 않는다. 기록 도구(싱크독_로컬 실행 파일의 하위 명령, 9.9)가 띄우고 기록을 개인 토큰으로 올린다 — 두 판이 같은 길로 받는다. 서버가 하는 일은 기록을 받고(300개) 보여 주는 것뿐이다
+
+#### C13 기록기는 대상 프로젝트를 고치지 않는다 — 대상이 원래 읽는 길로만 들어간다
+
+출처: [[SYNC-PRD-001#N5]]. Python은 `PYTHONPATH`의 sitecustomize, Node는 `NODE_OPTIONS`의 `--import`, 브라우저는 개발 서버 앞 프록시. 원본을 바꿔야만 되는 언어(Rust)는 사본을 만들어 거기서 띄운다. 기록기는 대상에 아무것도 설치하지 않는다 — Python 기록기는 표준 라이브러리만, Node 기록기는 기록 도구가 함께 담은 typescript만 쓴다. 비밀 같은 이름의 값은 `***`, 접속 주소는 호스트·포트만, 바깥 HTTP는 요청 줄만 남긴다
+
+#### C14 요청 대리는 싱크독_로컬에서 localhost로만
+
+출처: [[SYNC-PRD-001#R17]] — 사용자 결정 2026-10-12. 싱크독_깃허브 서버가 요청을 대신 보내면 서버 쪽 localhost로 간다 — 사람의 개발 서버가 아니다. 그래서 싱크독_로컬에만 둔다. localhost·127.0.0.1·::1이 아닌 주소를 거부하고, 리다이렉트를 따르지 않으며, 시간(10초)·응답 크기(1MB)를 자른다
+
 ---
 
 ## 2. 구성도
@@ -110,6 +122,7 @@ graph TB
 - **작업 사본** — 등록된 저장소를 노트북에 clone해 둔 것. 저장 시 여기에 쓰고 커밋해 push한다.
 - **서버 저장소** — GitHub 대신 서버 저장을 고른 프로젝트의 원격([[SYNC-PRD-001#R14]]). 노트북(서버) 안의 bare git이고, 작업 사본은 GitHub 저장소와 똑같이 이것을 clone해 쓴다. 그래서 파이프라인·재구축·코드 그래프가 저장 방식을 가리지 않는다.
 - **점선** — 플랫폼을 거치지 않고 에이전트가 저장소를 직접 읽는 경로. C5의 보장.
+- **기록 도구**(그림 밖) — 사람의 PC에서 사용자 프로그램을 기록기와 함께 띄우고, 기록을 개인 토큰으로 공개 주소의 REST에 올린다([[#C12]], 9.9). 서버 쪽에서 보면 토큰을 든 또 하나의 HTTP 손님이다.
 
 ---
 
@@ -127,7 +140,9 @@ graph TB
 | 인증 | GitHub OAuth (웹) / 개인 토큰 (MCP) | 5장 |
 | 모델 호출 | 외부 모델 API. `infra/llm.py` 어댑터 하나 | 읽는 중 질의([[SYNC-PRD-001#R11]])에만. 5.3 |
 | 첨부 | `python-multipart`(업로드 파싱) · `pypdf`(PDF 글자 추출). 바이트는 PostgreSQL `bytea` | 질문에 붙이는 파일(5.3). 새 저장 서비스를 두지 않는다 — 10MB×수십 개 규모라 DB로 충분하고, 커지면 바이트 자리만 객체 저장소로 옮긴다 |
-| 코드 그래프 | graphify(`graphifyy` — tree-sitter 문법 26종, 모델 없음) + 싱크독의 보강(파이썬은 AST, TS/JS는 graphify가 이미 쓰는 tree-sitter-typescript — 카드 BL, Rust는 tree-sitter-rust로 정의·호출을 보강이 다 맡는다 — 카드 BV) + networkx Louvain(`louvain_communities`, resolution 1.0, seed 42, 모델 없음)과 graphify의 허브 라벨을 서버 프로세스 안에서 — 함수의 커뮤니티(UI-17). graphify `cluster`는 안 쓴다 — 응집도 재쪼개기가 커뮤니티를 100개 넘게 만든다(#253). 싱크독 저장소 1초쯤 | 명세↔코드 대조([[SYNC-PRD-001#R13]]). 결과는 DB `code_graphs`에 줄인 모양으로(6장). 이미지가 170MB쯤 커진다 |
+| 코드 그래프 | graphify(`graphifyy` — tree-sitter 문법 26종, 모델 없음) + 싱크독의 보강(호출 순서·라우트·화면 요청은 Python AST·tree-sitter-typescript·tree-sitter-rust로, 장비는 의존성 목록·compose·설정 파일·라이브러리 호출 표로 — [[SYNC-PRD-001#R16]], 두 판이 바이트까지 같다; 파이썬은 AST, TS/JS는 graphify가 이미 쓰는 tree-sitter-typescript — 카드 BL, Rust는 tree-sitter-rust로 정의·호출을 보강이 다 맡는다 — 카드 BV) + networkx Louvain(`louvain_communities`, resolution 1.0, seed 42, 모델 없음)과 graphify의 허브 라벨을 서버 프로세스 안에서 — 함수의 커뮤니티(UI-17). graphify `cluster`는 안 쓴다 — 응집도 재쪼개기가 커뮤니티를 100개 넘게 만든다(#253). 싱크독 저장소 1초쯤 | 명세↔코드 대조([[SYNC-PRD-001#R13]]). 결과는 DB `code_graphs`에 줄인 모양으로(6장). 이미지가 170MB쯤 커진다 |
+| 흐름 보기 | three.js(npm으로 번들에 담는다 — [[#C10]]). 흐름 보기 화면(UI-19)만 따로 나눠 그 화면을 열 때 불러온다 · 장면은 InstancedMesh와 OrbitControls, 움직임이 없으면 그리기를 멈춘다 | [[SYNC-PRD-001#R16]]. 다른 화면의 첫 짐을 늘리지 않는다 |
+| 실행 기록 | DB `traces`(프로젝트마다 최근 300개, 기록 하나 사건 2만 개·4MB까지 — 넘으면 기록 도구가 잘라 `truncated`) · 올리기는 개인 토큰 | [[SYNC-PRD-001#R17]]. 기록은 사람이 다시 만들 수 있는 것이라 원본 저장소에 두지 않는다 |
 | git 입구 | `git http-backend`(이미지 안 git을 CGI로) | 서버 저장소의 clone·push([[SYNC-PRD-001#R14]]). 따로 Git 서버를 두지 않고 앱 경로 하나로 받는다 |
 | 실행 | Docker Compose (app + db) | 명령 하나로 켜고 끈다 |
 
@@ -384,6 +399,7 @@ C2에 따라 **저장소가 원본이고 DB는 색인**이다. 어느 쪽에 무
 | 서버 저장소([[SYNC-PRD-001#R14]]) | `ORIGINS_DIR/{코드}.git` — 서버 저장 프로젝트의 명세·첨부·이력 원본 | 손실 없음. 대신 **볼륨을 잃으면 원본을 잃는다** — 백업 대상 |
 | 보관된 서버 저장소 | `ORIGINS_DIR/_archive/{코드}-{UTC 시각}.git` — 해제한 서버 저장 프로젝트 | 손실 없음. 같은 코드로 가져오면 되살린다(UC-A1 3b) |
 | 코드 그래프([[SYNC-PRD-001#R13]]) | DB `code_graphs` — 프로젝트마다 한 행, 함수·호출 선·항목 ID. **코드 본문은 없다**(저장소에서 읽는다) | 코드에서 다시 만든다 — 다음 코드 커밋이나 재구축(UC-S8) |
+| 실행 기록([[SYNC-PRD-001#R17]]) | DB `traces` — 프로젝트마다 최근 300개 | **잃는다.** 원본이 없다 — 다시 기록하면 된다. 백업(6.1·9.6)에 든다. 재구축은 건드리지 않는다 |
 | 대화·첨부([[SYNC-PRD-001#R11]]) | **DB에만**(대화·턴·첨부 표. 첨부 바이트도 `bytea`) | **잃는다.** 읽는 사람의 메모라 원본이 없다 — 남길 값은 명세에 옮겼어야 한다. 재구축(UC-S6)은 이 표들을 건드리지 않는다 |
 
 **서버 저장이면 볼륨이 원본이다.** GitHub 프로젝트는 GitHub가 원본을 들고 있지만, 서버 저장 프로젝트는 `ORIGINS_DIR`(볼륨 `origins`)이 유일한 원본이다. 그 볼륨과 DB 덤프를 함께 백업한다 — DB만 백업하면 명세를 잃고, 볼륨만 백업하면 대화·첨부를 잃는다.
@@ -511,6 +527,7 @@ syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 | 백업 암호 | OpenPGP 대칭 암호(rpgp — SEIPDv1·AES256). `gpg --symmetric`과 서로 풀린다(카드 L16) | Docker 묶음의 백업(6.1, gpg)을 되살리고, 설치형의 백업을 `gpg -d`로도 푼다 |
 | 화면 | 같은 React 빌드(`npm run build`)를 실행 파일에 담는다. `/specs`·템플릿 사본도 담는다 | 화면은 하나다([[#C11]]) |
 | 트레이·자동 시작 | tray-icon(윈도 메시지 루프 · 리눅스 StatusNotifierItem, GTK 없이) · 윈도 사용자 시작 프로그램(HKCU Run) · 리눅스 XDG autostart(`~/.config/autostart`) | [[SYNC-PRD-001#R15]]. 트레이는 데스크톱 세션이 있어야 뜬다 — 그래서 리눅스는 데스크톱 로그인 때 켜는 XDG autostart다(사용자 결정 2026-10-08) |
+| 기록 도구 | 같은 실행 파일의 하위 명령 `trace`·`trace-web`(clap). 기록기(Python `sitecustomize`·`syncdoc_tracer.py`, Node 로더 `*.mjs`와 typescript, 브라우저 런타임, Rust 도우미 모듈)를 실행 파일에 담아 쓸 때 데이터 자리 밖 임시 폴더에 푼다 · 올리기는 reqwest | [[#C12]]·[[#C13]]. 싱크독_깃허브 사용자도 이 파일 하나로 기록한다 — 서버는 켜지 않아도 된다. 9.9 |
 | 설치 파일 | 윈도 NSIS setup.exe · 리눅스 .deb·AppImage. GitHub Actions의 윈도·리눅스 러너가 만든다. 서명은 없다 | Rust용 MSI 도구(WiX v3)는 지원이 끝났다 |
 
 ### 9.3 데이터 자리
@@ -553,6 +570,24 @@ syncdoc-local  (프로그램 하나 · 127.0.0.1:8010)
 - **같은 기능** — 공용 계약 시험(`contract/`) — 주소만 받는 HTTP·MCP·git 시나리오다. 파이썬 폐쇄망판(Docker)이 기준이고 Rust 판이 같은 결과를 내야 한다. 시험이 두 판을 직접 띄운다 — 파이썬 판은 작업 트리로 만든 이미지(빈 볼륨·임시 포트), Rust 판은 임시 데이터 자리. **계약 밖**(API-001에 없는 프레임워크 동작, 2026-10-07): 끝 슬래시 리다이렉트(307) · `/docs`·`/redoc`·`/openapi.json` · GET 경로의 HEAD · Range(206) · ETag 값의 꼴 · Host 머리 없는 요청 · 응답의 `date`·`server`·`connection` 머리와 본문을 나눠 보내는 꼴. 새 프로토콜(2026-07-28)의 본문 JSON 깊이의 정확한 경계는 파이썬 판이 9987겹 언저리에서 한 겹쯤 흔들려 바이트 비교 밖이다(카드 L18)
 - **MCP와 검증 문장** — Rust 판의 `/mcp`는 파이썬 mcp SDK의 핸드셰이크 경로를 통째로 옮긴다. 어떤 입력에도 상태·머리·본문(SSE 꼴과 pydantic 검증 문장까지)이 같다. REST의 `invalid-request`도 `loc`·`msg`가 같다(사용자 결정 2026-10-08). 이것은 사례 표로 다 덮을 수 없어 **두 판 차이 시험**이 지킨다 — 씨앗을 고정한 무작위 사례를 두 판에 보내 바이트로 비교한다. 옮긴 판과 자리는 [[SYNC-DOM-004]] 1장
 - **속도** — [[SYNC-PRD-001#R15]]의 수치를 같은 PC에서 두 판을 나란히 재어 본다 — 켜기(첫 실행·다시 켜기), 화면 조회, 문서 저장(git 포함), 싱크독 저장소의 코드 그래프, 켜 둔 메모리(PostgreSQL 포함) · 재는 법은 `cargo xtask speed`(`contract/speed.py` — 싱크독 저장소를 두 판에 번들로 가져와 같은 일을 시키고 표와 판정을 낸다, 카드 L17) · **리눅스와 윈도 둘 다**(같은 PC의 윈도 디스크 사본에서, Rust 판의 git은 설치판처럼 고정 MinGit — #387, 카드 L19)
+
+### 9.9 기록 도구
+
+[[#C12]]의 도구다. 싱크독_로컬 실행 파일의 하위 명령이라 따로 깔 것이 없다. 서버(앱)를 켜지 않아도 돈다.
+
+```
+syncdoc-local trace     --to <서버> --project <코드> [--job] [--name 이름] [--cwd 폴더] -- <띄울 명령…>
+syncdoc-local trace-web --to <서버> --project <코드> --target http://localhost:5173 [--port 3124]
+```
+
+- **토큰** — `SYNCDOC_TOKEN` 환경 변수, 없으면 터미널에서 묻는다(화면에 찍지 않는다). 저장하지 않는다
+- **준비** — 서버에서 프로젝트 그래프의 함수 범위(파일·시작·끝 줄·열쇠)·라우트·장비 주소와 커밋을 받는다(`GET /api/projects/{code}/trace-spans`). 작업 사본(`--cwd`)이 git이면 HEAD를 그 커밋과 비교해 다르면 한 줄로 알린다
+- **언어 알아보기** — 띄울 명령의 첫 낱말과 `--cwd`의 파일로 — `python`·`uv`·`uvicorn`·`gunicorn`·`flask`·`celery`·`manage.py` → Python · `node`·`npm`·`pnpm`·`yarn`·`tsx`·`next` → Node · `cargo` → Rust. 모르면 끝낸다
+- **붙이기** — Python은 `PYTHONPATH` 앞에 기록기 폴더, Node는 `NODE_OPTIONS`에 `--import` 로더, Rust는 `--cwd`의 작업 공간을 임시 폴더에 사본으로 떠서 함수 첫머리에 도우미 호출을 넣고 사본에서 띄운다. 공통 환경 변수 `SYNCDOC_TRACE_SPANS`(범위 파일)·`SYNCDOC_TRACE_OUT`(기록 폴더)·`SYNCDOC_TRACE_JOB`(작업이면 1)
+- **모으기와 올리기** — 기록기는 요청·작업 하나가 끝나면 기록 하나를 기록 폴더에 JSON으로 쓴다(Rust는 UDP로 도구에 보내고 도구가 쓴다). 도구가 폴더를 지켜보다가 새 파일을 `POST /api/projects/{code}/traces`로 올리고 지운다. 실패하면 세 번 다시 보내고 그래도 안 되면 한 줄 알리고 버린다
+- **끝내기** — 띄운 프로그램이 끝나면 남은 기록을 올리고 끝난다. Ctrl+C는 프로그램에 넘긴다. 임시 폴더(기록기·사본)는 지운다
+- **브라우저**(`trace-web`) — `--port`(기본 3124)에 프록시를 열어 `--target`으로 넘기고, HTML에 브라우저 런타임을 끼우고 화면 모듈에 계측을 넣는다. 화면 기록은 「화면」 표시로 같은 길로 올린다
+- **상한** — 기록 하나 사건 2만 개 · 4MB. 넘으면 기록기가 사건을 더 담지 않고 `truncated`를 켠다
 
 ---
 

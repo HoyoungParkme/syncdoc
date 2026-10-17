@@ -45,6 +45,9 @@ upstream: [SYNC-DOM-002, SYNC-SEQ-001, SYNC-API-001, SYNC-API-002, SYNC-STD-001]
 | [[#queries.code_view]] | 코드 탭 — 항목의 코드 대조 |
 | [[#queries.code_calls]] | 관계도 코드 호출 — MINISPEC 사이 호출 선 |
 | [[#queries.code_nodes]] | 코드 그래프 노드 — 함수 전부·커뮤니티·대조 상태 (UI-17) |
+| [[#queries.flow_view]] | 흐름 보기 — 그래프·흐름 키·층 표·대조 상태 (UI-19) |
+| [[#queries.flow_of]] | 함수 하나의 흐름 — MCP get_flow |
+| [[#queries.trace_spans]] | 기록 도구가 감쌀 함수 범위 |
 | [[#queries.code_source]] | 코드 보기 — 함수 본문 |
 | [[#queries.code_text]] | 코드 그래프의 코드 — 파일·줄로 함수 본문 (UI-17 4.6, 카드 BF) |
 
@@ -570,6 +573,65 @@ flowchart·classDiagram은 노드 id를 영문·숫자·_로만 만들고 라벨
 **테스트 관점** 항목 있는 함수에 `ms`·`status`(코드만 > 명세만 > 같음) · 도우미는 `ms` None · 항목 없는 함수에 층 표의 `layer`, 같은 파일에 항목 있으면 `도우미`, 항목 있는 함수는 `layer` None · 클래스 명세가 없는 프로젝트 → 도우미만 · 클래스 명세가 둘이면 두 층 표를 다 쓴다(카드 BV) · API 항목 함수는 `item`만 있고 `ms`·`status` None · 커뮤니티 목록과 함수의 `community`가 그래프 그대로 · 옛 그래프(`communities`·`item` 없음) → 빈 목록, `community` None, `item`은 `ms` · 그래프 없음 → `graph` None · 남의 프로젝트 → `not-found`
 
 ---
+
+#### queries.flow_view 흐름 보기 — 그래프·흐름 키·층 표·대조 상태
+
+**시그니처** `async def flow_view(code: str, user: User) -> FlowView`
+
+근거: [[SYNC-UC-001#UC-H24]] · [[SYNC-API-001#GET/api/projects/{code}/flow]] · [[SYNC-SEQ-001#SEQ-35]] · UI-19 · 사용자 결정 2026-10-12(층은 명세의 층 표)
+
+**처리**
+0. `project = ProjectService.get_owned(code, user)`
+1. `row = CodeGraphService.get(project.id)` · if None → 빈 `FlowView(graph=None, files=[], functions=[], calls=[], http=[], infra={nodes: [], links: []}, units=[], layers=[], communities=[])`
+2. [[#queries.code_nodes]] 2·2a와 같이 대조(`by_key`)와 층(`rows`·`layer_of`)
+3. 함수마다 `FlowFunction` — `code_nodes` 3의 `CodeNode` 값에 `end = f.get("end")` · `route = f.get("route")` · `steps = f.get("steps", [])`
+4. `files`·`http`·`units` = 그래프의 것(없으면 `[]`) · `infra` = 그래프의 것(없으면 빈 노드·선) · `calls = [[a, b] for a, b, _ in row.graph["calls"]]` · `communities` = 그래프의 것(없으면 `[]`) · `layers = [CodeLayerRow(name, patterns, specs)]` — `rows`에서
+5. `→ FlowView(graph=머리(row), …)`
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-011#codegraph.spec_calls]] · [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#codegraph.layer_table]] · [[SYNC-MS-011#codegraph.layers]]
+
+**테스트 관점** 흐름 키가 그래프 그대로 · `status`·`item`·`layer`가 `code_nodes`와 같다 · 층 표 줄이 `layers`로 · 옛 그래프(흐름 키 없음) → 빈 목록, `steps` `[]`, `route` None · 그래프 없음 → `graph` None · 남의 프로젝트 → `not-found`
+
+---
+
+#### queries.flow_of 함수 하나의 흐름 — MCP get_flow
+
+**시그니처** `async def flow_of(code: str, function: str, user: User) -> FlowOf`
+
+근거: [[SYNC-UC-001#UC-A11]] 1~2 · [[SYNC-API-002]] `get_flow` · [[SYNC-SEQ-001#SEQ-35]]
+
+**처리**
+0. `project = ProjectService.get_owned(code, user)` · `row = CodeGraphService.get(project.id)` · None이면 `! not-found {resource: "code_graph", id: code}`
+1. 함수 찾기 — `function`이 `파일:줄`이면 그 `key`, 아니면 `ms` 또는 `item`이 그것인 첫 함수. 없으면 `! not-found {resource: "function", id: function}`
+2. `flow_view` 3과 같이 그 함수의 `FlowFunction`(대조·층 포함 — `flow_view`를 부르지 않고 그 함수와 `callees`만 계산한다)
+3. `callees` — 그 함수 `steps`의 `to`가 가리키는 함수들(처음 본 차례, 겹치면 하나)의 `FlowFunction`
+4. `infra` — 그 함수와 `callees`의 steps의 `infra` id(처음 본 차례)에 맞는 그래프 `infra.nodes`
+5. `→ FlowOf(graph=머리(row), function, callees, infra)`
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-011#CodeGraphService.get]] · [[SYNC-MS-002#SpecService.list_by_project]] · [[SYNC-MS-002#SpecService.get_document]] · [[SYNC-MS-002#SpecService.item_blocks]] · [[SYNC-MS-011#codegraph.spec_calls]] · [[SYNC-MS-011#codegraph.compare]] · [[SYNC-MS-011#codegraph.layer_table]] · [[SYNC-MS-011#codegraph.layers]]
+
+**테스트 관점** 열쇠로 · MINISPEC 항목 ID로 · 없는 함수 → `not-found function` · 그래프 없음 → `not-found code_graph` · `callees`가 steps 차례 · 닿는 장비만
+
+---
+
+#### queries.trace_spans 기록 도구가 감쌀 함수
+
+**시그니처** `async def trace_spans(code: str, user: User) -> TraceSpans`
+
+근거: [[SYNC-UC-001#UC-H25]] 2 · [[SYNC-API-001#GET/api/projects/{code}/trace-spans]] · [[SYNC-SEQ-001#SEQ-36]]
+
+**처리**
+0. `project = ProjectService.get_owned(code, user)` · `row = CodeGraphService.get(project.id)` · None이면 `TraceSpans(commit_hash=None, spans=[], infra=[])`
+1. `spans` — 그래프 함수 중 `end`가 있는 것마다 `TraceSpan(key, file, line, end, name, qual, route)`, 그래프 차례
+2. `infra` — 그래프 `infra.nodes` 중 `host`가 있는 것(없으면 `[]`)
+3. `→ TraceSpans(commit_hash=row.commit_hash, spans, infra)`
+
+**호출하는 것** [[SYNC-MS-001#ProjectService.get_owned]] · [[SYNC-MS-011#CodeGraphService.get]]
+
+**테스트 관점** `end` 없는 함수는 빠진다 · 라우트가 실린다 · 그래프 없음 → 빈 것 · 남의 프로젝트 → `not-found`
+
+---
+
 
 #### queries.code_source 코드 보기
 
